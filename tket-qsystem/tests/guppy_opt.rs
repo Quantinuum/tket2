@@ -100,6 +100,10 @@ fn count_gates(h: &impl HugrView) -> HashMap<SmolStr, usize> {
 #[case::false_branch("false_branch", Some(vec![
     ("TKET1.tk1op", 1), ("tket.quantum.H", 1), ("tket.quantum.QAlloc", 1), ("tket.quantum.MeasureFree", 1)
 ]))]
+#[should_panic = "xfail"]
+#[case::func_decls("func_decls", Some(vec![
+    ("TKET1.tk1op", 1), ("tket.quantum.symbolic_angle", 1)
+]))]
 #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
 fn optimize_flattened_guppy(#[case] name: &str, #[case] xfail: Option<Vec<(&str, usize)>>) {
     let mut hugr = load_guppy_circuit(name, HugrFileType::Flat)
