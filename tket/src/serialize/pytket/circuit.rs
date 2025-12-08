@@ -52,7 +52,7 @@ pub struct EncodedCircuit<Node: HugrNode> {
 }
 
 /// Information stored about a pytket circuit encoded from a HUGR region.
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub(super) struct EncodedCircuitInfo {
     /// The serial circuit encoded from the region.
     pub serial_circuit: SerialCircuit,
@@ -65,15 +65,16 @@ pub(super) struct EncodedCircuitInfo {
     /// since parameters in pytket are unordered.
     pub input_params: Vec<String>,
     /// List of output parameter expressions found at the end of the encoded region.
-    //
-    // TODO: The decoder does not currently connect these, everything that
-    // _produces_ a parameter gets included in unsupported subgraphs instead.
     pub output_params: Vec<String>,
+    /// List of qubit registers seen at the output of the encoded region.
+    pub output_qubits: Vec<tket_json_rs::register::ElementId>,
+    /// List of bit registers seen at the output of the encoded region.
+    pub output_bits: Vec<tket_json_rs::register::ElementId>,
 }
 
 /// Nodes and edges from the original region that could not be encoded into the
 /// pytket circuit, as they cannot be attached to a pytket command.
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub(super) struct AdditionalNodesAndWires {
     /// Subgraphs of the region that could not be encoded as a pytket commands,
     /// and have no qubit/bits in their boundary that could be used to emit an
@@ -203,7 +204,7 @@ impl EncodedCircuit<Node> {
                 &encoded.serial_circuit.commands,
                 Some(&encoded.additional_nodes_and_wires),
             )?;
-            let decoded_node = decoder.finish(&encoded.output_params)?.node();
+            let decoded_node = decoder.finish(Some(encoded))?.node();
 
             // Move any non-local edges from originating from the old input node.
             let old_input = hugr.get_io(original_region).unwrap()[0];
@@ -374,7 +375,7 @@ impl<Node: HugrNode> EncodedCircuit<Node> {
         let mut decoder =
             PytketDecoderContext::new(serial_circuit, &mut hugr, target, options, None)?;
         decoder.run_decoder(&serial_circuit.commands, None)?;
-        decoder.finish(&[])?;
+        decoder.finish(None)?;
         Ok(hugr)
     }
 

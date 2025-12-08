@@ -8,6 +8,7 @@ mod wires;
 use hugr::extension::ExtensionRegistry;
 use hugr::hugr::hugrmut::HugrMut;
 use hugr::std_extensions::arithmetic::float_types::float64_type;
+use indexmap::IndexSet;
 pub use param::{LoadedParameter, ParameterType};
 pub use tracked_elem::{TrackedBit, TrackedQubit};
 pub use wires::TrackedWires;
@@ -34,7 +35,9 @@ use super::{
     METADATA_Q_REGISTERS,
 };
 use crate::extension::rotation::rotation_type;
-use crate::serialize::pytket::circuit::{AdditionalNodesAndWires, StraightThroughWire};
+use crate::serialize::pytket::circuit::{
+    AdditionalNodesAndWires, EncodedCircuitInfo, StraightThroughWire,
+};
 use crate::serialize::pytket::config::PytketDecoderConfig;
 use crate::serialize::pytket::decoder::wires::WireTracker;
 use crate::serialize::pytket::extension::{build_opaque_tket_op, RegisterCount};
@@ -300,9 +303,12 @@ impl<'h> PytketDecoderContext<'h> {
     ///
     /// # Arguments
     ///
-    /// - `output_params`: A list of output parameter expressions to associate
-    ///   with the region's outputs.
-    pub(super) fn finish(mut self, output_params: &[String]) -> Result<Node, PytketDecodeError> {
+    /// - `encoded_info`: Information stored while encoding the circuit, used to
+    ///   recover its original structure.
+    pub(super) fn finish(
+        mut self,
+        encoded_info: Option<&EncodedCircuitInfo>,
+    ) -> Result<Node, PytketDecodeError> {
         // Order the final wires according to the serial circuit register order.
         let known_qubits = self
             .wire_tracker
@@ -310,12 +316,34 @@ impl<'h> PytketDecoderContext<'h> {
             .cloned()
             .collect_vec();
         let known_bits = self.wire_tracker.known_pytket_bits().cloned().collect_vec();
-        let mut qubits = known_qubits.as_slice();
-        let mut bits = known_bits.as_slice();
+
+        // Qubits and bits appearing at the output.
+        let mut qubits: IndexSet<TrackedQubit> = IndexSet::new();
+        let mut bits: IndexSet<TrackedBit> = IndexSet::new();
+
+        if let Some(encoded_info) = encoded_info {
+            for qubit in encoded_info.output_qubits.iter() {
+                let id = self.wire_tracker.tracked_qubit_for_register(qubit)?;
+                qubits.insert(id.clone());
+            }
+            for bit in encoded_info.output_bits.iter() {
+                let id = self.wire_tracker.tracked_bit_for_register(bit)?;
+                bits.insert(id.clone());
+            }
+        }
+        // Add any additional qubits or bits we have seen, without modifying the
+        // order of the qubits already there.
+        qubits.extend(known_qubits);
+        bits.extend(known_bits);
+        let qubits: Vec<TrackedQubit> = qubits.into_iter().collect();
+        let bits: Vec<TrackedBit> = bits.into_iter().collect();
+        let mut qubits_slice: &[TrackedQubit] = &qubits;
+        let mut bits_slice: &[TrackedBit] = &bits;
 
         // Load the output parameter expressions.
-        let output_params = output_params
+        let output_params = encoded_info
             .iter()
+            .flat_map(|info| info.output_params.iter())
             .map(|p| self.load_half_turns(p))
             .collect_vec();
         let mut params: &[LoadedParameter] = &output_params;
@@ -347,8 +375,8 @@ impl<'h> PytketDecoderContext<'h> {
                     &self.config,
                     &mut self.builder,
                     ty,
-                    &mut qubits,
-                    &mut bits,
+                    &mut qubits_slice,
+                    &mut bits_slice,
                     &mut params,
                     Some(EncodedEdgeID::default()),
                 )
@@ -400,7 +428,7 @@ impl<'h> PytketDecoderContext<'h> {
         }
 
         // Qubits not in the output need to be freed.
-        self.add_implicit_qfree_operations(qubits);
+        self.add_implicit_qfree_operations(qubits_slice);
 
         // Store the name for the input parameter wires
         let input_params = self.wire_tracker.finish();
