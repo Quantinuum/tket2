@@ -20,7 +20,9 @@ use crate::serialize::pytket::extension::RegisterCount;
 use crate::serialize::pytket::opaque::{
     EncodedEdgeID, OpaqueSubgraph, OpaqueSubgraphPayload, SubgraphId,
 };
-use crate::serialize::pytket::{PytketDecodeError, PytketDecodeErrorInner, PytketDecoderConfig};
+use crate::serialize::pytket::{
+    PytketDecodeError, PytketDecodeErrorInner, PytketDecoderConfig, PARAMETER_TYPES,
+};
 
 impl<'h> PytketDecoderContext<'h> {
     /// Insert a subgraph encoded in the payload of a pytket barrier operation into
@@ -207,7 +209,7 @@ impl<'h> PytketDecoderContext<'h> {
                     wire_qubits.unwrap().iter().cloned(),
                     wire_bits.unwrap().iter().cloned(),
                 )?;
-            } else if [rotation_type(), float64_type()].contains(ty) {
+            } else if PARAMETER_TYPES.contains(ty) {
                 let param_name = id.output_parameter(out_idx);
                 let param = if ty == &rotation_type() {
                     LoadedParameter::rotation(wire)

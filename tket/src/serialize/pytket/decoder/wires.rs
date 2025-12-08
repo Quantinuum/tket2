@@ -25,7 +25,7 @@ use crate::serialize::pytket::decoder::{
 use crate::serialize::pytket::extension::RegisterCount;
 use crate::serialize::pytket::opaque::EncodedEdgeID;
 use crate::serialize::pytket::{
-    PytketDecodeError, PytketDecodeErrorInner, PytketDecoderConfig, RegisterHash,
+    PytketDecodeError, PytketDecodeErrorInner, PytketDecoderConfig, RegisterHash, PARAMETER_TYPES,
 };
 use crate::{symbolic_constant_op, TketOp};
 
@@ -661,7 +661,7 @@ impl WireTracker {
         }
 
         // Return a parameter input if the type is a float or rotation.
-        if [float64_type(), rotation_type()].contains(ty) {
+        if PARAMETER_TYPES.contains(ty) {
             let Some(param) = split_off_first(params) else {
                 return Err(
                     PytketDecodeErrorInner::NoMatchingParameter { ty: ty.to_string() }.wrap(),
