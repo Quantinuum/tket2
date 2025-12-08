@@ -67,7 +67,7 @@ lazy_static! {
     /// some special ones like tuple pack/unpack and the Noop operation.
     ///
     /// We have to insert the extension id manually due to
-    /// https://github.com/CQCL/hugr/issues/1496
+    /// https://github.com/quantinuum/hugr/issues/1496
     static ref IGNORED_EXTENSION_OPS: HashSet<OpName> = {
         let mut set = HashSet::new();
         set.insert(format!("prelude.{}", NoopDef.opdef_id()).into());
@@ -78,7 +78,7 @@ lazy_static! {
 }
 /// The [IGNORED_EXTENSION_OPS] definition depends on the buggy behaviour of [`NamedOp::name`], which returns bare names instead of scoped names on some cases.
 /// Once this test starts failing it should be time to drop the `format!("prelude.{}", ...)`.
-/// https://github.com/CQCL/hugr/issues/1496
+/// https://github.com/quantinuum/hugr/issues/1496
 #[test]
 fn issue_1496_remains() {
     assert_eq!("Noop", NoopDef.opdef_id())

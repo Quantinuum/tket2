@@ -13,8 +13,8 @@ on:
     types: [checks_requested]
 
 jobs:
-    check-title:
-        name: check-title
-        uses: CQCL/hugrverse-actions/.github/workflows/pr-title.yml@main
-        secrets:
-            GITHUB_PAT: ${{ secrets.HUGRBOT_PAT }}
+  check-title:
+    name: check-title
+    uses: quantinuum/hugrverse-actions/.github/workflows/pr-title.yml@main
+    secrets:
+      GITHUB_PAT: ${{ secrets.HUGRBOT_PAT }}

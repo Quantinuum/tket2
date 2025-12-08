@@ -239,7 +239,7 @@ type NodeWalker<'circ, T> = pv::Topo<
 
 /// An iterator over the commands of a circuit.
 // TODO: this can only be made generic over node type once `SiblingGraph` is
-// generic over node type. See https://github.com/CQCL/hugr/issues/1926
+// generic over node type. See https://github.com/quantinuum/hugr/issues/1926
 #[derive(Clone)]
 pub struct CommandIterator<'circ, T: HugrView> {
     /// The circuit.

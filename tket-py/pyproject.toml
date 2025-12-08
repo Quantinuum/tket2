@@ -41,8 +41,8 @@ tket_exts = { workspace = true }
 
 
 [project.urls]
-homepage = "https://github.com/CQCL/tket2/tree/main/tket-py"
-repository = "https://github.com/CQCL/tket2/tree/main/tket-py"
+homepage = "https://github.com/quantinuum/tket2/tree/main/tket-py"
+repository = "https://github.com/quantinuum/tket2/tree/main/tket-py"
 
 [build-system]
 requires = ["maturin~=1.7"]
