@@ -40,7 +40,7 @@ typetag.workspace = true
 
 # Defined here so it can be overridden by the codspeed CI job
 # using `cargo add`.
-insta = "1.44.1"
+insta = "1.44.3"
 
 [package.metadata.cargo-machete]
 ignored = ["cbindgen", "pyo3-build-config"]

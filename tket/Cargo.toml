@@ -87,7 +87,7 @@ cool_asserts = { workspace = true }
 # Defined here so it can be overridden by the codspeed CI job
 # using `cargo add`.
 criterion = { version = "0.7.0", features = ["html_reports"] }
-insta = "1.44.1"
+insta = "1.44.3"
 
 [[bench]]
 name = "bench_main"
