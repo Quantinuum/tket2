@@ -1,7 +1,7 @@
 //! Array codegen utilities.
 
 // TODO move to hugr-llvm crate
-// https://github.com/CQCL/tket2/issues/899
+// https://github.com/quantinuum/tket2/issues/899
 use anyhow::Result;
 use hugr::extension::prelude::usize_t;
 use hugr::llvm::emit::EmitFuncContext;
@@ -153,7 +153,7 @@ impl<ACG: array::ArrayCodegen + Clone> ArrayLowering for HeapArrayLowering<ACG> 
 /// array (i.e. it is of type `array.get_element_type().ptr_type()`) whereas the
 /// second one points to the whole array value, i.e. it is of type `array.ptr_type()`.
 // Note: copied from
-// https://github.com/CQCL/hugr/blob/bf3889fa206fbb5a22a5ae4b9ea5f8cc0468b4b7/hugr-llvm/src/extension/collections/array.rs#L186
+// https://github.com/quantinuum/hugr/blob/bf3889fa206fbb5a22a5ae4b9ea5f8cc0468b4b7/hugr-llvm/src/extension/collections/array.rs#L186
 pub fn build_array_alloca<'c>(
     builder: &Builder<'c>,
     array: ArrayValue<'c>,
