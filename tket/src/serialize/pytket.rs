@@ -277,4 +277,4 @@ impl From<&Bit> for RegisterHash {
 }
 
 /// A list of types we translate as pytket parameters.
-const PARAMETER_TYPES: LazyLock<[Type; 2]> = LazyLock::new(|| [float64_type(), rotation_type()]);
+static PARAMETER_TYPES: LazyLock<[Type; 2]> = LazyLock::new(|| [float64_type(), rotation_type()]);

@@ -752,7 +752,7 @@ fn circ_complex_param_type() -> Circuit {
     hugr.into()
 }
 
-/// A program with a unsupported subgraphs not associated to any qubit or bit.
+/// A program with two unsupported subgraphs not associated to any qubit or bit.
 /// <https://github.com/CQCL/tket2/issues/1294>
 #[fixture]
 fn circ_unsupported_subgraph_no_registers() -> Circuit {
@@ -765,7 +765,7 @@ fn circ_unsupported_subgraph_no_registers() -> Circuit {
     .unwrap();
     let [q] = h.input_wires_arr();
 
-    // Declare two function to calls.
+    // Declare two functions to call.
     let func1 = {
         let call_input_t = vec![];
         let call_output_t = vec![float64_type()];
@@ -775,10 +775,8 @@ fn circ_unsupported_subgraph_no_registers() -> Circuit {
     };
 
     let func2 = {
-        let call_input_t = vec![rotation_type()];
-        let call_output_t = vec![rotation_type()];
         h.module_root_builder()
-            .declare("func2", Signature::new(call_input_t, call_output_t).into())
+            .declare("func2", Signature::new_endo(vec![rotation_type()]).into())
             .unwrap()
     };
 

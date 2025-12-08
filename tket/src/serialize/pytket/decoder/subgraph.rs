@@ -6,7 +6,6 @@ use std::sync::Arc;
 use hugr::builder::Container;
 use hugr::hugr::hugrmut::{HugrMut, InsertedForest};
 use hugr::ops::{OpTag, OpTrait};
-use hugr::std_extensions::arithmetic::float_types::float64_type;
 use hugr::types::Type;
 use hugr::{Hugr, HugrView, Node, OutgoingPort, PortIndex, Wire};
 use hugr_core::hugr::internal::HugrMutInternals;

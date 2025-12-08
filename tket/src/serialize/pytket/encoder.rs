@@ -58,10 +58,10 @@ pub struct PytketEncoderContext<H: HugrView> {
     unsupported: UnsupportedTracker<H::Node>,
     /// A registry of already-encoded opaque subgraphs.
     opaque_subgraphs: OpaqueSubgraphs<H::Node>,
-    /// Subgraphs in `opaque_subgraphs` that could not be emitted as opaque barriers
-    /// barrier, and must be stored in the [`EncodedCircuitInfo`] instead when
-    /// finishing the encoding.
-    /// Identified by their [`super::opaque::SubgraphId`] in `opaque_subgraphs`.
+    /// Subgraphs in `opaque_subgraphs` that could not be emitted as opaque
+    /// barriers, and must be stored in the [`EncodedCircuitInfo`] instead when
+    /// finishing the encoding. Identified by their
+    /// [`super::opaque::SubgraphId`] in `opaque_subgraphs`.
     non_emitted_subgraphs: Vec<AdditionalSubgraph>,
     /// Configuration for the encoding.
     ///
@@ -642,8 +642,13 @@ impl<H: HugrView> PytketEncoderContext<H> {
 
         // Check that we have qubits or bits to attach the barrier command to.
         if op_values.qubits.is_empty() && op_values.bits.is_empty() {
-            // We cannot associate this subgraph to any qubit or bit register in the pytket circuit,
-            // so we'll store it in the [`AdditionalSubgraph`]s instead when finishing the encoding.
+            // We cannot associate this subgraph to any qubit or bit register in
+            // the pytket circuit, so we'll store it in the
+            // [`AdditionalSubgraph`]s instead when finishing the encoding.
+            //
+            // That list contains a list of subgraphs so we don't need to do any
+            // additional handling, but if we preferred in the future we could
+            // instead merge a single list of nodes if we wanted.
             self.non_emitted_subgraphs.push(AdditionalSubgraph {
                 id: subgraph_id,
                 params: input_param_exprs.clone(),
@@ -651,7 +656,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
         } else {
             // If there are registers to which to attach, emit it as a barrier command.
 
-            // Create pytket operation, and add the subcircuit as hugr
+            // Create the pytket operation, with an external reference to the subgraph.
             let args = MakeOperationArgs {
                 num_qubits: op_values.qubits.len(),
                 num_bits: op_values.bits.len(),
