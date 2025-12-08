@@ -12,7 +12,7 @@ use hugr::core::HugrNode;
 use hugr::hugr::patch::simple_replace::InvalidReplacement;
 use hugr::hugr::views::sibling_subgraph::{IncomingPorts, InvalidSubgraph, OutgoingPorts};
 use hugr::hugr::views::SiblingSubgraph;
-use hugr::ops::OpTrait;
+use hugr::ops::{constant, OpTrait};
 use hugr::types::Signature;
 use hugr::{Direction, HugrView, IncomingPort, OutgoingPort, Port, Wire};
 use indexmap::{IndexMap, IndexSet};
@@ -689,6 +689,19 @@ impl<N: HugrNode> Subcircuit<N> {
         _scope: &ResourceScope<impl HugrView<Node = N>>,
     ) -> impl Iterator<Item = (N, OutgoingPort)> + '_ {
         self.output_copyable.iter().copied()
+    }
+
+    /// Get the indices and values of the subcircuit inputs that can be
+    /// statically resolved to constants.
+    pub fn get_const_inputs<'c>(
+        &'c self,
+        circuit: &'c ResourceScope<impl HugrView<Node = N>>,
+    ) -> impl Iterator<Item = ((N, IncomingPort), constant::Value)> + 'c {
+        self.copyable_inputs(circuit).filter_map(move |(n, p)| {
+            let wire = circuit.get_copyable_wire(n, p)?;
+            let val = circuit.as_const_value(wire.into())?;
+            Some(((n, p), val.clone()))
+        })
     }
 
     /// Get the copyable expression for the given input port, if it is a

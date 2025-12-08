@@ -48,18 +48,90 @@ pub use flow::{DefaultResourceFlow, ResourceFlow, UnsupportedOp};
 pub use scope::ResourceScope;
 pub use types::{CircuitUnit, Position, ResourceAllocator, ResourceId};
 
+use crate::extension::rotation::{ConstRotation, RotationOp};
+
+use hugr::{
+    extension::simple_op::MakeExtensionOp,
+    ops::{constant, OpType},
+    std_extensions::arithmetic::{conversions::ConvertOpDef, float_types::ConstF64},
+    HugrView, IncomingPort, PortIndex,
+};
+
 // Internal modules
 mod flow;
 mod scope;
 mod types;
+
+impl<H: HugrView> ResourceScope<H> {
+    /// The constant value of a circuit unit.
+    pub fn as_const_value(&self, unit: CircuitUnit<H::Node>) -> Option<&constant::Value> {
+        let (mut curr_node, outport) = match unit {
+            CircuitUnit::Resource(..) => None,
+            CircuitUnit::Copyable(wire) => Some((wire.node(), wire.source())),
+        }?;
+
+        if outport.index() > 0 {
+            return None;
+        }
+
+        fn is_const_conversion_op(op: &OpType) -> bool {
+            if matches!(op, OpType::LoadConstant(..)) {
+                true
+            } else if let Some(op) = op.as_extension_op() {
+                if let Ok(op) = ConvertOpDef::from_extension_op(op) {
+                    op == ConvertOpDef::itousize
+                } else if let Ok(op) = RotationOp::from_extension_op(op) {
+                    matches!(
+                        op,
+                        RotationOp::from_halfturns_unchecked | RotationOp::from_halfturns
+                    )
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        }
+
+        let mut op;
+        while {
+            op = self.hugr().get_optype(curr_node);
+            is_const_conversion_op(op)
+        } {
+            (curr_node, _) = self
+                .hugr()
+                .single_linked_output(curr_node, IncomingPort::from(0))
+                .expect("invalid signature for conversion op");
+        }
+
+        if let OpType::Const(const_op) = op {
+            Some(&const_op.value)
+        } else {
+            None
+        }
+    }
+
+    /// The constant f64 value of a circuit unit (if it is a constant f64).
+    pub fn as_const_f64(&self, unit: CircuitUnit<H::Node>) -> Option<f64> {
+        let const_val = self.as_const_value(unit)?;
+        if let Some(const_rot) = const_val.get_custom_value::<ConstRotation>() {
+            Some(const_rot.half_turns())
+        } else if let Some(const_f64) = const_val.get_custom_value::<ConstF64>() {
+            Some(const_f64.value())
+        } else {
+            panic!("unknown constant type: {:?}", const_val);
+        }
+    }
+}
 
 #[cfg(test)]
 pub(crate) mod tests {
     use hugr::{
         builder::{DFGBuilder, Dataflow, DataflowHugr},
         extension::prelude::qb_t,
+        ops::{OpType, Value},
         types::Signature,
-        CircuitUnit, Hugr,
+        Hugr, HugrView, IncomingPort, Wire,
     };
 
     use itertools::Itertools;
@@ -67,7 +139,7 @@ pub(crate) mod tests {
 
     use crate::{
         extension::rotation::{rotation_type, ConstRotation},
-        resource::scope::tests::ResourceScopeReport,
+        resource::{scope::tests::ResourceScopeReport, CircuitUnit},
         utils::build_simple_circuit,
         Circuit, TketOp,
     };
@@ -86,7 +158,12 @@ pub(crate) mod tests {
         .into_hugr()
     }
 
-    // Gate being commuted has a non-linear input
+    /// A test circuit, with n_qubits qubits and the following layers of gates:
+    ///
+    /// - a layer of Hadamards (one on each qubit)
+    /// - a layer of CX (qubits grouped pairwise)
+    /// - if add_rz == true, a layer of rotations, with angle given as input to the circuit
+    /// - if add_const_rz == true, a layer of rotations, with angle pi/2
     pub fn cx_rz_circuit(n_qubits: usize, add_rz: bool, add_const_rz: bool) -> Hugr {
         let build = || {
             let out_qb_row = vec![qb_t(); n_qubits];
@@ -118,7 +195,7 @@ pub(crate) mod tests {
                 for i in 0..n_qubits {
                     circ.append_and_consume(
                         TketOp::Rz,
-                        [CircuitUnit::Linear(i), CircuitUnit::Wire(f)],
+                        [hugr::CircuitUnit::Linear(i), hugr::CircuitUnit::Wire(f)],
                     )?;
                 }
             }
@@ -127,7 +204,10 @@ pub(crate) mod tests {
                 for i in 0..n_qubits {
                     circ.append_and_consume(
                         TketOp::Rz,
-                        [CircuitUnit::Linear(i), CircuitUnit::Wire(const_angle)],
+                        [
+                            hugr::CircuitUnit::Linear(i),
+                            hugr::CircuitUnit::Wire(const_angle),
+                        ],
                     )?;
                 }
             }
@@ -170,5 +250,24 @@ pub(crate) mod tests {
         assert_eq!(info.resource_paths.len(), n_qubits);
         assert_eq!(info.n_copyable, add_const_rz as usize + add_rz as usize);
         insta::assert_snapshot!(name, info);
+    }
+
+    #[test]
+    fn test_as_const_value() {
+        let circ = cx_rz_circuit(2, false, true);
+        let rz_op = circ
+            .nodes()
+            .find(|&n| circ.get_optype(n) == &OpType::from(TketOp::Rz))
+            .unwrap();
+        let angle_inp = CircuitUnit::Copyable(Wire::from_connected_port(
+            rz_op,
+            IncomingPort::from(1),
+            &circ,
+        ));
+        let scope = ResourceScope::from_circuit(Circuit::from(&circ));
+        assert_eq!(
+            scope.as_const_value(angle_inp).unwrap(),
+            &Value::from(ConstRotation::PI_2)
+        );
     }
 }
