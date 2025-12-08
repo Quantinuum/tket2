@@ -41,7 +41,7 @@ classifiers = [
 version = "0.2.10" # updated by release-please
 
 [project.urls]
-repository = "https://github.com/CQCL/tket2/tree/main/qis-compiler"
+repository = "https://github.com/quantinuum/tket2/tree/main/qis-compiler"
 
 [tool.maturin]
 profile = "release"

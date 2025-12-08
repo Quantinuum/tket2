@@ -1,7 +1,7 @@
 # Representation of quantum types in HUGR
 
 TKET makes use of the
-[HUGR](https://github.com/CQCL/hugr/blob/main/specification/hugr.md)
+[HUGR](https://github.com/quantinuum/hugr/blob/main/specification/hugr.md)
 IR to represent programs. Here we describe how quantum operations (and
 the angles associated with some of them) are represented.
 

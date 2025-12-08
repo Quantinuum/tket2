@@ -188,7 +188,7 @@ impl MakeOpDef for RotationOp {
     }
 
     // TODO constant folding
-    // https://github.com/CQCL/tket2/issues/405
+    // https://github.com/quantinuum/tket2/issues/405
 }
 
 impl MakeRegisteredOp for RotationOp {

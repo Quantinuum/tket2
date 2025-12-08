@@ -55,7 +55,7 @@ def circuits(
 
 
 @pytest.mark.skip(
-    reason="bug to be investigated, see https://github.com/CQCL/tket2/issues/983"
+    reason="bug to be investigated, see https://github.com/quantinuum/tket2/issues/983"
 )
 def test_simple_badger_pass_no_opt():
     c = Circuit(3).CCX(0, 1, 2)

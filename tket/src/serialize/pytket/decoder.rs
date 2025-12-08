@@ -156,7 +156,7 @@ impl<'h> PytketDecoderContext<'h> {
 
         if !serialcirc.phase.is_empty() {
             // TODO - add a phase gate
-            // <https://github.com/CQCL/tket2/issues/598>
+            // <https://github.com/quantinuum/tket2/issues/598>
             // let phase = Param::new(serialcirc.phase);
             // decoder.add_phase(phase);
         }

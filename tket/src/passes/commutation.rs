@@ -17,7 +17,7 @@ use crate::{
 type Qb = crate::circuit::units::LinearUnit;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-// remove once https://github.com/CQCL-DEV/tket2/issues/126 is resolved
+// remove once https://github.com/quantinuum-DEV/tket2/issues/126 is resolved
 struct ComCommand {
     /// The operation node.
     node: Node,
@@ -481,7 +481,7 @@ mod test {
         build().unwrap().into()
     }
 
-    // bug https://github.com/CQCL/tket2/issues/253
+    // bug https://github.com/quantinuum/tket2/issues/253
     fn cx_commute_bug() -> Circuit {
         build_simple_circuit(3, |circ| {
             circ.append(TketOp::H, [2])?;

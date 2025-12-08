@@ -127,7 +127,7 @@ impl QSystemPass {
         #[cfg(feature = "llvm")]
         {
             // TODO: Remove "llvm" feature gate once `inline_constant_functions` is moved to
-            //  `hugr-passes`. See https://github.com/CQCL/hugr/issues/2419
+            //  `hugr-passes`. See https://github.com/quantinuum/hugr/issues/2419
             inline_constant_functions(hugr)?;
         }
         if self.constant_fold {
@@ -156,7 +156,7 @@ impl QSystemPass {
             let is_read = optype.cast() == Some(FutureOpDef::Read);
 
             // HACK: for now qallocs and qfrees are not adequately ordered,
-            // see <https://github.com/CQCL/guppylang/issues/778>. To
+            // see <https://github.com/quantinuum/guppylang/issues/778>. To
             // mitigate this we push qfrees as early as possible and qallocs
             // as late as possible
             //

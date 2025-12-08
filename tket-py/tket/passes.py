@@ -60,7 +60,7 @@ def badger_pass(
     """Construct a Badger pass.
 
     The Badger optimiser requires a pre-compiled rewriter produced by the
-    `compile-rewriter <https://github.com/CQCL/tket2/tree/main/badger-optimiser>`_
+    `compile-rewriter <https://github.com/quantinuum/tket2/tree/main/badger-optimiser>`_
     utility. If `rewriter` is not specified, a default one will be used.
 
     The cost function to minimise can be specified by passing `cost_fn` as `'cx'`
