@@ -28,6 +28,17 @@ pub struct SubgraphId {
     local_id: usize,
 }
 
+impl SubgraphId {
+    /// Returns a unique parameter name for the `i`-th output parameter of the subgraph.
+    pub(crate) fn output_parameter(&self, i: usize) -> String {
+        format!(
+            "p{tracker}_{local}_out{i}",
+            tracker = self.tracker_id,
+            local = self.local_id,
+        )
+    }
+}
+
 impl serde::Serialize for SubgraphId {
     fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
         (&self.tracker_id, &self.local_id).serialize(s)

@@ -11,6 +11,7 @@ use hugr::{Hugr, HugrView, Node, OutgoingPort, PortIndex, Wire};
 use hugr_core::hugr::internal::HugrMutInternals;
 use itertools::Itertools;
 
+use crate::extension::rotation::rotation_type;
 use crate::serialize::pytket::decoder::{
     DecodeStatus, FoundWire, LoadedParameter, PytketDecoderContext, TrackedBit, TrackedQubit,
 };
@@ -18,7 +19,9 @@ use crate::serialize::pytket::extension::RegisterCount;
 use crate::serialize::pytket::opaque::{
     EncodedEdgeID, OpaqueSubgraph, OpaqueSubgraphPayload, SubgraphId,
 };
-use crate::serialize::pytket::{PytketDecodeError, PytketDecodeErrorInner, PytketDecoderConfig};
+use crate::serialize::pytket::{
+    PytketDecodeError, PytketDecodeErrorInner, PytketDecoderConfig, PARAMETER_TYPES,
+};
 
 impl<'h> PytketDecoderContext<'h> {
     /// Insert a subgraph encoded in the payload of a pytket barrier operation into
@@ -81,7 +84,7 @@ impl<'h> PytketDecoderContext<'h> {
             subgraph, qubits, bits, params, old_parent, new_parent,
         )?;
 
-        self.rewire_external_subgraph_outputs(subgraph, qubits, bits, old_parent, new_parent)?;
+        self.rewire_external_subgraph_outputs(id, subgraph, qubits, bits, old_parent, new_parent)?;
 
         Ok(DecodeStatus::Success)
     }
@@ -159,6 +162,7 @@ impl<'h> PytketDecoderContext<'h> {
     /// Helper for [`Self::insert_external_subgraph`].
     fn rewire_external_subgraph_outputs(
         &mut self,
+        id: SubgraphId,
         subgraph: &OpaqueSubgraph<Node>,
         qubits: &[TrackedQubit],
         bits: &[TrackedBit],
@@ -171,10 +175,11 @@ impl<'h> PytketDecoderContext<'h> {
         let mut output_qubits = qubits;
         let mut output_bits = bits;
 
-        for (ty, (src, src_port)) in subgraph
+        for ((out_idx, ty), (src, src_port)) in subgraph
             .signature()
             .output()
             .iter()
+            .enumerate()
             .zip_eq(subgraph.outgoing_ports())
         {
             // Output wire from the subgraph. Depending on the type, we may need
@@ -182,8 +187,7 @@ impl<'h> PytketDecoderContext<'h> {
             // leave it untouched.
             let wire = Wire::new(*src, *src_port);
             if let Some(counts) = self.config().type_to_pytket(ty).filter(|c| c.params == 0) {
-                // This port declares new outputs to be tracked by the decoder.
-                // Output parameters from a subgraph are always marked as not supported (they don't map to any pytket argument variable).
+                // This port declares new bit/qubit outputs to be tracked by the decoder.
 
                 // Make sure to disconnect the old wire.
                 self.builder.hugr_mut().disconnect(*src, *src_port);
@@ -204,6 +208,15 @@ impl<'h> PytketDecoderContext<'h> {
                     wire_qubits.unwrap().iter().cloned(),
                     wire_bits.unwrap().iter().cloned(),
                 )?;
+            } else if PARAMETER_TYPES.contains(ty) {
+                let param_name = id.output_parameter(out_idx);
+                let param = if ty == &rotation_type() {
+                    LoadedParameter::rotation(wire)
+                } else {
+                    LoadedParameter::float_half_turns(wire)
+                };
+                self.wire_tracker
+                    .register_input_parameter(param, param_name)?;
             } else {
                 // This is an unsupported wire. If it was connected to the old
                 // region's output, rewire it to the new region's output.

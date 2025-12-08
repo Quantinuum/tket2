@@ -75,18 +75,26 @@ pub(super) struct EncodedCircuitInfo {
 /// pytket circuit, as they cannot be attached to a pytket command.
 #[derive(Debug, Clone)]
 pub(super) struct AdditionalNodesAndWires {
-    /// A subgraph of the region that does not contain any operation encodable
-    /// as a pytket command, and has no qubit/bits in its boundary that could be
-    /// used to emit an opaque barrier command in the [`serial_circuit`].
-    pub extra_subgraph: Option<SubgraphId>,
-    /// Parameter expression inputs to the `extra_subgraph`.
-    /// These cannot be encoded either if there's no pytket command to attach them to.
-    pub extra_subgraph_params: Vec<String>,
+    /// Subgraphs of the region that could not be encoded as a pytket commands,
+    /// and have no qubit/bits in their boundary that could be used to emit an
+    /// opaque barrier command in the [`serial_circuit`].
+    pub additional_subgraphs: Vec<AdditionalSubgraph>,
     /// List of wires that directly connected the input node to the output node in the encoded region,
     /// and were not encoded in [`serial_circuit`].
     ///
     /// We just store the input nodes's output port and output node's input port here.
     pub straight_through_wires: Vec<StraightThroughWire>,
+}
+
+/// A subgraph of the encoded circuit that could not be associated to any qubit or bit register in the pytket circuit.
+#[derive(Debug, Clone)]
+pub(super) struct AdditionalSubgraph {
+    /// The subgraph of the region that could not be encoded as a pytket command,
+    /// and has no qubit/bits in its boundary that could be used to emit an opaque
+    /// barrier command in the [`serial_circuit`].
+    pub id: SubgraphId,
+    /// Parameter expression inputs to the `subgraph`.
+    pub params: Vec<String>,
 }
 
 /// A wire stored in the [`EncodedCircuitInfo`] that directly connected the
