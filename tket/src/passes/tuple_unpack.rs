@@ -26,14 +26,14 @@ pub fn find_tuple_unpack_rewrites(
 
 /// Returns true if the given optype is a MakeTuple operation.
 ///
-/// Boilerplate required due to https://github.com/CQCL/hugr/issues/1496
+/// Boilerplate required due to https://github.com/quantinuum/hugr/issues/1496
 fn is_make_tuple(optype: &OpType) -> bool {
     optype.to_string() == format!("prelude.{}", TupleOpDef::MakeTuple.op_id())
 }
 
 /// Returns true if the given optype is an UnpackTuple operation.
 ///
-/// Boilerplate required due to https://github.com/CQCL/hugr/issues/1496
+/// Boilerplate required due to https://github.com/quantinuum/hugr/issues/1496
 fn is_unpack_tuple(optype: &OpType) -> bool {
     optype.to_string() == format!("prelude.{}", TupleOpDef::UnpackTuple.op_id())
 }
