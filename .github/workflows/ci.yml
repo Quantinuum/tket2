@@ -94,21 +94,29 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: mozilla-actions/sccache-action@v0.0.9
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: ${{ env.LLVM_VERSION }}
+          directory: ${{ runner.temp }}/llvm
       - name: Install tket-c-api library
         uses: ./.github/actions/tket-c-api
         with:
           install-path: ${{ env.TKET_C_API_PATH }}
-      - name: Install Python ${{ env.PYTHON_HIGHEST }}
-        run: uv python install ${{ env.PYTHON_HIGHEST }}
+      - name: Install Python ${{ env.PYTHON_LOWEST }}
+        run: uv python install ${{ env.PYTHON_LOWEST }}
       - name: Setup dependencies
-        run: uv sync --python ${{ env.PYTHON_HIGHEST }} --package tket --exact
+        # avoid building qis-compiler
+        run: uv sync --package=tket --exact --python ${{ env.PYTHON_LOWEST }}
       - name: Type check with mypy
-        run: uv run --no-project mypy .
+        run: uv run mypy .
       - name: Check formatting with ruff
         run: uv run --no-project ruff format --check
       - name: Lint with ruff
