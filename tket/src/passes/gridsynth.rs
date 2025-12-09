@@ -1,0 +1,366 @@
+//! TKET extension crate.
+//
+// TODO: These docs appear in the landing page of the crate documentation on docs.rs.
+// Make sure to update them to reflect the details of your extension.
+
+use hugr_core::{IncomingPort, OutgoingPort};
+use itertools::Itertools;
+use portgraph::Direction;
+use rsgridsynth::config::config_from_theta_epsilon;
+use rsgridsynth::gridsynth::gridsynth_gates;
+use crate::extension::rotation::ConstRotation;
+// use crate::hugr::ops::handle::NodeHandle;
+use crate::{Hugr, hugr, op_matches};
+use crate::hugr::builder::{DFGBuilder, Dataflow, HugrBuilder};
+use crate::hugr::extension::prelude::{qb_t};
+use crate::hugr::HugrView;
+use crate::hugr::hugr::hugrmut::HugrMut;
+use crate::hugr::{Node, Port};
+use crate::hugr::types::Signature;
+use crate::TketOp;
+// use crate::passes::guppy::NormalizeGuppy; 
+
+
+/// Find the FuncDefn node for the Rz gate.
+fn find_rz(hugr: &mut Hugr) -> Option<crate::hugr::Node> {
+    for node in hugr.nodes() {
+        let op_type = HugrView::get_optype(hugr, node);
+        if op_matches(op_type, TketOp::Rz) {
+            return Some(node);
+        }
+    }
+    None
+}
+// TO DO: extend this function to find all RZ gates
+
+fn find_linked_incoming_ports(hugr: &mut Hugr, node: Node, port_idx: usize) -> Vec<(Node, Port)> {
+    let ports = hugr.node_inputs(node);
+    let collected_ports: Vec<_> = ports.collect();
+    let linked_ports = hugr.
+        linked_ports(node, collected_ports[port_idx]);
+    let linked_ports: Vec<(Node, Port)> = linked_ports.collect();
+    linked_ports
+}
+
+/// find the output port and node linked to the input specified by `port_idz` for `node`
+fn find_single_linked_output_by_index(hugr: &mut Hugr, node: Node, port_idx: usize) -> (Node, OutgoingPort) {
+    let ports = hugr.node_inputs(node);
+    let collected_ports: Vec<_> = ports.collect();
+    let prev_node_and_port = hugr.
+        single_linked_output(node, collected_ports[port_idx]).unwrap();
+    prev_node_and_port
+}
+
+    // for node in hugr.nodes() {
+    //     let op_type = HugrView::get_optype(hugr, node);
+    //     if op_type.is_dfg() {
+    //         let dfg_node = node;
+    //         for node in hugr.descendants(dfg_node) {
+    //             let op_type = HugrView::get_optype(hugr, node);
+    //             if op_type.is_output() {
+    //                 return Some(node);
+    //             }
+    //         }
+    //     }
+    // }
+    // None
+
+// fn search4angle(prev_node: Node) {
+//     for (pos, node) in hugr.input_neighbours(prev_node).with_position() {
+//         // let mut is_first_neighbour = true; // for checking if node is first neighbour
+//         let op_type = hugr.get_optype(node);
+//         if op_type.is_const() {
+//             break
+//         }
+//         else if pos == itertools::Position::Only {
+//             let first_neighbour = node;
+
+//         }
+//         // if first neighbour
+//         else if pos == itertools::Position::First {
+//             let first_neighbour = node;
+//         }
+//         // else if is last element of neighbour
+//         else if ps == itertools::Position::Last {
+            
+//         }
+//     }
+// }
+
+/// Find the constant node containing the angle to be inputted to the Rz gate
+fn find_angle_node(hugr: &mut Hugr, rz_node: Node) -> Node {
+    // find linked ports to the rz port where the angle will be inputted
+    // the port offset of the angle is known to be 1 for the rz gate.
+    let (mut prev_node, _) = find_single_linked_output_by_index(hugr, rz_node, 1);
+
+    // SHORTCUT: specialise to simple hugrs with LoadConst preceded by const node
+    // TO DO: generalise the following
+    let linked_ports = find_linked_incoming_ports(hugr, prev_node, 0);
+    let angle_node = linked_ports[0].0;
+
+    // recursively check input neighbours until a constant node is found, explicitly handling some 
+    // specific edge cases where it may be a different constant
+    // loop {
+    //     for (pos, node) in hugr.input_neighbours(prev_node).with_position() {
+    //         // let mut is_first_neighbour = true; // for checking if node is first neighbour
+    //         let op_type = hugr.get_optype(node);
+    //         if op_type.is_const() {
+    //             break;
+    //         }
+    //         else if pos == itertools::Position::Only {
+    //             let first_neighbour = node;
+    //         }
+    //         // if first neighbour
+    //         else if pos == itertools::Position::First {
+    //             let first_neighbour = node;
+    //         }
+    //         // else if is last element of neighbour
+    //         else if ps == itertools::Position::Last {
+                
+    //         }
+    //     }
+    //     // for (pos, node) in hugr.input_neighbours(prev_node).with_position() {
+    //     //     // let mut is_first_neighbour = true; // for checking if node is first neighbour
+    //     //     let op_type = hugr.get_optype(node);
+    //     //     if op_type.is_const() {
+    //     //         break;
+    //     //     }
+    //     //     else if pos == itertools::Position::Only {
+    //     //         let first_neighbour = node;
+    //     //     }
+    //     //     // if first neighbour
+    //     //     else if pos == itertools::Position::First {
+    //     //         let first_neighbour = node;
+    //     //     }
+    //     //     // else if is last element of neighbour
+    //     //     else if ps == itertools::Position::Last {
+                
+    //     //     }
+    //     // }
+    // }
+
+    angle_node
+}
+
+fn find_angle(hugr: &mut Hugr) -> f64 {
+    let rz_node = find_rz(hugr).unwrap();
+    let angle_node = find_angle_node(hugr, rz_node);
+    let op_type = hugr.get_optype(angle_node);
+    let angle_const = op_type.as_const().unwrap();
+    let angle_val = &angle_const.value;
+    let rot: &ConstRotation = angle_val.get_custom_value().unwrap();
+    let angle = rot.to_radians();
+    angle
+}
+
+fn apply_gridsynth(hugr: &mut Hugr, epsilon: f64) -> String {
+    let theta = find_angle(hugr);
+    // The following parameters could be made user-specifiable. For simplicity, I fix them, for now
+    // let epsilon = 1e-1; // very low precision to allow easier visualisation for demo
+    let seed = 1234;
+    let verbose = false;
+    let mut gridsynth_config = config_from_theta_epsilon(theta, epsilon, seed, verbose);
+    let gates = gridsynth_gates(&mut gridsynth_config);
+    let gates = gates.gates;
+    gates    
+}
+
+
+fn gridsynth_output_to_hugr(gates: &str) -> Hugr {
+    let qb_row = vec![qb_t(); 1]; // TO CHECK: will it cause issues to insert new qubit wire?
+    let mut h = DFGBuilder::new(Signature::new(qb_row.clone(), qb_row)).unwrap();
+
+    let mut prev_op = h.input(); 
+    for gate in gates.chars() {
+        if gate == 'H' {
+            prev_op = h.add_dataflow_op(TketOp::H, prev_op.outputs()).unwrap();
+        }
+        else if gate == 'S' {
+            prev_op = h.add_dataflow_op(TketOp::S, prev_op.outputs()).unwrap();
+        }
+        else if gate == 'T' {
+            prev_op = h.add_dataflow_op(TketOp::T, prev_op.outputs()).unwrap();
+        }
+        else if gate == 'W' {
+            break; // Ignoring global phases for now.
+        }
+    }
+    h.set_outputs(prev_op.outputs()).unwrap();
+    let hugr = h.finish_hugr().unwrap();
+    hugr.validate().unwrap_or_else(|e| panic!("{e}"));
+    println!("{}", hugr.mermaid_string());
+    hugr
+}
+
+fn destroy_path_to_angle_node(hugr: &mut Hugr, rz_node: Node)  {
+    // find linked ports to the rz port where the angle will be inputted
+    // the port offset of the angle is known to be 1 for the rz gate.
+    let linked_ports = find_linked_incoming_ports(hugr, rz_node, 1);
+    let load_const_node = linked_ports[0].0;
+
+    // SHORTCUT: specialise to simple hugrs with LoadConst preceded by const node
+    // TO DO: generalise the following
+    let linked_ports = find_linked_incoming_ports(hugr, load_const_node, 0);
+    let angle_node = linked_ports[0].0;
+
+    hugr.remove_node(load_const_node);
+    hugr.remove_node(angle_node);
+    // println!("{}", hugr.mermaid_string());
+}
+
+/// get previous node that provided qubit to Rz gate
+fn find_qubit_source(hugr: &mut Hugr, rz_node: Node) -> Node {
+    let linked_ports = find_linked_incoming_ports(hugr, rz_node, 0);
+    let prev_node = linked_ports[0].0;
+    prev_node
+}
+
+/// Add a gridsynth gate to some previous node, which may or may not be a gridsynth gate, 
+/// and connect
+fn add_gate_and_connect(hugr: &mut Hugr, prev_node: Node, op: hugr::ops::OpType, output_node: Node) -> Node {
+    let current_node =  hugr.add_node_after(output_node, op);
+    let ports:  Vec<_> = hugr.node_outputs(prev_node).collect();
+    // Assuming there were no outgoing ports to begin with when deciding port offset
+    let src_port = ports[0];
+    let ports:  Vec<_> = hugr.node_inputs(current_node).collect();
+    let dst_port = ports[0];
+    hugr.connect(prev_node, src_port, current_node, dst_port);
+    let prev_node = current_node;
+    prev_node
+}
+
+fn find_dfg_output_node(hugr: &mut Hugr) -> Option<crate::hugr::Node> {
+    for node in hugr.nodes() {
+        let op_type = hugr.get_optype(node);
+        if op_type.is_dfg() {
+            let dfg_node = node;
+            for node in hugr.descendants(dfg_node) {
+                let op_type = HugrView::get_optype(hugr, node);
+                if op_type.is_output() {
+                    return Some(node);
+                }
+            }
+        }
+    }
+    None
+}
+
+fn replace_rz_with_gridsynth_output(hugr: &mut Hugr, rz_node: Node, gates: &str) {
+    // getting node that gave qubit to Rz gate
+    let mut prev_node = find_qubit_source(hugr, rz_node);
+    let dfg_output_node = find_dfg_output_node(hugr).unwrap();
+
+    hugr.remove_node(rz_node);
+
+    // recursively adding next gate in gates to prev_node
+    for gate in gates.chars() {
+        if gate == 'H' {
+            prev_node = add_gate_and_connect(hugr, prev_node, TketOp::H.into(), dfg_output_node);
+        }
+        else if gate == 'S' {
+            prev_node = add_gate_and_connect(hugr, prev_node, TketOp::S.into(), dfg_output_node);
+        }
+        else if gate == 'T' {
+            prev_node = add_gate_and_connect(hugr, prev_node, TketOp::T.into(), dfg_output_node);
+        }
+        else if gate == 'W' {
+            // find output node and connect it to node for previous gate
+
+            let ports:  Vec<_> = hugr.node_outputs(prev_node).collect();
+            // Assuming there were no outgoing ports to begin with when deciding port offset
+            let src_port = ports[0];
+            let ports:  Vec<_> = hugr.node_inputs(dfg_output_node).collect();
+            let dst_port = ports[0];
+            hugr.connect(prev_node, src_port, dfg_output_node, dst_port);
+            break; // Ignoring global phases for now.
+        }
+    }
+    hugr.validate().unwrap_or_else(|e| panic!("{e}"));
+} 
+
+/// Replace an Rz gate with the corresponding gates outputted by gridsynth
+pub fn apply_gridsynth_pass(hugr: &mut Hugr, epsilon: f64) {
+    let rz_node = find_rz(hugr).unwrap();
+    let gates = apply_gridsynth(hugr, epsilon);
+    destroy_path_to_angle_node(hugr, rz_node);
+    replace_rz_with_gridsynth_output(hugr, rz_node, &gates);
+}
+
+// TO DO: make compatible with Guppy hugrs. Right now, it will only work for simple hugrs not like the 
+// ones that guppy produces
+
+
+
+/// Example error.
+#[derive(Debug, derive_more::Display, derive_more::Error)]
+#[display("Example error: {message}")]
+pub struct ExampleError {
+    message: String,
+}
+
+// Test of example function
+#[cfg(test)]
+mod tests {
+    use std::fs::File;
+    use std::io::{BufReader, stdin};
+
+    use super::*;
+
+    use hugr_core::extension::{ExtensionRegistry, PRELUDE};
+    use hugr_core::std_extensions::{STD_REG, std_reg};
+    use crate::hugr::builder::Container;
+    use crate::hugr::envelope::read_described_envelope;
+    use crate::hugr::ops::Value;
+    use crate::extension::rotation::ConstRotation;
+    use crate::hugr::package::Package;
+    use crate::hugr::algorithms::const_fold::constant_fold_pass;
+
+    fn build_rz_only_circ() -> (Hugr, Node) {
+        let theta = 0.64;
+        let qb_row = vec![qb_t(); 1];
+        let mut h = DFGBuilder::new(Signature::new(qb_row.clone(), qb_row)).unwrap();
+        let [q_in] = h.input_wires_arr();
+
+        let constant = h.add_constant(Value::extension(ConstRotation::from_radians(theta).unwrap()));
+        let loaded_const = h.load_const(&constant);
+        let rz = h.add_dataflow_op(TketOp::Rz, [q_in, loaded_const]).unwrap();
+        let _ = h.set_outputs(rz.outputs());
+        let mut circ = h.finish_hugr().unwrap(); //(rz.outputs()).unwrap().into();
+        println!("First mermaid string is: {}", circ.mermaid_string());
+        circ.validate().unwrap_or_else(|e| panic!("{e}"));
+        let rz_node = find_rz(&mut circ).unwrap();
+        (circ, rz_node)
+    }
+
+
+    #[test]
+    fn gridsynth_pass_successful() {
+        // This test is just to check if a panic occurs
+        let (mut circ, rz_node) = build_rz_only_circ();
+        let epsilon: f64 = 1e-3;
+        // let gates = apply_gridsynth(&mut circ, epsilon);
+        // println!("{}", &gates);        
+        apply_gridsynth_pass(&mut circ, epsilon);
+        // println!("{}", circ.mermaid_string());
+    }
+
+    #[test]
+    fn test_gridsynth_output_to_hugr() {
+        let epsilon = 1e-3;
+        let (mut circ, rz_node) = build_rz_only_circ();
+        let gates = apply_gridsynth(&mut circ, epsilon);
+        gridsynth_output_to_hugr(&gates);
+    }
+
+    #[test]
+    fn test_import_guppy_rz() {
+        // TODO: update the following path
+        let f = File::open("/home/kennycampbell/coding_projects/tket_gridsynth_ext/guppy_rz").unwrap();
+        let reader = BufReader::new(f);
+        let registry = std_reg();
+        let (_, mut imported_package) = read_described_envelope(reader, &registry).unwrap();
+        let mut imported_hugr = &mut imported_package.modules[0];
+        constant_fold_pass(imported_hugr.as_mut());
+        println!("{}", imported_hugr.mermaid_string());
+    }
+}
