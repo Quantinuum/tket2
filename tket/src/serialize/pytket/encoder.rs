@@ -578,7 +578,6 @@ impl<H: HugrView> PytketEncoderContext<H> {
         let subgraph_id = self
             .opaque_subgraphs
             .register_opaque_subgraph(subgraph.clone());
-        let payload = OpaqueSubgraphPayload::new_external(subgraph_id);
 
         // Collects the input values for the subgraph.
         //
@@ -603,6 +602,8 @@ impl<H: HugrView> PytketEncoderContext<H> {
             .into_iter()
             .map(|p| self.values.param_expression(p).to_owned())
             .collect();
+
+        let payload = OpaqueSubgraphPayload::new_external(subgraph_id, input_param_exprs.clone());
 
         // Update the values in the node's outputs, and extend `op_values` with
         // any new output values.
@@ -660,7 +661,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
             let args = MakeOperationArgs {
                 num_qubits: op_values.qubits.len(),
                 num_bits: op_values.bits.len(),
-                params: Cow::Borrowed(&input_param_exprs),
+                params: Cow::Borrowed(&[]),
             };
             let mut pytket_op = make_tk1_operation(tket_json_rs::OpType::Barrier, args);
             pytket_op.data = Some(serde_json::to_string(&payload).unwrap());

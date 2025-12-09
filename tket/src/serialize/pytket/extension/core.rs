@@ -44,10 +44,17 @@ impl PytketDecoder for CoreDecoder {
                 op_type: PytketOptype::Barrier,
                 data: Some(payload),
                 ..
-            } => match OpaqueSubgraphPayload::load_str(payload, decoder.extension_registry()) {
-                Ok(payload) => decoder.insert_subgraph_from_payload(qubits, bits, params, &payload),
-                _ => Ok(DecodeStatus::Unsupported),
-            },
+            } =>
+            // Load an opaque subgraph from a barrier.
+            //
+            // Note that pytket can delete parameters to a barrier operation, so
+            // we encode them in the payload instead of reading `params`.
+            {
+                match OpaqueSubgraphPayload::load_str(payload, decoder.extension_registry()) {
+                    Ok(payload) => decoder.insert_subgraph_from_payload(qubits, bits, &payload),
+                    _ => Ok(DecodeStatus::Unsupported),
+                }
+            }
             PytketOperation {
                 op_type: PytketOptype::CircBox,
                 op_box:
