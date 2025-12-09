@@ -103,10 +103,8 @@ fn count_gates(h: &impl HugrView) -> HashMap<SmolStr, usize> {
 
 #[rstest]
 #[case::nested_array("nested_array", None)]
-#[should_panic = "xfail"]
-#[case::angles("angles", Some(vec![
-    ("tket.quantum.H", 2), ("tket.quantum.MeasureFree", 1), ("tket.quantum.Rz", 10), ("tket.quantum.QAlloc", 1)
-]))]
+#[should_panic = "PytketDecodeError { inner: DuplicatedParameter"]
+#[case::angles("angles", None)]
 #[should_panic = "xfail"]
 #[case::simple_cx("simple_cx", Some(vec![
     ("tket.quantum.QAlloc", 2), ("tket.quantum.MeasureFree", 2),
