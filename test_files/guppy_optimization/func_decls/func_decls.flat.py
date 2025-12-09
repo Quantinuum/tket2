@@ -18,7 +18,7 @@ def func1() -> float: ...
 
 
 @guppy.declare
-def func2(f: float) -> float: ...
+def func2(f: float, q: qubit) -> float: ...
 
 
 @guppy.comptime
@@ -30,7 +30,7 @@ def unknown_rotations(q: qubit) -> None:
     h(q)
     h(q)
 
-    other_rotation = func2(rotation + 1.0)
+    other_rotation = func2(rotation + 1.0, q)
     rx(q, angle(other_rotation))
 
 

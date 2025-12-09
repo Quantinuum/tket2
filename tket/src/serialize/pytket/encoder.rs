@@ -661,7 +661,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
             let args = MakeOperationArgs {
                 num_qubits: op_values.qubits.len(),
                 num_bits: op_values.bits.len(),
-                params: Cow::Owned(vec![]),
+                params: Cow::Borrowed(&[]),
             };
             let mut pytket_op = make_tk1_operation(tket_json_rs::OpType::Barrier, args);
             pytket_op.data = Some(serde_json::to_string(&payload).unwrap());
