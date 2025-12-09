@@ -5,13 +5,14 @@ use hugr::algorithms::inline_dfgs::InlineDFGsPass;
 use hugr::algorithms::normalize_cfgs::{NormalizeCFGError, NormalizeCFGPass};
 use hugr::algorithms::untuple::{UntupleError, UntupleRecursive};
 use hugr::algorithms::{
-    inline_acyclic, ComposablePass, RemoveDeadFuncsError, RemoveDeadFuncsPass, UntuplePass,
+    ComposablePass, RemoveDeadFuncsError, RemoveDeadFuncsPass, UntuplePass,
 };
 use hugr::hugr::hugrmut::HugrMut;
 use hugr::hugr::patch::inline_dfg::InlineDFGError;
-use hugr::Node;
+use hugr::ops::Value;
+use hugr::{IncomingPort, Node};
 
-use crate::passes::{unpack_container::TypeUnpacker, BorrowSquashPass};
+use crate::passes::BorrowSquashPass;
 
 /// Normalize the structure of a Guppy-generated circuit into something that can be optimized by tket.
 ///
@@ -82,26 +83,17 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for NormalizeGuppy {
     type Error = NormalizeGuppyErrors;
     type Result = ();
     fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
-        // We probably shouldn't inline quite as aggressively as this, but
-        // the results demonstrate how much we need to do at least some of it:
-        let qubit_finder = TypeUnpacker::for_qubits();
-        inline_acyclic(hugr, |h, call| {
-            // Look for qubits. Use instantiated type so that we inline generic
-            // (e.g. container) functions as this might enable better qubit tracking.
-            let inst = &h.get_optype(call).as_call().unwrap().instantiation;
-            inst.input_types()
-                .iter()
-                .chain(inst.output_types())
-                .any(|ty| qubit_finder.contains_element_type(ty))
-        })
-        .unwrap();
-        // Many functions now unreachable, so remove - this may improve compilation speed,
-        // although not if all remaining phases operate only beneath the entrypoint.
-        // Shouldn't be affected by anything else until we start removing untaken branches.
-        if self.dead_funcs {
+        let old_ep = hugr.entrypoint();
+        if self.dead_funcs && old_ep != hugr.module_root() {
+            // Remove everything not reachable from the entrypoint.
+            // (Could use visibility for module-entrypoint Hugrs, this might
+            // be appropriate if they are intended as libraries?)
             RemoveDeadFuncsPass::default().run(hugr)?;
         }
-
+        let old_ep = (old_ep != hugr.module_root()).then_some({
+            hugr.set_entrypoint(hugr.module_root());
+            old_ep
+        });
         if self.simplify_cfgs {
             NormalizeCFGPass::default().run(hugr)?;
         }
@@ -110,8 +102,12 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for NormalizeGuppy {
             UntuplePass::new(UntupleRecursive::Recursive).run(hugr)?;
         }
         // Should propagate through untuple, so could do earlier, and must be before BorrowSquash
-        if self.constant_fold {
-            ConstantFoldPass::default().run(hugr)?;
+        if let Some(ep) = old_ep.filter(|_|self.constant_fold) {
+            // For module-entrypoint Hugrs, we'd need to decide which functions are callable;
+            // the default is to assume none.
+            let no_inputs: [(IncomingPort, Value); 0] = [];
+            let cp = ConstantFoldPass::default().with_inputs(ep, no_inputs);
+            cp.run(hugr)?;
         }
         // Do earlier? Nothing creates DFGs
         if self.inline_dfgs {
@@ -124,7 +120,9 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for NormalizeGuppy {
                 .run(hugr)
                 .unwrap_or_else(|e| match e {});
         }
-
+        if let Some(ep) = old_ep {
+            hugr.set_entrypoint(ep);
+        }
         Ok(())
     }
 }
