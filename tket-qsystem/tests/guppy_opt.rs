@@ -3,8 +3,7 @@
 use hugr::hugr::hugrmut::HugrMut;
 use rayon::iter::ParallelIterator;
 use smol_str::SmolStr;
-use tket::circuit::check_hugr;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, VecDeque};
 use std::fs;
 use std::io::BufReader;
 use std::path::Path;
@@ -48,38 +47,30 @@ fn load_guppy_example(path: &str) -> std::io::Result<Hugr> {
 }
 
 fn run_pytket(h: &mut Hugr) {
-    fn run(h: &mut Hugr) {
-        let circ = Circuit::new(h);
-        let mut encoded =
-            EncodedCircuit::new(&circ, EncodeOptions::new().with_subcircuits(true)).unwrap();
-
-        encoded
-            .par_iter_mut()
-            .for_each(|(_region, serial_circuit)| {
-                let mut circuit_ptr = Tket1Circuit::from_serial_circuit(serial_circuit).unwrap();
-                Tket1Pass::run_from_json(CLIFFORD_SIMP_STR, &mut circuit_ptr).unwrap();
-                *serial_circuit = circuit_ptr.to_serial_circuit().unwrap();
-            });
-
-        encoded.reassemble_inplace(circ.into_hugr(), None).unwrap();
-    }
     let old_ep = h.entrypoint();
-    let mut optimizable_eps = HashSet::new();
     // We do not believe the above should remove any nodes that are valid Circuit parents,
     // except DFGs (which are "transparent"); so include only DFGs not contained in some
     // optimizable ancestor.
     let mut queue = VecDeque::from([h.module_root()]);
     while let Some(n) = queue.pop_front() {
         h.set_entrypoint(n);
-        if check_hugr(h).is_ok() {
-            optimizable_eps.insert(n);
-        } else {
-            queue.extend(h.children(n))
+
+        if let Ok(circ) = Circuit::try_new(&mut *h) {
+            let mut encoded =
+                EncodedCircuit::new(&circ, EncodeOptions::new().with_subcircuits(true)).unwrap();
+
+            encoded
+                .par_iter_mut()
+                .for_each(|(_region, serial_circuit)| {
+                    let mut circuit_ptr =
+                        Tket1Circuit::from_serial_circuit(serial_circuit).unwrap();
+                    Tket1Pass::run_from_json(CLIFFORD_SIMP_STR, &mut circuit_ptr).unwrap();
+                    *serial_circuit = circuit_ptr.to_serial_circuit().unwrap();
+                });
+
+            encoded.reassemble_inplace(circ.into_hugr(), None).unwrap();
         }
-    }
-    for n in optimizable_eps {
-        h.set_entrypoint(n);
-        run(h);
+        queue.extend(h.children(n))
     }
     h.set_entrypoint(old_ep);
 }

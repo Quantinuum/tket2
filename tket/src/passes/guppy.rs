@@ -4,9 +4,7 @@ use hugr::algorithms::const_fold::{ConstFoldError, ConstantFoldPass};
 use hugr::algorithms::inline_dfgs::InlineDFGsPass;
 use hugr::algorithms::normalize_cfgs::{NormalizeCFGError, NormalizeCFGPass};
 use hugr::algorithms::untuple::{UntupleError, UntupleRecursive};
-use hugr::algorithms::{
-    ComposablePass, RemoveDeadFuncsError, RemoveDeadFuncsPass, UntuplePass,
-};
+use hugr::algorithms::{ComposablePass, RemoveDeadFuncsError, RemoveDeadFuncsPass, UntuplePass};
 use hugr::hugr::hugrmut::HugrMut;
 use hugr::hugr::patch::inline_dfg::InlineDFGError;
 use hugr::ops::Value;
@@ -102,7 +100,7 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for NormalizeGuppy {
             UntuplePass::new(UntupleRecursive::Recursive).run(hugr)?;
         }
         // Should propagate through untuple, so could do earlier, and must be before BorrowSquash
-        if let Some(ep) = old_ep.filter(|_|self.constant_fold) {
+        if let Some(ep) = old_ep.filter(|_| self.constant_fold) {
             // For module-entrypoint Hugrs, we'd need to decide which functions are callable;
             // the default is to assume none.
             let no_inputs: [(IncomingPort, Value); 0] = [];
