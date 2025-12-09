@@ -22,10 +22,7 @@ use portmatching::{
 };
 use smol_str::SmolStr;
 
-use crate::{
-    circuit::Circuit,
-    rewrite::{CircuitRewrite, Subcircuit},
-};
+use crate::{circuit::Circuit, rewrite::CircuitRewrite};
 
 /// Matchable operations in a circuit.
 #[derive(
@@ -75,7 +72,8 @@ fn encode_op(op: OpType) -> Option<Vec<u8>> {
 /// pattern from the matcher.
 #[derive(Clone)]
 pub struct PatternMatch {
-    position: Subcircuit,
+    /// The matched subgraph.
+    subgraph: SiblingSubgraph,
     pattern: PatternID,
     /// The root of the pattern in the circuit.
     ///
@@ -96,13 +94,13 @@ impl PatternMatch {
     }
 
     /// Returns the matched subcircuit in the original circuit.
-    pub fn subcircuit(&self) -> &Subcircuit {
-        &self.position
+    pub fn subgraph(&self) -> &SiblingSubgraph {
+        &self.subgraph
     }
 
     /// Returns the matched nodes in the original circuit.
     pub fn nodes(&self) -> &[Node] {
-        self.position.nodes()
+        self.subgraph.nodes()
     }
 
     /// Create a pattern match from the image of a pattern root.
@@ -205,7 +203,7 @@ impl PatternMatch {
         let subgraph =
             SiblingSubgraph::try_new_with_checker(inputs, outputs, circ.hugr(), checker)?;
         Ok(Self {
-            position: subgraph.into(),
+            subgraph,
             pattern,
             root,
         })
@@ -217,7 +215,7 @@ impl PatternMatch {
         source: &Circuit<impl HugrView<Node = Node>>,
         target: Circuit,
     ) -> Result<CircuitRewrite, InvalidReplacement> {
-        CircuitRewrite::try_new(&self.position, source, target)
+        CircuitRewrite::try_new(&self.subgraph, source.hugr(), target)
     }
 }
 
@@ -225,7 +223,7 @@ impl Debug for PatternMatch {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("PatternMatch")
             .field("root", &self.root)
-            .field("nodes", &self.position.subgraph.nodes())
+            .field("nodes", &self.subgraph.nodes())
             .finish()
     }
 }

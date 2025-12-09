@@ -752,6 +752,55 @@ fn circ_complex_param_type() -> Circuit {
     hugr.into()
 }
 
+/// A program with two unsupported subgraphs not associated to any qubit or bit.
+/// <https://github.com/CQCL/tket2/issues/1294>
+#[fixture]
+fn circ_unsupported_subgraph_no_registers() -> Circuit {
+    let input_t = vec![qb_t()];
+    let output_t = vec![qb_t(), rotation_type()];
+    let mut h = FunctionBuilder::new(
+        "unsupported_subgraph_no_registers",
+        Signature::new(input_t, output_t),
+    )
+    .unwrap();
+    let [q] = h.input_wires_arr();
+
+    // Declare two functions to call.
+    let func1 = {
+        let call_input_t = vec![];
+        let call_output_t = vec![float64_type()];
+        h.module_root_builder()
+            .declare("func1", Signature::new(call_input_t, call_output_t).into())
+            .unwrap()
+    };
+
+    let func2 = {
+        h.module_root_builder()
+            .declare("func2", Signature::new_endo(vec![rotation_type()]).into())
+            .unwrap()
+    };
+
+    // An unsupported call that'll require an opaque subgraph to encode.
+    let call = h.call(&func1, &[], []).unwrap();
+    let [f] = call.outputs_arr();
+
+    // An operation that must be marked as unsupported, since it's input cannot be encoded.
+    let [rot] = h
+        .add_dataflow_op(RotationOp::from_halfturns_unchecked, [f])
+        .unwrap()
+        .outputs_arr();
+    let [q] = h
+        .add_dataflow_op(TketOp::Rz, [q, rot])
+        .unwrap()
+        .outputs_arr();
+
+    // A separate call that will generate a second opaque subgraph.
+    let [rot2] = h.call(&func2, &[], [rot]).unwrap().outputs_arr();
+
+    let hugr = h.finish_hugr_with_outputs([q, rot2]).unwrap();
+    hugr.into()
+}
+
 /// Check that all circuit ops have been translated to a native gate.
 ///
 /// Panics if there are tk1 ops in the circuit.
@@ -1005,6 +1054,11 @@ fn fail_on_modified_hugr(circ_tk1_ops: Circuit) {
 )]
 #[case::output_parameter_wire(circ_output_parameter_wire(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::non_local(circ_non_local(), 2, CircuitRoundtripTestConfig::Default)]
+#[case::unsupported_subgraph_no_registers(
+    circ_unsupported_subgraph_no_registers(),
+    1,
+    CircuitRoundtripTestConfig::Default
+)]
 
 fn encoded_circuit_roundtrip(
     #[case] circ: Circuit,

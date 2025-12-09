@@ -48,7 +48,7 @@ class CircBuild(TrackedDfg):
             The finished package.
         """
         # TODO: Replace with `finish_hugr` once extensions are included in the hugr itself.
-        # See https://github.com/CQCL/hugr/pull/1621
+        # See https://github.com/quantinuum/hugr/pull/1621
         import tket.extensions as ext
 
         extensions = [

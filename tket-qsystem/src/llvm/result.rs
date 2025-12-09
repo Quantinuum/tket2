@@ -167,7 +167,7 @@ impl<'c, H: HugrView<Node = Node>, AL: ArrayLowering + Clone> ResultEmitter<'c, 
         tag_ptr: BasicValueEnum,
         tag_len: IntValue,
     ) -> Result<()> {
-        // TODO update to return array after https://github.com/CQCL/tket2/issues/922
+        // TODO update to return array after https://github.com/quantinuum/tket2/issues/922
         let ResultArgs::Array(_, length) = op.args else {
             bail!("Expected array argument")
         };

@@ -4,6 +4,7 @@ use std::borrow::{Borrow, Cow};
 use std::fmt::Display;
 use std::mem;
 use std::num::{NonZero, NonZeroU8};
+use std::sync::LazyLock;
 
 use hugr::builder::{CircuitBuilder, DFGBuilder, Dataflow, DataflowHugr};
 use hugr::envelope::{EnvelopeConfig, EnvelopeFormat, ZstdConfig};
@@ -25,7 +26,6 @@ use derive_more::From;
 use hugr::{Hugr, HugrView, Wire};
 use serde::Serialize;
 use tket::circuit::CircuitHash;
-use tket::modifier::qubit_types_utils::contain_qubit_term;
 use tket::passes::pytket::lower_to_pytket;
 use tket::passes::CircuitChunks;
 use tket::serialize::pytket::{DecodeOptions, EncodeOptions};
@@ -131,6 +131,8 @@ impl Tk2Circuit {
     /// Loads a circuit from a HUGR envelope.
     ///
     /// If the name is not given, uses the encoded entrypoint.
+    //
+    // TODO(deprecated): Drop the `function_name` parameter in a breaking change.
     #[staticmethod]
     #[pyo3(signature = (bytes, function_name = None))]
     pub fn from_bytes(bytes: &[u8], function_name: Option<String>) -> PyResult<Self> {
@@ -138,8 +140,9 @@ impl Tk2Circuit {
             PyErr::new::<PyAttributeError, _>(format!("Could not read envelope: {e}"))
         };
         let circ = match function_name {
+            // NOTE: `load_function` uses the default REGISTRY which does not contain tket-qsystem extensions.
             Some(name) => Circuit::load_function(bytes, name).map_err(err)?,
-            None => Circuit::load(bytes, None).map_err(err)?,
+            None => Circuit::load(bytes, Some(&REGISTRY)).map_err(err)?,
         };
         Ok(Tk2Circuit { circ })
     }
@@ -147,6 +150,8 @@ impl Tk2Circuit {
     /// Loads a circuit from a HUGR envelope string.
     ///
     /// If the name is not given, uses the encoded entrypoint.
+    //
+    // TODO(deprecated): Drop the `function_name` parameter in a breaking change.
     #[staticmethod]
     #[pyo3(signature = (envelope, function_name = None))]
     pub fn from_str(envelope: &str, function_name: Option<String>) -> PyResult<Self> {
@@ -154,8 +159,9 @@ impl Tk2Circuit {
             PyErr::new::<PyAttributeError, _>(format!("Could not read envelope: {e}"))
         };
         let circ = match function_name {
+            // NOTE: `load_function_str` uses the default REGISTRY which does not contain tket-qsystem extensions.
             Some(name) => Circuit::load_function_str(envelope, name).map_err(err)?,
-            None => Circuit::load_str(envelope, None).map_err(err)?,
+            None => Circuit::load_str(envelope, Some(&REGISTRY)).map_err(err)?,
         };
         Ok(Tk2Circuit { circ })
     }
@@ -348,3 +354,27 @@ pub fn envelope_config_from_py(config: Bound<'_, PyAny>) -> PyResult<EnvelopeCon
 
     Ok(res)
 }
+
+/// Extension registry used for loading circuits.
+pub static REGISTRY: LazyLock<ExtensionRegistry> = LazyLock::new(|| {
+    let mut registry = hugr::std_extensions::std_reg();
+    registry.extend([
+        // tket extensions
+        tket::extension::TKET_EXTENSION.to_owned(),
+        tket::extension::rotation::ROTATION_EXTENSION.to_owned(),
+        tket::extension::bool::BOOL_EXTENSION.to_owned(),
+        tket::extension::debug::DEBUG_EXTENSION.to_owned(),
+        tket::extension::guppy::GUPPY_EXTENSION.to_owned(),
+        tket::extension::global_phase::GLOBAL_PHASE_EXTENSION.to_owned(),
+        tket::extension::modifier::MODIFIER_EXTENSION.to_owned(),
+        // tket-qsystem extensions
+        tket_qsystem::extension::gpu::EXTENSION.to_owned(),
+        tket_qsystem::extension::qsystem::EXTENSION.to_owned(),
+        tket_qsystem::extension::futures::EXTENSION.to_owned(),
+        tket_qsystem::extension::random::EXTENSION.to_owned(),
+        tket_qsystem::extension::result::EXTENSION.to_owned(),
+        tket_qsystem::extension::utils::EXTENSION.to_owned(),
+        tket_qsystem::extension::wasm::EXTENSION.to_owned(),
+    ]);
+    registry
+});
