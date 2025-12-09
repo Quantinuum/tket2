@@ -30,18 +30,35 @@ impl<'h> PytketDecoderContext<'h> {
         &mut self,
         qubits: &[TrackedQubit],
         bits: &[TrackedBit],
-        params: &[LoadedParameter],
         payload: &OpaqueSubgraphPayload,
     ) -> Result<DecodeStatus, PytketDecodeError> {
+        let mut load_params = |input_params: &[String]| {
+            input_params
+                .iter()
+                .map(|p| self.load_half_turns(p))
+                .collect_vec()
+        };
         let status = match payload {
-            OpaqueSubgraphPayload::External { id } => {
-                self.insert_external_subgraph(*id, qubits, bits, params)
+            OpaqueSubgraphPayload::External { id, input_params } => {
+                let loaded_params = load_params(input_params);
+                self.insert_external_subgraph(*id, qubits, bits, &loaded_params)
             }
             OpaqueSubgraphPayload::Inline {
                 hugr_envelope,
                 inputs,
                 outputs,
-            } => self.insert_inline_subgraph(hugr_envelope, inputs, outputs, qubits, bits, params),
+                input_params,
+            } => {
+                let loaded_params = load_params(input_params);
+                self.insert_inline_subgraph(
+                    hugr_envelope,
+                    inputs,
+                    outputs,
+                    qubits,
+                    bits,
+                    &loaded_params,
+                )
+            }
         }?;
 
         // Mark the used qubits and bits as outdated.

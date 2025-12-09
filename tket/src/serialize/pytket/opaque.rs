@@ -144,7 +144,9 @@ impl<N: HugrNode> OpaqueSubgraphs<N> {
             return Ok(());
         };
 
-        let Some(subgraph_id) = OpaqueSubgraphPayload::parse_external_id(&payload) else {
+        let Some((subgraph_id, input_arguments)) =
+            OpaqueSubgraphPayload::parse_external_payload(&payload)
+        else {
             // Not an External Payload, nothing to do.
             return Ok(());
         };
@@ -152,7 +154,7 @@ impl<N: HugrNode> OpaqueSubgraphs<N> {
             return Err(PytketEncodeError::custom(format!("Barrier operation with external subgraph payload points to an unknown subgraph: {subgraph_id}")));
         }
 
-        let payload = OpaqueSubgraphPayload::new_inline(&self[subgraph_id], hugr)?;
+        let payload = OpaqueSubgraphPayload::new_inline(&self[subgraph_id], hugr, input_arguments)?;
         command.op.data = Some(serde_json::to_string(&payload).unwrap());
 
         Ok(())
