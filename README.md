@@ -18,11 +18,7 @@ more information.
 
 ## Usage
 
-The rust crate documentation is available at [docs.rs](https://docs.rs/tket).
-
-See the [Getting Started][getting-started] notebook for a quick introduction to using `tket` in Python.
-
-  [getting-started]: https://github.com/quantinuum/tket2/blob/main/tket-py/docs/examples/1-Getting-Started.ipynb
+The rust crate documentation is available at [docs.rs](https://docs.rs/tket).s
 
 ## Developing TKET
 
