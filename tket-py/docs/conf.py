@@ -48,3 +48,16 @@ intersphinx_mapping = {
 }
 
 nb_execution_mode = "off"
+
+
+exclude_patterns = [
+    "**/jupyter_execute",
+    "jupyter_execute/*",
+    ".jupyter_cache",
+    "*.venv",
+    "README.md",
+    "**/README.md",
+    ".jupyter_cache",
+    "examples/1-Getting-Started.ipynb",
+    "examples/2-Rewriting-Circuits.ipynb",
+]
