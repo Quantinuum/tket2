@@ -3,7 +3,7 @@ members = ["tket-py", "tket-eccs", "tket-exts", "qis-compiler"]
 
 [dependency-groups]
 dev = [
-    "maturin >=1.9.2,<2",
+    "maturin >=1.10.2,<2",
     "pytest>=8.3.2,<10",
     "pytest-cov ~=7.0",
     "ruff>=0.6.2,<0.15",
