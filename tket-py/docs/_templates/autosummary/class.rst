@@ -6,7 +6,8 @@
    :members:
    :undoc-members:
    :inherited-members:
-   :special-members: __call__
+   :special-members: __call__, __init__
+   :show-inheritance:
 
    {% block methods %}
    {% if methods %}
