@@ -84,12 +84,13 @@ fn find_single_linked_output_by_index(hugr: &mut Hugr, node: Node, port_idx: usi
 
 /// Find the constant node containing the angle to be inputted to the Rz gate.
 /// It is assumed that `hugr` has had the NormalizeGuppy passes applied to it 
-/// prior to being applied
+/// prior to being applied. This function also cleans up behind itself removing 
+/// everything on the path to the `angle_node` but not the `angle_node` itself,
+/// which is still needed.
 fn find_angle_node(hugr: &mut Hugr, rz_node: Node) -> Node {
     // find linked ports to the rz port where the angle will be inputted
     // the port offset of the angle is known to be 1 for the rz gate.
     let (mut prev_node, _) = find_single_linked_output_by_index(hugr, rz_node, 1);
-    println!("Before loop, index is: {}", prev_node.index());
 
     // as all of the NormalizeGuppy passes have been run on the `hugr` before it enters this function,
     // and these passes include constant folding, we can assume that we can follow the 0th ports back
@@ -101,15 +102,20 @@ fn find_angle_node(hugr: &mut Hugr, rz_node: Node) -> Node {
         let op_type = hugr.get_optype(current_node);
         println!("{}", current_node.index());
         if op_type.is_const() {
-            println!("condition met");
+            hugr.remove_node(prev_node);
             let angle_node = current_node;
             return angle_node;
         }
         if ii >= max_iterations {
             panic!("Angle finding failed"); // TO DO: improve error handling
         }
+
+        // Deleting all but nodes on the way to the rz_node but not the rz_node itself
+        hugr.remove_node(prev_node);
+
         prev_node = current_node;
         ii += 1;
+
     }
 }
 
@@ -153,7 +159,10 @@ fn find_angle(hugr: &mut Hugr) -> f64 {
     } else {
         panic!("Angle not specified as ConstRotation or ConstF64")
     };
-    // let angle = rot.to_radians();
+    
+    // we now have what we need to know from the angle node and can remove it from the hugr 
+    hugr.remove_node(angle_node);
+
     println!("{}", angle);
     angle
 }
@@ -197,21 +206,64 @@ fn gridsynth_output_to_hugr(gates: &str) -> Hugr {
     hugr
 }
 
-fn destroy_path_to_angle_node(hugr: &mut Hugr, rz_node: Node)  {
-    // find linked ports to the rz port where the angle will be inputted
-    // the port offset of the angle is known to be 1 for the rz gate.
-    let linked_ports = find_linked_incoming_ports(hugr, rz_node, 1);
-    let load_const_node = linked_ports[0].0;
+    // let (mut prev_node, _) = find_single_linked_output_by_index(hugr, rz_node, 1);
+    // println!("Before loop, index is: {}", prev_node.index());
 
-    // SHORTCUT: specialise to simple hugrs with LoadConst preceded by const node
-    // TO DO: generalise the following
-    let linked_ports = find_linked_incoming_ports(hugr, load_const_node, 0);
-    let angle_node = linked_ports[0].0;
+    // // as all of the NormalizeGuppy passes have been run on the `hugr` before it enters this function,
+    // // and these passes include constant folding, we can assume that we can follow the 0th ports back
+    // // to a constant node where the angle is defined.
+    // let max_iterations = 10;
+    // let mut ii = 0;
+    // loop {
+    //     let (current_node, _) = find_single_linked_output_by_index(hugr, prev_node, 0);
+    //     let op_type = hugr.get_optype(current_node);
+    //     println!("{}", current_node.index());
+    //     if op_type.is_const() {
+    //         println!("condition met");
+    //         let angle_node = current_node;
+    //         return angle_node;
+    //     }
+    //     if ii >= max_iterations {
+    //         panic!("Angle finding failed"); // TO DO: improve error handling
+    //     }
+    //     prev_node = current_node;
+    //     ii += 1;
+    // }
 
-    hugr.remove_node(load_const_node);
-    hugr.remove_node(angle_node);
+// fn destroy_path_to_angle_node(hugr: &mut Hugr, rz_node: Node)  {
+//     // find linked ports to the rz port where the angle will be inputted
+//     // the port offset of the angle is known to be 1 for the rz gate.
+//     // let linked_ports = find_linked_incoming_ports(hugr, rz_node, 1);
+//     // let load_const_node = linked_ports[0].0;
+
+//     let (mut prev_node, _) = find_single_linked_output_by_index(hugr, rz_node, 1);
+//     println!("Before loop, index is: {}", prev_node.index());
+
+//     // as all of the NormalizeGuppy passes have been run on the `hugr` before it enters this function,
+//     // and these passes include constant folding, we can assume that we can follow the 0th ports back
+//     // to a constant node where the angle is defined.
+//     let max_iterations = 10;
+//     let mut ii = 0;
+//     loop {
+//         let (current_node, _) = find_single_linked_output_by_index(hugr, prev_node, 0);
+//         let op_type = hugr.get_optype(current_node);
+//         println!("{}", current_node.index());
+//         if op_type.is_const() {
+//             println!("condition met");
+//             let angle_node = current_node;
+//             return angle_node;
+//         }
+//         if ii >= max_iterations {
+//             panic!("Angle finding failed"); // TO DO: improve error handling
+//         }
+//         prev_node = current_node;
+//         ii += 1;
+//     }
+
+//     hugr.remove_node(load_const_node);
+//     hugr.remove_node(angle_node);
     // println!("{}", hugr.mermaid_string());
-}
+// }
 
 /// get previous node that provided qubit to Rz gate
 fn find_qubit_source(hugr: &mut Hugr, rz_node: Node) -> Node {
@@ -297,7 +349,7 @@ pub fn apply_gridsynth_pass(hugr: &mut Hugr, epsilon: f64) {
 
     let rz_node = find_rz(hugr).unwrap();
     let gates = apply_gridsynth(hugr, epsilon);
-    destroy_path_to_angle_node(hugr, rz_node);
+    // destroy_path_to_angle_node(hugr, rz_node);
     replace_rz_with_gridsynth_output(hugr, rz_node, &gates);
 }
 
@@ -393,8 +445,7 @@ mod tests {
 
     #[test]
     fn test_find_angle_node_for_guppy() {
-        let epsilon = 1e-2;
-        let mut imported_hugr = &mut import_rz_only_guppy_circuit();
+        let imported_hugr = &mut import_rz_only_guppy_circuit();
         NormalizeGuppy::default()
             .simplify_cfgs(true)
             .remove_tuple_untuple(true)
@@ -406,6 +457,23 @@ mod tests {
         let rz_node = find_rz(imported_hugr).unwrap();
         let angle_node = find_angle_node(imported_hugr, rz_node);
         assert_eq!(angle_node.index(), 20);
+    }
+
+    #[test]
+    fn test_find_angle_for_guppy() {
+        let imported_hugr = &mut import_rz_only_guppy_circuit();
+        NormalizeGuppy::default()
+            .simplify_cfgs(true)
+            .remove_tuple_untuple(true)
+            .constant_folding(true)
+            .remove_dead_funcs(true)
+            .inline_dfgs(true)
+            .run(imported_hugr)
+            .unwrap();
+        let rz_node = find_rz(imported_hugr).unwrap();
+        let angle = find_angle(imported_hugr);
+        println!("angle is {}", angle);
+        println!("hugr is {}", imported_hugr.mermaid_string());
     }
 
     #[test]
