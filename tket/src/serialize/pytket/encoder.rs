@@ -256,6 +256,8 @@ impl<H: HugrView> PytketEncoderContext<H> {
                 additional_subgraphs: self.non_emitted_subgraphs,
                 straight_through_wires: tracker_result.straight_through_wires,
             },
+            output_qubits: tracker_result.qubit_outputs,
+            output_bits: tracker_result.bit_outputs,
         };
 
         Ok((info, self.opaque_subgraphs))

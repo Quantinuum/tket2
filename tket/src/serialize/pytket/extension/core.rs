@@ -93,7 +93,7 @@ impl PytketDecoder for CoreDecoder {
                     decoder.opaque_subgraphs,
                 )?;
                 nested_decoder.run_decoder(&serial_circuit.commands, None)?;
-                let internal = nested_decoder.finish(&[])?.node();
+                let internal = nested_decoder.finish(None)?.node();
 
                 decoder
                     .wire_up_node(internal, qubits, qubits, bits, bits, params)
