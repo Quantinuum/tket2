@@ -42,8 +42,12 @@ __all__ = [
     "lower_to_pytket",
     "badger_optimise",
     "chunks",
+    # TODO: Remove export, use `NormalizeGuppy` instead
     "normalize_guppy",
     "PullForwardError",
+    "PytketPass",
+    "PassResult",
+    "NormalizeGuppy",
 ]
 
 
