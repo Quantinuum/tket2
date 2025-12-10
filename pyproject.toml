@@ -11,7 +11,7 @@ dev = [
     "hypothesis >=6.111.1,<7",
     "graphviz ~=0.21.0",
     "pre-commit ~=4.3",
-    "conan >= 2.0.0,<3",
+    "conan >= 2.23.0,<3",
     # Required to run `maturin develop`
     "pip >=25",
     # Pyyaml 0.6.0 makes setuptools fail. This ensures we're using a newer version.

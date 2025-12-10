@@ -7,7 +7,7 @@ dev = [
     "pytest>=8.4.2",
     "pytest-snapshot~=0.9.0",
     "cibuildwheel>=2.23.2",
-    "hugr>=0.14.0",
+    "hugr>=0.14.4",
 ]
 
 [project]
