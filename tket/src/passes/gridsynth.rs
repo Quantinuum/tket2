@@ -12,7 +12,8 @@ use crate::hugr::{Node, Port};
 use crate::hugr::types::Signature;
 use crate::TketOp;
 use hugr::algorithms::ComposablePass;
-use crate::passes::guppy::NormalizeGuppy; 
+use hugr::std_extensions::arithmetic::float_types::ConstF64;
+use crate::passes::guppy::NormalizeGuppy;
 
 
 /// Find the FuncDefn node for the Rz gate.
@@ -90,11 +91,6 @@ fn find_angle_node(hugr: &mut Hugr, rz_node: Node) -> Node {
     let (mut prev_node, _) = find_single_linked_output_by_index(hugr, rz_node, 1);
     println!("Before loop, index is: {}", prev_node.index());
 
-    // SHORTCUT: specialise to simple hugrs with LoadConst preceded by const node
-    // TO DO: generalise the following
-    // let linked_ports = find_linked_incoming_ports(hugr, prev_node, 0);
-    // let angle_node = linked_ports[0].0;
-
     // as all of the NormalizeGuppy passes have been run on the `hugr` before it enters this function,
     // and these passes include constant folding, we can assume that we can follow the 0th ports back
     // to a constant node where the angle is defined.
@@ -123,12 +119,42 @@ fn find_angle(hugr: &mut Hugr) -> f64 {
     let op_type = hugr.get_optype(angle_node);
     let angle_const = op_type.as_const().unwrap();
     let angle_val = &angle_const.value;
+    let angle_type = angle_val.get_type();
+    // let angle_type = angle_type.as_extension();
+    // match angle_type.
+    // println!("sum is: {:?}", angle_val.get_custom_value());
+    println!("extensions are: {:?}", angle_type);
+    // match angle_type {
+    //     float64 => {
+            
+    //     },
+
+    // }
     println!("angle val is {:?} with type {}", angle_val, angle_val.get_type());
-    
+    // println!("value is {}", angle_val::value);
+    // println!("Custom val is: {:?}", angle_val.value());
+    // if angle_type == 'float64' {
+        
+    // }
     // let angle_val = angle_val.get_type().value();
-    println!("Value is {}", angle_val.value());
-    let rot: &ConstRotation = angle_val.get_custom_value().unwrap();
-    let angle = rot.to_radians();
+    // println!("Value is {}", angle_val.value());
+    // let custom_val: Option<&dyn CustomConst> = angle_val.get_custom_value();
+    // let rot= match custom_val {
+    //     None => None,
+    //     Some(custom_val) => Some(custom_val),
+    // };
+    // println!("{:?}", rot);
+
+    let angle = if let Some(rot) = angle_val.get_custom_value::<ConstRotation>() {
+      rot.to_radians()
+    } else if let Some(fl) = angle_val.get_custom_value::<ConstF64>() {
+      let half_turns = fl.value();
+      ConstRotation::new(half_turns).unwrap().to_radians()
+    } else {
+        panic!("Angle not specified as ConstRotation or ConstF64")
+    };
+    // let angle = rot.to_radians();
+    println!("{}", angle);
     angle
 }
 
@@ -380,7 +406,6 @@ mod tests {
         let rz_node = find_rz(imported_hugr).unwrap();
         let angle_node = find_angle_node(imported_hugr, rz_node);
         assert_eq!(angle_node.index(), 20);
-
     }
 
     #[test]
