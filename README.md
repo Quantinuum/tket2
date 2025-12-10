@@ -18,7 +18,7 @@ more information.
 
 ## Usage
 
-The rust crate documentation is available at [docs.rs](https://docs.rs/tket).s
+The rust crate documentation is available at [docs.rs](https://docs.rs/tket).
 
 ## Developing TKET
 
