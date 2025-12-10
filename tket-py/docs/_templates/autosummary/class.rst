@@ -4,9 +4,10 @@
 
 .. autoclass:: {{ objname }}
    :members:
-   :exclude-members: __annotate_func__
    :undoc-members:
-   :special-members:
+   :inherited-members:
+   :special-members: __call__, __init__
+   :show-inheritance:
 
    {% block methods %}
    {% if methods %}

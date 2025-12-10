@@ -801,6 +801,24 @@ fn circ_unsupported_subgraph_no_registers() -> Circuit {
     hugr.into()
 }
 
+// A circuit that discards the first qubit input and only outputs the second one.
+#[fixture]
+fn circ_discard_first_qubit() -> Circuit {
+    let input_t = vec![qb_t(), qb_t()];
+    let output_t = vec![qb_t()];
+    let mut h =
+        FunctionBuilder::new("discard_first_qubit", Signature::new(input_t, output_t)).unwrap();
+
+    let [q1, q2] = h.input_wires_arr();
+
+    h.add_dataflow_op(TketOp::MeasureFree, [q1]).unwrap();
+
+    let [q2] = h.add_dataflow_op(TketOp::X, [q2]).unwrap().outputs_arr();
+
+    let hugr = h.finish_hugr_with_outputs([q2]).unwrap();
+    hugr.into()
+}
+
 /// Check that all circuit ops have been translated to a native gate.
 ///
 /// Panics if there are tk1 ops in the circuit.
@@ -1059,6 +1077,7 @@ fn fail_on_modified_hugr(circ_tk1_ops: Circuit) {
     1,
     CircuitRoundtripTestConfig::Default
 )]
+#[case::discard_first_qubit(circ_discard_first_qubit(), 1, CircuitRoundtripTestConfig::Default)]
 
 fn encoded_circuit_roundtrip(
     #[case] circ: Circuit,

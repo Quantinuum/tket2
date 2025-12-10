@@ -42,8 +42,12 @@ __all__ = [
     "lower_to_pytket",
     "badger_optimise",
     "chunks",
+    # TODO: Remove export, use `NormalizeGuppy` instead
     "normalize_guppy",
     "PullForwardError",
+    "PytketHugrPass",
+    "PassResult",
+    "NormalizeGuppy",
 ]
 
 
@@ -97,17 +101,17 @@ def badger_pass(
 
 
 @dataclass
-class PytketPass(ComposablePass):
+class PytketHugrPass(ComposablePass):
     pytket_pass: BasePass
 
     """
     A class which provides an interface to apply pytket passes to Hugr programs.
 
-    The user can create a :py:class:`PytketPass` object from any serializable member of `pytket.passes`.
+    The user can create a :py:class:`PytketHugrPass` object from any serializable member of `pytket.passes`.
     """
 
     def __init__(self, pytket_pass: BasePass) -> None:
-        """Initialize a PytketPass from a :py:class:`~pytket.passes.BasePass` instance."""
+        """Initialize a PytketHugrPass from a :py:class:`~pytket.passes.BasePass` instance."""
         self.pytket_pass = pytket_pass
 
     def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
@@ -134,7 +138,7 @@ class PytketPass(ComposablePass):
 class NormalizeGuppy(ComposablePass):
     simplify_cfgs: bool = True
     remove_tuple_untuple: bool = True
-    constant_folding: bool = False
+    constant_folding: bool = True
     remove_dead_funcs: bool = True
     inline_dfgs: bool = True
 
