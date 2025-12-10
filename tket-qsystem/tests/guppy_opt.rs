@@ -21,7 +21,8 @@ use tket_qsystem::QSystemPass;
 const GUPPY_EXAMPLES_DIR: &str = "../test_files/guppy_optimization";
 
 /// JSON encoding of the clifford simp pytket pass.
-const CLIFFORD_SIMP_STR: &str = r#"{"StandardPass": {"allow_swaps": true, "name": "CliffordSimp", "target_2qb_gate": "CX"}, "pass_class": "StandardPass"}"#;
+// const CLIFFORD_SIMP_STR: &str = r#"{"StandardPass": {"allow_swaps": true, "name": "CliffordSimp", "target_2qb_gate": "CX"}, "pass_class": "StandardPass"}"#;
+const SQUASH_STR: &str = r#"{"StandardPass": {"name": "SquashRzPhasedX"}, "pass_class": "StandardPass"}"#;
 
 enum HugrFileType {
     Original,
@@ -54,7 +55,7 @@ fn run_pytket(h: &mut Hugr) {
         .par_iter_mut()
         .for_each(|(_region, serial_circuit)| {
             let mut circuit_ptr = Tket1Circuit::from_serial_circuit(serial_circuit).unwrap();
-            Tket1Pass::run_from_json(CLIFFORD_SIMP_STR, &mut circuit_ptr).unwrap();
+            Tket1Pass::run_from_json(SQUASH_STR, &mut circuit_ptr).unwrap();
             *serial_circuit = circuit_ptr.to_serial_circuit().unwrap();
         });
 
