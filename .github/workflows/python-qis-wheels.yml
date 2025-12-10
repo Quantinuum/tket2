@@ -86,7 +86,7 @@ jobs:
 
       # if the hugr_qis compiler has changed, we build it.
       - name: Build selene-hugr-qis-compiler wheel
-        uses: pypa/cibuildwheel@v3.2.1
+        uses: pypa/cibuildwheel@v3.3.0
         with:
           package-dir: qis-compiler
 
