@@ -107,6 +107,7 @@ serve-docs: build-pydocs
 clean-docs:
     rm -rf tket-py/docs/build
     rm -rf tket-py/docs/generated
+    rm -rf tket-py/docs/jupyter_execute
 
 clean-env:
     uv clean
