@@ -1,7 +1,7 @@
 //! Definitions of the payloads for opaque barrier metadata in pytket circuits.
 
 use hugr::core::HugrNode;
-use hugr::envelope::{EnvelopeConfig, EnvelopeError};
+use hugr::envelope::{EnvelopeConfig};
 use hugr::extension::resolution::{WeakExtensionRegistry, resolve_type_extensions};
 use hugr::extension::{ExtensionRegistry, ExtensionRegistryLoadError};
 use hugr::package::Package;
@@ -194,7 +194,7 @@ impl OpaqueSubgraphPayload {
     pub fn load_str(json: &str, extensions: &ExtensionRegistry) -> Result<Self, PytketDecodeError> {
         let mut payload: Self = serde_json::from_str(json).map_err(|e| {
             PytketDecodeErrorInner::UnsupportedSubgraphInlinePayload {
-                source: EnvelopeError::SerdeError { source: e },
+                source: hugr::envelope::ReadError::SerdeError { source: e },
             }
             .wrap()
         })?;

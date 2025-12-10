@@ -3,7 +3,6 @@
 use derive_more::{Display, Error, From};
 use hugr::Wire;
 use hugr::core::HugrNode;
-use hugr::envelope::EnvelopeError;
 use hugr::ops::OpType;
 use itertools::Itertools;
 use tket_json_rs::register::ElementId;
@@ -455,7 +454,7 @@ pub enum PytketDecodeErrorInner {
     )]
     UnsupportedSubgraphInlinePayload {
         /// The envelope decoding error.
-        source: EnvelopeError,
+        source: hugr::envelope::ReadError,
     },
     /// Cannot translate a wire from one type to another.
     #[display("Cannot translate {wire} from type {initial_type} to type {target_type}{}",
