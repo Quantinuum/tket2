@@ -338,6 +338,7 @@ impl<'h> PytketDecoderContext<'h> {
         let qubits: Vec<TrackedQubit> = Vec::from_iter(qubits);
         let bits: Vec<TrackedBit> = Vec::from_iter(bits);
         let mut qubits_slice: &[TrackedQubit] = &qubits;
+        let mut bits_slice: &[TrackedBit] = &bits;
 
         // Load the output parameter expressions.
         let output_params = encoded_info
@@ -375,7 +376,7 @@ impl<'h> PytketDecoderContext<'h> {
                     &mut self.builder,
                     ty,
                     &mut qubits_slice,
-                    &mut bits.as_slice(),
+                    &mut bits_slice,
                     &mut params,
                     Some(EncodedEdgeID::default()),
                 )
