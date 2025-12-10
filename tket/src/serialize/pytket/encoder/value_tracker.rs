@@ -486,7 +486,7 @@ impl<N: HugrNode> ValueTracker<N> {
         }
 
         // Compute the final register permutations.
-        let qubit_permutation = compute_final_permutation(&qubit_outputs, &self.qubits);
+        let qubit_permutation = compute_final_permutation(qubit_outputs.clone(), &self.qubits);
 
         Ok(ValueTrackerResult {
             qubits: self.qubits,
@@ -596,11 +596,9 @@ fn read_metadata_json_list<T: serde::de::DeserializeOwned, H: HugrView>(
 ///
 /// Returns the final permutation of the output registers.
 pub(super) fn compute_final_permutation(
-    actual_outputs: &[RegisterUnit],
+    mut actual_outputs: Vec<RegisterUnit>,
     all_inputs: &[RegisterUnit],
 ) -> Vec<circuit_json::ImplicitPermutation> {
-    let mut actual_outputs = actual_outputs.to_vec();
-
     let declared_outputs: Vec<&RegisterUnit> = all_inputs.iter().collect();
     let mut actual_outputs_hashes: HashSet<RegisterHash> =
         actual_outputs.iter().map(RegisterHash::from).collect();
