@@ -15,4 +15,10 @@
    tket.rewrite
    tket.passes
    tket.types
+
+.. toctree::
+   :caption: Examples
+
+   examples/Guppy-opt-example
+
 ```
