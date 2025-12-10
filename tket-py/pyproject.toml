@@ -54,8 +54,6 @@ docs = [
     "myst-nb>=1.1.2",
     "sphinx-copybutton>=0.5.2",
     "sphinx-basic-ng>=1.0.0b2",
-    "guppylang>=0.21.6",
-    "jupyterlab>=4.5.0",
 ]
 
 [tool.maturin]
