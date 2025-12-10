@@ -111,13 +111,11 @@ pub mod dfg_modify;
 pub mod global_phase_modify;
 pub mod tket_op_modify;
 
-use super::qubit_types_utils::contain_qubits;
 use super::{CombinedModifier, ModifierFlags};
-use crate::{
-    extension::{global_phase::GlobalPhase, modifier::Modifier},
-    modifier::modifier_resolver::global_phase_modify::delete_phase,
-    TketOp,
-};
+use crate::passes::unpack_container::TypeUnpacker;
+use crate::{extension::global_phase::GlobalPhase, modifier::Modifier, TketOp};
+use global_phase_modify::delete_phase;
+
 use hugr::{
     builder::{BuildError, CFGBuilder, Container, Dataflow, SubContainer},
     core::HugrNode,
@@ -324,6 +322,7 @@ pub struct ModifierResolver<N = Node> {
     // ```
     // _modified_functions: HashMap<N, (CombinedModifier, Node)>,
     // ```
+    qubit_finder: TypeUnpacker,
 }
 
 impl<N> ModifierResolver<N> {
@@ -335,6 +334,7 @@ impl<N> ModifierResolver<N> {
             controls: Vec::default(),
             worklist: VecDeque::default(),
             call_map: HashMap::default(),
+            qubit_finder: TypeUnpacker::for_qubits(),
         }
     }
 }
@@ -854,7 +854,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         loop {
             // Wire inputs until the first quantum type
             while let Some(ty) = in_ty {
-                if contain_qubits(ty) {
+                if self.qubit_finder.contains_element_type(ty) {
                     break;
                 }
                 self.map_insert(old_in_wire, new_in_wire)?;
@@ -865,7 +865,7 @@ impl<N: HugrNode> ModifierResolver<N> {
 
             // Wire outputs until the first quantum type
             while let Some(ty) = out_ty {
-                if contain_qubits(ty) {
+                if self.qubit_finder.contains_element_type(ty) {
                     break;
                 }
                 self.map_insert(old_out_wire, new_out_wire)?;
@@ -876,7 +876,7 @@ impl<N: HugrNode> ModifierResolver<N> {
 
             // If both are quantum types, wire them in the opposite direction until the next non-quantum type
             while let Some(ty) = in_ty {
-                if !contain_qubits(ty) {
+                if !self.qubit_finder.contains_element_type(ty) {
                     break;
                 }
                 let new_in = if !self.modifiers.dagger {
@@ -893,7 +893,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                 in_ty = inputs.next();
             }
             while let Some(ty) = out_ty {
-                if !contain_qubits(ty) {
+                if !self.qubit_finder.contains_element_type(ty) {
                     break;
                 }
                 let new_out = if !self.modifiers.dagger {

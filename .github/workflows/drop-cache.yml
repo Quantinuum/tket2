@@ -5,5 +5,5 @@ on:
       - closed
 
 jobs:
-    drop-cache:
-        uses: CQCL/hugrverse-actions/.github/workflows/drop-cache.yml@main
+  drop-cache:
+    uses: quantinuum/hugrverse-actions/.github/workflows/drop-cache.yml@main

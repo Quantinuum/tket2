@@ -16,7 +16,7 @@ use hugr::ops::{OpTrait, OpType};
 use hugr::types::EdgeKind;
 
 use std::borrow::Cow;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 use std::ops::RangeTo;
 use std::sync::{Arc, RwLock};
 
@@ -30,7 +30,9 @@ use super::{
     PytketEncodeError, PytketEncodeOpError, METADATA_OPGROUP, METADATA_PHASE, METADATA_Q_REGISTERS,
 };
 use crate::circuit::Circuit;
-use crate::serialize::pytket::circuit::{AdditionalNodesAndWires, EncodedCircuitInfo};
+use crate::serialize::pytket::circuit::{
+    AdditionalNodesAndWires, AdditionalSubgraph, EncodedCircuitInfo,
+};
 use crate::serialize::pytket::config::PytketEncoderConfig;
 use crate::serialize::pytket::extension::RegisterCount;
 use crate::serialize::pytket::opaque::{OpaqueSubgraph, OpaqueSubgraphPayload};
@@ -56,6 +58,11 @@ pub struct PytketEncoderContext<H: HugrView> {
     unsupported: UnsupportedTracker<H::Node>,
     /// A registry of already-encoded opaque subgraphs.
     opaque_subgraphs: OpaqueSubgraphs<H::Node>,
+    /// Subgraphs in `opaque_subgraphs` that could not be emitted as opaque
+    /// barriers, and must be stored in the [`EncodedCircuitInfo`] instead when
+    /// finishing the encoding. Identified by their
+    /// [`super::opaque::SubgraphId`] in `opaque_subgraphs`.
+    non_emitted_subgraphs: Vec<AdditionalSubgraph>,
     /// Configuration for the encoding.
     ///
     /// Contains custom operation/type/const emitters.
@@ -176,6 +183,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
             values: ValueTracker::new(circ, region, &config)?,
             unsupported: UnsupportedTracker::new(circ),
             opaque_subgraphs,
+            non_emitted_subgraphs: vec![],
             config,
             function_cache: Arc::new(RwLock::new(HashMap::new())),
         })
@@ -224,30 +232,11 @@ impl<H: HugrView> PytketEncoderContext<H> {
         region: H::Node,
     ) -> Result<(EncodedCircuitInfo, OpaqueSubgraphs<H::Node>), PytketEncodeError<H::Node>> {
         // Add any remaining unsupported nodes
-        let mut extra_subgraph: Option<BTreeSet<H::Node>> = None;
-        let mut extra_subgraph_params = Vec::new();
         while !self.unsupported.is_empty() {
             let node = self.unsupported.iter().next().unwrap();
             let opaque_subgraphs = self.unsupported.extract_component(node, circ.hugr())?;
-            match self.emit_unsupported(&opaque_subgraphs, circ) {
-                Ok(()) => (),
-                Err(PytketEncodeError::UnsupportedSubgraphHasNoRegisters { params }) => {
-                    // We'll store the nodes in the `extra_subgraph` field of the `EncodedCircuitInfo`.
-                    // So the decoder can reconstruct the original subgraph.
-                    extra_subgraph
-                        .get_or_insert_default()
-                        .extend(opaque_subgraphs.nodes().iter().cloned());
-                    extra_subgraph_params.extend(params);
-                }
-                Err(e) => return Err(e),
-            }
+            self.emit_unsupported(&opaque_subgraphs, circ)?;
         }
-        let extra_subgraph = extra_subgraph
-            .map(|nodes| -> Result<_, PytketEncodeError<H::Node>> {
-                let subgraph = OpaqueSubgraph::try_from_nodes(nodes, circ.hugr())?;
-                Ok(self.opaque_subgraphs.register_opaque_subgraph(subgraph))
-            })
-            .transpose()?;
 
         let tracker_result = self.values.finish(circ, region)?;
 
@@ -264,8 +253,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
             input_params: tracker_result.input_params,
             output_params: tracker_result.params,
             additional_nodes_and_wires: AdditionalNodesAndWires {
-                extra_subgraph,
-                extra_subgraph_params,
+                additional_subgraphs: self.non_emitted_subgraphs,
                 straight_through_wires: tracker_result.straight_through_wires,
             },
         };
@@ -590,7 +578,6 @@ impl<H: HugrView> PytketEncoderContext<H> {
         let subgraph_id = self
             .opaque_subgraphs
             .register_opaque_subgraph(subgraph.clone());
-        let payload = OpaqueSubgraphPayload::new_external(subgraph_id);
 
         // Collects the input values for the subgraph.
         //
@@ -615,6 +602,8 @@ impl<H: HugrView> PytketEncoderContext<H> {
             .into_iter()
             .map(|p| self.values.param_expression(p).to_owned())
             .collect();
+
+        let payload = OpaqueSubgraphPayload::new_external(subgraph_id, input_param_exprs.clone());
 
         // Update the values in the node's outputs, and extend `op_values` with
         // any new output values.
@@ -646,31 +635,40 @@ impl<H: HugrView> PytketEncoderContext<H> {
                 |p| {
                     let range = out_param_count..out_param_count + p.expected_count;
                     out_param_count += p.expected_count;
-                    range.map(|i| format!("{subgraph_id}_out{i}")).collect_vec()
+                    range.map(|i| subgraph_id.output_parameter(i)).collect_vec()
                 },
             )?;
             op_values.append(new_outputs);
         }
 
         // Check that we have qubits or bits to attach the barrier command to.
-        //
-        // This should only fail when looking at the "leftover" unsupported nodes at the end of the decoding process.
         if op_values.qubits.is_empty() && op_values.bits.is_empty() {
-            return Err(PytketEncodeError::UnsupportedSubgraphHasNoRegisters {
+            // We cannot associate this subgraph to any qubit or bit register in
+            // the pytket circuit, so we'll store it in the
+            // [`AdditionalSubgraph`]s instead when finishing the encoding.
+            //
+            // That list contains a list of subgraphs so we don't need to do any
+            // additional handling, but if we preferred in the future we could
+            // instead merge a single list of nodes if we wanted.
+            self.non_emitted_subgraphs.push(AdditionalSubgraph {
+                id: subgraph_id,
                 params: input_param_exprs.clone(),
             });
+        } else {
+            // If there are registers to which to attach, emit it as a barrier command.
+
+            // Create the pytket operation, with an external reference to the subgraph.
+            let args = MakeOperationArgs {
+                num_qubits: op_values.qubits.len(),
+                num_bits: op_values.bits.len(),
+                params: Cow::Borrowed(&[]),
+            };
+            let mut pytket_op = make_tk1_operation(tket_json_rs::OpType::Barrier, args);
+            pytket_op.data = Some(serde_json::to_string(&payload).unwrap());
+
+            self.emit_command(pytket_op, &op_values.qubits, &op_values.bits, None);
         }
 
-        // Create pytket operation, and add the subcircuit as hugr
-        let args = MakeOperationArgs {
-            num_qubits: op_values.qubits.len(),
-            num_bits: op_values.bits.len(),
-            params: Cow::Borrowed(&input_param_exprs),
-        };
-        let mut pytket_op = make_tk1_operation(tket_json_rs::OpType::Barrier, args);
-        pytket_op.data = Some(serde_json::to_string(&payload).unwrap());
-
-        self.emit_command(pytket_op, &op_values.qubits, &op_values.bits, None);
         Ok(())
     }
 

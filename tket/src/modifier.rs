@@ -20,7 +20,6 @@ pub mod control;
 pub mod dagger;
 pub mod modifier_resolver;
 pub mod power;
-pub mod qubit_types_utils;
 
 pub use pass::ModifierResolverPass;
 

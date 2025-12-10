@@ -59,12 +59,12 @@ class TketOp(Enum):
         """Convert to a custom operation."""
         return self._to_rs().to_custom()
 
-    def _to_rs(self) -> tket._tket.ops.TketOp:
+    def _to_rs(self) -> "tket._tket.ops.TketOp":  # type: ignore[name-defined]
         """Convert to the Rust-backed TketOp representation."""
-        return tket._tket.ops.TketOp(self.name)
+        return tket._tket.ops.TketOp(self.name)  # type: ignore[attr-defined]
 
     @staticmethod
-    def _from_rs(op: tket._tket.ops.TketOp) -> "TketOp":
+    def _from_rs(op: tket._tket.ops.TketOp) -> "TketOp":  # type: ignore[name-defined]
         """Convert from the Rust-backed TketOp representation."""
         return TketOp[op.name]
 
@@ -72,7 +72,7 @@ class TketOp(Enum):
         """Check if two TketOps are equal."""
         if isinstance(other, TketOp):
             return self.name == other.name
-        elif isinstance(other, tket._tket.ops.TketOp):
+        elif isinstance(other, tket._tket.ops.TketOp):  # type: ignore[attr-defined]
             return self == TketOp._from_rs(other)
         elif isinstance(other, str):
             return self.name == other
@@ -95,12 +95,12 @@ class Pauli(Enum):
         gate_name = self.name
         return CustomOp(extension_name, gate_name, [QB_T], [QB_T])
 
-    def _to_rs(self) -> tket._tket.ops.Pauli:
+    def _to_rs(self) -> "tket._tket.ops.Pauli":  # type: ignore[name-defined]
         """Convert to the Rust-backed Pauli representation."""
-        return tket._tket.ops.Pauli(self.name)
+        return tket._tket.ops.Pauli(self.name)  # type: ignore[attr-defined]
 
     @staticmethod
-    def _from_rs(pauli: tket._tket.ops.Pauli) -> "Pauli":
+    def _from_rs(pauli: tket._tket.ops.Pauli) -> "Pauli":  # type: ignore[name-defined]
         """Convert from the Rust-backed Pauli representation."""
         return Pauli[pauli.name]
 
@@ -108,7 +108,7 @@ class Pauli(Enum):
         """Check if two Paulis are equal."""
         if isinstance(other, Pauli):
             return self.name == other.name
-        elif isinstance(other, tket._tket.ops.Pauli):
+        elif isinstance(other, tket._tket.ops.Pauli):  # type: ignore[attr-defined]
             return self == Pauli._from_rs(other)
         elif isinstance(other, str):
             return self.name == other

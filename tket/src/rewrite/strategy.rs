@@ -66,9 +66,7 @@ pub trait RewriteStrategy {
     /// Returns the cost of a rewrite's matched subcircuit before replacing it.
     #[inline]
     fn pre_rewrite_cost(&self, rw: &CircuitRewrite, circ: &Circuit) -> Self::Cost {
-        circ.nodes_cost(rw.subcircuit().nodes().iter().copied(), |op| {
-            self.op_cost(op)
-        })
+        circ.nodes_cost(rw.subgraph().nodes().iter().copied(), |op| self.op_cost(op))
     }
 
     /// Returns the expected cost of a rewrite's matched subcircuit after replacing it.
@@ -129,14 +127,14 @@ impl RewriteStrategy for GreedyRewriteStrategy {
         let mut circ = circ.clone();
         for rewrite in rewrites {
             if rewrite
-                .subcircuit()
+                .subgraph()
                 .nodes()
                 .iter()
                 .any(|n| changed_nodes.contains(n))
             {
                 continue;
             }
-            changed_nodes.extend(rewrite.subcircuit().nodes().iter().copied());
+            changed_nodes.extend(rewrite.subgraph().nodes().iter().copied());
             cost_delta += rewrite.node_count_delta();
             rewrite
                 .apply(&mut circ)
@@ -474,15 +472,30 @@ impl GammaStrategyCost<fn(&OpType) -> usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use hugr::hugr::views::SiblingSubgraph;
     use hugr::Node;
     use itertools::Itertools;
 
     use crate::rewrite::trace::REWRITE_TRACING_ENABLED;
-    use crate::{
-        circuit::Circuit,
-        rewrite::{CircuitRewrite, Subcircuit},
-        utils::build_simple_circuit,
-    };
+    use crate::{circuit::Circuit, rewrite::CircuitRewrite, utils::build_simple_circuit};
+
+    /// Create a rewrite rule to replace the subcircuit with a new circuit.
+    /// TODO: this should use the new Subcircuit; TEMP TEST WORKAROUND until that arrives.
+    ///
+    /// # Parameters
+    /// * `circuit` - The base circuit that contains the subcircuit.
+    /// * `replacement` - The new circuit to replace the subcircuit with.
+    fn create_rewrite(
+        ssg: &SiblingSubgraph<Node>,
+        circuit: &Circuit<impl HugrView<Node = Node>>,
+        replacement: Circuit<impl HugrView<Node = Node>>,
+    ) -> CircuitRewrite {
+        // The replacement must be a Dfg rooted hugr.
+        let replacement = replacement.extract_dfg().unwrap().into_hugr();
+        ssg.create_simple_replacement(circuit.hugr(), replacement)
+            .unwrap()
+            .into()
+    }
 
     fn n_cx(n_gates: usize) -> Circuit {
         let qbs = [0, 1];
@@ -497,18 +510,14 @@ mod tests {
 
     /// Rewrite cx_nodes -> empty
     fn rw_to_empty(circ: &Circuit, cx_nodes: impl Into<Vec<Node>>) -> CircuitRewrite {
-        let subcirc = Subcircuit::try_from_nodes(cx_nodes, circ).unwrap();
-        subcirc
-            .create_rewrite(circ, n_cx(0))
-            .unwrap_or_else(|e| panic!("{}", e))
+        let subcirc = SiblingSubgraph::try_from_nodes(cx_nodes, circ.hugr()).unwrap();
+        create_rewrite(&subcirc, circ, n_cx(0))
     }
 
     /// Rewrite cx_nodes -> 10x CX
     fn rw_to_full(circ: &Circuit, cx_nodes: impl Into<Vec<Node>>) -> CircuitRewrite {
-        let subcirc = Subcircuit::try_from_nodes(cx_nodes, circ).unwrap();
-        subcirc
-            .create_rewrite(circ, n_cx(10))
-            .unwrap_or_else(|e| panic!("{}", e))
+        let subcirc = SiblingSubgraph::try_from_nodes(cx_nodes, circ.hugr()).unwrap();
+        create_rewrite(&subcirc, circ, n_cx(10))
     }
 
     #[test]

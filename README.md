@@ -1,7 +1,7 @@
 # tket: The Hardware Agnostic Quantum Compiler
 
-[![build_status][]](https://github.com/CQCL/tket2/actions)
-[![codecov][]](https://codecov.io/gh/CQCL/tket2)
+[![build_status][]](https://github.com/quantinuum/tket2/actions)
+[![codecov][]](https://codecov.io/gh/quantinuum/tket2)
 
 TKET is an open source quantum compiler developed by Quantinuum. Central to
 TKET's design is its hardware agnosticism which allows researchers and quantum
@@ -12,8 +12,8 @@ different quantum architectures.
 a python package on [PyPI](https://pypi.org/project/tket/).
 
 See the respective
-[Rust](https://github.com/CQCL/tket2/blob/main/tket) and
-[Python](https://github.com/CQCL/tket2/blob/main/tket-py) READMEs for
+[Rust](https://github.com/quantinuum/tket2/blob/main/tket) and
+[Python](https://github.com/quantinuum/tket2/blob/main/tket-py) READMEs for
 more information.
 
 ## Usage
@@ -22,7 +22,7 @@ The rust crate documentation is available at [docs.rs](https://docs.rs/tket).
 
 See the [Getting Started][getting-started] notebook for a quick introduction to using `tket` in Python.
 
-  [getting-started]: https://github.com/CQCL/tket2/blob/main/tket-py/docs/examples/1-Getting-Started.ipynb
+  [getting-started]: https://github.com/quantinuum/tket2/blob/main/tket-py/docs/examples/1-Getting-Started.ipynb
 
 ## Developing TKET
 
@@ -32,7 +32,7 @@ See [DEVELOPMENT.md][] for instructions on setting up the development environmen
 
 This project is licensed under Apache License, Version 2.0 ([LICENSE][] or <http://www.apache.org/licenses/LICENSE-2.0>).
 
-  [build_status]: https://github.com/CQCL/tket2/actions/workflows/ci.yml/badge.svg
-  [codecov]: https://img.shields.io/codecov/c/gh/CQCL/tket2?logo=codecov
-  [LICENSE]: https://github.com/CQCL/tket2/blob/main/LICENCE
-  [DEVELOPMENT.md]: https://github.com/CQCL/tket2/blob/main/DEVELOPMENT.md
+  [build_status]: https://github.com/quantinuum/tket2/actions/workflows/ci.yml/badge.svg
+  [codecov]: https://img.shields.io/codecov/c/gh/quantinuum/tket2?logo=codecov
+  [LICENSE]: https://github.com/quantinuum/tket2/blob/main/LICENCE
+  [DEVELOPMENT.md]: https://github.com/quantinuum/tket2/blob/main/DEVELOPMENT.md

@@ -28,6 +28,17 @@ pub struct SubgraphId {
     local_id: usize,
 }
 
+impl SubgraphId {
+    /// Returns a unique parameter name for the `i`-th output parameter of the subgraph.
+    pub(crate) fn output_parameter(&self, i: usize) -> String {
+        format!(
+            "p{tracker}_{local}_out{i}",
+            tracker = self.tracker_id,
+            local = self.local_id,
+        )
+    }
+}
+
 impl serde::Serialize for SubgraphId {
     fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
         (&self.tracker_id, &self.local_id).serialize(s)
@@ -133,7 +144,9 @@ impl<N: HugrNode> OpaqueSubgraphs<N> {
             return Ok(());
         };
 
-        let Some(subgraph_id) = OpaqueSubgraphPayload::parse_external_id(&payload) else {
+        let Some((subgraph_id, input_arguments)) =
+            OpaqueSubgraphPayload::parse_external_payload(&payload)
+        else {
             // Not an External Payload, nothing to do.
             return Ok(());
         };
@@ -141,7 +154,7 @@ impl<N: HugrNode> OpaqueSubgraphs<N> {
             return Err(PytketEncodeError::custom(format!("Barrier operation with external subgraph payload points to an unknown subgraph: {subgraph_id}")));
         }
 
-        let payload = OpaqueSubgraphPayload::new_inline(&self[subgraph_id], hugr)?;
+        let payload = OpaqueSubgraphPayload::new_inline(&self[subgraph_id], hugr, input_arguments)?;
         command.op.data = Some(serde_json::to_string(&payload).unwrap());
 
         Ok(())
