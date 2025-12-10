@@ -44,6 +44,9 @@ __all__ = [
     "chunks",
     "normalize_guppy",
     "PullForwardError",
+    "PytketPass",
+    "PassResult",
+    "NormalizeGuppy",
 ]
 
 
