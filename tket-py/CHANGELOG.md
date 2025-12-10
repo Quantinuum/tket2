@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.12.13](https://github.com/Quantinuum/tket2/compare/tket-py-v0.12.12...tket-py-v0.12.13) (2025-12-10)
+
+
+### Features
+
+* Allow running arbitrary serializable pytket passes on hugrs ([#1266](https://github.com/Quantinuum/tket2/issues/1266)) ([24875e0](https://github.com/Quantinuum/tket2/commit/24875e06121a6929e842cc3f5c78126fc8bffc6f))
+* do constant folding by default in NormalizeGuppy ([#1309](https://github.com/Quantinuum/tket2/issues/1309)) ([3838c49](https://github.com/Quantinuum/tket2/commit/3838c4903077ca926a81141e10b18a984c4fbcf7))
+* implement `ComposablePass` for normalize Guppy pass ([#1286](https://github.com/Quantinuum/tket2/issues/1286)) ([d72d84d](https://github.com/Quantinuum/tket2/commit/d72d84d55b22ed574fe15f322304d54c5d445d1a))
+* implement `ComposeablePass` interface for any serializable pytket pass. ([#1269](https://github.com/Quantinuum/tket2/issues/1269)) ([71cb1f2](https://github.com/Quantinuum/tket2/commit/71cb1f2354b9e5058ff3c4ebe3e932e219105cbc))
+
+
+### Bug Fixes
+
+* update incomplete API docs for passes module ([#1308](https://github.com/Quantinuum/tket2/issues/1308)) ([0276ba2](https://github.com/Quantinuum/tket2/commit/0276ba201c38dbbccc92c237d5947b3f429a2a1a))
+* update incorrect version info in notebook ([#1312](https://github.com/Quantinuum/tket2/issues/1312)) ([af160ed](https://github.com/Quantinuum/tket2/commit/af160ed403edd836161ef46477423a31c15af4de))
+* Use qsystem extensions on Tk2Circuit.from_bytes/str ([#1296](https://github.com/Quantinuum/tket2/issues/1296)) ([df9f52a](https://github.com/Quantinuum/tket2/commit/df9f52a1d8cb0047fc4732beddfaeb2aa9b43d8b))
+
+
+### Documentation
+
+* add notebook on optimization of Guppy programs ([#1287](https://github.com/Quantinuum/tket2/issues/1287)) ([e82f959](https://github.com/Quantinuum/tket2/commit/e82f959c5b6a32ab4dcd0c60fc685e89e941d7ae))
+
 ## [0.12.12](https://github.com/quantinuum/tket2/compare/tket-py-v0.12.11...tket-py-v0.12.12) (2025-11-18)
 
 
