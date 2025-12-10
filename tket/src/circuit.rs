@@ -374,7 +374,7 @@ impl<T: HugrView> From<T> for Circuit<T> {
 
 /// Checks if the passed hugr is a valid circuit,
 /// and return [`CircuitError`] if not.
-fn check_hugr<H: HugrView>(hugr: &H) -> Result<(), CircuitError<H::Node>> {
+pub fn check_hugr<H: HugrView>(hugr: &H) -> Result<(), CircuitError<H::Node>> {
     let optype = hugr.entrypoint_optype();
     match optype {
         // Dataflow nodes are always valid.

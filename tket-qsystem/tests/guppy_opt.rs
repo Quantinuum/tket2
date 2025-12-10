@@ -1,8 +1,9 @@
 //! Tests optimizing Guppy-generated programs.
 
+use hugr::hugr::hugrmut::HugrMut;
 use rayon::iter::ParallelIterator;
 use smol_str::SmolStr;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::fs;
 use std::io::BufReader;
 use std::path::Path;
@@ -46,19 +47,32 @@ fn load_guppy_example(path: &str) -> std::io::Result<Hugr> {
 }
 
 fn run_pytket(h: &mut Hugr) {
-    let circ = Circuit::new(h);
-    let mut encoded =
-        EncodedCircuit::new(&circ, EncodeOptions::new().with_subcircuits(true)).unwrap();
+    let old_ep = h.entrypoint();
+    // We do not believe the above should remove any nodes that are valid Circuit parents,
+    // except DFGs (which are "transparent"); so include only DFGs not contained in some
+    // optimizable ancestor.
+    let mut queue = VecDeque::from([h.module_root()]);
+    while let Some(n) = queue.pop_front() {
+        h.set_entrypoint(n);
 
-    encoded
-        .par_iter_mut()
-        .for_each(|(_region, serial_circuit)| {
-            let mut circuit_ptr = Tket1Circuit::from_serial_circuit(serial_circuit).unwrap();
-            Tket1Pass::run_from_json(CLIFFORD_SIMP_STR, &mut circuit_ptr).unwrap();
-            *serial_circuit = circuit_ptr.to_serial_circuit().unwrap();
-        });
+        if let Ok(circ) = Circuit::try_new(&mut *h) {
+            let mut encoded =
+                EncodedCircuit::new(&circ, EncodeOptions::new().with_subcircuits(true)).unwrap();
 
-    encoded.reassemble_inplace(circ.into_hugr(), None).unwrap();
+            encoded
+                .par_iter_mut()
+                .for_each(|(_region, serial_circuit)| {
+                    let mut circuit_ptr =
+                        Tket1Circuit::from_serial_circuit(serial_circuit).unwrap();
+                    Tket1Pass::run_from_json(CLIFFORD_SIMP_STR, &mut circuit_ptr).unwrap();
+                    *serial_circuit = circuit_ptr.to_serial_circuit().unwrap();
+                });
+
+            encoded.reassemble_inplace(circ.into_hugr(), None).unwrap();
+        }
+        queue.extend(h.children(n))
+    }
+    h.set_entrypoint(old_ep);
 }
 
 fn count_gates(h: &impl HugrView) -> HashMap<SmolStr, usize> {
@@ -80,22 +94,14 @@ fn count_gates(h: &impl HugrView) -> HashMap<SmolStr, usize> {
 
 #[rstest]
 #[case::nested_array("nested_array", None)]
-#[should_panic = "xfail"]
-#[case::angles("angles", Some(vec![
-    ("tket.quantum.Rz", 2), ("tket.quantum.MeasureFree", 1), ("tket.quantum.H", 2), ("tket.quantum.QAlloc", 1)
-]))]
+#[should_panic = "PytketDecodeError { inner: DuplicatedParameter"]
+#[case::angles("angles", None)]
 #[should_panic = "xfail"]
 #[case::simple_cx("simple_cx", Some(vec![
     ("tket.quantum.QAlloc", 2), ("tket.quantum.MeasureFree", 2),
 ]))]
-#[should_panic = "xfail"]
-#[case::nested("nested", Some(vec![
-    ("tket.quantum.CZ", 6), ("tket.quantum.QAlloc", 3), ("tket.quantum.MeasureFree", 3), ("tket.quantum.H", 6)
-]))]
-#[should_panic = "xfail"]
-#[case::ranges("ranges", Some(vec![
-    ("tket.quantum.H", 8), ("tket.quantum.MeasureFree", 4), ("tket.quantum.QAlloc", 4), ("tket.quantum.CX", 6)
-]))]
+#[case::nested("nested", None)]
+#[case::ranges("ranges", None)]
 #[should_panic = "xfail"]
 #[case::false_branch("false_branch", Some(vec![
     ("TKET1.tk1op", 1), ("tket.quantum.H", 1), ("tket.quantum.QAlloc", 1), ("tket.quantum.MeasureFree", 1)
@@ -127,23 +133,9 @@ fn optimize_flattened_guppy(#[case] name: &str, #[case] xfail: Option<Vec<(&str,
 #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
 fn optimize_guppy_ranges_array() {
     // Demonstrates we can fully optimize the array operations in ranges
-    // (after control flow is flattened) if we play around with the entrypoint.
-    use hugr::algorithms::const_fold::ConstantFoldPass;
-    use hugr::hugr::hugrmut::HugrMut;
-    use tket::passes::BorrowSquashPass;
+    // (starting with a Hugr where only control flow has been flattened, not arrays)
     let mut hugr = load_guppy_example("ranges/ranges.flat.array.hugr").unwrap();
-
-    let f = hugr
-        .children(hugr.module_root())
-        .find(|n| {
-            hugr.get_optype(*n)
-                .as_func_defn()
-                .is_some_and(|fd| fd.func_name() == "f")
-        })
-        .unwrap();
-    hugr.set_entrypoint(f);
-    ConstantFoldPass::default().run(&mut hugr).unwrap();
-    BorrowSquashPass::default().run(&mut hugr).unwrap();
+    NormalizeGuppy::default().run(&mut hugr).unwrap();
     run_pytket(&mut hugr);
     let expected_counts =
         count_gates(&load_guppy_circuit("ranges", HugrFileType::Optimized).unwrap());

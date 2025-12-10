@@ -7,7 +7,8 @@ use hugr::algorithms::untuple::{UntupleError, UntupleRecursive};
 use hugr::algorithms::{ComposablePass, RemoveDeadFuncsError, RemoveDeadFuncsPass, UntuplePass};
 use hugr::hugr::hugrmut::HugrMut;
 use hugr::hugr::patch::inline_dfg::InlineDFGError;
-use hugr::Node;
+use hugr::ops::Value;
+use hugr::{IncomingPort, Node};
 
 use crate::passes::BorrowSquashPass;
 
@@ -80,6 +81,17 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for NormalizeGuppy {
     type Error = NormalizeGuppyErrors;
     type Result = ();
     fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
+        let old_ep = hugr.entrypoint();
+        if self.dead_funcs && old_ep != hugr.module_root() {
+            // Remove everything not reachable from the entrypoint.
+            // (Could use visibility for module-entrypoint Hugrs, this might
+            // be appropriate if they are intended as libraries?)
+            RemoveDeadFuncsPass::default().run(hugr)?;
+        }
+        let old_ep = (old_ep != hugr.module_root()).then_some({
+            hugr.set_entrypoint(hugr.module_root());
+            old_ep
+        });
         if self.simplify_cfgs {
             NormalizeCFGPass::default().run(hugr)?;
         }
@@ -88,13 +100,12 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for NormalizeGuppy {
             UntuplePass::new(UntupleRecursive::Recursive).run(hugr)?;
         }
         // Should propagate through untuple, so could do earlier, and must be before BorrowSquash
-        if self.constant_fold {
-            ConstantFoldPass::default().run(hugr)?;
-        }
-        // Only improves compilation speed, not affected by anything else
-        // until we start removing untaken branches
-        if self.dead_funcs {
-            RemoveDeadFuncsPass::default().run(hugr)?;
+        if let Some(ep) = old_ep.filter(|_| self.constant_fold) {
+            // For module-entrypoint Hugrs, we'd need to decide which functions are callable;
+            // the default is to assume none.
+            let no_inputs: [(IncomingPort, Value); 0] = [];
+            let cp = ConstantFoldPass::default().with_inputs(ep, no_inputs);
+            cp.run(hugr)?;
         }
         // Do earlier? Nothing creates DFGs
         if self.inline_dfgs {
@@ -107,7 +118,9 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for NormalizeGuppy {
                 .run(hugr)
                 .unwrap_or_else(|e| match e {});
         }
-
+        if let Some(ep) = old_ep {
+            hugr.set_entrypoint(ep);
+        }
         Ok(())
     }
 }
