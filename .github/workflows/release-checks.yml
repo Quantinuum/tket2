@@ -58,10 +58,10 @@ jobs:
           uv python pin ${{ matrix.target.python }}
       - name: Setup `tket-py` with only pypi deps
         env:
-          UV_RESOLUTION: ${{ matrix.target.resolution }}
+          RES: ${{ matrix.target.resolution }}
         run: |
-          uv lock --no-sources -U
-          uv sync --no-sources --no-install-workspace
+          UV_RESOLUTION="$RES" uv lock --no-sources -U
+          UV_RESOLUTION="$RES" uv sync --no-sources --no-install-workspace
           uv pip install --no-sources tket-exts
           uv pip install --no-sources tket-eccs
           uv run --no-sync maturin develop
