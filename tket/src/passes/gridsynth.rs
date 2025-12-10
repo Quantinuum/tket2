@@ -100,7 +100,6 @@ fn find_angle_node(hugr: &mut Hugr, rz_node: Node) -> Node {
     loop {
         let (current_node, _) = find_single_linked_output_by_index(hugr, prev_node, 0);
         let op_type = hugr.get_optype(current_node);
-        println!("{}", current_node.index());
         if op_type.is_const() {
             hugr.remove_node(prev_node);
             let angle_node = current_node;
@@ -125,32 +124,8 @@ fn find_angle(hugr: &mut Hugr) -> f64 {
     let op_type = hugr.get_optype(angle_node);
     let angle_const = op_type.as_const().unwrap();
     let angle_val = &angle_const.value;
-    let angle_type = angle_val.get_type();
-    // let angle_type = angle_type.as_extension();
-    // match angle_type.
-    // println!("sum is: {:?}", angle_val.get_custom_value());
-    println!("extensions are: {:?}", angle_type);
-    // match angle_type {
-    //     float64 => {
-            
-    //     },
 
-    // }
-    println!("angle val is {:?} with type {}", angle_val, angle_val.get_type());
-    // println!("value is {}", angle_val::value);
-    // println!("Custom val is: {:?}", angle_val.value());
-    // if angle_type == 'float64' {
-        
-    // }
-    // let angle_val = angle_val.get_type().value();
-    // println!("Value is {}", angle_val.value());
-    // let custom_val: Option<&dyn CustomConst> = angle_val.get_custom_value();
-    // let rot= match custom_val {
-    //     None => None,
-    //     Some(custom_val) => Some(custom_val),
-    // };
-    // println!("{:?}", rot);
-
+    // handling likely angle formats. Panic if angle is not one of the anticipated formats
     let angle = if let Some(rot) = angle_val.get_custom_value::<ConstRotation>() {
       rot.to_radians()
     } else if let Some(fl) = angle_val.get_custom_value::<ConstF64>() {
@@ -163,7 +138,6 @@ fn find_angle(hugr: &mut Hugr) -> f64 {
     // we now have what we need to know from the angle node and can remove it from the hugr 
     hugr.remove_node(angle_node);
 
-    println!("{}", angle);
     angle
 }
 
@@ -202,7 +176,6 @@ fn gridsynth_output_to_hugr(gates: &str) -> Hugr {
     h.set_outputs(prev_op.outputs()).unwrap();
     let hugr = h.finish_hugr().unwrap();
     hugr.validate().unwrap_or_else(|e| panic!("{e}"));
-    println!("{}", hugr.mermaid_string());
     hugr
 }
 
@@ -228,39 +201,26 @@ fn add_gate_and_connect(hugr: &mut Hugr, prev_node: Node, op: hugr::ops::OpType,
     prev_node
 }
 
-fn find_dfg_output_node(hugr: &mut Hugr) -> Option<crate::hugr::Node> {
-    for node in hugr.nodes() {
-        let op_type = hugr.get_optype(node);
-        if op_type.is_dfg() {
-            let dfg_node = node;
-            for node in hugr.descendants(dfg_node) {
-                let op_type = HugrView::get_optype(hugr, node);
-                if op_type.is_output() {
-                    return Some(node);
-                }
-            }
-        }
-    }
-    None
-}
 
 fn replace_rz_with_gridsynth_output(hugr: &mut Hugr, rz_node: Node, gates: &str) {
     // getting node that gave qubit to Rz gate
     let mut prev_node = find_qubit_source(hugr, rz_node);
-    let dfg_output_node = find_dfg_output_node(hugr).unwrap();
+    let parent = hugr.get_parent(rz_node).unwrap();
+    let output_node = hugr.get_io(parent).unwrap()[1];
+    // let dfg_output_node = find_sibling_output(hugr).unwrap();
 
     hugr.remove_node(rz_node);
 
     // recursively adding next gate in gates to prev_node
     for gate in gates.chars() {
         if gate == 'H' {
-            prev_node = add_gate_and_connect(hugr, prev_node, TketOp::H.into(), dfg_output_node);
+            prev_node = add_gate_and_connect(hugr, prev_node, TketOp::H.into(), output_node);
         }
         else if gate == 'S' {
-            prev_node = add_gate_and_connect(hugr, prev_node, TketOp::S.into(), dfg_output_node);
+            prev_node = add_gate_and_connect(hugr, prev_node, TketOp::S.into(), output_node);
         }
         else if gate == 'T' {
-            prev_node = add_gate_and_connect(hugr, prev_node, TketOp::T.into(), dfg_output_node);
+            prev_node = add_gate_and_connect(hugr, prev_node, TketOp::T.into(), output_node);
         }
         else if gate == 'W' {
             // find output node and connect it to node for previous gate
@@ -268,9 +228,9 @@ fn replace_rz_with_gridsynth_output(hugr: &mut Hugr, rz_node: Node, gates: &str)
             let ports:  Vec<_> = hugr.node_outputs(prev_node).collect();
             // Assuming there were no outgoing ports to begin with when deciding port offset
             let src_port = ports[0];
-            let ports:  Vec<_> = hugr.node_inputs(dfg_output_node).collect();
+            let ports:  Vec<_> = hugr.node_inputs(output_node).collect();
             let dst_port = ports[0];
-            hugr.connect(prev_node, src_port, dfg_output_node, dst_port);
+            hugr.connect(prev_node, src_port, output_node, dst_port);
             break; // Ignoring global phases for now.
         }
     }
@@ -370,8 +330,7 @@ mod tests {
 
     #[test]
     fn found_rz_guppy() {
-        let epsilon = 1e-2;
-        let mut imported_hugr = &mut import_rz_only_guppy_circuit();
+        let imported_hugr = &mut import_rz_only_guppy_circuit();
         NormalizeGuppy::default()
             .simplify_cfgs(true)
             .remove_tuple_untuple(true)
