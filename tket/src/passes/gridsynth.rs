@@ -1,15 +1,8 @@
-//! TKET extension crate.
-//
-// TODO: These docs appear in the landing page of the crate documentation on docs.rs.
-// Make sure to update them to reflect the details of your extension.
-
-use hugr_core::{IncomingPort, OutgoingPort};
-use itertools::Itertools;
-use portgraph::Direction;
+use hugr::NodeIndex;
+use hugr_core:: OutgoingPort;
 use rsgridsynth::config::config_from_theta_epsilon;
 use rsgridsynth::gridsynth::gridsynth_gates;
 use crate::extension::rotation::ConstRotation;
-// use crate::hugr::ops::handle::NodeHandle;
 use crate::{Hugr, hugr, op_matches};
 use crate::hugr::builder::{DFGBuilder, Dataflow, HugrBuilder};
 use crate::hugr::extension::prelude::{qb_t};
@@ -18,7 +11,8 @@ use crate::hugr::hugr::hugrmut::HugrMut;
 use crate::hugr::{Node, Port};
 use crate::hugr::types::Signature;
 use crate::TketOp;
-// use crate::passes::guppy::NormalizeGuppy; 
+use hugr::algorithms::ComposablePass;
+use crate::passes::guppy::NormalizeGuppy; 
 
 
 /// Find the FuncDefn node for the Rz gate.
@@ -87,59 +81,40 @@ fn find_single_linked_output_by_index(hugr: &mut Hugr, node: Node, port_idx: usi
 //     }
 // }
 
-/// Find the constant node containing the angle to be inputted to the Rz gate
+/// Find the constant node containing the angle to be inputted to the Rz gate.
+/// It is assumed that `hugr` has had the NormalizeGuppy passes applied to it 
+/// prior to being applied
 fn find_angle_node(hugr: &mut Hugr, rz_node: Node) -> Node {
     // find linked ports to the rz port where the angle will be inputted
     // the port offset of the angle is known to be 1 for the rz gate.
     let (mut prev_node, _) = find_single_linked_output_by_index(hugr, rz_node, 1);
+    println!("Before loop, index is: {}", prev_node.index());
 
     // SHORTCUT: specialise to simple hugrs with LoadConst preceded by const node
     // TO DO: generalise the following
-    let linked_ports = find_linked_incoming_ports(hugr, prev_node, 0);
-    let angle_node = linked_ports[0].0;
+    // let linked_ports = find_linked_incoming_ports(hugr, prev_node, 0);
+    // let angle_node = linked_ports[0].0;
 
-    // recursively check input neighbours until a constant node is found, explicitly handling some 
-    // specific edge cases where it may be a different constant
-    // loop {
-    //     for (pos, node) in hugr.input_neighbours(prev_node).with_position() {
-    //         // let mut is_first_neighbour = true; // for checking if node is first neighbour
-    //         let op_type = hugr.get_optype(node);
-    //         if op_type.is_const() {
-    //             break;
-    //         }
-    //         else if pos == itertools::Position::Only {
-    //             let first_neighbour = node;
-    //         }
-    //         // if first neighbour
-    //         else if pos == itertools::Position::First {
-    //             let first_neighbour = node;
-    //         }
-    //         // else if is last element of neighbour
-    //         else if ps == itertools::Position::Last {
-                
-    //         }
-    //     }
-    //     // for (pos, node) in hugr.input_neighbours(prev_node).with_position() {
-    //     //     // let mut is_first_neighbour = true; // for checking if node is first neighbour
-    //     //     let op_type = hugr.get_optype(node);
-    //     //     if op_type.is_const() {
-    //     //         break;
-    //     //     }
-    //     //     else if pos == itertools::Position::Only {
-    //     //         let first_neighbour = node;
-    //     //     }
-    //     //     // if first neighbour
-    //     //     else if pos == itertools::Position::First {
-    //     //         let first_neighbour = node;
-    //     //     }
-    //     //     // else if is last element of neighbour
-    //     //     else if ps == itertools::Position::Last {
-                
-    //     //     }
-    //     // }
-    // }
-
-    angle_node
+    // as all of the NormalizeGuppy passes have been run on the `hugr` before it enters this function,
+    // and these passes include constant folding, we can assume that we can follow the 0th ports back
+    // to a constant node where the angle is defined.
+    let max_iterations = 10;
+    let mut ii = 0;
+    loop {
+        let (current_node, _) = find_single_linked_output_by_index(hugr, prev_node, 0);
+        let op_type = hugr.get_optype(current_node);
+        println!("{}", current_node.index());
+        if op_type.is_const() {
+            println!("condition met");
+            let angle_node = current_node;
+            return angle_node;
+        }
+        if ii >= max_iterations {
+            panic!("Angle finding failed"); // TO DO: improve error handling
+        }
+        prev_node = current_node;
+        ii += 1;
+    }
 }
 
 fn find_angle(hugr: &mut Hugr) -> f64 {
@@ -148,6 +123,10 @@ fn find_angle(hugr: &mut Hugr) -> f64 {
     let op_type = hugr.get_optype(angle_node);
     let angle_const = op_type.as_const().unwrap();
     let angle_val = &angle_const.value;
+    println!("angle val is {:?} with type {}", angle_val, angle_val.get_type());
+    
+    // let angle_val = angle_val.get_type().value();
+    println!("Value is {}", angle_val.value());
     let rot: &ConstRotation = angle_val.get_custom_value().unwrap();
     let angle = rot.to_radians();
     angle
@@ -280,6 +259,16 @@ fn replace_rz_with_gridsynth_output(hugr: &mut Hugr, rz_node: Node, gates: &str)
 
 /// Replace an Rz gate with the corresponding gates outputted by gridsynth
 pub fn apply_gridsynth_pass(hugr: &mut Hugr, epsilon: f64) {
+    // Running passes to convert HUGR to standard form
+    NormalizeGuppy::default()
+        .simplify_cfgs(true)
+        .remove_tuple_untuple(true)
+        .constant_folding(true)
+        .remove_dead_funcs(true)
+        .inline_dfgs(true)
+        .run(hugr)
+        .unwrap();
+
     let rz_node = find_rz(hugr).unwrap();
     let gates = apply_gridsynth(hugr, epsilon);
     destroy_path_to_angle_node(hugr, rz_node);
@@ -302,18 +291,15 @@ pub struct ExampleError {
 #[cfg(test)]
 mod tests {
     use std::fs::File;
-    use std::io::{BufReader, stdin};
+    use std::io::BufReader;
 
     use super::*;
 
-    use hugr_core::extension::{ExtensionRegistry, PRELUDE};
-    use hugr_core::std_extensions::{STD_REG, std_reg};
+    use hugr_core::std_extensions::std_reg;
     use crate::hugr::builder::Container;
     use crate::hugr::envelope::read_described_envelope;
     use crate::hugr::ops::Value;
     use crate::extension::rotation::ConstRotation;
-    use crate::hugr::package::Package;
-    use crate::hugr::algorithms::const_fold::constant_fold_pass;
 
     fn build_rz_only_circ() -> (Hugr, Node) {
         let theta = 0.64;
@@ -332,11 +318,22 @@ mod tests {
         (circ, rz_node)
     }
 
+    fn import_rz_only_guppy_circuit() -> Hugr {
+        // TODO: update the following path
+        let f = File::open("/home/kennycampbell/coding_projects/tket_gridsynth_ext/guppy_rz").unwrap();
+        let reader = BufReader::new(f);
+        let registry = std_reg();
+        let (_, imported_package) = read_described_envelope(reader, &registry).unwrap();
+        let imported_hugr = imported_package.modules[0].clone();
+        println!("Before: {}", imported_hugr.mermaid_string());
+        imported_hugr
+    }
+
 
     #[test]
     fn gridsynth_pass_successful() {
         // This test is just to check if a panic occurs
-        let (mut circ, rz_node) = build_rz_only_circ();
+        let (mut circ, _) = build_rz_only_circ();
         let epsilon: f64 = 1e-3;
         // let gates = apply_gridsynth(&mut circ, epsilon);
         // println!("{}", &gates);        
@@ -347,20 +344,60 @@ mod tests {
     #[test]
     fn test_gridsynth_output_to_hugr() {
         let epsilon = 1e-3;
-        let (mut circ, rz_node) = build_rz_only_circ();
+        let (mut circ, _) = build_rz_only_circ();
         let gates = apply_gridsynth(&mut circ, epsilon);
         gridsynth_output_to_hugr(&gates);
     }
 
     #[test]
-    fn test_import_guppy_rz() {
-        // TODO: update the following path
-        let f = File::open("/home/kennycampbell/coding_projects/tket_gridsynth_ext/guppy_rz").unwrap();
-        let reader = BufReader::new(f);
-        let registry = std_reg();
-        let (_, mut imported_package) = read_described_envelope(reader, &registry).unwrap();
-        let mut imported_hugr = &mut imported_package.modules[0];
-        constant_fold_pass(imported_hugr.as_mut());
-        println!("{}", imported_hugr.mermaid_string());
+    fn found_rz_guppy() {
+        let epsilon = 1e-2;
+        let mut imported_hugr = &mut import_rz_only_guppy_circuit();
+        NormalizeGuppy::default()
+            .simplify_cfgs(true)
+            .remove_tuple_untuple(true)
+            .constant_folding(true)
+            .remove_dead_funcs(true)
+            .inline_dfgs(true)
+            .run(imported_hugr)
+            .unwrap();
+        let rz_node = find_rz(imported_hugr).unwrap();
+        assert_eq!(rz_node.index(), 17)
+    }
+
+    #[test]
+    fn test_find_angle_node_for_guppy() {
+        let epsilon = 1e-2;
+        let mut imported_hugr = &mut import_rz_only_guppy_circuit();
+        NormalizeGuppy::default()
+            .simplify_cfgs(true)
+            .remove_tuple_untuple(true)
+            .constant_folding(true)
+            .remove_dead_funcs(true)
+            .inline_dfgs(true)
+            .run(imported_hugr)
+            .unwrap();
+        let rz_node = find_rz(imported_hugr).unwrap();
+        let angle_node = find_angle_node(imported_hugr, rz_node);
+        assert_eq!(angle_node.index(), 20);
+
+    }
+
+    #[test]
+    fn test_with_guppy_hugr() {
+        let epsilon = 1e-2;
+        let mut imported_hugr = &mut import_rz_only_guppy_circuit();
+        NormalizeGuppy::default()
+            .simplify_cfgs(true)
+            .remove_tuple_untuple(true)
+            .constant_folding(true)
+            .remove_dead_funcs(true)
+            .inline_dfgs(true)
+            .run(imported_hugr)
+            .unwrap();
+        // constant_fold_pass(imported_hugr.as_mut());
+        // println!("after {}", imported_hugr.mermaid_string());
+        apply_gridsynth_pass(&mut imported_hugr, epsilon);
+        println!("after: {}", imported_hugr.mermaid_string());
     }
 }
