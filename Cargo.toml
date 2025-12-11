@@ -15,8 +15,8 @@ members = [
 default-members = ["tket", "tket-qsystem"]
 
 [workspace.package]
-rust-version = "1.85"
-edition = "2021"
+rust-version = "1.89"
+edition = "2024"
 homepage = "https://github.com/quantinuum/tket2"
 repository = "https://github.com/quantinuum/tket2"
 license = "Apache-2.0"
@@ -52,7 +52,7 @@ large_enum_variant = "allow"
 hugr = "0.24.3"
 hugr-core = "0.24.3"
 hugr-cli = "0.24.3"
-portgraph = "0.15.2"
+portgraph = "0.15.3"
 pyo3 = ">= 0.23.4, < 0.27"
 pyo3-build-config = ">= 0.23.4, < 0.28"
 
