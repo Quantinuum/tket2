@@ -1,4 +1,3 @@
-use hugr::NodeIndex;
 use hugr_core:: OutgoingPort;
 use rsgridsynth::config::config_from_theta_epsilon;
 use rsgridsynth::gridsynth::gridsynth_gates;
@@ -19,7 +18,7 @@ use crate::passes::guppy::NormalizeGuppy;
 /// Find the FuncDefn node for the Rz gate.
 fn find_rz(hugr: &mut Hugr) -> Option<crate::hugr::Node> {
     for node in hugr.nodes() {
-        let op_type = HugrView::get_optype(hugr, node);
+        let op_type = hugr.get_optype(node);
         if op_matches(op_type, TketOp::Rz) {
             return Some(node);
         }
@@ -46,41 +45,6 @@ fn find_single_linked_output_by_index(hugr: &mut Hugr, node: Node, port_idx: usi
     prev_node_and_port
 }
 
-    // for node in hugr.nodes() {
-    //     let op_type = HugrView::get_optype(hugr, node);
-    //     if op_type.is_dfg() {
-    //         let dfg_node = node;
-    //         for node in hugr.descendants(dfg_node) {
-    //             let op_type = HugrView::get_optype(hugr, node);
-    //             if op_type.is_output() {
-    //                 return Some(node);
-    //             }
-    //         }
-    //     }
-    // }
-    // None
-
-// fn search4angle(prev_node: Node) {
-//     for (pos, node) in hugr.input_neighbours(prev_node).with_position() {
-//         // let mut is_first_neighbour = true; // for checking if node is first neighbour
-//         let op_type = hugr.get_optype(node);
-//         if op_type.is_const() {
-//             break
-//         }
-//         else if pos == itertools::Position::Only {
-//             let first_neighbour = node;
-
-//         }
-//         // if first neighbour
-//         else if pos == itertools::Position::First {
-//             let first_neighbour = node;
-//         }
-//         // else if is last element of neighbour
-//         else if ps == itertools::Position::Last {
-            
-//         }
-//     }
-// }
 
 /// Find the constant node containing the angle to be inputted to the Rz gate.
 /// It is assumed that `hugr` has had the NormalizeGuppy passes applied to it 
@@ -283,6 +247,7 @@ mod tests {
 
     use super::*;
 
+    use hugr::NodeIndex;
     use hugr_core::std_extensions::std_reg;
     use crate::hugr::builder::Container;
     use crate::hugr::envelope::read_described_envelope;
