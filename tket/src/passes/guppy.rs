@@ -1,5 +1,6 @@
 //! A pass that normalizes the structure of Guppy-generated circuits into something that can be optimized by tket.
 
+use hugr::Node;
 use hugr::algorithms::const_fold::{ConstFoldError, ConstantFoldPass};
 use hugr::algorithms::inline_dfgs::InlineDFGsPass;
 use hugr::algorithms::normalize_cfgs::{NormalizeCFGError, NormalizeCFGPass};
@@ -7,7 +8,6 @@ use hugr::algorithms::untuple::{UntupleError, UntupleRecursive};
 use hugr::algorithms::{ComposablePass, RemoveDeadFuncsError, RemoveDeadFuncsPass, UntuplePass};
 use hugr::hugr::hugrmut::HugrMut;
 use hugr::hugr::patch::inline_dfg::InlineDFGError;
-use hugr::Node;
 
 use crate::passes::BorrowSquashPass;
 

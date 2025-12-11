@@ -1,23 +1,23 @@
 //! Encoder and decoder for the tket.bool extension
 
 use super::PytketEmitter;
-use crate::extension::bool::{BoolOp, ConstBool, BOOL_EXTENSION_ID, BOOL_TYPE_NAME};
+use crate::Circuit;
+use crate::extension::bool::{BOOL_EXTENSION_ID, BOOL_TYPE_NAME, BoolOp, ConstBool};
 use crate::serialize::pytket::config::TypeTranslatorSet;
 use crate::serialize::pytket::decoder::{
     DecodeStatus, LoadedParameter, PytketDecoderContext, TrackedBit, TrackedQubit,
 };
 use crate::serialize::pytket::encoder::{
-    make_tk1_classical_expression, make_tk1_classical_operation, EmitCommandOptions, EncodeStatus,
-    PytketEncoderContext, TrackedValues,
+    EmitCommandOptions, EncodeStatus, PytketEncoderContext, TrackedValues,
+    make_tk1_classical_expression, make_tk1_classical_operation,
 };
 use crate::serialize::pytket::extension::{PytketDecoder, PytketTypeTranslator, RegisterCount};
 use crate::serialize::pytket::{PytketDecodeError, PytketEncodeError};
-use crate::Circuit;
-use hugr::extension::simple_op::MakeExtensionOp;
-use hugr::extension::ExtensionId;
-use hugr::ops::constant::OpaqueValue;
-use hugr::ops::ExtensionOp;
 use hugr::HugrView;
+use hugr::extension::ExtensionId;
+use hugr::extension::simple_op::MakeExtensionOp;
+use hugr::ops::ExtensionOp;
+use hugr::ops::constant::OpaqueValue;
 use itertools::Itertools;
 use tket_json_rs::clexpr::op::ClOp;
 use tket_json_rs::clexpr::operator::{ClArgument, ClOperator, ClTerminal, ClVariable};

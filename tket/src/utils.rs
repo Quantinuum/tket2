@@ -1,8 +1,8 @@
 //! Utility functions for the library.
 
+use hugr::Hugr;
 use hugr::builder::FunctionBuilder;
 use hugr::types::{Type, TypeBound};
-use hugr::Hugr;
 use hugr::{
     builder::{BuildError, CircuitBuilder, Dataflow, DataflowHugr},
     extension::prelude::qb_t,

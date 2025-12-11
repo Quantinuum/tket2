@@ -9,11 +9,11 @@ use std::ops::{Index, IndexMut};
 use derive_more::From;
 use hugr::builder::{Container, FunctionBuilder};
 use hugr::hugr::hugrmut::HugrMut;
-use hugr::hugr::views::sibling_subgraph::TopoConvexChecker;
 use hugr::hugr::views::SiblingSubgraph;
+use hugr::hugr::views::sibling_subgraph::TopoConvexChecker;
 use hugr::hugr::{HugrError, NodeMetadataMap};
-use hugr::ops::handle::DataflowParentID;
 use hugr::ops::OpType;
+use hugr::ops::handle::DataflowParentID;
 use hugr::types::Signature;
 use hugr::{Hugr, HugrView, IncomingPort, Node, OutgoingPort, PortIndex, Wire};
 use hugr_core::hugr::internal::{HugrInternals, HugrMutInternals as _};
@@ -491,8 +491,8 @@ impl<'data> IntoParallelRefMutIterator<'data> for CircuitChunks {
 mod test {
     use crate::circuit::CircuitHash;
 
-    use crate::utils::build_simple_circuit;
     use crate::TketOp;
+    use crate::utils::build_simple_circuit;
 
     use super::*;
 

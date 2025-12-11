@@ -6,20 +6,20 @@ use std::str::FromStr;
 use std::sync::{Arc, Weak};
 
 use hugr::extension::simple_op::{
-    try_from_name, HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
+    HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError, try_from_name,
 };
 use hugr::extension::{ExtensionId, SignatureError, SignatureFunc};
 use hugr::ops::{ExtensionOp, OpName};
 use hugr::types::type_param::TypeParam;
 use hugr::types::{CustomType, PolyFuncType, Signature, TypeArg};
-use hugr::{type_row, Extension};
+use hugr::{Extension, type_row};
 use lazy_static::lazy_static;
 use smol_str::SmolStr;
 
 use crate::extension::TKET_EXTENSION;
 
-use super::rotation::rotation_type;
 use super::TKET_EXTENSION_ID;
+use super::rotation::rotation_type;
 
 /// The name of the symbolic expression opaque type arg.
 pub const SYM_EXPR_NAME: SmolStr = SmolStr::new_inline("SymExpr");
@@ -44,11 +44,7 @@ impl FromStr for SympyOpDef {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s == SYM_OP_ID {
-            Ok(Self)
-        } else {
-            Err(())
-        }
+        if s == SYM_OP_ID { Ok(Self) } else { Err(()) }
     }
 }
 

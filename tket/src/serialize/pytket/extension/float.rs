@@ -1,18 +1,18 @@
 //! Encoder and decoder for floating point operations.
 
 use super::PytketEmitter;
+use crate::Circuit;
+use crate::serialize::pytket::PytketEncodeError;
 use crate::serialize::pytket::config::TypeTranslatorSet;
 use crate::serialize::pytket::encoder::{EncodeStatus, PytketEncoderContext, TrackedValues};
 use crate::serialize::pytket::extension::{PytketTypeTranslator, RegisterCount};
-use crate::serialize::pytket::PytketEncodeError;
-use crate::Circuit;
-use hugr::extension::simple_op::MakeExtensionOp;
+use hugr::HugrView;
 use hugr::extension::ExtensionId;
-use hugr::ops::constant::OpaqueValue;
+use hugr::extension::simple_op::MakeExtensionOp;
 use hugr::ops::ExtensionOp;
+use hugr::ops::constant::OpaqueValue;
 use hugr::std_extensions::arithmetic::float_ops::FloatOps;
 use hugr::std_extensions::arithmetic::{float_ops, float_types};
-use hugr::HugrView;
 
 /// Encoder for [prelude](hugr::extension::prelude) operations.
 #[derive(Debug, Clone, Default)]

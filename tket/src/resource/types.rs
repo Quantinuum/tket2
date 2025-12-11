@@ -5,7 +5,7 @@
 //! positions, and the mapping structures that associate them with operations.
 
 use hugr::{
-    core::HugrNode, types::Signature, Direction, IncomingPort, OutgoingPort, Port, PortIndex, Wire,
+    Direction, IncomingPort, OutgoingPort, Port, PortIndex, Wire, core::HugrNode, types::Signature,
 };
 use itertools::Itertools;
 use num_rational::Rational64;

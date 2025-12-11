@@ -4,7 +4,7 @@ use core::panic;
 use std::cmp::Ordering;
 
 use derive_more::derive::{Display, Error};
-use hugr::{core::HugrNode, Direction, HugrView, IncomingPort, OutgoingPort, Port};
+use hugr::{Direction, HugrView, IncomingPort, OutgoingPort, Port, core::HugrNode};
 use itertools::{Either, Itertools};
 
 use crate::resource::{Position, ResourceId, ResourceScope};
@@ -448,7 +448,7 @@ mod tests {
     use super::{ResourceScope, *};
     use std::ops::RangeInclusive;
 
-    use crate::{resource::tests::cx_circuit, Circuit};
+    use crate::{Circuit, resource::tests::cx_circuit};
 
     use itertools::Itertools;
     use rstest::{fixture, rstest};

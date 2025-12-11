@@ -20,7 +20,7 @@ use crate::serialize::pytket::opaque::{
     EncodedEdgeID, OpaqueSubgraph, OpaqueSubgraphPayload, SubgraphId,
 };
 use crate::serialize::pytket::{
-    PytketDecodeError, PytketDecodeErrorInner, PytketDecoderConfig, PARAMETER_TYPES,
+    PARAMETER_TYPES, PytketDecodeError, PytketDecodeErrorInner, PytketDecoderConfig,
 };
 
 impl<'h> PytketDecoderContext<'h> {
@@ -323,11 +323,7 @@ impl<'h> PytketDecoderContext<'h> {
         let entrypoint_function =
             std::iter::successors(Some(to_insert_hugr.entrypoint()), |&node| {
                 let parent = to_insert_hugr.get_parent(node)?;
-                if parent == module {
-                    None
-                } else {
-                    Some(parent)
-                }
+                if parent == module { None } else { Some(parent) }
             })
             .last()
             .unwrap();

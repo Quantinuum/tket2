@@ -4,7 +4,7 @@
 //! that exposes some of TKET1's passes as Rust functions.
 #![warn(clippy::undocumented_unsafe_blocks)] // TODO: Fix and move to the workspace lints.
 
-use std::ffi::{c_char, CStr, CString};
+use std::ffi::{CStr, CString, c_char};
 use std::ptr;
 use thiserror::Error;
 use tket_json_rs::{OpType, SerialCircuit};

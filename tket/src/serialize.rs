@@ -11,8 +11,8 @@ use std::io;
 use hugr::extension::{ExtensionRegistry, ExtensionRegistryError};
 use hugr::hugr::ValidationError;
 pub use pytket::{
-    load_tk1_json_file, load_tk1_json_reader, load_tk1_json_str, save_tk1_json_file,
-    save_tk1_json_str, save_tk1_json_writer, TKETDecode,
+    TKETDecode, load_tk1_json_file, load_tk1_json_reader, load_tk1_json_str, save_tk1_json_file,
+    save_tk1_json_str, save_tk1_json_writer,
 };
 
 use derive_more::{Display, Error, From};
@@ -160,7 +160,9 @@ pub enum CircuitLoadError {
         available_functions: Vec<String>,
     },
     /// The function has an invalid control flow structure.
-    #[display("Function '{function}' has an invalid control flow structure. Currently only flat functions with no control flow primitives are supported.")]
+    #[display(
+        "Function '{function}' has an invalid control flow structure. Currently only flat functions with no control flow primitives are supported."
+    )]
     InvalidControlFlow {
         /// The function name.
         function: String,
@@ -272,8 +274,8 @@ fn find_function(mut hugr: Hugr, function_name: &str) -> Result<Circuit, Circuit
 
 #[cfg(test)]
 mod tests {
-    use crate::circuit::CircuitHash;
     use crate::TketOp;
+    use crate::circuit::CircuitHash;
 
     use super::*;
 

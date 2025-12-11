@@ -2,7 +2,7 @@
 
 mod commutation;
 
-pub use commutation::{apply_greedy_commutation, PullForwardError};
+pub use commutation::{PullForwardError, apply_greedy_commutation};
 
 pub mod borrow_squash;
 pub use borrow_squash::BorrowSquashPass;

@@ -113,19 +113,19 @@ pub mod tket_op_modify;
 
 use super::{CombinedModifier, ModifierFlags};
 use crate::passes::unpack_container::TypeUnpacker;
-use crate::{extension::global_phase::GlobalPhase, modifier::Modifier, TketOp};
+use crate::{TketOp, extension::global_phase::GlobalPhase, modifier::Modifier};
 use global_phase_modify::delete_phase;
 
 use hugr::{
+    HugrView, IncomingPort, Node, OutgoingPort, Port, PortIndex, Wire,
     builder::{BuildError, CFGBuilder, Container, Dataflow, SubContainer},
     core::HugrNode,
     extension::{prelude::qb_t, simple_op::MakeExtensionOp},
     hugr::hugrmut::HugrMut,
-    ops::{Const, OpType, CFG},
+    ops::{CFG, Const, OpType},
     std_extensions::collections::array::array_type,
     type_row,
     types::{EdgeKind, FuncTypeBase, Signature, Type},
-    HugrView, IncomingPort, Node, OutgoingPort, Port, PortIndex, Wire,
 };
 
 /// A wire of eigher direction.
@@ -202,7 +202,7 @@ fn connect<N>(
             return Err(ModifierResolverErrors::unreachable(format!(
                 "Cannot connect the wires with the same direction: {} -> {}",
                 w1, w2
-            )))
+            )));
         }
     };
     new_dfg.hugr_mut().connect(n_o, p_o, n_i, p_i);
@@ -756,12 +756,12 @@ impl<N: HugrNode> ModifierResolver<N> {
                 return Err(ModifierResolverErrors::unreachable(format!(
                     "Invalid node found inside modified function (OpType = {})",
                     optype.clone()
-                )))
+                )));
             }
             OpType::Case(_) => {
                 return Err(ModifierResolverErrors::unreachable(
                     "Case cannot be directly modified.".to_string(),
-                ))
+                ));
             }
 
             // Not resolvable
@@ -1144,16 +1144,16 @@ pub fn resolve_modifier_with_entrypoints(
 mod tests {
     use cool_asserts::assert_matches;
     use hugr::{
+        Hugr,
         builder::{DataflowSubContainer, HugrBuilder, ModuleBuilder},
-        ops::{handle::FuncID, CallIndirect, ExtensionOp},
+        ops::{CallIndirect, ExtensionOp, handle::FuncID},
         std_extensions::collections::array::ArrayOpBuilder,
         types::Term,
-        Hugr,
     };
 
     use crate::{
-        extension::modifier::{CONTROL_OP_ID, DAGGER_OP_ID, MODIFIER_EXTENSION},
         TketOp,
+        extension::modifier::{CONTROL_OP_ID, DAGGER_OP_ID, MODIFIER_EXTENSION},
     };
 
     use super::*;

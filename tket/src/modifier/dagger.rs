@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use hugr::{
     extension::SignatureFunc,
-    types::{type_param::TypeParam, FuncValueType, PolyFuncTypeRV, TypeBound, TypeRV},
+    types::{FuncValueType, PolyFuncTypeRV, TypeBound, TypeRV, type_param::TypeParam},
 };
 
 #[allow(missing_docs)]

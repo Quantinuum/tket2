@@ -8,8 +8,8 @@ use hugr::algorithms::untuple::{UntupleError, UntupleRecursive};
 use hugr::algorithms::{ComposablePass, UntuplePass};
 use hugr::{HugrView, Node};
 
-use crate::serialize::pytket::PytketEncodeOpError;
 use crate::Circuit;
+use crate::serialize::pytket::PytketEncodeOpError;
 
 /// Try to lower a circuit to a form that can be encoded as a pytket legacy circuit.
 pub fn lower_to_pytket<T: HugrView<Node = Node>>(
@@ -51,13 +51,13 @@ mod test {
 
     use super::*;
     use hugr::builder::{CFGBuilder, Dataflow, HugrBuilder};
-    use hugr::extension::prelude::{qb_t, MakeTuple, UnpackTuple};
+    use hugr::extension::prelude::{MakeTuple, UnpackTuple, qb_t};
 
+    use hugr::HugrView;
     use hugr::hugr::hugrmut::HugrMut;
     use hugr::ops::handle::NodeHandle;
     use hugr::ops::{OpTag, OpTrait, OpType, Tag};
     use hugr::types::{Signature, TypeRow};
-    use hugr::HugrView;
     use rstest::{fixture, rstest};
 
     /// Builds a circuit in the style of guppy's output.

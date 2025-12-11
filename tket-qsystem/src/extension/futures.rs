@@ -6,17 +6,17 @@
 use std::sync::{Arc, Weak};
 
 use hugr::{
+    Extension, Wire,
     builder::{BuildError, Dataflow},
     extension::{
-        simple_op::{
-            try_from_name, HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp,
-            OpLoadError,
-        },
         ExtensionBuildError, ExtensionId, OpDef, SignatureError, SignatureFunc, TypeDef, Version,
+        simple_op::{
+            HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
+            try_from_name,
+        },
     },
-    ops::{custom::ExtensionOp, OpType},
-    types::{type_param::TypeParam, CustomType, PolyFuncType, Signature, Type, TypeArg, TypeBound},
-    Extension, Wire,
+    ops::{OpType, custom::ExtensionOp},
+    types::{CustomType, PolyFuncType, Signature, Type, TypeArg, TypeBound, type_param::TypeParam},
 };
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -263,8 +263,8 @@ impl<D: Dataflow> FutureOpBuilder for D {}
 #[cfg(test)]
 pub(crate) mod test {
 
-    use hugr::builder::{Dataflow, DataflowHugr, FunctionBuilder};
     use hugr::HugrView;
+    use hugr::builder::{Dataflow, DataflowHugr, FunctionBuilder};
     use std::sync::Arc;
     use strum::IntoEnumIterator;
 

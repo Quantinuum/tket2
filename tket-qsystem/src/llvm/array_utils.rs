@@ -11,13 +11,13 @@ use hugr::llvm::extension::collections::array::{
 use hugr::llvm::extension::collections::{array, stack_array};
 use hugr::llvm::inkwell::types::{BasicType, BasicTypeEnum};
 use hugr::llvm::inkwell::values::BasicValueEnum;
-use hugr::llvm::{inkwell, CodegenExtension};
+use hugr::llvm::{CodegenExtension, inkwell};
 use hugr::{HugrView, Node};
+use inkwell::AddressSpace;
 use inkwell::builder::{Builder, BuilderError};
 use inkwell::context::Context;
 use inkwell::types::{IntType, PointerType, StructType};
 use inkwell::values::{ArrayValue, IntValue, PointerValue, StructValue};
-use inkwell::AddressSpace;
 
 /// Specifies different array lowering strategies.
 ///

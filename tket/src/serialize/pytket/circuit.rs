@@ -15,14 +15,14 @@ use itertools::Itertools;
 use rayon::iter::{IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator};
 use tket_json_rs::circuit_json::{Command as PytketCommand, SerialCircuit};
 
+use crate::Circuit;
 use crate::serialize::pytket::decoder::PytketDecoderContext;
 use crate::serialize::pytket::opaque::SubgraphId;
 use crate::serialize::pytket::{
-    default_decoder_config, default_encoder_config, DecodeInsertionTarget, DecodeOptions,
-    EncodeOptions, PytketDecodeError, PytketDecodeErrorInner, PytketDecoderConfig,
-    PytketEncodeError, PytketEncoderContext,
+    DecodeInsertionTarget, DecodeOptions, EncodeOptions, PytketDecodeError, PytketDecodeErrorInner,
+    PytketDecoderConfig, PytketEncodeError, PytketEncoderContext, default_decoder_config,
+    default_encoder_config,
 };
-use crate::Circuit;
 
 use super::opaque::OpaqueSubgraphs;
 

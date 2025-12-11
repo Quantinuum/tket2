@@ -9,14 +9,14 @@ use std::{
 
 use crate::extension::rotation::rotation_type;
 use hugr::{
+    Extension,
     extension::{
-        simple_op::{MakeOpDef, MakeRegisteredOp, OpLoadError},
         ExtensionId, OpDef, SignatureFunc, Version,
+        simple_op::{MakeOpDef, MakeRegisteredOp, OpLoadError},
     },
     ops::{ExtensionOp, OpName},
     type_row,
     types::Signature,
-    Extension,
 };
 use lazy_static::lazy_static;
 
@@ -116,15 +116,15 @@ impl MakeRegisteredOp for GlobalPhase {
 mod test {
     use cool_asserts::assert_matches;
     use hugr::{
+        HugrView,
         builder::{Dataflow, DataflowHugr, FunctionBuilder},
         extension::simple_op::{MakeExtensionOp, MakeOpDef},
         type_row,
         types::Signature,
-        HugrView,
     };
 
     use super::{
-        GlobalPhase, GLOBAL_PHASE_EXTENSION, GLOBAL_PHASE_EXTENSION_ID, GLOBAL_PHASE_OP_ID,
+        GLOBAL_PHASE_EXTENSION, GLOBAL_PHASE_EXTENSION_ID, GLOBAL_PHASE_OP_ID, GlobalPhase,
     };
     use crate::extension::rotation::ConstRotation;
 

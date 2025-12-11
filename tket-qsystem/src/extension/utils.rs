@@ -5,16 +5,16 @@ use std::sync::{Arc, Weak};
 
 use derive_more::derive::Display;
 use hugr::{
+    Extension, Wire,
     builder::{BuildError, Dataflow},
     extension::{
+        ExtensionId, ExtensionRegistry, OpDef, PRELUDE, SignatureFunc, Version,
         prelude::UnwrapBuilder,
-        simple_op::{try_from_name, MakeOpDef, MakeRegisteredOp},
-        ExtensionId, ExtensionRegistry, OpDef, SignatureFunc, Version, PRELUDE,
+        simple_op::{MakeOpDef, MakeRegisteredOp, try_from_name},
     },
     std_extensions::arithmetic::int_types::int_type,
     type_row,
     types::{Signature, TypeArg, TypeRowRV},
-    Extension, Wire,
 };
 use itertools::Itertools;
 use lazy_static::lazy_static;

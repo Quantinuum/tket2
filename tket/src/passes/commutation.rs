@@ -1,9 +1,9 @@
 use std::{collections::HashMap, rc::Rc};
 
 use derive_more::{Display, Error, From};
-use hugr::hugr::patch::PatchVerification;
 use hugr::hugr::Patch;
-use hugr::hugr::{hugrmut::HugrMut, HugrError};
+use hugr::hugr::patch::PatchVerification;
+use hugr::hugr::{HugrError, hugrmut::HugrMut};
 use hugr::{CircuitUnit, Direction, HugrView, Node, Port, PortIndex};
 use itertools::Itertools;
 use portgraph::PortOffset;

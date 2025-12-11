@@ -10,8 +10,8 @@
 //! It is implemented as a side-effect that takes a rotation angle as an input.
 
 use hugr::{
-    core::HugrNode, extension::simple_op::MakeExtensionOp, hugr::hugrmut::HugrMut,
-    ops::ExtensionOp, HugrView,
+    HugrView, core::HugrNode, extension::simple_op::MakeExtensionOp, hugr::hugrmut::HugrMut,
+    ops::ExtensionOp,
 };
 
 mod pass;

@@ -10,38 +10,38 @@ use std::{
 };
 
 use hugr::{
+    Extension, Wire,
     builder::{BuildError, Dataflow, DataflowSubContainer, SubContainer},
     extension::{
-        prelude::{bool_t, option_type, qb_t, UnwrapBuilder},
-        simple_op::{try_from_name, MakeOpDef, MakeRegisteredOp},
-        ExtensionId, ExtensionRegistry, OpDef, SignatureFunc, Version, PRELUDE,
+        ExtensionId, ExtensionRegistry, OpDef, PRELUDE, SignatureFunc, Version,
+        prelude::{UnwrapBuilder, bool_t, option_type, qb_t},
+        simple_op::{MakeOpDef, MakeRegisteredOp, try_from_name},
     },
     ops::{ExtensionOp, OpName, Value},
     std_extensions::{
         arithmetic::{
             float_ops::FloatOps,
-            float_types::{float64_type, ConstF64, EXTENSION as FLOAT_TYPES},
+            float_types::{ConstF64, EXTENSION as FLOAT_TYPES, float64_type},
             int_types::int_type,
         },
-        collections::array::{array_type_parametric, ArrayOpBuilder},
+        collections::array::{ArrayOpBuilder, array_type_parametric},
     },
     type_row,
-    types::{type_param::TypeParam, PolyFuncType, Signature, Type, TypeArg, TypeRow},
-    Extension, Wire,
+    types::{PolyFuncType, Signature, Type, TypeArg, TypeRow, type_param::TypeParam},
 };
 
 use crate::extension::futures;
 use derive_more::Display;
 use lazy_static::lazy_static;
 use strum::{EnumIter, EnumString, IntoStaticStr};
-use tket::extension::bool::{bool_type, BoolOp};
+use tket::extension::bool::{BoolOp, bool_type};
 
 use super::futures::future_type;
 
 mod barrier;
 mod lower;
 use lower::pi_mul_f64;
-pub use lower::{check_lowered, lower_tk2_op, LowerTk2Error, LowerTketToQSystemPass};
+pub use lower::{LowerTk2Error, LowerTketToQSystemPass, check_lowered, lower_tk2_op};
 
 /// The "tket.qsystem" extension id.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("tket.qsystem");
@@ -544,10 +544,10 @@ mod test {
 
     use cool_asserts::assert_matches;
     use futures::FutureOpBuilder as _;
+    use hugr::HugrView;
     use hugr::builder::{DataflowHugr, FunctionBuilder};
     use hugr::extension::simple_op::MakeExtensionOp;
     use hugr::ops::OpType;
-    use hugr::HugrView;
     use strum::IntoEnumIterator as _;
 
     use super::*;

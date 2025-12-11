@@ -3,7 +3,7 @@
 //! details.
 use hugr::{
     extension::{Extension, ExtensionBuildError, ExtensionId, TypeDefBound},
-    types::{type_param::TypeParam, CustomType, Type, TypeBound, TypeRow, TypeRowRV},
+    types::{CustomType, Type, TypeBound, TypeRow, TypeRowRV, type_param::TypeParam},
 };
 use lazy_static::lazy_static;
 use smol_str::SmolStr;

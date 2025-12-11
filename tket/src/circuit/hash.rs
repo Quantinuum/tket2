@@ -161,10 +161,10 @@ pub enum HashError {
 mod test {
     use tket_json_rs::circuit_json;
 
-    use crate::serialize::pytket::DecodeOptions;
-    use crate::serialize::TKETDecode;
-    use crate::utils::build_simple_circuit;
     use crate::TketOp;
+    use crate::serialize::TKETDecode;
+    use crate::serialize::pytket::DecodeOptions;
+    use crate::utils::build_simple_circuit;
 
     use super::*;
 

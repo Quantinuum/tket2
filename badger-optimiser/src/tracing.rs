@@ -7,10 +7,10 @@ use tket::optimiser::badger::log::{LOG_TARGET, METRICS_TARGET, PROGRESS_TARGET};
 
 use tracing::{Metadata, Subscriber};
 use tracing_appender::non_blocking;
+use tracing_subscriber::Layer;
 use tracing_subscriber::filter::filter_fn;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::Layer;
 
 fn log_filter(metadata: &Metadata<'_>) -> bool {
     metadata.target().starts_with(LOG_TARGET)

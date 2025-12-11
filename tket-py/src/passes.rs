@@ -9,10 +9,10 @@ use hugr::algorithms::ComposablePass;
 use pyo3::{prelude::*, types::IntoPyDict};
 use tket::optimiser::badger::BadgerOptions;
 use tket::passes;
-use tket::{op_matches, TketOp};
+use tket::{TketOp, op_matches};
 
 use crate::circuit::CircuitType;
-use crate::utils::{create_py_exception, ConvertPyErr};
+use crate::utils::{ConvertPyErr, create_py_exception};
 use crate::{
     circuit::{try_update_circ, try_with_circ},
     optimiser::PyBadgerOptimiser,

@@ -5,16 +5,16 @@ use std::sync::{Arc, Weak};
 
 use derive_more::derive::Display;
 use hugr::{
+    Extension, Wire,
     builder::{BuildError, Dataflow},
     extension::{
-        prelude::{option_type, UnwrapBuilder},
-        simple_op::{try_from_name, MakeOpDef, MakeRegisteredOp},
-        ExtensionBuildError, ExtensionId, ExtensionRegistry, OpDef, SignatureFunc, TypeDefBound,
-        Version, PRELUDE,
+        ExtensionBuildError, ExtensionId, ExtensionRegistry, OpDef, PRELUDE, SignatureFunc,
+        TypeDefBound, Version,
+        prelude::{UnwrapBuilder, option_type},
+        simple_op::{MakeOpDef, MakeRegisteredOp, try_from_name},
     },
     std_extensions::arithmetic::{float_types::float64_type, int_types::int_type},
     types::{CustomType, Signature, Type, TypeBound},
-    Extension, Wire,
 };
 use lazy_static::lazy_static;
 use smol_str::SmolStr;
@@ -240,8 +240,8 @@ mod test {
     use hugr::ops::Value;
     use hugr::std_extensions::arithmetic::int_types::ConstInt;
 
-    use hugr::builder::{DataflowHugr, FunctionBuilder};
     use hugr::HugrView;
+    use hugr::builder::{DataflowHugr, FunctionBuilder};
     use strum::IntoEnumIterator;
 
     use super::*;

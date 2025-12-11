@@ -20,7 +20,7 @@ use std::sync::Arc;
 use hugr::builder::{BuildHandle, Container, DFGBuilder, Dataflow, FunctionBuilder, SubContainer};
 use hugr::extension::prelude::{bool_t, qb_t};
 use hugr::ops::handle::{DataflowOpID, NodeHandle};
-use hugr::ops::{OpParent, OpTrait, OpType, DFG};
+use hugr::ops::{DFG, OpParent, OpTrait, OpType};
 use hugr::types::{Signature, Type, TypeRow};
 use hugr::{Hugr, HugrView, Node, OutgoingPort, Wire};
 use tracked_elem::{TrackedBitId, TrackedQubitId};
@@ -31,21 +31,21 @@ use tket_json_rs::circuit_json;
 use tket_json_rs::circuit_json::SerialCircuit;
 
 use super::{
-    PytketDecodeError, METADATA_B_REGISTERS, METADATA_INPUT_PARAMETERS, METADATA_PHASE,
-    METADATA_Q_REGISTERS,
+    METADATA_B_REGISTERS, METADATA_INPUT_PARAMETERS, METADATA_PHASE, METADATA_Q_REGISTERS,
+    PytketDecodeError,
 };
+use crate::TketOp;
 use crate::extension::rotation::rotation_type;
 use crate::serialize::pytket::circuit::{
     AdditionalNodesAndWires, EncodedCircuitInfo, StraightThroughWire,
 };
 use crate::serialize::pytket::config::PytketDecoderConfig;
 use crate::serialize::pytket::decoder::wires::WireTracker;
-use crate::serialize::pytket::extension::{build_opaque_tket_op, RegisterCount};
+use crate::serialize::pytket::extension::{RegisterCount, build_opaque_tket_op};
 use crate::serialize::pytket::opaque::{EncodedEdgeID, OpaqueSubgraphs};
 use crate::serialize::pytket::{
-    default_decoder_config, DecodeInsertionTarget, DecodeOptions, PytketDecodeErrorInner,
+    DecodeInsertionTarget, DecodeOptions, PytketDecodeErrorInner, default_decoder_config,
 };
-use crate::TketOp;
 
 /// State of the tket circuit being decoded.
 ///
@@ -413,12 +413,13 @@ impl<'h> PytketDecoderContext<'h> {
                     // Disconnected port with an unsupported type. We just skip
                     // it, since it must have been disconnected in the original
                     // hugr too.
-                    debug_assert!(self
-                        .builder
-                        .hugr()
-                        .get_optype(output_node)
-                        .port_kind(port)
-                        .is_none_or(|kind| !kind.is_value()));
+                    debug_assert!(
+                        self.builder
+                            .hugr()
+                            .get_optype(output_node)
+                            .port_kind(port)
+                            .is_none_or(|kind| !kind.is_value())
+                    );
                     continue;
                 }
             };

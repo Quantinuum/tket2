@@ -8,7 +8,7 @@ use tket::serialize::pytket::{EncodeOptions, EncodedCircuit};
 use tket_qsystem::pytket::{qsystem_decoder_config, qsystem_encoder_config};
 
 use crate::circuit::try_with_circ;
-use crate::utils::{create_py_exception, ConvertPyErr};
+use crate::utils::{ConvertPyErr, create_py_exception};
 
 /// Runs a pytket pass on all circuit-like regions under the entrypoint of the
 /// HUGR.

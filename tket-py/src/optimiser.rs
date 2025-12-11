@@ -6,9 +6,9 @@ use std::{fs, num::NonZeroUsize, path::PathBuf};
 use derive_more::derive::From;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use tket::Circuit;
 use tket::optimiser::badger::{BadgerOptions, DefaultBadgerStrategy};
 use tket::optimiser::{BadgerLogger, BadgerOptimiser};
-use tket::Circuit;
 
 use crate::circuit::update_circ;
 use crate::rewrite::{PyECCRewriter, PyRewriter};

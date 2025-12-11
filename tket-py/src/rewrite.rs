@@ -1,13 +1,13 @@
 //! PyO3 wrapper for rewriters.
 
 use derive_more::From;
-use hugr::{hugr::views::SiblingSubgraph, HugrView};
+use hugr::{HugrView, hugr::views::SiblingSubgraph};
 use itertools::Itertools;
 use pyo3::prelude::*;
 use std::path::PathBuf;
 use tket::{
-    rewrite::{CircuitRewrite, ECCRewriter, Rewriter},
     Circuit,
+    rewrite::{CircuitRewrite, ECCRewriter, Rewriter},
 };
 
 use crate::circuit::{PyNode, Tk2Circuit};

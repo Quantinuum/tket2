@@ -10,11 +10,11 @@ use hugr::{Hugr, Wire};
 use itertools::Itertools;
 use std::collections::HashMap;
 
+use crate::serialize::pytket::PytketDecodeError;
 use crate::serialize::pytket::decoder::{
     DecodeStatus, LoadedParameter, PytketDecoderContext, TrackedBit, TrackedQubit,
 };
 use crate::serialize::pytket::extension::{PytketDecoder, PytketTypeTranslator, RegisterCount};
-use crate::serialize::pytket::PytketDecodeError;
 
 use super::TypeTranslatorSet;
 

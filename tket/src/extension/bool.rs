@@ -6,14 +6,14 @@
 use std::sync::{Arc, Weak};
 
 use hugr::{
+    Extension, Wire,
     builder::{BuildError, Dataflow},
     extension::{
-        simple_op::{try_from_name, MakeOpDef, MakeRegisteredOp},
         ExtensionBuildError, ExtensionId, SignatureFunc, TypeDef, Version,
+        simple_op::{MakeOpDef, MakeRegisteredOp, try_from_name},
     },
     ops::constant::{CustomConst, ValueName},
     types::{CustomType, Signature, Type, TypeBound},
-    Extension, Wire,
 };
 use lazy_static::lazy_static;
 use smol_str::SmolStr;
@@ -244,7 +244,7 @@ pub(crate) mod test {
     use hugr::HugrView;
     use hugr::{
         builder::{DFGBuilder, Dataflow, DataflowHugr},
-        extension::{simple_op::MakeExtensionOp, OpDef},
+        extension::{OpDef, simple_op::MakeExtensionOp},
     };
     use strum::IntoEnumIterator;
 

@@ -9,16 +9,16 @@ use std::{
 
 use super::{CircuitPattern, NodeID, PEdge, PNode};
 use derive_more::{Display, Error, From};
+use hugr::hugr::views::SiblingSubgraph;
 use hugr::hugr::views::sibling_subgraph::{
     InvalidReplacement, InvalidSubgraph, InvalidSubgraphBoundary, TopoConvexChecker,
 };
-use hugr::hugr::views::SiblingSubgraph;
 use hugr::ops::OpType;
 use hugr::{HugrView, IncomingPort, Node, OutgoingPort, Port, PortIndex};
 use itertools::Itertools;
 use portmatching::{
-    automaton::{LineBuilder, ScopeAutomaton},
     EdgeProperty, PatternID,
+    automaton::{LineBuilder, ScopeAutomaton},
 };
 use smol_str::SmolStr;
 

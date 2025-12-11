@@ -1,12 +1,12 @@
 //! Modify nodes related to function calls.
 
 use hugr::{
+    IncomingPort, Wire,
     builder::{BuildError, Dataflow},
     core::HugrNode,
     extension::simple_op::MakeExtensionOp,
     hugr::hugrmut::HugrMut,
     ops::{Call, CallIndirect, DataflowOpTrait, LoadFunction, OpType},
-    IncomingPort, Wire,
 };
 
 use super::{ModifierError, ModifierResolver, ModifierResolverErrors};
@@ -259,17 +259,17 @@ impl<N: HugrNode> ModifierResolver<N> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::tests::{test_modifier_resolver, SetUnitary};
+    use super::super::tests::{SetUnitary, test_modifier_resolver};
     use super::super::*;
-    use crate::extension::modifier::{CONTROL_OP_ID, MODIFIER_EXTENSION};
     use crate::TketOp;
+    use crate::extension::modifier::{CONTROL_OP_ID, MODIFIER_EXTENSION};
     use hugr::{
+        Hugr,
         builder::{Dataflow, DataflowSubContainer, ModuleBuilder},
         extension::prelude::qb_t,
-        ops::{handle::FuncID, CallIndirect, ExtensionOp},
-        std_extensions::collections::array::{array_type, ArrayOpBuilder},
+        ops::{CallIndirect, ExtensionOp, handle::FuncID},
+        std_extensions::collections::array::{ArrayOpBuilder, array_type},
         types::{Signature, Term},
-        Hugr,
     };
 
     fn foo_call(module: &mut ModuleBuilder<Hugr>, t_num: usize) -> FuncID<true> {

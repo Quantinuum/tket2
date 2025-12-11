@@ -11,9 +11,9 @@ use hugr::types::Type;
 use hugr::{HugrView, Node};
 use itertools::Itertools;
 
+use crate::Circuit;
 use crate::circuit::Command;
 use crate::rewrite::CircuitRewrite;
-use crate::Circuit;
 
 /// Find tuple pack operations followed by tuple unpack operations
 /// and generate rewrites to remove them.
@@ -156,7 +156,7 @@ fn remove_pack_unpack<T: HugrView<Node = Node>>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use hugr::extension::prelude::{bool_t, qb_t, UnpackTuple};
+    use hugr::extension::prelude::{UnpackTuple, bool_t, qb_t};
 
     use hugr::types::Signature;
     use rstest::{fixture, rstest};

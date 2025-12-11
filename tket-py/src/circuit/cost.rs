@@ -4,7 +4,7 @@ use std::cmp::Ordering;
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Sub};
 
-use pyo3::{pyclass, pymethods, Py, PyAny, PyResult, PyTypeInfo, Python};
+use pyo3::{Py, PyAny, PyResult, PyTypeInfo, Python, pyclass, pymethods};
 use tket::circuit::cost::{CircuitCost, CostDelta};
 
 /// A generic circuit cost, backed by an arbitrary python object.

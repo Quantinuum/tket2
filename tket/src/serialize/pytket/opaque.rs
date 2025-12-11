@@ -15,8 +15,8 @@ use std::collections::BTreeMap;
 use std::ops::Index;
 
 use crate::serialize::pytket::PytketEncodeError;
-use hugr::core::HugrNode;
 use hugr::HugrView;
+use hugr::core::HugrNode;
 
 /// The ID of an [`OpaqueSubgraph`] registered in an `OpaqueSubgraphs` tracker.
 #[derive(Debug, derive_more::Display, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -151,7 +151,9 @@ impl<N: HugrNode> OpaqueSubgraphs<N> {
             return Ok(());
         };
         if !self.contains(subgraph_id) {
-            return Err(PytketEncodeError::custom(format!("Barrier operation with external subgraph payload points to an unknown subgraph: {subgraph_id}")));
+            return Err(PytketEncodeError::custom(format!(
+                "Barrier operation with external subgraph payload points to an unknown subgraph: {subgraph_id}"
+            )));
         }
 
         let payload = OpaqueSubgraphPayload::new_inline(&self[subgraph_id], hugr, input_arguments)?;

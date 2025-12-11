@@ -1,19 +1,19 @@
 //! Encoder and decoder for rotation operations.
 
 use super::PytketEmitter;
+use crate::Circuit;
 use crate::extension::rotation::{
-    ConstRotation, RotationOp, ROTATION_EXTENSION_ID, ROTATION_TYPE_ID,
+    ConstRotation, ROTATION_EXTENSION_ID, ROTATION_TYPE_ID, RotationOp,
 };
+use crate::serialize::pytket::PytketEncodeError;
 use crate::serialize::pytket::config::TypeTranslatorSet;
 use crate::serialize::pytket::encoder::{EncodeStatus, PytketEncoderContext, TrackedValues};
 use crate::serialize::pytket::extension::{PytketTypeTranslator, RegisterCount};
-use crate::serialize::pytket::PytketEncodeError;
-use crate::Circuit;
-use hugr::extension::simple_op::MakeExtensionOp;
-use hugr::extension::ExtensionId;
-use hugr::ops::constant::OpaqueValue;
-use hugr::ops::ExtensionOp;
 use hugr::HugrView;
+use hugr::extension::ExtensionId;
+use hugr::extension::simple_op::MakeExtensionOp;
+use hugr::ops::ExtensionOp;
+use hugr::ops::constant::OpaqueValue;
 use itertools::Itertools;
 
 /// Encoder for [prelude](hugr::extension::prelude) operations.

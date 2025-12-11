@@ -56,22 +56,22 @@ mod types;
 #[cfg(test)]
 pub(crate) mod tests {
     use hugr::{
+        CircuitUnit, Hugr,
         builder::{DFGBuilder, Dataflow, DataflowHugr},
         extension::prelude::qb_t,
         hugr::views::SiblingSubgraph,
         ops::handle::DataflowParentID,
         types::Signature,
-        CircuitUnit, Hugr,
     };
 
     use itertools::Itertools;
     use rstest::rstest;
 
     use crate::{
-        extension::rotation::{rotation_type, ConstRotation},
+        TketOp,
+        extension::rotation::{ConstRotation, rotation_type},
         resource::scope::tests::ResourceScopeReport,
         utils::build_simple_circuit,
-        TketOp,
     };
 
     use super::ResourceScope;

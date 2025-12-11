@@ -1,17 +1,17 @@
 //! LLVM lowering implementations for "tket.futures" operations.
 
-use crate::extension::futures::{self, FutureOp, FutureOpDef, FUTURE_TYPE_NAME};
-use anyhow::{anyhow, Result};
+use crate::extension::futures::{self, FUTURE_TYPE_NAME, FutureOp, FutureOpDef};
+use anyhow::{Result, anyhow};
 use hugr::extension::prelude::bool_t;
 use hugr::extension::simple_op::MakeExtensionOp;
 use hugr::ops::{ExtensionOp, Value};
 use hugr::std_extensions::arithmetic::int_types::INT_TYPES;
 use hugr::types::TypeArg;
 use hugr::{HugrView, Node};
+use hugr_llvm::CodegenExtsBuilder;
 use hugr_llvm::custom::CodegenExtension;
 use hugr_llvm::emit::func::EmitFuncContext;
-use hugr_llvm::emit::{emit_value, EmitOpArgs};
-use hugr_llvm::CodegenExtsBuilder;
+use hugr_llvm::emit::{EmitOpArgs, emit_value};
 use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::types::{BasicTypeEnum, IntType};
@@ -190,9 +190,9 @@ mod test {
     use hugr::extension::simple_op::MakeRegisteredOp;
     use hugr::std_extensions::arithmetic::int_types::int_type;
     use hugr_llvm::check_emission;
+    use hugr_llvm::test::TestContext;
     use hugr_llvm::test::llvm_ctx;
     use hugr_llvm::test::single_op_hugr;
-    use hugr_llvm::test::TestContext;
 
     use super::*;
     #[rstest::rstest]

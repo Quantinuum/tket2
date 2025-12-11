@@ -1,8 +1,8 @@
 //! Utilities for Control modifiers
 use hugr::{
-    extension::{prelude::qb_t, SignatureFunc},
+    extension::{SignatureFunc, prelude::qb_t},
     std_extensions::collections::array::array_type_parametric,
-    types::{type_param::TypeParam, FuncValueType, PolyFuncTypeRV, TypeArg, TypeBound, TypeRV},
+    types::{FuncValueType, PolyFuncTypeRV, TypeArg, TypeBound, TypeRV, type_param::TypeParam},
 };
 
 #[allow(missing_docs)]

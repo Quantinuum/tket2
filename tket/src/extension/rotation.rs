@@ -1,12 +1,12 @@
+use hugr::Wire;
 use hugr::builder::{BuildError, Dataflow};
 use hugr::extension::simple_op::{MakeOpDef, MakeRegisteredOp};
-use hugr::extension::{prelude::option_type, ExtensionId, Version};
-use hugr::ops::constant::{downcast_equal_consts, CustomConst, TryHash};
+use hugr::extension::{ExtensionId, Version, prelude::option_type};
+use hugr::ops::constant::{CustomConst, TryHash, downcast_equal_consts};
 use hugr::std_extensions::arithmetic::float_types::float64_type;
-use hugr::Wire;
 use hugr::{
-    types::{ConstTypeError, CustomType, Signature, Type, TypeBound},
     Extension,
+    types::{ConstTypeError, CustomType, Signature, Type, TypeBound},
 };
 use smol_str::SmolStr;
 use std::f64::consts::PI;

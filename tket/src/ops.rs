@@ -8,9 +8,9 @@ use hugr::ops::custom::ExtensionOp;
 use hugr::types::Type;
 use hugr::{
     extension::{
-        prelude::{bool_t, option_type, qb_t},
-        simple_op::{try_from_name, MakeOpDef, MakeRegisteredOp},
         ExtensionId, OpDef, SignatureFunc,
+        prelude::{bool_t, option_type, qb_t},
+        simple_op::{MakeOpDef, MakeRegisteredOp, try_from_name},
     },
     ops::OpType,
     type_row,
@@ -195,19 +195,19 @@ pub(crate) mod test {
     use hugr::builder::{DFGBuilder, Dataflow, DataflowHugr};
     use hugr::extension::prelude::{option_type, qb_t};
     use hugr::extension::simple_op::{MakeExtensionOp, MakeOpDef};
-    use hugr::extension::{prelude::UnwrapBuilder as _, OpDef};
+    use hugr::extension::{OpDef, prelude::UnwrapBuilder as _};
     use hugr::types::Signature;
-    use hugr::{type_row, CircuitUnit, HugrView};
+    use hugr::{CircuitUnit, HugrView, type_row};
     use itertools::Itertools;
     use rstest::{fixture, rstest};
     use strum::IntoEnumIterator;
 
     use super::TketOp;
+    use crate::Pauli;
     use crate::circuit::Circuit;
     use crate::extension::bool::bool_type;
     use crate::extension::{TKET_EXTENSION as EXTENSION, TKET_EXTENSION_ID as EXTENSION_ID};
     use crate::utils::build_simple_circuit;
-    use crate::Pauli;
     fn get_opdef(op: TketOp) -> Option<&'static Arc<OpDef>> {
         EXTENSION.get_op(&op.op_id())
     }

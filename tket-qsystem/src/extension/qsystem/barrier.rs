@@ -11,12 +11,12 @@ mod test {
     use hugr::extension::prelude::Barrier;
     use hugr::std_extensions::collections::borrow_array::borrow_array_type;
     use hugr::std_extensions::collections::value_array::value_array_type;
+    use hugr::{HugrView, ops::handle::NodeHandle};
     use hugr::{
         builder::DFGBuilder,
         extension::prelude::{bool_t, option_type, qb_t},
         std_extensions::collections::array::array_type,
     };
-    use hugr::{ops::handle::NodeHandle, HugrView};
     use itertools::Itertools;
     use rstest::rstest;
 
