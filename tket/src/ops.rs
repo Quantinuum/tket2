@@ -41,53 +41,188 @@ use strum::{EnumIter, EnumString, IntoStaticStr};
 #[non_exhaustive]
 /// Simple enum of tket quantum operations.
 pub enum TketOp {
-    /// Hadamard gate.
+    /// Hadamard gate
+    ///
+    /// This is a single qubit gate.
     H,
     /// Controlled-X (CNOT).
+    ///
+    /// Inputs:
+    /// - A control qubit
+    /// - The target qubit
+    ///
+    /// Outputs:
+    /// - The control qubit
+    /// - The target qubit
     CX,
     /// Controlled-Y.
+    ///
+    /// Inputs:
+    /// - A control qubit
+    /// - The target qubit
+    ///
+    /// Outputs:
+    /// - The control qubit
+    /// - The target qubit
     CY,
     /// Controlled-Z.
+    ///
+    /// Inputs:
+    /// - A control qubit
+    /// - The target qubit
+    ///
+    /// Outputs:
+    /// - The control qubit
+    /// - The target qubit
     CZ,
     /// Controlled-Rz rotation.
+    ///
+    /// Inputs:
+    /// - A control qubit
+    /// - The target qubit
+    /// - A [`rotation`](rotation_type) angle expressed in half-turns.
+    ///
+    /// Outputs:
+    /// - The control qubit
+    /// - The target qubit
+    ///
+    /// See [`TketOp::Rz`].
     CRz,
     /// T gate.
+    ///
+    /// Single qubit gate.
     T,
     /// T dagger gate.
+    ///
+    /// Dagger of [`TketOp::T`].
+    ///
+    /// This is a single qubit gate.
     Tdg,
     /// S gate.
+    ///
+    /// This is a single qubit gate.
     S,
     /// S dagger gate.
+    ///
+    /// Dagger of [`TketOp::S`].
+    ///
+    /// This is a single qubit gate.
     Sdg,
     /// Pauli X gate.
+    ///
+    /// This is a single qubit gate.
     X,
     /// Pauli Y gate.
+    ///
+    /// This is a single qubit gate.
     Y,
     /// Pauli Z gate.
+    ///
+    /// This is a single qubit gate.
     Z,
     /// Pauli X rotation.
+    ///
+    /// Inputs:
+    /// - A qubit
+    /// - A [`rotation`](rotation_type) angle expressed in half-turns.
+    ///
+    /// Outputs:
+    /// - A qubit
+    ///
+    /// This is a single qubit gate.
     Rx,
     /// Pauli Y rotation.
+    ///
+    /// Inputs:
+    /// - A qubit
+    /// - A [`rotation`](rotation_type) angle expressed in half-turns.
+    ///
+    /// Outputs:
+    /// - A qubit
+    ///
+    /// This is a single qubit gate.
     Ry,
     /// Pauli Z rotation.
+    ///
+    /// Inputs:
+    /// - A qubit
+    /// - A [`rotation`](rotation_type) angle expressed in half-turns.
+    ///
+    /// Outputs:
+    /// - A qubit
+    ///
+    /// This is a single qubit gate.
     Rz,
     /// Toffoli gate.
+    ///
+    /// Inputs:
+    /// - Control qubit 1
+    /// - Control qubit 2
+    /// - The target qubit
+    ///
+    /// Outputs:
+    /// - Control qubit 1
+    /// - Control qubit 2
+    /// - The target qubit
     Toffoli,
-    /// Measure a qubit and keep the qubit.
+    /// Measure a qubit and return it along with the measurement result.
+    ///
+    /// Inputs:
+    /// - A qubit
+    ///
+    /// Outputs:
+    /// - A qubit
+    /// - A boolean indicating whether the qubit was measured as 1
     Measure,
     /// Measure a qubit and consume the qubit.
+    ///
+    /// Inputs:
+    /// - A qubit
+    ///
+    /// Outputs:
+    /// - A boolean indicating whether the qubit was measured as 1
     MeasureFree,
     /// Allocate a qubit.
+    ///
+    /// Inputs:
+    /// - None
+    ///
+    /// Outputs:
+    /// - A qubit
     QAlloc,
     /// Try to allocate a qubit, returning an option with the qubit or None on failure.
+    ///
+    /// Inputs:
+    /// - None
+    ///
+    /// Outputs:
+    /// - An [`option_type`] with a qubit or None on failure
     TryQAlloc,
     /// Free a qubit.
+    ///
+    /// Inputs:
+    /// - A qubit
+    ///
+    /// Outputs:
+    /// - None
     QFree,
     /// Reset a qubit to |0>.
+    ///
+    /// Inputs:
+    /// - A qubit
+    ///
+    /// Outputs:
+    /// - A qubit in the |0> state
     Reset,
     /// V gate.
+    ///
+    /// This is a single qubit gate.
     V,
     /// V dagger gate.
+    ///
+    /// Dagger of [`TketOp::V`].
+    ///
+    /// This is a single qubit gate.
     Vdg,
 }
 
