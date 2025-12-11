@@ -67,6 +67,7 @@ lazy_static! {
     ]);
 }
 
+/// Quantum operations for Quantinuum H-series quantum computers.
 #[derive(
     Clone,
     Copy,
@@ -83,19 +84,29 @@ lazy_static! {
     EnumString,
     Display,
 )]
-#[allow(missing_docs)]
 #[non_exhaustive]
 pub enum QSystemOp {
+    /// Measure a qubit and lose it.
     Measure,
+    /// Lazily measure a qubit and lose it.
     LazyMeasure,
+    /// Lazily measure a qubit and reset it to the Z |0> eigenstate.
     LazyMeasureReset,
+    /// Rotate a qubit around the Z axis. Not physical.
     Rz,
+    /// PhasedX gate.
     PhasedX,
+    /// ZZ gate with an angle.
     ZZPhase,
+    /// Allocate a qubit in the Z |0> eigenstate.
     TryQAlloc,
+    /// Free a qubit (lose track of it).
     QFree,
+    /// Reset a qubit to the Z |0> eigenstate.
     Reset,
+    /// Measure a qubit and reset it to the Z |0> eigenstate.
     MeasureReset,
+    /// Measure a qubit (return 0 or 1) or detect leakage (return 2).
     LazyMeasureLeaked,
 }
 

@@ -22,6 +22,7 @@ use serde::{Deserialize, Serialize};
 use smol_str::ToSmolStr;
 use strum::{EnumIter, EnumString, IntoStaticStr};
 
+/// Standar TKET quantum operations.
 #[derive(
     Clone,
     Copy,
@@ -37,33 +38,56 @@ use strum::{EnumIter, EnumString, IntoStaticStr};
     IntoStaticStr,
     EnumString,
 )]
-#[allow(missing_docs)]
 #[non_exhaustive]
 /// Simple enum of tket quantum operations.
 pub enum TketOp {
+    /// Hadamard gate.
     H,
+    /// Controlled-X (CNOT).
     CX,
+    /// Controlled-Y.
     CY,
+    /// Controlled-Z.
     CZ,
+    /// Controlled-Rz rotation.
     CRz,
+    /// T gate.
     T,
+    /// T dagger gate.
     Tdg,
+    /// S gate.
     S,
+    /// S dagger gate.
     Sdg,
+    /// Pauli X gate.
     X,
+    /// Pauli Y gate.
     Y,
+    /// Pauli Z gate.
     Z,
+    /// Pauli X rotation.
     Rx,
+    /// Pauli Y rotation.
     Ry,
+    /// Pauli Z rotation.
     Rz,
+    /// Toffoli gate.
     Toffoli,
+    /// Measure a qubit and keep the qubit.
     Measure,
+    /// Measure a qubit and consume the qubit.
     MeasureFree,
+    /// Allocate a qubit.
     QAlloc,
+    /// Try to allocate a qubit, returning an option with the qubit or None on failure.
     TryQAlloc,
+    /// Free a qubit.
     QFree,
+    /// Reset a qubit to |0>.
     Reset,
+    /// V gate.
     V,
+    /// V dagger gate.
     Vdg,
 }
 
@@ -85,15 +109,18 @@ pub fn op_matches(op: &OpType, tket_op: TketOp) -> bool {
     op.to_string() == tket_op.exposed_name()
 }
 
+/// Simple enum representation of Pauli matrices.
 #[derive(
     Clone, Copy, Debug, Serialize, Deserialize, EnumIter, Display, PartialEq, PartialOrd, EnumString,
 )]
-#[allow(missing_docs)]
-/// Simple enum representation of Pauli matrices.
 pub enum Pauli {
+    /// Pauli identity matrix.
     I,
+    /// Pauli X matrix.
     X,
+    /// Pauli Y matrix.
     Y,
+    /// Pauli Z matrix.
     Z,
 }
 

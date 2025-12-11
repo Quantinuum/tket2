@@ -303,7 +303,6 @@ impl<N: HugrNode> Interval<N> {
     /// [`Interval::try_extend`] instead for a safe way to extend an interval.
     ///
     /// Return the direction the interval was extended in.
-    #[allow(dead_code)]
     pub(crate) fn add_node_unchecked(
         &mut self,
         node: N,

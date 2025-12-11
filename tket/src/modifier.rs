@@ -31,8 +31,9 @@ pub struct CombinedModifier {
     // Control arrays applied so far
     // The sum is supposed to be equal to `control`.
     accum_ctrl: Vec<usize>,
+    /// Whether the dagger modifier has been applied.
     dagger: bool,
-    #[allow(dead_code)]
+    /// Whether the power modifier has been applied.
     power: bool,
 }
 

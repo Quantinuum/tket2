@@ -113,7 +113,7 @@ impl CustomConst for ConstRotation {
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
-#[allow(missing_docs, non_camel_case_types)]
+#[expect(non_camel_case_types)]
 #[non_exhaustive]
 /// Rotation operations
 pub enum RotationOp {

@@ -159,7 +159,7 @@ fn lower_to_pytket<'py>(circ: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>>
 ///
 /// Log files will be written to the directory `log_dir` if specified.
 #[pyfunction]
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 #[pyo3(signature = (circ, optimiser, max_threads=None, timeout=None, progress_timeout=None, max_circuit_count=None, log_dir=None, rebase=None))]
 fn badger_optimise<'py>(
     circ: &Bound<'py, PyAny>,

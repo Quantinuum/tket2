@@ -6,7 +6,7 @@ use hugr::{
     types::{FuncValueType, PolyFuncTypeRV, TypeBound, TypeRV, type_param::TypeParam},
 };
 
-#[allow(missing_docs)]
+/// Dagger modifier.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub struct ModifierDagger;
 

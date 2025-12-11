@@ -46,7 +46,11 @@ pub trait ArrayLowering {
 
 /// Array lowering via the stack as implemented in [stack_array].
 #[derive(Clone)]
-#[allow(deprecated, reason = "Waiting for switch to new array lowering")]
+#[allow(
+    deprecated,
+    clippy::allow_attributes,
+    reason = "Waiting for switch to new array lowering"
+)]
 pub struct StackArrayLowering<ACG: stack_array::ArrayCodegen>(ACG);
 
 /// The default stack array lowering strategy using [stack_array::DefaultArrayCodegen].
@@ -192,11 +196,14 @@ pub fn build_int_array_load<'c>(
 }
 
 /// Enum representing the element types of a dense array.
-#[allow(missing_docs)]
 pub enum ElemType {
+    /// A signed integer element type.
     Int,
+    /// An unsigned integer element type.
     Uint,
+    /// A floating-point element type.
     Float,
+    /// A boolean element type.
     Bool,
 }
 

@@ -143,11 +143,12 @@ impl<N: HugrNode> std::fmt::Display for DirWire<N> {
 }
 
 impl<N> DirWire<N> {
-    #[allow(dead_code)]
+    /// Create a new DirWire.
     pub fn new(node: N, port: Port) -> Self {
         DirWire(node, port)
     }
 
+    /// Reverse the direction of the wire.
     pub fn reverse(self) -> Self {
         let index = self.1.index();
         let port = match self.1.as_directed() {

@@ -413,7 +413,11 @@ fn check_hugr<H: HugrView>(hugr: &H) -> Result<(), CircuitError<H::Node>> {
 ///
 /// This will return an error if the wire is not empty or if a HugrError
 /// occurs.
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    clippy::allow_attributes,
+    reason = "used when 'portmatching' feature is enabled, and in tests"
+)]
 pub(crate) fn remove_empty_wire(
     circ: &mut Circuit<impl HugrMut<Node = Node>>,
     input_port: usize,

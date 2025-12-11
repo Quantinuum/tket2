@@ -20,9 +20,9 @@ use hugr::{
 };
 use lazy_static::lazy_static;
 
-#[allow(missing_docs)]
+/// Identifier for the `tket.global_phase` extension.
 pub const GLOBAL_PHASE_EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("tket.global_phase");
-#[allow(missing_docs)]
+/// Version of the `tket.global_phase` extension.
 pub const GLOBAL_PHASE_VERSION: Version = Version::new(0, 1, 0);
 
 lazy_static! {
@@ -39,7 +39,7 @@ lazy_static! {
     )};
 }
 
-#[allow(missing_docs)]
+/// Identifier for the `global_phase` operation.
 pub static GLOBAL_PHASE_OP_ID: OpName = OpName::new_inline("global_phase");
 
 /// Global phase of a circuit.

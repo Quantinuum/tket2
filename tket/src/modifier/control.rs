@@ -5,7 +5,9 @@ use hugr::{
     types::{FuncValueType, PolyFuncTypeRV, TypeArg, TypeBound, TypeRV, type_param::TypeParam},
 };
 
-#[allow(missing_docs)]
+/// Control modifier.
+///
+/// Stores the number of controls qubits to apply.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub struct ModifierControl(usize);
 

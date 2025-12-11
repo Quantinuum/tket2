@@ -86,12 +86,14 @@ pub fn future_type(t: Type) -> Type {
     IntoStaticStr,
     EnumString,
 )]
-#[allow(missing_docs)]
 #[non_exhaustive]
 /// Simple enum of "tket.futures" operations.
 pub enum FutureOpDef {
+    /// Read a value from a Future, consuming it.
     Read,
+    /// Duplicate a Future. The original Future is consumed and two Futures are returned.
     Dup,
+    /// Consume a future without reading it.
     Free,
 }
 

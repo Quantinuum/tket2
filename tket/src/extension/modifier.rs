@@ -41,9 +41,9 @@ pub enum Modifier {
     PowerModifier,
 }
 
-#[allow(missing_docs)]
+/// Identifier for the `tket.modifier` extension.
 pub const MODIFIER_EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("tket.modifier");
-#[allow(missing_docs)]
+/// Version of the `tket.modifier` extension.
 pub const MODIFIER_VERSION: Version = Version::new(0, 1, 0);
 
 lazy_static! {
@@ -74,11 +74,11 @@ lazy_static! {
     )};
 }
 
-#[allow(missing_docs)]
+/// Identifier for the `ControlModifier` operation.
 pub const CONTROL_OP_ID: OpName = OpName::new_inline("ControlModifier");
-#[allow(missing_docs)]
+/// Identifier for the `DaggerModifier` operation.
 pub const DAGGER_OP_ID: OpName = OpName::new_inline("DaggerModifier");
-#[allow(missing_docs)]
+/// Identifier for the `PowerModifier` operation.
 pub const POWER_OP_ID: OpName = OpName::new_inline("PowerModifier");
 
 impl MakeOpDef for Modifier {

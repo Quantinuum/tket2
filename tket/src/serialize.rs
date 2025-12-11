@@ -23,16 +23,6 @@ use hugr::{Hugr, HugrView, Node};
 use crate::extension::REGISTRY;
 use crate::{Circuit, CircuitError};
 
-/// An encoded path pointing to a node in the HUGR,
-/// to be used as the [`Circuit`] root.
-///
-/// This key should not be used in the in-memory structure, as any modifications to the HUGR may
-/// invalidate the path.
-///
-/// TODO: Implement the path pointer. Currently this entry is not used.
-#[allow(unused)]
-const METADATA_ENTRYPOINT: &str = "TKET.entrypoint";
-
 impl<T: HugrView> Circuit<T> {
     /// Store the circuit as a HUGR envelope, using the given configuration.
     pub fn store(

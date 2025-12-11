@@ -388,7 +388,7 @@ pub enum InvalidPatternMatch {
     /// case an error would have been raised earlier on).
     #[display("empty match")]
     EmptyMatch,
-    #[allow(missing_docs)]
+    /// Other invalid subgraph errors.
     Other(InvalidSubgraph),
 }
 

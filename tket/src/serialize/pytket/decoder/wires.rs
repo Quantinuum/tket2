@@ -642,7 +642,7 @@ impl WireTracker {
     /// # Errors
     ///
     /// See [`WireTracker::find_typed_wires`] for possible errors.
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub(in crate::serialize::pytket) fn find_typed_wire(
         &mut self,
         config: &PytketDecoderConfig,

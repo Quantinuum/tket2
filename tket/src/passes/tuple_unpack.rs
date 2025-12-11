@@ -241,7 +241,7 @@ mod test {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mut num_rewrites = 0;
         loop {
-            #[allow(deprecated)]
+            #[expect(deprecated)]
             let Some(rewrite) = find_tuple_unpack_rewrites(&circ).next() else {
                 break;
             };

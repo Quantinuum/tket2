@@ -1,8 +1,4 @@
 //! The compiler for HUGR to QIS
-
-#![deny(missing_docs)]
-#![warn(rust_2021_compatibility, future_incompatible, unused)]
-
 pub mod array;
 
 use anyhow::{Result, anyhow};
@@ -10,7 +6,6 @@ use hugr::envelope::EnvelopeConfig;
 use hugr::llvm::CodegenExtsBuilder;
 use hugr::llvm::custom::CodegenExtsMap;
 use hugr::llvm::emit::{EmitHugr, Namer};
-#[allow(deprecated)]
 use hugr::llvm::extension::int::IntCodegenExtension;
 use hugr::llvm::utils::fat::FatExt as _;
 use hugr::llvm::utils::inline_constant_functions;
@@ -151,7 +146,6 @@ fn process_hugr(hugr: &mut Hugr) -> Result<()> {
     Ok(())
 }
 
-#[allow(deprecated)]
 fn codegen_extensions() -> CodegenExtsMap<'static, Hugr> {
     use array::SeleneHeapArrayCodegen;
     let pcg = QISPreludeCodegen;
@@ -414,7 +408,6 @@ pub fn get_opt_level(opt_level: u32) -> Result<OptimizationLevel> {
 }
 
 // -------------------- Python bindings -----------------------
-#[allow(missing_docs)]
 mod exceptions {
     use pyo3::exceptions::PyException;
 

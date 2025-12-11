@@ -31,6 +31,7 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 missing_docs = "warn"
 
 [workspace.lints.clippy]
+allow_attributes = "warn"
 
 # TODO: Reduce the size of error types.
 result_large_err = "allow"
@@ -87,7 +88,7 @@ rstest = "0.26.1"
 serde = "1.0.228"
 serde_json = "1.0.145"
 serde_with = "3.16.1"
-smol_str = "0.3.2"                                                   # Later versions require rustc version 1.89.
+smol_str = "0.3.4"
 strum = "0.27.2"
 thiserror = "2.0.17"
 tracing = "0.1.43"

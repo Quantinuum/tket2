@@ -74,7 +74,7 @@ pub struct PytketEncoderContext<H: HugrView> {
 ///
 /// Mostly related to qubit/bit/parameter reuse.
 #[derive(Default)]
-#[allow(clippy::type_complexity)]
+#[expect(clippy::type_complexity)]
 pub struct EmitCommandOptions<'a> {
     /// A function returning a list of input qubits to reuse in the output.
     /// Any additional required qubits IDs will be freshly generated.
@@ -1031,7 +1031,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
     ///   parameter expressions.
     /// - `wire_filter`: A function that takes a wire and returns true if the wire
     ///   at the output of the `node` should be registered.
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     fn register_node_outputs(
         &mut self,
         node: H::Node,
@@ -1139,7 +1139,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
     /// - `input_params`: The list of input parameter expressions.
     /// - `options_params_fn`: A function that computes the output parameter
     ///   expressions given the inputs.
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     fn register_port_output(
         &mut self,
         node: H::Node,
@@ -1240,7 +1240,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
     }
 
     /// Return the output wires of a node that have an associated pytket [`RegisterCount`].
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     fn node_output_values(
         &self,
         node: H::Node,

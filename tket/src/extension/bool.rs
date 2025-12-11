@@ -112,18 +112,23 @@ impl CustomConst for ConstBool {
     IntoStaticStr,
     EnumString,
 )]
-#[allow(missing_docs, non_camel_case_types)]
+#[expect(non_camel_case_types)]
 #[non_exhaustive]
 /// Simple enum of "tket.bool" operations.
 pub enum BoolOp {
-    // Gets a Hugr bool_t value from the opaque type.
+    /// Gets a Hugr bool_t value from the opaque type.
     read,
-    // Converts a Hugr bool_t value into the opaque type.
+    /// Converts a Hugr bool_t value into the opaque type.
     make_opaque,
+    /// Equality between two tket.bools.
     eq,
+    /// Negation of a tket.bool.
     not,
+    /// Logical AND between two tket.bools.
     and,
+    /// Logical OR between two tket.bools.
     or,
+    /// Logical XOR between two tket.bools.
     xor,
 }
 

@@ -55,7 +55,6 @@ lazy_static! {
     IntoStaticStr,
     EnumString,
 )]
-#[allow(missing_docs)]
 #[non_exhaustive]
 /// Result report operations from quantum runtime.
 /*
@@ -70,20 +69,28 @@ result_arr_f64<Tag: StringArg, N: Nat>( Array<N,f64> )
 result_arr_bool<Tag: StringArg, N: Nat>( Array<N, Sum((), ()) > )
 */
 pub enum ResultOpDef {
+    /// Report a boolean result.
     #[strum(serialize = "result_bool")]
     Bool,
+    /// Report a signed integer result.
     #[strum(serialize = "result_int")]
     Int,
+    /// Report an unsigned integer result.
     #[strum(serialize = "result_uint")]
     UInt,
+    /// Report a floating-point result.
     #[strum(serialize = "result_f64")]
     F64,
+    /// Report an array of boolean results.
     #[strum(serialize = "result_array_bool")]
     ArrBool,
+    /// Report an array of signed integer results.
     #[strum(serialize = "result_array_int")]
     ArrInt,
+    /// Report an array of unsigned integer results.
     #[strum(serialize = "result_array_uint")]
     ArrUInt,
+    /// Report an array of floating-point results.
     #[strum(serialize = "result_array_f64")]
     ArrF64,
 }

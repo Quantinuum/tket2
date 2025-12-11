@@ -94,7 +94,7 @@ pub enum ComputeType<T> {
         /// allowed.
         outputs: TypeRowRV,
     },
-    #[allow(missing_docs)]
+    /// Non-constructible variant.
     _Unreachable(std::convert::Infallible, PhantomData<T>),
 }
 
@@ -219,7 +219,7 @@ pub enum ComputeOp<T> {
         /// Note that row variables are not allowed here.
         outputs: TypeRow,
     },
-    #[allow(missing_docs)]
+    /// Non-constructible variant.
     _Unreachable(std::convert::Infallible, PhantomData<T>),
 }
 
@@ -243,15 +243,21 @@ macro_rules! compute_opdef {
             IntoStaticStr,
             EnumString,
         )]
-        #[allow(missing_docs, non_camel_case_types)]
+        #[expect(non_camel_case_types)]
         #[non_exhaustive]
         /// Simple enum of ops defined by the this extension.
         pub enum $opdef {
+            /// Retrieve the context for the given id.
             get_context,
+            /// Dispose of the context type.
             dispose_context,
+            /// Lookup a ComputeType::Func with the given signature.
             lookup_by_id,
+            /// Lookup a ComputeType::Func with the given name and signature.
             lookup_by_name,
+            /// Call a ComputeType::Func.
             call,
+            /// Read a future result type from a `call`.
             read_result,
         }
 
