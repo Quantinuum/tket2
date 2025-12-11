@@ -205,22 +205,29 @@ fn add_gate_and_connect(hugr: &mut Hugr, prev_node: Node, op: hugr::ops::OpType,
 fn replace_rz_with_gridsynth_output(hugr: &mut Hugr, rz_node: Node, gates: &str) {
     // getting node that gave qubit to Rz gate
     let mut prev_node = find_qubit_source(hugr, rz_node);
-    let parent = hugr.get_parent(rz_node).unwrap();
-    let output_node = hugr.get_io(parent).unwrap()[1];
-    // let dfg_output_node = find_sibling_output(hugr).unwrap();
 
+    // find output port
+    let outputs: Vec<_> = hugr.node_outputs(rz_node).collect();
+    let output_port = outputs[0];
+    let (next_node, _) = hugr
+                                    .single_linked_input(rz_node, output_port)
+                                    .unwrap();
+
+    // we have now inferred what we need to know from the Rz node we are replacing and can remove it
     hugr.remove_node(rz_node);
+
+    // println!("in panicking function: {}", hugr.mermaid_string());
 
     // recursively adding next gate in gates to prev_node
     for gate in gates.chars() {
         if gate == 'H' {
-            prev_node = add_gate_and_connect(hugr, prev_node, TketOp::H.into(), output_node);
+            prev_node = add_gate_and_connect(hugr, prev_node, TketOp::H.into(), next_node);
         }
         else if gate == 'S' {
-            prev_node = add_gate_and_connect(hugr, prev_node, TketOp::S.into(), output_node);
+            prev_node = add_gate_and_connect(hugr, prev_node, TketOp::S.into(), next_node);
         }
         else if gate == 'T' {
-            prev_node = add_gate_and_connect(hugr, prev_node, TketOp::T.into(), output_node);
+            prev_node = add_gate_and_connect(hugr, prev_node, TketOp::T.into(), next_node);
         }
         else if gate == 'W' {
             // find output node and connect it to node for previous gate
@@ -228,12 +235,14 @@ fn replace_rz_with_gridsynth_output(hugr: &mut Hugr, rz_node: Node, gates: &str)
             let ports:  Vec<_> = hugr.node_outputs(prev_node).collect();
             // Assuming there were no outgoing ports to begin with when deciding port offset
             let src_port = ports[0];
-            let ports:  Vec<_> = hugr.node_inputs(output_node).collect();
+            let ports:  Vec<_> = hugr.node_inputs(next_node).collect();
             let dst_port = ports[0];
-            hugr.connect(prev_node, src_port, output_node, dst_port);
+            hugr.connect(prev_node, src_port, next_node, dst_port);
             break; // Ignoring global phases for now.
         }
     }
+
+    println!("in panicking function: {}", hugr.mermaid_string());
     hugr.validate().unwrap_or_else(|e| panic!("{e}"));
 } 
 
@@ -304,7 +313,6 @@ mod tests {
         let registry = std_reg();
         let (_, imported_package) = read_described_envelope(reader, &registry).unwrap();
         let imported_hugr = imported_package.modules[0].clone();
-        println!("Before: {}", imported_hugr.mermaid_string());
         imported_hugr
     }
 
