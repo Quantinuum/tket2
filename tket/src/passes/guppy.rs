@@ -4,12 +4,14 @@ use hugr::algorithms::const_fold::{ConstFoldError, ConstantFoldPass};
 use hugr::algorithms::inline_dfgs::InlineDFGsPass;
 use hugr::algorithms::normalize_cfgs::{NormalizeCFGError, NormalizeCFGPass};
 use hugr::algorithms::untuple::{UntupleError, UntupleRecursive};
-use hugr::algorithms::{ComposablePass, RemoveDeadFuncsError, RemoveDeadFuncsPass, UntuplePass};
+use hugr::algorithms::{
+    inline_acyclic, ComposablePass, RemoveDeadFuncsError, RemoveDeadFuncsPass, UntuplePass,
+};
 use hugr::hugr::hugrmut::HugrMut;
 use hugr::hugr::patch::inline_dfg::InlineDFGError;
 use hugr::Node;
 
-use crate::passes::BorrowSquashPass;
+use crate::passes::{unpack_container::TypeUnpacker, BorrowSquashPass};
 
 /// Normalize the structure of a Guppy-generated circuit into something that can be optimized by tket.
 ///
@@ -80,6 +82,26 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for NormalizeGuppy {
     type Error = NormalizeGuppyErrors;
     type Result = ();
     fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
+        // We probably shouldn't inline quite as aggressively as this, but
+        // the results demonstrate how much we need to do at least some of it:
+        let qubit_finder = TypeUnpacker::for_qubits();
+        inline_acyclic(hugr, |h, call| {
+            // Look for qubits. Use instantiated type so that we inline generic
+            // (e.g. container) functions as this might enable better qubit tracking.
+            let inst = &h.get_optype(call).as_call().unwrap().instantiation;
+            inst.input_types()
+                .iter()
+                .chain(inst.output_types())
+                .any(|ty| qubit_finder.contains_element_type(ty))
+        })
+        .unwrap();
+        // Many functions now unreachable, so remove - this may improve compilation speed,
+        // although not if all remaining phases operate only beneath the entrypoint.
+        // Shouldn't be affected by anything else until we start removing untaken branches.
+        if self.dead_funcs {
+            RemoveDeadFuncsPass::default().run(hugr)?;
+        }
+
         if self.simplify_cfgs {
             NormalizeCFGPass::default().run(hugr)?;
         }
@@ -90,11 +112,6 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for NormalizeGuppy {
         // Should propagate through untuple, so could do earlier, and must be before BorrowSquash
         if self.constant_fold {
             ConstantFoldPass::default().run(hugr)?;
-        }
-        // Only improves compilation speed, not affected by anything else
-        // until we start removing untaken branches
-        if self.dead_funcs {
-            RemoveDeadFuncsPass::default().run(hugr)?;
         }
         // Do earlier? Nothing creates DFGs
         if self.inline_dfgs {
