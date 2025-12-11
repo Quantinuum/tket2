@@ -7,8 +7,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use super::{CircuitPattern, NodeID, PEdge, PNode};
-use derive_more::{Display, Error, From};
+use super::{pattern::InvalidPattern, CircuitPattern, NodeID, PEdge, PNode};
+use derive_more::{Display, Error, From, Into};
 use hugr::hugr::views::sibling_subgraph::{
     InvalidReplacement, InvalidSubgraph, InvalidSubgraphBoundary, TopoConvexChecker,
 };
@@ -364,6 +364,84 @@ impl PatternMatcher {
         let file = File::open(name)?;
         let mut reader = std::io::BufReader::new(file);
         Self::load_binary_io(&mut reader)
+    }
+}
+
+/// A rewrite rule defined by a left hand side and right hand side of an equation.
+#[derive(Clone, Debug, From, Into)]
+pub struct Rule(pub [Circuit; 2]);
+
+impl Rule {
+    /// Construct a rule from a pattern and a replacement.
+    pub fn new(l: Circuit, r: Circuit) -> Self {
+        Self([l, r])
+    }
+
+    /// The left hand side of the rule.
+    ///
+    /// This is the pattern that will be matched against the target circuit.
+    pub fn lhs(&self) -> Circuit {
+        self.0[0].clone()
+    }
+
+    /// The right hand side of the rule.
+    ///
+    /// This is the replacement that will be applied to the target circuit.
+    pub fn rhs(&self) -> Circuit {
+        self.0[1].clone()
+    }
+}
+
+/// A matcher object for a given set of rewrite rules.
+#[derive(Clone, Debug, From, Into)]
+pub struct RuleMatcher {
+    matcher: PatternMatcher,
+    rights: Vec<Circuit>,
+}
+
+impl RuleMatcher {
+    /// Construct a matcher from a set of rules.
+    pub fn from_rules(rules: Vec<Rule>) -> Result<Self, InvalidPattern> {
+        let (lefts, rights): (Vec<_>, Vec<_>) =
+            rules.into_iter().map(|Rule([l, r])| (l, r)).unzip();
+        let patterns: Result<Vec<CircuitPattern>, _> =
+            lefts.iter().map(CircuitPattern::try_from_circuit).collect();
+        let matcher = PatternMatcher::from_patterns(patterns?);
+
+        Ok(Self { matcher, rights })
+    }
+
+    /// Find the first match.
+    pub fn find_match(
+        &self,
+        target: &Circuit,
+    ) -> Result<Option<CircuitRewrite>, InvalidReplacement> {
+        if let Some(pmatch) = self.matcher.find_matches_iter(target).next() {
+            Ok(Some(self.match_to_rewrite(pmatch, target)?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Find all matches.
+    pub fn find_matches(
+        &self,
+        target: &Circuit,
+    ) -> Result<Vec<CircuitRewrite>, InvalidReplacement> {
+        self.matcher
+            .find_matches_iter(target)
+            .map(|m| self.match_to_rewrite(m, target))
+            .collect()
+    }
+
+    fn match_to_rewrite(
+        &self,
+        pmatch: PatternMatch,
+        target: &Circuit<impl HugrView<Node = Node>>,
+    ) -> Result<CircuitRewrite, InvalidReplacement> {
+        let r = self.rights.get(pmatch.pattern_id().0).unwrap().clone();
+        let rw = pmatch.to_rewrite(target, r)?;
+        Ok(rw)
     }
 }
 

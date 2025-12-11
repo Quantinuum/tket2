@@ -59,7 +59,7 @@ pub mod pattern;
 use hugr::types::EdgeKind;
 use hugr::{HugrView, OutgoingPort};
 use itertools::Itertools;
-pub use matcher::{PatternMatch, PatternMatcher};
+pub use matcher::{PatternMatch, PatternMatcher, Rule, RuleMatcher};
 pub use pattern::CircuitPattern;
 
 use derive_more::{Display, Error};
