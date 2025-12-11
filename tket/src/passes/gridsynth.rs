@@ -15,16 +15,26 @@ use hugr::std_extensions::arithmetic::float_types::ConstF64;
 use crate::passes::guppy::NormalizeGuppy;
 
 
-/// Find the FuncDefn node for the Rz gate.
-fn find_rz(hugr: &mut Hugr) -> Option<crate::hugr::Node> {
+/// Find the nodes for the Rz gates.
+fn find_rzs(hugr: &mut Hugr) -> Option<Vec<hugr::Node>> {
+    let mut rz_nodes: Vec<Node> = Vec::new();  
     for node in hugr.nodes() {
         let op_type = hugr.get_optype(node);
         if op_matches(op_type, TketOp::Rz) {
-            return Some(node);
+            rz_nodes.push(node);
+            // return Some(node);
         }
     }
+
+    // if there are rz_nodes:
+    if !(rz_nodes.is_empty()) {
+        return Some(rz_nodes);
+    }
+    // else return None
     None
 }
+
+
 // TO DO: extend this function to find all RZ gates
 
 fn find_linked_incoming_ports(hugr: &mut Hugr, node: Node, port_idx: usize) -> Vec<(Node, Port)> {
@@ -82,8 +92,7 @@ fn find_angle_node(hugr: &mut Hugr, rz_node: Node) -> Node {
     }
 }
 
-fn find_angle(hugr: &mut Hugr) -> f64 {
-    let rz_node = find_rz(hugr).unwrap();
+fn find_angle(hugr: &mut Hugr, rz_node: Node) -> f64 {
     let angle_node = find_angle_node(hugr, rz_node);
     let op_type = hugr.get_optype(angle_node);
     let angle_const = op_type.as_const().unwrap();
@@ -105,8 +114,8 @@ fn find_angle(hugr: &mut Hugr) -> f64 {
     angle
 }
 
-fn apply_gridsynth(hugr: &mut Hugr, epsilon: f64) -> String {
-    let theta = find_angle(hugr);
+fn apply_gridsynth(hugr: &mut Hugr, epsilon: f64, rz_node: Node) -> String {
+    let theta = find_angle(hugr, rz_node);
     // The following parameters could be made user-specifiable. For simplicity, I fix them, for now
     // let epsilon = 1e-1; // very low precision to allow easier visualisation for demo
     let seed = 1234;
@@ -194,19 +203,16 @@ fn replace_rz_with_gridsynth_output(hugr: &mut Hugr, rz_node: Node, gates: &str)
             prev_node = add_gate_and_connect(hugr, prev_node, TketOp::T.into(), next_node);
         }
         else if gate == 'W' {
-            // find output node and connect it to node for previous gate
-
-            let ports:  Vec<_> = hugr.node_outputs(prev_node).collect();
-            // Assuming there were no outgoing ports to begin with when deciding port offset
-            let src_port = ports[0];
-            let ports:  Vec<_> = hugr.node_inputs(next_node).collect();
-            let dst_port = ports[0];
-            hugr.connect(prev_node, src_port, next_node, dst_port);
             break; // Ignoring global phases for now.
         }
     }
-
-    println!("in panicking function: {}", hugr.mermaid_string());
+    let ports:  Vec<_> = hugr.node_outputs(prev_node).collect();
+    // Assuming there were no outgoing ports to begin with when deciding port offset
+    let src_port = ports[0];
+    let ports:  Vec<_> = hugr.node_inputs(next_node).collect();
+    let dst_port = ports[0];
+    hugr.connect(prev_node, src_port, next_node, dst_port);
+    println!("Inside panicking function: {}", hugr.mermaid_string());
     hugr.validate().unwrap_or_else(|e| panic!("{e}"));
 } 
 
@@ -222,9 +228,11 @@ pub fn apply_gridsynth_pass(hugr: &mut Hugr, epsilon: f64) {
         .run(hugr)
         .unwrap();
 
-    let rz_node = find_rz(hugr).unwrap();
-    let gates = apply_gridsynth(hugr, epsilon);
-    replace_rz_with_gridsynth_output(hugr, rz_node, &gates);
+    let rz_nodes = find_rzs(hugr).unwrap();
+    for node in rz_nodes {
+        let gates = apply_gridsynth(hugr, epsilon, node);
+        replace_rz_with_gridsynth_output(hugr, node, &gates);
+    }
 }
 
 // TO DO: make compatible with Guppy hugrs. Right now, it will only work for simple hugrs not like the 
@@ -267,18 +275,27 @@ mod tests {
         let mut circ = h.finish_hugr().unwrap(); //(rz.outputs()).unwrap().into();
         println!("First mermaid string is: {}", circ.mermaid_string());
         circ.validate().unwrap_or_else(|e| panic!("{e}"));
-        let rz_node = find_rz(&mut circ).unwrap();
+        let rz_nodes = find_rzs(&mut circ).unwrap();
+        let rz_node = rz_nodes[0];
         (circ, rz_node)
     }
 
-    fn import_rz_only_guppy_circuit() -> Hugr {
-        // TODO: update the following path
-        let f = File::open("/home/kennycampbell/coding_projects/tket_gridsynth_ext/guppy_rz").unwrap();
+    fn import_guppy(path: &'static str) -> Hugr {
+        let f = File::open(path).unwrap();
         let reader = BufReader::new(f);
         let registry = std_reg();
         let (_, imported_package) = read_described_envelope(reader, &registry).unwrap();
         let imported_hugr = imported_package.modules[0].clone();
         imported_hugr
+    }
+
+    fn import_rz_only_guppy_circuit() -> Hugr {
+        // TODO: update the following path
+        import_guppy("/home/kennycampbell/coding_projects/tket_gridsynth_ext/guppy_rz")
+    }
+
+    fn import_2rzs_guppy() -> Hugr {
+        import_guppy("/home/kennycampbell/coding_projects/tket_gridsynth_ext/guppy_2Rzs")
     }
 
 
@@ -296,8 +313,8 @@ mod tests {
     #[test]
     fn test_gridsynth_output_to_hugr() {
         let epsilon = 1e-3;
-        let (mut circ, _) = build_rz_only_circ();
-        let gates = apply_gridsynth(&mut circ, epsilon);
+        let (mut circ, rz_node) = build_rz_only_circ();
+        let gates = apply_gridsynth(&mut circ, epsilon, rz_node);
         gridsynth_output_to_hugr(&gates);
     }
 
@@ -312,7 +329,8 @@ mod tests {
             .inline_dfgs(true)
             .run(imported_hugr)
             .unwrap();
-        let rz_node = find_rz(imported_hugr).unwrap();
+        let rz_nodes = find_rzs(imported_hugr).unwrap();
+        let rz_node = rz_nodes[0];
         assert_eq!(rz_node.index(), 17)
     }
 
@@ -327,7 +345,8 @@ mod tests {
             .inline_dfgs(true)
             .run(imported_hugr)
             .unwrap();
-        let rz_node = find_rz(imported_hugr).unwrap();
+        let rz_nodes = find_rzs(imported_hugr).unwrap();
+        let rz_node = rz_nodes[0];
         let angle_node = find_angle_node(imported_hugr, rz_node);
         assert_eq!(angle_node.index(), 20);
     }
@@ -343,7 +362,9 @@ mod tests {
             .inline_dfgs(true)
             .run(imported_hugr)
             .unwrap();
-        let angle = find_angle(imported_hugr);
+        let rz_nodes = find_rzs(imported_hugr).unwrap();
+        let rz_node = rz_nodes[0];
+        let angle = find_angle(imported_hugr, rz_node);
         println!("angle is {}", angle);
         println!("hugr is {}", imported_hugr.mermaid_string());
     }
@@ -352,6 +373,25 @@ mod tests {
     fn test_with_guppy_hugr() {
         let epsilon = 1e-2;
         let mut imported_hugr = &mut import_rz_only_guppy_circuit();
+        NormalizeGuppy::default()
+            .simplify_cfgs(true)
+            .remove_tuple_untuple(true)
+            .constant_folding(true)
+            .remove_dead_funcs(true)
+            .inline_dfgs(true)
+            .run(imported_hugr)
+            .unwrap();
+        // constant_fold_pass(imported_hugr.as_mut());
+        // println!("after {}", imported_hugr.mermaid_string());
+        apply_gridsynth_pass(&mut imported_hugr, epsilon);
+        println!("after: {}", imported_hugr.mermaid_string());
+    }
+
+    #[test]
+    fn test_2rzs_guppy_hugr() {
+        let epsilon = 1e-2;
+        let mut imported_hugr = &mut import_2rzs_guppy();
+        println!("before: {}", imported_hugr.mermaid_string());
         NormalizeGuppy::default()
             .simplify_cfgs(true)
             .remove_tuple_untuple(true)
