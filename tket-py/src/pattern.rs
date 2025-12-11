@@ -99,11 +99,10 @@ impl RuleMatcher {
 
     pub fn find_match(&self, target: &Tk2Circuit) -> PyResult<Option<PyCircuitRewrite>> {
         let circ = &target.circ;
-        if let Some(pmatch) = self.matcher.find_matches_iter(circ).next() {
-            Ok(Some(self.match_to_rewrite(pmatch, circ)?))
-        } else {
-            Ok(None)
-        }
+        let Some(pmatch) = self.matcher.find_matches_iter(circ).next() else {
+            return Ok(None);
+        };
+        Ok(Some(self.match_to_rewrite(pmatch, circ)?))
     }
 
     pub fn find_matches(&self, target: &Tk2Circuit) -> PyResult<Vec<PyCircuitRewrite>> {

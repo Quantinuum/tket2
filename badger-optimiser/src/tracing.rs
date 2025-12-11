@@ -48,7 +48,7 @@ impl Tracer {
     }
 
     /// Clean log with the most important events.
-    fn stdout_layer<S>(&mut self, show_threads: bool) -> impl Layer<S>
+    fn stdout_layer<S>(&mut self, show_threads: bool) -> impl Layer<S> + use<S>
     where
         S: Subscriber + for<'span> tracing_subscriber::registry::LookupSpan<'span>,
     {
@@ -60,7 +60,7 @@ impl Tracer {
             .with_filter(filter_fn(log_filter))
     }
 
-    fn logfile_layer<S>(&mut self, logfile: PathBuf, show_threads: bool) -> impl Layer<S>
+    fn logfile_layer<S>(&mut self, logfile: PathBuf, show_threads: bool) -> impl Layer<S> + use<S>
     where
         S: Subscriber + for<'span> tracing_subscriber::registry::LookupSpan<'span>,
     {

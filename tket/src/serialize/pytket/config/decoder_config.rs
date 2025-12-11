@@ -93,7 +93,7 @@ impl PytketDecoderConfig {
     fn decoders_for_optype(
         &self,
         optype: &tket_json_rs::OpType,
-    ) -> impl Iterator<Item = &Box<dyn PytketDecoder + Send + Sync>> {
+    ) -> impl Iterator<Item = &Box<dyn PytketDecoder + Send + Sync>> + use<'_> {
         self.optype_decoders
             .get(optype)
             .into_iter()

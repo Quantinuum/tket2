@@ -584,12 +584,12 @@ impl WireTracker {
     }
 
     /// Returns the list of wires that contain the given qubit.
-    fn qubit_wires(&self, qubit: &TrackedQubit) -> impl Iterator<Item = Wire> + '_ {
+    fn qubit_wires(&self, qubit: &TrackedQubit) -> impl Iterator<Item = Wire> + '_ + use<'_> {
         self.qubit_wires[&qubit.id()].iter().copied()
     }
 
     /// Returns the list of wires that contain the given bit.
-    fn bit_wires(&self, bit: &TrackedBit) -> impl Iterator<Item = Wire> + '_ {
+    fn bit_wires(&self, bit: &TrackedBit) -> impl Iterator<Item = Wire> + '_ + use<'_> {
         self.bit_wires[&bit.id()].iter().copied()
     }
 

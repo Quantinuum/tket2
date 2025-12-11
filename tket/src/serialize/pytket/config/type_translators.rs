@@ -141,7 +141,7 @@ impl TypeTranslatorSet {
     fn translators_for_extension(
         &self,
         ext: &ExtensionId,
-    ) -> impl Iterator<Item = &Box<dyn PytketTypeTranslator + Send + Sync>> {
+    ) -> impl Iterator<Item = &Box<dyn PytketTypeTranslator + Send + Sync>> + use<'_> {
         self.extension_translators
             .get(ext)
             .into_iter()

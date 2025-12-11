@@ -85,7 +85,7 @@ impl HashState {
 }
 
 /// Returns a hashable representation of an operation.
-fn hashable_op(op: &OpType) -> impl Hash {
+fn hashable_op(op: &OpType) -> impl Hash + use<> {
     match op {
         OpType::ExtensionOp(op) if !op.args().is_empty() => {
             // TODO: Require hashing for TypeParams?

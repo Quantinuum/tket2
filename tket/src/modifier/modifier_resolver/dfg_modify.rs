@@ -133,8 +133,8 @@ impl<N: HugrNode> ModifierResolver<N> {
             }
             OpType::DataflowBlock(dfb) => {
                 let DataflowBlock {
-                    inputs: ref input,
-                    other_outputs: ref output,
+                    inputs: input,
+                    other_outputs: output,
                     sum_rows: _sum_rows,
                 } = dfb;
                 let offset = self.control_num();

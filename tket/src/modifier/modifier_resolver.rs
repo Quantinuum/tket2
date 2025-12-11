@@ -645,13 +645,12 @@ impl<N: HugrNode> ModifierResolver<N> {
             return Err(ModifierError::NotModifier(n, optype.clone()));
         }
         // Check if this is the first modifier in a chain.
-        if let Ok((caller, _)) = h.linked_inputs(n, 0).exactly_one() {
-            let optype = h.get_optype(caller);
-            if Modifier::from_optype(optype).is_some() {
-                return Err(ModifierError::NotInitialModifier(caller, optype.clone()));
-            }
-        } else {
+        let Ok((caller, _)) = h.linked_inputs(n, 0).exactly_one() else {
             return Err(ModifierError::NoCaller(n));
+        };
+        let optype = h.get_optype(caller);
+        if Modifier::from_optype(optype).is_some() {
+            return Err(ModifierError::NotInitialModifier(caller, optype.clone()));
         }
         Ok(())
     }
