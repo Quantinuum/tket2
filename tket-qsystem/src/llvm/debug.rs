@@ -1,17 +1,17 @@
 //! LLVM lowering implementations for "tket.debug" extension.
 
 use crate::llvm::prelude::emit_global_string;
-use anyhow::{anyhow, bail, Result};
+use anyhow::{Result, anyhow, bail};
 use hugr::extension::simple_op::MakeExtensionOp;
+use hugr::llvm::CodegenExtsBuilder;
 use hugr::llvm::custom::CodegenExtension;
 use hugr::llvm::emit::{EmitFuncContext, EmitOpArgs};
 use hugr::llvm::inkwell::AddressSpace;
-use hugr::llvm::CodegenExtsBuilder;
 use hugr::ops::ExtensionOp;
 use hugr::{HugrView, Node};
-use tket::extension::debug::{StateResult, DEBUG_EXTENSION_ID, STATE_RESULT_OP_ID};
+use tket::extension::debug::{DEBUG_EXTENSION_ID, STATE_RESULT_OP_ID, StateResult};
 
-use super::array_utils::{struct_1d_arr_alloc, struct_1d_arr_ptr_t, ArrayLowering, ElemType};
+use super::array_utils::{ArrayLowering, ElemType, struct_1d_arr_alloc, struct_1d_arr_ptr_t};
 
 static TAG_PREFIX: &str = "USER:";
 
@@ -117,9 +117,9 @@ mod test {
 
     use hugr::extension::simple_op::MakeRegisteredOp;
     use hugr::llvm::check_emission;
+    use hugr::llvm::test::TestContext;
     use hugr::llvm::test::llvm_ctx;
     use hugr::llvm::test::single_op_hugr;
-    use hugr::llvm::test::TestContext;
 
     use crate::llvm::array_utils::DEFAULT_HEAP_ARRAY_LOWERING;
     use crate::llvm::array_utils::DEFAULT_STACK_ARRAY_LOWERING;

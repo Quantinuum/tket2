@@ -2,13 +2,13 @@
 
 use std::collections::{BTreeSet, HashMap};
 
-use hugr::core::HugrNode;
 use hugr::HugrView;
+use hugr::core::HugrNode;
 use petgraph::unionfind::UnionFind;
 
-use crate::serialize::pytket::opaque::OpaqueSubgraph;
-use crate::serialize::pytket::PytketEncodeError;
 use crate::Circuit;
+use crate::serialize::pytket::PytketEncodeError;
+use crate::serialize::pytket::opaque::OpaqueSubgraph;
 
 /// A structure for tracking nodes in the hugr that cannot be encoded as TKET1
 /// operations.

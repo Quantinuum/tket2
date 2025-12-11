@@ -5,10 +5,10 @@ use hugr::builder::{Container, DFGBuilder};
 use hugr::extension::prelude::bool_t;
 use hugr::extension::simple_op::MakeRegisteredOp;
 use hugr::types::{Signature, Term};
-use hugr::{hugr::hugrmut::HugrMut, Node};
+use hugr::{Node, hugr::hugrmut::HugrMut};
 use tket::extension::guppy::{DROP_OP_NAME, GUPPY_EXTENSION};
 
-use crate::extension::futures::{future_type, FutureOp, FutureOpDef};
+use crate::extension::futures::{FutureOp, FutureOpDef, future_type};
 
 /// A pass that lowers "drop" ops from [GUPPY_EXTENSION]
 #[derive(Default, Debug, Clone)]
@@ -67,10 +67,10 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for LowerDropsPass {
 mod test {
     use std::sync::Arc;
 
-    use hugr::builder::{inout_sig, Dataflow, DataflowHugr};
+    use hugr::builder::{Dataflow, DataflowHugr, inout_sig};
     use hugr::ops::ExtensionOp;
-    use hugr::{extension::prelude::usize_t, std_extensions::collections::array::array_type};
     use hugr::{Hugr, HugrView};
+    use hugr::{extension::prelude::usize_t, std_extensions::collections::array::array_type};
 
     use super::*;
 

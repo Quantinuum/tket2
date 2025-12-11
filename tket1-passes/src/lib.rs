@@ -4,17 +4,21 @@
 //! that exposes some of TKET1's passes as Rust functions.
 #![warn(clippy::undocumented_unsafe_blocks)] // TODO: Fix and move to the workspace lints.
 
-use std::ffi::{c_char, CStr, CString};
+use std::ffi::{CStr, CString, c_char};
 use std::ptr;
 use thiserror::Error;
 use tket_json_rs::{OpType, SerialCircuit};
 
 // Include the auto-generated bindings
 mod ffi {
-    #![allow(non_camel_case_types)]
-    #![allow(non_upper_case_globals)]
-    #![allow(dead_code)]
-    #![allow(non_snake_case)]
+    #![allow(
+        non_camel_case_types,
+        non_upper_case_globals,
+        dead_code,
+        non_snake_case,
+        clippy::allow_attributes,
+        reason = "generated code"
+    )]
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
 

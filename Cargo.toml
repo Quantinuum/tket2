@@ -15,8 +15,8 @@ members = [
 default-members = ["tket", "tket-qsystem"]
 
 [workspace.package]
-rust-version = "1.85"
-edition = "2021"
+rust-version = "1.89"
+edition = "2024"
 homepage = "https://github.com/quantinuum/tket2"
 repository = "https://github.com/quantinuum/tket2"
 license = "Apache-2.0"
@@ -31,6 +31,7 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 missing_docs = "warn"
 
 [workspace.lints.clippy]
+allow_attributes = "warn"
 
 # TODO: Reduce the size of error types.
 result_large_err = "allow"
@@ -52,7 +53,7 @@ large_enum_variant = "allow"
 hugr = "0.24.3"
 hugr-core = "0.24.3"
 hugr-cli = "0.24.3"
-portgraph = "0.15.2"
+portgraph = "0.15.3"
 pyo3 = ">= 0.23.4, < 0.27"
 pyo3-build-config = ">= 0.23.4, < 0.28"
 
@@ -79,7 +80,7 @@ num_cpus = "1.17.0"
 peak_alloc = "0.3.0"
 pest = "2.8.4"
 pest_derive = "2.8.4"
-petgraph = { version = ">= 0.8.1, < 0.9", default-features = false }
+petgraph = { version = ">= 0.8.3, < 0.9", default-features = false }
 priority-queue = "2.7.0"
 rayon = "1.11"
 rmp-serde = "1.1.2"
@@ -87,7 +88,7 @@ rstest = "0.26.1"
 serde = "1.0.228"
 serde_json = "1.0.145"
 serde_with = "3.16.1"
-smol_str = "0.3.2"                                                   # Later versions require rustc version 1.89.
+smol_str = "0.3.4"
 strum = "0.27.2"
 thiserror = "2.0.17"
 tracing = "0.1.43"

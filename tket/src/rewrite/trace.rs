@@ -2,8 +2,8 @@
 //!
 //! This is only tracked if the `rewrite-tracing` feature is enabled.
 
-use hugr::hugr::hugrmut::HugrMut;
 use hugr::hugr::NodeMetadata;
+use hugr::hugr::hugrmut::HugrMut;
 use itertools::Itertools;
 
 use crate::Circuit;

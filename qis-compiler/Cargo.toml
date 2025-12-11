@@ -25,6 +25,9 @@ tket-qsystem = { path = "../tket-qsystem", version = "0.22.0", features = [
     "llvm",
 ] }
 
+[lints]
+workspace = true
+
 [features]
 default = []
 extension-module = ["pyo3/extension-module"]

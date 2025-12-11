@@ -8,37 +8,37 @@ use hugr::builder::{
     Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder,
     ModuleBuilder, SubContainer,
 };
-use hugr::extension::prelude::{bool_t, option_type, qb_t, UnwrapBuilder};
-use hugr::std_extensions::arithmetic::float_types::{float64_type, ConstF64};
+use hugr::extension::prelude::{UnwrapBuilder, bool_t, option_type, qb_t};
+use hugr::std_extensions::arithmetic::float_types::{ConstF64, float64_type};
 use rayon::iter::ParallelIterator;
 use std::sync::Arc;
 
+use hugr::HugrView;
 use hugr::hugr::hugrmut::HugrMut;
 use hugr::ops::handle::FuncID;
 use hugr::ops::{OpParent, OpType, Value};
 use hugr::std_extensions::arithmetic::float_ops::FloatOps;
 use hugr::types::{Signature, SumType};
-use hugr::HugrView;
 use itertools::Itertools;
 use rstest::{fixture, rstest};
 use tket_json_rs::circuit_json::{self, SerialCircuit};
 use tket_json_rs::optype;
 use tket_json_rs::register;
 
-use super::{TKETDecode, METADATA_INPUT_PARAMETERS, METADATA_Q_REGISTERS};
-use crate::circuit::Circuit;
-use crate::extension::bool::{bool_type, BoolOp};
-use crate::extension::rotation::{rotation_type, ConstRotation, RotationOp};
-use crate::extension::sympy::SympyOpDef;
-use crate::extension::TKET1_EXTENSION_ID;
-use crate::serialize::pytket::extension::{CoreDecoder, OpaqueTk1Op, PreludeEmitter};
-use crate::serialize::pytket::PytketEncodeError;
-use crate::serialize::pytket::{
-    default_decoder_config, default_encoder_config, DecodeInsertionTarget, DecodeOptions,
-    EncodeOptions, EncodedCircuit, PytketDecodeError, PytketDecodeErrorInner, PytketDecoderConfig,
-    PytketEncodeOpError, PytketEncoderConfig,
-};
+use super::{METADATA_INPUT_PARAMETERS, METADATA_Q_REGISTERS, TKETDecode};
 use crate::TketOp;
+use crate::circuit::Circuit;
+use crate::extension::TKET1_EXTENSION_ID;
+use crate::extension::bool::{BoolOp, bool_type};
+use crate::extension::rotation::{ConstRotation, RotationOp, rotation_type};
+use crate::extension::sympy::SympyOpDef;
+use crate::serialize::pytket::PytketEncodeError;
+use crate::serialize::pytket::extension::{CoreDecoder, OpaqueTk1Op, PreludeEmitter};
+use crate::serialize::pytket::{
+    DecodeInsertionTarget, DecodeOptions, EncodeOptions, EncodedCircuit, PytketDecodeError,
+    PytketDecodeErrorInner, PytketDecoderConfig, PytketEncodeOpError, PytketEncoderConfig,
+    default_decoder_config, default_encoder_config,
+};
 
 const EMPTY_CIRCUIT: &str = r#"{
         "phase": "0",

@@ -4,7 +4,7 @@ use core::panic;
 use std::cmp::Ordering;
 
 use derive_more::derive::{Display, Error};
-use hugr::{core::HugrNode, Direction, HugrView, IncomingPort, OutgoingPort, Port};
+use hugr::{Direction, HugrView, IncomingPort, OutgoingPort, Port, core::HugrNode};
 use itertools::{Either, Itertools};
 
 use crate::resource::{Position, ResourceId, ResourceScope};
@@ -303,7 +303,6 @@ impl<N: HugrNode> Interval<N> {
     /// [`Interval::try_extend`] instead for a safe way to extend an interval.
     ///
     /// Return the direction the interval was extended in.
-    #[allow(dead_code)]
     pub(crate) fn add_node_unchecked(
         &mut self,
         node: N,
@@ -448,7 +447,7 @@ mod tests {
     use super::{ResourceScope, *};
     use std::ops::RangeInclusive;
 
-    use crate::{resource::tests::cx_circuit, Circuit};
+    use crate::{Circuit, resource::tests::cx_circuit};
 
     use itertools::Itertools;
     use rstest::{fixture, rstest};

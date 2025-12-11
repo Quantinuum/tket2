@@ -10,7 +10,7 @@ use hugr::{CircuitUnit, Hugr};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-use crate::extension::rotation::{rotation_type, RotationOp};
+use crate::extension::rotation::{RotationOp, rotation_type};
 use crate::{Circuit, TketOp};
 
 #[derive(Debug, Serialize, Deserialize)]

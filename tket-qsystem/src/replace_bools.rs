@@ -5,34 +5,34 @@ mod static_array;
 use derive_more::{Display, Error, From};
 use hugr::algorithms::replace_types::{NodeTemplate, ReplaceTypesError, ReplacementOptions};
 use hugr::algorithms::{
-    ensure_no_nonlocal_edges, non_local::FindNonLocalEdgesError, ComposablePass, ReplaceTypes,
+    ComposablePass, ReplaceTypes, ensure_no_nonlocal_edges, non_local::FindNonLocalEdgesError,
 };
 use hugr::builder::{
-    inout_sig, BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
-    SubContainer,
+    BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, SubContainer,
+    inout_sig,
 };
 use hugr::extension::prelude::{bool_t, option_type, qb_t, usize_t};
 use hugr::extension::simple_op::{MakeOpDef, MakeRegisteredOp};
-use hugr::ops::{handle::ConditionalID, ExtensionOp, Tag, Value};
+use hugr::ops::{ExtensionOp, Tag, Value, handle::ConditionalID};
 use hugr::std_extensions::arithmetic::{
     conversions::ConvertOpDef, int_ops::IntOpDef, int_types::ConstInt,
 };
 use hugr::std_extensions::collections::{
-    array::{self, array_type, GenericArrayOpDef, ARRAY_CLONE_OP_ID, ARRAY_DISCARD_OP_ID},
-    borrow_array::{self, borrow_array_type, BArrayUnsafeOpDef, BorrowArray},
+    array::{self, ARRAY_CLONE_OP_ID, ARRAY_DISCARD_OP_ID, GenericArrayOpDef, array_type},
+    borrow_array::{self, BArrayUnsafeOpDef, BorrowArray, borrow_array_type},
 };
 use hugr::std_extensions::logic::LogicOp;
 use hugr::types::{SumType, Term, Type};
-use hugr::{hugr::hugrmut::HugrMut, type_row, Hugr, HugrView, Node, Wire};
+use hugr::{Hugr, HugrView, Node, Wire, hugr::hugrmut::HugrMut, type_row};
 use static_array::{ReplaceStaticArrayBoolPass, ReplaceStaticArrayBoolPassError};
+use tket::TketOp;
 use tket::extension::{
-    bool::{bool_type, BoolOp, ConstBool},
+    bool::{BoolOp, ConstBool, bool_type},
     guppy::{DROP_OP_NAME, GUPPY_EXTENSION},
 };
-use tket::TketOp;
 
 use crate::extension::{
-    futures::{future_type, FutureOp, FutureOpBuilder, FutureOpDef},
+    futures::{FutureOp, FutureOpBuilder, FutureOpDef, future_type},
     qsystem::QSystemOp,
 };
 
@@ -427,25 +427,25 @@ mod test {
     use crate::extension::qsystem::{QSystemOp, QSystemOpBuilder};
 
     use super::*;
-    use hugr::extension::prelude::{option_type, usize_t, UnwrapBuilder};
+    use hugr::extension::prelude::{UnwrapBuilder, option_type, usize_t};
     use hugr::extension::simple_op::HasDef;
     use hugr::ops::OpType;
     use hugr::std_extensions::collections::array::op_builder::GenericArrayOpBuilder;
     use hugr::std_extensions::collections::array::{Array, ArrayKind};
     use hugr::std_extensions::collections::borrow_array::{
-        borrow_array_type, BArrayOpBuilder, BorrowArray,
+        BArrayOpBuilder, BorrowArray, borrow_array_type,
     };
     use hugr::type_row;
     use hugr::{
-        builder::{inout_sig, DFGBuilder, Dataflow, DataflowHugr},
+        HugrView,
+        builder::{DFGBuilder, Dataflow, DataflowHugr, inout_sig},
         extension::prelude::qb_t,
         types::TypeRow,
-        HugrView,
     };
     use rstest::rstest;
     use tket::{
-        extension::bool::{BoolOp, BoolOpBuilder},
         TketOp,
+        extension::bool::{BoolOp, BoolOpBuilder},
     };
 
     fn tket_bool_t() -> Type {

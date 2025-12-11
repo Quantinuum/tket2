@@ -6,20 +6,20 @@ use std::sync::{Arc, Weak};
 use hugr::std_extensions::collections;
 use hugr::types::Signature;
 use hugr::{
+    Extension, Wire,
     builder::{BuildError, Dataflow},
     extension::{
-        prelude::bool_t,
-        simple_op::{try_from_name, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError},
         ExtensionId, OpDef, SignatureFunc, Version,
+        prelude::bool_t,
+        simple_op::{MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError, try_from_name},
     },
     ops::OpType,
     std_extensions::arithmetic::{
         float_types::float64_type,
-        int_types::{int_type, LOG_WIDTH_TYPE_PARAM},
+        int_types::{LOG_WIDTH_TYPE_PARAM, int_type},
     },
     type_row,
-    types::{type_param::TypeParam, PolyFuncType, Type, TypeArg},
-    Extension, Wire,
+    types::{PolyFuncType, Type, TypeArg, type_param::TypeParam},
 };
 
 use lazy_static::lazy_static;
@@ -55,7 +55,6 @@ lazy_static! {
     IntoStaticStr,
     EnumString,
 )]
-#[allow(missing_docs)]
 #[non_exhaustive]
 /// Result report operations from quantum runtime.
 /*
@@ -70,20 +69,28 @@ result_arr_f64<Tag: StringArg, N: Nat>( Array<N,f64> )
 result_arr_bool<Tag: StringArg, N: Nat>( Array<N, Sum((), ()) > )
 */
 pub enum ResultOpDef {
+    /// Report a boolean result.
     #[strum(serialize = "result_bool")]
     Bool,
+    /// Report a signed integer result.
     #[strum(serialize = "result_int")]
     Int,
+    /// Report an unsigned integer result.
     #[strum(serialize = "result_uint")]
     UInt,
+    /// Report a floating-point result.
     #[strum(serialize = "result_f64")]
     F64,
+    /// Report an array of boolean results.
     #[strum(serialize = "result_array_bool")]
     ArrBool,
+    /// Report an array of signed integer results.
     #[strum(serialize = "result_array_int")]
     ArrInt,
+    /// Report an array of unsigned integer results.
     #[strum(serialize = "result_array_uint")]
     ArrUInt,
+    /// Report an array of floating-point results.
     #[strum(serialize = "result_array_f64")]
     ArrF64,
 }
@@ -310,9 +317,11 @@ fn concrete_result_op_type_args(
 
         [TypeArg::String(arg), TypeArg::BoundedNat(n)] => Ok((arg.to_owned(), Some(*n), None)),
 
-        [TypeArg::String(arg), TypeArg::BoundedNat(n), TypeArg::BoundedNat(m)] => {
-            Ok((arg.to_owned(), Some(*n), Some(*m)))
-        }
+        [
+            TypeArg::String(arg),
+            TypeArg::BoundedNat(n),
+            TypeArg::BoundedNat(m),
+        ] => Ok((arg.to_owned(), Some(*n), Some(*m))),
 
         _ => Err(err()),
     }
@@ -400,8 +409,8 @@ impl<D: Dataflow> ResultOpBuilder for D {}
 #[cfg(test)]
 pub(crate) mod test {
     use cool_asserts::assert_matches;
-    use hugr::types::Signature;
     use hugr::HugrView;
+    use hugr::types::Signature;
     use hugr::{
         builder::{Dataflow, DataflowHugr, FunctionBuilder},
         std_extensions::arithmetic::int_types::INT_TYPES,

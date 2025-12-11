@@ -10,8 +10,8 @@
 //! It is implemented as a side-effect that takes a rotation angle as an input.
 
 use hugr::{
-    core::HugrNode, extension::simple_op::MakeExtensionOp, hugr::hugrmut::HugrMut,
-    ops::ExtensionOp, HugrView,
+    HugrView, core::HugrNode, extension::simple_op::MakeExtensionOp, hugr::hugrmut::HugrMut,
+    ops::ExtensionOp,
 };
 
 mod pass;
@@ -31,8 +31,9 @@ pub struct CombinedModifier {
     // Control arrays applied so far
     // The sum is supposed to be equal to `control`.
     accum_ctrl: Vec<usize>,
+    /// Whether the dagger modifier has been applied.
     dagger: bool,
-    #[allow(dead_code)]
+    /// Whether the power modifier has been applied.
     power: bool,
 }
 

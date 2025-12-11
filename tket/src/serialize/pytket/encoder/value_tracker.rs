@@ -23,12 +23,12 @@ use crate::circuit::Circuit;
 use crate::serialize::pytket::circuit::StraightThroughWire;
 use crate::serialize::pytket::extension::RegisterCount;
 use crate::serialize::pytket::{
-    PytketEncodeError, PytketEncodeOpError, RegisterHash, METADATA_B_REGISTERS,
-    METADATA_INPUT_PARAMETERS,
+    METADATA_B_REGISTERS, METADATA_INPUT_PARAMETERS, PytketEncodeError, PytketEncodeOpError,
+    RegisterHash,
 };
 
 use super::unit_generator::RegisterUnitGenerator;
-use super::{PytketEncoderConfig, METADATA_Q_REGISTERS};
+use super::{METADATA_Q_REGISTERS, PytketEncoderConfig};
 
 /// A structure for tracking qubits used in the circuit being encoded.
 ///
@@ -620,7 +620,8 @@ pub(super) fn compute_final_permutation(
     //
     // For each element `reg` at the output of the circuit, we find its position `i` at the input,
     // and find out the pytket output register associated with that position in the `declared_outputs` list.
-    let permutation = actual_outputs
+
+    actual_outputs
         .iter()
         .map(|reg| {
             let hash = reg.into();
@@ -631,7 +632,5 @@ pub(super) fn compute_final_permutation(
                 tket_json_rs::register::Qubit { id: out },
             )
         })
-        .collect_vec();
-
-    permutation
+        .collect_vec()
 }

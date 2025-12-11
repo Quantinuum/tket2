@@ -11,8 +11,8 @@ use std::io;
 use hugr::extension::{ExtensionRegistry, ExtensionRegistryError};
 use hugr::hugr::ValidationError;
 pub use pytket::{
-    load_tk1_json_file, load_tk1_json_reader, load_tk1_json_str, save_tk1_json_file,
-    save_tk1_json_str, save_tk1_json_writer, TKETDecode,
+    TKETDecode, load_tk1_json_file, load_tk1_json_reader, load_tk1_json_str, save_tk1_json_file,
+    save_tk1_json_str, save_tk1_json_writer,
 };
 
 use derive_more::{Display, Error, From};
@@ -22,16 +22,6 @@ use hugr::{Hugr, HugrView, Node};
 
 use crate::extension::REGISTRY;
 use crate::{Circuit, CircuitError};
-
-/// An encoded path pointing to a node in the HUGR,
-/// to be used as the [`Circuit`] root.
-///
-/// This key should not be used in the in-memory structure, as any modifications to the HUGR may
-/// invalidate the path.
-///
-/// TODO: Implement the path pointer. Currently this entry is not used.
-#[allow(unused)]
-const METADATA_ENTRYPOINT: &str = "TKET.entrypoint";
 
 impl<T: HugrView> Circuit<T> {
     /// Store the circuit as a HUGR envelope, using the given configuration.
@@ -160,7 +150,9 @@ pub enum CircuitLoadError {
         available_functions: Vec<String>,
     },
     /// The function has an invalid control flow structure.
-    #[display("Function '{function}' has an invalid control flow structure. Currently only flat functions with no control flow primitives are supported.")]
+    #[display(
+        "Function '{function}' has an invalid control flow structure. Currently only flat functions with no control flow primitives are supported."
+    )]
     InvalidControlFlow {
         /// The function name.
         function: String,
@@ -272,8 +264,8 @@ fn find_function(mut hugr: Hugr, function_name: &str) -> Result<Circuit, Circuit
 
 #[cfg(test)]
 mod tests {
-    use crate::circuit::CircuitHash;
     use crate::TketOp;
+    use crate::circuit::CircuitHash;
 
     use super::*;
 

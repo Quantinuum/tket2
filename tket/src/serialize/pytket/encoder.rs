@@ -17,7 +17,6 @@ use hugr::types::EdgeKind;
 
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::ops::RangeTo;
 use std::sync::{Arc, RwLock};
 
 use hugr::{Direction, HugrView, OutgoingPort, Wire};
@@ -27,7 +26,7 @@ use unsupported_tracker::UnsupportedTracker;
 
 use super::opaque::OpaqueSubgraphs;
 use super::{
-    PytketEncodeError, PytketEncodeOpError, METADATA_OPGROUP, METADATA_PHASE, METADATA_Q_REGISTERS,
+    METADATA_OPGROUP, METADATA_PHASE, METADATA_Q_REGISTERS, PytketEncodeError, PytketEncodeOpError,
 };
 use crate::circuit::Circuit;
 use crate::serialize::pytket::circuit::{
@@ -75,7 +74,7 @@ pub struct PytketEncoderContext<H: HugrView> {
 ///
 /// Mostly related to qubit/bit/parameter reuse.
 #[derive(Default)]
-#[allow(clippy::type_complexity)]
+#[expect(clippy::type_complexity)]
 pub struct EmitCommandOptions<'a> {
     /// A function returning a list of input qubits to reuse in the output.
     /// Any additional required qubits IDs will be freshly generated.
@@ -900,12 +899,12 @@ impl<H: HugrView> PytketEncoderContext<H> {
             }
             OpType::Const(op) => {
                 let config = Arc::clone(&self.config);
-                if self.config().type_to_pytket(&op.get_type()).is_some() {
-                    if let Some(values) = config.const_to_pytket(&op.value, self)? {
-                        let wire = Wire::new(node, 0);
-                        self.values.register_wire(wire, values.into_iter(), circ)?;
-                        return Ok(EncodeStatus::Success);
-                    }
+                if self.config().type_to_pytket(&op.get_type()).is_some()
+                    && let Some(values) = config.const_to_pytket(&op.value, self)?
+                {
+                    let wire = Wire::new(node, 0);
+                    self.values.register_wire(wire, values.into_iter(), circ)?;
+                    return Ok(EncodeStatus::Success);
                 }
             }
             // TODO: DFG and function call emissions are temporarily disabled,
@@ -1032,7 +1031,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
     ///   parameter expressions.
     /// - `wire_filter`: A function that takes a wire and returns true if the wire
     ///   at the output of the `node` should be registered.
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     fn register_node_outputs(
         &mut self,
         node: H::Node,
@@ -1140,7 +1139,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
     /// - `input_params`: The list of input parameter expressions.
     /// - `options_params_fn`: A function that computes the output parameter
     ///   expressions given the inputs.
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     fn register_port_output(
         &mut self,
         node: H::Node,
@@ -1192,7 +1191,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
         // Qubits
         // Reuse the ones from `qubits`, dropping them from the slice,
         // and allocate new ones as needed.
-        let output_qubits = match split_off(qubits, ..count.qubits) {
+        let output_qubits = match qubits.split_off(..count.qubits) {
             Some(reused_qubits) => reused_qubits.to_vec(),
             None => {
                 // Not enough qubits, allocate some fresh ones.
@@ -1212,7 +1211,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
         // Bits
         // Reuse the ones from `bits`, dropping them from the slice,
         // and allocate new ones as needed.
-        let output_bits = match split_off(bits, ..count.bits) {
+        let output_bits = match bits.split_off(..count.bits) {
             Some(reused_bits) => reused_bits.to_vec(),
             None => {
                 // Not enough bits, allocate some fresh ones.
@@ -1241,7 +1240,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
     }
 
     /// Return the output wires of a node that have an associated pytket [`RegisterCount`].
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     fn node_output_values(
         &self,
         node: H::Node,
@@ -1485,15 +1484,4 @@ pub fn make_tk1_classical_expression(
     let mut op = make_tk1_operation(tket_json_rs::OpType::ClExpr, args);
     op.classical_expr = Some(clexpr);
     op
-}
-
-// TODO: Replace with array's `split_off` method once MSRV is ≥1.87
-fn split_off<'a, T>(slice: &mut &'a [T], range: RangeTo<usize>) -> Option<&'a [T]> {
-    let split_index = range.end;
-    if split_index > slice.len() {
-        return None;
-    }
-    let (front, back) = slice.split_at(split_index);
-    *slice = back;
-    Some(front)
 }

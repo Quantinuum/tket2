@@ -6,16 +6,16 @@ use itertools::Itertools as _;
 use tket::hugr::{self, llvm::inkwell};
 
 use crate::extension::qsystem::{self, QSystemOp};
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use hugr::extension::prelude::qb_t;
 use hugr::llvm::custom::CodegenExtension;
-use hugr::llvm::emit::func::{build_option, EmitFuncContext};
-use hugr::llvm::emit::{emit_value, EmitOpArgs};
+use hugr::llvm::emit::func::{EmitFuncContext, build_option};
+use hugr::llvm::emit::{EmitOpArgs, emit_value};
 use inkwell::types::BasicType;
 use inkwell::values::{BasicValueEnum, FunctionValue, IntValue};
 use tket::hugr::llvm::CodegenExtsBuilder;
-use tket::hugr::ops::constant::Value;
 use tket::hugr::ops::ExtensionOp;
+use tket::hugr::ops::constant::Value;
 use tket::hugr::{HugrView, Node};
 
 use super::futures::future_type;
@@ -346,9 +346,9 @@ mod test {
 
     use hugr::extension::simple_op::MakeRegisteredOp;
     use hugr::llvm::check_emission;
+    use hugr::llvm::test::TestContext;
     use hugr::llvm::test::llvm_ctx;
     use hugr::llvm::test::single_op_hugr;
-    use hugr::llvm::test::TestContext;
     use rstest::rstest;
 
     use super::*;

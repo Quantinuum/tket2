@@ -64,8 +64,8 @@ pub use pattern::CircuitPattern;
 
 use derive_more::{Display, Error};
 use hugr::{
-    ops::{OpTag, OpTrait},
     Node, Port,
+    ops::{OpTag, OpTrait},
 };
 use matcher::MatchOp;
 

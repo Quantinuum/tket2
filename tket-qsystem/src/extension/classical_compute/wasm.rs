@@ -50,31 +50,31 @@
 use std::sync::{Arc, Weak};
 
 use hugr::{
+    Extension, Wire,
     builder::{BuildError, Dataflow},
     extension::{
+        ExtensionId, ExtensionRegistry, PRELUDE, SignatureError, SignatureFunc, Version,
         prelude::{option_type, usize_t},
         simple_op::{
-            try_from_name, HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp,
-            OpLoadError,
+            HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
+            try_from_name,
         },
-        ExtensionId, ExtensionRegistry, SignatureError, SignatureFunc, Version, PRELUDE,
     },
     ops::{
-        constant::{downcast_equal_consts, CustomConst, ValueName},
         ExtensionOp, OpName, OpType,
+        constant::{CustomConst, ValueName, downcast_equal_consts},
     },
     type_row,
     types::{
-        type_param::TermTypeError, CustomType, FuncValueType, PolyFuncTypeRV, Signature, SumType,
-        Type, TypeArg, TypeBound, TypeEnum, TypeRV, TypeRow, TypeRowRV,
+        CustomType, FuncValueType, PolyFuncTypeRV, Signature, SumType, Type, TypeArg, TypeBound,
+        TypeEnum, TypeRV, TypeRow, TypeRowRV, type_param::TermTypeError,
     },
-    Extension, Wire,
 };
 use itertools::Itertools as _;
 use lazy_static::lazy_static;
 use smol_str::format_smolstr;
 
-use super::{add_compute_type_defs, ComputeOp, ComputeType};
+use super::{ComputeOp, ComputeType, add_compute_type_defs};
 
 pub use super::{
     CONTEXT_TYPE_NAME, FUNC_TYPE_NAME, ID_PARAM, INPUTS_PARAM, MODULE_TYPE_NAME, NAME_PARAM,
@@ -212,7 +212,7 @@ mod test {
         builder::DFGBuilder,
         extension::prelude::bool_t,
         ops::DataflowOpTrait as _,
-        types::{type_param::TypeParam, Term},
+        types::{Term, type_param::TypeParam},
     };
     use rstest::rstest;
 

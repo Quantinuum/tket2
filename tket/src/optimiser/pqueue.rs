@@ -46,7 +46,7 @@ impl<S: Clone, P: Clone + Ord> StatePQueue<S, P> {
     }
 
     /// Reference to the minimal circuit in the queue.
-    #[allow(unused)]
+    #[expect(unused)]
     pub fn peek(&self) -> Option<Entry<&S, &P, u64>> {
         let (&hash, cost) = self.queue.peek_min()?;
         let state = self.hash_lookup.get(&hash)?;
@@ -157,7 +157,7 @@ impl<S: Clone, P: Clone + Ord> StatePQueue<S, P> {
     /// Discard the largest elements of the queue.
     ///
     /// Only keep up to `max_size` elements.
-    #[allow(unused)]
+    #[expect(unused)]
     pub fn truncate(&mut self, max_size: usize) {
         while self.queue.len() > max_size {
             let (hash, _) = self.queue.pop_max().unwrap();

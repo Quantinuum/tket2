@@ -11,8 +11,8 @@ mod options;
 
 pub use circuit::EncodedCircuit;
 pub use config::{
-    default_decoder_config, default_encoder_config, PytketDecoderConfig, PytketEncoderConfig,
-    TypeTranslatorSet,
+    PytketDecoderConfig, PytketEncoderConfig, TypeTranslatorSet, default_decoder_config,
+    default_encoder_config,
 };
 pub use encoder::PytketEncoderContext;
 pub use error::{

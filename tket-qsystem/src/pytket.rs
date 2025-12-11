@@ -7,7 +7,7 @@ pub use futures::FutureEmitter;
 use hugr::HugrView;
 pub use qsystem::QSystemEmitter;
 use tket::serialize::pytket::{
-    default_decoder_config, default_encoder_config, PytketDecoderConfig, PytketEncoderConfig,
+    PytketDecoderConfig, PytketEncoderConfig, default_decoder_config, default_encoder_config,
 };
 
 /// Default pytket decoder configuration for [`Circuit`][tket::Circuit]s with

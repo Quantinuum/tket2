@@ -3,18 +3,18 @@
 use std::sync::{Arc, Weak};
 
 use hugr::{
+    Extension,
     extension::{
+        ExtensionId, SignatureError, SignatureFunc, Version,
         prelude::qb_t,
         simple_op::{
-            try_from_name, HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp,
-            OpLoadError,
+            HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
+            try_from_name,
         },
-        ExtensionId, SignatureError, SignatureFunc, Version,
     },
     ops::OpName,
     std_extensions::collections::array::array_type_parametric,
-    types::{type_param::TypeParam, FuncValueType, PolyFuncTypeRV, TypeArg},
-    Extension,
+    types::{FuncValueType, PolyFuncTypeRV, TypeArg, type_param::TypeParam},
 };
 use lazy_static::lazy_static;
 
@@ -60,16 +60,20 @@ impl MakeOpDef for StateResultDef {
         PolyFuncTypeRV::new(
             vec![TypeParam::StringType, TypeParam::max_nat_type()],
             FuncValueType::new(
-                vec![array_type_parametric(
-                    TypeArg::new_var_use(1, TypeParam::max_nat_type()),
-                    qb_t(),
-                )
-                .unwrap()],
-                vec![array_type_parametric(
-                    TypeArg::new_var_use(1, TypeParam::max_nat_type()),
-                    qb_t(),
-                )
-                .unwrap()],
+                vec![
+                    array_type_parametric(
+                        TypeArg::new_var_use(1, TypeParam::max_nat_type()),
+                        qb_t(),
+                    )
+                    .unwrap(),
+                ],
+                vec![
+                    array_type_parametric(
+                        TypeArg::new_var_use(1, TypeParam::max_nat_type()),
+                        qb_t(),
+                    )
+                    .unwrap(),
+                ],
             ),
         )
         .into()

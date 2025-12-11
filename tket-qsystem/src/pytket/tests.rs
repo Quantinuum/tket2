@@ -5,12 +5,12 @@ use std::collections::{HashMap, HashSet};
 use hugr::builder::{Dataflow, DataflowHugr, FunctionBuilder};
 use hugr::extension::prelude::{bool_t, qb_t};
 
-use hugr::types::Signature;
 use hugr::HugrView;
+use hugr::types::Signature;
 use itertools::Itertools;
 use rstest::{fixture, rstest};
-use tket::extension::TKET1_EXTENSION_ID;
 use tket::TketOp;
+use tket::extension::TKET1_EXTENSION_ID;
 use tket_json_rs::circuit_json::{self, SerialCircuit};
 use tket_json_rs::register;
 

@@ -2,7 +2,7 @@
 
 use hugr::core::HugrNode;
 use hugr::envelope::{EnvelopeConfig, EnvelopeError};
-use hugr::extension::resolution::{resolve_type_extensions, WeakExtensionRegistry};
+use hugr::extension::resolution::{WeakExtensionRegistry, resolve_type_extensions};
 use hugr::extension::{ExtensionRegistry, ExtensionRegistryLoadError};
 use hugr::package::Package;
 use hugr::types::Type;

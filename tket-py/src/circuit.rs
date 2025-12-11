@@ -14,15 +14,15 @@ use hugr::types::{CustomType, Type, TypeBound};
 use pyo3::prelude::*;
 use std::fmt;
 
-use hugr::{type_row, Hugr, HugrView, Node, PortIndex};
+use hugr::{Hugr, HugrView, Node, PortIndex, type_row};
 use tket::rewrite::CircuitRewrite;
 use tket::serialize::TKETDecode;
 use tket_json_rs::circuit_json::SerialCircuit;
 
-use crate::utils::create_py_exception;
 use crate::utils::ConvertPyErr;
+use crate::utils::create_py_exception;
 
-pub use self::convert::{try_update_circ, try_with_circ, update_circ, with_circ, CircuitType};
+pub use self::convert::{CircuitType, try_update_circ, try_with_circ, update_circ, with_circ};
 pub use self::cost::PyCircuitCost;
 pub use self::tk2circuit::Tk2Circuit;
 pub use tket::{Pauli, TketOp};

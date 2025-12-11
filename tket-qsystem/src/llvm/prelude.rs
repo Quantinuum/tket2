@@ -3,15 +3,15 @@
 use std::hash::{DefaultHasher, Hash as _, Hasher as _};
 use tket::hugr::{self, llvm::inkwell};
 
-use anyhow::{anyhow, ensure, Result};
+use anyhow::{Result, anyhow, ensure};
 use hugr::llvm::emit::func::EmitFuncContext;
 use hugr::llvm::extension::prelude::PreludeCodegen;
 use hugr::llvm::types::TypingSession;
+use inkwell::AddressSpace;
 use inkwell::attributes::{Attribute, AttributeLoc};
 use inkwell::module::Linkage;
 use inkwell::types::{BasicType, IntType};
 use inkwell::values::{BasicValue, BasicValueEnum, FunctionValue, StructValue};
-use inkwell::AddressSpace;
 use tket::hugr::{HugrView, Node};
 
 #[derive(Clone)]
@@ -177,11 +177,11 @@ pub fn emit_global_string<'c, H: HugrView<Node = Node>>(
             .find_map(|i| {
                 let name = format!("{name_prefix}.{i}");
                 if let Some(global) = ctx.get_current_module().get_global(&name) {
-                    if let Some(v) = global.get_initializer() {
-                        if v == tgt_str_value {
-                            // We've found a global with the same value, use that.
-                            return Some(global);
-                        }
+                    if let Some(v) = global.get_initializer()
+                        && v == tgt_str_value
+                    {
+                        // We've found a global with the same value, use that.
+                        return Some(global);
                     }
                 } else {
                     let global =
@@ -209,8 +209,8 @@ pub fn emit_global_string<'c, H: HugrView<Node = Node>>(
 #[cfg(test)]
 mod test {
     use hugr::builder::{Dataflow, DataflowHugr};
-    use hugr::extension::prelude::{self, qb_t, ConstError, EXIT_OP_ID, PANIC_OP_ID};
     use hugr::extension::PRELUDE;
+    use hugr::extension::prelude::{self, ConstError, EXIT_OP_ID, PANIC_OP_ID, qb_t};
     use hugr::llvm::check_emission;
     use hugr::llvm::emit::test::SimpleHugrConfig;
 

@@ -7,22 +7,22 @@ pub mod type_unpack;
 pub use type_unpack::TypeUnpacker;
 
 use hugr::{
+    Wire,
     builder::{BuildError, Dataflow},
     extension::{
-        prelude::{option_type, UnpackTuple, UnwrapBuilder},
         Extension,
+        prelude::{UnpackTuple, UnwrapBuilder, option_type},
     },
     ops::{ExtensionOp, OpName},
     std_extensions::collections::{
-        array::{op_builder::GenericArrayOpBuilder, Array, ArrayKind},
+        array::{Array, ArrayKind, op_builder::GenericArrayOpBuilder},
         borrow_array::BorrowArray,
         value_array::ValueArray,
     },
     types::{
-        type_param::TypeParam, FuncValueType, PolyFuncTypeRV, SumType, Type, TypeArg, TypeBound,
-        TypeRV,
+        FuncValueType, PolyFuncTypeRV, SumType, Type, TypeArg, TypeBound, TypeRV,
+        type_param::TypeParam,
     },
-    Wire,
 };
 use std::sync::{Arc, LazyLock};
 
@@ -546,11 +546,11 @@ impl UnpackContainerBuilder {
 mod tests {
     use super::*;
     use hugr::{
+        HugrView,
         builder::{DFGBuilder, DataflowHugr as _},
         extension::prelude::{bool_t, option_type, qb_t, usize_t},
         std_extensions::collections::array::array_type,
         types::Signature,
-        HugrView,
     };
     use rstest::rstest;
 

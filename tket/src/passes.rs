@@ -2,7 +2,7 @@
 
 mod commutation;
 
-pub use commutation::{apply_greedy_commutation, PullForwardError};
+pub use commutation::{PullForwardError, apply_greedy_commutation};
 
 pub mod borrow_squash;
 pub use borrow_squash::BorrowSquashPass;
@@ -17,7 +17,7 @@ pub mod pytket;
 pub use pytket::lower_to_pytket;
 
 pub mod tuple_unpack;
-#[allow(deprecated)]
+#[expect(deprecated)]
 pub use tuple_unpack::find_tuple_unpack_rewrites;
 
 pub mod unpack_container;

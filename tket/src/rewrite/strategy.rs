@@ -28,11 +28,11 @@ use hugr::ops::OpType;
 use hugr::{HugrView, Node};
 use itertools::Itertools;
 
-use crate::circuit::cost::{is_cx, is_quantum, CircuitCost, CostDelta, LexicographicCost};
-use crate::{op_matches, Circuit, TketOp};
+use crate::circuit::cost::{CircuitCost, CostDelta, LexicographicCost, is_cx, is_quantum};
+use crate::{Circuit, TketOp, op_matches};
 
-use super::trace::RewriteTrace;
 use super::CircuitRewrite;
+use super::trace::RewriteTrace;
 
 /// Rewriting strategies for circuit optimisation.
 ///
@@ -472,8 +472,8 @@ impl GammaStrategyCost<fn(&OpType) -> usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hugr::hugr::views::SiblingSubgraph;
     use hugr::Node;
+    use hugr::hugr::views::SiblingSubgraph;
     use itertools::Itertools;
 
     use crate::rewrite::trace::REWRITE_TRACING_ENABLED;

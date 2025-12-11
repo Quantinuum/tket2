@@ -4,12 +4,12 @@ use derive_more::{Display, Error};
 use hugr::{HugrView, IncomingPort};
 use hugr::{Node, Port};
 use itertools::Itertools;
-use portmatching::{patterns::NoRootFound, HashMap, Pattern, SinglePatternMatcher};
+use portmatching::{HashMap, Pattern, SinglePatternMatcher, patterns::NoRootFound};
 use std::fmt::Debug;
 
 use super::{
-    matcher::{validate_circuit_edge, validate_circuit_node},
     PEdge, PNode,
+    matcher::{validate_circuit_edge, validate_circuit_node},
 };
 use crate::{circuit::Circuit, portmatching::NodeID};
 
@@ -144,7 +144,9 @@ pub enum InvalidPattern {
     #[display("The pattern is not connected")]
     NotConnected,
     /// Patterns cannot include empty wires.
-    #[display("The pattern contains an empty wire between {from_node}, {from_port} and {to_node}, {to_port}")]
+    #[display(
+        "The pattern contains an empty wire between {from_node}, {from_port} and {to_node}, {to_port}"
+    )]
     EmptyWire {
         /// The source node
         from_node: Node,
@@ -176,8 +178,8 @@ mod tests {
 
     use crate::extension::rotation::rotation_type;
 
-    use crate::utils::build_simple_circuit;
     use crate::TketOp;
+    use crate::utils::build_simple_circuit;
 
     use super::*;
 

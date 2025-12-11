@@ -2,11 +2,11 @@
 #![cfg(feature = "portmatching")]
 
 use rstest::{fixture, rstest};
+use tket::Circuit;
 use tket::optimiser::badger::BadgerOptions;
 use tket::optimiser::{BadgerOptimiser, ECCBadgerOptimiser};
-use tket::serialize::pytket::DecodeOptions;
 use tket::serialize::TKETDecode;
-use tket::Circuit;
+use tket::serialize::pytket::DecodeOptions;
 use tket_json_rs::circuit_json::SerialCircuit;
 
 /// A set of equivalence circuit classes (ECC)

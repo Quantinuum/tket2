@@ -9,10 +9,10 @@ use hugr::algorithms::ComposablePass;
 use pyo3::{prelude::*, types::IntoPyDict};
 use tket::optimiser::badger::BadgerOptions;
 use tket::passes;
-use tket::{op_matches, TketOp};
+use tket::{TketOp, op_matches};
 
 use crate::circuit::CircuitType;
-use crate::utils::{create_py_exception, ConvertPyErr};
+use crate::utils::{ConvertPyErr, create_py_exception};
 use crate::{
     circuit::{try_update_circ, try_with_circ},
     optimiser::PyBadgerOptimiser,
@@ -159,7 +159,7 @@ fn lower_to_pytket<'py>(circ: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>>
 ///
 /// Log files will be written to the directory `log_dir` if specified.
 #[pyfunction]
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 #[pyo3(signature = (circ, optimiser, max_threads=None, timeout=None, progress_timeout=None, max_circuit_count=None, log_dir=None, rebase=None))]
 fn badger_optimise<'py>(
     circ: &Bound<'py, PyAny>,

@@ -6,9 +6,9 @@ use std::{fs, num::NonZeroUsize, path::PathBuf};
 use derive_more::derive::From;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use tket::Circuit;
 use tket::optimiser::badger::{BadgerOptions, DefaultBadgerStrategy};
 use tket::optimiser::{BadgerLogger, BadgerOptimiser};
-use tket::Circuit;
 
 use crate::circuit::update_circ;
 use crate::rewrite::{PyECCRewriter, PyRewriter};
@@ -137,7 +137,7 @@ impl PyBadgerOptimiser {
     /// * `log_progress`: The path to a CSV file to log progress to.
     ///
     #[pyo3(name = "optimise")]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     #[pyo3(signature = (circ, timeout=None, progress_timeout=None, max_circuit_count=None, n_threads=None, split_circ=None, queue_size=None, log_progress=None))]
     pub fn py_optimise<'py>(
         &self,
