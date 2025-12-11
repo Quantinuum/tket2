@@ -1,6 +1,5 @@
 //! Methods to decode opaque subgraphs from a pytket barrier operation.
 
-use std::ops::RangeTo;
 use std::sync::Arc;
 
 use hugr::builder::Container;
@@ -209,8 +208,8 @@ impl<'h> PytketDecoderContext<'h> {
                 // Make sure to disconnect the old wire.
                 self.builder.hugr_mut().disconnect(*src, *src_port);
 
-                let wire_qubits = split_off(&mut output_qubits, ..counts.qubits);
-                let wire_bits = split_off(&mut output_bits, ..counts.bits);
+                let wire_qubits = output_qubits.split_off(..counts.qubits);
+                let wire_bits = output_bits.split_off(..counts.bits);
                 if wire_qubits.is_none() || wire_bits.is_none() {
                     return Err(make_unexpected_node_out_error(
                         self.config(),
@@ -438,8 +437,8 @@ impl<'h> PytketDecoderContext<'h> {
                     // Track the registers in the subgraph output wires.
                     // Output parameters from a subgraph are always marked as not supported (they don't map to any pytket argument variable).
                     // We only track qubit/bit wires here.
-                    let wire_qubits = split_off(&mut output_qubits, ..counts.qubits);
-                    let wire_bits = split_off(&mut output_bits, ..counts.bits);
+                    let wire_qubits = output_qubits.split_off(..counts.qubits);
+                    let wire_bits = output_bits.split_off(..counts.bits);
                     if wire_qubits.is_none() || wire_bits.is_none() {
                         return Err(make_unexpected_node_out_error(
                             self.config(),
@@ -467,17 +466,6 @@ impl<'h> PytketDecoderContext<'h> {
         }
         Ok(())
     }
-}
-
-// TODO: Replace with array's `split_off` method once MSRV is ≥1.87
-fn split_off<'a, T>(slice: &mut &'a [T], range: RangeTo<usize>) -> Option<&'a [T]> {
-    let split_index = range.end;
-    if split_index > slice.len() {
-        return None;
-    }
-    let (front, back) = slice.split_at(split_index);
-    *slice = back;
-    Some(front)
 }
 
 /// Helper to compute the expected register counts before generating a

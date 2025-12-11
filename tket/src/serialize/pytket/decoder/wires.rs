@@ -653,16 +653,9 @@ impl WireTracker {
         params: &mut &[LoadedParameter],
         unsupported_wire: Option<EncodedEdgeID>,
     ) -> Result<FoundWire, PytketDecodeError> {
-        // TODO: Use the slice `split_off_first` method once MSRV is ≥1.87
-        fn split_off_first<'a, T>(slice: &mut &'a [T]) -> Option<&'a T> {
-            let (first, rem) = slice.split_first()?;
-            *slice = rem;
-            Some(first)
-        }
-
         // Return a parameter input if the type is a float or rotation.
         if PARAMETER_TYPES.contains(ty) {
-            let Some(param) = split_off_first(params) else {
+            let Some(param) = params.split_off_first() else {
                 return Err(
                     PytketDecodeErrorInner::NoMatchingParameter { ty: ty.to_string() }.wrap(),
                 );

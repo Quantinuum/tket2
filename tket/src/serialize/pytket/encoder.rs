@@ -17,7 +17,6 @@ use hugr::types::EdgeKind;
 
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::ops::RangeTo;
 use std::sync::{Arc, RwLock};
 
 use hugr::{Direction, HugrView, OutgoingPort, Wire};
@@ -1192,7 +1191,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
         // Qubits
         // Reuse the ones from `qubits`, dropping them from the slice,
         // and allocate new ones as needed.
-        let output_qubits = match split_off(qubits, ..count.qubits) {
+        let output_qubits = match qubits.split_off(..count.qubits) {
             Some(reused_qubits) => reused_qubits.to_vec(),
             None => {
                 // Not enough qubits, allocate some fresh ones.
@@ -1212,7 +1211,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
         // Bits
         // Reuse the ones from `bits`, dropping them from the slice,
         // and allocate new ones as needed.
-        let output_bits = match split_off(bits, ..count.bits) {
+        let output_bits = match bits.split_off(..count.bits) {
             Some(reused_bits) => reused_bits.to_vec(),
             None => {
                 // Not enough bits, allocate some fresh ones.
@@ -1485,15 +1484,4 @@ pub fn make_tk1_classical_expression(
     let mut op = make_tk1_operation(tket_json_rs::OpType::ClExpr, args);
     op.classical_expr = Some(clexpr);
     op
-}
-
-// TODO: Replace with array's `split_off` method once MSRV is ≥1.87
-fn split_off<'a, T>(slice: &mut &'a [T], range: RangeTo<usize>) -> Option<&'a [T]> {
-    let split_index = range.end;
-    if split_index > slice.len() {
-        return None;
-    }
-    let (front, back) = slice.split_at(split_index);
-    *slice = back;
-    Some(front)
 }
