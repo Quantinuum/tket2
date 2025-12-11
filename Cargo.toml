@@ -80,7 +80,7 @@ num_cpus = "1.17.0"
 peak_alloc = "0.3.0"
 pest = "2.8.4"
 pest_derive = "2.8.4"
-petgraph = { version = ">= 0.8.1, < 0.9", default-features = false }
+petgraph = { version = ">= 0.8.3, < 0.9", default-features = false }
 priority-queue = "2.7.0"
 rayon = "1.11"
 rmp-serde = "1.1.2"
