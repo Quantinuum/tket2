@@ -1,0 +1,10 @@
+# Commits to ignore in blame output
+#
+# To configure git to use this file, run:
+# > git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# Github automatically reads this file for blame filtering.
+
+# Bump to rust edition 2024, MSRV 1.89, and a bunch of automated lint fixes
+# https://github.com/Quantinuum/tket2/pull/1314
+d8a169a23b2509c390730875d21869bf1e1a0fe3
