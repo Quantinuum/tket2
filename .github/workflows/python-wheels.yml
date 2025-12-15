@@ -268,7 +268,7 @@ jobs:
           ls -lh dist/*macosx*.whl
 
       - name: Upload wheels
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: wheels-${{ matrix.platform.target }}
           path: dist
@@ -311,7 +311,7 @@ jobs:
             --out ../dist \
             --manifest-path Cargo.toml
       - name: Upload sdist
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: wheels-sdist
           path: dist

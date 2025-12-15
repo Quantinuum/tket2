@@ -94,7 +94,7 @@ jobs:
         run: uvx twine check --strict wheelhouse/*.whl
 
       - name: Upload wheels
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: qis-compiler-wheels-${{ matrix.os }}
           path: wheelhouse/*.whl
