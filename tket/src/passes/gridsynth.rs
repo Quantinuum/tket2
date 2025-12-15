@@ -120,7 +120,8 @@ fn apply_gridsynth(hugr: &mut Hugr, epsilon: f64, rz_node: Node) -> String {
     // let epsilon = 1e-1; // very low precision to allow easier visualisation for demo
     let seed = 1234;
     let verbose = false;
-    let mut gridsynth_config = config_from_theta_epsilon(theta, epsilon, seed, verbose);
+    let up_to_phase = false;
+    let mut gridsynth_config = config_from_theta_epsilon(theta, epsilon, seed, verbose, up_to_phase);
     let gates = gridsynth_gates(&mut gridsynth_config);
     let gates = gates.gates;
     gates    
