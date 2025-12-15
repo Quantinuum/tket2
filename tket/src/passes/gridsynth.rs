@@ -51,8 +51,7 @@ fn find_single_linked_output_by_index(
     let ports = hugr.node_inputs(node);
     let collected_ports: Vec<_> = ports.collect();
 
-    hugr
-        .single_linked_output(node, collected_ports[port_idx])
+    hugr.single_linked_output(node, collected_ports[port_idx])
         .unwrap()
 }
 
@@ -224,14 +223,13 @@ mod tests {
     use super::*;
 
     use crate::extension::rotation::ConstRotation;
-    use crate::hugr::builder::Container;
+    use crate::hugr::builder::{Container, DFGBuilder, Dataflow, HugrBuilder};
     use crate::hugr::envelope::read_described_envelope;
+    use crate::hugr::extension::prelude::qb_t;
     use crate::hugr::ops::Value;
+    use crate::hugr::types::Signature;
     use hugr::NodeIndex;
     use hugr_core::std_extensions::std_reg;
-    use crate::hugr::types::Signature;
-    use crate::hugr::builder::{DFGBuilder, Dataflow, HugrBuilder};
-    use crate::hugr::extension::prelude::qb_t;
 
     fn build_rz_only_circ() -> (Hugr, Node) {
         let theta = 0.64;
