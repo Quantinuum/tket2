@@ -7,7 +7,7 @@ from tket.passes import (
     greedy_depth_reduce,
     chunks,
     NormalizeGuppy,
-    normalize_guppy,
+    normalize_guppy
 )
 from tket.circuit import Tk2Circuit
 
@@ -216,3 +216,4 @@ def test_normalize_guppy():
     c2 = Tk2Circuit(pytket_circ)
     normal_circ2 = normalize_guppy(c2)
     assert normal_circ2.circuit_cost(lambda op: int(op == TketOp.CX)) == 3
+    

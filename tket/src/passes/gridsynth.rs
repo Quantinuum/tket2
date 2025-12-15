@@ -212,7 +212,7 @@ fn replace_rz_with_gridsynth_output(hugr: &mut Hugr, rz_node: Node, gates: &str)
     let ports:  Vec<_> = hugr.node_inputs(next_node).collect();
     let dst_port = ports[0];
     hugr.connect(prev_node, src_port, next_node, dst_port);
-    println!("Inside panicking function: {}", hugr.mermaid_string());
+    // println!("Inside panicking function: {}", hugr.mermaid_string());
     hugr.validate().unwrap_or_else(|e| panic!("{e}"));
 } 
 

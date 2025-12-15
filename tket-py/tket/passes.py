@@ -191,19 +191,19 @@ class Gridsynth(ComposablePass):
     # the option to run NormalizeGuppy is set to False. The option would be specified
     # as a field of the dataclass (would also need to add @dataclass decorator)
     # like for NormalizeGuppy above
-    def run(self, hugr: Hugr, *, inplace: bool) -> PassResult:
+    def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
         # inplace option does nothing for now but I retain for consistency of 
         # API with other passes
         return implement_pass_run(
             self,
-            hugr=Hugr,
+            hugr=hugr,
             inplace=inplace,
-            inplace_call=self._apply_gridsynth_pass(hugr, self.epsilon)
+            copy_call=lambda h: self._apply_gridsynth_pass(hugr, self.epsilon, inplace)
         )
     
-    def _apply_gridsynth_pass(self, hugr: Hugr, epsilon) -> PassResult:
-        # TO DO: think about whether to work with Tk2Circuits rather than the 
-        # raw HUGR, like NormalizeGuppy. This may give further standardisation.
-        gridsynth(hugr, epsilon)
-        return PassResult.for_pass(self, hugr=hugr, inplace=True, result=None)
+    def _apply_gridsynth_pass(self, hugr: Hugr, epsilon: float, inplace: bool) -> PassResult:
+        compiler_state: Tk2Circuit = Tk2Circuit.from_bytes(hugr.to_bytes())
+        program = gridsynth(compiler_state, epsilon)
+        new_hugr = Hugr.from_str(program.to_str())
+        return PassResult.for_pass(self, hugr=new_hugr, inplace=inplace, result=None)
 
