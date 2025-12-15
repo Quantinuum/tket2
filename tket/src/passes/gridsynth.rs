@@ -233,10 +233,7 @@ pub fn apply_gridsynth_pass(hugr: &mut Hugr, epsilon: f64) {
         let gates = apply_gridsynth(hugr, epsilon, node);
         replace_rz_with_gridsynth_output(hugr, node, &gates);
     }
-}
-
-// TO DO: make compatible with Guppy hugrs. Right now, it will only work for simple hugrs not like the 
-// ones that guppy produces
+} // TO DO: change name of this function to gridsynth
 
 
 

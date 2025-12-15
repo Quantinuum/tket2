@@ -5,6 +5,8 @@ from .optimiser import BadgerOptimiser
 from .circuit import Tk2Circuit
 from pytket._tket.circuit import Circuit
 
+from hugr import Hugr
+
 CircuitClass = TypeVar("CircuitClass", Circuit, Tk2Circuit)
 
 class CircuitChunks:
@@ -103,3 +105,13 @@ def tket1_pass(
       circuit-like regions, and optimise them too.
       nested inside other subregions of the circuit.
     """
+
+def gridsynth(hugr: Hugr, epsilon: float) -> Hugr:
+    """Runs a pass applying the gridsynth algorithm to all Rz gates in a HUGR,
+      which decomposes them into the Clifford + T basis. 
+
+      Parameters:
+      - hugr: the hugr to run the pass on.
+      - epsilon: the precision of the gridsynth decomposition
+    """
+

@@ -2,6 +2,7 @@
 
 pub mod chunks;
 pub mod tket1;
+pub mod gridsynth;
 
 use std::{cmp::min, convert::TryInto, fs, num::NonZeroUsize, path::PathBuf};
 
@@ -29,6 +30,7 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     m.add_function(wrap_pyfunction!(normalize_guppy, &m)?)?;
     m.add_class::<self::chunks::PyCircuitChunks>()?;
     m.add_function(wrap_pyfunction!(self::chunks::chunks, &m)?)?;
+    m.add_function(wrap_pyfunction!(self::gridsynth::gridsynth, &m)?)?; 
     m.add_function(wrap_pyfunction!(self::tket1::tket1_pass, &m)?)?;
     m.add("PullForwardError", py.get_type::<PyPullForwardError>())?;
     m.add("TK1PassError", py.get_type::<tket1::PytketPassError>())?;
