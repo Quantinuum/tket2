@@ -178,9 +178,16 @@ impl<'h> PytketDecoderContext<'h> {
     fn init_metadata(dfg: &mut DFGBuilder<&mut Hugr>, serialcirc: &SerialCircuit) {
         // Metadata. The circuit requires "name", and we store other things that
         // should pass through the serialization roundtrip.
-        dfg.set_metadata(METADATA_PHASE, json!(serialcirc.phase));
-        dfg.set_metadata(METADATA_Q_REGISTERS, json!(serialcirc.qubits));
-        dfg.set_metadata(METADATA_B_REGISTERS, json!(serialcirc.bits));
+
+        // TODO: Replace these with `dfg.set_metadata::<...>(...)` once we
+        // implement metadata keys in tket.
+        let node = dfg.container_node();
+        dfg.hugr_mut()
+            .set_metadata_any(node, METADATA_PHASE, json!(serialcirc.phase));
+        dfg.hugr_mut()
+            .set_metadata_any(node, METADATA_Q_REGISTERS, json!(serialcirc.qubits));
+        dfg.hugr_mut()
+            .set_metadata_any(node, METADATA_B_REGISTERS, json!(serialcirc.bits));
     }
 
     /// Initialize the wire tracker with the input wires.
@@ -434,7 +441,11 @@ impl<'h> PytketDecoderContext<'h> {
         // Store the name for the input parameter wires
         let input_params = self.wire_tracker.finish();
         if !input_params.is_empty() {
-            self.builder.set_metadata(
+            // TODO: Replace this with `self.builder.set_metadata::<...>(...)` once we
+            // implement metadata keys in tket.
+            let node = self.builder.container_node();
+            self.builder.hugr_mut().set_metadata_any(
+                node,
                 METADATA_INPUT_PARAMETERS,
                 json!(input_params.into_iter().collect_vec()),
             );

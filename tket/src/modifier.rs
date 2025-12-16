@@ -63,7 +63,7 @@ struct ModifierFlags {
 
 impl ModifierFlags {
     fn from_metadata<N: HugrNode>(h: &impl HugrView<Node = N>, n: N) -> Option<Self> {
-        h.get_metadata(n, "unitary")
+        h.get_metadata_any(n, "unitary")
             .and_then(serde_json::Value::as_u64)
             .map(|num| ModifierFlags {
                 dagger: (num & 1) != 0,
@@ -83,7 +83,7 @@ impl ModifierFlags {
         if self.power {
             num |= 4;
         }
-        *h.get_metadata_mut(n, "unitary") = serde_json::Value::from(num);
+        h.set_metadata_any(n, "unitary", serde_json::Value::from(num));
     }
 
     fn satisfies(&self, combined: &CombinedModifier) -> bool {
