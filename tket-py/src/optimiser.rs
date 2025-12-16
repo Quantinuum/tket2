@@ -47,8 +47,10 @@ impl BadgerCostFunction {
     }
 }
 
-impl<'py> FromPyObject<'py> for BadgerCostFunction {
-    fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
+impl<'py> FromPyObject<'_, 'py> for BadgerCostFunction {
+    type Error = PyErr;
+
+    fn extract(ob: Borrowed<'_, 'py, PyAny>) -> Result<Self, Self::Error> {
         let str = ob.extract::<&str>()?;
         match str {
             "cx" => Ok(BadgerCostFunction::CXCount),
