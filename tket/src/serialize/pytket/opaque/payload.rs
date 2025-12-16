@@ -1,7 +1,7 @@
 //! Definitions of the payloads for opaque barrier metadata in pytket circuits.
 
 use hugr::core::HugrNode;
-use hugr::envelope::{EnvelopeConfig, EnvelopeError};
+use hugr::envelope::EnvelopeConfig;
 use hugr::extension::resolution::{WeakExtensionRegistry, resolve_type_extensions};
 use hugr::extension::{ExtensionRegistry, ExtensionRegistryLoadError};
 use hugr::package::Package;
@@ -9,6 +9,7 @@ use hugr::types::Type;
 use hugr::{HugrView, Wire};
 use itertools::Itertools;
 
+use crate::serialize::pytket::error::BarrierPayloadError;
 use crate::serialize::pytket::opaque::OpaqueSubgraph;
 use crate::serialize::pytket::{
     PytketDecodeError, PytketDecodeErrorInner, PytketEncodeError, PytketEncodeOpError,
@@ -192,12 +193,8 @@ impl OpaqueSubgraphPayload {
     ///
     /// Updates weak extension references inside the definition after loading.
     pub fn load_str(json: &str, extensions: &ExtensionRegistry) -> Result<Self, PytketDecodeError> {
-        let mut payload: Self = serde_json::from_str(json).map_err(|e| {
-            PytketDecodeErrorInner::UnsupportedSubgraphInlinePayload {
-                source: EnvelopeError::SerdeError { source: e },
-            }
-            .wrap()
-        })?;
+        let mut payload: Self =
+            serde_json::from_str(json).map_err(|e| BarrierPayloadError::SerdeDecoding(e).wrap())?;
 
         // Resolve the extension ops and types in the inline payload.
         if let Self::Inline {
@@ -208,15 +205,8 @@ impl OpaqueSubgraphPayload {
 
             // Resolve the cached input/output types.
             for (ty, _) in inputs.iter_mut().chain(outputs.iter_mut()) {
-                resolve_type_extensions(ty, &extensions).map_err(|e| {
-                    let registry_load_e =
-                        ExtensionRegistryLoadError::ExtensionResolutionError(Box::new(e));
-                    let envelope_e = EnvelopeError::ExtensionLoad {
-                        source: registry_load_e,
-                    };
-                    PytketDecodeErrorInner::UnsupportedSubgraphInlinePayload { source: envelope_e }
-                        .wrap()
-                })?;
+                resolve_type_extensions(ty, &extensions)
+                    .map_err(|e| BarrierPayloadError::ExtensionResolution(e).wrap())?;
             }
         }
 
