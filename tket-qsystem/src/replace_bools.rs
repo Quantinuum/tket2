@@ -3,7 +3,7 @@
 mod static_array;
 
 use derive_more::{Display, Error, From};
-use hugr::algorithms::replace_types::{NodeTemplate, ReplaceTypesError, ReplacementOptions};
+use hugr::algorithms::replace_types::{Linearizer, NodeTemplate, ReplaceTypesError};
 use hugr::algorithms::{
     ComposablePass, ReplaceTypes, ensure_no_nonlocal_edges, non_local::FindNonLocalEdgesError,
 };
@@ -366,20 +366,21 @@ fn lowerer() -> ReplaceTypes {
             borrow_array_type as fn(u64, Type) -> Type,
         ),
     ] {
-        #[expect(deprecated)] // TODO: Replace with set_replace_parametrized_op
-        lw.replace_parametrized_op_with(
+        lw.set_replace_parametrized_op(
             array_ext.get_op(ARRAY_CLONE_OP_ID.as_str()).unwrap(),
-            move |args| {
+            move |args, rt| {
                 let [size, elem_ty] = args else {
                     unreachable!()
                 };
                 let size = size.as_nat().unwrap();
                 let elem_ty = elem_ty.as_runtime().unwrap();
-                (!elem_ty.copyable()).then(|| {
-                    NodeTemplate::CompoundOp(Box::new(copy_dfg(type_fn(size, elem_ty.clone()))))
-                })
+                if elem_ty.copyable() {
+                    return Ok(None);
+                }
+
+                let array_ty = type_fn(size, elem_ty);
+                Ok(Some(rt.get_linearizer().copy_discard_op(&array_ty, 2)?))
             },
-            ReplacementOptions::default().with_linearization(true),
         );
         let drop_op_def = GUPPY_EXTENSION.get_op(DROP_OP_NAME.as_str()).unwrap();
 
@@ -418,7 +419,7 @@ fn lowerer() -> ReplaceTypes {
             }
             Some(barray_get_dest(*size, elem_ty.clone()))
         },
-        ReplacementOptions::default().with_linearization(true),
+        hugr::algorithms::replace_types::ReplacementOptions::default().with_linearization(true),
     );
 
     lw
