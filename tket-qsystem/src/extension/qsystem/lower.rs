@@ -114,7 +114,7 @@ pub fn lower_tk2_op(hugr: &mut impl HugrMut<Node = Node>) -> Result<Vec<Node>, L
             ReplaceOps::Tk2(tket_op) => {
                 // Handle TketOp replacements
                 if let Some(direct) = direct_map(tket_op) {
-                    lowerer.replace_op(
+                    lowerer.set_replace_op(
                         &tket_op.into_extension_op(),
                         NodeTemplate::SingleOp(direct.into()),
                     );
@@ -130,7 +130,7 @@ pub fn lower_tk2_op(hugr: &mut impl HugrMut<Node = Node>) -> Result<Vec<Node>, L
                         *e.insert(inserted)
                     }
                 };
-                lowerer.replace_op(
+                lowerer.set_replace_op(
                     &tket_op.into_extension_op(),
                     NodeTemplate::Call(func_node, vec![]),
                 );

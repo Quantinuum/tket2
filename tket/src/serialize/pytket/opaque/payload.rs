@@ -2,8 +2,8 @@
 
 use hugr::core::HugrNode;
 use hugr::envelope::EnvelopeConfig;
+use hugr::extension::ExtensionRegistry;
 use hugr::extension::resolution::{WeakExtensionRegistry, resolve_type_extensions};
-use hugr::extension::{ExtensionRegistry, ExtensionRegistryLoadError};
 use hugr::package::Package;
 use hugr::types::Type;
 use hugr::{HugrView, Wire};
@@ -11,9 +11,7 @@ use itertools::Itertools;
 
 use crate::serialize::pytket::error::BarrierPayloadError;
 use crate::serialize::pytket::opaque::OpaqueSubgraph;
-use crate::serialize::pytket::{
-    PytketDecodeError, PytketDecodeErrorInner, PytketEncodeError, PytketEncodeOpError,
-};
+use crate::serialize::pytket::{PytketDecodeError, PytketEncodeError, PytketEncodeOpError};
 
 use super::SubgraphId;
 

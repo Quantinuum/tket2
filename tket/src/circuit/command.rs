@@ -6,7 +6,7 @@ use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::iter::FusedIterator;
 
-use hugr::metadata::{Metadata, RawMetadataValue};
+use hugr::metadata::Metadata;
 use hugr::ops::{OpTag, OpTrait};
 use hugr::{HugrView, IncomingPort, OutgoingPort};
 use hugr_core::hugr::internal::{HugrInternals, PortgraphNodeMap};

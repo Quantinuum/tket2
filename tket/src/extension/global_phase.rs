@@ -107,8 +107,8 @@ impl MakeRegisteredOp for GlobalPhase {
         GLOBAL_PHASE_EXTENSION_ID.to_owned()
     }
 
-    fn extension_ref(&self) -> Weak<hugr::Extension> {
-        Arc::<hugr::Extension>::downgrade(&GLOBAL_PHASE_EXTENSION)
+    fn extension_ref(&self) -> Arc<hugr::Extension> {
+        GLOBAL_PHASE_EXTENSION.clone()
     }
 }
 
