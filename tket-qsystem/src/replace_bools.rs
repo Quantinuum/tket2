@@ -295,7 +295,7 @@ fn lowerer() -> ReplaceTypes {
     let mut lw = ReplaceTypes::default();
 
     // Replace tket.bool type.
-    lw.replace_type(bool_type().as_extension().unwrap().clone(), bool_dest());
+    lw.set_replace_type(bool_type().as_extension().unwrap().clone(), bool_dest());
     let dup_op = FutureOp {
         op: FutureOpDef::Dup,
         typ: bool_t(),
@@ -308,7 +308,7 @@ fn lowerer() -> ReplaceTypes {
     }
     .to_extension_op()
     .unwrap();
-    lw.linearizer()
+    lw.linearizer_mut()
         .register_simple(
             future_type(bool_t()).as_extension().unwrap().clone(),
             NodeTemplate::SingleOp(dup_op.into()),
@@ -366,57 +366,56 @@ fn lowerer() -> ReplaceTypes {
             borrow_array_type as fn(u64, Type) -> Type,
         ),
     ] {
-        lw.replace_parametrized_op_with(
+        lw.set_replace_parametrized_op(
             array_ext.get_op(ARRAY_CLONE_OP_ID.as_str()).unwrap(),
-            move |args| {
+            move |args, _| {
                 let [size, elem_ty] = args else {
                     unreachable!()
                 };
                 let size = size.as_nat().unwrap();
                 let elem_ty = elem_ty.as_runtime().unwrap();
-                (!elem_ty.copyable()).then(|| {
+                let template = (!elem_ty.copyable()).then(|| {
                     NodeTemplate::CompoundOp(Box::new(copy_dfg(type_fn(size, elem_ty.clone()))))
-                })
+                });
+                Ok(template)
             },
-            ReplacementOptions::default().with_linearization(true),
         );
         let drop_op_def = GUPPY_EXTENSION.get_op(DROP_OP_NAME.as_str()).unwrap();
 
-        lw.replace_parametrized_op(
+        lw.set_replace_parametrized_op(
             array_ext.get_op(ARRAY_DISCARD_OP_ID.as_str()).unwrap(),
-            move |args| {
+            move |args, _| {
                 let [size, elem_ty] = args else {
                     unreachable!()
                 };
                 let size = size.as_nat().unwrap();
                 let elem_ty = elem_ty.as_runtime().unwrap();
                 if elem_ty.copyable() {
-                    return None;
+                    return Ok(None);
                 }
                 let drop_op = ExtensionOp::new(
                     drop_op_def.clone(),
                     vec![type_fn(size, elem_ty.clone()).into()],
                 )
                 .unwrap();
-                Some(NodeTemplate::SingleOp(drop_op.into()))
+                Ok(Some(NodeTemplate::SingleOp(drop_op.into())))
             },
         );
     }
 
-    lw.replace_parametrized_op_with(
+    lw.set_replace_parametrized_op(
         borrow_array::EXTENSION
             .get_op(GenericArrayOpDef::<BorrowArray>::get.opdef_id().as_str())
             .unwrap(),
-        |args| {
+        |args, _| {
             let [Term::BoundedNat(size), Term::Runtime(elem_ty)] = args else {
                 unreachable!()
             };
             if elem_ty.copyable() {
-                return None;
+                return Ok(None);
             }
-            Some(barray_get_dest(*size, elem_ty.clone()))
+            Ok(Some(barray_get_dest(*size, elem_ty.clone())))
         },
-        ReplacementOptions::default().with_linearization(true),
     );
 
     lw
