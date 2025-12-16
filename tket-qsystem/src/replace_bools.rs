@@ -24,6 +24,7 @@ use hugr::std_extensions::collections::{
 use hugr::std_extensions::logic::LogicOp;
 use hugr::types::{SumType, Term, Type};
 use hugr::{Hugr, HugrView, Node, Wire, hugr::hugrmut::HugrMut, type_row};
+use itertools::Itertools;
 use static_array::{ReplaceStaticArrayBoolPass, ReplaceStaticArrayBoolPassError};
 use tket::TketOp;
 use tket::extension::{
@@ -214,16 +215,7 @@ fn measure_reset_dest() -> NodeTemplate {
     NodeTemplate::CompoundOp(Box::new(h))
 }
 
-fn copy_dfg(ty: Type) -> Hugr {
-    let mut dfb = DFGBuilder::new(inout_sig(ty.clone(), vec![ty.clone(), ty])).unwrap();
-    let mut h = std::mem::take(dfb.hugr_mut());
-    let [inp, outp] = h.get_io(h.entrypoint()).unwrap();
-    h.connect(inp, 0, outp, 0);
-    h.connect(inp, 0, outp, 1);
-    h
-}
-
-fn barray_get_dest(size: u64, elem_ty: Type) -> NodeTemplate {
+fn barray_get_dest(rt: &ReplaceTypes, size: u64, elem_ty: Type) -> NodeTemplate {
     let array_ty = borrow_array_type(size, elem_ty.clone());
     let opt_el = option_type(elem_ty.clone());
     let mut dfb = DFGBuilder::new(inout_sig(
@@ -266,10 +258,25 @@ fn barray_get_dest(size: u64, elem_ty: Type) -> NodeTemplate {
         )
         .unwrap()
         .outputs_arr();
-    let [elem1, elem2] = in_range
-        .add_hugr_with_wires(copy_dfg(elem_ty.clone()), [elem])
+
+    let in_range_container = in_range.container_node();
+    let copy_discard = rt
+        .get_linearizer()
+        .copy_discard_op(&elem_ty, 2)
         .unwrap()
-        .outputs_arr();
+        .add_hugr(in_range.hugr_mut(), in_range_container)
+        .unwrap();
+    in_range
+        .hugr_mut()
+        .connect(elem.node(), elem.source(), copy_discard, 0);
+    let [elem1, elem2] = in_range
+        .hugr_mut()
+        .node_outputs(copy_discard)
+        .map(|p| Wire::new(copy_discard, p))
+        .take(2)
+        .collect_array()
+        .unwrap();
+
     let [arr] = in_range
         .add_dataflow_op(
             BArrayUnsafeOpDef::r#return.to_concrete(elem_ty.clone(), size),
@@ -405,21 +412,19 @@ fn lowerer() -> ReplaceTypes {
         );
     }
 
-    #[expect(deprecated)] // TODO: Replace with set_replace_parametrized_op
-    lw.replace_parametrized_op_with(
+    lw.set_replace_parametrized_op(
         borrow_array::EXTENSION
             .get_op(GenericArrayOpDef::<BorrowArray>::get.opdef_id().as_str())
             .unwrap(),
-        |args| {
+        |args, rt| {
             let [Term::BoundedNat(size), Term::Runtime(elem_ty)] = args else {
                 unreachable!()
             };
             if elem_ty.copyable() {
-                return None;
+                return Ok(None);
             }
-            Some(barray_get_dest(*size, elem_ty.clone()))
+            Ok(Some(barray_get_dest(rt, *size, elem_ty.clone())))
         },
-        hugr::algorithms::replace_types::ReplacementOptions::default().with_linearization(true),
     );
 
     lw
