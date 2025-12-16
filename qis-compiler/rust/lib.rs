@@ -102,6 +102,12 @@ impl From<String> for ProcessErrs {
     }
 }
 
+impl From<inkwell::Error> for ProcessErrs {
+    fn from(value: inkwell::Error) -> Self {
+        Self(vec![value.to_string()])
+    }
+}
+
 impl From<LLVMString> for ProcessErrs {
     fn from(value: LLVMString) -> Self {
         Self(vec![value.to_string()])
@@ -270,7 +276,7 @@ fn wrap_main<'c>(
     let tc = builder
         .build_call(teardown, &[], "")?
         .try_as_basic_value()
-        .left()
+        .basic()
         .ok_or_else(|| anyhow!("get_tc has no return value"))?;
     // Return the initial time cursor
     let _ = builder.build_return(Some(&tc))?;
@@ -351,7 +357,7 @@ fn compile<'c, 'hugr: 'c>(
         let node = ctx.metadata_node(md_vec.as_slice());
         let _ = module
             .add_global_metadata(key, &node)
-            .map_err(Into::<ProcessErrs>::into);
+            .map_err(ProcessErrs::from);
     }
     module.verify().map_err(Into::<ProcessErrs>::into)?;
     Ok(module)

@@ -3,7 +3,7 @@
 mod static_array;
 
 use derive_more::{Display, Error, From};
-use hugr::algorithms::replace_types::{NodeTemplate, ReplaceTypesError, ReplacementOptions};
+use hugr::algorithms::replace_types::{NodeTemplate, ReplaceTypesError};
 use hugr::algorithms::{
     ComposablePass, ReplaceTypes, ensure_no_nonlocal_edges, non_local::FindNonLocalEdgesError,
 };
