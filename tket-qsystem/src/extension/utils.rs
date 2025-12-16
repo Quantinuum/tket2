@@ -1,7 +1,7 @@
 //! This module defines the "tket.qsystem.utils" extension, which includes the
 //! utility functions available for Quantinuum systems.
 
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 
 use derive_more::derive::Display;
 use hugr::{

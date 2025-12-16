@@ -337,22 +337,22 @@ fn lowerer() -> ReplaceTypes {
 
     // Replace all tket.bool ops.
     let read_op = BoolOp::read.to_extension_op().unwrap();
-    lw.replace_op(&read_op, read_op_dest());
+    lw.set_replace_op(&read_op, read_op_dest());
     let make_opaque_op = BoolOp::make_opaque.to_extension_op().unwrap();
-    lw.replace_op(&make_opaque_op, make_opaque_op_dest());
+    lw.set_replace_op(&make_opaque_op, make_opaque_op_dest());
     for op in [BoolOp::eq, BoolOp::and, BoolOp::or, BoolOp::xor] {
-        lw.replace_op(&op.to_extension_op().unwrap(), binary_logic_op_dest(&op));
+        lw.set_replace_op(&op.to_extension_op().unwrap(), binary_logic_op_dest(&op));
     }
     let not_op = BoolOp::not.to_extension_op().unwrap();
-    lw.replace_op(&not_op, not_op_dest());
+    lw.set_replace_op(&not_op, not_op_dest());
 
     // Replace measure ops with lazy versions.
     let tket_measure_free = TketOp::MeasureFree.to_extension_op().unwrap();
     let qsystem_measure = QSystemOp::Measure.to_extension_op().unwrap();
     let qsystem_measure_reset = QSystemOp::MeasureReset.to_extension_op().unwrap();
-    lw.replace_op(&tket_measure_free, measure_dest());
-    lw.replace_op(&qsystem_measure, measure_dest());
-    lw.replace_op(&qsystem_measure_reset, measure_reset_dest());
+    lw.set_replace_op(&tket_measure_free, measure_dest());
+    lw.set_replace_op(&qsystem_measure, measure_dest());
+    lw.set_replace_op(&qsystem_measure_reset, measure_reset_dest());
 
     // Replace (borrow/)array ops that used to have with copyable bounds with DFGs that
     // the linearizer can act on now that the elements are no longer copyable.

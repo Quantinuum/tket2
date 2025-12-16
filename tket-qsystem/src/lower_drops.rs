@@ -1,5 +1,5 @@
 /// Contains a pass to lower "drop" ops from the Guppy extension
-use hugr::algorithms::replace_types::{NodeTemplate, ReplaceTypesError, ReplacementOptions};
+use hugr::algorithms::replace_types::{NodeTemplate, ReplaceTypesError};
 use hugr::algorithms::{ComposablePass, ReplaceTypes};
 use hugr::builder::{Container, DFGBuilder};
 use hugr::extension::prelude::bool_t;
@@ -38,7 +38,7 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for LowerDropsPass {
         }
         .to_extension_op()
         .unwrap();
-        rt.linearizer()
+        rt.linearizer_mut()
             .register_simple(
                 future_type(bool_t()).as_extension().unwrap().clone(),
                 NodeTemplate::SingleOp(dup_op.into()),
@@ -46,18 +46,17 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for LowerDropsPass {
             )
             .unwrap();
 
-        rt.replace_parametrized_op_with(
+        rt.set_replace_parametrized_op(
             GUPPY_EXTENSION.get_op(DROP_OP_NAME.as_str()).unwrap(),
-            |targs| {
+            |targs, _| {
                 let [Term::Runtime(ty)] = targs else {
                     panic!("Expected just one type")
                 };
                 // The Hugr here is invalid, so we have to pull it out manually
                 let mut dfb = DFGBuilder::new(Signature::new(ty.clone(), vec![])).unwrap();
                 let h = std::mem::take(dfb.hugr_mut());
-                Some(NodeTemplate::CompoundOp(Box::new(h)))
+                Ok(Some(NodeTemplate::CompoundOp(Box::new(h))))
             },
-            ReplacementOptions::default().with_linearization(true),
         );
         rt.run(hugr)
     }
