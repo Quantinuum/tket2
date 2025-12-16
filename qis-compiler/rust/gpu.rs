@@ -793,7 +793,7 @@ fn emit_panic_with_gpu_error<'c, H: HugrView<Node = Node>>(
     let _ = builder
         .build_call(handle_error, &[], "gpu_error_handler_call")?
         .try_as_basic_value()
-        .unwrap_basic();
+        .unwrap_instruction();
     Ok(())
 }
 
