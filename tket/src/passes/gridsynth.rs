@@ -52,7 +52,7 @@ fn find_single_linked_output_by_index(
     let collected_ports: Vec<_> = ports.collect();
 
     hugr.single_linked_output(node, collected_ports[port_idx])
-        .unwrap()
+        .expect("Not yet set-up to handle cases where there are no previous nodes")
 }
 
 /// Find the constant node containing the angle to be inputted to the Rz gate.
@@ -136,15 +136,22 @@ fn find_qubit_source(hugr: &mut Hugr, rz_node: Node) -> Node {
 /// Add a gridsynth gate to some previous node, which may or may not be a gridsynth gate,
 /// and connect
 fn add_gate_and_connect(
-    hugr: &mut Hugr,
+    hugr: &mut Hugr, 
     prev_node: Node,
     op: hugr::ops::OpType,
     output_node: Node,
+    qubit_providing_node: Node, // the node providing qubit to Rz gate
+    qubit_providing_port: OutgoingPort // the output port providing qubit to Rz gate
 ) -> Node {
     let current_node = hugr.add_node_after(output_node, op);
     let ports: Vec<_> = hugr.node_outputs(prev_node).collect();
-    // Assuming there were no outgoing ports to begin with when deciding port offset
-    let src_port = ports[0];
+    let src_port = if prev_node.index() == qubit_providing_node.index() {
+        qubit_providing_port
+    }
+    else {
+        ports[0]
+    }
+    // let src_port = ports[0];
     let ports: Vec<_> = hugr.node_inputs(current_node).collect();
     let dst_port = ports[0];
     hugr.connect(prev_node, src_port, current_node, dst_port);
@@ -154,12 +161,22 @@ fn add_gate_and_connect(
 
 fn replace_rz_with_gridsynth_output(hugr: &mut Hugr, rz_node: Node, gates: &str) {
     // getting node that gave qubit to Rz gate
-    let mut prev_node = find_qubit_source(hugr, rz_node);
+    // let mut prev_node = find_qubit_source(hugr, rz_node);
+    // getting node and output port that gave qubit to Rz gate
+    let inputs: Vec<_> = hugr.node_inputs(rz_node).collect();
+    let input_port = inputs[0];
+    let (qubit_providing_node, qubit_providing_port)  = hugr.single_linked_output(rz_node, input_port).unwrap();
+    let mut prev_node = qubit_providing_node.clone();
+
+    //  I need the outgoing port of this node that connects to the rz_node
+    // BUG! This won't necessarily be the 0th port, eg, if of a two qubit gate
+    // Replace with the outgoing port of the original prev_node.
+    // This needs to go into the first gridsynth gate
 
     // find output port
     let outputs: Vec<_> = hugr.node_outputs(rz_node).collect();
     let output_port = outputs[0];
-    let (next_node, _) = hugr.single_linked_input(rz_node, output_port).unwrap();
+    let (next_node, dst_port) = hugr.single_linked_input(rz_node, output_port).unwrap();
 
     // we have now inferred what we need to know from the Rz node we are replacing and can remove it
     hugr.remove_node(rz_node);
@@ -180,11 +197,9 @@ fn replace_rz_with_gridsynth_output(hugr: &mut Hugr, rz_node: Node, gates: &str)
     }
     let ports: Vec<_> = hugr.node_outputs(prev_node).collect();
     // Assuming there were no outgoing ports to begin with when deciding port offset
-    let src_port = ports[0];
-    let ports: Vec<_> = hugr.node_inputs(next_node).collect();
-    let dst_port = ports[0];
+    let src_port = ports[0]; 
     hugr.connect(prev_node, src_port, next_node, dst_port);
-    // println!("Inside panicking function: {}", hugr.mermaid_string());
+    println!("Inside panicking function: {}", hugr.mermaid_string());
     hugr.validate().unwrap_or_else(|e| panic!("{e}"));
 }
 
@@ -225,10 +240,12 @@ mod tests {
     use crate::extension::rotation::ConstRotation;
     use crate::hugr::builder::{Container, DFGBuilder, Dataflow, HugrBuilder};
     use crate::hugr::envelope::read_described_envelope;
-    use crate::hugr::extension::prelude::qb_t;
+    use crate::extension::bool::bool_type;
+    use crate::hugr::extension::prelude::{qb_t};
     use crate::hugr::ops::Value;
     use crate::hugr::types::Signature;
     use hugr::NodeIndex;
+    use hugr::builder::DataflowHugr;
     use hugr_core::std_extensions::std_reg;
 
     fn build_rz_only_circ() -> (Hugr, Node) {
@@ -249,6 +266,111 @@ mod tests {
         let rz_nodes = find_rzs(&mut circ).unwrap();
         let rz_node = rz_nodes[0];
         (circ, rz_node)
+    }
+        
+    fn build_non_trivial_circ() -> Hugr {
+        // defining some angles for Rz gates in radians
+        let alpha = 0.23;
+        let beta = 1.78;
+        let inverse_angle = - alpha - beta;
+
+        // defining builder for circuit
+        let qb_row= vec![qb_t(); 1];
+        let meas_row = vec![bool_type(); 1];
+        let mut builder = DFGBuilder::new(Signature::new(qb_row.clone(), meas_row.clone())).unwrap();
+        let [q1] = builder.input_wires_arr();
+
+        // adding constant wires and nodes
+        let alpha_const = builder.add_constant(Value::extension(
+            ConstRotation::from_radians(alpha).unwrap(),
+        ));
+        let loaded_alpha = builder.load_const(&alpha_const);
+        let beta_const = builder.add_constant(Value::extension(
+            ConstRotation::from_radians(beta).unwrap(),
+        ));
+        let loaded_beta = builder.load_const(&beta_const);
+        let inverse_const = builder.add_constant(Value::extension(
+            ConstRotation::from_radians(inverse_angle).unwrap(),
+        ));
+        let loaded_inverse  = builder.load_const(&inverse_const);
+
+        // adding gates and measurements
+        let had1 = builder.add_dataflow_op(TketOp::H, [q1]).unwrap();
+        let [q1] = had1.outputs_arr();
+        let rz_alpha = builder.add_dataflow_op(TketOp::Rz, [q1, loaded_alpha]).unwrap();
+        let [q1] = rz_alpha.outputs_arr();
+        let rz_beta = builder.add_dataflow_op(TketOp::Rz, [q1, loaded_beta]).unwrap();
+        let [q1] = rz_beta.outputs_arr();
+        let rz_inverse = builder.add_dataflow_op(TketOp::Rz, [q1, loaded_inverse]).unwrap();
+        let [q1] = rz_inverse.outputs_arr();
+        let had2 = builder.add_dataflow_op(TketOp::H, [q1]).unwrap();
+        let [q1] = had2.outputs_arr();
+        let meas_res = builder.add_dataflow_op(TketOp::MeasureFree, [q1])
+            .unwrap()
+            .out_wire(0);
+
+        //println!("{}", builder.hugr().mermaid_string());
+
+        let mut circ = builder.finish_hugr_with_outputs([meas_res]).unwrap_or_else(|e| panic!("{e}"));
+        // let mut circ = builder.finish_hugr_with_outputs([q1, q2]).unwrap();
+        circ
+    }
+
+    fn build_non_trivial_circ_2qubits() -> Hugr {
+        // defining some angles for Rz gates in radians
+        let alpha = 0.23;
+        let beta = 1.78;
+        let inverse_angle = - alpha - beta;
+
+        // defining builder for circuit
+        let qb_row= vec![qb_t(); 2];
+        let meas_row = vec![bool_type(); 2];
+        let mut builder = DFGBuilder::new(Signature::new(qb_row.clone(), meas_row.clone())).unwrap();
+        let [q1, q2] = builder.input_wires_arr();
+
+        // adding constant wires and nodes
+        let alpha_const = builder.add_constant(Value::extension(
+            ConstRotation::from_radians(alpha).unwrap(),
+        ));
+        let loaded_alpha = builder.load_const(&alpha_const);
+        let beta_const = builder.add_constant(Value::extension(
+            ConstRotation::from_radians(beta).unwrap(),
+        ));
+        let loaded_beta = builder.load_const(&beta_const);
+        let inverse_const = builder.add_constant(Value::extension(
+            ConstRotation::from_radians(inverse_angle).unwrap(),
+        ));
+        let loaded_inverse  = builder.load_const(&inverse_const);
+
+        // adding gates and measurements
+        let had1 = builder.add_dataflow_op(TketOp::H, [q1]).unwrap();
+        let [q1] = had1.outputs_arr();
+        let rz_alpha = builder.add_dataflow_op(TketOp::Rz, [q1, loaded_alpha]).unwrap();
+        let [q1] = rz_alpha.outputs_arr();
+        let rz_beta = builder.add_dataflow_op(TketOp::Rz, [q1, loaded_beta]).unwrap();
+        let [q1] = rz_beta.outputs_arr();
+        let x = builder.add_dataflow_op(TketOp::X, [q2]).unwrap();
+        let [q2] = x.outputs_arr();
+        let cx1 = builder.add_dataflow_op(TketOp::CX, [q2, q1]).unwrap();
+        let [q2, q1] = cx1.outputs_arr();
+        let rz_inverse = builder.add_dataflow_op(TketOp::Rz, [q1, loaded_inverse]).unwrap();
+        let [q1] = rz_inverse.outputs_arr();
+        let cx2 = builder.add_dataflow_op(TketOp::CX, [q2, q1]).unwrap();
+        let [q2, q1] = cx2.outputs_arr();
+        let had2 = builder.add_dataflow_op(TketOp::H, [q1]).unwrap();
+        let [q1] = had2.outputs_arr();
+        let meas_res1 = builder.add_dataflow_op(TketOp::MeasureFree, [q1])
+            .unwrap()
+            .out_wire(0);
+        let meas_res2 = builder.add_dataflow_op(TketOp::MeasureFree, [q2])
+            .unwrap()
+            .out_wire(0);
+
+        //println!("{}", builder.hugr().mermaid_string());
+
+        let mut circ = builder.finish_hugr_with_outputs([meas_res1, meas_res2]).unwrap_or_else(|e| panic!("{e}"));
+        // let mut circ = builder.finish_hugr_with_outputs([q1, q2]).unwrap();
+        circ
     }
 
     fn import_guppy(path: &'static str) -> Hugr {
@@ -366,5 +488,23 @@ mod tests {
         // println!("after {}", imported_hugr.mermaid_string());
         apply_gridsynth_pass(imported_hugr, epsilon);
         println!("after: {}", imported_hugr.mermaid_string());
+    }
+
+    #[test]
+    fn test_non_trivial_circ_1qubit() {
+        let epsilon = 1e-2;
+        let mut hugr = build_non_trivial_circ();
+
+        apply_gridsynth_pass(&mut hugr, epsilon);
+    }
+
+    #[test]
+    fn test_non_trivial_circ_2qubits() {
+        let epsilon = 1e-2;
+        let mut hugr = build_non_trivial_circ_2qubits();
+        println!("before gridsynth: {}", hugr.mermaid_string());
+
+        apply_gridsynth_pass(&mut hugr, epsilon);
+
     }
 }
