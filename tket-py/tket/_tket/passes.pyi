@@ -28,6 +28,7 @@ def normalize_guppy(
     constant_folding: bool = False,
     remove_dead_funcs: bool = True,
     inline_dfgs: bool = True,
+    remove_redundant_order_edges: bool = True,
 ) -> CircuitClass:
     """Flatten the structure of a Guppy-generated program to enable additional optimisations.
 
@@ -39,6 +40,7 @@ def normalize_guppy(
     - constant_folding: Whether to constant fold the program.
     - remove_dead_funcs: Whether to remove dead functions.
     - inline_dfgs: Whether to inline DFG operations.
+    - remove_redundant_order_edges: Whether to remove redundant order edges.
     """
 
 def greedy_depth_reduce(circ: CircuitClass) -> tuple[CircuitClass, int]:
