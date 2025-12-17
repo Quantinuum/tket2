@@ -4,6 +4,7 @@ use crate::extension::rotation::ConstRotation;
 use crate::hugr::hugr::hugrmut::HugrMut;
 use crate::hugr::HugrView;
 use crate::hugr::{Node, Port};
+use crate::hugr::NodeIndex;
 use crate::passes::guppy::NormalizeGuppy;
 use crate::TketOp;
 use crate::{hugr, op_matches, Hugr};
@@ -150,8 +151,7 @@ fn add_gate_and_connect(
     }
     else {
         ports[0]
-    }
-    // let src_port = ports[0];
+    };
     let ports: Vec<_> = hugr.node_inputs(current_node).collect();
     let dst_port = ports[0];
     hugr.connect(prev_node, src_port, current_node, dst_port);
@@ -160,18 +160,11 @@ fn add_gate_and_connect(
 }
 
 fn replace_rz_with_gridsynth_output(hugr: &mut Hugr, rz_node: Node, gates: &str) {
-    // getting node that gave qubit to Rz gate
-    // let mut prev_node = find_qubit_source(hugr, rz_node);
     // getting node and output port that gave qubit to Rz gate
     let inputs: Vec<_> = hugr.node_inputs(rz_node).collect();
     let input_port = inputs[0];
     let (qubit_providing_node, qubit_providing_port)  = hugr.single_linked_output(rz_node, input_port).unwrap();
     let mut prev_node = qubit_providing_node.clone();
-
-    //  I need the outgoing port of this node that connects to the rz_node
-    // BUG! This won't necessarily be the 0th port, eg, if of a two qubit gate
-    // Replace with the outgoing port of the original prev_node.
-    // This needs to go into the first gridsynth gate
 
     // find output port
     let outputs: Vec<_> = hugr.node_outputs(rz_node).collect();
@@ -186,11 +179,14 @@ fn replace_rz_with_gridsynth_output(hugr: &mut Hugr, rz_node: Node, gates: &str)
     // recursively adding next gate in gates to prev_node
     for gate in gates.chars() {
         if gate == 'H' {
-            prev_node = add_gate_and_connect(hugr, prev_node, TketOp::H.into(), next_node);
+            prev_node = add_gate_and_connect(hugr, prev_node, TketOp::H.into(), next_node,
+                                             qubit_providing_node, qubit_providing_port);
         } else if gate == 'S' {
-            prev_node = add_gate_and_connect(hugr, prev_node, TketOp::S.into(), next_node);
+            prev_node = add_gate_and_connect(hugr, prev_node, TketOp::S.into(), next_node,
+                                            qubit_providing_node, qubit_providing_port);
         } else if gate == 'T' {
-            prev_node = add_gate_and_connect(hugr, prev_node, TketOp::T.into(), next_node);
+            prev_node = add_gate_and_connect(hugr, prev_node, TketOp::T.into(), next_node,
+                                            qubit_providing_node, qubit_providing_port);
         } else if gate == 'W' {
             break; // Ignoring global phases for now.
         }
