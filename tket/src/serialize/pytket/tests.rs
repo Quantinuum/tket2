@@ -13,6 +13,21 @@ use hugr::std_extensions::arithmetic::float_types::{ConstF64, float64_type};
 use rayon::iter::ParallelIterator;
 use std::sync::Arc;
 
+use super::TKETDecode;
+use crate::TketOp;
+use crate::circuit::Circuit;
+use crate::extension::TKET1_EXTENSION_ID;
+use crate::extension::bool::{BoolOp, bool_type};
+use crate::extension::rotation::{ConstRotation, RotationOp, rotation_type};
+use crate::extension::sympy::SympyOpDef;
+use crate::metadata;
+use crate::serialize::pytket::PytketEncodeError;
+use crate::serialize::pytket::extension::{CoreDecoder, OpaqueTk1Op, PreludeEmitter};
+use crate::serialize::pytket::{
+    DecodeInsertionTarget, DecodeOptions, EncodeOptions, EncodedCircuit, PytketDecodeError,
+    PytketDecodeErrorInner, PytketDecoderConfig, PytketEncodeOpError, PytketEncoderConfig,
+    default_decoder_config, default_encoder_config,
+};
 use hugr::HugrView;
 use hugr::hugr::hugrmut::HugrMut;
 use hugr::ops::handle::FuncID;
@@ -24,21 +39,7 @@ use rstest::{fixture, rstest};
 use tket_json_rs::circuit_json::{self, SerialCircuit};
 use tket_json_rs::optype;
 use tket_json_rs::register;
-
-use super::{METADATA_INPUT_PARAMETERS, METADATA_Q_REGISTERS, TKETDecode};
-use crate::TketOp;
-use crate::circuit::Circuit;
-use crate::extension::TKET1_EXTENSION_ID;
-use crate::extension::bool::{BoolOp, bool_type};
-use crate::extension::rotation::{ConstRotation, RotationOp, rotation_type};
-use crate::extension::sympy::SympyOpDef;
-use crate::serialize::pytket::PytketEncodeError;
-use crate::serialize::pytket::extension::{CoreDecoder, OpaqueTk1Op, PreludeEmitter};
-use crate::serialize::pytket::{
-    DecodeInsertionTarget, DecodeOptions, EncodeOptions, EncodedCircuit, PytketDecodeError,
-    PytketDecodeErrorInner, PytketDecoderConfig, PytketEncodeOpError, PytketEncoderConfig,
-    default_decoder_config, default_encoder_config,
-};
+use tket_json_rs::register::{ElementId, Qubit};
 
 const EMPTY_CIRCUIT: &str = r#"{
         "phase": "0",
@@ -250,10 +251,16 @@ fn circ_preset_qubits() -> Circuit {
     let mut hugr = h.finish_hugr_with_outputs([qb0, qb1]).unwrap();
 
     // A preset register for the first qubit output
-    hugr.set_metadata_any(
+    hugr.set_metadata::<metadata::QubitRegisters>(
         hugr.entrypoint(),
-        METADATA_Q_REGISTERS,
-        serde_json::json!([["q", [2]], ["q", [10]], ["q", [8]]]),
+        vec![
+            ElementId(String::from("q"), vec![2]),
+            ElementId(String::from("q"), vec![10]),
+            ElementId(String::from("q"), vec![8]),
+        ]
+        .into_iter()
+        .map(Qubit::from)
+        .collect_vec(),
     );
 
     hugr.into()
@@ -284,10 +291,9 @@ fn circ_parameterized() -> Circuit {
     let mut hugr = h.finish_hugr_with_outputs([q]).unwrap();
 
     // Preset names for some of the inputs
-    hugr.set_metadata_any(
+    hugr.set_metadata::<metadata::InputParameters>(
         hugr.entrypoint(),
-        METADATA_INPUT_PARAMETERS,
-        serde_json::json!(["alpha", "beta"]),
+        vec![String::from("alpha"), String::from("beta")],
     );
 
     hugr.into()

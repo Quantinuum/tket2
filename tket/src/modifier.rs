@@ -21,6 +21,7 @@ pub mod dagger;
 pub mod modifier_resolver;
 pub mod power;
 
+use crate::metadata;
 pub use pass::ModifierResolverPass;
 
 /// An accumulated modifier that combines control, dagger, and power modifiers.
@@ -63,8 +64,7 @@ struct ModifierFlags {
 
 impl ModifierFlags {
     fn from_metadata<N: HugrNode>(h: &impl HugrView<Node = N>, n: N) -> Option<Self> {
-        h.get_metadata_any(n, "unitary")
-            .and_then(serde_json::Value::as_u64)
+        h.get_metadata::<metadata::Unitary>(n)
             .map(|num| ModifierFlags {
                 dagger: (num & 1) != 0,
                 control: (num & 2) != 0,
@@ -83,7 +83,7 @@ impl ModifierFlags {
         if self.power {
             num |= 4;
         }
-        h.set_metadata_any(n, "unitary", serde_json::Value::from(num));
+        h.set_metadata::<metadata::Unitary>(n, num);
     }
 
     fn satisfies(&self, combined: &CombinedModifier) -> bool {
