@@ -14,7 +14,7 @@ use derive_more::{Display, Error, From};
 use hugr::{
     Hugr, HugrView, Node,
     algorithms::{
-        ComposablePass as _, LinearizeArrayPass, MonomorphizePass, RemoveDeadFuncsError,
+        ComposablePass as _, MonomorphizePass, RemoveDeadFuncsError,
         RemoveDeadFuncsPass,
         const_fold::{ConstFoldError, ConstantFoldPass},
         force_order,
@@ -69,7 +69,7 @@ pub enum QSystemPassError<N = Node> {
     LowerTk2Error(LowerTk2Error),
     /// An error from the component [ConstantFoldPass] pass.
     ConstantFoldError(ConstFoldError),
-    /// An error from the component [LinearizeArrayPass] pass.
+    /// An error from the component [LowerDropsPass] pass.
     LinearizeArrayError(ReplaceTypesError),
     #[cfg(feature = "llvm")]
     /// An error from the component [inline_constant_functions()] pass.
@@ -122,7 +122,6 @@ impl QSystemPass {
         // We expect any Hugr will have *either* drop ops, or ValueArrays (without drops),
         // so only one of these passes will do anything; the order is thus immaterial.
         self.lower_drops().run(hugr)?;
-        self.linearize_arrays().run(hugr)?;
 
         #[cfg(feature = "llvm")]
         {
@@ -199,10 +198,6 @@ impl QSystemPass {
 
     fn lower_drops(&self) -> LowerDropsPass {
         LowerDropsPass
-    }
-
-    fn linearize_arrays(&self) -> LinearizeArrayPass {
-        LinearizeArrayPass::default()
     }
 
     /// Returns a new `QSystemPass` with constant folding enabled according to

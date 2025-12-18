@@ -69,7 +69,6 @@ static REGISTRY: std::sync::LazyLock<ExtensionRegistry> = std::sync::LazyLock::n
         collections::array::EXTENSION.to_owned(),
         collections::static_array::EXTENSION.to_owned(),
         collections::borrow_array::EXTENSION.to_owned(),
-        collections::value_array::EXTENSION.to_owned(),
         qsystem_futures::EXTENSION.to_owned(),
         qsystem_result::EXTENSION.to_owned(),
         qsystem::EXTENSION.to_owned(),

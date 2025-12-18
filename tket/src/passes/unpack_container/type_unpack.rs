@@ -3,7 +3,6 @@
 use hugr::extension::prelude::qb_t;
 use hugr::std_extensions::collections::array::{Array, ArrayKind};
 use hugr::std_extensions::collections::borrow_array::BorrowArray;
-use hugr::std_extensions::collections::value_array::ValueArray;
 use hugr::types::{CustomType, SumType, Type, TypeArg, TypeRowRV};
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -91,7 +90,6 @@ impl TypeUnpacker {
             // other sums containing the element type are ignored.
         } else if let Some((size, elem_ty)) = ty.as_extension().and_then(|ext| {
             array_args::<Array>(ext)
-                .or_else(|| array_args::<ValueArray>(ext))
                 .or_else(|| array_args::<BorrowArray>(ext))
         }) {
             // Special case for Option[ElementType] since it is used in arrays.
@@ -185,7 +183,6 @@ mod test {
 
     #[rstest]
     #[case::array(Array)]
-    #[case::value(ValueArray)]
     #[case::borrow(BorrowArray)]
     fn test_array_types<AK: ArrayKind>(#[case] _kind: AK) {
         let analyzer = TypeUnpacker::for_qubits();
