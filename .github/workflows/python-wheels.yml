@@ -85,16 +85,16 @@ jobs:
           #  target: aarch64-unknown-linux-musl
           #  manylinux: "musllinux_1_2"
           - runner: ubuntu-24.04
-            # NOTE: We use the sightly older Ubuntu 22.04 runner to force a
-            # lower GLIBC version in the tket-c-api build.
-            #
-            # This should no longer be necessary once we fix the tket-c-api build.
-            # <https://github.com/Quantinuum/tket2/issues/1272>
             target: x86_64-unknown-linux-gnu
-            manylinux: "manylinux_2_39"
+            # Note: The runner image uses GLIBC 2.39, but we verified that the
+            # tket-c-api build works with GLIBC 2.34.
+            #
+            # This is a temporary workaround until we use a pre-built c-api library.
+            # <https://github.com/Quantinuum/tket2/issues/1272>
+            # <https://github.com/Quantinuum/tket2/pull/1271>
+            manylinux: "manylinux_2_34"
             test-wheels: true
           - runner: ubuntu-24.04
-            # NOTE: See comment above about Ubuntu 22.04 runner
             target: x86_64-unknown-linux-musl
             manylinux: "musllinux_1_2"
           # ---------------- Mac

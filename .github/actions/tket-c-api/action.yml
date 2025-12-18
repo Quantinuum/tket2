@@ -1,5 +1,5 @@
 name: "Install tket-c-api C++ library"
-description: "Retrieve cached tket-c-api C++ library or build if needed"
+description: "Retrieve cached tket-c-api C++ library or build if needed."
 
 inputs:
   install-path:
