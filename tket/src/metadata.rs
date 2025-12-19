@@ -1,5 +1,6 @@
 //! (Incomplete) Collection of metadata keys used throughout tket.
 
+use crate::rewrite::trace::RewriteTrace;
 use hugr_core::metadata::Metadata;
 use tket_json_rs::register::{Bit, Qubit};
 
@@ -11,6 +12,14 @@ pub struct MaxQubits;
 impl Metadata for MaxQubits {
     const KEY: &'static str = "TKET.expected_qubits"; // TODO think about this name really hard
     type Type<'hugr> = u32;
+}
+
+/// Metadata key for traced rewrites that were applied during circuit transformation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct CircuitRewriteTraces;
+impl Metadata for CircuitRewriteTraces {
+    const KEY: &'static str = "TKET.rewrites";
+    type Type<'hugr> = Vec<RewriteTrace>;
 }
 
 /// Metadata key for flagging unitarity constraints on a HUGR node
