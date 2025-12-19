@@ -59,10 +59,12 @@ impl<T: HugrMut> Circuit<T> {
         }
         let root = self.parent();
         let hugr = self.hugr_mut();
-        let Some(_) = hugr.get_metadata::<metadata::CircuitRewriteTraces>(root) else {
+        if hugr
+            .get_metadata::<metadata::CircuitRewriteTraces>(root)
+            .is_none()
+        {
             hugr.set_metadata::<metadata::CircuitRewriteTraces>(root, vec![]);
-            return;
-        };
+        }
     }
 
     /// Register a rewrite applied to the circuit.
