@@ -77,10 +77,11 @@ impl<T: HugrMut> Circuit<T> {
         match self
             .hugr()
             .get_metadata::<metadata::CircuitRewriteTraces>(root)
-            .as_mut()
         {
-            Some(meta) => {
+            Some(mut meta) => {
                 meta.push(rewrite.into());
+                self.hugr_mut()
+                    .set_metadata::<metadata::CircuitRewriteTraces>(root, meta);
                 true
             }
             // Tracing was not enabled for this circuit.
@@ -96,8 +97,12 @@ impl<T: HugrMut> Circuit<T> {
         if !REWRITE_TRACING_ENABLED {
             return None;
         }
-        self.hugr()
-            .get_metadata::<metadata::CircuitRewriteTraces>(self.parent())
-            .map(Vec::into_iter)
+        let ve = self
+            .hugr()
+            .get_metadata::<metadata::CircuitRewriteTraces>(self.parent());
+        println!("{:?}", self.parent());
+        println!("{:?}", ve);
+
+        ve.map(Vec::into_iter)
     }
 }
