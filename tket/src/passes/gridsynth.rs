@@ -123,7 +123,7 @@ fn apply_gridsynth(hugr: &mut Hugr, epsilon: f64, rz_node: Node) -> String {
     let mut gridsynth_config =
         config_from_theta_epsilon(theta, epsilon, seed, verbose, up_to_phase);
     let gates = gridsynth_gates(&mut gridsynth_config);
-    println!("{}", gates.gates);
+    // println!("{}", gates.gates);
     gates.gates
 }
 
@@ -457,8 +457,8 @@ mod tests {
         let rz_nodes = find_rzs(imported_hugr).unwrap();
         let rz_node = rz_nodes[0];
         let angle = find_angle(imported_hugr, rz_node);
-        println!("angle is {}", angle);
-        println!("hugr is {}", imported_hugr.mermaid_string());
+        // println!("angle is {}", angle);
+        // println!("hugr is {}", imported_hugr.mermaid_string());
     }
 
     #[test]

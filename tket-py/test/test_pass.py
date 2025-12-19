@@ -8,6 +8,7 @@ from tket.passes import (
     chunks,
     NormalizeGuppy,
     normalize_guppy,
+    # Gridsynth
 )
 from tket.circuit import Tk2Circuit
 
@@ -19,6 +20,8 @@ from hypothesis import given, settings
 from tket.passes import PytketPass
 from pytket.passes import CliffordSimp, SquashRzPhasedX, SequencePass
 from hugr.build.base import Hugr
+# from selene_sim import build, Quest
+# from hugr.qsystem.result import QsysResult
 
 import pytest
 
@@ -216,3 +219,20 @@ def test_normalize_guppy():
     c2 = Tk2Circuit(pytket_circ)
     normal_circ2 = normalize_guppy(c2)
     assert normal_circ2.circuit_cost(lambda op: int(op == TketOp.CX)) == 3
+
+# def test_gridsynth_pass():
+#     alpha = 0.71
+#     beta = 1.89
+#     inverse_angle = - alpha - beta
+#     epsilon = 1e-2
+
+#     pytket_circ = Circuit(1).H(0).Rz(alpha, 0).Rz(beta, 0).Rz(inverse_angle, 0).H(0)
+#     circ = Tk2Circuit(pytket_circ)
+#     hugr = Hugr.from_str(circ.to_str())
+#     gridsynth = Gridsynth(epsilon)
+#     gridsynth.run(hugr)
+#     runner = build(hugr, "test")
+#     shots = QsysResult(
+#         runner.run_shots(Quest(), n_qubits=1, n_shots=1))
+
+
