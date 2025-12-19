@@ -100,9 +100,6 @@ impl<T: HugrMut> Circuit<T> {
         let ve = self
             .hugr()
             .get_metadata::<metadata::CircuitRewriteTraces>(self.parent());
-        println!("{:?}", self.parent());
-        println!("{:?}", ve);
-
         ve.map(Vec::into_iter)
     }
 }
