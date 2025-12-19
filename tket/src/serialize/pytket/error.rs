@@ -1,10 +1,10 @@
 //! Error definitions for the pytket serialization.
 
 use derive_more::{Display, Error, From};
-use hugr::core::HugrNode;
-use hugr::envelope::EnvelopeError;
-use hugr::ops::OpType;
 use hugr::Wire;
+use hugr::core::HugrNode;
+use hugr::extension::resolution::ExtensionResolutionError;
+use hugr::ops::OpType;
 use itertools::Itertools;
 use tket_json_rs::register::ElementId;
 
@@ -33,7 +33,7 @@ pub enum PytketEncodeOpError<N: HugrNode = hugr::Node> {
     /// Tried to decode a tket1 operation with not enough qubit/bit arguments.
     #[display(
         "Operation {} is missing encoded arguments. Expected {expected_qubits} and {expected_bits}, but only \"{args:?}\" were specified.",
-        optype,
+        optype
     )]
     MissingSerialisedArguments {
         /// The operation name.
@@ -95,7 +95,9 @@ pub enum PytketEncodeError<N: HugrNode = hugr::Node> {
     /// Tried to extract an standalone circuit from an
     /// [`EncodedCircuit`][super::circuit::EncodedCircuit] whose head region is
     /// not a dataflow container in the original hugr.
-    #[display("Tried to extract an standalone circuit from an `EncodedCircuit` whose head region is not a dataflow container in the original hugr. Head operation {head_op}")]
+    #[display(
+        "Tried to extract an standalone circuit from an `EncodedCircuit` whose head region is not a dataflow container in the original hugr. Head operation {head_op}"
+    )]
     InvalidStandaloneHeadRegion {
         /// The head region operation that is not a dataflow container.
         head_op: String,
@@ -200,7 +202,9 @@ pub enum PytketDecodeErrorInner {
     /// The pytket circuit uses multi-indexed registers.
     //
     // This could be supported in the future, if there is a need for it.
-    #[display("Register {register} in the circuit has multiple indices. Tket2 does not support multi-indexed registers")]
+    #[display(
+        "Register {register} in the circuit has multiple indices. Tket2 does not support multi-indexed registers"
+    )]
     MultiIndexedRegister {
         /// The register name.
         register: String,
@@ -325,7 +329,9 @@ pub enum PytketDecodeErrorInner {
         param: String,
     },
     /// Not enough parameter names given for the input signature.
-    #[display("Tried to initialize a pytket circuit decoder with {num_params_given} given parameter names, but more were required by the input signature")]
+    #[display(
+        "Tried to initialize a pytket circuit decoder with {num_params_given} given parameter names, but more were required by the input signature"
+    )]
     MissingParametersInInput {
         /// The number of parameters given.
         num_params_given: usize,
@@ -333,7 +339,9 @@ pub enum PytketDecodeErrorInner {
     /// We don't support complex types containing parameters in the input.
     //
     // This restriction may be relaxed in the future.
-    #[display("Complex type {ty} contains {num_params} inside it. We only support input parameters in standalone 'float' or 'rotation'-typed wires")]
+    #[display(
+        "Complex type {ty} contains {num_params} inside it. We only support input parameters in standalone 'float' or 'rotation'-typed wires"
+    )]
     UnsupportedParametersInInput {
         /// The type that contains the parameters.
         ty: String,
@@ -407,13 +415,17 @@ pub enum PytketDecodeErrorInner {
         bit: String,
     },
     /// Tried to reassemble a circuit from a region that was not contained in the [`EncodedCircuit`][super::circuit::EncodedCircuit].
-    #[display("Tried to reassemble a circuit from region {region}, but the circuit was not found in the `EncodedCircuit`")]
+    #[display(
+        "Tried to reassemble a circuit from region {region}, but the circuit was not found in the `EncodedCircuit`"
+    )]
     NotAnEncodedRegion {
         /// The region we tried to decode
         region: String,
     },
     /// Tried to decode a circuit into an existing region, but the region was modified since creating the [`EncodedCircuit`][super::circuit::EncodedCircuit].
-    #[display("Tried to decode a circuit into region {region}, but the region was modified since creating the `EncodedCircuit`. New region optype: {new_optype}")]
+    #[display(
+        "Tried to decode a circuit into region {region}, but the region was modified since creating the `EncodedCircuit`. New region optype: {new_optype}"
+    )]
     IncompatibleTargetRegion {
         /// The region we tried to decode
         region: hugr::Node,
@@ -422,23 +434,24 @@ pub enum PytketDecodeErrorInner {
     },
     /// The pytket circuit contains an opaque barrier representing a unsupported subgraph in the original HUGR,
     /// but the corresponding subgraph is not present in the [`EncodedCircuit`][super::circuit::EncodedCircuit] structure.
-    #[display("The pytket circuit contains a barrier representing an opaque subgraph in the original HUGR, but the corresponding subgraph is not present in the `EncodedCircuit` structure. Subgraph ID {id}")]
+    #[display(
+        "The pytket circuit contains a barrier representing an opaque subgraph in the original HUGR, but the corresponding subgraph is not present in the `EncodedCircuit` structure. Subgraph ID {id}"
+    )]
     OpaqueSubgraphNotFound {
         /// The ID of the opaque subgraph.
         id: SubgraphId,
     },
     /// The stored subgraph payload was not a valid flat subgraph in a dataflow region of the target hugr.
-    #[display("The stored subgraph {id} was not a valid flat subgraph in a dataflow region of the target hugr.")]
+    #[display(
+        "The stored subgraph {id} was not a valid flat subgraph in a dataflow region of the target hugr."
+    )]
     ExternalSubgraphWasModified {
         /// The ID of the opaque subgraph.
         id: SubgraphId,
     },
     /// Cannot decode Hugr from an unsupported subgraph payload in a pytket barrier operation.
-    #[display("Cannot decode Hugr from an inline subgraph payload in a pytket barrier operation. {source}")]
-    UnsupportedSubgraphInlinePayload {
-        /// The envelope decoding error.
-        source: EnvelopeError,
-    },
+    #[display("{_0}")]
+    UnsupportedBarrierPayload(BarrierPayloadError),
     /// Cannot translate a wire from one type to another.
     #[display("Cannot translate {wire} from type {initial_type} to type {target_type}{}",
         context.as_ref().map(|s| format!(". {s}")).unwrap_or_default()
@@ -459,5 +472,29 @@ impl PytketDecodeErrorInner {
     /// Wrap the error in a [`PytketDecodeError`].
     pub fn wrap(self) -> PytketDecodeError {
         PytketDecodeError::from(self)
+    }
+}
+
+/// Sub-errors for [PytketDecodeError] raised when the payload of an opaque
+/// pytket barrier fails to be decoded as a
+/// [OpaqueSubgraphPayload][super::opaque::OpaqueSubgraphPayload].
+#[derive(derive_more::Debug, Display, Error)]
+#[non_exhaustive]
+pub enum BarrierPayloadError {
+    /// Cannot decode the payload as a JSON string.
+    #[display("Cannot decode the opaque subgraph payload from a JSON string. {_0}")]
+    SerdeDecoding(serde_json::Error),
+    /// Cannot decode the Hugr encoded in an opaque subgraph payload.
+    #[display("Cannot decode the Hugr encoded in an opaque subgraph payload. {_0}")]
+    HugrRead(hugr::envelope::ReadError),
+    /// Cannot resolve the extension references in the opaque subgraph payload.
+    #[display("Cannot resolve the extension references in the opaque subgraph payload. {_0}")]
+    ExtensionResolution(ExtensionResolutionError),
+}
+
+impl BarrierPayloadError {
+    /// Wrap the error in a [PytketDecodeError].
+    pub fn wrap(self) -> PytketDecodeError {
+        PytketDecodeErrorInner::UnsupportedBarrierPayload(self).wrap()
     }
 }

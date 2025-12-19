@@ -2,11 +2,11 @@
 use std::sync::Arc;
 
 use hugr::{
+    Extension,
     extension::{ExtensionId, Version},
     hugr::IdentList,
     type_row,
     types::{FuncValueType, PolyFuncTypeRV, Type, TypeBound},
-    Extension,
 };
 use lazy_static::lazy_static;
 use smol_str::SmolStr;
@@ -43,7 +43,7 @@ lazy_static! {
 mod test {
 
     use hugr::{
-        builder::{inout_sig, DFGBuilder, Dataflow, DataflowHugr},
+        builder::{DFGBuilder, Dataflow, DataflowHugr, inout_sig},
         extension::prelude::usize_t,
         std_extensions::collections::array::array_type,
     };

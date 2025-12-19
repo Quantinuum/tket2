@@ -5,10 +5,10 @@ use hugr::{
 };
 
 use crate::{
-    extension::rotation::{ConstRotation, RotationOp},
-    modifier::modifier_resolver::*,
     TketOp,
     TketOp::*,
+    extension::rotation::{ConstRotation, RotationOp},
+    modifier::modifier_resolver::*,
 };
 
 impl<N: HugrNode> ModifierResolver<N> {
@@ -561,18 +561,18 @@ impl CombinedModifier {
 mod test {
     use cool_asserts::assert_matches;
     use hugr::{
+        Hugr,
         builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
         extension::prelude::qb_t,
         ops::CallIndirect,
         std_extensions::collections::array::array_type,
         types::{Signature, Term},
-        Hugr,
     };
     use strum::IntoEnumIterator;
 
     use crate::{
         extension::rotation::ConstRotation,
-        modifier::modifier_resolver::tests::{test_modifier_resolver, SetUnitary},
+        modifier::modifier_resolver::tests::{SetUnitary, test_modifier_resolver},
         modifier::modifier_resolver::*,
     };
     use crate::{

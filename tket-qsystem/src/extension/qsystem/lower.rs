@@ -5,18 +5,18 @@ use hugr::extension::prelude::Barrier;
 use hugr::extension::simple_op::MakeExtensionOp;
 use hugr::hugr::patch::insert_cut::InsertCutError;
 use hugr::{
+    Hugr, HugrView, Node, Wire,
     builder::{BuildError, Dataflow, DataflowHugr, FunctionBuilder},
     extension::ExtensionRegistry,
-    hugr::{hugrmut::HugrMut, HugrError},
+    hugr::{HugrError, hugrmut::HugrMut},
     ops::{self, DataflowOpTrait},
     std_extensions::arithmetic::{float_ops::FloatOps, float_types::ConstF64},
     types::Signature,
-    Hugr, HugrView, Node, Wire,
 };
 use lazy_static::lazy_static;
-use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
-use tket::{extension::rotation::RotationOpBuilder, TketOp};
+use std::collections::btree_map::Entry;
+use tket::{TketOp, extension::rotation::RotationOpBuilder};
 
 use crate::extension::qsystem::{self, QSystemOp, QSystemOpBuilder};
 
@@ -114,7 +114,7 @@ pub fn lower_tk2_op(hugr: &mut impl HugrMut<Node = Node>) -> Result<Vec<Node>, L
             ReplaceOps::Tk2(tket_op) => {
                 // Handle TketOp replacements
                 if let Some(direct) = direct_map(tket_op) {
-                    lowerer.replace_op(
+                    lowerer.set_replace_op(
                         &tket_op.into_extension_op(),
                         NodeTemplate::SingleOp(direct.into()),
                     );
@@ -130,7 +130,7 @@ pub fn lower_tk2_op(hugr: &mut impl HugrMut<Node = Node>) -> Result<Vec<Node>, L
                         *e.insert(inserted)
                     }
                 };
-                lowerer.replace_op(
+                lowerer.set_replace_op(
                     &tket_op.into_extension_op(),
                     NodeTemplate::Call(func_node, vec![]),
                 );
@@ -158,7 +158,7 @@ pub fn lower_tk2_op(hugr: &mut impl HugrMut<Node = Node>) -> Result<Vec<Node>, L
 fn build_func(op: TketOp) -> Result<Hugr, LowerTk2Error> {
     let sig = op.into_extension_op().signature().into_owned();
     let sig = Signature::new(sig.input, sig.output); // ignore extension delta
-                                                     // TODO check generated names are namespaced enough
+    // TODO check generated names are namespaced enough
     let f_name = format!("__tk2_{}", op.op_id().to_lowercase());
     let mut b = FunctionBuilder::new(f_name, sig)?;
     let inputs: Vec<_> = b.input_wires().collect();
@@ -262,11 +262,12 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for LowerTketToQSystemPass {
 #[cfg(test)]
 mod test {
     use hugr::{
+        HugrView,
         builder::{DFGBuilder, FunctionBuilder},
-        extension::prelude::{bool_t, option_type, qb_t, UnwrapBuilder as _},
-        type_row, HugrView,
+        extension::prelude::{UnwrapBuilder as _, bool_t, option_type, qb_t},
+        type_row,
     };
-    use tket::{extension::rotation::rotation_type, Circuit};
+    use tket::{Circuit, extension::rotation::rotation_type};
 
     use super::*;
     use rstest::rstest;

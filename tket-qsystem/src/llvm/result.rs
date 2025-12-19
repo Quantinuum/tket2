@@ -2,23 +2,23 @@
 
 use crate::extension::result::{ResultArgs, ResultOp, ResultOpDef};
 use crate::llvm::prelude::emit_global_string;
-use anyhow::{anyhow, bail, Result};
+use anyhow::{Result, anyhow, bail};
+use hugr::llvm::CodegenExtsBuilder;
 use hugr::llvm::custom::CodegenExtension;
 use hugr::llvm::emit::{EmitFuncContext, EmitOpArgs};
 use hugr::llvm::inkwell;
 use hugr::llvm::sum::LLVMSumValue;
 use hugr::llvm::types::HugrSumType;
-use hugr::llvm::CodegenExtsBuilder;
+use inkwell::AddressSpace;
 use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::types::{FloatType, IntType, PointerType, VoidType};
 use inkwell::values::{BasicValueEnum, FunctionValue, IntValue};
-use inkwell::AddressSpace;
 use tket::hugr::extension::simple_op::MakeExtensionOp;
 use tket::hugr::ops::ExtensionOp;
 use tket::hugr::{HugrView, Node};
 
-use super::array_utils::{struct_1d_arr_alloc, struct_1d_arr_ptr_t, ArrayLowering, ElemType};
+use super::array_utils::{ArrayLowering, ElemType, struct_1d_arr_alloc, struct_1d_arr_ptr_t};
 
 static TAG_PREFIX: &str = "USER:";
 
@@ -292,9 +292,9 @@ mod test {
 
     use hugr::extension::simple_op::MakeRegisteredOp;
     use hugr::llvm::check_emission;
+    use hugr::llvm::test::TestContext;
     use hugr::llvm::test::llvm_ctx;
     use hugr::llvm::test::single_op_hugr;
-    use hugr::llvm::test::TestContext;
 
     use crate::llvm::prelude::QISPreludeCodegen;
 

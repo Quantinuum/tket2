@@ -2,18 +2,18 @@
 //! After resolving modifiers, all global phase operations are removed.
 //!
 use hugr::{
+    IncomingPort, Node, Wire,
     builder::Dataflow,
     core::HugrNode,
     extension::simple_op::MakeExtensionOp,
     hugr::hugrmut::HugrMut,
     std_extensions::arithmetic::{float_ops::FloatOps, float_types::ConstF64},
-    IncomingPort, Node, Wire,
 };
 
 use crate::{
-    extension::{global_phase::GlobalPhase, rotation::RotationOp},
-    modifier::modifier_resolver::{connect, ModifierResolver, ModifierResolverErrors},
     TketOp,
+    extension::{global_phase::GlobalPhase, rotation::RotationOp},
+    modifier::modifier_resolver::{ModifierResolver, ModifierResolverErrors, connect},
 };
 
 impl<N: HugrNode> ModifierResolver<N> {
@@ -122,8 +122,8 @@ pub fn delete_phase<N: HugrNode>(
 mod tests {
     use std::iter;
 
-    use hugr::ops::handle::FuncID;
     use hugr::Hugr;
+    use hugr::ops::handle::FuncID;
     use hugr::{
         builder::{DataflowSubContainer, ModuleBuilder},
         extension::prelude::qb_t,
@@ -131,8 +131,8 @@ mod tests {
     };
 
     use crate::extension::rotation::ConstRotation;
-    use crate::modifier::modifier_resolver::tests::test_modifier_resolver;
     use crate::modifier::modifier_resolver::tests::SetUnitary;
+    use crate::modifier::modifier_resolver::tests::test_modifier_resolver;
 
     use super::*;
 

@@ -6,8 +6,8 @@
 use std::time::Instant;
 
 use crate::optimiser::{
-    badger::BadgerOptions, pqueue::Entry, Optimiser, OptimiserOptions, OptimiserResult, State,
-    StatePQueue,
+    Optimiser, OptimiserOptions, OptimiserResult, State, StatePQueue, badger::BadgerOptions,
+    pqueue::Entry,
 };
 
 /// A single-threaded backtracking optimiser.
@@ -103,23 +103,23 @@ impl Optimiser for BacktrackingOptimiser {
                 }
             }
 
-            if let Some(timeout) = self.timeout {
-                if start_time.elapsed().as_secs_f64() > (timeout as f64) {
-                    timeout_flag = true;
-                    break;
-                }
+            if let Some(timeout) = self.timeout
+                && start_time.elapsed().as_secs_f64() > (timeout as f64)
+            {
+                timeout_flag = true;
+                break;
             }
-            if let Some(p_timeout) = self.progress_timeout {
-                if last_best_time.elapsed().as_secs_f64() > (p_timeout as f64) {
-                    timeout_flag = true;
-                    break;
-                }
+            if let Some(p_timeout) = self.progress_timeout
+                && last_best_time.elapsed().as_secs_f64() > (p_timeout as f64)
+            {
+                timeout_flag = true;
+                break;
             }
-            if let Some(max_visited_count) = self.max_visited_count {
-                if visited_count >= max_visited_count {
-                    timeout_flag = true;
-                    break;
-                }
+            if let Some(max_visited_count) = self.max_visited_count
+                && visited_count >= max_visited_count
+            {
+                timeout_flag = true;
+                break;
             }
         }
 

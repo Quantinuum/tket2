@@ -1,5 +1,6 @@
 //! Encoder for pytket operations that cannot be represented naturally in tket.
 
+use crate::Circuit;
 use crate::extension::rotation::rotation_type;
 use crate::extension::{TKET1_EXTENSION, TKET1_EXTENSION_ID, TKET1_OP_NAME};
 use crate::serialize::pytket::decoder::{
@@ -7,12 +8,11 @@ use crate::serialize::pytket::decoder::{
 };
 use crate::serialize::pytket::encoder::{EmitCommandOptions, EncodeStatus};
 use crate::serialize::pytket::{PytketDecodeError, PytketEncodeError, PytketEncoderContext};
-use crate::Circuit;
 
 use super::PytketEmitter;
 use hugr::builder::Dataflow;
-use hugr::extension::prelude::{bool_t, qb_t};
 use hugr::extension::ExtensionId;
+use hugr::extension::prelude::{bool_t, qb_t};
 use hugr::ops::{ExtensionOp, OpTrait, OpType};
 use hugr::types::{Signature, TypeArg};
 use hugr::{HugrView, IncomingPort};

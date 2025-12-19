@@ -6,7 +6,7 @@ use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::iter::FusedIterator;
 
-use hugr::hugr::NodeMetadata;
+use hugr::metadata::Metadata;
 use hugr::ops::{OpTag, OpTrait};
 use hugr::{HugrView, IncomingPort, OutgoingPort};
 use hugr_core::hugr::internal::{HugrInternals, PortgraphNodeMap};
@@ -15,8 +15,8 @@ use itertools::{EitherOrBoth, Itertools};
 use petgraph::visit as pv;
 use portgraph::PortView;
 
-use super::units::{filter, DefaultUnitLabeller, LinearUnit, UnitLabeller, Units};
 use super::Circuit;
+use super::units::{DefaultUnitLabeller, LinearUnit, UnitLabeller, Units, filter};
 
 pub use hugr::ops::OpType;
 pub use hugr::types::{EdgeKind, Type, TypeRow};
@@ -159,8 +159,8 @@ impl<'circ, T: HugrView<Node = Node>> Command<'circ, T> {
 
     /// Returns a metadata value associated with the command's node.
     #[inline]
-    pub fn metadata(&self, key: impl AsRef<str>) -> Option<&NodeMetadata> {
-        self.circ.hugr().get_metadata(self.node, key)
+    pub fn metadata<M: Metadata>(&self) -> Option<M::Type<'_>> {
+        self.circ.hugr().get_metadata::<M>(self.node)
     }
 }
 
@@ -335,7 +335,9 @@ impl<'circ, T: HugrView<Node = Node>> CommandIterator<'circ, T> {
                 self.delayed_consts.remove(&delayed);
                 for consumer in self.circ.hugr().output_neighbours(delayed) {
                     let Entry::Occupied(mut entry) = self.delayed_consumers.entry(consumer) else {
-                        panic!("Delayed node consumer was not in delayed_consumers. Delayed node: {delayed:?}, consumer: {consumer:?}.");
+                        panic!(
+                            "Delayed node consumer was not in delayed_consumers. Delayed node: {delayed:?}, consumer: {consumer:?}."
+                        );
                     };
                     *entry.get_mut() -= 1;
                     if *entry.get() == 0 {
@@ -486,8 +488,8 @@ mod test {
     use hugr::builder::{Container, DFGBuilder, Dataflow, DataflowHugr};
     use hugr::extension::prelude::qb_t;
     use hugr::hugr::hugrmut::HugrMut;
-    use hugr::ops::handle::NodeHandle;
     use hugr::ops::Value;
+    use hugr::ops::handle::NodeHandle;
     use hugr::types::Signature;
     use itertools::Itertools;
     use rstest::{fixture, rstest};
@@ -496,8 +498,8 @@ mod test {
 
     use crate::extension::rotation::ConstRotation;
 
-    use crate::utils::build_simple_circuit;
     use crate::TketOp;
+    use crate::utils::build_simple_circuit;
 
     use super::*;
 

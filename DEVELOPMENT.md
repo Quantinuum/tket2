@@ -29,7 +29,7 @@ shell by setting up [direnv](https://devenv.sh/automatic-shell-activation/).
 To setup the environment manually you will need:
 
 - Just: <https://just.systems/>
-- Rust `>=1.85`: <https://www.rust-lang.org/tools/install>
+- Rust `>=1.89`: <https://www.rust-lang.org/tools/install>
 - cargo-nextest: <https://nexte.st/docs/installation/pre-built-binaries/>
 - uv `>=0.3`: docs.astral.sh/uv/getting-started/installation
 - conan `>=2.0.0,<3`: This gets installed by `just setup` / `uv tool install conan`

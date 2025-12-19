@@ -15,7 +15,7 @@ pub use hash::CircuitHash;
 use hugr::extension::prelude::{NoopDef, TupleOpDef};
 use hugr::extension::simple_op::MakeOpDef;
 use hugr::hugr::views::sibling_subgraph::InvalidSubgraph;
-use hugr::hugr::views::{ExtractionResult, SiblingSubgraph};
+use hugr::hugr::views::{ExtractionResult, RootChecked, SiblingSubgraph};
 use hugr::ops::handle::DataflowParentID;
 use itertools::Either::{Left, Right};
 
@@ -34,7 +34,7 @@ pub use hugr::types::{EdgeKind, Type, TypeRow};
 pub use hugr::{Node, Port, Wire};
 use smol_str::ToSmolStr;
 
-use self::units::{filter, LinearUnit, Units};
+use self::units::{LinearUnit, Units, filter};
 
 /// A quantum circuit, represented as a function in a HUGR.
 #[derive(Debug, Clone)]
@@ -351,7 +351,10 @@ impl<T: HugrView<Node = Node>> Circuit<T> {
     where
         T: Clone,
     {
-        SiblingSubgraph::try_new_dataflow_subgraph::<_, DataflowParentID>(self.hugr())
+        let Ok(checked) = RootChecked::try_new(self.hugr()) else {
+            return Err(InvalidSubgraph::NonDataflowRegion);
+        };
+        SiblingSubgraph::try_new_dataflow_subgraph::<_, DataflowParentID>(checked)
     }
 
     /// Compute the cost of the circuit based on a per-operation cost function.
@@ -413,7 +416,11 @@ fn check_hugr<H: HugrView>(hugr: &H) -> Result<(), CircuitError<H::Node>> {
 ///
 /// This will return an error if the wire is not empty or if a HugrError
 /// occurs.
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    clippy::allow_attributes,
+    reason = "used when 'portmatching' feature is enabled, and in tests"
+)]
 pub(crate) fn remove_empty_wire(
     circ: &mut Circuit<impl HugrMut<Node = Node>>,
     input_port: usize,
@@ -515,7 +522,9 @@ pub enum CircuitMutError {
     #[from]
     CircuitError(CircuitError),
     /// The wire to be deleted is not empty.
-    #[display("Tried to delete non-empty input wire with offset {input_port} on dataflow node {dataflow_node}")]
+    #[display(
+        "Tried to delete non-empty input wire with offset {input_port} on dataflow node {dataflow_node}"
+    )]
     DeleteNonEmptyWire {
         /// The input port offset
         input_port: usize,
@@ -664,11 +673,11 @@ mod tests {
     };
 
     use super::*;
+    use crate::TketOp;
     use crate::extension::rotation::ConstRotation;
     use crate::serialize::load_tk1_json_str;
     use crate::serialize::pytket::DecodeOptions;
     use crate::utils::build_simple_circuit;
-    use crate::TketOp;
 
     #[fixture]
     fn tk1_circuit() -> Circuit {

@@ -10,10 +10,10 @@ use std::collections::HashMap;
 
 /// If a type is an option of the given element type.
 pub fn is_opt_of(ty: &Type, elem_type: &Type) -> bool {
-    if let Some(sum) = ty.as_sum() {
-        if let Some(inner) = sum.as_unary_option() {
-            return inner == elem_type;
-        }
+    if let Some(sum) = ty.as_sum()
+        && let Some(inner) = sum.as_unary_option()
+    {
+        return inner == elem_type;
     }
     false
 }

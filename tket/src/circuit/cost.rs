@@ -7,8 +7,8 @@ use std::iter::Sum;
 use std::num::NonZeroUsize;
 use std::ops::{Add, AddAssign};
 
-use crate::ops::op_matches;
 use crate::TketOp;
+use crate::ops::op_matches;
 
 /// The cost for a group of operations in a circuit, each with cost `OpCost`.
 pub trait CircuitCost: Add<Output = Self> + Sum<Self> + Debug + Default + Clone + Ord {
@@ -110,11 +110,7 @@ impl<T: Add<Output = T> + Default + Copy, const N: usize> Sum for LexicographicC
 impl<const N: usize> CostDelta for LexicographicCost<isize, N> {
     #[inline]
     fn as_isize(&self) -> isize {
-        if N > 0 {
-            self.0[0]
-        } else {
-            0
-        }
+        if N > 0 { self.0[0] } else { 0 }
     }
 }
 
@@ -123,11 +119,7 @@ impl<const N: usize> CircuitCost for LexicographicCost<usize, N> {
 
     #[inline]
     fn as_usize(&self) -> usize {
-        if N > 0 {
-            self.0[0]
-        } else {
-            0
-        }
+        if N > 0 { self.0[0] } else { 0 }
     }
 
     #[inline]

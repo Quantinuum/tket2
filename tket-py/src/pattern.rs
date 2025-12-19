@@ -4,12 +4,12 @@ pub mod portmatching;
 
 use crate::circuit::Tk2Circuit;
 use crate::rewrite::PyCircuitRewrite;
-use crate::utils::{create_py_exception, ConvertPyErr};
+use crate::utils::{ConvertPyErr, create_py_exception};
 
 use hugr::{HugrView, Node};
 use pyo3::prelude::*;
-use tket::portmatching::{CircuitPattern, PatternMatch, PatternMatcher};
 use tket::Circuit;
+use tket::portmatching::{CircuitPattern, PatternMatch, PatternMatcher};
 
 /// The module definition
 pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
@@ -99,11 +99,10 @@ impl RuleMatcher {
 
     pub fn find_match(&self, target: &Tk2Circuit) -> PyResult<Option<PyCircuitRewrite>> {
         let circ = &target.circ;
-        if let Some(pmatch) = self.matcher.find_matches_iter(circ).next() {
-            Ok(Some(self.match_to_rewrite(pmatch, circ)?))
-        } else {
-            Ok(None)
-        }
+        let Some(pmatch) = self.matcher.find_matches_iter(circ).next() else {
+            return Ok(None);
+        };
+        Ok(Some(self.match_to_rewrite(pmatch, circ)?))
     }
 
     pub fn find_matches(&self, target: &Tk2Circuit) -> PyResult<Vec<PyCircuitRewrite>> {

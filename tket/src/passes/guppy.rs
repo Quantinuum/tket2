@@ -1,13 +1,15 @@
 //! A pass that normalizes the structure of Guppy-generated circuits into something that can be optimized by tket.
 
+use hugr::Node;
 use hugr::algorithms::const_fold::{ConstFoldError, ConstantFoldPass};
 use hugr::algorithms::inline_dfgs::InlineDFGsPass;
 use hugr::algorithms::normalize_cfgs::{NormalizeCFGError, NormalizeCFGPass};
+use hugr::algorithms::redundant_order_edges::RedundantOrderEdgesPass;
 use hugr::algorithms::untuple::{UntupleError, UntupleRecursive};
 use hugr::algorithms::{ComposablePass, RemoveDeadFuncsError, RemoveDeadFuncsPass, UntuplePass};
+use hugr::hugr::HugrError;
 use hugr::hugr::hugrmut::HugrMut;
 use hugr::hugr::patch::inline_dfg::InlineDFGError;
-use hugr::Node;
 
 use crate::passes::BorrowSquashPass;
 
@@ -28,6 +30,8 @@ pub struct NormalizeGuppy {
     inline_dfgs: bool,
     /// Whether to squash BorrowArray borrow/return ops
     squash_borrows: bool,
+    /// Whether to remove redundant order edges.
+    remove_redundant_order_edges: bool,
 }
 
 impl NormalizeGuppy {
@@ -61,6 +65,11 @@ impl NormalizeGuppy {
         self.squash_borrows = squash;
         self
     }
+    /// Set whether to remove redundant order edges.
+    pub fn remove_redundant_order_edges(&mut self, remove: bool) -> &mut Self {
+        self.remove_redundant_order_edges = remove;
+        self
+    }
 }
 
 impl Default for NormalizeGuppy {
@@ -72,6 +81,7 @@ impl Default for NormalizeGuppy {
             dead_funcs: true,
             inline_dfgs: true,
             squash_borrows: true,
+            remove_redundant_order_edges: true,
         }
     }
 }
@@ -107,6 +117,13 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for NormalizeGuppy {
                 .run(hugr)
                 .unwrap_or_else(|e| match e {});
         }
+        // Remove redundant order edges once all other structural rewrites have been applied.
+        if self.remove_redundant_order_edges {
+            RedundantOrderEdgesPass::default()
+                .recursive(true)
+                .run(hugr)
+                .map_err(NormalizeGuppyErrors::RedundantOrderEdges)?;
+        }
 
         Ok(())
     }
@@ -125,6 +142,9 @@ pub enum NormalizeGuppyErrors {
     DeadFuncs(RemoveDeadFuncsError),
     /// Error while inlining DFG operations.
     Inline(InlineDFGError),
+    /// Error while removing redundant order edges.
+    #[from(ignore)]
+    RedundantOrderEdges(HugrError),
 }
 
 #[cfg(test)]
@@ -152,6 +172,7 @@ mod test {
             .constant_folding(false)
             .remove_dead_funcs(false)
             .inline_dfgs(false)
+            .remove_redundant_order_edges(false)
             .run(&mut hugr2)
             .unwrap();
 

@@ -1,8 +1,8 @@
 //! Encoder and decoder for tket operations with native pytket counterparts.
 
 use super::PytketEmitter;
-use crate::extension::sympy::SympyOp;
 use crate::extension::TKET_EXTENSION_ID;
+use crate::extension::sympy::SympyOp;
 use crate::serialize::pytket::decoder::{
     DecodeStatus, LoadedParameter, PytketDecoderContext, TrackedBit, TrackedQubit,
 };
@@ -10,8 +10,8 @@ use crate::serialize::pytket::encoder::{EmitCommandOptions, EncodeStatus, Pytket
 use crate::serialize::pytket::extension::PytketDecoder;
 use crate::serialize::pytket::{PytketDecodeError, PytketEncodeError};
 use crate::{Circuit, TketOp};
-use hugr::extension::simple_op::MakeExtensionOp;
 use hugr::extension::ExtensionId;
+use hugr::extension::simple_op::MakeExtensionOp;
 use hugr::ops::ExtensionOp;
 use hugr::{HugrView, Wire};
 use itertools::Itertools as _;

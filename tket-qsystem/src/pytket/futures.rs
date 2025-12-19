@@ -1,17 +1,17 @@
 //! Encoder and decoder for floating point operations.
 
-use hugr::extension::simple_op::MakeExtensionOp;
+use hugr::HugrView;
 use hugr::extension::ExtensionId;
+use hugr::extension::simple_op::MakeExtensionOp;
 use hugr::ops::ExtensionOp;
 use hugr::types::Term;
-use hugr::HugrView;
 use itertools::Itertools;
+use tket::Circuit;
 use tket::serialize::pytket::encoder::EncodeStatus;
 use tket::serialize::pytket::extension::{PytketTypeTranslator, RegisterCount};
 use tket::serialize::pytket::{
     PytketEmitter, PytketEncodeError, PytketEncoderContext, TypeTranslatorSet,
 };
-use tket::Circuit;
 
 use crate::extension::futures::{self, FutureOpDef};
 

@@ -1,6 +1,6 @@
 use crate::REGISTRY;
 use anyhow::{Error, Result, anyhow};
-use tket::hugr::envelope::read_described_envelope;
+use tket::hugr::envelope::read_envelope;
 use tket::hugr::ops::OpType;
 use tket::hugr::types::Term;
 use tket::hugr::{Hugr, HugrView};
@@ -12,7 +12,7 @@ use tket::extension::{TKET1_EXTENSION_ID, TKET1_OP_NAME};
 /// Interprets the string as a hugr package and, verifies there is exactly one module in the
 /// package, then extracts and returns that module.
 pub fn read_hugr_envelope(bytes: &[u8]) -> Result<Hugr> {
-    let (desc, package) = read_described_envelope(bytes, &REGISTRY)
+    let (desc, package) = read_envelope(bytes, &REGISTRY)
         .map_err(|e| Error::new(e).context("Error loading HUGR package."))?;
 
     if package.modules.len() != 1 {

@@ -7,7 +7,7 @@ use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::Instant;
 
-use crossbeam_channel::{select, Receiver, RecvError, SendError, Sender};
+use crossbeam_channel::{Receiver, RecvError, SendError, Sender, select};
 
 use crate::circuit::cost::CircuitCost;
 

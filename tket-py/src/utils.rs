@@ -54,13 +54,13 @@ pub fn into_vec<T, S: From<T>>(v: impl IntoIterator<Item = T>) -> Vec<S> {
 
 #[cfg(test)]
 pub(crate) mod test {
+    use hugr::Hugr;
     use hugr::builder::{
         BuildError, CircuitBuilder, Container, Dataflow, DataflowHugr, DataflowSubContainer,
         FunctionBuilder, HugrBuilder, ModuleBuilder,
     };
     use hugr::extension::prelude::qb_t;
     use hugr::ops::handle::NodeHandle;
-    use hugr::Hugr;
     use pyo3::{Bound, PyResult, Python};
     use tket::Circuit;
     use tket::TketOp;

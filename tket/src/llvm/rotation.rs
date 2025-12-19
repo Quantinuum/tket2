@@ -1,21 +1,21 @@
 //! `hugr-llvm` codegen extension for `tket.rotation`.
 
-use hugr::extension::prelude::{option_type, ConstError};
-use hugr::llvm::emit::{emit_value, EmitFuncContext, EmitOpArgs};
+use hugr::HugrView;
+use hugr::Node;
+use hugr::extension::prelude::{ConstError, option_type};
+use hugr::llvm::emit::{EmitFuncContext, EmitOpArgs, emit_value};
 use hugr::llvm::extension::{DefaultPreludeCodegen, PreludeCodegen};
 use hugr::llvm::inkwell;
 use hugr::llvm::types::TypingSession;
 use hugr::llvm::{CodegenExtension, CodegenExtsBuilder};
 use hugr::ops::ExtensionOp;
 use hugr::types::TypeName;
-use hugr::HugrView;
-use hugr::Node;
 
-use crate::extension::rotation::{rotation_type, ConstRotation, RotationOp, ROTATION_EXTENSION_ID};
-use anyhow::{anyhow, Result};
+use crate::extension::rotation::{ConstRotation, ROTATION_EXTENSION_ID, RotationOp, rotation_type};
+use anyhow::{Result, anyhow};
+use inkwell::FloatPredicate;
 use inkwell::types::FloatType;
 use inkwell::values::{FloatValue, IntValue};
-use inkwell::FloatPredicate;
 use lazy_static::lazy_static;
 const ROTATION_TYPE_ID: TypeName = TypeName::new_inline("rotation");
 
@@ -63,7 +63,6 @@ impl<PCG: PreludeCodegen> RotationCodegenExtension<PCG> {
     /// While lowering a `tket.rotation.from_halfturns_unchecked` op we must
     /// panic in some codepaths. This function allows customising the panic
     /// message. The default panic message is [static@DEFAULT_FROM_HALFTURNS_ERROR].
-    #[allow(unused)]
     pub fn with_from_halfturns_err(mut self, from_halfturns_err: ConstError) -> Self {
         self.from_halfturns_err = from_halfturns_err;
         self
@@ -213,7 +212,8 @@ impl<PCG: PreludeCodegen> CodegenExtension for RotationCodegenExtension<PCG> {
 #[cfg(test)]
 mod test {
 
-    use crate::extension::rotation::{rotation_type, RotationOpBuilder as _};
+    use crate::extension::rotation::{RotationOpBuilder as _, rotation_type};
+    use hugr::Node;
     use hugr::builder::{
         Dataflow, DataflowHugr, DataflowSubContainer as _, HugrBuilder, SubContainer,
     };
@@ -221,12 +221,11 @@ mod test {
     use hugr::llvm::check_emission;
     use hugr::llvm::emit::test::SimpleHugrConfig;
     use hugr::llvm::extension::DefaultPreludeCodegen;
-    use hugr::llvm::test::{exec_ctx, llvm_ctx, TestContext};
+    use hugr::llvm::test::{TestContext, exec_ctx, llvm_ctx};
     use hugr::llvm::types::HugrType;
-    use hugr::ops::constant::{CustomConst, TryHash};
     use hugr::ops::OpName;
-    use hugr::std_extensions::arithmetic::float_types::{float64_type, ConstF64};
-    use hugr::Node;
+    use hugr::ops::constant::{CustomConst, TryHash};
+    use hugr::std_extensions::arithmetic::float_types::{ConstF64, float64_type};
     use inkwell::values::BasicValueEnum;
     use rstest::rstest;
 

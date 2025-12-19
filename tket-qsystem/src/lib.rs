@@ -12,15 +12,15 @@ pub mod replace_bools;
 
 use derive_more::{Display, Error, From};
 use hugr::{
+    Hugr, HugrView, Node,
     algorithms::{
+        ComposablePass as _, LinearizeArrayPass, MonomorphizePass, RemoveDeadFuncsError,
+        RemoveDeadFuncsPass,
         const_fold::{ConstFoldError, ConstantFoldPass},
         force_order,
         replace_types::ReplaceTypesError,
-        ComposablePass as _, LinearizeArrayPass, MonomorphizePass, RemoveDeadFuncsError,
-        RemoveDeadFuncsPass,
     },
-    hugr::{hugrmut::HugrMut, HugrError},
-    Hugr, HugrView, Node,
+    hugr::{HugrError, hugrmut::HugrMut},
 };
 use lower_drops::LowerDropsPass;
 use replace_bools::{ReplaceBoolPass, ReplaceBoolPassError};
@@ -251,6 +251,7 @@ impl QSystemPass {
 #[cfg(test)]
 mod test {
     use hugr::{
+        HugrView as _,
         builder::{Dataflow, DataflowSubContainer, HugrBuilder},
         extension::prelude::qb_t,
         hugr::hugrmut::HugrMut,
@@ -258,7 +259,6 @@ mod test {
         std_extensions::arithmetic::float_types::ConstF64,
         type_row,
         types::Signature,
-        HugrView as _,
     };
 
     use itertools::Itertools as _;
@@ -267,8 +267,8 @@ mod test {
     use tket::extension::bool::bool_type;
 
     use crate::{
-        extension::{futures::FutureOpDef, qsystem::QSystemOp},
         QSystemPass,
+        extension::{futures::FutureOpDef, qsystem::QSystemOp},
     };
 
     #[rstest]

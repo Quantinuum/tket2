@@ -1,12 +1,12 @@
 //! Mapping from extension operation instances to function definitions
 //! that can be used to replace them.
 use hugr::{
-    algorithms::{mangle_name, replace_types::NodeTemplate, ReplaceTypes},
+    Hugr, Node, Wire,
+    algorithms::{ReplaceTypes, mangle_name, replace_types::NodeTemplate},
     builder::{BuildError, DataflowHugr, FunctionBuilder},
     hugr::hugrmut::HugrMut,
     ops::{DataflowOpTrait, ExtensionOp},
     types::TypeArg,
-    Hugr, Node, Wire,
 };
 use indexmap::IndexMap;
 use std::{cell::RefCell, ops::Deref};
@@ -120,7 +120,7 @@ impl OpFunctionMap {
             let func_node = hugr
                 .insert_hugr(hugr.module_root(), func_def)
                 .inserted_entrypoint;
-            lowerer.replace_op(&op, NodeTemplate::Call(func_node, vec![]));
+            lowerer.set_replace_op(&op, NodeTemplate::Call(func_node, vec![]));
         }
     }
 }

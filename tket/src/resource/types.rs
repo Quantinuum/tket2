@@ -5,7 +5,7 @@
 //! positions, and the mapping structures that associate them with operations.
 
 use hugr::{
-    core::HugrNode, types::Signature, Direction, IncomingPort, OutgoingPort, Port, PortIndex, Wire,
+    Direction, IncomingPort, OutgoingPort, Port, PortIndex, Wire, core::HugrNode, types::Signature,
 };
 use itertools::Itertools;
 use num_rational::Rational64;
@@ -50,7 +50,7 @@ impl Position {
     /// Create a new integer Position.
     ///
     /// This method should only be called by allocators and tests.
-    #[allow(unused)]
+    #[expect(unused)]
     pub(super) fn new_integer(i: i64) -> Self {
         Self(Rational64::from_integer(i))
     }
@@ -175,7 +175,7 @@ impl<T> PortMap<T> {
         self.vec[index] = value.into();
     }
 
-    #[allow(unused)]
+    #[allow(unused, clippy::allow_attributes, reason = "used only in tests")]
     pub(super) fn iter(&self) -> impl Iterator<Item = (Port, &T)> {
         let (inp_slice, out_slice) = self.vec.split_at(self.num_inputs);
         let inp_ports = (0..).map(IncomingPort::from).map_into();
@@ -185,7 +185,7 @@ impl<T> PortMap<T> {
         inp.chain(out)
     }
 
-    #[allow(unused)]
+    #[expect(unused)]
     pub(super) fn values(&self) -> impl Iterator<Item = &T> {
         self.vec.iter()
     }

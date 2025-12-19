@@ -10,10 +10,10 @@ use hugr::algorithms::ComposablePass;
 use pyo3::{prelude::*, types::IntoPyDict};
 use tket::optimiser::badger::BadgerOptions;
 use tket::passes;
-use tket::{op_matches, TketOp};
+use tket::{TketOp, op_matches};
 
 use crate::circuit::CircuitType;
-use crate::utils::{create_py_exception, ConvertPyErr};
+use crate::utils::{ConvertPyErr, create_py_exception};
 use crate::{
     circuit::{try_update_circ, try_with_circ},
     optimiser::PyBadgerOptimiser,
@@ -65,8 +65,9 @@ create_py_exception!(
 /// - constant_folding: Whether to constant fold the program.
 /// - remove_dead_funcs: Whether to remove dead functions.
 /// - inline_dfgs: Whether to inline DFG operations.
+/// - remove_redundant_order_edges: Whether to remove redundant order edges.
 #[pyfunction]
-#[pyo3(signature = (circ, *, simplify_cfgs = true, remove_tuple_untuple = true, constant_folding = false, remove_dead_funcs = true, inline_dfgs = true))]
+#[pyo3(signature = (circ, *, simplify_cfgs = true, remove_tuple_untuple = true, constant_folding = false, remove_dead_funcs = true, inline_dfgs = true, remove_redundant_order_edges = true))]
 fn normalize_guppy<'py>(
     circ: &Bound<'py, PyAny>,
     simplify_cfgs: bool,
@@ -74,6 +75,7 @@ fn normalize_guppy<'py>(
     constant_folding: bool,
     remove_dead_funcs: bool,
     inline_dfgs: bool,
+    remove_redundant_order_edges: bool,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py = circ.py();
     try_with_circ(circ, |mut circ, typ| {
@@ -83,7 +85,8 @@ fn normalize_guppy<'py>(
             .remove_tuple_untuple(remove_tuple_untuple)
             .constant_folding(constant_folding)
             .remove_dead_funcs(remove_dead_funcs)
-            .inline_dfgs(inline_dfgs);
+            .inline_dfgs(inline_dfgs)
+            .remove_redundant_order_edges(remove_redundant_order_edges);
 
         pass.run(circ.hugr_mut()).convert_pyerrs()?;
 
@@ -161,7 +164,7 @@ fn lower_to_pytket<'py>(circ: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>>
 ///
 /// Log files will be written to the directory `log_dir` if specified.
 #[pyfunction]
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 #[pyo3(signature = (circ, optimiser, max_threads=None, timeout=None, progress_timeout=None, max_circuit_count=None, log_dir=None, rebase=None))]
 fn badger_optimise<'py>(
     circ: &Bound<'py, PyAny>,

@@ -1,8 +1,4 @@
 //! The compiler for HUGR to QIS
-
-#![deny(missing_docs)]
-#![warn(rust_2021_compatibility, future_incompatible, unused)]
-
 pub mod array;
 
 use anyhow::{Result, anyhow};
@@ -10,7 +6,6 @@ use hugr::envelope::EnvelopeConfig;
 use hugr::llvm::CodegenExtsBuilder;
 use hugr::llvm::custom::CodegenExtsMap;
 use hugr::llvm::emit::{EmitHugr, Namer};
-#[allow(deprecated)]
 use hugr::llvm::extension::int::IntCodegenExtension;
 use hugr::llvm::utils::fat::FatExt as _;
 use hugr::llvm::utils::inline_constant_functions;
@@ -107,6 +102,12 @@ impl From<String> for ProcessErrs {
     }
 }
 
+impl From<inkwell::Error> for ProcessErrs {
+    fn from(value: inkwell::Error) -> Self {
+        Self(vec![value.to_string()])
+    }
+}
+
 impl From<LLVMString> for ProcessErrs {
     fn from(value: LLVMString) -> Self {
         Self(vec![value.to_string()])
@@ -151,7 +152,6 @@ fn process_hugr(hugr: &mut Hugr) -> Result<()> {
     Ok(())
 }
 
-#[allow(deprecated)]
 fn codegen_extensions() -> CodegenExtsMap<'static, Hugr> {
     use array::SeleneHeapArrayCodegen;
     let pcg = QISPreludeCodegen;
@@ -276,7 +276,7 @@ fn wrap_main<'c>(
     let tc = builder
         .build_call(teardown, &[], "")?
         .try_as_basic_value()
-        .left()
+        .basic()
         .ok_or_else(|| anyhow!("get_tc has no return value"))?;
     // Return the initial time cursor
     let _ = builder.build_return(Some(&tc))?;
@@ -357,7 +357,7 @@ fn compile<'c, 'hugr: 'c>(
         let node = ctx.metadata_node(md_vec.as_slice());
         let _ = module
             .add_global_metadata(key, &node)
-            .map_err(Into::<ProcessErrs>::into);
+            .map_err(ProcessErrs::from);
     }
     module.verify().map_err(Into::<ProcessErrs>::into)?;
     Ok(module)
@@ -414,7 +414,6 @@ pub fn get_opt_level(opt_level: u32) -> Result<OptimizationLevel> {
 }
 
 // -------------------- Python bindings -----------------------
-#[allow(missing_docs)]
 mod exceptions {
     use pyo3::exceptions::PyException;
 

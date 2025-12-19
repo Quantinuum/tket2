@@ -11,8 +11,8 @@ use std::path::PathBuf;
 use std::process::exit;
 
 use clap::Parser;
-use tket::optimiser::badger::log::BadgerLogger;
 use tket::optimiser::badger::BadgerOptions;
+use tket::optimiser::badger::log::BadgerLogger;
 use tket::optimiser::{BadgerOptimiser, ECCBadgerOptimiser};
 use tket::serialize::pytket::{DecodeOptions, EncodeOptions};
 use tket::serialize::{load_tk1_json_file, save_tk1_json_file};
@@ -156,7 +156,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let load_ecc_start = std::time::Instant::now();
     let Ok(optimiser) = load_optimiser(ecc_path) else {
         println!();
-        eprintln!("Unable to load ECC file {ecc_path:?}. Is it a JSON file of Quartz-generated ECCs? Or a pre-compiled `.rwr` ECC set?");
+        eprintln!(
+            "Unable to load ECC file {ecc_path:?}. Is it a JSON file of Quartz-generated ECCs? Or a pre-compiled `.rwr` ECC set?"
+        );
         exit(1);
     };
     println!(" done in {:?}", load_ecc_start.elapsed());

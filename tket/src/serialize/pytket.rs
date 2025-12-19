@@ -11,8 +11,8 @@ mod options;
 
 pub use circuit::EncodedCircuit;
 pub use config::{
-    default_decoder_config, default_encoder_config, PytketDecoderConfig, PytketEncoderConfig,
-    TypeTranslatorSet,
+    PytketDecoderConfig, PytketEncoderConfig, TypeTranslatorSet, default_decoder_config,
+    default_encoder_config,
 };
 pub use encoder::PytketEncoderContext;
 pub use error::{
@@ -138,7 +138,7 @@ impl TKETDecode for SerialCircuit {
     ) -> Result<Node, Self::DecodeError> {
         let mut decoder = PytketDecoderContext::new(self, hugr, target, options, None)?;
         decoder.run_decoder(&self.commands, None)?;
-        Ok(decoder.finish(&[])?.node())
+        Ok(decoder.finish(None)?.node())
     }
 
     fn encode(circuit: &Circuit, options: EncodeOptions) -> Result<Self, Self::EncodeError> {

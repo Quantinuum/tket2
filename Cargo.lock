@@ -24,6 +24,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "alloca"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e5a7d05ea6aea7e9e64d25b9156ba2fee3fdd659e34e41063cd2fc7cd020d7f4"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "allocator-api2"
 version = "0.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -565,10 +574,11 @@ dependencies = [
 
 [[package]]
 name = "criterion"
-version = "0.7.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1c047a62b0cc3e145fa84415a3191f628e980b194c2755aa12300a4e6cbd928"
+checksum = "4d883447757bb0ee46f233e9dc22eb84d93a9508c9b868687b274fc431d886bf"
 dependencies = [
+ "alloca",
  "anes",
  "cast",
  "ciborium",
@@ -577,6 +587,7 @@ dependencies = [
  "itertools 0.13.0",
  "num-traits",
  "oorandom",
+ "page_size",
  "plotters",
  "rayon",
  "regex",
@@ -588,9 +599,9 @@ dependencies = [
 
 [[package]]
 name = "criterion-plot"
-version = "0.6.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b1bcc0dc7dfae599d84ad0b1a55f80cde8af3725da8313b528da95ef783e338"
+checksum = "ed943f81ea2faa8dcecbbfa50164acf95d555afec96a27871663b300e387b2e4"
 dependencies = [
  "cast",
  "itertools 0.13.0",
@@ -1189,8 +1200,7 @@ dependencies = [
 [[package]]
 name = "hugr"
 version = "0.24.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d8b180fc27111bc631352b8516a281703430d96b4e0c4bedecb00585bb7bbb2"
+source = "git+https://github.com/quantinuum/hugr?rev=5415abebf35be4af4e5bac5c7fe54381aea55a3e#5415abebf35be4af4e5bac5c7fe54381aea55a3e"
 dependencies = [
  "hugr-core",
  "hugr-llvm",
@@ -1201,8 +1211,7 @@ dependencies = [
 [[package]]
 name = "hugr-cli"
 version = "0.24.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "21a63e1e7d6f798e9bd032fd616854b4294d680056088a386d8a9a6c00b4291c"
+source = "git+https://github.com/quantinuum/hugr?rev=5415abebf35be4af4e5bac5c7fe54381aea55a3e#5415abebf35be4af4e5bac5c7fe54381aea55a3e"
 dependencies = [
  "anyhow",
  "clap",
@@ -1210,7 +1219,7 @@ dependencies = [
  "clio",
  "derive_more 2.1.0",
  "hugr",
- "schemars 1.0.5",
+ "schemars 1.1.0",
  "serde",
  "serde_json",
  "tabled",
@@ -1222,8 +1231,7 @@ dependencies = [
 [[package]]
 name = "hugr-core"
 version = "0.24.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6cde86f402bdea148e74c72a951354839dd1fb1f703fe620b4ef4d471a7d5978"
+source = "git+https://github.com/quantinuum/hugr?rev=5415abebf35be4af4e5bac5c7fe54381aea55a3e#5415abebf35be4af4e5bac5c7fe54381aea55a3e"
 dependencies = [
  "base64",
  "cgmath",
@@ -1238,11 +1246,11 @@ dependencies = [
  "ordered-float",
  "pastey",
  "petgraph 0.8.3",
- "portgraph 0.15.2",
+ "portgraph 0.15.3",
  "regex",
  "relrc",
  "rustc-hash 2.1.1",
- "schemars 1.0.5",
+ "schemars 1.1.0",
  "semver",
  "serde",
  "serde_json",
@@ -1260,8 +1268,7 @@ dependencies = [
 [[package]]
 name = "hugr-llvm"
 version = "0.24.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c55104ec359dcf7c608a903dcb69be0297fcdda812c37bce18ee13b0ca3a0930"
+source = "git+https://github.com/quantinuum/hugr?rev=5415abebf35be4af4e5bac5c7fe54381aea55a3e#5415abebf35be4af4e5bac5c7fe54381aea55a3e"
 dependencies = [
  "anyhow",
  "cc",
@@ -1272,7 +1279,7 @@ dependencies = [
  "insta",
  "itertools 0.14.0",
  "petgraph 0.8.3",
- "portgraph 0.15.2",
+ "portgraph 0.15.3",
  "rstest",
  "strum",
 ]
@@ -1280,8 +1287,7 @@ dependencies = [
 [[package]]
 name = "hugr-model"
 version = "0.24.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2db0fbf9bf9e6f5828b905403c3c1e3b3b4e27520e92930a16915abbef60909b"
+source = "git+https://github.com/quantinuum/hugr?rev=5415abebf35be4af4e5bac5c7fe54381aea55a3e#5415abebf35be4af4e5bac5c7fe54381aea55a3e"
 dependencies = [
  "base64",
  "bumpalo",
@@ -1302,8 +1308,7 @@ dependencies = [
 [[package]]
 name = "hugr-passes"
 version = "0.24.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e170464e6c94176cd39099f52bac95552bf360b971959cd8a4a27d76e645ab9"
+source = "git+https://github.com/quantinuum/hugr?rev=5415abebf35be4af4e5bac5c7fe54381aea55a3e#5415abebf35be4af4e5bac5c7fe54381aea55a3e"
 dependencies = [
  "ascent",
  "derive_more 2.1.0",
@@ -1311,7 +1316,7 @@ dependencies = [
  "itertools 0.14.0",
  "pastey",
  "petgraph 0.8.3",
- "portgraph 0.15.2",
+ "portgraph 0.15.3",
  "strum",
  "thiserror 2.0.17",
 ]
@@ -1386,23 +1391,22 @@ dependencies = [
 
 [[package]]
 name = "inkwell"
-version = "0.6.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e67349bd7578d4afebbe15eaa642a80b884e8623db74b1716611b131feb1deef"
+checksum = "39457e8611219cf690f862a470575f5c06862910d03ea3c3b187ad7abc44b4e2"
 dependencies = [
- "either",
  "inkwell_internals",
  "libc",
  "llvm-sys",
  "once_cell",
- "thiserror 1.0.69",
+ "thiserror 2.0.17",
 ]
 
 [[package]]
 name = "inkwell_internals"
-version = "0.11.0"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f365c8de536236cfdebd0ba2130de22acefed18b1fb99c32783b3840aec5fb46"
+checksum = "ad9a7dd586b00f2b20e0b9ae3c6faa351fbfd56d15d63bbce35b13bece682eda"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1799,6 +1803,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "page_size"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "30d5b2194ed13191c1999ae0704b7839fb18384fa22e49b57eeaa97d79ce40da"
+dependencies = [
+ "libc",
+ "winapi",
+]
+
+[[package]]
 name = "papergrid"
 version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1830,9 +1844,9 @@ checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
 name = "pastey"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "35fb2e5f958ec131621fdd531e9fc186ed768cbe395337403ae56c17a74c68ec"
+checksum = "57d6c094ee800037dff99e02cab0eaf3142826586742a270ab3d7a62656bd27a"
 
 [[package]]
 name = "peak_alloc"
@@ -1982,9 +1996,9 @@ dependencies = [
 
 [[package]]
 name = "portgraph"
-version = "0.15.2"
+version = "0.15.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "654a4341391cb49edc51ea9905b8271e5c2685bb0fdf09eda940f6281fbc95a9"
+checksum = "0d2bc5f0a75d052384bd7f73a30b8e264041cebeeab29cfee0c6b72224bfd57f"
 dependencies = [
  "bitvec",
  "delegate 0.13.5",
@@ -2102,9 +2116,9 @@ dependencies = [
 
 [[package]]
 name = "pyo3"
-version = "0.26.0"
+version = "0.27.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ba0117f4212101ee6544044dae45abe1083d30ce7b29c4b5cbdfa2354e07383"
+checksum = "ab53c047fcd1a1d2a8820fe84f05d6be69e9526be40cb03b73f86b6b03e6d87d"
 dependencies = [
  "anyhow",
  "indoc",
@@ -2112,7 +2126,7 @@ dependencies = [
  "memoffset",
  "once_cell",
  "portable-atomic",
- "pyo3-build-config 0.26.0",
+ "pyo3-build-config",
  "pyo3-ffi",
  "pyo3-macros",
  "unindent",
@@ -2120,37 +2134,28 @@ dependencies = [
 
 [[package]]
 name = "pyo3-build-config"
-version = "0.26.0"
+version = "0.27.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fc6ddaf24947d12a9aa31ac65431fb1b851b8f4365426e182901eabfb87df5f"
-dependencies = [
- "target-lexicon",
-]
-
-[[package]]
-name = "pyo3-build-config"
-version = "0.27.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f77d387774f6f6eec64a004eac0ed525aab7fa1966d94b42f743797b3e395afb"
+checksum = "b455933107de8642b4487ed26d912c2d899dec6114884214a0b3bb3be9261ea6"
 dependencies = [
  "target-lexicon",
 ]
 
 [[package]]
 name = "pyo3-ffi"
-version = "0.26.0"
+version = "0.27.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "025474d3928738efb38ac36d4744a74a400c901c7596199e20e45d98eb194105"
+checksum = "1c85c9cbfaddf651b1221594209aed57e9e5cff63c4d11d1feead529b872a089"
 dependencies = [
  "libc",
- "pyo3-build-config 0.26.0",
+ "pyo3-build-config",
 ]
 
 [[package]]
 name = "pyo3-macros"
-version = "0.26.0"
+version = "0.27.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e64eb489f22fe1c95911b77c44cc41e7c19f3082fc81cce90f657cdc42ffded"
+checksum = "0a5b10c9bf9888125d917fb4d2ca2d25c8df94c7ab5a52e13313a07e050a3b02"
 dependencies = [
  "proc-macro2",
  "pyo3-macros-backend",
@@ -2160,22 +2165,22 @@ dependencies = [
 
 [[package]]
 name = "pyo3-macros-backend"
-version = "0.26.0"
+version = "0.27.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "100246c0ecf400b475341b8455a9213344569af29a3c841d29270e53102e0fcf"
+checksum = "03b51720d314836e53327f5871d4c0cfb4fb37cc2c4a11cc71907a86342c40f9"
 dependencies = [
  "heck",
  "proc-macro2",
- "pyo3-build-config 0.26.0",
+ "pyo3-build-config",
  "quote",
  "syn 2.0.108",
 ]
 
 [[package]]
 name = "pythonize"
-version = "0.26.0"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11e06e4cff9be2bbf2bddf28a486ae619172ea57e79787f856572878c62dcfe2"
+checksum = "a3a8f29db331e28c332c63496cfcbb822aca3d7320bc08b655d7fd0c29c50ede"
 dependencies = [
  "pyo3",
  "serde",
@@ -2505,9 +2510,9 @@ dependencies = [
 
 [[package]]
 name = "schemars"
-version = "1.0.5"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1317c3bf3e7df961da95b0a56a172a02abead31276215a0497241a7624b487ce"
+checksum = "9558e172d4e8533736ba97870c4b2cd63f84b382a3d6eb063da41b91cce17289"
 dependencies = [
  "dyn-clone",
  "ref-cast",
@@ -2518,9 +2523,9 @@ dependencies = [
 
 [[package]]
 name = "schemars_derive"
-version = "1.0.5"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f760a6150d45dd66ec044983c124595ae76912e77ed0b44124cb3e415cce5d9"
+checksum = "301858a4023d78debd2353c7426dc486001bddc91ae31a76fb1f55132f7e2633"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2543,7 +2548,7 @@ dependencies = [
  "insta",
  "itertools 0.14.0",
  "pyo3",
- "pyo3-build-config 0.27.1",
+ "pyo3-build-config",
  "rstest",
  "serde",
  "serde_json",
@@ -2639,7 +2644,7 @@ dependencies = [
  "indexmap 1.9.3",
  "indexmap 2.12.1",
  "schemars 0.9.0",
- "schemars 1.0.5",
+ "schemars 1.1.0",
  "serde_core",
  "serde_json",
  "serde_with_macros",
@@ -2986,7 +2991,7 @@ dependencies = [
  "pest",
  "pest_derive",
  "petgraph 0.8.3",
- "portgraph 0.15.2",
+ "portgraph 0.15.3",
  "portmatching",
  "priority-queue",
  "rayon",
@@ -3006,9 +3011,9 @@ dependencies = [
 
 [[package]]
 name = "tket-json-rs"
-version = "0.7.7"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1c424855b86bde6c2d1651241abf829f1bfcd8e5428356576ac11bd825357bc"
+checksum = "aea5374e5ef784cd4825cfcd7cfaf4c8a6a39a2da6129b12181aa0c9234f9678"
 dependencies = [
  "derive_more 2.1.0",
  "pyo3",
@@ -3299,13 +3304,13 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "uuid"
-version = "1.18.1"
+version = "1.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f87b8aa10b915a06587d0dec516c282ff295b475d94abf425d62b57710070a2"
+checksum = "e2e054861b4bd027cd373e18e8d8d8e6548085000e41290d95ce0c373a654b4a"
 dependencies = [
  "getrandom",
  "js-sys",
- "serde",
+ "serde_core",
  "wasm-bindgen",
 ]
 
@@ -3396,14 +3401,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "wide"
-version = "0.7.33"
+name = "winapi"
+version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ce5da8ecb62bcd8ec8b7ea19f69a51275e91299be594ea5cc6ef7819e16cd03"
+checksum = "5c839a674fcd7a98952e593242ea400abe93992746761e38641405d28b00f419"
 dependencies = [
- "bytemuck",
- "safe_arch",
+ "winapi-i686-pc-windows-gnu",
+ "winapi-x86_64-pc-windows-gnu",
 ]
+
+[[package]]
+name = "winapi-i686-pc-windows-gnu"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ac3b87c63620426dd9b991e5ce0329eff545bccbbb34f3be09ff6fb6ab51b7b6"
 
 [[package]]
 name = "winapi-util"
@@ -3413,6 +3424,12 @@ checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
  "windows-sys 0.61.2",
 ]
+
+[[package]]
+name = "winapi-x86_64-pc-windows-gnu"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[package]]
 name = "windows-core"

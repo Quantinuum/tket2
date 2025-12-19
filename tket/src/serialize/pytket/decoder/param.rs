@@ -6,11 +6,11 @@ use std::sync::LazyLock;
 use hugr::builder::{DFGBuilder, Dataflow};
 use hugr::ops::Value;
 use hugr::std_extensions::arithmetic::float_ops::FloatOps;
-use hugr::std_extensions::arithmetic::float_types::{float64_type, ConstF64};
+use hugr::std_extensions::arithmetic::float_types::{ConstF64, float64_type};
 use hugr::types::Type;
 use hugr::{Hugr, Wire};
 
-use crate::extension::rotation::{rotation_type, RotationOp};
+use crate::extension::rotation::{RotationOp, rotation_type};
 
 /// The type of a loaded parameter in the Hugr, including its unit.
 #[derive(Debug, derive_more::Display, Clone, Copy, Hash, PartialEq, Eq)]

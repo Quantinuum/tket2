@@ -6,17 +6,17 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::BufReader;
 use std::path::Path;
-use tket::extension::{TKET1_EXTENSION_ID, TKET_EXTENSION_ID};
+use tket::extension::{TKET_EXTENSION_ID, TKET1_EXTENSION_ID};
 
 use hugr::algorithms::ComposablePass;
 use hugr::{Hugr, HugrView};
 use rstest::rstest;
+use tket::Circuit;
 use tket::passes::NormalizeGuppy;
 use tket::serialize::pytket::{EncodeOptions, EncodedCircuit};
-use tket::Circuit;
 
-use tket1_passes::{Tket1Circuit, Tket1Pass};
 use tket_qsystem::QSystemPass;
+use tket1_passes::{Tket1Circuit, Tket1Pass};
 
 const GUPPY_EXAMPLES_DIR: &str = "../test_files/guppy_optimization";
 
@@ -64,10 +64,10 @@ fn run_pytket(h: &mut Hugr) {
 fn count_gates(h: &impl HugrView) -> HashMap<SmolStr, usize> {
     let mut counts = HashMap::new();
     for n in h.nodes() {
-        if let Some(eop) = h.get_optype(n).as_extension_op() {
-            if [TKET_EXTENSION_ID, TKET1_EXTENSION_ID].contains(eop.extension_id()) {
-                *counts.entry(eop.qualified_id()).or_default() += 1;
-            }
+        if let Some(eop) = h.get_optype(n).as_extension_op()
+            && [TKET_EXTENSION_ID, TKET1_EXTENSION_ID].contains(eop.extension_id())
+        {
+            *counts.entry(eop.qualified_id()).or_default() += 1;
         }
     }
     counts
@@ -82,7 +82,7 @@ fn count_gates(h: &impl HugrView) -> HashMap<SmolStr, usize> {
 #[case::nested_array("nested_array", None)]
 #[should_panic = "xfail"]
 #[case::angles("angles", Some(vec![
-    ("tket.quantum.Rz", 2), ("tket.quantum.MeasureFree", 1), ("tket.quantum.H", 2), ("tket.quantum.QAlloc", 1)
+    ("tket.quantum.Rz", 2), ("tket.quantum.QFree", 1), ("tket.quantum.Measure", 1), ("tket.quantum.H", 2), ("tket.quantum.QAlloc", 1)
 ]))]
 #[should_panic = "xfail"]
 #[case::simple_cx("simple_cx", Some(vec![
@@ -98,7 +98,11 @@ fn count_gates(h: &impl HugrView) -> HashMap<SmolStr, usize> {
 ]))]
 #[should_panic = "xfail"]
 #[case::false_branch("false_branch", Some(vec![
-    ("TKET1.tk1op", 1), ("tket.quantum.H", 1), ("tket.quantum.QAlloc", 1), ("tket.quantum.MeasureFree", 1)
+    ("tket.quantum.Measure", 1), ("tket.quantum.QFree", 1), ("tket.quantum.QAlloc", 1)
+]))]
+#[should_panic = "xfail"]
+#[case::func_decls("func_decls", Some(vec![
+    ("TKET1.tk1op", 2), ("tket.quantum.symbolic_angle", 1)
 ]))]
 #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
 fn optimize_flattened_guppy(#[case] name: &str, #[case] xfail: Option<Vec<(&str, usize)>>) {

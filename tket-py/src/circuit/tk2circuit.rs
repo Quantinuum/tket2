@@ -9,7 +9,7 @@ use std::sync::LazyLock;
 use hugr::builder::{CircuitBuilder, DFGBuilder, Dataflow, DataflowHugr};
 use hugr::envelope::{EnvelopeConfig, EnvelopeFormat, ZstdConfig};
 use hugr::extension::prelude::qb_t;
-use hugr::extension::{ExtensionRegistry, EMPTY_REG};
+use hugr::extension::{EMPTY_REG, ExtensionRegistry};
 use hugr::ops::handle::NodeHandle;
 use hugr::ops::{ExtensionOp, OpType};
 use hugr::package::Package;
@@ -18,27 +18,27 @@ use itertools::Itertools;
 use pyo3::exceptions::{PyAttributeError, PyValueError};
 use pyo3::types::{PyAnyMethods, PyModule, PyString, PyTypeMethods};
 use pyo3::{
-    pyclass, pymethods, Bound, FromPyObject, IntoPyObject, PyAny, PyErr, PyRef, PyRefMut, PyResult,
-    PyTypeInfo, Python,
+    Bound, FromPyObject, IntoPyObject, PyAny, PyErr, PyRef, PyRefMut, PyResult, PyTypeInfo, Python,
+    pyclass, pymethods,
 };
 
 use derive_more::From;
 use hugr::{Hugr, HugrView, Wire};
 use serde::Serialize;
 use tket::circuit::CircuitHash;
-use tket::passes::pytket::lower_to_pytket;
 use tket::passes::CircuitChunks;
-use tket::serialize::pytket::{DecodeOptions, EncodeOptions};
+use tket::passes::pytket::lower_to_pytket;
 use tket::serialize::TKETDecode;
+use tket::serialize::pytket::{DecodeOptions, EncodeOptions};
 use tket::{Circuit, TketOp};
 use tket_json_rs::circuit_json::SerialCircuit;
 
 use crate::ops::PyTketOp;
 use crate::rewrite::PyCircuitRewrite;
 use crate::types::PyHugrType;
-use crate::utils::{into_vec, ConvertPyErr};
+use crate::utils::{ConvertPyErr, into_vec};
 
-use super::{cost, with_circ, PyCircuitCost, PyNode, PyWire};
+use super::{PyCircuitCost, PyNode, PyWire, cost, with_circ};
 
 /// A circuit in tket format.
 ///
@@ -327,7 +327,7 @@ impl Tk2Circuit {
     ///
     /// Returns an error if the py object is not a Tk2Circuit.
     pub fn try_extract(circ: &Bound<PyAny>) -> PyResult<Self> {
-        circ.extract::<Tk2Circuit>()
+        circ.extract::<Tk2Circuit>().map_err(|e| e.into())
     }
 }
 

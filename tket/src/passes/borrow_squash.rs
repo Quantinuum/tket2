@@ -364,23 +364,23 @@ fn find_const<H: HugrView>(hugr: &H, n: H::Node, inp: IncomingPort) -> Option<u6
 mod test {
     use std::{collections::BTreeSet, io::BufReader};
 
-    use super::{find_const, BorrowSquashPass};
+    use super::{BorrowSquashPass, find_const};
     use crate::extension::REGISTRY;
     use hugr::{
-        algorithms::{const_fold::ConstantFoldPass, ComposablePass},
-        builder::{endo_sig, DFGBuilder, Dataflow, DataflowHugr, FunctionBuilder},
+        Hugr, HugrView,
+        algorithms::{ComposablePass, const_fold::ConstantFoldPass},
+        builder::{DFGBuilder, Dataflow, DataflowHugr, FunctionBuilder, endo_sig},
         extension::{
-            prelude::{qb_t, usize_t, ConstUsize},
+            prelude::{ConstUsize, qb_t, usize_t},
             simple_op::MakeExtensionOp,
         },
         hugr::hugrmut::HugrMut,
-        ops::{handle::NodeHandle, OpTrait},
+        ops::{OpTrait, handle::NodeHandle},
         std_extensions::collections::{
             array::ArrayKind,
             borrow_array::{BArrayOpBuilder, BArrayUnsafeOpDef, BorrowArray},
         },
         types::Signature,
-        Hugr, HugrView,
     };
     use itertools::Itertools;
     use rstest::{fixture, rstest};
@@ -544,10 +544,14 @@ mod test {
             .collect_array()
             .unwrap();
         for cx in [cx1, cx2] {
-            assert!(BTreeSet::from_iter(find_returns(&h))
-                .is_superset(&h.output_neighbours(cx).collect()));
-            assert!(BTreeSet::from_iter(find_borrows(&h))
-                .is_superset(&h.input_neighbours(cx).collect()));
+            assert!(
+                BTreeSet::from_iter(find_returns(&h))
+                    .is_superset(&h.output_neighbours(cx).collect())
+            );
+            assert!(
+                BTreeSet::from_iter(find_borrows(&h))
+                    .is_superset(&h.input_neighbours(cx).collect())
+            );
         }
 
         let res = BorrowSquashPass::default().run(&mut h).unwrap();
@@ -570,10 +574,11 @@ mod test {
         );
         // CX's should still be there (in same place), but now directly connected:
         for cx in [cx1, cx2] {
-            assert!(h
-                .get_optype(cx)
-                .as_extension_op()
-                .is_some_and(|eop| eop.qualified_id() == "tket.quantum.CX"));
+            assert!(
+                h.get_optype(cx)
+                    .as_extension_op()
+                    .is_some_and(|eop| eop.qualified_id() == "tket.quantum.CX")
+            );
         }
         assert!(h.output_neighbours(cx1).all(|n| n == cx2));
     }

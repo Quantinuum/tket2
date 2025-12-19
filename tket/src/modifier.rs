@@ -10,8 +10,8 @@
 //! It is implemented as a side-effect that takes a rotation angle as an input.
 
 use hugr::{
-    core::HugrNode, extension::simple_op::MakeExtensionOp, hugr::hugrmut::HugrMut,
-    ops::ExtensionOp, HugrView,
+    HugrView, core::HugrNode, extension::simple_op::MakeExtensionOp, hugr::hugrmut::HugrMut,
+    ops::ExtensionOp,
 };
 
 mod pass;
@@ -31,8 +31,9 @@ pub struct CombinedModifier {
     // Control arrays applied so far
     // The sum is supposed to be equal to `control`.
     accum_ctrl: Vec<usize>,
+    /// Whether the dagger modifier has been applied.
     dagger: bool,
-    #[allow(dead_code)]
+    /// Whether the power modifier has been applied.
     power: bool,
 }
 
@@ -62,7 +63,7 @@ struct ModifierFlags {
 
 impl ModifierFlags {
     fn from_metadata<N: HugrNode>(h: &impl HugrView<Node = N>, n: N) -> Option<Self> {
-        h.get_metadata(n, "unitary")
+        h.get_metadata_any(n, "unitary")
             .and_then(serde_json::Value::as_u64)
             .map(|num| ModifierFlags {
                 dagger: (num & 1) != 0,
@@ -82,7 +83,7 @@ impl ModifierFlags {
         if self.power {
             num |= 4;
         }
-        *h.get_metadata_mut(n, "unitary") = serde_json::Value::from(num);
+        h.set_metadata_any(n, "unitary", serde_json::Value::from(num));
     }
 
     fn satisfies(&self, combined: &CombinedModifier) -> bool {

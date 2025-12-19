@@ -1,6 +1,7 @@
 //! Encoder and decoder for tket operations with native pytket counterparts.
 
 use super::PytketEmitter;
+use crate::Circuit;
 use crate::serialize::pytket::config::TypeTranslatorSet;
 use crate::serialize::pytket::decoder::{
     DecodeStatus, LoadedParameter, PytketDecoderContext, TrackedBit, TrackedQubit,
@@ -9,13 +10,12 @@ use crate::serialize::pytket::encoder::{EmitCommandOptions, EncodeStatus, Pytket
 use crate::serialize::pytket::extension::{PytketDecoder, PytketTypeTranslator, RegisterCount};
 use crate::serialize::pytket::opaque::OpaqueSubgraphPayload;
 use crate::serialize::pytket::{PytketDecodeError, PytketEncodeError};
-use crate::Circuit;
-use hugr::extension::prelude::{bool_t, qb_t, BarrierDef, Noop, TupleOpDef, PRELUDE_ID};
-use hugr::extension::simple_op::MakeExtensionOp;
+use hugr::HugrView;
 use hugr::extension::ExtensionId;
+use hugr::extension::prelude::{BarrierDef, Noop, PRELUDE_ID, TupleOpDef, bool_t, qb_t};
+use hugr::extension::simple_op::MakeExtensionOp;
 use hugr::ops::{ExtensionOp, OpType};
 use hugr::types::TypeArg;
-use hugr::HugrView;
 use tket_json_rs::optype::OpType as PytketOptype;
 
 /// Encoder for [prelude](hugr::extension::prelude) operations.
