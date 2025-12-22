@@ -218,7 +218,10 @@ impl PatchVerification for PullForward {
         unimplemented!()
     }
 
-    fn invalidation_set(&self) -> impl Iterator<Item = Node> {
+    fn invalidated_nodes(
+        &self,
+        _: &impl HugrView<Node = Self::Node>,
+    ) -> impl Iterator<Item = Self::Node> {
         let cmd_node = std::iter::once(self.command.node());
         let next_nodes = self.new_nexts.values().map(|c| c.node());
         cmd_node.chain(next_nodes)

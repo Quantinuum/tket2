@@ -120,6 +120,8 @@ impl OpFunctionMap {
             let func_node = hugr
                 .insert_hugr(hugr.module_root(), func_def)
                 .inserted_entrypoint;
+            // TODO: Call is deprecated. We should use LinkedHugr instead.
+            #[expect(deprecated)]
             lowerer.set_replace_op(&op, NodeTemplate::Call(func_node, vec![]));
         }
     }
