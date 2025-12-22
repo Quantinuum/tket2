@@ -196,8 +196,8 @@ impl MakeRegisteredOp for RotationOp {
         ROTATION_EXTENSION_ID
     }
 
-    fn extension_ref(&self) -> Weak<Extension> {
-        Arc::downgrade(&ROTATION_EXTENSION)
+    fn extension_ref(&self) -> Arc<Extension> {
+        ROTATION_EXTENSION.clone()
     }
 }
 

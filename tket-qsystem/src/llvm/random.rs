@@ -87,7 +87,7 @@ impl<'c, H: HugrView<Node = Node>> RandomEmitter<'c, '_, '_, H> {
                 name,
             )?
             .try_as_basic_value()
-            .unwrap_left();
+            .unwrap_basic();
         args.outputs
             .finish(self.builder(), [result, self.rng_context()])
     }

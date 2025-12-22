@@ -9,8 +9,8 @@ use std::ops::{Index, IndexMut};
 use derive_more::From;
 use hugr::builder::{Container, FunctionBuilder};
 use hugr::hugr::hugrmut::HugrMut;
-use hugr::hugr::views::SiblingSubgraph;
 use hugr::hugr::views::sibling_subgraph::TopoConvexChecker;
+use hugr::hugr::views::{RootChecked, SiblingSubgraph};
 use hugr::hugr::{HugrError, NodeMetadataMap};
 use hugr::ops::OpType;
 use hugr::ops::handle::DataflowParentID;
@@ -107,8 +107,11 @@ impl Chunk {
 
         let [chunk_inp, chunk_out] = chunk.get_io(chunk_root).unwrap();
         // Insert the chunk circuit into the original circuit.
+        let Ok(checked) = RootChecked::try_new(&chunk) else {
+            panic!("The chunk circuit is no longer a dataflow graph");
+        };
         let subgraph =
-            SiblingSubgraph::<Node>::try_new_dataflow_subgraph::<_, DataflowParentID>(&chunk)
+            SiblingSubgraph::<Node>::try_new_dataflow_subgraph::<_, DataflowParentID>(checked)
                 .unwrap_or_else(|e| panic!("The chunk circuit is no longer a dataflow graph: {e}"));
         let node_map = circ.insert_subgraph(root, &chunk, &subgraph);
 

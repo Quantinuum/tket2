@@ -6,7 +6,7 @@ use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::iter::FusedIterator;
 
-use hugr::hugr::NodeMetadata;
+use hugr::metadata::Metadata;
 use hugr::ops::{OpTag, OpTrait};
 use hugr::{HugrView, IncomingPort, OutgoingPort};
 use hugr_core::hugr::internal::{HugrInternals, PortgraphNodeMap};
@@ -159,8 +159,8 @@ impl<'circ, T: HugrView<Node = Node>> Command<'circ, T> {
 
     /// Returns a metadata value associated with the command's node.
     #[inline]
-    pub fn metadata(&self, key: impl AsRef<str>) -> Option<&NodeMetadata> {
-        self.circ.hugr().get_metadata(self.node, key)
+    pub fn metadata<M: Metadata>(&self) -> Option<M::Type<'_>> {
+        self.circ.hugr().get_metadata::<M>(self.node)
     }
 }
 

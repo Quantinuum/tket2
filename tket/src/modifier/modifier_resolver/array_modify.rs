@@ -33,7 +33,6 @@ use hugr::{
             GenericArrayOpDef::{self, *},
         },
         borrow_array::{BArrayFromArray, BArrayOp, BArrayToArray},
-        value_array::{VArrayFromArray, VArrayOp, VArrayToArray},
     },
 };
 
@@ -47,8 +46,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         new_dfg: &mut impl Dataflow,
     ) -> Result<bool, ModifierResolverErrors<N>> {
         if let Some(op) = ArrayOp::from_optype(optype) {
-            self.generic_modify_array_op(h, n, op, new_dfg)?;
-        } else if let Some(op) = VArrayOp::from_optype(optype) {
             self.generic_modify_array_op(h, n, op, new_dfg)?;
         } else if let Some(op) = BArrayOp::from_optype(optype) {
             self.generic_modify_array_op(h, n, op, new_dfg)?;
@@ -108,11 +105,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         };
 
         // try some general array convert
-        let node = if let Ok(op) = VArrayToArray::from_extension_op(op) {
-            new_dfg.add_child_node(VArrayFromArray::new(op.elem_ty, op.size))
-        } else if let Ok(op) = VArrayFromArray::from_extension_op(op) {
-            new_dfg.add_child_node(VArrayToArray::new(op.elem_ty, op.size))
-        } else if let Ok(op) = BArrayToArray::from_extension_op(op) {
+        let node = if let Ok(op) = BArrayToArray::from_extension_op(op) {
             new_dfg.add_child_node(BArrayFromArray::new(op.elem_ty, op.size))
         } else if let Ok(op) = BArrayFromArray::from_extension_op(op) {
             new_dfg.add_child_node(BArrayToArray::new(op.elem_ty, op.size))

@@ -580,7 +580,7 @@ fn read_metadata_json_list<T: serde::de::DeserializeOwned, H: HugrView>(
     region: H::Node,
     metadata_key: &str,
 ) -> Vec<T> {
-    let Some(value) = circ.hugr().get_metadata(region, metadata_key) else {
+    let Some(value) = circ.hugr().get_metadata_any(region, metadata_key) else {
         return vec![];
     };
 

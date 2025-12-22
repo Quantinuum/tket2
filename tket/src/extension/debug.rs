@@ -141,8 +141,8 @@ impl MakeRegisteredOp for StateResult {
         DEBUG_EXTENSION_ID
     }
 
-    fn extension_ref(&self) -> Weak<Extension> {
-        Arc::downgrade(&DEBUG_EXTENSION)
+    fn extension_ref(&self) -> Arc<Extension> {
+        DEBUG_EXTENSION.clone()
     }
 }
 

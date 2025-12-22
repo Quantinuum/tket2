@@ -10,7 +10,6 @@ mod test {
     use hugr::builder::{Dataflow, DataflowHugr};
     use hugr::extension::prelude::Barrier;
     use hugr::std_extensions::collections::borrow_array::borrow_array_type;
-    use hugr::std_extensions::collections::value_array::value_array_type;
     use hugr::{HugrView, ops::handle::NodeHandle};
     use hugr::{
         builder::DFGBuilder,
@@ -32,7 +31,6 @@ mod test {
     // bare option of qubit is ignored
     #[case(vec![qb_t(), option_type(qb_t()).into()], 1, false)]
     #[case(vec![array_type(2, bool_t())], 0, false)]
-    #[case(vec![value_array_type(2, option_type(qb_t()).into())], 2, false)]
     #[case(vec![borrow_array_type(2, qb_t())], 2, false)]
     // special case, single array of qubits is passed directly to op without unpacking
     #[case(vec![array_type(3, qb_t())], 1, true)]

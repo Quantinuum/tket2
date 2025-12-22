@@ -3,7 +3,7 @@
 //! See [`crate::serialize::pytket`] for serialization to and from the legacy pytket format.
 pub mod pytket;
 
-pub use hugr::envelope::{EnvelopeConfig, EnvelopeError};
+pub use hugr::envelope::EnvelopeConfig;
 use hugr::hugr::hugrmut::HugrMut;
 
 use std::io;
@@ -29,22 +29,22 @@ impl<T: HugrView> Circuit<T> {
         &self,
         writer: impl io::Write,
         config: EnvelopeConfig,
-    ) -> Result<(), EnvelopeError> {
-        let pkg = self.wrap_package()?;
+    ) -> Result<(), hugr::envelope::WriteError> {
+        let pkg = self.wrap_package();
         pkg.store(writer, config)?;
         Ok(())
     }
 
     /// Store the circuit as a String in HUGR envelope format.
-    pub fn store_str(&self, config: EnvelopeConfig) -> Result<String, EnvelopeError> {
-        let pkg = self.wrap_package()?;
+    pub fn store_str(&self, config: EnvelopeConfig) -> Result<String, hugr::envelope::WriteError> {
+        let pkg = self.wrap_package();
         pkg.store_str(config)
     }
 
     /// Wrap the circuit in a package.
-    fn wrap_package(&self) -> Result<Package, EnvelopeError> {
+    fn wrap_package(&self) -> Package {
         let hugr = Circuit::to_owned(self).into_hugr();
-        Ok(Package::from_hugr(hugr))
+        Package::from_hugr(hugr)
     }
 }
 
@@ -163,7 +163,7 @@ pub enum CircuitLoadError {
     CircuitLoadError(CircuitError),
     /// Error loading an envelope.
     #[from]
-    EnvelopeError(EnvelopeError),
+    EnvelopeError(hugr::envelope::ReadError),
     /// Error validating the loaded circuit.
     #[from]
     ValidationError(ValidationError<Node>),

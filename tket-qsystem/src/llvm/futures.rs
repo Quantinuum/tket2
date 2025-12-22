@@ -150,7 +150,7 @@ impl<'c, H: HugrView<Node = Node>> FuturesEmitter<'c, '_, '_, H> {
                     .builder()
                     .build_call(read_func, &[arg.into()], "read_bool")?
                     .try_as_basic_value()
-                    .unwrap_left()
+                    .unwrap_basic()
                     .into_int_value();
                 let dec_refcount_func = self.get_func_dec_refcount()?;
                 self.builder()
@@ -172,7 +172,7 @@ impl<'c, H: HugrView<Node = Node>> FuturesEmitter<'c, '_, '_, H> {
                     .builder()
                     .build_call(read_func, &[arg.into()], "read_uint")?
                     .try_as_basic_value()
-                    .unwrap_left();
+                    .unwrap_basic();
                 let dec_refcount_func = self.get_func_dec_refcount()?;
                 self.builder()
                     .build_call(dec_refcount_func, &[arg.into()], "dec_refcount")?;

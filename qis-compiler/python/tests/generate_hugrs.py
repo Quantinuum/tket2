@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#     "guppylang ==0.21.6",
+#     "guppylang ==0.21.7",
 #     "tket",
 # ]
 # ///
@@ -107,6 +107,7 @@ def measure_qb_array() -> bytes:
 
 
 def print_array() -> bytes:
+    # TODO: Currently fails due to <https://github.com/Quantinuum/guppylang/issues/1408>.
     @guppy
     def main() -> None:
         qs = array(qubit() for _ in range(10))
@@ -234,7 +235,8 @@ if __name__ == "__main__":
         flip_some,
         discard_qb_array,
         measure_qb_array,
-        print_array,
+        # TODO: Currently fails due to <https://github.com/Quantinuum/guppylang/issues/1408>.
+        # print_array,
         postselect_exit,
         postselect_panic,
         rus,

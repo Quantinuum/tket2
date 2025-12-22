@@ -112,8 +112,8 @@ impl MakeRegisteredOp for SympyOp {
         TKET_EXTENSION_ID.to_owned()
     }
 
-    fn extension_ref(&self) -> Weak<Extension> {
-        Arc::downgrade(&TKET_EXTENSION)
+    fn extension_ref(&self) -> Arc<Extension> {
+        TKET_EXTENSION.clone()
     }
 }
 

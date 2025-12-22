@@ -250,7 +250,7 @@ fn circ_preset_qubits() -> Circuit {
     let mut hugr = h.finish_hugr_with_outputs([qb0, qb1]).unwrap();
 
     // A preset register for the first qubit output
-    hugr.set_metadata(
+    hugr.set_metadata_any(
         hugr.entrypoint(),
         METADATA_Q_REGISTERS,
         serde_json::json!([["q", [2]], ["q", [10]], ["q", [8]]]),
@@ -284,7 +284,7 @@ fn circ_parameterized() -> Circuit {
     let mut hugr = h.finish_hugr_with_outputs([q]).unwrap();
 
     // Preset names for some of the inputs
-    hugr.set_metadata(
+    hugr.set_metadata_any(
         hugr.entrypoint(),
         METADATA_INPUT_PARAMETERS,
         serde_json::json!(["alpha", "beta"]),

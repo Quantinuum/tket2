@@ -165,8 +165,8 @@ impl MakeRegisteredOp for WasmOp {
         EXTENSION_ID
     }
 
-    fn extension_ref(&self) -> Weak<Extension> {
-        Arc::downgrade(&EXTENSION)
+    fn extension_ref(&self) -> Arc<Extension> {
+        EXTENSION.clone()
     }
 }
 
@@ -309,12 +309,13 @@ mod test {
             inputs: inputs.clone(),
             outputs: outputs.clone(),
         };
-        let module_ty = WasmType::Module.get_type(op.extension_id(), &op.extension_ref());
+        let extension = Arc::downgrade(&op.extension_ref());
+        let module_ty = WasmType::Module.get_type(op.extension_id(), &extension);
         let func_ty = Type::new_extension(WasmType::func_custom_type(
             inputs.clone(),
             outputs.clone(),
             op.extension_id(),
-            &op.extension_ref(),
+            &extension,
         ));
         assert_eq!(
             op.to_extension_op().unwrap().signature(),

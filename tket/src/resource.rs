@@ -154,9 +154,13 @@ pub(crate) mod tests {
         #[case] add_rz: bool,
         #[case] add_const_rz: bool,
     ) {
+        use hugr::hugr::views::RootChecked;
+
         let circ = circ(n_qubits, add_rz, add_const_rz);
-        let subgraph =
-            SiblingSubgraph::try_new_dataflow_subgraph::<_, DataflowParentID>(&circ).unwrap();
+        let subgraph = SiblingSubgraph::try_new_dataflow_subgraph::<_, DataflowParentID>(
+            RootChecked::try_new(&circ).expect("Entrypoint should be a dataflow parent."),
+        )
+        .unwrap();
         let scope = ResourceScope::new(&circ, subgraph);
         let info = ResourceScopeReport::from(&scope);
 

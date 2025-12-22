@@ -15,7 +15,7 @@ pub use hash::CircuitHash;
 use hugr::extension::prelude::{NoopDef, TupleOpDef};
 use hugr::extension::simple_op::MakeOpDef;
 use hugr::hugr::views::sibling_subgraph::InvalidSubgraph;
-use hugr::hugr::views::{ExtractionResult, SiblingSubgraph};
+use hugr::hugr::views::{ExtractionResult, RootChecked, SiblingSubgraph};
 use hugr::ops::handle::DataflowParentID;
 use itertools::Either::{Left, Right};
 
@@ -351,7 +351,10 @@ impl<T: HugrView<Node = Node>> Circuit<T> {
     where
         T: Clone,
     {
-        SiblingSubgraph::try_new_dataflow_subgraph::<_, DataflowParentID>(self.hugr())
+        let Ok(checked) = RootChecked::try_new(self.hugr()) else {
+            return Err(InvalidSubgraph::NonDataflowRegion);
+        };
+        SiblingSubgraph::try_new_dataflow_subgraph::<_, DataflowParentID>(checked)
     }
 
     /// Compute the cost of the circuit based on a per-operation cost function.

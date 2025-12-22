@@ -327,7 +327,7 @@ impl Tk2Circuit {
     ///
     /// Returns an error if the py object is not a Tk2Circuit.
     pub fn try_extract(circ: &Bound<PyAny>) -> PyResult<Self> {
-        circ.extract::<Tk2Circuit>()
+        circ.extract::<Tk2Circuit>().map_err(|e| e.into())
     }
 }
 

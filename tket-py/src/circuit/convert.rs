@@ -63,7 +63,7 @@ where
     E: ConvertPyErr<Output = PyErr>,
     F: FnOnce(Circuit, CircuitType) -> Result<T, E>,
 {
-    let (circ, typ) = match Tk2Circuit::extract_bound(circ) {
+    let (circ, typ) = match Tk2Circuit::extract(circ.as_borrowed()) {
         // tket circuit
         Ok(t2circ) => (t2circ.circ, CircuitType::Tket),
         // tket1 circuit

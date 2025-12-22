@@ -3,7 +3,7 @@
 use derive_more::{Display, Error, From};
 use hugr::Wire;
 use hugr::core::HugrNode;
-use hugr::envelope::EnvelopeError;
+use hugr::extension::resolution::ExtensionResolutionError;
 use hugr::ops::OpType;
 use itertools::Itertools;
 use tket_json_rs::register::ElementId;
@@ -450,13 +450,8 @@ pub enum PytketDecodeErrorInner {
         id: SubgraphId,
     },
     /// Cannot decode Hugr from an unsupported subgraph payload in a pytket barrier operation.
-    #[display(
-        "Cannot decode Hugr from an inline subgraph payload in a pytket barrier operation. {source}"
-    )]
-    UnsupportedSubgraphInlinePayload {
-        /// The envelope decoding error.
-        source: EnvelopeError,
-    },
+    #[display("{_0}")]
+    UnsupportedBarrierPayload(BarrierPayloadError),
     /// Cannot translate a wire from one type to another.
     #[display("Cannot translate {wire} from type {initial_type} to type {target_type}{}",
         context.as_ref().map(|s| format!(". {s}")).unwrap_or_default()
@@ -477,5 +472,29 @@ impl PytketDecodeErrorInner {
     /// Wrap the error in a [`PytketDecodeError`].
     pub fn wrap(self) -> PytketDecodeError {
         PytketDecodeError::from(self)
+    }
+}
+
+/// Sub-errors for [PytketDecodeError] raised when the payload of an opaque
+/// pytket barrier fails to be decoded as a
+/// [OpaqueSubgraphPayload][super::opaque::OpaqueSubgraphPayload].
+#[derive(derive_more::Debug, Display, Error)]
+#[non_exhaustive]
+pub enum BarrierPayloadError {
+    /// Cannot decode the payload as a JSON string.
+    #[display("Cannot decode the opaque subgraph payload from a JSON string. {_0}")]
+    SerdeDecoding(serde_json::Error),
+    /// Cannot decode the Hugr encoded in an opaque subgraph payload.
+    #[display("Cannot decode the Hugr encoded in an opaque subgraph payload. {_0}")]
+    HugrRead(hugr::envelope::ReadError),
+    /// Cannot resolve the extension references in the opaque subgraph payload.
+    #[display("Cannot resolve the extension references in the opaque subgraph payload. {_0}")]
+    ExtensionResolution(ExtensionResolutionError),
+}
+
+impl BarrierPayloadError {
+    /// Wrap the error in a [PytketDecodeError].
+    pub fn wrap(self) -> PytketDecodeError {
+        PytketDecodeErrorInner::UnsupportedBarrierPayload(self).wrap()
     }
 }
