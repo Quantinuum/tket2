@@ -40,19 +40,19 @@ large_enum_variant = "allow"
 [patch.crates-io]
 
 # Uncomment to use unreleased versions of hugr
-hugr = { git = "https://github.com/quantinuum/hugr", "rev" = "5415abebf35be4af4e5bac5c7fe54381aea55a3e" }
-hugr-core = { git = "https://github.com/quantinuum/hugr", "rev" = "5415abebf35be4af4e5bac5c7fe54381aea55a3e" }
-hugr-cli = { git = "https://github.com/quantinuum/hugr", "rev" = "5415abebf35be4af4e5bac5c7fe54381aea55a3e" }
-hugr-passes = { git = "https://github.com/quantinuum/hugr", "rev" = "5415abebf35be4af4e5bac5c7fe54381aea55a3e" }
-hugr-llvm = { git = "https://github.com/quantinuum/hugr", "rev" = "5415abebf35be4af4e5bac5c7fe54381aea55a3e" }
+# hugr = { git = "https://github.com/quantinuum/hugr", "rev" = "5415abebf35be4af4e5bac5c7fe54381aea55a3e" }
+# hugr-core = { git = "https://github.com/quantinuum/hugr", "rev" = "5415abebf35be4af4e5bac5c7fe54381aea55a3e" }
+# hugr-cli = { git = "https://github.com/quantinuum/hugr", "rev" = "5415abebf35be4af4e5bac5c7fe54381aea55a3e" }
+# hugr-passes = { git = "https://github.com/quantinuum/hugr", "rev" = "5415abebf35be4af4e5bac5c7fe54381aea55a3e" }
+# hugr-llvm = { git = "https://github.com/quantinuum/hugr", "rev" = "5415abebf35be4af4e5bac5c7fe54381aea55a3e" }
 # portgraph = { git = "https://github.com/quantinuum/portgraph", rev = "68b96ac737e0c285d8c543b2d74a7aa80a18202c" }
 
 [workspace.dependencies]
 
 # Make sure to run `just recompile-eccs` if the hugr serialisation format changes.
-hugr = "0.24.3"
-hugr-core = "0.24.3"
-hugr-cli = "0.24.3"
+hugr = "0.25.0"
+hugr-core = "0.25.0"
+hugr-cli = "0.25.0"
 portgraph = "0.15.3"
 # There can only be one `pyo3` dependency in the whole workspace, so we use a
 # loose version constraint to prevent breaking changes in dependent crates where possible.
@@ -61,7 +61,7 @@ pyo3-build-config = ">= 0.27.2, < 0.28"
 
 bindgen = "0.72"
 cbindgen = "0.29"
-cc = "1.2.49"
+cc = "1.2.50"
 conan2 = "0.1.8"
 itertools = "0.14.0"
 tket-json-rs = "0.8.0"
@@ -73,7 +73,7 @@ clap = "4.5.53"
 crossbeam-channel = "0.5.15"
 csv = "1.4.0"
 delegate = "0.13.5"
-derive_more = "2.1.0"
+derive_more = "2.1.1"
 fxhash = "0.2.1"
 indexmap = "2.12.1"
 lazy_static = "1.5.0"
@@ -88,12 +88,12 @@ rayon = "1.11"
 rmp-serde = "1.1.2"
 rstest = "0.26.1"
 serde = "1.0.228"
-serde_json = "1.0.145"
+serde_json = "1.0.146"
 serde_with = "3.16.1"
 smol_str = "0.3.4"
 strum = "0.27.2"
 thiserror = "2.0.17"
-tracing = "0.1.43"
+tracing = "0.1.44"
 tracing-appender = "0.2.4"
 tracing-subscriber = "0.3.22"
 typetag = "0.2.21"

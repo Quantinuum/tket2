@@ -14,8 +14,7 @@ use derive_more::{Display, Error, From};
 use hugr::{
     Hugr, HugrView, Node,
     algorithms::{
-        ComposablePass as _, MonomorphizePass, RemoveDeadFuncsError,
-        RemoveDeadFuncsPass,
+        ComposablePass as _, MonomorphizePass, RemoveDeadFuncsError, RemoveDeadFuncsPass,
         const_fold::{ConstFoldError, ConstantFoldPass},
         force_order,
         replace_types::ReplaceTypesError,

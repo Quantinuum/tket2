@@ -88,10 +88,10 @@ impl TypeUnpacker {
             self.tuple_row(row)
 
             // other sums containing the element type are ignored.
-        } else if let Some((size, elem_ty)) = ty.as_extension().and_then(|ext| {
-            array_args::<Array>(ext)
-                .or_else(|| array_args::<BorrowArray>(ext))
-        }) {
+        } else if let Some((size, elem_ty)) = ty
+            .as_extension()
+            .and_then(|ext| array_args::<Array>(ext).or_else(|| array_args::<BorrowArray>(ext)))
+        {
             // Special case for Option[ElementType] since it is used in arrays.
             // Fragile - would be better with dedicated array type.
             // TODO remove and only support borrow arrays
