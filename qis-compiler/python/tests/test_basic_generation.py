@@ -61,7 +61,6 @@ def test_unsupported_pytket_ops() -> None:
         "flip_some",
         "discard_qb_array",
         "measure_qb_array",
-        "print_array",
         "postselect_exit",
         "postselect_panic",
         "rus",
