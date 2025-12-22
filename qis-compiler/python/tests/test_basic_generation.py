@@ -11,6 +11,8 @@ resources_dir = Path(__file__).parent / "resources"
 triples = [
     "x86_64-unknown-linux-gnu",
     "x86_64-apple-darwin",
+    # TODO: The test doesn't seem to like Apple Silicon, it throws a warning
+    # > 'aarch64' is not a recognized processor for this target (ignoring processor)
     "aarch64-apple-darwin",
     "x86_64-windows-msvc",
 ]
