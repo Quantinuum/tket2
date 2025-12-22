@@ -1,4 +1,4 @@
-/// Contains a pass to lower "drop" ops from the Guppy extension
+//! Contains a pass to lower "drop" ops from the Guppy extension
 use hugr::algorithms::replace_types::{Linearizer, NodeTemplate, ReplaceTypesError};
 use hugr::algorithms::{ComposablePass, ReplaceTypes};
 use hugr::extension::prelude::bool_t;
