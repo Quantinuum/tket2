@@ -30,9 +30,6 @@ use extension::{
     qsystem::{LowerTk2Error, LowerTketToQSystemPass, QSystemOp},
 };
 
-#[cfg(feature = "llvm")]
-use hugr::llvm::utils::inline_constant_functions;
-
 /// Modify a [hugr::Hugr] into a form that is acceptable for ingress into a
 /// Q-System. Returns an error if this cannot be done.
 ///
@@ -70,9 +67,6 @@ pub enum QSystemPassError<N = Node> {
     ConstantFoldError(ConstFoldError),
     /// An error from the component [LowerDropsPass] pass.
     LinearizeArrayError(ReplaceTypesError),
-    #[cfg(feature = "llvm")]
-    /// An error from the component [inline_constant_functions()] pass.
-    InlineConstantFunctionsError(anyhow::Error),
     /// An error when running [RemoveDeadFuncsPass] after the monomorphisation
     /// pass.
     ///
@@ -122,12 +116,6 @@ impl QSystemPass {
         // so only one of these passes will do anything; the order is thus immaterial.
         self.lower_drops().run(hugr)?;
 
-        #[cfg(feature = "llvm")]
-        {
-            // TODO: Remove "llvm" feature gate once `inline_constant_functions` is moved to
-            //  `hugr-passes`. See https://github.com/quantinuum/hugr/issues/2419
-            inline_constant_functions(hugr)?;
-        }
         if self.constant_fold {
             self.constant_fold().run(hugr)?;
         }
@@ -343,50 +331,6 @@ mod test {
             .filter(|&&n| FutureOpDef::try_from(hugr.get_optype(n)) == Ok(FutureOpDef::Read))
         {
             assert!(get_pos(call_node) < get_pos(n));
-        }
-    }
-
-    #[cfg(feature = "llvm")]
-    #[test]
-    fn const_function() {
-        use hugr::builder::{Container, DFGBuilder, DataflowHugr, ModuleBuilder};
-        use hugr::ops::{CallIndirect, Value};
-
-        let qb_sig: Signature = Signature::new_endo(qb_t());
-        let mut hugr = {
-            let mut builder = ModuleBuilder::new();
-            let val = Value::function({
-                let builder = DFGBuilder::new(Signature::new_endo(qb_t())).unwrap();
-                let [r] = builder.input_wires_arr();
-                builder.finish_hugr_with_outputs([r]).unwrap()
-            })
-            .unwrap();
-            let const_node = builder.add_constant(val);
-            {
-                let mut builder = builder.define_function("main", qb_sig.clone()).unwrap();
-                let [i] = builder.input_wires_arr();
-                let fun = builder.load_const(&const_node);
-                let [r] = builder
-                    .add_dataflow_op(
-                        CallIndirect {
-                            signature: qb_sig.clone(),
-                        },
-                        [fun, i],
-                    )
-                    .unwrap()
-                    .outputs_arr();
-                builder.finish_with_outputs([r]).unwrap();
-            };
-            builder.finish_hugr().unwrap()
-        };
-
-        QSystemPass::default().run(&mut hugr).unwrap();
-
-        // QSystemPass should have removed the const function
-        for n in hugr.descendants(hugr.module_root()) {
-            if hugr.get_optype(n).as_const().is_some() {
-                panic!("Const function is still there!");
-            }
         }
     }
 }
