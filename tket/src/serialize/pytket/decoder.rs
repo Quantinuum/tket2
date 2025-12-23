@@ -26,16 +26,13 @@ use hugr::{Hugr, HugrView, Node, OutgoingPort, Wire};
 use tracked_elem::{TrackedBitId, TrackedQubitId};
 
 use itertools::Itertools;
-use serde_json::json;
 use tket_json_rs::circuit_json;
 use tket_json_rs::circuit_json::SerialCircuit;
 
-use super::{
-    METADATA_B_REGISTERS, METADATA_INPUT_PARAMETERS, METADATA_PHASE, METADATA_Q_REGISTERS,
-    PytketDecodeError,
-};
+use super::PytketDecodeError;
 use crate::TketOp;
 use crate::extension::rotation::rotation_type;
+use crate::metadata;
 use crate::serialize::pytket::circuit::{
     AdditionalNodesAndWires, EncodedCircuitInfo, StraightThroughWire,
 };
@@ -179,15 +176,13 @@ impl<'h> PytketDecoderContext<'h> {
         // Metadata. The circuit requires "name", and we store other things that
         // should pass through the serialization roundtrip.
 
-        // TODO: Replace these with `dfg.set_metadata::<...>(...)` once we
-        // implement metadata keys in tket.
         let node = dfg.container_node();
         dfg.hugr_mut()
-            .set_metadata_any(node, METADATA_PHASE, json!(serialcirc.phase));
+            .set_metadata::<metadata::Phase>(node, &serialcirc.phase);
         dfg.hugr_mut()
-            .set_metadata_any(node, METADATA_Q_REGISTERS, json!(serialcirc.qubits));
+            .set_metadata::<metadata::QubitRegisters>(node, serialcirc.qubits.clone()); // TODO Do we find something better than clone?
         dfg.hugr_mut()
-            .set_metadata_any(node, METADATA_B_REGISTERS, json!(serialcirc.bits));
+            .set_metadata::<metadata::BitRegisters>(node, serialcirc.bits.clone());
     }
 
     /// Initialize the wire tracker with the input wires.
@@ -441,14 +436,13 @@ impl<'h> PytketDecoderContext<'h> {
         // Store the name for the input parameter wires
         let input_params = self.wire_tracker.finish();
         if !input_params.is_empty() {
-            // TODO: Replace this with `self.builder.set_metadata::<...>(...)` once we
-            // implement metadata keys in tket.
             let node = self.builder.container_node();
-            self.builder.hugr_mut().set_metadata_any(
-                node,
-                METADATA_INPUT_PARAMETERS,
-                json!(input_params.into_iter().collect_vec()),
-            );
+            self.builder
+                .hugr_mut()
+                .set_metadata::<metadata::InputParameters>(
+                    node,
+                    input_params.into_iter().collect_vec(),
+                );
         }
 
         Ok(self

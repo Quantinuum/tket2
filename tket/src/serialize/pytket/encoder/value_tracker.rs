@@ -15,20 +15,19 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use hugr::core::HugrNode;
 use hugr::ops::OpParent;
 use hugr::{HugrView, Wire};
+use hugr_core::metadata::Metadata;
 use itertools::Itertools;
 use tket_json_rs::circuit_json;
 use tket_json_rs::register::ElementId as RegisterUnit;
 
 use crate::circuit::Circuit;
+use crate::metadata;
 use crate::serialize::pytket::circuit::StraightThroughWire;
 use crate::serialize::pytket::extension::RegisterCount;
-use crate::serialize::pytket::{
-    METADATA_B_REGISTERS, METADATA_INPUT_PARAMETERS, PytketEncodeError, PytketEncodeOpError,
-    RegisterHash,
-};
+use crate::serialize::pytket::{PytketEncodeError, PytketEncodeOpError, RegisterHash};
 
+use super::PytketEncoderConfig;
 use super::unit_generator::RegisterUnitGenerator;
-use super::{METADATA_Q_REGISTERS, PytketEncoderConfig};
 
 /// A structure for tracking qubits used in the circuit being encoded.
 ///
@@ -218,10 +217,16 @@ impl<N: HugrNode> ValueTracker<N> {
         config: &PytketEncoderConfig<H>,
     ) -> Result<Self, PytketEncodeError<N>> {
         let param_variable_names: Vec<String> =
-            read_metadata_json_list(circ, region, METADATA_INPUT_PARAMETERS);
+            read_metadata_json_list::<_, _, metadata::InputParameters>(circ, region);
         let mut tracker = ValueTracker {
-            qubits: read_metadata_json_list(circ, region, METADATA_Q_REGISTERS),
-            bits: read_metadata_json_list(circ, region, METADATA_B_REGISTERS),
+            qubits: read_metadata_json_list::<_, _, metadata::QubitRegisters>(circ, region)
+                .into_iter()
+                .map(|q| q.id)
+                .collect_vec(),
+            bits: read_metadata_json_list::<_, _, metadata::BitRegisters>(circ, region)
+                .into_iter()
+                .map(|b| b.id)
+                .collect_vec(),
             params: Vec::with_capacity(param_variable_names.len()),
             wires: BTreeMap::new(),
             unused_qubits: BTreeSet::new(),
@@ -575,16 +580,17 @@ impl IntoIterator for TrackedValues {
 }
 
 /// Read a json-encoded vector of values from the circuit's root metadata.
-fn read_metadata_json_list<T: serde::de::DeserializeOwned, H: HugrView>(
+fn read_metadata_json_list<T: serde::de::DeserializeOwned, H: HugrView, K: Metadata>(
     circ: &Circuit<H>,
     region: H::Node,
-    metadata_key: &str,
-) -> Vec<T> {
-    let Some(value) = circ.hugr().get_metadata_any(region, metadata_key) else {
-        return vec![];
-    };
-
-    serde_json::from_value::<Vec<T>>(value.clone()).unwrap_or_default()
+) -> Vec<T>
+where
+    for<'hugr> K::Type<'hugr>: Into<Vec<T>>,
+{
+    circ.hugr()
+        .get_metadata::<K>(region)
+        .map(Into::into)
+        .unwrap_or_default()
 }
 
 /// Compute the final unit permutation for a circuit.
