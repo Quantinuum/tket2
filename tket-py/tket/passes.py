@@ -141,6 +141,7 @@ class NormalizeGuppy(ComposablePass):
     constant_folding: bool = True
     remove_dead_funcs: bool = True
     inline_dfgs: bool = True
+    remove_redundant_order_edges: bool = True
 
     """Flatten the structure of a Guppy-generated program to enable additional optimisations.
 
@@ -171,6 +172,7 @@ class NormalizeGuppy(ComposablePass):
             constant_folding=self.constant_folding,
             remove_dead_funcs=self.remove_dead_funcs,
             inline_dfgs=self.inline_dfgs,
+            remove_redundant_order_edges=self.remove_redundant_order_edges,
         )
         new_hugr = Hugr.from_str(opt_program.to_str())
         return PassResult.for_pass(self, hugr=new_hugr, inplace=inplace, result=None)
