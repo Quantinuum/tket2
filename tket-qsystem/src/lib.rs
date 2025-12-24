@@ -11,16 +11,16 @@ pub mod pytket;
 pub mod replace_bools;
 
 use derive_more::{Display, Error, From};
-use hugr::{
-    Hugr, HugrView, Node,
-    algorithms::{
-        ComposablePass as _, MonomorphizePass, RemoveDeadFuncsError, RemoveDeadFuncsPass,
-        const_fold::{ConstFoldError, ConstantFoldPass},
-        force_order,
-        replace_types::ReplaceTypesError,
-    },
-    hugr::{HugrError, hugrmut::HugrMut},
+use hugr::algorithms::const_fold::{ConstFoldError, ConstantFoldPass};
+use hugr::algorithms::{
+    ComposablePass as _, MonomorphizePass, RemoveDeadFuncsError, RemoveDeadFuncsPass, force_order,
+    replace_types::ReplaceTypesError,
 };
+use hugr::hugr::{HugrError, hugrmut::HugrMut};
+use hugr::{Hugr, HugrView, Node, core::Visibility, ops::OpType};
+use hugr_core::hugr::internal::HugrMutInternals;
+use std::collections::HashSet;
+
 use lower_drops::LowerDropsPass;
 use replace_bools::{ReplaceBoolPass, ReplaceBoolPassError};
 use tket::TketOp;
@@ -117,11 +117,33 @@ impl QSystemPass {
             rdfp.run(hugr)?
         }
 
+        // ReplaceTypes steps (there are several below) can introduce new helper
+        // functions that are public to enable linking/sharing. We'll make these private
+        // once we're done so that LLVM is not forced to compile them as callable.
+        let pubfuncs = hugr
+            .children(hugr.module_root())
+            .filter(|n| {
+                hugr.get_optype(*n)
+                    .as_func_defn()
+                    .is_some_and(|fd| fd.visibility() == &Visibility::Public)
+            })
+            .collect::<HashSet<_>>();
+
         self.lower_tk2().run(hugr)?;
         if self.lazify {
             self.replace_bools().run(hugr)?;
         }
         self.lower_drops().run(hugr)?;
+
+        for n in hugr
+            .children(hugr.module_root())
+            .filter(|n| !pubfuncs.contains(n))
+            .collect::<Vec<_>>()
+        {
+            if let OpType::FuncDefn(fd) = hugr.optype_mut(n) {
+                *fd.visibility_mut() = Visibility::Private;
+            }
+        }
 
         #[cfg(feature = "llvm")]
         {
