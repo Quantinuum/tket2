@@ -2746,6 +2746,7 @@ dependencies = [
  "derive_more 2.1.1",
  "hugr",
  "hugr-cli",
+ "hugr-core",
  "indexmap 2.12.1",
  "itertools 0.14.0",
  "lazy_static",
