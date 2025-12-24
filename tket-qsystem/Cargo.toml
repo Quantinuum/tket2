@@ -24,6 +24,7 @@ required-features = ["cli"]
 
 [dependencies]
 hugr.workspace = true
+hugr-core.workspace = true
 tket = { path = "../tket", version = "0.16.0" }
 tket-json-rs = { workspace = true }
 lazy_static.workspace = true
