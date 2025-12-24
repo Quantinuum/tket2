@@ -133,7 +133,6 @@ impl QSystemPass {
         if self.lazify {
             self.replace_bools().run(hugr)?;
         }
-
         // We expect any Hugr will have *either* drop ops, or ValueArrays (without drops),
         // so only one of these passes will do anything; the order is thus immaterial.
         self.lower_drops().run(hugr)?;
