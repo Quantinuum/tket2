@@ -20,11 +20,6 @@ use itertools::Itertools;
 use pyo3::prelude::*;
 use tket::hugr::ops::DataflowParent;
 
-// TODO: We still want to run this as long as deserialized hugrs are allowed to contain Value::Function
-// Once that variant is removed, we can remove this pass step.
-#[expect(deprecated)]
-use hugr::llvm::utils::inline_constant_functions;
-
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 use std::path::PathBuf;
@@ -148,10 +143,6 @@ fn get_hugr_llvm_module<'c, 'hugr, 'a: 'c>(
 
 fn process_hugr(hugr: &mut Hugr) -> Result<()> {
     QSystemPass::default().run(hugr)?;
-    // TODO: We still want to run this as long as deserialized hugrs are allowed to contain Value::Function
-    // Once that variant is removed, we can remove this pass step.
-    #[expect(deprecated)]
-    inline_constant_functions(hugr)?;
     Ok(())
 }
 
