@@ -1,5 +1,8 @@
 //! Mapping from extension operation instances to function definitions
 //! that can be used to replace them.
+use hugr::HugrView;
+use hugr::builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
+use hugr::ops::handle::{FuncID, NodeHandle};
 use hugr::{
     Hugr, Node, Wire,
     algorithms::{ReplaceTypes, mangle_name, replace_types::NodeTemplate},
@@ -8,6 +11,8 @@ use hugr::{
     ops::{DataflowOpTrait, ExtensionOp},
     types::TypeArg,
 };
+use hugr_core::Visibility;
+use hugr_core::hugr::linking::NameLinkingPolicy;
 use indexmap::IndexMap;
 use std::{cell::RefCell, ops::Deref};
 
@@ -112,17 +117,32 @@ impl OpFunctionMap {
     /// corresponding function definitions.
     pub fn register_operation_replacements(
         self,
-        hugr: &mut impl HugrMut<Node = Node>,
+        _hugr: &mut impl HugrMut<Node = Node>,
         lowerer: &mut ReplaceTypes,
     ) {
         // Use the centralized cache for all operation replacements
-        for (op, func_def) in self.into_function_iter() {
-            let func_node = hugr
-                .insert_hugr(hugr.module_root(), func_def)
-                .inserted_entrypoint;
-            // TODO: Call is deprecated. We should use LinkedHugr instead.
-            #[expect(deprecated)]
-            lowerer.set_replace_op(&op, NodeTemplate::Call(func_node, vec![]));
+        for (op, mut func_def) in self.into_function_iter() {
+            // Create a replacement hugr for the op nodes: Add a `call` node in the `func_def` hugr and set it as entrypoint.
+            let func_node = func_def.entrypoint();
+            let func_signature = func_def.inner_function_type().unwrap().into_owned();
+            let func_id = FuncID::<true>::from(func_node);
+            func_def.set_entrypoint(func_def.module_root());
+            let mut b = ModuleBuilder::with_hugr(func_def);
+            let call = {
+                let mut f = b
+                    .define_function_vis("", func_signature, Visibility::Private)
+                    .unwrap();
+                let call = f.call(&func_id, &[], f.input_wires()).unwrap();
+                f.finish_with_outputs(call.outputs()).unwrap();
+                call
+            };
+            let mut call_hugr = b.finish_hugr().unwrap();
+            call_hugr.set_entrypoint(call.node());
+
+            lowerer.set_replace_op(
+                &op,
+                NodeTemplate::LinkedHugr(Box::new(call_hugr), NameLinkingPolicy::default()),
+            );
         }
     }
 }
