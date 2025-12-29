@@ -1,9 +1,12 @@
 use derive_more::{Display, Error, From};
 use hugr::algorithms::replace_types::{NodeTemplate, ReplaceTypesError};
 use hugr::algorithms::{ComposablePass, ReplaceTypes};
+use hugr::builder::{DataflowSubContainer, HugrBuilder, ModuleBuilder};
+use hugr::core::Visibility;
 use hugr::extension::prelude::Barrier;
 use hugr::extension::simple_op::MakeExtensionOp;
 use hugr::hugr::patch::insert_cut::InsertCutError;
+use hugr::ops::handle::{FuncID, NodeHandle};
 use hugr::{
     Hugr, HugrView, Node, Wire,
     builder::{BuildError, Dataflow, DataflowHugr, FunctionBuilder},
@@ -13,6 +16,7 @@ use hugr::{
     std_extensions::arithmetic::{float_ops::FloatOps, float_types::ConstF64},
     types::Signature,
 };
+use hugr_core::hugr::linking::NameLinkingPolicy;
 use lazy_static::lazy_static;
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
@@ -88,7 +92,7 @@ enum ReplaceOps {
 /// # Errors
 /// Returns an error if the replacement fails.
 pub fn lower_tk2_op(hugr: &mut impl HugrMut<Node = Node>) -> Result<Vec<Node>, LowerTk2Error> {
-    let mut funcs: BTreeMap<TketOp, Node> = BTreeMap::new();
+    let mut funcs: BTreeMap<TketOp, NodeTemplate> = BTreeMap::new();
     let mut lowerer = ReplaceTypes::new_empty();
     let mut barrier_funcs = BarrierInserter::new();
 
@@ -122,20 +126,14 @@ pub fn lower_tk2_op(hugr: &mut impl HugrMut<Node = Node>) -> Result<Vec<Node>, L
                 }
 
                 // Need to get or create function definition
-                let func_node = match funcs.entry(tket_op) {
-                    Entry::Occupied(e) => *e.get(),
+                let template = match funcs.entry(tket_op) {
+                    Entry::Occupied(e) => e.get().clone(),
                     Entry::Vacant(e) => {
-                        let h = build_func(tket_op)?;
-                        let inserted = hugr.insert_hugr(hugr.module_root(), h).inserted_entrypoint;
-                        *e.insert(inserted)
+                        let template = func_as_node_template(build_func(tket_op)?);
+                        e.insert(template).clone()
                     }
                 };
-                lowerer.set_replace_op(
-                    &tket_op.into_extension_op(),
-                    // TODO: Call is deprecated. We should use LinkedHugr instead.
-                    #[expect(deprecated)]
-                    NodeTemplate::Call(func_node, vec![]),
-                );
+                lowerer.set_replace_op(&tket_op.into_extension_op(), template);
             }
             ReplaceOps::Barrier(barrier) => {
                 // Handle barrier replacements
@@ -200,6 +198,29 @@ fn build_func(op: TketOp) -> Result<Hugr, LowerTk2Error> {
         _ => return Err(LowerTk2Error::UnknownOp(op, inputs.len())), // non-exhaustive
     };
     Ok(b.finish_hugr_with_outputs(outputs)?)
+}
+
+/// Given a hugr with a function definition as entrypoint, constructs a
+/// [`NodeTemplate::LinkedHugr`] that produces a call to the function.
+fn func_as_node_template(mut func_def: Hugr) -> NodeTemplate {
+    // Create a replacement hugr for the op nodes: Add a `call` node in the `func_def` hugr and set it as entrypoint.
+    let func_node = func_def.entrypoint();
+    let func_signature = func_def.inner_function_type().unwrap().into_owned();
+    let func_id = FuncID::<true>::from(func_node);
+    func_def.set_entrypoint(func_def.module_root());
+    let mut b = ModuleBuilder::with_hugr(func_def);
+    let call = {
+        let mut f = b
+            .define_function_vis("", func_signature, Visibility::Private)
+            .unwrap();
+        let call = f.call(&func_id, &[], f.input_wires()).unwrap();
+        f.finish_with_outputs(call.outputs()).unwrap();
+        call
+    };
+    let mut call_hugr = b.finish_hugr().unwrap();
+    call_hugr.set_entrypoint(call.node());
+
+    NodeTemplate::LinkedHugr(Box::new(call_hugr), NameLinkingPolicy::default())
 }
 
 fn build_to_radians(b: &mut impl Dataflow, rotation: Wire) -> Result<Wire, BuildError> {
