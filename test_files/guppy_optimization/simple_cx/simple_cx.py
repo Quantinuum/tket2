@@ -25,5 +25,5 @@ def main() -> None:
     result("b2", b2)
 
 
-program = main.compile()
+program = main.compile_function()
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
