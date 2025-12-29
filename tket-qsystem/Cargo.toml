@@ -44,6 +44,9 @@ delegate.workspace = true
 indexmap.workspace = true
 anyhow = { workspace = true, optional = true }
 
+# Required due to <https://github.com/Quantinuum/hugr/pull/2781>
+hugr-core.workspace = true
+
 [dev-dependencies]
 cool_asserts.workspace = true
 petgraph.workspace = true
