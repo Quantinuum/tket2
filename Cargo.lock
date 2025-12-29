@@ -1091,9 +1091,9 @@ version = "0.24.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d8b180fc27111bc631352b8516a281703430d96b4e0c4bedecb00585bb7bbb2"
 dependencies = [
- "hugr-core",
+ "hugr-core 0.24.3",
  "hugr-llvm",
- "hugr-model",
+ "hugr-model 0.24.3",
  "hugr-passes",
 ]
 
@@ -1109,7 +1109,7 @@ dependencies = [
  "clio",
  "derive_more 2.1.0",
  "hugr",
- "schemars 1.0.5",
+ "schemars 1.2.0",
  "serde",
  "serde_json",
  "tabled",
@@ -1131,17 +1131,17 @@ dependencies = [
  "downcast-rs",
  "enum_dispatch",
  "html-escape",
- "hugr-model",
+ "hugr-model 0.24.3",
  "indexmap 2.12.1",
  "itertools 0.14.0",
  "ordered-float",
- "pastey",
+ "pastey 0.1.1",
  "petgraph 0.8.3",
  "portgraph 0.15.3",
  "regex",
  "relrc",
  "rustc-hash 2.1.1",
- "schemars 1.0.5",
+ "schemars 1.2.0",
  "semver",
  "serde",
  "serde_json",
@@ -1157,6 +1157,43 @@ dependencies = [
 ]
 
 [[package]]
+name = "hugr-core"
+version = "0.25.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b7ea123b056f42f5b0733dbb3e04780cc4d8d99102590e5cbb55ab8840f27926"
+dependencies = [
+ "base64",
+ "cgmath",
+ "delegate 0.13.5",
+ "derive_more 2.1.0",
+ "downcast-rs",
+ "enum_dispatch",
+ "html-escape",
+ "hugr-model 0.25.0",
+ "indexmap 2.12.1",
+ "itertools 0.14.0",
+ "ordered-float",
+ "pastey 0.2.1",
+ "petgraph 0.8.3",
+ "portgraph 0.15.3",
+ "regex",
+ "relrc",
+ "rustc-hash 2.1.1",
+ "schemars 1.2.0",
+ "semver",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "smallvec",
+ "smol_str",
+ "static_assertions",
+ "strum",
+ "thiserror 2.0.17",
+ "tracing",
+ "typetag",
+]
+
+[[package]]
 name = "hugr-llvm"
 version = "0.24.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1166,7 +1203,7 @@ dependencies = [
  "cc",
  "delegate 0.13.5",
  "derive_more 2.1.0",
- "hugr-core",
+ "hugr-core 0.24.3",
  "inkwell",
  "insta",
  "itertools 0.14.0",
@@ -1199,6 +1236,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "hugr-model"
+version = "0.25.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eaaf73c91321d9306b1adbe1dfdc371da99338cfd5c8c34c3a331d2357624d65"
+dependencies = [
+ "base64",
+ "bumpalo",
+ "capnp",
+ "derive_more 2.1.0",
+ "indexmap 2.12.1",
+ "itertools 0.14.0",
+ "ordered-float",
+ "pest",
+ "pest_derive",
+ "pretty",
+ "rustc-hash 2.1.1",
+ "semver",
+ "smol_str",
+ "thiserror 2.0.17",
+]
+
+[[package]]
 name = "hugr-passes"
 version = "0.24.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1206,9 +1265,9 @@ checksum = "9e170464e6c94176cd39099f52bac95552bf360b971959cd8a4a27d76e645ab9"
 dependencies = [
  "ascent",
  "derive_more 2.1.0",
- "hugr-core",
+ "hugr-core 0.24.3",
  "itertools 0.14.0",
- "pastey",
+ "pastey 0.1.1",
  "petgraph 0.8.3",
  "portgraph 0.15.3",
  "strum",
@@ -1633,6 +1692,12 @@ name = "pastey"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "35fb2e5f958ec131621fdd531e9fc186ed768cbe395337403ae56c17a74c68ec"
+
+[[package]]
+name = "pastey"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b867cad97c0791bbd3aaa6472142568c6c9e8f71937e98379f584cfb0cf35bec"
 
 [[package]]
 name = "peak_alloc"
@@ -2223,9 +2288,9 @@ dependencies = [
 
 [[package]]
 name = "schemars"
-version = "1.0.5"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1317c3bf3e7df961da95b0a56a172a02abead31276215a0497241a7624b487ce"
+checksum = "54e910108742c57a770f492731f99be216a52fadd361b06c8fb59d74ccc267d2"
 dependencies = [
  "dyn-clone",
  "ref-cast",
@@ -2236,9 +2301,9 @@ dependencies = [
 
 [[package]]
 name = "schemars_derive"
-version = "1.0.5"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f760a6150d45dd66ec044983c124595ae76912e77ed0b44124cb3e415cce5d9"
+checksum = "4908ad288c5035a8eb12cfdf0d49270def0a268ee162b75eeee0f85d155a7c45"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2357,7 +2422,7 @@ dependencies = [
  "indexmap 1.9.3",
  "indexmap 2.12.1",
  "schemars 0.9.0",
- "schemars 1.0.5",
+ "schemars 1.2.0",
  "serde_core",
  "serde_json",
  "serde_with_macros",
@@ -2682,7 +2747,7 @@ dependencies = [
  "derive_more 2.1.0",
  "fxhash",
  "hugr",
- "hugr-core",
+ "hugr-core 0.25.0",
  "indexmap 2.12.1",
  "insta",
  "itertools 0.14.0",

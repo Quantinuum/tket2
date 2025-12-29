@@ -51,7 +51,7 @@ large_enum_variant = "allow"
 
 # Make sure to run `just recompile-eccs` if the hugr serialisation format changes.
 hugr = "0.24.3"
-hugr-core = "0.24.3"
+hugr-core = "0.25.0"
 hugr-cli = "0.24.3"
 portgraph = "0.15.3"
 pyo3 = ">= 0.23.4, < 0.27"
