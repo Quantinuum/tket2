@@ -50,7 +50,7 @@ large_enum_variant = "allow"
 [workspace.dependencies]
 
 # Make sure to run `just recompile-eccs` if the hugr serialisation format changes.
-hugr = "0.24.3"
+hugr = "0.25.0"
 hugr-core = "0.24.3"
 hugr-cli = "0.24.3"
 portgraph = "0.15.3"
