@@ -3,7 +3,7 @@ use hugr::algorithms::replace_types::{Linearizer, NodeTemplate, ReplaceTypesErro
 use hugr::algorithms::{ComposablePass, ReplaceTypes};
 use hugr::extension::prelude::bool_t;
 use hugr::extension::simple_op::MakeRegisteredOp;
-use hugr::types::TypeArg;
+use hugr::types::Term;
 use hugr::{Node, hugr::hugrmut::HugrMut};
 use tket::extension::guppy::{DROP_OP_NAME, GUPPY_EXTENSION};
 
@@ -48,7 +48,7 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for LowerDropsPass {
         rt.set_replace_parametrized_op(
             GUPPY_EXTENSION.get_op(DROP_OP_NAME.as_str()).unwrap(),
             |args, rt| {
-                let [TypeArg::Runtime(ty)] = args else {
+                let [Term::Runtime(ty)] = args else {
                     panic!("Expected just one type")
                 };
                 Ok(Some(rt.get_linearizer().copy_discard_op(ty, 0)?))
