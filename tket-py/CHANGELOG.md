@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.14](https://github.com/Quantinuum/tket2/compare/tket-py-v0.12.13...tket-py-v0.12.14) (2025-12-30)
+
+
+### Features
+
+* Use constant folding by default on NormalizeGuppy ([#1323](https://github.com/Quantinuum/tket2/issues/1323)) ([6f11024](https://github.com/Quantinuum/tket2/commit/6f11024a6888660567540e7a2d2ac0bc0fd30dc3))
+
 ## [0.12.13](https://github.com/Quantinuum/tket2/compare/tket-py-v0.12.12...tket-py-v0.12.13) (2025-12-10)
 
 
