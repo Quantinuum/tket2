@@ -69,11 +69,6 @@ def test_unsupported_pytket_ops() -> None:
     ],
 )
 @pytest.mark.parametrize("target_triple", triples)
-# TODO: Fix non-deterministic snapshots
-# <https://github.com/Quantinuum/tket2/issues/1340>
-@pytest.mark.skip(
-    reason="Temporarily skipping while we solve non-deterministic snapshots"
-)
 def test_llvm(snapshot: Snapshot, hugr_file: str, target_triple: str) -> None:
     hugr_envelope = load(hugr_file)
     ir = compile_to_llvm_ir(hugr_envelope, target_triple=target_triple)  # type: ignore[call-arg]
