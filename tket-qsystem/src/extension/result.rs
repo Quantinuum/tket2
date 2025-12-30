@@ -1,7 +1,7 @@
 //! This module defines the Hugr extension used to represent result reporting operations,
 //! with static string tags.
 //!
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 
 use hugr::std_extensions::collections;
 use hugr::types::Signature;
@@ -376,8 +376,8 @@ impl MakeRegisteredOp for ResultOp {
         EXTENSION_ID
     }
 
-    fn extension_ref(&self) -> Weak<Extension> {
-        Arc::downgrade(&EXTENSION)
+    fn extension_ref(&self) -> Arc<Extension> {
+        EXTENSION.clone()
     }
 }
 

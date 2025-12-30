@@ -1164,7 +1164,9 @@ mod tests {
     }
     impl<T: Container> SetUnitary for T {
         fn set_unitary(&mut self) {
-            self.set_metadata("unitary", 7);
+            // TODO: Use `self.set_metadata::<...>(7)` once we implement metadata keys in tket.
+            let node = self.container_node();
+            self.hugr_mut().set_metadata_any(node, "unitary", 7);
         }
     }
 

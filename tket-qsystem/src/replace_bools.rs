@@ -3,7 +3,7 @@
 mod static_array;
 
 use derive_more::{Display, Error, From};
-use hugr::algorithms::replace_types::{NodeTemplate, ReplaceTypesError, ReplacementOptions};
+use hugr::algorithms::replace_types::{Linearizer, NodeTemplate, ReplaceTypesError};
 use hugr::algorithms::{
     ComposablePass, ReplaceTypes, ensure_no_nonlocal_edges, non_local::FindNonLocalEdgesError,
 };
@@ -23,7 +23,7 @@ use hugr::std_extensions::collections::{
 };
 use hugr::std_extensions::logic::LogicOp;
 use hugr::types::{SumType, Term, Type};
-use hugr::{Hugr, HugrView, Node, Wire, hugr::hugrmut::HugrMut, type_row};
+use hugr::{Hugr, Node, Wire, hugr::hugrmut::HugrMut, type_row};
 use static_array::{ReplaceStaticArrayBoolPass, ReplaceStaticArrayBoolPassError};
 use tket::TketOp;
 use tket::extension::{
@@ -214,16 +214,7 @@ fn measure_reset_dest() -> NodeTemplate {
     NodeTemplate::CompoundOp(Box::new(h))
 }
 
-fn copy_dfg(ty: Type) -> Hugr {
-    let mut dfb = DFGBuilder::new(inout_sig(ty.clone(), vec![ty.clone(), ty])).unwrap();
-    let mut h = std::mem::take(dfb.hugr_mut());
-    let [inp, outp] = h.get_io(h.entrypoint()).unwrap();
-    h.connect(inp, 0, outp, 0);
-    h.connect(inp, 0, outp, 1);
-    h
-}
-
-fn barray_get_dest(size: u64, elem_ty: Type) -> NodeTemplate {
+fn barray_get_dest(rt: &ReplaceTypes, size: u64, elem_ty: Type) -> NodeTemplate {
     let array_ty = borrow_array_type(size, elem_ty.clone());
     let opt_el = option_type(elem_ty.clone());
     let mut dfb = DFGBuilder::new(inout_sig(
@@ -266,10 +257,15 @@ fn barray_get_dest(size: u64, elem_ty: Type) -> NodeTemplate {
         )
         .unwrap()
         .outputs_arr();
-    let [elem1, elem2] = in_range
-        .add_hugr_with_wires(copy_dfg(elem_ty.clone()), [elem])
+
+    let [elem1, elem2] = rt
+        .get_linearizer()
+        .copy_discard_op(&elem_ty, 2)
+        .unwrap()
+        .add(&mut in_range, [elem])
         .unwrap()
         .outputs_arr();
+
     let [arr] = in_range
         .add_dataflow_op(
             BArrayUnsafeOpDef::r#return.to_concrete(elem_ty.clone(), size),
@@ -295,7 +291,7 @@ fn lowerer() -> ReplaceTypes {
     let mut lw = ReplaceTypes::default();
 
     // Replace tket.bool type.
-    lw.replace_type(bool_type().as_extension().unwrap().clone(), bool_dest());
+    lw.set_replace_type(bool_type().as_extension().unwrap().clone(), bool_dest());
     let dup_op = FutureOp {
         op: FutureOpDef::Dup,
         typ: bool_t(),
@@ -308,7 +304,7 @@ fn lowerer() -> ReplaceTypes {
     }
     .to_extension_op()
     .unwrap();
-    lw.linearizer()
+    lw.linearizer_mut()
         .register_simple(
             future_type(bool_t()).as_extension().unwrap().clone(),
             NodeTemplate::SingleOp(dup_op.into()),
@@ -337,22 +333,22 @@ fn lowerer() -> ReplaceTypes {
 
     // Replace all tket.bool ops.
     let read_op = BoolOp::read.to_extension_op().unwrap();
-    lw.replace_op(&read_op, read_op_dest());
+    lw.set_replace_op(&read_op, read_op_dest());
     let make_opaque_op = BoolOp::make_opaque.to_extension_op().unwrap();
-    lw.replace_op(&make_opaque_op, make_opaque_op_dest());
+    lw.set_replace_op(&make_opaque_op, make_opaque_op_dest());
     for op in [BoolOp::eq, BoolOp::and, BoolOp::or, BoolOp::xor] {
-        lw.replace_op(&op.to_extension_op().unwrap(), binary_logic_op_dest(&op));
+        lw.set_replace_op(&op.to_extension_op().unwrap(), binary_logic_op_dest(&op));
     }
     let not_op = BoolOp::not.to_extension_op().unwrap();
-    lw.replace_op(&not_op, not_op_dest());
+    lw.set_replace_op(&not_op, not_op_dest());
 
     // Replace measure ops with lazy versions.
     let tket_measure_free = TketOp::MeasureFree.to_extension_op().unwrap();
     let qsystem_measure = QSystemOp::Measure.to_extension_op().unwrap();
     let qsystem_measure_reset = QSystemOp::MeasureReset.to_extension_op().unwrap();
-    lw.replace_op(&tket_measure_free, measure_dest());
-    lw.replace_op(&qsystem_measure, measure_dest());
-    lw.replace_op(&qsystem_measure_reset, measure_reset_dest());
+    lw.set_replace_op(&tket_measure_free, measure_dest());
+    lw.set_replace_op(&qsystem_measure, measure_dest());
+    lw.set_replace_op(&qsystem_measure_reset, measure_reset_dest());
 
     // Replace (borrow/)array ops that used to have with copyable bounds with DFGs that
     // the linearizer can act on now that the elements are no longer copyable.
@@ -366,57 +362,58 @@ fn lowerer() -> ReplaceTypes {
             borrow_array_type as fn(u64, Type) -> Type,
         ),
     ] {
-        lw.replace_parametrized_op_with(
+        lw.set_replace_parametrized_op(
             array_ext.get_op(ARRAY_CLONE_OP_ID.as_str()).unwrap(),
-            move |args| {
-                let [size, elem_ty] = args else {
-                    unreachable!()
-                };
-                let size = size.as_nat().unwrap();
-                let elem_ty = elem_ty.as_runtime().unwrap();
-                (!elem_ty.copyable()).then(|| {
-                    NodeTemplate::CompoundOp(Box::new(copy_dfg(type_fn(size, elem_ty.clone()))))
-                })
-            },
-            ReplacementOptions::default().with_linearization(true),
-        );
-        let drop_op_def = GUPPY_EXTENSION.get_op(DROP_OP_NAME.as_str()).unwrap();
-
-        lw.replace_parametrized_op(
-            array_ext.get_op(ARRAY_DISCARD_OP_ID.as_str()).unwrap(),
-            move |args| {
+            move |args, rt| {
                 let [size, elem_ty] = args else {
                     unreachable!()
                 };
                 let size = size.as_nat().unwrap();
                 let elem_ty = elem_ty.as_runtime().unwrap();
                 if elem_ty.copyable() {
-                    return None;
+                    return Ok(None);
+                }
+
+                let array_ty = type_fn(size, elem_ty);
+                Ok(Some(rt.get_linearizer().copy_discard_op(&array_ty, 2)?))
+            },
+        );
+        let drop_op_def = GUPPY_EXTENSION.get_op(DROP_OP_NAME.as_str()).unwrap();
+
+        lw.set_replace_parametrized_op(
+            array_ext.get_op(ARRAY_DISCARD_OP_ID.as_str()).unwrap(),
+            move |args, _| {
+                let [size, elem_ty] = args else {
+                    unreachable!()
+                };
+                let size = size.as_nat().unwrap();
+                let elem_ty = elem_ty.as_runtime().unwrap();
+                if elem_ty.copyable() {
+                    return Ok(None);
                 }
                 let drop_op = ExtensionOp::new(
                     drop_op_def.clone(),
                     vec![type_fn(size, elem_ty.clone()).into()],
                 )
                 .unwrap();
-                Some(NodeTemplate::SingleOp(drop_op.into()))
+                Ok(Some(NodeTemplate::SingleOp(drop_op.into())))
             },
         );
     }
 
-    lw.replace_parametrized_op_with(
+    lw.set_replace_parametrized_op(
         borrow_array::EXTENSION
             .get_op(GenericArrayOpDef::<BorrowArray>::get.opdef_id().as_str())
             .unwrap(),
-        |args| {
+        |args, rt| {
             let [Term::BoundedNat(size), Term::Runtime(elem_ty)] = args else {
                 unreachable!()
             };
             if elem_ty.copyable() {
-                return None;
+                return Ok(None);
             }
-            Some(barray_get_dest(*size, elem_ty.clone()))
+            Ok(Some(barray_get_dest(rt, *size, elem_ty.clone())))
         },
-        ReplacementOptions::default().with_linearization(true),
     );
 
     lw

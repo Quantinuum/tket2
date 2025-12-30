@@ -183,7 +183,7 @@ impl GpuCodegen {
                 "gpu_ref_call",
             )?
             .try_as_basic_value()
-            .unwrap_left()
+            .unwrap_basic()
             .into_int_value();
         verify_gpu_call(ctx, success, "gpu_init")?;
 
@@ -224,7 +224,7 @@ impl GpuCodegen {
             .builder()
             .build_call(gpu_discard, &[gpu_ref.into()], "")?
             .try_as_basic_value()
-            .unwrap_left()
+            .unwrap_basic()
             .into_int_value();
         verify_gpu_call(ctx, success, "gpu_discard")?;
 
@@ -324,7 +324,7 @@ impl GpuCodegen {
                         "function_id_call",
                     )?
                     .try_as_basic_value()
-                    .unwrap_left()
+                    .unwrap_basic()
                     .into_int_value();
                 // On failure, we emit a panic
                 verify_gpu_call(ctx, success, "gpu_get_function_id")?;
@@ -351,7 +351,7 @@ impl GpuCodegen {
             .builder()
             .build_call(func, &[], "function_id_call")?
             .try_as_basic_value()
-            .unwrap_left()
+            .unwrap_basic()
             .into_int_value();
         op.outputs.finish(ctx.builder(), [func_id.into()])
     }
@@ -438,7 +438,7 @@ impl GpuCodegen {
             .builder()
             .build_call(gpu_call, &args, "")?
             .try_as_basic_value()
-            .unwrap_left()
+            .unwrap_basic()
             .into_int_value();
         // validate the call succeeded (panic otherwise)
         verify_gpu_call(ctx, success, "gpu_call")?;
@@ -502,7 +502,7 @@ impl GpuCodegen {
                         "read_status",
                     )?
                     .try_as_basic_value()
-                    .unwrap_left()
+                    .unwrap_basic()
                     .into_int_value();
                 // Check status and handle error if needed
                 verify_gpu_call(ctx, call, "gpu_get_result_64bits")?;
@@ -698,7 +698,7 @@ fn emit_api_validation<'c, H: HugrView<Node = Node>>(
                     "validate_call",
                 )?
                 .try_as_basic_value()
-                .unwrap_left()
+                .unwrap_basic()
                 .into_int_value();
             verify_gpu_call(ctx, success, "gpu_validate_api")?;
             // Mark as validated
@@ -708,10 +708,11 @@ fn emit_api_validation<'c, H: HugrView<Node = Node>>(
             function
         }
     };
-    ctx.builder()
+    let _ = ctx
+        .builder()
         .build_call(func, &[], "run_gpu_validation_call")?
         .try_as_basic_value()
-        .unwrap_right();
+        .unwrap_instruction();
     Ok(())
 }
 
@@ -752,7 +753,7 @@ fn emit_panic_with_gpu_error<'c, H: HugrView<Node = Node>>(
                 .builder()
                 .build_call(gpu_get_error, &[], "error_message")?
                 .try_as_basic_value()
-                .unwrap_left()
+                .unwrap_basic()
                 .into_pointer_value();
 
             // If it's null, replace with "No error message available"
@@ -771,7 +772,8 @@ fn emit_panic_with_gpu_error<'c, H: HugrView<Node = Node>>(
             )?;
 
             // Call panic_str with a generic error code and the message.
-            ctx.builder()
+            let _ = ctx
+                .builder()
                 .build_call(
                     selene_specific::panic_str_fn(ctx)?,
                     &[
@@ -781,17 +783,17 @@ fn emit_panic_with_gpu_error<'c, H: HugrView<Node = Node>>(
                     "panic_str_call",
                 )?
                 .try_as_basic_value()
-                .unwrap_right();
+                .unwrap_instruction();
             builder.build_unreachable()?;
             builder.position_at_end(current_block);
             function
         }
         Some(f) => f,
     };
-    builder
+    let _ = builder
         .build_call(handle_error, &[], "gpu_error_handler_call")?
         .try_as_basic_value()
-        .unwrap_right();
+        .unwrap_instruction();
     Ok(())
 }
 
@@ -841,14 +843,14 @@ fn verify_gpu_call<'c, H: HugrView<Node = Node>>(
         }
         Some(f) => f,
     };
-    builder
+    let _ = builder
         .build_call(
             handle_error,
             &[success_flag.into()],
             format!("{op_name}_handle_error").as_str(),
         )?
         .try_as_basic_value()
-        .unwrap_right();
+        .unwrap_instruction();
     Ok(())
 }
 

@@ -33,6 +33,9 @@ missing_docs = "warn"
 [workspace.lints.clippy]
 allow_attributes = "warn"
 
+# TODO: Fix warnings of this lint and set to "warn"
+iter_over_hash_type = "allow"
+
 # TODO: Reduce the size of error types.
 result_large_err = "allow"
 large_enum_variant = "allow"
@@ -40,29 +43,31 @@ large_enum_variant = "allow"
 [patch.crates-io]
 
 # Uncomment to use unreleased versions of hugr
-# hugr = { git = "https://github.com/quantinuum/hugr", "branch" = "ts/ba-copy-discard" }
-# hugr-core = { git = "https://github.com/quantinuum/hugr", "branch" = "ts/ba-copy-discard" }
-# hugr-cli = { git = "https://github.com/quantinuum/hugr", "branch" = "ts/ba-copy-discard" }
-# hugr-passes = { git = "https://github.com/quantinuum/hugr", "branch" = "ts/ba-copy-discard" }
-# hugr-llvm = { git = "https://github.com/quantinuum/hugr", "branch" = "ts/ba-copy-discard" }
+# hugr = { git = "https://github.com/quantinuum/hugr", "rev" = "5415abebf35be4af4e5bac5c7fe54381aea55a3e" }
+# hugr-core = { git = "https://github.com/quantinuum/hugr", "rev" = "5415abebf35be4af4e5bac5c7fe54381aea55a3e" }
+# hugr-cli = { git = "https://github.com/quantinuum/hugr", "rev" = "5415abebf35be4af4e5bac5c7fe54381aea55a3e" }
+# hugr-passes = { git = "https://github.com/quantinuum/hugr", "rev" = "5415abebf35be4af4e5bac5c7fe54381aea55a3e" }
+# hugr-llvm = { git = "https://github.com/quantinuum/hugr", "rev" = "5415abebf35be4af4e5bac5c7fe54381aea55a3e" }
 # portgraph = { git = "https://github.com/quantinuum/portgraph", rev = "68b96ac737e0c285d8c543b2d74a7aa80a18202c" }
 
 [workspace.dependencies]
 
 # Make sure to run `just recompile-eccs` if the hugr serialisation format changes.
-hugr = "0.24.3"
-hugr-core = "0.24.3"
-hugr-cli = "0.24.3"
+hugr = "0.25.1"
+hugr-core = "0.25.1"
+hugr-cli = "0.25.1"
 portgraph = "0.15.3"
-pyo3 = ">= 0.23.4, < 0.27"
-pyo3-build-config = ">= 0.23.4, < 0.28"
+# There can only be one `pyo3` dependency in the whole workspace, so we use a
+# loose version constraint to prevent breaking changes in dependent crates where possible.
+pyo3 = ">= 0.27.2, < 0.28"
+pyo3-build-config = ">= 0.27.2, < 0.28"
 
 bindgen = "0.72"
 cbindgen = "0.29"
 cc = "1.2.51"
 conan2 = "0.1.8"
 itertools = "0.14.0"
-tket-json-rs = "0.7.7"
+tket-json-rs = "0.8.0"
 portmatching = "0.3.3"
 bytemuck = "1.24.0"
 cgmath = "0.18.0"

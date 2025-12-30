@@ -312,8 +312,8 @@ impl MakeRegisteredOp for TketOp {
         EXTENSION_ID.to_owned()
     }
 
-    fn extension_ref(&self) -> Weak<hugr::Extension> {
-        Arc::<hugr::Extension>::downgrade(&TKET_EXTENSION)
+    fn extension_ref(&self) -> Arc<hugr::Extension> {
+        TKET_EXTENSION.clone()
     }
 }
 

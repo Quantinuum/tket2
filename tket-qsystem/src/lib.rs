@@ -6,7 +6,7 @@ pub mod cli;
 pub mod extension;
 #[cfg(feature = "llvm")]
 pub mod llvm;
-mod lower_drops;
+pub mod lower_drops;
 pub mod pytket;
 pub mod replace_bools;
 
@@ -14,8 +14,7 @@ use derive_more::{Display, Error, From};
 use hugr::{
     Hugr, HugrView, Node,
     algorithms::{
-        ComposablePass as _, LinearizeArrayPass, MonomorphizePass, RemoveDeadFuncsError,
-        RemoveDeadFuncsPass,
+        ComposablePass as _, MonomorphizePass, RemoveDeadFuncsError, RemoveDeadFuncsPass,
         const_fold::{ConstFoldError, ConstantFoldPass},
         force_order,
         replace_types::ReplaceTypesError,
@@ -32,6 +31,9 @@ use extension::{
 };
 
 #[cfg(feature = "llvm")]
+#[expect(deprecated)]
+// TODO: We still want to run this as long as deserialized hugrs are allowed to contain Value::Function
+// Once that variant is removed, we can remove this pass step.
 use hugr::llvm::utils::inline_constant_functions;
 
 /// Modify a [hugr::Hugr] into a form that is acceptable for ingress into a
@@ -69,7 +71,7 @@ pub enum QSystemPassError<N = Node> {
     LowerTk2Error(LowerTk2Error),
     /// An error from the component [ConstantFoldPass] pass.
     ConstantFoldError(ConstFoldError),
-    /// An error from the component [LinearizeArrayPass] pass.
+    /// An error from the component [LowerDropsPass] pass.
     LinearizeArrayError(ReplaceTypesError),
     #[cfg(feature = "llvm")]
     /// An error from the component [inline_constant_functions()] pass.
@@ -119,15 +121,13 @@ impl QSystemPass {
         if self.lazify {
             self.replace_bools().run(hugr)?;
         }
-        // We expect any Hugr will have *either* drop ops, or ValueArrays (without drops),
-        // so only one of these passes will do anything; the order is thus immaterial.
         self.lower_drops().run(hugr)?;
-        self.linearize_arrays().run(hugr)?;
 
         #[cfg(feature = "llvm")]
         {
-            // TODO: Remove "llvm" feature gate once `inline_constant_functions` is moved to
-            //  `hugr-passes`. See https://github.com/quantinuum/hugr/issues/2419
+            // TODO: We still want to run this as long as deserialized hugrs are allowed to contain Value::Function
+            // Once that variant is removed, we can remove this pass step.
+            #[expect(deprecated)]
             inline_constant_functions(hugr)?;
         }
         if self.constant_fold {
@@ -199,10 +199,6 @@ impl QSystemPass {
 
     fn lower_drops(&self) -> LowerDropsPass {
         LowerDropsPass
-    }
-
-    fn linearize_arrays(&self) -> LinearizeArrayPass {
-        LinearizeArrayPass::default()
     }
 
     /// Returns a new `QSystemPass` with constant folding enabled according to
@@ -354,6 +350,9 @@ mod test {
 
     #[cfg(feature = "llvm")]
     #[test]
+    // TODO: We still want to test this as long as deserialized hugrs are allowed to contain Value::Function
+    // Once that variant is removed, we can remove this test.
+    #[expect(deprecated)]
     fn const_function() {
         use hugr::builder::{Container, DFGBuilder, DataflowHugr, ModuleBuilder};
         use hugr::ops::{CallIndirect, Value};

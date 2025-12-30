@@ -8,7 +8,6 @@ use hugr::llvm::custom::CodegenExtsMap;
 use hugr::llvm::emit::{EmitHugr, Namer};
 use hugr::llvm::extension::int::IntCodegenExtension;
 use hugr::llvm::utils::fat::FatExt as _;
-use hugr::llvm::utils::inline_constant_functions;
 use inkwell::OptimizationLevel;
 use inkwell::context::Context;
 use inkwell::module::Module;
@@ -69,7 +68,6 @@ static REGISTRY: std::sync::LazyLock<ExtensionRegistry> = std::sync::LazyLock::n
         collections::array::EXTENSION.to_owned(),
         collections::static_array::EXTENSION.to_owned(),
         collections::borrow_array::EXTENSION.to_owned(),
-        collections::value_array::EXTENSION.to_owned(),
         qsystem_futures::EXTENSION.to_owned(),
         qsystem_result::EXTENSION.to_owned(),
         qsystem::EXTENSION.to_owned(),
@@ -99,6 +97,12 @@ impl Display for ProcessErrs {
 impl From<String> for ProcessErrs {
     fn from(value: String) -> Self {
         Self(vec![value])
+    }
+}
+
+impl From<inkwell::Error> for ProcessErrs {
+    fn from(value: inkwell::Error) -> Self {
+        Self(vec![value.to_string()])
     }
 }
 
@@ -139,10 +143,6 @@ fn get_hugr_llvm_module<'c, 'hugr, 'a: 'c>(
 
 fn process_hugr(hugr: &mut Hugr) -> Result<()> {
     QSystemPass::default().run(hugr)?;
-    // with_entrypoint(hugr, hugr.module_root(), |hugr| {
-    //     // `with_entrypoint` returns Rerooted, which the pass expects a bare Hugr.
-    // })?;
-    inline_constant_functions(hugr)?;
     Ok(())
 }
 
@@ -270,7 +270,7 @@ fn wrap_main<'c>(
     let tc = builder
         .build_call(teardown, &[], "")?
         .try_as_basic_value()
-        .left()
+        .basic()
         .ok_or_else(|| anyhow!("get_tc has no return value"))?;
     // Return the initial time cursor
     let _ = builder.build_return(Some(&tc))?;
@@ -351,7 +351,7 @@ fn compile<'c, 'hugr: 'c>(
         let node = ctx.metadata_node(md_vec.as_slice());
         let _ = module
             .add_global_metadata(key, &node)
-            .map_err(Into::<ProcessErrs>::into);
+            .map_err(ProcessErrs::from);
     }
     module.verify().map_err(Into::<ProcessErrs>::into)?;
     Ok(module)

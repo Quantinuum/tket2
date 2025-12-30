@@ -2,8 +2,8 @@
 //!
 //! This is only tracked if the `rewrite-tracing` feature is enabled.
 
-use hugr::hugr::NodeMetadata;
 use hugr::hugr::hugrmut::HugrMut;
+use hugr::metadata::RawMetadataValue;
 use itertools::Itertools;
 
 use crate::Circuit;
@@ -79,9 +79,11 @@ impl<T: HugrMut> Circuit<T> {
             return;
         }
         let root = self.parent();
-        let meta = self.hugr_mut().get_metadata_mut(root, METADATA_REWRITES);
-        if *meta == NodeMetadata::Null {
-            *meta = NodeMetadata::Array(vec![]);
+        let meta = self
+            .hugr_mut()
+            .get_metadata_any_mut(root, METADATA_REWRITES);
+        if *meta == RawMetadataValue::Null {
+            *meta = RawMetadataValue::Array(vec![]);
         }
     }
 
@@ -96,7 +98,7 @@ impl<T: HugrMut> Circuit<T> {
         let root = self.parent();
         match self
             .hugr_mut()
-            .get_metadata_mut(root, METADATA_REWRITES)
+            .get_metadata_any_mut(root, METADATA_REWRITES)
             .as_array_mut()
         {
             Some(meta) => {
@@ -117,7 +119,9 @@ impl<T: HugrMut> Circuit<T> {
         if !REWRITE_TRACING_ENABLED {
             return None;
         }
-        let meta = self.hugr().get_metadata(self.parent(), METADATA_REWRITES)?;
+        let meta = self
+            .hugr()
+            .get_metadata_any(self.parent(), METADATA_REWRITES)?;
         let rewrites = meta.as_array()?;
         Some(rewrites.iter().map_into())
     }

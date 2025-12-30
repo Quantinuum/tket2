@@ -14,6 +14,7 @@ use crate::extension::rotation::rotation_type;
 use crate::serialize::pytket::decoder::{
     DecodeStatus, FoundWire, LoadedParameter, PytketDecoderContext, TrackedBit, TrackedQubit,
 };
+use crate::serialize::pytket::error::BarrierPayloadError;
 use crate::serialize::pytket::extension::RegisterCount;
 use crate::serialize::pytket::opaque::{
     EncodedEdgeID, OpaqueSubgraph, OpaqueSubgraphPayload, SubgraphId,
@@ -269,7 +270,7 @@ impl<'h> PytketDecoderContext<'h> {
         params: &[LoadedParameter],
     ) -> Result<DecodeStatus, PytketDecodeError> {
         let to_insert_hugr = Hugr::load_str(hugr_envelope, Some(self.extension_registry()))
-            .map_err(|e| PytketDecodeErrorInner::UnsupportedSubgraphInlinePayload { source: e })?;
+            .map_err(|e| BarrierPayloadError::HugrRead(e).wrap())?;
         let to_insert_signature = to_insert_hugr.inner_function_type().unwrap();
 
         let module = self.builder.hugr().module_root();

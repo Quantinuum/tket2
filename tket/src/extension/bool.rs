@@ -184,8 +184,8 @@ impl MakeRegisteredOp for BoolOp {
         BOOL_EXTENSION_ID
     }
 
-    fn extension_ref(&self) -> Weak<Extension> {
-        Arc::downgrade(&BOOL_EXTENSION)
+    fn extension_ref(&self) -> Arc<Extension> {
+        BOOL_EXTENSION.clone()
     }
 }
 /// An extension trait for [Dataflow] providing methods to add "tket.bool"

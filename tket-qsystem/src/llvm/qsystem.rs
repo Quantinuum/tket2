@@ -181,7 +181,7 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                         "measure_i1",
                     )?
                     .try_as_basic_value()
-                    .unwrap_left()
+                    .unwrap_basic()
                     .into_int_value();
                 let result = builder.build_select(result_i1, true_val, false_val, "measure")?;
                 if op == QSystemOp::Measure {
@@ -217,7 +217,7 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                         "lazy_measure",
                     )?
                     .try_as_basic_value()
-                    .unwrap_left();
+                    .unwrap_basic();
                 builder.build_call(
                     self.runtime_func(context, RuntimeFunction::QFree)?,
                     &[qb.into()],
@@ -239,7 +239,7 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                         "lazy_measure_leaked",
                     )?
                     .try_as_basic_value()
-                    .unwrap_left();
+                    .unwrap_basic();
                 builder.build_call(
                     self.runtime_func(context, RuntimeFunction::QFree)?,
                     &[qb.into()],
@@ -260,7 +260,7 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                         "lazy_measure",
                     )?
                     .try_as_basic_value()
-                    .unwrap_left();
+                    .unwrap_basic();
                 builder.build_call(
                     self.runtime_func(context, RuntimeFunction::Reset)?,
                     &[qb.into()],
@@ -283,7 +283,7 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                         "qalloc",
                     )?
                     .try_as_basic_value()
-                    .unwrap_left();
+                    .unwrap_basic();
 
                 let max_qb = self
                     .0

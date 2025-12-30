@@ -72,7 +72,7 @@ fn inner_replace_types() -> ReplaceTypes {
         };
         replace_const_static_array(sav, rt)
     });
-    inner.replace_type(bool_type().as_extension().unwrap().clone(), bool_t());
+    inner.set_replace_type(bool_type().as_extension().unwrap().clone(), bool_t());
     inner.replace_consts(
         bool_type().as_extension().unwrap().clone(),
         |const_bool, _| {
@@ -120,7 +120,7 @@ fn outer_replace_types() -> ReplaceTypes {
             replace_const_static_array(sav, &inner)
         }
     });
-    outer.replace_parametrized_type(static_array_typedef, {
+    outer.set_replace_parametrized_type(static_array_typedef, {
         let inner = inner.clone();
         move |args| {
             let mut element_ty = {
@@ -133,25 +133,25 @@ fn outer_replace_types() -> ReplaceTypes {
             changed.then_some(static_array_type(element_ty))
         }
     });
-    outer.replace_parametrized_op(
+    outer.set_replace_parametrized_op(
         static_array::EXTENSION
             .get_op(&StaticArrayOpDef::get.opdef_id())
             .unwrap(),
         {
             let inner = inner.clone();
-            move |args| {
+            move |args, _| {
                 let [element_ty] = args else { unreachable!() };
-                get_op_dest(&inner, element_ty.as_runtime().unwrap())
+                Ok(get_op_dest(&inner, element_ty.as_runtime().unwrap()))
             }
         },
     );
-    outer.replace_parametrized_op(
+    outer.set_replace_parametrized_op(
         static_array::EXTENSION
             .get_op(&StaticArrayOpDef::len.opdef_id())
             .unwrap(),
-        move |args| {
+        move |args, _| {
             let [element_ty] = args else { unreachable!() };
-            len_op_dest(&inner, element_ty.as_runtime().unwrap())
+            Ok(len_op_dest(&inner, element_ty.as_runtime().unwrap()))
         },
     );
     outer

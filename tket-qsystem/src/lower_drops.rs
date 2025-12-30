@@ -1,10 +1,9 @@
-/// Contains a pass to lower "drop" ops from the Guppy extension
-use hugr::algorithms::replace_types::{NodeTemplate, ReplaceTypesError, ReplacementOptions};
+//! Contains a pass to lower "drop" ops from the Guppy extension
+use hugr::algorithms::replace_types::{Linearizer, NodeTemplate, ReplaceTypesError};
 use hugr::algorithms::{ComposablePass, ReplaceTypes};
-use hugr::builder::{Container, DFGBuilder};
 use hugr::extension::prelude::bool_t;
 use hugr::extension::simple_op::MakeRegisteredOp;
-use hugr::types::{Signature, Term};
+use hugr::types::Term;
 use hugr::{Node, hugr::hugrmut::HugrMut};
 use tket::extension::guppy::{DROP_OP_NAME, GUPPY_EXTENSION};
 
@@ -38,7 +37,7 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for LowerDropsPass {
         }
         .to_extension_op()
         .unwrap();
-        rt.linearizer()
+        rt.linearizer_mut()
             .register_simple(
                 future_type(bool_t()).as_extension().unwrap().clone(),
                 NodeTemplate::SingleOp(dup_op.into()),
@@ -46,18 +45,14 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for LowerDropsPass {
             )
             .unwrap();
 
-        rt.replace_parametrized_op_with(
+        rt.set_replace_parametrized_op(
             GUPPY_EXTENSION.get_op(DROP_OP_NAME.as_str()).unwrap(),
-            |targs| {
-                let [Term::Runtime(ty)] = targs else {
+            |args, rt| {
+                let [Term::Runtime(ty)] = args else {
                     panic!("Expected just one type")
                 };
-                // The Hugr here is invalid, so we have to pull it out manually
-                let mut dfb = DFGBuilder::new(Signature::new(ty.clone(), vec![])).unwrap();
-                let h = std::mem::take(dfb.hugr_mut());
-                Some(NodeTemplate::CompoundOp(Box::new(h)))
+                Ok(Some(rt.get_linearizer().copy_discard_op(ty, 0)?))
             },
-            ReplacementOptions::default().with_linearization(true),
         );
         rt.run(hugr)
     }
@@ -67,7 +62,7 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for LowerDropsPass {
 mod test {
     use std::sync::Arc;
 
-    use hugr::builder::{Dataflow, DataflowHugr, inout_sig};
+    use hugr::builder::{DFGBuilder, Dataflow, DataflowHugr, inout_sig};
     use hugr::ops::ExtensionOp;
     use hugr::{Hugr, HugrView};
     use hugr::{extension::prelude::usize_t, std_extensions::collections::array::array_type};

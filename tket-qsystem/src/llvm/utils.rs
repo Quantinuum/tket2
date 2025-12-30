@@ -44,7 +44,7 @@ fn emit_utils_op<H: HugrView<Node = Node>>(
                 .builder()
                 .build_call(fn_get_cur_shot, &[], "shot")?
                 .try_as_basic_value()
-                .unwrap_left();
+                .unwrap_basic();
             args.outputs.finish(ctx.builder(), [result])
         }
     }
