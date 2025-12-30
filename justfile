@@ -93,6 +93,7 @@ update-snapshots-rs:
     cargo insta review
 # Update python snapshot tests.
 update-snapshots-py *TEST_ARGS:
+    uv run maturin develop --uv
     uv run pytest --snapshot-update {{TEST_ARGS}}
 
 # Build the sphinx API documentation
