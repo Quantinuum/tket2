@@ -2,6 +2,7 @@
 //! that can be used to replace them.
 use hugr::HugrView;
 use hugr::builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
+use hugr::hugr::linking::OnMultiDefn;
 use hugr::ops::handle::{FuncID, NodeHandle};
 use hugr::{
     Hugr, Node, Wire,
@@ -141,7 +142,10 @@ impl OpFunctionMap {
 
             lowerer.set_replace_op(
                 &op,
-                NodeTemplate::LinkedHugr(Box::new(call_hugr), NameLinkingPolicy::default()),
+                NodeTemplate::LinkedHugr(
+                    Box::new(call_hugr),
+                    NameLinkingPolicy::default().on_multiple_defn(OnMultiDefn::UseTarget),
+                ),
             );
         }
     }

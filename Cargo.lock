@@ -1087,9 +1087,9 @@ dependencies = [
 
 [[package]]
 name = "hugr"
-version = "0.25.1"
+version = "0.25.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aead3d3461e0070e78f8342e6cf265b0cb36fca72d675b4ab5d360072c3485b5"
+checksum = "1acc664e575a0bf23e22579f5f5f876d69da67eb1dd3f4b01a0a30046716f6b8"
 dependencies = [
  "hugr-core",
  "hugr-llvm",
@@ -1099,9 +1099,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-cli"
-version = "0.25.1"
+version = "0.25.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa2b7b0285254b90968f627bc24cbb8a3ccf944e042dcd6ae3b65254e8d4d601"
+checksum = "bbf184312ec6b6b8899d213057e1ffed9fcec1e746b7ddf60df65d36af71ce6b"
 dependencies = [
  "anyhow",
  "clap",
@@ -1120,9 +1120,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-core"
-version = "0.25.1"
+version = "0.25.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c82cb93d4e5f35ee5a1abb575a44d00bc5e3fb99532017568a5317a757b51ade"
+checksum = "826012468adec6e638651a927659f9e853dc2223071b58537b1c36e894d0361b"
 dependencies = [
  "base64",
  "cgmath",
@@ -1158,9 +1158,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-llvm"
-version = "0.25.1"
+version = "0.25.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71bc2892e9975d8e467b3fdf8f832a90fd946e825713325056ce29b028dc1093"
+checksum = "63b1ceb2d1f8553766fd53d0b7837ee190b403458033dff28e9f0b320f9d32e4"
 dependencies = [
  "anyhow",
  "cc",
@@ -1178,9 +1178,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-model"
-version = "0.25.1"
+version = "0.25.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "947ff3d70cfedad6877ca5dca06b3c2799c99976348bb9105eef346a11137251"
+checksum = "6bfae740a44337418d46e3a60ec965087382dde7fa48194357e3c9c0e3838e98"
 dependencies = [
  "base64",
  "bumpalo",
@@ -1200,9 +1200,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-passes"
-version = "0.25.1"
+version = "0.25.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2731e00e456d979127de05bb3700631f79eaad1e10ae98b7bdb2259ef35a7cc"
+checksum = "2c645a9d405aff50991fed8e282759ebdac0b88c46dec830dd51813b0dda1b80"
 dependencies = [
  "ascent",
  "derive_more 2.1.1",
@@ -1309,9 +1309,9 @@ dependencies = [
 
 [[package]]
 name = "insta"
-version = "1.45.0"
+version = "1.45.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b76866be74d68b1595eb8060cb9191dca9c021db2316558e52ddc5d55d41b66c"
+checksum = "983e3b24350c84ab8a65151f537d67afbbf7153bb9f1110e03e9fa9b07f67a5c"
 dependencies = [
  "console",
  "once_cell",
@@ -2745,7 +2745,6 @@ dependencies = [
  "derive_more 2.1.1",
  "hugr",
  "hugr-cli",
- "hugr-core",
  "indexmap 2.12.1",
  "itertools 0.14.0",
  "lazy_static",
