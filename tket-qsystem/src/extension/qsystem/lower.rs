@@ -5,6 +5,8 @@ use hugr::builder::{DataflowSubContainer, HugrBuilder, ModuleBuilder};
 use hugr::core::Visibility;
 use hugr::extension::prelude::Barrier;
 use hugr::extension::simple_op::MakeExtensionOp;
+use hugr::hugr::linking::NameLinkingPolicy;
+use hugr::hugr::linking::OnMultiDefn;
 use hugr::hugr::patch::insert_cut::InsertCutError;
 use hugr::ops::handle::{FuncID, NodeHandle};
 use hugr::{
@@ -16,7 +18,6 @@ use hugr::{
     std_extensions::arithmetic::{float_ops::FloatOps, float_types::ConstF64},
     types::Signature,
 };
-use hugr_core::hugr::linking::NameLinkingPolicy;
 use lazy_static::lazy_static;
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
@@ -220,7 +221,10 @@ fn func_as_node_template(mut func_def: Hugr) -> NodeTemplate {
     let mut call_hugr = b.finish_hugr().unwrap();
     call_hugr.set_entrypoint(call.node());
 
-    NodeTemplate::LinkedHugr(Box::new(call_hugr), NameLinkingPolicy::default())
+    NodeTemplate::LinkedHugr(
+        Box::new(call_hugr),
+        NameLinkingPolicy::default().on_multiple_defn(OnMultiDefn::UseTarget),
+    )
 }
 
 fn build_to_radians(b: &mut impl Dataflow, rotation: Wire) -> Result<Wire, BuildError> {
