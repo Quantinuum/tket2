@@ -46,6 +46,7 @@ pub struct QSystemPass {
     monomorphize: bool,
     force_order: bool,
     lazify: bool,
+    hide_funcs: bool,
 }
 
 impl Default for QSystemPass {
@@ -55,6 +56,7 @@ impl Default for QSystemPass {
             monomorphize: true,
             force_order: true,
             lazify: true,
+            hide_funcs: true,
         }
     }
 }
@@ -120,14 +122,15 @@ impl QSystemPass {
         // ReplaceTypes steps (there are several below) can introduce new helper
         // functions that are public to enable linking/sharing. We'll make these private
         // once we're done so that LLVM is not forced to compile them as callable.
-        let pubfuncs = hugr
-            .children(hugr.module_root())
-            .filter(|n| {
-                hugr.get_optype(*n)
-                    .as_func_defn()
-                    .is_some_and(|fd| fd.visibility() == &Visibility::Public)
-            })
-            .collect::<HashSet<_>>();
+        let pubfuncs = self.hide_funcs.then(|| {
+            hugr.children(hugr.module_root())
+                .filter(|n| {
+                    hugr.get_optype(*n)
+                        .as_func_defn()
+                        .is_some_and(|fd| fd.visibility() == &Visibility::Public)
+                })
+                .collect::<HashSet<_>>()
+        });
 
         self.lower_tk2().run(hugr)?;
         if self.lazify {
@@ -135,13 +138,15 @@ impl QSystemPass {
         }
         self.lower_drops().run(hugr)?;
 
-        for n in hugr
-            .children(hugr.module_root())
-            .filter(|n| !pubfuncs.contains(n))
-            .collect::<Vec<_>>()
-        {
-            if let OpType::FuncDefn(fd) = hugr.optype_mut(n) {
-                *fd.visibility_mut() = Visibility::Private;
+        if let Some(pubfuncs) = pubfuncs {
+            for n in hugr
+                .children(hugr.module_root())
+                .filter(|n| !pubfuncs.contains(n))
+                .collect::<Vec<_>>()
+            {
+                if let OpType::FuncDefn(fd) = hugr.optype_mut(n) {
+                    *fd.visibility_mut() = Visibility::Private;
+                }
             }
         }
 
