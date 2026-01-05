@@ -21,6 +21,10 @@ dev = [
 [tool.uv]
 prerelease = "explicit"
 
+[tool.uv.sources]
+# hugr = { git = "https://github.com/quantinuum/hugr", subdirectory = "hugr-py", rev = "191c473" }
+
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
