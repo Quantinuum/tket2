@@ -1,5 +1,7 @@
 //! A pass that applies the gridsynth algorithm to all Rz gates in a HUGR.
 
+use std::collections::HashMap;
+
 use crate::extension::rotation::ConstRotation;
 use crate::hugr::hugr::hugrmut::HugrMut;
 use crate::hugr::HugrView;
@@ -13,6 +15,56 @@ use hugr::std_extensions::arithmetic::float_types::ConstF64;
 use hugr_core::OutgoingPort;
 use rsgridsynth::config::config_from_theta_epsilon;
 use rsgridsynth::gridsynth::gridsynth_gates;
+
+/// Garbage collector for cleaning up constant nodes providing angles to the Rz gates and 
+/// all nodes on the path to them.
+struct GarbageCollector{
+    references: HashMap<usize, usize>, // key: node index (of Const node containing angle),
+                                       // value: reference counter for that node
+    path: HashMap<usize, Vec<Node>> // key: node index (of Const node containing angle),
+                                    // value: the nodes leading up to the constant node and the constant
+                                    // node itself
+    
+} // CONCERN: I am concerned that this approach may not clean up properly if the Guppy user 
+  // has redundant calls of the constant (eg, has used it to define another constant but then 
+  // not used that constant).
+
+impl GarbageCollector {
+    /// Add references to constant node
+    fn add_references(&mut self, node: Node, increment: usize) {
+        // if reference not in references add it with the default value 1, else increment count
+        let count = self.references.entry(node.index()).or_insert(1);
+        *count += increment;
+    }
+
+    /// Remove reference to a constant node
+    fn remove_references(&mut self, node: Node, increment: usize) {
+        // reduce reference count by 1
+        let count = self.references.get_mut(&node.index()).unwrap();
+        *count -= increment;
+    }
+
+    /// Infer how many references there are to the angle-containing Const node
+    /// given the corresponding `load_const_node`
+    fn infer_references_to_angle(&mut self, hugr: &mut Hugr, load_const_node: Node, const_node: Node) {
+        let references_collection: Vec<_> = hugr.node_outputs(load_const_node).collect();
+        let num_references = references_collection.len();
+        // if reference not in references add it with the default value num_references, else do nothing
+        self.references.entry(const_node.index()).or_insert(num_references);     
+    }
+
+    /// If there are no references remaining to const_node, remove it and the nodes leading to it
+    fn collect(&mut self, hugr: &mut Hugr, const_node: Node) {
+        let node_index = &const_node.index();
+        if self.references[node_index] <= 0 {
+           let path: Vec<Node> = self.path.get(node_index).unwrap().to_vec();
+           for node in path {
+                hugr.remove_node(node);
+           }  
+        }
+    }
+}
+
 
 /// Find the nodes for the Rz gates.
 fn find_rzs(hugr: &mut Hugr) -> Option<Vec<hugr::Node>> {
@@ -56,43 +108,68 @@ fn find_single_linked_output_by_index(
         .expect("Not yet set-up to handle cases where there are no previous nodes")
 }
 
+
 /// Find the constant node containing the angle to be inputted to the Rz gate.
 /// It is assumed that `hugr` has had the NormalizeGuppy passes applied to it
 /// prior to being applied. This function also cleans up behind itself removing
 /// everything on the path to the `angle_node` but not the `angle_node` itself,
 /// which is still needed.
-fn find_angle_node(hugr: &mut Hugr, rz_node: Node) -> Node {
+fn find_angle_node(hugr: &mut Hugr, rz_node: Node, garbage_collector: &mut GarbageCollector) -> Node {
     // find linked ports to the rz port where the angle will be inputted
     // the port offset of the angle is known to be 1 for the rz gate.
     let (mut prev_node, _) = find_single_linked_output_by_index(hugr, rz_node, 1);
+    // let mut prev_nodes:  Vec<Node> = Vec::new();
 
     // as all of the NormalizeGuppy passes have been run on the `hugr` before it enters this function,
     // and these passes include constant folding, we can assume that we can follow the 0th ports back
     // to a constant node where the angle is defined.
     let max_iterations = 10;
     let mut ii = 0;
+    let mut path = Vec::new(); // The nodes leading up to the angle_node and the angle_node 
+                                          // itself
     loop {
+        // prev_nodes.push(prev_node);
         let (current_node, _) = find_single_linked_output_by_index(hugr, prev_node, 0);
         let op_type = hugr.get_optype(current_node);
+        path.push(current_node);
+
+        garbage_collector.add_references(current_node, 1);
+
+        // TO DO: update the following to apply additional checks that this is the angle node beyond
+        // just the fact it is a constant node
         if op_type.is_const() {
-            hugr.remove_node(prev_node);
+            // println!("The Rz node is: \n {}", rz_node.index());
+            // println!("The prev_nodes are: {:?}", prev_nodes);
+            // println!("Just before for loop, HUGR is: \n {}", hugr.mermaid_string());
+            // for node in prev_nodes {
+            //     // println!("Inside for loop: \n {}", hugr.mermaid_string());
+            //     hugr.remove_node(node);
+            // }
+            let load_const_node = prev_node;
             let angle_node = current_node;
+            // Add references to angle node if this has not already been done
+            garbage_collector.infer_references_to_angle(hugr, load_const_node, angle_node);
+            // Remove one reference to reflect the fact that we are about to use the angle node
+            garbage_collector.remove_references(angle_node, 1);
+            // Let garbage collector know what nodes led to the angle node
+            garbage_collector.path.entry(angle_node.index()).or_insert(path);
             return angle_node;
         }
         if ii >= max_iterations {
             panic!("Angle finding failed"); // TO DO: improve error handling
         }
 
-        // Deleting all but nodes on the way to the rz_node but not the rz_node itself
-        hugr.remove_node(prev_node);
+        // Deleting all but nodes on the way to the angle containing node but not the rz_node itself
+        // hugr.remove_node(prev_node); // TO DO: garbage collect instead (probably do inside if statement above)
+        // garbage_collector.remove_references(prev_node, 1);
 
         prev_node = current_node;
         ii += 1;
     }
 }
 
-fn find_angle(hugr: &mut Hugr, rz_node: Node) -> f64 {
-    let angle_node = find_angle_node(hugr, rz_node);
+fn find_angle(hugr: &mut Hugr, rz_node: Node, garbage_collector: &mut GarbageCollector) -> f64 {
+    let angle_node = find_angle_node(hugr, rz_node, garbage_collector);
     let op_type = hugr.get_optype(angle_node);
     let angle_const = op_type.as_const().unwrap();
     let angle_val = &angle_const.value;
@@ -107,16 +184,16 @@ fn find_angle(hugr: &mut Hugr, rz_node: Node) -> f64 {
         panic!("Angle not specified as ConstRotation or ConstF64")
     };
 
-    // we now have what we need to know from the angle node and can remove it from the hugr
-    hugr.remove_node(angle_node);
+    // we now have what we need to know from the angle node and can remove it from the hugr if 
+    // no further references remain to it
+    garbage_collector.collect(hugr, angle_node);
 
     angle
 }
 
-fn apply_gridsynth(hugr: &mut Hugr, epsilon: f64, rz_node: Node) -> String {
-    let theta = find_angle(hugr, rz_node);
-    // The following parameters could be made user-specifiable. For simplicity, I fix them, for now
-    // let epsilon = 1e-1; // very low precision to allow easier visualisation for demo
+fn apply_gridsynth(hugr: &mut Hugr, epsilon: f64, rz_node: Node,
+                   garbage_collector: &mut GarbageCollector) -> String {
+    let theta = find_angle(hugr, rz_node, garbage_collector);
     let seed = 1234;
     let verbose = false;
     let up_to_phase = false;
@@ -169,7 +246,8 @@ fn replace_rz_with_gridsynth_output(hugr: &mut Hugr, rz_node: Node, gates: &str)
     // getting node and output port that gave qubit to Rz gate
     let inputs: Vec<_> = hugr.node_inputs(rz_node).collect();
     let input_port = inputs[0];
-    let (qubit_providing_node, qubit_providing_port)  = hugr.single_linked_output(rz_node, input_port).unwrap();
+    let (qubit_providing_node, qubit_providing_port)  = hugr
+        .single_linked_output(rz_node, input_port).unwrap();
     let mut prev_node = qubit_providing_node.clone();
 
     // find output port
@@ -177,8 +255,9 @@ fn replace_rz_with_gridsynth_output(hugr: &mut Hugr, rz_node: Node, gates: &str)
     let output_port = outputs[0];
     let (next_node, dst_port) = hugr.single_linked_input(rz_node, output_port).unwrap();
 
-    // we have now inferred what we need to know from the Rz node we are replacing and can remove it
+    // we have now inferred what we need to know from the Rz node we are replacing and can remove it ao
     hugr.remove_node(rz_node);
+
 
     // println!("in panicking function: {}", hugr.mermaid_string());
 
@@ -206,7 +285,7 @@ fn replace_rz_with_gridsynth_output(hugr: &mut Hugr, rz_node: Node, gates: &str)
     // Assuming there were no outgoing ports to begin with when deciding port offset
     let src_port = ports[0]; 
     hugr.connect(prev_node, src_port, next_node, dst_port);
-    // println!("Inside panicking function: {}", hugr.mermaid_string());
+    // println!("Inside panicking function: \n {}", hugr.mermaid_string());
     hugr.validate().unwrap_or_else(|e| panic!("{e}"));
 }
 
@@ -222,9 +301,14 @@ pub fn apply_gridsynth_pass(hugr: &mut Hugr, epsilon: f64) {
         .run(hugr)
         .unwrap();
 
+    // println!("After normalize guppy the hugr is: \n {}", hugr.mermaid_string());
+
     let rz_nodes = find_rzs(hugr).unwrap();
+    let mut garbage_collector = GarbageCollector{
+        references: HashMap::new(), 
+        path: HashMap::new()};
     for node in rz_nodes {
-        let gates = apply_gridsynth(hugr, epsilon, node);
+        let gates = apply_gridsynth(hugr, epsilon, node, &mut garbage_collector);
         replace_rz_with_gridsynth_output(hugr, node, &gates);
     }
 } // TO DO: change name of this function to gridsynth
@@ -437,9 +521,12 @@ mod tests {
             .inline_dfgs(true)
             .run(imported_hugr)
             .unwrap();
+        let mut garbage_collector = GarbageCollector{
+            references: HashMap::new(), 
+            path: HashMap::new()};
         let rz_nodes = find_rzs(imported_hugr).unwrap();
         let rz_node = rz_nodes[0];
-        let angle_node = find_angle_node(imported_hugr, rz_node);
+        let angle_node = find_angle_node(imported_hugr, rz_node, &mut garbage_collector);
         assert_eq!(angle_node.index(), 20);
     }
 
@@ -454,9 +541,12 @@ mod tests {
             .inline_dfgs(true)
             .run(imported_hugr)
             .unwrap();
+        let mut garbage_collector = GarbageCollector{
+            references: HashMap::new(), 
+            path: HashMap::new()};
         let rz_nodes = find_rzs(imported_hugr).unwrap();
         let rz_node = rz_nodes[0];
-        let angle = find_angle(imported_hugr, rz_node);
+        let angle = find_angle(imported_hugr, rz_node, &mut garbage_collector);
         // println!("angle is {}", angle);
         // println!("hugr is {}", imported_hugr.mermaid_string());
     }
@@ -483,7 +573,7 @@ mod tests {
     fn test_2rzs_guppy_hugr() {
         let epsilon = 1e-2;
         let imported_hugr = &mut import_2rzs_guppy();
-        println!("before: {}", imported_hugr.mermaid_string());
+        // println!("before: {}", imported_hugr.mermaid_string());
         NormalizeGuppy::default()
             .simplify_cfgs(true)
             .remove_tuple_untuple(true)
