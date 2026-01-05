@@ -275,11 +275,13 @@ impl QSystemPass {
 mod test {
     use hugr::{
         HugrView as _,
-        builder::{Dataflow, DataflowSubContainer, HugrBuilder},
+        builder::{Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder},
+        core::Visibility,
         extension::prelude::qb_t,
         hugr::hugrmut::HugrMut,
-        ops::handle::NodeHandle,
+        ops::{ExtensionOp, OpType, handle::NodeHandle},
         std_extensions::arithmetic::float_types::ConstF64,
+        std_extensions::collections::array::{ArrayOpBuilder, array_type},
         type_row,
         types::Signature,
     };
@@ -287,7 +289,10 @@ mod test {
     use itertools::Itertools as _;
     use petgraph::visit::{Topo, Walker as _};
     use rstest::rstest;
-    use tket::extension::bool::bool_type;
+    use tket::extension::{
+        bool::bool_type,
+        guppy::{DROP_OP_NAME, GUPPY_EXTENSION},
+    };
 
     use crate::{
         QSystemPass,
@@ -373,6 +378,59 @@ mod test {
         {
             assert!(get_pos(call_node) < get_pos(n));
         }
+    }
+
+    #[test]
+    fn hide_funcs() {
+        let backup = {
+            let arr_t = || array_type(4, bool_type());
+            let mut dfb = FunctionBuilder::new("main", Signature::new_endo(arr_t())).unwrap();
+            let [arr] = dfb.input_wires_arr();
+            let (arr1, arr2) = dfb.add_array_clone(bool_type(), 4, arr).unwrap();
+            let dop = GUPPY_EXTENSION.get_op(&DROP_OP_NAME).unwrap();
+            dfb.add_dataflow_op(
+                ExtensionOp::new(dop.clone(), [arr_t().into()]).unwrap(),
+                [arr1],
+            )
+            .unwrap();
+            dfb.finish_hugr_with_outputs([arr2]).unwrap()
+        };
+
+        // Check there are no public funcs (after hiding)
+        let mut hugr = backup.clone();
+        QSystemPass::default().run(&mut hugr).unwrap();
+        assert!(
+            hugr.children(hugr.module_root())
+                .all(|n| match hugr.get_optype(n) {
+                    OpType::FuncDefn(fd) => fd.visibility() == &Visibility::Private,
+                    OpType::FuncDecl(fd) => fd.visibility() == &Visibility::Private,
+                    _ => true,
+                })
+        );
+        // Run again without hiding, and check the two have the same functions...
+        let mut hugr_public = backup;
+        QSystemPass {
+            hide_funcs: false,
+            ..Default::default()
+        }
+        .run(&mut hugr_public)
+        .unwrap();
+
+        let mut num_pub = 0;
+        for n in hugr_public.nodes() {
+            let mut expected_optype = hugr_public.get_optype(n).clone();
+            // ...except we expect the public funcs to be private now
+            let vis = match &mut expected_optype {
+                OpType::FuncDefn(fd) => fd.visibility_mut(),
+                OpType::FuncDecl(fd) => fd.visibility_mut(),
+                _ => continue,
+            };
+            if std::mem::replace(vis, Visibility::Private) == Visibility::Public {
+                num_pub += 1;
+            }
+            assert_eq!(hugr.get_optype(n), &expected_optype, "At node {n}:");
+        }
+        assert_eq!(num_pub, 4);
     }
 
     #[cfg(feature = "llvm")]
