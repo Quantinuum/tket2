@@ -105,3 +105,12 @@ def tket1_pass(
       circuit-like regions, and optimise them too.
       nested inside other subregions of the circuit.
     """
+
+def gridsynth(hugr: CircuitClass, epsilon: float) -> CircuitClass:
+    """Runs a pass applying the gridsynth algorithm to all Rz gates in a HUGR,
+    which decomposes them into the Clifford + T basis.
+
+    Parameters:
+    - hugr: the hugr to run the pass on.
+    - epsilon: the precision of the gridsynth decomposition
+    """
