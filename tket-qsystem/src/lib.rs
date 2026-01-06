@@ -396,20 +396,20 @@ mod test {
             dfb.finish_hugr_with_outputs([arr2]).unwrap()
         };
 
-        let pub_funcs = |hugr: &Hugr| {
+        let count_pub_funcs = |hugr: &Hugr| {
             hugr.children(hugr.module_root())
                 .filter(|n| match hugr.get_optype(*n) {
                     OpType::FuncDefn(fd) => fd.visibility() == &Visibility::Public,
                     OpType::FuncDecl(fd) => fd.visibility() == &Visibility::Public,
                     _ => false,
                 })
-                .collect_vec()
+                .count()
         };
 
         // Check there are no public funcs (after hiding)
         let mut hugr = orig.clone();
         QSystemPass::default().run(&mut hugr).unwrap();
-        assert_eq!(pub_funcs(&hugr), []);
+        assert_eq!(count_pub_funcs(&hugr), 0);
 
         // Run again without hiding...
         let mut hugr_public = orig;
@@ -420,7 +420,7 @@ mod test {
         .run(&mut hugr_public)
         .unwrap();
 
-        assert_eq!(pub_funcs(&hugr_public).len(), 4);
+        assert_eq!(count_pub_funcs(&hugr_public), 4);
         assert_eq!(
             hugr.children(hugr.module_root()).count(),
             hugr_public.children(hugr_public.module_root()).count()
