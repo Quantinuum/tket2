@@ -274,7 +274,7 @@ impl QSystemPass {
 #[cfg(test)]
 mod test {
     use hugr::{
-        HugrView as _,
+        Hugr, HugrView as _,
         builder::{Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder},
         core::Visibility,
         extension::prelude::qb_t,
@@ -382,7 +382,7 @@ mod test {
 
     #[test]
     fn hide_funcs() {
-        let backup = {
+        let orig = {
             let arr_t = || array_type(4, bool_type());
             let mut dfb = FunctionBuilder::new("main", Signature::new_endo(arr_t())).unwrap();
             let [arr] = dfb.input_wires_arr();
@@ -396,19 +396,23 @@ mod test {
             dfb.finish_hugr_with_outputs([arr2]).unwrap()
         };
 
-        // Check there are no public funcs (after hiding)
-        let mut hugr = backup.clone();
-        QSystemPass::default().run(&mut hugr).unwrap();
-        assert!(
+        let pub_funcs = |hugr: &Hugr| {
             hugr.children(hugr.module_root())
-                .all(|n| match hugr.get_optype(n) {
-                    OpType::FuncDefn(fd) => fd.visibility() == &Visibility::Private,
-                    OpType::FuncDecl(fd) => fd.visibility() == &Visibility::Private,
-                    _ => true,
+                .filter(|n| match hugr.get_optype(*n) {
+                    OpType::FuncDefn(fd) => fd.visibility() == &Visibility::Public,
+                    OpType::FuncDecl(fd) => fd.visibility() == &Visibility::Public,
+                    _ => false,
                 })
-        );
-        // Run again without hiding, and check the two have the same functions...
-        let mut hugr_public = backup;
+                .collect_vec()
+        };
+
+        // Check there are no public funcs (after hiding)
+        let mut hugr = orig.clone();
+        QSystemPass::default().run(&mut hugr).unwrap();
+        assert_eq!(pub_funcs(&hugr), []);
+
+        // Run again without hiding...
+        let mut hugr_public = orig;
         QSystemPass {
             hide_funcs: false,
             ..Default::default()
@@ -416,21 +420,12 @@ mod test {
         .run(&mut hugr_public)
         .unwrap();
 
-        let mut num_pub = 0;
-        for n in hugr_public.nodes() {
-            let mut expected_optype = hugr_public.get_optype(n).clone();
-            // ...except we expect the public funcs to be private now
-            let vis = match &mut expected_optype {
-                OpType::FuncDefn(fd) => fd.visibility_mut(),
-                OpType::FuncDecl(fd) => fd.visibility_mut(),
-                _ => continue,
-            };
-            if std::mem::replace(vis, Visibility::Private) == Visibility::Public {
-                num_pub += 1;
-            }
-            assert_eq!(hugr.get_optype(n), &expected_optype, "At node {n}:");
-        }
-        assert_eq!(num_pub, 4);
+        assert_eq!(pub_funcs(&hugr_public).len(), 4);
+        assert_eq!(
+            hugr.children(hugr.module_root()).count(),
+            hugr_public.children(hugr_public.module_root()).count()
+        );
+        assert_eq!(hugr.num_nodes(), hugr_public.num_nodes());
     }
 
     #[cfg(feature = "llvm")]
