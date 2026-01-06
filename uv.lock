@@ -22,7 +22,7 @@ dev = [
     { name = "conan", specifier = ">=2.23.0,<3" },
     { name = "graphviz", specifier = "~=0.21.0" },
     { name = "hypothesis", specifier = ">=6.111.1,<7" },
-    { name = "maturin", specifier = ">=1.9.2,<2" },
+    { name = "maturin", specifier = ">=1.10.2,<2" },
     { name = "mypy", specifier = ">=1.17.1,<2" },
     { name = "pip", specifier = ">=25" },
     { name = "pre-commit", specifier = "~=4.3" },
@@ -2746,7 +2746,8 @@ name = "sphinx-autodoc-typehints"
 version = "3.5.2"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.11'",
+    "python_full_version >= '3.14'",
+    "python_full_version >= '3.11' and python_full_version < '3.14'",
 ]
 dependencies = [
     { name = "sphinx", version = "8.2.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
