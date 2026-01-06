@@ -86,7 +86,13 @@ jobs:
           #  manylinux: "musllinux_1_2"
           - runner: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
-            manylinux: "manylinux2014"
+            # Note: The runner image uses GLIBC 2.39, but we verified that the
+            # tket-c-api build works with GLIBC 2.34.
+            #
+            # This is a temporary workaround until we use a pre-built c-api library.
+            # <https://github.com/Quantinuum/tket2/issues/1272>
+            # <https://github.com/Quantinuum/tket2/pull/1271>
+            manylinux: "manylinux_2_34"
             test-wheels: true
           - runner: ubuntu-24.04
             target: x86_64-unknown-linux-musl

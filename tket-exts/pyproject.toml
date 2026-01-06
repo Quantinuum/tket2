@@ -1,6 +1,6 @@
 [project]
 name = "tket-exts"
-version = "0.12.0"
+version = "0.12.1"
 requires-python = ">=3.10"
 description = "Precompiled rewrite sets for the tket compiler"
 license = { file = "LICENCE" }
@@ -26,7 +26,7 @@ classifiers = [
     "Topic :: Scientific/Engineering",
 ]
 
-dependencies = ['hugr ~= 0.14.0']
+dependencies = ['hugr >= 0.14.0, <0.16.0']
 
 [project.urls]
 homepage = "https://github.com/quantinuum/tket2/tree/main/tket-exts"

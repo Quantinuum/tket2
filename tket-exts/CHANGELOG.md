@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.1](https://github.com/Quantinuum/tket2/compare/tket-exts-v0.12.0...tket-exts-v0.12.1) (2026-01-06)
+
+
+### Features
+
+* **exts:** loosen dependency to allow hugr-py 0.15 ([#1344](https://github.com/Quantinuum/tket2/issues/1344)) ([1efcfa6](https://github.com/Quantinuum/tket2/commit/1efcfa6d04c3f9de7f994d50f0a2867c0062d79a))
+
 ## [0.12.0](https://github.com/quantinuum/tket2/compare/tket-exts-v0.11.0...tket-exts-v0.12.0) (2025-10-20)
 
 

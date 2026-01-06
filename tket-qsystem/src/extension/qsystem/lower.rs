@@ -132,6 +132,8 @@ pub fn lower_tk2_op(hugr: &mut impl HugrMut<Node = Node>) -> Result<Vec<Node>, L
                 };
                 lowerer.set_replace_op(
                     &tket_op.into_extension_op(),
+                    // TODO: Call is deprecated. We should use LinkedHugr instead.
+                    #[expect(deprecated)]
                     NodeTemplate::Call(func_node, vec![]),
                 );
             }

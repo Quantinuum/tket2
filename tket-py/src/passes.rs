@@ -67,7 +67,7 @@ create_py_exception!(
 /// - inline_dfgs: Whether to inline DFG operations.
 /// - remove_redundant_order_edges: Whether to remove redundant order edges.
 #[pyfunction]
-#[pyo3(signature = (circ, *, simplify_cfgs = true, remove_tuple_untuple = true, constant_folding = false, remove_dead_funcs = true, inline_dfgs = true, remove_redundant_order_edges = true))]
+#[pyo3(signature = (circ, *, simplify_cfgs = true, remove_tuple_untuple = true, constant_folding = true, remove_dead_funcs = true, inline_dfgs = true, remove_redundant_order_edges = true))]
 fn normalize_guppy<'py>(
     circ: &Bound<'py, PyAny>,
     simplify_cfgs: bool,

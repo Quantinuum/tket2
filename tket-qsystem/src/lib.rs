@@ -6,22 +6,21 @@ pub mod cli;
 pub mod extension;
 #[cfg(feature = "llvm")]
 pub mod llvm;
-mod lower_drops;
+pub mod lower_drops;
 pub mod pytket;
 pub mod replace_bools;
 
 use derive_more::{Display, Error, From};
-use hugr::{
-    Hugr, HugrView, Node,
-    algorithms::{
-        ComposablePass as _, LinearizeArrayPass, MonomorphizePass, RemoveDeadFuncsError,
-        RemoveDeadFuncsPass,
-        const_fold::{ConstFoldError, ConstantFoldPass},
-        force_order,
-        replace_types::ReplaceTypesError,
-    },
-    hugr::{HugrError, hugrmut::HugrMut},
+use hugr::algorithms::const_fold::{ConstFoldError, ConstantFoldPass};
+use hugr::algorithms::{
+    ComposablePass as _, MonomorphizePass, RemoveDeadFuncsError, RemoveDeadFuncsPass, force_order,
+    replace_types::ReplaceTypesError,
 };
+use hugr::hugr::{HugrError, hugrmut::HugrMut};
+use hugr::{Hugr, HugrView, Node, core::Visibility, ops::OpType};
+use hugr_core::hugr::internal::HugrMutInternals;
+use std::collections::HashSet;
+
 use lower_drops::LowerDropsPass;
 use replace_bools::{ReplaceBoolPass, ReplaceBoolPassError};
 use tket::TketOp;
@@ -32,6 +31,9 @@ use extension::{
 };
 
 #[cfg(feature = "llvm")]
+#[expect(deprecated)]
+// TODO: We still want to run this as long as deserialized hugrs are allowed to contain Value::Function
+// Once that variant is removed, we can remove this pass step.
 use hugr::llvm::utils::inline_constant_functions;
 
 /// Modify a [hugr::Hugr] into a form that is acceptable for ingress into a
@@ -44,6 +46,7 @@ pub struct QSystemPass {
     monomorphize: bool,
     force_order: bool,
     lazify: bool,
+    hide_funcs: bool,
 }
 
 impl Default for QSystemPass {
@@ -53,6 +56,7 @@ impl Default for QSystemPass {
             monomorphize: true,
             force_order: true,
             lazify: true,
+            hide_funcs: true,
         }
     }
 }
@@ -69,7 +73,7 @@ pub enum QSystemPassError<N = Node> {
     LowerTk2Error(LowerTk2Error),
     /// An error from the component [ConstantFoldPass] pass.
     ConstantFoldError(ConstFoldError),
-    /// An error from the component [LinearizeArrayPass] pass.
+    /// An error from the component [LowerDropsPass] pass.
     LinearizeArrayError(ReplaceTypesError),
     #[cfg(feature = "llvm")]
     /// An error from the component [inline_constant_functions()] pass.
@@ -115,19 +119,42 @@ impl QSystemPass {
             rdfp.run(hugr)?
         }
 
+        // ReplaceTypes steps (there are several below) can introduce new helper
+        // functions that are public to enable linking/sharing. We'll make these private
+        // once we're done so that LLVM is not forced to compile them as callable.
+        let pubfuncs = self.hide_funcs.then(|| {
+            hugr.children(hugr.module_root())
+                .filter(|n| {
+                    hugr.get_optype(*n)
+                        .as_func_defn()
+                        .is_some_and(|fd| fd.visibility() == &Visibility::Public)
+                })
+                .collect::<HashSet<_>>()
+        });
+
         self.lower_tk2().run(hugr)?;
         if self.lazify {
             self.replace_bools().run(hugr)?;
         }
-        // We expect any Hugr will have *either* drop ops, or ValueArrays (without drops),
-        // so only one of these passes will do anything; the order is thus immaterial.
         self.lower_drops().run(hugr)?;
-        self.linearize_arrays().run(hugr)?;
+
+        if let Some(pubfuncs) = pubfuncs {
+            for n in hugr
+                .children(hugr.module_root())
+                .filter(|n| !pubfuncs.contains(n))
+                .collect::<Vec<_>>()
+            {
+                if let OpType::FuncDefn(fd) = hugr.optype_mut(n) {
+                    *fd.visibility_mut() = Visibility::Private;
+                }
+            }
+        }
 
         #[cfg(feature = "llvm")]
         {
-            // TODO: Remove "llvm" feature gate once `inline_constant_functions` is moved to
-            //  `hugr-passes`. See https://github.com/quantinuum/hugr/issues/2419
+            // TODO: We still want to run this as long as deserialized hugrs are allowed to contain Value::Function
+            // Once that variant is removed, we can remove this pass step.
+            #[expect(deprecated)]
             inline_constant_functions(hugr)?;
         }
         if self.constant_fold {
@@ -201,10 +228,6 @@ impl QSystemPass {
         LowerDropsPass
     }
 
-    fn linearize_arrays(&self) -> LinearizeArrayPass {
-        LinearizeArrayPass::default()
-    }
-
     /// Returns a new `QSystemPass` with constant folding enabled according to
     /// `constant_fold`.
     ///
@@ -251,12 +274,14 @@ impl QSystemPass {
 #[cfg(test)]
 mod test {
     use hugr::{
-        HugrView as _,
-        builder::{Dataflow, DataflowSubContainer, HugrBuilder},
+        Hugr, HugrView as _,
+        builder::{Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder},
+        core::Visibility,
         extension::prelude::qb_t,
         hugr::hugrmut::HugrMut,
-        ops::handle::NodeHandle,
+        ops::{ExtensionOp, OpType, handle::NodeHandle},
         std_extensions::arithmetic::float_types::ConstF64,
+        std_extensions::collections::array::{ArrayOpBuilder, array_type},
         type_row,
         types::Signature,
     };
@@ -264,7 +289,10 @@ mod test {
     use itertools::Itertools as _;
     use petgraph::visit::{Topo, Walker as _};
     use rstest::rstest;
-    use tket::extension::bool::bool_type;
+    use tket::extension::{
+        bool::bool_type,
+        guppy::{DROP_OP_NAME, GUPPY_EXTENSION},
+    };
 
     use crate::{
         QSystemPass,
@@ -352,8 +380,59 @@ mod test {
         }
     }
 
+    #[test]
+    fn hide_funcs() {
+        let orig = {
+            let arr_t = || array_type(4, bool_type());
+            let mut dfb = FunctionBuilder::new("main", Signature::new_endo(arr_t())).unwrap();
+            let [arr] = dfb.input_wires_arr();
+            let (arr1, arr2) = dfb.add_array_clone(bool_type(), 4, arr).unwrap();
+            let dop = GUPPY_EXTENSION.get_op(&DROP_OP_NAME).unwrap();
+            dfb.add_dataflow_op(
+                ExtensionOp::new(dop.clone(), [arr_t().into()]).unwrap(),
+                [arr1],
+            )
+            .unwrap();
+            dfb.finish_hugr_with_outputs([arr2]).unwrap()
+        };
+
+        let count_pub_funcs = |hugr: &Hugr| {
+            hugr.children(hugr.module_root())
+                .filter(|n| match hugr.get_optype(*n) {
+                    OpType::FuncDefn(fd) => fd.visibility() == &Visibility::Public,
+                    OpType::FuncDecl(fd) => fd.visibility() == &Visibility::Public,
+                    _ => false,
+                })
+                .count()
+        };
+
+        // Check there are no public funcs (after hiding)
+        let mut hugr = orig.clone();
+        QSystemPass::default().run(&mut hugr).unwrap();
+        assert_eq!(count_pub_funcs(&hugr), 0);
+
+        // Run again without hiding...
+        let mut hugr_public = orig;
+        QSystemPass {
+            hide_funcs: false,
+            ..Default::default()
+        }
+        .run(&mut hugr_public)
+        .unwrap();
+
+        assert_eq!(count_pub_funcs(&hugr_public), 4);
+        assert_eq!(
+            hugr.children(hugr.module_root()).count(),
+            hugr_public.children(hugr_public.module_root()).count()
+        );
+        assert_eq!(hugr.num_nodes(), hugr_public.num_nodes());
+    }
+
     #[cfg(feature = "llvm")]
     #[test]
+    // TODO: We still want to test this as long as deserialized hugrs are allowed to contain Value::Function
+    // Once that variant is removed, we can remove this test.
+    #[expect(deprecated)]
     fn const_function() {
         use hugr::builder::{Container, DFGBuilder, DataflowHugr, ModuleBuilder};
         use hugr::ops::{CallIndirect, Value};

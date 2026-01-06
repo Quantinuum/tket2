@@ -25,7 +25,7 @@ def normalize_guppy(
     *,
     simplify_cfgs: bool = True,
     remove_tuple_untuple: bool = True,
-    constant_folding: bool = False,
+    constant_folding: bool = True,
     remove_dead_funcs: bool = True,
     inline_dfgs: bool = True,
     remove_redundant_order_edges: bool = True,

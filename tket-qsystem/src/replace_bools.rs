@@ -23,8 +23,7 @@ use hugr::std_extensions::collections::{
 };
 use hugr::std_extensions::logic::LogicOp;
 use hugr::types::{SumType, Term, Type};
-use hugr::{Hugr, HugrView, Node, Wire, hugr::hugrmut::HugrMut, type_row};
-use itertools::Itertools;
+use hugr::{Hugr, Node, Wire, hugr::hugrmut::HugrMut, type_row};
 use static_array::{ReplaceStaticArrayBoolPass, ReplaceStaticArrayBoolPassError};
 use tket::TketOp;
 use tket::extension::{
@@ -259,23 +258,13 @@ fn barray_get_dest(rt: &ReplaceTypes, size: u64, elem_ty: Type) -> NodeTemplate 
         .unwrap()
         .outputs_arr();
 
-    let in_range_container = in_range.container_node();
-    let copy_discard = rt
+    let [elem1, elem2] = rt
         .get_linearizer()
         .copy_discard_op(&elem_ty, 2)
         .unwrap()
-        .add_hugr(in_range.hugr_mut(), in_range_container)
-        .unwrap();
-    in_range
-        .hugr_mut()
-        .connect(elem.node(), elem.source(), copy_discard, 0);
-    let [elem1, elem2] = in_range
-        .hugr_mut()
-        .node_outputs(copy_discard)
-        .map(|p| Wire::new(copy_discard, p))
-        .take(2)
-        .collect_array()
-        .unwrap();
+        .add(&mut in_range, [elem])
+        .unwrap()
+        .outputs_arr();
 
     let [arr] = in_range
         .add_dataflow_op(
