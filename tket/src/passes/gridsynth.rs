@@ -103,7 +103,7 @@ fn find_rzs(hugr: &mut Hugr) -> Option<Vec<hugr::Node>> {
     None
 }
 
-/// find the output port and node linked to the input specified by `port_idz` for `node`
+/// Find the output port and node linked to the input specified by `port_idz` for `node`
 fn find_single_linked_output_by_index(
     hugr: &mut Hugr,
     node: Node,
@@ -126,12 +126,11 @@ fn find_angle_node(
     rz_node: Node,
     garbage_collector: &mut GarbageCollector,
 ) -> Node {
-    // find linked ports to the rz port where the angle will be inputted
+    // Find linked ports to the rz port where the angle will be inputted
     // the port offset of the angle is known to be 1 for the rz gate.
     let (mut prev_node, _) = find_single_linked_output_by_index(hugr, rz_node, 1);
-    // let mut prev_nodes:  Vec<Node> = Vec::new();
 
-    // as all of the NormalizeGuppy passes have been run on the `hugr` before it enters this function,
+    // As all of the NormalizeGuppy passes have been run on the `hugr` before it enters this function,
     // and these passes include constant folding, we can assume that we can follow the 0th ports back
     // to a constant node where the angle is defined.
     let max_iterations = 10;
@@ -139,23 +138,13 @@ fn find_angle_node(
     let mut path = Vec::new(); // The nodes leading up to the angle_node and the angle_node
     // itself
     loop {
-        // prev_nodes.push(prev_node);
         let (current_node, _) = find_single_linked_output_by_index(hugr, prev_node, 0);
         let op_type = hugr.get_optype(current_node);
         path.push(current_node);
 
         garbage_collector.add_references(current_node, 1);
 
-        // TO DO: update the following to apply additional checks that this is the angle node beyond
-        // just the fact it is a constant node
         if op_type.is_const() {
-            // println!("The Rz node is: \n {}", rz_node.index());
-            // println!("The prev_nodes are: {:?}", prev_nodes);
-            // println!("Just before for loop, HUGR is: \n {}", hugr.mermaid_string());
-            // for node in prev_nodes {
-            //     // println!("Inside for loop: \n {}", hugr.mermaid_string());
-            //     hugr.remove_node(node);
-            // }
             let load_const_node = prev_node;
             let angle_node = current_node;
             // Add references to angle node if this has not already been done
@@ -170,12 +159,8 @@ fn find_angle_node(
             return angle_node;
         }
         if ii >= max_iterations {
-            panic!("Angle finding failed"); // TO DO: improve error handling
+            panic!("Angle finding failed");
         }
-
-        // Deleting all but nodes on the way to the angle containing node but not the rz_node itself
-        // hugr.remove_node(prev_node); // TO DO: garbage collect instead (probably do inside if statement above)
-        // garbage_collector.remove_references(prev_node, 1);
 
         prev_node = current_node;
         ii += 1;
@@ -188,7 +173,7 @@ fn find_angle(hugr: &mut Hugr, rz_node: Node, garbage_collector: &mut GarbageCol
     let angle_const = op_type.as_const().unwrap();
     let angle_val = &angle_const.value;
 
-    // handling likely angle formats. Panic if angle is not one of the anticipated formats
+    // Handling likely angle formats. Panic if angle is not one of the anticipated formats
     let angle = if let Some(rot) = angle_val.get_custom_value::<ConstRotation>() {
         rot.to_radians()
     } else if let Some(fl) = angle_val.get_custom_value::<ConstF64>() {
@@ -198,7 +183,7 @@ fn find_angle(hugr: &mut Hugr, rz_node: Node, garbage_collector: &mut GarbageCol
         panic!("Angle not specified as ConstRotation or ConstF64")
     };
 
-    // we now have what we need to know from the angle node and can remove it from the hugr if
+    // We now have what we need to know from the angle node and can remove it from the HUGR if
     // no further references remain to it
     garbage_collector.collect(hugr, angle_node);
 
@@ -218,7 +203,6 @@ fn apply_gridsynth(
     let mut gridsynth_config =
         config_from_theta_epsilon(theta, epsilon, seed, verbose, up_to_phase);
     let gates = gridsynth_gates(&mut gridsynth_config);
-    // println!("{}", gates.gates);
     gates.gates
 }
 
@@ -229,13 +213,13 @@ fn add_gate_and_connect(
     prev_node: Node,
     op: hugr::ops::OpType,
     output_node: Node,
-    qubit_providing_node: Node, // the node providing qubit to Rz gate
-    qubit_providing_port: OutgoingPort, // the output port providing qubit to Rz gate
+    qubit_providing_node: Node, // The node providing qubit to Rz gate
+    qubit_providing_port: OutgoingPort, // The output port providing qubit to Rz gate
 ) -> Node {
     let current_node = hugr.add_node_after(output_node, op);
     let ports: Vec<_> = hugr.node_outputs(prev_node).collect();
 
-    // if the previous node was the qubit_providing_node then it could have multiple
+    // If the previous node was the qubit_providing_node then it could have multiple
     // outputs (eg, if multi-qubit gate and so need to be explicit about port)
     let src_port = if prev_node.index() == qubit_providing_node.index() {
         qubit_providing_port
@@ -250,7 +234,6 @@ fn add_gate_and_connect(
 
     current_node
 } // TO DO: reduce number of arguments to this function. Six is too many.
-// I think that there must be a better way of doing this.
 
 fn replace_rz_with_gridsynth_output(
     hugr: &mut Hugr,
@@ -271,8 +254,6 @@ fn replace_rz_with_gridsynth_output(
 
     // we have now inferred what we need to know from the Rz node we are replacing and can remove it ao
     hugr.remove_node(rz_node);
-
-    // println!("in panicking function: {}", hugr.mermaid_string());
 
     // recursively adding next gate in gates to prev_node
     for gate in gates.chars() {
@@ -322,7 +303,6 @@ fn replace_rz_with_gridsynth_output(
     // Assuming there were no outgoing ports to begin with when deciding port offset
     let src_port = ports[0];
     hugr.connect(prev_node, src_port, next_node, dst_port);
-    // println!("Inside panicking function: \n {}", hugr.mermaid_string());
     hugr.validate()?;
     Ok(())
 }
@@ -338,8 +318,6 @@ pub fn apply_gridsynth_pass(hugr: &mut Hugr, epsilon: f64) -> Result<(), Gridsyn
         .inline_dfgs(true)
         .run(hugr)?;
 
-    // println!("After normalize guppy the hugr is: \n {}", hugr.mermaid_string());
-
     let rz_nodes = find_rzs(hugr).unwrap();
     let mut garbage_collector = GarbageCollector {
         references: HashMap::new(),
@@ -350,7 +328,7 @@ pub fn apply_gridsynth_pass(hugr: &mut Hugr, epsilon: f64) -> Result<(), Gridsyn
         replace_rz_with_gridsynth_output(hugr, node, &gates)?;
     }
     Ok(())
-} // TO DO: change name of this function to gridsynth
+}
 
 /// Example error.
 #[derive(Debug, derive_more::Display, derive_more::Error)]
@@ -386,8 +364,7 @@ mod tests {
         let loaded_const = h.load_const(&constant);
         let rz = h.add_dataflow_op(TketOp::Rz, [q_in, loaded_const]).unwrap();
         let _ = h.set_outputs(rz.outputs());
-        let mut circ = h.finish_hugr().unwrap(); //(rz.outputs()).unwrap().into();
-        // println!("First mermaid string is: {}", circ.mermaid_string());
+        let mut circ = h.finish_hugr().unwrap();
         circ.validate().unwrap_or_else(|e| panic!("{e}"));
         let rz_nodes = find_rzs(&mut circ).unwrap();
         let rz_node = rz_nodes[0];
@@ -395,19 +372,19 @@ mod tests {
     }
 
     fn build_non_trivial_circ() -> Hugr {
-        // defining some angles for Rz gates in radians
+        // Defining some angles for Rz gates in radians
         let alpha = 0.23;
         let beta = 1.78;
         let inverse_angle = -alpha - beta;
 
-        // defining builder for circuit
+        // Defining builder for circuit
         let qb_row = vec![qb_t(); 1];
         let meas_row = vec![bool_type(); 1];
         let mut builder =
             DFGBuilder::new(Signature::new(qb_row.clone(), meas_row.clone())).unwrap();
         let [q1] = builder.input_wires_arr();
 
-        // adding constant wires and nodes
+        // Adding constant wires and nodes
         let alpha_const = builder.add_constant(Value::extension(
             ConstRotation::from_radians(alpha).unwrap(),
         ));
@@ -420,7 +397,7 @@ mod tests {
         ));
         let loaded_inverse = builder.load_const(&inverse_const);
 
-        // adding gates and measurements
+        // Adding gates and measurements
         let had1 = builder.add_dataflow_op(TketOp::H, [q1]).unwrap();
         let [q1] = had1.outputs_arr();
         let rz_alpha = builder
@@ -448,19 +425,19 @@ mod tests {
     }
 
     fn build_non_trivial_circ_2qubits() -> Hugr {
-        // defining some angles for Rz gates in radians
+        // Defining some angles for Rz gates in radians
         let alpha = 0.23;
         let beta = 1.78;
         let inverse_angle = -alpha - beta;
 
-        // defining builder for circuit
+        // Defining builder for circuit
         let qb_row = vec![qb_t(); 2];
         let meas_row = vec![bool_type(); 2];
         let mut builder =
             DFGBuilder::new(Signature::new(qb_row.clone(), meas_row.clone())).unwrap();
         let [q1, q2] = builder.input_wires_arr();
 
-        // adding constant wires and nodes
+        // Adding constant wires and nodes
         let alpha_const = builder.add_constant(Value::extension(
             ConstRotation::from_radians(alpha).unwrap(),
         ));
@@ -473,7 +450,7 @@ mod tests {
         ));
         let loaded_inverse = builder.load_const(&inverse_const);
 
-        // adding gates and measurements
+        // Adding gates and measurements
         let had1 = builder.add_dataflow_op(TketOp::H, [q1]).unwrap();
         let [q1] = had1.outputs_arr();
         let rz_alpha = builder
@@ -504,8 +481,6 @@ mod tests {
             .add_dataflow_op(TketOp::MeasureFree, [q2])
             .unwrap()
             .out_wire(0);
-
-        //println!("{}", builder.hugr().mermaid_string());
 
         builder
             .finish_hugr_with_outputs([meas_res1, meas_res2])
@@ -540,7 +515,6 @@ mod tests {
         // of this circuit working)
         let epsilon = 1e-2;
         let mut hugr = build_non_trivial_circ_2qubits();
-        println!("before gridsynth: {}", hugr.mermaid_string());
 
         apply_gridsynth_pass(&mut hugr, epsilon).unwrap();
     }
