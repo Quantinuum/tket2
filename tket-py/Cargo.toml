@@ -26,7 +26,6 @@ tket = { path = "../tket", version = "0.16.0", features = [
 ] }
 tket-qsystem = { path = "../tket-qsystem", version = "0.22.0" }
 tket1-passes = { path = "../tket1-passes", version = "0.0.0" }
-
 derive_more = { workspace = true, features = ["into", "from"] }
 hugr = { workspace = true }
 itertools = { workspace = true }

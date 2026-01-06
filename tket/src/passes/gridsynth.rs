@@ -3,11 +3,11 @@
 use std::collections::HashMap;
 
 use crate::extension::rotation::ConstRotation;
-use crate::hugr::hugr::hugrmut::HugrMut;
+use crate::hugr::hugr::{ValidationError, hugrmut::HugrMut};
 use crate::hugr::HugrView;
-use crate::hugr::{Node, Port};
+use crate::hugr::Node;
 use crate::hugr::NodeIndex;
-use crate::passes::guppy::NormalizeGuppy;
+use crate::passes::guppy::{NormalizeGuppy, NormalizeGuppyErrors};
 use crate::TketOp;
 use crate::{hugr, op_matches, Hugr};
 use hugr::algorithms::ComposablePass;
@@ -16,6 +16,19 @@ use hugr_core::OutgoingPort;
 use rsgridsynth::config::config_from_theta_epsilon;
 use rsgridsynth::gridsynth::gridsynth_gates;
 
+/// Errors that can occur during the Gridsynth pass due to acting on a hugr that 
+/// goes beyond the scope of what the pass can optimise. The most likely reasons for this
+/// are that the Rz angle is defined at runtime or that the NormalizeGuppy pass is unable
+/// to standardise the form of the HUGR enough. Issues may occur when the constant node 
+/// providing the angle crosses function boundaries or if the control flow is especially
+/// complicated
+#[derive(derive_more::Error, Debug, derive_more::Display, derive_more::From)]
+pub enum GridsynthError {
+    /// Error during the NormalizeGuppy pass
+    NormalizeGuppyErrors(NormalizeGuppyErrors),
+    /// Error during validation of the HUGR
+    ValidationError(ValidationError<Node>)
+}
 /// Garbage collector for cleaning up constant nodes providing angles to the Rz gates and 
 /// all nodes on the path to them.
 struct GarbageCollector{
@@ -85,15 +98,6 @@ fn find_rzs(hugr: &mut Hugr) -> Option<Vec<hugr::Node>> {
     None
 }
 
-// TO DO: extend this function to find all RZ gates
-
-fn find_linked_incoming_ports(hugr: &mut Hugr, node: Node, port_idx: usize) -> Vec<(Node, Port)> {
-    let ports = hugr.node_inputs(node);
-    let collected_ports: Vec<_> = ports.collect();
-    let linked_ports = hugr.linked_ports(node, collected_ports[port_idx]);
-    let linked_ports: Vec<(Node, Port)> = linked_ports.collect();
-    linked_ports
-}
 
 /// find the output port and node linked to the input specified by `port_idz` for `node`
 fn find_single_linked_output_by_index(
@@ -204,13 +208,6 @@ fn apply_gridsynth(hugr: &mut Hugr, epsilon: f64, rz_node: Node,
     gates.gates
 }
 
-/// get previous node that provided qubit to Rz gate
-fn find_qubit_source(hugr: &mut Hugr, rz_node: Node) -> Node {
-    let linked_ports = find_linked_incoming_ports(hugr, rz_node, 0);
-
-    linked_ports[0].0
-}
-
 /// Add a gridsynth gate to some previous node, which may or may not be a gridsynth gate,
 /// and connect
 fn add_gate_and_connect(
@@ -242,7 +239,8 @@ fn add_gate_and_connect(
 } // TO DO: reduce number of arguments to this function. Six is too many.
   // I think that there must be a better way of doing this.
 
-fn replace_rz_with_gridsynth_output(hugr: &mut Hugr, rz_node: Node, gates: &str) {
+fn replace_rz_with_gridsynth_output(hugr: &mut Hugr, rz_node: Node, gates: &str) 
+    -> Result<(), GridsynthError> {
     // getting node and output port that gave qubit to Rz gate
     let inputs: Vec<_> = hugr.node_inputs(rz_node).collect();
     let input_port = inputs[0];
@@ -286,11 +284,13 @@ fn replace_rz_with_gridsynth_output(hugr: &mut Hugr, rz_node: Node, gates: &str)
     let src_port = ports[0]; 
     hugr.connect(prev_node, src_port, next_node, dst_port);
     // println!("Inside panicking function: \n {}", hugr.mermaid_string());
-    hugr.validate().unwrap_or_else(|e| panic!("{e}"));
+    hugr.validate()?;
+    Ok(())
 }
 
 /// Replace an Rz gate with the corresponding gates outputted by gridsynth
-pub fn apply_gridsynth_pass(hugr: &mut Hugr, epsilon: f64) {
+pub fn apply_gridsynth_pass (
+    hugr: &mut Hugr, epsilon: f64) -> Result<(), GridsynthError> {
     // Running passes to convert HUGR to standard form
     NormalizeGuppy::default()
         .simplify_cfgs(true)
@@ -298,8 +298,7 @@ pub fn apply_gridsynth_pass(hugr: &mut Hugr, epsilon: f64) {
         .constant_folding(true)
         .remove_dead_funcs(true)
         .inline_dfgs(true)
-        .run(hugr)
-        .unwrap();
+        .run(hugr)?;
 
     // println!("After normalize guppy the hugr is: \n {}", hugr.mermaid_string());
 
@@ -309,8 +308,9 @@ pub fn apply_gridsynth_pass(hugr: &mut Hugr, epsilon: f64) {
         path: HashMap::new()};
     for node in rz_nodes {
         let gates = apply_gridsynth(hugr, epsilon, node, &mut garbage_collector);
-        replace_rz_with_gridsynth_output(hugr, node, &gates);
+        replace_rz_with_gridsynth_output(hugr, node, &gates)?;
     }
+    Ok(())
 } // TO DO: change name of this function to gridsynth
 
 /// Example error.
@@ -320,24 +320,20 @@ pub struct ExampleError {
     message: String,
 }
 
-// Test of example function
+// The following tests only check if any errors occur because Selene is challenging to access from the rust 
+// API. However, Selene simulations in Python versions of the HUGRs in these tests and more complicated HUGRS are
+// available at https://github.com/Quantinuum/gridsynth_guppy_demo.git 
 #[cfg(test)]
 mod tests {
-    use std::fs::File;
-    use std::io::BufReader;
-
     use super::*;
 
     use crate::extension::rotation::ConstRotation;
     use crate::hugr::builder::{Container, DFGBuilder, Dataflow, HugrBuilder};
-    use crate::hugr::envelope::read_described_envelope;
     use crate::extension::bool::bool_type;
     use crate::hugr::extension::prelude::{qb_t};
     use crate::hugr::ops::Value;
     use crate::hugr::types::Signature;
-    use hugr::NodeIndex;
     use hugr::builder::DataflowHugr;
-    use hugr_core::std_extensions::std_reg;
 
     fn build_rz_only_circ() -> (Hugr, Node) {
         let theta = 0.64;
@@ -402,7 +398,7 @@ mod tests {
 
         //println!("{}", builder.hugr().mermaid_string());
 
-        let mut circ = builder.finish_hugr_with_outputs([meas_res]).unwrap_or_else(|e| panic!("{e}"));
+        let circ = builder.finish_hugr_with_outputs([meas_res]).unwrap_or_else(|e| panic!("{e}"));
         // let mut circ = builder.finish_hugr_with_outputs([q1, q2]).unwrap();
         circ
     }
@@ -459,27 +455,9 @@ mod tests {
 
         //println!("{}", builder.hugr().mermaid_string());
 
-        let mut circ = builder.finish_hugr_with_outputs([meas_res1, meas_res2]).unwrap_or_else(|e| panic!("{e}"));
+        let circ = builder.finish_hugr_with_outputs([meas_res1, meas_res2]).unwrap_or_else(|e| panic!("{e}"));
         // let mut circ = builder.finish_hugr_with_outputs([q1, q2]).unwrap();
         circ
-    }
-
-    fn import_guppy(path: &'static str) -> Hugr {
-        let f = File::open(path).unwrap();
-        let reader = BufReader::new(f);
-        let registry = std_reg();
-        let (_, imported_package) = read_described_envelope(reader, &registry).unwrap();
-
-        imported_package.modules[0].clone()
-    }
-
-    fn import_rz_only_guppy_circuit() -> Hugr {
-        // TODO: update the following path
-        import_guppy("/home/kennycampbell/coding_projects/tket_gridsynth_ext/guppy_rz")
-    }
-
-    fn import_2rzs_guppy() -> Hugr {
-        import_guppy("/home/kennycampbell/coding_projects/tket_gridsynth_ext/guppy_2Rzs")
     }
 
     #[test]
@@ -487,126 +465,31 @@ mod tests {
         // This test is just to check if a panic occurs
         let (mut circ, _) = build_rz_only_circ();
         let epsilon: f64 = 1e-3;
-        // let rz_node = find_rzs(&mut circ).unwrap()[0];
-        // let gates = apply_gridsynth(&mut circ, epsilon, rz_node);
-        // println!("{}", &gates);
-        apply_gridsynth_pass(&mut circ, epsilon);
-        println!("{}", circ.mermaid_string());
-    }
-
-    #[test]
-    fn found_rz_guppy() {
-        let imported_hugr = &mut import_rz_only_guppy_circuit();
-        NormalizeGuppy::default()
-            .simplify_cfgs(true)
-            .remove_tuple_untuple(true)
-            .constant_folding(true)
-            .remove_dead_funcs(true)
-            .inline_dfgs(true)
-            .run(imported_hugr)
-            .unwrap();
-        let rz_nodes = find_rzs(imported_hugr).unwrap();
-        let rz_node = rz_nodes[0];
-        assert_eq!(rz_node.index(), 17)
-    }
-
-    #[test]
-    fn test_find_angle_node_for_guppy() {
-        let imported_hugr = &mut import_rz_only_guppy_circuit();
-        NormalizeGuppy::default()
-            .simplify_cfgs(true)
-            .remove_tuple_untuple(true)
-            .constant_folding(true)
-            .remove_dead_funcs(true)
-            .inline_dfgs(true)
-            .run(imported_hugr)
-            .unwrap();
-        let mut garbage_collector = GarbageCollector{
-            references: HashMap::new(), 
-            path: HashMap::new()};
-        let rz_nodes = find_rzs(imported_hugr).unwrap();
-        let rz_node = rz_nodes[0];
-        let angle_node = find_angle_node(imported_hugr, rz_node, &mut garbage_collector);
-        assert_eq!(angle_node.index(), 20);
-    }
-
-    #[test]
-    fn test_find_angle_for_guppy() {
-        let imported_hugr = &mut import_rz_only_guppy_circuit();
-        NormalizeGuppy::default()
-            .simplify_cfgs(true)
-            .remove_tuple_untuple(true)
-            .constant_folding(true)
-            .remove_dead_funcs(true)
-            .inline_dfgs(true)
-            .run(imported_hugr)
-            .unwrap();
-        let mut garbage_collector = GarbageCollector{
-            references: HashMap::new(), 
-            path: HashMap::new()};
-        let rz_nodes = find_rzs(imported_hugr).unwrap();
-        let rz_node = rz_nodes[0];
-        let angle = find_angle(imported_hugr, rz_node, &mut garbage_collector);
-        // println!("angle is {}", angle);
-        // println!("hugr is {}", imported_hugr.mermaid_string());
-    }
-
-    #[test]
-    fn test_with_guppy_hugr() {
-        let epsilon = 1e-2;
-        let imported_hugr = &mut import_rz_only_guppy_circuit();
-        NormalizeGuppy::default()
-            .simplify_cfgs(true)
-            .remove_tuple_untuple(true)
-            .constant_folding(true)
-            .remove_dead_funcs(true)
-            .inline_dfgs(true)
-            .run(imported_hugr)
-            .unwrap();
-        // constant_fold_pass(imported_hugr.as_mut());
-        // println!("after {}", imported_hugr.mermaid_string());
-        apply_gridsynth_pass(imported_hugr, epsilon);
-        println!("after: {}", imported_hugr.mermaid_string());
-    }
-
-    #[test]
-    fn test_2rzs_guppy_hugr() {
-        let epsilon = 1e-2;
-        let imported_hugr = &mut import_2rzs_guppy();
-        // println!("before: {}", imported_hugr.mermaid_string());
-        NormalizeGuppy::default()
-            .simplify_cfgs(true)
-            .remove_tuple_untuple(true)
-            .constant_folding(true)
-            .remove_dead_funcs(true)
-            .inline_dfgs(true)
-            .run(imported_hugr)
-            .unwrap();
-        // constant_fold_pass(imported_hugr.as_mut());
-        // println!("after {}", imported_hugr.mermaid_string());
-        apply_gridsynth_pass(imported_hugr, epsilon);
-        println!("after: {}", imported_hugr.mermaid_string());
+        apply_gridsynth_pass(&mut circ, epsilon).unwrap();
     }
 
     #[test]
     fn test_non_trivial_circ_1qubit() {
+        // Due to challenge of accessing Selene from rust, this just 
+        // tests for if errors occur. It would be nice to have a call to
+        // Selene here. (See https://github.com/Quantinuum/gridsynth_guppy_demo.git for a Python example
+        // of this circuit working)
         let epsilon = 1e-2;
         let mut hugr = build_non_trivial_circ();
 
-        apply_gridsynth_pass(&mut hugr, epsilon);
-        // TO DO: FINISH by checking measurement results
-        // will need to run selene sim
+        apply_gridsynth_pass(&mut hugr, epsilon).unwrap();
     }
 
     #[test]
     fn test_non_trivial_circ_2qubits() {
+        // Due to challenge of accessing Selene from rust, this just 
+        // tests for if errors occur. It would be nice to have a call to
+        // Selene here. (See https://github.com/Quantinuum/gridsynth_guppy_demo.git for a Python example
+        // of this circuit working)
         let epsilon = 1e-2;
         let mut hugr = build_non_trivial_circ_2qubits();
         println!("before gridsynth: {}", hugr.mermaid_string());
 
-        apply_gridsynth_pass(&mut hugr, epsilon);
-        // TO DO: FINISH by checking measurement results
-        // Will need to run selene sim
-
+        apply_gridsynth_pass(&mut hugr, epsilon).unwrap();
     }
 }

@@ -102,7 +102,3 @@ zstd = "0.13.3"
 anyhow = "1.0.100"
 num-rational = "0.4.2"
 rsgridsynth = "0.2.0"
-
-[profile.release.package.tket-py]
-# Some configurations to reduce the size of tket wheels
-strip = true
