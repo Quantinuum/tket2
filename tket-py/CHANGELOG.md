@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.12.14](https://github.com/Quantinuum/tket2/compare/tket-py-v0.12.13...tket-py-v0.12.14) (2026-01-06)
+
+
+### Features
+
+* Remove order edges in NormalizeGuppy pass ([#1326](https://github.com/Quantinuum/tket2/issues/1326)) ([dbfffd5](https://github.com/Quantinuum/tket2/commit/dbfffd5ec1fc8064dec3f9de1324a17a1545b1c5)), closes [#1325](https://github.com/Quantinuum/tket2/issues/1325)
+* Use constant folding by default on NormalizeGuppy ([#1323](https://github.com/Quantinuum/tket2/issues/1323)) ([6f11024](https://github.com/Quantinuum/tket2/commit/6f11024a6888660567540e7a2d2ac0bc0fd30dc3))
+
 ## [0.12.13](https://github.com/Quantinuum/tket2/compare/tket-py-v0.12.12...tket-py-v0.12.13) (2025-12-10)
 
 
