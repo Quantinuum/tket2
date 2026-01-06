@@ -43,11 +43,11 @@ large_enum_variant = "allow"
 [patch.crates-io]
 
 # Uncomment to use unreleased versions of hugr
-# hugr = { git = "https://github.com/quantinuum/hugr", "rev" = "5415abebf35be4af4e5bac5c7fe54381aea55a3e" }
-# hugr-core = { git = "https://github.com/quantinuum/hugr", "rev" = "5415abebf35be4af4e5bac5c7fe54381aea55a3e" }
-# hugr-cli = { git = "https://github.com/quantinuum/hugr", "rev" = "5415abebf35be4af4e5bac5c7fe54381aea55a3e" }
-# hugr-passes = { git = "https://github.com/quantinuum/hugr", "rev" = "5415abebf35be4af4e5bac5c7fe54381aea55a3e" }
-# hugr-llvm = { git = "https://github.com/quantinuum/hugr", "rev" = "5415abebf35be4af4e5bac5c7fe54381aea55a3e" }
+hugr = { git = "https://github.com/quantinuum/hugr", "branch" = "acl/replace_types_recursive_linked" }
+hugr-core = { git = "https://github.com/quantinuum/hugr", "branch" = "acl/replace_types_recursive_linked" }
+hugr-cli = { git = "https://github.com/quantinuum/hugr", "branch" = "acl/replace_types_recursive_linked" }
+hugr-passes = { git = "https://github.com/quantinuum/hugr", "branch" = "acl/replace_types_recursive_linked" }
+hugr-llvm = { git = "https://github.com/quantinuum/hugr", "branch" = "acl/replace_types_recursive_linked" }
 # portgraph = { git = "https://github.com/quantinuum/portgraph", rev = "68b96ac737e0c285d8c543b2d74a7aa80a18202c" }
 
 [workspace.dependencies]
