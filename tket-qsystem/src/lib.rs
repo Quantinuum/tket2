@@ -11,16 +11,16 @@ pub mod pytket;
 pub mod replace_bools;
 
 use derive_more::{Display, Error, From};
-use hugr::{
-    Hugr, HugrView, Node,
-    algorithms::{
-        ComposablePass as _, MonomorphizePass, RemoveDeadFuncsError, RemoveDeadFuncsPass,
-        const_fold::{ConstFoldError, ConstantFoldPass},
-        force_order,
-        replace_types::ReplaceTypesError,
-    },
-    hugr::{HugrError, hugrmut::HugrMut},
+use hugr::algorithms::const_fold::{ConstFoldError, ConstantFoldPass};
+use hugr::algorithms::{
+    ComposablePass as _, MonomorphizePass, RemoveDeadFuncsError, RemoveDeadFuncsPass, force_order,
+    replace_types::ReplaceTypesError,
 };
+use hugr::hugr::{HugrError, hugrmut::HugrMut};
+use hugr::{Hugr, HugrView, Node, core::Visibility, ops::OpType};
+use hugr_core::hugr::internal::HugrMutInternals;
+use std::collections::HashSet;
+
 use lower_drops::LowerDropsPass;
 use replace_bools::{ReplaceBoolPass, ReplaceBoolPassError};
 use tket::TketOp;
@@ -46,6 +46,7 @@ pub struct QSystemPass {
     monomorphize: bool,
     force_order: bool,
     lazify: bool,
+    hide_funcs: bool,
 }
 
 impl Default for QSystemPass {
@@ -55,6 +56,7 @@ impl Default for QSystemPass {
             monomorphize: true,
             force_order: true,
             lazify: true,
+            hide_funcs: true,
         }
     }
 }
@@ -117,11 +119,36 @@ impl QSystemPass {
             rdfp.run(hugr)?
         }
 
+        // ReplaceTypes steps (there are several below) can introduce new helper
+        // functions that are public to enable linking/sharing. We'll make these private
+        // once we're done so that LLVM is not forced to compile them as callable.
+        let pubfuncs = self.hide_funcs.then(|| {
+            hugr.children(hugr.module_root())
+                .filter(|n| {
+                    hugr.get_optype(*n)
+                        .as_func_defn()
+                        .is_some_and(|fd| fd.visibility() == &Visibility::Public)
+                })
+                .collect::<HashSet<_>>()
+        });
+
         self.lower_tk2().run(hugr)?;
         if self.lazify {
             self.replace_bools().run(hugr)?;
         }
         self.lower_drops().run(hugr)?;
+
+        if let Some(pubfuncs) = pubfuncs {
+            for n in hugr
+                .children(hugr.module_root())
+                .filter(|n| !pubfuncs.contains(n))
+                .collect::<Vec<_>>()
+            {
+                if let OpType::FuncDefn(fd) = hugr.optype_mut(n) {
+                    *fd.visibility_mut() = Visibility::Private;
+                }
+            }
+        }
 
         #[cfg(feature = "llvm")]
         {
@@ -247,12 +274,14 @@ impl QSystemPass {
 #[cfg(test)]
 mod test {
     use hugr::{
-        HugrView as _,
-        builder::{Dataflow, DataflowSubContainer, HugrBuilder},
+        Hugr, HugrView as _,
+        builder::{Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder},
+        core::Visibility,
         extension::prelude::qb_t,
         hugr::hugrmut::HugrMut,
-        ops::handle::NodeHandle,
+        ops::{ExtensionOp, OpType, handle::NodeHandle},
         std_extensions::arithmetic::float_types::ConstF64,
+        std_extensions::collections::array::{ArrayOpBuilder, array_type},
         type_row,
         types::Signature,
     };
@@ -260,7 +289,10 @@ mod test {
     use itertools::Itertools as _;
     use petgraph::visit::{Topo, Walker as _};
     use rstest::rstest;
-    use tket::extension::bool::bool_type;
+    use tket::extension::{
+        bool::bool_type,
+        guppy::{DROP_OP_NAME, GUPPY_EXTENSION},
+    };
 
     use crate::{
         QSystemPass,
@@ -346,6 +378,54 @@ mod test {
         {
             assert!(get_pos(call_node) < get_pos(n));
         }
+    }
+
+    #[test]
+    fn hide_funcs() {
+        let orig = {
+            let arr_t = || array_type(4, bool_type());
+            let mut dfb = FunctionBuilder::new("main", Signature::new_endo(arr_t())).unwrap();
+            let [arr] = dfb.input_wires_arr();
+            let (arr1, arr2) = dfb.add_array_clone(bool_type(), 4, arr).unwrap();
+            let dop = GUPPY_EXTENSION.get_op(&DROP_OP_NAME).unwrap();
+            dfb.add_dataflow_op(
+                ExtensionOp::new(dop.clone(), [arr_t().into()]).unwrap(),
+                [arr1],
+            )
+            .unwrap();
+            dfb.finish_hugr_with_outputs([arr2]).unwrap()
+        };
+
+        let count_pub_funcs = |hugr: &Hugr| {
+            hugr.children(hugr.module_root())
+                .filter(|n| match hugr.get_optype(*n) {
+                    OpType::FuncDefn(fd) => fd.visibility() == &Visibility::Public,
+                    OpType::FuncDecl(fd) => fd.visibility() == &Visibility::Public,
+                    _ => false,
+                })
+                .count()
+        };
+
+        // Check there are no public funcs (after hiding)
+        let mut hugr = orig.clone();
+        QSystemPass::default().run(&mut hugr).unwrap();
+        assert_eq!(count_pub_funcs(&hugr), 0);
+
+        // Run again without hiding...
+        let mut hugr_public = orig;
+        QSystemPass {
+            hide_funcs: false,
+            ..Default::default()
+        }
+        .run(&mut hugr_public)
+        .unwrap();
+
+        assert_eq!(count_pub_funcs(&hugr_public), 4);
+        assert_eq!(
+            hugr.children(hugr.module_root()).count(),
+            hugr_public.children(hugr_public.module_root()).count()
+        );
+        assert_eq!(hugr.num_nodes(), hugr_public.num_nodes());
     }
 
     #[cfg(feature = "llvm")]
