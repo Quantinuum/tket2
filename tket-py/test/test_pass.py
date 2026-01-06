@@ -220,6 +220,7 @@ def test_normalize_guppy():
     normal_circ2 = normalize_guppy(c2)
     assert normal_circ2.circuit_cost(lambda op: int(op == TketOp.CX)) == 3
 
+
 # def test_gridsynth_pass():
 #     alpha = 0.71
 #     beta = 1.89
@@ -234,5 +235,3 @@ def test_normalize_guppy():
 #     runner = build(hugr, "test")
 #     shots = QsysResult(
 #         runner.run_shots(Quest(), n_qubits=1, n_shots=1))
-
-
