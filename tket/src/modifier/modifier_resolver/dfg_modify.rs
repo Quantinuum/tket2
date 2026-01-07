@@ -5,6 +5,7 @@ use std::{
 };
 
 use hugr::{
+    HugrView, IncomingPort, Node, OutgoingPort, PortIndex, Wire,
     builder::{
         ConditionalBuilder, Container, DFGBuilder, Dataflow, FunctionBuilder, SubContainer,
         TailLoopBuilder,
@@ -12,10 +13,9 @@ use hugr::{
     core::HugrNode,
     extension::prelude::qb_t,
     hugr::hugrmut::HugrMut,
-    ops::{Call, Conditional, DataflowBlock, DataflowOpTrait, OpType, TailLoop, DFG},
+    ops::{Call, Conditional, DFG, DataflowBlock, DataflowOpTrait, OpType, TailLoop},
     std_extensions::collections::array::ArrayOpBuilder,
     types::{FuncTypeBase, Signature, TypeArg, TypeRow},
-    HugrView, IncomingPort, Node, OutgoingPort, PortIndex, Wire,
 };
 use hugr_core::hugr::internal::PortgraphNodeMap;
 use petgraph::visit::{Topo, Walker};
@@ -133,8 +133,8 @@ impl<N: HugrNode> ModifierResolver<N> {
             }
             OpType::DataflowBlock(dfb) => {
                 let DataflowBlock {
-                    inputs: ref input,
-                    other_outputs: ref output,
+                    inputs: input,
+                    other_outputs: output,
                     sum_rows: _sum_rows,
                 } = dfb;
                 let offset = self.control_num();
@@ -256,7 +256,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                 return Err(ModifierResolverErrors::unreachable(format!(
                     "Cannot wire outputs of control qubit in the node of OpType: {}",
                     optype
-                )))
+                )));
             }
         }
         Ok(())
@@ -638,22 +638,22 @@ where
 
 #[cfg(test)]
 mod test {
-    use super::super::tests::{test_modifier_resolver, SetUnitary};
+    use super::super::tests::{SetUnitary, test_modifier_resolver};
     use super::super::*;
+    use crate::TketOp;
     use crate::extension::{
         modifier::{CONTROL_OP_ID, DAGGER_OP_ID, MODIFIER_EXTENSION},
-        rotation::{rotation_type, ConstRotation},
+        rotation::{ConstRotation, rotation_type},
     };
-    use crate::TketOp;
     use cool_asserts::assert_matches;
     use hugr::{
+        Hugr,
         builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder, SubContainer},
         extension::prelude::qb_t,
-        ops::{handle::FuncID, CallIndirect, ExtensionOp},
-        std_extensions::collections::array::{array_type, ArrayOpBuilder},
+        ops::{CallIndirect, ExtensionOp, handle::FuncID},
+        std_extensions::collections::array::{ArrayOpBuilder, array_type},
         type_row,
         types::{Signature, Term},
-        Hugr,
     };
 
     fn foo_dfg(module: &mut ModuleBuilder<Hugr>, t_num: usize) -> FuncID<true> {

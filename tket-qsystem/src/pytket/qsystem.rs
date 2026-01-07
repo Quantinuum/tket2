@@ -1,19 +1,19 @@
 //! Encoder/decoder for [qsystem::EXTENSION][use crate::extension::qsystem::EXTENSION] operations.
 
-use hugr::extension::simple_op::MakeExtensionOp;
-use hugr::extension::ExtensionId;
-use hugr::ops::ExtensionOp;
 use hugr::HugrView;
+use hugr::extension::ExtensionId;
+use hugr::extension::simple_op::MakeExtensionOp;
+use hugr::ops::ExtensionOp;
 use itertools::Itertools as _;
+use tket::Circuit;
 use tket::serialize::pytket::decoder::{
     DecodeStatus, LoadedParameter, ParameterType, PytketDecoderContext, TrackedBit, TrackedQubit,
 };
-use tket::serialize::pytket::encoder::{make_tk1_operation, EmitCommandOptions, EncodeStatus};
+use tket::serialize::pytket::encoder::{EmitCommandOptions, EncodeStatus, make_tk1_operation};
 use tket::serialize::pytket::extension::PytketDecoder;
 use tket::serialize::pytket::{
     PytketDecodeError, PytketEmitter, PytketEncodeError, PytketEncoderContext,
 };
-use tket::Circuit;
 use tket_json_rs::optype::OpType as PytketOptype;
 
 use crate::extension;

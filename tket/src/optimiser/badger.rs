@@ -17,7 +17,7 @@ mod qtz_circuit;
 mod worker;
 
 use crossbeam_channel::select;
-pub use eq_circ_class::{load_eccs_json_file, EqCircClass};
+pub use eq_circ_class::{EqCircClass, load_eccs_json_file};
 use hugr::hugr::HugrError;
 use hugr::{HugrView, Node};
 pub use log::BadgerLogger;
@@ -27,14 +27,14 @@ use std::num::NonZeroUsize;
 use std::time::{Duration, Instant};
 use std::{mem, thread};
 
-use crate::circuit::cost::CircuitCost;
-use crate::circuit::CircuitHash;
-use crate::optimiser::badger::worker::BadgerWorker;
-use crate::optimiser::{pqueue_worker, BacktrackingOptimiser, Optimiser, State, StatePQWorker};
-use crate::passes::CircuitChunks;
-use crate::rewrite::strategy::{RewriteResult, RewriteStrategy};
-use crate::rewrite::Rewriter;
 use crate::Circuit;
+use crate::circuit::CircuitHash;
+use crate::circuit::cost::CircuitCost;
+use crate::optimiser::badger::worker::BadgerWorker;
+use crate::optimiser::{BacktrackingOptimiser, Optimiser, State, StatePQWorker, pqueue_worker};
+use crate::passes::CircuitChunks;
+use crate::rewrite::Rewriter;
+use crate::rewrite::strategy::{RewriteResult, RewriteStrategy};
 
 /// Configuration options for the Badger optimiser.
 #[derive(Copy, Clone, Debug)]
@@ -295,14 +295,13 @@ where
                         Ok(pqueue_worker::LogMessage::StateCount{processed_count: proc, seen_count: seen, queue_length}) => {
                             processed_count = proc;
                             seen_count = seen;
-                            if let Some(max_circuit_count) = opt.max_circuit_count {
-                                if seen_count > max_circuit_count {
+                            if let Some(max_circuit_count) = opt.max_circuit_count
+                                && seen_count > max_circuit_count {
                                     timeout_flag = true;
                                     // Signal the workers to stop.
                                     let _ = pq.close();
                                     break;
                                 }
-                            }
                             logger.log_progress(processed_count, Some(queue_length), seen_count);
                         }
                         Err(crossbeam_channel::RecvError) => {
@@ -449,9 +448,9 @@ mod badger_default {
 
     use hugr::ops::OpType;
 
+    use crate::rewrite::ECCRewriter;
     use crate::rewrite::ecc_rewriter::RewriterSerialisationError;
     use crate::rewrite::strategy::{ExhaustiveGreedyStrategy, LexicographicCostFunction};
-    use crate::rewrite::ECCRewriter;
 
     use super::*;
 
@@ -523,17 +522,17 @@ pub use badger_default::{DefaultBadgerStrategy, ECCBadgerOptimiser};
 #[cfg(feature = "portmatching")]
 mod tests {
     use hugr::{
+        HugrView,
         builder::{DFGBuilder, Dataflow, DataflowHugr},
         extension::prelude::qb_t,
         types::Signature,
-        HugrView,
     };
     use rstest::{fixture, rstest};
 
     use crate::serialize::load_tk1_json_str;
     use crate::serialize::pytket::DecodeOptions;
-    use crate::{extension::rotation::rotation_type, optimiser::badger::BadgerOptions};
     use crate::{Circuit, TketOp};
+    use crate::{extension::rotation::rotation_type, optimiser::badger::BadgerOptions};
 
     use super::{BadgerOptimiser, ECCBadgerOptimiser};
 

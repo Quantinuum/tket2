@@ -1,18 +1,17 @@
 //! Definitions of the payloads for opaque barrier metadata in pytket circuits.
 
 use hugr::core::HugrNode;
-use hugr::envelope::{EnvelopeConfig, EnvelopeError};
-use hugr::extension::resolution::{resolve_type_extensions, WeakExtensionRegistry};
-use hugr::extension::{ExtensionRegistry, ExtensionRegistryLoadError};
+use hugr::envelope::EnvelopeConfig;
+use hugr::extension::ExtensionRegistry;
+use hugr::extension::resolution::{WeakExtensionRegistry, resolve_type_extensions};
 use hugr::package::Package;
 use hugr::types::Type;
 use hugr::{HugrView, Wire};
 use itertools::Itertools;
 
+use crate::serialize::pytket::error::BarrierPayloadError;
 use crate::serialize::pytket::opaque::OpaqueSubgraph;
-use crate::serialize::pytket::{
-    PytketDecodeError, PytketDecodeErrorInner, PytketEncodeError, PytketEncodeOpError,
-};
+use crate::serialize::pytket::{PytketDecodeError, PytketEncodeError, PytketEncodeOpError};
 
 use super::SubgraphId;
 
@@ -85,6 +84,11 @@ pub enum OpaqueSubgraphPayload {
     External {
         /// The ID of the subgraph in the `OpaqueSubgraphs` registry.
         id: SubgraphId,
+        /// Input parameters to the subgraph.
+        ///
+        /// Pytket may delete parameters specified on a barrier command, so we
+        /// need to encode them here instead.
+        input_params: Vec<String>,
     },
     /// An inline payload, carrying the encoded envelope for the HUGR subgraph.
     #[serde(rename = "HugrInline")]
@@ -108,14 +112,25 @@ pub enum OpaqueSubgraphPayload {
         /// The types can also be inferred from the encoded hugr or linked
         /// subcircuit, but we store them here for robustness.
         outputs: Vec<(Type, EncodedEdgeID)>,
+        /// Input parameters to the subgraph.
+        ///
+        /// Pytket may delete parameters specified on a barrier command, so we
+        /// need to encode them here instead.
+        input_params: Vec<String>,
     },
 }
 
 impl OpaqueSubgraphPayload {
     /// Create an external payload by referencing a subgraph in the tracked by
     /// an [`EncodedCircuit`][super::super::EncodedCircuit].
-    pub fn new_external(subgraph_id: SubgraphId) -> Self {
-        Self::External { id: subgraph_id }
+    pub fn new_external(
+        subgraph_id: SubgraphId,
+        input_params: impl IntoIterator<Item = String>,
+    ) -> Self {
+        Self::External {
+            id: subgraph_id,
+            input_params: input_params.into_iter().collect(),
+        }
     }
 
     /// Create a new payload for an opaque subgraph in the Hugr.
@@ -133,6 +148,7 @@ impl OpaqueSubgraphPayload {
     pub fn new_inline<N: HugrNode>(
         subgraph: &OpaqueSubgraph<N>,
         hugr: &impl HugrView<Node = N>,
+        input_params: impl IntoIterator<Item = String>,
     ) -> Result<Self, PytketEncodeError<N>> {
         let signature = subgraph.signature();
 
@@ -167,6 +183,7 @@ impl OpaqueSubgraphPayload {
             hugr_envelope,
             inputs: signature.input().iter().cloned().zip(inputs).collect(),
             outputs: signature.output().iter().cloned().zip(outputs).collect(),
+            input_params: input_params.into_iter().collect(),
         })
     }
 
@@ -174,12 +191,8 @@ impl OpaqueSubgraphPayload {
     ///
     /// Updates weak extension references inside the definition after loading.
     pub fn load_str(json: &str, extensions: &ExtensionRegistry) -> Result<Self, PytketDecodeError> {
-        let mut payload: Self = serde_json::from_str(json).map_err(|e| {
-            PytketDecodeErrorInner::UnsupportedSubgraphInlinePayload {
-                source: EnvelopeError::SerdeError { source: e },
-            }
-            .wrap()
-        })?;
+        let mut payload: Self =
+            serde_json::from_str(json).map_err(|e| BarrierPayloadError::SerdeDecoding(e).wrap())?;
 
         // Resolve the extension ops and types in the inline payload.
         if let Self::Inline {
@@ -190,15 +203,8 @@ impl OpaqueSubgraphPayload {
 
             // Resolve the cached input/output types.
             for (ty, _) in inputs.iter_mut().chain(outputs.iter_mut()) {
-                resolve_type_extensions(ty, &extensions).map_err(|e| {
-                    let registry_load_e =
-                        ExtensionRegistryLoadError::ExtensionResolutionError(Box::new(e));
-                    let envelope_e = EnvelopeError::ExtensionLoad {
-                        source: registry_load_e,
-                    };
-                    PytketDecodeErrorInner::UnsupportedSubgraphInlinePayload { source: envelope_e }
-                        .wrap()
-                })?;
+                resolve_type_extensions(ty, &extensions)
+                    .map_err(|e| BarrierPayloadError::ExtensionResolution(e).wrap())?;
             }
         }
 
@@ -215,26 +221,31 @@ impl OpaqueSubgraphPayload {
         matches!(self, Self::External { .. })
     }
 
-    /// Parse the contents of an [`OpaqueSubgraphPayload::External`] from a string payload.
+    /// Parse the contents of an [`OpaqueSubgraphPayload::External`] from a
+    /// string payload.
     ///
-    /// Returns `None` if the payload is [`OpaqueSubgraphPayload::Inline`] or not an
-    /// [`OpaqueSubgraphPayload`].
+    /// Returns the subgraph ID and the list of input parameter expressions, if
+    /// the payload is a valid [`OpaqueSubgraphPayload::External`].
+    ///
+    /// Returns `None` if the payload is [`OpaqueSubgraphPayload::Inline`] or
+    /// not an [`OpaqueSubgraphPayload`].
     ///
     /// This method is more efficient than calling [Self::load_str], as it
     /// requires no allocations.
-    pub fn parse_external_id(payload: &str) -> Option<SubgraphId> {
+    pub fn parse_external_payload(payload: &str) -> Option<(SubgraphId, Vec<String>)> {
         #[derive(serde::Deserialize)]
         #[serde(rename = "HugrExternal")]
         #[serde(tag = "typ")]
         struct PartialPayload {
             pub id: SubgraphId,
+            pub input_params: Vec<String>,
         }
 
         // Deserialize the payload if it is External, avoiding a full copy to memory
         // for the other variant.
         serde_json::from_str::<PartialPayload>(payload)
             .ok()
-            .map(|payload| payload.id)
+            .map(|payload| (payload.id, payload.input_params))
     }
 
     /// Returns `true` if a string encodes an [`OpaqueSubgraphPayload`].

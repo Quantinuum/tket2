@@ -1,5 +1,5 @@
 name: "Install tket-c-api C++ library"
-description: "Retrieve cached tket-c-api C++ library or build if needed"
+description: "Retrieve cached tket-c-api C++ library or build if needed."
 
 inputs:
   install-path:
@@ -90,10 +90,10 @@ runs:
             PROFILE="linux-i686-gcc14"
             ;;
           x86_64-unknown-linux-gnu)
-            PROFILE="linux-x86_64-gcc14"
+            PROFILE="linux-x86_64-gcc13"
             ;;
           x86_64-unknown-linux-musl)
-            PROFILE="linux-x86_64-gcc14"
+            PROFILE="linux-x86_64-gcc13"
             ;;
           x86_64-pc-windows-msvc)
             PROFILE="windows-2025"
@@ -109,7 +109,7 @@ runs:
             elif [[ "$TARGET" == *"armv8"* ]] || [[ "$TARGET" == *"aarch64"* ]]; then
               PROFILE="linux-armv8-gcc14"
             elif [[ "$TARGET" == *"x86_64"* ]]; then
-              PROFILE="linux-x86_64-gcc14"
+              PROFILE="linux-x86_64-gcc13"
             else
               PROFILE=""
             fi

@@ -3,16 +3,16 @@
 use std::thread::{self, JoinHandle};
 
 use crate::circuit::CircuitHash;
-use crate::rewrite::strategy::RewriteStrategy;
 use crate::rewrite::Rewriter;
-use crate::{circuit::cost::CircuitCost, Circuit};
+use crate::rewrite::strategy::RewriteStrategy;
+use crate::{Circuit, circuit::cost::CircuitCost};
 
 use super::pqueue_worker::{StatePQueueChannels, Work};
 
 /// A worker that processes circuits for the Badger optimiser.
 pub struct BadgerWorker<R, S, P: Ord> {
     /// The worker ID.
-    #[allow(unused)]
+    #[expect(dead_code)]
     id: usize,
     /// The channel to send and receive work from.
     priority_channel: StatePQueueChannels<Circuit, P>,
@@ -29,7 +29,6 @@ where
     P: CircuitCost + Send + Sync + 'static,
 {
     /// Spawn a new worker thread.
-    #[allow(clippy::too_many_arguments)]
     pub fn spawn(
         id: usize,
         priority_channel: StatePQueueChannels<Circuit, P>,
@@ -79,7 +78,7 @@ where
                     let Ok(hash) = r.circ.circuit_hash(r.circ.parent()) else {
                         // The composed rewrites were not valid.
                         //
-                        // See [https://github.com/CQCL/tket2/discussions/242]
+                        // See [https://github.com/quantinuum/tket2/discussions/242]
                         return None;
                     };
 

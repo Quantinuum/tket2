@@ -3,7 +3,7 @@ name: Unsoundness checks
 on:
   schedule:
     # Weekly on Monday at 04:00 UTC
-    - cron: '0 4 * * 1'
+    - cron: "0 4 * * 1"
   workflow_dispatch: {}
 
 concurrency:
@@ -18,16 +18,15 @@ env:
   RUSTC_WRAPPER: "sccache"
   # Permissive provenance is required due to warnings in bitvec 1.0.1
   # Proptest flags required to fix https://github.com/proptest-rs/proptest/issues/253
-  MIRIFLAGS: '-Zmiri-permissive-provenance -Zmiri-env-forward=PROPTEST_DISABLE_FAILURE_PERSISTENCE'
+  MIRIFLAGS: "-Zmiri-permissive-provenance -Zmiri-env-forward=PROPTEST_DISABLE_FAILURE_PERSISTENCE"
   PROPTEST_DISABLE_FAILURE_PERSISTENCE: true
 
 jobs:
-
   miri:
     name: "Miri"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Install Miri
         run: |
           rustup toolchain install nightly --component miri
@@ -38,16 +37,16 @@ jobs:
         run: cargo miri test
 
   create-issue:
-    uses: CQCL/hugrverse-actions/.github/workflows/create-issue.yml@main
+    uses: quantinuum/hugrverse-actions/.github/workflows/create-issue.yml@main
     needs: miri
     if: always() && needs.miri.result == 'failure' && github.ref == 'refs/heads/main'
     secrets:
-        GITHUB_PAT: ${{ secrets.HUGRBOT_PAT }}
+      GITHUB_PAT: ${{ secrets.HUGRBOT_PAT }}
     with:
-        title: "💥 Unsoundness check fail on main"
-        body: |
-            The unsoundness check for `CQCL/tket2` failed.
+      title: "💥 Unsoundness check fail on main"
+      body: |
+        The unsoundness check for `quantinuum/tket2` failed.
 
-            [Please investigate](https://github.com/CQCL/tket2/actions/runs/${{ github.run_id }}).
-        unique-label: "unsoundness-checks"
-        other-labels: "bug"
+        [Please investigate](https://github.com/quantinuum/tket2/actions/runs/${{ github.run_id }}).
+      unique-label: "unsoundness-checks"
+      other-labels: "bug"

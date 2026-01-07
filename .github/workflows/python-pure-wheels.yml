@@ -46,7 +46,7 @@ jobs:
         env:
           SHOULD_RUN: ${{ github.event_name != 'release' || ( github.ref_type == 'tag' && startsWith(github.ref, format('refs/tags/{0}-v', matrix.target.dir)) ) }}
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         if: ${{ steps.check-tag.outputs.run == 'true' }}
       - name: Run sccache-cache
         if: ${{ steps.check-tag.outputs.run == 'true' }}
@@ -70,7 +70,7 @@ jobs:
 
       - name: Upload the built packages as artifacts
         if: ${{ steps.check-tag.outputs.run == 'true' }}
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: build-${{ matrix.target.dir }}-sdist
           path: |

@@ -30,21 +30,21 @@ pub use tk1::Tk1Emitter;
 pub use tket::TketOpEmitter;
 
 pub(crate) use bool::set_bits_op;
-pub(crate) use tk1::{build_opaque_tket_op, OpaqueTk1Op};
+pub(crate) use tk1::{OpaqueTk1Op, build_opaque_tket_op};
 
 use super::encoder::TrackedValues;
+use crate::Circuit;
 use crate::serialize::pytket::config::TypeTranslatorSet;
 use crate::serialize::pytket::decoder::{
     DecodeStatus, LoadedParameter, PytketDecoderContext, TrackedBit, TrackedQubit,
 };
 use crate::serialize::pytket::encoder::{EncodeStatus, PytketEncoderContext};
 use crate::serialize::pytket::{PytketDecodeError, PytketEncodeError};
-use crate::Circuit;
-use hugr::extension::ExtensionId;
-use hugr::ops::constant::OpaqueValue;
-use hugr::ops::ExtensionOp;
-use hugr::types::CustomType;
 use hugr::HugrView;
+use hugr::extension::ExtensionId;
+use hugr::ops::ExtensionOp;
+use hugr::ops::constant::OpaqueValue;
+use hugr::types::CustomType;
 
 /// An encoder of HUGR operations and types that transforms them into pytket
 /// primitives.

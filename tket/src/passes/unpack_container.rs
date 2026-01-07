@@ -7,22 +7,21 @@ pub mod type_unpack;
 pub use type_unpack::TypeUnpacker;
 
 use hugr::{
+    Wire,
     builder::{BuildError, Dataflow},
     extension::{
-        prelude::{option_type, UnpackTuple, UnwrapBuilder},
         Extension,
+        prelude::{UnpackTuple, UnwrapBuilder, option_type},
     },
     ops::{ExtensionOp, OpName},
     std_extensions::collections::{
-        array::{op_builder::GenericArrayOpBuilder, Array, ArrayKind},
+        array::{Array, ArrayKind, op_builder::GenericArrayOpBuilder},
         borrow_array::BorrowArray,
-        value_array::ValueArray,
     },
     types::{
-        type_param::TypeParam, FuncValueType, PolyFuncTypeRV, SumType, Type, TypeArg, TypeBound,
-        TypeRV,
+        FuncValueType, PolyFuncTypeRV, SumType, Type, TypeArg, TypeBound, TypeRV,
+        type_param::TypeParam,
     },
-    Wire,
 };
 use std::sync::{Arc, LazyLock};
 
@@ -81,8 +80,6 @@ const UNPACK_OPT: OpName = OpName::new_static("option_unwrap");
 const REPACK_OPT: OpName = OpName::new_static("option_tag");
 const ARRAY_UNPACK: OpName = OpName::new_static("array_unpack");
 const ARRAY_REPACK: OpName = OpName::new_static("array_repack");
-const VARRAY_UNPACK: OpName = OpName::new_static("varray_unpack");
-const VARRAY_REPACK: OpName = OpName::new_static("varray_repack");
 const BARRAY_UNPACK: OpName = OpName::new_static("barray_unpack");
 const BARRAY_REPACK: OpName = OpName::new_static("barray_repack");
 const TUPLE_UNPACK: OpName = OpName::new_static("tuple_unpack");
@@ -120,7 +117,6 @@ static TEMP_UNPACK_EXT: LazyLock<Arc<Extension>> = LazyLock::new(|| {
 
             // Add array operations for all ArrayKind types
             add_array_ops::<Array>(ext, ext_ref, ARRAY_UNPACK, ARRAY_REPACK).unwrap();
-            add_array_ops::<ValueArray>(ext, ext_ref, VARRAY_UNPACK, VARRAY_REPACK).unwrap();
             add_array_ops::<BorrowArray>(ext, ext_ref, BARRAY_UNPACK, BARRAY_REPACK).unwrap();
 
             let tuple_unpack_sig = PolyFuncTypeRV::new(
@@ -480,7 +476,6 @@ impl UnpackContainerBuilder {
         }
 
         handle_array_type!(Array, ARRAY_UNPACK);
-        handle_array_type!(ValueArray, VARRAY_UNPACK);
         handle_array_type!(BorrowArray, BARRAY_UNPACK);
 
         if let Some(row) = ty.as_sum().and_then(SumType::as_tuple) {
@@ -528,7 +523,6 @@ impl UnpackContainerBuilder {
         }
 
         handle_array_type!(Array, ARRAY_REPACK);
-        handle_array_type!(ValueArray, VARRAY_REPACK);
         handle_array_type!(BorrowArray, BARRAY_REPACK);
 
         if let Some(row) = ty.as_sum().and_then(SumType::as_tuple) {
@@ -546,11 +540,11 @@ impl UnpackContainerBuilder {
 mod tests {
     use super::*;
     use hugr::{
+        HugrView,
         builder::{DFGBuilder, DataflowHugr as _},
         extension::prelude::{bool_t, option_type, qb_t, usize_t},
         std_extensions::collections::array::array_type,
         types::Signature,
-        HugrView,
     };
     use rstest::rstest;
 
@@ -579,7 +573,6 @@ mod tests {
 
     #[rstest]
     #[case::array(Array, ARRAY_UNPACK, ARRAY_REPACK)]
-    #[case::value_array(ValueArray, VARRAY_UNPACK, VARRAY_REPACK)]
     #[case::borrow_array(BorrowArray, BARRAY_UNPACK, BARRAY_REPACK)]
     fn test_array_unpack_repack<AK: ArrayKind>(
         #[case] _kind: AK,

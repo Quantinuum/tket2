@@ -2,18 +2,23 @@
 //!
 //! This crate provides safe Rust bindings to the `libtket1-passes` C library
 //! that exposes some of TKET1's passes as Rust functions.
+#![warn(clippy::undocumented_unsafe_blocks)] // TODO: Fix and move to the workspace lints.
 
-use std::ffi::{c_char, CStr, CString};
+use std::ffi::{CStr, CString, c_char};
 use std::ptr;
 use thiserror::Error;
 use tket_json_rs::{OpType, SerialCircuit};
 
 // Include the auto-generated bindings
 mod ffi {
-    #![allow(non_camel_case_types)]
-    #![allow(non_upper_case_globals)]
-    #![allow(dead_code)]
-    #![allow(non_snake_case)]
+    #![allow(
+        non_camel_case_types,
+        non_upper_case_globals,
+        dead_code,
+        non_snake_case,
+        clippy::allow_attributes,
+        reason = "generated code"
+    )]
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
 
@@ -54,17 +59,10 @@ impl TryFrom<ffi::TketError> for PassError {
         if value == ffi::TketError_TKET_SUCCESS {
             return Err("No error occurred");
         }
+        // SAFETY: tket_error_string returns a valid pointer to a null-terminated string.
         let c_str = unsafe { CStr::from_ptr(ffi::tket_error_string(value)) };
         let s = c_str.to_string_lossy().to_string();
         Ok(PassError::Tket1Error(s))
-    }
-}
-
-fn try_from_optype(optype: OpType) -> Result<ffi::TketTargetGate, PassError> {
-    match optype {
-        OpType::CX => Ok(ffi::TketTargetGate_TKET_TARGET_CX),
-        OpType::TK2 => Ok(ffi::TketTargetGate_TKET_TARGET_TK2),
-        _ => Err(PassError::InvalidTargetGate(optype)),
     }
 }
 
@@ -97,6 +95,7 @@ impl Tket1Circuit {
     pub fn from_serial_circuit(serial_circuit: &SerialCircuit) -> Result<Self, PassError> {
         let json = serde_json::to_vec(&serial_circuit)?;
         let c_json = CString::new(json)?;
+        // SAFETY: c_json has been validated by CString::new.
         let circuit = unsafe { ffi::tket_circuit_from_json(c_json.as_ptr()) };
 
         if circuit.is_null() {
@@ -112,6 +111,7 @@ impl Tket1Circuit {
     pub fn to_serial_circuit(&self) -> Result<SerialCircuit, PassError> {
         let mut json_ptr: *mut c_char = ptr::null_mut();
 
+        // SAFETY: json_ptr is a valid pointer to a null-terminated string.
         let error_code = unsafe { ffi::tket_circuit_to_json(self.inner, &mut json_ptr) };
 
         if let Ok(pass_error) = error_code.try_into() {
@@ -122,141 +122,115 @@ impl Tket1Circuit {
             return Err(PassError::NullPointer);
         }
 
-        let c_str = unsafe { CStr::from_ptr(json_ptr) };
-        let serial_circuit = serde_json::from_str(c_str.to_string_lossy().as_ref())?;
+        let serial_circuit = {
+            // SAFETY: json_ptr is a valid pointer to a null-terminated string.
+            let c_str = unsafe { CStr::from_ptr(json_ptr) };
+            serde_json::from_str(c_str.to_string_lossy().as_ref())?
+        };
 
+        // SAFETY: json_ptr is a valid pointer to a null-terminated string.
+        // The pointer is not shared with any other living object at this point, so it is safe to free
         unsafe { ffi::tket_free_string(json_ptr) };
 
         Ok(serial_circuit)
-    }
-
-    /// Apply TKET1's two_qubit_squash transform to the circuit
-    pub fn two_qubit_squash(
-        &mut self,
-        target_gate: impl Into<OpType>,
-        cx_fidelity: f64,
-        allow_swaps: bool,
-    ) -> Result<(), PassError> {
-        let target_gate = try_from_optype(target_gate.into())?;
-        let error_code = unsafe {
-            ffi::tket_two_qubit_squash(self.inner, target_gate, cx_fidelity, allow_swaps)
-        };
-
-        if let Ok(pass_error) = error_code.try_into() {
-            return Err(pass_error);
-        }
-
-        Ok(())
-    }
-
-    /// Apply TKET1's clifford_simp transform to the circuit
-    pub fn clifford_simp(
-        &mut self,
-        target_gate: impl Into<OpType>,
-        allow_swaps: bool,
-    ) -> Result<(), PassError> {
-        let target_gate = try_from_optype(target_gate.into())?;
-        let error_code = unsafe { ffi::tket_clifford_simp(self.inner, target_gate, allow_swaps) };
-
-        if let Ok(pass_error) = error_code.try_into() {
-            return Err(pass_error);
-        }
-
-        Ok(())
-    }
-
-    /// Apply TKET1's squash_phasedx_rz transform to the circuit
-    pub fn squash_phasedx_rz(&mut self) -> Result<(), PassError> {
-        let error_code = unsafe { ffi::tket_squash_phasedx_rz(self.inner) };
-
-        if let Ok(pass_error) = error_code.try_into() {
-            return Err(pass_error);
-        }
-
-        Ok(())
     }
 }
 
 impl Drop for Tket1Circuit {
     fn drop(&mut self) {
         if !self.inner.is_null() {
+            // SAFETY: self.inner is a valid pointer to a TKET1 circuit.
             unsafe { ffi::tket_free_circuit(self.inner) };
+        }
+    }
+}
+
+/// A pytket pass in TKET1's in-memory format
+#[derive(Debug)]
+pub struct Tket1Pass {
+    inner: *mut ffi::TketPass,
+}
+
+impl Tket1Pass {
+    /// Load a json-encoded pass into memory.
+    pub fn from_json(json: &str) -> Result<Self, PassError> {
+        let c_json = CString::new(json)?;
+        // SAFETY: c_json has been validated by CString::new.
+        let pass = unsafe { ffi::tket_pass_from_json(c_json.as_ptr()) };
+        if pass.is_null() {
+            return Err(PassError::JsonError(
+                "Failed to create pytket pass from JSON".to_string(),
+            ));
+        }
+        Ok(Tket1Pass { inner: pass })
+    }
+
+    /// Apply the pass to a circuit
+    pub fn run(&self, circuit: &mut Tket1Circuit) -> Result<(), PassError> {
+        // SAFETY: circuit.inner and self.inner are valid pointers to TKET1 circuits and passes respectively, or NULL.
+        let error_code: ffi::TketError = unsafe { ffi::tket_apply_pass(circuit.inner, self.inner) };
+        if let Ok(pass_error) = error_code.try_into() {
+            return Err(pass_error);
+        }
+        Ok(())
+    }
+
+    /// Load a json-encoded pass and run it on a circuit
+    pub fn run_from_json(json: &str, circuit: &mut Tket1Circuit) -> Result<(), PassError> {
+        let pass = Self::from_json(json)?;
+        pass.run(circuit)
+    }
+}
+
+impl Drop for Tket1Pass {
+    fn drop(&mut self) {
+        if !self.inner.is_null() {
+            // SAFETY: self.inner is a valid pointer to a TKET1 pass.
+            unsafe { ffi::tket_free_pass(self.inner) };
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::sync::LazyLock;
-    use std::sync::Mutex;
-
     use super::*;
     use rstest::*;
 
-    const CIRC_STR: &str = include_str!("../../test_files/2cx.json");
-
-    // Mutex to ensure tests don't run in parallel, due to TKET1 bug, see
-    // https://github.com/CQCL/tket/issues/2009
-    static TEST_MUTEX: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+    const CIRC_STR: &str = r#"{"bits": [], "commands": [{"args": [["q", [0]], ["q", [1]]], "op": {"type": "CX"}}, {"args": [["q", [0]], ["q", [1]]], "op": {"type": "CX"}}], "created_qubits": [], "discarded_qubits": [], "implicit_permutation": [[["q", [0]], ["q", [0]]], [["q", [1]], ["q", [1]]]], "phase": "0.0", "qubits": [["q", [0]], ["q", [1]]]}"#;
+    const TWO_QUBIT_SQUASH_STR: &str = r#"{"StandardPass": {"allow_swaps": true, "fidelity": 1.0, "name": "KAKDecomposition", "target_2qb_gate": "CX"}, "pass_class": "StandardPass"}"#;
+    const CLIFFORD_SIMP_STR: &str = r#"{"StandardPass": {"allow_swaps": true, "name": "CliffordSimp", "target_2qb_gate": "CX"}, "pass_class": "StandardPass"}"#;
 
     #[fixture]
     fn circuit() -> SerialCircuit {
         serde_json::from_str(CIRC_STR).unwrap()
     }
 
+    #[fixture]
+    fn two_qubit_squash_pass() -> Tket1Pass {
+        Tket1Pass::from_json(TWO_QUBIT_SQUASH_STR).unwrap()
+    }
+
+    #[fixture]
+    fn clifford_simp_pass() -> Tket1Pass {
+        Tket1Pass::from_json(CLIFFORD_SIMP_STR).unwrap()
+    }
+
     #[rstest]
     fn test_circuit_creation(circuit: SerialCircuit) {
-        let _lock = TEST_MUTEX.lock().unwrap();
         let circuit_ptr = Tket1Circuit::from_serial_circuit(&circuit).unwrap();
         let serial_circuit = circuit_ptr.to_serial_circuit().unwrap();
         assert_eq!(circuit, serial_circuit);
     }
 
     #[rstest]
-    fn test_two_qubit_squash(circuit: SerialCircuit) {
-        let _lock = TEST_MUTEX.lock().unwrap();
+    #[case::two_qubit_squash(two_qubit_squash_pass())]
+    #[case::clifford_simp(clifford_simp_pass())]
+    fn test_two_qubit_squash(circuit: SerialCircuit, #[case] pass: Tket1Pass) {
         assert_eq!(circuit.commands.len(), 2);
         let mut circuit_ptr = Tket1Circuit::from_serial_circuit(&circuit).unwrap();
-        circuit_ptr.two_qubit_squash(OpType::CX, 1., true).unwrap();
+        pass.run(&mut circuit_ptr).unwrap();
         let serial_circuit = circuit_ptr.to_serial_circuit().unwrap();
         assert_eq!(serial_circuit.commands.len(), 0);
-    }
-
-    #[rstest]
-    fn test_clifford_simp(circuit: SerialCircuit) {
-        let _lock = TEST_MUTEX.lock().unwrap();
-        assert_eq!(circuit.commands.len(), 2);
-        let mut circuit_ptr = Tket1Circuit::from_serial_circuit(&circuit).unwrap();
-        circuit_ptr.clifford_simp(OpType::CX, true).unwrap();
-        let serial_circuit = circuit_ptr.to_serial_circuit().unwrap();
-        assert_eq!(serial_circuit.commands.len(), 0);
-    }
-
-    #[test]
-    fn test_target_gate_conversion() {
-        assert_eq!(
-            ffi::TketTargetGate_TKET_TARGET_CX,
-            try_from_optype(OpType::CX).unwrap()
-        );
-        assert_eq!(
-            ffi::TketTargetGate_TKET_TARGET_TK2,
-            try_from_optype(OpType::TK2).unwrap()
-        );
-    }
-
-    #[rstest]
-    fn test_error_handling(circuit: SerialCircuit) {
-        let mut circuit_ptr = Tket1Circuit::from_serial_circuit(&circuit).unwrap();
-        assert_eq!(
-            circuit_ptr.clifford_simp(OpType::CZ, true).unwrap_err(),
-            PassError::InvalidTargetGate(OpType::CZ)
-        );
-        assert_eq!(
-            circuit_ptr
-                .two_qubit_squash(OpType::CZ, 1., true)
-                .unwrap_err(),
-            PassError::InvalidTargetGate(OpType::CZ)
-        );
     }
 
     #[test]
@@ -265,13 +239,7 @@ mod tests {
             inner: ptr::null_mut(),
         };
         assert_eq!(
-            null_circ.clifford_simp(OpType::CX, true).unwrap_err(),
-            PassError::Tket1Error("Invalid NULL pointer in arguments".to_string())
-        );
-        assert_eq!(
-            null_circ
-                .two_qubit_squash(OpType::CX, 1., true)
-                .unwrap_err(),
+            clifford_simp_pass().run(&mut null_circ).unwrap_err(),
             PassError::Tket1Error("Invalid NULL pointer in arguments".to_string())
         );
     }
@@ -281,6 +249,7 @@ mod tests {
         // badly formatted JSON
         let circuit_json = r#"{"bits": [], "commands": [{"args": [["q", [0]], ["q", [1]]], "op": {"type": "CX"}}, {"args": [["q", [0]], ["q", [1]]], "op": {"type": "CX"}}], "created_qubits": [], "discarded_qubits": [], "implicit_permutation": [[["q", [0]], ["q", [0]]], [["q", [1]], ["q", [1]]]], "phase": "0.0", "qubits": [["q", [0]] ["q", [1]]]}"#;
         let c_str = CString::new(circuit_json).unwrap();
+        // SAFETY: c_str has been validated by CString::new.
         let circ_ptr = unsafe { ffi::tket_circuit_from_json(c_str.as_ptr()) };
         assert!(circ_ptr.is_null());
     }

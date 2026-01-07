@@ -25,9 +25,10 @@ def normalize_guppy(
     *,
     simplify_cfgs: bool = True,
     remove_tuple_untuple: bool = True,
-    constant_folding: bool = False,
+    constant_folding: bool = True,
     remove_dead_funcs: bool = True,
     inline_dfgs: bool = True,
+    remove_redundant_order_edges: bool = True,
 ) -> CircuitClass:
     """Flatten the structure of a Guppy-generated program to enable additional optimisations.
 
@@ -39,6 +40,7 @@ def normalize_guppy(
     - constant_folding: Whether to constant fold the program.
     - remove_dead_funcs: Whether to remove dead functions.
     - inline_dfgs: Whether to inline DFG operations.
+    - remove_redundant_order_edges: Whether to remove redundant order edges.
     """
 
 def greedy_depth_reduce(circ: CircuitClass) -> tuple[CircuitClass, int]:
@@ -86,32 +88,21 @@ def badger_optimise(
 def chunks(c: Circuit | Tk2Circuit, max_chunk_size: int) -> CircuitChunks:
     """Split a circuit into chunks of at most `max_chunk_size` gates."""
 
-def clifford_simp(
+def tket1_pass(
     circ: CircuitClass,
-    *,
-    allow_swaps: bool = True,
-    traverse_subcircuits: bool = True,
-) -> CircuitClass:
-    """Apply a number of rewrite rules for simplifying Clifford gate sequences,
-    similar to Duncan & Fagan (https://arxiv.org/abs/1901.10114). Produces a
-    circuit comprising TK1 and CX gates.
-
-    Parameters:
-    - allow_swaps: whether the rewriting may introduce implicit wire swaps.
-    - traverse_subcircuits: Whether to apply the optimisation to subregions
-      nested inside other subregions of the circuit.
-    """
-
-def squash_phasedx_rz(
-    circ: CircuitClass,
+    pass_json: str,
     *,
     traverse_subcircuits: bool = True,
 ) -> CircuitClass:
-    """Squash single qubit gates into PhasedX and Rz gates. Also remove identity
-    gates. Commute Rz gates to the back if possible.
+    """Runs a pytket pass on all circuit-like regions under the entrypoint of the
+    HUGR.
 
     Parameters:
-    - traverse_subcircuits: Whether to apply the optimisation to subregions
+    - pass_json: The JSON string of the pytket pass to run. See [pytket
+      documentation](https://docs.quantinuum.com/tket/api-docs/passes.html#pytket.passes.BasePass.to_dict)
+      for more details.
+    - traverse_subcircuits: Whether to recurse into the children of the
+      circuit-like regions, and optimise them too.
       nested inside other subregions of the circuit.
     """
 

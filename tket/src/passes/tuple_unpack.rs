@@ -5,14 +5,15 @@ use core::panic;
 use hugr::builder::{DFGBuilder, Dataflow, DataflowHugr};
 use hugr::extension::prelude::{MakeTuple, TupleOpDef};
 use hugr::extension::simple_op::MakeExtensionOp;
+use hugr::hugr::views::SiblingSubgraph;
 use hugr::ops::{OpTrait, OpType};
 use hugr::types::Type;
 use hugr::{HugrView, Node};
 use itertools::Itertools;
 
-use crate::circuit::Command;
-use crate::rewrite::{CircuitRewrite, Subcircuit};
 use crate::Circuit;
+use crate::circuit::Command;
+use crate::rewrite::CircuitRewrite;
 
 /// Find tuple pack operations followed by tuple unpack operations
 /// and generate rewrites to remove them.
@@ -25,14 +26,14 @@ pub fn find_tuple_unpack_rewrites(
 
 /// Returns true if the given optype is a MakeTuple operation.
 ///
-/// Boilerplate required due to https://github.com/CQCL/hugr/issues/1496
+/// Boilerplate required due to https://github.com/quantinuum/hugr/issues/1496
 fn is_make_tuple(optype: &OpType) -> bool {
     optype.to_string() == format!("prelude.{}", TupleOpDef::MakeTuple.op_id())
 }
 
 /// Returns true if the given optype is an UnpackTuple operation.
 ///
-/// Boilerplate required due to https://github.com/CQCL/hugr/issues/1496
+/// Boilerplate required due to https://github.com/quantinuum/hugr/issues/1496
 fn is_unpack_tuple(optype: &OpType) -> bool {
     optype.to_string() == format!("prelude.{}", TupleOpDef::UnpackTuple.op_id())
 }
@@ -102,8 +103,8 @@ fn remove_pack_unpack<T: HugrView<Node = Node>>(
 
     let mut nodes = unpack_nodes;
     nodes.push(pack_node);
-    let subcirc = Subcircuit::try_from_nodes(nodes, circ).unwrap();
-    let subcirc_signature = subcirc.signature(circ);
+    let subgraph = SiblingSubgraph::try_from_nodes(nodes, circ.hugr()).expect("is convex");
+    let subcirc_signature = subgraph.signature(circ.hugr());
 
     // The output port order in `Subcircuit::try_from_nodes` is not too well defined.
     // Check that the outputs are in the expected order.
@@ -142,20 +143,20 @@ fn remove_pack_unpack<T: HugrView<Node = Node>>(
         .finish_hugr_with_outputs(outputs)
         .unwrap_or_else(|e| {
             panic!("Failed to create replacement for removing tuple pack/unpack operations. {e}")
-        })
-        .into();
+        });
 
-    subcirc
-        .create_rewrite(circ, replacement)
+    subgraph
+        .create_simple_replacement(circ.hugr(), replacement)
         .unwrap_or_else(|e| {
             panic!("Failed to create rewrite for removing tuple pack/unpack operations. {e}")
         })
+        .into()
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use hugr::extension::prelude::{bool_t, qb_t, UnpackTuple};
+    use hugr::extension::prelude::{UnpackTuple, bool_t, qb_t};
 
     use hugr::types::Signature;
     use rstest::{fixture, rstest};
@@ -240,7 +241,7 @@ mod test {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mut num_rewrites = 0;
         loop {
-            #[allow(deprecated)]
+            #[expect(deprecated)]
             let Some(rewrite) = find_tuple_unpack_rewrites(&circ).next() else {
                 break;
             };

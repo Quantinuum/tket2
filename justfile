@@ -16,7 +16,7 @@ _check_default_conan_profile:
 
 # Prepare the environment for development, installing all the dependencies and
 # setting up the pre-commit hooks.
-setup: _check_default_conan_profile _check_nextest_installed
+setup: && _check_default_conan_profile _check_nextest_installed
     uv tool install conan
     uv sync
     [[ -n "${TKET_JUST_INHIBIT_GIT_HOOKS:-}" ]] || uv run pre-commit install -t pre-commit
@@ -93,6 +93,7 @@ update-snapshots-rs:
     cargo insta review
 # Update python snapshot tests.
 update-snapshots-py *TEST_ARGS:
+    uv run maturin develop --uv
     uv run pytest --snapshot-update {{TEST_ARGS}}
 
 # Build the sphinx API documentation
@@ -107,6 +108,7 @@ serve-docs: build-pydocs
 clean-docs:
     rm -rf tket-py/docs/build
     rm -rf tket-py/docs/generated
+    rm -rf tket-py/docs/jupyter_execute
 
 clean-env:
     uv clean

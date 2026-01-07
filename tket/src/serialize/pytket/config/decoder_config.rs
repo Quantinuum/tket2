@@ -10,11 +10,11 @@ use hugr::{Hugr, Wire};
 use itertools::Itertools;
 use std::collections::HashMap;
 
+use crate::serialize::pytket::PytketDecodeError;
 use crate::serialize::pytket::decoder::{
     DecodeStatus, LoadedParameter, PytketDecoderContext, TrackedBit, TrackedQubit,
 };
 use crate::serialize::pytket::extension::{PytketDecoder, PytketTypeTranslator, RegisterCount};
-use crate::serialize::pytket::PytketDecodeError;
 
 use super::TypeTranslatorSet;
 
@@ -93,7 +93,7 @@ impl PytketDecoderConfig {
     fn decoders_for_optype(
         &self,
         optype: &tket_json_rs::OpType,
-    ) -> impl Iterator<Item = &Box<dyn PytketDecoder + Send + Sync>> {
+    ) -> impl Iterator<Item = &Box<dyn PytketDecoder + Send + Sync>> + use<'_> {
         self.optype_decoders
             .get(optype)
             .into_iter()

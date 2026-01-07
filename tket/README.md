@@ -1,8 +1,8 @@
 # tket: The Hardware Agnostic Quantum Compiler
 
-[![build_status][]](https://github.com/CQCL/tket2/actions)
+[![build_status][]](https://github.com/quantinuum/tket2/actions)
 ![msrv][]
-[![codecov][]](https://codecov.io/gh/CQCL/tket2)
+[![codecov][]](https://codecov.io/gh/quantinuum/tket2)
 
 TKET is an open source quantum compiler developed by Quantinuum. Central to
 TKET's design is its hardware agnosticism which allows researchers and quantum
@@ -27,7 +27,7 @@ Defining a circuit in TKET is currently done by using the low-level [hugr Builde
 use tket::{Circuit, Hugr};
 
 // Load a tket1 circuit.
-let mut circ: Hugr = tket::json::load_tk1_json_file("test_files/barenco_tof_5.json").unwrap();
+let mut circ: Hugr = tket::json::load_tk1_json_file("test_files/pytket/barenco_tof_5.json").unwrap();
 
 assert_eq!(circ.qubit_count(), 9);
 assert_eq!(circ.num_gates(), 170);
@@ -67,15 +67,15 @@ See [DEVELOPMENT.md][] for instructions on setting up the development environmen
 
 This project is licensed under Apache License, Version 2.0 ([LICENSE][] or http://www.apache.org/licenses/LICENSE-2.0).
 
-  [build_status]: https://github.com/CQCL/tket2/actions/workflows/ci.yml/badge.svg
+  [build_status]: https://github.com/quantinuum/tket2/actions/workflows/ci.yml/badge.svg
   [msrv]: https://img.shields.io/crates/msrv/tket
-  [codecov]: https://img.shields.io/codecov/c/gh/CQCL/tket2?logo=codecov
+  [codecov]: https://img.shields.io/codecov/c/gh/quantinuum/tket2?logo=codecov
   [hugr]: https://lib.rs/crates/hugr
   [hugr Builder]: https://docs.rs/hugr/latest/hugr/builder/index.html
   [API documentation here]: https://docs.rs/tket/
   [`Circuit`]: https://docs.rs/tket/latest/tket/trait.Circuit.html
-  [`pytket`]: https://github.com/CQCL/tket
+  [`pytket`]: https://github.com/quantinuum/tket
   [`portmatching`]: https://lib.rs/crates/portmatching
-  [LICENSE]: https://github.com/CQCL/tket2/blob/main/LICENCE
-  [CHANGELOG]: https://github.com/CQCL/tket2/blob/main/tket/CHANGELOG.md
-  [DEVELOPMENT.md]: https://github.com/CQCL/tket2/blob/main/DEVELOPMENT.md
+  [LICENSE]: https://github.com/quantinuum/tket2/blob/main/LICENCE
+  [CHANGELOG]: https://github.com/quantinuum/tket2/blob/main/tket/CHANGELOG.md
+  [DEVELOPMENT.md]: https://github.com/quantinuum/tket2/blob/main/DEVELOPMENT.md

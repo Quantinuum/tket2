@@ -1,11 +1,11 @@
 use std::collections::BTreeSet;
 
 use hugr::{
+    Direction, HugrView, IncomingPort, OutgoingPort, Wire,
     core::HugrNode,
-    hugr::views::{sibling_subgraph::InvalidSubgraph, SiblingSubgraph},
+    hugr::views::{SiblingSubgraph, sibling_subgraph::InvalidSubgraph},
     ops::OpTrait,
     types::EdgeKind,
-    Direction, HugrView, IncomingPort, OutgoingPort, Wire,
 };
 use indexmap::IndexSet;
 use itertools::{Either, Itertools};
@@ -295,16 +295,16 @@ fn sort_inputs<N: HugrNode>(
 mod tests {
     use std::iter;
 
-    use crate::{extension::rotation::RotationOp, Circuit, TketOp};
+    use crate::{Circuit, TketOp, extension::rotation::RotationOp};
 
     use super::*;
     use hugr::{
+        Hugr, HugrView, IncomingPort, Node, OutgoingPort,
         builder::{Dataflow, DataflowHugr, FunctionBuilder, HugrBuilder},
         extension::prelude::{bool_t, qb_t},
         hugr::views::SiblingSubgraph,
         std_extensions::arithmetic::float_types::float64_type,
         types::Signature,
-        Hugr, HugrView, IncomingPort, Node, OutgoingPort,
     };
     use rstest::{fixture, rstest};
 

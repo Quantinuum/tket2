@@ -15,7 +15,7 @@ pub use hash::CircuitHash;
 use hugr::extension::prelude::{NoopDef, TupleOpDef};
 use hugr::extension::simple_op::MakeOpDef;
 use hugr::hugr::views::sibling_subgraph::InvalidSubgraph;
-use hugr::hugr::views::{ExtractionResult, SiblingSubgraph};
+use hugr::hugr::views::{ExtractionResult, RootChecked, SiblingSubgraph};
 use hugr::ops::handle::DataflowParentID;
 use itertools::Either::{Left, Right};
 
@@ -34,7 +34,7 @@ pub use hugr::types::{EdgeKind, Type, TypeRow};
 pub use hugr::{Node, Port, Wire};
 use smol_str::ToSmolStr;
 
-use self::units::{filter, LinearUnit, Units};
+use self::units::{LinearUnit, Units, filter};
 
 /// A quantum circuit, represented as a function in a HUGR.
 #[derive(Debug, Clone)]
@@ -67,7 +67,7 @@ lazy_static! {
     /// some special ones like tuple pack/unpack and the Noop operation.
     ///
     /// We have to insert the extension id manually due to
-    /// https://github.com/CQCL/hugr/issues/1496
+    /// https://github.com/quantinuum/hugr/issues/1496
     static ref IGNORED_EXTENSION_OPS: HashSet<OpName> = {
         let mut set = HashSet::new();
         set.insert(format!("prelude.{}", NoopDef.opdef_id()).into());
@@ -78,7 +78,7 @@ lazy_static! {
 }
 /// The [IGNORED_EXTENSION_OPS] definition depends on the buggy behaviour of [`NamedOp::name`], which returns bare names instead of scoped names on some cases.
 /// Once this test starts failing it should be time to drop the `format!("prelude.{}", ...)`.
-/// https://github.com/CQCL/hugr/issues/1496
+/// https://github.com/quantinuum/hugr/issues/1496
 #[test]
 fn issue_1496_remains() {
     assert_eq!("Noop", NoopDef.opdef_id())
@@ -351,7 +351,10 @@ impl<T: HugrView<Node = Node>> Circuit<T> {
     where
         T: Clone,
     {
-        SiblingSubgraph::try_new_dataflow_subgraph::<_, DataflowParentID>(self.hugr())
+        let Ok(checked) = RootChecked::try_new(self.hugr()) else {
+            return Err(InvalidSubgraph::NonDataflowRegion);
+        };
+        SiblingSubgraph::try_new_dataflow_subgraph::<_, DataflowParentID>(checked)
     }
 
     /// Compute the cost of the circuit based on a per-operation cost function.
@@ -413,7 +416,11 @@ fn check_hugr<H: HugrView>(hugr: &H) -> Result<(), CircuitError<H::Node>> {
 ///
 /// This will return an error if the wire is not empty or if a HugrError
 /// occurs.
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    clippy::allow_attributes,
+    reason = "used when 'portmatching' feature is enabled, and in tests"
+)]
 pub(crate) fn remove_empty_wire(
     circ: &mut Circuit<impl HugrMut<Node = Node>>,
     input_port: usize,
@@ -515,7 +522,9 @@ pub enum CircuitMutError {
     #[from]
     CircuitError(CircuitError),
     /// The wire to be deleted is not empty.
-    #[display("Tried to delete non-empty input wire with offset {input_port} on dataflow node {dataflow_node}")]
+    #[display(
+        "Tried to delete non-empty input wire with offset {input_port} on dataflow node {dataflow_node}"
+    )]
     DeleteNonEmptyWire {
         /// The input port offset
         input_port: usize,
@@ -664,11 +673,11 @@ mod tests {
     };
 
     use super::*;
+    use crate::TketOp;
     use crate::extension::rotation::ConstRotation;
     use crate::serialize::load_tk1_json_str;
     use crate::serialize::pytket::DecodeOptions;
     use crate::utils::build_simple_circuit;
-    use crate::TketOp;
 
     #[fixture]
     fn tk1_circuit() -> Circuit {

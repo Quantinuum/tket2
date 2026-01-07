@@ -7,7 +7,7 @@ use crate::modifier::modifier_resolver::ModifierResolverErrors;
 
 use super::modifier_resolver::resolve_modifier_with_entrypoints;
 
-#[allow(missing_docs)]
+/// A pass to resolve modifiers (control/dagger/power) in a Hugr.
 #[derive(Default)]
 pub struct ModifierResolverPass;
 

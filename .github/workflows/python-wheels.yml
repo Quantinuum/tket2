@@ -86,24 +86,32 @@ jobs:
           #  manylinux: "musllinux_1_2"
           - runner: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
-            manylinux: "manylinux2014"
+            # Note: The runner image uses GLIBC 2.39, but we verified that the
+            # tket-c-api build works with GLIBC 2.34.
+            #
+            # This is a temporary workaround until we use a pre-built c-api library.
+            # <https://github.com/Quantinuum/tket2/issues/1272>
+            # <https://github.com/Quantinuum/tket2/pull/1271>
+            manylinux: "manylinux_2_34"
             test-wheels: true
           - runner: ubuntu-24.04
             target: x86_64-unknown-linux-musl
             manylinux: "musllinux_1_2"
           # ---------------- Mac
-          - runner: macos-26
+          - runner: macos-14
             target: aarch64-apple-darwin
             test-wheels: true
+            macos-compatibility: "13.0"
           - runner: macos-15-intel
             target: x86_64-apple-darwin
             test-wheels: true
+            macos-compatibility: "15.0"
           # ---------------- Windows
           - runner: windows-2025
             target: x86_64-pc-windows-msvc
             test-wheels: true
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: mozilla-actions/sccache-action@v0.0.9
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -143,6 +151,7 @@ jobs:
               echo "TKET_C_API_PATH=$WORKSPACE/tket-c-api" >> $GITHUB_ENV
               echo "$WORKSPACE/tket-c-api/lib" >> $GITHUB_PATH
               echo "DYLD_LIBRARY_PATH=$WORKSPACE/tket-c-api/lib" >> $GITHUB_ENV
+              echo "MACOSX_DEPLOYMENT_TARGET=${{ matrix.platform.macos-compatibility }}" >> $GITHUB_ENV
               ;;
             Linux)
               echo "tket_c_api_path=$WORKSPACE/tket-c-api" >> $GITHUB_OUTPUT
@@ -265,7 +274,7 @@ jobs:
           ls -lh dist/*macosx*.whl
 
       - name: Upload wheels
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: wheels-${{ matrix.platform.target }}
           path: dist
@@ -291,7 +300,7 @@ jobs:
     if: ${{ needs.check-tag.outputs.run == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: mozilla-actions/sccache-action@v0.0.9
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
@@ -308,7 +317,7 @@ jobs:
             --out ../dist \
             --manifest-path Cargo.toml
       - name: Upload sdist
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: wheels-sdist
           path: dist
@@ -328,7 +337,7 @@ jobs:
       # Used to generate artifact attestation
       attestations: write
     steps:
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v6
         with:
           path: dist
           merge-multiple: true

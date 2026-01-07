@@ -57,7 +57,7 @@ jobs:
       # Bootstrap the build environment
       # ---------------------------------
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
 
@@ -86,7 +86,7 @@ jobs:
 
       # if the hugr_qis compiler has changed, we build it.
       - name: Build selene-hugr-qis-compiler wheel
-        uses: pypa/cibuildwheel@v3.2.1
+        uses: pypa/cibuildwheel@v3.3.0
         with:
           package-dir: qis-compiler
 
@@ -94,7 +94,7 @@ jobs:
         run: uvx twine check --strict wheelhouse/*.whl
 
       - name: Upload wheels
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: qis-compiler-wheels-${{ matrix.os }}
           path: wheelhouse/*.whl
@@ -112,7 +112,7 @@ jobs:
       # IMPORTANT: this permission is mandatory for trusted publishing
       id-token: write
     steps:
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v6
         with:
           path: wheelhouse
           merge-multiple: true

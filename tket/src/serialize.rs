@@ -3,7 +3,7 @@
 //! See [`crate::serialize::pytket`] for serialization to and from the legacy pytket format.
 pub mod pytket;
 
-pub use hugr::envelope::{EnvelopeConfig, EnvelopeError};
+pub use hugr::envelope::EnvelopeConfig;
 use hugr::hugr::hugrmut::HugrMut;
 
 use std::io;
@@ -11,8 +11,8 @@ use std::io;
 use hugr::extension::{ExtensionRegistry, ExtensionRegistryError};
 use hugr::hugr::ValidationError;
 pub use pytket::{
-    load_tk1_json_file, load_tk1_json_reader, load_tk1_json_str, save_tk1_json_file,
-    save_tk1_json_str, save_tk1_json_writer, TKETDecode,
+    TKETDecode, load_tk1_json_file, load_tk1_json_reader, load_tk1_json_str, save_tk1_json_file,
+    save_tk1_json_str, save_tk1_json_writer,
 };
 
 use derive_more::{Display, Error, From};
@@ -23,41 +23,28 @@ use hugr::{Hugr, HugrView, Node};
 use crate::extension::REGISTRY;
 use crate::{Circuit, CircuitError};
 
-/// An encoded path pointing to a node in the HUGR,
-/// to be used as the [`Circuit`] root.
-///
-/// This key should not be used in the in-memory structure, as any modifications to the HUGR may
-/// invalidate the path.
-///
-/// TODO: Implement the path pointer. Currently this entry is not used.
-#[allow(unused)]
-const METADATA_ENTRYPOINT: &str = "TKET.entrypoint";
-
 impl<T: HugrView> Circuit<T> {
     /// Store the circuit as a HUGR envelope, using the given configuration.
     pub fn store(
         &self,
         writer: impl io::Write,
         config: EnvelopeConfig,
-    ) -> Result<(), EnvelopeError> {
-        let pkg = self.wrap_package()?;
+    ) -> Result<(), hugr::envelope::WriteError> {
+        let pkg = self.wrap_package();
         pkg.store(writer, config)?;
         Ok(())
     }
 
     /// Store the circuit as a String in HUGR envelope format.
-    pub fn store_str(&self, config: EnvelopeConfig) -> Result<String, EnvelopeError> {
-        let pkg = self.wrap_package()?;
+    pub fn store_str(&self, config: EnvelopeConfig) -> Result<String, hugr::envelope::WriteError> {
+        let pkg = self.wrap_package();
         pkg.store_str(config)
     }
 
     /// Wrap the circuit in a package.
-    fn wrap_package(&self) -> Result<Package, EnvelopeError> {
+    fn wrap_package(&self) -> Package {
         let hugr = Circuit::to_owned(self).into_hugr();
-        let extensions = hugr.extensions().clone();
-        let mut package = Package::from_hugr(hugr);
-        package.extensions.extend(extensions);
-        Ok(package)
+        Package::from_hugr(hugr)
     }
 }
 
@@ -163,7 +150,9 @@ pub enum CircuitLoadError {
         available_functions: Vec<String>,
     },
     /// The function has an invalid control flow structure.
-    #[display("Function '{function}' has an invalid control flow structure. Currently only flat functions with no control flow primitives are supported.")]
+    #[display(
+        "Function '{function}' has an invalid control flow structure. Currently only flat functions with no control flow primitives are supported."
+    )]
     InvalidControlFlow {
         /// The function name.
         function: String,
@@ -174,7 +163,7 @@ pub enum CircuitLoadError {
     CircuitLoadError(CircuitError),
     /// Error loading an envelope.
     #[from]
-    EnvelopeError(EnvelopeError),
+    EnvelopeError(hugr::envelope::ReadError),
     /// Error validating the loaded circuit.
     #[from]
     ValidationError(ValidationError<Node>),
@@ -275,8 +264,8 @@ fn find_function(mut hugr: Hugr, function_name: &str) -> Result<Circuit, Circuit
 
 #[cfg(test)]
 mod tests {
-    use crate::circuit::CircuitHash;
     use crate::TketOp;
+    use crate::circuit::CircuitHash;
 
     use super::*;
 

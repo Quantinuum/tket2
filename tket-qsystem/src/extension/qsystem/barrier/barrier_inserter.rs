@@ -4,20 +4,20 @@ use hugr::ops::OpTrait;
 use hugr::std_extensions::collections::array::ArrayKind;
 use hugr::types::{Signature, Type};
 use hugr::{
+    Hugr, HugrView, IncomingPort, Node, OutgoingPort, Wire,
     algorithms::replace_types::ReplaceTypes,
     builder::{DFGBuilder, Dataflow},
     extension::prelude::Barrier,
     hugr::{
         hugrmut::HugrMut,
-        patch::{insert_cut::InsertCut, PatchHugrMut},
+        patch::{PatchHugrMut, insert_cut::InsertCut},
     },
-    Hugr, HugrView, IncomingPort, Node, OutgoingPort, Wire,
 };
-use tket::passes::unpack_container::type_unpack::{is_array_of, TypeUnpacker};
+use tket::passes::unpack_container::type_unpack::{TypeUnpacker, is_array_of};
 
 use crate::extension::qsystem::{
-    barrier::wrapped_barrier::{build_runtime_barrier_op, WrappedBarrierBuilder},
     LowerTk2Error,
+    barrier::wrapped_barrier::{WrappedBarrierBuilder, build_runtime_barrier_op},
 };
 use tket::passes::unpack_container::UnpackContainerBuilder;
 
@@ -169,10 +169,10 @@ impl BarrierInserter {
             .expect("Barrier can't be root.");
 
         // Handle the special case of a single array of qubits
-        if let [(ty, target)] = filtered_qbs.as_slice() {
-            if let Some(result) = self.try_array_barrier_shortcut(hugr, parent, ty, *target) {
-                return result;
-            }
+        if let [(ty, target)] = filtered_qbs.as_slice()
+            && let Some(result) = self.try_array_barrier_shortcut(hugr, parent, ty, *target)
+        {
+            return result;
         }
 
         // For the general case, build unpacking

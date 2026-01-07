@@ -3,14 +3,14 @@
 use std::sync::{Arc, LazyLock};
 
 use hugr::{
+    Hugr, Wire,
     builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
-    extension::{prelude::qb_t, Extension},
+    extension::{Extension, prelude::qb_t},
     ops::ExtensionOp,
     std_extensions::collections::array::array_type,
     types::{
-        type_param::TypeParam, FuncValueType, PolyFuncTypeRV, Signature, TypeArg, TypeBound, TypeRV,
+        FuncValueType, PolyFuncTypeRV, Signature, TypeArg, TypeBound, TypeRV, type_param::TypeParam,
     },
-    Hugr, Wire,
 };
 
 use crate::extension::qsystem::QSystemOpBuilder;

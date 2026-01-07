@@ -32,7 +32,7 @@ impl ArrayCodegen for SeleneHeapArrayCodegen {
             .builder()
             .build_call(malloc, &[size.into()], "")?
             .try_as_basic_value()
-            .unwrap_left();
+            .unwrap_basic();
         Ok(res.into_pointer_value())
     }
 
@@ -77,7 +77,7 @@ impl<PCG: PreludeCodegen> BorrowArrayCodegen for SeleneHeapBorrowArrayCodegen<PC
             .builder()
             .build_call(malloc, &[size.into()], "")?
             .try_as_basic_value()
-            .unwrap_left();
+            .unwrap_basic();
         Ok(res.into_pointer_value())
     }
 

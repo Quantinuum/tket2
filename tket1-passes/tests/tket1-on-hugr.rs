@@ -1,6 +1,6 @@
 //! Test running tket1 passes on hugr circuit.
 
-use tket1_passes::Tket1Circuit;
+use tket1_passes::{Tket1Circuit, Tket1Pass};
 
 use hugr::builder::{BuildError, Dataflow, DataflowHugr, FunctionBuilder};
 use hugr::extension::prelude::qb_t;
@@ -8,9 +8,12 @@ use hugr::types::Signature;
 use hugr::{HugrView, Node};
 use rayon::iter::ParallelIterator;
 use rstest::{fixture, rstest};
-use tket::extension::{TKET1_EXTENSION_ID, TKET_EXTENSION_ID};
+use tket::extension::{TKET_EXTENSION_ID, TKET1_EXTENSION_ID};
 use tket::serialize::pytket::{EncodeOptions, EncodedCircuit};
 use tket::{Circuit, TketOp};
+
+/// JSON encoding of the clifford simp pytket pass.
+const CLIFFORD_SIMP_STR: &str = r#"{"StandardPass": {"allow_swaps": true, "name": "CliffordSimp", "target_2qb_gate": "CX"}, "pass_class": "StandardPass"}"#;
 
 /// A flat quantum circuit inside a function.
 ///
@@ -54,9 +57,7 @@ fn test_clifford_simp(#[case] circ: Circuit, #[case] num_remaining_gates: usize)
         .par_iter_mut()
         .for_each(|(_region, serial_circuit)| {
             let mut circuit_ptr = Tket1Circuit::from_serial_circuit(serial_circuit).unwrap();
-            circuit_ptr
-                .clifford_simp(tket_json_rs::OpType::CX, true)
-                .unwrap();
+            Tket1Pass::run_from_json(CLIFFORD_SIMP_STR, &mut circuit_ptr).unwrap();
             *serial_circuit = circuit_ptr.to_serial_circuit().unwrap();
         });
 

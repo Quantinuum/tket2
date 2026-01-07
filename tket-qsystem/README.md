@@ -29,6 +29,6 @@ See [DEVELOPMENT.md][] for instructions on setting up the development environmen
 This project is licensed under Apache License, Version 2.0 ([LICENSE][] or <http://www.apache.org/licenses/LICENSE-2.0>).
 
   [msrv]: https://img.shields.io/crates/msrv/tket-qsystem
-  [LICENSE]: https://github.com/CQCL/tket2/blob/main/LICENCE
-  [CHANGELOG]: https://github.com/CQCL/tket2/blob/main/tket-qsystem/CHANGELOG.md
-  [DEVELOPMENT.md]: https://github.com/CQCL/tket2/blob/main/DEVELOPMENT.md
+  [LICENSE]: https://github.com/quantinuum/tket2/blob/main/LICENCE
+  [CHANGELOG]: https://github.com/quantinuum/tket2/blob/main/tket-qsystem/CHANGELOG.md
+  [DEVELOPMENT.md]: https://github.com/quantinuum/tket2/blob/main/DEVELOPMENT.md

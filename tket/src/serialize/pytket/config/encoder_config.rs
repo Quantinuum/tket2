@@ -10,10 +10,10 @@ use hugr::extension::{ExtensionId, ExtensionSet};
 use hugr::ops::{ExtensionOp, Value};
 use hugr::types::{SumType, Type};
 
-use crate::serialize::pytket::encoder::EncodeStatus;
-use crate::serialize::pytket::extension::{set_bits_op, PytketTypeTranslator, RegisterCount};
-use crate::serialize::pytket::{PytketEmitter, PytketEncodeError};
 use crate::Circuit;
+use crate::serialize::pytket::encoder::EncodeStatus;
+use crate::serialize::pytket::extension::{PytketTypeTranslator, RegisterCount, set_bits_op};
+use crate::serialize::pytket::{PytketEmitter, PytketEncodeError};
 
 use super::super::encoder::{PytketEncoderContext, TrackedValues};
 use super::TypeTranslatorSet;
@@ -173,7 +173,7 @@ impl<H: HugrView> PytketEncoderConfig<H> {
     fn emitters_for_extension(
         &self,
         ext: &ExtensionId,
-    ) -> impl Iterator<Item = &Box<dyn PytketEmitter<H>>> {
+    ) -> impl Iterator<Item = &Box<dyn PytketEmitter<H>>> + use<'_, H> {
         self.extension_emitters
             .get(ext)
             .into_iter()
@@ -186,7 +186,7 @@ impl<H: HugrView> PytketEncoderConfig<H> {
     fn emitters_for_extensions(
         &self,
         exts: &ExtensionSet,
-    ) -> impl Iterator<Item = &Box<dyn PytketEmitter<H>>> {
+    ) -> impl Iterator<Item = &Box<dyn PytketEmitter<H>>> + use<'_, H> {
         let emitter_ids: BTreeSet<usize> = exts
             .iter()
             .flat_map(|ext| self.extension_emitters.get(ext).into_iter().flatten())

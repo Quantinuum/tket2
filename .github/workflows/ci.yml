@@ -50,7 +50,7 @@ jobs:
       extensions: ${{ steps.filter.outputs.extensions }}
       qis: ${{ steps.filter.outputs.qis }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/check-changes
         id: filter
 
@@ -63,7 +63,7 @@ jobs:
       # Fail on rust compiler warnings.
       RUSTFLAGS: -D warnings
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: mozilla-actions/sccache-action@v0.0.9
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -92,23 +92,31 @@ jobs:
     if: ${{ needs.changes.outputs.python == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: mozilla-actions/sccache-action@v0.0.9
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: ${{ env.LLVM_VERSION }}
+          directory: ${{ runner.temp }}/llvm
       - name: Install tket-c-api library
         uses: ./.github/actions/tket-c-api
         with:
           install-path: ${{ env.TKET_C_API_PATH }}
-      - name: Install Python ${{ env.PYTHON_HIGHEST }}
-        run: uv python install ${{ env.PYTHON_HIGHEST }}
+      - name: Install Python ${{ env.PYTHON_LOWEST }}
+        run: uv python install ${{ env.PYTHON_LOWEST }}
       - name: Setup dependencies
-        run: uv sync --python ${{ env.PYTHON_HIGHEST }} --package tket --exact
+        # avoid building qis-compiler
+        run: uv sync --package=tket --exact --python ${{ env.PYTHON_LOWEST }}
       - name: Type check with mypy
-        run: uv run --no-project mypy .
+        run: uv run mypy .
       - name: Check formatting with ruff
         run: uv run --no-project ruff format --check
       - name: Lint with ruff
@@ -122,7 +130,7 @@ jobs:
     permissions:
       checks: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: mozilla-actions/sccache-action@v0.0.9
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -151,7 +159,7 @@ jobs:
     runs-on: ubuntu-latest
     name: tests (Rust stable, no features)
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: mozilla-actions/sccache-action@v0.0.9
       - id: toolchain
         uses: dtolnay/rust-toolchain@master
@@ -176,7 +184,7 @@ jobs:
     runs-on: ubuntu-latest
     name: tests (Rust stable, all features)
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: mozilla-actions/sccache-action@v0.0.9
       - id: toolchain
         uses: dtolnay/rust-toolchain@master
@@ -212,7 +220,7 @@ jobs:
         rust: [beta]
     name: tests (Rust ${{ matrix.rust }})
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: mozilla-actions/sccache-action@v0.0.9
       - id: toolchain
         uses: dtolnay/rust-toolchain@master
@@ -245,7 +253,7 @@ jobs:
     runs-on: ubuntu-latest
     name: tests (Rust nightly, coverage)
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: mozilla-actions/sccache-action@v0.0.9
       - uses: dtolnay/rust-toolchain@master
         with:
@@ -285,13 +293,13 @@ jobs:
     runs-on: ubuntu-latest
     name: tests (Rust MSRV, min dependencies)
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: mozilla-actions/sccache-action@v0.0.9
       - name: Install MSRV toolchain
         id: toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.85"
+          toolchain: "1.89"
       - name: Install nightly toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -314,7 +322,7 @@ jobs:
           cargo binstall cargo-minimal-versions --force
       - name: Pin transitive dependencies not compatible with our MSRV
         # Add new dependencies as needed if the check fails due to
-        # "package `XXX` cannot be built because it requires rustc YYY or newer, while the currently active rustc version is 1.85.0"
+        # "package `XXX` cannot be built because it requires rustc YYY or newer, while the currently active rustc version is 1.89.0"
         run: |
           rm Cargo.lock
           # cargo add -p tket insta@2.4.1
@@ -335,7 +343,7 @@ jobs:
     env:
       PKGS: tket-py tket-eccs tket-exts
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: mozilla-actions/sccache-action@v0.0.9
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -373,7 +381,7 @@ jobs:
     runs-on: ubuntu-latest
     name: qis-compiler test
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: mozilla-actions/sccache-action@v0.0.9
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -409,7 +417,7 @@ jobs:
     name: Check standard extensions
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: mozilla-actions/sccache-action@v0.0.9
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -432,7 +440,7 @@ jobs:
     if: ${{ needs.changes.outputs.extensions == 'true' }}
     name: Check extension versions
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0 # Need full history to compare with main
 

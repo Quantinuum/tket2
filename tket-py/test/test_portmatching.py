@@ -1,5 +1,5 @@
 from pytket import Circuit
-from pytket.qasm import circuit_from_qasm
+from pytket.qasm import circuit_from_qasm_str
 from tket.pattern import CircuitPattern, PatternMatcher
 
 
@@ -32,7 +32,23 @@ def test_non_convex_pattern():
 
 def test_larger_matching():
     """a larger crafted circuit with matches WIP"""
-    c = circuit_from_qasm("test_files/simple.qasm")
+    QASM = """OPENQASM 2.0;
+    include "qelib1.inc";
+
+    qreg q[3];
+
+    h q[0];
+    h q[1];
+    h q[1];
+    cx q[1], q[2];
+    h q[2];
+    cx q[1], q[2];
+    cx q[2], q[1];
+    cx q[1], q[2];
+    cx q[2], q[0];
+    """
+
+    c = circuit_from_qasm_str(QASM)
 
     p1 = CircuitPattern(Circuit(2).CX(0, 1).H(1))
     p2 = CircuitPattern(Circuit(2).H(0).CX(1, 0))

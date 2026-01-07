@@ -3,17 +3,16 @@
 use hugr::extension::prelude::qb_t;
 use hugr::std_extensions::collections::array::{Array, ArrayKind};
 use hugr::std_extensions::collections::borrow_array::BorrowArray;
-use hugr::std_extensions::collections::value_array::ValueArray;
 use hugr::types::{CustomType, SumType, Type, TypeArg, TypeRowRV};
 use std::cell::RefCell;
 use std::collections::HashMap;
 
 /// If a type is an option of the given element type.
 pub fn is_opt_of(ty: &Type, elem_type: &Type) -> bool {
-    if let Some(sum) = ty.as_sum() {
-        if let Some(inner) = sum.as_unary_option() {
-            return inner == elem_type;
-        }
+    if let Some(sum) = ty.as_sum()
+        && let Some(inner) = sum.as_unary_option()
+    {
+        return inner == elem_type;
     }
     false
 }
@@ -89,11 +88,10 @@ impl TypeUnpacker {
             self.tuple_row(row)
 
             // other sums containing the element type are ignored.
-        } else if let Some((size, elem_ty)) = ty.as_extension().and_then(|ext| {
-            array_args::<Array>(ext)
-                .or_else(|| array_args::<ValueArray>(ext))
-                .or_else(|| array_args::<BorrowArray>(ext))
-        }) {
+        } else if let Some((size, elem_ty)) = ty
+            .as_extension()
+            .and_then(|ext| array_args::<Array>(ext).or_else(|| array_args::<BorrowArray>(ext)))
+        {
             // Special case for Option[ElementType] since it is used in arrays.
             // Fragile - would be better with dedicated array type.
             // TODO remove and only support borrow arrays
@@ -185,7 +183,6 @@ mod test {
 
     #[rstest]
     #[case::array(Array)]
-    #[case::value(ValueArray)]
     #[case::borrow(BorrowArray)]
     fn test_array_types<AK: ArrayKind>(#[case] _kind: AK) {
         let analyzer = TypeUnpacker::for_qubits();

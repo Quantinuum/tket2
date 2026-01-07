@@ -1,9 +1,9 @@
 use std::{collections::HashMap, rc::Rc};
 
 use derive_more::{Display, Error, From};
-use hugr::hugr::patch::PatchVerification;
 use hugr::hugr::Patch;
-use hugr::hugr::{hugrmut::HugrMut, HugrError};
+use hugr::hugr::patch::PatchVerification;
+use hugr::hugr::{HugrError, hugrmut::HugrMut};
 use hugr::{CircuitUnit, Direction, HugrView, Node, Port, PortIndex};
 use itertools::Itertools;
 use portgraph::PortOffset;
@@ -17,7 +17,7 @@ use crate::{
 type Qb = crate::circuit::units::LinearUnit;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-// remove once https://github.com/CQCL-DEV/tket2/issues/126 is resolved
+// remove once https://github.com/quantinuum-DEV/tket2/issues/126 is resolved
 struct ComCommand {
     /// The operation node.
     node: Node,
@@ -218,7 +218,10 @@ impl PatchVerification for PullForward {
         unimplemented!()
     }
 
-    fn invalidation_set(&self) -> impl Iterator<Item = Node> {
+    fn invalidated_nodes(
+        &self,
+        _: &impl HugrView<Node = Self::Node>,
+    ) -> impl Iterator<Item = Self::Node> {
         let cmd_node = std::iter::once(self.command.node());
         let next_nodes = self.new_nexts.values().map(|c| c.node());
         cmd_node.chain(next_nodes)
@@ -481,7 +484,7 @@ mod test {
         build().unwrap().into()
     }
 
-    // bug https://github.com/CQCL/tket2/issues/253
+    // bug https://github.com/quantinuum/tket2/issues/253
     fn cx_commute_bug() -> Circuit {
         build_simple_circuit(3, |circ| {
             circ.append(TketOp::H, [2])?;

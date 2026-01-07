@@ -7,7 +7,7 @@ use hugr::builder::{DFGBuilder, Dataflow as _};
 use hugr::extension::prelude::{bool_t, qb_t};
 use hugr::hugr::hugrmut::HugrMut;
 use hugr::ops::Value;
-use hugr::std_extensions::arithmetic::float_types::{float64_type, ConstF64};
+use hugr::std_extensions::arithmetic::float_types::{ConstF64, float64_type};
 use hugr::types::Type;
 use hugr::{Hugr, IncomingPort, Node, Wire};
 use indexmap::{IndexMap, IndexSet};
@@ -16,8 +16,8 @@ use tket_json_rs::circuit_json::ImplicitPermutation;
 use tket_json_rs::register::ElementId as PytketRegister;
 
 use crate::extension::bool::bool_type;
-use crate::extension::rotation::{rotation_type, ConstRotation};
-use crate::serialize::pytket::decoder::param::parser::{parse_pytket_param, PytketParam};
+use crate::extension::rotation::{ConstRotation, rotation_type};
+use crate::serialize::pytket::decoder::param::parser::{PytketParam, parse_pytket_param};
 use crate::serialize::pytket::decoder::{
     LoadedParameter, ParameterType, PytketDecoderContext, TrackedBit, TrackedBitId, TrackedQubit,
     TrackedQubitId,
@@ -25,9 +25,9 @@ use crate::serialize::pytket::decoder::{
 use crate::serialize::pytket::extension::RegisterCount;
 use crate::serialize::pytket::opaque::EncodedEdgeID;
 use crate::serialize::pytket::{
-    PytketDecodeError, PytketDecodeErrorInner, PytketDecoderConfig, RegisterHash,
+    PARAMETER_TYPES, PytketDecodeError, PytketDecodeErrorInner, PytketDecoderConfig, RegisterHash,
 };
-use crate::{symbolic_constant_op, TketOp};
+use crate::{TketOp, symbolic_constant_op};
 
 /// Tracked data for a wire in [`TrackedWires`].
 #[derive(Debug, Clone, PartialEq)]
@@ -584,12 +584,12 @@ impl WireTracker {
     }
 
     /// Returns the list of wires that contain the given qubit.
-    fn qubit_wires(&self, qubit: &TrackedQubit) -> impl Iterator<Item = Wire> + '_ {
+    fn qubit_wires(&self, qubit: &TrackedQubit) -> impl Iterator<Item = Wire> + '_ + use<'_> {
         self.qubit_wires[&qubit.id()].iter().copied()
     }
 
     /// Returns the list of wires that contain the given bit.
-    fn bit_wires(&self, bit: &TrackedBit) -> impl Iterator<Item = Wire> + '_ {
+    fn bit_wires(&self, bit: &TrackedBit) -> impl Iterator<Item = Wire> + '_ + use<'_> {
         self.bit_wires[&bit.id()].iter().copied()
     }
 
@@ -642,7 +642,7 @@ impl WireTracker {
     /// # Errors
     ///
     /// See [`WireTracker::find_typed_wires`] for possible errors.
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub(in crate::serialize::pytket) fn find_typed_wire(
         &mut self,
         config: &PytketDecoderConfig,
@@ -653,16 +653,9 @@ impl WireTracker {
         params: &mut &[LoadedParameter],
         unsupported_wire: Option<EncodedEdgeID>,
     ) -> Result<FoundWire, PytketDecodeError> {
-        // TODO: Use the slice `split_off_first` method once MSRV is ≥1.87
-        fn split_off_first<'a, T>(slice: &mut &'a [T]) -> Option<&'a T> {
-            let (first, rem) = slice.split_first()?;
-            *slice = rem;
-            Some(first)
-        }
-
         // Return a parameter input if the type is a float or rotation.
-        if [float64_type(), rotation_type()].contains(ty) {
-            let Some(param) = split_off_first(params) else {
+        if PARAMETER_TYPES.contains(ty) {
+            let Some(param) = params.split_off_first() else {
                 return Err(
                     PytketDecodeErrorInner::NoMatchingParameter { ty: ty.to_string() }.wrap(),
                 );
@@ -981,7 +974,12 @@ impl WireTracker {
                     let res = hugr.add_dataflow_op(op, input_wires).unwrap_or_else(|e| {
                         panic!("Error while decoding pytket operation parameter \"{param}\". {e}",)
                     });
-                    assert_eq!(res.num_value_outputs(), 1, "An operation decoded from the pytket op parameter \"{param}\" had {} outputs", res.num_value_outputs());
+                    assert_eq!(
+                        res.num_value_outputs(),
+                        1,
+                        "An operation decoded from the pytket op parameter \"{param}\" had {} outputs",
+                        res.num_value_outputs()
+                    );
                     LoadedParameter::new(param_ty, res.out_wire(0))
                 }
             }
@@ -1189,9 +1187,9 @@ pub(in crate::serialize::pytket) enum FoundWire {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use hugr::Node;
     use hugr::extension::prelude::{bool_t, qb_t};
     use hugr::types::SumType;
-    use hugr::Node;
     use rstest::{fixture, rstest};
     use std::sync::Arc;
     use tket_json_rs::register::ElementId;

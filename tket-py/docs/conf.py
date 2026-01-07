@@ -19,6 +19,7 @@ extensions = [
     "sphinx.ext.viewcode",
     "sphinx_copybutton",
     "myst_nb",
+    "sphinx_autodoc_typehints",
 ]
 
 autosummary_ignore_module_all = False  # Respect __all__ if specified
@@ -40,4 +41,23 @@ suppress_warnings = [
 ]
 
 
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3", None),
+    "pytket": ("https://docs.quantinuum.com/tket/api-docs/", None),
+    "hugr": ("https://quantinuum.github.io/hugr/", None),
+}
+
 nb_execution_mode = "off"
+
+
+exclude_patterns = [
+    "**/jupyter_execute",
+    "jupyter_execute/*",
+    ".jupyter_cache",
+    "*.venv",
+    "README.md",
+    "**/README.md",
+    ".jupyter_cache",
+    "examples/1-Getting-Started.ipynb",
+    "examples/2-Rewriting-Circuits.ipynb",
+]

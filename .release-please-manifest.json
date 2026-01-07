@@ -1,6 +1,6 @@
 {
-    "tket-py": "0.12.11",
+    "tket-py": "0.12.13",
     "tket-eccs": "0.5.1",
-    "tket-exts": "0.12.0",
+    "tket-exts": "0.12.1",
     "qis-compiler": "0.2.10"
 }

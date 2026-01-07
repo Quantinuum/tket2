@@ -35,7 +35,7 @@ jobs:
     outputs:
       python: ${{ steps.filter.outputs.python || github.event_name != 'pull_request' }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/check-changes
         id: filter
   test:
@@ -44,7 +44,7 @@ jobs:
     if: ${{ needs.changes.outputs.python == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           submodules: true
 

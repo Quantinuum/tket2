@@ -16,8 +16,7 @@ use hugr::ops::{OpTrait, OpType};
 use hugr::types::EdgeKind;
 
 use std::borrow::Cow;
-use std::collections::{BTreeSet, HashMap};
-use std::ops::RangeTo;
+use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use hugr::{Direction, HugrView, OutgoingPort, Wire};
@@ -27,10 +26,12 @@ use unsupported_tracker::UnsupportedTracker;
 
 use super::opaque::OpaqueSubgraphs;
 use super::{
-    PytketEncodeError, PytketEncodeOpError, METADATA_OPGROUP, METADATA_PHASE, METADATA_Q_REGISTERS,
+    METADATA_OPGROUP, METADATA_PHASE, METADATA_Q_REGISTERS, PytketEncodeError, PytketEncodeOpError,
 };
 use crate::circuit::Circuit;
-use crate::serialize::pytket::circuit::{AdditionalNodesAndWires, EncodedCircuitInfo};
+use crate::serialize::pytket::circuit::{
+    AdditionalNodesAndWires, AdditionalSubgraph, EncodedCircuitInfo,
+};
 use crate::serialize::pytket::config::PytketEncoderConfig;
 use crate::serialize::pytket::extension::RegisterCount;
 use crate::serialize::pytket::opaque::{OpaqueSubgraph, OpaqueSubgraphPayload};
@@ -56,6 +57,11 @@ pub struct PytketEncoderContext<H: HugrView> {
     unsupported: UnsupportedTracker<H::Node>,
     /// A registry of already-encoded opaque subgraphs.
     opaque_subgraphs: OpaqueSubgraphs<H::Node>,
+    /// Subgraphs in `opaque_subgraphs` that could not be emitted as opaque
+    /// barriers, and must be stored in the [`EncodedCircuitInfo`] instead when
+    /// finishing the encoding. Identified by their
+    /// [`super::opaque::SubgraphId`] in `opaque_subgraphs`.
+    non_emitted_subgraphs: Vec<AdditionalSubgraph>,
     /// Configuration for the encoding.
     ///
     /// Contains custom operation/type/const emitters.
@@ -68,7 +74,7 @@ pub struct PytketEncoderContext<H: HugrView> {
 ///
 /// Mostly related to qubit/bit/parameter reuse.
 #[derive(Default)]
-#[allow(clippy::type_complexity)]
+#[expect(clippy::type_complexity)]
 pub struct EmitCommandOptions<'a> {
     /// A function returning a list of input qubits to reuse in the output.
     /// Any additional required qubits IDs will be freshly generated.
@@ -164,7 +170,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
             .filter(|s| !s.is_empty());
 
         // Recover other parameters stored in the metadata
-        let phase = match hugr.get_metadata(region, METADATA_PHASE) {
+        let phase = match hugr.get_metadata_any(region, METADATA_PHASE) {
             Some(p) => p.as_str().unwrap().to_string(),
             None => "0".to_string(),
         };
@@ -176,6 +182,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
             values: ValueTracker::new(circ, region, &config)?,
             unsupported: UnsupportedTracker::new(circ),
             opaque_subgraphs,
+            non_emitted_subgraphs: vec![],
             config,
             function_cache: Arc::new(RwLock::new(HashMap::new())),
         })
@@ -224,30 +231,11 @@ impl<H: HugrView> PytketEncoderContext<H> {
         region: H::Node,
     ) -> Result<(EncodedCircuitInfo, OpaqueSubgraphs<H::Node>), PytketEncodeError<H::Node>> {
         // Add any remaining unsupported nodes
-        let mut extra_subgraph: Option<BTreeSet<H::Node>> = None;
-        let mut extra_subgraph_params = Vec::new();
         while !self.unsupported.is_empty() {
             let node = self.unsupported.iter().next().unwrap();
             let opaque_subgraphs = self.unsupported.extract_component(node, circ.hugr())?;
-            match self.emit_unsupported(&opaque_subgraphs, circ) {
-                Ok(()) => (),
-                Err(PytketEncodeError::UnsupportedSubgraphHasNoRegisters { params }) => {
-                    // We'll store the nodes in the `extra_subgraph` field of the `EncodedCircuitInfo`.
-                    // So the decoder can reconstruct the original subgraph.
-                    extra_subgraph
-                        .get_or_insert_default()
-                        .extend(opaque_subgraphs.nodes().iter().cloned());
-                    extra_subgraph_params.extend(params);
-                }
-                Err(e) => return Err(e),
-            }
+            self.emit_unsupported(&opaque_subgraphs, circ)?;
         }
-        let extra_subgraph = extra_subgraph
-            .map(|nodes| -> Result<_, PytketEncodeError<H::Node>> {
-                let subgraph = OpaqueSubgraph::try_from_nodes(nodes, circ.hugr())?;
-                Ok(self.opaque_subgraphs.register_opaque_subgraph(subgraph))
-            })
-            .transpose()?;
 
         let tracker_result = self.values.finish(circ, region)?;
 
@@ -264,10 +252,11 @@ impl<H: HugrView> PytketEncoderContext<H> {
             input_params: tracker_result.input_params,
             output_params: tracker_result.params,
             additional_nodes_and_wires: AdditionalNodesAndWires {
-                extra_subgraph,
-                extra_subgraph_params,
+                additional_subgraphs: self.non_emitted_subgraphs,
                 straight_through_wires: tracker_result.straight_through_wires,
             },
+            output_qubits: tracker_result.qubit_outputs,
+            output_bits: tracker_result.bit_outputs,
         };
 
         Ok((info, self.opaque_subgraphs))
@@ -473,7 +462,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
         // Preserve the pytket opgroup, if it got stored in the metadata.
         let opgroup: Option<String> = circ
             .hugr()
-            .get_metadata(node, METADATA_OPGROUP)
+            .get_metadata_any(node, METADATA_OPGROUP)
             .and_then(serde_json::Value::as_str)
             .map(ToString::to_string);
 
@@ -590,7 +579,6 @@ impl<H: HugrView> PytketEncoderContext<H> {
         let subgraph_id = self
             .opaque_subgraphs
             .register_opaque_subgraph(subgraph.clone());
-        let payload = OpaqueSubgraphPayload::new_external(subgraph_id);
 
         // Collects the input values for the subgraph.
         //
@@ -615,6 +603,8 @@ impl<H: HugrView> PytketEncoderContext<H> {
             .into_iter()
             .map(|p| self.values.param_expression(p).to_owned())
             .collect();
+
+        let payload = OpaqueSubgraphPayload::new_external(subgraph_id, input_param_exprs.clone());
 
         // Update the values in the node's outputs, and extend `op_values` with
         // any new output values.
@@ -646,31 +636,40 @@ impl<H: HugrView> PytketEncoderContext<H> {
                 |p| {
                     let range = out_param_count..out_param_count + p.expected_count;
                     out_param_count += p.expected_count;
-                    range.map(|i| format!("{subgraph_id}_out{i}")).collect_vec()
+                    range.map(|i| subgraph_id.output_parameter(i)).collect_vec()
                 },
             )?;
             op_values.append(new_outputs);
         }
 
         // Check that we have qubits or bits to attach the barrier command to.
-        //
-        // This should only fail when looking at the "leftover" unsupported nodes at the end of the decoding process.
         if op_values.qubits.is_empty() && op_values.bits.is_empty() {
-            return Err(PytketEncodeError::UnsupportedSubgraphHasNoRegisters {
+            // We cannot associate this subgraph to any qubit or bit register in
+            // the pytket circuit, so we'll store it in the
+            // [`AdditionalSubgraph`]s instead when finishing the encoding.
+            //
+            // That list contains a list of subgraphs so we don't need to do any
+            // additional handling, but if we preferred in the future we could
+            // instead merge a single list of nodes if we wanted.
+            self.non_emitted_subgraphs.push(AdditionalSubgraph {
+                id: subgraph_id,
                 params: input_param_exprs.clone(),
             });
+        } else {
+            // If there are registers to which to attach, emit it as a barrier command.
+
+            // Create the pytket operation, with an external reference to the subgraph.
+            let args = MakeOperationArgs {
+                num_qubits: op_values.qubits.len(),
+                num_bits: op_values.bits.len(),
+                params: Cow::Borrowed(&[]),
+            };
+            let mut pytket_op = make_tk1_operation(tket_json_rs::OpType::Barrier, args);
+            pytket_op.data = Some(serde_json::to_string(&payload).unwrap());
+
+            self.emit_command(pytket_op, &op_values.qubits, &op_values.bits, None);
         }
 
-        // Create pytket operation, and add the subcircuit as hugr
-        let args = MakeOperationArgs {
-            num_qubits: op_values.qubits.len(),
-            num_bits: op_values.bits.len(),
-            params: Cow::Borrowed(&input_param_exprs),
-        };
-        let mut pytket_op = make_tk1_operation(tket_json_rs::OpType::Barrier, args);
-        pytket_op.data = Some(serde_json::to_string(&payload).unwrap());
-
-        self.emit_command(pytket_op, &op_values.qubits, &op_values.bits, None);
         Ok(())
     }
 
@@ -900,12 +899,12 @@ impl<H: HugrView> PytketEncoderContext<H> {
             }
             OpType::Const(op) => {
                 let config = Arc::clone(&self.config);
-                if self.config().type_to_pytket(&op.get_type()).is_some() {
-                    if let Some(values) = config.const_to_pytket(&op.value, self)? {
-                        let wire = Wire::new(node, 0);
-                        self.values.register_wire(wire, values.into_iter(), circ)?;
-                        return Ok(EncodeStatus::Success);
-                    }
+                if self.config().type_to_pytket(&op.get_type()).is_some()
+                    && let Some(values) = config.const_to_pytket(&op.value, self)?
+                {
+                    let wire = Wire::new(node, 0);
+                    self.values.register_wire(wire, values.into_iter(), circ)?;
+                    return Ok(EncodeStatus::Success);
                 }
             }
             // TODO: DFG and function call emissions are temporarily disabled,
@@ -1032,7 +1031,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
     ///   parameter expressions.
     /// - `wire_filter`: A function that takes a wire and returns true if the wire
     ///   at the output of the `node` should be registered.
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     fn register_node_outputs(
         &mut self,
         node: H::Node,
@@ -1140,7 +1139,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
     /// - `input_params`: The list of input parameter expressions.
     /// - `options_params_fn`: A function that computes the output parameter
     ///   expressions given the inputs.
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     fn register_port_output(
         &mut self,
         node: H::Node,
@@ -1192,7 +1191,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
         // Qubits
         // Reuse the ones from `qubits`, dropping them from the slice,
         // and allocate new ones as needed.
-        let output_qubits = match split_off(qubits, ..count.qubits) {
+        let output_qubits = match qubits.split_off(..count.qubits) {
             Some(reused_qubits) => reused_qubits.to_vec(),
             None => {
                 // Not enough qubits, allocate some fresh ones.
@@ -1212,7 +1211,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
         // Bits
         // Reuse the ones from `bits`, dropping them from the slice,
         // and allocate new ones as needed.
-        let output_bits = match split_off(bits, ..count.bits) {
+        let output_bits = match bits.split_off(..count.bits) {
             Some(reused_bits) => reused_bits.to_vec(),
             None => {
                 // Not enough bits, allocate some fresh ones.
@@ -1241,7 +1240,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
     }
 
     /// Return the output wires of a node that have an associated pytket [`RegisterCount`].
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     fn node_output_values(
         &self,
         node: H::Node,
@@ -1485,15 +1484,4 @@ pub fn make_tk1_classical_expression(
     let mut op = make_tk1_operation(tket_json_rs::OpType::ClExpr, args);
     op.classical_expr = Some(clexpr);
     op
-}
-
-// TODO: Replace with array's `split_off` method once MSRV is ≥1.87
-fn split_off<'a, T>(slice: &mut &'a [T], range: RangeTo<usize>) -> Option<&'a [T]> {
-    let split_index = range.end;
-    if split_index > slice.len() {
-        return None;
-    }
-    let (front, back) = slice.split_at(split_index);
-    *slice = back;
-    Some(front)
 }

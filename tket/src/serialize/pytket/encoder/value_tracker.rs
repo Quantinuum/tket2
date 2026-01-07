@@ -23,12 +23,12 @@ use crate::circuit::Circuit;
 use crate::serialize::pytket::circuit::StraightThroughWire;
 use crate::serialize::pytket::extension::RegisterCount;
 use crate::serialize::pytket::{
-    PytketEncodeError, PytketEncodeOpError, RegisterHash, METADATA_B_REGISTERS,
-    METADATA_INPUT_PARAMETERS,
+    METADATA_B_REGISTERS, METADATA_INPUT_PARAMETERS, PytketEncodeError, PytketEncodeOpError,
+    RegisterHash,
 };
 
 use super::unit_generator::RegisterUnitGenerator;
-use super::{PytketEncoderConfig, METADATA_Q_REGISTERS};
+use super::{METADATA_Q_REGISTERS, PytketEncoderConfig};
 
 /// A structure for tracking qubits used in the circuit being encoded.
 ///
@@ -187,6 +187,10 @@ pub struct ValueTrackerResult {
     pub bits: Vec<RegisterUnit>,
     /// The final list of parameter expressions at the output.
     pub params: Vec<String>,
+    /// The ordered list of qubit registers seen at the output of the region.
+    pub qubit_outputs: Vec<RegisterUnit>,
+    /// The ordered list of bit registers seen at the output of the region.
+    pub bit_outputs: Vec<RegisterUnit>,
     /// The implicit permutation of the qubit registers.
     pub qubit_permutation: Vec<circuit_json::ImplicitPermutation>,
     /// A list of parameter variables seen at the input node of the region.
@@ -482,12 +486,14 @@ impl<N: HugrNode> ValueTracker<N> {
         }
 
         // Compute the final register permutations.
-        let qubit_permutation = compute_final_permutation(qubit_outputs, &self.qubits);
+        let qubit_permutation = compute_final_permutation(qubit_outputs.clone(), &self.qubits);
 
         Ok(ValueTrackerResult {
             qubits: self.qubits,
             bits: self.bits,
             params: param_outputs,
+            qubit_outputs,
+            bit_outputs,
             qubit_permutation,
             input_params: self.input_params,
             straight_through_wires,
@@ -574,7 +580,7 @@ fn read_metadata_json_list<T: serde::de::DeserializeOwned, H: HugrView>(
     region: H::Node,
     metadata_key: &str,
 ) -> Vec<T> {
-    let Some(value) = circ.hugr().get_metadata(region, metadata_key) else {
+    let Some(value) = circ.hugr().get_metadata_any(region, metadata_key) else {
         return vec![];
     };
 
@@ -614,7 +620,8 @@ pub(super) fn compute_final_permutation(
     //
     // For each element `reg` at the output of the circuit, we find its position `i` at the input,
     // and find out the pytket output register associated with that position in the `declared_outputs` list.
-    let permutation = actual_outputs
+
+    actual_outputs
         .iter()
         .map(|reg| {
             let hash = reg.into();
@@ -625,7 +632,5 @@ pub(super) fn compute_final_permutation(
                 tket_json_rs::register::Qubit { id: out },
             )
         })
-        .collect_vec();
-
-    permutation
+        .collect_vec()
 }

@@ -15,14 +15,14 @@ use itertools::Itertools;
 use rayon::iter::{IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator};
 use tket_json_rs::circuit_json::{Command as PytketCommand, SerialCircuit};
 
+use crate::Circuit;
 use crate::serialize::pytket::decoder::PytketDecoderContext;
 use crate::serialize::pytket::opaque::SubgraphId;
 use crate::serialize::pytket::{
-    default_decoder_config, default_encoder_config, DecodeInsertionTarget, DecodeOptions,
-    EncodeOptions, PytketDecodeError, PytketDecodeErrorInner, PytketDecoderConfig,
-    PytketEncodeError, PytketEncoderContext,
+    DecodeInsertionTarget, DecodeOptions, EncodeOptions, PytketDecodeError, PytketDecodeErrorInner,
+    PytketDecoderConfig, PytketEncodeError, PytketEncoderContext, default_decoder_config,
+    default_encoder_config,
 };
-use crate::Circuit;
 
 use super::opaque::OpaqueSubgraphs;
 
@@ -52,7 +52,7 @@ pub struct EncodedCircuit<Node: HugrNode> {
 }
 
 /// Information stored about a pytket circuit encoded from a HUGR region.
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub(super) struct EncodedCircuitInfo {
     /// The serial circuit encoded from the region.
     pub serial_circuit: SerialCircuit,
@@ -65,28 +65,37 @@ pub(super) struct EncodedCircuitInfo {
     /// since parameters in pytket are unordered.
     pub input_params: Vec<String>,
     /// List of output parameter expressions found at the end of the encoded region.
-    //
-    // TODO: The decoder does not currently connect these, everything that
-    // _produces_ a parameter gets included in unsupported subgraphs instead.
     pub output_params: Vec<String>,
+    /// List of qubit registers seen at the output of the encoded region.
+    pub output_qubits: Vec<tket_json_rs::register::ElementId>,
+    /// List of bit registers seen at the output of the encoded region.
+    pub output_bits: Vec<tket_json_rs::register::ElementId>,
 }
 
 /// Nodes and edges from the original region that could not be encoded into the
 /// pytket circuit, as they cannot be attached to a pytket command.
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub(super) struct AdditionalNodesAndWires {
-    /// A subgraph of the region that does not contain any operation encodable
-    /// as a pytket command, and has no qubit/bits in its boundary that could be
-    /// used to emit an opaque barrier command in the [`serial_circuit`].
-    pub extra_subgraph: Option<SubgraphId>,
-    /// Parameter expression inputs to the `extra_subgraph`.
-    /// These cannot be encoded either if there's no pytket command to attach them to.
-    pub extra_subgraph_params: Vec<String>,
+    /// Subgraphs of the region that could not be encoded as a pytket commands,
+    /// and have no qubit/bits in their boundary that could be used to emit an
+    /// opaque barrier command in the [`serial_circuit`].
+    pub additional_subgraphs: Vec<AdditionalSubgraph>,
     /// List of wires that directly connected the input node to the output node in the encoded region,
     /// and were not encoded in [`serial_circuit`].
     ///
     /// We just store the input nodes's output port and output node's input port here.
     pub straight_through_wires: Vec<StraightThroughWire>,
+}
+
+/// A subgraph of the encoded circuit that could not be associated to any qubit or bit register in the pytket circuit.
+#[derive(Debug, Clone)]
+pub(super) struct AdditionalSubgraph {
+    /// The subgraph of the region that could not be encoded as a pytket command,
+    /// and has no qubit/bits in its boundary that could be used to emit an opaque
+    /// barrier command in the [`serial_circuit`].
+    pub id: SubgraphId,
+    /// Parameter expression inputs to the `subgraph`.
+    pub params: Vec<String>,
 }
 
 /// A wire stored in the [`EncodedCircuitInfo`] that directly connected the
@@ -195,7 +204,7 @@ impl EncodedCircuit<Node> {
                 &encoded.serial_circuit.commands,
                 Some(&encoded.additional_nodes_and_wires),
             )?;
-            let decoded_node = decoder.finish(&encoded.output_params)?.node();
+            let decoded_node = decoder.finish(Some(encoded))?.node();
 
             // Move any non-local edges from originating from the old input node.
             let old_input = hugr.get_io(original_region).unwrap()[0];
@@ -366,7 +375,7 @@ impl<Node: HugrNode> EncodedCircuit<Node> {
         let mut decoder =
             PytketDecoderContext::new(serial_circuit, &mut hugr, target, options, None)?;
         decoder.run_decoder(&serial_circuit.commands, None)?;
-        decoder.finish(&[])?;
+        decoder.finish(None)?;
         Ok(hugr)
     }
 

@@ -4,15 +4,15 @@ use std::borrow::Borrow;
 
 use hugr::builder::{CircuitBuilder, DFGBuilder, Dataflow, DataflowHugr};
 use hugr::extension::prelude::qb_t;
-use hugr::ops::handle::NodeHandle;
 use hugr::ops::OpType;
+use hugr::ops::handle::NodeHandle;
 use hugr::types::Type;
 use itertools::Itertools;
 use pyo3::exceptions::{PyAttributeError, PyValueError};
 use pyo3::types::{PyAnyMethods, PyModule, PyString, PyTypeMethods};
 use pyo3::{
-    pyclass, pymethods, Bound, FromPyObject, IntoPyObject, PyAny, PyErr, PyRefMut, PyResult,
-    PyTypeInfo, Python,
+    Bound, FromPyObject, IntoPyObject, PyAny, PyErr, PyRefMut, PyResult, PyTypeInfo, Python,
+    pyclass, pymethods,
 };
 
 use derive_more::From;
@@ -20,15 +20,15 @@ use hugr::{Hugr, HugrView, Wire};
 use serde::Serialize;
 use tket::circuit::CircuitHash;
 use tket::passes::CircuitChunks;
-use tket::serialize::pytket::{DecodeOptions, EncodeOptions};
 use tket::serialize::TKETDecode;
+use tket::serialize::pytket::{DecodeOptions, EncodeOptions};
 use tket::{Circuit, TketOp};
 use tket_json_rs::circuit_json::SerialCircuit;
 
 use crate::rewrite::PyCircuitRewrite;
 use crate::utils::ConvertPyErr;
 
-use super::{cost, PyCircuitCost, PyNode, PyWire, Tk2Circuit};
+use super::{PyCircuitCost, PyNode, PyWire, Tk2Circuit, cost};
 
 /// A flag to indicate the encoding of a circuit.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -63,7 +63,7 @@ where
     E: ConvertPyErr<Output = PyErr>,
     F: FnOnce(Circuit, CircuitType) -> Result<T, E>,
 {
-    let (circ, typ) = match Tk2Circuit::extract_bound(circ) {
+    let (circ, typ) = match Tk2Circuit::extract(circ.as_borrowed()) {
         // tket circuit
         Ok(t2circ) => (t2circ.circ, CircuitType::Tket),
         // tket1 circuit

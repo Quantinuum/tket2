@@ -16,7 +16,7 @@ jobs:
       rust: ${{ steps.filter.outputs.rust }}
       python: ${{ steps.filter.outputs.python }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/check-changes
         id: filter
 
@@ -33,7 +33,10 @@ jobs:
       LD_LIBRARY_PATH: ${{ github.workspace }}/tket-c-api/lib
     steps:
       - name: Checkout tket
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
+        # NOTE: here we are using tket-c-api configuration (version and conanfile.txt) from main
+        # to determine the APIs of both main and the PR branch before we look for breaking changes.
+        # This may give incorrect results / CI errors if the PR changes that configuration.
       - name: Install tket-c-api library
         uses: ./.github/actions/tket-c-api
         with:
@@ -42,7 +45,7 @@ jobs:
         run: |
           echo "Installing apt dependencies: llvm-14"
           sudo apt-get install -y llvm-14
-      - uses: CQCL/hugrverse-actions/rs-semver-checks@main
+      - uses: quantinuum/hugrverse-actions/rs-semver-checks@main
         env:
           TKET_C_API_PATH: ${{ env.TKET_C_API_PATH }}
         with:

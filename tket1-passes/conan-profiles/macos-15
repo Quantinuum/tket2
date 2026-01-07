@@ -8,4 +8,4 @@ compiler.version=17
 os=Macos
 
 [buildenv]
-MACOSX_DEPLOYMENT_TARGET=15.0
+MACOSX_DEPLOYMENT_TARGET=13.0

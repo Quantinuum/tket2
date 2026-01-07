@@ -1,7 +1,7 @@
 //! Array codegen utilities.
 
 // TODO move to hugr-llvm crate
-// https://github.com/CQCL/tket2/issues/899
+// https://github.com/quantinuum/tket2/issues/899
 use anyhow::Result;
 use hugr::extension::prelude::usize_t;
 use hugr::llvm::emit::EmitFuncContext;
@@ -11,13 +11,13 @@ use hugr::llvm::extension::collections::array::{
 use hugr::llvm::extension::collections::{array, stack_array};
 use hugr::llvm::inkwell::types::{BasicType, BasicTypeEnum};
 use hugr::llvm::inkwell::values::BasicValueEnum;
-use hugr::llvm::{inkwell, CodegenExtension};
+use hugr::llvm::{CodegenExtension, inkwell};
 use hugr::{HugrView, Node};
+use inkwell::AddressSpace;
 use inkwell::builder::{Builder, BuilderError};
 use inkwell::context::Context;
 use inkwell::types::{IntType, PointerType, StructType};
 use inkwell::values::{ArrayValue, IntValue, PointerValue, StructValue};
-use inkwell::AddressSpace;
 
 /// Specifies different array lowering strategies.
 ///
@@ -46,7 +46,11 @@ pub trait ArrayLowering {
 
 /// Array lowering via the stack as implemented in [stack_array].
 #[derive(Clone)]
-#[allow(deprecated, reason = "Waiting for switch to new array lowering")]
+#[allow(
+    deprecated,
+    clippy::allow_attributes,
+    reason = "Waiting for switch to new array lowering"
+)]
 pub struct StackArrayLowering<ACG: stack_array::ArrayCodegen>(ACG);
 
 /// The default stack array lowering strategy using [stack_array::DefaultArrayCodegen].
@@ -153,7 +157,7 @@ impl<ACG: array::ArrayCodegen + Clone> ArrayLowering for HeapArrayLowering<ACG> 
 /// array (i.e. it is of type `array.get_element_type().ptr_type()`) whereas the
 /// second one points to the whole array value, i.e. it is of type `array.ptr_type()`.
 // Note: copied from
-// https://github.com/CQCL/hugr/blob/bf3889fa206fbb5a22a5ae4b9ea5f8cc0468b4b7/hugr-llvm/src/extension/collections/array.rs#L186
+// https://github.com/quantinuum/hugr/blob/bf3889fa206fbb5a22a5ae4b9ea5f8cc0468b4b7/hugr-llvm/src/extension/collections/array.rs#L186
 pub fn build_array_alloca<'c>(
     builder: &Builder<'c>,
     array: ArrayValue<'c>,
@@ -192,11 +196,14 @@ pub fn build_int_array_load<'c>(
 }
 
 /// Enum representing the element types of a dense array.
-#[allow(missing_docs)]
 pub enum ElemType {
+    /// A signed integer element type.
     Int,
+    /// An unsigned integer element type.
     Uint,
+    /// A floating-point element type.
     Float,
+    /// A boolean element type.
     Bool,
 }
 

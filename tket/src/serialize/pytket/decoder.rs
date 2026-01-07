@@ -8,6 +8,7 @@ mod wires;
 use hugr::extension::ExtensionRegistry;
 use hugr::hugr::hugrmut::HugrMut;
 use hugr::std_extensions::arithmetic::float_types::float64_type;
+use indexmap::IndexSet;
 pub use param::{LoadedParameter, ParameterType};
 pub use tracked_elem::{TrackedBit, TrackedQubit};
 pub use wires::TrackedWires;
@@ -19,7 +20,7 @@ use std::sync::Arc;
 use hugr::builder::{BuildHandle, Container, DFGBuilder, Dataflow, FunctionBuilder, SubContainer};
 use hugr::extension::prelude::{bool_t, qb_t};
 use hugr::ops::handle::{DataflowOpID, NodeHandle};
-use hugr::ops::{OpParent, OpTrait, OpType, DFG};
+use hugr::ops::{DFG, OpParent, OpTrait, OpType};
 use hugr::types::{Signature, Type, TypeRow};
 use hugr::{Hugr, HugrView, Node, OutgoingPort, Wire};
 use tracked_elem::{TrackedBitId, TrackedQubitId};
@@ -30,19 +31,21 @@ use tket_json_rs::circuit_json;
 use tket_json_rs::circuit_json::SerialCircuit;
 
 use super::{
-    PytketDecodeError, METADATA_B_REGISTERS, METADATA_INPUT_PARAMETERS, METADATA_PHASE,
-    METADATA_Q_REGISTERS,
-};
-use crate::extension::rotation::rotation_type;
-use crate::serialize::pytket::circuit::{AdditionalNodesAndWires, StraightThroughWire};
-use crate::serialize::pytket::config::PytketDecoderConfig;
-use crate::serialize::pytket::decoder::wires::WireTracker;
-use crate::serialize::pytket::extension::{build_opaque_tket_op, RegisterCount};
-use crate::serialize::pytket::opaque::{EncodedEdgeID, OpaqueSubgraphs};
-use crate::serialize::pytket::{
-    default_decoder_config, DecodeInsertionTarget, DecodeOptions, PytketDecodeErrorInner,
+    METADATA_B_REGISTERS, METADATA_INPUT_PARAMETERS, METADATA_PHASE, METADATA_Q_REGISTERS,
+    PytketDecodeError,
 };
 use crate::TketOp;
+use crate::extension::rotation::rotation_type;
+use crate::serialize::pytket::circuit::{
+    AdditionalNodesAndWires, EncodedCircuitInfo, StraightThroughWire,
+};
+use crate::serialize::pytket::config::PytketDecoderConfig;
+use crate::serialize::pytket::decoder::wires::WireTracker;
+use crate::serialize::pytket::extension::{RegisterCount, build_opaque_tket_op};
+use crate::serialize::pytket::opaque::{EncodedEdgeID, OpaqueSubgraphs};
+use crate::serialize::pytket::{
+    DecodeInsertionTarget, DecodeOptions, PytketDecodeErrorInner, default_decoder_config,
+};
 
 /// State of the tket circuit being decoded.
 ///
@@ -156,7 +159,7 @@ impl<'h> PytketDecoderContext<'h> {
 
         if !serialcirc.phase.is_empty() {
             // TODO - add a phase gate
-            // <https://github.com/CQCL/tket2/issues/598>
+            // <https://github.com/quantinuum/tket2/issues/598>
             // let phase = Param::new(serialcirc.phase);
             // decoder.add_phase(phase);
         }
@@ -175,9 +178,16 @@ impl<'h> PytketDecoderContext<'h> {
     fn init_metadata(dfg: &mut DFGBuilder<&mut Hugr>, serialcirc: &SerialCircuit) {
         // Metadata. The circuit requires "name", and we store other things that
         // should pass through the serialization roundtrip.
-        dfg.set_metadata(METADATA_PHASE, json!(serialcirc.phase));
-        dfg.set_metadata(METADATA_Q_REGISTERS, json!(serialcirc.qubits));
-        dfg.set_metadata(METADATA_B_REGISTERS, json!(serialcirc.bits));
+
+        // TODO: Replace these with `dfg.set_metadata::<...>(...)` once we
+        // implement metadata keys in tket.
+        let node = dfg.container_node();
+        dfg.hugr_mut()
+            .set_metadata_any(node, METADATA_PHASE, json!(serialcirc.phase));
+        dfg.hugr_mut()
+            .set_metadata_any(node, METADATA_Q_REGISTERS, json!(serialcirc.qubits));
+        dfg.hugr_mut()
+            .set_metadata_any(node, METADATA_B_REGISTERS, json!(serialcirc.bits));
     }
 
     /// Initialize the wire tracker with the input wires.
@@ -300,9 +310,12 @@ impl<'h> PytketDecoderContext<'h> {
     ///
     /// # Arguments
     ///
-    /// - `output_params`: A list of output parameter expressions to associate
-    ///   with the region's outputs.
-    pub(super) fn finish(mut self, output_params: &[String]) -> Result<Node, PytketDecodeError> {
+    /// - `encoded_info`: Information stored while encoding the circuit, used to
+    ///   recover its original structure.
+    pub(super) fn finish(
+        mut self,
+        encoded_info: Option<&EncodedCircuitInfo>,
+    ) -> Result<Node, PytketDecodeError> {
         // Order the final wires according to the serial circuit register order.
         let known_qubits = self
             .wire_tracker
@@ -310,12 +323,34 @@ impl<'h> PytketDecoderContext<'h> {
             .cloned()
             .collect_vec();
         let known_bits = self.wire_tracker.known_pytket_bits().cloned().collect_vec();
-        let mut qubits = known_qubits.as_slice();
-        let mut bits = known_bits.as_slice();
+
+        // Qubits and bits appearing at the output.
+        let mut qubits: IndexSet<TrackedQubit> = IndexSet::new();
+        let mut bits: IndexSet<TrackedBit> = IndexSet::new();
+
+        if let Some(encoded_info) = encoded_info {
+            for qubit in encoded_info.output_qubits.iter() {
+                let id = self.wire_tracker.tracked_qubit_for_register(qubit)?;
+                qubits.insert(id.clone());
+            }
+            for bit in encoded_info.output_bits.iter() {
+                let id = self.wire_tracker.tracked_bit_for_register(bit)?;
+                bits.insert(id.clone());
+            }
+        }
+        // Add any additional qubits or bits we have seen, without modifying the
+        // order of the qubits already there.
+        qubits.extend(known_qubits);
+        bits.extend(known_bits);
+        let qubits: Vec<TrackedQubit> = Vec::from_iter(qubits);
+        let bits: Vec<TrackedBit> = Vec::from_iter(bits);
+        let mut qubits_slice: &[TrackedQubit] = &qubits;
+        let mut bits_slice: &[TrackedBit] = &bits;
 
         // Load the output parameter expressions.
-        let output_params = output_params
+        let output_params = encoded_info
             .iter()
+            .flat_map(|info| info.output_params.iter())
             .map(|p| self.load_half_turns(p))
             .collect_vec();
         let mut params: &[LoadedParameter] = &output_params;
@@ -347,8 +382,8 @@ impl<'h> PytketDecoderContext<'h> {
                     &self.config,
                     &mut self.builder,
                     ty,
-                    &mut qubits,
-                    &mut bits,
+                    &mut qubits_slice,
+                    &mut bits_slice,
                     &mut params,
                     Some(EncodedEdgeID::default()),
                 )
@@ -385,12 +420,13 @@ impl<'h> PytketDecoderContext<'h> {
                     // Disconnected port with an unsupported type. We just skip
                     // it, since it must have been disconnected in the original
                     // hugr too.
-                    debug_assert!(self
-                        .builder
-                        .hugr()
-                        .get_optype(output_node)
-                        .port_kind(port)
-                        .is_none_or(|kind| !kind.is_value()));
+                    debug_assert!(
+                        self.builder
+                            .hugr()
+                            .get_optype(output_node)
+                            .port_kind(port)
+                            .is_none_or(|kind| !kind.is_value())
+                    );
                     continue;
                 }
             };
@@ -400,12 +436,16 @@ impl<'h> PytketDecoderContext<'h> {
         }
 
         // Qubits not in the output need to be freed.
-        self.add_implicit_qfree_operations(qubits);
+        self.add_implicit_qfree_operations(qubits_slice);
 
         // Store the name for the input parameter wires
         let input_params = self.wire_tracker.finish();
         if !input_params.is_empty() {
-            self.builder.set_metadata(
+            // TODO: Replace this with `self.builder.set_metadata::<...>(...)` once we
+            // implement metadata keys in tket.
+            let node = self.builder.container_node();
+            self.builder.hugr_mut().set_metadata_any(
+                node,
                 METADATA_INPUT_PARAMETERS,
                 json!(input_params.into_iter().collect_vec()),
             );
@@ -467,24 +507,17 @@ impl<'h> PytketDecoderContext<'h> {
         commands: &[circuit_json::Command],
         extra_nodes_and_wires: Option<&AdditionalNodesAndWires>,
     ) -> Result<(), PytketDecodeError> {
-        let config = self.config().clone();
-        for com in commands {
-            let op_type = com.op.op_type;
-            self.process_command(com, config.as_ref())
-                .map_err(|e| e.pytket_op(&op_type))?;
-        }
-
         // Add additional subgraphs and wires not encoded in commands.
         let [input_node, output_node] = self.builder.io();
         if let Some(extras) = extra_nodes_and_wires {
-            if let Some(subgraph_id) = extras.extra_subgraph {
-                let params = extras
-                    .extra_subgraph_params
+            for extra_subgraph in &extras.additional_subgraphs {
+                let params = extra_subgraph
+                    .params
                     .iter()
                     .map(|p| self.load_half_turns(p))
                     .collect_vec();
 
-                self.insert_external_subgraph(subgraph_id, &[], &[], &params)
+                self.insert_external_subgraph(extra_subgraph.id, &[], &[], &params)
                     .map_err(|e| e.hugr_op("External subgraph"))?;
             }
 
@@ -502,6 +535,15 @@ impl<'h> PytketDecoderContext<'h> {
                 );
             }
         }
+
+        // Decode the pytket commands.
+        let config = self.config().clone();
+        for com in commands {
+            let op_type = com.op.op_type;
+            self.process_command(com, config.as_ref())
+                .map_err(|e| e.pytket_op(&op_type))?;
+        }
+
         Ok(())
     }
 

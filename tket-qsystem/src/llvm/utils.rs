@@ -4,8 +4,8 @@ use tket::hugr::{self};
 use crate::extension::utils::UtilsOp;
 use anyhow::Result;
 use hugr::llvm::custom::CodegenExtension;
-use hugr::llvm::emit::func::EmitFuncContext;
 use hugr::llvm::emit::EmitOpArgs;
+use hugr::llvm::emit::func::EmitFuncContext;
 use tket::hugr::ops::ExtensionOp;
 use tket::hugr::{HugrView, Node};
 
@@ -44,7 +44,7 @@ fn emit_utils_op<H: HugrView<Node = Node>>(
                 .builder()
                 .build_call(fn_get_cur_shot, &[], "shot")?
                 .try_as_basic_value()
-                .unwrap_left();
+                .unwrap_basic();
             args.outputs.finish(ctx.builder(), [result])
         }
     }
@@ -55,9 +55,9 @@ mod test {
     use crate::extension::utils::UtilsOp;
     use hugr::extension::simple_op::MakeRegisteredOp;
     use hugr::llvm::check_emission;
+    use hugr::llvm::test::TestContext;
     use hugr::llvm::test::llvm_ctx;
     use hugr::llvm::test::single_op_hugr;
-    use hugr::llvm::test::TestContext;
     use rstest::rstest;
 
     use super::*;

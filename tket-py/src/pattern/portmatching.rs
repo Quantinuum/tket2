@@ -9,7 +9,7 @@ use pyo3::{prelude::*, types::PyIterator};
 
 use tket::portmatching::{CircuitPattern, PatternMatch, PatternMatcher};
 
-use crate::circuit::{try_with_circ, with_circ, PyNode};
+use crate::circuit::{PyNode, try_with_circ, with_circ};
 
 /// A pattern that match a circuit exactly
 ///

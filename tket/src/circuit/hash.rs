@@ -85,7 +85,7 @@ impl HashState {
 }
 
 /// Returns a hashable representation of an operation.
-fn hashable_op(op: &OpType) -> impl Hash {
+fn hashable_op(op: &OpType) -> impl Hash + use<> {
     match op {
         OpType::ExtensionOp(op) if !op.args().is_empty() => {
             // TODO: Require hashing for TypeParams?
@@ -161,10 +161,10 @@ pub enum HashError {
 mod test {
     use tket_json_rs::circuit_json;
 
-    use crate::serialize::pytket::DecodeOptions;
-    use crate::serialize::TKETDecode;
-    use crate::utils::build_simple_circuit;
     use crate::TketOp;
+    use crate::serialize::TKETDecode;
+    use crate::serialize::pytket::DecodeOptions;
+    use crate::utils::build_simple_circuit;
 
     use super::*;
 

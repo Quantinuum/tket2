@@ -1,20 +1,20 @@
 //! This module defines the "tket.qsystem.utils" extension, which includes the
 //! utility functions available for Quantinuum systems.
 
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 
 use derive_more::derive::Display;
 use hugr::{
+    Extension, Wire,
     builder::{BuildError, Dataflow},
     extension::{
+        ExtensionId, ExtensionRegistry, OpDef, PRELUDE, SignatureFunc, Version,
         prelude::UnwrapBuilder,
-        simple_op::{try_from_name, MakeOpDef, MakeRegisteredOp},
-        ExtensionId, ExtensionRegistry, OpDef, SignatureFunc, Version, PRELUDE,
+        simple_op::{MakeOpDef, MakeRegisteredOp, try_from_name},
     },
     std_extensions::arithmetic::int_types::int_type,
     type_row,
     types::{Signature, TypeArg, TypeRowRV},
-    Extension, Wire,
 };
 use itertools::Itertools;
 use lazy_static::lazy_static;
@@ -101,8 +101,8 @@ impl MakeRegisteredOp for UtilsOp {
         EXTENSION_ID
     }
 
-    fn extension_ref(&self) -> Weak<Extension> {
-        Arc::downgrade(&EXTENSION)
+    fn extension_ref(&self) -> Arc<Extension> {
+        EXTENSION.clone()
     }
 }
 

@@ -1,13 +1,14 @@
 /// Provides a `ReplaceStaticArrayBoolPass` which replaces static arrays containing `tket.bool` with
 /// static arrays containing `bool_t` values.
 use hugr::{
+    HugrView as _, Node, Wire,
     algorithms::{
-        replace_types::{NodeTemplate, ReplaceTypesError},
         ComposablePass, ReplaceTypes,
+        replace_types::{NodeTemplate, ReplaceTypesError},
     },
     builder::{
-        inout_sig, BuildError, DFGBuilder, Dataflow, DataflowHugr as _, DataflowSubContainer as _,
-        SubContainer as _,
+        BuildError, DFGBuilder, Dataflow, DataflowHugr as _, DataflowSubContainer as _,
+        SubContainer as _, inout_sig,
     },
     extension::{
         prelude::{bool_t, option_type, usize_t},
@@ -18,15 +19,14 @@ use hugr::{
     std_extensions::collections::{
         array::ArrayValue,
         static_array::{
-            self, static_array_type, StaticArrayOpBuilder as _, StaticArrayOpDef, StaticArrayValue,
-            STATIC_ARRAY_TYPENAME,
+            self, STATIC_ARRAY_TYPENAME, StaticArrayOpBuilder as _, StaticArrayOpDef,
+            StaticArrayValue, static_array_type,
         },
     },
     types::{Transformable as _, Type, TypeEnum, TypeRow},
-    HugrView as _, Node, Wire,
 };
 use itertools::Itertools as _;
-use tket::extension::bool::{self, bool_type, BoolOpBuilder as _, ConstBool, BOOL_TYPE_NAME};
+use tket::extension::bool::{self, BOOL_TYPE_NAME, BoolOpBuilder as _, ConstBool, bool_type};
 
 #[non_exhaustive]
 #[derive(Debug, derive_more::Error, derive_more::Display, derive_more::From)]
@@ -72,7 +72,7 @@ fn inner_replace_types() -> ReplaceTypes {
         };
         replace_const_static_array(sav, rt)
     });
-    inner.replace_type(bool_type().as_extension().unwrap().clone(), bool_t());
+    inner.set_replace_type(bool_type().as_extension().unwrap().clone(), bool_t());
     inner.replace_consts(
         bool_type().as_extension().unwrap().clone(),
         |const_bool, _| {
@@ -120,7 +120,7 @@ fn outer_replace_types() -> ReplaceTypes {
             replace_const_static_array(sav, &inner)
         }
     });
-    outer.replace_parametrized_type(static_array_typedef, {
+    outer.set_replace_parametrized_type(static_array_typedef, {
         let inner = inner.clone();
         move |args| {
             let mut element_ty = {
@@ -133,25 +133,25 @@ fn outer_replace_types() -> ReplaceTypes {
             changed.then_some(static_array_type(element_ty))
         }
     });
-    outer.replace_parametrized_op(
+    outer.set_replace_parametrized_op(
         static_array::EXTENSION
             .get_op(&StaticArrayOpDef::get.opdef_id())
             .unwrap(),
         {
             let inner = inner.clone();
-            move |args| {
+            move |args, _| {
                 let [element_ty] = args else { unreachable!() };
-                get_op_dest(&inner, element_ty.as_runtime().unwrap())
+                Ok(get_op_dest(&inner, element_ty.as_runtime().unwrap()))
             }
         },
     );
-    outer.replace_parametrized_op(
+    outer.set_replace_parametrized_op(
         static_array::EXTENSION
             .get_op(&StaticArrayOpDef::len.opdef_id())
             .unwrap(),
-        move |args| {
+        move |args, _| {
             let [element_ty] = args else { unreachable!() };
-            len_op_dest(&inner, element_ty.as_runtime().unwrap())
+            Ok(len_op_dest(&inner, element_ty.as_runtime().unwrap()))
         },
     );
     outer
@@ -304,7 +304,7 @@ fn get_op_dest(rt: &ReplaceTypes, old_elem_ty: Type) -> Option<NodeTemplate> {
 #[cfg(test)]
 mod test {
     use hugr::types::SumType;
-    use hugr::{algorithms::ComposablePass as _, extension::prelude::option_type, HugrView as _};
+    use hugr::{HugrView as _, algorithms::ComposablePass as _, extension::prelude::option_type};
     use hugr::{
         builder::DataflowHugr as _, extension::prelude::ConstUsize,
         std_extensions::collections::static_array::StaticArrayOpBuilder as _,

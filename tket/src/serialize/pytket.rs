@@ -11,14 +11,16 @@ mod options;
 
 pub use circuit::EncodedCircuit;
 pub use config::{
-    default_decoder_config, default_encoder_config, PytketDecoderConfig, PytketEncoderConfig,
-    TypeTranslatorSet,
+    PytketDecoderConfig, PytketEncoderConfig, TypeTranslatorSet, default_decoder_config,
+    default_encoder_config,
 };
 pub use encoder::PytketEncoderContext;
 pub use error::{
     PytketDecodeError, PytketDecodeErrorInner, PytketEncodeError, PytketEncodeOpError,
 };
 pub use extension::PytketEmitter;
+use hugr::std_extensions::arithmetic::float_types::float64_type;
+use hugr::types::Type;
 pub use options::{DecodeInsertionTarget, DecodeOptions, EncodeOptions};
 
 use hugr::hugr::hugrmut::HugrMut;
@@ -30,6 +32,7 @@ mod tests;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::path::Path;
+use std::sync::LazyLock;
 use std::{fs, io};
 
 use tket_json_rs::circuit_json::SerialCircuit;
@@ -38,6 +41,7 @@ use tket_json_rs::register::{Bit, ElementId, Qubit};
 use self::decoder::PytketDecoderContext;
 use crate::circuit::Circuit;
 
+use crate::extension::rotation::rotation_type;
 pub use crate::passes::pytket::lower_to_pytket;
 
 /// Prefix used for storing metadata in the hugr nodes.
@@ -134,7 +138,7 @@ impl TKETDecode for SerialCircuit {
     ) -> Result<Node, Self::DecodeError> {
         let mut decoder = PytketDecoderContext::new(self, hugr, target, options, None)?;
         decoder.run_decoder(&self.commands, None)?;
-        Ok(decoder.finish(&[])?.node())
+        Ok(decoder.finish(None)?.node())
     }
 
     fn encode(circuit: &Circuit, options: EncodeOptions) -> Result<Self, Self::EncodeError> {
@@ -271,3 +275,6 @@ impl From<&Bit> for RegisterHash {
         }
     }
 }
+
+/// A list of types we translate as pytket parameters.
+static PARAMETER_TYPES: LazyLock<[Type; 2]> = LazyLock::new(|| [float64_type(), rotation_type()]);

@@ -4,14 +4,14 @@ members = ["tket-py", "tket-eccs", "tket-exts", "qis-compiler"]
 [dependency-groups]
 dev = [
     "maturin >=1.9.2,<2",
-    "pytest >=8.3.2,<9",
+    "pytest>=8.3.2,<10",
     "pytest-cov ~=7.0",
-    "ruff >=0.6.2,<0.7",
+    "ruff>=0.6.2,<0.15",
     "mypy >=1.17.1,<2",
     "hypothesis >=6.111.1,<7",
     "graphviz ~=0.21.0",
     "pre-commit ~=4.3",
-    "conan >= 2.0.0,<3",
+    "conan >= 2.23.0,<3",
     # Required to run `maturin develop`
     "pip >=25",
     # Pyyaml 0.6.0 makes setuptools fail. This ensures we're using a newer version.
@@ -20,6 +20,10 @@ dev = [
 
 [tool.uv]
 prerelease = "explicit"
+
+[tool.uv.sources]
+# hugr = { git = "https://github.com/quantinuum/hugr", subdirectory = "hugr-py", rev = "191c473" }
+
 
 [build-system]
 requires = ["hatchling"]

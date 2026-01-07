@@ -7,8 +7,8 @@ use std::collections::BTreeSet;
 
 use crate::serialize::pytket::PytketEncodeError;
 use hugr::core::HugrNode;
-use hugr::hugr::views::sibling_subgraph::InvalidSubgraph;
 use hugr::hugr::views::SiblingSubgraph;
+use hugr::hugr::views::sibling_subgraph::InvalidSubgraph;
 use hugr::types::Signature;
 use hugr::{Direction, Hugr, HugrView, IncomingPort, OutgoingPort};
 

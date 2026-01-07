@@ -2,7 +2,7 @@
 
 This guide is intended to help you get started with developing tket.
 
-If you find any errors or omissions in this document, please [open an issue](https://github.com/CQCL/tket2/issues/new)!
+If you find any errors or omissions in this document, please [open an issue](https://github.com/quantinuum/tket2/issues/new)!
 
 ## #️⃣ Setting up the development environment
 
@@ -29,16 +29,27 @@ shell by setting up [direnv](https://devenv.sh/automatic-shell-activation/).
 To setup the environment manually you will need:
 
 - Just: <https://just.systems/>
-- Rust `>=1.85`: <https://www.rust-lang.org/tools/install>
+- Rust `>=1.89`: <https://www.rust-lang.org/tools/install>
 - cargo-nextest: <https://nexte.st/docs/installation/pre-built-binaries/>
 - uv `>=0.3`: docs.astral.sh/uv/getting-started/installation
 - conan `>=2.0.0,<3`: This gets installed by `just setup` / `uv tool install conan`
+- Optional: llvm `== 14.0`. The "llvm" feature (backed by the sub-crate `hugr-llvm`)
+  requires LLVM installed. We use the rust bindings
+  [llvm-sys](https://crates.io/crates/llvm-sys) to [llvm](https://llvm.org/).
 
 Once you have these installed, install the required python dependencies and setup pre-commit hooks with:
 
 ```bash
 just setup
 ```
+
+#### Note on LLVM
+
+You will need llvm 14.0 installed in order for `just check` to run all its
+checks successfully. On Debian-based systems you can install it as the
+`llvm-14` package; you will also need to install `libpolly14-dev`. You should
+set the environment variable `LLVM_SYS_140_PREFIX` to point to its location
+(e.g. `/usr/lib/llvm-14`) when running `just check`.
 
 ## 🚀 Local development using the tket python library
 
@@ -100,7 +111,7 @@ just fix-python
 
 We run coverage checks on the CI. Once you submit a PR, you can review the
 line-by-line coverage report on
-[codecov](https://app.codecov.io/gh/CQCL/tket2/commits?branch=All%20branches).
+[codecov](https://app.codecov.io/gh/quantinuum/tket2/commits?branch=All%20branches).
 
 To run the coverage checks locally, first install `cargo-llvm-cov`.
 
@@ -119,7 +130,7 @@ This will generate a coverage file that can be opened with your favourite covera
 
 ## 🌐 Contributing to tket
 
-We welcome contributions to tket! Please open [an issue](https://github.com/CQCL/tket2/issues/new) or [pull request](https://github.com/CQCL/tket2/compare) if you have any questions or suggestions.
+We welcome contributions to tket! Please open [an issue](https://github.com/quantinuum/tket2/issues/new) or [pull request](https://github.com/quantinuum/tket2/compare) if you have any questions or suggestions.
 
 PRs should be made against the `main` branch, and should pass all CI checks before being merged. This includes using the [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/) format for the PR title.
 
@@ -220,7 +231,7 @@ the existing release PRs for examples on how to do this. Once the branch is
 ready, create a draft PR so that the release team can review it.
 
 The wheel building process and publication to PyPI is handled by the CI.
-Just create a [github release](https://github.com/CQCL/tket2/releases/new) from the **unmerged** branch.
+Just create a [github release](https://github.com/quantinuum/tket2/releases/new) from the **unmerged** branch.
 The release tag should follow the format used in the previous releases, e.g. `tket-py-v0.1.1`.
 
 ## 🎫 TKET, pytket, and TKET2
