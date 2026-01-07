@@ -300,8 +300,8 @@ impl<'a> RewriteQuantumState<'a> {
 
 #[cfg(test)]
 mod test {
+    use hugr_core::module_graph::ModuleGraph;
     use hugr::{
-        algorithms::call_graph::CallGraph,
         builder::{Dataflow, DataflowSubContainer as _},
         type_row,
         types::Signature,
@@ -407,7 +407,7 @@ mod test {
             }
         }
 
-        let call_graph = CallGraph::new(&hugr);
+        let call_graph = ModuleGraph::new(&hugr);
         let g = call_graph.graph();
         let funcs_by_name = all_funcs_by_name(&hugr);
 

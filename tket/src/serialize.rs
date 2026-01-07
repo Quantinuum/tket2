@@ -30,21 +30,24 @@ impl<T: HugrView> Circuit<T> {
         writer: impl io::Write,
         config: EnvelopeConfig,
     ) -> Result<(), hugr::envelope::WriteError> {
-        let pkg = self.wrap_package();
+        let pkg = self.wrap_package()?;
         pkg.store(writer, config)?;
         Ok(())
     }
 
     /// Store the circuit as a String in HUGR envelope format.
     pub fn store_str(&self, config: EnvelopeConfig) -> Result<String, hugr::envelope::WriteError> {
-        let pkg = self.wrap_package();
+        let pkg = self.wrap_package()?;
         pkg.store_str(config)
     }
 
     /// Wrap the circuit in a package.
-    fn wrap_package(&self) -> Package {
+    fn wrap_package(&self) -> Result<Package, hugr::envelope::WriteError> {
         let hugr = Circuit::to_owned(self).into_hugr();
-        Package::from_hugr(hugr)
+        let extensions = hugr.extensions().clone();
+        let mut package = Package::from_hugr(hugr);
+        package.extensions.extend(extensions);
+        Ok(package)
     }
 }
 
