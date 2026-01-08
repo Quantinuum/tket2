@@ -105,3 +105,10 @@ def tket1_pass(
       circuit-like regions, and optimise them too.
       nested inside other subregions of the circuit.
     """
+
+def replace_qubits(
+    circ: CircuitClass,
+    entrypoint: str | None = None,
+) -> CircuitClass:
+    """TODO
+    """

@@ -30,6 +30,8 @@ pub mod modifier;
 pub mod rotation;
 pub mod sympy;
 
+pub mod globals;
+
 use sympy::SympyOpDef;
 
 /// The ID of the TKET1 extension.
@@ -62,7 +64,8 @@ pub(crate) static ref REGISTRY: ExtensionRegistry = ExtensionRegistry::new(
     bool::BOOL_EXTENSION.to_owned(),
     debug::DEBUG_EXTENSION.to_owned(),
     guppy::GUPPY_EXTENSION.to_owned(),
-    rotation::ROTATION_EXTENSION.to_owned()
+    rotation::ROTATION_EXTENSION.to_owned(),
+    globals::EXTENSION.to_owned()
 ]));
 
 }
