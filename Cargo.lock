@@ -1087,8 +1087,9 @@ dependencies = [
 
 [[package]]
 name = "hugr"
-version = "0.25.2"
-source = "git+https://github.com/quantinuum/hugr?branch=acl%2Freplace_types_recursive_linked#9398f43978a7f8e1b5ba9490bd885c1ff1234fc6"
+version = "0.25.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "99c9459bd9f40683bec7e77e274d97c48ca0dea7bd56c713739426917fdb4a52"
 dependencies = [
  "hugr-core",
  "hugr-llvm",
@@ -1098,8 +1099,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-cli"
-version = "0.25.2"
-source = "git+https://github.com/quantinuum/hugr?branch=acl%2Freplace_types_recursive_linked#9398f43978a7f8e1b5ba9490bd885c1ff1234fc6"
+version = "0.25.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "685fc3e63bf8c62ecbcdbd6800e3a39ecb7a0c8157f7f3b3f762676480f586fb"
 dependencies = [
  "anyhow",
  "clap",
@@ -1118,8 +1120,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-core"
-version = "0.25.2"
-source = "git+https://github.com/quantinuum/hugr?branch=acl%2Freplace_types_recursive_linked#9398f43978a7f8e1b5ba9490bd885c1ff1234fc6"
+version = "0.25.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba2242499f1f522e24733b8aa9291b5c4ab07304cd1eceb72d594a241c3eef68"
 dependencies = [
  "base64",
  "cgmath",
@@ -1155,8 +1158,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-llvm"
-version = "0.25.2"
-source = "git+https://github.com/quantinuum/hugr?branch=acl%2Freplace_types_recursive_linked#9398f43978a7f8e1b5ba9490bd885c1ff1234fc6"
+version = "0.25.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1122c5a1825b0dccfd226f88c518f2ca71e7ee136f519f4909eb8faaa83ed389"
 dependencies = [
  "anyhow",
  "cc",
@@ -1174,8 +1178,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-model"
-version = "0.25.2"
-source = "git+https://github.com/quantinuum/hugr?branch=acl%2Freplace_types_recursive_linked#9398f43978a7f8e1b5ba9490bd885c1ff1234fc6"
+version = "0.25.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6df260f82a38cebdee63023a326e091b36be2e7455cfdd6476d57d2606cf2b4a"
 dependencies = [
  "base64",
  "bumpalo",
@@ -1195,8 +1200,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-passes"
-version = "0.25.2"
-source = "git+https://github.com/quantinuum/hugr?branch=acl%2Freplace_types_recursive_linked#9398f43978a7f8e1b5ba9490bd885c1ff1234fc6"
+version = "0.25.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d23c24634a4503e86951aad5d688d71bca98b090e0307103fd5bd5145917f2a9"
 dependencies = [
  "ascent",
  "derive_more 2.1.1",
@@ -2306,9 +2312,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.148"
+version = "1.0.149"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3084b546a1dd6289475996f182a22aba973866ea8e8b02c51d9f46b1336a22da"
+checksum = "83fc039473c5595ace860d8c4fafa220ff474b3fc6bfdb4293327f1a37e94d86"
 dependencies = [
  "itoa",
  "memchr",

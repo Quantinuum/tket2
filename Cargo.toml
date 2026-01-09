@@ -43,19 +43,19 @@ large_enum_variant = "allow"
 [patch.crates-io]
 
 # Uncomment to use unreleased versions of hugr
-hugr = { git = "https://github.com/quantinuum/hugr", "branch" = "acl/replace_types_recursive_linked" }
-hugr-core = { git = "https://github.com/quantinuum/hugr", "branch" = "acl/replace_types_recursive_linked" }
-hugr-cli = { git = "https://github.com/quantinuum/hugr", "branch" = "acl/replace_types_recursive_linked" }
-hugr-passes = { git = "https://github.com/quantinuum/hugr", "branch" = "acl/replace_types_recursive_linked" }
-hugr-llvm = { git = "https://github.com/quantinuum/hugr", "branch" = "acl/replace_types_recursive_linked" }
+# hugr = { git = "https://github.com/quantinuum/hugr", "rev" = "5415abebf35be4af4e5bac5c7fe54381aea55a3e" }
+# hugr-core = { git = "https://github.com/quantinuum/hugr", "rev" = "5415abebf35be4af4e5bac5c7fe54381aea55a3e" }
+# hugr-cli = { git = "https://github.com/quantinuum/hugr", "rev" = "5415abebf35be4af4e5bac5c7fe54381aea55a3e" }
+# hugr-passes = { git = "https://github.com/quantinuum/hugr", "rev" = "5415abebf35be4af4e5bac5c7fe54381aea55a3e" }
+# hugr-llvm = { git = "https://github.com/quantinuum/hugr", "rev" = "5415abebf35be4af4e5bac5c7fe54381aea55a3e" }
 # portgraph = { git = "https://github.com/quantinuum/portgraph", rev = "68b96ac737e0c285d8c543b2d74a7aa80a18202c" }
 
 [workspace.dependencies]
 
 # Make sure to run `just recompile-eccs` if the hugr serialisation format changes.
-hugr = "0.25.2"
-hugr-core = "0.25.2"
-hugr-cli = "0.25.2"
+hugr = "0.25.3"
+hugr-core = "0.25.3"
+hugr-cli = "0.25.3"
 portgraph = "0.15.3"
 # There can only be one `pyo3` dependency in the whole workspace, so we use a
 # loose version constraint to prevent breaking changes in dependent crates where possible.
