@@ -53,9 +53,9 @@ large_enum_variant = "allow"
 [workspace.dependencies]
 
 # Make sure to run `just recompile-eccs` if the hugr serialisation format changes.
-hugr = "0.25.2"
+hugr = "0.25.3"
 hugr-core = "0.25.2"
-hugr-cli = "0.25.2"
+hugr-cli = "0.25.3"
 portgraph = "0.15.3"
 # There can only be one `pyo3` dependency in the whole workspace, so we use a
 # loose version constraint to prevent breaking changes in dependent crates where possible.
@@ -64,7 +64,7 @@ pyo3-build-config = ">= 0.27.2, < 0.28"
 
 bindgen = "0.72"
 cbindgen = "0.29"
-cc = "1.2.51"
+cc = "1.2.52"
 conan2 = "0.1.8"
 itertools = "0.14.0"
 tket-json-rs = "0.8.0"
@@ -80,7 +80,7 @@ derive_more = "2.1.1"
 fxhash = "0.2.1"
 indexmap = "2.13.0"
 lazy_static = "1.5.0"
-libc = "0.2.179"
+libc = "0.2.180"
 num_cpus = "1.17.0"
 peak_alloc = "0.3.0"
 pest = "2.8.5"
