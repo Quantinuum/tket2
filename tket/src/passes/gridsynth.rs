@@ -51,7 +51,7 @@ impl GarbageCollector {
 
     /// Remove reference to a constant node
     fn remove_references(&mut self, node: Node, increment: usize) {
-        // reduce reference count by 1
+        // reduce reference count
         let count = self.references.get_mut(&node.index()).unwrap();
         *count -= increment;
     }
@@ -91,7 +91,6 @@ fn find_rzs(hugr: &mut Hugr) -> Option<Vec<hugr::Node>> {
         let op_type = hugr.get_optype(node);
         if op_matches(op_type, TketOp::Rz) {
             rz_nodes.push(node);
-            // return Some(node);
         }
     }
 
@@ -99,11 +98,10 @@ fn find_rzs(hugr: &mut Hugr) -> Option<Vec<hugr::Node>> {
     if !(rz_nodes.is_empty()) {
         return Some(rz_nodes);
     }
-    // else return None
     None
 }
 
-/// Find the output port and node linked to the input specified by `port_idz` for `node`
+/// Find the output port and node linked to the input specified by `port_idx` for `node`
 fn find_single_linked_output_by_index(
     hugr: &mut Hugr,
     node: Node,
@@ -252,7 +250,7 @@ fn replace_rz_with_gridsynth_output(
     let output_port = outputs[0];
     let (next_node, dst_port) = hugr.single_linked_input(rz_node, output_port).unwrap();
 
-    // we have now inferred what we need to know from the Rz node we are replacing and can remove it ao
+    // we have now inferred what we need to know from the Rz node we are replacing and can remove it
     hugr.remove_node(rz_node);
 
     // recursively adding next gate in gates to prev_node
