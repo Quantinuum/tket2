@@ -8,7 +8,6 @@ use hugr::llvm::custom::CodegenExtsMap;
 use hugr::llvm::emit::{EmitHugr, Namer};
 use hugr::llvm::extension::int::IntCodegenExtension;
 use hugr::llvm::utils::fat::FatExt as _;
-use hugr::llvm::utils::inline_constant_functions;
 use inkwell::OptimizationLevel;
 use inkwell::context::Context;
 use inkwell::module::Module;
@@ -69,7 +68,6 @@ static REGISTRY: std::sync::LazyLock<ExtensionRegistry> = std::sync::LazyLock::n
         collections::array::EXTENSION.to_owned(),
         collections::static_array::EXTENSION.to_owned(),
         collections::borrow_array::EXTENSION.to_owned(),
-        collections::value_array::EXTENSION.to_owned(),
         qsystem_futures::EXTENSION.to_owned(),
         qsystem_result::EXTENSION.to_owned(),
         qsystem::EXTENSION.to_owned(),
@@ -145,10 +143,6 @@ fn get_hugr_llvm_module<'c, 'hugr, 'a: 'c>(
 
 fn process_hugr(hugr: &mut Hugr) -> Result<()> {
     QSystemPass::default().run(hugr)?;
-    // with_entrypoint(hugr, hugr.module_root(), |hugr| {
-    //     // `with_entrypoint` returns Rerooted, which the pass expects a bare Hugr.
-    // })?;
-    inline_constant_functions(hugr)?;
     Ok(())
 }
 
