@@ -1087,9 +1087,9 @@ dependencies = [
 
 [[package]]
 name = "hugr"
-version = "0.25.2"
+version = "0.25.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1acc664e575a0bf23e22579f5f5f876d69da67eb1dd3f4b01a0a30046716f6b8"
+checksum = "348dc19b2da683e6d970a831bf963dfb1a0eab139ade635ea96c900c0e3be71a"
 dependencies = [
  "hugr-core",
  "hugr-llvm",
@@ -1099,9 +1099,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-cli"
-version = "0.25.2"
+version = "0.25.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bbf184312ec6b6b8899d213057e1ffed9fcec1e746b7ddf60df65d36af71ce6b"
+checksum = "c0d9fe16bee7be6adca75fa4136684cca4559326ee82dd9d4a71fcbebdaf6cb8"
 dependencies = [
  "anyhow",
  "clap",
@@ -1109,7 +1109,7 @@ dependencies = [
  "clio",
  "derive_more 2.1.1",
  "hugr",
- "schemars 1.1.0",
+ "schemars 1.2.0",
  "serde",
  "serde_json",
  "tabled",
@@ -1120,9 +1120,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-core"
-version = "0.25.2"
+version = "0.25.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "826012468adec6e638651a927659f9e853dc2223071b58537b1c36e894d0361b"
+checksum = "7cf12249903694b23db84d3cedb80036a00a77e64b74b1537d6e16ac87d9e497"
 dependencies = [
  "base64",
  "cgmath",
@@ -1141,7 +1141,7 @@ dependencies = [
  "regex",
  "relrc",
  "rustc-hash 2.1.1",
- "schemars 1.1.0",
+ "schemars 1.2.0",
  "semver",
  "serde",
  "serde_json",
@@ -1158,9 +1158,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-llvm"
-version = "0.25.2"
+version = "0.25.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "63b1ceb2d1f8553766fd53d0b7837ee190b403458033dff28e9f0b320f9d32e4"
+checksum = "efc2267d170e56c5496edbf19a0d94ec03cbdcb33d290e77527d5453ac1c8df2"
 dependencies = [
  "anyhow",
  "cc",
@@ -1178,9 +1178,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-model"
-version = "0.25.2"
+version = "0.25.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6bfae740a44337418d46e3a60ec965087382dde7fa48194357e3c9c0e3838e98"
+checksum = "1904203c53921aea0e343b8fcdc32ef73b523087cd7341428c84529443c32b36"
 dependencies = [
  "base64",
  "bumpalo",
@@ -1200,9 +1200,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-passes"
-version = "0.25.2"
+version = "0.25.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c645a9d405aff50991fed8e282759ebdac0b88c46dec830dd51813b0dda1b80"
+checksum = "58bc1f305292dbd4ab7791b44c5ada72a0b4f0abc302a809a7bc5b39357b1afd"
 dependencies = [
  "ascent",
  "derive_more 2.1.1",
@@ -2212,9 +2212,9 @@ dependencies = [
 
 [[package]]
 name = "schemars"
-version = "1.1.0"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9558e172d4e8533736ba97870c4b2cd63f84b382a3d6eb063da41b91cce17289"
+checksum = "54e910108742c57a770f492731f99be216a52fadd361b06c8fb59d74ccc267d2"
 dependencies = [
  "dyn-clone",
  "ref-cast",
@@ -2225,9 +2225,9 @@ dependencies = [
 
 [[package]]
 name = "schemars_derive"
-version = "1.1.0"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "301858a4023d78debd2353c7426dc486001bddc91ae31a76fb1f55132f7e2633"
+checksum = "4908ad288c5035a8eb12cfdf0d49270def0a268ee162b75eeee0f85d155a7c45"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2314,9 +2314,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.148"
+version = "1.0.149"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3084b546a1dd6289475996f182a22aba973866ea8e8b02c51d9f46b1336a22da"
+checksum = "83fc039473c5595ace860d8c4fafa220ff474b3fc6bfdb4293327f1a37e94d86"
 dependencies = [
  "itoa",
  "memchr",
@@ -2346,7 +2346,7 @@ dependencies = [
  "indexmap 1.9.3",
  "indexmap 2.13.0",
  "schemars 0.9.0",
- "schemars 1.1.0",
+ "schemars 1.2.0",
  "serde_core",
  "serde_json",
  "serde_with_macros",
