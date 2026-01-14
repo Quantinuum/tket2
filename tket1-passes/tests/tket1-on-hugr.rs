@@ -15,6 +15,9 @@ use tket::{Circuit, TketOp};
 /// JSON encoding of the clifford simp pytket pass.
 const CLIFFORD_SIMP_STR: &str = r#"{"StandardPass": {"allow_swaps": true, "name": "CliffordSimp", "target_2qb_gate": "CX"}, "pass_class": "StandardPass"}"#;
 
+const REMOVE_REDUNDANCIES_STR: &str =
+    r#"{"StandardPass": {"name": "RemoveRedundancies"}, "pass_class": "StandardPass"}"#;
+
 /// A flat quantum circuit inside a function.
 ///
 /// This should optimize to the identity.
@@ -47,9 +50,22 @@ fn circ_flat_quantum() -> Circuit {
     build().unwrap()
 }
 
+/// Circuit extracted from callum's bug report
+/// https://cambridgequantum.slack.com/archives/C09F952LKM4/p1768405383883349
+fn circ_callum_bug() -> Circuit {
+    let envelope: &[u8] = include_bytes!("callum-bug-report-normalized.hugr");
+    Circuit::load(envelope, None).unwrap()
+}
+
 #[rstest]
-#[case(circ_flat_quantum(), 0)]
-fn test_clifford_simp(#[case] circ: Circuit, #[case] num_remaining_gates: usize) {
+#[case(circ_flat_quantum(), 0, CLIFFORD_SIMP_STR)]
+#[case(circ_flat_quantum(), 7, REMOVE_REDUNDANCIES_STR)]
+#[case(circ_callum_bug(), 0, REMOVE_REDUNDANCIES_STR)]
+fn test_pytket_pass(
+    #[case] circ: Circuit,
+    #[case] num_remaining_gates: usize,
+    #[case] pass_json: &str,
+) {
     let mut encoded =
         EncodedCircuit::new(&circ, EncodeOptions::new().with_subcircuits(true)).unwrap();
 
@@ -57,7 +73,7 @@ fn test_clifford_simp(#[case] circ: Circuit, #[case] num_remaining_gates: usize)
         .par_iter_mut()
         .for_each(|(_region, serial_circuit)| {
             let mut circuit_ptr = Tket1Circuit::from_serial_circuit(serial_circuit).unwrap();
-            Tket1Pass::run_from_json(CLIFFORD_SIMP_STR, &mut circuit_ptr).unwrap();
+            Tket1Pass::run_from_json(pass_json, &mut circuit_ptr).unwrap();
             *serial_circuit = circuit_ptr.to_serial_circuit().unwrap();
         });
 
