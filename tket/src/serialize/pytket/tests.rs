@@ -293,7 +293,7 @@ fn circ_parameterized() -> Circuit {
     // Preset names for some of the inputs
     hugr.set_metadata::<metadata::InputParameters>(
         hugr.entrypoint(),
-        vec![String::from("alpha"), String::from("beta")],
+        vec!["alpha".to_string(), "beta".to_string()],
     );
 
     hugr.into()
