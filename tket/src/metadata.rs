@@ -1,4 +1,4 @@
-//! (Incomplete) Collection of metadata keys used throughout tket.
+//! Collection of metadata keys used throughout tket.
 
 use crate::rewrite::trace::RewriteTrace;
 use hugr_core::metadata::Metadata;
@@ -32,7 +32,7 @@ impl Metadata for Unitary {
     type Type<'hugr> = u8;
 }
 
-// Metadata keys migrated from TKET1
+// Metadata keys used for TKET1 compatibility
 
 /// Metadata key for explicit names for the input parameter wires.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
