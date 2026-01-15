@@ -5,12 +5,10 @@ use hugr_core::metadata::Metadata;
 use tket_json_rs::register::{Bit, Qubit};
 
 /// Metadata key for the number of qubits that a HUGR node expects to be required for execution.
-///
-/// This value is only valid when set at the entrypoint function node. TODO discuss this
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct MaxQubits;
 impl Metadata for MaxQubits {
-    const KEY: &'static str = "TKET.expected_qubits"; // TODO think about this name really hard
+    const KEY: &'static str = "TKET.max_qubits"; // TODO think about this name really hard
     type Type<'hugr> = u32;
 }
 
@@ -22,13 +20,13 @@ impl Metadata for CircuitRewriteTraces {
     type Type<'hugr> = Vec<RewriteTrace>;
 }
 
-/// Metadata key for flagging unitarity constraints on a HUGR node
+/// Metadata key for flagging unitarity constraints / modifiers on a HUGR node
 ///
-/// See crate::modifier::ModifierFlags TODO discuss this
+/// See crate::modifier::ModifierFlags
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Unitary;
 impl Metadata for Unitary {
-    const KEY: &'static str = "TKET.unitary"; // TODO think about this name really hard
+    const KEY: &'static str = "TKET.unitary";
     type Type<'hugr> = u8;
 }
 

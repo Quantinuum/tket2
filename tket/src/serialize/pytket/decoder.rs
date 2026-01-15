@@ -180,7 +180,7 @@ impl<'h> PytketDecoderContext<'h> {
         dfg.hugr_mut()
             .set_metadata::<metadata::Phase>(node, &serialcirc.phase);
         dfg.hugr_mut()
-            .set_metadata::<metadata::QubitRegisters>(node, serialcirc.qubits.clone()); // TODO Do we find something better than clone?
+            .set_metadata::<metadata::QubitRegisters>(node, serialcirc.qubits.clone());
         dfg.hugr_mut()
             .set_metadata::<metadata::BitRegisters>(node, serialcirc.bits.clone());
     }
