@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.12.14](https://github.com/Quantinuum/tket2/compare/tket-py-v0.12.13...tket-py-v0.12.14) (2026-01-15)
+
+
+### Features
+
+* make PytketHugrPass store a list of passes ([#1360](https://github.com/Quantinuum/tket2/issues/1360)) ([498dd3a](https://github.com/Quantinuum/tket2/commit/498dd3a5aed38ebab8823092a55755b8c41880ea))
+* Reduced glibc version requirement to 2.34 ([#1327](https://github.com/Quantinuum/tket2/issues/1327)) ([498dd3a](https://github.com/Quantinuum/tket2/commit/498dd3a5aed38ebab8823092a55755b8c41880ea))
+* Remove order edges in NormalizeGuppy pass ([#1326](https://github.com/Quantinuum/tket2/issues/1326)) ([dbfffd5](https://github.com/Quantinuum/tket2/commit/dbfffd5ec1fc8064dec3f9de1324a17a1545b1c5)), closes [#1325](https://github.com/Quantinuum/tket2/issues/1325)
+* Use constant folding by default on NormalizeGuppy ([#1323](https://github.com/Quantinuum/tket2/issues/1323)) ([6f11024](https://github.com/Quantinuum/tket2/commit/6f11024a6888660567540e7a2d2ac0bc0fd30dc3))
+
+
+### Bug Fixes
+
+* Incorrect manylinux version in linux wheels ([#1327](https://github.com/Quantinuum/tket2/issues/1327)) ([498dd3a](https://github.com/Quantinuum/tket2/commit/498dd3a5aed38ebab8823092a55755b8c41880ea))
+* Wrongly reused qubit IDs in pytket encoding ([#1358](https://github.com/Quantinuum/tket2/issues/1358)) ([498dd3a](https://github.com/Quantinuum/tket2/commit/498dd3a5aed38ebab8823092a55755b8c41880ea))
+
+
+### Documentation
+
+* update example notebook after Guppy optimization fixes ([#1357](https://github.com/Quantinuum/tket2/issues/1357)) ([7487e3a](https://github.com/Quantinuum/tket2/commit/7487e3a68b9fdea896377038e4bba4794f6a9f22))
+
 ## [0.12.13](https://github.com/Quantinuum/tket2/compare/tket-py-v0.12.12...tket-py-v0.12.13) (2025-12-10)
 
 
