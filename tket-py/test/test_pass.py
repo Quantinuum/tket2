@@ -155,7 +155,7 @@ def test_multiple_rules():
 def test_clifford_simp_no_swaps():
     c = Tk2Circuit(Circuit(4).CX(0, 2).CX(1, 2).CX(1, 2))
     hugr = Hugr.from_str(c.to_str())
-    cliff_pass = PytketHugrPass(CliffordSimp(allow_swaps=False))
+    cliff_pass = PytketHugrPass([CliffordSimp(allow_swaps=False)])
     res = cliff_pass.run(hugr)
     opt_circ = Tk2Circuit.from_bytes(res.hugr.to_bytes())
     assert opt_circ.circuit_cost(lambda op: int(op == TketOp.CX)) == 1
@@ -164,7 +164,7 @@ def test_clifford_simp_no_swaps():
 def test_clifford_simp_with_swaps() -> None:
     cx_circ = Tk2Circuit(Circuit(2).CX(0, 1).CX(1, 0))
     hugr = Hugr.from_str(cx_circ.to_str())
-    cliff_pass_perm = PytketHugrPass(CliffordSimp(allow_swaps=True))
+    cliff_pass_perm = PytketHugrPass([CliffordSimp(allow_swaps=True)])
     # Simplify 2 CX circuit to a single CX with an implicit swap.
     res = cliff_pass_perm.run(hugr)
     opt_circ = Tk2Circuit.from_bytes(res.hugr.to_bytes())
@@ -174,7 +174,7 @@ def test_clifford_simp_with_swaps() -> None:
 def test_squash_phasedx_rz():
     c = Tk2Circuit(Circuit(1).Rz(0.25, 0).Rz(0.75, 0).Rz(0.25, 0).Rz(-1.25, 0))
     hugr = Hugr.from_str(c.to_str())
-    squash_pass = PytketHugrPass(SquashRzPhasedX())
+    squash_pass = PytketHugrPass([SquashRzPhasedX()])
     opt_hugr = squash_pass(hugr)
     opt_circ = Tk2Circuit.from_bytes(opt_hugr.to_bytes())
     # TODO: We cannot use circuit_cost due to a panic on non-tket ops and there
@@ -188,7 +188,7 @@ def test_sequence_pass():
     )
     hugr = Hugr.from_str(c.to_str())
     seq_pass = SequencePass([SquashRzPhasedX(), CliffordSimp(allow_swaps=True)])
-    clifford_and_squash_pass = PytketHugrPass(seq_pass)
+    clifford_and_squash_pass = PytketHugrPass([seq_pass])
     res_hugr = clifford_and_squash_pass(hugr)
     opt_circ = Tk2Circuit.from_bytes(res_hugr.to_bytes())
     assert opt_circ.num_operations() == 1

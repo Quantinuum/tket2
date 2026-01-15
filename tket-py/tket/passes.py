@@ -102,7 +102,7 @@ def badger_pass(
 
 @dataclass
 class PytketHugrPass(ComposablePass):
-    pytket_pass: BasePass
+    pytket_passes: list[BasePass]
 
     """
     A class which provides an interface to apply pytket passes to Hugr programs.
@@ -110,9 +110,9 @@ class PytketHugrPass(ComposablePass):
     The user can create a :py:class:`PytketHugrPass` object from any serializable member of `pytket.passes`.
     """
 
-    def __init__(self, pytket_pass: BasePass) -> None:
+    def __init__(self, pytket_passes: list[BasePass]) -> None:
         """Initialize a PytketHugrPass from a :py:class:`~pytket.passes.BasePass` instance."""
-        self.pytket_pass = pytket_pass
+        self.pytket_passes = pytket_passes
 
     def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
         """Run the pytket pass as a HUGR transform returning a PassResult."""
@@ -124,9 +124,13 @@ class PytketHugrPass(ComposablePass):
         )
 
     def _run_pytket_pass_on_hugr(self, hugr: Hugr, inplace: bool) -> PassResult:
-        pass_json = json.dumps(self.pytket_pass.to_dict())
         compiler_state: Tk2Circuit = Tk2Circuit.from_bytes(hugr.to_bytes())
-        opt_program = tket1_pass(compiler_state, pass_json, traverse_subcircuits=True)
+        for py_pass in self.pytket_passes:
+            pass_json = json.dumps(py_pass.to_dict())
+            opt_program = tket1_pass(
+                compiler_state, pass_json, traverse_subcircuits=True
+            )
+
         new_hugr = Hugr.from_str(opt_program.to_str())
         # `for_pass` assumes Modified is true by default
         # TODO: if we can extract better info from tket1 as to what happened, use it.
