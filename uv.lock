@@ -2943,8 +2943,8 @@ docs = [
 
 [package.metadata]
 requires-dist = [
-    { name = "hugr", specifier = ">=0.14.4" },
-    { name = "pytket", specifier = ">=1.34,<3" },
+    { name = "hugr", specifier = "~=0.15.0" },
+    { name = "pytket", specifier = ">=2.1.0,<3" },
     { name = "tket-eccs", editable = "tket-eccs" },
     { name = "tket-exts", editable = "tket-exts" },
 ]
