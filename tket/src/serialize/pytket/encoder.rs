@@ -16,7 +16,7 @@ use hugr::ops::{OpTrait, OpType};
 use hugr::types::EdgeKind;
 
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
 
 use hugr::{Direction, HugrView, OutgoingPort, Wire};
@@ -1051,6 +1051,14 @@ impl<H: HugrView> PytketEncoderContext<H> {
             Some(f) => f(input_bits),
             None => input_bits.to_vec(),
         };
+
+        // Flag the input qubits that don't appear in the output as unused.
+        let used_qubits: HashSet<TrackedQubit> = output_qubits.iter().copied().collect();
+        for qb in input_qubits {
+            if !used_qubits.contains(qb) {
+                self.values.free_qubit(*qb);
+            }
+        }
 
         // Compute all the output parameters at once
         let out_params = match options.output_params_fn {

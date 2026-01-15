@@ -315,6 +315,16 @@ impl<N: HugrNode> ValueTracker<N> {
         })
     }
 
+    /// Frees a tracked qubit, and allow re-using it's ID when calling [`ValueTracker::new_qubit`].
+    pub fn free_qubit(&mut self, qb: TrackedQubit) {
+        self.unused_qubits.insert(qb);
+    }
+
+    /// Frees a tracked bit, and allow re-using it's ID when calling [`ValueTracker::new_bit`].
+    pub fn free_bit(&mut self, bit: TrackedBit) {
+        self.unused_bits.insert(bit);
+    }
+
     /// Register a new parameter string expression.
     ///
     /// Returns a unique identifier for the expression.
@@ -414,19 +424,6 @@ impl<N: HugrNode> ValueTracker<N> {
     fn unregister_wire(&mut self, wire: Wire<N>) -> Option<Vec<TrackedValue>> {
         let wire = self.wires.remove(&wire).unwrap();
         let values = wire.values?;
-
-        // Free up the qubit and bit registers associated with the wire.
-        for value in &values {
-            match value {
-                TrackedValue::Qubit(qb) => {
-                    self.unused_qubits.insert(*qb);
-                }
-                TrackedValue::Bit(bit) => {
-                    self.unused_bits.insert(*bit);
-                }
-                TrackedValue::Param(_) => {}
-            }
-        }
 
         Some(values)
     }

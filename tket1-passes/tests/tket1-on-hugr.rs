@@ -10,7 +10,6 @@ use hugr::types::Signature;
 use hugr::{HugrView, Node};
 use rayon::iter::ParallelIterator;
 use rstest::{fixture, rstest};
-use std::io::Write;
 use tket::extension::{TKET_EXTENSION_ID, TKET1_EXTENSION_ID};
 use tket::serialize::pytket::{EncodeOptions, EncodedCircuit};
 use tket::{Circuit, TketOp};
@@ -53,11 +52,6 @@ fn circ_flat_quantum() -> Circuit {
     build().unwrap()
 }
 
-fn circ_callum_bug() -> Circuit {
-    let envelope: &[u8] = include_bytes!("callum-bug-report-normalized.hugr");
-    Circuit::load(envelope, None).unwrap()
-}
-
 /// Circuit extracted from callum's bug report
 /// https://cambridgequantum.slack.com/archives/C09F952LKM4/p1768405383883349
 fn circ_borrow_array() -> Circuit {
@@ -96,8 +90,7 @@ fn circ_borrow_array() -> Circuit {
 #[rstest]
 #[case(circ_flat_quantum(), 0, CLIFFORD_SIMP_STR)]
 #[case(circ_flat_quantum(), 7, REMOVE_REDUNDANCIES_STR)]
-#[case(circ_callum_bug(), 0, REMOVE_REDUNDANCIES_STR)]
-#[case(circ_borrow_array(), 0, REMOVE_REDUNDANCIES_STR)]
+#[case(circ_borrow_array(), 2, REMOVE_REDUNDANCIES_STR)]
 fn test_pytket_pass(
     #[case] circ: Circuit,
     #[case] num_remaining_gates: usize,
@@ -109,18 +102,9 @@ fn test_pytket_pass(
     encoded
         .par_iter_mut()
         .for_each(|(_region, serial_circuit)| {
-            println!(
-                "Processing serial circuit:\n\n{}\n\n",
-                serde_json::to_string_pretty(serial_circuit).unwrap()
-            );
-            std::io::stdout().flush().unwrap();
-
             let mut circuit_ptr = Tket1Circuit::from_serial_circuit(serial_circuit).unwrap();
             Tket1Pass::run_from_json(pass_json, &mut circuit_ptr).unwrap();
             *serial_circuit = circuit_ptr.to_serial_circuit().unwrap();
-
-            println!("Done!");
-            std::io::stdout().flush().unwrap();
         });
 
     let mut new_circ = circ.clone();
