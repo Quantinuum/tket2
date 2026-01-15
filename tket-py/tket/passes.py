@@ -110,9 +110,9 @@ class PytketHugrPass(ComposablePass):
     The user can create a :py:class:`PytketHugrPass` object from any serializable member of `pytket.passes`.
     """
 
-    def __init__(self, pytket_passes: list[BasePass]) -> None:
+    def __init__(self, *pytket_passes: BasePass) -> None:
         """Initialize a PytketHugrPass from a :py:class:`~pytket.passes.BasePass` instance."""
-        self.pytket_passes = pytket_passes
+        self.pytket_passes = list(pytket_passes)
 
     def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
         """Run the pytket pass as a HUGR transform returning a PassResult."""
