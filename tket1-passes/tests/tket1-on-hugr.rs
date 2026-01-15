@@ -52,12 +52,8 @@ fn circ_flat_quantum() -> Circuit {
     build().unwrap()
 }
 
-/// Circuit extracted from callum's bug report
-/// https://cambridgequantum.slack.com/archives/C09F952LKM4/p1768405383883349
+/// A circuit with some (unsupported) borrow array operations.
 fn circ_borrow_array() -> Circuit {
-    //let envelope: &[u8] = include_bytes!("callum-bug-report-normalized.hugr");
-    //Circuit::load(envelope, None).unwrap()
-
     fn build() -> Result<Circuit, BuildError> {
         let arr_ty = BorrowArray::ty(2, qb_t());
         let input_t = vec![arr_ty.clone()];
