@@ -78,7 +78,7 @@ fn circ_borrow_array() -> Circuit {
         let (arr, q0) = h.add_borrow_array_borrow(qb_t(), 2, arr, idx_0)?;
         let (arr, q1) = h.add_borrow_array_borrow(qb_t(), 2, arr, idx_1)?;
 
-        let [q0, q1] = h.add_dataflow_op(TketOp::CX, [q0, q1])?.outputs_arr();
+        let [q0] = h.add_dataflow_op(TketOp::H, [q0])?.outputs_arr();
         let [q0, q1] = h.add_dataflow_op(TketOp::CX, [q0, q1])?.outputs_arr();
 
         let idx_0 = h.add_load_value(ConstUsize::new(0));
