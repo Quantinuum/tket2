@@ -1,9 +1,11 @@
 //! Test running tket1 passes on hugr circuit.
 
+use hugr::std_extensions::collections::array::ArrayKind;
+use hugr::std_extensions::collections::borrow_array::{BArrayOpBuilder, BorrowArray};
 use tket1_passes::{Tket1Circuit, Tket1Pass};
 
 use hugr::builder::{BuildError, Dataflow, DataflowHugr, FunctionBuilder};
-use hugr::extension::prelude::qb_t;
+use hugr::extension::prelude::{ConstUsize, qb_t};
 use hugr::types::Signature;
 use hugr::{HugrView, Node};
 use rayon::iter::ParallelIterator;
@@ -14,6 +16,9 @@ use tket::{Circuit, TketOp};
 
 /// JSON encoding of the clifford simp pytket pass.
 const CLIFFORD_SIMP_STR: &str = r#"{"StandardPass": {"allow_swaps": true, "name": "CliffordSimp", "target_2qb_gate": "CX"}, "pass_class": "StandardPass"}"#;
+
+const REMOVE_REDUNDANCIES_STR: &str =
+    r#"{"StandardPass": {"name": "RemoveRedundancies"}, "pass_class": "StandardPass"}"#;
 
 /// A flat quantum circuit inside a function.
 ///
@@ -47,9 +52,46 @@ fn circ_flat_quantum() -> Circuit {
     build().unwrap()
 }
 
+/// A circuit with some (unsupported) borrow array operations.
+fn circ_borrow_array() -> Circuit {
+    fn build() -> Result<Circuit, BuildError> {
+        let arr_ty = BorrowArray::ty(2, qb_t());
+        let input_t = vec![arr_ty.clone()];
+        let output_t = vec![arr_ty];
+        let mut h =
+            FunctionBuilder::new("borrow_array", Signature::new(input_t, output_t)).unwrap();
+
+        let [arr] = h.input_wires_arr();
+
+        let idx_0 = h.add_load_value(ConstUsize::new(0));
+        let idx_1 = h.add_load_value(ConstUsize::new(1));
+        let (arr, q0) = h.add_borrow_array_borrow(qb_t(), 2, arr, idx_0)?;
+        let (arr, q1) = h.add_borrow_array_borrow(qb_t(), 2, arr, idx_1)?;
+
+        let [q0] = h.add_dataflow_op(TketOp::H, [q0])?.outputs_arr();
+        let [q0, q1] = h.add_dataflow_op(TketOp::CX, [q0, q1])?.outputs_arr();
+
+        let idx_0 = h.add_load_value(ConstUsize::new(0));
+        let idx_1 = h.add_load_value(ConstUsize::new(1));
+        let arr = h.add_borrow_array_return(qb_t(), 2, arr, idx_0, q0)?;
+        let arr = h.add_borrow_array_return(qb_t(), 2, arr, idx_1, q1)?;
+
+        let hugr = h.finish_hugr_with_outputs([arr]).unwrap();
+
+        Ok(hugr.into())
+    }
+    build().unwrap()
+}
+
 #[rstest]
-#[case(circ_flat_quantum(), 0)]
-fn test_clifford_simp(#[case] circ: Circuit, #[case] num_remaining_gates: usize) {
+#[case(circ_flat_quantum(), 0, CLIFFORD_SIMP_STR)]
+#[case(circ_flat_quantum(), 7, REMOVE_REDUNDANCIES_STR)]
+#[case(circ_borrow_array(), 2, REMOVE_REDUNDANCIES_STR)]
+fn test_pytket_pass(
+    #[case] circ: Circuit,
+    #[case] num_remaining_gates: usize,
+    #[case] pass_json: &str,
+) {
     let mut encoded =
         EncodedCircuit::new(&circ, EncodeOptions::new().with_subcircuits(true)).unwrap();
 
@@ -57,7 +99,7 @@ fn test_clifford_simp(#[case] circ: Circuit, #[case] num_remaining_gates: usize)
         .par_iter_mut()
         .for_each(|(_region, serial_circuit)| {
             let mut circuit_ptr = Tket1Circuit::from_serial_circuit(serial_circuit).unwrap();
-            Tket1Pass::run_from_json(CLIFFORD_SIMP_STR, &mut circuit_ptr).unwrap();
+            Tket1Pass::run_from_json(pass_json, &mut circuit_ptr).unwrap();
             *serial_circuit = circuit_ptr.to_serial_circuit().unwrap();
         });
 
