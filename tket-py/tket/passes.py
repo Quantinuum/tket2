@@ -127,11 +127,11 @@ class PytketHugrPass(ComposablePass):
         compiler_state: Tk2Circuit = Tk2Circuit.from_bytes(hugr.to_bytes())
         for py_pass in self.pytket_passes:
             pass_json = json.dumps(py_pass.to_dict())
-            opt_program = tket1_pass(
+            compiler_state = tket1_pass(
                 compiler_state, pass_json, traverse_subcircuits=True
             )
 
-        new_hugr = Hugr.from_str(opt_program.to_str())
+        new_hugr = Hugr.from_str(compiler_state.to_str())
         # `for_pass` assumes Modified is true by default
         # TODO: if we can extract better info from tket1 as to what happened, use it.
         # Are there better results  we can use too?
