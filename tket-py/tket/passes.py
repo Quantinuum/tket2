@@ -14,6 +14,7 @@ from tket.circuit import Tk2Circuit
 
 from hugr.passes._composable_pass import (
     ComposablePass,
+    ComposedPass,
     implement_pass_run,
     PassResult,
 )
@@ -122,6 +123,13 @@ class PytketHugrPass(ComposablePass):
             inplace=inplace,
             copy_call=lambda h: self._run_pytket_pass_on_hugr(h, inplace),
         )
+
+    def then(self, other: ComposablePass) -> ComposablePass:
+        """Perform another composable pass after this pass."""
+        if isinstance(other, PytketHugrPass):
+            return PytketHugrPass(*self.pytket_passes, *other.pytket_passes)
+        else:
+            return ComposedPass(self, other)
 
     def _run_pytket_pass_on_hugr(self, hugr: Hugr, inplace: bool) -> PassResult:
         compiler_state: Tk2Circuit = Tk2Circuit.from_bytes(hugr.to_bytes())
