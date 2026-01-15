@@ -25,10 +25,9 @@ use tket_json_rs::circuit_json::{self, SerialCircuit};
 use unsupported_tracker::UnsupportedTracker;
 
 use super::opaque::OpaqueSubgraphs;
-use super::{
-    METADATA_OPGROUP, METADATA_PHASE, METADATA_Q_REGISTERS, PytketEncodeError, PytketEncodeOpError,
-};
+use super::{PytketEncodeError, PytketEncodeOpError};
 use crate::circuit::Circuit;
+use crate::metadata;
 use crate::serialize::pytket::circuit::{
     AdditionalNodesAndWires, AdditionalSubgraph, EncodedCircuitInfo,
 };
@@ -170,8 +169,8 @@ impl<H: HugrView> PytketEncoderContext<H> {
             .filter(|s| !s.is_empty());
 
         // Recover other parameters stored in the metadata
-        let phase = match hugr.get_metadata_any(region, METADATA_PHASE) {
-            Some(p) => p.as_str().unwrap().to_string(),
+        let phase = match hugr.get_metadata::<metadata::Phase>(region) {
+            Some(p) => p.to_string(),
             None => "0".to_string(),
         };
 
@@ -439,7 +438,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
         node: H::Node,
         circ: &Circuit<H>,
         options: EmitCommandOptions,
-        make_operation: impl FnOnce(MakeOperationArgs<'_>) -> tket_json_rs::circuit_json::Operation,
+        make_operation: impl FnOnce(MakeOperationArgs<'_>) -> circuit_json::Operation,
     ) -> Result<(), PytketEncodeError<H::Node>> {
         let TrackedValues {
             mut qubits,
@@ -462,8 +461,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
         // Preserve the pytket opgroup, if it got stored in the metadata.
         let opgroup: Option<String> = circ
             .hugr()
-            .get_metadata_any(node, METADATA_OPGROUP)
-            .and_then(serde_json::Value::as_str)
+            .get_metadata::<metadata::OpGroup>(node)
             .map(ToString::to_string);
 
         let args = MakeOperationArgs {
