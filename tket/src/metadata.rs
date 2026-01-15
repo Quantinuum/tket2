@@ -8,7 +8,7 @@ use tket_json_rs::register::{Bit, Qubit};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct MaxQubits;
 impl Metadata for MaxQubits {
-    const KEY: &'static str = "TKET.max_qubits"; // TODO think about this name really hard
+    const KEY: &'static str = "tket.hint.max_qubits";
     type Type<'hugr> = u32;
 }
 
