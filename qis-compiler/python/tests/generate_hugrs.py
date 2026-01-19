@@ -10,6 +10,7 @@ from pathlib import Path
 
 from guppylang import guppy
 from guppylang.std.builtins import array, exit, panic, result
+from guppylang.std.angles import pi
 from guppylang.std.qsystem.random import RNG
 from guppylang.std.qsystem.utils import get_current_shot
 from guppylang.std.quantum import (
@@ -24,6 +25,7 @@ from guppylang.std.quantum import (
     tdg,
     x,
     z,
+    crz,
 )
 
 resources_dir = Path(__file__).parent / "resources"
@@ -218,6 +220,20 @@ def rng() -> bytes:
 
     return main.compile().to_bytes()
 
+def qft_32() -> bytes:
+    @guppy
+    def main() -> None:
+        qs = array(qubit() for _ in range(32))
+        for i in range(32):
+            h(qs[i])
+            angle = pi / 2
+            for j in range(31 - i):
+                crz(qs[i], qs[i + j + 1], angle)
+                angle /= 2
+        result("cs", measure_array(qs))
+
+    return main.compile().to_bytes()
+
 
 def entry_args() -> bytes:
     @guppy
@@ -241,6 +257,7 @@ if __name__ == "__main__":
         postselect_panic,
         rus,
         print_current_shot,
+        qft_32,
         rng,
         entry_args,
     ]:

@@ -24,7 +24,7 @@ use tket::passes::replace_types::{NodeTemplate, ReplaceTypesError};
 use tket::passes::{ComposablePass, PassScope, ReplaceTypes};
 use tket::{TketOp, extension::rotation::RotationOpBuilder};
 
-use crate::extension::qsystem::{self, QSystemOp, QSystemOpBuilder};
+use crate::extension::qsystem::{self, QSystemOp, QSystemOpBuilder, QSystemPlatform};
 
 use super::barrier::BarrierInserter;
 
@@ -106,6 +106,7 @@ enum ReplaceOps {
 pub fn lower_tk2_ops(
     hugr: &mut impl HugrMut<Node = Node>,
     scope: impl Into<PassScope>,
+    platform: QSystemPlatform,
 ) -> Result<Vec<Node>, LowerTk2Error> {
     let scope = scope.into();
     let mut funcs: BTreeMap<TketOp, NodeTemplate> = BTreeMap::new();
@@ -145,7 +146,7 @@ pub fn lower_tk2_ops(
                     let template = match funcs.entry(tket_op) {
                         Entry::Occupied(e) => e.get().clone(),
                         Entry::Vacant(e) => {
-                            let template = func_as_node_template(build_func(tket_op)?);
+                            let template = func_as_node_template(build_func(platform, tket_op)?);
                             e.insert(template).clone()
                         }
                     };
@@ -175,7 +176,7 @@ pub fn lower_tk2_ops(
     Ok(replaced_nodes)
 }
 
-fn build_func(op: TketOp) -> Result<Hugr, LowerTk2Error> {
+fn build_func(platform: QSystemPlatform, op: TketOp) -> Result<Hugr, LowerTk2Error> {
     let sig = op.into_extension_op().signature().into_owned();
     let sig = Signature::new(sig.input, sig.output); // ignore extension delta
     // TODO check generated names are namespaced enough
@@ -183,38 +184,38 @@ fn build_func(op: TketOp) -> Result<Hugr, LowerTk2Error> {
     let mut b = FunctionBuilder::new(f_name, sig)?;
     let inputs: Vec<_> = b.input_wires().collect();
     let outputs = match (op, inputs.as_slice()) {
-        (TketOp::H, [q]) => vec![b.build_h(*q)?],
-        (TketOp::X, [q]) => vec![b.build_x(*q)?],
-        (TketOp::Y, [q]) => vec![b.build_y(*q)?],
-        (TketOp::Z, [q]) => vec![b.build_z(*q)?],
-        (TketOp::S, [q]) => vec![b.build_s(*q)?],
-        (TketOp::Sdg, [q]) => vec![b.build_sdg(*q)?],
-        (TketOp::V, [q]) => vec![b.build_v(*q)?],
-        (TketOp::Vdg, [q]) => vec![b.build_vdg(*q)?],
-        (TketOp::T, [q]) => vec![b.build_t(*q)?],
-        (TketOp::Tdg, [q]) => vec![b.build_tdg(*q)?],
-        (TketOp::Measure, [q]) => b.build_measure_flip(*q)?.into(),
+        (TketOp::H, [q]) => vec![b.build_h(platform, *q)?],
+        (TketOp::X, [q]) => vec![b.build_x(platform, *q)?],
+        (TketOp::Y, [q]) => vec![b.build_y(platform, *q)?],
+        (TketOp::Z, [q]) => vec![b.build_z(platform, *q)?],
+        (TketOp::S, [q]) => vec![b.build_s(platform, *q)?],
+        (TketOp::Sdg, [q]) => vec![b.build_sdg(platform, *q)?],
+        (TketOp::V, [q]) => vec![b.build_v(platform, *q)?],
+        (TketOp::Vdg, [q]) => vec![b.build_vdg(platform, *q)?],
+        (TketOp::T, [q]) => vec![b.build_t(platform, *q)?],
+        (TketOp::Tdg, [q]) => vec![b.build_tdg(platform, *q)?],
+        (TketOp::Measure, [q]) => b.build_measure_flip(platform, *q)?.into(),
         (TketOp::QAlloc, []) => vec![b.build_qalloc()?],
-        (TketOp::CX, [c, t]) => b.build_cx(*c, *t)?.into(),
-        (TketOp::CY, [c, t]) => b.build_cy(*c, *t)?.into(),
-        (TketOp::CZ, [c, t]) => b.build_cz(*c, *t)?.into(),
+        (TketOp::CX, [c, t]) => b.build_cx(platform, *c, *t)?.into(),
+        (TketOp::CY, [c, t]) => b.build_cy(platform, *c, *t)?.into(),
+        (TketOp::CZ, [c, t]) => b.build_cz(platform, *c, *t)?.into(),
         (TketOp::Rx, [q, angle]) => {
             let float = build_to_radians(&mut b, *angle)?;
-            vec![b.build_rx(*q, float)?]
+            vec![b.build_rx(platform, *q, float)?]
         }
         (TketOp::Ry, [q, angle]) => {
             let float = build_to_radians(&mut b, *angle)?;
-            vec![b.build_ry(*q, float)?]
+            vec![b.build_ry(platform, *q, float)?]
         }
         (TketOp::Rz, [q, angle]) => {
             let float = build_to_radians(&mut b, *angle)?;
-            vec![b.add_rz(*q, float)?]
+            vec![b.add_rz(platform, *q, float)?]
         }
         (TketOp::CRz, [c, t, angle]) => {
             let float = build_to_radians(&mut b, *angle)?;
-            b.build_crz(*c, *t, float)?.into()
+            b.build_crz(platform, *c, *t, float)?.into()
         }
-        (TketOp::Toffoli, [a, b_, c]) => b.build_toffoli(*a, *b_, *c)?.into(),
+        (TketOp::Toffoli, [a, b_, c]) => b.build_toffoli(platform, *a, *b_, *c)?.into(),
         _ => return Err(LowerTk2Error::UnknownOp(op, inputs.len())), // non-exhaustive
     };
     Ok(b.finish_hugr_with_outputs(outputs)?)
@@ -314,12 +315,27 @@ pub fn check_lowered<H: HugrView>(
 /// non-[`PassScope::Global`] scopes, multi-op replacement will not be
 /// performed, as they require adding functions at the global module level. See
 /// [`PassScope`] for more details.
-#[derive(Default, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct LowerTketToQSystemPass {
     /// Where to apply the pass.
     ///
     /// Configurable via [`WithScope::with_scope`].
     scope: PassScope,
+    /// Platform to lower for, which may affect the generated graph for some
+    /// operations.
+    ///
+    /// Configurable via new
+    platform: QSystemPlatform,
+}
+
+impl LowerTketToQSystemPass {
+    /// Creates a new pass with the given scope and platform.
+    pub fn new(platform: QSystemPlatform) -> Self {
+        Self {
+            scope: Default::default(),
+            platform,
+        }
+    }
 }
 
 impl WithScope for LowerTketToQSystemPass {
@@ -334,7 +350,7 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for LowerTketToQSystemPass {
     type Result = ();
 
     fn run(&self, hugr: &mut H) -> Result<(), LowerTk2Error> {
-        lower_tk2_ops(hugr, self.scope.clone())?;
+        lower_tk2_ops(hugr, self.scope.clone(), self.platform.clone())?;
         #[cfg(test)]
         check_lowered(hugr, self.scope.clone())
             .map_err(|missing_ops| LowerTk2Error::Unlowered { missing_ops })?;
@@ -357,11 +373,13 @@ mod test {
     use rstest::rstest;
 
     #[rstest]
-    #[case::global(PassScope::Global(Preserve::Public))]
-    #[case::entrypoint_flat(PassScope::EntrypointFlat)]
-    #[case::entrypoint_recursive(PassScope::EntrypointRecursive)]
-
-    fn test_lower_direct(#[case] scope: PassScope) {
+    #[case::global_helios(PassScope::Global(Preserve::Public), QSystemPlatform::Helios)]
+    #[case::entrypoint_flat_helios(PassScope::EntrypointFlat, QSystemPlatform::Helios)]
+    #[case::entrypoint_recursive_helios(PassScope::EntrypointRecursive, QSystemPlatform::Helios)]
+    #[case::global_sol(PassScope::Global(Preserve::Public), QSystemPlatform::Sol)]
+    #[case::entrypoint_flat_sol(PassScope::EntrypointFlat, QSystemPlatform::Sol)]
+    #[case::entrypoint_recursive_sol(PassScope::EntrypointRecursive, QSystemPlatform::Sol)]
+    fn test_lower_direct(#[case] scope: PassScope, #[case] platform: QSystemPlatform) {
         let mut b = FunctionBuilder::new("circuit", Signature::new_endo(type_row![])).unwrap();
         let [maybe_q] = b
             .add_dataflow_op(TketOp::TryQAlloc, [])
@@ -388,7 +406,7 @@ mod test {
             .finish_hugr_with_outputs([])
             .unwrap_or_else(|e| panic!("{}", e));
 
-        let lowered = lower_tk2_ops(&mut h, scope.clone()).unwrap();
+        let lowered = lower_tk2_ops(&mut h, scope.clone(), platform.clone()).unwrap();
         assert_eq!(lowered.len(), 5);
         let circ = Circuit::new(&h);
         let ops: Vec<QSystemOp> = circ
@@ -409,32 +427,58 @@ mod test {
     }
 
     #[rstest]
-    #[case(TketOp::H, Some(vec![QSystemOp::PhasedX, QSystemOp::Rz]))]
-    #[case(TketOp::X, Some(vec![QSystemOp::PhasedX]))]
-    #[case(TketOp::Y, Some(vec![QSystemOp::PhasedX]))]
-    #[case(TketOp::Z, Some(vec![QSystemOp::Rz]))]
-    #[case(TketOp::S, Some(vec![QSystemOp::Rz]))]
-    #[case(TketOp::Sdg, Some(vec![QSystemOp::Rz]))]
-    #[case(TketOp::V, Some(vec![QSystemOp::PhasedX]))]
-    #[case(TketOp::Vdg, Some(vec![QSystemOp::PhasedX]))]
-    #[case(TketOp::T, Some(vec![QSystemOp::Rz]))]
-    #[case(TketOp::Tdg, Some(vec![QSystemOp::Rz]))]
-    #[case(TketOp::Rx, Some(vec![QSystemOp::PhasedX]))]
-    #[case(TketOp::Ry, Some(vec![QSystemOp::PhasedX]))]
-    #[case(TketOp::Rz, Some(vec![QSystemOp::Rz]))]
+    #[case(TketOp::H, QSystemPlatform::Helios, Some(vec![QSystemOp::PhasedX, QSystemOp::Rz]))]
+    #[case(TketOp::X, QSystemPlatform::Helios, Some(vec![QSystemOp::PhasedX]))]
+    #[case(TketOp::Y, QSystemPlatform::Helios, Some(vec![QSystemOp::PhasedX]))]
+    #[case(TketOp::Z, QSystemPlatform::Helios, Some(vec![QSystemOp::Rz]))]
+    #[case(TketOp::S, QSystemPlatform::Helios, Some(vec![QSystemOp::Rz]))]
+    #[case(TketOp::Sdg, QSystemPlatform::Helios, Some(vec![QSystemOp::Rz]))]
+    #[case(TketOp::V, QSystemPlatform::Helios, Some(vec![QSystemOp::PhasedX]))]
+    #[case(TketOp::Vdg, QSystemPlatform::Helios, Some(vec![QSystemOp::PhasedX]))]
+    #[case(TketOp::T, QSystemPlatform::Helios, Some(vec![QSystemOp::Rz]))]
+    #[case(TketOp::Tdg, QSystemPlatform::Helios, Some(vec![QSystemOp::Rz]))]
+    #[case(TketOp::Rx, QSystemPlatform::Helios, Some(vec![QSystemOp::PhasedX]))]
+    #[case(TketOp::Ry, QSystemPlatform::Helios, Some(vec![QSystemOp::PhasedX]))]
+    #[case(TketOp::Rz, QSystemPlatform::Helios, Some(vec![QSystemOp::Rz]))]
+    #[case(TketOp::H, QSystemPlatform::Sol, Some(vec![QSystemOp::PhasedX, QSystemOp::Rz]))]
+    #[case(TketOp::X, QSystemPlatform::Sol, Some(vec![QSystemOp::PhasedX]))]
+    #[case(TketOp::Y, QSystemPlatform::Sol, Some(vec![QSystemOp::PhasedX]))]
+    #[case(TketOp::Z, QSystemPlatform::Sol, Some(vec![QSystemOp::Rz]))]
+    #[case(TketOp::S, QSystemPlatform::Sol, Some(vec![QSystemOp::Rz]))]
+    #[case(TketOp::Sdg, QSystemPlatform::Sol, Some(vec![QSystemOp::Rz]))]
+    #[case(TketOp::V, QSystemPlatform::Sol, Some(vec![QSystemOp::PhasedX]))]
+    #[case(TketOp::Vdg, QSystemPlatform::Sol, Some(vec![QSystemOp::PhasedX]))]
+    #[case(TketOp::T, QSystemPlatform::Sol, Some(vec![QSystemOp::Rz]))]
+    #[case(TketOp::Tdg, QSystemPlatform::Sol, Some(vec![QSystemOp::Rz]))]
+    #[case(TketOp::Rx, QSystemPlatform::Sol, Some(vec![QSystemOp::PhasedX]))]
+    #[case(TketOp::Ry, QSystemPlatform::Sol, Some(vec![QSystemOp::PhasedX]))]
+    #[case(TketOp::Rz, QSystemPlatform::Sol, Some(vec![QSystemOp::Rz]))]
     // multi qubit ordering is not deterministic
-    #[case(TketOp::CX, None)]
-    #[case(TketOp::CY, None)]
-    #[case(TketOp::CZ, None)]
-    #[case(TketOp::CRz, None)]
-    #[case(TketOp::Toffoli, None)]
+    #[case(TketOp::CX, QSystemPlatform::Helios, None)]
+    #[case(TketOp::CY, QSystemPlatform::Helios, None)]
+    #[case(TketOp::CZ, QSystemPlatform::Helios, None)]
+    #[case(TketOp::CRz, QSystemPlatform::Helios, None)]
+    #[case(TketOp::Toffoli, QSystemPlatform::Helios, None)]
+    // Uncomment when rebasing is added
+    //#[case(TketOp::CX, QSystemPlatform::Helios, None)]
+    //#[case(TketOp::CY, QSystemPlatform::Helios, None)]
+    //#[case(TketOp::CZ, QSystemPlatform::Helios, None)]
+    //#[case(TketOp::CRz, QSystemPlatform::Helios, None)]
+    //#[case(TketOp::Toffoli, QSystemPlatform::Helios, None)]
+
     // conditional doesn't fit in to commands
-    #[case(TketOp::Measure, None)]
-    #[case(TketOp::QAlloc, None)]
-    fn test_lower(#[case] t2op: TketOp, #[case] qsystem_ops: Option<Vec<QSystemOp>>) {
+    #[case(TketOp::Measure, QSystemPlatform::Helios, None)]
+    #[case(TketOp::QAlloc, QSystemPlatform::Helios, None)]
+    #[case(TketOp::Measure, QSystemPlatform::Sol, None)]
+    #[case(TketOp::QAlloc, QSystemPlatform::Sol, None)]
+    fn test_lower(
+        #[case] t2op: TketOp,
+        #[case] platform: QSystemPlatform,
+        #[case] qsystem_ops: Option<Vec<QSystemOp>>,
+    ) {
         // build dfg with just the op
 
-        let h = build_func(t2op).unwrap();
+        let h = build_func(platform, t2op).unwrap();
         let circ = Circuit::new(&h);
         let ops: Vec<QSystemOp> = circ
             .commands()
@@ -448,10 +492,13 @@ mod test {
     }
 
     #[rstest]
-    #[case::global(PassScope::Global(Preserve::Public))]
-    #[case::entrypoint_flat(PassScope::EntrypointFlat)]
-    #[case::entrypoint_recursive(PassScope::EntrypointRecursive)]
-    fn test_mixed(#[case] scope: PassScope) {
+    #[case::global_helios(PassScope::Global(Preserve::Public), QSystemPlatform::Helios)]
+    #[case::entrypoint_flat_helios(PassScope::EntrypointFlat, QSystemPlatform::Helios)]
+    #[case::entrypoint_recursive_helios(PassScope::EntrypointRecursive, QSystemPlatform::Helios)]
+    #[case::global_sol(PassScope::Global(Preserve::Public), QSystemPlatform::Sol)]
+    #[case::entrypoint_flat_sol(PassScope::EntrypointFlat, QSystemPlatform::Sol)]
+    #[case::entrypoint_recursive_sol(PassScope::EntrypointRecursive, QSystemPlatform::Sol)]
+    fn test_mixed(#[case] scope: PassScope, #[case] platform: QSystemPlatform) {
         let mut b = DFGBuilder::new(Signature::new([rotation_type()], [bool_t()])).unwrap();
         let [angle] = b.input_wires_arr();
         let qalloc = b.add_dataflow_op(TketOp::QAlloc, []).unwrap();
@@ -471,7 +518,7 @@ mod test {
 
         let original_node_count = h.nodes().count();
 
-        let lowered = lower_tk2_ops(&mut h, scope.clone()).unwrap();
+        let lowered = lower_tk2_ops(&mut h, scope.clone(), platform.clone()).unwrap();
 
         let expected_lower_count = match scope {
             PassScope::EntrypointFlat => 1,

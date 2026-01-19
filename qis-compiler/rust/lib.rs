@@ -142,12 +142,12 @@ fn get_hugr_llvm_module<'c, 'hugr, 'a: 'c>(
         .finish())
 }
 
-fn process_hugr(hugr: &mut Hugr) -> Result<()> {
-    QSystemPass::default().run(hugr)?;
+fn process_hugr(platform: qsystem::QSystemPlatform, hugr: &mut Hugr) -> Result<()> {
+    QSystemPass::defaults(platform).run(hugr)?;
     Ok(())
 }
 
-fn codegen_extensions() -> CodegenExtsMap<'static, Hugr> {
+fn codegen_extensions(platform: qsystem::QSystemPlatform) -> CodegenExtsMap<'static, Hugr> {
     use array::SeleneHeapArrayCodegen;
     let pcg = QISPreludeCodegen;
     CodegenExtsBuilder::default()
@@ -160,7 +160,7 @@ fn codegen_extensions() -> CodegenExtsMap<'static, Hugr> {
         .add_default_static_array_extensions()
         .add_borrow_array_extensions(array::SeleneHeapBorrowArrayCodegen(pcg.clone()))
         .add_extension(FuturesCodegenExtension)
-        .add_extension(QSystemCodegenExtension::from(pcg.clone()))
+        .add_extension(QSystemCodegenExtension::new(platform, pcg.clone()))
         .add_extension(RandomCodegenExtension)
         // Results use standard arrays.
         .add_extension(ResultsCodegenExtension::new(
@@ -182,7 +182,7 @@ fn get_module_with_std_exts<'c>(
     namer: Rc<Namer>,
     hugr: &'c mut Hugr,
 ) -> Result<Module<'c>> {
-    process_hugr(hugr)?;
+    process_hugr(args.platform, hugr)?;
     if let Some(filename) = &args.save_hugr {
         let file = fs::File::create(PathBuf::from(filename))?;
         hugr.store(file, EnvelopeConfig::text())?;
@@ -192,7 +192,7 @@ fn get_module_with_std_exts<'c>(
         namer,
         hugr,
         &args.name,
-        Rc::new(codegen_extensions()),
+        Rc::new(codegen_extensions(args.platform)),
     )
 }
 
@@ -290,6 +290,8 @@ struct CompileArgs<'a> {
     target_machine: &'a TargetMachine,
     /// Optimization level
     opt_level: OptimizationLevel,
+    /// Target quantum platform
+    platform: qsystem::QSystemPlatform,
 }
 
 impl<'a> CompileArgs<'a> {
@@ -297,6 +299,7 @@ impl<'a> CompileArgs<'a> {
         name: &impl ToString,
         target_machine: &'a TargetMachine,
         opt_level: OptimizationLevel,
+        platform: qsystem::QSystemPlatform,
     ) -> Self {
         Self {
             entry: None,
@@ -304,6 +307,7 @@ impl<'a> CompileArgs<'a> {
             save_hugr: None,
             target_machine,
             opt_level,
+            platform,
         }
     }
 }
@@ -408,6 +412,17 @@ pub fn get_opt_level(opt_level: u32) -> Result<OptimizationLevel> {
     }
 }
 
+/// Get the QSystemPlatform from the given string. Can be "helios" or "sol".
+pub fn get_platform(platform: &str) -> Result<qsystem::QSystemPlatform> {
+    match platform.to_lowercase().as_str() {
+        "helios" => Ok(qsystem::QSystemPlatform::Helios),
+        "sol" => Ok(qsystem::QSystemPlatform::Sol),
+        _ => Err(anyhow!(
+            "Unknown platform: {platform} (expected 'helios' or 'sol')"
+        )),
+    }
+}
+
 // -------------------- Python bindings -----------------------
 mod exceptions {
     use pyo3::exceptions::PyException;
@@ -418,7 +433,7 @@ mod exceptions {
 mod selene_hugr_qis_compiler {
     use super::{
         CompileArgs, Context, Hugr, PyResult, compile, get_native_target_machine, get_opt_level,
-        get_target_machine_from_triple, pyfunction, read_hugr_envelope,
+        get_platform, get_target_machine_from_triple, pyfunction, read_hugr_envelope,
     };
 
     #[pymodule_export]
@@ -436,11 +451,12 @@ mod selene_hugr_qis_compiler {
 
     /// Compile HUGR package to LLVM IR string
     #[pyfunction]
-    #[pyo3(signature = (pkg_bytes, opt_level=2, target_triple="native"))]
+    #[pyo3(signature = (pkg_bytes, opt_level=2, target_triple="native", platform="helios"))]
     pub fn compile_to_llvm_ir(
         pkg_bytes: &[u8],
         opt_level: u32,
         target_triple: &str,
+        platform: &str,
     ) -> PyResult<String> {
         let opt = get_opt_level(opt_level)?;
         let target_machine = if target_triple == "native" {
@@ -448,10 +464,11 @@ mod selene_hugr_qis_compiler {
         } else {
             get_target_machine_from_triple(target_triple, opt)
         }?;
+        let platform = get_platform(platform)?;
         let mut hugr = py_read_envelope(pkg_bytes)?;
         let ctx = Context::create();
         let llvm_module = compile(
-            &CompileArgs::new(&"hugr", &target_machine, opt),
+            &CompileArgs::new(&"hugr", &target_machine, opt, platform),
             &ctx,
             &mut hugr,
         )?;
@@ -460,11 +477,12 @@ mod selene_hugr_qis_compiler {
 
     /// Compile HUGR package to LLVM bitcode
     #[pyfunction]
-    #[pyo3(signature = (pkg_bytes, opt_level=2, target_triple="native"))]
+    #[pyo3(signature = (pkg_bytes, opt_level=2, target_triple="native", platform="helios"))]
     pub fn compile_to_bitcode(
         pkg_bytes: &[u8],
         opt_level: u32,
         target_triple: &str,
+        platform: &str,
     ) -> PyResult<Vec<u8>> {
         let opt = get_opt_level(opt_level)?;
         let target_machine = if target_triple == "native" {
@@ -472,10 +490,11 @@ mod selene_hugr_qis_compiler {
         } else {
             get_target_machine_from_triple(target_triple, opt)
         }?;
+        let platform = get_platform(platform)?;
         let mut hugr = py_read_envelope(pkg_bytes)?;
         let ctx = Context::create();
         let llvm_module = compile(
-            &CompileArgs::new(&"hugr", &target_machine, opt),
+            &CompileArgs::new(&"hugr", &target_machine, opt, platform),
             &ctx,
             &mut hugr,
         )?;
