@@ -448,47 +448,6 @@
       },
       "binary": false
     },
-    "TwinPhasedX": {
-      "extension": "tket.qsystem",
-      "name": "TwinPhasedX",
-      "description": "NPhasedX with N=2, a.k.a. rpg. Specific to the Sol platform.",
-      "signature": {
-        "params": [],
-        "body": {
-          "input": [
-            {
-              "t": "Q"
-            },
-            {
-              "t": "Q"
-            },
-            {
-              "t": "Opaque",
-              "extension": "arithmetic.float.types",
-              "id": "float64",
-              "args": [],
-              "bound": "C"
-            },
-            {
-              "t": "Opaque",
-              "extension": "arithmetic.float.types",
-              "id": "float64",
-              "args": [],
-              "bound": "C"
-            }
-          ],
-          "output": [
-            {
-              "t": "Q"
-            },
-            {
-              "t": "Q"
-            }
-          ]
-        }
-      },
-      "binary": false
-    },
     "ZZPhase": {
       "extension": "tket.qsystem",
       "name": "ZZPhase",

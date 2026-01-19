@@ -42,7 +42,6 @@ class QSystemExtension(TketExtension):
             self.try_QAlloc.op_def(),
             self.ZZPhase.op_def(),
             self.phasedXX.op_def(),
-            self.twinPhasedX.op_def(),
             self.tk2.op_def(),
         ]
 
@@ -126,11 +125,6 @@ class QSystemExtension(TketExtension):
     def phasedXX(self) -> ExtOp:
         """Two-qubit XX gate (alias 'rpp')."""
         return self().get_op("PhasedXX").instantiate()
-
-    @functools.cached_property
-    def twinPhasedX(self) -> ExtOp:
-        """Native 2-phasedX gate with two float parameters (alias 'rpg')."""
-        return self().get_op("TwinPhasedX").instantiate()
 
     @functools.cached_property
     def tk2(self) -> ExtOp:

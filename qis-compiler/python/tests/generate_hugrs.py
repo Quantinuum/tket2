@@ -220,6 +220,7 @@ def rng() -> bytes:
 
     return main.compile().to_bytes()
 
+
 def qft_32() -> bytes:
     @guppy
     def main() -> None:
