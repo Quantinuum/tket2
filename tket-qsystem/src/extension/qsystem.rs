@@ -67,6 +67,20 @@ lazy_static! {
     ]);
 }
 
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+)]
+pub enum QSystemPlatform {
+    /// Quantinuum Helios, supporting rxy, rzz, rz
+    Helios,
+    /// Quantinuum Sol, supporting rp, rpp, rpg, tk2
+    Sol,
+}
+
 /// Quantum operations for Quantinuum H-series quantum computers.
 #[derive(
     Clone,
@@ -108,6 +122,12 @@ pub enum QSystemOp {
     MeasureReset,
     /// Measure a qubit (return 0 or 1) or detect leakage (return 2).
     LazyMeasureLeaked,
+    /// PhasedXX gate, sol-only (rpp)
+    PhasedXX,
+    /// NPhasedX with N=2, sol-only (rpg)
+    N2PhasedX,
+    /// Tk2 gate, sol-only (rxxyyzz)
+    Tk2,
 }
 
 impl MakeOpDef for QSystemOp {
@@ -131,6 +151,12 @@ impl MakeOpDef for QSystemOp {
             TryQAlloc => Signature::new(type_row![], Type::from(option_type(one_qb_row))),
             QFree => Signature::new(one_qb_row, type_row![]),
             MeasureReset => Signature::new(one_qb_row.clone(), vec![qb_t(), bool_type()]),
+            PhasedXX => Signature::new(vec![qb_t(), qb_t(), float64_type(), float64_type()], two_qb_row),
+            N2PhasedX => Signature::new(vec![qb_t(), qb_t(), float64_type(), float64_type()], two_qb_row),
+            Tk2 => Signature::new(
+                vec![qb_t(), qb_t(), float64_type(), float64_type(), float64_type()],
+                two_qb_row,
+            ),
         }
         .into()
     }
@@ -151,9 +177,9 @@ impl MakeOpDef for QSystemOp {
         match self {
             QSystemOp::Measure => "Measure a qubit and lose it.",
             QSystemOp::LazyMeasure => "Lazily measure a qubit and lose it.",
-            QSystemOp::Rz => "Rotate a qubit around the Z axis. Not physical.",
+            QSystemOp::Rz => "Rotate a qubit around the Z axis. Not physical. Helios only.",
             QSystemOp::PhasedX => "PhasedX gate.",
-            QSystemOp::ZZPhase => "ZZ gate with an angle.",
+            QSystemOp::ZZPhase => "ZZ gate with an angle (helios only).",
             QSystemOp::TryQAlloc => "Allocate a qubit in the Z |0> eigenstate.",
             QSystemOp::QFree => "Free a qubit (lose track of it).",
             QSystemOp::Reset => "Reset a qubit to the Z |0> eigenstate.",
@@ -164,6 +190,9 @@ impl MakeOpDef for QSystemOp {
             QSystemOp::LazyMeasureReset => {
                 "Lazily measure a qubit and reset it to the Z |0> eigenstate."
             }
+            QSystemOp::PhasedXX => "PhasedXX gate, a.k.a. rpp. Sol only.",
+            QSystemOp::N2PhasedX => "NPhasedX with N=2, a.k.a. rpg. Sol only.",
+            QSystemOp::Tk2 => "Tk2 gate, a.k.a. rxxyyzz. Sol only.",
         }
         .to_string()
     }
@@ -242,6 +271,26 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
         Ok(self
             .add_dataflow_op(QSystemOp::LazyMeasure, [qb])?
             .out_wire(0))
+    }
+    /// Add a "tket.qsystem.PhasedXX" op.
+    fn add_phased_xx(&mut self, qb1: Wire, qb2: Wire, angle1: Wire, angle2: Wire) -> Result<[Wire; 2], BuildError> {
+        Ok(self
+            .add_dataflow_op(QSystemOp::PhasedXX, [qb1, qb2, angle1, angle2])?
+            .outputs_arr())
+    }
+    
+    /// Add a "tket.qsystem.N2PhasedX" op.
+    fn add_n2phased_x(&mut self, qb1: Wire, qb2: Wire, angle1: Wire, angle2: Wire) -> Result<[Wire; 2], BuildError> {
+        Ok(self
+            .add_dataflow_op(QSystemOp::N2PhasedX, [qb1, qb2, angle1, angle2])?
+            .outputs_arr())
+    }
+    
+    /// Add a "tket.qsystem.Tk2" op.
+    fn add_tk2(&mut self, qb1: Wire, qb2: Wire, angle1: Wire, angle2: Wire, angle3: Wire) -> Result<[Wire; 2], BuildError> {
+        Ok(self
+            .add_dataflow_op(QSystemOp::Tk2, [qb1, qb2, angle1, angle2, angle3])?
+            .outputs_arr())
     }
 
     /// Add a "tket.qsystem.LazyMeasureLeaked" op.

@@ -5,8 +5,8 @@ use hugr::llvm::inkwell::types::FunctionType;
 use itertools::Itertools as _;
 use tket::hugr::{self, llvm::inkwell};
 
-use crate::extension::qsystem::{self, QSystemOp};
-use anyhow::{Result, anyhow};
+use crate::extension::qsystem::{self, QSystemOp, QSystemPlatform};
+use anyhow::{Result, anyhow, bail};
 use hugr::extension::prelude::qb_t;
 use hugr::llvm::custom::CodegenExtension;
 use hugr::llvm::emit::func::{EmitFuncContext, build_option};
@@ -22,7 +22,17 @@ use super::futures::future_type;
 
 /// Codegen extension for quantum operations.
 #[derive(derive_more::From)]
-pub struct QSystemCodegenExtension<PCG>(PCG);
+pub struct QSystemCodegenExtension<PCG: PreludeCodegen> {
+    platform: QSystemPlatform,
+    codegen: PCG,
+}
+impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
+    pub fn new(platform: QSystemPlatform, codegen: PCG) -> Self {
+        Self {
+            platform, codegen
+        }
+    }
+}
 
 impl<PCG: PreludeCodegen> CodegenExtension for QSystemCodegenExtension<PCG> {
     fn add_extension<'a, H: HugrView<Node = Node> + 'a>(
@@ -44,11 +54,27 @@ impl<PCG: PreludeCodegen> CodegenExtension for QSystemCodegenExtension<PCG> {
     }
 }
 
+trait QSystemRuntimeFunction {
+    fn name(&self) -> &str;
+
+    fn func_type<'c>(
+        &self,
+        context: &EmitFuncContext<'c, '_, impl HugrView<Node = Node>>,
+        pcg: &impl PreludeCodegen,
+    ) -> FunctionType<'c>;
+
+    fn get_func<'c, H: HugrView<Node = Node>>(
+        &self,
+        context: &EmitFuncContext<'c, '_, H>,
+        pcg: &impl PreludeCodegen,
+    ) -> Result<FunctionValue<'c>>{
+        let func_type = self.func_type(context, pcg);
+        context.get_extern_func(self.name(), func_type)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum RuntimeFunction {
-    Rz,
-    Rzz,
-    Rxy,
+enum GenericRuntimeFunction {
     QAlloc,
     QFree,
     Measure,
@@ -57,18 +83,15 @@ enum RuntimeFunction {
     Reset,
 }
 
-impl RuntimeFunction {
+impl QSystemRuntimeFunction for GenericRuntimeFunction {
     fn name(&self) -> &str {
         match self {
-            RuntimeFunction::Rz => "___rz",
-            RuntimeFunction::Rzz => "___rzz",
-            RuntimeFunction::Rxy => "___rxy",
-            RuntimeFunction::QAlloc => "___qalloc",
-            RuntimeFunction::QFree => "___qfree",
-            RuntimeFunction::Measure => "___measure",
-            RuntimeFunction::LazyMeasureLeaked => "___lazy_measure_leaked",
-            RuntimeFunction::LazyMeasure => "___lazy_measure",
-            RuntimeFunction::Reset => "___reset",
+            GenericRuntimeFunction::QAlloc => "___qalloc",
+            GenericRuntimeFunction::QFree => "___qfree",
+            GenericRuntimeFunction::Measure => "___measure",
+            GenericRuntimeFunction::LazyMeasureLeaked => "___lazy_measure_leaked",
+            GenericRuntimeFunction::LazyMeasure => "___lazy_measure",
+            GenericRuntimeFunction::Reset => "___reset",
         }
     }
 
@@ -82,36 +105,116 @@ impl RuntimeFunction {
             .as_basic_type_enum();
         let iwc = context.iw_context();
         match self {
-            RuntimeFunction::Rz => iwc
-                .void_type()
-                .fn_type(&[qb_type.into(), iwc.f64_type().into()], false),
-            RuntimeFunction::Rzz => iwc.void_type().fn_type(
-                &[qb_type.into(), qb_type.into(), iwc.f64_type().into()],
-                false,
-            ),
-            RuntimeFunction::Rxy => iwc.void_type().fn_type(
-                &[qb_type.into(), iwc.f64_type().into(), iwc.f64_type().into()],
-                false,
-            ),
-            RuntimeFunction::QAlloc => qb_type.fn_type(&[], false),
-            RuntimeFunction::QFree => iwc.void_type().fn_type(&[qb_type.into()], false),
-            RuntimeFunction::Measure => iwc.bool_type().fn_type(&[qb_type.into()], false),
-            RuntimeFunction::LazyMeasureLeaked => {
+            GenericRuntimeFunction::QAlloc => qb_type.fn_type(&[], false),
+            GenericRuntimeFunction::QFree => iwc.void_type().fn_type(&[qb_type.into()], false),
+            GenericRuntimeFunction::Measure => iwc.bool_type().fn_type(&[qb_type.into()], false),
+            GenericRuntimeFunction::LazyMeasureLeaked => {
                 future_type(iwc).fn_type(&[qb_type.into()], false)
             }
-            RuntimeFunction::LazyMeasure => future_type(iwc).fn_type(&[qb_type.into()], false),
-            RuntimeFunction::Reset => iwc.void_type().fn_type(&[qb_type.into()], false),
+            GenericRuntimeFunction::LazyMeasure => future_type(iwc).fn_type(&[qb_type.into()], false),
+            GenericRuntimeFunction::Reset => iwc.void_type().fn_type(&[qb_type.into()], false),
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HeliosGateFunction {
+    Rz,
+    Rzz,
+    Rxy,
+}
+impl QSystemRuntimeFunction for HeliosGateFunction {
+    fn name(&self) -> &str {
+        match self {
+            HeliosGateFunction::Rz => "___rz",
+            HeliosGateFunction::Rzz => "___rzz",
+            HeliosGateFunction::Rxy => "___rxy",
         }
     }
 
-    fn get_func<'c, H: HugrView<Node = Node>>(
+    fn func_type<'c>(
         &self,
-        context: &EmitFuncContext<'c, '_, H>,
+        context: &EmitFuncContext<'c, '_, impl HugrView<Node = Node>>,
         pcg: &impl PreludeCodegen,
-    ) -> Result<FunctionValue<'c>> {
-        let func_type = self.func_type(context, pcg);
-        context.get_extern_func(self.name(), func_type)
+    ) -> FunctionType<'c> {
+        let qb_type = pcg
+            .qubit_type(&context.typing_session())
+            .as_basic_type_enum();
+        let iwc = context.iw_context();
+        match self {
+            HeliosGateFunction::Rz => iwc
+                .void_type()
+                .fn_type(&[qb_type.into(), iwc.f64_type().into()], false),
+            HeliosGateFunction::Rzz => iwc.void_type().fn_type(
+                &[qb_type.into(), qb_type.into(), iwc.f64_type().into()],
+                false,
+            ),
+            HeliosGateFunction::Rxy => iwc.void_type().fn_type(
+                &[qb_type.into(), iwc.f64_type().into(), iwc.f64_type().into()],
+                false,
+            ),
+        }
     }
+}
+
+
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SolGateFunction {
+    Rp,
+    Rpp,
+    Rpg,
+    Rxxyyzz,
+}
+
+impl QSystemRuntimeFunction for SolGateFunction {
+    fn name(&self) -> &str {
+        match self {
+            SolGateFunction::Rp => "___rp",
+            SolGateFunction::Rpp => "___rpp",
+            SolGateFunction::Rpg => "___rpg",
+            SolGateFunction::Rxxyyzz => "___rxxyyzz",
+        }
+    }
+
+    fn func_type<'c>(
+        &self,
+        context: &EmitFuncContext<'c, '_, impl HugrView<Node = Node>>,
+        pcg: &impl PreludeCodegen,
+    ) -> FunctionType<'c> {
+        let qubit = pcg
+            .qubit_type(&context.typing_session())
+            .as_basic_type_enum()
+            .into();
+        let iwc = context.iw_context();
+        let float = iwc.f64_type().into();
+        match self {
+            SolGateFunction::Rp => iwc
+                .void_type()
+                .fn_type(&[qubit, float, float], false),
+            SolGateFunction::Rpp => iwc.void_type().fn_type(
+                &[qubit, qubit, float, float],
+                false,
+            ),
+            SolGateFunction::Rpg => iwc.void_type().fn_type(
+                &[qubit, qubit, float, float],
+                false,
+            ),
+            SolGateFunction::Rxxyyzz => iwc.void_type().fn_type(
+                &[qubit, qubit, float, float, float],
+                false,
+            ),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RuntimeFunction {
+    Generic(GenericRuntimeFunction),
+    HeliosGate(HeliosGateFunction),
+    SolGate(SolGateFunction),
 }
 
 impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
@@ -120,7 +223,33 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
         context: &EmitFuncContext<'c, '_, impl HugrView<Node = Node>>,
         rf: RuntimeFunction,
     ) -> Result<FunctionValue<'c>> {
-        rf.get_func(context, &self.0)
+        match (self.platform, rf) {
+            (QSystemPlatform::Helios, RuntimeFunction::HeliosGate(gf)) => gf.get_func(context, &self.codegen),
+            (QSystemPlatform::Sol, RuntimeFunction::SolGate(gf)) => gf.get_func(context, &self.codegen),
+            (_, RuntimeFunction::Generic(gf)) => gf.get_func(context, &self.codegen),
+            (QSystemPlatform::Helios, RuntimeFunction::SolGate(_)) => {
+                bail!("Sol gate function called on Helios platform")
+            }
+            (QSystemPlatform::Sol, RuntimeFunction::HeliosGate(_)) => {
+                bail!("Helios gate function called on Sol platform")
+            }
+        }
+    }
+    fn runtime_func_name<'c>(
+        &self,
+        rf: &'c RuntimeFunction,
+    ) -> Result<&'c str> {
+        match (self.platform, rf) {
+            (QSystemPlatform::Helios, RuntimeFunction::HeliosGate(gf)) => Ok(gf.name()),
+            (QSystemPlatform::Sol, RuntimeFunction::SolGate(gf)) => Ok(gf.name()),
+            (_, RuntimeFunction::Generic(gf)) => Ok(gf.name()),
+            (QSystemPlatform::Helios, RuntimeFunction::SolGate(_)) => {
+                bail!("Sol gate function called on Helios platform")
+            }
+            (QSystemPlatform::Sol, RuntimeFunction::HeliosGate(_)) => {
+                bail!("Helios gate function called on Sol platform")
+            }
+        }
     }
 
     /// Helper function to `emit` a qsystem operation.
@@ -138,9 +267,10 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
             .collect_vec();
         let outputs = output_indices.iter().map(|&i| args.inputs[i]).collect_vec();
         let func = self.runtime_func(context, runtime_func)?;
+        let func_name = self.runtime_func_name(&runtime_func)?;
         context
             .builder()
-            .build_call(func, &inputs, runtime_func.name())?;
+            .build_call(func, &inputs, func_name)?;
         args.outputs.finish(context.builder(), outputs)
     }
 
@@ -151,22 +281,24 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
         args: EmitOpArgs<'c, '_, ExtensionOp, H>,
         op: QSystemOp,
     ) -> Result<()> {
-        match op {
+        match (self.platform, op) {
             // Rotation about Z
-            QSystemOp::Rz => self.emit_impl(context, args, RuntimeFunction::Rz, &[0, 1], &[0]),
-            // Rotation about ZZ (aka "ZZPhase")
-            QSystemOp::ZZPhase => {
-                self.emit_impl(context, args, RuntimeFunction::Rzz, &[0, 1, 2], &[0, 1])
-            }
-            // Rotation in X and Y
-            // (α,β) ↦ Rz(β)Rx(α)Rz(−β)
-            //
-            // aka "PhasedX", "R1XY", "U1q"
-            QSystemOp::PhasedX => {
-                self.emit_impl(context, args, RuntimeFunction::Rxy, &[0, 1, 2], &[0])
-            }
+            (QSystemPlatform::Helios, QSystemOp::Rz) => self.emit_impl(context, args, RuntimeFunction::HeliosGate(HeliosGateFunction::Rz), &[0, 1], &[0]),
+            (QSystemPlatform::Helios, QSystemOp::ZZPhase) => self.emit_impl(context, args, RuntimeFunction::HeliosGate(HeliosGateFunction::Rzz), &[0, 1, 2], &[0, 1]),
+            (QSystemPlatform::Helios, QSystemOp::PhasedX) => self.emit_impl(context, args, RuntimeFunction::HeliosGate(HeliosGateFunction::Rxy), &[0, 1, 2], &[0]),
+            (QSystemPlatform::Helios, QSystemOp::PhasedXX) => { bail!("PhasedXX not implemented for Helios platform") }
+            (QSystemPlatform::Helios, QSystemOp::N2PhasedX) => { bail!("N2PhasedX not implemented for Helios platform") }
+            (QSystemPlatform::Helios, QSystemOp::Tk2) => { bail!("Tk2 not implemented for Helios platform") }
+
+            (QSystemPlatform::Sol, QSystemOp::Rz) => { bail!("Rz not implemented for Sol platform") }
+            (QSystemPlatform::Sol, QSystemOp::ZZPhase) => { bail!("Rzz not implemented for Sol platform") }
+            (QSystemPlatform::Sol, QSystemOp::PhasedX) => { self.emit_impl(context, args, RuntimeFunction::SolGate(SolGateFunction::Rp), &[0, 1, 2], &[0]) }
+            (QSystemPlatform::Sol, QSystemOp::PhasedXX) => { self.emit_impl(context, args, RuntimeFunction::SolGate(SolGateFunction::Rpp), &[0, 1, 2, 3], &[0]) }
+            (QSystemPlatform::Sol, QSystemOp::N2PhasedX) => { self.emit_impl(context, args, RuntimeFunction::SolGate(SolGateFunction::Rpg), &[0, 1, 2, 3], &[0]) }
+            (QSystemPlatform::Sol, QSystemOp::Tk2) => { self.emit_impl(context, args, RuntimeFunction::SolGate(SolGateFunction::Rxxyyzz), &[0, 1, 2, 3, 4], &[0]) }
+            
             // Measure qubit in Z basis
-            QSystemOp::Measure | QSystemOp::MeasureReset => {
+            (_, QSystemOp::Measure | QSystemOp::MeasureReset) => {
                 let true_val = emit_value(context, &Value::true_val())?;
                 let false_val = emit_value(context, &Value::false_val())?;
                 let builder = context.builder();
@@ -176,7 +308,7 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                     .map_err(|_| anyhow!("Measure expects one input"))?;
                 let result_i1 = builder
                     .build_call(
-                        self.runtime_func(context, RuntimeFunction::Measure)?,
+                        self.runtime_func(context, RuntimeFunction::Generic(GenericRuntimeFunction::Measure))?,
                         &[qb.into()],
                         "measure_i1",
                     )?
@@ -188,7 +320,7 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                     // normal measure may put the qubit in invalid state, so assume
                     // deallocation, don't return it
                     builder.build_call(
-                        self.runtime_func(context, RuntimeFunction::QFree)?,
+                        self.runtime_func(context, RuntimeFunction::Generic(GenericRuntimeFunction::QFree))?,
                         &[qb.into()],
                         "qfree",
                     )?;
@@ -196,7 +328,7 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                 } else {
                     // MeasureReset will reset the qubit after measurement so safe to return
                     builder.build_call(
-                        self.runtime_func(context, RuntimeFunction::Reset)?,
+                        self.runtime_func(context, RuntimeFunction::Generic(GenericRuntimeFunction::Reset))?,
                         &[qb.into()],
                         "reset",
                     )?;
@@ -204,7 +336,7 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                 }
             }
             // Measure qubit in Z basis, not forcing to a boolean
-            QSystemOp::LazyMeasure => {
+            (_, QSystemOp::LazyMeasure) => {
                 let builder = context.builder();
                 let [qb] = args
                     .inputs
@@ -212,21 +344,21 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                     .map_err(|_| anyhow!("LazyMeasure expects one input"))?;
                 let result = builder
                     .build_call(
-                        self.runtime_func(context, RuntimeFunction::LazyMeasure)?,
+                        self.runtime_func(context, RuntimeFunction::Generic(GenericRuntimeFunction::LazyMeasure))?,
                         &[qb.into()],
                         "lazy_measure",
                     )?
                     .try_as_basic_value()
                     .unwrap_basic();
                 builder.build_call(
-                    self.runtime_func(context, RuntimeFunction::QFree)?,
+                    self.runtime_func(context, RuntimeFunction::Generic(GenericRuntimeFunction::QFree))?,
                     &[qb.into()],
                     "qfree",
                 )?;
                 args.outputs.finish(builder, [result])
             }
             // Measure qubit in Z basis or detect leakage, not forcing to a boolean
-            QSystemOp::LazyMeasureLeaked => {
+            (_, QSystemOp::LazyMeasureLeaked) => {
                 let builder = context.builder();
                 let [qb] = args
                     .inputs
@@ -234,20 +366,20 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                     .map_err(|_| anyhow!("LazyMeasureLeaked expects one input"))?;
                 let result = builder
                     .build_call(
-                        self.runtime_func(context, RuntimeFunction::LazyMeasureLeaked)?,
+                        self.runtime_func(context, RuntimeFunction::Generic(GenericRuntimeFunction::LazyMeasureLeaked))?,
                         &[qb.into()],
                         "lazy_measure_leaked",
                     )?
                     .try_as_basic_value()
                     .unwrap_basic();
                 builder.build_call(
-                    self.runtime_func(context, RuntimeFunction::QFree)?,
+                    self.runtime_func(context, RuntimeFunction::Generic(GenericRuntimeFunction::QFree))?,
                     &[qb.into()],
                     "qfree",
                 )?;
                 args.outputs.finish(builder, [result])
             }
-            QSystemOp::LazyMeasureReset => {
+            (_, QSystemOp::LazyMeasureReset) => {
                 let builder = context.builder();
                 let [qb] = args
                     .inputs
@@ -255,22 +387,22 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                     .map_err(|_| anyhow!("LazyMeasureReset expects one input"))?;
                 let result = builder
                     .build_call(
-                        self.runtime_func(context, RuntimeFunction::LazyMeasure)?,
+                        self.runtime_func(context, RuntimeFunction::Generic(GenericRuntimeFunction::LazyMeasure))?,
                         &[qb.into()],
                         "lazy_measure",
                     )?
                     .try_as_basic_value()
                     .unwrap_basic();
                 builder.build_call(
-                    self.runtime_func(context, RuntimeFunction::Reset)?,
+                    self.runtime_func(context, RuntimeFunction::Generic(GenericRuntimeFunction::Reset))?,
                     &[qb.into()],
                     "reset",
                 )?;
                 args.outputs.finish(builder, [qb, result])
             }
             // Reset a qubit
-            QSystemOp::Reset => self.emit_impl(context, args, RuntimeFunction::Reset, &[0], &[0]),
-            QSystemOp::TryQAlloc => {
+            (_, QSystemOp::Reset) => self.emit_impl(context, args, RuntimeFunction::Generic(GenericRuntimeFunction::Reset), &[0], &[0]),
+            (_, QSystemOp::TryQAlloc) => {
                 let [] = args
                     .inputs
                     .try_into()
@@ -278,7 +410,7 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                 let qb = context
                     .builder()
                     .build_call(
-                        self.runtime_func(context, RuntimeFunction::QAlloc)?,
+                        self.runtime_func(context, RuntimeFunction::Generic(GenericRuntimeFunction::QAlloc))?,
                         &[],
                         "qalloc",
                     )?
@@ -286,7 +418,7 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                     .unwrap_basic();
 
                 let max_qb = self
-                    .0
+                    .codegen
                     .qubit_type(&context.typing_session())
                     .as_basic_type_enum()
                     .into_int_type()
@@ -302,7 +434,7 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                 let result = build_option(context, not_max, qb, qb_t())?;
                 args.outputs.finish(context.builder(), [result])
             }
-            QSystemOp::QFree => self.emit_impl(context, args, RuntimeFunction::QFree, &[0], &[]),
+            (_, QSystemOp::QFree) => self.emit_impl(context, args, RuntimeFunction::Generic(GenericRuntimeFunction::QFree), &[0], &[]),
         }
     }
 
@@ -325,7 +457,7 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
         let reset_bb =
             context.build_positioned_new_block("reset_bb", Some(id_bb), |context, bb| {
                 context.builder().build_call(
-                    self.runtime_func(context, RuntimeFunction::Reset)?,
+                    self.runtime_func(context, RuntimeFunction::Generic(GenericRuntimeFunction::Reset))?,
                     &[qb.into()],
                     "reset",
                 )?;
