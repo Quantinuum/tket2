@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 from pytest_snapshot.plugin import Snapshot
-from selene_hugr_qis_compiler import compile_to_llvm_ir #, HugrReadError, check_hugr
+from selene_hugr_qis_compiler import compile_to_llvm_ir  # , HugrReadError, check_hugr
 
 resources_dir = Path(__file__).parent / "resources"
 
@@ -38,13 +38,19 @@ def load(name: str) -> bytes:
 )
 @pytest.mark.parametrize("target_triple", triples)
 @pytest.mark.parametrize("platform", platforms)
-def test_llvm_multiplatform(snapshot: Snapshot, hugr_file: str, target_triple: str, platform: str) -> None:
+def test_llvm_multiplatform(
+    snapshot: Snapshot, hugr_file: str, target_triple: str, platform: str
+) -> None:
     hugr_envelope = load(hugr_file)
-    ir = compile_to_llvm_ir(hugr_envelope, target_triple=target_triple, platform=platform)  # type: ignore[call-arg]
+    ir = compile_to_llvm_ir(
+        hugr_envelope, target_triple=target_triple, platform=platform
+    )  # type: ignore[call-arg]
     snapshot.assert_match(ir, f"{hugr_file}_{target_triple}_{platform}")
-    
 
-@pytest.mark.xfail(reason="Requires tket2 functionality that is not yet implemented for Sol")
+
+@pytest.mark.xfail(
+    reason="Requires tket2 functionality that is not yet implemented for Sol"
+)
 @pytest.mark.parametrize(
     "hugr_file",
     [
@@ -52,6 +58,8 @@ def test_llvm_multiplatform(snapshot: Snapshot, hugr_file: str, target_triple: s
     ],
 )
 @pytest.mark.parametrize("target_triple", triples)
-def test_llvm_multiplatform_todos(snapshot: Snapshot, hugr_file: str, target_triple: str) -> None:
+def test_llvm_multiplatform_todos(
+    snapshot: Snapshot, hugr_file: str, target_triple: str
+) -> None:
     hugr_envelope = load(hugr_file)
     ir = compile_to_llvm_ir(hugr_envelope, target_triple=target_triple, platform="Sol")  # type: ignore[call-arg]
