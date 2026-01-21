@@ -27,6 +27,7 @@ pub struct QSystemCodegenExtension<PCG: PreludeCodegen> {
     codegen: PCG,
 }
 impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
+    /// Create a new `QSystemCodegenExtension` for the desired qsystem platform
     pub fn new(platform: QSystemPlatform, codegen: PCG) -> Self {
         Self { platform, codegen }
     }
