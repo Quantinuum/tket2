@@ -15,7 +15,7 @@ use tket::Circuit;
 use tket::passes::NormalizeGuppy;
 use tket::serialize::pytket::{EncodeOptions, EncodedCircuit};
 
-use tket_qsystem::QSystemPass;
+use tket_qsystem::{QSystemPass, QSystemPlatform};
 use tket1_passes::{Tket1Circuit, Tket1Pass};
 
 const GUPPY_EXAMPLES_DIR: &str = "../test_files/guppy_optimization";
@@ -195,7 +195,10 @@ fn optimize_guppy(#[case] name: &str) {
     assert_eq!(count_gates(&hugr), opt);
 
     // Lower to QSystem. This may blow up the HUGR size.
-    QSystemPass::default().run(&mut hugr).unwrap();
+    //TODO: add Sol case
+    QSystemPass::defaults(QSystemPlatform::Helios)
+        .run(&mut hugr)
+        .unwrap();
 
     hugr.validate().unwrap_or_else(|e| panic!("{e}"));
 }

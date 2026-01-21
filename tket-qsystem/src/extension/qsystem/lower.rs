@@ -87,9 +87,12 @@ enum ReplaceOps {
 ///
 /// # Errors
 /// Returns an error if the replacement fails.
-/// 
+///
 /// TODO: consider a rename - tk2 can mean both 'tket2' and the TK2 gate.
-pub fn lower_tk2_op(platform: QSystemPlatform, hugr: &mut impl HugrMut<Node = Node>) -> Result<Vec<Node>, LowerTk2Error> {
+pub fn lower_tk2_op(
+    platform: QSystemPlatform,
+    hugr: &mut impl HugrMut<Node = Node>,
+) -> Result<Vec<Node>, LowerTk2Error> {
     let mut funcs: BTreeMap<TketOp, Node> = BTreeMap::new();
     let mut lowerer = ReplaceTypes::new_empty();
     let mut barrier_funcs = BarrierInserter::new();
@@ -249,7 +252,7 @@ pub fn check_lowered<H: HugrView>(hugr: &H) -> Result<(), Vec<H::Node>> {
 /// Invokes [lower_tk2_op]. If validation is enabled the resulting HUGR is
 /// checked with [check_lowered].
 #[derive(Debug, Clone)]
-pub struct LowerTketToQSystemPass{
+pub struct LowerTketToQSystemPass {
     platform: QSystemPlatform,
 }
 impl LowerTketToQSystemPass {
@@ -310,7 +313,7 @@ mod test {
             .finish_hugr_with_outputs([])
             .unwrap_or_else(|e| panic!("{}", e));
 
-        let lowered = lower_tk2_op(&mut h, platform).unwrap();
+        let lowered = lower_tk2_op(platform, &mut h).unwrap();
         assert_eq!(lowered.len(), 5);
         let circ = Circuit::new(&h);
         let ops: Vec<QSystemOp> = circ
@@ -344,16 +347,42 @@ mod test {
     #[case(TketOp::Rx, QSystemPlatform::Helios, Some(vec![QSystemOp::PhasedX]))]
     #[case(TketOp::Ry, QSystemPlatform::Helios, Some(vec![QSystemOp::PhasedX]))]
     #[case(TketOp::Rz, QSystemPlatform::Helios, Some(vec![QSystemOp::Rz]))]
+    #[case(TketOp::H, QSystemPlatform::Sol, Some(vec![QSystemOp::PhasedX, QSystemOp::Rz]))]
+    #[case(TketOp::X, QSystemPlatform::Sol, Some(vec![QSystemOp::PhasedX]))]
+    #[case(TketOp::Y, QSystemPlatform::Sol, Some(vec![QSystemOp::PhasedX]))]
+    #[case(TketOp::Z, QSystemPlatform::Sol, Some(vec![QSystemOp::Rz]))]
+    #[case(TketOp::S, QSystemPlatform::Sol, Some(vec![QSystemOp::Rz]))]
+    #[case(TketOp::Sdg, QSystemPlatform::Sol, Some(vec![QSystemOp::Rz]))]
+    #[case(TketOp::V, QSystemPlatform::Sol, Some(vec![QSystemOp::PhasedX]))]
+    #[case(TketOp::Vdg, QSystemPlatform::Sol, Some(vec![QSystemOp::PhasedX]))]
+    #[case(TketOp::T, QSystemPlatform::Sol, Some(vec![QSystemOp::Rz]))]
+    #[case(TketOp::Tdg, QSystemPlatform::Sol, Some(vec![QSystemOp::Rz]))]
+    #[case(TketOp::Rx, QSystemPlatform::Sol, Some(vec![QSystemOp::PhasedX]))]
+    #[case(TketOp::Ry, QSystemPlatform::Sol, Some(vec![QSystemOp::PhasedX]))]
+    #[case(TketOp::Rz, QSystemPlatform::Sol, Some(vec![QSystemOp::Rz]))]
     // multi qubit ordering is not deterministic
-    #[case(TketOp::CX, None)]
-    #[case(TketOp::CY, None)]
-    #[case(TketOp::CZ, None)]
-    #[case(TketOp::CRz, None)]
-    #[case(TketOp::Toffoli, None)]
+    #[case(TketOp::CX, QSystemPlatform::Helios, None)]
+    #[case(TketOp::CY, QSystemPlatform::Helios, None)]
+    #[case(TketOp::CZ, QSystemPlatform::Helios, None)]
+    #[case(TketOp::CRz, QSystemPlatform::Helios, None)]
+    #[case(TketOp::Toffoli, QSystemPlatform::Helios, None)]
+    // Uncomment when rebasing is added
+    //#[case(TketOp::CX, QSystemPlatform::Helios, None)]
+    //#[case(TketOp::CY, QSystemPlatform::Helios, None)]
+    //#[case(TketOp::CZ, QSystemPlatform::Helios, None)]
+    //#[case(TketOp::CRz, QSystemPlatform::Helios, None)]
+    //#[case(TketOp::Toffoli, QSystemPlatform::Helios, None)]
+
     // conditional doesn't fit in to commands
-    #[case(TketOp::Measure, None)]
-    #[case(TketOp::QAlloc, None)]
-    fn test_lower(#[case] t2op: TketOp, #[case] platform: QSystemPlatform, #[case] qsystem_ops: Option<Vec<QSystemOp>>) {
+    #[case(TketOp::Measure, QSystemPlatform::Helios, None)]
+    #[case(TketOp::QAlloc, QSystemPlatform::Helios, None)]
+    #[case(TketOp::Measure, QSystemPlatform::Sol, None)]
+    #[case(TketOp::QAlloc, QSystemPlatform::Sol, None)]
+    fn test_lower(
+        #[case] t2op: TketOp,
+        #[case] platform: QSystemPlatform,
+        #[case] qsystem_ops: Option<Vec<QSystemOp>>,
+    ) {
         // build dfg with just the op
 
         let h = build_func(platform, t2op).unwrap();

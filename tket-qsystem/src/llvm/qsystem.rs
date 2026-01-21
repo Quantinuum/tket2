@@ -28,9 +28,7 @@ pub struct QSystemCodegenExtension<PCG: PreludeCodegen> {
 }
 impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
     pub fn new(platform: QSystemPlatform, codegen: PCG) -> Self {
-        Self {
-            platform, codegen
-        }
+        Self { platform, codegen }
     }
 }
 
@@ -67,7 +65,7 @@ trait QSystemRuntimeFunction {
         &self,
         context: &EmitFuncContext<'c, '_, H>,
         pcg: &impl PreludeCodegen,
-    ) -> Result<FunctionValue<'c>>{
+    ) -> Result<FunctionValue<'c>> {
         let func_type = self.func_type(context, pcg);
         context.get_extern_func(self.name(), func_type)
     }
@@ -111,12 +109,13 @@ impl QSystemRuntimeFunction for GenericRuntimeFunction {
             GenericRuntimeFunction::LazyMeasureLeaked => {
                 future_type(iwc).fn_type(&[qb_type.into()], false)
             }
-            GenericRuntimeFunction::LazyMeasure => future_type(iwc).fn_type(&[qb_type.into()], false),
+            GenericRuntimeFunction::LazyMeasure => {
+                future_type(iwc).fn_type(&[qb_type.into()], false)
+            }
             GenericRuntimeFunction::Reset => iwc.void_type().fn_type(&[qb_type.into()], false),
         }
     }
 }
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum HeliosGateFunction {
@@ -158,9 +157,6 @@ impl QSystemRuntimeFunction for HeliosGateFunction {
     }
 }
 
-
-
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SolGateFunction {
     Rp,
@@ -193,24 +189,17 @@ impl QSystemRuntimeFunction for SolGateFunction {
         let iwc = context.iw_context();
         let float = iwc.f64_type().into();
         match self {
-            SolGateFunction::Rp => iwc
+            SolGateFunction::Rp => iwc.void_type().fn_type(&[qubit, float, float], false),
+            SolGateFunction::Rz => iwc.void_type().fn_type(&[qubit, float], false),
+            SolGateFunction::Rpp => iwc
                 .void_type()
-                .fn_type(&[qubit, float, float], false),
-            SolGateFunction::Rz => iwc
+                .fn_type(&[qubit, qubit, float, float], false),
+            SolGateFunction::Rpg => iwc
                 .void_type()
-                .fn_type(&[qubit, float], false),
-            SolGateFunction::Rpp => iwc.void_type().fn_type(
-                &[qubit, qubit, float, float],
-                false,
-            ),
-            SolGateFunction::Rpg => iwc.void_type().fn_type(
-                &[qubit, qubit, float, float],
-                false,
-            ),
-            SolGateFunction::Rxxyyzz => iwc.void_type().fn_type(
-                &[qubit, qubit, float, float, float],
-                false,
-            ),
+                .fn_type(&[qubit, qubit, float, float], false),
+            SolGateFunction::Rxxyyzz => iwc
+                .void_type()
+                .fn_type(&[qubit, qubit, float, float, float], false),
         }
     }
 }
@@ -229,8 +218,12 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
         rf: RuntimeFunction,
     ) -> Result<FunctionValue<'c>> {
         match (self.platform, rf) {
-            (QSystemPlatform::Helios, RuntimeFunction::HeliosGate(gf)) => gf.get_func(context, &self.codegen),
-            (QSystemPlatform::Sol, RuntimeFunction::SolGate(gf)) => gf.get_func(context, &self.codegen),
+            (QSystemPlatform::Helios, RuntimeFunction::HeliosGate(gf)) => {
+                gf.get_func(context, &self.codegen)
+            }
+            (QSystemPlatform::Sol, RuntimeFunction::SolGate(gf)) => {
+                gf.get_func(context, &self.codegen)
+            }
             (_, RuntimeFunction::Generic(gf)) => gf.get_func(context, &self.codegen),
             (QSystemPlatform::Helios, RuntimeFunction::SolGate(_)) => {
                 bail!("Sol gate function called on Helios platform")
@@ -240,10 +233,7 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
             }
         }
     }
-    fn runtime_func_name<'c>(
-        &self,
-        rf: &'c RuntimeFunction,
-    ) -> Result<&'c str> {
+    fn runtime_func_name<'c>(&self, rf: &'c RuntimeFunction) -> Result<&'c str> {
         match (self.platform, rf) {
             (QSystemPlatform::Helios, RuntimeFunction::HeliosGate(gf)) => Ok(gf.name()),
             (QSystemPlatform::Sol, RuntimeFunction::SolGate(gf)) => Ok(gf.name()),
@@ -273,9 +263,7 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
         let outputs = output_indices.iter().map(|&i| args.inputs[i]).collect_vec();
         let func = self.runtime_func(context, runtime_func)?;
         let func_name = self.runtime_func_name(&runtime_func)?;
-        context
-            .builder()
-            .build_call(func, &inputs, func_name)?;
+        context.builder().build_call(func, &inputs, func_name)?;
         args.outputs.finish(context.builder(), outputs)
     }
 
@@ -288,20 +276,76 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
     ) -> Result<()> {
         match (self.platform, op) {
             // Rotation about Z
-            (QSystemPlatform::Helios, QSystemOp::Rz) => self.emit_impl(context, args, RuntimeFunction::HeliosGate(HeliosGateFunction::Rz), &[0, 1], &[0]),
-            (QSystemPlatform::Helios, QSystemOp::ZZPhase) => self.emit_impl(context, args, RuntimeFunction::HeliosGate(HeliosGateFunction::Rzz), &[0, 1, 2], &[0, 1]),
-            (QSystemPlatform::Helios, QSystemOp::PhasedX) => self.emit_impl(context, args, RuntimeFunction::HeliosGate(HeliosGateFunction::Rxy), &[0, 1, 2], &[0]),
-            (QSystemPlatform::Helios, QSystemOp::PhasedXX) => { bail!("PhasedXX not implemented for Helios platform") }
-            (QSystemPlatform::Helios, QSystemOp::TwinPhasedX) => { bail!("TwinPhasedX not implemented for Helios platform") }
-            (QSystemPlatform::Helios, QSystemOp::Tk2) => { bail!("Tk2 not implemented for Helios platform") }
+            (QSystemPlatform::Helios, QSystemOp::Rz) => self.emit_impl(
+                context,
+                args,
+                RuntimeFunction::HeliosGate(HeliosGateFunction::Rz),
+                &[0, 1],
+                &[0],
+            ),
+            (QSystemPlatform::Helios, QSystemOp::ZZPhase) => self.emit_impl(
+                context,
+                args,
+                RuntimeFunction::HeliosGate(HeliosGateFunction::Rzz),
+                &[0, 1, 2],
+                &[0, 1],
+            ),
+            (QSystemPlatform::Helios, QSystemOp::PhasedX) => self.emit_impl(
+                context,
+                args,
+                RuntimeFunction::HeliosGate(HeliosGateFunction::Rxy),
+                &[0, 1, 2],
+                &[0],
+            ),
+            (QSystemPlatform::Helios, QSystemOp::PhasedXX) => {
+                bail!("PhasedXX not implemented for Helios platform")
+            }
+            (QSystemPlatform::Helios, QSystemOp::TwinPhasedX) => {
+                bail!("TwinPhasedX not implemented for Helios platform")
+            }
+            (QSystemPlatform::Helios, QSystemOp::Tk2) => {
+                bail!("Tk2 not implemented for Helios platform")
+            }
 
-            (QSystemPlatform::Sol, QSystemOp::Rz) => self.emit_impl(context, args, RuntimeFunction::SolGate(SolGateFunction::Rz), &[0, 1], &[0]),
-            (QSystemPlatform::Sol, QSystemOp::ZZPhase) => { bail!("Rzz not implemented for Sol platform") }
-            (QSystemPlatform::Sol, QSystemOp::PhasedX) => { self.emit_impl(context, args, RuntimeFunction::SolGate(SolGateFunction::Rp), &[0, 1, 2], &[0]) }
-            (QSystemPlatform::Sol, QSystemOp::PhasedXX) => { self.emit_impl(context, args, RuntimeFunction::SolGate(SolGateFunction::Rpp), &[0, 1, 2, 3], &[0]) }
-            (QSystemPlatform::Sol, QSystemOp::TwinPhasedX) => { self.emit_impl(context, args, RuntimeFunction::SolGate(SolGateFunction::Rpg), &[0, 1, 2, 3], &[0]) }
-            (QSystemPlatform::Sol, QSystemOp::Tk2) => { self.emit_impl(context, args, RuntimeFunction::SolGate(SolGateFunction::Rxxyyzz), &[0, 1, 2, 3, 4], &[0]) }
-            
+            (QSystemPlatform::Sol, QSystemOp::Rz) => self.emit_impl(
+                context,
+                args,
+                RuntimeFunction::SolGate(SolGateFunction::Rz),
+                &[0, 1],
+                &[0],
+            ),
+            (QSystemPlatform::Sol, QSystemOp::ZZPhase) => {
+                bail!("Rzz not implemented for Sol platform")
+            }
+            (QSystemPlatform::Sol, QSystemOp::PhasedX) => self.emit_impl(
+                context,
+                args,
+                RuntimeFunction::SolGate(SolGateFunction::Rp),
+                &[0, 1, 2],
+                &[0],
+            ),
+            (QSystemPlatform::Sol, QSystemOp::PhasedXX) => self.emit_impl(
+                context,
+                args,
+                RuntimeFunction::SolGate(SolGateFunction::Rpp),
+                &[0, 1, 2, 3],
+                &[0],
+            ),
+            (QSystemPlatform::Sol, QSystemOp::TwinPhasedX) => self.emit_impl(
+                context,
+                args,
+                RuntimeFunction::SolGate(SolGateFunction::Rpg),
+                &[0, 1, 2, 3],
+                &[0],
+            ),
+            (QSystemPlatform::Sol, QSystemOp::Tk2) => self.emit_impl(
+                context,
+                args,
+                RuntimeFunction::SolGate(SolGateFunction::Rxxyyzz),
+                &[0, 1, 2, 3, 4],
+                &[0],
+            ),
+
             // Measure qubit in Z basis
             (_, QSystemOp::Measure | QSystemOp::MeasureReset) => {
                 let true_val = emit_value(context, &Value::true_val())?;
@@ -313,7 +357,10 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                     .map_err(|_| anyhow!("Measure expects one input"))?;
                 let result_i1 = builder
                     .build_call(
-                        self.runtime_func(context, RuntimeFunction::Generic(GenericRuntimeFunction::Measure))?,
+                        self.runtime_func(
+                            context,
+                            RuntimeFunction::Generic(GenericRuntimeFunction::Measure),
+                        )?,
                         &[qb.into()],
                         "measure_i1",
                     )?
@@ -325,7 +372,10 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                     // normal measure may put the qubit in invalid state, so assume
                     // deallocation, don't return it
                     builder.build_call(
-                        self.runtime_func(context, RuntimeFunction::Generic(GenericRuntimeFunction::QFree))?,
+                        self.runtime_func(
+                            context,
+                            RuntimeFunction::Generic(GenericRuntimeFunction::QFree),
+                        )?,
                         &[qb.into()],
                         "qfree",
                     )?;
@@ -333,7 +383,10 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                 } else {
                     // MeasureReset will reset the qubit after measurement so safe to return
                     builder.build_call(
-                        self.runtime_func(context, RuntimeFunction::Generic(GenericRuntimeFunction::Reset))?,
+                        self.runtime_func(
+                            context,
+                            RuntimeFunction::Generic(GenericRuntimeFunction::Reset),
+                        )?,
                         &[qb.into()],
                         "reset",
                     )?;
@@ -349,14 +402,20 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                     .map_err(|_| anyhow!("LazyMeasure expects one input"))?;
                 let result = builder
                     .build_call(
-                        self.runtime_func(context, RuntimeFunction::Generic(GenericRuntimeFunction::LazyMeasure))?,
+                        self.runtime_func(
+                            context,
+                            RuntimeFunction::Generic(GenericRuntimeFunction::LazyMeasure),
+                        )?,
                         &[qb.into()],
                         "lazy_measure",
                     )?
                     .try_as_basic_value()
                     .unwrap_basic();
                 builder.build_call(
-                    self.runtime_func(context, RuntimeFunction::Generic(GenericRuntimeFunction::QFree))?,
+                    self.runtime_func(
+                        context,
+                        RuntimeFunction::Generic(GenericRuntimeFunction::QFree),
+                    )?,
                     &[qb.into()],
                     "qfree",
                 )?;
@@ -371,14 +430,20 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                     .map_err(|_| anyhow!("LazyMeasureLeaked expects one input"))?;
                 let result = builder
                     .build_call(
-                        self.runtime_func(context, RuntimeFunction::Generic(GenericRuntimeFunction::LazyMeasureLeaked))?,
+                        self.runtime_func(
+                            context,
+                            RuntimeFunction::Generic(GenericRuntimeFunction::LazyMeasureLeaked),
+                        )?,
                         &[qb.into()],
                         "lazy_measure_leaked",
                     )?
                     .try_as_basic_value()
                     .unwrap_basic();
                 builder.build_call(
-                    self.runtime_func(context, RuntimeFunction::Generic(GenericRuntimeFunction::QFree))?,
+                    self.runtime_func(
+                        context,
+                        RuntimeFunction::Generic(GenericRuntimeFunction::QFree),
+                    )?,
                     &[qb.into()],
                     "qfree",
                 )?;
@@ -392,21 +457,33 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                     .map_err(|_| anyhow!("LazyMeasureReset expects one input"))?;
                 let result = builder
                     .build_call(
-                        self.runtime_func(context, RuntimeFunction::Generic(GenericRuntimeFunction::LazyMeasure))?,
+                        self.runtime_func(
+                            context,
+                            RuntimeFunction::Generic(GenericRuntimeFunction::LazyMeasure),
+                        )?,
                         &[qb.into()],
                         "lazy_measure",
                     )?
                     .try_as_basic_value()
                     .unwrap_basic();
                 builder.build_call(
-                    self.runtime_func(context, RuntimeFunction::Generic(GenericRuntimeFunction::Reset))?,
+                    self.runtime_func(
+                        context,
+                        RuntimeFunction::Generic(GenericRuntimeFunction::Reset),
+                    )?,
                     &[qb.into()],
                     "reset",
                 )?;
                 args.outputs.finish(builder, [qb, result])
             }
             // Reset a qubit
-            (_, QSystemOp::Reset) => self.emit_impl(context, args, RuntimeFunction::Generic(GenericRuntimeFunction::Reset), &[0], &[0]),
+            (_, QSystemOp::Reset) => self.emit_impl(
+                context,
+                args,
+                RuntimeFunction::Generic(GenericRuntimeFunction::Reset),
+                &[0],
+                &[0],
+            ),
             (_, QSystemOp::TryQAlloc) => {
                 let [] = args
                     .inputs
@@ -415,7 +492,10 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                 let qb = context
                     .builder()
                     .build_call(
-                        self.runtime_func(context, RuntimeFunction::Generic(GenericRuntimeFunction::QAlloc))?,
+                        self.runtime_func(
+                            context,
+                            RuntimeFunction::Generic(GenericRuntimeFunction::QAlloc),
+                        )?,
                         &[],
                         "qalloc",
                     )?
@@ -439,7 +519,13 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                 let result = build_option(context, not_max, qb, qb_t())?;
                 args.outputs.finish(context.builder(), [result])
             }
-            (_, QSystemOp::QFree) => self.emit_impl(context, args, RuntimeFunction::Generic(GenericRuntimeFunction::QFree), &[0], &[]),
+            (_, QSystemOp::QFree) => self.emit_impl(
+                context,
+                args,
+                RuntimeFunction::Generic(GenericRuntimeFunction::QFree),
+                &[0],
+                &[],
+            ),
         }
     }
 
@@ -462,7 +548,10 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
         let reset_bb =
             context.build_positioned_new_block("reset_bb", Some(id_bb), |context, bb| {
                 context.builder().build_call(
-                    self.runtime_func(context, RuntimeFunction::Generic(GenericRuntimeFunction::Reset))?,
+                    self.runtime_func(
+                        context,
+                        RuntimeFunction::Generic(GenericRuntimeFunction::Reset),
+                    )?,
                     &[qb.into()],
                     "reset",
                 )?;
@@ -511,11 +600,15 @@ mod test {
         use crate::llvm::{futures::FuturesCodegenExtension, prelude::QISPreludeCodegen};
 
         llvm_ctx.add_extensions(|ceb| {
-            ceb.add_extension(QSystemCodegenExtension(QISPreludeCodegen))
-                .add_extension(FuturesCodegenExtension)
-                .add_prelude_extensions(QISPreludeCodegen)
-                .add_float_extensions()
-                .add_logic_extensions()
+            // TODO: add Sol case
+            ceb.add_extension(QSystemCodegenExtension::new(
+                QSystemPlatform::Helios,
+                QISPreludeCodegen,
+            ))
+            .add_extension(FuturesCodegenExtension)
+            .add_prelude_extensions(QISPreludeCodegen)
+            .add_float_extensions()
+            .add_logic_extensions()
         });
         let ext_op = op.to_extension_op().unwrap().into();
         let mut hugr = single_op_hugr(ext_op);

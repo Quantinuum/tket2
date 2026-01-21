@@ -289,7 +289,7 @@ struct CompileArgs<'a> {
     target_machine: &'a TargetMachine,
     /// Optimization level
     opt_level: OptimizationLevel,
-    /// Target quantum platform 
+    /// Target quantum platform
     platform: qsystem::QSystemPlatform,
 }
 
@@ -306,7 +306,7 @@ impl<'a> CompileArgs<'a> {
             save_hugr: None,
             target_machine,
             opt_level,
-            platform
+            platform,
         }
     }
 }
@@ -416,10 +416,11 @@ pub fn get_platform(platform: &str) -> Result<qsystem::QSystemPlatform> {
     match platform {
         "Helios" => Ok(qsystem::QSystemPlatform::Helios),
         "Sol" => Ok(qsystem::QSystemPlatform::Sol),
-        _ => Err(anyhow!("Unknown platform: {platform} (expected 'Helios' or 'Sol')")),
+        _ => Err(anyhow!(
+            "Unknown platform: {platform} (expected 'Helios' or 'Sol')"
+        )),
     }
 }
-
 
 // -------------------- Python bindings -----------------------
 mod exceptions {
@@ -431,7 +432,7 @@ mod exceptions {
 mod selene_hugr_qis_compiler {
     use super::{
         CompileArgs, Context, Hugr, PyResult, compile, get_native_target_machine, get_opt_level,
-        get_target_machine_from_triple, get_platform, pyfunction, read_hugr_envelope,
+        get_platform, get_target_machine_from_triple, pyfunction, read_hugr_envelope,
     };
 
     #[pymodule_export]
