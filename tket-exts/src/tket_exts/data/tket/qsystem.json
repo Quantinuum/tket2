@@ -168,47 +168,6 @@
       },
       "binary": false
     },
-    "N2PhasedX": {
-      "extension": "tket.qsystem",
-      "name": "N2PhasedX",
-      "description": "NPhasedX with N=2, a.k.a. rpg. Sol only.",
-      "signature": {
-        "params": [],
-        "body": {
-          "input": [
-            {
-              "t": "Q"
-            },
-            {
-              "t": "Q"
-            },
-            {
-              "t": "Opaque",
-              "extension": "arithmetic.float.types",
-              "id": "float64",
-              "args": [],
-              "bound": "C"
-            },
-            {
-              "t": "Opaque",
-              "extension": "arithmetic.float.types",
-              "id": "float64",
-              "args": [],
-              "bound": "C"
-            }
-          ],
-          "output": [
-            {
-              "t": "Q"
-            },
-            {
-              "t": "Q"
-            }
-          ]
-        }
-      },
-      "binary": false
-    },
     "PhasedX": {
       "extension": "tket.qsystem",
       "name": "PhasedX",
@@ -483,6 +442,47 @@
                   }
                 ]
               ]
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "TwinPhasedX": {
+      "extension": "tket.qsystem",
+      "name": "TwinPhasedX",
+      "description": "NPhasedX with N=2, a.k.a. rpg. Sol only.",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Q"
+            },
+            {
+              "t": "Q"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Q"
+            },
+            {
+              "t": "Q"
             }
           ]
         }

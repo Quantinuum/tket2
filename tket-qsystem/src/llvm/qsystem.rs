@@ -164,6 +164,7 @@ impl QSystemRuntimeFunction for HeliosGateFunction {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SolGateFunction {
     Rp,
+    Rz,
     Rpp,
     Rpg,
     Rxxyyzz,
@@ -173,6 +174,7 @@ impl QSystemRuntimeFunction for SolGateFunction {
     fn name(&self) -> &str {
         match self {
             SolGateFunction::Rp => "___rp",
+            SolGateFunction::Rz => "___rz",
             SolGateFunction::Rpp => "___rpp",
             SolGateFunction::Rpg => "___rpg",
             SolGateFunction::Rxxyyzz => "___rxxyyzz",
@@ -194,6 +196,9 @@ impl QSystemRuntimeFunction for SolGateFunction {
             SolGateFunction::Rp => iwc
                 .void_type()
                 .fn_type(&[qubit, float, float], false),
+            SolGateFunction::Rz => iwc
+                .void_type()
+                .fn_type(&[qubit, float], false),
             SolGateFunction::Rpp => iwc.void_type().fn_type(
                 &[qubit, qubit, float, float],
                 false,
@@ -287,14 +292,14 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
             (QSystemPlatform::Helios, QSystemOp::ZZPhase) => self.emit_impl(context, args, RuntimeFunction::HeliosGate(HeliosGateFunction::Rzz), &[0, 1, 2], &[0, 1]),
             (QSystemPlatform::Helios, QSystemOp::PhasedX) => self.emit_impl(context, args, RuntimeFunction::HeliosGate(HeliosGateFunction::Rxy), &[0, 1, 2], &[0]),
             (QSystemPlatform::Helios, QSystemOp::PhasedXX) => { bail!("PhasedXX not implemented for Helios platform") }
-            (QSystemPlatform::Helios, QSystemOp::N2PhasedX) => { bail!("N2PhasedX not implemented for Helios platform") }
+            (QSystemPlatform::Helios, QSystemOp::TwinPhasedX) => { bail!("TwinPhasedX not implemented for Helios platform") }
             (QSystemPlatform::Helios, QSystemOp::Tk2) => { bail!("Tk2 not implemented for Helios platform") }
 
-            (QSystemPlatform::Sol, QSystemOp::Rz) => { bail!("Rz not implemented for Sol platform") }
+            (QSystemPlatform::Sol, QSystemOp::Rz) => self.emit_impl(context, args, RuntimeFunction::SolGate(SolGateFunction::Rz), &[0, 1], &[0]),
             (QSystemPlatform::Sol, QSystemOp::ZZPhase) => { bail!("Rzz not implemented for Sol platform") }
             (QSystemPlatform::Sol, QSystemOp::PhasedX) => { self.emit_impl(context, args, RuntimeFunction::SolGate(SolGateFunction::Rp), &[0, 1, 2], &[0]) }
             (QSystemPlatform::Sol, QSystemOp::PhasedXX) => { self.emit_impl(context, args, RuntimeFunction::SolGate(SolGateFunction::Rpp), &[0, 1, 2, 3], &[0]) }
-            (QSystemPlatform::Sol, QSystemOp::N2PhasedX) => { self.emit_impl(context, args, RuntimeFunction::SolGate(SolGateFunction::Rpg), &[0, 1, 2, 3], &[0]) }
+            (QSystemPlatform::Sol, QSystemOp::TwinPhasedX) => { self.emit_impl(context, args, RuntimeFunction::SolGate(SolGateFunction::Rpg), &[0, 1, 2, 3], &[0]) }
             (QSystemPlatform::Sol, QSystemOp::Tk2) => { self.emit_impl(context, args, RuntimeFunction::SolGate(SolGateFunction::Rxxyyzz), &[0, 1, 2, 3, 4], &[0]) }
             
             // Measure qubit in Z basis

@@ -32,7 +32,6 @@ def load(name: str) -> bytes:
         "measure_qb_array",
         "postselect_exit",
         "postselect_panic",
-        #"rus", - 2q gates need some work
         "print_current_shot",
         "rng",
     ],
@@ -43,3 +42,16 @@ def test_llvm_multiplatform(snapshot: Snapshot, hugr_file: str, target_triple: s
     hugr_envelope = load(hugr_file)
     ir = compile_to_llvm_ir(hugr_envelope, target_triple=target_triple, platform=platform)  # type: ignore[call-arg]
     snapshot.assert_match(ir, f"{hugr_file}_{target_triple}_{platform}")
+    
+
+@pytest.mark.parametrize(
+    "hugr_file",
+    [
+        "rus",
+    ],
+)
+@pytest.mark.parametrize("target_triple", triples)
+def test_llvm_multiplatform(snapshot: Snapshot, hugr_file: str, target_triple: str) -> None:
+    hugr_envelope = load(hugr_file)
+    with pytest.raises(BaseException, match="not yet implemented"):
+        ir = compile_to_llvm_ir(hugr_envelope, target_triple=target_triple, platform="Sol")  # type: ignore[call-arg]

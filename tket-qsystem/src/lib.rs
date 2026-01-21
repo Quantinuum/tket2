@@ -27,7 +27,7 @@ use tket::TketOp;
 
 use extension::{
     futures::FutureOpDef,
-    qsystem::{LowerTk2Error, LowerTketToQSystemPass, QSystemOp},
+    qsystem::{LowerTk2Error, LowerTketToQSystemPass, QSystemOp, QSystemPlatform},
 };
 
 #[cfg(feature = "llvm")]
@@ -47,16 +47,18 @@ pub struct QSystemPass {
     force_order: bool,
     lazify: bool,
     hide_funcs: bool,
+    platform: QSystemPlatform,
 }
 
-impl Default for QSystemPass {
-    fn default() -> Self {
+impl QSystemPass {
+    pub fn defaults(platform: QSystemPlatform) -> Self {
         Self {
             constant_fold: false,
             monomorphize: true,
             force_order: true,
             lazify: true,
             hide_funcs: true,
+            platform
         }
     }
 }
@@ -209,7 +211,7 @@ impl QSystemPass {
     }
 
     fn lower_tk2(&self) -> LowerTketToQSystemPass {
-        LowerTketToQSystemPass
+        LowerTketToQSystemPass::new(self.platform)
     }
 
     fn replace_bools(&self) -> ReplaceBoolPass {
