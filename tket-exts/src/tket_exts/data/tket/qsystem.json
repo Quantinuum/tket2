@@ -206,7 +206,7 @@
     "PhasedXX": {
       "extension": "tket.qsystem",
       "name": "PhasedXX",
-      "description": "PhasedXX gate, a.k.a. rpp. Sol only.",
+      "description": "PhasedXX gate, a.k.a. rpp, specific to the Sol platform.",
       "signature": {
         "params": [],
         "body": {
@@ -349,7 +349,7 @@
     "Rz": {
       "extension": "tket.qsystem",
       "name": "Rz",
-      "description": "Rotate a qubit around the Z axis. Not physical. Helios only.",
+      "description": "Rotate a qubit around the Z axis. Not physical on Helios or Sol platforms.",
       "signature": {
         "params": [],
         "body": {
@@ -377,7 +377,7 @@
     "Tk2": {
       "extension": "tket.qsystem",
       "name": "Tk2",
-      "description": "Tk2 gate, a.k.a. rxxyyzz. Sol only.",
+      "description": "Tk2 gate, a.k.a. rxxyyzz. Specific to the Sol platform.",
       "signature": {
         "params": [],
         "body": {
@@ -451,7 +451,7 @@
     "TwinPhasedX": {
       "extension": "tket.qsystem",
       "name": "TwinPhasedX",
-      "description": "NPhasedX with N=2, a.k.a. rpg. Sol only.",
+      "description": "NPhasedX with N=2, a.k.a. rpg. Specific to the Sol platform.",
       "signature": {
         "params": [],
         "body": {
@@ -492,7 +492,7 @@
     "ZZPhase": {
       "extension": "tket.qsystem",
       "name": "ZZPhase",
-      "description": "ZZ gate with an angle (helios only).",
+      "description": "ZZ gate with an angle, specific to the Helios platform.",
       "signature": {
         "params": [],
         "body": {

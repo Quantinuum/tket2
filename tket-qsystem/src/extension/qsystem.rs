@@ -177,9 +177,9 @@ impl MakeOpDef for QSystemOp {
         match self {
             QSystemOp::Measure => "Measure a qubit and lose it.",
             QSystemOp::LazyMeasure => "Lazily measure a qubit and lose it.",
-            QSystemOp::Rz => "Rotate a qubit around the Z axis. Not physical. Helios only.",
+            QSystemOp::Rz => "Rotate a qubit around the Z axis. Not physical on Helios or Sol platforms.",
             QSystemOp::PhasedX => "PhasedX gate.",
-            QSystemOp::ZZPhase => "ZZ gate with an angle (helios only).",
+            QSystemOp::ZZPhase => "ZZ gate with an angle, specific to the Helios platform.",
             QSystemOp::TryQAlloc => "Allocate a qubit in the Z |0> eigenstate.",
             QSystemOp::QFree => "Free a qubit (lose track of it).",
             QSystemOp::Reset => "Reset a qubit to the Z |0> eigenstate.",
@@ -190,9 +190,9 @@ impl MakeOpDef for QSystemOp {
             QSystemOp::LazyMeasureReset => {
                 "Lazily measure a qubit and reset it to the Z |0> eigenstate."
             }
-            QSystemOp::PhasedXX => "PhasedXX gate, a.k.a. rpp. Sol only.",
-            QSystemOp::TwinPhasedX => "NPhasedX with N=2, a.k.a. rpg. Sol only.",
-            QSystemOp::Tk2 => "Tk2 gate, a.k.a. rxxyyzz. Sol only.",
+            QSystemOp::PhasedXX => "PhasedXX gate, a.k.a. rpp, specific to the Sol platform.",
+            QSystemOp::TwinPhasedX => "NPhasedX with N=2, a.k.a. rpg. Specific to the Sol platform.",
+            QSystemOp::Tk2 => "Tk2 gate, a.k.a. rxxyyzz. Specific to the Sol platform.",
         }
         .to_string()
     }
