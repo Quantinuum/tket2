@@ -44,6 +44,7 @@ def test_llvm_multiplatform(snapshot: Snapshot, hugr_file: str, target_triple: s
     snapshot.assert_match(ir, f"{hugr_file}_{target_triple}_{platform}")
     
 
+@pytest.mark.xfail(reason="Requires tket2 functionality that is not yet implemented for Sol")
 @pytest.mark.parametrize(
     "hugr_file",
     [
@@ -51,7 +52,6 @@ def test_llvm_multiplatform(snapshot: Snapshot, hugr_file: str, target_triple: s
     ],
 )
 @pytest.mark.parametrize("target_triple", triples)
-def test_llvm_multiplatform(snapshot: Snapshot, hugr_file: str, target_triple: str) -> None:
+def test_llvm_multiplatform_todos(snapshot: Snapshot, hugr_file: str, target_triple: str) -> None:
     hugr_envelope = load(hugr_file)
-    with pytest.raises(BaseException, match="not yet implemented"):
-        ir = compile_to_llvm_ir(hugr_envelope, target_triple=target_triple, platform="Sol")  # type: ignore[call-arg]
+    ir = compile_to_llvm_ir(hugr_envelope, target_triple=target_triple, platform="Sol")  # type: ignore[call-arg]
