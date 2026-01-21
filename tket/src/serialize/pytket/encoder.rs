@@ -881,19 +881,21 @@ impl<H: HugrView> PytketEncoderContext<H> {
                 }
             }
             OpType::LoadConstant(constant) => {
-                // If we are loading a supported type, emit a transparent node
-                // by reassigning the input values to the new outputs.
-                //
-                // Otherwise, if we're loading an unsupported type, this node
-                // should be part of an unsupported subgraph.
+                let cst = circ
+                    .hugr()
+                    .single_linked_output(node, constant.constant_port())
+                    .expect("LoadConstant must have a linked Const");
+                // Check if the Const was successfully encoded
                 if self
-                    .config()
-                    .type_to_pytket(constant.constant_type())
+                    .values
+                    .peek_wire_values(Wire::new(cst.0, cst.1))
                     .is_some()
                 {
                     self.emit_transparent_node(node, circ, |ps| ps.input_params.to_owned())?;
                     return Ok(EncodeStatus::Success);
                 }
+                // Otherwise (inc. if we're loading an unsupported type), this node
+                // should be part of an unsupported subgraph.
             }
             OpType::Const(op) => {
                 let config = Arc::clone(&self.config);
