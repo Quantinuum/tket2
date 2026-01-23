@@ -18,7 +18,7 @@ from tket_exts.tket.result import ResultExtension
 from tket_exts.tket.wasm import WasmExtension
 
 from typing_extensions import deprecated
-from hugr.ext import Extension
+from hugr.ext import Extension, ExtensionRegistry
 from tket_exts import tket
 
 # This is updated by our release-please workflow, triggered by this
@@ -61,3 +61,34 @@ global_phase: GlobalPhaseExtension = tket.global_phase.GlobalPhaseExtension()
 @deprecated("Use tket_exts.bool() instead")
 def opaque_bool() -> Extension:
     return bool()
+
+
+def tket_registry() -> ExtensionRegistry:
+    """Returns an ExtensionRegistry containing all the tket extensions.
+
+    This can be used when loading a Hugr containing tket operations and types
+
+    Returns:
+        An ExtensionRegistry containing all the tket extensions.
+    """
+    tket_exts = [
+        tket.bool.BoolExtension(),
+        tket.debug.DebugExtension(),
+        tket.gpu.GpuExtension(),
+        tket.guppy.GuppyExtension(),
+        tket.rotation.RotationExtension(),
+        tket.futures.FuturesExtension(),
+        tket.qsystem.QSystemExtension(),
+        tket.qsystem.QSystemRandomExtension(),
+        tket.qsystem.QSystemUtilsExtension(),
+        tket.quantum.QuantumExtension(),
+        tket.result.ResultExtension(),
+        tket.wasm.WasmExtension(),
+        tket.modifier.ModifierExtension(),
+        tket.global_phase.GlobalPhaseExtension(),
+    ]
+
+    registry = ExtensionRegistry()
+    for ext in tket_exts:
+        registry.add_extension(ext())
+    return registry
