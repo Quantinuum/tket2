@@ -3,6 +3,7 @@ from typing import Optional, Literal
 import json
 from dataclasses import dataclass
 
+from hugr import Hugr
 from pytket import Circuit
 from pytket.passes import (
     CustomPass,
@@ -10,7 +11,7 @@ from pytket.passes import (
 )
 
 from tket import optimiser
-from tket.circuit import Tk2Circuit
+from tket.circuit import _hugr_to_tk2circuit
 
 from hugr.passes._composable_pass import (
     ComposablePass,
@@ -19,8 +20,6 @@ from hugr.passes._composable_pass import (
     PassResult,
 )
 
-
-from hugr.hugr.base import Hugr
 
 # Re-export native bindings.
 from ._tket.passes import (
@@ -132,7 +131,7 @@ class PytketHugrPass(ComposablePass):
             return ComposedPass(self, other)
 
     def _run_pytket_pass_on_hugr(self, hugr: Hugr, inplace: bool) -> PassResult:
-        compiler_state: Tk2Circuit = Tk2Circuit.from_bytes(hugr.to_bytes())
+        compiler_state, registry = _hugr_to_tk2circuit(hugr)
         for py_pass in self.pytket_passes:
             pass_json = json.dumps(py_pass.to_dict())
             compiler_state = tket1_pass(
@@ -140,6 +139,7 @@ class PytketHugrPass(ComposablePass):
             )
 
         new_hugr = Hugr.from_str(compiler_state.to_str())
+        new_hugr.resolve_extensions(registry)
         # `for_pass` assumes Modified is true by default
         # TODO: if we can extract better info from tket1 as to what happened, use it.
         # Are there better results  we can use too?
@@ -176,7 +176,7 @@ class NormalizeGuppy(ComposablePass):
         )
 
     def _normalize(self, hugr: Hugr, inplace: bool) -> PassResult:
-        compiler_state: Tk2Circuit = Tk2Circuit.from_bytes(hugr.to_bytes())
+        compiler_state, registry = _hugr_to_tk2circuit(hugr)
         opt_program = normalize_guppy(
             compiler_state,
             simplify_cfgs=self.simplify_cfgs,
@@ -187,4 +187,5 @@ class NormalizeGuppy(ComposablePass):
             remove_redundant_order_edges=self.remove_redundant_order_edges,
         )
         new_hugr = Hugr.from_str(opt_program.to_str())
+        new_hugr.resolve_extensions(registry)
         return PassResult.for_pass(self, hugr=new_hugr, inplace=inplace, result=None)

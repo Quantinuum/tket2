@@ -1,5 +1,6 @@
 //! Rust-backed representation of circuits
 
+use std::any::Any;
 use std::borrow::{Borrow, Cow};
 use std::fmt::Display;
 use std::mem;
@@ -19,7 +20,7 @@ use pyo3::exceptions::{PyAttributeError, PyValueError};
 use pyo3::types::{PyAnyMethods, PyModule, PyString, PyTypeMethods};
 use pyo3::{
     Bound, FromPyObject, IntoPyObject, PyAny, PyErr, PyRef, PyRefMut, PyResult, PyTypeInfo, Python,
-    pyclass, pymethods,
+    pyclass, pyfunction, pymethods,
 };
 
 use derive_more::From;
@@ -378,3 +379,12 @@ pub static REGISTRY: LazyLock<ExtensionRegistry> = LazyLock::new(|| {
     ]);
     registry
 });
+
+/// Returns a list of extension ids supported by the Tk2Circuit loader.
+///
+/// Extensions not in this list must be included in the package when converting
+/// loading a Tk2Circuit.
+#[pyfunction]
+pub fn embedded_extensions() -> Vec<String> {
+    REGISTRY.iter().map(|e| e.name.to_string()).collect()
+}
