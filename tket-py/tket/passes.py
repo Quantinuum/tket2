@@ -32,6 +32,7 @@ from ._tket.passes import (
     tket1_pass,
     normalize_guppy,
     PullForwardError,
+    gridsynth,
 )
 
 __all__ = [
@@ -187,4 +188,43 @@ class NormalizeGuppy(ComposablePass):
             remove_redundant_order_edges=self.remove_redundant_order_edges,
         )
         new_hugr = Hugr.from_str(opt_program.to_str())
+        return PassResult.for_pass(self, hugr=new_hugr, inplace=inplace, result=None)
+
+
+@dataclass
+class Gridsynth(ComposablePass):
+    epsilon: float
+
+    """Apply the gridsynth algorithm to all Rz gates in the Hugr.
+
+    This includes a NormalizeGuppy pass with all of the constituent passes applied
+    before applying gridsynth to standardise the
+    format.
+
+    Parameters:
+    - epsilon: The allowable error tolerance.
+    """
+
+    # TO DO: make the NormalizeGuppy pass optional, in case it is already run
+    # before Gridsynth. Need to warn users, at least in docs that if NormalizeGuppy
+    # is not run first then Gridsynth is likely to fail. Maybe issue the warning if
+    # the option to run NormalizeGuppy is set to False. The option would be specified
+    # as a field of the dataclass (would also need to add @dataclass decorator)
+    # like for NormalizeGuppy above
+    def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
+        # inplace option does nothing for now but I retain for consistency of
+        # API with other passes
+        return implement_pass_run(
+            self,
+            hugr=hugr,
+            inplace=inplace,
+            copy_call=lambda h: self._apply_gridsynth_pass(hugr, self.epsilon, inplace),
+        )
+
+    def _apply_gridsynth_pass(
+        self, hugr: Hugr, epsilon: float, inplace: bool
+    ) -> PassResult:
+        compiler_state: Tk2Circuit = Tk2Circuit.from_bytes(hugr.to_bytes())
+        program = gridsynth(compiler_state, epsilon)
+        new_hugr = Hugr.from_str(program.to_str())
         return PassResult.for_pass(self, hugr=new_hugr, inplace=inplace, result=None)
