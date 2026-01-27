@@ -3,10 +3,10 @@
 /// (2) that NormalizeGuppy has been run. It expects that the following is guaranteed:
 /// * That every Const node is immediately connected to a LoadConst node.
 /// * That every constant is used in a single place (i.e. that there's a single output
-///     of each LoadConst).
+///   of each LoadConst).
 /// * That we can find the Const node connected to an Rz node by first following the
-///     input port 1 of the Rz node (i.e. the angle argument) and then iteratively
-///     following the input on port 0 until we reach a Const node.
+///   input port 1 of the Rz node (i.e. the angle argument) and then iteratively
+///   following the input on port 0 until we reach a Const node.
 use std::collections::HashMap;
 
 use crate::TketOp;

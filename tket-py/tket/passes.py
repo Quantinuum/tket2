@@ -210,7 +210,9 @@ class Gridsynth(ComposablePass):
             self,
             hugr=hugr,
             inplace=inplace,
-            copy_call=lambda h: self._apply_gridsynth_pass(hugr, self.epsilon, self.simplify, inplace),
+            copy_call=lambda h: self._apply_gridsynth_pass(
+                hugr, self.epsilon, self.simplify, inplace
+            ),
         )
 
     def _apply_gridsynth_pass(
