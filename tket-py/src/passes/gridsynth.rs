@@ -16,7 +16,11 @@ create_py_exception!(
 /// Binding to a python function called gridsynth that runs the rust function called
 /// apply_gridsynth pass behind the scenes
 #[pyfunction]
-pub fn gridsynth<'py>(circ: &Bound<'py, PyAny>, epsilon: f64, simplify: bool) -> PyResult<Bound<'py, PyAny>> {
+pub fn gridsynth<'py>(
+    circ: &Bound<'py, PyAny>,
+    epsilon: f64,
+    simplify: bool,
+) -> PyResult<Bound<'py, PyAny>> {
     let py = circ.py();
 
     try_with_circ(circ, |mut circ: tket::Circuit, typ: CircuitType| {
