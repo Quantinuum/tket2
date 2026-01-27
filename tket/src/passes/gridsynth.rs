@@ -1,4 +1,12 @@
 //! A pass that applies the gridsynth algorithm to all Rz gates in a HUGR.
+/// The pass introduced here assumes that (1) all functions have been inlined and
+/// (2) that NormalizeGuppy has been run. It expects that the following is guaranteed:
+/// * That every Const node is immediately connected to a LoadConst node.
+/// * That every constant is used in a single place (i.e. that there's a single output
+///     of each LoadConst).
+/// * That we can find the Const node connected to an Rz node by first following the
+///     input port 1 of the Rz node (i.e. the angle argument) and then iteratively
+///     following the input on port 0 until we reach a Const node.
 
 use std::collections::HashMap;
 
@@ -188,7 +196,7 @@ fn find_angle(hugr: &mut Hugr, rz_node: Node, garbage_collector: &mut GarbageCol
     angle
 }
 
-fn apply_gridsynth(
+fn get_gridsynth_gates(
     hugr: &mut Hugr,
     epsilon: f64,
     rz_node: Node,
@@ -200,8 +208,39 @@ fn apply_gridsynth(
     let up_to_phase = false;
     let mut gridsynth_config =
         config_from_theta_epsilon(theta, epsilon, seed, verbose, up_to_phase);
-    let gates = gridsynth_gates(&mut gridsynth_config);
-    gates.gates
+    let mut gate_sequence = gridsynth_gates(&mut gridsynth_config).gates;
+    let mut new_gate_sequence: String;
+
+    // TODO: Make all of this optional!
+
+    let n = gate_sequence.len();
+    let mut normal_form_reached = false;
+    while !normal_form_reached {
+        // Not the most efficient, but it's easiest to reach the normal form by doing
+        // string rewrites.
+        // TODO: Can be done with Regex, preferably by providing all LHS to the Regex
+        //  so they are all matched at once; then we replace each one accordingly.
+        // NOTE: Ignoring global phase factors
+        new_gate_sequence = gate_sequence
+            // Cancellation rules
+            .replacen("ZZ","",n).replacen("XX","",n).replacen("HH","",n)
+            .replacen("SS","Z",n).replacen("TT","S",n).replacen("DD","SZ",n)
+            .replacen("TD","",n).replacen("DT","",n)
+            // Rules to push Paulis to the right
+            .replacen("ZS","SZ",n).replacen("ZT","TZ",n).replacen("ZD","DZ",n)
+            .replacen("XS","SZX",n).replacen("XT","DX",n).replacen("XD","TX",n)
+            .replacen("ZH","HX",n).replacen("XH","HZ",n)
+            .replacen("XZ","ZX",n)
+            // Interaction of H and S (reduces number of H)
+            .replacen("HSH","SHSX",n)
+            // Interaction of S and T (reduces number of S)
+            .replacen("DS","T",n).replacen("SD","T",n)
+            .replacen("TS","DZ",n).replacen("ST","DZ",n);
+        // Stop when no more changes are possible
+        normal_form_reached = new_gate_sequence == gate_sequence;
+        gate_sequence = new_gate_sequence;
+    }
+    gate_sequence
 }
 
 /// Add a gridsynth gate to some previous node, which may or may not be a gridsynth gate,
@@ -250,52 +289,34 @@ fn replace_rz_with_gridsynth_output(
     let output_port = outputs[0];
     let (next_node, dst_port) = hugr.single_linked_input(rz_node, output_port).unwrap();
 
-    // we have now inferred what we need to know from the Rz node we are replacing and can remove it
+    // we have now inferred what we need to know from the Rz node; we can remove it
     hugr.remove_node(rz_node);
 
+    // Remove the W which correspond to exp(i*pi/4) scalars.
+    // NOTE: keeping track of these is important if this is used to realise a CRz gate.
+    // Since this is not the intended use, it is safe to remove them.
+    let gate_sequence = gates.replacen("W","", gates.len());
+
     // recursively adding next gate in gates to prev_node
-    for gate in gates.chars() {
-        if gate == 'H' {
-            prev_node = add_gate_and_connect(
-                hugr,
-                prev_node,
-                TketOp::H.into(),
-                next_node,
-                qubit_providing_node,
-                qubit_providing_port,
-            );
-        } else if gate == 'S' {
-            prev_node = add_gate_and_connect(
-                hugr,
-                prev_node,
-                TketOp::S.into(),
-                next_node,
-                qubit_providing_node,
-                qubit_providing_port,
-            );
-        } else if gate == 'T' {
-            prev_node = add_gate_and_connect(
-                hugr,
-                prev_node,
-                TketOp::T.into(),
-                next_node,
-                qubit_providing_node,
-                qubit_providing_port,
-            );
-        } else if gate == 'X' {
-            prev_node = add_gate_and_connect(
-                hugr,
-                prev_node,
-                TketOp::X.into(),
-                next_node,
-                qubit_providing_node,
-                qubit_providing_port,
-            );
-        } else if gate == 'W' {
-            break; // Ignoring global phases for now.
-        } else {
-            panic!("The gate {gate} is not supported")
-        }
+    for gate in gate_sequence.chars() {
+        let tket_op: hugr::ops::OpType = match gate {
+            'H' => TketOp::H.into(),
+            'S' => TketOp::S.into(),
+            'T' => TketOp::T.into(),
+            'D' => TketOp::Tdg.into(),
+            'X' => TketOp::X.into(),
+            'Z' => TketOp::Z.into(),
+            _ => panic!("The gate {gate} is not supported")
+        };
+
+        prev_node = add_gate_and_connect(
+            hugr,
+            prev_node,
+            tket_op,
+            next_node,
+            qubit_providing_node,
+            qubit_providing_port,
+        );
     }
     let ports: Vec<_> = hugr.node_outputs(prev_node).collect();
     // Assuming there were no outgoing ports to begin with when deciding port offset
@@ -322,7 +343,7 @@ pub fn apply_gridsynth_pass(hugr: &mut Hugr, epsilon: f64) -> Result<(), Gridsyn
         path: HashMap::new(),
     };
     for node in rz_nodes {
-        let gates = apply_gridsynth(hugr, epsilon, node, &mut garbage_collector);
+        let gates = get_gridsynth_gates(hugr, epsilon, node, &mut garbage_collector);
         replace_rz_with_gridsynth_output(hugr, node, &gates)?;
     }
     Ok(())
