@@ -182,6 +182,7 @@ class NormalizeGuppy(ComposablePass):
 @dataclass
 class Gridsynth(ComposablePass):
     epsilon: float
+    simplify: bool = True
 
     """Apply the gridsynth algorithm to all Rz gates in the Hugr.
 
@@ -191,6 +192,9 @@ class Gridsynth(ComposablePass):
 
     Parameters:
     - epsilon: The allowable error tolerance.
+    - simplify: If `True`, each sequence of gridsynth gates is compressed into
+      a sequence of H*T and H*Tdg gates, sandwiched by Clifford gates. This sequence
+      always has a smaller number of S and H gates, and the same number of T+Tdg gates.
     """
 
     # TO DO: make the NormalizeGuppy pass optional, in case it is already run
@@ -206,13 +210,13 @@ class Gridsynth(ComposablePass):
             self,
             hugr=hugr,
             inplace=inplace,
-            copy_call=lambda h: self._apply_gridsynth_pass(hugr, self.epsilon, inplace),
+            copy_call=lambda h: self._apply_gridsynth_pass(hugr, self.epsilon, self.simplify, inplace),
         )
 
     def _apply_gridsynth_pass(
-        self, hugr: Hugr, epsilon: float, inplace: bool
+        self, hugr: Hugr, epsilon: float, simplify: bool, inplace: bool
     ) -> PassResult:
         compiler_state: Tk2Circuit = Tk2Circuit.from_bytes(hugr.to_bytes())
-        program = gridsynth(compiler_state, epsilon)
+        program = gridsynth(compiler_state, epsilon, simplify)
         new_hugr = Hugr.from_str(program.to_str())
         return PassResult.for_pass(self, hugr=new_hugr, inplace=inplace, result=None)

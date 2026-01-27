@@ -106,11 +106,14 @@ def tket1_pass(
       nested inside other subregions of the circuit.
     """
 
-def gridsynth(hugr: CircuitClass, epsilon: float) -> CircuitClass:
+def gridsynth(hugr: CircuitClass, epsilon: float, simplify: bool) -> CircuitClass:
     """Runs a pass applying the gridsynth algorithm to all Rz gates in a HUGR,
     which decomposes them into the Clifford + T basis.
 
     Parameters:
     - hugr: the hugr to run the pass on.
     - epsilon: the precision of the gridsynth decomposition
+    - simplify: if `True`, each sequence of gridsynth gates is compressed into
+      a sequence of H*T and H*Tdg gates, sandwiched by Clifford gates. This sequence
+      always has a smaller number of S and H gates, and the same number of T+Tdg gates.
     """
