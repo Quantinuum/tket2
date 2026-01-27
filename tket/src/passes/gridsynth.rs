@@ -139,8 +139,6 @@ fn find_angle_node(
     // As all of the NormalizeGuppy passes have been run on the `hugr` before it enters this function,
     // and these passes include constant folding, we can assume that we can follow the 0th ports back
     // to a constant node where the angle is defined.
-    let max_iterations = 10;
-    let mut ii = 0;
     let mut path = Vec::new(); // The nodes leading up to the angle_node and the angle_node
     // itself
     loop {
@@ -164,12 +162,8 @@ fn find_angle_node(
                 .or_insert(path);
             return angle_node;
         }
-        if ii >= max_iterations {
-            panic!("Angle finding failed");
-        }
 
         prev_node = current_node;
-        ii += 1;
     }
 }
 
