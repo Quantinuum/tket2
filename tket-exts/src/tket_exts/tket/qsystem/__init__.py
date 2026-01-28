@@ -11,7 +11,7 @@ from hugr.ops import ExtOp
 from hugr.tys import BoundedNatArg
 from .._util import TketExtension, load_extension
 
-__all__ = ["QSystemRandomExtension", "QSystemUtilsExtension", "QSystemExtension"]
+__all__ = ["QSystemRandomExtension", "QSystemUtilsExtension", "QSystemGenericExtension"]
 
 
 class QSystemExtension(TketExtension):
@@ -41,6 +41,9 @@ class QSystemExtension(TketExtension):
             self.Rz.op_def(),
             self.try_QAlloc.op_def(),
             self.ZZPhase.op_def(),
+            self.phasedXX.op_def(),
+            self.twinPhasedX.op_def(),
+            self.tk2.op_def(),
         ]
 
     @functools.cached_property
@@ -118,3 +121,18 @@ class QSystemExtension(TketExtension):
     def ZZPhase(self) -> ExtOp:
         """Two-qubit ZZ gate with a float angle."""
         return self().get_op("ZZPhase").instantiate()
+
+    @functools.cached_property
+    def phasedXX(self) -> ExtOp:
+        """Two-qubit XX gate (rpp)."""
+        return self().get_op("PhasedXX").instantiate()
+
+    @functools.cached_property
+    def twinPhasedX(self) -> ExtOp:
+        """Native 2-phasedX gate with two float parameters (rpg)."""
+        return self().get_op("TwinPhasedX").instantiate()
+
+    @functools.cached_property
+    def tk2(self) -> ExtOp:
+        """Tk2 gate (rxxyyzz)."""
+        return self().get_op("Tk2").instantiate()

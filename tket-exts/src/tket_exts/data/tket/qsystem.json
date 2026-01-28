@@ -203,6 +203,47 @@
       },
       "binary": false
     },
+    "PhasedXX": {
+      "extension": "tket.qsystem",
+      "name": "PhasedXX",
+      "description": "PhasedXX gate, a.k.a. rpp, specific to the Sol platform.",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Q"
+            },
+            {
+              "t": "Q"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Q"
+            },
+            {
+              "t": "Q"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
     "QFree": {
       "extension": "tket.qsystem",
       "name": "QFree",
@@ -308,7 +349,7 @@
     "Rz": {
       "extension": "tket.qsystem",
       "name": "Rz",
-      "description": "Rotate a qubit around the Z axis. Not physical.",
+      "description": "Rotate a qubit around the Z axis. Not physical on Helios or Sol platforms.",
       "signature": {
         "params": [],
         "body": {
@@ -325,6 +366,54 @@
             }
           ],
           "output": [
+            {
+              "t": "Q"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "Tk2": {
+      "extension": "tket.qsystem",
+      "name": "Tk2",
+      "description": "Tk2 gate, a.k.a. rxxyyzz. Specific to the Sol platform.",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Q"
+            },
+            {
+              "t": "Q"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Q"
+            },
             {
               "t": "Q"
             }
@@ -359,10 +448,51 @@
       },
       "binary": false
     },
+    "TwinPhasedX": {
+      "extension": "tket.qsystem",
+      "name": "TwinPhasedX",
+      "description": "NPhasedX with N=2, a.k.a. rpg. Specific to the Sol platform.",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Q"
+            },
+            {
+              "t": "Q"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Q"
+            },
+            {
+              "t": "Q"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
     "ZZPhase": {
       "extension": "tket.qsystem",
       "name": "ZZPhase",
-      "description": "ZZ gate with an angle.",
+      "description": "ZZ gate with an angle, specific to the Helios platform.",
       "signature": {
         "params": [],
         "body": {

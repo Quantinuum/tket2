@@ -62,6 +62,11 @@ impl QSystemEmitter {
             QSystemOp::Rz => PytketOptype::Rz,
             QSystemOp::PhasedX => PytketOptype::PhasedX,
             QSystemOp::ZZPhase => PytketOptype::ZZPhase,
+            QSystemOp::PhasedXX => {
+                return Ok(EncodeStatus::Unsupported);
+            }
+            QSystemOp::TwinPhasedX => PytketOptype::NPhasedX, // TODO
+            QSystemOp::Tk2 => PytketOptype::TK2,
             QSystemOp::Reset => PytketOptype::Reset,
             QSystemOp::QFree => {
                 // Mark the qubit inputs as explored and forget about them.

@@ -18,7 +18,7 @@ use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
 use tket::{TketOp, extension::rotation::RotationOpBuilder};
 
-use crate::extension::qsystem::{self, QSystemOp, QSystemOpBuilder};
+use crate::extension::qsystem::{self, QSystemOp, QSystemOpBuilder, QSystemPlatform};
 
 use super::barrier::BarrierInserter;
 
@@ -87,7 +87,12 @@ enum ReplaceOps {
 ///
 /// # Errors
 /// Returns an error if the replacement fails.
-pub fn lower_tk2_op(hugr: &mut impl HugrMut<Node = Node>) -> Result<Vec<Node>, LowerTk2Error> {
+///
+/// TODO: consider a rename - tk2 can mean both 'tket2' and the TK2 gate.
+pub fn lower_tk2_op(
+    platform: QSystemPlatform,
+    hugr: &mut impl HugrMut<Node = Node>,
+) -> Result<Vec<Node>, LowerTk2Error> {
     let mut funcs: BTreeMap<TketOp, Node> = BTreeMap::new();
     let mut lowerer = ReplaceTypes::new_empty();
     let mut barrier_funcs = BarrierInserter::new();
@@ -125,7 +130,7 @@ pub fn lower_tk2_op(hugr: &mut impl HugrMut<Node = Node>) -> Result<Vec<Node>, L
                 let func_node = match funcs.entry(tket_op) {
                     Entry::Occupied(e) => *e.get(),
                     Entry::Vacant(e) => {
-                        let h = build_func(tket_op)?;
+                        let h = build_func(platform, tket_op)?;
                         let inserted = hugr.insert_hugr(hugr.module_root(), h).inserted_entrypoint;
                         *e.insert(inserted)
                     }
@@ -157,7 +162,7 @@ pub fn lower_tk2_op(hugr: &mut impl HugrMut<Node = Node>) -> Result<Vec<Node>, L
     Ok(replaced_nodes)
 }
 
-fn build_func(op: TketOp) -> Result<Hugr, LowerTk2Error> {
+fn build_func(platform: QSystemPlatform, op: TketOp) -> Result<Hugr, LowerTk2Error> {
     let sig = op.into_extension_op().signature().into_owned();
     let sig = Signature::new(sig.input, sig.output); // ignore extension delta
     // TODO check generated names are namespaced enough
@@ -165,38 +170,38 @@ fn build_func(op: TketOp) -> Result<Hugr, LowerTk2Error> {
     let mut b = FunctionBuilder::new(f_name, sig)?;
     let inputs: Vec<_> = b.input_wires().collect();
     let outputs = match (op, inputs.as_slice()) {
-        (TketOp::H, [q]) => vec![b.build_h(*q)?],
-        (TketOp::X, [q]) => vec![b.build_x(*q)?],
-        (TketOp::Y, [q]) => vec![b.build_y(*q)?],
-        (TketOp::Z, [q]) => vec![b.build_z(*q)?],
-        (TketOp::S, [q]) => vec![b.build_s(*q)?],
-        (TketOp::Sdg, [q]) => vec![b.build_sdg(*q)?],
-        (TketOp::V, [q]) => vec![b.build_v(*q)?],
-        (TketOp::Vdg, [q]) => vec![b.build_vdg(*q)?],
-        (TketOp::T, [q]) => vec![b.build_t(*q)?],
-        (TketOp::Tdg, [q]) => vec![b.build_tdg(*q)?],
-        (TketOp::Measure, [q]) => b.build_measure_flip(*q)?.into(),
+        (TketOp::H, [q]) => vec![b.build_h(platform, *q)?],
+        (TketOp::X, [q]) => vec![b.build_x(platform, *q)?],
+        (TketOp::Y, [q]) => vec![b.build_y(platform, *q)?],
+        (TketOp::Z, [q]) => vec![b.build_z(platform, *q)?],
+        (TketOp::S, [q]) => vec![b.build_s(platform, *q)?],
+        (TketOp::Sdg, [q]) => vec![b.build_sdg(platform, *q)?],
+        (TketOp::V, [q]) => vec![b.build_v(platform, *q)?],
+        (TketOp::Vdg, [q]) => vec![b.build_vdg(platform, *q)?],
+        (TketOp::T, [q]) => vec![b.build_t(platform, *q)?],
+        (TketOp::Tdg, [q]) => vec![b.build_tdg(platform, *q)?],
+        (TketOp::Measure, [q]) => b.build_measure_flip(platform, *q)?.into(),
         (TketOp::QAlloc, []) => vec![b.build_qalloc()?],
-        (TketOp::CX, [c, t]) => b.build_cx(*c, *t)?.into(),
-        (TketOp::CY, [c, t]) => b.build_cy(*c, *t)?.into(),
-        (TketOp::CZ, [c, t]) => b.build_cz(*c, *t)?.into(),
+        (TketOp::CX, [c, t]) => b.build_cx(platform, *c, *t)?.into(),
+        (TketOp::CY, [c, t]) => b.build_cy(platform, *c, *t)?.into(),
+        (TketOp::CZ, [c, t]) => b.build_cz(platform, *c, *t)?.into(),
         (TketOp::Rx, [q, angle]) => {
             let float = build_to_radians(&mut b, *angle)?;
-            vec![b.build_rx(*q, float)?]
+            vec![b.build_rx(platform, *q, float)?]
         }
         (TketOp::Ry, [q, angle]) => {
             let float = build_to_radians(&mut b, *angle)?;
-            vec![b.build_ry(*q, float)?]
+            vec![b.build_ry(platform, *q, float)?]
         }
         (TketOp::Rz, [q, angle]) => {
             let float = build_to_radians(&mut b, *angle)?;
-            vec![b.add_rz(*q, float)?]
+            vec![b.add_rz(platform, *q, float)?]
         }
         (TketOp::CRz, [c, t, angle]) => {
             let float = build_to_radians(&mut b, *angle)?;
-            b.build_crz(*c, *t, float)?.into()
+            b.build_crz(platform, *c, *t, float)?.into()
         }
-        (TketOp::Toffoli, [a, b_, c]) => b.build_toffoli(*a, *b_, *c)?.into(),
+        (TketOp::Toffoli, [a, b_, c]) => b.build_toffoli(platform, *a, *b_, *c)?.into(),
         _ => return Err(LowerTk2Error::UnknownOp(op, inputs.len())), // non-exhaustive
     };
     Ok(b.finish_hugr_with_outputs(outputs)?)
@@ -246,15 +251,23 @@ pub fn check_lowered<H: HugrView>(hugr: &H) -> Result<(), Vec<H::Node>> {
 ///
 /// Invokes [lower_tk2_op]. If validation is enabled the resulting HUGR is
 /// checked with [check_lowered].
-#[derive(Default, Debug, Clone)]
-pub struct LowerTketToQSystemPass;
+#[derive(Debug, Clone)]
+pub struct LowerTketToQSystemPass {
+    platform: QSystemPlatform,
+}
+impl LowerTketToQSystemPass {
+    /// Create a new lowering pass for the given quantum platform.
+    pub fn new(platform: QSystemPlatform) -> Self {
+        Self { platform }
+    }
+}
 
 impl<H: HugrMut<Node = Node>> ComposablePass<H> for LowerTketToQSystemPass {
     type Error = LowerTk2Error;
     type Result = ();
 
     fn run(&self, hugr: &mut H) -> Result<(), LowerTk2Error> {
-        lower_tk2_op(hugr)?;
+        lower_tk2_op(self.platform, hugr)?;
         #[cfg(test)]
         check_lowered(hugr).map_err(|missing_ops| LowerTk2Error::Unlowered { missing_ops })?;
         Ok(())
@@ -274,8 +287,10 @@ mod test {
     use super::*;
     use rstest::rstest;
 
-    #[test]
-    fn test_lower_direct() {
+    #[rstest]
+    #[case(QSystemPlatform::Helios)]
+    #[case(QSystemPlatform::Sol)]
+    fn test_lower_direct(#[case] platform: QSystemPlatform) {
         let mut b = FunctionBuilder::new("circuit", Signature::new_endo(type_row![])).unwrap();
         let [maybe_q] = b
             .add_dataflow_op(TketOp::TryQAlloc, [])
@@ -298,7 +313,7 @@ mod test {
             .finish_hugr_with_outputs([])
             .unwrap_or_else(|e| panic!("{}", e));
 
-        let lowered = lower_tk2_op(&mut h).unwrap();
+        let lowered = lower_tk2_op(platform, &mut h).unwrap();
         assert_eq!(lowered.len(), 5);
         let circ = Circuit::new(&h);
         let ops: Vec<QSystemOp> = circ
@@ -319,32 +334,58 @@ mod test {
     }
 
     #[rstest]
-    #[case(TketOp::H, Some(vec![QSystemOp::PhasedX, QSystemOp::Rz]))]
-    #[case(TketOp::X, Some(vec![QSystemOp::PhasedX]))]
-    #[case(TketOp::Y, Some(vec![QSystemOp::PhasedX]))]
-    #[case(TketOp::Z, Some(vec![QSystemOp::Rz]))]
-    #[case(TketOp::S, Some(vec![QSystemOp::Rz]))]
-    #[case(TketOp::Sdg, Some(vec![QSystemOp::Rz]))]
-    #[case(TketOp::V, Some(vec![QSystemOp::PhasedX]))]
-    #[case(TketOp::Vdg, Some(vec![QSystemOp::PhasedX]))]
-    #[case(TketOp::T, Some(vec![QSystemOp::Rz]))]
-    #[case(TketOp::Tdg, Some(vec![QSystemOp::Rz]))]
-    #[case(TketOp::Rx, Some(vec![QSystemOp::PhasedX]))]
-    #[case(TketOp::Ry, Some(vec![QSystemOp::PhasedX]))]
-    #[case(TketOp::Rz, Some(vec![QSystemOp::Rz]))]
+    #[case(TketOp::H, QSystemPlatform::Helios, Some(vec![QSystemOp::PhasedX, QSystemOp::Rz]))]
+    #[case(TketOp::X, QSystemPlatform::Helios, Some(vec![QSystemOp::PhasedX]))]
+    #[case(TketOp::Y, QSystemPlatform::Helios, Some(vec![QSystemOp::PhasedX]))]
+    #[case(TketOp::Z, QSystemPlatform::Helios, Some(vec![QSystemOp::Rz]))]
+    #[case(TketOp::S, QSystemPlatform::Helios, Some(vec![QSystemOp::Rz]))]
+    #[case(TketOp::Sdg, QSystemPlatform::Helios, Some(vec![QSystemOp::Rz]))]
+    #[case(TketOp::V, QSystemPlatform::Helios, Some(vec![QSystemOp::PhasedX]))]
+    #[case(TketOp::Vdg, QSystemPlatform::Helios, Some(vec![QSystemOp::PhasedX]))]
+    #[case(TketOp::T, QSystemPlatform::Helios, Some(vec![QSystemOp::Rz]))]
+    #[case(TketOp::Tdg, QSystemPlatform::Helios, Some(vec![QSystemOp::Rz]))]
+    #[case(TketOp::Rx, QSystemPlatform::Helios, Some(vec![QSystemOp::PhasedX]))]
+    #[case(TketOp::Ry, QSystemPlatform::Helios, Some(vec![QSystemOp::PhasedX]))]
+    #[case(TketOp::Rz, QSystemPlatform::Helios, Some(vec![QSystemOp::Rz]))]
+    #[case(TketOp::H, QSystemPlatform::Sol, Some(vec![QSystemOp::PhasedX, QSystemOp::Rz]))]
+    #[case(TketOp::X, QSystemPlatform::Sol, Some(vec![QSystemOp::PhasedX]))]
+    #[case(TketOp::Y, QSystemPlatform::Sol, Some(vec![QSystemOp::PhasedX]))]
+    #[case(TketOp::Z, QSystemPlatform::Sol, Some(vec![QSystemOp::Rz]))]
+    #[case(TketOp::S, QSystemPlatform::Sol, Some(vec![QSystemOp::Rz]))]
+    #[case(TketOp::Sdg, QSystemPlatform::Sol, Some(vec![QSystemOp::Rz]))]
+    #[case(TketOp::V, QSystemPlatform::Sol, Some(vec![QSystemOp::PhasedX]))]
+    #[case(TketOp::Vdg, QSystemPlatform::Sol, Some(vec![QSystemOp::PhasedX]))]
+    #[case(TketOp::T, QSystemPlatform::Sol, Some(vec![QSystemOp::Rz]))]
+    #[case(TketOp::Tdg, QSystemPlatform::Sol, Some(vec![QSystemOp::Rz]))]
+    #[case(TketOp::Rx, QSystemPlatform::Sol, Some(vec![QSystemOp::PhasedX]))]
+    #[case(TketOp::Ry, QSystemPlatform::Sol, Some(vec![QSystemOp::PhasedX]))]
+    #[case(TketOp::Rz, QSystemPlatform::Sol, Some(vec![QSystemOp::Rz]))]
     // multi qubit ordering is not deterministic
-    #[case(TketOp::CX, None)]
-    #[case(TketOp::CY, None)]
-    #[case(TketOp::CZ, None)]
-    #[case(TketOp::CRz, None)]
-    #[case(TketOp::Toffoli, None)]
+    #[case(TketOp::CX, QSystemPlatform::Helios, None)]
+    #[case(TketOp::CY, QSystemPlatform::Helios, None)]
+    #[case(TketOp::CZ, QSystemPlatform::Helios, None)]
+    #[case(TketOp::CRz, QSystemPlatform::Helios, None)]
+    #[case(TketOp::Toffoli, QSystemPlatform::Helios, None)]
+    // Uncomment when rebasing is added
+    //#[case(TketOp::CX, QSystemPlatform::Helios, None)]
+    //#[case(TketOp::CY, QSystemPlatform::Helios, None)]
+    //#[case(TketOp::CZ, QSystemPlatform::Helios, None)]
+    //#[case(TketOp::CRz, QSystemPlatform::Helios, None)]
+    //#[case(TketOp::Toffoli, QSystemPlatform::Helios, None)]
+
     // conditional doesn't fit in to commands
-    #[case(TketOp::Measure, None)]
-    #[case(TketOp::QAlloc, None)]
-    fn test_lower(#[case] t2op: TketOp, #[case] qsystem_ops: Option<Vec<QSystemOp>>) {
+    #[case(TketOp::Measure, QSystemPlatform::Helios, None)]
+    #[case(TketOp::QAlloc, QSystemPlatform::Helios, None)]
+    #[case(TketOp::Measure, QSystemPlatform::Sol, None)]
+    #[case(TketOp::QAlloc, QSystemPlatform::Sol, None)]
+    fn test_lower(
+        #[case] t2op: TketOp,
+        #[case] platform: QSystemPlatform,
+        #[case] qsystem_ops: Option<Vec<QSystemOp>>,
+    ) {
         // build dfg with just the op
 
-        let h = build_func(t2op).unwrap();
+        let h = build_func(platform, t2op).unwrap();
         let circ = Circuit::new(&h);
         let ops: Vec<QSystemOp> = circ
             .commands()
@@ -357,8 +398,10 @@ mod test {
         assert_eq!(check_lowered(&h), Ok(()));
     }
 
-    #[test]
-    fn test_mixed() {
+    #[rstest]
+    #[case(QSystemPlatform::Helios)]
+    #[case(QSystemPlatform::Sol)]
+    fn test_mixed(#[case] platform: QSystemPlatform) {
         let mut b = DFGBuilder::new(Signature::new(rotation_type(), bool_t())).unwrap();
         let [angle] = b.input_wires_arr();
         let qalloc = b.add_dataflow_op(TketOp::QAlloc, []).unwrap();
@@ -376,7 +419,7 @@ mod test {
         b.set_order(&rx, &qfree);
         let mut h = b.finish_hugr_with_outputs([bool]).unwrap();
 
-        let lowered = lower_tk2_op(&mut h).unwrap();
+        let lowered = lower_tk2_op(platform, &mut h).unwrap();
         assert_eq!(lowered.len(), 6);
         // dfg, input, output, alloc + (10 for unwrap), phasedx, rz, toturns, fmul, phasedx, free +
         // 5x(float + load), measure_reset, conditional, case(input, output) * 2, flip

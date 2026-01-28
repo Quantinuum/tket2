@@ -67,6 +67,16 @@ lazy_static! {
     ]);
 }
 
+/// Target platform for QSystem operations. This can determine supported operations,
+/// the native gateset, and steer optimisation choices.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QSystemPlatform {
+    /// Quantinuum Helios, supporting rxy, rzz, rz
+    Helios,
+    /// Quantinuum Sol, supporting rp, rpp, rpg, tk2
+    Sol,
+}
+
 /// Quantum operations for Quantinuum H-series quantum computers.
 #[derive(
     Clone,
@@ -108,6 +118,12 @@ pub enum QSystemOp {
     MeasureReset,
     /// Measure a qubit (return 0 or 1) or detect leakage (return 2).
     LazyMeasureLeaked,
+    /// PhasedXX gate, sol-only (rpp)
+    PhasedXX,
+    /// NPhasedX with N=2, sol-only (rpg)
+    TwinPhasedX,
+    /// Tk2 gate, sol-only (rxxyyzz)
+    Tk2,
 }
 
 impl MakeOpDef for QSystemOp {
@@ -131,6 +147,24 @@ impl MakeOpDef for QSystemOp {
             TryQAlloc => Signature::new(type_row![], Type::from(option_type(one_qb_row))),
             QFree => Signature::new(one_qb_row, type_row![]),
             MeasureReset => Signature::new(one_qb_row.clone(), vec![qb_t(), bool_type()]),
+            PhasedXX => Signature::new(
+                vec![qb_t(), qb_t(), float64_type(), float64_type()],
+                two_qb_row,
+            ),
+            TwinPhasedX => Signature::new(
+                vec![qb_t(), qb_t(), float64_type(), float64_type()],
+                two_qb_row,
+            ),
+            Tk2 => Signature::new(
+                vec![
+                    qb_t(),
+                    qb_t(),
+                    float64_type(),
+                    float64_type(),
+                    float64_type(),
+                ],
+                two_qb_row,
+            ),
         }
         .into()
     }
@@ -151,9 +185,11 @@ impl MakeOpDef for QSystemOp {
         match self {
             QSystemOp::Measure => "Measure a qubit and lose it.",
             QSystemOp::LazyMeasure => "Lazily measure a qubit and lose it.",
-            QSystemOp::Rz => "Rotate a qubit around the Z axis. Not physical.",
+            QSystemOp::Rz => {
+                "Rotate a qubit around the Z axis. Not physical on Helios or Sol platforms."
+            }
             QSystemOp::PhasedX => "PhasedX gate.",
-            QSystemOp::ZZPhase => "ZZ gate with an angle.",
+            QSystemOp::ZZPhase => "ZZ gate with an angle, specific to the Helios platform.",
             QSystemOp::TryQAlloc => "Allocate a qubit in the Z |0> eigenstate.",
             QSystemOp::QFree => "Free a qubit (lose track of it).",
             QSystemOp::Reset => "Reset a qubit to the Z |0> eigenstate.",
@@ -164,6 +200,11 @@ impl MakeOpDef for QSystemOp {
             QSystemOp::LazyMeasureReset => {
                 "Lazily measure a qubit and reset it to the Z |0> eigenstate."
             }
+            QSystemOp::PhasedXX => "PhasedXX gate, a.k.a. rpp, specific to the Sol platform.",
+            QSystemOp::TwinPhasedX => {
+                "NPhasedX with N=2, a.k.a. rpg. Specific to the Sol platform."
+            }
+            QSystemOp::Tk2 => "Tk2 gate, a.k.a. rxxyyzz. Specific to the Sol platform.",
         }
         .to_string()
     }
@@ -243,6 +284,63 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
             .add_dataflow_op(QSystemOp::LazyMeasure, [qb])?
             .out_wire(0))
     }
+    /// Add a "tket.qsystem.PhasedXX" op.
+    fn add_phased_xx(
+        &mut self,
+        platform: QSystemPlatform,
+        qb1: Wire,
+        qb2: Wire,
+        angle1: Wire,
+        angle2: Wire,
+    ) -> Result<[Wire; 2], BuildError> {
+        match platform {
+            QSystemPlatform::Helios => {
+                unimplemented!("PhasedXX lowering for Helios is not yet implemented")
+            }
+            QSystemPlatform::Sol => Ok(self
+                .add_dataflow_op(QSystemOp::PhasedXX, [qb1, qb2, angle1, angle2])?
+                .outputs_arr()),
+        }
+    }
+
+    /// Add a "tket.qsystem.TwinPhasedX" op.
+    fn add_twin_phased_x(
+        &mut self,
+        platform: QSystemPlatform,
+        qb1: Wire,
+        qb2: Wire,
+        angle1: Wire,
+        angle2: Wire,
+    ) -> Result<[Wire; 2], BuildError> {
+        match platform {
+            QSystemPlatform::Helios => {
+                unimplemented!("TwinPhasedX lowering for Helios is not yet implemented")
+            }
+            QSystemPlatform::Sol => Ok(self
+                .add_dataflow_op(QSystemOp::TwinPhasedX, [qb1, qb2, angle1, angle2])?
+                .outputs_arr()),
+        }
+    }
+
+    /// Add a "tket.qsystem.Tk2" op.
+    fn add_tk2(
+        &mut self,
+        platform: QSystemPlatform,
+        qb1: Wire,
+        qb2: Wire,
+        angle1: Wire,
+        angle2: Wire,
+        angle3: Wire,
+    ) -> Result<[Wire; 2], BuildError> {
+        match platform {
+            QSystemPlatform::Helios => {
+                unimplemented!("Tk2 lowering for Helios is not yet implemented")
+            }
+            QSystemPlatform::Sol => Ok(self
+                .add_dataflow_op(QSystemOp::Tk2, [qb1, qb2, angle1, angle2, angle3])?
+                .outputs_arr()),
+        }
+    }
 
     /// Add a "tket.qsystem.LazyMeasureLeaked" op.
     fn add_lazy_measure_leaked(&mut self, qb: Wire) -> Result<Wire, BuildError> {
@@ -269,27 +367,76 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
     }
 
     /// Add a maximally entangling "tket.qsystem.ZZPhase(pi/2)" op.
-    fn build_zz_max(&mut self, qb1: Wire, qb2: Wire) -> Result<[Wire; 2], BuildError> {
-        let pi_2 = pi_mul_f64(self, 0.5);
-        self.add_zz_phase(qb1, qb2, pi_2)
+    fn build_zz_max(
+        &mut self,
+        platform: QSystemPlatform,
+        qb1: Wire,
+        qb2: Wire,
+    ) -> Result<[Wire; 2], BuildError> {
+        match platform {
+            QSystemPlatform::Helios => {
+                let pi_2 = pi_mul_f64(self, 0.5);
+                self.add_zz_phase(platform, qb1, qb2, pi_2)
+            }
+            QSystemPlatform::Sol => {
+                let pi_minus = pi_mul_f64(self, -1.0);
+                let pi_2 = pi_mul_f64(self, 0.5);
+                let pi_minus_2 = pi_mul_f64(self, -0.5);
+
+                let [qb1, qb2] = self.add_twin_phased_x(platform, qb1, qb2, pi_2, pi_minus_2)?;
+                let [qb1, qb2] = self.add_phased_xx(platform, qb1, qb2, pi_2, pi_minus)?;
+                let [qb1, qb2] = self.add_twin_phased_x(platform, qb1, qb2, pi_2, pi_2)?;
+                Ok([qb1, qb2])
+            }
+        }
     }
 
     /// Add a "tket.qsystem.ZZPhase" op.
-    fn add_zz_phase(&mut self, qb1: Wire, qb2: Wire, angle: Wire) -> Result<[Wire; 2], BuildError> {
-        Ok(self
-            .add_dataflow_op(QSystemOp::ZZPhase, [qb1, qb2, angle])?
-            .outputs_arr())
+    fn add_zz_phase(
+        &mut self,
+        platform: QSystemPlatform,
+        qb1: Wire,
+        qb2: Wire,
+        angle: Wire,
+    ) -> Result<[Wire; 2], BuildError> {
+        Ok(match platform {
+            QSystemPlatform::Helios => self
+                .add_dataflow_op(QSystemOp::ZZPhase, [qb1, qb2, angle])?
+                .outputs_arr(),
+            QSystemPlatform::Sol => {
+                let pi_minus = pi_mul_f64(self, -1.0);
+                let pi_2 = pi_mul_f64(self, 0.5);
+                let pi_minus_2 = pi_mul_f64(self, -0.5);
+
+                let [qb1, qb2] = self.add_twin_phased_x(platform, qb1, qb2, pi_2, pi_minus_2)?;
+                let [qb1, qb2] = self.add_phased_xx(platform, qb1, qb2, angle, pi_minus)?;
+                let [qb1, qb2] = self.add_twin_phased_x(platform, qb1, qb2, pi_2, pi_2)?;
+                [qb1, qb2]
+                // unimplemented!("ZZPhase lowering for Sol is not yet implemented")
+            }
+        })
     }
 
     /// Add a "tket.qsystem.PhasedX" op.
-    fn add_phased_x(&mut self, qb: Wire, angle1: Wire, angle2: Wire) -> Result<Wire, BuildError> {
+    fn add_phased_x(
+        &mut self,
+        _platform: QSystemPlatform,
+        qb: Wire,
+        angle1: Wire,
+        angle2: Wire,
+    ) -> Result<Wire, BuildError> {
         Ok(self
             .add_dataflow_op(QSystemOp::PhasedX, [qb, angle1, angle2])?
             .out_wire(0))
     }
 
     /// Add a "tket.qsystem.Rz" op.
-    fn add_rz(&mut self, qb: Wire, angle: Wire) -> Result<Wire, BuildError> {
+    fn add_rz(
+        &mut self,
+        _platform: QSystemPlatform,
+        qb: Wire,
+        angle: Wire,
+    ) -> Result<Wire, BuildError> {
         Ok(self
             .add_dataflow_op(QSystemOp::Rz, [qb, angle])?
             .out_wire(0))
@@ -321,173 +468,333 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
     }
 
     /// Build a hadamard gate in terms of QSystem primitives.
-    fn build_h(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+    fn build_h(&mut self, platform: QSystemPlatform, qb: Wire) -> Result<Wire, BuildError> {
         let pi = pi_mul_f64(self, 1.0);
         let pi_2 = pi_mul_f64(self, 0.5);
         let pi_minus_2 = pi_mul_f64(self, -0.5);
 
-        let q = self.add_phased_x(qb, pi_2, pi_minus_2)?;
-        self.add_rz(q, pi)
+        let q = self.add_phased_x(platform, qb, pi_2, pi_minus_2)?;
+        self.add_rz(platform, q, pi)
     }
 
     /// Build an X gate in terms of QSystem primitives.
-    fn build_x(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+    fn build_x(&mut self, platform: QSystemPlatform, qb: Wire) -> Result<Wire, BuildError> {
         let pi = pi_mul_f64(self, 1.0);
         let zero = pi_mul_f64(self, 0.0);
-        self.add_phased_x(qb, pi, zero)
+        self.add_phased_x(platform, qb, pi, zero)
     }
 
     /// Build a Y gate in terms of QSystem primitives.
-    fn build_y(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+    fn build_y(&mut self, platform: QSystemPlatform, qb: Wire) -> Result<Wire, BuildError> {
         let pi = pi_mul_f64(self, 1.0);
         let pi_2 = pi_mul_f64(self, 0.5);
-        self.add_phased_x(qb, pi, pi_2)
+        self.add_phased_x(platform, qb, pi, pi_2)
     }
 
     /// Build a Z gate in terms of QSystem primitives.
-    fn build_z(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+    fn build_z(&mut self, platform: QSystemPlatform, qb: Wire) -> Result<Wire, BuildError> {
         let pi = pi_mul_f64(self, 1.0);
-        self.add_rz(qb, pi)
+        self.add_rz(platform, qb, pi)
     }
 
     /// Build an S gate in terms of QSystem primitives.
-    fn build_s(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+    fn build_s(&mut self, platform: QSystemPlatform, qb: Wire) -> Result<Wire, BuildError> {
         let pi_2 = pi_mul_f64(self, 0.5);
-        self.add_rz(qb, pi_2)
+        self.add_rz(platform, qb, pi_2)
     }
 
     /// Build an Sdg gate in terms of QSystem primitives.
-    fn build_sdg(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+    fn build_sdg(&mut self, platform: QSystemPlatform, qb: Wire) -> Result<Wire, BuildError> {
         let pi_minus_2 = pi_mul_f64(self, -0.5);
-        self.add_rz(qb, pi_minus_2)
+        self.add_rz(platform, qb, pi_minus_2)
     }
 
     /// Build a V gate in terms of QSystem primitives.
-    fn build_v(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+    fn build_v(&mut self, platform: QSystemPlatform, qb: Wire) -> Result<Wire, BuildError> {
         let pi_2 = pi_mul_f64(self, 0.5);
         let zero = pi_mul_f64(self, 0.0);
-        self.add_phased_x(qb, pi_2, zero)
+        self.add_phased_x(platform, qb, pi_2, zero)
     }
 
     /// Build a Vdg gate in terms of QSystem primitives.
-    fn build_vdg(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+    fn build_vdg(&mut self, platform: QSystemPlatform, qb: Wire) -> Result<Wire, BuildError> {
         let pi_minus_2 = pi_mul_f64(self, -0.5);
         let zero = pi_mul_f64(self, 0.0);
-        self.add_phased_x(qb, pi_minus_2, zero)
+        self.add_phased_x(platform, qb, pi_minus_2, zero)
     }
 
     /// Build a T gate in terms of QSystem primitives.
-    fn build_t(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+    fn build_t(&mut self, platform: QSystemPlatform, qb: Wire) -> Result<Wire, BuildError> {
         let pi_4 = pi_mul_f64(self, 0.25);
-        self.add_rz(qb, pi_4)
+        self.add_rz(platform, qb, pi_4)
     }
 
     /// Build a Tdg gate in terms of QSystem primitives.
-    fn build_tdg(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+    fn build_tdg(&mut self, platform: QSystemPlatform, qb: Wire) -> Result<Wire, BuildError> {
         let pi_minus_4 = pi_mul_f64(self, -0.25);
-        self.add_rz(qb, pi_minus_4)
+        self.add_rz(platform, qb, pi_minus_4)
     }
 
     /// Build a CNOT gate in terms of QSystem primitives.
-    fn build_cx(&mut self, c: Wire, t: Wire) -> Result<[Wire; 2], BuildError> {
-        let pi = pi_mul_f64(self, 1.0);
-        let pi_2 = pi_mul_f64(self, 0.5);
-        let pi_minus_2 = pi_mul_f64(self, -0.5);
+    fn build_cx(
+        &mut self,
+        platform: QSystemPlatform,
+        c: Wire,
+        t: Wire,
+    ) -> Result<[Wire; 2], BuildError> {
+        Ok(match platform {
+            QSystemPlatform::Helios => {
+                let pi = pi_mul_f64(self, 1.0);
+                let pi_2 = pi_mul_f64(self, 0.5);
+                let pi_minus_2 = pi_mul_f64(self, -0.5);
 
-        let t = self.add_phased_x(t, pi_minus_2, pi_2)?;
-        let [c, t] = self.build_zz_max(c, t)?;
-        let c = self.add_rz(c, pi_minus_2)?;
-        let t = self.add_phased_x(t, pi_2, pi)?;
-        let t = self.add_rz(t, pi_minus_2)?;
+                let t = self.add_phased_x(platform, t, pi_minus_2, pi_2)?;
+                let [c, t] = self.build_zz_max(platform, c, t)?;
+                let c = self.add_rz(platform, c, pi_minus_2)?;
+                let t = self.add_phased_x(platform, t, pi_2, pi)?;
+                let t = self.add_rz(platform, t, pi_minus_2)?;
+                [c, t]
+            }
+            QSystemPlatform::Sol => {
+                let pi_2 = pi_mul_f64(self, 0.5);
+                let pi_minus_2 = pi_mul_f64(self, -0.5);
+                let zero = pi_mul_f64(self, 0.0);
 
-        Ok([c, t])
+                let c = self.add_phased_x(platform, c, pi_2, pi_2)?;
+                let [c, t] = self.add_phased_xx(platform, c, t, pi_2, zero)?;
+                let c = self.add_phased_x(platform, c, pi_minus_2, pi_2)?;
+                let c = self.add_rz(platform, c, pi_minus_2)?;
+                let t = self.add_phased_x(platform, t, pi_minus_2, zero)?;
+                [c, t]
+                // unimplemented!("CX lowering for Sol is not yet implemented")
+            }
+        })
     }
 
     /// Build a CY gate in terms of QSystem primitives.
-    fn build_cy(&mut self, a: Wire, b: Wire) -> Result<[Wire; 2], BuildError> {
-        let pi = pi_mul_f64(self, 1.0);
-        let pi_2 = pi_mul_f64(self, 0.5);
-        let pi_minus_2 = pi_mul_f64(self, -0.5);
+    fn build_cy(
+        &mut self,
+        platform: QSystemPlatform,
+        a: Wire,
+        b: Wire,
+    ) -> Result<[Wire; 2], BuildError> {
+        Ok(match platform {
+            QSystemPlatform::Helios => {
+                let pi = pi_mul_f64(self, 1.0);
+                let pi_2 = pi_mul_f64(self, 0.5);
+                let pi_minus_2 = pi_mul_f64(self, -0.5);
 
-        let a = self.add_phased_x(a, pi, pi)?;
-        let b = self.add_phased_x(b, pi_minus_2, pi)?;
-        let [a, b] = self.build_zz_max(a, b)?;
-        let a = self.add_phased_x(a, pi, pi_2)?;
-        let b = self.add_phased_x(b, pi_minus_2, pi_minus_2)?;
-        let a = self.add_rz(a, pi_minus_2)?;
-        let b = self.add_rz(b, pi_2)?;
-        Ok([a, b])
+                let a = self.add_phased_x(platform, a, pi, pi)?;
+                let b = self.add_phased_x(platform, b, pi_minus_2, pi)?;
+                let [a, b] = self.build_zz_max(platform, a, b)?;
+                let a = self.add_phased_x(platform, a, pi, pi_2)?;
+                let b = self.add_phased_x(platform, b, pi_minus_2, pi_minus_2)?;
+                let a = self.add_rz(platform, a, pi_minus_2)?;
+                let b = self.add_rz(platform, b, pi_2)?;
+                [a, b]
+            }
+            QSystemPlatform::Sol => {
+                let pi_2 = pi_mul_f64(self, 0.5);
+                let pi_minus_2 = pi_mul_f64(self, -0.5);
+                let zero = pi_mul_f64(self, 0.0);
+
+                let a = self.add_phased_x(platform, a, pi_2, pi_2)?;
+                let b = self.add_rz(platform, b, pi_minus_2)?;
+                let [a, b] = self.add_phased_xx(platform, a, b, pi_2, zero)?;
+                let a = self.add_phased_x(platform, a, pi_minus_2, pi_2)?;
+                let a = self.add_rz(platform, a, pi_minus_2)?;
+                let b = self.add_phased_x(platform, b, pi_minus_2, zero)?;
+                let b = self.add_rz(platform, b, pi_2)?;
+                [a, b]
+                // unimplemented!("CY lowering for Sol is not yet implemented")
+            }
+        })
     }
 
     /// Build a CZ gate in terms of QSystem primitives.
-    fn build_cz(&mut self, a: Wire, b: Wire) -> Result<[Wire; 2], BuildError> {
-        let pi_minus_2 = pi_mul_f64(self, -0.5);
+    fn build_cz(
+        &mut self,
+        platform: QSystemPlatform,
+        a: Wire,
+        b: Wire,
+    ) -> Result<[Wire; 2], BuildError> {
+        Ok(match platform {
+            QSystemPlatform::Helios => {
+                let pi_minus_2 = pi_mul_f64(self, -0.5);
+                let [a, b] = self.build_zz_max(platform, a, b)?;
+                let b = self.add_rz(platform, b, pi_minus_2)?;
+                let a = self.add_rz(platform, a, pi_minus_2)?;
+                [a, b]
+            }
+            QSystemPlatform::Sol => {
+                let pi_minus = pi_mul_f64(self, -1.0);
+                let pi_2 = pi_mul_f64(self, 0.5);
+                let pi_minus_2 = pi_mul_f64(self, -0.5);
 
-        let [a, b] = self.build_zz_max(a, b)?;
-        let b = self.add_rz(b, pi_minus_2)?;
-        let a = self.add_rz(a, pi_minus_2)?;
-
-        Ok([a, b])
+                let [a, b] = self.add_twin_phased_x(platform, a, b, pi_2, pi_minus_2)?;
+                let [a, b] = self.add_phased_xx(platform, a, b, pi_2, pi_minus)?;
+                let [a, b] = self.add_twin_phased_x(platform, a, b, pi_2, pi_2)?;
+                let a = self.add_rz(platform, a, pi_minus_2)?;
+                let b = self.add_rz(platform, b, pi_minus_2)?;
+                [a, b]
+                // unimplemented!("CZ lowering for Sol is not yet implemented")
+            }
+        })
     }
 
     /// Build a RX gate in terms of QSystem primitives.
-    fn build_rx(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError> {
+    fn build_rx(
+        &mut self,
+        platform: QSystemPlatform,
+        qb: Wire,
+        theta: Wire,
+    ) -> Result<Wire, BuildError> {
         let zero = pi_mul_f64(self, 0.0);
-        self.add_phased_x(qb, theta, zero)
+        self.add_phased_x(platform, qb, theta, zero)
     }
 
     /// Build a RY gate in terms of QSystem primitives.
-    fn build_ry(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError> {
+    fn build_ry(
+        &mut self,
+        platform: QSystemPlatform,
+        qb: Wire,
+        theta: Wire,
+    ) -> Result<Wire, BuildError> {
         let pi_2 = pi_mul_f64(self, 0.5);
-        self.add_phased_x(qb, theta, pi_2)
+        self.add_phased_x(platform, qb, theta, pi_2)
     }
 
     /// Build a CRZ gate in terms of QSystem primitives.
-    fn build_crz(&mut self, a: Wire, b: Wire, lambda: Wire) -> Result<[Wire; 2], BuildError> {
-        let two = self.add_load_const(Value::from(ConstF64::new(2.0)));
-        let lambda_2 = self
-            .add_dataflow_op(FloatOps::fdiv, [lambda, two])?
-            .out_wire(0);
-        let lambda_minus_2 = self
-            .add_dataflow_op(FloatOps::fneg, [lambda_2])?
-            .out_wire(0);
+    fn build_crz(
+        &mut self,
+        platform: QSystemPlatform,
+        a: Wire,
+        b: Wire,
+        lambda: Wire,
+    ) -> Result<[Wire; 2], BuildError> {
+        Ok(match platform {
+            QSystemPlatform::Helios => {
+                let two = self.add_load_const(Value::from(ConstF64::new(2.0)));
+                let lambda_2 = self
+                    .add_dataflow_op(FloatOps::fdiv, [lambda, two])?
+                    .out_wire(0);
+                let lambda_minus_2 = self
+                    .add_dataflow_op(FloatOps::fneg, [lambda_2])?
+                    .out_wire(0);
 
-        let [a, b] = self.add_zz_phase(a, b, lambda_minus_2)?;
-        let b = self.add_rz(b, lambda_2)?;
-        Ok([a, b])
+                let [a, b] = self.add_zz_phase(platform, a, b, lambda_minus_2)?;
+                let b = self.add_rz(platform, b, lambda_2)?;
+                [a, b]
+            }
+            QSystemPlatform::Sol => {
+                let two = self.add_load_const(Value::from(ConstF64::new(2.0)));
+                let lambda_2 = self
+                    .add_dataflow_op(FloatOps::fdiv, [lambda, two])?
+                    .out_wire(0);
+                let lambda_minus_2 = self
+                    .add_dataflow_op(FloatOps::fneg, [lambda_2])?
+                    .out_wire(0);
+
+                let pi_minus = pi_mul_f64(self, -1.0);
+                let pi_2 = pi_mul_f64(self, 0.5);
+                let pi_minus_2 = pi_mul_f64(self, -0.5);
+
+                let [a, b] = self.add_twin_phased_x(platform, a, b, pi_2, pi_minus_2)?;
+                let [a, b] = self.add_phased_xx(platform, a, b, lambda_minus_2, pi_minus)?;
+                let [a, b] = self.add_twin_phased_x(platform, a, b, pi_2, pi_2)?;
+
+                let b = self.add_rz(platform, b, lambda_2)?;
+                [a, b]
+
+                // unimplemented!("CRZ lowering for Sol is not yet implemented")
+            }
+        })
     }
 
     /// Build a Toffoli (CCX) gate in terms of QSystem primitives.
-    fn build_toffoli(&mut self, a: Wire, b: Wire, c: Wire) -> Result<[Wire; 3], BuildError> {
-        let pi = pi_mul_f64(self, 1.0);
-        let pi_2 = pi_mul_f64(self, 0.5);
-        let pi_minus_2 = pi_mul_f64(self, -0.5);
-        let pi_4 = pi_mul_f64(self, 0.25);
-        let pi_minus_4 = pi_mul_f64(self, -0.25);
-        let pi_minus_3_4 = pi_mul_f64(self, -0.75);
-        let zero = pi_mul_f64(self, 0.0);
+    fn build_toffoli(
+        &mut self,
+        platform: QSystemPlatform,
+        a: Wire,
+        b: Wire,
+        c: Wire,
+    ) -> Result<[Wire; 3], BuildError> {
+        Ok(match platform {
+            QSystemPlatform::Helios => {
+                let pi = pi_mul_f64(self, 1.0);
+                let pi_2 = pi_mul_f64(self, 0.5);
+                let pi_minus_2 = pi_mul_f64(self, -0.5);
+                let pi_4 = pi_mul_f64(self, 0.25);
+                let pi_minus_4 = pi_mul_f64(self, -0.25);
+                let pi_minus_3_4 = pi_mul_f64(self, -0.75);
+                let zero = pi_mul_f64(self, 0.0);
 
-        let c = self.add_phased_x(c, pi, pi_minus_2)?;
-        let [b, c] = self.build_zz_max(b, c)?;
-        let c = self.add_phased_x(c, pi_4, pi_2)?;
-        let [a, c] = self.build_zz_max(a, c)?;
-        let c = self.add_phased_x(c, pi_4, zero)?;
-        let [b, c] = self.build_zz_max(b, c)?;
-        let c = self.add_phased_x(c, pi_4, pi_minus_2)?;
-        let [a, c] = self.build_zz_max(a, c)?;
-        let a = self.add_phased_x(a, pi, pi_4)?;
-        let c = self.add_phased_x(c, pi_minus_3_4, pi)?;
-        let [a, b] = self.add_zz_phase(a, b, pi_4)?;
-        let c = self.add_rz(c, pi)?;
-        let a = self.add_phased_x(a, pi, pi_minus_4)?;
-        let b = self.add_rz(b, pi_minus_3_4)?;
-        let a = self.add_rz(a, pi_4)?;
+                let c = self.add_phased_x(platform, c, pi, pi_minus_2)?;
+                let [b, c] = self.build_zz_max(platform, b, c)?;
+                let c = self.add_phased_x(platform, c, pi_4, pi_2)?;
+                let [a, c] = self.build_zz_max(platform, a, c)?;
+                let c = self.add_phased_x(platform, c, pi_4, zero)?;
+                let [b, c] = self.build_zz_max(platform, b, c)?;
+                let c = self.add_phased_x(platform, c, pi_4, pi_minus_2)?;
+                let [a, c] = self.build_zz_max(platform, a, c)?;
+                let a = self.add_phased_x(platform, a, pi, pi_4)?;
+                let c = self.add_phased_x(platform, c, pi_minus_3_4, pi)?;
+                let [a, b] = self.add_zz_phase(platform, a, b, pi_4)?;
+                let c = self.add_rz(platform, c, pi)?;
+                let a = self.add_phased_x(platform, a, pi, pi_minus_4)?;
+                let b = self.add_rz(platform, b, pi_minus_3_4)?;
+                let a = self.add_rz(platform, a, pi_4)?;
 
-        Ok([a, b, c])
+                [a, b, c]
+            }
+            QSystemPlatform::Sol => {
+                let pi = pi_mul_f64(self, 1.0);
+                let pi_2 = pi_mul_f64(self, 0.5);
+                let pi_minus_2 = pi_mul_f64(self, -0.5);
+                let pi_4 = pi_mul_f64(self, 0.25);
+                let pi_minus_4 = pi_mul_f64(self, -0.25);
+                let pi_minus_3_4 = pi_mul_f64(self, -0.75);
+                let zero = pi_mul_f64(self, 0.0);
+
+                let [a, b] = self.add_twin_phased_x(platform, a, b, pi_2, pi_minus_3_4)?;
+                let a = self.add_rz(platform, a, pi_minus_3_4)?;
+                let b = self.add_rz(platform, b, pi_minus_3_4)?;
+                let c = self.add_phased_x(platform, c, pi_2, pi_minus_2)?;
+                let c = self.add_rz(platform, c, pi_minus_3_4)?;
+
+                let [a, c] = self.add_phased_xx(platform, a, c, pi_2, zero)?;
+
+                let a = self.add_phased_x(platform, a, pi_minus_2, zero)?;
+                let c = self.add_phased_x(platform, c, pi_4, pi_minus_2)?;
+
+                let [a, b] = self.add_phased_xx(platform, a, b, pi_minus_4, zero)?;
+                let c = self.add_rz(platform, c, pi_2)?;
+
+                let [b, c] = self.add_phased_xx(platform, b, c, pi_4, zero)?;
+                let c = self.add_phased_x(platform, c, pi_2, pi_minus_2)?;
+                let c = self.add_rz(platform, c, pi)?;
+
+                let [a, c] = self.add_phased_xx(platform, a, c, pi_2, zero)?;
+                let [a, c] = self.add_twin_phased_x(platform, a, c, pi_2, pi_minus_2)?;
+                let a = self.add_rz(platform, a, pi_2)?;
+                let c = self.add_rz(platform, c, pi_2)?;
+
+                let [b, c] = self.add_phased_xx(platform, b, c, pi_minus_4, zero)?;
+                let b = self.add_phased_x(platform, b, pi_2, pi_minus_2)?;
+                let b = self.add_rz(platform, b, pi)?;
+
+                [a, b, c]
+                // unimplemented!("Toffoli lowering for Sol is not yet implemented")
+            }
+        })
     }
 
     /// Build a projective measurement with a conditional flip.
-    fn build_measure_flip(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
+    fn build_measure_flip(
+        &mut self,
+        platform: QSystemPlatform,
+        qb: Wire,
+    ) -> Result<[Wire; 2], BuildError> {
         let [qb, b] = self.add_measure_reset(qb)?;
         let sum_b = self.add_dataflow_op(BoolOp::read, [b])?.out_wire(0);
         let mut conditional = self.conditional_builder(
@@ -504,7 +811,7 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
         // case 1: 1 state measured, flip
         let mut case1 = conditional.case_builder(1)?;
         let [qb] = case1.input_wires_arr();
-        let qb = case1.build_x(qb)?;
+        let qb = case1.build_x(platform, qb)?;
         case1.finish_with_outputs([qb])?;
 
         let [qb] = conditional.finish_sub_container()?.outputs_arr();
@@ -559,6 +866,7 @@ mod test {
     use hugr::builder::{DataflowHugr, FunctionBuilder};
     use hugr::extension::simple_op::MakeExtensionOp;
     use hugr::ops::OpType;
+    use rstest::rstest;
     use strum::IntoEnumIterator as _;
 
     use super::*;
@@ -603,8 +911,11 @@ mod test {
         assert_matches!(hugr.validate(), Ok(_));
     }
 
-    #[test]
-    fn all_ops() {
+    #[rstest]
+    #[case(QSystemPlatform::Helios)]
+    //TODO: uncomment when 2q operation rebasing is supported for Sol
+    //#[case(QSystemPlatform::Sol)]
+    fn all_ops(#[case] platform: QSystemPlatform) {
         let hugr = {
             let mut func_builder = FunctionBuilder::new(
                 "all_ops",
@@ -614,9 +925,11 @@ mod test {
             let [q0, angle] = func_builder.input_wires_arr();
             let q1 = func_builder.build_qalloc().unwrap();
             let q0 = func_builder.add_reset(q0).unwrap();
-            let q1 = func_builder.add_phased_x(q1, angle, angle).unwrap();
-            let [q0, q1] = func_builder.build_zz_max(q0, q1).unwrap();
-            let [q0, q1] = func_builder.add_zz_phase(q0, q1, angle).unwrap();
+            let q1 = func_builder
+                .add_phased_x(platform, q1, angle, angle)
+                .unwrap();
+            let [q0, q1] = func_builder.build_zz_max(platform, q0, q1).unwrap();
+            let [q0, q1] = func_builder.add_zz_phase(platform, q0, q1, angle).unwrap();
 
             let [q0, q1] = func_builder
                 .build_wrapped_barrier([q0, q1])
@@ -624,7 +937,7 @@ mod test {
                 .try_into()
                 .unwrap();
 
-            let q0 = func_builder.add_rz(q0, angle).unwrap();
+            let q0 = func_builder.add_rz(platform, q0, angle).unwrap();
             let [q0, _b] = func_builder.add_measure_reset(q0).unwrap();
             let b = func_builder.add_measure(q0).unwrap();
             func_builder.add_qfree(q1).unwrap();
