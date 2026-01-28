@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.12.2](https://github.com/Quantinuum/tket2/compare/tket-exts-v0.12.1...tket-exts-v0.12.2) (2026-01-28)
+
+
+### Features
+
+* **tket-exts:** Export an ExtensionRegistry with all tket extensions ([#1371](https://github.com/Quantinuum/tket2/issues/1371)) ([c908427](https://github.com/Quantinuum/tket2/commit/c90842757dca3d4169be3c87fe4b1469b22fa194))
+
+
+### Documentation
+
+* Correct docstrings for two extensions ([#1378](https://github.com/Quantinuum/tket2/issues/1378)) ([a9c859a](https://github.com/Quantinuum/tket2/commit/a9c859a6b1c3ebd1f867b8da55d82b38f0ff9fee))
+
 ## [0.12.1](https://github.com/Quantinuum/tket2/compare/tket-exts-v0.12.0...tket-exts-v0.12.1) (2026-01-06)
 
 
