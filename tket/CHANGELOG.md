@@ -1,6 +1,38 @@
 # Changelog
 
 
+## [0.17.0](https://github.com/Quantinuum/tket2/compare/tket-v0.16.0...tket-v0.17.0) - 2026-01-28
+
+### Bug Fixes
+
+- *(encoded-circ)* Track unsupported wires between input and output ([#1224](https://github.com/Quantinuum/tket2/pull/1224))
+- Multiple fixes to the pytket encoder ([#1226](https://github.com/Quantinuum/tket2/pull/1226))
+- Don't use opgroup in pytket barrier encoding ([#1251](https://github.com/Quantinuum/tket2/pull/1251))
+- guppy_to_circuit always returns num_operations = 0 ([#1200](https://github.com/Quantinuum/tket2/pull/1200))
+- *(pytket-decoder)* Avoid QAllocating and immediately freeing qubits ([#1256](https://github.com/Quantinuum/tket2/pull/1256))
+- Encoding of opaque subgraphs with no associated qubit/bit ([#1295](https://github.com/Quantinuum/tket2/pull/1295))
+- [**breaking**] Don't rely on command params for pytket barriers ([#1298](https://github.com/Quantinuum/tket2/pull/1298))
+- Track output qubits in CircuitInfo ([#1304](https://github.com/Quantinuum/tket2/pull/1304))
+- Wrongly reused qubit IDs in pytket encoding ([#1358](https://github.com/Quantinuum/tket2/pull/1358))
+
+### New Features
+
+- Deprecate local find_tuple_unpack rewrite ([#1188](https://github.com/Quantinuum/tket2/pull/1188))
+- Add CopyableExpressionAST ([#1209](https://github.com/Quantinuum/tket2/pull/1209))
+- `NormalizeGuppy` pass to simplify generated structure ([#1220](https://github.com/Quantinuum/tket2/pull/1220))
+- [**breaking**] pytket EncodedCircuit struct for in-place pytket optimisation ([#1211](https://github.com/Quantinuum/tket2/pull/1211))
+- [**breaking**] Interval is independent of resource IDs and scope position ([#1205](https://github.com/Quantinuum/tket2/pull/1205))
+- Don't translate usizes to pytket ([#1241](https://github.com/Quantinuum/tket2/pull/1241))
+- BorrowSquashPass to elide redundant borrow/return ops ([#1159](https://github.com/Quantinuum/tket2/pull/1159))
+- [**breaking**] Bump hugr to 0.25.0 ([#1325](https://github.com/Quantinuum/tket2/pull/1325))
+- Remove order edges in NormalizeGuppy pass ([#1326](https://github.com/Quantinuum/tket2/pull/1326))
+
+### Refactor
+
+- Remove contain_qubits, use TypeUnpacker ([#1283](https://github.com/Quantinuum/tket2/pull/1283))
+- [**breaking**] Replace Subcircuit with SiblingSubgraph ([#1288](https://github.com/Quantinuum/tket2/pull/1288))
+- *(metadata)* [**breaking**] Migrate all metadata keys onto the new metadata traits ([#1328](https://github.com/Quantinuum/tket2/pull/1328))
+
 ## [0.16.0](https://github.com/quantinuum/tket2/compare/tket-v0.15.0...tket-v0.16.0) - 2025-10-20
 
 ### Bug Fixes
