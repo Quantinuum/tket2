@@ -382,15 +382,10 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
                 let pi = pi_mul_f64(self, 1.0);
                 let pi_2 = pi_mul_f64(self, 0.5);
                 let pi_minus_2 = pi_mul_f64(self, -0.5);
-                let zero = pi_mul_f64(self, 0.0);
 
-                let qb1 = self.add_rz(platform, qb1, pi)?;
-                let qb2 = self.add_rz(platform, qb2, pi)?;
-                let [qb1, qb2] = self.add_twin_phased_x(platform, qb1, qb2, pi_2, pi_2)?;
-                let [qb1, qb2] = self.add_phased_xx(platform, qb1, qb2, pi_2, zero)?;
-                let [qb1, qb2] = self.add_twin_phased_x(platform, qb1, qb2, pi_2, pi_minus_2)?;
-                let qb1 = self.add_rz(platform, qb1, pi)?;
-                let qb2 = self.add_rz(platform, qb2, pi)?;
+                let [qb1, qb2] = self.add_twin_phased_x(platform, a, b, pi_2, pi_minus_2)?;
+                let [qb1, qb2] = self.add_phased_xx(platform, a, b, pi_2, pi)?;
+                let [qb1, qb2] = self.add_twin_phased_x(platform, a, b, pi_2, pi_2)?;
                 Ok([qb1, qb2])
             }
         }
@@ -412,15 +407,10 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
                 let pi = pi_mul_f64(self, 1.0);
                 let pi_2 = pi_mul_f64(self, 0.5);
                 let pi_minus_2 = pi_mul_f64(self, -0.5);
-                let zero = pi_mul_f64(self, 0.0);
 
-                let qb1 = self.add_rz(platform, qb1, pi)?;
-                let qb2 = self.add_rz(platform, qb2, pi)?;
-                let [qb1, qb2] = self.add_twin_phased_x(platform, qb1, qb2, pi_2, pi_2)?;
-                let [qb1, qb2] = self.add_phased_xx(platform, qb1, qb2, angle, zero)?;
-                let [qb1, qb2] = self.add_twin_phased_x(platform, qb1, qb2, pi_2, pi_minus_2)?;
-                let qb1 = self.add_rz(platform, qb1, pi)?;
-                let qb2 = self.add_rz(platform, qb2, pi)?;
+                let [qb1, qb2] = self.add_twin_phased_x(platform, a, b, pi_2, pi_minus_2)?;
+                let [qb1, qb2] = self.add_phased_xx(platform, a, b, angle, pi)?;
+                let [qb1, qb2] = self.add_twin_phased_x(platform, a, b, pi_2, pi_2)?;
 
                 [qb1, qb2]
                 // unimplemented!("ZZPhase lowering for Sol is not yet implemented")
