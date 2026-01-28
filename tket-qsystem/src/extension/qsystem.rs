@@ -558,7 +558,7 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
                 let c = self.add_phased_x(platform, c, pi_minus_2, pi_2)?;
                 let c = self.add_rz(platform, c, pi_minus_2)?;
                 let t = self.add_phased_x(platform, c, pi_minus_2, zero)?;
-
+                
                 [c, t]
                 // unimplemented!("CX lowering for Sol is not yet implemented")
             }
@@ -627,14 +627,11 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
                 let pi_minus_2 = pi_mul_f64(self, -0.5);
                 let zero = pi_mul_f64(self, 0.0);
                 
-                let a = self.add_phased_x(platform, a, pi_2, pi_2)?;
-                let b = self.add_phased_x(platform, a, pi_2, pi_minus_2)?;
-                let b = self.add_rz(platform, b, pi)?;
-                let [a, b] = self.add_phased_xx(platform, a, b, pi_2, zero)?;
-                let a = self.add_phased_x(platform, a, pi_minus_2, pi_2)?;
+                let [a, b] = self.add_twin_phased_x(platform, a, b, pi_2, pi_minus_2)?
+                let [a, b] = self.add_phased_xx(platform, a, b, pi_2, pi)?;
+                let [a, b] = self.add_twin_phased_x(platform, a, b, pi_2, pi_2)?;
                 let a = self.add_rz(platform, a, pi_minus_2)?;
-                let b = self.add_phased_x(platform, a, pi_2, pi_minus_2)?;
-                let b = self.add_rz(platform, b, pi_2)?;
+                let b = self.add_rz(platform, b, pi_minus_2)?;
                 [a, b]
                 // unimplemented!("CZ lowering for Sol is not yet implemented")
             }
@@ -694,25 +691,15 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
                     .add_dataflow_op(FloatOps::fneg, [lambda_2])?
                     .out_wire(0);
 
+                let pi = pi_mul_f64(self, 1.0);
                 let pi_2 = pi_mul_f64(self, 0.5);
                 let pi_minus_2 = pi_mul_f64(self, -0.5);
-                let zero = pi_mul_f64(self, 0.0);
 
-                let a = self.add_phased_x(platform, a, pi_minus_2, zero)?;
-                let b = self.add_phased_x(platform, b, pi_2, zero)?;
+                let [a, b] = self.add_twin_phased_x(platform, a, b, pi_2, pi_minus_2)?;
+                let [a, b] = self.add_phased_xx(platform, a, b, lambda_minus_2, pi)?;
+                let [a, b] = self.add_twin_phased_x(platform, a, b, pi_2, pi_2)?;
 
-                let a = self.add_rz(platform, a, pi_minus_2)?;
-                let b = self.add_rz(platform, b, pi_2)?;
-
-                let [a, b] = self.add_phased_xx(platform, a, b, lambda_minus_2)?;
-
-                let a = self.add_phased_x(platform, a, pi_2, pi_minus_2)?;
-                let b = self.add_phased_x(platform, b, pi_minus_2, pi_2)?;
-
-                let a = self.add_rz(platform, a, pi_2)?;
-                // TODO: ... please combine the last two, I didn't know how to add a constant two "lambda_2" appropriately
-                let b = self.add_rz(platform, a, pi_minus_2)?;
-                let b = self.add_rz(platform, a, lambda_2)?;
+                let b = self.add_rz(platform, b, lambda_2)?;
                 [a, b]
                 
                 // unimplemented!("CRZ lowering for Sol is not yet implemented")
