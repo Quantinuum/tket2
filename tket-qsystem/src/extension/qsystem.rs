@@ -361,7 +361,18 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
                 self.add_zz_phase(platform, qb1, qb2, pi_2)
             }
             QSystemPlatform::Sol => {
-                unimplemented!("ZZMax lowering for Sol is not yet implemented")
+                let pi = pi_mul_f64(self, 1.0);
+                let pi_2 = pi_mul_f64(self, 0.5);
+                let pi_minus_2 = pi_mul_f64(self, -0.5);
+
+                let qb1 = self.add_rz(platform, qb1, pi)?;
+                let qb2 = self.add_rz(platform, qb2, pi)?;
+                let [qb1, qb2] = self.add_twin_phased_x(platform, qb1, qb2, pi_2, pi_2)?;
+                let [qb1, qb2] = self.add_phased_xx(platform, qb1, qb2, pi_2, 0)?;
+                let [qb1, qb2] = self.add_twin_phased_x(platform, qb1, qb2, pi_2, pi_minus_2)?;
+                let qb1 = self.add_rz(platform, qb1, pi)?;
+                let qb2 = self.add_rz(platform, qb2, pi)?;
+                [qb1, qb2]
             }
         }
     }
@@ -379,7 +390,21 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
                 .add_dataflow_op(QSystemOp::ZZPhase, [qb1, qb2, angle])?
                 .outputs_arr(),
             QSystemPlatform::Sol => {
-                unimplemented!("ZZPhase lowering for Sol is not yet implemented")
+                let pi = pi_mul_f64(self, 1.0);
+                let pi_2 = pi_mul_f64(self, 0.5);
+                let pi_minus_2 = pi_mul_f64(self, -0.5);
+                let zero = pi_mul_f64(self, 0.0);
+
+                let qb1 = self.add_rz(platform, qb1, pi)?;
+                let qb2 = self.add_rz(platform, qb2, pi)?;
+                let [qb1, qb2] = self.add_twin_phased_x(platform, qb1, qb2, pi_2, pi_2)?;
+                let [qb1, qb2] = self.add_phased_xx(platform, qb1, qb2, angle, zero)?;
+                let [qb1, qb2] = self.add_twin_phased_x(platform, qb1, qb2, pi_2, pi_minus_2)?;
+                let qb1 = self.add_rz(platform, qb1, pi)?;
+                let qb2 = self.add_rz(platform, qb2, pi)?;
+
+                [qb1, qb2]
+                // unimplemented!("ZZPhase lowering for Sol is not yet implemented")
             }
         })
     }
@@ -523,7 +548,19 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
                 [c, t]
             }
             QSystemPlatform::Sol => {
-                unimplemented!("CX lowering for Sol is not yet implemented")
+                let pi = pi_mul_f64(self, 1.0);
+                let pi_2 = pi_mul_f64(self, 0.5);
+                let pi_minus_2 = pi_mul_f64(self, -0.5);
+                let zero = pi_mul_f64(self, 0.0);
+                
+                let c = self.add_phased_x(platform, c, pi_2, pi_2)?;
+                let [c, t] = self.add_phased_xx(platform, c, t, pi_2, zero)?;
+                let c = self.add_phased_x(platform, c, pi_minus_2, pi_2)?;
+                let c = self.add_rz(platform, c, pi_minus_2)?;
+                let t = self.add_phased_x(platform, c, pi_minus_2, zero)?;
+
+                [c, t]
+                // unimplemented!("CX lowering for Sol is not yet implemented")
             }
         })
     }
@@ -551,7 +588,20 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
                 [a, b]
             }
             QSystemPlatform::Sol => {
-                unimplemented!("CY lowering for Sol is not yet implemented")
+                let pi = pi_mul_f64(self, 1.0);
+                let pi_2 = pi_mul_f64(self, 0.5);
+                let pi_minus_2 = pi_mul_f64(self, -0.5);
+                let zero = pi_mul_f64(self, 0.0);
+                
+                let a = self.add_phased_x(platform, a, pi_2, pi_2)?;
+                let b = self.add_rz(platform, b, pi_minus_2)?;
+                let [a, b] = self.add_phased_xx(platform, a, b, pi_2, zero)?;
+                let a = self.add_phased_x(platform, a, pi_minus_2, pi_2)?;
+                let a = self.add_rz(platform, a, pi_minus_2)?;
+                let b = self.add_phased_x(platform, a, pi_minus_2, zero)?;
+                let b = self.add_rz(platform, b, pi_2)?;
+                [a, b]
+                // unimplemented!("CY lowering for Sol is not yet implemented")
             }
         })
     }
@@ -572,7 +622,21 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
                 [a, b]
             }
             QSystemPlatform::Sol => {
-                unimplemented!("CZ lowering for Sol is not yet implemented")
+                let pi = pi_mul_f64(self, 1.0);
+                let pi_2 = pi_mul_f64(self, 0.5);
+                let pi_minus_2 = pi_mul_f64(self, -0.5);
+                let zero = pi_mul_f64(self, 0.0);
+                
+                let a = self.add_phased_x(platform, a, pi_2, pi_2)?;
+                let b = self.add_phased_x(platform, a, pi_2, pi_minus_2)?;
+                let b = self.add_rz(platform, b, pi)?;
+                let [a, b] = self.add_phased_xx(platform, a, b, pi_2, zero)?;
+                let a = self.add_phased_x(platform, a, pi_minus_2, pi_2)?;
+                let a = self.add_rz(platform, a, pi_minus_2)?;
+                let b = self.add_phased_x(platform, a, pi_2, pi_minus_2)?;
+                let b = self.add_rz(platform, b, pi_2)?;
+                [a, b]
+                // unimplemented!("CZ lowering for Sol is not yet implemented")
             }
         })
     }
@@ -622,7 +686,36 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
                 [a, b]
             }
             QSystemPlatform::Sol => {
-                unimplemented!("CRZ lowering for Sol is not yet implemented")
+                let two = self.add_load_const(Value::from(ConstF64::new(2.0)));
+                let lambda_2 = self
+                    .add_dataflow_op(FloatOps::fdiv, [lambda, two])?
+                    .out_wire(0);
+                let lambda_minus_2 = self
+                    .add_dataflow_op(FloatOps::fneg, [lambda_2])?
+                    .out_wire(0);
+
+                let pi_2 = pi_mul_f64(self, 0.5);
+                let pi_minus_2 = pi_mul_f64(self, -0.5);
+                let zero = pi_mul_f64(self, 0.0);
+
+                let a = self.add_phased_x(platform, a, pi_minus_2, zero)?;
+                let b = self.add_phased_x(platform, b, pi_2, zero)?;
+
+                let a = self.add_rz(platform, a, pi_minus_2)?;
+                let b = self.add_rz(platform, b, pi_2)?;
+
+                let [a, b] = self.add_phased_xx(platform, a, b, lambda_minus_2)?;
+
+                let a = self.add_phased_x(platform, a, pi_2, pi_minus_2)?;
+                let b = self.add_phased_x(platform, b, pi_minus_2, pi_2)?;
+
+                let a = self.add_rz(platform, a, pi_2)?;
+                // TODO: ... please combine the last two, I didn't know how to add a constant two "lambda_2" appropriately
+                let b = self.add_rz(platform, a, pi_minus_2)?;
+                let b = self.add_rz(platform, a, lambda_2)?;
+                [a, b]
+                
+                // unimplemented!("CRZ lowering for Sol is not yet implemented")
             }
         })
     }
@@ -664,7 +757,42 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
                 [a, b, c]
             }
             QSystemPlatform::Sol => {
-                unimplemented!("Toffoli lowering for Sol is not yet implemented")
+                let pi = pi_mul_f64(self, 1.0);
+                let pi_2 = pi_mul_f64(self, 0.5);
+                let pi_minus_2 = pi_mul_f64(self, -0.5);
+                let pi_4 = pi_mul_f64(self, 0.25);
+                let pi_minus_4 = pi_mul_f64(self, -0.25);
+                let pi_minus_3_4 = pi_mul_f64(self, -0.75);
+                let zero = pi_mul_f64(self, 0.0);
+
+                let [a, b] = self.add_twin_phased_x(platform, a, b, pi_2, pi_minus_3_4)?;
+                let a = self.add_rz(platform, a, pi_minus_3_4)?;
+                let b = self.add_rz(platform, b, pi_minus_3_4)?;
+                let c = self.add_phased_x(platform, c, pi_2, pi_minus_2)?;
+                let c = self.add_rz(platform, c, pi_minus_3_4)?;
+
+                let [a, c] = self.add_phased_xx(platform, a, c, pi_2, zero)?;
+
+                let a = self.add_phased_x(platform, a, pi_minus_2, zero)?;
+                let c = self.add_phased_x(platform, c, pi_4, pi_minus_2)?;
+
+                let [a, b] = self.add_phased_xx(platform, a, b pi_minus_4, zero)?;
+                let c = self.add_rz(platform, c, pi_2)?;
+
+                let [b, c] = self.add_phased_xx(platform, b, c, pi_4, zero)?;
+                let c = self.add_phased_x(platform, c, pi_2, pi_minus_2)?;
+                let c = self.add_rz(platform, c, pi)?;
+
+                let [a, c] = self.add_twin_phased_x(platform, a, c, pi_2, pi_minus_2)?;
+                let a = self.add_rz(platform, a, pi_2)?;
+                let c = self.add_rz(platform, c, pi_2)?;
+
+                let [b, c] = self.add_phased_xx(platform, b, c, pi_minus_4, zero)?;
+                let b = self.add_phased_x(platform, b, pi_2, pi_minus_2)?;
+                let b = self.add_rz(platform, b, pi)?;
+
+                [a, b, c]
+                // unimplemented!("Toffoli lowering for Sol is not yet implemented")
             }
         })
     }
