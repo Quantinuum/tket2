@@ -34,6 +34,8 @@ def load(name: str) -> bytes:
         "postselect_panic",
         "print_current_shot",
         "rng",
+        "rus",
+        "qft_32",
     ],
 )
 @pytest.mark.parametrize("target_triple", triples)
@@ -54,7 +56,7 @@ def test_llvm_multiplatform(
 @pytest.mark.parametrize(
     "hugr_file",
     [
-        "rus",
+        # Look ma, no unimplemented gates!
     ],
 )
 @pytest.mark.parametrize("target_triple", triples)

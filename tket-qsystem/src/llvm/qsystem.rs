@@ -330,21 +330,21 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                 args,
                 RuntimeFunction::SolGate(SolGateFunction::Rpp),
                 &[0, 1, 2, 3],
-                &[0],
+                &[0, 1],
             ),
             (QSystemPlatform::Sol, QSystemOp::TwinPhasedX) => self.emit_impl(
                 context,
                 args,
                 RuntimeFunction::SolGate(SolGateFunction::Rpg),
                 &[0, 1, 2, 3],
-                &[0],
+                &[0, 1],
             ),
             (QSystemPlatform::Sol, QSystemOp::Tk2) => self.emit_impl(
                 context,
                 args,
                 RuntimeFunction::SolGate(SolGateFunction::Rxxyyzz),
                 &[0, 1, 2, 3, 4],
-                &[0],
+                &[0, 1],
             ),
 
             // Measure qubit in Z basis
