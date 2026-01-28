@@ -10,6 +10,7 @@ from tket.passes import (
     normalize_guppy,
 )
 from tket.circuit import Tk2Circuit
+from tket_exts import tket_registry
 
 from tket.pattern import Rule, RuleMatcher
 import hypothesis.strategies as st
@@ -154,7 +155,7 @@ def test_multiple_rules():
 
 def test_clifford_simp_no_swaps():
     c = Tk2Circuit(Circuit(4).CX(0, 2).CX(1, 2).CX(1, 2))
-    hugr = Hugr.from_str(c.to_str())
+    hugr = Hugr.from_str(c.to_str(), tket_registry())
     cliff_pass = PytketHugrPass(CliffordSimp(allow_swaps=False))
     res = cliff_pass.run(hugr)
     opt_circ = Tk2Circuit.from_bytes(res.hugr.to_bytes())
@@ -163,7 +164,7 @@ def test_clifford_simp_no_swaps():
 
 def test_clifford_simp_with_swaps() -> None:
     cx_circ = Tk2Circuit(Circuit(2).CX(0, 1).CX(1, 0))
-    hugr = Hugr.from_str(cx_circ.to_str())
+    hugr = Hugr.from_str(cx_circ.to_str(), tket_registry())
     cliff_pass_perm = PytketHugrPass(CliffordSimp(allow_swaps=True))
     # Simplify 2 CX circuit to a single CX with an implicit swap.
     res = cliff_pass_perm.run(hugr)
@@ -173,7 +174,7 @@ def test_clifford_simp_with_swaps() -> None:
 
 def test_squash_phasedx_rz():
     c = Tk2Circuit(Circuit(1).Rz(0.25, 0).Rz(0.75, 0).Rz(0.25, 0).Rz(-1.25, 0))
-    hugr = Hugr.from_str(c.to_str())
+    hugr = Hugr.from_str(c.to_str(), tket_registry())
     squash_pass = PytketHugrPass(SquashRzPhasedX())
     opt_hugr = squash_pass(hugr)
     opt_circ = Tk2Circuit.from_bytes(opt_hugr.to_bytes())
@@ -186,7 +187,7 @@ def test_sequence_pass():
     c = Tk2Circuit(
         Circuit(2).CX(0, 1).CX(1, 0).Rz(0.25, 0).Rz(0.75, 0).Rz(0.25, 0).Rz(-1.25, 0)
     )
-    hugr = Hugr.from_str(c.to_str())
+    hugr = Hugr.from_str(c.to_str(), tket_registry())
     seq_pass = SequencePass([SquashRzPhasedX(), CliffordSimp(allow_swaps=True)])
     clifford_and_squash_pass = PytketHugrPass(seq_pass)
     res_hugr = clifford_and_squash_pass(hugr)
@@ -206,7 +207,8 @@ def test_normalize_guppy():
     # TODO: add a more thorough test which checks that the hugr is normalized as expected.
     # test NormalizeGuppy as a ComposablePass
     c1 = Tk2Circuit(pytket_circ)
-    hugr = Hugr.from_str(c1.to_str())
+    hugr = Hugr.from_str(c1.to_str(), tket_registry())
+
     normalize = NormalizeGuppy()
     clean_hugr = normalize(hugr)
     normal_circ1 = Tk2Circuit.from_bytes(clean_hugr.to_bytes())

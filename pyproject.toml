@@ -22,7 +22,7 @@ dev = [
 prerelease = "explicit"
 
 [tool.uv.sources]
-# hugr = { git = "https://github.com/quantinuum/hugr", subdirectory = "hugr-py", rev = "191c473" }
+#hugr = { git = "https://github.com/quantinuum/hugr", subdirectory = "hugr-py", rev = "6d7e2023" }
 
 
 [build-system]

@@ -2711,7 +2711,7 @@ dev = [
 [package.metadata.requires-dev]
 dev = [
     { name = "cibuildwheel", specifier = ">=2.23.2" },
-    { name = "hugr", specifier = ">=0.14.4" },
+    { name = "hugr", specifier = "~=0.15.1" },
     { name = "pytest", specifier = ">=8.4.2" },
     { name = "pytest-snapshot", specifier = "~=0.9.0" },
 ]
@@ -3105,7 +3105,7 @@ docs = [
 
 [package.metadata]
 requires-dist = [
-    { name = "hugr", specifier = "~=0.15.0" },
+    { name = "hugr", specifier = "~=0.15.1" },
     { name = "pytket", specifier = ">=2.1.0,<3" },
     { name = "tket-eccs", editable = "tket-eccs" },
     { name = "tket-exts", editable = "tket-exts" },
