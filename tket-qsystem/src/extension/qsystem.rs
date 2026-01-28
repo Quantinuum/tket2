@@ -379,12 +379,12 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
                 self.add_zz_phase(platform, qb1, qb2, pi_2)
             }
             QSystemPlatform::Sol => {
-                let pi = pi_mul_f64(self, 1.0);
+                let pi_minus = pi_mul_f64(self, -1.0);
                 let pi_2 = pi_mul_f64(self, 0.5);
                 let pi_minus_2 = pi_mul_f64(self, -0.5);
 
                 let [qb1, qb2] = self.add_twin_phased_x(platform, qb1, qb2, pi_2, pi_minus_2)?;
-                let [qb1, qb2] = self.add_phased_xx(platform, qb1, qb2, pi_2, pi)?;
+                let [qb1, qb2] = self.add_phased_xx(platform, qb1, qb2, pi_2, pi_minus)?;
                 let [qb1, qb2] = self.add_twin_phased_x(platform, qb1, qb2, pi_2, pi_2)?;
                 Ok([qb1, qb2])
             }
@@ -404,12 +404,12 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
                 .add_dataflow_op(QSystemOp::ZZPhase, [qb1, qb2, angle])?
                 .outputs_arr(),
             QSystemPlatform::Sol => {
-                let pi = pi_mul_f64(self, 1.0);
+                let pi_minus = pi_mul_f64(self, -1.0);
                 let pi_2 = pi_mul_f64(self, 0.5);
                 let pi_minus_2 = pi_mul_f64(self, -0.5);
 
                 let [qb1, qb2] = self.add_twin_phased_x(platform, qb1, qb2, pi_2, pi_minus_2)?;
-                let [qb1, qb2] = self.add_phased_xx(platform, qb1, qb2, angle, pi)?;
+                let [qb1, qb2] = self.add_phased_xx(platform, qb1, qb2, angle, pi_minus)?;
                 let [qb1, qb2] = self.add_twin_phased_x(platform, qb1, qb2, pi_2, pi_2)?;
                 [qb1, qb2]
                 // unimplemented!("ZZPhase lowering for Sol is not yet implemented")
@@ -627,12 +627,12 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
                 [a, b]
             }
             QSystemPlatform::Sol => {
-                let pi = pi_mul_f64(self, 1.0);
+                let pi_minus = pi_mul_f64(self, -1.0);
                 let pi_2 = pi_mul_f64(self, 0.5);
                 let pi_minus_2 = pi_mul_f64(self, -0.5);
 
                 let [a, b] = self.add_twin_phased_x(platform, a, b, pi_2, pi_minus_2)?;
-                let [a, b] = self.add_phased_xx(platform, a, b, pi_2, pi)?;
+                let [a, b] = self.add_phased_xx(platform, a, b, pi_2, pi_minus)?;
                 let [a, b] = self.add_twin_phased_x(platform, a, b, pi_2, pi_2)?;
                 let a = self.add_rz(platform, a, pi_minus_2)?;
                 let b = self.add_rz(platform, b, pi_minus_2)?;
@@ -695,12 +695,12 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
                     .add_dataflow_op(FloatOps::fneg, [lambda_2])?
                     .out_wire(0);
 
-                let pi = pi_mul_f64(self, 1.0);
+                let pi_minus = pi_mul_f64(self, -1.0);
                 let pi_2 = pi_mul_f64(self, 0.5);
                 let pi_minus_2 = pi_mul_f64(self, -0.5);
 
                 let [a, b] = self.add_twin_phased_x(platform, a, b, pi_2, pi_minus_2)?;
-                let [a, b] = self.add_phased_xx(platform, a, b, lambda_minus_2, pi)?;
+                let [a, b] = self.add_phased_xx(platform, a, b, lambda_minus_2, pi_minus)?;
                 let [a, b] = self.add_twin_phased_x(platform, a, b, pi_2, pi_2)?;
 
                 let b = self.add_rz(platform, b, lambda_2)?;
