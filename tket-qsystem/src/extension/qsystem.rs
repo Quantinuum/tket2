@@ -763,7 +763,7 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
                 let a = self.add_phased_x(platform, a, pi_minus_2, zero)?;
                 let c = self.add_phased_x(platform, c, pi_4, pi_minus_2)?;
 
-                let [a, b] = self.add_phased_xx(platform, a, b pi_minus_4, zero)?;
+                let [a, b] = self.add_phased_xx(platform, a, b, pi_minus_4, zero)?;
                 let c = self.add_rz(platform, c, pi_2)?;
 
                 let [b, c] = self.add_phased_xx(platform, b, c, pi_4, zero)?;
