@@ -1,0 +1,18 @@
+---
+source: tket-qsystem/src/llvm/globals.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+@__globals__.my_global = thread_local global { i1, i64 } { i1 false, i64 poison }
+
+define private { i1, i64 } @_hl.main.1({ i1, i64 } %0) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %current_value = load { i1, i64 }, { i1, i64 }* @__globals__.my_global, align 4
+  store { i1, i64 } %0, { i1, i64 }* @__globals__.my_global, align 4
+  ret { i1, i64 } %current_value
+}

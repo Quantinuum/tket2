@@ -29,6 +29,7 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     m.add_function(wrap_pyfunction!(normalize_guppy, &m)?)?;
     m.add_class::<self::chunks::PyCircuitChunks>()?;
     m.add_function(wrap_pyfunction!(self::chunks::chunks, &m)?)?;
+    m.add_function(wrap_pyfunction!(replace_qubits, &m)?)?;
     m.add_function(wrap_pyfunction!(self::tket1::tket1_pass, &m)?)?;
     m.add("PullForwardError", py.get_type::<PyPullForwardError>())?;
     m.add("TK1PassError", py.get_type::<tket1::PytketPassError>())?;
@@ -103,6 +104,29 @@ fn greedy_depth_reduce<'py>(circ: &Bound<'py, PyAny>) -> PyResult<(Bound<'py, Py
         PyResult::Ok((circ, n_moves))
     })
 }
+
+/// TODO
+#[pyfunction]
+#[pyo3(signature = (circ, entrypoint = None))]
+fn replace_qubits<'py>(circ: &Bound<'py, PyAny>, entrypoint: Option<&str>) -> PyResult<Bound<'py, PyAny>> {
+    let py = circ.py();
+    let pass = {
+        let mut p = passes::rewrite_quantum::RewriteQuantumPass::default();
+        p.entrypoint = entrypoint.map(|s| s.to_owned());
+        p
+    };
+    try_with_circ(circ, move |mut circ, _| {
+        pass.run(&mut circ.hugr_mut()).convert_pyerrs()?;
+        let circ = CircuitType::Tket.convert(py, circ)?;
+        PyResult::Ok(circ)
+    })
+}
+
+create_py_exception!(
+    tket::passes::rewrite_quantum::RewriteQuantumPassError,
+    PyRewriteQuantumPassError,
+    "Errors that can occur while rewriting qubits."
+);
 
 /// Rebase a circuit to the Nam gate set (CX, Rz, H) using TKET1.
 ///
