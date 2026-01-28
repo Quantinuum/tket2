@@ -287,41 +287,59 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
     /// Add a "tket.qsystem.PhasedXX" op.
     fn add_phased_xx(
         &mut self,
+        platform: QSystemPlatform,
         qb1: Wire,
         qb2: Wire,
         angle1: Wire,
         angle2: Wire,
     ) -> Result<[Wire; 2], BuildError> {
-        Ok(self
-            .add_dataflow_op(QSystemOp::PhasedXX, [qb1, qb2, angle1, angle2])?
-            .outputs_arr())
+        match platform {
+            QSystemPlatform::Helios => {
+                unimplemented!("PhasedXX lowering for Helios is not yet implemented")
+            }
+            QSystemPlatform::Sol => Ok(self
+                .add_dataflow_op(QSystemOp::PhasedXX, [qb1, qb2, angle1, angle2])?
+                .outputs_arr()),
+        }
     }
 
     /// Add a "tket.qsystem.TwinPhasedX" op.
     fn add_twin_phased_x(
         &mut self,
+        platform: QSystemPlatform,
         qb1: Wire,
         qb2: Wire,
         angle1: Wire,
         angle2: Wire,
     ) -> Result<[Wire; 2], BuildError> {
-        Ok(self
-            .add_dataflow_op(QSystemOp::TwinPhasedX, [qb1, qb2, angle1, angle2])?
-            .outputs_arr())
+        match platform {
+            QSystemPlatform::Helios => {
+                unimplemented!("TwinPhasedX lowering for Helios is not yet implemented")
+            }
+            QSystemPlatform::Sol => Ok(self
+                .add_dataflow_op(QSystemOp::TwinPhasedX, [qb1, qb2, angle1, angle2])?
+                .outputs_arr()),
+        }
     }
 
     /// Add a "tket.qsystem.Tk2" op.
     fn add_tk2(
         &mut self,
+        platform: QSystemPlatform,
         qb1: Wire,
         qb2: Wire,
         angle1: Wire,
         angle2: Wire,
         angle3: Wire,
     ) -> Result<[Wire; 2], BuildError> {
-        Ok(self
-            .add_dataflow_op(QSystemOp::Tk2, [qb1, qb2, angle1, angle2, angle3])?
-            .outputs_arr())
+        match platform {
+            QSystemPlatform::Helios => {
+                unimplemented!("Tk2 lowering for Helios is not yet implemented")
+            }
+            QSystemPlatform::Sol => Ok(self
+                .add_dataflow_op(QSystemOp::Tk2, [qb1, qb2, angle1, angle2, angle3])?
+                .outputs_arr()),
+        }
     }
 
     /// Add a "tket.qsystem.LazyMeasureLeaked" op.
@@ -364,15 +382,16 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
                 let pi = pi_mul_f64(self, 1.0);
                 let pi_2 = pi_mul_f64(self, 0.5);
                 let pi_minus_2 = pi_mul_f64(self, -0.5);
+                let zero = pi_mul_f64(self, 0.0);
 
                 let qb1 = self.add_rz(platform, qb1, pi)?;
                 let qb2 = self.add_rz(platform, qb2, pi)?;
                 let [qb1, qb2] = self.add_twin_phased_x(platform, qb1, qb2, pi_2, pi_2)?;
-                let [qb1, qb2] = self.add_phased_xx(platform, qb1, qb2, pi_2, 0)?;
+                let [qb1, qb2] = self.add_phased_xx(platform, qb1, qb2, pi_2, zero)?;
                 let [qb1, qb2] = self.add_twin_phased_x(platform, qb1, qb2, pi_2, pi_minus_2)?;
                 let qb1 = self.add_rz(platform, qb1, pi)?;
                 let qb2 = self.add_rz(platform, qb2, pi)?;
-                [qb1, qb2]
+                Ok([qb1, qb2])
             }
         }
     }
@@ -548,17 +567,15 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
                 [c, t]
             }
             QSystemPlatform::Sol => {
-                let pi = pi_mul_f64(self, 1.0);
                 let pi_2 = pi_mul_f64(self, 0.5);
                 let pi_minus_2 = pi_mul_f64(self, -0.5);
                 let zero = pi_mul_f64(self, 0.0);
-                
+
                 let c = self.add_phased_x(platform, c, pi_2, pi_2)?;
                 let [c, t] = self.add_phased_xx(platform, c, t, pi_2, zero)?;
                 let c = self.add_phased_x(platform, c, pi_minus_2, pi_2)?;
                 let c = self.add_rz(platform, c, pi_minus_2)?;
-                let t = self.add_phased_x(platform, c, pi_minus_2, zero)?;
-                
+                let t = self.add_phased_x(platform, t, pi_minus_2, zero)?;
                 [c, t]
                 // unimplemented!("CX lowering for Sol is not yet implemented")
             }
@@ -588,17 +605,16 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
                 [a, b]
             }
             QSystemPlatform::Sol => {
-                let pi = pi_mul_f64(self, 1.0);
                 let pi_2 = pi_mul_f64(self, 0.5);
                 let pi_minus_2 = pi_mul_f64(self, -0.5);
                 let zero = pi_mul_f64(self, 0.0);
-                
+
                 let a = self.add_phased_x(platform, a, pi_2, pi_2)?;
                 let b = self.add_rz(platform, b, pi_minus_2)?;
                 let [a, b] = self.add_phased_xx(platform, a, b, pi_2, zero)?;
                 let a = self.add_phased_x(platform, a, pi_minus_2, pi_2)?;
                 let a = self.add_rz(platform, a, pi_minus_2)?;
-                let b = self.add_phased_x(platform, a, pi_minus_2, zero)?;
+                let b = self.add_phased_x(platform, b, pi_minus_2, zero)?;
                 let b = self.add_rz(platform, b, pi_2)?;
                 [a, b]
                 // unimplemented!("CY lowering for Sol is not yet implemented")
@@ -625,8 +641,7 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
                 let pi = pi_mul_f64(self, 1.0);
                 let pi_2 = pi_mul_f64(self, 0.5);
                 let pi_minus_2 = pi_mul_f64(self, -0.5);
-                let zero = pi_mul_f64(self, 0.0);
-                
+
                 let [a, b] = self.add_twin_phased_x(platform, a, b, pi_2, pi_minus_2)?;
                 let [a, b] = self.add_phased_xx(platform, a, b, pi_2, pi)?;
                 let [a, b] = self.add_twin_phased_x(platform, a, b, pi_2, pi_2)?;
@@ -701,7 +716,7 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
 
                 let b = self.add_rz(platform, b, lambda_2)?;
                 [a, b]
-                
+
                 // unimplemented!("CRZ lowering for Sol is not yet implemented")
             }
         })
