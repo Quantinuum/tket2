@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.16](https://github.com/Quantinuum/tket2/compare/tket-py-v0.12.15...tket-py-v0.12.16) (2026-01-29)
+
+
+### Bug Fixes
+
+* Bundle additional extensions while roundtripping to rust in tket passes ([#1372](https://github.com/Quantinuum/tket2/issues/1372)) ([225a7fc](https://github.com/Quantinuum/tket2/commit/225a7fc3fc940cd4b320b15c359680321f854b0b))
+
 ## [0.12.14](https://github.com/Quantinuum/tket2/compare/tket-py-v0.12.13...tket-py-v0.12.14) (2026-01-15)
 
 
