@@ -382,7 +382,7 @@ pub static REGISTRY: LazyLock<ExtensionRegistry> = LazyLock::new(|| {
 
 /// Returns a list of extension ids supported by the Tk2Circuit loader.
 ///
-/// Extensions not in this list must be included in the package when converting
+/// Extensions not in this list must be included in the package when
 /// loading a Tk2Circuit.
 #[pyfunction]
 pub fn embedded_extensions() -> Vec<String> {

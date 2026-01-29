@@ -44,7 +44,7 @@ __all__ = [
 def _hugr_to_tk2circuit(hugr: Hugr) -> tuple[Tk2Circuit, ExtensionRegistry]:
     """Convert a Hugr to a Tk2Circuit, including non-standard extensions.
 
-    This wraps the hugr in a Package with its used extensions (excluding those
+    This wraps the Hugr in a Package with its used extensions (excluding those
     already embedded in the Rust loader) so that non-standard extensions are
     properly encoded and can be decoded by Rust.
 

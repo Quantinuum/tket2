@@ -182,7 +182,7 @@ def validate_circuit(hugr: Tk2Circuit | Tk1Circuit) -> None: ...
 def embedded_extensions() -> list[str]:
     """Returns a list of extension ids supported by the Tk2Circuit loader.
 
-    Extensions not in this list must be included in the package when converting
+    Extensions not in this list must be included in the package when
     loading a Tk2Circuit.
     """
 
