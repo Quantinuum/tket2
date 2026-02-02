@@ -27,8 +27,7 @@ impl PyCircuitCost {
 
 impl Default for PyCircuitCost {
     fn default() -> Self {
-        #[expect(deprecated, reason = "deprecated and renamed in pyo3 0.26")]
-        Python::with_gil(|py| PyCircuitCost { cost: py.None() })
+        Python::attach(|py| PyCircuitCost { cost: py.None() })
     }
 }
 
@@ -36,8 +35,7 @@ impl Add for PyCircuitCost {
     type Output = PyCircuitCost;
 
     fn add(self, rhs: PyCircuitCost) -> Self::Output {
-        #[expect(deprecated, reason = "deprecated and renamed in pyo3 0.26")]
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let cost = self
                 .cost
                 .call_method1(py, "__add__", (rhs.cost,))
@@ -49,8 +47,7 @@ impl Add for PyCircuitCost {
 
 impl AddAssign for PyCircuitCost {
     fn add_assign(&mut self, rhs: Self) {
-        #[expect(deprecated, reason = "deprecated and renamed in pyo3 0.26")]
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let cost = self
                 .cost
                 .call_method1(py, "__add__", (rhs.cost,))
@@ -64,8 +61,7 @@ impl Sub for PyCircuitCost {
     type Output = PyCircuitCost;
 
     fn sub(self, rhs: PyCircuitCost) -> Self::Output {
-        #[expect(deprecated, reason = "deprecated and renamed in pyo3 0.26")]
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let cost = self
                 .cost
                 .call_method1(py, "__sub__", (rhs.cost,))
@@ -77,8 +73,7 @@ impl Sub for PyCircuitCost {
 
 impl Sum for PyCircuitCost {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        #[expect(deprecated, reason = "deprecated and renamed in pyo3 0.26")]
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let cost = iter
                 .fold(None, |acc: Option<Py<PyAny>>, c| {
                     Some(match acc {
@@ -96,8 +91,7 @@ impl Sum for PyCircuitCost {
 
 impl PartialEq for PyCircuitCost {
     fn eq(&self, other: &Self) -> bool {
-        #[expect(deprecated, reason = "deprecated and renamed in pyo3 0.26")]
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let res = self
                 .cost
                 .call_method1(py, "__eq__", (&other.cost,))
@@ -118,8 +112,7 @@ impl PartialOrd for PyCircuitCost {
 
 impl Ord for PyCircuitCost {
     fn cmp(&self, other: &Self) -> Ordering {
-        #[expect(deprecated, reason = "deprecated and renamed in pyo3 0.26")]
-        Python::with_gil(|py| -> PyResult<Ordering> {
+        Python::attach(|py| -> PyResult<Ordering> {
             let res = self.cost.call_method1(py, "__lt__", (&other.cost,))?;
             if res.is_truthy(py)? {
                 return Ok(Ordering::Less);
@@ -136,8 +129,7 @@ impl Ord for PyCircuitCost {
 
 impl CostDelta for PyCircuitCost {
     fn as_isize(&self) -> isize {
-        #[expect(deprecated, reason = "deprecated and renamed in pyo3 0.26")]
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let res = self
                 .cost
                 .call_method0(py, "__int__")
@@ -164,8 +156,7 @@ impl CircuitCost for PyCircuitCost {
     }
 
     fn div_cost(&self, n: std::num::NonZeroUsize) -> Self {
-        #[expect(deprecated, reason = "deprecated and renamed in pyo3 0.26")]
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let res = self
                 .cost
                 .call_method0(py, "__div__")
