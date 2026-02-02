@@ -59,8 +59,8 @@ hugr-cli = "0.25.4"
 portgraph = "0.15.3"
 # There can only be one `pyo3` dependency in the whole workspace, so we use a
 # loose version constraint to prevent breaking changes in dependent crates where possible.
-pyo3 = ">= 0.27.2, < 0.28"
-pyo3-build-config = ">= 0.27.2, < 0.28"
+pyo3 = ">= 0.27.2, < 0.29"
+pyo3-build-config = ">= 0.27.2, < 0.29"
 
 bindgen = "0.72"
 cbindgen = "0.29"
