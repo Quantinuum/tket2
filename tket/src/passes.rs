@@ -16,8 +16,4 @@ pub use guppy::NormalizeGuppy;
 pub mod pytket;
 pub use pytket::lower_to_pytket;
 
-pub mod tuple_unpack;
-#[expect(deprecated)]
-pub use tuple_unpack::find_tuple_unpack_rewrites;
-
 pub mod unpack_container;
