@@ -23,8 +23,27 @@ env:
   UV_VERSION: "0.9.7"
 
 jobs:
+  # Check if the tag matches the package name,
+  # or if the workflow is running on a non-release event.
+  check-tag:
+    name: Check tag
+    runs-on: ubuntu-latest
+    outputs:
+      run_exts: ${{ steps.check-tag.outputs.run_exts }}
+      run_eccs: ${{ steps.check-tag.outputs.run_eccs }}
+    steps:
+      - name: Check tag
+        id: check-tag
+        run: |
+          echo "run_exts=$RUN_EXTS" >> $GITHUB_OUTPUT
+          echo "run_eccs=$RUN_ECCS" >> $GITHUB_OUTPUT
+        env:
+          RUN_EXTS: ${{ github.event_name != 'release' || ( github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/tket-exts-v') ) }}
+          RUN_ECCS: ${{ github.event_name != 'release' || ( github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/tket-eccs-v') ) }}
+
   build-publish:
     name: Package and publish wheels
+    needs: check-tag
     runs-on: ubuntu-latest
     environment: release
     permissions:
@@ -33,43 +52,38 @@ jobs:
     strategy:
       matrix:
         target:
-          - { dir: tket-eccs, name: tket_eccs }
-          - { dir: tket-exts, name: tket_exts }
-    steps:
-      # Check the release tag against the package name
-      #
-      # Skip the workflow when triggered by a release event for any other package.
-      - name: Check tag
-        id: check-tag
-        run: |
-          echo "run=$SHOULD_RUN" >> $GITHUB_OUTPUT
-        env:
-          SHOULD_RUN: ${{ github.event_name != 'release' || ( github.ref_type == 'tag' && startsWith(github.ref, format('refs/tags/{0}-v', matrix.target.dir)) ) }}
+          - dir: tket-eccs
+            name: tket_eccs
+            run: ${{ needs.check-tag.outputs.run_eccs }}
+          - dir: tket-exts
+            name: tket_exts
+            run: ${{ needs.check-tag.outputs.run_exts }}
 
+    steps:
       - uses: actions/checkout@v6
-        if: ${{ steps.check-tag.outputs.run == 'true' }}
+        if: ${{ matrix.target.run == 'true' }}
       - name: Run sccache-cache
-        if: ${{ steps.check-tag.outputs.run == 'true' }}
+        if: ${{ matrix.target.run == 'true' }}
         uses: mozilla-actions/sccache-action@v0.0.9
 
       - name: Set up uv
-        if: ${{ steps.check-tag.outputs.run == 'true' }}
+        if: ${{ matrix.target.run == 'true' }}
         uses: astral-sh/setup-uv@v7
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
       - name: Install Python 3.13
         run: uv python install 3.13
-        if: ${{ steps.check-tag.outputs.run == 'true' }}
+        if: ${{ matrix.target.run == 'true' }}
 
       - name: Build sdist and wheels
-        if: ${{ steps.check-tag.outputs.run == 'true' }}
+        if: ${{ matrix.target.run == 'true' }}
         run: |
           cd ${{ matrix.target.dir }}
           uvx --from build pyproject-build --installer uv --outdir ../dist
 
       - name: Upload the built packages as artifacts
-        if: ${{ steps.check-tag.outputs.run == 'true' }}
+        if: ${{ matrix.target.run == 'true' }}
         uses: actions/upload-artifact@v6
         with:
           name: build-${{ matrix.target.dir }}-sdist
@@ -78,14 +92,14 @@ jobs:
             dist/*.whl
 
       - name: Test installing the built wheels
-        if: ${{ steps.check-tag.outputs.run == 'true' }}
+        if: ${{ matrix.target.run == 'true' }}
         run: |
           echo "Testing the newly built ${{ matrix.target.name }} wheels..."
           uv run -f dist --with ${{ matrix.target.name }} --refresh-package ${{ matrix.target.name }} --no-project -- python -c "import ${{ matrix.target.name }}"
           uvx twine check --strict dist/*
 
       - name: Report
-        if: ${{ (github.event_name == 'release' && github.ref_type == 'tag' && startsWith(github.ref, format('refs/tags/{0}-v', matrix.target.dir)) ) || (github.event_name == 'workflow_dispatch' && github.ref_type == 'tag' && startsWith(github.ref, format('refs/tags/{0}-v', matrix.target.dir)) ) }}
+        if: ${{ (github.event_name == 'release' && matrix.target.run ) || (github.event_name == 'workflow_dispatch' && github.ref_type == 'tag' && startsWith(github.ref, format('refs/tags/{0}-v', matrix.target.dir)) ) }}
         run: |
           echo "Publishing to PyPI..."
           echo "Based on the following workflow variables, this is a new version tag push:"
@@ -94,7 +108,7 @@ jobs:
           echo "  - ref: ${{ github.ref }}"
 
       - name: Publish package distributions to PyPI
-        if: ${{ (github.event_name == 'release' && github.ref_type == 'tag' && startsWith(github.ref, format('refs/tags/{0}-v', matrix.target.dir)) ) || (github.event_name == 'workflow_dispatch' && github.ref_type == 'tag' && startsWith(github.ref, format('refs/tags/{0}-v', matrix.target.dir)) ) }}
+        if: ${{ (github.event_name == 'release' && matrix.target.run ) || (github.event_name == 'workflow_dispatch' && github.ref_type == 'tag' && startsWith(github.ref, format('refs/tags/{0}-v', matrix.target.dir)) ) }}
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           verbose: true
