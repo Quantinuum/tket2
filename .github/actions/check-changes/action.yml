@@ -10,7 +10,7 @@ description: Checks if any relevant files have changed in the current pull reque
 # ```
 
 # Set job outputs to values from filter step
-# These outputs are always true when running after a merge to main, or if the PR has a `run-ci-checks` label.
+# These outputs are always true when running after a merge to main, or if the PR has a `X-run-thorough-ci-tests` label.
 outputs:
   extensions:
     description: "The extension definitions have changed"
@@ -37,16 +37,16 @@ runs:
       shell: bash
       id: override
       run: |
-        echo "Label contains run-ci-checks: $OVERRIDE_LABEL"
+        echo "Label contains X-run-thorough-ci-tests: $OVERRIDE_LABEL"
         if [ "$OVERRIDE_LABEL" == "true" ]; then
-          echo "Overriding due to label 'run-ci-checks'"
+          echo "Overriding due to label 'X-run-thorough-ci-tests'"
           echo "out=true" >> $GITHUB_OUTPUT
         elif [ "$DEFAULT_BRANCH" == "true" ]; then
           echo "Overriding due to running on the default branch"
           echo "out=true" >> $GITHUB_OUTPUT
         fi
       env:
-        OVERRIDE_LABEL: ${{ github.event_name == 'pull_request' && contains( github.event.pull_request.labels.*.name, 'run-ci-checks') }}
+        OVERRIDE_LABEL: ${{ github.event_name == 'pull_request' && contains( github.event.pull_request.labels.*.name, 'X-run-thorough-ci-tests') }}
         DEFAULT_BRANCH: ${{ github.ref_name == github.event.repository.default_branch }}
     - if: steps.override.outputs.out != 'true'
       uses: dorny/paths-filter@v3

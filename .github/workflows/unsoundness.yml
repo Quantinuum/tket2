@@ -68,5 +68,5 @@ jobs:
         The unsoundness check for `quantinuum/tket2` failed.
 
         [Please investigate](https://github.com/quantinuum/tket2/actions/runs/${{ github.run_id }}).
-      unique-label: "unsoundness-checks"
-      other-labels: "bug"
+      unique-label: "X-unsoundness-checks"
+      other-labels: "C-bugfix"
