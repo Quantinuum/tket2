@@ -290,9 +290,9 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
 name = "capnp"
-version = "0.23.2"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa8c2ce958193219f203a6887788231a1aaa0b22ed012d67436ea3b87a9645c4"
+checksum = "fe8af2e2d255489928e31504fa51d86a41d040179098a8ad6828e0d11c54dcd6"
 dependencies = [
  "embedded-io",
 ]
@@ -420,9 +420,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.5.56"
+version = "4.5.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a75ca66430e33a14957acc24c5077b503e7d374151b2b4b3a10c83b4ceb4be0e"
+checksum = "6899ea499e3fb9305a65d5ebf6e3d2248c5fab291f300ad0a704fbe142eae31a"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -440,9 +440,9 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.5.56"
+version = "4.5.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "793207c7fa6300a0608d1080b858e5fdbe713cdc1c8db9fb17777d8a13e63df0"
+checksum = "7b12c8b680195a62a8364d16b8447b01b6c2c8f9aaf68bee653be34d4245e238"
 dependencies = [
  "anstream",
  "anstyle",
@@ -565,9 +565,9 @@ dependencies = [
 
 [[package]]
 name = "criterion"
-version = "0.8.1"
+version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d883447757bb0ee46f233e9dc22eb84d93a9508c9b868687b274fc431d886bf"
+checksum = "950046b2aa2492f9a536f5f4f9a3de7b9e2476e575e05bd6c333371add4d98f3"
 dependencies = [
  "alloca",
  "anes",
@@ -590,9 +590,9 @@ dependencies = [
 
 [[package]]
 name = "criterion-plot"
-version = "0.8.1"
+version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed943f81ea2faa8dcecbbfa50164acf95d555afec96a27871663b300e387b2e4"
+checksum = "d8d80a2f4f5b554395e47b5d8305bc3d27813bacb73493eb1001e8f76dae29ea"
 dependencies = [
  "cast",
  "itertools 0.13.0",
@@ -1087,9 +1087,9 @@ dependencies = [
 
 [[package]]
 name = "hugr"
-version = "0.25.4"
+version = "0.25.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "348dc19b2da683e6d970a831bf963dfb1a0eab139ade635ea96c900c0e3be71a"
+checksum = "fd00dba7a62eb9bd1f6d5de3228c6ce8ffe66de6b1f0136fe83e301551279df4"
 dependencies = [
  "hugr-core",
  "hugr-llvm",
@@ -1099,9 +1099,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-cli"
-version = "0.25.4"
+version = "0.25.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0d9fe16bee7be6adca75fa4136684cca4559326ee82dd9d4a71fcbebdaf6cb8"
+checksum = "a0f32df90256b9a271a3469888b994f4321f81a1ab113b53dfc73b2aa7a683f8"
 dependencies = [
  "anyhow",
  "clap",
@@ -1120,9 +1120,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-core"
-version = "0.25.4"
+version = "0.25.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7cf12249903694b23db84d3cedb80036a00a77e64b74b1537d6e16ac87d9e497"
+checksum = "5f74a33c77656348627f1e2d1e14fb3cec9290de089eab563865b5b6e425c83a"
 dependencies = [
  "base64",
  "cgmath",
@@ -1158,9 +1158,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-llvm"
-version = "0.25.4"
+version = "0.25.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "efc2267d170e56c5496edbf19a0d94ec03cbdcb33d290e77527d5453ac1c8df2"
+checksum = "87856638478e1333c28622eceb3a53b134442689a495a3d1f9561d73c4ae78ad"
 dependencies = [
  "anyhow",
  "cc",
@@ -1178,9 +1178,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-model"
-version = "0.25.4"
+version = "0.25.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1904203c53921aea0e343b8fcdc32ef73b523087cd7341428c84529443c32b36"
+checksum = "e66235beee742c77222c58922d450ee51306f81e11938ef3d46e5f451f8e4217"
 dependencies = [
  "base64",
  "bumpalo",
@@ -1200,9 +1200,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-passes"
-version = "0.25.4"
+version = "0.25.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58bc1f305292dbd4ab7791b44c5ada72a0b4f0abc302a809a7bc5b39357b1afd"
+checksum = "3d08ecd0fb41745afc8cd2848477801ec352c62e522e7a215d9d10f381e0f665"
 dependencies = [
  "ascent",
  "derive_more 2.1.1",
