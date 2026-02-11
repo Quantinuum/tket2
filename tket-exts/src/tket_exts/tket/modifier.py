@@ -8,7 +8,7 @@ from ._util import TketExtension, load_extension
 
 
 class ModifierExtension(TketExtension):
-    """TKET's standard quantum operations."""
+    """Control, dagger and power modifiers for unitary operations."""
 
     @functools.cache
     def __call__(self) -> Extension:

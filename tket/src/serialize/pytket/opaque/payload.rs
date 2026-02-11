@@ -20,7 +20,7 @@ use super::SubgraphId;
 /// See [`OpaqueSubgraphPayload`].
 #[deprecated(
     note = "Opaque barriers do not set an opgroup anymore",
-    since = "0.16.1"
+    since = "0.17.0"
 )]
 pub const OPGROUP_OPAQUE_HUGR: &str = "OPAQUE_HUGR";
 

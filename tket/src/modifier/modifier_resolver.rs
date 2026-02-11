@@ -1155,6 +1155,7 @@ mod tests {
     use crate::{
         TketOp,
         extension::modifier::{CONTROL_OP_ID, DAGGER_OP_ID, MODIFIER_EXTENSION},
+        metadata,
     };
 
     use super::*;
@@ -1164,9 +1165,8 @@ mod tests {
     }
     impl<T: Container> SetUnitary for T {
         fn set_unitary(&mut self) {
-            // TODO: Use `self.set_metadata::<...>(7)` once we implement metadata keys in tket.
             let node = self.container_node();
-            self.hugr_mut().set_metadata_any(node, "unitary", 7);
+            self.hugr_mut().set_metadata::<metadata::Unitary>(node, 7);
         }
     }
 

@@ -79,9 +79,16 @@ fn compare_serial_circs(a: &SerialCircuit, b: &SerialCircuit) {
     assert_eq!(&a.qubits, &b.qubits);
     assert_eq!(a.commands.len(), b.commands.len());
 
+    // Allow additional bit ids after a roundtrip, as the encoder may freely
+    // allocate new IDs instead of reusing old ones.
     let bits_a: HashSet<_> = a.bits.iter().collect();
     let bits_b: HashSet<_> = b.bits.iter().collect();
-    assert_eq!(bits_a, bits_b);
+    assert!(
+        bits_b.is_superset(&bits_a),
+        "Some bit IDs in original circuit are missing the roundtrip. Original: [{}], Roundtrip: [{}]",
+        bits_a.iter().join(", "),
+        bits_b.iter().join(", "),
+    );
 
     // We ignore the commands order here, as two encodings may swap
     // non-dependant operations.

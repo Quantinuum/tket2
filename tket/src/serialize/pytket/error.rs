@@ -106,7 +106,7 @@ pub enum PytketEncodeError<N: HugrNode = hugr::Node> {
     #[display("An unsupported subgraph has no qubits or bits to attach the barrier command to{}",
         if params.is_empty() {"".to_string()} else {format!(" alongside its parameters [{}]", params.iter().join(", "))}
     )]
-    #[deprecated(since = "0.16.1", note = "No longer emitted since 0.16.1")]
+    #[deprecated(since = "0.17.0", note = "No longer emitted since 0.17.0")]
     #[from(ignore)]
     UnsupportedSubgraphHasNoRegisters {
         /// Parameter inputs to the unsupported subgraph.

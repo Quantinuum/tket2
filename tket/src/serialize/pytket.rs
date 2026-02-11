@@ -44,19 +44,6 @@ use crate::circuit::Circuit;
 use crate::extension::rotation::rotation_type;
 pub use crate::passes::pytket::lower_to_pytket;
 
-/// Prefix used for storing metadata in the hugr nodes.
-pub const METADATA_PREFIX: &str = "TKET1";
-/// The global phase specified as metadata.
-pub const METADATA_PHASE: &str = "TKET1.phase";
-/// Explicit names for the input qubit registers.
-pub const METADATA_Q_REGISTERS: &str = "TKET1.qubit_registers";
-/// Explicit names for the input bit registers.
-pub const METADATA_B_REGISTERS: &str = "TKET1.bit_registers";
-/// A tket1 operation "opgroup" field.
-pub const METADATA_OPGROUP: &str = "TKET1.opgroup";
-/// Explicit names for the input parameter wires.
-pub const METADATA_INPUT_PARAMETERS: &str = "TKET1.input_parameters";
-
 /// A serialized representation of a [`Circuit`].
 ///
 /// Implemented by [`SerialCircuit`], the JSON format used by tket1's `pytket` library.

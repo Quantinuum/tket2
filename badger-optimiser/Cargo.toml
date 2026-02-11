@@ -16,7 +16,7 @@ tket = { path = "../tket", features = [
     "rewrite-tracing",
     "binary-eccs",
 ] }
-tket-qsystem = { path = "../tket-qsystem", version = "0.22.0" }
+tket-qsystem = { path = "../tket-qsystem", version = "0.23.0" }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 tracing-appender = { workspace = true }

@@ -3,6 +3,7 @@ from typing import Optional, Literal
 import json
 from dataclasses import dataclass
 
+from hugr import Hugr
 from pytket import Circuit
 from pytket.passes import (
     CustomPass,
@@ -10,16 +11,15 @@ from pytket.passes import (
 )
 
 from tket import optimiser
-from tket.circuit import Tk2Circuit
+from tket.circuit import _hugr_to_tk2circuit
 
 from hugr.passes._composable_pass import (
     ComposablePass,
+    ComposedPass,
     implement_pass_run,
     PassResult,
 )
 
-
-from hugr.hugr.base import Hugr
 
 # Re-export native bindings.
 from ._tket.passes import (
@@ -102,7 +102,7 @@ def badger_pass(
 
 @dataclass
 class PytketHugrPass(ComposablePass):
-    pytket_pass: BasePass
+    pytket_passes: list[BasePass]
 
     """
     A class which provides an interface to apply pytket passes to Hugr programs.
@@ -110,9 +110,9 @@ class PytketHugrPass(ComposablePass):
     The user can create a :py:class:`PytketHugrPass` object from any serializable member of `pytket.passes`.
     """
 
-    def __init__(self, pytket_pass: BasePass) -> None:
+    def __init__(self, *pytket_passes: BasePass) -> None:
         """Initialize a PytketHugrPass from a :py:class:`~pytket.passes.BasePass` instance."""
-        self.pytket_pass = pytket_pass
+        self.pytket_passes = list(pytket_passes)
 
     def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
         """Run the pytket pass as a HUGR transform returning a PassResult."""
@@ -123,11 +123,23 @@ class PytketHugrPass(ComposablePass):
             copy_call=lambda h: self._run_pytket_pass_on_hugr(h, inplace),
         )
 
+    def then(self, other: ComposablePass) -> ComposablePass:
+        """Perform another composable pass after this pass."""
+        if isinstance(other, PytketHugrPass):
+            return PytketHugrPass(*self.pytket_passes, *other.pytket_passes)
+        else:
+            return ComposedPass(self, other)
+
     def _run_pytket_pass_on_hugr(self, hugr: Hugr, inplace: bool) -> PassResult:
-        pass_json = json.dumps(self.pytket_pass.to_dict())
-        compiler_state: Tk2Circuit = Tk2Circuit.from_bytes(hugr.to_bytes())
-        opt_program = tket1_pass(compiler_state, pass_json, traverse_subcircuits=True)
-        new_hugr = Hugr.from_str(opt_program.to_str())
+        compiler_state, registry = _hugr_to_tk2circuit(hugr)
+        for py_pass in self.pytket_passes:
+            pass_json = json.dumps(py_pass.to_dict())
+            compiler_state = tket1_pass(
+                compiler_state, pass_json, traverse_subcircuits=True
+            )
+
+        new_hugr = Hugr.from_str(compiler_state.to_str())
+        new_hugr.resolve_extensions(registry)
         # `for_pass` assumes Modified is true by default
         # TODO: if we can extract better info from tket1 as to what happened, use it.
         # Are there better results  we can use too?
@@ -164,7 +176,7 @@ class NormalizeGuppy(ComposablePass):
         )
 
     def _normalize(self, hugr: Hugr, inplace: bool) -> PassResult:
-        compiler_state: Tk2Circuit = Tk2Circuit.from_bytes(hugr.to_bytes())
+        compiler_state, registry = _hugr_to_tk2circuit(hugr)
         opt_program = normalize_guppy(
             compiler_state,
             simplify_cfgs=self.simplify_cfgs,
@@ -175,4 +187,5 @@ class NormalizeGuppy(ComposablePass):
             remove_redundant_order_edges=self.remove_redundant_order_edges,
         )
         new_hugr = Hugr.from_str(opt_program.to_str())
+        new_hugr.resolve_extensions(registry)
         return PassResult.for_pass(self, hugr=new_hugr, inplace=inplace, result=None)

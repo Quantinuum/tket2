@@ -47,6 +47,7 @@
 
 pub mod circuit;
 pub mod extension;
+pub mod metadata;
 pub mod modifier;
 pub(crate) mod ops;
 pub mod optimiser;
