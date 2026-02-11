@@ -64,55 +64,55 @@ id_bb.i105.i:                                     ; preds = %reset_bb.i103.i, %_
   %3 = insertvalue { i1, i64 } { i1 true, i64 poison }, i64 %qalloc.i101.i, 1
   %4 = select i1 %not_max.not.i102.i, { i1, i64 } { i1 false, i64 poison }, { i1, i64 } %3
   %.fca.0.extract.i104.i = extractvalue { i1, i64 } %4, 0
-  br i1 %.fca.0.extract.i104.i, label %__hugr__.__tk2_qalloc.36.exit108.i, label %cond_40_case_0.i107.i
+  br i1 %.fca.0.extract.i104.i, label %__hugr__.__tk2_qalloc.50.exit.i, label %cond_54_case_0.i.i
 
-cond_40_case_0.i107.i:                            ; preds = %id_bb.i105.i
+cond_54_case_0.i.i:                               ; preds = %id_bb.i105.i
   tail call void @panic(i32 1001, i8* getelementptr inbounds ([47 x i8], [47 x i8]* @"e_No more qu.3B2EEBF0.0", i64 0, i64 0))
   unreachable
 
-__hugr__.__tk2_qalloc.36.exit108.i:               ; preds = %id_bb.i105.i
+__hugr__.__tk2_qalloc.50.exit.i:                  ; preds = %id_bb.i105.i
   %.fca.1.extract.i106.i = extractvalue { i1, i64 } %4, 1
-  %qalloc.i109.i = tail call i64 @___qalloc()
-  %not_max.not.i110.i = icmp eq i64 %qalloc.i109.i, -1
-  br i1 %not_max.not.i110.i, label %id_bb.i113.i, label %reset_bb.i111.i
+  %qalloc.i107.i = tail call i64 @___qalloc()
+  %not_max.not.i108.i = icmp eq i64 %qalloc.i107.i, -1
+  br i1 %not_max.not.i108.i, label %id_bb.i111.i, label %reset_bb.i109.i
 
-reset_bb.i111.i:                                  ; preds = %__hugr__.__tk2_qalloc.36.exit108.i
-  tail call void @___reset(i64 %qalloc.i109.i)
-  br label %id_bb.i113.i
+reset_bb.i109.i:                                  ; preds = %__hugr__.__tk2_qalloc.50.exit.i
+  tail call void @___reset(i64 %qalloc.i107.i)
+  br label %id_bb.i111.i
 
-id_bb.i113.i:                                     ; preds = %reset_bb.i111.i, %__hugr__.__tk2_qalloc.36.exit108.i
-  %5 = insertvalue { i1, i64 } { i1 true, i64 poison }, i64 %qalloc.i109.i, 1
-  %6 = select i1 %not_max.not.i110.i, { i1, i64 } { i1 false, i64 poison }, { i1, i64 } %5
-  %.fca.0.extract.i112.i = extractvalue { i1, i64 } %6, 0
-  br i1 %.fca.0.extract.i112.i, label %__hugr__.__tk2_qalloc.36.exit116.i, label %cond_40_case_0.i115.i
+id_bb.i111.i:                                     ; preds = %reset_bb.i109.i, %__hugr__.__tk2_qalloc.50.exit.i
+  %5 = insertvalue { i1, i64 } { i1 true, i64 poison }, i64 %qalloc.i107.i, 1
+  %6 = select i1 %not_max.not.i108.i, { i1, i64 } { i1 false, i64 poison }, { i1, i64 } %5
+  %.fca.0.extract.i110.i = extractvalue { i1, i64 } %6, 0
+  br i1 %.fca.0.extract.i110.i, label %__hugr__.__tk2_qalloc.64.exit.i, label %cond_68_case_0.i.i
 
-cond_40_case_0.i115.i:                            ; preds = %id_bb.i113.i
+cond_68_case_0.i.i:                               ; preds = %id_bb.i111.i
   tail call void @panic(i32 1001, i8* getelementptr inbounds ([47 x i8], [47 x i8]* @"e_No more qu.3B2EEBF0.0", i64 0, i64 0))
   unreachable
 
-__hugr__.__tk2_qalloc.36.exit116.i:               ; preds = %id_bb.i113.i
-  %.fca.1.extract.i114.i = extractvalue { i1, i64 } %6, 1
-  tail call void @___rxy(i64 %.fca.1.extract.i114.i, double 0x400921FB54442D18, double 0.000000e+00)
-  %qalloc.i117.i = tail call i64 @___qalloc()
-  %not_max.not.i118.i = icmp eq i64 %qalloc.i117.i, -1
-  br i1 %not_max.not.i118.i, label %id_bb.i121.i, label %reset_bb.i119.i
+__hugr__.__tk2_qalloc.64.exit.i:                  ; preds = %id_bb.i111.i
+  %.fca.1.extract.i112.i = extractvalue { i1, i64 } %6, 1
+  tail call void @___rxy(i64 %.fca.1.extract.i112.i, double 0x400921FB54442D18, double 0.000000e+00)
+  %qalloc.i113.i = tail call i64 @___qalloc()
+  %not_max.not.i114.i = icmp eq i64 %qalloc.i113.i, -1
+  br i1 %not_max.not.i114.i, label %id_bb.i117.i, label %reset_bb.i115.i
 
-reset_bb.i119.i:                                  ; preds = %__hugr__.__tk2_qalloc.36.exit116.i
-  tail call void @___reset(i64 %qalloc.i117.i)
-  br label %id_bb.i121.i
+reset_bb.i115.i:                                  ; preds = %__hugr__.__tk2_qalloc.64.exit.i
+  tail call void @___reset(i64 %qalloc.i113.i)
+  br label %id_bb.i117.i
 
-id_bb.i121.i:                                     ; preds = %reset_bb.i119.i, %__hugr__.__tk2_qalloc.36.exit116.i
-  %7 = insertvalue { i1, i64 } { i1 true, i64 poison }, i64 %qalloc.i117.i, 1
-  %8 = select i1 %not_max.not.i118.i, { i1, i64 } { i1 false, i64 poison }, { i1, i64 } %7
-  %.fca.0.extract.i120.i = extractvalue { i1, i64 } %8, 0
-  br i1 %.fca.0.extract.i120.i, label %__hugr__.main.1.exit, label %cond_40_case_0.i123.i
+id_bb.i117.i:                                     ; preds = %reset_bb.i115.i, %__hugr__.__tk2_qalloc.64.exit.i
+  %7 = insertvalue { i1, i64 } { i1 true, i64 poison }, i64 %qalloc.i113.i, 1
+  %8 = select i1 %not_max.not.i114.i, { i1, i64 } { i1 false, i64 poison }, { i1, i64 } %7
+  %.fca.0.extract.i116.i = extractvalue { i1, i64 } %8, 0
+  br i1 %.fca.0.extract.i116.i, label %__hugr__.main.1.exit, label %cond_82_case_0.i.i
 
-cond_40_case_0.i123.i:                            ; preds = %id_bb.i121.i
+cond_82_case_0.i.i:                               ; preds = %id_bb.i117.i
   tail call void @panic(i32 1001, i8* getelementptr inbounds ([47 x i8], [47 x i8]* @"e_No more qu.3B2EEBF0.0", i64 0, i64 0))
   unreachable
 
-__hugr__.main.1.exit:                             ; preds = %id_bb.i121.i
-  %.fca.1.extract.i122.i = extractvalue { i1, i64 } %8, 1
+__hugr__.main.1.exit:                             ; preds = %id_bb.i117.i
+  %.fca.1.extract.i118.i = extractvalue { i1, i64 } %8, 1
   %lazy_measure.i = tail call i64 @___lazy_measure(i64 %.fca.1.extract.i.i)
   tail call void @___qfree(i64 %.fca.1.extract.i.i)
   %read_bool.i = tail call i1 @___read_future_bool(i64 %lazy_measure.i)
@@ -123,14 +123,14 @@ __hugr__.main.1.exit:                             ; preds = %id_bb.i121.i
   %read_bool35.i = tail call i1 @___read_future_bool(i64 %lazy_measure22.i)
   tail call void @___dec_future_refcount(i64 %lazy_measure22.i)
   tail call void @print_bool(i8* getelementptr inbounds ([13 x i8], [13 x i8]* @res_c1.1F7A6571.0, i64 0, i64 0), i64 12, i1 %read_bool35.i)
-  %lazy_measure44.i = tail call i64 @___lazy_measure(i64 %.fca.1.extract.i114.i)
-  tail call void @___qfree(i64 %.fca.1.extract.i114.i)
+  %lazy_measure44.i = tail call i64 @___lazy_measure(i64 %.fca.1.extract.i112.i)
+  tail call void @___qfree(i64 %.fca.1.extract.i112.i)
   %read_bool57.i = tail call i1 @___read_future_bool(i64 %lazy_measure44.i)
   tail call void @___dec_future_refcount(i64 %lazy_measure44.i)
   tail call void @print_bool(i8* getelementptr inbounds ([13 x i8], [13 x i8]* @res_c2.60825383.0, i64 0, i64 0), i64 12, i1 %read_bool57.i)
-  tail call void @___rxy(i64 %.fca.1.extract.i122.i, double 0x400921FB54442D18, double 0.000000e+00)
-  %lazy_measure67.i = tail call i64 @___lazy_measure(i64 %.fca.1.extract.i122.i)
-  tail call void @___qfree(i64 %.fca.1.extract.i122.i)
+  tail call void @___rxy(i64 %.fca.1.extract.i118.i, double 0x400921FB54442D18, double 0.000000e+00)
+  %lazy_measure67.i = tail call i64 @___lazy_measure(i64 %.fca.1.extract.i118.i)
+  tail call void @___qfree(i64 %.fca.1.extract.i118.i)
   %read_bool80.i = tail call i1 @___read_future_bool(i64 %lazy_measure67.i)
   tail call void @___dec_future_refcount(i64 %lazy_measure67.i)
   tail call void @print_bool(i8* getelementptr inbounds ([13 x i8], [13 x i8]* @res_c3.B223E16D.0, i64 0, i64 0), i64 12, i1 %read_bool80.i)
