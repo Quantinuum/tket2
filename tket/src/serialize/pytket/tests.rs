@@ -60,6 +60,21 @@ const SIMPLE_JSON: &str = r#"{
         "implicit_permutation": [[["q", [0]], ["q", [0]]], [["q", [1]], ["q", [1]]]]
     }"#;
 
+const SIMPLE_MEASURE: &str = r#"{
+        "phase": "0.0",
+        "bits": [["c", [0]], ["c", [1]]],
+        "qubits": [["q", [0]], ["q", [1]]],
+        "commands": [
+            {"args": [["q", [0]]], "op": {"type": "H"}},
+            {"args": [["q", [0]], ["q", [1]]], "op": {"type": "CX"}},
+            {"args": [["q", [0]], ["c", [0]]], "op": {"type": "Measure"}},
+            {"args": [["q", [1]], ["c", [1]]], "op": {"type": "Measure"}}
+        ],
+        "created_qubits": [],
+        "discarded_qubits": [],
+        "implicit_permutation": [[["q", [0]], ["q", [0]]], [["q", [1]], ["q", [1]]]]
+    }"#;
+
 const MULTI_REGISTER: &str = r#"{
         "phase": "0",
         "bits": [],
@@ -855,6 +870,7 @@ fn check_no_tk1_ops(circ: &Circuit) {
 
 #[rstest]
 #[case::simple(SIMPLE_JSON, 2, 2, false)]
+#[case::simple_measure(SIMPLE_MEASURE, 4, 2, false)]
 #[case::multi_register(MULTI_REGISTER, 2, 3, false)]
 #[case::unknown_op(UNKNOWN_OP, 2, 3, true)]
 #[case::small_parametrized(SMALL_PARAMETERIZED, 1, 1, false)]
@@ -1202,6 +1218,37 @@ fn test_inplace_decoding() {
 
     assert!(hugr.get_optype(func1).is_func_defn());
     assert!(hugr.get_optype(dfg).is_dfg());
+}
+
+/// Test the decoding pytket circuits with externally-set signatures.
+#[rstest]
+#[case::qubits_in_qubits_out(Signature::new_endo(vec![qb_t(), qb_t()]))]
+#[case::qubits_in_bits_out(Signature::new(vec![qb_t(), qb_t()], vec![bool_t(), bool_t()]))]
+#[case::nothing_in_all_out(Signature::new(vec![], vec![qb_t(), qb_t(), bool_t(), bool_t()]))]
+#[case::nothing_in_nothing_out(Signature::new(vec![], vec![]))]
+#[case::params_in_all_out(Signature::new(vec![rotation_type(), float64_type()], vec![qb_t(), qb_t(), bool_t(), bool_t()]))]
+fn test_decoding_signature(#[case] signature: Signature) {
+    // A circuit on two qubits, with two measurement operations.
+    let serial: circuit_json::SerialCircuit = serde_json::from_str(SIMPLE_MEASURE).unwrap();
+
+    let options = DecodeOptions::default().with_signature(signature);
+    let circ = serial.decode(options).unwrap();
+
+    // Hugr must be valid.
+    circ.hugr().validate().unwrap();
+
+    // Hugr must contain the two measurement ops.
+    let measure_op_count = circ
+        .hugr()
+        .children(circ.parent())
+        .filter(|&child| {
+            circ.hugr()
+                .get_optype(child)
+                .as_extension_op()
+                .is_some_and(|op| op.unqualified_id() == "Measure")
+        })
+        .count();
+    assert_eq!(measure_op_count, 2);
 }
 
 /// Test the lazy qubit/bit decoding behaviour when the registers are not
