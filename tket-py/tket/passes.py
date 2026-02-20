@@ -166,8 +166,8 @@ class NormalizeGuppy(ComposablePass):
     - constant_folding: Whether to constant fold the program.
     - remove_dead_funcs: Whether to remove dead functions.
     - inline_dfgs: Whether to inline DFG operations.
-    - squash_borrows: Whether to squash return-borrow pairs on BorrowArrays.
     - remove_redundant_order_edges: Whether to remove redundant order edges.
+    - squash_borrows: Whether to squash return-borrow pairs on BorrowArrays.
     """
 
     def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
