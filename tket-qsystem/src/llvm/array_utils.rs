@@ -16,7 +16,7 @@ use hugr::{HugrView, Node};
 use inkwell::AddressSpace;
 use inkwell::builder::{Builder, BuilderError};
 use inkwell::context::Context;
-use inkwell::types::{IntType, PointerType, StructType};
+use inkwell::types::{IntType, StructType};
 use inkwell::values::{ArrayValue, IntValue, PointerValue, StructValue};
 
 /// Specifies different array lowering strategies.
@@ -33,6 +33,7 @@ pub trait ArrayLowering {
         builder: &Builder<'c>,
         val: BasicValueEnum<'c>,
         elem_type: BasicTypeEnum<'c>,
+        length: u32,
     ) -> Result<PointerValue<'c>>;
 
     /// Turns a pointer to the first array element into an array value in the given lowering.
@@ -78,6 +79,7 @@ impl<ACG: stack_array::ArrayCodegen + Clone> ArrayLowering for StackArrayLowerin
         builder: &Builder<'c>,
         val: BasicValueEnum<'c>,
         _elem_type: BasicTypeEnum<'c>,
+        _length: u32,
     ) -> Result<PointerValue<'c>> {
         build_array_alloca(builder, val.into_array_value())
             .map_err(|e| anyhow!("Could not build array alloca: {e}"))
@@ -122,9 +124,11 @@ impl<ACG: array::ArrayCodegen + Clone> ArrayLowering for HeapArrayLowering<ACG> 
         builder: &Builder<'c>,
         val: BasicValueEnum<'c>,
         elem_type: BasicTypeEnum<'c>,
+        length: u32,
     ) -> Result<PointerValue<'c>> {
         let (array_ptr, offset) = decompose_array_fat_pointer(builder, val)?;
-        let elem_ptr = unsafe { builder.build_in_bounds_gep(elem_type, array_ptr, &[offset], "")? };
+        let array_ty = elem_type.array_type(length);
+        let elem_ptr = unsafe { builder.build_in_bounds_gep(array_ty, array_ptr, &[offset], "")? };
         Ok(elem_ptr)
     }
 
@@ -189,6 +193,7 @@ pub enum ElemType {
 }
 
 impl ElemType {
+    /// Get the corresponding `inkwell::types::BasicTypeEnum`
     pub fn llvm_type<'a>(&self, ctx: &'a Context) -> BasicTypeEnum<'a> {
         match *self {
             ElemType::Int | ElemType::Uint => ctx.i64_type().into(),
@@ -211,7 +216,7 @@ impl ElemType {
 /// The fourth field points to an array of masking data of the same size as the
 /// primary data in memory and contains boolean values to indicate the presence
 /// of data in the primary array. Dense arrays have mask values of all zeros.
-pub fn struct_1d_arr_t<'a>(ctx: &'a Context, data_type: &'a ElemType) -> StructType<'a> {
+pub fn struct_1d_arr_t<'a>(ctx: &'a Context) -> StructType<'a> {
     let ptr_t = ctx.ptr_type(AddressSpace::default());
     ctx.struct_type(
         &[
@@ -232,17 +237,16 @@ pub fn struct_1d_arr_alloc<'a>(
     ctx: &'a Context,
     builder: &Builder<'a>,
     length: u32,
-    data_type: &'a ElemType,
     array_ptr: PointerValue<'a>,
 ) -> Result<(PointerValue<'a>, StructValue<'a>), BuilderError> {
-    let out_arr_type = struct_1d_arr_t(ctx, data_type);
+    let out_arr_type = struct_1d_arr_t(ctx);
     let out_arr_ptr = builder.build_alloca(out_arr_type, "out_arr_alloca")?;
 
     let ptr_t = ctx.ptr_type(AddressSpace::default());
-    let x_field = builder.build_struct_gep(ptr_t, out_arr_ptr, 0, "x_ptr")?;
-    let y_field = builder.build_struct_gep(ptr_t, out_arr_ptr, 1, "y_ptr")?;
-    let arr_field = builder.build_struct_gep(ptr_t, out_arr_ptr, 2, "arr_ptr")?;
-    let mask_field = builder.build_struct_gep(ptr_t, out_arr_ptr, 3, "mask_ptr")?;
+    let x_field = builder.build_struct_gep(out_arr_type, out_arr_ptr, 0, "x_ptr")?;
+    let y_field = builder.build_struct_gep(out_arr_type, out_arr_ptr, 1, "y_ptr")?;
+    let arr_field = builder.build_struct_gep(out_arr_type, out_arr_ptr, 2, "arr_ptr")?;
+    let mask_field = builder.build_struct_gep(out_arr_type, out_arr_ptr, 3, "mask_ptr")?;
 
     let x_val = ctx.i32_type().const_int(length.into(), false);
     let y_val = ctx.i32_type().const_int(1, false);
@@ -305,7 +309,7 @@ mod tests {
     fn build_array<'c>(
         context: &'c Context,
         builder: &Builder<'c>,
-    ) -> Result<(PointerValue<'c>, PointerValue<'c>), BuilderError> {
+    ) -> Result<PointerValue<'c>, BuilderError> {
         // Create test array
         let i32_type = context.i32_type();
         let array =
@@ -323,8 +327,7 @@ mod tests {
 
         make_bb(&context, &module, &builder);
 
-        let (array_ptr, _) =
-            build_array(&context, &builder).expect("Array allocation should succeed");
+        let array_ptr = build_array(&context, &builder).expect("Array allocation should succeed");
         let i32_type = context.i32_type();
         let array_length = 2;
         let loaded_array = build_int_array_load(&builder, array_ptr, i32_type, array_length)
@@ -342,29 +345,14 @@ mod tests {
     #[test]
     fn test_struct_1d_arr_t() {
         let context = Context::create();
+        let struct_ty = struct_1d_arr_t(&context);
 
-        // Test for each element type
-        let int_struct = struct_1d_arr_t(&context, &ElemType::Int);
-        let uint_struct = struct_1d_arr_t(&context, &ElemType::Uint);
-        let float_struct = struct_1d_arr_t(&context, &ElemType::Float);
-        let bool_struct = struct_1d_arr_t(&context, &ElemType::Bool);
-
-        let structs = [int_struct, uint_struct, float_struct, bool_struct];
-
-        for s in &structs {
-            // All structs should have 4 fields
-            assert_eq!(s.get_field_types().len(), 4);
-
-            // Check the field types (first two fields should be i32 for all structs)
-            assert!(s.get_field_types()[0].is_int_type());
-            assert!(s.get_field_types()[1].is_int_type());
-
-            // Third field should be a pointer to the corresponding data type
-            assert!(s.get_field_types()[2].is_pointer_type());
-
-            // Fourth field should be a pointer to bool type for all structs
-            assert!(s.get_field_types()[3].is_pointer_type());
-        }
+        // Fields should be (int, int, ptr, ptr)
+        assert_eq!(struct_ty.get_field_types().len(), 4);
+        assert!(struct_ty.get_field_types()[0].is_int_type());
+        assert!(struct_ty.get_field_types()[1].is_int_type());
+        assert!(struct_ty.get_field_types()[2].is_pointer_type());
+        assert!(struct_ty.get_field_types()[3].is_pointer_type());
     }
 
     /// Test that struct_1d_arr_alloc properly allocates and initializes a dense array struct.
@@ -376,13 +364,13 @@ mod tests {
 
         make_bb(&context, &module, &builder);
 
-        let (array_ptr, _) = build_array(&context, &builder).unwrap();
+        let array_ptr = build_array(&context, &builder).unwrap();
         // Test the function with different element types
         let elem_types = [ElemType::Int, ElemType::Float, ElemType::Bool];
 
         for elem_type in elem_types.iter() {
             let (struct_ptr, _) =
-                struct_1d_arr_alloc(&context, &builder, 2, elem_type, array_ptr).unwrap();
+                struct_1d_arr_alloc(&context, &builder, 2, array_ptr).unwrap();
 
             assert!(!struct_ptr.is_null(), "Struct pointer should not be null");
         }
@@ -413,12 +401,12 @@ mod tests {
         let elem_ty = emit_ctx.iw_context().i32_type().into();
         let size = 2;
 
-        let (array_ptr, _) = build_array(emit_ctx.iw_context(), emit_ctx.builder()).unwrap();
+        let array_ptr = build_array(emit_ctx.iw_context(), emit_ctx.builder()).unwrap();
         let array = array_lowering
             .array_from_ptr(&mut emit_ctx, array_ptr, elem_ty, size)
             .unwrap();
         let new_array_ptr = array_lowering
-            .array_to_ptr(emit_ctx.builder(), array)
+            .array_to_ptr(emit_ctx.builder(), array, elem_ty, size)
             .unwrap();
         assert_eq!(array_ptr.get_type(), new_array_ptr.get_type());
         let new_array = array_lowering

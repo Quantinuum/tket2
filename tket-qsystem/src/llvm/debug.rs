@@ -82,12 +82,11 @@ impl<AL: ArrayLowering> DebugCodegenExtension<AL> {
             .try_into()
             .map_err(|_| anyhow!(format!("StateResult expects a qubit array argument")))?;
         let qubits_array = self.array_lowering.array_to_ptr(
-            builder, qubits, i64_t.as_basic_type_enum())?;
+            builder, qubits, i64_t.as_basic_type_enum(), array_len.try_into()?)?;
         let (qubits_ptr, _) = struct_1d_arr_alloc(
             iw_ctx,
             builder,
             array_len.try_into()?,
-            &ElemType::Int,
             qubits_array,
         )?;
 

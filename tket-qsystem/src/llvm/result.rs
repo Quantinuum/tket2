@@ -145,7 +145,7 @@ impl<'c, H: HugrView<Node = Node>, AL: ArrayLowering + Clone> ResultEmitter<'c, 
 
         let tag_ptr = emit_global_string(self.0, tag, "res_", format!("{TAG_PREFIX}{type_tag}"))?;
         let tag_len = {
-            let mut l = self
+            let l = self
                 .0
                 .builder()
                 .build_load(self.i8_t(), tag_ptr.into_pointer_value(), "tag_len")?
@@ -171,12 +171,11 @@ impl<'c, H: HugrView<Node = Node>, AL: ArrayLowering + Clone> ResultEmitter<'c, 
 
         let print_fn = self.get_func_print(op)?;
         let array = self.1.array_to_ptr(self.builder(), val,
-            data_type.llvm_type(self.iw_context()))?;
+            data_type.llvm_type(self.iw_context()), length.try_into()?)?;
         let (array_ptr, _) = struct_1d_arr_alloc(
             self.iw_context(),
             self.builder(),
             length.try_into()?,
-            data_type,
             array,
         )?;
         self.builder().build_call(
