@@ -1087,8 +1087,8 @@ dependencies = [
 
 [[package]]
 name = "hugr"
-version = "0.25.6"
-source = "git+https://github.com/quantinuum/hugr?rev=0ab742f4502f12e9ef0b9dd8f3fe767c10150983#0ab742f4502f12e9ef0b9dd8f3fe767c10150983"
+version = "0.30.0"
+source = "git+https://github.com/quantinuum/hugr?rev=3dacad485c1004a84b22e8a1de0f86fb7087e05b#3dacad485c1004a84b22e8a1de0f86fb7087e05b"
 dependencies = [
  "hugr-core",
  "hugr-llvm",
@@ -1098,8 +1098,8 @@ dependencies = [
 
 [[package]]
 name = "hugr-cli"
-version = "0.25.6"
-source = "git+https://github.com/quantinuum/hugr?rev=0ab742f4502f12e9ef0b9dd8f3fe767c10150983#0ab742f4502f12e9ef0b9dd8f3fe767c10150983"
+version = "0.30.0"
+source = "git+https://github.com/quantinuum/hugr?rev=3dacad485c1004a84b22e8a1de0f86fb7087e05b#3dacad485c1004a84b22e8a1de0f86fb7087e05b"
 dependencies = [
  "anyhow",
  "clap",
@@ -1118,8 +1118,8 @@ dependencies = [
 
 [[package]]
 name = "hugr-core"
-version = "0.25.6"
-source = "git+https://github.com/quantinuum/hugr?rev=0ab742f4502f12e9ef0b9dd8f3fe767c10150983#0ab742f4502f12e9ef0b9dd8f3fe767c10150983"
+version = "0.30.0"
+source = "git+https://github.com/quantinuum/hugr?rev=3dacad485c1004a84b22e8a1de0f86fb7087e05b#3dacad485c1004a84b22e8a1de0f86fb7087e05b"
 dependencies = [
  "base64",
  "cgmath",
@@ -1155,8 +1155,8 @@ dependencies = [
 
 [[package]]
 name = "hugr-llvm"
-version = "0.25.6"
-source = "git+https://github.com/quantinuum/hugr?rev=0ab742f4502f12e9ef0b9dd8f3fe767c10150983#0ab742f4502f12e9ef0b9dd8f3fe767c10150983"
+version = "0.30.0"
+source = "git+https://github.com/quantinuum/hugr?rev=3dacad485c1004a84b22e8a1de0f86fb7087e05b#3dacad485c1004a84b22e8a1de0f86fb7087e05b"
 dependencies = [
  "anyhow",
  "cc",
@@ -1174,8 +1174,8 @@ dependencies = [
 
 [[package]]
 name = "hugr-model"
-version = "0.25.6"
-source = "git+https://github.com/quantinuum/hugr?rev=0ab742f4502f12e9ef0b9dd8f3fe767c10150983#0ab742f4502f12e9ef0b9dd8f3fe767c10150983"
+version = "0.30.0"
+source = "git+https://github.com/quantinuum/hugr?rev=3dacad485c1004a84b22e8a1de0f86fb7087e05b#3dacad485c1004a84b22e8a1de0f86fb7087e05b"
 dependencies = [
  "base64",
  "bumpalo",
@@ -1195,8 +1195,8 @@ dependencies = [
 
 [[package]]
 name = "hugr-passes"
-version = "0.25.6"
-source = "git+https://github.com/quantinuum/hugr?rev=0ab742f4502f12e9ef0b9dd8f3fe767c10150983#0ab742f4502f12e9ef0b9dd8f3fe767c10150983"
+version = "0.30.0"
+source = "git+https://github.com/quantinuum/hugr?rev=3dacad485c1004a84b22e8a1de0f86fb7087e05b#3dacad485c1004a84b22e8a1de0f86fb7087e05b"
 dependencies = [
  "ascent",
  "derive_more 2.1.1",
