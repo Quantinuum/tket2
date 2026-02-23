@@ -242,7 +242,6 @@ pub fn struct_1d_arr_alloc<'a>(
     let out_arr_type = struct_1d_arr_t(ctx);
     let out_arr_ptr = builder.build_alloca(out_arr_type, "out_arr_alloca")?;
 
-    let ptr_t = ctx.ptr_type(AddressSpace::default());
     let x_field = builder.build_struct_gep(out_arr_type, out_arr_ptr, 0, "x_ptr")?;
     let y_field = builder.build_struct_gep(out_arr_type, out_arr_ptr, 1, "y_ptr")?;
     let arr_field = builder.build_struct_gep(out_arr_type, out_arr_ptr, 2, "arr_ptr")?;
@@ -365,15 +364,8 @@ mod tests {
         make_bb(&context, &module, &builder);
 
         let array_ptr = build_array(&context, &builder).unwrap();
-        // Test the function with different element types
-        let elem_types = [ElemType::Int, ElemType::Float, ElemType::Bool];
-
-        for elem_type in elem_types.iter() {
-            let (struct_ptr, _) =
-                struct_1d_arr_alloc(&context, &builder, 2, array_ptr).unwrap();
-
-            assert!(!struct_ptr.is_null(), "Struct pointer should not be null");
-        }
+        let (struct_ptr, _) = struct_1d_arr_alloc(&context, &builder, 2, array_ptr).unwrap();
+        assert!(!struct_ptr.is_null(), "Struct pointer should not be null");
 
         builder
             .build_return(None)

@@ -12,7 +12,7 @@ use hugr::ops::ExtensionOp;
 use hugr::{HugrView, Node};
 use tket::extension::debug::{DEBUG_EXTENSION_ID, STATE_RESULT_OP_ID, StateResult};
 
-use super::array_utils::{ArrayLowering, ElemType, struct_1d_arr_alloc};
+use super::array_utils::{ArrayLowering, struct_1d_arr_alloc};
 
 static TAG_PREFIX: &str = "USER:";
 
