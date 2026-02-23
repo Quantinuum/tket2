@@ -1,0 +1,699 @@
+//! Extension providing logical operations on Iceberg codeblocks.
+
+use std::sync::{Arc, LazyLock, Weak};
+
+use hugr::{
+    Extension,
+    extension::{
+        CustomValidator, ExtensionId, OpDef, SignatureError, SignatureFunc, ValidateJustArgs,
+        prelude::bool_t,
+        simple_op::{
+            HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
+            try_from_name,
+        },
+    },
+    ops::{ExtensionOp, OpName},
+    std_extensions::{
+        arithmetic::float_types::float64_type,
+        collections::array::{Array, ArrayKind},
+    },
+    types::{FuncValueType, PolyFuncTypeRV, Type, TypeArg, type_param::TypeParam},
+};
+use strum::{EnumIter, EnumString, IntoStaticStr};
+
+use super::types::{block_tv, get_usize};
+
+/// The extension identifier.
+pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("logical.iceberg.ops");
+/// Extension version.
+pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
+
+/// Logical Iceberg operations.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
+#[non_exhaustive]
+pub enum IcebergOpDef {
+    /// X gate.
+    X,
+    /// Z gate.
+    Z,
+    /// X gate on two qubits.
+    XX,
+    /// Y gate on two qubits.
+    YY,
+    /// Z gate on two qubits.
+    ZZ,
+    /// X gate on all but one qubit.
+    AllButOneX,
+    /// Z gate on all but one qubit.
+    AllButOneZ,
+    /// X gate on all qubits.
+    AllX,
+    /// Y gate on all qubits.
+    AllY,
+    /// Z gate on all qubits.
+    AllZ,
+    /// X gate on one qubit with Z on all others.
+    XWithAllButOneZ,
+    /// Z gate on one qubit with X on all others.
+    ZWithAllButOneX,
+    /// Fan-out from one qubit to all others.
+    FanOut,
+    /// Fan-in to one qubut from all others.
+    FanIn,
+    /// Rx gate.
+    Rx,
+    /// Rz gate.
+    Rz,
+    /// Rx gate on all qubits.
+    AllRx,
+    /// Ry gate on all qubits.
+    AllRy,
+    /// Rz gate on all qubits.
+    AllRz,
+    /// Rx gate on all but one qubit.
+    AllButOneRx,
+    /// Ry gate on all but one qubit.
+    AllButOneRy,
+    /// Rz gate on all but one qubit.
+    AllButOneRz,
+    /// H gate on all qubits.
+    AllH,
+    /// XXPhase gate.
+    XXPhase,
+    /// YYPhase gate.
+    YYPhase,
+    /// ZZPhase gate.
+    ZZPhase,
+    /// CX gate.
+    CX,
+    /// Swap of two qubits within a block.
+    SWAP,
+    /// ZZPhase gate involving two blocks.
+    ZZPhaseBetweenBlocks,
+    /// CX gate applied transversally over two blocks.
+    CXTransverse,
+    /// Prepare the all-zero state on a block.
+    AllocZero,
+    /// Syndrome measurement.
+    MeasureSyndrome,
+    /// Destructive measurement of all qubits.
+    MeasureAll,
+    /// Non-destructive measurement of one qubit in the X basis.
+    MeasureOneX,
+    /// Non-destructive measurement of one qubit in the Z basis.
+    MeasureOneZ,
+}
+
+/// Concrete Iceberg logical operation with block size and indices set.
+pub struct ConcreteIcebergOp {
+    /// The kind of operation.
+    pub def: IcebergOpDef,
+
+    /// The block size.
+    pub k: usize,
+
+    /// Qubit index parameters.
+    pub indices: Vec<usize>,
+}
+
+impl HasConcrete for IcebergOpDef {
+    type Concrete = ConcreteIcebergOp;
+
+    fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
+        let args: Vec<usize> = type_args
+            .iter()
+            .map(|a| get_usize(a).map_err(|_| SignatureError::InvalidTypeArgs))
+            .collect::<Result<_, _>>()?;
+        Ok(ConcreteIcebergOp {
+            def: *self,
+            k: args[0],
+            indices: args[1..].to_vec(),
+        })
+    }
+}
+
+impl HasDef for ConcreteIcebergOp {
+    type Def = IcebergOpDef;
+}
+
+impl MakeExtensionOp for ConcreteIcebergOp {
+    fn op_id(&self) -> OpName {
+        self.def.opdef_id()
+    }
+
+    fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError> {
+        let def = IcebergOpDef::from_def(ext_op.def())?;
+        def.instantiate(ext_op.args())
+    }
+
+    fn type_args(&self) -> Vec<TypeArg> {
+        let mut args: Vec<TypeArg> = vec![(self.k as u64).into()];
+        args.extend(self.indices.iter().map(|&i| (i as u64).into()));
+        args
+    }
+}
+
+impl MakeRegisteredOp for ConcreteIcebergOp {
+    fn extension_id(&self) -> ExtensionId {
+        EXTENSION_ID.clone()
+    }
+
+    fn extension_ref(&self) -> Arc<Extension> {
+        EXTENSION.clone()
+    }
+}
+
+impl IcebergOpDef {
+    /// Initialize a [`ConcreteIcebergOp`] from an [`IcebergOpDef`] that
+    /// requires a single qubit index.
+    #[must_use]
+    pub fn with_size_and_index(self, k: usize, i: usize) -> ConcreteIcebergOp {
+        ConcreteIcebergOp {
+            def: self,
+            k,
+            indices: vec![i],
+        }
+    }
+}
+
+/// Validator to check that the list of type arguments consists of a sequence
+/// of natural numbers, the first of which (representing the block size) is
+/// at least 2 and greater than all subsequent (representing qubit indices).
+struct ArgsValidator {
+    /// Expected number of index arguments following the initial block size.
+    n_idx: usize,
+}
+
+impl ValidateJustArgs for ArgsValidator {
+    fn validate(&self, arg_values: &[TypeArg]) -> Result<(), SignatureError> {
+        let n = arg_values.len();
+        if n != 1 + self.n_idx {
+            return Err(SignatureError::InvalidTypeArgs);
+        }
+        let k = get_usize(&arg_values[0])?;
+        if k < 2 {
+            return Err(SignatureError::InvalidTypeArgs);
+        }
+        for arg in arg_values.iter().skip(1) {
+            let i = get_usize(arg)?;
+            if i >= k {
+                return Err(SignatureError::InvalidTypeArgs);
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Get an array-of-bool type with size corresponding to a type variable with a
+/// given ID.
+fn bool_array_tv(var_id: usize) -> Type {
+    Array::ty_parametric(
+        TypeArg::new_var_use(var_id, TypeParam::max_nat_type()),
+        bool_t(),
+    )
+    .unwrap()
+}
+
+fn vec_of_blocks_and_angles(n_blocks: usize, n_angles: usize) -> Vec<Type> {
+    let mut types: Vec<Type> = vec![block_tv(0); n_blocks];
+    types.extend(vec![float64_type(); n_angles]);
+    types
+}
+
+fn vec_of_blocks_and_bools(n_blocks: usize, n_bools: usize) -> Vec<Type> {
+    let mut types: Vec<Type> = vec![block_tv(0); n_blocks];
+    types.extend(vec![bool_t(); n_bools]);
+    types
+}
+
+fn block_with_angles_sig(n_angles: usize) -> FuncValueType {
+    FuncValueType::new(
+        vec_of_blocks_and_angles(1, n_angles),
+        vec_of_blocks_and_angles(1, 0),
+    )
+}
+
+/// Signature of an operation that acts on a single block, with a number of
+/// additional angle inputs and a number of index parameters.
+fn sig_1_block(n_angles: usize, n_indices: usize) -> SignatureFunc {
+    CustomValidator::new(
+        PolyFuncTypeRV::new(
+            vec![TypeParam::max_nat_type(); 1 + n_indices],
+            block_with_angles_sig(n_angles),
+        ),
+        ArgsValidator { n_idx: n_indices },
+    )
+    .into()
+}
+
+impl MakeOpDef for IcebergOpDef {
+    fn opdef_id(&self) -> OpName {
+        <&Self as Into<&'static str>>::into(self).into()
+    }
+
+    fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError> {
+        try_from_name(op_def.name(), op_def.extension_id())
+    }
+
+    fn extension(&self) -> ExtensionId {
+        EXTENSION_ID.clone()
+    }
+
+    fn extension_ref(&self) -> Weak<Extension> {
+        Arc::downgrade(&EXTENSION)
+    }
+
+    fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
+        use IcebergOpDef::*;
+        match self {
+            X => sig_1_block(0, 1),
+            Z => sig_1_block(0, 1),
+            XX => sig_1_block(0, 2),
+            YY => sig_1_block(0, 2),
+            ZZ => sig_1_block(0, 2),
+            AllButOneX => sig_1_block(0, 1),
+            AllButOneZ => sig_1_block(0, 1),
+            AllX => sig_1_block(0, 0),
+            AllY => sig_1_block(0, 0),
+            AllZ => sig_1_block(0, 0),
+            XWithAllButOneZ => sig_1_block(0, 1),
+            ZWithAllButOneX => sig_1_block(0, 1),
+            FanOut => sig_1_block(0, 1),
+            FanIn => sig_1_block(0, 1),
+            Rx => sig_1_block(1, 1),
+            Rz => sig_1_block(1, 1),
+            AllRx => sig_1_block(1, 0),
+            AllRy => sig_1_block(1, 0),
+            AllRz => sig_1_block(1, 0),
+            AllButOneRx => sig_1_block(1, 1),
+            AllButOneRy => sig_1_block(1, 1),
+            AllButOneRz => sig_1_block(1, 1),
+            AllH => sig_1_block(0, 0),
+            XXPhase => sig_1_block(1, 2),
+            YYPhase => sig_1_block(1, 2),
+            ZZPhase => sig_1_block(1, 2),
+            CX => sig_1_block(0, 2),
+            SWAP => sig_1_block(0, 2),
+            ZZPhaseBetweenBlocks => CustomValidator::new(
+                PolyFuncTypeRV::new(
+                    vec![TypeParam::max_nat_type(); 3],
+                    FuncValueType::new(
+                        vec_of_blocks_and_angles(2, 1),
+                        vec_of_blocks_and_angles(2, 0),
+                    ),
+                ),
+                ArgsValidator { n_idx: 2 },
+            )
+            .into(),
+            CXTransverse => CustomValidator::new(
+                PolyFuncTypeRV::new(
+                    vec![TypeParam::max_nat_type()],
+                    FuncValueType::new_endo(vec_of_blocks_and_angles(2, 0)),
+                ),
+                ArgsValidator { n_idx: 0 },
+            )
+            .into(),
+            AllocZero => CustomValidator::new(
+                PolyFuncTypeRV::new(
+                    vec![TypeParam::max_nat_type()],
+                    FuncValueType::new(
+                        vec_of_blocks_and_angles(0, 0),
+                        vec_of_blocks_and_angles(1, 0),
+                    ),
+                ),
+                ArgsValidator { n_idx: 0 },
+            )
+            .into(),
+            MeasureSyndrome => CustomValidator::new(
+                PolyFuncTypeRV::new(
+                    vec![TypeParam::max_nat_type()],
+                    FuncValueType::new(
+                        vec_of_blocks_and_angles(1, 0),
+                        vec_of_blocks_and_bools(1, 2),
+                    ),
+                ),
+                ArgsValidator { n_idx: 0 },
+            )
+            .into(),
+            MeasureAll => CustomValidator::new(
+                PolyFuncTypeRV::new(
+                    vec![TypeParam::max_nat_type()],
+                    FuncValueType::new(vec_of_blocks_and_angles(1, 0), vec![bool_array_tv(0)]),
+                ),
+                ArgsValidator { n_idx: 0 },
+            )
+            .into(),
+            MeasureOneX => CustomValidator::new(
+                PolyFuncTypeRV::new(
+                    vec![TypeParam::max_nat_type(); 2],
+                    FuncValueType::new(
+                        vec_of_blocks_and_angles(1, 0),
+                        vec_of_blocks_and_bools(1, 1),
+                    ),
+                ),
+                ArgsValidator { n_idx: 1 },
+            )
+            .into(),
+            MeasureOneZ => CustomValidator::new(
+                PolyFuncTypeRV::new(
+                    vec![TypeParam::max_nat_type(); 2],
+                    FuncValueType::new(
+                        vec_of_blocks_and_angles(1, 0),
+                        vec_of_blocks_and_bools(1, 1),
+                    ),
+                ),
+                ArgsValidator { n_idx: 1 },
+            )
+            .into(),
+        }
+    }
+
+    fn description(&self) -> String {
+        use IcebergOpDef::*;
+        match self {
+            X => "apply an X gate to one qubit",
+            Z => "apply a Z gate to one qubit",
+            XX => "apply an X gate to two qubits",
+            YY => "apply a Y gate to two qubits",
+            ZZ => "apply a Z gate to two qubits",
+            AllButOneX => "apply an X gate to all but one qubit",
+            AllButOneZ => "apply a Z gate to all but one qubit",
+            AllX => "apply an X gate to all qubits",
+            AllY => "apply a Y gate to all qubits",
+            AllZ => "apply a Z gate to all qubits",
+            XWithAllButOneZ => "apply an X gate to one qubit and a Z to the rest",
+            ZWithAllButOneX => "apply a Z gate to one qubit and an X to the rest",
+            FanOut => "fan-out from one qubit to the rest",
+            FanIn => "fan-in to one qubit from the rest",
+            Rx => "apply an Rx gate to one qubit",
+            Rz => "apply an Rz gate to one qubit",
+            AllRx => "apply an Rx gate to all qubits",
+            AllRy => "apply an Ry gate to all qubits",
+            AllRz => "apply an Rz gate to all qubits",
+            AllButOneRx => "apply an Rx gate to all but one qubit",
+            AllButOneRy => "apply an Ry gate to all but one qubit",
+            AllButOneRz => "apply an Rz gate to all but one qubit",
+            AllH => "apply an H gate to all qubits",
+            XXPhase => "apply an XXPhase gate to two qubits within a block",
+            YYPhase => "apply a YYPhase gate to two qubits within a block",
+            ZZPhase => "apply a ZZPhase gate to two qubits within a block",
+            CX => "apply a CX gate to two qubits within a block",
+            SWAP => "swap two qubits within a block",
+            ZZPhaseBetweenBlocks => {
+                "apply a ZZPhase gate to two qubits on different blocks of the same size"
+            }
+            CXTransverse => "apply a CX gate transversally over two blocks of the same size",
+            AllocZero => "allocate a block in the all-zero state",
+            MeasureSyndrome => "perform a syndrome measurement, producing (X,Z) error indicators",
+            MeasureAll => "destructively measure all qubits in the Z basis",
+            MeasureOneX => "non-destructively measure one qubit in the X basis",
+            MeasureOneZ => "non-destructively measure one qubit in the Z basis",
+        }
+        .into()
+    }
+}
+
+/// Extension for logical Iceberg operations.
+pub static EXTENSION: LazyLock<Arc<Extension>> = LazyLock::new(|| {
+    Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
+        IcebergOpDef::load_all_ops(extension, extension_ref).unwrap();
+    })
+});
+
+#[cfg(test)]
+mod tests {
+    use hugr::{
+        CircuitUnit, HugrView,
+        builder::{
+            DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder, ModuleBuilder,
+        },
+        envelope::{EnvelopeConfig, EnvelopeFormat, read_envelope, write_envelope},
+        extension::ExtensionRegistry,
+        ops::DataflowOpTrait,
+        package::Package,
+        std_extensions::{
+            arithmetic::float_types::ConstF64, collections::array::array_type, std_reg,
+        },
+        types::Signature,
+    };
+
+    use crate::iceberg::types::EXTENSION as types_extension;
+    use crate::iceberg::types::block_type;
+
+    use super::*;
+
+    #[test]
+    fn test_iceberg_ops_extension() {
+        assert_eq!(EXTENSION.name() as &str, "logical.iceberg.ops");
+        assert_eq!(EXTENSION.types().count(), 0);
+        assert_eq!(EXTENSION.operations().count(), 35);
+    }
+
+    #[test]
+    fn test_signatures() {
+        assert_eq!(
+            IcebergOpDef::X
+                .with_size_and_index(6, 3)
+                .to_extension_op()
+                .unwrap()
+                .signature()
+                .as_ref(),
+            &Signature::new(block_type(6), block_type(6))
+        );
+    }
+
+    #[test]
+    fn test_hugr_ops() {
+        let block = block_type(6);
+        let x3 = EXTENSION
+            .instantiate_extension_op("X", [6.into(), 3.into()])
+            .unwrap();
+        let z4 = EXTENSION
+            .instantiate_extension_op("Z", [6.into(), 4.into()])
+            .unwrap();
+        let yy14 = EXTENSION
+            .instantiate_extension_op("YY", [6.into(), 1.into(), 4.into()])
+            .unwrap();
+        let allx = EXTENSION
+            .instantiate_extension_op("AllX", [6.into()])
+            .unwrap();
+        let allrz = EXTENSION
+            .instantiate_extension_op("AllRz", [6.into()])
+            .unwrap();
+        let rz3 = EXTENSION
+            .instantiate_extension_op("Rz", [6.into(), 3.into()])
+            .unwrap();
+        let allbutonery1 = EXTENSION
+            .instantiate_extension_op("AllButOneRy", [6.into(), 1.into()])
+            .unwrap();
+        let allh = EXTENSION
+            .instantiate_extension_op("AllH", [6.into()])
+            .unwrap();
+        let yyphase05 = EXTENSION
+            .instantiate_extension_op("YYPhase", [6.into(), 0.into(), 5.into()])
+            .unwrap();
+        let zzphasebetweenblocks34 = EXTENSION
+            .instantiate_extension_op("ZZPhaseBetweenBlocks", [6.into(), 3.into(), 4.into()])
+            .unwrap();
+        let cxtransverse = EXTENSION
+            .instantiate_extension_op("CXTransverse", [6.into()])
+            .unwrap();
+        let cx23 = EXTENSION
+            .instantiate_extension_op("CX", [6.into(), 2.into(), 3.into()])
+            .unwrap();
+        let swap51 = EXTENSION
+            .instantiate_extension_op("SWAP", [6.into(), 5.into(), 1.into()])
+            .unwrap();
+        let mut module_builder = ModuleBuilder::new();
+        let signature = Signature::new_endo(vec![block; 2]);
+        let mut f_build = module_builder.define_function("main", signature).unwrap();
+        let wires: Vec<_> = f_build.input_wires().collect();
+        let mut linear = f_build.as_circuit(wires);
+        linear.append(x3, [0]).unwrap();
+        linear.append(z4, [0]).unwrap();
+        linear.append(yy14, [0]).unwrap();
+        linear.append(allx, [0]).unwrap();
+        let angle = linear.add_constant(ConstF64::new(0.25));
+        linear
+            .append_and_consume(allrz, [CircuitUnit::Linear(0), CircuitUnit::Wire(angle)])
+            .unwrap();
+        linear
+            .append_and_consume(rz3, [CircuitUnit::Linear(0), CircuitUnit::Wire(angle)])
+            .unwrap();
+        linear
+            .append_and_consume(
+                allbutonery1,
+                [CircuitUnit::Linear(0), CircuitUnit::Wire(angle)],
+            )
+            .unwrap();
+        linear.append(allh, [0]).unwrap();
+        linear
+            .append_and_consume(
+                yyphase05,
+                [CircuitUnit::Linear(0), CircuitUnit::Wire(angle)],
+            )
+            .unwrap();
+        linear
+            .append_and_consume(
+                zzphasebetweenblocks34,
+                [
+                    CircuitUnit::Linear(0),
+                    CircuitUnit::Linear(1),
+                    CircuitUnit::Wire(angle),
+                ],
+            )
+            .unwrap();
+        linear.append(cxtransverse, [0, 1]).unwrap();
+        linear.append(cx23, [1]).unwrap();
+        linear.append(swap51, [0]).unwrap();
+        let outs = linear.finish();
+        f_build.finish_with_outputs(outs).unwrap();
+        let h = module_builder.finish_hugr().unwrap();
+        h.validate().unwrap();
+    }
+
+    #[test]
+    fn test_alloc_measure() {
+        let alloczero = EXTENSION
+            .instantiate_extension_op("AllocZero", [7.into()])
+            .unwrap();
+        let x3 = EXTENSION
+            .instantiate_extension_op("X", [7.into(), 3.into()])
+            .unwrap();
+        let measuresyndrome = EXTENSION
+            .instantiate_extension_op("MeasureSyndrome", [7.into()])
+            .unwrap();
+        let mut outputs: Vec<Type> = vec![block_type(7)];
+        outputs.extend(vec![bool_t(); 2]);
+        let mut dfg_builder = DFGBuilder::new(Signature::new(vec![], outputs)).unwrap();
+        let handle = dfg_builder.add_dataflow_op(alloczero, vec![]).unwrap();
+        let handle = dfg_builder.add_dataflow_op(x3, handle.outputs()).unwrap();
+        let handle = dfg_builder
+            .add_dataflow_op(measuresyndrome, handle.outputs())
+            .unwrap();
+        let h = dfg_builder
+            .finish_hugr_with_outputs(handle.outputs())
+            .unwrap();
+        h.validate().unwrap();
+    }
+
+    #[test]
+    fn test_measure_all() {
+        let measureall = EXTENSION
+            .instantiate_extension_op("MeasureAll", [4.into()])
+            .unwrap();
+        let mut dfg_builder =
+            DFGBuilder::new(Signature::new(vec![block_type(4)], array_type(4, bool_t()))).unwrap();
+        let handle = dfg_builder
+            .add_dataflow_op(measureall, dfg_builder.input_wires())
+            .unwrap();
+        let h = dfg_builder
+            .finish_hugr_with_outputs(handle.outputs())
+            .unwrap();
+        h.validate().unwrap();
+    }
+
+    #[test]
+    fn test_measure_one() {
+        let measureonez0 = EXTENSION
+            .instantiate_extension_op("MeasureOneZ", [2.into(), 0.into()])
+            .unwrap();
+        let measureonez1 = EXTENSION
+            .instantiate_extension_op("MeasureOneZ", [2.into(), 1.into()])
+            .unwrap();
+        let allh = EXTENSION
+            .instantiate_extension_op("AllH", [2.into()])
+            .unwrap();
+        let mut dfg_builder = DFGBuilder::new(Signature::new(
+            vec![block_type(2)],
+            vec![block_type(2), bool_t(), bool_t()],
+        ))
+        .unwrap();
+        let handle = dfg_builder
+            .add_dataflow_op(allh, dfg_builder.input_wires())
+            .unwrap();
+        let handle = dfg_builder
+            .add_dataflow_op(measureonez0, handle.outputs())
+            .unwrap();
+        let [block, c0] = handle.outputs_arr();
+        let handle = dfg_builder
+            .add_dataflow_op(measureonez1, vec![block])
+            .unwrap();
+        let [block, c1] = handle.outputs_arr();
+        let h = dfg_builder
+            .finish_hugr_with_outputs(vec![block, c0, c1])
+            .unwrap();
+        h.validate().unwrap();
+    }
+
+    #[test]
+    fn test_serialization() {
+        let block = block_type(6);
+        let x3 = EXTENSION
+            .instantiate_extension_op("X", [6.into(), 3.into()])
+            .unwrap();
+        let mut module_builder = ModuleBuilder::new();
+        let signature = Signature::new_endo(vec![block]);
+        let mut f_build = module_builder.define_function("main", signature).unwrap();
+        let wires: Vec<_> = f_build.input_wires().collect();
+        let mut linear = f_build.as_circuit(wires);
+        linear.append(x3, [0]).unwrap();
+        let outs = linear.finish();
+        f_build.finish_with_outputs(outs).unwrap();
+        let h = module_builder.finish_hugr().unwrap();
+        let package = Package::new([h]);
+        let mut bytes: Vec<u8> = Vec::new();
+        write_envelope(
+            &mut bytes,
+            &package,
+            EnvelopeConfig::new(EnvelopeFormat::ModelWithExtensions),
+        )
+        .unwrap();
+        let buff = std::io::BufReader::new(bytes.as_slice());
+        let mut reg: ExtensionRegistry = std_reg();
+        reg.extend([types_extension.clone(), EXTENSION.clone()]);
+        let (_, package1) = read_envelope(buff, &reg).unwrap();
+        let h1 = &package1.modules[0];
+        h1.validate().unwrap();
+    }
+
+    #[test]
+    fn test_mismatched_k() {
+        let block = block_type(6);
+        let x3 = EXTENSION
+            .instantiate_extension_op("X", [6.into(), 3.into()])
+            .unwrap();
+        let x3_bad_k = EXTENSION
+            .instantiate_extension_op("X", [5.into(), 3.into()])
+            .unwrap();
+        let mut module_builder = ModuleBuilder::new();
+        let signature = Signature::new_endo(vec![block]);
+        let mut f_build = module_builder.define_function("main", signature).unwrap();
+        let wires: Vec<_> = f_build.input_wires().collect();
+        let mut linear = f_build.as_circuit(wires);
+        linear.append(x3, [0]).unwrap();
+        linear.append(x3_bad_k, [0]).unwrap();
+        let outs = linear.finish();
+        f_build.finish_with_outputs(outs).unwrap();
+        assert!(module_builder.finish_hugr().is_err());
+    }
+
+    #[test]
+    fn test_invalid_ops() {
+        assert!(
+            EXTENSION
+                .instantiate_extension_op("X", [1.into(), 0.into()])
+                .is_err()
+        );
+        assert!(
+            EXTENSION
+                .instantiate_extension_op("X", [6.into(), 6.into()])
+                .is_err()
+        );
+        assert!(
+            EXTENSION
+                .instantiate_extension_op("XX", [6.into(), 0.into()])
+                .is_err()
+        );
+    }
+}

@@ -2742,6 +2742,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "tket-qec"
+version = "0.1.0"
+dependencies = [
+ "hugr",
+ "semver",
+ "strum",
+]
+
+[[package]]
 name = "tket-qsystem"
 version = "0.23.0"
 dependencies = [
