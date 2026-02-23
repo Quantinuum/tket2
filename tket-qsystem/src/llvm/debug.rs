@@ -7,11 +7,12 @@ use hugr::llvm::CodegenExtsBuilder;
 use hugr::llvm::custom::CodegenExtension;
 use hugr::llvm::emit::{EmitFuncContext, EmitOpArgs};
 use hugr::llvm::inkwell::AddressSpace;
+use hugr::llvm::inkwell::types::BasicType;
 use hugr::ops::ExtensionOp;
 use hugr::{HugrView, Node};
 use tket::extension::debug::{DEBUG_EXTENSION_ID, STATE_RESULT_OP_ID, StateResult};
 
-use super::array_utils::{ArrayLowering, ElemType, struct_1d_arr_alloc, struct_1d_arr_ptr_t};
+use super::array_utils::{ArrayLowering, ElemType, struct_1d_arr_alloc};
 
 static TAG_PREFIX: &str = "USER:";
 
@@ -54,8 +55,9 @@ impl<AL: ArrayLowering> DebugCodegenExtension<AL> {
         // Types (qubits are just i64s).
         let iw_ctx = ctx.iw_context();
         let void_t = iw_ctx.void_type();
-        let i8_ptr_t = iw_ctx.i8_type().ptr_type(AddressSpace::default());
+        let i8_t = iw_ctx.i8_type();
         let i64_t = iw_ctx.i64_type();
+        let ptr_t = iw_ctx.ptr_type(AddressSpace::default());
 
         // Tag arguments.
         let state_result = StateResult::from_extension_op(args.node().as_ref())?;
@@ -64,14 +66,13 @@ impl<AL: ArrayLowering> DebugCodegenExtension<AL> {
             bail!("Empty state result tag received");
         }
         let tag_ptr = emit_global_string(ctx, tag, "res_", format!("{TAG_PREFIX}STATE:"))?;
+        // The first byte of the string contains its length. Load that value
+        // and zext it into i64.
         let tag_len = {
-            let mut l = builder
-                .build_load(tag_ptr.into_pointer_value(), "tag_len")?
+            let l = builder
+                .build_load(i8_t, tag_ptr.into_pointer_value(), "tag_len")?
                 .into_int_value();
-            if l.get_type() != i64_t {
-                l = builder.build_int_z_extend(l, i64_t, "tag_len")?;
-            }
-            l
+            builder.build_int_z_extend(l, i64_t, "tag_len")?
         };
 
         // Qubit array argument.
@@ -80,7 +81,8 @@ impl<AL: ArrayLowering> DebugCodegenExtension<AL> {
             .inputs
             .try_into()
             .map_err(|_| anyhow!(format!("StateResult expects a qubit array argument")))?;
-        let qubits_array = self.array_lowering.array_to_ptr(builder, qubits)?;
+        let qubits_array = self.array_lowering.array_to_ptr(
+            builder, qubits, i64_t.as_basic_type_enum())?;
         let (qubits_ptr, _) = struct_1d_arr_alloc(
             iw_ctx,
             builder,
@@ -94,9 +96,9 @@ impl<AL: ArrayLowering> DebugCodegenExtension<AL> {
             "print_state_result",
             void_t.fn_type(
                 &[
-                    i8_ptr_t.into(),
+                    ptr_t.into(),
                     i64_t.into(),
-                    struct_1d_arr_ptr_t(iw_ctx, &ElemType::Int).into(),
+                    ptr_t.into(),
                 ],
                 false,
             ),

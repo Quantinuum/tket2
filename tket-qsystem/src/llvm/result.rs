@@ -12,13 +12,13 @@ use hugr::llvm::types::HugrSumType;
 use inkwell::AddressSpace;
 use inkwell::builder::Builder;
 use inkwell::context::Context;
-use inkwell::types::{FloatType, IntType, PointerType, VoidType};
+use inkwell::types::{FloatType, IntType, PointerType, VoidType, BasicMetadataTypeEnum};
 use inkwell::values::{BasicValueEnum, FunctionValue, IntValue};
 use tket::hugr::extension::simple_op::MakeExtensionOp;
 use tket::hugr::ops::ExtensionOp;
 use tket::hugr::{HugrView, Node};
 
-use super::array_utils::{ArrayLowering, ElemType, struct_1d_arr_alloc, struct_1d_arr_ptr_t};
+use super::array_utils::{ArrayLowering, ElemType, struct_1d_arr_alloc};
 
 static TAG_PREFIX: &str = "USER:";
 
@@ -60,8 +60,12 @@ impl<'c, H: HugrView<Node = Node>, AL: ArrayLowering + Clone> ResultEmitter<'c, 
         self.0.typing_session().iw_context()
     }
 
-    fn int_t(&self) -> IntType<'c> {
+    fn i64_t(&self) -> IntType<'c> {
         self.iw_context().i64_type()
+    }
+
+    fn i8_t(&self) -> IntType<'c> {
+        self.iw_context().i8_type()
     }
 
     fn float_t(&self) -> FloatType<'c> {
@@ -72,10 +76,8 @@ impl<'c, H: HugrView<Node = Node>, AL: ArrayLowering + Clone> ResultEmitter<'c, 
         self.iw_context().bool_type()
     }
 
-    fn i8_ptr_t(&self) -> PointerType<'c> {
-        self.iw_context()
-            .i8_type()
-            .ptr_type(AddressSpace::default())
+    fn ptr_t(&self) -> PointerType<'c> {
+        self.iw_context().ptr_type(AddressSpace::default())
     }
 
     fn void_t(&self) -> VoidType<'c> {
@@ -88,18 +90,18 @@ impl<'c, H: HugrView<Node = Node>, AL: ArrayLowering + Clone> ResultEmitter<'c, 
 
     fn get_func_print(&self, op: &ResultOp) -> Result<FunctionValue<'c>> {
         // The first two parameters are the same for all print function variants
-        let mut params = vec![self.i8_ptr_t().into(), self.int_t().into()];
+        let mut params : Vec<BasicMetadataTypeEnum> = vec![self.ptr_t().into(), self.i64_t().into()];
         let symbol = match op.result_op {
             ResultOpDef::Bool => {
                 params.push(self.bool_t().into());
                 "print_bool"
             }
             ResultOpDef::Int => {
-                params.push(self.int_t().into());
+                params.push(self.i64_t().into());
                 "print_int"
             }
             ResultOpDef::UInt => {
-                params.push(self.int_t().into());
+                params.push(self.i64_t().into());
                 "print_uint"
             }
             ResultOpDef::F64 => {
@@ -107,19 +109,19 @@ impl<'c, H: HugrView<Node = Node>, AL: ArrayLowering + Clone> ResultEmitter<'c, 
                 "print_float"
             }
             ResultOpDef::ArrBool => {
-                params.push(struct_1d_arr_ptr_t(self.iw_context(), &ElemType::Bool).into());
+                params.push(self.ptr_t().into());
                 "print_bool_arr"
             }
             ResultOpDef::ArrInt => {
-                params.push(struct_1d_arr_ptr_t(self.iw_context(), &ElemType::Int).into());
+                params.push(self.ptr_t().into());
                 "print_int_arr"
             }
             ResultOpDef::ArrUInt => {
-                params.push(struct_1d_arr_ptr_t(self.iw_context(), &ElemType::Uint).into());
+                params.push(self.ptr_t().into());
                 "print_uint_arr"
             }
             ResultOpDef::ArrF64 => {
-                params.push(struct_1d_arr_ptr_t(self.iw_context(), &ElemType::Float).into());
+                params.push(self.ptr_t().into());
                 "print_float_arr"
             }
         };
@@ -146,14 +148,9 @@ impl<'c, H: HugrView<Node = Node>, AL: ArrayLowering + Clone> ResultEmitter<'c, 
             let mut l = self
                 .0
                 .builder()
-                .build_load(tag_ptr.into_pointer_value(), "tag_len")?
+                .build_load(self.i8_t(), tag_ptr.into_pointer_value(), "tag_len")?
                 .into_int_value();
-            if self.int_t() != l.get_type() {
-                l = self
-                    .builder()
-                    .build_int_z_extend(l, self.int_t(), "tag_len")?;
-            }
-            l
+            self.builder().build_int_z_extend(l, self.i64_t(), "tag_len")?
         };
 
         Ok((tag_ptr, tag_len))
@@ -173,7 +170,8 @@ impl<'c, H: HugrView<Node = Node>, AL: ArrayLowering + Clone> ResultEmitter<'c, 
         };
 
         let print_fn = self.get_func_print(op)?;
-        let array = self.1.array_to_ptr(self.builder(), val)?;
+        let array = self.1.array_to_ptr(self.builder(), val,
+            data_type.llvm_type(self.iw_context()))?;
         let (array_ptr, _) = struct_1d_arr_alloc(
             self.iw_context(),
             self.builder(),

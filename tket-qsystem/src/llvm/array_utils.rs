@@ -2,7 +2,7 @@
 
 // TODO move to hugr-llvm crate
 // https://github.com/quantinuum/tket2/issues/899
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use hugr::extension::prelude::usize_t;
 use hugr::llvm::emit::EmitFuncContext;
 use hugr::llvm::extension::collections::array::{
@@ -32,6 +32,7 @@ pub trait ArrayLowering {
         &self,
         builder: &Builder<'c>,
         val: BasicValueEnum<'c>,
+        elem_type: BasicTypeEnum<'c>,
     ) -> Result<PointerValue<'c>>;
 
     /// Turns a pointer to the first array element into an array value in the given lowering.
@@ -76,9 +77,10 @@ impl<ACG: stack_array::ArrayCodegen + Clone> ArrayLowering for StackArrayLowerin
         &self,
         builder: &Builder<'c>,
         val: BasicValueEnum<'c>,
+        _elem_type: BasicTypeEnum<'c>,
     ) -> Result<PointerValue<'c>> {
-        let (elem_ptr, _) = build_array_alloca(builder, val.into_array_value())?;
-        Ok(elem_ptr)
+        build_array_alloca(builder, val.into_array_value())
+            .map_err(|e| anyhow!("Could not build array alloca: {e}"))
     }
 
     fn array_from_ptr<'c, H: HugrView<Node = Node>>(
@@ -89,16 +91,8 @@ impl<ACG: stack_array::ArrayCodegen + Clone> ArrayLowering for StackArrayLowerin
         length: u32,
     ) -> Result<BasicValueEnum<'c>> {
         let builder = ctx.builder();
-        let ptr = builder
-            .build_bit_cast(
-                ptr,
-                elem_type
-                    .array_type(length)
-                    .ptr_type(AddressSpace::default()),
-                "",
-            )?
-            .into_pointer_value();
-        let array = builder.build_load(ptr, "")?.into_array_value();
+        let array_ty = elem_type.array_type(length);
+        let array = builder.build_load(array_ty, ptr, "")?.into_array_value();
         Ok(array.into())
     }
 }
@@ -127,9 +121,10 @@ impl<ACG: array::ArrayCodegen + Clone> ArrayLowering for HeapArrayLowering<ACG> 
         &self,
         builder: &Builder<'c>,
         val: BasicValueEnum<'c>,
+        elem_type: BasicTypeEnum<'c>,
     ) -> Result<PointerValue<'c>> {
         let (array_ptr, offset) = decompose_array_fat_pointer(builder, val)?;
-        let elem_ptr = unsafe { builder.build_in_bounds_gep(array_ptr, &[offset], "")? };
+        let elem_ptr = unsafe { builder.build_in_bounds_gep(elem_type, array_ptr, &[offset], "")? };
         Ok(elem_ptr)
     }
 
@@ -153,26 +148,19 @@ impl<ACG: array::ArrayCodegen + Clone> ArrayLowering for HeapArrayLowering<ACG> 
 
 /// Helper function to allocate an array on the stack.
 ///
-/// Returns two pointers: The first one is a pointer to the first element of the
-/// array (i.e. it is of type `array.get_element_type().ptr_type()`) whereas the
-/// second one points to the whole array value, i.e. it is of type `array.ptr_type()`.
-// Note: copied from
-// https://github.com/quantinuum/hugr/blob/bf3889fa206fbb5a22a5ae4b9ea5f8cc0468b4b7/hugr-llvm/src/extension/collections/array.rs#L186
+/// Returns a pointer to the newly allocated array. 
 pub fn build_array_alloca<'c>(
     builder: &Builder<'c>,
     array: ArrayValue<'c>,
-) -> Result<(PointerValue<'c>, PointerValue<'c>), BuilderError> {
+) -> Result<PointerValue<'c>, BuilderError> {
     let array_ty = array.get_type();
     let array_len: IntValue<'c> = {
         let ctx = builder.get_insert_block().unwrap().get_context();
         ctx.i32_type().const_int(u64::from(array_ty.len()), false)
     };
     let ptr = builder.build_array_alloca(array_ty.get_element_type(), array_len, "")?;
-    let array_ptr = builder
-        .build_bit_cast(ptr, array_ty.ptr_type(AddressSpace::default()), "")?
-        .into_pointer_value();
-    builder.build_store(array_ptr, array)?;
-    Result::Ok((ptr, array_ptr))
+    builder.build_store(ptr, array)?;
+    Result::Ok(ptr)
 }
 
 /// Helper function to load an array from a pointer.
@@ -182,16 +170,9 @@ pub fn build_int_array_load<'c>(
     elem_type: IntType<'c>,
     length: u32,
 ) -> Result<ArrayValue<'c>, BuilderError> {
-    let ptr = builder
-        .build_bit_cast(
-            array_ptr,
-            elem_type
-                .array_type(length)
-                .ptr_type(AddressSpace::default()),
-            "",
-        )?
-        .into_pointer_value();
-    let array = builder.build_load(ptr, "")?.into_array_value();
+    
+    let array_ty = elem_type.array_type(length);
+    let array = builder.build_load(array_ty, array_ptr, "")?.into_array_value();
     Result::Ok(array)
 }
 
@@ -207,6 +188,17 @@ pub enum ElemType {
     Bool,
 }
 
+impl ElemType {
+    pub fn llvm_type<'a>(&self, ctx: &'a Context) -> BasicTypeEnum<'a> {
+        match *self {
+            ElemType::Int | ElemType::Uint => ctx.i64_type().into(),
+            ElemType::Float => ctx.f64_type().into(),
+            ElemType::Bool => ctx.bool_type().into(),
+        }
+    }
+}
+
+
 /// Helper function to create a dense array struct type.
 ///
 /// The struct contains four fields:
@@ -220,26 +212,16 @@ pub enum ElemType {
 /// primary data in memory and contains boolean values to indicate the presence
 /// of data in the primary array. Dense arrays have mask values of all zeros.
 pub fn struct_1d_arr_t<'a>(ctx: &'a Context, data_type: &'a ElemType) -> StructType<'a> {
-    let data_ptr_t = match data_type {
-        ElemType::Int | ElemType::Uint => ctx.i64_type().ptr_type(AddressSpace::default()),
-        ElemType::Float => ctx.f64_type().ptr_type(AddressSpace::default()),
-        ElemType::Bool => ctx.bool_type().ptr_type(AddressSpace::default()),
-    };
+    let ptr_t = ctx.ptr_type(AddressSpace::default());
     ctx.struct_type(
         &[
             ctx.i32_type().into(), // x
             ctx.i32_type().into(), // y
-            data_ptr_t.into(),     /* pointer to first array
-                                    * elem */
-            ctx.bool_type().ptr_type(AddressSpace::default()).into(), // pointer to first mask elem
+            ptr_t.into(),  // pointer to first element
+            ptr_t.into(), // pointer to first mask element
         ],
         true,
     )
-}
-
-/// Helper function to create a `PointerType` to a dense array.
-pub fn struct_1d_arr_ptr_t<'a>(ctx: &'a Context, data_type: &'a ElemType) -> PointerType<'a> {
-    struct_1d_arr_t(ctx, data_type).ptr_type(AddressSpace::default())
 }
 
 /// Helper function to allocate and initialize a dense array struct on the stack.
@@ -256,22 +238,15 @@ pub fn struct_1d_arr_alloc<'a>(
     let out_arr_type = struct_1d_arr_t(ctx, data_type);
     let out_arr_ptr = builder.build_alloca(out_arr_type, "out_arr_alloca")?;
 
-    let x_field = builder.build_struct_gep(out_arr_ptr, 0, "x_ptr")?;
-    let y_field = builder.build_struct_gep(out_arr_ptr, 1, "y_ptr")?;
-    let arr_field = builder.build_struct_gep(out_arr_ptr, 2, "arr_ptr")?;
-    let mask_field = builder.build_struct_gep(out_arr_ptr, 3, "mask_ptr")?;
+    let ptr_t = ctx.ptr_type(AddressSpace::default());
+    let x_field = builder.build_struct_gep(ptr_t, out_arr_ptr, 0, "x_ptr")?;
+    let y_field = builder.build_struct_gep(ptr_t, out_arr_ptr, 1, "y_ptr")?;
+    let arr_field = builder.build_struct_gep(ptr_t, out_arr_ptr, 2, "arr_ptr")?;
+    let mask_field = builder.build_struct_gep(ptr_t, out_arr_ptr, 3, "mask_ptr")?;
 
     let x_val = ctx.i32_type().const_int(length.into(), false);
     let y_val = ctx.i32_type().const_int(1, false);
-    let bit_cast_type = match data_type {
-        ElemType::Bool => ctx.bool_type().ptr_type(AddressSpace::default()),
-        ElemType::Int | ElemType::Uint => ctx.i64_type().ptr_type(AddressSpace::default()),
-        ElemType::Float => ctx.f64_type().ptr_type(AddressSpace::default()),
-    };
-    let casted_arr_ptr = builder
-        .build_bit_cast(array_ptr, bit_cast_type, "")?
-        .into_pointer_value();
-    let (mask_ptr, _) = build_array_alloca(
+    let mask_ptr = build_array_alloca(
         builder,
         ctx.bool_type().const_array(
             vec![ctx.bool_type().const_int(0, false); length.try_into().unwrap()].as_slice(),
@@ -280,10 +255,10 @@ pub fn struct_1d_arr_alloc<'a>(
 
     builder.build_store(x_field, x_val)?;
     builder.build_store(y_field, y_val)?;
-    builder.build_store(arr_field, casted_arr_ptr)?;
+    builder.build_store(arr_field, array_ptr)?;
     builder.build_store(mask_field, mask_ptr)?;
 
-    let out_arr = builder.build_load(out_arr_ptr, "")?.into_struct_value();
+    let out_arr = builder.build_load(out_arr_type, out_arr_ptr, "")?.into_struct_value();
 
     Result::Ok((out_arr_ptr, out_arr))
 }
@@ -303,11 +278,9 @@ mod tests {
 
         make_bb(&context, &module, &builder);
 
-        let (ptr, array_ptr) =
-            build_array(&context, &builder).expect("Array allocation should succeed");
+        let ptr = build_array(&context, &builder).expect("Array allocation should succeed");
 
-        assert!(!ptr.is_null(), "Element pointer should not be null");
-        assert!(!array_ptr.is_null(), "Array pointer should not be null");
+        assert!(!ptr.is_null(), "Pointer should not be null");
 
         builder
             .build_return(None)
@@ -391,23 +364,6 @@ mod tests {
 
             // Fourth field should be a pointer to bool type for all structs
             assert!(s.get_field_types()[3].is_pointer_type());
-        }
-    }
-
-    /// Test that struct_1d_arr_ptr_t returns the correct pointer type.
-    #[test]
-    fn test_struct_1d_arr_ptr_t() {
-        let context = Context::create();
-
-        // Test for each element type
-        let int_ptr = struct_1d_arr_ptr_t(&context, &ElemType::Int);
-        let uint_ptr = struct_1d_arr_ptr_t(&context, &ElemType::Uint);
-        let float_ptr = struct_1d_arr_ptr_t(&context, &ElemType::Float);
-        let bool_ptr = struct_1d_arr_ptr_t(&context, &ElemType::Bool);
-
-        // Test that all element types return struct pointer types
-        for ptr in [int_ptr, uint_ptr, float_ptr, bool_ptr] {
-            assert!(ptr.get_element_type().is_struct_type());
         }
     }
 
