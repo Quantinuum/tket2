@@ -1087,8 +1087,8 @@ dependencies = [
 
 [[package]]
 name = "hugr"
-version = "0.30.0"
-source = "git+https://github.com/quantinuum/hugr?rev=3dacad485c1004a84b22e8a1de0f86fb7087e05b#3dacad485c1004a84b22e8a1de0f86fb7087e05b"
+version = "0.25.6"
+source = "git+https://github.com/quantinuum/hugr?branch=george%2Fllvmup#7d8587c64086ea5a2a4486b23ef7b73ab2c44040"
 dependencies = [
  "hugr-core",
  "hugr-llvm",
@@ -1098,8 +1098,8 @@ dependencies = [
 
 [[package]]
 name = "hugr-cli"
-version = "0.30.0"
-source = "git+https://github.com/quantinuum/hugr?rev=3dacad485c1004a84b22e8a1de0f86fb7087e05b#3dacad485c1004a84b22e8a1de0f86fb7087e05b"
+version = "0.25.6"
+source = "git+https://github.com/quantinuum/hugr?branch=george%2Fllvmup#7d8587c64086ea5a2a4486b23ef7b73ab2c44040"
 dependencies = [
  "anyhow",
  "clap",
@@ -1118,8 +1118,8 @@ dependencies = [
 
 [[package]]
 name = "hugr-core"
-version = "0.30.0"
-source = "git+https://github.com/quantinuum/hugr?rev=3dacad485c1004a84b22e8a1de0f86fb7087e05b#3dacad485c1004a84b22e8a1de0f86fb7087e05b"
+version = "0.25.6"
+source = "git+https://github.com/quantinuum/hugr?branch=george%2Fllvmup#7d8587c64086ea5a2a4486b23ef7b73ab2c44040"
 dependencies = [
  "base64",
  "cgmath",
@@ -1155,8 +1155,8 @@ dependencies = [
 
 [[package]]
 name = "hugr-llvm"
-version = "0.30.0"
-source = "git+https://github.com/quantinuum/hugr?rev=3dacad485c1004a84b22e8a1de0f86fb7087e05b#3dacad485c1004a84b22e8a1de0f86fb7087e05b"
+version = "0.25.6"
+source = "git+https://github.com/quantinuum/hugr?branch=george%2Fllvmup#7d8587c64086ea5a2a4486b23ef7b73ab2c44040"
 dependencies = [
  "anyhow",
  "cc",
@@ -1174,8 +1174,8 @@ dependencies = [
 
 [[package]]
 name = "hugr-model"
-version = "0.30.0"
-source = "git+https://github.com/quantinuum/hugr?rev=3dacad485c1004a84b22e8a1de0f86fb7087e05b#3dacad485c1004a84b22e8a1de0f86fb7087e05b"
+version = "0.25.6"
+source = "git+https://github.com/quantinuum/hugr?branch=george%2Fllvmup#7d8587c64086ea5a2a4486b23ef7b73ab2c44040"
 dependencies = [
  "base64",
  "bumpalo",
@@ -1195,8 +1195,8 @@ dependencies = [
 
 [[package]]
 name = "hugr-passes"
-version = "0.30.0"
-source = "git+https://github.com/quantinuum/hugr?rev=3dacad485c1004a84b22e8a1de0f86fb7087e05b#3dacad485c1004a84b22e8a1de0f86fb7087e05b"
+version = "0.25.6"
+source = "git+https://github.com/quantinuum/hugr?branch=george%2Fllvmup#7d8587c64086ea5a2a4486b23ef7b73ab2c44040"
 dependencies = [
  "ascent",
  "derive_more 2.1.1",
