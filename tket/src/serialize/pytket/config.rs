@@ -14,7 +14,7 @@ use crate::serialize::pytket::extension::{
 };
 use hugr::HugrView;
 
-/// Default pytket decoder configuration for [`Circuit`][crate::Circuit]s.
+/// Default pytket decoder configuration for Hugrs.
 ///
 /// Contains a list of custom decoders that define translations of legacy tket
 /// primitives into HUGR operations.
@@ -33,7 +33,7 @@ pub fn default_decoder_config() -> PytketDecoderConfig {
     config
 }
 
-/// Default encoder configuration for [`Circuit`][crate::Circuit]s.
+/// Default encoder configuration for Hugrs.
 ///
 /// Contains emitters for std and tket operations.
 pub fn default_encoder_config<H: HugrView>() -> PytketEncoderConfig<H> {

@@ -114,7 +114,7 @@ impl DecodeOptions {
 }
 
 /// Where to insert the decoded circuit when calling
-/// [`TKETDecode::decode_inplace`][super::TKETDecode::decode_inplace].
+/// [`TKETDecode::decode_into`][super::TKETDecode::decode_into].
 #[derive(Debug, derive_more::Display, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum DecodeInsertionTarget {

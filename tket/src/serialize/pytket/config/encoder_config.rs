@@ -1,4 +1,4 @@
-//! Configuration for converting [`Circuit`]s into
+//! Configuration for converting Hugrs into
 //! [`tket_json_rs::circuit_json::SerialCircuit`]
 //!
 //! A configuration struct contains a list of custom emitters that define
@@ -19,7 +19,7 @@ use super::TypeTranslatorSet;
 use hugr::HugrView;
 use itertools::Itertools;
 
-/// Configuration for converting [`Circuit`] into
+/// Configuration for converting Hugrs into
 /// [`tket_json_rs::circuit_json::SerialCircuit`].
 ///
 /// Contains custom emitters that define translations for HUGR operations,

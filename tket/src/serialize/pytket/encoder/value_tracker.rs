@@ -199,7 +199,7 @@ pub struct ValueTrackerResult {
 }
 
 impl<N: HugrNode> ValueTracker<N> {
-    /// Create a new [`ValueTracker`] from the inputs of a [`Circuit`].
+    /// Create a new [`ValueTracker`] from the inputs of a Hugr.
     ///
     /// Reads a number of metadata values from the circuit root node, if present, to preserve information on circuits produced by
     /// decoding a pytket circuit:

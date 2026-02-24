@@ -1,4 +1,4 @@
-//! Intermediate structure for encoding [`Circuit`]s into [`SerialCircuit`]s.
+//! Intermediate structure for encoding Hugrs into [`SerialCircuit`]s.
 
 mod unit_generator;
 mod unsupported_tracker;
@@ -34,7 +34,7 @@ use crate::serialize::pytket::config::PytketEncoderConfig;
 use crate::serialize::pytket::extension::RegisterCount;
 use crate::serialize::pytket::opaque::{OpaqueSubgraph, OpaqueSubgraphPayload};
 
-/// The state of an in-progress [`SerialCircuit`] being built from a [`Circuit`].
+/// The state of an in-progress [`SerialCircuit`] being built from a Hugr.
 #[derive(derive_more::Debug)]
 #[debug(bounds(H: HugrView))]
 pub struct PytketEncoderContext<H: HugrView> {
@@ -145,11 +145,11 @@ impl<'a> EmitCommandOptions<'a> {
 }
 
 impl<H: HugrView> PytketEncoderContext<H> {
-    /// Create a new [`PytketEncoderContext`] from a [`Circuit`].
+    /// Create a new [`PytketEncoderContext`] from a Hugr.
     ///
     /// # Arguments
     ///
-    /// - `circ`: The circuit to encode.
+    /// - `hugr`: The Hugr to encode.
     /// - `region`: The region of the circuit to encode.
     /// - `opaque_subgraphs`: The opaque subgraphs registry to use.
     /// - `config`: The configuration for the encoder.

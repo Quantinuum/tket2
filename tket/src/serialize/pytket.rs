@@ -45,7 +45,7 @@ use self::decoder::PytketDecoderContext;
 use crate::extension::rotation::rotation_type;
 pub use crate::passes::pytket::lower_to_pytket;
 
-/// A serialized representation of a [`Circuit`].
+/// Encode and decode dataflow regions in HUGRs into pytket-like flat quantum circuits.
 ///
 /// Implemented by [`SerialCircuit`], the JSON format used by tket1's `pytket` library.
 pub trait TKETDecode: Sized {
