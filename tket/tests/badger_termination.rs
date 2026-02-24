@@ -51,7 +51,7 @@ fn simple_circ() -> Circuit {
         "qubits": [["q", [0]], ["q", [1]], ["q", [2]]]
     }"#;
     let ser: SerialCircuit = serde_json::from_str(json).unwrap();
-    ser.decode(DecodeOptions::new()).unwrap()
+    ser.decode(DecodeOptions::new()).unwrap().into()
 }
 
 #[rstest]

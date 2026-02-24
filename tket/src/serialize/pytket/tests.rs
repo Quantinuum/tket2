@@ -15,7 +15,6 @@ use std::sync::Arc;
 
 use super::TKETDecode;
 use crate::TketOp;
-use crate::circuit::Circuit;
 use crate::extension::TKET1_EXTENSION_ID;
 use crate::extension::bool::{BoolOp, bool_type};
 use crate::extension::rotation::{ConstRotation, RotationOp, rotation_type};
@@ -28,12 +27,12 @@ use crate::serialize::pytket::{
     PytketDecodeErrorInner, PytketDecoderConfig, PytketEncodeOpError, PytketEncoderConfig,
     default_decoder_config, default_encoder_config,
 };
-use hugr::HugrView;
 use hugr::hugr::hugrmut::HugrMut;
 use hugr::ops::handle::FuncID;
 use hugr::ops::{OpParent, OpType, Value};
 use hugr::std_extensions::arithmetic::float_ops::FloatOps;
 use hugr::types::{Signature, SumType};
+use hugr::{Hugr, HugrView};
 use itertools::Itertools;
 use rstest::{fixture, rstest};
 use tket_json_rs::circuit_json::{self, SerialCircuit};
@@ -257,7 +256,7 @@ fn compare_serial_circs(a: &SerialCircuit, b: &SerialCircuit) {
 
 /// A simple circuit with some preset qubit registers
 #[fixture]
-fn circ_preset_qubits() -> Circuit {
+fn circ_preset_qubits() -> Hugr {
     let input_t = vec![qb_t()];
     let output_t = vec![qb_t(), qb_t()];
     let mut h = FunctionBuilder::new("preset_qubits", Signature::new(input_t, output_t)).unwrap();
@@ -285,12 +284,12 @@ fn circ_preset_qubits() -> Circuit {
         .collect_vec(),
     );
 
-    hugr.into()
+    hugr
 }
 
 /// A simple circuit with some input parameters
 #[fixture]
-fn circ_parameterized() -> Circuit {
+fn circ_parameterized() -> Hugr {
     let input_t = vec![qb_t(), rotation_type(), rotation_type(), rotation_type()];
     let output_t = vec![qb_t()];
     let mut h = FunctionBuilder::new("parameterized", Signature::new(input_t, output_t)).unwrap();
@@ -318,12 +317,12 @@ fn circ_parameterized() -> Circuit {
         vec!["alpha".to_string(), "beta".to_string()],
     );
 
-    hugr.into()
+    hugr
 }
 
 /// A circuit with a TK1 opaque operation.
 #[fixture]
-fn circ_tk1_ops() -> Circuit {
+fn circ_tk1_ops() -> Hugr {
     let input_t = vec![qb_t(), qb_t()];
     let output_t = vec![qb_t(), qb_t()];
     let mut h = FunctionBuilder::new("tk1_ops", Signature::new(input_t, output_t)).unwrap();
@@ -339,8 +338,7 @@ fn circ_tk1_ops() -> Circuit {
         .into();
     let [q1, q2] = h.add_dataflow_op(op, [q1, q2]).unwrap().outputs_arr();
 
-    let hugr = h.finish_hugr_with_outputs([q1, q2]).unwrap();
-    hugr.into()
+    h.finish_hugr_with_outputs([q1, q2]).unwrap()
 }
 
 /// A circuit with a non-flat unsupported subgraph.
@@ -348,7 +346,7 @@ fn circ_tk1_ops() -> Circuit {
 /// Tries to allocate a qubit, and panics if it fails.
 /// This creates an unsupported conditional inside the region.
 #[fixture]
-fn circ_unsupported_subtree() -> Circuit {
+fn circ_unsupported_subtree() -> Hugr {
     let input_t = vec![];
     let output_t = vec![qb_t()];
     let mut h =
@@ -360,13 +358,12 @@ fn circ_unsupported_subtree() -> Circuit {
         .outputs_arr();
     let [q] = h.build_unwrap_sum(1, option_type(qb_t()), maybe_q).unwrap();
 
-    let hugr = h.finish_hugr_with_outputs([q]).unwrap();
-    hugr.into()
+    h.finish_hugr_with_outputs([q]).unwrap()
 }
 
 /// A circuit with a recursive function call.
 #[fixture]
-fn circ_recursive() -> Circuit {
+fn circ_recursive() -> Hugr {
     let input_t = vec![qb_t()];
     let output_t = vec![qb_t()];
     let mut h = FunctionBuilder::new("recursive", Signature::new(input_t, output_t)).unwrap();
@@ -374,14 +371,12 @@ fn circ_recursive() -> Circuit {
 
     let [q] = h.input_wires_arr();
     let [q] = h.call(&func, &[], [q]).unwrap().outputs_arr();
-    let hugr = h.finish_hugr_with_outputs([q]).unwrap();
-
-    hugr.into()
+    h.finish_hugr_with_outputs([q]).unwrap()
 }
 
 /// A circuit with global constant definitions.
 #[fixture]
-fn circ_global_defs() -> Circuit {
+fn circ_global_defs() -> Hugr {
     let input_t = vec![qb_t()];
     let output_t = vec![qb_t()];
     let mut h = FunctionBuilder::new(
@@ -406,14 +401,12 @@ fn circ_global_defs() -> Circuit {
         .unwrap()
         .outputs_arr();
     let [q] = h.call(&func_decl, &[], [q]).unwrap().outputs_arr();
-    let hugr = h.finish_hugr_with_outputs([q]).unwrap();
-
-    hugr.into()
+    h.finish_hugr_with_outputs([q]).unwrap()
 }
 
 /// A circuit with non-local dataflow edges.
 #[fixture]
-fn circ_non_local() -> Circuit {
+fn circ_non_local() -> Hugr {
     let input_t = vec![qb_t(), rotation_type()];
     let inner_input_t = vec![qb_t()];
     let output_t = vec![qb_t()];
@@ -435,14 +428,12 @@ fn circ_non_local() -> Circuit {
         dfg.finish_sub_container().unwrap()
     }
     .outputs_arr();
-    let hugr = h.finish_hugr_with_outputs([q]).unwrap();
-
-    hugr.into()
+    h.finish_hugr_with_outputs([q]).unwrap()
 }
 
 /// A simple circuit with ancillae
 #[fixture]
-fn circ_measure_ancilla() -> Circuit {
+fn circ_measure_ancilla() -> Hugr {
     let input_t = vec![qb_t()];
     let output_t = vec![bool_t(), bool_t()];
     let mut h = FunctionBuilder::new("meas_ancilla", Signature::new(input_t, output_t)).unwrap();
@@ -468,13 +459,11 @@ fn circ_measure_ancilla() -> Circuit {
         .unwrap()
         .outputs_arr();
 
-    h.finish_hugr_with_outputs([meas_qb, meas_anc])
-        .unwrap()
-        .into()
+    h.finish_hugr_with_outputs([meas_qb, meas_anc]).unwrap()
 }
 
 #[fixture]
-fn circ_add_angles_symbolic() -> (Circuit, String) {
+fn circ_add_angles_symbolic() -> (Hugr, String) {
     let input_t = vec![qb_t(), rotation_type(), rotation_type()];
     let output_t = vec![qb_t()];
     let mut h =
@@ -490,12 +479,12 @@ fn circ_add_angles_symbolic() -> (Circuit, String) {
         .unwrap()
         .outputs_arr();
 
-    let circ = h.finish_hugr_with_outputs([qb]).unwrap().into();
+    let circ = h.finish_hugr_with_outputs([qb]).unwrap();
     (circ, "(f0) + (f1)".to_string())
 }
 
 #[fixture]
-fn circ_add_angles_constants() -> (Circuit, String) {
+fn circ_add_angles_constants() -> (Hugr, String) {
     let qb_row = vec![qb_t()];
     let mut h = FunctionBuilder::new(
         "add_angles_constants",
@@ -516,13 +505,13 @@ fn circ_add_angles_constants() -> (Circuit, String) {
         .add_dataflow_op(TketOp::Rx, [qb, point5])
         .unwrap()
         .outputs();
-    let circ = h.finish_hugr_with_outputs(qbs).unwrap().into();
+    let circ = h.finish_hugr_with_outputs(qbs).unwrap();
     (circ, "(0.2) + (0.3)".to_string())
 }
 
 #[fixture]
 /// An Rx operation using some complex ops to compute its angle.
-fn circ_complex_angle_computation() -> (Circuit, String) {
+fn circ_complex_angle_computation() -> (Hugr, String) {
     let input_t = vec![qb_t(), rotation_type(), rotation_type()];
     let output_t = vec![qb_t()];
     let mut h = FunctionBuilder::new(
@@ -572,13 +561,13 @@ fn circ_complex_angle_computation() -> (Circuit, String) {
         .unwrap()
         .outputs();
 
-    let circ = h.finish_hugr_with_outputs(qbs).unwrap().into();
+    let circ = h.finish_hugr_with_outputs(qbs).unwrap();
     (circ, "((f0) ** (f1)) + ((cos(pi)) + (0.2))".to_string())
 }
 
 /// A circuit with a nested DFG block.
 #[fixture]
-fn circ_nested_dfgs() -> Circuit {
+fn circ_nested_dfgs() -> Hugr {
     let input_t = vec![qb_t()];
     let output_t = vec![bool_t()];
     let mut h =
@@ -613,12 +602,12 @@ fn circ_nested_dfgs() -> Circuit {
     };
     let [bool] = inner_dfg.outputs_arr();
 
-    h.finish_hugr_with_outputs([bool]).unwrap().into()
+    h.finish_hugr_with_outputs([bool]).unwrap()
 }
 
 // A circuit with some simple circuit and an unsupported subgraph that does not interact with it.
 #[fixture]
-fn circ_independent_subgraph() -> Circuit {
+fn circ_independent_subgraph() -> Hugr {
     let input_t = vec![qb_t(), qb_t(), option_type(bool_t()).into()];
     let output_t = vec![qb_t(), qb_t(), bool_t()];
     let mut h =
@@ -634,13 +623,12 @@ fn circ_independent_subgraph() -> Circuit {
         .build_unwrap_sum(1, option_type(bool_t()), maybe_b)
         .unwrap();
 
-    let hugr = h.finish_hugr_with_outputs([q1, q2, maybe_b]).unwrap();
-    hugr.into()
+    h.finish_hugr_with_outputs([q1, q2, maybe_b]).unwrap()
 }
 
 // A circuit with an unsupported wire from the input to the output.
 #[fixture]
-fn circ_unsupported_io_wire() -> Circuit {
+fn circ_unsupported_io_wire() -> Hugr {
     let input_t = vec![qb_t(), qb_t(), option_type(qb_t()).into()];
     let output_t = vec![qb_t(), qb_t(), option_type(qb_t()).into()];
     let mut h = FunctionBuilder::new(
@@ -656,13 +644,12 @@ fn circ_unsupported_io_wire() -> Circuit {
         .unwrap()
         .outputs_arr();
 
-    let hugr = h.finish_hugr_with_outputs([q1, q2, maybe_q]).unwrap();
-    hugr.into()
+    h.finish_hugr_with_outputs([q1, q2, maybe_q]).unwrap()
 }
 
 // Nodes with order edges should be marked as unsupported to preserve the connection.
 #[fixture]
-fn circ_order_edge() -> Circuit {
+fn circ_order_edge() -> Hugr {
     let input_t = vec![qb_t(), qb_t()];
     let output_t = vec![qb_t(), qb_t()];
     let mut h = FunctionBuilder::new("order_edge", Signature::new(input_t, output_t)).unwrap();
@@ -680,13 +667,12 @@ fn circ_order_edge() -> Circuit {
 
     h.set_order(&cx1, &cx3);
 
-    let hugr = h.finish_hugr_with_outputs([q1, q2]).unwrap();
-    hugr.into()
+    h.finish_hugr_with_outputs([q1, q2]).unwrap()
 }
 
 // Bool types get converted automatically between native and tket representations.
 #[fixture]
-fn circ_bool_conversion() -> Circuit {
+fn circ_bool_conversion() -> Hugr {
     let input_t = vec![bool_t(), bool_type()];
     let output_t = vec![bool_t(), bool_type()];
     let mut h = FunctionBuilder::new("bool_conversion", Signature::new(input_t, output_t)).unwrap();
@@ -702,14 +688,13 @@ fn circ_bool_conversion() -> Circuit {
         .unwrap()
         .outputs_arr();
 
-    let hugr = h.finish_hugr_with_outputs([native_b1, tket_b0]).unwrap();
-    hugr.into()
+    h.finish_hugr_with_outputs([native_b1, tket_b0]).unwrap()
 }
 
 /// A circuit that requires tracking info in `extra_subgraph` or `straight_through_wires`
 /// (see `EncodedCircuitInfo`), for a nested circuit in a CircBox.
 #[fixture]
-fn circ_unsupported_extras_in_circ_box() -> Circuit {
+fn circ_unsupported_extras_in_circ_box() -> Hugr {
     let input_t = vec![option_type(bool_t()).into(), option_type(qb_t()).into()];
     let output_t = vec![bool_t(), option_type(qb_t()).into()];
     let mut h = FunctionBuilder::new(
@@ -736,13 +721,12 @@ fn circ_unsupported_extras_in_circ_box() -> Circuit {
             .outputs_arr()
     };
 
-    let hugr = h.finish_hugr_with_outputs([maybe_b, maybe_q]).unwrap();
-    hugr.into()
+    h.finish_hugr_with_outputs([maybe_b, maybe_q]).unwrap()
 }
 
 // A circuit with an output parameter wire.
 #[fixture]
-fn circ_output_parameter_wire() -> Circuit {
+fn circ_output_parameter_wire() -> Hugr {
     let input_t = vec![];
     let output_t = vec![float64_type(), rotation_type()];
     let mut h =
@@ -759,15 +743,13 @@ fn circ_output_parameter_wire() -> Circuit {
         .unwrap()
         .out_wire(0);
 
-    let hugr = h
-        .finish_hugr_with_outputs([two_pi, two_pi_rotation])
-        .unwrap();
-    hugr.into()
+    h.finish_hugr_with_outputs([two_pi, two_pi_rotation])
+        .unwrap()
 }
 
 // A circuit with a [float64] wire, which should be treated as unsupported.
 #[fixture]
-fn circ_complex_param_type() -> Circuit {
+fn circ_complex_param_type() -> Hugr {
     let input_t = vec![];
     let output_t = vec![SumType::new_tuple(vec![float64_type()]).into()];
     let mut h =
@@ -776,14 +758,13 @@ fn circ_complex_param_type() -> Circuit {
     let float64 = h.add_load_value(ConstF64::new(1.0));
     let float_tuple = h.make_tuple([float64]).unwrap();
 
-    let hugr = h.finish_hugr_with_outputs([float_tuple]).unwrap();
-    hugr.into()
+    h.finish_hugr_with_outputs([float_tuple]).unwrap()
 }
 
 /// A program with two unsupported subgraphs not associated to any qubit or bit.
 /// <https://github.com/CQCL/tket2/issues/1294>
 #[fixture]
-fn circ_unsupported_subgraph_no_registers() -> Circuit {
+fn circ_unsupported_subgraph_no_registers() -> Hugr {
     let input_t = vec![qb_t()];
     let output_t = vec![qb_t(), rotation_type()];
     let mut h = FunctionBuilder::new(
@@ -825,13 +806,12 @@ fn circ_unsupported_subgraph_no_registers() -> Circuit {
     // A separate call that will generate a second opaque subgraph.
     let [rot2] = h.call(&func2, &[], [rot]).unwrap().outputs_arr();
 
-    let hugr = h.finish_hugr_with_outputs([q, rot2]).unwrap();
-    hugr.into()
+    h.finish_hugr_with_outputs([q, rot2]).unwrap()
 }
 
 // A circuit that discards the first qubit input and only outputs the second one.
 #[fixture]
-fn circ_discard_first_qubit() -> Circuit {
+fn circ_discard_first_qubit() -> Hugr {
     let input_t = vec![qb_t(), qb_t()];
     let output_t = vec![qb_t()];
     let mut h =
@@ -843,16 +823,15 @@ fn circ_discard_first_qubit() -> Circuit {
 
     let [q2] = h.add_dataflow_op(TketOp::X, [q2]).unwrap().outputs_arr();
 
-    let hugr = h.finish_hugr_with_outputs([q2]).unwrap();
-    hugr.into()
+    h.finish_hugr_with_outputs([q2]).unwrap()
 }
 
 /// Check that all circuit ops have been translated to a native gate.
 ///
 /// Panics if there are tk1 ops in the circuit.
-fn check_no_tk1_ops(circ: &Circuit) {
-    for node in circ.hugr().entry_descendants() {
-        let Some(op) = circ.hugr().get_optype(node).as_extension_op() else {
+fn check_no_tk1_ops(hugr: &Hugr) {
+    for node in hugr.entry_descendants() {
+        let Some(op) = hugr.get_optype(node).as_extension_op() else {
             continue;
         };
         if op.extension_id() == &TKET1_EXTENSION_ID {
@@ -886,14 +865,14 @@ fn json_roundtrip(
     let ser: circuit_json::SerialCircuit = serde_json::from_str(circ_s).unwrap();
     assert_eq!(ser.commands.len(), num_commands);
 
-    let circ: Circuit = ser.decode(DecodeOptions::new()).unwrap();
-    assert_eq!(circ.qubit_count(), num_qubits);
+    let hugr: Hugr = ser.decode(DecodeOptions::new()).unwrap();
+    assert_eq!(crate::Circuit::new(&hugr).qubit_count(), num_qubits);
 
     if !has_tk1_ops {
-        check_no_tk1_ops(&circ);
+        check_no_tk1_ops(&hugr);
     }
 
-    let reser: SerialCircuit = SerialCircuit::encode(&circ, EncodeOptions::new()).unwrap();
+    let reser: SerialCircuit = SerialCircuit::encode(&hugr, EncodeOptions::new()).unwrap();
     validate_serial_circ(&reser);
     compare_serial_circs(&ser, &reser);
 }
@@ -904,11 +883,11 @@ fn json_roundtrip(
 fn json_file_roundtrip(#[case] circ: impl AsRef<std::path::Path>) {
     let reader = BufReader::new(std::fs::File::open(circ).unwrap());
     let ser: circuit_json::SerialCircuit = serde_json::from_reader(reader).unwrap();
-    let circ: Circuit = ser.decode(DecodeOptions::new()).unwrap();
+    let hugr: Hugr = ser.decode(DecodeOptions::new()).unwrap();
 
-    check_no_tk1_ops(&circ);
+    check_no_tk1_ops(&hugr);
 
-    let reser: SerialCircuit = SerialCircuit::encode(&circ, EncodeOptions::new()).unwrap();
+    let reser: SerialCircuit = SerialCircuit::encode(&hugr, EncodeOptions::new()).unwrap();
     validate_serial_circ(&reser);
     compare_serial_circs(&ser, &reser);
 }
@@ -950,18 +929,19 @@ impl CircuitRoundtripTestConfig {
 }
 
 #[rstest]
-fn encoded_circuit_attributes(circ_measure_ancilla: Circuit) {
-    let circ = circ_measure_ancilla;
+fn encoded_circuit_attributes(circ_measure_ancilla: Hugr) {
+    let hugr = circ_measure_ancilla;
 
     let encode_options = EncodeOptions::new().with_subcircuits(true);
 
-    let encoded = EncodedCircuit::new(&circ, encode_options).unwrap_or_else(|e| panic!("{e}"));
+    let encoded = EncodedCircuit::new(&hugr, encode_options).unwrap_or_else(|e| panic!("{e}"));
 
-    assert!(encoded.contains_circuit(circ.parent()));
+    assert!(encoded.contains_circuit(hugr.entrypoint()));
     assert_eq!(encoded.len(), 1);
     assert!(!encoded.is_empty());
 
-    let (_, serial_circ) = encoded.iter().exactly_one().ok().unwrap();
+    let (region, serial_circ) = encoded.iter().exactly_one().ok().unwrap();
+    assert_eq!(region, hugr.entrypoint());
     assert_eq!(serial_circ.commands.len(), 2);
 
     let par_sum: usize = encoded
@@ -987,8 +967,12 @@ fn encoded_circuit_attributes(circ_measure_ancilla: Circuit) {
 #[case::nested_dfgs(circ_nested_dfgs(), CircuitRoundtripTestConfig::Default)]
 #[case::tk1_ops(circ_tk1_ops(), CircuitRoundtripTestConfig::Default)]
 #[case::missing_decoders(circ_measure_ancilla(), CircuitRoundtripTestConfig::NoStd)]
-fn circuit_standalone_roundtrip(#[case] circ: Circuit, #[case] config: CircuitRoundtripTestConfig) {
-    let circ_signature = circ.circuit_signature().into_owned();
+fn circuit_standalone_roundtrip(#[case] hugr: Hugr, #[case] config: CircuitRoundtripTestConfig) {
+    let circ_signature = hugr
+        .entrypoint_optype()
+        .inner_function_type()
+        .expect("Dataflow entrypoint")
+        .into_owned();
     let decode_options = DecodeOptions::new()
         .with_signature(circ_signature.clone())
         .with_config(config.decoder_config());
@@ -996,16 +980,16 @@ fn circuit_standalone_roundtrip(#[case] circ: Circuit, #[case] config: CircuitRo
         .with_subcircuits(true)
         .with_config(config.encoder_config());
 
-    let encoded = EncodedCircuit::new_standalone(&circ, encode_options.clone())
+    let encoded = EncodedCircuit::new_standalone(&hugr, encode_options.clone())
         .unwrap_or_else(|e| panic!("{e}"));
 
-    assert!(encoded.contains_circuit(circ.parent()));
+    assert!(encoded.contains_circuit(hugr.entrypoint()));
     assert_eq!(encoded.len(), 1);
 
     // Re-encode the EncodedCircuit
     let extracted_from_circ = encoded
         .reassemble(
-            circ.parent(),
+            hugr.entrypoint(),
             Some("main".to_string()),
             decode_options.clone(),
         )
@@ -1015,12 +999,16 @@ fn circuit_standalone_roundtrip(#[case] circ: Circuit, #[case] config: CircuitRo
         .unwrap_or_else(|e| panic!("{e}"));
 
     // Extract the head pytket circuit, and re-encode it on its own.
-    let ser: &SerialCircuit = &encoded[circ.parent()];
-    let deser: Circuit = ser.decode(decode_options).unwrap_or_else(|e| panic!("{e}"));
+    let ser: &SerialCircuit = &encoded[hugr.entrypoint()];
+    let deser: Hugr = ser.decode(decode_options).unwrap_or_else(|e| panic!("{e}"));
 
-    deser.hugr().validate().unwrap_or_else(|e| panic!("{e}"));
+    deser.validate().unwrap_or_else(|e| panic!("{e}"));
 
-    let deser_sig = deser.circuit_signature();
+    let deser_sig = deser
+        .entrypoint_optype()
+        .inner_function_type()
+        .expect("Dataflow entrypoint")
+        .into_owned();
     assert_eq!(
         &circ_signature.input, &deser_sig.input,
         "Input signature mismatch\n  Expected: {}\n  Actual:   {}",
@@ -1043,8 +1031,8 @@ fn circuit_standalone_roundtrip(#[case] circ: Circuit, #[case] config: CircuitRo
 #[case::unsupported_subtree(circ_unsupported_subtree())]
 #[case::global_defs(circ_global_defs())]
 #[case::recursive(circ_recursive())]
-fn reject_standalone_complex_subgraphs(#[case] circ: Circuit) {
-    let try_encoded = EncodedCircuit::new_standalone(&circ, EncodeOptions::new());
+fn reject_standalone_complex_subgraphs(#[case] hugr: Hugr) {
+    let try_encoded = EncodedCircuit::new_standalone(&hugr, EncodeOptions::new());
     assert_matches!(
         try_encoded,
         Err(PytketEncodeError::OpEncoding(
@@ -1055,7 +1043,7 @@ fn reject_standalone_complex_subgraphs(#[case] circ: Circuit) {
 
 /// Test that modifying the hugr before reassembling an EncodedCircuit fails.
 #[rstest]
-fn fail_on_modified_hugr(circ_tk1_ops: Circuit) {
+fn fail_on_modified_hugr(circ_tk1_ops: Hugr) {
     let encoded = EncodedCircuit::new(&circ_tk1_ops, EncodeOptions::new().with_subcircuits(true))
         .unwrap_or_else(|e| panic!("{e}"));
 
@@ -1109,28 +1097,36 @@ fn fail_on_modified_hugr(circ_tk1_ops: Circuit) {
 #[case::discard_first_qubit(circ_discard_first_qubit(), 1, CircuitRoundtripTestConfig::Default)]
 
 fn encoded_circuit_roundtrip(
-    #[case] circ: Circuit,
+    #[case] hugr: Hugr,
     #[case] num_circuits: usize,
     #[case] config: CircuitRoundtripTestConfig,
 ) {
-    let circ_signature = circ.circuit_signature().into_owned();
+    let circ_signature = hugr
+        .entrypoint_optype()
+        .inner_function_type()
+        .expect("Dataflow entrypoint")
+        .into_owned();
     let encode_options = EncodeOptions::new()
         .with_subcircuits(true)
         .with_config(config.encoder_config());
 
-    let encoded = EncodedCircuit::new(&circ, encode_options).unwrap_or_else(|e| panic!("{e}"));
+    let encoded = EncodedCircuit::new(&hugr, encode_options).unwrap_or_else(|e| panic!("{e}"));
 
-    assert!(encoded.contains_circuit(circ.parent()));
+    assert!(encoded.contains_circuit(hugr.entrypoint()));
     assert_eq!(encoded.len(), num_circuits);
 
-    let mut deser = circ.clone();
+    let mut deser = hugr.clone();
     encoded
-        .reassemble_inplace(deser.hugr_mut(), Some(Arc::new(config.decoder_config())))
+        .reassemble_inplace(&mut deser, Some(Arc::new(config.decoder_config())))
         .unwrap_or_else(|e| panic!("{e}"));
 
-    deser.hugr().validate().unwrap_or_else(|e| panic!("{e}"));
+    deser.validate().unwrap_or_else(|e| panic!("{e}"));
 
-    let deser_sig = deser.circuit_signature();
+    let deser_sig = deser
+        .entrypoint_optype()
+        .inner_function_type()
+        .expect("Dataflow entrypoint")
+        .into_owned();
     assert_eq!(
         &circ_signature.input, &deser_sig.input,
         "Input signature mismatch\n  Expected: {}\n  Actual:   {}",
@@ -1152,15 +1148,15 @@ fn encoded_circuit_roundtrip(
 #[case::symbolic(circ_add_angles_symbolic())]
 #[case::constants(circ_add_angles_constants())]
 #[case::complex(circ_complex_angle_computation())]
-fn test_add_angle_serialise(#[case] circ_add_angles: (Circuit, String)) {
-    let (circ, expected) = circ_add_angles;
+fn test_add_angle_serialise(#[case] circ_add_angles: (Hugr, String)) {
+    let (hugr, expected) = circ_add_angles;
 
-    let ser: SerialCircuit = SerialCircuit::encode(&circ, EncodeOptions::new()).unwrap();
+    let ser: SerialCircuit = SerialCircuit::encode(&hugr, EncodeOptions::new()).unwrap();
     assert_eq!(ser.commands.len(), 1);
     assert_eq!(ser.commands[0].op.op_type, optype::OpType::Rx);
     assert_eq!(ser.commands[0].op.params, Some(vec![expected]));
 
-    let deser: Circuit = ser.decode(DecodeOptions::new()).unwrap();
+    let deser: Hugr = ser.decode(DecodeOptions::new()).unwrap();
     let reser = SerialCircuit::encode(&deser, EncodeOptions::new()).unwrap();
     validate_serial_circ(&reser);
     compare_serial_circs(&ser, &reser);
@@ -1174,7 +1170,7 @@ fn test_inplace_decoding() {
     let mut builder = ModuleBuilder::new();
 
     let func1 = serial
-        .decode_inplace(
+        .decode_into(
             builder.hugr_mut(),
             DecodeInsertionTarget::Function { fn_name: None },
             DecodeOptions::new(),
@@ -1195,7 +1191,7 @@ fn test_inplace_decoding() {
         let [inp, out] = fn_build.io();
 
         let dfg = serial
-            .decode_inplace(
+            .decode_into(
                 fn_build.hugr_mut(),
                 DecodeInsertionTarget::Region { parent: fn2_node },
                 DecodeOptions::new(),
@@ -1232,18 +1228,16 @@ fn test_decoding_signature(#[case] signature: Signature) {
     let serial: circuit_json::SerialCircuit = serde_json::from_str(SIMPLE_MEASURE).unwrap();
 
     let options = DecodeOptions::default().with_signature(signature);
-    let circ = serial.decode(options).unwrap();
+    let hugr = serial.decode(options).unwrap();
 
     // Hugr must be valid.
-    circ.hugr().validate().unwrap();
+    hugr.validate().unwrap();
 
     // Hugr must contain the two measurement ops.
-    let measure_op_count = circ
-        .hugr()
-        .children(circ.parent())
+    let measure_op_count = hugr
+        .children(hugr.entrypoint())
         .filter(|&child| {
-            circ.hugr()
-                .get_optype(child)
+            hugr.get_optype(child)
                 .as_extension_op()
                 .is_some_and(|op| op.unqualified_id() == "Measure")
         })
@@ -1260,13 +1254,13 @@ fn test_qubit_elision() {
     let ser: circuit_json::SerialCircuit = serde_json::from_str(EMPTY_CIRCUIT).unwrap();
     assert_eq!(ser.commands.len(), 0);
 
-    let circ: Circuit = ser
+    let hugr: Hugr = ser
         .decode(DecodeOptions::new().with_signature(Signature::new_endo(vec![])))
         .unwrap();
-    assert_eq!(circ.qubit_count(), 0);
+    assert_eq!(crate::Circuit::new(&hugr).qubit_count(), 0);
 
-    check_no_tk1_ops(&circ);
+    check_no_tk1_ops(&hugr);
 
     // The circuit should have no alloc/frees or const definitions
-    assert_eq!(circ.num_operations(), 0);
+    assert_eq!(crate::Circuit::new(&hugr).num_operations(), 0);
 }

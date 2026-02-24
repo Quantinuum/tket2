@@ -6,7 +6,6 @@ use hugr::extension::simple_op::MakeExtensionOp;
 use hugr::ops::ExtensionOp;
 use hugr::types::Term;
 use itertools::Itertools;
-use tket::Circuit;
 use tket::serialize::pytket::encoder::EncodeStatus;
 use tket::serialize::pytket::extension::{PytketTypeTranslator, RegisterCount};
 use tket::serialize::pytket::{
@@ -32,7 +31,7 @@ impl<H: HugrView> PytketEmitter<H> for FutureEmitter {
         &self,
         node: H::Node,
         op: &ExtensionOp,
-        circ: &Circuit<H>,
+        hugr: &H,
         encoder: &mut PytketEncoderContext<H>,
     ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
         let Ok(rot_op) = FutureOpDef::from_extension_op(op) else {
@@ -42,18 +41,18 @@ impl<H: HugrView> PytketEmitter<H> for FutureEmitter {
         match rot_op {
             FutureOpDef::Read => {
                 // Transparent map
-                encoder.emit_transparent_node(node, circ, |ps| ps.input_params.to_vec())?;
+                encoder.emit_transparent_node(node, hugr, |ps| ps.input_params.to_vec())?;
                 Ok(EncodeStatus::Success)
             }
             FutureOpDef::Dup => {
                 // Register the same input values for each output.
-                let values = encoder.get_input_values(node, circ)?;
-                let outputs = circ.hugr().node_outputs(node).collect_vec();
+                let values = encoder.get_input_values(node, hugr)?;
+                let outputs = hugr.node_outputs(node).collect_vec();
                 let out0 = hugr::Wire::new(node, outputs[0]);
                 let out1 = hugr::Wire::new(node, outputs[1]);
 
-                encoder.values.register_wire(out0, values.clone(), circ)?;
-                encoder.values.register_wire(out1, values, circ)?;
+                encoder.values.register_wire(out0, values.clone(), hugr)?;
+                encoder.values.register_wire(out1, values, hugr)?;
 
                 Ok(EncodeStatus::Success)
             }

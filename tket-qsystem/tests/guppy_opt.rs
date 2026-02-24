@@ -11,7 +11,6 @@ use tket::extension::{TKET_EXTENSION_ID, TKET1_EXTENSION_ID};
 use hugr::algorithms::ComposablePass;
 use hugr::{Hugr, HugrView};
 use rstest::rstest;
-use tket::Circuit;
 use tket::passes::NormalizeGuppy;
 use tket::serialize::pytket::{EncodeOptions, EncodedCircuit};
 
@@ -46,9 +45,7 @@ fn load_guppy_example(path: &str) -> std::io::Result<Hugr> {
 }
 
 fn run_pytket(h: &mut Hugr) {
-    let circ = Circuit::new(h);
-    let mut encoded =
-        EncodedCircuit::new(&circ, EncodeOptions::new().with_subcircuits(true)).unwrap();
+    let mut encoded = EncodedCircuit::new(h, EncodeOptions::new().with_subcircuits(true)).unwrap();
 
     encoded
         .par_iter_mut()
@@ -58,7 +55,7 @@ fn run_pytket(h: &mut Hugr) {
             *serial_circuit = circuit_ptr.to_serial_circuit().unwrap();
         });
 
-    encoded.reassemble_inplace(circ.into_hugr(), None).unwrap();
+    encoded.reassemble_inplace(h, None).unwrap();
 }
 
 fn count_gates(h: &impl HugrView) -> HashMap<SmolStr, usize> {

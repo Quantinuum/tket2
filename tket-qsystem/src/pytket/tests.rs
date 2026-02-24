@@ -5,8 +5,8 @@ use std::collections::{HashMap, HashSet};
 use hugr::builder::{Dataflow, DataflowHugr, FunctionBuilder};
 use hugr::extension::prelude::{bool_t, qb_t};
 
-use hugr::HugrView;
 use hugr::types::Signature;
+use hugr::{Hugr, HugrView};
 use itertools::Itertools;
 use rstest::{fixture, rstest};
 use tket::TketOp;
@@ -14,7 +14,6 @@ use tket::extension::TKET1_EXTENSION_ID;
 use tket_json_rs::circuit_json::{self, SerialCircuit};
 use tket_json_rs::register;
 
-use tket::circuit::Circuit;
 use tket::serialize::pytket::TKETDecode;
 use tket::serialize::pytket::{DecodeOptions, EncodeOptions};
 
@@ -146,7 +145,7 @@ fn compare_serial_circs(a: &SerialCircuit, b: &SerialCircuit) {
 
 /// A simple circuit with some qsystem operations.
 #[fixture]
-fn circ_qsystem_native_gates() -> Circuit {
+fn circ_qsystem_native_gates() -> Hugr {
     let input_t = vec![qb_t()];
     let output_t = vec![bool_t(), bool_t()];
     let mut h =
@@ -167,17 +166,15 @@ fn circ_qsystem_native_gates() -> Circuit {
     let [bit_0] = h.add_read(future_bit_0, bool_t()).unwrap();
     let [bit_1] = h.add_read(future_bit_1, bool_t()).unwrap();
 
-    let hugr = h.finish_hugr_with_outputs([bit_0, bit_1]).unwrap();
-
-    hugr.into()
+    h.finish_hugr_with_outputs([bit_0, bit_1]).unwrap()
 }
 
 /// Check that all circuit ops have been translated to a native gate.
 ///
 /// Panics if there are tk1 ops in the circuit.
-fn check_no_tk1_ops(circ: &Circuit) {
-    for node in circ.hugr().entry_descendants() {
-        let Some(op) = circ.hugr().get_optype(node).as_extension_op() else {
+fn check_no_tk1_ops(hugr: &Hugr) {
+    for node in hugr.entry_descendants() {
+        let Some(op) = hugr.get_optype(node).as_extension_op() else {
             continue;
         };
         if op.extension_id() == &TKET1_EXTENSION_ID {
@@ -204,17 +201,17 @@ fn json_roundtrip(
     let ser: circuit_json::SerialCircuit = serde_json::from_str(circ_s).unwrap();
     assert_eq!(ser.commands.len(), num_commands);
 
-    let circ: Circuit = ser
+    let hugr: Hugr = ser
         .decode(DecodeOptions::new().with_config(qsystem_decoder_config()))
         .unwrap();
-    assert_eq!(circ.qubit_count(), num_qubits);
+    assert_eq!(tket::Circuit::new(&hugr).qubit_count(), num_qubits);
 
     if !has_tk1_ops {
-        check_no_tk1_ops(&circ);
+        check_no_tk1_ops(&hugr);
     }
 
     let reser: SerialCircuit = SerialCircuit::encode(
-        &circ,
+        &hugr,
         EncodeOptions::new().with_config(qsystem_encoder_config()),
     )
     .unwrap();
@@ -227,19 +224,24 @@ fn json_roundtrip(
 /// Note: this is not a pure roundtrip as the encoder may add internal qubits/bits to the circuit.
 #[rstest]
 #[case::native_gates(circ_qsystem_native_gates(), Signature::new_endo(vec![qb_t(), qb_t(), bool_t(), bool_t()]))]
-fn circuit_roundtrip(#[case] circ: Circuit, #[case] decoded_sig: Signature) {
+fn circuit_roundtrip(#[case] hugr: Hugr, #[case] decoded_sig: Signature) {
+    use hugr::ops::OpParent;
     use tket::serialize::pytket::EncodeOptions;
 
     let ser: SerialCircuit = SerialCircuit::encode(
-        &circ,
+        &hugr,
         EncodeOptions::new().with_config(qsystem_encoder_config()),
     )
     .unwrap();
-    let deser: Circuit = ser
+    let deser: Hugr = ser
         .decode(DecodeOptions::new().with_config(qsystem_decoder_config()))
         .unwrap();
 
-    let deser_sig = deser.circuit_signature();
+    let deser_sig = deser
+        .entrypoint_optype()
+        .inner_function_type()
+        .expect("Dataflow entrypoint")
+        .into_owned();
     assert_eq!(
         &decoded_sig.input, &deser_sig.input,
         "Input signature mismatch\n  Expected: {}\n  Actual:   {}",

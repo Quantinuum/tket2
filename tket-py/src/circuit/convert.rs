@@ -45,7 +45,7 @@ impl CircuitType {
     pub fn convert(self, py: Python, circ: Circuit) -> PyResult<Bound<PyAny>> {
         match self {
             CircuitType::Tket1 => SerialCircuit::encode(
-                &circ,
+                &circ.hugr(),
                 EncodeOptions::new().with_config(tket_qsystem::pytket::qsystem_encoder_config()),
             )
             .convert_pyerrs()?
@@ -73,7 +73,8 @@ where
                     DecodeOptions::new()
                         .with_config(tket_qsystem::pytket::qsystem_decoder_config()),
                 )
-                .convert_pyerrs()?,
+                .convert_pyerrs()?
+                .into(),
             CircuitType::Tket1,
         ),
     };

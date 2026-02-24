@@ -11,6 +11,7 @@ use std::path::PathBuf;
 use std::process::exit;
 
 use clap::Parser;
+use tket::Circuit;
 use tket::optimiser::badger::BadgerOptions;
 use tket::optimiser::badger::log::BadgerLogger;
 use tket::optimiser::{BadgerOptimiser, ECCBadgerOptimiser};
@@ -144,10 +145,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let badger_logger = BadgerLogger::new(circ_candidates_csv);
 
-    let mut circ = load_tk1_json_file(
+    let mut circ: Circuit = load_tk1_json_file(
         input_path,
         DecodeOptions::new().with_config(tket_qsystem::pytket::qsystem_decoder_config()),
-    )?;
+    )?
+    .into();
     if opts.rewrite_tracing {
         circ.enable_rewrite_tracing();
     }
@@ -188,7 +190,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Saving result");
     save_tk1_json_file(
-        &opt_circ,
+        opt_circ.hugr(),
         output_path,
         EncodeOptions::new().with_config(tket_qsystem::pytket::qsystem_encoder_config()),
     )?;

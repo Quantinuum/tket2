@@ -1,6 +1,7 @@
 //! Encoder and decoder for tket operations with native pytket counterparts.
 
 use super::PytketEmitter;
+use crate::TketOp;
 use crate::extension::TKET_EXTENSION_ID;
 use crate::extension::sympy::SympyOp;
 use crate::serialize::pytket::decoder::{
@@ -9,7 +10,6 @@ use crate::serialize::pytket::decoder::{
 use crate::serialize::pytket::encoder::{EmitCommandOptions, EncodeStatus, PytketEncoderContext};
 use crate::serialize::pytket::extension::PytketDecoder;
 use crate::serialize::pytket::{PytketDecodeError, PytketEncodeError};
-use crate::{Circuit, TketOp};
 use hugr::extension::ExtensionId;
 use hugr::extension::simple_op::MakeExtensionOp;
 use hugr::ops::ExtensionOp;
@@ -30,13 +30,13 @@ impl<H: HugrView> PytketEmitter<H> for TketOpEmitter {
         &self,
         node: H::Node,
         op: &ExtensionOp,
-        circ: &Circuit<H>,
+        hugr: &H,
         encoder: &mut PytketEncoderContext<H>,
     ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
         if let Ok(tket_op) = TketOp::from_extension_op(op) {
-            self.encode_tket_op(node, tket_op, circ, encoder)
+            self.encode_tket_op(node, tket_op, hugr, encoder)
         } else if let Ok(sympy_op) = SympyOp::from_extension_op(op) {
-            self.encode_sympy_op(node, sympy_op, circ, encoder)
+            self.encode_sympy_op(node, sympy_op, hugr, encoder)
         } else {
             Ok(EncodeStatus::Unsupported)
         }
@@ -49,7 +49,7 @@ impl TketOpEmitter {
         &self,
         node: H::Node,
         tket_op: TketOp,
-        circ: &Circuit<H>,
+        hugr: &H,
         encoder: &mut PytketEncoderContext<H>,
     ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
         let serial_op = match tket_op {
@@ -80,10 +80,10 @@ impl TketOpEmitter {
             // These operations are implicitly supported by the encoding,
             // they do not create a new command but just modify the value trackers.
             TketOp::QAlloc => {
-                let out_port = circ.hugr().node_outputs(node).next().unwrap();
+                let out_port = hugr.node_outputs(node).next().unwrap();
                 let wire = Wire::new(node, out_port);
                 let qb = encoder.values.new_qubit();
-                encoder.values.register_wire(wire, [qb], circ)?;
+                encoder.values.register_wire(wire, [qb], hugr)?;
                 return Ok(EncodeStatus::Success);
             }
             // Since the qubit still gets connected at the end of the circuit,
@@ -98,7 +98,7 @@ impl TketOpEmitter {
         };
 
         // Most operations map directly to a pytket one.
-        encoder.emit_node(serial_op, node, circ, EmitCommandOptions::new())?;
+        encoder.emit_node(serial_op, node, hugr, EmitCommandOptions::new())?;
 
         Ok(EncodeStatus::Success)
     }
@@ -108,10 +108,10 @@ impl TketOpEmitter {
         &self,
         node: H::Node,
         sympy_op: SympyOp,
-        circ: &Circuit<H>,
+        hugr: &H,
         encoder: &mut PytketEncoderContext<H>,
     ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
-        encoder.emit_transparent_node(node, circ, |_| vec![sympy_op.expr.clone()])?;
+        encoder.emit_transparent_node(node, hugr, |_| vec![sympy_op.expr.clone()])?;
         Ok(EncodeStatus::Success)
     }
 }

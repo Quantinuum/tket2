@@ -1,7 +1,6 @@
 //! Encoder and decoder for the tket.bool extension
 
 use super::PytketEmitter;
-use crate::Circuit;
 use crate::extension::bool::{BOOL_EXTENSION_ID, BOOL_TYPE_NAME, BoolOp, ConstBool};
 use crate::serialize::pytket::config::TypeTranslatorSet;
 use crate::serialize::pytket::decoder::{
@@ -35,7 +34,7 @@ impl<H: HugrView> PytketEmitter<H> for BoolEmitter {
         &self,
         node: H::Node,
         op: &ExtensionOp,
-        circ: &Circuit<H>,
+        hugr: &H,
         encoder: &mut PytketEncoderContext<H>,
     ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
         let Ok(rot_op) = BoolOp::from_extension_op(op) else {
@@ -46,7 +45,7 @@ impl<H: HugrView> PytketEmitter<H> for BoolEmitter {
             // Conversion ops between native bools and `tket.bool`.
             // Both are represented as a pytket bit, so this is a no-op.
             BoolOp::read | BoolOp::make_opaque => {
-                encoder.emit_transparent_node(node, circ, |_| Vec::new())?;
+                encoder.emit_transparent_node(node, hugr, |_| Vec::new())?;
                 return Ok(EncodeStatus::Success);
             }
             BoolOp::eq => (2, 1, ClOp::BitEq),
@@ -68,7 +67,7 @@ impl<H: HugrView> PytketEmitter<H> for BoolEmitter {
             .collect_vec();
 
         let op = make_tk1_classical_expression(bit_count, &output_bits, &[], expression);
-        encoder.emit_node_command(node, circ, EmitCommandOptions::new(), move |_| op)?;
+        encoder.emit_node_command(node, hugr, EmitCommandOptions::new(), move |_| op)?;
         Ok(EncodeStatus::Success)
     }
 

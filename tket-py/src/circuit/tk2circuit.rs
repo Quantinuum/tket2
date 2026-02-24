@@ -85,7 +85,7 @@ impl Tk2Circuit {
     pub fn to_tket1<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let circ = lower_to_pytket(&self.circ).convert_pyerrs()?;
         SerialCircuit::encode(
-            &circ,
+            circ.hugr(),
             EncodeOptions::new().with_config(tket_qsystem::pytket::qsystem_encoder_config()),
         )
         .convert_pyerrs()?
@@ -173,7 +173,7 @@ impl Tk2Circuit {
         let circ = lower_to_pytket(&self.circ).convert_pyerrs()?;
         serde_json::to_string(
             &SerialCircuit::encode(
-                &circ,
+                circ.hugr(),
                 EncodeOptions::new().with_config(tket_qsystem::pytket::qsystem_encoder_config()),
             )
             .convert_pyerrs()?,
@@ -186,14 +186,14 @@ impl Tk2Circuit {
     /// Decode a tket1 json string to a circuit.
     #[staticmethod]
     pub fn from_tket1_json(json: &str) -> PyResult<Self> {
-        let circ = tket::serialize::load_tk1_json_str(
+        let hugr = tket::serialize::load_tk1_json_str(
             json,
             DecodeOptions::new().with_config(tket_qsystem::pytket::qsystem_decoder_config()),
         )
         .map_err(|e| {
             PyErr::new::<PyAttributeError, _>(format!("Could not load pytket circuit: {e}"))
         })?;
-        Ok(Tk2Circuit { circ })
+        Ok(Tk2Circuit { circ: hugr.into() })
     }
 
     /// Encode the circuit as a tket1 json utf8 bytes.
@@ -202,7 +202,7 @@ impl Tk2Circuit {
         let circ = lower_to_pytket(&self.circ).convert_pyerrs()?;
         serde_json::to_vec(
             &SerialCircuit::encode(
-                &circ,
+                circ.hugr(),
                 EncodeOptions::new().with_config(tket_qsystem::pytket::qsystem_encoder_config()),
             )
             .convert_pyerrs()?,
@@ -215,14 +215,14 @@ impl Tk2Circuit {
     /// Decode a tket1 json utf8 bytes to a circuit.
     #[staticmethod]
     pub fn from_tket1_json_bytes(json: &[u8]) -> PyResult<Self> {
-        let circ = tket::serialize::load_tk1_json_reader(
+        let hugr = tket::serialize::load_tk1_json_reader(
             json,
             DecodeOptions::new().with_config(tket_qsystem::pytket::qsystem_decoder_config()),
         )
         .map_err(|e| {
             PyErr::new::<PyAttributeError, _>(format!("Could not load pytket circuit: {e}"))
         })?;
-        Ok(Tk2Circuit { circ })
+        Ok(Tk2Circuit { circ: hugr.into() })
     }
 
     /// Compute the cost of the circuit based on a per-operation cost function.

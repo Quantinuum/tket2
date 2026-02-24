@@ -31,7 +31,7 @@ pub fn tket1_pass<'py>(
 
     try_with_circ(circ, |mut circ, typ| {
         let mut encoded_circ = EncodedCircuit::new(
-            &circ,
+            circ.hugr(),
             EncodeOptions::new()
                 .with_config(qsystem_encoder_config())
                 .with_subcircuits(traverse_subcircuits),
