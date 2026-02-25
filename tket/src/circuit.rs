@@ -3,7 +3,6 @@
 pub mod command;
 pub mod cost;
 mod extract_dfg;
-mod hash;
 pub mod units;
 
 use std::borrow::Cow;
@@ -11,7 +10,7 @@ use std::collections::HashSet;
 use std::iter::Sum;
 
 pub use command::{Command, CommandIterator};
-pub use hash::CircuitHash;
+use hugr::algorithms::hash::{HashError, HugrHash};
 use hugr::extension::prelude::{NoopDef, TupleOpDef};
 use hugr::extension::simple_op::MakeOpDef;
 use hugr::hugr::views::sibling_subgraph::InvalidSubgraph;
@@ -267,6 +266,11 @@ impl<T: HugrView> Circuit<T> {
             .into_iter()
             .map(|n| op_cost(self.hugr.get_optype(n)))
             .sum()
+    }
+
+    /// Compute the hash of the circuit.
+    pub fn circuit_hash(&self, node: T::Node) -> Result<u64, HashError> {
+        self.hugr.region_hash(node)
     }
 
     /// Return the graphviz representation of the underlying graph and hierarchy side by side.
