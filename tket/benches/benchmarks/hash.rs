@@ -1,3 +1,8 @@
+//! Benchmark hashing hugrs.
+//!
+//! TODO: This is already being done in the Hugr repository, so we could remove it from here.
+//! We don't delete it yet to keep an example for writing benchmarks. Remove it once other benchmarks are written.
+
 use std::hint::black_box;
 
 use criterion::{AxisScale, BenchmarkId, Criterion, PlotConfiguration, criterion_group};
