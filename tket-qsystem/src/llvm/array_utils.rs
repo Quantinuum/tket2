@@ -2,7 +2,7 @@
 
 // TODO move to hugr-llvm crate
 // https://github.com/quantinuum/tket2/issues/899
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use hugr::extension::prelude::usize_t;
 use hugr::llvm::emit::EmitFuncContext;
 use hugr::llvm::extension::collections::array::{
@@ -152,7 +152,7 @@ impl<ACG: array::ArrayCodegen + Clone> ArrayLowering for HeapArrayLowering<ACG> 
 
 /// Helper function to allocate an array on the stack.
 ///
-/// Returns a pointer to the newly allocated array. 
+/// Returns a pointer to the newly allocated array.
 pub fn build_array_alloca<'c>(
     builder: &Builder<'c>,
     array: ArrayValue<'c>,
@@ -174,9 +174,10 @@ pub fn build_int_array_load<'c>(
     elem_type: IntType<'c>,
     length: u32,
 ) -> Result<ArrayValue<'c>, BuilderError> {
-    
     let array_ty = elem_type.array_type(length);
-    let array = builder.build_load(array_ty, array_ptr, "")?.into_array_value();
+    let array = builder
+        .build_load(array_ty, array_ptr, "")?
+        .into_array_value();
     Result::Ok(array)
 }
 
@@ -203,7 +204,6 @@ impl ElemType {
     }
 }
 
-
 /// Helper function to create a dense array struct type.
 ///
 /// The struct contains four fields:
@@ -222,8 +222,8 @@ pub fn struct_1d_arr_t<'a>(ctx: &'a Context) -> StructType<'a> {
         &[
             ctx.i32_type().into(), // x
             ctx.i32_type().into(), // y
-            ptr_t.into(),  // pointer to first element
-            ptr_t.into(), // pointer to first mask element
+            ptr_t.into(),          // pointer to first element
+            ptr_t.into(),          // pointer to first mask element
         ],
         true,
     )
@@ -261,7 +261,9 @@ pub fn struct_1d_arr_alloc<'a>(
     builder.build_store(arr_field, array_ptr)?;
     builder.build_store(mask_field, mask_ptr)?;
 
-    let out_arr = builder.build_load(out_arr_type, out_arr_ptr, "")?.into_struct_value();
+    let out_arr = builder
+        .build_load(out_arr_type, out_arr_ptr, "")?
+        .into_struct_value();
 
     Result::Ok((out_arr_ptr, out_arr))
 }

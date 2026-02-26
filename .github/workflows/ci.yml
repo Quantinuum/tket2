@@ -26,8 +26,8 @@ env:
 
   # different strings for install action and feature name
   # adapted from https://github.com/TheDan64/inkwell/blob/master/.github/workflows/test.yml
-  LLVM_VERSION: "14.0"
-  LLVM_FEATURE_NAME: "14-0"
+  LLVM_VERSION: "21.1"
+  LLVM_FEATURE_NAME: "21-1"
 
   # Path to the cached tket-c-api library
   # When this envvar is set, the `./.github/actions/tket-c-api` action **must** be run to fetch the artifacts

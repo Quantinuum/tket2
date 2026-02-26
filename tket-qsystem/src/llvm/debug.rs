@@ -82,25 +82,18 @@ impl<AL: ArrayLowering> DebugCodegenExtension<AL> {
             .try_into()
             .map_err(|_| anyhow!(format!("StateResult expects a qubit array argument")))?;
         let qubits_array = self.array_lowering.array_to_ptr(
-            builder, qubits, i64_t.as_basic_type_enum(), array_len.try_into()?)?;
-        let (qubits_ptr, _) = struct_1d_arr_alloc(
-            iw_ctx,
             builder,
+            qubits,
+            i64_t.as_basic_type_enum(),
             array_len.try_into()?,
-            qubits_array,
         )?;
+        let (qubits_ptr, _) =
+            struct_1d_arr_alloc(iw_ctx, builder, array_len.try_into()?, qubits_array)?;
 
         // Build the function call.
         let fn_state_result = ctx.get_extern_func(
             "print_state_result",
-            void_t.fn_type(
-                &[
-                    ptr_t.into(),
-                    i64_t.into(),
-                    ptr_t.into(),
-                ],
-                false,
-            ),
+            void_t.fn_type(&[ptr_t.into(), i64_t.into(), ptr_t.into()], false),
         )?;
 
         builder.build_call(

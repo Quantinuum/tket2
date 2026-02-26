@@ -88,7 +88,7 @@
 //!    to other result types in future.
 
 use crate::selene_specific;
-use anyhow::{Result, ensure, bail};
+use anyhow::{Result, bail, ensure};
 use hugr::extension::prelude::option_type;
 use hugr::llvm::{CodegenExtension, CodegenExtsBuilder, inkwell};
 use hugr::std_extensions::arithmetic::int_types::int_type;
@@ -396,8 +396,6 @@ impl GpuCodegen {
         let gpu_ref = gpu_ref.into_int_value();
         let func = fn_id.into_int_value();
 
-        let builder = ctx.builder();
-
         let gpu_call = ctx.get_extern_func(
             "gpu_call",
             iwc.i8_type().fn_type(
@@ -405,10 +403,8 @@ impl GpuCodegen {
                     gpu_ref.get_type().into(),
                     func.get_type().into(),
                     iwc.i64_type().into(),
-                    iwc.ptr_type(inkwell::AddressSpace::default())
-                        .into(),
-                    iwc.ptr_type(inkwell::AddressSpace::default())
-                        .into(),
+                    iwc.ptr_type(inkwell::AddressSpace::default()).into(),
+                    iwc.ptr_type(inkwell::AddressSpace::default()).into(),
                 ],
                 false,
             ),
@@ -503,18 +499,16 @@ impl GpuCodegen {
 
                 // load the result from the result pointer
                 let result_ty = ctx.llvm_type(single_result)?;
-                ensure!(result_ty == i64_t || result_ty == f64_t,
-                        "ReadResult operation with a single output expects either \
+                ensure!(
+                    result_ty == i64_t || result_ty == f64_t,
+                    "ReadResult operation with a single output expects either \
                         i64 or f64, got: {result_ty:?}"
                 );
-                    
+
                 let result = ctx.builder().build_load(result_ty, result_ptr, "result")?;
                 op.outputs.finish(
                     ctx.builder(),
-                    [
-                        gpu_ref.as_basic_value_enum(),
-                        result.as_basic_value_enum(),
-                    ],
+                    [gpu_ref.as_basic_value_enum(), result.as_basic_value_enum()],
                 )?;
             }
             other => {
@@ -705,8 +699,7 @@ fn emit_panic_with_gpu_error<'c, H: HugrView<Node = Node>>(
             // Try to get the error message from the GPU library.
             let gpu_get_error = ctx.get_extern_func(
                 "gpu_get_error",
-                iwc.ptr_type(AddressSpace::default())
-                    .fn_type(&[], false),
+                iwc.ptr_type(AddressSpace::default()).fn_type(&[], false),
             )?;
 
             let error_message = ctx

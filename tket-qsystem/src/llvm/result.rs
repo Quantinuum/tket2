@@ -12,7 +12,7 @@ use hugr::llvm::types::HugrSumType;
 use inkwell::AddressSpace;
 use inkwell::builder::Builder;
 use inkwell::context::Context;
-use inkwell::types::{FloatType, IntType, PointerType, VoidType, BasicMetadataTypeEnum};
+use inkwell::types::{BasicMetadataTypeEnum, FloatType, IntType, PointerType, VoidType};
 use inkwell::values::{BasicValueEnum, FunctionValue, IntValue};
 use tket::hugr::extension::simple_op::MakeExtensionOp;
 use tket::hugr::ops::ExtensionOp;
@@ -90,7 +90,7 @@ impl<'c, H: HugrView<Node = Node>, AL: ArrayLowering + Clone> ResultEmitter<'c, 
 
     fn get_func_print(&self, op: &ResultOp) -> Result<FunctionValue<'c>> {
         // The first two parameters are the same for all print function variants
-        let mut params : Vec<BasicMetadataTypeEnum> = vec![self.ptr_t().into(), self.i64_t().into()];
+        let mut params: Vec<BasicMetadataTypeEnum> = vec![self.ptr_t().into(), self.i64_t().into()];
         let symbol = match op.result_op {
             ResultOpDef::Bool => {
                 params.push(self.bool_t().into());
@@ -150,7 +150,8 @@ impl<'c, H: HugrView<Node = Node>, AL: ArrayLowering + Clone> ResultEmitter<'c, 
                 .builder()
                 .build_load(self.i8_t(), tag_ptr.into_pointer_value(), "tag_len")?
                 .into_int_value();
-            self.builder().build_int_z_extend(l, self.i64_t(), "tag_len")?
+            self.builder()
+                .build_int_z_extend(l, self.i64_t(), "tag_len")?
         };
 
         Ok((tag_ptr, tag_len))
@@ -170,14 +171,14 @@ impl<'c, H: HugrView<Node = Node>, AL: ArrayLowering + Clone> ResultEmitter<'c, 
         };
 
         let print_fn = self.get_func_print(op)?;
-        let array = self.1.array_to_ptr(self.builder(), val,
-            data_type.llvm_type(self.iw_context()), length.try_into()?)?;
-        let (array_ptr, _) = struct_1d_arr_alloc(
-            self.iw_context(),
+        let array = self.1.array_to_ptr(
             self.builder(),
+            val,
+            data_type.llvm_type(self.iw_context()),
             length.try_into()?,
-            array,
         )?;
+        let (array_ptr, _) =
+            struct_1d_arr_alloc(self.iw_context(), self.builder(), length.try_into()?, array)?;
         self.builder().build_call(
             print_fn,
             &[tag_ptr.into(), tag_len.into(), array_ptr.into()],
