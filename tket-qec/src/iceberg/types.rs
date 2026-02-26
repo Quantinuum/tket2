@@ -20,6 +20,8 @@ pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 pub const BLOCK_TYPENAME: TypeName = TypeName::new_inline("block");
 
 /// Type of an Iceberg block of a given size.
+///
+/// * `k_arg` - The number of logical qubits in the code block.
 pub fn block_custom_type(k_arg: impl Into<TypeArg>, extension_ref: &Weak<Extension>) -> CustomType {
     CustomType::new(
         BLOCK_TYPENAME,
