@@ -191,7 +191,7 @@ impl ValidateJustArgs for ArgsValidator {
             return Err(SignatureError::InvalidTypeArgs);
         }
         let k = get_usize(&arg_values[0])?;
-        if k < 2 {
+        if k == 0 || k % 2 == 1 {
             return Err(SignatureError::InvalidTypeArgs);
         }
         for arg in arg_values.iter().skip(1) {
@@ -555,15 +555,15 @@ mod tests {
     #[test]
     fn test_alloc_measure() {
         let alloczero = EXTENSION
-            .instantiate_extension_op("AllocZero", [7.into()])
+            .instantiate_extension_op("AllocZero", [8.into()])
             .unwrap();
         let x3 = EXTENSION
-            .instantiate_extension_op("X", [7.into(), 3.into()])
+            .instantiate_extension_op("X", [8.into(), 3.into()])
             .unwrap();
         let measuresyndrome = EXTENSION
-            .instantiate_extension_op("MeasureSyndrome", [7.into()])
+            .instantiate_extension_op("MeasureSyndrome", [8.into()])
             .unwrap();
-        let mut outputs: Vec<Type> = vec![block_type(7)];
+        let mut outputs: Vec<Type> = vec![block_type(8)];
         outputs.extend(vec![bool_t(); 2]);
         let mut dfg_builder = DFGBuilder::new(Signature::new(vec![], outputs)).unwrap();
         let handle = dfg_builder.add_dataflow_op(alloczero, vec![]).unwrap();
@@ -664,7 +664,7 @@ mod tests {
             .instantiate_extension_op("X", [6.into(), 3.into()])
             .unwrap();
         let x3_bad_k = EXTENSION
-            .instantiate_extension_op("X", [5.into(), 3.into()])
+            .instantiate_extension_op("X", [4.into(), 3.into()])
             .unwrap();
         let mut module_builder = ModuleBuilder::new();
         let signature = Signature::new_endo(vec![block]);
