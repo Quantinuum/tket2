@@ -681,7 +681,7 @@ mod tests {
 
     #[fixture]
     fn tk1_circuit() -> Circuit {
-        load_tk1_json_str(
+        let hugr = load_tk1_json_str(
             r#"{
             "name": "MyCirc",
             "phase": "0",
@@ -696,7 +696,8 @@ mod tests {
         }"#,
             DecodeOptions::new(),
         )
-        .unwrap()
+        .unwrap();
+        hugr.into()
     }
 
     /// 2-qubit circuit with a Hadamard, a CNOT, and an Rz gate.

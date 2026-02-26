@@ -5,7 +5,6 @@ use hugr::extension::ExtensionId;
 use hugr::extension::simple_op::MakeExtensionOp;
 use hugr::ops::ExtensionOp;
 use itertools::Itertools as _;
-use tket::Circuit;
 use tket::serialize::pytket::decoder::{
     DecodeStatus, LoadedParameter, ParameterType, PytketDecoderContext, TrackedBit, TrackedQubit,
 };
@@ -32,13 +31,13 @@ impl<H: HugrView> PytketEmitter<H> for QSystemEmitter {
         &self,
         node: H::Node,
         op: &ExtensionOp,
-        circ: &Circuit<H>,
+        hugr: &H,
         encoder: &mut PytketEncoderContext<H>,
     ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
         if let Ok(tket_op) = QSystemOp::from_extension_op(op) {
-            self.encode_qsystem_op(node, tket_op, circ, encoder)
+            self.encode_qsystem_op(node, tket_op, hugr, encoder)
         } else if let Ok(sympy_op) = RuntimeBarrierDef::from_extension_op(op) {
-            self.encode_runtime_barrier_op(node, sympy_op, circ, encoder)
+            self.encode_runtime_barrier_op(node, sympy_op, hugr, encoder)
         } else {
             Ok(EncodeStatus::Unsupported)
         }
@@ -51,7 +50,7 @@ impl QSystemEmitter {
         &self,
         node: H::Node,
         qsystem_op: QSystemOp,
-        circ: &Circuit<H>,
+        hugr: &H,
         encoder: &mut PytketEncoderContext<H>,
     ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
         let serial_op = match qsystem_op {
@@ -65,7 +64,7 @@ impl QSystemEmitter {
             QSystemOp::Reset => PytketOptype::Reset,
             QSystemOp::QFree => {
                 // Mark the qubit inputs as explored and forget about them.
-                encoder.get_input_values(node, circ)?;
+                encoder.get_input_values(node, hugr)?;
                 return Ok(EncodeStatus::Success);
             }
             QSystemOp::LazyMeasureReset | QSystemOp::MeasureReset => {
@@ -84,7 +83,7 @@ impl QSystemEmitter {
 
         // pytket parameters are always in half-turns.
         // Since the `tket.qsystem` op inputs are in radians, we have to convert them here.
-        encoder.emit_node_command(node, circ, EmitCommandOptions::new(), move |mut inputs| {
+        encoder.emit_node_command(node, hugr, EmitCommandOptions::new(), move |mut inputs| {
             for param in inputs.params.to_mut() {
                 *param = match param.strip_suffix(") * (pi)") {
                     Some(s) if s.starts_with("(") => s[1..].to_string(),
@@ -101,13 +100,13 @@ impl QSystemEmitter {
         &self,
         node: H::Node,
         _runtime_barrier_op: RuntimeBarrierDef,
-        circ: &Circuit<H>,
+        hugr: &H,
         encoder: &mut PytketEncoderContext<H>,
     ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
         encoder.emit_node(
             PytketOptype::Barrier,
             node,
-            circ,
+            hugr,
             EmitCommandOptions::new().reuse_all_bits(),
         )?;
 

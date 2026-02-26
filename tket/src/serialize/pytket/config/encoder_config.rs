@@ -1,4 +1,4 @@
-//! Configuration for converting [`Circuit`]s into
+//! Configuration for converting Hugrs into
 //! [`tket_json_rs::circuit_json::SerialCircuit`]
 //!
 //! A configuration struct contains a list of custom emitters that define
@@ -10,7 +10,6 @@ use hugr::extension::{ExtensionId, ExtensionSet};
 use hugr::ops::{ExtensionOp, Value};
 use hugr::types::{SumType, Type};
 
-use crate::Circuit;
 use crate::serialize::pytket::encoder::EncodeStatus;
 use crate::serialize::pytket::extension::{PytketTypeTranslator, RegisterCount, set_bits_op};
 use crate::serialize::pytket::{PytketEmitter, PytketEncodeError};
@@ -20,7 +19,7 @@ use super::TypeTranslatorSet;
 use hugr::HugrView;
 use itertools::Itertools;
 
-/// Configuration for converting [`Circuit`] into
+/// Configuration for converting Hugrs into
 /// [`tket_json_rs::circuit_json::SerialCircuit`].
 ///
 /// Contains custom emitters that define translations for HUGR operations,
@@ -91,13 +90,13 @@ impl<H: HugrView> PytketEncoderConfig<H> {
         &self,
         node: H::Node,
         op: &ExtensionOp,
-        circ: &Circuit<H>,
+        hugr: &H,
         encoder: &mut PytketEncoderContext<H>,
     ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
         let mut result = EncodeStatus::Unsupported;
         let extension = op.def().extension_id();
         for enc in self.emitters_for_extension(extension) {
-            if enc.op_to_pytket(node, op, circ, encoder)? == EncodeStatus::Success {
+            if enc.op_to_pytket(node, op, hugr, encoder)? == EncodeStatus::Success {
                 result = EncodeStatus::Success;
                 break;
             }

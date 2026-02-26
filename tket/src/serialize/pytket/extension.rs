@@ -33,7 +33,6 @@ pub(crate) use bool::set_bits_op;
 pub(crate) use tk1::{OpaqueTk1Op, build_opaque_tket_op};
 
 use super::encoder::TrackedValues;
-use crate::Circuit;
 use crate::serialize::pytket::config::TypeTranslatorSet;
 use crate::serialize::pytket::decoder::{
     DecodeStatus, LoadedParameter, PytketDecoderContext, TrackedBit, TrackedQubit,
@@ -81,10 +80,10 @@ pub trait PytketEmitter<H: HugrView> {
         &self,
         node: H::Node,
         op: &ExtensionOp,
-        circ: &Circuit<H>,
+        hugr: &H,
         encoder: &mut PytketEncoderContext<H>,
     ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
-        let _ = (node, op, circ, encoder);
+        let _ = (node, op, hugr, encoder);
         Ok(EncodeStatus::Unsupported)
     }
 

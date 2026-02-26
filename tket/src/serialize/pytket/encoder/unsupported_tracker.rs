@@ -6,7 +6,6 @@ use hugr::HugrView;
 use hugr::core::HugrNode;
 use petgraph::unionfind::UnionFind;
 
-use crate::Circuit;
 use crate::serialize::pytket::PytketEncodeError;
 use crate::serialize::pytket::opaque::OpaqueSubgraph;
 
@@ -42,7 +41,7 @@ struct UnsupportedNode {
 
 impl<N: HugrNode> UnsupportedTracker<N> {
     /// Create a new [`UnsupportedTracker`].
-    pub fn new(_circ: &Circuit<impl HugrView>) -> Self {
+    pub fn new(_hugr: &impl HugrView<Node = N>) -> Self {
         Self {
             nodes: HashMap::new(),
             components: UnionFind::new_empty(),
@@ -55,7 +54,7 @@ impl<N: HugrNode> UnsupportedTracker<N> {
     }
 
     /// Record an unsupported node in the hugr.
-    pub fn record_node(&mut self, node: N, circ: &Circuit<impl HugrView<Node = N>>) {
+    pub fn record_node(&mut self, node: N, hugr: &impl HugrView<Node = N>) {
         let node_data = UnsupportedNode {
             component: self.components.new_set(),
         };
@@ -63,7 +62,7 @@ impl<N: HugrNode> UnsupportedTracker<N> {
 
         // Take the union of the component with any currently tracked incoming
         // neighbour.
-        for neighbour in circ.hugr().input_neighbours(node) {
+        for neighbour in hugr.input_neighbours(node) {
             if let Some(neigh_data) = self.nodes.get(&neighbour) {
                 self.components
                     .union(neigh_data.component, node_data.component);

@@ -25,7 +25,7 @@
 //! use hugr::HugrView;
 //!
 //! // Load a tket1 circuit.
-//! let mut circ: Circuit = tket::serialize::load_tk1_json_file("../test_files/pytket/barenco_tof_5.json", DecodeOptions::new()).unwrap();
+//! let mut circ: Circuit = tket::serialize::load_tk1_json_file("../test_files/pytket/barenco_tof_5.json", DecodeOptions::new()).unwrap().into();
 //!
 //! assert_eq!(circ.qubit_count(), 9);
 //! assert_eq!(circ.num_operations(), 170);

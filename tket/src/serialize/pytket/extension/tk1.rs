@@ -1,6 +1,5 @@
 //! Encoder for pytket operations that cannot be represented naturally in tket.
 
-use crate::Circuit;
 use crate::extension::rotation::rotation_type;
 use crate::extension::{TKET1_EXTENSION, TKET1_EXTENSION_ID, TKET1_OP_NAME};
 use crate::serialize::pytket::decoder::{
@@ -36,7 +35,7 @@ impl<H: HugrView> PytketEmitter<H> for Tk1Emitter {
         &self,
         node: H::Node,
         op: &ExtensionOp,
-        circ: &Circuit<H>,
+        hugr: &H,
         encoder: &mut PytketEncoderContext<H>,
     ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
         if op.qualified_id() != format!("{TKET1_EXTENSION_ID}.{TKET1_OP_NAME}") {
@@ -52,7 +51,7 @@ impl<H: HugrView> PytketEmitter<H> for Tk1Emitter {
         // Most operations map directly to a pytket one.
         encoder.emit_node_command(
             node,
-            circ,
+            hugr,
             EmitCommandOptions::new(),
             // Emit the pre-defined pytket operation stored in the metadata.
             move |_| op.serialised_op,

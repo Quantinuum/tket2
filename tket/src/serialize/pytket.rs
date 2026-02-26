@@ -19,13 +19,15 @@ pub use error::{
     PytketDecodeError, PytketDecodeErrorInner, PytketEncodeError, PytketEncodeOpError,
 };
 pub use extension::PytketEmitter;
+use hugr::core::HugrNode;
+use hugr::ops::OpTag;
 use hugr::std_extensions::arithmetic::float_types::float64_type;
 use hugr::types::Type;
 pub use options::{DecodeInsertionTarget, DecodeOptions, EncodeOptions};
 
 use hugr::hugr::hugrmut::HugrMut;
 use hugr::ops::handle::NodeHandle;
-use hugr::{Hugr, Node};
+use hugr::{Hugr, HugrView, Node};
 #[cfg(test)]
 mod tests;
 
@@ -39,20 +41,25 @@ use tket_json_rs::circuit_json::SerialCircuit;
 use tket_json_rs::register::{Bit, ElementId, Qubit};
 
 use self::decoder::PytketDecoderContext;
-use crate::circuit::Circuit;
 
 use crate::extension::rotation::rotation_type;
 pub use crate::passes::pytket::lower_to_pytket;
 
-/// A serialized representation of a [`Circuit`].
+/// Encode and decode dataflow regions in HUGRs into pytket-like flat quantum circuits.
 ///
 /// Implemented by [`SerialCircuit`], the JSON format used by tket1's `pytket` library.
 pub trait TKETDecode: Sized {
     /// Error type of decoding errors.
     type DecodeError;
     /// Error type of encoding errors.
-    type EncodeError;
-    /// Convert the serialized circuit to a circuit.
+    type EncodeError<N: HugrNode>;
+    /// Convert a serialized pytket circuit to a HUGR.
+    ///
+    /// The HUGR will contain a single function as entrypoint containing the
+    /// decoded circuit.
+    ///
+    /// The function name will be determined by the `name` of the serialized
+    /// circuit, if present, or will be empty otherwise.
     ///
     /// See [DecodeOptions] to define the options used by the decoder.
     ///
@@ -63,7 +70,8 @@ pub trait TKETDecode: Sized {
     /// # Returns
     ///
     /// The encoded circuit.
-    fn decode(&self, options: DecodeOptions) -> Result<Circuit, Self::DecodeError>;
+    fn decode(&self, options: DecodeOptions) -> Result<Hugr, Self::DecodeError>;
+
     /// Convert the serialized circuit into a function definition in an existing HUGR.
     ///
     /// Does **not** modify the HUGR's entrypoint.
@@ -77,9 +85,7 @@ pub trait TKETDecode: Sized {
     /// # Returns
     ///
     /// The node id of the defined function.
-    //
-    // TODO: This should probably be renamed as `decode_into` (à la `clone_into`).
-    fn decode_inplace(
+    fn decode_into(
         &self,
         // This cannot be a generic HugrMut since it is stored inside the `PytketDecoderContext` that we to be Send+Sync
         // (so that the extension decoder traits are dyn-compatible).
@@ -87,37 +93,44 @@ pub trait TKETDecode: Sized {
         target: DecodeInsertionTarget,
         options: DecodeOptions,
     ) -> Result<Node, Self::DecodeError>;
-    /// Convert a circuit to a serialized pytket circuit.
+
+    /// Convert the circuit-like entrypoint region of a Hugr to a serialized
+    /// pytket circuit.
     ///
     /// See [EncodeOptions] for the options used by the encoder.
     ///
+    /// If the entrypoint region is not a dataflow region, an error will be returned.
+    ///
     /// # Arguments
     ///
-    /// - `circuit`: The circuit to encode.
+    /// - `hugr`: The Hugr to encode.
     /// - `options`: The options for the encoder.
     ///
     /// # Returns
     ///
     /// A serialized pytket circuit.
-    fn encode(circuit: &Circuit, options: EncodeOptions) -> Result<Self, Self::EncodeError>;
+    fn encode<H: HugrView>(
+        hugr: &H,
+        options: EncodeOptions<H>,
+    ) -> Result<Self, Self::EncodeError<H::Node>>;
 }
 
 impl TKETDecode for SerialCircuit {
     type DecodeError = PytketDecodeError;
-    type EncodeError = PytketEncodeError;
+    type EncodeError<N: HugrNode> = PytketEncodeError<N>;
 
-    fn decode(&self, options: DecodeOptions) -> Result<Circuit, Self::DecodeError> {
+    fn decode(&self, options: DecodeOptions) -> Result<Hugr, Self::DecodeError> {
         let mut hugr = Hugr::new();
-        let main_func = self.decode_inplace(
+        let main_func = self.decode_into(
             &mut hugr,
             DecodeInsertionTarget::Function { fn_name: None },
             options,
         )?;
         hugr.set_entrypoint(main_func);
-        Ok(hugr.into())
+        Ok(hugr)
     }
 
-    fn decode_inplace(
+    fn decode_into(
         &self,
         hugr: &mut Hugr,
         target: DecodeInsertionTarget,
@@ -128,9 +141,23 @@ impl TKETDecode for SerialCircuit {
         Ok(decoder.finish(None)?.node())
     }
 
-    fn encode(circuit: &Circuit, options: EncodeOptions) -> Result<Self, Self::EncodeError> {
-        let mut encoded = EncodedCircuit::new_standalone(circuit, options)?;
-        Ok(std::mem::take(&mut encoded[circuit.parent()]))
+    fn encode<H: HugrView>(
+        hugr: &H,
+        options: EncodeOptions<H>,
+    ) -> Result<Self, Self::EncodeError<H::Node>> {
+        if !OpTag::DataflowParent.is_superset(hugr.entrypoint_tag()) {
+            return Err(PytketEncodeError::NonDataflowRegion {
+                region: hugr.entrypoint(),
+                optype: hugr.entrypoint_optype().to_string(),
+            });
+        }
+
+        let mut encoded = EncodedCircuit::new_standalone(hugr, options)?;
+
+        let serial_circ = encoded
+            .get_circuit_mut(hugr.entrypoint())
+            .expect("Hugr entrypoint must be a dataflow region");
+        Ok(std::mem::take(serial_circ))
     }
 }
 
@@ -140,7 +167,7 @@ impl TKETDecode for SerialCircuit {
 pub fn load_tk1_json_file(
     path: impl AsRef<Path>,
     options: DecodeOptions,
-) -> Result<Circuit, PytketDecodeError> {
+) -> Result<Hugr, PytketDecodeError> {
     let file = fs::File::open(path).map_err(PytketDecodeError::custom)?;
     let reader = io::BufReader::new(file);
     load_tk1_json_reader(reader, options)
@@ -152,16 +179,16 @@ pub fn load_tk1_json_file(
 pub fn load_tk1_json_reader(
     json: impl io::Read,
     options: DecodeOptions,
-) -> Result<Circuit, PytketDecodeError> {
+) -> Result<Hugr, PytketDecodeError> {
     let ser: SerialCircuit = serde_json::from_reader(json).map_err(PytketDecodeError::custom)?;
-    let circ: Circuit = ser.decode(options)?;
+    let circ: Hugr = ser.decode(options)?;
     Ok(circ)
 }
 
 /// Load a TKET1 circuit from a JSON string.
 ///
 /// See [DecodeOptions] for the options used by the decoder.
-pub fn load_tk1_json_str(json: &str, options: DecodeOptions) -> Result<Circuit, PytketDecodeError> {
+pub fn load_tk1_json_str(json: &str, options: DecodeOptions) -> Result<Hugr, PytketDecodeError> {
     let reader = json.as_bytes();
     load_tk1_json_reader(reader, options)
 }
@@ -176,11 +203,11 @@ pub fn load_tk1_json_str(json: &str, options: DecodeOptions) -> Result<Circuit, 
 ///
 /// Returns an error if the circuit is not flat or if it contains operations not
 /// supported by pytket.
-pub fn save_tk1_json_file(
-    circ: &Circuit,
+pub fn save_tk1_json_file<H: HugrView>(
+    circ: &H,
     path: impl AsRef<Path>,
-    options: EncodeOptions,
-) -> Result<(), PytketEncodeError> {
+    options: EncodeOptions<H>,
+) -> Result<(), PytketEncodeError<H::Node>> {
     let file = fs::File::create(path).map_err(PytketEncodeError::custom)?;
     let writer = io::BufWriter::new(file);
     save_tk1_json_writer(circ, writer, options)
@@ -196,11 +223,11 @@ pub fn save_tk1_json_file(
 ///
 /// Returns an error if the circuit is not flat or if it contains operations not
 /// supported by pytket.
-pub fn save_tk1_json_writer(
-    circ: &Circuit,
+pub fn save_tk1_json_writer<H: HugrView>(
+    circ: &H,
     w: impl io::Write,
-    options: EncodeOptions,
-) -> Result<(), PytketEncodeError> {
+    options: EncodeOptions<H>,
+) -> Result<(), PytketEncodeError<H::Node>> {
     let serial_circ = SerialCircuit::encode(circ, options)?;
     serde_json::to_writer(w, &serial_circ).map_err(PytketEncodeError::custom)?;
     Ok(())
@@ -216,10 +243,10 @@ pub fn save_tk1_json_writer(
 ///
 /// Returns an error if the circuit is not flat or if it contains operations not
 /// supported by pytket.
-pub fn save_tk1_json_str(
-    circ: &Circuit,
-    options: EncodeOptions,
-) -> Result<String, PytketEncodeError> {
+pub fn save_tk1_json_str<H: HugrView>(
+    circ: &H,
+    options: EncodeOptions<H>,
+) -> Result<String, PytketEncodeError<H::Node>> {
     let mut buf = io::BufWriter::new(Vec::new());
     save_tk1_json_writer(circ, &mut buf, options)?;
     let bytes = buf.into_inner().unwrap();
