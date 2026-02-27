@@ -1069,10 +1069,10 @@ pub fn resolve_modifier_with_entrypoints(
 ) -> Result<(), ModifierResolverErrors<Node>> {
     use ModifierResolverErrors::*;
 
-    let entry_points: VecDeque<_> = entry_points.into_iter().collect();
+    let entry_points: Vec<_> = entry_points.into_iter().collect();
 
     let mut resolver = ModifierResolver::new();
-    let mut worklist = entry_points.clone();
+    let mut worklist = VecDeque::from_iter(entry_points.iter().copied());
     let mut visited = vec![];
     while let Some(node) = worklist.pop_front() {
         if !h.contains_node(node) || visited.contains(&node) {
@@ -1094,7 +1094,7 @@ pub fn resolve_modifier_with_entrypoints(
     // This might be insufficient as a cleanup since the resolution procedure might
     // generate nodes that are not reachable from the entry points.
     // If more thorough cleanup is needed, we should run dead code elimination.
-    let mut deletelist = entry_points.clone();
+    let mut deletelist = VecDeque::from_iter(entry_points.iter().copied());
     let mut visited = vec![];
     while let Some(node) = deletelist.pop_front() {
         deletelist.extend(h.children(node).filter(|n| !visited.contains(n)));
@@ -1132,7 +1132,7 @@ pub fn resolve_modifier_with_entrypoints(
 
     // TODO: This as well.
     // Ad hoc cleanup procedure.
-    delete_phase(h, [h.module_root()])?;
+    delete_phase(h, entry_points)?;
 
     h.validate()
         .map_err(|e| ModifierResolverErrors::BuildError(e.into()))?;
