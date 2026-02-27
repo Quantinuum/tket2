@@ -77,7 +77,7 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for BorrowSquashPass {
                     local_queue.extend(all_outs(hugr, child));
                 }
                 // If the node is a container, mark it as a region to be processed.
-                if hugr.children(child).next().is_some() {
+                if self.scope.recursive() && hugr.children(child).next().is_some() {
                     regions.push_back(child);
                 }
             }
