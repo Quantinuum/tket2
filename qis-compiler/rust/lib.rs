@@ -17,6 +17,7 @@ use inkwell::targets::{
     CodeModel, InitializationConfig, RelocMode, Target, TargetMachine, TargetTriple,
 };
 use itertools::Itertools;
+#[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
 use tket::hugr::ops::DataflowParent;
 
@@ -45,11 +46,12 @@ use tket_qsystem::llvm::{
     random::RandomCodegenExtension, result::ResultsCodegenExtension, utils::UtilsCodegenExtension,
 };
 use tracing::{Level, event, instrument};
+#[cfg(feature = "pyo3")]
 use utils::read_hugr_envelope;
 
 mod gpu;
 mod selene_specific;
-mod utils;
+pub mod utils;
 
 const LLVM_MAIN: &str = "qmain";
 const METADATA: &[(&str, &[&str])] = &[("name", &["mainlib"])];
@@ -278,7 +280,7 @@ fn wrap_main<'c>(
 }
 
 #[derive(Debug)]
-struct CompileArgs<'a> {
+pub struct CompileArgs<'a> {
     /// Entry point symbol
     entry: Option<String>,
     /// LLVM module name
@@ -292,7 +294,7 @@ struct CompileArgs<'a> {
 }
 
 impl<'a> CompileArgs<'a> {
-    fn new(
+    pub fn new(
         name: &impl ToString,
         target_machine: &'a TargetMachine,
         opt_level: OptimizationLevel,
@@ -310,7 +312,7 @@ impl<'a> CompileArgs<'a> {
 /// Compile the given HUGR to an LLVM module.
 /// This function is the primary entry point for the compiler.
 #[instrument(skip(ctx, hugr),parent = None)]
-fn compile<'c, 'hugr: 'c>(
+pub fn compile<'c, 'hugr: 'c>(
     args: &CompileArgs,
     ctx: &'c Context,
     hugr: &'hugr mut Hugr,
@@ -408,11 +410,13 @@ pub fn get_opt_level(opt_level: u32) -> Result<OptimizationLevel> {
 }
 
 // -------------------- Python bindings -----------------------
+#[cfg(feature = "pyo3")]
 mod exceptions {
     use pyo3::exceptions::PyException;
 
     pyo3::create_exception!(selene_hugr_qis_compiler, HugrReadError, PyException);
 }
+#[cfg(feature = "pyo3")]
 #[pymodule]
 mod selene_hugr_qis_compiler {
     use super::{
