@@ -382,7 +382,7 @@ mod test {
         });
         let ext_op = op.to_extension_op().unwrap().into();
         let mut hugr = single_op_hugr(ext_op);
-        crate::replace_bools::ReplaceBoolPass
+        crate::replace_bools::ReplaceBoolPass::default()
             .run(&mut hugr)
             .unwrap();
         check_emission!(hugr, llvm_ctx);

@@ -60,6 +60,8 @@ impl Default for QSystemPass {
 #[derive(Error, Debug, Display, From)]
 #[non_exhaustive]
 /// An error reported from [QSystemPass].
+//
+// TODO: Implement ComposablePass for QSystemPass
 pub enum QSystemPassError<N = Node> {
     /// An error from the component [ReplaceBoolPass].
     ReplaceBoolError(ReplaceBoolPassError<N>),
@@ -196,11 +198,11 @@ impl QSystemPass {
     }
 
     fn lower_tk2(&self) -> LowerTketToQSystemPass {
-        LowerTketToQSystemPass
+        LowerTketToQSystemPass::default()
     }
 
     fn replace_bools(&self) -> ReplaceBoolPass {
-        ReplaceBoolPass
+        ReplaceBoolPass::default()
     }
 
     fn constant_fold(&self) -> ConstantFoldPass {
@@ -212,7 +214,7 @@ impl QSystemPass {
     }
 
     fn lower_drops(&self) -> LowerDropsPass {
-        LowerDropsPass
+        LowerDropsPass::default()
     }
 
     /// Returns a new `QSystemPass` with constant folding enabled according to
