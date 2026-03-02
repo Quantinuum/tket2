@@ -4,6 +4,7 @@ from typing import TypeVar
 from .optimiser import BadgerOptimiser
 from .circuit import Tk2Circuit
 from pytket._tket.circuit import Circuit
+from hugr.passes.scope import PassScope
 
 CircuitClass = TypeVar("CircuitClass", Circuit, Tk2Circuit)
 
@@ -30,6 +31,7 @@ def normalize_guppy(
     inline_dfgs: bool = True,
     remove_redundant_order_edges: bool = True,
     squash_borrows: bool = True,
+    scope: PassScope | None = None,
 ) -> CircuitClass:
     """Flatten the structure of a Guppy-generated program to enable additional optimisations.
 
@@ -90,7 +92,7 @@ def tket1_pass(
     circ: CircuitClass,
     pass_json: str,
     *,
-    traverse_subcircuits: bool = True,
+    scope: PassScope | None = None,
 ) -> CircuitClass:
     """Runs a pytket pass on all circuit-like regions under the entrypoint of the
     HUGR.

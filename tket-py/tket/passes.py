@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pathlib import Path
 from typing import Optional, Literal
 import json
@@ -13,11 +15,15 @@ from pytket.passes import (
 from tket import optimiser
 from tket.circuit import _hugr_to_tk2circuit
 
-from hugr.passes._composable_pass import (
+from hugr.passes.composable import (
     ComposablePass,
     ComposedPass,
     implement_pass_run,
     PassResult,
+)
+from hugr.passes.scope import (
+    PassScope,
+    GlobalScope,
 )
 
 
@@ -101,6 +107,7 @@ def badger_pass(
 @dataclass
 class PytketHugrPass(ComposablePass):
     pytket_passes: list[BasePass]
+    _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
 
     """
     A class which provides an interface to apply pytket passes to Hugr programs.
@@ -128,12 +135,19 @@ class PytketHugrPass(ComposablePass):
         else:
             return ComposedPass(self, other)
 
+    def with_scope(self, scope: PassScope) -> PytketHugrPass:
+        """Set the scope configuration for the composed pass."""
+        self._scope = scope
+        return self
+
     def _run_pytket_pass_on_hugr(self, hugr: Hugr, inplace: bool) -> PassResult:
         compiler_state, registry = _hugr_to_tk2circuit(hugr)
         for py_pass in self.pytket_passes:
             pass_json = json.dumps(py_pass.to_dict())
             compiler_state = tket1_pass(
-                compiler_state, pass_json, traverse_subcircuits=True
+                compiler_state,
+                pass_json,
+                scope=self._scope,
             )
 
         new_hugr = Hugr.from_str(compiler_state.to_str())

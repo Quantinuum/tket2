@@ -1,5 +1,6 @@
 //! Passes that call to tket1-passes using the tket-c-api.
 
+use hugr_passes::PassScope;
 use rayon::iter::ParallelIterator;
 use std::sync::Arc;
 
@@ -8,6 +9,7 @@ use tket::serialize::pytket::{EncodeOptions, EncodedCircuit};
 use tket_qsystem::pytket::{qsystem_decoder_config, qsystem_encoder_config};
 
 use crate::circuit::try_with_circ;
+use crate::passes::PyPassScope;
 use crate::utils::{ConvertPyErr, create_py_exception};
 
 /// Runs a pytket pass on all circuit-like regions under the entrypoint of the
@@ -18,25 +20,32 @@ use crate::utils::{ConvertPyErr, create_py_exception};
 /// - pass_json: The JSON string of the pytket pass to run. See [pytket
 ///   documentation](https://docs.quantinuum.com/tket/api-docs/passes.html#pytket.passes.BasePass.to_dict)
 ///   for more details.
-/// - traverse_subcircuits: Whether to recurse into the children of the
-///   circuit-like regions, and optimise them too.
 #[pyfunction]
-#[pyo3(signature = (circ, pass_json, *, traverse_subcircuits = true))]
-pub fn tket1_pass<'py>(
+#[pyo3(signature = (circ, pass_json, *, scope = None))]
+pub(crate) fn tket1_pass<'py>(
     circ: &Bound<'py, PyAny>,
     pass_json: &str,
-    traverse_subcircuits: bool,
+    scope: Option<PyPassScope>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py = circ.py();
 
     try_with_circ(circ, |mut circ, typ| {
-        let mut encoded_circ = EncodedCircuit::new(
-            circ.hugr(),
-            EncodeOptions::new()
-                .with_config(qsystem_encoder_config())
-                .with_subcircuits(traverse_subcircuits),
-        )
-        .convert_pyerrs()?;
+        // TODO: Implement a Tket1Pass: ComposablePass, use it here with the right scope.
+        // (Create an issue and link it here).
+        let scope: PassScope = scope.unwrap_or_default().scope;
+        let encode_options = EncodeOptions::new()
+            .with_config(qsystem_encoder_config())
+            .with_subcircuits(scope.recursive());
+
+        let Some(root) = scope.root(circ.hugr()) else {
+            // Local scope with module entrypoint, do not modify the hugr.
+            let circ = typ.convert(py, circ)?;
+            return PyResult::Ok(circ);
+        };
+
+        let mut encoded_circ =
+            EncodedCircuit::new_with_entrypoint(circ.hugr(), root, encode_options)
+                .convert_pyerrs()?;
 
         encoded_circ
             .par_iter_mut()

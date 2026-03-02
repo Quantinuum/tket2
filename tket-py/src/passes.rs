@@ -1,11 +1,14 @@
 //! Passes for optimising circuits.
 
 pub mod chunks;
+mod scope;
 pub mod tket1;
+
+pub(crate) use scope::PyPassScope;
 
 use std::{cmp::min, convert::TryInto, fs, num::NonZeroUsize, path::PathBuf};
 
-use hugr_passes::composable::ComposablePass;
+use hugr_passes::composable::{ComposablePass, WithScope};
 use pyo3::{prelude::*, types::IntoPyDict};
 use tket::optimiser::badger::BadgerOptions;
 use tket::passes;
@@ -58,7 +61,7 @@ create_py_exception!(
 /// - squash_borrows: Whether to squash return-borrow pairs on BorrowArrays.
 /// - remove_redundant_order_edges: Whether to remove redundant order edges.
 #[pyfunction]
-#[pyo3(signature = (circ, *, simplify_cfgs = true, remove_tuple_untuple = true, constant_folding = true, remove_dead_funcs = true, inline_dfgs = true, remove_redundant_order_edges = true, squash_borrows = true))]
+#[pyo3(signature = (circ, *, simplify_cfgs = true, remove_tuple_untuple = true, constant_folding = true, remove_dead_funcs = true, inline_dfgs = true, remove_redundant_order_edges = true, squash_borrows = true, scope = None))]
 #[expect(clippy::too_many_arguments)]
 fn normalize_guppy<'py>(
     circ: &Bound<'py, PyAny>,
@@ -69,10 +72,12 @@ fn normalize_guppy<'py>(
     inline_dfgs: bool,
     remove_redundant_order_edges: bool,
     squash_borrows: bool,
+    scope: Option<PyPassScope>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py = circ.py();
     try_with_circ(circ, |mut circ, typ| {
-        let mut pass = tket::passes::NormalizeGuppy::default();
+        let py_scope = scope.unwrap_or_default();
+        let mut pass = tket::passes::NormalizeGuppy::default_with_scope(py_scope.scope);
 
         pass.simplify_cfgs(simplify_cfgs)
             .remove_tuple_untuple(remove_tuple_untuple)
