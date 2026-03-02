@@ -25,7 +25,6 @@ from hugr.passes._composable_pass import (
 from ._tket.passes import (
     CircuitChunks,
     greedy_depth_reduce,
-    lower_to_pytket,
     badger_optimise,
     chunks,
     tket1_pass,
@@ -39,7 +38,6 @@ __all__ = [
     # TODO: Wrap these in Python classes.
     "CircuitChunks",
     "greedy_depth_reduce",
-    "lower_to_pytket",
     "badger_optimise",
     "chunks",
     # TODO: Remove export, use `NormalizeGuppy` instead

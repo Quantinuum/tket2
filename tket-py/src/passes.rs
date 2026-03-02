@@ -11,7 +11,6 @@ use tket::optimiser::badger::BadgerOptions;
 use tket::passes;
 use tket::{TketOp, op_matches};
 
-use crate::circuit::CircuitType;
 use crate::utils::{ConvertPyErr, create_py_exception};
 use crate::{
     circuit::{try_update_circ, try_with_circ},
@@ -24,7 +23,6 @@ use crate::{
 pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     let m = PyModule::new(py, "passes")?;
     m.add_function(wrap_pyfunction!(greedy_depth_reduce, &m)?)?;
-    m.add_function(wrap_pyfunction!(lower_to_pytket, &m)?)?;
     m.add_function(wrap_pyfunction!(badger_optimise, &m)?)?;
     m.add_function(wrap_pyfunction!(normalize_guppy, &m)?)?;
     m.add_class::<self::chunks::PyCircuitChunks>()?;
@@ -39,12 +37,6 @@ create_py_exception!(
     tket::passes::PullForwardError,
     PyPullForwardError,
     "Error from a `PullForward` operation"
-);
-
-create_py_exception!(
-    tket::passes::pytket::PytketLoweringError,
-    PyPytketLoweringError,
-    "Errors that can occur while removing high-level operations from HUGR intended to be encoded as a pytket circuit."
 );
 
 create_py_exception!(
@@ -120,24 +112,6 @@ fn rebase_nam(circ: &Bound<PyAny>) -> PyResult<()> {
     let op_set = py.eval(c"{OpType.CX, OpType.Rz, OpType.H}", None, Some(&locals))?;
     let rebase_pass = auto_rebase.call1((op_set,))?.getattr("apply")?;
     rebase_pass.call1((circ,)).map(|_| ())
-}
-
-/// A pass that removes high-level control flow from a HUGR, so it can be used in pytket.
-#[pyfunction]
-fn lower_to_pytket<'py>(circ: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
-    let py = circ.py();
-    try_with_circ(circ, |circ, typ| match typ {
-        CircuitType::Tket1 => {
-            // If the circuit is already in tket1 format, just return it.
-            let circ = typ.convert(py, circ)?;
-            PyResult::Ok(circ)
-        }
-        CircuitType::Tket => {
-            let circ = passes::lower_to_pytket(&circ).convert_pyerrs()?;
-            let circ = typ.convert(py, circ)?;
-            PyResult::Ok(circ)
-        }
-    })
 }
 
 /// Badger optimisation pass.

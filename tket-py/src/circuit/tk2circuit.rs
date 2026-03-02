@@ -7,6 +7,7 @@ use std::mem;
 use std::num::{NonZero, NonZeroU8};
 use std::sync::LazyLock;
 
+use hugr::algorithms::ComposablePass;
 use hugr::builder::{CircuitBuilder, DFGBuilder, Dataflow, DataflowHugr};
 use hugr::envelope::{EnvelopeConfig, EnvelopeFormat, ZstdConfig};
 use hugr::extension::prelude::qb_t;
@@ -27,8 +28,7 @@ use derive_more::From;
 use hugr::{Hugr, HugrView, Wire};
 use serde::Serialize;
 use tket::circuit::CircuitHash;
-use tket::passes::CircuitChunks;
-use tket::passes::pytket::lower_to_pytket;
+use tket::passes::{CircuitChunks, NormalizeGuppy};
 use tket::serialize::TKETDecode;
 use tket::serialize::pytket::{DecodeOptions, EncodeOptions};
 use tket::{Circuit, TketOp};
@@ -83,9 +83,10 @@ impl Tk2Circuit {
 
     /// Convert the [`Tk2Circuit`] to a tket1 circuit.
     pub fn to_tket1<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let circ = lower_to_pytket(&self.circ).convert_pyerrs()?;
+        let mut hugr = self.circ.hugr().clone();
+        NormalizeGuppy::default().run(&mut hugr).convert_pyerrs()?;
         SerialCircuit::encode(
-            circ.hugr(),
+            &hugr,
             EncodeOptions::new().with_config(tket_qsystem::pytket::qsystem_encoder_config()),
         )
         .convert_pyerrs()?
@@ -170,15 +171,14 @@ impl Tk2Circuit {
     /// Encode the circuit as a tket1 json string.
     pub fn to_tket1_json(&self) -> PyResult<String> {
         // Try to simplify tuple pack-unpack pairs, and other operations not supported by pytket.
-        let circ = lower_to_pytket(&self.circ).convert_pyerrs()?;
-        serde_json::to_string(
-            &SerialCircuit::encode(
-                circ.hugr(),
-                EncodeOptions::new().with_config(tket_qsystem::pytket::qsystem_encoder_config()),
-            )
-            .convert_pyerrs()?,
+        let mut hugr = self.circ.hugr().clone();
+        NormalizeGuppy::default().run(&mut hugr).convert_pyerrs()?;
+        let serial = SerialCircuit::encode(
+            &hugr,
+            EncodeOptions::new().with_config(tket_qsystem::pytket::qsystem_encoder_config()),
         )
-        .map_err(|e| {
+        .convert_pyerrs()?;
+        serde_json::to_string(&serial).map_err(|e| {
             PyErr::new::<PyValueError, _>(format!("Could not encode pytket circuit to str: {e}"))
         })
     }
@@ -199,15 +199,14 @@ impl Tk2Circuit {
     /// Encode the circuit as a tket1 json utf8 bytes.
     pub fn to_tket1_json_bytes(&self) -> PyResult<Vec<u8>> {
         // Try to simplify tuple pack-unpack pairs, and other operations not supported by pytket.
-        let circ = lower_to_pytket(&self.circ).convert_pyerrs()?;
-        serde_json::to_vec(
-            &SerialCircuit::encode(
-                circ.hugr(),
-                EncodeOptions::new().with_config(tket_qsystem::pytket::qsystem_encoder_config()),
-            )
-            .convert_pyerrs()?,
+        let mut hugr = self.circ.hugr().clone();
+        NormalizeGuppy::default().run(&mut hugr).convert_pyerrs()?;
+        let serial = SerialCircuit::encode(
+            &hugr,
+            EncodeOptions::new().with_config(tket_qsystem::pytket::qsystem_encoder_config()),
         )
-        .map_err(|e| {
+        .convert_pyerrs()?;
+        serde_json::to_vec(&serial).map_err(|e| {
             PyErr::new::<PyValueError, _>(format!("Could not encode pytket circuit to bytes: {e}"))
         })
     }

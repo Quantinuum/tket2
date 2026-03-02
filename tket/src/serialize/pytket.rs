@@ -43,7 +43,6 @@ use tket_json_rs::register::{Bit, ElementId, Qubit};
 use self::decoder::PytketDecoderContext;
 
 use crate::extension::rotation::rotation_type;
-pub use crate::passes::pytket::lower_to_pytket;
 
 /// Encode and decode dataflow regions in HUGRs into pytket-like flat quantum circuits.
 ///
@@ -195,7 +194,8 @@ pub fn load_tk1_json_str(json: &str, options: DecodeOptions) -> Result<Hugr, Pyt
 
 /// Save a circuit to file in TK1 JSON format.
 ///
-/// You may need to normalize the circuit using [`lower_to_pytket`] before saving.
+/// You may need to normalize the circuit using
+/// [`NormalizeGuppy`][crate::passes::NormalizeGuppy] before saving.
 ///
 /// See [EncodeOptions] for the options used by the encoder.
 ///
@@ -215,7 +215,8 @@ pub fn save_tk1_json_file<H: HugrView>(
 
 /// Save a circuit in TK1 JSON format to a writer.
 ///
-/// You may need to normalize the circuit using [`lower_to_pytket`] before saving.
+/// You may need to normalize the circuit using
+/// [`NormalizeGuppy`][crate::passes::NormalizeGuppy] before saving.
 ///
 /// See [EncodeOptions] for the options used by the encoder.
 ///
@@ -235,7 +236,8 @@ pub fn save_tk1_json_writer<H: HugrView>(
 
 /// Save a circuit in TK1 JSON format to a String.
 ///
-/// You may need to normalize the circuit using [`lower_to_pytket`] before saving.
+/// You may need to normalize the circuit using
+/// [`NormalizeGuppy`][crate::passes::NormalizeGuppy] before saving.
 ///
 /// See [EncodeOptions] for the options used by the encoder.
 ///
