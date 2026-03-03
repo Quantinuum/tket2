@@ -32,7 +32,8 @@ hugr = { workspace = true }
 itertools = { workspace = true }
 num_cpus = { workspace = true }
 portmatching = { workspace = true }
-pyo3 = { workspace = true, features = ["py-clone", "abi3-py310"] }
+pyo3 = { workspace = true, features = ["py-clone", "abi3-py310", "anyhow"] }
+anyhow = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }

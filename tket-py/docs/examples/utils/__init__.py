@@ -2,7 +2,6 @@
 
 from hugr import Hugr
 from hugr.envelope import EnvelopeConfig
-from tket.passes import lower_to_pytket
 from tket.circuit import Tk2Circuit
 from typing import Any
 
@@ -36,6 +35,4 @@ def guppy_to_circuit(func_def: Any) -> Tk2Circuit:
     f_name = pkg.modules[0].entrypoint_op().f_name
 
     byt = pkg.to_bytes()
-    circ = Tk2Circuit.from_bytes(byt, f_name)
-
-    return lower_to_pytket(circ)
+    return Tk2Circuit.from_bytes(byt, f_name)
