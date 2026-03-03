@@ -118,6 +118,7 @@ impl PytketDecoder for QSystemEmitter {
     fn op_types(&self) -> Vec<PytketOptype> {
         // Process native optypes that are not supported by the `TketOp` emitter.
         vec![
+            PytketOptype::Rz,
             PytketOptype::PhasedX,
             PytketOptype::ZZPhase,
             PytketOptype::ZZMax,
@@ -134,6 +135,7 @@ impl PytketDecoder for QSystemEmitter {
         decoder: &mut PytketDecoderContext<'h>,
     ) -> Result<DecodeStatus, PytketDecodeError> {
         let op = match op.op_type {
+            PytketOptype::Rz => QSystemOp::Rz,
             PytketOptype::PhasedX => QSystemOp::PhasedX,
             PytketOptype::ZZPhase => QSystemOp::ZZPhase,
             PytketOptype::ZZMax => {
