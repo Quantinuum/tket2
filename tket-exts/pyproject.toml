@@ -2,7 +2,7 @@
 name = "tket-exts"
 version = "0.12.2"
 requires-python = ">=3.10"
-description = "Precompiled rewrite sets for the tket compiler"
+description = "Python interface for hugr extensions offered by tket"
 license = { file = "LICENCE" }
 readme = "README.md"
 authors = [
