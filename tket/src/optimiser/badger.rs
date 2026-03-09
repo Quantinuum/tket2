@@ -28,7 +28,6 @@ use std::time::{Duration, Instant};
 use std::{mem, thread};
 
 use crate::Circuit;
-use crate::circuit::CircuitHash;
 use crate::circuit::cost::CircuitCost;
 use crate::optimiser::badger::worker::BadgerWorker;
 use crate::optimiser::{BacktrackingOptimiser, Optimiser, State, StatePQWorker, pqueue_worker};

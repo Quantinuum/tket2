@@ -492,8 +492,6 @@ impl<'data> IntoParallelRefMutIterator<'data> for CircuitChunks {
 
 #[cfg(test)]
 mod test {
-    use crate::circuit::CircuitHash;
-
     use crate::TketOp;
     use crate::utils::build_simple_circuit;
 

@@ -7,6 +7,8 @@ use std::mem;
 use std::num::{NonZero, NonZeroU8};
 use std::sync::LazyLock;
 
+use anyhow::Context;
+use hugr::algorithms::ComposablePass;
 use hugr::builder::{CircuitBuilder, DFGBuilder, Dataflow, DataflowHugr};
 use hugr::envelope::{EnvelopeConfig, EnvelopeFormat, ZstdConfig};
 use hugr::extension::prelude::qb_t;
@@ -26,9 +28,7 @@ use pyo3::{
 use derive_more::From;
 use hugr::{Hugr, HugrView, Wire};
 use serde::Serialize;
-use tket::circuit::CircuitHash;
-use tket::passes::CircuitChunks;
-use tket::passes::pytket::lower_to_pytket;
+use tket::passes::{CircuitChunks, NormalizeGuppy};
 use tket::serialize::TKETDecode;
 use tket::serialize::pytket::{DecodeOptions, EncodeOptions};
 use tket::{Circuit, TketOp};
@@ -75,21 +75,23 @@ impl Tk2Circuit {
     /// Converts the input circuit to a `Hugr` if required via its serialisation
     /// interface.
     #[new]
-    pub fn new(circ: &Bound<PyAny>) -> PyResult<Self> {
+    pub fn new(circ: &Bound<PyAny>) -> anyhow::Result<Self> {
         Ok(Self {
             circ: with_circ(circ, |hugr, _| hugr)?,
         })
     }
 
     /// Convert the [`Tk2Circuit`] to a tket1 circuit.
-    pub fn to_tket1<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let circ = lower_to_pytket(&self.circ).convert_pyerrs()?;
-        SerialCircuit::encode(
-            circ.hugr(),
+    pub fn to_tket1<'py>(&self, py: Python<'py>) -> anyhow::Result<Bound<'py, PyAny>> {
+        let mut hugr = self.circ.hugr().clone();
+        NormalizeGuppy::default().run(&mut hugr)?;
+        let serial = SerialCircuit::encode(
+            &hugr,
             EncodeOptions::new().with_config(tket_qsystem::pytket::qsystem_encoder_config()),
-        )
-        .convert_pyerrs()?
-        .to_tket1(py)
+        )?;
+        serial
+            .to_tket1(py)
+            .context("Could not convert tk2circuit to tket1")
     }
 
     /// Apply a rewrite on the circuit.
@@ -101,16 +103,15 @@ impl Tk2Circuit {
     ///
     /// If no config is given, it defaults to the default binary envelope.
     #[pyo3(signature = (config = None))]
-    pub fn to_bytes(&self, config: Option<Bound<'_, PyAny>>) -> PyResult<Vec<u8>> {
-        fn err(e: impl Display) -> PyErr {
-            PyErr::new::<PyAttributeError, _>(format!("Could not encode circuit: {e}"))
-        };
+    pub fn to_bytes(&self, config: Option<Bound<'_, PyAny>>) -> anyhow::Result<Vec<u8>> {
         let config = match config {
             Some(cfg) => envelope_config_from_py(cfg)?,
             None => EnvelopeConfig::binary(),
         };
         let mut buf = Vec::new();
-        self.circ.store(&mut buf, config).map_err(err)?;
+        self.circ
+            .store(&mut buf, config)
+            .context("Could not encode tk2circuit to bytes")?;
         Ok(buf)
     }
 
@@ -118,15 +119,14 @@ impl Tk2Circuit {
     ///
     /// If no config is given, it defaults to the default text envelope.
     #[pyo3(signature = (config = None))]
-    pub fn to_str(&self, config: Option<Bound<'_, PyAny>>) -> PyResult<String> {
-        fn err(e: impl Display) -> PyErr {
-            PyErr::new::<PyAttributeError, _>(format!("Could not encode circuit: {e}"))
-        };
+    pub fn to_str(&self, config: Option<Bound<'_, PyAny>>) -> anyhow::Result<String> {
         let config = match config {
             Some(cfg) => envelope_config_from_py(cfg)?,
             None => EnvelopeConfig::text(),
         };
-        self.circ.store_str(config).map_err(err)
+        self.circ
+            .store_str(config)
+            .context("Could not encode tk2circuit to string")
     }
 
     /// Loads a circuit from a HUGR envelope.
@@ -136,15 +136,13 @@ impl Tk2Circuit {
     // TODO(deprecated): Drop the `function_name` parameter in a breaking change.
     #[staticmethod]
     #[pyo3(signature = (bytes, function_name = None))]
-    pub fn from_bytes(bytes: &[u8], function_name: Option<String>) -> PyResult<Self> {
-        fn err(e: impl Display) -> PyErr {
-            PyErr::new::<PyAttributeError, _>(format!("Could not read envelope: {e}"))
-        };
+    pub fn from_bytes(bytes: &[u8], function_name: Option<String>) -> anyhow::Result<Self> {
         let circ = match function_name {
             // NOTE: `load_function` uses the default REGISTRY which does not contain tket-qsystem extensions.
-            Some(name) => Circuit::load_function(bytes, name).map_err(err)?,
-            None => Circuit::load(bytes, Some(&REGISTRY)).map_err(err)?,
-        };
+            Some(name) => Circuit::load_function(bytes, name),
+            None => Circuit::load(bytes, Some(&REGISTRY)),
+        }
+        .context("Could not read tk2circuit from bytes")?;
         Ok(Tk2Circuit { circ })
     }
 
@@ -155,73 +153,59 @@ impl Tk2Circuit {
     // TODO(deprecated): Drop the `function_name` parameter in a breaking change.
     #[staticmethod]
     #[pyo3(signature = (envelope, function_name = None))]
-    pub fn from_str(envelope: &str, function_name: Option<String>) -> PyResult<Self> {
-        fn err(e: impl Display) -> PyErr {
-            PyErr::new::<PyAttributeError, _>(format!("Could not read envelope: {e}"))
-        };
+    pub fn from_str(envelope: &str, function_name: Option<String>) -> anyhow::Result<Self> {
         let circ = match function_name {
             // NOTE: `load_function_str` uses the default REGISTRY which does not contain tket-qsystem extensions.
-            Some(name) => Circuit::load_function_str(envelope, name).map_err(err)?,
-            None => Circuit::load_str(envelope, Some(&REGISTRY)).map_err(err)?,
-        };
+            Some(name) => Circuit::load_function_str(envelope, name),
+            None => Circuit::load_str(envelope, Some(&REGISTRY)),
+        }
+        .context("Could not read tk2circuit from string")?;
         Ok(Tk2Circuit { circ })
     }
 
     /// Encode the circuit as a tket1 json string.
-    pub fn to_tket1_json(&self) -> PyResult<String> {
+    pub fn to_tket1_json(&self) -> anyhow::Result<String> {
         // Try to simplify tuple pack-unpack pairs, and other operations not supported by pytket.
-        let circ = lower_to_pytket(&self.circ).convert_pyerrs()?;
-        serde_json::to_string(
-            &SerialCircuit::encode(
-                circ.hugr(),
-                EncodeOptions::new().with_config(tket_qsystem::pytket::qsystem_encoder_config()),
-            )
-            .convert_pyerrs()?,
-        )
-        .map_err(|e| {
-            PyErr::new::<PyValueError, _>(format!("Could not encode pytket circuit to str: {e}"))
-        })
+        let mut hugr = self.circ.hugr().clone();
+        NormalizeGuppy::default().run(&mut hugr)?;
+        let serial = SerialCircuit::encode(
+            &hugr,
+            EncodeOptions::new().with_config(tket_qsystem::pytket::qsystem_encoder_config()),
+        )?;
+        serde_json::to_string(&serial).context("Could not encode pytket circuit to str")
     }
 
     /// Decode a tket1 json string to a circuit.
     #[staticmethod]
-    pub fn from_tket1_json(json: &str) -> PyResult<Self> {
+    pub fn from_tket1_json(json: &str) -> anyhow::Result<Self> {
         let hugr = tket::serialize::load_tk1_json_str(
             json,
             DecodeOptions::new().with_config(tket_qsystem::pytket::qsystem_decoder_config()),
         )
-        .map_err(|e| {
-            PyErr::new::<PyAttributeError, _>(format!("Could not load pytket circuit: {e}"))
-        })?;
+        .context("Could not load pytket circuit")?;
         Ok(Tk2Circuit { circ: hugr.into() })
     }
 
     /// Encode the circuit as a tket1 json utf8 bytes.
-    pub fn to_tket1_json_bytes(&self) -> PyResult<Vec<u8>> {
+    pub fn to_tket1_json_bytes(&self) -> anyhow::Result<Vec<u8>> {
         // Try to simplify tuple pack-unpack pairs, and other operations not supported by pytket.
-        let circ = lower_to_pytket(&self.circ).convert_pyerrs()?;
-        serde_json::to_vec(
-            &SerialCircuit::encode(
-                circ.hugr(),
-                EncodeOptions::new().with_config(tket_qsystem::pytket::qsystem_encoder_config()),
-            )
-            .convert_pyerrs()?,
-        )
-        .map_err(|e| {
-            PyErr::new::<PyValueError, _>(format!("Could not encode pytket circuit to bytes: {e}"))
-        })
+        let mut hugr = self.circ.hugr().clone();
+        NormalizeGuppy::default().run(&mut hugr)?;
+        let serial = SerialCircuit::encode(
+            &hugr,
+            EncodeOptions::new().with_config(tket_qsystem::pytket::qsystem_encoder_config()),
+        )?;
+        serde_json::to_vec(&serial).context("Could not encode pytket circuit to bytes")
     }
 
     /// Decode a tket1 json utf8 bytes to a circuit.
     #[staticmethod]
-    pub fn from_tket1_json_bytes(json: &[u8]) -> PyResult<Self> {
+    pub fn from_tket1_json_bytes(json: &[u8]) -> anyhow::Result<Self> {
         let hugr = tket::serialize::load_tk1_json_reader(
             json,
             DecodeOptions::new().with_config(tket_qsystem::pytket::qsystem_decoder_config()),
         )
-        .map_err(|e| {
-            PyErr::new::<PyAttributeError, _>(format!("Could not load pytket circuit: {e}"))
-        })?;
+        .context("Could not load pytket circuit")?;
         Ok(Tk2Circuit { circ: hugr.into() })
     }
 
@@ -232,15 +216,16 @@ impl Tk2Circuit {
     ///     `__eq__`, `__int__`, and integer `__div__`.
     ///
     /// :returns: The sum of all operation costs.
-    pub fn circuit_cost<'py>(&self, cost_fn: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+    pub fn circuit_cost<'py>(
+        &self,
+        cost_fn: &Bound<'py, PyAny>,
+    ) -> anyhow::Result<Bound<'py, PyAny>> {
         let py = cost_fn.py();
-        let cost_fn = |op: &OpType| -> PyResult<PyCircuitCost> {
+        let cost_fn = |op: &OpType| -> anyhow::Result<PyCircuitCost> {
             // TODO: We should ignore non-tket operations instead.
             let Some(tk2_op) = op.cast::<TketOp>() else {
                 let op_name = op.to_string();
-                return Err(PyErr::new::<PyValueError, _>(format!(
-                    "Could not convert circuit operation to a `TketOp`: {op_name}"
-                )));
+                anyhow::bail!("Could not convert circuit operation to a `TketOp`: {op_name}");
             };
             let tk2_py_op = PyTketOp::from(tk2_op);
             let cost = cost_fn.call1((tk2_py_op,))?;
@@ -270,27 +255,20 @@ impl Tk2Circuit {
     }
 
     /// Copy the circuit.
-    pub fn __copy__(&self) -> PyResult<Self> {
+    pub fn __copy__(&self) -> anyhow::Result<Self> {
         Ok(self.clone())
     }
 
     /// Copy the circuit.
-    pub fn __deepcopy__(&self, _memo: Bound<PyAny>) -> PyResult<Self> {
+    pub fn __deepcopy__(&self, _memo: Bound<PyAny>) -> anyhow::Result<Self> {
         Ok(self.clone())
     }
 
-    fn node_op(&self, node: PyNode) -> PyResult<Cow<'_, [u8]>> {
-        let custom: ExtensionOp = self
-            .circ
-            .hugr()
-            .get_optype(node.node)
-            .clone()
-            .try_into()
-            .map_err(|e| {
-                PyErr::new::<PyValueError, _>(format!(
-                    "Could not convert circuit operation to an `ExtensionOp`: {e}"
-                ))
-            })?;
+    fn node_op(&self, node: PyNode) -> anyhow::Result<Cow<'_, [u8]>> {
+        let optype: OpType = self.circ.hugr().get_optype(node.node).clone();
+        let custom: ExtensionOp = optype.try_into().map_err(|_| {
+            anyhow::anyhow!("Could not convert circuit operation to an `ExtensionOp`")
+        })?;
 
         Ok(serde_json::to_vec(&custom).unwrap().into())
     }
@@ -333,14 +311,13 @@ impl Tk2Circuit {
 }
 
 /// Converts a python `hugr.envelope.EnvelopeConfig` into a rust-based [`EnvelopeConfig`].
-pub fn envelope_config_from_py(config: Bound<'_, PyAny>) -> PyResult<EnvelopeConfig> {
+pub fn envelope_config_from_py(config: Bound<'_, PyAny>) -> anyhow::Result<EnvelopeConfig> {
     let mut res = EnvelopeConfig::default();
 
     let format = config.getattr("format")?;
     let format_ident: usize = format.getattr("value")?.extract()?;
-    res.format = EnvelopeFormat::from_repr(format_ident).ok_or_else(|| {
-        PyErr::new::<PyValueError, _>(format!("Invalid envelope format: {format_ident}"))
-    })?;
+    res.format = EnvelopeFormat::from_repr(format_ident)
+        .ok_or_else(|| anyhow::anyhow!("Invalid envelope format: {format_ident}"))?;
 
     let zstd: Option<usize> = config.getattr("zstd")?.extract()?;
     res.zstd = zstd.map(|level| {

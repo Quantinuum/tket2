@@ -13,7 +13,4 @@ pub use chunks::CircuitChunks;
 pub mod guppy;
 pub use guppy::NormalizeGuppy;
 
-pub mod pytket;
-pub use pytket::lower_to_pytket;
-
 pub mod unpack_container;
