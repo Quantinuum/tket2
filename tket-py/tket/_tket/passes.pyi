@@ -29,6 +29,7 @@ def normalize_guppy(
     remove_dead_funcs: bool = True,
     inline_dfgs: bool = True,
     remove_redundant_order_edges: bool = True,
+    squash_borrows: bool = True,
 ) -> CircuitClass:
     """Flatten the structure of a Guppy-generated program to enable additional optimisations.
 

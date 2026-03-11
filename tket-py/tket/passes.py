@@ -152,6 +152,7 @@ class NormalizeGuppy(ComposablePass):
     remove_dead_funcs: bool = True
     inline_dfgs: bool = True
     remove_redundant_order_edges: bool = True
+    squash_borrows: bool = True
 
     """Flatten the structure of a Guppy-generated program to enable additional optimisations.
 
@@ -163,6 +164,8 @@ class NormalizeGuppy(ComposablePass):
     - constant_folding: Whether to constant fold the program.
     - remove_dead_funcs: Whether to remove dead functions.
     - inline_dfgs: Whether to inline DFG operations.
+    - remove_redundant_order_edges: Whether to remove redundant order edges.
+    - squash_borrows: Whether to squash return-borrow pairs on BorrowArrays.
     """
 
     def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
@@ -183,6 +186,7 @@ class NormalizeGuppy(ComposablePass):
             remove_dead_funcs=self.remove_dead_funcs,
             inline_dfgs=self.inline_dfgs,
             remove_redundant_order_edges=self.remove_redundant_order_edges,
+            squash_borrows=self.squash_borrows,
         )
         new_hugr = Hugr.from_str(opt_program.to_str())
         new_hugr.resolve_extensions(registry)
