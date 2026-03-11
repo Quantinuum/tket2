@@ -12,7 +12,7 @@ use hugr::{
 };
 
 /// The extension identifier.
-pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("logical.iceberg.types");
+pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("tket.qec.iceberg.types");
 /// Extension version.
 pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 
@@ -94,7 +94,7 @@ mod tests {
     #[test]
     fn test_iceberg_types_extension() {
         let extn = extension();
-        assert_eq!(extn.name() as &str, "logical.iceberg.types");
+        assert_eq!(extn.name() as &str, "tket.qec.iceberg.types");
         assert_eq!(extn.types().count(), 1);
         assert_eq!(extn.operations().count(), 0);
     }

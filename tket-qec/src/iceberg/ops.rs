@@ -24,7 +24,7 @@ use strum::{EnumIter, EnumString, IntoStaticStr};
 use super::types::{block_tv, get_usize};
 
 /// The extension identifier.
-pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("logical.iceberg.ops");
+pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("tket.qec.iceberg.ops");
 /// Extension version.
 pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 
@@ -444,7 +444,7 @@ mod tests {
 
     #[test]
     fn test_iceberg_ops_extension() {
-        assert_eq!(EXTENSION.name() as &str, "logical.iceberg.ops");
+        assert_eq!(EXTENSION.name() as &str, "tket.qec.iceberg.ops");
         assert_eq!(EXTENSION.types().count(), 0);
         assert_eq!(EXTENSION.operations().count(), 35);
     }
