@@ -21,7 +21,7 @@ use hugr::{
 };
 use strum::{EnumIter, EnumString, IntoStaticStr};
 
-use super::types::{block_tv, get_usize};
+use super::types::block_tv;
 
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("tket.qec.iceberg.ops");
@@ -111,19 +111,19 @@ pub struct ConcreteIcebergOp {
     pub def: IcebergOpDef,
 
     /// The block size.
-    pub k: usize,
+    pub k: u64,
 
     /// Qubit index parameters.
-    pub indices: Vec<usize>,
+    pub indices: Vec<u64>,
 }
 
 impl HasConcrete for IcebergOpDef {
     type Concrete = ConcreteIcebergOp;
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
-        let args: Vec<usize> = type_args
+        let args: Vec<u64> = type_args
             .iter()
-            .map(|a| get_usize(a).map_err(|_| SignatureError::InvalidTypeArgs))
+            .map(|arg| arg.as_nat().ok_or(SignatureError::InvalidTypeArgs))
             .collect::<Result<_, _>>()?;
         Ok(ConcreteIcebergOp {
             def: *self,
@@ -168,7 +168,7 @@ impl IcebergOpDef {
     /// Initialize a [`ConcreteIcebergOp`] from an [`IcebergOpDef`] that
     /// requires a single qubit index.
     #[must_use]
-    pub fn with_size_and_index(self, k: usize, i: usize) -> ConcreteIcebergOp {
+    pub fn with_size_and_index(self, k: u64, i: u64) -> ConcreteIcebergOp {
         ConcreteIcebergOp {
             def: self,
             k,
@@ -191,12 +191,12 @@ impl ValidateJustArgs for ArgsValidator {
         if n != 1 + self.n_idx {
             return Err(SignatureError::InvalidTypeArgs);
         }
-        let k = get_usize(&arg_values[0])?;
+        let k = arg_values[0].as_nat().unwrap();
         if k == 0 || k % 2 == 1 {
             return Err(SignatureError::InvalidTypeArgs);
         }
         for arg in arg_values.iter().skip(1) {
-            let i = get_usize(arg)?;
+            let i = arg.as_nat().unwrap();
             if i >= k {
                 return Err(SignatureError::InvalidTypeArgs);
             }

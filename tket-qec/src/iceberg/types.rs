@@ -5,10 +5,7 @@ use std::sync::{Arc, LazyLock, Weak};
 use hugr::{
     Extension,
     extension::ExtensionId,
-    types::{
-        CustomType, Type, TypeArg, TypeBound, TypeName,
-        type_param::{TermTypeError, TypeParam},
-    },
+    types::{CustomType, Type, TypeArg, TypeBound, TypeName, type_param::TypeParam},
 };
 
 /// The extension identifier.
@@ -35,17 +32,6 @@ pub fn block_custom_type(k_arg: impl Into<TypeArg>, extension_ref: &Weak<Extensi
 /// Type of an Iceberg block of a given size.
 pub fn block_type(k_arg: impl Into<TypeArg>) -> Type {
     block_custom_type(k_arg, &Arc::<Extension>::downgrade(&EXTENSION)).into()
-}
-
-/// Get a usize from a [`TypeArg`].
-pub fn get_usize(arg: &TypeArg) -> Result<usize, TermTypeError> {
-    match arg {
-        TypeArg::BoundedNat(i) => Ok(*i as usize),
-        _ => Err(TermTypeError::TypeMismatch {
-            term: Box::new(arg.clone()),
-            type_: Box::new(TypeParam::max_nat_type()),
-        }),
-    }
 }
 
 /// Extension for logical Iceberg block type.
