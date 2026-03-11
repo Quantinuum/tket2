@@ -30,78 +30,79 @@ pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 
 /// Logical Iceberg operations.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
+#[expect(non_camel_case_types)]
 #[non_exhaustive]
 pub enum IcebergOpDef {
     /// X gate.
-    X,
+    x,
     /// Z gate.
-    Z,
+    z,
     /// X gate on two qubits.
-    XX,
+    xx,
     /// Y gate on two qubits.
-    YY,
+    yy,
     /// Z gate on two qubits.
-    ZZ,
+    zz,
     /// X gate on all but one qubit.
-    AllButOneX,
+    all_but_one_x,
     /// Z gate on all but one qubit.
-    AllButOneZ,
+    all_but_one_z,
     /// X gate on all qubits.
-    AllX,
+    all_x,
     /// Y gate on all qubits.
-    AllY,
+    all_y,
     /// Z gate on all qubits.
-    AllZ,
+    all_z,
     /// X gate on one qubit with Z on all others.
-    XWithAllButOneZ,
+    x_with_all_but_one_z,
     /// Z gate on one qubit with X on all others.
-    ZWithAllButOneX,
+    z_with_all_but_one_x,
     /// Fan-out from one qubit to all others.
-    FanOut,
+    fan_out,
     /// Fan-in to one qubut from all others.
-    FanIn,
+    fan_in,
     /// Rx gate.
-    Rx,
+    rx,
     /// Rz gate.
-    Rz,
+    rz,
     /// Rx gate on all qubits.
-    AllRx,
+    all_rx,
     /// Ry gate on all qubits.
-    AllRy,
+    all_ry,
     /// Rz gate on all qubits.
-    AllRz,
+    all_rz,
     /// Rx gate on all but one qubit.
-    AllButOneRx,
+    all_but_one_rx,
     /// Ry gate on all but one qubit.
-    AllButOneRy,
+    all_but_one_ry,
     /// Rz gate on all but one qubit.
-    AllButOneRz,
+    all_but_one_rz,
     /// H gate on all qubits.
-    AllH,
+    all_h,
     /// XXPhase gate.
-    XXPhase,
+    xx_phase,
     /// YYPhase gate.
-    YYPhase,
+    yy_phase,
     /// ZZPhase gate.
-    ZZPhase,
+    zz_phase,
     /// CX gate.
-    CX,
+    cx,
     /// Swap of two qubits within a block.
-    SWAP,
+    swap,
     /// ZZPhase gate involving two blocks.
-    ZZPhaseBetweenBlocks,
+    zz_phase_between_blocks,
     /// CX gate applied transversally over two blocks.
-    CXTransverse,
+    cx_transverse,
     /// Prepare the all-zero state on a block.
-    AllocZero,
+    alloc_zero,
     /// Syndrome measurement.
-    MeasureSyndrome,
+    measure_syndrome,
     /// Destructive measurement of all qubits.
-    MeasureAll,
+    measure_all,
     /// Non-destructive measurement of one qubit in the X basis.
-    MeasureOneX,
+    measure_one_x,
     /// Non-destructive measurement of one qubit in the Z basis.
-    MeasureOneZ,
+    measure_one_z,
 }
 
 /// Concrete Iceberg logical operation with block size and indices set.
@@ -266,35 +267,35 @@ impl MakeOpDef for IcebergOpDef {
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         use IcebergOpDef::*;
         match self {
-            X => sig_1_block(0, 1),
-            Z => sig_1_block(0, 1),
-            XX => sig_1_block(0, 2),
-            YY => sig_1_block(0, 2),
-            ZZ => sig_1_block(0, 2),
-            AllButOneX => sig_1_block(0, 1),
-            AllButOneZ => sig_1_block(0, 1),
-            AllX => sig_1_block(0, 0),
-            AllY => sig_1_block(0, 0),
-            AllZ => sig_1_block(0, 0),
-            XWithAllButOneZ => sig_1_block(0, 1),
-            ZWithAllButOneX => sig_1_block(0, 1),
-            FanOut => sig_1_block(0, 1),
-            FanIn => sig_1_block(0, 1),
-            Rx => sig_1_block(1, 1),
-            Rz => sig_1_block(1, 1),
-            AllRx => sig_1_block(1, 0),
-            AllRy => sig_1_block(1, 0),
-            AllRz => sig_1_block(1, 0),
-            AllButOneRx => sig_1_block(1, 1),
-            AllButOneRy => sig_1_block(1, 1),
-            AllButOneRz => sig_1_block(1, 1),
-            AllH => sig_1_block(0, 0),
-            XXPhase => sig_1_block(1, 2),
-            YYPhase => sig_1_block(1, 2),
-            ZZPhase => sig_1_block(1, 2),
-            CX => sig_1_block(0, 2),
-            SWAP => sig_1_block(0, 2),
-            ZZPhaseBetweenBlocks => CustomValidator::new(
+            x => sig_1_block(0, 1),
+            z => sig_1_block(0, 1),
+            xx => sig_1_block(0, 2),
+            yy => sig_1_block(0, 2),
+            zz => sig_1_block(0, 2),
+            all_but_one_x => sig_1_block(0, 1),
+            all_but_one_z => sig_1_block(0, 1),
+            all_x => sig_1_block(0, 0),
+            all_y => sig_1_block(0, 0),
+            all_z => sig_1_block(0, 0),
+            x_with_all_but_one_z => sig_1_block(0, 1),
+            z_with_all_but_one_x => sig_1_block(0, 1),
+            fan_out => sig_1_block(0, 1),
+            fan_in => sig_1_block(0, 1),
+            rx => sig_1_block(1, 1),
+            rz => sig_1_block(1, 1),
+            all_rx => sig_1_block(1, 0),
+            all_ry => sig_1_block(1, 0),
+            all_rz => sig_1_block(1, 0),
+            all_but_one_rx => sig_1_block(1, 1),
+            all_but_one_ry => sig_1_block(1, 1),
+            all_but_one_rz => sig_1_block(1, 1),
+            all_h => sig_1_block(0, 0),
+            xx_phase => sig_1_block(1, 2),
+            yy_phase => sig_1_block(1, 2),
+            zz_phase => sig_1_block(1, 2),
+            cx => sig_1_block(0, 2),
+            swap => sig_1_block(0, 2),
+            zz_phase_between_blocks => CustomValidator::new(
                 PolyFuncTypeRV::new(
                     vec![TypeParam::max_nat_type(); 3],
                     FuncValueType::new(
@@ -305,7 +306,7 @@ impl MakeOpDef for IcebergOpDef {
                 ArgsValidator { n_idx: 2 },
             )
             .into(),
-            CXTransverse => CustomValidator::new(
+            cx_transverse => CustomValidator::new(
                 PolyFuncTypeRV::new(
                     vec![TypeParam::max_nat_type()],
                     FuncValueType::new_endo(vec_of_blocks_and_angles(2, 0)),
@@ -313,7 +314,7 @@ impl MakeOpDef for IcebergOpDef {
                 ArgsValidator { n_idx: 0 },
             )
             .into(),
-            AllocZero => CustomValidator::new(
+            alloc_zero => CustomValidator::new(
                 PolyFuncTypeRV::new(
                     vec![TypeParam::max_nat_type()],
                     FuncValueType::new(
@@ -324,7 +325,7 @@ impl MakeOpDef for IcebergOpDef {
                 ArgsValidator { n_idx: 0 },
             )
             .into(),
-            MeasureSyndrome => CustomValidator::new(
+            measure_syndrome => CustomValidator::new(
                 PolyFuncTypeRV::new(
                     vec![TypeParam::max_nat_type()],
                     FuncValueType::new(
@@ -335,7 +336,7 @@ impl MakeOpDef for IcebergOpDef {
                 ArgsValidator { n_idx: 0 },
             )
             .into(),
-            MeasureAll => CustomValidator::new(
+            measure_all => CustomValidator::new(
                 PolyFuncTypeRV::new(
                     vec![TypeParam::max_nat_type()],
                     FuncValueType::new(vec_of_blocks_and_angles(1, 0), vec![bool_array_tv(0)]),
@@ -343,7 +344,7 @@ impl MakeOpDef for IcebergOpDef {
                 ArgsValidator { n_idx: 0 },
             )
             .into(),
-            MeasureOneX => CustomValidator::new(
+            measure_one_x => CustomValidator::new(
                 PolyFuncTypeRV::new(
                     vec![TypeParam::max_nat_type(); 2],
                     FuncValueType::new(
@@ -354,7 +355,7 @@ impl MakeOpDef for IcebergOpDef {
                 ArgsValidator { n_idx: 1 },
             )
             .into(),
-            MeasureOneZ => CustomValidator::new(
+            measure_one_z => CustomValidator::new(
                 PolyFuncTypeRV::new(
                     vec![TypeParam::max_nat_type(); 2],
                     FuncValueType::new(
@@ -371,43 +372,43 @@ impl MakeOpDef for IcebergOpDef {
     fn description(&self) -> String {
         use IcebergOpDef::*;
         match self {
-            X => "apply an X gate to one qubit",
-            Z => "apply a Z gate to one qubit",
-            XX => "apply an X gate to two qubits",
-            YY => "apply a Y gate to two qubits",
-            ZZ => "apply a Z gate to two qubits",
-            AllButOneX => "apply an X gate to all but one qubit",
-            AllButOneZ => "apply a Z gate to all but one qubit",
-            AllX => "apply an X gate to all qubits",
-            AllY => "apply a Y gate to all qubits",
-            AllZ => "apply a Z gate to all qubits",
-            XWithAllButOneZ => "apply an X gate to one qubit and a Z to the rest",
-            ZWithAllButOneX => "apply a Z gate to one qubit and an X to the rest",
-            FanOut => "fan-out from one qubit to the rest",
-            FanIn => "fan-in to one qubit from the rest",
-            Rx => "apply an Rx gate to one qubit",
-            Rz => "apply an Rz gate to one qubit",
-            AllRx => "apply an Rx gate to all qubits",
-            AllRy => "apply an Ry gate to all qubits",
-            AllRz => "apply an Rz gate to all qubits",
-            AllButOneRx => "apply an Rx gate to all but one qubit",
-            AllButOneRy => "apply an Ry gate to all but one qubit",
-            AllButOneRz => "apply an Rz gate to all but one qubit",
-            AllH => "apply an H gate to all qubits",
-            XXPhase => "apply an XXPhase gate to two qubits within a block",
-            YYPhase => "apply a YYPhase gate to two qubits within a block",
-            ZZPhase => "apply a ZZPhase gate to two qubits within a block",
-            CX => "apply a CX gate to two qubits within a block",
-            SWAP => "swap two qubits within a block",
-            ZZPhaseBetweenBlocks => {
+            x => "apply an X gate to one qubit",
+            z => "apply a Z gate to one qubit",
+            xx => "apply an X gate to two qubits",
+            yy => "apply a Y gate to two qubits",
+            zz => "apply a Z gate to two qubits",
+            all_but_one_x => "apply an X gate to all but one qubit",
+            all_but_one_z => "apply a Z gate to all but one qubit",
+            all_x => "apply an X gate to all qubits",
+            all_y => "apply a Y gate to all qubits",
+            all_z => "apply a Z gate to all qubits",
+            x_with_all_but_one_z => "apply an X gate to one qubit and a Z to the rest",
+            z_with_all_but_one_x => "apply a Z gate to one qubit and an X to the rest",
+            fan_out => "fan-out from one qubit to the rest",
+            fan_in => "fan-in to one qubit from the rest",
+            rx => "apply an Rx gate to one qubit",
+            rz => "apply an Rz gate to one qubit",
+            all_rx => "apply an Rx gate to all qubits",
+            all_ry => "apply an Ry gate to all qubits",
+            all_rz => "apply an Rz gate to all qubits",
+            all_but_one_rx => "apply an Rx gate to all but one qubit",
+            all_but_one_ry => "apply an Ry gate to all but one qubit",
+            all_but_one_rz => "apply an Rz gate to all but one qubit",
+            all_h => "apply an H gate to all qubits",
+            xx_phase => "apply an XXPhase gate to two qubits within a block",
+            yy_phase => "apply a YYPhase gate to two qubits within a block",
+            zz_phase => "apply a ZZPhase gate to two qubits within a block",
+            cx => "apply a CX gate to two qubits within a block",
+            swap => "swap two qubits within a block",
+            zz_phase_between_blocks => {
                 "apply a ZZPhase gate to two qubits on different blocks of the same size"
             }
-            CXTransverse => "apply a CX gate transversally over two blocks of the same size",
-            AllocZero => "allocate a block in the all-zero state",
-            MeasureSyndrome => "perform a syndrome measurement, producing (X,Z) error indicators",
-            MeasureAll => "destructively measure all qubits in the Z basis",
-            MeasureOneX => "non-destructively measure one qubit in the X basis",
-            MeasureOneZ => "non-destructively measure one qubit in the Z basis",
+            cx_transverse => "apply a CX gate transversally over two blocks of the same size",
+            alloc_zero => "allocate a block in the all-zero state",
+            measure_syndrome => "perform a syndrome measurement, producing (X,Z) error indicators",
+            measure_all => "destructively measure all qubits in the Z basis",
+            measure_one_x => "non-destructively measure one qubit in the X basis",
+            measure_one_z => "non-destructively measure one qubit in the Z basis",
         }
         .into()
     }
@@ -452,7 +453,7 @@ mod tests {
     #[test]
     fn test_signatures() {
         assert_eq!(
-            IcebergOpDef::X
+            IcebergOpDef::x
                 .with_size_and_index(6, 3)
                 .to_extension_op()
                 .unwrap()
@@ -466,43 +467,43 @@ mod tests {
     fn test_hugr_ops() {
         let block = block_type(6);
         let x3 = EXTENSION
-            .instantiate_extension_op("X", [6.into(), 3.into()])
+            .instantiate_extension_op("x", [6.into(), 3.into()])
             .unwrap();
         let z4 = EXTENSION
-            .instantiate_extension_op("Z", [6.into(), 4.into()])
+            .instantiate_extension_op("z", [6.into(), 4.into()])
             .unwrap();
         let yy14 = EXTENSION
-            .instantiate_extension_op("YY", [6.into(), 1.into(), 4.into()])
+            .instantiate_extension_op("yy", [6.into(), 1.into(), 4.into()])
             .unwrap();
         let allx = EXTENSION
-            .instantiate_extension_op("AllX", [6.into()])
+            .instantiate_extension_op("all_x", [6.into()])
             .unwrap();
         let allrz = EXTENSION
-            .instantiate_extension_op("AllRz", [6.into()])
+            .instantiate_extension_op("all_rz", [6.into()])
             .unwrap();
         let rz3 = EXTENSION
-            .instantiate_extension_op("Rz", [6.into(), 3.into()])
+            .instantiate_extension_op("rz", [6.into(), 3.into()])
             .unwrap();
         let allbutonery1 = EXTENSION
-            .instantiate_extension_op("AllButOneRy", [6.into(), 1.into()])
+            .instantiate_extension_op("all_but_one_ry", [6.into(), 1.into()])
             .unwrap();
         let allh = EXTENSION
-            .instantiate_extension_op("AllH", [6.into()])
+            .instantiate_extension_op("all_h", [6.into()])
             .unwrap();
         let yyphase05 = EXTENSION
-            .instantiate_extension_op("YYPhase", [6.into(), 0.into(), 5.into()])
+            .instantiate_extension_op("yy_phase", [6.into(), 0.into(), 5.into()])
             .unwrap();
         let zzphasebetweenblocks34 = EXTENSION
-            .instantiate_extension_op("ZZPhaseBetweenBlocks", [6.into(), 3.into(), 4.into()])
+            .instantiate_extension_op("zz_phase_between_blocks", [6.into(), 3.into(), 4.into()])
             .unwrap();
         let cxtransverse = EXTENSION
-            .instantiate_extension_op("CXTransverse", [6.into()])
+            .instantiate_extension_op("cx_transverse", [6.into()])
             .unwrap();
         let cx23 = EXTENSION
-            .instantiate_extension_op("CX", [6.into(), 2.into(), 3.into()])
+            .instantiate_extension_op("cx", [6.into(), 2.into(), 3.into()])
             .unwrap();
         let swap51 = EXTENSION
-            .instantiate_extension_op("SWAP", [6.into(), 5.into(), 1.into()])
+            .instantiate_extension_op("swap", [6.into(), 5.into(), 1.into()])
             .unwrap();
         let mut module_builder = ModuleBuilder::new();
         let signature = Signature::new_endo(vec![block; 2]);
@@ -555,13 +556,13 @@ mod tests {
     #[test]
     fn test_alloc_measure() {
         let alloczero = EXTENSION
-            .instantiate_extension_op("AllocZero", [8.into()])
+            .instantiate_extension_op("alloc_zero", [8.into()])
             .unwrap();
         let x3 = EXTENSION
-            .instantiate_extension_op("X", [8.into(), 3.into()])
+            .instantiate_extension_op("x", [8.into(), 3.into()])
             .unwrap();
         let measuresyndrome = EXTENSION
-            .instantiate_extension_op("MeasureSyndrome", [8.into()])
+            .instantiate_extension_op("measure_syndrome", [8.into()])
             .unwrap();
         let mut outputs: Vec<Type> = vec![block_type(8)];
         outputs.extend(vec![bool_t(); 2]);
@@ -580,7 +581,7 @@ mod tests {
     #[test]
     fn test_measure_all() {
         let measureall = EXTENSION
-            .instantiate_extension_op("MeasureAll", [4.into()])
+            .instantiate_extension_op("measure_all", [4.into()])
             .unwrap();
         let mut dfg_builder =
             DFGBuilder::new(Signature::new(vec![block_type(4)], array_type(4, bool_t()))).unwrap();
@@ -596,13 +597,13 @@ mod tests {
     #[test]
     fn test_measure_one() {
         let measureonez0 = EXTENSION
-            .instantiate_extension_op("MeasureOneZ", [2.into(), 0.into()])
+            .instantiate_extension_op("measure_one_z", [2.into(), 0.into()])
             .unwrap();
         let measureonez1 = EXTENSION
-            .instantiate_extension_op("MeasureOneZ", [2.into(), 1.into()])
+            .instantiate_extension_op("measure_one_z", [2.into(), 1.into()])
             .unwrap();
         let allh = EXTENSION
-            .instantiate_extension_op("AllH", [2.into()])
+            .instantiate_extension_op("all_h", [2.into()])
             .unwrap();
         let mut dfg_builder = DFGBuilder::new(Signature::new(
             vec![block_type(2)],
@@ -630,7 +631,7 @@ mod tests {
     fn test_serialization() {
         let block = block_type(6);
         let x3 = EXTENSION
-            .instantiate_extension_op("X", [6.into(), 3.into()])
+            .instantiate_extension_op("x", [6.into(), 3.into()])
             .unwrap();
         let mut module_builder = ModuleBuilder::new();
         let signature = Signature::new_endo(vec![block]);
@@ -661,10 +662,10 @@ mod tests {
     fn test_mismatched_k() {
         let block = block_type(6);
         let x3 = EXTENSION
-            .instantiate_extension_op("X", [6.into(), 3.into()])
+            .instantiate_extension_op("x", [6.into(), 3.into()])
             .unwrap();
         let x3_bad_k = EXTENSION
-            .instantiate_extension_op("X", [4.into(), 3.into()])
+            .instantiate_extension_op("x", [4.into(), 3.into()])
             .unwrap();
         let mut module_builder = ModuleBuilder::new();
         let signature = Signature::new_endo(vec![block]);
@@ -682,17 +683,17 @@ mod tests {
     fn test_invalid_ops() {
         assert!(
             EXTENSION
-                .instantiate_extension_op("X", [1.into(), 0.into()])
+                .instantiate_extension_op("x", [1.into(), 0.into()])
                 .is_err()
         );
         assert!(
             EXTENSION
-                .instantiate_extension_op("X", [6.into(), 6.into()])
+                .instantiate_extension_op("x", [6.into(), 6.into()])
                 .is_err()
         );
         assert!(
             EXTENSION
-                .instantiate_extension_op("XX", [6.into(), 0.into()])
+                .instantiate_extension_op("xx", [6.into(), 0.into()])
                 .is_err()
         );
     }
