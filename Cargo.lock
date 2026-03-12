@@ -2769,6 +2769,7 @@ dependencies = [
  "hugr",
  "semver",
  "strum",
+ "tket-qsystem",
 ]
 
 [[package]]
