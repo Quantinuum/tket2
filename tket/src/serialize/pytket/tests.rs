@@ -296,7 +296,7 @@ fn circ_preset_bits() -> Hugr {
     let mut h = FunctionBuilder::new("preset_bits", Signature::new(input_t, output_t)).unwrap();
 
     let [b0] = h.input_wires_arr();
-    let b1 = h.add_load_value(ConstBool::new(true));
+    let b1 = h.add_load_value(ConstBool::new(false));
     let [b_and] = h
         .add_dataflow_op(BoolOp::and, [b0, b1])
         .unwrap()
@@ -990,6 +990,7 @@ fn encoded_circuit_attributes(circ_measure_ancilla: Hugr) {
 #[rstest]
 #[case::meas_ancilla(circ_measure_ancilla(), CircuitRoundtripTestConfig::Default)]
 #[case::preset_qubits(circ_preset_qubits(), CircuitRoundtripTestConfig::Default)]
+#[case::preset_bits(circ_preset_bits(), CircuitRoundtripTestConfig::Default)]
 #[case::preset_parameterized(circ_parameterized(), CircuitRoundtripTestConfig::Default)]
 // TODO: Should pass once CircBox encoding of DFGs is re-enabled.
 #[should_panic(expected = "Cannot encode subgraphs with nested structure")]

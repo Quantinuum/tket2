@@ -686,14 +686,16 @@ impl WireTracker {
         };
 
         // List candidate wires that contain the qubits and bits we need.
-        let qubit_candidates = qubit_args
-            .first()
-            .into_iter()
-            .flat_map(|qb| self.qubit_wires(qb));
-        let bit_candidates = bit_args
-            .first()
-            .into_iter()
-            .flat_map(|bit| self.bit_wires(bit));
+        let qubit_candidates = if reg_count.qubits > 0 && !qubit_args.is_empty() {
+            itertools::Either::Left(self.qubit_wires(&qubit_args[0]))
+        } else {
+            itertools::Either::Right(std::iter::empty())
+        };
+        let bit_candidates = if reg_count.bits > 0 && !bit_args.is_empty() {
+            itertools::Either::Left(self.bit_wires(&bit_args[0]))
+        } else {
+            itertools::Either::Right(std::iter::empty())
+        };
         let candidates = qubit_candidates.chain(bit_candidates).collect_vec();
 
         // The bits and qubits we expect the wire to contain.
@@ -766,13 +768,13 @@ impl WireTracker {
 
         // Convert the wire type, if needed.
         let wire_data = &self.wires[&wire];
-        let new_wire = config.transform_typed_value(wire, wire_data.ty(), ty, builder)?;
+        let found_wire_type = wire_data.ty();
+        let new_wire = config.transform_typed_value(wire, found_wire_type, ty, builder)?;
 
         if wire == new_wire {
             Ok(FoundWire::Register(self.wires[&wire].clone()))
         } else {
-            let ty: Arc<Type> = wire_data.ty.clone();
-            self.track_wire(new_wire, ty, wire_qubits, wire_bits)?;
+            self.track_wire(new_wire, Arc::new(ty.clone()), wire_qubits, wire_bits)?;
             self.mark_wire_outdated(wire);
             Ok(FoundWire::Register(self.wires[&new_wire].clone()))
         }

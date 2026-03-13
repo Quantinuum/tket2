@@ -59,7 +59,7 @@ impl<H: HugrView> PytketEmitter<H> for BoolEmitter {
         // variable inputs. If new [`BoolOp`]s are added that do not follow
         // this, the following code will need to be adjusted.
         let bit_count = (num_inputs + num_outputs) as usize;
-        let output_bits = (0..num_outputs).collect_vec();
+        let output_bits = (num_inputs..(num_inputs + num_outputs)).collect_vec();
         let mut expression = ClOperator::default();
         expression.op = clop;
         expression.args = (0..num_inputs)
@@ -67,7 +67,13 @@ impl<H: HugrView> PytketEmitter<H> for BoolEmitter {
             .collect_vec();
 
         let op = make_tk1_classical_expression(bit_count, &output_bits, &[], expression);
-        encoder.emit_node_command(node, hugr, EmitCommandOptions::new(), move |_| op)?;
+        encoder.emit_node_command(
+            node,
+            hugr,
+            // Output bits use new registers, so don't reuse any input bits.
+            EmitCommandOptions::new().reuse_bits(|_| vec![]),
+            move |_| op,
+        )?;
         Ok(EncodeStatus::Success)
     }
 
