@@ -1099,9 +1099,9 @@ dependencies = [
 
 [[package]]
 name = "hugr"
-version = "0.25.6"
+version = "0.25.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc11e18017e6ff91448e08e7180e786ca3247c7539de190f01253298442c92a9"
+checksum = "a45b39ce076230f7b2d7ca08ba20d77a8f61bb9d4a3bba2c3ac25a8e2df0cb68"
 dependencies = [
  "hugr-core",
  "hugr-llvm",
@@ -1111,9 +1111,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-cli"
-version = "0.25.6"
+version = "0.25.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6baee3cc2fe4d7c5635a630341e28237f12a8e5beef31b5aaaebe93bc9ba90a"
+checksum = "8a4557d1748193b7970607bbdfb2fa9b9694ce49337a6df9aa96edef472c48f0"
 dependencies = [
  "anyhow",
  "clap",
@@ -1132,9 +1132,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-core"
-version = "0.25.6"
+version = "0.25.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37961239a500fb1eb128b990de804e32902979682263c326694328e36e95f0ad"
+checksum = "0701cebf3e3331826d945c9f7b1e043a3c476cd5ca2ade3dbce105a6bd39c0d0"
 dependencies = [
  "base64",
  "cgmath",
@@ -1170,9 +1170,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-llvm"
-version = "0.25.6"
+version = "0.25.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d903c4878c5329fb754550460421fbdd35825e5ba6d4bf7ae16336b6e9e7c84"
+checksum = "8c1babb400579c90091c0d3b0637563018208af332c90f2b9125b13bb1bb6f3a"
 dependencies = [
  "anyhow",
  "cc",
@@ -1190,9 +1190,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-model"
-version = "0.25.6"
+version = "0.25.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed89e3ad3d857cd6fe212682d3601d0bdbdfafc69a570e3ff08c1d54ddf21bef"
+checksum = "c3b422e3b24b6586f683abe93393f8b9b8bb8b0d028723a13d4c48816039935e"
 dependencies = [
  "base64",
  "bumpalo",
@@ -1212,9 +1212,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-passes"
-version = "0.25.6"
+version = "0.25.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d566bdb985b053d8b02cfbe443f225a3fbc3ef2656193f5072d1c70b6abfe827"
+checksum = "8034893e2f6def14f03406c1d43a79663b9c83364b840bc808e0ffef4ad34e2d"
 dependencies = [
  "ascent",
  "derive_more 2.1.1",
@@ -1441,9 +1441,9 @@ checksum = "09edd9e8b54e49e587e4f6295a7d29c3ea94d469cb40ab8ca70b288248a81db2"
 
 [[package]]
 name = "libc"
-version = "0.2.182"
+version = "0.2.183"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6800badb6cb2082ffd7b6a67e6125bb39f18782f793520caee8cb8846be06112"
+checksum = "b5b646652bf6661599e1da8901b3b9522896f01e736bad5f723fe7a3a27f899d"
 
 [[package]]
 name = "libloading"
@@ -2451,9 +2451,9 @@ dependencies = [
 
 [[package]]
 name = "smol_str"
-version = "0.3.5"
+version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f7a918bd2a9951d18ee6e48f076843e8e73a9a5d22cf05bcd4b7a81bdd04e17"
+checksum = "4aaa7368fcf4852a4c2dd92df0cace6a71f2091ca0a23391ce7f3a31833f1523"
 dependencies = [
  "borsh",
  "serde_core",
@@ -2726,9 +2726,9 @@ dependencies = [
 
 [[package]]
 name = "tket-json-rs"
-version = "0.8.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aea5374e5ef784cd4825cfcd7cfaf4c8a6a39a2da6129b12181aa0c9234f9678"
+checksum = "dd84cd4e9aba4cd47134be2d36fa04765e850ac16fd53948082734f5dc364965"
 dependencies = [
  "derive_more 2.1.1",
  "pyo3",
