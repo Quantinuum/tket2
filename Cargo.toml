@@ -15,7 +15,7 @@ members = [
 default-members = ["tket", "tket-qsystem"]
 
 [workspace.package]
-rust-version = "1.89"
+rust-version = "1.91"
 edition = "2024"
 homepage = "https://github.com/quantinuum/tket2"
 repository = "https://github.com/quantinuum/tket2"
