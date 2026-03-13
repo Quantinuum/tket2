@@ -14,7 +14,7 @@ use hugr::{
     },
     ops::{ExtensionOp, OpName},
     std_extensions::{
-        arithmetic::float_types::float64_type,
+        arithmetic::{float_types::float64_type, int_types::int_type},
         collections::array::{Array, ArrayKind},
     },
     types::{FuncValueType, PolyFuncTypeRV, Type, TypeArg, type_param::TypeParam},
@@ -30,22 +30,45 @@ pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("tket.qec.icebe
 pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 
 /// Logical Iceberg operations.
+///
+/// Those operations that are "addressable", i.e. are associated with one or
+/// more specific logical qubits within the block, have two versions: a "static"
+/// version, where the indices are parameters to the operation definition, and a
+/// "dynamic" version, where the indices are integer inputs to the operation.
+/// The static form provides static guarantees that the indices are within the
+/// allowed range, and is simpler to reason about; the dynamic form provides
+/// greater flexibility to the programmer.
+///
+/// The dynamic versions are named with the suffix `_d`: for example `x` is the
+/// static form of the X gate and `x_d` is the dynamic form.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
 #[expect(non_camel_case_types)]
 #[non_exhaustive]
 pub enum IcebergOpDef {
     /// X gate.
     x,
+    /// X gate (with dynamic index).
+    x_d,
     /// Z gate.
     z,
+    /// Z gate (with dynamic index).
+    z_d,
     /// Fan-out from one qubit to all others.
     fan_out,
-    /// Fan-in to one qubut from all others.
+    /// Fan-out from one qubit to all others (with dynamic index).
+    fan_out_d,
+    /// Fan-in to one qubit from all others.
     fan_in,
+    /// Fan-in to one qubit from all others (with dynamic index).
+    fan_in_d,
     /// Rx gate.
     rx,
+    /// Rx gate (with dynamic index).
+    rx_d,
     /// Rz gate.
     rz,
+    /// Rz gate (with dynamic index).
+    rz_d,
     /// Rx gate on all qubits.
     all_rx,
     /// Ry gate on all qubits.
@@ -54,24 +77,42 @@ pub enum IcebergOpDef {
     all_rz,
     /// Rx gate on all but one qubit.
     all_but_one_rx,
+    /// Rx gate on all but one qubit (with dynamic index).
+    all_but_one_rx_d,
     /// Ry gate on all but one qubit.
     all_but_one_ry,
+    /// Ry gate on all but one qubit (with dynamic index).
+    all_but_one_ry_d,
     /// Rz gate on all but one qubit.
     all_but_one_rz,
+    /// Rz gate on all but one qubit (with dynamic index).
+    all_but_one_rz_d,
     /// H gate on all qubits.
     all_h,
     /// XXPhase gate.
     xx_phase,
+    /// XXPhase gate (with dynamic indices).
+    xx_phase_d,
     /// YYPhase gate.
     yy_phase,
+    /// YYPhase gate (with dynamic indices).
+    yy_phase_d,
     /// ZZPhase gate.
     zz_phase,
+    /// ZZPhase gate (with dynamic indices).
+    zz_phase_d,
     /// CX gate.
     cx,
+    /// CX gate (with dynamic indices).
+    cx_d,
     /// Swap of two qubits within a block.
     swap,
+    /// Swap of two qubits within a block (with dynamic indices).
+    swap_d,
     /// ZZPhase gate involving two blocks.
     zz_phase_between_blocks,
+    /// ZZPhase gate involving two blocks (with dynamic indices).
+    zz_phase_between_blocks_d,
     /// CX gate applied transversally over two blocks.
     cx_transverse,
     /// Prepare the all-zero state on a block.
@@ -82,8 +123,12 @@ pub enum IcebergOpDef {
     measure_all,
     /// Non-destructive measurement of one qubit in the X basis.
     measure_one_x,
+    /// Non-destructive measurement of one qubit in the X basis (with dynamic index).
+    measure_one_x_d,
     /// Non-destructive measurement of one qubit in the Z basis.
     measure_one_z,
+    /// Non-destructive measurement of one qubit in the Z basis (with dynamic index).
+    measure_one_z_d,
 }
 
 /// Concrete Iceberg logical operation with block size and indices set.
@@ -202,6 +247,17 @@ fn vec_of_blocks_and_angles(n_blocks: usize, n_angles: usize) -> Vec<Type> {
     types
 }
 
+fn vec_of_blocks_and_ints_and_angles(
+    n_blocks: usize,
+    n_indices: usize,
+    n_angles: usize,
+) -> Vec<Type> {
+    let mut types: Vec<Type> = vec![block_tv(0); n_blocks];
+    types.extend(vec![int_type(6); n_indices]);
+    types.extend(vec![float64_type(); n_angles]);
+    types
+}
+
 fn vec_of_blocks_and_bools(n_blocks: usize, n_bools: usize) -> Vec<Type> {
     let mut types: Vec<Type> = vec![block_tv(0); n_blocks];
     types.extend(vec![future_type(bool_t()); n_bools]);
@@ -215,6 +271,13 @@ fn block_with_angles_sig(n_angles: usize) -> FuncValueType {
     )
 }
 
+fn block_with_ints_and_angles_sig(n_indices: usize, n_angles: usize) -> FuncValueType {
+    FuncValueType::new(
+        vec_of_blocks_and_ints_and_angles(1, n_indices, n_angles),
+        vec_of_blocks_and_ints_and_angles(1, 0, 0),
+    )
+}
+
 /// Signature of an operation that acts on a single block, with a number of
 /// additional angle inputs and a number of index parameters.
 fn sig_1_block(n_angles: usize, n_indices: usize) -> SignatureFunc {
@@ -224,6 +287,16 @@ fn sig_1_block(n_angles: usize, n_indices: usize) -> SignatureFunc {
             block_with_angles_sig(n_angles),
         ),
         ArgsValidator { n_idx: n_indices },
+    )
+    .into()
+}
+
+/// Signature of an operation that acts on a single block, with a number of
+/// additional angle inputs and a number of index inputs.
+fn sig_1_block_d(n_angles: usize, n_indices: usize) -> SignatureFunc {
+    PolyFuncTypeRV::new(
+        vec![TypeParam::max_nat_type()],
+        block_with_ints_and_angles_sig(n_indices, n_angles),
     )
     .into()
 }
@@ -249,23 +322,37 @@ impl MakeOpDef for IcebergOpDef {
         use IcebergOpDef::*;
         match self {
             x => sig_1_block(0, 1),
+            x_d => sig_1_block_d(0, 1),
             z => sig_1_block(0, 1),
+            z_d => sig_1_block_d(0, 1),
             fan_out => sig_1_block(0, 1),
+            fan_out_d => sig_1_block_d(0, 1),
             fan_in => sig_1_block(0, 1),
+            fan_in_d => sig_1_block_d(0, 1),
             rx => sig_1_block(1, 1),
+            rx_d => sig_1_block_d(1, 1),
             rz => sig_1_block(1, 1),
+            rz_d => sig_1_block_d(1, 1),
             all_rx => sig_1_block(1, 0),
             all_ry => sig_1_block(1, 0),
             all_rz => sig_1_block(1, 0),
             all_but_one_rx => sig_1_block(1, 1),
+            all_but_one_rx_d => sig_1_block_d(1, 1),
             all_but_one_ry => sig_1_block(1, 1),
+            all_but_one_ry_d => sig_1_block_d(1, 1),
             all_but_one_rz => sig_1_block(1, 1),
+            all_but_one_rz_d => sig_1_block_d(1, 1),
             all_h => sig_1_block(0, 0),
             xx_phase => sig_1_block(1, 2),
+            xx_phase_d => sig_1_block_d(1, 2),
             yy_phase => sig_1_block(1, 2),
+            yy_phase_d => sig_1_block_d(1, 2),
             zz_phase => sig_1_block(1, 2),
+            zz_phase_d => sig_1_block_d(1, 2),
             cx => sig_1_block(0, 2),
+            cx_d => sig_1_block_d(0, 2),
             swap => sig_1_block(0, 2),
+            swap_d => sig_1_block_d(0, 2),
             zz_phase_between_blocks => CustomValidator::new(
                 PolyFuncTypeRV::new(
                     vec![TypeParam::max_nat_type(); 3],
@@ -275,6 +362,14 @@ impl MakeOpDef for IcebergOpDef {
                     ),
                 ),
                 ArgsValidator { n_idx: 2 },
+            )
+            .into(),
+            zz_phase_between_blocks_d => PolyFuncTypeRV::new(
+                vec![TypeParam::max_nat_type()],
+                FuncValueType::new(
+                    vec_of_blocks_and_ints_and_angles(2, 2, 1),
+                    vec_of_blocks_and_ints_and_angles(2, 0, 0),
+                ),
             )
             .into(),
             cx_transverse => CustomValidator::new(
@@ -326,6 +421,14 @@ impl MakeOpDef for IcebergOpDef {
                 ArgsValidator { n_idx: 1 },
             )
             .into(),
+            measure_one_x_d => PolyFuncTypeRV::new(
+                vec![TypeParam::max_nat_type()],
+                FuncValueType::new(
+                    vec_of_blocks_and_ints_and_angles(1, 1, 0),
+                    vec_of_blocks_and_bools(1, 1),
+                ),
+            )
+            .into(),
             measure_one_z => CustomValidator::new(
                 PolyFuncTypeRV::new(
                     vec![TypeParam::max_nat_type(); 2],
@@ -337,6 +440,14 @@ impl MakeOpDef for IcebergOpDef {
                 ArgsValidator { n_idx: 1 },
             )
             .into(),
+            measure_one_z_d => PolyFuncTypeRV::new(
+                vec![TypeParam::max_nat_type()],
+                FuncValueType::new(
+                    vec_of_blocks_and_ints_and_angles(1, 1, 0),
+                    vec_of_blocks_and_bools(1, 1),
+                ),
+            )
+            .into(),
         }
     }
 
@@ -344,32 +455,57 @@ impl MakeOpDef for IcebergOpDef {
         use IcebergOpDef::*;
         match self {
             x => "apply an X gate to one qubit",
+            x_d => "apply an X gate to one qubit (with dynamic index)",
             z => "apply a Z gate to one qubit",
+            z_d => "apply a Z gate to one qubit (with dynamic index)",
             fan_out => "fan-out from one qubit to the rest",
+            fan_out_d => "fan-out from one qubit to the rest (with dynamic index)",
             fan_in => "fan-in to one qubit from the rest",
+            fan_in_d => "fan-in to one qubit from the rest (with dynamic index)",
             rx => "apply an Rx gate to one qubit",
+            rx_d => "apply an Rx gate to one qubit (with dynamic index)",
             rz => "apply an Rz gate to one qubit",
+            rz_d => "apply an Rz gate to one qubit (with dynamic index)",
             all_rx => "apply an Rx gate to all qubits",
             all_ry => "apply an Ry gate to all qubits",
             all_rz => "apply an Rz gate to all qubits",
             all_but_one_rx => "apply an Rx gate to all but one qubit",
+            all_but_one_rx_d => "apply an Rx gate to all but one qubit (with dynamic index)",
             all_but_one_ry => "apply an Ry gate to all but one qubit",
+            all_but_one_ry_d => "apply an Ry gate to all but one qubit (with dynamic index)",
             all_but_one_rz => "apply an Rz gate to all but one qubit",
+            all_but_one_rz_d => "apply an Rz gate to all but one qubit (with dynamic index)",
             all_h => "apply an H gate to all qubits",
             xx_phase => "apply an XXPhase gate to two qubits within a block",
+            xx_phase_d => {
+                "apply an XXPhase gate to two qubits within a block (with dynamic indices)"
+            }
             yy_phase => "apply a YYPhase gate to two qubits within a block",
+            yy_phase_d => {
+                "apply a YYPhase gate to two qubits within a block (with dynamic indices)"
+            }
             zz_phase => "apply a ZZPhase gate to two qubits within a block",
+            zz_phase_d => {
+                "apply a ZZPhase gate to two qubits within a block (with dynamic indices)"
+            }
             cx => "apply a CX gate to two qubits within a block",
+            cx_d => "apply a CX gate to two qubits within a block (with dynamic indices)",
             swap => "swap two qubits within a block",
+            swap_d => "swap two qubits within a block (with dynamic indices)",
             zz_phase_between_blocks => {
                 "apply a ZZPhase gate to two qubits on different blocks of the same size"
+            }
+            zz_phase_between_blocks_d => {
+                "apply a ZZPhase gate to two qubits on different blocks of the same size (with dynamic indices)"
             }
             cx_transverse => "apply a CX gate transversally over two blocks of the same size",
             alloc_zero => "allocate a block in the all-zero state",
             measure_syndrome => "perform a syndrome measurement, producing (X,Z) error indicators",
             measure_all => "destructively measure all qubits in the Z basis",
             measure_one_x => "non-destructively measure one qubit in the X basis",
+            measure_one_x_d => "non-destructively measure one qubit in the X basis (with dynamic index)",
             measure_one_z => "non-destructively measure one qubit in the Z basis",
+            measure_one_z_d => "non-destructively measure one qubit in the Z basis (with dynamic index)",
         }
         .into()
     }
@@ -394,7 +530,9 @@ mod tests {
         ops::DataflowOpTrait,
         package::Package,
         std_extensions::{
-            arithmetic::float_types::ConstF64, collections::array::array_type, std_reg,
+            arithmetic::{float_types::ConstF64, int_types::ConstInt},
+            collections::array::array_type,
+            std_reg,
         },
         types::Signature,
     };
@@ -408,7 +546,7 @@ mod tests {
     fn test_iceberg_ops_extension() {
         assert_eq!(EXTENSION.name() as &str, "tket.qec.iceberg.ops");
         assert_eq!(EXTENSION.types().count(), 0);
-        assert_eq!(EXTENSION.operations().count(), 25);
+        assert_eq!(EXTENSION.operations().count(), 42);
     }
 
     #[test]
@@ -430,6 +568,9 @@ mod tests {
         let x3 = EXTENSION
             .instantiate_extension_op("x", [6.into(), 3.into()])
             .unwrap();
+        let x_d = EXTENSION
+            .instantiate_extension_op("x_d", [6.into()])
+            .unwrap();
         let z4 = EXTENSION
             .instantiate_extension_op("z", [6.into(), 4.into()])
             .unwrap();
@@ -438,6 +579,9 @@ mod tests {
             .unwrap();
         let rz3 = EXTENSION
             .instantiate_extension_op("rz", [6.into(), 3.into()])
+            .unwrap();
+        let rx_d = EXTENSION
+            .instantiate_extension_op("rx_d", [6.into()])
             .unwrap();
         let allbutonery1 = EXTENSION
             .instantiate_extension_op("all_but_one_ry", [6.into(), 1.into()])
@@ -448,14 +592,23 @@ mod tests {
         let yyphase05 = EXTENSION
             .instantiate_extension_op("yy_phase", [6.into(), 0.into(), 5.into()])
             .unwrap();
+        let xxphase_d = EXTENSION
+            .instantiate_extension_op("xx_phase_d", [6.into()])
+            .unwrap();
         let zzphasebetweenblocks34 = EXTENSION
             .instantiate_extension_op("zz_phase_between_blocks", [6.into(), 3.into(), 4.into()])
+            .unwrap();
+        let zzphasebetweenblocks_d = EXTENSION
+            .instantiate_extension_op("zz_phase_between_blocks_d", [6.into()])
             .unwrap();
         let cxtransverse = EXTENSION
             .instantiate_extension_op("cx_transverse", [6.into()])
             .unwrap();
         let cx23 = EXTENSION
             .instantiate_extension_op("cx", [6.into(), 2.into(), 3.into()])
+            .unwrap();
+        let cx_d = EXTENSION
+            .instantiate_extension_op("cx_d", [6.into()])
             .unwrap();
         let swap51 = EXTENSION
             .instantiate_extension_op("swap", [6.into(), 5.into(), 1.into()])
@@ -466,6 +619,11 @@ mod tests {
         let wires: Vec<_> = f_build.input_wires().collect();
         let mut linear = f_build.as_circuit(wires);
         linear.append(x3, [0]).unwrap();
+        let index2 = linear.add_constant(ConstInt::new_u(6, 2).unwrap());
+        let index5 = linear.add_constant(ConstInt::new_u(6, 5).unwrap());
+        linear
+            .append_and_consume(x_d, [CircuitUnit::Linear(0), CircuitUnit::Wire(index2)])
+            .unwrap();
         linear.append(z4, [0]).unwrap();
         let angle = linear.add_constant(ConstF64::new(0.25));
         linear
@@ -473,6 +631,16 @@ mod tests {
             .unwrap();
         linear
             .append_and_consume(rz3, [CircuitUnit::Linear(0), CircuitUnit::Wire(angle)])
+            .unwrap();
+        linear
+            .append_and_consume(
+                rx_d,
+                [
+                    CircuitUnit::Linear(0),
+                    CircuitUnit::Wire(index2),
+                    CircuitUnit::Wire(angle),
+                ],
+            )
             .unwrap();
         linear
             .append_and_consume(
@@ -489,6 +657,17 @@ mod tests {
             .unwrap();
         linear
             .append_and_consume(
+                xxphase_d,
+                [
+                    CircuitUnit::Linear(0),
+                    CircuitUnit::Wire(index2),
+                    CircuitUnit::Wire(index5),
+                    CircuitUnit::Wire(angle),
+                ],
+            )
+            .unwrap();
+        linear
+            .append_and_consume(
                 zzphasebetweenblocks34,
                 [
                     CircuitUnit::Linear(0),
@@ -497,8 +676,30 @@ mod tests {
                 ],
             )
             .unwrap();
+        linear
+            .append_and_consume(
+                zzphasebetweenblocks_d,
+                [
+                    CircuitUnit::Linear(0),
+                    CircuitUnit::Linear(1),
+                    CircuitUnit::Wire(index2),
+                    CircuitUnit::Wire(index5),
+                    CircuitUnit::Wire(angle),
+                ],
+            )
+            .unwrap();
         linear.append(cxtransverse, [0, 1]).unwrap();
         linear.append(cx23, [1]).unwrap();
+        linear
+            .append_and_consume(
+                cx_d,
+                [
+                    CircuitUnit::Linear(0),
+                    CircuitUnit::Wire(index2),
+                    CircuitUnit::Wire(index5),
+                ],
+            )
+            .unwrap();
         linear.append(swap51, [0]).unwrap();
         let outs = linear.finish();
         f_build.finish_with_outputs(outs).unwrap();
@@ -558,12 +759,20 @@ mod tests {
         let measureonez1 = EXTENSION
             .instantiate_extension_op("measure_one_z", [2.into(), 1.into()])
             .unwrap();
+        let measureonez_d = EXTENSION
+            .instantiate_extension_op("measure_one_z_d", [2.into()])
+            .unwrap();
         let allh = EXTENSION
             .instantiate_extension_op("all_h", [2.into()])
             .unwrap();
         let mut dfg_builder = DFGBuilder::new(Signature::new(
             vec![block_type(2)],
-            vec![block_type(2), future_type(bool_t()), future_type(bool_t())],
+            vec![
+                block_type(2),
+                future_type(bool_t()),
+                future_type(bool_t()),
+                future_type(bool_t()),
+            ],
         ))
         .unwrap();
         let handle = dfg_builder
@@ -577,8 +786,13 @@ mod tests {
             .add_dataflow_op(measureonez1, vec![block])
             .unwrap();
         let [block, c1] = handle.outputs_arr();
+        let index0_wire = dfg_builder.add_load_value(ConstInt::new_u(6, 0).unwrap());
+        let handle = dfg_builder
+            .add_dataflow_op(measureonez_d, [block, index0_wire])
+            .unwrap();
+        let [block, c2] = handle.outputs_arr();
         let h = dfg_builder
-            .finish_hugr_with_outputs(vec![block, c0, c1])
+            .finish_hugr_with_outputs(vec![block, c0, c1, c2])
             .unwrap();
         h.validate().unwrap();
     }
