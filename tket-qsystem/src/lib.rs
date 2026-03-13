@@ -115,6 +115,8 @@ impl QSystemPass {
         if self.monomorphize {
             self.monomorphization().run(hugr).unwrap();
 
+            #[expect(deprecated)]
+            // Will move to pass scopes in <https://github.com/Quantinuum/tket2/pull/1429>
             let rdfp = RemoveDeadFuncsPass::default().with_module_entry_points([entrypoint]);
             rdfp.run(hugr)?
         }

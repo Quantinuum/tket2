@@ -5,7 +5,7 @@ use hugr::algorithms::const_fold::{ConstFoldError, ConstantFoldPass};
 use hugr::algorithms::inline_dfgs::InlineDFGsPass;
 use hugr::algorithms::normalize_cfgs::{NormalizeCFGError, NormalizeCFGPass};
 use hugr::algorithms::redundant_order_edges::RedundantOrderEdgesPass;
-use hugr::algorithms::untuple::{UntupleError, UntupleRecursive};
+use hugr::algorithms::untuple::UntupleError;
 use hugr::algorithms::{ComposablePass, RemoveDeadFuncsError, RemoveDeadFuncsPass, UntuplePass};
 use hugr::hugr::HugrError;
 use hugr::hugr::hugrmut::HugrMut;
@@ -95,7 +95,9 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for NormalizeGuppy {
         }
         // When we do function inlining, do this after, to sort out argument marshalling
         if self.untuple {
-            UntuplePass::new(UntupleRecursive::Recursive).run(hugr)?;
+            #[expect(deprecated)]
+            // Will move to pass scopes in <https://github.com/Quantinuum/tket2/pull/1429>
+            UntuplePass::new(hugr::algorithms::untuple::UntupleRecursive::Recursive).run(hugr)?;
         }
         // Should propagate through untuple, so could do earlier, and must be before BorrowSquash
         if self.constant_fold {
