@@ -1,7 +1,7 @@
 //! Pass to resolve modifiers (control/dagger/power) in a Hugr.
-use hugr::algorithms::ComposablePass;
 use hugr::hugr::hugrmut::HugrMut;
 use hugr::{HugrView, Node};
+use hugr_passes::ComposablePass;
 
 use crate::modifier::modifier_resolver::ModifierResolverErrors;
 

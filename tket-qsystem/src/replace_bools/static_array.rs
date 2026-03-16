@@ -1,11 +1,5 @@
-/// Provides a `ReplaceStaticArrayBoolPass` which replaces static arrays containing `tket.bool` with
-/// static arrays containing `bool_t` values.
 use hugr::{
     HugrView as _, Node, Wire,
-    algorithms::{
-        ComposablePass, ReplaceTypes,
-        replace_types::{NodeTemplate, ReplaceTypesError},
-    },
     builder::{
         BuildError, DFGBuilder, Dataflow, DataflowHugr as _, DataflowSubContainer as _,
         SubContainer as _, inout_sig,
@@ -24,6 +18,12 @@ use hugr::{
         },
     },
     types::{Transformable as _, Type, TypeEnum, TypeRow},
+};
+/// Provides a `ReplaceStaticArrayBoolPass` which replaces static arrays containing `tket.bool` with
+/// static arrays containing `bool_t` values.
+use hugr_passes::{
+    ComposablePass, ReplaceTypes,
+    replace_types::{NodeTemplate, ReplaceTypesError},
 };
 use itertools::Itertools as _;
 use tket::extension::bool::{self, BOOL_TYPE_NAME, BoolOpBuilder as _, ConstBool, bool_type};
@@ -304,7 +304,7 @@ fn get_op_dest(rt: &ReplaceTypes, old_elem_ty: Type) -> Option<NodeTemplate> {
 #[cfg(test)]
 mod test {
     use hugr::types::SumType;
-    use hugr::{HugrView as _, algorithms::ComposablePass as _, extension::prelude::option_type};
+    use hugr::{HugrView as _, extension::prelude::option_type};
     use hugr::{
         builder::DataflowHugr as _, extension::prelude::ConstUsize,
         std_extensions::collections::static_array::StaticArrayOpBuilder as _,
@@ -316,6 +316,7 @@ mod test {
         type_row,
         types::Signature,
     };
+    use hugr_passes::ComposablePass as _;
     use rstest::rstest;
 
     use super::*;

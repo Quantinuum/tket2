@@ -1,6 +1,4 @@
 use derive_more::{Display, Error, From};
-use hugr::algorithms::replace_types::{NodeTemplate, ReplaceTypesError};
-use hugr::algorithms::{ComposablePass, ReplaceTypes};
 use hugr::builder::{Container, HugrBuilder};
 use hugr::core::Visibility;
 use hugr::extension::prelude::Barrier;
@@ -18,6 +16,8 @@ use hugr::{
     std_extensions::arithmetic::{float_ops::FloatOps, float_types::ConstF64},
     types::Signature,
 };
+use hugr_passes::replace_types::{NodeTemplate, ReplaceTypesError};
+use hugr_passes::{ComposablePass, ReplaceTypes};
 use lazy_static::lazy_static;
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
@@ -60,7 +60,7 @@ pub enum LowerTk2Error {
     OpReplacement(HugrError),
     /// An error raised when lowering operations.
     #[display("Error when lowering ops: {_0}")]
-    CircuitReplacement(hugr::algorithms::lower::LowerError),
+    CircuitReplacement(hugr_passes::lower::LowerError),
     /// TketOps were not lowered after the pass.
     #[display("TketOps were not lowered: {missing_ops:?}")]
     #[from(ignore)]

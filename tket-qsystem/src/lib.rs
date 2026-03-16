@@ -11,14 +11,14 @@ pub mod pytket;
 pub mod replace_bools;
 
 use derive_more::{Display, Error, From};
-use hugr::algorithms::const_fold::{ConstFoldError, ConstantFoldPass};
-use hugr::algorithms::{
-    ComposablePass as _, MonomorphizePass, RemoveDeadFuncsError, RemoveDeadFuncsPass, force_order,
-    replace_types::ReplaceTypesError,
-};
 use hugr::hugr::{HugrError, hugrmut::HugrMut};
 use hugr::{Hugr, HugrView, Node, core::Visibility, ops::OpType};
 use hugr_core::hugr::internal::HugrMutInternals;
+use hugr_passes::const_fold::{ConstFoldError, ConstantFoldPass};
+use hugr_passes::{
+    ComposablePass as _, MonomorphizePass, RemoveDeadFuncsError, RemoveDeadFuncsPass, force_order,
+    replace_types::ReplaceTypesError,
+};
 use std::collections::HashSet;
 
 use lower_drops::LowerDropsPass;
@@ -81,7 +81,7 @@ pub enum QSystemPassError<N = Node> {
     /// An error when running [RemoveDeadFuncsPass] after the monomorphisation
     /// pass.
     ///
-    ///  [RemoveDeadFuncsPass]: hugr::algorithms::RemoveDeadFuncsError
+    ///  [RemoveDeadFuncsPass]: hugr_passes::RemoveDeadFuncsError
     DCEError(RemoveDeadFuncsError),
     /// No [FuncDefn] named "main" in [Module].
     ///

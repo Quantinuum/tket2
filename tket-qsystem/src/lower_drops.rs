@@ -1,10 +1,10 @@
 //! Contains a pass to lower "drop" ops from the Guppy extension
-use hugr::algorithms::replace_types::{Linearizer, NodeTemplate, ReplaceTypesError};
-use hugr::algorithms::{ComposablePass, ReplaceTypes};
 use hugr::extension::prelude::bool_t;
 use hugr::extension::simple_op::MakeRegisteredOp;
 use hugr::types::Term;
 use hugr::{Node, hugr::hugrmut::HugrMut};
+use hugr_passes::replace_types::{Linearizer, NodeTemplate, ReplaceTypesError};
+use hugr_passes::{ComposablePass, ReplaceTypes};
 use tket::extension::guppy::{DROP_OP_NAME, GUPPY_EXTENSION};
 
 use crate::extension::futures::{FutureOp, FutureOpDef, future_type};

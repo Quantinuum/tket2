@@ -1,15 +1,15 @@
 //! A pass that normalizes the structure of Guppy-generated circuits into something that can be optimized by tket.
 
 use hugr::Node;
-use hugr::algorithms::const_fold::{ConstFoldError, ConstantFoldPass};
-use hugr::algorithms::inline_dfgs::InlineDFGsPass;
-use hugr::algorithms::normalize_cfgs::{NormalizeCFGError, NormalizeCFGPass};
-use hugr::algorithms::redundant_order_edges::RedundantOrderEdgesPass;
-use hugr::algorithms::untuple::UntupleError;
-use hugr::algorithms::{ComposablePass, RemoveDeadFuncsError, RemoveDeadFuncsPass, UntuplePass};
 use hugr::hugr::HugrError;
 use hugr::hugr::hugrmut::HugrMut;
 use hugr::hugr::patch::inline_dfg::InlineDFGError;
+use hugr_passes::const_fold::{ConstFoldError, ConstantFoldPass};
+use hugr_passes::inline_dfgs::InlineDFGsPass;
+use hugr_passes::normalize_cfgs::{NormalizeCFGError, NormalizeCFGPass};
+use hugr_passes::redundant_order_edges::RedundantOrderEdgesPass;
+use hugr_passes::untuple::UntupleError;
+use hugr_passes::{ComposablePass, RemoveDeadFuncsError, RemoveDeadFuncsPass, UntuplePass};
 
 use crate::passes::BorrowSquashPass;
 
@@ -97,7 +97,7 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for NormalizeGuppy {
         if self.untuple {
             #[expect(deprecated)]
             // Will move to pass scopes in <https://github.com/Quantinuum/tket2/pull/1429>
-            UntuplePass::new(hugr::algorithms::untuple::UntupleRecursive::Recursive).run(hugr)?;
+            UntuplePass::new(hugr_passes::untuple::UntupleRecursive::Recursive).run(hugr)?;
         }
         // Should propagate through untuple, so could do earlier, and must be before BorrowSquash
         if self.constant_fold {

@@ -3,10 +3,6 @@
 mod static_array;
 
 use derive_more::{Display, Error, From};
-use hugr::algorithms::replace_types::{Linearizer, NodeTemplate, ReplaceTypesError};
-use hugr::algorithms::{
-    ComposablePass, ReplaceTypes, ensure_no_nonlocal_edges, non_local::FindNonLocalEdgesError,
-};
 use hugr::builder::{
     BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, SubContainer,
     inout_sig,
@@ -24,6 +20,10 @@ use hugr::std_extensions::collections::{
 use hugr::std_extensions::logic::LogicOp;
 use hugr::types::{SumType, Term, Type};
 use hugr::{Hugr, Node, Wire, hugr::hugrmut::HugrMut, type_row};
+use hugr_passes::replace_types::{Linearizer, NodeTemplate, ReplaceTypesError};
+use hugr_passes::{
+    ComposablePass, ReplaceTypes, ensure_no_nonlocal_edges, non_local::FindNonLocalEdgesError,
+};
 use static_array::{ReplaceStaticArrayBoolPass, ReplaceStaticArrayBoolPassError};
 use tket::TketOp;
 use tket::extension::{
