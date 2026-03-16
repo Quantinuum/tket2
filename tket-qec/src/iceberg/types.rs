@@ -1,6 +1,6 @@
 //! Extension providing a type for the Iceberg codeblock.
 
-use std::sync::{Arc, LazyLock, Weak};
+use std::sync::{Arc, LazyLock};
 
 use hugr::{
     Extension,
@@ -19,19 +19,15 @@ pub const BLOCK_TYPENAME: TypeName = TypeName::new_inline("block");
 /// Type of an Iceberg block of a given size.
 ///
 /// * `k_arg` - The number of logical qubits in the code block.
-pub fn block_custom_type(k_arg: impl Into<TypeArg>, extension_ref: &Weak<Extension>) -> CustomType {
+pub fn block_type(k_arg: impl Into<TypeArg>) -> Type {
     CustomType::new(
         BLOCK_TYPENAME,
         [k_arg.into()],
         EXTENSION_ID,
         TypeBound::Linear,
-        extension_ref,
+        &Arc::<Extension>::downgrade(&EXTENSION),
     )
-}
-
-/// Type of an Iceberg block of a given size.
-pub fn block_type(k_arg: impl Into<TypeArg>) -> Type {
-    block_custom_type(k_arg, &Arc::<Extension>::downgrade(&EXTENSION)).into()
+    .into()
 }
 
 /// Extension for logical Iceberg block type.
