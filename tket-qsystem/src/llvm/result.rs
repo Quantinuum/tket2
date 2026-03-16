@@ -286,7 +286,6 @@ impl<'c, H: HugrView<Node = Node>, AL: ArrayLowering + Clone> ResultEmitter<'c, 
 mod test {
     use crate::extension::result::ResultOp;
     use crate::llvm::array_utils::DEFAULT_HEAP_ARRAY_LOWERING;
-    use crate::llvm::array_utils::DEFAULT_STACK_ARRAY_LOWERING;
 
     use hugr::extension::simple_op::MakeRegisteredOp;
     use hugr::llvm::check_emission;
@@ -301,26 +300,23 @@ mod test {
     use super::*;
 
     #[rstest]
-    #[case::bool(1, ResultOp::new_bool("test_bool"), &DEFAULT_STACK_ARRAY_LOWERING)]
-    #[case::int(2, ResultOp::new_int("test_int", 6), &DEFAULT_STACK_ARRAY_LOWERING)]
-    #[case::uint(3, ResultOp::new_uint("test_uint", 6), &DEFAULT_STACK_ARRAY_LOWERING)]
-    #[case::f64(4, ResultOp::new_f64("test_f64"), &DEFAULT_STACK_ARRAY_LOWERING)]
+    #[case::bool(1, ResultOp::new_bool("test_bool"), &DEFAULT_HEAP_ARRAY_LOWERING)]
+    #[case::int(2, ResultOp::new_int("test_int", 6), &DEFAULT_HEAP_ARRAY_LOWERING)]
+    #[case::uint(3, ResultOp::new_uint("test_uint", 6), &DEFAULT_HEAP_ARRAY_LOWERING)]
+    #[case::f64(4, ResultOp::new_f64("test_f64"), &DEFAULT_HEAP_ARRAY_LOWERING)]
     #[case::arr_bool(5, ResultOp::new_bool("test_arr_bool").array_op(10), &DEFAULT_HEAP_ARRAY_LOWERING)]
-    #[case::arr_bool(6, ResultOp::new_bool("test_arr_bool").array_op(10), &DEFAULT_STACK_ARRAY_LOWERING)]
     #[case::arr_int(7, ResultOp::new_int("test_arr_int", 6).array_op(10), &DEFAULT_HEAP_ARRAY_LOWERING)]
-    #[case::arr_int(8, ResultOp::new_int("test_arr_int", 6).array_op(10), &DEFAULT_STACK_ARRAY_LOWERING)]
     #[case::arr_uint(9, ResultOp::new_uint("test_arr_uint", 6).array_op(10), &DEFAULT_HEAP_ARRAY_LOWERING)]
-    #[case::arr_int(10, ResultOp::new_int("test_arr_int", 6).array_op(10), &DEFAULT_STACK_ARRAY_LOWERING)]
     #[case::arr_f64(11, ResultOp::new_f64("test_arr_f64").array_op(10), &DEFAULT_HEAP_ARRAY_LOWERING)]
     // test cases for various tags
-    #[case::unicode_tag(12, ResultOp::new_int("测试字符串", 6), &DEFAULT_STACK_ARRAY_LOWERING)]
-    #[case::special_chars(13, ResultOp::new_uint("test!@#$%^&*()", 6), &DEFAULT_STACK_ARRAY_LOWERING)]
+    #[case::unicode_tag(12, ResultOp::new_int("测试字符串", 6), &DEFAULT_HEAP_ARRAY_LOWERING)]
+    #[case::special_chars(13, ResultOp::new_uint("test!@#$%^&*()", 6), &DEFAULT_HEAP_ARRAY_LOWERING)]
     #[should_panic(expected = "Constant string too long")]
-    #[case::very_long_tag(14, ResultOp::new_f64("x".repeat(256)), &DEFAULT_STACK_ARRAY_LOWERING)]
-    #[case::whitespace(15, ResultOp::new_bool("   spaces   tabs\t\t\tnewlines\n\n\n"), &DEFAULT_STACK_ARRAY_LOWERING)]
-    #[case::emoji(16, ResultOp::new_bool("🚀👨‍👩‍👧‍👦🌍"), &DEFAULT_STACK_ARRAY_LOWERING)]
+    #[case::very_long_tag(14, ResultOp::new_f64("x".repeat(256)), &DEFAULT_HEAP_ARRAY_LOWERING)]
+    #[case::whitespace(15, ResultOp::new_bool("   spaces   tabs\t\t\tnewlines\n\n\n"), &DEFAULT_HEAP_ARRAY_LOWERING)]
+    #[case::emoji(16, ResultOp::new_bool("🚀👨‍👩‍👧‍👦🌍"), &DEFAULT_HEAP_ARRAY_LOWERING)]
     #[should_panic(expected = "Empty result tag received")]
-    #[case::actually_empty(17, ResultOp::new_bool(""), &DEFAULT_STACK_ARRAY_LOWERING)]
+    #[case::actually_empty(17, ResultOp::new_bool(""), &DEFAULT_HEAP_ARRAY_LOWERING)]
     fn emit_result_codegen(
         #[case] _i: i32,
         #[with(_i)] mut llvm_ctx: TestContext,

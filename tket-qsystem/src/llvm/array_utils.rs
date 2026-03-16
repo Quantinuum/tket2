@@ -8,7 +8,7 @@ use hugr::llvm::emit::EmitFuncContext;
 use hugr::llvm::extension::collections::array::{
     build_array_fat_pointer, decompose_array_fat_pointer,
 };
-use hugr::llvm::extension::collections::{array, stack_array};
+use hugr::llvm::extension::collections::array;
 use hugr::llvm::inkwell::types::{BasicType, BasicTypeEnum};
 use hugr::llvm::inkwell::values::BasicValueEnum;
 use hugr::llvm::{CodegenExtension, inkwell};
@@ -44,59 +44,6 @@ pub trait ArrayLowering {
         elem_type: BasicTypeEnum<'c>,
         length: u32,
     ) -> Result<BasicValueEnum<'c>>;
-}
-
-/// Array lowering via the stack as implemented in [stack_array].
-#[derive(Clone)]
-#[allow(
-    deprecated,
-    clippy::allow_attributes,
-    reason = "Waiting for switch to new array lowering"
-)]
-pub struct StackArrayLowering<ACG: stack_array::ArrayCodegen>(ACG);
-
-/// The default stack array lowering strategy using [stack_array::DefaultArrayCodegen].
-#[expect(deprecated)]
-pub const DEFAULT_STACK_ARRAY_LOWERING: StackArrayLowering<stack_array::DefaultArrayCodegen> =
-    StackArrayLowering(stack_array::DefaultArrayCodegen);
-
-#[expect(deprecated)]
-impl<ACG: stack_array::ArrayCodegen> StackArrayLowering<ACG> {
-    /// Creates a new [StackArrayLowering].
-    pub const fn new(array_codegen: ACG) -> Self {
-        Self(array_codegen)
-    }
-}
-
-#[expect(deprecated)]
-impl<ACG: stack_array::ArrayCodegen + Clone> ArrayLowering for StackArrayLowering<ACG> {
-    fn codegen_extension(&self) -> impl CodegenExtension {
-        stack_array::ArrayCodegenExtension::new(self.0.clone())
-    }
-
-    fn array_to_ptr<'c>(
-        &self,
-        builder: &Builder<'c>,
-        val: BasicValueEnum<'c>,
-        _elem_type: BasicTypeEnum<'c>,
-        _length: u32,
-    ) -> Result<PointerValue<'c>> {
-        build_array_alloca(builder, val.into_array_value())
-            .map_err(|e| anyhow!("Could not build array alloca: {e}"))
-    }
-
-    fn array_from_ptr<'c, H: HugrView<Node = Node>>(
-        &self,
-        ctx: &mut EmitFuncContext<'c, '_, H>,
-        ptr: PointerValue<'c>,
-        elem_type: BasicTypeEnum<'c>,
-        length: u32,
-    ) -> Result<BasicValueEnum<'c>> {
-        let builder = ctx.builder();
-        let array_ty = elem_type.array_type(length);
-        let array = builder.build_load(array_ty, ptr, "")?.into_array_value();
-        Ok(array.into())
-    }
 }
 
 /// Array lowering via a heap as implemented in [mod@array].
@@ -380,7 +327,6 @@ mod tests {
     /// Tests that [ArrayLowering::array_to_ptr] and [ArrayLowering::array_from_ptr] are inverses.
     #[rstest]
     #[case(DEFAULT_HEAP_ARRAY_LOWERING)]
-    #[case(DEFAULT_STACK_ARRAY_LOWERING)]
     fn test_array_ptr_conversion(#[case] array_lowering: impl ArrayLowering) {
         let mut llvm_ctx = llvm_ctx(-1);
         llvm_ctx.add_extensions(|cge| cge.add_default_prelude_extensions());

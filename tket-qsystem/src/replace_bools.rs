@@ -24,7 +24,7 @@ use hugr_passes::composable::WithScope;
 use hugr_passes::non_local::LocalizeEdges;
 use hugr_passes::replace_types::{Linearizer, NodeTemplate, ReplaceTypesError};
 use hugr_passes::{
-    ComposablePass, ReplaceTypes, ensure_no_nonlocal_edges, non_local::FindNonLocalEdgesError,
+    ComposablePass, ReplaceTypes, non_local::FindNonLocalEdgesError,
 };
 use static_array::{ReplaceStaticArrayBoolPass, ReplaceStaticArrayBoolPassError};
 use tket::TketOp;

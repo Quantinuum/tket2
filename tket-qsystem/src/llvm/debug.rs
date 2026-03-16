@@ -116,7 +116,6 @@ mod test {
     use hugr::llvm::test::single_op_hugr;
 
     use crate::llvm::array_utils::DEFAULT_HEAP_ARRAY_LOWERING;
-    use crate::llvm::array_utils::DEFAULT_STACK_ARRAY_LOWERING;
     use crate::llvm::prelude::QISPreludeCodegen;
 
     use rstest::rstest;
@@ -124,7 +123,6 @@ mod test {
     use super::*;
 
     #[rstest]
-    #[case::state_result(1, StateResult::new("test_state_result".to_string(), 2), &DEFAULT_STACK_ARRAY_LOWERING)]
     #[case::state_result(2, StateResult::new("test_state_result".to_string(), 2), &DEFAULT_HEAP_ARRAY_LOWERING)]
     fn emit_debug_codegen(
         #[case] _i: i32,
