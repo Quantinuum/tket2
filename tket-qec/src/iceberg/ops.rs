@@ -174,8 +174,8 @@ impl MakeExtensionOp for ConcreteIcebergOp {
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        let mut args: Vec<TypeArg> = vec![(self.k as u64).into()];
-        args.extend(self.indices.iter().map(|&i| (i as u64).into()));
+        let mut args: Vec<TypeArg> = vec![self.k.into()];
+        args.extend(self.indices.iter().map(|&i| i.into()));
         args
     }
 }
