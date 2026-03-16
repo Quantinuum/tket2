@@ -143,9 +143,7 @@ impl MakeOpDef for BoolOp {
         match self {
             BoolOp::read => Signature::new([bool_type], [sum_type]).into(),
             BoolOp::make_opaque => Signature::new([sum_type], [bool_type]).into(),
-            BoolOp::not => {
-                Signature::new([bool_type.clone()], [bool_type.clone()]).into()
-            }
+            BoolOp::not => Signature::new([bool_type.clone()], [bool_type.clone()]).into(),
             BoolOp::eq | BoolOp::and | BoolOp::or | BoolOp::xor => {
                 Signature::new([bool_type.clone(), bool_type.clone()], [bool_type.clone()]).into()
             }
