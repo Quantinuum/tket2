@@ -64,7 +64,7 @@ pyo3-build-config = ">= 0.27.2, < 0.29"
 
 bindgen = "0.72"
 cbindgen = "0.29"
-cc = "1.2.56"
+cc = "1.2.57"
 conan2 = "0.1.9"
 itertools = "0.14.0"
 tket-json-rs = "0.8.1"
