@@ -3,6 +3,7 @@ use hugr::extension::prelude::bool_t;
 use hugr::extension::simple_op::MakeRegisteredOp;
 use hugr::types::Term;
 use hugr::{Node, hugr::hugrmut::HugrMut};
+use hugr_passes::composable::WithScope;
 use hugr_passes::replace_types::{Linearizer, NodeTemplate, ReplaceTypesError};
 use hugr_passes::{ComposablePass, ReplaceTypes};
 use tket::extension::guppy::{DROP_OP_NAME, GUPPY_EXTENSION};
@@ -12,6 +13,14 @@ use crate::extension::futures::{FutureOp, FutureOpDef, future_type};
 /// A pass that lowers "drop" ops from [GUPPY_EXTENSION]
 #[derive(Default, Debug, Clone)]
 pub struct LowerDropsPass;
+
+impl WithScope for LowerDropsPass {
+    fn with_scope(self, _scope: impl Into<hugr_passes::PassScope>) -> Self {
+        // TODO: Follow scope configuration
+        // <https://github.com/Quantinuum/tket2/pull/1429>
+        self
+    }
+}
 
 impl<H: HugrMut<Node = Node>> ComposablePass<H> for LowerDropsPass {
     type Error = ReplaceTypesError;

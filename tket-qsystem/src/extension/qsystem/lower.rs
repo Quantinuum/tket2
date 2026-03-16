@@ -16,6 +16,7 @@ use hugr::{
     std_extensions::arithmetic::{float_ops::FloatOps, float_types::ConstF64},
     types::Signature,
 };
+use hugr_passes::composable::WithScope;
 use hugr_passes::replace_types::{NodeTemplate, ReplaceTypesError};
 use hugr_passes::{ComposablePass, ReplaceTypes};
 use lazy_static::lazy_static;
@@ -274,6 +275,14 @@ pub fn check_lowered<H: HugrView>(hugr: &H) -> Result<(), Vec<H::Node>> {
 /// checked with [check_lowered].
 #[derive(Default, Debug, Clone)]
 pub struct LowerTketToQSystemPass;
+
+impl WithScope for LowerTketToQSystemPass {
+    fn with_scope(self, _scope: impl Into<hugr_passes::PassScope>) -> Self {
+        // TODO: Follow scope configuration
+        // <https://github.com/Quantinuum/tket2/pull/1429>
+        self
+    }
+}
 
 impl<H: HugrMut<Node = Node>> ComposablePass<H> for LowerTketToQSystemPass {
     type Error = LowerTk2Error;

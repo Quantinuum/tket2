@@ -14,6 +14,8 @@ use derive_more::{Display, Error, From};
 use hugr::hugr::{HugrError, hugrmut::HugrMut};
 use hugr::{Hugr, HugrView, Node, core::Visibility, ops::OpType};
 use hugr_core::hugr::internal::HugrMutInternals;
+use hugr_passes::PassScope;
+use hugr_passes::composable::{Preserve, WithScope};
 use hugr_passes::const_fold::{ConstFoldError, ConstantFoldPass};
 use hugr_passes::{
     ComposablePass as _, MonomorphizePass, RemoveDeadFuncsError, RemoveDeadFuncsPass, force_order,
@@ -29,12 +31,6 @@ use extension::{
     futures::FutureOpDef,
     qsystem::{LowerTk2Error, LowerTketToQSystemPass, QSystemOp},
 };
-
-#[cfg(feature = "llvm")]
-#[expect(deprecated)]
-// TODO: We still want to run this as long as deserialized hugrs are allowed to contain Value::Function
-// Once that variant is removed, we can remove this pass step.
-use hugr::llvm::utils::inline_constant_functions;
 
 /// Modify a [hugr::Hugr] into a form that is acceptable for ingress into a
 /// Q-System. Returns an error if this cannot be done.
@@ -75,9 +71,6 @@ pub enum QSystemPassError<N = Node> {
     ConstantFoldError(ConstFoldError),
     /// An error from the component [LowerDropsPass] pass.
     LinearizeArrayError(ReplaceTypesError),
-    #[cfg(feature = "llvm")]
-    /// An error from the component [inline_constant_functions()] pass.
-    InlineConstantFunctionsError(anyhow::Error),
     /// An error when running [RemoveDeadFuncsPass] after the monomorphisation
     /// pass.
     ///
@@ -117,7 +110,7 @@ impl QSystemPass {
 
             #[expect(deprecated)]
             // Will move to pass scopes in <https://github.com/Quantinuum/tket2/pull/1429>
-            let rdfp = RemoveDeadFuncsPass::default().with_module_entry_points([entrypoint]);
+            let rdfp = RemoveDeadFuncsPass::default_with_scope(PassScope::Global(Preserve::All));
             rdfp.run(hugr)?
         }
 
@@ -152,13 +145,6 @@ impl QSystemPass {
             }
         }
 
-        #[cfg(feature = "llvm")]
-        {
-            // TODO: We still want to run this as long as deserialized hugrs are allowed to contain Value::Function
-            // Once that variant is removed, we can remove this pass step.
-            #[expect(deprecated)]
-            inline_constant_functions(hugr)?;
-        }
         if self.constant_fold {
             self.constant_fold().run(hugr)?;
         }
@@ -223,7 +209,7 @@ impl QSystemPass {
     }
 
     fn monomorphization(&self) -> MonomorphizePass {
-        MonomorphizePass
+        MonomorphizePass::default()
     }
 
     fn lower_drops(&self) -> LowerDropsPass {
@@ -428,52 +414,5 @@ mod test {
             hugr_public.children(hugr_public.module_root()).count()
         );
         assert_eq!(hugr.num_nodes(), hugr_public.num_nodes());
-    }
-
-    #[cfg(feature = "llvm")]
-    #[test]
-    // TODO: We still want to test this as long as deserialized hugrs are allowed to contain Value::Function
-    // Once that variant is removed, we can remove this test.
-    #[expect(deprecated)]
-    fn const_function() {
-        use hugr::builder::{Container, DFGBuilder, DataflowHugr, ModuleBuilder};
-        use hugr::ops::{CallIndirect, Value};
-
-        let qb_sig: Signature = Signature::new_endo(qb_t());
-        let mut hugr = {
-            let mut builder = ModuleBuilder::new();
-            let val = Value::function({
-                let builder = DFGBuilder::new(Signature::new_endo(qb_t())).unwrap();
-                let [r] = builder.input_wires_arr();
-                builder.finish_hugr_with_outputs([r]).unwrap()
-            })
-            .unwrap();
-            let const_node = builder.add_constant(val);
-            {
-                let mut builder = builder.define_function("main", qb_sig.clone()).unwrap();
-                let [i] = builder.input_wires_arr();
-                let fun = builder.load_const(&const_node);
-                let [r] = builder
-                    .add_dataflow_op(
-                        CallIndirect {
-                            signature: qb_sig.clone(),
-                        },
-                        [fun, i],
-                    )
-                    .unwrap()
-                    .outputs_arr();
-                builder.finish_with_outputs([r]).unwrap();
-            };
-            builder.finish_hugr().unwrap()
-        };
-
-        QSystemPass::default().run(&mut hugr).unwrap();
-
-        // QSystemPass should have removed the const function
-        for n in hugr.descendants(hugr.module_root()) {
-            if hugr.get_optype(n).as_const().is_some() {
-                panic!("Const function is still there!");
-            }
-        }
     }
 }

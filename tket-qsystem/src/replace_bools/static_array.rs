@@ -19,6 +19,7 @@ use hugr::{
     },
     types::{Transformable as _, Type, TypeEnum, TypeRow},
 };
+use hugr_passes::composable::WithScope;
 /// Provides a `ReplaceStaticArrayBoolPass` which replaces static arrays containing `tket.bool` with
 /// static arrays containing `bool_t` values.
 use hugr_passes::{
@@ -40,6 +41,14 @@ type Result<T> = std::result::Result<T, ReplaceStaticArrayBoolPassError>;
 /// Provides a `ReplaceStaticArrayBoolPass` which replaces static arrays
 /// containing `tket.bool` with static arrays containing `bool_t` values.
 pub struct ReplaceStaticArrayBoolPass(ReplaceTypes);
+
+impl WithScope for ReplaceStaticArrayBoolPass {
+    fn with_scope(self, _scope: impl Into<hugr_passes::PassScope>) -> Self {
+        // TODO: Follow scope configuration
+        // <https://github.com/Quantinuum/tket2/pull/1429>
+        self
+    }
+}
 
 impl<H: HugrMut<Node = Node>> ComposablePass<H> for ReplaceStaticArrayBoolPass {
     type Error = ReplaceStaticArrayBoolPassError;

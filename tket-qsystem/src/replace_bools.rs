@@ -20,6 +20,8 @@ use hugr::std_extensions::collections::{
 use hugr::std_extensions::logic::LogicOp;
 use hugr::types::{SumType, Term, Type};
 use hugr::{Hugr, Node, Wire, hugr::hugrmut::HugrMut, type_row};
+use hugr_passes::composable::WithScope;
+use hugr_passes::non_local::LocalizeEdges;
 use hugr_passes::replace_types::{Linearizer, NodeTemplate, ReplaceTypesError};
 use hugr_passes::{
     ComposablePass, ReplaceTypes, ensure_no_nonlocal_edges, non_local::FindNonLocalEdgesError,
@@ -68,12 +70,20 @@ pub enum ReplaceBoolPassError<N> {
 #[derive(Default, Debug, Clone)]
 pub struct ReplaceBoolPass;
 
+impl WithScope for ReplaceBoolPass {
+    fn with_scope(self, _scope: impl Into<hugr_passes::PassScope>) -> Self {
+        // TODO: Follow scope configuration
+        // <https://github.com/Quantinuum/tket2/pull/1429>
+        self
+    }
+}
+
 impl<H: HugrMut<Node = Node>> ComposablePass<H> for ReplaceBoolPass {
     type Error = ReplaceBoolPassError<H::Node>;
     type Result = ();
 
     fn run(&self, hugr: &mut H) -> Result<(), Self::Error> {
-        ensure_no_nonlocal_edges(hugr)?;
+        LocalizeEdges::default().check_no_nonlocal_edges(hugr)?;
         ReplaceStaticArrayBoolPass::default().run(hugr)?;
         let lowerer = lowerer();
         lowerer.run(hugr)?;

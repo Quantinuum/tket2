@@ -356,7 +356,9 @@ fn circ_unsupported_subtree() -> Hugr {
         .add_dataflow_op(TketOp::TryQAlloc, [])
         .unwrap()
         .outputs_arr();
-    let [q] = h.build_unwrap_sum(1, option_type(qb_t()), maybe_q).unwrap();
+    let [q] = h
+        .build_unwrap_sum(1, option_type([qb_t()]), maybe_q)
+        .unwrap();
 
     h.finish_hugr_with_outputs([q]).unwrap()
 }
@@ -608,7 +610,7 @@ fn circ_nested_dfgs() -> Hugr {
 // A circuit with some simple circuit and an unsupported subgraph that does not interact with it.
 #[fixture]
 fn circ_independent_subgraph() -> Hugr {
-    let input_t = vec![qb_t(), qb_t(), option_type(bool_t()).into()];
+    let input_t = vec![qb_t(), qb_t(), option_type([bool_t()]).into()];
     let output_t = vec![qb_t(), qb_t(), bool_t()];
     let mut h =
         FunctionBuilder::new("independent_subgraph", Signature::new(input_t, output_t)).unwrap();
@@ -620,7 +622,7 @@ fn circ_independent_subgraph() -> Hugr {
         .unwrap()
         .outputs_arr();
     let [maybe_b] = h
-        .build_unwrap_sum(1, option_type(bool_t()), maybe_b)
+        .build_unwrap_sum(1, option_type([bool_t()]), maybe_b)
         .unwrap();
 
     h.finish_hugr_with_outputs([q1, q2, maybe_b]).unwrap()
@@ -629,8 +631,8 @@ fn circ_independent_subgraph() -> Hugr {
 // A circuit with an unsupported wire from the input to the output.
 #[fixture]
 fn circ_unsupported_io_wire() -> Hugr {
-    let input_t = vec![qb_t(), qb_t(), option_type(qb_t()).into()];
-    let output_t = vec![qb_t(), qb_t(), option_type(qb_t()).into()];
+    let input_t = vec![qb_t(), qb_t(), option_type([qb_t()]).into()];
+    let output_t = vec![qb_t(), qb_t(), option_type([qb_t()]).into()];
     let mut h = FunctionBuilder::new(
         "unsupported_input_to_output",
         Signature::new(input_t, output_t),
@@ -695,8 +697,8 @@ fn circ_bool_conversion() -> Hugr {
 /// (see `EncodedCircuitInfo`), for a nested circuit in a CircBox.
 #[fixture]
 fn circ_unsupported_extras_in_circ_box() -> Hugr {
-    let input_t = vec![option_type(bool_t()).into(), option_type(qb_t()).into()];
-    let output_t = vec![bool_t(), option_type(qb_t()).into()];
+    let input_t = vec![option_type([bool_t()]).into(), option_type([qb_t()]).into()];
+    let output_t = vec![bool_t(), option_type([qb_t()]).into()];
     let mut h = FunctionBuilder::new(
         "unsupported_extras_in_circ_box",
         Signature::new(input_t.clone(), output_t.clone()),
@@ -712,7 +714,7 @@ fn circ_unsupported_extras_in_circ_box() -> Hugr {
         let [maybe_b, maybe_q] = nested.input_wires_arr();
 
         let [maybe_b] = nested
-            .build_unwrap_sum(1, option_type(bool_t()), maybe_b)
+            .build_unwrap_sum(1, option_type([bool_t()]), maybe_b)
             .unwrap();
 
         nested

@@ -10,6 +10,7 @@ use hugr::std_extensions::collections::borrow_array::{BArrayUnsafeOpDef, BORROW_
 use hugr::types::{EdgeKind, Type};
 use hugr::{HugrView, IncomingPort, Node, OutgoingPort, Wire};
 use hugr_passes::ComposablePass;
+use hugr_passes::composable::WithScope;
 
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -33,6 +34,14 @@ impl BorrowSquashPass {
     /// beneath the entrypoint.
     pub fn set_regions(mut self, regions: impl IntoIterator<Item = Node>) -> Self {
         self.regions = Some(regions.into_iter().collect());
+        self
+    }
+}
+
+impl WithScope for BorrowSquashPass {
+    fn with_scope(self, _scope: impl Into<hugr_passes::PassScope>) -> Self {
+        // TODO: Follow scope configuration
+        // <https://github.com/Quantinuum/tket2/pull/1429>
         self
     }
 }
@@ -383,7 +392,7 @@ mod test {
 
     #[rstest]
     fn simple() {
-        let mut dfb = DFGBuilder::new(endo_sig(BorrowArray::ty(3, qb_t()))).unwrap();
+        let mut dfb = DFGBuilder::new(endo_sig([BorrowArray::ty(3, qb_t())])).unwrap();
         let [arr] = dfb.input_wires_arr();
         let idx = dfb.add_load_value(ConstUsize::new(1));
         let (arr, q) = dfb.add_borrow_array_borrow(qb_t(), 3, arr, idx).unwrap();

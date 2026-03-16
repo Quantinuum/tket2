@@ -53,13 +53,13 @@ impl ModifierPower {
                     )),
                     int_type(6).into(),
                 ],
-                TypeRV::new_function(FuncValueType::new(
+                [TypeRV::new_function(FuncValueType::new(
                     vec![
                         TypeRV::new_row_var_use(0, TypeBound::Linear),
                         TypeRV::new_row_var_use(1, TypeBound::Copyable),
                     ],
-                    TypeRV::new_row_var_use(0, TypeBound::Linear),
-                )),
+                    [TypeRV::new_row_var_use(0, TypeBound::Linear)],
+                ))],
             ),
         )
         .into()
