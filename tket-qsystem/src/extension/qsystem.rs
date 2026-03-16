@@ -120,17 +120,25 @@ impl MakeOpDef for QSystemOp {
         let one_qb_row = TypeRow::from(vec![qb_t()]);
         let two_qb_row = TypeRow::from(vec![qb_t(), qb_t()]);
         match self {
-            LazyMeasure => Signature::new(qb_t(), future_type(bool_t())),
-            LazyMeasureLeaked => Signature::new(qb_t(), future_type(int_type(6))),
-            LazyMeasureReset => Signature::new(qb_t(), vec![qb_t(), future_type(bool_t())]),
-            Reset => Signature::new(one_qb_row.clone(), one_qb_row),
+            LazyMeasure => Signature::new(one_qb_row.clone(), vec![future_type(bool_t())]),
+            LazyMeasureLeaked => Signature::new(one_qb_row.clone(), vec![future_type(int_type(6))]),
+            LazyMeasureReset => {
+                Signature::new(one_qb_row.clone(), vec![qb_t(), future_type(bool_t())])
+            }
+            Reset => Signature::new(one_qb_row.clone(), one_qb_row.clone()),
             ZZPhase => Signature::new(vec![qb_t(), qb_t(), float64_type()], two_qb_row),
-            Measure => Signature::new(one_qb_row, bool_type()),
-            Rz => Signature::new(vec![qb_t(), float64_type()], one_qb_row),
-            PhasedX => Signature::new(vec![qb_t(), float64_type(), float64_type()], one_qb_row),
-            TryQAlloc => Signature::new(type_row![], Type::from(option_type(one_qb_row))),
-            QFree => Signature::new(one_qb_row, type_row![]),
-            MeasureReset => Signature::new(one_qb_row.clone(), vec![qb_t(), bool_type()]),
+            Measure => Signature::new(one_qb_row.clone(), vec![bool_type()]),
+            Rz => Signature::new(vec![qb_t(), float64_type()], one_qb_row.clone()),
+            PhasedX => Signature::new(
+                vec![qb_t(), float64_type(), float64_type()],
+                one_qb_row.clone(),
+            ),
+            TryQAlloc => Signature::new(
+                type_row![],
+                vec![Type::from(option_type(one_qb_row.clone()))],
+            ),
+            QFree => Signature::new(one_qb_row.clone(), type_row![]),
+            MeasureReset => Signature::new(one_qb_row, vec![qb_t(), bool_type()]),
         }
         .into()
     }
@@ -217,10 +225,10 @@ impl MakeOpDef for RuntimeBarrierDef {
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         PolyFuncType::new(
             [TypeParam::max_nat_type()],
-            Signature::new_endo(
+            Signature::new_endo(vec![
                 array_type_parametric(TypeArg::new_var_use(0, TypeParam::max_nat_type()), qb_t())
                     .unwrap(),
-            ),
+            ]),
         )
         .into()
     }
@@ -514,7 +522,7 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
     /// Build a qalloc operation that panics on failure.
     fn build_qalloc(&mut self) -> Result<Wire, BuildError> {
         let maybe_qb = self.add_try_alloc()?;
-        let [qb] = self.build_expect_sum(1, option_type(qb_t()), maybe_qb, |_| {
+        let [qb] = self.build_expect_sum(1, option_type(vec![qb_t()]), maybe_qb, |_| {
             "No more qubits available to allocate.".to_string()
         })?;
         Ok(qb)
@@ -579,9 +587,11 @@ mod test {
     #[test]
     fn lazy_circuit() {
         let hugr = {
-            let mut func_builder =
-                FunctionBuilder::new("circuit", Signature::new(qb_t(), vec![qb_t(), bool_t()]))
-                    .unwrap();
+            let mut func_builder = FunctionBuilder::new(
+                "circuit",
+                Signature::new(vec![qb_t()], vec![qb_t(), bool_t()]),
+            )
+            .unwrap();
             let [qb] = func_builder.input_wires_arr();
             let [qb, lazy_b] = func_builder.add_lazy_measure_reset(qb).unwrap();
             let [b] = func_builder.add_read(lazy_b, bool_t()).unwrap();
@@ -594,7 +604,8 @@ mod test {
     fn leaked() {
         let hugr = {
             let mut func_builder =
-                FunctionBuilder::new("leaked", Signature::new(qb_t(), vec![int_type(6)])).unwrap();
+                FunctionBuilder::new("leaked", Signature::new(vec![qb_t()], vec![int_type(6)]))
+                    .unwrap();
             let [qb] = func_builder.input_wires_arr();
             let lazy_i = func_builder.add_lazy_measure_leaked(qb).unwrap();
             let [i] = func_builder.add_read(lazy_i, int_type(6)).unwrap();

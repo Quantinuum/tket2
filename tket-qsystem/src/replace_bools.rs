@@ -23,9 +23,7 @@ use hugr::{Hugr, Node, Wire, hugr::hugrmut::HugrMut, type_row};
 use hugr_passes::composable::WithScope;
 use hugr_passes::non_local::LocalizeEdges;
 use hugr_passes::replace_types::{Linearizer, NodeTemplate, ReplaceTypesError};
-use hugr_passes::{
-    ComposablePass, ReplaceTypes, non_local::FindNonLocalEdgesError,
-};
+use hugr_passes::{ComposablePass, ReplaceTypes, non_local::FindNonLocalEdgesError};
 use static_array::{ReplaceStaticArrayBoolPass, ReplaceStaticArrayBoolPassError};
 use tket::TketOp;
 use tket::extension::{
@@ -93,13 +91,16 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for ReplaceBoolPass {
 
 /// The type each tket.bool is replaced with.
 fn bool_dest() -> Type {
-    SumType::new([bool_t(), future_type(bool_t())]).into()
+    SumType::new([vec![bool_t()], vec![future_type(bool_t())]]).into()
 }
 
 fn read_builder(dfb: &mut DFGBuilder<Hugr>, sum_wire: Wire) -> BuildHandle<ConditionalID> {
     let mut cb = dfb
         .conditional_builder(
-            ([bool_t().into(), future_type(bool_t()).into()], sum_wire),
+            (
+                [vec![bool_t()].into(), vec![future_type(bool_t())].into()],
+                sum_wire,
+            ),
             [],
             vec![bool_t()].into(),
         )
@@ -131,7 +132,10 @@ fn make_opaque_op_dest() -> NodeTemplate {
     let [inp] = dfb.input_wires_arr();
     let out = dfb
         .add_dataflow_op(
-            Tag::new(0, vec![bool_t().into(), future_type(bool_t()).into()]),
+            Tag::new(
+                0,
+                vec![vec![bool_t()].into(), vec![future_type(bool_t())].into()],
+            ),
             vec![inp],
         )
         .unwrap();
@@ -162,7 +166,10 @@ fn binary_logic_op_dest(op: &BoolOp) -> NodeTemplate {
     };
     let out = dfb
         .add_dataflow_op(
-            Tag::new(0, vec![bool_t().into(), future_type(bool_t()).into()]),
+            Tag::new(
+                0,
+                vec![vec![bool_t()].into(), vec![future_type(bool_t())].into()],
+            ),
             vec![result.out_wire(0)],
         )
         .unwrap();
@@ -180,7 +187,10 @@ fn not_op_dest() -> NodeTemplate {
         .unwrap();
     let out = dfb
         .add_dataflow_op(
-            Tag::new(0, vec![bool_t().into(), future_type(bool_t()).into()]),
+            Tag::new(
+                0,
+                vec![vec![bool_t()].into(), vec![future_type(bool_t())].into()],
+            ),
             vec![result.out_wire(0)],
         )
         .unwrap();
@@ -196,7 +206,10 @@ fn measure_dest() -> NodeTemplate {
     let measure = dfb.add_dataflow_op(lazy_measure, vec![q]).unwrap();
     let tagged_output = dfb
         .add_dataflow_op(
-            Tag::new(1, vec![bool_t().into(), future_type(bool_t()).into()]),
+            Tag::new(
+                1,
+                vec![vec![bool_t()].into(), vec![future_type(bool_t())].into()],
+            ),
             vec![measure.out_wire(0)],
         )
         .unwrap();
@@ -214,7 +227,10 @@ fn measure_reset_dest() -> NodeTemplate {
     let measure = dfb.add_dataflow_op(lazy_measure_reset, vec![q]).unwrap();
     let tagged_output = dfb
         .add_dataflow_op(
-            Tag::new(1, vec![bool_t().into(), future_type(bool_t()).into()]),
+            Tag::new(
+                1,
+                vec![vec![bool_t()].into(), vec![future_type(bool_t())].into()],
+            ),
             vec![measure.out_wire(1)],
         )
         .unwrap();
@@ -226,7 +242,7 @@ fn measure_reset_dest() -> NodeTemplate {
 
 fn barray_get_dest(rt: &ReplaceTypes, size: u64, elem_ty: Type) -> NodeTemplate {
     let array_ty = borrow_array_type(size, elem_ty.clone());
-    let opt_el = option_type(elem_ty.clone());
+    let opt_el = option_type(vec![elem_ty.clone()]);
     let mut dfb = DFGBuilder::new(inout_sig(
         vec![array_ty.clone(), usize_t()],
         vec![opt_el.clone().into(), array_ty.clone()],
@@ -253,7 +269,10 @@ fn barray_get_dest(rt: &ReplaceTypes, size: u64, elem_ty: Type) -> NodeTemplate 
     let mut out_of_range = cb.case_builder(0).unwrap();
     let [arr_in, _] = out_of_range.input_wires_arr();
     let [none] = out_of_range
-        .add_dataflow_op(Tag::new(0, vec![type_row![], elem_ty.clone().into()]), [])
+        .add_dataflow_op(
+            Tag::new(0, vec![type_row![], vec![elem_ty.clone()].into()]),
+            [],
+        )
         .unwrap()
         .outputs_arr();
     out_of_range.finish_with_outputs([none, arr_in]).unwrap();
@@ -284,7 +303,10 @@ fn barray_get_dest(rt: &ReplaceTypes, size: u64, elem_ty: Type) -> NodeTemplate 
         .unwrap()
         .outputs_arr();
     let [some] = in_range
-        .add_dataflow_op(Tag::new(1, vec![type_row![], elem_ty.into()]), [elem2])
+        .add_dataflow_op(
+            Tag::new(1, vec![type_row![], vec![elem_ty].into()]),
+            [elem2],
+        )
         .unwrap()
         .outputs_arr();
     in_range.finish_with_outputs([some, arr]).unwrap();
@@ -663,7 +685,7 @@ mod test {
             .add_borrow_array_get(src_ty.clone(), 4, arr_in, idx)
             .unwrap();
         let [elem] = dfb
-            .build_unwrap_sum(1, option_type(src_ty.clone()), opt_elem)
+            .build_unwrap_sum(1, option_type(vec![src_ty.clone()]), opt_elem)
             .unwrap();
         let mut h = dfb.finish_hugr_with_outputs([arr, elem]).unwrap();
 

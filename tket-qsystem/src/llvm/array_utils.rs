@@ -2,13 +2,13 @@
 
 // TODO move to hugr-llvm crate
 // https://github.com/quantinuum/tket2/issues/899
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use hugr::extension::prelude::usize_t;
 use hugr::llvm::emit::EmitFuncContext;
+use hugr::llvm::extension::collections::array;
 use hugr::llvm::extension::collections::array::{
     build_array_fat_pointer, decompose_array_fat_pointer,
 };
-use hugr::llvm::extension::collections::array;
 use hugr::llvm::inkwell::types::{BasicType, BasicTypeEnum};
 use hugr::llvm::inkwell::values::BasicValueEnum;
 use hugr::llvm::{CodegenExtension, inkwell};

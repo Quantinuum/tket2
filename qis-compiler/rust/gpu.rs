@@ -188,7 +188,7 @@ impl GpuCodegen {
         verify_gpu_call(ctx, success, "gpu_init")?;
 
         let gpu_ref = builder.build_load(iwc.i64_type(), gpu_ref_ptr, "gpu_ref")?;
-        let result_t = ts.llvm_sum_type(option_type(int_type(6)))?;
+        let result_t = ts.llvm_sum_type(option_type(vec![int_type(6)]))?;
         // Although the result is an option type, we always return true
         // in this lowering: failure is already handled.
         let pair = result_t.build_tag(builder, 1, vec![gpu_ref])?;
@@ -980,17 +980,17 @@ mod test {
     })]
     #[case::call_ret_int(GpuOp::Call {
         inputs: type_row![],
-        outputs: TypeRow::from(usize_t()),
+        outputs: TypeRow::from(vec![usize_t()]),
     })]
     #[case::call_ret_float(GpuOp::Call {
         inputs: type_row![],
-        outputs: TypeRow::from(float64_type()),
+        outputs: TypeRow::from(vec![float64_type()]),
     })]
     #[case::read_result_int(GpuOp::ReadResult {
-        outputs: TypeRow::from(usize_t()),
+        outputs: TypeRow::from(vec![usize_t()]),
     })]
     #[case::read_result_float(GpuOp::ReadResult {
-        outputs: TypeRow::from(float64_type()),
+        outputs: TypeRow::from(vec![float64_type()]),
     })]
     fn gpu_codegen(#[context] ctx: Context, mut llvm_ctx: TestContext, #[case] op: GpuOp) {
         let _g = {

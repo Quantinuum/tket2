@@ -316,14 +316,18 @@ mod test {
             .add_dataflow_op(TketOp::TryQAlloc, [])
             .unwrap()
             .outputs_arr();
-        let [q] = b.build_unwrap_sum(1, option_type(qb_t()), maybe_q).unwrap();
+        let [q] = b
+            .build_unwrap_sum(1, option_type(vec![qb_t()]), maybe_q)
+            .unwrap();
         let [q] = b.add_dataflow_op(TketOp::Reset, [q]).unwrap().outputs_arr();
         b.add_dataflow_op(TketOp::QFree, [q]).unwrap();
         let [maybe_q] = b
             .add_dataflow_op(TketOp::TryQAlloc, [])
             .unwrap()
             .outputs_arr();
-        let [q] = b.build_unwrap_sum(1, option_type(qb_t()), maybe_q).unwrap();
+        let [q] = b
+            .build_unwrap_sum(1, option_type(vec![qb_t()]), maybe_q)
+            .unwrap();
 
         let [_] = b
             .add_dataflow_op(TketOp::MeasureFree, [q])
@@ -394,7 +398,7 @@ mod test {
 
     #[test]
     fn test_mixed() {
-        let mut b = DFGBuilder::new(Signature::new(rotation_type(), bool_t())).unwrap();
+        let mut b = DFGBuilder::new(Signature::new(vec![rotation_type()], vec![bool_t()])).unwrap();
         let [angle] = b.input_wires_arr();
         let qalloc = b.add_dataflow_op(TketOp::QAlloc, []).unwrap();
         let [q] = qalloc.outputs_arr();

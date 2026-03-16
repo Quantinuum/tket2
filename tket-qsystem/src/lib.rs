@@ -302,7 +302,7 @@ mod test {
             let mut builder = mb
                 .define_function(
                     "main",
-                    Signature::new(qb_t(), vec![bool_type(), bool_type()]),
+                    Signature::new(vec![qb_t()], vec![bool_type(), bool_type()]),
                 )
                 .unwrap();
             let [qb] = builder.input_wires_arr();
@@ -372,7 +372,7 @@ mod test {
     fn hide_funcs() {
         let orig = {
             let arr_t = || array_type(4, bool_type());
-            let mut dfb = FunctionBuilder::new("main", Signature::new_endo(arr_t())).unwrap();
+            let mut dfb = FunctionBuilder::new("main", Signature::new_endo(vec![arr_t()])).unwrap();
             let [arr] = dfb.input_wires_arr();
             let (arr1, arr2) = dfb.add_array_clone(bool_type(), 4, arr).unwrap();
             let dop = GUPPY_EXTENSION.get_op(&DROP_OP_NAME).unwrap();

@@ -29,6 +29,7 @@ tket1-passes = { path = "../tket1-passes", version = "0.0.0" }
 
 derive_more = { workspace = true, features = ["into", "from"] }
 hugr = { workspace = true }
+hugr-passes = { workspace = true }
 itertools = { workspace = true }
 num_cpus = { workspace = true }
 portmatching = { workspace = true }

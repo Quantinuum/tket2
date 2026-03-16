@@ -20,7 +20,7 @@ mod test {
     use rstest::rstest;
 
     fn opt_q_arr(size: u64) -> hugr::types::Type {
-        array_type(size, option_type(qb_t()).into())
+        array_type(size, option_type(vec![qb_t()]).into())
     }
 
     #[rstest]
@@ -29,7 +29,7 @@ mod test {
     // special case, array of option qubit is unwrapped and unpacked
     #[case(vec![qb_t(), opt_q_arr(2)], 3, false)]
     // bare option of qubit is ignored
-    #[case(vec![qb_t(), option_type(qb_t()).into()], 1, false)]
+    #[case(vec![qb_t(), option_type(vec![qb_t()]).into()], 1, false)]
     #[case(vec![array_type(2, bool_t())], 0, false)]
     #[case(vec![borrow_array_type(2, qb_t())], 2, false)]
     // special case, single array of qubits is passed directly to op without unpacking
