@@ -7,7 +7,7 @@ source_filename = "test_context"
 
 @"res_\E6\B5\8B\E8\AF\95\E5\AD\97\E7\AC\A6\E4\B8\B2.935D2D1A.0" = private constant [25 x i8] c"\18USER:INT:\E6\B5\8B\E8\AF\95\E5\AD\97\E7\AC\A6\E4\B8\B2"
 
-define private void @_hl.main.1(i64 %0) {
+define internal void @_hl.main.1(i64 %0) {
 alloca_block:
   %"2_0" = alloca i64, align 8
   br label %entry_block

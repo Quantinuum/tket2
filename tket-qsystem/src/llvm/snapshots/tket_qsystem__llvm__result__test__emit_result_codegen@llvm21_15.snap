@@ -7,7 +7,7 @@ source_filename = "test_context"
 
 @"res_   spaces .F46B5D1D.0" = private constant [41 x i8] c"(USER:BOOL:   spaces   tabs\09\09\09newlines\0A\0A\0A"
 
-define private void @_hl.main.1(i1 %0) {
+define internal void @_hl.main.1(i1 %0) {
 alloca_block:
   br label %entry_block
 

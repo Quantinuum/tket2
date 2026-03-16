@@ -7,7 +7,7 @@ source_filename = "test_context"
 
 @res_test_arr_b.866EEC87.0 = private constant [27 x i8] c"\1AUSER:BOOLARR:test_arr_bool"
 
-define private void @_hl.main.1({ ptr, i64 } %0) {
+define internal void @_hl.main.1({ ptr, i64 } %0) {
 alloca_block:
   %"2_0" = alloca { ptr, i64 }, align 8
   br label %entry_block

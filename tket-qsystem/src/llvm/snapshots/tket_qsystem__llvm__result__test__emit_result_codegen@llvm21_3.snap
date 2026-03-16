@@ -7,7 +7,7 @@ source_filename = "test_context"
 
 @res_test_uint.DE04EADD.0 = private constant [19 x i8] c"\12USER:INT:test_uint"
 
-define private void @_hl.main.1(i64 %0) {
+define internal void @_hl.main.1(i64 %0) {
 alloca_block:
   br label %entry_block
 

@@ -7,7 +7,7 @@ source_filename = "test_context"
 
 @res_test_bool.427F8271.0 = private constant [20 x i8] c"\13USER:BOOL:test_bool"
 
-define private void @_hl.main.1(i1 %0) {
+define internal void @_hl.main.1(i1 %0) {
 alloca_block:
   br label %entry_block
 

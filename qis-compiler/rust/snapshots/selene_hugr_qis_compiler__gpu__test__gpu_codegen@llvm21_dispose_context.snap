@@ -7,7 +7,7 @@ source_filename = "test_context"
 
 @no_gpu_error = private unnamed_addr constant [27 x i8] c"No error message available\00", align 1
 
-define private void @_hl.main.1(i64 %0) {
+define internal void @_hl.main.1(i64 %0) {
 alloca_block:
   br label %entry_block
 

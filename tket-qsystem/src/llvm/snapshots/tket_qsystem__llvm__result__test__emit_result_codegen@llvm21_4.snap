@@ -7,7 +7,7 @@ source_filename = "test_context"
 
 @res_test_f64.A24BDAE1.0 = private constant [20 x i8] c"\13USER:FLOAT:test_f64"
 
-define private void @_hl.main.1(double %0) {
+define internal void @_hl.main.1(double %0) {
 alloca_block:
   br label %entry_block
 

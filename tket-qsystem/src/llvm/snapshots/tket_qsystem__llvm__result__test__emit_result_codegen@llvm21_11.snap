@@ -7,7 +7,7 @@ source_filename = "test_context"
 
 @res_test_arr_f.038B27BE.0 = private constant [27 x i8] c"\1AUSER:FLOATARR:test_arr_f64"
 
-define private void @_hl.main.1({ ptr, i64 } %0) {
+define internal void @_hl.main.1({ ptr, i64 } %0) {
 alloca_block:
   br label %entry_block
 

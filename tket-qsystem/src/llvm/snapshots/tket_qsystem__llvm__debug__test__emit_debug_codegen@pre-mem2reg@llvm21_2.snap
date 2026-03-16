@@ -7,7 +7,7 @@ source_filename = "test_context"
 
 @res_test_state.900F7606.0 = private constant [29 x i8] c"\1CUSER:STATE:test_state_result"
 
-define private { ptr, i64 } @_hl.main.1({ ptr, i64 } %0) {
+define internal { ptr, i64 } @_hl.main.1({ ptr, i64 } %0) {
 alloca_block:
   %"0" = alloca { ptr, i64 }, align 8
   %"2_0" = alloca { ptr, i64 }, align 8
