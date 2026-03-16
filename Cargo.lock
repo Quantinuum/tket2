@@ -1086,19 +1086,20 @@ dependencies = [
 
 [[package]]
 name = "hugr"
-version = "0.25.6"
-source = "git+https://github.com/quantinuum/hugr?branch=george%2Fllvmup#7d8587c64086ea5a2a4486b23ef7b73ab2c44040"
+version = "0.26.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "60bd5eca20bf3e7045b68668c7b29e80e05e1c36072e9adf1b7565ecaec906e3"
 dependencies = [
  "hugr-core",
  "hugr-llvm",
  "hugr-model",
- "hugr-passes",
 ]
 
 [[package]]
 name = "hugr-cli"
-version = "0.25.6"
-source = "git+https://github.com/quantinuum/hugr?branch=george%2Fllvmup#7d8587c64086ea5a2a4486b23ef7b73ab2c44040"
+version = "0.26.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "13c2e99f82b15e5a9f8a41c96f4fe8647ba93315b2c84a533a34f0e916b5b4eb"
 dependencies = [
  "anyhow",
  "clap",
@@ -1117,8 +1118,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-core"
-version = "0.25.6"
-source = "git+https://github.com/quantinuum/hugr?branch=george%2Fllvmup#7d8587c64086ea5a2a4486b23ef7b73ab2c44040"
+version = "0.26.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3aaf6aa2670a90068eafb9606418fd0d24c0b34064c70590e24e0db8c6d43cd9"
 dependencies = [
  "base64",
  "cgmath",
@@ -1145,7 +1147,7 @@ dependencies = [
  "smallvec",
  "smol_str",
  "static_assertions",
- "strum 0.27.2",
+ "strum",
  "thiserror 2.0.18",
  "tracing",
  "typetag",
@@ -1154,8 +1156,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-llvm"
-version = "0.25.6"
-source = "git+https://github.com/quantinuum/hugr?branch=george%2Fllvmup#7d8587c64086ea5a2a4486b23ef7b73ab2c44040"
+version = "0.26.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "efcbab7e40ab80cc1de863b998a17a01e9c58b1e2c1f339da33fe2fed9bbc124"
 dependencies = [
  "anyhow",
  "cc",
@@ -1168,13 +1171,14 @@ dependencies = [
  "petgraph 0.8.3",
  "portgraph 0.15.3",
  "rstest",
- "strum 0.27.2",
+ "strum",
 ]
 
 [[package]]
 name = "hugr-model"
-version = "0.25.6"
-source = "git+https://github.com/quantinuum/hugr?branch=george%2Fllvmup#7d8587c64086ea5a2a4486b23ef7b73ab2c44040"
+version = "0.26.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a2403a481855ba1dd61c1354c3173c03a53546558a8373e4dee3beaa0001796"
 dependencies = [
  "base64",
  "bumpalo",
@@ -1194,8 +1198,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-passes"
-version = "0.25.6"
-source = "git+https://github.com/quantinuum/hugr?branch=george%2Fllvmup#7d8587c64086ea5a2a4486b23ef7b73ab2c44040"
+version = "0.26.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c3022a594f5c428c2ee12e6cf7c8f690eff71972231d9b40f29a52e299f8e91f"
 dependencies = [
  "ascent",
  "derive_more 2.1.1",
@@ -1206,7 +1211,7 @@ dependencies = [
  "petgraph 0.8.3",
  "portgraph 0.15.3",
  "serde_json",
- "strum 0.27.2",
+ "strum",
  "thiserror 2.0.18",
 ]
 
@@ -2233,7 +2238,7 @@ dependencies = [
  "rstest",
  "serde",
  "serde_json",
- "strum 0.28.0",
+ "strum",
  "tket",
  "tket-qsystem",
  "tracing",
@@ -2425,32 +2430,11 @@ checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 
 [[package]]
 name = "strum"
-version = "0.27.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af23d6f6c1a224baef9d3f61e287d2761385a5b88fdab4eb4c6f11aeb54c4bcf"
-dependencies = [
- "strum_macros 0.27.2",
-]
-
-[[package]]
-name = "strum"
 version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9628de9b8791db39ceda2b119bbe13134770b56c138ec1d3af810d045c04f9bd"
 dependencies = [
- "strum_macros 0.28.0",
-]
-
-[[package]]
-name = "strum_macros"
-version = "0.27.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7695ce3845ea4b33927c055a39dc438a45b059f7c1b3d91d38d10355fb8cbca7"
-dependencies = [
- "heck",
- "proc-macro2",
- "quote",
- "syn 2.0.114",
+ "strum_macros",
 ]
 
 [[package]]
@@ -2691,7 +2675,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "smol_str",
- "strum 0.28.0",
+ "strum",
  "tket-json-rs",
  "tracing",
  "typetag",
@@ -2709,7 +2693,7 @@ dependencies = [
  "pythonize",
  "serde",
  "serde_json",
- "strum 0.27.2",
+ "strum",
  "uuid",
 ]
 
@@ -2729,7 +2713,7 @@ dependencies = [
  "rstest",
  "serde",
  "serde_json",
- "strum 0.28.0",
+ "strum",
  "tket",
  "tket-json-rs",
  "tket-qsystem",
@@ -2758,7 +2742,7 @@ dependencies = [
  "serde",
  "serde_json",
  "smol_str",
- "strum 0.28.0",
+ "strum",
  "tket",
  "tket-json-rs",
  "tket1-passes",
