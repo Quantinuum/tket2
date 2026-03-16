@@ -117,6 +117,8 @@ pub enum IcebergOpDef {
     cx_transverse,
     /// Prepare the all-zero state on a block.
     alloc_zero,
+    /// Free a block.
+    free,
     /// Syndrome measurement.
     measure_syndrome,
     /// Destructive measurement of all qubits.
@@ -391,6 +393,17 @@ impl MakeOpDef for IcebergOpDef {
                 ArgsValidator { n_idx: 0 },
             )
             .into(),
+            free => CustomValidator::new(
+                PolyFuncTypeRV::new(
+                    vec![TypeParam::max_nat_type()],
+                    FuncValueType::new(
+                        vec_of_blocks_and_angles(1, 0),
+                        vec_of_blocks_and_angles(0, 0),
+                    ),
+                ),
+                ArgsValidator { n_idx: 0 },
+            )
+            .into(),
             measure_syndrome => CustomValidator::new(
                 PolyFuncTypeRV::new(
                     vec![TypeParam::max_nat_type()],
@@ -500,6 +513,7 @@ impl MakeOpDef for IcebergOpDef {
             }
             cx_transverse => "apply a CX gate transversally over two blocks of the same size",
             alloc_zero => "allocate a block in the all-zero state",
+            free => "free a block",
             measure_syndrome => "perform a syndrome measurement, producing (X,Z) error indicators",
             measure_all => "destructively measure all qubits in the Z basis",
             measure_one_x => "non-destructively measure one qubit in the X basis",
@@ -521,7 +535,7 @@ pub static EXTENSION: LazyLock<Arc<Extension>> = LazyLock::new(|| {
 #[cfg(test)]
 mod tests {
     use hugr::{
-        CircuitUnit, HugrView,
+        CircuitUnit, HugrView, Wire,
         builder::{
             DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder, ModuleBuilder,
         },
@@ -546,7 +560,7 @@ mod tests {
     fn test_iceberg_ops_extension() {
         assert_eq!(EXTENSION.name() as &str, "tket.qec.iceberg.ops");
         assert_eq!(EXTENSION.types().count(), 0);
-        assert_eq!(EXTENSION.operations().count(), 42);
+        assert_eq!(EXTENSION.operations().count(), 43);
     }
 
     #[test]
@@ -708,7 +722,7 @@ mod tests {
     }
 
     #[test]
-    fn test_alloc_measure() {
+    fn test_alloc_measure_free() {
         let alloczero = EXTENSION
             .instantiate_extension_op("alloc_zero", [8.into()])
             .unwrap();
@@ -718,16 +732,26 @@ mod tests {
         let measuresyndrome = EXTENSION
             .instantiate_extension_op("measure_syndrome", [8.into()])
             .unwrap();
-        let mut outputs: Vec<Type> = vec![block_type(8)];
-        outputs.extend(vec![future_type(bool_t()); 2]);
+        let free = EXTENSION
+            .instantiate_extension_op("free", [8.into()])
+            .unwrap();
+        let outputs: Vec<Type> = vec![future_type(bool_t()); 2];
         let mut dfg_builder = DFGBuilder::new(Signature::new(vec![], outputs)).unwrap();
         let handle = dfg_builder.add_dataflow_op(alloczero, vec![]).unwrap();
         let handle = dfg_builder.add_dataflow_op(x3, handle.outputs()).unwrap();
         let handle = dfg_builder
             .add_dataflow_op(measuresyndrome, handle.outputs())
             .unwrap();
+        let wires: Vec<Wire> = handle.outputs().collect();
+        assert_eq!(wires.len(), 3);
+        let block_wire = wires[0];
+        let bool_wire_0 = wires[1];
+        let bool_wire_1 = wires[2];
+        let handle = dfg_builder.add_dataflow_op(free, [block_wire]).unwrap();
+        let outs: Vec<Wire> = handle.outputs().collect();
+        assert!(outs.is_empty());
         let h = dfg_builder
-            .finish_hugr_with_outputs(handle.outputs())
+            .finish_hugr_with_outputs([bool_wire_0, bool_wire_1])
             .unwrap();
         h.validate().unwrap();
     }
