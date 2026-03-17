@@ -55,14 +55,24 @@ pub enum IcebergOpDef {
     z_d,
     /// X gate on two qubits.
     xx,
+    /// X gate on two qubits (with dynamic indices).
+    xx_d,
     /// Y gate on two qubits.
     yy,
+    /// Y gate on two qubits (with dynamic indices).
+    yy_d,
     /// Z gate on two qubits.
     zz,
+    /// Z gate on two qubits (with dynamic indices).
+    zz_d,
     /// X gate on all but one qubit.
     all_but_one_x,
+    /// X gate on all but one qubit (with dynamic index).
+    all_but_one_x_d,
     /// Z gate on all but one qubit.
     all_but_one_z,
+    /// Z gate on all but one qubit (with dynamic index).
+    all_but_one_z_d,
     /// X gate on all qubits.
     all_x,
     /// Y gate on all qubits.
@@ -71,8 +81,12 @@ pub enum IcebergOpDef {
     all_z,
     /// X gate on one qubit with Z on all others.
     x_with_all_but_one_z,
+    /// X gate on one qubit with Z on all others (with dynamic index).
+    x_with_all_but_one_z_d,
     /// Z gate on one qubit with X on all others.
     z_with_all_but_one_x,
+    /// Z gate on one qubit with X on all others (with dynamic index).
+    z_with_all_but_one_x_d,
     /// Fan-out from one qubit to all others.
     fan_out,
     /// Fan-out from one qubit to all others (with dynamic index).
@@ -348,15 +362,22 @@ impl MakeOpDef for IcebergOpDef {
             z => sig_1_block(0, 1),
             z_d => sig_1_block_d(0, 1),
             xx => sig_1_block(0, 2),
+            xx_d => sig_1_block_d(0, 2),
             yy => sig_1_block(0, 2),
+            yy_d => sig_1_block_d(0, 2),
             zz => sig_1_block(0, 2),
+            zz_d => sig_1_block_d(0, 2),
             all_but_one_x => sig_1_block(0, 1),
+            all_but_one_x_d => sig_1_block_d(0, 1),
             all_but_one_z => sig_1_block(0, 1),
+            all_but_one_z_d => sig_1_block_d(0, 1),
             all_x => sig_1_block(0, 0),
             all_y => sig_1_block(0, 0),
             all_z => sig_1_block(0, 0),
             x_with_all_but_one_z => sig_1_block(0, 1),
+            x_with_all_but_one_z_d => sig_1_block_d(0, 1),
             z_with_all_but_one_x => sig_1_block(0, 1),
+            z_with_all_but_one_x_d => sig_1_block_d(0, 1),
             fan_out => sig_1_block(0, 1),
             fan_out_d => sig_1_block_d(0, 1),
             fan_in => sig_1_block(0, 1),
@@ -502,15 +523,22 @@ impl MakeOpDef for IcebergOpDef {
             z => "apply a Z gate to one qubit",
             z_d => "apply a Z gate to one qubit (with dynamic index)",
             xx => "apply an X gate to two qubits",
+            xx_d => "apply an X gate to two qubits (with dynamic indices)",
             yy => "apply a Y gate to two qubits",
+            yy_d => "apply a Y gate to two qubits (with dynamic indices)",
             zz => "apply a Z gate to two qubits",
+            zz_d => "apply a Z gate to two qubits (with dynamic indices)",
             all_but_one_x => "apply an X gate to all but one qubit",
+            all_but_one_x_d => "apply an X gate to all but one qubit (with dynamic index)",
             all_but_one_z => "apply a Z gate to all but one qubit",
+            all_but_one_z_d => "apply a Z gate to all but one qubit (with dynamic index)",
             all_x => "apply an X gate to all qubits",
             all_y => "apply a Y gate to all qubits",
             all_z => "apply a Z gate to all qubits",
             x_with_all_but_one_z => "apply an X gate to one qubit and a Z to the rest",
+            x_with_all_but_one_z_d => "apply an X gate to one qubit and a Z to the rest (with dynamic index)",
             z_with_all_but_one_x => "apply a Z gate to one qubit and an X to the rest",
+            z_with_all_but_one_x_d => "apply a Z gate to one qubit and an X to the rest (with dynamic index)",
             fan_out => "fan-out from one qubit to the rest",
             fan_out_d => "fan-out from one qubit to the rest (with dynamic index)",
             fan_in => "fan-in to one qubit from the rest",
@@ -600,7 +628,7 @@ mod tests {
     fn test_iceberg_ops_extension() {
         assert_eq!(EXTENSION.name() as &str, "tket.qec.iceberg.ops");
         assert_eq!(EXTENSION.types().count(), 0);
-        assert_eq!(EXTENSION.operations().count(), 53);
+        assert_eq!(EXTENSION.operations().count(), 60);
     }
 
     #[test]
