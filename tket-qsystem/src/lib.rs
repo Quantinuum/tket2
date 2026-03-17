@@ -273,6 +273,7 @@ mod test {
         types::Signature,
     };
 
+    use hugr_core::hugr::internal::{HugrInternals, PortgraphNodeMap};
     use itertools::Itertools as _;
     use petgraph::visit::{Topo, Walker as _};
     use rstest::rstest;
@@ -350,18 +351,23 @@ mod test {
         }
         QSystemPass::default().run(&mut hugr).unwrap();
 
-        let topo_sorted = Topo::new(&hugr.as_petgraph())
-            .iter(&hugr.as_petgraph())
-            .collect_vec();
+        let (pg, node_map) = hugr.region_portgraph(main_node);
+        let topo_sorted = Topo::new(&pg).iter(&pg).collect_vec();
 
-        let get_pos = |x| topo_sorted.iter().position(|&y| y == x).unwrap();
+        let get_pos = |x| {
+            topo_sorted
+                .iter()
+                .position(|&y| y == node_map.to_portgraph(x))
+                .unwrap()
+        };
         assert!(get_pos(h_node) < get_pos(f_node));
         assert!(get_pos(h_node) < get_pos(call_node));
         assert!(get_pos(rx_node) < get_pos(call_node));
 
-        for &n in topo_sorted
+        for n in topo_sorted
             .iter()
-            .filter(|&&n| FutureOpDef::try_from(hugr.get_optype(n)) == Ok(FutureOpDef::Read))
+            .map(|&pg_n| node_map.from_portgraph(pg_n))
+            .filter(|&n| FutureOpDef::try_from(hugr.get_optype(n)) == Ok(FutureOpDef::Read))
         {
             assert!(get_pos(call_node) < get_pos(n));
         }
