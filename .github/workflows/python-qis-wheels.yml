@@ -46,7 +46,8 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
-          - ubuntu-24.04-arm
+          # TODO: Temporarily disabled until we create a manylinux_2_28 compatible docker image for ARM with LLVM 21.
+          #- ubuntu-24.04-arm
           - macos-15
           - macos-15-intel
           - windows-2022
