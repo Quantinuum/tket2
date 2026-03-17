@@ -16,7 +16,7 @@ use hugr::ops::handle::NodeHandle;
 use hugr::ops::{ExtensionOp, OpType};
 use hugr::package::Package;
 use hugr::types::Type;
-use hugr_passes::ComposablePass;
+use hugr_passes::composable::ComposablePass;
 use itertools::Itertools;
 use pyo3::exceptions::{PyAttributeError, PyValueError};
 use pyo3::types::{PyAnyMethods, PyModule, PyString, PyTypeMethods};

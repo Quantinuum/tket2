@@ -1,0 +1,17 @@
+---
+source: tket-qsystem/src/llvm/random.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define internal void @_hl.main.1({} %0) {
+alloca_block:
+  %"2_0" = alloca {}, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store {} %0, ptr %"2_0", align 1
+  %"2_01" = load {}, ptr %"2_0", align 1
+  ret void
+}

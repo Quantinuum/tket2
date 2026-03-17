@@ -79,10 +79,11 @@ impl<PCG: PreludeCodegen> RotationCodegenExtension<PCG> {
         let builder = context.builder();
 
         // We must distinguish {NaNs, infinities} from finite
-        // values. The `llvm.is.fpclass` intrinsic was introduced in llvm 15
-        // and is the best way to do so. For now we are using llvm
-        // 14, and so we use 3 `feq`s.
-        // Below is commented code that we can use once we support llvm 15.
+        // values. The `llvm.is.fpclass` intrinsic was introduced in LLVM15
+        // and is the best way to do so.
+        // This was written when using LLVM14, so we used 3 `feq`s.
+        //
+        // TODO: We now use LLVM21. Update this accordingly.
         let half_turns_ok = {
             let is_pos_inf = builder.build_float_compare(
                 FloatPredicate::OEQ,

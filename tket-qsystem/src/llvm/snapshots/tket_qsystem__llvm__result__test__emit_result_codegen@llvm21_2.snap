@@ -1,0 +1,21 @@
+---
+source: tket-qsystem/src/llvm/result.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+@res_test_int.258C85C2.0 = private constant [18 x i8] c"\11USER:INT:test_int"
+
+define internal void @_hl.main.1(i64 %0) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %tag_len = load i8, ptr @res_test_int.258C85C2.0, align 1
+  %tag_len2 = zext i8 %tag_len to i64
+  call void @print_int(ptr @res_test_int.258C85C2.0, i64 %tag_len2, i64 %0)
+  ret void
+}
+
+declare void @print_int(ptr, i64, i64)

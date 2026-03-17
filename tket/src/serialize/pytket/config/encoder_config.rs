@@ -153,7 +153,6 @@ impl<H: HugrView> PytketEncoderConfig<H> {
                         return Ok(None);
                     }
                 }
-                _ => return Ok(None),
             }
         }
         Ok(Some(values))

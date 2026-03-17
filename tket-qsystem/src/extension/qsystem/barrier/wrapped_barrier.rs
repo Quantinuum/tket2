@@ -35,7 +35,7 @@ static TEMP_BARRIER_EXT: LazyLock<Arc<Extension>> = LazyLock::new(|| {
                 Default::default(),
                 PolyFuncTypeRV::new(
                     vec![TypeParam::new_list_type(TypeBound::Linear)],
-                    FuncValueType::new_endo(TypeRV::new_row_var_use(0, TypeBound::Linear)),
+                    FuncValueType::new_endo(vec![TypeRV::new_row_var_use(0, TypeBound::Linear)]),
                 ),
                 ext_ref,
             )
@@ -100,7 +100,8 @@ impl Default for WrappedBarrierBuilder {
 
 /// Build a runtime barrier operation for an array of qubits
 pub(super) fn build_runtime_barrier_op(array_size: u64) -> Result<Hugr, BuildError> {
-    let mut barr_builder = DFGBuilder::new(Signature::new_endo(array_type(array_size, qb_t())))?;
+    let mut barr_builder =
+        DFGBuilder::new(Signature::new_endo(vec![array_type(array_size, qb_t())]))?;
     let array_wire = barr_builder.input().out_wire(0);
     let out = barr_builder.add_runtime_barrier(array_wire, array_size)?;
     barr_builder.finish_hugr_with_outputs([out])

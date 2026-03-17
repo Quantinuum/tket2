@@ -92,7 +92,7 @@ test-command = "pytest -vv {package}"
 
 [tool.cibuildwheel.linux.environment]
 PATH = '$HOME/.cargo/bin:/tmp/llvm/bin:$PATH'
-LLVM_SYS_140_PREFIX = '/tmp/llvm'
+LLVM_SYS_211_PREFIX = '/tmp/llvm'
 environment-pass = ["CACHE_CARGO"]
 [tool.cibuildwheel.linux]
 before-all = '''
@@ -108,17 +108,23 @@ before-all = '''
             cp -r /host/tmp/ci-cache/hugr-qis/target {package}
         fi;
     fi;
-    dnf install libffi-devel -y
+    dnf install libffi-devel ncurses-devel -y
     mkdir -p /tmp/llvm;
     if [ "$(uname -m)" = "x86_64" ];
     then
-        curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-14.0.6/clang+llvm-14.0.6-x86_64-linux-gnu-rhel-8.4.tar.xz;
-        tar xf clang+llvm-14.0.6-x86_64-linux-gnu-rhel-8.4.tar.xz -C /tmp/llvm --strip-components=1;
+        curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.8/LLVM-21.1.8-Linux-X64.tar.xz;
+        tar xf LLVM-21.1.8-Linux-X64.tar.xz -C /tmp/llvm --strip-components=1;
     else
-        dnf install ncurses-compat-libs ncurses-devel -y;
-        curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-14.0.6/clang+llvm-14.0.6-aarch64-linux-gnu.tar.xz
-        tar xf clang+llvm-14.0.6-aarch64-linux-gnu.tar.xz -C /tmp/llvm --strip-components=1;
+        dnf install ncurses-compat-libs -y;
+        curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.8/LLVM-21.1.8-Linux-ARM64.tar.xz
+        tar xf LLVM-21.1.8-Linux-ARM64.tar.xz -C /tmp/llvm --strip-components=1;
     fi;
+    # The official LLVM binaries are built on Ubuntu 22.04 (glibc 2.35),
+    # which is too new for manylinux_2_28 (glibc 2.28). The static
+    # libraries and headers work fine, but llvm-config can't execute.
+    # Replace it with a shell script wrapper.
+    cp {package}/scripts/llvm-config-wrapper.sh /tmp/llvm/bin/llvm-config;
+    chmod +x /tmp/llvm/bin/llvm-config;
 '''
 before-test = '''
     if ${CACHE_CARGO};
@@ -150,16 +156,14 @@ repair-wheel-command = [
 ]
 
 [tool.cibuildwheel.macos.environment]
-PATH = '/tmp/llvm:$PATH'
-LLVM_SYS_140_PREFIX = '/tmp/llvm'
+PATH = '/tmp/llvm/bin:$PATH'
+LLVM_SYS_211_PREFIX = '/tmp/llvm'
 MACOSX_DEPLOYMENT_TARGET = "15.0"
 [tool.cibuildwheel.macos]
 before-all = [
     'curl -sSf https://sh.rustup.rs | sh -s -- -y',
-    'if [ "$(uname -m)" = "arm64" ]; then ARCH_PREFIX=arm64-apple-darwin22.3.0; else ARCH_PREFIX=x86_64-apple-darwin; fi',
-    'curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-14.0.6/clang+llvm-14.0.6-$ARCH_PREFIX.tar.xz',
-    'mkdir -p /tmp/llvm',
-    'tar xf clang+llvm-14.0.6-$ARCH_PREFIX.tar.xz -C /tmp/llvm --strip-components=1',
+    'brew install llvm@21',
+    'ln -sf $(brew --prefix llvm@21) /tmp/llvm',
 ]
 repair-wheel-command = [
     'DYLD_FALLBACK_LIBRARY_PATH=/tmp/llvm/lib delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel}',
@@ -168,12 +172,12 @@ repair-wheel-command = [
 
 [tool.cibuildwheel.windows.environment]
 PATH = 'C:\\LLVM\\bin;$PATH'
-LLVM_SYS_140_PREFIX = 'C:\\LLVM'
+LLVM_SYS_211_PREFIX = 'C:\\LLVM'
 [tool.cibuildwheel.windows]
 before-all = [
     'rustup update',
-    'curl -LO https://github.com/PLC-lang/llvm-package-windows/releases/download/v14.0.6/LLVM-14.0.6-win64.7z',
-    '7z x LLVM-14.0.6-win64.7z "-oC:\LLVM" -y',
+    'curl -LO https://github.com/PLC-lang/llvm-package-windows/releases/download/v21.1.7/LLVM-21.1.7-win64.7z',
+    '7z x LLVM-21.1.7-win64.7z "-oC:\LLVM" -y',
 ]
 repair-wheel-command = [
     'uvx delvewheel repair -w {dest_dir} {wheel}',

@@ -83,7 +83,7 @@ mod test {
         let arr_type = array_type(2, usize_t());
         let drop_op = GUPPY_EXTENSION.get_op(DROP_OP_NAME.as_str()).unwrap();
         let drop_node = ExtensionOp::new(drop_op.clone(), [arr_type.clone().into()]).unwrap();
-        let mut b = DFGBuilder::new(inout_sig(arr_type, vec![])).unwrap();
+        let mut b = DFGBuilder::new(inout_sig(vec![arr_type], vec![])).unwrap();
         let inp = b.input_wires();
         b.add_dataflow_op(drop_node, inp).unwrap();
         let mut h = b.finish_hugr_with_outputs([]).unwrap();

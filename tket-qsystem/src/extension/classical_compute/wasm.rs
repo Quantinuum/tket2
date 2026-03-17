@@ -319,7 +319,7 @@ mod test {
         ));
         assert_eq!(
             op.to_extension_op().unwrap().signature(),
-            Signature::new(module_ty, func_ty)
+            Signature::new(vec![module_ty], vec![func_ty])
         );
     }
 

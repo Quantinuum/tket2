@@ -1,0 +1,20 @@
+---
+source: tket-qsystem/src/llvm/futures.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define internal void @_hl.main.1(i64 %0) {
+alloca_block:
+  %"2_0" = alloca i64, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store i64 %0, ptr %"2_0", align 4
+  %"2_01" = load i64, ptr %"2_0", align 4
+  call void @___dec_future_refcount(i64 %"2_01")
+  ret void
+}
+
+declare void @___dec_future_refcount(i64)

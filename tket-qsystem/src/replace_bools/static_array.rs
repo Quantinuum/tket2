@@ -271,7 +271,7 @@ fn get_op_dest(rt: &ReplaceTypes, old_elem_ty: Type) -> Option<NodeTemplate> {
         let mut hugr1 = {
             let mut dfb = DFGBuilder::new(inout_sig(
                 vec![static_array_type(old_elem_ty.clone()), usize_t()],
-                Type::from(option_type(old_elem_ty.clone())),
+                vec![Type::from(option_type(vec![old_elem_ty.clone()]))],
             ))
             .unwrap();
             let [arr, index] = dfb.input_wires_arr();
@@ -295,9 +295,9 @@ fn get_op_dest(rt: &ReplaceTypes, old_elem_ty: Type) -> Option<NodeTemplate> {
             .input()[0]
             .clone();
 
-        let res_ty = Type::from(option_type(old_elem_ty.clone()));
+        let res_ty = Type::from(option_type(vec![old_elem_ty.clone()]));
         let mut dfb =
-            DFGBuilder::new(inout_sig(vec![new_arr_ty, usize_t()], res_ty.clone())).unwrap();
+            DFGBuilder::new(inout_sig(vec![new_arr_ty, usize_t()], vec![res_ty.clone()])).unwrap();
         let [arr, index] = dfb.input_wires_arr();
         let [val] = dfb
             .add_hugr_with_wires(hugr1, [arr, index])
@@ -362,7 +362,7 @@ mod test {
             let element_ty = x.get_element_type().clone();
             let mut builder = DFGBuilder::new(Signature::new(
                 type_row![],
-                vec![option_type(element_ty.clone()).into(), usize_t()],
+                vec![option_type(vec![element_ty.clone()]).into(), usize_t()],
             ))
             .unwrap();
 
