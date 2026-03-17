@@ -53,6 +53,26 @@ pub enum IcebergOpDef {
     z,
     /// Z gate (with dynamic index).
     z_d,
+    /// X gate on two qubits.
+    xx,
+    /// Y gate on two qubits.
+    yy,
+    /// Z gate on two qubits.
+    zz,
+    /// X gate on all but one qubit.
+    all_but_one_x,
+    /// Z gate on all but one qubit.
+    all_but_one_z,
+    /// X gate on all qubits.
+    all_x,
+    /// Y gate on all qubits.
+    all_y,
+    /// Z gate on all qubits.
+    all_z,
+    /// X gate on one qubit with Z on all others.
+    x_with_all_but_one_z,
+    /// Z gate on one qubit with X on all others.
+    z_with_all_but_one_x,
     /// Fan-out from one qubit to all others.
     fan_out,
     /// Fan-out from one qubit to all others (with dynamic index).
@@ -327,6 +347,16 @@ impl MakeOpDef for IcebergOpDef {
             x_d => sig_1_block_d(0, 1),
             z => sig_1_block(0, 1),
             z_d => sig_1_block_d(0, 1),
+            xx => sig_1_block(0, 2),
+            yy => sig_1_block(0, 2),
+            zz => sig_1_block(0, 2),
+            all_but_one_x => sig_1_block(0, 1),
+            all_but_one_z => sig_1_block(0, 1),
+            all_x => sig_1_block(0, 0),
+            all_y => sig_1_block(0, 0),
+            all_z => sig_1_block(0, 0),
+            x_with_all_but_one_z => sig_1_block(0, 1),
+            z_with_all_but_one_x => sig_1_block(0, 1),
             fan_out => sig_1_block(0, 1),
             fan_out_d => sig_1_block_d(0, 1),
             fan_in => sig_1_block(0, 1),
@@ -471,6 +501,16 @@ impl MakeOpDef for IcebergOpDef {
             x_d => "apply an X gate to one qubit (with dynamic index)",
             z => "apply a Z gate to one qubit",
             z_d => "apply a Z gate to one qubit (with dynamic index)",
+            xx => "apply an X gate to two qubits",
+            yy => "apply a Y gate to two qubits",
+            zz => "apply a Z gate to two qubits",
+            all_but_one_x => "apply an X gate to all but one qubit",
+            all_but_one_z => "apply a Z gate to all but one qubit",
+            all_x => "apply an X gate to all qubits",
+            all_y => "apply a Y gate to all qubits",
+            all_z => "apply a Z gate to all qubits",
+            x_with_all_but_one_z => "apply an X gate to one qubit and a Z to the rest",
+            z_with_all_but_one_x => "apply a Z gate to one qubit and an X to the rest",
             fan_out => "fan-out from one qubit to the rest",
             fan_out_d => "fan-out from one qubit to the rest (with dynamic index)",
             fan_in => "fan-in to one qubit from the rest",
@@ -560,7 +600,7 @@ mod tests {
     fn test_iceberg_ops_extension() {
         assert_eq!(EXTENSION.name() as &str, "tket.qec.iceberg.ops");
         assert_eq!(EXTENSION.types().count(), 0);
-        assert_eq!(EXTENSION.operations().count(), 43);
+        assert_eq!(EXTENSION.operations().count(), 53);
     }
 
     #[test]
@@ -587,6 +627,12 @@ mod tests {
             .unwrap();
         let z4 = EXTENSION
             .instantiate_extension_op("z", [6.into(), 4.into()])
+            .unwrap();
+        let yy14 = EXTENSION
+            .instantiate_extension_op("yy", [6.into(), 1.into(), 4.into()])
+            .unwrap();
+        let allx = EXTENSION
+            .instantiate_extension_op("all_x", [6.into()])
             .unwrap();
         let allrz = EXTENSION
             .instantiate_extension_op("all_rz", [6.into()])
@@ -639,6 +685,8 @@ mod tests {
             .append_and_consume(x_d, [CircuitUnit::Linear(0), CircuitUnit::Wire(index2)])
             .unwrap();
         linear.append(z4, [0]).unwrap();
+        linear.append(yy14, [0]).unwrap();
+        linear.append(allx, [0]).unwrap();
         let angle = linear.add_constant(ConstF64::new(0.25));
         linear
             .append_and_consume(allrz, [CircuitUnit::Linear(0), CircuitUnit::Wire(angle)])
@@ -887,7 +935,7 @@ mod tests {
         );
         assert!(
             EXTENSION
-                .instantiate_extension_op("cx", [6.into(), 0.into()])
+                .instantiate_extension_op("xx", [6.into(), 0.into()])
                 .is_err()
         );
     }
