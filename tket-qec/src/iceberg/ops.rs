@@ -1,6 +1,9 @@
 //! Extension providing logical operations on Iceberg codeblocks.
 
-use std::sync::{Arc, LazyLock, Weak};
+use std::{
+    collections::HashSet,
+    sync::{Arc, LazyLock, Weak},
+};
 
 use hugr::{
     Extension,
@@ -241,7 +244,8 @@ impl IcebergOpDef {
 
 /// Validator to check that the list of type arguments consists of a sequence
 /// of natural numbers, the first of which (representing the block size) is
-/// at least 2 and greater than all subsequent (representing qubit indices).
+/// at least 2 and greater than all subsequent (representing qubit indices);
+/// in addition the qubit indices must be distinct from one another.
 struct ArgsValidator {
     /// Expected number of index arguments following the initial block size.
     n_idx: usize,
@@ -251,6 +255,32 @@ impl ValidateJustArgs for ArgsValidator {
     fn validate(&self, arg_values: &[TypeArg]) -> Result<(), SignatureError> {
         let n = arg_values.len();
         if n != 1 + self.n_idx {
+            return Err(SignatureError::InvalidTypeArgs);
+        }
+        let k = arg_values[0].as_nat().unwrap();
+        if k == 0 || k % 2 == 1 {
+            return Err(SignatureError::InvalidTypeArgs);
+        }
+        let mut args: HashSet<u64> = HashSet::new();
+        for arg in arg_values.iter().skip(1) {
+            let i = arg.as_nat().unwrap();
+            if i >= k || args.contains(&i) {
+                return Err(SignatureError::InvalidTypeArgs);
+            }
+            args.insert(i);
+        }
+        Ok(())
+    }
+}
+
+/// Validator to check that the list of type arguments consists of 3 natural
+/// numbers, the first of which (representing the block size) is at least 2 and
+/// greater than both subsequent (representing qubit indices in two blocks).
+struct InterBlockArgsValidator {}
+
+impl ValidateJustArgs for InterBlockArgsValidator {
+    fn validate(&self, arg_values: &[TypeArg]) -> Result<(), SignatureError> {
+        if arg_values.len() != 3 {
             return Err(SignatureError::InvalidTypeArgs);
         }
         let k = arg_values[0].as_nat().unwrap();
@@ -414,7 +444,7 @@ impl MakeOpDef for IcebergOpDef {
                         vec_of_blocks_and_angles(2, 0),
                     ),
                 ),
-                ArgsValidator { n_idx: 2 },
+                InterBlockArgsValidator {},
             )
             .into(),
             zz_phase_between_blocks_d => PolyFuncTypeRV::new(
@@ -964,6 +994,16 @@ mod tests {
         assert!(
             EXTENSION
                 .instantiate_extension_op("xx", [6.into(), 0.into()])
+                .is_err()
+        );
+        assert!(
+            EXTENSION
+                .instantiate_extension_op("xx", [6.into(), 0.into(), 0.into()])
+                .is_err()
+        );
+        assert!(
+            EXTENSION
+                .instantiate_extension_op("zz_phase_between_blocks", [6.into(), 0.into(), 6.into()])
                 .is_err()
         );
     }
