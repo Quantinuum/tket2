@@ -21,8 +21,8 @@ use inkwell::values::{ArrayValue, IntValue, PointerValue, StructValue};
 
 /// Specifies different array lowering strategies.
 ///
-/// See [DEFAULT_STACK_ARRAY_LOWERING] and [DEFAULT_HEAP_ARRAY_LOWERING] for the default
-/// array lowerings implementing this trait.
+/// See [DEFAULT_HEAP_ARRAY_LOWERING] for the default array lowerings
+/// implementing this trait.
 pub trait ArrayLowering {
     /// The [CodegenExtension] specifying the array lowering.
     fn codegen_extension(&self) -> impl CodegenExtension;
