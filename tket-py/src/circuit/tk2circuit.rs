@@ -61,7 +61,7 @@ use super::{PyCircuitCost, PyNode, PyWire, cost, with_circ};
 /// # Convert back to a pytket.Circuit
 /// c2 = t2c.to_tket1()
 /// ```
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Debug, PartialEq, From)]
 pub struct Tk2Circuit {
     /// Rust representation of the circuit.

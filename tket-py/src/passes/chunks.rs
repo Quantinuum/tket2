@@ -24,7 +24,7 @@ pub fn chunks(c: &Bound<PyAny>, max_chunk_size: usize) -> PyResult<PyCircuitChun
 /// Python equivalent of [`CircuitChunks`].
 ///
 /// [`CircuitChunks`]: tket::passes::chunks::CircuitChunks
-#[pyclass]
+#[pyclass(from_py_object)]
 #[pyo3(name = "CircuitChunks")]
 #[derive(Debug, Clone, From)]
 pub struct PyCircuitChunks {

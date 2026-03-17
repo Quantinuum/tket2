@@ -108,7 +108,7 @@ pub fn render_circuit_mermaid(c: &Bound<PyAny>) -> PyResult<String> {
 }
 
 /// A [`hugr::Node`] wrapper for Python.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[pyo3(name = "Node")]
 #[repr(transparent)]
 #[derive(From, Into, PartialEq, Eq, Hash, Clone, Copy)]
@@ -144,7 +144,7 @@ impl PyNode {
 }
 
 /// A [`hugr::Node`] wrapper for Python.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[pyo3(name = "Wire")]
 #[repr(transparent)]
 #[derive(From, Into, PartialEq, Eq, Hash, Clone, Copy)]
