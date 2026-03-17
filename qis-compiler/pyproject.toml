@@ -112,12 +112,12 @@ before-all = '''
     mkdir -p /tmp/llvm;
     if [ "$(uname -m)" = "x86_64" ];
     then
-        curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.8/clang+llvm-21.1.8-x86_64-linux-gnu-rhel-8.4.tar.xz;
-        tar xf clang+llvm-21.1.8-x86_64-linux-gnu-rhel-8.4.tar.xz -C /tmp/llvm --strip-components=1;
+        curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.8/LLVM-21.1.8-Linux-X64.tar.xz;
+        tar xf LLVM-21.1.8-Linux-X64.tar.xz -C /tmp/llvm --strip-components=1;
     else
         dnf install ncurses-compat-libs ncurses-devel -y;
-        curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.8/clang+llvm-21.1.8-aarch64-linux-gnu.tar.xz
-        tar xf clang+llvm-21.1.8-aarch64-linux-gnu.tar.xz -C /tmp/llvm --strip-components=1;
+        curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.8/LLVM-21.1.8-Linux-ARM64.tar.xz
+        tar xf LLVM-21.1.8-Linux-ARM64.tar.xz -C /tmp/llvm --strip-components=1;
     fi;
 '''
 before-test = '''
@@ -156,10 +156,7 @@ MACOSX_DEPLOYMENT_TARGET = "15.0"
 [tool.cibuildwheel.macos]
 before-all = [
     'curl -sSf https://sh.rustup.rs | sh -s -- -y',
-    'if [ "$(uname -m)" = "arm64" ]; then ARCH_PREFIX=arm64-apple-darwin22.3.0; else ARCH_PREFIX=x86_64-apple-darwin; fi',
-    'curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.8/clang+llvm-21.1.8-$ARCH_PREFIX.tar.xz',
-    'mkdir -p /tmp/llvm',
-    'tar xf clang+llvm-21.1.8-$ARCH_PREFIX.tar.xz -C /tmp/llvm --strip-components=1',
+    'if [ "$(uname -m)" = "arm64" ]; then ARCH_SUFFIX=macOS-ARM64; else ARCH_SUFFIX=macOS-X64; fi && curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.8/LLVM-21.1.8-$ARCH_SUFFIX.tar.xz && mkdir -p /tmp/llvm && tar xf LLVM-21.1.8-$ARCH_SUFFIX.tar.xz -C /tmp/llvm --strip-components=1',
 ]
 repair-wheel-command = [
     'DYLD_FALLBACK_LIBRARY_PATH=/tmp/llvm/lib delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel}',
