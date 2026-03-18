@@ -84,8 +84,14 @@ cache-keys = [
 build = "cp310-*"
 build-frontend = "build[uv]; args: -C--profile=release"
 skip = "*-win32 *-manylinux_i686 *-musllinux*"
-manylinux-x86_64-image = "manylinux_2_28"
-manylinux-aarch64-image = "manylinux_2_28"
+
+# TODO: This has been temporarily bumped to get the tests working after the
+# update to LLVM 21. This needs to go back to 'manylinux_2_28' before release.
+#
+# The official LLVM distribution for Linux is built on glibc 2.35, so we cannot
+# use it when building older manylinux versions.
+manylinux-x86_64-image = "manylinux_2_34"
+manylinux-aarch64-image = "manylinux_2_34"
 
 before-test = "uv sync --only-dev --active"
 test-command = "pytest -vv {package}"
@@ -93,8 +99,16 @@ test-command = "pytest -vv {package}"
 [tool.cibuildwheel.linux.environment]
 PATH = '$HOME/.cargo/bin:/tmp/llvm/bin:$PATH'
 LLVM_SYS_211_PREFIX = '/tmp/llvm'
-environment-pass = ["CACHE_CARGO"]
+# The official LLVM static archives contain LLVM bitcode (from ThinLTO build)
+# which GNU ld cannot handle. We use LLVM 21's own ld.lld (from /tmp/llvm/bin)
+# which can correctly lower newer intrinsics like llvm.modf (added in LLVM 20).
+RUSTFLAGS = '-C link-arg=-fuse-ld=lld'
+# LLVM 21's ld.lld was built on Ubuntu 22.04 and requires GLIBCXX_3.4.30+.
+# AlmaLinux 9 ships GCC 11 (GLIBCXX_3.4.29). gcc-toolset-13 provides
+# GCC 13's libstdc++ with the needed symbols.
+LD_LIBRARY_PATH = '/opt/rh/gcc-toolset-13/root/usr/lib64'
 [tool.cibuildwheel.linux]
+environment-pass = ["CACHE_CARGO"]
 before-all = '''
     curl -sSf https://sh.rustup.rs | sh -s -- -y;
     if ${CACHE_CARGO};
@@ -108,7 +122,15 @@ before-all = '''
             cp -r /host/tmp/ci-cache/hugr-qis/target {package}
         fi;
     fi;
-    dnf install libffi-devel ncurses-devel -y
+    dnf install libffi-devel ncurses-devel libxml2-devel libzstd-devel zlib-devel gcc-toolset-13-runtime -y
+    # llvm-config --system-libs hardcodes Debian-style absolute paths from the
+    # Ubuntu 22.04 build host (e.g. /usr/lib/<arch>-linux-gnu/libzstd.a).
+    # llvm-sys checks is_file() on these and panics if missing. LLVM was built
+    # with LLVM_USE_STATIC_ZSTD=ON so zstd is already in the LLVM .a files;
+    # create empty placeholder archives so the check passes.
+    mkdir -p /usr/lib/x86_64-linux-gnu /usr/lib/aarch64-linux-gnu
+    ar rc /usr/lib/x86_64-linux-gnu/libzstd.a
+    ar rc /usr/lib/aarch64-linux-gnu/libzstd.a
     mkdir -p /tmp/llvm;
     if [ "$(uname -m)" = "x86_64" ];
     then
@@ -119,12 +141,9 @@ before-all = '''
         curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.8/LLVM-21.1.8-Linux-ARM64.tar.xz
         tar xf LLVM-21.1.8-Linux-ARM64.tar.xz -C /tmp/llvm --strip-components=1;
     fi;
-    # The official LLVM binaries are built on Ubuntu 22.04 (glibc 2.35),
-    # which is too new for manylinux_2_28 (glibc 2.28). The static
-    # libraries and headers work fine, but llvm-config can't execute.
-    # Replace it with a shell script wrapper.
-    cp {package}/scripts/llvm-config-wrapper.sh /tmp/llvm/bin/llvm-config;
-    chmod +x /tmp/llvm/bin/llvm-config;
+    # Remove linker binaries we don't need (Mach-O, COFF, WebAssembly).
+    # Keep ld.lld and lld for ELF linking with correct LLVM 21 intrinsic support.
+    rm -f /tmp/llvm/bin/ld64.lld /tmp/llvm/bin/lld-link /tmp/llvm/bin/wasm-ld;
 '''
 before-test = '''
     if ${CACHE_CARGO};
