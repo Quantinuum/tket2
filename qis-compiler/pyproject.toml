@@ -128,9 +128,8 @@ before-all = '''
     # llvm-sys checks is_file() on these and panics if missing. LLVM was built
     # with LLVM_USE_STATIC_ZSTD=ON so zstd is already in the LLVM .a files;
     # create empty placeholder archives so the check passes.
-    mkdir -p /usr/lib/x86_64-linux-gnu /usr/lib/aarch64-linux-gnu
+    mkdir -p /usr/lib/x86_64-linux-gnu
     ar rc /usr/lib/x86_64-linux-gnu/libzstd.a
-    ar rc /usr/lib/aarch64-linux-gnu/libzstd.a
     mkdir -p /tmp/llvm;
     if [ "$(uname -m)" = "x86_64" ];
     then
