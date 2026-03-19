@@ -42,7 +42,9 @@
 //! names ending in `_d`. For example, `x_d` takes a block and an integer as
 //! inputs, and outputs the block. Note that whereas the static versions are
 //! infallible (validity of indices is checked on construction), the dynamic
-//! versions will panic if the indices are invalid.
+//! versions will panic if the indices are invalid. When frontends generate
+//! dynamic operations compilers should attempt to transform them to static
+//! operations where possible.
 
 pub mod ops;
 pub mod types;
