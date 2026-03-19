@@ -670,7 +670,7 @@ mod tests {
                 .unwrap()
                 .signature()
                 .as_ref(),
-            &Signature::new(block_type(6), block_type(6))
+            &Signature::new([block_type(6)], [block_type(6)])
         );
     }
 
@@ -868,8 +868,8 @@ mod tests {
             .instantiate_extension_op("measure_all", [4.into()])
             .unwrap();
         let mut dfg_builder = DFGBuilder::new(Signature::new(
-            vec![block_type(4)],
-            array_type(4, future_type(bool_t())),
+            [block_type(4)],
+            [array_type(4, future_type(bool_t()))],
         ))
         .unwrap();
         let handle = dfg_builder
