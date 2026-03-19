@@ -50,31 +50,31 @@ pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 pub enum IcebergOpDef {
     /// X gate.
     x,
-    /// X gate (with dynamic index).
+    /// X gate with dynamic index.
     x_d,
     /// Z gate.
     z,
-    /// Z gate (with dynamic index).
+    /// Z gate with dynamic index.
     z_d,
     /// X gate on two qubits.
     xx,
-    /// X gate on two qubits (with dynamic indices).
+    /// X gate on two qubits with dynamic indices.
     xx_d,
     /// Y gate on two qubits.
     yy,
-    /// Y gate on two qubits (with dynamic indices).
+    /// Y gate on two qubits with dynamic indices.
     yy_d,
     /// Z gate on two qubits.
     zz,
-    /// Z gate on two qubits (with dynamic indices).
+    /// Z gate on two qubits with dynamic indices.
     zz_d,
     /// X gate on all but one qubit.
     all_but_one_x,
-    /// X gate on all but one qubit (with dynamic index).
+    /// X gate on all but one qubit with dynamic index.
     all_but_one_x_d,
     /// Z gate on all but one qubit.
     all_but_one_z,
-    /// Z gate on all but one qubit (with dynamic index).
+    /// Z gate on all but one qubit with dynamic index.
     all_but_one_z_d,
     /// X gate on all qubits.
     all_x,
@@ -84,27 +84,27 @@ pub enum IcebergOpDef {
     all_z,
     /// X gate on one qubit with Z on all others.
     x_with_all_but_one_z,
-    /// X gate on one qubit with Z on all others (with dynamic index).
+    /// X gate on one qubit with Z on all others with dynamic index.
     x_with_all_but_one_z_d,
     /// Z gate on one qubit with X on all others.
     z_with_all_but_one_x,
-    /// Z gate on one qubit with X on all others (with dynamic index).
+    /// Z gate on one qubit with X on all others with dynamic index.
     z_with_all_but_one_x_d,
     /// Fan-out from one qubit to all others.
     fan_out,
-    /// Fan-out from one qubit to all others (with dynamic index).
+    /// Fan-out from one qubit to all others with dynamic index.
     fan_out_d,
     /// Fan-in to one qubit from all others.
     fan_in,
-    /// Fan-in to one qubit from all others (with dynamic index).
+    /// Fan-in to one qubit from all others with dynamic index.
     fan_in_d,
     /// Rx gate.
     rx,
-    /// Rx gate (with dynamic index).
+    /// Rx gate with dynamic index.
     rx_d,
     /// Rz gate.
     rz,
-    /// Rz gate (with dynamic index).
+    /// Rz gate with dynamic index.
     rz_d,
     /// Rx gate on all qubits.
     all_rx,
@@ -114,41 +114,41 @@ pub enum IcebergOpDef {
     all_rz,
     /// Rx gate on all but one qubit.
     all_but_one_rx,
-    /// Rx gate on all but one qubit (with dynamic index).
+    /// Rx gate on all but one qubit with dynamic index.
     all_but_one_rx_d,
     /// Ry gate on all but one qubit.
     all_but_one_ry,
-    /// Ry gate on all but one qubit (with dynamic index).
+    /// Ry gate on all but one qubit with dynamic index.
     all_but_one_ry_d,
     /// Rz gate on all but one qubit.
     all_but_one_rz,
-    /// Rz gate on all but one qubit (with dynamic index).
+    /// Rz gate on all but one qubit with dynamic index.
     all_but_one_rz_d,
     /// H gate on all qubits.
     all_h,
     /// XXPhase gate.
     xx_phase,
-    /// XXPhase gate (with dynamic indices).
+    /// XXPhase gate with dynamic indices.
     xx_phase_d,
     /// YYPhase gate.
     yy_phase,
-    /// YYPhase gate (with dynamic indices).
+    /// YYPhase gate with dynamic indices.
     yy_phase_d,
     /// ZZPhase gate.
     zz_phase,
-    /// ZZPhase gate (with dynamic indices).
+    /// ZZPhase gate with dynamic indices.
     zz_phase_d,
     /// CX gate.
     cx,
-    /// CX gate (with dynamic indices).
+    /// CX gate with dynamic indices.
     cx_d,
     /// Swap of two qubits within a block.
     swap,
-    /// Swap of two qubits within a block (with dynamic indices).
+    /// Swap of two qubits within a block with dynamic indices.
     swap_d,
     /// ZZPhase gate involving two blocks.
     zz_phase_between_blocks,
-    /// ZZPhase gate involving two blocks (with dynamic indices).
+    /// ZZPhase gate involving two blocks with dynamic indices.
     zz_phase_between_blocks_d,
     /// CX gate applied transversally over two blocks.
     cx_transverse,
@@ -162,11 +162,11 @@ pub enum IcebergOpDef {
     measure_all,
     /// Non-destructive measurement of one qubit in the X basis.
     measure_one_x,
-    /// Non-destructive measurement of one qubit in the X basis (with dynamic index).
+    /// Non-destructive measurement of one qubit in the X basis with dynamic index.
     measure_one_x_d,
     /// Non-destructive measurement of one qubit in the Z basis.
     measure_one_z,
-    /// Non-destructive measurement of one qubit in the Z basis (with dynamic index).
+    /// Non-destructive measurement of one qubit in the Z basis with dynamic index.
     measure_one_z_d,
 }
 
@@ -549,65 +549,65 @@ impl MakeOpDef for IcebergOpDef {
         use IcebergOpDef::*;
         match self {
             x => "apply an X gate to one qubit",
-            x_d => "apply an X gate to one qubit (with dynamic index)",
+            x_d => "apply an X gate to one qubit with dynamic index",
             z => "apply a Z gate to one qubit",
-            z_d => "apply a Z gate to one qubit (with dynamic index)",
+            z_d => "apply a Z gate to one qubit with dynamic index",
             xx => "apply an X gate to two qubits",
-            xx_d => "apply an X gate to two qubits (with dynamic indices)",
+            xx_d => "apply an X gate to two qubits with dynamic indices",
             yy => "apply a Y gate to two qubits",
-            yy_d => "apply a Y gate to two qubits (with dynamic indices)",
+            yy_d => "apply a Y gate to two qubits with dynamic indices",
             zz => "apply a Z gate to two qubits",
-            zz_d => "apply a Z gate to two qubits (with dynamic indices)",
+            zz_d => "apply a Z gate to two qubits with dynamic indices",
             all_but_one_x => "apply an X gate to all but one qubit",
-            all_but_one_x_d => "apply an X gate to all but one qubit (with dynamic index)",
+            all_but_one_x_d => "apply an X gate to all but one qubit with dynamic index",
             all_but_one_z => "apply a Z gate to all but one qubit",
-            all_but_one_z_d => "apply a Z gate to all but one qubit (with dynamic index)",
+            all_but_one_z_d => "apply a Z gate to all but one qubit with dynamic index",
             all_x => "apply an X gate to all qubits",
             all_y => "apply a Y gate to all qubits",
             all_z => "apply a Z gate to all qubits",
             x_with_all_but_one_z => "apply an X gate to one qubit and a Z to the rest",
-            x_with_all_but_one_z_d => "apply an X gate to one qubit and a Z to the rest (with dynamic index)",
+            x_with_all_but_one_z_d => "apply an X gate to one qubit and a Z to the rest with dynamic index",
             z_with_all_but_one_x => "apply a Z gate to one qubit and an X to the rest",
-            z_with_all_but_one_x_d => "apply a Z gate to one qubit and an X to the rest (with dynamic index)",
+            z_with_all_but_one_x_d => "apply a Z gate to one qubit and an X to the rest with dynamic index",
             fan_out => "fan-out from one qubit to the rest",
-            fan_out_d => "fan-out from one qubit to the rest (with dynamic index)",
+            fan_out_d => "fan-out from one qubit to the rest with dynamic index",
             fan_in => "fan-in to one qubit from the rest",
-            fan_in_d => "fan-in to one qubit from the rest (with dynamic index)",
+            fan_in_d => "fan-in to one qubit from the rest with dynamic index",
             rx => "apply an Rx gate to one qubit",
-            rx_d => "apply an Rx gate to one qubit (with dynamic index)",
+            rx_d => "apply an Rx gate to one qubit with dynamic index",
             rz => "apply an Rz gate to one qubit",
-            rz_d => "apply an Rz gate to one qubit (with dynamic index)",
+            rz_d => "apply an Rz gate to one qubit with dynamic index",
             all_rx => "apply an Rx gate to all qubits",
             all_ry => "apply an Ry gate to all qubits",
             all_rz => "apply an Rz gate to all qubits",
             all_but_one_rx => "apply an Rx gate to all but one qubit",
-            all_but_one_rx_d => "apply an Rx gate to all but one qubit (with dynamic index)",
+            all_but_one_rx_d => "apply an Rx gate to all but one qubit with dynamic index",
             all_but_one_ry => "apply an Ry gate to all but one qubit",
-            all_but_one_ry_d => "apply an Ry gate to all but one qubit (with dynamic index)",
+            all_but_one_ry_d => "apply an Ry gate to all but one qubit with dynamic index",
             all_but_one_rz => "apply an Rz gate to all but one qubit",
-            all_but_one_rz_d => "apply an Rz gate to all but one qubit (with dynamic index)",
+            all_but_one_rz_d => "apply an Rz gate to all but one qubit with dynamic index",
             all_h => "apply an H gate to all qubits",
             xx_phase => "apply an XXPhase gate to two qubits within a block",
             xx_phase_d => {
-                "apply an XXPhase gate to two qubits within a block (with dynamic indices)"
+                "apply an XXPhase gate to two qubits within a block with dynamic indices"
             }
             yy_phase => "apply a YYPhase gate to two qubits within a block",
             yy_phase_d => {
-                "apply a YYPhase gate to two qubits within a block (with dynamic indices)"
+                "apply a YYPhase gate to two qubits within a block with dynamic indices"
             }
             zz_phase => "apply a ZZPhase gate to two qubits within a block",
             zz_phase_d => {
-                "apply a ZZPhase gate to two qubits within a block (with dynamic indices)"
+                "apply a ZZPhase gate to two qubits within a block with dynamic indices"
             }
             cx => "apply a CX gate to two qubits within a block",
-            cx_d => "apply a CX gate to two qubits within a block (with dynamic indices)",
+            cx_d => "apply a CX gate to two qubits within a block with dynamic indices",
             swap => "swap two qubits within a block",
-            swap_d => "swap two qubits within a block (with dynamic indices)",
+            swap_d => "swap two qubits within a block with dynamic indices",
             zz_phase_between_blocks => {
                 "apply a ZZPhase gate to two qubits on different blocks of the same size"
             }
             zz_phase_between_blocks_d => {
-                "apply a ZZPhase gate to two qubits on different blocks of the same size (with dynamic indices)"
+                "apply a ZZPhase gate to two qubits on different blocks of the same size with dynamic indices"
             }
             cx_transverse => "apply a CX gate transversally over two blocks of the same size",
             alloc_zero => "allocate a block in the all-zero state",
@@ -615,9 +615,9 @@ impl MakeOpDef for IcebergOpDef {
             measure_syndrome => "perform a syndrome measurement, producing (X,Z) error indicators",
             measure_all => "destructively measure all qubits in the Z basis",
             measure_one_x => "non-destructively measure one qubit in the X basis",
-            measure_one_x_d => "non-destructively measure one qubit in the X basis (with dynamic index)",
+            measure_one_x_d => "non-destructively measure one qubit in the X basis with dynamic index",
             measure_one_z => "non-destructively measure one qubit in the Z basis",
-            measure_one_z_d => "non-destructively measure one qubit in the Z basis (with dynamic index)",
+            measure_one_z_d => "non-destructively measure one qubit in the Z basis with dynamic index",
         }
         .into()
     }
