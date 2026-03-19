@@ -236,7 +236,7 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for QSystemPass {
     type Error = QSystemPassError;
     type Result = ();
 
-    /// Run `QSystemPass` on the given [Hugr]. `registry` is used for
+    /// Run `QSystemPass` on the given Hugr. `registry` is used for
     /// validation, if enabled.
     /// Expects the HUGR to have a function entrypoint.
     fn run(&self, hugr: &mut H) -> Result<(), QSystemPassError> {
