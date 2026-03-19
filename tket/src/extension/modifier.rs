@@ -227,7 +227,7 @@ mod test {
         #[case] op_fn: fn(Type, Type) -> (ExtensionOp, Signature),
         #[case] needs_extra_param: bool,
     ) {
-        let original_sig = Signature::new(vec![int_type(6), bool_t()], int_type(6));
+        let original_sig = Signature::new([int_type(6), bool_t()], [int_type(6)]);
         let (control_op, modified_sig) = op_fn(int_type(6), bool_t());
         let main_sig = modified_sig.clone();
 

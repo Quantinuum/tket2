@@ -108,15 +108,19 @@ impl MakeOpDef for FutureOpDef {
         let future_type = Type::new_extension(future_custom_type(t_type.clone(), extension_ref));
         match self {
             FutureOpDef::Read => {
-                PolyFuncType::new([t_param], Signature::new(future_type, t_type)).into()
+                PolyFuncType::new([t_param], Signature::new(vec![future_type], vec![t_type])).into()
             }
             FutureOpDef::Dup => PolyFuncType::new(
                 [t_param],
-                Signature::new(future_type.clone(), vec![future_type.clone(), future_type]),
+                Signature::new(
+                    vec![future_type.clone()],
+                    vec![future_type.clone(), future_type],
+                ),
             )
             .into(),
             FutureOpDef::Free => {
-                PolyFuncType::new([t_param], Signature::new(future_type.clone(), vec![])).into()
+                PolyFuncType::new([t_param], Signature::new(vec![future_type.clone()], vec![]))
+                    .into()
             }
         }
     }
@@ -307,7 +311,10 @@ pub(crate) mod test {
         let hugr = {
             let mut func_builder = FunctionBuilder::new(
                 "circuit",
-                PolyFuncType::new(vec![t_param], Signature::new(future_type, t.clone())),
+                PolyFuncType::new(
+                    vec![t_param],
+                    Signature::new(vec![future_type], vec![t.clone()]),
+                ),
             )
             .unwrap();
             let [future_w] = func_builder.input_wires_arr();

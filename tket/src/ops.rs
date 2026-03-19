@@ -273,16 +273,16 @@ impl MakeOpDef for TketOp {
     fn init_signature(&self, _extension_ref: &std::sync::Weak<hugr::Extension>) -> SignatureFunc {
         use TketOp::*;
         match self {
-            H | T | S | V | X | Y | Z | Tdg | Sdg | Vdg | Reset => Signature::new_endo(qb_t()),
+            H | T | S | V | X | Y | Z | Tdg | Sdg | Vdg | Reset => Signature::new_endo([qb_t()]),
             CX | CZ | CY => Signature::new_endo(vec![qb_t(); 2]),
             Toffoli => Signature::new_endo(vec![qb_t(); 3]),
-            Measure => Signature::new(qb_t(), vec![qb_t(), bool_t()]),
-            MeasureFree => Signature::new(qb_t(), bool_type()),
-            Rz | Rx | Ry => Signature::new(vec![qb_t(), rotation_type()], qb_t()),
+            Measure => Signature::new([qb_t()], vec![qb_t(), bool_t()]),
+            MeasureFree => Signature::new([qb_t()], [bool_type()]),
+            Rz | Rx | Ry => Signature::new(vec![qb_t(), rotation_type()], [qb_t()]),
             CRz => Signature::new(vec![qb_t(), qb_t(), rotation_type()], vec![qb_t(); 2]),
-            QAlloc => Signature::new(type_row![], qb_t()),
-            TryQAlloc => Signature::new(type_row![], Type::from(option_type(qb_t()))),
-            QFree => Signature::new(qb_t(), type_row![]),
+            QAlloc => Signature::new(type_row![], [qb_t()]),
+            TryQAlloc => Signature::new(type_row![], [Type::from(option_type([qb_t()]))]),
+            QFree => Signature::new([qb_t()], type_row![]),
         }
         .into()
     }
@@ -422,13 +422,13 @@ pub(crate) mod test {
 
     #[test]
     fn try_qalloc_measure_free() {
-        let mut b = DFGBuilder::new(Signature::new(type_row![], bool_type())).unwrap();
+        let mut b = DFGBuilder::new(Signature::new(type_row![], [bool_type()])).unwrap();
 
         let try_q = b
             .add_dataflow_op(TketOp::TryQAlloc, [])
             .unwrap()
             .out_wire(0);
-        let [q] = b.build_unwrap_sum(1, option_type(qb_t()), try_q).unwrap();
+        let [q] = b.build_unwrap_sum(1, option_type([qb_t()]), try_q).unwrap();
         let measured = b
             .add_dataflow_op(TketOp::MeasureFree, [q])
             .unwrap()

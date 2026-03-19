@@ -701,7 +701,7 @@ mod test {
                 .unwrap()
                 .out_wire(0);
             let sum_just_input = builder
-                .make_sum(0, vec![rotation_type().into(), type_row![]], vec![angle])
+                .make_sum(0, vec![[rotation_type()].into(), type_row![]], vec![angle])
                 .unwrap();
             let outputs = [rotated].into_iter().chain(inputs);
             builder
@@ -770,10 +770,12 @@ mod test {
 
         let cfg = {
             let mut cfg = func
-                .cfg_builder(vec![(qb_t(), inputs[0])], qb_t().into())
+                .cfg_builder(vec![(qb_t(), inputs[0])], [qb_t()].into())
                 .unwrap();
             let bb = {
-                let mut bb = cfg.entry_builder(vec![type_row![]], qb_t().into()).unwrap();
+                let mut bb = cfg
+                    .entry_builder(vec![type_row![]], [qb_t()].into())
+                    .unwrap();
                 let mut inputs: Vec<_> = bb.input_wires().collect();
                 inputs[0] = bb
                     .add_dataflow_op(TketOp::X, vec![inputs[0]])

@@ -8,7 +8,6 @@ use std::num::{NonZero, NonZeroU8};
 use std::sync::LazyLock;
 
 use anyhow::Context;
-use hugr::algorithms::ComposablePass;
 use hugr::builder::{CircuitBuilder, DFGBuilder, Dataflow, DataflowHugr};
 use hugr::envelope::{EnvelopeConfig, EnvelopeFormat, ZstdConfig};
 use hugr::extension::prelude::qb_t;
@@ -17,6 +16,7 @@ use hugr::ops::handle::NodeHandle;
 use hugr::ops::{ExtensionOp, OpType};
 use hugr::package::Package;
 use hugr::types::Type;
+use hugr_passes::composable::ComposablePass;
 use itertools::Itertools;
 use pyo3::exceptions::{PyAttributeError, PyValueError};
 use pyo3::types::{PyAnyMethods, PyModule, PyString, PyTypeMethods};
@@ -61,7 +61,7 @@ use super::{PyCircuitCost, PyNode, PyWire, cost, with_circ};
 /// # Convert back to a pytket.Circuit
 /// c2 = t2c.to_tket1()
 /// ```
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Debug, PartialEq, From)]
 pub struct Tk2Circuit {
     /// Rust representation of the circuit.

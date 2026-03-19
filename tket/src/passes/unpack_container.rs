@@ -41,12 +41,12 @@ fn generic_array_unpack_sig<AK: ArrayKind>() -> PolyFuncTypeRV {
             TypeParam::new_list_type(TypeBound::Linear),
         ],
         FuncValueType::new(
-            AK::ty_parametric(
+            [AK::ty_parametric(
                 TypeArg::new_var_use(0, TypeParam::max_nat_type()),
                 Type::new_var_use(1, TypeBound::Linear),
             )
-            .unwrap(),
-            TypeRV::new_row_var_use(2, TypeBound::Linear),
+            .unwrap()],
+            [TypeRV::new_row_var_use(2, TypeBound::Linear)],
         ),
     )
 }
@@ -95,10 +95,10 @@ static TEMP_UNPACK_EXT: LazyLock<Arc<Extension>> = LazyLock::new(|| {
                 vec![TypeParam::RuntimeType(TypeBound::Linear)],
                 FuncValueType::new(
                     hugr::types::TypeRow::from(vec![Type::from(
-                        hugr::extension::prelude::option_type(Type::new_var_use(
+                        hugr::extension::prelude::option_type([Type::new_var_use(
                             0,
                             TypeBound::Linear,
-                        )),
+                        )]),
                     )]),
                     hugr::types::TypeRow::from(vec![Type::new_var_use(0, TypeBound::Linear)]),
                 ),
@@ -127,8 +127,11 @@ static TEMP_UNPACK_EXT: LazyLock<Arc<Extension>> = LazyLock::new(|| {
                     TypeParam::new_list_type(TypeBound::Linear),
                 ],
                 FuncValueType::new(
-                    Type::new_tuple(TypeRV::new_row_var_use(0, TypeBound::Linear)),
-                    TypeRV::new_row_var_use(1, TypeBound::Linear),
+                    [Type::new_tuple([TypeRV::new_row_var_use(
+                        0,
+                        TypeBound::Linear,
+                    )])],
+                    [TypeRV::new_row_var_use(1, TypeBound::Linear)],
                 ),
             );
             // pack some wires into a tuple
@@ -196,7 +199,7 @@ impl UnpackContainerBuilder {
             .insert_with(&op, &[elem_ty.clone().into()], |func_b| {
                 let [in_wire] = func_b.input_wires_arr();
                 let [out_wire] =
-                    func_b.build_expect_sum(1, option_type(elem_ty.clone()), in_wire, |_| {
+                    func_b.build_expect_sum(1, option_type([elem_ty.clone()]), in_wire, |_| {
                         format!("Value of type Option<{elem_ty}> is None so cannot unpack.")
                     })?;
                 Ok(vec![out_wire])
@@ -559,7 +562,7 @@ mod tests {
     fn test_option_unwrap_wrap() -> Result<(), BuildError> {
         let analyzer = TypeUnpacker::for_qubits();
         let factory = UnpackContainerBuilder::new(analyzer);
-        let option_qb_type = Type::from(option_type(qb_t()));
+        let option_qb_type = Type::from(option_type([qb_t()]));
         let mut builder = DFGBuilder::new(Signature::new_endo(vec![option_qb_type]))?;
 
         let input = builder.input().out_wire(0);
@@ -587,7 +590,7 @@ mod tests {
         let array_type = AK::ty(array_size, qb_t());
 
         // Build a dataflow graph that unpacks and repacks the array
-        let mut builder = DFGBuilder::new(Signature::new_endo(array_type))?;
+        let mut builder = DFGBuilder::new(Signature::new_endo([array_type]))?;
         let input = builder.input().out_wire(0);
 
         // Unpack the array
@@ -611,7 +614,7 @@ mod tests {
         let tuple_row = vec![qb_t(), bool_t()];
         let tuple_type = Type::new_tuple(tuple_row.clone());
 
-        let mut builder = DFGBuilder::new(Signature::new_endo(tuple_type))?;
+        let mut builder = DFGBuilder::new(Signature::new_endo([tuple_type]))?;
 
         let input = builder.input().out_wire(0);
         let unpacked = factory.unpack_tuple(&mut builder, input, &tuple_row)?;

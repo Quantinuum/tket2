@@ -1,0 +1,21 @@
+---
+source: tket-qsystem/src/llvm/result.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+@"res_\F0\9F\9A\80\F0\9F\91\A8\E2\80\8D\F0\9F\91\A9\E2\80\8D\F0\9F\91\A7\E2\80\8D\F0\9F\91\A6\F0\9F\8C\8D.F7EE3FAA.0" = private constant [44 x i8] c"+USER:BOOL:\F0\9F\9A\80\F0\9F\91\A8\E2\80\8D\F0\9F\91\A9\E2\80\8D\F0\9F\91\A7\E2\80\8D\F0\9F\91\A6\F0\9F\8C\8D"
+
+define internal void @_hl.main.1(i1 %0) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %tag_len = load i8, ptr @"res_\F0\9F\9A\80\F0\9F\91\A8\E2\80\8D\F0\9F\91\A9\E2\80\8D\F0\9F\91\A7\E2\80\8D\F0\9F\91\A6\F0\9F\8C\8D.F7EE3FAA.0", align 1
+  %tag_len2 = zext i8 %tag_len to i64
+  call void @print_bool(ptr @"res_\F0\9F\9A\80\F0\9F\91\A8\E2\80\8D\F0\9F\91\A9\E2\80\8D\F0\9F\91\A7\E2\80\8D\F0\9F\91\A6\F0\9F\8C\8D.F7EE3FAA.0", i64 %tag_len2, i1 %0)
+  ret void
+}
+
+declare void @print_bool(ptr, i64, i1)

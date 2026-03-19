@@ -5,7 +5,7 @@ pub mod tket1;
 
 use std::{cmp::min, convert::TryInto, fs, num::NonZeroUsize, path::PathBuf};
 
-use hugr::algorithms::ComposablePass;
+use hugr_passes::composable::ComposablePass;
 use pyo3::{prelude::*, types::IntoPyDict};
 use tket::optimiser::badger::BadgerOptions;
 use tket::passes;

@@ -1,0 +1,34 @@
+---
+source: tket-qsystem/src/llvm/random.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define internal { double, {} } @_hl.main.1({} %0) {
+alloca_block:
+  %"0" = alloca double, align 8
+  %"1" = alloca {}, align 8
+  %"2_0" = alloca {}, align 8
+  %"4_0" = alloca double, align 8
+  %"4_1" = alloca {}, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store {} %0, ptr %"2_0", align 1
+  %"2_01" = load {}, ptr %"2_0", align 1
+  %rfloat = call double @random_float()
+  store double %rfloat, ptr %"4_0", align 8
+  store {} zeroinitializer, ptr %"4_1", align 1
+  %"4_02" = load double, ptr %"4_0", align 8
+  %"4_13" = load {}, ptr %"4_1", align 1
+  store double %"4_02", ptr %"0", align 8
+  store {} %"4_13", ptr %"1", align 1
+  %"04" = load double, ptr %"0", align 8
+  %"15" = load {}, ptr %"1", align 1
+  %mrv = insertvalue { double, {} } poison, double %"04", 0
+  %mrv6 = insertvalue { double, {} } %mrv, {} %"15", 1
+  ret { double, {} } %mrv6
+}
+
+declare double @random_float()

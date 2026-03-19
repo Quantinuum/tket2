@@ -46,7 +46,7 @@ create_py_exception!(
 );
 
 #[derive(Clone)]
-#[pyclass]
+#[pyclass(from_py_object)]
 /// A rewrite rule defined by a left hand side and right hand side of an equation.
 pub struct Rule(pub [Circuit; 2]);
 
@@ -78,7 +78,7 @@ impl Rule {
         }
     }
 }
-#[pyclass]
+#[pyclass(skip_from_py_object)]
 struct RuleMatcher {
     matcher: PatternMatcher,
     rights: Vec<Circuit>,

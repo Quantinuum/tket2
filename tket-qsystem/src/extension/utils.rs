@@ -71,7 +71,7 @@ impl MakeOpDef for UtilsOp {
 
     fn init_signature(&self, _extension_ref: &std::sync::Weak<Extension>) -> SignatureFunc {
         match self {
-            UtilsOp::GetCurrentShot => Signature::new(type_row![], int_type(6)),
+            UtilsOp::GetCurrentShot => Signature::new(type_row![], vec![int_type(6)]),
         }
         .into()
     }

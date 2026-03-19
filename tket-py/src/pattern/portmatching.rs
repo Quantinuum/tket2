@@ -16,7 +16,7 @@ use crate::circuit::{PyNode, try_with_circ, with_circ};
 /// Python equivalent of [`CircuitPattern`].
 ///
 /// [`CircuitPattern`]: tket::portmatching::matcher::CircuitPattern
-#[pyclass]
+#[pyclass(from_py_object)]
 #[pyo3(name = "CircuitPattern")]
 #[repr(transparent)]
 #[derive(Debug, Clone, From)]
@@ -48,7 +48,7 @@ impl PyCircuitPattern {
 /// Python equivalent of [`PatternMatcher`].
 ///
 /// [`PatternMatcher`]: tket::portmatching::matcher::PatternMatcher
-#[pyclass]
+#[pyclass(from_py_object)]
 #[pyo3(name = "PatternMatcher")]
 #[repr(transparent)]
 #[derive(Debug, Clone, From)]
@@ -102,7 +102,7 @@ impl PyPatternMatcher {
 /// Python equivalent of [`PatternMatch`].
 ///
 /// [`PatternMatch`]: tket::portmatching::matcher::PatternMatch
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Debug, Clone, From)]
 #[pyo3(name = "PatternMatch")]
 pub struct PyPatternMatch {
@@ -128,7 +128,7 @@ impl PyPatternMatch {
 }
 
 /// A [`hugr::Node`] wrapper for Python.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[pyo3(name = "PatternID")]
 #[repr(transparent)]
 #[derive(From, Into, PartialEq, Eq, Hash, Clone, Copy)]

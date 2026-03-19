@@ -186,7 +186,7 @@ pub(crate) mod test {
         let qb_array_type = array_type(22, qb_t());
         let hugr = {
             let mut builder =
-                DFGBuilder::new(Signature::new(qb_array_type.clone(), qb_array_type)).unwrap();
+                DFGBuilder::new(Signature::new([qb_array_type.clone()], [qb_array_type])).unwrap();
             let inputs: [hugr::Wire; 1] = builder.input_wires_arr();
             let output = builder.add_dataflow_op(op, inputs).unwrap();
             builder.finish_hugr_with_outputs(output.outputs()).unwrap()

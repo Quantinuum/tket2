@@ -61,6 +61,7 @@ derive_more = { workspace = true, features = [
 ] }
 hugr = { workspace = true }
 hugr-core = { workspace = true }
+hugr-passes = { workspace = true }
 portgraph = { workspace = true, features = ["serde", "petgraph"] }
 strum = { workspace = true, features = ["derive"] }
 fxhash = { workspace = true }

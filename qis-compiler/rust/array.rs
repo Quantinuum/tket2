@@ -24,7 +24,6 @@ impl ArrayCodegen for SeleneHeapArrayCodegen {
     ) -> Result<PointerValue<'c>> {
         let iw_ctx = ctx.typing_session().iw_context();
         let malloc_sig = iw_ctx
-            .i8_type()
             .ptr_type(AddressSpace::default())
             .fn_type(&[iw_ctx.i64_type().into()], false);
         let malloc = ctx.get_extern_func("heap_alloc", malloc_sig)?;
@@ -42,7 +41,7 @@ impl ArrayCodegen for SeleneHeapArrayCodegen {
         ptr: PointerValue<'c>,
     ) -> Result<()> {
         let iw_ctx = ctx.typing_session().iw_context();
-        let ptr_ty = iw_ctx.i8_type().ptr_type(AddressSpace::default());
+        let ptr_ty = iw_ctx.ptr_type(AddressSpace::default());
         let ptr = ctx.builder().build_bit_cast(ptr, ptr_ty, "")?;
 
         let free_sig = iw_ctx.void_type().fn_type(&[ptr_ty.into()], false);
@@ -69,7 +68,6 @@ impl<PCG: PreludeCodegen> BorrowArrayCodegen for SeleneHeapBorrowArrayCodegen<PC
     ) -> Result<PointerValue<'c>> {
         let iw_ctx = ctx.typing_session().iw_context();
         let malloc_sig = iw_ctx
-            .i8_type()
             .ptr_type(AddressSpace::default())
             .fn_type(&[iw_ctx.i64_type().into()], false);
         let malloc = ctx.get_extern_func("heap_alloc", malloc_sig)?;
@@ -87,7 +85,7 @@ impl<PCG: PreludeCodegen> BorrowArrayCodegen for SeleneHeapBorrowArrayCodegen<PC
         ptr: PointerValue<'c>,
     ) -> Result<()> {
         let iw_ctx = ctx.typing_session().iw_context();
-        let ptr_ty = iw_ctx.i8_type().ptr_type(AddressSpace::default());
+        let ptr_ty = iw_ctx.ptr_type(AddressSpace::default());
         let ptr = ctx.builder().build_bit_cast(ptr, ptr_ty, "")?;
 
         let free_sig = iw_ctx.void_type().fn_type(&[ptr_ty.into()], false);

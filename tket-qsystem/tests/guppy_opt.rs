@@ -8,8 +8,8 @@ use std::io::BufReader;
 use std::path::Path;
 use tket::extension::{TKET_EXTENSION_ID, TKET1_EXTENSION_ID};
 
-use hugr::algorithms::ComposablePass;
 use hugr::{Hugr, HugrView};
+use hugr_passes::ComposablePass;
 use rstest::rstest;
 use tket::passes::NormalizeGuppy;
 use tket::serialize::pytket::{EncodeOptions, EncodedCircuit};
@@ -125,8 +125,8 @@ fn optimize_flattened_guppy(#[case] name: &str, #[case] xfail: Option<Vec<(&str,
 fn optimize_guppy_ranges_array() {
     // Demonstrates we can fully optimize the array operations in ranges
     // (after control flow is flattened) if we play around with the entrypoint.
-    use hugr::algorithms::const_fold::ConstantFoldPass;
     use hugr::hugr::hugrmut::HugrMut;
+    use hugr_passes::const_fold::ConstantFoldPass;
     use tket::passes::BorrowSquashPass;
     let mut hugr = load_guppy_example("ranges/ranges.flat.array.hugr").unwrap();
 

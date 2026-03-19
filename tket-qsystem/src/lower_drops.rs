@@ -1,10 +1,11 @@
 //! Contains a pass to lower "drop" ops from the Guppy extension
-use hugr::algorithms::replace_types::{Linearizer, NodeTemplate, ReplaceTypesError};
-use hugr::algorithms::{ComposablePass, ReplaceTypes};
 use hugr::extension::prelude::bool_t;
 use hugr::extension::simple_op::MakeRegisteredOp;
 use hugr::types::Term;
 use hugr::{Node, hugr::hugrmut::HugrMut};
+use hugr_passes::composable::WithScope;
+use hugr_passes::replace_types::{Linearizer, NodeTemplate, ReplaceTypesError};
+use hugr_passes::{ComposablePass, ReplaceTypes};
 use tket::extension::guppy::{DROP_OP_NAME, GUPPY_EXTENSION};
 
 use crate::extension::futures::{FutureOp, FutureOpDef, future_type};
@@ -12,6 +13,14 @@ use crate::extension::futures::{FutureOp, FutureOpDef, future_type};
 /// A pass that lowers "drop" ops from [GUPPY_EXTENSION]
 #[derive(Default, Debug, Clone)]
 pub struct LowerDropsPass;
+
+impl WithScope for LowerDropsPass {
+    fn with_scope(self, _scope: impl Into<hugr_passes::PassScope>) -> Self {
+        // TODO: Follow scope configuration
+        // <https://github.com/Quantinuum/tket2/pull/1429>
+        self
+    }
+}
 
 impl<H: HugrMut<Node = Node>> ComposablePass<H> for LowerDropsPass {
     type Error = ReplaceTypesError;
@@ -74,7 +83,7 @@ mod test {
         let arr_type = array_type(2, usize_t());
         let drop_op = GUPPY_EXTENSION.get_op(DROP_OP_NAME.as_str()).unwrap();
         let drop_node = ExtensionOp::new(drop_op.clone(), [arr_type.clone().into()]).unwrap();
-        let mut b = DFGBuilder::new(inout_sig(arr_type, vec![])).unwrap();
+        let mut b = DFGBuilder::new(inout_sig(vec![arr_type], vec![])).unwrap();
         let inp = b.input_wires();
         b.add_dataflow_op(drop_node, inp).unwrap();
         let mut h = b.finish_hugr_with_outputs([]).unwrap();

@@ -148,16 +148,16 @@ impl MakeOpDef for RotationOp {
         let rotation_type = Type::new_extension(rotation_custom_type(extension_ref));
         match self {
             RotationOp::from_halfturns => Signature::new(
-                float64_type(),
-                Type::from(option_type(rotation_type.clone())),
+                [float64_type()],
+                [Type::from(option_type([rotation_type.clone()]))],
             ),
             RotationOp::from_halfturns_unchecked => {
-                Signature::new(float64_type(), rotation_type.clone())
+                Signature::new([float64_type()], [rotation_type.clone()])
             }
-            RotationOp::to_halfturns => Signature::new(rotation_type.clone(), float64_type()),
+            RotationOp::to_halfturns => Signature::new([rotation_type.clone()], [float64_type()]),
             RotationOp::radd => Signature::new(
                 vec![rotation_type.clone(), rotation_type.clone()],
-                rotation_type,
+                [rotation_type],
             ),
         }
         .into()
@@ -291,8 +291,8 @@ mod test {
     #[test]
     fn test_builder() {
         let mut builder = DFGBuilder::new(Signature::new(
-            rotation_type(),
-            vec![Type::from(option_type(rotation_type())), rotation_type()],
+            [rotation_type()],
+            [Type::from(option_type([rotation_type()])), rotation_type()],
         ))
         .unwrap();
 
