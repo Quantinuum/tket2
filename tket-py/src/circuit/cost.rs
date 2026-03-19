@@ -8,7 +8,7 @@ use pyo3::{Py, PyAny, PyResult, PyTypeInfo, Python, pyclass, pymethods};
 use tket::circuit::cost::{CircuitCost, CostDelta};
 
 /// A generic circuit cost, backed by an arbitrary python object.
-#[pyclass]
+#[pyclass(skip_from_py_object)]
 #[derive(Clone, Debug)]
 #[pyo3(name = "CircuitCost")]
 pub struct PyCircuitCost {

@@ -1,6 +1,4 @@
 use derive_more::{Display, Error, From};
-use hugr::algorithms::replace_types::{NodeTemplate, ReplaceTypesError};
-use hugr::algorithms::{ComposablePass, ReplaceTypes};
 use hugr::builder::{Container, HugrBuilder};
 use hugr::core::Visibility;
 use hugr::extension::prelude::Barrier;
@@ -18,6 +16,9 @@ use hugr::{
     std_extensions::arithmetic::{float_ops::FloatOps, float_types::ConstF64},
     types::Signature,
 };
+use hugr_passes::composable::WithScope;
+use hugr_passes::replace_types::{NodeTemplate, ReplaceTypesError};
+use hugr_passes::{ComposablePass, ReplaceTypes};
 use lazy_static::lazy_static;
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
@@ -60,7 +61,7 @@ pub enum LowerTk2Error {
     OpReplacement(HugrError),
     /// An error raised when lowering operations.
     #[display("Error when lowering ops: {_0}")]
-    CircuitReplacement(hugr::algorithms::lower::LowerError),
+    CircuitReplacement(hugr_passes::lower::LowerError),
     /// TketOps were not lowered after the pass.
     #[display("TketOps were not lowered: {missing_ops:?}")]
     #[from(ignore)]
@@ -275,6 +276,14 @@ pub fn check_lowered<H: HugrView>(hugr: &H) -> Result<(), Vec<H::Node>> {
 #[derive(Default, Debug, Clone)]
 pub struct LowerTketToQSystemPass;
 
+impl WithScope for LowerTketToQSystemPass {
+    fn with_scope(self, _scope: impl Into<hugr_passes::PassScope>) -> Self {
+        // TODO: Follow scope configuration
+        // <https://github.com/Quantinuum/tket2/pull/1429>
+        self
+    }
+}
+
 impl<H: HugrMut<Node = Node>> ComposablePass<H> for LowerTketToQSystemPass {
     type Error = LowerTk2Error;
     type Result = ();
@@ -307,14 +316,18 @@ mod test {
             .add_dataflow_op(TketOp::TryQAlloc, [])
             .unwrap()
             .outputs_arr();
-        let [q] = b.build_unwrap_sum(1, option_type(qb_t()), maybe_q).unwrap();
+        let [q] = b
+            .build_unwrap_sum(1, option_type(vec![qb_t()]), maybe_q)
+            .unwrap();
         let [q] = b.add_dataflow_op(TketOp::Reset, [q]).unwrap().outputs_arr();
         b.add_dataflow_op(TketOp::QFree, [q]).unwrap();
         let [maybe_q] = b
             .add_dataflow_op(TketOp::TryQAlloc, [])
             .unwrap()
             .outputs_arr();
-        let [q] = b.build_unwrap_sum(1, option_type(qb_t()), maybe_q).unwrap();
+        let [q] = b
+            .build_unwrap_sum(1, option_type(vec![qb_t()]), maybe_q)
+            .unwrap();
 
         let [_] = b
             .add_dataflow_op(TketOp::MeasureFree, [q])
@@ -385,7 +398,7 @@ mod test {
 
     #[test]
     fn test_mixed() {
-        let mut b = DFGBuilder::new(Signature::new(rotation_type(), bool_t())).unwrap();
+        let mut b = DFGBuilder::new(Signature::new(vec![rotation_type()], vec![bool_t()])).unwrap();
         let [angle] = b.input_wires_arr();
         let qalloc = b.add_dataflow_op(TketOp::QAlloc, []).unwrap();
         let [q] = qalloc.outputs_arr();

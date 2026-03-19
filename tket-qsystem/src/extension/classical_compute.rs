@@ -298,23 +298,23 @@ macro_rules! compute_opdef {
                 match self {
                     // [usize] -> [Context]
                     Self::get_context => Signature::new(
-                        usize_t(),
-                        Type::from(ComputeOp::<$ext>::get_context_return_type(
+                        vec![usize_t()],
+                        vec![Type::from(ComputeOp::<$ext>::get_context_return_type(
                             self.extension(),
                             extension_ref,
-                        )),
+                        ))],
                     )
                     .into(),
                     // [Context] -> []
-                    Self::dispose_context => Signature::new(context_type, type_row![]).into(),
+                    Self::dispose_context => Signature::new(vec![context_type], type_row![]).into(),
                     // <id: usize, inputs: TypeRow, outputs: TypeRow> [Module] -> [ComputeType::Func { inputs, outputs }]
                     Self::lookup_by_id => {
                         let inputs = TypeRV::new_row_var_use(1, TypeBound::Copyable);
                         let outputs = TypeRV::new_row_var_use(2, TypeBound::Copyable);
 
                         let func_type = ComputeType::<$ext>::func_custom_type(
-                            inputs,
-                            outputs,
+                            vec![inputs],
+                            vec![outputs],
                             self.extension(),
                             extension_ref,
                         )
@@ -335,8 +335,8 @@ macro_rules! compute_opdef {
                         let outputs = TypeRV::new_row_var_use(2, TypeBound::Copyable);
 
                         let func_type = ComputeType::<$ext>::func_custom_type(
-                            inputs,
-                            outputs,
+                            vec![inputs],
+                            vec![outputs],
                             self.extension(),
                             extension_ref,
                         )
@@ -357,14 +357,14 @@ macro_rules! compute_opdef {
                         let inputs = TypeRV::new_row_var_use(0, TypeBound::Copyable);
                         let outputs = TypeRV::new_row_var_use(1, TypeBound::Copyable);
                         let func_type = Type::new_extension(ComputeType::<$ext>::func_custom_type(
-                            inputs.clone(),
-                            outputs.clone(),
+                            vec![inputs.clone()],
+                            vec![outputs.clone()],
                             self.extension(),
                             extension_ref,
                         ));
                         let result_type =
                             TypeRV::new_extension(ComputeType::<$ext>::result_custom_type(
-                                outputs,
+                                vec![outputs],
                                 self.extension(),
                                 extension_ref,
                             ));
@@ -383,7 +383,7 @@ macro_rules! compute_opdef {
                         let outputs = TypeRV::new_row_var_use(0, TypeBound::Copyable);
                         let result_type =
                             TypeRV::new_extension(ComputeType::<$ext>::result_custom_type(
-                                outputs.clone(),
+                                vec![outputs.clone()],
                                 self.extension(),
                                 extension_ref,
                             ));
@@ -590,7 +590,9 @@ macro_rules! compute_opdef {
                 extension_id: ExtensionId,
                 extension_ref: &Weak<Extension>,
             ) -> SumType {
-                option_type(ComputeType::<$ext>::Context.get_type(extension_id, extension_ref))
+                option_type(vec![
+                    ComputeType::<$ext>::Context.get_type(extension_id, extension_ref),
+                ])
             }
         }
 

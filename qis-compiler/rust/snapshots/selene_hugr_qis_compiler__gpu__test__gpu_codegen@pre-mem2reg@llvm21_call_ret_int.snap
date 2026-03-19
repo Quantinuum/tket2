@@ -1,0 +1,66 @@
+---
+source: qis-compiler/rust/gpu.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+@arg_types = private unnamed_addr constant [3 x i8] c":i\00", align 1
+@no_gpu_error = private unnamed_addr constant [27 x i8] c"No error message available\00", align 1
+
+define internal i64 @_hl.main.1(i64 %0, i64 %1) {
+alloca_block:
+  %"0" = alloca i64, align 8
+  %"2_0" = alloca i64, align 8
+  %"2_1" = alloca i64, align 8
+  %"4_0" = alloca i64, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store i64 %0, ptr %"2_0", align 4
+  store i64 %1, ptr %"2_1", align 4
+  %"2_01" = load i64, ptr %"2_0", align 4
+  %"2_12" = load i64, ptr %"2_1", align 4
+  %gpu_input_blob = alloca [0 x i8], align 1
+  %2 = call i8 @gpu_call(i64 %"2_01", i64 %"2_12", i64 0, ptr %gpu_input_blob, ptr @arg_types)
+  call void @validate_gpu_response(i8 %2)
+  store i64 %"2_01", ptr %"4_0", align 4
+  %"4_03" = load i64, ptr %"4_0", align 4
+  store i64 %"4_03", ptr %"0", align 4
+  %"04" = load i64, ptr %"0", align 4
+  ret i64 %"04"
+}
+
+declare i8 @gpu_call(i64, i64, i64, ptr, ptr)
+
+; Function Attrs: noinline
+define void @validate_gpu_response(i8 %0) #0 {
+entry:
+  %success = icmp ne i8 %0, 0
+  br i1 %success, label %ok, label %err
+
+ok:                                               ; preds = %entry
+  ret void
+
+err:                                              ; preds = %entry
+  call void @gpu_error_handler()
+  unreachable
+}
+
+; Function Attrs: noinline
+define void @gpu_error_handler() #0 {
+entry:
+  %error_message = call ptr @gpu_get_error()
+  %is_null = icmp eq ptr %error_message, null
+  %error_message_nonnull = select i1 %is_null, ptr @no_gpu_error, ptr %error_message
+  call void @panic_str(i32 70002, ptr %error_message_nonnull)
+  unreachable
+}
+
+declare ptr @gpu_get_error()
+
+; Function Attrs: noreturn
+declare void @panic_str(i32, ptr) #1
+
+attributes #0 = { noinline }
+attributes #1 = { noreturn }

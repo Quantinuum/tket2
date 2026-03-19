@@ -213,11 +213,11 @@ mod test {
         let analyzer = TypeUnpacker::for_qubits();
 
         // Option<qubit> by itself should NOT be a container
-        let opt_qubit = option_type(qb_t()).into();
+        let opt_qubit = option_type([qb_t()]).into();
         assert!(!analyzer.contains_element_type(&opt_qubit));
 
         // Array of Option<qubit> should be a special case (a container with that many qubits)
-        let opt_qubit_array = array_type(4, option_type(qb_t()).into());
+        let opt_qubit_array = array_type(4, option_type([qb_t()]).into());
         let result = analyzer.unpack_type(&opt_qubit_array);
 
         let types = result.unwrap();
@@ -225,7 +225,7 @@ mod test {
         assert!(types.iter().all(|t| t == &qb_t()));
 
         // Option of non-quantum types should not be a container
-        let opt_bool = option_type(bool_t()).into();
+        let opt_bool = option_type([bool_t()]).into();
         assert!(!analyzer.contains_element_type(&opt_bool));
     }
 
@@ -291,7 +291,7 @@ mod test {
             bool_t(),
             array_type(
                 2,
-                Type::new_tuple(vec![qb_t(), array_type(3, option_type(qb_t()).into())]),
+                Type::new_tuple(vec![qb_t(), array_type(3, option_type([qb_t()]).into())]),
             ),
             qb_t(),
         ]);

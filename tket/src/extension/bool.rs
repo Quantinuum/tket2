@@ -141,14 +141,12 @@ impl MakeOpDef for BoolOp {
         let bool_type = Type::new_extension(bool_custom_type(extension_ref));
         let sum_type = Type::new_unit_sum(2);
         match self {
-            BoolOp::read => Signature::new(bool_type, sum_type).into(),
-            BoolOp::make_opaque => Signature::new(sum_type, bool_type).into(),
-            BoolOp::not => Signature::new(bool_type.clone(), bool_type.clone()).into(),
-            BoolOp::eq | BoolOp::and | BoolOp::or | BoolOp::xor => Signature::new(
-                vec![bool_type.clone(), bool_type.clone()],
-                bool_type.clone(),
-            )
-            .into(),
+            BoolOp::read => Signature::new([bool_type], [sum_type]).into(),
+            BoolOp::make_opaque => Signature::new([sum_type], [bool_type]).into(),
+            BoolOp::not => Signature::new([bool_type.clone()], [bool_type.clone()]).into(),
+            BoolOp::eq | BoolOp::and | BoolOp::or | BoolOp::xor => {
+                Signature::new([bool_type.clone(), bool_type.clone()], [bool_type.clone()]).into()
+            }
         }
     }
 
@@ -287,7 +285,7 @@ pub(crate) mod test {
         let sum_type = Type::new_unit_sum(2);
 
         let hugr = {
-            let mut builder = DFGBuilder::new(Signature::new(bool_type, sum_type)).unwrap();
+            let mut builder = DFGBuilder::new(Signature::new([bool_type], [sum_type])).unwrap();
             let [input] = builder.input_wires_arr();
             let output = builder.add_bool_read(input).unwrap();
             builder.finish_hugr_with_outputs(output).unwrap()
@@ -301,7 +299,7 @@ pub(crate) mod test {
         let sum_type = Type::new_unit_sum(2);
 
         let hugr = {
-            let mut builder = DFGBuilder::new(Signature::new(sum_type, bool_type)).unwrap();
+            let mut builder = DFGBuilder::new(Signature::new([sum_type], [bool_type])).unwrap();
             let [input] = builder.input_wires_arr();
             let output = builder.add_bool_make_opaque(input).unwrap();
             builder.finish_hugr_with_outputs(output).unwrap()

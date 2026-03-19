@@ -1,15 +1,16 @@
 //! A pass that normalizes the structure of Guppy-generated circuits into something that can be optimized by tket.
 
 use hugr::Node;
-use hugr::algorithms::const_fold::{ConstFoldError, ConstantFoldPass};
-use hugr::algorithms::inline_dfgs::InlineDFGsPass;
-use hugr::algorithms::normalize_cfgs::{NormalizeCFGError, NormalizeCFGPass};
-use hugr::algorithms::redundant_order_edges::RedundantOrderEdgesPass;
-use hugr::algorithms::untuple::UntupleError;
-use hugr::algorithms::{ComposablePass, RemoveDeadFuncsError, RemoveDeadFuncsPass, UntuplePass};
 use hugr::hugr::HugrError;
 use hugr::hugr::hugrmut::HugrMut;
 use hugr::hugr::patch::inline_dfg::InlineDFGError;
+use hugr_passes::composable::WithScope;
+use hugr_passes::const_fold::{ConstFoldError, ConstantFoldPass};
+use hugr_passes::inline_dfgs::InlineDFGsPass;
+use hugr_passes::normalize_cfgs::{NormalizeCFGError, NormalizeCFGPass};
+use hugr_passes::redundant_order_edges::RedundantOrderEdgesPass;
+use hugr_passes::untuple::UntupleError;
+use hugr_passes::{ComposablePass, RemoveDeadFuncsError, RemoveDeadFuncsPass, UntuplePass};
 
 use crate::passes::BorrowSquashPass;
 
@@ -86,6 +87,14 @@ impl Default for NormalizeGuppy {
     }
 }
 
+impl WithScope for NormalizeGuppy {
+    fn with_scope(self, _scope: impl Into<hugr_passes::PassScope>) -> Self {
+        // TODO: Follow scope configuration
+        // <https://github.com/Quantinuum/tket2/pull/1429>
+        self
+    }
+}
+
 impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for NormalizeGuppy {
     type Error = NormalizeGuppyErrors;
     type Result = ();
@@ -95,9 +104,7 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for NormalizeGuppy {
         }
         // When we do function inlining, do this after, to sort out argument marshalling
         if self.untuple {
-            #[expect(deprecated)]
-            // Will move to pass scopes in <https://github.com/Quantinuum/tket2/pull/1429>
-            UntuplePass::new(hugr::algorithms::untuple::UntupleRecursive::Recursive).run(hugr)?;
+            UntuplePass::default().run(hugr)?;
         }
         // Should propagate through untuple, so could do earlier, and must be before BorrowSquash
         if self.constant_fold {
@@ -110,7 +117,9 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for NormalizeGuppy {
         }
         // Do earlier? Nothing creates DFGs
         if self.inline_dfgs {
-            InlineDFGsPass.run(hugr).unwrap_or_else(|e| match e {})
+            InlineDFGsPass::default()
+                .run(hugr)
+                .unwrap_or_else(|e| match e {})
         }
         // Potentially, could (need to) do fixpoint here with untuple,
         // as both create opportunities for the other
@@ -122,7 +131,6 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for NormalizeGuppy {
         // Remove redundant order edges once all other structural rewrites have been applied.
         if self.remove_redundant_order_edges {
             RedundantOrderEdgesPass::default()
-                .recursive(true)
                 .run(hugr)
                 .map_err(NormalizeGuppyErrors::RedundantOrderEdges)?;
         }

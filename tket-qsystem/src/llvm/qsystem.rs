@@ -369,7 +369,7 @@ mod test {
         #[with(_i)] mut llvm_ctx: TestContext,
         #[case] op: QSystemOp,
     ) {
-        use hugr::algorithms::ComposablePass;
+        use hugr_passes::ComposablePass;
 
         use crate::llvm::{futures::FuturesCodegenExtension, prelude::QISPreludeCodegen};
 

@@ -26,7 +26,7 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
 /// Python equivalent of [`CircuitRewrite`].
 ///
 /// [`CircuitRewrite`]: tket::rewrite::CircuitRewrite
-#[pyclass]
+#[pyclass(from_py_object)]
 #[pyo3(name = "CircuitRewrite")]
 #[derive(Debug, Clone, From)]
 #[repr(transparent)]
@@ -99,7 +99,7 @@ impl Rewriter for PyRewriter {
 /// Python equivalent of [`Subcircuit`].
 ///
 /// [`Subcircuit`]: tket::rewrite::Subcircuit
-#[pyclass]
+#[pyclass(from_py_object)]
 #[pyo3(name = "Subcircuit")]
 #[derive(Debug, Clone, From)]
 #[repr(transparent)]
@@ -122,7 +122,7 @@ impl PySubcircuit {
 /// In every equivalence class, one circuit is chosen as the representative.
 /// Valid rewrites turn a non-representative circuit into its representative,
 /// or a representative circuit into any of the equivalent non-representative
-#[pyclass(name = "ECCRewriter")]
+#[pyclass(name = "ECCRewriter", from_py_object)]
 #[derive(Clone, From)]
 pub struct PyECCRewriter(ECCRewriter);
 

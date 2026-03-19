@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#     "guppylang ==0.21.7",
+#     "guppylang ==0.21.9",
 #     "tket",
 # ]
 # ///

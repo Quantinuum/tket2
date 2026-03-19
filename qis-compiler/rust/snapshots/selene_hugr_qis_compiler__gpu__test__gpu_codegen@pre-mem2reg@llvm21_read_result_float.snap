@@ -1,0 +1,71 @@
+---
+source: qis-compiler/rust/gpu.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+@no_gpu_error = private unnamed_addr constant [27 x i8] c"No error message available\00", align 1
+
+define internal { i64, double } @_hl.main.1(i64 %0) {
+alloca_block:
+  %"0" = alloca i64, align 8
+  %"1" = alloca double, align 8
+  %"2_0" = alloca i64, align 8
+  %"4_0" = alloca i64, align 8
+  %"4_1" = alloca double, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store i64 %0, ptr %"2_0", align 4
+  %"2_01" = load i64, ptr %"2_0", align 4
+  %int_result = alloca i64, align 8
+  %read_status = call i8 @gpu_get_result(i64 %"2_01", i64 8, ptr %int_result)
+  call void @validate_gpu_response(i8 %read_status)
+  %result = load double, ptr %int_result, align 8
+  store i64 %"2_01", ptr %"4_0", align 4
+  store double %result, ptr %"4_1", align 8
+  %"4_02" = load i64, ptr %"4_0", align 4
+  %"4_13" = load double, ptr %"4_1", align 8
+  store i64 %"4_02", ptr %"0", align 4
+  store double %"4_13", ptr %"1", align 8
+  %"04" = load i64, ptr %"0", align 4
+  %"15" = load double, ptr %"1", align 8
+  %mrv = insertvalue { i64, double } poison, i64 %"04", 0
+  %mrv6 = insertvalue { i64, double } %mrv, double %"15", 1
+  ret { i64, double } %mrv6
+}
+
+declare i8 @gpu_get_result(i64, i64, ptr)
+
+; Function Attrs: noinline
+define void @validate_gpu_response(i8 %0) #0 {
+entry:
+  %success = icmp ne i8 %0, 0
+  br i1 %success, label %ok, label %err
+
+ok:                                               ; preds = %entry
+  ret void
+
+err:                                              ; preds = %entry
+  call void @gpu_error_handler()
+  unreachable
+}
+
+; Function Attrs: noinline
+define void @gpu_error_handler() #0 {
+entry:
+  %error_message = call ptr @gpu_get_error()
+  %is_null = icmp eq ptr %error_message, null
+  %error_message_nonnull = select i1 %is_null, ptr @no_gpu_error, ptr %error_message
+  call void @panic_str(i32 70002, ptr %error_message_nonnull)
+  unreachable
+}
+
+declare ptr @gpu_get_error()
+
+; Function Attrs: noreturn
+declare void @panic_str(i32, ptr) #1
+
+attributes #0 = { noinline }
+attributes #1 = { noreturn }

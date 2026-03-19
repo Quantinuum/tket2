@@ -6,7 +6,6 @@ use hugr::hugr::linking::OnMultiDefn;
 use hugr::ops::handle::{FuncID, NodeHandle};
 use hugr::{
     Hugr, Node, Wire,
-    algorithms::{ReplaceTypes, mangle_name, replace_types::NodeTemplate},
     builder::{BuildError, DataflowHugr, FunctionBuilder},
     hugr::hugrmut::HugrMut,
     ops::{DataflowOpTrait, ExtensionOp},
@@ -14,6 +13,7 @@ use hugr::{
 };
 use hugr_core::Visibility;
 use hugr_core::hugr::linking::NameLinkingPolicy;
+use hugr_passes::{ReplaceTypes, mangle_name, replace_types::NodeTemplate};
 use indexmap::IndexMap;
 use std::{cell::RefCell, ops::Deref};
 

@@ -7,7 +7,7 @@ use std::hint::black_box;
 
 use criterion::{AxisScale, BenchmarkId, Criterion, PlotConfiguration, criterion_group};
 use hugr::HugrView;
-use hugr::algorithms::hash::HugrHash;
+use hugr_passes::hash::HugrHash;
 
 use super::generators::make_cnot_layers;
 

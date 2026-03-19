@@ -88,7 +88,7 @@
 //!    to other result types in future.
 
 use crate::selene_specific;
-use anyhow::{Result, bail};
+use anyhow::{Result, bail, ensure};
 use hugr::extension::prelude::option_type;
 use hugr::llvm::{CodegenExtension, CodegenExtsBuilder, inkwell};
 use hugr::std_extensions::arithmetic::int_types::int_type;
@@ -167,7 +167,7 @@ impl GpuCodegen {
             iwc.i8_type().fn_type(
                 &[
                     iwc.i64_type().into(),
-                    iwc.i64_type().ptr_type(AddressSpace::default()).into(),
+                    iwc.ptr_type(AddressSpace::default()).into(),
                 ],
                 false,
             ),
@@ -187,8 +187,8 @@ impl GpuCodegen {
             .into_int_value();
         verify_gpu_call(ctx, success, "gpu_init")?;
 
-        let gpu_ref = builder.build_load(gpu_ref_ptr, "gpu_ref")?;
-        let result_t = ts.llvm_sum_type(option_type(int_type(6)))?;
+        let gpu_ref = builder.build_load(iwc.i64_type(), gpu_ref_ptr, "gpu_ref")?;
+        let result_t = ts.llvm_sum_type(option_type(vec![int_type(6)]))?;
         // Although the result is an option type, we always return true
         // in this lowering: failure is already handled.
         let pair = result_t.build_tag(builder, 1, vec![gpu_ref])?;
@@ -271,7 +271,7 @@ impl GpuCodegen {
                 // Grab the set flag to check if it is initialized.
                 let is_set = ctx
                     .builder()
-                    .build_load(set_flag.as_pointer_value(), "function_id")?
+                    .build_load(iwc.i8_type(), set_flag.as_pointer_value(), "function_id")?
                     .into_int_value();
                 let needs_lookup = ctx.builder().build_int_compare(
                     inkwell::IntPredicate::EQ,
@@ -291,7 +291,7 @@ impl GpuCodegen {
                 ctx.builder().position_at_end(read_cache_block);
                 let stored_func_id = ctx
                     .builder()
-                    .build_load(stored_id.as_pointer_value(), "function_id")?
+                    .build_load(iwc.i64_type(), stored_id.as_pointer_value(), "function_id")?
                     .into_int_value();
                 ctx.builder().build_return(Some(&stored_func_id))?;
 
@@ -304,8 +304,8 @@ impl GpuCodegen {
                     "gpu_get_function_id",
                     iwc.i8_type().fn_type(
                         &[
-                            iwc.i8_type().ptr_type(AddressSpace::default()).into(),
-                            iwc.i64_type().ptr_type(AddressSpace::default()).into(),
+                            iwc.ptr_type(AddressSpace::default()).into(),
+                            iwc.ptr_type(AddressSpace::default()).into(),
                         ],
                         false,
                     ),
@@ -331,7 +331,7 @@ impl GpuCodegen {
                 // Otherwise, store the function id and set the flag
                 let func_id = ctx
                     .builder()
-                    .build_load(function_id_ptr, "function_id")?
+                    .build_load(iwc.i64_type(), function_id_ptr, "function_id")?
                     .into_int_value();
                 ctx.builder()
                     .build_store(stored_id.as_pointer_value(), func_id)?;
@@ -396,8 +396,6 @@ impl GpuCodegen {
         let gpu_ref = gpu_ref.into_int_value();
         let func = fn_id.into_int_value();
 
-        let builder = ctx.builder();
-
         let gpu_call = ctx.get_extern_func(
             "gpu_call",
             iwc.i8_type().fn_type(
@@ -405,12 +403,8 @@ impl GpuCodegen {
                     gpu_ref.get_type().into(),
                     func.get_type().into(),
                     iwc.i64_type().into(),
-                    iwc.i8_type()
-                        .ptr_type(inkwell::AddressSpace::default())
-                        .into(),
-                    iwc.i8_type()
-                        .ptr_type(inkwell::AddressSpace::default())
-                        .into(),
+                    iwc.ptr_type(inkwell::AddressSpace::default()).into(),
+                    iwc.ptr_type(inkwell::AddressSpace::default()).into(),
                 ],
                 false,
             ),
@@ -422,11 +416,7 @@ impl GpuCodegen {
 
         // create an i8 array of length blob_size and populate it with
         // the packed arguments
-        let (blob, blob_size) = pack_arguments(ctx, fn_args)?;
-        let i64_zero = iwc.i64_type().const_zero();
-        let blob_ptr = unsafe {
-            builder.build_in_bounds_gep(blob, &[i64_zero, i64_zero], "gpu_input_blob_ptr")?
-        };
+        let (blob_ptr, blob_size) = pack_arguments(ctx, fn_args)?;
 
         // pass the blob size, blob pointer, and signature string to gpu_call as
         // arguments
@@ -467,7 +457,7 @@ impl GpuCodegen {
                 let i8_t = iwc.i8_type().as_basic_type_enum();
                 let i64_t = iwc.i64_type().as_basic_type_enum();
                 let f64_t = iwc.f64_type().as_basic_type_enum();
-                let result_ptr_t = iwc.i8_type().ptr_type(AddressSpace::default());
+                let result_ptr_t = iwc.ptr_type(AddressSpace::default());
 
                 // Results can currently come in as ints or floats.
                 // When this expands we can allocate an appropriate buffer
@@ -507,54 +497,19 @@ impl GpuCodegen {
                 // Check status and handle error if needed
                 verify_gpu_call(ctx, call, "gpu_get_result_64bits")?;
 
-                match ctx.llvm_type(single_result)? {
-                    i if i == i64_t => {
-                        // The result type is an integer, so we can just load
-                        // it directly.
-                        let int_result = ctx
-                            .builder()
-                            .build_load(int_result_ptr, "int_result")?
-                            .into_int_value();
-                        op.outputs.finish(
-                            ctx.builder(),
-                            [
-                                gpu_ref.as_basic_value_enum(),
-                                int_result.as_basic_value_enum(),
-                            ],
-                        )?;
-                    }
-                    f if f == f64_t => {
-                        // The result type is a float, so we need to reinterpret
-                        // the result pointer from a pointer to int to a pointer
-                        // to float, then load it.
-                        let float_result_ptr = ctx
-                            .builder()
-                            .build_bit_cast(
-                                int_result_ptr,
-                                iwc.f64_type().ptr_type(AddressSpace::default()),
-                                "float_result_ptr",
-                            )?
-                            .into_pointer_value();
+                // load the result from the result pointer
+                let result_ty = ctx.llvm_type(single_result)?;
+                ensure!(
+                    result_ty == i64_t || result_ty == f64_t,
+                    "ReadResult operation with a single output expects either \
+                        i64 or f64, got: {result_ty:?}"
+                );
 
-                        let float_result = ctx
-                            .builder()
-                            .build_load(float_result_ptr, "float_result")?
-                            .into_float_value();
-                        op.outputs.finish(
-                            ctx.builder(),
-                            [
-                                gpu_ref.as_basic_value_enum(),
-                                float_result.as_basic_value_enum(),
-                            ],
-                        )?;
-                    }
-                    _ => {
-                        bail!(
-                            "ReadResult operation with a single output expects either i64 or f64, got: {:?}",
-                            ctx.llvm_type(single_result)?
-                        );
-                    }
-                }
+                let result = ctx.builder().build_load(result_ty, result_ptr, "result")?;
+                op.outputs.finish(
+                    ctx.builder(),
+                    [gpu_ref.as_basic_value_enum(), result.as_basic_value_enum()],
+                )?;
             }
             other => {
                 bail!("ReadResult operation expects either zero or one, got: {other:?}")
@@ -660,7 +615,7 @@ fn emit_api_validation<'c, H: HugrView<Node = Node>>(
             let already_validated = builder.build_int_compare(
                 inkwell::IntPredicate::NE,
                 builder
-                    .build_load(stored.as_pointer_value(), "validated")?
+                    .build_load(iwc.i8_type(), stored.as_pointer_value(), "validated")?
                     .into_int_value(),
                 iwc.i8_type().const_zero(),
                 "already_validated",
@@ -744,9 +699,7 @@ fn emit_panic_with_gpu_error<'c, H: HugrView<Node = Node>>(
             // Try to get the error message from the GPU library.
             let gpu_get_error = ctx.get_extern_func(
                 "gpu_get_error",
-                iwc.i8_type()
-                    .ptr_type(AddressSpace::default())
-                    .fn_type(&[], false),
+                iwc.ptr_type(AddressSpace::default()).fn_type(&[], false),
             )?;
 
             let error_message = ctx
@@ -761,7 +714,7 @@ fn emit_panic_with_gpu_error<'c, H: HugrView<Node = Node>>(
                 ctx.builder().build_int_compare(
                     inkwell::IntPredicate::EQ,
                     error_message,
-                    iwc.i8_type().ptr_type(AddressSpace::default()).const_null(),
+                    iwc.ptr_type(AddressSpace::default()).const_null(),
                     "is_null",
                 )?,
                 ctx.builder()
@@ -948,6 +901,7 @@ fn pack_arguments<'c, H: HugrView<Node = Node>>(
     for &arg in fn_args {
         let dest_ptr = unsafe {
             builder.build_in_bounds_gep(
+                blob_ty,
                 blob,
                 &[
                     iwc.i64_type().const_zero(),
@@ -966,32 +920,18 @@ fn pack_arguments<'c, H: HugrView<Node = Node>>(
             }
             BasicTypeEnum::IntType(i) if i.get_bit_width() == 64 => {
                 // Store the integer into an aligned i64 temporary,
-                // then copy its bytes into the blob in an unaligned manner.
+                // then copy its bytes into the blob with 1-byte alignment
                 let tmp = builder.build_alloca(iwc.i64_type(), "arg_i64_tmp")?;
                 builder.build_store(tmp, arg)?;
-                let src_i8 = builder.build_pointer_cast(
-                    tmp,
-                    iwc.i8_type()
-                        .array_type(8)
-                        .ptr_type(AddressSpace::default()),
-                    "arg_i8_ptr",
-                )?;
-                builder.build_memcpy(dest_ptr, 1, src_i8, 1, iwc.i64_type().const_int(8, false))?;
+                builder.build_memcpy(dest_ptr, 1, tmp, 1, iwc.i64_type().const_int(8, false))?;
                 offset += 8;
             }
             BasicTypeEnum::FloatType(_) => {
                 // Store the float into an aligned f64 temporary,
-                // then copy its bytes into the blob in an unaligned manner.
+                // then copy its bytes into the blob with 1-byte alginment
                 let tmp = builder.build_alloca(iwc.f64_type(), "arg_f64_tmp")?;
                 builder.build_store(tmp, arg)?;
-                let src_i8 = builder.build_pointer_cast(
-                    tmp,
-                    iwc.i8_type()
-                        .array_type(8)
-                        .ptr_type(AddressSpace::default()),
-                    "arg_i8_ptr",
-                )?;
-                builder.build_memcpy(dest_ptr, 1, src_i8, 1, iwc.i64_type().const_int(8, false))?;
+                builder.build_memcpy(dest_ptr, 1, tmp, 1, iwc.i64_type().const_int(8, false))?;
                 offset += 8;
             }
             // We have already validated types when sizing the blob,
@@ -1040,17 +980,17 @@ mod test {
     })]
     #[case::call_ret_int(GpuOp::Call {
         inputs: type_row![],
-        outputs: TypeRow::from(usize_t()),
+        outputs: TypeRow::from(vec![usize_t()]),
     })]
     #[case::call_ret_float(GpuOp::Call {
         inputs: type_row![],
-        outputs: TypeRow::from(float64_type()),
+        outputs: TypeRow::from(vec![float64_type()]),
     })]
     #[case::read_result_int(GpuOp::ReadResult {
-        outputs: TypeRow::from(usize_t()),
+        outputs: TypeRow::from(vec![usize_t()]),
     })]
     #[case::read_result_float(GpuOp::ReadResult {
-        outputs: TypeRow::from(float64_type()),
+        outputs: TypeRow::from(vec![float64_type()]),
     })]
     fn gpu_codegen(#[context] ctx: Context, mut llvm_ctx: TestContext, #[case] op: GpuOp) {
         let _g = {

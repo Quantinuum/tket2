@@ -1,0 +1,32 @@
+---
+source: tket-qsystem/src/llvm/qsystem.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define internal i64 @_hl.main.1(i64 %0, double %1, double %2) {
+alloca_block:
+  %"0" = alloca i64, align 8
+  %"2_0" = alloca i64, align 8
+  %"2_1" = alloca double, align 8
+  %"2_2" = alloca double, align 8
+  %"4_0" = alloca i64, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store i64 %0, ptr %"2_0", align 4
+  store double %1, ptr %"2_1", align 8
+  store double %2, ptr %"2_2", align 8
+  %"2_01" = load i64, ptr %"2_0", align 4
+  %"2_12" = load double, ptr %"2_1", align 8
+  %"2_23" = load double, ptr %"2_2", align 8
+  call void @___rxy(i64 %"2_01", double %"2_12", double %"2_23")
+  store i64 %"2_01", ptr %"4_0", align 4
+  %"4_04" = load i64, ptr %"4_0", align 4
+  store i64 %"4_04", ptr %"0", align 4
+  %"05" = load i64, ptr %"0", align 4
+  ret i64 %"05"
+}
+
+declare void @___rxy(i64, double, double)

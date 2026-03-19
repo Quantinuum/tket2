@@ -24,7 +24,7 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
 /// Python equivalent of [`TketOp`].
 ///
 /// [`TketOp`]: tket::ops::TketOp
-#[pyclass]
+#[pyclass(skip_from_py_object)]
 #[pyo3(name = "TketOp")]
 #[derive(Debug, Clone, From)]
 #[repr(transparent)]
@@ -84,7 +84,7 @@ impl PyTketOp {
 }
 
 /// Iterator over the operations.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[pyo3(name = "TketOpIter")]
 #[derive(Debug, Clone)]
 #[repr(transparent)]
@@ -111,7 +111,7 @@ impl PyTketOpIter {
 /// Python equivalent of [`Pauli`].
 ///
 /// [`Pauli`]: tket::ops::Pauli
-#[pyclass]
+#[pyclass(from_py_object)]
 #[pyo3(name = "Pauli")]
 #[derive(Debug, Clone, From)]
 #[repr(transparent)]
@@ -191,7 +191,7 @@ impl PyPauli {
 }
 
 /// Iterator over the Pauli matrices.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[pyo3(name = "PauliIter")]
 #[derive(Debug, Clone)]
 #[repr(transparent)]
@@ -218,7 +218,7 @@ impl PyPauliIter {
 // TODO: These can no longer be constructed from Python. Since `hugr-rs 0.14`
 // we need an extension and `OpDef` to defines these.
 // When fixing this, make sure to fix `PyHugrType` too.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[pyo3(name = "CustomOp")]
 #[repr(transparent)]
 #[derive(From, Into, PartialEq, Clone)]

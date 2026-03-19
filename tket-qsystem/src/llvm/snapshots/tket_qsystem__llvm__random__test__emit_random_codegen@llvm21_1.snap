@@ -1,0 +1,19 @@
+---
+source: tket-qsystem/src/llvm/random.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define internal { i32, {} } @_hl.main.1({} %0) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %rint = call i32 @random_int()
+  %mrv = insertvalue { i32, {} } poison, i32 %rint, 0
+  %mrv6 = insertvalue { i32, {} } %mrv, {} zeroinitializer, 1
+  ret { i32, {} } %mrv6
+}
+
+declare i32 @random_int()

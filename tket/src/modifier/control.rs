@@ -32,14 +32,14 @@ impl ModifierControl {
                 TypeParam::new_list_type(TypeBound::Linear),
             ],
             FuncValueType::new(
-                TypeRV::new_function(FuncValueType::new(
+                [TypeRV::new_function(FuncValueType::new(
                     vec![
                         TypeRV::new_row_var_use(1, TypeBound::Linear),
                         TypeRV::new_row_var_use(2, TypeBound::Linear),
                     ],
                     vec![TypeRV::new_row_var_use(1, TypeBound::Linear)],
-                )),
-                TypeRV::new_function(FuncValueType::new(
+                ))],
+                [TypeRV::new_function(FuncValueType::new(
                     vec![
                         array_type_parametric(
                             TypeArg::new_var_use(0, TypeParam::max_nat_type()),
@@ -59,7 +59,7 @@ impl ModifierControl {
                         .into(),
                         TypeRV::new_row_var_use(1, TypeBound::Linear),
                     ],
-                )),
+                ))],
             ),
         )
         .into()

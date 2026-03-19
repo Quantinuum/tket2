@@ -24,7 +24,7 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
 ///
 /// Currently only exposes loading from an ECC file using the constructor
 /// and optimising using default logging settings.
-#[pyclass(name = "BadgerOptimiser")]
+#[pyclass(name = "BadgerOptimiser", skip_from_py_object)]
 #[derive(Clone, From)]
 pub struct PyBadgerOptimiser(BadgerOptimiser<PyRewriter, DefaultBadgerStrategy>);
 

@@ -116,7 +116,7 @@ impl QISPreludeCodegen {
         let func_type = iwc.void_type().fn_type(
             &[
                 iwc.i32_type().into(),
-                iwc.i8_type().ptr_type(AddressSpace::default()).into(),
+                iwc.ptr_type(AddressSpace::default()).into(),
             ],
             false,
         );
@@ -196,14 +196,7 @@ pub fn emit_global_string<'c, H: HugrView<Node = Node>>(
             })
             .unwrap()
     };
-    Ok(ctx
-        .builder()
-        .build_pointer_cast(
-            global.as_pointer_value(),
-            ctx.iw_context().i8_type().ptr_type(AddressSpace::default()),
-            "",
-        )?
-        .as_basic_value_enum())
+    Ok(global.as_pointer_value().as_basic_value_enum())
 }
 
 #[cfg(test)]

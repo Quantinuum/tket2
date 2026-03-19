@@ -170,7 +170,7 @@ impl ResultOpDef {
     fn result_signature(&self) -> SignatureFunc {
         PolyFuncType::new(
             [vec![TypeParam::StringType], self.type_params()].concat(),
-            Signature::new(self.arg_type(), type_row![]),
+            Signature::new(vec![self.arg_type()], type_row![]),
         )
         .into()
     }

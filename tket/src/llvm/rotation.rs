@@ -79,10 +79,11 @@ impl<PCG: PreludeCodegen> RotationCodegenExtension<PCG> {
         let builder = context.builder();
 
         // We must distinguish {NaNs, infinities} from finite
-        // values. The `llvm.is.fpclass` intrinsic was introduced in llvm 15
-        // and is the best way to do so. For now we are using llvm
-        // 14, and so we use 3 `feq`s.
-        // Below is commented code that we can use once we support llvm 15.
+        // values. The `llvm.is.fpclass` intrinsic was introduced in LLVM15
+        // and is the best way to do so.
+        // This was written when using LLVM14, so we used 3 `feq`s.
+        //
+        // TODO: We now use LLVM21. Update this accordingly.
         let half_turns_ok = {
             let is_pos_inf = builder.build_float_compare(
                 FloatPredicate::OEQ,
@@ -169,7 +170,7 @@ impl<PCG: PreludeCodegen> RotationCodegenExtension<PCG> {
                     self.emit_from_halfturns(context, half_turns.into_float_value())?;
 
                 let builder = context.builder();
-                let result_sum_type = ts.llvm_sum_type(option_type(rotation_type()))?;
+                let result_sum_type = ts.llvm_sum_type(option_type([rotation_type()]))?;
                 let success = result_sum_type.build_tag(builder, 1, vec![half_turns.into()])?;
                 let failure = result_sum_type.build_tag(builder, 0, vec![])?;
                 let result = builder.build_select(half_turns_ok, success, failure, "")?;
@@ -247,7 +248,7 @@ mod test {
                 let [rot2] = {
                     let mb_rot = builder.add_from_halfturns(half_turns).unwrap();
                     builder
-                        .build_unwrap_sum(1, option_type(rotation_type()), mb_rot)
+                        .build_unwrap_sum(1, option_type([rotation_type()]), mb_rot)
                         .unwrap()
                 };
                 let _ = builder
@@ -273,7 +274,7 @@ mod test {
         #[case] expected_half_turns: f64,
     ) {
         let hugr = SimpleHugrConfig::new()
-            .with_outs(float64_type())
+            .with_outs([float64_type()])
             .finish(|mut builder| {
                 let rot2 = builder.add_load_value(angle1);
                 let rot1 = builder.add_load_value(angle2);
@@ -309,7 +310,7 @@ mod test {
         #[case] expected_halfturns: f64,
     ) {
         let hugr = SimpleHugrConfig::new()
-            .with_outs(float64_type())
+            .with_outs([float64_type()])
             .finish(|mut builder| {
                 let rot = builder.add_load_value(angle);
                 let halfturns = builder.add_to_halfturns(rot).unwrap();
@@ -377,7 +378,7 @@ mod test {
         use hugr::ops::Value;
 
         let hugr = SimpleHugrConfig::new()
-            .with_outs(float64_type())
+            .with_outs([float64_type()])
             .finish(|mut builder| {
                 let konst: Value = if halfturns.is_finite() {
                     ConstF64::new(halfturns).into()

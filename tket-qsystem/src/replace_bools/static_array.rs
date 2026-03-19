@@ -1,11 +1,5 @@
-/// Provides a `ReplaceStaticArrayBoolPass` which replaces static arrays containing `tket.bool` with
-/// static arrays containing `bool_t` values.
 use hugr::{
     HugrView as _, Node, Wire,
-    algorithms::{
-        ComposablePass, ReplaceTypes,
-        replace_types::{NodeTemplate, ReplaceTypesError},
-    },
     builder::{
         BuildError, DFGBuilder, Dataflow, DataflowHugr as _, DataflowSubContainer as _,
         SubContainer as _, inout_sig,
@@ -25,6 +19,13 @@ use hugr::{
     },
     types::{Transformable as _, Type, TypeEnum, TypeRow},
 };
+use hugr_passes::composable::WithScope;
+/// Provides a `ReplaceStaticArrayBoolPass` which replaces static arrays containing `tket.bool` with
+/// static arrays containing `bool_t` values.
+use hugr_passes::{
+    ComposablePass, ReplaceTypes,
+    replace_types::{NodeTemplate, ReplaceTypesError},
+};
 use itertools::Itertools as _;
 use tket::extension::bool::{self, BOOL_TYPE_NAME, BoolOpBuilder as _, ConstBool, bool_type};
 
@@ -40,6 +41,14 @@ type Result<T> = std::result::Result<T, ReplaceStaticArrayBoolPassError>;
 /// Provides a `ReplaceStaticArrayBoolPass` which replaces static arrays
 /// containing `tket.bool` with static arrays containing `bool_t` values.
 pub struct ReplaceStaticArrayBoolPass(ReplaceTypes);
+
+impl WithScope for ReplaceStaticArrayBoolPass {
+    fn with_scope(self, _scope: impl Into<hugr_passes::PassScope>) -> Self {
+        // TODO: Follow scope configuration
+        // <https://github.com/Quantinuum/tket2/pull/1429>
+        self
+    }
+}
 
 impl<H: HugrMut<Node = Node>> ComposablePass<H> for ReplaceStaticArrayBoolPass {
     type Error = ReplaceStaticArrayBoolPassError;
@@ -262,7 +271,7 @@ fn get_op_dest(rt: &ReplaceTypes, old_elem_ty: Type) -> Option<NodeTemplate> {
         let mut hugr1 = {
             let mut dfb = DFGBuilder::new(inout_sig(
                 vec![static_array_type(old_elem_ty.clone()), usize_t()],
-                Type::from(option_type(old_elem_ty.clone())),
+                vec![Type::from(option_type(vec![old_elem_ty.clone()]))],
             ))
             .unwrap();
             let [arr, index] = dfb.input_wires_arr();
@@ -286,9 +295,9 @@ fn get_op_dest(rt: &ReplaceTypes, old_elem_ty: Type) -> Option<NodeTemplate> {
             .input()[0]
             .clone();
 
-        let res_ty = Type::from(option_type(old_elem_ty.clone()));
+        let res_ty = Type::from(option_type(vec![old_elem_ty.clone()]));
         let mut dfb =
-            DFGBuilder::new(inout_sig(vec![new_arr_ty, usize_t()], res_ty.clone())).unwrap();
+            DFGBuilder::new(inout_sig(vec![new_arr_ty, usize_t()], vec![res_ty.clone()])).unwrap();
         let [arr, index] = dfb.input_wires_arr();
         let [val] = dfb
             .add_hugr_with_wires(hugr1, [arr, index])
@@ -304,7 +313,7 @@ fn get_op_dest(rt: &ReplaceTypes, old_elem_ty: Type) -> Option<NodeTemplate> {
 #[cfg(test)]
 mod test {
     use hugr::types::SumType;
-    use hugr::{HugrView as _, algorithms::ComposablePass as _, extension::prelude::option_type};
+    use hugr::{HugrView as _, extension::prelude::option_type};
     use hugr::{
         builder::DataflowHugr as _, extension::prelude::ConstUsize,
         std_extensions::collections::static_array::StaticArrayOpBuilder as _,
@@ -316,6 +325,7 @@ mod test {
         type_row,
         types::Signature,
     };
+    use hugr_passes::ComposablePass as _;
     use rstest::rstest;
 
     use super::*;
@@ -352,7 +362,7 @@ mod test {
             let element_ty = x.get_element_type().clone();
             let mut builder = DFGBuilder::new(Signature::new(
                 type_row![],
-                vec![option_type(element_ty.clone()).into(), usize_t()],
+                vec![option_type(vec![element_ty.clone()]).into(), usize_t()],
             ))
             .unwrap();
 

@@ -33,8 +33,9 @@ env:
   RUSTC_WRAPPER: "sccache"
   # different strings for install action and feature name
   # adapted from https://github.com/TheDan64/inkwell/blob/master/.github/workflows/test.yml
-  LLVM_VERSION: "14.0"
-  LLVM_FEATURE_NAME: "14-0"
+  LLVM_MAIN_VERSION: "21"
+  LLVM_VERSION: "21.1"
+  LLVM_FEATURE_NAME: "21-1"
 
 jobs:
   # Check if the tag matches the package name,
@@ -123,9 +124,11 @@ jobs:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
       - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: ${{ env.LLVM_VERSION }}
+        run: |
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          sudo add-apt-repository 'deb http://apt.llvm.org/noble/   llvm-toolchain-noble-${{ env.LLVM_MAIN_VERSION }}  main'
+          sudo apt update
+          sudo apt install llvm-${{ env.LLVM_MAIN_VERSION }} libpolly-${{ env.LLVM_MAIN_VERSION }}-dev
 
         # Set the path to the cached tket-c-api library
         # When this envvar is set, the `./.github/actions/tket-c-api` action **must** be run to fetch the artifacts

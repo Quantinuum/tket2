@@ -1,0 +1,37 @@
+---
+source: tket-qsystem/src/llvm/random.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define internal { i32, {} } @_hl.main.1({} %0, i32 %1) {
+alloca_block:
+  %"0" = alloca i32, align 4
+  %"1" = alloca {}, align 8
+  %"2_0" = alloca {}, align 8
+  %"2_1" = alloca i32, align 4
+  %"4_0" = alloca i32, align 4
+  %"4_1" = alloca {}, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store {} %0, ptr %"2_0", align 1
+  store i32 %1, ptr %"2_1", align 4
+  %"2_01" = load {}, ptr %"2_0", align 1
+  %"2_12" = load i32, ptr %"2_1", align 4
+  %rintb = call i32 @random_rng(i32 %"2_12")
+  store i32 %rintb, ptr %"4_0", align 4
+  store {} zeroinitializer, ptr %"4_1", align 1
+  %"4_03" = load i32, ptr %"4_0", align 4
+  %"4_14" = load {}, ptr %"4_1", align 1
+  store i32 %"4_03", ptr %"0", align 4
+  store {} %"4_14", ptr %"1", align 1
+  %"05" = load i32, ptr %"0", align 4
+  %"16" = load {}, ptr %"1", align 1
+  %mrv = insertvalue { i32, {} } poison, i32 %"05", 0
+  %mrv7 = insertvalue { i32, {} } %mrv, {} %"16", 1
+  ret { i32, {} } %mrv7
+}
+
+declare i32 @random_rng(i32)
