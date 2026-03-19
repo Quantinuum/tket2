@@ -20,6 +20,7 @@ use hugr::std_extensions::collections::{
 use hugr::std_extensions::logic::LogicOp;
 use hugr::types::{SumType, Term, Type};
 use hugr::{Hugr, Node, Wire, hugr::hugrmut::HugrMut, type_row};
+use hugr_passes::PassScope;
 use hugr_passes::composable::WithScope;
 use hugr_passes::non_local::LocalizeEdges;
 use hugr_passes::replace_types::{Linearizer, NodeTemplate, ReplaceTypesError};

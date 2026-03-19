@@ -7,7 +7,6 @@ mod test {
     use super::*;
 
     use crate::extension::qsystem::{self, lower_tk2_op};
-    use hugr::algorithms::composable::Preserve;
     use hugr::builder::{Dataflow, DataflowHugr};
     use hugr::extension::prelude::Barrier;
     use hugr::std_extensions::collections::borrow_array::borrow_array_type;
@@ -17,6 +16,7 @@ mod test {
         extension::prelude::{bool_t, option_type, qb_t},
         std_extensions::collections::array::array_type,
     };
+    use hugr_passes::composable::Preserve;
     use itertools::Itertools;
     use rstest::rstest;
 

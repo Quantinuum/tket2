@@ -5,7 +5,7 @@ use hugr::types::Term;
 use hugr::{Node, hugr::hugrmut::HugrMut};
 use hugr_passes::composable::WithScope;
 use hugr_passes::replace_types::{Linearizer, NodeTemplate, ReplaceTypesError};
-use hugr_passes::{ComposablePass, ReplaceTypes};
+use hugr_passes::{ComposablePass, PassScope, ReplaceTypes};
 use tket::extension::guppy::{DROP_OP_NAME, GUPPY_EXTENSION};
 
 use crate::extension::futures::{FutureOp, FutureOpDef, future_type};

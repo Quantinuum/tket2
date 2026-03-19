@@ -19,6 +19,7 @@ use hugr::{
     },
     types::{Transformable as _, Type, TypeEnum, TypeRow},
 };
+use hugr_passes::PassScope;
 use hugr_passes::composable::WithScope;
 /// Provides a `ReplaceStaticArrayBoolPass` which replaces static arrays containing `tket.bool` with
 /// static arrays containing `bool_t` values.

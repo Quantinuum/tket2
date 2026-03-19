@@ -9,8 +9,8 @@ use hugr::std_extensions::arithmetic::int_types::ConstInt;
 use hugr::std_extensions::collections::borrow_array::{BArrayUnsafeOpDef, BORROW_ARRAY_TYPENAME};
 use hugr::types::{EdgeKind, Type};
 use hugr::{HugrView, IncomingPort, Node, OutgoingPort, Wire};
-use hugr_passes::ComposablePass;
 use hugr_passes::composable::WithScope;
+use hugr_passes::{ComposablePass, PassScope};
 
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -29,9 +29,8 @@ pub struct BorrowSquashPass {
 }
 
 impl WithScope for BorrowSquashPass {
-    fn with_scope(self, _scope: impl Into<hugr_passes::PassScope>) -> Self {
-        // TODO: Follow scope configuration
-        // <https://github.com/Quantinuum/tket2/pull/1429>
+    fn with_scope(mut self, scope: impl Into<hugr_passes::PassScope>) -> Self {
+        self.scope = scope.into();
         self
     }
 }
@@ -41,14 +40,6 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for BorrowSquashPass {
     type Error = BorrowSquashError;
     /// Pairs of (Return node, Borrow node) that were elided.
     type Result = Vec<(Node, Node)>;
-
-    /// Set the scope configuration used to run the pass.
-    ///
-    /// See [`PassScope`] for more details.
-    fn with_scope_internal(mut self, scope: impl Into<PassScope>) -> Self {
-        self.scope = scope.into();
-        self
-    }
 
     /// Perform the pass on the given hugr.
     ///

@@ -18,7 +18,7 @@ use hugr::{
 };
 use hugr_passes::composable::WithScope;
 use hugr_passes::replace_types::{NodeTemplate, ReplaceTypesError};
-use hugr_passes::{ComposablePass, ReplaceTypes};
+use hugr_passes::{ComposablePass, PassScope, ReplaceTypes};
 use lazy_static::lazy_static;
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
