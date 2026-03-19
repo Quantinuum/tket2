@@ -1010,5 +1010,15 @@ mod tests {
                 .instantiate_extension_op("zz_phase_between_blocks", [6.into(), 0.into(), 6.into()])
                 .is_err()
         );
+        assert!(
+            EXTENSION
+                .instantiate_extension_op("x", [6.into(), "0".into()])
+                .is_err()
+        );
+        assert!(
+            EXTENSION
+                .instantiate_extension_op("x", ["6".into(), 0.into()])
+                .is_err()
+        );
     }
 }
