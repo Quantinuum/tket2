@@ -14,3 +14,5 @@ pub mod guppy;
 pub use guppy::NormalizeGuppy;
 
 pub mod unpack_container;
+
+pub mod rewrite_quantum;

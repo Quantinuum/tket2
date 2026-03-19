@@ -19,6 +19,7 @@ use inkwell::targets::{
 use itertools::Itertools;
 use pyo3::prelude::*;
 use tket::hugr::ops::DataflowParent;
+use tket_qsystem::llvm::globals::GlobalsCodegenExtension;
 
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
@@ -74,6 +75,7 @@ static REGISTRY: std::sync::LazyLock<ExtensionRegistry> = std::sync::LazyLock::n
         ROTATION_EXTENSION.to_owned(),
         TKET_EXTENSION.to_owned(),
         TKET1_EXTENSION.to_owned(),
+        tket::extension::globals::EXTENSION.to_owned(),
         tket::extension::bool::BOOL_EXTENSION.to_owned(),
         tket::extension::debug::DEBUG_EXTENSION.to_owned(),
         tket_qsystem::extension::gpu::EXTENSION.to_owned(),
@@ -170,6 +172,7 @@ fn codegen_extensions() -> CodegenExtsMap<'static, Hugr> {
         // State results use standard arrays.
         .add_extension(DebugCodegenExtension::new(SeleneHeapArrayCodegen::LOWERING))
         .add_extension(gpu::GpuCodegen)
+        .add_extension(GlobalsCodegenExtension)
         .finish()
 }
 

@@ -30,6 +30,7 @@ from ._tket.passes import (
     tket1_pass,
     normalize_guppy,
     PullForwardError,
+    replace_qubits,
 )
 
 __all__ = [
@@ -43,6 +44,7 @@ __all__ = [
     # TODO: Remove export, use `NormalizeGuppy` instead
     "normalize_guppy",
     "PullForwardError",
+    "replace_qubits",
     "PytketHugrPass",
     "PassResult",
     "NormalizeGuppy",
