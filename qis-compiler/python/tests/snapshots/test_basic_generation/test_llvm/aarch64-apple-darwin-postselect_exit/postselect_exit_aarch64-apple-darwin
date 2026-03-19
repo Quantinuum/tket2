@@ -57,9 +57,9 @@ __hugr__.__tk2_qalloc.41.exit.i:                  ; preds = %entry
   unreachable
 
 __hugr__.main.1.exit:                             ; preds = %__hugr__.__tk2_qalloc.41.exit.i
-  %read_bool67.i = tail call i1 @___read_future_bool(i64 %lazy_measure.i)
+  %read_bool66.i = tail call i1 @___read_future_bool(i64 %lazy_measure.i)
   tail call void @___dec_future_refcount(i64 %lazy_measure.i)
-  tail call void @print_bool(ptr nonnull @res_c.1C9EF4D1.0, i64 11, i1 %read_bool67.i)
+  tail call void @print_bool(ptr nonnull @res_c.1C9EF4D1.0, i64 11, i1 %read_bool66.i)
   %2 = tail call i64 @teardown()
   ret i64 %2
 }
