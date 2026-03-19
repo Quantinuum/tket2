@@ -1,4 +1,5 @@
-//! HUGR extension for logical operations on the Iceberg code.
+//! HUGR extension for logical operations on the
+//! [Iceberg code](https://arxiv.org/abs/2211.06703).
 //!
 //! The extension `tket.qec.iceberg.types` provides one new type: this is the
 //! code block for the [[k+2, k, 2]] Iceberg code (parametrized by an even
