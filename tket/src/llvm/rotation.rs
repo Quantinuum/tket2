@@ -3,7 +3,7 @@
 use hugr::HugrView;
 use hugr::Node;
 use hugr::extension::prelude::{ConstError, option_type};
-use hugr::llvm::emit::{EmitFuncContext, EmitOpArgs, emit_value};
+use hugr::llvm::emit::{EmitFuncContext, EmitOpArgs, emit_value, get_intrinsic};
 use hugr::llvm::extension::{DefaultPreludeCodegen, PreludeCodegen};
 use hugr::llvm::inkwell;
 use hugr::llvm::types::TypingSession;
@@ -13,11 +13,27 @@ use hugr::types::TypeName;
 
 use crate::extension::rotation::{ConstRotation, ROTATION_EXTENSION_ID, RotationOp, rotation_type};
 use anyhow::{Result, anyhow};
-use inkwell::FloatPredicate;
 use inkwell::types::FloatType;
 use inkwell::values::{FloatValue, IntValue};
 use lazy_static::lazy_static;
 const ROTATION_TYPE_ID: TypeName = TypeName::new_inline("rotation");
+const FPCLASS_NEG_NORMAL_MASK: u64 = 1 << 3;
+const FPCLASS_NEG_SUBNORMAL_MASK: u64 = 1 << 4;
+const FPCLASS_NEG_ZERO_MASK: u64 = 1 << 5;
+const FPCLASS_POS_ZERO_MASK: u64 = 1 << 6;
+const FPCLASS_POS_SUBNORMAL_MASK: u64 = 1 << 7;
+const FPCLASS_POS_NORMAL_MASK: u64 = 1 << 8;
+// `llvm.is.fpclass` uses a bitmask over IEEE classes. Match exactly the finite
+// classes so `from_halfturns` accepts zeros, subnormals, and normals, but
+// rejects NaNs and infinities.
+// Source:
+// https://llvm.org/docs/LangRef.html#llvm-is-fpclass
+const FPCLASS_FINITE_MASK: u64 = FPCLASS_NEG_NORMAL_MASK
+    | FPCLASS_NEG_SUBNORMAL_MASK
+    | FPCLASS_NEG_ZERO_MASK
+    | FPCLASS_POS_ZERO_MASK
+    | FPCLASS_POS_SUBNORMAL_MASK
+    | FPCLASS_POS_NORMAL_MASK;
 
 /// A codegen extension for the `tket.rotation` extension.
 ///
@@ -75,39 +91,28 @@ impl<PCG: PreludeCodegen> RotationCodegenExtension<PCG> {
         context: &mut EmitFuncContext<'c, '_, H>,
         half_turns: FloatValue<'c>,
     ) -> Result<(FloatValue<'c>, IntValue<'c>)> {
-        let angle_ty = llvm_angle_type(&context.typing_session());
         let builder = context.builder();
-
-        // We must distinguish {NaNs, infinities} from finite
-        // values. The `llvm.is.fpclass` intrinsic was introduced in LLVM15
-        // and is the best way to do so.
-        // This was written when using LLVM14, so we used 3 `feq`s.
-        //
-        // TODO: We now use LLVM21. Update this accordingly.
-        let half_turns_ok = {
-            let is_pos_inf = builder.build_float_compare(
-                FloatPredicate::OEQ,
-                half_turns,
-                angle_ty.const_float(f64::INFINITY),
-                "",
-            )?;
-            let is_neg_inf = builder.build_float_compare(
-                FloatPredicate::OEQ,
-                half_turns,
-                angle_ty.const_float(f64::NEG_INFINITY),
-                "",
-            )?;
-            let is_nan = builder.build_float_compare(
-                FloatPredicate::UNO,
-                half_turns,
-                angle_ty.const_zero(),
-                "",
-            )?;
-            builder.build_not(
-                builder.build_or(builder.build_or(is_pos_inf, is_neg_inf, "")?, is_nan, "")?,
+        let is_fpclass = get_intrinsic(
+            context.get_current_module(),
+            "llvm.is.fpclass",
+            [half_turns.get_type().into()],
+        )?;
+        let half_turns_ok = builder
+            .build_call(
+                is_fpclass,
+                &[
+                    half_turns.into(),
+                    context
+                        .iw_context()
+                        .i32_type()
+                        .const_int(FPCLASS_FINITE_MASK, false)
+                        .into(),
+                ],
                 "",
             )?
-        };
+            .try_as_basic_value()
+            .expect_basic("llvm.is.fpclass returns an i1")
+            .into_int_value();
 
         Ok((half_turns, half_turns_ok))
     }
@@ -261,7 +266,9 @@ mod test {
                 .add_prelude_extensions(prelude.clone())
                 .add_float_extensions()
         });
-        check_emission!(hugr, llvm_ctx);
+        let emission = check_emission!(hugr, llvm_ctx);
+        let mod_str = emission.module().to_string();
+        assert!(mod_str.contains("llvm.is.fpclass.f64"));
     }
 
     #[rstest]
