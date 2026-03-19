@@ -38,6 +38,9 @@ jupyter_execute/
 
 # binaries
 *.so
+*.dylib
+*.dylib.yml
+*.plist
 
 # a reserved working dir for local experimentation
 /scratch
