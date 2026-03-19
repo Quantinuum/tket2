@@ -12,15 +12,14 @@ pub mod replace_bools;
 
 use derive_more::{Display, Error, From};
 use hugr::hugr::{HugrError, hugrmut::HugrMut};
-use hugr::{Hugr, HugrView, Node, core::Visibility, ops::OpType};
-use hugr_core::hugr::internal::HugrMutInternals;
-use hugr_passes::PassScope;
-use hugr_passes::composable::{Preserve, WithScope};
+use hugr::{HugrView, Node, core::Visibility, ops::OpType};
+use hugr_passes::composable::WithScope;
 use hugr_passes::const_fold::{ConstFoldError, ConstantFoldPass};
 use hugr_passes::{
-    ComposablePass as _, MonomorphizePass, RemoveDeadFuncsError, RemoveDeadFuncsPass, force_order,
-    replace_types::ReplaceTypesError,
+    ComposablePass, MonomorphizePass, PassScope, RemoveDeadFuncsError, RemoveDeadFuncsPass,
+    force_order, replace_types::ReplaceTypesError,
 };
+use itertools::Itertools as _;
 use std::collections::HashSet;
 
 use lower_drops::LowerDropsPass;
@@ -36,23 +35,29 @@ use extension::{
 /// Q-System. Returns an error if this cannot be done.
 ///
 /// To construct a `QSystemPass` use [Default::default].
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct QSystemPass {
     constant_fold: bool,
     monomorphize: bool,
     force_order: bool,
     lazify: bool,
     hide_funcs: bool,
+
+    /// Where to apply the pass.
+    ///
+    /// Configurable via [`WithScope::with_scope`].
+    scope: PassScope,
 }
 
 impl Default for QSystemPass {
     fn default() -> Self {
         Self {
-            constant_fold: false,
+            constant_fold: true,
             monomorphize: true,
             force_order: true,
             lazify: true,
             hide_funcs: true,
+            scope: PassScope::default(),
         }
     }
 }
@@ -60,8 +65,6 @@ impl Default for QSystemPass {
 #[derive(Error, Debug, Display, From)]
 #[non_exhaustive]
 /// An error reported from [QSystemPass].
-//
-// TODO: Implement ComposablePass for QSystemPass
 pub enum QSystemPassError<N = Node> {
     /// An error from the component [ReplaceBoolPass].
     ReplaceBoolError(ReplaceBoolPassError<N>),
@@ -87,136 +90,6 @@ pub enum QSystemPassError<N = Node> {
 }
 
 impl QSystemPass {
-    /// Run `QSystemPass` on the given [Hugr]. `registry` is used for
-    /// validation, if enabled.
-    /// Expects the HUGR to have a function entrypoint.
-    pub fn run(&self, hugr: &mut Hugr) -> Result<(), QSystemPassError> {
-        let entrypoint = if hugr.entrypoint_optype().is_module() {
-            // backwards compatibility: if the entrypoint is a module, we look for
-            // a function named "main" in the module and use that as the entrypoint.
-            hugr.children(hugr.entrypoint())
-                .find(|&n| {
-                    hugr.get_optype(n)
-                        .as_func_defn()
-                        .is_some_and(|fd| fd.func_name() == "main")
-                })
-                .ok_or(QSystemPassError::NoMain)?
-        } else {
-            hugr.entrypoint()
-        };
-
-        // passes that run on whole module
-        hugr.set_entrypoint(hugr.module_root());
-        if self.monomorphize {
-            self.monomorphization().run(hugr).unwrap();
-
-            // Will move to pass scopes in <https://github.com/Quantinuum/tket2/pull/1429>
-            let rdfp = RemoveDeadFuncsPass::default_with_scope(PassScope::Global(Preserve::All));
-            rdfp.run(hugr)?
-        }
-
-        // ReplaceTypes steps (there are several below) can introduce new helper
-        // functions that are public to enable linking/sharing. We'll make these private
-        // once we're done so that LLVM is not forced to compile them as callable.
-        let pubfuncs = self.hide_funcs.then(|| {
-            hugr.children(hugr.module_root())
-                .filter(|n| {
-                    hugr.get_optype(*n)
-                        .as_func_defn()
-                        .is_some_and(|fd| fd.visibility() == &Visibility::Public)
-                })
-                .collect::<HashSet<_>>()
-        });
-
-        self.lower_tk2().run(hugr)?;
-        if self.lazify {
-            self.replace_bools().run(hugr)?;
-        }
-        self.lower_drops().run(hugr)?;
-
-        if let Some(pubfuncs) = pubfuncs {
-            for n in hugr
-                .children(hugr.module_root())
-                .filter(|n| !pubfuncs.contains(n))
-                .collect::<Vec<_>>()
-            {
-                if let OpType::FuncDefn(fd) = hugr.optype_mut(n) {
-                    *fd.visibility_mut() = Visibility::Private;
-                }
-            }
-        }
-
-        if self.constant_fold {
-            self.constant_fold().run(hugr)?;
-        }
-        if self.force_order {
-            self.force_order(hugr)?;
-        }
-        // restore the entrypoint
-        hugr.set_entrypoint(entrypoint);
-        Ok(())
-    }
-
-    fn force_order(&self, hugr: &mut Hugr) -> Result<(), QSystemPassError> {
-        force_order(hugr, hugr.entrypoint(), |hugr, node| {
-            let optype = hugr.get_optype(node);
-
-            let is_quantum =
-                optype.cast::<TketOp>().is_some() || optype.cast::<QSystemOp>().is_some();
-            let is_qalloc = matches!(
-                optype.cast(),
-                Some(TketOp::QAlloc) | Some(TketOp::TryQAlloc)
-            ) || optype.cast() == Some(QSystemOp::TryQAlloc);
-            let is_qfree =
-                optype.cast() == Some(TketOp::QFree) || optype.cast() == Some(QSystemOp::QFree);
-            let is_read = optype.cast() == Some(FutureOpDef::Read);
-
-            // HACK: for now qallocs and qfrees are not adequately ordered,
-            // see <https://github.com/quantinuum/guppylang/issues/778>. To
-            // mitigate this we push qfrees as early as possible and qallocs
-            // as late as possible
-            //
-            // To maximise laziness we push quantum ops (including
-            // LazyMeasure) as early as possible and Future::Read as late as
-            // possible.
-            if is_qfree {
-                -3
-            } else if is_quantum && !is_qalloc {
-                // non-qalloc quantum ops
-                -2
-            } else if is_qalloc {
-                -1
-            } else if !is_read {
-                // all other ops
-                0
-            } else {
-                // Future::Read ops
-                1
-            }
-        })?;
-        Ok::<_, QSystemPassError>(())
-    }
-
-    fn lower_tk2(&self) -> LowerTketToQSystemPass {
-        LowerTketToQSystemPass::default()
-    }
-
-    fn replace_bools(&self) -> ReplaceBoolPass {
-        ReplaceBoolPass::default()
-    }
-
-    fn constant_fold(&self) -> ConstantFoldPass {
-        ConstantFoldPass::default()
-    }
-
-    fn monomorphization(&self) -> MonomorphizePass {
-        MonomorphizePass::default()
-    }
-
-    fn lower_drops(&self) -> LowerDropsPass {
-        LowerDropsPass::default()
-    }
-
     /// Returns a new `QSystemPass` with constant folding enabled according to
     /// `constant_fold`.
     ///
@@ -258,12 +131,163 @@ impl QSystemPass {
         self.lazify = lazify;
         self
     }
+
+    /// Add order edges in the HUGR regions to force qubit frees to be as early
+    /// as possible, quantum ops to be as early as possible, and Future::Reads
+    /// to be as late as possible.
+    fn force_order(&self, hugr: &mut impl HugrMut<Node = Node>) -> Result<(), QSystemPassError> {
+        let Some(root) = self.scope.root(hugr) else {
+            // Scope tells us not to modify any node.
+            return Ok(());
+        };
+
+        force_order(hugr, root, |hugr, node| {
+            let optype = hugr.get_optype(node);
+
+            let is_quantum =
+                optype.cast::<TketOp>().is_some() || optype.cast::<QSystemOp>().is_some();
+            let is_qalloc = matches!(
+                optype.cast(),
+                Some(TketOp::QAlloc) | Some(TketOp::TryQAlloc)
+            ) || optype.cast() == Some(QSystemOp::TryQAlloc);
+            let is_qfree =
+                optype.cast() == Some(TketOp::QFree) || optype.cast() == Some(QSystemOp::QFree);
+            let is_read = optype.cast() == Some(FutureOpDef::Read);
+
+            // HACK: for now qallocs and qfrees are not adequately ordered,
+            // see <https://github.com/quantinuum/guppylang/issues/778>. To
+            // mitigate this we push qfrees as early as possible and qallocs
+            // as late as possible
+            //
+            // To maximise laziness we push quantum ops (including
+            // LazyMeasure) as early as possible and Future::Read as late as
+            // possible.
+            if is_qfree {
+                -3
+            } else if is_quantum && !is_qalloc {
+                // non-qalloc quantum ops
+                -2
+            } else if is_qalloc {
+                -1
+            } else if !is_read {
+                // all other ops
+                0
+            } else {
+                // Future::Read ops
+                1
+            }
+        })?;
+        Ok(())
+    }
+
+    /// Find a function named "main" in the HUGR.
+    ///
+    /// This is used for backwards compatibility with HUGRs that have a module as
+    /// the entrypoint.
+    ///
+    /// Returns [`QSystemPassError::NoMain`] if there is no function named "main".
+    fn find_main(&self, hugr: &impl HugrView<Node = Node>) -> Result<Node, QSystemPassError> {
+        hugr.children(hugr.module_root())
+            .find(|&n| {
+                hugr.get_optype(n)
+                    .as_func_defn()
+                    .is_some_and(|fd| fd.func_name() == "main")
+            })
+            .ok_or(QSystemPassError::NoMain)
+    }
+
+    /// Collect the set of public function definitions in the HUGR, if `hide_funcs` is
+    /// enabled. These will be made private at the end of the pass to avoid
+    /// forcing LLVM to compile them as callable.
+    fn collect_pub_funcs(&self, hugr: &impl HugrView<Node = Node>) -> Option<HashSet<Node>> {
+        self.hide_funcs.then(|| {
+            hugr.children(hugr.module_root())
+                .filter(|n| {
+                    hugr.get_optype(*n)
+                        .as_func_defn()
+                        .is_some_and(|fd| fd.visibility() == &Visibility::Public)
+                })
+                .collect::<HashSet<_>>()
+        })
+    }
+
+    /// Mark non-whitelisted function definitions as private to avoid forcing LLVM to compile them as callable.
+    ///
+    /// Use [`Self::collect_pub_funcs`] to get the set of whitelisted public functions before running the main passes.
+    fn hide_non_pub_funcs(&self, hugr: &mut impl HugrMut<Node = Node>, pub_funcs: HashSet<Node>) {
+        for n in hugr.children(hugr.module_root()).collect_vec() {
+            if !pub_funcs.contains(&n)
+                && let OpType::FuncDefn(fd) = hugr.optype_mut(n)
+            {
+                *fd.visibility_mut() = Visibility::Private;
+            }
+        }
+    }
+}
+
+impl WithScope for QSystemPass {
+    fn with_scope(mut self, scope: impl Into<PassScope>) -> Self {
+        self.scope = scope.into();
+        self
+    }
+}
+
+impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for QSystemPass {
+    type Error = QSystemPassError;
+    type Result = ();
+
+    /// Run `QSystemPass` on the given [Hugr]. `registry` is used for
+    /// validation, if enabled.
+    /// Expects the HUGR to have a function entrypoint.
+    fn run(&self, hugr: &mut H) -> Result<(), QSystemPassError> {
+        if self.monomorphize {
+            MonomorphizePass::default_with_scope(self.scope.clone())
+                .run(hugr)
+                .unwrap_or_else(|never| match never {});
+            RemoveDeadFuncsPass::default_with_scope(self.scope.clone()).run(hugr)?
+        }
+
+        // ReplaceTypes steps (there are several below) can introduce new helper
+        // functions that are public to enable linking/sharing. We'll make these private
+        // once we're done so that LLVM is not forced to compile them as callable.
+        let pub_funcs = self.collect_pub_funcs(hugr);
+
+        LowerTketToQSystemPass::default_with_scope(self.scope.clone()).run(hugr)?;
+        if self.lazify {
+            ReplaceBoolPass::default_with_scope(self.scope.clone()).run(hugr)?;
+        }
+
+        LowerDropsPass::default_with_scope(self.scope.clone()).run(hugr)?;
+
+        // Mark any new helper functions as private.
+        if let Some(pub_funcs) = pub_funcs {
+            self.hide_non_pub_funcs(hugr, pub_funcs);
+        }
+
+        if self.constant_fold {
+            ConstantFoldPass::default().run(hugr)?;
+        }
+        if self.force_order {
+            self.force_order(hugr)?;
+        }
+
+        // Backwards compatibility: If the entrypoint is a module, find a function named "main" and set that as
+        // entrypoint instead.
+        if hugr.entrypoint() == hugr.module_root() {
+            let main_n = self.find_main(hugr)?;
+            hugr.set_entrypoint(main_n);
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod test {
+    use super::*;
+
     use hugr::{
-        Hugr, HugrView as _,
+        Hugr,
         builder::{Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder},
         core::Visibility,
         extension::prelude::qb_t,
@@ -276,7 +300,6 @@ mod test {
     };
 
     use hugr_core::hugr::internal::{HugrInternals, PortgraphNodeMap};
-    use itertools::Itertools as _;
     use petgraph::visit::{Topo, Walker as _};
     use rstest::rstest;
     use tket::extension::{
@@ -284,10 +307,7 @@ mod test {
         guppy::{DROP_OP_NAME, GUPPY_EXTENSION},
     };
 
-    use crate::{
-        QSystemPass,
-        extension::{futures::FutureOpDef, qsystem::QSystemOp},
-    };
+    use crate::extension::{futures::FutureOpDef, qsystem::QSystemOp};
 
     #[rstest]
     #[case(false)]
@@ -302,9 +322,10 @@ mod test {
 
         let (mut hugr, [call_node, h_node, f_node, rx_node, main_node]) = {
             let mut builder = mb
-                .define_function(
+                .define_function_vis(
                     "main",
                     Signature::new(vec![qb_t()], vec![bool_type(), bool_type()]),
+                    Visibility::Public,
                 )
                 .unwrap();
             let [qb] = builder.input_wires_arr();

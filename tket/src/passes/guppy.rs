@@ -38,7 +38,7 @@ pub struct NormalizeGuppy {
 
     /// Where to apply the pass.
     ///
-    /// Configurable via [`ComposablePass::with_scope`].
+    /// Configurable via [`WithScope::with_scope`].
     scope: PassScope,
 }
 

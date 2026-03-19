@@ -2231,6 +2231,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "cbindgen",
+ "hugr-passes",
  "insta",
  "itertools 0.14.0",
  "pyo3",

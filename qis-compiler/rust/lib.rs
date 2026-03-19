@@ -8,6 +8,7 @@ use hugr::llvm::custom::CodegenExtsMap;
 use hugr::llvm::emit::{EmitHugr, Namer};
 use hugr::llvm::extension::int::IntCodegenExtension;
 use hugr::llvm::utils::fat::FatExt as _;
+use hugr_passes::composable::ComposablePass;
 use inkwell::OptimizationLevel;
 use inkwell::context::Context;
 use inkwell::module::Module;
