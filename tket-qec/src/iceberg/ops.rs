@@ -257,13 +257,15 @@ impl ValidateJustArgs for ArgsValidator {
         if n != 1 + self.n_idx {
             return Err(SignatureError::InvalidTypeArgs);
         }
-        let k = arg_values[0].as_nat().unwrap();
+        let k = arg_values[0]
+            .as_nat()
+            .ok_or(SignatureError::InvalidTypeArgs)?;
         if k == 0 || k % 2 == 1 {
             return Err(SignatureError::InvalidTypeArgs);
         }
         let mut args: HashSet<u64> = HashSet::new();
         for arg in arg_values.iter().skip(1) {
-            let i = arg.as_nat().unwrap();
+            let i = arg.as_nat().ok_or(SignatureError::InvalidTypeArgs)?;
             if i >= k || args.contains(&i) {
                 return Err(SignatureError::InvalidTypeArgs);
             }
@@ -283,12 +285,14 @@ impl ValidateJustArgs for InterBlockArgsValidator {
         if arg_values.len() != 3 {
             return Err(SignatureError::InvalidTypeArgs);
         }
-        let k = arg_values[0].as_nat().unwrap();
+        let k = arg_values[0]
+            .as_nat()
+            .ok_or(SignatureError::InvalidTypeArgs)?;
         if k == 0 || k % 2 == 1 {
             return Err(SignatureError::InvalidTypeArgs);
         }
         for arg in arg_values.iter().skip(1) {
-            let i = arg.as_nat().unwrap();
+            let i = arg.as_nat().ok_or(SignatureError::InvalidTypeArgs)?;
             if i >= k {
                 return Err(SignatureError::InvalidTypeArgs);
             }
