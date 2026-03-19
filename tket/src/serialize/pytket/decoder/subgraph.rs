@@ -65,9 +65,6 @@ impl<'h> PytketDecoderContext<'h> {
         qubits.iter().for_each(|q| {
             self.wire_tracker.mark_qubit_outdated(q.clone());
         });
-        bits.iter().for_each(|b| {
-            self.wire_tracker.mark_bit_outdated(b.clone());
-        });
 
         Ok(status)
     }

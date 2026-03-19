@@ -311,16 +311,9 @@ impl<'h> PytketDecoderContext<'h> {
         mut self,
         encoded_info: Option<&EncodedCircuitInfo>,
     ) -> Result<Node, PytketDecodeError> {
-        // Order the final wires according to the serial circuit register order.
-        let mut known_qubits: IndexSet<TrackedQubit> =
-            self.wire_tracker.known_pytket_qubits().cloned().collect();
-        let mut known_bits: IndexSet<TrackedBit> =
-            self.wire_tracker.known_pytket_bits().cloned().collect();
-
         // Qubits and bits appearing at the output.
         let mut qubits: Vec<TrackedQubit> = Vec::new();
         let mut bits: Vec<TrackedBit> = Vec::new();
-
         if let Some(encoded_info) = encoded_info {
             for qubit in encoded_info.output_qubits.iter() {
                 let id = self.wire_tracker.tracked_qubit_for_register(qubit)?;
@@ -332,7 +325,13 @@ impl<'h> PytketDecoderContext<'h> {
             }
         }
 
-        // Add any additional qubits or bits we have seen but haven't added to the list.
+        // Add any other qubit and bit names used throughout the circuit, in the
+        // order they were registered.
+        let mut known_qubits: IndexSet<TrackedQubit> =
+            self.wire_tracker.known_pytket_qubits().cloned().collect();
+        let mut known_bits: IndexSet<TrackedBit> =
+            self.wire_tracker.known_pytket_bits().cloned().collect();
+        // Ignore qubits and bits that were already added to the list.
         for q in &qubits {
             known_qubits.shift_remove(q);
         }

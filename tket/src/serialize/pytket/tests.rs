@@ -288,7 +288,7 @@ fn circ_preset_qubits() -> Hugr {
 }
 
 /// A simple circuit with some preset input and output bit registers,
-/// including multiple outputs for the same register.
+/// including multiple outputs of the same register.
 #[fixture]
 fn circ_preset_bits() -> Hugr {
     let input_t = vec![bool_type()];
