@@ -11,7 +11,8 @@ use hugr::{
 use smol_str::SmolStr;
 use std::f64::consts::PI;
 use std::sync::{Arc, Weak};
-use strum::{EnumIter, EnumString, IntoStaticStr};
+#[cfg_attr(not(test), expect(unused_imports, reason = "IntoEnumIterator"))]
+use strum::{EnumIter, EnumString, IntoEnumIterator, IntoStaticStr};
 
 use lazy_static::lazy_static;
 
@@ -248,7 +249,6 @@ mod test {
         builder::{DFGBuilder, DataflowHugr},
         ops::OpType,
     };
-    use strum::IntoEnumIterator;
 
     use super::*;
 

@@ -17,7 +17,9 @@ use hugr::{
 };
 use lazy_static::lazy_static;
 use smol_str::SmolStr;
-use strum::{EnumIter, EnumString, IntoStaticStr};
+
+#[cfg_attr(not(test), expect(unused_imports, reason = "IntoEnumIterator"))]
+use strum::{EnumIter, EnumString, IntoEnumIterator, IntoStaticStr};
 
 /// The ID of the `tket.bool` extension.
 pub const BOOL_EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("tket.bool");
@@ -249,7 +251,6 @@ pub(crate) mod test {
         builder::{DFGBuilder, Dataflow, DataflowHugr},
         extension::{OpDef, simple_op::MakeExtensionOp},
     };
-    use strum::IntoEnumIterator;
 
     fn get_opdef(op: BoolOp) -> Option<&'static Arc<OpDef>> {
         BOOL_EXTENSION.get_op(&op.op_id())

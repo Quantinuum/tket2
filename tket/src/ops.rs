@@ -20,7 +20,8 @@ use hugr::{
 use derive_more::Display;
 use serde::{Deserialize, Serialize};
 use smol_str::ToSmolStr;
-use strum::{EnumIter, EnumString, IntoStaticStr};
+#[expect(unused_imports, reason = "IntoEnumIterator")]
+use strum::{EnumIter, EnumString, IntoEnumIterator, IntoStaticStr};
 
 /// Standar TKET quantum operations.
 #[derive(
