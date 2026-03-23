@@ -226,7 +226,8 @@ pub enum ComputeOp<T> {
 macro_rules! compute_opdef {
     ($ext_id:expr, $ext:ty, $opdef:ident) => {
         use serde::{Deserialize, Serialize};
-        use strum::{EnumIter, EnumString, IntoStaticStr};
+        #[expect(unused_imports, reason = "IntoEnumIterator")]
+        use strum::{EnumIter, EnumString, IntoEnumIterator, IntoStaticStr};
 
         #[derive(
             Clone,

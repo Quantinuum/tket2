@@ -12,7 +12,8 @@ use hugr::{
     ops::OpName,
 };
 use serde::{Deserialize, Serialize};
-use strum::{EnumIter, EnumString, IntoStaticStr};
+#[expect(unused_imports, reason = "IntoEnumIterator")]
+use strum::{EnumIter, EnumString, IntoEnumIterator, IntoStaticStr};
 
 use crate::modifier::{control::ModifierControl, dagger::ModifierDagger, power::ModifierPower};
 

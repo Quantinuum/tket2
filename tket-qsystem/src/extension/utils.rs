@@ -18,7 +18,8 @@ use hugr::{
 };
 use itertools::Itertools;
 use lazy_static::lazy_static;
-use strum::{EnumIter, EnumString, IntoStaticStr};
+#[cfg_attr(not(test), expect(unused_imports, reason = "IntoEnumIterator"))]
+use strum::{EnumIter, EnumString, IntoEnumIterator, IntoStaticStr};
 
 /// The extension ID for the utils extension.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("tket.qsystem.utils");
@@ -132,7 +133,6 @@ mod test {
         builder::{DataflowHugr, FunctionBuilder},
         extension::simple_op::MakeExtensionOp,
     };
-    use strum::IntoEnumIterator;
 
     use super::*;
 

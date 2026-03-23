@@ -33,7 +33,8 @@ use hugr::{
 use crate::extension::futures;
 use derive_more::Display;
 use lazy_static::lazy_static;
-use strum::{EnumIter, EnumString, IntoStaticStr};
+#[cfg_attr(not(test), expect(unused_imports, reason = "IntoEnumIterator"))]
+use strum::{EnumIter, EnumString, IntoEnumIterator, IntoStaticStr};
 use tket::extension::bool::{BoolOp, bool_type};
 
 use super::futures::future_type;
@@ -567,7 +568,6 @@ mod test {
     use hugr::builder::{DataflowHugr, FunctionBuilder};
     use hugr::extension::simple_op::MakeExtensionOp;
     use hugr::ops::OpType;
-    use strum::IntoEnumIterator as _;
 
     use super::*;
 

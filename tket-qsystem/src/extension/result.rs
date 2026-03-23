@@ -24,7 +24,8 @@ use hugr::{
 
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use strum::{EnumIter, EnumString, IntoStaticStr};
+#[cfg_attr(not(test), expect(unused_imports, reason = "IntoEnumIterator"))]
+use strum::{EnumIter, EnumString, IntoEnumIterator, IntoStaticStr};
 
 /// The "tket.result" extension id.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("tket.result");
@@ -417,7 +418,6 @@ pub(crate) mod test {
         std_extensions::collections::array::array_type,
     };
     use std::sync::Arc;
-    use strum::IntoEnumIterator;
 
     use super::*;
 
