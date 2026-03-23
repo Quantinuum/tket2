@@ -116,10 +116,6 @@ pub enum IcebergOpDef {
     all_but_one_rx,
     /// Rx gate on all but one qubit with dynamic index.
     all_but_one_rx_d,
-    /// Ry gate on all but one qubit.
-    all_but_one_ry,
-    /// Ry gate on all but one qubit with dynamic index.
-    all_but_one_ry_d,
     /// Rz gate on all but one qubit.
     all_but_one_rz,
     /// Rz gate on all but one qubit with dynamic index.
@@ -425,8 +421,6 @@ impl MakeOpDef for IcebergOpDef {
             all_rz => sig_1_block(1, 0),
             all_but_one_rx => sig_1_block(1, 1),
             all_but_one_rx_d => sig_1_block_d(1, 1),
-            all_but_one_ry => sig_1_block(1, 1),
-            all_but_one_ry_d => sig_1_block_d(1, 1),
             all_but_one_rz => sig_1_block(1, 1),
             all_but_one_rz_d => sig_1_block_d(1, 1),
             all_h => sig_1_block(0, 0),
@@ -586,8 +580,6 @@ impl MakeOpDef for IcebergOpDef {
             all_rz => "apply an Rz gate to all qubits",
             all_but_one_rx => "apply an Rx gate to all but one qubit",
             all_but_one_rx_d => "apply an Rx gate to all but one qubit with dynamic index",
-            all_but_one_ry => "apply an Ry gate to all but one qubit",
-            all_but_one_ry_d => "apply an Ry gate to all but one qubit with dynamic index",
             all_but_one_rz => "apply an Rz gate to all but one qubit",
             all_but_one_rz_d => "apply an Rz gate to all but one qubit with dynamic index",
             all_h => "apply an H gate to all qubits",
@@ -662,7 +654,7 @@ mod tests {
     fn test_iceberg_ops_extension() {
         assert_eq!(EXTENSION.name() as &str, "tket.qec.iceberg.ops");
         assert_eq!(EXTENSION.types().count(), 0);
-        assert_eq!(EXTENSION.operations().count(), 60);
+        assert_eq!(EXTENSION.operations().count(), 58);
     }
 
     #[test]
@@ -705,8 +697,8 @@ mod tests {
         let rx_d = EXTENSION
             .instantiate_extension_op("rx_d", [6.into()])
             .unwrap();
-        let allbutonery1 = EXTENSION
-            .instantiate_extension_op("all_but_one_ry", [6.into(), 1.into()])
+        let allbutonerz1 = EXTENSION
+            .instantiate_extension_op("all_but_one_rz", [6.into(), 1.into()])
             .unwrap();
         let allh = EXTENSION
             .instantiate_extension_op("all_h", [6.into()])
@@ -768,7 +760,7 @@ mod tests {
             .unwrap();
         linear
             .append_and_consume(
-                allbutonery1,
+                allbutonerz1,
                 [CircuitUnit::Linear(0), CircuitUnit::Wire(angle)],
             )
             .unwrap();
