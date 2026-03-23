@@ -542,15 +542,6 @@ impl WireTracker {
         qubit
     }
 
-    /// Mark a bit as outdated, without adding a new wire containing the fresh value.
-    ///
-    /// This is used when a hugr operation consumes pytket registers as its inputs, but doesn't use them in the outputs.
-    pub fn mark_bit_outdated(&mut self, mut bit: TrackedBit) -> TrackedBit {
-        self.bits[bit.id().0].mark_outdated();
-        bit.mark_outdated();
-        bit
-    }
-
     /// Returns the latest tracked qubit for a pytket register.
     ///
     /// Returns an error if the register is not known.
@@ -689,10 +680,12 @@ impl WireTracker {
         let qubit_candidates = qubit_args
             .first()
             .into_iter()
+            .filter(|_| reg_count.qubits > 0 && !qubit_args.is_empty())
             .flat_map(|qb| self.qubit_wires(qb));
         let bit_candidates = bit_args
             .first()
             .into_iter()
+            .filter(|_| reg_count.bits > 0 && !bit_args.is_empty())
             .flat_map(|bit| self.bit_wires(bit));
         let candidates = qubit_candidates.chain(bit_candidates).collect_vec();
 
@@ -765,14 +758,13 @@ impl WireTracker {
         *bit_args = &bit_args[reg_count.bits..];
 
         // Convert the wire type, if needed.
-        let wire_data = &self.wires[&wire];
-        let new_wire = config.transform_typed_value(wire, wire_data.ty(), ty, builder)?;
+        let found_wire_data = &self.wires[&wire];
+        let new_wire = config.transform_typed_value(wire, found_wire_data.ty(), ty, builder)?;
 
         if wire == new_wire {
             Ok(FoundWire::Register(self.wires[&wire].clone()))
         } else {
-            let ty: Arc<Type> = wire_data.ty.clone();
-            self.track_wire(new_wire, ty, wire_qubits, wire_bits)?;
+            self.track_wire(new_wire, Arc::new(ty.clone()), wire_qubits, wire_bits)?;
             self.mark_wire_outdated(wire);
             Ok(FoundWire::Register(self.wires[&new_wire].clone()))
         }

@@ -59,7 +59,7 @@ impl<H: HugrView> PytketEmitter<H> for BoolEmitter {
         // variable inputs. If new [`BoolOp`]s are added that do not follow
         // this, the following code will need to be adjusted.
         let bit_count = (num_inputs + num_outputs) as usize;
-        let output_bits = (0..num_outputs).collect_vec();
+        let output_bits = (num_inputs..(num_inputs + num_outputs)).collect_vec();
         let mut expression = ClOperator::default();
         expression.op = clop;
         expression.args = (0..num_inputs)
@@ -67,7 +67,10 @@ impl<H: HugrView> PytketEmitter<H> for BoolEmitter {
             .collect_vec();
 
         let op = make_tk1_classical_expression(bit_count, &output_bits, &[], expression);
-        encoder.emit_node_command(node, hugr, EmitCommandOptions::new(), move |_| op)?;
+        // Output bits should use new registers, so don't reuse any input bits.
+        let dont_reuse_inputs = EmitCommandOptions::new().reuse_bits(|_| vec![]);
+        encoder.emit_node_command(node, hugr, dont_reuse_inputs, move |_| op)?;
+
         Ok(EncodeStatus::Success)
     }
 
@@ -186,4 +189,52 @@ pub(crate) fn set_bits_op(values: &[bool]) -> tket_json_rs::circuit_json::Operat
             values: values.to_vec(),
         },
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::extension::bool::bool_type;
+    use crate::serialize::pytket::{EncodeOptions, TKETDecode};
+    use hugr::builder::{Dataflow, DataflowHugr, FunctionBuilder};
+    use hugr::types::Signature;
+    use rstest::rstest;
+    use tket_json_rs::circuit_json::SerialCircuit;
+
+    /// ClExprs .
+    #[rstest]
+    #[case::not(BoolOp::not, 1)]
+    #[case::and(BoolOp::and, 2)]
+    #[case::or(BoolOp::or, 2)]
+    #[case::xor(BoolOp::xor, 2)]
+    #[case::eq(BoolOp::eq, 2)]
+    fn bool_op_output_uses_fresh_bits(#[case] op: BoolOp, #[case] num_inputs: usize) {
+        let input_t: Vec<_> = (0..num_inputs).map(|_| bool_type()).collect();
+        let output_t = vec![bool_type()];
+        let mut h = FunctionBuilder::new("bool_op", Signature::new(input_t, output_t)).unwrap();
+        let inputs: Vec<_> = h.input_wires().collect();
+        let [out] = h.add_dataflow_op(op, inputs).unwrap().outputs_arr();
+        let hugr = h.finish_hugr_with_outputs([out]).unwrap();
+
+        let ser = SerialCircuit::encode(&hugr, EncodeOptions::new()).unwrap();
+
+        let clexpr_cmd = ser
+            .commands
+            .iter()
+            .find(|cmd| cmd.op.op_type == tket_json_rs::OpType::ClExpr)
+            .expect("Expected a ClExpr command in the encoded circuit");
+
+        // Args layout for a BoolOp: [input_bits..., output_bit]
+        // The output bit must use a fresh register, not one of the input bits.
+        assert_eq!(clexpr_cmd.args.len(), num_inputs + 1);
+        let input_args = &clexpr_cmd.args[..num_inputs];
+        let output_args = &clexpr_cmd.args[num_inputs..];
+        for output_arg in output_args {
+            assert!(
+                !input_args.contains(output_arg),
+                "Output bit {output_arg} reuses an input bit register. Input args: {}",
+                input_args.iter().join(", ")
+            );
+        }
+    }
 }

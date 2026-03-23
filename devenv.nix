@@ -22,6 +22,9 @@ in
     pkgs.ncurses
     pkgs.stdenv.cc.cc.lib
     pkgs.conan
+    # cmake is needed for conan to build packages from source when
+    # prebuilt binaries aren't available for Nix's clang version.
+    pkgs.cmake
 
   ] ++ lib.optionals pkgs.stdenv.isDarwin [
     pkgs.xz

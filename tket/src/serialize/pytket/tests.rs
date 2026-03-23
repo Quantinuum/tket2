@@ -16,7 +16,7 @@ use std::sync::Arc;
 use super::TKETDecode;
 use crate::TketOp;
 use crate::extension::TKET1_EXTENSION_ID;
-use crate::extension::bool::{BoolOp, bool_type};
+use crate::extension::bool::{BoolOp, ConstBool, bool_type};
 use crate::extension::rotation::{ConstRotation, RotationOp, rotation_type};
 use crate::extension::sympy::SympyOpDef;
 use crate::metadata;
@@ -282,6 +282,35 @@ fn circ_preset_qubits() -> Hugr {
         .into_iter()
         .map(Qubit::from)
         .collect_vec(),
+    );
+
+    hugr
+}
+
+/// A simple circuit with some preset input and output bit registers,
+/// including multiple outputs of the same register.
+#[fixture]
+fn circ_preset_bits() -> Hugr {
+    let input_t = vec![bool_type()];
+    let output_t = vec![bool_type(), bool_type(), bool_type()];
+    let mut h = FunctionBuilder::new("preset_bits", Signature::new(input_t, output_t)).unwrap();
+
+    let [b0] = h.input_wires_arr();
+    let b1 = h.add_load_value(ConstBool::new(false));
+    let [b_and] = h
+        .add_dataflow_op(BoolOp::and, [b0, b1])
+        .unwrap()
+        .outputs_arr();
+
+    let mut hugr = h.finish_hugr_with_outputs([b0, b_and, b0]).unwrap();
+
+    // A preset register for the first qubit output
+    hugr.set_metadata::<metadata::BitRegisters>(
+        hugr.entrypoint(),
+        vec![ElementId(String::from("b"), vec![1])]
+            .into_iter()
+            .map(register::Bit::from)
+            .collect_vec(),
     );
 
     hugr
@@ -963,6 +992,7 @@ fn encoded_circuit_attributes(circ_measure_ancilla: Hugr) {
 #[rstest]
 #[case::meas_ancilla(circ_measure_ancilla(), CircuitRoundtripTestConfig::Default)]
 #[case::preset_qubits(circ_preset_qubits(), CircuitRoundtripTestConfig::Default)]
+#[case::preset_bits(circ_preset_bits(), CircuitRoundtripTestConfig::Default)]
 #[case::preset_parameterized(circ_parameterized(), CircuitRoundtripTestConfig::Default)]
 // TODO: Should pass once CircBox encoding of DFGs is re-enabled.
 #[should_panic(expected = "Cannot encode subgraphs with nested structure")]
@@ -1070,6 +1100,7 @@ fn fail_on_modified_hugr(circ_tk1_ops: Hugr) {
 #[rstest]
 #[case::meas_ancilla(circ_measure_ancilla(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::preset_qubits(circ_preset_qubits(), 1, CircuitRoundtripTestConfig::Default)]
+#[case::preset_bits(circ_preset_bits(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::preset_parameterized(circ_parameterized(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::nested_dfgs(circ_nested_dfgs(), 2, CircuitRoundtripTestConfig::Default)]
 #[case::flat_opaque(circ_tk1_ops(), 1, CircuitRoundtripTestConfig::Default)]

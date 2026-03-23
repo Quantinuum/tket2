@@ -4,6 +4,13 @@ on:
     branches:
       - main
 
+env:
+  # different strings for install action and feature name
+  # adapted from https://github.com/TheDan64/inkwell/blob/master/.github/workflows/test.yml
+  LLVM_MAIN_VERSION: "21"
+  LLVM_VERSION: "21.1"
+  LLVM_FEATURE_NAME: "21-1"
+
 jobs:
   # Check if changes were made to the relevant files.
   # Always returns true if running on the default branch, to ensure all changes are thoroughly checked.
@@ -41,10 +48,12 @@ jobs:
         uses: ./.github/actions/tket-c-api
         with:
           install-path: ${{ env.TKET_C_API_PATH }}
-      - name: Install LLVM from apt
+      - name: Install LLVM and Clang
         run: |
-          echo "Installing apt dependencies: llvm-14"
-          sudo apt-get install -y llvm-14
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          sudo add-apt-repository 'deb http://apt.llvm.org/noble/   llvm-toolchain-noble-${{ env.LLVM_MAIN_VERSION }}  main'
+          sudo apt update
+          sudo apt install llvm-${{ env.LLVM_MAIN_VERSION }} libpolly-${{ env.LLVM_MAIN_VERSION }}-dev
       - uses: quantinuum/hugrverse-actions/rs-semver-checks@main
         env:
           TKET_C_API_PATH: ${{ env.TKET_C_API_PATH }}

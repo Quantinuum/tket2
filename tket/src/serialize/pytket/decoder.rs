@@ -311,34 +311,36 @@ impl<'h> PytketDecoderContext<'h> {
         mut self,
         encoded_info: Option<&EncodedCircuitInfo>,
     ) -> Result<Node, PytketDecodeError> {
-        // Order the final wires according to the serial circuit register order.
-        let known_qubits = self
-            .wire_tracker
-            .known_pytket_qubits()
-            .cloned()
-            .collect_vec();
-        let known_bits = self.wire_tracker.known_pytket_bits().cloned().collect_vec();
-
         // Qubits and bits appearing at the output.
-        let mut qubits: IndexSet<TrackedQubit> = IndexSet::new();
-        let mut bits: IndexSet<TrackedBit> = IndexSet::new();
-
+        let mut qubits: Vec<TrackedQubit> = Vec::new();
+        let mut bits: Vec<TrackedBit> = Vec::new();
         if let Some(encoded_info) = encoded_info {
             for qubit in encoded_info.output_qubits.iter() {
                 let id = self.wire_tracker.tracked_qubit_for_register(qubit)?;
-                qubits.insert(id.clone());
+                qubits.push(id.clone());
             }
             for bit in encoded_info.output_bits.iter() {
                 let id = self.wire_tracker.tracked_bit_for_register(bit)?;
-                bits.insert(id.clone());
+                bits.push(id.clone());
             }
         }
-        // Add any additional qubits or bits we have seen, without modifying the
-        // order of the qubits already there.
+
+        // Add any other qubit and bit names used throughout the circuit, in the
+        // order they were registered.
+        let mut known_qubits: IndexSet<TrackedQubit> =
+            self.wire_tracker.known_pytket_qubits().cloned().collect();
+        let mut known_bits: IndexSet<TrackedBit> =
+            self.wire_tracker.known_pytket_bits().cloned().collect();
+        // Ignore qubits and bits that were already added to the list.
+        for q in &qubits {
+            known_qubits.shift_remove(q);
+        }
+        for b in &bits {
+            known_bits.shift_remove(b);
+        }
         qubits.extend(known_qubits);
         bits.extend(known_bits);
-        let qubits: Vec<TrackedQubit> = Vec::from_iter(qubits);
-        let bits: Vec<TrackedBit> = Vec::from_iter(bits);
+
         let mut qubits_slice: &[TrackedQubit] = &qubits;
         let mut bits_slice: &[TrackedBit] = &bits;
 
@@ -623,11 +625,6 @@ impl<'h> PytketDecoderContext<'h> {
     /// and pytket parameters. Registers the node's output wires in the wire
     /// tracker.
     ///
-    /// The qubits registers in `wires` are reused between the operation inputs
-    /// and outputs. Bit registers, on the other hand, are not reused. We use
-    /// the first registers in `wires` for the bit inputs and the remaining
-    /// registers for the outputs.
-    ///
     /// The input wire types must match the operation's input signature, no type
     /// conversion is performed.
     ///
@@ -741,9 +738,6 @@ impl<'h> PytketDecoderContext<'h> {
                 .hugr_mut()
                 .connect(wire.node(), wire.source(), node, input_idx);
         }
-        input_bits.iter().take(op_input_count.bits).for_each(|b| {
-            self.wire_tracker.mark_bit_outdated(b.clone());
-        });
 
         // Register the output wires.
         let output_qubits = output_qubits.iter().take(op_output_count.qubits).cloned();
@@ -814,9 +808,8 @@ impl<'h> PytketDecoderContext<'h> {
     /// Given a new node in the HUGR, register all of its output wires in the
     /// tracker.
     ///
-    /// Consumes the bits and qubits in order. Any unused bits and qubits are
-    /// marked as outdated, as they are assumed to have been consumed in the
-    /// inputs.
+    /// Consumes the bits and qubits in order. Any unused qubits are marked as
+    /// outdated, as they are assumed to have been consumed in the inputs.
     pub fn register_node_outputs(
         &mut self,
         node: Node,
@@ -861,12 +854,9 @@ impl<'h> PytketDecoderContext<'h> {
                 .track_wire(wire, Arc::new(ty.clone()), wire_qubits, wire_bits)?;
         }
 
-        // Mark any unused qubits and bits as outdated.
+        // Mark any unused qubits as outdated.
         qubits.for_each(|q| {
             self.wire_tracker.mark_qubit_outdated(q);
-        });
-        bits.for_each(|b| {
-            self.wire_tracker.mark_bit_outdated(b);
         });
 
         Ok(())
