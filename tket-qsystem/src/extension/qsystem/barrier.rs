@@ -6,7 +6,7 @@ pub use barrier_inserter::BarrierInserter;
 mod test {
     use super::*;
 
-    use crate::extension::qsystem::{self, lower_tk2_op};
+    use crate::extension::qsystem::{self, lower_tk2_ops};
     use hugr::builder::{Dataflow, DataflowHugr};
     use hugr::extension::prelude::Barrier;
     use hugr::std_extensions::collections::borrow_array::borrow_array_type;
@@ -59,7 +59,7 @@ mod test {
         };
 
         // lower barrier to barrier + runtime barrier
-        let lowered = lower_tk2_op(&mut h, Preserve::Public).unwrap_or_else(|e| panic!("{}", e));
+        let lowered = lower_tk2_ops(&mut h, Preserve::Public).unwrap_or_else(|e| panic!("{}", e));
         h.validate().unwrap_or_else(|e| panic!("{}", e));
         assert!(matches!(&lowered[..], [n] if barr_n == *n));
 

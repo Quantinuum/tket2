@@ -114,9 +114,7 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for NormalizeGuppy {
         }
         // When we do function inlining, do this after, to sort out argument marshalling
         if self.untuple {
-            UntuplePass::default()
-                .with_scope(self.scope.clone())
-                .run(hugr)?;
+            UntuplePass::default_with_scope(self.scope.clone()).run(hugr)?;
         }
         // Should propagate through untuple, so could do earlier, and must be before BorrowSquash
         if self.constant_fold {

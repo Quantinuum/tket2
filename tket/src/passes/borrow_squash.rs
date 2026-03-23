@@ -54,18 +54,17 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for BorrowSquashPass {
         // Seen nodes and queue used in each region. Shared and cleared between
         // loops to minimize re-allocations.
         let mut seen = HashSet::new();
-        let mut local_queue = VecDeque::new();
+        let mut op_queue = VecDeque::new();
         while let Some(region) = regions.pop_front() {
             let is_dataflow_region = OpTag::DataflowParent >= hugr.get_optype(region).tag();
             seen.clear();
-            local_queue.clear();
+            op_queue.clear(); // Should already be empty, but just in case.
 
-            // Start with all nodes not reachable along dataflow edges from other nodes. (Includes Input.)
             for child in hugr.children(region) {
                 // If the node is not reachable along dataflow edges from other nodes,
                 // it is a fresh value.
                 if is_dataflow_region && hugr.in_value_types(child).next().is_none() {
-                    local_queue.extend(all_outs(hugr, child));
+                    op_queue.extend(all_outs(hugr, child));
                 }
                 // If the node is a container, mark it as a region to be processed.
                 if self.scope.recursive() && hugr.children(child).next().is_some() {
@@ -73,11 +72,11 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for BorrowSquashPass {
                 }
             }
 
-            while let Some(start) = local_queue.pop_front() {
+            while let Some(start) = op_queue.pop_front() {
                 if !seen.insert(start) {
                     continue;
                 }
-                let elided = borrow_squash_traversal(hugr, &mut local_queue, start, true);
+                let elided = borrow_squash_traversal(hugr, &mut op_queue, start, true);
                 results.extend(elided);
             }
         }

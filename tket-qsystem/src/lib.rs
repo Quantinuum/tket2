@@ -34,6 +34,10 @@ use extension::{
 /// Modify a [hugr::Hugr] into a form that is acceptable for ingress into a
 /// Q-System. Returns an error if this cannot be done.
 ///
+/// This pass should only be applied with [`PassScope::Global`] scopes on HUGRs
+/// with function entrypoints. An error will be returned if this is not the
+/// case.
+///
 /// To construct a `QSystemPass` use [Default::default].
 #[derive(Debug, Clone)]
 pub struct QSystemPass {
@@ -87,13 +91,19 @@ pub enum QSystemPassError<N = Node> {
     /// [Module]: hugr::ops::Module
     #[display("No function named 'main' in module.")]
     NoMain,
+    /// QSystemPass was applied with a local scope.
+    #[display("QSystemPass was applied with a local scope {scope}")]
+    LocalScopeError {
+        /// The scope that was applied.
+        scope: PassScope,
+    },
 }
 
 impl QSystemPass {
     /// Returns a new `QSystemPass` with constant folding enabled according to
     /// `constant_fold`.
     ///
-    /// Off by default.
+    /// On by default
     pub fn with_constant_fold(mut self, constant_fold: bool) -> Self {
         self.constant_fold = constant_fold;
         self
@@ -103,13 +113,12 @@ impl QSystemPass {
     /// `monomorphize`.
     ///
     /// On by default.
-    pub fn with_monormophize(mut self, monomorphize: bool) -> Self {
+    pub fn with_monomorphize(mut self, monomorphize: bool) -> Self {
         self.monomorphize = monomorphize;
         self
     }
 
-    /// Returns a new `QSystemPass` with forcing the HUGR to have
-    /// totally-ordered ops enabled according to `force_order`.
+    /// Changes whether we force a total ordering on all ops in the Hugr.
     ///
     /// On by default.
     ///
@@ -120,8 +129,7 @@ impl QSystemPass {
         self
     }
 
-    /// Returns a new `QSystemPass` with lazification enabled according to
-    /// `lazify`.
+    /// Enables or disables lazification of quantum measurement ops.
     ///
     /// On by default.
     ///
@@ -240,6 +248,12 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for QSystemPass {
     /// validation, if enabled.
     /// Expects the HUGR to have a function entrypoint.
     fn run(&self, hugr: &mut H) -> Result<(), QSystemPassError> {
+        if !matches!(self.scope, PassScope::Global(_)) {
+            return Err(QSystemPassError::LocalScopeError {
+                scope: self.scope.clone(),
+            });
+        }
+
         if self.monomorphize {
             MonomorphizePass::default_with_scope(self.scope.clone())
                 .run(hugr)
