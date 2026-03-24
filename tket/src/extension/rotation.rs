@@ -207,7 +207,7 @@ impl MakeOpDef for RotationOp {
             // thus they have the same folding.
             RotationOp::from_halfturns | RotationOp::from_halfturns_unchecked => {
                 def.set_constant_folder(|consts: &[(IncomingPort, Value)]| {
-                    let (_, v) = consts.get(0)?;
+                    let (_, v) = consts.first()?;
                     let f = v.get_custom_value::<ConstF64>()?;
                     let rot = ConstRotation::new(f.value()).ok()?;
                     fold_out_row([Value::extension(rot)])
@@ -216,7 +216,7 @@ impl MakeOpDef for RotationOp {
 
             RotationOp::to_halfturns => {
                 def.set_constant_folder(|consts: &[(IncomingPort, Value)]| {
-                    let (_, v) = consts.get(0)?;
+                    let (_, v) = consts.first()?;
                     let rot = v.get_custom_value::<ConstRotation>()?;
                     fold_out_row([Value::extension(ConstF64::new(rot.half_turns()))])
                 });
