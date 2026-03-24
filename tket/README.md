@@ -11,7 +11,6 @@ different quantum architectures.
 
 Circuits are represented using the HUGR IR defined in the
 [hugr] crate. TKET augments Hugr with
-
 * The [`Circuit`] trait, providing a high-level interface for working with HUGRs representing quantum circuits
 * a HUGR extension with quantum operations
 * A composable pass system for optimising circuits
@@ -22,8 +21,7 @@ encoding.
 
 # Using TKET
 
-Defining a circuit in TKET is currently done by using the low-level [hugr Builder] API, or by loading tket1 circuits
-from JSON files.
+Defining a circuit in TKET is currently done by using the low-level [hugr Builder] API, or by loading tket1 circuits from JSON files.
 
 ```rust
 use std::io::BufReader;
@@ -74,26 +72,15 @@ See [DEVELOPMENT.md][] for instructions on setting up the development environmen
 
 This project is licensed under Apache License, Version 2.0 ([LICENSE][] or http://www.apache.org/licenses/LICENSE-2.0).
 
-[build_status]: https://github.com/quantinuum/tket2/actions/workflows/ci.yml/badge.svg
-
-[msrv]: https://img.shields.io/crates/msrv/tket
-
-[codecov]: https://img.shields.io/codecov/c/gh/quantinuum/tket2?logo=codecov
-
-[hugr]: https://lib.rs/crates/hugr
-
-[hugr Builder]: https://docs.rs/hugr/latest/hugr/builder/index.html
-
-[API documentation here]: https://docs.rs/tket/
-
-[`Circuit`]: https://docs.rs/tket/latest/tket/trait.Circuit.html
-
-[`pytket`]: https://github.com/quantinuum/tket
-
-[`portmatching`]: https://lib.rs/crates/portmatching
-
-[LICENSE]: https://github.com/quantinuum/tket2/blob/main/LICENCE
-
-[CHANGELOG]: https://github.com/quantinuum/tket2/blob/main/tket/CHANGELOG.md
-
-[DEVELOPMENT.md]: https://github.com/quantinuum/tket2/blob/main/DEVELOPMENT.md
+  [build_status]: https://github.com/quantinuum/tket2/actions/workflows/ci.yml/badge.svg
+  [msrv]: https://img.shields.io/crates/msrv/tket
+  [codecov]: https://img.shields.io/codecov/c/gh/quantinuum/tket2?logo=codecov
+  [hugr]: https://lib.rs/crates/hugr
+  [hugr Builder]: https://docs.rs/hugr/latest/hugr/builder/index.html
+  [API documentation here]: https://docs.rs/tket/
+  [`Circuit`]: https://docs.rs/tket/latest/tket/trait.Circuit.html
+  [`pytket`]: https://github.com/quantinuum/tket
+  [`portmatching`]: https://lib.rs/crates/portmatching
+  [LICENSE]: https://github.com/quantinuum/tket2/blob/main/LICENCE
+  [CHANGELOG]: https://github.com/quantinuum/tket2/blob/main/tket/CHANGELOG.md
+  [DEVELOPMENT.md]: https://github.com/quantinuum/tket2/blob/main/DEVELOPMENT.md
