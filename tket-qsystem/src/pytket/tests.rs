@@ -312,7 +312,7 @@ fn circuit_standalone_roundtrip(#[case] hugr: Hugr) {
     )
     .unwrap();
     validate_serial_circ(&reser);
-    compare_serial_circs(&ser, &reser);
+    compare_serial_circs(ser, &reser);
 }
 
 #[rstest]
