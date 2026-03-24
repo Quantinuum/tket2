@@ -30,7 +30,7 @@ use tket::serialize::{TKETDecode, pytket::DecodeOptions};
 use tket_json_rs::circuit_json::SerialCircuit;
 
 // Load a tket1 circuit.
-let reader = BufReader::new(std::fs::File::open("test_files/pytket/barenco_tof_5.json").unwrap());
+let reader = BufReader::new(std::fs::File::open("../test_files/pytket/barenco_tof_5.json").unwrap());
 let ser: SerialCircuit = serde_json::from_reader(reader).unwrap();
 let mut circ: Circuit = ser.decode(DecodeOptions::new()).unwrap().into();
 
