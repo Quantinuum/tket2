@@ -41,14 +41,14 @@ assert_eq!(circ.num_operations(), 170);
 
 // Traverse the circuit and print the gates.
 for command in circ.commands() {
-    println ! ("{:?}", command.optype());
+    println!("{:?}", command.optype());
 }
 
 // Render the circuit as a mermaid diagram.
 println!("{}", circ.mermaid_string());
 
 // Optimise the circuit.
-tket::passes::apply_greedy_commutation( & mut circ).unwrap();
+tket::passes::apply_greedy_commutation(&mut circ).unwrap();
 ```
 
 Please read the [API documentation here][].
