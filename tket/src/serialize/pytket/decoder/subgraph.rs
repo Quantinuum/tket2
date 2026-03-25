@@ -269,6 +269,8 @@ impl<'h> PytketDecoderContext<'h> {
         let [old_input, old_output] = self.builder.hugr().get_io(old_parent).expect("IO nodes");
         let [new_input, new_output] = self.builder.hugr().get_io(new_parent).expect("IO nodes");
 
+        // Find the order edge ports.
+        // Since we are in a dataflow region, nodes are guaranteed to have an order-edge `other_port`s.
         let order_out = |node: Node| {
             self.builder
                 .hugr()
