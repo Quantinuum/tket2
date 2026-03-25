@@ -19,6 +19,7 @@ use super::{
 type PV<V, N> = PartialValue<V, N>;
 
 type NodeInputs<V, N> = Vec<(IncomingPort, PV<V, N>)>;
+type NodeOutputs<V, N> = Vec<(OutgoingPort, PV<V, N>)>;
 
 /// Basic structure for performing an analysis. Usage:
 /// 1. Make a new instance via [`Self::new()`]
@@ -31,6 +32,7 @@ type NodeInputs<V, N> = Vec<(IncomingPort, PV<V, N>)>;
 pub struct Machine<H: HugrView, V: AbstractValue> {
     hugr: H,
     in_wire_proto: HashMap<H::Node, NodeInputs<V, H::Node>>,
+    out_wire_proto: HashMap<H::Node, NodeOutputs<V, H::Node>>,
 }
 
 impl<H: HugrView, V: AbstractValue> Machine<H, V> {
@@ -39,6 +41,7 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
         Self {
             hugr,
             in_wire_proto: Default::default(),
+            out_wire_proto: Default::default(),
         }
     }
 }
@@ -149,16 +152,22 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
                 .into_iter()
                 .flat_map(|(n, vals)| vals.into_iter().map(move |(ip, v)| (n, ip, v)))
                 .collect(),
+            self.out_wire_proto
+                .into_iter()
+                .flat_map(|(n, vals)| vals.into_iter().map(move |(op, v)| (n, op, v)))
+                .collect(),
         )
     }
 }
 
 pub(super) type InWire<V, N> = (N, IncomingPort, PartialValue<V, N>);
+type OutWire<V, N> = (N, OutgoingPort, PartialValue<V, N>);
 
-pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
+fn run_datalog<V: AbstractValue, H: HugrView>(
     mut ctx: impl DFContext<V, Node = H::Node>,
     hugr: H,
     in_wire_value_proto: Vec<InWire<V, H::Node>>,
+    out_wire_value_proto: Vec<OutWire<V, H::Node>>,
 ) -> AnalysisResults<V, H> {
     // ascent-(macro-)generated code generates a bunch of warnings,
     // keep code in here to a minimum.
@@ -198,6 +207,7 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
 
         // Initialize all wires to bottom
         out_wire_value(n, p, PV::bottom()) <-- out_wire(n, p);
+        in_wire_value(n, p, PV::bottom()) <-- in_wire(n, p);
 
         // Outputs to inputs
         in_wire_value(n, ip, v) <-- in_wire(n, ip),
@@ -205,11 +215,17 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
             out_wire_value(m, op, v);
 
         // Prepopulate in_wire_value from in_wire_value_proto.
-        in_wire_value(n, p, PV::bottom()) <-- in_wire(n, p);
+
         in_wire_value(n, p, v) <-- for (n, p, v) in &in_wire_value_proto,
           node(n),
           if let Some(sig) = hugr.signature(*n),
           if sig.input_ports().contains(p);
+
+        // Prepopulate out_wire_value from out_wire_value_proto.
+        out_wire_value(n, p, v) <-- for (n, p, v) in &out_wire_value_proto,
+          node(n),
+          if let Some(sig) = hugr.signature(*n),
+          if sig.output_ports().contains(p);
 
         // Assemble node_in_value_row from in_wire_value's
         node_in_value_row(n, ValueRow::new(sig.input_count())) <-- node(n), if let Some(sig) = hugr.signature(*n);
