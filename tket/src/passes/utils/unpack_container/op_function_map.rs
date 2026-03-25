@@ -1,5 +1,7 @@
 //! Mapping from extension operation instances to function definitions
 //! that can be used to replace them.
+use crate::passes::monomorphize::mangle_name;
+use crate::passes::{ReplaceTypes, replace_types::NodeTemplate};
 use hugr::HugrView;
 use hugr::builder::{Container, Dataflow, HugrBuilder};
 use hugr::hugr::linking::OnMultiDefn;
@@ -13,7 +15,6 @@ use hugr::{
 };
 use hugr_core::Visibility;
 use hugr_core::hugr::linking::NameLinkingPolicy;
-use hugr_passes::{ReplaceTypes, mangle_name, replace_types::NodeTemplate};
 use indexmap::IndexMap;
 use std::{cell::RefCell, ops::Deref};
 

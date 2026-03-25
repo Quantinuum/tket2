@@ -34,7 +34,7 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
 }
 
 create_py_exception!(
-    tket::passes::PullForwardError,
+    tket::passes::commutation::PullForwardError,
     PyPullForwardError,
     "Error from a `PullForward` operation"
 );

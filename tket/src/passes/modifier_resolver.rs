@@ -1,12 +1,10 @@
 //! Pass to resolve modifiers (control/dagger/power) in a Hugr.
+use crate::modifier::modifier_resolver::resolve_modifier_with_entrypoints;
+use crate::passes::{ComposablePass, PassScope, WithScope};
 use hugr::Node;
 use hugr::hugr::hugrmut::HugrMut;
-use hugr_passes::composable::WithScope;
-use hugr_passes::{ComposablePass, PassScope};
 
-use crate::modifier::modifier_resolver::ModifierResolverErrors;
-
-use super::modifier_resolver::resolve_modifier_with_entrypoints;
+pub use crate::modifier::modifier_resolver::ModifierResolverErrors;
 
 /// A pass to resolve modifiers (control/dagger/power) in a Hugr.
 #[derive(Default)]
@@ -16,7 +14,7 @@ pub struct ModifierResolverPass {
 }
 
 impl WithScope for ModifierResolverPass {
-    fn with_scope(mut self, scope: impl Into<hugr_passes::PassScope>) -> Self {
+    fn with_scope(mut self, scope: impl Into<crate::passes::PassScope>) -> Self {
         self.scope = scope.into();
         self
     }

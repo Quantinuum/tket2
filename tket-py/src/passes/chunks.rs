@@ -3,7 +3,7 @@
 use derive_more::From;
 use pyo3::exceptions::PyAttributeError;
 use pyo3::prelude::*;
-use tket::passes::CircuitChunks;
+use tket::passes::utils::CircuitChunks;
 
 use crate::circuit::CircuitType;
 use crate::circuit::{try_with_circ, with_circ};
@@ -23,7 +23,7 @@ pub fn chunks(c: &Bound<PyAny>, max_chunk_size: usize) -> PyResult<PyCircuitChun
 ///
 /// Python equivalent of [`CircuitChunks`].
 ///
-/// [`CircuitChunks`]: tket::passes::chunks::CircuitChunks
+/// [`CircuitChunks`]: tket::passes::utils::CircuitChunks
 #[pyclass(from_py_object)]
 #[pyo3(name = "CircuitChunks")]
 #[derive(Debug, Clone, From)]

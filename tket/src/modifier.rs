@@ -14,7 +14,6 @@ use hugr::{
     ops::ExtensionOp,
 };
 
-mod pass;
 use crate::extension::modifier::Modifier;
 pub mod control;
 pub mod dagger;
@@ -22,7 +21,6 @@ pub mod modifier_resolver;
 pub mod power;
 
 use crate::metadata;
-pub use pass::ModifierResolverPass;
 
 /// An accumulated modifier that combines control, dagger, and power modifiers.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]

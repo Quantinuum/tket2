@@ -2,8 +2,9 @@
 //! container types like array and tuple.
 
 pub mod op_function_map;
-pub use op_function_map::OpFunctionMap;
 pub mod type_unpack;
+
+pub use op_function_map::OpFunctionMap;
 pub use type_unpack::TypeUnpacker;
 
 use hugr::{

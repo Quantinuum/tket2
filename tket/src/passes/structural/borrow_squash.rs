@@ -428,8 +428,10 @@ mod test {
     #[fixture]
     fn ranges_array() -> Hugr {
         let reader = BufReader::new(
-            include_bytes!("../../../test_files/guppy_optimization/ranges/ranges.flat.array.hugr")
-                .as_slice(),
+            include_bytes!(
+                "../../../../test_files/guppy_optimization/ranges/ranges.flat.array.hugr"
+            )
+            .as_slice(),
         );
         Hugr::load(reader, Some(&REGISTRY)).unwrap()
     }
@@ -496,8 +498,10 @@ mod test {
         let inner_array_type = BorrowArray::ty(5, qb_t());
         let outer_array_type = BorrowArray::ty(3, inner_array_type.clone());
         let reader = BufReader::new(
-            include_bytes!("../../../test_files/guppy_optimization/nested_array/nested_array.hugr")
-                .as_slice(),
+            include_bytes!(
+                "../../../../test_files/guppy_optimization/nested_array/nested_array.hugr"
+            )
+            .as_slice(),
         );
         let mut h = Hugr::load(reader, Some(&REGISTRY)).unwrap();
         let array_func = h
