@@ -214,6 +214,8 @@ impl MakeOpDef for RotationOp {
                 });
             }
 
+            // Since ConstF64 cannot be NaN or infinite,
+            // when folding a from_halfturns we always return `Some`.
             RotationOp::from_halfturns => {
                 def.set_constant_folder(|consts: &[(IncomingPort, Value)]| {
                     let (_, v) = consts.first()?;
