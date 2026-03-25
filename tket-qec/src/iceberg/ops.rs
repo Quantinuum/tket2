@@ -172,24 +172,20 @@ pub struct ConcreteIcebergOp {
     pub def: IcebergOpDef,
 
     /// The block size.
-    pub k: u64,
+    pub k: TypeArg,
 
     /// Qubit index parameters.
-    pub indices: Vec<u64>,
+    pub indices: Vec<TypeArg>,
 }
 
 impl HasConcrete for IcebergOpDef {
     type Concrete = ConcreteIcebergOp;
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
-        let args: Vec<u64> = type_args
-            .iter()
-            .map(|arg| arg.as_nat().ok_or(SignatureError::InvalidTypeArgs))
-            .collect::<Result<_, _>>()?;
         Ok(ConcreteIcebergOp {
             def: *self,
-            k: args[0],
-            indices: args[1..].to_vec(),
+            k: type_args[0].clone(),
+            indices: type_args[1..].to_vec(),
         })
     }
 }
@@ -209,8 +205,8 @@ impl MakeExtensionOp for ConcreteIcebergOp {
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        let mut args: Vec<TypeArg> = vec![self.k.into()];
-        args.extend(self.indices.iter().map(|&i| i.into()));
+        let mut args: Vec<TypeArg> = vec![self.k.clone()];
+        args.extend(self.indices.iter().cloned());
         args
     }
 }
@@ -232,8 +228,8 @@ impl IcebergOpDef {
     pub fn with_size_and_index(self, k: u64, i: u64) -> ConcreteIcebergOp {
         ConcreteIcebergOp {
             def: self,
-            k,
-            indices: vec![i],
+            k: k.into(),
+            indices: vec![i.into()],
         }
     }
 }
@@ -253,15 +249,17 @@ impl ValidateJustArgs for ArgsValidator {
         if n != 1 + self.n_idx {
             return Err(SignatureError::InvalidTypeArgs);
         }
-        let k = arg_values[0]
-            .as_nat()
-            .ok_or(SignatureError::InvalidTypeArgs)?;
+        let Some(k) = arg_values[0].as_nat() else {
+            // TypeArgs may be variable uses, in which case we can't extract a k.
+            // In this case, we can't validate so just return Ok.
+            return Ok(());
+        };
         if k == 0 || k % 2 == 1 {
             return Err(SignatureError::InvalidTypeArgs);
         }
         let mut args: HashSet<u64> = HashSet::new();
         for arg in arg_values.iter().skip(1) {
-            let i = arg.as_nat().ok_or(SignatureError::InvalidTypeArgs)?;
+            let Some(i) = arg.as_nat() else { continue };
             if i >= k || args.contains(&i) {
                 return Err(SignatureError::InvalidTypeArgs);
             }
