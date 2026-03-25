@@ -84,33 +84,21 @@ cache-keys = [
 build = "cp310-*"
 build-frontend = "build[uv]; args: -C--profile=release"
 skip = "*-win32 *-manylinux_i686 *-musllinux*"
-
-# TODO: This has been temporarily bumped to get the tests working after the
-# update to LLVM 21. This needs to go back to 'manylinux_2_28' before release.
-#
-# The official LLVM distribution for Linux is built on glibc 2.35, so we cannot
-# use it when building older manylinux versions.
-manylinux-x86_64-image = "manylinux_2_34"
-manylinux-aarch64-image = "manylinux_2_34"
+manylinux-x86_64-image = "quay.io/pypa/manylinux_2_28_x86_64"
+manylinux-aarch64-image = "quay.io/pypa/manylinux_2_28_aarch64"
 
 before-test = "uv sync --only-dev --active"
 test-command = "pytest -vv {package}"
 
 [tool.cibuildwheel.linux.environment]
-PATH = '$HOME/.cargo/bin:/tmp/llvm/bin:$PATH'
-LLVM_SYS_211_PREFIX = '/tmp/llvm'
-# The official LLVM static archives contain LLVM bitcode (from ThinLTO build)
-# which GNU ld cannot handle. We use LLVM 21's own ld.lld (from /tmp/llvm/bin)
-# which can correctly lower newer intrinsics like llvm.modf (added in LLVM 20).
-RUSTFLAGS = '-C link-arg=-fuse-ld=lld'
-# LLVM 21's ld.lld was built on Ubuntu 22.04 and requires GLIBCXX_3.4.30+.
-# AlmaLinux 9 ships GCC 11 (GLIBCXX_3.4.29). gcc-toolset-13 provides
-# GCC 13's libstdc++ with the needed symbols.
-LD_LIBRARY_PATH = '/opt/rh/gcc-toolset-13/root/usr/lib64'
+PATH = '$HOME/.cargo/bin:/tmp/hugrverse/bin:$PATH'
+TKET_C_API_PATH = '/tmp/hugrverse'
+LLVM_SYS_211_PREFIX = '/tmp/hugrverse'
 [tool.cibuildwheel.linux]
 environment-pass = ["CACHE_CARGO"]
 before-all = '''
     curl -sSf https://sh.rustup.rs | sh -s -- -y;
+    dnf install -y --setopt=install_weak_deps=False libffi-devel gcc-toolset-13;
     if ${CACHE_CARGO};
     then
         if [ -d /host/tmp/ci-cache/hugr-qis/.cargo ];
@@ -122,27 +110,16 @@ before-all = '''
             cp -r /host/tmp/ci-cache/hugr-qis/target {package}
         fi;
     fi;
-    dnf install libffi-devel ncurses-devel libxml2-devel libzstd-devel zlib-devel gcc-toolset-13-runtime -y
-    # llvm-config --system-libs hardcodes Debian-style absolute paths from the
-    # Ubuntu 22.04 build host (e.g. /usr/lib/<arch>-linux-gnu/libzstd.a).
-    # llvm-sys checks is_file() on these and panics if missing. LLVM was built
-    # with LLVM_USE_STATIC_ZSTD=ON so zstd is already in the LLVM .a files;
-    # create empty placeholder archives so the check passes.
-    mkdir -p /usr/lib/x86_64-linux-gnu
-    ar rc /usr/lib/x86_64-linux-gnu/libzstd.a
-    mkdir -p /tmp/llvm;
-    if [ "$(uname -m)" = "x86_64" ];
-    then
-        curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.8/LLVM-21.1.8-Linux-X64.tar.xz;
-        tar xf LLVM-21.1.8-Linux-X64.tar.xz -C /tmp/llvm --strip-components=1;
+    if [ "$(uname -m)" = "x86_64" ]; then
+        HUGRVERSE_ARCH=manylinux_2_28_x86_64;
     else
-        dnf install ncurses-compat-libs -y;
-        curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.8/LLVM-21.1.8-Linux-ARM64.tar.xz
-        tar xf LLVM-21.1.8-Linux-ARM64.tar.xz -C /tmp/llvm --strip-components=1;
+        HUGRVERSE_ARCH=manylinux_2_28_aarch64;
     fi;
-    # Remove linker binaries we don't need (Mach-O, COFF, WebAssembly).
-    # Keep ld.lld and lld for ELF linking with correct LLVM 21 intrinsic support.
-    rm -f /tmp/llvm/bin/ld64.lld /tmp/llvm/bin/lld-link /tmp/llvm/bin/wasm-ld;
+    llvm_url="https://github.com/Quantinuum/hugrverse-env/releases/download/v0.3.0/hugrenv-llvm-${HUGRVERSE_ARCH}.tar.gz"
+    tket_url="https://github.com/Quantinuum/hugrverse-env/releases/download/v0.3.0/hugrenv-tket-${HUGRVERSE_ARCH}.tar.gz"
+    echo "Downloading HUGRVERSE environment from ${llvm_url} and ${tket_url}";
+    curl -L $llvm_url | tar xz -C /tmp;
+    curl -L $tket_url | tar xz -C /tmp;
 '''
 before-test = '''
     if ${CACHE_CARGO};
@@ -174,28 +151,37 @@ repair-wheel-command = [
 ]
 
 [tool.cibuildwheel.macos.environment]
-PATH = '/tmp/llvm/bin:$PATH'
-LLVM_SYS_211_PREFIX = '/tmp/llvm'
+PATH = '/tmp/hugrverse/bin:$PATH'
+LLVM_SYS_211_PREFIX = '/tmp/hugrverse'
+TKET_C_API_PATH = '/tmp/hugrverse'
 MACOSX_DEPLOYMENT_TARGET = "15.0"
 [tool.cibuildwheel.macos]
 before-all = [
     'curl -sSf https://sh.rustup.rs | sh -s -- -y',
-    'brew install llvm@21',
-    'ln -sf $(brew --prefix llvm@21) /tmp/llvm',
+    'if [ "$(uname -m)" = "arm64" ]; then HUGRVERSE_ARCH=macosx_15_0_aarch64; else HUGRVERSE_ARCH=macosx_15_0_x86_64; fi',
+    'llvm_url="https://github.com/Quantinuum/hugrverse-env/releases/download/v0.3.0/hugrenv-llvm-${HUGRVERSE_ARCH}.tar.gz"',
+    'tket_url="https://github.com/Quantinuum/hugrverse-env/releases/download/v0.3.0/hugrenv-tket-${HUGRVERSE_ARCH}.tar.gz"',
+    'echo "Downloading HUGRVERSE environment from ${llvm_url} and ${tket_url}"',
+    'curl -L $llvm_url | tar xz -C /tmp',
+    'curl -L $tket_url | tar xz -C /tmp',
 ]
 repair-wheel-command = [
-    'DYLD_FALLBACK_LIBRARY_PATH=/tmp/llvm/lib delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel}',
+    'DYLD_FALLBACK_LIBRARY_PATH=${LLVM_SYS_211_PREFIX}/lib delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel}',
     'uvx abi3audit --strict --report {wheel}',
 ]
 
 [tool.cibuildwheel.windows.environment]
-PATH = 'C:\\LLVM\\bin;$PATH'
-LLVM_SYS_211_PREFIX = 'C:\\LLVM'
+PATH = '$RUNNER_TEMP\\hugrverse\\bin;$PATH'
+LLVM_SYS_211_PREFIX = '$RUNNER_TEMP\\hugrverse'
+TKET_C_API_PATH = '$RUNNER_TEMP\\hugrverse'
 [tool.cibuildwheel.windows]
 before-all = [
+    'curl -L -o hugrenv-llvm-win_amd64.tar.gz https://github.com/Quantinuum/hugrverse-env/releases/download/v0.3.0/hugrenv-llvm-win_amd64.tar.gz',
+    'curl -L -o hugrenv-tket-win_amd64.tar.gz https://github.com/Quantinuum/hugrverse-env/releases/download/v0.3.0/hugrenv-tket-win_amd64.tar.gz',
+    # tar is awkward wrt windows paths, so use python
+    '''python -c "import os, tarfile; d=os.environ['RUNNER_TEMP']; tarfile.open('hugrenv-llvm-win_amd64.tar.gz', 'r:gz').extractall(d)"''',
+    '''python -c "import os, tarfile; d=os.environ['RUNNER_TEMP']; tarfile.open('hugrenv-tket-win_amd64.tar.gz', 'r:gz').extractall(d)"''',
     'rustup update',
-    'curl -LO https://github.com/PLC-lang/llvm-package-windows/releases/download/v21.1.7/LLVM-21.1.7-win64.7z',
-    '7z x LLVM-21.1.7-win64.7z "-oC:\LLVM" -y',
 ]
 repair-wheel-command = [
     'uvx delvewheel repair -w {dest_dir} {wheel}',

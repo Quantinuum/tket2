@@ -26,16 +26,12 @@ env:
 
   # different strings for install action and feature name
   # adapted from https://github.com/TheDan64/inkwell/blob/master/.github/workflows/test.yml
-  LLVM_MAIN_VERSION: "21"
-  LLVM_VERSION: "21.1"
-  LLVM_FEATURE_NAME: "21-1"
-
-  # Path to the cached tket-c-api library
-  # When this envvar is set, the `./.github/actions/tket-c-api` action **must** be run to fetch the artifacts
-  # This config is not required, but speeds up the build by caching the tket-c-api library
-  # The alternative is to install conan and remove the env var
-  TKET_C_API_PATH: "${{ github.workspace }}/tket-c-api"
-  LD_LIBRARY_PATH: ${{ github.workspace }}/tket-c-api/lib
+  HUGRENV_VERSION: "0.3.0"
+  HUGRENV_ROOT: "/tmp/hugrverse"
+  HUGRENV_PLATFORM: "manylinux_2_28_x86_64"
+  TKET_C_API_PATH: "/tmp/hugrverse"
+  LD_LIBRARY_PATH: "/tmp/hugrverse/lib"
+  LLVM_SYS_211_PREFIX: "/tmp/hugrverse"
 
 jobs:
   # Check if changes were made to the relevant files.
@@ -70,18 +66,15 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-      - name: Install tket-c-api library
-        uses: ./.github/actions/tket-c-api
-        with:
-          install-path: ${{ env.TKET_C_API_PATH }}
+      - name: Install compliant tket1 and LLVM
+        run: |
+          mkdir -p $HUGRENV_ROOT
+          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-tket-${HUGRENV_PLATFORM}.tar.gz \
+            | tar xz -C $HUGRENV_ROOT --strip-components=1
+          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-llvm-${HUGRENV_PLATFORM}.tar.gz \
+            | tar xz -C $HUGRENV_ROOT --strip-components=1
       - name: Check formatting
         run: cargo fmt -- --check
-      - name: Install LLVM and Clang
-        run: |
-          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
-          sudo add-apt-repository 'deb http://apt.llvm.org/noble/   llvm-toolchain-noble-${{ env.LLVM_MAIN_VERSION }}  main'
-          sudo apt update
-          sudo apt install llvm-${{ env.LLVM_MAIN_VERSION }} libpolly-${{ env.LLVM_MAIN_VERSION }}-dev
       - name: Run clippy
         run: cargo clippy --all-targets --all-features --workspace -- -D warnings
       - name: Build docs
@@ -104,16 +97,13 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
-      - name: Install LLVM and Clang
+      - name: Install compliant tket1 and LLVM
         run: |
-          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
-          sudo add-apt-repository 'deb http://apt.llvm.org/noble/   llvm-toolchain-noble-${{ env.LLVM_MAIN_VERSION }}  main'
-          sudo apt update
-          sudo apt install llvm-${{ env.LLVM_MAIN_VERSION }} libpolly-${{ env.LLVM_MAIN_VERSION }}-dev
-      - name: Install tket-c-api library
-        uses: ./.github/actions/tket-c-api
-        with:
-          install-path: ${{ env.TKET_C_API_PATH }}
+          mkdir -p $HUGRENV_ROOT
+          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-tket-${HUGRENV_PLATFORM}.tar.gz \
+            | tar xz -C $HUGRENV_ROOT --strip-components=1
+          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-llvm-${HUGRENV_PLATFORM}.tar.gz \
+            | tar xz -C $HUGRENV_ROOT --strip-components=1
       - name: Install Python ${{ env.PYTHON_LOWEST }}
         run: uv python install ${{ env.PYTHON_LOWEST }}
       - name: Setup dependencies
@@ -138,10 +128,13 @@ jobs:
       - uses: mozilla-actions/sccache-action@v0.0.9
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
-      - name: Install tket-c-api library
-        uses: ./.github/actions/tket-c-api
-        with:
-          install-path: ${{ env.TKET_C_API_PATH }}
+      - name: Install compliant tket1 and LLVM
+        run: |
+          mkdir -p $HUGRENV_ROOT
+          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-tket-${HUGRENV_PLATFORM}.tar.gz \
+            | tar xz -C $HUGRENV_ROOT --strip-components=1
+          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-llvm-${HUGRENV_PLATFORM}.tar.gz \
+            | tar xz -C $HUGRENV_ROOT --strip-components=1
       - uses: cargo-bins/cargo-binstall@main
       - name: Install cargo-codspeed
         run: cargo binstall cargo-codspeed --force
@@ -172,10 +165,13 @@ jobs:
           toolchain: "stable"
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
-      - name: Install tket-c-api library
-        uses: ./.github/actions/tket-c-api
-        with:
-          install-path: ${{ env.TKET_C_API_PATH }}
+      - name: Install compliant tket1 and LLVM
+        run: |
+          mkdir -p $HUGRENV_ROOT
+          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-tket-${HUGRENV_PLATFORM}.tar.gz \
+            | tar xz -C $HUGRENV_ROOT --strip-components=1
+          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-llvm-${HUGRENV_PLATFORM}.tar.gz \
+            | tar xz -C $HUGRENV_ROOT --strip-components=1
       - uses: taiki-e/install-action@nextest
       - name: Build with no features
         run: cargo nextest r --verbose -p tket -p tket-py -p tket-qsystem --no-default-features --no-run
@@ -197,16 +193,13 @@ jobs:
           toolchain: "stable"
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
-      - name: Install LLVM and Clang
+      - name: Install compliant tket1 and LLVM
         run: |
-          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
-          sudo add-apt-repository 'deb http://apt.llvm.org/noble/   llvm-toolchain-noble-${{ env.LLVM_MAIN_VERSION }}  main'
-          sudo apt update
-          sudo apt install llvm-${{ env.LLVM_MAIN_VERSION }} libpolly-${{ env.LLVM_MAIN_VERSION }}-dev
-      - name: Install tket-c-api library
-        uses: ./.github/actions/tket-c-api
-        with:
-          install-path: ${{ env.TKET_C_API_PATH }}
+          mkdir -p $HUGRENV_ROOT
+          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-tket-${HUGRENV_PLATFORM}.tar.gz \
+            | tar xz -C $HUGRENV_ROOT --strip-components=1
+          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-llvm-${HUGRENV_PLATFORM}.tar.gz \
+            | tar xz -C $HUGRENV_ROOT --strip-components=1
       - uses: taiki-e/install-action@nextest
       - name: Build with all features
         run: cargo nextest r --verbose --workspace --all-features --no-run
@@ -233,16 +226,13 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
-      - name: Install LLVM and Clang
+      - name: Install compliant tket1 and LLVM
         run: |
-          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
-          sudo add-apt-repository 'deb http://apt.llvm.org/noble/   llvm-toolchain-noble-${{ env.LLVM_MAIN_VERSION }}  main'
-          sudo apt update
-          sudo apt install llvm-${{ env.LLVM_MAIN_VERSION }} libpolly-${{ env.LLVM_MAIN_VERSION }}-dev
-      - name: Install tket-c-api library
-        uses: ./.github/actions/tket-c-api
-        with:
-          install-path: ${{ env.TKET_C_API_PATH }}
+          mkdir -p $HUGRENV_ROOT
+          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-tket-${HUGRENV_PLATFORM}.tar.gz \
+            | tar xz -C $HUGRENV_ROOT --strip-components=1
+          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-llvm-${HUGRENV_PLATFORM}.tar.gz \
+            | tar xz -C $HUGRENV_ROOT --strip-components=1
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
       - uses: taiki-e/install-action@nextest
@@ -269,16 +259,13 @@ jobs:
           # Nightly is required to count doctests coverage
           toolchain: "nightly"
           components: llvm-tools-preview
-      - name: Install LLVM and Clang
+      - name: Install compliant tket1 and LLVM
         run: |
-          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
-          sudo add-apt-repository 'deb http://apt.llvm.org/noble/   llvm-toolchain-noble-${{ env.LLVM_MAIN_VERSION }}  main'
-          sudo apt update
-          sudo apt install llvm-${{ env.LLVM_MAIN_VERSION }} libpolly-${{ env.LLVM_MAIN_VERSION }}-dev
-      - name: Install tket-c-api library
-        uses: ./.github/actions/tket-c-api
-        with:
-          install-path: ${{ env.TKET_C_API_PATH }}
+          mkdir -p $HUGRENV_ROOT
+          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-tket-${HUGRENV_PLATFORM}.tar.gz \
+            | tar xz -C $HUGRENV_ROOT --strip-components=1
+          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-llvm-${HUGRENV_PLATFORM}.tar.gz \
+            | tar xz -C $HUGRENV_ROOT --strip-components=1
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Run tests with coverage instrumentation
@@ -318,16 +305,13 @@ jobs:
           toolchain: "nightly"
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
-      - name: Install LLVM and Clang
+      - name: Install compliant tket1 and LLVM
         run: |
-          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
-          sudo add-apt-repository 'deb http://apt.llvm.org/noble/   llvm-toolchain-noble-${{ env.LLVM_MAIN_VERSION }}  main'
-          sudo apt update
-          sudo apt install llvm-${{ env.LLVM_MAIN_VERSION }} libpolly-${{ env.LLVM_MAIN_VERSION }}-dev
-      - name: Install tket-c-api library
-        uses: ./.github/actions/tket-c-api
-        with:
-          install-path: ${{ env.TKET_C_API_PATH }}
+          mkdir -p $HUGRENV_ROOT
+          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-tket-${HUGRENV_PLATFORM}.tar.gz \
+            | tar xz -C $HUGRENV_ROOT --strip-components=1
+          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-llvm-${HUGRENV_PLATFORM}.tar.gz \
+            | tar xz -C $HUGRENV_ROOT --strip-components=1
       - uses: cargo-bins/cargo-binstall@main
       - name: Install cargo-minimal-versions
         run: |
@@ -365,10 +349,13 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
-      - name: Install tket-c-api library
-        uses: ./.github/actions/tket-c-api
-        with:
-          install-path: ${{ env.TKET_C_API_PATH }}
+      - name: Install compliant tket1 and LLVM
+        run: |
+          mkdir -p $HUGRENV_ROOT
+          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-tket-${HUGRENV_PLATFORM}.tar.gz \
+            | tar xz -C $HUGRENV_ROOT --strip-components=1
+          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-llvm-${HUGRENV_PLATFORM}.tar.gz \
+            | tar xz -C $HUGRENV_ROOT --strip-components=1
       - name: Install Python ${{ env.PYTHON_LOWEST }}
         run: uv python install ${{ env.PYTHON_LOWEST }}
       - name: Setup dependencies
@@ -403,16 +390,13 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
-      - name: Install LLVM and Clang
+      - name: Install compliant tket1 and LLVM
         run: |
-          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
-          sudo add-apt-repository 'deb http://apt.llvm.org/noble/   llvm-toolchain-noble-${{ env.LLVM_MAIN_VERSION }}  main'
-          sudo apt update
-          sudo apt install llvm-${{ env.LLVM_MAIN_VERSION }} libpolly-${{ env.LLVM_MAIN_VERSION }}-dev
-      - name: Install tket-c-api library
-        uses: ./.github/actions/tket-c-api
-        with:
-          install-path: ${{ env.TKET_C_API_PATH }}
+          mkdir -p $HUGRENV_ROOT
+          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-tket-${HUGRENV_PLATFORM}.tar.gz \
+            | tar xz -C $HUGRENV_ROOT --strip-components=1
+          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-llvm-${HUGRENV_PLATFORM}.tar.gz \
+            | tar xz -C $HUGRENV_ROOT --strip-components=1
       - name: Install Python ${{ env.PYTHON_LOWEST }}
         run: uv python install ${{ env.PYTHON_LOWEST }}
       - name: Run qis-compiler tests

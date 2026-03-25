@@ -2,6 +2,7 @@
 /target
 tket-py/target/
 /dist
+/wheelhouse
 
 # Python caches
 __pycache__
