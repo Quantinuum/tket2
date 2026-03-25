@@ -28,12 +28,18 @@ type NodeInputs<V, N> = Vec<(IncomingPort, PV<V, N>)>;
 ///    [`Self::prepopulate_inputs`] can be used on each externally-callable
 ///    [`FuncDefn`](OpType::FuncDefn) to set all inputs to [`PartialValue::Top`].
 /// 3. Call [`Self::run`] to produce [`AnalysisResults`]
-pub struct Machine<H: HugrView, V: AbstractValue>(H, HashMap<H::Node, NodeInputs<V, H::Node>>);
+pub struct Machine<H: HugrView, V: AbstractValue> {
+    hugr: H,
+    in_wire_proto: HashMap<H::Node, NodeInputs<V, H::Node>>,
+}
 
 impl<H: HugrView, V: AbstractValue> Machine<H, V> {
     /// Create a new Machine to analyse the given Hugr(View)
     pub fn new(hugr: H) -> Self {
-        Self(hugr, Default::default())
+        Self {
+            hugr,
+            in_wire_proto: Default::default(),
+        }
     }
 }
 
@@ -41,8 +47,11 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
     /// Provide initial values for a wire - these will be `join`d with any computed
     /// or any value previously prepopulated for the same Wire.
     pub fn prepopulate_wire(&mut self, w: Wire<H::Node>, v: PartialValue<V, H::Node>) {
-        for (n, inp) in self.0.linked_inputs(w.node(), w.source()) {
-            self.1.entry(n).or_default().push((inp, v.clone()));
+        for (n, inp) in self.hugr.linked_inputs(w.node(), w.source()) {
+            self.in_wire_proto
+                .entry(n)
+                .or_default()
+                .push((inp, v.clone()));
         }
     }
 
@@ -61,15 +70,15 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
         parent: H::Node,
         in_values: impl IntoIterator<Item = (IncomingPort, PartialValue<V, H::Node>)>,
     ) -> Result<(), OpType> {
-        if !self.0.contains_node(parent) {
+        if !self.hugr.contains_node(parent) {
             return Ok(());
         }
-        match self.0.get_optype(parent) {
+        match self.hugr.get_optype(parent) {
             OpType::DataflowBlock(_) | OpType::Case(_) | OpType::FuncDefn(_) => {
                 // Put values onto out-wires of Input node
-                let [inp, _] = self.0.get_io(parent).unwrap();
+                let [inp, _] = self.hugr.get_io(parent).unwrap();
                 let mut vals =
-                    vec![PartialValue::Top; self.0.signature(inp).unwrap().output_types().len()];
+                    vec![PartialValue::Top; self.hugr.signature(inp).unwrap().output_types().len()];
                 for (ip, v) in in_values {
                     vals[ip.index()] = v;
                 }
@@ -79,12 +88,14 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
             }
             OpType::DFG(_) | OpType::TailLoop(_) | OpType::CFG(_) | OpType::Conditional(_) => {
                 // dataflow will handle this and propagate to the correct Input node(s)
-                let mut vals =
-                    vec![PartialValue::Top; self.0.signature(parent).unwrap().input_types().len()];
+                let mut vals = vec![
+                    PartialValue::Top;
+                    self.hugr.signature(parent).unwrap().input_types().len()
+                ];
                 for (ip, v) in in_values {
                     vals[ip.index()] = v;
                 }
-                self.1
+                self.in_wire_proto
                     .entry(parent)
                     .or_default()
                     .extend(vals.into_iter().enumerate().map(|(i, v)| (i.into(), v)));
@@ -113,28 +124,28 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
         context: impl DFContext<V, Node = H::Node>,
         in_values: impl IntoIterator<Item = (IncomingPort, PartialValue<V, H::Node>)>,
     ) -> AnalysisResults<V, H> {
-        if self.0.entrypoint_optype().is_module() {
+        if self.hugr.entrypoint_optype().is_module() {
             assert!(
                 in_values.into_iter().next().is_none(),
                 "No inputs possible for Module"
             );
         } else {
-            let ep = self.0.entrypoint();
+            let ep = self.hugr.entrypoint();
             let mut p = in_values.into_iter().peekable();
             // We must provide some inputs to the root so that they are Top rather than Bottom.
             // (However, this test will fail for DataflowBlock or Case roots, i.e. if no
             // inputs have been provided they will still see Bottom. We could store the "input"
-            // values for even these nodes in self.1 and then convert to actual Wire values
+            // values for even these nodes in self.in_wire_proto and then convert to actual Wire values
             // (outputs from the Input node) before we run_datalog, but we would need to have
             // a separate store of output-wire values in self to keep prepopulate_wire working.)
-            if p.peek().is_some() || !self.1.contains_key(&ep) {
+            if p.peek().is_some() || !self.in_wire_proto.contains_key(&ep) {
                 self.prepopulate_inputs(ep, p).unwrap();
             }
         }
         run_datalog(
             context,
-            self.0,
-            self.1
+            self.hugr,
+            self.in_wire_proto
                 .into_iter()
                 .flat_map(|(n, vals)| vals.into_iter().map(move |(ip, v)| (n, ip, v)))
                 .collect(),
