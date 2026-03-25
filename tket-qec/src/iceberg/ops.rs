@@ -640,7 +640,7 @@ mod tests {
             collections::array::array_type,
             std_reg,
         },
-        types::{Signature, TypeBound},
+        types::Signature,
     };
 
     use crate::iceberg::types::EXTENSION as types_extension;
