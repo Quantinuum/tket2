@@ -50,12 +50,10 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
     /// Provide initial values for a wire - these will be `join`d with any computed
     /// or any value previously prepopulated for the same Wire.
     pub fn prepopulate_wire(&mut self, w: Wire<H::Node>, v: PartialValue<V, H::Node>) {
-        for (n, inp) in self.hugr.linked_inputs(w.node(), w.source()) {
-            self.in_wire_proto
-                .entry(n)
-                .or_default()
-                .push((inp, v.clone()));
-        }
+        self.out_wire_proto
+            .entry(w.node())
+            .or_default()
+            .push((w.source(), v));
     }
 
     /// Provide initial values for the inputs to a container node
