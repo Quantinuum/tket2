@@ -6,21 +6,21 @@ use std::{
 };
 
 use hugr::{
+    Extension,
     extension::{
+        CustomValidator, ExtensionId, OpDef, SignatureError, SignatureFunc, ValidateJustArgs,
         prelude::bool_t,
         simple_op::{
-            try_from_name, HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp,
-            OpLoadError,
+            HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
+            try_from_name,
         },
-        CustomValidator, ExtensionId, OpDef, SignatureError, SignatureFunc, ValidateJustArgs,
     },
     ops::{ExtensionOp, OpName},
     std_extensions::{
         arithmetic::{float_types::float64_type, int_types::int_type},
         collections::array::{Array, ArrayKind},
     },
-    types::{type_param::TypeParam, FuncValueType, PolyFuncTypeRV, Type, TypeArg},
-    Extension,
+    types::{FuncValueType, PolyFuncTypeRV, Type, TypeArg, type_param::TypeParam},
 };
 use strum::{EnumIter, EnumString, IntoStaticStr};
 use tket_qsystem::extension::futures::future_type;
