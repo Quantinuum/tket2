@@ -163,7 +163,7 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
             .collect::<Vec<_>>();
         // Sadly the results immutably borrow the hugr, so we must extract everything we need before mutation
         let terminating_tail_loops = hugr
-            .entry_descendants()
+            .descendants(root)
             .filter(|n| {
                 results.tail_loop_terminates(*n) == Some(TailLoopTermination::NeverContinues)
             })
