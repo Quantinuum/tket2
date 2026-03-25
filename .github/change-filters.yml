@@ -11,6 +11,7 @@ rust:
   - "tket-qsystem/**"
   - "badger-optimiser/**"
   - "compile-rewriter/**"
+  - "hugr-passes/**"
   - "tket1-passes/**"
 
 python:
