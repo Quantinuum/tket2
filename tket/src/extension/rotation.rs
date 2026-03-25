@@ -2,6 +2,7 @@ use hugr::IncomingPort;
 use hugr::Wire;
 use hugr::builder::{BuildError, Dataflow};
 use hugr::extension::fold_out_row;
+use hugr::extension::prelude::const_some;
 use hugr::extension::simple_op::{MakeOpDef, MakeRegisteredOp};
 use hugr::extension::{ExtensionId, Version, prelude::option_type};
 use hugr::ops::Value;
@@ -203,14 +204,23 @@ impl MakeOpDef for RotationOp {
                     fold_out_row([Value::extension(sum)])
                 });
             }
-            // Since ConstF64 cannot be NaN or infinite, from_halfturns cannot return None and from_halfturns_unchecked cannot panic,
-            // thus they have the same folding.
-            RotationOp::from_halfturns | RotationOp::from_halfturns_unchecked => {
+
+            RotationOp::from_halfturns_unchecked => {
                 def.set_constant_folder(|consts: &[(IncomingPort, Value)]| {
                     let (_, v) = consts.first()?;
                     let f = v.get_custom_value::<ConstF64>()?;
                     let rot = ConstRotation::new(f.value()).ok()?;
                     fold_out_row([Value::extension(rot)])
+                });
+            }
+
+            RotationOp::from_halfturns => {
+                def.set_constant_folder(|consts: &[(IncomingPort, Value)]| {
+                    let (_, v) = consts.first()?;
+                    let f = v.get_custom_value::<ConstF64>()?;
+                    let rot = ConstRotation::new(f.value()).ok()?;
+                    let option_vale = const_some(Value::extension(rot));
+                    fold_out_row([option_vale])
                 });
             }
 
@@ -436,11 +446,8 @@ mod test {
         assert_eq!(result_checked.len(), 1);
         assert_eq!(result_unchecked.len(), 1);
         assert_eq!(
-            result_checked[0]
-                .get_custom_value::<ConstRotation>()
-                .unwrap()
-                .half_turns(),
-            val
+            result_checked[0],
+            const_some(Value::extension(ConstRotation::new(val).unwrap()))
         );
         assert_eq!(
             result_unchecked[0]
