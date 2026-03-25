@@ -9,44 +9,34 @@ use hugr::std_extensions::arithmetic::int_types::ConstInt;
 use hugr::std_extensions::collections::borrow_array::{BArrayUnsafeOpDef, BORROW_ARRAY_TYPENAME};
 use hugr::types::{EdgeKind, Type};
 use hugr::{HugrView, IncomingPort, Node, OutgoingPort, Wire};
-use hugr_passes::ComposablePass;
 use hugr_passes::composable::WithScope;
+use hugr_passes::{ComposablePass, PassScope};
 
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet, VecDeque};
 
-/// A pass for eliding pairs of return-borrow operations on [BorrowArray]s
-/// where they have identical constant indices and there is a preceding borrow (not elided)
-/// that guarantees the elided ops would not have panicked.
+/// A pass for eliding pairs of return-borrow operations on [BorrowArray]s.
+///
+/// Pairs are elided if they have identical constant indices and there is a
+/// preceding borrow (not elided) that guarantees the elided ops would not have
+/// panicked.
 ///
 /// [BorrowArray]: hugr::std_extensions::collections::borrow_array::BorrowArray
 #[derive(Clone, Debug, Default)]
 pub struct BorrowSquashPass {
-    regions: Option<Vec<Node>>,
-}
-
-impl BorrowSquashPass {
-    /// Sets the regions (subgraphs) in which to perform the pass.
-    ///
-    /// Overrides effect of any previous call; if `regions` is empty, the pass will do nothing.
-    ///
-    /// If `with_regions` is not called, the default is for the pass to act on all dataflow regions
-    /// beneath the entrypoint.
-    pub fn set_regions(mut self, regions: impl IntoIterator<Item = Node>) -> Self {
-        self.regions = Some(regions.into_iter().collect());
-        self
-    }
+    /// The scope within which the pass will operate.
+    scope: PassScope,
 }
 
 impl WithScope for BorrowSquashPass {
-    fn with_scope(self, _scope: impl Into<hugr_passes::PassScope>) -> Self {
-        // TODO: Follow scope configuration
-        // <https://github.com/Quantinuum/tket2/pull/1429>
+    fn with_scope(mut self, scope: impl Into<hugr_passes::PassScope>) -> Self {
+        self.scope = scope.into();
         self
     }
 }
 
 impl<H: HugrMut<Node = Node>> ComposablePass<H> for BorrowSquashPass {
+    /// Errors that can occur during the pass.
     type Error = BorrowSquashError;
     /// Pairs of (Return node, Borrow node) that were elided.
     type Result = Vec<(Node, Node)>;
@@ -58,29 +48,35 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for BorrowSquashPass {
     ///
     /// [ConstantFoldPass]: hugr_passes::const_fold::ConstantFoldPass
     fn run(&self, hugr: &mut H) -> Result<Vec<(Node, Node)>, BorrowSquashError> {
-        let mut temp = Vec::new(); // to keep alive
-        let regions = self.regions.as_ref().unwrap_or_else(|| {
-            temp.extend(
-                hugr.entry_descendants()
-                    .filter(|n| OpTag::DataflowParent.is_superset(hugr.get_optype(*n).tag())),
-            );
-            &temp
-        });
+        let mut regions = VecDeque::from_iter(self.scope.root(hugr));
         let mut results = Vec::new();
-        for region in regions {
-            let mut seen = HashSet::new();
-            // Start with all nodes not reachable along dataflow edges from other nodes. (Includes Input.)
-            let mut queue = VecDeque::from_iter(
-                hugr.children(*region)
-                    .filter(|n| hugr.in_value_types(*n).next().is_none())
-                    .flat_map(|n| all_outs(hugr, n)),
-            );
 
-            while let Some(start) = queue.pop_front() {
+        // Seen nodes and queue used in each region. Shared and cleared between
+        // loops to minimize re-allocations.
+        let mut seen = HashSet::new();
+        let mut op_queue = VecDeque::new();
+        while let Some(region) = regions.pop_front() {
+            let is_dataflow_region = OpTag::DataflowParent >= hugr.get_optype(region).tag();
+            seen.clear();
+            op_queue.clear(); // Should already be empty, but just in case.
+
+            for child in hugr.children(region) {
+                // If the node is not reachable along dataflow edges from other nodes,
+                // it is a fresh value.
+                if is_dataflow_region && hugr.in_value_types(child).next().is_none() {
+                    op_queue.extend(all_outs(hugr, child));
+                }
+                // If the node is a container, mark it as a region to be processed.
+                if self.scope.recursive() && hugr.children(child).next().is_some() {
+                    regions.push_back(child);
+                }
+            }
+
+            while let Some(start) = op_queue.pop_front() {
                 if !seen.insert(start) {
                     continue;
                 }
-                let elided = borrow_squash_traversal(hugr, &mut queue, start, true);
+                let elided = borrow_squash_traversal(hugr, &mut op_queue, start, true);
                 results.extend(elided);
             }
         }

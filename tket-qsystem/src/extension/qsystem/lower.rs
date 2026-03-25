@@ -18,7 +18,7 @@ use hugr::{
 };
 use hugr_passes::composable::WithScope;
 use hugr_passes::replace_types::{NodeTemplate, ReplaceTypesError};
-use hugr_passes::{ComposablePass, ReplaceTypes};
+use hugr_passes::{ComposablePass, PassScope, ReplaceTypes};
 use lazy_static::lazy_static;
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
@@ -87,19 +87,34 @@ enum ReplaceOps {
 
 /// Lower [`TketOp`] operations to [`QSystemOp`] operations.
 ///
-/// Single op replacements are done directly, while multi-op replacements are done
-/// by lazily defining and calling functions that implement the decomposition.
-/// Returns the nodes that were replaced.
+/// Single op replacements are done directly, while multi-op replacements are
+/// done by lazily defining and calling functions that implement the
+/// decomposition. Returns the nodes that were replaced.
+///
+/// The operation is parameterized by a `scope`. For non-[`PassScope::Global`]
+/// passes multi-op replacement will not be performed, as they require adding
+/// functions at the global module definition. See [`PassScope`] for more details.
+///
+/// # Arguments
+///
+/// * `hugr` - The HUGR to lower.
+/// * `scope` - The scope across which to lower in the HUGR
 ///
 /// # Errors
+///
 /// Returns an error if the replacement fails.
-pub fn lower_tk2_op(hugr: &mut impl HugrMut<Node = Node>) -> Result<Vec<Node>, LowerTk2Error> {
+pub fn lower_tk2_ops(
+    hugr: &mut impl HugrMut<Node = Node>,
+    scope: impl Into<PassScope>,
+) -> Result<Vec<Node>, LowerTk2Error> {
+    let scope = scope.into();
     let mut funcs: BTreeMap<TketOp, NodeTemplate> = BTreeMap::new();
-    let mut lowerer = ReplaceTypes::new_empty();
+    let mut lowerer = ReplaceTypes::new_empty().with_scope(scope.clone());
     let mut barrier_funcs = BarrierInserter::new();
 
-    let replacements: Vec<_> = hugr
-        .nodes()
+    let replacements: Vec<_> = scope
+        .regions(hugr)
+        .flat_map(|region| hugr.children(region))
         .filter_map(|n| {
             let optype = hugr.get_optype(n);
             if let Some(op) = optype.cast::<TketOp>() {
@@ -114,8 +129,6 @@ pub fn lower_tk2_op(hugr: &mut impl HugrMut<Node = Node>) -> Result<Vec<Node>, L
 
     let mut replaced_nodes = Vec::with_capacity(replacements.len());
     for (node, op) in replacements {
-        replaced_nodes.push(node);
-
         match op {
             ReplaceOps::Tk2(tket_op) => {
                 // Handle TketOp replacements
@@ -124,35 +137,40 @@ pub fn lower_tk2_op(hugr: &mut impl HugrMut<Node = Node>) -> Result<Vec<Node>, L
                         &tket_op.into_extension_op(),
                         NodeTemplate::SingleOp(direct.into()),
                     );
-                    continue;
-                }
 
-                // Need to get or create function definition
-                let template = match funcs.entry(tket_op) {
-                    Entry::Occupied(e) => e.get().clone(),
-                    Entry::Vacant(e) => {
-                        let template = func_as_node_template(build_func(tket_op)?);
-                        e.insert(template).clone()
-                    }
-                };
-                lowerer.set_replace_op(&tket_op.into_extension_op(), template);
+                    replaced_nodes.push(node);
+                } else if matches!(scope, PassScope::Global(_)) {
+                    // Only perform multi-op replacement for global passes, as we
+                    // cannot define new functions for local entrypoint scopes.
+                    let template = match funcs.entry(tket_op) {
+                        Entry::Occupied(e) => e.get().clone(),
+                        Entry::Vacant(e) => {
+                            let template = func_as_node_template(build_func(tket_op)?);
+                            e.insert(template).clone()
+                        }
+                    };
+                    lowerer.set_replace_op(&tket_op.into_extension_op(), template);
+
+                    replaced_nodes.push(node);
+                }
             }
             ReplaceOps::Barrier(barrier) => {
                 // Handle barrier replacements
-                barrier_funcs.insert_runtime_barrier(hugr, node, barrier)?;
+                //
+                // Only perform the replacement for global passes, as we
+                // cannot define the barrier function for local entrypoint scopes.
+                if let PassScope::Global(_) = scope {
+                    barrier_funcs.insert_runtime_barrier(hugr, node, barrier)?;
+                    replaced_nodes.push(node);
+                }
             }
         }
     }
 
     barrier_funcs.register_operation_replacements(hugr, &mut lowerer);
 
-    // functions inserted at module root level so lowerer needs to be
-    // run with module root as entrypoint
-    let old_entrypoint = hugr.entrypoint();
-    hugr.set_entrypoint(hugr.module_root());
-    lowerer.run(hugr)?;
-    // restore entrypoint
-    hugr.set_entrypoint(old_entrypoint);
+    // Replace the operations.
+    lowerer.with_scope(scope.clone()).run(hugr)?;
 
     Ok(replaced_nodes)
 }
@@ -246,18 +264,36 @@ fn direct_map(op: TketOp) -> Option<QSystemOp> {
     })
 }
 
-/// Check there are no "tket.quantum" ops left in the HUGR.
+/// Check there are no "tket.quantum" ops left in the HUGR that should have been
+/// lowered by [lower_tk2_ops] with the given scope.
+///
+/// To check that there isn't any unlowered operations, use
+/// [`PassScope::Global`] as the scope.
+///
+/// See [`LowerTketToQSystemPass`] for details on which operations are affected
+/// depending on the scope.
 ///
 /// # Errors
+///
 /// Returns vector of nodes that are not lowered.
-pub fn check_lowered<H: HugrView>(hugr: &H) -> Result<(), Vec<H::Node>> {
-    let unlowered: Vec<H::Node> = hugr
-        .nodes()
+pub fn check_lowered<H: HugrView>(
+    hugr: &H,
+    scope: impl Into<PassScope>,
+) -> Result<(), Vec<H::Node>> {
+    let scope = scope.into();
+    let unlowered: Vec<H::Node> = scope
+        .regions(hugr)
+        .flat_map(|region| hugr.children(region))
         .filter_map(|node| {
-            let optype = hugr.get_optype(node);
-            optype.as_extension_op().and_then(|ext| {
-                (ext.def().extension_id() == &tket::extension::TKET_EXTENSION_ID).then_some(node)
-            })
+            let tket_op = hugr.get_optype(node).cast::<TketOp>()?;
+
+            if !matches!(scope, PassScope::Global(_)) && direct_map(tket_op).is_none() {
+                // Local entrypoint scopes do not perform multi-op replacements,
+                // as those need to add functions at the global module level.
+                return None;
+            }
+
+            Some(node)
         })
         .collect();
 
@@ -268,18 +304,27 @@ pub fn check_lowered<H: HugrView>(hugr: &H) -> Result<(), Vec<H::Node>> {
     }
 }
 
-/// A `Hugr -> Hugr` pass that replaces [tket::TketOp] nodes to
-/// equivalent graphs made of [QSystemOp]s.
+/// A `Hugr -> Hugr` pass that replaces [tket::TketOp] nodes to equivalent
+/// graphs made of [QSystemOp]s.
 ///
-/// Invokes [lower_tk2_op]. If validation is enabled the resulting HUGR is
+/// Invokes [lower_tk2_ops]. If validation is enabled the resulting HUGR is
 /// checked with [check_lowered].
+///
+/// The pass scope may be controlled via [`WithScope::with_scope`]. For
+/// non-[`PassScope::Global`] scopes, multi-op replacement will not be
+/// performed, as they require adding functions at the global module level. See
+/// [`PassScope`] for more details.
 #[derive(Default, Debug, Clone)]
-pub struct LowerTketToQSystemPass;
+pub struct LowerTketToQSystemPass {
+    /// Where to apply the pass.
+    ///
+    /// Configurable via [`WithScope::with_scope`].
+    scope: PassScope,
+}
 
 impl WithScope for LowerTketToQSystemPass {
-    fn with_scope(self, _scope: impl Into<hugr_passes::PassScope>) -> Self {
-        // TODO: Follow scope configuration
-        // <https://github.com/Quantinuum/tket2/pull/1429>
+    fn with_scope(mut self, scope: impl Into<PassScope>) -> Self {
+        self.scope = scope.into();
         self
     }
 }
@@ -289,9 +334,10 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for LowerTketToQSystemPass {
     type Result = ();
 
     fn run(&self, hugr: &mut H) -> Result<(), LowerTk2Error> {
-        lower_tk2_op(hugr)?;
+        lower_tk2_ops(hugr, self.scope.clone())?;
         #[cfg(test)]
-        check_lowered(hugr).map_err(|missing_ops| LowerTk2Error::Unlowered { missing_ops })?;
+        check_lowered(hugr, self.scope.clone())
+            .map_err(|missing_ops| LowerTk2Error::Unlowered { missing_ops })?;
         Ok(())
     }
 }
@@ -304,13 +350,18 @@ mod test {
         extension::prelude::{UnwrapBuilder as _, bool_t, option_type, qb_t},
         type_row,
     };
+    use hugr_passes::composable::Preserve;
     use tket::{Circuit, extension::rotation::rotation_type};
 
     use super::*;
     use rstest::rstest;
 
-    #[test]
-    fn test_lower_direct() {
+    #[rstest]
+    #[case::global(PassScope::Global(Preserve::Public))]
+    #[case::entrypoint_flat(PassScope::EntrypointFlat)]
+    #[case::entrypoint_recursive(PassScope::EntrypointRecursive)]
+
+    fn test_lower_direct(#[case] scope: PassScope) {
         let mut b = FunctionBuilder::new("circuit", Signature::new_endo(type_row![])).unwrap();
         let [maybe_q] = b
             .add_dataflow_op(TketOp::TryQAlloc, [])
@@ -337,7 +388,7 @@ mod test {
             .finish_hugr_with_outputs([])
             .unwrap_or_else(|e| panic!("{}", e));
 
-        let lowered = lower_tk2_op(&mut h).unwrap();
+        let lowered = lower_tk2_ops(&mut h, scope.clone()).unwrap();
         assert_eq!(lowered.len(), 5);
         let circ = Circuit::new(&h);
         let ops: Vec<QSystemOp> = circ
@@ -354,7 +405,7 @@ mod test {
                 QSystemOp::QFree,
             ]
         );
-        assert_eq!(check_lowered(&h), Ok(()));
+        assert_eq!(check_lowered(&h, scope), Ok(()));
     }
 
     #[rstest]
@@ -393,12 +444,15 @@ mod test {
             assert_eq!(ops, qsystem_ops);
         }
 
-        assert_eq!(check_lowered(&h), Ok(()));
+        assert_eq!(check_lowered(&h, Preserve::Public), Ok(()));
     }
 
-    #[test]
-    fn test_mixed() {
-        let mut b = DFGBuilder::new(Signature::new(vec![rotation_type()], vec![bool_t()])).unwrap();
+    #[rstest]
+    #[case::global(PassScope::Global(Preserve::Public))]
+    #[case::entrypoint_flat(PassScope::EntrypointFlat)]
+    #[case::entrypoint_recursive(PassScope::EntrypointRecursive)]
+    fn test_mixed(#[case] scope: PassScope) {
+        let mut b = DFGBuilder::new(Signature::new([rotation_type()], [bool_t()])).unwrap();
         let [angle] = b.input_wires_arr();
         let qalloc = b.add_dataflow_op(TketOp::QAlloc, []).unwrap();
         let [q] = qalloc.outputs_arr();
@@ -415,14 +469,28 @@ mod test {
         b.set_order(&rx, &qfree);
         let mut h = b.finish_hugr_with_outputs([bool]).unwrap();
 
-        let lowered = lower_tk2_op(&mut h).unwrap();
-        assert_eq!(lowered.len(), 6);
-        // dfg, input, output, alloc + (10 for unwrap), phasedx, rz, toturns, fmul, phasedx, free +
-        // 5x(float + load), measure_reset, conditional, case(input, output) * 2, flip
-        // (phasedx + 2*(float + load)), tket.read
-        // + 10 for the barrier array wrapping, unwrapping and option unwrapping
-        assert_eq!(h.descendants(h.module_root()).count(), 72);
-        assert_eq!(check_lowered(&h), Ok(()));
+        let original_node_count = h.nodes().count();
+
+        let lowered = lower_tk2_ops(&mut h, scope.clone()).unwrap();
+
+        let expected_lower_count = match scope {
+            PassScope::EntrypointFlat => 1,
+            PassScope::EntrypointRecursive => 1,
+            PassScope::Global(_) => 6,
+            _ => unreachable!(),
+        };
+        assert_eq!(lowered.len(), expected_lower_count);
+
+        let final_node_count = h.nodes().count();
+        let expected_node_count = match scope {
+            PassScope::EntrypointFlat => original_node_count,
+            PassScope::EntrypointRecursive => original_node_count,
+            PassScope::Global(_) => original_node_count + 59,
+            _ => unreachable!(),
+        };
+        assert_eq!(final_node_count, expected_node_count);
+
+        assert_eq!(check_lowered(&h, scope), Ok(()));
         if let Err(e) = h.validate() {
             panic!("{}", e);
         }

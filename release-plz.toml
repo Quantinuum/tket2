@@ -57,3 +57,7 @@ release = true
 [[package]]
 name = "tket-qsystem"
 release = true
+
+[[package]]
+name = "hugr-passes"
+release = true

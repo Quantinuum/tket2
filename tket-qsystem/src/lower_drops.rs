@@ -5,19 +5,23 @@ use hugr::types::Term;
 use hugr::{Node, hugr::hugrmut::HugrMut};
 use hugr_passes::composable::WithScope;
 use hugr_passes::replace_types::{Linearizer, NodeTemplate, ReplaceTypesError};
-use hugr_passes::{ComposablePass, ReplaceTypes};
+use hugr_passes::{ComposablePass, PassScope, ReplaceTypes};
 use tket::extension::guppy::{DROP_OP_NAME, GUPPY_EXTENSION};
 
 use crate::extension::futures::{FutureOp, FutureOpDef, future_type};
 
 /// A pass that lowers "drop" ops from [GUPPY_EXTENSION]
 #[derive(Default, Debug, Clone)]
-pub struct LowerDropsPass;
+pub struct LowerDropsPass {
+    /// Where to apply the pass.
+    ///
+    /// Configurable via [`WithScope::with_scope`].
+    scope: PassScope,
+}
 
 impl WithScope for LowerDropsPass {
-    fn with_scope(self, _scope: impl Into<hugr_passes::PassScope>) -> Self {
-        // TODO: Follow scope configuration
-        // <https://github.com/Quantinuum/tket2/pull/1429>
+    fn with_scope(mut self, scope: impl Into<PassScope>) -> Self {
+        self.scope = scope.into();
         self
     }
 }
@@ -29,7 +33,7 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for LowerDropsPass {
     type Result = bool;
 
     fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
-        let mut rt = ReplaceTypes::default();
+        let mut rt = ReplaceTypes::default().with_scope(self.scope.clone());
 
         // future(bool) is not in the default linearizer handler so we add it here.
         // TODO: Create ReplaceTypes with future(bool) linearized by default to avoid
@@ -97,7 +101,7 @@ mod test {
                 .count()
         };
         assert_eq!(count_drops(&h), 1);
-        LowerDropsPass.run(&mut h).unwrap();
+        LowerDropsPass::default().run(&mut h).unwrap();
         h.validate().unwrap();
         assert_eq!(count_drops(&h), 0);
     }

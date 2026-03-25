@@ -70,3 +70,6 @@ docs/_build/
 
 # Pyenv
 .python-version
+
+# MacOS debug symbols
+*.dylib.dSYM

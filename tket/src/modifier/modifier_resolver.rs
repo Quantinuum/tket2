@@ -1132,7 +1132,7 @@ pub fn resolve_modifier_with_entrypoints(
 
     // TODO: This as well.
     // Ad hoc cleanup procedure.
-    delete_phase(h, [h.module_root()])?;
+    delete_phase(h, entry_points)?;
 
     h.validate()
         .map_err(|e| ModifierResolverErrors::BuildError(e.into()))?;

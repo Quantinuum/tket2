@@ -36,6 +36,8 @@ llvm = ["hugr/llvm", "hugr/llvm-test", "dep:anyhow"]
 default = ["binary-eccs"]
 
 [dependencies]
+hugr-passes = { path = "../hugr-passes", version = "0.26.1" }
+
 lazy_static = { workspace = true }
 cgmath = { workspace = true }
 tket-json-rs = { workspace = true }
@@ -61,7 +63,6 @@ derive_more = { workspace = true, features = [
 ] }
 hugr = { workspace = true }
 hugr-core = { workspace = true }
-hugr-passes = { workspace = true }
 portgraph = { workspace = true, features = ["serde", "petgraph"] }
 strum = { workspace = true, features = ["derive"] }
 fxhash = { workspace = true }

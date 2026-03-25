@@ -146,7 +146,9 @@ jobs:
       - name: Install cargo-codspeed
         run: cargo binstall cargo-codspeed --force
       - name: Override criterion with the CodSpeed harness
-        run: cargo add --dev codspeed-criterion-compat --rename criterion --package tket
+        run: |
+          cargo add --dev codspeed-criterion-compat --rename criterion --package tket
+          cargo add --dev codspeed-criterion-compat --rename criterion --package hugr-passes
       - name: Build benchmarks
         run: cargo codspeed build --profile bench --features portmatching,binary-eccs,rewrite-tracing
       - name: Run benchmarks
@@ -177,9 +179,9 @@ jobs:
           install-path: ${{ env.TKET_C_API_PATH }}
       - uses: taiki-e/install-action@nextest
       - name: Build with no features
-        run: cargo nextest r --verbose -p tket -p tket-py -p tket-qsystem --no-default-features --no-run
+        run: cargo nextest r --verbose -p tket -p tket-py -p tket-qsystem -p hugr-passes --no-default-features --no-run
       - name: Tests with no features
-        run: cargo nextest r --verbose -p tket -p tket-py -p tket-qsystem --no-default-features
+        run: cargo nextest r --verbose -p tket -p tket-py -p tket-qsystem -p hugr-passes --no-default-features
 
   # Run tests on Rust stable
   tests-rs-stable-all-features:
@@ -408,6 +410,10 @@ jobs:
           sudo add-apt-repository 'deb http://apt.llvm.org/noble/   llvm-toolchain-noble-${{ env.LLVM_MAIN_VERSION }}  main'
           sudo apt update
           sudo apt install llvm-${{ env.LLVM_MAIN_VERSION }} libpolly-${{ env.LLVM_MAIN_VERSION }}-dev
+      - name: Install tket-c-api library
+        uses: ./.github/actions/tket-c-api
+        with:
+          install-path: ${{ env.TKET_C_API_PATH }}
       - name: Install Python ${{ env.PYTHON_LOWEST }}
         run: uv python install ${{ env.PYTHON_LOWEST }}
       - name: Run qis-compiler tests
@@ -436,6 +442,10 @@ jobs:
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
       - uses: extractions/setup-just@v3
+      - name: Install tket-c-api library
+        uses: ./.github/actions/tket-c-api
+        with:
+          install-path: ${{ env.TKET_C_API_PATH }}
       - name: Generate the updated definitions
         run: just gen-extensions
       - name: Check if the declarations are up to date

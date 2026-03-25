@@ -20,6 +20,7 @@ use hugr::std_extensions::collections::{
 use hugr::std_extensions::logic::LogicOp;
 use hugr::types::{SumType, Term, Type};
 use hugr::{Hugr, Node, Wire, hugr::hugrmut::HugrMut, type_row};
+use hugr_passes::PassScope;
 use hugr_passes::composable::WithScope;
 use hugr_passes::non_local::LocalizeEdges;
 use hugr_passes::replace_types::{Linearizer, NodeTemplate, ReplaceTypesError};
@@ -66,12 +67,16 @@ pub enum ReplaceBoolPassError<N> {
 /// [QSystemOp::LazyMeasure]: crate::extension::qsystem::QSystemOp::LazyMeasure
 /// [QSystemOp::LazyMeasureReset]: crate::extension::qsystem::QSystemOp::LazyMeasureReset
 #[derive(Default, Debug, Clone)]
-pub struct ReplaceBoolPass;
+pub struct ReplaceBoolPass {
+    /// Where to apply the pass.
+    ///
+    /// Configurable via [`WithScope::with_scope`].
+    scope: PassScope,
+}
 
 impl WithScope for ReplaceBoolPass {
-    fn with_scope(self, _scope: impl Into<hugr_passes::PassScope>) -> Self {
-        // TODO: Follow scope configuration
-        // <https://github.com/Quantinuum/tket2/pull/1429>
+    fn with_scope(mut self, scope: impl Into<PassScope>) -> Self {
+        self.scope = scope.into();
         self
     }
 }
@@ -81,10 +86,9 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for ReplaceBoolPass {
     type Result = ();
 
     fn run(&self, hugr: &mut H) -> Result<(), Self::Error> {
-        LocalizeEdges::default().check_no_nonlocal_edges(hugr)?;
-        ReplaceStaticArrayBoolPass::default().run(hugr)?;
-        let lowerer = lowerer();
-        lowerer.run(hugr)?;
+        LocalizeEdges::default_with_scope(self.scope.clone()).check_no_nonlocal_edges(hugr)?;
+        ReplaceStaticArrayBoolPass::default_with_scope(self.scope.clone()).run(hugr)?;
+        lowerer().with_scope(self.scope.clone()).run(hugr)?;
         Ok(())
     }
 }
@@ -488,7 +492,7 @@ mod test {
         let mut h = dfb.finish_hugr_with_outputs([const_wire]).unwrap();
 
         h.validate().unwrap();
-        let pass = ReplaceBoolPass;
+        let pass = ReplaceBoolPass::default();
         pass.run(&mut h).unwrap();
         h.validate().unwrap();
         let sig = h.signature(h.entrypoint()).unwrap();
@@ -504,7 +508,7 @@ mod test {
 
         assert_eq!(h.num_nodes(), 8);
 
-        let pass = ReplaceBoolPass;
+        let pass = ReplaceBoolPass::default();
         pass.run(&mut h).unwrap();
         h.validate().unwrap();
 
@@ -524,7 +528,7 @@ mod test {
 
         assert_eq!(h.num_nodes(), 8);
 
-        let pass = ReplaceBoolPass;
+        let pass = ReplaceBoolPass::default();
         pass.run(&mut h).unwrap();
         h.validate().unwrap();
 
@@ -550,7 +554,7 @@ mod test {
         let result = dfb.add_dataflow_op(logic_op, [b1, b2]).unwrap();
         let mut h = dfb.finish_hugr_with_outputs(result.outputs()).unwrap();
 
-        let pass = ReplaceBoolPass;
+        let pass = ReplaceBoolPass::default();
         pass.run(&mut h).unwrap();
         h.validate().unwrap();
 
@@ -566,7 +570,7 @@ mod test {
         let result = dfb.add_dataflow_op(BoolOp::not, [b]).unwrap();
         let mut h = dfb.finish_hugr_with_outputs(result.outputs()).unwrap();
 
-        let pass = ReplaceBoolPass;
+        let pass = ReplaceBoolPass::default();
         pass.run(&mut h).unwrap();
         h.validate().unwrap();
 
@@ -584,7 +588,7 @@ mod test {
         let output = dfb.add_dataflow_op(measure_op, [q]).unwrap();
         let mut h = dfb.finish_hugr_with_outputs(output.outputs()).unwrap();
 
-        let pass = ReplaceBoolPass;
+        let pass = ReplaceBoolPass::default();
         pass.run(&mut h).unwrap();
         h.validate().unwrap();
 
@@ -609,7 +613,7 @@ mod test {
         let output = dfb.add_measure_reset(q).unwrap();
         let mut h = dfb.finish_hugr_with_outputs(output).unwrap();
 
-        let pass = ReplaceBoolPass;
+        let pass = ReplaceBoolPass::default();
         pass.run(&mut h).unwrap();
         h.validate().unwrap();
 
@@ -636,7 +640,7 @@ mod test {
         let mut h = dfb.finish_hugr_with_outputs([arr1, arr2]).unwrap();
 
         h.validate().unwrap();
-        let pass = ReplaceBoolPass;
+        let pass = ReplaceBoolPass::default();
         pass.run(&mut h).unwrap();
         h.validate().unwrap();
 
@@ -664,7 +668,7 @@ mod test {
         let mut h = dfb.finish_hugr_with_outputs([]).unwrap();
 
         h.validate().unwrap();
-        let pass = ReplaceBoolPass;
+        let pass = ReplaceBoolPass::default();
         pass.run(&mut h).unwrap();
         h.validate().unwrap();
     }
@@ -690,7 +694,7 @@ mod test {
         let mut h = dfb.finish_hugr_with_outputs([arr, elem]).unwrap();
 
         h.validate().unwrap();
-        let pass = ReplaceBoolPass;
+        let pass = ReplaceBoolPass::default();
         pass.run(&mut h).unwrap(); // Fails here with mismatch, option_type(bool_dest()) is not Copyable
         h.validate().unwrap();
 
