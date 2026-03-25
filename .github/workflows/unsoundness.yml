@@ -56,8 +56,27 @@ jobs:
         uses: ./.github/actions/tket-c-api
         with:
           install-path: ${{ env.TKET_C_API_PATH }}
+
+      # Run miri unsoundness checks.
+      #
+      # Skip tests that take over 5mins in CI.
       - name: Test with Miri
-        run: cargo miri test
+        run: |
+          cargo miri nextest run --no-default-features -- \
+            `# -------- hugr-passes` \
+            --skip "dataflow::partial_value::test::bounded_lattice" \
+            --skip "dataflow::partial_value::test::lattice" \
+            --skip "dataflow::partial_value::test::lattice_associative" \
+            --skip "dataflow::partial_value::test::meet_join_self_noop" \
+            --skip "dataflow::partial_value::test::partial_value_type" \
+            --skip "dataflow::partial_value::test::partial_value_valid" \
+            --skip "merge_bbs::test::check_ext_id_wellformed" \
+            --skip "monomorphize::test::test_recursion_module" \
+            --skip "normalize_cfgs::test::check_ext_id_wellformed" \
+            --skip "replace_types::test::dfg_conditional_case" \
+            --skip "replace_types::test::module_func_cfg_call" \
+            --skip "replace_types::test::op_to_call" \
+            #
 
   create-issue:
     uses: quantinuum/hugrverse-actions/.github/workflows/create-issue.yml@main
