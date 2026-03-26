@@ -5,6 +5,7 @@ use std::{
 
 use hugr_core::ops::constant::{CustomConst, CustomSerialized};
 use hugr_core::ops::handle::NodeHandle;
+use hugr_core::std_extensions::collections::list::ListOp;
 use hugr_core::{Visibility, ops::Const};
 use itertools::Itertools;
 use rstest::rstest;
@@ -1659,14 +1660,23 @@ fn test_module() -> Result<(), Box<dyn std::error::Error>> {
 
 /// Check that opaque constants don't cause panics when they fail to be folded.
 //
-// TODO: The disabled tests here are waiting for
-//<https://github.com/Quantinuum/hugr/pull/2986> to be merged and released.
-//
 // TODO: Add tests for RotationOp once this is moved to the tket crate.
+//
+// TODO: The cases marked with `should_panic` should be fixed once
+//<https://github.com/Quantinuum/hugr/pull/2986> is merged and released.
 #[rstest]
-//#[case::float_fsub(FloatOps::fsub)] #[case::float_fadd(FloatOps::fadd)]
-//#[case::float_fmul(FloatOps::fmul)] #[case::float_fdiv(FloatOps::fdiv)]
-//#[case::float_fneg(FloatOps::fneg)] #[case::float_fabs(FloatOps::fabs)]
+#[should_panic]
+#[case::float_fsub(FloatOps::fsub)]
+#[should_panic]
+#[case::float_fadd(FloatOps::fadd)]
+#[should_panic]
+#[case::float_fmul(FloatOps::fmul)]
+#[should_panic]
+#[case::float_fdiv(FloatOps::fdiv)]
+#[should_panic]
+#[case::float_fneg(FloatOps::fneg)]
+#[should_panic]
+#[case::float_fabs(FloatOps::fabs)]
 #[case::logic_and(LogicOp::And)]
 #[case::logic_or(LogicOp::Or)]
 #[case::logic_not(LogicOp::Not)]
@@ -1678,15 +1688,22 @@ fn test_module() -> Result<(), Box<dyn std::error::Error>> {
 #[case::convert_convert_u(ConvertOpDef::convert_u.with_log_width(5))]
 #[case::convert_convert_s(ConvertOpDef::convert_s.with_log_width(5))]
 #[case::convert_itobool(ConvertOpDef::itobool.without_log_width())]
-//#[case::convert_ifrombool(ConvertOpDef::ifrombool.without_log_width())]
+#[should_panic]
+#[case::convert_ifrombool(ConvertOpDef::ifrombool.without_log_width())]
 #[case::convert_itostring_u(ConvertOpDef::itostring_u.with_log_width(5))]
 #[case::convert_itostring_s(ConvertOpDef::itostring_s.with_log_width(5))]
-//#[case::list_pop(ListOp::pop.with_type(bool_t()).to_extension_op().unwrap())]
-//#[case::list_push(ListOp::push.with_type(bool_t()).to_extension_op().unwrap())]
-//#[case::list_get(ListOp::get.with_type(bool_t()).to_extension_op().unwrap())]
-//#[case::list_set(ListOp::set.with_type(bool_t()).to_extension_op().unwrap())]
-//#[case::list_insert(ListOp::insert.with_type(bool_t()).to_extension_op().unwrap())]
-//#[case::list_length(ListOp::length.with_type(bool_t()).to_extension_op().unwrap())]
+#[should_panic]
+#[case::list_pop(ListOp::pop.with_type(bool_t()).to_extension_op().unwrap())]
+#[should_panic]
+#[case::list_push(ListOp::push.with_type(bool_t()).to_extension_op().unwrap())]
+#[should_panic]
+#[case::list_get(ListOp::get.with_type(bool_t()).to_extension_op().unwrap())]
+#[should_panic]
+#[case::list_set(ListOp::set.with_type(bool_t()).to_extension_op().unwrap())]
+#[should_panic]
+#[case::list_insert(ListOp::insert.with_type(bool_t()).to_extension_op().unwrap())]
+#[should_panic]
+#[case::list_length(ListOp::length.with_type(bool_t()).to_extension_op().unwrap())]
 fn test_opaque_consts(#[case] op: impl Into<OpType>) {
     let op = op.into();
     let sig = op.dataflow_signature().unwrap();
