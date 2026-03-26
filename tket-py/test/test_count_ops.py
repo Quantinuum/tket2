@@ -30,6 +30,9 @@ testdata = [
     ("conditional_loop", 8),
     ("fn_calls", 2),
     ("repeat_until_success", 21),
+    # TODO: Requires this fix from hugr-rs
+    # <https://github.com/Quantinuum/hugr/pull/2986>
+    # ("extern_def", 2),
 ]
 
 

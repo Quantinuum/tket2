@@ -3,14 +3,15 @@ use std::{
     sync::LazyLock,
 };
 
+use hugr_core::ops::constant::{CustomConst, CustomSerialized};
 use hugr_core::ops::handle::NodeHandle;
 use hugr_core::{Visibility, ops::Const};
 use itertools::Itertools;
 use rstest::rstest;
 
 use hugr_core::builder::{
-    Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
-    ModuleBuilder, SubContainer, endo_sig, inout_sig,
+    Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
+    HugrBuilder, ModuleBuilder, SubContainer, endo_sig, inout_sig,
 };
 use hugr_core::extension::prelude::{
     ConstError, ConstString, MakeTuple, UnpackTuple, bool_t, const_ok, error_type, string_type,
@@ -18,7 +19,7 @@ use hugr_core::extension::prelude::{
 };
 
 use hugr_core::hugr::hugrmut::HugrMut;
-use hugr_core::ops::{OpTag, OpTrait, OpType, Value, constant::CustomConst};
+use hugr_core::ops::{OpTag, OpTrait, OpType, Value};
 use hugr_core::std_extensions::arithmetic::{
     conversions::ConvertOpDef,
     float_ops::FloatOps,
@@ -1654,4 +1655,58 @@ fn test_module() -> Result<(), Box<dyn std::error::Error>> {
         Some(&Const::new(ConstInt::new_u(5, 24).unwrap().into()))
     );
     Ok(())
+}
+
+/// Check that opaque constants don't cause panics when they fail to be folded.
+//
+// TODO: The disabled tests here are waiting for
+//<https://github.com/Quantinuum/hugr/pull/2986> to be merged and released.
+//
+// TODO: Add tests for RotationOp once this is moved to the tket crate.
+#[rstest]
+//#[case::float_fsub(FloatOps::fsub)] #[case::float_fadd(FloatOps::fadd)]
+//#[case::float_fmul(FloatOps::fmul)] #[case::float_fdiv(FloatOps::fdiv)]
+//#[case::float_fneg(FloatOps::fneg)] #[case::float_fabs(FloatOps::fabs)]
+#[case::logic_and(LogicOp::And)]
+#[case::logic_or(LogicOp::Or)]
+#[case::logic_not(LogicOp::Not)]
+#[case::int_iadd(IntOpDef::iadd.with_log_width(5))]
+#[case::int_isub(IntOpDef::isub.with_log_width(5))]
+#[case::int_ineg(IntOpDef::ineg.with_log_width(5))]
+#[case::convert_trunc_u(ConvertOpDef::trunc_u.with_log_width(5))]
+#[case::convert_trunc_s(ConvertOpDef::trunc_s.with_log_width(5))]
+#[case::convert_convert_u(ConvertOpDef::convert_u.with_log_width(5))]
+#[case::convert_convert_s(ConvertOpDef::convert_s.with_log_width(5))]
+#[case::convert_itobool(ConvertOpDef::itobool.without_log_width())]
+//#[case::convert_ifrombool(ConvertOpDef::ifrombool.without_log_width())]
+#[case::convert_itostring_u(ConvertOpDef::itostring_u.with_log_width(5))]
+#[case::convert_itostring_s(ConvertOpDef::itostring_s.with_log_width(5))]
+//#[case::list_pop(ListOp::pop.with_type(bool_t()).to_extension_op().unwrap())]
+//#[case::list_push(ListOp::push.with_type(bool_t()).to_extension_op().unwrap())]
+//#[case::list_get(ListOp::get.with_type(bool_t()).to_extension_op().unwrap())]
+//#[case::list_set(ListOp::set.with_type(bool_t()).to_extension_op().unwrap())]
+//#[case::list_insert(ListOp::insert.with_type(bool_t()).to_extension_op().unwrap())]
+//#[case::list_length(ListOp::length.with_type(bool_t()).to_extension_op().unwrap())]
+fn test_opaque_consts(#[case] op: impl Into<OpType>) {
+    let op = op.into();
+    let sig = op.dataflow_signature().unwrap();
+
+    let mut build = FunctionBuilder::new("fn", noargfn(sig.output.clone())).unwrap();
+
+    let inputs = sig
+        .input
+        .iter()
+        .enumerate()
+        .map(|(i, typ)| {
+            let opaque = CustomSerialized::new(typ.clone(), format!("opaque{i}").into());
+            build.add_load_const(Value::extension(opaque))
+        })
+        .collect_vec();
+    let x2 = build.add_dataflow_op(op.clone(), inputs).unwrap();
+    let mut h = build.finish_hugr_with_outputs(x2.outputs()).unwrap();
+
+    constant_fold_pass(&mut h);
+
+    // Nothing got folded. The op is still there.
+    assert!(h.entry_descendants().any(|n| h.get_optype(n) == &op));
 }
