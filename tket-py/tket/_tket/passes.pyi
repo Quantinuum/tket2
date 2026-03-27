@@ -1,27 +1,23 @@
 from pathlib import Path
-from typing import TypeVar
 
 from .optimiser import BadgerOptimiser
-from .circuit import Tk2Circuit
-from pytket._tket.circuit import Circuit
-
-CircuitClass = TypeVar("CircuitClass", Circuit, Tk2Circuit)
+from .program import TkProgram
 
 class CircuitChunks:
-    def reassemble(self) -> Circuit | Tk2Circuit:
+    def reassemble(self) -> TkProgram:
         """Reassemble the circuit from its chunks."""
 
-    def circuits(self) -> list[Circuit | Tk2Circuit]:
+    def circuits(self) -> list[TkProgram]:
         """Returns clones of the split circuits."""
 
-    def update_circuit(self, index: int, circ: Circuit | Tk2Circuit) -> None:
+    def update_circuit(self, index: int, circ: TkProgram) -> None:
         """Replace a circuit chunk with a new version."""
 
 class PullForwardError(Exception):
     """Error from a `PullForward` operation."""
 
 def normalize_guppy(
-    circ: CircuitClass,
+    circ: TkProgram,
     *,
     simplify_cfgs: bool = True,
     remove_tuple_untuple: bool = True,
@@ -30,7 +26,7 @@ def normalize_guppy(
     inline_dfgs: bool = True,
     remove_redundant_order_edges: bool = True,
     squash_borrows: bool = True,
-) -> CircuitClass:
+) -> None:
     """Flatten the structure of a Guppy-generated program to enable additional optimisations.
 
     This should normally be called first before other optimisations.
@@ -44,54 +40,32 @@ def normalize_guppy(
     - remove_redundant_order_edges: Whether to remove redundant order edges.
     """
 
-def greedy_depth_reduce(circ: CircuitClass) -> tuple[CircuitClass, int]:
+def greedy_depth_reduce(circ: TkProgram) -> int:
     """Greedy depth reduction of a circuit.
 
-    Returns the reduced circuit and the depth reduction.
+    Mutates the circuit in place and returns the number of moves made.
     """
 
 def badger_optimise(
-    circ: CircuitClass,
+    circ: TkProgram,
     optimiser: BadgerOptimiser,
     max_threads: int | None = None,
     timeout: int | None = None,
     progress_timeout: int | None = None,
     max_circuit_count: int | None = None,
     log_dir: Path | None = None,
-    rebase: bool | None = False,
-) -> CircuitClass:
-    """Optimise a circuit using the Badger optimiser.
+) -> None:
+    """Optimise a circuit using the Badger optimiser."""
 
-    HyperTKET's best attempt at optimising a circuit using circuit rewriting
-    and the given Badger optimiser.
-
-    By default, the input circuit will be rebased to Nam, i.e. CX + Rz + H before
-    optimising. This can be deactivated by setting `rebase` to `false`, in which
-    case the circuit is expected to be in the Nam gate set.
-
-    Will use at most `max_threads` threads (plus a constant). Defaults to the
-    number of CPUs available.
-
-    The optimisation will terminate at the first of the following timeout
-    criteria, if set:
-    - `timeout` seconds (default: 15min) have elapsed since the start of the
-      optimisation
-    - `progress_timeout` (default: None) seconds have elapsed since progress
-      in the cost function was last made
-    - `max_circuit_count` (default: None) circuits have been explored.
-
-    Log files will be written to the directory `log_dir` if specified.
-    """
-
-def chunks(c: Circuit | Tk2Circuit, max_chunk_size: int) -> CircuitChunks:
+def chunks(c: TkProgram, max_chunk_size: int) -> CircuitChunks:
     """Split a circuit into chunks of at most `max_chunk_size` gates."""
 
 def tket1_pass(
-    circ: CircuitClass,
+    circ: TkProgram,
     pass_json: str,
     *,
     traverse_subcircuits: bool = True,
-) -> CircuitClass:
+) -> None:
     """Runs a pytket pass on all circuit-like regions under the entrypoint of the
     HUGR.
 

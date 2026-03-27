@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Iterable
+from typing import Iterable, TYPE_CHECKING
 
 from hugr import Hugr, tys, ops
 from hugr.package import Package
@@ -9,7 +9,9 @@ from hugr.std.float import FLOAT_T
 from hugr.build.function import Module
 from hugr.build.tracked_dfg import TrackedDfg
 from hugr.envelope import EnvelopeConfig
-from tket.circuit import Tk2Circuit
+
+if TYPE_CHECKING:
+    from tket.program import TkProgram
 
 from dataclasses import dataclass
 
@@ -73,19 +75,19 @@ class CircBuild(TrackedDfg):
 
         return Package(modules=[module.hugr], extensions=extensions)
 
-    def finish(self, other_extensions: list[Extension] | None = None) -> Tk2Circuit:
+    def finish(self, other_extensions: list[Extension] | None = None) -> TkProgram:
         """Finish building the circuit by setting all the qubits as the output
         and validate."""
+        from tket.program import TkProgram
 
-        return Tk2Circuit.from_str(
+        return TkProgram.from_str(
             self.finish_package(
                 other_extensions=other_extensions, function_name="main"
             ).to_str(EnvelopeConfig.TEXT),
-            "main",
         )
 
 
-def from_coms(*args: Command) -> Tk2Circuit:
+def from_coms(*args: Command) -> TkProgram:
     """Build a circuit from a sequence of commands, assuming
     only qubits are referred to by index."""
     commands: list[Command] = []
@@ -111,7 +113,7 @@ def load_custom(serialized: bytes) -> ops.Custom:
     return sops.ExtensionOp(**ext).deserialize()
 
 
-def id_circ(n_qb: int) -> Tk2Circuit:
+def id_circ(n_qb: int) -> TkProgram:
     b = CircBuild.with_nqb(n_qb)
     b.set_tracked_outputs()
     return b.finish()

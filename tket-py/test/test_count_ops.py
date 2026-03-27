@@ -1,10 +1,10 @@
 from pathlib import Path
-from tket.passes import normalize_guppy
-from tket.circuit import Tk2Circuit
+from tket.passes import NormalizeGuppy
+from tket.program import TkProgram
 import pytest
 
 
-def load_example(example_name: str) -> Tk2Circuit:
+def load_example(example_name: str) -> TkProgram:
     """Load a guppy example and normalize it."""
     # Load the hugr file from test_files/guppy_examples
     hugr_path = (
@@ -16,10 +16,11 @@ def load_example(example_name: str) -> Tk2Circuit:
 
     with open(hugr_path, "rb") as f:
         hugr_bytes = f.read()
-    circ = Tk2Circuit.from_bytes(hugr_bytes)
+    circ = TkProgram.from_bytes(hugr_bytes)
 
     # Normalize the guppy circuit before returning
-    return normalize_guppy(circ)
+    NormalizeGuppy()._run_tk(circ)
+    return circ
 
 
 testdata = [

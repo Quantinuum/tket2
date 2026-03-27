@@ -4,14 +4,14 @@ import json
 from dataclasses import dataclass
 
 from hugr import Hugr
-from pytket import Circuit
 from pytket.passes import (
     CustomPass,
     BasePass,
 )
 
 from tket import optimiser
-from tket.circuit import _hugr_to_tk2circuit
+from tket._tket.optimiser import BadgerOptimiser
+from tket.program import TkProgram
 
 from hugr.passes._composable_pass import (
     ComposablePass,
@@ -21,16 +21,17 @@ from hugr.passes._composable_pass import (
 )
 
 
-# Re-export native bindings.
+# Import the native bindings (used internally).
 from ._tket.passes import (
     CircuitChunks,
-    greedy_depth_reduce,
-    badger_optimise,
-    chunks,
-    tket1_pass,
-    normalize_guppy,
+    greedy_depth_reduce as _greedy_depth_reduce,
+    badger_optimise as _badger_optimise,
+    chunks as _chunks,
+    tket1_pass as _tket1_pass,
+    normalize_guppy as _normalize_guppy,
     PullForwardError,
 )
+
 
 __all__ = [
     "badger_pass",
@@ -40,8 +41,6 @@ __all__ = [
     "greedy_depth_reduce",
     "badger_optimise",
     "chunks",
-    # TODO: Remove export, use `NormalizeGuppy` instead
-    "normalize_guppy",
     "PullForwardError",
     "PytketHugrPass",
     "PassResult",
@@ -56,7 +55,6 @@ def badger_pass(
     progress_timeout: Optional[int] = None,
     max_circuit_count: Optional[int] = None,
     log_dir: Optional[Path] = None,
-    rebase: bool = False,
     cost_fn: Literal["cx", "rz"] | None = None,
 ) -> BasePass:
     """Construct a Badger pass.
@@ -69,7 +67,7 @@ def badger_pass(
     or `'rz'`. If not specified, the default is `'cx'`.
 
     The arguments `max_threads`, `timeout`, `progress_timeout`, `max_circuit_count`,
-    `log_dir` and `rebase` are optional and will be passed on to the Badger
+    and `log_dir` are optional and will be passed on to the Badger
     optimiser if provided."""
     if rewriter is None:
         try:
@@ -82,18 +80,21 @@ def badger_pass(
         rewriter = tket_eccs.nam_6_3()
     opt = optimiser.BadgerOptimiser.load_precompiled(rewriter, cost_fn=cost_fn)
 
-    def apply(circuit: Circuit) -> Circuit:
+    def apply(circuit):
         """Apply Badger optimisation to the circuit."""
-        return badger_optimise(
-            circuit,
+        from tket._tket.program import TkProgram as RustTkProgram
+
+        tk = RustTkProgram.from_tket1(circuit)
+        badger_optimise(
+            tk,
             optimiser=opt,
             max_threads=max_threads,
             timeout=timeout,
             progress_timeout=progress_timeout,
             max_circuit_count=max_circuit_count,
             log_dir=log_dir,
-            rebase=rebase,
         )
+        return tk
 
     return CustomPass(apply, label="tket.badger_pass")
 
@@ -129,18 +130,15 @@ class PytketHugrPass(ComposablePass):
             return ComposedPass(self, other)
 
     def _run_pytket_pass_on_hugr(self, hugr: Hugr, inplace: bool) -> PassResult:
-        compiler_state, registry = _hugr_to_tk2circuit(hugr)
+        tk_program = TkProgram.from_python(hugr)
         for py_pass in self.pytket_passes:
             pass_json = json.dumps(py_pass.to_dict())
-            compiler_state = tket1_pass(
-                compiler_state, pass_json, traverse_subcircuits=True
-            )
+            _tket1_pass(tk_program._inner, pass_json, traverse_subcircuits=True)
 
-        new_hugr = Hugr.from_str(compiler_state.to_str())
-        new_hugr.resolve_extensions(registry)
-        # `for_pass` assumes Modified is true by default
-        # TODO: if we can extract better info from tket1 as to what happened, use it.
-        # Are there better results  we can use too?
+        package = tk_program.to_python()
+        new_hugr = package.modules[0]
+        if tk_program._py_extensions is not None:
+            new_hugr.resolve_extensions(tk_program._py_extensions)
         return PassResult.for_pass(self, hugr=new_hugr, inplace=inplace, result=None)
 
 
@@ -177,9 +175,21 @@ class NormalizeGuppy(ComposablePass):
         )
 
     def _normalize(self, hugr: Hugr, inplace: bool) -> PassResult:
-        compiler_state, registry = _hugr_to_tk2circuit(hugr)
-        opt_program = normalize_guppy(
-            compiler_state,
+        tk_program = TkProgram.from_python(hugr)
+
+        self._run_tk(tk_program)
+
+        package = tk_program.to_python()
+        return PassResult.for_pass(
+            self, hugr=package.modules[0], inplace=inplace, result=None
+        )
+
+    def _run_tk(self, program: TkProgram) -> TkProgram:
+        """Run the pass in the TkProgram
+
+        TODO: This should be part of a protocol."""
+        _normalize_guppy(
+            program._inner,
             simplify_cfgs=self.simplify_cfgs,
             remove_tuple_untuple=self.remove_tuple_untuple,
             constant_folding=self.constant_folding,
@@ -188,6 +198,55 @@ class NormalizeGuppy(ComposablePass):
             remove_redundant_order_edges=self.remove_redundant_order_edges,
             squash_borrows=self.squash_borrows,
         )
-        new_hugr = Hugr.from_str(opt_program.to_str())
-        new_hugr.resolve_extensions(registry)
-        return PassResult.for_pass(self, hugr=new_hugr, inplace=inplace, result=None)
+        return program
+
+
+def greedy_depth_reduce(program: TkProgram) -> int:
+    return _greedy_depth_reduce(program._inner)
+
+
+def badger_optimise(
+    program: TkProgram,
+    optimiser: BadgerOptimiser,
+    max_threads: int | None = None,
+    timeout: int | None = None,
+    progress_timeout: int | None = None,
+    max_circuit_count: int | None = None,
+    log_dir: Path | None = None,
+) -> None:
+    """Optimise a circuit using the Badger optimiser.
+
+    HyperTKET's best attempt at optimising a circuit using circuit rewriting
+    and the given Badger optimiser.
+
+    The input circuit is expected to be in the Nam gate set, i.e. CX + Rz + H.
+
+    Mutates the circuit in place.
+
+    Will use at most `max_threads` threads (plus a constant). Defaults to the
+    number of CPUs available.
+
+    The optimisation will terminate at the first of the following timeout
+    criteria, if set:
+    - `timeout` seconds (default: 15min) have elapsed since the start of the
+      optimisation
+    - `progress_timeout` (default: None) seconds have elapsed since progress
+      in the cost function was last made
+    - `max_circuit_count` (default: None) circuits have been explored.
+
+    Log files will be written to the directory `log_dir` if specified.
+    """
+    _badger_optimise(
+        program._inner,
+        optimiser=optimiser,
+        max_threads=max_threads,
+        timeout=timeout,
+        progress_timeout=progress_timeout,
+        max_circuit_count=max_circuit_count,
+        log_dir=log_dir,
+    )
+
+
+def chunks(program: TkProgram, max_chunk_size: int) -> CircuitChunks:
+    """Split a circuit into chunks of at most `max_chunk_size` gates."""
+    return _chunks(program._inner, max_chunk_size)
