@@ -622,3 +622,25 @@ fn call_indirect(#[case] inp1: PartialValue<Void>, #[case] inp2: PartialValue<Vo
     assert_eq!(results.read_out_wire(w1), out);
     assert_eq!(results.read_out_wire(w2), out);
 }
+
+#[test]
+fn func_set_input() {
+    let mut mb = ModuleBuilder::new();
+    let func = mb
+        .define_function("f", Signature::new_endo(vec![bool_t()]))
+        .unwrap();
+    let [inp] = func.input_wires_arr();
+    let func = func.finish_with_outputs([inp]).unwrap();
+    let hugr = mb.finish_hugr().unwrap();
+
+    let [inp, _] = hugr.get_io(func.node()).unwrap();
+    let mut m = Machine::<_, Void>::new(&hugr);
+    let inp_w = Wire::new(inp, 0);
+    m.prepopulate_wire(inp_w, pv_true());
+    let results = m.run(TestContext, []);
+    assert_eq!(
+        results.read_out_wire(inp_w),
+        //BUG should be: Some(pv_true())
+        Some(PartialValue::Bottom) // BUG (func not called, so as if we have not provided any inputs)
+    );
+}

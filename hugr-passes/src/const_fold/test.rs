@@ -3,8 +3,8 @@ use std::{
     sync::LazyLock,
 };
 
-use hugr_core::ops::handle::NodeHandle;
 use hugr_core::{Visibility, ops::Const};
+use hugr_core::{Wire, ops::handle::NodeHandle};
 use itertools::Itertools;
 use rstest::rstest;
 
@@ -30,7 +30,10 @@ use hugr_core::std_extensions::logic::LogicOp;
 use hugr_core::types::{Signature, SumType, Type, TypeBound, TypeRow, TypeRowRV};
 use hugr_core::{Hugr, HugrView, IncomingPort, Node, type_row};
 
-use crate::{ComposablePass as _, composable::ValidatingPass};
+use crate::{
+    ComposablePass as _, composable::ValidatingPass, const_fold::value_handle::HashedConst,
+    dataflow::Machine,
+};
 use crate::{
     PassScope,
     composable::WithScope,
@@ -1654,4 +1657,46 @@ fn test_module() -> Result<(), Box<dyn std::error::Error>> {
         Some(&Const::new(ConstInt::new_u(5, 24).unwrap().into()))
     );
     Ok(())
+}
+
+// This really belongs in dataflow/Machine tests, but we need ConstFoldContext
+#[test]
+fn func_override_input_top() {
+    let mut mb = ModuleBuilder::new();
+    let int5 = INT_TYPES[5].clone();
+
+    let mut inc = mb
+        .define_function("plus_one", Signature::new_endo([int5.clone()]))
+        .unwrap();
+    let [x] = inc.input_wires_arr();
+    let one = inc.add_load_value(ConstInt::new_u(5, 1).unwrap());
+    let sum = inc
+        .add_dataflow_op(IntOpDef::iadd.with_log_width(5), [x, one])
+        .unwrap();
+    let inc = inc.finish_with_outputs(sum.outputs()).unwrap();
+
+    let mut main = mb
+        .define_function("main", Signature::new([], [int5]))
+        .unwrap();
+    let three = main.add_load_value(ConstInt::new_u(5, 3).unwrap());
+    let call = main.call(inc.handle(), &[], [three]).unwrap();
+    main.finish_with_outputs(call.outputs()).unwrap();
+
+    let hugr = mb.finish_hugr().unwrap();
+
+    let [inc_in, _] = hugr.get_io(inc.node()).unwrap();
+    let inc_in = Wire::new(inc_in, 0);
+    let mut machine = Machine::<_, ValueHandle>::new(hugr);
+
+    machine.prepopulate_wire(inc_in, PartialValue::Top);
+    let results = machine.run(ConstFoldContext, []);
+    // Should be:
+    //assert_eq!(results.read_out_wire(inc_in), Some(PartialValue::Top));
+    // but actually:
+    let hc =
+        HashedConst::try_new(std::sync::Arc::new(ConstInt::new_u(5, 3).unwrap().into())).unwrap();
+    assert_eq!(
+        results.read_out_wire(inc_in),
+        Some(PartialValue::Value(ValueHandle::Hashable(hc)))
+    );
 }
