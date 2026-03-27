@@ -30,10 +30,7 @@ use hugr_core::std_extensions::logic::LogicOp;
 use hugr_core::types::{Signature, SumType, Type, TypeBound, TypeRow, TypeRowRV};
 use hugr_core::{Hugr, HugrView, IncomingPort, Node, type_row};
 
-use crate::{
-    ComposablePass as _, composable::ValidatingPass, const_fold::value_handle::HashedConst,
-    dataflow::Machine,
-};
+use crate::{ComposablePass as _, composable::ValidatingPass, dataflow::Machine};
 use crate::{
     PassScope,
     composable::WithScope,
@@ -1690,13 +1687,5 @@ fn func_override_input_top() {
 
     machine.prepopulate_wire(inc_in, PartialValue::Top);
     let results = machine.run(ConstFoldContext, []);
-    // Should be:
-    //assert_eq!(results.read_out_wire(inc_in), Some(PartialValue::Top));
-    // but actually:
-    let hc =
-        HashedConst::try_new(std::sync::Arc::new(ConstInt::new_u(5, 3).unwrap().into())).unwrap();
-    assert_eq!(
-        results.read_out_wire(inc_in),
-        Some(PartialValue::Value(ValueHandle::Hashable(hc)))
-    );
+    assert_eq!(results.read_out_wire(inc_in), Some(PartialValue::Top));
 }

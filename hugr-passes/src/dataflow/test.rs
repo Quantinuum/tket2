@@ -638,9 +638,5 @@ fn func_set_input() {
     let inp_w = Wire::new(inp, 0);
     m.prepopulate_wire(inp_w, pv_true());
     let results = m.run(TestContext, []);
-    assert_eq!(
-        results.read_out_wire(inp_w),
-        //BUG should be: Some(pv_true())
-        Some(PartialValue::Bottom) // BUG (func not called, so as if we have not provided any inputs)
-    );
+    assert_eq!(results.read_out_wire(inp_w), Some(pv_true()));
 }
