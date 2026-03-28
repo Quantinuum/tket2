@@ -329,7 +329,7 @@ pub(crate) mod test {
     use hugr_core::ops::{DFG, Input, OpType, Output, handle::NodeHandle};
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
     use hugr_core::types::{Signature, TypeRow};
-    use hugr_core::{Hugr, HugrView, IncomingPort, Node, NodeIndex};
+    use hugr_core::{Hugr, HugrView, IncomingPort, Node};
 
     use crate::composable::WithScope;
     use crate::const_fold::{ConstFoldError, ConstantFoldPass};
@@ -362,9 +362,7 @@ pub(crate) mod test {
         let hugr = mb.finish_hugr().unwrap();
 
         let c_usz = Value::from(ConstUsize::new(2));
-        let not_a_node = Node::from(portgraph::NodeIndex::new(
-            hugr.nodes().map(Node::index).max().unwrap() + 1,
-        ));
+        let not_a_node = Node::from(portgraph::NodeIndex::new(0xDEADBEEF));
         assert!(!hugr.contains_node(not_a_node));
         let dce = DeadCodeElimPass::default().with_entry_points([not_a_node]);
         let cfold = ConstantFoldPass::default().with_inputs(id2.node(), [(0, c_usz.clone())]);
