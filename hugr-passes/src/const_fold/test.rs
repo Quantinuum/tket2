@@ -1771,10 +1771,9 @@ fn two_funcs_hugr(entrypoint_is_main: Option<bool>) -> (Hugr, Node, Node) {
 }
 
 #[rstest]
-#[case(Preserve::Public, Some(true))]
 fn two_funcs_fully_folded(
-    #[case] scope: impl Into<PassScope>,
-    #[case] entrypoint_is_main: Option<bool>,
+    #[values(Preserve::Public, Preserve::Entrypoint)] scope: impl Into<PassScope>,
+    #[values(Some(true), None)] entrypoint_is_main: Option<bool>,
 ) {
     let (mut hugr, main, callee) = two_funcs_hugr(entrypoint_is_main);
     ConstantFoldPass::default_with_scope(scope.into())
@@ -1852,6 +1851,10 @@ fn two_funcs_check_callee_fully_folded(hugr: &Hugr, callee: Node) {
 
 #[rstest]
 #[case(Preserve::Public, Some(false))]
+#[case(Preserve::Entrypoint, Some(false))]
+#[case(Preserve::All, Some(false))]
+#[case(Preserve::All, Some(true))]
+#[case(Preserve::All, None)]
 fn two_funcs_preserve_f(
     #[case] scope: impl Into<PassScope>,
     #[case] entrypoint_is_main: Option<bool>,
@@ -1915,4 +1918,55 @@ fn check_two_funcs_main_uses_call(hugr: &Hugr, main: Node) {
     );
     let call_out = hugr.output_neighbours(call).exactly_one().ok().unwrap();
     assert!(hugr.get_optype(call_out).is_output());
+}
+
+#[rstest]
+fn two_funcs_entrypoint(
+    #[values(PassScope::EntrypointFlat, PassScope::EntrypointRecursive)] scope: PassScope,
+) {
+    let (backup, main, callee) = two_funcs_hugr(None);
+    let mut hugr = backup.clone();
+    ConstantFoldPass::default_with_scope(scope.clone())
+        .run(&mut hugr)
+        .unwrap();
+    assert_eq!(backup, hugr);
+
+    fn check_identical(hugr: &Hugr, backup: &Hugr, node: Node) {
+        // Don't check extract_hugr is identical as that would ignore edges incoming to the subtree
+        assert_eq!(
+            hugr.descendants(node).collect_vec(),
+            backup.descendants(node).collect_vec()
+        );
+        for n in hugr.descendants(node) {
+            assert_eq!(hugr.get_optype(n), backup.get_optype(n));
+            assert_eq!(
+                hugr.node_inputs(n).collect_vec(),
+                backup.node_inputs(n).collect_vec()
+            );
+            for ip in hugr.node_inputs(n) {
+                assert_eq!(
+                    hugr.linked_outputs(n, ip).collect_vec(),
+                    backup.linked_outputs(n, ip).collect_vec()
+                );
+            }
+            assert_eq!(
+                hugr.children(n).collect_vec(),
+                backup.children(n).collect_vec()
+            );
+        }
+    }
+
+    let (mut hugr, _, _) = two_funcs_hugr(Some(true));
+    ConstantFoldPass::default_with_scope(scope.clone())
+        .run(&mut hugr)
+        .unwrap();
+    two_funcs_check_main_fully_folded(&hugr, main);
+    check_identical(&hugr, &backup, callee);
+
+    let (mut hugr, _, _) = two_funcs_hugr(Some(false));
+    ConstantFoldPass::default_with_scope(scope)
+        .run(&mut hugr)
+        .unwrap();
+    check_identical(&hugr, &backup, main);
+    two_funcs_check_f_respects_argument(&hugr, callee);
 }
