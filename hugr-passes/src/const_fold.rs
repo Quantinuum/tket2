@@ -139,9 +139,8 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
                 .map_err(|op| ConstFoldError::InvalidEntryPoint { node, op })?;
         }
 
-        let results = m.run(ConstFoldContext, []);
+        let results = m.run_subtree(ConstFoldContext, root);
         let mb_root_inp = hugr.get_io(hugr.entrypoint()).map(|[i, _]| i);
-
         let wires_to_break = hugr
             .descendants(root)
             .flat_map(|n| hugr.node_inputs(n).map(move |ip| (n, ip)))
