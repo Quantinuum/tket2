@@ -70,8 +70,6 @@ class PytketHugrPass(ComposablePass):
 
         package = tk_program.to_python()
         new_hugr = package.modules[0]
-        if tk_program._py_extensions is not None:
-            new_hugr.resolve_extensions(tk_program._py_extensions)
         return PassResult.for_pass(self, hugr=new_hugr, inplace=inplace, result=None)
 
 

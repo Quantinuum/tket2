@@ -24,7 +24,7 @@ HUGRSerializationError = _state.HUGRSerializationError
 TK1EncodeError = _state.TK1EncodeError
 
 if TYPE_CHECKING:
-    from ._rewrite import CircuitRewrite
+    from tket._rewrite import CircuitRewrite
 
 
 __all__ = [
@@ -99,10 +99,9 @@ class CompilationState:
         hugr_bytes = self._inner.to_bytes()
         package = Package.from_bytes(hugr_bytes, self._py_extensions)
         if self._py_extensions is not None:
-            # TODO: Requires hugr-py release. Instead we resolve each hugr separately.
-            # package.resolve_extensions(self._py_extensions)
-            for module in package.modules:
-                module.resolve_extensions(self._py_extensions)
+            # Resolve the extensions in the loaded package using the python registry, if needed.
+            # TODO: Use the `package.resolve_extensions` for clarity once it's been released in `hugr-py 0.16.0`.
+            package.used_extensions(self._py_extensions)
         return package
 
     @staticmethod

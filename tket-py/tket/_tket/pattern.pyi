@@ -1,5 +1,5 @@
 from typing import Iterator
-from .program import Node, CompilationState
+from .state import Node, CompilationState
 from .rewrite import CircuitRewrite
 
 class Rule:
