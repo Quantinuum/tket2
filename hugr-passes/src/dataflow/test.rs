@@ -5,7 +5,7 @@ use ascent::{Lattice, lattice::BoundedLattice};
 use hugr_core::builder::{CFGBuilder, DataflowHugr, ModuleBuilder, inout_sig};
 use hugr_core::ops::{CallIndirect, TailLoop};
 use hugr_core::types::{ConstTypeError, TypeRow};
-use hugr_core::{Hugr, Node, Wire};
+use hugr_core::{Hugr, IncomingPort, Node, Wire};
 use hugr_core::{
     HugrView,
     builder::{DFGBuilder, Dataflow, DataflowSubContainer, HugrBuilder, SubContainer, endo_sig},
@@ -639,4 +639,39 @@ fn func_set_input() {
     m.prepopulate_wire(inp_w, pv_true());
     let results = m.run(TestContext, []);
     assert_eq!(results.read_out_wire(inp_w), Some(pv_true()));
+}
+
+#[rstest]
+fn func_override_input_top(#[values(false, true)] pre_pop_wire: bool) {
+    let mut mb = ModuleBuilder::new();
+
+    let callee = mb
+        .define_function("id", Signature::new_endo([bool_t()]))
+        .unwrap();
+    let [b] = callee.input_wires_arr();
+    let callee = callee.finish_with_outputs([b]).unwrap();
+
+    let mut main = mb
+        .define_function("main", Signature::new([], [bool_t()]))
+        .unwrap();
+    let tr = main.add_load_value(Value::true_val());
+    let call = main.call(callee.handle(), &[], [tr]).unwrap();
+    main.finish_with_outputs(call.outputs()).unwrap();
+
+    let hugr = mb.finish_hugr().unwrap();
+
+    let [callee_inp, _] = hugr.get_io(callee.node()).unwrap();
+    let callee_inp = Wire::new(callee_inp, 0);
+    let mut machine = Machine::<_, Void>::new(hugr);
+
+    if pre_pop_wire {
+        machine.prepopulate_wire(callee_inp, PartialValue::Top);
+    } else {
+        machine
+            .prepopulate_inputs(callee.node(), [(IncomingPort::from(0), PartialValue::Top)])
+            .unwrap();
+    }
+    let results = machine.run(TestContext, []);
+    // `true` value from main should be overridden by the `Top` we fed in:
+    assert_eq!(results.read_out_wire(callee_inp), Some(PartialValue::Top));
 }
