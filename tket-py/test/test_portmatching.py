@@ -1,12 +1,12 @@
 from pytket import Circuit
 from pytket.qasm import circuit_from_qasm_str
-from tket.pattern import CircuitPattern, PatternMatcher
-from tket.program import TkProgram
+from tket._pattern import CircuitPattern, PatternMatcher
+from tket._state import CompilationState
 
 
 def _tk(circ: Circuit):
-    """Convert a pytket Circuit to a Rust TkProgram."""
-    return TkProgram.from_tket1(circ)._inner
+    """Convert a pytket Circuit to a Rust CompilationState."""
+    return CompilationState.from_tket1(circ)._inner
 
 
 def test_simple_matching():

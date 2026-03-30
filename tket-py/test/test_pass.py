@@ -1,16 +1,15 @@
 from pytket import Circuit, OpType
 from typing import Callable, Any
-from tket.ops import TketOp
+from tket._ops import TketOp
 from tket.passes import (
-    badger_pass,
-    greedy_depth_reduce,
-    chunks,
+    _badger_optimise,
+    _greedy_depth_reduce,
     NormalizeGuppy,
 )
-from tket.program import TkProgram
+from tket._state import CompilationState
 from tket_exts import tket_registry
 
-from tket.pattern import Rule, RuleMatcher
+from tket._pattern import Rule, RuleMatcher
 import hypothesis.strategies as st
 from hypothesis.strategies._internal import SearchStrategy
 from hypothesis import given, settings
@@ -57,30 +56,30 @@ def circuits(
     reason="bug to be investigated, see https://github.com/quantinuum/tket2/issues/983"
 )
 def test_simple_badger_pass_no_opt():
-    c = Circuit(3).CCX(0, 1, 2)
-    badger = badger_pass(max_threads=1, timeout=0)
-    badger.apply(c)
+    state = CompilationState.from_tket1(Circuit(3).CCX(0, 1, 2))
+    _badger_optimise(state, max_threads=1, timeout=0)
+    c = state.to_tket1()
     assert c.n_gates_of_type(OpType.CX) == 6
 
 
 def test_depth_optimise():
-    c = TkProgram.from_tket1(Circuit(4).CX(0, 2).CX(1, 2).CX(1, 3))
+    c = CompilationState.from_tket1(Circuit(4).CX(0, 2).CX(1, 2).CX(1, 3))
 
     original = c.to_tket1()
     assert original.depth() == 3
 
-    greedy_depth_reduce(c)
+    _greedy_depth_reduce(c)
 
     result = c.to_tket1()
     assert result.depth() == 2
 
 
 def _depth_impl(circ: Circuit) -> None:
-    tk = TkProgram.from_tket1(circ)
+    tk = CompilationState.from_tket1(circ)
     original_gates = circ.n_gates
     original_depth = circ.depth()
 
-    greedy_depth_reduce(tk)
+    _greedy_depth_reduce(tk)
 
     new = tk.to_tket1()
     assert original_gates == new.n_gates
@@ -98,25 +97,12 @@ def test_depth_bug() -> None:
     _depth_impl(circ)
 
 
-def test_chunks():
-    c = Circuit(4).CX(0, 2).CX(1, 3).CX(1, 2).CX(0, 3).CX(1, 3)
-
-    tk = TkProgram.from_tket1(c)
-
-    circ_chunks = chunks(tk, 2)
-    circuits = circ_chunks.circuits()
-    circ_chunks.update_circuit(0, circuits[0])
-    tk2 = circ_chunks.reassemble()
-
-    assert type(tk2).__name__ == "TkProgram"
-
-
 def test_cx_rule():
-    c = TkProgram.from_tket1(Circuit(4).CX(0, 2).CX(1, 2).CX(1, 2))
+    c = CompilationState.from_tket1(Circuit(4).CX(0, 2).CX(1, 2).CX(1, 2))
 
     rule = Rule(
-        TkProgram.from_tket1(Circuit(2).CX(0, 1).CX(0, 1))._inner,
-        TkProgram.from_tket1(Circuit(2))._inner,
+        CompilationState.from_tket1(Circuit(2).CX(0, 1).CX(0, 1))._inner,
+        CompilationState.from_tket1(Circuit(2))._inner,
     )
     matcher = RuleMatcher([rule])
 
@@ -130,15 +116,17 @@ def test_cx_rule():
 
 
 def test_multiple_rules():
-    circ = TkProgram.from_tket1(Circuit(3).CX(0, 1).H(0).H(1).H(2).Z(0).H(0).H(1).H(2))
+    circ = CompilationState.from_tket1(
+        Circuit(3).CX(0, 1).H(0).H(1).H(2).Z(0).H(0).H(1).H(2)
+    )
 
     rule1 = Rule(
-        TkProgram.from_tket1(Circuit(1).H(0).Z(0).H(0))._inner,
-        TkProgram.from_tket1(Circuit(1).X(0))._inner,
+        CompilationState.from_tket1(Circuit(1).H(0).Z(0).H(0))._inner,
+        CompilationState.from_tket1(Circuit(1).X(0))._inner,
     )
     rule2 = Rule(
-        TkProgram.from_tket1(Circuit(1).H(0).H(0))._inner,
-        TkProgram.from_tket1(Circuit(1))._inner,
+        CompilationState.from_tket1(Circuit(1).H(0).H(0))._inner,
+        CompilationState.from_tket1(Circuit(1))._inner,
     )
     matcher = RuleMatcher([rule1, rule2])
 
@@ -154,46 +142,46 @@ def test_multiple_rules():
 
 
 def test_clifford_simp_no_swaps():
-    c = TkProgram.from_tket1(Circuit(4).CX(0, 2).CX(1, 2).CX(1, 2))
+    c = CompilationState.from_tket1(Circuit(4).CX(0, 2).CX(1, 2).CX(1, 2))
     hugr = Hugr.from_str(c.to_str(), tket_registry())
     cliff_pass = PytketHugrPass(CliffordSimp(allow_swaps=False))
     res = cliff_pass.run(hugr)
-    opt_circ = TkProgram.from_bytes(res.hugr.to_bytes())
+    opt_circ = CompilationState.from_bytes(res.hugr.to_bytes())
     assert opt_circ.circuit_cost(lambda op: int(op == TketOp.CX)) == 1
 
 
 def test_clifford_simp_with_swaps() -> None:
-    cx_circ = TkProgram.from_tket1(Circuit(2).CX(0, 1).CX(1, 0))
+    cx_circ = CompilationState.from_tket1(Circuit(2).CX(0, 1).CX(1, 0))
     hugr = Hugr.from_str(cx_circ.to_str(), tket_registry())
     cliff_pass_perm = PytketHugrPass(CliffordSimp(allow_swaps=True))
     # Simplify 2 CX circuit to a single CX with an implicit swap.
     res = cliff_pass_perm.run(hugr)
-    opt_circ = TkProgram.from_bytes(res.hugr.to_bytes())
+    opt_circ = CompilationState.from_bytes(res.hugr.to_bytes())
     assert opt_circ.circuit_cost(lambda op: int(op == TketOp.CX)) == 1
 
 
 def test_squash_phasedx_rz():
-    c = TkProgram.from_tket1(
+    c = CompilationState.from_tket1(
         Circuit(1).Rz(0.25, 0).Rz(0.75, 0).Rz(0.25, 0).Rz(-1.25, 0)
     )
     hugr = Hugr.from_str(c.to_str(), tket_registry())
     squash_pass = PytketHugrPass(SquashRzPhasedX())
     opt_hugr = squash_pass(hugr)
-    opt_circ = TkProgram.from_bytes(opt_hugr.to_bytes())
+    opt_circ = CompilationState.from_bytes(opt_hugr.to_bytes())
     # TODO: We cannot use circuit_cost due to a panic on non-tket ops and there
     # being some parameter loads...
     assert opt_circ.num_operations() == 0
 
 
 def test_sequence_pass():
-    c = TkProgram.from_tket1(
+    c = CompilationState.from_tket1(
         Circuit(2).CX(0, 1).CX(1, 0).Rz(0.25, 0).Rz(0.75, 0).Rz(0.25, 0).Rz(-1.25, 0)
     )
     hugr = Hugr.from_str(c.to_str(), tket_registry())
     seq_pass = SequencePass([SquashRzPhasedX(), CliffordSimp(allow_swaps=True)])
     clifford_and_squash_pass = PytketHugrPass(seq_pass)
     res_hugr = clifford_and_squash_pass(hugr)
-    opt_circ = TkProgram.from_bytes(res_hugr.to_bytes())
+    opt_circ = CompilationState.from_bytes(res_hugr.to_bytes())
     assert opt_circ.num_operations() == 1
     assert opt_circ.circuit_cost(lambda op: int(op == TketOp.CX)) == 1
 
@@ -208,10 +196,10 @@ def test_normalize_guppy():
     pytket_circ = Circuit(4).CX(0, 2).CX(1, 2).CX(1, 2)
     # TODO: add a more thorough test which checks that the hugr is normalized as expected.
     # test NormalizeGuppy as a ComposablePass
-    c1 = TkProgram.from_tket1(pytket_circ)
+    c1 = CompilationState.from_tket1(pytket_circ)
     hugr = Hugr.from_str(c1.to_str(), tket_registry())
 
     normalize = NormalizeGuppy()
     clean_hugr = normalize(hugr)
-    normal_circ1 = TkProgram.from_bytes(clean_hugr.to_bytes())
+    normal_circ1 = CompilationState.from_bytes(clean_hugr.to_bytes())
     assert normal_circ1.circuit_cost(lambda op: int(op == TketOp.CX)) == 3

@@ -1,5 +1,5 @@
 from typing import Iterator
-from .program import Node, TkProgram
+from .program import Node, CompilationState
 from .rewrite import CircuitRewrite
 
 class Rule:
@@ -7,18 +7,18 @@ class Rule:
 
     def __init__(
         self,
-        l: TkProgram,  # noqa: E741
-        r: TkProgram,
+        l: CompilationState,  # noqa: E741
+        r: CompilationState,
     ) -> None:
         """Create a new rewrite rule."""
 
-    def lhs(self) -> TkProgram:
+    def lhs(self) -> CompilationState:
         """Get the left hand side of the rule.
 
         This is the pattern that is matched in the circuit.
         """
 
-    def rhs(self) -> TkProgram:
+    def rhs(self) -> CompilationState:
         """Get the right hand side of the rule.
 
         This is the pattern that is replaced in the circuit.
@@ -30,16 +30,16 @@ class RuleMatcher:
     def __init__(self, rules: list[Rule]) -> None:
         """Create a new rule matcher."""
 
-    def find_match(self, circ: TkProgram) -> CircuitRewrite | None:
+    def find_match(self, circ: CompilationState) -> CircuitRewrite | None:
         """Find a match of the rules in the circuit."""
 
-    def find_matches(self, circ: TkProgram) -> list[CircuitRewrite]:
+    def find_matches(self, circ: CompilationState) -> list[CircuitRewrite]:
         """Find all matches of the rules in the circuit."""
 
 class CircuitPattern:
     """A pattern that matches a circuit exactly."""
 
-    def __init__(self, circ: TkProgram) -> None:
+    def __init__(self, circ: CompilationState) -> None:
         """Create a new circuit pattern."""
 
 class PatternMatcher:
@@ -48,10 +48,10 @@ class PatternMatcher:
     def __init__(self, patterns: Iterator[CircuitPattern]) -> None:
         """Create a new pattern matcher."""
 
-    def find_match(self, circ: TkProgram) -> PatternMatch | None:
+    def find_match(self, circ: CompilationState) -> PatternMatch | None:
         """Find a match of the patterns in the circuit."""
 
-    def find_matches(self, circ: TkProgram) -> list[PatternMatch]:
+    def find_matches(self, circ: CompilationState) -> list[PatternMatch]:
         """Find all matches of the patterns in the circuit."""
 
 class PatternMatch:

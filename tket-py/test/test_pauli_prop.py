@@ -5,11 +5,11 @@ from pytket._tket.circuit import Circuit
 
 from hugr.ops import Custom
 from hugr.hugr import Wire
-from tket.program import (
-    TkProgram,
+from tket._state import (
+    CompilationState,
     Node as Tk2Node,
 )
-from tket.program.build import (
+from tket._state.build import (
     CircBuild,
     H,
     from_coms,
@@ -24,8 +24,8 @@ from tket.program.build import (
     id_circ,
 )
 from hugr.std.logic import Not
-from tket.pattern import Rule, RuleMatcher  # type: ignore
-from tket.rewrite import CircuitRewrite, Subcircuit  # type: ignore
+from tket._pattern import Rule, RuleMatcher  # type: ignore
+from tket._rewrite import CircuitRewrite, Subcircuit  # type: ignore
 
 
 @pytest.fixture
@@ -110,7 +110,7 @@ def propagate_matcher(
     return RuleMatcher([*merge_rules, *propagate_rules, *measure_rules])
 
 
-def apply_exhaustive(circ: TkProgram, matcher: RuleMatcher) -> int:
+def apply_exhaustive(circ: CompilationState, matcher: RuleMatcher) -> int:
     """Apply the first matching rule until no more matches are found. Return the
     number of rewrites applied."""
     match_count = 0
@@ -121,7 +121,7 @@ def apply_exhaustive(circ: TkProgram, matcher: RuleMatcher) -> int:
     return match_count
 
 
-def add_error_after(circ: TkProgram, wire: Wire, error: Custom):
+def add_error_after(circ: CompilationState, wire: Wire, error: Custom):
     """Use a rewrite to insert an operation on a qubit wire assuming the error is
     a one qubit operation, and the source gate of the wire only acts on qubits."""
     port = wire.out_port()
@@ -142,7 +142,7 @@ def add_error_after(circ: TkProgram, wire: Wire, error: Custom):
     circ._inner.apply_rewrite(rw)
 
 
-def final_pauli_string(circ: TkProgram) -> str:
+def final_pauli_string(circ: CompilationState) -> str:
     """Assuming the circuit only has qubit outputs - check the final operations
     on each qubit, and if they are paulis concatenate them into a string."""
     inner = circ._inner

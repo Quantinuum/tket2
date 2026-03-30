@@ -11,7 +11,7 @@ from hugr.build.tracked_dfg import TrackedDfg
 from hugr.envelope import EnvelopeConfig
 
 if TYPE_CHECKING:
-    from tket.program import TkProgram
+    from tket._state import CompilationState
 
 from dataclasses import dataclass
 
@@ -75,19 +75,21 @@ class CircBuild(TrackedDfg):
 
         return Package(modules=[module.hugr], extensions=extensions)
 
-    def finish(self, other_extensions: list[Extension] | None = None) -> TkProgram:
+    def finish(
+        self, other_extensions: list[Extension] | None = None
+    ) -> CompilationState:
         """Finish building the circuit by setting all the qubits as the output
         and validate."""
-        from tket.program import TkProgram
+        from tket._state import CompilationState
 
-        return TkProgram.from_str(
+        return CompilationState.from_str(
             self.finish_package(
                 other_extensions=other_extensions, function_name="main"
             ).to_str(EnvelopeConfig.TEXT),
         )
 
 
-def from_coms(*args: Command) -> TkProgram:
+def from_coms(*args: Command) -> CompilationState:
     """Build a circuit from a sequence of commands, assuming
     only qubits are referred to by index."""
     commands: list[Command] = []
@@ -113,7 +115,7 @@ def load_custom(serialized: bytes) -> ops.Custom:
     return sops.ExtensionOp(**ext).deserialize()
 
 
-def id_circ(n_qb: int) -> TkProgram:
+def id_circ(n_qb: int) -> CompilationState:
     b = CircBuild.with_nqb(n_qb)
     b.set_tracked_outputs()
     return b.finish()

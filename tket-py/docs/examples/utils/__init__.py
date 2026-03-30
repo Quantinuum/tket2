@@ -2,7 +2,7 @@
 
 from hugr import Hugr
 from hugr.envelope import EnvelopeConfig
-from tket import TkProgram
+from tket._state import CompilationState
 
 
 def setup_jupyter_rendering():
@@ -14,10 +14,10 @@ def setup_jupyter_rendering():
         return h.render_dot()._repr_mimebundle_(include, exclude, **kwargs)
 
     def _repr_tk2circ(
-        circ: TkProgram, include=None, exclude=None, **kwargs
+        circ: CompilationState, include=None, exclude=None, **kwargs
     ) -> dict[str, bytes | str]:
         h = Hugr.from_bytes(circ.to_bytes(EnvelopeConfig.BINARY))
         return _repr_hugr(h, include, exclude, **kwargs)
 
     setattr(Hugr, "_repr_mimebundle_", _repr_hugr)
-    setattr(TkProgram, "_repr_mimebundle_", _repr_tk2circ)
+    setattr(CompilationState, "_repr_mimebundle_", _repr_tk2circ)

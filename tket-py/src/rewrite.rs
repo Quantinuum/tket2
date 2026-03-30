@@ -10,7 +10,7 @@ use tket::{
     rewrite::{CircuitRewrite, ECCRewriter, Rewriter},
 };
 
-use crate::program::{PyNode, TkProgram};
+use crate::state::{CompilationState, PyNode};
 
 /// The module definition
 pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
@@ -46,15 +46,15 @@ impl PyCircuitRewrite {
     }
 
     /// The replacement subcircuit.
-    pub fn replacement(&self) -> TkProgram {
+    pub fn replacement(&self) -> CompilationState {
         self.rewrite.replacement().to_owned().into_hugr().into()
     }
 
     #[new]
     fn try_new(
         source_position: PySubcircuit,
-        source_circ: PyRef<TkProgram>,
-        replacement: PyRef<TkProgram>,
+        source_circ: PyRef<CompilationState>,
+        replacement: PyRef<CompilationState>,
     ) -> PyResult<Self> {
         Ok(Self {
             rewrite: CircuitRewrite::try_new(
@@ -108,7 +108,7 @@ pub struct PySubcircuit(SiblingSubgraph);
 #[pymethods]
 impl PySubcircuit {
     #[new]
-    fn from_nodes(nodes: Vec<PyNode>, circ: &TkProgram) -> PyResult<Self> {
+    fn from_nodes(nodes: Vec<PyNode>, circ: &CompilationState) -> PyResult<Self> {
         let nodes: Vec<_> = nodes.into_iter().map_into().collect();
         Ok(Self(
             SiblingSubgraph::try_from_nodes(nodes, &circ.hugr)
@@ -144,8 +144,8 @@ impl PyECCRewriter {
         )?))
     }
 
-    /// Returns a list of circuit rewrites that can be applied to the given TkProgram.
-    pub fn get_rewrites(&self, circ: &TkProgram) -> Vec<PyCircuitRewrite> {
+    /// Returns a list of circuit rewrites that can be applied to the given CompilationState.
+    pub fn get_rewrites(&self, circ: &CompilationState) -> Vec<PyCircuitRewrite> {
         let c = Circuit::new(circ.hugr.clone());
         self.0.get_rewrites(&c).into_iter().map_into().collect()
     }

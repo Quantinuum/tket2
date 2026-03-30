@@ -65,7 +65,7 @@ pub(crate) mod test {
     use tket::Circuit;
     use tket::TketOp;
 
-    use crate::program::TkProgram;
+    use crate::state::CompilationState;
 
     /// Utility for building a module with a single circuit definition.
     pub fn build_module_with_circuit<F>(num_qubits: usize, f: F) -> Result<Circuit, BuildError>
@@ -84,7 +84,7 @@ pub(crate) mod test {
 
     /// Generates a simple tket circuit for testing,
     /// defined as a function inside a module.
-    pub fn make_module_tk2_circuit<'py>(py: Python<'py>) -> PyResult<Bound<'py, TkProgram>> {
+    pub fn make_module_tk2_circuit<'py>(py: Python<'py>) -> PyResult<Bound<'py, CompilationState>> {
         let circ = build_module_with_circuit(2, |circ| {
             circ.append(TketOp::H, [0])?;
             circ.append(TketOp::CX, [0, 1])?;
@@ -94,7 +94,7 @@ pub(crate) mod test {
         .unwrap();
         Bound::new(
             py,
-            TkProgram {
+            CompilationState {
                 hugr: circ.into_hugr(),
             },
         )

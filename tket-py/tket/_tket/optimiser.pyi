@@ -1,8 +1,8 @@
 from typing import Literal, TYPE_CHECKING
-from .program import TkProgram
+from .state import CompilationState
 
 if TYPE_CHECKING:
-    from ..rewrite import Rewriter
+    from .._rewrite import Rewriter
 
 from pathlib import Path
 
@@ -40,7 +40,7 @@ class BadgerOptimiser:
 
     def optimise(
         self,
-        circ: TkProgram,
+        circ: CompilationState,
         timeout: int | None = None,
         progress_timeout: int | None = None,
         max_circuit_count: int | None = None,

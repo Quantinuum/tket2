@@ -6,25 +6,25 @@ from typing import TYPE_CHECKING
 
 from hugr.envelope import EnvelopeConfig
 from hugr.ext import ExtensionRegistry
-from .._tket import program as _program
+from .._tket import state as _state
 from .build import CircBuild, Command
 
 from hugr.hugr.base import Hugr
 from hugr.package import Package
 
 # Re-export types from the Rust module
-Node = _program.Node
-Wire = _program.Wire
-CircuitCost = _program.CircuitCost
-embedded_extensions = _program.embedded_extensions
-HugrError = _program.HugrError
-BuildError = _program.BuildError
-ValidationError = _program.ValidationError
-HUGRSerializationError = _program.HUGRSerializationError
-TK1EncodeError = _program.TK1EncodeError
+Node = _state.Node
+Wire = _state.Wire
+CircuitCost = _state.CircuitCost
+embedded_extensions = _state.embedded_extensions
+HugrError = _state.HugrError
+BuildError = _state.BuildError
+ValidationError = _state.ValidationError
+HUGRSerializationError = _state.HUGRSerializationError
+TK1EncodeError = _state.TK1EncodeError
 
 if TYPE_CHECKING:
-    from .rewrite import CircuitRewrite
+    from ._rewrite import CircuitRewrite
 
 
 __all__ = [
@@ -32,7 +32,7 @@ __all__ = [
     "Command",
     # Bindings.
     # TODO: Wrap these in Python classes.
-    "TkProgram",
+    "CompilationState",
     "Node",
     "Wire",
     "CircuitCost",
@@ -46,7 +46,7 @@ __all__ = [
 
 
 @dataclass
-class TkProgram:
+class CompilationState:
     """A quantum circuit represented as a HUGR.
 
     This representation is optimized for compilation and rewriting. For building
@@ -54,7 +54,7 @@ class TkProgram:
     used instead.
     """
 
-    _inner: _program.TkProgram = field(default_factory=_program.TkProgram)
+    _inner: _state.CompilationState = field(default_factory=_state.CompilationState)
     # Optional registry of python-defined extensions, used to load the hugr back
     # into Python.
     #
@@ -63,17 +63,17 @@ class TkProgram:
     _py_extensions: ExtensionRegistry | None = None
 
     @staticmethod
-    def from_tket1(circ) -> TkProgram:
-        """Create a TkProgram from a legacy pytket Circuit."""
-        return TkProgram(_inner=_program.TkProgram.from_tket1(circ))
+    def from_tket1(circ) -> CompilationState:
+        """Create a CompilationState from a legacy pytket Circuit."""
+        return CompilationState(_inner=_state.CompilationState.from_tket1(circ))
 
     @staticmethod
-    def from_python(hugr: Hugr | Package) -> TkProgram:
-        """Convert a python-backed Hugr to a TkProgram."""
+    def from_python(hugr: Hugr | Package) -> CompilationState:
+        """Convert a python-backed Hugr to a CompilationState."""
         py_extensions = None
         # Get extensions used by this hugr that are not already in the Rust registry.
         if isinstance(hugr, Hugr):
-            embedded = set(_program.embedded_extensions())
+            embedded = set(_state.embedded_extensions())
             res = hugr.used_extensions()
             py_extensions = res.used_extensions
             extensions = [
@@ -88,13 +88,13 @@ class TkProgram:
         else:
             raise ValueError(f"Expected a Hugr or Package, got {type(hugr)}")
 
-        return TkProgram(
-            _inner=_program.TkProgram.from_bytes(package.to_bytes()),
+        return CompilationState(
+            _inner=_state.CompilationState.from_bytes(package.to_bytes()),
             _py_extensions=py_extensions,
         )
 
     def to_python(self) -> Package:
-        """Convert this TkProgram back to a python Hugr package."""
+        """Convert this CompilationState back to a python Hugr package."""
         # Convert the inner hugr to bytes and load it in Python.
         hugr_bytes = self._inner.to_bytes()
         package = Package.from_bytes(hugr_bytes, self._py_extensions)
@@ -106,8 +106,8 @@ class TkProgram:
         return package
 
     @staticmethod
-    def from_bytes(envelope: bytes) -> TkProgram:
-        """Deserialize a byte string to a TkProgram.
+    def from_bytes(envelope: bytes) -> CompilationState:
+        """Deserialize a byte string to a CompilationState.
 
         Some envelope formats can be read from a string. See :meth:`from_str`.
 
@@ -120,19 +120,19 @@ class TkProgram:
         # TODO: Allow passing an extension registry to use when loading the
         # envelope from the hugr side. This will require encoding the extensions
         # (as json), passing them, and loading them in
-        # `_program.TkProgram.from_bytes` before parsing the envelope.
+        # `_program.CompilationState.from_bytes` before parsing the envelope.
         #
         # Remember to filter out the embedded extensions from _program.embedded_extensions(),
         # since we use those already when loading things in Rust.
 
-        return TkProgram(
-            _inner=_program.TkProgram.from_bytes(envelope),
+        return CompilationState(
+            _inner=_state.CompilationState.from_bytes(envelope),
             _py_extensions=None,
         )
 
     @staticmethod
-    def from_str(envelope: str) -> TkProgram:
-        """Deserialize a string to a TkProgram.
+    def from_str(envelope: str) -> CompilationState:
+        """Deserialize a string to a CompilationState.
 
         Not all envelope formats can be read from a string.
         See :meth:`from_bytes` for a more general method.
@@ -143,8 +143,8 @@ class TkProgram:
         Returns:
             The loaded program.
         """
-        return TkProgram(
-            _inner=_program.TkProgram.from_str(envelope),
+        return CompilationState(
+            _inner=_state.CompilationState.from_str(envelope),
             _py_extensions=None,
         )
 
@@ -171,11 +171,11 @@ class TkProgram:
         """Hash the program."""
         return self._inner.hash()
 
-    def __copy__(self) -> TkProgram:
+    def __copy__(self) -> CompilationState:
         """Copy the program."""
         import copy
 
-        return TkProgram(copy.copy(self._inner), self._py_extensions)
+        return CompilationState(copy.copy(self._inner), self._py_extensions)
 
     def render_mermaid(self) -> str:
         """Render the program as a mermaid string."""

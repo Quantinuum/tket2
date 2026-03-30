@@ -1,35 +1,17 @@
 //! Rust-backed representation of circuits
 
-use std::any::Any;
-use std::borrow::{Borrow, Cow};
-use std::fmt::Display;
-use std::mem;
-use std::num::{NonZero, NonZeroU8};
-use std::sync::{Arc, LazyLock};
+use std::num::NonZeroU8;
+use std::sync::LazyLock;
 
 use anyhow::Context;
-use hugr::builder::{CircuitBuilder, DFGBuilder, Dataflow, DataflowHugr};
 use hugr::envelope::{EnvelopeConfig, EnvelopeFormat, ZstdConfig};
-use hugr::extension::prelude::qb_t;
-use hugr::extension::{EMPTY_REG, ExtensionRegistry};
-use hugr::ops::handle::NodeHandle;
-use hugr::ops::{ExtensionOp, OpType};
-use hugr::package::Package;
-use hugr::types::Type;
-use hugr_passes::composable::ComposablePass;
-use itertools::Itertools;
-use pyo3::exceptions::{PyAttributeError, PyValueError};
-use pyo3::types::{IntoPyDict, PyAnyMethods, PyModule, PyString, PyTypeMethods};
-use pyo3::{
-    Bound, FromPyObject, IntoPyObject, PyAny, PyErr, PyRef, PyRefMut, PyResult, PyTypeInfo, Python,
-    pyclass, pyfunction, pymethods,
-};
+use hugr::extension::ExtensionRegistry;
+use hugr::ops::OpType;
+use pyo3::types::PyAnyMethods;
+use pyo3::{Bound, PyAny, Python, pyclass, pyfunction, pymethods};
 
 use derive_more::From;
-use hugr::{Hugr, HugrView, Wire};
-use serde::Serialize;
-use tket::passes::NormalizeGuppy;
-use tket::passes::utils::CircuitChunks;
+use hugr::{Hugr, HugrView};
 use tket::serialize::TKETDecode;
 use tket::serialize::pytket::{DecodeOptions, EncodeOptions};
 use tket::{Circuit, TketOp};
@@ -37,10 +19,8 @@ use tket_json_rs::circuit_json::SerialCircuit;
 
 use crate::ops::PyTketOp;
 use crate::rewrite::PyCircuitRewrite;
-use crate::types::PyHugrType;
-use crate::utils::{ConvertPyErr, into_vec};
 
-use super::{PyCircuitCost, PyNode, PyWire, cost};
+use super::PyCircuitCost;
 
 /// A quantum program represented as a HUGR.
 ///
@@ -49,17 +29,17 @@ use super::{PyCircuitCost, PyNode, PyWire, cost};
 /// used instead.
 #[pyclass(skip_from_py_object)]
 #[derive(Clone, Debug, Default, PartialEq, From)]
-pub struct TkProgram {
+pub struct CompilationState {
     /// Rust representation of the Hugr.
     pub hugr: Hugr,
 }
 
 #[pymethods]
-impl TkProgram {
+impl CompilationState {
     /// Create a new empty program.
     #[new]
     pub fn new() -> Self {
-        TkProgram { hugr: Hugr::new() }
+        CompilationState { hugr: Hugr::new() }
     }
 
     /// Load a program from a legacy `pytket.Circuit`.
@@ -69,8 +49,8 @@ impl TkProgram {
             .decode(
                 DecodeOptions::new().with_config(tket_qsystem::pytket::qsystem_decoder_config()),
             )
-            .context("Could not decode a TkProgram from a pytket circuit")?;
-        Ok(TkProgram { hugr })
+            .context("Could not decode a CompilationState from a pytket circuit")?;
+        Ok(CompilationState { hugr })
     }
 
     /// Convert the program back to a legacy `pytket.Circuit`.
@@ -104,7 +84,7 @@ impl TkProgram {
         let mut buf = Vec::new();
         self.hugr
             .store(&mut buf, config)
-            .context("Could not encode TkProgram to bytes")?;
+            .context("Could not encode CompilationState to bytes")?;
         Ok(buf)
     }
 
@@ -119,16 +99,16 @@ impl TkProgram {
         };
         self.hugr
             .store_str(config)
-            .context("Could not encode TkProgram to string")
+            .context("Could not encode CompilationState to string")
     }
 
     /// Loads a HUGR envelope from envelope bytes.
     #[staticmethod]
     #[pyo3(signature = (bytes))]
     pub fn from_bytes(bytes: &[u8]) -> anyhow::Result<Self> {
-        let hugr =
-            Hugr::load(bytes, Some(&REGISTRY)).context("Could not read TkProgram from bytes")?;
-        Ok(TkProgram { hugr })
+        let hugr = Hugr::load(bytes, Some(&REGISTRY))
+            .context("Could not read CompilationState from bytes")?;
+        Ok(CompilationState { hugr })
     }
 
     /// Loads a HUGR from an envelope string.
@@ -137,8 +117,8 @@ impl TkProgram {
     #[expect(clippy::should_implement_trait)] // Cannot use AsRef<str> with pyo3 methods.
     pub fn from_str(envelope: &str) -> anyhow::Result<Self> {
         let hugr = Hugr::load_str(envelope, Some(&REGISTRY))
-            .context("Could not read TkProgram from string")?;
-        Ok(TkProgram { hugr })
+            .context("Could not read CompilationState from string")?;
+        Ok(CompilationState { hugr })
     }
 
     /// Compute the cost of the circuit based on a per-operation cost function.
@@ -206,7 +186,9 @@ impl TkProgram {
     ///
     /// Returns `Ok(())` if the program is valid, and raises an exception with details if not.
     pub fn validate(&self) -> anyhow::Result<()> {
-        self.hugr.validate().context("TkProgram validation failed")
+        self.hugr
+            .validate()
+            .context("CompilationState validation failed")
     }
 }
 
@@ -257,10 +239,10 @@ pub static REGISTRY: LazyLock<ExtensionRegistry> = LazyLock::new(|| {
     registry
 });
 
-/// Returns a list of extension ids supported by the TkProgram loader.
+/// Returns a list of extension ids supported by the CompilationState loader.
 ///
 /// Extensions not in this list must be included in the package when
-/// loading a TkProgram.
+/// loading a CompilationState.
 #[pyfunction]
 pub fn embedded_extensions() -> Vec<String> {
     REGISTRY.iter().map(|e| e.name.to_string()).collect()

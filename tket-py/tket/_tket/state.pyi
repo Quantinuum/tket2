@@ -4,14 +4,18 @@ from pytket._tket.circuit import Circuit as Tk1Circuit
 from tket._tket.ops import TketOp
 from hugr.envelope import EnvelopeConfig
 
-class TkProgram:
-    """Rust representation of a TKET program."""
+class CompilationState:
+    """Program state definition.
+
+    This is a wrapper around a rust-defined HUGR that is optimised for
+    compilation and rewriting.
+    """
 
     def __init__(self) -> None:
         """Create a new empty program."""
 
     @staticmethod
-    def from_tket1(circ: Tk1Circuit) -> TkProgram:
+    def from_tket1(circ: Tk1Circuit) -> CompilationState:
         """Load a program from a legacy pytket Circuit."""
 
     def apply_rewrite(self, rw) -> None:
@@ -39,8 +43,8 @@ class TkProgram:
         """
 
     @staticmethod
-    def from_bytes(envelope: bytes) -> TkProgram:
-        """Load a TkProgram from a HUGR envelope.
+    def from_bytes(envelope: bytes) -> CompilationState:
+        """Load a CompilationState from a HUGR envelope.
 
         Some envelope formats can be read from a string. See :meth:`from_str`.
 
@@ -52,8 +56,8 @@ class TkProgram:
         """
 
     @staticmethod
-    def from_str(envelope: str) -> TkProgram:
-        """Load a TkProgram from a HUGR envelope string.
+    def from_str(envelope: str) -> CompilationState:
+        """Load a CompilationState from a HUGR envelope string.
 
         Not all envelope formats can be represented as strings.
         See :meth:`from_bytes` for a more general method.
@@ -88,10 +92,10 @@ class TkProgram:
     def to_tket1(self) -> Tk1Circuit:
         """Convert the program back to a legacy pytket Circuit."""
 
-    def __copy__(self) -> TkProgram:
+    def __copy__(self) -> CompilationState:
         """Copy the program."""
 
-    def __deepcopy__(self, memo: object) -> TkProgram:
+    def __deepcopy__(self, memo: object) -> CompilationState:
         """Deep copy the program."""
 
 class Node:
@@ -113,7 +117,7 @@ class CircuitCost:
     """A cost associated with a circuit."""
 
 def embedded_extensions() -> list[str]:
-    """Returns the list of extension ids supported by the TkProgram loader."""
+    """Returns the list of extension ids supported by the CompilationState loader."""
 
 class HugrError(Exception): ...
 class BuildError(Exception): ...

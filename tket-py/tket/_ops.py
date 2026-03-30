@@ -6,7 +6,7 @@ from typing import Protocol
 import tket
 
 from tket._tket.ops import CustomOp
-from tket.types import QB_T
+from tket._types import QB_T
 
 __all__ = ["CustomOp", "ToCustomOp", "TketOp", "Pauli"]
 

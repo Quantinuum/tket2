@@ -1,23 +1,23 @@
 from pathlib import Path
 
 from .optimiser import BadgerOptimiser
-from .program import TkProgram
+from .state import CompilationState
 
 class CircuitChunks:
-    def reassemble(self) -> TkProgram:
+    def reassemble(self) -> CompilationState:
         """Reassemble the circuit from its chunks."""
 
-    def circuits(self) -> list[TkProgram]:
+    def circuits(self) -> list[CompilationState]:
         """Returns clones of the split circuits."""
 
-    def update_circuit(self, index: int, circ: TkProgram) -> None:
+    def update_circuit(self, index: int, circ: CompilationState) -> None:
         """Replace a circuit chunk with a new version."""
 
 class PullForwardError(Exception):
     """Error from a `PullForward` operation."""
 
 def normalize_guppy(
-    circ: TkProgram,
+    circ: CompilationState,
     *,
     simplify_cfgs: bool = True,
     remove_tuple_untuple: bool = True,
@@ -40,14 +40,14 @@ def normalize_guppy(
     - remove_redundant_order_edges: Whether to remove redundant order edges.
     """
 
-def greedy_depth_reduce(circ: TkProgram) -> int:
+def greedy_depth_reduce(circ: CompilationState) -> int:
     """Greedy depth reduction of a circuit.
 
     Mutates the circuit in place and returns the number of moves made.
     """
 
 def badger_optimise(
-    circ: TkProgram,
+    circ: CompilationState,
     optimiser: BadgerOptimiser,
     max_threads: int | None = None,
     timeout: int | None = None,
@@ -57,11 +57,11 @@ def badger_optimise(
 ) -> None:
     """Optimise a circuit using the Badger optimiser."""
 
-def chunks(c: TkProgram, max_chunk_size: int) -> CircuitChunks:
+def chunks(c: CompilationState, max_chunk_size: int) -> CircuitChunks:
     """Split a circuit into chunks of at most `max_chunk_size` gates."""
 
 def tket1_pass(
-    circ: TkProgram,
+    circ: CompilationState,
     pass_json: str,
     *,
     traverse_subcircuits: bool = True,

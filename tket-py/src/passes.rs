@@ -12,7 +12,7 @@ use tket::passes;
 use tket::{Circuit, TketOp, op_matches};
 
 use crate::optimiser::PyBadgerOptimiser;
-use crate::program::TkProgram;
+use crate::state::CompilationState;
 use crate::utils::{ConvertPyErr, create_py_exception};
 
 /// The module definition
@@ -59,7 +59,7 @@ create_py_exception!(
 #[pyo3(signature = (circ, *, simplify_cfgs = true, remove_tuple_untuple = true, constant_folding = true, remove_dead_funcs = true, inline_dfgs = true, remove_redundant_order_edges = true, squash_borrows = true))]
 #[expect(clippy::too_many_arguments)]
 fn normalize_guppy(
-    circ: &mut TkProgram,
+    circ: &mut CompilationState,
     simplify_cfgs: bool,
     remove_tuple_untuple: bool,
     constant_folding: bool,
@@ -84,7 +84,7 @@ fn normalize_guppy(
 
 /// Pass which greedily commutes operations forwards in order to reduce depth.
 #[pyfunction]
-fn greedy_depth_reduce(circ: &mut TkProgram) -> PyResult<u32> {
+fn greedy_depth_reduce(circ: &mut CompilationState) -> PyResult<u32> {
     let mut c = Circuit::new(circ.hugr.clone());
     let n_moves = passes::apply_greedy_commutation(&mut c).convert_pyerrs()?;
     circ.hugr = c.into_hugr();
@@ -111,7 +111,7 @@ fn greedy_depth_reduce(circ: &mut TkProgram) -> PyResult<u32> {
 #[pyfunction]
 #[pyo3(signature = (circ, optimiser, max_threads=None, timeout=None, progress_timeout=None, max_circuit_count=None, log_dir=None))]
 fn badger_optimise(
-    circ: &mut TkProgram,
+    circ: &mut CompilationState,
     optimiser: &PyBadgerOptimiser,
     max_threads: Option<NonZeroUsize>,
     timeout: Option<u64>,

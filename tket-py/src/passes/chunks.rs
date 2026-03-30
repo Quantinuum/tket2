@@ -6,12 +6,12 @@ use pyo3::prelude::*;
 use tket::Circuit;
 use tket::passes::utils::CircuitChunks;
 
-use crate::program::TkProgram;
+use crate::state::CompilationState;
 use crate::utils::ConvertPyErr;
 
 /// Split a circuit into chunks of a given size.
 #[pyfunction]
-pub fn chunks(c: &TkProgram, max_chunk_size: usize) -> PyResult<PyCircuitChunks> {
+pub fn chunks(c: &CompilationState, max_chunk_size: usize) -> PyResult<PyCircuitChunks> {
     let circ = Circuit::new(c.hugr.clone());
     let chunks = CircuitChunks::split(&circ, max_chunk_size);
     Ok(PyCircuitChunks { chunks })
@@ -33,19 +33,19 @@ pub struct PyCircuitChunks {
 #[pymethods]
 impl PyCircuitChunks {
     /// Reassemble the chunks into a circuit.
-    fn reassemble(&self) -> PyResult<TkProgram> {
+    fn reassemble(&self) -> PyResult<CompilationState> {
         let circ = self.clone().chunks.reassemble().convert_pyerrs()?;
-        Ok(TkProgram {
+        Ok(CompilationState {
             hugr: circ.into_hugr(),
         })
     }
 
     /// Returns clones of the split circuits.
-    fn circuits(&self) -> PyResult<Vec<TkProgram>> {
+    fn circuits(&self) -> PyResult<Vec<CompilationState>> {
         self.chunks
             .iter()
             .map(|circ| {
-                Ok(TkProgram {
+                Ok(CompilationState {
                     hugr: circ.clone().into_hugr(),
                 })
             })
@@ -53,7 +53,7 @@ impl PyCircuitChunks {
     }
 
     /// Replaces a chunk's circuit with an updated version.
-    fn update_circuit(&mut self, index: usize, new_circ: &TkProgram) -> PyResult<()> {
+    fn update_circuit(&mut self, index: usize, new_circ: &CompilationState) -> PyResult<()> {
         let circ = Circuit::new(&new_circ.hugr);
         let circuit_sig = circ.circuit_signature();
         let chunk_sig = self.chunks[index].circuit_signature();

@@ -2,8 +2,8 @@
 
 pub mod portmatching;
 
-use crate::program::TkProgram;
 use crate::rewrite::PyCircuitRewrite;
+use crate::state::CompilationState;
 use crate::utils::{ConvertPyErr, create_py_exception};
 
 use hugr::{HugrView, Node};
@@ -53,7 +53,7 @@ pub struct Rule(pub [Circuit; 2]);
 #[pymethods]
 impl Rule {
     #[new]
-    fn new_rule(l: &TkProgram, r: &TkProgram) -> PyResult<Rule> {
+    fn new_rule(l: &CompilationState, r: &CompilationState) -> PyResult<Rule> {
         let l = Circuit::new(l.hugr.clone());
         let r = Circuit::new(r.hugr.clone());
         Ok(Rule([l, r]))
@@ -62,8 +62,8 @@ impl Rule {
     /// The left hand side of the rule.
     ///
     /// This is the pattern that will be matched against the target circuit.
-    fn lhs(&self) -> TkProgram {
-        TkProgram {
+    fn lhs(&self) -> CompilationState {
+        CompilationState {
             hugr: self.0[0].clone().into_hugr(),
         }
     }
@@ -71,8 +71,8 @@ impl Rule {
     /// The right hand side of the rule.
     ///
     /// This is the replacement that will be applied to the target circuit.
-    fn rhs(&self) -> TkProgram {
-        TkProgram {
+    fn rhs(&self) -> CompilationState {
+        CompilationState {
             hugr: self.0[1].clone().into_hugr(),
         }
     }
@@ -96,7 +96,7 @@ impl RuleMatcher {
         Ok(Self { matcher, rights })
     }
 
-    pub fn find_match(&self, target: &TkProgram) -> PyResult<Option<PyCircuitRewrite>> {
+    pub fn find_match(&self, target: &CompilationState) -> PyResult<Option<PyCircuitRewrite>> {
         let circ = Circuit::new(&target.hugr);
         let Some(pmatch) = self.matcher.find_matches_iter(&circ).next() else {
             return Ok(None);
@@ -104,7 +104,7 @@ impl RuleMatcher {
         Ok(Some(self.match_to_rewrite(pmatch, &circ)?))
     }
 
-    pub fn find_matches(&self, target: &TkProgram) -> PyResult<Vec<PyCircuitRewrite>> {
+    pub fn find_matches(&self, target: &CompilationState) -> PyResult<Vec<PyCircuitRewrite>> {
         let circ = Circuit::new(&target.hugr);
         self.matcher
             .find_matches_iter(&circ)

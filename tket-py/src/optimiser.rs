@@ -10,8 +10,8 @@ use tket::Circuit;
 use tket::optimiser::badger::{BadgerOptions, DefaultBadgerStrategy};
 use tket::optimiser::{BadgerLogger, BadgerOptimiser};
 
-use crate::program::TkProgram;
 use crate::rewrite::{PyECCRewriter, PyRewriter};
+use crate::state::CompilationState;
 
 /// The module definition
 pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
@@ -143,7 +143,7 @@ impl PyBadgerOptimiser {
     #[pyo3(signature = (circ, timeout=None, progress_timeout=None, max_circuit_count=None, n_threads=None, split_circ=None, queue_size=None, log_progress=None))]
     pub fn py_optimise(
         &self,
-        circ: &mut TkProgram,
+        circ: &mut CompilationState,
         timeout: Option<u64>,
         progress_timeout: Option<u64>,
         max_circuit_count: Option<usize>,

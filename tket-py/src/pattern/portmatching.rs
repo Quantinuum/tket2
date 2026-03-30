@@ -9,7 +9,7 @@ use pyo3::{prelude::*, types::PyIterator};
 
 use tket::portmatching::{CircuitPattern, PatternMatch, PatternMatcher};
 
-use crate::program::{PyNode, TkProgram};
+use crate::state::{CompilationState, PyNode};
 
 /// A pattern that match a circuit exactly
 ///
@@ -29,7 +29,7 @@ pub struct PyCircuitPattern {
 impl PyCircuitPattern {
     /// Construct a pattern from a circuit.
     #[new]
-    pub fn from_circuit(circ: &TkProgram) -> PyResult<Self> {
+    pub fn from_circuit(circ: &CompilationState) -> PyResult<Self> {
         let c = tket::Circuit::new(circ.hugr.clone());
         let pattern = CircuitPattern::try_from_circuit(&c)
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
@@ -81,13 +81,13 @@ impl PyPatternMatcher {
     }
 
     /// Find one convex match in a circuit.
-    pub fn find_match(&self, circ: &TkProgram) -> PyResult<Option<PyPatternMatch>> {
+    pub fn find_match(&self, circ: &CompilationState) -> PyResult<Option<PyPatternMatch>> {
         let c = tket::Circuit::new(circ.hugr.clone());
         Ok(self.matcher.find_matches_iter(&c).next().map(Into::into))
     }
 
     /// Find all convex matches in a circuit.
-    pub fn find_matches(&self, circ: &TkProgram) -> PyResult<Vec<PyPatternMatch>> {
+    pub fn find_matches(&self, circ: &CompilationState) -> PyResult<Vec<PyPatternMatch>> {
         let c = tket::Circuit::new(circ.hugr.clone());
         Ok(self
             .matcher
