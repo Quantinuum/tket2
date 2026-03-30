@@ -7,7 +7,7 @@ use ascent::lattice::BoundedLattice;
 use itertools::Itertools;
 
 use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
-use hugr_core::ops::{DataflowOpTrait, OpTrait, OpType, TailLoop};
+use hugr_core::ops::{DataflowOpTrait, OpTag, OpTrait, OpType, TailLoop};
 use hugr_core::{HugrView, IncomingPort, OutgoingPort, PortIndex as _, Wire};
 
 use super::value_row::ValueRow;
@@ -132,14 +132,12 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
             );
         } else {
             let ep = self.hugr.entrypoint();
+            let have_value_for_entry = self.in_wire_proto.contains_key(&ep)
+                || (self.hugr.entrypoint_optype().tag() <= OpTag::DataflowParent
+                    && self.out_wire_proto.contains_key(&ep));
             let mut p = in_values.into_iter().peekable();
             // We must provide some inputs to the root so that they are Top rather than Bottom.
-            // (However, this test will fail for DataflowBlock or Case roots, i.e. if no
-            // inputs have been provided they will still see Bottom. We could store the "input"
-            // values for even these nodes in self.in_wire_proto and then convert to actual Wire values
-            // (outputs from the Input node) before we run_datalog, but we would need to have
-            // a separate store of output-wire values in self to keep prepopulate_wire working.)
-            if p.peek().is_some() || !self.in_wire_proto.contains_key(&ep) {
+            if p.peek().is_some() || !have_value_for_entry {
                 self.prepopulate_inputs(ep, p).unwrap();
             }
         }
