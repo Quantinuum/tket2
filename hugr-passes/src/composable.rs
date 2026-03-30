@@ -379,7 +379,6 @@ pub(crate) mod test {
             .with_inputs(id1.node(), [(0, c_usz)])
             .then(dce.clone())
             .run(&mut hugr.clone());
-        // This is returning Ok(()), which seems odd.
         assert_eq!(r, Err(Either::Right(dce_err)));
 
         // Avoid wrapping in Either by mapping both to same Error
