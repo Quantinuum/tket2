@@ -190,6 +190,11 @@ class NormalizeGuppy(ComposablePass):
             copy_call=lambda h: self._normalize(h, inplace),
         )
 
+    def with_scope(self, scope: PassScope) -> NormalizeGuppy:
+        """Set the scope configuration for the NormalizeGuppy pass."""
+        self._scope = scope
+        return self
+
     def _normalize(self, hugr: Hugr, inplace: bool) -> PassResult:
         compiler_state, registry = _hugr_to_tk2circuit(hugr)
         opt_program = normalize_guppy(
