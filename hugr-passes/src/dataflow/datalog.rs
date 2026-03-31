@@ -30,7 +30,7 @@ type NodeOutputs<V, N> = Vec<(OutgoingPort, PV<V, N>)>;
 ///    [`FuncDefn`](OpType::FuncDefn) to set all inputs to [`PartialValue::Top`].
 /// 3. Call [`Self::run`] to produce [`AnalysisResults`]
 pub struct Machine<H: HugrView, V: AbstractValue> {
-    hugr: H,
+    pub(super) hugr: H,
     in_wire_proto: HashMap<H::Node, NodeInputs<V, H::Node>>,
     out_wire_proto: HashMap<H::Node, NodeOutputs<V, H::Node>>,
 }
@@ -124,6 +124,10 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
     /// # Panics
     /// May panic in various ways if the Hugr is invalid;
     /// or if any `in_values` are provided for a module-rooted Hugr.
+    #[deprecated(
+        note = "Use `run_subtree` and `prepopulate_wire` / `prepopulate_inputs` instead",
+        since = "0.26.2"
+    )]
     pub fn run(
         mut self,
         context: impl DFContext<V, Node = H::Node>,
