@@ -8,10 +8,8 @@ use thiserror::Error;
 use hugr_core::{
     HugrView, IncomingPort, Node, NodeIndex, OutgoingPort, PortIndex, Wire,
     hugr::hugrmut::HugrMut,
-    ops::{
-        Const, DataflowOpTrait, ExtensionOp, LoadConstant, OpType, Value, constant::OpaqueValue,
-    },
-    types::EdgeKind,
+    ops::constant::OpaqueValue,
+    ops::{Const, DataflowOpTrait, ExtensionOp, LoadConstant, OpType, Value},
 };
 use value_handle::ValueHandle;
 
@@ -140,21 +138,16 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
         }
 
         let results = m.run_subtree(ConstFoldContext, root);
-        let mb_root_inp = hugr.get_io(hugr.entrypoint()).map(|[i, _]| i);
-        let wires_to_break = hugr
-            .descendants(root)
-            .flat_map(|n| hugr.node_inputs(n).map(move |ip| (n, ip)))
-            .filter(|(n, ip)| {
-                *n != root && matches!(hugr.get_optype(*n).port_kind(*ip), Some(EdgeKind::Value(_)))
-            })
-            .filter_map(|(n, ip)| {
-                let (src, outp) = hugr.single_linked_output(n, ip).unwrap();
-                // Avoid breaking edges from existing LoadConstant (we'd only add another)
-                // or from root input node (any "external inputs" provided will show up here
-                //   - potentially also in other places which this won't catch)
-                (!hugr.get_optype(src).is_load_constant() && Some(src) != mb_root_inp).then_some((
-                    n,
-                    ip,
+        let mut root_descs = hugr.descendants(root);
+        assert_eq!(root_descs.next(), Some(root)); // Skip root
+        let wires_to_break = root_descs
+            .filter(|n| !hugr.get_optype(*n).is_load_constant()) // no point in adding another Const!
+            .flat_map(|n| hugr.out_value_types(n).map(move |(outp, _ty)| (n, outp)))
+            .filter_map(|(src, outp)| {
+                hugr.linked_inputs(src, outp).next()?; // Skip unconnected outputs
+                Some((
+                    src,
+                    outp,
                     results
                         .try_read_wire_concrete::<Value>(Wire::new(src, outp))
                         .ok()?,
@@ -169,15 +162,17 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
             })
             .collect::<Vec<_>>();
 
-        for (n, inport, v) in wires_to_break {
+        for (n, outport, v) in wires_to_break {
             let parent = hugr.get_parent(n).unwrap();
             let datatype = v.get_type();
             // We could try hash-consing identical Consts, but not ATM
             let cst = hugr.add_node_with_parent(parent, Const::new(v));
             let lcst = hugr.add_node_with_parent(parent, LoadConstant { datatype });
             hugr.connect(cst, OutgoingPort::from(0), lcst, IncomingPort::from(0));
-            hugr.disconnect(n, inport);
-            hugr.connect(lcst, OutgoingPort::from(0), n, inport);
+            for (n, inport) in hugr.linked_inputs(n, outport).collect::<Vec<_>>() {
+                hugr.disconnect(n, inport);
+                hugr.connect(lcst, OutgoingPort::from(0), n, inport);
+            }
         }
         // Eliminate dead code not required for the same entry points.
         let dce = DeadCodeElimPass::<H>::default_with_scope(self.scope.clone());
