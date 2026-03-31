@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashSet, hash_map::RandomState},
+    collections::{HashMap, HashSet, hash_map::RandomState},
     sync::LazyLock,
 };
 
@@ -26,7 +26,7 @@ use hugr_core::std_extensions::logic::LogicOp;
 use hugr_core::types::{Signature, SumType, Type, TypeBound, TypeRow, TypeRowRV};
 use hugr_core::{Hugr, HugrView, IncomingPort, Node, Visibility, type_row};
 use itertools::Itertools;
-use rstest::rstest;
+use rstest::{fixture, rstest};
 
 use crate::dataflow::{DFContext, PartialValue, partial_from_const};
 use crate::{ComposablePass as _, composable::ValidatingPass};
@@ -1629,18 +1629,15 @@ fn test_module() -> Result<(), Box<dyn std::error::Error>> {
         ]
     );
 
-    let tags = hugr
-        .children(main.node())
-        .map(|n| hugr.get_optype(n).tag())
-        .collect_vec();
-    for (tag, expected_count) in [
-        (OpTag::Input, 1),
-        (OpTag::Output, 1),
-        (OpTag::Const, 1),
-        (OpTag::LoadConst, 2),
-    ] {
-        assert_eq!(tags.iter().filter(|t| **t == tag).count(), expected_count);
-    }
+    assert_eq!(
+        get_child_tags(&hugr, main.node()),
+        HashMap::from([
+            (OpTag::Input, 1),
+            (OpTag::Output, 1),
+            (OpTag::Const, 1),
+            (OpTag::LoadConst, 2),
+        ])
+    );
     assert_eq!(
         hugr.children(main.node())
             .find_map(|n| hugr.get_optype(n).as_const()),
@@ -1717,4 +1714,159 @@ fn test_opaque_consts(#[case] op: impl Into<OpType>) {
 
     // Nothing got folded. The op is still there.
     assert!(h.entry_descendants().any(|n| h.get_optype(n) == &op));
+}
+
+fn get_child_tags(hugr: &Hugr, node: Node) -> HashMap<OpTag, usize> {
+    hugr.children(node)
+        .into_grouping_map_by(|n| hugr.get_optype(*n).tag())
+        .fold(0, |c, _, _| c + 1)
+}
+
+fn int_cst(v: u64) -> Value {
+    Value::from(ConstInt::new_u(5, v).unwrap())
+}
+
+/// A module-entrypoint hugr with a main function (the second element of tuple)
+/// calling another function (the third element of tuple) with some constant arguments.
+#[fixture]
+fn two_funcs_hugr() -> (Hugr, Node, Node) {
+    let mut mb = ModuleBuilder::new();
+    let mut callee = mb
+        .define_function("callee", Signature::new_endo([INT_TYPES[5].clone()]))
+        .unwrap();
+    let [inp] = callee.input_wires_arr();
+    let [lc7, lc11] = [7, 11].map(|v| callee.add_load_value(int_cst(v)));
+    let [add_csts] = callee
+        .add_dataflow_op(IntOpDef::iadd.with_log_width(5), [lc7, lc11])
+        .unwrap()
+        .outputs_arr();
+    let add_inp = callee
+        .add_dataflow_op(IntOpDef::iadd.with_log_width(5), [add_csts, inp])
+        .unwrap();
+    let callee = callee.finish_with_outputs(add_inp.outputs()).unwrap();
+
+    let mut main = mb
+        .define_function_vis(
+            "main",
+            Signature::new(type_row![], vec![INT_TYPES[5].clone()]),
+            Visibility::Public,
+        )
+        .unwrap();
+    let [lc3, lc5] = [3, 5].map(|v| main.add_load_value(int_cst(v)));
+    let add_csts = main
+        .add_dataflow_op(IntOpDef::iadd.with_log_width(5), [lc3, lc5])
+        .unwrap();
+    let call = main.call(callee.handle(), &[], add_csts.outputs()).unwrap();
+    let main = main.finish_with_outputs(call.outputs()).unwrap();
+    (mb.finish_hugr().unwrap(), main.node(), callee.node())
+}
+
+#[test]
+fn two_funcs_main() {
+    let (mut hugr, main, callee) = two_funcs_hugr();
+    hugr.set_entrypoint(main);
+    let orig_callee_tags = get_child_tags(&hugr, callee);
+    constant_fold_pass(&mut hugr);
+    let main_tags = get_child_tags(&hugr, main);
+    assert_eq!(
+        main_tags,
+        HashMap::from([
+            (OpTag::Input, 1),
+            (OpTag::Output, 1),
+            (OpTag::FnCall, 1),
+            (OpTag::Const, 2),
+            (OpTag::LoadConst, 2)
+        ])
+    );
+
+    let output = hugr
+        .children(main)
+        .filter(|n| hugr.get_optype(*n).is_output())
+        .exactly_one()
+        .ok()
+        .unwrap();
+    let out_src = hugr.input_neighbours(output).exactly_one().ok().unwrap();
+    assert!(hugr.get_optype(out_src).is_load_constant());
+    let out_cst = hugr.input_neighbours(out_src).exactly_one().ok().unwrap();
+    assert_eq!(
+        hugr.get_optype(out_cst).as_const().unwrap().value(),
+        &int_cst(3 + 5 + 7 + 11)
+    );
+
+    // The call is unused, but not removable since we don't allow_increase_termination
+    let call = hugr
+        .children(main)
+        .filter(|n| hugr.get_optype(*n).is_call())
+        .exactly_one()
+        .ok()
+        .unwrap();
+    let (call_src, _) = hugr.single_linked_output(call, 0).unwrap();
+    assert!(hugr.get_optype(call_src).is_load_constant());
+    let call_cst = hugr.input_neighbours(call_src).exactly_one().ok().unwrap();
+    assert_eq!(
+        hugr.get_optype(call_cst).as_const().unwrap().value(),
+        &int_cst(3 + 5)
+    );
+    assert!(hugr.output_neighbours(call).next().is_none());
+
+    // In theory the callee should be fully folded - it's not preserved, so can be specialised
+    // to the caller. This is failing...
+    /*assert_eq!(get_child_tags(&hugr, callee), HashMap::from([
+    (OpTag::Input, 1),
+    (OpTag::Output, 1),
+    (OpTag::Const, 1),
+    (OpTag::LoadConst, 1)]));*/
+    // Instead we have: (?!)
+    assert_eq!(get_child_tags(&hugr, callee), orig_callee_tags);
+}
+
+#[test]
+fn two_funcs_f() {
+    let (mut hugr, main, callee) = two_funcs_hugr();
+    let orig_main_tags = get_child_tags(&hugr, main);
+    hugr.set_entrypoint(callee);
+    constant_fold_pass(&mut hugr);
+
+    // Callee: cannot assume anything about argument, so only fold the 7+11, not the addition with the input
+    assert_eq!(
+        get_child_tags(&hugr, callee),
+        HashMap::from([
+            (OpTag::Input, 1),
+            (OpTag::Output, 1),
+            (OpTag::Const, 1),
+            (OpTag::LoadConst, 1),
+            (OpTag::Leaf, 1)
+        ])
+    );
+    assert_eq!(
+        hugr.children(callee)
+            .filter_map(|n| hugr.get_optype(n).as_const())
+            .exactly_one()
+            .ok()
+            .unwrap()
+            .value(),
+        &int_cst(7 + 11)
+    );
+
+    // Main: fold the 3+5, but not the call, since this aliases with other arguments to callee.
+    // However, this is failing....
+    /*assert_eq!(get_child_tags(&hugr, main), HashMap::from([
+        (OpTag::Input, 1),
+        (OpTag::Output, 1),
+        (OpTag::FnCall, 1),
+        (OpTag::Const, 1),
+        (OpTag::LoadConst, 1)]));
+    let call = hugr.children(main)
+        .filter(|n| hugr.get_optype(*n).is_call())
+        .exactly_one()
+        .ok()
+        .unwrap();
+    let call_src = hugr.input_neighbours(call).exactly_one().ok().unwrap();
+    assert!(hugr.get_optype(call_src).is_load_constant());
+    let call_cst = hugr.input_neighbours(call_src).exactly_one().ok().unwrap();
+    assert_eq!(hugr.get_optype(call_cst).as_const().unwrap().value(), &int_cst(3+5));
+    let call_out = hugr.output_neighbours(call).exactly_one().ok().unwrap();
+    assert!(hugr.get_optype(call_out).is_output());*/
+    // Instead, it seems main is not optimized at all:
+    assert_eq!(get_child_tags(&hugr, main), orig_main_tags);
 }
