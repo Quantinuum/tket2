@@ -36,8 +36,6 @@ llvm = ["hugr/llvm", "hugr/llvm-test", "dep:anyhow"]
 default = ["binary-eccs"]
 
 [dependencies]
-hugr-passes = { path = "../hugr-passes", version = "0.26.1" }
-
 lazy_static = { workspace = true }
 cgmath = { workspace = true }
 tket-json-rs = { workspace = true }
@@ -79,11 +77,16 @@ pest_derive = { workspace = true }
 zstd = { workspace = true, optional = true }
 anyhow = { workspace = true, optional = true }
 num-rational = { workspace = true }
+ascent = "0.8.0"
+pastey = { workspace = true }
+thiserror = { workspace = true }
 
 
 [dev-dependencies]
 rstest = { workspace = true }
 cool_asserts = { workspace = true }
+proptest = { workspace = true }
+proptest-recurse = { workspace = true }
 
 
 # Defined here so it can be overridden by the codspeed CI job

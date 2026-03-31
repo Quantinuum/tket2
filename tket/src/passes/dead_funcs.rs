@@ -10,8 +10,8 @@ use hugr_core::{
 };
 use petgraph::visit::{Dfs, Walker};
 
-use crate::composable::{Preserve, WithScope};
-use crate::{ComposablePass, PassScope};
+use crate::passes::composable::{Preserve, WithScope};
+use crate::passes::{ComposablePass, PassScope};
 
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
@@ -123,8 +123,8 @@ mod test {
     use rstest::rstest;
 
     use super::RemoveDeadFuncsPass;
-    use crate::PassScope;
-    use crate::composable::{Preserve, WithScope, test::run_validating};
+    use crate::passes::PassScope;
+    use crate::passes::composable::{Preserve, WithScope, test::run_validating};
 
     fn hugr(use_entrypoint: bool) -> Hugr {
         let mut hb = ModuleBuilder::new();

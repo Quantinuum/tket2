@@ -12,7 +12,7 @@ use hugr::{
         patch::{PatchHugrMut, insert_cut::InsertCut},
     },
 };
-use hugr_passes::replace_types::ReplaceTypes;
+use tket::passes::replace_types::ReplaceTypes;
 use tket::passes::utils::unpack_container::type_unpack::{TypeUnpacker, is_array_of};
 
 use crate::extension::qsystem::{

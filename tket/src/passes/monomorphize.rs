@@ -13,8 +13,8 @@ use hugr_core::{
 use hugr_core::hugr::{HugrView, OpType, hugrmut::HugrMut};
 use itertools::Itertools as _;
 
-use crate::composable::WithScope;
-use crate::{ComposablePass, PassScope};
+use crate::passes::composable::WithScope;
+use crate::passes::{ComposablePass, PassScope};
 
 fn is_polymorphic(fd: &FuncDefn) -> bool {
     !fd.signature().params().is_empty()
@@ -165,7 +165,7 @@ fn instantiate(
 /// instantiations of the polymorphic ones.
 ///
 /// The original polymorphic [`FuncDefn`]s are left untouched (including Calls inside
-/// them); they can be removed by e.g. [`crate::RemoveDeadFuncsPass`].
+/// them); they can be removed by e.g. [`crate::passes::RemoveDeadFuncsPass`].
 ///
 /// If the Hugr's entrypoint is a [`FuncDefn`](OpType::FuncDefn) with polymorphic
 /// signature then the HUGR will not be modified.
@@ -283,8 +283,8 @@ mod test {
     use hugr_core::{Hugr, HugrView, Node, Visibility};
     use rstest::rstest;
 
-    use crate::composable::{Preserve, WithScope};
-    use crate::{ComposablePass, MonomorphizePass, RemoveDeadFuncsPass};
+    use crate::passes::composable::{Preserve, WithScope};
+    use crate::passes::{ComposablePass, MonomorphizePass, RemoveDeadFuncsPass};
 
     use super::{is_polymorphic, mangle_name};
 

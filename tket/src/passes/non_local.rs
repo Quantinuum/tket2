@@ -6,8 +6,8 @@ use hugr_core::{
     types::{EdgeKind, Type},
 };
 
-use crate::composable::WithScope;
-use crate::{ComposablePass, PassScope, composable::Preserve};
+use crate::passes::composable::WithScope;
+use crate::passes::{ComposablePass, PassScope, composable::Preserve};
 
 mod localize;
 use localize::ExtraSourceReqs;
@@ -175,7 +175,7 @@ mod test {
         types::Signature,
     };
 
-    use crate::composable::WithScope;
+    use crate::passes::composable::WithScope;
 
     use super::*;
 

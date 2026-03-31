@@ -32,8 +32,8 @@ use hugr_core::std_extensions::logic::LogicOp;
 use hugr_core::types::{Signature, SumType, Type, TypeBound, TypeRow, TypeRowRV};
 use hugr_core::{Hugr, HugrView, IncomingPort, Node, type_row};
 
-use crate::{ComposablePass as _, composable::ValidatingPass};
-use crate::{
+use crate::passes::{ComposablePass as _, composable::ValidatingPass};
+use crate::passes::{
     PassScope,
     composable::WithScope,
     dataflow::{DFContext, PartialValue, partial_from_const},

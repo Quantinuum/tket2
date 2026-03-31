@@ -6,8 +6,8 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 
-use crate::composable::WithScope;
-use crate::{ComposablePass, PassScope};
+use crate::passes::composable::WithScope;
+use crate::passes::{ComposablePass, PassScope};
 
 /// Configuration for Dead Code Elimination pass
 #[derive(Clone)]
@@ -239,7 +239,7 @@ mod test {
     use hugr_core::{HugrView, ops::Value, type_row};
     use itertools::Itertools;
 
-    use crate::ComposablePass;
+    use crate::passes::ComposablePass;
 
     use super::{DeadCodeElimPass, PreserveNode};
 

@@ -5,10 +5,10 @@ pub mod tket1;
 
 use std::{cmp::min, convert::TryInto, fs, num::NonZeroUsize, path::PathBuf};
 
-use hugr_passes::composable::ComposablePass;
 use pyo3::prelude::*;
 use tket::optimiser::badger::BadgerOptions;
 use tket::passes;
+use tket::passes::composable::ComposablePass;
 use tket::{Circuit, TketOp, op_matches};
 
 use crate::optimiser::PyBadgerOptimiser;

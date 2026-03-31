@@ -7,8 +7,8 @@ use hugr_core::hugr::{
 };
 use itertools::Itertools;
 
-use crate::composable::WithScope;
-use crate::{ComposablePass, PassScope};
+use crate::passes::composable::WithScope;
+use crate::passes::{ComposablePass, PassScope};
 
 /// Inlines all DFG nodes nested below the entrypoint.
 ///
@@ -63,7 +63,7 @@ mod test {
         types::Signature,
     };
 
-    use crate::ComposablePass;
+    use crate::passes::ComposablePass;
 
     use super::InlineDFGsPass;
 

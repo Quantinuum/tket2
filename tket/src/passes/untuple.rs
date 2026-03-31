@@ -13,8 +13,8 @@ use hugr_core::types::Type;
 use hugr_core::{HugrView, Node, PortIndex, SimpleReplacement};
 use itertools::Itertools;
 
-use crate::composable::WithScope;
-use crate::{ComposablePass, PassScope};
+use crate::passes::composable::WithScope;
+use crate::passes::{ComposablePass, PassScope};
 
 /// A pass that removes unnecessary `MakeTuple` operations immediately followed
 /// by `UnpackTuple`s.
@@ -260,7 +260,7 @@ fn remove_pack_unpack<'h, T: HugrView>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::composable::WithScope;
+    use crate::passes::composable::WithScope;
     use hugr_core::Hugr;
     use hugr_core::builder::FunctionBuilder;
     use hugr_core::extension::prelude::{UnpackTuple, bool_t, qb_t};

@@ -13,14 +13,14 @@ pub mod replace_bools;
 use derive_more::{Display, Error, From};
 use hugr::hugr::{HugrError, hugrmut::HugrMut};
 use hugr::{HugrView, Node, core::Visibility, ops::OpType};
-use hugr_passes::composable::WithScope;
-use hugr_passes::const_fold::{ConstFoldError, ConstantFoldPass};
-use hugr_passes::{
+use itertools::Itertools as _;
+use std::collections::HashSet;
+use tket::passes::composable::WithScope;
+use tket::passes::const_fold::{ConstFoldError, ConstantFoldPass};
+use tket::passes::{
     ComposablePass, MonomorphizePass, PassScope, RemoveDeadFuncsError, RemoveDeadFuncsPass,
     force_order, replace_types::ReplaceTypesError,
 };
-use itertools::Itertools as _;
-use std::collections::HashSet;
 
 use lower_drops::LowerDropsPass;
 use replace_bools::{ReplaceBoolPass, ReplaceBoolPassError};
@@ -83,7 +83,7 @@ pub enum QSystemPassError<N = Node> {
     /// An error when running [RemoveDeadFuncsPass] after the monomorphisation
     /// pass.
     ///
-    ///  [RemoveDeadFuncsPass]: hugr_passes::RemoveDeadFuncsError
+    ///  [RemoveDeadFuncsPass]: tket::passes::RemoveDeadFuncsError
     DCEError(RemoveDeadFuncsError),
     /// No [FuncDefn] named "main" in [Module].
     ///

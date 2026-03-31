@@ -23,7 +23,6 @@ name = "tket-qsystem"
 required-features = ["cli"]
 
 [dependencies]
-hugr-passes = { path = "../hugr-passes", version = "0.26.1" }
 tket = { path = "../tket", version = "0.17.0" }
 tket1-passes = { path = "../tket1-passes" }
 

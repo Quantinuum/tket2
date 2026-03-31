@@ -148,7 +148,6 @@ jobs:
       - name: Override criterion with the CodSpeed harness
         run: |
           cargo add --dev codspeed-criterion-compat --rename criterion --package tket
-          cargo add --dev codspeed-criterion-compat --rename criterion --package hugr-passes
       - name: Build benchmarks
         run: cargo codspeed build --profile bench --features portmatching,binary-eccs,rewrite-tracing
       - name: Run benchmarks
@@ -179,9 +178,9 @@ jobs:
           install-path: ${{ env.TKET_C_API_PATH }}
       - uses: taiki-e/install-action@nextest
       - name: Build with no features
-        run: cargo nextest r --verbose -p tket -p tket-py -p tket-qsystem -p hugr-passes --no-default-features --no-run
+        run: cargo nextest r --verbose -p tket -p tket-py -p tket-qsystem --no-default-features --no-run
       - name: Tests with no features
-        run: cargo nextest r --verbose -p tket -p tket-py -p tket-qsystem -p hugr-passes --no-default-features
+        run: cargo nextest r --verbose -p tket -p tket-py -p tket-qsystem --no-default-features
 
   # Run tests on Rust stable
   tests-rs-stable-all-features:

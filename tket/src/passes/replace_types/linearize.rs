@@ -28,7 +28,7 @@ use super::{NodeTemplate, ParametricType};
 /// would be a specific instantiation of the function for the
 /// type-that-becomes-linear, into which copy/discard can be inserted.
 ///
-/// [monomorphization]: crate::MonomorphizePass
+/// [monomorphization]: crate::passes::MonomorphizePass
 /// [Copyable]: hugr_core::types::TypeBound::Copyable
 pub trait Linearizer {
     /// Insert copy or discard operations (as appropriate) enough to wire `src`
@@ -397,9 +397,13 @@ mod test {
     use itertools::Itertools;
     use rstest::rstest;
 
-    use crate::replace_types::handlers::{DISCARD_TO_UNIT_PREFIX, MAKE_NONE_PREFIX, UNWRAP_PREFIX};
-    use crate::replace_types::{LinearizeError, Linearizer, NodeTemplate, ReplaceTypesError};
-    use crate::{ComposablePass, ReplaceTypes};
+    use crate::passes::replace_types::handlers::{
+        DISCARD_TO_UNIT_PREFIX, MAKE_NONE_PREFIX, UNWRAP_PREFIX,
+    };
+    use crate::passes::replace_types::{
+        LinearizeError, Linearizer, NodeTemplate, ReplaceTypesError,
+    };
+    use crate::passes::{ComposablePass, ReplaceTypes};
 
     const LIN_T: &str = "Lin";
     const COPY_T: &str = "Copy";

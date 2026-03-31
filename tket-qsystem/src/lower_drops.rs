@@ -3,10 +3,10 @@ use hugr::extension::prelude::bool_t;
 use hugr::extension::simple_op::MakeRegisteredOp;
 use hugr::types::Term;
 use hugr::{Node, hugr::hugrmut::HugrMut};
-use hugr_passes::composable::WithScope;
-use hugr_passes::replace_types::{Linearizer, NodeTemplate, ReplaceTypesError};
-use hugr_passes::{ComposablePass, PassScope, ReplaceTypes};
 use tket::extension::guppy::{DROP_OP_NAME, GUPPY_EXTENSION};
+use tket::passes::composable::WithScope;
+use tket::passes::replace_types::{Linearizer, NodeTemplate, ReplaceTypesError};
+use tket::passes::{ComposablePass, PassScope, ReplaceTypes};
 
 use crate::extension::futures::{FutureOp, FutureOpDef, future_type};
 
