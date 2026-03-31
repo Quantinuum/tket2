@@ -89,7 +89,7 @@ fn test_unpack_tuple_const() {
         .outputs_arr();
     let hugr = builder.finish_hugr().unwrap();
 
-    let results = Machine::new(&hugr).run_subtree(TestContext, hugr.entrypoint());
+    let results = Machine::new(&hugr).run_subtree(TestContext, hugr.module_root());
 
     let o1_r: Value = results.try_read_wire_concrete(o1).unwrap();
     assert_eq!(o1_r, Value::false_val());
@@ -150,7 +150,7 @@ fn test_tail_loop_always_iterates() {
     let [tl_o1, tl_o2] = tail_loop.outputs_arr();
     let hugr = builder.finish_hugr().unwrap();
 
-    let results = Machine::new(&hugr).run_subtree(TestContext, hugr.entrypoint());
+    let results = Machine::new(&hugr).run_subtree(TestContext, hugr.module_root());
 
     let o_r1 = results.read_out_wire(tl_o1).unwrap();
     assert_eq!(o_r1, PartialValue::bottom());
@@ -246,7 +246,7 @@ fn test_tail_loop_containing_conditional() {
     let hugr = builder.finish_hugr().unwrap();
     let [o_w1, o_w2] = tail_loop.outputs_arr();
 
-    let results = Machine::new(&hugr).run_subtree(TestContext, hugr.entrypoint());
+    let results = Machine::new(&hugr).run_subtree(TestContext, hugr.module_root());
 
     let o_r1 = results.read_out_wire(o_w1).unwrap();
     assert_eq!(o_r1, pv_true());
@@ -443,7 +443,7 @@ fn test_call(
         let mut m = Machine::new(&hugr);
         m.prepopulate_inputs(hugr.entrypoint(), [(0.into(), inp0), (1.into(), inp1)])
             .unwrap();
-        m.run_subtree(TestContext, hugr.entrypoint())
+        m.run_subtree(TestContext, hugr.module_root())
     };
 
     let [res0, res1] = [0, 1].map(|i| {
@@ -532,7 +532,7 @@ fn test_module() {
         let mut mach = Machine::new(&hugr);
         mach.prepopulate_inputs(main.node(), [(0.into(), pv_true())])
             .unwrap();
-        mach.run_subtree(TestContext, hugr.entrypoint())
+        mach.run_subtree(TestContext, hugr.module_root())
     };
     assert_eq!(
         results_just_main.read_out_wire(Wire::new(f2_inp, 0)),
@@ -670,7 +670,7 @@ fn func_set_input(#[values(false, true)] pre_pop_wire: bool) {
         m.prepopulate_inputs(func.node(), [(IncomingPort::from(0), pv_true())])
             .unwrap();
     }
-    let results = m.run_subtree(TestContext, hugr.entrypoint());
+    let results = m.run_subtree(TestContext, hugr.module_root());
     assert_eq!(results.read_out_wire(inp_w), Some(pv_true()));
 }
 
