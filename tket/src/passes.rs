@@ -6,61 +6,61 @@ pub use composable::{ComposablePass, InScope, PassScope, WithScope};
 
 // -- tket-defined passes ---------------------------------------------------
 
-/// Elide pairs of return-borrow operations on `BorrowArray`s.
+// Elide pairs of return-borrow operations on `BorrowArray`s.
 pub mod borrow_squash;
 pub use borrow_squash::BorrowSquashPass;
 
-/// Greedy gate commutation on quantum circuits.
+// Greedy gate commutation on quantum circuits.
 pub mod commutation;
 pub use commutation::apply_greedy_commutation;
 
-/// Constant folding pass.
+// Constant folding pass.
 pub mod const_fold;
 pub use const_fold::ConstantFoldPass;
 
-/// Dataflow analysis framework.
+// Dataflow analysis framework.
 pub mod dataflow;
 
-/// Dead code elimination pass.
+// Dead code elimination pass.
 pub mod dead_code;
 pub use dead_code::DeadCodeElimPass;
 
-/// Dead function removal.
+// Dead function removal.
 pub mod dead_funcs;
 pub use dead_funcs::{RemoveDeadFuncsError, RemoveDeadFuncsPass};
 
-/// Force a topological order on nodes.
+// Force a topological order on nodes.
 pub mod force_order;
 pub use force_order::{force_order, force_order_by_key};
 
-/// Normalize the structure of Guppy-generated programs.
+// Normalize the structure of Guppy-generated programs.
 pub mod guppy;
 pub use guppy::NormalizeGuppy;
 
-/// Inline DFG nodes.
+// Inline DFG nodes.
 pub mod inline_dfgs;
 pub use inline_dfgs::InlineDFGsPass;
 
-/// Inline function calls.
+// Inline function calls.
 pub mod inline_funcs;
 pub use inline_funcs::inline_acyclic;
 
-/// Lower and replace operations.
+// Lower and replace operations.
 pub mod lower;
 pub use lower::{lower_ops, replace_many_ops};
 
-/// Resolve modifier operations (control/dagger/power).
+// Resolve modifier operations (control/dagger/power).
 pub mod modifier_resolver;
 pub use modifier_resolver::ModifierResolverPass;
 
-/// Monomorphization pass.
+// Monomorphization pass.
 pub mod monomorphize;
 pub use monomorphize::{MonomorphizePass, mangle_name};
 
-/// Nest SESE regions in CFGs.
+// Nest SESE regions in CFGs.
 pub mod nest_cfgs;
 
-/// Find and localize non-local edges.
+// Find and localize non-local edges.
 pub mod non_local;
 #[deprecated(
     note = "Use LocalizeEdgesPass::check_no_nonlocal_edges",
@@ -69,19 +69,19 @@ pub mod non_local;
 #[expect(deprecated)]
 pub use non_local::ensure_no_nonlocal_edges;
 
-/// CFG normalization (merge blocks, simplify control flow).
+// CFG normalization (merge blocks, simplify control flow).
 pub mod normalize_cfgs;
 pub use normalize_cfgs::NormalizeCFGPass;
 
-/// Remove redundant order edges.
+// Remove redundant order edges.
 pub mod redundant_order_edges;
 pub use redundant_order_edges::RedundantOrderEdgesPass;
 
-/// Replace types, ops, and constants across a HUGR.
+// Replace types, ops, and constants across a HUGR.
 pub mod replace_types;
 pub use replace_types::ReplaceTypes;
 
-/// Remove redundant tuple pack/unpack operations.
+// Remove redundant tuple pack/unpack operations.
 pub mod untuple;
 pub use untuple::UntuplePass;
 

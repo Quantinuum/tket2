@@ -1,3 +1,7 @@
+//! Monomorphization pass.
+//!
+//! Replaces calls to polymorphic functions with calls to new monomorphic
+//! definitions.
 use std::{
     collections::{HashMap, hash_map::Entry},
     convert::Infallible,
