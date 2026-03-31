@@ -26,10 +26,11 @@ use hugr_core::std_extensions::logic::LogicOp;
 use hugr_core::types::{Signature, SumType, Type, TypeBound, TypeRow, TypeRowRV};
 use hugr_core::{Hugr, HugrView, IncomingPort, Node, Visibility, type_row};
 use itertools::Itertools;
-use rstest::{fixture, rstest};
+use rstest::rstest;
 
+use crate::ComposablePass as _;
+use crate::composable::{PassScope, Preserve, ValidatingPass, WithScope};
 use crate::dataflow::{DFContext, PartialValue, partial_from_const};
-use crate::{ComposablePass as _, composable::ValidatingPass};
 
 use super::{ConstFoldContext, ConstantFoldPass, ValueHandle};
 
@@ -1728,8 +1729,12 @@ fn int_cst(v: u64) -> Value {
 
 /// A module-entrypoint hugr with a main function (the second element of tuple)
 /// calling another function (the third element of tuple) with some constant arguments.
-#[fixture]
-fn two_funcs_hugr() -> (Hugr, Node, Node) {
+///
+/// The `entrypoint_is_main` argument controls whether the entrypoint should be
+/// * None -> the module
+/// * Some(true) -> main
+/// * Some(false) -> callee
+fn two_funcs_hugr(entrypoint_is_main: Option<bool>) -> (Hugr, Node, Node) {
     let mut mb = ModuleBuilder::new();
     let mut callee = mb
         .define_function("callee", Signature::new_endo([INT_TYPES[5].clone()]))
@@ -1758,15 +1763,29 @@ fn two_funcs_hugr() -> (Hugr, Node, Node) {
         .unwrap();
     let call = main.call(callee.handle(), &[], add_csts.outputs()).unwrap();
     let main = main.finish_with_outputs(call.outputs()).unwrap();
-    (mb.finish_hugr().unwrap(), main.node(), callee.node())
+    let mut hugr = mb.finish_hugr().unwrap();
+    if let Some(use_main) = entrypoint_is_main {
+        hugr.set_entrypoint(if use_main { main.node() } else { callee.node() });
+    }
+    (hugr, main.node(), callee.node())
 }
 
-#[test]
-fn two_funcs_main() {
-    let (mut hugr, main, callee) = two_funcs_hugr();
-    hugr.set_entrypoint(main);
-    constant_fold_pass(&mut hugr);
-    let main_tags = get_child_tags(&hugr, main);
+#[rstest]
+#[case(Preserve::Public, Some(true))]
+fn two_funcs_fully_folded(
+    #[case] scope: impl Into<PassScope>,
+    #[case] entrypoint_is_main: Option<bool>,
+) {
+    let (mut hugr, main, callee) = two_funcs_hugr(entrypoint_is_main);
+    ConstantFoldPass::default_with_scope(scope.into())
+        .run(&mut hugr)
+        .unwrap();
+    two_funcs_check_main_fully_folded(&hugr, main);
+    two_funcs_check_callee_fully_folded(&hugr, callee);
+}
+
+fn two_funcs_check_main_fully_folded(hugr: &Hugr, main: Node) {
+    let main_tags = get_child_tags(hugr, main);
     assert_eq!(
         main_tags,
         HashMap::from([
@@ -1777,7 +1796,7 @@ fn two_funcs_main() {
             (OpTag::LoadConst, 2)
         ])
     );
-
+    // Two consts - first is the result...
     let output = hugr
         .children(main)
         .filter(|n| hugr.get_optype(*n).is_output())
@@ -1807,11 +1826,13 @@ fn two_funcs_main() {
         &int_cst(3 + 5)
     );
     assert!(hugr.output_neighbours(call).next().is_none());
+}
 
+fn two_funcs_check_callee_fully_folded(hugr: &Hugr, callee: Node) {
     // callee should be fully folded - it's not preserved, so can be specialised
     // to the caller.
     assert_eq!(
-        get_child_tags(&hugr, callee),
+        get_child_tags(hugr, callee),
         HashMap::from([
             (OpTag::Input, 1),
             (OpTag::Output, 1),
@@ -1829,15 +1850,25 @@ fn two_funcs_main() {
     assert_eq!(cst.value(), &int_cst(3 + 5 + 7 + 11));
 }
 
-#[test]
-fn two_funcs_f() {
-    let (mut hugr, main, callee) = two_funcs_hugr();
-    hugr.set_entrypoint(callee);
-    constant_fold_pass(&mut hugr);
+#[rstest]
+#[case(Preserve::Public, Some(false))]
+fn two_funcs_preserve_f(
+    #[case] scope: impl Into<PassScope>,
+    #[case] entrypoint_is_main: Option<bool>,
+) {
+    let (mut hugr, main, callee) = two_funcs_hugr(entrypoint_is_main);
+    ConstantFoldPass::default_with_scope(scope.into())
+        .run(&mut hugr)
+        .unwrap();
 
+    two_funcs_check_f_respects_argument(&hugr, callee);
+    check_two_funcs_main_uses_call(&hugr, main);
+}
+
+fn two_funcs_check_f_respects_argument(hugr: &Hugr, callee: Node) {
     // Callee: cannot assume anything about argument, so only fold the 7+11, not the addition with the input
     assert_eq!(
-        get_child_tags(&hugr, callee),
+        get_child_tags(hugr, callee),
         HashMap::from([
             (OpTag::Input, 1),
             (OpTag::Output, 1),
@@ -1855,10 +1886,12 @@ fn two_funcs_f() {
             .value(),
         &int_cst(7 + 11)
     );
+}
 
+fn check_two_funcs_main_uses_call(hugr: &Hugr, main: Node) {
     // Main: fold the 3+5, but not the call, since this aliases with other arguments to callee.
     assert_eq!(
-        get_child_tags(&hugr, main),
+        get_child_tags(hugr, main),
         HashMap::from([
             (OpTag::Input, 1),
             (OpTag::Output, 1),
