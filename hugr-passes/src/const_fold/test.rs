@@ -3,13 +3,6 @@ use std::{
     sync::LazyLock,
 };
 
-use hugr_core::ops::constant::{CustomConst, CustomSerialized};
-use hugr_core::ops::handle::NodeHandle;
-use hugr_core::std_extensions::collections::list::ListOp;
-use hugr_core::{Visibility, ops::Const};
-use itertools::Itertools;
-use rstest::rstest;
-
 use hugr_core::builder::{
     Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
     HugrBuilder, ModuleBuilder, SubContainer, endo_sig, inout_sig,
@@ -18,9 +11,9 @@ use hugr_core::extension::prelude::{
     ConstError, ConstString, MakeTuple, UnpackTuple, bool_t, const_ok, error_type, string_type,
     sum_with_error,
 };
-
 use hugr_core::hugr::hugrmut::HugrMut;
-use hugr_core::ops::{OpTag, OpTrait, OpType, Value};
+use hugr_core::ops::constant::{CustomConst, CustomSerialized};
+use hugr_core::ops::{Const, OpTag, OpTrait, OpType, Value, handle::NodeHandle};
 use hugr_core::std_extensions::arithmetic::{
     conversions::ConvertOpDef,
     float_ops::FloatOps,
@@ -28,22 +21,20 @@ use hugr_core::std_extensions::arithmetic::{
     int_ops::IntOpDef,
     int_types::{ConstInt, INT_TYPES},
 };
+use hugr_core::std_extensions::collections::list::ListOp;
 use hugr_core::std_extensions::logic::LogicOp;
 use hugr_core::types::{Signature, SumType, Type, TypeBound, TypeRow, TypeRowRV};
-use hugr_core::{Hugr, HugrView, IncomingPort, Node, type_row};
+use hugr_core::{Hugr, HugrView, IncomingPort, Node, Visibility, type_row};
+use itertools::Itertools;
+use rstest::rstest;
 
+use crate::dataflow::{DFContext, PartialValue, partial_from_const};
 use crate::{ComposablePass as _, composable::ValidatingPass};
-use crate::{
-    PassScope,
-    composable::WithScope,
-    dataflow::{DFContext, PartialValue, partial_from_const},
-};
 
 use super::{ConstFoldContext, ConstantFoldPass, ValueHandle};
 
 fn constant_fold_pass(h: &mut (impl HugrMut<Node = Node> + 'static)) {
-    // the default ConstantFoldPass has no scope, i.e. preserving legacy behavior
-    let c = ConstantFoldPass::default().with_scope(PassScope::default());
+    let c = ConstantFoldPass::default();
     ValidatingPass::new(c).run(h).unwrap();
 }
 
