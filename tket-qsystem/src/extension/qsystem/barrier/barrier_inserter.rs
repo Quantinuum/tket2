@@ -13,13 +13,13 @@ use hugr::{
     },
 };
 use hugr_passes::replace_types::ReplaceTypes;
-use tket::passes::unpack_container::type_unpack::{TypeUnpacker, is_array_of};
+use tket::passes::utils::unpack_container::type_unpack::{TypeUnpacker, is_array_of};
 
 use crate::extension::qsystem::{
     LowerTk2Error,
     barrier::wrapped_barrier::{WrappedBarrierBuilder, build_runtime_barrier_op},
 };
-use tket::passes::unpack_container::UnpackContainerBuilder;
+use tket::passes::utils::unpack_container::UnpackContainerBuilder;
 
 type Target = (Node, IncomingPort);
 

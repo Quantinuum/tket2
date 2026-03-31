@@ -2,8 +2,8 @@
 
 pub mod portmatching;
 
-use crate::circuit::Tk2Circuit;
 use crate::rewrite::PyCircuitRewrite;
+use crate::state::CompilationState;
 use crate::utils::{ConvertPyErr, create_py_exception};
 
 use hugr::{HugrView, Node};
@@ -53,28 +53,27 @@ pub struct Rule(pub [Circuit; 2]);
 #[pymethods]
 impl Rule {
     #[new]
-    fn new_rule(l: &Bound<PyAny>, r: &Bound<PyAny>) -> PyResult<Rule> {
-        let l = Tk2Circuit::new(l)?;
-        let r = Tk2Circuit::new(r)?;
-
-        Ok(Rule([l.circ, r.circ]))
+    fn new_rule(l: &CompilationState, r: &CompilationState) -> PyResult<Rule> {
+        let l = Circuit::new(l.hugr.clone());
+        let r = Circuit::new(r.hugr.clone());
+        Ok(Rule([l, r]))
     }
 
     /// The left hand side of the rule.
     ///
     /// This is the pattern that will be matched against the target circuit.
-    fn lhs(&self) -> Tk2Circuit {
-        Tk2Circuit {
-            circ: self.0[0].clone(),
+    fn lhs(&self) -> CompilationState {
+        CompilationState {
+            hugr: self.0[0].clone().into_hugr(),
         }
     }
 
     /// The right hand side of the rule.
     ///
     /// This is the replacement that will be applied to the target circuit.
-    fn rhs(&self) -> Tk2Circuit {
-        Tk2Circuit {
-            circ: self.0[1].clone(),
+    fn rhs(&self) -> CompilationState {
+        CompilationState {
+            hugr: self.0[1].clone().into_hugr(),
         }
     }
 }
@@ -97,19 +96,19 @@ impl RuleMatcher {
         Ok(Self { matcher, rights })
     }
 
-    pub fn find_match(&self, target: &Tk2Circuit) -> PyResult<Option<PyCircuitRewrite>> {
-        let circ = &target.circ;
-        let Some(pmatch) = self.matcher.find_matches_iter(circ).next() else {
+    pub fn find_match(&self, target: &CompilationState) -> PyResult<Option<PyCircuitRewrite>> {
+        let circ = Circuit::new(&target.hugr);
+        let Some(pmatch) = self.matcher.find_matches_iter(&circ).next() else {
             return Ok(None);
         };
-        Ok(Some(self.match_to_rewrite(pmatch, circ)?))
+        Ok(Some(self.match_to_rewrite(pmatch, &circ)?))
     }
 
-    pub fn find_matches(&self, target: &Tk2Circuit) -> PyResult<Vec<PyCircuitRewrite>> {
-        let circ = &target.circ;
+    pub fn find_matches(&self, target: &CompilationState) -> PyResult<Vec<PyCircuitRewrite>> {
+        let circ = Circuit::new(&target.hugr);
         self.matcher
-            .find_matches_iter(circ)
-            .map(|m| self.match_to_rewrite(m, circ))
+            .find_matches_iter(&circ)
+            .map(|m| self.match_to_rewrite(m, &circ))
             .collect()
     }
 }

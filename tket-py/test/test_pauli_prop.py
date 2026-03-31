@@ -5,11 +5,11 @@ from pytket._tket.circuit import Circuit
 
 from hugr.ops import Custom
 from hugr.hugr import Wire
-from tket.circuit import (
-    Tk2Circuit,
+from tket._state import (
+    CompilationState,
     Node as Tk2Node,
 )
-from tket.circuit.build import (
+from tket._state.build import (
     CircBuild,
     H,
     from_coms,
@@ -24,17 +24,17 @@ from tket.circuit.build import (
     id_circ,
 )
 from hugr.std.logic import Not
-from tket.pattern import Rule, RuleMatcher  # type: ignore
-from tket.rewrite import CircuitRewrite, Subcircuit  # type: ignore
+from tket._pattern import Rule, RuleMatcher  # type: ignore
+from tket._rewrite import CircuitRewrite, Subcircuit  # type: ignore
 
 
 @pytest.fixture
 def merge_rules() -> list[Rule]:
     paulis = [PauliX(0), PauliY(0), PauliZ(0)]
-    identities = [Rule(from_coms(p, p), id_circ(1)) for p in paulis]
+    identities = [Rule(from_coms(p, p)._inner, id_circ(1)._inner) for p in paulis]
 
     off_diag = [
-        Rule(from_coms(p0, p1), from_coms(p2))
+        Rule(from_coms(p0, p1)._inner, from_coms(p2)._inner)
         for p0, p1, p2 in itertools.permutations(paulis)
     ]
     return [*identities, *off_diag]
@@ -43,15 +43,25 @@ def merge_rules() -> list[Rule]:
 @pytest.fixture
 def propagate_rules() -> list[Rule]:
     hadamard_rules = [
-        Rule(from_coms(PauliX(0), H(0)), from_coms(H(0), PauliZ(0))),
-        Rule(from_coms(PauliZ(0), H(0)), from_coms(H(0), PauliX(0))),
+        Rule(from_coms(PauliX(0), H(0))._inner, from_coms(H(0), PauliZ(0))._inner),
+        Rule(from_coms(PauliZ(0), H(0))._inner, from_coms(H(0), PauliX(0))._inner),
     ]
 
     cx_rules = [
-        Rule(from_coms(PauliZ(0), CX(0, 1)), from_coms(CX(0, 1), PauliZ(0))),
-        Rule(from_coms(PauliX(1), CX(0, 1)), from_coms(CX(0, 1), PauliX(1))),
-        Rule(from_coms(PauliZ(1), CX(0, 1)), from_coms(CX(0, 1), PauliZ(0), PauliZ(1))),
-        Rule(from_coms(PauliX(0), CX(0, 1)), from_coms(CX(0, 1), PauliX(0), PauliX(1))),
+        Rule(
+            from_coms(PauliZ(0), CX(0, 1))._inner, from_coms(CX(0, 1), PauliZ(0))._inner
+        ),
+        Rule(
+            from_coms(PauliX(1), CX(0, 1))._inner, from_coms(CX(0, 1), PauliX(1))._inner
+        ),
+        Rule(
+            from_coms(PauliZ(1), CX(0, 1))._inner,
+            from_coms(CX(0, 1), PauliZ(0), PauliZ(1))._inner,
+        ),
+        Rule(
+            from_coms(PauliX(0), CX(0, 1))._inner,
+            from_coms(CX(0, 1), PauliX(0), PauliX(1))._inner,
+        ),
     ]
 
     return [*hadamard_rules, *cx_rules]
@@ -71,7 +81,7 @@ def measure_rules() -> list[Rule]:
     r_build.set_indexed_outputs(0, b)
     rtk = r_build.finish()
 
-    rules = [Rule(ltk, rtk)]
+    rules = [Rule(ltk._inner, rtk._inner)]
 
     # Z does not affect measurement result
     r_build = CircBuild.with_nqb(1)
@@ -84,7 +94,7 @@ def measure_rules() -> list[Rule]:
     r_build.set_indexed_outputs(0, b)
     rtk = r_build.finish()
 
-    rules.append(Rule(ltk, rtk))
+    rules.append(Rule(ltk._inner, rtk._inner))
 
     return rules
 
@@ -100,40 +110,42 @@ def propagate_matcher(
     return RuleMatcher([*merge_rules, *propagate_rules, *measure_rules])
 
 
-def apply_exhaustive(circ: Tk2Circuit, matcher: RuleMatcher) -> int:
+def apply_exhaustive(circ: CompilationState, matcher: RuleMatcher) -> int:
     """Apply the first matching rule until no more matches are found. Return the
     number of rewrites applied."""
     match_count = 0
-    while match := matcher.find_match(circ):
+    while match := matcher.find_match(circ._inner):  # type: ignore[arg-type]
         match_count += 1
-        circ.apply_rewrite(match)
+        circ._inner.apply_rewrite(match)
 
     return match_count
 
 
-def add_error_after(circ: Tk2Circuit, wire: Wire, error: Custom):
+def add_error_after(circ: CompilationState, wire: Wire, error: Custom):
     """Use a rewrite to insert an operation on a qubit wire assuming the error is
     a one qubit operation, and the source gate of the wire only acts on qubits."""
     port = wire.out_port()
     node = Tk2Node(port.node.idx)
     port_offset = port.offset
-    n_qb = len(circ.node_outputs(node)) - 1  # ignore Order port
-    subc = Subcircuit([node], circ)
+    inner = circ._inner
+    n_qb = len(inner.node_outputs(node)) - 1  # type: ignore[attr-defined]  # ignore Order port
+    subc = Subcircuit([node], inner)  # type: ignore[arg-type]
     replace_build = CircBuild.with_nqb(n_qb)
-    current = load_custom(circ.node_op(node))
+    current = load_custom(inner.node_op(node))  # type: ignore[attr-defined]
     replace_build.add(current(*list(range(n_qb))))
     replace_build.add(error(port_offset))
     replace_build.set_tracked_outputs()
     replacement = replace_build.finish()
 
-    rw = CircuitRewrite(subc, circ, replacement)
+    rw = CircuitRewrite(subc, inner, replacement._inner)  # type: ignore[arg-type]
 
-    circ.apply_rewrite(rw)
+    circ._inner.apply_rewrite(rw)
 
 
-def final_pauli_string(circ: Tk2Circuit) -> str:
+def final_pauli_string(circ: CompilationState) -> str:
     """Assuming the circuit only has qubit outputs - check the final operations
     on each qubit, and if they are paulis concatenate them into a string."""
+    inner = circ._inner
 
     def map_op(op: Custom) -> str:
         n = op.name()
@@ -141,8 +153,8 @@ def final_pauli_string(circ: Tk2Circuit) -> str:
 
     # TODO ignore non-qubit outputs
     return "".join(
-        map_op(load_custom(circ.node_op(w.node())))
-        for w in circ.node_inputs(circ.output_node())
+        map_op(load_custom(inner.node_op(w.node())))  # type: ignore[attr-defined]
+        for w in inner.node_inputs(inner.output_node())  # type: ignore[attr-defined]
     )
 
 

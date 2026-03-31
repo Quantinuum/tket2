@@ -1,5 +1,6 @@
 //! Elide pairs of return-borrow operations on a `BorrowArray` where possible.
 
+use crate::passes::{ComposablePass, PassScope, WithScope};
 use derive_more::{Display, Error};
 use hugr::extension::prelude::ConstUsize;
 use hugr::extension::simple_op::MakeExtensionOp;
@@ -9,8 +10,6 @@ use hugr::std_extensions::arithmetic::int_types::ConstInt;
 use hugr::std_extensions::collections::borrow_array::{BArrayUnsafeOpDef, BORROW_ARRAY_TYPENAME};
 use hugr::types::{EdgeKind, Type};
 use hugr::{HugrView, IncomingPort, Node, OutgoingPort, Wire};
-use hugr_passes::composable::WithScope;
-use hugr_passes::{ComposablePass, PassScope};
 
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -29,7 +28,7 @@ pub struct BorrowSquashPass {
 }
 
 impl WithScope for BorrowSquashPass {
-    fn with_scope(mut self, scope: impl Into<hugr_passes::PassScope>) -> Self {
+    fn with_scope(mut self, scope: impl Into<crate::passes::PassScope>) -> Self {
         self.scope = scope.into();
         self
     }
@@ -46,7 +45,7 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for BorrowSquashPass {
     /// Note it is recommended to run [ConstantFoldPass] first to make as many indices
     /// constant as possible.
     ///
-    /// [ConstantFoldPass]: hugr_passes::const_fold::ConstantFoldPass
+    /// [ConstantFoldPass]: crate::passes::const_fold::ConstantFoldPass
     fn run(&self, hugr: &mut H) -> Result<Vec<(Node, Node)>, BorrowSquashError> {
         let mut regions = VecDeque::from_iter(self.scope.root(hugr));
         let mut results = Vec::new();
@@ -371,6 +370,7 @@ mod test {
 
     use super::{BorrowSquashPass, find_const};
     use crate::extension::REGISTRY;
+    use crate::passes::{ComposablePass, const_fold::ConstantFoldPass};
     use hugr::builder::{DFGBuilder, Dataflow, DataflowHugr, FunctionBuilder, endo_sig};
     use hugr::extension::prelude::{ConstUsize, qb_t, usize_t};
     use hugr::extension::simple_op::MakeExtensionOp;
@@ -382,7 +382,6 @@ mod test {
     };
     use hugr::types::Signature;
     use hugr::{Hugr, HugrView};
-    use hugr_passes::{ComposablePass, const_fold::ConstantFoldPass};
     use itertools::Itertools;
     use rstest::{fixture, rstest};
 

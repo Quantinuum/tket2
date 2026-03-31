@@ -14,7 +14,7 @@ use hugr::{
 };
 
 use crate::extension::qsystem::QSystemOpBuilder;
-use tket::passes::unpack_container::op_function_map::OpFunctionMap;
+use tket::passes::utils::unpack_container::op_function_map::OpFunctionMap;
 
 /// Temporary extension name for barrier-specific operations.
 pub(super) const TEMP_BARRIER_EXT_NAME: hugr::hugr::IdentList =

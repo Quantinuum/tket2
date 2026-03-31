@@ -31,7 +31,7 @@ use crate::Circuit;
 use crate::circuit::cost::CircuitCost;
 use crate::optimiser::badger::worker::BadgerWorker;
 use crate::optimiser::{BacktrackingOptimiser, Optimiser, State, StatePQWorker, pqueue_worker};
-use crate::passes::CircuitChunks;
+use crate::passes::utils::CircuitChunks;
 use crate::rewrite::Rewriter;
 use crate::rewrite::strategy::{RewriteResult, RewriteStrategy};
 

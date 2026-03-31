@@ -92,7 +92,7 @@ mod test {
                 // if the runtime barrier function is never called
                 // make sure it is because there are no qubits in the barrier
 
-                use tket::passes::unpack_container::type_unpack::TypeUnpacker;
+                use tket::passes::utils::unpack_container::type_unpack::TypeUnpacker;
 
                 let analyzer = TypeUnpacker::for_qubits();
                 let tuple_type = hugr::types::Type::new_tuple(type_row);
@@ -124,7 +124,7 @@ mod test {
         for n in h.nodes() {
             if let Some(op) = h.get_optype(n).as_extension_op() {
                 for factory_ext in [
-                    &tket::passes::unpack_container::TEMP_UNPACK_EXT_NAME,
+                    &tket::passes::utils::unpack_container::TEMP_UNPACK_EXT_NAME,
                     &wrapped_barrier::TEMP_BARRIER_EXT_NAME,
                 ] {
                     assert_ne!(

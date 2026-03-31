@@ -10,7 +10,7 @@ use tket::{
     rewrite::{CircuitRewrite, ECCRewriter, Rewriter},
 };
 
-use crate::circuit::{PyNode, Tk2Circuit};
+use crate::state::{CompilationState, PyNode};
 
 /// The module definition
 pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
@@ -46,21 +46,21 @@ impl PyCircuitRewrite {
     }
 
     /// The replacement subcircuit.
-    pub fn replacement(&self) -> Tk2Circuit {
-        self.rewrite.replacement().to_owned().into()
+    pub fn replacement(&self) -> CompilationState {
+        self.rewrite.replacement().to_owned().into_hugr().into()
     }
 
     #[new]
     fn try_new(
         source_position: PySubcircuit,
-        source_circ: PyRef<Tk2Circuit>,
-        replacement: Tk2Circuit,
+        source_circ: PyRef<CompilationState>,
+        replacement: PyRef<CompilationState>,
     ) -> PyResult<Self> {
         Ok(Self {
             rewrite: CircuitRewrite::try_new(
                 &source_position.0,
-                source_circ.circ.hugr(),
-                replacement.circ,
+                &source_circ.hugr,
+                Circuit::new(replacement.hugr.clone()),
             )
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?,
         })
@@ -108,10 +108,10 @@ pub struct PySubcircuit(SiblingSubgraph);
 #[pymethods]
 impl PySubcircuit {
     #[new]
-    fn from_nodes(nodes: Vec<PyNode>, circ: &Tk2Circuit) -> PyResult<Self> {
+    fn from_nodes(nodes: Vec<PyNode>, circ: &CompilationState) -> PyResult<Self> {
         let nodes: Vec<_> = nodes.into_iter().map_into().collect();
         Ok(Self(
-            SiblingSubgraph::try_from_nodes(nodes, circ.circ.hugr())
+            SiblingSubgraph::try_from_nodes(nodes, &circ.hugr)
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?,
         ))
     }
@@ -144,12 +144,9 @@ impl PyECCRewriter {
         )?))
     }
 
-    /// Returns a list of circuit rewrites that can be applied to the given Tk2Circuit.
-    pub fn get_rewrites(&self, circ: &Tk2Circuit) -> Vec<PyCircuitRewrite> {
-        self.0
-            .get_rewrites(&circ.circ)
-            .into_iter()
-            .map_into()
-            .collect()
+    /// Returns a list of circuit rewrites that can be applied to the given CompilationState.
+    pub fn get_rewrites(&self, circ: &CompilationState) -> Vec<PyCircuitRewrite> {
+        let c = Circuit::new(circ.hugr.clone());
+        self.0.get_rewrites(&c).into_iter().map_into().collect()
     }
 }

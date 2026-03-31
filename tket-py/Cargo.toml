@@ -26,10 +26,10 @@ tket = { path = "../tket", version = "0.17.0", features = [
 ] }
 tket-qsystem = { path = "../tket-qsystem", version = "0.23.0" }
 tket1-passes = { path = "../tket1-passes", version = "0.0.0" }
+hugr-passes = { path = "../hugr-passes", version = "0.26.1" }
 
 derive_more = { workspace = true, features = ["into", "from"] }
 hugr = { workspace = true }
-hugr-passes = { workspace = true }
 itertools = { workspace = true }
 num_cpus = { workspace = true }
 portmatching = { workspace = true }

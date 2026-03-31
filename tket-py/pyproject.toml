@@ -29,7 +29,7 @@ classifiers = [
 
 
 dependencies = [
-    'hugr ~= 0.15.1',
+    'hugr ~= 0.15.5',
     "pytket>=2.1.0,<3",
     'tket_eccs ~= 0.5.1',
     'tket_exts >= 0.12.2, <0.13',
