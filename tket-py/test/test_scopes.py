@@ -26,7 +26,6 @@ def _count_ops(hugr: Hugr, op_string_name: str) -> int:
 
 def test_nested_function_opt_global() -> None:
     h = _hugr_from_path("test_files/guppy_optimization/nested/nested.flat.hugr")
-
     h_normalized = normalize(h)
 
     fpo = PytketHugrPass(FullPeepholeOptimise())
@@ -41,9 +40,11 @@ def test_nested_function_opt_global() -> None:
 def test_nested_function_opt_local() -> None:
     h = _hugr_from_path("test_files/guppy_optimization/nested/nested.flat.hugr")
     h_normalized = normalize(h)
+
     fpo = PytketHugrPass(FullPeepholeOptimise())
     fpo_local_flat = fpo.with_scope(LocalScope.FLAT)
-    flat_opt_hugr = fpo_local_flat(h_normalized)
 
+    flat_opt_hugr = fpo_local_flat(h_normalized)
+    # Assert that no optimization is applied to the internal function.
     assert _count_ops(flat_opt_hugr, "H") == 6
     assert _count_ops(flat_opt_hugr, "CZ") == 6
