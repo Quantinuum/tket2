@@ -107,9 +107,10 @@ class NormalizeGuppy(ComposablePass):
             copy_call=lambda h: self._normalize(h, inplace),
         )
 
-    def with_scope(self, scope: PassScope) -> NormalizeGuppy:
-        """Set the scope configuration for the NormalizeGuppy pass."""
-        self._scope = scope
+    def with_scope(self, _scope: PassScope) -> ComposablePass:
+        """Set the scope of this pass and return self."""
+        # TODO: Store the scope and pass it to the Rust side.
+        # <https://github.com/Quantinuum/tket2/issues/1450>
         return self
 
     def _normalize(self, hugr: Hugr, inplace: bool) -> PassResult:
