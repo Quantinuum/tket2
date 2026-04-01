@@ -21,7 +21,7 @@ env:
   MIRIFLAGS: "-Zmiri-permissive-provenance -Zmiri-env-forward=PROPTEST_DISABLE_FAILURE_PERSISTENCE"
   PROPTEST_DISABLE_FAILURE_PERSISTENCE: true
 
-  HUGRENV_VERSION: "0.3.0"
+  HUGRENV_VERSION: "0.3.1"
   HUGRENV_ROOT: "/tmp/hugrverse"
   HUGRENV_PLATFORM: "manylinux_2_28_x86_64"
   TKET_C_API_PATH: "/tmp/hugrverse"

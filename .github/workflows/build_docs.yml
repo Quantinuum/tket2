@@ -21,7 +21,7 @@ env:
   # When this envvar is set, the `./.github/actions/tket-c-api` action **must** be run to fetch the artifacts
   # This config is not required, but speeds up the build by caching the tket-c-api library
   # The alternative is to install conan and remove the env var
-  HUGRENV_VERSION: "0.3.0"
+  HUGRENV_VERSION: "0.3.1"
   HUGRENV_ROOT: "/tmp/hugrverse"
   HUGRENV_PLATFORM: "manylinux_2_28_x86_64"
   TKET_C_API_PATH: "/tmp/hugrverse"

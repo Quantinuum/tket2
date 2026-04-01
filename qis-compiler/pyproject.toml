@@ -115,8 +115,8 @@ before-all = '''
     else
         HUGRVERSE_ARCH=manylinux_2_28_aarch64;
     fi;
-    llvm_url="https://github.com/Quantinuum/hugrverse-env/releases/download/v0.3.0/hugrenv-llvm-${HUGRVERSE_ARCH}.tar.gz"
-    tket_url="https://github.com/Quantinuum/hugrverse-env/releases/download/v0.3.0/hugrenv-tket-${HUGRVERSE_ARCH}.tar.gz"
+    llvm_url="https://github.com/Quantinuum/hugrverse-env/releases/download/v0.3.1/hugrenv-llvm-${HUGRVERSE_ARCH}.tar.gz"
+    tket_url="https://github.com/Quantinuum/hugrverse-env/releases/download/v0.3.1/hugrenv-tket-${HUGRVERSE_ARCH}.tar.gz"
     echo "Downloading HUGRVERSE environment from ${llvm_url} and ${tket_url}";
     curl -L $llvm_url | tar xz -C /tmp;
     curl -L $tket_url | tar xz -C /tmp;
@@ -159,8 +159,8 @@ MACOSX_DEPLOYMENT_TARGET = "15.0"
 before-all = [
     'curl -sSf https://sh.rustup.rs | sh -s -- -y',
     'if [ "$(uname -m)" = "arm64" ]; then HUGRVERSE_ARCH=macosx_15_0_aarch64; else HUGRVERSE_ARCH=macosx_15_0_x86_64; fi',
-    'llvm_url="https://github.com/Quantinuum/hugrverse-env/releases/download/v0.3.0/hugrenv-llvm-${HUGRVERSE_ARCH}.tar.gz"',
-    'tket_url="https://github.com/Quantinuum/hugrverse-env/releases/download/v0.3.0/hugrenv-tket-${HUGRVERSE_ARCH}.tar.gz"',
+    'llvm_url="https://github.com/Quantinuum/hugrverse-env/releases/download/v0.3.1/hugrenv-llvm-${HUGRVERSE_ARCH}.tar.gz"',
+    'tket_url="https://github.com/Quantinuum/hugrverse-env/releases/download/v0.3.1/hugrenv-tket-${HUGRVERSE_ARCH}.tar.gz"',
     'echo "Downloading HUGRVERSE environment from ${llvm_url} and ${tket_url}"',
     'curl -L $llvm_url | tar xz -C /tmp',
     'curl -L $tket_url | tar xz -C /tmp',
@@ -176,8 +176,8 @@ LLVM_SYS_211_PREFIX = '$RUNNER_TEMP\\hugrverse'
 TKET_C_API_PATH = '$RUNNER_TEMP\\hugrverse'
 [tool.cibuildwheel.windows]
 before-all = [
-    'curl -L -o hugrenv-llvm-win_amd64.tar.gz https://github.com/Quantinuum/hugrverse-env/releases/download/v0.3.0/hugrenv-llvm-win_amd64.tar.gz',
-    'curl -L -o hugrenv-tket-win_amd64.tar.gz https://github.com/Quantinuum/hugrverse-env/releases/download/v0.3.0/hugrenv-tket-win_amd64.tar.gz',
+    'curl -L -o hugrenv-llvm-win_amd64.tar.gz https://github.com/Quantinuum/hugrverse-env/releases/download/v0.3.1/hugrenv-llvm-win_amd64.tar.gz',
+    'curl -L -o hugrenv-tket-win_amd64.tar.gz https://github.com/Quantinuum/hugrverse-env/releases/download/v0.3.1/hugrenv-tket-win_amd64.tar.gz',
     # tar is awkward wrt windows paths, so use python
     '''python -c "import os, tarfile; d=os.environ['RUNNER_TEMP']; tarfile.open('hugrenv-llvm-win_amd64.tar.gz', 'r:gz').extractall(d)"''',
     '''python -c "import os, tarfile; d=os.environ['RUNNER_TEMP']; tarfile.open('hugrenv-tket-win_amd64.tar.gz', 'r:gz').extractall(d)"''',
