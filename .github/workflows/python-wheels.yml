@@ -131,12 +131,12 @@ jobs:
       - name: Install compliant tket1 and LLVM
         shell: bash
         run: |
-          mkdir -p $HUGRENV_ROOT
           extract_to="${{ matrix.platform.hugrenv.root }}"
-          # if windows, use cygpath
           if [[ "${{ matrix.platform.hugrenv.platform }}" == win* ]]; then
+            # use cygpath - tar doesn't like windows paths
             extract_to=$(cygpath -w "$extract_to")
           fi
+          mkdir -p "$extract_to"
           curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${{ matrix.platform.hugrenv.version }}/hugrenv-tket-${{ matrix.platform.hugrenv.platform }}.tar.gz \
             | tar xz -C $extract_to --strip-components=1
           curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${{ matrix.platform.hugrenv.version }}/hugrenv-llvm-${{ matrix.platform.hugrenv.platform }}.tar.gz \
