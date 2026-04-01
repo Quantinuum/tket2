@@ -66,55 +66,56 @@ jobs:
         #    to be built with zig.
         # - test-wheels: Whether to test installing the wheels.
         #    This is only done when the target platform matches the runner platform.
+        # - hugrenv: The configuration for the hugrverse environment to use for the build.
+        #    - platform: The platform string used in the hugrverse environment release artifacts.
+        #    - version: The version of the hugrverse environment to use.
+        #    - root: The root directory where the hugrverse environment will be extracted.
         #
         # Note that platform support is limited by the pytket wheels' availability.
         # Since we have it as a dependency, wheels built for other platforms will be unusable.
         platform:
           # ---------------- Linux
-          # aarch64 cross-compilation with maturin was causing linking issues
-          # (it doesn't seem to be using zig even though we set --zig)
-          # so it's temporarily disabled
           - runner: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
-            manylinux: "manylinux2014"
-            hugrenv-platform: "manylinux_2_28_aarch64"
-            hugrenv-version: "0.3.0"
-            hugrenv-root: "/tmp/hugrverse"
-            #- runner: ubuntu-24.04-arm
-            #  target: aarch64-unknown-linux-musl
-            #  manylinux: "musllinux_1_2"
-          - runner: ubuntu-24.04
-            target: x86_64-unknown-linux-gnu
-            hugrenv-platform: "manylinux_2_28_x86_64"
-            hugrenv-version: "0.3.0"
-            hugrenv-root: "/tmp/hugrverse"
+            hugrenv:
+              platform: "manylinux_2_28_aarch64"
+              version: "0.3.0"
+              root: "/tmp/hugrverse"
             manylinux: "manylinux_2_28"
             test-wheels: true
-            #- runner: ubuntu-24.04
-            #  target: x86_64-unknown-linux-musl
-            #  manylinux: "musllinux_1_2"
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            hugrenv:
+              platform: "manylinux_2_28_x86_64"
+              version: "0.3.0"
+              root: "/tmp/hugrverse"
+            manylinux: "manylinux_2_28"
+            test-wheels: true
           # ---------------- Mac
           - runner: macos-14
             target: aarch64-apple-darwin
-            hugrenv-platform: "macosx_15_0_aarch64"
-            hugrenv-version: "0.3.0"
-            hugrenv-root: "/tmp/hugrverse"
-            test-wheels: true
             macos-compatibility: "15.0"
+            test-wheels: true
+            hugrenv:
+              platform: "macosx_15_0_aarch64"
+              version: "0.3.0"
+              root: "/tmp/hugrverse"
           - runner: macos-15-intel
             target: x86_64-apple-darwin
-            hugrenv-platform: "macosx_15_0_x86_64"
-            hugrenv-version: "0.3.0"
-            hugrenv-root: "/tmp/hugrverse"
-            test-wheels: true
             macos-compatibility: "15.0"
+            test-wheels: true
+            hugrenv:
+              platform: "macosx_15_0_x86_64"
+              version: "0.3.0"
+              root: "/tmp/hugrverse"
           # ---------------- Windows
           - runner: windows-2025
             target: x86_64-pc-windows-msvc
-            hugrenv-platform: "win_amd64"
-            hugrenv-version: "0.3.0"
-            hugrenv-root: "C:\\hugrverse"
             test-wheels: true
+            hugrenv:
+              platform: "win_amd64"
+              version: "0.3.0"
+              root: "C:/hugrverse"
     steps:
       - uses: actions/checkout@v6
       - uses: mozilla-actions/sccache-action@v0.0.9
@@ -131,12 +132,17 @@ jobs:
         shell: bash
         run: |
           mkdir -p $HUGRENV_ROOT
-          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${{ matrix.platform.hugrenv-version }}/hugrenv-tket-${{ matrix.platform.hugrenv-platform }}.tar.gz \
-            | tar xz -C ${{ matrix.platform.hugrenv-root }} --strip-components=1
-          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${{ matrix.platform.hugrenv-version }}/hugrenv-llvm-${{ matrix.platform.hugrenv-platform }}.tar.gz \
-            | tar xz -C ${{ matrix.platform.hugrenv-root }} --strip-components=1
-          echo "TKET_C_API_PATH=${{ matrix.platform.hugrenv-root }}" >> "$GITHUB_ENV"
-          echo "LLVM_SYS_211_PREFIX=${{ matrix.platform.hugrenv-root }}" >> "$GITHUB_ENV"
+          extract_to="${{ matrix.platform.hugrenv.root }}"
+          # if windows, use cygpath
+          if [[ "${{ matrix.platform.hugrenv.platform }}" == win* ]]; then
+            extract_to=$(cygpath -w "$extract_to")
+          fi
+          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${{ matrix.platform.hugrenv.version }}/hugrenv-tket-${{ matrix.platform.hugrenv.platform }}.tar.gz \
+            | tar xz -C $extract_to --strip-components=1
+          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${{ matrix.platform.hugrenv.version }}/hugrenv-llvm-${{ matrix.platform.hugrenv.platform }}.tar.gz \
+            | tar xz -C $extract_to --strip-components=1
+          echo "TKET_C_API_PATH=${{ matrix.platform.hugrenv.root }}" >> "$GITHUB_ENV"
+          echo "LLVM_SYS_211_PREFIX=${{ matrix.platform.hugrenv.root }}" >> "$GITHUB_ENV"
 
       - uses: mlugg/setup-zig@v2
         if: ${{ matrix.platform.manylinux }}
@@ -230,7 +236,7 @@ jobs:
           echo "Testing the newly built ${{ matrix.platform.target }} wheels..."
           if [ "$TEST_INSTALL" = "true" ]; then
             # Make sure we only use the tket lib from the wheel itself
-            rm -rf ${{ matrix.platform.hugrenv-root }}
+            rm -rf ${{ matrix.platform.hugrenv.root }}
             uv run -f dist --with tket --refresh-package tket --no-project -- python -c "import tket"
           fi
           uvx twine check --strict dist/*
