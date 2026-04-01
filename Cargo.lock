@@ -1239,13 +1239,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hugr-passes"
-version = "0.26.1"
-dependencies = [
- "tket",
-]
-
-[[package]]
 name = "iana-time-zone"
 version = "0.1.65"
 source = "registry+https://github.com/rust-lang/crates.io-index"
