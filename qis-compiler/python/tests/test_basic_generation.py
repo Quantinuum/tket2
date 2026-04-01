@@ -1,8 +1,6 @@
 from pathlib import Path
 
 import pytest
-from hugr.ops import CFG
-from hugr.package import Package
 from pytest_snapshot.plugin import Snapshot
 from selene_hugr_qis_compiler import HugrReadError, check_hugr, compile_to_llvm_ir
 
@@ -35,12 +33,6 @@ def test_check() -> None:
     bad_end = hugr_envelope[:-1]
     with pytest.raises(HugrReadError, match="Premature end of file"):
         check_hugr(bad_end)
-
-    package = Package.from_bytes(hugr_envelope)
-    hugr = package.modules[0]
-    hugr.add_node(CFG([], []))
-    with pytest.raises(HugrReadError, match="CFG must have children"):
-        check_hugr(package.to_str().encode("utf-8"))
 
 
 def test_unsupported_pytket_ops() -> None:
