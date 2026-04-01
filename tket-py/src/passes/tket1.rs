@@ -34,7 +34,9 @@ pub(crate) fn tket1_pass(
         .with_config(qsystem_encoder_config())
         .with_subcircuits(scope.recursive());
 
-    let root = scope.root(&program.hugr).unwrap();
+    let Some(root) = scope.root(&program.hugr) else {
+        return Ok(());
+    };
 
     let mut encoded_circ = EncodedCircuit::new_with_entrypoint(&program.hugr, root, encode_options)
         .convert_pyerrs()?;
