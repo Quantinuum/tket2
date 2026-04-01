@@ -362,7 +362,7 @@ pub(crate) mod test {
         let hugr = mb.finish_hugr().unwrap();
 
         let c_usz = Value::from(ConstUsize::new(2));
-        let not_a_node = Node::from(portgraph::NodeIndex::new(0xDEADBEEF));
+        let not_a_node = Node::from(portgraph::NodeIndex::new(0xFFFF));
         assert!(!hugr.contains_node(not_a_node));
         let dce = DeadCodeElimPass::default().with_entry_points([not_a_node]);
         let cfold = ConstantFoldPass::default().with_inputs(id2.node(), [(0, c_usz.clone())]);

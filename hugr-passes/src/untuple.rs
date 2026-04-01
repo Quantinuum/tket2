@@ -78,10 +78,11 @@ fn find_rewrites<H: HugrView>(
     let mut children_queue = VecDeque::new();
     children_queue.push_back(parent);
 
-    // Required to create SimpleReplacements.
-    let mut convex_checker: Option<TopoConvexChecker<H>> = None;
-
     while let Some(parent) = children_queue.pop_front() {
+        // Required to create SimpleReplacements.
+        // Reset for each parent as `TopoConvexChecker` is tied to a specific parent node.
+        let mut convex_checker: Option<TopoConvexChecker<H>> = None;
+
         for node in hugr.children(parent) {
             let op = hugr.get_optype(node);
             if let Some(rw) = make_rewrite(hugr, &mut convex_checker, node, op) {

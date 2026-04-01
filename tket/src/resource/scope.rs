@@ -603,7 +603,7 @@ fn toposort_subgraph<'h, H: HugrView>(
         .map(|&n| pg_map.to_portgraph(n))
         .collect();
 
-    let pg: NodeFiltered<_, NodeFilter<_>, _> =
+    let pg: NodeFiltered<_, NodeFilter<_, _>, _> =
         FilteredGraph::new(&pg, contains_node, |_, _| true, &subgraph_nodes);
     let topo: TopoSort<_> = toposort(
         pg,

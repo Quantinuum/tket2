@@ -1661,21 +1661,13 @@ fn test_module() -> Result<(), Box<dyn std::error::Error>> {
 /// Check that opaque constants don't cause panics when they fail to be folded.
 //
 // TODO: Add tests for RotationOp once this is moved to the tket crate.
-//
-// TODO: The cases marked with `should_panic` should be fixed once
-//<https://github.com/Quantinuum/hugr/pull/2986> is merged and released.
+// <https://github.com/Quantinuum/tket2/pull/1487>
 #[rstest]
-#[should_panic]
 #[case::float_fsub(FloatOps::fsub)]
-#[should_panic]
 #[case::float_fadd(FloatOps::fadd)]
-#[should_panic]
 #[case::float_fmul(FloatOps::fmul)]
-#[should_panic]
 #[case::float_fdiv(FloatOps::fdiv)]
-#[should_panic]
 #[case::float_fneg(FloatOps::fneg)]
-#[should_panic]
 #[case::float_fabs(FloatOps::fabs)]
 #[case::logic_and(LogicOp::And)]
 #[case::logic_or(LogicOp::Or)]
@@ -1688,21 +1680,14 @@ fn test_module() -> Result<(), Box<dyn std::error::Error>> {
 #[case::convert_convert_u(ConvertOpDef::convert_u.with_log_width(5))]
 #[case::convert_convert_s(ConvertOpDef::convert_s.with_log_width(5))]
 #[case::convert_itobool(ConvertOpDef::itobool.without_log_width())]
-#[should_panic]
 #[case::convert_ifrombool(ConvertOpDef::ifrombool.without_log_width())]
 #[case::convert_itostring_u(ConvertOpDef::itostring_u.with_log_width(5))]
 #[case::convert_itostring_s(ConvertOpDef::itostring_s.with_log_width(5))]
-#[should_panic]
 #[case::list_pop(ListOp::pop.with_type(bool_t()).to_extension_op().unwrap())]
-#[should_panic]
 #[case::list_push(ListOp::push.with_type(bool_t()).to_extension_op().unwrap())]
-#[should_panic]
 #[case::list_get(ListOp::get.with_type(bool_t()).to_extension_op().unwrap())]
-#[should_panic]
 #[case::list_set(ListOp::set.with_type(bool_t()).to_extension_op().unwrap())]
-#[should_panic]
 #[case::list_insert(ListOp::insert.with_type(bool_t()).to_extension_op().unwrap())]
-#[should_panic]
 #[case::list_length(ListOp::length.with_type(bool_t()).to_extension_op().unwrap())]
 fn test_opaque_consts(#[case] op: impl Into<OpType>) {
     let op = op.into();
