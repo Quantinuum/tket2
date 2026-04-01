@@ -62,12 +62,6 @@ pub mod nest_cfgs;
 
 // Find and localize non-local edges.
 pub mod non_local;
-#[deprecated(
-    note = "Use LocalizeEdgesPass::check_no_nonlocal_edges",
-    since = "0.26.0"
-)]
-#[expect(deprecated)]
-pub use non_local::ensure_no_nonlocal_edges;
 
 // CFG normalization (merge blocks, simplify control flow).
 pub mod normalize_cfgs;
