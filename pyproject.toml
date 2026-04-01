@@ -16,13 +16,14 @@ dev = [
     "pip >=25",
     # Pyyaml 0.6.0 makes setuptools fail. This ensures we're using a newer version.
     "pyyaml >=6.0.2",
+    "hugr>=0.16"
 ]
 
 [tool.uv]
 prerelease = "explicit"
 
 [tool.uv.sources]
-hugr = { git = "https://github.com/quantinuum/hugr", subdirectory = "hugr-py", rev = "31c28154" }
+#hugr = { git = "https://github.com/quantinuum/hugr", subdirectory = "hugr-py", rev = "31c28154" }
 
 
 [build-system]

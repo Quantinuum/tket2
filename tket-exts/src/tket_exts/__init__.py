@@ -90,5 +90,5 @@ def tket_registry() -> ExtensionRegistry:
 
     registry = ExtensionRegistry()
     for ext in tket_exts:
-        registry.add_extension(ext())
+        registry.register(ext())
     return registry

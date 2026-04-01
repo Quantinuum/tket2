@@ -78,8 +78,8 @@ class CompilationState:
             py_extensions = res.used_extensions
             extensions = [
                 ext
-                for id, ext in res.used_extensions.extensions.items()
-                if id not in embedded
+                for ext in res.used_extensions.extensions
+                if ext.name not in embedded
             ]
             # Wrap the hugr in a package with the non-standard extensions.
             package = Package(modules=[hugr], extensions=extensions)
