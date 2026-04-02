@@ -210,6 +210,7 @@ jobs:
         shell: bash
         run: |
           echo "Repairing macOS wheels with delocate..."
+          export DYLD_LIBRARY_PATH="${{ matrix.platform.hugrenv.root }}/lib:${{ matrix.platform.hugrenv.root }}/lib64:$DYLD_LIBRARY_PATH"
           ls -lh dist || true
           MAC_WHEELS=$(ls dist/*macosx*.whl 2>/dev/null || true)
           if [ -z "$MAC_WHEELS" ]; then
