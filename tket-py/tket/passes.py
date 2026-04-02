@@ -110,7 +110,7 @@ class NormalizeGuppy(ComposablePass):
             copy_call=lambda h: self._normalize(h, inplace),
         )
 
-    def with_scope(self, _scope: PassScope) -> ComposablePass:
+    def with_scope(self, _scope: PassScope) -> NormalizeGuppy:
         """Set the scope of this pass and return self."""
         self._scope = _scope
         return self
