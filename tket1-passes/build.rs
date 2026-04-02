@@ -214,8 +214,10 @@ fn cargo_set_custom_lib_path(search_path: &[PathBuf]) {
     let lib_name = "tket-c-api";
     println!("cargo:rustc-link-lib={lib_name}");
 
-    // If on windows, also link tket itself
     if cfg!(target_os = "windows") {
+        // If on windows, also link tket and symengine, as we're
+        // providing static libs
         println!("cargo:rustc-link-lib=tket");
+        println!("cargo:rustc-link-lib=symengine");
     }
 }

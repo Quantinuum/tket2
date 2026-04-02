@@ -425,10 +425,11 @@ jobs:
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
       - uses: extractions/setup-just@v3
-      - name: Install tket-c-api library
-        uses: ./.github/actions/tket-c-api
-        with:
-          install-path: ${{ env.TKET_C_API_PATH }}
+      - name: Install compliant tket1 and LLVM
+        run: |
+          mkdir -p $HUGRENV_ROOT
+          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-tket-${HUGRENV_PLATFORM}.tar.gz \
+            | tar xz -C $HUGRENV_ROOT --strip-components=1
       - name: Generate the updated definitions
         run: just gen-extensions
       - name: Check if the declarations are up to date
