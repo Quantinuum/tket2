@@ -30,7 +30,7 @@ type NodeOutputs<V, N> = Vec<(OutgoingPort, PV<V, N>)>;
 ///    [`FuncDefn`](OpType::FuncDefn) to set all inputs to [`PartialValue::Top`].
 /// 3. Call [`Self::run`] to produce [`AnalysisResults`]
 pub struct Machine<H: HugrView, V: AbstractValue> {
-    hugr: H,
+    pub(super) hugr: H,
     in_wire_proto: HashMap<H::Node, NodeInputs<V, H::Node>>,
     out_wire_proto: HashMap<H::Node, NodeOutputs<V, H::Node>>,
 }
@@ -106,7 +106,9 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
         Ok(())
     }
 
-    /// Run the analysis (iterate until a lattice fixpoint is reached).
+    /// Run the analysis (iterate until a lattice fixpoint is reached)
+    /// and return results for the entrypoint-subtree.
+    ///
     /// As a shortcut, for Hugrs whose [HugrView::entrypoint] is a
     /// [`FuncDefn`](OpType::FuncDefn), [CFG](OpType::CFG), [DFG](OpType::DFG),
     /// [Conditional](OpType::Conditional) or [`TailLoop`](OpType::TailLoop) only
@@ -117,9 +119,15 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
     ///
     /// The context passed in allows interpretation of leaf operations.
     ///
+    /// See also [`Self::run_subtree`] for running the analysis on an arbitrary subtree.
+    ///
     /// # Panics
     /// May panic in various ways if the Hugr is invalid;
     /// or if any `in_values` are provided for a module-rooted Hugr.
+    #[deprecated(
+        note = "Use `run_subtree` and `prepopulate_wire` / `prepopulate_inputs` instead",
+        since = "0.18.0"
+    )]
     pub fn run(
         mut self,
         context: impl DFContext<V, Node = H::Node>,
@@ -141,9 +149,22 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
                 self.prepopulate_inputs(ep, p).unwrap();
             }
         }
+        let ep = self.hugr.entrypoint();
+        self.run_subtree(context, ep)
+    }
+
+    /// Run the analysis (iterate until a lattice fixpoint is reached).
+    ///
+    /// Return results only for the given subtree.
+    pub fn run_subtree(
+        self,
+        context: impl DFContext<V, Node = H::Node>,
+        root: H::Node,
+    ) -> AnalysisResults<V, H> {
         run_datalog(
             context,
             self.hugr,
+            root,
             self.in_wire_proto
                 .into_iter()
                 .flat_map(|(n, vals)| vals.into_iter().map(move |(ip, v)| (n, ip, v)))
@@ -162,6 +183,7 @@ type OutWire<V, N> = (N, OutgoingPort, PartialValue<V, N>);
 fn run_datalog<V: AbstractValue, H: HugrView>(
     mut ctx: impl DFContext<V, Node = H::Node>,
     hugr: H,
+    result_root: H::Node,
     in_wire_value_proto: Vec<InWire<V, H::Node>>,
     out_wire_value_proto: Vec<OutWire<V, H::Node>>,
 ) -> AnalysisResults<V, H> {
@@ -184,10 +206,9 @@ fn run_datalog<V: AbstractValue, H: HugrView>(
         lattice in_wire_value(H::Node, IncomingPort, PV<V, H::Node>); // <Node> receives, on <IncomingPort>, the value <PV>
         lattice node_in_value_row(H::Node, ValueRow<V, H::Node>); // <Node>'s inputs are <ValueRow>
 
-        // Analyse all nodes as this will compute the most accurate results for the desired nodes
-        // (i.e. the entry_descendants). Moreover, this is the only sound policy until we correctly
-        // mark incoming edges as `Top`, see https://github.com/CQCL/hugr/issues/2254), so is a
-        // workaround for that.
+        // Analyse all nodes as this will compute the most accurate results for the desired nodes.
+        // Moreover, this is the only sound policy until we correctly mark incoming edges at `Top`,
+        // see https://github.com/CQCL/hugr/issues/2254), so is a workaround for that.
         // When that issue is solved, we can consider a flag to restrict analysis to the subregion
         // (for efficiency - will still decrease accuracy of solutions, but will at least be safe).
         node(n) <-- for n in hugr.nodes();
@@ -392,11 +413,12 @@ fn run_datalog<V: AbstractValue, H: HugrView>(
             if matches!(v, PartialValue::Top | PartialValue::Value(_)),
             for p in ci.signature().output_ports();
     };
-    let entry_descs = hugr.entry_descendants().collect::<HashSet<_>>();
+    let filter_nodes = (result_root != hugr.module_root())
+        .then_some(hugr.descendants(result_root).collect::<HashSet<_>>());
     let out_wire_values = all_results
         .out_wire_value
         .iter()
-        .filter(|(n, _, _)| entry_descs.contains(n))
+        .filter(|(n, _, _)| filter_nodes.as_ref().is_none_or(|f| f.contains(n)))
         .map(|(n, p, v)| (Wire::new(*n, *p), v.clone()))
         .collect();
     AnalysisResults {
@@ -405,17 +427,17 @@ fn run_datalog<V: AbstractValue, H: HugrView>(
         in_wire_value: all_results
             .in_wire_value
             .into_iter()
-            .filter(|(n, _, _)| entry_descs.contains(n))
+            .filter(|(n, _, _)| filter_nodes.as_ref().is_none_or(|f| f.contains(n)))
             .collect(),
         case_reachable: all_results
             .case_reachable
             .into_iter()
-            .filter(|(_, n)| entry_descs.contains(n))
+            .filter(|(_, n)| filter_nodes.as_ref().is_none_or(|f| f.contains(n)))
             .collect(),
         bb_reachable: all_results
             .bb_reachable
             .into_iter()
-            .filter(|(_, n)| entry_descs.contains(n))
+            .filter(|(_, n)| filter_nodes.as_ref().is_none_or(|f| f.contains(n)))
             .collect(),
     }
 }
