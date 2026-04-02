@@ -18,8 +18,8 @@ use hugr_core::ops::{
 };
 use hugr_core::{Direction, Hugr, HugrView, Node, OutgoingPort, PortIndex};
 
-use crate::composable::WithScope;
-use crate::{ComposablePass, PassScope};
+use crate::passes::composable::WithScope;
+use crate::passes::{ComposablePass, PassScope};
 
 /// Merge any basic blocks that are direct children of the specified [`CFG`]-entrypoint
 /// Hugr.
@@ -538,7 +538,7 @@ mod test {
     use hugr_core::{Extension, HugrView, const_extension_ids, type_row};
 
     use super::{NormalizeCFGPass, NormalizeCFGResult, merge_basic_blocks, normalize_cfg};
-    use crate::ComposablePass;
+    use crate::passes::ComposablePass;
 
     const_extension_ids! {
         const EXT_ID: ExtensionId = "TestExt";
@@ -850,7 +850,7 @@ mod test {
         else {
             panic!("Unexpected result");
         };
-        assert_eq!(entry_nodes_moved, []);
+        assert!(entry_nodes_moved.is_empty());
         assert_eq!(
             h.children(h.entrypoint())
                 .map(|n| h.get_optype(n).tag())

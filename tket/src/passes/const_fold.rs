@@ -1,5 +1,5 @@
 //! Constant-folding pass.
-//! An (example) use of the [dataflow analysis framework](super::dataflow).
+//! An (example) use of the [dataflow analysis framework](crate::passes::dataflow).
 
 pub mod value_handle;
 use std::{collections::HashMap, sync::Arc};
@@ -15,12 +15,12 @@ use hugr_core::{
 };
 use value_handle::ValueHandle;
 
-use crate::composable::{ComposablePass, PassScope, WithScope};
-use crate::dataflow::{
+use crate::passes::composable::{ComposablePass, PassScope, WithScope};
+use crate::passes::dataflow::{
     ConstLoader, ConstLocation, DFContext, Machine, PartialValue, TailLoopTermination,
     partial_from_const,
 };
-use crate::dead_code::{DeadCodeElimError, DeadCodeElimPass, PreserveNode};
+use crate::passes::dead_code::{DeadCodeElimError, DeadCodeElimPass, PreserveNode};
 
 #[derive(Debug, Clone, Default)]
 /// A configuration for the Constant Folding pass.

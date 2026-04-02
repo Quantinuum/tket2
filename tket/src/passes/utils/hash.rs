@@ -172,8 +172,8 @@ pub enum HashError {
 
 #[cfg(test)]
 mod test {
-    use crate::utils::build_simple_hugr;
-    use crate::utils::test_quantum_extension::{cx_gate, h_gate};
+    use crate::passes::test_utils::build_simple_hugr;
+    use crate::passes::test_utils::test_quantum_extension::{cx_gate, h_gate};
     use hugr_core::builder::{Dataflow, DataflowSubContainer};
 
     use super::*;

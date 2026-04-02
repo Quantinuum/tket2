@@ -25,7 +25,7 @@ use hugr_core::{Visibility, type_row};
 
 use itertools::Itertools;
 
-use crate::mangle_name;
+use crate::passes::mangle_name;
 
 use super::{
     CallbackHandler, LinearizeError, Linearizer, NodeTemplate, ReplaceTypes, ReplaceTypesError,
@@ -511,7 +511,7 @@ mod test {
         types::Signature,
     };
 
-    use crate::replace_types::{DelegatingLinearizer, Linearizer};
+    use crate::passes::replace_types::{DelegatingLinearizer, Linearizer};
 
     #[test]
     fn test_borrow_array_discard() {

@@ -6,7 +6,6 @@ resolver = "2"
 members = [
     "badger-optimiser",
     "compile-rewriter",
-    "hugr-passes",
     "qis-compiler",
     "tket",
     "tket1-passes",
@@ -14,7 +13,7 @@ members = [
     "tket-qsystem",
     "tket-qec",
 ]
-default-members = ["tket", "tket-qsystem", "hugr-passes"]
+default-members = ["tket", "tket-qsystem"]
 
 [workspace.package]
 rust-version = "1.91"

@@ -20,17 +20,17 @@ use hugr::std_extensions::collections::{
 use hugr::std_extensions::logic::LogicOp;
 use hugr::types::{SumType, Term, Type};
 use hugr::{Hugr, Node, Wire, hugr::hugrmut::HugrMut, type_row};
-use hugr_passes::PassScope;
-use hugr_passes::composable::WithScope;
-use hugr_passes::non_local::LocalizeEdges;
-use hugr_passes::replace_types::{Linearizer, NodeTemplate, ReplaceTypesError};
-use hugr_passes::{ComposablePass, ReplaceTypes, non_local::FindNonLocalEdgesError};
 use static_array::{ReplaceStaticArrayBoolPass, ReplaceStaticArrayBoolPassError};
 use tket::TketOp;
 use tket::extension::{
     bool::{BoolOp, ConstBool, bool_type},
     guppy::{DROP_OP_NAME, GUPPY_EXTENSION},
 };
+use tket::passes::PassScope;
+use tket::passes::composable::WithScope;
+use tket::passes::non_local::LocalizeEdges;
+use tket::passes::replace_types::{Linearizer, NodeTemplate, ReplaceTypesError};
+use tket::passes::{ComposablePass, ReplaceTypes, non_local::FindNonLocalEdgesError};
 
 use crate::extension::{
     futures::{FutureOp, FutureOpBuilder, FutureOpDef, future_type},

@@ -28,7 +28,7 @@ use super::{NodeTemplate, ParametricType};
 /// would be a specific instantiation of the function for the
 /// type-that-becomes-linear, into which copy/discard can be inserted.
 ///
-/// [monomorphization]: crate::MonomorphizePass
+/// [monomorphization]: crate::passes::MonomorphizePass
 /// [Copyable]: hugr_core::types::TypeBound::Copyable
 pub trait Linearizer {
     /// Insert copy or discard operations (as appropriate) enough to wire `src`
@@ -200,9 +200,7 @@ impl DelegatingLinearizer {
     /// * [`LinearizeError::CopyableType`] If `typ` is
     ///   [Copyable](hugr_core::types::TypeBound::Copyable)
     /// * [`LinearizeError::WrongSignature`] if `copy` or `discard` do not have the expected
-    ///   inputs or outputs (for [`NodeTemplate::SingleOp`] and [`NodeTemplate::CompoundOp`]
-    ///   only: the signature for a [`NodeTemplate::Call`] cannot be checked until it is used
-    ///   in a Hugr).
+    ///   inputs or outputs.
     pub fn register_simple(
         &mut self,
         cty: CustomType,
@@ -397,9 +395,11 @@ mod test {
     use itertools::Itertools;
     use rstest::rstest;
 
-    use crate::replace_types::handlers::{DISCARD_TO_UNIT_PREFIX, MAKE_NONE_PREFIX, UNWRAP_PREFIX};
-    use crate::replace_types::{LinearizeError, Linearizer, NodeTemplate, ReplaceTypesError};
-    use crate::{ComposablePass, ReplaceTypes};
+    use crate::passes::replace_types::handlers::{MAKE_NONE_PREFIX, UNWRAP_PREFIX};
+    use crate::passes::replace_types::{
+        LinearizeError, Linearizer, NodeTemplate, ReplaceTypesError,
+    };
+    use crate::passes::{ComposablePass, ReplaceTypes};
 
     const LIN_T: &str = "Lin";
     const COPY_T: &str = "Copy";
@@ -711,7 +711,7 @@ mod test {
     }
 
     #[rstest]
-    fn call_in_array(#[values(true, false)] use_linking: bool) {
+    fn call_in_array() {
         let (e, _) = ext_lowerer();
         let lin_ct = e.get_type(LIN_T).unwrap().instantiate([]).unwrap();
         let lin_t: Type = lin_ct.clone().into();
@@ -739,42 +739,30 @@ mod test {
         let backup = dfb.finish_hugr().unwrap();
 
         let mut lower_discard_to_call = ReplaceTypes::default();
-        if use_linking {
-            lower_discard_to_call
-                .linearizer_mut()
-                .register_simple(
-                    lin_ct.clone(),
-                    NodeTemplate::CompoundOp(Box::new({
-                        // Not a valid Hugr, but won't be used
-                        std::mem::take(
-                            DFGBuilder::new(inout_sig([lin_t.clone()], vec![lin_t.clone(); 2]))
-                                .unwrap()
-                                .hugr_mut(),
-                        )
-                    })),
-                    NodeTemplate::linked_hugr({
-                        let mut dfb = DFGBuilder::new(inout_sig([lin_t.clone()], [])).unwrap();
-                        let drop_fn = dfb
-                            .module_root_builder()
-                            .declare("drop", inout_sig([lin_t.clone()], []).into())
-                            .unwrap();
-                        let ins = dfb.input_wires();
-                        let call = dfb.call(&drop_fn, &[], ins).unwrap();
-                        dfb.finish_hugr_with_outputs(call.outputs()).unwrap()
-                    }),
-                )
-                .unwrap();
-        } else {
-            #[expect(deprecated)] // Remove use_linking==false case along with NodeTemplate::Call
-            lower_discard_to_call
-                .linearizer_mut()
-                .register_simple(
-                    lin_ct.clone(),
-                    NodeTemplate::Call(backup.entrypoint(), vec![]), // Arbitrary, unused
-                    NodeTemplate::Call(discard_fn, vec![]),
-                )
-                .unwrap();
-        };
+        lower_discard_to_call
+            .linearizer_mut()
+            .register_simple(
+                lin_ct.clone(),
+                NodeTemplate::CompoundOp(Box::new({
+                    // Not a valid Hugr, but won't be used
+                    std::mem::take(
+                        DFGBuilder::new(inout_sig([lin_t.clone()], vec![lin_t.clone(); 2]))
+                            .unwrap()
+                            .hugr_mut(),
+                    )
+                })),
+                NodeTemplate::linked_hugr({
+                    let mut dfb = DFGBuilder::new(inout_sig([lin_t.clone()], [])).unwrap();
+                    let drop_fn = dfb
+                        .module_root_builder()
+                        .declare("drop", inout_sig([lin_t.clone()], []).into())
+                        .unwrap();
+                    let ins = dfb.input_wires();
+                    let call = dfb.call(&drop_fn, &[], ins).unwrap();
+                    dfb.finish_hugr_with_outputs(call.outputs()).unwrap()
+                }),
+            )
+            .unwrap();
         // Ok to lower usize_t to lin_t and call that function
         {
             let mut lowerer = lower_discard_to_call.clone();
@@ -791,36 +779,8 @@ mod test {
         );
         let mut h = backup.clone();
         let r = lower_discard_to_call.run(&mut h);
-        if use_linking {
-            r.unwrap();
-            h.validate().unwrap();
-        } else {
-            // Without linking, the Call node to the function discarding the array<lin_t> is
-            // inside a nested Hugr (hidden here, built by the array linearization helper)
-            // that does not define "drop".
-            // So, we might expect a LinearizeError in building that nested Hugr.
-            // However, by (bad) luck the target Node of the call identifies,
-            // in the nested Hugr, the Lin->() function being built, which makes
-            // a legal Hugr (the unit outport can have zero edges).
-            // Of course this would loop forever at runtime!
-            r.unwrap();
-            h.validate().unwrap();
-            let disc = h
-                .children(h.module_root())
-                .find(|n| {
-                    h.get_optype(*n)
-                        .as_func_defn()
-                        .is_some_and(|fd| fd.func_name().contains(DISCARD_TO_UNIT_PREFIX))
-                })
-                .unwrap();
-            let call = h
-                .descendants(disc)
-                .filter(|n| h.get_optype(*n).is_call())
-                .exactly_one()
-                .ok()
-                .unwrap();
-            assert_eq!(h.static_source(call), Some(disc)); // Ooops.
-        }
+        r.unwrap();
+        h.validate().unwrap();
     }
 
     #[test]

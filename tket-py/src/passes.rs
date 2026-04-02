@@ -8,10 +8,10 @@ pub(crate) use scope::PyPassScope;
 
 use std::{cmp::min, convert::TryInto, fs, num::NonZeroUsize, path::PathBuf};
 
-use hugr_passes::composable::{ComposablePass, WithScope};
 use pyo3::prelude::*;
 use tket::optimiser::badger::BadgerOptions;
 use tket::passes;
+use tket::passes::composable::{ComposablePass, WithScope};
 use tket::{Circuit, TketOp, op_matches};
 
 use crate::optimiser::PyBadgerOptimiser;

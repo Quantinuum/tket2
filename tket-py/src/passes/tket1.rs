@@ -1,8 +1,8 @@
 //! Passes that call to tket1-passes using the tket-c-api.
 
-use hugr_passes::PassScope;
 use rayon::iter::ParallelIterator;
 use std::sync::Arc;
+use tket::passes::composable::PassScope;
 
 use crate::passes::PyPassScope;
 use pyo3::prelude::*;

@@ -1,9 +1,8 @@
 //! Bindings for pass scopes.
 
-use hugr_passes::PassScope;
-use hugr_passes::composable::Preserve;
 use pyo3::prelude::*;
 use pyo3::types::PyAnyMethods;
+use tket::passes::composable::{PassScope, Preserve};
 
 #[derive(Debug, Default, Clone, derive_more::From, derive_more::Into)]
 pub(crate) struct PyPassScope {

@@ -63,7 +63,7 @@ jobs:
       - name: Test with Miri
         run: |
           cargo miri nextest run --no-default-features -- \
-            `# -------- hugr-passes` \
+            `# -------- tket::passes` \
             --skip "dataflow::partial_value::test::bounded_lattice" \
             --skip "dataflow::partial_value::test::lattice" \
             --skip "dataflow::partial_value::test::lattice_associative" \

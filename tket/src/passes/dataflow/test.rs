@@ -48,7 +48,9 @@ impl<N> AsConcrete<Void, N> for Value {
         Self::sum(value.tag, value.values, value.st)
     }
 
-    fn from_func(func: LoadedFunction<N>) -> Result<Self, crate::dataflow::LoadedFunction<N>> {
+    fn from_func(
+        func: LoadedFunction<N>,
+    ) -> Result<Self, crate::passes::dataflow::LoadedFunction<N>> {
         Err(func)
     }
 }

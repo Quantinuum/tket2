@@ -6,8 +6,8 @@ use hugr_core::{
     types::{EdgeKind, Type},
 };
 
-use crate::composable::WithScope;
-use crate::{ComposablePass, PassScope, composable::Preserve};
+use crate::passes::composable::WithScope;
+use crate::passes::{ComposablePass, PassScope, composable::Preserve};
 
 mod localize;
 use localize::ExtraSourceReqs;
@@ -88,7 +88,7 @@ impl WithScope for LocalizeEdges {
     }
 }
 
-/// An error from [ensure_no_nonlocal_edges]
+/// An error from [LocalizeEdges]
 #[derive(Clone, derive_more::Error, derive_more::Display, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum FindNonLocalEdgesError<N> {
@@ -96,14 +96,6 @@ pub enum FindNonLocalEdgesError<N> {
     #[display("Found {} nonlocal edges", _0.len())]
     #[error(ignore)] // Vec not convertible
     Edges(Vec<(N, IncomingPort)>),
-}
-
-/// Verifies that there are no non local value edges in the Hugr beneath the entrypoint.
-#[deprecated(note = "Use LocalizeEdges::check_no_nonlocal_edges", since = "0.26.0")]
-pub fn ensure_no_nonlocal_edges<H: HugrView>(
-    hugr: &H,
-) -> Result<(), FindNonLocalEdgesError<H::Node>> {
-    LocalizeEdges::new_for_hugr(hugr).check_no_nonlocal_edges(hugr)
 }
 
 impl LocalizeEdges {
@@ -175,7 +167,7 @@ mod test {
         types::Signature,
     };
 
-    use crate::composable::WithScope;
+    use crate::passes::composable::WithScope;
 
     use super::*;
 

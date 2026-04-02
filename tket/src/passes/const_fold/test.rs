@@ -28,9 +28,9 @@ use hugr_core::{Hugr, HugrView, IncomingPort, Node, Visibility, type_row};
 use itertools::Itertools;
 use rstest::rstest;
 
-use crate::ComposablePass as _;
-use crate::composable::{PassScope, Preserve, ValidatingPass, WithScope};
-use crate::dataflow::{DFContext, PartialValue, partial_from_const};
+use crate::passes::ComposablePass as _;
+use crate::passes::composable::{PassScope, Preserve, ValidatingPass, WithScope};
+use crate::passes::dataflow::{DFContext, PartialValue, partial_from_const};
 
 use super::{ConstFoldContext, ConstantFoldPass, ValueHandle};
 

@@ -1239,27 +1239,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hugr-passes"
-version = "0.26.1"
-dependencies = [
- "ascent",
- "criterion",
- "derive_more 2.1.1",
- "fxhash",
- "hugr-core",
- "itertools 0.14.0",
- "pastey",
- "petgraph 0.8.3",
- "portgraph 0.16.0",
- "proptest",
- "proptest-recurse",
- "rstest",
- "serde_json",
- "strum",
- "thiserror 2.0.18",
-]
-
-[[package]]
 name = "iana-time-zone"
 version = "0.1.65"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2404,7 +2383,6 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "cbindgen",
- "hugr-passes",
  "insta",
  "itertools 0.14.0",
  "pyo3",
@@ -2828,6 +2806,7 @@ name = "tket"
 version = "0.17.0"
 dependencies = [
  "anyhow",
+ "ascent",
  "bytemuck",
  "cgmath",
  "chrono",
@@ -2840,18 +2819,20 @@ dependencies = [
  "fxhash",
  "hugr",
  "hugr-core",
- "hugr-passes",
  "indexmap 2.13.0",
  "insta",
  "itertools 0.14.0",
  "lazy_static",
  "num-rational",
+ "pastey",
  "pest",
  "pest_derive",
  "petgraph 0.8.3",
  "portgraph 0.16.0",
  "portmatching",
  "priority-queue",
+ "proptest",
+ "proptest-recurse",
  "rayon",
  "rmp-serde",
  "rstest",
@@ -2860,6 +2841,7 @@ dependencies = [
  "serde_with",
  "smol_str",
  "strum",
+ "thiserror 2.0.18",
  "tket-json-rs",
  "tracing",
  "typetag",
@@ -2889,7 +2871,6 @@ dependencies = [
  "cool_asserts",
  "derive_more 2.1.1",
  "hugr",
- "hugr-passes",
  "itertools 0.14.0",
  "num_cpus",
  "portmatching",
@@ -2927,7 +2908,6 @@ dependencies = [
  "hugr",
  "hugr-cli",
  "hugr-core",
- "hugr-passes",
  "indexmap 2.13.0",
  "itertools 0.14.0",
  "lazy_static",

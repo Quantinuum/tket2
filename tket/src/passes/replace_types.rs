@@ -29,8 +29,8 @@ use hugr_core::types::{
 };
 use hugr_core::{Direction, Hugr, HugrView, Node, PortIndex, Visibility, Wire};
 
-use crate::composable::WithScope;
-use crate::{ComposablePass, PassScope};
+use crate::passes::composable::WithScope;
+use crate::passes::{ComposablePass, PassScope};
 
 mod linearize;
 pub use linearize::{CallbackHandler, DelegatingLinearizer, LinearizeError, Linearizer};
@@ -57,18 +57,12 @@ pub enum NodeTemplate {
     ///
     /// It is **recommended** to use [Self::LinkedHugr] instead.
     ///
-    /// [monomorphization]: crate::MonomorphizePass
+    /// [monomorphization]: crate::passes::MonomorphizePass
     CompoundOp(Box<Hugr>),
     /// Defines a sub-Hugr to insert, whose entrypoint becomes (or replaces) the desired Node.
     /// Other children of the Hugr reachable from the entrypoint will also be inserted
     /// according to the specified linking policy.
     LinkedHugr(Box<Hugr>, NameLinkingPolicy),
-    /// A Call to an existing function.
-    #[deprecated(
-        note = "Use LinkedHugr with Call entrypoint and FuncDecl",
-        since = "0.24.4"
-    )]
-    Call(Node, Vec<TypeArg>),
 }
 
 impl NodeTemplate {
@@ -126,12 +120,6 @@ impl NodeTemplate {
     ///
     /// * If `parent` is not in the `hugr`
     ///
-    /// # Errors
-    ///
-    /// * If `self` is a [`Self::Call`] and the target Node either
-    ///    * is neither a [`FuncDefn`] nor a [`FuncDecl`]
-    ///    * has a [`signature`] which the type-args of the [`Self::Call`] do not match
-    ///
     /// [`signature`]: hugr_core::types::PolyFuncType
     /// [`FuncDecl`]: hugr_core::ops::FuncDecl
     /// [`FuncDefn`]: hugr_core::ops::FuncDefn
@@ -148,14 +136,6 @@ impl NodeTemplate {
             NodeTemplate::LinkedHugr(h, pol) => {
                 Ok(hugr.insert_link_hugr(parent, *h, &pol)?.inserted_entrypoint)
             }
-            #[expect(deprecated)] // remove together
-            NodeTemplate::Call(target, type_args) => {
-                let c = call(hugr, target, type_args)?;
-                let tgt_port = c.called_function_port();
-                let n = hugr.add_node_with_parent(parent, c);
-                hugr.connect(target, 0, n, tgt_port);
-                Ok(n)
-            }
         }
     }
 
@@ -169,15 +149,6 @@ impl NodeTemplate {
             NodeTemplate::SingleOp(opty) => dfb.add_dataflow_op(opty, inputs),
             NodeTemplate::CompoundOp(h) => dfb.add_hugr_with_wires(*h, inputs),
             NodeTemplate::LinkedHugr(h, pol) => dfb.add_link_hugr_with_wires(*h, &pol, inputs),
-            #[expect(deprecated)] // remove together
-            // Really we should check whether func points at a FuncDecl or FuncDefn and create
-            // the appropriate variety of FuncID but it doesn't matter for the purpose of making a Call.
-            NodeTemplate::Call(func, type_args) => {
-                if !dfb.hugr().contains_node(func) {
-                    return Err(BuildError::NodeNotFound { node: func });
-                }
-                dfb.call(&FuncID::<true>::from(func), &type_args, inputs)
-            }
         }
     }
 
@@ -251,12 +222,6 @@ impl NodeTemplate {
                 }
                 (root_opty, static_source, static_inport)
             }
-            #[expect(deprecated)] // remove together
-            NodeTemplate::Call(func, type_args) => {
-                let c = call(hugr, func, type_args).map_err(ef)?;
-                let called_func_port = c.called_function_port();
-                (c.into(), Some(func), Some(called_func_port))
-            }
         };
         *hugr.optype_mut(n) = new_optype;
         if let Some(static_inport) = static_inport {
@@ -278,8 +243,6 @@ impl NodeTemplate {
             NodeTemplate::SingleOp(op_type) => op_type,
             NodeTemplate::CompoundOp(hugr) => hugr.entrypoint_optype(),
             NodeTemplate::LinkedHugr(hugr, _) => hugr.entrypoint_optype(),
-            #[expect(deprecated)] // remove together, perhaps refactor to return just Signature
-            NodeTemplate::Call(_, _) => return Ok(()), // no way to tell
         }
         .dataflow_signature();
         if sig.as_deref().map(Signature::io) == Some((inputs, outputs)) {
@@ -290,29 +253,9 @@ impl NodeTemplate {
     }
 }
 
-fn call<H: HugrView<Node = Node>>(
-    h: &H,
-    func: Node,
-    type_args: Vec<TypeArg>,
-) -> Result<Call, BuildError> {
-    let func_sig = match h.get_optype(func) {
-        OpType::FuncDecl(fd) => fd.signature().clone(),
-        OpType::FuncDefn(fd) => fd.signature().clone(),
-        _ => {
-            return Err(BuildError::UnexpectedType {
-                node: func,
-                op_desc: "func defn/decl",
-            });
-        }
-    };
-    Ok(Call::try_new(func_sig, type_args)?)
-}
-
 /// Options for how a replacement (op or type) is processed.
 ///
-/// May be specified by
-/// [ReplaceTypes::replace_op_with], [ReplaceTypes::replace_parametrized_op_with],
-/// [ReplaceTypes::replace_type_opts] or [ReplaceTypes::replace_parametrized_type_opts].
+/// May be specified by [ReplaceTypes::set_replace_op] or [ReplaceTypes::set_replace_type].
 /// Otherwise (the default), replacements are inserted as given (without further processing).
 #[derive(Clone, Default, PartialEq, Eq)] // More derives might inhibit future extension
 pub struct ReplacementOptions {
@@ -344,7 +287,7 @@ impl ReplacementOptions {
 ///
 /// Parametrized types and ops will be reparameterized taking into account the
 /// replacements, but any ops taking/returning the replaced types *not* as a result of
-/// parametrization, will also need to be replaced - see [`Self::replace_op`].
+/// parametrization, will also need to be replaced - see [`Self::set_replace_op`].
 /// Similarly [Const]s.
 ///
 /// Types that are [Copyable](hugr_core::types::TypeBound::Copyable) may also be replaced
@@ -355,8 +298,8 @@ impl ReplacementOptions {
 /// * [`NodeTemplate::CompoundOp`] only works for operations that do not use type variables
 /// * "Overrides" of specific instantiations of polymorphic types will not be detected if
 ///   the instantiations are created inside polymorphic functions. For example, suppose
-///   we [`Self::replace_type`] type `A` with `X`, [`Self::replace_parametrized_type`]
-///   container `MyList` with `List`, and [`Self::replace_type`] `MyList<A>` with
+///   we [`Self::set_replace_type`] type `A` with `X`, [`Self::set_replace_parametrized_type`]
+///   container `MyList` with `List`, and [`Self::set_replace_type`] `MyList<A>` with
 ///   `SpecialListOfXs`. If a function `foo` polymorphic over a type variable `T` dealing
 ///   with `MyList<T>`s, that is called with type argument `A`, then `foo<T>` will be
 ///   updated to deal with `List<T>`s and the call `foo<A>` updated to `foo<X>`, but this
@@ -365,7 +308,7 @@ impl ReplacementOptions {
 ///   would use `SpecialListOfXs`.)
 /// * See also limitations noted for [Linearizer].
 ///
-/// [monomorphization]: crate::MonomorphizePass
+/// [monomorphization]: crate::passes::MonomorphizePass
 #[derive(Clone)]
 pub struct ReplaceTypes {
     type_map: HashMap<CustomType, (Type, ReplacementOptions)>,
@@ -467,13 +410,6 @@ impl ReplaceTypes {
     }
 
     /// Configures this instance to replace occurrences of type `src` with `dest`.
-    #[deprecated(note = "Use set_replace_type", since = "0.25.0")]
-    pub fn replace_type(&mut self, src: CustomType, dest: Type) {
-        #[expect(deprecated)] // remove together
-        self.replace_type_opts(src, dest, ReplacementOptions::default())
-    }
-
-    /// Configures this instance to replace occurrences of type `src` with `dest`.
     ///
     /// `dest` will be recursively transformed by this [ReplaceTypes] before replacement.
     /// (Cases where a type should be replaced by a type containing an instance of
@@ -481,8 +417,8 @@ impl ReplaceTypes {
     /// type. )
     ///
     /// Note that if `src` is an instance of a *parametrized* [`TypeDef`], this takes
-    /// precedence over [`Self::replace_parametrized_type`] where the `src`s overlap. Thus, this
-    /// should only be used on already-*[monomorphize](crate::MonomorphizePass)d* Hugrs, as
+    /// precedence over [`Self::set_replace_parametrized_type`] where the `src`s overlap. Thus, this
+    /// should only be used on already-*[monomorphize](crate::passes::MonomorphizePass)d* Hugrs, as
     /// substitution (parametric polymorphism) happening later will not respect this replacement.
     ///
     /// If there are any [`LoadConstant`]s of this type, callers should also call [`Self::replace_consts`]
@@ -491,32 +427,13 @@ impl ReplaceTypes {
     ///
     /// Note that if `src` is Copyable and `dest` is Linear, then (besides linearity violations)
     /// [`SignatureError`] will be raised if this leads to an impossible type e.g. ArrayOfCopyables(src).
-    /// (This can be overridden by an additional [`Self::replace_type`].)
+    /// (This can be overridden by an additional [`Self::set_replace_type`].)
     pub fn set_replace_type(&mut self, src: CustomType, dest: Type) {
         // We could check that 'dest' is copyable, 'src' is linear, or relevant copy and
         // discard functions are registered with the linearizer; but since we can't check
         // that for parametrized types, we'll be consistent and not check here either.
         self.type_map
             .insert(src, (dest, ReplacementOptions::recursive()));
-    }
-
-    /// Configures this instance to replace occurrences of type `src` with `dest`,
-    /// according to the given `ReplacementOptions`.
-    #[deprecated(note = "Use set_replace_type", since = "0.25.0")]
-    pub fn replace_type_opts(&mut self, src: CustomType, dest: Type, opts: ReplacementOptions) {
-        self.type_map.insert(src, (dest, opts));
-    }
-
-    /// Configures this instance to change occurrences of a parametrized type `src`
-    /// via a callback that builds the replacement type given the [`TypeArg`]s.
-    #[deprecated(note = "Use set_replace_parametrized_type", since = "0.25.0")]
-    pub fn replace_parametrized_type(
-        &mut self,
-        src: &TypeDef,
-        dest_fn: impl Fn(&[TypeArg]) -> Option<Type> + 'static,
-    ) {
-        #[expect(deprecated)] // remove together
-        self.replace_parametrized_type_opts(src, dest_fn, ReplacementOptions::default())
     }
 
     /// Configures this instance to change occurrences of a parametrized type `src`
@@ -555,27 +472,7 @@ impl ReplaceTypes {
         );
     }
 
-    /// Configures this instance to change occurrences of a parametrized type `src`
-    /// via a callback that builds the replacement type given the [`TypeArg`]s,
-    /// and using the given [ReplacementOptions].
-    #[deprecated(note = "Use set_replace_parametrized_type", since = "0.25.0")]
-    pub fn replace_parametrized_type_opts(
-        &mut self,
-        src: &TypeDef,
-        dest_fn: impl Fn(&[TypeArg]) -> Option<Type> + 'static,
-        opts: ReplacementOptions,
-    ) {
-        self.param_types
-            .insert(src.into(), (Arc::new(dest_fn), opts));
-    }
-
     /// Allows to configure how to deal with types/wires that were `Copyable`
-    /// but have become linear as a result of type-changing.
-    #[deprecated(note = "Use get_linearizer or linearizer_mut", since = "0.25.0")]
-    pub fn linearizer(&mut self) -> &mut DelegatingLinearizer {
-        &mut self.linearize
-    }
-
     /// Allows to configure how to deal with types/wires that were [Copyable]
     /// but have become linear as a result of type-changing. Specifically,
     /// the [Linearizer] is used whenever lowering produces an outport which both
@@ -596,13 +493,6 @@ impl ReplaceTypes {
     }
 
     /// Configures this instance to change occurrences of `src` to `dest`.
-    #[deprecated(note = "Use set_replace_op", since = "0.25.0")]
-    pub fn replace_op(&mut self, src: &ExtensionOp, dest: NodeTemplate) {
-        #[expect(deprecated)] // remove together
-        self.replace_op_with(src, dest, ReplacementOptions::default())
-    }
-
-    /// Configures this instance to change occurrences of `src` to `dest`.
     ///
     /// The RHS will be recursively processed by this [ReplaceTypes].
     /// (Cases where an op should be replaced by a container including an
@@ -611,7 +501,7 @@ impl ReplaceTypes {
     ///
     /// Note that if `src` is an instance of a *parametrized* [`OpDef`], this takes
     /// precedence over [`Self::set_replace_parametrized_op`] where the `src`s overlap.
-    /// Thus, this method should only be used for already-*[monomorphize](crate::MonomorphizePass)d*
+    /// Thus, this method should only be used for already-*[monomorphize](crate::passes::MonomorphizePass)d*
     /// Hugrs, as substitution (parametric polymorphism) happening later will not respect
     /// this replacement.
     pub fn set_replace_op(&mut self, src: &ExtensionOp, dest: NodeTemplate) {
@@ -619,29 +509,6 @@ impl ReplaceTypes {
             OpHashWrapper::from(src),
             (dest, ReplacementOptions::recursive()),
         );
-    }
-
-    /// Configures this instance to change occurrences of `src` to `dest`.
-    #[deprecated(note = "Use set_replace_op", since = "0.25.0")]
-    pub fn replace_op_with(
-        &mut self,
-        src: &ExtensionOp,
-        dest: NodeTemplate,
-        opts: ReplacementOptions,
-    ) {
-        self.op_map.insert(OpHashWrapper::from(src), (dest, opts));
-    }
-
-    /// Configures this instance to change occurrences of a parametrized op `src`
-    /// via a callback that builds the replacement type given the [`TypeArg`]s.
-    #[deprecated(note = "Use set_replace_parametrized_op", since = "0.25.0")]
-    pub fn replace_parametrized_op(
-        &mut self,
-        src: &OpDef,
-        dest_fn: impl Fn(&[TypeArg]) -> Option<NodeTemplate> + 'static,
-    ) {
-        #[expect(deprecated)] // remove together
-        self.replace_parametrized_op_with(src, dest_fn, ReplacementOptions::default())
     }
 
     /// Configures this instance to change occurrences of a parametrized op `src`
@@ -662,21 +529,6 @@ impl ReplaceTypes {
         self.param_ops.insert(
             src.into(),
             (Arc::new(dest_fn), ReplacementOptions::recursive()),
-        );
-    }
-
-    /// Configures this instance to change occurrences of a parametrized op `src`
-    /// via a callback that builds the replacement type given the [`TypeArg`]s.
-    #[deprecated(note = "Use set_replace_parametrized_op", since = "0.25.0")]
-    pub fn replace_parametrized_op_with(
-        &mut self,
-        src: &OpDef,
-        dest_fn: impl Fn(&[TypeArg]) -> Option<NodeTemplate> + 'static,
-        opts: ReplacementOptions,
-    ) {
-        self.param_ops.insert(
-            src.into(),
-            (Arc::new(move |args, _| Ok(dest_fn(args))), opts),
         );
     }
 
@@ -989,7 +841,7 @@ impl From<&OpDef> for ParametricOp {
 mod test {
     use std::sync::Arc;
 
-    use crate::replace_types::handlers::generic_array_const;
+    use crate::passes::replace_types::handlers::generic_array_const;
     use hugr_core::builder::{
         BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
         FunctionBuilder, HugrBuilder, ModuleBuilder, SubContainer, TailLoopBuilder, endo_sig,
@@ -1022,7 +874,7 @@ mod test {
     use itertools::Itertools;
     use rstest::rstest;
 
-    use crate::{ComposablePass, mangle_name};
+    use crate::passes::{ComposablePass, mangle_name};
 
     use super::{NodeTemplate, ReplaceTypes, handlers::list_const};
 
@@ -1484,7 +1336,7 @@ mod test {
     }
 
     #[rstest]
-    fn op_to_call_polymorphic(#[values(true, false)] use_linking: bool) {
+    fn op_to_call_polymorphic() {
         // Note the resulting Hugr has a polymorphic lowered_read function, which would
         // mean (re)running monomorphization *after* ReplaceTypes; usually we would expect
         // monomorphization to happen first so that ReplaceTypes can act upon the concrete types.
@@ -1527,17 +1379,14 @@ mod test {
 
         let mut lw = lowerer(&e);
         lw.set_replace_parametrized_op(e.get_op(READ).unwrap().as_ref(), move |args, _| {
-            Ok(Some(if use_linking {
-                let mut decl_b = ModuleBuilder::new();
-                let decl_node = decl_b.declare("lowered_read", read_poly.clone()).unwrap();
-                let mut decl_hugr = decl_b.finish_hugr().unwrap();
-                decl_hugr.set_entrypoint(decl_node.node());
+            let mut decl_b = ModuleBuilder::new();
+            let decl_node = decl_b.declare("lowered_read", read_poly.clone()).unwrap();
+            let mut decl_hugr = decl_b.finish_hugr().unwrap();
+            decl_hugr.set_entrypoint(decl_node.node());
 
-                NodeTemplate::call_to_function(decl_hugr, args).unwrap()
-            } else {
-                #[expect(deprecated)] // remove use_linking==false case
-                NodeTemplate::Call(read_func, args.to_owned())
-            }))
+            Ok(Some(
+                NodeTemplate::call_to_function(decl_hugr, args).unwrap(),
+            ))
         });
         lw.run(&mut h).unwrap();
         h.validate().unwrap();
