@@ -28,7 +28,7 @@ pub(crate) fn tket1_pass(
     scope: Option<PyPassScope>,
 ) -> PyResult<()> {
     // TODO: Implement a Tket1Pass: ComposablePass, use it here with the right scope.
-    // (Create an issue and link it here).
+    // <https://github.com/Quantinuum/tket2/issues/1494>
     let scope: PassScope = scope.unwrap_or_default().scope;
     let encode_options = EncodeOptions::new()
         .with_config(qsystem_encoder_config())
