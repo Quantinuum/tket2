@@ -1,14 +1,7 @@
 use std::{
-    collections::{HashSet, hash_map::RandomState},
+    collections::{HashMap, HashSet, hash_map::RandomState},
     sync::LazyLock,
 };
-
-use hugr_core::ops::constant::{CustomConst, CustomSerialized};
-use hugr_core::ops::handle::NodeHandle;
-use hugr_core::std_extensions::collections::list::ListOp;
-use hugr_core::{Visibility, ops::Const};
-use itertools::Itertools;
-use rstest::rstest;
 
 use hugr_core::builder::{
     Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
@@ -18,9 +11,9 @@ use hugr_core::extension::prelude::{
     ConstError, ConstString, MakeTuple, UnpackTuple, bool_t, const_ok, error_type, string_type,
     sum_with_error,
 };
-
 use hugr_core::hugr::hugrmut::HugrMut;
-use hugr_core::ops::{OpTag, OpTrait, OpType, Value};
+use hugr_core::ops::constant::{CustomConst, CustomSerialized};
+use hugr_core::ops::{Const, OpTag, OpTrait, OpType, Value, handle::NodeHandle};
 use hugr_core::std_extensions::arithmetic::{
     conversions::ConvertOpDef,
     float_ops::FloatOps,
@@ -28,22 +21,21 @@ use hugr_core::std_extensions::arithmetic::{
     int_ops::IntOpDef,
     int_types::{ConstInt, INT_TYPES},
 };
+use hugr_core::std_extensions::collections::list::ListOp;
 use hugr_core::std_extensions::logic::LogicOp;
 use hugr_core::types::{Signature, SumType, Type, TypeBound, TypeRow, TypeRowRV};
-use hugr_core::{Hugr, HugrView, IncomingPort, Node, type_row};
+use hugr_core::{Hugr, HugrView, IncomingPort, Node, Visibility, type_row};
+use itertools::Itertools;
+use rstest::rstest;
 
-use crate::{ComposablePass as _, composable::ValidatingPass};
-use crate::{
-    PassScope,
-    composable::WithScope,
-    dataflow::{DFContext, PartialValue, partial_from_const},
-};
+use crate::ComposablePass as _;
+use crate::composable::{PassScope, Preserve, ValidatingPass, WithScope};
+use crate::dataflow::{DFContext, PartialValue, partial_from_const};
 
 use super::{ConstFoldContext, ConstantFoldPass, ValueHandle};
 
 fn constant_fold_pass(h: &mut (impl HugrMut<Node = Node> + 'static)) {
-    // the default ConstantFoldPass has no scope, i.e. preserving legacy behavior
-    let c = ConstantFoldPass::default().with_scope(PassScope::default());
+    let c = ConstantFoldPass::default();
     ValidatingPass::new(c).run(h).unwrap();
 }
 
@@ -1638,18 +1630,15 @@ fn test_module() -> Result<(), Box<dyn std::error::Error>> {
         ]
     );
 
-    let tags = hugr
-        .children(main.node())
-        .map(|n| hugr.get_optype(n).tag())
-        .collect_vec();
-    for (tag, expected_count) in [
-        (OpTag::Input, 1),
-        (OpTag::Output, 1),
-        (OpTag::Const, 1),
-        (OpTag::LoadConst, 2),
-    ] {
-        assert_eq!(tags.iter().filter(|t| **t == tag).count(), expected_count);
-    }
+    assert_eq!(
+        get_child_tags(&hugr, main.node()),
+        HashMap::from([
+            (OpTag::Input, 1),
+            (OpTag::Output, 1),
+            (OpTag::Const, 1),
+            (OpTag::LoadConst, 2),
+        ])
+    );
     assert_eq!(
         hugr.children(main.node())
             .find_map(|n| hugr.get_optype(n).as_const()),
@@ -1711,4 +1700,253 @@ fn test_opaque_consts(#[case] op: impl Into<OpType>) {
 
     // Nothing got folded. The op is still there.
     assert!(h.entry_descendants().any(|n| h.get_optype(n) == &op));
+}
+
+fn get_child_tags(hugr: &Hugr, node: Node) -> HashMap<OpTag, usize> {
+    hugr.children(node)
+        .into_grouping_map_by(|n| hugr.get_optype(*n).tag())
+        .fold(0, |c, _, _| c + 1)
+}
+
+fn int_cst(v: u64) -> Value {
+    Value::from(ConstInt::new_u(5, v).unwrap())
+}
+
+/// A module-entrypoint hugr with a main function (the second element of tuple)
+/// calling another function (the third element of tuple) with some constant arguments.
+///
+/// The `entrypoint_is_main` argument controls whether the entrypoint should be
+/// * None -> the module
+/// * Some(true) -> main
+/// * Some(false) -> callee
+fn two_funcs_hugr(entrypoint_is_main: Option<bool>) -> (Hugr, Node, Node) {
+    let mut mb = ModuleBuilder::new();
+    let mut callee = mb
+        .define_function("callee", Signature::new_endo([INT_TYPES[5].clone()]))
+        .unwrap();
+    let [inp] = callee.input_wires_arr();
+    let [lc7, lc11] = [7, 11].map(|v| callee.add_load_value(int_cst(v)));
+    let [add_csts] = callee
+        .add_dataflow_op(IntOpDef::iadd.with_log_width(5), [lc7, lc11])
+        .unwrap()
+        .outputs_arr();
+    let add_inp = callee
+        .add_dataflow_op(IntOpDef::iadd.with_log_width(5), [add_csts, inp])
+        .unwrap();
+    let callee = callee.finish_with_outputs(add_inp.outputs()).unwrap();
+
+    let mut main = mb
+        .define_function_vis(
+            "main",
+            Signature::new(type_row![], vec![INT_TYPES[5].clone()]),
+            Visibility::Public,
+        )
+        .unwrap();
+    let [lc3, lc5] = [3, 5].map(|v| main.add_load_value(int_cst(v)));
+    let add_csts = main
+        .add_dataflow_op(IntOpDef::iadd.with_log_width(5), [lc3, lc5])
+        .unwrap();
+    let call = main.call(callee.handle(), &[], add_csts.outputs()).unwrap();
+    let main = main.finish_with_outputs(call.outputs()).unwrap();
+    let mut hugr = mb.finish_hugr().unwrap();
+    if let Some(use_main) = entrypoint_is_main {
+        hugr.set_entrypoint(if use_main { main.node() } else { callee.node() });
+    }
+    (hugr, main.node(), callee.node())
+}
+
+#[rstest]
+fn two_funcs_fully_folded(
+    #[values(Preserve::Public, Preserve::Entrypoint)] scope: impl Into<PassScope>,
+    #[values(Some(true), None)] entrypoint_is_main: Option<bool>,
+) {
+    let (mut hugr, main, callee) = two_funcs_hugr(entrypoint_is_main);
+    ConstantFoldPass::default_with_scope(scope.into())
+        .run(&mut hugr)
+        .unwrap();
+
+    two_funcs_check_main_fully_folded(&hugr, main);
+
+    // callee should be fully folded - it's not preserved, so can be specialised
+    // to the caller.
+    assert_eq!(
+        get_child_tags(&hugr, callee),
+        HashMap::from([
+            (OpTag::Input, 1),
+            (OpTag::Output, 1),
+            (OpTag::Const, 1),
+            (OpTag::LoadConst, 1)
+        ])
+    );
+
+    let cst = hugr
+        .children(callee)
+        .filter_map(|n| hugr.get_optype(n).as_const())
+        .exactly_one()
+        .ok()
+        .unwrap();
+    assert_eq!(cst.value(), &int_cst(3 + 5 + 7 + 11));
+}
+
+fn two_funcs_check_main_fully_folded(hugr: &Hugr, main: Node) {
+    let main_tags = get_child_tags(hugr, main);
+    assert_eq!(
+        main_tags,
+        HashMap::from([
+            (OpTag::Input, 1),
+            (OpTag::Output, 1),
+            (OpTag::FnCall, 1),
+            (OpTag::Const, 2),
+            (OpTag::LoadConst, 2)
+        ])
+    );
+    // Two consts - first is the result...
+    let output = hugr
+        .children(main)
+        .filter(|n| hugr.get_optype(*n).is_output())
+        .exactly_one()
+        .ok()
+        .unwrap();
+    let out_src = hugr.input_neighbours(output).exactly_one().ok().unwrap();
+    assert!(hugr.get_optype(out_src).is_load_constant());
+    let out_cst = hugr.input_neighbours(out_src).exactly_one().ok().unwrap();
+    assert_eq!(
+        hugr.get_optype(out_cst).as_const().unwrap().value(),
+        &int_cst(3 + 5 + 7 + 11)
+    );
+
+    // The call is unused, but not removable since we don't allow_increase_termination
+    let call = hugr
+        .children(main)
+        .filter(|n| hugr.get_optype(*n).is_call())
+        .exactly_one()
+        .ok()
+        .unwrap();
+    let (call_src, _) = hugr.single_linked_output(call, 0).unwrap();
+    assert!(hugr.get_optype(call_src).is_load_constant());
+    let call_cst = hugr.input_neighbours(call_src).exactly_one().ok().unwrap();
+    assert_eq!(
+        hugr.get_optype(call_cst).as_const().unwrap().value(),
+        &int_cst(3 + 5)
+    );
+    assert!(hugr.output_neighbours(call).next().is_none());
+}
+
+#[rstest]
+#[case(Preserve::Public, Some(false))]
+#[case(Preserve::Entrypoint, Some(false))]
+#[case(Preserve::All, Some(false))]
+#[case(Preserve::All, Some(true))]
+#[case(Preserve::All, None)]
+fn two_funcs_preserve_f(
+    #[case] scope: impl Into<PassScope>,
+    #[case] entrypoint_is_main: Option<bool>,
+) {
+    let (mut hugr, main, callee) = two_funcs_hugr(entrypoint_is_main);
+    ConstantFoldPass::default_with_scope(scope.into())
+        .run(&mut hugr)
+        .unwrap();
+
+    two_funcs_check_f_respects_argument(&hugr, callee);
+
+    // Main: fold the 3+5, but not the call, since this aliases with other arguments to callee.
+    assert_eq!(
+        get_child_tags(&hugr, main),
+        HashMap::from([
+            (OpTag::Input, 1),
+            (OpTag::Output, 1),
+            (OpTag::FnCall, 1),
+            (OpTag::Const, 1),
+            (OpTag::LoadConst, 1)
+        ])
+    );
+    let call = hugr
+        .children(main)
+        .filter(|n| hugr.get_optype(*n).is_call())
+        .exactly_one()
+        .ok()
+        .unwrap();
+    let (call_src, _) = hugr.single_linked_output(call, 0).unwrap();
+    assert!(hugr.get_optype(call_src).is_load_constant());
+    let call_cst = hugr.input_neighbours(call_src).exactly_one().ok().unwrap();
+    assert_eq!(
+        hugr.get_optype(call_cst).as_const().unwrap().value(),
+        &int_cst(3 + 5)
+    );
+    let call_out = hugr.output_neighbours(call).exactly_one().ok().unwrap();
+    assert!(hugr.get_optype(call_out).is_output());
+}
+
+fn two_funcs_check_f_respects_argument(hugr: &Hugr, callee: Node) {
+    // Callee: cannot assume anything about argument, so only fold the 7+11, not the addition with the input
+    assert_eq!(
+        get_child_tags(hugr, callee),
+        HashMap::from([
+            (OpTag::Input, 1),
+            (OpTag::Output, 1),
+            (OpTag::Const, 1),
+            (OpTag::LoadConst, 1),
+            (OpTag::Leaf, 1)
+        ])
+    );
+    assert_eq!(
+        hugr.children(callee)
+            .filter_map(|n| hugr.get_optype(n).as_const())
+            .exactly_one()
+            .ok()
+            .unwrap()
+            .value(),
+        &int_cst(7 + 11)
+    );
+}
+
+#[rstest]
+fn two_funcs_entrypoint(
+    #[values(PassScope::EntrypointFlat, PassScope::EntrypointRecursive)] scope: PassScope,
+) {
+    let (backup, main, callee) = two_funcs_hugr(None);
+    let mut hugr = backup.clone();
+    ConstantFoldPass::default_with_scope(scope.clone())
+        .run(&mut hugr)
+        .unwrap();
+    assert_eq!(backup, hugr);
+
+    fn check_identical(hugr: &Hugr, backup: &Hugr, node: Node) {
+        // Don't check extract_hugr is identical as that would ignore edges incoming to the subtree
+        assert_eq!(
+            hugr.descendants(node).collect_vec(),
+            backup.descendants(node).collect_vec()
+        );
+        for n in hugr.descendants(node) {
+            assert_eq!(hugr.get_optype(n), backup.get_optype(n));
+            assert_eq!(
+                hugr.node_inputs(n).collect_vec(),
+                backup.node_inputs(n).collect_vec()
+            );
+            for ip in hugr.node_inputs(n) {
+                assert_eq!(
+                    hugr.linked_outputs(n, ip).collect_vec(),
+                    backup.linked_outputs(n, ip).collect_vec()
+                );
+            }
+            assert_eq!(
+                hugr.children(n).collect_vec(),
+                backup.children(n).collect_vec()
+            );
+        }
+    }
+
+    let (mut hugr, _, _) = two_funcs_hugr(Some(true));
+    ConstantFoldPass::default_with_scope(scope.clone())
+        .run(&mut hugr)
+        .unwrap();
+    two_funcs_check_main_fully_folded(&hugr, main);
+    check_identical(&hugr, &backup, callee);
+
+    let (mut hugr, _, _) = two_funcs_hugr(Some(false));
+    ConstantFoldPass::default_with_scope(scope)
+        .run(&mut hugr)
+        .unwrap();
+    check_identical(&hugr, &backup, main);
+    two_funcs_check_f_respects_argument(&hugr, callee);
 }

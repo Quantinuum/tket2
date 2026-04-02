@@ -73,7 +73,7 @@ fn test_make_tuple() {
     let v3 = builder.make_tuple([v1, v2]).unwrap();
     let hugr = builder.finish_hugr().unwrap();
 
-    let results = Machine::new(&hugr).run(TestContext, []);
+    let results = Machine::new(&hugr).run_subtree(TestContext, hugr.entrypoint());
 
     let x: Value = results.try_read_wire_concrete(v3).unwrap();
     assert_eq!(x, Value::tuple([Value::false_val(), Value::true_val()]));
@@ -89,7 +89,7 @@ fn test_unpack_tuple_const() {
         .outputs_arr();
     let hugr = builder.finish_hugr().unwrap();
 
-    let results = Machine::new(&hugr).run(TestContext, []);
+    let results = Machine::new(&hugr).run_subtree(TestContext, hugr.module_root());
 
     let o1_r: Value = results.try_read_wire_concrete(o1).unwrap();
     assert_eq!(o1_r, Value::false_val());
@@ -115,7 +115,7 @@ fn test_tail_loop_never_iterates() {
     let [tl_o] = tail_loop.outputs_arr();
     let hugr = builder.finish_hugr().unwrap();
 
-    let results = Machine::new(&hugr).run(TestContext, []);
+    let results = Machine::new(&hugr).run_subtree(TestContext, hugr.entrypoint());
 
     let o_r: Value = results.try_read_wire_concrete(tl_o).unwrap();
     assert_eq!(o_r, r_v);
@@ -150,7 +150,7 @@ fn test_tail_loop_always_iterates() {
     let [tl_o1, tl_o2] = tail_loop.outputs_arr();
     let hugr = builder.finish_hugr().unwrap();
 
-    let results = Machine::new(&hugr).run(TestContext, []);
+    let results = Machine::new(&hugr).run_subtree(TestContext, hugr.module_root());
 
     let o_r1 = results.read_out_wire(tl_o1).unwrap();
     assert_eq!(o_r1, PartialValue::bottom());
@@ -183,7 +183,7 @@ fn test_tail_loop_two_iters() {
     let hugr = builder.finish_hugr().unwrap();
     let [o_w1, o_w2] = tail_loop.outputs_arr();
 
-    let results = Machine::new(&hugr).run(TestContext, []);
+    let results = Machine::new(&hugr).run_subtree(TestContext, hugr.entrypoint());
 
     let o_r1 = results.read_out_wire(o_w1).unwrap();
     assert_eq!(o_r1, pv_true_or_false());
@@ -246,7 +246,7 @@ fn test_tail_loop_containing_conditional() {
     let hugr = builder.finish_hugr().unwrap();
     let [o_w1, o_w2] = tail_loop.outputs_arr();
 
-    let results = Machine::new(&hugr).run(TestContext, []);
+    let results = Machine::new(&hugr).run_subtree(TestContext, hugr.module_root());
 
     let o_r1 = results.read_out_wire(o_w1).unwrap();
     assert_eq!(o_r1, pv_true());
@@ -298,7 +298,12 @@ fn test_conditional() {
         2,
         [PartialValue::new_variant(0, [])],
     ));
-    let results = Machine::new(&hugr).run(TestContext, [(0.into(), arg_pv)]);
+    let results = {
+        let mut m = Machine::new(&hugr);
+        m.prepopulate_inputs(hugr.entrypoint(), [(0.into(), arg_pv)])
+            .unwrap();
+        m.run_subtree(TestContext, hugr.entrypoint())
+    };
 
     let cond_r1: Value = results.try_read_wire_concrete(cond_o1).unwrap();
     assert_eq!(cond_r1, Value::false_val());
@@ -393,7 +398,13 @@ fn test_cfg(
     xor_and_cfg: Hugr,
 ) {
     let root = xor_and_cfg.entrypoint();
-    let results = Machine::new(&xor_and_cfg).run(TestContext, [(0.into(), inp0), (1.into(), inp1)]);
+    let mut m = Machine::new(&xor_and_cfg);
+    m.prepopulate_inputs(
+        xor_and_cfg.entrypoint(),
+        [(0.into(), inp0), (1.into(), inp1)],
+    )
+    .unwrap();
+    let results = m.run_subtree(TestContext, xor_and_cfg.entrypoint());
 
     assert_eq!(results.read_out_wire(Wire::new(root, 0)).unwrap(), out0);
     assert_eq!(results.read_out_wire(Wire::new(root, 1)).unwrap(), out1);
@@ -428,7 +439,12 @@ fn test_call(
         .outputs_arr();
     let hugr = builder.finish_hugr_with_outputs([a2, b2]).unwrap();
 
-    let results = Machine::new(&hugr).run(TestContext, [(0.into(), inp0), (1.into(), inp1)]);
+    let results = {
+        let mut m = Machine::new(&hugr);
+        m.prepopulate_inputs(hugr.entrypoint(), [(0.into(), inp0), (1.into(), inp1)])
+            .unwrap();
+        m.run_subtree(TestContext, hugr.module_root())
+    };
 
     let [res0, res1] = [0, 1].map(|i| {
         results
@@ -454,9 +470,18 @@ fn test_region() {
     let nested = nested.finish_with_outputs([nested_in, cst_w]).unwrap();
     let hugr = builder.finish_hugr_with_outputs(nested.outputs()).unwrap();
     let [nested_input, _] = hugr.get_io(nested.node()).unwrap();
-    let whole_hugr_results = Machine::new(&hugr).run(TestContext, [(0.into(), pv_true())]);
-    let sub_hugr_results =
-        Machine::new(hugr.with_entrypoint(nested.node())).run(TestContext, [(0.into(), pv_true())]);
+    let whole_hugr_results = {
+        let mut m = Machine::new(&hugr);
+        m.prepopulate_inputs(hugr.entrypoint(), [(0.into(), pv_true())])
+            .unwrap();
+        m.run_subtree(TestContext, hugr.entrypoint())
+    };
+    let sub_hugr_results = {
+        let mut m = Machine::new(&hugr);
+        m.prepopulate_inputs(nested.node(), [(0.into(), pv_true())])
+            .unwrap();
+        m.run_subtree(TestContext, nested.node())
+    };
     for (wire, val) in [
         (Wire::new(nested_input, 0), Some(pv_true())),
         (Wire::new(nested.node(), 0), Some(pv_true())),
@@ -507,7 +532,7 @@ fn test_module() {
         let mut mach = Machine::new(&hugr);
         mach.prepopulate_inputs(main.node(), [(0.into(), pv_true())])
             .unwrap();
-        mach.run(TestContext, [])
+        mach.run_subtree(TestContext, hugr.module_root())
     };
     assert_eq!(
         results_just_main.read_out_wire(Wire::new(f2_inp, 0)),
@@ -532,7 +557,7 @@ fn test_module() {
             .unwrap();
         m.prepopulate_inputs(main.node(), [(0.into(), pv_false())])
             .unwrap();
-        m.run(TestContext, [])
+        m.run_subtree(TestContext, hugr.entrypoint())
     };
 
     for call in [f2_call, main_call] {
@@ -595,14 +620,17 @@ fn call_indirect(#[case] inp1: PartialValue<Void>, #[case] inp2: PartialValue<Vo
     let h = dfb.finish_hugr_with_outputs([res1, res2]).unwrap();
 
     let run = |which| {
-        Machine::new(&h).run(
-            TestContext,
+        let mut m = Machine::new(&h);
+        m.prepopulate_inputs(
+            h.entrypoint(),
             [
                 (0.into(), inp1.clone()),
                 (1.into(), which),
                 (2.into(), inp2.clone()),
             ],
         )
+        .unwrap();
+        m.run_subtree(TestContext, h.entrypoint())
     };
     let (w1, w2) = (Wire::new(h.entrypoint(), 0), Wire::new(h.entrypoint(), 1));
 
@@ -623,8 +651,8 @@ fn call_indirect(#[case] inp1: PartialValue<Void>, #[case] inp2: PartialValue<Vo
     assert_eq!(results.read_out_wire(w2), out);
 }
 
-#[test]
-fn func_set_input() {
+#[rstest]
+fn func_set_input(#[values(false, true)] pre_pop_wire: bool) {
     let mut mb = ModuleBuilder::new();
     let func = mb
         .define_function("f", Signature::new_endo(vec![bool_t()]))
@@ -636,8 +664,13 @@ fn func_set_input() {
     let [inp, _] = hugr.get_io(func.node()).unwrap();
     let mut m = Machine::<_, Void>::new(&hugr);
     let inp_w = Wire::new(inp, 0);
-    m.prepopulate_wire(inp_w, pv_true());
-    let results = m.run(TestContext, []);
+    if pre_pop_wire {
+        m.prepopulate_wire(inp_w, pv_true());
+    } else {
+        m.prepopulate_inputs(func.node(), [(IncomingPort::from(0), pv_true())])
+            .unwrap();
+    }
+    let results = m.run_subtree(TestContext, hugr.module_root());
     assert_eq!(results.read_out_wire(inp_w), Some(pv_true()));
 }
 
@@ -662,6 +695,7 @@ fn func_override_input_top(#[values(false, true)] pre_pop_wire: bool) {
 
     let [callee_inp, _] = hugr.get_io(callee.node()).unwrap();
     let callee_inp = Wire::new(callee_inp, 0);
+    let ep = hugr.entrypoint();
     let mut machine = Machine::<_, Void>::new(hugr);
 
     if pre_pop_wire {
@@ -671,7 +705,7 @@ fn func_override_input_top(#[values(false, true)] pre_pop_wire: bool) {
             .prepopulate_inputs(callee.node(), [(IncomingPort::from(0), PartialValue::Top)])
             .unwrap();
     }
-    let results = machine.run(TestContext, []);
+    let results = machine.run_subtree(TestContext, ep);
     // `true` value from main should be overridden by the `Top` we fed in:
     assert_eq!(results.read_out_wire(callee_inp), Some(PartialValue::Top));
 }
