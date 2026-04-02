@@ -25,6 +25,8 @@ in {
     # cmake is needed for conan to build packages from source when
     # prebuilt binaries aren't available for Nix's clang version.
     pkgs.cmake
+    # pytket?
+    pkgs.gmp
 
   ] ++ lib.optionals pkgs.stdenv.isDarwin [
     pkgs.xz
@@ -34,7 +36,6 @@ in {
     cargo --version
     python --version
     uv --version
-    export LD_LIBRARY_PATH="${hugrenv}/lib:${hugrenv}/lib64:$LD_LIBRARY_PATH"
   '';
 
   env = {
