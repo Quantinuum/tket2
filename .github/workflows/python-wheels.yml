@@ -236,9 +236,25 @@ jobs:
         run: |
           echo "Testing the newly built ${{ matrix.platform.target }} wheels..."
           if [ "$TEST_INSTALL" = "true" ]; then
-            # Make sure we only use the tket lib from the wheel itself
+            # Remove original libraries from the build environment to ensure that
+            # the test installation is actually using the built wheels, and not picking up
+            # the libraries from the hugrverse environment.
             rm -rf ${{ matrix.platform.hugrenv.root }}
-            uv run -f dist --with tket --refresh-package tket --no-project -- python -c "import tket"
+
+            # Import tket from within a fresh environment/directory rather than the source
+            # directory to avoid source conflicts (the repaired wheel has modified library paths)
+            tmpdir=$(mktemp -d);
+            cd $tmpdir;
+
+            uv run \
+                -f "$GITHUB_WORKSPACE/dist" \
+                --with tket \
+                --refresh-package tket \
+                --no-project \
+                -- \
+                  python -c "import tket; print(tket.__file__);"
+
+            cd $GITHUB_WORKSPACE;
           fi
           uvx twine check --strict dist/*
         env:
