@@ -361,6 +361,10 @@ jobs:
       - name: Setup dependencies
         # avoid building qis-compiler
         run: uv sync --package=tket --exact --python ${{ env.PYTHON_LOWEST }}
+      - name: Clear hugrverse from LD_LIBRARY_PATH
+        run: |
+          echo "LD_LIBRARY_PATH=$(echo $LD_LIBRARY_PATH | tr ':' '\n' | grep -v '/tmp/hugrverse' | tr '\n' ':')" >> $GITHUB_ENV
+
       - name: Run python tests with coverage instrumentation
         run: uv run --no-project pytest --cov=./ --cov-report=xml ${{ env.PKGS }}
       - name: Upload python coverage to codecov.io

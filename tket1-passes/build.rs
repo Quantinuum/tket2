@@ -219,5 +219,10 @@ fn cargo_set_custom_lib_path(search_path: &[PathBuf]) {
         // providing static libs
         println!("cargo:rustc-link-lib=tket");
         println!("cargo:rustc-link-lib=symengine");
+        println!("cargo:rustc-link-lib=tkassert");
+        println!("cargo:rustc-link-lib=tklog");
+        println!("cargo:rustc-link-lib=tkrng");
+        println!("cargo:rustc-link-lib=tktokenswap");
+        println!("cargo:rustc-link-lib=tkwsm");
     }
 }
