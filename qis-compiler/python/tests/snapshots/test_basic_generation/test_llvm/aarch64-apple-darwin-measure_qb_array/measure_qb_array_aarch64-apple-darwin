@@ -315,19 +315,19 @@ __barray_mask_return.exit252.i:                   ; preds = %__barray_mask_borro
   br label %__barray_check_bounds.exit.i.i.i
 
 73:                                               ; preds = %loop_body.i.i
-  %74 = lshr i64 %.fca.2.extract85.i.i.i, 6
-  %75 = getelementptr i64, ptr %.fca.1.extract84.i.i.i, i64 %74
+  %74 = lshr i64 %.fca.2.extract82.i.i.i, 6
+  %75 = getelementptr i64, ptr %.fca.1.extract81.i.i.i, i64 %74
   %76 = load i64, ptr %75, align 4
-  %77 = and i64 %.fca.2.extract85.i.i.i, 63
+  %77 = and i64 %.fca.2.extract82.i.i.i, 63
   %78 = sub nuw nsw i64 64, %77
   %79 = lshr i64 -1, %78
   %80 = icmp eq i64 %77, 0
   %81 = select i1 %80, i64 0, i64 %79
   %82 = or i64 %76, %81
   store i64 %82, ptr %75, align 4
-  %last_valid.i.i.i.i = add i64 %.fca.2.extract85.i.i.i, 9
+  %last_valid.i.i.i.i = add i64 %.fca.2.extract82.i.i.i, 9
   %83 = lshr i64 %last_valid.i.i.i.i, 6
-  %84 = getelementptr inbounds nuw i64, ptr %.fca.1.extract84.i.i.i, i64 %83
+  %84 = getelementptr inbounds nuw i64, ptr %.fca.1.extract81.i.i.i, i64 %83
   %85 = load i64, ptr %84, align 4
   %86 = and i64 %last_valid.i.i.i.i, 63
   %87 = shl nsw i64 -2, %86
@@ -356,15 +356,15 @@ mask_block_err.i.i.i.i:                           ; preds = %mask_block_ok.i.i.i
   unreachable
 
 __barray_check_bounds.exit.i.i.i:                 ; preds = %loop_body.i.i, %__barray_mask_return.exit252.i
-  %.fca.2.extract85.i187.i.i = phi i64 [ 0, %__barray_mask_return.exit252.i ], [ %.fca.2.extract85.i.i.i, %loop_body.i.i ]
-  %.fca.1.extract84.i186.i.i = phi ptr [ %2, %__barray_mask_return.exit252.i ], [ %.fca.1.extract84.i.i.i, %loop_body.i.i ]
-  %.fca.0.extract83.i185.i.i = phi ptr [ %1, %__barray_mask_return.exit252.i ], [ %.fca.0.extract83.i.i.i, %loop_body.i.i ]
+  %.fca.2.extract82.i187.i.i = phi i64 [ 0, %__barray_mask_return.exit252.i ], [ %.fca.2.extract82.i.i.i, %loop_body.i.i ]
+  %.fca.1.extract81.i186.i.i = phi ptr [ %2, %__barray_mask_return.exit252.i ], [ %.fca.1.extract81.i.i.i, %loop_body.i.i ]
+  %.fca.0.extract80.i185.i.i = phi ptr [ %1, %__barray_mask_return.exit252.i ], [ %.fca.0.extract80.i.i.i, %loop_body.i.i ]
   %"306_0.sroa.15.0184.i.i" = phi i64 [ 0, %__barray_mask_return.exit252.i ], [ %95, %loop_body.i.i ]
   %.pn165183.i.i = phi { { ptr, ptr, i64 }, i64 } [ %70, %__barray_mask_return.exit252.i ], [ %110, %loop_body.i.i ]
   %95 = add nuw nsw i64 %"306_0.sroa.15.0184.i.i", 1
-  %96 = add i64 %"306_0.sroa.15.0184.i.i", %.fca.2.extract85.i187.i.i
+  %96 = add i64 %"306_0.sroa.15.0184.i.i", %.fca.2.extract82.i187.i.i
   %97 = lshr i64 %96, 6
-  %98 = getelementptr inbounds nuw i64, ptr %.fca.1.extract84.i186.i.i, i64 %97
+  %98 = getelementptr inbounds nuw i64, ptr %.fca.1.extract81.i186.i.i, i64 %97
   %99 = load i64, ptr %98, align 4
   %100 = and i64 %96, 63
   %101 = lshr i64 %99, %100
@@ -379,7 +379,7 @@ __barray_check_bounds.exit.i.i:                   ; preds = %__barray_check_boun
   %103 = shl nuw i64 1, %100
   %104 = xor i64 %103, %99
   store i64 %104, ptr %98, align 4
-  %105 = getelementptr inbounds i64, ptr %.fca.0.extract83.i185.i.i, i64 %96
+  %105 = getelementptr inbounds i64, ptr %.fca.0.extract80.i185.i.i, i64 %96
   %106 = load i64, ptr %105, align 4
   %lazy_measure.i.i = tail call i64 @___lazy_measure(i64 %106)
   tail call void @___qfree(i64 %106)
@@ -402,15 +402,15 @@ loop_body.i.i:                                    ; preds = %__barray_check_boun
   %113 = getelementptr inbounds nuw { i1, i64, i1 }, ptr %71, i64 %"306_0.sroa.15.0184.i.i"
   store { i1, i64, i1 } %"371_054.fca.2.insert.i.i", ptr %113, align 4
   %114 = extractvalue { { ptr, ptr, i64 }, i64 } %.pn165183.i.i, 0
-  %.fca.0.extract83.i.i.i = extractvalue { ptr, ptr, i64 } %114, 0
-  %.fca.1.extract84.i.i.i = extractvalue { ptr, ptr, i64 } %114, 1
-  %.fca.2.extract85.i.i.i = extractvalue { ptr, ptr, i64 } %114, 2
+  %.fca.0.extract80.i.i.i = extractvalue { ptr, ptr, i64 } %114, 0
+  %.fca.1.extract81.i.i.i = extractvalue { ptr, ptr, i64 } %114, 1
+  %.fca.2.extract82.i.i.i = extractvalue { ptr, ptr, i64 } %114, 2
   %exitcond.not.i.i = icmp eq i64 %95, 10
   br i1 %exitcond.not.i.i, label %73, label %__barray_check_bounds.exit.i.i.i
 
 "__hugr__.$measure_array$$n(10).280.exit.i":      ; preds = %91, %73
-  tail call void @heap_free(ptr %.fca.0.extract83.i.i.i)
-  tail call void @heap_free(ptr nonnull %.fca.1.extract84.i.i.i)
+  tail call void @heap_free(ptr %.fca.0.extract80.i.i.i)
+  tail call void @heap_free(ptr nonnull %.fca.1.extract81.i.i.i)
   br label %__barray_check_bounds.exit255.i
 
 cond_89_case_0.i:                                 ; preds = %cond_exit_89.thread.i
