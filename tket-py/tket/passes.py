@@ -60,7 +60,9 @@ class PytketHugrPass(ComposablePass):
     def then(self, other: ComposablePass) -> ComposablePass:
         """Perform another composable pass after this pass."""
         if isinstance(other, PytketHugrPass):
-            return PytketHugrPass(*self.pytket_passes, *other.pytket_passes).with_scope(self.scope)
+            return PytketHugrPass(*self.pytket_passes, *other.pytket_passes).with_scope(
+                self._scope
+            )
         else:
             return ComposedPass(self, other)
 
@@ -84,6 +86,7 @@ class NormalizeGuppy(ComposablePass):
     inline_dfgs: bool = True
     remove_redundant_order_edges: bool = True
     squash_borrows: bool = True
+    _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
 
     """Flatten the structure of a Guppy-generated program to enable additional optimisations.
 
@@ -109,8 +112,7 @@ class NormalizeGuppy(ComposablePass):
 
     def with_scope(self, _scope: PassScope) -> ComposablePass:
         """Set the scope of this pass and return self."""
-        # TODO: Store the scope and pass it to the Rust side.
-        # <https://github.com/Quantinuum/tket2/issues/1450>
+        self._scope = _scope
         return self
 
     def _normalize(self, hugr: Hugr, inplace: bool) -> PassResult:
@@ -136,6 +138,7 @@ class NormalizeGuppy(ComposablePass):
             inline_dfgs=self.inline_dfgs,
             remove_redundant_order_edges=self.remove_redundant_order_edges,
             squash_borrows=self.squash_borrows,
+            scope=self._scope,
         )
         return program
 
