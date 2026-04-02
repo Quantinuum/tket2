@@ -126,7 +126,7 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
     /// or if any `in_values` are provided for a module-rooted Hugr.
     #[deprecated(
         note = "Use `run_subtree` and `prepopulate_wire` / `prepopulate_inputs` instead",
-        since = "0.26.2"
+        since = "0.18.0"
     )]
     pub fn run(
         mut self,
