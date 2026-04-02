@@ -60,7 +60,7 @@ class PytketHugrPass(ComposablePass):
     def then(self, other: ComposablePass) -> ComposablePass:
         """Perform another composable pass after this pass."""
         if isinstance(other, PytketHugrPass):
-            return PytketHugrPass(*self.pytket_passes, *other.pytket_passes)
+            return PytketHugrPass(*self.pytket_passes, *other.pytket_passes).with_scope(self.scope)
         else:
             return ComposedPass(self, other)
 
