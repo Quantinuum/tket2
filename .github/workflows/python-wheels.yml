@@ -163,20 +163,19 @@ jobs:
           echo "COMPATIBILITY_FLAG=$COMPATIBILITY_FLAG" >> "$GITHUB_OUTPUT"
           echo "WITH_ZIG_FLAG=$WITH_ZIG_FLAG" >> "$GITHUB_OUTPUT"
 
-      # Skipping this for now - we now just have a .lib file in the tket-c-api windows artifact.
-      #- name: Copy DLL to package directory (Windows)
-      #  if: runner.os == 'Windows'
-      #  shell: bash
-      #  run: |
-      #    # Copy the DLL to the package directory so maturin can include it in the wheel
-      #    if [ -f "$TKET_C_API_PATH/bin/tket-c-api.dll" ]; then
-      #      cp "$TKET_C_API_PATH/bin/tket-c-api.dll" "$MODULE_DIR/tket/tket-c-api.dll"
-      #      echo "Copied DLL to $MODULE_DIR/tket/tket-c-api.dll"
-      #      ls -lh "$MODULE_DIR/tket/tket-c-api.dll"
-      #    else
-      #      echo "ERROR: DLL not found at $TKET_C_API_PATH/bin/tket-c-api.dll"
-      #      exit 1
-      #    fi
+      - name: Copy DLL to package directory (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          # Copy the DLL to the package directory so maturin can include it in the wheel
+          if [ -f "$TKET_C_API_PATH/bin/tket-c-api.dll" ]; then
+            cp "$TKET_C_API_PATH/bin/tket-c-api.dll" "$MODULE_DIR/tket/tket-c-api.dll"
+            echo "Copied DLL to $MODULE_DIR/tket/tket-c-api.dll"
+            ls -lh "$MODULE_DIR/tket/tket-c-api.dll"
+          else
+            echo "ERROR: DLL not found at $TKET_C_API_PATH/bin/tket-c-api.dll"
+            exit 1
+          fi
 
       - name: Build wheels
         shell: bash
