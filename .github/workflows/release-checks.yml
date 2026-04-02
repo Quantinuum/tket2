@@ -26,7 +26,7 @@ env:
   HUGRENV_ROOT: "/tmp/hugrverse"
   HUGRENV_PLATFORM: "manylinux_2_28_x86_64"
   TKET_C_API_PATH: "/tmp/hugrverse"
-  LD_LIBRARY_PATH: "/tmp/hugrverse/lib"
+  LD_LIBRARY_PATH: "/tmp/hugrverse/lib:/tmp/hugrverse/lib64"
 
 jobs:
   py-release:

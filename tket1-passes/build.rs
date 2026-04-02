@@ -211,8 +211,11 @@ fn cargo_set_custom_lib_path(search_path: &[PathBuf]) {
         }
     }
 
-    // On Windows, the import library is named tket-c-api.lib (without lib prefix)
-    // On Unix systems, it's typically libtket-c-api.so/dylib, but we link as tket-c-api
     let lib_name = "tket-c-api";
     println!("cargo:rustc-link-lib={lib_name}");
+
+    // If on windows, also link tket itself
+    if cfg!(target_os = "windows") {
+        println!("cargo:rustc-link-lib=tket");
+    }
 }

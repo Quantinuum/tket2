@@ -34,6 +34,7 @@ in {
     cargo --version
     python --version
     uv --version
+    export LD_LIBRARY_PATH="${hugrenv}/lib:${hugrenv}/lib64:$LD_LIBRARY_PATH"
   '';
 
   env = {
