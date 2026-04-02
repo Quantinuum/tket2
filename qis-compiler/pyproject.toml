@@ -176,8 +176,8 @@ LLVM_SYS_211_PREFIX = '$RUNNER_TEMP\\hugrverse'
 TKET_C_API_PATH = '$RUNNER_TEMP\\hugrverse'
 [tool.cibuildwheel.windows]
 before-all = [
-    'curl -L -o hugrenv-llvm-win_amd64.tar.gz https://github.com/Quantinuum/hugrverse-env/releases/download/v0.3.1/hugrenv-llvm-win_amd64.tar.gz',
-    'curl -L -o hugrenv-tket-win_amd64.tar.gz https://github.com/Quantinuum/hugrverse-env/releases/download/v0.3.1/hugrenv-tket-win_amd64.tar.gz',
+    'curl -L -o hugrenv-llvm-win_amd64.tar.gz https://github.com/Quantinuum/hugrverse-env/releases/download/v0.3.2-beta-windows/hugrenv-llvm-win_amd64.tar.gz',
+    'curl -L -o hugrenv-tket-win_amd64.tar.gz https://github.com/Quantinuum/hugrverse-env/releases/download/v0.3.2-beta-windows/hugrenv-tket-win_amd64.tar.gz',
     # tar is awkward wrt windows paths, so use python
     '''python -c "import os, tarfile; d=os.environ['RUNNER_TEMP']; tarfile.open('hugrenv-llvm-win_amd64.tar.gz', 'r:gz').extractall(d)"''',
     '''python -c "import os, tarfile; d=os.environ['RUNNER_TEMP']; tarfile.open('hugrenv-tket-win_amd64.tar.gz', 'r:gz').extractall(d)"''',

@@ -19,7 +19,7 @@ fn main() {
     let target = SupportedPlatform::from_target_str(&env::var("TARGET").unwrap());
 
     let header_path = if let Some(path) = custom_tket_path {
-        cargo_set_custom_lib_path(&[path.join("lib"), path.join("lib64")]);
+        cargo_set_custom_lib_path(&[path.join("lib"), path.join("lib64"), path.join("bin")]);
         let header_path = path.join("include").join("tket-c-api.h");
 
         assert!(
@@ -214,15 +214,15 @@ fn cargo_set_custom_lib_path(search_path: &[PathBuf]) {
     let lib_name = "tket-c-api";
     println!("cargo:rustc-link-lib={lib_name}");
 
-    if cfg!(target_os = "windows") {
-        // If on windows, also link tket and symengine, as we're
-        // providing static libs
-        println!("cargo:rustc-link-lib=tket");
-        println!("cargo:rustc-link-lib=symengine");
-        println!("cargo:rustc-link-lib=tkassert");
-        println!("cargo:rustc-link-lib=tklog");
-        println!("cargo:rustc-link-lib=tkrng");
-        println!("cargo:rustc-link-lib=tktokenswap");
-        println!("cargo:rustc-link-lib=tkwsm");
-    }
+    //if cfg!(target_os = "windows") {
+    //    // If on windows, also link tket and symengine, as we're
+    //    // providing static libs
+    //    println!("cargo:rustc-link-lib=tket");
+    //    println!("cargo:rustc-link-lib=symengine");
+    //    println!("cargo:rustc-link-lib=tkassert");
+    //    println!("cargo:rustc-link-lib=tklog");
+    //    println!("cargo:rustc-link-lib=tkrng");
+    //    println!("cargo:rustc-link-lib=tktokenswap");
+    //    println!("cargo:rustc-link-lib=tkwsm");
+    //}
 }

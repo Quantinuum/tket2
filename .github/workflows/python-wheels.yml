@@ -114,7 +114,7 @@ jobs:
             test-wheels: true
             hugrenv:
               platform: "win_amd64"
-              version: "0.3.1"
+              version: "0.3.2-beta-windows"
               root: "C:/hugrverse"
     steps:
       - uses: actions/checkout@v6
