@@ -31,6 +31,7 @@ runs:
         install_path="${{ inputs.install-path }}"
         target="${{ inputs.target }}"
         packages="${{ inputs.packages }}"
+        mkdir -p $install_path
         echo "Downloading hugrenv version $version for target $target to $install_path"
         for package in ${packages//,/ }; do
           echo "Downloading package $package"
