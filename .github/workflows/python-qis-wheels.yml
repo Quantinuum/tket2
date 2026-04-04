@@ -56,7 +56,7 @@ jobs:
           - name: windows-2022
             target: win_amd64
     name: "qis-compiler wheels (${{matrix.os}})"
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.os.name }}
     steps:
       # ---------------------------------
       # Bootstrap the build environment
@@ -74,7 +74,7 @@ jobs:
 
       - uses: ./.github/actions/install-hugrenv
         with:
-          target: ${{ matrix.target }}
+          target: ${{ matrix.os.target }}
 
       # Note that we are using CIBuildWheel to build the wheels.
       # This treats linux differently to macos and windows.
@@ -105,7 +105,7 @@ jobs:
       - name: Upload wheels
         uses: actions/upload-artifact@v7
         with:
-          name: qis-compiler-wheels-${{ matrix.os }}
+          name: qis-compiler-wheels-${{ matrix.os.name }}
           path: wheelhouse/*.whl
           if-no-files-found: error
 

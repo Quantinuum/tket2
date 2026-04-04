@@ -23,19 +23,18 @@ runs:
       id: version
       run: |
         version=$(jq -r '.version' hugrenv.lock)
-        echo "version=$version" >> $GITHUB_OUTPUT
+        echo "HUGRENV_VERSION=$version" >> $GITHUB_ENV
     - name: Download from hugrverse-env
       shell: bash
       run: |
-        version="${{ steps.version.outputs.version }}"
         install_path="${{ inputs.install-path }}"
         target="${{ inputs.target }}"
         packages="${{ inputs.packages }}"
         mkdir -p $install_path
-        echo "Downloading hugrenv version $version for target $target to $install_path"
+        echo "Downloading hugrenv version $HUGRENV_VERSION for target $target to $install_path"
         for package in ${packages//,/ }; do
           echo "Downloading package $package"
-          url="https://github.com/Quantinuum/hugrverse-env/releases/download/v${version}/hugrenv-${package}-${target}.tar.gz"
+          url="https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-${package}-${target}.tar.gz"
           curl -L "$url" | tar -xzf - -C $install_path --strip-components=1
         done
     - name: Set environment variables
@@ -55,7 +54,24 @@ runs:
           echo "Setting LIBCLANG_PATH to ${{ inputs.install-path }}/lib"
           echo "LIBCLANG_PATH=${{ inputs.install-path }}/lib" >> $GITHUB_ENV
         fi;
-        echo "Setting HUGRENV_VERSION to $version"
-        echo "HUGRENV_VERSION=$version" >> $GITHUB_ENV
+        # if linux, set LD_LIBRARY_PATH to include lib and lib64
+        if [[ "${{ inputs.target }}" == *linux* ]]; then
+          echo "Setting LD_LIBRARY_PATH to include ${{ inputs.install-path }}/lib and ${{ inputs.install-path }}/lib64"
+          echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${{ inputs.install-path }}/lib:${{ inputs.install-path }}/lib64:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
+        fi;
+        # if macos, set DYLD_LIBRARY_PATH to include lib
+        if [[ "${{ inputs.target }}" == *macos* ]]; then
+          echo "Setting DYLD_LIBRARY_PATH to include ${{ inputs.install-path }}/lib"
+          echo "DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:${{ inputs.install-path }}/lib:${DYLD_LIBRARY_PATH}" >> $GITHUB_ENV
+        fi;
+        # if windows, set PATH to include bin
+        if [[ "${{ inputs.target }}" == *win* ]]; then
+          echo "Setting PATH to include ${{ inputs.install-path }}/lib and ${{ inputs.install-path }}/lib64"
+          echo "${{ inputs.install-path }}/lib" >> $GITHUB_PATH
+          echo "${{ inputs.install-path }}/lib64" >> $GITHUB_PATH
+        fi;
+        echo "Setting PATH to include ${{ inputs.install-path }}/bin"
+        echo "${{ inputs.install-path }}/bin:$PATH" >> $GITHUB_PATH
+
 
 
