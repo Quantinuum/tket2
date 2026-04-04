@@ -1,0 +1,59 @@
+name: Get the hugrenv version used in this branch
+description: Reads hugrenv.lock to extract the version field
+
+inputs:
+  install-path:
+    description: "The path to the hugrenv installation (default: /tmp/hugrverse)"
+    required: false
+    default: "/tmp/hugrverse"
+  target:
+    description: "The target platform (e.g. manylinux_2_28_x86_64, macos_15_0_aarch64, win_amd64)"
+    required: false
+    default: "manylinux_2_28_x86_64"
+  packages:
+    description: "Comma-separated list of packages to install (default: llvm,tket)"
+    required: false
+    default: "llvm,tket"
+
+runs:
+  using: composite
+  steps:
+    - name: Get version from hugrenv.lock
+      shell: bash
+      id: version
+      run: |
+        version=$(jq -r '.version' hugrenv.lock)
+        echo "version=$version" >> $GITHUB_OUTPUT
+    - name: Download from hugrverse-env
+      shell: bash
+      run: |
+        version="${{ steps.version.outputs.version }}"
+        install_path="${{ inputs.install-path }}"
+        target="${{ inputs.target }}"
+        packages="${{ inputs.packages }}"
+        echo "Downloading hugrenv version $version for target $target to $install_path"
+        for package in ${packages//,/ }; do
+          echo "Downloading package $package"
+          url="https://github.com/Quantinuum/hugrverse-env/releases/download/v${version}/hugrenv-${package}-${target}.tar.gz"
+          curl -L "$url" | tar -xzf - -C $install_path --strip-components=1
+    - name: Set environment variables
+      shell: bash
+      run: |
+        echo "Setting environment variables for hugrenv"
+        echo "HUGRENV_PATH=${{ inputs.install-path }}" >> $GITHUB_ENV
+        # if tket is in the packages, set TKET_C_API_PATH
+        if [[ "${{ inputs.packages }}" == *"tket"* ]]; then
+          echo "Setting TKET_C_API_PATH to ${{ inputs.install-path }}"
+          echo "TKET_C_API_PATH=${{ inputs.install-path }}" >> $GITHUB_ENV
+        fi;
+        # if llvm is in the packages, set LLVM_SYS_211_PREFIX and LIBCLANG_PATH
+        if [[ "${{ inputs.packages }}" == *"llvm"* ]]; then
+          echo "Setting LLVM_SYS_211_PREFIX to ${{ inputs.install-path }}"
+          echo "LLVM_SYS_211_PREFIX=${{ inputs.install-path }}" >> $GITHUB_ENV
+          echo "Setting LIBCLANG_PATH to ${{ inputs.install-path }}/lib"
+          echo "LIBCLANG_PATH=${{ inputs.install-path }}/lib" >> $GITHUB_ENV
+        fi;
+        echo "Setting HUGRENV_VERSION to $version"
+        echo "HUGRENV_VERSION=$version" >> $GITHUB_ENV
+
+

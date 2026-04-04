@@ -77,45 +77,29 @@ jobs:
           # ---------------- Linux
           - runner: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
-            hugrenv:
-              platform: "manylinux_2_28_aarch64"
-              version: "0.3.1"
-              root: "/tmp/hugrverse"
-            manylinux: "manylinux_2_28"
+            hugrenv-platform: manylinux_2_28_aarch64
             test-wheels: true
           - runner: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
-            hugrenv:
-              platform: "manylinux_2_28_x86_64"
-              version: "0.3.1"
-              root: "/tmp/hugrverse"
-            manylinux: "manylinux_2_28"
+            hugrenv-platform: manylinux_2_28_x86_64
+            manylinux: manylinux_2_28
             test-wheels: true
           # ---------------- Mac
           - runner: macos-14
             target: aarch64-apple-darwin
+            hugrenv-platform: macos_15_0_aarch64
             macos-compatibility: "15.0"
             test-wheels: true
-            hugrenv:
-              platform: "macosx_15_0_aarch64"
-              version: "0.3.1"
-              root: "/tmp/hugrverse"
           - runner: macos-15-intel
             target: x86_64-apple-darwin
+            hugrenv-platform: macos_15_0_x86_64
             macos-compatibility: "15.0"
             test-wheels: true
-            hugrenv:
-              platform: "macosx_15_0_x86_64"
-              version: "0.3.1"
-              root: "/tmp/hugrverse"
           # ---------------- Windows
           - runner: windows-2025
             target: x86_64-pc-windows-msvc
+            hugrenv-platform: win_amd64
             test-wheels: true
-            hugrenv:
-              platform: "win_amd64"
-              version: "0.3.2-beta-windows"
-              root: "C:/hugrverse"
     steps:
       - uses: actions/checkout@v6
       - uses: mozilla-actions/sccache-action@v0.0.9
@@ -128,21 +112,9 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
-      - name: Install compliant tket1 and LLVM
-        shell: bash
-        run: |
-          extract_to="${{ matrix.platform.hugrenv.root }}"
-          if [[ "${{ matrix.platform.hugrenv.platform }}" == win* ]]; then
-            # use cygpath - tar doesn't like windows paths
-            extract_to=$(cygpath -w "$extract_to")
-          fi
-          mkdir -p "$extract_to"
-          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${{ matrix.platform.hugrenv.version }}/hugrenv-tket-${{ matrix.platform.hugrenv.platform }}.tar.gz \
-            | tar xz -C $extract_to --strip-components=1
-          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${{ matrix.platform.hugrenv.version }}/hugrenv-llvm-${{ matrix.platform.hugrenv.platform }}.tar.gz \
-            | tar xz -C $extract_to --strip-components=1
-          echo "TKET_C_API_PATH=${{ matrix.platform.hugrenv.root }}" >> "$GITHUB_ENV"
-          echo "LLVM_SYS_211_PREFIX=${{ matrix.platform.hugrenv.root }}" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/install-hugrenv
+        with:
+          target: ${{ matrix.platform.hugrenv-platform }}
 
       - uses: mlugg/setup-zig@v2
         if: ${{ matrix.platform.manylinux }}
@@ -209,7 +181,7 @@ jobs:
         shell: bash
         run: |
           echo "Repairing macOS wheels with delocate..."
-          export DYLD_LIBRARY_PATH="${{ matrix.platform.hugrenv.root }}/lib:${{ matrix.platform.hugrenv.root }}/lib64:$DYLD_LIBRARY_PATH"
+          export DYLD_LIBRARY_PATH="$HUGRENV_PATH/lib:$HUGRENV_PATH/lib64:$DYLD_LIBRARY_PATH"
           ls -lh dist || true
           MAC_WHEELS=$(ls dist/*macosx*.whl 2>/dev/null || true)
           if [ -z "$MAC_WHEELS" ]; then
@@ -239,7 +211,10 @@ jobs:
             # Remove original libraries from the build environment to ensure that
             # the test installation is actually using the built wheels, and not picking up
             # the libraries from the hugrverse environment.
-            rm -rf ${{ matrix.platform.hugrenv.root }}
+            rm -rf $HUGRENV_PATH;
+            unset HUGRENV_PATH;
+            unset TKET_C_API_PATH;
+            unset LLVM_SYS_211_PREFIX;
 
             # Import tket from within a fresh environment/directory rather than the source
             # directory to avoid source conflicts (the repaired wheel has modified library paths)

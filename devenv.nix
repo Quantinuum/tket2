@@ -40,8 +40,9 @@ in {
 
   env = {
     "LLVM_SYS_${llvmVersionMajor}${llvmVersionMinor}_PREFIX" = "${llvmPackages.libllvm.dev}";
-    "TKET_C_API_PATH" = "${hugrenv}";
+    "TKET_C_API_PATH" = "${hugrenv.path}";
     "LIBCLANG_PATH" = "${pkgs.libclang.lib}/lib";
+    "HUGRENV_VERSION" = "${hugrenv.version}";
   };
 
   # https://devenv.sh/languages/

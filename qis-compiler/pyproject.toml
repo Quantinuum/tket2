@@ -89,13 +89,14 @@ manylinux-aarch64-image = "quay.io/pypa/manylinux_2_28_aarch64"
 
 before-test = "uv sync --only-dev --active"
 test-command = "pytest -vv {package}"
+environment-pass = ["HUGRENV_PATH", "TKET_C_API_PATH", "LLVM_SYS_211_PREFIX"]
 
 [tool.cibuildwheel.linux.environment]
-PATH = '$HOME/.cargo/bin:/tmp/hugrverse/bin:$PATH'
-TKET_C_API_PATH = '/tmp/hugrverse'
-LLVM_SYS_211_PREFIX = '/tmp/hugrverse'
+PATH = '$HOME/.cargo/bin:/host/${HUGRENV_PATH}/bin:$PATH'
+TKET_C_API_PATH = '/host/${TKET_C_API_PATH}'
+LLVM_SYS_211_PREFIX = '/host/${LLVM_SYS_211_PREFIX}'
 [tool.cibuildwheel.linux]
-environment-pass = ["CACHE_CARGO"]
+environment-pass = ["HUGRENV_VERSION", "CACHE_CARGO"]
 before-all = '''
     curl -sSf https://sh.rustup.rs | sh -s -- -y;
     dnf install -y --setopt=install_weak_deps=False libffi-devel gcc-toolset-13;
@@ -115,11 +116,6 @@ before-all = '''
     else
         HUGRVERSE_ARCH=manylinux_2_28_aarch64;
     fi;
-    llvm_url="https://github.com/Quantinuum/hugrverse-env/releases/download/v0.3.1/hugrenv-llvm-${HUGRVERSE_ARCH}.tar.gz"
-    tket_url="https://github.com/Quantinuum/hugrverse-env/releases/download/v0.3.1/hugrenv-tket-${HUGRVERSE_ARCH}.tar.gz"
-    echo "Downloading HUGRVERSE environment from ${llvm_url} and ${tket_url}";
-    curl -L $llvm_url | tar xz -C /tmp;
-    curl -L $tket_url | tar xz -C /tmp;
 '''
 before-test = '''
     if ${CACHE_CARGO};
@@ -158,29 +154,14 @@ MACOSX_DEPLOYMENT_TARGET = "15.0"
 [tool.cibuildwheel.macos]
 before-all = [
     'curl -sSf https://sh.rustup.rs | sh -s -- -y',
-    'if [ "$(uname -m)" = "arm64" ]; then HUGRVERSE_ARCH=macosx_15_0_aarch64; else HUGRVERSE_ARCH=macosx_15_0_x86_64; fi',
-    'llvm_url="https://github.com/Quantinuum/hugrverse-env/releases/download/v0.3.1/hugrenv-llvm-${HUGRVERSE_ARCH}.tar.gz"',
-    'tket_url="https://github.com/Quantinuum/hugrverse-env/releases/download/v0.3.1/hugrenv-tket-${HUGRVERSE_ARCH}.tar.gz"',
-    'echo "Downloading HUGRVERSE environment from ${llvm_url} and ${tket_url}"',
-    'curl -L $llvm_url | tar xz -C /tmp',
-    'curl -L $tket_url | tar xz -C /tmp',
 ]
 repair-wheel-command = [
     'DYLD_FALLBACK_LIBRARY_PATH=${LLVM_SYS_211_PREFIX}/lib delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel}',
     'uvx abi3audit --strict --report {wheel}',
 ]
 
-[tool.cibuildwheel.windows.environment]
-PATH = '$RUNNER_TEMP\\hugrverse\\bin;$PATH'
-LLVM_SYS_211_PREFIX = '$RUNNER_TEMP\\hugrverse'
-TKET_C_API_PATH = '$RUNNER_TEMP\\hugrverse'
 [tool.cibuildwheel.windows]
 before-all = [
-    'curl -L -o hugrenv-llvm-win_amd64.tar.gz https://github.com/Quantinuum/hugrverse-env/releases/download/v0.3.2-beta-windows/hugrenv-llvm-win_amd64.tar.gz',
-    'curl -L -o hugrenv-tket-win_amd64.tar.gz https://github.com/Quantinuum/hugrverse-env/releases/download/v0.3.2-beta-windows/hugrenv-tket-win_amd64.tar.gz',
-    # tar is awkward wrt windows paths, so use python
-    '''python -c "import os, tarfile; d=os.environ['RUNNER_TEMP']; tarfile.open('hugrenv-llvm-win_amd64.tar.gz', 'r:gz').extractall(d)"''',
-    '''python -c "import os, tarfile; d=os.environ['RUNNER_TEMP']; tarfile.open('hugrenv-tket-win_amd64.tar.gz', 'r:gz').extractall(d)"''',
     'rustup update',
 ]
 repair-wheel-command = [

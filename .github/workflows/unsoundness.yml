@@ -42,13 +42,7 @@ jobs:
           rustup toolchain install nightly --component miri
           rustup override set nightly
           cargo miri setup
-      - name: Install compliant tket1 and LLVM
-        run: |
-          mkdir -p $HUGRENV_ROOT
-          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-tket-${HUGRENV_PLATFORM}.tar.gz \
-            | tar xz -C $HUGRENV_ROOT --strip-components=1
-          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-llvm-${HUGRENV_PLATFORM}.tar.gz \
-            | tar xz -C $HUGRENV_ROOT --strip-components=1
+      - uses: ./.github/actions/install-hugrenv
 
       # Run miri unsoundness checks.
       #

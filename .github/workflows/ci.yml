@@ -24,15 +24,6 @@ env:
   PYTHON_HIGHEST: "3.14"
   PYTHON_LOWEST: "3.10"
 
-  # different strings for install action and feature name
-  # adapted from https://github.com/TheDan64/inkwell/blob/master/.github/workflows/test.yml
-  HUGRENV_VERSION: "0.3.1"
-  HUGRENV_ROOT: "/tmp/hugrverse"
-  HUGRENV_PLATFORM: "manylinux_2_28_x86_64"
-  TKET_C_API_PATH: "/tmp/hugrverse"
-  LD_LIBRARY_PATH: "/tmp/hugrverse/lib:/tmp/hugrverse/lib64"
-  LLVM_SYS_211_PREFIX: "/tmp/hugrverse"
-
 jobs:
   # Check if changes were made to the relevant files.
   # Always returns true if running on the default branch, to ensure all changes are thoroughly checked.
@@ -66,13 +57,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-      - name: Install compliant tket1 and LLVM
-        run: |
-          mkdir -p $HUGRENV_ROOT
-          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-tket-${HUGRENV_PLATFORM}.tar.gz \
-            | tar xz -C $HUGRENV_ROOT --strip-components=1
-          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-llvm-${HUGRENV_PLATFORM}.tar.gz \
-            | tar xz -C $HUGRENV_ROOT --strip-components=1
+      - uses: ./.github/actions/install-hugrenv
       - name: Check formatting
         run: cargo fmt -- --check
       - name: Run clippy
@@ -97,13 +82,7 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
-      - name: Install compliant tket1 and LLVM
-        run: |
-          mkdir -p $HUGRENV_ROOT
-          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-tket-${HUGRENV_PLATFORM}.tar.gz \
-            | tar xz -C $HUGRENV_ROOT --strip-components=1
-          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-llvm-${HUGRENV_PLATFORM}.tar.gz \
-            | tar xz -C $HUGRENV_ROOT --strip-components=1
+      - uses: ./.github/actions/install-hugrenv
       - name: Install Python ${{ env.PYTHON_LOWEST }}
         run: uv python install ${{ env.PYTHON_LOWEST }}
       - name: Setup dependencies
@@ -128,13 +107,7 @@ jobs:
       - uses: mozilla-actions/sccache-action@v0.0.9
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
-      - name: Install compliant tket1 and LLVM
-        run: |
-          mkdir -p $HUGRENV_ROOT
-          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-tket-${HUGRENV_PLATFORM}.tar.gz \
-            | tar xz -C $HUGRENV_ROOT --strip-components=1
-          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-llvm-${HUGRENV_PLATFORM}.tar.gz \
-            | tar xz -C $HUGRENV_ROOT --strip-components=1
+      - uses: ./.github/actions/install-hugrenv
       - uses: cargo-bins/cargo-binstall@main
       - name: Install cargo-codspeed
         run: cargo binstall cargo-codspeed --force
@@ -165,13 +138,7 @@ jobs:
           toolchain: "stable"
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
-      - name: Install compliant tket1 and LLVM
-        run: |
-          mkdir -p $HUGRENV_ROOT
-          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-tket-${HUGRENV_PLATFORM}.tar.gz \
-            | tar xz -C $HUGRENV_ROOT --strip-components=1
-          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-llvm-${HUGRENV_PLATFORM}.tar.gz \
-            | tar xz -C $HUGRENV_ROOT --strip-components=1
+      - uses: ./.github/actions/install-hugrenv
       - uses: taiki-e/install-action@nextest
       - name: Build with no features
         run: cargo nextest r --verbose -p tket -p tket-py -p tket-qsystem --no-default-features --no-run
@@ -193,13 +160,7 @@ jobs:
           toolchain: "stable"
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
-      - name: Install compliant tket1 and LLVM
-        run: |
-          mkdir -p $HUGRENV_ROOT
-          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-tket-${HUGRENV_PLATFORM}.tar.gz \
-            | tar xz -C $HUGRENV_ROOT --strip-components=1
-          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-llvm-${HUGRENV_PLATFORM}.tar.gz \
-            | tar xz -C $HUGRENV_ROOT --strip-components=1
+      - uses: ./.github/actions/install-hugrenv
       - uses: taiki-e/install-action@nextest
       - name: Build with all features
         run: cargo nextest r --verbose --workspace --all-features --no-run
@@ -226,13 +187,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
-      - name: Install compliant tket1 and LLVM
-        run: |
-          mkdir -p $HUGRENV_ROOT
-          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-tket-${HUGRENV_PLATFORM}.tar.gz \
-            | tar xz -C $HUGRENV_ROOT --strip-components=1
-          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-llvm-${HUGRENV_PLATFORM}.tar.gz \
-            | tar xz -C $HUGRENV_ROOT --strip-components=1
+      - uses: ./.github/actions/install-hugrenv
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
       - uses: taiki-e/install-action@nextest
@@ -259,13 +214,7 @@ jobs:
           # Nightly is required to count doctests coverage
           toolchain: "nightly"
           components: llvm-tools-preview
-      - name: Install compliant tket1 and LLVM
-        run: |
-          mkdir -p $HUGRENV_ROOT
-          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-tket-${HUGRENV_PLATFORM}.tar.gz \
-            | tar xz -C $HUGRENV_ROOT --strip-components=1
-          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-llvm-${HUGRENV_PLATFORM}.tar.gz \
-            | tar xz -C $HUGRENV_ROOT --strip-components=1
+      - uses: ./.github/actions/install-hugrenv
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Run tests with coverage instrumentation
@@ -305,13 +254,7 @@ jobs:
           toolchain: "nightly"
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
-      - name: Install compliant tket1 and LLVM
-        run: |
-          mkdir -p $HUGRENV_ROOT
-          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-tket-${HUGRENV_PLATFORM}.tar.gz \
-            | tar xz -C $HUGRENV_ROOT --strip-components=1
-          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-llvm-${HUGRENV_PLATFORM}.tar.gz \
-            | tar xz -C $HUGRENV_ROOT --strip-components=1
+      - uses: ./.github/actions/install-hugrenv
       - uses: cargo-bins/cargo-binstall@main
       - name: Install cargo-minimal-versions
         run: |
@@ -349,13 +292,7 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
-      - name: Install compliant tket1 and LLVM
-        run: |
-          mkdir -p $HUGRENV_ROOT
-          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-tket-${HUGRENV_PLATFORM}.tar.gz \
-            | tar xz -C $HUGRENV_ROOT --strip-components=1
-          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-llvm-${HUGRENV_PLATFORM}.tar.gz \
-            | tar xz -C $HUGRENV_ROOT --strip-components=1
+      - uses: ./.github/actions/install-hugrenv
       - name: Install Python ${{ env.PYTHON_LOWEST }}
         run: uv python install ${{ env.PYTHON_LOWEST }}
       - name: Setup dependencies
@@ -394,13 +331,7 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
-      - name: Install compliant tket1 and LLVM
-        run: |
-          mkdir -p $HUGRENV_ROOT
-          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-tket-${HUGRENV_PLATFORM}.tar.gz \
-            | tar xz -C $HUGRENV_ROOT --strip-components=1
-          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-llvm-${HUGRENV_PLATFORM}.tar.gz \
-            | tar xz -C $HUGRENV_ROOT --strip-components=1
+      - uses: ./.github/actions/install-hugrenv
       - name: Install Python ${{ env.PYTHON_LOWEST }}
         run: uv python install ${{ env.PYTHON_LOWEST }}
       - name: Run qis-compiler tests
@@ -429,11 +360,6 @@ jobs:
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
       - uses: extractions/setup-just@v3
-      - name: Install compliant tket1 and LLVM
-        run: |
-          mkdir -p $HUGRENV_ROOT
-          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-tket-${HUGRENV_PLATFORM}.tar.gz \
-            | tar xz -C $HUGRENV_ROOT --strip-components=1
       - name: Generate the updated definitions
         run: just gen-extensions
       - name: Check if the declarations are up to date

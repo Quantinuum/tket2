@@ -75,6 +75,11 @@ miri *TEST_ARGS:
 recompile-eccs:
     scripts/compile-test-eccs.sh
 
+# Update hugrenv version, including discovery of new hashes.
+# This change bumps the hugrenv version used in both devenv and CI.
+update-hugrenv version:
+    scripts/update-hugrenv.sh {{version}}
+
 # Regenerates all hugr definitions inside `test_files/`
 recompile-test-hugrs:
     @echo "---- Recompiling example guppy programs ----"
@@ -95,6 +100,8 @@ update-snapshots-rs:
 update-snapshots-py *TEST_ARGS:
     uv run maturin develop --uv
     uv run pytest --snapshot-update {{TEST_ARGS}}
+
+
 
 # Build the sphinx API documentation
 build-pydocs:

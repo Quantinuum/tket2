@@ -17,18 +17,6 @@ permissions:
 env:
   UV_VERSION: "0.9.7"
   UV_FROZEN: 1
-  # Path to the cached tket-c-api library
-  # When this envvar is set, the `./.github/actions/tket-c-api` action **must** be run to fetch the artifacts
-  # This config is not required, but speeds up the build by caching the tket-c-api library
-  # The alternative is to install conan and remove the env var
-  HUGRENV_VERSION: "0.3.1"
-  HUGRENV_ROOT: "/tmp/hugrverse"
-  HUGRENV_PLATFORM: "manylinux_2_28_x86_64"
-  TKET_C_API_PATH: "/tmp/hugrverse"
-  LD_LIBRARY_PATH: "/tmp/hugrverse/lib"
-  LLVM_SYS_211_PREFIX: "/tmp/hugrverse"
-
-
 
 jobs:
   # Check if changes were made to the relevant files.
@@ -59,11 +47,9 @@ jobs:
           just-version: "1.40.0"
 
 
-      - name: Install compliant tket1
-        run: |
-          mkdir -p $HUGRENV_ROOT
-          curl -L https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-tket-${HUGRENV_PLATFORM}.tar.gz \
-            | tar xz -C $HUGRENV_ROOT --strip-components=1
+      - uses: ./.github/actions/install-hugrenv
+        with:
+          packages: "tket"
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
