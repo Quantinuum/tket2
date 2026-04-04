@@ -2,14 +2,6 @@ name: Get the hugrenv version used in this branch
 description: Reads hugrenv.lock to extract the version field
 
 inputs:
-  install-path:
-    description: "The path to the hugrenv installation (default: /tmp/hugrverse)"
-    required: false
-    default: "/tmp/hugrverse"
-  target:
-    description: "The target platform (e.g. manylinux_2_28_x86_64, macosx_15_0_aarch64, win_amd64)"
-    required: false
-    default: "manylinux_2_28_x86_64"
   packages:
     description: "Comma-separated list of packages to install (default: llvm,tket)"
     required: false
@@ -24,54 +16,108 @@ runs:
       run: |
         version=$(jq -r '.version' hugrenv.lock)
         echo "HUGRENV_VERSION=$version" >> $GITHUB_ENV
+    - name: Get target platform
+      shell: bash
+      id: install_path
+      run: |
+        # Identify the system (left columns) to figure out the target and path
+        # +------------------------++------------------------+-----------------+
+        # | host os | architecture || target                 | extraction path |
+        # +------------------------++------------------------+-----------------+
+        # | linux   | x86_64       || manylinux_2_28_x86_64  | /opt/hugrverse  |
+        # | linux   | aarch64      || manylinux_2_28_aarch64 | /opt/hugrverse  |
+        # | macos   | x86_64       || macosx_15_0_x86_64     | /opt/hugrverse  |
+        # | macos   | aarch64      || macosx_15_0_aarch64    | /opt/hugrverse  |
+        # | windows | x86_64       || win_amd64              | C:\hugrverse    |
+        # +---------+--------------++------------------------+-----------------+
+        os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+        arch="$(uname -m)"
+        case $os in
+          linux)
+            if [[ "$arch" == "x86_64" ]]; then
+              target="manylinux_2_28_x86_64"
+            elif [[ "$arch" == "aarch64" ]]; then
+              target="manylinux_2_28_aarch64"
+            else
+              echo "Unsupported architecture: $arch"
+              exit 1
+            fi
+            ;;
+          darwin)
+            if [[ "$arch" == "x86_64" ]]; then
+              target="macosx_15_0_x86_64"
+            elif [[ "$arch" == "arm64" ]]; then
+              target="macosx_15_0_aarch64"
+            else
+              echo "Unsupported architecture: $arch"
+              exit 1
+            fi
+            ;;
+          msys*|cygwin*|mingw*|win*)
+            if [[ "$arch" == "x86_64" ]]; then
+              target="win_amd64"
+            else
+              echo "Unsupported architecture: $arch"
+              exit 1
+            fi
+            ;;
+          *)
+            echo "Unsupported OS: $os"
+            exit 1
+            ;;
+        esac
+        echo "HUGRENV_TARGET=$target" >> $GITHUB_ENV
+        echo "HUGRENV_PATH=${HUGRENV_PATH}" >> $GITHUB_ENV
+
     - name: Download from hugrverse-env
       shell: bash
       run: |
-        install_path="${{ inputs.install-path }}"
-        target="${{ inputs.target }}"
         packages="${{ inputs.packages }}"
-        mkdir -p $install_path
-        echo "Downloading hugrenv version $HUGRENV_VERSION for target $target to $install_path"
+        echo "Downloading hugrenv version ${HUGRENV_VERSION} for target ${HUGRENV_TARGET} with packages $packages to ${HUGRENV_PATH}"
+        mkdir -p $HUGRENV_PATH
         for package in ${packages//,/ }; do
           echo "Downloading package $package"
-          url="https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-${package}-${target}.tar.gz"
-          curl -L "$url" | tar -xzf - -C $install_path --strip-components=1
+          url="https://github.com/Quantinuum/hugrverse-env/releases/download/v${HUGRENV_VERSION}/hugrenv-${package}-${HUGRENV_TARGET}.tar.gz"
+          curl -L "$url" | tar -xzf - -C ${HUGRENV_PATH} --strip-components=1
         done
+
     - name: Set environment variables
       shell: bash
       run: |
         echo "Setting environment variables for hugrenv"
-        echo "HUGRENV_PATH=${{ inputs.install-path }}" >> $GITHUB_ENV
+
         # if tket is in the packages, set TKET_C_API_PATH
         if [[ "${{ inputs.packages }}" == *"tket"* ]]; then
-          echo "Setting TKET_C_API_PATH to ${{ inputs.install-path }}"
-          echo "TKET_C_API_PATH=${{ inputs.install-path }}" >> $GITHUB_ENV
+          echo "Setting TKET_C_API_PATH to ${HUGRENV_PATH}"
+          echo "TKET_C_API_PATH=${HUGRENV_PATH}" >> $GITHUB_ENV
         fi;
+
         # if llvm is in the packages, set LLVM_SYS_211_PREFIX and LIBCLANG_PATH
         if [[ "${{ inputs.packages }}" == *"llvm"* ]]; then
-          echo "Setting LLVM_SYS_211_PREFIX to ${{ inputs.install-path }}"
-          echo "LLVM_SYS_211_PREFIX=${{ inputs.install-path }}" >> $GITHUB_ENV
-          echo "Setting LIBCLANG_PATH to ${{ inputs.install-path }}/lib"
-          echo "LIBCLANG_PATH=${{ inputs.install-path }}/lib" >> $GITHUB_ENV
+          echo "Setting LLVM_SYS_211_PREFIX to ${HUGRENV_PATH}"
+          echo "LLVM_SYS_211_PREFIX=${HUGRENV_PATH}" >> $GITHUB_ENV
+          echo "Setting LIBCLANG_PATH to ${HUGRENV_PATH}/lib"
+          echo "LIBCLANG_PATH=${HUGRENV_PATH}/lib" >> $GITHUB_ENV
         fi;
-        # if linux, set LD_LIBRARY_PATH to include lib and lib64
-        if [[ "${{ inputs.target }}" == *linux* ]]; then
-          echo "Setting LD_LIBRARY_PATH to include ${{ inputs.install-path }}/lib and ${{ inputs.install-path }}/lib64"
-          echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${{ inputs.install-path }}/lib:${{ inputs.install-path }}/lib64:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
-        fi;
-        # if macos, set DYLD_LIBRARY_PATH to include lib
-        if [[ "${{ inputs.target }}" == *macos* ]]; then
-          echo "Setting DYLD_LIBRARY_PATH to include ${{ inputs.install-path }}/lib"
-          echo "DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:${{ inputs.install-path }}/lib:${DYLD_LIBRARY_PATH}" >> $GITHUB_ENV
-        fi;
-        # if windows, set PATH to include bin
-        if [[ "${{ inputs.target }}" == *win* ]]; then
-          echo "Setting PATH to include ${{ inputs.install-path }}/lib and ${{ inputs.install-path }}/lib64"
-          echo "${{ inputs.install-path }}/lib" >> $GITHUB_PATH
-          echo "${{ inputs.install-path }}/lib64" >> $GITHUB_PATH
-        fi;
-        echo "Setting PATH to include ${{ inputs.install-path }}/bin"
-        echo "${{ inputs.install-path }}/bin:$PATH" >> $GITHUB_PATH
+        # set library env vars
+        case $HUGRENV_TARGET in
+          manylinux*)
+            echo "Setting LD_LIBRARY_PATH to include ${HUGRENV_PATH}/lib and ${HUGRENV_PATH}/lib64"
+            echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${HUGRENV_PATH}/lib:${HUGRENV_PATH}/lib64:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
+            ;;
+          macosx*)
+            echo "Setting DYLD_LIBRARY_PATH to include ${HUGRENV_PATH}/lib"
+            echo "DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:${HUGRENV_PATH}/lib:${DYLD_LIBRARY_PATH}" >> $GITHUB_ENV
+            ;;
+          win*)
+            echo "Setting PATH to include ${HUGRENV_PATH}/lib and ${HUGRENV_PATH}/lib64"
+            echo "${HUGRENV_PATH}/lib" >> $GITHUB_PATH
+            echo "${HUGRENV_PATH}/lib64" >> $GITHUB_PATH
+            ;;
+        esac
+        # set $PATH
+        echo "Setting PATH to include ${HUGRENV_PATH}/bin"
+        echo "${HUGRENV_PATH}/bin:$PATH" >> $GITHUB_PATH
 
 
 

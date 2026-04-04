@@ -77,28 +77,23 @@ jobs:
           # ---------------- Linux
           - runner: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
-            hugrenv-platform: manylinux_2_28_aarch64
             test-wheels: true
           - runner: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
-            hugrenv-platform: manylinux_2_28_x86_64
             manylinux: manylinux_2_28
             test-wheels: true
           # ---------------- Mac
           - runner: macos-14
             target: aarch64-apple-darwin
-            hugrenv-platform: macosx_15_0_aarch64
             macos-compatibility: "15.0"
             test-wheels: true
           - runner: macos-15-intel
             target: x86_64-apple-darwin
-            hugrenv-platform: macosx_15_0_x86_64
             macos-compatibility: "15.0"
             test-wheels: true
           # ---------------- Windows
           - runner: windows-2025
             target: x86_64-pc-windows-msvc
-            hugrenv-platform: win_amd64
             test-wheels: true
     steps:
       - uses: actions/checkout@v6
@@ -113,9 +108,6 @@ jobs:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
       - uses: ./.github/actions/install-hugrenv
-        with:
-          target: ${{ matrix.platform.hugrenv-platform }}
-
       - uses: mlugg/setup-zig@v2
         if: ${{ matrix.platform.manylinux }}
 

@@ -357,6 +357,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: mozilla-actions/sccache-action@v0.0.9
+      - uses: ./.github/actions/install-hugrenv
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
       - uses: extractions/setup-just@v3
