@@ -34,6 +34,7 @@ runs:
         arch="$(uname -m)"
         case $os in
           linux)
+            install_path="/opt/hugrverse"
             if [[ "$arch" == "x86_64" ]]; then
               target="manylinux_2_28_x86_64"
             elif [[ "$arch" == "aarch64" ]]; then
@@ -44,6 +45,7 @@ runs:
             fi
             ;;
           darwin)
+            install_path="/opt/hugrverse"
             if [[ "$arch" == "x86_64" ]]; then
               target="macosx_15_0_x86_64"
             elif [[ "$arch" == "arm64" ]]; then
@@ -54,6 +56,7 @@ runs:
             fi
             ;;
           msys*|cygwin*|mingw*|win*)
+            install_path="C:\\hugrverse"
             if [[ "$arch" == "x86_64" ]]; then
               target="win_amd64"
             else
@@ -66,8 +69,8 @@ runs:
             exit 1
             ;;
         esac
-        echo "HUGRENV_TARGET=$target" >> $GITHUB_ENV
-        echo "HUGRENV_PATH=${HUGRENV_PATH}" >> $GITHUB_ENV
+        echo "HUGRENV_TARGET=${target}" >> $GITHUB_ENV
+        echo "HUGRENV_PATH=${install_path}" >> $GITHUB_ENV
 
     - name: Download from hugrverse-env
       shell: bash
