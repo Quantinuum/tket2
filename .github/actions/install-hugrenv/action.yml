@@ -24,17 +24,17 @@ runs:
         # +------------------------++------------------------+-----------------+
         # | host os | architecture || target                 | extraction path |
         # +------------------------++------------------------+-----------------+
-        # | linux   | x86_64       || manylinux_2_28_x86_64  | /opt/hugrverse  |
-        # | linux   | aarch64      || manylinux_2_28_aarch64 | /opt/hugrverse  |
-        # | macos   | x86_64       || macosx_15_0_x86_64     | /opt/hugrverse  |
-        # | macos   | aarch64      || macosx_15_0_aarch64    | /opt/hugrverse  |
+        # | linux   | x86_64       || manylinux_2_28_x86_64  | /tmp/hugrverse  |
+        # | linux   | aarch64      || manylinux_2_28_aarch64 | /tmp/hugrverse  |
+        # | macos   | x86_64       || macosx_15_0_x86_64     | /tmp/hugrverse  |
+        # | macos   | aarch64      || macosx_15_0_aarch64    | /tmp/hugrverse  |
         # | windows | x86_64       || win_amd64              | C:\hugrverse    |
         # +---------+--------------++------------------------+-----------------+
         os="$(uname -s | tr '[:upper:]' '[:lower:]')"
         arch="$(uname -m)"
         case $os in
           linux)
-            install_path="/opt/hugrverse"
+            install_path="/tmp/hugrverse"
             if [[ "$arch" == "x86_64" ]]; then
               target="manylinux_2_28_x86_64"
             elif [[ "$arch" == "aarch64" ]]; then
@@ -45,7 +45,7 @@ runs:
             fi
             ;;
           darwin)
-            install_path="/opt/hugrverse"
+            install_path="/tmp/hugrverse"
             if [[ "$arch" == "x86_64" ]]; then
               target="macosx_15_0_x86_64"
             elif [[ "$arch" == "arm64" ]]; then
