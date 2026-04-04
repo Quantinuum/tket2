@@ -36,6 +36,7 @@ runs:
           echo "Downloading package $package"
           url="https://github.com/Quantinuum/hugrverse-env/releases/download/v${version}/hugrenv-${package}-${target}.tar.gz"
           curl -L "$url" | tar -xzf - -C $install_path --strip-components=1
+        done
     - name: Set environment variables
       shell: bash
       run: |
