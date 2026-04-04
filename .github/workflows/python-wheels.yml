@@ -87,12 +87,12 @@ jobs:
           # ---------------- Mac
           - runner: macos-14
             target: aarch64-apple-darwin
-            hugrenv-platform: macos_15_0_aarch64
+            hugrenv-platform: macosx_15_0_aarch64
             macos-compatibility: "15.0"
             test-wheels: true
           - runner: macos-15-intel
             target: x86_64-apple-darwin
-            hugrenv-platform: macos_15_0_x86_64
+            hugrenv-platform: macosx_15_0_x86_64
             macos-compatibility: "15.0"
             test-wheels: true
           # ---------------- Windows

@@ -20,7 +20,6 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  CACHE_CARGO: true
   UV_VERSION: "0.9.7"
 jobs:
   # Check if the tag matches the package name,
@@ -50,12 +49,12 @@ jobs:
           - name: ubuntu-24.04-arm
             target: manylinux_2_28_aarch64
           - name: macos-15
-            target: macos_15_0_aarch64
+            target: macosx_15_0_aarch64
           - name: macos-15-intel
-            target: macos_15_0_x86_64
+            target: macosx_15_0_x86_64
           - name: windows-2022
             target: win_amd64
-    name: "qis-compiler wheels (${{matrix.os}})"
+    name: "qis-compiler wheels (${{matrix.os.name}})"
     runs-on: ${{ matrix.os.name }}
     steps:
       # ---------------------------------
@@ -76,24 +75,6 @@ jobs:
         with:
           target: ${{ matrix.os.target }}
 
-      # Note that we are using CIBuildWheel to build the wheels.
-      # This treats linux differently to macos and windows.
-      #
-      # On linux, building on the host platform adds an implicit
-      # requirement on the host platform's glibc version and other
-      # system libraries that happen to be available. To mitigate
-      # this, builds are performed within a docker container that
-      # is compatible with manylinux (in our case, manylinux_2_28).
-      #
-      # See https://github.com/pypa/manylinux for more information
-      # about the manylinux project.
-      #
-      # This is an important aspect of wheel building, as it means
-      # that wheels are built in an isolated environment. We use
-      # /tmp/ci-cache for caching, which is then accessed as
-      # /host/tmp/ci-cache within the container.
-
-      # if the hugr_qis compiler has changed, we build it.
       - name: Build selene-hugr-qis-compiler wheel
         uses: pypa/cibuildwheel@v3.4.0
         with:

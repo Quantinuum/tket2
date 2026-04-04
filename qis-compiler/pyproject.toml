@@ -89,56 +89,21 @@ manylinux-aarch64-image = "quay.io/pypa/manylinux_2_28_aarch64"
 
 before-test = "uv sync --only-dev --active"
 test-command = "pytest -vv {package}"
-environment-pass = ["HUGRENV_PATH", "TKET_C_API_PATH", "LLVM_SYS_211_PREFIX"]
 
 [tool.cibuildwheel.linux.environment]
-PATH = '$HOME/.cargo/bin:/host/${HUGRENV_PATH}/bin:$PATH'
-TKET_C_API_PATH = '/host/${TKET_C_API_PATH}'
-LLVM_SYS_211_PREFIX = '/host/${LLVM_SYS_211_PREFIX}'
+# we prepend /host to incoming paths because cibuildwheel mounts the host filesystem at /host.
+# this can ONLY be done if you know for sure that the libraries available at that directory on
+# the host are compatible with the build environment, e.g. manylinux compliant.
+PATH = '$HOME/.cargo/bin:/host${HUGRENV_PATH}/bin:$PATH'
+TKET_C_API_PATH = '/host${TKET_C_API_PATH}'
+LLVM_SYS_211_PREFIX = '/host${LLVM_SYS_211_PREFIX}'
 [tool.cibuildwheel.linux]
-environment-pass = ["HUGRENV_VERSION", "CACHE_CARGO"]
+environment-pass = ["HUGRENV_PATH", "TKET_C_API_PATH", "LLVM_SYS_211_PREFIX"]
 before-all = '''
     curl -sSf https://sh.rustup.rs | sh -s -- -y;
     dnf install -y --setopt=install_weak_deps=False libffi-devel gcc-toolset-13;
-    if ${CACHE_CARGO};
-    then
-        if [ -d /host/tmp/ci-cache/hugr-qis/.cargo ];
-        then
-            cp -r /host/tmp/ci-cache/hugr-qis/.cargo $HOME;
-        fi;
-        if [ -d /host/tmp/ci-cache/hugr-qis/target ];
-        then
-            cp -r /host/tmp/ci-cache/hugr-qis/target {package}
-        fi;
-    fi;
-    if [ "$(uname -m)" = "x86_64" ]; then
-        HUGRVERSE_ARCH=manylinux_2_28_x86_64;
-    else
-        HUGRVERSE_ARCH=manylinux_2_28_aarch64;
-    fi;
 '''
 before-test = '''
-    if ${CACHE_CARGO};
-    then
-        echo "Copying cache to the host"
-
-        mkdir -p /host/tmp/ci-cache/hugr-qis;
-
-        if [ -d $HOME/.cargo ];
-        then
-            rm -rf /host/tmp/ci-cache/hugr-qis/.cargo;
-            cp -r $HOME/.cargo /host/tmp/ci-cache/hugr-qis/;
-        fi;
-
-        if [ -d {package}/target ];
-        then
-            rm -rf /host/tmp/ci-cache/hugr-qis/target;
-            cp -r {package}/target /host/tmp/ci-cache/hugr-qis;
-        fi;
-
-        # make sure the cache is readable by the host
-        chmod -R a+rX /host/tmp/ci-cache/hugr-qis
-    fi
     uv sync --only-dev --active
 '''
 repair-wheel-command = [
@@ -147,9 +112,7 @@ repair-wheel-command = [
 ]
 
 [tool.cibuildwheel.macos.environment]
-PATH = '/tmp/hugrverse/bin:$PATH'
-LLVM_SYS_211_PREFIX = '/tmp/hugrverse'
-TKET_C_API_PATH = '/tmp/hugrverse'
+PATH = '$HOME/.cargo/bin:${HUGRENV_PATH}/bin:$PATH'
 MACOSX_DEPLOYMENT_TARGET = "15.0"
 [tool.cibuildwheel.macos]
 before-all = [
@@ -160,6 +123,8 @@ repair-wheel-command = [
     'uvx abi3audit --strict --report {wheel}',
 ]
 
+[tool.cibuildwheel.windows.environment]
+PATH = '$HOME/.cargo/bin:${HUGRENV_PATH}/bin:$PATH'
 [tool.cibuildwheel.windows]
 before-all = [
     'rustup update',

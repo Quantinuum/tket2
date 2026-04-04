@@ -7,7 +7,7 @@ inputs:
     required: false
     default: "/tmp/hugrverse"
   target:
-    description: "The target platform (e.g. manylinux_2_28_x86_64, macos_15_0_aarch64, win_amd64)"
+    description: "The target platform (e.g. manylinux_2_28_x86_64, macosx_15_0_aarch64, win_amd64)"
     required: false
     default: "manylinux_2_28_x86_64"
   packages:
