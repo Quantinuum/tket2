@@ -60,7 +60,7 @@ jobs:
           enable-cache: true
           version: ${{ env.UV_VERSION }}
 
-      - uses: quantinuum/hugrverse-env/.github/actions/install-hugrenv.yml@feat/add-install-action
+      - uses: quantinuum/hugrverse-env/.github/actions/install-hugrenv/action.yml@feat/add-install-action
 
       - name: Build selene-hugr-qis-compiler wheel
         uses: pypa/cibuildwheel@v3.4.0
