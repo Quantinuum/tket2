@@ -42,7 +42,7 @@ jobs:
           rustup toolchain install nightly --component miri
           rustup override set nightly
           cargo miri setup
-      - uses: quantinuum/hugrverse-env/.github/actions/install-hugrenv/action.yml@feat/add-install-action
+      - uses: quantinuum/hugrverse-env/.github/actions/install-hugrenv@feat/add-install-action
 
       # Run miri unsoundness checks.
       #

@@ -57,7 +57,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-      - uses: quantinuum/hugrverse-env/.github/actions/install-hugrenv/action.yml@feat/add-install-action
+      - uses: quantinuum/hugrverse-env/.github/actions/install-hugrenv@feat/add-install-action
       - name: Check formatting
         run: cargo fmt -- --check
       - name: Run clippy
@@ -82,7 +82,7 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
-      - uses: quantinuum/hugrverse-env/.github/actions/install-hugrenv/action.yml@feat/add-install-action
+      - uses: quantinuum/hugrverse-env/.github/actions/install-hugrenv@feat/add-install-action
       - name: Install Python ${{ env.PYTHON_LOWEST }}
         run: uv python install ${{ env.PYTHON_LOWEST }}
       - name: Setup dependencies
@@ -107,7 +107,7 @@ jobs:
       - uses: mozilla-actions/sccache-action@v0.0.9
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
-      - uses: quantinuum/hugrverse-env/.github/actions/install-hugrenv/action.yml@feat/add-install-action
+      - uses: quantinuum/hugrverse-env/.github/actions/install-hugrenv@feat/add-install-action
       - uses: cargo-bins/cargo-binstall@main
       - name: Install cargo-codspeed
         run: cargo binstall cargo-codspeed --force
@@ -138,7 +138,7 @@ jobs:
           toolchain: "stable"
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
-      - uses: quantinuum/hugrverse-env/.github/actions/install-hugrenv/action.yml@feat/add-install-action
+      - uses: quantinuum/hugrverse-env/.github/actions/install-hugrenv@feat/add-install-action
       - uses: taiki-e/install-action@nextest
       - name: Build with no features
         run: cargo nextest r --verbose -p tket -p tket-py -p tket-qsystem --no-default-features --no-run
@@ -160,7 +160,7 @@ jobs:
           toolchain: "stable"
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
-      - uses: quantinuum/hugrverse-env/.github/actions/install-hugrenv/action.yml@feat/add-install-action
+      - uses: quantinuum/hugrverse-env/.github/actions/install-hugrenv@feat/add-install-action
       - uses: taiki-e/install-action@nextest
       - name: Build with all features
         run: cargo nextest r --verbose --workspace --all-features --no-run
@@ -187,7 +187,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
-      - uses: quantinuum/hugrverse-env/.github/actions/install-hugrenv/action.yml@feat/add-install-action
+      - uses: quantinuum/hugrverse-env/.github/actions/install-hugrenv@feat/add-install-action
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
       - uses: taiki-e/install-action@nextest
@@ -214,7 +214,7 @@ jobs:
           # Nightly is required to count doctests coverage
           toolchain: "nightly"
           components: llvm-tools-preview
-      - uses: quantinuum/hugrverse-env/.github/actions/install-hugrenv/action.yml@feat/add-install-action
+      - uses: quantinuum/hugrverse-env/.github/actions/install-hugrenv@feat/add-install-action
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Run tests with coverage instrumentation
@@ -254,7 +254,7 @@ jobs:
           toolchain: "nightly"
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
-      - uses: quantinuum/hugrverse-env/.github/actions/install-hugrenv/action.yml@feat/add-install-action
+      - uses: quantinuum/hugrverse-env/.github/actions/install-hugrenv@feat/add-install-action
       - uses: cargo-bins/cargo-binstall@main
       - name: Install cargo-minimal-versions
         run: |
@@ -292,7 +292,7 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
-      - uses: quantinuum/hugrverse-env/.github/actions/install-hugrenv/action.yml@feat/add-install-action
+      - uses: quantinuum/hugrverse-env/.github/actions/install-hugrenv@feat/add-install-action
       - name: Install Python ${{ env.PYTHON_LOWEST }}
         run: uv python install ${{ env.PYTHON_LOWEST }}
       - name: Setup dependencies
@@ -331,7 +331,7 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
-      - uses: quantinuum/hugrverse-env/.github/actions/install-hugrenv/action.yml@feat/add-install-action
+      - uses: quantinuum/hugrverse-env/.github/actions/install-hugrenv@feat/add-install-action
       - name: Install Python ${{ env.PYTHON_LOWEST }}
         run: uv python install ${{ env.PYTHON_LOWEST }}
       - name: Run qis-compiler tests
@@ -357,7 +357,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: mozilla-actions/sccache-action@v0.0.9
-      - uses: quantinuum/hugrverse-env/.github/actions/install-hugrenv/action.yml@feat/add-install-action
+      - uses: quantinuum/hugrverse-env/.github/actions/install-hugrenv@feat/add-install-action
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
       - uses: extractions/setup-just@v3
