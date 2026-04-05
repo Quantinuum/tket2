@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -euox pipefail
 
 version="${1:?usage: update-hugrenv.sh <version>}"
-cd "$(dirname "$0")"
-cd ..
+cd "$(dirname "$0")/.."
 lockfile="hugrenv.lock"
 
 update_version() {
+  local version="$1"
   echo "Replacing version with $version"
   new_json=$(
     jq \
@@ -20,20 +20,22 @@ update_version() {
 set_hash() {
   local platform="$1"
   local arch="$2"
-  local hash="$3"
+  local package="$3"
+  local hash="$4"
   new_json=$(
     jq \
       --arg platform "$platform" \
       --arg arch "$arch" \
+      --arg package "$package" \
       --arg hash "$hash" \
-      '.hashes[$platform][$arch] = $hash' \
+      '.hashes[$platform][$arch][$package] = $hash' \
       "$lockfile"
   );
   echo "${new_json}" > "$lockfile"
 }
 wipe_hash() {
-  echo "Wiping hash for $1 ($2)"
-  set_hash "$1" "$2" "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+  echo "Wiping hash for $3 on $1 ($2)"
+  set_hash "$1" "$2" "$3" "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 }
 
 extract_hash() {
@@ -43,16 +45,23 @@ extract_hash() {
 update_one() {
   local platform="$1"
   local arch="$2"
+  local package="$3"
   local found_hash
   local output
 
-  wipe_hash "$platform" "$arch"
+  wipe_hash "$platform" "$arch" "$package"
 
-  echo "Finding new hash for $platform ($arch) - this may take some time"
+  echo "Finding new hash for $package on $platform ($arch) - this may take some time"
 
-  if output=$(nix-build ./hugrenv.nix --argstr platform "$platform" --argstr arch "$arch" 2>&1); then
+  if output=$(
+      nix-build ./hugrenv.nix \
+        --argstr platform "$platform" \
+        --argstr arch "$arch" \
+        --arg packages '["'$package'"]' \
+        2>&1
+  ); then
     echo "$output"
-    echo "Error: expected fixed-output mismatch for $key"
+    echo "Error: expected fixed-output mismatch for ${package} on ${platform} (${arch}), but build succeeded without mismatch"
     exit 1
   fi
 
@@ -65,11 +74,16 @@ update_one() {
 
   echo "Found hash for $platform ($arch): $found_hash"
 
-  set_hash "$platform" "$arch" "$found_hash"
+  set_hash "$platform" "$arch" "$package" "$found_hash"
 }
 
-update_version
-update_one macosx_15_0 aarch64
-update_one macosx_15_0 x86_64
-update_one manylinux_2_28 aarch64
-update_one manylinux_2_28 x86_64
+
+update_version "$version"
+
+for package in "tket" "llvm"; do
+    for platform in "macosx_15_0" "manylinux_2_28"; do
+        for arch in "aarch64" "x86_64"; do
+            update_one "$platform" "$arch" "$package"
+        done
+    done
+done

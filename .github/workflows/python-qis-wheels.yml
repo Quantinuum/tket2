@@ -52,13 +52,7 @@ jobs:
     name: "qis-compiler wheels (${{matrix.os}})"
     runs-on: ${{ matrix.os }}
     steps:
-      # ---------------------------------
-      # Bootstrap the build environment
-      # ---------------------------------
-
       - uses: actions/checkout@v6
-        with:
-          submodules: recursive
 
       - name: Set up UV
         uses: astral-sh/setup-uv@v7

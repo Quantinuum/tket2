@@ -1,11 +1,8 @@
 { pkgs, lib, inputs, ... }:
 let
-  llvmVersion = "21";
-  llvmPackages = pkgs."llvmPackages_${llvmVersion}";
-  versionInfo = builtins.splitVersion llvmPackages.release_version;
-  llvmVersionMajor = builtins.elemAt versionInfo 0;
-  llvmVersionMinor = builtins.elemAt versionInfo 1;
-  hugrenv = pkgs.callPackage ./hugrenv.nix {};
+  hugrenv = pkgs.callPackage ./hugrenv.nix {
+    packages = ["tket" "llvm"];
+  };
 in {
   # https://devenv.sh/packages/
   # on macos frameworks have to be explicitly specified
@@ -17,17 +14,9 @@ in {
 
     # These are required to be able to link to llvm.
     pkgs.libffi
-    pkgs.libxml2
-    pkgs.zlib
-    pkgs.ncurses
-    pkgs.stdenv.cc.cc.lib
-    pkgs.conan
-    # cmake is needed for conan to build packages from source when
-    # prebuilt binaries aren't available for Nix's clang version.
-    pkgs.cmake
-    # pytket?
-    pkgs.gmp
-
+    # used to override jemalloc-sys to use nixpkgs' jemalloc
+    # instead of building with cmake (and requiring reduced hardening)
+    pkgs.jemalloc
   ] ++ lib.optionals pkgs.stdenv.isDarwin [
     pkgs.xz
   ];
@@ -36,13 +25,21 @@ in {
     cargo --version
     python --version
     uv --version
+    # append hugrenv to bin and lib paths
+    export PATH="${hugrenv}/bin:$PATH"
+    # if macos use DYLD_LIBRARY_PATH instead of LD_LIBRARY_PATH
+    if [ "$(uname)" = "Darwin" ]; then
+      export DYLD_LIBRARY_PATH="${hugrenv}/lib:${hugrenv}/lib64:${pkgs.stdenv.cc.cc.lib}/lib:$DYLD_LIBRARY_PATH"
+    else
+      export LD_LIBRARY_PATH="${hugrenv}/lib:${hugrenv}/lib64:${pkgs.stdenv.cc.cc.lib}/lib:$LD_LIBRARY_PATH"
+    fi
   '';
 
   env = {
-    "LLVM_SYS_${llvmVersionMajor}${llvmVersionMinor}_PREFIX" = "${llvmPackages.libllvm.dev}";
-    "TKET_C_API_PATH" = "${hugrenv.path}";
-    "LIBCLANG_PATH" = "${pkgs.libclang.lib}/lib";
-    "HUGRENV_VERSION" = "${hugrenv.version}";
+    "LLVM_SYS_211_PREFIX" = "${hugrenv}";
+    "TKET_C_API_PATH" = "${hugrenv}";
+    "LIBCLANG_PATH" = "${hugrenv}/lib";
+    "JEMALLOC_OVERRIDE" = "${pkgs.jemalloc}/lib/libjemalloc.so";
   };
 
   # https://devenv.sh/languages/

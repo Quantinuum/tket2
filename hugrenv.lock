@@ -2,12 +2,24 @@
   "version": "0.4.0",
   "hashes": {
     "macosx_15_0": {
-      "aarch64": "sha256-p/UOpEAruG0FZjfrGNq9jLWdGeTng4SKUp2OD/xtADk=",
-      "x86_64": "sha256-a3xdklQQm5K8sM7A4q/Z8NvTc2LzmvY/37D58VjGlQE="
+      "aarch64": {
+        "tket": "sha256-p/UOpEAruG0FZjfrGNq9jLWdGeTng4SKUp2OD/xtADk=",
+        "llvm": "sha256-KpNLRwL5rpMoG2JW88aHKj+/nJPqcKXxAPQhrTov5ew="
+      },
+      "x86_64": {
+        "tket": "sha256-a3xdklQQm5K8sM7A4q/Z8NvTc2LzmvY/37D58VjGlQE=",
+        "llvm": "sha256-jBEhZu3MUMkZQTCPwF18ABSFuhtLUhCBTUHAQSmVh3o="
+      }
     },
     "manylinux_2_28": {
-      "aarch64": "sha256-BUOI/FEZ3p6XDOqKOVKWDDm5qMD5Cs2ghWxd5wXk8Nc=",
-      "x86_64": "sha256-q5dXP1Fiq3tcHhE3lYQO9CYFoZzAPXCI5BWrT4HKrNo="
+      "aarch64": {
+        "tket": "sha256-BUOI/FEZ3p6XDOqKOVKWDDm5qMD5Cs2ghWxd5wXk8Nc=",
+        "llvm": "sha256-f3/vh+VGPVvLDRgYUlnOaCXGKokh+seBuZ2SUN7514k="
+      },
+      "x86_64": {
+        "tket": "sha256-q5dXP1Fiq3tcHhE3lYQO9CYFoZzAPXCI5BWrT4HKrNo=",
+        "llvm": "sha256-xF5Mg5/qrnn2HtWDnp9s1RK0SeyHjgkMHWZgHKRxjIQ="
+      }
     }
   }
 }
