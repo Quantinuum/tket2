@@ -107,20 +107,23 @@ runs:
           manylinux*)
             echo "Setting LD_LIBRARY_PATH to include ${HUGRENV_PATH}/lib and ${HUGRENV_PATH}/lib64"
             echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${HUGRENV_PATH}/lib:${HUGRENV_PATH}/lib64:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
+            echo "Setting PATH to include ${HUGRENV_PATH}/bin"
+            echo "${HUGRENV_PATH}/bin" >> $GITHUB_PATH
             ;;
           macosx*)
             echo "Setting DYLD_LIBRARY_PATH to include ${HUGRENV_PATH}/lib"
             echo "DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:${HUGRENV_PATH}/lib:${DYLD_LIBRARY_PATH}" >> $GITHUB_ENV
+            echo "Setting PATH to include ${HUGRENV_PATH}/bin"
+            echo "${HUGRENV_PATH}/bin" >> $GITHUB_PATH
             ;;
           win*)
-            echo "Setting PATH to include ${HUGRENV_PATH}/lib and ${HUGRENV_PATH}/lib64"
-            echo "${HUGRENV_PATH}/lib" >> $GITHUB_PATH
-            echo "${HUGRENV_PATH}/lib64" >> $GITHUB_PATH
+            echo "Setting PATH to include ${HUGRENV_PATH}/lib, ${HUGRENV_PATH}/lib64, and ${HUGRENV_PATH}/bin"
+            echo "${HUGRENV_PATH}\\lib" >> $GITHUB_PATH
+            echo "${HUGRENV_PATH}\\lib64" >> $GITHUB_PATH
+            echo "${HUGRENV_PATH}\\bin" >> $GITHUB_PATH
             ;;
         esac
         # set $PATH
-        echo "Setting PATH to include ${HUGRENV_PATH}/bin"
-        echo "${HUGRENV_PATH}/bin:$PATH" >> $GITHUB_PATH
 
 
 
