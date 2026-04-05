@@ -108,7 +108,7 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
-      - uses: ./.github/actions/install-hugrenv
+      - uses: quantinuum/hugrverse-env/.github/actions/install-hugrenv.yml@feat/add-install-action
       - uses: mlugg/setup-zig@v2
         if: ${{ matrix.platform.manylinux }}
 
