@@ -214,10 +214,10 @@ jobs:
             tmpdir=$(mktemp -d);
             cd $tmpdir;
 
+            # Force UV to use the built wheel
+            WHEEL_PATH=$(ls "$GITHUB_WORKSPACE/dist/"*.whl | head -n 1)
             uv run \
-                -f "$GITHUB_WORKSPACE/dist" \
-                --with tket \
-                --refresh-package tket \
+                --with ${WHEEL_PATH} \
                 --no-project \
                 -- \
                   python -c "import tket; print(tket.__file__);"
