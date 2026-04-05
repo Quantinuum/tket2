@@ -124,7 +124,7 @@ repair-wheel-command = [
 ]
 
 [tool.cibuildwheel.windows.environment]
-PATH = '${HUGRENV_PATH}/bin:$PATH'
+PATH = '${HUGRENV_PATH}\\bin;$PATH'
 [tool.cibuildwheel.windows]
 before-all = [
     'rustup update',
