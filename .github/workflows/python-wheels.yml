@@ -214,14 +214,26 @@ jobs:
             tmpdir=$(mktemp -d);
             cd $tmpdir;
 
-            # Force UV to use the built wheel
-            WHEEL_PATH=$(ls "$GITHUB_WORKSPACE/dist/"*.whl | head -n 1)
-            uv run \
-                --with ${WHEEL_PATH} \
-                --no-project \
-                -- \
-                  python -c "import tket; print(tket.__file__);"
+            # To avoid interference from the existing environment, use a python venv.
+            # Note that this approach is chosen because some unwanted behaviour was seen
+            # on some platforms when using uv directly.
+            uv run python -m venv venv
 
+            # First install the pure python packages from this commit; this avoids fetching them
+            # from pypi and providing false positives or false negatives in the presence of a conflict.
+            venv/bin/pip install ${GITHUB_WORKSPACE}/tket-eccs
+            venv/bin/pip install ${GITHUB_WORKSPACE}/tket-exts
+
+            # Install the built wheel
+            wheel_path=$(ls "$GITHUB_WORKSPACE/dist/"*.whl | head -n 1)
+            venv/bin/pip install ${wheel_path}
+
+            # Try importing tket to verify that the installation works.
+            # Although not a comprehensive test (TODO), this at least verifies
+            # that the dynamic libraries are correctly linked and can be loaded.
+            venv/bin/python -c "import tket; print(tket.__file__);"
+
+            # Now return to the original workspace for further steps.
             cd $GITHUB_WORKSPACE;
           fi
           uvx twine check --strict dist/*
