@@ -78,7 +78,7 @@ recompile-eccs:
 # Update hugrenv version, including discovery of new hashes.
 # This change bumps the hugrenv version used in both devenv and CI.
 update-hugrenv version:
-    scripts/update-hugrenv.sh {{version}}
+    curl -L -o hugrenv.lock https://github.com/Quantinuum/hugrverse-env/releases/download/v{{version}}/hugrenv.lock
 
 # Regenerates all hugr definitions inside `test_files/`
 recompile-test-hugrs:
