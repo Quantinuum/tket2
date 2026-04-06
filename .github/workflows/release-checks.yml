@@ -36,7 +36,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: mozilla-actions/sccache-action@v0.0.9
-      - uses: quantinuum/hugrverse-env/.github/actions/install-hugrenv@feat/add-install-action
+      - uses: quantinuum/hugrverse-env/.github/actions/install-hugrenv@main
         with:
           packages: "tket"
       - name: Set up uv

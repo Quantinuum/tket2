@@ -108,7 +108,7 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
-      - uses: quantinuum/hugrverse-env/.github/actions/install-hugrenv@feat/add-install-action
+      - uses: quantinuum/hugrverse-env/.github/actions/install-hugrenv@main
       - uses: mlugg/setup-zig@v2
         if: ${{ matrix.platform.manylinux }}
       - name: Set MACOSX_DEPLOYMENT_TARGET on macos
