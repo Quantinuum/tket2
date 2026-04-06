@@ -86,11 +86,11 @@ jobs:
           # ---------------- Mac
           - runner: macos-14
             target: aarch64-apple-darwin
-            macos-compatibility: "15.0"
+            macos-compatibility: "11.0"
             test-wheels: true
           - runner: macos-15-intel
             target: x86_64-apple-darwin
-            macos-compatibility: "15.0"
+            macos-compatibility: "11.0"
             test-wheels: true
           # ---------------- Windows
           - runner: windows-2025
@@ -111,6 +111,9 @@ jobs:
       - uses: quantinuum/hugrverse-env/.github/actions/install-hugrenv@feat/add-install-action
       - uses: mlugg/setup-zig@v2
         if: ${{ matrix.platform.manylinux }}
+      - name: Set MACOSX_DEPLOYMENT_TARGET on macos
+        if: matrix.platform.macos-compatibility
+        run: echo "MACOSX_DEPLOYMENT_TARGET=${{ matrix.platform.macos-compatibility }}" >> $GITHUB_ENV
 
       - name: Set compatibility flag
         id: compatibility-flag
@@ -219,19 +222,27 @@ jobs:
             # on some platforms when using uv directly.
             uv run python -m venv venv
 
+            if [ -d "venv/Scripts" ]; then
+              venv_python="venv/Scripts/python"
+              venv_pip="venv/Scripts/pip"
+            else
+              venv_python="venv/bin/python"
+              venv_pip="venv/bin/pip"
+            fi
+
             # First install the pure python packages from this commit; this avoids fetching them
             # from pypi and providing false positives or false negatives in the presence of a conflict.
-            venv/bin/pip install ${GITHUB_WORKSPACE}/tket-eccs
-            venv/bin/pip install ${GITHUB_WORKSPACE}/tket-exts
+            ${venv_pip} install ${GITHUB_WORKSPACE}/tket-eccs
+            ${venv_pip} install ${GITHUB_WORKSPACE}/tket-exts
 
             # Install the built wheel
             wheel_path=$(ls "$GITHUB_WORKSPACE/dist/"*.whl | head -n 1)
-            venv/bin/pip install ${wheel_path}
+            ${venv_pip} install ${wheel_path}
 
             # Try importing tket to verify that the installation works.
             # Although not a comprehensive test (TODO), this at least verifies
             # that the dynamic libraries are correctly linked and can be loaded.
-            venv/bin/python -c "import tket; print(tket.__file__);"
+            ${venv_python} -c "import tket; print(tket.__file__);"
 
             # Now return to the original workspace for further steps.
             cd $GITHUB_WORKSPACE;
