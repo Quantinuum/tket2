@@ -1,6 +1,6 @@
 {
   pkgs ? import <nixpkgs> {},
-  platform ? if pkgs.stdenv.isDarwin then "macosx_15_0" else "manylinux_2_28",
+  platform ? if pkgs.stdenv.isDarwin then "macosx_11_0" else "manylinux_2_28",
   arch ? if pkgs.stdenv.isAarch64 then "aarch64" else "x86_64",
   packages ? [ "tket" "llvm" ],
 }:
