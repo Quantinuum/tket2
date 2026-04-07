@@ -32,7 +32,7 @@ dependencies = [
     'hugr ~= 0.16.0',
     "pytket>=2.1.0,<3",
     'tket_eccs ~= 0.5.1',
-    'tket_exts >= 0.12.2, <0.13',
+    'tket_exts >= 0.12.3, <0.13',
 ]
 
 [tool.uv.sources]
