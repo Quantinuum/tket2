@@ -24,7 +24,6 @@ required-features = ["cli"]
 
 [dependencies]
 tket = { path = "../tket", version = "0.18.0" }
-tket1-passes = { path = "../tket1-passes" }
 
 hugr.workspace = true
 hugr-core.workspace = true
@@ -48,6 +47,8 @@ indexmap.workspace = true
 anyhow = { workspace = true, optional = true }
 
 [dev-dependencies]
+tket1-passes = { path = "../tket1-passes" }
+
 cool_asserts.workspace = true
 petgraph.workspace = true
 rstest.workspace = true

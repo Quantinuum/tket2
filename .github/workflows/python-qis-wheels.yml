@@ -63,7 +63,7 @@ jobs:
       - uses: quantinuum/hugrverse-env/.github/actions/install-hugrenv@main
 
       - name: Build selene-hugr-qis-compiler wheel
-        uses: pypa/cibuildwheel@v3.4.0
+        uses: pypa/cibuildwheel@v3.4.1
         with:
           package-dir: qis-compiler
 
