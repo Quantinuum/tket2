@@ -5,6 +5,7 @@ rust-core: &rust-core
   - "tket/**"
   - "Cargo.toml"
   - "Cargo.lock"
+  - "hugrenv.lock"
 
 rust:
   - *rust-core
