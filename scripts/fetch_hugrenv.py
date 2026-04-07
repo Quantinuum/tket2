@@ -1,3 +1,4 @@
+import argparse
 import io
 import json
 import platform
@@ -5,12 +6,19 @@ import posixpath
 import tarfile
 import urllib.request
 from pathlib import Path
-import sys
 
-if len(sys.argv) != 2:
-    raise SystemExit(f"Usage: {sys.argv[0]} <install_path>")
+parser = argparse.ArgumentParser(
+    description="Fetch and extract hugrverse-env llvm/tket artifacts for the current platform."
+)
+parser.add_argument(
+    "install_path",
+    nargs="?",
+    default="./target/hugrenv/",
+    help="Destination directory for extracted files (default: ./target/hugrenv/).",
+)
+args = parser.parse_args()
 
-install_path = Path(sys.argv[1]).expanduser().resolve()
+install_path = Path(args.install_path).expanduser().resolve()
 install_path.mkdir(parents=True, exist_ok=True)
 script_dir = Path(__file__).resolve().parent
 lock_path = script_dir.parent / "hugrenv.lock"

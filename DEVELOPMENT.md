@@ -57,6 +57,8 @@ If you are not using Nix, you can fetch the same prebuilt `llvm` + `tket`
 artifacts used by CI directly from [`hugrenv.lock`](hugrenv.lock):
 
 ```bash
+just fetch-hugrenv
+# optional custom destination:
 just fetch-hugrenv /path/to/hugrenv
 ```
 
@@ -67,6 +69,11 @@ This command:
 - uses the version and supported target matrix pinned in `hugrenv.lock`;
 - extracts them into the path you provide;
 - prints the environment variables to export for your shell.
+
+If you run the command with no argument, it installs to `./target/hugrenv/`.
+This is convenient for single-repo local work, but if you want to manage
+multiple hugrenv versions (or share one install across multiple repositories),
+prefer an explicit central location and/or versioned install paths.
 
 For bash/zsh this includes:
 

@@ -82,8 +82,8 @@ update-hugrenv version:
 
 # Fetch hugrverse environment packages for the current platform and extract them
 # to the provided directory.
-fetch-hugrenv install_path:
-    python scripts/fetch_hugrenv.py {{install_path}}
+fetch-hugrenv install_path='./target/hugrenv/':
+    python scripts/fetch_hugrenv.py "{{install_path}}"
 
 
 # Regenerates all hugr definitions inside `test_files/`
