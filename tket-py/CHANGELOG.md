@@ -2,18 +2,20 @@
 
 ## [0.13.0](https://github.com/Quantinuum/tket2/compare/tket-py-v0.12.16...tket-py-v0.13.0) (2026-04-07)
 
+This release removes outdated APIs from the public interface. `Tk2Circuit` has been replaced with a temporarily unstable `CompilationState`.
+The `hugr` dependency has been updated to `0.26.0`, adding support for pass scopes in the `CompositePass` framework.
 
 ### ⚠ BREAKING CHANGES
 
 * Removed `Tk2Circuit` use `CompilationState` instead. Non-stable APIs have been marked as internal. They will be re-designed and stabilized in future releases.
-* Moved `tket::modifier::ModifierResolverPass` to
-* Renamed
+* Moved `tket::modifier::ModifierResolverPass` to `tket::passes`.
+* Renamed `tket_qsystem::extension::qsystem::lower_tket_op` to `lower_tket_ops`.
 * Updated public `hugr` dependency to `0.26.0`.
 * Minimum supported Rust version bumped to 1.91
 * Removed `CircuitHash` trait, use `Circuit::circuit_hash` or `hugr::algorithms::hash::HugrHash` instead.
 * Removed `tket::passes::lower_to_pytket`. Use `NormalizeGuppy` instead.
 * Renamed `TKETDecode::decode_inplace` to `decode_into`.
-* Removed deprecated `find_tuple_unpack_rewrites`. Use
+* Removed deprecated `find_tuple_unpack_rewrites`. Use `tket::passes::UntuplePass` instead.
 
 ### Features
 
