@@ -3096,7 +3096,7 @@ source = { editable = "tket-eccs" }
 
 [[package]]
 name = "tket-exts"
-version = "0.12.2"
+version = "0.12.3"
 source = { editable = "tket-exts" }
 dependencies = [
     { name = "hugr" },
