@@ -4,14 +4,14 @@
 #     "guppylang ==0.21.11",
 # ]
 # ///
-"""A conditional branch inside a loop"""
+"""A simple controlled gate using modifiers"""
 
 from pathlib import Path
 from sys import argv
 
 from guppylang import guppy
-from guppylang.std.builtins import control
-from guppylang.std.quantum import qubit, x, z
+from guppylang.std.builtins import control, dagger
+from guppylang.std.quantum import qubit, s
 
 from guppylang.experimental import enable_experimental_features
 
@@ -21,8 +21,8 @@ enable_experimental_features()
 @guppy
 def control_zx(q0: qubit, q1: qubit) -> None:
     with control(q0):
-        z(q1)
-        x(q1)
+        with dagger:
+            s(q1)
 
 
 program = control_zx.compile_function()
