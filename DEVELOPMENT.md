@@ -54,26 +54,26 @@ set the environment variable `LLVM_SYS_211_PREFIX` to point to its location
 #### Using hugrenv without Nix
 
 If you are not using Nix, you can fetch the same prebuilt `llvm` + `tket`
-artifacts used by CI directly from [`hugrenv.lock`](hugrenv.lock):
+artifacts used by CI using
 
 ```bash
 just fetch-hugrenv
-# optional custom destination:
-just fetch-hugrenv /path/to/hugrenv
 ```
+
+with an optional installation path parameter.
 
 This command:
 
 - detects your OS/architecture;
 - downloads the matching `hugrverse-env` release tarballs;
 - uses the version and supported target matrix pinned in `hugrenv.lock`;
-- extracts them into the path you provide;
+- extracts them into the path you provide, or `./target/hugrenv/` by default;
 - prints the environment variables to export for your shell.
 
-If you run the command with no argument, it installs to `./target/hugrenv/`.
-This is convenient for single-repo local work, but if you want to manage
-multiple hugrenv versions (or share one install across multiple repositories),
-prefer an explicit central location and/or versioned install paths.
+Using the default installation path is convenient for single-repo local work,
+but if you want to manage multiple hugrenv versions (or share one install across
+multiple repositories), prefer an explicit central location and/or versioned
+install paths.
 
 For bash/zsh this includes:
 
