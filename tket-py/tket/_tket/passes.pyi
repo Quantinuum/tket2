@@ -82,4 +82,10 @@ def tket1_pass(
 
 def resolve_modifiers(
     circ: CompilationState, scope: PassScope = GlobalScope.PRESERVE_PUBLIC
-) -> None: ...
+) -> None:
+    """
+    Runs a Rust backed pass to resolve quantum modifiers (control, dagger, power).
+
+    :param circ: The input program as a CompilationState.
+    :param scope: A scope to control how the pass is applied to HUGR regions.
+    """
