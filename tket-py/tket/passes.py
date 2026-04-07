@@ -21,11 +21,7 @@ from hugr.passes.composable import (
 from hugr.passes.scope import PassScope, GlobalScope
 
 
-__all__ = [
-    "PytketHugrPass",
-    "PassResult",
-    "NormalizeGuppy",
-]
+__all__ = ["PytketHugrPass", "PassResult", "NormalizeGuppy", "ModifierResolverPass"]
 
 
 @dataclass
@@ -211,7 +207,7 @@ def _badger_optimise(
 
 
 @dataclass
-class ResolveModifers(ComposablePass):
+class ModifierResolverPass(ComposablePass):
     """A pass to resolve Guppy modifiers (control, dagger, power)."""
 
     _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
@@ -224,7 +220,7 @@ class ResolveModifers(ComposablePass):
             copy_call=lambda h: self._resolve(h, inplace),
         )
 
-    def with_scope(self, _scope: PassScope) -> ResolveModifers:
+    def with_scope(self, _scope: PassScope) -> ModifierResolverPass:
         """Set the scope of this pass and return self."""
         self._scope = _scope
         return self
