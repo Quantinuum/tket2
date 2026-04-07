@@ -29,6 +29,7 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     m.add_class::<self::chunks::PyCircuitChunks>()?;
     m.add_function(wrap_pyfunction!(self::chunks::chunks, &m)?)?;
     m.add_function(wrap_pyfunction!(self::tket1::tket1_pass, &m)?)?;
+    m.add_function(wrap_pyfunction!(resolve_modifiers, &m)?)?;
     m.add("PullForwardError", py.get_type::<PyPullForwardError>())?;
     m.add("TK1PassError", py.get_type::<tket1::PytketPassError>())?;
     Ok(m)
@@ -46,6 +47,11 @@ create_py_exception!(
     "Errors from the Guppy normalization pass."
 );
 
+create_py_exception!(
+    tket::passes::modifier_resolver::ModifierResolverErrors,
+    PyModifierResolverError,
+    "Errors from the modifer resolver pass."
+);
 /// Flatten the structure of a Guppy-generated program to enable additional optimisations.
 ///
 /// This should normally be called first before other optimisations.
@@ -174,5 +180,14 @@ fn badger_optimise(
         optimised = optimiser.optimise(optimised, log_file, options);
     }
     circ.hugr = optimised.into_hugr();
+    Ok(())
+}
+
+#[pyfunction]
+#[pyo3(signature = (circ, scope = None))]
+fn resolve_modifiers(circ: &mut CompilationState, scope: Option<PyPassScope>) -> PyResult<()> {
+    let py_scope = scope.unwrap_or_default();
+    let pass = tket::passes::ModifierResolverPass::default_with_scope(py_scope.scope);
+    pass.run(&mut circ.hugr).convert_pyerrs()?;
     Ok(())
 }

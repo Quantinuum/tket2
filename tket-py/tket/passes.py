@@ -208,3 +208,39 @@ def _badger_optimise(
         max_circuit_count=max_circuit_count,
         log_dir=log_dir,
     )
+
+
+@dataclass
+class ResolveModifers(ComposablePass):
+    _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
+
+    def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
+        return implement_pass_run(
+            self,
+            hugr=hugr,
+            inplace=inplace,
+            copy_call=lambda h: self._resolve(h, inplace),
+        )
+
+    def with_scope(self, _scope: PassScope) -> ResolveModifers:
+        """Set the scope of this pass and return self."""
+        self._scope = _scope
+        return self
+
+    def _resolve(self, hugr: Hugr, inplace: bool) -> PassResult:
+        tk_program = _state.CompilationState.from_python(hugr)
+
+        self._run_tk(tk_program)
+
+        package = tk_program.to_python()
+        return PassResult.for_pass(
+            self, hugr=package.modules[0], inplace=inplace, result=None
+        )
+
+    def _run_tk(self, program: _state.CompilationState) -> _state.CompilationState:
+        """Run the pass in the CompilationState"""
+        _passes.resolve_modifiers(
+            program._inner,
+            scope=self._scope,
+        )
+        return program
