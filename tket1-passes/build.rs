@@ -9,7 +9,6 @@ use std::process::Command;
 const CONAN_REMOTE: &str = "https://quantinuumsw.jfrog.io/artifactory/api/conan/tket1-libs";
 
 fn main() {
-    // // Configure when to rerun the build script
     println!("cargo:rerun-if-env-changed=TKET_C_API_PATH");
     println!("cargo:rerun-if-changed=conanfile.txt");
     println!("cargo:rerun-if-changed=build.rs");
@@ -19,7 +18,7 @@ fn main() {
     let target = SupportedPlatform::from_target_str(&env::var("TARGET").unwrap());
 
     let header_path = if let Some(path) = custom_tket_path {
-        cargo_set_custom_lib_path(&[path.join("lib"), path.join("lib64"), path.join("bin")]);
+        cargo_set_custom_lib_paths(&[path.join("lib"), path.join("lib64"), path.join("bin")]);
         let header_path = path.join("include").join("tket-c-api.h");
 
         assert!(
@@ -204,7 +203,7 @@ fn add_conan_remote_if_missing(conan_remote: &str) {
     }
 }
 
-fn cargo_set_custom_lib_path(search_path: &[PathBuf]) {
+fn cargo_set_custom_lib_paths(search_path: &[PathBuf]) {
     for path in search_path {
         if path.exists() {
             println!("cargo:rustc-link-search={}", path.display());
@@ -213,16 +212,4 @@ fn cargo_set_custom_lib_path(search_path: &[PathBuf]) {
 
     let lib_name = "tket-c-api";
     println!("cargo:rustc-link-lib={lib_name}");
-
-    //if cfg!(target_os = "windows") {
-    //    // If on windows, also link tket and symengine, as we're
-    //    // providing static libs
-    //    println!("cargo:rustc-link-lib=tket");
-    //    println!("cargo:rustc-link-lib=symengine");
-    //    println!("cargo:rustc-link-lib=tkassert");
-    //    println!("cargo:rustc-link-lib=tklog");
-    //    println!("cargo:rustc-link-lib=tkrng");
-    //    println!("cargo:rustc-link-lib=tktokenswap");
-    //    println!("cargo:rustc-link-lib=tkwsm");
-    //}
 }

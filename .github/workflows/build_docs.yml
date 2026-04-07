@@ -76,7 +76,7 @@ jobs:
     if: ${{ needs.changes.outputs.python == 'true' && github.event_name == 'push' }}
     steps:
       - name: Setup Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
       - name: Deploy to GitHub Pages.
         id: deployment
         uses: actions/deploy-pages@v5

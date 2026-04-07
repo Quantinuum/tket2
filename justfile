@@ -80,6 +80,12 @@ recompile-eccs:
 update-hugrenv version:
     curl -L -o hugrenv.lock https://github.com/Quantinuum/hugrverse-env/releases/download/v{{version}}/hugrenv.lock
 
+# Fetch hugrverse environment packages for the current platform and extract them
+# to the provided directory.
+fetch-hugrenv install_path='./target/hugrenv/':
+    python scripts/fetch_hugrenv.py "{{install_path}}"
+
+
 # Regenerates all hugr definitions inside `test_files/`
 recompile-test-hugrs:
     @echo "---- Recompiling example guppy programs ----"
