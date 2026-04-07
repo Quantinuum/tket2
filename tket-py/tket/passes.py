@@ -220,9 +220,9 @@ class ModifierResolverPass(ComposablePass):
             copy_call=lambda h: self._resolve(h, inplace),
         )
 
-    def with_scope(self, _scope: PassScope) -> ModifierResolverPass:
+    def with_scope(self, scope: PassScope) -> ModifierResolverPass:
         """Set the scope of this pass and return self."""
-        self._scope = _scope
+        self._scope = scope
         return self
 
     def _resolve(self, hugr: Hugr, inplace: bool) -> PassResult:
