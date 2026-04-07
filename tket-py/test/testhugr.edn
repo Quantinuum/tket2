@@ -667,11 +667,6 @@ HUGRiHJv)@[{"version": "0.2.0", "name": "tket.bool", "types": {"bool": {"extensi
                          (core.adt
                            [[(collections.borrow_arr.borrow_array ?_1 ?_0)
                              (arithmetic.int.types.int 6)]])]])]])]))
-            ((collections.borrow_arr.discard_all_borrowed ?_1 ?_0) [%_99] []
-              (signature
-                (core.fn [(collections.borrow_arr.borrow_array ?_1 ?_0)] [])))
-            ((prelude.MakeTuple []) [] [%_102]
-              (signature (core.fn [] [(core.adt [[]])])))
             ((core.make_adt
                 [[]
                  [(core.adt
