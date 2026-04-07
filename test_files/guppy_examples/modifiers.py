@@ -19,11 +19,11 @@ enable_experimental_features()
 
 
 @guppy
-def control_zx(q0: qubit, q1: qubit) -> None:
+def control_sdg(q0: qubit, q1: qubit) -> None:
     with control(q0):
         with dagger:
             s(q1)
 
 
-program = control_zx.compile_function()
+program = control_sdg.compile_function()
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
