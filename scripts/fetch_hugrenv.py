@@ -81,7 +81,7 @@ for package in ("llvm", "tket"):
 print("")
 print(f"hugrenv {version} installed in {install_path}")
 print(
-    f"To use the hugrenv libraries, set the following environment variables in your shell."
+    "To use the hugrenv libraries, set the following environment variables in your shell."
 )
 print("")
 if os_name == "windows":
