@@ -29,10 +29,20 @@ os_name = platform.system().lower()
 arch = platform.machine().lower()
 if os_name == "linux":
     platform_key = "manylinux_2_28"
-    arch_key = {"x86_64": "x86_64", "amd64": "x86_64", "aarch64": "aarch64", "arm64": "aarch64"}.get(arch)
+    arch_key = {
+        "x86_64": "x86_64",
+        "amd64": "x86_64",
+        "aarch64": "aarch64",
+        "arm64": "aarch64",
+    }.get(arch)
 elif os_name == "darwin":
     platform_key = "macosx_11_0"
-    arch_key = {"x86_64": "x86_64", "amd64": "x86_64", "aarch64": "aarch64", "arm64": "aarch64"}.get(arch)
+    arch_key = {
+        "x86_64": "x86_64",
+        "amd64": "x86_64",
+        "aarch64": "aarch64",
+        "arm64": "aarch64",
+    }.get(arch)
 elif os_name == "windows":
     platform_key = "win"
     arch_key = {"x86_64": "amd64", "amd64": "amd64"}.get(arch)
@@ -70,23 +80,25 @@ for package in ("llvm", "tket"):
 
 print("")
 print(f"hugrenv {version} installed in {install_path}")
-print(f"To use the hugrenv libraries, set the following environment variables in your shell.")
+print(
+    f"To use the hugrenv libraries, set the following environment variables in your shell."
+)
 print("")
 if os_name == "windows":
     p = str(install_path)
     print("PowerShell:")
-    print(f"$env:TKET_C_API_PATH = \"{p}\"")
-    print(f"$env:LLVM_SYS_211_PREFIX = \"{p}\"")
-    print(f"$env:LIBCLANG_PATH = \"{p}\\\\lib\"")
-    print(f"$env:PATH = \"{p}\\\\bin;{p}\\\\lib;{p}\\\\lib64;$env:PATH\"")
+    print(f'$env:TKET_C_API_PATH = "{p}"')
+    print(f'$env:LLVM_SYS_211_PREFIX = "{p}"')
+    print(f'$env:LIBCLANG_PATH = "{p}\\\\lib"')
+    print(f'$env:PATH = "{p}\\\\bin;{p}\\\\lib;{p}\\\\lib64;$env:PATH"')
 else:
     p = str(install_path)
     print("Bash/Zsh:")
-    print(f"export TKET_C_API_PATH=\"{p}\"")
-    print(f"export LLVM_SYS_211_PREFIX=\"{p}\"")
-    print(f"export LIBCLANG_PATH=\"{p}/lib\"")
-    print(f"export PATH=\"{p}/bin:$PATH\"")
+    print(f'export TKET_C_API_PATH="{p}"')
+    print(f'export LLVM_SYS_211_PREFIX="{p}"')
+    print(f'export LIBCLANG_PATH="{p}/lib"')
+    print(f'export PATH="{p}/bin:$PATH"')
     if os_name == "darwin":
-        print(f"export DYLD_LIBRARY_PATH=\"{p}/lib:{p}/lib64:$DYLD_LIBRARY_PATH\"")
+        print(f'export DYLD_LIBRARY_PATH="{p}/lib:{p}/lib64:$DYLD_LIBRARY_PATH"')
     else:
-        print(f"export LD_LIBRARY_PATH=\"{p}/lib:{p}/lib64:$LD_LIBRARY_PATH\"")
+        print(f'export LD_LIBRARY_PATH="{p}/lib:{p}/lib64:$LD_LIBRARY_PATH"')
