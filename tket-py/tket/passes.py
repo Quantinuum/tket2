@@ -212,6 +212,8 @@ def _badger_optimise(
 
 @dataclass
 class ResolveModifers(ComposablePass):
+    """A pass to resolve Guppy modifiers (control, dagger, power)."""
+
     _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
 
     def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
