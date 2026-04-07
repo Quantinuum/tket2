@@ -466,188 +466,12 @@ HUGRiHJv)@[{"version": "0.2.0", "name": "tket.bool", "types": {"bool": {"extensi
                       (core.adt
                         [[(collections.borrow_arr.borrow_array ?_1 ?_0)
                           (arithmetic.int.types.int 6)]])]])]])]]))
-        (block [%_69] [%_70 %_71]
+        (block [%_69] [%_86]
           (signature
             (core.ctrl
               [[(core.adt
                   [[(collections.borrow_arr.borrow_array ?_1 ?_0)
                     (arithmetic.int.types.int 6)]])]]
-              [[(collections.borrow_arr.borrow_array ?_1 ?_0)]
-               [(arithmetic.int.types.int 6)
-                (collections.borrow_arr.borrow_array ?_1 ?_0)]]))
-          (dfg [%_72] [%_73 %_74]
-            (signature
-              (core.fn
-                [(core.adt
-                   [[(collections.borrow_arr.borrow_array ?_1 ?_0)
-                     (arithmetic.int.types.int 6)]])]
-                [(core.adt [[] [(arithmetic.int.types.int 6)]])
-                 (collections.borrow_arr.borrow_array ?_1 ?_0)]))
-            ((prelude.UnpackTuple
-                [(collections.borrow_arr.borrow_array ?_1 ?_0)
-                 (arithmetic.int.types.int 6)])
-              [%_72] [%_74 %_75]
-              (signature
-                (core.fn
-                  [(core.adt
-                     [[(collections.borrow_arr.borrow_array ?_1 ?_0)
-                       (arithmetic.int.types.int 6)]])]
-                  [(collections.borrow_arr.borrow_array ?_1 ?_0)
-                   (arithmetic.int.types.int 6)])))
-            ((prelude.load_nat ?_1) [] [%_76]
-              (signature (core.fn [] [prelude.usize])))
-            (arithmetic.conversions.ifromusize [%_76] [%_77]
-              (signature
-                (core.fn [prelude.usize] [(arithmetic.int.types.int 6)])))
-            ((arithmetic.int.iu_to_s 6) [%_77] [%_78]
-              (signature
-                (core.fn
-                  [(arithmetic.int.types.int 6)]
-                  [(arithmetic.int.types.int 6)])))
-            ((arithmetic.int.ilt_s 6) [%_75 %_78] [%_79]
-              (signature
-                (core.fn
-                  [(arithmetic.int.types.int 6) (arithmetic.int.types.int 6)]
-                  [(core.adt [[] []])])))
-            (tket.bool.make_opaque [%_79] [%_80]
-              (signature (core.fn [(core.adt [[] []])] [tket.bool.bool])))
-            (tket.bool.read [%_80] [%_81]
-              (signature (core.fn [tket.bool.bool] [(core.adt [[] []])])))
-            (cond [%_81 %_75] [%_73]
-              (signature
-                (core.fn
-                  [(core.adt [[] []]) (arithmetic.int.types.int 6)]
-                  [(core.adt [[] [(arithmetic.int.types.int 6)]])]))
-              (dfg [%_82] [%_83]
-                (signature
-                  (core.fn
-                    [(arithmetic.int.types.int 6)]
-                    [(core.adt [[] [(arithmetic.int.types.int 6)]])]))
-                ((core.make_adt [[] [(arithmetic.int.types.int 6)]] [] 0)
-                  [] [%_83]
-                  (signature
-                    (core.fn
-                      []
-                      [(core.adt [[] [(arithmetic.int.types.int 6)]])]))))
-              (dfg [%_84] [%_85]
-                (signature
-                  (core.fn
-                    [(arithmetic.int.types.int 6)]
-                    [(core.adt [[] [(arithmetic.int.types.int 6)]])]))
-                ((core.make_adt
-                    [[] [(arithmetic.int.types.int 6)]]
-                    [(arithmetic.int.types.int 6)]
-                    1)
-                  [%_84] [%_85]
-                  (signature
-                    (core.fn
-                      [(arithmetic.int.types.int 6)]
-                      [(core.adt [[] [(arithmetic.int.types.int 6)]])])))))))
-        (block [%_71] [%_86]
-          (signature
-            (core.ctrl
-              [[(arithmetic.int.types.int 6)
-                (collections.borrow_arr.borrow_array ?_1 ?_0)]]
-              [[(core.adt
-                  [[]
-                   [(core.adt
-                      [[?_0
-                        (core.adt
-                          [[(collections.borrow_arr.borrow_array ?_1 ?_0)
-                            (arithmetic.int.types.int 6)]])]])]])]]))
-          (dfg [%_87 %_88] [%_89 %_90]
-            (signature
-              (core.fn
-                [(arithmetic.int.types.int 6)
-                 (collections.borrow_arr.borrow_array ?_1 ?_0)]
-                [(core.adt [[]])
-                 (core.adt
-                   [[]
-                    [(core.adt
-                       [[?_0
-                         (core.adt
-                           [[(collections.borrow_arr.borrow_array ?_1 ?_0)
-                             (arithmetic.int.types.int 6)]])]])]])]))
-            (arithmetic.conversions.itousize [%_87] [%_91]
-              (signature
-                (core.fn [(arithmetic.int.types.int 6)] [prelude.usize])))
-            ((collections.borrow_arr.borrow ?_1 ?_0) [%_88 %_91] [%_92 %_93]
-              (signature
-                (core.fn
-                  [(collections.borrow_arr.borrow_array ?_1 ?_0) prelude.usize]
-                  [(collections.borrow_arr.borrow_array ?_1 ?_0) ?_0])))
-            ((core.load_const
-                (arithmetic.int.types.int 6)
-                (arithmetic.int.const 6 1))
-              [] [%_95]
-              (signature (core.fn [] [(arithmetic.int.types.int 6)])))
-            ((arithmetic.int.iadd 6) [%_87 %_95] [%_96]
-              (signature
-                (core.fn
-                  [(arithmetic.int.types.int 6) (arithmetic.int.types.int 6)]
-                  [(arithmetic.int.types.int 6)])))
-            ((prelude.MakeTuple
-                [(collections.borrow_arr.borrow_array ?_1 ?_0)
-                 (arithmetic.int.types.int 6)])
-              [%_92 %_96] [%_97]
-              (signature
-                (core.fn
-                  [(collections.borrow_arr.borrow_array ?_1 ?_0)
-                   (arithmetic.int.types.int 6)]
-                  [(core.adt
-                     [[(collections.borrow_arr.borrow_array ?_1 ?_0)
-                       (arithmetic.int.types.int 6)]])])))
-            ((prelude.MakeTuple
-                [?_0
-                 (core.adt
-                   [[(collections.borrow_arr.borrow_array ?_1 ?_0)
-                     (arithmetic.int.types.int 6)]])])
-              [%_93 %_97] [%_98]
-              (signature
-                (core.fn
-                  [?_0
-                   (core.adt
-                     [[(collections.borrow_arr.borrow_array ?_1 ?_0)
-                       (arithmetic.int.types.int 6)]])]
-                  [(core.adt
-                     [[?_0
-                       (core.adt
-                         [[(collections.borrow_arr.borrow_array ?_1 ?_0)
-                           (arithmetic.int.types.int 6)]])]])])))
-            ((core.make_adt
-                [[]
-                 [(core.adt
-                    [[?_0
-                      (core.adt
-                        [[(collections.borrow_arr.borrow_array ?_1 ?_0)
-                          (arithmetic.int.types.int 6)]])]])]]
-                [(core.adt
-                   [[?_0
-                     (core.adt
-                       [[(collections.borrow_arr.borrow_array ?_1 ?_0)
-                         (arithmetic.int.types.int 6)]])]])]
-                1)
-              [%_98] [%_90]
-              (signature
-                (core.fn
-                  [(core.adt
-                     [[?_0
-                       (core.adt
-                         [[(collections.borrow_arr.borrow_array ?_1 ?_0)
-                           (arithmetic.int.types.int 6)]])]])]
-                  [(core.adt
-                     [[]
-                      [(core.adt
-                         [[?_0
-                           (core.adt
-                             [[(collections.borrow_arr.borrow_array ?_1 ?_0)
-                               (arithmetic.int.types.int 6)]])]])]])])))
-            ((core.make_adt [[]] [] 0) [] [%_89]
-              (signature (core.fn [] [(core.adt [[]])])))))
-        (block [%_70] [%_86]
-          (signature
-            (core.ctrl
-              [[(collections.borrow_arr.borrow_array ?_1 ?_0)]]
               [[(core.adt
                   [[]
                    [(core.adt
@@ -658,7 +482,9 @@ HUGRiHJv)@[{"version": "0.2.0", "name": "tket.bool", "types": {"bool": {"extensi
           (dfg [%_99] [%_100 %_101]
             (signature
               (core.fn
-                [(collections.borrow_arr.borrow_array ?_1 ?_0)]
+                [(core.adt
+                    [[(collections.borrow_arr.borrow_array ?_1 ?_0)
+                      (arithmetic.int.types.int 6)]])]
                 [(core.adt [[]])
                  (core.adt
                    [[]
