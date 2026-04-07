@@ -112,7 +112,7 @@ pub mod global_phase_modify;
 pub mod tket_op_modify;
 
 use super::{CombinedModifier, ModifierFlags};
-use crate::passes::unpack_container::TypeUnpacker;
+use crate::passes::utils::unpack_container::TypeUnpacker;
 use crate::{TketOp, extension::global_phase::GlobalPhase, modifier::Modifier};
 use global_phase_modify::delete_phase;
 
@@ -1132,7 +1132,7 @@ pub fn resolve_modifier_with_entrypoints(
 
     // TODO: This as well.
     // Ad hoc cleanup procedure.
-    delete_phase(h, [h.module_root()])?;
+    delete_phase(h, entry_points)?;
 
     h.validate()
         .map_err(|e| ModifierResolverErrors::BuildError(e.into()))?;

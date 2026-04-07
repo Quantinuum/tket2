@@ -41,7 +41,7 @@ use super::futures::future_type;
 mod barrier;
 mod lower;
 use lower::pi_mul_f64;
-pub use lower::{LowerTk2Error, LowerTketToQSystemPass, check_lowered, lower_tk2_op};
+pub use lower::{LowerTk2Error, LowerTketToQSystemPass, check_lowered, lower_tk2_ops};
 
 /// The "tket.qsystem" extension id.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("tket.qsystem");

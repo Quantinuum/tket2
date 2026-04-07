@@ -9,7 +9,7 @@ use pyo3::{prelude::*, types::PyIterator};
 
 use tket::portmatching::{CircuitPattern, PatternMatch, PatternMatcher};
 
-use crate::circuit::{PyNode, try_with_circ, with_circ};
+use crate::state::{CompilationState, PyNode};
 
 /// A pattern that match a circuit exactly
 ///
@@ -27,10 +27,12 @@ pub struct PyCircuitPattern {
 
 #[pymethods]
 impl PyCircuitPattern {
-    /// Construct a pattern from a TKET1 circuit
+    /// Construct a pattern from a circuit.
     #[new]
-    pub fn from_circuit(circ: &Bound<PyAny>) -> PyResult<Self> {
-        let pattern = try_with_circ(circ, |circ, _| CircuitPattern::try_from_circuit(&circ))?;
+    pub fn from_circuit(circ: &CompilationState) -> PyResult<Self> {
+        let c = tket::Circuit::new(circ.hugr.clone());
+        let pattern = CircuitPattern::try_from_circuit(&c)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
         Ok(pattern.into())
     }
 
@@ -79,21 +81,20 @@ impl PyPatternMatcher {
     }
 
     /// Find one convex match in a circuit.
-    pub fn find_match(&self, circ: &Bound<PyAny>) -> PyResult<Option<PyPatternMatch>> {
-        with_circ(circ, |circ, _| {
-            self.matcher.find_matches_iter(&circ).next().map(Into::into)
-        })
+    pub fn find_match(&self, circ: &CompilationState) -> PyResult<Option<PyPatternMatch>> {
+        let c = tket::Circuit::new(circ.hugr.clone());
+        Ok(self.matcher.find_matches_iter(&c).next().map(Into::into))
     }
 
     /// Find all convex matches in a circuit.
-    pub fn find_matches(&self, circ: &Bound<PyAny>) -> PyResult<Vec<PyPatternMatch>> {
-        with_circ(circ, |circ, _| {
-            self.matcher
-                .find_matches(&circ)
-                .into_iter()
-                .map_into()
-                .collect()
-        })
+    pub fn find_matches(&self, circ: &CompilationState) -> PyResult<Vec<PyPatternMatch>> {
+        let c = tket::Circuit::new(circ.hugr.clone());
+        Ok(self
+            .matcher
+            .find_matches(&c)
+            .into_iter()
+            .map_into()
+            .collect())
     }
 }
 

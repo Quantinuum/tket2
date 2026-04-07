@@ -99,7 +99,7 @@ jobs:
           uvx twine check --strict dist/*
 
       - name: Report
-        if: ${{ (github.event_name == 'release' && matrix.target.run ) || (github.event_name == 'workflow_dispatch' && github.ref_type == 'tag' && startsWith(github.ref, format('refs/tags/{0}-v', matrix.target.dir)) ) }}
+        if: ${{ (github.event_name == 'release' && matrix.target.run == 'true') || (github.event_name == 'workflow_dispatch' && github.ref_type == 'tag' && startsWith(github.ref, format('refs/tags/{0}-v', matrix.target.dir)) ) }}
         run: |
           echo "Publishing to PyPI..."
           echo "Based on the following workflow variables, this is a new version tag push:"
@@ -108,7 +108,7 @@ jobs:
           echo "  - ref: ${{ github.ref }}"
 
       - name: Publish package distributions to PyPI
-        if: ${{ (github.event_name == 'release' && matrix.target.run ) || (github.event_name == 'workflow_dispatch' && github.ref_type == 'tag' && startsWith(github.ref, format('refs/tags/{0}-v', matrix.target.dir)) ) }}
+        if: ${{ (github.event_name == 'release' && matrix.target.run == 'true') || (github.event_name == 'workflow_dispatch' && github.ref_type == 'tag' && startsWith(github.ref, format('refs/tags/{0}-v', matrix.target.dir)) ) }}
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           verbose: true

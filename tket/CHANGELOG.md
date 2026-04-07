@@ -1,6 +1,42 @@
 # Changelog
 
 
+## [0.18.0](https://github.com/Quantinuum/tket2/compare/tket-v0.17.0...tket-v0.18.0) - 2026-04-02
+
+This release bumps `hugr` to 0.27.0 and reworks the pytket encoding/decoding API to use raw `Hugr`s.
+The `tket::passes` module now contains the passes previously available in `hugr_passes`.
+
+### Bug Fixes
+
+- *(pytket decoder)* Panic on repeated bit registers in pytket decoded output ([#1445](https://github.com/Quantinuum/tket2/pull/1445))
+- pytket encoder drops order edges to the output node ([#1466](https://github.com/Quantinuum/tket2/pull/1466))
+
+### Documentation
+
+- Fix tket README introductory example ([#1463](https://github.com/Quantinuum/tket2/pull/1463))
+
+### New Features
+
+- [**breaking**] Use raw Hugrs in pytket encoding/decoding API ([#1418](https://github.com/Quantinuum/tket2/pull/1418))
+- [**breaking**] Remove unused `lower_to_pytket` pass ([#1431](https://github.com/Quantinuum/tket2/pull/1431))
+- [**breaking**] Replace CircuitHash with hugr's implementation ([#1420](https://github.com/Quantinuum/tket2/pull/1420))
+- [**breaking**] Update MSRV to rust 1.91 ([#1446](https://github.com/Quantinuum/tket2/pull/1446))
+- [**breaking**] Update to hugr 0.26.0 ([#1448](https://github.com/Quantinuum/tket2/pull/1448))
+- [**breaking**] Follow pass scopes in composable passes ([#1429](https://github.com/Quantinuum/tket2/pull/1429))
+- Implemented `post_opdef` for `RotationOp` for constant folding ([#1468](https://github.com/Quantinuum/tket2/pull/1468))
+- [**breaking**] Reorganize `tket::passes` and add `hugr_passes` re-exports ([#1472](https://github.com/Quantinuum/tket2/pull/1472))
+- [**breaking**] Bump `hugr` dependency to 0.27.0 ([#1488](https://github.com/Quantinuum/tket2/pull/1488))
+- Move hugr-passes implementations to tket::passes ([#1487](https://github.com/Quantinuum/tket2/pull/1487))
+- Pass scopes in python API, update to hugr-py 0.16 ([#1464](https://github.com/Quantinuum/tket2/pull/1464))
+
+### Refactor
+
+- *(llvm)* use llvm.is.fpclass for from_halfturns ([#1457](https://github.com/Quantinuum/tket2/pull/1457))
+
+### Testing
+
+- Fixed signatures when decoding pytket circuits ([#1405](https://github.com/Quantinuum/tket2/pull/1405))
+
 ## [0.17.0](https://github.com/Quantinuum/tket2/compare/tket-v0.16.0...tket-v0.17.0) - 2026-02-02
 
 ### Bug Fixes

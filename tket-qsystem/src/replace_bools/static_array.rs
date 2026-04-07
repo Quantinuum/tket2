@@ -19,15 +19,16 @@ use hugr::{
     },
     types::{Transformable as _, Type, TypeEnum, TypeRow},
 };
-use hugr_passes::composable::WithScope;
+use itertools::Itertools as _;
+use tket::extension::bool::{self, BOOL_TYPE_NAME, BoolOpBuilder as _, ConstBool, bool_type};
+use tket::passes::PassScope;
+use tket::passes::composable::WithScope;
 /// Provides a `ReplaceStaticArrayBoolPass` which replaces static arrays containing `tket.bool` with
 /// static arrays containing `bool_t` values.
-use hugr_passes::{
+use tket::passes::{
     ComposablePass, ReplaceTypes,
     replace_types::{NodeTemplate, ReplaceTypesError},
 };
-use itertools::Itertools as _;
-use tket::extension::bool::{self, BOOL_TYPE_NAME, BoolOpBuilder as _, ConstBool, bool_type};
 
 #[non_exhaustive]
 #[derive(Debug, derive_more::Error, derive_more::Display, derive_more::From)]
@@ -43,9 +44,8 @@ type Result<T> = std::result::Result<T, ReplaceStaticArrayBoolPassError>;
 pub struct ReplaceStaticArrayBoolPass(ReplaceTypes);
 
 impl WithScope for ReplaceStaticArrayBoolPass {
-    fn with_scope(self, _scope: impl Into<hugr_passes::PassScope>) -> Self {
-        // TODO: Follow scope configuration
-        // <https://github.com/Quantinuum/tket2/pull/1429>
+    fn with_scope(mut self, scope: impl Into<PassScope>) -> Self {
+        self.0 = self.0.with_scope(scope);
         self
     }
 }
@@ -325,8 +325,8 @@ mod test {
         type_row,
         types::Signature,
     };
-    use hugr_passes::ComposablePass as _;
     use rstest::rstest;
+    use tket::passes::ComposablePass as _;
 
     use super::*;
 

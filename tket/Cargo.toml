@@ -1,6 +1,6 @@
 [package]
 name = "tket"
-version = "0.17.0"
+version = "0.18.0"
 edition = { workspace = true }
 rust-version = { workspace = true }
 
@@ -61,7 +61,6 @@ derive_more = { workspace = true, features = [
 ] }
 hugr = { workspace = true }
 hugr-core = { workspace = true }
-hugr-passes = { workspace = true }
 portgraph = { workspace = true, features = ["serde", "petgraph"] }
 strum = { workspace = true, features = ["derive"] }
 fxhash = { workspace = true }
@@ -78,17 +77,22 @@ pest_derive = { workspace = true }
 zstd = { workspace = true, optional = true }
 anyhow = { workspace = true, optional = true }
 num-rational = { workspace = true }
+ascent = "0.8.0"
+pastey = { workspace = true }
+thiserror = { workspace = true }
 
 
 [dev-dependencies]
 rstest = { workspace = true }
 cool_asserts = { workspace = true }
+proptest = { workspace = true }
+proptest-recurse = { workspace = true }
 
 
 # Defined here so it can be overridden by the codspeed CI job
 # using `cargo add`.
 criterion = { version = "0.8.2", features = ["html_reports"] }
-insta = "1.46.3"
+insta = "1.47.0"
 
 [[bench]]
 name = "bench_main"

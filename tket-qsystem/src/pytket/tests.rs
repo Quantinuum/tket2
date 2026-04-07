@@ -1,24 +1,27 @@
 //! General tests.
-
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 use hugr::builder::{Dataflow, DataflowHugr, FunctionBuilder};
 use hugr::extension::prelude::{bool_t, qb_t};
 
+use hugr::ops::OpParent;
 use hugr::types::Signature;
 use hugr::{Hugr, HugrView};
 use itertools::Itertools;
 use rstest::{fixture, rstest};
 use tket::TketOp;
 use tket::extension::TKET1_EXTENSION_ID;
+use tket::extension::bool::BoolOp;
+use tket::serialize::pytket::EncodedCircuit;
+use tket::serialize::pytket::TKETDecode;
+use tket::serialize::pytket::{DecodeOptions, EncodeOptions};
 use tket_json_rs::circuit_json::{self, SerialCircuit};
 use tket_json_rs::register;
 
-use tket::serialize::pytket::TKETDecode;
-use tket::serialize::pytket::{DecodeOptions, EncodeOptions};
-
 use crate::extension::futures::FutureOpBuilder;
 use crate::extension::qsystem::QSystemOp;
+use crate::extension::result::ResultOp;
 use crate::pytket::{qsystem_decoder_config, qsystem_encoder_config};
 
 const NATIVE_GATES_JSON: &str = r#"{
@@ -169,6 +172,34 @@ fn circ_qsystem_native_gates() -> Hugr {
     h.finish_hugr_with_outputs([bit_0, bit_1]).unwrap()
 }
 
+/// A circuit where the output is only reachable via an order edge.
+///
+/// The pytket pass used to drop the order edge here.
+/// <https://github.com/Quantinuum/tket2/issues/1410>
+#[fixture]
+fn circ_dropped_order_edge() -> Hugr {
+    let input_t = vec![];
+    let output_t = vec![];
+    let mut h =
+        FunctionBuilder::new("dropped_order_edge", Signature::new(input_t, output_t)).unwrap();
+
+    let [q] = h.add_dataflow_op(TketOp::QAlloc, []).unwrap().outputs_arr();
+    let [q] = h.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
+    let [q] = h.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
+    let [b] = h
+        .add_dataflow_op(TketOp::MeasureFree, [q])
+        .unwrap()
+        .outputs_arr();
+    let [b] = h.add_dataflow_op(BoolOp::read, [b]).unwrap().outputs_arr();
+    let result = h
+        .add_dataflow_op(ResultOp::new_bool("result"), [b])
+        .unwrap();
+
+    h.set_order(&result, &h.output());
+
+    h.finish_hugr_with_outputs([]).unwrap()
+}
+
 /// Check that all circuit ops have been translated to a native gate.
 ///
 /// Panics if there are tk1 ops in the circuit.
@@ -223,19 +254,41 @@ fn json_roundtrip(
 ///
 /// Note: this is not a pure roundtrip as the encoder may add internal qubits/bits to the circuit.
 #[rstest]
-#[case::native_gates(circ_qsystem_native_gates(), Signature::new_endo(vec![qb_t(), qb_t(), bool_t(), bool_t()]))]
-fn circuit_roundtrip(#[case] hugr: Hugr, #[case] decoded_sig: Signature) {
-    use hugr::ops::OpParent;
-    use tket::serialize::pytket::EncodeOptions;
+#[case::native_gates(circ_qsystem_native_gates())]
+fn circuit_standalone_roundtrip(#[case] hugr: Hugr) {
+    let circ_signature = hugr
+        .entrypoint_optype()
+        .inner_function_type()
+        .expect("Dataflow entrypoint")
+        .into_owned();
+    let decode_options = DecodeOptions::new()
+        .with_signature(circ_signature.clone())
+        .with_config(qsystem_decoder_config());
+    let encode_options = EncodeOptions::new()
+        .with_subcircuits(true)
+        .with_config(qsystem_encoder_config());
 
-    let ser: SerialCircuit = SerialCircuit::encode(
-        &hugr,
-        EncodeOptions::new().with_config(qsystem_encoder_config()),
-    )
-    .unwrap();
-    let deser: Hugr = ser
-        .decode(DecodeOptions::new().with_config(qsystem_decoder_config()))
-        .unwrap();
+    let encoded = EncodedCircuit::new_standalone(&hugr, encode_options.clone())
+        .unwrap_or_else(|e| panic!("{e}"));
+
+    assert!(encoded.contains_circuit(hugr.entrypoint()));
+    assert_eq!(encoded.len(), 1);
+
+    // Re-encode the EncodedCircuit
+    let extracted_from_circ = encoded
+        .reassemble(
+            hugr.entrypoint(),
+            Some("main".to_string()),
+            decode_options.clone(),
+        )
+        .unwrap_or_else(|e| panic!("{e}"));
+    extracted_from_circ
+        .validate()
+        .unwrap_or_else(|e| panic!("{e}"));
+
+    // Extract the head pytket circuit, and re-encode it on its own.
+    let ser: &SerialCircuit = &encoded[hugr.entrypoint()];
+    let deser: Hugr = ser.decode(decode_options).unwrap_or_else(|e| panic!("{e}"));
 
     let deser_sig = deser
         .entrypoint_optype()
@@ -243,14 +296,14 @@ fn circuit_roundtrip(#[case] hugr: Hugr, #[case] decoded_sig: Signature) {
         .expect("Dataflow entrypoint")
         .into_owned();
     assert_eq!(
-        &decoded_sig.input, &deser_sig.input,
+        &circ_signature.input, &deser_sig.input,
         "Input signature mismatch\n  Expected: {}\n  Actual:   {}",
-        &decoded_sig, &deser_sig
+        &circ_signature, &deser_sig
     );
     assert_eq!(
-        &decoded_sig.output, &deser_sig.output,
+        &circ_signature.output, &deser_sig.output,
         "Output signature mismatch\n  Expected: {}\n  Actual:   {}",
-        &decoded_sig, &deser_sig
+        &circ_signature, &deser_sig
     );
 
     let reser = SerialCircuit::encode(
@@ -259,5 +312,87 @@ fn circuit_roundtrip(#[case] hugr: Hugr, #[case] decoded_sig: Signature) {
     )
     .unwrap();
     validate_serial_circ(&reser);
-    compare_serial_circs(&ser, &reser);
+    compare_serial_circs(ser, &reser);
+}
+
+#[rstest]
+#[case::native_gates(circ_qsystem_native_gates(), 1)]
+#[case::dropped_order_edge(circ_dropped_order_edge(), 1)]
+fn encoded_circuit_roundtrip(#[case] hugr: Hugr, #[case] num_circuits: usize) {
+    let circ_signature = hugr
+        .entrypoint_optype()
+        .inner_function_type()
+        .expect("Dataflow entrypoint")
+        .into_owned();
+    let encode_options = EncodeOptions::new()
+        .with_subcircuits(true)
+        .with_config(qsystem_encoder_config());
+
+    let encoded = EncodedCircuit::new(&hugr, encode_options).unwrap_or_else(|e| panic!("{e}"));
+
+    assert!(encoded.contains_circuit(hugr.entrypoint()));
+    assert_eq!(encoded.len(), num_circuits);
+
+    let mut deser = hugr.clone();
+    encoded
+        .reassemble_inplace(&mut deser, Some(Arc::new(qsystem_decoder_config())))
+        .unwrap_or_else(|e| panic!("{e}"));
+
+    deser.validate().unwrap_or_else(|e| panic!("{e}"));
+
+    let deser_sig = deser
+        .entrypoint_optype()
+        .inner_function_type()
+        .expect("Dataflow entrypoint")
+        .into_owned();
+    assert_eq!(
+        &circ_signature.input, &deser_sig.input,
+        "Input signature mismatch\n  Expected: {}\n  Actual:   {}",
+        &circ_signature, &deser_sig
+    );
+    assert_eq!(
+        &circ_signature.output, &deser_sig.output,
+        "Output signature mismatch\n  Expected: {}\n  Actual:   {}",
+        &circ_signature, &deser_sig
+    );
+}
+
+#[rstest]
+/// Regression test for <https://github.com/Quantinuum/tket2/issues/1410>
+///
+/// The pytket pass used to drop the order edge between the `Result` operation
+/// and the output.
+fn regression_dropped_order_edge(circ_dropped_order_edge: Hugr) {
+    let hugr = circ_dropped_order_edge;
+
+    let encode_options = EncodeOptions::new()
+        .with_subcircuits(true)
+        .with_config(qsystem_encoder_config());
+    let encoded = EncodedCircuit::new(&hugr, encode_options).unwrap_or_else(|e| panic!("{e}"));
+    assert!(encoded.contains_circuit(hugr.entrypoint()));
+
+    let mut deser = hugr.clone();
+    encoded
+        .reassemble_inplace(&mut deser, Some(Arc::new(qsystem_decoder_config())))
+        .unwrap_or_else(|e| panic!("{e}"));
+
+    deser.validate().unwrap_or_else(|e| panic!("{e}"));
+
+    // Find the result and output nodes
+    let func_node = deser.entrypoint();
+    let result_node = deser
+        .children(func_node)
+        .find(|n| deser.get_optype(*n).cast::<ResultOp>().is_some())
+        .unwrap();
+    let output_node = deser.get_io(func_node).unwrap()[1];
+
+    // Check that the order edge is still there
+    let order_edge_out = deser.get_optype(result_node).other_output_port().unwrap();
+    let order_edge_in = deser.get_optype(output_node).other_input_port().unwrap();
+    assert_eq!(
+        deser
+            .linked_inputs(result_node, order_edge_out)
+            .collect_vec(),
+        vec![(output_node, order_edge_in)]
+    );
 }

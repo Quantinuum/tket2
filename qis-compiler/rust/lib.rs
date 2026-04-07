@@ -19,6 +19,7 @@ use inkwell::targets::{
 use itertools::Itertools;
 use pyo3::prelude::*;
 use tket::hugr::ops::DataflowParent;
+use tket::passes::composable::ComposablePass;
 
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
