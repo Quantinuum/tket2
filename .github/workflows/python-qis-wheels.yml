@@ -20,7 +20,6 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  CACHE_CARGO: true
   UV_VERSION: "0.9.7"
 jobs:
   # Check if the tag matches the package name,
@@ -46,21 +45,14 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
-          # Temporarily disable arm builds until we have a solution for official LLVM 21.1 builds requiring glibc 2.35.
-          #- ubuntu-24.04-arm
+          - ubuntu-24.04-arm
           - macos-15
           - macos-15-intel
           - windows-2022
     name: "qis-compiler wheels (${{matrix.os}})"
     runs-on: ${{ matrix.os }}
     steps:
-      # ---------------------------------
-      # Bootstrap the build environment
-      # ---------------------------------
-
       - uses: actions/checkout@v6
-        with:
-          submodules: recursive
 
       - name: Set up UV
         uses: astral-sh/setup-uv@v7
@@ -68,24 +60,8 @@ jobs:
           enable-cache: true
           version: ${{ env.UV_VERSION }}
 
-      # Note that we are using CIBuildWheel to build the wheels.
-      # This treats linux differently to macos and windows.
-      #
-      # On linux, building on the host platform adds an implicit
-      # requirement on the host platform's glibc version and other
-      # system libraries that happen to be available. To mitigate
-      # this, builds are performed within a docker container that
-      # is compatible with manylinux (in our case, manylinux_2_28).
-      #
-      # See https://github.com/pypa/manylinux for more information
-      # about the manylinux project.
-      #
-      # This is an important aspect of wheel building, as it means
-      # that wheels are built in an isolated environment. We use
-      # /tmp/ci-cache for caching, which is then accessed as
-      # /host/tmp/ci-cache within the container.
+      - uses: quantinuum/hugrverse-env/install-hugrenv-action@main
 
-      # if the hugr_qis compiler has changed, we build it.
       - name: Build selene-hugr-qis-compiler wheel
         uses: pypa/cibuildwheel@v3.4.1
         with:

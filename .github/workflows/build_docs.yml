@@ -17,12 +17,6 @@ permissions:
 env:
   UV_VERSION: "0.9.7"
   UV_FROZEN: 1
-  # Path to the cached tket-c-api library
-  # When this envvar is set, the `./.github/actions/tket-c-api` action **must** be run to fetch the artifacts
-  # This config is not required, but speeds up the build by caching the tket-c-api library
-  # The alternative is to install conan and remove the env var
-  TKET_C_API_PATH: "${{ github.workspace }}/tket-c-api"
-  LD_LIBRARY_PATH: ${{ github.workspace }}/tket-c-api/lib
 
 jobs:
   # Check if changes were made to the relevant files.
@@ -51,10 +45,11 @@ jobs:
       - uses: extractions/setup-just@v3
         with:
           just-version: "1.40.0"
-      - name: Install tket-c-api library
-        uses: ./.github/actions/tket-c-api
+
+
+      - uses: quantinuum/hugrverse-env/install-hugrenv-action@main
         with:
-          install-path: ${{ env.TKET_C_API_PATH }}
+          packages: "tket"
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7

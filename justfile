@@ -75,6 +75,17 @@ miri *TEST_ARGS:
 recompile-eccs:
     scripts/compile-test-eccs.sh
 
+# Update hugrenv version, including discovery of new hashes.
+# This change bumps the hugrenv version used in both devenv and CI.
+update-hugrenv version:
+    curl -L -o hugrenv.lock https://github.com/Quantinuum/hugrverse-env/releases/download/v{{version}}/hugrenv.lock
+
+# Fetch hugrverse environment packages for the current platform and extract them
+# to the provided directory.
+fetch-hugrenv install_path='./target/hugrenv/':
+    python scripts/fetch_hugrenv.py "{{install_path}}"
+
+
 # Regenerates all hugr definitions inside `test_files/`
 recompile-test-hugrs:
     @echo "---- Recompiling example guppy programs ----"
@@ -95,6 +106,8 @@ update-snapshots-rs:
 update-snapshots-py *TEST_ARGS:
     uv run maturin develop --uv
     uv run pytest --snapshot-update {{TEST_ARGS}}
+
+
 
 # Build the sphinx API documentation
 build-pydocs:

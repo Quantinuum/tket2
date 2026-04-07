@@ -51,6 +51,39 @@ checks successfully. On Debian-based systems you can install it as the
 set the environment variable `LLVM_SYS_211_PREFIX` to point to its location
 (e.g. `/usr/lib/llvm-21`) when running `just check`.
 
+#### Using hugrenv without Nix
+
+If you are not using Nix, you can fetch the same prebuilt `llvm` + `tket`
+artifacts used by CI using
+
+```bash
+just fetch-hugrenv
+```
+
+with an optional installation path parameter.
+
+This command:
+
+- detects your OS/architecture;
+- downloads the matching `hugrverse-env` release tarballs;
+- uses the version and supported target matrix pinned in `hugrenv.lock`;
+- extracts them into the path you provide, or `./target/hugrenv/` by default;
+- prints the environment variables to export for your shell.
+
+Using the default installation path is convenient for single-repo local work,
+but if you want to manage multiple hugrenv versions (or share one install across
+multiple repositories), prefer an explicit central location and/or versioned
+install paths.
+
+For bash/zsh this includes:
+
+- `TKET_C_API_PATH=/path/to/hugrenv`
+- `LLVM_SYS_211_PREFIX=/path/to/hugrenv`
+- `LIBCLANG_PATH=/path/to/hugrenv/lib`
+- `PATH=/path/to/hugrenv/bin:$PATH`
+- `LD_LIBRARY_PATH` (Linux) or `DYLD_LIBRARY_PATH` (macOS) including
+  `/path/to/hugrenv/lib` and `/path/to/hugrenv/lib64`.
+
 ## 🚀 Local development using the tket python library
 
 If you want to use the `tket` python library directly from the repository, you can build it with:
