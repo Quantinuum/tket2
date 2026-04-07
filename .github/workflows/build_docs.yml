@@ -47,7 +47,7 @@ jobs:
           just-version: "1.40.0"
 
 
-      - uses: quantinuum/hugrverse-env/.github/actions/install-hugrenv@main
+      - uses: quantinuum/hugrverse-env/install-hugrenv-action@main
         with:
           packages: "tket"
 
