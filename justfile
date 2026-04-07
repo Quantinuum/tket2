@@ -97,15 +97,15 @@ install_path.mkdir(parents=True, exist_ok=True)
 lock = json.loads(Path("hugrenv.lock").read_text(encoding="utf-8"))
 version = lock["version"]
 
-system = platform.system().lower()
+os_name = platform.system().lower()
 arch = platform.machine().lower()
-if system == "linux":
+if os_name == "linux":
     platform_key = "manylinux_2_28"
     arch_key = {"x86_64": "x86_64", "amd64": "x86_64", "aarch64": "aarch64", "arm64": "aarch64"}.get(arch)
-elif system == "darwin":
+elif os_name == "darwin":
     platform_key = "macosx_11_0"
     arch_key = {"x86_64": "x86_64", "amd64": "x86_64", "aarch64": "aarch64", "arm64": "aarch64"}.get(arch)
-elif system == "windows":
+elif os_name == "windows":
     platform_key = "win"
     arch_key = {"x86_64": "amd64", "amd64": "amd64"}.get(arch)
 else:
@@ -113,7 +113,7 @@ else:
     arch_key = None
 
 if platform_key is None or arch_key is None:
-    raise SystemExit(f"Unsupported platform: os={system} arch={arch}")
+    raise SystemExit(f"Unsupported platform: os={os_name} arch={arch}")
 
 for package in ("llvm", "tket"):
     try:
@@ -147,7 +147,7 @@ for package in ("llvm", "tket"):
 print("")
 print(f"hugrenv {version} installed in {install_path}")
 print("")
-if system == "windows":
+if os_name == "windows":
     p = str(install_path)
     print("PowerShell:")
     print(f"$env:TKET_C_API_PATH = \"{p}\"")
@@ -161,7 +161,7 @@ else:
     print(f"export LLVM_SYS_211_PREFIX=\"{p}\"")
     print(f"export LIBCLANG_PATH=\"{p}/lib\"")
     print(f"export PATH=\"{p}/bin:$PATH\"")
-    if system == "darwin":
+    if os_name == "darwin":
         print(f"export DYLD_LIBRARY_PATH=\"{p}/lib:{p}/lib64:$DYLD_LIBRARY_PATH\"")
     else:
         print(f"export LD_LIBRARY_PATH=\"{p}/lib:{p}/lib64:$LD_LIBRARY_PATH\"")
