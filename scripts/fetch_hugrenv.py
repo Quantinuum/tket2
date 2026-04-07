@@ -37,10 +37,6 @@ elif os_name == "windows":
     platform_key = "win"
     arch_key = {"x86_64": "amd64", "amd64": "amd64"}.get(arch)
 else:
-    platform_key = None
-    arch_key = None
-
-if platform_key is None or arch_key is None:
     raise SystemExit(f"Unsupported platform: os={os_name} arch={arch}")
 
 for package in ("llvm", "tket"):
