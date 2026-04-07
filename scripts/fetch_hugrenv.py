@@ -12,7 +12,9 @@ if len(sys.argv) != 2:
 
 install_path = Path(sys.argv[1]).expanduser().resolve()
 install_path.mkdir(parents=True, exist_ok=True)
-lock = json.loads(Path("hugrenv.lock").read_text(encoding="utf-8"))
+script_dir = Path(__file__).resolve().parent
+lock_path = script_dir.parent / "hugrenv.lock"
+lock = json.loads(lock_path.read_text(encoding="utf-8"))
 version = lock["version"]
 
 os_name = platform.system().lower()
