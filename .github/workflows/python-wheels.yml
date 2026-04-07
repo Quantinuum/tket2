@@ -66,10 +66,9 @@ jobs:
         #    to be built with zig.
         # - test-wheels: Whether to test installing the wheels.
         #    This is only done when the target platform matches the runner platform.
-        # - hugrenv: The configuration for the hugrverse environment to use for the build.
-        #    - platform: The platform string used in the hugrverse environment release artifacts.
-        #    - version: The version of the hugrverse environment to use.
-        #    - root: The root directory where the hugrverse environment will be extracted.
+        # - macos-compatibility: the minimum supported macosx version to build macos
+        #    wheels for. Violations (e.g. library dependencies on newer system libraries)
+        #    will result in CI failure.
         #
         # Note that platform support is limited by the pytket wheels' availability.
         # Since we have it as a dependency, wheels built for other platforms will be unusable.
