@@ -24,7 +24,7 @@ use tket::passes::{
 };
 
 use lower_drops::LowerDropsPass;
-use replace_bools::{ReplaceBoolPass, ReplaceBoolPassError};
+use replace_measurement::{ReplaceMeasurementPass, ReplaceMeasurementPassError};
 use tket::TketOp;
 
 use extension::{
@@ -45,7 +45,6 @@ pub struct QSystemPass {
     constant_fold: bool,
     monomorphize: bool,
     force_order: bool,
-    lazify: bool,
     hide_funcs: bool,
 
     /// Where to apply the pass.
@@ -60,7 +59,6 @@ impl Default for QSystemPass {
             constant_fold: true,
             monomorphize: true,
             force_order: true,
-            lazify: true,
             hide_funcs: true,
             scope: PassScope::default(),
         }
@@ -72,7 +70,7 @@ impl Default for QSystemPass {
 /// An error reported from [QSystemPass].
 pub enum QSystemPassError<N = Node> {
     /// An error from the component [ReplaceBoolPass].
-    ReplaceBoolError(ReplaceBoolPassError<N>),
+    ReplaceMeasurementError(ReplaceMeasurementPassError<N>),
     /// An error from the component [force_order()] pass.
     ForceOrderError(HugrError),
     /// An error from the component [LowerTketToQSystemPass] pass.
@@ -127,17 +125,6 @@ impl QSystemPass {
     /// `tket.futures.read` ops as late as possible.
     pub fn with_force_order(mut self, force_order: bool) -> Self {
         self.force_order = force_order;
-        self
-    }
-
-    /// Enables or disables lazification of quantum measurement ops.
-    ///
-    /// On by default.
-    ///
-    /// When enabled we replace strict measurement ops with lazy equivalents
-    /// from `tket.qsystem`.
-    pub fn with_lazify(mut self, lazify: bool) -> Self {
-        self.lazify = lazify;
         self
     }
 
@@ -267,10 +254,9 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for QSystemPass {
         // once we're done so that LLVM is not forced to compile them as callable.
         let pub_funcs = self.collect_pub_funcs(hugr);
 
+        ReplaceMeasurementPass::default_with_scope(self.scope.clone()).run(hugr)?;
+
         LowerTketToQSystemPass::default_with_scope(self.scope.clone()).run(hugr)?;
-        if self.lazify {
-            ReplaceBoolPass::default_with_scope(self.scope.clone()).run(hugr)?;
-        }
 
         LowerDropsPass::default_with_scope(self.scope.clone()).run(hugr)?;
 
@@ -314,6 +300,7 @@ mod test {
         types::Signature,
     };
 
+    use hugr::extension::prelude::bool_t;
     use hugr_core::hugr::internal::{HugrInternals, PortgraphNodeMap};
     use petgraph::visit::{Topo, Walker as _};
     use rstest::rstest;
@@ -336,10 +323,12 @@ mod test {
             .unwrap();
 
         let (mut hugr, [call_node, h_node, f_node, rx_node, main_node]) = {
+            use tket::extension::MeasurementOp;
+
             let mut builder = mb
                 .define_function_vis(
                     "main",
-                    Signature::new(vec![qb_t()], vec![opaque_bool_type(), opaque_bool_type()]),
+                    Signature::new(vec![qb_t()], vec![bool_t(), bool_t()]),
                     Visibility::Public,
                 )
                 .unwrap();
@@ -375,8 +364,13 @@ mod test {
                 .unwrap()
                 .outputs_arr();
 
+            let [bool_result] = builder
+                .add_dataflow_op(MeasurementOp::Read, [measure_result])
+                .unwrap()
+                .outputs_arr();
+
             let main_n = builder
-                .finish_with_outputs([measure_result, measure_result])
+                .finish_with_outputs([bool_result, bool_result])
                 .unwrap()
                 .node();
             let hugr = mb.finish_hugr().unwrap();

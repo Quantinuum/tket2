@@ -5,12 +5,15 @@ use derive_more::{Display, Error, From};
 use hugr::extension::prelude::bool_t;
 use hugr::extension::simple_op::MakeRegisteredOp;
 use hugr::{Node, hugr::hugrmut::HugrMut};
-use hugr_passes::PassScope;
-use hugr_passes::composable::WithScope;
-use hugr_passes::non_local::LocalizeEdges;
-use hugr_passes::replace_types::{NodeTemplate, ReplaceTypesError};
-use hugr_passes::{ComposablePass, ReplaceTypes, non_local::FindNonLocalEdgesError};
-use tket::{TketOp, extension::measurement_type};
+use tket::passes::PassScope;
+use tket::passes::composable::WithScope;
+use tket::passes::non_local::LocalizeEdges;
+use tket::passes::replace_types::{NodeTemplate, ReplaceTypesError};
+use tket::passes::{ComposablePass, ReplaceTypes, non_local::FindNonLocalEdgesError};
+use tket::{
+    TketOp,
+    extension::{MeasurementOp, measurement_type},
+};
 
 use crate::extension::futures::{FutureOp, FutureOpDef, future_type};
 use crate::extension::qsystem::QSystemOp;
@@ -73,9 +76,29 @@ fn lowerer() -> ReplaceTypes {
     }
     .to_extension_op()
     .unwrap();
+    let future_bool_dup = FutureOp {
+        op: FutureOpDef::Dup,
+        typ: bool_t(),
+    }
+    .to_extension_op()
+    .unwrap();
+    let future_bool_free = FutureOp {
+        op: FutureOpDef::Free,
+        typ: bool_t(),
+    }
+    .to_extension_op()
+    .unwrap();
     lw.set_replace_op(
-        &TketOp::Read.to_extension_op().unwrap(),
+        &MeasurementOp::Read.to_extension_op().unwrap(),
         NodeTemplate::SingleOp(future_bool_read.into()),
+    );
+    lw.set_replace_op(
+        &MeasurementOp::Dup.to_extension_op().unwrap(),
+        NodeTemplate::SingleOp(future_bool_dup.into()),
+    );
+    lw.set_replace_op(
+        &MeasurementOp::Free.to_extension_op().unwrap(),
+        NodeTemplate::SingleOp(future_bool_free.into()),
     );
 
     lw.set_replace_op(
@@ -104,7 +127,9 @@ mod test {
     use super::*;
     use hugr::HugrView;
     use hugr::builder::{DFGBuilder, Dataflow, DataflowHugr, inout_sig};
+    use hugr::extension::simple_op::MakeOpDef;
     use hugr::ops::OpType;
+    use hugr::types::Type;
     use hugr::types::TypeRow;
     use rstest::rstest;
 
@@ -114,7 +139,7 @@ mod test {
     fn test_replace_measurement_type_and_read() {
         let mut dfb = DFGBuilder::new(inout_sig(vec![measurement_type()], vec![bool_t()])).unwrap();
         let [m] = dfb.input_wires_arr();
-        let out = dfb.add_dataflow_op(TketOp::Read, [m]).unwrap();
+        let out = dfb.add_dataflow_op(MeasurementOp::Read, [m]).unwrap();
         let mut h = dfb.finish_hugr_with_outputs(out.outputs()).unwrap();
         h.validate().unwrap();
 
@@ -133,14 +158,38 @@ mod test {
         );
         assert!(
             !h.nodes()
-                .any(|n| h.get_optype(n).cast::<TketOp>() == Some(TketOp::Read))
+                .filter_map(|n| h.get_optype(n).as_extension_op())
+                .any(|op| MeasurementOp::from_op(op) == Ok(MeasurementOp::Read))
+        );
+    }
+
+    #[rstest]
+    #[case(MeasurementOp::Dup, FutureOpDef::Dup, vec![measurement_type(); 2])]
+    #[case(MeasurementOp::Free, FutureOpDef::Free, vec![])]
+    fn test_replace_measurement_lineariser_ops(
+        #[case] measurement_op: MeasurementOp,
+        #[case] expected_op: FutureOpDef,
+        #[case] outputs: Vec<Type>,
+    ) {
+        let mut dfb = DFGBuilder::new(inout_sig(vec![measurement_type()], outputs)).unwrap();
+        let [m] = dfb.input_wires_arr();
+        let op = dfb.add_dataflow_op(measurement_op, [m]).unwrap();
+        let mut h = dfb.finish_hugr_with_outputs(op.outputs()).unwrap();
+        h.validate().unwrap();
+
+        ReplaceMeasurementPass::default().run(&mut h).unwrap();
+        h.validate().unwrap();
+
+        assert!(
+            h.nodes()
+                .any(|n| FutureOpDef::try_from(h.get_optype(n)) == Ok(expected_op))
         );
     }
 
     #[rstest]
     #[case(TketOp::MeasureFree, QSystemOp::LazyMeasure)]
     #[case(QSystemOp::Measure, QSystemOp::LazyMeasure)]
-    fn test_replace_measurement_ops<T: Into<OpType>>(
+    fn test_replace_measure_ops<T: Into<OpType>>(
         #[case] measure_op: T,
         #[case] expected_op: QSystemOp,
     ) {

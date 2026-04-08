@@ -350,7 +350,7 @@ mod test {
         extension::prelude::{UnwrapBuilder as _, bool_t, option_type, qb_t},
         type_row,
     };
-    use tket::passes::composable::Preserve;
+    use tket::{extension::{MeasurementOp, MeasurementOpBuilder}, passes::composable::Preserve};
     use tket::{Circuit, extension::rotation::rotation_type};
 
     use super::*;
@@ -380,10 +380,11 @@ mod test {
             .build_unwrap_sum(1, option_type(vec![qb_t()]), maybe_q)
             .unwrap();
 
-        let [_] = b
+        let [r] = b
             .add_dataflow_op(TketOp::MeasureFree, [q])
             .unwrap()
             .outputs_arr();
+        let [_] = b.add_dataflow_op(MeasurementOp::Read, [r]).unwrap().outputs_arr();
         let mut h = b
             .finish_hugr_with_outputs([])
             .unwrap_or_else(|e| panic!("{}", e));
@@ -460,10 +461,11 @@ mod test {
         let rx = b.add_dataflow_op(TketOp::Rx, [q, angle]).unwrap();
         let [q] = rx.outputs_arr();
         let q = b.add_barrier([q]).unwrap().out_wire(0);
-        let [q, bool] = b
+        let [q, msmt] = b
             .add_dataflow_op(TketOp::Measure, [q])
             .unwrap()
             .outputs_arr();
+        let [bool] = b.add_measurement_read(msmt).unwrap();
         let qfree = b.add_dataflow_op(TketOp::QFree, [q]).unwrap();
         b.set_order(&qalloc, &rx);
         b.set_order(&rx, &qfree);

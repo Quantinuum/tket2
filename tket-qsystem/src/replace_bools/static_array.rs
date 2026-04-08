@@ -21,7 +21,7 @@ use hugr::{
 };
 use itertools::Itertools as _;
 use tket::extension::bool::{
-    self, ConstOpaqueBool, OPAQUE_BOOL_TYPE_NAME, OpaqueBoolOpBuilder as _, OpaqueBoolOpBuilder,
+    self, ConstOpaqueBool, OPAQUE_BOOL_TYPE_NAME, OpaqueBoolOpBuilder as _, opaque_bool_type,
 };
 use tket::passes::PassScope;
 use tket::passes::composable::WithScope;

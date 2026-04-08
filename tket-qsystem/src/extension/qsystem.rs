@@ -29,7 +29,7 @@ use hugr::{
     type_row,
     types::{PolyFuncType, Signature, Type, TypeArg, TypeRow, type_param::TypeParam},
 };
-use tket::{TketOp, extension::measurement_type};
+use tket::extension::{MeasurementOp, measurement::MEASUREMENT_EXTENSION, measurement_type};
 
 use crate::extension::futures;
 use derive_more::Display;
@@ -62,6 +62,7 @@ lazy_static! {
     pub static ref REGISTRY: ExtensionRegistry = ExtensionRegistry::new([
         EXTENSION.to_owned(),
         futures::EXTENSION.to_owned(),
+        MEASUREMENT_EXTENSION.to_owned(),
         PRELUDE.to_owned(),
         FLOAT_TYPES.to_owned(),
     ]);
@@ -497,7 +498,7 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
     /// Build a projective measurement with a conditional flip.
     fn build_measure_flip(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
         let [qb, b] = self.add_measure_reset(qb)?;
-        let sum_b = self.add_dataflow_op(TketOp::Read, [b])?.out_wire(0);
+        let sum_b = self.add_dataflow_op(MeasurementOp::Read, [b])?.out_wire(0);
         let mut conditional = self.conditional_builder(
             ([type_row![], type_row![]], sum_b),
             [(qb_t(), qb)],
@@ -568,6 +569,7 @@ mod test {
     use hugr::extension::simple_op::MakeExtensionOp;
     use hugr::ops::OpType;
     use strum::IntoEnumIterator as _;
+    use tket::extension::MeasurementOpBuilder;
 
     use super::*;
 
@@ -638,6 +640,7 @@ mod test {
             let q0 = func_builder.add_rz(q0, angle).unwrap();
             let [q0, _b] = func_builder.add_measure_reset(q0).unwrap();
             let b = func_builder.add_measure(q0).unwrap();
+            func_builder.add_measurement_free(b).unwrap();
             func_builder.add_qfree(q1).unwrap();
 
             func_builder.finish_hugr_with_outputs([b]).unwrap()

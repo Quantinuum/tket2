@@ -103,11 +103,6 @@ impl TketOpEmitter {
             TketOp::TryQAlloc => {
                 return Ok(EncodeStatus::Unsupported);
             }
-            TketOp::Read => {
-                // As the measurement type is not supported, we don't translate the
-                // read operation as well for now.
-                return Ok(EncodeStatus::Unsupported);
-            }
         };
 
         // Most operations map directly to a pytket one.

@@ -11,8 +11,7 @@ use hugr::{Hugr, HugrView};
 use itertools::Itertools;
 use rstest::{fixture, rstest};
 use tket::TketOp;
-use tket::extension::TKET1_EXTENSION_ID;
-use tket::extension::bool::OpaqueBoolOp;
+use tket::extension::{MeasurementOp, TKET1_EXTENSION_ID};
 use tket::serialize::pytket::EncodedCircuit;
 use tket::serialize::pytket::TKETDecode;
 use tket::serialize::pytket::{DecodeOptions, EncodeOptions};
@@ -191,7 +190,7 @@ fn circ_dropped_order_edge() -> Hugr {
         .unwrap()
         .outputs_arr();
     let [b] = h
-        .add_dataflow_op(OpaqueBoolOp::read, [b])
+        .add_dataflow_op(MeasurementOp::Read, [b])
         .unwrap()
         .outputs_arr();
     let result = h

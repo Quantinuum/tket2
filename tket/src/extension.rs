@@ -2,20 +2,19 @@
 //!
 //! This includes a extension for the opaque TKET1 operations.
 
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 
 use crate::TketOp;
 use crate::serialize::pytket::extension::OpaqueTk1Op;
 use hugr::Extension;
 use hugr::extension::simple_op::MakeOpDef;
 use hugr::extension::{
-    CustomSignatureFunc, ExtensionBuildError, ExtensionId, ExtensionRegistry, SignatureError,
-    TypeDef, Version,
+    CustomSignatureFunc, ExtensionId, ExtensionRegistry, SignatureError, Version,
 };
 use hugr::hugr::IdentList;
 use hugr::std_extensions::STD_REG;
 use hugr::types::type_param::{TypeArg, TypeParam};
-use hugr::types::{CustomType, PolyFuncType, PolyFuncTypeRV, Type, TypeBound};
+use hugr::types::{PolyFuncType, PolyFuncTypeRV};
 use lazy_static::lazy_static;
 use smol_str::SmolStr;
 
@@ -26,11 +25,16 @@ pub mod debug;
 pub mod global_phase;
 /// Definition for ops used by Guppy.
 pub mod guppy;
+/// Definition for measurement types.
+pub mod measurement;
 pub mod modifier;
 /// Definition for Angle ops and types.
 pub mod rotation;
 pub mod sympy;
 
+pub use measurement::{
+    MeasurementOp, MeasurementOpBuilder, measurement_custom_type, measurement_type,
+};
 use sympy::SympyOpDef;
 
 /// The ID of the TKET1 extension.
@@ -63,6 +67,7 @@ pub(crate) static ref REGISTRY: ExtensionRegistry = ExtensionRegistry::new(
     bool::OPAQUE_BOOL_EXTENSION.to_owned(),
     debug::DEBUG_EXTENSION.to_owned(),
     guppy::GUPPY_EXTENSION.to_owned(),
+    measurement::MEASUREMENT_EXTENSION.to_owned(),
     rotation::ROTATION_EXTENSION.to_owned()
 ]));
 
@@ -90,35 +95,6 @@ impl CustomSignatureFunc for Tk1Signature {
     }
 }
 
-fn add_measurement_type_def(
-    ext: &mut Extension,
-    extension_ref: Weak<Extension>,
-) -> Result<&TypeDef, ExtensionBuildError> {
-    ext.add_type(
-        MEASUREMENT_TYPE_ID.to_owned(),
-        vec![],
-        "A type representing the result of a measurement operation".into(),
-        TypeBound::Linear.into(),
-        &extension_ref,
-    )
-}
-
-/// Returns a `Measurement` [CustomType].
-pub fn measurement_custom_type(extension_ref: &Weak<Extension>) -> CustomType {
-    CustomType::new(
-        MEASUREMENT_TYPE_ID.to_owned(),
-        vec![],
-        TKET_EXTENSION_ID,
-        TypeBound::Linear,
-        extension_ref,
-    )
-}
-
-/// Returns a `Measurement` [Type].
-pub fn measurement_type() -> Type {
-    measurement_custom_type(&Arc::downgrade(&TKET_EXTENSION)).into()
-}
-
 /// Name of tket extension.
 pub const TKET_EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("tket.quantum");
 
@@ -129,12 +105,8 @@ lazy_static! {
     /// The extension definition for TKET ops and types.
     pub static ref TKET_EXTENSION: Arc<Extension> = {
         Extension::new_arc(TKET_EXTENSION_ID, TKET_EXTENSION_VERSION, |res, ext_ref| {
-            let _ = add_measurement_type_def(res, ext_ref.clone()).unwrap();
             TketOp::load_all_ops(res, ext_ref).expect("add_fail");
             SympyOpDef.add_to_extension(res, ext_ref).unwrap();
         })
     };
-
-    /// The name of the `Measurement` type.
-    pub static ref MEASUREMENT_TYPE_ID: SmolStr = SmolStr::new_inline("Measurement");
 }
