@@ -28,7 +28,7 @@ use tket::passes::composable::WithScope;
 use tket::passes::const_fold::{ConstFoldError, ConstantFoldPass};
 use tket::passes::{
     ComposablePass, MonomorphizePass, PassScope, RemoveDeadFuncsError, RemoveDeadFuncsPass,
-    force_order, replace_types::ReplaceTypesError,
+    force_order, replace_types::ReplaceTypesError, NormalizeGuppy
 };
 
 use lower_drops::LowerDropsPass;
@@ -299,6 +299,19 @@ impl ComposablePass<Hugr> for QSystemPass {
             hugr.set_entrypoint(main_n);
         }
 
+        // Apply NormalizeGuppy to simplify the HUGR before the 1Q squash pass.
+        let mut normalize_pass = NormalizeGuppy::default();
+
+        normalize_pass.simplify_cfgs(true)
+        .remove_tuple_untuple(true)
+        .constant_folding(true)
+        .remove_dead_funcs(true)
+        .inline_dfgs(true)
+        .remove_redundant_order_edges(true)
+        .squash_borrows(true);
+
+        normalize_pass.run(hugr).unwrap();
+
         // Call the SquashRzPhasedX pass from pytket using the pass JSON
         // https://docs.quantinuum.com/tket/api-docs/passes.html#pytket.passes.SquashRzPhasedX
         // Squash single qubit gates after conversion to the Qsystem gate set.
@@ -313,15 +326,8 @@ impl ComposablePass<Hugr> for QSystemPass {
             .par_iter_mut()
             .for_each(|(_region, serial_circuit)| {
                 let mut circuit_ptr = Tket1Circuit::from_serial_circuit(serial_circuit).unwrap();
-                let my_circuit_json_before = serde_json::to_value(&serial_circuit).unwrap();
-                println!("Circuit before ============================={_region}");
-                println!("{}", my_circuit_json_before);
                 Tket1Pass::run_from_json(&squash_pass_json_string, &mut circuit_ptr).unwrap();
                 *serial_circuit = circuit_ptr.to_serial_circuit().unwrap();
-
-                let my_circuit_json_after = serde_json::to_value(&serial_circuit).unwrap();
-                println!("Circuit after =============================={_region}");
-                println!("{}", my_circuit_json_after)
             });
         encoded
             .reassemble_inplace(hugr, Some(Arc::new(qsystem_decoder_config())))
