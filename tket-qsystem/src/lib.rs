@@ -10,6 +10,7 @@ pub mod lower_drops;
 pub mod pytket;
 pub mod replace_bools;
 
+use hugr::Hugr;
 use pytket::qsystem_decoder_config;
 use rayon::iter::ParallelIterator;
 use replace_bools::{ReplaceBoolPass, ReplaceBoolPassError};
@@ -17,7 +18,6 @@ use std::sync::Arc;
 use tket::TketOp;
 use tket::serialize::pytket::{EncodeOptions, EncodedCircuit};
 use tket1_passes::{Tket1Circuit, Tket1Pass};
-use tket::hugr::Hugr;
 
 use derive_more::{Display, Error, From};
 use hugr::hugr::{HugrError, hugrmut::HugrMut};
@@ -247,14 +247,14 @@ impl WithScope for QSystemPass {
     }
 }
 
-impl<H: Hugr<Node = Node> + 'static> ComposablePass<H> for QSystemPass {
+impl ComposablePass<Hugr> for QSystemPass {
     type Error = QSystemPassError;
     type Result = ();
 
     /// Run `QSystemPass` on the given Hugr. `registry` is used for
     /// validation, if enabled.
     /// Expects the HUGR to have a function entrypoint.
-    fn run(&self, hugr: &mut H) -> Result<(), QSystemPassError> {
+    fn run(&self, hugr: &mut Hugr) -> Result<(), QSystemPassError> {
         if !matches!(self.scope, PassScope::Global(_)) {
             return Err(QSystemPassError::LocalScopeError {
                 scope: self.scope.clone(),
@@ -308,7 +308,7 @@ impl<H: Hugr<Node = Node> + 'static> ComposablePass<H> for QSystemPass {
             })
             .unwrap();
         let mut encoded =
-            EncodedCircuit::new(&mut hugr, EncodeOptions::new().with_subcircuits(true)).unwrap();
+            EncodedCircuit::new(hugr, EncodeOptions::new().with_subcircuits(true)).unwrap();
         encoded
             .par_iter_mut()
             .for_each(|(_region, serial_circuit)| {
