@@ -11,7 +11,7 @@ use hugr_core::ops::Value;
 use hugr_core::ops::constant::OpaqueValue;
 use hugr_core::types::ConstTypeError;
 
-use crate::dataflow::{AbstractValue, AsConcrete, ConstLocation, LoadedFunction, Sum};
+use crate::passes::dataflow::{AbstractValue, AsConcrete, ConstLocation, LoadedFunction, Sum};
 
 /// A custom constant that has been successfully hashed via [`TryHash`](hugr_core::ops::constant::TryHash)
 #[derive(Clone, Debug)]
@@ -158,7 +158,9 @@ impl<N: HugrNode> AsConcrete<ValueHandle<N>, N> for Value {
         Self::sum(value.tag, value.values, value.st)
     }
 
-    fn from_func(func: LoadedFunction<N>) -> Result<Self, crate::dataflow::LoadedFunction<N>> {
+    fn from_func(
+        func: LoadedFunction<N>,
+    ) -> Result<Self, crate::passes::dataflow::LoadedFunction<N>> {
         Err(func)
     }
 }

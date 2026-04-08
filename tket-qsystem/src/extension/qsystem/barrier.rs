@@ -16,9 +16,9 @@ mod test {
         extension::prelude::{bool_t, option_type, qb_t},
         std_extensions::collections::array::array_type,
     };
-    use hugr_passes::composable::Preserve;
     use itertools::Itertools;
     use rstest::rstest;
+    use tket::passes::composable::Preserve;
 
     fn opt_q_arr(size: u64) -> hugr::types::Type {
         array_type(size, option_type(vec![qb_t()]).into())

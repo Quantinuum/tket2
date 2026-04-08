@@ -10,8 +10,8 @@ use hugr_core::{HugrView, IncomingPort, Node, OutgoingPort};
 use itertools::Itertools;
 use petgraph::visit::Walker;
 
-use crate::composable::WithScope;
-use crate::{ComposablePass, PassScope};
+use crate::passes::composable::WithScope;
+use crate::passes::{ComposablePass, PassScope};
 
 /// A pass for removing order edges in a Hugr region that are already implied by
 /// other order or dataflow dependencies.

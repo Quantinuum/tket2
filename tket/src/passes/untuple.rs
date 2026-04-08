@@ -13,8 +13,8 @@ use hugr_core::types::Type;
 use hugr_core::{HugrView, Node, PortIndex, SimpleReplacement};
 use itertools::Itertools;
 
-use crate::composable::WithScope;
-use crate::{ComposablePass, PassScope};
+use crate::passes::composable::WithScope;
+use crate::passes::{ComposablePass, PassScope};
 
 /// A pass that removes unnecessary `MakeTuple` operations immediately followed
 /// by `UnpackTuple`s.
@@ -78,10 +78,11 @@ fn find_rewrites<H: HugrView>(
     let mut children_queue = VecDeque::new();
     children_queue.push_back(parent);
 
-    // Required to create SimpleReplacements.
-    let mut convex_checker: Option<TopoConvexChecker<H>> = None;
-
     while let Some(parent) = children_queue.pop_front() {
+        // Required to create SimpleReplacements.
+        // Reset for each parent as `TopoConvexChecker` is tied to a specific parent node.
+        let mut convex_checker: Option<TopoConvexChecker<H>> = None;
+
         for node in hugr.children(parent) {
             let op = hugr.get_optype(node);
             if let Some(rw) = make_rewrite(hugr, &mut convex_checker, node, op) {
@@ -259,7 +260,7 @@ fn remove_pack_unpack<'h, T: HugrView>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::composable::WithScope;
+    use crate::passes::composable::WithScope;
     use hugr_core::Hugr;
     use hugr_core::builder::FunctionBuilder;
     use hugr_core::extension::prelude::{UnpackTuple, bool_t, qb_t};

@@ -2,7 +2,9 @@
 
 use rayon::iter::ParallelIterator;
 use std::sync::Arc;
+use tket::passes::composable::PassScope;
 
+use crate::passes::PyPassScope;
 use pyo3::prelude::*;
 use tket::serialize::pytket::{EncodeOptions, EncodedCircuit};
 use tket_qsystem::pytket::{qsystem_decoder_config, qsystem_encoder_config};
@@ -18,22 +20,26 @@ use crate::utils::{ConvertPyErr, create_py_exception};
 /// - pass_json: The JSON string of the pytket pass to run. See [pytket
 ///   documentation](https://docs.quantinuum.com/tket/api-docs/passes.html#pytket.passes.BasePass.to_dict)
 ///   for more details.
-/// - traverse_subcircuits: Whether to recurse into the children of the
-///   circuit-like regions, and optimise them too.
 #[pyfunction]
-#[pyo3(signature = (program, pass_json, *, traverse_subcircuits = true))]
-pub fn tket1_pass(
+#[pyo3(signature = (program, pass_json, *, scope = None))]
+pub(crate) fn tket1_pass(
     program: &mut CompilationState,
     pass_json: &str,
-    traverse_subcircuits: bool,
+    scope: Option<PyPassScope>,
 ) -> PyResult<()> {
-    let mut encoded_circ = EncodedCircuit::new(
-        &program.hugr,
-        EncodeOptions::new()
-            .with_config(qsystem_encoder_config())
-            .with_subcircuits(traverse_subcircuits),
-    )
-    .convert_pyerrs()?;
+    // TODO: Implement a Tket1Pass: ComposablePass, use it here with the right scope.
+    // <https://github.com/Quantinuum/tket2/issues/1494>
+    let scope: PassScope = scope.unwrap_or_default().scope;
+    let encode_options = EncodeOptions::new()
+        .with_config(qsystem_encoder_config())
+        .with_subcircuits(scope.recursive());
+
+    let Some(root) = scope.root(&program.hugr) else {
+        return Ok(());
+    };
+
+    let mut encoded_circ = EncodedCircuit::new_with_entrypoint(&program.hugr, root, encode_options)
+        .convert_pyerrs()?;
 
     encoded_circ
         .par_iter_mut()

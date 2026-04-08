@@ -1,5 +1,5 @@
 //! Constant-folding pass.
-//! An (example) use of the [dataflow analysis framework](super::dataflow).
+//! An (example) use of the [dataflow analysis framework](crate::passes::dataflow).
 
 pub mod value_handle;
 use std::{collections::HashMap, sync::Arc};
@@ -15,12 +15,12 @@ use hugr_core::{
 };
 use value_handle::ValueHandle;
 
-use crate::composable::{ComposablePass, PassScope, WithScope};
-use crate::dataflow::{
+use crate::passes::composable::{ComposablePass, PassScope, WithScope};
+use crate::passes::dataflow::{
     ConstLoader, ConstLocation, DFContext, Machine, PartialValue, TailLoopTermination,
     partial_from_const,
 };
-use crate::dead_code::{DeadCodeElimError, DeadCodeElimPass, PreserveNode};
+use crate::passes::dead_code::{DeadCodeElimError, DeadCodeElimPass, PreserveNode};
 
 #[derive(Debug, Clone, Default)]
 /// A configuration for the Constant Folding pass.
@@ -139,9 +139,8 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
                 .map_err(|op| ConstFoldError::InvalidEntryPoint { node, op })?;
         }
 
-        let results = m.run(ConstFoldContext, []);
+        let results = m.run_subtree(ConstFoldContext, root);
         let mb_root_inp = hugr.get_io(hugr.entrypoint()).map(|[i, _]| i);
-
         let wires_to_break = hugr
             .descendants(root)
             .flat_map(|n| hugr.node_inputs(n).map(move |ip| (n, ip)))
@@ -164,7 +163,7 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
             .collect::<Vec<_>>();
         // Sadly the results immutably borrow the hugr, so we must extract everything we need before mutation
         let terminating_tail_loops = hugr
-            .entry_descendants()
+            .descendants(root)
             .filter(|n| {
                 results.tail_loop_terminates(*n) == Some(TailLoopTermination::NeverContinues)
             })

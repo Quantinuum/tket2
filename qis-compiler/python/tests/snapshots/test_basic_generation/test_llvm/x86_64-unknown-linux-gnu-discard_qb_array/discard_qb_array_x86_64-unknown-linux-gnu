@@ -241,14 +241,14 @@ mask_block_err.i.i.i.i:                           ; preds = %mask_block_ok.i.i.i
   unreachable
 
 __barray_check_bounds.exit.i.i.i:                 ; preds = %"__hugr__.$ArrayIter.__next__$$t(qubit)$n(10).302.exit.thread.i.i", %cond_exit_20.i.9
-  %.fca.2.extract85.i185.i.i = phi i64 [ 0, %cond_exit_20.i.9 ], [ %.fca.1.0.0.2.extract.i.i.i, %"__hugr__.$ArrayIter.__next__$$t(qubit)$n(10).302.exit.thread.i.i" ]
-  %.fca.1.extract84.i184.i.i = phi ptr [ %2, %cond_exit_20.i.9 ], [ %.fca.1.0.0.1.extract.i.i.i, %"__hugr__.$ArrayIter.__next__$$t(qubit)$n(10).302.exit.thread.i.i" ]
-  %.fca.0.extract83.i183.i.i = phi ptr [ %1, %cond_exit_20.i.9 ], [ %.fca.1.0.0.0.extract.i.i.i, %"__hugr__.$ArrayIter.__next__$$t(qubit)$n(10).302.exit.thread.i.i" ]
+  %.fca.2.extract82.i185.i.i = phi i64 [ 0, %cond_exit_20.i.9 ], [ %.fca.1.0.0.2.extract.i.i.i, %"__hugr__.$ArrayIter.__next__$$t(qubit)$n(10).302.exit.thread.i.i" ]
+  %.fca.1.extract81.i184.i.i = phi ptr [ %2, %cond_exit_20.i.9 ], [ %.fca.1.0.0.1.extract.i.i.i, %"__hugr__.$ArrayIter.__next__$$t(qubit)$n(10).302.exit.thread.i.i" ]
+  %.fca.0.extract80.i183.i.i = phi ptr [ %1, %cond_exit_20.i.9 ], [ %.fca.1.0.0.0.extract.i.i.i, %"__hugr__.$ArrayIter.__next__$$t(qubit)$n(10).302.exit.thread.i.i" ]
   %"294_0.0182.i.i" = phi i64 [ 0, %cond_exit_20.i.9 ], [ %72, %"__hugr__.$ArrayIter.__next__$$t(qubit)$n(10).302.exit.thread.i.i" ]
   %.pn181.i.i = phi { { ptr, ptr, i64 }, i64 } [ %42, %cond_exit_20.i.9 ], [ %80, %"__hugr__.$ArrayIter.__next__$$t(qubit)$n(10).302.exit.thread.i.i" ]
-  %65 = add i64 %"294_0.0182.i.i", %.fca.2.extract85.i185.i.i
+  %65 = add i64 %"294_0.0182.i.i", %.fca.2.extract82.i185.i.i
   %66 = lshr i64 %65, 6
-  %67 = getelementptr inbounds nuw i64, ptr %.fca.1.extract84.i184.i.i, i64 %66
+  %67 = getelementptr inbounds nuw i64, ptr %.fca.1.extract81.i184.i.i, i64 %66
   %68 = load i64, ptr %67, align 4
   %69 = and i64 %65, 63
   %70 = lshr i64 %68, %69
@@ -264,7 +264,7 @@ panic.i.i.i.i:                                    ; preds = %__barray_check_boun
   %73 = shl nuw i64 1, %69
   %74 = xor i64 %73, %68
   store i64 %74, ptr %67, align 4
-  %75 = getelementptr inbounds i64, ptr %.fca.0.extract83.i183.i.i, i64 %65
+  %75 = getelementptr inbounds i64, ptr %.fca.0.extract80.i183.i.i, i64 %65
   %76 = load i64, ptr %75, align 4
   %.fca.1.0.0.0.extract.i.i.i = extractvalue { { ptr, ptr, i64 }, i64 } %.pn181.i.i, 0, 0
   %.fca.1.0.0.1.extract.i.i.i = extractvalue { { ptr, ptr, i64 }, i64 } %.pn181.i.i, 0, 1

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pathlib import Path
 import json
 from dataclasses import dataclass
@@ -10,25 +12,22 @@ from pytket.passes import (
 from tket import _state
 from ._tket import passes as _passes, optimiser as _optimiser
 
-from hugr.passes._composable_pass import (
+from hugr.passes.composable import (
     ComposablePass,
     ComposedPass,
     implement_pass_run,
     PassResult,
 )
-from hugr.passes._scope import PassScope
+from hugr.passes.scope import PassScope, GlobalScope
 
 
-__all__ = [
-    "PytketHugrPass",
-    "PassResult",
-    "NormalizeGuppy",
-]
+__all__ = ["PytketHugrPass", "PassResult", "NormalizeGuppy", "ModifierResolverPass"]
 
 
 @dataclass
 class PytketHugrPass(ComposablePass):
     pytket_passes: list[BasePass]
+    _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
 
     """
     A class which provides an interface to apply pytket passes to Hugr programs.
@@ -40,10 +39,9 @@ class PytketHugrPass(ComposablePass):
         """Initialize a PytketHugrPass from a :py:class:`~pytket.passes.BasePass` instance."""
         self.pytket_passes = list(pytket_passes)
 
-    def with_scope(self, _scope: PassScope) -> ComposablePass:
-        """Set the scope of this pass and return self."""
-        # TODO: Store the scope and pass it to the Rust side.
-        # <https://github.com/Quantinuum/tket2/issues/1450>
+    def with_scope(self, scope: PassScope) -> PytketHugrPass:
+        """Set the scope configuration for the composed pass."""
+        self._scope = scope
         return self
 
     def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
@@ -58,7 +56,9 @@ class PytketHugrPass(ComposablePass):
     def then(self, other: ComposablePass) -> ComposablePass:
         """Perform another composable pass after this pass."""
         if isinstance(other, PytketHugrPass):
-            return PytketHugrPass(*self.pytket_passes, *other.pytket_passes)
+            return PytketHugrPass(*self.pytket_passes, *other.pytket_passes).with_scope(
+                self._scope
+            )
         else:
             return ComposedPass(self, other)
 
@@ -66,7 +66,7 @@ class PytketHugrPass(ComposablePass):
         tk_program = _state.CompilationState.from_python(hugr)
         for py_pass in self.pytket_passes:
             pass_json = json.dumps(py_pass.to_dict())
-            _passes.tket1_pass(tk_program._inner, pass_json, traverse_subcircuits=True)
+            _passes.tket1_pass(tk_program._inner, pass_json, scope=self._scope)
 
         package = tk_program.to_python()
         new_hugr = package.modules[0]
@@ -82,6 +82,7 @@ class NormalizeGuppy(ComposablePass):
     inline_dfgs: bool = True
     remove_redundant_order_edges: bool = True
     squash_borrows: bool = True
+    _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
 
     """Flatten the structure of a Guppy-generated program to enable additional optimisations.
 
@@ -97,12 +98,6 @@ class NormalizeGuppy(ComposablePass):
     - squash_borrows: Whether to squash return-borrow pairs on BorrowArrays.
     """
 
-    def with_scope(self, _scope: PassScope) -> ComposablePass:
-        """Set the scope of this pass and return self."""
-        # TODO: Store the scope and pass it to the Rust side.
-        # <https://github.com/Quantinuum/tket2/issues/1450>
-        return self
-
     def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
         return implement_pass_run(
             self,
@@ -110,6 +105,11 @@ class NormalizeGuppy(ComposablePass):
             inplace=inplace,
             copy_call=lambda h: self._normalize(h, inplace),
         )
+
+    def with_scope(self, _scope: PassScope) -> NormalizeGuppy:
+        """Set the scope of this pass and return self."""
+        self._scope = _scope
+        return self
 
     def _normalize(self, hugr: Hugr, inplace: bool) -> PassResult:
         tk_program = _state.CompilationState.from_python(hugr)
@@ -134,6 +134,7 @@ class NormalizeGuppy(ComposablePass):
             inline_dfgs=self.inline_dfgs,
             remove_redundant_order_edges=self.remove_redundant_order_edges,
             squash_borrows=self.squash_borrows,
+            scope=self._scope,
         )
         return program
 
@@ -203,3 +204,41 @@ def _badger_optimise(
         max_circuit_count=max_circuit_count,
         log_dir=log_dir,
     )
+
+
+@dataclass
+class ModifierResolverPass(ComposablePass):
+    """A pass to resolve Guppy modifiers (control, dagger, power)."""
+
+    _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
+
+    def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
+        return implement_pass_run(
+            self,
+            hugr=hugr,
+            inplace=inplace,
+            copy_call=lambda h: self._resolve(h, inplace),
+        )
+
+    def with_scope(self, scope: PassScope) -> ModifierResolverPass:
+        """Set the scope of this pass and return self."""
+        self._scope = scope
+        return self
+
+    def _resolve(self, hugr: Hugr, inplace: bool) -> PassResult:
+        tk_program = _state.CompilationState.from_python(hugr)
+
+        self._run_tk(tk_program)
+
+        package = tk_program.to_python()
+        return PassResult.for_pass(
+            self, hugr=package.modules[0], inplace=inplace, result=None
+        )
+
+    def _run_tk(self, program: _state.CompilationState) -> _state.CompilationState:
+        """Run the pass in the CompilationState"""
+        _passes.resolve_modifiers(
+            program._inner,
+            scope=self._scope,
+        )
+        return program

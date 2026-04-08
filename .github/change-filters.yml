@@ -5,13 +5,13 @@ rust-core: &rust-core
   - "tket/**"
   - "Cargo.toml"
   - "Cargo.lock"
+  - "hugrenv.lock"
 
 rust:
   - *rust-core
   - "tket-qsystem/**"
   - "badger-optimiser/**"
   - "compile-rewriter/**"
-  - "hugr-passes/**"
   - "tket1-passes/**"
   - "tket-qec/**"
 

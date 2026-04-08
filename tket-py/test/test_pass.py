@@ -5,6 +5,7 @@ from tket.passes import (
     _badger_optimise,
     _greedy_depth_reduce,
     NormalizeGuppy,
+    ModifierResolverPass,
 )
 from tket._state import CompilationState
 from tket_exts import tket_registry
@@ -19,6 +20,28 @@ from pytket.passes import CliffordSimp, SquashRzPhasedX, SequencePass
 from hugr.build.base import Hugr
 
 import pytest
+
+
+from pathlib import Path
+
+
+normalize = NormalizeGuppy()
+
+
+def _hugr_from_path(str_path: str) -> Hugr:
+    with open(Path(str_path), "rb") as f:
+        h = Hugr.from_bytes(f.read())
+
+    return h
+
+
+def _count_ops(hugr: Hugr, op_string_name: str) -> int:
+    count = 0
+    for _, data in hugr.nodes():
+        if op_string_name in data.op.name():
+            count += 1
+
+    return count
 
 
 @st.composite
@@ -203,3 +226,17 @@ def test_normalize_guppy():
     clean_hugr = normalize(hugr)
     normal_circ1 = CompilationState.from_bytes(clean_hugr.to_bytes())
     assert normal_circ1.circuit_cost(lambda op: int(op == TketOp.CX)) == 3
+
+
+def test_modifier_resolver() -> None:
+    normalize = NormalizeGuppy()
+    mr_pass = ModifierResolverPass()
+    modifier_hugr: Hugr = _hugr_from_path("test_files/guppy_examples/modifiers.hugr")
+
+    normalized = normalize(modifier_hugr)
+
+    assert _count_ops(normalized, "tket.modifier.ControlModifier") == 1
+
+    resolved: Hugr = mr_pass(normalized)
+
+    assert _count_ops(resolved, "tket.modifier.ControlModifier") == 0
