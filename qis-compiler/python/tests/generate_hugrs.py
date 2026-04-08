@@ -10,11 +10,12 @@
 from pathlib import Path
 
 from guppylang import guppy
-from guppylang.std.builtins import array, exit, panic, result
 from guppylang.std.angles import pi
+from guppylang.std.builtins import array, exit, panic, result
 from guppylang.std.qsystem.random import RNG
 from guppylang.std.qsystem.utils import get_current_shot
 from guppylang.std.quantum import (
+    crz,
     cx,
     discard,
     discard_array,
@@ -26,7 +27,6 @@ from guppylang.std.quantum import (
     tdg,
     x,
     z,
-    crz,
 )
 
 resources_dir = Path(__file__).parent / "resources"
@@ -220,6 +220,7 @@ def rng() -> bytes:
         result("rint_bnd2", rint_bnd)
 
     return main.compile().to_bytes()
+
 
 def qft_32() -> bytes:
     @guppy

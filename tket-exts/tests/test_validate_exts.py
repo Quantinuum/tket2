@@ -88,7 +88,6 @@ def ext_qsystem() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
             ext.try_QAlloc,
             ext.ZZPhase,
             ext.phasedXX,
-            ext.twinPhasedX,
             ext.tk2,
         ],
     )

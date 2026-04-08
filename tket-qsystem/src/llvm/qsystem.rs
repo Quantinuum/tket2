@@ -163,7 +163,6 @@ enum SolGateFunction {
     Rp,
     Rz,
     Rpp,
-    Rpg,
     Rxxyyzz,
 }
 
@@ -173,7 +172,6 @@ impl QSystemRuntimeFunction for SolGateFunction {
             SolGateFunction::Rp => "___rp",
             SolGateFunction::Rz => "___rz",
             SolGateFunction::Rpp => "___rpp",
-            SolGateFunction::Rpg => "___rpg",
             SolGateFunction::Rxxyyzz => "___rxxyyzz",
         }
     }
@@ -193,9 +191,6 @@ impl QSystemRuntimeFunction for SolGateFunction {
             SolGateFunction::Rp => iwc.void_type().fn_type(&[qubit, float, float], false),
             SolGateFunction::Rz => iwc.void_type().fn_type(&[qubit, float], false),
             SolGateFunction::Rpp => iwc
-                .void_type()
-                .fn_type(&[qubit, qubit, float, float], false),
-            SolGateFunction::Rpg => iwc
                 .void_type()
                 .fn_type(&[qubit, qubit, float, float], false),
             SolGateFunction::Rxxyyzz => iwc
@@ -301,13 +296,9 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
             (QSystemPlatform::Helios, QSystemOp::PhasedXX) => {
                 bail!("PhasedXX not implemented for Helios platform")
             }
-            (QSystemPlatform::Helios, QSystemOp::TwinPhasedX) => {
-                bail!("TwinPhasedX not implemented for Helios platform")
-            }
             (QSystemPlatform::Helios, QSystemOp::Tk2) => {
                 bail!("Tk2 not implemented for Helios platform")
             }
-
             (QSystemPlatform::Sol, QSystemOp::Rz) => self.emit_impl(
                 context,
                 args,
@@ -329,13 +320,6 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                 context,
                 args,
                 RuntimeFunction::SolGate(SolGateFunction::Rpp),
-                &[0, 1, 2, 3],
-                &[0, 1],
-            ),
-            (QSystemPlatform::Sol, QSystemOp::TwinPhasedX) => self.emit_impl(
-                context,
-                args,
-                RuntimeFunction::SolGate(SolGateFunction::Rpg),
                 &[0, 1, 2, 3],
                 &[0, 1],
             ),
