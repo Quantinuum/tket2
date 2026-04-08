@@ -406,7 +406,7 @@ mod test {
             .finish_hugr_with_outputs([])
             .unwrap_or_else(|e| panic!("{}", e));
 
-        let lowered = lower_tk2_ops(&mut h, scope.clone(), platform.clone()).unwrap();
+        let lowered = lower_tk2_ops(&mut h, scope.clone(), platform).unwrap();
         assert_eq!(lowered.len(), 5);
         let circ = Circuit::new(&h);
         let ops: Vec<QSystemOp> = circ
@@ -518,7 +518,7 @@ mod test {
 
         let original_node_count = h.nodes().count();
 
-        let lowered = lower_tk2_ops(&mut h, scope.clone(), platform.clone()).unwrap();
+        let lowered = lower_tk2_ops(&mut h, scope.clone(), platform).unwrap();
 
         let expected_lower_count = match scope {
             PassScope::EntrypointFlat => 1,
