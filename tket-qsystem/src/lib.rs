@@ -272,7 +272,9 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for QSystemPass {
         // once we're done so that LLVM is not forced to compile them as callable.
         let pub_funcs = self.collect_pub_funcs(hugr);
 
-        LowerTketToQSystemPass::new(self.platform).with_scope(self.scope.clone()).run(hugr)?;
+        LowerTketToQSystemPass::new(self.platform)
+            .with_scope(self.scope.clone())
+            .run(hugr)?;
         if self.lazify {
             ReplaceBoolPass::default_with_scope(self.scope.clone()).run(hugr)?;
         }
