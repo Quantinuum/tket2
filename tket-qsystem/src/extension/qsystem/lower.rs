@@ -350,7 +350,7 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for LowerTketToQSystemPass {
     type Result = ();
 
     fn run(&self, hugr: &mut H) -> Result<(), LowerTk2Error> {
-        lower_tk2_ops(hugr, self.scope.clone(), self.platform.clone())?;
+        lower_tk2_ops(hugr, self.scope.clone(), self.platform)?;
         #[cfg(test)]
         check_lowered(hugr, self.scope.clone())
             .map_err(|missing_ops| LowerTk2Error::Unlowered { missing_ops })?;
