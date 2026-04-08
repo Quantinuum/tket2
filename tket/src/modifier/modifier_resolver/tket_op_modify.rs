@@ -473,7 +473,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                     })
                 }
             }
-            Measure | MeasureFree | QAlloc | TryQAlloc | QFree | Reset | Read  => {
+            Measure | MeasureFree | QAlloc | TryQAlloc | QFree | Reset | Read => {
                 let new = new_fn.add_child_node(op);
                 let incoming = 0..new_fn.hugr().num_inputs(new);
                 let outgoing = 0..new_fn.hugr().num_outputs(new);

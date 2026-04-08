@@ -163,7 +163,9 @@ impl MakeOpDef for OpaqueBoolOp {
     fn description(&self) -> String {
         match self {
             OpaqueBoolOp::read => "Convert a tket.bool into a Hugr bool_t (a unit sum).".into(),
-            OpaqueBoolOp::make_opaque => "Convert a Hugr bool_t (a unit sum) into an tket.bool.".into(),
+            OpaqueBoolOp::make_opaque => {
+                "Convert a Hugr bool_t (a unit sum) into an tket.bool.".into()
+            }
             OpaqueBoolOp::eq => "Equality between two tket.bools.".into(),
             OpaqueBoolOp::not => "Negation of a tket.bool.".into(),
             OpaqueBoolOp::and => "Logical AND between two tket.bools.".into(),

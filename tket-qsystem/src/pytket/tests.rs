@@ -190,7 +190,10 @@ fn circ_dropped_order_edge() -> Hugr {
         .add_dataflow_op(TketOp::MeasureFree, [q])
         .unwrap()
         .outputs_arr();
-    let [b] = h.add_dataflow_op(OpaqueBoolOp::read, [b]).unwrap().outputs_arr();
+    let [b] = h
+        .add_dataflow_op(OpaqueBoolOp::read, [b])
+        .unwrap()
+        .outputs_arr();
     let result = h
         .add_dataflow_op(ResultOp::new_bool("result"), [b])
         .unwrap();

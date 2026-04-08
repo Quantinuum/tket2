@@ -16,7 +16,7 @@ use std::sync::Arc;
 use super::TKETDecode;
 use crate::TketOp;
 use crate::extension::TKET1_EXTENSION_ID;
-use crate::extension::bool::{OpaqueBoolOp, ConstOpaqueBool, opaque_bool_type};
+use crate::extension::bool::{ConstOpaqueBool, OpaqueBoolOp, opaque_bool_type};
 use crate::extension::rotation::{ConstRotation, RotationOp, rotation_type};
 use crate::extension::sympy::SympyOpDef;
 use crate::metadata;

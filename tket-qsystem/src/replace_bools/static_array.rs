@@ -28,7 +28,9 @@ use hugr_passes::{
     replace_types::{NodeTemplate, ReplaceTypesError},
 };
 use itertools::Itertools as _;
-use tket::extension::bool::{self, OPAQUE_BOOL_TYPE_NAME, OpaqueBoolOpBuilder as _, ConstOpaqueBool, opaque_bool_type};
+use tket::extension::bool::{
+    self, ConstOpaqueBool, OPAQUE_BOOL_TYPE_NAME, OpaqueBoolOpBuilder as _, opaque_bool_type,
+};
 
 #[non_exhaustive]
 #[derive(Debug, derive_more::Error, derive_more::Display, derive_more::From)]
@@ -85,7 +87,10 @@ fn inner_replace_types() -> ReplaceTypes {
     inner.replace_consts(
         opaque_bool_type().as_extension().unwrap().clone(),
         |const_bool, _| {
-            let cb: &ConstOpaqueBool = const_bool.value().downcast_ref::<ConstOpaqueBool>().unwrap();
+            let cb: &ConstOpaqueBool = const_bool
+                .value()
+                .downcast_ref::<ConstOpaqueBool>()
+                .unwrap();
             Ok(Value::from_bool(cb.value()))
         },
     );
@@ -331,7 +336,12 @@ mod test {
     use super::*;
 
     fn static_array_tket_bool() -> StaticArrayValue {
-        StaticArrayValue::try_new("arr", opaque_bool_type(), [ConstOpaqueBool::new(true).into()]).unwrap()
+        StaticArrayValue::try_new(
+            "arr",
+            opaque_bool_type(),
+            [ConstOpaqueBool::new(true).into()],
+        )
+        .unwrap()
     }
 
     fn static_array_static_array_tket_bool() -> StaticArrayValue {

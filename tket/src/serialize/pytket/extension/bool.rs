@@ -1,7 +1,9 @@
 //! Encoder and decoder for the tket.bool extension
 
 use super::PytketEmitter;
-use crate::extension::bool::{OPAQUE_BOOL_EXTENSION_ID, OPAQUE_BOOL_TYPE_NAME, OpaqueBoolOp, ConstOpaqueBool};
+use crate::extension::bool::{
+    ConstOpaqueBool, OPAQUE_BOOL_EXTENSION_ID, OPAQUE_BOOL_TYPE_NAME, OpaqueBoolOp,
+};
 use crate::serialize::pytket::config::TypeTranslatorSet;
 use crate::serialize::pytket::decoder::{
     DecodeStatus, LoadedParameter, PytketDecoderContext, TrackedBit, TrackedQubit,

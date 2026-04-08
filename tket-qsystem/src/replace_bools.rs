@@ -28,7 +28,7 @@ use hugr_passes::{ComposablePass, ReplaceTypes, non_local::FindNonLocalEdgesErro
 use static_array::{ReplaceStaticArrayBoolPass, ReplaceStaticArrayBoolPassError};
 use tket::TketOp;
 use tket::extension::{
-    bool::{OpaqueBoolOp, ConstOpaqueBool, opaque_bool_type},
+    bool::{ConstOpaqueBool, OpaqueBoolOp, opaque_bool_type},
     guppy::{DROP_OP_NAME, GUPPY_EXTENSION},
 };
 
@@ -327,7 +327,10 @@ fn lowerer() -> ReplaceTypes {
     let mut lw = ReplaceTypes::default();
 
     // Replace tket.bool type.
-    lw.set_replace_type(opaque_bool_type().as_extension().unwrap().clone(), bool_dest());
+    lw.set_replace_type(
+        opaque_bool_type().as_extension().unwrap().clone(),
+        bool_dest(),
+    );
     let dup_op = FutureOp {
         op: FutureOpDef::Dup,
         typ: bool_t(),
@@ -372,7 +375,12 @@ fn lowerer() -> ReplaceTypes {
     lw.set_replace_op(&read_op, read_op_dest());
     let make_opaque_op = OpaqueBoolOp::make_opaque.to_extension_op().unwrap();
     lw.set_replace_op(&make_opaque_op, make_opaque_op_dest());
-    for op in [OpaqueBoolOp::eq, OpaqueBoolOp::and, OpaqueBoolOp::or, OpaqueBoolOp::xor] {
+    for op in [
+        OpaqueBoolOp::eq,
+        OpaqueBoolOp::and,
+        OpaqueBoolOp::or,
+        OpaqueBoolOp::xor,
+    ] {
         lw.set_replace_op(&op.to_extension_op().unwrap(), binary_logic_op_dest(&op));
     }
     let not_op = OpaqueBoolOp::not.to_extension_op().unwrap();
@@ -608,7 +616,8 @@ mod test {
 
     #[test]
     fn test_measure_reset() {
-        let mut dfb = DFGBuilder::new(inout_sig(vec![qb_t()], vec![qb_t(), opaque_bool_type()])).unwrap();
+        let mut dfb =
+            DFGBuilder::new(inout_sig(vec![qb_t()], vec![qb_t(), opaque_bool_type()])).unwrap();
         let [q] = dfb.input_wires_arr();
         let output = dfb.add_measure_reset(q).unwrap();
         let mut h = dfb.finish_hugr_with_outputs(output).unwrap();

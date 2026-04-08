@@ -60,8 +60,8 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for ReplaceMeasurementPass {
 fn lowerer() -> ReplaceTypes {
     let mut lw = ReplaceTypes::default();
 
-    // As the measurement type acts like an alias for `Future<Bool>`, all the 
-    // replacements are straightforward. 
+    // As the measurement type acts like an alias for `Future<Bool>`, all the
+    // replacements are straightforward.
     lw.set_replace_type(
         measurement_type().as_extension().unwrap().clone(),
         future_type(bool_t()),
@@ -88,7 +88,12 @@ fn lowerer() -> ReplaceTypes {
     );
     lw.set_replace_op(
         &QSystemOp::MeasureReset.to_extension_op().unwrap(),
-        NodeTemplate::SingleOp(QSystemOp::LazyMeasureReset.to_extension_op().unwrap().into()),
+        NodeTemplate::SingleOp(
+            QSystemOp::LazyMeasureReset
+                .to_extension_op()
+                .unwrap()
+                .into(),
+        ),
     );
 
     lw
@@ -111,21 +116,25 @@ mod test {
         let [m] = dfb.input_wires_arr();
         let out = dfb.add_dataflow_op(TketOp::Read, [m]).unwrap();
         let mut h = dfb.finish_hugr_with_outputs(out.outputs()).unwrap();
-
         h.validate().unwrap();
+
         ReplaceMeasurementPass::default().run(&mut h).unwrap();
         h.validate().unwrap();
 
+        // Check that type was replaced.
         let sig = h.signature(h.entrypoint()).unwrap();
         assert_eq!(sig.input(), &TypeRow::from(vec![future_type(bool_t())]));
         assert_eq!(sig.output(), &TypeRow::from(vec![bool_t()]));
 
-        assert!(h
-            .nodes()
-            .any(|n| FutureOpDef::try_from(h.get_optype(n)) == Ok(FutureOpDef::Read)));
-        assert!(!h
-            .nodes()
-            .any(|n| h.get_optype(n).cast::<TketOp>() == Some(TketOp::Read)));
+        // Check that the op was replaced.
+        assert!(
+            h.nodes()
+                .any(|n| FutureOpDef::try_from(h.get_optype(n)) == Ok(FutureOpDef::Read))
+        );
+        assert!(
+            !h.nodes()
+                .any(|n| h.get_optype(n).cast::<TketOp>() == Some(TketOp::Read))
+        );
     }
 
     #[rstest]
@@ -135,24 +144,30 @@ mod test {
         #[case] measure_op: T,
         #[case] expected_op: QSystemOp,
     ) {
-        let mut dfb = DFGBuilder::new(inout_sig(vec![hugr::extension::prelude::qb_t()], vec![measurement_type()])).unwrap();
+        let mut dfb = DFGBuilder::new(inout_sig(
+            vec![hugr::extension::prelude::qb_t()],
+            vec![measurement_type()],
+        ))
+        .unwrap();
         let [q] = dfb.input_wires_arr();
         let out = dfb.add_dataflow_op(measure_op, [q]).unwrap();
         let mut h = dfb.finish_hugr_with_outputs(out.outputs()).unwrap();
-
         h.validate().unwrap();
+
         ReplaceMeasurementPass::default().run(&mut h).unwrap();
         h.validate().unwrap();
 
         let sig = h.signature(h.entrypoint()).unwrap();
         assert_eq!(sig.output(), &TypeRow::from(vec![future_type(bool_t())]));
 
-        assert!(h
-            .nodes()
-            .any(|n| h.get_optype(n).cast::<QSystemOp>() == Some(expected_op)));
-        assert!(!h
-            .nodes()
-            .any(|n| h.get_optype(n).cast::<TketOp>() == Some(TketOp::MeasureFree)));
+        assert!(
+            h.nodes()
+                .any(|n| h.get_optype(n).cast::<QSystemOp>() == Some(expected_op))
+        );
+        assert!(
+            !h.nodes()
+                .any(|n| h.get_optype(n).cast::<TketOp>() == Some(TketOp::MeasureFree))
+        );
     }
 
     #[test]
@@ -165,8 +180,8 @@ mod test {
         let [q] = dfb.input_wires_arr();
         let out = dfb.add_measure_reset(q).unwrap();
         let mut h = dfb.finish_hugr_with_outputs(out).unwrap();
-
         h.validate().unwrap();
+
         ReplaceMeasurementPass::default().run(&mut h).unwrap();
         h.validate().unwrap();
 
@@ -179,11 +194,13 @@ mod test {
             ])
         );
 
-        assert!(h
-            .nodes()
-            .any(|n| h.get_optype(n).cast::<QSystemOp>() == Some(QSystemOp::LazyMeasureReset)));
-        assert!(!h
-            .nodes()
-            .any(|n| h.get_optype(n).cast::<QSystemOp>() == Some(QSystemOp::MeasureReset)));
+        assert!(
+            h.nodes()
+                .any(|n| h.get_optype(n).cast::<QSystemOp>() == Some(QSystemOp::LazyMeasureReset))
+        );
+        assert!(
+            !h.nodes()
+                .any(|n| h.get_optype(n).cast::<QSystemOp>() == Some(QSystemOp::MeasureReset))
+        );
     }
 }

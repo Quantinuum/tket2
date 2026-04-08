@@ -2,7 +2,9 @@ use std::sync::{Arc, Weak};
 
 use crate::extension::rotation::rotation_type;
 use crate::extension::sympy::SympyOpDef;
-use crate::extension::{TKET_EXTENSION, TKET_EXTENSION_ID as EXTENSION_ID, measurement_type};
+use crate::extension::{
+    TKET_EXTENSION, TKET_EXTENSION_ID as EXTENSION_ID, measurement_custom_type,
+};
 use hugr::ops::custom::ExtensionOp;
 use hugr::types::Type;
 use hugr::{
@@ -277,20 +279,21 @@ impl MakeOpDef for TketOp {
         <&'static str>::from(self).into()
     }
 
-    fn init_signature(&self, _extension_ref: &std::sync::Weak<hugr::Extension>) -> SignatureFunc {
+    fn init_signature(&self, extension_ref: &std::sync::Weak<hugr::Extension>) -> SignatureFunc {
         use TketOp::*;
+        let measurement_type = Type::new_extension(measurement_custom_type(extension_ref));
         match self {
             H | T | S | V | X | Y | Z | Tdg | Sdg | Vdg | Reset => Signature::new_endo([qb_t()]),
             CX | CZ | CY => Signature::new_endo(vec![qb_t(); 2]),
             Toffoli => Signature::new_endo(vec![qb_t(); 3]),
-            Measure => Signature::new([qb_t()], vec![qb_t(), measurement_type()]),
-            MeasureFree => Signature::new([qb_t()], [measurement_type()]),
+            Measure => Signature::new([qb_t()], vec![qb_t(), measurement_type]),
+            MeasureFree => Signature::new([qb_t()], [measurement_type]),
             Rz | Rx | Ry => Signature::new(vec![qb_t(), rotation_type()], [qb_t()]),
             CRz => Signature::new(vec![qb_t(), qb_t(), rotation_type()], vec![qb_t(); 2]),
             QAlloc => Signature::new(type_row![], [qb_t()]),
             TryQAlloc => Signature::new(type_row![], [Type::from(option_type([qb_t()]))]),
             QFree => Signature::new([qb_t()], type_row![]),
-            Read => Signature::new([measurement_type()], [bool_t()]),
+            Read => Signature::new([measurement_type], [bool_t()]),
         }
         .into()
     }
@@ -416,15 +419,18 @@ pub(crate) mod test {
                 TketOp::CX,
                 [CircuitUnit::Linear(0), CircuitUnit::Wire(ancilla)],
             )?[0];
-            let ancilla = circ.append_with_outputs(TketOp::Measure, [ancilla])?[0];
+            let result = circ.append_with_outputs(TketOp::Measure, [ancilla])?;
+            let ancilla = result[0];
+            let msmt = result[1];
+            let _ = circ.append_with_outputs(TketOp::Read, [msmt])?[0];
             circ.append_and_consume(TketOp::QFree, [ancilla])?;
 
             Ok(())
         })
         .unwrap();
 
-        // 5 commands: alloc, reset, cx, measure, free
-        assert_eq!(h.commands().count(), 5);
+        // 6 commands: alloc, reset, cx, measure, read, free
+        assert_eq!(h.commands().count(), 6);
     }
 
     #[test]
@@ -451,7 +457,7 @@ pub(crate) mod test {
             .map(|n| h.get_optype(n))
             .collect_vec();
 
-        assert_eq!(top_ops.len(), 5);
+        assert_eq!(top_ops.len(), 6);
         // first two are I/O
         assert_eq!(
             TketOp::from_op(top_ops[2].as_extension_op().unwrap()).unwrap(),
@@ -462,7 +468,12 @@ pub(crate) mod test {
             TketOp::from_op(top_ops[4].as_extension_op().unwrap()).unwrap(),
             TketOp::MeasureFree
         );
+        assert_eq!(
+            TketOp::from_op(top_ops[5].as_extension_op().unwrap()).unwrap(),
+            TketOp::Read
+        );
     }
+
     #[test]
     fn tket_op_properties() {
         for op in TketOp::iter() {

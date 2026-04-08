@@ -14,7 +14,7 @@ use hugr::ops::Value;
 use hugr::types::SumType;
 use hugr::types::TypeName;
 
-use crate::extension::bool::{OPAQUE_BOOL_EXTENSION_ID, OpaqueBoolOp, ConstOpaqueBool};
+use crate::extension::bool::{ConstOpaqueBool, OPAQUE_BOOL_EXTENSION_ID, OpaqueBoolOp};
 use anyhow::{Result, anyhow};
 use inkwell::IntPredicate;
 use inkwell::types::IntType;
@@ -133,7 +133,11 @@ mod test {
     #[case::or(5, OpaqueBoolOp::or)]
     #[case::xor(6, OpaqueBoolOp::xor)]
     #[case::eq(7, OpaqueBoolOp::eq)]
-    fn emit_all_ops(#[case] _id: i32, #[with(_id)] mut llvm_ctx: TestContext, #[case] op: OpaqueBoolOp) {
+    fn emit_all_ops(
+        #[case] _id: i32,
+        #[with(_id)] mut llvm_ctx: TestContext,
+        #[case] op: OpaqueBoolOp,
+    ) {
         let pcg = DefaultPreludeCodegen;
         llvm_ctx.add_extensions(move |ceb| {
             ceb.add_extension(BoolCodegenExtension)

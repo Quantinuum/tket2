@@ -98,13 +98,10 @@ fn add_measurement_type_def(
         MEASUREMENT_TYPE_ID.to_owned(),
         vec![],
         "A type representing the result of a measurement operation".into(),
-        TypeBound::Copyable.into(),
+        TypeBound::Linear.into(),
         &extension_ref,
     )
 }
-
-/// The name of the `Measurement` type.
-pub const MEASUREMENT_TYPE_ID: SmolStr = SmolStr::new_inline("Measurement");
 
 /// Returns a `Measurement` [CustomType].
 pub fn measurement_custom_type(extension_ref: &Weak<Extension>) -> CustomType {
@@ -137,4 +134,7 @@ lazy_static! {
             SympyOpDef.add_to_extension(res, ext_ref).unwrap();
         })
     };
+
+    /// The name of the `Measurement` type.
+    pub static ref MEASUREMENT_TYPE_ID: SmolStr = SmolStr::new_inline("Measurement");
 }
