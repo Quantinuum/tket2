@@ -38,9 +38,12 @@ use tket::hugr::{self, llvm::inkwell};
 use tket::hugr::{Hugr, HugrView, Node};
 use tket::llvm::rotation::RotationCodegenExtension;
 use tket_qsystem::QSystemPass;
-use tket_qsystem::extension::{futures as qsystem_futures, qsystem, result as qsystem_result};
+use tket_qsystem::extension::{
+    futures as qsystem_futures, globals as qsystem_globals, qsystem, result as qsystem_result,
+};
 use tket_qsystem::llvm::array_utils::ArrayLowering;
 pub use tket_qsystem::llvm::futures::FuturesCodegenExtension;
+use tket_qsystem::llvm::globals::GlobalsCodegenExtension;
 use tket_qsystem::llvm::{
     debug::DebugCodegenExtension, prelude::QISPreludeCodegen, qsystem::QSystemCodegenExtension,
     random::RandomCodegenExtension, result::ResultsCodegenExtension, utils::UtilsCodegenExtension,
@@ -70,6 +73,7 @@ static REGISTRY: std::sync::LazyLock<ExtensionRegistry> = std::sync::LazyLock::n
         collections::static_array::EXTENSION.to_owned(),
         collections::borrow_array::EXTENSION.to_owned(),
         qsystem_futures::EXTENSION.to_owned(),
+        qsystem_globals::EXTENSION.to_owned(),
         qsystem_result::EXTENSION.to_owned(),
         qsystem::EXTENSION.to_owned(),
         ROTATION_EXTENSION.to_owned(),
@@ -160,6 +164,7 @@ fn codegen_extensions() -> CodegenExtsMap<'static, Hugr> {
         .add_default_static_array_extensions()
         .add_borrow_array_extensions(array::SeleneHeapBorrowArrayCodegen(pcg.clone()))
         .add_extension(FuturesCodegenExtension)
+        .add_extension(GlobalsCodegenExtension)
         .add_extension(QSystemCodegenExtension::from(pcg.clone()))
         .add_extension(RandomCodegenExtension)
         // Results use standard arrays.
