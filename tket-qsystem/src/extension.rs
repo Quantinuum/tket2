@@ -3,6 +3,7 @@ pub mod classical_compute;
 pub use classical_compute::gpu;
 pub use classical_compute::wasm;
 pub mod futures;
+pub mod globals;
 pub mod qsystem;
 pub mod random;
 pub mod result;

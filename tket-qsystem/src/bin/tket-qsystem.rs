@@ -19,6 +19,7 @@ fn main() -> Result<()> {
                 tket_qsystem::extension::gpu::EXTENSION.to_owned(),
                 tket_qsystem::extension::qsystem::EXTENSION.to_owned(),
                 tket_qsystem::extension::futures::EXTENSION.to_owned(),
+                tket_qsystem::extension::globals::EXTENSION.to_owned(),
                 tket_qsystem::extension::random::EXTENSION.to_owned(),
                 tket_qsystem::extension::result::EXTENSION.to_owned(),
                 tket_qsystem::extension::utils::EXTENSION.to_owned(),
