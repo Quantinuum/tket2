@@ -1,0 +1,58 @@
+{
+  "version": "0.1.0",
+  "name": "tket.globals",
+  "types": {},
+  "operations": {
+    "swap": {
+      "extension": "tket.globals",
+      "name": "swap",
+      "description": "Swap the contents of the named global variable with the argument.",
+      "signature": {
+        "params": [
+          {
+            "tp": "String"
+          },
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Sum",
+              "s": "General",
+              "rows": [
+                [],
+                [
+                  {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                ]
+              ]
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "General",
+              "rows": [
+                [],
+                [
+                  {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                ]
+              ]
+            }
+          ]
+        }
+      },
+      "binary": false
+    }
+  }
+}

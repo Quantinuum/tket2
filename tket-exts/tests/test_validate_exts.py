@@ -69,6 +69,15 @@ def ext_futures() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
     )
 
 
+def ext_globals() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
+    ext = tket_exts.globals
+    return (
+        ext,
+        [],
+        [ext.swap],
+    )
+
+
 def ext_qsystem() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
     ext = tket_exts.qsystem
     return (
@@ -202,6 +211,7 @@ def ext_wasm() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
         ext_gpu,
         ext_guppy,
         ext_futures,
+        ext_globals,
         ext_qsystem,
         ext_qsystem_random,
         ext_qsystem_utils,
