@@ -1,0 +1,102 @@
+{
+  "version": "0.2.0",
+  "name": "tket.measurement",
+  "types": {
+    "Measurement": {
+      "extension": "tket.measurement",
+      "name": "Measurement",
+      "params": [],
+      "description": "A type representing the result of a measurement operation",
+      "bound": {
+        "b": "Explicit",
+        "bound": "A"
+      }
+    }
+  },
+  "operations": {
+    "Dup": {
+      "extension": "tket.measurement",
+      "name": "Dup",
+      "description": "Duplicate a measurement. The original measurement is consumed and two measurements are returned.",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "tket.measurement",
+              "id": "Measurement",
+              "args": [],
+              "bound": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "tket.measurement",
+              "id": "Measurement",
+              "args": [],
+              "bound": "A"
+            },
+            {
+              "t": "Opaque",
+              "extension": "tket.measurement",
+              "id": "Measurement",
+              "args": [],
+              "bound": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "Free": {
+      "extension": "tket.measurement",
+      "name": "Free",
+      "description": "Consume a measurement without reading it.",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "tket.measurement",
+              "id": "Measurement",
+              "args": [],
+              "bound": "A"
+            }
+          ],
+          "output": []
+        }
+      },
+      "binary": false
+    },
+    "Read": {
+      "extension": "tket.measurement",
+      "name": "Read",
+      "description": "Read a measurement, consuming it and returning a Hugr bool.",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "tket.measurement",
+              "id": "Measurement",
+              "args": [],
+              "bound": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ]
+        }
+      },
+      "binary": false
+    }
+  }
+}

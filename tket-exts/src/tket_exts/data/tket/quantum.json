@@ -224,10 +224,10 @@
           "output": [
             {
               "t": "Opaque",
-              "extension": "tket.bool",
-              "id": "bool",
+              "extension": "tket.measurement",
+              "id": "Measurement",
               "args": [],
-              "bound": "C"
+              "bound": "A"
             }
           ]
         }

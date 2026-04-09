@@ -45,7 +45,7 @@ in {
   # https://devenv.sh/languages/
 
   languages.rust = {
-    enable = false;
+    enable = true;
     channel = "stable";
     components = [ "rustc" "cargo" "clippy" "rustfmt" "rust-analyzer" ];
   };

@@ -16,6 +16,7 @@ from tket_exts.tket.qsystem import (
 from tket_exts.tket.quantum import QuantumExtension
 from tket_exts.tket.result import ResultExtension
 from tket_exts.tket.wasm import WasmExtension
+from tket_exts.tket.measurement import MeasurementExtension
 
 from typing_extensions import deprecated
 from hugr.ext import Extension, ExtensionRegistry
@@ -40,6 +41,7 @@ __all__ = [
     "wasm",
     "modifier",
     "global_phase",
+    "measurement",
 ]
 
 bool: BoolExtension = tket.bool.BoolExtension()
@@ -56,6 +58,7 @@ result: ResultExtension = tket.result.ResultExtension()
 wasm: WasmExtension = tket.wasm.WasmExtension()
 modifier: ModifierExtension = tket.modifier.ModifierExtension()
 global_phase: GlobalPhaseExtension = tket.global_phase.GlobalPhaseExtension()
+measurement: MeasurementExtension = tket.measurement.MeasurementExtension()
 
 
 @deprecated("Use tket_exts.bool() instead")
@@ -86,6 +89,7 @@ def tket_registry() -> ExtensionRegistry:
         tket.wasm.WasmExtension(),
         tket.modifier.ModifierExtension(),
         tket.global_phase.GlobalPhaseExtension(),
+        tket.measurement.MeasurementExtension(),
     ]
 
     registry = ExtensionRegistry()
