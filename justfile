@@ -18,7 +18,7 @@ _check_default_conan_profile:
 # setting up the pre-commit hooks.
 setup: && _check_default_conan_profile _check_nextest_installed
     uv tool install conan
-    uv sync
+    uv sync --all-extras
     [[ -n "${TKET_JUST_INHIBIT_GIT_HOOKS:-}" ]] || uv run pre-commit install -t pre-commit
 
 # Run the pre-commit checks.

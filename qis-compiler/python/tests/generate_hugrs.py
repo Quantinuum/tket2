@@ -3,6 +3,7 @@
 # dependencies = [
 #     "guppylang ==0.21.9",
 #     "tket",
+#     "pytket >=2.1.0,<3",
 # ]
 # ///
 

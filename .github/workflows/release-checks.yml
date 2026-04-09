@@ -53,7 +53,7 @@ jobs:
           RES: ${{ matrix.target.resolution }}
         run: |
           UV_RESOLUTION="$RES" uv lock --no-sources -U
-          UV_RESOLUTION="$RES" uv sync --no-sources --no-install-workspace
+          UV_RESOLUTION="$RES" uv sync --all-extras --no-sources --no-install-workspace
           uv pip install --no-sources tket-exts
           uv pip install --no-sources tket-eccs
           uv run --no-sync maturin develop

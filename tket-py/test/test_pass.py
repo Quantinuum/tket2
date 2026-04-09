@@ -1,4 +1,3 @@
-from pytket import Circuit, OpType
 from typing import Callable, Any
 from tket._ops import TketOp
 from tket.passes import (
@@ -16,13 +15,14 @@ from hypothesis.strategies._internal import SearchStrategy
 from hypothesis import given, settings
 
 from tket.passes import PytketHugrPass
-from pytket.passes import CliffordSimp, SquashRzPhasedX, SequencePass
 from hugr.build.base import Hugr
 
 import pytest
-
-
 from pathlib import Path
+
+pytket = pytest.importorskip("pytket")
+from pytket import Circuit, OpType  # noqa: E402
+from pytket.passes import CliffordSimp, SquashRzPhasedX, SequencePass  # noqa: E402
 
 
 normalize = NormalizeGuppy()
