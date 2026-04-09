@@ -156,16 +156,15 @@ jobs:
             --target ${{ matrix.platform.target }} \
             --strip
 
-      - name: Build free-threaded wheels
-        # TODO: pytket is a required dependency of tket-py, but it doesn't build free-threaded wheels yet
-        if: false
+      - name: Build free-threaded 3.13 wheels
+        # TODO: We only build free-threaded wheels for 3.13t since hugr doesn't build them for 3.14 yet.
         shell: bash
         run: |
           cd ${{ env.MODULE_DIR }}
-          uv run --python ${{ env.PYTHON_VERSION }}+freethreaded \
+          uv run --python 3.13t \
             ${{ steps.compatibility-flag.outputs.WITH_ZIG_FLAG }} \
             maturin build \
-            ${{ steps.compatibility-flag.outputs.COMPATIBILITY_FLAG }} \
+            --interpreter 3.13t \
             --release \
             --out ../dist \
             --target ${{ matrix.platform.target }} \
