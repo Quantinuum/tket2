@@ -3,11 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 import json
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from hugr import Hugr
-from pytket.passes import (
-    BasePass,
-)
 
 from tket import _state
 from ._tket import passes as _passes, optimiser as _optimiser
@@ -19,6 +17,13 @@ from hugr.passes.composable import (
     PassResult,
 )
 from hugr.passes.scope import PassScope, GlobalScope
+
+if TYPE_CHECKING:
+    try:
+        # Available via the `pytket` extra, and as a dev dependency for testing.
+        from pytket.passes import BasePass
+    except ImportError:
+        from typing import Any as BasePass  # type: ignore
 
 
 __all__ = ["PytketHugrPass", "PassResult", "NormalizeGuppy", "ModifierResolverPass"]
