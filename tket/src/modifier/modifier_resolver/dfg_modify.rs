@@ -69,8 +69,8 @@ impl<N: HugrNode> ModifierResolver<N> {
             }
         }
         self.with_worklist(worklist, |this| {
-            while let Some(old_n) = this.worklist().pop_front() {
-                this.modify_op(h, old_n, new_dfg)?;
+            while let Some(working_node) = this.worklist().pop_front() {
+                this.modify_op(h, working_node, new_dfg)?;
             }
             Ok::<(), ModifierResolverErrors<N>>(())
         })
