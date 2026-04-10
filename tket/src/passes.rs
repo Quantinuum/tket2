@@ -58,7 +58,8 @@ pub mod monomorphize;
 pub use monomorphize::{MonomorphizePass, mangle_name};
 
 // Nest SESE regions in CFGs.
-pub mod nest_cfgs;
+// TODO(deprecated): Remove this re-export in a breaking release.
+pub use crate::control::nest_cfgs;
 
 // Find and localize non-local edges.
 pub mod non_local;
@@ -78,10 +79,6 @@ pub use replace_types::ReplaceTypes;
 // Remove redundant tuple pack/unpack operations.
 pub mod untuple;
 pub use untuple::UntuplePass;
-
-// -- Internal modules -------------------------------------------------------
-
-pub(crate) mod half_node;
 
 #[cfg(test)]
 pub(crate) mod test_utils;

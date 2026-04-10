@@ -2,7 +2,7 @@
 
 use std::hash::Hash;
 
-use super::nest_cfgs::CfgNodeMap;
+use crate::control::nest_cfgs::CfgNodeMap;
 
 use hugr_core::hugr::internal::HugrInternals;
 use hugr_core::hugr::views::RootChecked;
@@ -10,22 +10,28 @@ use hugr_core::ops::handle::CfgID;
 use hugr_core::ops::{OpTag, OpTrait};
 use hugr_core::{Direction, HugrView, Node};
 
-/// We provide a view of a cfg where every node has at most one of
-/// (multiple predecessors, multiple successors).
-/// So for BBs with multiple preds + succs, we generate TWO `HalfNode`'s with a single edge between
-/// them; that single edge can then be a region boundary that did not exist before.
-/// TODO: this unfortunately doesn't capture all cases: when a node has multiple preds and succs,
-/// we could "merge" *any subset* of the in-edges into a single in-edge via an extra empty BB;
-/// the in-edge from that extra/empty BB, might be the endpoint of a useful SESE region,
-/// but we don't have a way to identify *which subset* to select. (Here we say *all preds* if >1 succ)
+/// A CFG view that splits "diamonds with feedback" nodes into two halves.
+///
+/// The SESE analysis in [`crate::control::nest_cfgs`] reasons about region
+/// boundaries as edges between abstract CFG nodes. A basic block with both
+/// multiple predecessors and multiple successors can hide a useful boundary,
+/// because there is no single incoming or outgoing edge that isolates the
+/// split/join behaviour. `HalfNode` models such a block as two abstract nodes
+/// with a synthetic edge between them, making that hidden boundary visible to
+/// the analysis without mutating the underlying HUGR first.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 enum HalfNode<N = Node> {
-    /// All predecessors of original BB; successors if this does not break rule, else the X
+    /// The "incoming" half of an original basic block.
     N(N),
-    // Exists only for BBs with multiple preds _and_ succs; has a single pred (the N), plus original succs
+    /// The "outgoing" half of a split basic block.
     X(N),
 }
 
+/// A non-mutating CFG view that exposes [`HalfNode`]s to the SESE analysis.
+///
+/// This is currently an experiment rather than production infrastructure, but
+/// it belongs in `control` because it changes the *analysis view* of a CFG
+/// rather than performing a pass-level transformation.
 struct HalfNodeView<H: HugrInternals> {
     h: H,
     entry: H::Node,
@@ -33,6 +39,11 @@ struct HalfNodeView<H: HugrInternals> {
 }
 
 impl<H: HugrView> HalfNodeView<H> {
+    /// Builds the split-node view for a well-formed CFG rooted at `h`.
+    ///
+    /// The constructor caches the entry/exit nodes because the CFG traits ask
+    /// for them repeatedly during traversal, and the split-node logic depends on
+    /// treating those distinguished blocks consistently.
     pub(crate) fn new(h: RootChecked<H, CfgID<H::Node>>) -> Self {
         let h = h.into_hugr();
 
@@ -44,11 +55,23 @@ impl<H: HugrView> HalfNodeView<H> {
         Self { h, entry, exit }
     }
 
+    /// Returns whether `n` needs to be split into `N(n)` and `X(n)`.
+    ///
+    /// Only blocks with both multiple predecessors and multiple successors can
+    /// hide a useful internal boundary. Those are exactly the cases where this
+    /// view inserts the synthetic "half-node" edge.
     fn is_multi_node(&self, n: H::Node) -> bool {
         // TODO if <n> is the entry-node, should we pretend there's an extra predecessor? (The "outside")
         // We could also setify here before counting, but never
         self.bb_preds(n).take(2).count() + self.bb_succs(n).take(2).count() == 4
     }
+
+    /// Maps a concrete CFG node to the abstract node seen after following one of
+    /// its outgoing edges.
+    ///
+    /// For split blocks, successors should be reached from `X(n)` so the
+    /// synthetic `N(n) -> X(n)` edge can itself act as a candidate SESE
+    /// boundary.
     fn resolve_out(&self, n: H::Node) -> HalfNode<H::Node> {
         if self.is_multi_node(n) {
             HalfNode::X(n)
@@ -57,9 +80,12 @@ impl<H: HugrView> HalfNodeView<H> {
         }
     }
 
+    /// Returns the concrete CFG successors of a basic block in the underlying HUGR.
     fn bb_succs(&self, n: H::Node) -> impl Iterator<Item = H::Node> + '_ {
         self.h.neighbours(n, Direction::Outgoing)
     }
+
+    /// Returns the concrete CFG predecessors of a basic block in the underlying HUGR.
     fn bb_preds(&self, n: H::Node) -> impl Iterator<Item = H::Node> + '_ {
         self.h.neighbours(n, Direction::Incoming)
     }
@@ -96,8 +122,8 @@ impl<H: HugrView> CfgNodeMap<HalfNode<H::Node>> for HalfNodeView<H> {
 
 #[cfg(test)]
 mod test {
-    use super::super::nest_cfgs::{EdgeClassifier, test::*};
     use super::{HalfNode, HalfNodeView};
+    use crate::control::nest_cfgs::{EdgeClassifier, test::*};
     use hugr_core::builder::BuildError;
     use hugr_core::hugr::views::RootChecked;
     use hugr_core::ops::handle::NodeHandle;

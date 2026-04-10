@@ -46,6 +46,7 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 pub mod circuit;
+pub mod control;
 pub mod extension;
 pub mod metadata;
 pub mod modifier;
