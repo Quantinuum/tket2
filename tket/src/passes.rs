@@ -76,6 +76,10 @@ pub use redundant_order_edges::RedundantOrderEdgesPass;
 pub mod replace_types;
 pub use replace_types::ReplaceTypes;
 
+// Structured CFG analysis façade (RVSDG/Beyond-Relooper strategies).
+pub mod structuralize_cfgs;
+pub use structuralize_cfgs::StructuralizeCfgsPass;
+
 // Remove redundant tuple pack/unpack operations.
 pub mod untuple;
 pub use untuple::UntuplePass;

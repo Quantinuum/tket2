@@ -29,8 +29,10 @@
 
 use std::collections::{HashMap, HashSet, VecDeque};
 
+use derive_more::{Display, Error};
 use hugr::core::HugrNode;
 
+use super::interface::RegionInterface;
 use super::{CfgNodeMap, edge_classes, region_blocks};
 
 /// A handle identifying a region in a [`RegionGraph`].
@@ -89,6 +91,8 @@ pub struct ControlRegion<T: HugrNode> {
     pub blocks: HashSet<T>,
     /// The region's control boundary.
     pub boundary: RegionBoundary<T>,
+    /// Canonicalized block-level interface derived from boundary edges.
+    pub interface: RegionInterface<T>,
     /// The ordered contents of the region.
     pub body: ControlRegionBody<T>,
 }
@@ -101,6 +105,44 @@ pub struct RegionBoundary<T> {
     pub incoming: Vec<(T, T)>,
     /// Edges leaving the region to nodes outside it.
     pub outgoing: Vec<(T, T)>,
+}
+
+/// Errors from building RVSDG structural analyses.
+#[derive(Clone, Debug, Display, Error)]
+#[non_exhaustive]
+pub enum RvsdgBuildError<T: HugrNode> {
+    /// Region boundaries did not define a valid SESE region.
+    #[display("invalid SESE region boundaries for entry edge {entry:?} and exit edge {exit:?}")]
+    InvalidRegionBlocks {
+        /// Claimed entry edge for the SESE region.
+        entry: (T, T),
+        /// Claimed exit edge for the SESE region.
+        exit: (T, T),
+    },
+    /// A branch region did not expose a join component.
+    #[display("branch region {region:?} did not expose a join component")]
+    MissingBranchJoin {
+        /// Region whose branch join could not be identified.
+        region: RegionId,
+    },
+    /// Structured traversal re-visited a component while building a path.
+    #[display("control-tree path revisited component in region {region:?}")]
+    CyclicPath {
+        /// Region where component traversal re-visited a node.
+        region: RegionId,
+    },
+    /// Expected a linearized path but found multiple successors.
+    #[display("expected a linearized path in region {region:?}")]
+    NonLinearPath {
+        /// Region where linear path recovery found multiple successors.
+        region: RegionId,
+    },
+    /// Expected a basic block component but found a nested region.
+    #[display("expected a basic block component while building branch region {region:?}")]
+    ExpectedBlock {
+        /// Branch region where split/join component was unexpectedly nested.
+        region: RegionId,
+    },
 }
 
 /// A SESE region discovered in a CFG.
@@ -145,8 +187,10 @@ impl<T: HugrNode> RegionGraph<T> {
 }
 
 /// Build a structural region graph for a CFG view.
-pub fn build_region_graph<T: HugrNode>(cfg: &impl CfgNodeMap<T>) -> RegionGraph<T> {
-    let mut descs = collect_regions(cfg);
+pub fn build_region_graph<T: HugrNode>(
+    cfg: &impl CfgNodeMap<T>,
+) -> Result<RegionGraph<T>, RvsdgBuildError<T>> {
+    let mut descs = collect_regions(cfg)?;
     let root_blocks = root_blocks(cfg);
 
     let mut parents = vec![None; descs.len()];
@@ -178,14 +222,16 @@ pub fn build_region_graph<T: HugrNode>(cfg: &impl CfgNodeMap<T>) -> RegionGraph<
         boundary: region_boundary(cfg, &regions_root_desc(cfg)),
         children: Vec::new(),
     });
-    regions.extend(descs.iter_mut().map(|desc| Region {
-        kind: classify_region(cfg, desc),
-        entry_edge: Some(desc.entry_edge),
-        exit_edge: Some(desc.exit_edge),
-        boundary: region_boundary(cfg, desc),
-        blocks: std::mem::take(&mut desc.blocks),
-        children: Vec::new(),
-    }));
+    for desc in &mut descs {
+        regions.push(Region {
+            kind: classify_region(cfg, desc),
+            entry_edge: Some(desc.entry_edge),
+            exit_edge: Some(desc.exit_edge),
+            boundary: region_boundary(cfg, desc),
+            blocks: std::mem::take(&mut desc.blocks),
+            children: Vec::new(),
+        });
+    }
 
     for (idx, parent) in parents.into_iter().enumerate() {
         let child_id = RegionId(idx + 1);
@@ -193,12 +239,14 @@ pub fn build_region_graph<T: HugrNode>(cfg: &impl CfgNodeMap<T>) -> RegionGraph<
         regions[parent_id.0].children.push(child_id);
     }
 
-    RegionGraph { root, regions }
+    Ok(RegionGraph { root, regions })
 }
 
 /// Build an ordered control-region tree for a CFG view.
-pub fn build_control_tree<T: HugrNode>(cfg: &impl CfgNodeMap<T>) -> ControlRegion<T> {
-    let regions = build_region_graph(cfg);
+pub fn build_control_tree<T: HugrNode>(
+    cfg: &impl CfgNodeMap<T>,
+) -> Result<ControlRegion<T>, RvsdgBuildError<T>> {
+    let regions = build_region_graph(cfg)?;
     build_region_tree(cfg, &regions, regions.root())
 }
 
@@ -222,7 +270,9 @@ struct RegionDesc<T> {
 /// does not try to assign parents, classify loops vs. branches, or build an
 /// ordered tree. Its job is only to answer: "which edge pairs delimit valid
 /// SESE regions, and which blocks do those regions contain?"
-fn collect_regions<T: HugrNode>(cfg: &impl CfgNodeMap<T>) -> Vec<RegionDesc<T>> {
+fn collect_regions<T: HugrNode>(
+    cfg: &impl CfgNodeMap<T>,
+) -> Result<Vec<RegionDesc<T>>, RvsdgBuildError<T>> {
     let edge_classes = edge_classes(cfg);
     let mut rem_edges: HashMap<usize, HashSet<(T, T)>> = HashMap::new();
     let mut regions = Vec::new();
@@ -237,8 +287,8 @@ fn collect_regions<T: HugrNode>(cfg: &impl CfgNodeMap<T>) -> Vec<RegionDesc<T>> 
         &mut rem_edges,
         None,
         &mut regions,
-    );
-    regions
+    )?;
+    Ok(regions)
 }
 
 /// Returns the unique exit edge found while traversing a candidate region.
@@ -267,7 +317,7 @@ fn collect_regions_traverse<T: HugrNode>(
     rem_edges: &mut HashMap<usize, HashSet<(T, T)>>,
     stop_at: Option<usize>,
     regions: &mut Vec<RegionDesc<T>>,
-) -> Option<(T, T)> {
+) -> Result<Option<(T, T)>, RvsdgBuildError<T>> {
     let mut seen = HashSet::new();
     let mut stack = vec![n];
     let mut exit_edges = Vec::new();
@@ -301,11 +351,15 @@ fn collect_regions_traverse<T: HugrNode>(
                         rem_edges,
                         Some(class),
                         regions,
-                    )
+                    )?
                     .expect("region traversal should find an exit edge");
                     assert!(rem_edges.get_mut(&class).unwrap().remove(&edge));
-                    let blocks = region_blocks(cfg, prev_edge, edge)
-                        .expect("cycle-equivalent edge pairs should define a SESE region");
+                    let blocks = region_blocks(cfg, prev_edge, edge).map_err(|_| {
+                        RvsdgBuildError::InvalidRegionBlocks {
+                            entry: prev_edge,
+                            exit: edge,
+                        }
+                    })?;
                     regions.push(RegionDesc {
                         entry_edge: prev_edge,
                         exit_edge: edge,
@@ -317,7 +371,7 @@ fn collect_regions_traverse<T: HugrNode>(
         }
     }
 
-    unique_edge(exit_edges)
+    Ok(unique_edge(exit_edges))
 }
 
 /// Computes the block set for the synthetic root region.
@@ -448,13 +502,14 @@ fn build_region_tree<T: HugrNode>(
     cfg: &impl CfgNodeMap<T>,
     graph: &RegionGraph<T>,
     region_id: RegionId,
-) -> ControlRegion<T> {
+) -> Result<ControlRegion<T>, RvsdgBuildError<T>> {
     let region = graph.region(region_id);
     match region.kind {
-        RegionKind::Root | RegionKind::Linear => ControlRegion {
+        RegionKind::Root | RegionKind::Linear => Ok(ControlRegion {
             kind: region.kind,
             blocks: region.blocks.clone(),
             boundary: region.boundary.clone(),
+            interface: RegionInterface::from_boundary(&region.boundary),
             body: ControlRegionBody::Sequence(build_sequence_items(
                 cfg,
                 graph,
@@ -462,12 +517,13 @@ fn build_region_tree<T: HugrNode>(
                 sequence_start(cfg, graph, region_id),
                 sequence_end(cfg, graph, region_id),
                 None,
-            )),
-        },
-        RegionKind::Loop => ControlRegion {
+            )?),
+        }),
+        RegionKind::Loop => Ok(ControlRegion {
             kind: region.kind,
             blocks: region.blocks.clone(),
             boundary: region.boundary.clone(),
+            interface: RegionInterface::from_boundary(&region.boundary),
             body: ControlRegionBody::Loop {
                 body: build_sequence_items(
                     cfg,
@@ -479,9 +535,9 @@ fn build_region_tree<T: HugrNode>(
                         .entry_edge
                         .zip(region.exit_edge)
                         .map(|(entry, exit)| (exit.0, entry.1)),
-                ),
+                )?,
             },
-        },
+        }),
         RegionKind::Branch => build_branch_tree(cfg, graph, region_id),
     }
 }
@@ -497,28 +553,30 @@ fn build_branch_tree<T: HugrNode>(
     cfg: &impl CfgNodeMap<T>,
     graph: &RegionGraph<T>,
     region_id: RegionId,
-) -> ControlRegion<T> {
+) -> Result<ControlRegion<T>, RvsdgBuildError<T>> {
     let compressed = CompressedRegion::new(cfg, graph, region_id, None);
     let split = sequence_start(cfg, graph, region_id);
-    let join = sequence_end(cfg, graph, region_id).expect("branch regions should have a join");
+    let join = sequence_end(cfg, graph, region_id)
+        .ok_or(RvsdgBuildError::MissingBranchJoin { region: region_id })?;
 
     let arms = compressed
         .successors(split)
         .into_iter()
-        .map(|start| build_path_items(cfg, graph, &compressed, start, Some(join), false))
-        .collect();
+        .map(|start| build_path_items(cfg, graph, &compressed, start, Some(join), false, region_id))
+        .collect::<Result<Vec<_>, _>>()?;
 
     let region = graph.region(region_id);
-    ControlRegion {
+    Ok(ControlRegion {
         kind: region.kind,
         blocks: region.blocks.clone(),
         boundary: region.boundary.clone(),
+        interface: RegionInterface::from_boundary(&region.boundary),
         body: ControlRegionBody::Branch {
-            split: vec![expect_block(split)],
+            split: vec![expect_block(split, region_id)?],
             arms,
-            join: vec![expect_block(join)],
+            join: vec![expect_block(join, region_id)?],
         },
-    }
+    })
 }
 
 /// Builds a linear sequence of control-tree items inside a region.
@@ -534,9 +592,9 @@ fn build_sequence_items<T: HugrNode>(
     start: Component<T>,
     end: Option<Component<T>>,
     ignored_edge: Option<(T, T)>,
-) -> Vec<ControlTree<T>> {
+) -> Result<Vec<ControlTree<T>>, RvsdgBuildError<T>> {
     let compressed = CompressedRegion::new(cfg, graph, region_id, ignored_edge);
-    build_path_items(cfg, graph, &compressed, start, end, true)
+    build_path_items(cfg, graph, &compressed, start, end, true, region_id)
 }
 
 /// Walks a linearized path through a compressed region and materializes tree items.
@@ -553,7 +611,8 @@ fn build_path_items<T: HugrNode>(
     start: Component<T>,
     end: Option<Component<T>>,
     include_end: bool,
-) -> Vec<ControlTree<T>> {
+    region_id: RegionId,
+) -> Result<Vec<ControlTree<T>>, RvsdgBuildError<T>> {
     let mut items = Vec::new();
     let mut current = Some(start);
     let mut seen = HashSet::new();
@@ -562,11 +621,10 @@ fn build_path_items<T: HugrNode>(
         if Some(component) == end && !include_end {
             break;
         }
-        assert!(
-            seen.insert(component),
-            "control-tree path should not revisit components"
-        );
-        items.push(component_to_tree(cfg, graph, component));
+        if !seen.insert(component) {
+            return Err(RvsdgBuildError::CyclicPath { region: region_id });
+        }
+        items.push(component_to_tree(cfg, graph, component)?);
         if Some(component) == end {
             break;
         }
@@ -574,11 +632,11 @@ fn build_path_items<T: HugrNode>(
         current = match succs.as_slice() {
             [] => None,
             [next] => Some(*next),
-            _ => panic!("expected a linearized path inside structured region"),
+            _ => return Err(RvsdgBuildError::NonLinearPath { region: region_id }),
         };
     }
 
-    items
+    Ok(items)
 }
 
 /// Converts a compressed-region component back into the public tree form.
@@ -590,12 +648,12 @@ fn component_to_tree<T: HugrNode>(
     cfg: &impl CfgNodeMap<T>,
     graph: &RegionGraph<T>,
     component: Component<T>,
-) -> ControlTree<T> {
+) -> Result<ControlTree<T>, RvsdgBuildError<T>> {
     match component {
-        Component::Block(node) => ControlTree::Block(node),
-        Component::Region(region_id) => {
-            ControlTree::Region(Box::new(build_region_tree(cfg, graph, region_id)))
-        }
+        Component::Block(node) => Ok(ControlTree::Block(node)),
+        Component::Region(region_id) => Ok(ControlTree::Region(Box::new(build_region_tree(
+            cfg, graph, region_id,
+        )?))),
     }
 }
 
@@ -641,10 +699,13 @@ fn sequence_end<T: HugrNode>(
 /// Keeping this check centralized makes the branch-building code easier to read
 /// and ensures we fail with a targeted message if a structural assumption stops
 /// holding.
-fn expect_block<T>(component: Component<T>) -> T {
+fn expect_block<T: HugrNode>(
+    component: Component<T>,
+    region: RegionId,
+) -> Result<T, RvsdgBuildError<T>> {
     match component {
-        Component::Block(node) => node,
-        Component::Region(_) => panic!("expected a block component"),
+        Component::Block(node) => Ok(node),
+        Component::Region(_) => Err(RvsdgBuildError::ExpectedBlock { region }),
     }
 }
 
@@ -748,6 +809,7 @@ mod test {
         build_region_graph,
     };
     use crate::control::IdentityCfgMap;
+    use crate::control::interface::RegionInterface;
     use crate::control::nest_cfgs::test::build_conditional_in_loop_cfg;
     use hugr::Hugr;
     use hugr::builder::{
@@ -826,7 +888,7 @@ mod test {
     #[test]
     fn detects_nested_branch_inside_loop() -> Result<(), BuildError> {
         let (h, _, _) = build_conditional_in_loop_cfg(true)?;
-        let graph = build_region_graph(&IdentityCfgMap::new(h));
+        let graph = build_region_graph(&IdentityCfgMap::new(h)).unwrap();
 
         let mut kind_counts =
             graph
@@ -861,7 +923,7 @@ mod test {
     #[test]
     fn detects_conditional_and_loop_as_siblings() -> Result<(), BuildError> {
         let h = build_cond_then_loop_cfg()?;
-        let graph = build_region_graph(&IdentityCfgMap::new(h));
+        let graph = build_region_graph(&IdentityCfgMap::new(h)).unwrap();
         let root = graph.region(graph.root());
 
         let root_child_kinds = root
@@ -879,7 +941,7 @@ mod test {
     #[test]
     fn region_boundaries_are_sese() -> Result<(), BuildError> {
         let (h, _, _) = build_conditional_in_loop_cfg(true)?;
-        let graph = build_region_graph(&IdentityCfgMap::new(h));
+        let graph = build_region_graph(&IdentityCfgMap::new(h)).unwrap();
 
         for region in graph.regions() {
             match region.kind {
@@ -905,7 +967,7 @@ mod test {
     #[test]
     fn control_tree_orders_nested_loop_body() -> Result<(), BuildError> {
         let (h, _, _) = build_conditional_in_loop_cfg(true)?;
-        let tree = build_control_tree(&IdentityCfgMap::new(h));
+        let tree = build_control_tree(&IdentityCfgMap::new(h)).unwrap();
 
         assert_eq!(tree.kind, RegionKind::Root);
         assert_eq!(
@@ -913,6 +975,13 @@ mod test {
             RegionBoundary {
                 incoming: vec![],
                 outgoing: vec![],
+            }
+        );
+        assert_eq!(
+            tree.interface,
+            RegionInterface {
+                entry_blocks: vec![],
+                exit_blocks: vec![],
             }
         );
 
@@ -929,6 +998,8 @@ mod test {
         assert_eq!(loop_region.kind, RegionKind::Loop);
         assert_eq!(loop_region.boundary.incoming.len(), 1);
         assert_eq!(loop_region.boundary.outgoing.len(), 1);
+        assert_eq!(loop_region.interface.entry_blocks.len(), 1);
+        assert_eq!(loop_region.interface.exit_blocks.len(), 1);
 
         let ControlRegionBody::Loop { body: loop_items } = &loop_region.body else {
             panic!("loop region should expose a loop body");
@@ -943,6 +1014,8 @@ mod test {
         assert_eq!(branch_region.kind, RegionKind::Branch);
         assert_eq!(branch_region.boundary.incoming.len(), 1);
         assert_eq!(branch_region.boundary.outgoing.len(), 1);
+        assert_eq!(branch_region.interface.entry_blocks.len(), 1);
+        assert_eq!(branch_region.interface.exit_blocks.len(), 1);
 
         let ControlRegionBody::Branch { split, arms, join } = &branch_region.body else {
             panic!("branch region should expose branch arms");
@@ -961,7 +1034,7 @@ mod test {
     #[test]
     fn control_tree_orders_conditional_then_loop() -> Result<(), BuildError> {
         let h = build_cond_then_loop_cfg()?;
-        let tree = build_control_tree(&IdentityCfgMap::new(h));
+        let tree = build_control_tree(&IdentityCfgMap::new(h)).unwrap();
 
         let ControlRegionBody::Sequence(root_items) = &tree.body else {
             panic!("root should be a sequence region");
@@ -997,8 +1070,8 @@ mod test {
     #[test]
     fn control_tree_regions_preserve_region_blocks() -> Result<(), BuildError> {
         let (h, _, _) = build_conditional_in_loop_cfg(true)?;
-        let graph = build_region_graph(&IdentityCfgMap::new(h.clone()));
-        let tree = build_control_tree(&IdentityCfgMap::new(h));
+        let graph = build_region_graph(&IdentityCfgMap::new(h.clone())).unwrap();
+        let tree = build_control_tree(&IdentityCfgMap::new(h)).unwrap();
 
         let ControlRegionBody::Sequence(root_items) = &tree.body else {
             panic!("root should be a sequence region");
