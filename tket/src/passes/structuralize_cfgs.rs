@@ -4,14 +4,13 @@
 //! keeps strategy/scope selection in pass-land, so future RVSDG and
 //! Beyond-Relooper implementations can share one integration point.
 
-use std::collections::HashMap;
-
 use hugr::Node;
 use hugr::hugr::hugrmut::HugrMut;
 use itertools::Either;
 
 use crate::control::structuralize::{
-    StructuralizationError, StructuralizationStrategy, analyze_hugr_cfgs,
+    StructuralizationError, StructuralizationRewriteReport, StructuralizationStrategy,
+    structurize_cfgs,
 };
 use crate::passes::composable::WithScope;
 use crate::passes::{ComposablePass, PassScope};
@@ -39,8 +38,8 @@ impl WithScope for StructuralizeCfgsPass {
 }
 
 impl<H: HugrMut<Node = Node>> ComposablePass<H> for StructuralizeCfgsPass {
-    type Error = StructuralizationError<Node>;
-    type Result = HashMap<Node, crate::control::rvsdg::ControlRegion<Node>>;
+    type Error = StructuralizationError;
+    type Result = StructuralizationRewriteReport;
 
     fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
         let ctrs = {
@@ -52,12 +51,9 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for StructuralizeCfgsPass {
             }
         };
 
-        let scoped_nodes = ctrs.collect::<std::collections::HashSet<_>>();
-        let report = analyze_hugr_cfgs(hugr, self.strategy)?;
-        Ok(report
-            .cfg_regions
-            .into_iter()
-            .filter(|(cfg, _)| scoped_nodes.contains(cfg))
-            .collect())
+        let scoped_cfgs = ctrs
+            .filter(|n| hugr.get_optype(*n).is_cfg())
+            .collect::<Vec<_>>();
+        structurize_cfgs(hugr, &scoped_cfgs, self.strategy)
     }
 }
