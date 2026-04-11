@@ -139,7 +139,7 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
 
         let results = m.run_subtree(ConstFoldContext, root);
         let mut root_descs = hugr.descendants(root);
-        assert_eq!(root_descs.next(), Some(root)); // Skip root
+        assert_eq!(root_descs.next(), Some(root), "Could not skip root");
         let wires_to_break = root_descs
             .filter(|n| !hugr.get_optype(*n).is_load_constant()) // no point in adding another Const!
             .flat_map(|n| hugr.out_value_types(n).map(move |(outp, _ty)| (n, outp)))
