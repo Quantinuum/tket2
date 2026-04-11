@@ -1,0 +1,100 @@
+graph LR
+    subgraph 0 ["(0) Module"]
+        direction LR
+        subgraph 1 ["(1) [**FuncDefn: #quot;__main__.main#quot;**]"]
+            direction LR
+            style 1 stroke:#832561,stroke-width:3px
+            2["(2) Input"]
+            3["(3) Output"]
+            subgraph 4 ["(4) DFG"]
+                direction LR
+                43["(43) Input"]
+                42["(42) Output"]
+                subgraph 41 ["(41) DFG"]
+                    direction LR
+                    34["(34) Input"]
+                    33["(33) Output"]
+                    32["(32) tket.quantum.QAlloc"]
+                    31["(31) Tag"]
+                    34-."0:0".->32
+                    32--"0:1<br>qubit"-->33
+                    32-."1:2".->33
+                    31--"0:0<br>Unit"-->33
+                end
+                subgraph 40 ["(40) DFG"]
+                    direction LR
+                    30["(30) Input"]
+                    29["(29) Output"]
+                    28["(28) tket.quantum.H"]
+                    27["(27) prelude.MakeTuple"]
+                    26["(26) Tag"]
+                    30--"0:0<br>qubit"-->28
+                    28--"0:1<br>qubit"-->29
+                    26--"0:0<br>Unit"-->29
+                end
+                subgraph 39 ["(39) DFG"]
+                    direction LR
+                    25["(25) Input"]
+                    24["(24) Output"]
+                    23["(23) tket.quantum.H"]
+                    22["(22) prelude.MakeTuple"]
+                    21["(21) Tag"]
+                    25--"0:0<br>qubit"-->23
+                    23--"0:1<br>qubit"-->24
+                    21--"0:0<br>Unit"-->24
+                end
+                subgraph 38 ["(38) DFG"]
+                    direction LR
+                    20["(20) Input"]
+                    19["(19) Output"]
+                    18["(18) Tag"]
+                    20--"0:1<br>qubit"-->19
+                    18--"0:0<br>Unit"-->19
+                end
+                subgraph 37 ["(37) DFG"]
+                    direction LR
+                    17["(17) Input"]
+                    16["(16) Output"]
+                    15["(15) Tag"]
+                    17--"0:1<br>qubit"-->16
+                    15--"0:0<br>Unit"-->16
+                end
+                subgraph 36 ["(36) DFG"]
+                    direction LR
+                    14["(14) Input"]
+                    13["(13) Output"]
+                    12["(12) tket.quantum.H"]
+                    11["(11) prelude.MakeTuple"]
+                    10["(10) Tag"]
+                    14--"0:0<br>qubit"-->12
+                    12--"0:1<br>qubit"-->13
+                    10--"0:0<br>Unit"-->13
+                end
+                subgraph 35 ["(35) DFG"]
+                    direction LR
+                    9["(9) Input"]
+                    8["(8) Output"]
+                    7["(7) tket.quantum.MeasureFree"]
+                    6["(6) tket.bool.read"]
+                    5["(5) tket.result.result_bool"]
+                    45["(45) prelude.MakeTuple"]
+                    46["(46) Tag"]
+                    9--"0:0<br>qubit"-->7
+                    9-."1:1".->7
+                    7--"0:0<br>bool"-->6
+                    7-."1:1".->5
+                    6--"0:0<br>Bool"-->5
+                    5-."0:1".->8
+                    46--"0:0<br>Unit"-->8
+                end
+                41--"1:0<br>qubit"-->40
+                40--"1:0<br>qubit"-->39
+                39--"1:0<br>qubit"-->38
+                38--"1:0<br>qubit"-->37
+                37--"1:0<br>qubit"-->36
+                36--"1:0<br>qubit"-->35
+            end
+            2-."0:0".->4
+            4-."0:0".->3
+        end
+    end

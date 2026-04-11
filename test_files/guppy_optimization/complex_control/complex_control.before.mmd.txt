@@ -1,0 +1,100 @@
+graph LR
+    subgraph 0 ["(0) Module"]
+        direction LR
+        subgraph 1 ["(1) [**FuncDefn: #quot;__main__.main#quot;**]"]
+            direction LR
+            style 1 stroke:#832561,stroke-width:3px
+            2["(2) Input"]
+            3["(3) Output"]
+            subgraph 4 ["(4) CFG"]
+                direction LR
+                subgraph 5 ["(5) DataflowBlock"]
+                    direction LR
+                    6["(6) Input"]
+                    7["(7) Output"]
+                    8["(8) tket.quantum.QAlloc"]
+                    9["(9) Tag"]
+                    6-."0:0".->8
+                    8--"0:1<br>qubit"-->7
+                    8-."1:2".->7
+                    9--"0:0<br>Unit"-->7
+                end
+                10["(10) ExitBlock"]
+                subgraph 11 ["(11) DataflowBlock"]
+                    direction LR
+                    12["(12) Input"]
+                    13["(13) Output"]
+                    14["(14) tket.quantum.H"]
+                    15["(15) prelude.MakeTuple"]
+                    16["(16) Tag"]
+                    12--"0:0<br>qubit"-->14
+                    14--"0:1<br>qubit"-->13
+                    16--"0:0<br>Unit"-->13
+                end
+                subgraph 17 ["(17) DataflowBlock"]
+                    direction LR
+                    18["(18) Input"]
+                    19["(19) Output"]
+                    20["(20) tket.quantum.H"]
+                    21["(21) prelude.MakeTuple"]
+                    22["(22) Tag"]
+                    18--"0:0<br>qubit"-->20
+                    20--"0:1<br>qubit"-->19
+                    22--"0:0<br>Unit"-->19
+                end
+                subgraph 23 ["(23) DataflowBlock"]
+                    direction LR
+                    24["(24) Input"]
+                    25["(25) Output"]
+                    26["(26) Tag"]
+                    24--"0:1<br>qubit"-->25
+                    26--"0:0<br>Unit"-->25
+                end
+                subgraph 27 ["(27) DataflowBlock"]
+                    direction LR
+                    28["(28) Input"]
+                    29["(29) Output"]
+                    30["(30) Tag"]
+                    28--"0:1<br>qubit"-->29
+                    30--"0:0<br>Unit"-->29
+                end
+                subgraph 31 ["(31) DataflowBlock"]
+                    direction LR
+                    32["(32) Input"]
+                    33["(33) Output"]
+                    34["(34) tket.quantum.H"]
+                    35["(35) prelude.MakeTuple"]
+                    36["(36) Tag"]
+                    32--"0:0<br>qubit"-->34
+                    34--"0:1<br>qubit"-->33
+                    36--"0:0<br>Unit"-->33
+                end
+                subgraph 37 ["(37) DataflowBlock"]
+                    direction LR
+                    38["(38) Input"]
+                    39["(39) Output"]
+                    40["(40) tket.quantum.MeasureFree"]
+                    41["(41) tket.bool.read"]
+                    42["(42) tket.result.result_bool"]
+                    43["(43) prelude.MakeTuple"]
+                    44["(44) Tag"]
+                    38--"0:0<br>qubit"-->40
+                    38-."1:1".->40
+                    40--"0:0<br>bool"-->41
+                    40-."1:1".->42
+                    41--"0:0<br>Bool"-->42
+                    42-."0:1".->39
+                    44--"0:0<br>Unit"-->39
+                end
+                5-."0:0".->11
+                11-."0:0".->17
+                17-."0:0".->23
+                23-."0:0".->27
+                27-."0:0".->31
+                31-."0:0".->37
+                37-."0:0".->10
+            end
+            2-."0:0".->4
+            4-."0:0".->3
+        end
+    end

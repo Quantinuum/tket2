@@ -883,6 +883,7 @@ mod test {
     use hugr::{Hugr, HugrView};
     use hugr_core::ops::OpTag;
     use itertools::Itertools;
+    use std::io::BufReader;
 
     fn n_identity<T: DataflowSubContainer>(
         mut dataflow_builder: T,
@@ -1103,5 +1104,35 @@ mod test {
         assert!(h.get_optype(ins_b.node()).is_cfg());
         assert_eq!(h.nodes().filter(|n| h.get_optype(*n).is_cfg()).count(), 1);
         Ok(())
+    }
+
+    #[test]
+    fn structurizes_guppy_complex_control_fixture() {
+        let reader = BufReader::new(
+            include_bytes!(
+                "../../../test_files/guppy_optimization/complex_control/complex_control.hugr"
+            )
+            .as_slice(),
+        );
+        let mut h = Hugr::load(reader, None).unwrap();
+        let before = h.mermaid_string();
+
+        let report = StructuralizeCfgsPass::default().run(&mut h).unwrap();
+        assert!(!report.rewrites.is_empty());
+        assert_eq!(h.nodes().filter(|n| h.get_optype(*n).is_cfg()).count(), 0);
+        assert_eq!(
+            before,
+            include_str!(
+                "../../../test_files/guppy_optimization/complex_control/complex_control.before.mmd.txt"
+            )
+        );
+
+        let after = h.mermaid_string();
+        assert_eq!(
+            after,
+            include_str!(
+                "../../../test_files/guppy_optimization/complex_control/complex_control.after.mmd.txt"
+            )
+        );
     }
 }
