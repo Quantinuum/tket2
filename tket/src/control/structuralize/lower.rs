@@ -21,12 +21,18 @@ use crate::passes::composable::ComposablePass;
 
 use super::analyze::analyze_cfg_region;
 use super::types::{
-    StructuralizationError, StructuralizationRewrite, StructuralizationRewriteReport,
-    StructuralizationStrategy, StructuredBlock, StructuredLoopKind, StructuredNode,
-    StructuredRegion, StructuredRegionBody, structured_node_contains_block,
+    StructuralizationError, StructuralizationRewriteReport, StructuralizationStrategy,
+    StructuredBlock, StructuredLoopKind, StructuredNode, StructuredRegion, StructuredRegionBody,
+    structured_node_contains_block,
 };
 
 /// Structuralize the specified CFGs and rewrite them in place.
+///
+/// # Errors
+///
+/// Returns an error when the selected strategy is unsupported, when CFG
+/// structural analysis or lowering fails for any targeted CFG, or when local
+/// post-rewrite normalization produces an invalid HUGR.
 pub fn structurize_cfgs<H: HugrMut<Node = Node>>(
     hugr: &mut H,
     cfgs: &[Node],
@@ -58,10 +64,7 @@ pub fn structurize_cfgs<H: HugrMut<Node = Node>>(
     for (cfg, replacement) in prepared {
         rewrite_cfg_as_dfg(hugr, cfg, replacement);
         NormalizeCFGPass::default().run(&mut hugr.with_entrypoint_mut(cfg))?;
-        rewrites.push(StructuralizationRewrite {
-            cfg,
-            rewritten: true,
-        });
+        rewrites.push(cfg);
     }
 
     Ok(StructuralizationRewriteReport { rewrites })

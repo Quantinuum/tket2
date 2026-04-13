@@ -19,7 +19,7 @@ mod types;
 pub use analyze::analyze_hugr_cfgs;
 pub use lower::structurize_cfgs;
 pub use types::{
-    RegionIo, StructuralizationAnalysisReport, StructuralizationError, StructuralizationRewrite,
+    RegionIo, StructuralizationAnalysisReport, StructuralizationError,
     StructuralizationRewriteReport, StructuralizationStrategy, StructuredBlock, StructuredLoopKind,
     StructuredNode, StructuredRegion, StructuredRegionBody,
 };

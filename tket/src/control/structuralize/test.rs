@@ -120,8 +120,8 @@ fn build_header_controlled_loop_cfg() -> Result<Hugr, BuildError> {
 
 fn single_cfg_analysis(h: &Hugr) -> StructuredRegionBody {
     let report = analyze_hugr_cfgs(h, StructuralizationStrategy::Rvsdg).unwrap();
-    let StructuralizationAnalysisReport { mut cfg_regions } = report;
-    let (_, region) = cfg_regions.drain().exactly_one().unwrap();
+    let StructuralizationAnalysisReport { cfg_regions } = report;
+    let (_, region) = cfg_regions.into_iter().exactly_one().unwrap();
     region.body
 }
 
@@ -217,6 +217,7 @@ fn lowers_conditional_and_loop_cfgs() -> Result<(), BuildError> {
         .collect_vec();
     let report = structurize_cfgs(&mut h, &cfgs, StructuralizationStrategy::Rvsdg).unwrap();
     assert_eq!(report.rewrites.len(), 1);
+    assert_eq!(report.rewrites[0], cfgs[0]);
     assert_eq!(h.nodes().filter(|n| h.get_optype(*n).is_cfg()).count(), 0);
     assert_eq!(
         h.nodes()

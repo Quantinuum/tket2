@@ -5,7 +5,7 @@
 //! easier to understand what information is computed during analysis and what
 //! invariants lowering relies on.
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use derive_more::{Display, Error};
 use hugr::Node;
@@ -157,23 +157,14 @@ impl StructuredRegion {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct StructuralizationAnalysisReport {
     /// Structured control tree plus HUGR-specific lowering metadata for each CFG.
-    pub cfg_regions: HashMap<Node, StructuredRegion>,
-}
-
-/// Per-CFG rewrite result.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct StructuralizationRewrite {
-    /// Rewritten CFG node.
-    pub cfg: Node,
-    /// Whether the CFG was rewritten.
-    pub rewritten: bool,
+    pub cfg_regions: BTreeMap<Node, StructuredRegion>,
 }
 
 /// Mutable rewrite report returned by the pass layer.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct StructuralizationRewriteReport {
-    /// All CFG rewrites performed by the pass.
-    pub rewrites: Vec<StructuralizationRewrite>,
+    /// CFG nodes that were rewritten into structured dataflow.
+    pub rewrites: Vec<Node>,
 }
 
 /// Errors returned by HUGR-level structuralization entry points.

@@ -4,7 +4,7 @@
 //! HUGR-specific details needed for lowering: ordered region I/O, typed block
 //! summaries, and explicit loop-shape metadata.
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use hugr::ops::{OpTrait, OpType};
 use hugr::types::TypeRow;
@@ -21,13 +21,19 @@ use super::types::{
 };
 
 /// Analyze all CFGs in a HUGR using the requested strategy.
+///
+/// # Errors
+///
+/// Returns an error when the requested strategy is unsupported, when RVSDG
+/// region discovery fails for a CFG, or when HUGR-specific region I/O and loop
+/// metadata cannot be derived deterministically for lowering.
 pub fn analyze_hugr_cfgs<H: HugrView<Node = Node>>(
     hugr: &H,
     strategy: StructuralizationStrategy,
 ) -> Result<StructuralizationAnalysisReport, StructuralizationError> {
     match strategy {
         StructuralizationStrategy::Rvsdg => {
-            let mut cfg_regions = HashMap::new();
+            let mut cfg_regions = BTreeMap::new();
             for cfg in hugr
                 .nodes()
                 .filter(|n| hugr.get_optype(*n).tag() == OpTag::Cfg)

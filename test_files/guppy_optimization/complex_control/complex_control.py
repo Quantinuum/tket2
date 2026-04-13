@@ -10,8 +10,6 @@ from pathlib import Path
 from sys import argv
 
 from guppylang import guppy
-from guppylang.std.builtins import result
-from guppylang.std.quantum import h, measure, qubit
 
 
 @guppy

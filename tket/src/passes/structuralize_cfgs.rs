@@ -73,12 +73,9 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for StructuralizeCfgsPass {
             .collect::<Vec<_>>();
         let report = structurize_cfgs(hugr, &scoped_cfgs, self.strategy)?;
         if self.inline_dfgs {
-            for rewrite in &report.rewrites {
-                if !rewrite.rewritten {
-                    continue;
-                }
+            for &cfg in &report.rewrites {
                 InlineDFGsPass::default_with_scope(PassScope::EntrypointRecursive)
-                    .run(&mut hugr.with_entrypoint_mut(rewrite.cfg))
+                    .run(&mut hugr.with_entrypoint_mut(cfg))
                     .unwrap();
             }
         }
