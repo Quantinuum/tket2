@@ -294,6 +294,7 @@ impl CfgInfo {
             .into_iter()
             .map(|succ| self.build_scope(cfg_view, succ, scope, Some(join_node), active_loop))
             .collect::<Result<Vec<_>, _>>()?;
+        let next = self.linear_continuation(join_node, scope, active_loop)?;
 
         Ok((
             StructuredRegion {
@@ -303,7 +304,7 @@ impl CfgInfo {
                 },
                 body: StructuredRegionBody::Branch { split, arms, join },
             },
-            Some(join_node),
+            next,
         ))
     }
 
@@ -332,6 +333,28 @@ impl CfgInfo {
         Err(StructuralizationError::Relooper {
             reason: format!("branch at node {split_node} has no in-scope join"),
         })
+    }
+
+    /// Returns the linear continuation after a region-local join block.
+    ///
+    /// Branch regions already include their join block in the shared lowering
+    /// IR, so the enclosing scope must resume *after* that join has run. This
+    /// helper enforces the current lowering invariant that a join contributes
+    /// at most one visible successor to the surrounding structured scope.
+    fn linear_continuation(
+        &self,
+        node: Node,
+        scope: &BTreeSet<Node>,
+        active_loop: Option<Node>,
+    ) -> Result<Option<Node>, StructuralizationError> {
+        let successors = self.scope_successors(node, scope, active_loop);
+        match successors.as_slice() {
+            [] => Ok(None),
+            [next] => Ok(Some(*next)),
+            _ => Err(StructuralizationError::Relooper {
+                reason: format!("join node {node} has multiple visible successors"),
+            }),
+        }
     }
 
     /// Structures one reducible loop rooted at its unique header.

@@ -1177,7 +1177,7 @@ dependencies = [
  "ordered-float",
  "pastey",
  "petgraph 0.8.3",
- "portgraph 0.16.0",
+ "portgraph 0.16.1",
  "regex",
  "relrc",
  "rustc-hash 2.1.2",
@@ -1211,7 +1211,7 @@ dependencies = [
  "insta",
  "itertools 0.14.0",
  "petgraph 0.8.3",
- "portgraph 0.16.0",
+ "portgraph 0.16.1",
  "rstest",
  "strum",
 ]
@@ -1798,9 +1798,9 @@ dependencies = [
 
 [[package]]
 name = "portgraph"
-version = "0.16.0"
+version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c4d6244193810d114467998a979f0f763e5422ea546586d309fb70a68c036fb5"
+checksum = "6a1395575e261a0c0dd2d360ac4e3b14a4c9f68647ee12e59d96af959e4c0f79"
 dependencies = [
  "bitvec",
  "delegate 0.13.5",
@@ -2213,7 +2213,7 @@ dependencies = [
  "derive_more 0.99.20",
  "fxhash",
  "itertools 0.13.0",
- "petgraph 0.8.3",
+ "petgraph 0.6.5",
  "serde",
  "slotmap_fork_lmondada",
  "thiserror 1.0.69",
@@ -2828,7 +2828,7 @@ dependencies = [
  "pest",
  "pest_derive",
  "petgraph 0.8.3",
- "portgraph 0.16.0",
+ "portgraph 0.16.1",
  "portmatching",
  "priority-queue",
  "proptest",

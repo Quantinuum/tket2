@@ -11,9 +11,10 @@ use hugr::hugr::hugrmut::HugrMut;
 use hugr::ops::handle::{BasicBlockID, ConstID, NodeHandle};
 use hugr::ops::{OpTrait, OpType, Value};
 use hugr::types::Signature;
-use hugr::{Hugr, HugrView};
+use hugr::{Hugr, HugrView, Node};
 use hugr_core::ops::OpTag;
 use itertools::Itertools;
+use rstest::{fixture, rstest};
 use std::io::BufReader;
 
 use super::{
@@ -30,6 +31,18 @@ fn n_identity<T: DataflowSubContainer>(
     dataflow_builder.finish_with_outputs([unit].into_iter().chain(wires))
 }
 
+/// Builds the classic diamond subgraph used by several structuralization tests.
+///
+/// ```text
+///        split
+///       /     \
+///    left    right
+///       \     /
+///        merge
+/// ```
+///
+/// The helper returns the merge block so larger fixtures can continue from the
+/// common join point.
 fn build_then_else_merge_from_if<T: AsMut<Hugr> + AsRef<Hugr>>(
     cfg: &mut CFGBuilder<T>,
     unit_const: &ConstID,
@@ -54,6 +67,17 @@ fn build_then_else_merge_from_if<T: AsMut<Hugr> + AsRef<Hugr>>(
     Ok(merge)
 }
 
+/// Builds a CFG with a branch followed by a tail-controlled loop.
+///
+/// ```text
+///  entry -> split -> left ---\
+///                  \          > merge -> head -> tail -> exit
+///                   -> right -/                  ^      /
+///                                                |_____/
+/// ```
+///
+/// This is the simplest fixture where both strategies must recognize sibling
+/// structured regions in sequence: first a branch, then a loop.
 fn build_cond_then_loop_cfg() -> Result<Hugr, BuildError> {
     let mut cfg_builder = CFGBuilder::new(Signature::new_endo([usize_t()]))?;
     let pred_const = cfg_builder.add_constant(Value::unit_sum(0, 2).expect("0 < 2"));
@@ -86,6 +110,17 @@ fn build_cond_then_loop_cfg() -> Result<Hugr, BuildError> {
     Ok(cfg_builder.finish_hugr()?)
 }
 
+/// Builds a pre-tested `while` loop.
+///
+/// ```text
+///  entry -> header -> after -> exit
+///            ^  |
+///            |  v
+///            body
+/// ```
+///
+/// The break edge and the backedge come from different blocks, so this fixture
+/// specifically exercises header-controlled loop analysis and lowering.
 fn build_header_controlled_loop_cfg() -> Result<Hugr, BuildError> {
     let mut cfg_builder = CFGBuilder::new(Signature::new_endo([usize_t()]))?;
     let pred_const = cfg_builder.add_constant(Value::unit_sum(0, 2).expect("0 < 2"));
@@ -118,6 +153,21 @@ fn build_header_controlled_loop_cfg() -> Result<Hugr, BuildError> {
     Ok(cfg_builder.finish_hugr()?)
 }
 
+/// Builds an irreducible CFG with a two-entry cycle.
+///
+/// ```text
+///             /-> a -> c -\
+///            /    ^   /    \
+///           /      \ /      \
+///  entry ---        x        +--> exit
+///           \      / \      /
+///            \    v   \    /
+///             \-> b -> d -/
+/// ```
+///
+/// Neither `a` nor `b` is the unique header of the cyclic SCC, so the
+/// Beyond-Relooper implementation must currently reject this fixture until the
+/// Appendix A preprocessing step is implemented.
 fn build_irreducible_cfg() -> Result<Hugr, BuildError> {
     let mut cfg_builder = CFGBuilder::new(Signature::new_endo([usize_t()]))?;
     let pred_const = cfg_builder.add_constant(Value::unit_sum(0, 2).expect("0 < 2"));
@@ -157,6 +207,53 @@ fn build_irreducible_cfg() -> Result<Hugr, BuildError> {
     Ok(cfg_builder.finish_hugr()?)
 }
 
+/// Loads the checked-in Guppy fixture used for end-to-end structuralization tests.
+///
+/// The fixture contains real Guppy-emitted branches and loops, so it is a good
+/// regression target for differences between the RVSDG and Beyond-Relooper
+/// strategies.
+fn load_guppy_complex_control_fixture() -> Hugr {
+    let reader = BufReader::new(
+        include_bytes!(
+            "../../../../test_files/guppy_optimization/complex_control/complex_control.hugr"
+        )
+        .as_slice(),
+    );
+    Hugr::load(reader, None).unwrap()
+}
+
+#[fixture]
+fn cond_then_loop() -> Hugr {
+    build_cond_then_loop_cfg().unwrap()
+}
+
+#[fixture]
+fn nested_branch_loop() -> Hugr {
+    let (h, _, _) = build_conditional_in_loop_cfg(true).unwrap();
+    h
+}
+
+#[fixture]
+fn combined_headers() -> Hugr {
+    let (h, _, _) = build_conditional_in_loop_cfg(false).unwrap();
+    h
+}
+
+#[fixture]
+fn header_loop() -> Hugr {
+    build_header_controlled_loop_cfg().unwrap()
+}
+
+#[fixture]
+fn irreducible() -> Hugr {
+    build_irreducible_cfg().unwrap()
+}
+
+#[fixture]
+fn complex_control() -> Hugr {
+    load_guppy_complex_control_fixture()
+}
+
 fn single_cfg_analysis(h: &Hugr) -> StructuredRegionBody {
     let report = analyze_hugr_cfgs(h, StructuralizationStrategy::Rvsdg).unwrap();
     let StructuralizationAnalysisReport { cfg_regions } = report;
@@ -164,10 +261,38 @@ fn single_cfg_analysis(h: &Hugr) -> StructuredRegionBody {
     region.body
 }
 
-#[test]
-fn analyzes_branch_then_loop_io() -> Result<(), BuildError> {
-    let h = build_cond_then_loop_cfg()?;
-    let body = single_cfg_analysis(&h);
+fn cfgs(h: &Hugr) -> Vec<Node> {
+    h.nodes()
+        .filter(|n| h.get_optype(*n).tag() == OpTag::Cfg)
+        .collect_vec()
+}
+
+fn run_structurize(h: &mut Hugr, strategy: StructuralizationStrategy) {
+    let cfgs = cfgs(h);
+    structurize_cfgs(h, &cfgs, strategy).unwrap();
+}
+
+fn conditional_count(h: &Hugr) -> usize {
+    h.nodes()
+        .filter(|n| matches!(h.get_optype(*n), OpType::Conditional(_)))
+        .count()
+}
+
+fn tail_loop_count(h: &Hugr) -> usize {
+    h.nodes()
+        .filter(|n| matches!(h.get_optype(*n), OpType::TailLoop(_)))
+        .count()
+}
+
+fn assert_lowered_counts(h: &Hugr, expected_conditionals: usize, expected_loops: usize) {
+    assert_eq!(h.nodes().filter(|n| h.get_optype(*n).is_cfg()).count(), 0);
+    assert_eq!(conditional_count(h), expected_conditionals);
+    assert_eq!(tail_loop_count(h), expected_loops);
+}
+
+#[rstest]
+fn branch_then_loop_io(cond_then_loop: Hugr) {
+    let body = single_cfg_analysis(&cond_then_loop);
     let StructuredRegionBody::Sequence(items) = body else {
         panic!("expected root sequence");
     };
@@ -194,13 +319,11 @@ fn analyzes_branch_then_loop_io() -> Result<(), BuildError> {
     };
     assert_eq!(continue_inputs.len(), 1);
     assert_eq!(break_outputs.len(), 1);
-    Ok(())
 }
 
-#[test]
-fn analyzes_nested_branch_inside_loop_io() -> Result<(), BuildError> {
-    let (h, _, _) = build_conditional_in_loop_cfg(true)?;
-    let body = single_cfg_analysis(&h);
+#[rstest]
+fn nested_branch_io(nested_branch_loop: Hugr) {
+    let body = single_cfg_analysis(&nested_branch_loop);
     let StructuredRegionBody::Sequence(items) = body else {
         panic!("expected root sequence");
     };
@@ -217,13 +340,11 @@ fn analyzes_nested_branch_inside_loop_io() -> Result<(), BuildError> {
         panic!("expected branch body");
     };
     assert_eq!(arms.len(), 2);
-    Ok(())
 }
 
-#[test]
-fn analyzes_header_controlled_loop_io() -> Result<(), BuildError> {
-    let h = build_header_controlled_loop_cfg()?;
-    let body = single_cfg_analysis(&h);
+#[rstest]
+fn header_loop_io(header_loop: Hugr) {
+    let body = single_cfg_analysis(&header_loop);
     let StructuredRegionBody::Sequence(items) = body else {
         panic!("expected root sequence");
     };
@@ -244,162 +365,116 @@ fn analyzes_header_controlled_loop_io() -> Result<(), BuildError> {
     assert_eq!(body.len(), 1);
     assert_eq!(continue_inputs.len(), 1);
     assert_eq!(break_outputs.len(), 1);
-    Ok(())
 }
 
-#[test]
-fn lowers_conditional_and_loop_cfgs() -> Result<(), BuildError> {
-    let mut h = build_cond_then_loop_cfg()?;
-    let cfgs = h
-        .nodes()
-        .filter(|n| h.get_optype(*n).tag() == OpTag::Cfg)
-        .collect_vec();
-    let report = structurize_cfgs(&mut h, &cfgs, StructuralizationStrategy::Rvsdg).unwrap();
+#[rstest]
+fn lowers_branch_then_loop(mut cond_then_loop: Hugr) {
+    let original_cfgs = cfgs(&cond_then_loop);
+    let report = structurize_cfgs(
+        &mut cond_then_loop,
+        &original_cfgs,
+        StructuralizationStrategy::Rvsdg,
+    )
+    .unwrap();
     assert_eq!(report.rewrites.len(), 1);
-    assert_eq!(report.rewrites[0], cfgs[0]);
-    assert_eq!(h.nodes().filter(|n| h.get_optype(*n).is_cfg()).count(), 0);
-    assert_eq!(
-        h.nodes()
-            .filter(|n| matches!(h.get_optype(*n), OpType::Conditional(_)))
-            .count(),
-        2
-    );
-    assert_eq!(
-        h.nodes()
-            .filter(|n| matches!(h.get_optype(*n), OpType::TailLoop(_)))
-            .count(),
-        1
-    );
-    Ok(())
+    assert_eq!(report.rewrites[0], original_cfgs[0]);
+    assert_lowered_counts(&cond_then_loop, 2, 1);
 }
 
-#[test]
-fn lowers_nested_branch_inside_loop() -> Result<(), BuildError> {
-    let (mut h, _, _) = build_conditional_in_loop_cfg(true)?;
-    let cfgs = h
-        .nodes()
-        .filter(|n| h.get_optype(*n).tag() == OpTag::Cfg)
-        .collect_vec();
-    structurize_cfgs(&mut h, &cfgs, StructuralizationStrategy::Rvsdg).unwrap();
-    assert_eq!(h.nodes().filter(|n| h.get_optype(*n).is_cfg()).count(), 0);
-    assert_eq!(
-        h.nodes()
-            .filter(|n| matches!(h.get_optype(*n), OpType::Conditional(_)))
-            .count(),
-        2
-    );
-    assert_eq!(
-        h.nodes()
-            .filter(|n| matches!(h.get_optype(*n), OpType::TailLoop(_)))
-            .count(),
-        1
-    );
-    Ok(())
+#[rstest]
+fn lowers_nested_branch(mut nested_branch_loop: Hugr) {
+    run_structurize(&mut nested_branch_loop, StructuralizationStrategy::Rvsdg);
+    assert_lowered_counts(&nested_branch_loop, 2, 1);
 }
 
-#[test]
-fn lowers_header_controlled_loop() -> Result<(), BuildError> {
-    let mut h = build_header_controlled_loop_cfg()?;
-    let cfgs = h
-        .nodes()
-        .filter(|n| h.get_optype(*n).tag() == OpTag::Cfg)
-        .collect_vec();
-    structurize_cfgs(&mut h, &cfgs, StructuralizationStrategy::Rvsdg).unwrap();
-    assert_eq!(h.nodes().filter(|n| h.get_optype(*n).is_cfg()).count(), 0);
-    assert_eq!(
-        h.nodes()
-            .filter(|n| matches!(h.get_optype(*n), OpType::Conditional(_)))
-            .count(),
-        2
-    );
-    assert_eq!(
-        h.nodes()
-            .filter(|n| matches!(h.get_optype(*n), OpType::TailLoop(_)))
-            .count(),
-        1
-    );
-    Ok(())
+#[rstest]
+fn lowers_header_loop(mut header_loop: Hugr) {
+    run_structurize(&mut header_loop, StructuralizationStrategy::Rvsdg);
+    assert_lowered_counts(&header_loop, 2, 1);
 }
 
-#[test]
-fn pass_rewrites_cfgs_with_both_strategies() -> Result<(), BuildError> {
-    let (mut h, _, _) = build_conditional_in_loop_cfg(true)?;
-    let report = StructuralizeCfgsPass::default().run(&mut h).unwrap();
-    assert_eq!(report.rewrites.len(), 1);
-
-    let (mut h, _, _) = build_conditional_in_loop_cfg(true)?;
+#[rstest]
+#[case::rvsdg(StructuralizationStrategy::Rvsdg)]
+#[case::relooper(StructuralizationStrategy::BeyondRelooper)]
+fn pass_rewrites_supported_cfg(
+    #[case] strategy: StructuralizationStrategy,
+    nested_branch_loop: Hugr,
+) {
+    let mut h = nested_branch_loop;
     let report = StructuralizeCfgsPass::default()
-        .with_strategy(StructuralizationStrategy::BeyondRelooper)
+        .with_strategy(strategy)
         .run(&mut h)
         .unwrap();
     assert_eq!(report.rewrites.len(), 1);
     assert_eq!(h.nodes().filter(|n| h.get_optype(*n).is_cfg()).count(), 0);
-    Ok(())
 }
 
-#[test]
-fn beyond_structurizes_combined_loop_headers() -> Result<(), BuildError> {
-    let (mut beyond_h, _, _) = build_conditional_in_loop_cfg(false)?;
-    let cfgs = beyond_h
-        .nodes()
-        .filter(|n| beyond_h.get_optype(*n).tag() == OpTag::Cfg)
-        .collect_vec();
+#[rstest]
+fn relooper_handles_combined_headers(mut combined_headers: Hugr) {
+    let cfgs = cfgs(&combined_headers);
     let report = structurize_cfgs(
-        &mut beyond_h,
+        &mut combined_headers,
         &cfgs,
         StructuralizationStrategy::BeyondRelooper,
     )
     .unwrap();
     assert_eq!(report.rewrites.len(), 1);
     assert_eq!(
-        beyond_h
+        combined_headers
             .nodes()
-            .filter(|n| beyond_h.get_optype(*n).is_cfg())
+            .filter(|n| combined_headers.get_optype(*n).is_cfg())
             .count(),
         0
     );
     assert!(
-        beyond_h
+        combined_headers
             .nodes()
-            .any(|n| matches!(beyond_h.get_optype(n), OpType::TailLoop(_)))
+            .any(|n| matches!(combined_headers.get_optype(n), OpType::TailLoop(_)))
     );
     assert!(
-        beyond_h
+        combined_headers
             .nodes()
-            .filter(|n| matches!(beyond_h.get_optype(*n), OpType::Conditional(_)))
+            .filter(|n| matches!(combined_headers.get_optype(*n), OpType::Conditional(_)))
             .count()
             >= 1
     );
-
-    let (mut rvsdg_h, _, _) = build_conditional_in_loop_cfg(false)?;
-    let cfgs = rvsdg_h
-        .nodes()
-        .filter(|n| rvsdg_h.get_optype(*n).tag() == OpTag::Cfg)
-        .collect_vec();
-    assert!(structurize_cfgs(&mut rvsdg_h, &cfgs, StructuralizationStrategy::Rvsdg).is_err());
-    Ok(())
 }
 
-#[test]
-fn beyond_rejects_irreducible_cfgs_until_preprocessed() -> Result<(), BuildError> {
-    let mut h = build_irreducible_cfg()?;
-    let cfgs = h
-        .nodes()
-        .filter(|n| h.get_optype(*n).tag() == OpTag::Cfg)
-        .collect_vec();
-    let err =
-        structurize_cfgs(&mut h, &cfgs, StructuralizationStrategy::BeyondRelooper).unwrap_err();
+#[rstest]
+fn rvsdg_rejects_combined_headers(mut combined_headers: Hugr) {
+    let cfgs = cfgs(&combined_headers);
+    assert!(
+        structurize_cfgs(
+            &mut combined_headers,
+            &cfgs,
+            StructuralizationStrategy::Rvsdg
+        )
+        .is_err()
+    );
+}
+
+#[rstest]
+fn relooper_rejects_irreducible(mut irreducible: Hugr) {
+    let cfgs = cfgs(&irreducible);
+    let err = structurize_cfgs(
+        &mut irreducible,
+        &cfgs,
+        StructuralizationStrategy::BeyondRelooper,
+    )
+    .unwrap_err();
     assert!(matches!(
         err,
         super::StructuralizationError::UnsupportedIrreducibleCfg { .. }
     ));
-    Ok(())
 }
 
-#[test]
-fn beyond_rewrite_is_deterministic() -> Result<(), BuildError> {
-    let (mut a, _, _) = build_conditional_in_loop_cfg(false)?;
-    let (mut b, _, _) = build_conditional_in_loop_cfg(false)?;
+#[rstest]
+fn relooper_is_deterministic(combined_headers: Hugr) {
+    let mut a = combined_headers;
+    let mut b = {
+        let (h, _, _) = build_conditional_in_loop_cfg(false).unwrap();
+        h
+    };
     StructuralizeCfgsPass::default()
         .with_strategy(StructuralizationStrategy::BeyondRelooper)
         .run(&mut a)
@@ -409,28 +484,31 @@ fn beyond_rewrite_is_deterministic() -> Result<(), BuildError> {
         .run(&mut b)
         .unwrap();
     assert_eq!(a.mermaid_string(), b.mermaid_string());
-    Ok(())
 }
 
-#[test]
-fn pass_inlines_helper_dfgs_by_default() -> Result<(), BuildError> {
-    let mut h = build_header_controlled_loop_cfg()?;
-    StructuralizeCfgsPass::default().run(&mut h).unwrap();
-    assert_eq!(h.nodes().filter(|n| h.get_optype(*n).is_cfg()).count(), 0);
-    assert_eq!(h.nodes().filter(|n| h.get_optype(*n).is_dfg()).count(), 1);
-
-    let mut h = build_header_controlled_loop_cfg()?;
+#[rstest]
+#[case::default(true, 1)]
+#[case::disabled(false, 2)]
+fn pass_inlining(#[case] inline_dfgs: bool, #[case] minimum_dfgs: usize, header_loop: Hugr) {
+    let mut h = header_loop;
     StructuralizeCfgsPass::default()
-        .inline_dfgs(false)
+        .inline_dfgs(inline_dfgs)
         .run(&mut h)
         .unwrap();
-    assert!(h.nodes().filter(|n| h.get_optype(*n).is_dfg()).count() > 1);
-    Ok(())
+    assert_eq!(h.nodes().filter(|n| h.get_optype(*n).is_cfg()).count(), 0);
+    if inline_dfgs {
+        assert_eq!(
+            h.nodes().filter(|n| h.get_optype(*n).is_dfg()).count(),
+            minimum_dfgs
+        );
+    } else {
+        assert!(h.nodes().filter(|n| h.get_optype(*n).is_dfg()).count() >= minimum_dfgs);
+    }
 }
 
-#[test]
-fn pass_respects_scope_without_touching_other_cfgs() -> Result<(), BuildError> {
-    let cfg_a = build_cond_then_loop_cfg()?;
+#[rstest]
+fn scope_preserves_other_cfgs(cond_then_loop: Hugr) -> Result<(), BuildError> {
+    let cfg_a = cond_then_loop;
     let cfg_b = build_cond_then_loop_cfg()?;
     let mut module = ModuleBuilder::new();
     let mut func_a = module.define_function("a", Signature::new_endo([usize_t()]))?;
@@ -454,27 +532,20 @@ fn pass_respects_scope_without_touching_other_cfgs() -> Result<(), BuildError> {
     Ok(())
 }
 
-#[test]
-fn structurizes_guppy_complex_control_fixture() {
-    let reader = BufReader::new(
-        include_bytes!(
-            "../../../../test_files/guppy_optimization/complex_control/complex_control.hugr"
-        )
-        .as_slice(),
-    );
-    let mut h = Hugr::load(reader, None).unwrap();
-
-    let report = StructuralizeCfgsPass::default().run(&mut h).unwrap();
+#[rstest]
+#[case::rvsdg(StructuralizationStrategy::Rvsdg)]
+#[case::relooper(StructuralizationStrategy::BeyondRelooper)]
+fn structurizes_complex_control(
+    #[case] strategy: StructuralizationStrategy,
+    complex_control: Hugr,
+) {
+    let mut h = complex_control;
+    let report = StructuralizeCfgsPass::default()
+        .with_strategy(strategy)
+        .run(&mut h)
+        .unwrap();
     assert!(!report.rewrites.is_empty());
     assert_eq!(h.nodes().filter(|n| h.get_optype(*n).is_cfg()).count(), 0);
-    assert!(
-        h.nodes()
-            .any(|n| matches!(h.get_optype(n), OpType::TailLoop(_)))
-    );
-    assert!(
-        h.nodes()
-            .filter(|n| matches!(h.get_optype(*n), OpType::Conditional(_)))
-            .count()
-            >= 1
-    );
+    assert!(tail_loop_count(&h) >= 1);
+    assert!(conditional_count(&h) >= 1);
 }
