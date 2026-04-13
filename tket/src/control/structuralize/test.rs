@@ -591,23 +591,24 @@ fn structurizes_guppy_example(loop_and_branch: Hugr, #[case] strategy: Structura
 }
 
 #[rstest]
-#[case::rvsdg(StructuralizationStrategy::Rvsdg)]
-#[case::relooper(StructuralizationStrategy::BeyondRelooper)]
-fn complex_control_not_supported_yet(
-    complex_control: Hugr,
-    #[case] strategy: StructuralizationStrategy,
-) {
+fn structurizes_complex_control(complex_control: Hugr) {
+    let mut h = complex_control;
+    let report = StructuralizeCfgsPass::default()
+        .with_strategy(StructuralizationStrategy::BeyondRelooper)
+        .run(&mut h)
+        .unwrap();
+    assert!(!report.rewrites.is_empty());
+    assert_eq!(h.nodes().filter(|n| h.get_optype(*n).is_cfg()).count(), 0);
+    assert!(tail_loop_count(&h) >= 1);
+    assert!(conditional_count(&h) >= 1);
+}
+
+#[rstest]
+fn rvsdg_rejects_complex_control(complex_control: Hugr) {
     let mut h = complex_control;
     let err = StructuralizeCfgsPass::default()
-        .with_strategy(strategy)
+        .with_strategy(StructuralizationStrategy::Rvsdg)
         .run(&mut h)
         .unwrap_err();
-    match strategy {
-        StructuralizationStrategy::Rvsdg => {
-            assert!(matches!(err, super::StructuralizationError::Rvsdg(_)));
-        }
-        StructuralizationStrategy::BeyondRelooper => {
-            assert!(matches!(err, super::StructuralizationError::Build(_)));
-        }
-    }
+    assert!(matches!(err, super::StructuralizationError::Rvsdg(_)));
 }

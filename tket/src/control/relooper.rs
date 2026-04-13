@@ -25,8 +25,8 @@ use crate::control::structuralize::shared::{
     analyze_block, block_input_row, block_successor_payload, cfg_input_row, cfg_output_row,
 };
 use crate::control::structuralize::{
-    RegionIo, StructuralizationError, StructuredBlock, StructuredLoopKind, StructuredNode,
-    StructuredRegion, StructuredRegionBody,
+    RegionIo, StructuralizationError, StructuredBlock, StructuredBranchJoinKind,
+    StructuredLoopKind, StructuredNode, StructuredRegion, StructuredRegionBody,
 };
 use crate::control::{CfgNodeMap, IdentityCfgMap};
 
@@ -294,7 +294,7 @@ impl CfgInfo {
             .into_iter()
             .map(|succ| self.build_scope(cfg_view, succ, scope, Some(join_node), active_loop))
             .collect::<Result<Vec<_>, _>>()?;
-        let next = self.linear_continuation(join_node, scope, active_loop)?;
+        let (join_kind, next) = self.branch_continuation(join_node, scope, active_loop);
 
         Ok((
             StructuredRegion {
@@ -302,7 +302,12 @@ impl CfgInfo {
                     inputs: split.inputs().clone(),
                     outputs: join.inputs().clone(),
                 },
-                body: StructuredRegionBody::Branch { split, arms, join },
+                body: StructuredRegionBody::Branch {
+                    split,
+                    arms,
+                    join,
+                    join_kind,
+                },
             },
             next,
         ))
@@ -335,25 +340,24 @@ impl CfgInfo {
         })
     }
 
-    /// Returns the linear continuation after a region-local join block.
+    /// Classifies how control should continue after a branch join.
     ///
-    /// Branch regions already include their join block in the shared lowering
-    /// IR, so the enclosing scope must resume *after* that join has run. This
-    /// helper enforces the current lowering invariant that a join contributes
-    /// at most one visible successor to the surrounding structured scope.
-    fn linear_continuation(
+    /// Most joins are plain blocks and can be lowered inside the branch region,
+    /// after which the enclosing scope resumes with the join's single visible
+    /// successor. If the join itself is the next split block, the branch region
+    /// defers lowering that join and lets the enclosing scope resume directly
+    /// at the join node.
+    fn branch_continuation(
         &self,
         node: Node,
         scope: &BTreeSet<Node>,
         active_loop: Option<Node>,
-    ) -> Result<Option<Node>, StructuralizationError> {
+    ) -> (StructuredBranchJoinKind, Option<Node>) {
         let successors = self.scope_successors(node, scope, active_loop);
         match successors.as_slice() {
-            [] => Ok(None),
-            [next] => Ok(Some(*next)),
-            _ => Err(StructuralizationError::Relooper {
-                reason: format!("join node {node} has multiple visible successors"),
-            }),
+            [] => (StructuredBranchJoinKind::Inline, None),
+            [next] => (StructuredBranchJoinKind::Inline, Some(*next)),
+            _ => (StructuredBranchJoinKind::Deferred, Some(node)),
         }
     }
 

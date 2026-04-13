@@ -16,8 +16,9 @@ use super::shared::{
     analyze_block, block_input_row, block_successor_payload, cfg_input_row, cfg_output_row,
 };
 use super::types::{
-    RegionIo, StructuralizationError, StructuredBlock, StructuredLoopKind, StructuredNode,
-    StructuredRegion, StructuredRegionBody, structured_node_contains_block,
+    RegionIo, StructuralizationError, StructuredBlock, StructuredBranchJoinKind,
+    StructuredLoopKind, StructuredNode, StructuredRegion, StructuredRegionBody,
+    structured_node_contains_block,
 };
 
 /// Analyzes one CFG through the RVSDG structural tree and enriches the result
@@ -75,6 +76,7 @@ fn analyze_region<H: HugrView<Node = Node>>(
                     })
                     .collect::<Result<Vec<_>, _>>()?,
                 join: analyze_block(cfg_view, *join)?,
+                join_kind: StructuredBranchJoinKind::Inline,
             }
         }
         control_rvsdg::ControlRegionBody::Loop { body } => {

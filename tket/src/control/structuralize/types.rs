@@ -91,6 +91,17 @@ pub(crate) enum StructuredLoopKind {
     HeaderControlled,
 }
 
+/// How a structured branch hands control to its join block.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum StructuredBranchJoinKind {
+    /// The branch region lowers its join block internally and returns the
+    /// continuation after that join.
+    Inline,
+    /// The branch region returns the join inputs to the surrounding sequence,
+    /// which will lower the join block as the next structured node.
+    Deferred,
+}
+
 /// HUGR-specific body information for a structured region.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum StructuredRegionBody {
@@ -104,6 +115,9 @@ pub(crate) enum StructuredRegionBody {
         arms: Vec<Vec<StructuredNode>>,
         /// Join block executed after the `Conditional`.
         join: StructuredBlock,
+        /// Whether the join block is lowered inside the branch or by the
+        /// surrounding sequence.
+        join_kind: StructuredBranchJoinKind,
     },
     /// A structured loop lowered via `TailLoop`.
     Loop {
@@ -210,6 +224,12 @@ pub enum StructuralizationError {
         /// Short description of the mismatch or unsupported construct.
         reason: String,
     },
+    /// The shared rewrite pipeline could not materialize a structured CFG replacement.
+    #[display("failed to materialize a structured CFG rewrite because {reason}")]
+    Materialization {
+        /// Short description of the rewrite mismatch.
+        reason: String,
+    },
     /// The selected strategy is not implemented yet.
     #[display("structuralization strategy {strategy:?} is not implemented yet")]
     UnsupportedStrategy {
@@ -267,7 +287,12 @@ fn structured_region_contains_block(region: &StructuredRegion, target: Node) -> 
         StructuredRegionBody::Sequence(items) => items
             .iter()
             .any(|item| structured_node_contains_block(item, target)),
-        StructuredRegionBody::Branch { split, arms, join } => {
+        StructuredRegionBody::Branch {
+            split,
+            arms,
+            join,
+            join_kind: _,
+        } => {
             split.node() == target
                 || arms
                     .iter()
