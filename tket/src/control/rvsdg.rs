@@ -493,7 +493,7 @@ fn regions_root_desc<T: HugrNode>(cfg: &impl CfgNodeMap<T>) -> RegionDesc<T> {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 enum Component<T> {
     Block(T),
     Region(RegionId),
@@ -597,8 +597,7 @@ fn build_branch_tree<T: HugrNode>(
     let join = sequence_end(cfg, graph, region_id)
         .ok_or(RvsdgBuildError::MissingBranchJoin { region: region_id })?;
 
-    let arms = compressed
-        .successors(split)
+    let arms = ordered_branch_starts(cfg, graph, &compressed, region_id, split)
         .into_iter()
         .map(|start| build_path_items(cfg, graph, &compressed, start, Some(join), false, region_id))
         .collect::<Result<Vec<_>, _>>()?;
@@ -615,6 +614,42 @@ fn build_branch_tree<T: HugrNode>(
             join: vec![expect_block(join, region_id)?],
         },
     })
+}
+
+/// Returns branch-arm entry components in CFG successor order.
+///
+/// Branch case ordering is part of the emitted structured HUGR, so it must be
+/// deterministic and should follow the split block's successor order rather
+/// than the iteration order of the compressed region's internal hash tables.
+fn ordered_branch_starts<T: HugrNode>(
+    cfg: &impl CfgNodeMap<T>,
+    graph: &RegionGraph<T>,
+    compressed: &CompressedRegion<T>,
+    region_id: RegionId,
+    split: Component<T>,
+) -> Vec<Component<T>> {
+    let split_block = expect_block(split, region_id)
+        .expect("branch region split component should always be a concrete block");
+    let region = graph.region(region_id);
+    let child_owner = child_owner_map(graph, region);
+    let mut starts = Vec::new();
+
+    for succ in cfg.successors(split_block) {
+        if !region.blocks.contains(&succ) {
+            continue;
+        }
+        let component = component_for(succ, &child_owner);
+        if component == split || starts.contains(&component) {
+            continue;
+        }
+        starts.push(component);
+    }
+
+    if starts.is_empty() {
+        compressed.successors(split)
+    } else {
+        starts
+    }
 }
 
 /// Builds a linear sequence of control-tree items inside a region.
@@ -798,11 +833,14 @@ impl<T: HugrNode> CompressedRegion<T> {
     /// callers need to pattern-match on the number of successors to validate
     /// structural assumptions.
     fn successors(&self, component: Component<T>) -> Vec<Component<T>> {
-        self.succs
+        let mut succs = self
+            .succs
             .get(&component)
             .into_iter()
             .flat_map(|set| set.iter().copied())
-            .collect()
+            .collect::<Vec<_>>();
+        succs.sort();
+        succs
     }
 }
 
