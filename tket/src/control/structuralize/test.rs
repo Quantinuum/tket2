@@ -15,7 +15,9 @@ use hugr::{Hugr, HugrView, Node};
 use hugr_core::ops::OpTag;
 use itertools::Itertools;
 use rstest::{fixture, rstest};
+use std::fs;
 use std::io::BufReader;
+use std::path::Path;
 
 use super::{
     StructuralizationAnalysisReport, StructuralizationStrategy, StructuredLoopKind, StructuredNode,
@@ -47,24 +49,27 @@ fn build_then_else_merge_from_if<T: AsMut<Hugr> + AsRef<Hugr>>(
     cfg: &mut CFGBuilder<T>,
     unit_const: &ConstID,
     split: BasicBlockID,
-) -> Result<BasicBlockID, BuildError> {
+) -> BasicBlockID {
     let merge = n_identity(
-        cfg.simple_block_builder(endo_sig([usize_t()]), 1)?,
+        cfg.simple_block_builder(endo_sig([usize_t()]), 1).unwrap(),
         unit_const,
-    )?;
+    )
+    .unwrap();
     let left = n_identity(
-        cfg.simple_block_builder(endo_sig([usize_t()]), 1)?,
+        cfg.simple_block_builder(endo_sig([usize_t()]), 1).unwrap(),
         unit_const,
-    )?;
+    )
+    .unwrap();
     let right = n_identity(
-        cfg.simple_block_builder(endo_sig([usize_t()]), 1)?,
+        cfg.simple_block_builder(endo_sig([usize_t()]), 1).unwrap(),
         unit_const,
-    )?;
-    cfg.branch(&split, 0, &left)?;
-    cfg.branch(&split, 1, &right)?;
-    cfg.branch(&left, 0, &merge)?;
-    cfg.branch(&right, 0, &merge)?;
-    Ok(merge)
+    )
+    .unwrap();
+    cfg.branch(&split, 0, &left).unwrap();
+    cfg.branch(&split, 1, &right).unwrap();
+    cfg.branch(&left, 0, &merge).unwrap();
+    cfg.branch(&right, 0, &merge).unwrap();
+    merge
 }
 
 /// Builds a CFG with a branch followed by a tail-controlled loop.
@@ -78,36 +83,49 @@ fn build_then_else_merge_from_if<T: AsMut<Hugr> + AsRef<Hugr>>(
 ///
 /// This is the simplest fixture where both strategies must recognize sibling
 /// structured regions in sequence: first a branch, then a loop.
-fn build_cond_then_loop_cfg() -> Result<Hugr, BuildError> {
-    let mut cfg_builder = CFGBuilder::new(Signature::new_endo([usize_t()]))?;
+#[fixture]
+fn build_cond_then_loop_cfg() -> Hugr {
+    let mut cfg_builder = CFGBuilder::new(Signature::new_endo([usize_t()])).unwrap();
     let pred_const = cfg_builder.add_constant(Value::unit_sum(0, 2).expect("0 < 2"));
     let const_unit = cfg_builder.add_constant(Value::unary_unit_sum());
 
     let entry = n_identity(
-        cfg_builder.simple_entry_builder(vec![usize_t()].into(), 1)?,
+        cfg_builder
+            .simple_entry_builder(vec![usize_t()].into(), 1)
+            .unwrap(),
         &const_unit,
-    )?;
+    )
+    .unwrap();
     let split = n_identity(
-        cfg_builder.simple_block_builder(endo_sig([usize_t()]), 2)?,
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 2)
+            .unwrap(),
         &pred_const,
-    )?;
-    cfg_builder.branch(&entry, 0, &split)?;
-    let merge = build_then_else_merge_from_if(&mut cfg_builder, &const_unit, split)?;
+    )
+    .unwrap();
+    cfg_builder.branch(&entry, 0, &split).unwrap();
+    let merge = build_then_else_merge_from_if(&mut cfg_builder, &const_unit, split);
     let head = n_identity(
-        cfg_builder.simple_block_builder(endo_sig([usize_t()]), 1)?,
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 1)
+            .unwrap(),
         &const_unit,
-    )?;
+    )
+    .unwrap();
     let tail = n_identity(
-        cfg_builder.simple_block_builder(endo_sig([usize_t()]), 2)?,
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 2)
+            .unwrap(),
         &pred_const,
-    )?;
-    cfg_builder.branch(&merge, 0, &head)?;
-    cfg_builder.branch(&head, 0, &tail)?;
-    cfg_builder.branch(&tail, 1, &head)?;
+    )
+    .unwrap();
+    cfg_builder.branch(&merge, 0, &head).unwrap();
+    cfg_builder.branch(&head, 0, &tail).unwrap();
+    cfg_builder.branch(&tail, 1, &head).unwrap();
     let exit = cfg_builder.exit_block();
-    cfg_builder.branch(&tail, 0, &exit)?;
+    cfg_builder.branch(&tail, 0, &exit).unwrap();
 
-    Ok(cfg_builder.finish_hugr()?)
+    cfg_builder.finish_hugr().unwrap()
 }
 
 /// Builds a pre-tested `while` loop.
@@ -121,36 +139,49 @@ fn build_cond_then_loop_cfg() -> Result<Hugr, BuildError> {
 ///
 /// The break edge and the backedge come from different blocks, so this fixture
 /// specifically exercises header-controlled loop analysis and lowering.
-fn build_header_controlled_loop_cfg() -> Result<Hugr, BuildError> {
-    let mut cfg_builder = CFGBuilder::new(Signature::new_endo([usize_t()]))?;
+#[fixture]
+fn build_header_controlled_loop_cfg() -> Hugr {
+    let mut cfg_builder = CFGBuilder::new(Signature::new_endo([usize_t()])).unwrap();
     let pred_const = cfg_builder.add_constant(Value::unit_sum(0, 2).expect("0 < 2"));
     let const_unit = cfg_builder.add_constant(Value::unary_unit_sum());
 
     let entry = n_identity(
-        cfg_builder.simple_entry_builder(vec![usize_t()].into(), 1)?,
+        cfg_builder
+            .simple_entry_builder(vec![usize_t()].into(), 1)
+            .unwrap(),
         &const_unit,
-    )?;
+    )
+    .unwrap();
     let header = n_identity(
-        cfg_builder.simple_block_builder(endo_sig([usize_t()]), 2)?,
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 2)
+            .unwrap(),
         &pred_const,
-    )?;
+    )
+    .unwrap();
     let body = n_identity(
-        cfg_builder.simple_block_builder(endo_sig([usize_t()]), 1)?,
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 1)
+            .unwrap(),
         &const_unit,
-    )?;
+    )
+    .unwrap();
     let after = n_identity(
-        cfg_builder.simple_block_builder(endo_sig([usize_t()]), 1)?,
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 1)
+            .unwrap(),
         &const_unit,
-    )?;
+    )
+    .unwrap();
     let exit = cfg_builder.exit_block();
 
-    cfg_builder.branch(&entry, 0, &header)?;
-    cfg_builder.branch(&header, 0, &after)?;
-    cfg_builder.branch(&header, 1, &body)?;
-    cfg_builder.branch(&body, 0, &header)?;
-    cfg_builder.branch(&after, 0, &exit)?;
+    cfg_builder.branch(&entry, 0, &header).unwrap();
+    cfg_builder.branch(&header, 0, &after).unwrap();
+    cfg_builder.branch(&header, 1, &body).unwrap();
+    cfg_builder.branch(&body, 0, &header).unwrap();
+    cfg_builder.branch(&after, 0, &exit).unwrap();
 
-    Ok(cfg_builder.finish_hugr()?)
+    cfg_builder.finish_hugr().unwrap()
 }
 
 /// Builds an irreducible CFG with a two-entry cycle.
@@ -168,90 +199,94 @@ fn build_header_controlled_loop_cfg() -> Result<Hugr, BuildError> {
 /// Neither `a` nor `b` is the unique header of the cyclic SCC, so the
 /// Beyond-Relooper implementation must currently reject this fixture until the
 /// Appendix A preprocessing step is implemented.
-fn build_irreducible_cfg() -> Result<Hugr, BuildError> {
-    let mut cfg_builder = CFGBuilder::new(Signature::new_endo([usize_t()]))?;
+#[fixture]
+fn build_irreducible_cfg() -> Hugr {
+    let mut cfg_builder = CFGBuilder::new(Signature::new_endo([usize_t()])).unwrap();
     let pred_const = cfg_builder.add_constant(Value::unit_sum(0, 2).expect("0 < 2"));
     let const_unit = cfg_builder.add_constant(Value::unary_unit_sum());
 
     let entry = n_identity(
-        cfg_builder.simple_entry_builder(vec![usize_t()].into(), 2)?,
+        cfg_builder
+            .simple_entry_builder(vec![usize_t()].into(), 2)
+            .unwrap(),
         &pred_const,
-    )?;
+    )
+    .unwrap();
     let a = n_identity(
-        cfg_builder.simple_block_builder(endo_sig([usize_t()]), 1)?,
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 1)
+            .unwrap(),
         &const_unit,
-    )?;
+    )
+    .unwrap();
     let b = n_identity(
-        cfg_builder.simple_block_builder(endo_sig([usize_t()]), 1)?,
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 1)
+            .unwrap(),
         &const_unit,
-    )?;
+    )
+    .unwrap();
     let c = n_identity(
-        cfg_builder.simple_block_builder(endo_sig([usize_t()]), 2)?,
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 2)
+            .unwrap(),
         &pred_const,
-    )?;
+    )
+    .unwrap();
     let d = n_identity(
-        cfg_builder.simple_block_builder(endo_sig([usize_t()]), 2)?,
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 2)
+            .unwrap(),
         &pred_const,
-    )?;
+    )
+    .unwrap();
     let exit = cfg_builder.exit_block();
 
-    cfg_builder.branch(&entry, 0, &a)?;
-    cfg_builder.branch(&entry, 1, &b)?;
-    cfg_builder.branch(&a, 0, &c)?;
-    cfg_builder.branch(&b, 0, &d)?;
-    cfg_builder.branch(&c, 0, &b)?;
-    cfg_builder.branch(&c, 1, &exit)?;
-    cfg_builder.branch(&d, 0, &a)?;
-    cfg_builder.branch(&d, 1, &exit)?;
+    cfg_builder.branch(&entry, 0, &a).unwrap();
+    cfg_builder.branch(&entry, 1, &b).unwrap();
+    cfg_builder.branch(&a, 0, &c).unwrap();
+    cfg_builder.branch(&b, 0, &d).unwrap();
+    cfg_builder.branch(&c, 0, &b).unwrap();
+    cfg_builder.branch(&c, 1, &exit).unwrap();
+    cfg_builder.branch(&d, 0, &a).unwrap();
+    cfg_builder.branch(&d, 1, &exit).unwrap();
 
-    Ok(cfg_builder.finish_hugr()?)
+    cfg_builder.finish_hugr().unwrap()
 }
 
-/// Loads the checked-in Guppy fixture used for end-to-end structuralization tests.
+/// Loads a checked-in Guppy optimization fixture by directory name.
 ///
-/// The fixture contains real Guppy-emitted branches and loops, so it is a good
-/// regression target for differences between the RVSDG and Beyond-Relooper
-/// strategies.
-fn load_guppy_complex_control_fixture() -> Hugr {
-    let reader = BufReader::new(
-        include_bytes!(
-            "../../../../test_files/guppy_optimization/complex_control/complex_control.hugr"
-        )
-        .as_slice(),
-    );
+/// The structuralization tests use these examples as end-to-end regressions for
+/// real Guppy-emitted CFGs.
+fn load_guppy_example(name: &str) -> Hugr {
+    let file = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../test_files/guppy_optimization")
+        .join(name)
+        .join(format!("{name}.hugr"));
+    let reader = BufReader::new(fs::File::open(file).unwrap());
     Hugr::load(reader, None).unwrap()
 }
 
 #[fixture]
-fn cond_then_loop() -> Hugr {
-    build_cond_then_loop_cfg().unwrap()
-}
-
-#[fixture]
-fn nested_branch_loop() -> Hugr {
+fn build_nested_branch_loop_cfg() -> Hugr {
     let (h, _, _) = build_conditional_in_loop_cfg(true).unwrap();
     h
 }
 
 #[fixture]
-fn combined_headers() -> Hugr {
+fn build_combined_headers_cfg() -> Hugr {
     let (h, _, _) = build_conditional_in_loop_cfg(false).unwrap();
     h
 }
 
 #[fixture]
-fn header_loop() -> Hugr {
-    build_header_controlled_loop_cfg().unwrap()
-}
-
-#[fixture]
-fn irreducible() -> Hugr {
-    build_irreducible_cfg().unwrap()
+fn loop_and_branch() -> Hugr {
+    load_guppy_example("loop_and_branch")
 }
 
 #[fixture]
 fn complex_control() -> Hugr {
-    load_guppy_complex_control_fixture()
+    load_guppy_example("complex_control")
 }
 
 fn single_cfg_analysis(h: &Hugr) -> StructuredRegionBody {
@@ -291,7 +326,7 @@ fn assert_lowered_counts(h: &Hugr, expected_conditionals: usize, expected_loops:
 }
 
 #[rstest]
-fn branch_then_loop_io(cond_then_loop: Hugr) {
+fn branch_then_loop_io(#[from(build_cond_then_loop_cfg)] cond_then_loop: Hugr) {
     let body = single_cfg_analysis(&cond_then_loop);
     let StructuredRegionBody::Sequence(items) = body else {
         panic!("expected root sequence");
@@ -322,7 +357,7 @@ fn branch_then_loop_io(cond_then_loop: Hugr) {
 }
 
 #[rstest]
-fn nested_branch_io(nested_branch_loop: Hugr) {
+fn nested_branch_io(#[from(build_nested_branch_loop_cfg)] nested_branch_loop: Hugr) {
     let body = single_cfg_analysis(&nested_branch_loop);
     let StructuredRegionBody::Sequence(items) = body else {
         panic!("expected root sequence");
@@ -343,7 +378,7 @@ fn nested_branch_io(nested_branch_loop: Hugr) {
 }
 
 #[rstest]
-fn header_loop_io(header_loop: Hugr) {
+fn header_loop_io(#[from(build_header_controlled_loop_cfg)] header_loop: Hugr) {
     let body = single_cfg_analysis(&header_loop);
     let StructuredRegionBody::Sequence(items) = body else {
         panic!("expected root sequence");
@@ -368,7 +403,7 @@ fn header_loop_io(header_loop: Hugr) {
 }
 
 #[rstest]
-fn lowers_branch_then_loop(mut cond_then_loop: Hugr) {
+fn lowers_branch_then_loop(#[from(build_cond_then_loop_cfg)] mut cond_then_loop: Hugr) {
     let original_cfgs = cfgs(&cond_then_loop);
     let report = structurize_cfgs(
         &mut cond_then_loop,
@@ -382,13 +417,13 @@ fn lowers_branch_then_loop(mut cond_then_loop: Hugr) {
 }
 
 #[rstest]
-fn lowers_nested_branch(mut nested_branch_loop: Hugr) {
+fn lowers_nested_branch(#[from(build_nested_branch_loop_cfg)] mut nested_branch_loop: Hugr) {
     run_structurize(&mut nested_branch_loop, StructuralizationStrategy::Rvsdg);
     assert_lowered_counts(&nested_branch_loop, 2, 1);
 }
 
 #[rstest]
-fn lowers_header_loop(mut header_loop: Hugr) {
+fn lowers_header_loop(#[from(build_header_controlled_loop_cfg)] mut header_loop: Hugr) {
     run_structurize(&mut header_loop, StructuralizationStrategy::Rvsdg);
     assert_lowered_counts(&header_loop, 2, 1);
 }
@@ -398,7 +433,7 @@ fn lowers_header_loop(mut header_loop: Hugr) {
 #[case::relooper(StructuralizationStrategy::BeyondRelooper)]
 fn pass_rewrites_supported_cfg(
     #[case] strategy: StructuralizationStrategy,
-    nested_branch_loop: Hugr,
+    #[from(build_nested_branch_loop_cfg)] nested_branch_loop: Hugr,
 ) {
     let mut h = nested_branch_loop;
     let report = StructuralizeCfgsPass::default()
@@ -410,7 +445,9 @@ fn pass_rewrites_supported_cfg(
 }
 
 #[rstest]
-fn relooper_handles_combined_headers(mut combined_headers: Hugr) {
+fn relooper_handles_combined_headers(
+    #[from(build_combined_headers_cfg)] mut combined_headers: Hugr,
+) {
     let cfgs = cfgs(&combined_headers);
     let report = structurize_cfgs(
         &mut combined_headers,
@@ -441,7 +478,7 @@ fn relooper_handles_combined_headers(mut combined_headers: Hugr) {
 }
 
 #[rstest]
-fn rvsdg_rejects_combined_headers(mut combined_headers: Hugr) {
+fn rvsdg_rejects_combined_headers(#[from(build_combined_headers_cfg)] mut combined_headers: Hugr) {
     let cfgs = cfgs(&combined_headers);
     assert!(
         structurize_cfgs(
@@ -454,7 +491,7 @@ fn rvsdg_rejects_combined_headers(mut combined_headers: Hugr) {
 }
 
 #[rstest]
-fn relooper_rejects_irreducible(mut irreducible: Hugr) {
+fn relooper_rejects_irreducible(#[from(build_irreducible_cfg)] mut irreducible: Hugr) {
     let cfgs = cfgs(&irreducible);
     let err = structurize_cfgs(
         &mut irreducible,
@@ -469,7 +506,7 @@ fn relooper_rejects_irreducible(mut irreducible: Hugr) {
 }
 
 #[rstest]
-fn relooper_is_deterministic(combined_headers: Hugr) {
+fn relooper_is_deterministic(#[from(build_combined_headers_cfg)] combined_headers: Hugr) {
     let mut a = combined_headers;
     let mut b = {
         let (h, _, _) = build_conditional_in_loop_cfg(false).unwrap();
@@ -489,7 +526,11 @@ fn relooper_is_deterministic(combined_headers: Hugr) {
 #[rstest]
 #[case::default(true, 1)]
 #[case::disabled(false, 2)]
-fn pass_inlining(#[case] inline_dfgs: bool, #[case] minimum_dfgs: usize, header_loop: Hugr) {
+fn pass_inlining(
+    #[case] inline_dfgs: bool,
+    #[case] minimum_dfgs: usize,
+    #[from(build_header_controlled_loop_cfg)] header_loop: Hugr,
+) {
     let mut h = header_loop;
     StructuralizeCfgsPass::default()
         .inline_dfgs(inline_dfgs)
@@ -507,9 +548,11 @@ fn pass_inlining(#[case] inline_dfgs: bool, #[case] minimum_dfgs: usize, header_
 }
 
 #[rstest]
-fn scope_preserves_other_cfgs(cond_then_loop: Hugr) -> Result<(), BuildError> {
+fn scope_preserves_other_cfgs(
+    #[from(build_cond_then_loop_cfg)] cond_then_loop: Hugr,
+) -> Result<(), BuildError> {
     let cfg_a = cond_then_loop;
-    let cfg_b = build_cond_then_loop_cfg()?;
+    let cfg_b = build_cond_then_loop_cfg();
     let mut module = ModuleBuilder::new();
     let mut func_a = module.define_function("a", Signature::new_endo([usize_t()]))?;
     let [a_in] = func_a.input_wires_arr();
@@ -535,11 +578,8 @@ fn scope_preserves_other_cfgs(cond_then_loop: Hugr) -> Result<(), BuildError> {
 #[rstest]
 #[case::rvsdg(StructuralizationStrategy::Rvsdg)]
 #[case::relooper(StructuralizationStrategy::BeyondRelooper)]
-fn structurizes_complex_control(
-    #[case] strategy: StructuralizationStrategy,
-    complex_control: Hugr,
-) {
-    let mut h = complex_control;
+fn structurizes_guppy_example(loop_and_branch: Hugr, #[case] strategy: StructuralizationStrategy) {
+    let mut h = loop_and_branch;
     let report = StructuralizeCfgsPass::default()
         .with_strategy(strategy)
         .run(&mut h)
@@ -548,4 +588,26 @@ fn structurizes_complex_control(
     assert_eq!(h.nodes().filter(|n| h.get_optype(*n).is_cfg()).count(), 0);
     assert!(tail_loop_count(&h) >= 1);
     assert!(conditional_count(&h) >= 1);
+}
+
+#[rstest]
+#[case::rvsdg(StructuralizationStrategy::Rvsdg)]
+#[case::relooper(StructuralizationStrategy::BeyondRelooper)]
+fn complex_control_not_supported_yet(
+    complex_control: Hugr,
+    #[case] strategy: StructuralizationStrategy,
+) {
+    let mut h = complex_control;
+    let err = StructuralizeCfgsPass::default()
+        .with_strategy(strategy)
+        .run(&mut h)
+        .unwrap_err();
+    match strategy {
+        StructuralizationStrategy::Rvsdg => {
+            assert!(matches!(err, super::StructuralizationError::Rvsdg(_)));
+        }
+        StructuralizationStrategy::BeyondRelooper => {
+            assert!(matches!(err, super::StructuralizationError::Build(_)));
+        }
+    }
 }

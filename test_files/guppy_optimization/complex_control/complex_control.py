@@ -4,32 +4,50 @@
 #     "guppylang >=0.21.6",
 # ]
 # ///
-"""Nested and sibling conditional branches."""
+"""A complex Guppy control-flow example with helper calls and array updates."""
 
 from pathlib import Path
 from sys import argv
 
 from guppylang import guppy
+from guppylang.std.builtins import array
 
 
 @guppy
-def foo(b1: bool, b2: bool) -> int:
-    res = 0
+def make_array(base: int) -> array[int, 6]:
+    """Make a fixed-size array of integers starting from the input base."""
+    return array(base + i for i in range(6))
 
-    while b1:
-        if not b2:
-            res += 1
+
+@guppy
+def increment_all(xs: array[int, 6], delta: int) -> array[int, 6]:
+    """Increment all entries of the input array by a fixed delta."""
+    return array(xs[i] + delta + i for i in range(6))
+
+
+@guppy
+def complex_control(check_first: bool, return_sum: bool) -> int:
+    xs = make_array(42)
+    total = 0
+    do_loop = True
+
+    while do_loop:
+        xs = increment_all(xs, 1)
+
+        if check_first:
+            total = total + xs[0]
+            xs = increment_all(xs, 2)
         else:
-            res += 2
-        b1 = res < 5
+            total = total + xs[1]
+            xs = increment_all(xs, 3)
 
-    if not b2:
-        res *= 2
-    else:
-        res *= 3
+        do_loop = total < 40
 
-    return res
+    if return_sum:
+        return total + xs[0] + xs[1] + xs[2] + xs[3] + xs[4] + xs[5]
+
+    return total
 
 
-program = foo.compile_function()
+program = complex_control.compile_function()
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
