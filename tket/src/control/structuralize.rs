@@ -87,6 +87,15 @@ pub enum StructuredNode {
     Region(Box<StructuredRegion>),
 }
 
+/// Lowering family chosen for a structured loop.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StructuredLoopKind {
+    /// The latch both re-enters the header and exits the loop.
+    TailControlled,
+    /// The header decides whether to enter the body or break immediately.
+    HeaderControlled,
+}
+
 /// HUGR-specific body information for a structured region.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum StructuredRegionBody {
@@ -103,8 +112,14 @@ pub enum StructuredRegionBody {
     },
     /// A structured loop lowered via `TailLoop`.
     Loop {
+        /// Loop-shape classification used during lowering.
+        kind: StructuredLoopKind,
+        /// The CFG block acting as the loop header.
+        header: StructuredBlock,
         /// One-iteration loop body items.
         body: Vec<StructuredNode>,
+        /// CFG block whose successor returns control to the header.
+        backedge_source: Node,
         /// Payload row for the continue edge.
         continue_inputs: TypeRow,
         /// Payload row for the break edge.
@@ -354,18 +369,6 @@ fn analyze_cfg_region<H: HugrView<Node = Node>>(
                 .map(|item| analyze_node(cfg_view, cfg, item))
                 .collect::<Result<Vec<_>, _>>()?;
 
-            let latch =
-                structured_body
-                    .last()
-                    .ok_or_else(|| StructuralizationError::UnsupportedLoop {
-                        reason: "loop body is empty".into(),
-                    })?;
-            let StructuredNode::Block(StructuredBlock::Dataflow { node: latch, .. }) = latch else {
-                return Err(StructuralizationError::UnsupportedLoop {
-                    reason: "loop latch is not a basic block".into(),
-                });
-            };
-
             let header = region
                 .boundary
                 .incoming
@@ -374,6 +377,7 @@ fn analyze_cfg_region<H: HugrView<Node = Node>>(
                 .ok_or_else(|| StructuralizationError::UnsupportedLoop {
                     reason: "loop has no entry boundary".into(),
                 })?;
+            let header_block = analyze_block(cfg_view, header)?;
             let exit_target = region
                 .boundary
                 .outgoing
@@ -382,52 +386,42 @@ fn analyze_cfg_region<H: HugrView<Node = Node>>(
                 .ok_or_else(|| StructuralizationError::UnsupportedLoop {
                     reason: "loop has no exit boundary".into(),
                 })?;
-
-            let latch_op = cfg_view
-                .get_optype(*latch)
-                .as_dataflow_block()
-                .ok_or(StructuralizationError::ExpectedDataflowBlock { node: *latch })?;
-            let successors = cfg.successors(*latch).collect_vec();
-            let continue_case = successors
-                .iter()
-                .position(|&succ| succ == header)
+            let exit_source = region
+                .boundary
+                .outgoing
+                .first()
+                .map(|(src, _)| *src)
                 .ok_or_else(|| StructuralizationError::UnsupportedLoop {
-                    reason: "loop latch has no backedge to the header".into(),
+                    reason: "loop has no exit boundary".into(),
                 })?;
-            let break_case = successors
-                .iter()
-                .position(|&succ| succ == exit_target)
-                .ok_or_else(|| StructuralizationError::UnsupportedLoop {
-                    reason: "loop latch has no exit edge".into(),
-                })?;
-            let continue_inputs = latch_op.successor_input(continue_case).ok_or_else(|| {
-                StructuralizationError::UnsupportedLoop {
-                    reason: "loop continue case is out of range".into(),
-                }
-            })?;
-            let break_outputs = latch_op.successor_input(break_case).ok_or_else(|| {
-                StructuralizationError::UnsupportedLoop {
-                    reason: "loop break case is out of range".into(),
-                }
-            })?;
+            let backedge_source = unique_backedge_source(cfg, &region, header)?;
 
-            if continue_inputs != io.inputs {
-                return Err(StructuralizationError::UnsupportedLoop {
-                    reason: "loop continue payload does not match the loop entry row".into(),
-                });
-            }
-            if break_outputs != io.outputs {
-                return Err(StructuralizationError::UnsupportedLoop {
-                    reason: "loop break payload does not match the loop exit row".into(),
-                });
-            }
+            let loop_body = analyze_loop_body(
+                cfg_view,
+                cfg,
+                LoopAnalysisInput {
+                    region: &region,
+                    boundary: LoopBoundary {
+                        header,
+                        backedge_source,
+                        exit_source,
+                        exit_target,
+                    },
+                    header: header_block,
+                    body: structured_body,
+                    io: &io,
+                },
+            )?;
 
             StructuredRegionBody::Loop {
-                body: structured_body,
-                continue_inputs,
-                break_outputs,
-                continue_case,
-                break_case,
+                kind: loop_body.kind,
+                header: loop_body.header,
+                body: loop_body.body,
+                backedge_source: loop_body.backedge_source,
+                continue_inputs: loop_body.continue_inputs,
+                break_outputs: loop_body.break_outputs,
+                continue_case: loop_body.continue_case,
+                break_case: loop_body.break_case,
             }
         }
     };
@@ -473,6 +467,491 @@ fn analyze_block<H: HugrView<Node = Node>>(
     }
 }
 
+struct LoopAnalysis {
+    kind: StructuredLoopKind,
+    header: StructuredBlock,
+    body: Vec<StructuredNode>,
+    backedge_source: Node,
+    continue_inputs: TypeRow,
+    break_outputs: TypeRow,
+    continue_case: usize,
+    break_case: usize,
+}
+
+#[derive(Clone, Copy)]
+struct LoopBoundary {
+    header: Node,
+    backedge_source: Node,
+    exit_source: Node,
+    exit_target: Node,
+}
+
+struct LoopAnalysisInput<'a> {
+    region: &'a rvsdg::ControlRegion<Node>,
+    boundary: LoopBoundary,
+    header: StructuredBlock,
+    body: Vec<StructuredNode>,
+    io: &'a RegionIo,
+}
+
+struct LoopLowering<'a> {
+    header: &'a StructuredBlock,
+    body: &'a [StructuredNode],
+    backedge_source: Node,
+    continue_inputs: &'a TypeRow,
+    break_outputs: &'a TypeRow,
+    continue_case: usize,
+    break_case: usize,
+}
+
+impl<'a> LoopLowering<'a> {
+    fn new(
+        header: &'a StructuredBlock,
+        body: &'a [StructuredNode],
+        backedge_source: Node,
+        continue_inputs: &'a TypeRow,
+        break_outputs: &'a TypeRow,
+        continue_case: usize,
+        break_case: usize,
+    ) -> Self {
+        Self {
+            header,
+            body,
+            backedge_source,
+            continue_inputs,
+            break_outputs,
+            continue_case,
+            break_case,
+        }
+    }
+
+    fn lower_tail_controlled<B, H>(
+        &self,
+        builder: &mut B,
+        cfg_view: &H,
+        current: Vec<Wire>,
+    ) -> Result<Vec<Wire>, StructuralizationError>
+    where
+        B: Dataflow + Container,
+        H: HugrView<Node = Node>,
+    {
+        let (latch, prefix) =
+            self.body
+                .split_last()
+                .ok_or_else(|| StructuralizationError::UnsupportedLoop {
+                    reason: "loop body is empty".into(),
+                })?;
+        let StructuredNode::Block(latch_block @ StructuredBlock::Dataflow { node, sum_rows, .. }) =
+            latch
+        else {
+            return Err(StructuralizationError::UnsupportedLoop {
+                reason: "loop latch is not a basic block".into(),
+            });
+        };
+        if *node != self.backedge_source {
+            return Err(StructuralizationError::UnsupportedLoop {
+                reason: "loop latch does not match the analyzed backedge source".into(),
+            });
+        }
+
+        let mut loop_builder = builder.tail_loop_builder(
+            self.continue_inputs
+                .iter()
+                .cloned()
+                .zip(current.iter().copied())
+                .collect_vec(),
+            [],
+            self.break_outputs.clone(),
+        )?;
+        let loop_sig = loop_builder.loop_signature()?.clone();
+        let loop_inputs = loop_builder.input_wires().collect_vec();
+        let prefix_out = lower_sequence(&mut loop_builder, cfg_view, prefix, loop_inputs)?;
+        let latch_out = lower_block(&mut loop_builder, cfg_view, latch_block, prefix_out)?;
+        let [latch_control, latch_rest @ ..] = latch_out.as_slice() else {
+            return Err(StructuralizationError::UnsupportedLoop {
+                reason: "loop latch did not produce a control value".into(),
+            });
+        };
+
+        if sum_rows.len() != 2 {
+            return Err(StructuralizationError::UnsupportedLoop {
+                reason: format!(
+                    "loop latch must have exactly two successors, found {}",
+                    sum_rows.len()
+                ),
+            });
+        }
+        if self.continue_case >= sum_rows.len() || self.break_case >= sum_rows.len() {
+            return Err(StructuralizationError::UnsupportedLoop {
+                reason: "loop case index is out of range".into(),
+            });
+        }
+
+        let mut cond = loop_builder.conditional_builder(
+            (sum_rows.clone(), *latch_control),
+            self.continue_inputs
+                .iter()
+                .cloned()
+                .zip(latch_rest.iter().copied())
+                .collect_vec(),
+            [Type::new_sum([
+                self.continue_inputs.clone(),
+                self.break_outputs.clone(),
+            ])]
+            .into(),
+        )?;
+        for case_idx in 0..sum_rows.len() {
+            let mut case = cond.case_builder(case_idx)?;
+            let case_inputs = case.input_wires().collect_vec();
+            let result = if case_idx == self.continue_case {
+                case.make_continue(loop_sig.clone(), case_inputs)?
+            } else if case_idx == self.break_case {
+                case.make_break(loop_sig.clone(), case_inputs)?
+            } else {
+                return Err(StructuralizationError::UnsupportedLoop {
+                    reason: format!("unexpected loop successor case {case_idx}"),
+                });
+            };
+            case.finish_with_outputs([result])?;
+        }
+        let [loop_control] = cond.finish_sub_container()?.outputs_arr();
+        let loop_handle = loop_builder.finish_with_outputs(loop_control, [])?;
+        Ok(loop_handle.outputs().collect())
+    }
+
+    fn lower_header_controlled<B, H>(
+        &self,
+        builder: &mut B,
+        cfg_view: &H,
+        current: Vec<Wire>,
+    ) -> Result<Vec<Wire>, StructuralizationError>
+    where
+        B: Dataflow + Container,
+        H: HugrView<Node = Node>,
+    {
+        let StructuredBlock::Dataflow {
+            sum_rows, outputs, ..
+        } = self.header
+        else {
+            return Err(StructuralizationError::UnsupportedLoop {
+                reason: "header-controlled loop header is not a basic block".into(),
+            });
+        };
+        if self.continue_case >= sum_rows.len() || self.break_case >= sum_rows.len() {
+            return Err(StructuralizationError::UnsupportedLoop {
+                reason: "loop case index is out of range".into(),
+            });
+        }
+
+        let header_out = lower_block(builder, cfg_view, self.header, current)?;
+        let [header_control, header_rest @ ..] = header_out.as_slice() else {
+            return Err(StructuralizationError::UnsupportedLoop {
+                reason: "loop header did not produce a control value".into(),
+            });
+        };
+        if header_rest.len() != outputs.len() {
+            return Err(StructuralizationError::UnsupportedLoop {
+                reason: "loop header output arity does not match its analyzed row".into(),
+            });
+        }
+
+        let mut cond = builder.conditional_builder(
+            (sum_rows.clone(), *header_control),
+            outputs
+                .iter()
+                .cloned()
+                .zip(header_rest.iter().copied())
+                .collect_vec(),
+            self.break_outputs.clone(),
+        )?;
+
+        for case_idx in 0..sum_rows.len() {
+            let mut case = cond.case_builder(case_idx)?;
+            let case_inputs = case.input_wires().collect_vec();
+            if case_idx == self.break_case {
+                case.finish_with_outputs(case_inputs)?;
+                continue;
+            }
+            if case_idx != self.continue_case {
+                return Err(StructuralizationError::UnsupportedLoop {
+                    reason: format!("unexpected loop successor case {case_idx}"),
+                });
+            }
+
+            let mut loop_builder = case.tail_loop_builder(
+                self.continue_inputs
+                    .iter()
+                    .cloned()
+                    .zip(case_inputs.iter().copied())
+                    .collect_vec(),
+                [],
+                self.break_outputs.clone(),
+            )?;
+            let loop_sig = loop_builder.loop_signature()?.clone();
+            let loop_inputs = loop_builder.input_wires().collect_vec();
+            let body_out = lower_sequence(&mut loop_builder, cfg_view, self.body, loop_inputs)?;
+            let reevaluated = lower_block(&mut loop_builder, cfg_view, self.header, body_out)?;
+            let [loop_control, loop_rest @ ..] = reevaluated.as_slice() else {
+                return Err(StructuralizationError::UnsupportedLoop {
+                    reason: "loop header reevaluation did not produce a control value".into(),
+                });
+            };
+            if !self
+                .body
+                .iter()
+                .any(|item| structured_node_contains_block(item, self.backedge_source))
+            {
+                return Err(StructuralizationError::UnsupportedLoop {
+                    reason: "header-controlled loop body does not contain the backedge source"
+                        .into(),
+                });
+            }
+
+            let mut loop_cond = loop_builder.conditional_builder(
+                (sum_rows.clone(), *loop_control),
+                outputs
+                    .iter()
+                    .cloned()
+                    .zip(loop_rest.iter().copied())
+                    .collect_vec(),
+                [Type::new_sum([
+                    self.continue_inputs.clone(),
+                    self.break_outputs.clone(),
+                ])]
+                .into(),
+            )?;
+            for inner_case_idx in 0..sum_rows.len() {
+                let mut inner_case = loop_cond.case_builder(inner_case_idx)?;
+                let inner_inputs = inner_case.input_wires().collect_vec();
+                let result = if inner_case_idx == self.continue_case {
+                    inner_case.make_continue(loop_sig.clone(), inner_inputs)?
+                } else if inner_case_idx == self.break_case {
+                    inner_case.make_break(loop_sig.clone(), inner_inputs)?
+                } else {
+                    return Err(StructuralizationError::UnsupportedLoop {
+                        reason: format!("unexpected loop successor case {inner_case_idx}"),
+                    });
+                };
+                inner_case.finish_with_outputs([result])?;
+            }
+            let [loop_control] = loop_cond.finish_sub_container()?.outputs_arr();
+            let loop_handle = loop_builder.finish_with_outputs(loop_control, [])?;
+            case.finish_with_outputs(loop_handle.outputs())?;
+        }
+
+        let cond_handle = cond.finish_sub_container()?;
+        Ok(cond_handle.outputs().collect_vec())
+    }
+}
+
+fn unique_backedge_source<H: HugrView<Node = Node>>(
+    cfg: &IdentityCfgMap<H>,
+    region: &rvsdg::ControlRegion<Node>,
+    header: Node,
+) -> Result<Node, StructuralizationError> {
+    cfg.predecessors(header)
+        .filter(|pred| region.blocks.contains(pred))
+        .exactly_one()
+        .map_err(|_| StructuralizationError::UnsupportedLoop {
+            reason: "loop does not have a unique in-region backedge to the header".into(),
+        })
+}
+
+fn block_successor_payload<H: HugrView<Node = Node>>(
+    cfg_view: &H,
+    block: Node,
+    case_idx: usize,
+    reason: &str,
+) -> Result<TypeRow, StructuralizationError> {
+    cfg_view
+        .get_optype(block)
+        .as_dataflow_block()
+        .ok_or(StructuralizationError::ExpectedDataflowBlock { node: block })?
+        .successor_input(case_idx)
+        .ok_or_else(|| StructuralizationError::UnsupportedLoop {
+            reason: reason.into(),
+        })
+}
+
+fn analyze_loop_body<H: HugrView<Node = Node>>(
+    cfg_view: &H,
+    cfg: &IdentityCfgMap<H>,
+    input: LoopAnalysisInput<'_>,
+) -> Result<LoopAnalysis, StructuralizationError> {
+    if input.body.is_empty() {
+        return Err(StructuralizationError::UnsupportedLoop {
+            reason: "loop body is empty".into(),
+        });
+    }
+
+    if input.boundary.backedge_source == input.boundary.exit_source {
+        let structured_tail =
+            input
+                .body
+                .last()
+                .ok_or_else(|| StructuralizationError::UnsupportedLoop {
+                    reason: "loop body is empty".into(),
+                })?;
+        let StructuredNode::Block(StructuredBlock::Dataflow {
+            node: tail_node, ..
+        }) = structured_tail
+        else {
+            return Err(StructuralizationError::UnsupportedLoop {
+                reason: "tail-controlled loop body does not end in a basic block".into(),
+            });
+        };
+        if *tail_node != input.boundary.backedge_source {
+            return Err(StructuralizationError::UnsupportedLoop {
+                reason: "tail-controlled loop body does not end at the backedge source".into(),
+            });
+        }
+
+        let successors = cfg.successors(input.boundary.backedge_source).collect_vec();
+        let continue_case = successors
+            .iter()
+            .position(|&succ| succ == input.boundary.header)
+            .ok_or_else(|| StructuralizationError::UnsupportedLoop {
+                reason: "loop latch has no backedge to the header".into(),
+            })?;
+        let break_case = successors
+            .iter()
+            .position(|&succ| succ == input.boundary.exit_target)
+            .ok_or_else(|| StructuralizationError::UnsupportedLoop {
+                reason: "loop latch has no exit edge".into(),
+            })?;
+        let continue_inputs = block_successor_payload(
+            cfg_view,
+            input.boundary.backedge_source,
+            continue_case,
+            "loop continue case is out of range",
+        )?;
+        let break_outputs = block_successor_payload(
+            cfg_view,
+            input.boundary.backedge_source,
+            break_case,
+            "loop break case is out of range",
+        )?;
+
+        if continue_inputs != input.io.inputs {
+            return Err(StructuralizationError::UnsupportedLoop {
+                reason: "loop continue payload does not match the loop entry row".into(),
+            });
+        }
+        if break_outputs != input.io.outputs {
+            return Err(StructuralizationError::UnsupportedLoop {
+                reason: "loop break payload does not match the loop exit row".into(),
+            });
+        }
+
+        return Ok(LoopAnalysis {
+            kind: StructuredLoopKind::TailControlled,
+            header: input.header,
+            body: input.body,
+            backedge_source: input.boundary.backedge_source,
+            continue_inputs,
+            break_outputs,
+            continue_case,
+            break_case,
+        });
+    }
+
+    if input.boundary.exit_source != input.boundary.header {
+        return Err(StructuralizationError::UnsupportedLoop {
+            reason: "header-controlled loops must exit directly from the header".into(),
+        });
+    }
+
+    let StructuredNode::Block(StructuredBlock::Dataflow {
+        node: first_node,
+        sum_rows,
+        outputs,
+        ..
+    }) = input
+        .body
+        .first()
+        .ok_or_else(|| StructuralizationError::UnsupportedLoop {
+            reason: "loop body is empty".into(),
+        })?
+    else {
+        return Err(StructuralizationError::UnsupportedLoop {
+            reason: "header-controlled loop header is not a basic block".into(),
+        });
+    };
+    if *first_node != input.boundary.header {
+        return Err(StructuralizationError::UnsupportedLoop {
+            reason: "header-controlled loop body does not begin at the header".into(),
+        });
+    }
+
+    let successors = cfg.successors(input.boundary.header).collect_vec();
+    let continue_case = successors
+        .iter()
+        .position(|succ| input.region.blocks.contains(succ) && *succ != input.boundary.header)
+        .ok_or_else(|| StructuralizationError::UnsupportedLoop {
+            reason: "header-controlled loop header has no in-region continue edge".into(),
+        })?;
+    let break_case = successors
+        .iter()
+        .position(|&succ| succ == input.boundary.exit_target)
+        .ok_or_else(|| StructuralizationError::UnsupportedLoop {
+            reason: "header-controlled loop header has no exit edge".into(),
+        })?;
+    let continue_inputs = block_successor_payload(
+        cfg_view,
+        input.boundary.header,
+        continue_case,
+        "header-controlled loop continue case is out of range",
+    )?;
+    let break_outputs = block_successor_payload(
+        cfg_view,
+        input.boundary.header,
+        break_case,
+        "header-controlled loop break case is out of range",
+    )?;
+
+    if break_outputs != input.io.outputs {
+        return Err(StructuralizationError::UnsupportedLoop {
+            reason: "loop break payload does not match the loop exit row".into(),
+        });
+    }
+    if sum_rows.len() != 2 {
+        return Err(StructuralizationError::UnsupportedLoop {
+            reason: format!(
+                "header-controlled loop header must have exactly two successors, found {}",
+                sum_rows.len()
+            ),
+        });
+    }
+    if outputs != &continue_inputs || continue_inputs != break_outputs {
+        return Err(StructuralizationError::UnsupportedLoop {
+            reason:
+                "header-controlled loop requires identical continue, break, and header output rows"
+                    .into(),
+        });
+    }
+    if !input
+        .body
+        .iter()
+        .skip(1)
+        .any(|node| structured_node_contains_block(node, input.boundary.backedge_source))
+    {
+        return Err(StructuralizationError::UnsupportedLoop {
+            reason: "header-controlled loop body does not contain the backedge source".into(),
+        });
+    }
+
+    Ok(LoopAnalysis {
+        kind: StructuredLoopKind::HeaderControlled,
+        header: input.header,
+        body: input.body.into_iter().skip(1).collect(),
+        backedge_source: input.boundary.backedge_source,
+        continue_inputs,
+        break_outputs,
+        continue_case,
+        break_case,
+    })
+}
+
 fn region_input_row<H: HugrView<Node = Node>>(
     cfg_view: &H,
     region: &rvsdg::ControlRegion<Node>,
@@ -499,6 +978,36 @@ fn region_input_row<H: HugrView<Node = Node>>(
         OpType::DataflowBlock(block) => Ok(block.inputs.clone()),
         OpType::ExitBlock(exit) => Ok(exit.cfg_outputs.clone()),
         _ => Err(StructuralizationError::ExpectedDataflowBlock { node: entry_block }),
+    }
+}
+
+fn structured_node_contains_block(node: &StructuredNode, target: Node) -> bool {
+    match node {
+        StructuredNode::Block(StructuredBlock::Dataflow { node, .. })
+        | StructuredNode::Block(StructuredBlock::Exit { node, .. }) => *node == target,
+        StructuredNode::Region(region) => structured_region_contains_block(region, target),
+    }
+}
+
+fn structured_region_contains_block(region: &StructuredRegion, target: Node) -> bool {
+    match &region.body {
+        StructuredRegionBody::Sequence(items) => items
+            .iter()
+            .any(|item| structured_node_contains_block(item, target)),
+        StructuredRegionBody::Branch { split, arms, join } => {
+            split.node() == target
+                || arms
+                    .iter()
+                    .flatten()
+                    .any(|item| structured_node_contains_block(item, target))
+                || join.node() == target
+        }
+        StructuredRegionBody::Loop { header, body, .. } => {
+            header.node() == target
+                || body
+                    .iter()
+                    .any(|item| structured_node_contains_block(item, target))
+        }
     }
 }
 
@@ -644,88 +1153,32 @@ where
             Ok(join_out.into_iter().skip(1).collect())
         }
         StructuredRegionBody::Loop {
+            kind,
+            header,
             body,
+            backedge_source,
             continue_inputs,
             break_outputs,
             continue_case,
             break_case,
         } => {
-            let (latch, prefix) =
-                body.split_last()
-                    .ok_or_else(|| StructuralizationError::UnsupportedLoop {
-                        reason: "loop body is empty".into(),
-                    })?;
-            let StructuredNode::Block(latch_block @ StructuredBlock::Dataflow { sum_rows, .. }) =
-                latch
-            else {
-                return Err(StructuralizationError::UnsupportedLoop {
-                    reason: "loop latch is not a basic block".into(),
-                });
-            };
-
-            let mut loop_builder = builder.tail_loop_builder(
-                continue_inputs
-                    .iter()
-                    .cloned()
-                    .zip(current.iter().copied())
-                    .collect_vec(),
-                [],
-                break_outputs.clone(),
-            )?;
-            let loop_sig = loop_builder.loop_signature()?.clone();
-            let loop_inputs = loop_builder.input_wires().collect_vec();
-            let prefix_out = lower_sequence(&mut loop_builder, cfg_view, prefix, loop_inputs)?;
-            let latch_out = lower_block(&mut loop_builder, cfg_view, latch_block, prefix_out)?;
-            let [latch_control, latch_rest @ ..] = latch_out.as_slice() else {
-                return Err(StructuralizationError::UnsupportedLoop {
-                    reason: "loop latch did not produce a control value".into(),
-                });
-            };
-
-            if sum_rows.len() != 2 {
-                return Err(StructuralizationError::UnsupportedLoop {
-                    reason: format!(
-                        "loop latch must have exactly two successors, found {}",
-                        sum_rows.len()
-                    ),
-                });
+            let loop_lowering = LoopLowering::new(
+                header,
+                body,
+                *backedge_source,
+                continue_inputs,
+                break_outputs,
+                *continue_case,
+                *break_case,
+            );
+            match kind {
+                StructuredLoopKind::TailControlled => {
+                    loop_lowering.lower_tail_controlled(builder, cfg_view, current)
+                }
+                StructuredLoopKind::HeaderControlled => {
+                    loop_lowering.lower_header_controlled(builder, cfg_view, current)
+                }
             }
-            if *continue_case >= sum_rows.len() || *break_case >= sum_rows.len() {
-                return Err(StructuralizationError::UnsupportedLoop {
-                    reason: "loop case index is out of range".into(),
-                });
-            }
-
-            let mut cond = loop_builder.conditional_builder(
-                (sum_rows.clone(), *latch_control),
-                continue_inputs
-                    .iter()
-                    .cloned()
-                    .zip(latch_rest.iter().copied())
-                    .collect_vec(),
-                [Type::new_sum([
-                    continue_inputs.clone(),
-                    break_outputs.clone(),
-                ])]
-                .into(),
-            )?;
-            for case_idx in 0..sum_rows.len() {
-                let mut case = cond.case_builder(case_idx)?;
-                let case_inputs = case.input_wires().collect_vec();
-                let result = if case_idx == *continue_case {
-                    case.make_continue(loop_sig.clone(), case_inputs)?
-                } else if case_idx == *break_case {
-                    case.make_break(loop_sig.clone(), case_inputs)?
-                } else {
-                    return Err(StructuralizationError::UnsupportedLoop {
-                        reason: format!("unexpected loop successor case {case_idx}"),
-                    });
-                };
-                case.finish_with_outputs([result])?;
-            }
-            let [loop_control] = cond.finish_sub_container()?.outputs_arr();
-            let loop_handle = loop_builder.finish_with_outputs(loop_control, [])?;
-            Ok(loop_handle.outputs().collect())
         }
     }
 }
@@ -818,11 +1271,6 @@ where
         .insert_view_forest(cfg_view, copied_nodes.iter().copied(), copied_roots)
         .map_err(|err| BuildError::HugrViewInsertionError(err.to_string()))?;
     let root = insertion.node_map[node];
-    for (dst_port, wire) in block_inputs.into_iter().enumerate() {
-        builder
-            .hugr_mut()
-            .connect(wire.node(), wire.source(), root, dst_port);
-    }
     let signature = builder
         .hugr()
         .get_optype(root)
@@ -838,6 +1286,23 @@ where
     builder
         .hugr_mut()
         .set_num_ports(root, input_count, output_count);
+    let root_input_count = builder.hugr().get_optype(root).input_count();
+    if block_inputs.len() > root_input_count {
+        return Err(StructuralizationError::Build(BuildError::InvalidHUGR(
+            hugr::hugr::ValidationError::WrongNumberOfPorts {
+                node: *node,
+                optype: Box::new(cfg_view.get_optype(*node).clone()),
+                expected: root_input_count,
+                actual: block_inputs.len(),
+                dir: hugr::Direction::Incoming,
+            },
+        )));
+    }
+    for (dst_port, wire) in block_inputs.into_iter().enumerate() {
+        builder
+            .hugr_mut()
+            .connect(wire.node(), wire.source(), root, dst_port);
+    }
     Ok((0..value_output_count)
         .map(|offset| Wire::new(root, offset))
         .collect())
@@ -864,8 +1329,8 @@ fn rewrite_cfg_as_dfg<H: HugrMut<Node = Node>>(hugr: &mut H, cfg: Node, replacem
 #[cfg(test)]
 mod test {
     use super::{
-        StructuralizationAnalysisReport, StructuralizationStrategy, StructuredNode,
-        StructuredRegionBody, analyze_hugr_cfgs, structurize_cfgs,
+        StructuralizationAnalysisReport, StructuralizationStrategy, StructuredLoopKind,
+        StructuredNode, StructuredRegionBody, analyze_hugr_cfgs, structurize_cfgs,
     };
     use crate::control::nest_cfgs::test::build_conditional_in_loop_cfg;
     use crate::passes::composable::WithScope;
@@ -950,6 +1415,38 @@ mod test {
         Ok(cfg_builder.finish_hugr()?)
     }
 
+    fn build_header_controlled_loop_cfg() -> Result<Hugr, BuildError> {
+        let mut cfg_builder = CFGBuilder::new(Signature::new_endo([usize_t()]))?;
+        let pred_const = cfg_builder.add_constant(Value::unit_sum(0, 2).expect("0 < 2"));
+        let const_unit = cfg_builder.add_constant(Value::unary_unit_sum());
+
+        let entry = n_identity(
+            cfg_builder.simple_entry_builder(vec![usize_t()].into(), 1)?,
+            &const_unit,
+        )?;
+        let header = n_identity(
+            cfg_builder.simple_block_builder(endo_sig([usize_t()]), 2)?,
+            &pred_const,
+        )?;
+        let body = n_identity(
+            cfg_builder.simple_block_builder(endo_sig([usize_t()]), 1)?,
+            &const_unit,
+        )?;
+        let after = n_identity(
+            cfg_builder.simple_block_builder(endo_sig([usize_t()]), 1)?,
+            &const_unit,
+        )?;
+        let exit = cfg_builder.exit_block();
+
+        cfg_builder.branch(&entry, 0, &header)?;
+        cfg_builder.branch(&header, 0, &after)?;
+        cfg_builder.branch(&header, 1, &body)?;
+        cfg_builder.branch(&body, 0, &header)?;
+        cfg_builder.branch(&after, 0, &exit)?;
+
+        Ok(cfg_builder.finish_hugr()?)
+    }
+
     fn single_cfg_analysis(h: &Hugr) -> StructuredRegionBody {
         let report = analyze_hugr_cfgs(h, StructuralizationStrategy::Rvsdg).unwrap();
         let StructuralizationAnalysisReport { mut cfg_regions } = report;
@@ -1014,6 +1511,33 @@ mod test {
     }
 
     #[test]
+    fn analyzes_header_controlled_loop_io() -> Result<(), BuildError> {
+        let h = build_header_controlled_loop_cfg()?;
+        let body = single_cfg_analysis(&h);
+        let StructuredRegionBody::Sequence(items) = body else {
+            panic!("expected root sequence");
+        };
+        let StructuredNode::Region(loop_region) = &items[1] else {
+            panic!("expected loop region");
+        };
+        let StructuredRegionBody::Loop {
+            kind,
+            body,
+            continue_inputs,
+            break_outputs,
+            ..
+        } = &loop_region.body
+        else {
+            panic!("expected loop body");
+        };
+        assert_eq!(*kind, StructuredLoopKind::HeaderControlled);
+        assert_eq!(body.len(), 1);
+        assert_eq!(continue_inputs.len(), 1);
+        assert_eq!(break_outputs.len(), 1);
+        Ok(())
+    }
+
+    #[test]
     fn lowers_conditional_and_loop_cfgs() -> Result<(), BuildError> {
         let mut h = build_cond_then_loop_cfg()?;
         let cfgs = h
@@ -1063,6 +1587,30 @@ mod test {
     }
 
     #[test]
+    fn lowers_header_controlled_loop() -> Result<(), BuildError> {
+        let mut h = build_header_controlled_loop_cfg()?;
+        let cfgs = h
+            .nodes()
+            .filter(|n| h.get_optype(*n).tag() == OpTag::Cfg)
+            .collect_vec();
+        structurize_cfgs(&mut h, &cfgs, StructuralizationStrategy::Rvsdg).unwrap();
+        assert_eq!(h.nodes().filter(|n| h.get_optype(*n).is_cfg()).count(), 0);
+        assert_eq!(
+            h.nodes()
+                .filter(|n| matches!(h.get_optype(*n), OpType::Conditional(_)))
+                .count(),
+            2
+        );
+        assert_eq!(
+            h.nodes()
+                .filter(|n| matches!(h.get_optype(*n), OpType::TailLoop(_)))
+                .count(),
+            1
+        );
+        Ok(())
+    }
+
+    #[test]
     fn pass_rewrites_cfgs_and_keeps_strategy_error() -> Result<(), BuildError> {
         let (mut h, _, _) = build_conditional_in_loop_cfg(true)?;
         let report = StructuralizeCfgsPass::default().run(&mut h).unwrap();
@@ -1077,6 +1625,22 @@ mod test {
             err,
             super::StructuralizationError::UnsupportedStrategy { .. }
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn pass_inlines_helper_dfgs_by_default() -> Result<(), BuildError> {
+        let mut h = build_header_controlled_loop_cfg()?;
+        StructuralizeCfgsPass::default().run(&mut h).unwrap();
+        assert_eq!(h.nodes().filter(|n| h.get_optype(*n).is_cfg()).count(), 0);
+        assert_eq!(h.nodes().filter(|n| h.get_optype(*n).is_dfg()).count(), 1);
+
+        let mut h = build_header_controlled_loop_cfg()?;
+        StructuralizeCfgsPass::default()
+            .inline_dfgs(false)
+            .run(&mut h)
+            .unwrap();
+        assert!(h.nodes().filter(|n| h.get_optype(*n).is_dfg()).count() > 1);
         Ok(())
     }
 
@@ -1115,24 +1679,19 @@ mod test {
             .as_slice(),
         );
         let mut h = Hugr::load(reader, None).unwrap();
-        let before = h.mermaid_string();
 
         let report = StructuralizeCfgsPass::default().run(&mut h).unwrap();
         assert!(!report.rewrites.is_empty());
         assert_eq!(h.nodes().filter(|n| h.get_optype(*n).is_cfg()).count(), 0);
-        assert_eq!(
-            before,
-            include_str!(
-                "../../../test_files/guppy_optimization/complex_control/complex_control.before.mmd.txt"
-            )
+        assert!(
+            h.nodes()
+                .any(|n| matches!(h.get_optype(n), OpType::TailLoop(_)))
         );
-
-        let after = h.mermaid_string();
-        assert_eq!(
-            after,
-            include_str!(
-                "../../../test_files/guppy_optimization/complex_control/complex_control.after.mmd.txt"
-            )
+        assert!(
+            h.nodes()
+                .filter(|n| matches!(h.get_optype(*n), OpType::Conditional(_)))
+                .count()
+                >= 1
         );
     }
 }

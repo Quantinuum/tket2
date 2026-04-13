@@ -31,6 +31,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use derive_more::{Display, Error};
 use hugr::core::HugrNode;
+use itertools::Itertools;
 
 use super::interface::RegionInterface;
 use super::{CfgNodeMap, edge_classes, region_blocks};
@@ -141,6 +142,12 @@ pub enum RvsdgBuildError<T: HugrNode> {
     #[display("expected a basic block component while building branch region {region:?}")]
     ExpectedBlock {
         /// Branch region where split/join component was unexpectedly nested.
+        region: RegionId,
+    },
+    /// A loop region did not expose a unique in-region backedge to its header.
+    #[display("loop region {region:?} did not expose a unique backedge to its header")]
+    MissingLoopBackedge {
+        /// Loop region whose backedge could not be identified.
         region: RegionId,
     },
 }
@@ -525,21 +532,52 @@ fn build_region_tree<T: HugrNode>(
             boundary: region.boundary.clone(),
             interface: RegionInterface::from_boundary(&region.boundary),
             body: ControlRegionBody::Loop {
-                body: build_sequence_items(
-                    cfg,
-                    graph,
-                    region_id,
-                    sequence_start(cfg, graph, region_id),
-                    sequence_end(cfg, graph, region_id),
-                    region
-                        .entry_edge
-                        .zip(region.exit_edge)
-                        .map(|(entry, exit)| (exit.0, entry.1)),
-                )?,
+                body: {
+                    let backedge = loop_backedge(cfg, graph, region_id)?;
+                    build_sequence_items(
+                        cfg,
+                        graph,
+                        region_id,
+                        sequence_start(cfg, graph, region_id),
+                        Some(component_for(
+                            backedge.0,
+                            &child_owner_map(graph, graph.region(region_id)),
+                        )),
+                        Some(backedge),
+                    )?
+                },
             },
         }),
         RegionKind::Branch => build_branch_tree(cfg, graph, region_id),
     }
+}
+
+/// Finds the unique in-region backedge that returns control to a loop header.
+///
+/// Loop regions in the compressed control tree are represented as one linearized
+/// iteration. To recover that path we need the actual edge that closes the
+/// cycle, which is the unique predecessor of the loop header that still lies
+/// inside the loop body.
+fn loop_backedge<T: HugrNode>(
+    cfg: &impl CfgNodeMap<T>,
+    graph: &RegionGraph<T>,
+    region_id: RegionId,
+) -> Result<(T, T), RvsdgBuildError<T>> {
+    let region = graph.region(region_id);
+    let header = region
+        .entry_edge
+        .map(|(_, dst)| dst)
+        .expect("loop regions should have an entry edge");
+    let backedges = cfg
+        .predecessors(header)
+        .filter(|pred| region.blocks.contains(pred))
+        .map(|pred| (pred, header))
+        .collect::<Vec<_>>();
+
+    backedges
+        .into_iter()
+        .exactly_one()
+        .map_err(|_| RvsdgBuildError::MissingLoopBackedge { region: region_id })
 }
 
 /// Builds the ordered representation of a structured branch region.

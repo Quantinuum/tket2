@@ -13,19 +13,36 @@ use crate::control::structuralize::{
     structurize_cfgs,
 };
 use crate::passes::composable::WithScope;
-use crate::passes::{ComposablePass, PassScope};
+use crate::passes::{ComposablePass, InlineDFGsPass, PassScope};
 
-/// Pass that extracts structured CFG regions from CFG nodes.
-#[derive(Clone, Debug, Default)]
+/// Pass that structuralizes CFG regions, optionally inlining helper DFGs.
+#[derive(Clone, Debug)]
 pub struct StructuralizeCfgsPass {
     strategy: StructuralizationStrategy,
     scope: PassScope,
+    inline_dfgs: bool,
+}
+
+impl Default for StructuralizeCfgsPass {
+    fn default() -> Self {
+        Self {
+            strategy: StructuralizationStrategy::default(),
+            scope: PassScope::default(),
+            inline_dfgs: true,
+        }
+    }
 }
 
 impl StructuralizeCfgsPass {
     /// Sets the structuralization strategy.
     pub fn with_strategy(mut self, strategy: StructuralizationStrategy) -> Self {
         self.strategy = strategy;
+        self
+    }
+
+    /// Sets whether helper DFG wrappers emitted during lowering should be inlined.
+    pub fn inline_dfgs(mut self, inline: bool) -> Self {
+        self.inline_dfgs = inline;
         self
     }
 }
@@ -54,6 +71,17 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for StructuralizeCfgsPass {
         let scoped_cfgs = ctrs
             .filter(|n| hugr.get_optype(*n).is_cfg())
             .collect::<Vec<_>>();
-        structurize_cfgs(hugr, &scoped_cfgs, self.strategy)
+        let report = structurize_cfgs(hugr, &scoped_cfgs, self.strategy)?;
+        if self.inline_dfgs {
+            for rewrite in &report.rewrites {
+                if !rewrite.rewritten {
+                    continue;
+                }
+                InlineDFGsPass::default_with_scope(PassScope::EntrypointRecursive)
+                    .run(&mut hugr.with_entrypoint_mut(rewrite.cfg))
+                    .unwrap();
+            }
+        }
+        Ok(report)
     }
 }
