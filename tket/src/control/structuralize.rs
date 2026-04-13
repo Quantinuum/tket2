@@ -12,6 +12,7 @@
 
 mod analyze;
 mod lower;
+pub(crate) mod shared;
 #[cfg(test)]
 mod test;
 mod types;

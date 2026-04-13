@@ -118,6 +118,45 @@ fn build_header_controlled_loop_cfg() -> Result<Hugr, BuildError> {
     Ok(cfg_builder.finish_hugr()?)
 }
 
+fn build_irreducible_cfg() -> Result<Hugr, BuildError> {
+    let mut cfg_builder = CFGBuilder::new(Signature::new_endo([usize_t()]))?;
+    let pred_const = cfg_builder.add_constant(Value::unit_sum(0, 2).expect("0 < 2"));
+    let const_unit = cfg_builder.add_constant(Value::unary_unit_sum());
+
+    let entry = n_identity(
+        cfg_builder.simple_entry_builder(vec![usize_t()].into(), 2)?,
+        &pred_const,
+    )?;
+    let a = n_identity(
+        cfg_builder.simple_block_builder(endo_sig([usize_t()]), 1)?,
+        &const_unit,
+    )?;
+    let b = n_identity(
+        cfg_builder.simple_block_builder(endo_sig([usize_t()]), 1)?,
+        &const_unit,
+    )?;
+    let c = n_identity(
+        cfg_builder.simple_block_builder(endo_sig([usize_t()]), 2)?,
+        &pred_const,
+    )?;
+    let d = n_identity(
+        cfg_builder.simple_block_builder(endo_sig([usize_t()]), 2)?,
+        &pred_const,
+    )?;
+    let exit = cfg_builder.exit_block();
+
+    cfg_builder.branch(&entry, 0, &a)?;
+    cfg_builder.branch(&entry, 1, &b)?;
+    cfg_builder.branch(&a, 0, &c)?;
+    cfg_builder.branch(&b, 0, &d)?;
+    cfg_builder.branch(&c, 0, &b)?;
+    cfg_builder.branch(&c, 1, &exit)?;
+    cfg_builder.branch(&d, 0, &a)?;
+    cfg_builder.branch(&d, 1, &exit)?;
+
+    Ok(cfg_builder.finish_hugr()?)
+}
+
 fn single_cfg_analysis(h: &Hugr) -> StructuredRegionBody {
     let report = analyze_hugr_cfgs(h, StructuralizationStrategy::Rvsdg).unwrap();
     let StructuralizationAnalysisReport { cfg_regions } = report;
@@ -283,20 +322,93 @@ fn lowers_header_controlled_loop() -> Result<(), BuildError> {
 }
 
 #[test]
-fn pass_rewrites_cfgs_and_keeps_strategy_error() -> Result<(), BuildError> {
+fn pass_rewrites_cfgs_with_both_strategies() -> Result<(), BuildError> {
     let (mut h, _, _) = build_conditional_in_loop_cfg(true)?;
     let report = StructuralizeCfgsPass::default().run(&mut h).unwrap();
     assert_eq!(report.rewrites.len(), 1);
 
     let (mut h, _, _) = build_conditional_in_loop_cfg(true)?;
-    let err = StructuralizeCfgsPass::default()
+    let report = StructuralizeCfgsPass::default()
         .with_strategy(StructuralizationStrategy::BeyondRelooper)
         .run(&mut h)
-        .unwrap_err();
+        .unwrap();
+    assert_eq!(report.rewrites.len(), 1);
+    assert_eq!(h.nodes().filter(|n| h.get_optype(*n).is_cfg()).count(), 0);
+    Ok(())
+}
+
+#[test]
+fn beyond_structurizes_combined_loop_headers() -> Result<(), BuildError> {
+    let (mut beyond_h, _, _) = build_conditional_in_loop_cfg(false)?;
+    let cfgs = beyond_h
+        .nodes()
+        .filter(|n| beyond_h.get_optype(*n).tag() == OpTag::Cfg)
+        .collect_vec();
+    let report = structurize_cfgs(
+        &mut beyond_h,
+        &cfgs,
+        StructuralizationStrategy::BeyondRelooper,
+    )
+    .unwrap();
+    assert_eq!(report.rewrites.len(), 1);
+    assert_eq!(
+        beyond_h
+            .nodes()
+            .filter(|n| beyond_h.get_optype(*n).is_cfg())
+            .count(),
+        0
+    );
+    assert!(
+        beyond_h
+            .nodes()
+            .any(|n| matches!(beyond_h.get_optype(n), OpType::TailLoop(_)))
+    );
+    assert!(
+        beyond_h
+            .nodes()
+            .filter(|n| matches!(beyond_h.get_optype(*n), OpType::Conditional(_)))
+            .count()
+            >= 1
+    );
+
+    let (mut rvsdg_h, _, _) = build_conditional_in_loop_cfg(false)?;
+    let cfgs = rvsdg_h
+        .nodes()
+        .filter(|n| rvsdg_h.get_optype(*n).tag() == OpTag::Cfg)
+        .collect_vec();
+    assert!(structurize_cfgs(&mut rvsdg_h, &cfgs, StructuralizationStrategy::Rvsdg).is_err());
+    Ok(())
+}
+
+#[test]
+fn beyond_rejects_irreducible_cfgs_until_preprocessed() -> Result<(), BuildError> {
+    let mut h = build_irreducible_cfg()?;
+    let cfgs = h
+        .nodes()
+        .filter(|n| h.get_optype(*n).tag() == OpTag::Cfg)
+        .collect_vec();
+    let err =
+        structurize_cfgs(&mut h, &cfgs, StructuralizationStrategy::BeyondRelooper).unwrap_err();
     assert!(matches!(
         err,
-        super::StructuralizationError::UnsupportedStrategy { .. }
+        super::StructuralizationError::UnsupportedIrreducibleCfg { .. }
     ));
+    Ok(())
+}
+
+#[test]
+fn beyond_rewrite_is_deterministic() -> Result<(), BuildError> {
+    let (mut a, _, _) = build_conditional_in_loop_cfg(false)?;
+    let (mut b, _, _) = build_conditional_in_loop_cfg(false)?;
+    StructuralizeCfgsPass::default()
+        .with_strategy(StructuralizationStrategy::BeyondRelooper)
+        .run(&mut a)
+        .unwrap();
+    StructuralizeCfgsPass::default()
+        .with_strategy(StructuralizationStrategy::BeyondRelooper)
+        .run(&mut b)
+        .unwrap();
+    assert_eq!(a.mermaid_string(), b.mermaid_string());
     Ok(())
 }
 

@@ -59,14 +59,14 @@ pub enum StructuredBlock {
 
 impl StructuredBlock {
     /// Returns the original CFG node represented by this structured block.
-    pub(super) fn node(&self) -> Node {
+    pub(crate) fn node(&self) -> Node {
         match self {
             Self::Dataflow { node, .. } | Self::Exit { node, .. } => *node,
         }
     }
 
     /// Returns the value row that must be available before executing the block.
-    pub(super) fn inputs(&self) -> &TypeRow {
+    pub(crate) fn inputs(&self) -> &TypeRow {
         match self {
             Self::Dataflow { inputs, .. } | Self::Exit { inputs, .. } => inputs,
         }
@@ -129,8 +129,6 @@ pub enum StructuredRegionBody {
 /// HUGR-specific structural summary for one region.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StructuredRegion {
-    /// Generic RVSDG control region.
-    pub control: rvsdg::ControlRegion<Node>,
     /// Ordered HUGR interface of the region.
     pub io: RegionIo,
     /// HUGR-specific lowering metadata.
@@ -196,6 +194,20 @@ pub enum StructuralizationError {
     #[display("loop region could not be lowered because {reason}")]
     UnsupportedLoop {
         /// Short description of the mismatch.
+        reason: String,
+    },
+    /// A reducible-CFG precondition for the Beyond-Relooper translation was not met.
+    #[display("Beyond Relooper requires Appendix A preprocessing for CFG {cfg} because {reason}")]
+    UnsupportedIrreducibleCfg {
+        /// CFG root that would require the Appendix A preprocessing step.
+        cfg: Node,
+        /// Short description of the reducibility failure.
+        reason: String,
+    },
+    /// The Beyond-Relooper translation could not derive a valid structured form.
+    #[display("Beyond Relooper could not derive a structured form because {reason}")]
+    Relooper {
+        /// Short description of the mismatch or unsupported construct.
         reason: String,
     },
     /// The selected strategy is not implemented yet.

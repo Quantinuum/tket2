@@ -6,14 +6,17 @@
 
 use std::collections::BTreeMap;
 
-use hugr::ops::{OpTrait, OpType};
+use hugr::ops::OpTrait;
 use hugr::types::TypeRow;
 use hugr::{HugrView, Node};
 use hugr_core::ops::OpTag;
 use itertools::Itertools;
 
-use crate::control::{CfgNodeMap, IdentityCfgMap, rvsdg};
+use crate::control::{CfgNodeMap, IdentityCfgMap, relooper, rvsdg};
 
+use super::shared::{
+    analyze_block, block_input_row, block_successor_payload, cfg_input_row, cfg_output_row,
+};
 use super::types::{
     RegionIo, StructuralizationAnalysisReport, StructuralizationError, StructuralizationStrategy,
     StructuredBlock, StructuredLoopKind, StructuredNode, StructuredRegion, StructuredRegionBody,
@@ -50,7 +53,16 @@ pub fn analyze_hugr_cfgs<H: HugrView<Node = Node>>(
             Ok(StructuralizationAnalysisReport { cfg_regions })
         }
         StructuralizationStrategy::BeyondRelooper => {
-            Err(StructuralizationError::UnsupportedStrategy { strategy })
+            let mut cfg_regions = BTreeMap::new();
+            for cfg in hugr
+                .nodes()
+                .filter(|n| hugr.get_optype(*n).tag() == OpTag::Cfg)
+            {
+                let cfg_view = hugr.with_entrypoint(cfg);
+                let id_cfg = IdentityCfgMap::new(cfg_view.clone());
+                cfg_regions.insert(cfg, relooper::analyze_cfg(&cfg_view, &id_cfg)?);
+            }
+            Ok(StructuralizationAnalysisReport { cfg_regions })
         }
     }
 }
@@ -166,11 +178,7 @@ pub(super) fn analyze_cfg_region<H: HugrView<Node = Node>>(
         }
     };
 
-    Ok(StructuredRegion {
-        control: region,
-        io,
-        body,
-    })
+    Ok(StructuredRegion { io, body })
 }
 
 /// Converts a single control-tree node into the structured representation.
@@ -186,26 +194,6 @@ fn analyze_node<H: HugrView<Node = Node>>(
         rvsdg::ControlTree::Region(region) => Ok(StructuredNode::Region(Box::new(
             analyze_cfg_region(cfg_view, cfg, *region)?,
         ))),
-    }
-}
-
-/// Reclassifies a CFG node as either a typed dataflow block or exit block.
-fn analyze_block<H: HugrView<Node = Node>>(
-    cfg_view: &H,
-    node: Node,
-) -> Result<StructuredBlock, StructuralizationError> {
-    match cfg_view.get_optype(node) {
-        OpType::DataflowBlock(block) => Ok(StructuredBlock::Dataflow {
-            node,
-            inputs: block.inputs.clone(),
-            sum_rows: block.sum_rows.clone(),
-            outputs: block.other_outputs.clone(),
-        }),
-        OpType::ExitBlock(exit) => Ok(StructuredBlock::Exit {
-            node,
-            inputs: exit.cfg_outputs.clone(),
-        }),
-        _ => Err(StructuralizationError::ExpectedDataflowBlock { node }),
     }
 }
 
@@ -266,26 +254,6 @@ fn unique_backedge_source<H: HugrView<Node = Node>>(
         })
 }
 
-/// Returns the payload row carried along one outgoing successor edge.
-///
-/// Loop analysis uses this to match CFG successor ports against region-level
-/// live-in/live-out rows.
-fn block_successor_payload<H: HugrView<Node = Node>>(
-    cfg_view: &H,
-    block: Node,
-    case_idx: usize,
-    reason: &str,
-) -> Result<TypeRow, StructuralizationError> {
-    cfg_view
-        .get_optype(block)
-        .as_dataflow_block()
-        .ok_or(StructuralizationError::ExpectedDataflowBlock { node: block })?
-        .successor_input(case_idx)
-        .ok_or_else(|| StructuralizationError::UnsupportedLoop {
-            reason: reason.into(),
-        })
-}
-
 /// Classifies a loop region into the specific lowering shape we support.
 ///
 /// This function is where generic region information becomes HUGR-specific
@@ -343,13 +311,25 @@ fn analyze_loop_body<H: HugrView<Node = Node>>(
             input.boundary.backedge_source,
             continue_case,
             "loop continue case is out of range",
-        )?;
+        )
+        .map_err(|err| match err {
+            StructuralizationError::Relooper { reason } => {
+                StructuralizationError::UnsupportedLoop { reason }
+            }
+            other => other,
+        })?;
         let break_outputs = block_successor_payload(
             cfg_view,
             input.boundary.backedge_source,
             break_case,
             "loop break case is out of range",
-        )?;
+        )
+        .map_err(|err| match err {
+            StructuralizationError::Relooper { reason } => {
+                StructuralizationError::UnsupportedLoop { reason }
+            }
+            other => other,
+        })?;
 
         if continue_inputs != input.io.inputs {
             return Err(StructuralizationError::UnsupportedLoop {
@@ -420,13 +400,25 @@ fn analyze_loop_body<H: HugrView<Node = Node>>(
         input.boundary.header,
         continue_case,
         "header-controlled loop continue case is out of range",
-    )?;
+    )
+    .map_err(|err| match err {
+        StructuralizationError::Relooper { reason } => {
+            StructuralizationError::UnsupportedLoop { reason }
+        }
+        other => other,
+    })?;
     let break_outputs = block_successor_payload(
         cfg_view,
         input.boundary.header,
         break_case,
         "header-controlled loop break case is out of range",
-    )?;
+    )
+    .map_err(|err| match err {
+        StructuralizationError::Relooper { reason } => {
+            StructuralizationError::UnsupportedLoop { reason }
+        }
+        other => other,
+    })?;
 
     if break_outputs != input.io.outputs {
         return Err(StructuralizationError::UnsupportedLoop {
@@ -480,13 +472,7 @@ fn region_input_row<H: HugrView<Node = Node>>(
     region: &rvsdg::ControlRegion<Node>,
 ) -> Result<TypeRow, StructuralizationError> {
     if region.kind == rvsdg::RegionKind::Root {
-        return Ok(cfg_view
-            .get_optype(cfg_view.entrypoint())
-            .as_cfg()
-            .expect("cfg view should be rooted at CFG")
-            .signature
-            .input
-            .clone());
+        return cfg_input_row(cfg_view);
     }
 
     let entry_block = region
@@ -497,11 +483,7 @@ fn region_input_row<H: HugrView<Node = Node>>(
         .ok_or_else(|| StructuralizationError::UnsupportedBranch {
             reason: "region has no entry boundary".into(),
         })?;
-    match cfg_view.get_optype(entry_block) {
-        OpType::DataflowBlock(block) => Ok(block.inputs.clone()),
-        OpType::ExitBlock(exit) => Ok(exit.cfg_outputs.clone()),
-        _ => Err(StructuralizationError::ExpectedDataflowBlock { node: entry_block }),
-    }
+    block_input_row(cfg_view, entry_block)
 }
 
 /// Computes the ordered live-out row for a structured region.
@@ -513,13 +495,7 @@ fn region_output_row<H: HugrView<Node = Node>>(
     region: &rvsdg::ControlRegion<Node>,
 ) -> Result<TypeRow, StructuralizationError> {
     if region.kind == rvsdg::RegionKind::Root {
-        return Ok(cfg_view
-            .get_optype(cfg_view.entrypoint())
-            .as_cfg()
-            .expect("cfg view should be rooted at CFG")
-            .signature
-            .output
-            .clone());
+        return cfg_output_row(cfg_view);
     }
 
     let exit_target = region
@@ -530,9 +506,10 @@ fn region_output_row<H: HugrView<Node = Node>>(
         .ok_or_else(|| StructuralizationError::UnsupportedBranch {
             reason: "region has no exit boundary".into(),
         })?;
-    match cfg_view.get_optype(exit_target) {
-        OpType::DataflowBlock(block) => Ok(block.inputs.clone()),
-        OpType::ExitBlock(exit) => Ok(exit.cfg_outputs.clone()),
-        _ => Err(StructuralizationError::ExpectedExitBlock { node: exit_target }),
-    }
+    block_input_row(cfg_view, exit_target).map_err(|err| match err {
+        StructuralizationError::ExpectedDataflowBlock { node } => {
+            StructuralizationError::ExpectedExitBlock { node }
+        }
+        other => other,
+    })
 }

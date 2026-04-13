@@ -15,7 +15,7 @@ use hugr::{Hugr, HugrView, Node, Wire};
 use hugr_core::hugr::internal::HugrMutInternals;
 use itertools::Itertools;
 
-use crate::control::{IdentityCfgMap, rvsdg};
+use crate::control::{IdentityCfgMap, relooper, rvsdg};
 use crate::passes::NormalizeCFGPass;
 use crate::passes::composable::ComposablePass;
 
@@ -38,24 +38,20 @@ pub fn structurize_cfgs<H: HugrMut<Node = Node>>(
     cfgs: &[Node],
     strategy: StructuralizationStrategy,
 ) -> Result<StructuralizationRewriteReport, StructuralizationError> {
-    match strategy {
-        StructuralizationStrategy::Rvsdg => {}
-        StructuralizationStrategy::BeyondRelooper => {
-            return Err(StructuralizationError::UnsupportedStrategy { strategy });
-        }
-    }
-
     let cfgs = outermost_cfgs(hugr, cfgs);
     let mut prepared = Vec::with_capacity(cfgs.len());
 
     for &cfg in &cfgs {
         let cfg_view = hugr.with_entrypoint(cfg);
         let id_cfg = IdentityCfgMap::new(cfg_view.clone());
-        let analyzed = analyze_cfg_region(
-            &cfg_view,
-            &id_cfg,
-            rvsdg::build_control_tree(&id_cfg).map_err(StructuralizationError::Rvsdg)?,
-        )?;
+        let analyzed = match strategy {
+            StructuralizationStrategy::Rvsdg => analyze_cfg_region(
+                &cfg_view,
+                &id_cfg,
+                rvsdg::build_control_tree(&id_cfg).map_err(StructuralizationError::Rvsdg)?,
+            )?,
+            StructuralizationStrategy::BeyondRelooper => relooper::analyze_cfg(&cfg_view, &id_cfg)?,
+        };
         let replacement = lower_cfg_region(&cfg_view, &analyzed)?;
         prepared.push((cfg, replacement));
     }
@@ -463,8 +459,15 @@ where
             }
 
             let cond_out = cond.finish_sub_container()?.outputs().collect_vec();
-            let join_out = lower_block(builder, cfg_view, join, cond_out)?;
-            Ok(join_out.into_iter().skip(1).collect())
+            match join {
+                StructuredBlock::Dataflow { .. } => {
+                    let join_out = lower_block(builder, cfg_view, join, cond_out)?;
+                    Ok(join_out.into_iter().skip(1).collect())
+                }
+                StructuredBlock::Exit { .. } => {
+                    lower_linear_block(builder, cfg_view, join, cond_out)
+                }
+            }
         }
         StructuredRegionBody::Loop {
             kind,
