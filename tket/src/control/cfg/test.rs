@@ -12,8 +12,9 @@ use rstest::{fixture, rstest};
 use crate::control::nest_cfgs::test::build_conditional_in_loop_cfg;
 use crate::control::{CfgNodeMap, IdentityCfgMap};
 
+use super::CfgFacts;
 use super::CfgFactsError;
-use super::preprocess::NormalizedCfg;
+use super::preprocess::{NormalizedCfg, PreprocessedCfg, PreprocessedNode};
 
 #[fixture]
 fn combined_headers_cfg() -> Hugr {
@@ -151,6 +152,27 @@ fn normalization_rejects_irreducible_cfg(irreducible_cfg: Hugr) {
         CfgFactsError::Irreducible { cfg, entries }
             if cfg == cfg_root && entries.len() == 2
     ));
+}
+
+#[rstest]
+fn preprocessing_makes_irreducible_cfg_reducible(irreducible_cfg: Hugr) {
+    let cfg_root = irreducible_cfg
+        .nodes()
+        .find(|node| irreducible_cfg.get_optype(*node).is_cfg())
+        .unwrap();
+    let cfg_view = irreducible_cfg.with_entrypoint(cfg_root);
+    let cfg = IdentityCfgMap::new(cfg_view);
+
+    let preprocessed = PreprocessedCfg::new(cfg_root, &cfg).unwrap();
+    let facts = CfgFacts::new(preprocessed.entry_node(), &preprocessed).unwrap();
+
+    assert!(facts.scope.len() > 6);
+    assert!(
+        preprocessed
+            .scope()
+            .iter()
+            .any(|node| matches!(node, PreprocessedNode::Duplicate { .. }))
+    );
 }
 
 #[rstest]
