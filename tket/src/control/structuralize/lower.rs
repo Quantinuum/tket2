@@ -15,11 +15,10 @@ use hugr::{Hugr, HugrView, Node, Wire};
 use hugr_core::hugr::internal::HugrMutInternals;
 use itertools::Itertools;
 
-use crate::control::{IdentityCfgMap, relooper, rvsdg};
 use crate::passes::NormalizeCFGPass;
 use crate::passes::composable::ComposablePass;
 
-use super::analyze::analyze_cfg_region;
+use super::analyze::analyze_cfg;
 use super::types::{
     StructuralizationError, StructuralizationRewriteReport, StructuralizationStrategy,
     StructuredBlock, StructuredLoopKind, StructuredNode, StructuredRegion, StructuredRegionBody,
@@ -43,15 +42,7 @@ pub fn structurize_cfgs<H: HugrMut<Node = Node>>(
 
     for &cfg in &cfgs {
         let cfg_view = hugr.with_entrypoint(cfg);
-        let id_cfg = IdentityCfgMap::new(cfg_view.clone());
-        let analyzed = match strategy {
-            StructuralizationStrategy::Rvsdg => analyze_cfg_region(
-                &cfg_view,
-                &id_cfg,
-                rvsdg::build_control_tree(&id_cfg).map_err(StructuralizationError::Rvsdg)?,
-            )?,
-            StructuralizationStrategy::BeyondRelooper => relooper::analyze_cfg(&cfg_view, &id_cfg)?,
-        };
+        let analyzed = analyze_cfg(cfg_view.clone(), strategy)?;
         let replacement = lower_cfg_region(&cfg_view, &analyzed)?;
         prepared.push((cfg, replacement));
     }

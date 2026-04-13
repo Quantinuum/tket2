@@ -12,6 +12,7 @@
 
 mod analyze;
 mod lower;
+mod rvsdg;
 pub(crate) mod shared;
 #[cfg(test)]
 mod test;
@@ -19,8 +20,11 @@ mod types;
 
 pub use analyze::analyze_hugr_cfgs;
 pub use lower::structurize_cfgs;
+pub(crate) use types::{
+    RegionIo, StructuredBlock, StructuredLoopKind, StructuredNode, StructuredRegion,
+    StructuredRegionBody,
+};
 pub use types::{
-    RegionIo, StructuralizationAnalysisReport, StructuralizationError,
-    StructuralizationRewriteReport, StructuralizationStrategy, StructuredBlock, StructuredLoopKind,
-    StructuredNode, StructuredRegion, StructuredRegionBody,
+    StructuralizationAnalysisReport, StructuralizationError, StructuralizationRewriteReport,
+    StructuralizationStrategy,
 };

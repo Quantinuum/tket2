@@ -27,7 +27,7 @@ pub enum StructuralizationStrategy {
 
 /// Ordered HUGR-facing interface for a structured region.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct RegionIo {
+pub(crate) struct RegionIo {
     /// Values entering the region from outside it.
     pub inputs: TypeRow,
     /// Values leaving the region to the surrounding region.
@@ -36,7 +36,7 @@ pub struct RegionIo {
 
 /// HUGR-facing summary of a CFG block used during lowering.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum StructuredBlock {
+pub(crate) enum StructuredBlock {
     /// A normal CFG basic block.
     Dataflow {
         /// Original block node.
@@ -75,7 +75,7 @@ impl StructuredBlock {
 
 /// A HUGR-specific analyzed control tree node.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum StructuredNode {
+pub(crate) enum StructuredNode {
     /// A single CFG block.
     Block(StructuredBlock),
     /// A nested structured region.
@@ -84,7 +84,7 @@ pub enum StructuredNode {
 
 /// Lowering family chosen for a structured loop.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum StructuredLoopKind {
+pub(crate) enum StructuredLoopKind {
     /// The latch both re-enters the header and exits the loop.
     TailControlled,
     /// The header decides whether to enter the body or break immediately.
@@ -93,7 +93,7 @@ pub enum StructuredLoopKind {
 
 /// HUGR-specific body information for a structured region.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum StructuredRegionBody {
+pub(crate) enum StructuredRegionBody {
     /// A linear sequence of blocks / nested regions.
     Sequence(Vec<StructuredNode>),
     /// A structured branch lowered via `Conditional`.
@@ -128,11 +128,11 @@ pub enum StructuredRegionBody {
 
 /// HUGR-specific structural summary for one region.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct StructuredRegion {
+pub(crate) struct StructuredRegion {
     /// Ordered HUGR interface of the region.
-    pub io: RegionIo,
+    pub(crate) io: RegionIo,
     /// HUGR-specific lowering metadata.
-    pub body: StructuredRegionBody,
+    pub(crate) body: StructuredRegionBody,
 }
 
 impl StructuredRegion {
@@ -155,7 +155,7 @@ impl StructuredRegion {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct StructuralizationAnalysisReport {
     /// Structured control tree plus HUGR-specific lowering metadata for each CFG.
-    pub cfg_regions: BTreeMap<Node, StructuredRegion>,
+    pub(crate) cfg_regions: BTreeMap<Node, StructuredRegion>,
 }
 
 /// Mutable rewrite report returned by the pass layer.
