@@ -254,6 +254,192 @@ fn build_irreducible_cfg() -> Hugr {
     cfg_builder.finish_hugr().unwrap()
 }
 
+/// Builds a reducible loop whose header can exit to one target and whose body
+/// can exit to a different target before the two paths rejoin.
+///
+/// ```text
+///  entry -> header -----> after ---------------------\
+///            ^ \                                     |
+///            |  \                                    v
+///            |   -> body -> split -> break_mid ---> join -> exit
+///            |                |
+///            \ cont <---------/
+/// ```
+///
+/// This shape remains reducible because `header` is the unique loop header, but
+/// it still requires distinguishing multiple loop exits. Both strategies
+/// currently reject it because they expect a unique loop exit target.
+#[fixture]
+fn build_two_level_loop_escape_cfg() -> Hugr {
+    let mut cfg_builder = CFGBuilder::new(Signature::new_endo([usize_t()])).unwrap();
+    let pred_const = cfg_builder.add_constant(Value::unit_sum(0, 2).expect("0 < 2"));
+    let const_unit = cfg_builder.add_constant(Value::unary_unit_sum());
+
+    let entry = n_identity(
+        cfg_builder
+            .simple_entry_builder(vec![usize_t()].into(), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let header = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 2)
+            .unwrap(),
+        &pred_const,
+    )
+    .unwrap();
+    let body = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let split = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 2)
+            .unwrap(),
+        &pred_const,
+    )
+    .unwrap();
+    let cont = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let break_mid = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let after = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let join = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let exit = cfg_builder.exit_block();
+
+    cfg_builder.branch(&entry, 0, &header).unwrap();
+    cfg_builder.branch(&header, 0, &after).unwrap();
+    cfg_builder.branch(&header, 1, &body).unwrap();
+    cfg_builder.branch(&body, 0, &split).unwrap();
+    cfg_builder.branch(&split, 0, &break_mid).unwrap();
+    cfg_builder.branch(&split, 1, &cont).unwrap();
+    cfg_builder.branch(&cont, 0, &header).unwrap();
+    cfg_builder.branch(&break_mid, 0, &join).unwrap();
+    cfg_builder.branch(&after, 0, &join).unwrap();
+    cfg_builder.branch(&join, 0, &exit).unwrap();
+
+    cfg_builder.finish_hugr().unwrap()
+}
+
+/// Builds a reducible loop whose header and body break to distinct exit blocks
+/// that only merge after the loop.
+///
+/// ```text
+///  entry -> header -----> after_a -------\
+///            ^ \                          |
+///            |  \                         v
+///            |   -> body -> split -> after_b ---> join -> exit
+///            |                |
+///            \ cont <---------/
+/// ```
+///
+/// The loop still has a unique header, so the CFG is reducible, but the
+/// structuralizer currently treats the two break targets as unsupported loop
+/// exits rather than threading them through a richer region interface.
+#[fixture]
+fn build_multi_exit_loop_cfg() -> Hugr {
+    let mut cfg_builder = CFGBuilder::new(Signature::new_endo([usize_t()])).unwrap();
+    let pred_const = cfg_builder.add_constant(Value::unit_sum(0, 2).expect("0 < 2"));
+    let const_unit = cfg_builder.add_constant(Value::unary_unit_sum());
+
+    let entry = n_identity(
+        cfg_builder
+            .simple_entry_builder(vec![usize_t()].into(), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let header = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 2)
+            .unwrap(),
+        &pred_const,
+    )
+    .unwrap();
+    let body = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let split = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 2)
+            .unwrap(),
+        &pred_const,
+    )
+    .unwrap();
+    let cont = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let after_a = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let after_b = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let join = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let exit = cfg_builder.exit_block();
+
+    cfg_builder.branch(&entry, 0, &header).unwrap();
+    cfg_builder.branch(&header, 0, &after_a).unwrap();
+    cfg_builder.branch(&header, 1, &body).unwrap();
+    cfg_builder.branch(&body, 0, &split).unwrap();
+    cfg_builder.branch(&split, 0, &after_b).unwrap();
+    cfg_builder.branch(&split, 1, &cont).unwrap();
+    cfg_builder.branch(&cont, 0, &header).unwrap();
+    cfg_builder.branch(&after_a, 0, &join).unwrap();
+    cfg_builder.branch(&after_b, 0, &join).unwrap();
+    cfg_builder.branch(&join, 0, &exit).unwrap();
+
+    cfg_builder.finish_hugr().unwrap()
+}
+
 /// Loads a checked-in Guppy optimization fixture by directory name.
 ///
 /// The structuralization tests use these examples as end-to-end regressions for
@@ -323,6 +509,53 @@ fn assert_lowered_counts(h: &Hugr, expected_conditionals: usize, expected_loops:
     assert_eq!(h.nodes().filter(|n| h.get_optype(*n).is_cfg()).count(), 0);
     assert_eq!(conditional_count(h), expected_conditionals);
     assert_eq!(tail_loop_count(h), expected_loops);
+}
+
+type TestCfgBuilder = fn() -> Hugr;
+
+fn expect_irreducible_error(
+    err: super::StructuralizationError,
+    strategy: StructuralizationStrategy,
+) {
+    match strategy {
+        StructuralizationStrategy::Rvsdg => {
+            assert!(matches!(
+                err,
+                super::StructuralizationError::Rvsdg(
+                    crate::control::rvsdg::RvsdgBuildError::IrreducibleCfg { .. }
+                )
+            ));
+        }
+        StructuralizationStrategy::BeyondRelooper => {
+            assert!(matches!(
+                err,
+                super::StructuralizationError::UnsupportedIrreducibleCfg { .. }
+            ));
+        }
+    }
+}
+
+fn expect_multiple_loop_exit_error(
+    err: super::StructuralizationError,
+    strategy: StructuralizationStrategy,
+) {
+    match strategy {
+        StructuralizationStrategy::Rvsdg => {
+            assert!(matches!(
+                err,
+                super::StructuralizationError::Rvsdg(
+                    crate::control::rvsdg::RvsdgBuildError::UnsupportedLoop { reason, .. }
+                ) if reason.contains("unique exit target")
+            ));
+        }
+        StructuralizationStrategy::BeyondRelooper => {
+            assert!(matches!(
+                err,
+                super::StructuralizationError::Relooper { reason }
+                    if reason.contains("unique exit target")
+            ));
+        }
+    }
 }
 
 #[rstest]
@@ -476,18 +709,32 @@ fn handles_combined_headers(
 }
 
 #[rstest]
-fn relooper_rejects_irreducible(#[from(build_irreducible_cfg)] mut irreducible: Hugr) {
+#[case::rvsdg(StructuralizationStrategy::Rvsdg)]
+#[case::relooper(StructuralizationStrategy::BeyondRelooper)]
+fn rejects_irreducible_cfg(
+    #[case] strategy: StructuralizationStrategy,
+    #[from(build_irreducible_cfg)] mut irreducible: Hugr,
+) {
     let cfgs = cfgs(&irreducible);
-    let err = structurize_cfgs(
-        &mut irreducible,
-        &cfgs,
-        StructuralizationStrategy::BeyondRelooper,
-    )
-    .unwrap_err();
-    assert!(matches!(
-        err,
-        super::StructuralizationError::UnsupportedIrreducibleCfg { .. }
-    ));
+    let err = structurize_cfgs(&mut irreducible, &cfgs, strategy).unwrap_err();
+    expect_irreducible_error(err, strategy);
+}
+
+#[rstest]
+#[case::two_level_escape(build_two_level_loop_escape_cfg as TestCfgBuilder)]
+#[case::multi_exit_loop(build_multi_exit_loop_cfg as TestCfgBuilder)]
+fn rejects_reducible_cfgs_with_multiple_loop_exit_targets(
+    #[case] build_cfg: TestCfgBuilder,
+    #[values(
+        StructuralizationStrategy::Rvsdg,
+        StructuralizationStrategy::BeyondRelooper
+    )]
+    strategy: StructuralizationStrategy,
+) {
+    let mut h = build_cfg();
+    let cfgs = cfgs(&h);
+    let err = structurize_cfgs(&mut h, &cfgs, strategy).unwrap_err();
+    expect_multiple_loop_exit_error(err, strategy);
 }
 
 #[rstest]
