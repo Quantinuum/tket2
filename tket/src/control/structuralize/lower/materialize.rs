@@ -7,11 +7,11 @@
 //! original nodes.
 
 use hugr::hugr::hugrmut::HugrMut;
-use hugr::ops::{DFG, OpParent};
+use hugr::ops::{DFG, OpParent, OpType};
 use hugr::{HugrView, IncomingPort, Node, OutgoingPort};
 use itertools::Itertools;
 
-use super::template::LoweredCfgTemplate;
+use super::template::{BlockMaterialization, LoweredCfgTemplate};
 use crate::control::structuralize::StructuralizationError;
 
 /// Materializes one detached template into the destination CFG root.
@@ -44,7 +44,14 @@ pub(super) fn materialize_cfg_rewrite<H: HugrMut<Node = Node>>(
                     placeholder.placeholder, placeholder.original
                 ),
             })?;
-        materialize_block_placeholder(hugr, placeholder.original, inserted_placeholder)?;
+        match placeholder.materialization {
+            BlockMaterialization::Move => {
+                materialize_block_placeholder(hugr, placeholder.original, inserted_placeholder)?
+            }
+            BlockMaterialization::Clone => {
+                clone_block_placeholder(hugr, placeholder.original, inserted_placeholder)?
+            }
+        }
     }
 
     replace_cfg_root(hugr, cfg, inserted.inserted_entrypoint)
@@ -94,6 +101,53 @@ fn materialize_block_placeholder<H: HugrMut<Node = Node>>(
 
     rewire_placeholder_inputs(hugr, placeholder, original, input_count);
     rewire_placeholder_outputs(hugr, placeholder, original, output_count);
+    hugr.remove_subtree(placeholder);
+    Ok(())
+}
+
+/// Replaces one placeholder with a cloned copy of an already-analyzed block subtree.
+///
+/// Duplicated preprocessed CFG nodes map back to the same original HUGR block.
+/// The first occurrence moves that block subtree into the structured rewrite;
+/// later occurrences clone the moved subtree so each duplicated CFG node keeps
+/// its own materialized block body.
+fn clone_block_placeholder<H: HugrMut<Node = Node>>(
+    hugr: &mut H,
+    original: Node,
+    placeholder: Node,
+) -> Result<(), StructuralizationError> {
+    let parent =
+        hugr.get_parent(placeholder)
+            .ok_or_else(|| StructuralizationError::Materialization {
+                reason: format!("placeholder {placeholder} has no parent"),
+            })?;
+    let signature = hugr
+        .get_optype(original)
+        .inner_function_type()
+        .ok_or_else(|| StructuralizationError::Materialization {
+            reason: format!("block {original} is not a dataflow block"),
+        })?
+        .into_owned();
+    let clone = hugr.add_node_with_parent(parent, DFG { signature });
+    hugr.copy_descendants(original, clone, None);
+
+    let placeholder_input_count = hugr.get_optype(placeholder).input_count();
+    let placeholder_output_count = hugr.get_optype(placeholder).output_count();
+    let clone_input_count = hugr.get_optype(clone).input_count();
+    let clone_output_count = hugr.get_optype(clone).output_count();
+    if clone_input_count != placeholder_input_count
+        || clone_output_count != placeholder_output_count
+    {
+        return Err(StructuralizationError::Materialization {
+            reason: format!(
+                "placeholder {placeholder} port counts ({placeholder_input_count}, {placeholder_output_count}) \
+                 did not match cloned block {clone} port counts ({clone_input_count}, {clone_output_count})"
+            ),
+        });
+    }
+
+    rewire_placeholder_inputs(hugr, placeholder, clone, clone_input_count);
+    rewire_placeholder_outputs(hugr, placeholder, clone, clone_output_count);
     hugr.remove_subtree(placeholder);
     Ok(())
 }
@@ -174,8 +228,23 @@ fn replace_cfg_root<H: HugrMut<Node = Node>>(
         })?
         .into_owned();
 
-    for child in hugr.children(cfg).collect_vec() {
-        hugr.remove_subtree(child);
+    let children = hugr.children(cfg).collect_vec();
+    for child in &children {
+        if matches!(
+            hugr.get_optype(*child),
+            OpType::DataflowBlock(_) | OpType::ExitBlock(_)
+        ) {
+            continue;
+        }
+        hugr.set_parent(*child, inserted_root);
+    }
+    for child in children {
+        if matches!(
+            hugr.get_optype(child),
+            OpType::DataflowBlock(_) | OpType::ExitBlock(_)
+        ) {
+            hugr.remove_subtree(child);
+        }
     }
     hugr.replace_op(cfg, DFG { signature });
     while let Some(child) = hugr.first_child(inserted_root) {
@@ -183,4 +252,108 @@ fn replace_cfg_root<H: HugrMut<Node = Node>>(
     }
     hugr.remove_node(inserted_root);
     Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use hugr::builder::{CFGBuilder, Container, DataflowSubContainer, HugrBuilder, endo_sig};
+    use hugr::extension::prelude::usize_t;
+    use hugr::ops::Value;
+    use hugr::ops::handle::ConstID;
+    use hugr::types::{Signature, TypeRow};
+    use hugr::{Hugr, HugrView};
+    use rstest::{fixture, rstest};
+
+    use super::super::template::{BlockMaterialization, prepare_cfg_replacement};
+    use crate::control::structuralize::shared::analyze_block;
+    use crate::control::structuralize::{
+        RegionIo, StructuredNode, StructuredRegion, StructuredRegionBody,
+    };
+    use crate::control::{CfgNodeMap, IdentityCfgMap};
+
+    /// Builds a tiny CFG with one identity block between entry and exit.
+    #[fixture]
+    fn single_block_cfg() -> Hugr {
+        let mut cfg_builder = CFGBuilder::new(Signature::new_endo([usize_t()])).unwrap();
+        let const_unit = cfg_builder.add_constant(Value::unary_unit_sum());
+
+        let entry = n_identity(
+            cfg_builder
+                .simple_entry_builder(vec![usize_t()].into(), 1)
+                .unwrap(),
+            &const_unit,
+        )
+        .unwrap();
+        let block = n_identity(
+            cfg_builder
+                .simple_block_builder(endo_sig([usize_t()]), 1)
+                .unwrap(),
+            &const_unit,
+        )
+        .unwrap();
+        let exit = cfg_builder.exit_block();
+
+        cfg_builder.branch(&entry, 0, &block).unwrap();
+        cfg_builder.branch(&block, 0, &exit).unwrap();
+        cfg_builder.finish_hugr().unwrap()
+    }
+
+    /// Duplicated placeholders move the first block occurrence and clone the rest.
+    #[rstest]
+    fn materializes_duplicated_blocks(single_block_cfg: Hugr) {
+        let cfg = single_block_cfg
+            .nodes()
+            .find(|node| single_block_cfg.get_optype(*node).is_cfg())
+            .unwrap();
+        let cfg_view = single_block_cfg.with_entrypoint(cfg);
+        let cfg_map = IdentityCfgMap::new(cfg_view.clone());
+        let entry = cfg_map.entry_node();
+        let block = cfg_map.successors(entry).next().unwrap();
+        let exit = cfg_map.exit_node();
+
+        let block_summary = analyze_block(&cfg_view, block).unwrap();
+        let exit_summary = analyze_block(&cfg_view, exit).unwrap();
+        let region = StructuredRegion {
+            io: RegionIo {
+                inputs: TypeRow::from([usize_t()]),
+                outputs: TypeRow::from([usize_t()]),
+            },
+            body: StructuredRegionBody::Sequence(vec![
+                StructuredNode::Block(block_summary.clone()),
+                StructuredNode::Block(block_summary),
+                StructuredNode::Block(exit_summary),
+            ]),
+        };
+
+        let replacement = prepare_cfg_replacement(&cfg_view, &region).unwrap();
+        assert_eq!(replacement.placeholders.len(), 2);
+        assert_eq!(
+            replacement.placeholders[0].materialization,
+            BlockMaterialization::Move
+        );
+        assert_eq!(
+            replacement.placeholders[1].materialization,
+            BlockMaterialization::Clone
+        );
+
+        let mut hugr = single_block_cfg;
+        super::materialize_cfg_rewrite(&mut hugr, cfg, replacement).unwrap();
+        hugr.validate().unwrap();
+        assert_eq!(
+            hugr.nodes()
+                .filter(|n| hugr.get_optype(*n).is_cfg())
+                .count(),
+            0
+        );
+    }
+
+    /// Finishes one identity-like CFG block builder.
+    fn n_identity<T: DataflowSubContainer>(
+        mut dataflow_builder: T,
+        pred_const: &ConstID,
+    ) -> Result<T::ContainerHandle, hugr::builder::BuildError> {
+        let wires = dataflow_builder.input_wires();
+        let unit = dataflow_builder.load_const(pred_const);
+        dataflow_builder.finish_with_outputs([unit].into_iter().chain(wires))
+    }
 }

@@ -14,6 +14,7 @@ use hugr::ops::OpParent;
 use hugr::types::{Signature, Type, TypeRow};
 use hugr::{Direction, Hugr, HugrView, Node, Wire};
 use itertools::Itertools;
+use std::collections::BTreeSet;
 
 use super::super::types::{
     StructuralizationError, StructuredBlock, StructuredBranchJoinKind, StructuredLoopKind,
@@ -40,6 +41,17 @@ pub(super) struct BlockPlaceholder {
     pub(super) original: Node,
     /// Placeholder `DFG` node inside the detached template.
     pub(super) placeholder: Node,
+    /// Whether this placeholder should move the source subtree or clone it.
+    pub(super) materialization: BlockMaterialization,
+}
+
+/// How one placeholder should obtain its CFG block subtree.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum BlockMaterialization {
+    /// Move the original CFG block subtree into the structured replacement.
+    Move,
+    /// Clone the already-existing block subtree for a duplicated CFG node.
+    Clone,
 }
 
 /// Borrowed lowering state for one analyzed loop region.
@@ -109,6 +121,8 @@ struct TemplateLowerer<'a, H> {
     cfg_view: &'a H,
     /// Placeholder mapping accumulated while lowering blocks.
     placeholders: Vec<BlockPlaceholder>,
+    /// Original blocks already assigned a move-based placeholder.
+    seen_blocks: BTreeSet<Node>,
 }
 
 impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
@@ -117,6 +131,7 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
         Self {
             cfg_view,
             placeholders: Vec::new(),
+            seen_blocks: BTreeSet::new(),
         }
     }
 
@@ -595,9 +610,15 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
             placeholder_inputs,
         )?;
         let handle = placeholder.finish_with_outputs(panic.outputs())?;
+        let materialization = if self.seen_blocks.insert(*node) {
+            BlockMaterialization::Move
+        } else {
+            BlockMaterialization::Clone
+        };
         self.placeholders.push(BlockPlaceholder {
             original: *node,
             placeholder: placeholder_node,
+            materialization,
         });
         Ok(handle.outputs().collect())
     }

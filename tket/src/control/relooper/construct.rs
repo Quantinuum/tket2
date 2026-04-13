@@ -41,7 +41,7 @@ pub(super) fn build_cfg_ast<H: HugrView<Node = Node>>(
 /// must still map each graph node back to one original HUGR block so block
 /// summaries and lowering metadata can be recovered from the immutable HUGR
 /// view.
-fn build_cfg_ast_with_map<H, T, C>(
+pub(super) fn build_cfg_ast_with_map<H, T, C>(
     cfg_view: &H,
     cfg: &C,
 ) -> Result<RelooperRegion, StructuralizationError>

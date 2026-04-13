@@ -35,7 +35,7 @@ use std::collections::BTreeMap;
 /// unique entry. The duplicated graph nodes still refer back to one original
 /// HUGR block so later stages can recover block summaries deterministically.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(super) enum PreprocessedNode<T> {
+pub(crate) enum PreprocessedNode<T> {
     /// One original CFG block.
     Original(T),
     /// One duplicated occurrence of an original CFG block.
@@ -48,7 +48,10 @@ pub(super) enum PreprocessedNode<T> {
 }
 
 #[cfg(test)]
-impl<T: HugrNode> fmt::Display for PreprocessedNode<T> {
+impl<T> fmt::Display for PreprocessedNode<T>
+where
+    T: HugrNode + fmt::Display,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Original(node) => fmt::Display::fmt(node, f),
@@ -211,6 +214,7 @@ where
     }
 
     /// Returns the nodes preserved or introduced by preprocessing.
+    #[cfg(test)]
     pub(super) fn scope(&self) -> &BTreeSet<PreprocessedNode<T>> {
         &self.scope
     }
