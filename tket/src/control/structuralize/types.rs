@@ -18,10 +18,10 @@ use crate::passes::normalize_cfgs::NormalizeCFGError;
 /// Strategy selector for control-flow structuralization.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum StructuralizationStrategy {
-    /// Build the current RVSDG-style structured control tree and lower it.
+    /// Build an RVSDG for the CFG and lower it.
     #[default]
     Rvsdg,
-    /// Placeholder for a future Beyond-Relooper implementation.
+    /// Use the Beyond-Relooper strategy for reducible CFGs.
     BeyondRelooper,
 }
 

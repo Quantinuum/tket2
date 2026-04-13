@@ -12,10 +12,9 @@ use hugr::core::HugrNode;
 use std::collections::HashMap;
 
 pub(crate) mod half_node;
-pub mod interface;
 pub mod nest_cfgs;
 pub(crate) mod relooper;
-pub mod rvsdg;
+pub(crate) mod rvsdg;
 pub mod structuralize;
 
 pub use nest_cfgs::{CfgNodeMap, IdentityCfgMap, RegionBlocksError, region_blocks};

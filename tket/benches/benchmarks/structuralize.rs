@@ -1,7 +1,7 @@
 //! Benchmarks for CFG structuralization strategies.
 //!
 //! These benchmarks compare the RVSDG and Beyond-Relooper strategies on the
-//! same semi-complex Guppy-generated CFG fixture.
+//! same Guppy-generated whole-program fixtures.
 
 use std::hint::black_box;
 
@@ -12,7 +12,7 @@ use tket::passes::structuralize_cfgs::StructuralizeCfgsPass;
 
 use super::guppy::load_guppy_example;
 
-const WHOLE_PROGRAM_EXAMPLES: &[&str] = &["loop_and_branch"];
+const WHOLE_PROGRAM_EXAMPLES: &[&str] = &["loop_and_branch", "complex_control"];
 
 /// Benchmark the pure structural analysis cost for each strategy.
 fn bench_structural_analysis(c: &mut Criterion) {

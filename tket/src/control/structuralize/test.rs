@@ -445,16 +445,14 @@ fn pass_rewrites_supported_cfg(
 }
 
 #[rstest]
-fn relooper_handles_combined_headers(
+#[case::rvsdg(StructuralizationStrategy::Rvsdg)]
+#[case::relooper(StructuralizationStrategy::BeyondRelooper)]
+fn handles_combined_headers(
+    #[case] strategy: StructuralizationStrategy,
     #[from(build_combined_headers_cfg)] mut combined_headers: Hugr,
 ) {
     let cfgs = cfgs(&combined_headers);
-    let report = structurize_cfgs(
-        &mut combined_headers,
-        &cfgs,
-        StructuralizationStrategy::BeyondRelooper,
-    )
-    .unwrap();
+    let report = structurize_cfgs(&mut combined_headers, &cfgs, strategy).unwrap();
     assert_eq!(report.rewrites.len(), 1);
     assert_eq!(
         combined_headers
@@ -478,19 +476,6 @@ fn relooper_handles_combined_headers(
 }
 
 #[rstest]
-fn rvsdg_rejects_combined_headers(#[from(build_combined_headers_cfg)] mut combined_headers: Hugr) {
-    let cfgs = cfgs(&combined_headers);
-    assert!(
-        structurize_cfgs(
-            &mut combined_headers,
-            &cfgs,
-            StructuralizationStrategy::Rvsdg
-        )
-        .is_err()
-    );
-}
-
-#[rstest]
 fn relooper_rejects_irreducible(#[from(build_irreducible_cfg)] mut irreducible: Hugr) {
     let cfgs = cfgs(&irreducible);
     let err = structurize_cfgs(
@@ -506,18 +491,23 @@ fn relooper_rejects_irreducible(#[from(build_irreducible_cfg)] mut irreducible: 
 }
 
 #[rstest]
-fn relooper_is_deterministic(#[from(build_combined_headers_cfg)] combined_headers: Hugr) {
+#[case::rvsdg(StructuralizationStrategy::Rvsdg)]
+#[case::relooper(StructuralizationStrategy::BeyondRelooper)]
+fn strategy_is_deterministic(
+    #[case] strategy: StructuralizationStrategy,
+    #[from(build_combined_headers_cfg)] combined_headers: Hugr,
+) {
     let mut a = combined_headers;
     let mut b = {
         let (h, _, _) = build_conditional_in_loop_cfg(false).unwrap();
         h
     };
     StructuralizeCfgsPass::default()
-        .with_strategy(StructuralizationStrategy::BeyondRelooper)
+        .with_strategy(strategy)
         .run(&mut a)
         .unwrap();
     StructuralizeCfgsPass::default()
-        .with_strategy(StructuralizationStrategy::BeyondRelooper)
+        .with_strategy(strategy)
         .run(&mut b)
         .unwrap();
     assert_eq!(a.mermaid_string(), b.mermaid_string());
@@ -591,24 +581,19 @@ fn structurizes_guppy_example(loop_and_branch: Hugr, #[case] strategy: Structura
 }
 
 #[rstest]
-fn structurizes_complex_control(complex_control: Hugr) {
+#[case::rvsdg(StructuralizationStrategy::Rvsdg)]
+#[case::relooper(StructuralizationStrategy::BeyondRelooper)]
+fn structurizes_complex_control(
+    complex_control: Hugr,
+    #[case] strategy: StructuralizationStrategy,
+) {
     let mut h = complex_control;
     let report = StructuralizeCfgsPass::default()
-        .with_strategy(StructuralizationStrategy::BeyondRelooper)
+        .with_strategy(strategy)
         .run(&mut h)
         .unwrap();
     assert!(!report.rewrites.is_empty());
     assert_eq!(h.nodes().filter(|n| h.get_optype(*n).is_cfg()).count(), 0);
     assert!(tail_loop_count(&h) >= 1);
     assert!(conditional_count(&h) >= 1);
-}
-
-#[rstest]
-fn rvsdg_rejects_complex_control(complex_control: Hugr) {
-    let mut h = complex_control;
-    let err = StructuralizeCfgsPass::default()
-        .with_strategy(StructuralizationStrategy::Rvsdg)
-        .run(&mut h)
-        .unwrap_err();
-    assert!(matches!(err, super::StructuralizationError::Rvsdg(_)));
 }
