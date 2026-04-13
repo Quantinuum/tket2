@@ -11,6 +11,7 @@
 use hugr::core::HugrNode;
 use std::collections::HashMap;
 
+pub(crate) mod cfg;
 pub(crate) mod half_node;
 pub mod nest_cfgs;
 pub(crate) mod relooper;

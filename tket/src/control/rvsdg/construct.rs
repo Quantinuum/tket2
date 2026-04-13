@@ -1,19 +1,17 @@
 //! Reducible-CFG to RVSDG construction.
 //!
-//! The builder uses dominators, postdominators, and natural-loop discovery to
-//! structure a reducible CFG into nested RVSDG regions with explicit `gamma`
-//! and `theta` nodes, ordered arguments/results, and bundled control
-//! variables.
+//! The builder uses shared CFG facts to structure a reducible CFG into nested
+//! RVSDG regions with explicit `gamma` and `theta` nodes, ordered
+//! arguments/results, and bundled control variables.
 
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::collections::BTreeSet;
 
 use hugr::ops::OpType;
 use hugr::types::{Type, TypeRow};
 use hugr::{HugrView, Node};
 use itertools::Itertools;
-use petgraph::algo::{dominators::simple_fast, kosaraju_scc};
-use petgraph::graphmap::DiGraphMap;
 
+use crate::control::cfg::{CfgFacts, CfgFactsError};
 use crate::control::{CfgNodeMap, IdentityCfgMap};
 
 use super::error::RvsdgBuildError;
@@ -33,7 +31,8 @@ pub(crate) fn build_cfg_rvsdg<H: HugrView<Node = Node>>(
     cfg_view: &H,
     cfg: &IdentityCfgMap<H>,
 ) -> Result<Rvsdg, RvsdgBuildError<Node>> {
-    let info = CfgInfo::new(cfg_view.entrypoint(), cfg)?;
+    let cfg_root = cfg_view.entrypoint();
+    let info = CfgFacts::new(cfg_root, cfg).map_err(|err| map_cfg_facts_error(cfg_root, err))?;
     let mut builder = RvsdgBuilder::new(cfg_view);
     let root = builder.build_root(cfg.entry_node(), &info.scope, &info, cfg)?;
     Ok(Rvsdg { root })
@@ -73,7 +72,7 @@ impl<'a, H: HugrView<Node = Node>> RvsdgBuilder<'a, H> {
         &mut self,
         start: Node,
         scope: &BTreeSet<Node>,
-        info: &CfgInfo,
+        info: &CfgFacts,
         cfg: &impl CfgNodeMap<Node>,
     ) -> Result<Region, RvsdgBuildError<Node>> {
         let arguments = self.cfg_signature_inputs()?;
@@ -117,7 +116,7 @@ impl<'a, H: HugrView<Node = Node>> RvsdgBuilder<'a, H> {
         scope: &BTreeSet<Node>,
         stop: Option<Node>,
         active_loop: Option<Node>,
-        info: &CfgInfo,
+        info: &CfgFacts,
         cfg: &impl CfgNodeMap<Node>,
     ) -> Result<Vec<RvsdgNode>, RvsdgBuildError<Node>> {
         let mut items = Vec::new();
@@ -190,7 +189,7 @@ impl<'a, H: HugrView<Node = Node>> RvsdgBuilder<'a, H> {
         scope: &BTreeSet<Node>,
         stop: Option<Node>,
         active_loop: Option<Node>,
-        info: &CfgInfo,
+        info: &CfgFacts,
         cfg: &impl CfgNodeMap<Node>,
     ) -> Result<(GammaNode, Option<Node>), RvsdgBuildError<Node>> {
         let split = self.build_block(split_node)?;
@@ -208,7 +207,12 @@ impl<'a, H: HugrView<Node = Node>> RvsdgBuilder<'a, H> {
         if sum_rows.is_empty() {
             return Err(RvsdgBuildError::ExpectedBlock { node: split_node });
         }
-        let join_node = info.branch_join(split_node, scope, stop)?;
+        let join_node = info
+            .branch_join(split_node, scope, stop)
+            .map_err(|reason| RvsdgBuildError::UnsupportedBranch {
+                split: split_node,
+                reason,
+            })?;
         let join = self.build_block(join_node)?;
         let join_inputs = join.inputs().to_vec();
 
@@ -252,7 +256,7 @@ impl<'a, H: HugrView<Node = Node>> RvsdgBuilder<'a, H> {
                 output,
             })
             .collect_vec();
-        let (join_kind, next) = info.branch_continuation(join_node, scope, active_loop);
+        let (join_kind, next) = branch_continuation(info, join_node, scope, active_loop);
 
         Ok((
             GammaNode {
@@ -274,7 +278,7 @@ impl<'a, H: HugrView<Node = Node>> RvsdgBuilder<'a, H> {
         &mut self,
         header: Node,
         scope: &BTreeSet<Node>,
-        info: &CfgInfo,
+        info: &CfgFacts,
         cfg: &impl CfgNodeMap<Node>,
     ) -> Result<(ThetaNode, Option<Node>), RvsdgBuildError<Node>> {
         let loop_blocks = info
@@ -484,305 +488,40 @@ fn block_successor_row<H: HugrView<Node = Node>>(
         .ok_or_else(|| format!("successor case {case_idx} is out of range for node {node}"))
 }
 
-/// Deterministic reducible-CFG facts used during RVSDG construction.
-struct CfgInfo {
-    /// Reachable nodes that also reach the exit.
-    scope: BTreeSet<Node>,
-    /// Deterministic in-scope successor order per node.
-    succs: BTreeMap<Node, Vec<Node>>,
-    /// Immediate postdominator relation.
-    ipostdom: BTreeMap<Node, Option<Node>>,
-    /// Loop-header to backedge-source mapping.
-    backedges: BTreeMap<Node, Vec<Node>>,
-    /// Loop-header to natural-loop-block set mapping.
-    loop_blocks: BTreeMap<Node, BTreeSet<Node>>,
-}
-
-impl CfgInfo {
-    /// Computes the reducible-CFG facts needed by the RVSDG builder.
-    fn new(cfg_root: Node, cfg: &impl CfgNodeMap<Node>) -> Result<Self, RvsdgBuildError<Node>> {
-        let reachable = forward_reachable(cfg);
-        let can_reach_exit = backward_reachable_from_exit(cfg);
-        let scope = reachable
-            .intersection(&can_reach_exit)
-            .copied()
-            .collect::<BTreeSet<_>>();
-        let graph = build_graph(cfg, &scope);
-        ensure_reducible(cfg_root, cfg, &scope, &graph)?;
-
-        let entry = cfg.entry_node();
-        let exit = cfg.exit_node();
-        let doms = simple_fast(&graph, entry);
-        let reversed = reverse_graph(&graph);
-        let postdoms = simple_fast(&reversed, exit);
-
-        let succs = scope
-            .iter()
-            .copied()
-            .map(|node| {
-                (
-                    node,
-                    cfg.successors(node)
-                        .filter(|succ: &Node| scope.contains(succ))
-                        .collect_vec(),
-                )
-            })
-            .collect::<BTreeMap<_, _>>();
-        let preds = scope
-            .iter()
-            .copied()
-            .map(|node| {
-                (
-                    node,
-                    cfg.predecessors(node)
-                        .filter(|pred: &Node| scope.contains(pred))
-                        .collect_vec(),
-                )
-            })
-            .collect::<BTreeMap<_, _>>();
-
-        let idom = scope
-            .iter()
-            .copied()
-            .map(|node| (node, doms.immediate_dominator(node)))
-            .collect::<BTreeMap<_, _>>();
-        let ipostdom = scope
-            .iter()
-            .copied()
-            .map(|node| (node, postdoms.immediate_dominator(node)))
-            .collect::<BTreeMap<_, _>>();
-
-        let backedges = succs
-            .iter()
-            .flat_map(|(&src, succs)| succs.iter().copied().map(move |dst| (src, dst)))
-            .filter(|(src, dst)| dominates(*dst, *src, &idom))
-            .fold(BTreeMap::<Node, Vec<Node>>::new(), |mut map, (src, dst)| {
-                map.entry(dst).or_default().push(src);
-                map
-            });
-
-        let loop_blocks = backedges
-            .iter()
-            .map(|(&header, sources)| {
-                (
-                    header,
-                    natural_loop_blocks(header, sources, &preds, &idom, &scope),
-                )
-            })
-            .collect::<BTreeMap<_, _>>();
-
-        Ok(Self {
-            scope,
-            succs,
-            ipostdom,
-            backedges,
-            loop_blocks,
-        })
-    }
-
-    /// Returns in-scope successors visible from the current structured walk.
-    fn scope_successors(
-        &self,
-        node: Node,
-        scope: &BTreeSet<Node>,
-        active_loop: Option<Node>,
-    ) -> Vec<Node> {
-        self.succs
-            .get(&node)
-            .into_iter()
-            .flatten()
-            .copied()
-            .filter(|succ| scope.contains(succ))
-            .filter(|succ| {
-                active_loop.is_none_or(|header| !self.is_loop_backedge(node, *succ, header))
-            })
-            .collect()
-    }
-
-    /// Tells whether an edge is the suppressed backedge of the active loop.
-    fn is_loop_backedge(&self, src: Node, dst: Node, header: Node) -> bool {
-        dst == header
-            && self
-                .backedges
-                .get(&header)
-                .is_some_and(|sources| sources.contains(&src))
-    }
-
-    /// Tells whether a node should be structured as a nested loop in the current scope.
-    fn is_nested_loop_header(
-        &self,
-        node: Node,
-        scope: &BTreeSet<Node>,
-        active_loop: Option<Node>,
-    ) -> bool {
-        active_loop != Some(node)
-            && self
-                .loop_blocks
-                .get(&node)
-                .is_some_and(|blocks| blocks.is_subset(scope))
-    }
-
-    /// Returns the join node for a structured branch.
-    fn branch_join(
-        &self,
-        split_node: Node,
-        scope: &BTreeSet<Node>,
-        stop: Option<Node>,
-    ) -> Result<Node, RvsdgBuildError<Node>> {
-        let mut current = self.ipostdom.get(&split_node).copied().flatten();
-        while let Some(join) = current {
-            if join != split_node && scope.contains(&join) {
-                return Ok(join);
-            }
-            current = self.ipostdom.get(&join).copied().flatten();
-        }
-        if let Some(stop) = stop.filter(|node| scope.contains(node)) {
-            return Ok(stop);
-        }
-        Err(RvsdgBuildError::UnsupportedBranch {
-            split: split_node,
-            reason: "branch has no in-scope join".into(),
-        })
-    }
-
-    /// Classifies how control should continue after a branch join.
-    fn branch_continuation(
-        &self,
-        node: Node,
-        scope: &BTreeSet<Node>,
-        active_loop: Option<Node>,
-    ) -> (BranchJoinKind, Option<Node>) {
-        let successors = self.scope_successors(node, scope, active_loop);
-        match successors.as_slice() {
-            [] => (BranchJoinKind::Inline, None),
-            [next] => (BranchJoinKind::Inline, Some(*next)),
-            _ => (BranchJoinKind::Deferred, Some(node)),
-        }
+/// Classifies how control should continue after a branch join.
+fn branch_continuation(
+    info: &CfgFacts,
+    node: Node,
+    scope: &BTreeSet<Node>,
+    active_loop: Option<Node>,
+) -> (BranchJoinKind, Option<Node>) {
+    let successors = info.scope_successors(node, scope, active_loop);
+    match successors.as_slice() {
+        [] => (BranchJoinKind::Inline, None),
+        [next] => (BranchJoinKind::Inline, Some(*next)),
+        _ => (BranchJoinKind::Deferred, Some(node)),
     }
 }
 
-/// Builds the scoped CFG graph used for dominance queries.
-fn build_graph(cfg: &impl CfgNodeMap<Node>, scope: &BTreeSet<Node>) -> DiGraphMap<Node, ()> {
-    let mut graph = DiGraphMap::new();
-    for &node in scope {
-        graph.add_node(node);
-    }
-    for &node in scope {
-        for succ in cfg.successors(node) {
-            if scope.contains(&succ) {
-                graph.add_edge(node, succ, ());
+/// Maps shared CFG-facts failures into RVSDG construction errors.
+fn map_cfg_facts_error(cfg_root: Node, err: CfgFactsError) -> RvsdgBuildError<Node> {
+    match err {
+        CfgFactsError::NoEntryExitPath => RvsdgBuildError::MalformedScope {
+            start: cfg_root,
+            reason: "cfg has no entry-to-exit path".into(),
+        },
+        CfgFactsError::ReachableNodesDoNotReachExit { dropped } => {
+            RvsdgBuildError::MalformedScope {
+                start: dropped.first().copied().unwrap_or(cfg_root),
+                reason: format!(
+                    "reachable nodes do not all reach the CFG exit: {:?}",
+                    dropped
+                ),
             }
         }
+        CfgFactsError::Irreducible { cfg, entries } => RvsdgBuildError::IrreducibleCfg {
+            cfg,
+            reason: format!("cyclic SCC has multiple entries: {:?}", entries),
+        },
     }
-    graph
-}
-
-/// Reverses a graph for postdominator computation.
-fn reverse_graph(graph: &DiGraphMap<Node, ()>) -> DiGraphMap<Node, ()> {
-    let mut reversed = DiGraphMap::new();
-    for node in graph.nodes() {
-        reversed.add_node(node);
-    }
-    for (src, dst, _) in graph.all_edges() {
-        reversed.add_edge(dst, src, ());
-    }
-    reversed
-}
-
-/// Returns all nodes reachable from the CFG entry.
-fn forward_reachable(cfg: &impl CfgNodeMap<Node>) -> BTreeSet<Node> {
-    let mut seen = BTreeSet::new();
-    let mut pending = VecDeque::from([cfg.entry_node()]);
-    while let Some(node) = pending.pop_front() {
-        if !seen.insert(node) {
-            continue;
-        }
-        pending.extend(cfg.successors(node));
-    }
-    seen
-}
-
-/// Returns all nodes that can reach the CFG exit.
-fn backward_reachable_from_exit(cfg: &impl CfgNodeMap<Node>) -> BTreeSet<Node> {
-    let mut seen = BTreeSet::new();
-    let mut pending = VecDeque::from([cfg.exit_node()]);
-    while let Some(node) = pending.pop_front() {
-        if !seen.insert(node) {
-            continue;
-        }
-        pending.extend(cfg.predecessors(node));
-    }
-    seen
-}
-
-/// Ensures the scoped CFG is reducible.
-fn ensure_reducible(
-    cfg_root: Node,
-    cfg: &impl CfgNodeMap<Node>,
-    scope: &BTreeSet<Node>,
-    graph: &DiGraphMap<Node, ()>,
-) -> Result<(), RvsdgBuildError<Node>> {
-    for scc in kosaraju_scc(graph) {
-        let cyclic = scc.len() > 1 || scc.iter().any(|node| graph.contains_edge(*node, *node));
-        if !cyclic {
-            continue;
-        }
-        let members = scc.into_iter().collect::<BTreeSet<_>>();
-        let entries = members
-            .iter()
-            .copied()
-            .filter(|node| {
-                *node == cfg.entry_node()
-                    || cfg
-                        .predecessors(*node)
-                        .any(|pred: Node| scope.contains(&pred) && !members.contains(&pred))
-            })
-            .collect_vec();
-        if entries.len() > 1 {
-            return Err(RvsdgBuildError::IrreducibleCfg {
-                cfg: cfg_root,
-                reason: format!("cyclic SCC has multiple entries: {:?}", entries),
-            });
-        }
-    }
-    Ok(())
-}
-
-/// Returns whether `dom` dominates `node`.
-fn dominates(dom: Node, mut node: Node, idom: &BTreeMap<Node, Option<Node>>) -> bool {
-    loop {
-        if dom == node {
-            return true;
-        }
-        match idom.get(&node).copied().flatten() {
-            Some(parent) => node = parent,
-            None => return false,
-        }
-    }
-}
-
-/// Computes the natural loop blocks for one loop header.
-fn natural_loop_blocks(
-    header: Node,
-    sources: &[Node],
-    preds: &BTreeMap<Node, Vec<Node>>,
-    idom: &BTreeMap<Node, Option<Node>>,
-    scope: &BTreeSet<Node>,
-) -> BTreeSet<Node> {
-    let mut blocks = BTreeSet::from([header]);
-    let mut pending = sources.iter().copied().collect::<VecDeque<_>>();
-    while let Some(node) = pending.pop_front() {
-        if !scope.contains(&node) || !dominates(header, node, idom) || !blocks.insert(node) {
-            continue;
-        }
-        pending.extend(
-            preds
-                .get(&node)
-                .into_iter()
-                .flatten()
-                .copied()
-                .filter(|pred| *pred != header),
-        );
-    }
-    blocks
 }

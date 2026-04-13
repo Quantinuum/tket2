@@ -13,14 +13,13 @@
 //! require the Appendix A preprocessing step, which is intentionally out of
 //! scope for this first implementation.
 
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::collections::BTreeSet;
 
 use hugr::HugrView;
 use hugr::Node;
 use itertools::Itertools;
-use petgraph::algo::{dominators::simple_fast, kosaraju_scc};
-use petgraph::graphmap::DiGraphMap;
 
+use crate::control::cfg::{CfgFacts, CfgFactsError};
 use crate::control::structuralize::shared::{
     analyze_block, block_input_row, block_successor_payload, cfg_input_row, cfg_output_row,
 };
@@ -39,7 +38,8 @@ pub(crate) fn analyze_cfg<H: HugrView<Node = Node>>(
     cfg_view: &H,
     cfg: &IdentityCfgMap<H>,
 ) -> Result<StructuredRegion, StructuralizationError> {
-    let info = CfgInfo::new(cfg_view.entrypoint(), cfg)?;
+    let info = CfgFacts::new(cfg_view.entrypoint(), cfg)
+        .map_err(|err| map_cfg_facts_error(cfg_view.entrypoint(), err))?;
     let body = StructuredRegionBody::Sequence(info.build_scope(
         cfg_view,
         cfg.entry_node(),
@@ -56,122 +56,7 @@ pub(crate) fn analyze_cfg<H: HugrView<Node = Node>>(
     })
 }
 
-/// Cached CFG analyses used by the Beyond-Relooper traversal.
-///
-/// The traversal repeatedly queries the same successor order, dominance
-/// relation, postdominator relation, and loop headers while recursively
-/// structuring subscopes, so these facts are precomputed once and stored in a
-/// deterministic form.
-struct CfgInfo {
-    scope: BTreeSet<Node>,
-    succs: BTreeMap<Node, Vec<Node>>,
-    ipostdom: BTreeMap<Node, Option<Node>>,
-    backedges: BTreeMap<Node, Vec<Node>>,
-    loop_blocks: BTreeMap<Node, BTreeSet<Node>>,
-}
-
-impl CfgInfo {
-    /// Computes the deterministic graph facts needed by the Beyond traversal.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the CFG contains reachable nodes that cannot reach
-    /// the exit, when the CFG is irreducible and would need Appendix A
-    /// preprocessing, or when a dominator/postdominator fact required by the
-    /// reducible traversal cannot be derived.
-    fn new(cfg_root: Node, cfg: &impl CfgNodeMap<Node>) -> Result<Self, StructuralizationError> {
-        let reachable = forward_reachable(cfg);
-        let can_reach_exit = backward_reachable_from_exit(cfg);
-        let scope = reachable
-            .intersection(&can_reach_exit)
-            .copied()
-            .collect::<BTreeSet<_>>();
-        if scope.is_empty() {
-            return Err(StructuralizationError::Relooper {
-                reason: "cfg has no entry-to-exit path".into(),
-            });
-        }
-        let dropped = reachable.difference(&can_reach_exit).copied().collect_vec();
-        if !dropped.is_empty() {
-            return Err(StructuralizationError::Relooper {
-                reason: format!(
-                    "reachable nodes do not all reach the CFG exit: {:?}",
-                    dropped
-                ),
-            });
-        }
-
-        let graph = build_graph(cfg, &scope);
-        ensure_reducible(cfg_root, cfg, &scope, &graph)?;
-
-        let entry = cfg.entry_node();
-        let exit = cfg.exit_node();
-        let doms = simple_fast(&graph, entry);
-        let reversed = reverse_graph(&graph);
-        let postdoms = simple_fast(&reversed, exit);
-
-        let succs = scope
-            .iter()
-            .copied()
-            .map(|node| {
-                let ordered = cfg
-                    .successors(node)
-                    .filter(|succ: &Node| scope.contains(succ))
-                    .collect_vec();
-                (node, ordered)
-            })
-            .collect::<BTreeMap<_, _>>();
-        let preds = scope
-            .iter()
-            .copied()
-            .map(|node| {
-                let ordered = cfg
-                    .predecessors(node)
-                    .filter(|pred: &Node| scope.contains(pred))
-                    .collect_vec();
-                (node, ordered)
-            })
-            .collect::<BTreeMap<_, _>>();
-
-        let idom = scope
-            .iter()
-            .copied()
-            .map(|node| (node, doms.immediate_dominator(node)))
-            .collect::<BTreeMap<_, _>>();
-        let ipostdom = scope
-            .iter()
-            .copied()
-            .map(|node| (node, postdoms.immediate_dominator(node)))
-            .collect::<BTreeMap<_, _>>();
-
-        let backedges = succs
-            .iter()
-            .flat_map(|(&src, succs)| succs.iter().copied().map(move |dst| (src, dst)))
-            .filter(|(src, dst)| dominates(*dst, *src, &idom))
-            .fold(BTreeMap::<Node, Vec<Node>>::new(), |mut map, (src, dst)| {
-                map.entry(dst).or_default().push(src);
-                map
-            });
-
-        let loop_blocks = backedges
-            .iter()
-            .map(|(&header, sources)| {
-                (
-                    header,
-                    natural_loop_blocks(header, sources, &preds, &idom, &scope),
-                )
-            })
-            .collect::<BTreeMap<_, _>>();
-
-        Ok(Self {
-            scope,
-            succs,
-            ipostdom,
-            backedges,
-            loop_blocks,
-        })
-    }
-
+impl CfgFacts {
     /// Structures one linear scope until it reaches an explicit stop node.
     ///
     /// The walker emits straight-line blocks, nested branch regions, and nested
@@ -228,52 +113,6 @@ impl CfgInfo {
         Ok(items)
     }
 
-    /// Returns the in-scope successors visible from the current structured walk.
-    ///
-    /// When structuring a loop body, the loop-closing backedge is suppressed so
-    /// one logical iteration can be materialized as a linear sequence ending at
-    /// the latch or body tail.
-    fn scope_successors(
-        &self,
-        node: Node,
-        scope: &BTreeSet<Node>,
-        active_loop: Option<Node>,
-    ) -> Vec<Node> {
-        self.succs
-            .get(&node)
-            .into_iter()
-            .flatten()
-            .copied()
-            .filter(|succ| scope.contains(succ))
-            .filter(|succ| {
-                active_loop.is_none_or(|header| !self.is_loop_backedge(node, *succ, header))
-            })
-            .collect()
-    }
-
-    /// Tells whether the specified edge is the suppressed backedge of the active loop.
-    fn is_loop_backedge(&self, src: Node, dst: Node, header: Node) -> bool {
-        dst == header
-            && self
-                .backedges
-                .get(&header)
-                .is_some_and(|sources| sources.contains(&src))
-    }
-
-    /// Tells whether a node should be structured as a nested loop in the current scope.
-    fn is_nested_loop_header(
-        &self,
-        node: Node,
-        scope: &BTreeSet<Node>,
-        active_loop: Option<Node>,
-    ) -> bool {
-        active_loop != Some(node)
-            && self
-                .loop_blocks
-                .get(&node)
-                .is_some_and(|blocks| blocks.is_subset(scope))
-    }
-
     /// Structures one reducible branch region rooted at a CFG split.
     ///
     /// The join node is taken from the postdominator chain, which is the
@@ -287,14 +126,18 @@ impl CfgInfo {
         active_loop: Option<Node>,
     ) -> Result<(StructuredRegion, Option<Node>), StructuralizationError> {
         let split = analyze_block(cfg_view, split_node)?;
-        let join_node = self.branch_join(split_node, scope, stop)?;
+        let join_node = self
+            .branch_join(split_node, scope, stop)
+            .map_err(|reason| StructuralizationError::Relooper {
+                reason: format!("branch at node {split_node} {reason}"),
+            })?;
         let join = analyze_block(cfg_view, join_node)?;
         let arms = self
             .scope_successors(split_node, scope, active_loop)
             .into_iter()
             .map(|succ| self.build_scope(cfg_view, succ, scope, Some(join_node), active_loop))
             .collect::<Result<Vec<_>, _>>()?;
-        let (join_kind, next) = self.branch_continuation(join_node, scope, active_loop);
+        let (join_kind, next) = branch_continuation(self, join_node, scope, active_loop);
 
         Ok((
             StructuredRegion {
@@ -311,54 +154,6 @@ impl CfgInfo {
             },
             next,
         ))
-    }
-
-    /// Returns the join node for a structured branch.
-    ///
-    /// The first postdominator inside the current scope is the structured join
-    /// used by the Beyond-Relooper traversal. When structuring an arm that is
-    /// already bounded by an enclosing stop node, that stop node is allowed to
-    /// act as the join.
-    fn branch_join(
-        &self,
-        split_node: Node,
-        scope: &BTreeSet<Node>,
-        stop: Option<Node>,
-    ) -> Result<Node, StructuralizationError> {
-        let mut current = self.ipostdom.get(&split_node).copied().flatten();
-        while let Some(join) = current {
-            if join != split_node && scope.contains(&join) {
-                return Ok(join);
-            }
-            current = self.ipostdom.get(&join).copied().flatten();
-        }
-        if let Some(stop) = stop.filter(|node| scope.contains(node)) {
-            return Ok(stop);
-        }
-        Err(StructuralizationError::Relooper {
-            reason: format!("branch at node {split_node} has no in-scope join"),
-        })
-    }
-
-    /// Classifies how control should continue after a branch join.
-    ///
-    /// Most joins are plain blocks and can be lowered inside the branch region,
-    /// after which the enclosing scope resumes with the join's single visible
-    /// successor. If the join itself is the next split block, the branch region
-    /// defers lowering that join and lets the enclosing scope resume directly
-    /// at the join node.
-    fn branch_continuation(
-        &self,
-        node: Node,
-        scope: &BTreeSet<Node>,
-        active_loop: Option<Node>,
-    ) -> (StructuredBranchJoinKind, Option<Node>) {
-        let successors = self.scope_successors(node, scope, active_loop);
-        match successors.as_slice() {
-            [] => (StructuredBranchJoinKind::Inline, None),
-            [next] => (StructuredBranchJoinKind::Inline, Some(*next)),
-            _ => (StructuredBranchJoinKind::Deferred, Some(node)),
-        }
     }
 
     /// Structures one reducible loop rooted at its unique header.
@@ -530,132 +325,46 @@ impl CfgInfo {
     }
 }
 
-/// Builds a deterministic graph map over the scoped CFG nodes.
-fn build_graph(cfg: &impl CfgNodeMap<Node>, scope: &BTreeSet<Node>) -> DiGraphMap<Node, ()> {
-    let mut graph = DiGraphMap::new();
-    for &node in scope {
-        graph.add_node(node);
+/// Classifies how control should continue after a branch join.
+///
+/// Most joins are plain blocks and can be lowered inside the branch region,
+/// after which the enclosing scope resumes with the join's single visible
+/// successor. If the join itself is the next split block, the branch region
+/// defers lowering that join and lets the enclosing scope resume directly at
+/// the join node.
+fn branch_continuation(
+    info: &CfgFacts,
+    node: Node,
+    scope: &BTreeSet<Node>,
+    active_loop: Option<Node>,
+) -> (StructuredBranchJoinKind, Option<Node>) {
+    let successors = info.scope_successors(node, scope, active_loop);
+    match successors.as_slice() {
+        [] => (StructuredBranchJoinKind::Inline, None),
+        [next] => (StructuredBranchJoinKind::Inline, Some(*next)),
+        _ => (StructuredBranchJoinKind::Deferred, Some(node)),
     }
-    for &node in scope {
-        for succ in cfg.successors(node) {
-            if scope.contains(&succ) {
-                graph.add_edge(node, succ, ());
+}
+
+/// Maps shared CFG-facts failures into Beyond-Relooper analysis errors.
+fn map_cfg_facts_error(cfg_root: Node, err: CfgFactsError) -> StructuralizationError {
+    match err {
+        CfgFactsError::NoEntryExitPath => StructuralizationError::Relooper {
+            reason: "cfg has no entry-to-exit path".into(),
+        },
+        CfgFactsError::ReachableNodesDoNotReachExit { dropped } => {
+            StructuralizationError::Relooper {
+                reason: format!(
+                    "reachable nodes do not all reach the CFG exit: {:?}",
+                    dropped
+                ),
+            }
+        }
+        CfgFactsError::Irreducible { entries, .. } => {
+            StructuralizationError::UnsupportedIrreducibleCfg {
+                cfg: cfg_root,
+                reason: format!("cyclic SCC has multiple entries: {:?}", entries),
             }
         }
     }
-    graph
-}
-
-/// Builds the reversed graph used for postdominator computation.
-fn reverse_graph(graph: &DiGraphMap<Node, ()>) -> DiGraphMap<Node, ()> {
-    let mut reversed = DiGraphMap::new();
-    for node in graph.nodes() {
-        reversed.add_node(node);
-    }
-    for (src, dst, _) in graph.all_edges() {
-        reversed.add_edge(dst, src, ());
-    }
-    reversed
-}
-
-/// Returns all nodes reachable from the CFG entry.
-fn forward_reachable(cfg: &impl CfgNodeMap<Node>) -> BTreeSet<Node> {
-    let mut seen = BTreeSet::new();
-    let mut pending = VecDeque::from([cfg.entry_node()]);
-    while let Some(node) = pending.pop_front() {
-        if !seen.insert(node) {
-            continue;
-        }
-        pending.extend(cfg.successors(node));
-    }
-    seen
-}
-
-/// Returns all nodes that can reach the CFG exit.
-fn backward_reachable_from_exit(cfg: &impl CfgNodeMap<Node>) -> BTreeSet<Node> {
-    let mut seen = BTreeSet::new();
-    let mut pending = VecDeque::from([cfg.exit_node()]);
-    while let Some(node) = pending.pop_front() {
-        if !seen.insert(node) {
-            continue;
-        }
-        pending.extend(cfg.predecessors(node));
-    }
-    seen
-}
-
-/// Checks whether the scoped CFG is reducible.
-///
-/// Each cyclic SCC in a reducible CFG has a unique entry from outside the SCC.
-/// If a cyclic SCC has multiple entries, the Beyond-Relooper implementation in
-/// this module would require Appendix A preprocessing before translation.
-fn ensure_reducible(
-    cfg_root: Node,
-    cfg: &impl CfgNodeMap<Node>,
-    scope: &BTreeSet<Node>,
-    graph: &DiGraphMap<Node, ()>,
-) -> Result<(), StructuralizationError> {
-    for scc in kosaraju_scc(graph) {
-        let cyclic = scc.len() > 1 || scc.iter().any(|node| graph.contains_edge(*node, *node));
-        if !cyclic {
-            continue;
-        }
-        let members = scc.into_iter().collect::<BTreeSet<_>>();
-        let entries = members
-            .iter()
-            .copied()
-            .filter(|node| {
-                *node == cfg.entry_node()
-                    || cfg
-                        .predecessors(*node)
-                        .any(|pred: Node| scope.contains(&pred) && !members.contains(&pred))
-            })
-            .collect_vec();
-        if entries.len() > 1 {
-            return Err(StructuralizationError::UnsupportedIrreducibleCfg {
-                cfg: cfg_root,
-                reason: format!("cyclic SCC has multiple entries: {:?}", entries),
-            });
-        }
-    }
-    Ok(())
-}
-
-/// Returns whether `dom` dominates `node` using an immediate-dominator chain.
-fn dominates(dom: Node, mut node: Node, idom: &BTreeMap<Node, Option<Node>>) -> bool {
-    loop {
-        if dom == node {
-            return true;
-        }
-        match idom.get(&node).copied().flatten() {
-            Some(parent) => node = parent,
-            None => return false,
-        }
-    }
-}
-
-/// Computes the natural loop blocks for one loop header.
-fn natural_loop_blocks(
-    header: Node,
-    sources: &[Node],
-    preds: &BTreeMap<Node, Vec<Node>>,
-    idom: &BTreeMap<Node, Option<Node>>,
-    scope: &BTreeSet<Node>,
-) -> BTreeSet<Node> {
-    let mut blocks = BTreeSet::from([header]);
-    let mut pending = sources.iter().copied().collect::<VecDeque<_>>();
-    while let Some(node) = pending.pop_front() {
-        if !scope.contains(&node) || !dominates(header, node, idom) || !blocks.insert(node) {
-            continue;
-        }
-        pending.extend(
-            preds
-                .get(&node)
-                .into_iter()
-                .flatten()
-                .copied()
-                .filter(|pred| *pred != header),
-        );
-    }
-    blocks
 }
