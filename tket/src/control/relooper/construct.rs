@@ -6,6 +6,7 @@
 
 use std::collections::BTreeSet;
 
+use hugr::core::HugrNode;
 use hugr::{HugrView, Node};
 use itertools::Itertools;
 
@@ -16,7 +17,7 @@ use crate::control::structuralize::shared::{
 use crate::control::structuralize::{
     RegionIo, StructuralizationError, StructuredBlock, StructuredBranchJoinKind, StructuredLoopKind,
 };
-use crate::control::{CfgNodeMap, IdentityCfgMap};
+use crate::control::{CfgBlockMap, IdentityCfgMap};
 
 use super::ast::{RelooperBody, RelooperNode, RelooperRegion};
 
@@ -31,10 +32,29 @@ pub(super) fn build_cfg_ast<H: HugrView<Node = Node>>(
     cfg_view: &H,
     cfg: &IdentityCfgMap<H>,
 ) -> Result<RelooperRegion, StructuralizationError> {
-    let info = CfgFacts::new(cfg_view.entrypoint(), cfg)
+    build_cfg_ast_with_map(cfg_view, cfg)
+}
+
+/// Builds the Beyond-Relooper AST for one CFG-like graph view.
+///
+/// The graph view may introduce synthetic nodes during preprocessing, but it
+/// must still map each graph node back to one original HUGR block so block
+/// summaries and lowering metadata can be recovered from the immutable HUGR
+/// view.
+fn build_cfg_ast_with_map<H, T, C>(
+    cfg_view: &H,
+    cfg: &C,
+) -> Result<RelooperRegion, StructuralizationError>
+where
+    H: HugrView<Node = Node>,
+    T: HugrNode,
+    C: CfgBlockMap<T>,
+{
+    let info = CfgFacts::<T>::new(cfg.entry_node(), cfg)
         .map_err(|err| map_cfg_facts_error(cfg_view.entrypoint(), err))?;
     let body = RelooperBody::Sequence(info.build_scope(
         cfg_view,
+        cfg,
         cfg.entry_node(),
         &info.scope,
         None,
@@ -49,21 +69,29 @@ pub(super) fn build_cfg_ast<H: HugrView<Node = Node>>(
     })
 }
 
-impl CfgFacts<Node> {
+impl<T> CfgFacts<T>
+where
+    T: HugrNode,
+{
     /// Structures one linear scope until it reaches an explicit stop node.
     ///
     /// The walker emits straight-line blocks, nested branch regions, and nested
     /// loop regions while preserving CFG successor order. Nested loops are
     /// carved out before generic branching so loop headers are always lowered as
     /// loops rather than accidental multi-way branches.
-    fn build_scope<H: HugrView<Node = Node>>(
+    fn build_scope<H, C>(
         &self,
         cfg_view: &H,
-        start: Node,
-        scope: &BTreeSet<Node>,
-        stop: Option<Node>,
-        active_loop: Option<Node>,
-    ) -> Result<Vec<RelooperNode>, StructuralizationError> {
+        cfg: &C,
+        start: T,
+        scope: &BTreeSet<T>,
+        stop: Option<T>,
+        active_loop: Option<T>,
+    ) -> Result<Vec<RelooperNode>, StructuralizationError>
+    where
+        H: HugrView<Node = Node>,
+        C: CfgBlockMap<T>,
+    {
         let mut items = Vec::new();
         let mut current = Some(start);
         let mut seen = BTreeSet::new();
@@ -79,7 +107,7 @@ impl CfgFacts<Node> {
             }
 
             if self.is_nested_loop_header(node, scope, active_loop) {
-                let (region, next) = self.build_loop_region(cfg_view, node, scope)?;
+                let (region, next) = self.build_loop_region(cfg_view, cfg, node, scope)?;
                 items.push(RelooperNode::Region(Box::new(region)));
                 current = next;
                 continue;
@@ -88,13 +116,13 @@ impl CfgFacts<Node> {
             let succs = self.scope_successors(node, scope, active_loop);
             if succs.len() > 1 {
                 let (region, next) =
-                    self.build_branch_region(cfg_view, node, scope, stop, active_loop)?;
+                    self.build_branch_region(cfg_view, cfg, node, scope, stop, active_loop)?;
                 items.push(RelooperNode::Region(Box::new(region)));
                 current = next;
                 continue;
             }
 
-            let block = analyze_block(cfg_view, node)?;
+            let block = analyze_block(cfg_view, cfg.hugr_node(node))?;
             let is_exit = matches!(block, StructuredBlock::Exit { .. });
             items.push(RelooperNode::Block(block));
             current = succs.into_iter().next();
@@ -107,25 +135,30 @@ impl CfgFacts<Node> {
     }
 
     /// Structures one reducible branch region rooted at a CFG split.
-    fn build_branch_region<H: HugrView<Node = Node>>(
+    fn build_branch_region<H, C>(
         &self,
         cfg_view: &H,
-        split_node: Node,
-        scope: &BTreeSet<Node>,
-        stop: Option<Node>,
-        active_loop: Option<Node>,
-    ) -> Result<(RelooperRegion, Option<Node>), StructuralizationError> {
-        let split = analyze_block(cfg_view, split_node)?;
+        cfg: &C,
+        split_node: T,
+        scope: &BTreeSet<T>,
+        stop: Option<T>,
+        active_loop: Option<T>,
+    ) -> Result<(RelooperRegion, Option<T>), StructuralizationError>
+    where
+        H: HugrView<Node = Node>,
+        C: CfgBlockMap<T>,
+    {
+        let split = analyze_block(cfg_view, cfg.hugr_node(split_node))?;
         let join_node = self
             .branch_join(split_node, scope, stop)
             .map_err(|reason| StructuralizationError::Relooper {
                 reason: format!("branch at node {split_node} {reason}"),
             })?;
-        let join = analyze_block(cfg_view, join_node)?;
+        let join = analyze_block(cfg_view, cfg.hugr_node(join_node))?;
         let arms = self
             .scope_successors(split_node, scope, active_loop)
             .into_iter()
-            .map(|succ| self.build_scope(cfg_view, succ, scope, Some(join_node), active_loop))
+            .map(|succ| self.build_scope(cfg_view, cfg, succ, scope, Some(join_node), active_loop))
             .collect::<Result<Vec<_>, _>>()?;
         let (join_kind, next) = branch_continuation(self, join_node, scope, active_loop);
 
@@ -147,12 +180,17 @@ impl CfgFacts<Node> {
     }
 
     /// Structures one reducible loop rooted at its unique header.
-    fn build_loop_region<H: HugrView<Node = Node>>(
+    fn build_loop_region<H, C>(
         &self,
         cfg_view: &H,
-        header: Node,
-        scope: &BTreeSet<Node>,
-    ) -> Result<(RelooperRegion, Option<Node>), StructuralizationError> {
+        cfg: &C,
+        header: T,
+        scope: &BTreeSet<T>,
+    ) -> Result<(RelooperRegion, Option<T>), StructuralizationError>
+    where
+        H: HugrView<Node = Node>,
+        C: CfgBlockMap<T>,
+    {
         let loop_blocks = self
             .loop_blocks
             .get(&header)
@@ -196,7 +234,7 @@ impl CfgFacts<Node> {
             .map_err(|_| StructuralizationError::Relooper {
                 reason: format!("loop headed by {header} does not have a unique backedge source"),
             })?;
-        let header_block = analyze_block(cfg_view, header)?;
+        let header_block = analyze_block(cfg_view, cfg.hugr_node(header))?;
         let header_succs = self.succs.get(&header).cloned().unwrap_or_default();
         let in_loop_succs = header_succs
             .iter()
@@ -211,7 +249,7 @@ impl CfgFacts<Node> {
 
         let io = RegionIo {
             inputs: header_block.inputs().clone(),
-            outputs: block_input_row(cfg_view, exit_target)?,
+            outputs: block_input_row(cfg_view, cfg.hugr_node(exit_target))?,
         };
 
         let body = if !out_of_loop_succs.is_empty() {
@@ -239,23 +277,29 @@ impl CfgFacts<Node> {
                 })?;
             let continue_inputs = block_successor_payload(
                 cfg_view,
-                header,
+                cfg.hugr_node(header),
                 continue_case,
                 "header-controlled loop continue case is out of range",
             )?;
             let break_outputs = block_successor_payload(
                 cfg_view,
-                header,
+                cfg.hugr_node(header),
                 break_case,
                 "header-controlled loop exit case is out of range",
             )?;
-            let body =
-                self.build_scope(cfg_view, continue_target, &loop_blocks, None, Some(header))?;
+            let body = self.build_scope(
+                cfg_view,
+                cfg,
+                continue_target,
+                &loop_blocks,
+                None,
+                Some(header),
+            )?;
             RelooperBody::Loop {
                 kind: StructuredLoopKind::HeaderControlled,
                 header: header_block,
                 body,
-                backedge_source,
+                backedge_source: cfg.hugr_node(backedge_source),
                 continue_inputs,
                 break_outputs,
                 continue_case,
@@ -284,22 +328,22 @@ impl CfgFacts<Node> {
                 })?;
             let continue_inputs = block_successor_payload(
                 cfg_view,
-                exit_source,
+                cfg.hugr_node(exit_source),
                 continue_case,
                 "tail-controlled loop continue case is out of range",
             )?;
             let break_outputs = block_successor_payload(
                 cfg_view,
-                exit_source,
+                cfg.hugr_node(exit_source),
                 break_case,
                 "tail-controlled loop exit case is out of range",
             )?;
-            let body = self.build_scope(cfg_view, header, &loop_blocks, None, Some(header))?;
+            let body = self.build_scope(cfg_view, cfg, header, &loop_blocks, None, Some(header))?;
             RelooperBody::Loop {
                 kind: StructuredLoopKind::TailControlled,
                 header: header_block,
                 body,
-                backedge_source,
+                backedge_source: cfg.hugr_node(backedge_source),
                 continue_inputs,
                 break_outputs,
                 continue_case,
@@ -312,12 +356,12 @@ impl CfgFacts<Node> {
 }
 
 /// Classifies how control should continue after a branch join.
-fn branch_continuation(
-    info: &CfgFacts<Node>,
-    node: Node,
-    scope: &BTreeSet<Node>,
-    active_loop: Option<Node>,
-) -> (StructuredBranchJoinKind, Option<Node>) {
+fn branch_continuation<T: HugrNode>(
+    info: &CfgFacts<T>,
+    node: T,
+    scope: &BTreeSet<T>,
+    active_loop: Option<T>,
+) -> (StructuredBranchJoinKind, Option<T>) {
     let successors = info.scope_successors(node, scope, active_loop);
     match successors.as_slice() {
         [] => (StructuredBranchJoinKind::Inline, None),
@@ -327,7 +371,10 @@ fn branch_continuation(
 }
 
 /// Maps shared CFG-facts failures into Beyond-Relooper analysis errors.
-fn map_cfg_facts_error(cfg_root: Node, err: CfgFactsError<Node>) -> StructuralizationError {
+fn map_cfg_facts_error<T: HugrNode>(
+    cfg_root: Node,
+    err: CfgFactsError<T>,
+) -> StructuralizationError {
     match err {
         CfgFactsError::NoEntryExitPath => StructuralizationError::Relooper {
             reason: "cfg has no entry-to-exit path".into(),

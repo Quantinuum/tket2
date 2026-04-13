@@ -7,14 +7,18 @@
 //! the strategy implementations and gives later preprocessing passes a common
 //! boundary.
 
+mod preprocess;
+#[cfg(test)]
+mod test;
+
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use hugr::core::HugrNode;
-use itertools::Itertools;
-use petgraph::algo::{dominators::simple_fast, kosaraju_scc};
+use petgraph::algo::dominators::simple_fast;
 use petgraph::graphmap::DiGraphMap;
 
 use super::CfgNodeMap;
+use preprocess::NormalizedCfg;
 
 /// Reducibility or reachability mismatch discovered while analyzing a CFG.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -65,26 +69,12 @@ where
     /// Returns an error when no entry-to-exit path exists, when some reachable
     /// nodes cannot reach the exit, or when the scoped CFG is irreducible.
     pub(crate) fn new(cfg_root: T, cfg: &impl CfgNodeMap<T>) -> Result<Self, CfgFactsError<T>> {
-        let reachable = forward_reachable(cfg);
-        let can_reach_exit = backward_reachable_from_exit(cfg);
-        let scope = reachable
-            .intersection(&can_reach_exit)
-            .copied()
-            .collect::<BTreeSet<_>>();
-        if scope.is_empty() {
-            return Err(CfgFactsError::NoEntryExitPath);
-        }
+        let normalized = NormalizedCfg::new(cfg_root, cfg)?;
+        let scope = normalized.scope().clone();
+        let graph = normalized.graph();
 
-        let dropped = reachable.difference(&can_reach_exit).copied().collect_vec();
-        if !dropped.is_empty() {
-            return Err(CfgFactsError::ReachableNodesDoNotReachExit { dropped });
-        }
-
-        let graph = build_graph(cfg, &scope);
-        ensure_reducible(cfg_root, cfg, &scope, &graph)?;
-
-        let entry = cfg.entry_node();
-        let exit = cfg.exit_node();
+        let entry = normalized.entry_node();
+        let exit = normalized.exit_node();
         let doms = simple_fast(&graph, entry);
         let reversed = reverse_graph(&graph);
         let postdoms = simple_fast(&reversed, exit);
@@ -92,26 +82,12 @@ where
         let succs = scope
             .iter()
             .copied()
-            .map(|node| {
-                (
-                    node,
-                    cfg.successors(node)
-                        .filter(|succ: &T| scope.contains(succ))
-                        .collect_vec(),
-                )
-            })
+            .map(|node| (node, normalized.successors(node).collect::<Vec<_>>()))
             .collect::<BTreeMap<_, _>>();
         let preds = scope
             .iter()
             .copied()
-            .map(|node| {
-                (
-                    node,
-                    cfg.predecessors(node)
-                        .filter(|pred: &T| scope.contains(pred))
-                        .collect_vec(),
-                )
-            })
+            .map(|node| (node, normalized.predecessors(node).collect::<Vec<_>>()))
             .collect::<BTreeMap<_, _>>();
 
         let idom = scope
@@ -225,25 +201,6 @@ where
     }
 }
 
-/// Builds the scoped CFG graph used for dominance queries.
-fn build_graph<T>(cfg: &impl CfgNodeMap<T>, scope: &BTreeSet<T>) -> DiGraphMap<T, ()>
-where
-    T: HugrNode,
-{
-    let mut graph = DiGraphMap::new();
-    for &node in scope {
-        graph.add_node(node);
-    }
-    for &node in scope {
-        for succ in cfg.successors(node) {
-            if scope.contains(&succ) {
-                graph.add_edge(node, succ, ());
-            }
-        }
-    }
-    graph
-}
-
 /// Reverses a graph so postdominators can be computed as dominators.
 fn reverse_graph<T>(graph: &DiGraphMap<T, ()>) -> DiGraphMap<T, ()>
 where
@@ -257,74 +214,6 @@ where
         reversed.add_edge(dst, src, ());
     }
     reversed
-}
-
-/// Returns all nodes reachable from the CFG entry.
-fn forward_reachable<T>(cfg: &impl CfgNodeMap<T>) -> BTreeSet<T>
-where
-    T: HugrNode,
-{
-    let mut seen = BTreeSet::new();
-    let mut pending = VecDeque::from([cfg.entry_node()]);
-    while let Some(node) = pending.pop_front() {
-        if !seen.insert(node) {
-            continue;
-        }
-        pending.extend(cfg.successors(node));
-    }
-    seen
-}
-
-/// Returns all nodes that can reach the CFG exit.
-fn backward_reachable_from_exit<T>(cfg: &impl CfgNodeMap<T>) -> BTreeSet<T>
-where
-    T: HugrNode,
-{
-    let mut seen = BTreeSet::new();
-    let mut pending = VecDeque::from([cfg.exit_node()]);
-    while let Some(node) = pending.pop_front() {
-        if !seen.insert(node) {
-            continue;
-        }
-        pending.extend(cfg.predecessors(node));
-    }
-    seen
-}
-
-/// Ensures the entry-to-exit scope is reducible.
-fn ensure_reducible<T>(
-    cfg_root: T,
-    cfg: &impl CfgNodeMap<T>,
-    scope: &BTreeSet<T>,
-    graph: &DiGraphMap<T, ()>,
-) -> Result<(), CfgFactsError<T>>
-where
-    T: HugrNode,
-{
-    for scc in kosaraju_scc(graph) {
-        let cyclic = scc.len() > 1 || scc.iter().any(|node| graph.contains_edge(*node, *node));
-        if !cyclic {
-            continue;
-        }
-        let members = scc.into_iter().collect::<BTreeSet<_>>();
-        let entries = members
-            .iter()
-            .copied()
-            .filter(|node| {
-                *node == cfg.entry_node()
-                    || cfg
-                        .predecessors(*node)
-                        .any(|pred: T| scope.contains(&pred) && !members.contains(&pred))
-            })
-            .collect_vec();
-        if entries.len() > 1 {
-            return Err(CfgFactsError::Irreducible {
-                cfg: cfg_root,
-                entries,
-            });
-        }
-    }
-    Ok(())
 }
 
 /// Returns whether `dom` dominates `node`.
