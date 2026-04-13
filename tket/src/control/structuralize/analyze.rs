@@ -11,13 +11,11 @@ use hugr::ops::OpTrait;
 use hugr::{HugrView, Node};
 use hugr_core::ops::OpTag;
 
-use crate::control::{IdentityCfgMap, relooper};
-
-use super::rvsdg;
 use super::types::{
     StructuralizationAnalysisReport, StructuralizationError, StructuralizationStrategy,
     StructuredRegion,
 };
+use crate::control::{IdentityCfgMap, relooper, rvsdg};
 
 /// Analyze all CFGs in a HUGR using the requested strategy.
 ///

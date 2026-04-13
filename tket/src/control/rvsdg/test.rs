@@ -11,7 +11,9 @@ use rstest::{fixture, rstest};
 use crate::control::IdentityCfgMap;
 use crate::control::nest_cfgs::test::build_conditional_in_loop_cfg;
 
-use super::{LoopKind, RvsdgBuildError, RvsdgNode, build_cfg_rvsdg};
+use crate::control::structuralize::{StructuredNode, StructuredRegionBody};
+
+use super::{LoopKind, RvsdgBuildError, RvsdgNode, analyze_cfg, build_cfg_rvsdg};
 
 fn find_gamma(nodes: &[RvsdgNode]) -> Option<&super::GammaNode> {
     nodes.iter().find_map(|node| match node {
@@ -139,6 +141,46 @@ fn deterministic_order(combined_headers: Hugr) {
     let a = build_cfg_rvsdg(&cfg_a, &IdentityCfgMap::new(cfg_a.clone())).unwrap();
     let b = build_cfg_rvsdg(&cfg_b, &IdentityCfgMap::new(cfg_b.clone())).unwrap();
     assert_eq!(a, b);
+}
+
+#[rstest]
+fn lowered_region_contains_loop_and_branch(combined_headers: Hugr) {
+    let cfg_node = combined_headers
+        .nodes()
+        .find(|node| combined_headers.get_optype(*node).is_cfg())
+        .unwrap();
+    let cfg_view = combined_headers.with_entrypoint(cfg_node);
+    let lowered = analyze_cfg(&cfg_view, &IdentityCfgMap::new(cfg_view.clone())).unwrap();
+
+    let StructuredRegionBody::Sequence(items) = lowered.body else {
+        panic!("expected sequence root");
+    };
+    assert!(items.iter().any(contains_loop));
+    assert!(items.iter().any(contains_branch));
+}
+
+fn contains_loop(node: &StructuredNode) -> bool {
+    match node {
+        StructuredNode::Block(_) => false,
+        StructuredNode::Region(region) => match &region.body {
+            StructuredRegionBody::Sequence(items) => items.iter().any(contains_loop),
+            StructuredRegionBody::Branch { arms, .. } => {
+                arms.iter().flat_map(|arm| arm.iter()).any(contains_loop)
+            }
+            StructuredRegionBody::Loop { .. } => true,
+        },
+    }
+}
+
+fn contains_branch(node: &StructuredNode) -> bool {
+    match node {
+        StructuredNode::Block(_) => false,
+        StructuredNode::Region(region) => match &region.body {
+            StructuredRegionBody::Sequence(items) => items.iter().any(contains_branch),
+            StructuredRegionBody::Branch { .. } => true,
+            StructuredRegionBody::Loop { body, .. } => body.iter().any(contains_branch),
+        },
+    }
 }
 
 #[rstest]

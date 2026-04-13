@@ -25,6 +25,7 @@
 mod construct;
 mod error;
 mod ir;
+mod lower;
 #[cfg(test)]
 mod test;
 
@@ -33,3 +34,4 @@ pub(crate) use error::RvsdgBuildError;
 pub(crate) use ir::{
     BlockNode, BranchJoinKind, GammaNode, LoopKind, Region, RvsdgNode, ThetaNode, vars_to_row,
 };
+pub(crate) use lower::analyze_cfg;

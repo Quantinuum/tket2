@@ -13,7 +13,6 @@
 
 mod analyze;
 mod lower;
-mod rvsdg;
 pub(crate) mod shared;
 #[cfg(test)]
 mod test;
