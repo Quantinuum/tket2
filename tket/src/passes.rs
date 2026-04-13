@@ -75,6 +75,10 @@ pub use redundant_order_edges::RedundantOrderEdgesPass;
 pub mod replace_types;
 pub use replace_types::ReplaceTypes;
 
+// Rebase a HUGR from one set of operations onto another, via a common "pivot" set of operations.
+pub mod rebase;
+pub use rebase::RebasePass;
+
 // Remove redundant tuple pack/unpack operations.
 pub mod untuple;
 pub use untuple::UntuplePass;
