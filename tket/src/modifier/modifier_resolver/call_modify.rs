@@ -36,6 +36,10 @@ impl<N: HugrNode> ModifierResolver<N> {
             let new = self.add_node_no_modification(h, call_node, call.clone(), new_dfg)?;
             self.call_map()
                 .insert(callee.0, (new, call.called_function_port()));
+            println!(
+                "Copied Call node {} as is, no modification needed.",
+                call_node
+            );
             return Ok(());
         };
 
@@ -76,18 +80,18 @@ impl<N: HugrNode> ModifierResolver<N> {
     pub(super) fn apply_modifier_chain_to_loaded_fn(
         &mut self,
         h: &mut impl HugrMut<Node = N>,
-        n: N, // modifier node
+        modifier_node: N, // modifier node
     ) -> Result<N, ModifierResolverErrors<N>> {
         // The final target of modifiers to apply.
         // Collection of modifiers to apply.
-        let modifiers_and_targ = self.trace_modifiers_chain(h, n)?;
+        let modifiers_and_targ = self.trace_modifiers_chain(h, modifier_node)?;
         let targ = modifiers_and_targ
             .last()
             .cloned()
-            .ok_or(ModifierError::NoTarget(n))?;
+            .ok_or(ModifierError::NoTarget(modifier_node))?;
 
         // The function to apply the modifier to.
-        let (func, load) = Self::get_loaded_function(h, n, targ, h.get_optype(targ))?;
+        let (func, load) = Self::get_loaded_function(h, modifier_node, targ, h.get_optype(targ))?;
 
         // Modify the function
         let modified_fn = self.modify_fn(h, func)?;
@@ -97,7 +101,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         let mut modified_sig = load.func_sig.clone();
         self.modify_signature(modified_sig.body_mut(), false);
         let load = LoadFunction::try_new(modified_sig, load.type_args).map_err(BuildError::from)?;
-        let new_load = h.add_node_after(n, load);
+        let new_load = h.add_node_after(modifier_node, load);
         h.connect(modified_fn, 0, new_load, 0);
 
         Ok(new_load)
@@ -293,8 +297,49 @@ mod tests {
             .call(callee.handle(), &[], vec![inputs[0]])
             .unwrap()
             .out_wire(0);
+        // inputs[0] = func
+        //     .add_dataflow_op(TketOp::X, vec![inputs[0]])
+        //     .unwrap()
+        //     .out_wire(0);
+        *func.finish_with_outputs(inputs).unwrap().handle()
+    }
+
+    /// Nested call pattern: `foo(q) = foo1(q)`, `foo1(q) = bar(q)`, `bar(q) = X(q)`.
+    /// Tests that the resolver correctly propagates modifiers through a three-level call chain.
+    fn foo_modifier_on_function(module: &mut ModuleBuilder<Hugr>, t_num: usize) -> FuncID<true> {
+        // bar: applies X to its single qubit argument.
+        let bar = {
+            let bar_sig = Signature::new_endo(vec![qb_t()]);
+            let mut bar_builder = module.define_function("inner", bar_sig).unwrap();
+            bar_builder.set_unitary();
+            let mut inputs: Vec<Wire> = bar_builder.input_wires().collect();
+            inputs[0] = bar_builder
+                .add_dataflow_op(TketOp::X, vec![inputs[0]])
+                .unwrap()
+                .out_wire(0);
+            bar_builder.finish_with_outputs(inputs).unwrap()
+        };
+
+        // foo1: delegates entirely to bar.
+        let foo1 = {
+            let foo1_sig = Signature::new_endo(vec![qb_t()]);
+            let mut foo1_builder = module.define_function("outer", foo1_sig).unwrap();
+            foo1_builder.set_unitary();
+            let mut inputs: Vec<Wire> = foo1_builder.input_wires().collect();
+            inputs[0] = foo1_builder
+                .call(bar.handle(), &[], vec![inputs[0]])
+                .unwrap()
+                .out_wire(0);
+            foo1_builder.finish_with_outputs(inputs).unwrap()
+        };
+
+        // foo: delegates entirely to foo1.
+        let foo_sig = Signature::new_endo(iter::repeat_n(qb_t(), t_num).collect::<Vec<_>>());
+        let mut func = module.define_function("foo", foo_sig).unwrap();
+        func.set_unitary();
+        let mut inputs: Vec<_> = func.input_wires().collect();
         inputs[0] = func
-            .add_dataflow_op(TketOp::X, vec![inputs[0]])
+            .call(foo1.handle(), &[], vec![inputs[0]])
             .unwrap()
             .out_wire(0);
         *func.finish_with_outputs(inputs).unwrap().handle()
@@ -405,18 +450,21 @@ mod tests {
     }
 
     #[rstest::rstest]
-    #[case::call(1, 1, foo_call, false)]
-    // #[case::call_dagger(1, 1, foo_call, true)]
-    // #[case::indir_call(1, 1, foo_indir_call, false)]
-    // #[case::indir_call_dagger(1, 1, foo_indir_call, true)]
-    // #[case::load_fn(1, 1, foo_load_fn, false)]
-    // #[case::nested_modifier(2, 2, foo_nested_modifier, false)]
+    // #[case::call_twice(1, 1, foo_modifier_on_function, false, "foo_call_twice")]
+    #[case::call(1, 1, foo_call, false, "foo_call")]
+    // #[case::call_twice_dagger(1, 1, foo_call_twice, true, "foo_call_twice_dagger")]
+    // #[case::call_dagger(1, 1, foo_call, true, "foo_call_dagger")]
+    // #[case::indir_call(1, 1, foo_indir_call, false, "indir_call")]
+    // #[case::indir_call_dagger(1, 1, foo_indir_call, true, "indir_call_dagger")]
+    // #[case::load_fn(1, 1, foo_load_fn, false, "load_fn")]
+    // #[case::nested_modifier(2, 2, foo_nested_modifier, false, "nested_modifier")]
     pub fn test_call_modify(
         #[case] target_num: usize,
         #[case] ctrl_num: u64,
         #[case] foo: fn(&mut ModuleBuilder<Hugr>, usize) -> FuncID<true>,
         #[case] dagger: bool,
+        #[case] name: &str,
     ) {
-        test_modifier_resolver(target_num, ctrl_num, foo, dagger);
+        test_modifier_resolver(target_num, ctrl_num, foo, dagger, name);
     }
 }

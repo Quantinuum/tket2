@@ -303,13 +303,22 @@ impl<N: HugrNode> ModifierResolver<N> {
     ) -> Result<Option<N>, ModifierResolverErrors<N>> {
         let satisfies = ModifierFlags::from_metadata(h, func)
             .is_some_and(|flags| flags.satisfies(&self.modifiers));
-        if !satisfies {
-            let in_out_match = signature.input == signature.output;
-            if in_out_match {
-                // If the flag is not set and the signature does not show an evident problem, skip the modification.
-                return Ok(None);
-            }
-        }
+        println!(
+            "  Function node {},\n  Unitary flags: {:?},\n  Combined modifier: {:?},\n  Satisfies: {}",
+            func,
+            // NICOLA: here we have the issue, no metadata from the function node
+            ModifierFlags::from_metadata(h, func),
+            self.modifiers,
+            satisfies
+        );
+        // NICOLA: the satisfies is wrongly False
+        // if !satisfies {
+        //     let in_out_match = signature.input == signature.output;
+        //     if in_out_match {
+        //         // If the flag is not set and the signature does not show an evident problem, skip the modification.
+        //         return Ok(None);
+        //     }
+        // }
         Ok(Some(self.modify_fn(h, func)?))
     }
 
@@ -807,7 +816,7 @@ mod test {
         #[case] foo: fn(&mut ModuleBuilder<Hugr>, usize) -> FuncID<true>,
         #[case] dagger: bool,
     ) {
-        test_modifier_resolver(t_num, c_num, foo, dagger);
+        test_modifier_resolver(t_num, c_num, foo, dagger, "name");
     }
 
     // This test checks the case where a modifier is not chained but duplicated.

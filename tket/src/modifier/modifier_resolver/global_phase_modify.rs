@@ -156,6 +156,6 @@ mod tests {
         #[case] foo: fn(&mut ModuleBuilder<Hugr>, usize) -> FuncID<true>,
         #[case] dagger: bool,
     ) {
-        test_modifier_resolver(0, c_num, foo, dagger);
+        test_modifier_resolver(0, c_num, foo, dagger, "name");
     }
 }

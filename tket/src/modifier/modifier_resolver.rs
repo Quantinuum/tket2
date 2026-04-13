@@ -200,6 +200,7 @@ fn connect<N>(
         (Either::Right(p_o), Either::Left(p_i)) => (w1.0, p_o, w2.0, p_i),
         (Either::Left(p_i), Either::Right(p_o)) => (w2.0, p_o, w1.0, p_i),
         _ => {
+            // NICOLA Here we fail with multiple modifier
             return Err(ModifierResolverErrors::unreachable(format!(
                 "Cannot connect the wires with the same direction: {} -> {}",
                 w1, w2
@@ -722,6 +723,10 @@ impl<N: HugrNode> ModifierResolver<N> {
         new_dfg: &mut impl Dataflow,
     ) -> Result<(), ModifierResolverErrors<N>> {
         let optype = &h.get_optype(target_node).clone();
+        println!(
+            "Modifying node {} with operation type {}... ",
+            target_node, optype
+        );
         match optype {
             // Skip input/output nodes: it should be handled by its parent as it sets control qubits.
             OpType::Input(_) | OpType::Output(_) => {}
@@ -1169,7 +1174,7 @@ pub fn resolve_modifier_with_entrypoints(
 // Definitions of helpers for tests
 #[cfg(test)]
 mod tests {
-    use std::fs;
+    use std::{fs, io::BufReader, path::Path};
 
     use cool_asserts::assert_matches;
     use hugr::{
@@ -1218,6 +1223,7 @@ mod tests {
         ctrl_num: u64,
         foo: impl FnOnce(&mut ModuleBuilder<Hugr>, usize) -> FuncID<true>,
         dagger: bool,
+        name: &str,
     ) {
         // --- Build the module ---
         let mut module = ModuleBuilder::new();
@@ -1340,7 +1346,7 @@ mod tests {
 
         // Dump the hugr before resolution for debugging.
         let s = h.mermaid_string();
-        let _ = fs::write("before.mmd", &s);
+        let _ = fs::write(format!("{}_before.mmd", name), &s);
         assert_matches!(h.validate(), Ok(()));
 
         // Apply the modifier resolver starting from the module entrypoint.
@@ -1349,9 +1355,40 @@ mod tests {
 
         // Dump the hugr after resolution for debugging.
         let s = h.mermaid_string();
-        let _ = fs::write("after.mmd", &s);
+        let _ = fs::write(format!("{}_after.mmd", name), &s);
 
         // The resolved hugr must still be structurally valid.
+        assert_matches!(h.validate(), Ok(()));
+    }
+
+    const GUPPY_EXAMPLES_DIR: &str = "../test_files/modifier_examples";
+    const MERMAID_OUTPUT_DIR: &str = "../test_files/mermaid_output";
+
+    fn load_guppy_example(name: &str) -> std::io::Result<Hugr> {
+        let file = Path::new(GUPPY_EXAMPLES_DIR).join(&format!("{name}.hugr"));
+        let reader = fs::File::open(file)?;
+        let reader = BufReader::new(reader);
+        Ok(Hugr::load(reader, None).unwrap())
+    }
+    #[rstest::rstest]
+    #[case::call("ctrl_on_call")]
+    // #[case::call("ctrl_on_x")]
+    pub fn test_saved_hugr(#[case] name: &str) {
+        let mut h = load_guppy_example(name).unwrap();
+
+        let _ = fs::write(
+            format!("{}{}_before.mmd", MERMAID_OUTPUT_DIR, name),
+            &h.mermaid_string(),
+        );
+        assert_matches!(h.validate(), Ok(()));
+
+        let entrypoint = h.entrypoint();
+        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+
+        let _ = fs::write(
+            format!("{}{}_after.mmd", MERMAID_OUTPUT_DIR, name),
+            &h.mermaid_string(),
+        );
         assert_matches!(h.validate(), Ok(()));
     }
 }
