@@ -18,7 +18,7 @@ pub(crate) mod relooper;
 pub(crate) mod rvsdg;
 pub mod structuralize;
 
-pub use nest_cfgs::{CfgNodeMap, IdentityCfgMap, RegionBlocksError, region_blocks};
+pub use nest_cfgs::{CfgBlockMap, CfgNodeMap, IdentityCfgMap, RegionBlocksError, region_blocks};
 
 use nest_cfgs::EdgeClassifier;
 

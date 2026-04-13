@@ -9,7 +9,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
-use hugr::Node;
+use hugr::core::HugrNode;
 use itertools::Itertools;
 use petgraph::algo::{dominators::simple_fast, kosaraju_scc};
 use petgraph::graphmap::DiGraphMap;
@@ -18,50 +18,53 @@ use super::CfgNodeMap;
 
 /// Reducibility or reachability mismatch discovered while analyzing a CFG.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum CfgFactsError {
+pub(crate) enum CfgFactsError<T> {
     /// No path exists from the CFG entry to the CFG exit.
     NoEntryExitPath,
     /// Some nodes reachable from the entry do not reach the exit.
     ReachableNodesDoNotReachExit {
         /// Reachable nodes excluded from the entry-to-exit scope.
-        dropped: Vec<Node>,
+        dropped: Vec<T>,
     },
     /// A cyclic SCC has more than one entry from outside the SCC.
     Irreducible {
         /// CFG root whose scope failed reducibility.
-        cfg: Node,
+        cfg: T,
         /// Entry blocks into the cyclic SCC.
-        entries: Vec<Node>,
+        entries: Vec<T>,
     },
 }
 
 /// Deterministic graph facts shared by structuralization strategies.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct CfgFacts {
+pub(crate) struct CfgFacts<T> {
     /// Reachable nodes that also reach the exit.
-    pub(crate) scope: BTreeSet<Node>,
+    pub(crate) scope: BTreeSet<T>,
     /// Deterministic in-scope successor order per node.
-    pub(crate) succs: BTreeMap<Node, Vec<Node>>,
+    pub(crate) succs: BTreeMap<T, Vec<T>>,
     /// Deterministic in-scope predecessor order per node.
-    pub(crate) preds: BTreeMap<Node, Vec<Node>>,
+    pub(crate) preds: BTreeMap<T, Vec<T>>,
     /// Immediate dominator relation.
-    pub(crate) idom: BTreeMap<Node, Option<Node>>,
+    pub(crate) idom: BTreeMap<T, Option<T>>,
     /// Immediate postdominator relation.
-    pub(crate) ipostdom: BTreeMap<Node, Option<Node>>,
+    pub(crate) ipostdom: BTreeMap<T, Option<T>>,
     /// Loop-header to backedge-source mapping.
-    pub(crate) backedges: BTreeMap<Node, Vec<Node>>,
+    pub(crate) backedges: BTreeMap<T, Vec<T>>,
     /// Loop-header to natural-loop-block set mapping.
-    pub(crate) loop_blocks: BTreeMap<Node, BTreeSet<Node>>,
+    pub(crate) loop_blocks: BTreeMap<T, BTreeSet<T>>,
 }
 
-impl CfgFacts {
+impl<T> CfgFacts<T>
+where
+    T: HugrNode,
+{
     /// Computes deterministic CFG facts over the entry-to-exit scope.
     ///
     /// # Errors
     ///
     /// Returns an error when no entry-to-exit path exists, when some reachable
     /// nodes cannot reach the exit, or when the scoped CFG is irreducible.
-    pub(crate) fn new(cfg_root: Node, cfg: &impl CfgNodeMap<Node>) -> Result<Self, CfgFactsError> {
+    pub(crate) fn new(cfg_root: T, cfg: &impl CfgNodeMap<T>) -> Result<Self, CfgFactsError<T>> {
         let reachable = forward_reachable(cfg);
         let can_reach_exit = backward_reachable_from_exit(cfg);
         let scope = reachable
@@ -93,7 +96,7 @@ impl CfgFacts {
                 (
                     node,
                     cfg.successors(node)
-                        .filter(|succ: &Node| scope.contains(succ))
+                        .filter(|succ: &T| scope.contains(succ))
                         .collect_vec(),
                 )
             })
@@ -105,7 +108,7 @@ impl CfgFacts {
                 (
                     node,
                     cfg.predecessors(node)
-                        .filter(|pred: &Node| scope.contains(pred))
+                        .filter(|pred: &T| scope.contains(pred))
                         .collect_vec(),
                 )
             })
@@ -126,7 +129,7 @@ impl CfgFacts {
             .iter()
             .flat_map(|(&src, succs)| succs.iter().copied().map(move |dst| (src, dst)))
             .filter(|(src, dst)| dominates(*dst, *src, &idom))
-            .fold(BTreeMap::<Node, Vec<Node>>::new(), |mut map, (src, dst)| {
+            .fold(BTreeMap::<T, Vec<T>>::new(), |mut map, (src, dst)| {
                 map.entry(dst).or_default().push(src);
                 map
             });
@@ -158,10 +161,10 @@ impl CfgFacts {
     /// suppressed so a single logical iteration can be traversed linearly.
     pub(crate) fn scope_successors(
         &self,
-        node: Node,
-        scope: &BTreeSet<Node>,
-        active_loop: Option<Node>,
-    ) -> Vec<Node> {
+        node: T,
+        scope: &BTreeSet<T>,
+        active_loop: Option<T>,
+    ) -> Vec<T> {
         self.succs
             .get(&node)
             .into_iter()
@@ -175,7 +178,7 @@ impl CfgFacts {
     }
 
     /// Returns whether the specified edge is the active loop's backedge.
-    pub(crate) fn is_loop_backedge(&self, src: Node, dst: Node, header: Node) -> bool {
+    pub(crate) fn is_loop_backedge(&self, src: T, dst: T, header: T) -> bool {
         dst == header
             && self
                 .backedges
@@ -186,9 +189,9 @@ impl CfgFacts {
     /// Returns whether the node should be structured as a nested loop in this scope.
     pub(crate) fn is_nested_loop_header(
         &self,
-        node: Node,
-        scope: &BTreeSet<Node>,
-        active_loop: Option<Node>,
+        node: T,
+        scope: &BTreeSet<T>,
+        active_loop: Option<T>,
     ) -> bool {
         active_loop != Some(node)
             && self
@@ -204,10 +207,10 @@ impl CfgFacts {
     /// structured.
     pub(crate) fn branch_join(
         &self,
-        split_node: Node,
-        scope: &BTreeSet<Node>,
-        stop: Option<Node>,
-    ) -> Result<Node, String> {
+        split_node: T,
+        scope: &BTreeSet<T>,
+        stop: Option<T>,
+    ) -> Result<T, String> {
         let mut current = self.ipostdom.get(&split_node).copied().flatten();
         while let Some(join) = current {
             if join != split_node && scope.contains(&join) {
@@ -223,7 +226,10 @@ impl CfgFacts {
 }
 
 /// Builds the scoped CFG graph used for dominance queries.
-fn build_graph(cfg: &impl CfgNodeMap<Node>, scope: &BTreeSet<Node>) -> DiGraphMap<Node, ()> {
+fn build_graph<T>(cfg: &impl CfgNodeMap<T>, scope: &BTreeSet<T>) -> DiGraphMap<T, ()>
+where
+    T: HugrNode,
+{
     let mut graph = DiGraphMap::new();
     for &node in scope {
         graph.add_node(node);
@@ -239,7 +245,10 @@ fn build_graph(cfg: &impl CfgNodeMap<Node>, scope: &BTreeSet<Node>) -> DiGraphMa
 }
 
 /// Reverses a graph so postdominators can be computed as dominators.
-fn reverse_graph(graph: &DiGraphMap<Node, ()>) -> DiGraphMap<Node, ()> {
+fn reverse_graph<T>(graph: &DiGraphMap<T, ()>) -> DiGraphMap<T, ()>
+where
+    T: HugrNode,
+{
     let mut reversed = DiGraphMap::new();
     for node in graph.nodes() {
         reversed.add_node(node);
@@ -251,7 +260,10 @@ fn reverse_graph(graph: &DiGraphMap<Node, ()>) -> DiGraphMap<Node, ()> {
 }
 
 /// Returns all nodes reachable from the CFG entry.
-fn forward_reachable(cfg: &impl CfgNodeMap<Node>) -> BTreeSet<Node> {
+fn forward_reachable<T>(cfg: &impl CfgNodeMap<T>) -> BTreeSet<T>
+where
+    T: HugrNode,
+{
     let mut seen = BTreeSet::new();
     let mut pending = VecDeque::from([cfg.entry_node()]);
     while let Some(node) = pending.pop_front() {
@@ -264,7 +276,10 @@ fn forward_reachable(cfg: &impl CfgNodeMap<Node>) -> BTreeSet<Node> {
 }
 
 /// Returns all nodes that can reach the CFG exit.
-fn backward_reachable_from_exit(cfg: &impl CfgNodeMap<Node>) -> BTreeSet<Node> {
+fn backward_reachable_from_exit<T>(cfg: &impl CfgNodeMap<T>) -> BTreeSet<T>
+where
+    T: HugrNode,
+{
     let mut seen = BTreeSet::new();
     let mut pending = VecDeque::from([cfg.exit_node()]);
     while let Some(node) = pending.pop_front() {
@@ -277,12 +292,15 @@ fn backward_reachable_from_exit(cfg: &impl CfgNodeMap<Node>) -> BTreeSet<Node> {
 }
 
 /// Ensures the entry-to-exit scope is reducible.
-fn ensure_reducible(
-    cfg_root: Node,
-    cfg: &impl CfgNodeMap<Node>,
-    scope: &BTreeSet<Node>,
-    graph: &DiGraphMap<Node, ()>,
-) -> Result<(), CfgFactsError> {
+fn ensure_reducible<T>(
+    cfg_root: T,
+    cfg: &impl CfgNodeMap<T>,
+    scope: &BTreeSet<T>,
+    graph: &DiGraphMap<T, ()>,
+) -> Result<(), CfgFactsError<T>>
+where
+    T: HugrNode,
+{
     for scc in kosaraju_scc(graph) {
         let cyclic = scc.len() > 1 || scc.iter().any(|node| graph.contains_edge(*node, *node));
         if !cyclic {
@@ -296,7 +314,7 @@ fn ensure_reducible(
                 *node == cfg.entry_node()
                     || cfg
                         .predecessors(*node)
-                        .any(|pred: Node| scope.contains(&pred) && !members.contains(&pred))
+                        .any(|pred: T| scope.contains(&pred) && !members.contains(&pred))
             })
             .collect_vec();
         if entries.len() > 1 {
@@ -310,7 +328,10 @@ fn ensure_reducible(
 }
 
 /// Returns whether `dom` dominates `node`.
-fn dominates(dom: Node, mut node: Node, idom: &BTreeMap<Node, Option<Node>>) -> bool {
+fn dominates<T>(dom: T, mut node: T, idom: &BTreeMap<T, Option<T>>) -> bool
+where
+    T: HugrNode,
+{
     loop {
         if dom == node {
             return true;
@@ -323,13 +344,16 @@ fn dominates(dom: Node, mut node: Node, idom: &BTreeMap<Node, Option<Node>>) -> 
 }
 
 /// Computes the natural loop blocks for one loop header.
-fn natural_loop_blocks(
-    header: Node,
-    sources: &[Node],
-    preds: &BTreeMap<Node, Vec<Node>>,
-    idom: &BTreeMap<Node, Option<Node>>,
-    scope: &BTreeSet<Node>,
-) -> BTreeSet<Node> {
+fn natural_loop_blocks<T>(
+    header: T,
+    sources: &[T],
+    preds: &BTreeMap<T, Vec<T>>,
+    idom: &BTreeMap<T, Option<T>>,
+    scope: &BTreeSet<T>,
+) -> BTreeSet<T>
+where
+    T: HugrNode,
+{
     let mut blocks = BTreeSet::from([header]);
     let mut pending = sources.iter().copied().collect::<VecDeque<_>>();
     while let Some(node) = pending.pop_front() {

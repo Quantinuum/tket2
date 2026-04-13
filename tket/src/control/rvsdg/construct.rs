@@ -72,7 +72,7 @@ impl<'a, H: HugrView<Node = Node>> RvsdgBuilder<'a, H> {
         &mut self,
         start: Node,
         scope: &BTreeSet<Node>,
-        info: &CfgFacts,
+        info: &CfgFacts<Node>,
         cfg: &impl CfgNodeMap<Node>,
     ) -> Result<Region, RvsdgBuildError<Node>> {
         let arguments = self.cfg_signature_inputs()?;
@@ -116,7 +116,7 @@ impl<'a, H: HugrView<Node = Node>> RvsdgBuilder<'a, H> {
         scope: &BTreeSet<Node>,
         stop: Option<Node>,
         active_loop: Option<Node>,
-        info: &CfgFacts,
+        info: &CfgFacts<Node>,
         cfg: &impl CfgNodeMap<Node>,
     ) -> Result<Vec<RvsdgNode>, RvsdgBuildError<Node>> {
         let mut items = Vec::new();
@@ -189,7 +189,7 @@ impl<'a, H: HugrView<Node = Node>> RvsdgBuilder<'a, H> {
         scope: &BTreeSet<Node>,
         stop: Option<Node>,
         active_loop: Option<Node>,
-        info: &CfgFacts,
+        info: &CfgFacts<Node>,
         cfg: &impl CfgNodeMap<Node>,
     ) -> Result<(GammaNode, Option<Node>), RvsdgBuildError<Node>> {
         let split = self.build_block(split_node)?;
@@ -278,7 +278,7 @@ impl<'a, H: HugrView<Node = Node>> RvsdgBuilder<'a, H> {
         &mut self,
         header: Node,
         scope: &BTreeSet<Node>,
-        info: &CfgFacts,
+        info: &CfgFacts<Node>,
         cfg: &impl CfgNodeMap<Node>,
     ) -> Result<(ThetaNode, Option<Node>), RvsdgBuildError<Node>> {
         let loop_blocks = info
@@ -490,7 +490,7 @@ fn block_successor_row<H: HugrView<Node = Node>>(
 
 /// Classifies how control should continue after a branch join.
 fn branch_continuation(
-    info: &CfgFacts,
+    info: &CfgFacts<Node>,
     node: Node,
     scope: &BTreeSet<Node>,
     active_loop: Option<Node>,
@@ -504,7 +504,7 @@ fn branch_continuation(
 }
 
 /// Maps shared CFG-facts failures into RVSDG construction errors.
-fn map_cfg_facts_error(cfg_root: Node, err: CfgFactsError) -> RvsdgBuildError<Node> {
+fn map_cfg_facts_error(cfg_root: Node, err: CfgFactsError<Node>) -> RvsdgBuildError<Node> {
     match err {
         CfgFactsError::NoEntryExitPath => RvsdgBuildError::MalformedScope {
             start: cfg_root,

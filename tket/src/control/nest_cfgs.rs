@@ -71,6 +71,18 @@ pub trait CfgNodeMap<T> {
     fn predecessors(&self, node: T) -> impl Iterator<Item = T>;
 }
 
+/// Extension of [`CfgNodeMap`] for graph views whose nodes correspond to HUGR
+/// basic blocks.
+///
+/// Strategy-specific preprocessing may introduce synthetic graph nodes while
+/// still referring back to one original HUGR block for block analysis and
+/// lowering. This trait provides that mapping without forcing every CFG view to
+/// use [`Node`] as its graph-node type.
+pub trait CfgBlockMap<T>: CfgNodeMap<T> {
+    /// Returns the original HUGR node associated with a graph node.
+    fn hugr_node(&self, node: T) -> Node;
+}
+
 /// Extension of [`CfgNodeMap`] to that can perform (mutable/destructive)
 /// nesting of regions detected.
 pub trait CfgNester<T>: CfgNodeMap<T> {
@@ -241,6 +253,12 @@ impl<H: HugrView> CfgNodeMap<H::Node> for IdentityCfgMap<H> {
 
     fn predecessors(&self, node: H::Node) -> impl Iterator<Item = H::Node> {
         self.h.neighbours(node, Direction::Incoming)
+    }
+}
+
+impl<H: HugrView<Node = Node>> CfgBlockMap<Node> for IdentityCfgMap<H> {
+    fn hugr_node(&self, node: Node) -> Node {
+        node
     }
 }
 

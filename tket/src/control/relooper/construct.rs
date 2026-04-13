@@ -49,7 +49,7 @@ pub(super) fn build_cfg_ast<H: HugrView<Node = Node>>(
     })
 }
 
-impl CfgFacts {
+impl CfgFacts<Node> {
     /// Structures one linear scope until it reaches an explicit stop node.
     ///
     /// The walker emits straight-line blocks, nested branch regions, and nested
@@ -313,7 +313,7 @@ impl CfgFacts {
 
 /// Classifies how control should continue after a branch join.
 fn branch_continuation(
-    info: &CfgFacts,
+    info: &CfgFacts<Node>,
     node: Node,
     scope: &BTreeSet<Node>,
     active_loop: Option<Node>,
@@ -327,7 +327,7 @@ fn branch_continuation(
 }
 
 /// Maps shared CFG-facts failures into Beyond-Relooper analysis errors.
-fn map_cfg_facts_error(cfg_root: Node, err: CfgFactsError) -> StructuralizationError {
+fn map_cfg_facts_error(cfg_root: Node, err: CfgFactsError<Node>) -> StructuralizationError {
     match err {
         CfgFactsError::NoEntryExitPath => StructuralizationError::Relooper {
             reason: "cfg has no entry-to-exit path".into(),
