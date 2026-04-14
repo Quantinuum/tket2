@@ -131,12 +131,12 @@ fn lower_theta(theta: &ThetaNode) -> Result<StructuredRegion, StructuralizationE
                 .iter()
                 .map(lower_node)
                 .collect::<Result<Vec<_>, _>>()?,
-            backedge_source: theta.backedge_source,
-            continue_edge: StructuredLoopEdge {
+            backedge_sources: vec![theta.backedge_source],
+            continue_edges: vec![StructuredLoopEdge {
                 source: theta.continue_edge.source,
                 case: theta.continue_edge.case,
                 payload: vars_to_row(&theta.continue_edge.payload),
-            },
+            }],
             exits: theta
                 .exits
                 .iter()

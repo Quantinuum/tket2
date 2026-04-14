@@ -149,10 +149,10 @@ pub(crate) enum StructuredRegionBody {
         header: StructuredBlock,
         /// One-iteration loop body items.
         body: Vec<StructuredNode>,
-        /// CFG block whose successor returns control to the header.
-        backedge_source: Node,
-        /// Continue edge routed back to the loop header.
-        continue_edge: StructuredLoopEdge,
+        /// CFG blocks whose successors return control to the header.
+        backedge_sources: Vec<Node>,
+        /// Continue edges routed back to the loop header.
+        continue_edges: Vec<StructuredLoopEdge>,
         /// Distinct loop exits selected by break edges in the loop body.
         exits: Vec<StructuredLoopExit>,
         /// Immediate payload row consumed by the `TailLoop` break path.

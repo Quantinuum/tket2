@@ -99,10 +99,10 @@ pub(in crate::control) struct RelooperLoopLowering {
     pub(super) kind: StructuredLoopKind,
     /// Header block that guards or enters the loop.
     pub(super) header: StructuredBlock,
-    /// CFG block whose successor returns control to the header.
-    pub(super) backedge_source: Node,
-    /// Continue edge routed back to the loop header.
-    pub(super) continue_edge: StructuredLoopEdge,
+    /// CFG blocks whose successors return control to the header.
+    pub(super) backedge_sources: Vec<Node>,
+    /// Continue edges routed back to the loop header.
+    pub(super) continue_edges: Vec<StructuredLoopEdge>,
 }
 
 /// One statement in the Beyond-Relooper AST.

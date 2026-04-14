@@ -803,14 +803,14 @@ fn branch_then_loop_io(#[from(build_cond_then_loop_cfg)] cond_then_loop: Hugr) {
         panic!("expected loop region");
     };
     let StructuredRegionBody::Loop {
-        continue_edge,
+        continue_edges,
         break_outputs,
         ..
     } = &loop_region.body
     else {
         panic!("expected loop body");
     };
-    assert_eq!(continue_edge.payload.len(), 1);
+    assert_eq!(continue_edges[0].payload.len(), 1);
     assert_eq!(break_outputs.len(), 1);
 }
 
@@ -847,7 +847,7 @@ fn header_loop_io(#[from(build_header_controlled_loop_cfg)] header_loop: Hugr) {
     let StructuredRegionBody::Loop {
         kind,
         body,
-        continue_edge,
+        continue_edges,
         break_outputs,
         ..
     } = &loop_region.body
@@ -856,7 +856,7 @@ fn header_loop_io(#[from(build_header_controlled_loop_cfg)] header_loop: Hugr) {
     };
     assert_eq!(*kind, StructuredLoopKind::HeaderControlled);
     assert_eq!(body.len(), 1);
-    assert_eq!(continue_edge.payload.len(), 1);
+    assert_eq!(continue_edges[0].payload.len(), 1);
     assert_eq!(break_outputs.len(), 1);
 }
 
@@ -971,10 +971,6 @@ fn lowers_reducible_cfgs_with_multiple_loop_exit_targets(
 }
 
 #[rstest]
-#[case::non_unique_backedge(
-    build_non_unique_backedge_loop_cfg as TestCfgBuilder,
-    "unique backedge source"
-)]
 #[case::multi_continue_header(
     build_multi_continue_header_loop_cfg as TestCfgBuilder,
     "exactly one in-loop successor"
@@ -988,6 +984,27 @@ fn documents_current_relooper_gaps(
     assert!(
         err.contains(expected_reason),
         "expected `{expected_reason}` in `{err}`"
+    );
+}
+
+#[rstest]
+fn lowers_non_unique_backedge_loop(
+    #[from(build_non_unique_backedge_loop_cfg)] mut non_unique_backedge_loop: Hugr,
+) {
+    let cfgs = cfgs(&non_unique_backedge_loop);
+    let report = structurize_cfgs(
+        &mut non_unique_backedge_loop,
+        &cfgs,
+        StructuralizationStrategy::BeyondRelooper,
+    )
+    .unwrap();
+    assert_eq!(report.rewrites.len(), 1);
+    assert_eq!(
+        non_unique_backedge_loop
+            .nodes()
+            .filter(|n| non_unique_backedge_loop.get_optype(*n).is_cfg())
+            .count(),
+        0
     );
 }
 

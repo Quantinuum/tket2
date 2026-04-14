@@ -263,8 +263,11 @@ where
                 Ok::<Vec<RelooperStmt>, StructuralizationError>(arm)
             })
             .collect::<Result<Vec<_>, _>>()?;
-        let (join_kind, next) =
-            branch_continuation(self, join_node, frame.scope, frame.active_loop);
+        let (join_kind, next) = if frame.active_loop == Some(join_node) {
+            (StructuredBranchJoinKind::Deferred, None)
+        } else {
+            branch_continuation(self, join_node, frame.scope, frame.active_loop)
+        };
 
         Ok((
             RelooperRegion {
@@ -329,17 +332,19 @@ where
             .map(|(_, dst)| *dst)
             .unique()
             .collect_vec();
-        let backedge_source = self
+        let backedge_sources = self
             .backedges
             .get(&header)
             .into_iter()
             .flatten()
             .copied()
             .filter(|source| loop_blocks.contains(source))
-            .exactly_one()
-            .map_err(|_| StructuralizationError::Relooper {
-                reason: format!("loop headed by {header} does not have a unique backedge source"),
-            })?;
+            .collect_vec();
+        if backedge_sources.is_empty() {
+            return Err(StructuralizationError::UnsupportedLoop {
+                reason: format!("loop headed by {header} has no backedge source"),
+            });
+        }
         let header_block = analyze_block(cfg_view, cfg.hugr_node(header))?;
         let header_succs = self.succs.get(&header).cloned().unwrap_or_default();
         let in_loop_succs = header_succs
@@ -442,12 +447,15 @@ where
                         lowering: RelooperLoopLowering {
                             kind: StructuredLoopKind::HeaderControlled,
                             header: header_block,
-                            backedge_source: cfg.hugr_node(backedge_source),
-                            continue_edge: StructuredLoopEdge {
+                            backedge_sources: backedge_sources
+                                .iter()
+                                .map(|source| cfg.hugr_node(*source))
+                                .collect(),
+                            continue_edges: vec![StructuredLoopEdge {
                                 source: cfg.hugr_node(header),
                                 case: continue_case,
                                 payload: continue_payload,
-                            },
+                            }],
                         },
                         body: Box::new(RelooperStmt::Seq(body)),
                     },
@@ -462,22 +470,36 @@ where
                 },
             )
         } else {
-            let latch_succs = self
-                .succs
-                .get(&backedge_source)
-                .cloned()
-                .unwrap_or_default();
-            let continue_case = latch_succs.iter().position(|succ| *succ == header).ok_or(
-                StructuralizationError::UnsupportedLoop {
-                    reason: "loop latch has no backedge to the header".into(),
-                },
-            )?;
-            let continue_payload = block_successor_payload(
-                cfg_view,
-                cfg.hugr_node(backedge_source),
-                continue_case,
-                "tail-controlled loop continue case is out of range",
-            )?;
+            let continue_edges = backedge_sources
+                .iter()
+                .copied()
+                .map(|backedge_source| {
+                    let latch_succs = self
+                        .succs
+                        .get(&backedge_source)
+                        .cloned()
+                        .unwrap_or_default();
+                    let continue_case = latch_succs.iter().position(|succ| *succ == header).ok_or(
+                        StructuralizationError::UnsupportedLoop {
+                            reason: format!(
+                                "loop latch {backedge_source} has no backedge to the header"
+                            ),
+                        },
+                    )?;
+                    let continue_payload = block_successor_payload(
+                        cfg_view,
+                        cfg.hugr_node(backedge_source),
+                        continue_case,
+                        "tail-controlled loop continue case is out of range",
+                    )?;
+                    Ok(StructuredLoopEdge {
+                        source: cfg.hugr_node(backedge_source),
+                        case: continue_case,
+                        payload: continue_payload,
+                    })
+                })
+                .collect::<Result<Vec<_>, StructuralizationError>>()?;
+            let continue_payload = continue_edges[0].payload.clone();
             let exit_continuations = exit_targets
                 .iter()
                 .copied()
@@ -537,12 +559,11 @@ where
                         lowering: RelooperLoopLowering {
                             kind: StructuredLoopKind::TailControlled,
                             header: header_block,
-                            backedge_source: cfg.hugr_node(backedge_source),
-                            continue_edge: StructuredLoopEdge {
-                                source: cfg.hugr_node(backedge_source),
-                                case: continue_case,
-                                payload: continue_payload,
-                            },
+                            backedge_sources: backedge_sources
+                                .iter()
+                                .map(|source| cfg.hugr_node(*source))
+                                .collect(),
+                            continue_edges: continue_edges.clone(),
                         },
                         body: Box::new(RelooperStmt::Seq(body)),
                     },

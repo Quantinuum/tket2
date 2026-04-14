@@ -194,8 +194,8 @@ fn lower_loop_body<H: HugrView<Node = Node>>(
         kind: lowering.kind,
         header: lowering.header.clone(),
         body: lower_stmt_as_sequence_in_context(cfg_view, body, Some(*label))?,
-        backedge_source: lowering.backedge_source,
-        continue_edge: lowering.continue_edge.clone(),
+        backedge_sources: lowering.backedge_sources.clone(),
+        continue_edges: lowering.continue_edges.clone(),
         exits: exit_edges
             .iter()
             .cloned()
