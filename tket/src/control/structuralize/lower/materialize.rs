@@ -427,8 +427,18 @@ mod test {
         let block = cfg_map.successors(entry).next().unwrap();
         let exit = cfg_map.exit_node();
 
-        let block_summary = analyze_block(&cfg_view, block).unwrap();
-        let exit_summary = analyze_block(&cfg_view, exit).unwrap();
+        let block_summary = analyze_block(
+            &cfg_view,
+            crate::control::cfg::PreprocessedNode::Original(block),
+            block,
+        )
+        .unwrap();
+        let exit_summary = analyze_block(
+            &cfg_view,
+            crate::control::cfg::PreprocessedNode::Original(exit),
+            exit,
+        )
+        .unwrap();
         let region = StructuredRegion {
             io: RegionIo {
                 inputs: TypeRow::from([usize_t()]),

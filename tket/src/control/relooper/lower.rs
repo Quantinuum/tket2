@@ -428,8 +428,14 @@ fn label_target_block<H: HugrView<Node = Node>>(
     cfg_view: &H,
     label: RelooperLabel,
 ) -> Result<StructuredBlock, StructuralizationError> {
-    let node = match label {
-        RelooperLabel::Original(node) | RelooperLabel::Duplicate { original: node, .. } => node,
+    let (cfg_node, node) = match label {
+        RelooperLabel::Original(node) => {
+            (crate::control::cfg::PreprocessedNode::Original(node), node)
+        }
+        RelooperLabel::Duplicate { original, clone_id } => (
+            crate::control::cfg::PreprocessedNode::Duplicate { original, clone_id },
+            original,
+        ),
     };
-    analyze_block(cfg_view, node)
+    analyze_block(cfg_view, cfg_node, node)
 }

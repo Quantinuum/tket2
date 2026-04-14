@@ -12,6 +12,7 @@ use hugr::Node;
 use hugr::builder::BuildError;
 use hugr::types::TypeRow;
 
+use crate::control::cfg::PreprocessedNode;
 use crate::control::rvsdg;
 use crate::passes::normalize_cfgs::NormalizeCFGError;
 
@@ -34,11 +35,21 @@ pub(crate) struct RegionIo {
     pub outputs: TypeRow,
 }
 
+/// Stable identity for one CFG node occurrence used during lowering.
+///
+/// Structuralization may preprocess irreducible graphs by duplicating CFG
+/// nodes. Lowering therefore needs a control-edge identity that remains unique
+/// per CFG occurrence even when multiple occurrences map back to the same
+/// original HUGR block.
+pub(crate) type StructuredCfgNode = PreprocessedNode<Node>;
+
 /// HUGR-facing summary of a CFG block used during lowering.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum StructuredBlock {
     /// A normal CFG basic block.
     Dataflow {
+        /// CFG-node identity used by structural analysis and lowering.
+        cfg_node: StructuredCfgNode,
         /// Original block node.
         node: Node,
         /// Dataflow inputs to the block body.
@@ -50,6 +61,8 @@ pub(crate) enum StructuredBlock {
     },
     /// The CFG exit block.
     Exit {
+        /// CFG-node identity used by structural analysis and lowering.
+        cfg_node: StructuredCfgNode,
         /// Original exit block node.
         node: Node,
         /// Values consumed by the exit block.
@@ -62,6 +75,13 @@ impl StructuredBlock {
     pub(crate) fn node(&self) -> Node {
         match self {
             Self::Dataflow { node, .. } | Self::Exit { node, .. } => *node,
+        }
+    }
+
+    /// Returns the CFG-node identity represented by this structured block.
+    pub(crate) fn cfg_node(&self) -> StructuredCfgNode {
+        match self {
+            Self::Dataflow { cfg_node, .. } | Self::Exit { cfg_node, .. } => *cfg_node,
         }
     }
 
@@ -95,7 +115,7 @@ pub(crate) enum StructuredLoopKind {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct StructuredLoopEdge {
     /// CFG block producing the control decision.
-    pub(crate) source: Node,
+    pub(crate) source: StructuredCfgNode,
     /// Successor index selected by that control decision.
     pub(crate) case: usize,
     /// Payload row carried along that successor.

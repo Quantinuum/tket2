@@ -8,21 +8,44 @@ use hugr::ops::OpType;
 use hugr::types::TypeRow;
 use hugr::{HugrView, Node};
 
-use super::types::{StructuralizationError, StructuredBlock};
+use crate::control::cfg::PreprocessedNode;
+
+use super::types::{StructuralizationError, StructuredBlock, StructuredCfgNode};
+
+/// Converts one CFG graph node into the lowering identity used by structured blocks.
+pub(crate) trait IntoStructuredCfgNode {
+    /// Returns the stable CFG-node identity for this graph node.
+    fn into_structured_cfg_node(self) -> StructuredCfgNode;
+}
+
+impl IntoStructuredCfgNode for Node {
+    fn into_structured_cfg_node(self) -> StructuredCfgNode {
+        PreprocessedNode::Original(self)
+    }
+}
+
+impl IntoStructuredCfgNode for PreprocessedNode<Node> {
+    fn into_structured_cfg_node(self) -> StructuredCfgNode {
+        self
+    }
+}
 
 /// Reclassifies a CFG node as either a typed dataflow block or exit block.
 pub(crate) fn analyze_block<H: HugrView<Node = Node>>(
     cfg_view: &H,
+    cfg_node: StructuredCfgNode,
     node: Node,
 ) -> Result<StructuredBlock, StructuralizationError> {
     match cfg_view.get_optype(node) {
         OpType::DataflowBlock(block) => Ok(StructuredBlock::Dataflow {
+            cfg_node,
             node,
             inputs: block.inputs.clone(),
             sum_rows: block.sum_rows.clone(),
             outputs: block.other_outputs.clone(),
         }),
         OpType::ExitBlock(exit) => Ok(StructuredBlock::Exit {
+            cfg_node,
             node,
             inputs: exit.cfg_outputs.clone(),
         }),

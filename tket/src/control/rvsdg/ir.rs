@@ -8,6 +8,8 @@
 use hugr::Node;
 use hugr::types::{Type, TypeRow};
 
+use crate::control::structuralize::StructuredCfgNode;
+
 /// Identifier for one RVSDG variable.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub(crate) struct VarId(pub(crate) usize);
@@ -63,6 +65,8 @@ pub(crate) enum RvsdgNode {
 pub(crate) enum BlockNode {
     /// A dataflow basic block.
     Dataflow {
+        /// CFG-node identity used by structural analysis and lowering.
+        cfg_node: StructuredCfgNode,
         /// Original CFG block node.
         node: Node,
         /// Value inputs to the block.
@@ -74,6 +78,8 @@ pub(crate) enum BlockNode {
     },
     /// The CFG exit block.
     Exit {
+        /// CFG-node identity used by structural analysis and lowering.
+        cfg_node: StructuredCfgNode,
         /// Original CFG exit node.
         node: Node,
         /// Values consumed by the exit.
@@ -171,7 +177,7 @@ pub(crate) struct ThetaLoopVar {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ThetaEdge {
     /// CFG block producing the control decision.
-    pub(crate) source: Node,
+    pub(crate) source: StructuredCfgNode,
     /// Successor index chosen by that control decision.
     pub(crate) case: usize,
     /// Variables carried along that successor.

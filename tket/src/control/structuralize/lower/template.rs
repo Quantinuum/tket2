@@ -18,9 +18,9 @@ use itertools::Itertools;
 use std::collections::BTreeSet;
 
 use super::super::types::{
-    StructuralizationError, StructuredBlock, StructuredBranchJoinKind, StructuredLoopEdge,
-    StructuredLoopExit, StructuredLoopKind, StructuredNode, StructuredRegion, StructuredRegionBody,
-    structured_node_contains_block,
+    StructuralizationError, StructuredBlock, StructuredBranchJoinKind, StructuredCfgNode,
+    StructuredLoopEdge, StructuredLoopExit, StructuredLoopKind, StructuredNode, StructuredRegion,
+    StructuredRegionBody, structured_node_contains_block,
 };
 
 /// Detached replacement template for one CFG rewrite.
@@ -140,14 +140,14 @@ impl<'a> LoopLowering<'a> {
     }
 
     /// Returns whether a specific block/case pair continues the loop.
-    fn is_continue_case(&self, node: Node, case: usize) -> bool {
+    fn is_continue_case(&self, node: StructuredCfgNode, case: usize) -> bool {
         self.continue_edges
             .iter()
             .any(|edge| edge.source == node && edge.case == case)
     }
 
     /// Returns whether a specific block/case pair exits the loop.
-    fn break_exit_index(&self, node: Node, case: usize) -> Option<usize> {
+    fn break_exit_index(&self, node: StructuredCfgNode, case: usize) -> Option<usize> {
         self.exits.iter().position(|exit| {
             exit.edges
                 .iter()
@@ -162,7 +162,7 @@ impl<'a> LoopLowering<'a> {
                 .iter()
                 .flat_map(|exit| exit.edges.iter().map(|edge| edge.source)),
         );
-        targets.any(|target| structured_node_contains_block(node, target))
+        targets.any(|target| structured_node_contains_block(node, original_cfg_node(target)))
     }
 
     /// Returns the unique header continue edge expected by the current
@@ -174,6 +174,15 @@ impl<'a> LoopLowering<'a> {
                     .into(),
             }
         })
+    }
+}
+
+/// Returns the original HUGR block represented by one structured CFG node.
+fn original_cfg_node(node: StructuredCfgNode) -> Node {
+    match node {
+        StructuredCfgNode::Original(node) | StructuredCfgNode::Duplicate { original: node, .. } => {
+            node
+        }
     }
 }
 
@@ -478,16 +487,23 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
         };
 
         match first {
-            StructuredNode::Block(block @ StructuredBlock::Dataflow { node, sum_rows, .. }) => {
+            StructuredNode::Block(
+                block @ StructuredBlock::Dataflow {
+                    node,
+                    sum_rows,
+                    outputs,
+                    ..
+                },
+            ) => {
                 let has_special_case = loop_lowering
                     .continue_edges
                     .iter()
-                    .any(|edge| edge.source == *node)
+                    .any(|edge| edge.source == block.cfg_node())
                     || loop_lowering
                         .exits
                         .iter()
                         .flat_map(|exit| exit.edges.iter())
-                        .any(|edge| edge.source == *node);
+                        .any(|edge| edge.source == block.cfg_node());
                 if !has_special_case {
                     let next = self.lower_linear_block(builder, block, current)?;
                     return self.lower_tail_loop_items(
@@ -510,8 +526,10 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
 
                 let ordinary_cases = (0..sum_rows.len())
                     .filter(|&case_idx| {
-                        !loop_lowering.is_continue_case(*node, case_idx)
-                            && loop_lowering.break_exit_index(*node, case_idx).is_none()
+                        !loop_lowering.is_continue_case(block.cfg_node(), case_idx)
+                            && loop_lowering
+                                .break_exit_index(block.cfg_node(), case_idx)
+                                .is_none()
                     })
                     .collect_vec();
                 if ordinary_cases.len() > 1 {
@@ -524,8 +542,7 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
 
                 let mut cond = builder.conditional_builder(
                     (sum_rows.clone(), *control),
-                    loop_lowering
-                        .continue_inputs()
+                    outputs
                         .iter()
                         .cloned()
                         .zip(payload.iter().copied())
@@ -539,12 +556,16 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
                 for case_idx in 0..sum_rows.len() {
                     let mut case = cond.case_builder(case_idx)?;
                     let case_inputs = case.input_wires().collect_vec();
-                    let result = if loop_lowering.is_continue_case(*node, case_idx) {
+                    let result = if loop_lowering.is_continue_case(block.cfg_node(), case_idx) {
                         case.make_continue(loop_sig.clone(), case_inputs)?
-                    } else if let Some(exit_idx) = loop_lowering.break_exit_index(*node, case_idx) {
+                    } else if let Some(exit_idx) =
+                        loop_lowering.break_exit_index(block.cfg_node(), case_idx)
+                    {
                         let break_inputs = self.build_loop_break_inputs(
                             &mut case,
                             loop_lowering,
+                            block.cfg_node(),
+                            case_idx,
                             exit_idx,
                             case_inputs,
                         )?;
@@ -611,14 +632,18 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
                         let mut case = cond.case_builder(case_idx)?;
                         let case_inputs = case.input_wires().collect_vec();
                         let Some(arm) = arms.iter().find(|arm| arm.case == case_idx) else {
-                            let result = if loop_lowering.is_continue_case(split.node(), case_idx) {
+                            let result = if loop_lowering
+                                .is_continue_case(split.cfg_node(), case_idx)
+                            {
                                 case.make_continue(loop_sig.clone(), case_inputs)?
                             } else if let Some(exit_idx) =
-                                loop_lowering.break_exit_index(split.node(), case_idx)
+                                loop_lowering.break_exit_index(split.cfg_node(), case_idx)
                             {
                                 let break_inputs = self.build_loop_break_inputs(
                                     &mut case,
                                     loop_lowering,
+                                    split.cfg_node(),
+                                    case_idx,
                                     exit_idx,
                                     case_inputs,
                                 )?;
@@ -760,10 +785,16 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
             let mut case = cond.case_builder(case_idx)?;
             let case_inputs = case.input_wires().collect_vec();
             if let Some(exit_idx) =
-                loop_lowering.break_exit_index(loop_lowering.header.node(), case_idx)
+                loop_lowering.break_exit_index(loop_lowering.header.cfg_node(), case_idx)
             {
-                let break_inputs =
-                    self.build_loop_break_inputs(&mut case, &loop_lowering, exit_idx, case_inputs)?;
+                let break_inputs = self.build_loop_break_inputs(
+                    &mut case,
+                    &loop_lowering,
+                    loop_lowering.header.cfg_node(),
+                    case_idx,
+                    exit_idx,
+                    case_inputs,
+                )?;
                 case.finish_with_outputs(break_inputs)?;
                 continue;
             }
@@ -828,11 +859,13 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
                 let result = if inner_case_idx == continue_edge.case {
                     inner_case.make_continue(loop_sig.clone(), inner_inputs)?
                 } else if let Some(exit_idx) =
-                    loop_lowering.break_exit_index(loop_lowering.header.node(), inner_case_idx)
+                    loop_lowering.break_exit_index(loop_lowering.header.cfg_node(), inner_case_idx)
                 {
                     let break_inputs = self.build_loop_break_inputs(
                         &mut inner_case,
                         &loop_lowering,
+                        loop_lowering.header.cfg_node(),
+                        inner_case_idx,
                         exit_idx,
                         inner_inputs,
                     )?;
@@ -863,13 +896,45 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
         &mut self,
         builder: &mut B,
         loop_lowering: &LoopLowering<'_>,
+        current_node: StructuredCfgNode,
+        current_case: usize,
         exit_idx: usize,
         exit_inputs: Vec<Wire>,
     ) -> Result<Vec<Wire>, StructuralizationError>
     where
         B: Dataflow + Container,
     {
+        let expected_outputs = loop_lowering.exits[exit_idx].outputs.clone();
+        let actual_outputs: TypeRow = exit_inputs
+            .iter()
+            .map(|&wire| builder.get_wire_type(wire))
+            .collect::<Result<Vec<_>, _>>()?
+            .into();
+        if exit_inputs.len() != expected_outputs.len() {
+            return Err(StructuralizationError::UnsupportedLoop {
+                reason: format!(
+                    "loop break inputs had the wrong arity: got {}, expected {}",
+                    exit_inputs.len(),
+                    expected_outputs.len()
+                ),
+            });
+        }
         if loop_lowering.exits.len() == 1 {
+            if actual_outputs != expected_outputs {
+                return Err(StructuralizationError::UnsupportedLoop {
+                    reason: format!(
+                        "single-exit loop break payload mismatch at header {} from control {:?}/case {}: actual {actual_outputs:?}, expected {expected_outputs:?}, exit edge payload {:?}, break outputs {:?}",
+                        loop_lowering.header.node(),
+                        current_node,
+                        current_case,
+                        loop_lowering.exits[exit_idx]
+                            .edges
+                            .first()
+                            .map(|edge| edge.payload.clone()),
+                        loop_lowering.break_outputs,
+                    ),
+                });
+            }
             return Ok(exit_inputs);
         }
         let rows = loop_lowering

@@ -475,6 +475,11 @@ fn complex_control() -> Hugr {
 }
 
 #[fixture]
+fn nested_loops() -> Hugr {
+    load_guppy_example("nested_loops")
+}
+
+#[fixture]
 fn bell_test() -> Hugr {
     load_guppy_example("bell_test")
 }
@@ -1143,6 +1148,22 @@ fn structurizes_complex_control(
     #[case] strategy: StructuralizationStrategy,
 ) {
     let mut h = complex_control;
+    let report = StructuralizeCfgsPass::default()
+        .with_strategy(strategy)
+        .run(&mut h)
+        .unwrap();
+    assert!(!report.rewrites.is_empty());
+    h.validate().unwrap();
+    assert_eq!(h.nodes().filter(|n| h.get_optype(*n).is_cfg()).count(), 0);
+    assert!(tail_loop_count(&h) >= 1);
+    assert!(conditional_count(&h) >= 1);
+}
+
+#[rstest]
+#[case::rvsdg(StructuralizationStrategy::Rvsdg)]
+#[case::relooper(StructuralizationStrategy::Relooper)]
+fn structurizes_nested_loops(nested_loops: Hugr, #[case] strategy: StructuralizationStrategy) {
+    let mut h = nested_loops;
     let report = StructuralizeCfgsPass::default()
         .with_strategy(strategy)
         .run(&mut h)

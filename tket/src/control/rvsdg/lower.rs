@@ -59,17 +59,24 @@ fn lower_node(node: &RvsdgNode) -> Result<StructuredNode, StructuralizationError
 fn lower_block(block: &BlockNode) -> StructuredBlock {
     match block {
         BlockNode::Dataflow {
+            cfg_node,
             node,
             inputs,
             sum_rows,
             outputs,
         } => StructuredBlock::Dataflow {
+            cfg_node: *cfg_node,
             node: *node,
             inputs: vars_to_row(inputs),
             sum_rows: sum_rows.iter().map(|row| vars_to_row(row)).collect(),
             outputs: vars_to_row(outputs),
         },
-        BlockNode::Exit { node, inputs } => StructuredBlock::Exit {
+        BlockNode::Exit {
+            cfg_node,
+            node,
+            inputs,
+        } => StructuredBlock::Exit {
+            cfg_node: *cfg_node,
             node: *node,
             inputs: vars_to_row(inputs),
         },
