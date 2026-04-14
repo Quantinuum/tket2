@@ -111,14 +111,11 @@ fn normalize_guppy(
 /// Parameters:
 /// - strategy: Structuralization strategy to use. One of `"rvsdg"` or
 ///   `"beyond_relooper"`.
-/// - inline_dfgs: Whether helper DFG wrappers emitted during lowering should be
-///   inlined after the rewrite.
 #[pyfunction]
-#[pyo3(signature = (circ, *, strategy = "rvsdg", inline_dfgs = true, scope = None))]
+#[pyo3(signature = (circ, *, strategy = "rvsdg", scope = None))]
 fn structuralize_cfgs(
     circ: &mut CompilationState,
     strategy: &str,
-    inline_dfgs: bool,
     scope: Option<PyPassScope>,
 ) -> PyResult<()> {
     let py_scope = scope.unwrap_or_default();
@@ -132,8 +129,7 @@ fn structuralize_cfgs(
     };
 
     let pass = tket::passes::StructuralizeCfgsPass::default_with_scope(py_scope.scope)
-        .with_strategy(strategy)
-        .inline_dfgs(inline_dfgs);
+        .with_strategy(strategy);
     pass.run(&mut circ.hugr).convert_pyerrs()?;
     Ok(())
 }

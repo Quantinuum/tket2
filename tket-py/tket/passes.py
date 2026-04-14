@@ -171,12 +171,9 @@ class StructuralizeCfgs(ComposablePass):
 
     Parameters:
     - strategy: Structuralization strategy.
-    - inline_dfgs: Whether helper DFG wrappers emitted during lowering should
-      be inlined afterwards.
     """
 
     strategy: StructuralizationStrategy = StructuralizationStrategy.RVSDG
-    inline_dfgs: bool = True
     _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
 
     def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
@@ -207,7 +204,6 @@ class StructuralizeCfgs(ComposablePass):
         _passes.structuralize_cfgs(
             program._inner,
             strategy=self.strategy.value,
-            inline_dfgs=self.inline_dfgs,
             scope=self._scope,
         )
         return program

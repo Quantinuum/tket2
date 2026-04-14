@@ -21,6 +21,24 @@ type ExitContinuations = Vec<Vec<StructuredNode>>;
 /// Raw AST loop-exit continuations in wrapped-block order.
 type RawExitContinuations<'a> = Vec<(Vec<StructuredLoopEdge>, &'a [RelooperStmt])>;
 
+/// One explicit non-local exit propagated while lowering a sequence.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum LoweredExit {
+    /// Branch to an enclosing labelled construct.
+    Branch(RelooperLabel),
+    /// Return from the enclosing region with the given payload row.
+    Return(hugr::types::TypeRow),
+}
+
+/// Lowered straight-line items plus an optional propagated explicit exit.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct LoweredSequence {
+    /// Lowered structured nodes emitted before the explicit exit.
+    nodes: Vec<StructuredNode>,
+    /// Explicit exit that still needs to be interpreted by an enclosing scope.
+    exit: Option<LoweredExit>,
+}
+
 /// Builds one detached rewrite template from a Beyond-Relooper AST.
 ///
 /// # Errors
@@ -52,9 +70,10 @@ fn lower_stmt_as_body<H: HugrView<Node = Node>>(
     stmt: &RelooperStmt,
 ) -> Result<StructuredRegionBody, StructuralizationError> {
     Ok(match stmt {
-        RelooperStmt::Seq(_) => {
-            StructuredRegionBody::Sequence(lower_stmt_as_sequence_in_context(cfg_view, stmt, None)?)
-        }
+        RelooperStmt::Seq(_) => StructuredRegionBody::Sequence(require_closed_sequence(
+            lower_stmt_as_sequence_in_context(cfg_view, stmt, None)?,
+            "top-level sequence",
+        )?),
         RelooperStmt::Region(region) => return Ok(lower_region(cfg_view, region)?.body),
         RelooperStmt::Block {
             label,
@@ -72,7 +91,8 @@ fn lower_stmt_as_body<H: HugrView<Node = Node>>(
                                 cfg_view,
                                 &arm.body,
                                 Some(*label),
-                            )?,
+                            )?
+                            .nodes,
                         })
                     })
                     .collect::<Result<Vec<_>, _>>()?,
@@ -80,9 +100,10 @@ fn lower_stmt_as_body<H: HugrView<Node = Node>>(
                 join_kind: lowering.join_kind,
             },
             _ => {
-                return Ok(StructuredRegionBody::Sequence(
+                return Ok(StructuredRegionBody::Sequence(require_closed_sequence(
                     lower_stmt_as_sequence_in_context(cfg_view, body, Some(*label))?,
-                ));
+                    "labelled block body",
+                )?));
             }
         },
         RelooperStmt::Case { .. } => {
@@ -110,82 +131,98 @@ fn lower_stmt_as_sequence_in_context<H: HugrView<Node = Node>>(
     cfg_view: &H,
     stmt: &RelooperStmt,
     terminal_label: Option<RelooperLabel>,
-) -> Result<Vec<StructuredNode>, StructuralizationError> {
-    match stmt {
-        RelooperStmt::Seq(items) => {
-            if let Some((region, raw_continuations)) = extract_wrapped_loop_region(items) {
-                return Ok(vec![StructuredNode::Region(Box::new(
-                    lower_wrapped_loop_region(cfg_view, region, &raw_continuations)?,
-                ))]);
-            }
-            let mut items = items.as_slice();
-            match (terminal_label, items.last()) {
-                (Some(label), Some(RelooperStmt::Br(target))) if *target == label => {
-                    items = &items[..items.len() - 1];
-                }
-                (None, Some(RelooperStmt::Return(_))) => {
-                    items = &items[..items.len() - 1];
-                }
-                _ => {}
-            }
-            let mut lowered = Vec::new();
-            for stmt in items {
-                append_sequence_stmt(cfg_view, &mut lowered, stmt)?;
-            }
-            Ok(lowered)
+) -> Result<LoweredSequence, StructuralizationError> {
+    let mut lowered = lower_stmt_as_sequence(cfg_view, stmt)?;
+    match (&terminal_label, &lowered.exit) {
+        (Some(label), Some(LoweredExit::Branch(target))) if target == label => {
+            lowered.exit = None;
         }
-        _ => {
-            let mut lowered = Vec::new();
-            append_sequence_stmt(cfg_view, &mut lowered, stmt)?;
-            Ok(lowered)
+        (None, Some(LoweredExit::Return(_))) => {
+            lowered.exit = None;
         }
+        _ => {}
     }
+
+    if lowered.exit.is_some()
+        && matches!(
+            stmt,
+            RelooperStmt::Case { .. }
+                | RelooperStmt::Loop { .. }
+                | RelooperStmt::Region(_)
+                | RelooperStmt::Exec(_)
+        )
+    {
+        return Err(StructuralizationError::Relooper {
+            reason: "explicit labelled exits cannot yet cross this structured boundary".into(),
+        });
+    }
+
+    Ok(lowered)
 }
 
-/// Appends one statement to a lowered straight-line sequence.
-fn append_sequence_stmt<H: HugrView<Node = Node>>(
+/// Lowers one statement into a straight-line sequence, propagating any explicit exit.
+fn lower_stmt_as_sequence<H: HugrView<Node = Node>>(
     cfg_view: &H,
-    lowered: &mut Vec<StructuredNode>,
     stmt: &RelooperStmt,
-) -> Result<(), StructuralizationError> {
+) -> Result<LoweredSequence, StructuralizationError> {
     match stmt {
         RelooperStmt::Seq(items) => {
             if let Some((region, raw_continuations)) = extract_wrapped_loop_region(items) {
-                lowered.push(StructuredNode::Region(Box::new(lower_wrapped_loop_region(
-                    cfg_view,
-                    region,
-                    &raw_continuations,
-                )?)));
-                return Ok(());
+                return Ok(LoweredSequence {
+                    nodes: vec![StructuredNode::Region(Box::new(lower_wrapped_loop_region(
+                        cfg_view,
+                        region,
+                        &raw_continuations,
+                    )?))],
+                    exit: None,
+                });
             }
-            for item in items {
-                append_sequence_stmt(cfg_view, lowered, item)?;
+            let mut lowered = Vec::new();
+            for (idx, item) in items.iter().enumerate() {
+                let item = lower_stmt_as_sequence(cfg_view, item)?;
+                lowered.extend(item.nodes);
+                if let Some(exit) = item.exit {
+                    if idx + 1 != items.len() {
+                        return Err(StructuralizationError::Relooper {
+                            reason: "sequence contains statements after an explicit exit".into(),
+                        });
+                    }
+                    return Ok(LoweredSequence {
+                        nodes: lowered,
+                        exit: Some(exit),
+                    });
+                }
             }
-            Ok(())
+            Ok(LoweredSequence {
+                nodes: lowered,
+                exit: None,
+            })
         }
-        RelooperStmt::Region(region) => {
-            lowered.push(StructuredNode::Region(Box::new(lower_region(
+        RelooperStmt::Region(region) => Ok(LoweredSequence {
+            nodes: vec![StructuredNode::Region(Box::new(lower_region(
                 cfg_view, region,
-            )?)));
-            Ok(())
-        }
-        RelooperStmt::Exec(block) => {
-            lowered.push(StructuredNode::Block(block.clone()));
-            Ok(())
-        }
+            )?))],
+            exit: None,
+        }),
+        RelooperStmt::Exec(block) => Ok(LoweredSequence {
+            nodes: vec![StructuredNode::Block(block.clone())],
+            exit: None,
+        }),
         RelooperStmt::Block { label, body, .. } => {
-            lowered.extend(lower_stmt_as_sequence_in_context(
-                cfg_view,
-                body,
-                Some(*label),
-            )?);
-            Ok(())
+            lower_stmt_as_sequence_in_context(cfg_view, body, Some(*label))
         }
-        RelooperStmt::Case { .. }
-        | RelooperStmt::Loop { .. }
-        | RelooperStmt::Br(_)
-        | RelooperStmt::Return(_) => Err(StructuralizationError::Relooper {
-            reason: "nested control statements must be wrapped in an analyzed region".into(),
+        RelooperStmt::Case { .. } | RelooperStmt::Loop { .. } => {
+            Err(StructuralizationError::Relooper {
+                reason: "nested control statements must be wrapped in an analyzed region".into(),
+            })
+        }
+        RelooperStmt::Br(label) => Ok(LoweredSequence {
+            nodes: Vec::new(),
+            exit: Some(LoweredExit::Branch(*label)),
+        }),
+        RelooperStmt::Return(payload) => Ok(LoweredSequence {
+            nodes: Vec::new(),
+            exit: Some(LoweredExit::Return(payload.clone())),
         }),
     }
 }
@@ -202,7 +239,10 @@ fn lower_loop_body<H: HugrView<Node = Node>>(
     Ok(StructuredRegionBody::Loop {
         kind: lowering.kind,
         header: lowering.header.clone(),
-        body: lower_stmt_as_sequence_in_context(cfg_view, body, Some(*label))?,
+        body: require_closed_sequence(
+            lower_stmt_as_sequence_in_context(cfg_view, body, Some(*label))?,
+            "loop body",
+        )?,
         backedge_sources: lowering.backedge_sources.clone(),
         continue_edges: lowering.continue_edges.clone(),
         exits: exit_edges
@@ -298,15 +338,23 @@ fn lower_exit_sequence<H: HugrView<Node = Node>>(
     cfg_view: &H,
     items: &[RelooperStmt],
 ) -> Result<Vec<StructuredNode>, StructuralizationError> {
-    let mut items = items;
-    if let Some(RelooperStmt::Br(_) | RelooperStmt::Return(_)) = items.last() {
-        items = &items[..items.len() - 1];
+    Ok(lower_stmt_as_sequence(cfg_view, &RelooperStmt::Seq(items.to_vec()))?.nodes)
+}
+
+/// Ensures a lowered sequence has no remaining explicit exit.
+fn require_closed_sequence(
+    lowered: LoweredSequence,
+    context: &str,
+) -> Result<Vec<StructuredNode>, StructuralizationError> {
+    match lowered.exit {
+        None => Ok(lowered.nodes),
+        Some(LoweredExit::Branch(_)) => Err(StructuralizationError::Relooper {
+            reason: format!("{context} still contains an explicit branch to an outer label"),
+        }),
+        Some(LoweredExit::Return(_)) => Err(StructuralizationError::Relooper {
+            reason: format!("{context} still contains an explicit return"),
+        }),
     }
-    let mut lowered = Vec::new();
-    for stmt in items {
-        append_sequence_stmt(cfg_view, &mut lowered, stmt)?;
-    }
-    Ok(lowered)
 }
 
 /// Lowers one Beyond-Relooper statement into one structured node.

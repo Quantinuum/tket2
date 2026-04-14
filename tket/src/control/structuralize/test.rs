@@ -10,8 +10,8 @@ use hugr::extension::prelude::usize_t;
 use hugr::hugr::hugrmut::HugrMut;
 use hugr::ops::handle::{BasicBlockID, ConstID, NodeHandle};
 use hugr::ops::{OpTrait, OpType, Value};
-use hugr::types::Signature;
-use hugr::{Hugr, HugrView, Node};
+use hugr::types::{EdgeKind, Signature};
+use hugr::{Hugr, HugrView, IncomingPort, Node, OutgoingPort};
 use hugr_core::ops::OpTag;
 use itertools::Itertools;
 use rstest::{fixture, rstest};
@@ -472,6 +472,45 @@ fn loop_and_branch() -> Hugr {
 #[fixture]
 fn complex_control() -> Hugr {
     load_guppy_example("complex_control")
+}
+
+#[fixture]
+fn bell_test() -> Hugr {
+    load_guppy_example("bell_test")
+}
+
+/// Count the external state-order links attached to a container's internal
+/// `Input` and `Output` children, preserving port order.
+///
+/// This helper is used to compare raw CFG `DataflowBlock` wiring with the DFG
+/// produced after structuralization. For this regression we care only about
+/// state-order ports and only about the number of edges per such port, not the
+/// exact peer nodes.
+fn container_order_link_counts(h: &Hugr, container: Node) -> (Vec<usize>, Vec<usize>) {
+    let children = h.children(container).collect_vec();
+    let input = children
+        .iter()
+        .copied()
+        .find(|child| matches!(h.get_optype(*child), OpType::Input(_)))
+        .unwrap();
+    let output = children
+        .iter()
+        .copied()
+        .find(|child| matches!(h.get_optype(*child), OpType::Output(_)))
+        .unwrap();
+    let input_links = (0..h.get_optype(input).output_count())
+        .filter(|&port| {
+            h.get_optype(input).port_kind(OutgoingPort::from(port)) == Some(EdgeKind::StateOrder)
+        })
+        .map(|port| h.linked_inputs(input, OutgoingPort::from(port)).count())
+        .collect();
+    let output_links = (0..h.get_optype(output).input_count())
+        .filter(|&port| {
+            h.get_optype(output).port_kind(IncomingPort::from(port)) == Some(EdgeKind::StateOrder)
+        })
+        .map(|port| h.linked_outputs(output, IncomingPort::from(port)).count())
+        .collect();
+    (input_links, output_links)
 }
 
 fn single_cfg_analysis(h: &Hugr) -> StructuredRegionBody {
@@ -1045,27 +1084,11 @@ fn strategy_is_deterministic(
 }
 
 #[rstest]
-#[case::default(true, 1)]
-#[case::disabled(false, 2)]
-fn pass_inlining(
-    #[case] inline_dfgs: bool,
-    #[case] minimum_dfgs: usize,
-    #[from(build_header_controlled_loop_cfg)] header_loop: Hugr,
-) {
+fn pass_inlining(#[from(build_header_controlled_loop_cfg)] header_loop: Hugr) {
     let mut h = header_loop;
-    StructuralizeCfgsPass::default()
-        .inline_dfgs(inline_dfgs)
-        .run(&mut h)
-        .unwrap();
+    StructuralizeCfgsPass::default().run(&mut h).unwrap();
     assert_eq!(h.nodes().filter(|n| h.get_optype(*n).is_cfg()).count(), 0);
-    if inline_dfgs {
-        assert_eq!(
-            h.nodes().filter(|n| h.get_optype(*n).is_dfg()).count(),
-            minimum_dfgs
-        );
-    } else {
-        assert!(h.nodes().filter(|n| h.get_optype(*n).is_dfg()).count() >= minimum_dfgs);
-    }
+    assert_eq!(h.nodes().filter(|n| h.get_optype(*n).is_dfg()).count(), 1);
 }
 
 #[rstest]
@@ -1106,6 +1129,7 @@ fn structurizes_guppy_example(loop_and_branch: Hugr, #[case] strategy: Structura
         .run(&mut h)
         .unwrap();
     assert!(!report.rewrites.is_empty());
+    h.validate().unwrap();
     assert_eq!(h.nodes().filter(|n| h.get_optype(*n).is_cfg()).count(), 0);
     assert!(tail_loop_count(&h) >= 1);
     assert!(conditional_count(&h) >= 1);
@@ -1124,7 +1148,38 @@ fn structurizes_complex_control(
         .run(&mut h)
         .unwrap();
     assert!(!report.rewrites.is_empty());
+    h.validate().unwrap();
     assert_eq!(h.nodes().filter(|n| h.get_optype(*n).is_cfg()).count(), 0);
     assert!(tail_loop_count(&h) >= 1);
     assert!(conditional_count(&h) >= 1);
+}
+
+#[rstest]
+#[case::rvsdg(StructuralizationStrategy::Rvsdg)]
+#[case::relooper(StructuralizationStrategy::Relooper)]
+fn bell_test_preserves_container_io_wiring(
+    bell_test: Hugr,
+    #[case] strategy: StructuralizationStrategy,
+) {
+    let raw_block = bell_test
+        .nodes()
+        .find(|node| bell_test.get_optype(*node).is_dataflow_block())
+        .unwrap();
+    let (raw_input_links, raw_output_links) = container_order_link_counts(&bell_test, raw_block);
+    assert!(raw_input_links.iter().all(|count| *count > 0));
+    assert!(raw_output_links.iter().all(|count| *count > 0));
+
+    let mut structured = bell_test;
+    let report = StructuralizeCfgsPass::default()
+        .with_strategy(strategy)
+        .run(&mut structured)
+        .unwrap();
+    assert!(!report.rewrites.is_empty());
+    structured.validate().unwrap();
+
+    let structured_container = structured.entrypoint();
+    let (structured_input_links, structured_output_links) =
+        container_order_link_counts(&structured, structured_container);
+    assert_eq!(structured_input_links, raw_input_links);
+    assert_eq!(structured_output_links, raw_output_links);
 }

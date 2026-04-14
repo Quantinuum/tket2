@@ -10,6 +10,7 @@ use hugr::builder::{
     BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, SubContainer,
 };
 use hugr::extension::prelude::{ConstError, UnwrapBuilder};
+use hugr::ops::handle::NodeHandle;
 use hugr::ops::{OpParent, Tag, TailLoop};
 use hugr::types::{Signature, Type, TypeRow};
 use hugr::{Direction, Hugr, HugrView, Node, Wire};
@@ -73,6 +74,40 @@ struct LoopLowering<'a> {
     exits: &'a [StructuredLoopExit],
     /// Payload row consumed by the `TailLoop` break path.
     break_outputs: &'a TypeRow,
+}
+
+/// Lowered fragment together with the sibling nodes that carry its order
+/// dependencies inside the enclosing container.
+struct LoweredFragment {
+    /// Value wires produced by the fragment.
+    outputs: Vec<Wire>,
+    /// Nodes in the fragment that should be ordered after the enclosing
+    /// container input or a previous sibling.
+    entry_order_edges: Vec<Node>,
+    /// Nodes in the fragment that should be ordered before a following sibling
+    /// or the enclosing container output.
+    exit_order_edges: Vec<Node>,
+}
+
+impl LoweredFragment {
+    /// Creates a fragment for one lowered sibling node.
+    fn ordered(outputs: Vec<Wire>, node: Node) -> Self {
+        Self {
+            outputs,
+            entry_order_edges: vec![node],
+            exit_order_edges: vec![node],
+        }
+    }
+
+    /// Creates an order-less fragment, used for exit blocks that only validate
+    /// an existing row of wires.
+    fn passthrough(outputs: Vec<Wire>) -> Self {
+        Self {
+            outputs,
+            entry_order_edges: Vec::new(),
+            exit_order_edges: Vec::new(),
+        }
+    }
 }
 
 impl<'a> LoopLowering<'a> {
@@ -188,8 +223,9 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
             region.io.outputs.clone(),
         ))?;
         let inputs = builder.input_wires().collect_vec();
-        let state = self.lower_sequence(&mut builder, region.body_sequence()?, inputs)?;
-        let hugr = builder.finish_hugr_with_outputs(state)?;
+        let fragment = self.lower_sequence(&mut builder, region.body_sequence()?, inputs)?;
+        self.close_fragment(&mut builder, &fragment, None);
+        let hugr = builder.finish_hugr_with_outputs(fragment.outputs)?;
         Ok(LoweredCfgTemplate {
             hugr,
             placeholders: self.placeholders,
@@ -202,14 +238,32 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
         builder: &mut B,
         items: &[StructuredNode],
         mut current: Vec<Wire>,
-    ) -> Result<Vec<Wire>, StructuralizationError>
+    ) -> Result<LoweredFragment, StructuralizationError>
     where
         B: Dataflow + Container,
     {
+        let mut entry_order_edges = Vec::new();
+        let mut previous_exit_order_edges = Vec::new();
         for item in items {
-            current = self.lower_node(builder, item, current)?;
+            let fragment = self.lower_node(builder, item, current)?;
+            self.connect_order_edges(
+                builder,
+                &previous_exit_order_edges,
+                &fragment.entry_order_edges,
+            );
+            if entry_order_edges.is_empty() {
+                entry_order_edges = fragment.entry_order_edges.clone();
+            }
+            if !fragment.exit_order_edges.is_empty() {
+                previous_exit_order_edges = fragment.exit_order_edges.clone();
+            }
+            current = fragment.outputs;
         }
-        Ok(current)
+        Ok(LoweredFragment {
+            outputs: current,
+            entry_order_edges,
+            exit_order_edges: previous_exit_order_edges,
+        })
     }
 
     /// Dispatches lowering for either a single block or a nested region.
@@ -218,7 +272,7 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
         builder: &mut B,
         node: &StructuredNode,
         current: Vec<Wire>,
-    ) -> Result<Vec<Wire>, StructuralizationError>
+    ) -> Result<LoweredFragment, StructuralizationError>
     where
         B: Dataflow + Container,
     {
@@ -238,7 +292,7 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
         builder: &mut B,
         region: &StructuredRegion,
         current: Vec<Wire>,
-    ) -> Result<Vec<Wire>, StructuralizationError>
+    ) -> Result<LoweredFragment, StructuralizationError>
     where
         B: Dataflow + Container,
     {
@@ -250,7 +304,7 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
                 join,
                 join_kind,
             } => {
-                let split_out = self.lower_block(builder, split, current)?;
+                let (split_out, _) = self.lower_block(builder, split, current)?;
                 let StructuredBlock::Dataflow {
                     sum_rows, outputs, ..
                 } = split
@@ -293,22 +347,45 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
                 for arm in arms {
                     let mut case = cond.case_builder(arm.case)?;
                     let case_inputs = case.input_wires().collect_vec();
-                    let case_outputs = self.lower_sequence(&mut case, &arm.body, case_inputs)?;
-                    case.finish_with_outputs(case_outputs)?;
+                    let case_fragment = self.lower_sequence(&mut case, &arm.body, case_inputs)?;
+                    self.close_fragment(&mut case, &case_fragment, None);
+                    case.finish_with_outputs(case_fragment.outputs)?;
                 }
 
-                let cond_out = cond.finish_sub_container()?.outputs().collect_vec();
+                let cond_handle = cond.finish_sub_container()?;
+                let cond_node = cond_handle.node();
+                let cond_out = cond_handle.outputs().collect_vec();
                 match join_kind {
                     StructuredBranchJoinKind::Inline => match join {
                         StructuredBlock::Dataflow { .. } => {
-                            let join_out = self.lower_block(builder, join, cond_out)?;
-                            Ok(join_out.into_iter().skip(1).collect())
+                            let join_fragment = self.lower_linear_block(builder, join, cond_out)?;
+                            self.connect_order_edges(
+                                builder,
+                                &[cond_node],
+                                &join_fragment.entry_order_edges,
+                            );
+                            Ok(LoweredFragment {
+                                outputs: join_fragment.outputs,
+                                entry_order_edges: vec![cond_node],
+                                exit_order_edges: if join_fragment.exit_order_edges.is_empty() {
+                                    vec![cond_node]
+                                } else {
+                                    join_fragment.exit_order_edges
+                                },
+                            })
                         }
                         StructuredBlock::Exit { .. } => {
-                            self.lower_linear_block(builder, join, cond_out)
+                            let join_fragment = self.lower_linear_block(builder, join, cond_out)?;
+                            Ok(LoweredFragment {
+                                outputs: join_fragment.outputs,
+                                entry_order_edges: vec![cond_node],
+                                exit_order_edges: vec![cond_node],
+                            })
                         }
                     },
-                    StructuredBranchJoinKind::Deferred => Ok(cond_out),
+                    StructuredBranchJoinKind::Deferred => {
+                        Ok(LoweredFragment::ordered(cond_out, cond_node))
+                    }
                 }
             }
             StructuredRegionBody::Loop {
@@ -350,7 +427,7 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
         builder: &mut B,
         loop_lowering: LoopLowering<'_>,
         current: Vec<Wire>,
-    ) -> Result<Vec<Wire>, StructuralizationError>
+    ) -> Result<LoweredFragment, StructuralizationError>
     where
         B: Dataflow + Container,
     {
@@ -374,7 +451,12 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
             &loop_sig,
         )?;
         let loop_handle = loop_builder.finish_with_outputs(loop_control, [])?;
-        self.lower_loop_exits(builder, &loop_lowering, loop_handle.outputs().collect())
+        self.lower_loop_exits(
+            builder,
+            &loop_lowering,
+            loop_handle.outputs().collect(),
+            loop_handle.node(),
+        )
     }
 
     /// Lowers one loop-body sequence into a `TailLoop` continue/break sum.
@@ -411,13 +493,13 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
                     return self.lower_tail_loop_items(
                         builder,
                         rest,
-                        next,
+                        next.outputs,
                         loop_lowering,
                         loop_sig,
                     );
                 }
 
-                let block_out = self.lower_block(builder, block, current)?;
+                let (block_out, _) = self.lower_block(builder, block, current)?;
                 let [control, payload @ ..] = block_out.as_slice() else {
                     return Err(StructuralizationError::UnsupportedLoop {
                         reason: format!(
@@ -497,7 +579,7 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
                     join,
                     join_kind,
                 } if loop_lowering.contains_loop_control(first) => {
-                    let split_out = self.lower_block(builder, split, current)?;
+                    let (split_out, _) = self.lower_block(builder, split, current)?;
                     let StructuredBlock::Dataflow {
                         sum_rows, outputs, ..
                     } = split
@@ -549,7 +631,8 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
                             case.finish_with_outputs([result])?;
                             continue;
                         };
-                        let arm_outputs = self.lower_sequence(&mut case, &arm.body, case_inputs)?;
+                        let arm_fragment =
+                            self.lower_sequence(&mut case, &arm.body, case_inputs)?;
                         let result = if rejoins_at_header {
                             if !rest.is_empty() {
                                 return Err(StructuralizationError::UnsupportedLoop {
@@ -557,7 +640,7 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
                                         .into(),
                                 });
                             }
-                            case.make_continue(loop_sig.clone(), arm_outputs)?
+                            case.make_continue(loop_sig.clone(), arm_fragment.outputs)?
                         } else {
                             match join_kind {
                                 StructuredBranchJoinKind::Inline
@@ -571,7 +654,7 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
                                     self.lower_tail_loop_items(
                                         &mut case,
                                         &remaining,
-                                        arm_outputs,
+                                        arm_fragment.outputs,
                                         loop_lowering,
                                         loop_sig,
                                     )?
@@ -580,8 +663,11 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
                                     let after_join = match join_kind {
                                         StructuredBranchJoinKind::Inline => match join {
                                             StructuredBlock::Dataflow { .. } => {
-                                                let join_out =
-                                                    self.lower_block(&mut case, join, arm_outputs)?;
+                                                let (join_out, _) = self.lower_block(
+                                                    &mut case,
+                                                    join,
+                                                    arm_fragment.outputs,
+                                                )?;
                                                 join_out.into_iter().skip(1).collect()
                                             }
                                             StructuredBlock::Exit { .. } => {
@@ -594,7 +680,7 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
                                                 );
                                             }
                                         },
-                                        StructuredBranchJoinKind::Deferred => arm_outputs,
+                                        StructuredBranchJoinKind::Deferred => arm_fragment.outputs,
                                     };
                                     self.lower_tail_loop_items(
                                         &mut case,
@@ -613,7 +699,7 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
                 }
                 _ => {
                     let next = self.lower_region(builder, region, current)?;
-                    self.lower_tail_loop_items(builder, rest, next, loop_lowering, loop_sig)
+                    self.lower_tail_loop_items(builder, rest, next.outputs, loop_lowering, loop_sig)
                 }
             },
         }
@@ -629,7 +715,7 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
         builder: &mut B,
         loop_lowering: LoopLowering<'_>,
         current: Vec<Wire>,
-    ) -> Result<Vec<Wire>, StructuralizationError>
+    ) -> Result<LoweredFragment, StructuralizationError>
     where
         B: Dataflow + Container,
     {
@@ -648,7 +734,7 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
             });
         }
 
-        let header_out = self.lower_block(builder, loop_lowering.header, current)?;
+        let (header_out, _) = self.lower_block(builder, loop_lowering.header, current)?;
         let [header_control, header_rest @ ..] = header_out.as_slice() else {
             return Err(StructuralizationError::UnsupportedLoop {
                 reason: "loop header did not produce a control value".into(),
@@ -699,10 +785,13 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
             )?;
             let loop_sig = loop_builder.loop_signature()?.clone();
             let loop_inputs = loop_builder.input_wires().collect_vec();
-            let body_out =
+            let body_fragment =
                 self.lower_sequence(&mut loop_builder, loop_lowering.body, loop_inputs)?;
-            let reevaluated =
-                self.lower_block(&mut loop_builder, loop_lowering.header, body_out)?;
+            let (reevaluated, _) = self.lower_block(
+                &mut loop_builder,
+                loop_lowering.header,
+                body_fragment.outputs,
+            )?;
             let [loop_control, loop_rest @ ..] = reevaluated.as_slice() else {
                 return Err(StructuralizationError::UnsupportedLoop {
                     reason: "loop header reevaluation did not produce a control value".into(),
@@ -761,7 +850,12 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
         }
 
         let cond_handle = cond.finish_sub_container()?;
-        self.lower_loop_exits(builder, &loop_lowering, cond_handle.outputs().collect_vec())
+        self.lower_loop_exits(
+            builder,
+            &loop_lowering,
+            cond_handle.outputs().collect_vec(),
+            cond_handle.node(),
+        )
     }
 
     /// Builds the `TailLoop` break payload for one selected loop exit.
@@ -795,7 +889,8 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
         builder: &mut B,
         loop_lowering: &LoopLowering<'_>,
         current: Vec<Wire>,
-    ) -> Result<Vec<Wire>, StructuralizationError>
+        loop_anchor: Node,
+    ) -> Result<LoweredFragment, StructuralizationError>
     where
         B: Dataflow + Container,
     {
@@ -803,8 +898,22 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
             [] => Err(StructuralizationError::UnsupportedLoop {
                 reason: "loop has no exits".into(),
             }),
-            [exit] if exit.continuation.is_empty() => Ok(current),
-            [exit] => self.lower_sequence(builder, &exit.continuation, current),
+            [exit] if exit.continuation.is_empty() => {
+                Ok(LoweredFragment::ordered(current, loop_anchor))
+            }
+            [exit] => {
+                let fragment = self.lower_sequence(builder, &exit.continuation, current)?;
+                self.connect_order_edges(builder, &[loop_anchor], &fragment.entry_order_edges);
+                Ok(LoweredFragment {
+                    outputs: fragment.outputs,
+                    entry_order_edges: vec![loop_anchor],
+                    exit_order_edges: if fragment.exit_order_edges.is_empty() {
+                        vec![loop_anchor]
+                    } else {
+                        fragment.exit_order_edges
+                    },
+                })
+            }
             exits => {
                 let [control] = current.as_slice() else {
                     return Err(StructuralizationError::UnsupportedLoop {
@@ -837,14 +946,20 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
                 for (case_idx, exit) in exits.iter().enumerate() {
                     let mut case = cond.case_builder(case_idx)?;
                     let case_inputs = case.input_wires().collect_vec();
-                    let case_outputs = if exit.continuation.is_empty() {
-                        case_inputs
+                    let case_fragment = if exit.continuation.is_empty() {
+                        LoweredFragment::passthrough(case_inputs)
                     } else {
                         self.lower_sequence(&mut case, &exit.continuation, case_inputs)?
                     };
-                    case.finish_with_outputs(case_outputs)?;
+                    self.close_fragment(&mut case, &case_fragment, None);
+                    case.finish_with_outputs(case_fragment.outputs)?;
                 }
-                Ok(cond.finish_sub_container()?.outputs().collect())
+                let cond_handle = cond.finish_sub_container()?;
+                builder.add_other_wire(loop_anchor, cond_handle.node());
+                Ok(LoweredFragment::ordered(
+                    cond_handle.outputs().collect(),
+                    cond_handle.node(),
+                ))
             }
         }
     }
@@ -859,14 +974,17 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
         builder: &mut B,
         block: &StructuredBlock,
         current: Vec<Wire>,
-    ) -> Result<Vec<Wire>, StructuralizationError>
+    ) -> Result<LoweredFragment, StructuralizationError>
     where
         B: Dataflow + Container,
     {
         match block {
             StructuredBlock::Dataflow { .. } => {
-                let out = self.lower_block(builder, block, current)?;
-                Ok(out.into_iter().skip(1).collect())
+                let (out, node) = self.lower_block(builder, block, current)?;
+                Ok(LoweredFragment::ordered(
+                    out.into_iter().skip(1).collect(),
+                    node,
+                ))
             }
             StructuredBlock::Exit { inputs, .. } => {
                 let actual = current
@@ -876,7 +994,7 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
                 if TypeRow::from(actual) != *inputs {
                     return Err(StructuralizationError::ExpectedExitBlock { node: block.node() });
                 }
-                Ok(current)
+                Ok(LoweredFragment::passthrough(current))
             }
         }
     }
@@ -892,7 +1010,7 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
         builder: &mut B,
         block: &StructuredBlock,
         block_inputs: Vec<Wire>,
-    ) -> Result<Vec<Wire>, StructuralizationError>
+    ) -> Result<(Vec<Wire>, Node), StructuralizationError>
     where
         B: Dataflow + Container,
     {
@@ -942,7 +1060,38 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
             placeholder: placeholder_node,
             materialization,
         });
-        Ok(handle.outputs().collect())
+        Ok((handle.outputs().collect(), handle.node()))
+    }
+
+    /// Closes a fragment within the current container by connecting its
+    /// explicit order edges to the container `Input`/`Output` nodes.
+    fn close_fragment<B>(
+        &mut self,
+        builder: &mut B,
+        fragment: &LoweredFragment,
+        start_order_edge: Option<Node>,
+    ) where
+        B: Dataflow + Container,
+    {
+        let start = start_order_edge.unwrap_or(builder.input().node());
+        self.connect_order_edges(builder, &[start], &fragment.entry_order_edges);
+        self.connect_order_edges(
+            builder,
+            &fragment.exit_order_edges,
+            &[builder.output().node()],
+        );
+    }
+
+    /// Connects each source order edge to each destination order edge.
+    fn connect_order_edges<B>(&mut self, builder: &mut B, sources: &[Node], targets: &[Node])
+    where
+        B: Dataflow + Container,
+    {
+        for &source in sources {
+            for &target in targets {
+                builder.add_other_wire(source, target);
+            }
+        }
     }
 }
 

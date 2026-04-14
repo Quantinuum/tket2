@@ -8,7 +8,7 @@
 
 use hugr::hugr::hugrmut::HugrMut;
 use hugr::ops::{DFG, OpParent, OpType};
-use hugr::{HugrView, IncomingPort, Node, OutgoingPort};
+use hugr::{HugrView, IncomingPort, Node, OutgoingPort, PortIndex};
 use itertools::Itertools;
 
 use super::template::{BlockMaterialization, LoweredCfgTemplate};
@@ -33,6 +33,7 @@ pub(super) fn materialize_cfg_rewrite<H: HugrMut<Node = Node>>(
         })?;
     let inserted = hugr.insert_hugr(parent, replacement.hugr);
 
+    let mut materialized_blocks = Vec::with_capacity(replacement.placeholders.len());
     for placeholder in replacement.placeholders {
         let inserted_placeholder = inserted
             .node_map
@@ -45,13 +46,20 @@ pub(super) fn materialize_cfg_rewrite<H: HugrMut<Node = Node>>(
                 ),
             })?;
         match placeholder.materialization {
-            BlockMaterialization::Move => {
-                materialize_block_placeholder(hugr, placeholder.original, inserted_placeholder)?
-            }
-            BlockMaterialization::Clone => {
-                clone_block_placeholder(hugr, placeholder.original, inserted_placeholder)?
-            }
+            BlockMaterialization::Move => materialized_blocks.push(materialize_block_placeholder(
+                hugr,
+                placeholder.original,
+                inserted_placeholder,
+            )?),
+            BlockMaterialization::Clone => materialized_blocks.push(clone_block_placeholder(
+                hugr,
+                placeholder.original,
+                inserted_placeholder,
+            )?),
         }
+    }
+    for block in materialized_blocks {
+        inline_materialized_block(hugr, block)?;
     }
 
     replace_cfg_root(hugr, cfg, inserted.inserted_entrypoint)
@@ -66,7 +74,7 @@ fn materialize_block_placeholder<H: HugrMut<Node = Node>>(
     hugr: &mut H,
     original: Node,
     placeholder: Node,
-) -> Result<(), StructuralizationError> {
+) -> Result<Node, StructuralizationError> {
     let parent =
         hugr.get_parent(placeholder)
             .ok_or_else(|| StructuralizationError::Materialization {
@@ -102,7 +110,7 @@ fn materialize_block_placeholder<H: HugrMut<Node = Node>>(
     rewire_placeholder_inputs(hugr, placeholder, original, input_count);
     rewire_placeholder_outputs(hugr, placeholder, original, output_count);
     hugr.remove_subtree(placeholder);
-    Ok(())
+    Ok(original)
 }
 
 /// Replaces one placeholder with a cloned copy of an already-analyzed block subtree.
@@ -115,7 +123,7 @@ fn clone_block_placeholder<H: HugrMut<Node = Node>>(
     hugr: &mut H,
     original: Node,
     placeholder: Node,
-) -> Result<(), StructuralizationError> {
+) -> Result<Node, StructuralizationError> {
     let parent =
         hugr.get_parent(placeholder)
             .ok_or_else(|| StructuralizationError::Materialization {
@@ -149,7 +157,7 @@ fn clone_block_placeholder<H: HugrMut<Node = Node>>(
     rewire_placeholder_inputs(hugr, placeholder, clone, clone_input_count);
     rewire_placeholder_outputs(hugr, placeholder, clone, clone_output_count);
     hugr.remove_subtree(placeholder);
-    Ok(())
+    Ok(clone)
 }
 
 /// Disconnects every external port of a node from its current surroundings.
@@ -207,6 +215,114 @@ fn rewire_placeholder_outputs<H: HugrMut<Node = Node>>(
         hugr.disconnect_edge(placeholder, src_port, dst, dst_port);
         hugr.connect(original, src_port, dst, dst_port);
     }
+}
+
+/// Inlines one materialized block `DFG` into its parent container.
+///
+/// This preserves the block's exact boundary order fanout/fanin before the
+/// generic `InlineDFGsPass` runs, so structuralization does not rely on later
+/// DFG inlining to reconstruct order edges from nested block bodies.
+fn inline_materialized_block<H: HugrMut<Node = Node>>(
+    hugr: &mut H,
+    block: Node,
+) -> Result<(), StructuralizationError> {
+    let parent = hugr
+        .get_parent(block)
+        .ok_or_else(|| StructuralizationError::Materialization {
+            reason: format!("materialized block {block} has no parent"),
+        })?;
+    let dfg_ty = hugr.get_optype(block);
+    let other_input =
+        dfg_ty
+            .other_input_port()
+            .ok_or_else(|| StructuralizationError::Materialization {
+                reason: format!("materialized block {block} has no order input port"),
+            })?;
+    let other_output =
+        dfg_ty
+            .other_output_port()
+            .ok_or_else(|| StructuralizationError::Materialization {
+                reason: format!("materialized block {block} has no order output port"),
+            })?;
+    let [input, output] =
+        hugr.get_io(block)
+            .ok_or_else(|| StructuralizationError::Materialization {
+                reason: format!("materialized block {block} has no input/output children"),
+            })?;
+
+    for child in hugr.children(block).skip(2).collect_vec() {
+        hugr.set_parent(child, parent);
+    }
+
+    let input_order_targets = hugr
+        .linked_inputs(input, hugr.get_optype(input).other_output_port().unwrap())
+        .collect_vec();
+    for (src_node, _) in hugr.linked_outputs(block, other_input).collect_vec() {
+        for (target_node, _) in &input_order_targets {
+            hugr.add_other_edge(src_node, *target_node);
+        }
+    }
+
+    for input_port in hugr.node_inputs(block).collect_vec() {
+        if input_port == other_input {
+            continue;
+        }
+        let (src_node, src_port) =
+            hugr.single_linked_output(block, input_port)
+                .ok_or_else(|| StructuralizationError::Materialization {
+                    reason: format!(
+                        "materialized block {block} input {input_port:?} was disconnected"
+                    ),
+                })?;
+        hugr.disconnect(block, input_port);
+        let block_input_port = OutgoingPort::from(input_port.index());
+        let targets = hugr.linked_inputs(input, block_input_port).collect_vec();
+        hugr.disconnect(input, block_input_port);
+
+        for (target_node, target_port) in targets {
+            hugr.connect(src_node, src_port, target_node, target_port);
+        }
+        for (target_node, _) in &input_order_targets {
+            hugr.add_other_edge(src_node, *target_node);
+        }
+    }
+
+    let output_order_sources = hugr
+        .linked_outputs(output, hugr.get_optype(output).other_input_port().unwrap())
+        .collect_vec();
+    for (target_node, _) in hugr.linked_inputs(block, other_output).collect_vec() {
+        for (src_node, _) in &output_order_sources {
+            hugr.add_other_edge(*src_node, target_node);
+        }
+    }
+
+    for output_port in hugr.node_outputs(block).collect_vec() {
+        if output_port == other_output {
+            continue;
+        }
+        let block_output_port = IncomingPort::from(output_port.index());
+        let (src_node, src_port) = hugr
+            .single_linked_output(output, block_output_port)
+            .ok_or_else(|| StructuralizationError::Materialization {
+                reason: format!(
+                    "materialized block {block} output {output_port:?} was disconnected"
+                ),
+            })?;
+        hugr.disconnect(output, block_output_port);
+
+        for (target_node, target_port) in hugr.linked_inputs(block, output_port).collect_vec() {
+            hugr.connect(src_node, src_port, target_node, target_port);
+            for (order_src, _) in &output_order_sources {
+                hugr.add_other_edge(*order_src, target_node);
+            }
+        }
+        hugr.disconnect(block, output_port);
+    }
+
+    hugr.remove_node(input);
+    hugr.remove_node(output);
+    hugr.remove_node(block);
+    Ok(())
 }
 
 /// Replaces the original CFG root with the inserted structured replacement.

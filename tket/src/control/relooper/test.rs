@@ -10,9 +10,12 @@ use rstest::{fixture, rstest};
 
 use crate::control::IdentityCfgMap;
 use crate::control::nest_cfgs::test::build_conditional_in_loop_cfg;
-use crate::control::structuralize::{StructuredNode, StructuredRegionBody};
+use crate::control::structuralize::{
+    RegionIo, StructuralizationError, StructuredBranchJoinKind, StructuredNode,
+    StructuredRegionBody,
+};
 
-use super::ast::{RelooperLabel, RelooperStmt};
+use super::ast::{RelooperBlockLowering, RelooperLabel, RelooperRegion, RelooperStmt};
 use super::construct::build_cfg_ast;
 use super::lower::lower_region;
 
@@ -204,6 +207,130 @@ fn lowered_multi_exit_loop_preserves_exit_count(multi_exit_loop: hugr::Hugr) {
 
     let loops = collect_lowered_loops(&lowered.body);
     assert!(loops.iter().any(|(_, exits)| *exits == 2), "{lowered:#?}");
+}
+
+#[rstest]
+fn lowering_rejects_top_level_br(combined_headers: hugr::Hugr) {
+    let cfg_node = combined_headers
+        .nodes()
+        .find(|node| combined_headers.get_optype(*node).is_cfg())
+        .unwrap();
+    let cfg_view = combined_headers.with_entrypoint(cfg_node);
+    let region = RelooperRegion {
+        io: RegionIo {
+            inputs: [].into(),
+            outputs: [].into(),
+        },
+        body: RelooperStmt::Br(RelooperLabel::Original(cfg_node)),
+    };
+
+    let err = lower_region(&cfg_view, &region).unwrap_err();
+    assert!(matches!(
+        err,
+        StructuralizationError::Relooper { reason }
+            if reason.contains("explicit labelled exits are not lowered yet")
+    ));
+}
+
+#[rstest]
+fn lowering_rejects_nonlocal_br_inside_block(combined_headers: hugr::Hugr) {
+    let cfg_node = combined_headers
+        .nodes()
+        .find(|node| combined_headers.get_optype(*node).is_cfg())
+        .unwrap();
+    let other_label = combined_headers
+        .nodes()
+        .find(|node| *node != cfg_node)
+        .unwrap();
+    let cfg_view = combined_headers.with_entrypoint(cfg_node);
+    let region = RelooperRegion {
+        io: RegionIo {
+            inputs: [].into(),
+            outputs: [].into(),
+        },
+        body: RelooperStmt::Block {
+            label: RelooperLabel::Original(cfg_node),
+            lowering: RelooperBlockLowering {
+                join_kind: StructuredBranchJoinKind::Deferred,
+                loop_exit_edges: Vec::new(),
+            },
+            body: Box::new(RelooperStmt::Seq(vec![RelooperStmt::Br(
+                RelooperLabel::Original(other_label),
+            )])),
+        },
+    };
+
+    let err = lower_region(&cfg_view, &region).unwrap_err();
+    assert!(matches!(
+        err,
+        StructuralizationError::Relooper { reason }
+            if reason.contains("labelled block body")
+                && reason.contains("explicit branch to an outer label")
+    ));
+}
+
+#[rstest]
+fn lowering_propagates_br_to_enclosing_block(combined_headers: hugr::Hugr) {
+    let cfg_node = combined_headers
+        .nodes()
+        .find(|node| combined_headers.get_optype(*node).is_cfg())
+        .unwrap();
+    let other_label = combined_headers
+        .nodes()
+        .find(|node| *node != cfg_node)
+        .unwrap();
+    let cfg_view = combined_headers.with_entrypoint(cfg_node);
+    let region = RelooperRegion {
+        io: RegionIo {
+            inputs: [].into(),
+            outputs: [].into(),
+        },
+        body: RelooperStmt::Block {
+            label: RelooperLabel::Original(cfg_node),
+            lowering: RelooperBlockLowering {
+                join_kind: StructuredBranchJoinKind::Deferred,
+                loop_exit_edges: Vec::new(),
+            },
+            body: Box::new(RelooperStmt::Seq(vec![RelooperStmt::Block {
+                label: RelooperLabel::Original(other_label),
+                lowering: RelooperBlockLowering {
+                    join_kind: StructuredBranchJoinKind::Deferred,
+                    loop_exit_edges: Vec::new(),
+                },
+                body: Box::new(RelooperStmt::Seq(vec![RelooperStmt::Br(
+                    RelooperLabel::Original(cfg_node),
+                )])),
+            }])),
+        },
+    };
+
+    let lowered = lower_region(&cfg_view, &region).unwrap();
+    let StructuredRegionBody::Sequence(ref items) = lowered.body else {
+        panic!("expected a sequence body");
+    };
+    assert!(items.is_empty(), "{lowered:#?}");
+}
+
+#[rstest]
+fn lowering_consumes_top_level_return(combined_headers: hugr::Hugr) {
+    let cfg_node = combined_headers
+        .nodes()
+        .find(|node| combined_headers.get_optype(*node).is_cfg())
+        .unwrap();
+    let cfg_view = combined_headers.with_entrypoint(cfg_node);
+    let region = RelooperRegion {
+        io: RegionIo {
+            inputs: [].into(),
+            outputs: [].into(),
+        },
+        body: RelooperStmt::Seq(vec![RelooperStmt::Return([].into())]),
+    };
+
+    let lowered = lower_region(&cfg_view, &region).unwrap();
+    let StructuredRegionBody::Sequence(ref items) = lowered.body else {
+        panic!("expected a sequence body");
+    };
+    assert!(items.is_empty(), "{lowered:#?}");
 }
 
 fn contains_loop(stmt: &RelooperStmt) -> bool {

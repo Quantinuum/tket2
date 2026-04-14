@@ -61,7 +61,6 @@ fn bench_structuralize_pass(c: &mut Criterion) {
                         |mut hugr| {
                             StructuralizeCfgsPass::default()
                                 .with_strategy(strategy)
-                                .inline_dfgs(false)
                                 .run(&mut hugr)
                                 .unwrap();
                             black_box(hugr);
