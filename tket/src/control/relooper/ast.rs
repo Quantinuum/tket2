@@ -1,9 +1,22 @@
 //! Private control AST for the Beyond-Relooper strategy.
 //!
-//! The current Beyond-Relooper implementation reconstructs structured control
-//! before the shared HUGR rewrite phase. This module defines the strategy-local
-//! AST used to represent that reconstructed control without exposing the shared
-//! structuralization IR to the analysis phase.
+//! The Beyond Relooper paper phrases translation in terms of a target language
+//! with straight-line code, sequencing, labelled blocks, loops, conditionals,
+//! and multilevel exits interpreted relative to a surrounding context. This
+//! module models that control language locally so the strategy can evolve
+//! independently from the shared HUGR rewrite pipeline.
+//!
+//! One intentional deviation from the paper is that binary `if` is generalized
+//! to [`RelooperStmt::Case`]. HUGR CFG blocks can branch over any ordered sum,
+//! and the later HUGR lowering naturally consumes a multi-arm case split, so
+//! keeping this construct n-ary avoids re-encoding an arbitrary fanout as a
+//! tree of binary conditionals.
+//!
+//! A second intentional deviation is that some statements carry small
+//! strategy-local lowering records. Those records are not part of the control
+//! language itself; they preserve typed HUGR facts that the current lowerer
+//! still needs while the strategy moves toward a fully context-driven lowering
+//! of multilevel exits.
 
 use hugr::{Node, types::TypeRow};
 
@@ -11,66 +24,139 @@ use crate::control::structuralize::{
     RegionIo, StructuredBlock, StructuredBranchJoinKind, StructuredLoopEdge, StructuredLoopKind,
 };
 
+/// One label referenced by the strategy-local AST.
+///
+/// Labels are backed by CFG nodes so debugging the reconstructed control is
+/// straightforward. Preprocessing may duplicate CFG blocks, so duplicated
+/// occurrences carry a deterministic clone identifier in addition to the
+/// original HUGR node.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) enum RelooperLabel {
+    /// One original CFG block.
+    Original(Node),
+    /// One duplicated occurrence created during preprocessing.
+    Duplicate {
+        /// Original HUGR block represented by the duplicate.
+        original: Node,
+        /// Deterministic duplicate identifier scoped to one preprocessed CFG.
+        clone_id: usize,
+    },
+}
+
+/// One frame in the context stack used by the paper's recursive translation.
+///
+/// The innermost enclosing construct is stored first, matching the paper's
+/// presentation of context-sensitive branch depths.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum RelooperContextFrame {
+    /// The current node is nested beneath a case split.
+    Case,
+    /// The current node is nested beneath a loop headed by `label`.
+    LoopHeadedBy(RelooperLabel),
+    /// The current node is nested within a block followed by `label`.
+    BlockFollowedBy(RelooperLabel),
+}
+
+/// Ordered stack of enclosing structured constructs.
+pub(crate) type RelooperContext = Vec<RelooperContextFrame>;
+
 /// One analyzed region in the Beyond-Relooper AST.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct RelooperRegion {
     /// Ordered values crossing the region boundary.
     pub(super) io: RegionIo,
     /// Structured body of the region.
-    pub(super) body: RelooperBody,
+    pub(super) body: RelooperStmt,
 }
 
-/// One structured body in the Beyond-Relooper AST.
+/// HUGR-facing details for one labelled block.
+///
+/// The paper's target language only needs the label and body. The current
+/// lowerer still requires the typed join block and whether that join lowers
+/// locally or in the surrounding sequence, so those details live here instead
+/// of inside the statement shape itself.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) enum RelooperBody {
-    /// A straight-line sequence of blocks and nested regions.
-    Sequence(Vec<RelooperNode>),
-    /// A structured branch rooted at one CFG split block.
-    Branch {
+pub(super) struct RelooperBlockLowering {
+    /// Block reached after this structured body completes.
+    pub(super) follow: StructuredBlock,
+    /// Whether the followed-by block lowers inside the block or in the
+    /// surrounding scope.
+    pub(super) join_kind: StructuredBranchJoinKind,
+}
+
+/// HUGR-facing details for one analysed loop.
+///
+/// The statement language only needs a labelled loop body. The current
+/// structural HUGR lowerer also needs the loop family and the CFG edges that
+/// feed continue and break paths, so those details are grouped here until exit
+/// lowering becomes fully context-driven.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct RelooperLoopLowering {
+    /// Loop family selected from the CFG.
+    pub(super) kind: StructuredLoopKind,
+    /// Header block that guards or enters the loop.
+    pub(super) header: StructuredBlock,
+    /// CFG block whose successor returns control to the header.
+    pub(super) backedge_source: Node,
+    /// Continue edge routed back to the loop header.
+    pub(super) continue_edge: StructuredLoopEdge,
+    /// Distinct exits routed out of the loop.
+    pub(super) exits: Vec<RelooperExit>,
+}
+
+/// One explicit exit in the Beyond-Relooper AST.
+///
+/// The paper's target language uses `br depth` and `return`. This
+/// representation keeps the target label explicit, which is easier to inspect
+/// while the lowerer still derives concrete depths from the active context.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct RelooperExit {
+    /// Label targeted by the exit.
+    pub(super) target: RelooperLabel,
+    /// Payload carried along the exit edge.
+    pub(super) payload: TypeRow,
+    /// HUGR-facing edge summaries selecting this exit.
+    pub(super) edges: Vec<StructuredLoopEdge>,
+    /// Continuation lowered after the exit reaches its target.
+    pub(super) continuation: Box<RelooperStmt>,
+}
+
+/// One statement in the Beyond-Relooper AST.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) enum RelooperStmt {
+    /// A straight-line sequence of statements.
+    Seq(Vec<RelooperStmt>),
+    /// A nested structured region with its own interface.
+    Region(Box<RelooperRegion>),
+    /// One executable CFG block.
+    Exec(StructuredBlock),
+    /// A labelled block after which execution reaches the label's target.
+    Block {
+        /// Label naming the code immediately after the block.
+        label: RelooperLabel,
+        /// HUGR-facing lowering details for the block target.
+        lowering: RelooperBlockLowering,
+        /// Body governed by the labelled block.
+        body: Box<RelooperStmt>,
+    },
+    /// An n-way case split driven by a CFG split block.
+    Case {
         /// Split block executed before arm dispatch.
         split: StructuredBlock,
-        /// Per-arm bodies.
-        arms: Vec<Vec<RelooperNode>>,
-        /// Join block merging the branch arms.
-        join: StructuredBlock,
-        /// Whether the join lowers inside the region or in the surrounding scope.
-        join_kind: StructuredBranchJoinKind,
+        /// Ordered case arms.
+        arms: Vec<RelooperStmt>,
     },
-    /// A structured loop rooted at one loop header.
+    /// A labelled loop.
     Loop {
-        /// Loop family selected from the CFG.
-        kind: StructuredLoopKind,
-        /// Header block that guards or enters the loop.
-        header: StructuredBlock,
+        /// Label used to refer to the loop header in the surrounding context.
+        label: RelooperLabel,
+        /// HUGR-facing lowering details for the loop.
+        lowering: RelooperLoopLowering,
         /// One logical iteration of the loop body.
-        body: Vec<RelooperNode>,
-        /// CFG block whose successor returns control to the header.
-        backedge_source: Node,
-        /// Continue edge routed back to the loop header.
-        continue_edge: StructuredLoopEdge,
-        /// Distinct exits routed out of the loop.
-        exits: Vec<RelooperLoopExit>,
-        /// Immediate payload row consumed by the `TailLoop` break path.
-        break_outputs: TypeRow,
+        body: Box<RelooperStmt>,
     },
-}
-
-/// One loop exit with its immediate payload and strategy-local continuation.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) struct RelooperLoopExit {
-    /// Break edges that select this exit variant.
-    pub(super) edges: Vec<StructuredLoopEdge>,
-    /// Immediate payload emitted when the loop exits through this variant.
-    pub(super) outputs: TypeRow,
-    /// Continuation lowered after the loop exits through this variant.
-    pub(super) continuation: Vec<RelooperNode>,
-}
-
-/// One item in a Beyond-Relooper sequence.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) enum RelooperNode {
-    /// A leaf CFG block.
-    Block(StructuredBlock),
-    /// A nested structured region.
-    Region(Box<RelooperRegion>),
+    /// A branch to an enclosing labelled construct.
+    Br(Box<RelooperExit>),
+    /// Return from the enclosing region with the given payload row.
+    Return(TypeRow),
 }

@@ -7,11 +7,10 @@
 use std::collections::BTreeSet;
 
 use hugr::core::HugrNode;
-use hugr::types::Type;
 use hugr::{HugrView, Node};
 use itertools::Itertools;
 
-use crate::control::cfg::{CfgFacts, CfgFactsError};
+use crate::control::cfg::{CfgFacts, CfgFactsError, PreprocessedNode};
 use crate::control::structuralize::shared::{
     analyze_block, block_input_row, block_successor_payload, cfg_input_row, cfg_output_row,
 };
@@ -21,7 +20,54 @@ use crate::control::structuralize::{
 };
 use crate::control::{CfgBlockMap, IdentityCfgMap};
 
-use super::ast::{RelooperBody, RelooperLoopExit, RelooperNode, RelooperRegion};
+use super::ast::{
+    RelooperBlockLowering, RelooperContext, RelooperContextFrame, RelooperExit, RelooperLabel,
+    RelooperLoopLowering, RelooperRegion, RelooperStmt,
+};
+
+/// One recursive scope walk in the Beyond-Relooper constructor.
+struct ScopeBuild<'a, T> {
+    start: T,
+    scope: &'a BTreeSet<T>,
+    stop: Option<T>,
+    active_loop: Option<T>,
+    context: &'a RelooperContext,
+}
+
+/// Shared recursive environment for nested branch and loop construction.
+struct ScopeFrame<'a, T> {
+    scope: &'a BTreeSet<T>,
+    stop: Option<T>,
+    active_loop: Option<T>,
+    context: &'a RelooperContext,
+}
+
+/// Converts one CFG-graph node into the label used by the Beyond-Relooper AST.
+///
+/// Labels follow CFG nodes so debugging the reconstructed control stays close
+/// to the source graph. Preprocessing may duplicate nodes, so duplicated
+/// entries carry their stable clone identifiers into the label.
+pub(crate) trait IntoRelooperLabel: HugrNode {
+    /// Returns the strategy-local label for this CFG node.
+    fn into_relooper_label(self) -> RelooperLabel;
+}
+
+impl IntoRelooperLabel for Node {
+    fn into_relooper_label(self) -> RelooperLabel {
+        RelooperLabel::Original(self)
+    }
+}
+
+impl IntoRelooperLabel for PreprocessedNode<Node> {
+    fn into_relooper_label(self) -> RelooperLabel {
+        match self {
+            PreprocessedNode::Original(node) => RelooperLabel::Original(node),
+            PreprocessedNode::Duplicate { original, clone_id } => {
+                RelooperLabel::Duplicate { original, clone_id }
+            }
+        }
+    }
+}
 
 /// Builds the Beyond-Relooper AST for one CFG.
 ///
@@ -49,18 +95,21 @@ pub(super) fn build_cfg_ast_with_map<H, T, C>(
 ) -> Result<RelooperRegion, StructuralizationError>
 where
     H: HugrView<Node = Node>,
-    T: HugrNode,
+    T: IntoRelooperLabel,
     C: CfgBlockMap<T>,
 {
     let info = CfgFacts::<T>::new(cfg.entry_node(), cfg)
         .map_err(|err| map_cfg_facts_error(cfg_view.entrypoint(), err))?;
-    let body = RelooperBody::Sequence(info.build_scope(
+    let body = RelooperStmt::Seq(info.build_scope(
         cfg_view,
         cfg,
-        cfg.entry_node(),
-        &info.scope,
-        None,
-        None,
+        ScopeBuild {
+            start: cfg.entry_node(),
+            scope: &info.scope,
+            stop: None,
+            active_loop: None,
+            context: &RelooperContext::new(),
+        },
     )?);
     Ok(RelooperRegion {
         io: RegionIo {
@@ -73,7 +122,7 @@ where
 
 impl<T> CfgFacts<T>
 where
-    T: HugrNode,
+    T: IntoRelooperLabel,
 {
     /// Structures one linear scope until it reaches an explicit stop node.
     ///
@@ -85,21 +134,18 @@ where
         &self,
         cfg_view: &H,
         cfg: &C,
-        start: T,
-        scope: &BTreeSet<T>,
-        stop: Option<T>,
-        active_loop: Option<T>,
-    ) -> Result<Vec<RelooperNode>, StructuralizationError>
+        request: ScopeBuild<'_, T>,
+    ) -> Result<Vec<RelooperStmt>, StructuralizationError>
     where
         H: HugrView<Node = Node>,
         C: CfgBlockMap<T>,
     {
         let mut items = Vec::new();
-        let mut current = Some(start);
+        let mut current = Some(request.start);
         let mut seen = BTreeSet::new();
 
         while let Some(node) = current {
-            if Some(node) == stop || !scope.contains(&node) {
+            if Some(node) == request.stop || !request.scope.contains(&node) {
                 break;
             }
             if !seen.insert(node) {
@@ -108,29 +154,51 @@ where
                 });
             }
 
-            if self.is_nested_loop_header(node, scope, active_loop) {
-                let (region, next) =
-                    self.build_loop_region(cfg_view, cfg, node, scope, stop, active_loop)?;
-                items.push(RelooperNode::Region(Box::new(region)));
+            if self.is_nested_loop_header(node, request.scope, request.active_loop) {
+                let (region, next) = self.build_loop_region(
+                    cfg_view,
+                    cfg,
+                    node,
+                    ScopeFrame {
+                        scope: request.scope,
+                        stop: request.stop,
+                        active_loop: request.active_loop,
+                        context: request.context,
+                    },
+                )?;
+                items.push(RelooperStmt::Region(Box::new(region)));
                 current = next;
                 continue;
             }
 
-            let succs = self.scope_successors(node, scope, active_loop);
+            let succs = self.scope_successors(node, request.scope, request.active_loop);
             if succs.len() > 1 {
-                let (region, next) =
-                    self.build_branch_region(cfg_view, cfg, node, scope, stop, active_loop)?;
-                items.push(RelooperNode::Region(Box::new(region)));
+                let (region, next) = self.build_branch_region(
+                    cfg_view,
+                    cfg,
+                    node,
+                    ScopeFrame {
+                        scope: request.scope,
+                        stop: request.stop,
+                        active_loop: request.active_loop,
+                        context: request.context,
+                    },
+                )?;
+                items.push(RelooperStmt::Region(Box::new(region)));
                 current = next;
                 continue;
             }
 
             let block = analyze_block(cfg_view, cfg.hugr_node(node))?;
-            let is_exit = matches!(block, StructuredBlock::Exit { .. });
-            items.push(RelooperNode::Block(block));
-            current = succs.into_iter().next();
-            if is_exit {
-                break;
+            match block {
+                StructuredBlock::Exit { inputs, .. } => {
+                    items.push(RelooperStmt::Return(inputs));
+                    break;
+                }
+                block => {
+                    items.push(RelooperStmt::Exec(block));
+                    current = succs.into_iter().next();
+                }
             }
         }
 
@@ -143,9 +211,7 @@ where
         cfg_view: &H,
         cfg: &C,
         split_node: T,
-        scope: &BTreeSet<T>,
-        stop: Option<T>,
-        active_loop: Option<T>,
+        frame: ScopeFrame<'_, T>,
     ) -> Result<(RelooperRegion, Option<T>), StructuralizationError>
     where
         H: HugrView<Node = Node>,
@@ -153,17 +219,43 @@ where
     {
         let split = analyze_block(cfg_view, cfg.hugr_node(split_node))?;
         let join_node = self
-            .branch_join(split_node, scope, stop)
+            .branch_join(split_node, frame.scope, frame.stop)
             .map_err(|reason| StructuralizationError::Relooper {
                 reason: format!("branch at node {split_node} {reason}"),
             })?;
         let join = analyze_block(cfg_view, cfg.hugr_node(join_node))?;
         let arms = self
-            .scope_successors(split_node, scope, active_loop)
+            .scope_successors(split_node, frame.scope, frame.active_loop)
             .into_iter()
-            .map(|succ| self.build_scope(cfg_view, cfg, succ, scope, Some(join_node), active_loop))
+            .map(|succ| {
+                let arm_context = push_context(
+                    &push_context(
+                        frame.context,
+                        RelooperContextFrame::BlockFollowedBy(join_node.into_relooper_label()),
+                    ),
+                    RelooperContextFrame::Case,
+                );
+                let mut arm = self.build_scope(
+                    cfg_view,
+                    cfg,
+                    ScopeBuild {
+                        start: succ,
+                        scope: frame.scope,
+                        stop: Some(join_node),
+                        active_loop: frame.active_loop,
+                        context: &arm_context,
+                    },
+                )?;
+                append_branch_to_label(
+                    &mut arm,
+                    join_node.into_relooper_label(),
+                    join.inputs().clone(),
+                );
+                Ok::<Vec<RelooperStmt>, StructuralizationError>(arm)
+            })
             .collect::<Result<Vec<_>, _>>()?;
-        let (join_kind, next) = branch_continuation(self, join_node, scope, active_loop);
+        let (join_kind, next) =
+            branch_continuation(self, join_node, frame.scope, frame.active_loop);
 
         Ok((
             RelooperRegion {
@@ -171,11 +263,16 @@ where
                     inputs: split.inputs().clone(),
                     outputs: join.inputs().clone(),
                 },
-                body: RelooperBody::Branch {
-                    split,
-                    arms,
-                    join,
-                    join_kind,
+                body: RelooperStmt::Block {
+                    label: join_node.into_relooper_label(),
+                    lowering: RelooperBlockLowering {
+                        follow: join,
+                        join_kind,
+                    },
+                    body: Box::new(RelooperStmt::Case {
+                        split,
+                        arms: arms.into_iter().map(RelooperStmt::Seq).collect(),
+                    }),
                 },
             },
             next,
@@ -188,9 +285,7 @@ where
         cfg_view: &H,
         cfg: &C,
         header: T,
-        scope: &BTreeSet<T>,
-        stop: Option<T>,
-        active_loop: Option<T>,
+        frame: ScopeFrame<'_, T>,
     ) -> Result<(RelooperRegion, Option<T>), StructuralizationError>
     where
         H: HugrView<Node = Node>,
@@ -202,7 +297,7 @@ where
             .ok_or(StructuralizationError::Relooper {
                 reason: format!("missing loop blocks for header {header}"),
             })?
-            .intersection(scope)
+            .intersection(frame.scope)
             .copied()
             .collect::<BTreeSet<_>>();
         let exit_edges = loop_blocks
@@ -253,7 +348,7 @@ where
         let io = RegionIo {
             inputs: header_block.inputs().clone(),
             outputs: if multi_exit {
-                loop_continuation_outputs(cfg_view, cfg, stop)?
+                loop_continuation_outputs(cfg_view, cfg, frame.stop)?
             } else {
                 block_input_row(cfg_view, cfg.hugr_node(exit_targets[0]))?
             },
@@ -312,42 +407,73 @@ where
                             reason: "header-controlled loop has no exit edges".into(),
                         },
                     )?;
-                    Ok(RelooperLoopExit {
+                    Ok(RelooperExit {
+                        target: target.into_relooper_label(),
+                        payload: outputs.clone(),
                         edges,
-                        outputs,
-                        continuation: if multi_exit {
-                            self.build_scope(cfg_view, cfg, target, scope, stop, active_loop)?
+                        continuation: Box::new(if multi_exit {
+                            let mut continuation = self.build_scope(
+                                cfg_view,
+                                cfg,
+                                ScopeBuild {
+                                    start: target,
+                                    scope: frame.scope,
+                                    stop: frame.stop,
+                                    active_loop: frame.active_loop,
+                                    context: frame.context,
+                                },
+                            )?;
+                            append_exit_from_context(
+                                &mut continuation,
+                                frame.context,
+                                io.outputs.clone(),
+                            );
+                            RelooperStmt::Seq(continuation)
                         } else {
-                            Vec::new()
-                        },
+                            RelooperStmt::Seq(Vec::new())
+                        }),
                     })
                 })
-                .collect::<Result<Vec<RelooperLoopExit>, StructuralizationError>>()?;
-            let break_outputs = loop_break_outputs(&exits);
+                .collect::<Result<Vec<RelooperExit>, StructuralizationError>>()?;
+            let loop_context = push_context(
+                frame.context,
+                RelooperContextFrame::LoopHeadedBy(header.into_relooper_label()),
+            );
             let body = self.build_scope(
                 cfg_view,
                 cfg,
-                continue_target,
-                &loop_blocks,
-                None,
-                Some(header),
+                ScopeBuild {
+                    start: continue_target,
+                    scope: &loop_blocks,
+                    stop: None,
+                    active_loop: Some(header),
+                    context: &loop_context,
+                },
             )?;
+            let mut body = body;
+            append_branch_to_label(
+                &mut body,
+                header.into_relooper_label(),
+                continue_payload.clone(),
+            );
             (
-                RelooperBody::Loop {
-                    kind: StructuredLoopKind::HeaderControlled,
-                    header: header_block,
-                    body,
-                    backedge_source: cfg.hugr_node(backedge_source),
-                    continue_edge: StructuredLoopEdge {
-                        source: cfg.hugr_node(header),
-                        case: continue_case,
-                        payload: continue_payload,
+                RelooperStmt::Loop {
+                    label: header.into_relooper_label(),
+                    lowering: RelooperLoopLowering {
+                        kind: StructuredLoopKind::HeaderControlled,
+                        header: header_block,
+                        backedge_source: cfg.hugr_node(backedge_source),
+                        continue_edge: StructuredLoopEdge {
+                            source: cfg.hugr_node(header),
+                            case: continue_case,
+                            payload: continue_payload,
+                        },
+                        exits,
                     },
-                    exits,
-                    break_outputs,
+                    body: Box::new(RelooperStmt::Seq(body)),
                 },
                 if multi_exit {
-                    stop
+                    frame.stop
                 } else {
                     Some(exit_targets[0])
                 },
@@ -404,35 +530,72 @@ where
                             reason: "tail-controlled loop has no exit edges".into(),
                         },
                     )?;
-                    Ok(RelooperLoopExit {
+                    Ok(RelooperExit {
+                        target: target.into_relooper_label(),
+                        payload: outputs.clone(),
                         edges,
-                        outputs,
-                        continuation: if multi_exit {
-                            self.build_scope(cfg_view, cfg, target, scope, stop, active_loop)?
+                        continuation: Box::new(if multi_exit {
+                            let mut continuation = self.build_scope(
+                                cfg_view,
+                                cfg,
+                                ScopeBuild {
+                                    start: target,
+                                    scope: frame.scope,
+                                    stop: frame.stop,
+                                    active_loop: frame.active_loop,
+                                    context: frame.context,
+                                },
+                            )?;
+                            append_exit_from_context(
+                                &mut continuation,
+                                frame.context,
+                                io.outputs.clone(),
+                            );
+                            RelooperStmt::Seq(continuation)
                         } else {
-                            Vec::new()
-                        },
+                            RelooperStmt::Seq(Vec::new())
+                        }),
                     })
                 })
-                .collect::<Result<Vec<RelooperLoopExit>, StructuralizationError>>()?;
-            let break_outputs = loop_break_outputs(&exits);
-            let body = self.build_scope(cfg_view, cfg, header, &loop_blocks, None, Some(header))?;
+                .collect::<Result<Vec<RelooperExit>, StructuralizationError>>()?;
+            let loop_context = push_context(
+                frame.context,
+                RelooperContextFrame::LoopHeadedBy(header.into_relooper_label()),
+            );
+            let mut body = self.build_scope(
+                cfg_view,
+                cfg,
+                ScopeBuild {
+                    start: header,
+                    scope: &loop_blocks,
+                    stop: None,
+                    active_loop: Some(header),
+                    context: &loop_context,
+                },
+            )?;
+            append_branch_to_label(
+                &mut body,
+                header.into_relooper_label(),
+                continue_payload.clone(),
+            );
             (
-                RelooperBody::Loop {
-                    kind: StructuredLoopKind::TailControlled,
-                    header: header_block,
-                    body,
-                    backedge_source: cfg.hugr_node(backedge_source),
-                    continue_edge: StructuredLoopEdge {
-                        source: cfg.hugr_node(backedge_source),
-                        case: continue_case,
-                        payload: continue_payload,
+                RelooperStmt::Loop {
+                    label: header.into_relooper_label(),
+                    lowering: RelooperLoopLowering {
+                        kind: StructuredLoopKind::TailControlled,
+                        header: header_block,
+                        backedge_source: cfg.hugr_node(backedge_source),
+                        continue_edge: StructuredLoopEdge {
+                            source: cfg.hugr_node(backedge_source),
+                            case: continue_case,
+                            payload: continue_payload,
+                        },
+                        exits,
                     },
-                    exits,
-                    break_outputs,
+                    body: Box::new(RelooperStmt::Seq(body)),
                 },
                 if multi_exit {
-                    stop
+                    frame.stop
                 } else {
                     Some(exit_targets[0])
                 },
@@ -460,14 +623,66 @@ where
     }
 }
 
-/// Returns the immediate `TailLoop` break row for one analyzed exit set.
-fn loop_break_outputs(exits: &[RelooperLoopExit]) -> hugr::types::TypeRow {
-    match exits {
-        [exit] => exit.outputs.clone(),
-        _ => vec![Type::new_sum(
-            exits.iter().map(|exit| exit.outputs.clone()).collect_vec(),
-        )]
-        .into(),
+/// Returns a new context with one innermost frame pushed on the front.
+fn push_context(context: &RelooperContext, frame: RelooperContextFrame) -> RelooperContext {
+    let mut nested = Vec::with_capacity(context.len() + 1);
+    nested.push(frame);
+    nested.extend(context.iter().copied());
+    nested
+}
+
+/// Returns the innermost enclosing block-followed-by label, if any.
+fn context_follow_label(context: &RelooperContext) -> Option<RelooperLabel> {
+    context.iter().find_map(|frame| match frame {
+        RelooperContextFrame::BlockFollowedBy(label) => Some(*label),
+        _ => None,
+    })
+}
+
+/// Appends an explicit branch to the target label unless the sequence already terminates.
+fn append_branch_to_label(
+    items: &mut Vec<RelooperStmt>,
+    target: RelooperLabel,
+    payload: hugr::types::TypeRow,
+) {
+    if items.last().is_some_and(is_terminal_stmt) {
+        return;
+    }
+    items.push(RelooperStmt::Br(Box::new(RelooperExit {
+        target,
+        payload,
+        edges: Vec::new(),
+        continuation: Box::new(RelooperStmt::Seq(Vec::new())),
+    })));
+}
+
+/// Appends the explicit exit selected by the active Beyond-Relooper context.
+///
+/// The paper phrases non-local control in terms of exits interpreted relative
+/// to the enclosing context. The current implementation keeps labels explicit,
+/// so this helper chooses the innermost block-followed-by target when one is
+/// available and otherwise returns from the enclosing region.
+fn append_exit_from_context(
+    items: &mut Vec<RelooperStmt>,
+    context: &RelooperContext,
+    payload: hugr::types::TypeRow,
+) {
+    if items.last().is_some_and(is_terminal_stmt) {
+        return;
+    }
+    match context_follow_label(context) {
+        Some(label) => append_branch_to_label(items, label, payload),
+        None => items.push(RelooperStmt::Return(payload)),
+    }
+}
+
+/// Returns whether a statement already terminates control flow in its sequence.
+fn is_terminal_stmt(stmt: &RelooperStmt) -> bool {
+    match stmt {
+        RelooperStmt::Br(_) | RelooperStmt::Return(_) => true,
+        RelooperStmt::Seq(items) => items.last().is_some_and(is_terminal_stmt),
+        RelooperStmt::Region(region) => is_terminal_stmt(&region.body),
+        _ => false,
     }
 }
 

@@ -34,6 +34,7 @@ tket-py/docs/build
 tket-py/docs/generated
 jupyter_execute/
 
+AGENTS.md
 .github/copilot-instructions.md
 
 
