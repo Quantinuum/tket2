@@ -15,19 +15,23 @@ use super::types::{
     StructuralizationAnalysisReport, StructuralizationError, StructuralizationStrategy,
     StructuredRegion,
 };
-use crate::control::{IdentityCfgMap, relooper, rvsdg};
+use crate::control::{IdentityCfgMap, rvsdg};
 
 /// Analyze all CFGs in a HUGR using the requested strategy.
 ///
 /// # Errors
 ///
-/// Returns an error when strategy-specific CFG analysis fails for any CFG or
-/// when a lowering-oriented structural region cannot be derived
-/// deterministically.
+/// Returns an error when RVSDG-based CFG analysis fails for any CFG or when a
+/// lowering-oriented structural region cannot be derived deterministically.
 pub fn analyze_hugr_cfgs<H: HugrView<Node = Node>>(
     hugr: &H,
     strategy: StructuralizationStrategy,
 ) -> Result<StructuralizationAnalysisReport, StructuralizationError> {
+    if strategy != StructuralizationStrategy::Rvsdg {
+        return Err(StructuralizationError::Relooper {
+            reason: "analysis reports are only exposed for the RVSDG strategy".into(),
+        });
+    }
     let mut cfg_regions = BTreeMap::new();
     for cfg in hugr
         .nodes()
@@ -41,16 +45,18 @@ pub fn analyze_hugr_cfgs<H: HugrView<Node = Node>>(
 
 /// Analyzes one CFG into the shared lowering-oriented structural region form.
 ///
-/// This is the strategy dispatch point used by both the public analysis entry
-/// point and the rewrite path. It keeps lowerer code free from strategy-
-/// specific RVSDG or Beyond-Relooper details.
+/// This helper is used by the RVSDG rewrite path and the public RVSDG analysis
+/// entry point. Beyond-Relooper no longer routes through this shared IR.
 pub(super) fn analyze_cfg<H: HugrView<Node = Node> + Clone>(
     cfg_view: H,
     strategy: StructuralizationStrategy,
 ) -> Result<StructuredRegion, StructuralizationError> {
+    debug_assert_eq!(strategy, StructuralizationStrategy::Rvsdg);
     let id_cfg = IdentityCfgMap::new(cfg_view.clone());
     match strategy {
         StructuralizationStrategy::Rvsdg => rvsdg::analyze_cfg(&cfg_view, &id_cfg),
-        StructuralizationStrategy::BeyondRelooper => relooper::analyze_cfg(&cfg_view, &id_cfg),
+        StructuralizationStrategy::BeyondRelooper => Err(StructuralizationError::Relooper {
+            reason: "Beyond-Relooper does not produce shared analysis reports".into(),
+        }),
     }
 }

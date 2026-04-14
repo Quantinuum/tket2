@@ -62,7 +62,7 @@ pub(crate) type RelooperContext = Vec<RelooperContextFrame>;
 
 /// One analyzed region in the Beyond-Relooper AST.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) struct RelooperRegion {
+pub(in crate::control) struct RelooperRegion {
     /// Ordered values crossing the region boundary.
     pub(super) io: RegionIo,
     /// Structured body of the region.
@@ -72,16 +72,19 @@ pub(super) struct RelooperRegion {
 /// HUGR-facing details for one labelled block.
 ///
 /// The paper's target language only needs the label and body. The current
-/// lowerer still requires the typed join block and whether that join lowers
-/// locally or in the surrounding sequence, so those details live here instead
-/// of inside the statement shape itself.
+/// lowerer still requires whether the followed-by block lowers locally or in
+/// the surrounding sequence, so that detail lives here instead of inside the
+/// statement shape itself.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) struct RelooperBlockLowering {
-    /// Block reached after this structured body completes.
-    pub(super) follow: StructuredBlock,
+pub(in crate::control) struct RelooperBlockLowering {
     /// Whether the followed-by block lowers inside the block or in the
     /// surrounding scope.
     pub(super) join_kind: StructuredBranchJoinKind,
+    /// Loop-exit selectors routed to this labelled block.
+    ///
+    /// Ordinary branch blocks leave this empty. Wrapped loop-exit blocks use it
+    /// to record which CFG edges break to the block's label.
+    pub(super) loop_exit_edges: Vec<StructuredLoopEdge>,
 }
 
 /// HUGR-facing details for one analysed loop.
@@ -91,7 +94,7 @@ pub(super) struct RelooperBlockLowering {
 /// feed continue and break paths, so those details are grouped here until exit
 /// lowering becomes fully context-driven.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) struct RelooperLoopLowering {
+pub(in crate::control) struct RelooperLoopLowering {
     /// Loop family selected from the CFG.
     pub(super) kind: StructuredLoopKind,
     /// Header block that guards or enters the loop.
@@ -100,30 +103,11 @@ pub(super) struct RelooperLoopLowering {
     pub(super) backedge_source: Node,
     /// Continue edge routed back to the loop header.
     pub(super) continue_edge: StructuredLoopEdge,
-    /// Distinct exits routed out of the loop.
-    pub(super) exits: Vec<RelooperExit>,
-}
-
-/// One explicit exit in the Beyond-Relooper AST.
-///
-/// The paper's target language uses `br depth` and `return`. This
-/// representation keeps the target label explicit, which is easier to inspect
-/// while the lowerer still derives concrete depths from the active context.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) struct RelooperExit {
-    /// Label targeted by the exit.
-    pub(super) target: RelooperLabel,
-    /// Payload carried along the exit edge.
-    pub(super) payload: TypeRow,
-    /// HUGR-facing edge summaries selecting this exit.
-    pub(super) edges: Vec<StructuredLoopEdge>,
-    /// Continuation lowered after the exit reaches its target.
-    pub(super) continuation: Box<RelooperStmt>,
 }
 
 /// One statement in the Beyond-Relooper AST.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) enum RelooperStmt {
+pub(in crate::control) enum RelooperStmt {
     /// A straight-line sequence of statements.
     Seq(Vec<RelooperStmt>),
     /// A nested structured region with its own interface.
@@ -156,7 +140,7 @@ pub(super) enum RelooperStmt {
         body: Box<RelooperStmt>,
     },
     /// A branch to an enclosing labelled construct.
-    Br(Box<RelooperExit>),
+    Br(RelooperLabel),
     /// Return from the enclosing region with the given payload row.
     Return(TypeRow),
 }

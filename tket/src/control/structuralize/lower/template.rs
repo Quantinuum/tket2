@@ -28,7 +28,7 @@ use super::super::types::{
 /// records which placeholder `DFG` should be replaced with which original CFG
 /// block once the template is inserted into the destination HUGR.
 #[derive(Debug)]
-pub(super) struct LoweredCfgTemplate {
+pub(crate) struct LoweredCfgTemplate {
     /// Structured replacement skeleton built in isolation.
     pub(super) hugr: Hugr,
     /// Placeholder-to-original block mapping for materialization.
@@ -37,7 +37,7 @@ pub(super) struct LoweredCfgTemplate {
 
 /// Mapping from a template placeholder node back to the original CFG block.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) struct BlockPlaceholder {
+pub(crate) struct BlockPlaceholder {
     /// Original CFG basic block node.
     pub(super) original: Node,
     /// Placeholder `DFG` node inside the detached template.
@@ -48,7 +48,7 @@ pub(super) struct BlockPlaceholder {
 
 /// How one placeholder should obtain its CFG block subtree.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum BlockMaterialization {
+pub(crate) enum BlockMaterialization {
     /// Move the original CFG block subtree into the structured replacement.
     Move,
     /// Clone the already-existing block subtree for a duplicated CFG node.
@@ -131,7 +131,7 @@ impl<'a> LoopLowering<'a> {
 ///
 /// Returns an error when the analyzed region cannot be lowered into the shared
 /// structured HUGR template.
-pub(super) fn prepare_cfg_replacement<H: HugrView<Node = Node>>(
+pub(crate) fn prepare_cfg_replacement<H: HugrView<Node = Node>>(
     cfg_view: &H,
     region: &StructuredRegion,
 ) -> Result<LoweredCfgTemplate, StructuralizationError> {

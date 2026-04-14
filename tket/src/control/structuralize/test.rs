@@ -492,6 +492,13 @@ fn run_structurize(h: &mut Hugr, strategy: StructuralizationStrategy) {
     structurize_cfgs(h, &cfgs, strategy).unwrap();
 }
 
+fn structurize_result(mut h: Hugr, strategy: StructuralizationStrategy) -> Result<Hugr, String> {
+    let cfgs = cfgs(&h);
+    structurize_cfgs(&mut h, &cfgs, strategy)
+        .map(|_| h)
+        .map_err(|err| err.to_string())
+}
+
 fn conditional_count(h: &Hugr) -> usize {
     h.nodes()
         .filter(|n| matches!(h.get_optype(*n), OpType::Conditional(_)))
@@ -511,6 +518,270 @@ fn assert_lowered_counts(h: &Hugr, expected_conditionals: usize, expected_loops:
 }
 
 type TestCfgBuilder = fn() -> Hugr;
+
+/// Builds a reducible loop with two distinct latch blocks flowing back to the
+/// same header.
+///
+/// ```text
+///  entry -> header -----> after -> exit
+///            |             ^
+///            v             |
+///           body -> split -+
+///                    |   |
+///                    v   v
+///                 latch_a latch_b
+///                    \   /
+///                     \ /
+///                    header
+/// ```
+///
+/// The CFG is reducible because `header` is the unique loop header, but the
+/// loop has two backedge sources instead of one.
+#[fixture]
+fn build_non_unique_backedge_loop_cfg() -> Hugr {
+    let mut cfg_builder = CFGBuilder::new(Signature::new_endo([usize_t()])).unwrap();
+    let pred_const = cfg_builder.add_constant(Value::unit_sum(0, 2).expect("0 < 2"));
+    let const_unit = cfg_builder.add_constant(Value::unary_unit_sum());
+
+    let entry = n_identity(
+        cfg_builder
+            .simple_entry_builder(vec![usize_t()].into(), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let header = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 2)
+            .unwrap(),
+        &pred_const,
+    )
+    .unwrap();
+    let body = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let split = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 2)
+            .unwrap(),
+        &pred_const,
+    )
+    .unwrap();
+    let latch_a = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let latch_b = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let after = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let exit = cfg_builder.exit_block();
+
+    cfg_builder.branch(&entry, 0, &header).unwrap();
+    cfg_builder.branch(&header, 0, &after).unwrap();
+    cfg_builder.branch(&header, 1, &body).unwrap();
+    cfg_builder.branch(&body, 0, &split).unwrap();
+    cfg_builder.branch(&split, 0, &latch_a).unwrap();
+    cfg_builder.branch(&split, 1, &latch_b).unwrap();
+    cfg_builder.branch(&latch_a, 0, &header).unwrap();
+    cfg_builder.branch(&latch_b, 0, &header).unwrap();
+    cfg_builder.branch(&after, 0, &exit).unwrap();
+
+    cfg_builder.finish_hugr().unwrap()
+}
+
+/// Builds a reducible header-controlled loop whose header branches to two
+/// distinct in-loop successors.
+///
+/// ```text
+///  entry -> header -----> after -> exit
+///            |  \
+///            |   \
+///            v    v
+///          left  right
+///            \    /
+///             \  /
+///             latch
+///               |
+///               v
+///             header
+/// ```
+///
+/// This still has a unique loop header, but the header's continue path is
+/// multi-way rather than selecting one in-loop successor.
+#[fixture]
+fn build_multi_continue_header_loop_cfg() -> Hugr {
+    let mut cfg_builder = CFGBuilder::new(Signature::new_endo([usize_t()])).unwrap();
+    let tri_const = cfg_builder.add_constant(Value::unit_sum(0, 3).expect("0 < 3"));
+    let const_unit = cfg_builder.add_constant(Value::unary_unit_sum());
+
+    let entry = n_identity(
+        cfg_builder
+            .simple_entry_builder(vec![usize_t()].into(), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let header = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 3)
+            .unwrap(),
+        &tri_const,
+    )
+    .unwrap();
+    let left = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let right = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let latch = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let after = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let exit = cfg_builder.exit_block();
+
+    cfg_builder.branch(&entry, 0, &header).unwrap();
+    cfg_builder.branch(&header, 0, &after).unwrap();
+    cfg_builder.branch(&header, 1, &left).unwrap();
+    cfg_builder.branch(&header, 2, &right).unwrap();
+    cfg_builder.branch(&left, 0, &latch).unwrap();
+    cfg_builder.branch(&right, 0, &latch).unwrap();
+    cfg_builder.branch(&latch, 0, &header).unwrap();
+    cfg_builder.branch(&after, 0, &exit).unwrap();
+
+    cfg_builder.finish_hugr().unwrap()
+}
+
+/// Builds a larger irreducible SCC with three external entries.
+///
+/// ```text
+///              a -----> x
+///              ^        |
+///              |        v
+///  entry -> p -+-> b -> y -> exit
+///           |  |        |
+///           |  \-> c <--/
+///           |      |
+///           z <----/
+/// ```
+///
+/// The cycle `a,b,c,x,y,z` has three distinct external entries via `a`, `b`,
+/// and `c`, so preprocessing must duplicate more than a simple two-entry knot.
+#[fixture]
+fn build_three_entry_irreducible_cfg() -> Hugr {
+    let mut cfg_builder = CFGBuilder::new(Signature::new_endo([usize_t()])).unwrap();
+    let tri_const = cfg_builder.add_constant(Value::unit_sum(0, 3).expect("0 < 3"));
+    let pred_const = cfg_builder.add_constant(Value::unit_sum(0, 2).expect("0 < 2"));
+    let const_unit = cfg_builder.add_constant(Value::unary_unit_sum());
+
+    let entry = n_identity(
+        cfg_builder
+            .simple_entry_builder(vec![usize_t()].into(), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let p = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 3)
+            .unwrap(),
+        &tri_const,
+    )
+    .unwrap();
+    let a = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let b = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let c = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let x = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let y = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 2)
+            .unwrap(),
+        &pred_const,
+    )
+    .unwrap();
+    let z = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let exit = cfg_builder.exit_block();
+
+    cfg_builder.branch(&entry, 0, &p).unwrap();
+    cfg_builder.branch(&p, 0, &a).unwrap();
+    cfg_builder.branch(&p, 1, &b).unwrap();
+    cfg_builder.branch(&p, 2, &c).unwrap();
+    cfg_builder.branch(&a, 0, &x).unwrap();
+    cfg_builder.branch(&b, 0, &y).unwrap();
+    cfg_builder.branch(&c, 0, &z).unwrap();
+    cfg_builder.branch(&x, 0, &y).unwrap();
+    cfg_builder.branch(&y, 0, &c).unwrap();
+    cfg_builder.branch(&y, 1, &exit).unwrap();
+    cfg_builder.branch(&z, 0, &a).unwrap();
+
+    cfg_builder.finish_hugr().unwrap()
+}
 
 #[rstest]
 fn branch_then_loop_io(#[from(build_cond_then_loop_cfg)] cond_then_loop: Hugr) {
@@ -696,6 +967,39 @@ fn lowers_reducible_cfgs_with_multiple_loop_exit_targets(
     let cfgs = cfgs(&h);
     let report = structurize_cfgs(&mut h, &cfgs, strategy).unwrap();
     assert_eq!(report.rewrites.len(), 1);
+    assert_eq!(h.nodes().filter(|n| h.get_optype(*n).is_cfg()).count(), 0);
+}
+
+#[rstest]
+#[case::non_unique_backedge(
+    build_non_unique_backedge_loop_cfg as TestCfgBuilder,
+    "unique backedge source"
+)]
+#[case::multi_continue_header(
+    build_multi_continue_header_loop_cfg as TestCfgBuilder,
+    "exactly one in-loop successor"
+)]
+fn documents_current_relooper_gaps(
+    #[case] build_cfg: TestCfgBuilder,
+    #[case] expected_reason: &str,
+) {
+    let err = structurize_result(build_cfg(), StructuralizationStrategy::BeyondRelooper)
+        .expect_err("fixture should currently expose a Beyond-Relooper gap");
+    assert!(
+        err.contains(expected_reason),
+        "expected `{expected_reason}` in `{err}`"
+    );
+}
+
+#[rstest]
+#[case::rvsdg(StructuralizationStrategy::Rvsdg)]
+#[case::relooper(StructuralizationStrategy::BeyondRelooper)]
+fn preprocesses_three_entry_irreducible_cfg(
+    #[case] strategy: StructuralizationStrategy,
+    #[from(build_three_entry_irreducible_cfg)] three_entry_irreducible: Hugr,
+) {
+    let h = structurize_result(three_entry_irreducible, strategy)
+        .unwrap_or_else(|err| panic!("strategy {strategy:?} failed on three-entry SCC: {err}"));
     assert_eq!(h.nodes().filter(|n| h.get_optype(*n).is_cfg()).count(), 0);
 }
 

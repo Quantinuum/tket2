@@ -12,13 +12,14 @@
 //! Relooper paths evolve independently without one giant file.
 
 mod analyze;
-mod lower;
+pub(crate) mod lower;
 pub(crate) mod shared;
 #[cfg(test)]
 mod test;
 mod types;
 
 pub use analyze::analyze_hugr_cfgs;
+pub(crate) use lower::LoweredCfgTemplate;
 pub use lower::structurize_cfgs;
 pub(crate) use types::{
     RegionIo, StructuredBlock, StructuredBranchJoinKind, StructuredLoopEdge, StructuredLoopExit,

@@ -30,8 +30,9 @@ use super::analyze::analyze_cfg;
 use super::types::{
     StructuralizationError, StructuralizationRewriteReport, StructuralizationStrategy,
 };
+use crate::control::{IdentityCfgMap, relooper};
 use materialize::materialize_cfg_rewrite;
-use template::prepare_cfg_replacement;
+pub(crate) use template::{LoweredCfgTemplate, prepare_cfg_replacement};
 
 /// Structuralize the specified CFGs and rewrite them in place.
 ///
@@ -49,8 +50,16 @@ pub fn structurize_cfgs<H: HugrMut<Node = Node>>(
     let mut rewrites = Vec::with_capacity(cfgs.len());
     for cfg in cfgs {
         let cfg_view = hugr.with_entrypoint(cfg);
-        let analyzed = analyze_cfg(cfg_view.clone(), strategy)?;
-        let replacement = prepare_cfg_replacement(&cfg_view, &analyzed)?;
+        let replacement = match strategy {
+            StructuralizationStrategy::Rvsdg => {
+                let analyzed = analyze_cfg(cfg_view.clone(), strategy)?;
+                prepare_cfg_replacement(&cfg_view, &analyzed)?
+            }
+            StructuralizationStrategy::BeyondRelooper => {
+                let id_cfg = IdentityCfgMap::new(cfg_view.clone());
+                relooper::prepare_cfg_rewrite(&cfg_view, &id_cfg)?
+            }
+        };
         materialize_cfg_rewrite(hugr, cfg, replacement)?;
         NormalizeCFGPass::default()
             .with_scope(PassScope::EntrypointRecursive)
