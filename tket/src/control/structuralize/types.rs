@@ -102,6 +102,17 @@ pub(crate) struct StructuredLoopEdge {
     pub(crate) payload: TypeRow,
 }
 
+/// One structured loop exit with its immediate payload and continuation.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct StructuredLoopExit {
+    /// Break edges that select this exit variant.
+    pub(crate) edges: Vec<StructuredLoopEdge>,
+    /// Immediate payload emitted when the loop exits through this variant.
+    pub(crate) outputs: TypeRow,
+    /// Continuation lowered after the loop exits through this variant.
+    pub(crate) continuation: Vec<StructuredNode>,
+}
+
 /// How a structured branch hands control to its join block.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum StructuredBranchJoinKind {
@@ -142,9 +153,12 @@ pub(crate) enum StructuredRegionBody {
         backedge_source: Node,
         /// Continue edge routed back to the loop header.
         continue_edge: StructuredLoopEdge,
-        /// Break edges routed out of the loop to the enclosing continuation.
-        break_edges: Vec<StructuredLoopEdge>,
-        /// Common payload row for values produced when the loop exits.
+        /// Distinct loop exits selected by break edges in the loop body.
+        exits: Vec<StructuredLoopExit>,
+        /// Immediate payload row consumed by the `TailLoop` break path.
+        ///
+        /// Single-exit loops use the exit payload directly. Multi-exit loops
+        /// use a tagged sum carrying the selected exit payload.
         break_outputs: TypeRow,
     },
 }

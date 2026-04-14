@@ -10,7 +10,8 @@ use hugr::{HugrView, Node};
 use crate::control::IdentityCfgMap;
 use crate::control::structuralize::{
     RegionIo, StructuralizationError, StructuredBlock, StructuredBranchJoinKind,
-    StructuredLoopEdge, StructuredLoopKind, StructuredNode, StructuredRegion, StructuredRegionBody,
+    StructuredLoopEdge, StructuredLoopExit, StructuredLoopKind, StructuredNode, StructuredRegion,
+    StructuredRegionBody,
 };
 
 use super::{
@@ -136,16 +137,41 @@ fn lower_theta(theta: &ThetaNode) -> Result<StructuredRegion, StructuralizationE
                 case: theta.continue_edge.case,
                 payload: vars_to_row(&theta.continue_edge.payload),
             },
-            break_edges: theta
-                .break_edges
+            exits: theta
+                .exits
                 .iter()
-                .map(|edge| StructuredLoopEdge {
-                    source: edge.source,
-                    case: edge.case,
-                    payload: vars_to_row(&edge.payload),
+                .map(|exit| StructuredLoopExit {
+                    edges: exit
+                        .edges
+                        .iter()
+                        .map(|edge| StructuredLoopEdge {
+                            source: edge.source,
+                            case: edge.case,
+                            payload: vars_to_row(&edge.payload),
+                        })
+                        .collect(),
+                    outputs: vars_to_row(&exit.outputs),
+                    continuation: exit
+                        .continuation
+                        .body
+                        .iter()
+                        .map(lower_node)
+                        .collect::<Result<Vec<_>, _>>()
+                        .expect("rvsdg exit continuation lowering is infallible"),
                 })
                 .collect(),
-            break_outputs: vars_to_row(&theta.outputs),
+            break_outputs: if theta.exits.len() == 1 {
+                vars_to_row(&theta.exits[0].outputs)
+            } else {
+                vec![hugr::types::Type::new_sum(
+                    theta
+                        .exits
+                        .iter()
+                        .map(|exit| vars_to_row(&exit.outputs))
+                        .collect::<Vec<_>>(),
+                )]
+                .into()
+            },
         },
     })
 }

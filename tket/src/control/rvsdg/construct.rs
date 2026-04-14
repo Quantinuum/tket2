@@ -18,7 +18,7 @@ use crate::control::cfg::{CfgFacts, CfgFactsError};
 use super::error::RvsdgBuildError;
 use super::ir::{
     BlockNode, BranchJoinKind, GammaEntryVar, GammaNode, GammaOutputVar, LoopKind, Region,
-    RegionVar, Rvsdg, RvsdgNode, ThetaEdge, ThetaLoopVar, ThetaNode, VarId,
+    RegionVar, Rvsdg, RvsdgNode, ThetaEdge, ThetaExit, ThetaLoopVar, ThetaNode, VarId,
 };
 
 /// Builds an RVSDG for one reducible CFG.
@@ -155,7 +155,7 @@ impl<'a, H: HugrView<Node = Node>> RvsdgBuilder<'a, H> {
             }
 
             if info.is_nested_loop_header(node, scope, active_loop) {
-                let (theta, next) = self.build_theta(node, scope, info, cfg)?;
+                let (theta, next) = self.build_theta(node, scope, stop, active_loop, info, cfg)?;
                 items.push(RvsdgNode::Theta(Box::new(theta)));
                 current = next;
                 continue;
@@ -306,6 +306,8 @@ impl<'a, H: HugrView<Node = Node>> RvsdgBuilder<'a, H> {
         &mut self,
         header: T,
         scope: &BTreeSet<T>,
+        stop: Option<T>,
+        active_loop: Option<T>,
         info: &CfgFacts<T>,
         cfg: &C,
     ) -> Result<(ThetaNode, Option<T>), RvsdgBuildError<Node>>
@@ -338,15 +340,11 @@ impl<'a, H: HugrView<Node = Node>> RvsdgBuilder<'a, H> {
                 !loop_blocks.contains(dst) && !info.is_loop_backedge(*src, *dst, header)
             })
             .collect_vec();
-        let exit_target = exit_edges
+        let exit_targets = exit_edges
             .iter()
             .map(|(_, dst)| *dst)
-            .dedup()
-            .exactly_one()
-            .map_err(|_| RvsdgBuildError::UnsupportedLoop {
-                header: cfg.hugr_node(header),
-                reason: "loop does not have a unique exit target".into(),
-            })?;
+            .unique()
+            .collect_vec();
         let backedge_source = info
             .backedges
             .get(&header)
@@ -374,17 +372,12 @@ impl<'a, H: HugrView<Node = Node>> RvsdgBuilder<'a, H> {
             .filter(|succ| !loop_blocks.contains(succ))
             .collect_vec();
 
-        let (kind, continue_edge, break_edges, body_start) = if !out_of_loop_succs.is_empty() {
+        let multi_exit = exit_targets.len() > 1;
+        let (kind, continue_edge, exits, body_start, next) = if !out_of_loop_succs.is_empty() {
             let continue_target = in_loop_succs.into_iter().exactly_one().map_err(|_| {
                 RvsdgBuildError::UnsupportedLoop {
                     header: cfg.hugr_node(header),
                     reason: "header-controlled loop must have one in-loop successor".into(),
-                }
-            })?;
-            let break_target = out_of_loop_succs.into_iter().exactly_one().map_err(|_| {
-                RvsdgBuildError::UnsupportedLoop {
-                    header: cfg.hugr_node(header),
-                    reason: "header-controlled loop must have one exit successor".into(),
                 }
             })?;
             let continue_case = header_succs
@@ -394,13 +387,6 @@ impl<'a, H: HugrView<Node = Node>> RvsdgBuilder<'a, H> {
                     header: cfg.hugr_node(header),
                     reason: "header-controlled loop is missing the continue edge".into(),
                 })?;
-            let break_case = header_succs
-                .iter()
-                .position(|succ| *succ == break_target)
-                .ok_or_else(|| RvsdgBuildError::UnsupportedLoop {
-                    header: cfg.hugr_node(header),
-                    reason: "header-controlled loop is missing the break edge".into(),
-                })?;
             let continue_payload = self.fresh_vars(
                 &block_successor_row(self.cfg_view, cfg.hugr_node(header), continue_case).map_err(
                     |reason| RvsdgBuildError::UnsupportedLoop {
@@ -409,14 +395,72 @@ impl<'a, H: HugrView<Node = Node>> RvsdgBuilder<'a, H> {
                     },
                 )?,
             );
-            let break_payload = self.fresh_vars(
-                &block_successor_row(self.cfg_view, cfg.hugr_node(header), break_case).map_err(
-                    |reason| RvsdgBuildError::UnsupportedLoop {
-                        header: cfg.hugr_node(header),
-                        reason,
-                    },
-                )?,
-            );
+            let exits = exit_targets
+                .iter()
+                .copied()
+                .map(|target| {
+                    let edges = exit_edges
+                        .iter()
+                        .copied()
+                        .filter(|(_, dst)| *dst == target)
+                        .map(|(exit_source, _)| {
+                            let succs = info.succs.get(&exit_source).cloned().unwrap_or_default();
+                            let break_case = succs
+                                .iter()
+                                .position(|succ| *succ == target)
+                                .ok_or_else(|| RvsdgBuildError::UnsupportedLoop {
+                                    header: cfg.hugr_node(header),
+                                    reason: format!(
+                                        "header-controlled loop exit source {} is missing the exit edge",
+                                        cfg.hugr_node(exit_source)
+                                    ),
+                                })?;
+                            let break_payload = block_successor_row(
+                                self.cfg_view,
+                                cfg.hugr_node(exit_source),
+                                break_case,
+                            )
+                            .map_err(|reason| RvsdgBuildError::UnsupportedLoop {
+                                header: cfg.hugr_node(header),
+                                reason,
+                            })?;
+                            Ok(ThetaEdge {
+                                source: cfg.hugr_node(exit_source),
+                                case: break_case,
+                                payload: self.fresh_vars(&break_payload),
+                            })
+                        })
+                        .collect::<Result<Vec<_>, _>>()?;
+                    let outputs = edges.first().map(|edge| edge.payload.clone()).ok_or_else(|| {
+                        RvsdgBuildError::UnsupportedLoop {
+                            header: cfg.hugr_node(header),
+                            reason: "loop must have at least one break edge".into(),
+                        }
+                    })?;
+                    let continuation = if multi_exit {
+                        let final_results = loop_continuation_results(
+                            self,
+                            cfg_view_output_row(self.cfg_view, cfg, stop)?,
+                        );
+                        Region {
+                            arguments: outputs.clone(),
+                            body: self.build_scope(target, scope, stop, active_loop, info, cfg)?,
+                            results: final_results,
+                        }
+                    } else {
+                        Region {
+                            arguments: outputs.clone(),
+                            body: Vec::new(),
+                            results: outputs.clone(),
+                        }
+                    };
+                    Ok(ThetaExit {
+                        edges,
+                        outputs,
+                        continuation,
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()?;
             (
                 LoopKind::HeaderControlled,
                 ThetaEdge {
@@ -424,12 +468,13 @@ impl<'a, H: HugrView<Node = Node>> RvsdgBuilder<'a, H> {
                     case: continue_case,
                     payload: continue_payload,
                 },
-                vec![ThetaEdge {
-                    source: cfg.hugr_node(header),
-                    case: break_case,
-                    payload: break_payload,
-                }],
+                exits,
                 continue_target,
+                if multi_exit {
+                    stop
+                } else {
+                    Some(exit_targets[0])
+                },
             )
         } else {
             let latch_succs = info
@@ -451,31 +496,73 @@ impl<'a, H: HugrView<Node = Node>> RvsdgBuilder<'a, H> {
                         reason,
                     })?,
             );
-            let break_edges = exit_edges
+            let exits = exit_targets
                 .iter()
                 .copied()
-                .map(|(exit_source, _)| {
-                    let succs = info.succs.get(&exit_source).cloned().unwrap_or_default();
-                    let break_case = succs
+                .map(|target| {
+                    let edges = exit_edges
                         .iter()
-                        .position(|succ| *succ == exit_target)
-                        .ok_or_else(|| RvsdgBuildError::UnsupportedLoop {
-                            header: cfg.hugr_node(header),
-                            reason: format!(
-                                "loop exit source {} is missing the exit edge",
-                                cfg.hugr_node(exit_source)
-                            ),
-                        })?;
-                    let break_payload =
-                        block_successor_row(self.cfg_view, cfg.hugr_node(exit_source), break_case)
-                            .map_err(|reason| RvsdgBuildError::UnsupportedLoop {
-                                header: cfg.hugr_node(header),
-                                reason,
+                        .copied()
+                        .filter(|(_, dst)| *dst == target)
+                        .map(|(exit_source, _)| {
+                            let succs = info.succs.get(&exit_source).cloned().unwrap_or_default();
+                            let break_case = succs
+                                .iter()
+                                .position(|succ| *succ == target)
+                                .ok_or_else(|| RvsdgBuildError::UnsupportedLoop {
+                                    header: cfg.hugr_node(header),
+                                    reason: format!(
+                                        "loop exit source {} is missing the exit edge",
+                                        cfg.hugr_node(exit_source)
+                                    ),
+                                })?;
+                            let break_payload = block_successor_row(
+                                self.cfg_view,
+                                cfg.hugr_node(exit_source),
+                                break_case,
+                            )
+                            .map_err(|reason| {
+                                RvsdgBuildError::UnsupportedLoop {
+                                    header: cfg.hugr_node(header),
+                                    reason,
+                                }
                             })?;
-                    Ok(ThetaEdge {
-                        source: cfg.hugr_node(exit_source),
-                        case: break_case,
-                        payload: self.fresh_vars(&break_payload),
+                            Ok(ThetaEdge {
+                                source: cfg.hugr_node(exit_source),
+                                case: break_case,
+                                payload: self.fresh_vars(&break_payload),
+                            })
+                        })
+                        .collect::<Result<Vec<_>, _>>()?;
+                    let outputs =
+                        edges
+                            .first()
+                            .map(|edge| edge.payload.clone())
+                            .ok_or_else(|| RvsdgBuildError::UnsupportedLoop {
+                                header: cfg.hugr_node(header),
+                                reason: "loop must have at least one break edge".into(),
+                            })?;
+                    let continuation = if multi_exit {
+                        let final_results = loop_continuation_results(
+                            self,
+                            cfg_view_output_row(self.cfg_view, cfg, stop)?,
+                        );
+                        Region {
+                            arguments: outputs.clone(),
+                            body: self.build_scope(target, scope, stop, active_loop, info, cfg)?,
+                            results: final_results,
+                        }
+                    } else {
+                        Region {
+                            arguments: outputs.clone(),
+                            body: Vec::new(),
+                            results: outputs.clone(),
+                        }
+                    };
+                    Ok(ThetaExit {
+                        edges,
+                        outputs,
+                        continuation,
                     })
                 })
                 .collect::<Result<Vec<_>, _>>()?;
@@ -486,8 +573,13 @@ impl<'a, H: HugrView<Node = Node>> RvsdgBuilder<'a, H> {
                     case: continue_case,
                     payload: continue_payload,
                 },
-                break_edges,
+                exits,
                 header,
+                if multi_exit {
+                    stop
+                } else {
+                    Some(exit_targets[0])
+                },
             )
         };
 
@@ -501,24 +593,15 @@ impl<'a, H: HugrView<Node = Node>> RvsdgBuilder<'a, H> {
                 post: self.fresh_var(continue_ty.ty),
             })
             .collect_vec();
-        let break_outputs: TypeRow = break_edges
-            .first()
-            .map(|edge| {
-                edge.payload
-                    .iter()
-                    .map(|var| var.ty.clone())
-                    .collect::<Vec<_>>()
-                    .into()
-            })
-            .ok_or_else(|| RvsdgBuildError::UnsupportedLoop {
-                header: cfg.hugr_node(header),
-                reason: "loop must have at least one break edge".into(),
-            })?;
-        let outputs = break_outputs
-            .iter()
-            .cloned()
-            .map(|ty| self.fresh_var(ty))
-            .collect_vec();
+        let outputs = if multi_exit {
+            cfg_view_output_row(self.cfg_view, cfg, stop)?
+                .iter()
+                .cloned()
+                .map(|ty| self.fresh_var(ty))
+                .collect_vec()
+        } else {
+            exits[0].outputs.clone()
+        };
         let body = Region {
             arguments: loop_vars.iter().map(|var| var.pre.clone()).collect(),
             body: self.build_scope(body_start, &loop_blocks, None, Some(header), info, cfg)?,
@@ -534,10 +617,10 @@ impl<'a, H: HugrView<Node = Node>> RvsdgBuilder<'a, H> {
                 body,
                 backedge_source: cfg.hugr_node(backedge_source),
                 continue_edge,
-                break_edges,
+                exits,
                 loop_vars,
             },
-            Some(exit_target),
+            next,
         ))
     }
 }
@@ -553,6 +636,46 @@ fn branch_arguments(
         .cloned()
         .chain(entry_outputs.iter().cloned())
         .collect()
+}
+
+/// Returns the final output row visible after a loop continuation reaches stop.
+fn cfg_view_output_row<H, T, C>(
+    cfg_view: &H,
+    cfg: &C,
+    stop: Option<T>,
+) -> Result<TypeRow, RvsdgBuildError<Node>>
+where
+    H: HugrView<Node = Node>,
+    T: HugrNode,
+    C: CfgBlockMap<T>,
+{
+    match stop {
+        Some(stop) => Ok(cfg_view
+            .get_optype(cfg.hugr_node(stop))
+            .as_dataflow_block()
+            .ok_or(RvsdgBuildError::ExpectedBlock {
+                node: cfg.hugr_node(stop),
+            })?
+            .inputs
+            .clone()),
+        None => Ok(cfg_view
+            .get_optype(cfg_view.entrypoint())
+            .as_cfg()
+            .ok_or(RvsdgBuildError::ExpectedBlock {
+                node: cfg_view.entrypoint(),
+            })?
+            .signature
+            .output
+            .clone()),
+    }
+}
+
+/// Allocates ordered RVSDG variables for one loop-continuation output row.
+fn loop_continuation_results<H: HugrView<Node = Node>>(
+    builder: &mut RvsdgBuilder<'_, H>,
+    row: TypeRow,
+) -> Vec<RegionVar> {
+    builder.fresh_vars(&row)
 }
 
 /// Returns the typed payload row emitted along one successor edge.

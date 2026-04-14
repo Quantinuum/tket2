@@ -48,11 +48,22 @@ pub(super) enum RelooperBody {
         backedge_source: Node,
         /// Continue edge routed back to the loop header.
         continue_edge: StructuredLoopEdge,
-        /// Break edges routed out of the loop.
-        break_edges: Vec<StructuredLoopEdge>,
-        /// Common payload row for all loop exits.
+        /// Distinct exits routed out of the loop.
+        exits: Vec<RelooperLoopExit>,
+        /// Immediate payload row consumed by the `TailLoop` break path.
         break_outputs: TypeRow,
     },
+}
+
+/// One loop exit with its immediate payload and strategy-local continuation.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct RelooperLoopExit {
+    /// Break edges that select this exit variant.
+    pub(super) edges: Vec<StructuredLoopEdge>,
+    /// Immediate payload emitted when the loop exits through this variant.
+    pub(super) outputs: TypeRow,
+    /// Continuation lowered after the loop exits through this variant.
+    pub(super) continuation: Vec<RelooperNode>,
 }
 
 /// One item in a Beyond-Relooper sequence.

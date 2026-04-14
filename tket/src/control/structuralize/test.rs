@@ -267,8 +267,8 @@ fn build_irreducible_cfg() -> Hugr {
 /// ```
 ///
 /// This shape remains reducible because `header` is the unique loop header, but
-/// it still requires distinguishing multiple loop exits. Both strategies
-/// currently reject it because they expect a unique loop exit target.
+/// it still requires distinguishing multiple loop exits before control rejoins
+/// later in the CFG.
 #[fixture]
 fn build_two_level_loop_escape_cfg() -> Hugr {
     let mut cfg_builder = CFGBuilder::new(Signature::new_endo([usize_t()])).unwrap();
@@ -359,9 +359,8 @@ fn build_two_level_loop_escape_cfg() -> Hugr {
 ///            \ cont <---------/
 /// ```
 ///
-/// The loop still has a unique header, so the CFG is reducible, but the
-/// structuralizer currently treats the two break targets as unsupported loop
-/// exits rather than threading them through a richer region interface.
+/// The loop still has a unique header, so the CFG is reducible, but
+/// structuralization must preserve both exit continuations until they rejoin.
 #[fixture]
 fn build_multi_exit_loop_cfg() -> Hugr {
     let mut cfg_builder = CFGBuilder::new(Signature::new_endo([usize_t()])).unwrap();
@@ -512,29 +511,6 @@ fn assert_lowered_counts(h: &Hugr, expected_conditionals: usize, expected_loops:
 }
 
 type TestCfgBuilder = fn() -> Hugr;
-
-fn expect_multiple_loop_exit_error(
-    err: super::StructuralizationError,
-    strategy: StructuralizationStrategy,
-) {
-    match strategy {
-        StructuralizationStrategy::Rvsdg => {
-            assert!(matches!(
-                err,
-                super::StructuralizationError::Rvsdg(
-                    crate::control::rvsdg::RvsdgBuildError::UnsupportedLoop { reason, .. }
-                ) if reason.contains("unique exit target")
-            ));
-        }
-        StructuralizationStrategy::BeyondRelooper => {
-            assert!(matches!(
-                err,
-                super::StructuralizationError::Relooper { reason }
-                    if reason.contains("unique exit target")
-            ));
-        }
-    }
-}
 
 #[rstest]
 fn branch_then_loop_io(#[from(build_cond_then_loop_cfg)] cond_then_loop: Hugr) {
@@ -708,7 +684,7 @@ fn lowers_irreducible_cfg(
 #[rstest]
 #[case::two_level_escape(build_two_level_loop_escape_cfg as TestCfgBuilder)]
 #[case::multi_exit_loop(build_multi_exit_loop_cfg as TestCfgBuilder)]
-fn rejects_reducible_cfgs_with_multiple_loop_exit_targets(
+fn lowers_reducible_cfgs_with_multiple_loop_exit_targets(
     #[case] build_cfg: TestCfgBuilder,
     #[values(
         StructuralizationStrategy::Rvsdg,
@@ -718,8 +694,9 @@ fn rejects_reducible_cfgs_with_multiple_loop_exit_targets(
 ) {
     let mut h = build_cfg();
     let cfgs = cfgs(&h);
-    let err = structurize_cfgs(&mut h, &cfgs, strategy).unwrap_err();
-    expect_multiple_loop_exit_error(err, strategy);
+    let report = structurize_cfgs(&mut h, &cfgs, strategy).unwrap();
+    assert_eq!(report.rewrites.len(), 1);
+    assert_eq!(h.nodes().filter(|n| h.get_optype(*n).is_cfg()).count(), 0);
 }
 
 #[rstest]

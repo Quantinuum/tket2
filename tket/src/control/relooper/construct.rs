@@ -7,6 +7,7 @@
 use std::collections::BTreeSet;
 
 use hugr::core::HugrNode;
+use hugr::types::Type;
 use hugr::{HugrView, Node};
 use itertools::Itertools;
 
@@ -20,7 +21,7 @@ use crate::control::structuralize::{
 };
 use crate::control::{CfgBlockMap, IdentityCfgMap};
 
-use super::ast::{RelooperBody, RelooperNode, RelooperRegion};
+use super::ast::{RelooperBody, RelooperLoopExit, RelooperNode, RelooperRegion};
 
 /// Builds the Beyond-Relooper AST for one CFG.
 ///
@@ -108,7 +109,8 @@ where
             }
 
             if self.is_nested_loop_header(node, scope, active_loop) {
-                let (region, next) = self.build_loop_region(cfg_view, cfg, node, scope)?;
+                let (region, next) =
+                    self.build_loop_region(cfg_view, cfg, node, scope, stop, active_loop)?;
                 items.push(RelooperNode::Region(Box::new(region)));
                 current = next;
                 continue;
@@ -187,6 +189,8 @@ where
         cfg: &C,
         header: T,
         scope: &BTreeSet<T>,
+        stop: Option<T>,
+        active_loop: Option<T>,
     ) -> Result<(RelooperRegion, Option<T>), StructuralizationError>
     where
         H: HugrView<Node = Node>,
@@ -216,14 +220,11 @@ where
                 !loop_blocks.contains(dst) && !self.is_loop_backedge(*src, *dst, header)
             })
             .collect_vec();
-        let exit_target = exit_edges
+        let exit_targets = exit_edges
             .iter()
             .map(|(_, dst)| *dst)
-            .dedup()
-            .exactly_one()
-            .map_err(|_| StructuralizationError::Relooper {
-                reason: format!("loop headed by {header} does not have a unique exit target"),
-            })?;
+            .unique()
+            .collect_vec();
         let backedge_source = self
             .backedges
             .get(&header)
@@ -248,20 +249,20 @@ where
             .filter(|succ| !loop_blocks.contains(succ))
             .collect_vec();
 
+        let multi_exit = exit_targets.len() > 1;
         let io = RegionIo {
             inputs: header_block.inputs().clone(),
-            outputs: block_input_row(cfg_view, cfg.hugr_node(exit_target))?,
+            outputs: if multi_exit {
+                loop_continuation_outputs(cfg_view, cfg, stop)?
+            } else {
+                block_input_row(cfg_view, cfg.hugr_node(exit_targets[0]))?
+            },
         };
 
-        let body = if !out_of_loop_succs.is_empty() {
+        let (body, next) = if !out_of_loop_succs.is_empty() {
             let continue_target = in_loop_succs.into_iter().exactly_one().map_err(|_| {
                 StructuralizationError::UnsupportedLoop {
                     reason: "header-controlled loop must have exactly one in-loop successor".into(),
-                }
-            })?;
-            let break_target = out_of_loop_succs.into_iter().exactly_one().map_err(|_| {
-                StructuralizationError::UnsupportedLoop {
-                    reason: "header-controlled loop must have exactly one exit successor".into(),
                 }
             })?;
             let continue_case = header_succs
@@ -270,24 +271,59 @@ where
                 .ok_or(StructuralizationError::UnsupportedLoop {
                     reason: "header-controlled loop continue edge is missing".into(),
                 })?;
-            let break_case = header_succs
-                .iter()
-                .position(|succ| *succ == break_target)
-                .ok_or(StructuralizationError::UnsupportedLoop {
-                    reason: "header-controlled loop exit edge is missing".into(),
-                })?;
             let continue_payload = block_successor_payload(
                 cfg_view,
                 cfg.hugr_node(header),
                 continue_case,
                 "header-controlled loop continue case is out of range",
             )?;
-            let break_outputs = block_successor_payload(
-                cfg_view,
-                cfg.hugr_node(header),
-                break_case,
-                "header-controlled loop exit case is out of range",
-            )?;
+            let exits = exit_targets
+                .iter()
+                .copied()
+                .map(|target| {
+                    let edges = exit_edges
+                        .iter()
+                        .filter(|(_, dst)| *dst == target)
+                        .map(|(src, _)| {
+                            let source = cfg.hugr_node(*src);
+                            let succs = self.succs.get(src).cloned().unwrap_or_default();
+                            let break_case = succs.iter().position(|succ| *succ == target).ok_or(
+                                StructuralizationError::UnsupportedLoop {
+                                    reason: format!(
+                                        "header-controlled loop exit source {src} has no edge to target"
+                                    ),
+                                },
+                            )?;
+                            let payload = block_successor_payload(
+                                cfg_view,
+                                source,
+                                break_case,
+                                "header-controlled loop exit case is out of range",
+                            )?;
+                            Ok(StructuredLoopEdge {
+                                source,
+                                case: break_case,
+                                payload,
+                            })
+                        })
+                        .collect::<Result<Vec<_>, StructuralizationError>>()?;
+                    let outputs = edges.first().map(|edge| edge.payload.clone()).ok_or(
+                        StructuralizationError::UnsupportedLoop {
+                            reason: "header-controlled loop has no exit edges".into(),
+                        },
+                    )?;
+                    Ok(RelooperLoopExit {
+                        edges,
+                        outputs,
+                        continuation: if multi_exit {
+                            self.build_scope(cfg_view, cfg, target, scope, stop, active_loop)?
+                        } else {
+                            Vec::new()
+                        },
+                    })
+                })
+                .collect::<Result<Vec<RelooperLoopExit>, StructuralizationError>>()?;
+            let break_outputs = loop_break_outputs(&exits);
             let body = self.build_scope(
                 cfg_view,
                 cfg,
@@ -296,23 +332,26 @@ where
                 None,
                 Some(header),
             )?;
-            RelooperBody::Loop {
-                kind: StructuredLoopKind::HeaderControlled,
-                header: header_block,
-                body,
-                backedge_source: cfg.hugr_node(backedge_source),
-                continue_edge: StructuredLoopEdge {
-                    source: cfg.hugr_node(header),
-                    case: continue_case,
-                    payload: continue_payload,
+            (
+                RelooperBody::Loop {
+                    kind: StructuredLoopKind::HeaderControlled,
+                    header: header_block,
+                    body,
+                    backedge_source: cfg.hugr_node(backedge_source),
+                    continue_edge: StructuredLoopEdge {
+                        source: cfg.hugr_node(header),
+                        case: continue_case,
+                        payload: continue_payload,
+                    },
+                    exits,
+                    break_outputs,
                 },
-                break_edges: vec![StructuredLoopEdge {
-                    source: cfg.hugr_node(header),
-                    case: break_case,
-                    payload: break_outputs.clone(),
-                }],
-                break_outputs,
-            }
+                if multi_exit {
+                    stop
+                } else {
+                    Some(exit_targets[0])
+                },
+            )
         } else {
             let latch_succs = self
                 .succs
@@ -330,53 +369,105 @@ where
                 continue_case,
                 "tail-controlled loop continue case is out of range",
             )?;
-            let break_edges = exit_edges
+            let exits = exit_targets
                 .iter()
-                .map(|(src, _)| {
-                    let source = cfg.hugr_node(*src);
-                    let succs = self.succs.get(src).cloned().unwrap_or_default();
-                    let break_case = succs.iter().position(|succ| *succ == exit_target).ok_or(
+                .copied()
+                .map(|target| {
+                    let edges = exit_edges
+                        .iter()
+                        .filter(|(_, dst)| *dst == target)
+                        .map(|(src, _)| {
+                            let source = cfg.hugr_node(*src);
+                            let succs = self.succs.get(src).cloned().unwrap_or_default();
+                            let break_case = succs.iter().position(|succ| *succ == target).ok_or(
+                                StructuralizationError::UnsupportedLoop {
+                                    reason: format!(
+                                        "loop exit source {src} has no edge to the exit target"
+                                    ),
+                                },
+                            )?;
+                            let payload = block_successor_payload(
+                                cfg_view,
+                                source,
+                                break_case,
+                                "tail-controlled loop exit case is out of range",
+                            )?;
+                            Ok(StructuredLoopEdge {
+                                source,
+                                case: break_case,
+                                payload,
+                            })
+                        })
+                        .collect::<Result<Vec<_>, StructuralizationError>>()?;
+                    let outputs = edges.first().map(|edge| edge.payload.clone()).ok_or(
                         StructuralizationError::UnsupportedLoop {
-                            reason: format!(
-                                "loop exit source {src} has no edge to the exit target"
-                            ),
+                            reason: "tail-controlled loop has no exit edges".into(),
                         },
                     )?;
-                    let payload = block_successor_payload(
-                        cfg_view,
-                        source,
-                        break_case,
-                        "tail-controlled loop exit case is out of range",
-                    )?;
-                    Ok(StructuredLoopEdge {
-                        source,
-                        case: break_case,
-                        payload,
+                    Ok(RelooperLoopExit {
+                        edges,
+                        outputs,
+                        continuation: if multi_exit {
+                            self.build_scope(cfg_view, cfg, target, scope, stop, active_loop)?
+                        } else {
+                            Vec::new()
+                        },
                     })
                 })
-                .collect::<Result<Vec<_>, StructuralizationError>>()?;
-            let break_outputs = break_edges.first().map(|edge| edge.payload.clone()).ok_or(
-                StructuralizationError::UnsupportedLoop {
-                    reason: "tail-controlled loop has no exit edges".into(),
-                },
-            )?;
+                .collect::<Result<Vec<RelooperLoopExit>, StructuralizationError>>()?;
+            let break_outputs = loop_break_outputs(&exits);
             let body = self.build_scope(cfg_view, cfg, header, &loop_blocks, None, Some(header))?;
-            RelooperBody::Loop {
-                kind: StructuredLoopKind::TailControlled,
-                header: header_block,
-                body,
-                backedge_source: cfg.hugr_node(backedge_source),
-                continue_edge: StructuredLoopEdge {
-                    source: cfg.hugr_node(backedge_source),
-                    case: continue_case,
-                    payload: continue_payload,
+            (
+                RelooperBody::Loop {
+                    kind: StructuredLoopKind::TailControlled,
+                    header: header_block,
+                    body,
+                    backedge_source: cfg.hugr_node(backedge_source),
+                    continue_edge: StructuredLoopEdge {
+                        source: cfg.hugr_node(backedge_source),
+                        case: continue_case,
+                        payload: continue_payload,
+                    },
+                    exits,
+                    break_outputs,
                 },
-                break_edges,
-                break_outputs,
-            }
+                if multi_exit {
+                    stop
+                } else {
+                    Some(exit_targets[0])
+                },
+            )
         };
 
-        Ok((RelooperRegion { io, body }, Some(exit_target)))
+        Ok((RelooperRegion { io, body }, next))
+    }
+}
+
+/// Returns the output row visible after a loop continuation reaches its stop.
+fn loop_continuation_outputs<T, H, C>(
+    cfg_view: &H,
+    cfg: &C,
+    stop: Option<T>,
+) -> Result<hugr::types::TypeRow, StructuralizationError>
+where
+    T: HugrNode,
+    H: HugrView<Node = Node>,
+    C: CfgBlockMap<T>,
+{
+    match stop {
+        Some(stop) => block_input_row(cfg_view, cfg.hugr_node(stop)),
+        None => cfg_output_row(cfg_view),
+    }
+}
+
+/// Returns the immediate `TailLoop` break row for one analyzed exit set.
+fn loop_break_outputs(exits: &[RelooperLoopExit]) -> hugr::types::TypeRow {
+    match exits {
+        [exit] => exit.outputs.clone(),
+        _ => vec![Type::new_sum(
+            exits.iter().map(|exit| exit.outputs.clone()).collect_vec(),
+        )]
+        .into(),
     }
 }
 

@@ -169,6 +169,17 @@ pub(crate) struct ThetaEdge {
     pub(crate) payload: Vec<RegionVar>,
 }
 
+/// One loop exit with its immediate payload and continuation region.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ThetaExit {
+    /// Break edges that select this exit variant.
+    pub(crate) edges: Vec<ThetaEdge>,
+    /// Immediate payload emitted when the loop exits through this variant.
+    pub(crate) outputs: Vec<RegionVar>,
+    /// Continuation lowered after the loop exits through this variant.
+    pub(crate) continuation: Region,
+}
+
 /// RVSDG loop node corresponding to one structured loop.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ThetaNode {
@@ -186,8 +197,8 @@ pub(crate) struct ThetaNode {
     pub(crate) backedge_source: Node,
     /// Continue edge routed back to the loop header.
     pub(crate) continue_edge: ThetaEdge,
-    /// Break edges routed out of the loop to the enclosing continuation.
-    pub(crate) break_edges: Vec<ThetaEdge>,
+    /// Distinct exits routed out of the loop to the enclosing continuation.
+    pub(crate) exits: Vec<ThetaExit>,
     /// Explicit loop-carried variables.
     pub(crate) loop_vars: Vec<ThetaLoopVar>,
 }

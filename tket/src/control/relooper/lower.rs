@@ -6,10 +6,11 @@
 //! not depend on the shared lowering types directly.
 
 use crate::control::structuralize::{
-    StructuralizationError, StructuredNode, StructuredRegion, StructuredRegionBody,
+    StructuralizationError, StructuredLoopExit, StructuredNode, StructuredRegion,
+    StructuredRegionBody,
 };
 
-use super::ast::{RelooperBody, RelooperNode, RelooperRegion};
+use super::ast::{RelooperBody, RelooperLoopExit, RelooperNode, RelooperRegion};
 
 /// Lowers one Beyond-Relooper region into the shared structuralization region.
 pub(super) fn lower_region(
@@ -50,7 +51,7 @@ fn lower_body(body: &RelooperBody) -> Result<StructuredRegionBody, Structuraliza
             body,
             backedge_source,
             continue_edge,
-            break_edges,
+            exits,
             break_outputs,
         } => StructuredRegionBody::Loop {
             kind: *kind,
@@ -58,7 +59,10 @@ fn lower_body(body: &RelooperBody) -> Result<StructuredRegionBody, Structuraliza
             body: body.iter().map(lower_node).collect::<Result<Vec<_>, _>>()?,
             backedge_source: *backedge_source,
             continue_edge: continue_edge.clone(),
-            break_edges: break_edges.clone(),
+            exits: exits
+                .iter()
+                .map(lower_exit)
+                .collect::<Result<Vec<_>, _>>()?,
             break_outputs: break_outputs.clone(),
         },
     })
@@ -69,5 +73,18 @@ fn lower_node(node: &RelooperNode) -> Result<StructuredNode, StructuralizationEr
     Ok(match node {
         RelooperNode::Block(block) => StructuredNode::Block(block.clone()),
         RelooperNode::Region(region) => StructuredNode::Region(Box::new(lower_region(region)?)),
+    })
+}
+
+/// Lowers one Beyond-Relooper loop exit into the shared structural form.
+fn lower_exit(exit: &RelooperLoopExit) -> Result<StructuredLoopExit, StructuralizationError> {
+    Ok(StructuredLoopExit {
+        edges: exit.edges.clone(),
+        outputs: exit.outputs.clone(),
+        continuation: exit
+            .continuation
+            .iter()
+            .map(lower_node)
+            .collect::<Result<Vec<_>, _>>()?,
     })
 }
