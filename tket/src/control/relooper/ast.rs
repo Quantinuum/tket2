@@ -8,7 +8,7 @@
 use hugr::{Node, types::TypeRow};
 
 use crate::control::structuralize::{
-    RegionIo, StructuredBlock, StructuredBranchJoinKind, StructuredLoopKind,
+    RegionIo, StructuredBlock, StructuredBranchJoinKind, StructuredLoopEdge, StructuredLoopKind,
 };
 
 /// One analyzed region in the Beyond-Relooper AST.
@@ -46,14 +46,12 @@ pub(super) enum RelooperBody {
         body: Vec<RelooperNode>,
         /// CFG block whose successor returns control to the header.
         backedge_source: Node,
-        /// Payload row for the continue edge.
-        continue_inputs: TypeRow,
-        /// Payload row for the break edge.
+        /// Continue edge routed back to the loop header.
+        continue_edge: StructuredLoopEdge,
+        /// Break edges routed out of the loop.
+        break_edges: Vec<StructuredLoopEdge>,
+        /// Common payload row for all loop exits.
         break_outputs: TypeRow,
-        /// Successor index that continues the loop.
-        continue_case: usize,
-        /// Successor index that exits the loop.
-        break_case: usize,
     },
 }
 

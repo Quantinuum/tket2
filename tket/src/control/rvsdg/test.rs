@@ -13,7 +13,7 @@ use crate::control::nest_cfgs::test::build_conditional_in_loop_cfg;
 
 use crate::control::structuralize::{StructuredNode, StructuredRegionBody};
 
-use super::{LoopKind, RvsdgBuildError, RvsdgNode, analyze_cfg, build_cfg_rvsdg};
+use super::{LoopKind, RvsdgNode, analyze_cfg, build_cfg_rvsdg};
 
 fn find_gamma(nodes: &[RvsdgNode]) -> Option<&super::GammaNode> {
     nodes.iter().find_map(|node| match node {
@@ -81,6 +81,61 @@ fn header_loop() -> Hugr {
 fn combined_headers() -> Hugr {
     let (h, _, _) = build_conditional_in_loop_cfg(false).unwrap();
     h
+}
+
+#[fixture]
+fn irreducible() -> Hugr {
+    let mut cfg_builder = CFGBuilder::new(Signature::new_endo([usize_t()])).unwrap();
+    let pred_const = cfg_builder.add_constant(Value::unit_sum(0, 2).expect("0 < 2"));
+    let const_unit = cfg_builder.add_constant(Value::unary_unit_sum());
+
+    let entry = n_identity(
+        cfg_builder
+            .simple_entry_builder(vec![usize_t()].into(), 2)
+            .unwrap(),
+        &pred_const,
+    )
+    .unwrap();
+    let a = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let b = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let c = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 2)
+            .unwrap(),
+        &pred_const,
+    )
+    .unwrap();
+    let d = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 2)
+            .unwrap(),
+        &pred_const,
+    )
+    .unwrap();
+    let exit = cfg_builder.exit_block();
+
+    cfg_builder.branch(&entry, 0, &a).unwrap();
+    cfg_builder.branch(&entry, 1, &b).unwrap();
+    cfg_builder.branch(&a, 0, &c).unwrap();
+    cfg_builder.branch(&b, 0, &d).unwrap();
+    cfg_builder.branch(&c, 0, &b).unwrap();
+    cfg_builder.branch(&c, 1, &exit).unwrap();
+    cfg_builder.branch(&d, 0, &a).unwrap();
+    cfg_builder.branch(&d, 1, &exit).unwrap();
+
+    cfg_builder.finish_hugr().unwrap()
 }
 
 #[rstest]
@@ -184,61 +239,19 @@ fn contains_branch(node: &StructuredNode) -> bool {
 }
 
 #[rstest]
-fn rejects_irreducible() {
-    let mut cfg_builder = CFGBuilder::new(Signature::new_endo([usize_t()])).unwrap();
-    let pred_const = cfg_builder.add_constant(Value::unit_sum(0, 2).expect("0 < 2"));
-    let const_unit = cfg_builder.add_constant(Value::unary_unit_sum());
-
-    let entry = n_identity(
-        cfg_builder
-            .simple_entry_builder(vec![usize_t()].into(), 2)
-            .unwrap(),
-        &pred_const,
-    )
-    .unwrap();
-    let a = n_identity(
-        cfg_builder
-            .simple_block_builder(endo_sig([usize_t()]), 1)
-            .unwrap(),
-        &const_unit,
-    )
-    .unwrap();
-    let b = n_identity(
-        cfg_builder
-            .simple_block_builder(endo_sig([usize_t()]), 1)
-            .unwrap(),
-        &const_unit,
-    )
-    .unwrap();
-    let c = n_identity(
-        cfg_builder
-            .simple_block_builder(endo_sig([usize_t()]), 2)
-            .unwrap(),
-        &pred_const,
-    )
-    .unwrap();
-    let d = n_identity(
-        cfg_builder
-            .simple_block_builder(endo_sig([usize_t()]), 2)
-            .unwrap(),
-        &pred_const,
-    )
-    .unwrap();
-    let exit = cfg_builder.exit_block();
-
-    cfg_builder.branch(&entry, 0, &a).unwrap();
-    cfg_builder.branch(&entry, 1, &b).unwrap();
-    cfg_builder.branch(&a, 0, &c).unwrap();
-    cfg_builder.branch(&b, 0, &d).unwrap();
-    cfg_builder.branch(&c, 0, &b).unwrap();
-    cfg_builder.branch(&c, 1, &exit).unwrap();
-    cfg_builder.branch(&d, 0, &a).unwrap();
-    cfg_builder.branch(&d, 1, &exit).unwrap();
-
-    let h = cfg_builder.finish_hugr().unwrap();
-    let cfg_node = h.nodes().find(|node| h.get_optype(*node).is_cfg()).unwrap();
-    let base = h.clone();
+fn preprocesses_irreducible(#[from(irreducible)] irreducible: Hugr) {
+    let cfg_node = irreducible
+        .nodes()
+        .find(|node| irreducible.get_optype(*node).is_cfg())
+        .unwrap();
+    let base = irreducible.clone();
     let cfg_view = base.with_entrypoint(cfg_node);
-    let err = build_cfg_rvsdg(&cfg_view, &IdentityCfgMap::new(cfg_view.clone())).unwrap_err();
-    assert!(matches!(err, RvsdgBuildError::IrreducibleCfg { .. }));
+    let rvsdg = build_cfg_rvsdg(&cfg_view, &IdentityCfgMap::new(cfg_view.clone())).unwrap();
+    assert!(!rvsdg.root.body.is_empty());
+
+    let lowered = analyze_cfg(&cfg_view, &IdentityCfgMap::new(cfg_view.clone())).unwrap();
+    let StructuredRegionBody::Sequence(items) = lowered.body else {
+        panic!("expected sequence root");
+    };
+    assert!(!items.is_empty());
 }

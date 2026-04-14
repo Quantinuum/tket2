@@ -21,8 +21,8 @@ mod types;
 pub use analyze::analyze_hugr_cfgs;
 pub use lower::structurize_cfgs;
 pub(crate) use types::{
-    RegionIo, StructuredBlock, StructuredBranchJoinKind, StructuredLoopKind, StructuredNode,
-    StructuredRegion, StructuredRegionBody,
+    RegionIo, StructuredBlock, StructuredBranchJoinKind, StructuredLoopEdge, StructuredLoopKind,
+    StructuredNode, StructuredRegion, StructuredRegionBody,
 };
 pub use types::{
     StructuralizationAnalysisReport, StructuralizationError, StructuralizationRewriteReport,

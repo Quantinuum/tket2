@@ -19,6 +19,7 @@ use petgraph::graphmap::DiGraphMap;
 
 use super::CfgNodeMap;
 use preprocess::NormalizedCfg;
+pub(crate) use preprocess::PreprocessedCfg;
 
 /// Reducibility or reachability mismatch discovered while analyzing a CFG.
 #[derive(Clone, Debug, PartialEq, Eq)]

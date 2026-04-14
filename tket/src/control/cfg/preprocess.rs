@@ -12,7 +12,6 @@
 //! builder's external contract again.
 
 use std::collections::{BTreeSet, VecDeque};
-#[cfg(test)]
 use std::fmt;
 
 use hugr::core::HugrNode;
@@ -21,14 +20,10 @@ use petgraph::algo::kosaraju_scc;
 use petgraph::graphmap::DiGraphMap;
 
 use super::{CfgFactsError, CfgNodeMap};
-#[cfg(test)]
 use crate::control::CfgBlockMap;
-#[cfg(test)]
 use hugr::Node;
-#[cfg(test)]
 use std::collections::BTreeMap;
 
-#[cfg(test)]
 /// Graph node used by irreducibility preprocessing.
 ///
 /// Preprocessing may duplicate part of an SCC to give each cyclic region a
@@ -47,7 +42,6 @@ pub(crate) enum PreprocessedNode<T> {
     },
 }
 
-#[cfg(test)]
 impl<T> fmt::Display for PreprocessedNode<T>
 where
     T: HugrNode + fmt::Display,
@@ -60,14 +54,13 @@ where
     }
 }
 
-#[cfg(test)]
 /// Graph-level preprocessing result for one CFG.
 ///
 /// Unlike [`NormalizedCfg`], this view may contain duplicated graph nodes used
 /// to split multi-entry SCCs into reducible regions. Each duplicated node still
 /// maps back to an original HUGR block through [`CfgBlockMap`].
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) struct PreprocessedCfg<T> {
+pub(crate) struct PreprocessedCfg<T> {
     /// Entry node of the preprocessed graph.
     entry: PreprocessedNode<T>,
     /// Exit node of the preprocessed graph.
@@ -134,7 +127,6 @@ where
     }
 }
 
-#[cfg(test)]
 impl<T> PreprocessedCfg<T>
 where
     T: HugrNode,
@@ -153,7 +145,7 @@ where
     /// Returns an error when the CFG has no entry-to-exit path, when reachable
     /// nodes do not all reach the exit, or when the current preprocessing
     /// strategy cannot eliminate all irreducible SCCs.
-    pub(super) fn new(cfg_root: T, cfg: &impl CfgNodeMap<T>) -> Result<Self, CfgFactsError<T>> {
+    pub(crate) fn new(cfg_root: T, cfg: &impl CfgNodeMap<T>) -> Result<Self, CfgFactsError<T>> {
         let original_scope = entry_to_exit_scope(cfg)?;
         let entry = PreprocessedNode::Original(cfg.entry_node());
         let exit = PreprocessedNode::Original(cfg.exit_node());
@@ -246,7 +238,6 @@ where
     }
 }
 
-#[cfg(test)]
 impl<T> CfgNodeMap<PreprocessedNode<T>> for PreprocessedCfg<T>
 where
     T: HugrNode,
@@ -268,7 +259,6 @@ where
     }
 }
 
-#[cfg(test)]
 impl CfgBlockMap<PreprocessedNode<Node>> for PreprocessedCfg<Node> {
     fn hugr_node(&self, node: PreprocessedNode<Node>) -> Node {
         self.blocks[&node]
@@ -365,7 +355,6 @@ where
 }
 
 /// Returns the first multi-entry cyclic SCC in deterministic node order.
-#[cfg(test)]
 fn irreducible_scc<T>(entry: T, succs: &BTreeMap<T, Vec<T>>) -> Option<(BTreeSet<T>, Vec<T>)>
 where
     T: HugrNode,
@@ -393,7 +382,6 @@ where
 }
 
 /// Splits a multi-entry SCC by cloning the subgraph owned by each extra entry.
-#[cfg(test)]
 fn split_multi_entry_scc<T>(
     scope: &mut BTreeSet<PreprocessedNode<T>>,
     succs: &mut BTreeMap<PreprocessedNode<T>, Vec<PreprocessedNode<T>>>,
@@ -452,7 +440,6 @@ fn split_multi_entry_scc<T>(
 }
 
 /// Returns the region to clone for one extra SCC entry.
-#[cfg(test)]
 fn clone_region<T>(
     extra_entry: T,
     members: &BTreeSet<T>,
@@ -478,7 +465,6 @@ where
 }
 
 /// Rebuilds predecessors from deterministic successors.
-#[cfg(test)]
 fn rebuild_predecessors<T>(scope: &BTreeSet<T>, succs: &BTreeMap<T, Vec<T>>) -> BTreeMap<T, Vec<T>>
 where
     T: HugrNode,
@@ -497,7 +483,6 @@ where
 }
 
 /// Returns predecessors of one node derived from the successor map.
-#[cfg(test)]
 fn predecessors_from_successors<T>(node: T, succs: &BTreeMap<T, Vec<T>>) -> Vec<T>
 where
     T: HugrNode,
@@ -510,7 +495,6 @@ where
 }
 
 /// Returns the original HUGR block referenced by a preprocessed node.
-#[cfg(test)]
 fn original_node<T>(node: PreprocessedNode<T>) -> T
 where
     T: HugrNode,
@@ -545,7 +529,6 @@ where
 }
 
 /// Builds a graph from a deterministic successor map.
-#[cfg(test)]
 fn cfg_graph_from_successors<T>(entry: T, succs: &BTreeMap<T, Vec<T>>) -> DiGraphMap<T, ()>
 where
     T: HugrNode,

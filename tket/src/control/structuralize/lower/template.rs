@@ -10,15 +10,16 @@ use hugr::builder::{
     BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, SubContainer,
 };
 use hugr::extension::prelude::{ConstError, UnwrapBuilder};
-use hugr::ops::OpParent;
+use hugr::ops::{OpParent, TailLoop};
 use hugr::types::{Signature, Type, TypeRow};
 use hugr::{Direction, Hugr, HugrView, Node, Wire};
 use itertools::Itertools;
 use std::collections::BTreeSet;
 
 use super::super::types::{
-    StructuralizationError, StructuredBlock, StructuredBranchJoinKind, StructuredLoopKind,
-    StructuredNode, StructuredRegion, StructuredRegionBody, structured_node_contains_block,
+    StructuralizationError, StructuredBlock, StructuredBranchJoinKind, StructuredLoopEdge,
+    StructuredLoopKind, StructuredNode, StructuredRegion, StructuredRegionBody,
+    structured_node_contains_block,
 };
 
 /// Detached replacement template for one CFG rewrite.
@@ -66,14 +67,12 @@ struct LoopLowering<'a> {
     body: &'a [StructuredNode],
     /// CFG block that returns control to the header.
     backedge_source: Node,
-    /// Payload row for the continue edge.
-    continue_inputs: &'a TypeRow,
+    /// Continue edge routed back to the loop header.
+    continue_edge: &'a StructuredLoopEdge,
+    /// Break edges routed out of the loop.
+    break_edges: &'a [StructuredLoopEdge],
     /// Payload row for the break edge.
     break_outputs: &'a TypeRow,
-    /// Successor index that continues the loop.
-    continue_case: usize,
-    /// Successor index that breaks the loop.
-    break_case: usize,
 }
 
 impl<'a> LoopLowering<'a> {
@@ -82,20 +81,42 @@ impl<'a> LoopLowering<'a> {
         header: &'a StructuredBlock,
         body: &'a [StructuredNode],
         backedge_source: Node,
-        continue_inputs: &'a TypeRow,
+        continue_edge: &'a StructuredLoopEdge,
+        break_edges: &'a [StructuredLoopEdge],
         break_outputs: &'a TypeRow,
-        continue_case: usize,
-        break_case: usize,
     ) -> Self {
         Self {
             header,
             body,
             backedge_source,
-            continue_inputs,
+            continue_edge,
+            break_edges,
             break_outputs,
-            continue_case,
-            break_case,
         }
+    }
+
+    /// Returns the payload row carried on the loop's continue edge.
+    fn continue_inputs(&self) -> &TypeRow {
+        &self.continue_edge.payload
+    }
+
+    /// Returns whether a specific block/case pair continues the loop.
+    fn is_continue_case(&self, node: Node, case: usize) -> bool {
+        self.continue_edge.source == node && self.continue_edge.case == case
+    }
+
+    /// Returns whether a specific block/case pair exits the loop.
+    fn is_break_case(&self, node: Node, case: usize) -> bool {
+        self.break_edges
+            .iter()
+            .any(|edge| edge.source == node && edge.case == case)
+    }
+
+    /// Returns whether a structured item contains a block with loop control edges.
+    fn contains_loop_control(&self, node: &StructuredNode) -> bool {
+        let mut targets = std::iter::once(self.continue_edge.source)
+            .chain(self.break_edges.iter().map(|edge| edge.source));
+        targets.any(|target| structured_node_contains_block(node, target))
     }
 }
 
@@ -267,19 +288,17 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
                 header,
                 body,
                 backedge_source,
-                continue_inputs,
+                continue_edge,
+                break_edges,
                 break_outputs,
-                continue_case,
-                break_case,
             } => {
                 let loop_lowering = LoopLowering::new(
                     header,
                     body,
                     *backedge_source,
-                    continue_inputs,
+                    continue_edge,
+                    break_edges,
                     break_outputs,
-                    *continue_case,
-                    *break_case,
                 );
                 match kind {
                     StructuredLoopKind::TailControlled => {
@@ -307,27 +326,9 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
     where
         B: Dataflow + Container,
     {
-        let (latch, prefix) = loop_lowering.body.split_last().ok_or_else(|| {
-            StructuralizationError::UnsupportedLoop {
-                reason: "loop body is empty".into(),
-            }
-        })?;
-        let StructuredNode::Block(latch_block @ StructuredBlock::Dataflow { node, sum_rows, .. }) =
-            latch
-        else {
-            return Err(StructuralizationError::UnsupportedLoop {
-                reason: "loop latch is not a basic block".into(),
-            });
-        };
-        if *node != loop_lowering.backedge_source {
-            return Err(StructuralizationError::UnsupportedLoop {
-                reason: "loop latch does not match the analyzed backedge source".into(),
-            });
-        }
-
         let mut loop_builder = builder.tail_loop_builder(
             loop_lowering
-                .continue_inputs
+                .continue_inputs()
                 .iter()
                 .cloned()
                 .zip(current.iter().copied())
@@ -337,61 +338,191 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
         )?;
         let loop_sig = loop_builder.loop_signature()?.clone();
         let loop_inputs = loop_builder.input_wires().collect_vec();
-        let prefix_out = self.lower_sequence(&mut loop_builder, prefix, loop_inputs)?;
-        let latch_out = self.lower_block(&mut loop_builder, latch_block, prefix_out)?;
-        let [latch_control, latch_rest @ ..] = latch_out.as_slice() else {
+        let loop_control = self.lower_tail_loop_items(
+            &mut loop_builder,
+            loop_lowering.body,
+            loop_inputs,
+            &loop_lowering,
+            &loop_sig,
+        )?;
+        let loop_handle = loop_builder.finish_with_outputs(loop_control, [])?;
+        Ok(loop_handle.outputs().collect())
+    }
+
+    /// Lowers one loop-body sequence into a `TailLoop` continue/break sum.
+    fn lower_tail_loop_items<B>(
+        &mut self,
+        builder: &mut B,
+        items: &[StructuredNode],
+        current: Vec<Wire>,
+        loop_lowering: &LoopLowering<'_>,
+        loop_sig: &TailLoop,
+    ) -> Result<Wire, StructuralizationError>
+    where
+        B: Dataflow + Container,
+    {
+        let Some((first, rest)) = items.split_first() else {
             return Err(StructuralizationError::UnsupportedLoop {
-                reason: "loop latch did not produce a control value".into(),
+                reason: "loop body does not reach a continue or break edge".into(),
             });
         };
 
-        if sum_rows.len() != 2 {
-            return Err(StructuralizationError::UnsupportedLoop {
-                reason: format!(
-                    "loop latch must have exactly two successors, found {}",
-                    sum_rows.len()
-                ),
-            });
-        }
-        if loop_lowering.continue_case >= sum_rows.len()
-            || loop_lowering.break_case >= sum_rows.len()
-        {
-            return Err(StructuralizationError::UnsupportedLoop {
-                reason: "loop case index is out of range".into(),
-            });
-        }
+        match first {
+            StructuredNode::Block(block @ StructuredBlock::Dataflow { node, sum_rows, .. }) => {
+                let has_special_case = loop_lowering.continue_edge.source == *node
+                    || loop_lowering
+                        .break_edges
+                        .iter()
+                        .any(|edge| edge.source == *node);
+                if !has_special_case {
+                    let next = self.lower_linear_block(builder, block, current)?;
+                    return self.lower_tail_loop_items(
+                        builder,
+                        rest,
+                        next,
+                        loop_lowering,
+                        loop_sig,
+                    );
+                }
 
-        let mut cond = loop_builder.conditional_builder(
-            (sum_rows.clone(), *latch_control),
-            loop_lowering
-                .continue_inputs
-                .iter()
-                .cloned()
-                .zip(latch_rest.iter().copied())
-                .collect_vec(),
-            [Type::new_sum([
-                loop_lowering.continue_inputs.clone(),
-                loop_lowering.break_outputs.clone(),
-            ])]
-            .into(),
-        )?;
-        for case_idx in 0..sum_rows.len() {
-            let mut case = cond.case_builder(case_idx)?;
-            let case_inputs = case.input_wires().collect_vec();
-            let result = if case_idx == loop_lowering.continue_case {
-                case.make_continue(loop_sig.clone(), case_inputs)?
-            } else if case_idx == loop_lowering.break_case {
-                case.make_break(loop_sig.clone(), case_inputs)?
-            } else {
-                return Err(StructuralizationError::UnsupportedLoop {
-                    reason: format!("unexpected loop successor case {case_idx}"),
-                });
-            };
-            case.finish_with_outputs([result])?;
+                let block_out = self.lower_block(builder, block, current)?;
+                let [control, payload @ ..] = block_out.as_slice() else {
+                    return Err(StructuralizationError::UnsupportedLoop {
+                        reason: format!(
+                            "loop control block {node} did not produce a control value"
+                        ),
+                    });
+                };
+
+                let ordinary_cases = (0..sum_rows.len())
+                    .filter(|&case_idx| {
+                        !loop_lowering.is_continue_case(*node, case_idx)
+                            && !loop_lowering.is_break_case(*node, case_idx)
+                    })
+                    .collect_vec();
+                if ordinary_cases.len() > 1 {
+                    return Err(StructuralizationError::UnsupportedLoop {
+                        reason: format!(
+                            "loop control block {node} has multiple in-loop successor cases"
+                        ),
+                    });
+                }
+
+                let mut cond = builder.conditional_builder(
+                    (sum_rows.clone(), *control),
+                    loop_lowering
+                        .continue_inputs()
+                        .iter()
+                        .cloned()
+                        .zip(payload.iter().copied())
+                        .collect_vec(),
+                    [Type::new_sum([
+                        loop_lowering.continue_inputs().clone(),
+                        loop_lowering.break_outputs.clone(),
+                    ])]
+                    .into(),
+                )?;
+                for case_idx in 0..sum_rows.len() {
+                    let mut case = cond.case_builder(case_idx)?;
+                    let case_inputs = case.input_wires().collect_vec();
+                    let result = if loop_lowering.is_continue_case(*node, case_idx) {
+                        case.make_continue(loop_sig.clone(), case_inputs)?
+                    } else if loop_lowering.is_break_case(*node, case_idx) {
+                        case.make_break(loop_sig.clone(), case_inputs)?
+                    } else if ordinary_cases.contains(&case_idx) {
+                        self.lower_tail_loop_items(
+                            &mut case,
+                            rest,
+                            case_inputs,
+                            loop_lowering,
+                            loop_sig,
+                        )?
+                    } else {
+                        return Err(StructuralizationError::UnsupportedLoop {
+                            reason: format!("unexpected loop successor case {case_idx}"),
+                        });
+                    };
+                    case.finish_with_outputs([result])?;
+                }
+                let [result] = cond.finish_sub_container()?.outputs_arr();
+                Ok(result)
+            }
+            StructuredNode::Block(StructuredBlock::Exit { node, .. }) => {
+                Err(StructuralizationError::UnsupportedLoop {
+                    reason: format!("loop body unexpectedly reaches exit block {node}"),
+                })
+            }
+            StructuredNode::Region(region) => match &region.body {
+                StructuredRegionBody::Branch {
+                    split,
+                    arms,
+                    join,
+                    join_kind,
+                } if loop_lowering.contains_loop_control(first) => {
+                    let split_out = self.lower_block(builder, split, current)?;
+                    let StructuredBlock::Dataflow {
+                        sum_rows, outputs, ..
+                    } = split
+                    else {
+                        return Err(StructuralizationError::ExpectedDataflowBlock {
+                            node: split.node(),
+                        });
+                    };
+                    let [control, rest_outputs @ ..] = split_out.as_slice() else {
+                        return Err(StructuralizationError::UnsupportedBranch {
+                            reason: "split block did not produce a control output".into(),
+                        });
+                    };
+                    let mut cond = builder.conditional_builder(
+                        (sum_rows.clone(), *control),
+                        outputs
+                            .iter()
+                            .cloned()
+                            .zip(rest_outputs.iter().copied())
+                            .collect_vec(),
+                        [Type::new_sum([
+                            loop_lowering.continue_inputs().clone(),
+                            loop_lowering.break_outputs.clone(),
+                        ])]
+                        .into(),
+                    )?;
+                    for (case_idx, arm) in arms.iter().enumerate() {
+                        let mut case = cond.case_builder(case_idx)?;
+                        let case_inputs = case.input_wires().collect_vec();
+                        let arm_outputs = self.lower_sequence(&mut case, arm, case_inputs)?;
+                        let after_join = match join_kind {
+                            StructuredBranchJoinKind::Inline => match join {
+                                StructuredBlock::Dataflow { .. } => {
+                                    let join_out =
+                                        self.lower_block(&mut case, join, arm_outputs)?;
+                                    join_out.into_iter().skip(1).collect()
+                                }
+                                StructuredBlock::Exit { .. } => {
+                                    return Err(StructuralizationError::UnsupportedLoop {
+                                        reason: "loop branch join cannot be an exit block".into(),
+                                    });
+                                }
+                            },
+                            StructuredBranchJoinKind::Deferred => arm_outputs,
+                        };
+                        let result = self.lower_tail_loop_items(
+                            &mut case,
+                            rest,
+                            after_join,
+                            loop_lowering,
+                            loop_sig,
+                        )?;
+                        case.finish_with_outputs([result])?;
+                    }
+                    let [result] = cond.finish_sub_container()?.outputs_arr();
+                    Ok(result)
+                }
+                _ => {
+                    let next = self.lower_region(builder, region, current)?;
+                    self.lower_tail_loop_items(builder, rest, next, loop_lowering, loop_sig)
+                }
+            },
         }
-        let [loop_control] = cond.finish_sub_container()?.outputs_arr();
-        let loop_handle = loop_builder.finish_with_outputs(loop_control, [])?;
-        Ok(loop_handle.outputs().collect())
     }
 
     /// Lowers a header-tested loop as an outer `Conditional` plus inner `TailLoop`.
@@ -416,9 +547,12 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
                 reason: "header-controlled loop header is not a basic block".into(),
             });
         };
-        if loop_lowering.continue_case >= sum_rows.len()
-            || loop_lowering.break_case >= sum_rows.len()
-        {
+        let [break_edge] = loop_lowering.break_edges else {
+            return Err(StructuralizationError::UnsupportedLoop {
+                reason: "header-controlled loop must have exactly one break edge".into(),
+            });
+        };
+        if loop_lowering.continue_edge.case >= sum_rows.len() || break_edge.case >= sum_rows.len() {
             return Err(StructuralizationError::UnsupportedLoop {
                 reason: "loop case index is out of range".into(),
             });
@@ -449,11 +583,11 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
         for case_idx in 0..sum_rows.len() {
             let mut case = cond.case_builder(case_idx)?;
             let case_inputs = case.input_wires().collect_vec();
-            if case_idx == loop_lowering.break_case {
+            if case_idx == break_edge.case {
                 case.finish_with_outputs(case_inputs)?;
                 continue;
             }
-            if case_idx != loop_lowering.continue_case {
+            if case_idx != loop_lowering.continue_edge.case {
                 return Err(StructuralizationError::UnsupportedLoop {
                     reason: format!("unexpected loop successor case {case_idx}"),
                 });
@@ -461,7 +595,7 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
 
             let mut loop_builder = case.tail_loop_builder(
                 loop_lowering
-                    .continue_inputs
+                    .continue_inputs()
                     .iter()
                     .cloned()
                     .zip(case_inputs.iter().copied())
@@ -499,7 +633,7 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
                     .zip(loop_rest.iter().copied())
                     .collect_vec(),
                 [Type::new_sum([
-                    loop_lowering.continue_inputs.clone(),
+                    loop_lowering.continue_inputs().clone(),
                     loop_lowering.break_outputs.clone(),
                 ])]
                 .into(),
@@ -507,9 +641,9 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
             for inner_case_idx in 0..sum_rows.len() {
                 let mut inner_case = loop_cond.case_builder(inner_case_idx)?;
                 let inner_inputs = inner_case.input_wires().collect_vec();
-                let result = if inner_case_idx == loop_lowering.continue_case {
+                let result = if inner_case_idx == loop_lowering.continue_edge.case {
                     inner_case.make_continue(loop_sig.clone(), inner_inputs)?
-                } else if inner_case_idx == loop_lowering.break_case {
+                } else if inner_case_idx == break_edge.case {
                     inner_case.make_break(loop_sig.clone(), inner_inputs)?
                 } else {
                     return Err(StructuralizationError::UnsupportedLoop {

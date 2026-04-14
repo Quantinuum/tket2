@@ -91,6 +91,17 @@ pub(crate) enum StructuredLoopKind {
     HeaderControlled,
 }
 
+/// One analyzed loop edge that either continues or exits the loop.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct StructuredLoopEdge {
+    /// CFG block producing the control decision.
+    pub(crate) source: Node,
+    /// Successor index selected by that control decision.
+    pub(crate) case: usize,
+    /// Payload row carried along that successor.
+    pub(crate) payload: TypeRow,
+}
+
 /// How a structured branch hands control to its join block.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum StructuredBranchJoinKind {
@@ -129,14 +140,12 @@ pub(crate) enum StructuredRegionBody {
         body: Vec<StructuredNode>,
         /// CFG block whose successor returns control to the header.
         backedge_source: Node,
-        /// Payload row for the continue edge.
-        continue_inputs: TypeRow,
-        /// Payload row for the break edge.
+        /// Continue edge routed back to the loop header.
+        continue_edge: StructuredLoopEdge,
+        /// Break edges routed out of the loop to the enclosing continuation.
+        break_edges: Vec<StructuredLoopEdge>,
+        /// Common payload row for values produced when the loop exits.
         break_outputs: TypeRow,
-        /// Index of the latch successor that continues the loop.
-        continue_case: usize,
-        /// Index of the latch successor that exits the loop.
-        break_case: usize,
     },
 }
 

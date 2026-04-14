@@ -49,19 +49,17 @@ fn lower_body(body: &RelooperBody) -> Result<StructuredRegionBody, Structuraliza
             header,
             body,
             backedge_source,
-            continue_inputs,
+            continue_edge,
+            break_edges,
             break_outputs,
-            continue_case,
-            break_case,
         } => StructuredRegionBody::Loop {
             kind: *kind,
             header: header.clone(),
             body: body.iter().map(lower_node).collect::<Result<Vec<_>, _>>()?,
             backedge_source: *backedge_source,
-            continue_inputs: continue_inputs.clone(),
+            continue_edge: continue_edge.clone(),
+            break_edges: break_edges.clone(),
             break_outputs: break_outputs.clone(),
-            continue_case: *continue_case,
-            break_case: *break_case,
         },
     })
 }

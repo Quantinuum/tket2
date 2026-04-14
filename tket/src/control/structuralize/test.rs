@@ -196,9 +196,9 @@ fn build_header_controlled_loop_cfg() -> Hugr {
 ///             \-> b -> d -/
 /// ```
 ///
-/// Neither `a` nor `b` is the unique header of the cyclic SCC, so the
-/// Beyond-Relooper implementation must currently reject this fixture until the
-/// Appendix A preprocessing step is implemented.
+/// Neither `a` nor `b` is the unique header of the cyclic SCC, so both
+/// strategies must preprocess or normalize the graph before they can derive
+/// structured control from it.
 #[fixture]
 fn build_irreducible_cfg() -> Hugr {
     let mut cfg_builder = CFGBuilder::new(Signature::new_endo([usize_t()])).unwrap();
@@ -513,28 +513,6 @@ fn assert_lowered_counts(h: &Hugr, expected_conditionals: usize, expected_loops:
 
 type TestCfgBuilder = fn() -> Hugr;
 
-fn expect_irreducible_error(
-    err: super::StructuralizationError,
-    strategy: StructuralizationStrategy,
-) {
-    match strategy {
-        StructuralizationStrategy::Rvsdg => {
-            assert!(matches!(
-                err,
-                super::StructuralizationError::Rvsdg(
-                    crate::control::rvsdg::RvsdgBuildError::IrreducibleCfg { .. }
-                )
-            ));
-        }
-        StructuralizationStrategy::BeyondRelooper => {
-            assert!(matches!(
-                err,
-                super::StructuralizationError::UnsupportedIrreducibleCfg { .. }
-            ));
-        }
-    }
-}
-
 fn expect_multiple_loop_exit_error(
     err: super::StructuralizationError,
     strategy: StructuralizationStrategy,
@@ -578,14 +556,14 @@ fn branch_then_loop_io(#[from(build_cond_then_loop_cfg)] cond_then_loop: Hugr) {
         panic!("expected loop region");
     };
     let StructuredRegionBody::Loop {
-        continue_inputs,
+        continue_edge,
         break_outputs,
         ..
     } = &loop_region.body
     else {
         panic!("expected loop body");
     };
-    assert_eq!(continue_inputs.len(), 1);
+    assert_eq!(continue_edge.payload.len(), 1);
     assert_eq!(break_outputs.len(), 1);
 }
 
@@ -622,7 +600,7 @@ fn header_loop_io(#[from(build_header_controlled_loop_cfg)] header_loop: Hugr) {
     let StructuredRegionBody::Loop {
         kind,
         body,
-        continue_inputs,
+        continue_edge,
         break_outputs,
         ..
     } = &loop_region.body
@@ -631,7 +609,7 @@ fn header_loop_io(#[from(build_header_controlled_loop_cfg)] header_loop: Hugr) {
     };
     assert_eq!(*kind, StructuredLoopKind::HeaderControlled);
     assert_eq!(body.len(), 1);
-    assert_eq!(continue_inputs.len(), 1);
+    assert_eq!(continue_edge.payload.len(), 1);
     assert_eq!(break_outputs.len(), 1);
 }
 
@@ -711,13 +689,20 @@ fn handles_combined_headers(
 #[rstest]
 #[case::rvsdg(StructuralizationStrategy::Rvsdg)]
 #[case::relooper(StructuralizationStrategy::BeyondRelooper)]
-fn rejects_irreducible_cfg(
+fn lowers_irreducible_cfg(
     #[case] strategy: StructuralizationStrategy,
     #[from(build_irreducible_cfg)] mut irreducible: Hugr,
 ) {
     let cfgs = cfgs(&irreducible);
-    let err = structurize_cfgs(&mut irreducible, &cfgs, strategy).unwrap_err();
-    expect_irreducible_error(err, strategy);
+    let report = structurize_cfgs(&mut irreducible, &cfgs, strategy).unwrap();
+    assert_eq!(report.rewrites.len(), 1);
+    assert_eq!(
+        irreducible
+            .nodes()
+            .filter(|n| irreducible.get_optype(*n).is_cfg())
+            .count(),
+        0
+    );
 }
 
 #[rstest]

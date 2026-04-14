@@ -10,7 +10,7 @@ use hugr::{HugrView, Node};
 use crate::control::IdentityCfgMap;
 use crate::control::structuralize::{
     RegionIo, StructuralizationError, StructuredBlock, StructuredBranchJoinKind,
-    StructuredLoopKind, StructuredNode, StructuredRegion, StructuredRegionBody,
+    StructuredLoopEdge, StructuredLoopKind, StructuredNode, StructuredRegion, StructuredRegionBody,
 };
 
 use super::{
@@ -131,16 +131,21 @@ fn lower_theta(theta: &ThetaNode) -> Result<StructuredRegion, StructuralizationE
                 .map(lower_node)
                 .collect::<Result<Vec<_>, _>>()?,
             backedge_source: theta.backedge_source,
-            continue_inputs: vars_to_row(
-                &theta
-                    .loop_vars
-                    .iter()
-                    .map(|var| var.post.clone())
-                    .collect::<Vec<_>>(),
-            ),
+            continue_edge: StructuredLoopEdge {
+                source: theta.continue_edge.source,
+                case: theta.continue_edge.case,
+                payload: vars_to_row(&theta.continue_edge.payload),
+            },
+            break_edges: theta
+                .break_edges
+                .iter()
+                .map(|edge| StructuredLoopEdge {
+                    source: edge.source,
+                    case: edge.case,
+                    payload: vars_to_row(&edge.payload),
+                })
+                .collect(),
             break_outputs: vars_to_row(&theta.outputs),
-            continue_case: theta.continue_case,
-            break_case: theta.break_case,
         },
     })
 }

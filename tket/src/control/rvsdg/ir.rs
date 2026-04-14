@@ -158,6 +158,17 @@ pub(crate) struct ThetaLoopVar {
     pub(crate) post: RegionVar,
 }
 
+/// One loop edge classified during `theta` construction.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ThetaEdge {
+    /// CFG block producing the control decision.
+    pub(crate) source: Node,
+    /// Successor index chosen by that control decision.
+    pub(crate) case: usize,
+    /// Variables carried along that successor.
+    pub(crate) payload: Vec<RegionVar>,
+}
+
 /// RVSDG loop node corresponding to one structured loop.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ThetaNode {
@@ -173,10 +184,10 @@ pub(crate) struct ThetaNode {
     pub(crate) body: Region,
     /// CFG block whose successor returns control to the header.
     pub(crate) backedge_source: Node,
-    /// Successor index that continues the loop.
-    pub(crate) continue_case: usize,
-    /// Successor index that breaks the loop.
-    pub(crate) break_case: usize,
+    /// Continue edge routed back to the loop header.
+    pub(crate) continue_edge: ThetaEdge,
+    /// Break edges routed out of the loop to the enclosing continuation.
+    pub(crate) break_edges: Vec<ThetaEdge>,
     /// Explicit loop-carried variables.
     pub(crate) loop_vars: Vec<ThetaLoopVar>,
 }
