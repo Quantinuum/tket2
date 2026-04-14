@@ -219,9 +219,10 @@ fn contains_loop(node: &StructuredNode) -> bool {
         StructuredNode::Block(_) => false,
         StructuredNode::Region(region) => match &region.body {
             StructuredRegionBody::Sequence(items) => items.iter().any(contains_loop),
-            StructuredRegionBody::Branch { arms, .. } => {
-                arms.iter().flat_map(|arm| arm.iter()).any(contains_loop)
-            }
+            StructuredRegionBody::Branch { arms, .. } => arms
+                .iter()
+                .flat_map(|arm| arm.body.iter())
+                .any(contains_loop),
             StructuredRegionBody::Loop { .. } => true,
         },
     }

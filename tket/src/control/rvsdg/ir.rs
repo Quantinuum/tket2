@@ -128,14 +128,23 @@ pub(crate) struct GammaNode {
     pub(crate) entry_vars: Vec<GammaEntryVar>,
     /// Case-specific match payload rows.
     pub(crate) match_rows: Vec<Vec<RegionVar>>,
-    /// Per-branch regions.
-    pub(crate) branches: Vec<Region>,
+    /// Visible branch regions keyed by their originating split case.
+    pub(crate) branches: Vec<GammaBranch>,
     /// Values produced by each branch and made available after the join.
     pub(crate) outputs: Vec<GammaOutputVar>,
     /// Join block executed after the branches merge.
     pub(crate) join: BlockNode,
     /// Whether the join belongs to the branch region or the enclosing sequence.
     pub(crate) join_kind: BranchJoinKind,
+}
+
+/// One visible `gamma` branch together with its match-case index.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct GammaBranch {
+    /// Successor case index selected by the split block.
+    pub(crate) case: usize,
+    /// Region lowered for that visible successor.
+    pub(crate) region: Region,
 }
 
 /// Loop families currently supported by the RVSDG builder.

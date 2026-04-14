@@ -10,8 +10,8 @@ use hugr::{HugrView, Node};
 use crate::control::structuralize::lower::{LoweredCfgTemplate, prepare_cfg_replacement};
 use crate::control::structuralize::shared::analyze_block;
 use crate::control::structuralize::{
-    StructuralizationError, StructuredBlock, StructuredLoopEdge, StructuredLoopExit,
-    StructuredNode, StructuredRegion, StructuredRegionBody,
+    StructuralizationError, StructuredBlock, StructuredCaseArm, StructuredLoopEdge,
+    StructuredLoopExit, StructuredNode, StructuredRegion, StructuredRegionBody,
 };
 
 use super::ast::{RelooperLabel, RelooperRegion, RelooperStmt};
@@ -65,7 +65,16 @@ fn lower_stmt_as_body<H: HugrView<Node = Node>>(
                 split: split.clone(),
                 arms: arms
                     .iter()
-                    .map(|arm| lower_stmt_as_sequence_in_context(cfg_view, arm, Some(*label)))
+                    .map(|arm| {
+                        Ok::<StructuredCaseArm, StructuralizationError>(StructuredCaseArm {
+                            case: arm.case,
+                            body: lower_stmt_as_sequence_in_context(
+                                cfg_view,
+                                &arm.body,
+                                Some(*label),
+                            )?,
+                        })
+                    })
                     .collect::<Result<Vec<_>, _>>()?,
                 join: label_target_block(cfg_view, *label)?,
                 join_kind: lowering.join_kind,

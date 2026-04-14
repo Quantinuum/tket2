@@ -22,8 +22,8 @@ pub use analyze::analyze_hugr_cfgs;
 pub(crate) use lower::LoweredCfgTemplate;
 pub use lower::structurize_cfgs;
 pub(crate) use types::{
-    RegionIo, StructuredBlock, StructuredBranchJoinKind, StructuredLoopEdge, StructuredLoopExit,
-    StructuredLoopKind, StructuredNode, StructuredRegion, StructuredRegionBody,
+    RegionIo, StructuredBlock, StructuredBranchJoinKind, StructuredCaseArm, StructuredLoopEdge,
+    StructuredLoopExit, StructuredLoopKind, StructuredNode, StructuredRegion, StructuredRegionBody,
 };
 pub use types::{
     StructuralizationAnalysisReport, StructuralizationError, StructuralizationRewriteReport,

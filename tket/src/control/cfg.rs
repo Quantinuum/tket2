@@ -14,6 +14,7 @@ mod test;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use hugr::core::HugrNode;
+use itertools::Itertools;
 use petgraph::algo::dominators::simple_fast;
 use petgraph::graphmap::DiGraphMap;
 
@@ -154,6 +155,27 @@ where
             .collect()
     }
 
+    /// Returns the in-scope successors visible from the current structured walk
+    /// together with their original successor indices.
+    pub(crate) fn scope_successor_cases(
+        &self,
+        node: T,
+        scope: &BTreeSet<T>,
+        active_loop: Option<T>,
+    ) -> Vec<(usize, T)> {
+        self.succs
+            .get(&node)
+            .into_iter()
+            .flatten()
+            .copied()
+            .enumerate()
+            .filter(|(_, succ)| scope.contains(succ))
+            .filter(|(_, succ)| {
+                active_loop.is_none_or(|header| !self.is_loop_backedge(node, *succ, header))
+            })
+            .collect()
+    }
+
     /// Returns whether the specified edge is the active loop's backedge.
     pub(crate) fn is_loop_backedge(&self, src: T, dst: T, header: T) -> bool {
         dst == header
@@ -187,7 +209,11 @@ where
         split_node: T,
         scope: &BTreeSet<T>,
         stop: Option<T>,
+        active_loop: Option<T>,
     ) -> Result<T, String> {
+        if let Some(join) = self.visible_branch_join(split_node, scope, active_loop) {
+            return Ok(join);
+        }
         let mut current = self.ipostdom.get(&split_node).copied().flatten();
         while let Some(join) = current {
             if join != split_node && scope.contains(&join) {
@@ -199,6 +225,59 @@ where
             return Ok(stop);
         }
         Err("branch has no in-scope join".into())
+    }
+
+    /// Returns the earliest common join visible inside the current scope.
+    ///
+    /// This induced-graph search is important for loop-local branches whose
+    /// visible join is hidden by an out-of-scope postdominator in the full CFG.
+    fn visible_branch_join(
+        &self,
+        split_node: T,
+        scope: &BTreeSet<T>,
+        active_loop: Option<T>,
+    ) -> Option<T> {
+        let successors = self.scope_successors(split_node, scope, active_loop);
+        let mut reachable_sets = successors
+            .into_iter()
+            .map(|succ| self.reachable_in_scope(succ, scope, active_loop))
+            .collect_vec();
+        let mut common = reachable_sets.pop()?;
+        for reachable in reachable_sets {
+            common = common.intersection(&reachable).copied().collect();
+        }
+        common.remove(&split_node);
+        let candidates = common.iter().copied().collect_vec();
+        candidates
+            .iter()
+            .copied()
+            .filter(|candidate| {
+                !candidates.iter().copied().any(|other| {
+                    other != *candidate
+                        && self
+                            .reachable_in_scope(other, scope, active_loop)
+                            .contains(candidate)
+                })
+            })
+            .min()
+    }
+
+    /// Returns all nodes reachable from `start` while staying inside `scope`.
+    fn reachable_in_scope(
+        &self,
+        start: T,
+        scope: &BTreeSet<T>,
+        active_loop: Option<T>,
+    ) -> BTreeSet<T> {
+        let mut stack = vec![start];
+        let mut visited = BTreeSet::new();
+        while let Some(node) = stack.pop() {
+            if !visited.insert(node) {
+                continue;
+            }
+            stack.extend(self.scope_successors(node, scope, active_loop));
+        }
+        visited
     }
 }
 

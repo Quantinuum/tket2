@@ -212,7 +212,7 @@ fn contains_loop(stmt: &RelooperStmt) -> bool {
         RelooperStmt::Region(region) => contains_loop(&region.body),
         RelooperStmt::Exec(_) => false,
         RelooperStmt::Block { body, .. } => contains_loop(body),
-        RelooperStmt::Case { arms, .. } => arms.iter().any(contains_loop),
+        RelooperStmt::Case { arms, .. } => arms.iter().any(|arm| contains_loop(&arm.body)),
         RelooperStmt::Loop { .. } => true,
         RelooperStmt::Br(_) | RelooperStmt::Return(_) => false,
     }
@@ -236,7 +236,7 @@ fn contains_block(stmt: &RelooperStmt) -> bool {
         RelooperStmt::Region(region) => contains_block(&region.body),
         RelooperStmt::Exec(_) => false,
         RelooperStmt::Block { .. } => true,
-        RelooperStmt::Case { arms, .. } => arms.iter().any(contains_block),
+        RelooperStmt::Case { arms, .. } => arms.iter().any(|arm| contains_block(&arm.body)),
         RelooperStmt::Loop { body, .. } => contains_block(body),
         RelooperStmt::Br(_) | RelooperStmt::Return(_) => false,
     }
@@ -248,7 +248,7 @@ fn contains_br(stmt: &RelooperStmt) -> bool {
         RelooperStmt::Region(region) => contains_br(&region.body),
         RelooperStmt::Exec(_) => false,
         RelooperStmt::Block { body, .. } => contains_br(body),
-        RelooperStmt::Case { arms, .. } => arms.iter().any(contains_br),
+        RelooperStmt::Case { arms, .. } => arms.iter().any(|arm| contains_br(&arm.body)),
         RelooperStmt::Loop { body, .. } => contains_br(body),
         RelooperStmt::Br(_) => true,
         RelooperStmt::Return(_) => false,
@@ -261,7 +261,7 @@ fn contains_return(stmt: &RelooperStmt) -> bool {
         RelooperStmt::Region(region) => contains_return(&region.body),
         RelooperStmt::Exec(_) => false,
         RelooperStmt::Block { body, .. } => contains_return(body),
-        RelooperStmt::Case { arms, .. } => arms.iter().any(contains_return),
+        RelooperStmt::Case { arms, .. } => arms.iter().any(|arm| contains_return(&arm.body)),
         RelooperStmt::Loop { body, .. } => contains_return(body),
         RelooperStmt::Br(_) => false,
         RelooperStmt::Return(_) => true,
@@ -276,7 +276,9 @@ fn contains_original_label(stmt: &RelooperStmt) -> bool {
         RelooperStmt::Block { label, body, .. } => {
             matches!(label, RelooperLabel::Original(_)) || contains_original_label(body)
         }
-        RelooperStmt::Case { arms, .. } => arms.iter().any(contains_original_label),
+        RelooperStmt::Case { arms, .. } => {
+            arms.iter().any(|arm| contains_original_label(&arm.body))
+        }
         RelooperStmt::Loop { label, body, .. } => {
             matches!(label, RelooperLabel::Original(_)) || contains_original_label(body)
         }
@@ -317,7 +319,7 @@ fn collect_loop_exit_edge_counts(stmt: &RelooperStmt) -> Vec<usize> {
         }
         RelooperStmt::Case { arms, .. } => arms
             .iter()
-            .flat_map(collect_loop_exit_edge_counts)
+            .flat_map(|arm| collect_loop_exit_edge_counts(&arm.body))
             .collect(),
         RelooperStmt::Loop { body, .. } => collect_loop_exit_edge_counts(body),
     }
@@ -330,7 +332,7 @@ fn collect_lowered_loops(body: &StructuredRegionBody) -> Vec<(&[StructuredNode],
         }
         StructuredRegionBody::Branch { arms, .. } => arms
             .iter()
-            .flat_map(|arm| arm.iter().flat_map(collect_loops_from_node))
+            .flat_map(|arm| arm.body.iter().flat_map(collect_loops_from_node))
             .collect(),
         StructuredRegionBody::Loop { body, exits, .. } => vec![(body.as_slice(), exits.len())],
     }

@@ -9,7 +9,7 @@ use hugr::{HugrView, Node};
 
 use crate::control::IdentityCfgMap;
 use crate::control::structuralize::{
-    RegionIo, StructuralizationError, StructuredBlock, StructuredBranchJoinKind,
+    RegionIo, StructuralizationError, StructuredBlock, StructuredBranchJoinKind, StructuredCaseArm,
     StructuredLoopEdge, StructuredLoopExit, StructuredLoopKind, StructuredNode, StructuredRegion,
     StructuredRegionBody,
 };
@@ -95,11 +95,15 @@ fn lower_gamma(gamma: &GammaNode) -> StructuredRegion {
                 .branches
                 .iter()
                 .map(|branch| {
-                    branch
-                        .body
-                        .iter()
-                        .map(lower_node)
-                        .collect::<Result<Vec<_>, _>>()
+                    Ok::<StructuredCaseArm, StructuralizationError>(StructuredCaseArm {
+                        case: branch.case,
+                        body: branch
+                            .region
+                            .body
+                            .iter()
+                            .map(lower_node)
+                            .collect::<Result<Vec<_>, _>>()?,
+                    })
                 })
                 .collect::<Result<Vec<_>, _>>()
                 .expect("rvsdg branch lowering is infallible"),

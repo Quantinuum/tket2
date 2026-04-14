@@ -17,8 +17,8 @@ use crate::control::cfg::{CfgFacts, CfgFactsError};
 
 use super::error::RvsdgBuildError;
 use super::ir::{
-    BlockNode, BranchJoinKind, GammaEntryVar, GammaNode, GammaOutputVar, LoopKind, Region,
-    RegionVar, Rvsdg, RvsdgNode, ThetaEdge, ThetaExit, ThetaLoopVar, ThetaNode, VarId,
+    BlockNode, BranchJoinKind, GammaBranch, GammaEntryVar, GammaNode, GammaOutputVar, LoopKind,
+    Region, RegionVar, Rvsdg, RvsdgNode, ThetaEdge, ThetaExit, ThetaLoopVar, ThetaNode, VarId,
 };
 
 /// Builds an RVSDG for one reducible CFG.
@@ -236,7 +236,7 @@ impl<'a, H: HugrView<Node = Node>> RvsdgBuilder<'a, H> {
             });
         }
         let join_node = info
-            .branch_join(split_node, scope, stop)
+            .branch_join(split_node, scope, stop, active_loop)
             .map_err(|reason| RvsdgBuildError::UnsupportedBranch {
                 split: cfg.hugr_node(split_node),
                 reason,
@@ -244,19 +244,22 @@ impl<'a, H: HugrView<Node = Node>> RvsdgBuilder<'a, H> {
         let join = self.build_block(cfg.hugr_node(join_node))?;
         let join_inputs = join.inputs().to_vec();
 
-        let arms = info.scope_successors(split_node, scope, active_loop);
+        let arms = info.scope_successor_cases(split_node, scope, active_loop);
         let mut branches = Vec::with_capacity(arms.len());
-        for (case_idx, succ) in arms.iter().copied().enumerate() {
+        for (case_idx, succ) in arms.iter().copied() {
             let branch_arguments = branch_arguments(&sum_rows, &outputs, case_idx);
             let branch_results = join_inputs
                 .iter()
                 .map(|var| self.fresh_var(var.ty.clone()))
                 .collect_vec();
             let body = self.build_scope(succ, scope, Some(join_node), active_loop, info, cfg)?;
-            branches.push(Region {
-                arguments: branch_arguments,
-                body,
-                results: branch_results,
+            branches.push(GammaBranch {
+                case: case_idx,
+                region: Region {
+                    arguments: branch_arguments,
+                    body,
+                    results: branch_results,
+                },
             });
         }
 
@@ -268,7 +271,7 @@ impl<'a, H: HugrView<Node = Node>> RvsdgBuilder<'a, H> {
                 input,
                 branch_arguments: branches
                     .iter()
-                    .map(|branch| branch.arguments[sum_rows[0].len() + idx].clone())
+                    .map(|branch| branch.region.arguments[sum_rows[0].len() + idx].clone())
                     .collect(),
             })
             .collect_vec();
@@ -279,7 +282,7 @@ impl<'a, H: HugrView<Node = Node>> RvsdgBuilder<'a, H> {
             .map(|(idx, output)| GammaOutputVar {
                 branch_results: branches
                     .iter()
-                    .map(|branch| branch.results[idx].clone())
+                    .map(|branch| branch.region.results[idx].clone())
                     .collect(),
                 output,
             })

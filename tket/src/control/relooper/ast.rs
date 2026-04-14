@@ -127,8 +127,8 @@ pub(in crate::control) enum RelooperStmt {
     Case {
         /// Split block executed before arm dispatch.
         split: StructuredBlock,
-        /// Ordered case arms.
-        arms: Vec<RelooperStmt>,
+        /// Visible case arms keyed by their originating split case.
+        arms: Vec<RelooperCaseArm>,
     },
     /// A labelled loop.
     Loop {
@@ -143,4 +143,13 @@ pub(in crate::control) enum RelooperStmt {
     Br(RelooperLabel),
     /// Return from the enclosing region with the given payload row.
     Return(TypeRow),
+}
+
+/// One visible case arm together with the split case that reaches it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(in crate::control) struct RelooperCaseArm {
+    /// Successor case index selected by the split block.
+    pub(super) case: usize,
+    /// Statement body lowered for that visible successor.
+    pub(super) body: RelooperStmt,
 }

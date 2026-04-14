@@ -274,20 +274,26 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
                     join.inputs().clone(),
                 )?;
 
-                if arms.len() != sum_rows.len() {
+                if arms.len() != sum_rows.len()
+                    || arms
+                        .iter()
+                        .map(|arm| arm.case)
+                        .sorted()
+                        .ne(0..sum_rows.len())
+                {
                     return Err(StructuralizationError::UnsupportedBranch {
                         reason: format!(
-                            "split block exposes {} cases but region has {} arms",
+                            "split block exposes {} cases but region has {} visible arms",
                             sum_rows.len(),
                             arms.len()
                         ),
                     });
                 }
 
-                for (case_idx, arm) in arms.iter().enumerate() {
-                    let mut case = cond.case_builder(case_idx)?;
+                for arm in arms {
+                    let mut case = cond.case_builder(arm.case)?;
                     let case_inputs = case.input_wires().collect_vec();
-                    let case_outputs = self.lower_sequence(&mut case, arm, case_inputs)?;
+                    let case_outputs = self.lower_sequence(&mut case, &arm.body, case_inputs)?;
                     case.finish_with_outputs(case_outputs)?;
                 }
 
@@ -519,10 +525,31 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
                         .into(),
                     )?;
                     let rejoins_at_header = join.node() == loop_lowering.header.node();
-                    for (case_idx, arm) in arms.iter().enumerate() {
+                    for case_idx in 0..sum_rows.len() {
                         let mut case = cond.case_builder(case_idx)?;
                         let case_inputs = case.input_wires().collect_vec();
-                        let arm_outputs = self.lower_sequence(&mut case, arm, case_inputs)?;
+                        let Some(arm) = arms.iter().find(|arm| arm.case == case_idx) else {
+                            let result = if loop_lowering.is_continue_case(split.node(), case_idx) {
+                                case.make_continue(loop_sig.clone(), case_inputs)?
+                            } else if let Some(exit_idx) =
+                                loop_lowering.break_exit_index(split.node(), case_idx)
+                            {
+                                let break_inputs = self.build_loop_break_inputs(
+                                    &mut case,
+                                    loop_lowering,
+                                    exit_idx,
+                                    case_inputs,
+                                )?;
+                                case.make_break(loop_sig.clone(), break_inputs)?
+                            } else {
+                                return Err(StructuralizationError::UnsupportedLoop {
+                                    reason: format!("unexpected loop successor case {case_idx}"),
+                                });
+                            };
+                            case.finish_with_outputs([result])?;
+                            continue;
+                        };
+                        let arm_outputs = self.lower_sequence(&mut case, &arm.body, case_inputs)?;
                         let result = if rejoins_at_header {
                             if !rest.is_empty() {
                                 return Err(StructuralizationError::UnsupportedLoop {
@@ -532,29 +559,52 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
                             }
                             case.make_continue(loop_sig.clone(), arm_outputs)?
                         } else {
-                            let after_join = match join_kind {
-                                StructuredBranchJoinKind::Inline => match join {
-                                    StructuredBlock::Dataflow { .. } => {
-                                        let join_out =
-                                            self.lower_block(&mut case, join, arm_outputs)?;
-                                        join_out.into_iter().skip(1).collect()
-                                    }
-                                    StructuredBlock::Exit { .. } => {
-                                        return Err(StructuralizationError::UnsupportedLoop {
-                                            reason: "loop branch join cannot be an exit block"
-                                                .into(),
-                                        });
-                                    }
-                                },
-                                StructuredBranchJoinKind::Deferred => arm_outputs,
-                            };
-                            self.lower_tail_loop_items(
-                                &mut case,
-                                rest,
-                                after_join,
-                                loop_lowering,
-                                loop_sig,
-                            )?
+                            match join_kind {
+                                StructuredBranchJoinKind::Inline
+                                    if loop_lowering.contains_loop_control(
+                                        &StructuredNode::Block(join.clone()),
+                                    ) =>
+                                {
+                                    let mut remaining = Vec::with_capacity(1 + rest.len());
+                                    remaining.push(StructuredNode::Block(join.clone()));
+                                    remaining.extend(rest.iter().cloned());
+                                    self.lower_tail_loop_items(
+                                        &mut case,
+                                        &remaining,
+                                        arm_outputs,
+                                        loop_lowering,
+                                        loop_sig,
+                                    )?
+                                }
+                                _ => {
+                                    let after_join = match join_kind {
+                                        StructuredBranchJoinKind::Inline => match join {
+                                            StructuredBlock::Dataflow { .. } => {
+                                                let join_out =
+                                                    self.lower_block(&mut case, join, arm_outputs)?;
+                                                join_out.into_iter().skip(1).collect()
+                                            }
+                                            StructuredBlock::Exit { .. } => {
+                                                return Err(
+                                                    StructuralizationError::UnsupportedLoop {
+                                                        reason:
+                                                            "loop branch join cannot be an exit block"
+                                                                .into(),
+                                                    },
+                                                );
+                                            }
+                                        },
+                                        StructuredBranchJoinKind::Deferred => arm_outputs,
+                                    };
+                                    self.lower_tail_loop_items(
+                                        &mut case,
+                                        rest,
+                                        after_join,
+                                        loop_lowering,
+                                        loop_sig,
+                                    )?
+                                }
+                            }
                         };
                         case.finish_with_outputs([result])?;
                     }

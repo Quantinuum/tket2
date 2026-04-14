@@ -971,19 +971,23 @@ fn lowers_reducible_cfgs_with_multiple_loop_exit_targets(
 }
 
 #[rstest]
-#[case::multi_continue_header(
-    build_multi_continue_header_loop_cfg as TestCfgBuilder,
-    "exactly one in-loop successor"
-)]
-fn documents_current_relooper_gaps(
-    #[case] build_cfg: TestCfgBuilder,
-    #[case] expected_reason: &str,
+fn lowers_multi_continue_header_loop(
+    #[from(build_multi_continue_header_loop_cfg)] mut multi_continue_header_loop: Hugr,
 ) {
-    let err = structurize_result(build_cfg(), StructuralizationStrategy::BeyondRelooper)
-        .expect_err("fixture should currently expose a Beyond-Relooper gap");
-    assert!(
-        err.contains(expected_reason),
-        "expected `{expected_reason}` in `{err}`"
+    let cfgs = cfgs(&multi_continue_header_loop);
+    let report = structurize_cfgs(
+        &mut multi_continue_header_loop,
+        &cfgs,
+        StructuralizationStrategy::BeyondRelooper,
+    )
+    .unwrap();
+    assert_eq!(report.rewrites.len(), 1);
+    assert_eq!(
+        multi_continue_header_loop
+            .nodes()
+            .filter(|n| multi_continue_header_loop.get_optype(*n).is_cfg())
+            .count(),
+        0
     );
 }
 

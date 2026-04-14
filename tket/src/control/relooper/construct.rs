@@ -21,7 +21,7 @@ use crate::control::structuralize::{
 use crate::control::{CfgBlockMap, IdentityCfgMap};
 
 use super::ast::{
-    RelooperBlockLowering, RelooperContext, RelooperContextFrame, RelooperLabel,
+    RelooperBlockLowering, RelooperCaseArm, RelooperContext, RelooperContextFrame, RelooperLabel,
     RelooperLoopLowering, RelooperRegion, RelooperStmt,
 };
 
@@ -228,15 +228,15 @@ where
     {
         let split = analyze_block(cfg_view, cfg.hugr_node(split_node))?;
         let join_node = self
-            .branch_join(split_node, frame.scope, frame.stop)
+            .branch_join(split_node, frame.scope, frame.stop, frame.active_loop)
             .map_err(|reason| StructuralizationError::Relooper {
                 reason: format!("branch at node {split_node} {reason}"),
             })?;
         let join = analyze_block(cfg_view, cfg.hugr_node(join_node))?;
         let arms = self
-            .scope_successors(split_node, frame.scope, frame.active_loop)
+            .scope_successor_cases(split_node, frame.scope, frame.active_loop)
             .into_iter()
-            .map(|succ| {
+            .map(|(case_idx, succ)| {
                 let arm_context = push_context(
                     &push_context(
                         frame.context,
@@ -260,7 +260,10 @@ where
                     join_node.into_relooper_label(),
                     join.inputs().clone(),
                 );
-                Ok::<Vec<RelooperStmt>, StructuralizationError>(arm)
+                Ok::<RelooperCaseArm, StructuralizationError>(RelooperCaseArm {
+                    case: case_idx,
+                    body: RelooperStmt::Seq(arm),
+                })
             })
             .collect::<Result<Vec<_>, _>>()?;
         let (join_kind, next) = if frame.active_loop == Some(join_node) {
@@ -281,10 +284,7 @@ where
                         join_kind,
                         loop_exit_edges: Vec::new(),
                     },
-                    body: Box::new(RelooperStmt::Case {
-                        split,
-                        arms: arms.into_iter().map(RelooperStmt::Seq).collect(),
-                    }),
+                    body: Box::new(RelooperStmt::Case { split, arms }),
                 },
             },
             next,
@@ -369,7 +369,8 @@ where
         };
 
         let loop_label = header.into_relooper_label();
-        let (body, next) = if !out_of_loop_succs.is_empty() {
+        let use_header_controlled = !out_of_loop_succs.is_empty() && in_loop_succs.len() == 1;
+        let (body, next) = if use_header_controlled {
             let continue_target = in_loop_succs.into_iter().exactly_one().map_err(|_| {
                 StructuralizationError::UnsupportedLoop {
                     reason: "header-controlled loop must have exactly one in-loop successor".into(),

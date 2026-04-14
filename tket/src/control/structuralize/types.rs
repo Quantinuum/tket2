@@ -124,6 +124,15 @@ pub(crate) enum StructuredBranchJoinKind {
     Deferred,
 }
 
+/// One visible branch arm together with the split case that reaches it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct StructuredCaseArm {
+    /// Successor case index selected by the split block.
+    pub(crate) case: usize,
+    /// Lowered body for that visible successor.
+    pub(crate) body: Vec<StructuredNode>,
+}
+
 /// HUGR-specific body information for a structured region.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum StructuredRegionBody {
@@ -133,8 +142,8 @@ pub(crate) enum StructuredRegionBody {
     Branch {
         /// Split block executed before the `Conditional`.
         split: StructuredBlock,
-        /// Per-arm bodies.
-        arms: Vec<Vec<StructuredNode>>,
+        /// Per-arm bodies keyed by their originating split case.
+        arms: Vec<StructuredCaseArm>,
         /// Join block executed after the `Conditional`.
         join: StructuredBlock,
         /// Whether the join block is lowered inside the branch or by the
@@ -319,7 +328,7 @@ fn structured_region_contains_block(region: &StructuredRegion, target: Node) -> 
             split.node() == target
                 || arms
                     .iter()
-                    .flatten()
+                    .flat_map(|arm| arm.body.iter())
                     .any(|item| structured_node_contains_block(item, target))
                 || join.node() == target
         }
