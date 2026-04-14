@@ -888,7 +888,7 @@ fn lowers_header_loop(#[from(build_header_controlled_loop_cfg)] mut header_loop:
 
 #[rstest]
 #[case::rvsdg(StructuralizationStrategy::Rvsdg)]
-#[case::relooper(StructuralizationStrategy::BeyondRelooper)]
+#[case::relooper(StructuralizationStrategy::Relooper)]
 fn pass_rewrites_supported_cfg(
     #[case] strategy: StructuralizationStrategy,
     #[from(build_nested_branch_loop_cfg)] nested_branch_loop: Hugr,
@@ -904,7 +904,7 @@ fn pass_rewrites_supported_cfg(
 
 #[rstest]
 #[case::rvsdg(StructuralizationStrategy::Rvsdg)]
-#[case::relooper(StructuralizationStrategy::BeyondRelooper)]
+#[case::relooper(StructuralizationStrategy::Relooper)]
 fn handles_combined_headers(
     #[case] strategy: StructuralizationStrategy,
     #[from(build_combined_headers_cfg)] mut combined_headers: Hugr,
@@ -935,7 +935,7 @@ fn handles_combined_headers(
 
 #[rstest]
 #[case::rvsdg(StructuralizationStrategy::Rvsdg)]
-#[case::relooper(StructuralizationStrategy::BeyondRelooper)]
+#[case::relooper(StructuralizationStrategy::Relooper)]
 fn lowers_irreducible_cfg(
     #[case] strategy: StructuralizationStrategy,
     #[from(build_irreducible_cfg)] mut irreducible: Hugr,
@@ -957,10 +957,7 @@ fn lowers_irreducible_cfg(
 #[case::multi_exit_loop(build_multi_exit_loop_cfg as TestCfgBuilder)]
 fn lowers_reducible_cfgs_with_multiple_loop_exit_targets(
     #[case] build_cfg: TestCfgBuilder,
-    #[values(
-        StructuralizationStrategy::Rvsdg,
-        StructuralizationStrategy::BeyondRelooper
-    )]
+    #[values(StructuralizationStrategy::Rvsdg, StructuralizationStrategy::Relooper)]
     strategy: StructuralizationStrategy,
 ) {
     let mut h = build_cfg();
@@ -978,7 +975,7 @@ fn lowers_multi_continue_header_loop(
     let report = structurize_cfgs(
         &mut multi_continue_header_loop,
         &cfgs,
-        StructuralizationStrategy::BeyondRelooper,
+        StructuralizationStrategy::Relooper,
     )
     .unwrap();
     assert_eq!(report.rewrites.len(), 1);
@@ -999,7 +996,7 @@ fn lowers_non_unique_backedge_loop(
     let report = structurize_cfgs(
         &mut non_unique_backedge_loop,
         &cfgs,
-        StructuralizationStrategy::BeyondRelooper,
+        StructuralizationStrategy::Relooper,
     )
     .unwrap();
     assert_eq!(report.rewrites.len(), 1);
@@ -1014,7 +1011,7 @@ fn lowers_non_unique_backedge_loop(
 
 #[rstest]
 #[case::rvsdg(StructuralizationStrategy::Rvsdg)]
-#[case::relooper(StructuralizationStrategy::BeyondRelooper)]
+#[case::relooper(StructuralizationStrategy::Relooper)]
 fn preprocesses_three_entry_irreducible_cfg(
     #[case] strategy: StructuralizationStrategy,
     #[from(build_three_entry_irreducible_cfg)] three_entry_irreducible: Hugr,
@@ -1026,7 +1023,7 @@ fn preprocesses_three_entry_irreducible_cfg(
 
 #[rstest]
 #[case::rvsdg(StructuralizationStrategy::Rvsdg)]
-#[case::relooper(StructuralizationStrategy::BeyondRelooper)]
+#[case::relooper(StructuralizationStrategy::Relooper)]
 fn strategy_is_deterministic(
     #[case] strategy: StructuralizationStrategy,
     #[from(build_combined_headers_cfg)] combined_headers: Hugr,
@@ -1101,7 +1098,7 @@ fn scope_preserves_other_cfgs(
 
 #[rstest]
 #[case::rvsdg(StructuralizationStrategy::Rvsdg)]
-#[case::relooper(StructuralizationStrategy::BeyondRelooper)]
+#[case::relooper(StructuralizationStrategy::Relooper)]
 fn structurizes_guppy_example(loop_and_branch: Hugr, #[case] strategy: StructuralizationStrategy) {
     let mut h = loop_and_branch;
     let report = StructuralizeCfgsPass::default()
@@ -1116,7 +1113,7 @@ fn structurizes_guppy_example(loop_and_branch: Hugr, #[case] strategy: Structura
 
 #[rstest]
 #[case::rvsdg(StructuralizationStrategy::Rvsdg)]
-#[case::relooper(StructuralizationStrategy::BeyondRelooper)]
+#[case::relooper(StructuralizationStrategy::Relooper)]
 fn structurizes_complex_control(
     complex_control: Hugr,
     #[case] strategy: StructuralizationStrategy,

@@ -55,7 +55,7 @@ pub(super) fn analyze_cfg<H: HugrView<Node = Node> + Clone>(
     let id_cfg = IdentityCfgMap::new(cfg_view.clone());
     match strategy {
         StructuralizationStrategy::Rvsdg => rvsdg::analyze_cfg(&cfg_view, &id_cfg),
-        StructuralizationStrategy::BeyondRelooper => Err(StructuralizationError::Relooper {
+        StructuralizationStrategy::Relooper => Err(StructuralizationError::Relooper {
             reason: "Beyond-Relooper does not produce shared analysis reports".into(),
         }),
     }

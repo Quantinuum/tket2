@@ -5,6 +5,7 @@ mod scope;
 pub mod tket1;
 
 pub(crate) use scope::PyPassScope;
+use tket::control::structuralize::StructuralizationStrategy;
 
 use std::{cmp::min, convert::TryInto, fs, num::NonZeroUsize, path::PathBuf};
 
@@ -26,11 +27,16 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     m.add_function(wrap_pyfunction!(greedy_depth_reduce, &m)?)?;
     m.add_function(wrap_pyfunction!(badger_optimise, &m)?)?;
     m.add_function(wrap_pyfunction!(normalize_guppy, &m)?)?;
+    m.add_function(wrap_pyfunction!(structuralize_cfgs, &m)?)?;
     m.add_class::<self::chunks::PyCircuitChunks>()?;
     m.add_function(wrap_pyfunction!(self::chunks::chunks, &m)?)?;
     m.add_function(wrap_pyfunction!(self::tket1::tket1_pass, &m)?)?;
     m.add_function(wrap_pyfunction!(resolve_modifiers, &m)?)?;
     m.add("PullForwardError", py.get_type::<PyPullForwardError>())?;
+    m.add(
+        "StructuralizeCfgsError",
+        py.get_type::<PyStructuralizeCfgsError>(),
+    )?;
     m.add("TK1PassError", py.get_type::<tket1::PytketPassError>())?;
     Ok(m)
 }
@@ -52,6 +58,13 @@ create_py_exception!(
     PyModifierResolverError,
     "Errors from the modifer resolver pass."
 );
+
+create_py_exception!(
+    tket::control::structuralize::StructuralizationError,
+    PyStructuralizeCfgsError,
+    "Errors from the CFG structuralization pass."
+);
+
 /// Flatten the structure of a Guppy-generated program to enable additional optimisations.
 ///
 /// This should normally be called first before other optimisations.
@@ -89,6 +102,38 @@ fn normalize_guppy(
         .remove_redundant_order_edges(remove_redundant_order_edges)
         .squash_borrows(squash_borrows);
 
+    pass.run(&mut circ.hugr).convert_pyerrs()?;
+    Ok(())
+}
+
+/// Structuralize CFG regions into nested `Conditional` and `TailLoop` nodes.
+///
+/// Parameters:
+/// - strategy: Structuralization strategy to use. One of `"rvsdg"` or
+///   `"beyond_relooper"`.
+/// - inline_dfgs: Whether helper DFG wrappers emitted during lowering should be
+///   inlined after the rewrite.
+#[pyfunction]
+#[pyo3(signature = (circ, *, strategy = "rvsdg", inline_dfgs = true, scope = None))]
+fn structuralize_cfgs(
+    circ: &mut CompilationState,
+    strategy: &str,
+    inline_dfgs: bool,
+    scope: Option<PyPassScope>,
+) -> PyResult<()> {
+    let py_scope = scope.unwrap_or_default();
+
+    let strategy = match strategy {
+        "rvsdg" => StructuralizationStrategy::Rvsdg,
+        "relooper" => StructuralizationStrategy::Relooper,
+        _ => Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "unknown structuralization strategy {strategy:?}; expected 'rvsdg' or 'relooper'"
+        )))?,
+    };
+
+    let pass = tket::passes::StructuralizeCfgsPass::default_with_scope(py_scope.scope)
+        .with_strategy(strategy)
+        .inline_dfgs(inline_dfgs);
     pass.run(&mut circ.hugr).convert_pyerrs()?;
     Ok(())
 }

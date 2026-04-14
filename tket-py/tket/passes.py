@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import json
 from dataclasses import dataclass
+from enum import Enum
 
 from hugr import Hugr
 from pytket.passes import (
@@ -21,7 +22,14 @@ from hugr.passes.composable import (
 from hugr.passes.scope import PassScope, GlobalScope
 
 
-__all__ = ["PytketHugrPass", "PassResult", "NormalizeGuppy", "ModifierResolverPass"]
+__all__ = [
+    "PytketHugrPass",
+    "PassResult",
+    "NormalizeGuppy",
+    "StructuralizationStrategy",
+    "StructuralizeCfgs",
+    "ModifierResolverPass",
+]
 
 
 @dataclass
@@ -134,6 +142,72 @@ class NormalizeGuppy(ComposablePass):
             inline_dfgs=self.inline_dfgs,
             remove_redundant_order_edges=self.remove_redundant_order_edges,
             squash_borrows=self.squash_borrows,
+            scope=self._scope,
+        )
+        return program
+
+
+class StructuralizationStrategy(str, Enum):
+    """Configuration for Structuralization strategy to use in the StructuralizeCfgs pass.
+
+    The strategies available are:
+    - RVSDG: Use the RVSDG-based structuralization
+        strategy. Based in the approach described in "Structural Analysis of
+        Reducible and Irreducible Control Flow Graphs" by Banerjee et al.
+        <https://arxiv.org/abs/2210.03652>.
+    - Relooper: Use the Beyond-Relooper structuralization strategy <https://zenodo.org/records/6727752>
+
+    Both strategies are currently being tested. We may keep one or both of them in the long term
+    depending on their performance and the quality of the resulting circuits.
+    """
+
+    RVSDG = "rvsdg"
+    RELOOPER = "relooper"
+
+
+@dataclass
+class StructuralizeCfgs(ComposablePass):
+    """Structuralize CFG regions into nested `Conditional` and `TailLoop` nodes.
+
+    Parameters:
+    - strategy: Structuralization strategy.
+    - inline_dfgs: Whether helper DFG wrappers emitted during lowering should
+      be inlined afterwards.
+    """
+
+    strategy: StructuralizationStrategy = StructuralizationStrategy.RVSDG
+    inline_dfgs: bool = True
+    _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
+
+    def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
+        return implement_pass_run(
+            self,
+            hugr=hugr,
+            inplace=inplace,
+            copy_call=lambda h: self._structuralize(h, inplace),
+        )
+
+    def with_scope(self, _scope: PassScope) -> StructuralizeCfgs:
+        """Set the scope of this pass and return self."""
+        self._scope = _scope
+        return self
+
+    def _structuralize(self, hugr: Hugr, inplace: bool) -> PassResult:
+        tk_program = _state.CompilationState.from_python(hugr)
+
+        self._run_tk(tk_program)
+
+        package = tk_program.to_python()
+        return PassResult.for_pass(
+            self, hugr=package.modules[0], inplace=inplace, result=None
+        )
+
+    def _run_tk(self, program: _state.CompilationState) -> _state.CompilationState:
+        """Run the pass in the CompilationState."""
+        _passes.structuralize_cfgs(
+            program._inner,
+            strategy=self.strategy.value,
+            inline_dfgs=self.inline_dfgs,
             scope=self._scope,
         )
         return program

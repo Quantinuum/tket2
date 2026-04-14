@@ -55,7 +55,7 @@ pub fn structurize_cfgs<H: HugrMut<Node = Node>>(
                 let analyzed = analyze_cfg(cfg_view.clone(), strategy)?;
                 prepare_cfg_replacement(&cfg_view, &analyzed)?
             }
-            StructuralizationStrategy::BeyondRelooper => {
+            StructuralizationStrategy::Relooper => {
                 let id_cfg = IdentityCfgMap::new(cfg_view.clone());
                 relooper::prepare_cfg_rewrite(&cfg_view, &id_cfg)?
             }

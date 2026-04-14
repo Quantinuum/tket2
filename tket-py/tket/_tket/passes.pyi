@@ -1,5 +1,4 @@
 from pathlib import Path
-
 from .optimiser import BadgerOptimiser
 from .state import CompilationState
 from hugr.passes.scope import PassScope, GlobalScope
@@ -41,6 +40,15 @@ def normalize_guppy(
     - inline_dfgs: Whether to inline DFG operations.
     - remove_redundant_order_edges: Whether to remove redundant order edges.
     """
+
+def structuralize_cfgs(
+    circ: CompilationState,
+    *,
+    strategy: str = "rvsdg",
+    inline_dfgs: bool = True,
+    scope: PassScope = GlobalScope.PRESERVE_PUBLIC,
+) -> None:
+    """Structuralize CFG regions into nested `Conditional` and `TailLoop` nodes."""
 
 def greedy_depth_reduce(circ: CompilationState) -> int:
     """Greedy depth reduction of a circuit.

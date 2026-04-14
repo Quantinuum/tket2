@@ -299,11 +299,8 @@ fn lower_exit_sequence<H: HugrView<Node = Node>>(
     items: &[RelooperStmt],
 ) -> Result<Vec<StructuredNode>, StructuralizationError> {
     let mut items = items;
-    match items.last() {
-        Some(RelooperStmt::Br(_) | RelooperStmt::Return(_)) => {
-            items = &items[..items.len() - 1];
-        }
-        _ => {}
+    if let Some(RelooperStmt::Br(_) | RelooperStmt::Return(_)) = items.last() {
+        items = &items[..items.len() - 1];
     }
     let mut lowered = Vec::new();
     for stmt in items {

@@ -5,6 +5,8 @@ from tket.passes import (
     _badger_optimise,
     _greedy_depth_reduce,
     NormalizeGuppy,
+    StructuralizationStrategy,
+    StructuralizeCfgs,
     ModifierResolverPass,
 )
 from tket._state import CompilationState
@@ -240,3 +242,15 @@ def test_modifier_resolver() -> None:
     resolved: Hugr = mr_pass(normalized)
 
     assert _count_ops(resolved, "tket.modifier.ControlModifier") == 0
+
+
+def test_structuralize_cfgs() -> None:
+    hugr = _hugr_from_path(
+        "test_files/guppy_optimization/complex_control/complex_control.hugr"
+    )
+
+    structuralize = StructuralizeCfgs(strategy=StructuralizationStrategy.RELOOPER)
+    structured = structuralize(hugr)
+
+    assert _count_ops(structured, "CFG") == 0
+    assert _count_ops(structured, "Conditional") >= 1

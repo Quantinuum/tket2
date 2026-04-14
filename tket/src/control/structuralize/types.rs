@@ -22,7 +22,7 @@ pub enum StructuralizationStrategy {
     #[default]
     Rvsdg,
     /// Use the Beyond-Relooper strategy for reducible CFGs.
-    BeyondRelooper,
+    Relooper,
 }
 
 /// Ordered HUGR-facing interface for a structured region.

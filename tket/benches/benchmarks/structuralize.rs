@@ -22,7 +22,7 @@ fn bench_structural_analysis(c: &mut Criterion) {
 
         for &(name, strategy) in &[
             ("rvsdg", StructuralizationStrategy::Rvsdg),
-            ("relooper", StructuralizationStrategy::BeyondRelooper),
+            ("relooper", StructuralizationStrategy::Relooper),
         ] {
             group.bench_with_input(
                 BenchmarkId::new("strategy", name),
@@ -50,7 +50,7 @@ fn bench_structuralize_pass(c: &mut Criterion) {
 
         for &(name, strategy) in &[
             ("rvsdg", StructuralizationStrategy::Rvsdg),
-            ("relooper", StructuralizationStrategy::BeyondRelooper),
+            ("relooper", StructuralizationStrategy::Relooper),
         ] {
             group.bench_with_input(
                 BenchmarkId::new("strategy", name),
