@@ -74,6 +74,14 @@ pub(crate) enum StructuredBlock {
         sum_rows: Vec<TypeRow>,
         /// Non-control outputs emitted by the block.
         outputs: TypeRow,
+        /// Unique visible successor case when the block is lowered as straight-line code.
+        ///
+        /// Some structured walks suppress out-of-scope successors, such as
+        /// loop-closing backedges or exits that belong to an enclosing region.
+        /// Lowering needs to know which original CFG successor remains visible
+        /// so it can forward that successor payload instead of blindly
+        /// discarding the control sum.
+        linear_successor: Option<usize>,
     },
     /// The CFG exit block.
     Exit {

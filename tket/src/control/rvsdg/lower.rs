@@ -64,12 +64,14 @@ fn lower_block(block: &BlockNode) -> StructuredBlock {
             inputs,
             sum_rows,
             outputs,
+            linear_successor,
         } => StructuredBlock::Dataflow {
             cfg_node: *cfg_node,
             node: *node,
             inputs: vars_to_row(inputs),
             sum_rows: sum_rows.iter().map(|row| vars_to_row(row)).collect(),
             outputs: vars_to_row(outputs),
+            linear_successor: *linear_successor,
         },
         BlockNode::Exit {
             cfg_node,

@@ -364,12 +364,12 @@ impl<'a, H: hugr::HugrView<Node = Node>> TemplateLowerer<'a, H> {
                                     let after_join = match join_kind {
                                         super::StructuredBranchJoinKind::Inline => match join {
                                             StructuredBlock::Dataflow { .. } => {
-                                                let (join_out, _) = self.lower_block(
+                                                self.lower_linear_block(
                                                     &mut case,
                                                     join,
                                                     arm_fragment.outputs,
-                                                )?;
-                                                join_out.into_iter().skip(1).collect()
+                                                )?
+                                                .outputs
                                             }
                                             StructuredBlock::Exit { .. } => {
                                                 return Err(

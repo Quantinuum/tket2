@@ -341,10 +341,14 @@ pub(super) fn build_multi_exit_loop_cfg() -> Hugr {
 }
 
 pub(super) fn load_guppy_example(name: &str) -> Hugr {
-    let file = Path::new(env!("CARGO_MANIFEST_DIR"))
+    let one_file = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../test_files/guppy_examples")
+        .join(format!("{name}.hugr"));
+    let nested = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../test_files/guppy_optimization")
         .join(name)
         .join(format!("{name}.hugr"));
+    let file = if one_file.exists() { one_file } else { nested };
     let reader = BufReader::new(fs::File::open(file).unwrap());
     Hugr::load(reader, None).unwrap()
 }

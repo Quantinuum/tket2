@@ -176,6 +176,27 @@ where
             .collect()
     }
 
+    /// Returns the unique visible successor case for a straight-line scope walk.
+    ///
+    /// Structured construction uses this to preserve the payload carried by the
+    /// single remaining CFG successor when other successors are hidden by the
+    /// current scope, such as loop-closing backedges or exits handled by an
+    /// enclosing structured region.
+    pub(crate) fn scope_linear_successor_case(
+        &self,
+        node: T,
+        scope: &BTreeSet<T>,
+        active_loop: Option<T>,
+    ) -> Option<usize> {
+        match self
+            .scope_successor_cases(node, scope, active_loop)
+            .as_slice()
+        {
+            [(case_idx, _)] => Some(*case_idx),
+            _ => None,
+        }
+    }
+
     /// Returns whether the specified edge is the active loop's backedge.
     pub(crate) fn is_loop_backedge(&self, src: T, dst: T, header: T) -> bool {
         dst == header

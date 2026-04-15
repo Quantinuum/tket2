@@ -14,7 +14,7 @@ use crate::control::structuralize::{
 };
 
 use super::ast::{RelooperLabel, RelooperRegion, RelooperStmt};
-use super::block::analyze_block;
+use super::block::analyze_block_with_linear_successor;
 
 /// Lowered loop-exit continuations in wrapped-block order.
 type ExitContinuations = Vec<Vec<StructuredNode>>;
@@ -437,5 +437,9 @@ fn label_target_block<H: HugrView<Node = Node>>(
             original,
         ),
     };
-    analyze_block(cfg_view, cfg_node, node)
+    let linear_successor = cfg_view
+        .get_optype(node)
+        .as_dataflow_block()
+        .and_then(|block| (block.sum_rows.len() == 1).then_some(0));
+    analyze_block_with_linear_successor(cfg_view, cfg_node, node, linear_successor)
 }

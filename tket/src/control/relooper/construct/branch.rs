@@ -10,7 +10,7 @@ use crate::control::cfg::CfgFacts;
 use crate::control::relooper::construct::context::{append_branch_to_label, push_context};
 use crate::control::structuralize::{StructuralizationError, StructuredBranchJoinKind};
 
-use super::{IntoRelooperLabel, ScopeFrame, analyze_block};
+use super::{IntoRelooperLabel, ScopeFrame, analyze_block, analyze_block_with_linear_successor};
 use crate::control::relooper::ast::{
     RelooperBlockLowering, RelooperCaseArm, RelooperContextFrame, RelooperRegion, RelooperStmt,
 };
@@ -43,10 +43,11 @@ where
             .map_err(|reason| StructuralizationError::Relooper {
                 reason: format!("branch at node {split_node} {reason}"),
             })?;
-        let join = analyze_block(
+        let join = analyze_block_with_linear_successor(
             cfg_view,
             join_node.into_structured_cfg_node(),
             cfg.hugr_node(join_node),
+            self.scope_linear_successor_case(join_node, frame.scope, frame.active_loop),
         )?;
         let arms = self
             .scope_successor_cases(split_node, frame.scope, frame.active_loop)

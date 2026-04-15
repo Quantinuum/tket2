@@ -84,6 +84,8 @@ fn scope_preserves_other_cfgs(
 #[case::complex_control_relooper("complex_control", StructuralizationStrategy::Relooper)]
 #[case::nested_loops_rvsdg("nested_loops", StructuralizationStrategy::Rvsdg)]
 #[case::nested_loops_relooper("nested_loops", StructuralizationStrategy::Relooper)]
+#[case::shortcircuit_rvsdg("shortcircuit", StructuralizationStrategy::Rvsdg)]
+#[case::shortcircuit_relooper("shortcircuit", StructuralizationStrategy::Relooper)]
 fn structurizes_checked_in_fixture(
     #[case] example: &str,
     #[case] strategy: StructuralizationStrategy,

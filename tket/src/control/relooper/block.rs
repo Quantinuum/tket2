@@ -17,6 +17,16 @@ pub(super) fn analyze_block<H: HugrView<Node = Node>>(
     cfg_node: StructuredCfgNode,
     node: Node,
 ) -> Result<StructuredBlock, StructuralizationError> {
+    analyze_block_with_linear_successor(cfg_view, cfg_node, node, None)
+}
+
+/// Reclassifies a CFG node while recording its unique visible successor case.
+pub(super) fn analyze_block_with_linear_successor<H: HugrView<Node = Node>>(
+    cfg_view: &H,
+    cfg_node: StructuredCfgNode,
+    node: Node,
+    linear_successor: Option<usize>,
+) -> Result<StructuredBlock, StructuralizationError> {
     match cfg_view.get_optype(node) {
         OpType::DataflowBlock(block) => Ok(StructuredBlock::Dataflow {
             cfg_node,
@@ -24,6 +34,7 @@ pub(super) fn analyze_block<H: HugrView<Node = Node>>(
             inputs: block.inputs.clone(),
             sum_rows: block.sum_rows.clone(),
             outputs: block.other_outputs.clone(),
+            linear_successor,
         }),
         OpType::ExitBlock(exit) => Ok(StructuredBlock::Exit {
             cfg_node,

@@ -498,6 +498,7 @@ mod test {
                 inputs: block.inputs.clone(),
                 sum_rows: block.sum_rows.clone(),
                 outputs: block.other_outputs.clone(),
+                linear_successor: None,
             }),
             hugr::ops::OpType::ExitBlock(exit) => Ok(StructuredBlock::Exit {
                 cfg_node,

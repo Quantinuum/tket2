@@ -57,7 +57,11 @@ impl<'a, H: HugrView<Node = Node>> RvsdgBuilder<'a, H> {
                 split: cfg.hugr_node(split_node),
                 reason,
             })?;
-        let join = self.build_block(join_node, cfg.hugr_node(join_node))?;
+        let join = self.build_block_with_linear_successor(
+            join_node,
+            cfg.hugr_node(join_node),
+            info.scope_linear_successor_case(join_node, scope, active_loop),
+        )?;
         let join_inputs = join.inputs().to_vec();
 
         let arms = info.scope_successor_cases(split_node, scope, active_loop);

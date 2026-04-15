@@ -75,6 +75,8 @@ pub(super) enum BlockNode {
         sum_rows: Vec<Vec<RegionVar>>,
         /// Shared non-control outputs emitted by the block.
         outputs: Vec<RegionVar>,
+        /// Unique visible successor case when the block is lowered as straight-line code.
+        linear_successor: Option<usize>,
     },
     /// The CFG exit block.
     Exit {

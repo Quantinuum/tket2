@@ -168,7 +168,11 @@ impl<'a, H: HugrView<Node = Node>> RvsdgBuilder<'a, H> {
                 continue;
             }
 
-            let block = self.build_block(node, cfg.hugr_node(node))?;
+            let block = self.build_block_with_linear_successor(
+                node,
+                cfg.hugr_node(node),
+                info.scope_linear_successor_case(node, scope, active_loop),
+            )?;
             let is_exit = matches!(block, BlockNode::Exit { .. });
             items.push(RvsdgNode::Block(block));
             current = succs.into_iter().next();
@@ -186,6 +190,16 @@ impl<'a, H: HugrView<Node = Node>> RvsdgBuilder<'a, H> {
         cfg_node: T,
         node: Node,
     ) -> Result<BlockNode, RvsdgBuildError<Node>> {
+        self.build_block_with_linear_successor(cfg_node, node, None)
+    }
+
+    /// Converts one CFG block into a typed RVSDG leaf with straight-line successor metadata.
+    fn build_block_with_linear_successor<T: IntoStructuredCfgNode>(
+        &mut self,
+        cfg_node: T,
+        node: Node,
+        linear_successor: Option<usize>,
+    ) -> Result<BlockNode, RvsdgBuildError<Node>> {
         match self.cfg_view.get_optype(node) {
             OpType::DataflowBlock(block) => Ok(BlockNode::Dataflow {
                 cfg_node: cfg_node.into_structured_cfg_node(),
@@ -197,6 +211,7 @@ impl<'a, H: HugrView<Node = Node>> RvsdgBuilder<'a, H> {
                     .map(|row| self.fresh_vars(row))
                     .collect(),
                 outputs: self.fresh_vars(&block.other_outputs),
+                linear_successor,
             }),
             OpType::ExitBlock(exit) => Ok(BlockNode::Exit {
                 cfg_node: cfg_node.into_structured_cfg_node(),

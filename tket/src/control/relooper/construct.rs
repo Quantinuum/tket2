@@ -20,7 +20,9 @@ use crate::control::structuralize::{
 };
 
 use super::ast::{RelooperContext, RelooperLabel, RelooperRegion, RelooperStmt};
-use super::block::{analyze_block, cfg_input_row, cfg_output_row};
+use super::block::{
+    analyze_block, analyze_block_with_linear_successor, cfg_input_row, cfg_output_row,
+};
 
 /// One recursive scope walk in the Beyond-Relooper constructor.
 pub(super) struct ScopeBuild<'a, T> {
@@ -172,10 +174,11 @@ where
                 continue;
             }
 
-            let block = analyze_block(
+            let block = analyze_block_with_linear_successor(
                 cfg_view,
                 node.into_structured_cfg_node(),
                 cfg.hugr_node(node),
+                self.scope_linear_successor_case(node, request.scope, request.active_loop),
             )?;
             match block {
                 StructuredBlock::Exit { inputs, .. } => {
