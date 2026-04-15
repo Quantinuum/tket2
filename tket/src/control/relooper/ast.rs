@@ -62,7 +62,7 @@ pub(crate) type RelooperContext = Vec<RelooperContextFrame>;
 
 /// One analyzed region in the Beyond-Relooper AST.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(in crate::control) struct RelooperRegion {
+pub(super) struct RelooperRegion {
     /// Ordered values crossing the region boundary.
     pub(super) io: RegionIo,
     /// Structured body of the region.
@@ -76,7 +76,7 @@ pub(in crate::control) struct RelooperRegion {
 /// the surrounding sequence, so that detail lives here instead of inside the
 /// statement shape itself.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(in crate::control) struct RelooperBlockLowering {
+pub(super) struct RelooperBlockLowering {
     /// Whether the followed-by block lowers inside the block or in the
     /// surrounding scope.
     pub(super) join_kind: StructuredBranchJoinKind,
@@ -94,7 +94,7 @@ pub(in crate::control) struct RelooperBlockLowering {
 /// feed continue and break paths, so those details are grouped here until exit
 /// lowering becomes fully context-driven.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(in crate::control) struct RelooperLoopLowering {
+pub(super) struct RelooperLoopLowering {
     /// Loop family selected from the CFG.
     pub(super) kind: StructuredLoopKind,
     /// Header block that guards or enters the loop.
@@ -107,7 +107,7 @@ pub(in crate::control) struct RelooperLoopLowering {
 
 /// One statement in the Beyond-Relooper AST.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(in crate::control) enum RelooperStmt {
+pub(super) enum RelooperStmt {
     /// A straight-line sequence of statements.
     Seq(Vec<RelooperStmt>),
     /// A nested structured region with its own interface.
@@ -147,7 +147,7 @@ pub(in crate::control) enum RelooperStmt {
 
 /// One visible case arm together with the split case that reaches it.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(in crate::control) struct RelooperCaseArm {
+pub(super) struct RelooperCaseArm {
     /// Successor case index selected by the split block.
     pub(super) case: usize,
     /// Statement body lowered for that visible successor.

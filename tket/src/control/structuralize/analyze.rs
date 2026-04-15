@@ -5,16 +5,19 @@
 //! RVSDG and Beyond-Relooper logic lives in their own modules so the shared
 //! entry points stay free of strategy-specific region details.
 
+use hugr::{HugrView, Node};
+
+#[cfg(test)]
 use std::collections::BTreeMap;
 
+#[cfg(test)]
 use hugr::ops::OpTrait;
-use hugr::{HugrView, Node};
+#[cfg(test)]
 use hugr_core::ops::OpTag;
 
-use super::types::{
-    StructuralizationAnalysisReport, StructuralizationError, StructuralizationStrategy,
-    StructuredRegion,
-};
+#[cfg(test)]
+use super::types::StructuralizationAnalysisReport;
+use super::types::{StructuralizationError, StructuralizationStrategy, StructuredRegion};
 use crate::control::{IdentityCfgMap, rvsdg};
 
 /// Analyze all CFGs in a HUGR using the requested strategy.
@@ -23,7 +26,8 @@ use crate::control::{IdentityCfgMap, rvsdg};
 ///
 /// Returns an error when RVSDG-based CFG analysis fails for any CFG or when a
 /// lowering-oriented structural region cannot be derived deterministically.
-pub fn analyze_hugr_cfgs<H: HugrView<Node = Node>>(
+#[cfg(test)]
+pub(crate) fn analyze_hugr_cfgs<H: HugrView<Node = Node>>(
     hugr: &H,
     strategy: StructuralizationStrategy,
 ) -> Result<StructuralizationAnalysisReport, StructuralizationError> {

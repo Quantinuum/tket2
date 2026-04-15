@@ -5,8 +5,6 @@
 //! easier to understand what information is computed during analysis and what
 //! invariants lowering relies on.
 
-use std::collections::BTreeMap;
-
 use derive_more::{Display, Error};
 use hugr::Node;
 use hugr::builder::BuildError;
@@ -42,6 +40,24 @@ pub(crate) struct RegionIo {
 /// per CFG occurrence even when multiple occurrences map back to the same
 /// original HUGR block.
 pub(crate) type StructuredCfgNode = PreprocessedNode<Node>;
+
+/// Converts one CFG graph node into the lowering identity used by structured blocks.
+pub(crate) trait IntoStructuredCfgNode {
+    /// Returns the stable CFG-node identity for this graph node.
+    fn into_structured_cfg_node(self) -> StructuredCfgNode;
+}
+
+impl IntoStructuredCfgNode for Node {
+    fn into_structured_cfg_node(self) -> StructuredCfgNode {
+        PreprocessedNode::Original(self)
+    }
+}
+
+impl IntoStructuredCfgNode for PreprocessedNode<Node> {
+    fn into_structured_cfg_node(self) -> StructuredCfgNode {
+        self
+    }
+}
 
 /// HUGR-facing summary of a CFG block used during lowering.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -218,10 +234,11 @@ impl StructuredRegion {
 }
 
 /// Structured CFG analysis output for one HUGR.
+#[cfg(test)]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct StructuralizationAnalysisReport {
+pub(crate) struct StructuralizationAnalysisReport {
     /// Structured control tree plus HUGR-specific lowering metadata for each CFG.
-    pub(crate) cfg_regions: BTreeMap<Node, StructuredRegion>,
+    pub(crate) cfg_regions: std::collections::BTreeMap<Node, StructuredRegion>,
 }
 
 /// Mutable rewrite report returned by the pass layer.

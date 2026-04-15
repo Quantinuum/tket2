@@ -34,7 +34,7 @@ use hugr::{HugrView, Node};
 use crate::control::IdentityCfgMap;
 use crate::control::cfg::{CfgFactsError, PreprocessedCfg};
 
-pub(crate) fn build_cfg_rvsdg<H: HugrView<Node = Node>>(
+fn build_cfg_rvsdg<H: HugrView<Node = Node>>(
     cfg_view: &H,
     cfg: &IdentityCfgMap<H>,
 ) -> Result<ir::Rvsdg, RvsdgBuildError<Node>> {
@@ -50,10 +50,15 @@ pub(crate) fn build_cfg_rvsdg<H: HugrView<Node = Node>>(
 }
 
 pub(crate) use error::RvsdgBuildError;
-pub(crate) use ir::{
-    BlockNode, BranchJoinKind, GammaNode, LoopKind, Region, RvsdgNode, ThetaNode, vars_to_row,
-};
-pub(crate) use lower::analyze_cfg;
+pub(crate) fn analyze_cfg<H: HugrView<Node = Node>>(
+    cfg_view: &H,
+    cfg: &IdentityCfgMap<H>,
+) -> Result<
+    crate::control::structuralize::StructuredRegion,
+    crate::control::structuralize::StructuralizationError,
+> {
+    lower::analyze_cfg(cfg_view, cfg)
+}
 
 /// Converts shared CFG-fact failures into RVSDG entry-point errors.
 fn map_cfg_facts_error(

@@ -16,6 +16,7 @@
 //! remains stable.
 
 mod ast;
+mod block;
 mod construct;
 mod lower;
 #[cfg(test)]
@@ -42,7 +43,7 @@ pub(crate) fn prepare_cfg_rewrite<H: HugrView<Node = Node>>(
         Err(StructuralizationError::UnsupportedIrreducibleCfg { .. }) => {
             let preprocessed = PreprocessedCfg::new(cfg_view.entrypoint(), cfg)
                 .map_err(map_cfg_facts_error(cfg_view.entrypoint()))?;
-            construct::build_cfg_program_with_map(cfg_view, &preprocessed)?
+            construct::build_cfg_program(cfg_view, &preprocessed)?
         }
         Err(err) => return Err(err),
     };

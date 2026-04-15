@@ -16,7 +16,7 @@ use crate::control::structuralize::{
 };
 
 use super::ast::{RelooperBlockLowering, RelooperLabel, RelooperRegion, RelooperStmt};
-use super::construct::build_cfg_ast;
+use super::construct::build_cfg_program;
 use super::lower::lower_region;
 
 fn n_identity<T: DataflowSubContainer>(
@@ -122,8 +122,8 @@ fn ast_is_deterministic(combined_headers: hugr::Hugr) {
     let base_b = combined_headers;
     let cfg_a = base_a.with_entrypoint(cfg_node);
     let cfg_b = base_b.with_entrypoint(cfg_node);
-    let a = build_cfg_ast(&cfg_a, &IdentityCfgMap::new(cfg_a.clone())).unwrap();
-    let b = build_cfg_ast(&cfg_b, &IdentityCfgMap::new(cfg_b.clone())).unwrap();
+    let a = build_cfg_program(&cfg_a, &IdentityCfgMap::new(cfg_a.clone())).unwrap();
+    let b = build_cfg_program(&cfg_b, &IdentityCfgMap::new(cfg_b.clone())).unwrap();
     assert_eq!(a, b);
 }
 
@@ -134,7 +134,7 @@ fn combined_headers_contains_loop_and_branch(combined_headers: hugr::Hugr) {
         .find(|node| combined_headers.get_optype(*node).is_cfg())
         .unwrap();
     let cfg_view = combined_headers.with_entrypoint(cfg_node);
-    let ast = build_cfg_ast(&cfg_view, &IdentityCfgMap::new(cfg_view.clone())).unwrap();
+    let ast = build_cfg_program(&cfg_view, &IdentityCfgMap::new(cfg_view.clone())).unwrap();
 
     let RelooperStmt::Seq(items) = ast.body else {
         panic!("expected a sequence root");
@@ -153,7 +153,7 @@ fn combined_headers_uses_cfg_backed_labels(combined_headers: hugr::Hugr) {
         .find(|node| combined_headers.get_optype(*node).is_cfg())
         .unwrap();
     let cfg_view = combined_headers.with_entrypoint(cfg_node);
-    let ast = build_cfg_ast(&cfg_view, &IdentityCfgMap::new(cfg_view.clone())).unwrap();
+    let ast = build_cfg_program(&cfg_view, &IdentityCfgMap::new(cfg_view.clone())).unwrap();
 
     let RelooperStmt::Seq(items) = ast.body else {
         panic!("expected a sequence root");
@@ -168,7 +168,7 @@ fn multi_exit_loop_wraps_exits_in_labelled_blocks(multi_exit_loop: hugr::Hugr) {
         .find(|node| multi_exit_loop.get_optype(*node).is_cfg())
         .unwrap();
     let cfg_view = multi_exit_loop.with_entrypoint(cfg_node);
-    let ast = build_cfg_ast(&cfg_view, &IdentityCfgMap::new(cfg_view.clone())).unwrap();
+    let ast = build_cfg_program(&cfg_view, &IdentityCfgMap::new(cfg_view.clone())).unwrap();
 
     let labels = collect_block_labels(&ast.body);
     assert!(labels.len() >= 2);
@@ -183,7 +183,7 @@ fn lowered_combined_headers_loop_has_body(combined_headers: hugr::Hugr) {
         .find(|node| combined_headers.get_optype(*node).is_cfg())
         .unwrap();
     let cfg_view = combined_headers.with_entrypoint(cfg_node);
-    let ast = build_cfg_ast(&cfg_view, &IdentityCfgMap::new(cfg_view.clone())).unwrap();
+    let ast = build_cfg_program(&cfg_view, &IdentityCfgMap::new(cfg_view.clone())).unwrap();
     let lowered = lower_region(&cfg_view, &ast).unwrap();
 
     let loops = collect_lowered_loops(&lowered.body);
@@ -202,7 +202,7 @@ fn lowered_multi_exit_loop_preserves_exit_count(multi_exit_loop: hugr::Hugr) {
         .find(|node| multi_exit_loop.get_optype(*node).is_cfg())
         .unwrap();
     let cfg_view = multi_exit_loop.with_entrypoint(cfg_node);
-    let ast = build_cfg_ast(&cfg_view, &IdentityCfgMap::new(cfg_view.clone())).unwrap();
+    let ast = build_cfg_program(&cfg_view, &IdentityCfgMap::new(cfg_view.clone())).unwrap();
     let lowered = lower_region(&cfg_view, &ast).unwrap();
 
     let loops = collect_lowered_loops(&lowered.body);

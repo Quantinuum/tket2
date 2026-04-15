@@ -1,32 +1,28 @@
-//! HUGR-specific entry points for CFG structuralization analysis and lowering.
+//! HUGR-facing entry points for CFG structuralization.
 //!
-//! This module keeps HUGR-facing concerns out of `control::rvsdg`: typed block
-//! interfaces, region I/O summaries, and lowering from strategy-specific
-//! structured analyses into nested `DFG` / `Conditional` / `TailLoop` nodes.
-//!
-//! The public API is intentionally small:
-//! `analyze_hugr_cfgs` produces a lowering-ready structural summary, while
-//! `structurize_cfgs` performs the rewrite. Strategy-specific analyzers live in
-//! their own submodules and all converge on one private shared lowering IR.
-//! Keeping the implementation split this way lets the RVSDG and Beyond-
-//! Relooper paths evolve independently without one giant file.
+//! The pass-oriented public interface lives here, together with the
+//! HUGR-specific structured-control types consumed by the rewrite pipeline.
+//! Strategy-specific reconstruction stays in `control::rvsdg` and
+//! `control::relooper`; only the lowering-oriented data that is genuinely
+//! shared between strategies belongs in this module.
 
 mod analyze;
 pub(crate) mod lower;
-pub(crate) mod shared;
 #[cfg(test)]
 mod test;
 mod types;
 
-pub use analyze::analyze_hugr_cfgs;
+#[cfg(test)]
+pub(crate) use analyze::analyze_hugr_cfgs;
 pub(crate) use lower::LoweredCfgTemplate;
 pub use lower::structurize_cfgs;
+#[cfg(test)]
+pub(crate) use types::StructuralizationAnalysisReport;
 pub(crate) use types::{
-    RegionIo, StructuredBlock, StructuredBranchJoinKind, StructuredCaseArm, StructuredCfgNode,
-    StructuredLoopEdge, StructuredLoopExit, StructuredLoopKind, StructuredNode, StructuredRegion,
-    StructuredRegionBody,
+    IntoStructuredCfgNode, RegionIo, StructuredBlock, StructuredBranchJoinKind, StructuredCaseArm,
+    StructuredCfgNode, StructuredLoopEdge, StructuredLoopExit, StructuredLoopKind, StructuredNode,
+    StructuredRegion, StructuredRegionBody,
 };
 pub use types::{
-    StructuralizationAnalysisReport, StructuralizationError, StructuralizationRewriteReport,
-    StructuralizationStrategy,
+    StructuralizationError, StructuralizationRewriteReport, StructuralizationStrategy,
 };

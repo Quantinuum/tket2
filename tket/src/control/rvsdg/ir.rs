@@ -12,11 +12,11 @@ use crate::control::structuralize::StructuredCfgNode;
 
 /// Identifier for one RVSDG variable.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub(crate) struct VarId(pub(crate) usize);
+pub(super) struct VarId(pub(super) usize);
 
 /// One ordered variable in a region or structural node interface.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct RegionVar {
+pub(super) struct RegionVar {
     /// Stable identifier used by tests and translations.
     pub(crate) id: VarId,
     /// Value type carried by the variable.
@@ -24,7 +24,7 @@ pub(crate) struct RegionVar {
 }
 
 /// Converts an ordered variable list back into a [`TypeRow`].
-pub(crate) fn vars_to_row(vars: &[RegionVar]) -> TypeRow {
+pub(super) fn vars_to_row(vars: &[RegionVar]) -> TypeRow {
     vars.iter()
         .map(|var| var.ty.clone())
         .collect::<Vec<_>>()
@@ -33,14 +33,14 @@ pub(crate) fn vars_to_row(vars: &[RegionVar]) -> TypeRow {
 
 /// Root RVSDG object for one CFG.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct Rvsdg {
+pub(super) struct Rvsdg {
     /// Root region covering the whole CFG.
     pub(crate) root: Region,
 }
 
 /// One RVSDG region with explicit ordered arguments and results.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct Region {
+pub(super) struct Region {
     /// Variables visible when entering the region.
     pub(crate) arguments: Vec<RegionVar>,
     /// Ordered body nodes in the region.
@@ -51,7 +51,7 @@ pub(crate) struct Region {
 
 /// One node inside a region body.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum RvsdgNode {
+pub(super) enum RvsdgNode {
     /// Reference to one original CFG block.
     Block(BlockNode),
     /// Structured branch.
@@ -62,7 +62,7 @@ pub(crate) enum RvsdgNode {
 
 /// HUGR-facing summary of one original CFG block.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum BlockNode {
+pub(super) enum BlockNode {
     /// A dataflow basic block.
     Dataflow {
         /// CFG-node identity used by structural analysis and lowering.
@@ -89,7 +89,7 @@ pub(crate) enum BlockNode {
 
 impl BlockNode {
     /// Returns the ordered value inputs required by the block.
-    pub(crate) fn inputs(&self) -> &[RegionVar] {
+    pub(super) fn inputs(&self) -> &[RegionVar] {
         match self {
             Self::Dataflow { inputs, .. } | Self::Exit { inputs, .. } => inputs,
         }
@@ -98,7 +98,7 @@ impl BlockNode {
 
 /// How control continues after a `gamma` join.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum BranchJoinKind {
+pub(super) enum BranchJoinKind {
     /// The `gamma` lowers its join block internally.
     Inline,
     /// The enclosing region lowers the join block afterwards.
@@ -107,7 +107,7 @@ pub(crate) enum BranchJoinKind {
 
 /// Values routed into all `gamma` branches.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct GammaEntryVar {
+pub(super) struct GammaEntryVar {
     /// Shared input at the `gamma` boundary.
     pub(crate) input: RegionVar,
     /// Per-branch argument representing that shared input inside each branch.
@@ -116,7 +116,7 @@ pub(crate) struct GammaEntryVar {
 
 /// Values routed out of all `gamma` branches.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct GammaOutputVar {
+pub(super) struct GammaOutputVar {
     /// Per-branch result reaching the join point.
     pub(crate) branch_results: Vec<RegionVar>,
     /// Shared output of the `gamma`.
@@ -125,7 +125,7 @@ pub(crate) struct GammaOutputVar {
 
 /// RVSDG branch node corresponding to a structured conditional.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct GammaNode {
+pub(super) struct GammaNode {
     /// Region inputs visible at the branch boundary.
     pub(crate) inputs: Vec<RegionVar>,
     /// Split block executed before dispatching to the branches.
@@ -146,7 +146,7 @@ pub(crate) struct GammaNode {
 
 /// One visible `gamma` branch together with its match-case index.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct GammaBranch {
+pub(super) struct GammaBranch {
     /// Successor case index selected by the split block.
     pub(crate) case: usize,
     /// Region lowered for that visible successor.
@@ -155,7 +155,7 @@ pub(crate) struct GammaBranch {
 
 /// Loop families currently supported by the RVSDG builder.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum LoopKind {
+pub(super) enum LoopKind {
     /// The loop break and backedge come from the same latch block.
     TailControlled,
     /// The header tests whether zero iterations are taken.
@@ -164,7 +164,7 @@ pub(crate) enum LoopKind {
 
 /// One loop-carried variable in a `theta` node.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct ThetaLoopVar {
+pub(super) struct ThetaLoopVar {
     /// Value at loop entry.
     pub(crate) input: RegionVar,
     /// Value visible at the start of an iteration.
@@ -175,7 +175,7 @@ pub(crate) struct ThetaLoopVar {
 
 /// One loop edge classified during `theta` construction.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct ThetaEdge {
+pub(super) struct ThetaEdge {
     /// CFG block producing the control decision.
     pub(crate) source: StructuredCfgNode,
     /// Successor index chosen by that control decision.
@@ -186,7 +186,7 @@ pub(crate) struct ThetaEdge {
 
 /// One loop exit with its immediate payload and continuation region.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct ThetaExit {
+pub(super) struct ThetaExit {
     /// Break edges that select this exit variant.
     pub(crate) edges: Vec<ThetaEdge>,
     /// Immediate payload emitted when the loop exits through this variant.
@@ -197,7 +197,7 @@ pub(crate) struct ThetaExit {
 
 /// RVSDG loop node corresponding to one structured loop.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct ThetaNode {
+pub(super) struct ThetaNode {
     /// Region inputs visible at the loop boundary.
     pub(crate) inputs: Vec<RegionVar>,
     /// Region outputs visible after the loop exits.

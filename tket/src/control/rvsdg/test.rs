@@ -13,9 +13,11 @@ use crate::control::nest_cfgs::test::build_conditional_in_loop_cfg;
 
 use crate::control::structuralize::{StructuredNode, StructuredRegionBody};
 
-use super::{LoopKind, RvsdgNode, analyze_cfg, build_cfg_rvsdg};
+use super::analyze_cfg;
+use super::build_cfg_rvsdg;
+use super::ir::{GammaNode, LoopKind, RvsdgNode};
 
-fn find_gamma(nodes: &[RvsdgNode]) -> Option<&super::GammaNode> {
+fn find_gamma(nodes: &[RvsdgNode]) -> Option<&GammaNode> {
     nodes.iter().find_map(|node| match node {
         RvsdgNode::Gamma(gamma) => Some(gamma.as_ref()),
         RvsdgNode::Theta(theta) => find_gamma(&theta.body.body),

@@ -1,37 +1,18 @@
-//! Shared helpers for strategy-specific structural analyses.
+//! HUGR-facing block summaries used by the Beyond-Relooper strategy.
 //!
-//! Both the RVSDG path and the Beyond-Relooper path need the same HUGR-facing
-//! block summaries and row extraction logic before lowering can begin. Keeping
-//! those helpers here avoids duplicating the typed CFG/HUGR boundary handling.
+//! These helpers sit exactly at the boundary between CFG facts and the
+//! strategy-local AST. They are intentionally local to `control::relooper`
+//! because RVSDG no longer needs them and the shared lowering layer should not
+//! own strategy-specific block analysis.
 
 use hugr::ops::OpType;
 use hugr::types::TypeRow;
 use hugr::{HugrView, Node};
 
-use crate::control::cfg::PreprocessedNode;
-
-use super::types::{StructuralizationError, StructuredBlock, StructuredCfgNode};
-
-/// Converts one CFG graph node into the lowering identity used by structured blocks.
-pub(crate) trait IntoStructuredCfgNode {
-    /// Returns the stable CFG-node identity for this graph node.
-    fn into_structured_cfg_node(self) -> StructuredCfgNode;
-}
-
-impl IntoStructuredCfgNode for Node {
-    fn into_structured_cfg_node(self) -> StructuredCfgNode {
-        PreprocessedNode::Original(self)
-    }
-}
-
-impl IntoStructuredCfgNode for PreprocessedNode<Node> {
-    fn into_structured_cfg_node(self) -> StructuredCfgNode {
-        self
-    }
-}
+use crate::control::structuralize::{StructuralizationError, StructuredBlock, StructuredCfgNode};
 
 /// Reclassifies a CFG node as either a typed dataflow block or exit block.
-pub(crate) fn analyze_block<H: HugrView<Node = Node>>(
+pub(super) fn analyze_block<H: HugrView<Node = Node>>(
     cfg_view: &H,
     cfg_node: StructuredCfgNode,
     node: Node,
@@ -54,7 +35,7 @@ pub(crate) fn analyze_block<H: HugrView<Node = Node>>(
 }
 
 /// Returns the input row required by a CFG block or exit block.
-pub(crate) fn block_input_row<H: HugrView<Node = Node>>(
+pub(super) fn block_input_row<H: HugrView<Node = Node>>(
     cfg_view: &H,
     node: Node,
 ) -> Result<TypeRow, StructuralizationError> {
@@ -66,7 +47,7 @@ pub(crate) fn block_input_row<H: HugrView<Node = Node>>(
 }
 
 /// Returns the payload row carried along one outgoing successor edge.
-pub(crate) fn block_successor_payload<H: HugrView<Node = Node>>(
+pub(super) fn block_successor_payload<H: HugrView<Node = Node>>(
     cfg_view: &H,
     block: Node,
     case_idx: usize,
@@ -83,7 +64,7 @@ pub(crate) fn block_successor_payload<H: HugrView<Node = Node>>(
 }
 
 /// Returns the entrypoint signature input row for a CFG view.
-pub(crate) fn cfg_input_row<H: HugrView<Node = Node>>(
+pub(super) fn cfg_input_row<H: HugrView<Node = Node>>(
     cfg_view: &H,
 ) -> Result<TypeRow, StructuralizationError> {
     Ok(cfg_view
@@ -98,7 +79,7 @@ pub(crate) fn cfg_input_row<H: HugrView<Node = Node>>(
 }
 
 /// Returns the entrypoint signature output row for a CFG view.
-pub(crate) fn cfg_output_row<H: HugrView<Node = Node>>(
+pub(super) fn cfg_output_row<H: HugrView<Node = Node>>(
     cfg_view: &H,
 ) -> Result<TypeRow, StructuralizationError> {
     Ok(cfg_view

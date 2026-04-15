@@ -8,13 +8,13 @@
 use hugr::{HugrView, Node};
 
 use crate::control::structuralize::lower::{LoweredCfgTemplate, prepare_cfg_replacement};
-use crate::control::structuralize::shared::analyze_block;
 use crate::control::structuralize::{
     StructuralizationError, StructuredBlock, StructuredCaseArm, StructuredLoopEdge,
     StructuredLoopExit, StructuredNode, StructuredRegion, StructuredRegionBody,
 };
 
 use super::ast::{RelooperLabel, RelooperRegion, RelooperStmt};
+use super::block::analyze_block;
 
 /// Lowered loop-exit continuations in wrapped-block order.
 type ExitContinuations = Vec<Vec<StructuredNode>>;

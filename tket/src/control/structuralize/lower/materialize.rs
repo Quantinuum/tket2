@@ -381,9 +381,11 @@ mod test {
     use rstest::{fixture, rstest};
 
     use super::super::template::{BlockMaterialization, prepare_cfg_replacement};
-    use crate::control::structuralize::shared::analyze_block;
     use crate::control::structuralize::{
         RegionIo, StructuredNode, StructuredRegion, StructuredRegionBody,
+    };
+    use crate::control::structuralize::{
+        StructuralizationError, StructuredBlock, StructuredCfgNode,
     };
     use crate::control::{CfgNodeMap, IdentityCfgMap};
 
@@ -481,5 +483,28 @@ mod test {
         let wires = dataflow_builder.input_wires();
         let unit = dataflow_builder.load_const(pred_const);
         dataflow_builder.finish_with_outputs([unit].into_iter().chain(wires))
+    }
+
+    /// Reclassifies one CFG node for lower-level materialization tests.
+    fn analyze_block<H: HugrView<Node = hugr::Node>>(
+        cfg_view: &H,
+        cfg_node: StructuredCfgNode,
+        node: hugr::Node,
+    ) -> Result<StructuredBlock, StructuralizationError> {
+        match cfg_view.get_optype(node) {
+            hugr::ops::OpType::DataflowBlock(block) => Ok(StructuredBlock::Dataflow {
+                cfg_node,
+                node,
+                inputs: block.inputs.clone(),
+                sum_rows: block.sum_rows.clone(),
+                outputs: block.other_outputs.clone(),
+            }),
+            hugr::ops::OpType::ExitBlock(exit) => Ok(StructuredBlock::Exit {
+                cfg_node,
+                node,
+                inputs: exit.cfg_outputs.clone(),
+            }),
+            _ => Err(StructuralizationError::ExpectedDataflowBlock { node }),
+        }
     }
 }

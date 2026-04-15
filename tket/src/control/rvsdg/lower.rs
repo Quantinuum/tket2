@@ -14,9 +14,9 @@ use crate::control::structuralize::{
     StructuredRegionBody,
 };
 
-use super::{
-    BlockNode, BranchJoinKind, GammaNode, LoopKind, Region, RvsdgNode, ThetaNode, build_cfg_rvsdg,
-    vars_to_row,
+use super::build_cfg_rvsdg;
+use super::ir::{
+    BlockNode, BranchJoinKind, GammaNode, LoopKind, Region, RvsdgNode, ThetaNode, vars_to_row,
 };
 
 /// Analyzes one CFG through the RVSDG strategy and lowers it into the shared
