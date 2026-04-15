@@ -5,6 +5,7 @@ from tket.passes import (
     _badger_optimise,
     _greedy_depth_reduce,
     NormalizeGuppy,
+    SinkConditionalInputs,
     StructuralizationStrategy,
     StructuralizeCfgs,
     ModifierResolverPass,
@@ -254,3 +255,12 @@ def test_structuralize_cfgs() -> None:
 
     assert _count_ops(structured, "CFG") == 0
     assert _count_ops(structured, "Conditional") >= 1
+
+
+def test_sink_conditional_inputs() -> None:
+    hugr = _hugr_from_path("test_files/guppy_examples/shortcircuit.hugr")
+
+    sink_inputs = SinkConditionalInputs()
+    sunk = sink_inputs(hugr)
+
+    assert _count_ops(sunk, "Conditional") >= 1

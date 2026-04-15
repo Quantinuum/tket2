@@ -26,6 +26,7 @@ __all__ = [
     "PytketHugrPass",
     "PassResult",
     "NormalizeGuppy",
+    "SinkConditionalInputs",
     "StructuralizationStrategy",
     "StructuralizeCfgs",
     "ModifierResolverPass",
@@ -163,6 +164,43 @@ class StructuralizationStrategy(str, Enum):
 
     RVSDG = "rvsdg"
     RELOOPER = "relooper"
+
+
+@dataclass
+class SinkConditionalInputs(ComposablePass):
+    """Sink branch-local shared conditional inputs into individual cases.
+
+    Shared `other_inputs` of a `Conditional` that are used by at most one case
+    are moved into that case, or removed entirely when dead.
+    """
+
+    _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
+
+    def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
+        return implement_pass_run(
+            self,
+            hugr=hugr,
+            inplace=inplace,
+            copy_call=lambda h: self._sink_inputs(h, inplace),
+        )
+
+    def with_scope(self, _scope: PassScope) -> SinkConditionalInputs:
+        """Set the scope of this pass and return self."""
+        self._scope = _scope
+        return self
+
+    def _sink_inputs(self, hugr: Hugr, inplace: bool) -> PassResult:
+        tk_program = _state.CompilationState.from_python(hugr)
+
+        _passes.sink_conditional_inputs(
+            tk_program._inner,
+            scope=self._scope,
+        )
+
+        package = tk_program.to_python()
+        return PassResult.for_pass(
+            self, hugr=package.modules[0], inplace=inplace, result=None
+        )
 
 
 @dataclass

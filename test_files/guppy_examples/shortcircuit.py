@@ -10,8 +10,8 @@ from pathlib import Path
 from sys import argv
 
 from guppylang import guppy
-from guppylang.std.builtins import result
-from guppylang.std.quantum import h, measure, qubit
+from guppylang.std.builtins import array, owned, result
+from guppylang.std.quantum import cz, h, measure, qubit
 
 
 @guppy
@@ -22,7 +22,7 @@ def main() -> None:
     q = qubit()
     # Apply loops and unpack the result array
     i = 0
-    while a and b:
+    for i in range(4):
         h(q)
 
         i += 1

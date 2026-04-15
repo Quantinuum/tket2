@@ -84,6 +84,10 @@ pub use structuralize_cfgs::StructuralizeCfgsPass;
 pub mod untuple;
 pub use untuple::UntuplePass;
 
+// Sink branch-local conditional inputs into individual cases.
+pub mod sink_conditional_inputs;
+pub use sink_conditional_inputs::SinkConditionalInputsPass;
+
 #[cfg(test)]
 pub(crate) mod test_utils;
 

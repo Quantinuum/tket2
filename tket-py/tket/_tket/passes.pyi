@@ -41,6 +41,13 @@ def normalize_guppy(
     - remove_redundant_order_edges: Whether to remove redundant order edges.
     """
 
+def sink_conditional_inputs(
+    circ: CompilationState,
+    *,
+    scope: PassScope = GlobalScope.PRESERVE_PUBLIC,
+) -> None:
+    """Sink branch-local shared conditional inputs into individual cases."""
+
 def structuralize_cfgs(
     circ: CompilationState,
     *,

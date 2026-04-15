@@ -27,6 +27,7 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     m.add_function(wrap_pyfunction!(greedy_depth_reduce, &m)?)?;
     m.add_function(wrap_pyfunction!(badger_optimise, &m)?)?;
     m.add_function(wrap_pyfunction!(normalize_guppy, &m)?)?;
+    m.add_function(wrap_pyfunction!(sink_conditional_inputs, &m)?)?;
     m.add_function(wrap_pyfunction!(structuralize_cfgs, &m)?)?;
     m.add_class::<self::chunks::PyCircuitChunks>()?;
     m.add_function(wrap_pyfunction!(self::chunks::chunks, &m)?)?;
@@ -36,6 +37,10 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     m.add(
         "StructuralizeCfgsError",
         py.get_type::<PyStructuralizeCfgsError>(),
+    )?;
+    m.add(
+        "SinkConditionalInputsError",
+        py.get_type::<PySinkConditionalInputsError>(),
     )?;
     m.add("TK1PassError", py.get_type::<tket1::PytketPassError>())?;
     Ok(m)
@@ -63,6 +68,12 @@ create_py_exception!(
     tket::control::structuralize::StructuralizationError,
     PyStructuralizeCfgsError,
     "Errors from the CFG structuralization pass."
+);
+
+create_py_exception!(
+    tket::passes::sink_conditional_inputs::SinkConditionalInputsError,
+    PySinkConditionalInputsError,
+    "Errors from the conditional-input sinking pass."
 );
 
 /// Flatten the structure of a Guppy-generated program to enable additional optimisations.
@@ -102,6 +113,22 @@ fn normalize_guppy(
         .remove_redundant_order_edges(remove_redundant_order_edges)
         .squash_borrows(squash_borrows);
 
+    pass.run(&mut circ.hugr).convert_pyerrs()?;
+    Ok(())
+}
+
+/// Sink branch-local shared conditional inputs into the case that uses them.
+///
+/// Shared `other_inputs` to a conditional that are used by at most one case
+/// are rebuilt inside that case, or removed entirely if they are unused.
+#[pyfunction]
+#[pyo3(signature = (circ, *, scope = None))]
+fn sink_conditional_inputs(
+    circ: &mut CompilationState,
+    scope: Option<PyPassScope>,
+) -> PyResult<()> {
+    let py_scope = scope.unwrap_or_default();
+    let pass = tket::passes::SinkConditionalInputsPass::default_with_scope(py_scope.scope);
     pass.run(&mut circ.hugr).convert_pyerrs()?;
     Ok(())
 }
