@@ -5,19 +5,24 @@
 //! loop-exit continuations and selectors are recovered from the AST-wrapped
 //! labelled blocks rather than from a side table external to the AST.
 
+use hugr::types::TypeRow;
 use hugr::{HugrView, Node};
 
 use crate::control::structuralize::lower::{LoweredCfgTemplate, prepare_cfg_replacement};
 use crate::control::structuralize::{
-    StructuralizationError, StructuredBlock, StructuredCaseArm, StructuredLoopEdge,
-    StructuredLoopExit, StructuredNode, StructuredRegion, StructuredRegionBody,
+    MultilevelExitDispatch, MultilevelExitVariant, RegionIo, StructuralizationError,
+    StructuredBlock, StructuredBranchTargetKind, StructuredCaseArm, StructuredCfgNode,
+    StructuredExitEffect, StructuredLoopEdge, StructuredLoopExit, StructuredNode, StructuredRegion,
+    StructuredRegionBody,
 };
 
-use super::ast::{RelooperLabel, RelooperRegion, RelooperStmt};
+use super::ast::{
+    RelooperBranch, RelooperBranchTarget, RelooperLabel, RelooperRegion, RelooperStmt,
+};
 use super::block::analyze_block_with_linear_successor;
 
 /// Lowered loop-exit continuations in wrapped-block order.
-type ExitContinuations = Vec<Vec<StructuredNode>>;
+type ExitContinuations = Vec<LoweredSequence>;
 /// Raw AST loop-exit continuations in wrapped-block order.
 type RawExitContinuations<'a> = Vec<(Vec<StructuredLoopEdge>, &'a [RelooperStmt])>;
 
@@ -25,7 +30,7 @@ type RawExitContinuations<'a> = Vec<(Vec<StructuredLoopEdge>, &'a [RelooperStmt]
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum LoweredExit {
     /// Branch to an enclosing labelled construct.
-    Branch(RelooperLabel),
+    Branch(RelooperBranch),
     /// Return from the enclosing region with the given payload row.
     Return(hugr::types::TypeRow),
 }
@@ -37,6 +42,30 @@ struct LoweredSequence {
     nodes: Vec<StructuredNode>,
     /// Explicit exit that still needs to be interpreted by an enclosing scope.
     exit: Option<LoweredExit>,
+}
+
+impl LoweredSequence {
+    /// Returns one empty closed sequence, used when an exit has no continuation.
+    fn closed_empty() -> Self {
+        Self {
+            nodes: Vec::new(),
+            exit: None,
+        }
+    }
+}
+
+/// Returns the output row produced by a lowered straight-line sequence.
+fn lowered_sequence_output_row(items: &[StructuredNode]) -> hugr::types::TypeRow {
+    match items.last() {
+        Some(StructuredNode::Block(block)) => match block {
+            StructuredBlock::Dataflow { outputs, .. }
+            | StructuredBlock::Exit {
+                inputs: outputs, ..
+            } => outputs.clone(),
+        },
+        Some(StructuredNode::Region(region)) => region.io.outputs.clone(),
+        None => hugr::types::TypeRow::default(),
+    }
 }
 
 /// Builds one detached rewrite template from a Beyond-Relooper AST.
@@ -60,6 +89,7 @@ pub(super) fn lower_region<H: HugrView<Node = Node>>(
 ) -> Result<StructuredRegion, StructuralizationError> {
     Ok(StructuredRegion {
         io: region.io.clone(),
+        multilevel_exit_dispatch: None,
         body: lower_stmt_as_body(cfg_view, &region.body)?,
     })
 }
@@ -90,7 +120,7 @@ fn lower_stmt_as_body<H: HugrView<Node = Node>>(
                             body: lower_stmt_as_sequence_in_context(
                                 cfg_view,
                                 &arm.body,
-                                Some(*label),
+                                Some(RelooperBranchTarget::BlockFollowedBy(*label)),
                             )?
                             .nodes,
                         })
@@ -101,7 +131,11 @@ fn lower_stmt_as_body<H: HugrView<Node = Node>>(
             },
             _ => {
                 return Ok(StructuredRegionBody::Sequence(require_closed_sequence(
-                    lower_stmt_as_sequence_in_context(cfg_view, body, Some(*label))?,
+                    lower_stmt_as_sequence_in_context(
+                        cfg_view,
+                        body,
+                        Some(RelooperBranchTarget::BlockFollowedBy(*label)),
+                    )?,
                     "labelled block body",
                 )?));
             }
@@ -130,11 +164,30 @@ fn lower_stmt_as_body<H: HugrView<Node = Node>>(
 fn lower_stmt_as_sequence_in_context<H: HugrView<Node = Node>>(
     cfg_view: &H,
     stmt: &RelooperStmt,
-    terminal_label: Option<RelooperLabel>,
+    terminal_target: Option<RelooperBranchTarget>,
 ) -> Result<LoweredSequence, StructuralizationError> {
+    if let RelooperStmt::Seq(items) = stmt
+        && let Some((region, raw_continuations)) = extract_wrapped_loop_region(items)
+    {
+        return Ok(LoweredSequence {
+            nodes: vec![StructuredNode::Region(Box::new(lower_wrapped_loop_region(
+                cfg_view,
+                region,
+                &raw_continuations,
+                terminal_target,
+            )?))],
+            exit: None,
+        });
+    }
     let mut lowered = lower_stmt_as_sequence(cfg_view, stmt)?;
-    match (&terminal_label, &lowered.exit) {
-        (Some(label), Some(LoweredExit::Branch(target))) if target == label => {
+    match (&terminal_target, &lowered.exit) {
+        (
+            Some(target),
+            Some(LoweredExit::Branch(RelooperBranch {
+                target: exit_target,
+                ..
+            })),
+        ) if exit_target == target => {
             lowered.exit = None;
         }
         (None, Some(LoweredExit::Return(_))) => {
@@ -167,16 +220,6 @@ fn lower_stmt_as_sequence<H: HugrView<Node = Node>>(
 ) -> Result<LoweredSequence, StructuralizationError> {
     match stmt {
         RelooperStmt::Seq(items) => {
-            if let Some((region, raw_continuations)) = extract_wrapped_loop_region(items) {
-                return Ok(LoweredSequence {
-                    nodes: vec![StructuredNode::Region(Box::new(lower_wrapped_loop_region(
-                        cfg_view,
-                        region,
-                        &raw_continuations,
-                    )?))],
-                    exit: None,
-                });
-            }
             let mut lowered = Vec::new();
             for (idx, item) in items.iter().enumerate() {
                 let item = lower_stmt_as_sequence(cfg_view, item)?;
@@ -208,17 +251,19 @@ fn lower_stmt_as_sequence<H: HugrView<Node = Node>>(
             nodes: vec![StructuredNode::Block(block.clone())],
             exit: None,
         }),
-        RelooperStmt::Block { label, body, .. } => {
-            lower_stmt_as_sequence_in_context(cfg_view, body, Some(*label))
-        }
+        RelooperStmt::Block { label, body, .. } => lower_stmt_as_sequence_in_context(
+            cfg_view,
+            body,
+            Some(RelooperBranchTarget::BlockFollowedBy(*label)),
+        ),
         RelooperStmt::Case { .. } | RelooperStmt::Loop { .. } => {
             Err(StructuralizationError::Relooper {
                 reason: "nested control statements must be wrapped in an analyzed region".into(),
             })
         }
-        RelooperStmt::Br(label) => Ok(LoweredSequence {
+        RelooperStmt::Br(branch) => Ok(LoweredSequence {
             nodes: Vec::new(),
-            exit: Some(LoweredExit::Branch(*label)),
+            exit: Some(LoweredExit::Branch(branch.clone())),
         }),
         RelooperStmt::Return(payload) => Ok(LoweredSequence {
             nodes: Vec::new(),
@@ -234,13 +279,17 @@ fn lower_loop_body<H: HugrView<Node = Node>>(
     lowering: &super::ast::RelooperLoopLowering,
     body: &RelooperStmt,
     exit_edges: &[Vec<StructuredLoopEdge>],
-    exit_continuations: &[Vec<StructuredNode>],
+    exit_continuations: &[LoweredSequence],
 ) -> Result<StructuredRegionBody, StructuralizationError> {
     Ok(StructuredRegionBody::Loop {
         kind: lowering.kind,
         header: lowering.header.clone(),
         body: require_closed_sequence(
-            lower_stmt_as_sequence_in_context(cfg_view, body, Some(*label))?,
+            lower_stmt_as_sequence_in_context(
+                cfg_view,
+                body,
+                Some(RelooperBranchTarget::LoopHeadedBy(*label)),
+            )?,
             "loop body",
         )?,
         backedge_sources: lowering.backedge_sources.clone(),
@@ -252,7 +301,7 @@ fn lower_loop_body<H: HugrView<Node = Node>>(
                 exit_continuations
                     .iter()
                     .cloned()
-                    .chain(std::iter::repeat_with(Vec::new)),
+                    .chain(std::iter::repeat_with(LoweredSequence::closed_empty)),
             )
             .map(|(edges, continuation)| lower_exit(edges, continuation))
             .collect::<Result<Vec<_>, _>>()?,
@@ -265,10 +314,11 @@ fn lower_wrapped_loop_region<H: HugrView<Node = Node>>(
     cfg_view: &H,
     region: &RelooperRegion,
     raw_continuations: &RawExitContinuations<'_>,
+    terminal_target: Option<RelooperBranchTarget>,
 ) -> Result<StructuredRegion, StructuralizationError> {
     let exit_continuations = raw_continuations
         .iter()
-        .map(|(_, items)| lower_exit_sequence(cfg_view, items))
+        .map(|(_, items)| lower_exit_sequence(cfg_view, items, terminal_target))
         .collect::<Result<ExitContinuations, StructuralizationError>>()?;
     let exit_edges = raw_continuations
         .iter()
@@ -284,16 +334,27 @@ fn lower_wrapped_loop_region<H: HugrView<Node = Node>>(
             reason: "wrapped loop extraction did not produce a loop region".into(),
         });
     };
+    let loop_body = lower_loop_body(
+        cfg_view,
+        label,
+        lowering,
+        body,
+        &exit_edges,
+        &exit_continuations,
+    )?;
+    let multilevel_exit_dispatch = compute_multilevel_dispatch(&loop_body);
+    let io = if multilevel_exit_dispatch.is_some() {
+        RegionIo {
+            inputs: region.io.inputs.clone(),
+            outputs: compute_multilevel_sum_outputs(&loop_body),
+        }
+    } else {
+        region.io.clone()
+    };
     Ok(StructuredRegion {
-        io: region.io.clone(),
-        body: lower_loop_body(
-            cfg_view,
-            label,
-            lowering,
-            body,
-            &exit_edges,
-            &exit_continuations,
-        )?,
+        io,
+        multilevel_exit_dispatch,
+        body: loop_body,
     })
 }
 
@@ -337,8 +398,16 @@ fn extract_wrapped_loop_region(
 fn lower_exit_sequence<H: HugrView<Node = Node>>(
     cfg_view: &H,
     items: &[RelooperStmt],
-) -> Result<Vec<StructuredNode>, StructuralizationError> {
-    Ok(lower_stmt_as_sequence(cfg_view, &RelooperStmt::Seq(items.to_vec()))?.nodes)
+    terminal_target: Option<RelooperBranchTarget>,
+) -> Result<LoweredSequence, StructuralizationError> {
+    match terminal_target {
+        Some(target) => lower_stmt_as_sequence_in_context(
+            cfg_view,
+            &RelooperStmt::Seq(items.to_vec()),
+            Some(target),
+        ),
+        None => lower_stmt_as_sequence(cfg_view, &RelooperStmt::Seq(items.to_vec())),
+    }
 }
 
 /// Ensures a lowered sequence has no remaining explicit exit.
@@ -383,13 +452,56 @@ fn lower_stmt<H: HugrView<Node = Node>>(
 /// Lowers one Beyond-Relooper loop exit into the shared structural form.
 fn lower_exit(
     edges: Vec<StructuredLoopEdge>,
-    continuation: Vec<StructuredNode>,
+    continuation: LoweredSequence,
 ) -> Result<StructuredLoopExit, StructuralizationError> {
+    let outputs = exit_output_row(&edges)?;
+    let continuation_outputs = if continuation.nodes.is_empty() {
+        outputs.clone()
+    } else {
+        lowered_sequence_output_row(&continuation.nodes)
+    };
+    let effect = match continuation.exit {
+        None => StructuredExitEffect::Local(continuation_outputs.clone()),
+        Some(LoweredExit::Return(outputs)) => StructuredExitEffect::Return(outputs),
+        Some(LoweredExit::Branch(branch)) => StructuredExitEffect::Branch {
+            kind: lower_branch_target_kind(branch.target),
+            target: lower_branch_target_label(branch.target),
+            outputs: branch.outputs,
+        },
+    };
     Ok(StructuredLoopExit {
-        outputs: exit_output_row(&edges)?,
+        outputs,
         edges,
-        continuation,
+        continuation: continuation.nodes,
+        continuation_outputs,
+        effect,
     })
+}
+
+/// Converts one Beyond-Relooper label into the shared CFG-backed label shape.
+fn lower_label(label: RelooperLabel) -> StructuredCfgNode {
+    match label {
+        RelooperLabel::Original(node) => StructuredCfgNode::Original(node),
+        RelooperLabel::Duplicate { original, clone_id } => {
+            StructuredCfgNode::Duplicate { original, clone_id }
+        }
+    }
+}
+
+/// Returns the shared target kind for one propagated branch.
+fn lower_branch_target_kind(target: RelooperBranchTarget) -> StructuredBranchTargetKind {
+    match target {
+        RelooperBranchTarget::BlockFollowedBy(_) => StructuredBranchTargetKind::BlockFollowedBy,
+        RelooperBranchTarget::LoopHeadedBy(_) => StructuredBranchTargetKind::LoopHeadedBy,
+    }
+}
+
+/// Returns the shared CFG-backed label for one propagated branch.
+fn lower_branch_target_label(target: RelooperBranchTarget) -> StructuredCfgNode {
+    match target {
+        RelooperBranchTarget::BlockFollowedBy(label)
+        | RelooperBranchTarget::LoopHeadedBy(label) => lower_label(label),
+    }
 }
 
 /// Returns the immediate `TailLoop` break row for one analyzed exit set.
@@ -442,4 +554,90 @@ fn label_target_block<H: HugrView<Node = Node>>(
         .as_dataflow_block()
         .and_then(|block| (block.sum_rows.len() == 1).then_some(0));
     analyze_block_with_linear_successor(cfg_view, cfg_node, node, linear_successor)
+}
+
+/// Detects whether a loop body has heterogeneous exit effects requiring
+/// multilevel dispatch in the enclosing loop.
+fn compute_multilevel_dispatch(body: &StructuredRegionBody) -> Option<MultilevelExitDispatch> {
+    let StructuredRegionBody::Loop { exits, .. } = body else {
+        return None;
+    };
+    if exits.len() <= 1 {
+        return None;
+    }
+    // Multilevel dispatch is needed when exits produce different
+    // continuation output rows.  If all exits produce the same row,
+    // the homogeneous path in lower_loop_exits handles them directly.
+    let first_row = &exits[0].continuation_outputs;
+    let heterogeneous = exits.iter().any(|e| e.continuation_outputs != *first_row);
+    if !heterogeneous {
+        return None;
+    }
+    Some(MultilevelExitDispatch {
+        variants: exits
+            .iter()
+            .map(|exit| MultilevelExitVariant {
+                effect: exit.effect.clone(),
+                continuation_outputs: exit.continuation_outputs.clone(),
+                edges: exit.edges.clone(),
+            })
+            .collect(),
+    })
+}
+
+/// Computes the Sum output row for a loop with multilevel exit dispatch.
+fn compute_multilevel_sum_outputs(body: &StructuredRegionBody) -> TypeRow {
+    let StructuredRegionBody::Loop { exits, .. } = body else {
+        return TypeRow::default();
+    };
+    let variant_rows: Vec<TypeRow> = exits
+        .iter()
+        .map(|exit| exit.continuation_outputs.clone())
+        .collect();
+    vec![hugr::types::Type::new_sum(variant_rows)].into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use hugr::types::Type;
+    use portgraph::NodeIndex;
+    use rstest::rstest;
+
+    /// Loop exits targeting outer labels must preserve that target so later
+    /// lowering can distinguish different non-local exits semantically.
+    #[rstest]
+    fn lower_exit_preserves_branch_target() {
+        let target = RelooperBranchTarget::LoopHeadedBy(RelooperLabel::Duplicate {
+            original: Node::from(NodeIndex::new(7)),
+            clone_id: 3,
+        });
+        let lowered = lower_exit(
+            vec![StructuredLoopEdge {
+                source: StructuredCfgNode::Original(Node::from(NodeIndex::new(1))),
+                case: 0,
+                payload: [Type::UNIT].into(),
+            }],
+            LoweredSequence {
+                nodes: Vec::new(),
+                exit: Some(LoweredExit::Branch(RelooperBranch {
+                    target,
+                    outputs: [Type::UNIT].into(),
+                })),
+            },
+        )
+        .unwrap();
+
+        assert_eq!(
+            lowered.effect,
+            StructuredExitEffect::Branch {
+                kind: StructuredBranchTargetKind::LoopHeadedBy,
+                target: StructuredCfgNode::Duplicate {
+                    original: Node::from(NodeIndex::new(7)),
+                    clone_id: 3,
+                },
+                outputs: [Type::UNIT].into(),
+            }
+        );
+    }
 }

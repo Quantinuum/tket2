@@ -1,7 +1,7 @@
 //! Context-sensitive exit helpers for the Beyond-Relooper constructor.
 
 use crate::control::relooper::ast::{
-    RelooperContext, RelooperContextFrame, RelooperLabel, RelooperStmt,
+    RelooperBranch, RelooperBranchTarget, RelooperContext, RelooperContextFrame, RelooperStmt,
 };
 
 /// Returns a new context with one innermost frame pushed on the front.
@@ -15,24 +15,34 @@ pub(super) fn push_context(
     nested
 }
 
-/// Returns the innermost enclosing block-followed-by label, if any.
-fn context_follow_label(context: &RelooperContext) -> Option<RelooperLabel> {
+/// Returns the innermost enclosing structured target that should consume one
+/// propagated branch.
+pub(super) fn context_branch_target(context: &RelooperContext) -> Option<RelooperBranchTarget> {
     context.iter().find_map(|frame| match frame {
-        RelooperContextFrame::BlockFollowedBy(label) => Some(*label),
+        RelooperContextFrame::BlockFollowedBy(label) => {
+            Some(RelooperBranchTarget::BlockFollowedBy(*label))
+        }
+        RelooperContextFrame::LoopHeadedBy(label) => {
+            Some(RelooperBranchTarget::LoopHeadedBy(*label))
+        }
         _ => None,
     })
 }
 
-/// Appends an explicit branch to the target label unless the sequence already terminates.
-pub(super) fn append_branch_to_label(
+/// Appends an explicit branch to the target unless the sequence already
+/// terminates.
+pub(super) fn append_branch_to_target(
     items: &mut Vec<RelooperStmt>,
-    target: RelooperLabel,
-    _payload: hugr::types::TypeRow,
+    target: RelooperBranchTarget,
+    payload: hugr::types::TypeRow,
 ) {
     if items.last().is_some_and(is_terminal_stmt) {
         return;
     }
-    items.push(RelooperStmt::Br(target));
+    items.push(RelooperStmt::Br(RelooperBranch {
+        target,
+        outputs: payload,
+    }));
 }
 
 /// Appends the explicit exit selected by the active Beyond-Relooper context.
@@ -44,8 +54,8 @@ pub(super) fn append_exit_from_context(
     if items.last().is_some_and(is_terminal_stmt) {
         return;
     }
-    match context_follow_label(context) {
-        Some(label) => append_branch_to_label(items, label, payload),
+    match context_branch_target(context) {
+        Some(target) => append_branch_to_target(items, target, payload),
         None => items.push(RelooperStmt::Return(payload)),
     }
 }

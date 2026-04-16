@@ -19,9 +19,10 @@ pub(crate) use lower::structurize_cfg;
 #[cfg(test)]
 pub(crate) use types::StructuralizationAnalysisReport;
 pub(crate) use types::{
-    IntoStructuredCfgNode, RegionIo, StructuredBlock, StructuredBranchJoinKind, StructuredCaseArm,
-    StructuredCfgNode, StructuredLoopEdge, StructuredLoopExit, StructuredLoopKind, StructuredNode,
-    StructuredRegion, StructuredRegionBody,
+    IntoStructuredCfgNode, MultilevelExitDispatch, MultilevelExitVariant, RegionIo,
+    StructuredBlock, StructuredBranchJoinKind, StructuredBranchTargetKind, StructuredCaseArm,
+    StructuredCfgNode, StructuredExitEffect, StructuredLoopEdge, StructuredLoopExit,
+    StructuredLoopKind, StructuredNode, StructuredRegion, StructuredRegionBody,
 };
 pub use types::{
     StructuralizationError, StructuralizationRewriteReport, StructuralizationStrategy,

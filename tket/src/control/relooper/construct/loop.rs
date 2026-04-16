@@ -9,11 +9,13 @@ use itertools::Itertools;
 use crate::control::CfgBlockMap;
 use crate::control::cfg::CfgFacts;
 use crate::control::relooper::ast::{
-    RelooperBlockLowering, RelooperContextFrame, RelooperLoopLowering, RelooperRegion, RelooperStmt,
+    RelooperBlockLowering, RelooperBranchTarget, RelooperContextFrame, RelooperLoopLowering,
+    RelooperRegion, RelooperStmt,
 };
 use crate::control::relooper::block::{block_input_row, block_successor_payload, cfg_output_row};
 use crate::control::relooper::construct::context::{
-    append_branch_to_label, append_exit_from_context, push_context,
+    append_branch_to_target, append_exit_from_context, context_branch_target, is_terminal_stmt,
+    push_context,
 };
 use crate::control::structuralize::IntoStructuredCfgNode;
 use crate::control::structuralize::{
@@ -145,11 +147,22 @@ where
                                 context: frame.context,
                             },
                         )?;
-                        append_exit_from_context(
-                            &mut continuation,
-                            frame.context,
-                            io.outputs.clone(),
-                        );
+                        // If the target is outside the enclosing scope, this
+                        // exit leaves all enclosing loops entirely rather than
+                        // branching back to the nearest one.
+                        if frame.scope.contains(target) {
+                            let exit_payload = context_branch_target(frame.context)
+                                .map(|target| branch_target_payload_row(cfg_view, target))
+                                .transpose()?
+                                .unwrap_or_else(|| io.outputs.clone());
+                            append_exit_from_context(
+                                &mut continuation,
+                                frame.context,
+                                exit_payload,
+                            );
+                        } else if !continuation.last().is_some_and(is_terminal_stmt) {
+                            continuation.push(RelooperStmt::Return(io.outputs.clone()));
+                        }
                         Ok(continuation)
                     } else {
                         Ok(Vec::new())
@@ -180,7 +193,11 @@ where
                 },
             )?;
             let mut body = body;
-            append_branch_to_label(&mut body, loop_label, continue_payload.clone());
+            append_branch_to_target(
+                &mut body,
+                RelooperBranchTarget::LoopHeadedBy(loop_label),
+                continue_payload.clone(),
+            );
             (
                 wrap_loop_exits(
                     &io,
@@ -257,11 +274,19 @@ where
                                 context: frame.context,
                             },
                         )?;
-                        append_exit_from_context(
-                            &mut continuation,
-                            frame.context,
-                            io.outputs.clone(),
-                        );
+                        if frame.scope.contains(target) {
+                            let exit_payload = context_branch_target(frame.context)
+                                .map(|target| branch_target_payload_row(cfg_view, target))
+                                .transpose()?
+                                .unwrap_or_else(|| io.outputs.clone());
+                            append_exit_from_context(
+                                &mut continuation,
+                                frame.context,
+                                exit_payload,
+                            );
+                        } else if !continuation.last().is_some_and(is_terminal_stmt) {
+                            continuation.push(RelooperStmt::Return(io.outputs.clone()));
+                        }
                         Ok(continuation)
                     } else {
                         Ok(Vec::new())
@@ -291,7 +316,11 @@ where
                     context: &loop_context,
                 },
             )?;
-            append_branch_to_label(&mut body, loop_label, continue_payload.clone());
+            append_branch_to_target(
+                &mut body,
+                RelooperBranchTarget::LoopHeadedBy(loop_label),
+                continue_payload.clone(),
+            );
             (
                 wrap_loop_exits(
                     &io,
@@ -322,6 +351,22 @@ where
 
         Ok((RelooperRegion { io, body }, next))
     }
+}
+
+/// Returns the input row expected by one explicit branch target in the
+/// enclosing Beyond-Relooper context.
+fn branch_target_payload_row<H: HugrView<Node = Node>>(
+    cfg_view: &H,
+    target: RelooperBranchTarget,
+) -> Result<hugr::types::TypeRow, StructuralizationError> {
+    let node = match target {
+        RelooperBranchTarget::BlockFollowedBy(label)
+        | RelooperBranchTarget::LoopHeadedBy(label) => match label {
+            super::super::ast::RelooperLabel::Original(node)
+            | super::super::ast::RelooperLabel::Duplicate { original: node, .. } => node,
+        },
+    };
+    block_input_row(cfg_view, node)
 }
 
 /// Wraps a loop in labelled blocks that encode multi-exit continuations.

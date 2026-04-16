@@ -7,12 +7,13 @@ use hugr::{HugrView, Node};
 
 use crate::control::CfgBlockMap;
 use crate::control::cfg::CfgFacts;
-use crate::control::relooper::construct::context::{append_branch_to_label, push_context};
+use crate::control::relooper::construct::context::{append_branch_to_target, push_context};
 use crate::control::structuralize::{StructuralizationError, StructuredBranchJoinKind};
 
 use super::{IntoRelooperLabel, ScopeFrame, analyze_block, analyze_block_with_linear_successor};
 use crate::control::relooper::ast::{
-    RelooperBlockLowering, RelooperCaseArm, RelooperContextFrame, RelooperRegion, RelooperStmt,
+    RelooperBlockLowering, RelooperBranchTarget, RelooperCaseArm, RelooperContextFrame,
+    RelooperRegion, RelooperStmt,
 };
 use crate::control::structuralize::IntoStructuredCfgNode;
 use crate::control::structuralize::RegionIo;
@@ -71,9 +72,9 @@ where
                         context: &arm_context,
                     },
                 )?;
-                append_branch_to_label(
+                append_branch_to_target(
                     &mut arm,
-                    join_node.into_relooper_label(),
+                    RelooperBranchTarget::BlockFollowedBy(join_node.into_relooper_label()),
                     join.inputs().clone(),
                 );
                 Ok::<RelooperCaseArm, StructuralizationError>(RelooperCaseArm {

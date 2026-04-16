@@ -57,6 +57,27 @@ pub(crate) enum RelooperContextFrame {
     BlockFollowedBy(RelooperLabel),
 }
 
+/// One explicit labelled branch target in the Beyond-Relooper AST.
+///
+/// Preserving whether a branch targets an enclosing block continuation or an
+/// enclosing loop header is important for later multilevel-exit lowering.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum RelooperBranchTarget {
+    /// Branch to the continuation after one enclosing labelled block.
+    BlockFollowedBy(RelooperLabel),
+    /// Branch to one enclosing loop header.
+    LoopHeadedBy(RelooperLabel),
+}
+
+/// One explicit non-local branch in the Beyond-Relooper AST.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct RelooperBranch {
+    /// Enclosing target that should consume the branch.
+    pub(crate) target: RelooperBranchTarget,
+    /// Ordered payload row carried to that enclosing target.
+    pub(crate) outputs: TypeRow,
+}
+
 /// Ordered stack of enclosing structured constructs.
 pub(crate) type RelooperContext = Vec<RelooperContextFrame>;
 
@@ -139,8 +160,8 @@ pub(super) enum RelooperStmt {
         /// One logical iteration of the loop body.
         body: Box<RelooperStmt>,
     },
-    /// A branch to an enclosing labelled construct.
-    Br(RelooperLabel),
+    /// A branch to one enclosing structured construct.
+    Br(RelooperBranch),
     /// Return from the enclosing region with the given payload row.
     Return(TypeRow),
 }

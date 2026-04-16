@@ -210,10 +210,10 @@ pub(super) struct ThetaNode {
     pub(crate) header: BlockNode,
     /// Region representing one logical iteration of the loop body.
     pub(crate) body: Region,
-    /// CFG block whose successor returns control to the header.
-    pub(crate) backedge_source: Node,
-    /// Continue edge routed back to the loop header.
-    pub(crate) continue_edge: ThetaEdge,
+    /// CFG blocks whose successors return control to the header.
+    pub(crate) backedge_sources: Vec<Node>,
+    /// Continue edges routed back to the loop header.
+    pub(crate) continue_edges: Vec<ThetaEdge>,
     /// Distinct exits routed out of the loop to the enclosing continuation.
     pub(crate) exits: Vec<ThetaExit>,
     /// Explicit loop-carried variables.

@@ -47,7 +47,7 @@ pub use inline_dfgs::InlineDFGsPass;
 
 // Inline function calls.
 pub mod inline_funcs;
-pub use inline_funcs::inline_acyclic;
+pub use inline_funcs::{InlineFunctionsPass, inline_acyclic};
 
 // Lower and replace operations.
 pub mod lower;

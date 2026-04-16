@@ -15,7 +15,10 @@ use crate::control::structuralize::{
     StructuredRegionBody,
 };
 
-use super::ast::{RelooperBlockLowering, RelooperLabel, RelooperRegion, RelooperStmt};
+use super::ast::{
+    RelooperBlockLowering, RelooperBranch, RelooperBranchTarget, RelooperLabel, RelooperRegion,
+    RelooperStmt,
+};
 use super::construct::build_cfg_program;
 use super::lower::lower_region;
 
@@ -221,7 +224,10 @@ fn lowering_rejects_top_level_br(combined_headers: hugr::Hugr) {
             inputs: [].into(),
             outputs: [].into(),
         },
-        body: RelooperStmt::Br(RelooperLabel::Original(cfg_node)),
+        body: RelooperStmt::Br(RelooperBranch {
+            target: RelooperBranchTarget::BlockFollowedBy(RelooperLabel::Original(cfg_node)),
+            outputs: [].into(),
+        }),
     };
 
     let err = lower_region(&cfg_view, &region).unwrap_err();
@@ -254,9 +260,10 @@ fn lowering_rejects_nonlocal_br_inside_block(combined_headers: hugr::Hugr) {
                 join_kind: StructuredBranchJoinKind::Deferred,
                 loop_exit_edges: Vec::new(),
             },
-            body: Box::new(RelooperStmt::Seq(vec![RelooperStmt::Br(
-                RelooperLabel::Original(other_label),
-            )])),
+            body: Box::new(RelooperStmt::Seq(vec![RelooperStmt::Br(RelooperBranch {
+                target: RelooperBranchTarget::BlockFollowedBy(RelooperLabel::Original(other_label)),
+                outputs: [].into(),
+            })])),
         },
     };
 
@@ -297,9 +304,12 @@ fn lowering_propagates_br_to_enclosing_block(combined_headers: hugr::Hugr) {
                     join_kind: StructuredBranchJoinKind::Deferred,
                     loop_exit_edges: Vec::new(),
                 },
-                body: Box::new(RelooperStmt::Seq(vec![RelooperStmt::Br(
-                    RelooperLabel::Original(cfg_node),
-                )])),
+                body: Box::new(RelooperStmt::Seq(vec![RelooperStmt::Br(RelooperBranch {
+                    target: RelooperBranchTarget::BlockFollowedBy(RelooperLabel::Original(
+                        cfg_node,
+                    )),
+                    outputs: [].into(),
+                })])),
             }])),
         },
     };
@@ -409,7 +419,11 @@ fn contains_original_label(stmt: &RelooperStmt) -> bool {
         RelooperStmt::Loop { label, body, .. } => {
             matches!(label, RelooperLabel::Original(_)) || contains_original_label(body)
         }
-        RelooperStmt::Br(label) => matches!(label, RelooperLabel::Original(_)),
+        RelooperStmt::Br(branch) => matches!(
+            branch.target,
+            RelooperBranchTarget::BlockFollowedBy(RelooperLabel::Original(_))
+                | RelooperBranchTarget::LoopHeadedBy(RelooperLabel::Original(_))
+        ),
         RelooperStmt::Return(_) => false,
     }
 }

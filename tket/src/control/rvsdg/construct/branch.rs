@@ -142,12 +142,19 @@ pub(super) fn branch_arguments(
 }
 
 /// Classifies how control should continue after a branch join.
+///
+/// A join at the active loop header terminates the current logical iteration
+/// of the `theta` body, so the surrounding loop lowering consumes that join as
+/// a continue rather than re-entering the header inside the body sequence.
 pub(super) fn branch_continuation<T: HugrNode>(
     info: &CfgFacts<T>,
     node: T,
     scope: &BTreeSet<T>,
     active_loop: Option<T>,
 ) -> (BranchJoinKind, Option<T>) {
+    if active_loop == Some(node) {
+        return (BranchJoinKind::Deferred, None);
+    }
     let successors = info.scope_successors(node, scope, active_loop);
     match successors.as_slice() {
         [] => (BranchJoinKind::Inline, None),

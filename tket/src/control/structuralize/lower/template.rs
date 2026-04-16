@@ -19,9 +19,9 @@ use itertools::Itertools;
 use std::collections::BTreeSet;
 
 use super::super::types::{
-    StructuralizationError, StructuredBlock, StructuredBranchJoinKind, StructuredCfgNode,
-    StructuredLoopEdge, StructuredLoopExit, StructuredLoopKind, StructuredNode, StructuredRegion,
-    StructuredRegionBody, structured_node_contains_block,
+    MultilevelExitDispatch, StructuralizationError, StructuredBlock, StructuredBranchJoinKind,
+    StructuredCfgNode, StructuredLoopEdge, StructuredLoopExit, StructuredLoopKind, StructuredNode,
+    StructuredRegion, StructuredRegionBody, structured_node_contains_block,
 };
 
 /// Detached replacement template for one CFG rewrite.
@@ -67,8 +67,6 @@ struct LoopLowering<'a> {
     header: &'a StructuredBlock,
     /// One-iteration body items.
     body: &'a [StructuredNode],
-    /// CFG blocks that return control to the header.
-    backedge_sources: &'a [Node],
     /// Continue edges routed back to the loop header.
     continue_edges: &'a [StructuredLoopEdge],
     /// Distinct exits routed out of the loop.
@@ -336,19 +334,13 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
                 kind,
                 header,
                 body,
-                backedge_sources,
+                backedge_sources: _,
                 continue_edges,
                 exits,
                 break_outputs,
             } => {
-                let loop_lowering = LoopLowering::new(
-                    header,
-                    body,
-                    backedge_sources,
-                    continue_edges,
-                    exits,
-                    break_outputs,
-                );
+                let loop_lowering =
+                    LoopLowering::new(header, body, continue_edges, exits, break_outputs);
                 match kind {
                     StructuredLoopKind::TailControlled => {
                         self.lower_tail_controlled_loop(builder, loop_lowering, current)

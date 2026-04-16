@@ -83,13 +83,13 @@ fn lowers_multi_continue_header_loop(
 }
 
 #[rstest]
+#[case::rvsdg(StructuralizationStrategy::Rvsdg)]
+#[case::relooper(StructuralizationStrategy::Relooper)]
 fn lowers_non_unique_backedge_loop(
+    #[case] strategy: StructuralizationStrategy,
     #[from(build_non_unique_backedge_loop_cfg)] mut non_unique_backedge_loop: Hugr,
 ) {
-    let report = structurize_report(
-        &mut non_unique_backedge_loop,
-        StructuralizationStrategy::Relooper,
-    );
+    let report = structurize_report(&mut non_unique_backedge_loop, strategy);
     assert_eq!(report.rewrites.len(), 1);
     assert_eq!(
         non_unique_backedge_loop

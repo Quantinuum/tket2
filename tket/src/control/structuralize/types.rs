@@ -135,6 +135,15 @@ pub(crate) enum StructuredLoopKind {
     HeaderControlled,
 }
 
+/// Kind of enclosing structured target selected by one propagated branch.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum StructuredBranchTargetKind {
+    /// Branch to the continuation after an enclosing labelled block.
+    BlockFollowedBy,
+    /// Branch to one enclosing loop header.
+    LoopHeadedBy,
+}
+
 /// One analyzed loop edge that either continues or exits the loop.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct StructuredLoopEdge {
@@ -155,6 +164,48 @@ pub(crate) struct StructuredLoopExit {
     pub(crate) outputs: TypeRow,
     /// Continuation lowered after the loop exits through this variant.
     pub(crate) continuation: Vec<StructuredNode>,
+    /// The output row that the continuation body actually produces.
+    ///
+    /// For empty continuations this equals `outputs`; for non-empty
+    /// continuations it is the output row of the last node in the body.
+    /// This may differ from `effect.outputs()` for Branch effects where
+    /// the branch carries outer-scope values rather than the continuation's
+    /// own outputs.
+    pub(crate) continuation_outputs: TypeRow,
+    /// Effect produced after the exit continuation, if any, or the local
+    /// outputs visible when the continuation completes normally.
+    pub(crate) effect: StructuredExitEffect,
+}
+
+/// Explicit control effect preserved after lowering one loop exit continuation.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum StructuredExitEffect {
+    /// The loop exit continues normally inside the current enclosing sequence.
+    Local(TypeRow),
+    /// The loop exit returns from the enclosing region with the given row.
+    Return(TypeRow),
+    /// The loop exit branches to one enclosing structured target.
+    ///
+    /// The target is identified by the CFG-backed label node for the enclosing
+    /// block or loop that should consume the propagated exit.
+    Branch {
+        /// Kind of enclosing target that should consume this exit.
+        kind: StructuredBranchTargetKind,
+        /// Enclosing CFG-backed target that should consume this exit.
+        target: StructuredCfgNode,
+        /// Ordered payload row visible when the branch effect is emitted.
+        outputs: TypeRow,
+    },
+}
+
+impl StructuredExitEffect {
+    /// Returns the ordered row visible after this exit effect is produced.
+    pub(crate) fn outputs(&self) -> &TypeRow {
+        match self {
+            Self::Local(outputs) | Self::Return(outputs) => outputs,
+            Self::Branch { outputs, .. } => outputs,
+        }
+    }
 }
 
 /// How a structured branch hands control to its join block.
@@ -223,6 +274,37 @@ pub(crate) struct StructuredRegion {
     pub(crate) io: RegionIo,
     /// HUGR-specific lowering metadata.
     pub(crate) body: StructuredRegionBody,
+    /// When present, the region's output is a Sum encoding which of several
+    /// heterogeneous loop exits was taken.  The enclosing loop body must
+    /// dispatch on this Sum: local variants continue the body, while non-local
+    /// variants cause the enclosing loop to break or propagate the effect.
+    pub(crate) multilevel_exit_dispatch: Option<MultilevelExitDispatch>,
+}
+
+/// Describes the exit dispatch that the enclosing loop must perform after a
+/// region whose multi-exit inner loop produced a tagged Sum output.
+///
+/// The region output is `[Sum(variant_rows)]` where each variant corresponds
+/// to one of the inner loop's structured exits.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct MultilevelExitDispatch {
+    /// Per-variant description: which exit effect each Sum variant represents,
+    /// and the ordered payload row carried by that variant.
+    pub(crate) variants: Vec<MultilevelExitVariant>,
+}
+
+/// One variant of the multilevel-exit Sum dispatched by the enclosing loop.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct MultilevelExitVariant {
+    /// Effect produced by this exit variant.
+    pub(crate) effect: StructuredExitEffect,
+    /// The actual output row produced by the inner loop's continuation for
+    /// this variant. This is used as the Sum variant row in the dispatch
+    /// Conditional.
+    pub(crate) continuation_outputs: TypeRow,
+    /// The exit edges associated with this variant, used to match against
+    /// the enclosing loop's exits when building tagged break payloads.
+    pub(crate) edges: Vec<StructuredLoopEdge>,
 }
 
 impl StructuredRegion {

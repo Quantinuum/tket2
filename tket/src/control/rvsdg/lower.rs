@@ -10,8 +10,8 @@ use hugr::{HugrView, Node};
 use crate::control::IdentityCfgMap;
 use crate::control::structuralize::{
     RegionIo, StructuralizationError, StructuredBlock, StructuredBranchJoinKind, StructuredCaseArm,
-    StructuredLoopEdge, StructuredLoopExit, StructuredLoopKind, StructuredNode, StructuredRegion,
-    StructuredRegionBody,
+    StructuredExitEffect, StructuredLoopEdge, StructuredLoopExit, StructuredLoopKind,
+    StructuredNode, StructuredRegion, StructuredRegionBody,
 };
 
 use super::build_cfg_rvsdg;
@@ -36,6 +36,7 @@ fn lower_region(region: &Region) -> Result<StructuredRegion, StructuralizationEr
             inputs: vars_to_row(&region.arguments),
             outputs: vars_to_row(&region.results),
         },
+        multilevel_exit_dispatch: None,
         body: StructuredRegionBody::Sequence(
             region
                 .body
@@ -98,6 +99,7 @@ fn lower_gamma(gamma: &GammaNode) -> StructuredRegion {
                     .collect::<Vec<_>>(),
             ),
         },
+        multilevel_exit_dispatch: None,
         body: StructuredRegionBody::Branch {
             split: lower_block(&gamma.split),
             arms: gamma
@@ -127,11 +129,18 @@ fn lower_gamma(gamma: &GammaNode) -> StructuredRegion {
 
 /// Lowers one RVSDG `theta` node into a structured loop region.
 fn lower_theta(theta: &ThetaNode) -> Result<StructuredRegion, StructuralizationError> {
+    let multilevel_exit_dispatch = compute_theta_multilevel_dispatch(theta);
+    let io_outputs = if multilevel_exit_dispatch.is_some() {
+        compute_multilevel_sum_row(theta)
+    } else {
+        vars_to_row(&theta.outputs)
+    };
     Ok(StructuredRegion {
         io: RegionIo {
             inputs: vars_to_row(&theta.inputs),
-            outputs: vars_to_row(&theta.outputs),
+            outputs: io_outputs,
         },
+        multilevel_exit_dispatch,
         body: StructuredRegionBody::Loop {
             kind: match theta.kind {
                 LoopKind::TailControlled => StructuredLoopKind::TailControlled,
@@ -144,33 +153,52 @@ fn lower_theta(theta: &ThetaNode) -> Result<StructuredRegion, StructuralizationE
                 .iter()
                 .map(lower_node)
                 .collect::<Result<Vec<_>, _>>()?,
-            backedge_sources: vec![theta.backedge_source],
-            continue_edges: vec![StructuredLoopEdge {
-                source: theta.continue_edge.source,
-                case: theta.continue_edge.case,
-                payload: vars_to_row(&theta.continue_edge.payload),
-            }],
+            backedge_sources: theta.backedge_sources.clone(),
+            continue_edges: theta
+                .continue_edges
+                .iter()
+                .map(|edge| StructuredLoopEdge {
+                    source: edge.source,
+                    case: edge.case,
+                    payload: vars_to_row(&edge.payload),
+                })
+                .collect(),
             exits: theta
                 .exits
                 .iter()
-                .map(|exit| StructuredLoopExit {
-                    edges: exit
-                        .edges
-                        .iter()
-                        .map(|edge| StructuredLoopEdge {
-                            source: edge.source,
-                            case: edge.case,
-                            payload: vars_to_row(&edge.payload),
-                        })
-                        .collect(),
-                    outputs: vars_to_row(&exit.outputs),
-                    continuation: exit
-                        .continuation
-                        .body
-                        .iter()
-                        .map(lower_node)
-                        .collect::<Result<Vec<_>, _>>()
-                        .expect("rvsdg exit continuation lowering is infallible"),
+                .map(|exit| {
+                    let cont_outputs = if exit.continuation.body.is_empty() {
+                        vars_to_row(&exit.outputs)
+                    } else {
+                        vars_to_row(&exit.continuation.results)
+                    };
+                    StructuredLoopExit {
+                        edges: exit
+                            .edges
+                            .iter()
+                            .map(|edge| StructuredLoopEdge {
+                                source: edge.source,
+                                case: edge.case,
+                                payload: vars_to_row(&edge.payload),
+                            })
+                            .collect(),
+                        outputs: vars_to_row(&exit.outputs),
+                        continuation: exit
+                            .continuation
+                            .body
+                            .iter()
+                            .map(lower_node)
+                            .collect::<Result<Vec<_>, _>>()
+                            .expect("rvsdg exit continuation lowering is infallible"),
+                        continuation_outputs: cont_outputs.clone(),
+                        effect: if exit.continuation.body.is_empty() && theta.exits.len() > 1 {
+                            // Empty continuation in a multi-exit loop means the
+                            // exit target was outside the enclosing scope.
+                            StructuredExitEffect::Return(vars_to_row(&exit.outputs))
+                        } else {
+                            StructuredExitEffect::Local(cont_outputs)
+                        },
+                    }
                 })
                 .collect(),
             break_outputs: if theta.exits.len() == 1 {
@@ -187,4 +215,82 @@ fn lower_theta(theta: &ThetaNode) -> Result<StructuredRegion, StructuralizationE
             },
         },
     })
+}
+
+/// Checks whether a theta node has heterogeneous exit output types that need
+/// multilevel dispatch in the enclosing loop body.
+fn compute_theta_multilevel_dispatch(
+    theta: &ThetaNode,
+) -> Option<crate::control::structuralize::MultilevelExitDispatch> {
+    use crate::control::structuralize::{MultilevelExitDispatch, MultilevelExitVariant};
+    if theta.exits.len() <= 1 {
+        return None;
+    }
+    let cont_outputs: Vec<_> = theta
+        .exits
+        .iter()
+        .map(|exit| {
+            if exit.continuation.body.is_empty() {
+                vars_to_row(&exit.outputs)
+            } else {
+                vars_to_row(&exit.continuation.results)
+            }
+        })
+        .collect();
+    let effects: Vec<_> = theta
+        .exits
+        .iter()
+        .map(|exit| {
+            if exit.continuation.body.is_empty() {
+                StructuredExitEffect::Return(vars_to_row(&exit.outputs))
+            } else {
+                StructuredExitEffect::Local(vars_to_row(&exit.continuation.results))
+            }
+        })
+        .collect();
+    // Multilevel dispatch is needed when exits produce different
+    // continuation output rows.
+    let first_row = &cont_outputs[0];
+    let heterogeneous = cont_outputs.iter().any(|r| r != first_row);
+    if !heterogeneous {
+        return None;
+    }
+    Some(MultilevelExitDispatch {
+        variants: effects
+            .into_iter()
+            .zip(cont_outputs)
+            .zip(theta.exits.iter())
+            .map(
+                |((effect, continuation_outputs), exit)| MultilevelExitVariant {
+                    effect,
+                    continuation_outputs,
+                    edges: exit
+                        .edges
+                        .iter()
+                        .map(|edge| StructuredLoopEdge {
+                            source: edge.source,
+                            case: edge.case,
+                            payload: vars_to_row(&edge.payload),
+                        })
+                        .collect(),
+                },
+            )
+            .collect(),
+    })
+}
+
+/// Computes the Sum output row for a theta with multilevel exit dispatch.
+fn compute_multilevel_sum_row(theta: &ThetaNode) -> hugr::types::TypeRow {
+    let variant_rows: Vec<hugr::types::TypeRow> = theta
+        .exits
+        .iter()
+        .map(|exit| {
+            if exit.continuation.body.is_empty() {
+                vars_to_row(&exit.outputs)
+            } else {
+                vars_to_row(&exit.continuation.results)
+            }
+        })
+        .collect();
+    vec![hugr::types::Type::new_sum(variant_rows)].into()
 }

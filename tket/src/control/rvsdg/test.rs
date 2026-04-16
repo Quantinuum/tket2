@@ -86,6 +86,76 @@ fn combined_headers() -> Hugr {
 }
 
 #[fixture]
+fn non_unique_backedge_loop() -> Hugr {
+    let mut cfg_builder = CFGBuilder::new(Signature::new_endo([usize_t()])).unwrap();
+    let pred_const = cfg_builder.add_constant(Value::unit_sum(0, 2).expect("0 < 2"));
+    let const_unit = cfg_builder.add_constant(Value::unary_unit_sum());
+
+    let entry = n_identity(
+        cfg_builder
+            .simple_entry_builder(vec![usize_t()].into(), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let header = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 2)
+            .unwrap(),
+        &pred_const,
+    )
+    .unwrap();
+    let body = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let split = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 2)
+            .unwrap(),
+        &pred_const,
+    )
+    .unwrap();
+    let latch_a = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let latch_b = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let after = n_identity(
+        cfg_builder
+            .simple_block_builder(endo_sig([usize_t()]), 1)
+            .unwrap(),
+        &const_unit,
+    )
+    .unwrap();
+    let exit = cfg_builder.exit_block();
+
+    cfg_builder.branch(&entry, 0, &header).unwrap();
+    cfg_builder.branch(&header, 0, &after).unwrap();
+    cfg_builder.branch(&header, 1, &body).unwrap();
+    cfg_builder.branch(&body, 0, &split).unwrap();
+    cfg_builder.branch(&split, 0, &latch_a).unwrap();
+    cfg_builder.branch(&split, 1, &latch_b).unwrap();
+    cfg_builder.branch(&latch_a, 0, &header).unwrap();
+    cfg_builder.branch(&latch_b, 0, &header).unwrap();
+    cfg_builder.branch(&after, 0, &exit).unwrap();
+
+    cfg_builder.finish_hugr().unwrap()
+}
+
+#[fixture]
 fn irreducible() -> Hugr {
     let mut cfg_builder = CFGBuilder::new(Signature::new_endo([usize_t()])).unwrap();
     let pred_const = cfg_builder.add_constant(Value::unit_sum(0, 2).expect("0 < 2"));
@@ -183,6 +253,31 @@ fn theta_loop_vars(header_loop: Hugr) {
     assert_eq!(theta.loop_vars.len(), 1);
     assert_eq!(theta.body.arguments.len(), 1);
     assert_eq!(theta.body.results.len(), 1);
+}
+
+#[rstest]
+fn theta_supports_multiple_backedge_sources(non_unique_backedge_loop: Hugr) {
+    let base = non_unique_backedge_loop.clone();
+    let cfg_node = non_unique_backedge_loop
+        .nodes()
+        .find(|node| non_unique_backedge_loop.get_optype(*node).is_cfg())
+        .unwrap();
+    let cfg_view = base.with_entrypoint(cfg_node);
+    let cfg = IdentityCfgMap::new(cfg_view.clone());
+    let rvsdg = build_cfg_rvsdg(&cfg_view, &cfg).unwrap();
+    let theta = rvsdg
+        .root
+        .body
+        .iter()
+        .find_map(|node| match node {
+            RvsdgNode::Theta(theta) => Some(theta.as_ref()),
+            _ => None,
+        })
+        .unwrap();
+
+    assert_eq!(theta.kind, LoopKind::HeaderControlled);
+    assert_eq!(theta.backedge_sources.len(), 2);
+    assert_eq!(theta.continue_edges.len(), 1);
 }
 
 #[rstest]

@@ -1,5 +1,6 @@
 //! Contains a pass to inline calls to selected functions in a Hugr.
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::convert::Infallible;
 
 use itertools::Itertools;
 use petgraph::algo::tarjan_scc;
@@ -7,10 +8,63 @@ use petgraph::algo::tarjan_scc;
 use hugr_core::hugr::{hugrmut::HugrMut, patch::inline_call::InlineCall};
 use hugr_core::module_graph::{ModuleGraph, StaticNode};
 
+use crate::passes::{ComposablePass, InScope, PassScope, WithScope};
+
 /// Error raised by [inline_acyclic]
 #[derive(Clone, Debug, thiserror::Error, PartialEq)]
 #[non_exhaustive]
 pub enum InlineFuncsError {}
+
+/// Inlines all DFG nodes nested below the entrypoint.
+///
+/// See [InlineDFG] for a rewrite to inline single DFGs.
+#[derive(Debug, Clone)]
+pub struct InlineFunctionsPass {
+    /// Maximum function size to inline.
+    max_inline_size: usize,
+
+    scope: PassScope,
+}
+
+impl Default for InlineFunctionsPass {
+    fn default() -> Self {
+        Self {
+            max_inline_size: 64,
+            scope: Default::default(),
+        }
+    }
+}
+
+impl InlineFunctionsPass {
+    /// Sets the maximum function size to inline, measured in number of descendant nodes from the function node.
+    pub fn with_max_inline_size(mut self, max_inline_size: usize) -> Self {
+        self.max_inline_size = max_inline_size;
+        self
+    }
+}
+
+impl<H: HugrMut> ComposablePass<H> for InlineFunctionsPass {
+    type Error = Infallible;
+    type Result = ();
+
+    fn run(&self, h: &mut H) -> Result<(), Self::Error> {
+        let mut should_inline_cache: HashMap<H::Node, bool> = HashMap::new();
+        inline_acyclic(h, |h, call| {
+            if self.scope.in_scope(h, call) != InScope::Yes {
+                return false;
+            }
+            *should_inline_cache.entry(call).or_insert_with(|| true)
+        });
+        Ok(())
+    }
+}
+
+impl WithScope for InlineFunctionsPass {
+    fn with_scope(mut self, scope: impl Into<PassScope>) -> Self {
+        self.scope = scope.into();
+        self
+    }
+}
 
 /// Inline (a subset of) [Call]s whose target [FuncDefn]s are not in cycles of the call
 /// graph.
@@ -23,7 +77,7 @@ pub enum InlineFuncsError {}
 /// [FuncDefn]: hugr_core::ops::FuncDefn
 pub fn inline_acyclic<H: HugrMut>(
     h: &mut H,
-    call_predicate: impl Fn(&H, H::Node) -> bool,
+    mut call_predicate: impl FnMut(&H, H::Node) -> bool,
 ) -> Result<(), InlineFuncsError> {
     let cg = ModuleGraph::new(&*h);
     let g = cg.graph();

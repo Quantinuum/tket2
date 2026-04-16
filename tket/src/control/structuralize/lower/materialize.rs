@@ -451,6 +451,7 @@ mod test {
                 StructuredNode::Block(block_summary),
                 StructuredNode::Block(exit_summary),
             ]),
+            multilevel_exit_dispatch: None,
         };
 
         let replacement = prepare_cfg_replacement(&cfg_view, &region).unwrap();
