@@ -27,7 +27,7 @@ use hugr_core::builder::{
 };
 use hugr_core::hugr::hugrmut::HugrMut;
 use hugr_core::hugr::internal::PortgraphNodeMap;
-use hugr_core::ops::{Conditional, Const, OpTag, OpTrait, OpType, Tag};
+use hugr_core::ops::{Conditional, Const, OpTag, OpTrait, OpType, Tag, Value};
 use hugr_core::types::EdgeKind;
 use hugr_core::{Hugr, HugrView, IncomingPort, Node, OutgoingPort, PortIndex, Wire};
 use itertools::Itertools;
@@ -84,11 +84,20 @@ enum ConsumerOtherInputSource {
     ProducerOutput { output_index: usize },
 }
 
+/// How one producer case constructs the consumer selector.
+#[derive(Clone, Debug)]
+enum ProducerSelectorSource {
+    /// The selector is built directly by a case-local `Tag` op.
+    Tag { selector_tag_node: Node },
+    /// The selector is loaded from a constant tagged sum value.
+    LoadConstant { payload_values: Vec<Value> },
+}
+
 /// Selected consumer case for one producer case.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 struct ProducerCaseSelection {
     consumer_case_index: usize,
-    selector_tag_node: Node,
+    selector_source: ProducerSelectorSource,
 }
 
 /// Complete rewrite plan for one direct producer/consumer pair.
@@ -312,7 +321,8 @@ fn other_input_source<H: HugrView<Node = Node>>(
 
 /// Return the selected consumer case for one producer case.
 ///
-/// The fused producer output must come directly from a case-local `Tag`.
+/// The fused producer output must come directly from either a case-local
+/// `Tag` or a case-local `LoadConstant` of a tagged sum value.
 fn producer_case_selection<H: HugrView<Node = Node>>(
     hugr: &H,
     producer_case_node: Node,
@@ -325,10 +335,42 @@ fn producer_case_selection<H: HugrView<Node = Node>>(
     if hugr.get_parent(selector_node) != Some(producer_case_node) {
         return None;
     }
-    let tag: Tag = hugr.get_optype(selector_node).clone().try_into().ok()?;
-    (tag.tag < consumer_case_count).then_some(ProducerCaseSelection {
-        consumer_case_index: tag.tag,
-        selector_tag_node: selector_node,
+
+    if let Ok(tag) = <&Tag>::try_from(hugr.get_optype(selector_node)) {
+        return (tag.tag < consumer_case_count).then_some(ProducerCaseSelection {
+            consumer_case_index: tag.tag,
+            selector_source: ProducerSelectorSource::Tag {
+                selector_tag_node: selector_node,
+            },
+        });
+    }
+
+    load_constant_sum_selection(hugr, selector_node, consumer_case_count)
+}
+
+/// Return the selected consumer case when the selector comes from a constant.
+fn load_constant_sum_selection<H: HugrView<Node = Node>>(
+    hugr: &H,
+    load_constant_node: Node,
+    consumer_case_count: usize,
+) -> Option<ProducerCaseSelection> {
+    let OpType::LoadConstant(_) = hugr.get_optype(load_constant_node) else {
+        return None;
+    };
+    let const_node = hugr
+        .input_neighbours(load_constant_node)
+        .exactly_one()
+        .ok()?;
+    let Const { value, .. } = hugr.get_optype(const_node).clone().try_into().ok()?;
+    let Value::Sum(hugr_core::ops::constant::Sum { tag, values, .. }) = value else {
+        return None;
+    };
+
+    (tag < consumer_case_count).then_some(ProducerCaseSelection {
+        consumer_case_index: tag,
+        selector_source: ProducerSelectorSource::LoadConstant {
+            payload_values: values,
+        },
     })
 }
 
@@ -442,13 +484,14 @@ where
         })
         .collect::<Vec<_>>();
 
-    let selection = plan.selections[producer_case_index];
-    let tag_payloads = tag_payload_wires(
+    let selection = &plan.selections[producer_case_index];
+    let tag_payloads = selector_payload_wires(
         hugr,
-        selection.selector_tag_node,
+        selection,
         producer_input,
         &producer_case_inputs,
         &producer_built_outputs,
+        &mut case_builder,
     );
 
     let consumer_case_node = plan.consumer_case_nodes[selection.consumer_case_index];
@@ -456,7 +499,7 @@ where
     let consumer_sum_len = plan.consumer.sum_rows[selection.consumer_case_index].len();
 
     let mut consumer_case_inputs = HashMap::<OutgoingPort, Wire>::new();
-    for (index, wire) in tag_payloads.into_iter().enumerate() {
+    for (index, wire) in tag_payloads?.into_iter().enumerate() {
         consumer_case_inputs.insert(OutgoingPort::from(index), wire);
     }
     for (old_index, binding) in plan.consumer_other_inputs.iter().enumerate() {
@@ -512,32 +555,46 @@ where
     Ok(case_builder.finish_with_outputs(outputs)?)
 }
 
-/// Return the payload wires feeding one rebuilt `Tag`.
-fn tag_payload_wires<H: HugrView<Node = Node>>(
+/// Return the payload wires feeding one known selector value.
+fn selector_payload_wires<H, B>(
     hugr: &H,
-    tag_node: Node,
+    selection: &ProducerCaseSelection,
     producer_input: Node,
     producer_case_inputs: &HashMap<OutgoingPort, Wire>,
     producer_built_outputs: &HashMap<(Node, OutgoingPort), Wire>,
-) -> Vec<Wire> {
-    let tag: Tag = hugr
-        .get_optype(tag_node)
-        .clone()
-        .try_into()
-        .expect("tag node");
-    (0..tag.variants[tag.tag].len())
-        .map(|index| {
-            let input = IncomingPort::from(index);
-            let (source_node, source_port) = hugr
-                .single_linked_output(tag_node, input)
-                .expect("tag payload linked");
-            if source_node == producer_input {
-                producer_case_inputs[&source_port]
-            } else {
-                producer_built_outputs[&(source_node, source_port)]
-            }
-        })
-        .collect()
+    case_builder: &mut B,
+) -> Result<Vec<Wire>, CaseOfCaseError>
+where
+    H: HugrView<Node = Node>,
+    B: Dataflow + DataflowSubContainer,
+{
+    match &selection.selector_source {
+        ProducerSelectorSource::Tag { selector_tag_node } => {
+            let tag: Tag = hugr
+                .get_optype(*selector_tag_node)
+                .clone()
+                .try_into()
+                .expect("tag node");
+            Ok((0..tag.variants[tag.tag].len())
+                .map(|index| {
+                    let input = IncomingPort::from(index);
+                    let (source_node, source_port) = hugr
+                        .single_linked_output(*selector_tag_node, input)
+                        .expect("tag payload linked");
+                    if source_node == producer_input {
+                        producer_case_inputs[&source_port]
+                    } else {
+                        producer_built_outputs[&(source_node, source_port)]
+                    }
+                })
+                .collect())
+        }
+        ProducerSelectorSource::LoadConstant { payload_values } => Ok(payload_values
+            .iter()
+            .cloned()
+            .map(|value| case_builder.add_load_value(value))
+            .collect()),
+    }
 }
 
 /// Apply a previously planned rewrite in-place.
@@ -766,7 +823,7 @@ mod test {
     use hugr_core::extension::prelude::usize_t;
     use hugr_core::extension::prelude::{ConstUsize, Noop};
     use hugr_core::ops::{Conditional, Value};
-    use hugr_core::types::{Signature, Type, TypeRow};
+    use hugr_core::types::{Signature, SumType, Type, TypeRow};
     use hugr_core::{HugrView, type_row};
 
     use super::*;
@@ -886,6 +943,46 @@ mod test {
             let mut case = consumer.case_builder(case_index).unwrap();
             let out = case.add_load_value(ConstUsize::new(value));
             case.finish_with_outputs([out]).unwrap();
+        }
+        let consumer = consumer.finish_sub_container().unwrap();
+
+        builder
+            .finish_hugr_with_outputs(consumer.outputs().collect::<Vec<_>>())
+            .unwrap()
+    }
+
+    fn build_constant_selector_case_of_case_hugr() -> Hugr {
+        let rows = vec![[usize_t()].into(), [usize_t()].into()];
+        let sum_ty = Type::new_sum(rows.clone());
+        let mut builder = DFGBuilder::new(Signature::new(vec![], vec![usize_t()])).unwrap();
+        let pred = builder.add_load_value(Value::true_val());
+        let mut producer = builder
+            .conditional_builder((two_way_sum_rows(), pred), [], vec![sum_ty].into())
+            .unwrap();
+
+        for (case_index, payload) in [11, 17].into_iter().enumerate() {
+            let mut case = producer.case_builder(case_index).unwrap();
+            let selector = case.add_load_value(
+                Value::sum(
+                    case_index,
+                    [ConstUsize::new(payload).into()],
+                    SumType::new(rows.clone()),
+                )
+                .unwrap(),
+            );
+            case.finish_with_outputs([selector]).unwrap();
+        }
+
+        let producer = producer.finish_sub_container().unwrap();
+        let [selector] = producer.outputs_arr();
+
+        let mut consumer = builder
+            .conditional_builder((rows, selector), [], vec![usize_t()].into())
+            .unwrap();
+        for case_index in 0..2 {
+            let case = consumer.case_builder(case_index).unwrap();
+            let [payload] = case.input_wires_arr();
+            case.finish_with_outputs([payload]).unwrap();
         }
         let consumer = consumer.finish_sub_container().unwrap();
 
@@ -1215,6 +1312,20 @@ mod test {
         assert_eq!(result.rewrites_applied, 1);
         hugr.validate().unwrap();
         assert_eq!(conditional_count(&hugr), 1);
+    }
+
+    #[test]
+    fn rewrites_constant_selector_case_of_case() {
+        let mut hugr = build_constant_selector_case_of_case_hugr();
+        let result = CaseOfCasePass::default().run(&mut hugr).unwrap();
+
+        assert_eq!(result.rewrites_applied, 1);
+        hugr.validate().unwrap();
+        assert_eq!(conditional_count(&hugr), 1);
+
+        let (_, conditional) = first_conditional(&hugr);
+        assert_eq!(conditional.other_inputs.len(), 0);
+        assert_eq!(conditional.outputs.len(), 1);
     }
 
     #[test]
