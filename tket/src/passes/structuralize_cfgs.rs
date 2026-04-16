@@ -8,6 +8,7 @@ use std::collections::VecDeque;
 
 use hugr::Node;
 use hugr::hugr::hugrmut::HugrMut;
+use hugr::ops::{OpTag, OpTrait, OpType};
 
 use crate::control::structuralize::{
     StructuralizationError, StructuralizationRewriteReport, StructuralizationStrategy,
@@ -59,14 +60,22 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for StructuralizeCfgsPass {
                 rewrites: Vec::new(),
             });
         };
-        queue.extend(region_children(root, hugr));
+        queue.push_back(root);
 
         while let Some(region) = queue.pop_front() {
-            if hugr.get_optype(region).is_cfg() {
-                if structurize_cfg(hugr, region, self.strategy)? {
-                    rewrites.push(region);
+            if hugr.get_optype(region).is_cfg() && structurize_cfg(hugr, region, self.strategy)? {
+                rewrites.push(region);
+            } else if is_dataflow_region(hugr.get_optype(region)) {
+                let local_cfgs = hugr
+                    .children(region)
+                    .filter(|node| hugr.get_optype(*node).is_cfg())
+                    .collect::<Vec<_>>();
+                for cfg in local_cfgs {
+                    if structurize_cfg(hugr, cfg, self.strategy)? {
+                        rewrites.push(cfg);
+                    }
                 }
-            };
+            }
 
             if self.scope.recursive() {
                 queue.extend(region_children(region, hugr));
@@ -75,4 +84,10 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for StructuralizeCfgsPass {
 
         Ok(StructuralizationRewriteReport { rewrites })
     }
+}
+
+/// Returns whether one node owns a dataflow region whose direct CFG children
+/// should be structuralized locally.
+fn is_dataflow_region(op: &OpType) -> bool {
+    OpTag::DataflowParent.is_superset(op.tag())
 }

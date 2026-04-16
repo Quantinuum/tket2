@@ -43,7 +43,7 @@ pub(crate) fn structurize_cfg<H: HugrMut<Node = Node>>(
     strategy: StructuralizationStrategy,
 ) -> Result<bool, StructuralizationError> {
     let Some(replacement) = prepare_replacement_with_normalize_retry(hugr, cfg, strategy)? else {
-        return Ok(false);
+        return Ok(true);
     };
     materialize_cfg_rewrite(hugr, cfg, replacement)?;
     Ok(true)

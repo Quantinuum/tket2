@@ -4,6 +4,7 @@ from tket._ops import TketOp
 from tket.passes import (
     _badger_optimise,
     _greedy_depth_reduce,
+    CaseOfCase,
     NormalizeGuppy,
     SinkConditionalInputs,
     StructuralizationStrategy,
@@ -264,3 +265,12 @@ def test_sink_conditional_inputs() -> None:
     sunk = sink_inputs(hugr)
 
     assert _count_ops(sunk, "Conditional") >= 1
+
+
+def test_case_of_case() -> None:
+    hugr = _hugr_from_path("test_files/guppy_examples/shortcircuit.hugr")
+
+    case_of_case = CaseOfCase()
+    rewritten = case_of_case(hugr)
+
+    assert _count_ops(rewritten, "Conditional") >= 1

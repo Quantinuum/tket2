@@ -25,6 +25,7 @@ from hugr.passes.scope import PassScope, GlobalScope
 __all__ = [
     "PytketHugrPass",
     "PassResult",
+    "CaseOfCase",
     "NormalizeGuppy",
     "SinkConditionalInputs",
     "StructuralizationStrategy",
@@ -80,6 +81,46 @@ class PytketHugrPass(ComposablePass):
         package = tk_program.to_python()
         new_hugr = package.modules[0]
         return PassResult.for_pass(self, hugr=new_hugr, inplace=inplace, result=None)
+
+
+@dataclass
+class CaseOfCase(ComposablePass):
+    """Fuse direct sibling conditional chains with a conservative case-of-case rewrite.
+
+    Parameters:
+    - max_duplicated_nodes: Maximum number of consumer-case internal nodes that
+      may be duplicated by one rewrite.
+    """
+
+    max_duplicated_nodes: int = 32
+    _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
+
+    def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
+        return implement_pass_run(
+            self,
+            hugr=hugr,
+            inplace=inplace,
+            copy_call=lambda h: self._case_of_case(h, inplace),
+        )
+
+    def with_scope(self, _scope: PassScope) -> CaseOfCase:
+        """Set the scope of this pass and return self."""
+        self._scope = _scope
+        return self
+
+    def _case_of_case(self, hugr: Hugr, inplace: bool) -> PassResult:
+        tk_program = _state.CompilationState.from_python(hugr)
+
+        _passes.case_of_case(
+            tk_program._inner,
+            max_duplicated_nodes=self.max_duplicated_nodes,
+            scope=self._scope,
+        )
+
+        package = tk_program.to_python()
+        return PassResult.for_pass(
+            self, hugr=package.modules[0], inplace=inplace, result=None
+        )
 
 
 @dataclass

@@ -27,6 +27,7 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     m.add_function(wrap_pyfunction!(greedy_depth_reduce, &m)?)?;
     m.add_function(wrap_pyfunction!(badger_optimise, &m)?)?;
     m.add_function(wrap_pyfunction!(normalize_guppy, &m)?)?;
+    m.add_function(wrap_pyfunction!(case_of_case, &m)?)?;
     m.add_function(wrap_pyfunction!(sink_conditional_inputs, &m)?)?;
     m.add_function(wrap_pyfunction!(structuralize_cfgs, &m)?)?;
     m.add_class::<self::chunks::PyCircuitChunks>()?;
@@ -34,6 +35,7 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     m.add_function(wrap_pyfunction!(self::tket1::tket1_pass, &m)?)?;
     m.add_function(wrap_pyfunction!(resolve_modifiers, &m)?)?;
     m.add("PullForwardError", py.get_type::<PyPullForwardError>())?;
+    m.add("CaseOfCaseError", py.get_type::<PyCaseOfCaseError>())?;
     m.add(
         "StructuralizeCfgsError",
         py.get_type::<PyStructuralizeCfgsError>(),
@@ -62,6 +64,12 @@ create_py_exception!(
     tket::passes::modifier_resolver::ModifierResolverErrors,
     PyModifierResolverError,
     "Errors from the modifer resolver pass."
+);
+
+create_py_exception!(
+    tket::passes::case_of_case::CaseOfCaseError,
+    PyCaseOfCaseError,
+    "Errors from the case-of-case pass."
 );
 
 create_py_exception!(
@@ -113,6 +121,25 @@ fn normalize_guppy(
         .remove_redundant_order_edges(remove_redundant_order_edges)
         .squash_borrows(squash_borrows);
 
+    pass.run(&mut circ.hugr).convert_pyerrs()?;
+    Ok(())
+}
+
+/// Fuse direct sibling conditional chains with a conservative case-of-case rewrite.
+///
+/// This pass looks for direct sibling `Conditional A -> Conditional B` chains
+/// in one region at a time and duplicates small selected consumer cases into
+/// the producer when the selector is known branch-locally.
+#[pyfunction]
+#[pyo3(signature = (circ, *, max_duplicated_nodes = 32, scope = None))]
+fn case_of_case(
+    circ: &mut CompilationState,
+    max_duplicated_nodes: usize,
+    scope: Option<PyPassScope>,
+) -> PyResult<()> {
+    let py_scope = scope.unwrap_or_default();
+    let pass = tket::passes::CaseOfCasePass::default_with_scope(py_scope.scope)
+        .with_max_duplicated_nodes(max_duplicated_nodes);
     pass.run(&mut circ.hugr).convert_pyerrs()?;
     Ok(())
 }

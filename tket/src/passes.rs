@@ -14,6 +14,10 @@ pub use borrow_squash::BorrowSquashPass;
 pub mod commutation;
 pub use commutation::apply_greedy_commutation;
 
+// Fuse direct sibling conditional chains with case-of-case rewriting.
+pub mod case_of_case;
+pub use case_of_case::CaseOfCasePass;
+
 // Constant folding pass.
 pub mod const_fold;
 pub use const_fold::ConstantFoldPass;

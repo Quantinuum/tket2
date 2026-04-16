@@ -41,6 +41,14 @@ def normalize_guppy(
     - remove_redundant_order_edges: Whether to remove redundant order edges.
     """
 
+def case_of_case(
+    circ: CompilationState,
+    *,
+    max_duplicated_nodes: int = 32,
+    scope: PassScope = GlobalScope.PRESERVE_PUBLIC,
+) -> None:
+    """Fuse direct sibling conditional chains with a conservative case-of-case rewrite."""
+
 def sink_conditional_inputs(
     circ: CompilationState,
     *,
