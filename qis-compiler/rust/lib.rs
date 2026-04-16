@@ -5,7 +5,7 @@ use anyhow::{Result, anyhow};
 use hugr::envelope::EnvelopeConfig;
 use hugr::llvm::CodegenExtsBuilder;
 use hugr::llvm::custom::CodegenExtsMap;
-use hugr::llvm::emit::{EmitHugr, Namer};
+use hugr::llvm::emit::{EmitHugr, Namer, debug_info::DebugInfoContext};
 use hugr::llvm::extension::int::IntCodegenExtension;
 use hugr::llvm::utils::fat::FatExt as _;
 use inkwell::OptimizationLevel;
@@ -134,11 +134,12 @@ fn get_hugr_llvm_module<'c, 'hugr, 'a: 'c>(
     hugr: &'hugr Hugr,
     module_name: impl AsRef<str>,
     exts: Rc<CodegenExtsMap<'a, Hugr>>,
-) -> Result<Module<'c>> {
+    emit_debug: bool,
+) -> Result<(Module<'c>, Option<DebugInfoContext<'c>>)> {
     let module = context.create_module(module_name.as_ref());
     let emit = EmitHugr::new(context, module, namer, exts);
     Ok(emit
-        .emit_module(hugr.try_fat(hugr.module_root()).unwrap())?
+        .emit_module(hugr.try_fat(hugr.module_root()).unwrap(), emit_debug)?
         .finish())
 }
 
@@ -181,7 +182,8 @@ fn get_module_with_std_exts<'c>(
     context: &'c Context,
     namer: Rc<Namer>,
     hugr: &'c mut Hugr,
-) -> Result<Module<'c>> {
+    emit_debug: bool,
+) -> Result<(Module<'c>, Option<DebugInfoContext<'c>>)> {
     process_hugr(hugr)?;
     if let Some(filename) = &args.save_hugr {
         let file = fs::File::create(PathBuf::from(filename))?;
@@ -193,6 +195,7 @@ fn get_module_with_std_exts<'c>(
         hugr,
         &args.name,
         Rc::new(codegen_extensions()),
+        emit_debug,
     )
 }
 
@@ -250,6 +253,7 @@ fn wrap_main<'c>(
     module: &Module<'c>,
     hugr_entry: &str,
     module_entry: &str,
+    mut maybe_di_ctx: Option<&mut DebugInfoContext<'c>>,
 ) -> Result<()> {
     let entry_ty = ctx.i64_type().fn_type(&[ctx.i64_type().into()], false);
     let entry_fun = module.add_function(module_entry, entry_ty, None);
@@ -259,6 +263,11 @@ fn wrap_main<'c>(
     let teardown = module.add_function("teardown", teardown_type, None);
     let block = ctx.append_basic_block(entry_fun, "entry");
     let builder = ctx.create_builder();
+
+    if let Some(ref mut di_ctx) = maybe_di_ctx {
+        di_ctx.set_compiler_generated(entry_fun, ctx, &builder)?;
+    }
+
     builder.position_at_end(block);
 
     let initial_tc = entry_fun.get_nth_param(0).unwrap().into_int_value();
@@ -275,6 +284,10 @@ fn wrap_main<'c>(
         .ok_or_else(|| anyhow!("get_tc has no return value"))?;
     // Return the initial time cursor
     let _ = builder.build_return(Some(&tc))?;
+
+    if let Some(di_ctx) = maybe_di_ctx {
+        di_ctx.unset_debug_loc(&builder)?;
+    }
     Ok(())
 }
 
@@ -315,6 +328,7 @@ fn compile<'c, 'hugr: 'c>(
     args: &CompileArgs,
     ctx: &'c Context,
     hugr: &'hugr mut Hugr,
+    emit_debug: bool,
 ) -> Result<Module<'c>> {
     event!(Level::DEBUG, "starting primary compilation");
     let namer = Rc::new(Namer::new("__hugr__.", true));
@@ -328,9 +342,15 @@ fn compile<'c, 'hugr: 'c>(
     let module_entry = args.entry.as_ref().map_or(LLVM_MAIN, |x| x.as_ref());
 
     // Create a new LLVM module using hugr-llvm
-    let module = get_module_with_std_exts(args, ctx, namer, hugr)?;
+    let (module, mut maybe_di_ctx) = get_module_with_std_exts(args, ctx, namer, hugr, emit_debug)?;
 
-    wrap_main(ctx, &module, &hugr_entry, module_entry)?;
+    wrap_main(
+        ctx,
+        &module,
+        &hugr_entry,
+        module_entry,
+        maybe_di_ctx.as_mut(),
+    )?;
 
     let (data_layout, triple) = {
         (
@@ -354,7 +374,12 @@ fn compile<'c, 'hugr: 'c>(
             .add_global_metadata(key, &node)
             .map_err(ProcessErrs::from);
     }
+
+    if let Some(di_ctx) = maybe_di_ctx.take() {
+        di_ctx.finish();
+    }
     module.verify().map_err(Into::<ProcessErrs>::into)?;
+
     Ok(module)
 }
 
@@ -436,11 +461,12 @@ mod selene_hugr_qis_compiler {
 
     /// Compile HUGR package to LLVM IR string
     #[pyfunction]
-    #[pyo3(signature = (pkg_bytes, opt_level=2, target_triple="native"))]
+    #[pyo3(signature = (pkg_bytes, opt_level=2, target_triple="native", emit_debug=false))]
     pub fn compile_to_llvm_ir(
         pkg_bytes: &[u8],
         opt_level: u32,
         target_triple: &str,
+        emit_debug: bool,
     ) -> PyResult<String> {
         let opt = get_opt_level(opt_level)?;
         let target_machine = if target_triple == "native" {
@@ -454,17 +480,19 @@ mod selene_hugr_qis_compiler {
             &CompileArgs::new(&"hugr", &target_machine, opt),
             &ctx,
             &mut hugr,
+            emit_debug,
         )?;
         Ok(llvm_module.to_string())
     }
 
     /// Compile HUGR package to LLVM bitcode
     #[pyfunction]
-    #[pyo3(signature = (pkg_bytes, opt_level=2, target_triple="native"))]
+    #[pyo3(signature = (pkg_bytes, opt_level=2, target_triple="native", emit_debug=false))]
     pub fn compile_to_bitcode(
         pkg_bytes: &[u8],
         opt_level: u32,
         target_triple: &str,
+        emit_debug: bool,
     ) -> PyResult<Vec<u8>> {
         let opt = get_opt_level(opt_level)?;
         let target_machine = if target_triple == "native" {
@@ -478,6 +506,7 @@ mod selene_hugr_qis_compiler {
             &CompileArgs::new(&"hugr", &target_machine, opt),
             &ctx,
             &mut hugr,
+            emit_debug,
         )?;
         Ok(llvm_module.write_bitcode_to_memory().as_slice().to_vec())
     }

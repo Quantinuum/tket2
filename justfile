@@ -33,7 +33,7 @@ build:
 test: test-rust test-python
 # Run all rust tests.
 test-rust *TEST_ARGS: _check_nextest_installed
-    uv run cargo nextest r --all-features {{TEST_ARGS}}
+    uv run cargo nextest r --all-features {{TEST_ARGS}} --no-fail-fast
 # Run all python tests.
 test-python *TEST_ARGS:
     uv run maturin develop --uv
