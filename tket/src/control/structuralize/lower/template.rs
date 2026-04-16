@@ -283,6 +283,16 @@ impl<'a, H: HugrView<Node = Node>> TemplateLowerer<'a, H> {
                     let case_inputs = case.input_wires().collect_vec();
                     let case_fragment = self.lower_sequence(&mut case, &arm.body, case_inputs)?;
                     self.close_fragment(&mut case, &case_fragment, None);
+                    if case_fragment.outputs.len() != join.inputs().len() {
+                        return Err(StructuralizationError::UnsupportedBranch {
+                            reason: format!(
+                                "branch arm {} produced {} outputs but join expects {}",
+                                arm.case,
+                                case_fragment.outputs.len(),
+                                join.inputs().len()
+                            ),
+                        });
+                    }
                     case.finish_with_outputs(case_fragment.outputs)?;
                 }
 

@@ -91,7 +91,10 @@ impl<'a, H: HugrView<Node = Node>> RvsdgBuilder<'a, H> {
                 input,
                 branch_arguments: branches
                     .iter()
-                    .map(|branch| branch.region.arguments[sum_rows[0].len() + idx].clone())
+                    .map(|branch| {
+                        let match_len = sum_rows[branch.case].len();
+                        branch.region.arguments[match_len + idx].clone()
+                    })
                     .collect(),
             })
             .collect_vec();

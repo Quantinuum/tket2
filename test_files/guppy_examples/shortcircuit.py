@@ -10,24 +10,15 @@ from pathlib import Path
 from sys import argv
 
 from guppylang import guppy
-from guppylang.std.builtins import array, owned, result
-from guppylang.std.quantum import cz, h, measure, qubit
+from guppylang.std.builtins import result
+from guppylang.std.quantum import h, measure, qubit
 
 
 @guppy
-def main() -> None:
-    a = True
-    b = True
-
+def main(a: bool, b: bool) -> None:
     q = qubit()
-    # Apply loops and unpack the result array
-    i = 0
-    for i in range(4):
+    if b or not a:
         h(q)
-
-        i += 1
-        if i > 4 or not a:
-            break
 
     result("b", measure(q))
 

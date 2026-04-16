@@ -78,17 +78,18 @@ fn scope_preserves_other_cfgs(
 }
 
 #[rstest]
-#[case::loop_and_branch_rvsdg("loop_and_branch", StructuralizationStrategy::Rvsdg)]
-#[case::loop_and_branch_relooper("loop_and_branch", StructuralizationStrategy::Relooper)]
-#[case::complex_control_rvsdg("complex_control", StructuralizationStrategy::Rvsdg)]
-#[case::complex_control_relooper("complex_control", StructuralizationStrategy::Relooper)]
-#[case::nested_loops_rvsdg("nested_loops", StructuralizationStrategy::Rvsdg)]
-#[case::nested_loops_relooper("nested_loops", StructuralizationStrategy::Relooper)]
-#[case::shortcircuit_rvsdg("shortcircuit", StructuralizationStrategy::Rvsdg)]
-#[case::shortcircuit_relooper("shortcircuit", StructuralizationStrategy::Relooper)]
+#[case::loop_and_branch_rvsdg("loop_and_branch", StructuralizationStrategy::Rvsdg, 1)]
+#[case::loop_and_branch_relooper("loop_and_branch", StructuralizationStrategy::Relooper, 1)]
+#[case::complex_control_rvsdg("complex_control", StructuralizationStrategy::Rvsdg, 1)]
+#[case::complex_control_relooper("complex_control", StructuralizationStrategy::Relooper, 1)]
+#[case::nested_loops_rvsdg("nested_loops", StructuralizationStrategy::Rvsdg, 1)]
+#[case::nested_loops_relooper("nested_loops", StructuralizationStrategy::Relooper, 1)]
+#[case::shortcircuit_rvsdg("shortcircuit", StructuralizationStrategy::Rvsdg, 0)]
+#[case::shortcircuit_relooper("shortcircuit", StructuralizationStrategy::Relooper, 0)]
 fn structurizes_checked_in_fixture(
     #[case] example: &str,
     #[case] strategy: StructuralizationStrategy,
+    #[case] min_tail_loops: usize,
 ) {
     let mut h = load_guppy_example(example);
     let report = StructuralizeCfgsPass::default()
@@ -98,6 +99,6 @@ fn structurizes_checked_in_fixture(
     assert!(!report.rewrites.is_empty());
     h.validate().unwrap();
     assert_eq!(h.nodes().filter(|n| h.get_optype(*n).is_cfg()).count(), 0);
-    assert!(tail_loop_count(&h) >= 1);
+    assert!(tail_loop_count(&h) >= min_tail_loops);
     assert!(conditional_count(&h) >= 1);
 }

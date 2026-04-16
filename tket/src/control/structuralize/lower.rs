@@ -22,9 +22,7 @@ use hugr::HugrView;
 use hugr::Node;
 use hugr::hugr::hugrmut::HugrMut;
 
-use crate::passes::NormalizeCFGPass;
-use crate::passes::composable::ComposablePass;
-use crate::passes::{PassScope, composable::WithScope};
+use crate::passes::normalize_cfgs::normalize_cfg;
 
 use super::analyze::analyze_cfg;
 use super::types::{
@@ -49,25 +47,77 @@ pub fn structurize_cfgs<H: HugrMut<Node = Node>>(
     let cfgs = outermost_cfgs(hugr, cfgs);
     let mut rewrites = Vec::with_capacity(cfgs.len());
     for cfg in cfgs {
-        let cfg_view = hugr.with_entrypoint(cfg);
-        let replacement = match strategy {
-            StructuralizationStrategy::Rvsdg => {
-                let analyzed = analyze_cfg(cfg_view.clone(), strategy)?;
-                prepare_cfg_replacement(&cfg_view, &analyzed)?
-            }
-            StructuralizationStrategy::Relooper => {
-                let id_cfg = IdentityCfgMap::new(cfg_view.clone());
-                relooper::prepare_cfg_rewrite(&cfg_view, &id_cfg)?
-            }
+        let Some(replacement) = prepare_replacement_with_normalize_retry(hugr, cfg, strategy)?
+        else {
+            continue;
         };
         materialize_cfg_rewrite(hugr, cfg, replacement)?;
-        NormalizeCFGPass::default()
-            .with_scope(PassScope::EntrypointRecursive)
-            .run(&mut hugr.with_entrypoint_mut(cfg))?;
+        normalize_nested_cfgs(hugr, cfg)?;
         rewrites.push(cfg);
     }
 
     Ok(StructuralizationRewriteReport { rewrites })
+}
+
+/// Prepares one CFG rewrite, retrying after local CFG normalization when raw
+/// branch shapes are not yet directly structuralizable.
+fn prepare_replacement_with_normalize_retry<H: HugrMut<Node = Node>>(
+    hugr: &mut H,
+    cfg: Node,
+    strategy: StructuralizationStrategy,
+) -> Result<Option<LoweredCfgTemplate>, StructuralizationError> {
+    match prepare_replacement(hugr, cfg, strategy) {
+        Ok(replacement) => Ok(Some(replacement)),
+        Err(StructuralizationError::UnsupportedBranch { .. }) => {
+            normalize_cfg(&mut hugr.with_entrypoint_mut(cfg))?;
+            if !hugr.get_optype(cfg).is_cfg() {
+                return Ok(None);
+            }
+            prepare_replacement(hugr, cfg, strategy).map(Some)
+        }
+        Err(err) => Err(err),
+    }
+}
+
+/// Prepares the detached structured replacement for one CFG without mutating it.
+fn prepare_replacement<H: HugrMut<Node = Node>>(
+    hugr: &H,
+    cfg: Node,
+    strategy: StructuralizationStrategy,
+) -> Result<LoweredCfgTemplate, StructuralizationError> {
+    let cfg_view = hugr.with_entrypoint(cfg);
+    match strategy {
+        StructuralizationStrategy::Rvsdg => {
+            let analyzed = analyze_cfg(cfg_view.clone(), strategy)?;
+            prepare_cfg_replacement(&cfg_view, &analyzed)
+        }
+        StructuralizationStrategy::Relooper => {
+            let id_cfg = IdentityCfgMap::new(cfg_view.clone());
+            relooper::prepare_cfg_rewrite(&cfg_view, &id_cfg)
+        }
+    }
+}
+
+/// Normalizes nested CFGs beneath one rewritten region root.
+///
+/// Structuralization can materialize helper CFGs inside the rewritten region,
+/// for example when original block subgraphs already contained nested control
+/// flow. The structuralization pipeline only owns one rewritten root at a
+/// time, so it normalizes exactly the nested CFG descendants of that root
+/// rather than invoking the general pass layer again.
+fn normalize_nested_cfgs<H: HugrMut<Node = Node>>(
+    hugr: &mut H,
+    root: Node,
+) -> Result<(), StructuralizationError> {
+    let mut cfgs = hugr
+        .descendants(root)
+        .filter(|node| hugr.get_optype(*node).is_cfg())
+        .collect::<Vec<_>>();
+    cfgs.reverse();
+    for cfg in cfgs {
+        normalize_cfg(&mut hugr.with_entrypoint_mut(cfg))?;
+    }
+    Ok(())
 }
 
 /// Filters a set of CFG roots down to the outermost ones.

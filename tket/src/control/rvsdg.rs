@@ -34,12 +34,19 @@ use hugr::{HugrView, Node};
 use crate::control::IdentityCfgMap;
 use crate::control::cfg::{CfgFactsError, PreprocessedCfg};
 
+pub(crate) use error::RvsdgBuildError;
+
 fn build_cfg_rvsdg<H: HugrView<Node = Node>>(
     cfg_view: &H,
     cfg: &IdentityCfgMap<H>,
 ) -> Result<ir::Rvsdg, RvsdgBuildError<Node>> {
     match construct::build_cfg_rvsdg_with_map(cfg_view, cfg) {
         Ok(rvsdg) => Ok(rvsdg),
+        // If the CFG is irreducible, we attempt to preprocess it to make it reducible before trying again.
+        //
+        // This is the case when the CFG has loops with multiple entries, that cannot be mapped directly to tail-loops.
+        //
+        // Most guppy-generated HUGRs should be reducible, but hand-written CFGs may not be.
         Err(RvsdgBuildError::IrreducibleCfg { .. }) => {
             let preprocessed = PreprocessedCfg::new(cfg_view.entrypoint(), cfg)
                 .map_err(map_cfg_facts_error(cfg_view.entrypoint()))?;
@@ -49,7 +56,6 @@ fn build_cfg_rvsdg<H: HugrView<Node = Node>>(
     }
 }
 
-pub(crate) use error::RvsdgBuildError;
 pub(crate) fn analyze_cfg<H: HugrView<Node = Node>>(
     cfg_view: &H,
     cfg: &IdentityCfgMap<H>,
