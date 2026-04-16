@@ -1,8 +1,8 @@
-//! Shared lowering pipeline for structured CFG rewrites.
+//! Shared lowering pipeline for one structured CFG rewrite.
 //!
 //! Strategy-specific analysis produces a private lowering-oriented IR in
-//! [`crate::control::structuralize::types`]. This module turns that IR into a
-//! structured replacement by:
+//! [`crate::control::structuralize::types`]. This module turns one analyzed CFG
+//! into a structured replacement by:
 //!
 //! 1. building a detached template containing `Conditional`, `TailLoop`, and
 //!    placeholder `DFG` nodes, and
@@ -16,47 +16,37 @@
 mod materialize;
 mod template;
 
-use std::collections::BTreeSet;
-
-use hugr::HugrView;
 use hugr::Node;
 use hugr::hugr::hugrmut::HugrMut;
 
 use crate::passes::normalize_cfgs::normalize_cfg;
 
 use super::analyze::analyze_cfg;
-use super::types::{
-    StructuralizationError, StructuralizationRewriteReport, StructuralizationStrategy,
-};
+use super::types::{StructuralizationError, StructuralizationStrategy};
 use crate::control::{IdentityCfgMap, relooper};
 use materialize::materialize_cfg_rewrite;
 pub(crate) use template::{LoweredCfgTemplate, prepare_cfg_replacement};
 
-/// Structuralize the specified CFGs and rewrite them in place.
+/// Structuralizes one CFG and rewrites it in place.
 ///
 /// # Errors
 ///
 /// Returns an error when the selected strategy is unsupported, when CFG
-/// structural analysis or lowering fails for any targeted CFG, or when local
-/// post-rewrite normalization produces an invalid HUGR.
-pub fn structurize_cfgs<H: HugrMut<Node = Node>>(
+/// structural analysis or lowering fails for the targeted CFG, or when the
+/// local normalization retry produces an invalid HUGR.
+///
+/// Returns `Ok(true)` when a CFG was rewritten, and `Ok(false)` when the local
+/// normalization retry simplified the CFG away before structuralization.
+pub(crate) fn structurize_cfg<H: HugrMut<Node = Node>>(
     hugr: &mut H,
-    cfgs: &[Node],
+    cfg: Node,
     strategy: StructuralizationStrategy,
-) -> Result<StructuralizationRewriteReport, StructuralizationError> {
-    let cfgs = outermost_cfgs(hugr, cfgs);
-    let mut rewrites = Vec::with_capacity(cfgs.len());
-    for cfg in cfgs {
-        let Some(replacement) = prepare_replacement_with_normalize_retry(hugr, cfg, strategy)?
-        else {
-            continue;
-        };
-        materialize_cfg_rewrite(hugr, cfg, replacement)?;
-        normalize_nested_cfgs(hugr, cfg)?;
-        rewrites.push(cfg);
-    }
-
-    Ok(StructuralizationRewriteReport { rewrites })
+) -> Result<bool, StructuralizationError> {
+    let Some(replacement) = prepare_replacement_with_normalize_retry(hugr, cfg, strategy)? else {
+        return Ok(false);
+    };
+    materialize_cfg_rewrite(hugr, cfg, replacement)?;
+    Ok(true)
 }
 
 /// Prepares one CFG rewrite, retrying after local CFG normalization when raw
@@ -96,47 +86,4 @@ fn prepare_replacement<H: HugrMut<Node = Node>>(
             relooper::prepare_cfg_rewrite(&cfg_view, &id_cfg)
         }
     }
-}
-
-/// Normalizes nested CFGs beneath one rewritten region root.
-///
-/// Structuralization can materialize helper CFGs inside the rewritten region,
-/// for example when original block subgraphs already contained nested control
-/// flow. The structuralization pipeline only owns one rewritten root at a
-/// time, so it normalizes exactly the nested CFG descendants of that root
-/// rather than invoking the general pass layer again.
-fn normalize_nested_cfgs<H: HugrMut<Node = Node>>(
-    hugr: &mut H,
-    root: Node,
-) -> Result<(), StructuralizationError> {
-    let mut cfgs = hugr
-        .descendants(root)
-        .filter(|node| hugr.get_optype(*node).is_cfg())
-        .collect::<Vec<_>>();
-    cfgs.reverse();
-    for cfg in cfgs {
-        normalize_cfg(&mut hugr.with_entrypoint_mut(cfg))?;
-    }
-    Ok(())
-}
-
-/// Filters a set of CFG roots down to the outermost ones.
-///
-/// Rewriting a parent CFG subsumes rewriting nested CFGs beneath it, so the
-/// pass only prepares top-level rewrite targets.
-fn outermost_cfgs<H: HugrView<Node = Node>>(hugr: &H, cfgs: &[Node]) -> Vec<Node> {
-    let cfg_set = cfgs.iter().copied().collect::<BTreeSet<_>>();
-    cfgs.iter()
-        .copied()
-        .filter(|cfg| {
-            let mut parent = hugr.get_parent(*cfg);
-            while let Some(node) = parent {
-                if cfg_set.contains(&node) {
-                    return false;
-                }
-                parent = hugr.get_parent(node);
-            }
-            true
-        })
-        .collect()
 }

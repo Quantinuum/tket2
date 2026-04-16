@@ -41,16 +41,29 @@ pub(super) fn cfgs(h: &Hugr) -> Vec<Node> {
 }
 
 pub(super) fn run_structurize(h: &mut Hugr, strategy: StructuralizationStrategy) {
-    let cfgs = cfgs(h);
-    structurize_cfgs(h, &cfgs, strategy).unwrap();
+    StructuralizeCfgsPass::default()
+        .with_strategy(strategy)
+        .run(h)
+        .unwrap();
+}
+
+pub(super) fn structurize_report(
+    h: &mut Hugr,
+    strategy: StructuralizationStrategy,
+) -> StructuralizationRewriteReport {
+    StructuralizeCfgsPass::default()
+        .with_strategy(strategy)
+        .run(h)
+        .unwrap()
 }
 
 pub(super) fn structurize_result(
     mut h: Hugr,
     strategy: StructuralizationStrategy,
 ) -> Result<Hugr, String> {
-    let cfgs = cfgs(&h);
-    structurize_cfgs(&mut h, &cfgs, strategy)
+    StructuralizeCfgsPass::default()
+        .with_strategy(strategy)
+        .run(&mut h)
         .map(|_| h)
         .map_err(|err| err.to_string())
 }

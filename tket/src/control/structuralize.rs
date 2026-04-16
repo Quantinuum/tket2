@@ -15,7 +15,7 @@ mod types;
 #[cfg(test)]
 pub(crate) use analyze::analyze_hugr_cfgs;
 pub(crate) use lower::LoweredCfgTemplate;
-pub use lower::structurize_cfgs;
+pub(crate) use lower::structurize_cfg;
 #[cfg(test)]
 pub(crate) use types::StructuralizationAnalysisReport;
 pub(crate) use types::{

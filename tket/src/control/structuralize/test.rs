@@ -27,8 +27,8 @@ use std::io::BufReader;
 use std::path::Path;
 
 use super::{
-    StructuralizationAnalysisReport, StructuralizationStrategy, StructuredLoopKind, StructuredNode,
-    StructuredRegionBody, analyze_hugr_cfgs, structurize_cfgs,
+    StructuralizationAnalysisReport, StructuralizationRewriteReport, StructuralizationStrategy,
+    StructuredLoopKind, StructuredNode, StructuredRegionBody, analyze_hugr_cfgs,
 };
 
 use fixtures::*;

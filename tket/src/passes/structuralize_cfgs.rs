@@ -4,13 +4,14 @@
 //! keeps strategy/scope selection in pass-land, so future RVSDG and
 //! Beyond-Relooper implementations can share one integration point.
 
+use std::collections::VecDeque;
+
 use hugr::Node;
 use hugr::hugr::hugrmut::HugrMut;
-use itertools::Either;
 
 use crate::control::structuralize::{
     StructuralizationError, StructuralizationRewriteReport, StructuralizationStrategy,
-    structurize_cfgs,
+    structurize_cfg,
 };
 use crate::passes::composable::WithScope;
 use crate::passes::{ComposablePass, PassScope};
@@ -42,25 +43,36 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for StructuralizeCfgsPass {
     type Result = StructuralizationRewriteReport;
 
     fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
+        let mut rewrites = Vec::new();
+        let mut queue = VecDeque::new();
+
+        fn region_children<H: HugrMut<Node = Node>>(
+            n: Node,
+            hugr: &mut H,
+        ) -> impl Iterator<Item = Node> + '_ {
+            hugr.children(n)
+                .filter(|child| hugr.children(*child).next().is_some())
+        }
+
         let Some(root) = self.scope.root(hugr) else {
             return Ok(StructuralizationRewriteReport {
                 rewrites: Vec::new(),
             });
         };
+        queue.extend(region_children(root, hugr));
 
-        let ctrs = {
+        while let Some(region) = queue.pop_front() {
+            if hugr.get_optype(region).is_cfg() {
+                if structurize_cfg(hugr, region, self.strategy)? {
+                    rewrites.push(region);
+                }
+            };
+
             if self.scope.recursive() {
-                Either::Right(hugr.descendants(root))
-            } else {
-                Either::Left(std::iter::once(root))
+                queue.extend(region_children(region, hugr));
             }
-        };
+        }
 
-        let scoped_cfgs = ctrs
-            .filter(|n| hugr.get_optype(*n).is_cfg())
-            .collect::<Vec<_>>();
-        let report = structurize_cfgs(hugr, &scoped_cfgs, self.strategy)?;
-
-        Ok(report)
+        Ok(StructuralizationRewriteReport { rewrites })
     }
 }

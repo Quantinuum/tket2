@@ -9,8 +9,7 @@ fn handles_combined_headers(
     #[case] strategy: StructuralizationStrategy,
     #[from(build_combined_headers_cfg)] mut combined_headers: Hugr,
 ) {
-    let cfgs = cfgs(&combined_headers);
-    let report = structurize_cfgs(&mut combined_headers, &cfgs, strategy).unwrap();
+    let report = structurize_report(&mut combined_headers, strategy);
     assert_eq!(report.rewrites.len(), 1);
     assert_eq!(
         combined_headers
@@ -40,8 +39,7 @@ fn lowers_irreducible_cfg(
     #[case] strategy: StructuralizationStrategy,
     #[from(build_irreducible_cfg)] mut irreducible: Hugr,
 ) {
-    let cfgs = cfgs(&irreducible);
-    let report = structurize_cfgs(&mut irreducible, &cfgs, strategy).unwrap();
+    let report = structurize_report(&mut irreducible, strategy);
     assert_eq!(report.rewrites.len(), 1);
     assert_eq!(
         irreducible
@@ -61,8 +59,7 @@ fn lowers_reducible_cfgs_with_multiple_loop_exit_targets(
     strategy: StructuralizationStrategy,
 ) {
     let mut h = build_cfg();
-    let cfgs = cfgs(&h);
-    let report = structurize_cfgs(&mut h, &cfgs, strategy).unwrap();
+    let report = structurize_report(&mut h, strategy);
     assert_eq!(report.rewrites.len(), 1);
     assert_eq!(h.nodes().filter(|n| h.get_optype(*n).is_cfg()).count(), 0);
 }
@@ -71,13 +68,10 @@ fn lowers_reducible_cfgs_with_multiple_loop_exit_targets(
 fn lowers_multi_continue_header_loop(
     #[from(build_multi_continue_header_loop_cfg)] mut multi_continue_header_loop: Hugr,
 ) {
-    let cfgs = cfgs(&multi_continue_header_loop);
-    let report = structurize_cfgs(
+    let report = structurize_report(
         &mut multi_continue_header_loop,
-        &cfgs,
         StructuralizationStrategy::Relooper,
-    )
-    .unwrap();
+    );
     assert_eq!(report.rewrites.len(), 1);
     assert_eq!(
         multi_continue_header_loop
@@ -92,13 +86,10 @@ fn lowers_multi_continue_header_loop(
 fn lowers_non_unique_backedge_loop(
     #[from(build_non_unique_backedge_loop_cfg)] mut non_unique_backedge_loop: Hugr,
 ) {
-    let cfgs = cfgs(&non_unique_backedge_loop);
-    let report = structurize_cfgs(
+    let report = structurize_report(
         &mut non_unique_backedge_loop,
-        &cfgs,
         StructuralizationStrategy::Relooper,
-    )
-    .unwrap();
+    );
     assert_eq!(report.rewrites.len(), 1);
     assert_eq!(
         non_unique_backedge_loop

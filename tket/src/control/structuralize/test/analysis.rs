@@ -82,12 +82,7 @@ fn header_loop_io(#[from(build_header_controlled_loop_cfg)] header_loop: Hugr) {
 #[rstest]
 fn lowers_branch_then_loop(#[from(build_cond_then_loop_cfg)] mut cond_then_loop: Hugr) {
     let original_cfgs = cfgs(&cond_then_loop);
-    let report = structurize_cfgs(
-        &mut cond_then_loop,
-        &original_cfgs,
-        StructuralizationStrategy::Rvsdg,
-    )
-    .unwrap();
+    let report = structurize_report(&mut cond_then_loop, StructuralizationStrategy::Rvsdg);
     assert_eq!(report.rewrites.len(), 1);
     assert_eq!(report.rewrites[0], original_cfgs[0]);
     assert_lowered_counts(&cond_then_loop, 2, 1);
