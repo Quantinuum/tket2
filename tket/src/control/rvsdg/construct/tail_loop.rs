@@ -112,15 +112,19 @@ impl<'a, H: HugrView<Node = Node>> RvsdgBuilder<'a, H> {
                     },
                 )?,
             );
-            let exits = build_theta_exit_continuations(self, ThetaExitContinuationBuild {
-                cfg,
-                scope,
-                stop,
-                active_loop,
-                info,
-                header,
-                multi_exit,
-            }, &exit_variants)?;
+            let exits = build_theta_exit_continuations(
+                self,
+                ThetaExitContinuationBuild {
+                    cfg,
+                    scope,
+                    stop,
+                    active_loop,
+                    info,
+                    header,
+                    multi_exit,
+                },
+                &exit_variants,
+            )?;
             (
                 LoopKind::HeaderControlled,
                 vec![ThetaEdge {
@@ -145,15 +149,19 @@ impl<'a, H: HugrView<Node = Node>> RvsdgBuilder<'a, H> {
                 header,
                 &backedge_sources,
             )?;
-            let exits = build_theta_exit_continuations(self, ThetaExitContinuationBuild {
-                cfg,
-                scope,
-                stop,
-                active_loop,
-                info,
-                header,
-                multi_exit,
-            }, &exit_variants)?;
+            let exits = build_theta_exit_continuations(
+                self,
+                ThetaExitContinuationBuild {
+                    cfg,
+                    scope,
+                    stop,
+                    active_loop,
+                    info,
+                    header,
+                    multi_exit,
+                },
+                &exit_variants,
+            )?;
             (
                 LoopKind::TailControlled,
                 continue_edges,

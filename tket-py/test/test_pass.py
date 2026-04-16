@@ -5,6 +5,7 @@ from tket.passes import (
     _badger_optimise,
     _greedy_depth_reduce,
     CaseOfCase,
+    InlineFunctions,
     NormalizeGuppy,
     SinkConditionalInputs,
     StructuralizationStrategy,
@@ -274,3 +275,13 @@ def test_case_of_case() -> None:
     rewritten = case_of_case(hugr)
 
     assert _count_ops(rewritten, "Conditional") >= 1
+
+
+def test_inline_functions() -> None:
+    hugr = _hugr_from_path("test_files/guppy_examples/fn_calls.hugr")
+
+    assert _count_ops(hugr, "Call") == 2
+
+    inlined = InlineFunctions(max_inline_size=64)(hugr)
+
+    assert _count_ops(inlined, "Call") == 0

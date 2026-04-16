@@ -1,6 +1,5 @@
 //! Contains a pass to inline calls to selected functions in a Hugr.
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::convert::Infallible;
 
 use itertools::Itertools;
 use petgraph::algo::tarjan_scc;
@@ -44,7 +43,7 @@ impl InlineFunctionsPass {
 }
 
 impl<H: HugrMut> ComposablePass<H> for InlineFunctionsPass {
-    type Error = Infallible;
+    type Error = InlineFuncsError;
     type Result = ();
 
     fn run(&self, h: &mut H) -> Result<(), Self::Error> {
@@ -53,9 +52,14 @@ impl<H: HugrMut> ComposablePass<H> for InlineFunctionsPass {
             if self.scope.in_scope(h, call) != InScope::Yes {
                 return false;
             }
-            *should_inline_cache.entry(call).or_insert_with(|| true)
-        });
-        Ok(())
+            let Some(func) = h.static_source(call) else {
+                return false;
+            };
+            *should_inline_cache.entry(func).or_insert_with(|| {
+                let func_size = h.descendants(func).count();
+                func_size <= self.max_inline_size
+            })
+        })
     }
 }
 
@@ -131,7 +135,8 @@ mod test {
     use hugr_core::ops::OpType;
     use hugr_core::{Hugr, extension::prelude::qb_t, types::Signature};
 
-    use super::inline_acyclic;
+    use super::{InlineFunctionsPass, inline_acyclic};
+    use crate::passes::composable::test::run_validating;
 
     ///          /->-\
     /// main -> f     g -> b -> c
@@ -273,5 +278,30 @@ mod test {
             OpType::FuncDefn(fd) => fd.func_name(),
             _ => panic!(),
         }
+    }
+
+    #[rstest]
+    #[case(0, vec!["f", "b"])]
+    #[case(usize::MAX, vec!["f"])]
+    fn inline_functions_pass_respects_max_inline_size(
+        #[case] max_inline_size: usize,
+        #[case] g_targets: Vec<&'static str>,
+    ) {
+        let mut h = make_test_hugr();
+        run_validating(
+            InlineFunctionsPass::default().with_max_inline_size(max_inline_size),
+            &mut h,
+        )
+        .unwrap();
+
+        let cg = ModuleGraph::new(&h);
+        let g = find_func(&h, "g");
+        assert_eq!(
+            outgoing_calls(&cg, g)
+                .into_iter()
+                .map(|n| func_name(&h, n).as_str())
+                .collect::<HashSet<_>>(),
+            HashSet::from_iter(g_targets),
+        );
     }
 }

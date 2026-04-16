@@ -30,6 +30,7 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     m.add_function(wrap_pyfunction!(case_of_case, &m)?)?;
     m.add_function(wrap_pyfunction!(sink_conditional_inputs, &m)?)?;
     m.add_function(wrap_pyfunction!(structuralize_cfgs, &m)?)?;
+    m.add_function(wrap_pyfunction!(inline_functions, &m)?)?;
     m.add_class::<self::chunks::PyCircuitChunks>()?;
     m.add_function(wrap_pyfunction!(self::chunks::chunks, &m)?)?;
     m.add_function(wrap_pyfunction!(self::tket1::tket1_pass, &m)?)?;
@@ -43,6 +44,10 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     m.add(
         "SinkConditionalInputsError",
         py.get_type::<PySinkConditionalInputsError>(),
+    )?;
+    m.add(
+        "InlineFunctionsError",
+        py.get_type::<PyInlineFunctionsError>(),
     )?;
     m.add("TK1PassError", py.get_type::<tket1::PytketPassError>())?;
     Ok(m)
@@ -82,6 +87,12 @@ create_py_exception!(
     tket::passes::sink_conditional_inputs::SinkConditionalInputsError,
     PySinkConditionalInputsError,
     "Errors from the conditional-input sinking pass."
+);
+
+create_py_exception!(
+    tket::passes::inline_funcs::InlineFuncsError,
+    PyInlineFunctionsError,
+    "Errors from the function inlining pass."
 );
 
 /// Flatten the structure of a Guppy-generated program to enable additional optimisations.
@@ -184,6 +195,25 @@ fn structuralize_cfgs(
 
     let pass = tket::passes::StructuralizeCfgsPass::default_with_scope(py_scope.scope)
         .with_strategy(strategy);
+    pass.run(&mut circ.hugr).convert_pyerrs()?;
+    Ok(())
+}
+
+/// Inline acyclic function calls below the selected scope.
+///
+/// Parameters:
+/// - max_inline_size: Maximum number of descendants allowed in a callee for
+///   its call sites to be inlined.
+#[pyfunction]
+#[pyo3(signature = (circ, *, max_inline_size = 64, scope = None))]
+fn inline_functions(
+    circ: &mut CompilationState,
+    max_inline_size: usize,
+    scope: Option<PyPassScope>,
+) -> PyResult<()> {
+    let py_scope = scope.unwrap_or_default();
+    let pass = tket::passes::InlineFunctionsPass::default_with_scope(py_scope.scope)
+        .with_max_inline_size(max_inline_size);
     pass.run(&mut circ.hugr).convert_pyerrs()?;
     Ok(())
 }

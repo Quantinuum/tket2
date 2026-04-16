@@ -64,6 +64,14 @@ def structuralize_cfgs(
 ) -> None:
     """Structuralize CFG regions into nested `Conditional` and `TailLoop` nodes."""
 
+def inline_functions(
+    circ: CompilationState,
+    *,
+    max_inline_size: int = 64,
+    scope: PassScope = GlobalScope.PRESERVE_PUBLIC,
+) -> None:
+    """Inline acyclic function calls below the selected scope."""
+
 def greedy_depth_reduce(circ: CompilationState) -> int:
     """Greedy depth reduction of a circuit.
 
