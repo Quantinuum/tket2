@@ -66,10 +66,10 @@ impl MakeOpDef for GlobalsOpDef {
         match self {
             Self::swap => PolyFuncType::new(
                 [NAME_PARAM.to_owned(), TYPE_PARAM.to_owned()],
-                Signature::new_endo(Type::from(option_type(Type::new_var_use(
+                Signature::new_endo([Type::from(option_type([Type::new_var_use(
                     1,
                     TypeBound::Linear,
-                )))),
+                )]))]),
             )
             .into(),
         }

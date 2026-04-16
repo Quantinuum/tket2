@@ -38,7 +38,7 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
     match op {
         GlobalsOp::Swap { name, ty } => {
             let sym = format!("{PREFIX}.{name}");
-            let sym_ty = context.llvm_sum_type(option_type(ty.clone()))?;
+            let sym_ty = context.llvm_sum_type(option_type([ty.clone()]))?;
 
             let [new_value] = &args.inputs[..] else {
                 bail!("Expected one input for GlobalsOp::Swap")
@@ -54,12 +54,12 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
             let none_value = sym_ty.build_tag(builder, 0, vec![])?;
 
             let global = module.get_global(&sym).unwrap_or_else(|| {
-                let global = module.add_global(sym_ty, Some(AddressSpace::default()), &sym);
+                let global = module.add_global(sym_ty.clone(), Some(AddressSpace::default()), &sym);
                 global.set_initializer(&none_value);
                 global
             });
 
-            let result = builder.build_load(global.as_pointer_value(), "current_value")?;
+            let result = builder.build_load(sym_ty, global.as_pointer_value(), "current_value")?;
             let _ = builder.build_store(global.as_pointer_value(), *new_value)?;
             args.outputs.finish(builder, [result])?
         }
