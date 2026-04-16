@@ -62,6 +62,7 @@ struct ModifierFlags {
 
 impl ModifierFlags {
     fn from_metadata<N: HugrNode>(h: &impl HugrView<Node = N>, n: N) -> Option<Self> {
+        println!(" Metadata for node {:?}: {:?}", n, h.node_metadata_map(n));
         h.get_metadata::<metadata::Unitary>(n)
             .map(|num| ModifierFlags {
                 dagger: (num & 1) != 0,
