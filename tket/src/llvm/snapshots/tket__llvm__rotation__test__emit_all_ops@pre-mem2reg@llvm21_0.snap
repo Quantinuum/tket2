@@ -88,14 +88,14 @@ cond_exit_7:                                      ; preds = %cond_7_case_1, %con
   ret void
 }
 
-; Function Attrs: nocallback nocreateundeforpoison nofree nosync nounwind speculatable willreturn memory(none)
+; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
 declare i1 @llvm.is.fpclass.f64(double, i32 immarg) #0
 
 declare i32 @printf(ptr, ...)
 
 declare void @abort()
 
-attributes #0 = { nocallback nocreateundeforpoison nofree nosync nounwind speculatable willreturn memory(none) }
+attributes #0 = { nocallback nofree nosync nounwind speculatable willreturn memory(none) }
 
 !llvm.module.flags = !{!0}
 !llvm.dbg.cu = !{!1}
