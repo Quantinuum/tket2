@@ -97,7 +97,7 @@ class CompilationState:
         """Convert this CompilationState back to a python Hugr package."""
         # Convert the inner hugr to bytes and load it in Python.
         hugr_bytes = self._inner.to_bytes()
-        package = Package.from_bytes(hugr_bytes, self._py_extensions)
+        package = Package.from_bytes(hugr_bytes)
         if self._py_extensions is not None:
             # Resolve the extensions in the loaded package using the python registry, if needed.
             # TODO: Use the `package.resolve_extensions` for clarity once it's been released in `hugr-py 0.16.0`.
