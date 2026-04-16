@@ -75,12 +75,12 @@ class CompilationState:
         if isinstance(hugr, Hugr):
             embedded = set(_state.embedded_extensions())
             res = hugr.used_extensions()
-            py_extensions = res.used_extensions
             extensions = [
                 ext
                 for ext in res.used_extensions.extensions
                 if ext.name not in embedded
             ]
+            py_extensions = ExtensionRegistry.from_extensions(extensions)
             # Wrap the hugr in a package with the non-standard extensions.
             package = Package(modules=[hugr], extensions=extensions)
         elif isinstance(hugr, Package):
