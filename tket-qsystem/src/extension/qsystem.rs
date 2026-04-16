@@ -70,6 +70,7 @@ lazy_static! {
 /// Target platform for QSystem operations. This can determine supported operations,
 /// the native gateset, and steer optimisation choices.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum QSystemPlatform {
     /// Quantinuum Helios, supporting rxy, rzz, rz
     Helios,
@@ -396,7 +397,6 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
                 let qb1 = self.add_phased_x(platform, qb1, pi_2, pi_2)?;
                 let qb2 = self.add_phased_x(platform, qb2, pi_2, pi_2)?;
                 [qb1, qb2]
-                // unimplemented!("ZZPhase lowering for Sol is not yet implemented")
             }
         })
     }
@@ -550,7 +550,6 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
                 let c = self.add_rz(platform, c, pi_minus_2)?;
                 let t = self.add_phased_x(platform, t, pi_minus_2, zero)?;
                 [c, t]
-                // unimplemented!("CX lowering for Sol is not yet implemented")
             }
         })
     }
@@ -623,7 +622,6 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
                 let a = self.add_rz(platform, a, pi_minus_2)?;
                 let b = self.add_rz(platform, b, pi_minus_2)?;
                 [a, b]
-                // unimplemented!("CZ lowering for Sol is not yet implemented")
             }
         })
     }
@@ -692,8 +690,6 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
                 let b = self.add_phased_x(platform, b, pi_2, pi_2)?;
                 let b = self.add_rz(platform, b, lambda_2)?;
                 [a, b]
-
-                // unimplemented!("CRZ lowering for Sol is not yet implemented")
             }
         })
     }
@@ -773,7 +769,6 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
                 let b = self.add_rz(platform, b, pi)?;
 
                 [a, b, c]
-                // unimplemented!("Toffoli lowering for Sol is not yet implemented")
             }
         })
     }
