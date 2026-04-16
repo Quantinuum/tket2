@@ -428,6 +428,27 @@ impl From<NormalizeCFGError> for StructuralizationError {
     }
 }
 
+impl StructuralizationError {
+    /// Returns `true` when this error means the CFG cannot be structuralized
+    /// with the requested strategy and may be left unchanged.
+    pub(crate) fn is_unstructuralizable(&self) -> bool {
+        match self {
+            Self::Rvsdg(_) => true,
+            Self::ExpectedDataflowBlock { .. }
+            | Self::ExpectedExitBlock { .. }
+            | Self::UnsupportedBranch { .. }
+            | Self::UnsupportedLoop { .. }
+            | Self::UnsupportedIrreducibleCfg { .. }
+            | Self::Relooper { .. }
+            | Self::UnsupportedStrategy { .. } => true,
+            Self::Materialization { .. }
+            | Self::Build(_)
+            | Self::Validation(_)
+            | Self::Normalize(_) => false,
+        }
+    }
+}
+
 /// Reports whether a structured subtree still contains a specific original CFG block.
 ///
 /// Analysis and lowering both use this to sanity-check that inferred loop
