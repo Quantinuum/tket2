@@ -8,7 +8,7 @@ let
   sources = builtins.fromJSON (builtins.readFile ./hugrenv.lock);
   version = sources.version;
   get-package = package: pkgs.fetchzip {
-    url = let 
+    url = let
       path="https://github.com/Quantinuum/hugrverse-env/releases/download/v${version}/hugrenv-${package}-${platform}_${arch}.tar.gz";
     in builtins.trace "fetching ${package} from ${path}" path;
     sha256 = sources.hashes.${platform}.${arch}.${package};
