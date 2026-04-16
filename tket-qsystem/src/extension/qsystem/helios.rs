@@ -4,40 +4,29 @@
 //! In the case of lazy operations,
 //! laziness is represented by returning `tket.futures.Future` classical
 //! values. Qubits are never lazy.
-use std::{
-    str::FromStr,
-    sync::{Arc, Weak},
-};
+use std::{str::FromStr, sync::Arc};
 
 use hugr::{
     Extension, Wire,
-    builder::{BuildError, Dataflow, DataflowSubContainer, SubContainer},
+    builder::{BuildError, Dataflow},
     extension::{
         ExtensionId, OpDef, SignatureFunc, Version,
-        prelude::{UnwrapBuilder, bool_t, option_type, qb_t},
+        prelude::qb_t,
         simple_op::{MakeOpDef, MakeRegisteredOp, try_from_name},
     },
-    ops::{ExtensionOp, OpName, Value},
-    std_extensions::{
-        arithmetic::{
-            float_ops::FloatOps,
-            float_types::{ConstF64, float64_type},
-            int_types::int_type,
-        },
-        collections::array::{ArrayOpBuilder, array_type_parametric},
+    ops::Value,
+    std_extensions::arithmetic::{
+        float_ops::FloatOps,
+        float_types::{ConstF64, float64_type},
     },
-    type_row,
-    types::{PolyFuncType, Signature, Type, TypeArg, TypeRow, type_param::TypeParam},
+    types::{Signature, TypeRow},
 };
 
+use super::common::{self, CommonOp, CommonOpBuilder, SharedOp};
+use super::lower::pi_mul_f64;
 use derive_more::Display;
 use lazy_static::lazy_static;
 use strum::{EnumIter, EnumString, IntoStaticStr};
-use tket::extension::bool::{BoolOp, bool_type};
-
-use super::futures::future_type;
-
-use super::lower::pi_mul_f64;
 
 /// The "tket.qsystem.helios" extension id.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("tket.qsystem.helios");
@@ -104,31 +93,19 @@ impl MakeOpDef for HeliosOp {
     }
 
     fn init_signature(&self, _extension_ref: &std::sync::Weak<Extension>) -> SignatureFunc {
-        use HeliosOp::*;
-        let one_qb_row = TypeRow::from(vec![qb_t()]);
-        let two_qb_row = TypeRow::from(vec![qb_t(), qb_t()]);
-        match self {
-            LazyMeasure => Signature::new(one_qb_row.clone(), vec![future_type(bool_t())]),
-            LazyMeasureLeaked => Signature::new(one_qb_row.clone(), vec![future_type(int_type(6))]),
-            LazyMeasureReset => {
-                Signature::new(one_qb_row.clone(), vec![qb_t(), future_type(bool_t())])
+        if let Ok(shared_op) = SharedOp::try_from(*self) {
+            shared_op.signature()
+        } else {
+            // For Helios-specific ops, provide custom signatures.
+            match self {
+                HeliosOp::ZZPhase => Signature::new(
+                    vec![qb_t(), qb_t(), float64_type()],
+                    TypeRow::from(vec![qb_t(), qb_t()]),
+                )
+                .into(),
+                _ => unreachable!("All other HeliosOps should have been convertible to SharedOps."),
             }
-            Reset => Signature::new(one_qb_row.clone(), one_qb_row.clone()),
-            ZZPhase => Signature::new(vec![qb_t(), qb_t(), float64_type()], two_qb_row.clone()),
-            Measure => Signature::new(one_qb_row.clone(), vec![bool_type()]),
-            Rz => Signature::new(vec![qb_t(), float64_type()], one_qb_row.clone()),
-            PhasedX => Signature::new(
-                vec![qb_t(), float64_type(), float64_type()],
-                one_qb_row.clone(),
-            ),
-            TryQAlloc => Signature::new(
-                type_row![],
-                vec![Type::from(option_type(one_qb_row.clone()))],
-            ),
-            QFree => Signature::new(one_qb_row.clone(), type_row![]),
-            MeasureReset => Signature::new(one_qb_row, vec![qb_t(), bool_type()]),
         }
-        .into()
     }
 
     fn from_def(op_def: &OpDef) -> Result<Self, hugr::extension::simple_op::OpLoadError> {
@@ -144,23 +121,13 @@ impl MakeOpDef for HeliosOp {
     }
 
     fn description(&self) -> String {
-        match self {
-            HeliosOp::Measure => "Measure a qubit and lose it.",
-            HeliosOp::LazyMeasure => "Lazily measure a qubit and lose it.",
-            HeliosOp::Rz => {
-                "Rotate a qubit around the Z axis. Not physical on Helios or Sol platforms."
-            }
-            HeliosOp::PhasedX => "PhasedX gate.",
-            HeliosOp::ZZPhase => "ZZ gate with an angle, specific to the Helios platform.",
-            HeliosOp::TryQAlloc => "Allocate a qubit in the Z |0> eigenstate.",
-            HeliosOp::QFree => "Free a qubit (lose track of it).",
-            HeliosOp::Reset => "Reset a qubit to the Z |0> eigenstate.",
-            HeliosOp::MeasureReset => "Measure a qubit and reset it to the Z |0> eigenstate.",
-            HeliosOp::LazyMeasureLeaked => {
-                "Measure a qubit (return 0 or 1) or detect leakage (return 2)."
-            }
-            HeliosOp::LazyMeasureReset => {
-                "Lazily measure a qubit and reset it to the Z |0> eigenstate."
+        if let Ok(shared_op) = SharedOp::try_from(*self) {
+            shared_op.description()
+        } else {
+            // For Helios-specific ops, provide custom descriptions.
+            match self {
+                HeliosOp::ZZPhase => "ZZ gate with an angle, specific to the Helios platform.",
+                _ => unreachable!("All other HeliosOps should have been convertible to SharedOps."),
             }
         }
         .to_string()
@@ -177,8 +144,47 @@ impl MakeRegisteredOp for HeliosOp {
     }
 }
 
+impl TryFrom<HeliosOp> for SharedOp {
+    type Error = &'static str;
+
+    fn try_from(helios_op: HeliosOp) -> Result<Self, Self::Error> {
+        use HeliosOp::*;
+        match helios_op {
+            Measure => Ok(SharedOp::Measure),
+            LazyMeasure => Ok(SharedOp::LazyMeasure),
+            Rz => Ok(SharedOp::Rz),
+            PhasedX => Ok(SharedOp::PhasedX),
+            TryQAlloc => Ok(SharedOp::TryQAlloc),
+            QFree => Ok(SharedOp::QFree),
+            Reset => Ok(SharedOp::Reset),
+            MeasureReset => Ok(SharedOp::MeasureReset),
+            LazyMeasureLeaked => Ok(SharedOp::LazyMeasureLeaked),
+            LazyMeasureReset => Ok(SharedOp::LazyMeasureReset),
+            ZZPhase => Err("Helios-specific ops don't have a corresponding SharedOp."),
+        }
+    }
+}
+
+impl From<SharedOp> for HeliosOp {
+    fn from(shared_op: SharedOp) -> Self {
+        use SharedOp::*;
+        match shared_op {
+            Measure => HeliosOp::Measure,
+            LazyMeasure => HeliosOp::LazyMeasure,
+            Rz => HeliosOp::Rz,
+            PhasedX => HeliosOp::PhasedX,
+            TryQAlloc => HeliosOp::TryQAlloc,
+            QFree => HeliosOp::QFree,
+            Reset => HeliosOp::Reset,
+            MeasureReset => HeliosOp::MeasureReset,
+            LazyMeasureLeaked => HeliosOp::LazyMeasureLeaked,
+            LazyMeasureReset => HeliosOp::LazyMeasureReset,
+        }
+    }
+}
+impl CommonOp for HeliosOp {}
 /// The name of the "tket.qsystem.RuntimeBarrier" operation.
-pub const RUNTIME_BARRIER_NAME: OpName = OpName::new_inline("RuntimeBarrier");
+pub const RUNTIME_BARRIER_NAME: hugr::ops::OpName = common::RUNTIME_BARRIER_NAME;
 
 /// Helper struct for the "tket.qsystem.RuntimeBarrier" operation definition.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -188,11 +194,7 @@ impl FromStr for RuntimeBarrierDef {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s == RuntimeBarrierDef.opdef_id().as_str() {
-            Ok(Self)
-        } else {
-            Err(())
-        }
+        common::runtime_barrier_from_str(s).map(|()| Self)
     }
 }
 
@@ -212,58 +214,48 @@ impl MakeOpDef for RuntimeBarrierDef {
         Arc::downgrade(&EXTENSION)
     }
 
-    fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
-        PolyFuncType::new(
-            [TypeParam::max_nat_type()],
-            Signature::new_endo(vec![
-                array_type_parametric(TypeArg::new_var_use(0, TypeParam::max_nat_type()), qb_t())
-                    .unwrap(),
-            ]),
-        )
-        .into()
+    fn init_signature(
+        &self,
+        _extension_ref: &std::sync::Weak<Extension>,
+    ) -> hugr::extension::SignatureFunc {
+        common::runtime_barrier_signature()
     }
 
     fn description(&self) -> String {
-        "Acts as a runtime barrier between operations on argument qubits.".to_string()
+        common::runtime_barrier_description()
     }
 
-    fn opdef_id(&self) -> OpName {
+    fn opdef_id(&self) -> hugr::ops::OpName {
         RUNTIME_BARRIER_NAME
     }
 }
 
 /// An extension trait for [Dataflow] providing methods to add
 /// "tket.qsystem.helios" operations.
-pub trait HeliosOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
+pub trait HeliosOpBuilder: CommonOpBuilder {
     /// Add a "tket.qsystem.helios.LazyMeasure" op.
     fn add_lazy_measure(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        Ok(self
-            .add_dataflow_op(HeliosOp::LazyMeasure, [qb])?
-            .out_wire(0))
+        CommonOpBuilder::add_lazy_measure_with::<HeliosOp>(self, qb)
     }
 
     /// Add a "tket.qsystem.helios.LazyMeasureLeaked" op.
     fn add_lazy_measure_leaked(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        Ok(self
-            .add_dataflow_op(HeliosOp::LazyMeasureLeaked, [qb])?
-            .out_wire(0))
+        CommonOpBuilder::add_lazy_measure_leaked_with::<HeliosOp>(self, qb)
     }
 
     /// Add a "tket.qsystem.helios.LazyMeasureReset" op.
     fn add_lazy_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
-        Ok(self
-            .add_dataflow_op(HeliosOp::LazyMeasureReset, [qb])?
-            .outputs_arr())
+        CommonOpBuilder::add_lazy_measure_reset_with::<HeliosOp>(self, qb)
     }
 
     /// Add a "tket.qsystem.helios.Measure" op.
     fn add_measure(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        Ok(self.add_dataflow_op(HeliosOp::Measure, [qb])?.out_wire(0))
+        CommonOpBuilder::add_measure_with::<HeliosOp>(self, qb)
     }
 
     /// Add a "tket.qsystem.helios.Reset" op.
     fn add_reset(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        Ok(self.add_dataflow_op(HeliosOp::Reset, [qb])?.out_wire(0))
+        CommonOpBuilder::add_reset_with::<HeliosOp>(self, qb)
     }
 
     /// Add a maximally entangling "tket.qsystem.ZZPhase(pi/2)" op.
@@ -281,107 +273,83 @@ pub trait HeliosOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
 
     /// Add a "tket.qsystem.helios.PhasedX" op.
     fn add_phased_x(&mut self, qb: Wire, angle1: Wire, angle2: Wire) -> Result<Wire, BuildError> {
-        Ok(self
-            .add_dataflow_op(HeliosOp::PhasedX, [qb, angle1, angle2])?
-            .out_wire(0))
+        CommonOpBuilder::add_phased_x_with::<HeliosOp>(self, qb, angle1, angle2)
     }
 
     /// Add a "tket.qsystem.helios.Rz" op.
     fn add_rz(&mut self, qb: Wire, angle: Wire) -> Result<Wire, BuildError> {
-        Ok(self.add_dataflow_op(HeliosOp::Rz, [qb, angle])?.out_wire(0))
+        CommonOpBuilder::add_rz_with::<HeliosOp>(self, qb, angle)
     }
 
     /// Add a "tket.qsystem.helios.TryQAlloc" op.
     fn add_try_alloc(&mut self) -> Result<Wire, BuildError> {
-        Ok(self.add_dataflow_op(HeliosOp::TryQAlloc, [])?.out_wire(0))
+        CommonOpBuilder::add_try_alloc_with::<HeliosOp>(self)
     }
 
     /// Add a "tket.qsystem.helios.QFree" op.
     fn add_qfree(&mut self, qb: Wire) -> Result<(), BuildError> {
-        self.add_dataflow_op(HeliosOp::QFree, [qb])?;
-        Ok(())
+        CommonOpBuilder::add_qfree_with::<HeliosOp>(self, qb)
     }
 
     /// Add a "tket.qsystem.helios.MeasureReset" op.
     /// This operation is equivalent to a `Measure` followed by a `Reset`.
     fn add_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
-        Ok(self
-            .add_dataflow_op(HeliosOp::MeasureReset, [qb])?
-            .outputs_arr())
+        CommonOpBuilder::add_measure_reset_with::<HeliosOp>(self, qb)
     }
 
     /// Add a "tket.qsystem.helios.RuntimeBarrier" op.
     fn add_runtime_barrier(&mut self, qbs: Wire, array_size: u64) -> Result<Wire, BuildError> {
-        let op = runtime_barrier_ext_op(array_size)?;
-        Ok(self.add_dataflow_op(op, [qbs])?.out_wire(0))
+        CommonOpBuilder::add_runtime_barrier_with(self, &EXTENSION, qbs, array_size)
     }
 
     /// Build a hadamard gate in terms of QSystem primitives.
     fn build_h(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        let pi = pi_mul_f64(self, 1.0);
-        let pi_2 = pi_mul_f64(self, 0.5);
-        let pi_minus_2 = pi_mul_f64(self, -0.5);
-
-        let q = self.add_phased_x(qb, pi_2, pi_minus_2)?;
-        self.add_rz(q, pi)
+        CommonOpBuilder::build_h_with::<HeliosOp>(self, qb)
     }
 
     /// Build an X gate in terms of QSystem primitives.
     fn build_x(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        let pi = pi_mul_f64(self, 1.0);
-        let zero = pi_mul_f64(self, 0.0);
-        self.add_phased_x(qb, pi, zero)
+        CommonOpBuilder::build_x_with::<HeliosOp>(self, qb)
     }
 
     /// Build a Y gate in terms of QSystem primitives.
     fn build_y(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        let pi = pi_mul_f64(self, 1.0);
-        let pi_2 = pi_mul_f64(self, 0.5);
-        self.add_phased_x(qb, pi, pi_2)
+        CommonOpBuilder::build_y_with::<HeliosOp>(self, qb)
     }
 
     /// Build a Z gate in terms of QSystem primitives.
     fn build_z(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        let pi = pi_mul_f64(self, 1.0);
-        self.add_rz(qb, pi)
+        CommonOpBuilder::build_z_with::<HeliosOp>(self, qb)
     }
 
     /// Build an S gate in terms of QSystem primitives.
     fn build_s(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        let pi_2 = pi_mul_f64(self, 0.5);
-        self.add_rz(qb, pi_2)
+        CommonOpBuilder::build_s_with::<HeliosOp>(self, qb)
     }
 
     /// Build an Sdg gate in terms of QSystem primitives.
     fn build_sdg(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        let pi_minus_2 = pi_mul_f64(self, -0.5);
-        self.add_rz(qb, pi_minus_2)
+        CommonOpBuilder::build_sdg_with::<HeliosOp>(self, qb)
     }
 
     /// Build a V gate in terms of QSystem primitives.
     fn build_v(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        let pi_2 = pi_mul_f64(self, 0.5);
-        let zero = pi_mul_f64(self, 0.0);
-        self.add_phased_x(qb, pi_2, zero)
+        CommonOpBuilder::build_v_with::<HeliosOp>(self, qb)
     }
 
     /// Build a Vdg gate in terms of QSystem primitives.
     fn build_vdg(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        let pi_minus_2 = pi_mul_f64(self, -0.5);
-        let zero = pi_mul_f64(self, 0.0);
-        self.add_phased_x(qb, pi_minus_2, zero)
+        CommonOpBuilder::build_vdg_with::<HeliosOp>(self, qb)
     }
 
     /// Build a T gate in terms of QSystem primitives.
     fn build_t(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        let pi_4 = pi_mul_f64(self, 0.25);
-        self.add_rz(qb, pi_4)
+        CommonOpBuilder::build_t_with::<HeliosOp>(self, qb)
     }
 
     /// Build a Tdg gate in terms of QSystem primitives.
     fn build_tdg(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        let pi_minus_4 = pi_mul_f64(self, -0.25);
-        self.add_rz(qb, pi_minus_4)
+        CommonOpBuilder::build_tdg_with::<HeliosOp>(self, qb)
     }
 
     /// Build a CNOT gate in terms of QSystem primitives.
@@ -425,14 +393,12 @@ pub trait HeliosOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
 
     /// Build a RX gate in terms of QSystem primitives.
     fn build_rx(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError> {
-        let zero = pi_mul_f64(self, 0.0);
-        self.add_phased_x(qb, theta, zero)
+        CommonOpBuilder::build_rx_with::<HeliosOp>(self, qb, theta)
     }
 
     /// Build a RY gate in terms of QSystem primitives.
     fn build_ry(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError> {
-        let pi_2 = pi_mul_f64(self, 0.5);
-        self.add_phased_x(qb, theta, pi_2)
+        CommonOpBuilder::build_ry_with::<HeliosOp>(self, qb, theta)
     }
 
     /// Build a CRZ gate in terms of QSystem primitives.
@@ -481,36 +447,12 @@ pub trait HeliosOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
 
     /// Build a projective measurement with a conditional flip.
     fn build_measure_flip(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
-        let [qb, b] = self.add_measure_reset(qb)?;
-        let sum_b = self.add_dataflow_op(BoolOp::read, [b])?.out_wire(0);
-        let mut conditional = self.conditional_builder(
-            ([type_row![], type_row![]], sum_b),
-            [(qb_t(), qb)],
-            vec![qb_t()].into(),
-        )?;
-
-        // case 0: 0 state measured, leave alone
-        let case0 = conditional.case_builder(0)?;
-        let [qb] = case0.input_wires_arr();
-        case0.finish_with_outputs([qb])?;
-
-        // case 1: 1 state measured, flip
-        let mut case1 = conditional.case_builder(1)?;
-        let [qb] = case1.input_wires_arr();
-        let qb = case1.build_x(qb)?;
-        case1.finish_with_outputs([qb])?;
-
-        let [qb] = conditional.finish_sub_container()?.outputs_arr();
-        Ok([qb, sum_b])
+        CommonOpBuilder::build_measure_flip_with::<HeliosOp>(self, qb)
     }
 
     /// Build a qalloc operation that panics on failure.
     fn build_qalloc(&mut self) -> Result<Wire, BuildError> {
-        let maybe_qb = self.add_try_alloc()?;
-        let [qb] = self.build_expect_sum(1, option_type(vec![qb_t()]), maybe_qb, |_| {
-            "No more qubits available to allocate.".to_string()
-        })?;
-        Ok(qb)
+        CommonOpBuilder::build_qalloc_with::<HeliosOp>(self)
     }
 
     /// Build an array from qubit wires, apply a barrier, and unwrap the array afterwards.
@@ -521,15 +463,10 @@ pub trait HeliosOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
     where
         Self: Sized,
     {
-        let qbs: Vec<_> = qbs.into_iter().collect();
-        let size = qbs.len() as u64;
-        let q_arr = self.add_new_array(qb_t(), qbs)?;
-        let q_arr = self.add_runtime_barrier(q_arr, size)?;
-
-        self.add_array_unpack(qb_t(), size, q_arr)
+        CommonOpBuilder::build_wrapped_barrier_with(self, &EXTENSION, qbs)
     }
 
-    /// Build a "tket.qsystem.helios.PhasedXX" op in terms of Helios primitives.
+    /// Build a "tket.qsystem.sol.PhasedXX" op in terms of Helios primitives.
     fn build_phased_xx(
         &mut self,
         _qb1: Wire,
@@ -540,7 +477,7 @@ pub trait HeliosOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
         unimplemented!("PhasedXX lowering for Helios is not yet implemented")
     }
 
-    /// Build a "tket.qsystem.helios.Tk2" op in terms of Helios primitives.
+    /// Build a "tket.qsystem.sol.Tk2" op in terms of Helios primitives.
     fn build_tk2(
         &mut self,
         _qb1: Wire,
@@ -553,74 +490,31 @@ pub trait HeliosOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
     }
 }
 
-/// Build a runtime barrier operation on an array of qubits given its size.
-pub(crate) fn runtime_barrier_ext_op(
-    array_size: u64,
-) -> Result<ExtensionOp, hugr::extension::SignatureError> {
-    ExtensionOp::new(
-        EXTENSION.get_op(&RUNTIME_BARRIER_NAME).unwrap().clone(),
-        [TypeArg::BoundedNat(array_size)],
-    )
-}
-
 impl<D: Dataflow> HeliosOpBuilder for D {}
 
 #[cfg(test)]
 mod test {
-    use std::sync::Arc;
-
-    use crate::extension::futures::FutureOpBuilder as _;
-    use cool_asserts::assert_matches;
+    use crate::extension::qsystem::common::test_utils;
 
     use hugr::HugrView;
     use hugr::builder::{DataflowHugr, FunctionBuilder};
-    use hugr::extension::simple_op::MakeExtensionOp;
-    use hugr::ops::OpType;
-    use strum::IntoEnumIterator as _;
+    use tket::extension::bool::bool_type;
 
     use super::*;
 
-    fn get_opdef(op: HeliosOp) -> Option<&'static Arc<OpDef>> {
-        EXTENSION.get_op(&op.op_id())
-    }
-
     #[test]
     fn create_extension() {
-        assert_eq!(EXTENSION.name(), &EXTENSION_ID);
-
-        for o in HeliosOp::iter() {
-            assert_eq!(HeliosOp::from_def(get_opdef(o).unwrap()), Ok(o));
-        }
+        test_utils::assert_extension_roundtrip::<HeliosOp>(&EXTENSION, &EXTENSION_ID);
     }
 
     #[test]
     fn lazy_circuit() {
-        let hugr = {
-            let mut func_builder = FunctionBuilder::new(
-                "circuit",
-                Signature::new(vec![qb_t()], vec![qb_t(), bool_t()]),
-            )
-            .unwrap();
-            let [qb] = func_builder.input_wires_arr();
-            let [qb, lazy_b] = func_builder.add_lazy_measure_reset(qb).unwrap();
-            let [b] = func_builder.add_read(lazy_b, bool_t()).unwrap();
-            func_builder.finish_hugr_with_outputs([qb, b]).unwrap()
-        };
-        assert_matches!(hugr.validate(), Ok(_));
+        test_utils::assert_lazy_circuit(|builder, qb| builder.add_lazy_measure_reset(qb));
     }
 
     #[test]
     fn leaked() {
-        let hugr = {
-            let mut func_builder =
-                FunctionBuilder::new("leaked", Signature::new(vec![qb_t()], vec![int_type(6)]))
-                    .unwrap();
-            let [qb] = func_builder.input_wires_arr();
-            let lazy_i = func_builder.add_lazy_measure_leaked(qb).unwrap();
-            let [i] = func_builder.add_read(lazy_i, int_type(6)).unwrap();
-            func_builder.finish_hugr_with_outputs([i]).unwrap()
-        };
-        assert_matches!(hugr.validate(), Ok(_));
+        test_utils::assert_leaked_measurement(|builder, qb| builder.add_lazy_measure_leaked(qb));
     }
 
     #[test]
@@ -656,12 +550,6 @@ mod test {
 
     #[test]
     fn test_cast() {
-        // test overlapping names don't cause cast errors
-        for op in HeliosOp::iter() {
-            let optype: OpType = op.into();
-            let new_op: HeliosOp = optype.cast().unwrap();
-            assert_eq!(op, new_op);
-            assert_eq!(optype.cast::<tket::TketOp>(), None);
-        }
+        test_utils::assert_cast_roundtrip::<HeliosOp>();
     }
 }

@@ -16,6 +16,7 @@ use crate::extension::futures;
 use lazy_static::lazy_static;
 
 mod barrier;
+mod common;
 pub mod helios;
 mod lower;
 pub mod sol;
