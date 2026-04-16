@@ -24,7 +24,7 @@ pub struct QSystemEmitter;
 
 impl<H: HugrView> PytketEmitter<H> for QSystemEmitter {
     fn extensions(&self) -> Option<Vec<ExtensionId>> {
-        Some(vec![extension::qsystem::EXTENSION_ID])
+        Some(vec![extension::qsystem::helios::EXTENSION_ID])
     }
 
     fn op_to_pytket(
@@ -58,10 +58,11 @@ impl QSystemEmitter {
             QSystemOp::Rz => PytketOptype::Rz,
             QSystemOp::PhasedX => PytketOptype::PhasedX,
             QSystemOp::ZZPhase => PytketOptype::ZZPhase,
-            QSystemOp::PhasedXX => {
-                return Ok(EncodeStatus::Unsupported);
-            }
-            QSystemOp::Tk2 => PytketOptype::TK2,
+            // TODO Sol codegenF
+            // QSystemOp::PhasedXX => {
+            //     return Ok(EncodeStatus::Unsupported);
+            // }
+            // QSystemOp::Tk2 => PytketOptype::TK2,
             QSystemOp::Reset => PytketOptype::Reset,
             QSystemOp::QFree => {
                 // Mark the qubit inputs as explored and forget about them.

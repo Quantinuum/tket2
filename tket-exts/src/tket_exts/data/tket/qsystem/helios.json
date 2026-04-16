@@ -1,10 +1,10 @@
 {
   "version": "0.5.1",
-  "name": "tket.qsystem",
+  "name": "tket.qsystem.helios",
   "types": {},
   "operations": {
     "LazyMeasure": {
-      "extension": "tket.qsystem",
+      "extension": "tket.qsystem.helios",
       "name": "LazyMeasure",
       "description": "Lazily measure a qubit and lose it.",
       "signature": {
@@ -38,7 +38,7 @@
       "binary": false
     },
     "LazyMeasureLeaked": {
-      "extension": "tket.qsystem",
+      "extension": "tket.qsystem.helios",
       "name": "LazyMeasureLeaked",
       "description": "Measure a qubit (return 0 or 1) or detect leakage (return 2).",
       "signature": {
@@ -79,7 +79,7 @@
       "binary": false
     },
     "LazyMeasureReset": {
-      "extension": "tket.qsystem",
+      "extension": "tket.qsystem.helios",
       "name": "LazyMeasureReset",
       "description": "Lazily measure a qubit and reset it to the Z |0> eigenstate.",
       "signature": {
@@ -116,7 +116,7 @@
       "binary": false
     },
     "Measure": {
-      "extension": "tket.qsystem",
+      "extension": "tket.qsystem.helios",
       "name": "Measure",
       "description": "Measure a qubit and lose it.",
       "signature": {
@@ -141,7 +141,7 @@
       "binary": false
     },
     "MeasureReset": {
-      "extension": "tket.qsystem",
+      "extension": "tket.qsystem.helios",
       "name": "MeasureReset",
       "description": "Measure a qubit and reset it to the Z |0> eigenstate.",
       "signature": {
@@ -169,7 +169,7 @@
       "binary": false
     },
     "PhasedX": {
-      "extension": "tket.qsystem",
+      "extension": "tket.qsystem.helios",
       "name": "PhasedX",
       "description": "PhasedX gate.",
       "signature": {
@@ -204,7 +204,7 @@
       "binary": false
     },
     "QFree": {
-      "extension": "tket.qsystem",
+      "extension": "tket.qsystem.helios",
       "name": "QFree",
       "description": "Free a qubit (lose track of it).",
       "signature": {
@@ -221,7 +221,7 @@
       "binary": false
     },
     "Reset": {
-      "extension": "tket.qsystem",
+      "extension": "tket.qsystem.helios",
       "name": "Reset",
       "description": "Reset a qubit to the Z |0> eigenstate.",
       "signature": {
@@ -242,7 +242,7 @@
       "binary": false
     },
     "RuntimeBarrier": {
-      "extension": "tket.qsystem",
+      "extension": "tket.qsystem.helios",
       "name": "RuntimeBarrier",
       "description": "Acts as a runtime barrier between operations on argument qubits.",
       "signature": {
@@ -306,7 +306,7 @@
       "binary": false
     },
     "Rz": {
-      "extension": "tket.qsystem",
+      "extension": "tket.qsystem.helios",
       "name": "Rz",
       "description": "Rotate a qubit around the Z axis. Not physical on Helios or Sol platforms.",
       "signature": {
@@ -334,7 +334,7 @@
       "binary": false
     },
     "TryQAlloc": {
-      "extension": "tket.qsystem",
+      "extension": "tket.qsystem.helios",
       "name": "TryQAlloc",
       "description": "Allocate a qubit in the Z |0> eigenstate.",
       "signature": {
@@ -360,7 +360,7 @@
       "binary": false
     },
     "ZZPhase": {
-      "extension": "tket.qsystem",
+      "extension": "tket.qsystem.helios",
       "name": "ZZPhase",
       "description": "ZZ gate with an angle, specific to the Helios platform.",
       "signature": {

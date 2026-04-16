@@ -293,12 +293,6 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                 &[0, 1, 2],
                 &[0],
             ),
-            (QSystemPlatform::Helios, QSystemOp::PhasedXX) => {
-                bail!("PhasedXX not implemented for Helios platform")
-            }
-            (QSystemPlatform::Helios, QSystemOp::Tk2) => {
-                bail!("Tk2 not implemented for Helios platform")
-            }
             (QSystemPlatform::Sol, QSystemOp::Rz) => self.emit_impl(
                 context,
                 args,
@@ -316,20 +310,21 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                 &[0, 1, 2],
                 &[0],
             ),
-            (QSystemPlatform::Sol, QSystemOp::PhasedXX) => self.emit_impl(
-                context,
-                args,
-                RuntimeFunction::SolGate(SolGateFunction::Rpp),
-                &[0, 1, 2, 3],
-                &[0, 1],
-            ),
-            (QSystemPlatform::Sol, QSystemOp::Tk2) => self.emit_impl(
-                context,
-                args,
-                RuntimeFunction::SolGate(SolGateFunction::Rxxyyzz),
-                &[0, 1, 2, 3, 4],
-                &[0, 1],
-            ),
+            // TODO Sol codegen
+            // (QSystemPlatform::Sol, QSystemOp::PhasedXX) => self.emit_impl(
+            //     context,
+            //     args,
+            //     RuntimeFunction::SolGate(SolGateFunction::Rpp),
+            //     &[0, 1, 2, 3],
+            //     &[0, 1],
+            // ),
+            // (QSystemPlatform::Sol, QSystemOp::Tk2) => self.emit_impl(
+            //     context,
+            //     args,
+            //     RuntimeFunction::SolGate(SolGateFunction::Rxxyyzz),
+            //     &[0, 1, 2, 3, 4],
+            //     &[0, 1],
+            // ),
 
             // Measure qubit in Z basis
             (_, QSystemOp::Measure | QSystemOp::MeasureReset) => {

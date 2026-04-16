@@ -1,10 +1,10 @@
 {
   "version": "0.5.1",
-  "name": "tket.qsystem",
+  "name": "tket.qsystem.sol",
   "types": {},
   "operations": {
     "LazyMeasure": {
-      "extension": "tket.qsystem",
+      "extension": "tket.qsystem.sol",
       "name": "LazyMeasure",
       "description": "Lazily measure a qubit and lose it.",
       "signature": {
@@ -38,7 +38,7 @@
       "binary": false
     },
     "LazyMeasureLeaked": {
-      "extension": "tket.qsystem",
+      "extension": "tket.qsystem.sol",
       "name": "LazyMeasureLeaked",
       "description": "Measure a qubit (return 0 or 1) or detect leakage (return 2).",
       "signature": {
@@ -79,7 +79,7 @@
       "binary": false
     },
     "LazyMeasureReset": {
-      "extension": "tket.qsystem",
+      "extension": "tket.qsystem.sol",
       "name": "LazyMeasureReset",
       "description": "Lazily measure a qubit and reset it to the Z |0> eigenstate.",
       "signature": {
@@ -116,7 +116,7 @@
       "binary": false
     },
     "Measure": {
-      "extension": "tket.qsystem",
+      "extension": "tket.qsystem.sol",
       "name": "Measure",
       "description": "Measure a qubit and lose it.",
       "signature": {
@@ -141,7 +141,7 @@
       "binary": false
     },
     "MeasureReset": {
-      "extension": "tket.qsystem",
+      "extension": "tket.qsystem.sol",
       "name": "MeasureReset",
       "description": "Measure a qubit and reset it to the Z |0> eigenstate.",
       "signature": {
@@ -169,7 +169,7 @@
       "binary": false
     },
     "PhasedX": {
-      "extension": "tket.qsystem",
+      "extension": "tket.qsystem.sol",
       "name": "PhasedX",
       "description": "PhasedX gate.",
       "signature": {
@@ -203,8 +203,49 @@
       },
       "binary": false
     },
+    "PhasedXX": {
+      "extension": "tket.qsystem.sol",
+      "name": "PhasedXX",
+      "description": "PhasedXX gate, a.k.a. rpp, specific to the Sol platform.",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Q"
+            },
+            {
+              "t": "Q"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Q"
+            },
+            {
+              "t": "Q"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
     "QFree": {
-      "extension": "tket.qsystem",
+      "extension": "tket.qsystem.sol",
       "name": "QFree",
       "description": "Free a qubit (lose track of it).",
       "signature": {
@@ -221,7 +262,7 @@
       "binary": false
     },
     "Reset": {
-      "extension": "tket.qsystem",
+      "extension": "tket.qsystem.sol",
       "name": "Reset",
       "description": "Reset a qubit to the Z |0> eigenstate.",
       "signature": {
@@ -242,7 +283,7 @@
       "binary": false
     },
     "RuntimeBarrier": {
-      "extension": "tket.qsystem",
+      "extension": "tket.qsystem.sol",
       "name": "RuntimeBarrier",
       "description": "Acts as a runtime barrier between operations on argument qubits.",
       "signature": {
@@ -306,7 +347,7 @@
       "binary": false
     },
     "Rz": {
-      "extension": "tket.qsystem",
+      "extension": "tket.qsystem.sol",
       "name": "Rz",
       "description": "Rotate a qubit around the Z axis. Not physical on Helios or Sol platforms.",
       "signature": {
@@ -333,8 +374,56 @@
       },
       "binary": false
     },
+    "Tk2": {
+      "extension": "tket.qsystem.sol",
+      "name": "Tk2",
+      "description": "Tk2 gate, a.k.a. rxxyyzz. Specific to the Sol platform.",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Q"
+            },
+            {
+              "t": "Q"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Q"
+            },
+            {
+              "t": "Q"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
     "TryQAlloc": {
-      "extension": "tket.qsystem",
+      "extension": "tket.qsystem.sol",
       "name": "TryQAlloc",
       "description": "Allocate a qubit in the Z |0> eigenstate.",
       "signature": {
@@ -353,40 +442,6 @@
                   }
                 ]
               ]
-            }
-          ]
-        }
-      },
-      "binary": false
-    },
-    "ZZPhase": {
-      "extension": "tket.qsystem",
-      "name": "ZZPhase",
-      "description": "ZZ gate with an angle, specific to the Helios platform.",
-      "signature": {
-        "params": [],
-        "body": {
-          "input": [
-            {
-              "t": "Q"
-            },
-            {
-              "t": "Q"
-            },
-            {
-              "t": "Opaque",
-              "extension": "arithmetic.float.types",
-              "id": "float64",
-              "args": [],
-              "bound": "C"
-            }
-          ],
-          "output": [
-            {
-              "t": "Q"
-            },
-            {
-              "t": "Q"
             }
           ]
         }

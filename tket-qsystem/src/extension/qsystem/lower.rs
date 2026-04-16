@@ -176,7 +176,7 @@ pub fn lower_tk2_ops(
     Ok(replaced_nodes)
 }
 
-fn build_func(platform: QSystemPlatform, op: TketOp) -> Result<Hugr, LowerTk2Error> {
+fn build_func(_platform: QSystemPlatform, op: TketOp) -> Result<Hugr, LowerTk2Error> {
     let sig = op.into_extension_op().signature().into_owned();
     let sig = Signature::new(sig.input, sig.output); // ignore extension delta
     // TODO check generated names are namespaced enough
@@ -184,38 +184,38 @@ fn build_func(platform: QSystemPlatform, op: TketOp) -> Result<Hugr, LowerTk2Err
     let mut b = FunctionBuilder::new(f_name, sig)?;
     let inputs: Vec<_> = b.input_wires().collect();
     let outputs = match (op, inputs.as_slice()) {
-        (TketOp::H, [q]) => vec![b.build_h(platform, *q)?],
-        (TketOp::X, [q]) => vec![b.build_x(platform, *q)?],
-        (TketOp::Y, [q]) => vec![b.build_y(platform, *q)?],
-        (TketOp::Z, [q]) => vec![b.build_z(platform, *q)?],
-        (TketOp::S, [q]) => vec![b.build_s(platform, *q)?],
-        (TketOp::Sdg, [q]) => vec![b.build_sdg(platform, *q)?],
-        (TketOp::V, [q]) => vec![b.build_v(platform, *q)?],
-        (TketOp::Vdg, [q]) => vec![b.build_vdg(platform, *q)?],
-        (TketOp::T, [q]) => vec![b.build_t(platform, *q)?],
-        (TketOp::Tdg, [q]) => vec![b.build_tdg(platform, *q)?],
-        (TketOp::Measure, [q]) => b.build_measure_flip(platform, *q)?.into(),
+        (TketOp::H, [q]) => vec![b.build_h(*q)?],
+        (TketOp::X, [q]) => vec![b.build_x(*q)?],
+        (TketOp::Y, [q]) => vec![b.build_y(*q)?],
+        (TketOp::Z, [q]) => vec![b.build_z(*q)?],
+        (TketOp::S, [q]) => vec![b.build_s(*q)?],
+        (TketOp::Sdg, [q]) => vec![b.build_sdg(*q)?],
+        (TketOp::V, [q]) => vec![b.build_v(*q)?],
+        (TketOp::Vdg, [q]) => vec![b.build_vdg(*q)?],
+        (TketOp::T, [q]) => vec![b.build_t(*q)?],
+        (TketOp::Tdg, [q]) => vec![b.build_tdg(*q)?],
+        (TketOp::Measure, [q]) => b.build_measure_flip(*q)?.into(),
         (TketOp::QAlloc, []) => vec![b.build_qalloc()?],
-        (TketOp::CX, [c, t]) => b.build_cx(platform, *c, *t)?.into(),
-        (TketOp::CY, [c, t]) => b.build_cy(platform, *c, *t)?.into(),
-        (TketOp::CZ, [c, t]) => b.build_cz(platform, *c, *t)?.into(),
+        (TketOp::CX, [c, t]) => b.build_cx(*c, *t)?.into(),
+        (TketOp::CY, [c, t]) => b.build_cy(*c, *t)?.into(),
+        (TketOp::CZ, [c, t]) => b.build_cz(*c, *t)?.into(),
         (TketOp::Rx, [q, angle]) => {
             let float = build_to_radians(&mut b, *angle)?;
-            vec![b.build_rx(platform, *q, float)?]
+            vec![b.build_rx(*q, float)?]
         }
         (TketOp::Ry, [q, angle]) => {
             let float = build_to_radians(&mut b, *angle)?;
-            vec![b.build_ry(platform, *q, float)?]
+            vec![b.build_ry(*q, float)?]
         }
         (TketOp::Rz, [q, angle]) => {
             let float = build_to_radians(&mut b, *angle)?;
-            vec![b.add_rz(platform, *q, float)?]
+            vec![b.add_rz(*q, float)?]
         }
         (TketOp::CRz, [c, t, angle]) => {
             let float = build_to_radians(&mut b, *angle)?;
-            b.build_crz(platform, *c, *t, float)?.into()
+            b.build_crz(*c, *t, float)?.into()
         }
-        (TketOp::Toffoli, [a, b_, c]) => b.build_toffoli(platform, *a, *b_, *c)?.into(),
+        (TketOp::Toffoli, [a, b_, c]) => b.build_toffoli(*a, *b_, *c)?.into(),
         _ => return Err(LowerTk2Error::UnknownOp(op, inputs.len())), // non-exhaustive
     };
     Ok(b.finish_hugr_with_outputs(outputs)?)
