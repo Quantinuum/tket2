@@ -1174,7 +1174,11 @@ pub fn resolve_modifier_with_entrypoints(
 // Definitions of helpers for tests
 #[cfg(test)]
 mod tests {
-    use std::{fs, io::BufReader, path::Path};
+    use std::{
+        fs,
+        io::{BufReader, BufWriter},
+        path::Path,
+    };
 
     use cool_asserts::assert_matches;
     use hugr::{
@@ -1372,8 +1376,10 @@ mod tests {
     }
     #[rstest::rstest]
     #[case::call("ctrl_on_call")]
-    // #[case::call("ctrl_on_x")]
+    #[case::call("ctrl_on_x")]
     pub fn test_saved_hugr(#[case] name: &str) {
+        use hugr::envelope::EnvelopeConfig;
+
         let mut h = load_guppy_example(name).unwrap();
 
         // Note: NICOLA Method to save the hugr
@@ -1387,10 +1393,16 @@ mod tests {
         let entrypoint = h.entrypoint();
         resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
 
-        let _ = fs::write(
-            format!("{}{}_after.mmd", MERMAID_OUTPUT_DIR, name),
-            &h.mermaid_string(),
-        );
+        // TODO: better folder
+        fs::create_dir_all(MERMAID_OUTPUT_DIR).unwrap();
+        let output = Path::new(MERMAID_OUTPUT_DIR).join(format!("{name}_after.hugr"));
+        let writer = fs::File::create(output).unwrap();
+        let writer = BufWriter::new(writer);
+        h.store(writer, EnvelopeConfig::binary()).unwrap();
+        // let _ = fs::write(
+        //     format!("{}{}_after.mmd", MERMAID_OUTPUT_DIR, name),
+        //     &h.mermaid_string(),
+        // );
         assert_matches!(h.validate(), Ok(()));
     }
 }

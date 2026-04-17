@@ -10,7 +10,7 @@ from pathlib import Path
 from sys import argv
 
 from guppylang import guppy
-from guppylang.std.builtins import control
+from guppylang.std.builtins import control, result
 from guppylang.std.quantum import qubit
 from guppylang.std.qsystem import measure
 from guppylang.std.quantum import h, x
@@ -28,12 +28,12 @@ def main() -> None:
     with control(q1):
         x(q2)
 
-    measure(q1)
-    measure(q2)
+    result("q1", measure(q1))
+    result("q2", measure(q2))
 
 
 program = main.compile()
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
 program.modules[0].render_dot().render(
-    argv[0].removesuffix(".py") + "_before", cleanup=True
+    argv[0].removesuffix(".py") + "_before", directory="../../0_hugr_pdf", cleanup=True
 )
