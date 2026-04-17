@@ -259,6 +259,21 @@ def test_structuralize_cfgs() -> None:
     assert _count_ops(structured, "Conditional") >= 1
 
 
+def test_structuralize_cfgs_accepts_skip_unstructuralizable_cfgs() -> None:
+    hugr = _hugr_from_path(
+        "test_files/guppy_optimization/complex_control/complex_control.hugr"
+    )
+
+    structuralize = StructuralizeCfgs(
+        strategy=StructuralizationStrategy.RELOOPER,
+        skip_unstructuralizable_cfgs=False,
+    )
+    structured = structuralize(hugr)
+
+    assert _count_ops(structured, "CFG") == 0
+    assert _count_ops(structured, "Conditional") >= 1
+
+
 def test_sink_conditional_inputs() -> None:
     hugr = _hugr_from_path("test_files/guppy_examples/shortcircuit.hugr")
 
@@ -285,3 +300,15 @@ def test_inline_functions() -> None:
     inlined = InlineFunctions(max_inline_size=64)(hugr)
 
     assert _count_ops(inlined, "Call") == 0
+
+
+def test_compilation_state_roundtrip_filters_embedded_extensions() -> None:
+    hugr = _hugr_from_path("test_files/guppy_examples/complex_control.hugr")
+    cfg_count = _count_ops(hugr, "CFG")
+    conditional_count = _count_ops(hugr, "Conditional")
+
+    package = CompilationState.from_python(hugr).to_python()
+    roundtripped = package.modules[0]
+
+    assert _count_ops(roundtripped, "CFG") == cfg_count
+    assert _count_ops(roundtripped, "Conditional") == conditional_count

@@ -291,9 +291,12 @@ class StructuralizeCfgs(ComposablePass):
 
     Parameters:
     - strategy: Structuralization strategy.
+    - skip_unstructuralizable_cfgs: Leave CFGs unchanged when they cannot be
+      structuralized instead of raising an error.
     """
 
     strategy: StructuralizationStrategy = StructuralizationStrategy.RVSDG
+    skip_unstructuralizable_cfgs: bool = True
     _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
 
     def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
@@ -324,6 +327,7 @@ class StructuralizeCfgs(ComposablePass):
         _passes.structuralize_cfgs(
             program._inner,
             strategy=self.strategy.value,
+            skip_unstructuralizable_cfgs=self.skip_unstructuralizable_cfgs,
             scope=self._scope,
         )
         return program

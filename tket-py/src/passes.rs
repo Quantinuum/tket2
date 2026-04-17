@@ -176,11 +176,20 @@ fn sink_conditional_inputs(
 /// Parameters:
 /// - strategy: Structuralization strategy to use. One of `"rvsdg"` or
 ///   `"beyond_relooper"`.
+/// - skip_unstructuralizable_cfgs: When true, CFGs that cannot be structuralized
+///   are left unchanged instead of causing the pass to fail.
 #[pyfunction]
-#[pyo3(signature = (circ, *, strategy = "rvsdg", scope = None))]
+#[pyo3(signature = (
+    circ,
+    *,
+    strategy = "rvsdg",
+    skip_unstructuralizable_cfgs = true,
+    scope = None
+))]
 fn structuralize_cfgs(
     circ: &mut CompilationState,
     strategy: &str,
+    skip_unstructuralizable_cfgs: bool,
     scope: Option<PyPassScope>,
 ) -> PyResult<()> {
     let py_scope = scope.unwrap_or_default();
@@ -194,7 +203,8 @@ fn structuralize_cfgs(
     };
 
     let pass = tket::passes::StructuralizeCfgsPass::default_with_scope(py_scope.scope)
-        .with_strategy(strategy);
+        .with_strategy(strategy)
+        .with_skip_unstructuralizable_cfgs(skip_unstructuralizable_cfgs);
     pass.run(&mut circ.hugr).convert_pyerrs()?;
     Ok(())
 }

@@ -60,6 +60,7 @@ def structuralize_cfgs(
     circ: CompilationState,
     *,
     strategy: str = "rvsdg",
+    skip_unstructuralizable_cfgs: bool = True,
     scope: PassScope = GlobalScope.PRESERVE_PUBLIC,
 ) -> None:
     """Structuralize CFG regions into nested `Conditional` and `TailLoop` nodes."""
