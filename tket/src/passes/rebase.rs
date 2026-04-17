@@ -387,9 +387,9 @@ mod test {
         f.write(hugr.mermaid_string().as_ref()).unwrap();
     }
 
-    fn h_replacement() -> Hugr {
+    fn x_replacement() -> Hugr {
         let h = build_simple_circuit(1, |circ| {
-            let angle = circ.add_constant(ConstRotation::PI_2);
+            let angle = circ.add_constant(ConstRotation::PI);
             circ.append_and_consume(
                 TketOp::Rx,
                 [CircuitUnit::Linear(0), CircuitUnit::Wire(angle)],
@@ -449,33 +449,28 @@ mod test {
         h.unwrap().into_hugr()
     }
 
-    fn bell_state_hugr() -> Hugr {
-        let h = build_simple_circuit(2, |circ| {
-            circ.append(TketOp::H, [0])?;
-            circ.append(TketOp::H, [0])?;
-            circ.append(TketOp::CX, [0, 1])?;
-            Ok(())
-        });
-
-        h.unwrap().into_hugr()
-    }
-
     #[test]
     fn test_rebase_pass() -> Result<(), Box<dyn Error>> {
-        let mut hugr = bell_state_hugr();
+        let mut hugr = build_simple_circuit(2, |circ| {
+            circ.append(TketOp::X, [0])?;
+            circ.append(TketOp::X, [0])?;
+            circ.append(TketOp::CX, [0, 1])?;
+            Ok(())
+        })?
+        .into_hugr();
         print_hugr(&hugr, "hugr_before");
 
         let pass = RebasePass::new(
             PassScope::default(),
             HashMap::from_iter([
-                (TketOp::H.qualified_id(), h_replacement()),
+                (TketOp::X.qualified_id(), x_replacement()),
                 (TketOp::CX.qualified_id(), cx_id_replacement()),
             ]),
             HashMap::from_iter([
                 (TketOp::Rx.qualified_id(), rx_replacement()),
                 (TketOp::CX.qualified_id(), cx_hh_replacement()),
             ]),
-            InlineConfig::default(),
+            InlineConfig::none(),
         );
         run_validating(pass, &mut hugr)?;
 
