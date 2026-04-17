@@ -21,7 +21,13 @@ from hugr.passes.composable import (
 from hugr.passes.scope import PassScope, GlobalScope
 
 
-__all__ = ["PytketHugrPass", "PassResult", "NormalizeGuppy", "ModifierResolverPass"]
+__all__ = [
+    "PytketHugrPass",
+    "PassResult",
+    "InlineFunctions",
+    "NormalizeGuppy",
+    "ModifierResolverPass",
+]
 
 
 @dataclass
@@ -137,6 +143,46 @@ class NormalizeGuppy(ComposablePass):
             scope=self._scope,
         )
         return program
+
+
+@dataclass
+class InlineFunctions(ComposablePass):
+    """Inline acyclic function calls below the selected scope.
+
+    Parameters:
+    - max_inline_size: Maximum number of descendants allowed in a callee for
+      its call sites to be inlined.
+    """
+
+    max_inline_size: int = 64
+    _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
+
+    def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
+        return implement_pass_run(
+            self,
+            hugr=hugr,
+            inplace=inplace,
+            copy_call=lambda h: self._inline_functions(h, inplace),
+        )
+
+    def with_scope(self, _scope: PassScope) -> InlineFunctions:
+        """Set the scope of this pass and return self."""
+        self._scope = _scope
+        return self
+
+    def _inline_functions(self, hugr: Hugr, inplace: bool) -> PassResult:
+        tk_program = _state.CompilationState.from_python(hugr)
+
+        _passes.inline_functions(
+            tk_program._inner,
+            max_inline_size=self.max_inline_size,
+            scope=self._scope,
+        )
+
+        package = tk_program.to_python()
+        return PassResult.for_pass(
+            self, hugr=package.modules[0], inplace=inplace, result=None
+        )
 
 
 def _greedy_depth_reduce(program: _state.CompilationState) -> int:

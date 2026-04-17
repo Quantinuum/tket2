@@ -4,6 +4,7 @@ from tket._ops import TketOp
 from tket.passes import (
     _badger_optimise,
     _greedy_depth_reduce,
+    InlineFunctions,
     NormalizeGuppy,
     ModifierResolverPass,
 )
@@ -240,3 +241,11 @@ def test_modifier_resolver() -> None:
     resolved: Hugr = mr_pass(normalized)
 
     assert _count_ops(resolved, "tket.modifier.ControlModifier") == 0
+
+
+def test_inline_functions() -> None:
+    hugr = _hugr_from_path("test_files/guppy_examples/fn_calls.hugr")
+
+    inlined = InlineFunctions(max_inline_size=64)(hugr)
+
+    assert inlined.to_bytes() == hugr.to_bytes()
