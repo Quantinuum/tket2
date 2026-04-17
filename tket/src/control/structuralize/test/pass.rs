@@ -118,6 +118,8 @@ fn scope_preserves_other_cfgs(
 #[case::loop_and_branch_relooper("loop_and_branch", StructuralizationStrategy::Relooper, 1)]
 #[case::complex_control_rvsdg("complex_control", StructuralizationStrategy::Rvsdg, 1)]
 #[case::complex_control_relooper("complex_control", StructuralizationStrategy::Relooper, 1)]
+#[case::hw_example_rvsdg("hw_example", StructuralizationStrategy::Rvsdg, 0)]
+#[case::hw_example_relooper("hw_example", StructuralizationStrategy::Relooper, 0)]
 #[case::nested_loops_rvsdg("nested_loops", StructuralizationStrategy::Rvsdg, 1)]
 #[case::nested_loops_relooper("nested_loops", StructuralizationStrategy::Relooper, 1)]
 #[case::shortcircuit_rvsdg("shortcircuit", StructuralizationStrategy::Rvsdg, 0)]

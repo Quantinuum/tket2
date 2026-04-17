@@ -85,8 +85,10 @@ where
             .collect::<Result<Vec<_>, _>>()?;
         let (join_kind, next) = if frame.active_loop == Some(join_node) {
             (StructuredBranchJoinKind::Deferred, None)
+        } else if frame.stop == Some(join_node) {
+            (StructuredBranchJoinKind::Deferred, Some(join_node))
         } else {
-            branch_continuation(self, join_node, frame.scope, frame.active_loop)
+            branch_continuation(self, join_node, frame.scope, frame.stop, frame.active_loop)
         };
 
         Ok((
@@ -114,8 +116,12 @@ pub(super) fn branch_continuation<T: HugrNode>(
     info: &CfgFacts<T>,
     node: T,
     scope: &BTreeSet<T>,
+    stop: Option<T>,
     active_loop: Option<T>,
 ) -> (StructuredBranchJoinKind, Option<T>) {
+    if stop == Some(node) {
+        return (StructuredBranchJoinKind::Deferred, Some(node));
+    }
     let successors = info.scope_successors(node, scope, active_loop);
     match successors.as_slice() {
         [] => (StructuredBranchJoinKind::Inline, None),
