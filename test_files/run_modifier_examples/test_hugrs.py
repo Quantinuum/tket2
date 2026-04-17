@@ -20,7 +20,16 @@ modifier_examples_dir = Path(__file__).resolve().parents[1] / "modified_hugrs"
 
 print(modifier_examples_dir)
 all_results: list[str] = []
-for hugr_path in modifier_examples_dir.glob("*.hugr"):
+if len(sys.argv) > 1:
+    requested_hugr = Path(sys.argv[1] + "_solved.hugr")
+    hugr_path = requested_hugr
+    if not hugr_path.is_absolute():
+        hugr_path = modifier_examples_dir / requested_hugr
+    hugr_paths = [hugr_path]
+else:
+    hugr_paths = sorted(modifier_examples_dir.glob("*.hugr"))
+
+for hugr_path in hugr_paths:
     print(f"Processing {hugr_path}...")
     hugr_bytes = hugr_path.read_bytes()
     hugr = Hugr.from_bytes(hugr_bytes)

@@ -12,3 +12,8 @@ recompile-hugrs:
         echo "Re-generating $example"
         uv run --no-project "$example"
     done
+
+# Re-generate a single hugr file.
+rh example:
+    echo "Re-generating {{example}}"
+    uv run --no-project "{{example}}"

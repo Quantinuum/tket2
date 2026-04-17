@@ -1368,7 +1368,55 @@ mod tests {
     const GUPPY_EXAMPLES_DIR: &str = "../test_files/modifier_examples";
     const HUGR_OUTPUT_DIR: &str = "../test_files/modified_hugrs";
 
+    fn load_guppy_examples() -> std::io::Result<Vec<(String, Hugr)>> {
+        let mut files = fs::read_dir(GUPPY_EXAMPLES_DIR)?
+            .filter_map(|entry| {
+                let path = entry.ok()?.path();
+                path.extension()
+                    .is_some_and(|ext| ext == "hugr")
+                    .then_some(path)
+            })
+            .collect::<Vec<_>>();
+        files.sort_unstable();
+
+        files
+            .into_iter()
+            .map(|file| {
+                let name = file.file_stem().unwrap().to_string_lossy().into_owned();
+                let reader = fs::File::open(file)?;
+                let reader = BufReader::new(reader);
+                Ok((name, Hugr::load(reader, None).unwrap()))
+            })
+            .collect()
+    }
+
+    #[test]
+    pub fn test_saved_hugrs() {
+        use hugr::envelope::EnvelopeConfig;
+
+        for (name, mut h) in load_guppy_examples().unwrap() {
+            // Note: NICOLA Method to save the hugr
+            // h.store(writer, config)
+            // let _ = fs::write(
+            //     format!("{}{}_before.mmd", MERMAID_OUTPUT_DIR, name),
+            //     &h.mermaid_string(),
+            // );
+            assert_matches!(h.validate(), Ok(()));
+
+            let entrypoint = h.entrypoint();
+            resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+
+            fs::create_dir_all(HUGR_OUTPUT_DIR).unwrap();
+            let output = Path::new(HUGR_OUTPUT_DIR).join(format!("{name}_solved.hugr"));
+            let writer = fs::File::create(output).unwrap();
+            let writer = BufWriter::new(writer);
+            h.store(writer, EnvelopeConfig::binary()).unwrap();
+            assert_matches!(h.validate(), Ok(()));
+        }
+    }
+
     fn load_guppy_example(name: &str) -> std::io::Result<Hugr> {
+        // todo return a list of all the hugrs in the GUPPY_EXAMPLES_DIR
         let file = Path::new(GUPPY_EXAMPLES_DIR).join(&format!("{name}.hugr"));
         let reader = fs::File::open(file)?;
         let reader = BufReader::new(reader);
@@ -1382,18 +1430,11 @@ mod tests {
 
         let mut h = load_guppy_example(name).unwrap();
 
-        // Note: NICOLA Method to save the hugr
-        // h.store(writer, config)
-        // let _ = fs::write(
-        //     format!("{}{}_before.mmd", MERMAID_OUTPUT_DIR, name),
-        //     &h.mermaid_string(),
-        // );
         assert_matches!(h.validate(), Ok(()));
 
         let entrypoint = h.entrypoint();
         resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
 
-        // TODO: better folder
         fs::create_dir_all(HUGR_OUTPUT_DIR).unwrap();
         let output = Path::new(HUGR_OUTPUT_DIR).join(format!("{name}_solved.hugr"));
         let writer = fs::File::create(output).unwrap();

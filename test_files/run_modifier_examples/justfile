@@ -3,12 +3,14 @@ help:
     @just --list --justfile {{justfile()}}
 
 # Re-generate all hugr files and their mermaid diagrams.
-r: recompile-hugrs
+r: run-hugrs
 
 # Re-generate all hugr files.
-recompile-hugrs:
-    #!/usr/bin/env sh
-    for example in $(find . -type f -name "*.py"); do
-        echo "Running hugrs"
-        uv run --no-project "$example"
-    done
+run-hugrs:
+    uv run --no-project "test_hugrs.py"
+    
+
+
+# Re-generate a single hugr file.
+rh example:
+    uv run --no-project "test_hugrs.py" "{{example}}"

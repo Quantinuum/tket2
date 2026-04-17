@@ -93,6 +93,24 @@ recompile-test-hugrs:
     @echo "---- Recompiling optimization-target guppy programs ----"
     just test_files/guppy_optimization/recompile
 
+mod:
+    @echo "---- Compiling hugrs ----"
+    just test_files/modifier_examples/r
+    @echo "---- Applying passes ----"
+    cargo test -p tket test_saved_hugrs
+    @echo "---- Running hugrs ----"
+    just test_files/run_modifier_examples/r
+
+
+modh name:
+    @echo "---- Compiling hugr {{name}} ----"
+    just test_files/modifier_examples/rh "{{name}}.py"
+    @echo "---- Applying passes ----"
+    cargo test -p tket test_saved_hugr
+    @echo "---- Running hugr {{name}} ----"
+    just test_files/run_modifier_examples/rh "{{name}}"
+
+
 # Generate serialized declarations for the tket extensions
 gen-extensions:
     cargo run -p tket-qsystem gen-extensions -o tket-exts/src/tket_exts/data
