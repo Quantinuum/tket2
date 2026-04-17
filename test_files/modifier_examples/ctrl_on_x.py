@@ -8,14 +8,16 @@
 
 from pathlib import Path
 from sys import argv
+import sys
 
 from guppylang import guppy
 from guppylang.std.builtins import control, result
 from guppylang.std.quantum import qubit
 from guppylang.std.qsystem import measure
 from guppylang.std.quantum import h, x
-from ..utility import hugr_pdf_directory
 
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+from utility import hugr_pdf_directory
 from guppylang.experimental import enable_experimental_features
 
 enable_experimental_features()

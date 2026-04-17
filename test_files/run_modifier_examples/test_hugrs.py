@@ -7,12 +7,14 @@
 """Run on selene the passed hugrs"""
 
 from pathlib import Path
+import sys
 
 from hugr import Hugr
 from hugr.package import Package
 from guppylang.emulator import EmulatorBuilder
 
-from ..utility import hugr_pdf_directory
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+from utility import hugr_pdf_directory
 
 modifier_examples_dir = Path(__file__).resolve().parents[1] / "modified_hugrs"
 
