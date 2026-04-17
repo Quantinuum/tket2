@@ -75,12 +75,12 @@ class CompilationState:
         if isinstance(hugr, Hugr):
             embedded = set(_state.embedded_extensions())
             res = hugr.used_extensions()
+            py_extensions = res.used_extensions
             extensions = [
                 ext
                 for ext in res.used_extensions.extensions
                 if ext.name not in embedded
             ]
-            py_extensions = ExtensionRegistry.from_extensions(extensions)
             # Wrap the hugr in a package with the non-standard extensions.
             package = Package(modules=[hugr], extensions=extensions)
         elif isinstance(hugr, Package):
@@ -97,7 +97,7 @@ class CompilationState:
         """Convert this CompilationState back to a python Hugr package."""
         # Convert the inner hugr to bytes and load it in Python.
         hugr_bytes = self._inner.to_bytes()
-        package = Package.from_bytes(hugr_bytes)
+        package = Package.from_bytes(hugr_bytes, self._py_extensions)
         if self._py_extensions is not None:
             # Resolve the extensions in the loaded package using the python registry, if needed.
             # TODO: Use the `package.resolve_extensions` for clarity once it's been released in `hugr-py 0.16.0`.
