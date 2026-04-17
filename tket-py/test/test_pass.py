@@ -274,6 +274,35 @@ def test_structuralize_cfgs_accepts_skip_unstructuralizable_cfgs() -> None:
     assert _count_ops(structured, "Conditional") >= 1
 
 
+@pytest.mark.parametrize(
+    "strategy",
+    [StructuralizationStrategy.RELOOPER, StructuralizationStrategy.RVSDG],
+)
+def test_structuralize_cfgs_hw_example(
+    strategy: StructuralizationStrategy,
+) -> None:
+    hugr = _hugr_from_path("test_files/guppy_examples/hw_example.hugr")
+
+    structured = StructuralizeCfgs(strategy=strategy)(hugr)
+
+    assert _count_ops(structured, "CFG") == 0
+
+
+@pytest.mark.parametrize(
+    "strategy",
+    [StructuralizationStrategy.RELOOPER, StructuralizationStrategy.RVSDG],
+)
+def test_inline_then_structuralize_cfgs_hw_example(
+    strategy: StructuralizationStrategy,
+) -> None:
+    hugr = _hugr_from_path("test_files/guppy_examples/hw_example.hugr")
+
+    inlined = InlineFunctions()(hugr)
+    structured = StructuralizeCfgs(strategy=strategy)(inlined)
+
+    assert _count_ops(structured, "CFG") == 0
+
+
 def test_sink_conditional_inputs() -> None:
     hugr = _hugr_from_path("test_files/guppy_examples/shortcircuit.hugr")
 

@@ -60,6 +60,12 @@ pub(crate) struct CfgFacts<T> {
     pub(crate) loop_blocks: BTreeMap<T, BTreeSet<T>>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+enum ScopedPostdomNode<T> {
+    Real(T),
+    Exit,
+}
+
 impl<T> CfgFacts<T>
 where
     T: HugrNode,
@@ -259,8 +265,10 @@ where
         active_loop: Option<T>,
     ) -> Option<T> {
         let successors = self.scope_successors(split_node, scope, active_loop);
+        let scoped_postdom = self.scoped_postdominators(scope, active_loop);
         let mut reachable_sets = successors
-            .into_iter()
+            .iter()
+            .copied()
             .map(|succ| self.reachable_in_scope(succ, scope, active_loop))
             .collect_vec();
         let mut common = reachable_sets.pop()?;
@@ -273,6 +281,12 @@ where
             .iter()
             .copied()
             .filter(|candidate| {
+                let candidate = ScopedPostdomNode::Real(*candidate);
+                successors.iter().copied().all(|succ| {
+                    dominates(candidate, ScopedPostdomNode::Real(succ), &scoped_postdom)
+                })
+            })
+            .filter(|candidate| {
                 !candidates.iter().copied().any(|other| {
                     other != *candidate
                         && self
@@ -281,6 +295,36 @@ where
                 })
             })
             .min()
+    }
+
+    /// Computes scoped postdominators for the current structured walk.
+    fn scoped_postdominators(
+        &self,
+        scope: &BTreeSet<T>,
+        active_loop: Option<T>,
+    ) -> BTreeMap<ScopedPostdomNode<T>, Option<ScopedPostdomNode<T>>> {
+        let mut graph = DiGraphMap::new();
+        graph.add_node(ScopedPostdomNode::Exit);
+
+        for &node in scope {
+            let scoped_node = ScopedPostdomNode::Real(node);
+            graph.add_node(scoped_node);
+            let successors = self.scope_successors(node, scope, active_loop);
+            if successors.is_empty() {
+                graph.add_edge(scoped_node, ScopedPostdomNode::Exit, ());
+                continue;
+            }
+            for succ in successors {
+                graph.add_edge(scoped_node, ScopedPostdomNode::Real(succ), ());
+            }
+        }
+
+        let reversed = reverse_graph(&graph);
+        let postdoms = simple_fast(&reversed, ScopedPostdomNode::Exit);
+        graph
+            .nodes()
+            .map(|node| (node, postdoms.immediate_dominator(node)))
+            .collect()
     }
 
     /// Returns all nodes reachable from `start` while staying inside `scope`.
@@ -305,7 +349,7 @@ where
 /// Reverses a graph so postdominators can be computed as dominators.
 fn reverse_graph<T>(graph: &DiGraphMap<T, ()>) -> DiGraphMap<T, ()>
 where
-    T: HugrNode,
+    T: Copy + Ord + std::hash::Hash,
 {
     let mut reversed = DiGraphMap::new();
     for node in graph.nodes() {
@@ -320,7 +364,7 @@ where
 /// Returns whether `dom` dominates `node`.
 fn dominates<T>(dom: T, mut node: T, idom: &BTreeMap<T, Option<T>>) -> bool
 where
-    T: HugrNode,
+    T: Copy + Ord,
 {
     loop {
         if dom == node {

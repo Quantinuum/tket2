@@ -141,3 +141,25 @@ fn bell_test_preserves_container_io_wiring(
     assert_eq!(structured_input_links, raw_input_links);
     assert_eq!(structured_output_links, raw_output_links);
 }
+
+#[rstest]
+#[case::rvsdg(StructuralizationStrategy::Rvsdg)]
+#[case::relooper(StructuralizationStrategy::Relooper)]
+fn lowers_short_circuit_hw_example(#[case] strategy: StructuralizationStrategy) {
+    let mut hw_example = load_guppy_example("hw_example");
+
+    let report = StructuralizeCfgsPass::default()
+        .with_strategy(strategy)
+        .with_skip_unstructuralizable_cfgs(false)
+        .run(&mut hw_example)
+        .unwrap_or_else(|err| panic!("strategy {strategy:?} failed on hw_example: {err}"));
+
+    assert!(!report.rewrites.is_empty());
+    assert_eq!(
+        hw_example
+            .nodes()
+            .filter(|n| hw_example.get_optype(*n).is_cfg())
+            .count(),
+        0
+    );
+}
