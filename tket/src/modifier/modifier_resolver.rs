@@ -1376,10 +1376,12 @@ mod tests {
     pub fn test_saved_hugr(#[case] name: &str) {
         let mut h = load_guppy_example(name).unwrap();
 
-        let _ = fs::write(
-            format!("{}{}_before.mmd", MERMAID_OUTPUT_DIR, name),
-            &h.mermaid_string(),
-        );
+        // Note: NICOLA Method to save the hugr
+        // h.store(writer, config)
+        // let _ = fs::write(
+        //     format!("{}{}_before.mmd", MERMAID_OUTPUT_DIR, name),
+        //     &h.mermaid_string(),
+        // );
         assert_matches!(h.validate(), Ok(()));
 
         let entrypoint = h.entrypoint();
