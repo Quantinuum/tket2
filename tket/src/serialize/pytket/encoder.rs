@@ -868,16 +868,15 @@ impl<H: HugrView> PytketEncoderContext<H> {
         // If none of the encoders can handle the operation, we just add it to
         // the unsupported tracker and move on.
         match optype {
-            OpType::ExtensionOp(op) => {
+            OpType::ExtensionOp(op)
                 // Ignore nodes with order edges, as they cannot be represented in the pytket circuit.
-                if !self.has_order_edges(node, optype, hugr) {
+                if !self.has_order_edges(node, optype, hugr) => {
                     let config = Arc::clone(&self.config);
                     if config.op_to_pytket(node, op, hugr, self)? == EncodeStatus::Success {
                         return Ok(EncodeStatus::Success);
                     }
                 }
-            }
-            OpType::LoadConstant(constant) => {
+            OpType::LoadConstant(constant)
                 // If we are loading a supported type, emit a transparent node
                 // by reassigning the input values to the new outputs.
                 //
@@ -887,18 +886,17 @@ impl<H: HugrView> PytketEncoderContext<H> {
                     .config()
                     .type_to_pytket(constant.constant_type())
                     .is_some()
-                {
+                => {
                     self.emit_transparent_node(node, hugr, |ps| ps.input_params.to_owned())?;
                     return Ok(EncodeStatus::Success);
                 }
-            }
             OpType::Const(op) => {
                 let config = Arc::clone(&self.config);
                 if self.config().type_to_pytket(&op.get_type()).is_some()
                     && let Some(values) = config.const_to_pytket(&op.value, self)?
                 {
                     let wire = Wire::new(node, 0);
-                    self.values.register_wire(wire, values.into_iter(), hugr)?;
+                    self.values.register_wire(wire, values, hugr)?;
                     return Ok(EncodeStatus::Success);
                 }
             }
