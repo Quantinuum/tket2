@@ -14,6 +14,7 @@ from guppylang.std.builtins import control, result
 from guppylang.std.quantum import qubit
 from guppylang.std.qsystem import measure
 from guppylang.std.quantum import h, x
+from ..utility import hugr_pdf_directory
 
 from guppylang.experimental import enable_experimental_features
 
@@ -35,5 +36,5 @@ def main() -> None:
 program = main.compile()
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
 program.modules[0].render_dot().render(
-    argv[0].removesuffix(".py") + "_before", directory="../../0_hugr_pdf", cleanup=True
+    argv[0].removesuffix(".py") + "_before", directory=hugr_pdf_directory, cleanup=True
 )

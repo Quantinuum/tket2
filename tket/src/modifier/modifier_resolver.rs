@@ -1366,7 +1366,7 @@ mod tests {
     }
 
     const GUPPY_EXAMPLES_DIR: &str = "../test_files/modifier_examples";
-    const MERMAID_OUTPUT_DIR: &str = "../test_files/mermaid_output";
+    const HUGR_OUTPUT_DIR: &str = "../test_files/modified_hugrs";
 
     fn load_guppy_example(name: &str) -> std::io::Result<Hugr> {
         let file = Path::new(GUPPY_EXAMPLES_DIR).join(&format!("{name}.hugr"));
@@ -1394,15 +1394,11 @@ mod tests {
         resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
 
         // TODO: better folder
-        fs::create_dir_all(MERMAID_OUTPUT_DIR).unwrap();
-        let output = Path::new(MERMAID_OUTPUT_DIR).join(format!("{name}_after.hugr"));
+        fs::create_dir_all(HUGR_OUTPUT_DIR).unwrap();
+        let output = Path::new(HUGR_OUTPUT_DIR).join(format!("{name}_solved.hugr"));
         let writer = fs::File::create(output).unwrap();
         let writer = BufWriter::new(writer);
         h.store(writer, EnvelopeConfig::binary()).unwrap();
-        // let _ = fs::write(
-        //     format!("{}{}_after.mmd", MERMAID_OUTPUT_DIR, name),
-        //     &h.mermaid_string(),
-        // );
         assert_matches!(h.validate(), Ok(()));
     }
 }
