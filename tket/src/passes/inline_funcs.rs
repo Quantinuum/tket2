@@ -72,7 +72,7 @@ impl WithScope for InlineFunctionsPass {
 /// Inline (a subset of) [Call]s whose target [FuncDefn]s are not in cycles of the call
 /// graph.
 ///
-/// Processes any calls nodes that are descendants of the entrypoint.
+/// Processes any call nodes that are descendants of the entrypoint.
 ///
 /// The function `call_predicate` is passed each such [Call] node and can return
 /// `false` to prevent that Call from being inlined. (Note the [Call] may be created as
