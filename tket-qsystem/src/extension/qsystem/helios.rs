@@ -236,37 +236,44 @@ impl MakeOpDef for RuntimeBarrierDef {
 /// "tket.qsystem.helios" operations.
 pub trait HeliosOpBuilder: CommonOpBuilder {
     /// Add a "tket.qsystem.helios.LazyMeasure" op.
+    #[deprecated(since = "0.25.0", note = "Use the SynthesizeHeliosOp trait instead.")]
     fn add_lazy_measure(&mut self, qb: Wire) -> Result<Wire, BuildError> {
         CommonOpBuilder::add_lazy_measure_with::<HeliosOp>(self, qb)
     }
 
     /// Add a "tket.qsystem.helios.LazyMeasureLeaked" op.
+    #[deprecated(since = "0.25.0", note = "Use the SynthesizeHeliosOp trait instead.")]
     fn add_lazy_measure_leaked(&mut self, qb: Wire) -> Result<Wire, BuildError> {
         CommonOpBuilder::add_lazy_measure_leaked_with::<HeliosOp>(self, qb)
     }
 
     /// Add a "tket.qsystem.helios.LazyMeasureReset" op.
+    #[deprecated(since = "0.25.0", note = "Use the SynthesizeHeliosOp trait instead.")]
     fn add_lazy_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
         CommonOpBuilder::add_lazy_measure_reset_with::<HeliosOp>(self, qb)
     }
 
     /// Add a "tket.qsystem.helios.Measure" op.
+    #[deprecated(since = "0.25.0", note = "Use the SynthesizeHeliosOp trait instead.")]
     fn add_measure(&mut self, qb: Wire) -> Result<Wire, BuildError> {
         CommonOpBuilder::add_measure_with::<HeliosOp>(self, qb)
     }
 
     /// Add a "tket.qsystem.helios.Reset" op.
+    #[deprecated(since = "0.25.0", note = "Use the SynthesizeHeliosOp trait instead.")]
     fn add_reset(&mut self, qb: Wire) -> Result<Wire, BuildError> {
         CommonOpBuilder::add_reset_with::<HeliosOp>(self, qb)
     }
 
     /// Add a maximally entangling "tket.qsystem.ZZPhase(pi/2)" op.
+    #[expect(deprecated)]
     fn build_zz_max(&mut self, qb1: Wire, qb2: Wire) -> Result<[Wire; 2], BuildError> {
         let pi_2 = pi_mul_f64(self, 0.5);
         self.add_zz_phase(qb1, qb2, pi_2)
     }
 
     /// Add a "tket.qsystem.helios.ZZPhase" op.
+    #[deprecated(since = "0.25.0", note = "Use the SynthesizeHeliosOp trait instead.")]
     fn add_zz_phase(&mut self, qb1: Wire, qb2: Wire, angle: Wire) -> Result<[Wire; 2], BuildError> {
         Ok(self
             .add_dataflow_op(HeliosOp::ZZPhase, [qb1, qb2, angle])?
@@ -274,32 +281,38 @@ pub trait HeliosOpBuilder: CommonOpBuilder {
     }
 
     /// Add a "tket.qsystem.helios.PhasedX" op.
+    #[deprecated(since = "0.25.0", note = "Use the SynthesizeHeliosOp trait instead.")]
     fn add_phased_x(&mut self, qb: Wire, angle1: Wire, angle2: Wire) -> Result<Wire, BuildError> {
         CommonOpBuilder::add_phased_x_with::<HeliosOp>(self, qb, angle1, angle2)
     }
 
     /// Add a "tket.qsystem.helios.Rz" op.
+    #[deprecated(since = "0.25.0", note = "Use the SynthesizeHeliosOp trait instead.")]
     fn add_rz(&mut self, qb: Wire, angle: Wire) -> Result<Wire, BuildError> {
         CommonOpBuilder::add_rz_with::<HeliosOp>(self, qb, angle)
     }
 
     /// Add a "tket.qsystem.helios.TryQAlloc" op.
+    #[deprecated(since = "0.25.0", note = "Use the SynthesizeHeliosOp trait instead.")]
     fn add_try_alloc(&mut self) -> Result<Wire, BuildError> {
         CommonOpBuilder::add_try_alloc_with::<HeliosOp>(self)
     }
 
     /// Add a "tket.qsystem.helios.QFree" op.
+    #[deprecated(since = "0.25.0", note = "Use the SynthesizeHeliosOp trait instead.")]
     fn add_qfree(&mut self, qb: Wire) -> Result<(), BuildError> {
         CommonOpBuilder::add_qfree_with::<HeliosOp>(self, qb)
     }
 
     /// Add a "tket.qsystem.helios.MeasureReset" op.
     /// This operation is equivalent to a `Measure` followed by a `Reset`.
+    #[deprecated(since = "0.25.0", note = "Use the SynthesizeHeliosOp trait instead.")]
     fn add_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
         CommonOpBuilder::add_measure_reset_with::<HeliosOp>(self, qb)
     }
 
     /// Add a "tket.qsystem.helios.RuntimeBarrier" op.
+    #[deprecated(since = "0.25.0", note = "Use the SynthesizeHeliosOp trait instead.")]
     fn add_runtime_barrier(&mut self, qbs: Wire, array_size: u64) -> Result<Wire, BuildError> {
         CommonOpBuilder::add_runtime_barrier_with(self, &EXTENSION, qbs, array_size)
     }
@@ -395,6 +408,7 @@ pub trait HeliosOpBuilder: CommonOpBuilder {
     }
 
     /// Build a CNOT gate in terms of QSystem primitives.
+    #[expect(deprecated)]
     #[deprecated(
         since = "0.25.0",
         note = "Use lowering through SynthesizeTketOp instead."
@@ -413,6 +427,7 @@ pub trait HeliosOpBuilder: CommonOpBuilder {
     }
 
     /// Build a CY gate in terms of QSystem primitives.
+    #[expect(deprecated)]
     #[deprecated(
         since = "0.25.0",
         note = "Use lowering through SynthesizeTketOp instead."
@@ -433,6 +448,7 @@ pub trait HeliosOpBuilder: CommonOpBuilder {
     }
 
     /// Build a CZ gate in terms of QSystem primitives.
+    #[expect(deprecated)]
     #[deprecated(
         since = "0.25.0",
         note = "Use lowering through SynthesizeTketOp instead."
@@ -476,13 +492,15 @@ pub trait HeliosOpBuilder: CommonOpBuilder {
         let lambda_minus_2 = self
             .add_dataflow_op(FloatOps::fneg, [lambda_2])?
             .out_wire(0);
-
+        #[expect(deprecated)]
         let [a, b] = self.add_zz_phase(a, b, lambda_minus_2)?;
+        #[expect(deprecated)]
         let b = self.add_rz(b, lambda_2)?;
         Ok([a, b])
     }
 
     /// Build a Toffoli (CCX) gate in terms of QSystem primitives.
+    #[expect(deprecated)]
     #[deprecated(
         since = "0.25.0",
         note = "Use lowering through SynthesizeTketOp instead."
@@ -649,6 +667,92 @@ where
     }
 }
 
+/// Builder trait for lowering `HeliosOp`s into a target operation set.
+pub(crate) trait SynthesizeHeliosOp: Dataflow {
+    /// Build a "tket.qsystem.helios.LazyMeasure" op.
+    fn build_lazy_measure(&mut self, qb: Wire) -> Result<Wire, BuildError>;
+
+    /// Build a "tket.qsystem.helios.LazyMeasureLeaked" op.
+    fn build_lazy_measure_leaked(&mut self, qb: Wire) -> Result<Wire, BuildError>;
+
+    /// Build a "tket.qsystem.helios.LazyMeasureReset" op.
+    fn build_lazy_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError>;
+
+    /// Build a "tket.qsystem.helios.Measure" op.
+    fn build_measure(&mut self, qb: Wire) -> Result<Wire, BuildError>;
+
+    /// Build a "tket.qsystem.helios.Reset" op.
+    fn build_reset(&mut self, qb: Wire) -> Result<Wire, BuildError>;
+
+    /// Build a "tket.qsystem.helios.ZZPhase" op.
+    fn build_zz_phase(
+        &mut self,
+        qb1: Wire,
+        qb2: Wire,
+        angle: Wire,
+    ) -> Result<[Wire; 2], BuildError>;
+
+    fn build_zz_max(&mut self, qb1: Wire, qb2: Wire) -> Result<[Wire; 2], BuildError> {
+        let pi_2 = pi_mul_f64(self, 0.5);
+        self.build_zz_phase(qb1, qb2, pi_2)
+    }
+
+    /// Build a "tket.qsystem.helios.PhasedX" op.
+    fn build_phased_x(&mut self, qb: Wire, angle1: Wire, angle2: Wire) -> Result<Wire, BuildError>;
+
+    /// Build a "tket.qsystem.helios.Rz" op.
+    fn build_rz(&mut self, qb: Wire, angle: Wire) -> Result<Wire, BuildError>;
+    /// Build a "tket.qsystem.helios.TryQAlloc" op.
+    fn build_try_alloc(&mut self) -> Result<Wire, BuildError>;
+    /// Build a "tket.qsystem.helios.QFree" op.
+    fn build_qfree(&mut self, qb: Wire) -> Result<(), BuildError>;
+    /// Build a "tket.qsystem.helios.MeasureReset" op.
+    /// This operation is equivalent to a `Measure` followed by a `Reset`.
+    fn build_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError>;
+
+    /// Build a "tket.qsystem.helios.RuntimeBarrier" op.
+    fn build_runtime_barrier(&mut self, qbs: Wire, array_size: u64) -> Result<Wire, BuildError>;
+}
+
+#[expect(deprecated)]
+impl<D> SynthesizeHeliosOp for HeliosBuilder<D>
+where
+    D: DataflowHugr + HeliosOpBuilder,
+{
+    delegate! {
+        to self.inner {
+            #[call(add_lazy_measure)]
+            fn build_lazy_measure(&mut self, qb: Wire) -> Result<Wire, BuildError>;
+            #[call(add_lazy_measure_leaked)]
+            fn build_lazy_measure_leaked(&mut self, qb: Wire) -> Result<Wire, BuildError>;
+            #[call(add_lazy_measure_reset)]
+            fn build_lazy_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError>;
+            #[call(add_measure)]
+            fn build_measure(&mut self, qb: Wire) -> Result<Wire, BuildError>;
+            #[call(add_reset)]
+            fn build_reset(&mut self, qb: Wire) -> Result<Wire, BuildError>;
+            #[call(add_zz_phase)]
+            fn build_zz_phase(
+                &mut self,
+                qb1: Wire,
+                qb2: Wire,
+                angle: Wire,
+            ) -> Result<[Wire; 2], BuildError>;
+            #[call(add_phased_x)]
+            fn build_phased_x(&mut self, qb: Wire, angle1: Wire, angle2: Wire) -> Result<Wire, BuildError>;
+            #[call(add_rz)]
+            fn build_rz(&mut self, qb: Wire, angle: Wire) -> Result<Wire, BuildError>;
+            #[call(add_try_alloc)]
+            fn build_try_alloc(&mut self) -> Result<Wire, BuildError>;
+            #[call(add_qfree)]
+            fn build_qfree(&mut self, qb: Wire) -> Result<(), BuildError>;
+            #[call(add_measure_reset)]
+            fn build_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError>;
+            #[call(add_runtime_barrier)]
+            fn build_runtime_barrier(&mut self, qbs: Wire, array_size: u64) -> Result<Wire, BuildError>;
+        }
+    }
+}
 #[cfg(test)]
 mod test {
     use crate::extension::qsystem::common::test_utils;
