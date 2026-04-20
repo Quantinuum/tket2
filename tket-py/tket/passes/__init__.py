@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from pathlib import Path
-import json
 from dataclasses import dataclass
+import json
+from pathlib import Path
 
 from hugr import Hugr
 from pytket.passes import (
@@ -10,7 +10,8 @@ from pytket.passes import (
 )
 
 from tket import _state
-from ._tket import passes as _passes, optimiser as _optimiser
+from . import inline_funcs
+from .._tket import passes as _passes, optimiser as _optimiser
 
 from hugr.passes.composable import (
     ComposablePass,
@@ -24,6 +25,7 @@ from hugr.passes.scope import PassScope, GlobalScope
 __all__ = [
     "PytketHugrPass",
     "PassResult",
+    "InlineFuncsHeuristic",
     "InlineFunctions",
     "NormalizeGuppy",
     "ModifierResolverPass",
@@ -150,11 +152,14 @@ class InlineFunctions(ComposablePass):
     """Inline acyclic function calls below the selected scope.
 
     Parameters:
-    - max_inline_size: Maximum number of descendants allowed in a callee for
-      its call sites to be inlined.
+    - heuristic: Heuristic used to choose which non-recursive functions to
+      inline. Defaults to `MaxSize(64)`.
+    - follow_inline_hints: Whether to follow compiler hints for inlining
+      functions.
     """
 
-    max_inline_size: int = 64
+    heuristic: inline_funcs.InlineFuncsHeuristic = inline_funcs.MaxSize(64)
+    follow_inline_hints: bool = True
     _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
 
     def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
@@ -175,7 +180,8 @@ class InlineFunctions(ComposablePass):
 
         _passes.inline_functions(
             tk_program._inner,
-            max_inline_size=self.max_inline_size,
+            heuristic=self.heuristic,
+            follow_inline_hints=self.follow_inline_hints,
             scope=self._scope,
         )
 

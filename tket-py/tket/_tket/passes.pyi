@@ -2,6 +2,7 @@ from pathlib import Path
 
 from .optimiser import BadgerOptimiser
 from .state import CompilationState
+from ..passes import inline_funcs
 from hugr.passes.scope import PassScope, GlobalScope
 
 class CircuitChunks:
@@ -45,7 +46,8 @@ def normalize_guppy(
 def inline_functions(
     circ: CompilationState,
     *,
-    max_inline_size: int = 64,
+    heuristic: inline_funcs.InlineFuncsHeuristic = inline_funcs.MaxSize(64),
+    follow_inline_hints: bool = True,
     scope: PassScope = GlobalScope.PRESERVE_PUBLIC,
 ) -> None:
     """Inline acyclic function calls below the selected scope."""

@@ -1,6 +1,7 @@
 //! Passes for optimising circuits.
 
 pub mod chunks;
+mod inline_funcs;
 mod scope;
 pub mod tket1;
 
@@ -26,7 +27,7 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     m.add_function(wrap_pyfunction!(greedy_depth_reduce, &m)?)?;
     m.add_function(wrap_pyfunction!(badger_optimise, &m)?)?;
     m.add_function(wrap_pyfunction!(normalize_guppy, &m)?)?;
-    m.add_function(wrap_pyfunction!(inline_functions, &m)?)?;
+    m.add_function(wrap_pyfunction!(self::inline_funcs::inline_functions, &m)?)?;
     m.add_class::<self::chunks::PyCircuitChunks>()?;
     m.add_function(wrap_pyfunction!(self::chunks::chunks, &m)?)?;
     m.add_function(wrap_pyfunction!(self::tket1::tket1_pass, &m)?)?;
@@ -100,25 +101,6 @@ fn normalize_guppy(
         .remove_redundant_order_edges(remove_redundant_order_edges)
         .squash_borrows(squash_borrows);
 
-    pass.run(&mut circ.hugr).convert_pyerrs()?;
-    Ok(())
-}
-
-/// Inline acyclic function calls below the selected scope.
-///
-/// Parameters:
-/// - max_inline_size: Maximum number of descendants allowed in a callee for
-///   its call sites to be inlined.
-#[pyfunction]
-#[pyo3(signature = (circ, *, max_inline_size = 64, scope = None))]
-fn inline_functions(
-    circ: &mut CompilationState,
-    max_inline_size: usize,
-    scope: Option<PyPassScope>,
-) -> PyResult<()> {
-    let py_scope = scope.unwrap_or_default();
-    let pass = tket::passes::InlineFunctionsPass::default_with_scope(py_scope.scope)
-        .with_max_inline_size(max_inline_size);
     pass.run(&mut circ.hugr).convert_pyerrs()?;
     Ok(())
 }

@@ -1,6 +1,7 @@
 //! Contains a pass to inline calls to selected functions in a Hugr.
 use std::collections::{HashMap, HashSet, VecDeque};
 
+use hugr::HugrView;
 use itertools::Itertools;
 use petgraph::algo::tarjan_scc;
 
@@ -14,6 +15,36 @@ use crate::passes::{ComposablePass, PassScope, WithScope};
 #[non_exhaustive]
 pub enum InlineFuncsError {}
 
+/// Heuristic for deciding which functions to inline.
+///
+/// Note that recursive functions are never inlined.
+#[derive(Clone, Debug)]
+#[non_exhaustive]
+pub enum InlineFuncsHeuristic {
+    /// Inline functions that contain at most the specified number of children
+    /// nodes.
+    MaxSize(usize),
+    /// Inline all non-recursive functions.
+    All,
+    // TODO: Heuristic based on function signature. <https://github.com/Quantinuum/tket2/issues/1003>
+}
+
+impl InlineFuncsHeuristic {
+    /// Returns `True` if the function definition should be inlined.
+    fn should_inline<H: HugrView>(&self, func: H::Node, hugr: &H) -> bool {
+        match self {
+            InlineFuncsHeuristic::MaxSize(size) => hugr.descendants(func).count() <= *size,
+            InlineFuncsHeuristic::All => true,
+        }
+    }
+}
+
+impl Default for InlineFuncsHeuristic {
+    fn default() -> Self {
+        Self::MaxSize(64)
+    }
+}
+
 /// Inlines non-recursive function calls.
 ///
 /// We use a heuristic to determine which functions to inline. Currently, we
@@ -21,8 +52,13 @@ pub enum InlineFuncsError {}
 /// `max_inline_size` (defaults to 64).
 #[derive(Debug, Clone)]
 pub struct InlineFunctionsPass {
-    /// Maximum function size to inline.
-    max_inline_size: usize,
+    /// Heuristic for deciding which functions to inline.
+    heuristic: InlineFuncsHeuristic,
+    /// Whether to follow compiler hints for inlining functions.
+    //
+    // Note that the inline hint metadata has not been defined yet, so this is currently unused.
+    // TODO: <https://github.com/Quantinuum/hugr/issues/2328>
+    follow_inline_hints: bool,
 
     scope: PassScope,
 }
@@ -30,16 +66,23 @@ pub struct InlineFunctionsPass {
 impl Default for InlineFunctionsPass {
     fn default() -> Self {
         Self {
-            max_inline_size: 64,
+            heuristic: InlineFuncsHeuristic::default(),
+            follow_inline_hints: true,
             scope: Default::default(),
         }
     }
 }
 
 impl InlineFunctionsPass {
-    /// Sets the maximum function size to inline, measured in number of descendant nodes from the function node.
-    pub fn with_max_inline_size(mut self, max_inline_size: usize) -> Self {
-        self.max_inline_size = max_inline_size;
+    /// Sets the heuristic for deciding which functions to inline.
+    pub fn with_heuristic(mut self, heuristic: InlineFuncsHeuristic) -> Self {
+        self.heuristic = heuristic;
+        self
+    }
+
+    /// Sets whether to follow compiler hints for inlining functions.
+    pub fn follow_inline_hints(mut self, follow_inline_hints: bool) -> Self {
+        self.follow_inline_hints = follow_inline_hints;
         self
     }
 }
@@ -54,10 +97,9 @@ impl<H: HugrMut> ComposablePass<H> for InlineFunctionsPass {
             let Some(func) = h.static_source(call) else {
                 return false;
             };
-            *should_inline_cache.entry(func).or_insert_with(|| {
-                let func_size = h.descendants(func).count();
-                func_size <= self.max_inline_size
-            })
+            *should_inline_cache
+                .entry(func)
+                .or_insert_with(|| self.heuristic.should_inline(func, h))
         })
     }
 }
@@ -167,6 +209,7 @@ mod test {
 
     use super::{InlineFunctionsPass, inline_acyclic_scoped};
     use crate::passes::composable::test::run_validating;
+    use crate::passes::inline_funcs::InlineFuncsHeuristic;
     use crate::passes::{PassScope, composable::Preserve};
 
     ///          /->-\
@@ -320,15 +363,16 @@ mod test {
     }
 
     #[rstest]
-    #[case(0, vec!["f", "b"])]
-    #[case(usize::MAX, vec!["f"])]
+    #[case::size_zero(InlineFuncsHeuristic::MaxSize(0), vec!["f", "b"])]
+    #[case::size_unlimited(InlineFuncsHeuristic::MaxSize(usize::MAX), vec!["f"])]
+    #[case::all(InlineFuncsHeuristic::All, vec!["f"])]
     fn inline_functions_pass_respects_max_inline_size(
-        #[case] max_inline_size: usize,
+        #[case] heuristic: InlineFuncsHeuristic,
         #[case] g_targets: Vec<&'static str>,
     ) {
         let mut h = make_test_hugr();
         run_validating(
-            InlineFunctionsPass::default().with_max_inline_size(max_inline_size),
+            InlineFunctionsPass::default().with_heuristic(heuristic),
             &mut h,
         )
         .unwrap();

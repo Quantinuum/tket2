@@ -5,6 +5,7 @@ from tket.passes import (
     _badger_optimise,
     _greedy_depth_reduce,
     InlineFunctions,
+    inline_funcs,
     NormalizeGuppy,
     ModifierResolverPass,
 )
@@ -248,6 +249,10 @@ def test_inline_functions() -> None:
 
     assert _count_ops(hugr, "Call") == 2
 
-    inlined = InlineFunctions(max_inline_size=64)(hugr)
+    max_size = InlineFunctions(heuristic=inline_funcs.MaxSize(42))(hugr)
 
-    assert _count_ops(inlined, "Call") == 0
+    assert _count_ops(max_size, "Call") == 0
+
+    all = InlineFunctions(heuristic=inline_funcs.All())(hugr)
+
+    assert _count_ops(all, "Call") == 0
