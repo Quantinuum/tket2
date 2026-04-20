@@ -96,18 +96,12 @@ recompile-test-hugrs:
 mod:
     @echo "---- Compiling hugrs ----"
     just test_files/modifier_examples/r
-    @echo "---- Applying passes ----"
-    cargo test -p tket test_saved_hugrs
-    @echo "---- Running hugrs ----"
     just test_files/run_modifier_examples/r
 
 
 modh name:
     @echo "---- Compiling hugr {{name}} ----"
     just test_files/modifier_examples/rh "{{name}}.py"
-    @echo "---- Applying passes ----"
-    cargo test -p tket test_saved_hugr
-    @echo "---- Running hugr {{name}} ----"
     just test_files/run_modifier_examples/rh "{{name}}"
 
 

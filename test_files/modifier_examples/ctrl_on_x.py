@@ -11,9 +11,9 @@ from sys import argv
 import sys
 
 from guppylang import guppy
-from guppylang.std.builtins import control, result
-from guppylang.std.quantum import qubit
-from guppylang.std.qsystem import measure
+from guppylang.std.builtins import control
+from guppylang.std.debug import state_result
+from guppylang.std.quantum import qubit, discard
 from guppylang.std.quantum import h, x
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
@@ -31,8 +31,9 @@ def main() -> None:
     with control(q1):
         x(q2)
 
-    result("q1", measure(q1))
-    result("q2", measure(q2))
+    state_result("r", q1, q2)
+    discard(q1)
+    discard(q2)
 
 
 program = main.compile()

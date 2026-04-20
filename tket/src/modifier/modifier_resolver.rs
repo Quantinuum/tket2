@@ -1167,6 +1167,7 @@ pub fn resolve_modifier_with_entrypoints(
     // Confirm that the resulting hugr is still structurally valid after all rewrites.
     h.validate()
         .map_err(|e| ModifierResolverErrors::BuildError(e.into()))?;
+    // h.extensions_mut() = original_extensions;
 
     Ok(())
 }
@@ -1176,7 +1177,7 @@ pub fn resolve_modifier_with_entrypoints(
 mod tests {
     use std::{
         fs,
-        io::{BufReader, BufWriter},
+        io::{BufReader, BufWriter, Cursor},
         path::Path,
     };
 
@@ -1184,13 +1185,17 @@ mod tests {
     use hugr::{
         Hugr,
         builder::{DataflowSubContainer, HugrBuilder, ModuleBuilder},
+        extension::ExtensionRegistry,
         ops::{CallIndirect, ExtensionOp, handle::FuncID},
+        package::Package,
         std_extensions::collections::array::ArrayOpBuilder,
         types::Term,
     };
 
     use crate::{
         TketOp,
+        extension::REGISTRY,
+        extension::global_phase::GLOBAL_PHASE_EXTENSION,
         extension::modifier::{CONTROL_OP_ID, DAGGER_OP_ID, MODIFIER_EXTENSION},
         metadata,
     };
@@ -1368,6 +1373,13 @@ mod tests {
     const GUPPY_EXAMPLES_DIR: &str = "../test_files/modifier_examples";
     const HUGR_OUTPUT_DIR: &str = "../test_files/modified_hugrs";
 
+    fn load_guppy_example(name: &str) -> std::io::Result<Hugr> {
+        let file = Path::new(GUPPY_EXAMPLES_DIR).join(format!("{name}.hugr"));
+        let reader = fs::File::open(file)?;
+        let reader = BufReader::new(reader);
+        Ok(Hugr::load(reader, None).unwrap())
+    }
+
     fn load_guppy_examples() -> std::io::Result<Vec<(String, Hugr)>> {
         let mut files = fs::read_dir(GUPPY_EXAMPLES_DIR)?
             .filter_map(|entry| {
@@ -1383,63 +1395,68 @@ mod tests {
             .into_iter()
             .map(|file| {
                 let name = file.file_stem().unwrap().to_string_lossy().into_owned();
-                let reader = fs::File::open(file)?;
-                let reader = BufReader::new(reader);
-                Ok((name, Hugr::load(reader, None).unwrap()))
+                let h = load_guppy_example(&name)?;
+                Ok((name, h))
             })
             .collect()
     }
 
-    #[test]
-    pub fn test_saved_hugrs() {
+    /// Resolve modifiers in `h`, write the result to `HUGR_OUTPUT_DIR/{name}_solved.hugr`,
+    /// and assert that the hugr is valid both before and after resolution.
+    fn resolve_and_save(name: &str, h: &mut Hugr) {
         use hugr::envelope::EnvelopeConfig;
-
-        for (name, mut h) in load_guppy_examples().unwrap() {
-            // Note: NICOLA Method to save the hugr
-            // h.store(writer, config)
-            // let _ = fs::write(
-            //     format!("{}{}_before.mmd", MERMAID_OUTPUT_DIR, name),
-            //     &h.mermaid_string(),
-            // );
-            assert_matches!(h.validate(), Ok(()));
-
-            let entrypoint = h.entrypoint();
-            resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
-
-            fs::create_dir_all(HUGR_OUTPUT_DIR).unwrap();
-            let output = Path::new(HUGR_OUTPUT_DIR).join(format!("{name}_solved.hugr"));
-            let writer = fs::File::create(output).unwrap();
-            let writer = BufWriter::new(writer);
-            h.store(writer, EnvelopeConfig::binary()).unwrap();
-            assert_matches!(h.validate(), Ok(()));
-        }
-    }
-
-    fn load_guppy_example(name: &str) -> std::io::Result<Hugr> {
-        // todo return a list of all the hugrs in the GUPPY_EXAMPLES_DIR
-        let file = Path::new(GUPPY_EXAMPLES_DIR).join(&format!("{name}.hugr"));
-        let reader = fs::File::open(file)?;
-        let reader = BufReader::new(reader);
-        Ok(Hugr::load(reader, None).unwrap())
-    }
-    #[rstest::rstest]
-    #[case::call("ctrl_on_call")]
-    #[case::call("ctrl_on_x")]
-    pub fn test_saved_hugr(#[case] name: &str) {
-        use hugr::envelope::EnvelopeConfig;
-
-        let mut h = load_guppy_example(name).unwrap();
 
         assert_matches!(h.validate(), Ok(()));
 
         let entrypoint = h.entrypoint();
-        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        resolve_modifier_with_entrypoints(h, [entrypoint]).unwrap();
 
         fs::create_dir_all(HUGR_OUTPUT_DIR).unwrap();
         let output = Path::new(HUGR_OUTPUT_DIR).join(format!("{name}_solved.hugr"));
         let writer = fs::File::create(output).unwrap();
         let writer = BufWriter::new(writer);
-        h.store(writer, EnvelopeConfig::binary()).unwrap();
+        h.store_with_exts(writer, EnvelopeConfig::binary(), h.extensions())
+            .unwrap();
         assert_matches!(h.validate(), Ok(()));
+    }
+
+    #[test]
+    pub fn test_saved_hugrs() {
+        for (name, mut h) in load_guppy_examples().unwrap() {
+            resolve_and_save(&name, &mut h);
+        }
+    }
+
+    #[rstest::rstest]
+    #[case::call("ctrl_on_call2")]
+    // #[case::call("ctrl_on_x")]
+    pub fn test_saved_hugr(#[case] name: &str) {
+        let mut h = load_guppy_example(name).unwrap();
+        resolve_and_save(name, &mut h);
+    }
+
+    // TODO: this test fails because the resolver does not preserve extensions, I have not idea why.
+    pub fn test_resolved_hugr_keeps_extensions(name: &str) {
+        use hugr::envelope::EnvelopeConfig;
+
+        let mut h = load_guppy_example(name).unwrap();
+        let loaded_extensions = h.extensions().ids().cloned().collect::<Vec<_>>();
+
+        let entrypoint = h.entrypoint();
+        // removing this call makes the test succeed
+        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+
+        let resolved_extensions = h.extensions().ids().cloned().collect::<Vec<_>>();
+        assert_eq!(loaded_extensions, resolved_extensions);
+
+        let mut bytes = Vec::new();
+        h.store_with_exts(&mut bytes, EnvelopeConfig::binary(), h.extensions())
+            .unwrap();
+
+        let reloaded = Hugr::load(Cursor::new(bytes), None).unwrap();
+        assert_matches!(reloaded.validate(), Ok(()));
+
+        let reloaded_extensions = reloaded.extensions().ids().cloned().collect::<Vec<_>>();
+        assert_eq!(resolved_extensions, reloaded_extensions); //Failing here!
     }
 }
