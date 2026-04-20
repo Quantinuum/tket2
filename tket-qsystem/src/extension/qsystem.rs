@@ -20,6 +20,7 @@ mod common;
 pub mod helios;
 mod lower;
 pub mod sol;
+mod synth_tket_op;
 pub use lower::{LowerTk2Error, LowerTketToQSystemPass, check_lowered, lower_tk2_ops};
 
 /// The "tket.qsystem" extension id.

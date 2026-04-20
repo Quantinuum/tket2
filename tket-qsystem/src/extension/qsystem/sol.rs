@@ -6,9 +6,10 @@
 //! values. Qubits are never lazy.
 use std::{str::FromStr, sync::Arc};
 
+use delegate::delegate;
 use hugr::{
-    Extension, Wire,
-    builder::{BuildError, Dataflow},
+    Extension, Hugr, Node, Wire,
+    builder::{BuildError, Container, Dataflow, DataflowHugr, HugrBuilder},
     extension::{
         ExtensionId, OpDef, SignatureFunc, Version,
         prelude::qb_t,
@@ -24,6 +25,7 @@ use hugr::{
 
 use super::common::{self, CommonOp, CommonOpBuilder, SharedOp};
 use super::lower::pi_mul_f64;
+use super::synth_tket_op::SynthesizeTketOp;
 use derive_more::Display;
 use lazy_static::lazy_static;
 use strum::{EnumIter, EnumString, IntoStaticStr};
@@ -354,187 +356,6 @@ pub trait SolOpBuilder: CommonOpBuilder {
         CommonOpBuilder::add_runtime_barrier_with(self, &EXTENSION, qbs, array_size)
     }
 
-    /// Build a hadamard gate in terms of QSystem primitives.
-    fn build_h(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_h_with::<SolOp>(self, qb)
-    }
-
-    /// Build an X gate in terms of QSystem primitives.
-    fn build_x(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_x_with::<SolOp>(self, qb)
-    }
-
-    /// Build a Y gate in terms of QSystem primitives.
-    fn build_y(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_y_with::<SolOp>(self, qb)
-    }
-
-    /// Build a Z gate in terms of QSystem primitives.
-    fn build_z(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_z_with::<SolOp>(self, qb)
-    }
-
-    /// Build an S gate in terms of QSystem primitives.
-    fn build_s(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_s_with::<SolOp>(self, qb)
-    }
-
-    /// Build an Sdg gate in terms of QSystem primitives.
-    fn build_sdg(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_sdg_with::<SolOp>(self, qb)
-    }
-
-    /// Build a V gate in terms of QSystem primitives.
-    fn build_v(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_v_with::<SolOp>(self, qb)
-    }
-
-    /// Build a Vdg gate in terms of QSystem primitives.
-    fn build_vdg(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_vdg_with::<SolOp>(self, qb)
-    }
-
-    /// Build a T gate in terms of QSystem primitives.
-    fn build_t(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_t_with::<SolOp>(self, qb)
-    }
-
-    /// Build a Tdg gate in terms of QSystem primitives.
-    fn build_tdg(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_tdg_with::<SolOp>(self, qb)
-    }
-
-    /// Build a CNOT gate in terms of QSystem primitives.
-    fn build_cx(&mut self, c: Wire, t: Wire) -> Result<[Wire; 2], BuildError> {
-        let pi_2 = pi_mul_f64(self, 0.5);
-        let pi_minus_2 = pi_mul_f64(self, -0.5);
-        let zero = pi_mul_f64(self, 0.0);
-
-        let c = self.add_phased_x(c, pi_2, pi_2)?;
-        let [c, t] = self.add_phased_xx(c, t, pi_2, zero)?;
-        let c = self.add_phased_x(c, pi_minus_2, pi_2)?;
-        let c = self.add_rz(c, pi_minus_2)?;
-        let t = self.add_phased_x(t, pi_minus_2, zero)?;
-        Ok([c, t])
-    }
-
-    /// Build a CY gate in terms of QSystem primitives.
-    fn build_cy(&mut self, a: Wire, b: Wire) -> Result<[Wire; 2], BuildError> {
-        let pi_2 = pi_mul_f64(self, 0.5);
-        let pi_minus_2 = pi_mul_f64(self, -0.5);
-        let zero = pi_mul_f64(self, 0.0);
-
-        let a = self.add_phased_x(a, pi_2, pi_2)?;
-        let b = self.add_rz(b, pi_minus_2)?;
-        let [a, b] = self.add_phased_xx(a, b, pi_2, zero)?;
-        let a = self.add_phased_x(a, pi_minus_2, pi_2)?;
-        let a = self.add_rz(a, pi_minus_2)?;
-        let b = self.add_phased_x(b, pi_minus_2, zero)?;
-        let b = self.add_rz(b, pi_2)?;
-        Ok([a, b])
-    }
-
-    /// Build a CZ gate in terms of QSystem primitives.
-    fn build_cz(&mut self, a: Wire, b: Wire) -> Result<[Wire; 2], BuildError> {
-        let pi_minus = pi_mul_f64(self, -1.0);
-        let pi_2 = pi_mul_f64(self, 0.5);
-        let pi_minus_2 = pi_mul_f64(self, -0.5);
-
-        let a = self.add_phased_x(a, pi_2, pi_minus_2)?;
-        let b = self.add_phased_x(b, pi_2, pi_minus_2)?;
-        let [a, b] = self.add_phased_xx(a, b, pi_2, pi_minus)?;
-        let a = self.add_phased_x(a, pi_2, pi_2)?;
-        let b = self.add_phased_x(b, pi_2, pi_2)?;
-        let a = self.add_rz(a, pi_minus_2)?;
-        let b = self.add_rz(b, pi_minus_2)?;
-        Ok([a, b])
-    }
-
-    /// Build a RX gate in terms of QSystem primitives.
-    fn build_rx(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_rx_with::<SolOp>(self, qb, theta)
-    }
-
-    /// Build a RY gate in terms of QSystem primitives.
-    fn build_ry(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_ry_with::<SolOp>(self, qb, theta)
-    }
-
-    /// Build a CRZ gate in terms of QSystem primitives.
-    fn build_crz(&mut self, a: Wire, b: Wire, lambda: Wire) -> Result<[Wire; 2], BuildError> {
-        let two = self.add_load_const(Value::from(ConstF64::new(2.0)));
-        let lambda_2 = self
-            .add_dataflow_op(FloatOps::fdiv, [lambda, two])?
-            .out_wire(0);
-        let lambda_minus_2 = self
-            .add_dataflow_op(FloatOps::fneg, [lambda_2])?
-            .out_wire(0);
-
-        let pi_minus = pi_mul_f64(self, -1.0);
-        let pi_2 = pi_mul_f64(self, 0.5);
-        let pi_minus_2 = pi_mul_f64(self, -0.5);
-
-        let a = self.add_phased_x(a, pi_2, pi_minus_2)?;
-        let b = self.add_phased_x(b, pi_2, pi_minus_2)?;
-        let [a, b] = self.add_phased_xx(a, b, lambda_minus_2, pi_minus)?;
-        let a = self.add_phased_x(a, pi_2, pi_2)?;
-        let b = self.add_phased_x(b, pi_2, pi_2)?;
-        let b = self.add_rz(b, lambda_2)?;
-        Ok([a, b])
-    }
-
-    /// Build a Toffoli (CCX) gate in terms of QSystem primitives.
-    fn build_toffoli(&mut self, a: Wire, b: Wire, c: Wire) -> Result<[Wire; 3], BuildError> {
-        let pi = pi_mul_f64(self, 1.0);
-        let pi_2 = pi_mul_f64(self, 0.5);
-        let pi_minus_2 = pi_mul_f64(self, -0.5);
-        let pi_4 = pi_mul_f64(self, 0.25);
-        let pi_minus_4 = pi_mul_f64(self, -0.25);
-        let pi_minus_3_4 = pi_mul_f64(self, -0.75);
-        let zero = pi_mul_f64(self, 0.0);
-
-        let a = self.add_phased_x(a, pi_2, pi_minus_3_4)?;
-        let b = self.add_phased_x(b, pi_2, pi_minus_3_4)?;
-        let a = self.add_rz(a, pi_minus_3_4)?;
-        let b = self.add_rz(b, pi_minus_3_4)?;
-        let c = self.add_phased_x(c, pi_2, pi_minus_2)?;
-        let c = self.add_rz(c, pi_minus_3_4)?;
-
-        let [a, c] = self.add_phased_xx(a, c, pi_2, zero)?;
-
-        let a = self.add_phased_x(a, pi_minus_2, zero)?;
-        let c = self.add_phased_x(c, pi_4, pi_minus_2)?;
-
-        let [a, b] = self.add_phased_xx(a, b, pi_minus_4, zero)?;
-        let c = self.add_rz(c, pi_2)?;
-
-        let [b, c] = self.add_phased_xx(b, c, pi_4, zero)?;
-        let c = self.add_phased_x(c, pi_2, pi_minus_2)?;
-        let c = self.add_rz(c, pi)?;
-
-        let [a, c] = self.add_phased_xx(a, c, pi_2, zero)?;
-        let a = self.add_phased_x(a, pi_2, pi_minus_2)?;
-        let c = self.add_phased_x(c, pi_2, pi_minus_2)?;
-        let a = self.add_rz(a, pi_2)?;
-        let c = self.add_rz(c, pi_2)?;
-
-        let [b, c] = self.add_phased_xx(b, c, pi_minus_4, zero)?;
-        let b = self.add_phased_x(b, pi_2, pi_minus_2)?;
-        let b = self.add_rz(b, pi)?;
-
-        Ok([a, b, c])
-    }
-
-    /// Build a projective measurement with a conditional flip.
-    fn build_measure_flip(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
-        CommonOpBuilder::build_measure_flip_with::<SolOp>(self, qb)
-    }
-
-    /// Build a qalloc operation that panics on failure.
-    fn build_qalloc(&mut self) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_qalloc_with::<SolOp>(self)
-    }
-
     /// Build an array from qubit wires, apply a barrier, and unwrap the array afterwards.
     fn build_wrapped_barrier(
         &mut self,
@@ -548,6 +369,224 @@ pub trait SolOpBuilder: CommonOpBuilder {
 }
 
 impl<D: Dataflow> SolOpBuilder for D {}
+
+#[derive(Debug)]
+/// Implmements traits for lowering operations in terms of Sol primitives.
+pub(super) struct SolBuilder<D> {
+    inner: D,
+}
+
+impl<D> SolBuilder<D> {
+    pub(super) fn new(inner: D) -> Self {
+        Self { inner }
+    }
+}
+
+impl<D> Container for SolBuilder<D>
+where
+    D: Container,
+{
+    delegate! {
+        to self.inner {
+            fn container_node(&self) -> Node;
+            fn hugr_mut(&mut self) -> &mut Hugr;
+            fn hugr(&self) -> &Hugr;
+        }
+    }
+}
+
+impl<D> HugrBuilder for SolBuilder<D>
+where
+    D: HugrBuilder,
+{
+    delegate! {
+        to self.inner {
+            fn finish_hugr(self) -> Result<Hugr, hugr::hugr::validate::ValidationError<Node>>;
+        }
+    }
+}
+
+impl<D> Dataflow for SolBuilder<D>
+where
+    D: Dataflow,
+{
+    delegate! {
+        to self.inner {
+            fn num_inputs(&self) -> usize;
+        }
+    }
+}
+
+impl<D> SynthesizeTketOp for SolBuilder<D>
+where
+    D: DataflowHugr + SolOpBuilder,
+{
+    fn build_h(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::build_h_with::<SolOp>(&mut self.inner, qb)
+    }
+
+    fn build_x(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::build_x_with::<SolOp>(&mut self.inner, qb)
+    }
+
+    fn build_y(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::build_y_with::<SolOp>(&mut self.inner, qb)
+    }
+
+    fn build_z(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::build_z_with::<SolOp>(&mut self.inner, qb)
+    }
+
+    fn build_s(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::build_s_with::<SolOp>(&mut self.inner, qb)
+    }
+
+    fn build_sdg(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::build_sdg_with::<SolOp>(&mut self.inner, qb)
+    }
+
+    fn build_v(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::build_v_with::<SolOp>(&mut self.inner, qb)
+    }
+
+    fn build_vdg(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::build_vdg_with::<SolOp>(&mut self.inner, qb)
+    }
+
+    fn build_t(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::build_t_with::<SolOp>(&mut self.inner, qb)
+    }
+
+    fn build_tdg(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::build_tdg_with::<SolOp>(&mut self.inner, qb)
+    }
+
+    fn build_measure_flip(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
+        CommonOpBuilder::build_measure_flip_with::<SolOp>(&mut self.inner, qb)
+    }
+
+    fn build_qalloc(&mut self) -> Result<Wire, BuildError> {
+        CommonOpBuilder::build_qalloc_with::<SolOp>(&mut self.inner)
+    }
+
+    fn build_cx(&mut self, c: Wire, t: Wire) -> Result<[Wire; 2], BuildError> {
+        let pi_2 = pi_mul_f64(self, 0.5);
+        let pi_minus_2 = pi_mul_f64(self, -0.5);
+        let zero = pi_mul_f64(self, 0.0);
+
+        let c = self.inner.add_phased_x(c, pi_2, pi_2)?;
+        let [c, t] = self.inner.add_phased_xx(c, t, pi_2, zero)?;
+        let c = self.inner.add_phased_x(c, pi_minus_2, pi_2)?;
+        let c = self.inner.add_rz(c, pi_minus_2)?;
+        let t = self.inner.add_phased_x(t, pi_minus_2, zero)?;
+        Ok([c, t])
+    }
+
+    fn build_cy(&mut self, a: Wire, b: Wire) -> Result<[Wire; 2], BuildError> {
+        let pi_2 = pi_mul_f64(self, 0.5);
+        let pi_minus_2 = pi_mul_f64(self, -0.5);
+        let zero = pi_mul_f64(self, 0.0);
+
+        let a = self.inner.add_phased_x(a, pi_2, pi_2)?;
+        let b = self.inner.add_rz(b, pi_minus_2)?;
+        let [a, b] = self.inner.add_phased_xx(a, b, pi_2, zero)?;
+        let a = self.inner.add_phased_x(a, pi_minus_2, pi_2)?;
+        let a = self.inner.add_rz(a, pi_minus_2)?;
+        let b = self.inner.add_phased_x(b, pi_minus_2, zero)?;
+        let b = self.inner.add_rz(b, pi_2)?;
+        Ok([a, b])
+    }
+
+    fn build_cz(&mut self, a: Wire, b: Wire) -> Result<[Wire; 2], BuildError> {
+        let pi_minus = pi_mul_f64(self, -1.0);
+        let pi_2 = pi_mul_f64(self, 0.5);
+        let pi_minus_2 = pi_mul_f64(self, -0.5);
+
+        let a = self.inner.add_phased_x(a, pi_2, pi_minus_2)?;
+        let b = self.inner.add_phased_x(b, pi_2, pi_minus_2)?;
+        let [a, b] = self.inner.add_phased_xx(a, b, pi_2, pi_minus)?;
+        let a = self.inner.add_phased_x(a, pi_2, pi_2)?;
+        let b = self.inner.add_phased_x(b, pi_2, pi_2)?;
+        let a = self.inner.add_rz(a, pi_minus_2)?;
+        let b = self.inner.add_rz(b, pi_minus_2)?;
+        Ok([a, b])
+    }
+
+    fn build_rx(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::build_rx_with::<SolOp>(&mut self.inner, qb, theta)
+    }
+
+    fn build_ry(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::build_ry_with::<SolOp>(&mut self.inner, qb, theta)
+    }
+
+    fn build_rz(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError> {
+        self.inner.add_rz(qb, theta)
+    }
+
+    fn build_crz(&mut self, a: Wire, b: Wire, lambda: Wire) -> Result<[Wire; 2], BuildError> {
+        let two = self.add_load_const(Value::from(ConstF64::new(2.0)));
+        let lambda_2 = self
+            .add_dataflow_op(FloatOps::fdiv, [lambda, two])?
+            .out_wire(0);
+        let lambda_minus_2 = self
+            .add_dataflow_op(FloatOps::fneg, [lambda_2])?
+            .out_wire(0);
+
+        let pi_minus = pi_mul_f64(self, -1.0);
+        let pi_2 = pi_mul_f64(self, 0.5);
+        let pi_minus_2 = pi_mul_f64(self, -0.5);
+
+        let a = self.inner.add_phased_x(a, pi_2, pi_minus_2)?;
+        let b = self.inner.add_phased_x(b, pi_2, pi_minus_2)?;
+        let [a, b] = self.inner.add_phased_xx(a, b, lambda_minus_2, pi_minus)?;
+        let a = self.inner.add_phased_x(a, pi_2, pi_2)?;
+        let b = self.inner.add_phased_x(b, pi_2, pi_2)?;
+        let b = self.inner.add_rz(b, lambda_2)?;
+        Ok([a, b])
+    }
+
+    fn build_toffoli(&mut self, a: Wire, b: Wire, c: Wire) -> Result<[Wire; 3], BuildError> {
+        let pi = pi_mul_f64(self, 1.0);
+        let pi_2 = pi_mul_f64(self, 0.5);
+        let pi_minus_2 = pi_mul_f64(self, -0.5);
+        let pi_4 = pi_mul_f64(self, 0.25);
+        let pi_minus_4 = pi_mul_f64(self, -0.25);
+        let pi_minus_3_4 = pi_mul_f64(self, -0.75);
+        let zero = pi_mul_f64(self, 0.0);
+
+        let a = self.inner.add_phased_x(a, pi_2, pi_minus_3_4)?;
+        let b = self.inner.add_phased_x(b, pi_2, pi_minus_3_4)?;
+        let a = self.inner.add_rz(a, pi_minus_3_4)?;
+        let b = self.inner.add_rz(b, pi_minus_3_4)?;
+        let c = self.inner.add_phased_x(c, pi_2, pi_minus_2)?;
+        let c = self.inner.add_rz(c, pi_minus_3_4)?;
+
+        let [a, c] = self.inner.add_phased_xx(a, c, pi_2, zero)?;
+
+        let a = self.inner.add_phased_x(a, pi_minus_2, zero)?;
+        let c = self.inner.add_phased_x(c, pi_4, pi_minus_2)?;
+
+        let [a, b] = self.inner.add_phased_xx(a, b, pi_minus_4, zero)?;
+        let c = self.inner.add_rz(c, pi_2)?;
+
+        let [b, c] = self.inner.add_phased_xx(b, c, pi_4, zero)?;
+        let c = self.inner.add_phased_x(c, pi_2, pi_minus_2)?;
+        let c = self.inner.add_rz(c, pi)?;
+
+        let [a, c] = self.inner.add_phased_xx(a, c, pi_2, zero)?;
+        let a = self.inner.add_phased_x(a, pi_2, pi_minus_2)?;
+        let c = self.inner.add_phased_x(c, pi_2, pi_minus_2)?;
+        let a = self.inner.add_rz(a, pi_2)?;
+        let c = self.inner.add_rz(c, pi_2)?;
+
+        let [b, c] = self.inner.add_phased_xx(b, c, pi_minus_4, zero)?;
+        let b = self.inner.add_phased_x(b, pi_2, pi_minus_2)?;
+        let b = self.inner.add_rz(b, pi)?;
+
+        Ok([a, b, c])
+    }
+}
 
 #[cfg(test)]
 mod test {
@@ -584,7 +623,7 @@ mod test {
             )
             .unwrap();
             let [q0, angle] = func_builder.input_wires_arr();
-            let q1 = func_builder.build_qalloc().unwrap();
+            let q1 = CommonOpBuilder::build_qalloc_with::<SolOp>(&mut func_builder).unwrap();
             let q0 = func_builder.add_reset(q0).unwrap();
             let q1 = func_builder.add_phased_x(q1, angle, angle).unwrap();
             let [q0, q1] = func_builder.build_zz_max(q0, q1).unwrap();

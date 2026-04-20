@@ -24,9 +24,12 @@ use tket::passes::replace_types::{NodeTemplate, ReplaceTypesError};
 use tket::passes::{ComposablePass, PassScope, ReplaceTypes};
 use tket::{TketOp, extension::rotation::RotationOpBuilder};
 
-use crate::extension::qsystem::{self, QSystemOp, QSystemOpBuilder, QSystemPlatform};
+use crate::extension::qsystem::{self, QSystemOp, QSystemPlatform};
 
 use super::barrier::BarrierInserter;
+use super::helios::HeliosBuilder;
+use super::sol::SolBuilder;
+use super::synth_tket_op::SynthesizeTketOp;
 
 lazy_static! {
     /// Extension registry including [crate::extension::qsystem::REGISTRY] and
@@ -176,12 +179,22 @@ pub fn lower_tk2_ops(
     Ok(replaced_nodes)
 }
 
-fn build_func(_platform: QSystemPlatform, op: TketOp) -> Result<Hugr, LowerTk2Error> {
+fn build_func(platform: QSystemPlatform, op: TketOp) -> Result<Hugr, LowerTk2Error> {
     let sig = op.into_extension_op().signature().into_owned();
     let sig = Signature::new(sig.input, sig.output); // ignore extension delta
     // TODO check generated names are namespaced enough
     let f_name = format!("__tk2_{}", op.op_id().to_lowercase());
-    let mut b = FunctionBuilder::new(f_name, sig)?;
+    let inner = FunctionBuilder::new(f_name, sig)?;
+    match platform {
+        QSystemPlatform::Helios => build_func_with_builder(HeliosBuilder::new(inner), op),
+        QSystemPlatform::Sol => build_func_with_builder(SolBuilder::new(inner), op),
+    }
+}
+
+fn build_func_with_builder<B>(mut b: B, op: TketOp) -> Result<Hugr, LowerTk2Error>
+where
+    B: SynthesizeTketOp,
+{
     let inputs: Vec<_> = b.input_wires().collect();
     let outputs = match (op, inputs.as_slice()) {
         (TketOp::H, [q]) => vec![b.build_h(*q)?],
@@ -209,7 +222,7 @@ fn build_func(_platform: QSystemPlatform, op: TketOp) -> Result<Hugr, LowerTk2Er
         }
         (TketOp::Rz, [q, angle]) => {
             let float = build_to_radians(&mut b, *angle)?;
-            vec![b.add_rz(*q, float)?]
+            vec![b.build_rz(*q, float)?]
         }
         (TketOp::CRz, [c, t, angle]) => {
             let float = build_to_radians(&mut b, *angle)?;
@@ -369,8 +382,16 @@ mod test {
     use tket::passes::composable::Preserve;
     use tket::{Circuit, extension::rotation::rotation_type};
 
+    use crate::extension::qsystem::{helios::HeliosOp, sol::SolOp};
+
     use super::*;
     use rstest::rstest;
+
+    #[derive(Debug, PartialEq, Eq)]
+    enum ExpectedOp {
+        Helios(HeliosOp),
+        Sol(SolOp),
+    }
 
     #[rstest]
     #[case::global_helios(PassScope::Global(Preserve::Public), QSystemPlatform::Helios)]
@@ -428,32 +449,32 @@ mod test {
     }
 
     #[rstest]
-    #[case(TketOp::H, QSystemPlatform::Helios, Some(vec![QSystemOp::PhasedX, QSystemOp::Rz]))]
-    #[case(TketOp::X, QSystemPlatform::Helios, Some(vec![QSystemOp::PhasedX]))]
-    #[case(TketOp::Y, QSystemPlatform::Helios, Some(vec![QSystemOp::PhasedX]))]
-    #[case(TketOp::Z, QSystemPlatform::Helios, Some(vec![QSystemOp::Rz]))]
-    #[case(TketOp::S, QSystemPlatform::Helios, Some(vec![QSystemOp::Rz]))]
-    #[case(TketOp::Sdg, QSystemPlatform::Helios, Some(vec![QSystemOp::Rz]))]
-    #[case(TketOp::V, QSystemPlatform::Helios, Some(vec![QSystemOp::PhasedX]))]
-    #[case(TketOp::Vdg, QSystemPlatform::Helios, Some(vec![QSystemOp::PhasedX]))]
-    #[case(TketOp::T, QSystemPlatform::Helios, Some(vec![QSystemOp::Rz]))]
-    #[case(TketOp::Tdg, QSystemPlatform::Helios, Some(vec![QSystemOp::Rz]))]
-    #[case(TketOp::Rx, QSystemPlatform::Helios, Some(vec![QSystemOp::PhasedX]))]
-    #[case(TketOp::Ry, QSystemPlatform::Helios, Some(vec![QSystemOp::PhasedX]))]
-    #[case(TketOp::Rz, QSystemPlatform::Helios, Some(vec![QSystemOp::Rz]))]
-    #[case(TketOp::H, QSystemPlatform::Sol, Some(vec![QSystemOp::PhasedX, QSystemOp::Rz]))]
-    #[case(TketOp::X, QSystemPlatform::Sol, Some(vec![QSystemOp::PhasedX]))]
-    #[case(TketOp::Y, QSystemPlatform::Sol, Some(vec![QSystemOp::PhasedX]))]
-    #[case(TketOp::Z, QSystemPlatform::Sol, Some(vec![QSystemOp::Rz]))]
-    #[case(TketOp::S, QSystemPlatform::Sol, Some(vec![QSystemOp::Rz]))]
-    #[case(TketOp::Sdg, QSystemPlatform::Sol, Some(vec![QSystemOp::Rz]))]
-    #[case(TketOp::V, QSystemPlatform::Sol, Some(vec![QSystemOp::PhasedX]))]
-    #[case(TketOp::Vdg, QSystemPlatform::Sol, Some(vec![QSystemOp::PhasedX]))]
-    #[case(TketOp::T, QSystemPlatform::Sol, Some(vec![QSystemOp::Rz]))]
-    #[case(TketOp::Tdg, QSystemPlatform::Sol, Some(vec![QSystemOp::Rz]))]
-    #[case(TketOp::Rx, QSystemPlatform::Sol, Some(vec![QSystemOp::PhasedX]))]
-    #[case(TketOp::Ry, QSystemPlatform::Sol, Some(vec![QSystemOp::PhasedX]))]
-    #[case(TketOp::Rz, QSystemPlatform::Sol, Some(vec![QSystemOp::Rz]))]
+    #[case(TketOp::H, QSystemPlatform::Helios, Some(vec![ExpectedOp::Helios(HeliosOp::PhasedX), ExpectedOp::Helios(HeliosOp::Rz)]))]
+    #[case(TketOp::X, QSystemPlatform::Helios, Some(vec![ExpectedOp::Helios(HeliosOp::PhasedX)]))]
+    #[case(TketOp::Y, QSystemPlatform::Helios, Some(vec![ExpectedOp::Helios(HeliosOp::PhasedX)]))]
+    #[case(TketOp::Z, QSystemPlatform::Helios, Some(vec![ExpectedOp::Helios(HeliosOp::Rz)]))]
+    #[case(TketOp::S, QSystemPlatform::Helios, Some(vec![ExpectedOp::Helios(HeliosOp::Rz)]))]
+    #[case(TketOp::Sdg, QSystemPlatform::Helios, Some(vec![ExpectedOp::Helios(HeliosOp::Rz)]))]
+    #[case(TketOp::V, QSystemPlatform::Helios, Some(vec![ExpectedOp::Helios(HeliosOp::PhasedX)]))]
+    #[case(TketOp::Vdg, QSystemPlatform::Helios, Some(vec![ExpectedOp::Helios(HeliosOp::PhasedX)]))]
+    #[case(TketOp::T, QSystemPlatform::Helios, Some(vec![ExpectedOp::Helios(HeliosOp::Rz)]))]
+    #[case(TketOp::Tdg, QSystemPlatform::Helios, Some(vec![ExpectedOp::Helios(HeliosOp::Rz)]))]
+    #[case(TketOp::Rx, QSystemPlatform::Helios, Some(vec![ExpectedOp::Helios(HeliosOp::PhasedX)]))]
+    #[case(TketOp::Ry, QSystemPlatform::Helios, Some(vec![ExpectedOp::Helios(HeliosOp::PhasedX)]))]
+    #[case(TketOp::Rz, QSystemPlatform::Helios, Some(vec![ExpectedOp::Helios(HeliosOp::Rz)]))]
+    #[case(TketOp::H, QSystemPlatform::Sol, Some(vec![ExpectedOp::Sol(SolOp::PhasedX), ExpectedOp::Sol(SolOp::Rz)]))]
+    #[case(TketOp::X, QSystemPlatform::Sol, Some(vec![ExpectedOp::Sol(SolOp::PhasedX)]))]
+    #[case(TketOp::Y, QSystemPlatform::Sol, Some(vec![ExpectedOp::Sol(SolOp::PhasedX)]))]
+    #[case(TketOp::Z, QSystemPlatform::Sol, Some(vec![ExpectedOp::Sol(SolOp::Rz)]))]
+    #[case(TketOp::S, QSystemPlatform::Sol, Some(vec![ExpectedOp::Sol(SolOp::Rz)]))]
+    #[case(TketOp::Sdg, QSystemPlatform::Sol, Some(vec![ExpectedOp::Sol(SolOp::Rz)]))]
+    #[case(TketOp::V, QSystemPlatform::Sol, Some(vec![ExpectedOp::Sol(SolOp::PhasedX)]))]
+    #[case(TketOp::Vdg, QSystemPlatform::Sol, Some(vec![ExpectedOp::Sol(SolOp::PhasedX)]))]
+    #[case(TketOp::T, QSystemPlatform::Sol, Some(vec![ExpectedOp::Sol(SolOp::Rz)]))]
+    #[case(TketOp::Tdg, QSystemPlatform::Sol, Some(vec![ExpectedOp::Sol(SolOp::Rz)]))]
+    #[case(TketOp::Rx, QSystemPlatform::Sol, Some(vec![ExpectedOp::Sol(SolOp::PhasedX)]))]
+    #[case(TketOp::Ry, QSystemPlatform::Sol, Some(vec![ExpectedOp::Sol(SolOp::PhasedX)]))]
+    #[case(TketOp::Rz, QSystemPlatform::Sol, Some(vec![ExpectedOp::Sol(SolOp::Rz)]))]
     // multi qubit ordering is not deterministic
     #[case(TketOp::CX, QSystemPlatform::Helios, None)]
     #[case(TketOp::CY, QSystemPlatform::Helios, None)]
@@ -475,22 +496,58 @@ mod test {
     fn test_lower(
         #[case] t2op: TketOp,
         #[case] platform: QSystemPlatform,
-        #[case] qsystem_ops: Option<Vec<QSystemOp>>,
+        #[case] qsystem_ops: Option<Vec<ExpectedOp>>,
     ) {
         // build dfg with just the op
 
         let h = build_func(platform, t2op).unwrap();
         let circ = Circuit::new(&h);
-        let ops: Vec<QSystemOp> = circ
-            .toposorted_children(circ.parent())
-            .expect("circuit entrypoint should be dataflow region")
-            .filter_map(|n| circ.hugr().get_optype(n).cast())
-            .collect();
+        let ops: Vec<ExpectedOp> = match platform {
+            QSystemPlatform::Helios => circ
+                .toposorted_children(circ.parent())
+                .expect("circuit entrypoint should be dataflow region")
+                .filter_map(|n| circ.hugr().get_optype(n).cast().map(ExpectedOp::Helios))
+                .collect(),
+            QSystemPlatform::Sol => circ
+                .toposorted_children(circ.parent())
+                .expect("circuit entrypoint should be dataflow region")
+                .filter_map(|n| circ.hugr().get_optype(n).cast().map(ExpectedOp::Sol))
+                .collect(),
+        };
         if let Some(qsystem_ops) = qsystem_ops {
             assert_eq!(ops, qsystem_ops);
         }
 
         assert_eq!(check_lowered(&h, Preserve::Public), Ok(()));
+    }
+
+    #[test]
+    fn test_build_func_uses_platform_specific_ops() {
+        let helios = build_func(QSystemPlatform::Helios, TketOp::CX).unwrap();
+        let helios_circuit = Circuit::new(&helios);
+        assert!(
+            helios_circuit
+                .commands()
+                .any(|command| matches!(command.optype().cast(), Some(HeliosOp::ZZPhase)))
+        );
+        assert!(
+            !helios_circuit
+                .commands()
+                .any(|command| matches!(command.optype().cast(), Some(SolOp::PhasedXX)))
+        );
+
+        let sol = build_func(QSystemPlatform::Sol, TketOp::CX).unwrap();
+        let sol_circuit = Circuit::new(&sol);
+        assert!(
+            sol_circuit
+                .commands()
+                .any(|command| matches!(command.optype().cast(), Some(SolOp::PhasedXX)))
+        );
+        assert!(
+            !sol_circuit
+                .commands()
+                .any(|command| matches!(command.optype().cast(), Some(HeliosOp::ZZPhase)))
+        );
     }
 
     #[rstest]
