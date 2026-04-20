@@ -33,5 +33,5 @@ def outer(q0: qubit @ owned) -> qubit:
     return mid(q0)
 
 
-program = inner.compile_function()
+program = outer.compile_function()
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())

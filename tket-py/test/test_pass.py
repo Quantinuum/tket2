@@ -246,6 +246,8 @@ def test_modifier_resolver() -> None:
 def test_inline_functions() -> None:
     hugr = _hugr_from_path("test_files/guppy_examples/fn_calls.hugr")
 
+    assert _count_ops(hugr, "Call") == 2
+
     inlined = InlineFunctions(max_inline_size=64)(hugr)
 
-    assert inlined.to_bytes() == hugr.to_bytes()
+    assert _count_ops(inlined, "Call") == 0
