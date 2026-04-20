@@ -71,7 +71,7 @@ def test_unsupported_pytket_ops() -> None:
 @pytest.mark.parametrize("target_triple", triples)
 def test_llvm(snapshot: Snapshot, hugr_file: str, target_triple: str) -> None:
     hugr_envelope = load(hugr_file)
-    ir = compile_to_llvm_ir(hugr_envelope, target_triple=target_triple, emit_debug=True)  # type: ignore[call-arg]
+    ir = compile_to_llvm_ir(hugr_envelope, target_triple=target_triple, emit_debug=True)
     snapshot.assert_match(ir, f"{hugr_file}_{target_triple}")
 
 
@@ -116,5 +116,5 @@ def test_gpu(snapshot: Snapshot, target_triple: str) -> None:
     # above, using the tket_qsystem::extension::gpu entities.
     hugr_file = resources_dir / "example_gpu.hugr"
     hugr_envelope = hugr_file.read_bytes()
-    ir = compile_to_llvm_ir(hugr_envelope, target_triple=target_triple)  # type: ignore[call-arg]
+    ir = compile_to_llvm_ir(hugr_envelope, target_triple=target_triple)
     snapshot.assert_match(ir, f"gpu_{target_triple}")
