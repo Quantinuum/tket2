@@ -299,16 +299,9 @@ pub trait SolOpBuilder: CommonOpBuilder {
 
     /// Add a maximally entangling "tket.qsystem.sol.ZZPhase(pi/2)" op.
     fn build_zz_max(&mut self, qb1: Wire, qb2: Wire) -> Result<[Wire; 2], BuildError> {
-        let pi_minus = pi_mul_f64(self, -1.0);
         let pi_2 = pi_mul_f64(self, 0.5);
-        let pi_minus_2 = pi_mul_f64(self, -0.5);
 
-        let qb1 = self.add_phased_x(qb1, pi_2, pi_minus_2)?;
-        let qb2 = self.add_phased_x(qb2, pi_2, pi_minus_2)?;
-        let [qb1, qb2] = self.add_phased_xx(qb1, qb2, pi_2, pi_minus)?;
-        let qb1 = self.add_phased_x(qb1, pi_2, pi_2)?;
-        let qb2 = self.add_phased_x(qb2, pi_2, pi_2)?;
-        Ok([qb1, qb2])
+        self.build_zz_phase(qb1, qb2, pi_2)
     }
 
     /// Build a "tket.qsystem.helios.ZZPhase" op in terms of Sol primitives.
