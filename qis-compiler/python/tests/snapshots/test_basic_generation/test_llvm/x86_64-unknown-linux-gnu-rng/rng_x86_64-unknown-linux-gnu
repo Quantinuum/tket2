@@ -98,7 +98,7 @@ declare i64 @teardown() local_unnamed_addr
 !30 = !DILocation(line: 218, column: 8, scope: !4)
 !31 = !DILocation(line: 219, column: 8, scope: !4)
 !32 = !DILocation(line: 220, column: 8, scope: !4)
-!33 = distinct !DISubprogram(name: "main", linkageName: "qmain", scope: null, file: !34, type: !35, spFlags: DISPFlagDefinition, unit: !1)
+!33 = distinct !DISubprogram(name: "qmain", linkageName: "qmain", scope: null, file: !34, type: !35, spFlags: DISPFlagDefinition, unit: !1)
 !34 = !DIFile(filename: "COMPILER_GENERATED_CODE", directory: "")
 !35 = !DISubroutineType(types: !36)
 !36 = !{!15, !15}

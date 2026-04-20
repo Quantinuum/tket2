@@ -135,11 +135,16 @@ fn get_hugr_llvm_module<'c, 'hugr, 'a: 'c>(
     module_name: impl AsRef<str>,
     exts: Rc<CodegenExtsMap<'a, Hugr>>,
     emit_debug: bool,
+    ptr_bits: u32,
 ) -> Result<(Module<'c>, Option<DebugInfoContext<'c>>)> {
     let module = context.create_module(module_name.as_ref());
     let emit = EmitHugr::new(context, module, namer, exts);
     Ok(emit
-        .emit_module(hugr.try_fat(hugr.module_root()).unwrap(), emit_debug)?
+        .emit_module(
+            hugr.try_fat(hugr.module_root()).unwrap(),
+            emit_debug,
+            ptr_bits,
+        )?
         .finish())
 }
 
@@ -189,6 +194,9 @@ fn get_module_with_std_exts<'c>(
         let file = fs::File::create(PathBuf::from(filename))?;
         hugr.store(file, EnvelopeConfig::text())?;
     }
+    let ptr_bits = context
+        .ptr_sized_int_type(&args.target_machine.get_target_data(), Default::default())
+        .get_bit_width();
     get_hugr_llvm_module(
         context,
         namer,
@@ -196,6 +204,7 @@ fn get_module_with_std_exts<'c>(
         &args.name,
         Rc::new(codegen_extensions()),
         emit_debug,
+        ptr_bits,
     )
 }
 

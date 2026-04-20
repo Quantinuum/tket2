@@ -43,7 +43,7 @@ declare i64 @teardown() local_unnamed_addr
 !7 = !{null}
 !8 = !DILocation(line: 195, column: 23, scope: !4)
 !9 = !DILocation(line: 195, column: 8, scope: !4)
-!10 = distinct !DISubprogram(name: "main", linkageName: "qmain", scope: null, file: !11, type: !12, spFlags: DISPFlagDefinition, unit: !1)
+!10 = distinct !DISubprogram(name: "qmain", linkageName: "qmain", scope: null, file: !11, type: !12, spFlags: DISPFlagDefinition, unit: !1)
 !11 = !DIFile(filename: "COMPILER_GENERATED_CODE", directory: "")
 !12 = !DISubroutineType(types: !13)
 !13 = !{!14, !14}

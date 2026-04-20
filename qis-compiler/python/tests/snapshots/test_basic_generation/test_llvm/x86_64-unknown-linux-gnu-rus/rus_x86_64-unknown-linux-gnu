@@ -162,6 +162,6 @@ attributes #0 = { noreturn }
 !25 = !DILocation(line: 175, column: 12, scope: !10, inlinedAt: !14)
 !26 = !DILocation(line: 181, column: 12, scope: !10, inlinedAt: !14)
 !27 = !DILocation(line: 187, column: 8, scope: !4)
-!28 = distinct !DISubprogram(name: "main", linkageName: "qmain", scope: null, file: !29, type: !11, spFlags: DISPFlagDefinition, unit: !1)
+!28 = distinct !DISubprogram(name: "qmain", linkageName: "qmain", scope: null, file: !29, type: !11, spFlags: DISPFlagDefinition, unit: !1)
 !29 = !DIFile(filename: "COMPILER_GENERATED_CODE", directory: "")
 !30 = !DILocation(line: 0, scope: !28)
