@@ -5,6 +5,26 @@ target triple = "aarch64-apple-darwin"
 
 @"e_No more qu.3B2EEBF0.0" = private constant [47 x i8] c".EXIT:INT:No more qubits available to allocate."
 
+define void @"__hugr__.__main__.no_results.<locals>.bar.1"() local_unnamed_addr !dbg !4 {
+alloca_block:
+  %qalloc.i = tail call i64 @___qalloc(), !dbg !8
+  %not_max.not.not.i = icmp eq i64 %qalloc.i, -1, !dbg !8
+  br i1 %not_max.not.not.i, label %cond_18_case_0.i, label %__hugr__.__tk2_qalloc.14.exit, !dbg !8
+
+cond_18_case_0.i:                                 ; preds = %alloca_block
+  tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0"), !dbg !8
+  unreachable, !dbg !8
+
+__hugr__.__tk2_qalloc.14.exit:                    ; preds = %alloca_block
+  tail call void @___reset(i64 %qalloc.i), !dbg !8
+  tail call void @___rxy(i64 %qalloc.i, double 0x3FF921FB54442D18, double 0xBFF921FB54442D18), !dbg !9
+  tail call void @___rz(i64 %qalloc.i, double 0x400921FB54442D18), !dbg !9
+  %lazy_measure = tail call i64 @___lazy_measure(i64 %qalloc.i)
+  tail call void @___qfree(i64 %qalloc.i)
+  tail call void @___dec_future_refcount(i64 %lazy_measure)
+  ret void
+}
+
 declare i64 @___lazy_measure(i64) local_unnamed_addr
 
 declare void @___qfree(i64) local_unnamed_addr
@@ -22,26 +42,12 @@ declare void @___rxy(i64, double, double) local_unnamed_addr
 
 declare void @___rz(i64, double) local_unnamed_addr
 
-define i64 @qmain(i64 %0) local_unnamed_addr {
+define i64 @qmain(i64 %0) local_unnamed_addr !dbg !10 {
 entry:
-  tail call void @setup(i64 %0)
-  %qalloc.i.i = tail call i64 @___qalloc()
-  %not_max.not.not.i.i = icmp eq i64 %qalloc.i.i, -1
-  br i1 %not_max.not.not.i.i, label %cond_18_case_0.i.i, label %__hugr__.bar.1.exit
-
-cond_18_case_0.i.i:                               ; preds = %entry
-  tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0")
-  unreachable
-
-__hugr__.bar.1.exit:                              ; preds = %entry
-  tail call void @___reset(i64 %qalloc.i.i)
-  tail call void @___rxy(i64 %qalloc.i.i, double 0x3FF921FB54442D18, double 0xBFF921FB54442D18)
-  tail call void @___rz(i64 %qalloc.i.i, double 0x400921FB54442D18)
-  %lazy_measure.i = tail call i64 @___lazy_measure(i64 %qalloc.i.i)
-  tail call void @___qfree(i64 %qalloc.i.i)
-  tail call void @___dec_future_refcount(i64 %lazy_measure.i)
-  %1 = tail call i64 @teardown()
-  ret i64 %1
+  tail call void @setup(i64 %0), !dbg !15
+  tail call void @"__hugr__.__main__.no_results.<locals>.bar.1"(), !dbg !15
+  %1 = tail call i64 @teardown(), !dbg !15
+  ret i64 %1, !dbg !15
 }
 
 declare void @setup(i64) local_unnamed_addr
@@ -50,6 +56,23 @@ declare i64 @teardown() local_unnamed_addr
 
 attributes #0 = { noreturn }
 
-!name = !{!0}
+!llvm.module.flags = !{!0}
+!llvm.dbg.cu = !{!1}
+!name = !{!3}
 
-!0 = !{!"mainlib"}
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "guppylang (guppylang-internals-v0.32.0)-v0.21.11", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "/Users/george.hodgkins/proj/tket2/qis-compiler/python/tests/generate_hugrs.py", directory: "file:///Users/george.hodgkins/proj/clone-anduril")
+!3 = !{!"mainlib"}
+!4 = distinct !DISubprogram(name: "no_results.<locals>.bar", linkageName: "__hugr__.__main__.no_results.<locals>.bar.1", scope: null, file: !5, line: 64, type: !6, scopeLine: 65, spFlags: DISPFlagDefinition, unit: !1)
+!5 = !DIFile(filename: "/Users/george.hodgkins/proj/tket2/qis-compiler/python/tests/generate_hugrs.py", directory: "")
+!6 = !DISubroutineType(types: !7)
+!7 = !{null}
+!8 = !DILocation(line: 65, column: 20, scope: !4)
+!9 = !DILocation(line: 66, column: 8, scope: !4)
+!10 = distinct !DISubprogram(name: "main", linkageName: "qmain", scope: null, file: !11, type: !12, spFlags: DISPFlagDefinition, unit: !1)
+!11 = !DIFile(filename: "COMPILER_GENERATED_CODE", directory: "")
+!12 = !DISubroutineType(types: !13)
+!13 = !{!14, !14}
+!14 = !DIBasicType(name: "i64", size: 64, encoding: DW_ATE_unsigned)
+!15 = !DILocation(line: 0, scope: !10)

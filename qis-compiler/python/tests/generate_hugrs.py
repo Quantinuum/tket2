@@ -1,10 +1,12 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#     "guppylang ==0.21.9",
+#     "guppylang==0.21.9,
 #     "tket",
 # ]
 # ///
+# TODO: point at re-released guppylang(-internals) once available with debug info. right
+# now the code below is not compatible with the version specified above.
 
 from pathlib import Path
 
@@ -25,6 +27,7 @@ from guppylang.std.quantum import (
     x,
     z,
 )
+from guppylang_internals.debug_mode import turn_off_debug_mode, turn_on_debug_mode
 
 resources_dir = Path(__file__).parent / "resources"
 
@@ -244,5 +247,7 @@ if __name__ == "__main__":
         rng,
         entry_args,
     ]:
+        turn_on_debug_mode()
         envelope = func()
+        turn_off_debug_mode()
         (resources_dir / f"{func.__name__}.hugr").write_bytes(envelope)
