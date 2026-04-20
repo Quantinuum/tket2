@@ -11,10 +11,10 @@ from sys import argv
 import sys
 
 from guppylang import guppy
-from guppylang.std.builtins import dagger
+from guppylang.std.builtins import control, dagger
 from guppylang.std.debug import state_result
 from guppylang.std.quantum import discard, qubit, angle
-from guppylang.std.quantum import rx
+from guppylang.std.quantum import h, rx, x
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 from utility import hugr_pdf_directory
@@ -31,13 +31,22 @@ def bar(q: qubit) -> None:
 
 @guppy
 def main() -> None:
+    c1 = qubit()
     t = qubit()
-
-    with dagger:
+    c2 = qubit()
+    c3 = qubit()
+    h(c1)
+    x(c2)
+    x(c3)
+    with control(c1, c2, c3):
+        # with dagger:
         bar(t)
 
-    state_result("r", t)
+    state_result("r", c1, c2, c3, t)
+    discard(c1)
     discard(t)
+    discard(c3)
+    discard(c2)
 
 
 program = main.compile()
