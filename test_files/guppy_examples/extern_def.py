@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang ==0.21.10",
+#     "guppylang ==0.21.13",
 # ]
 # ///
 """Extern operation declaration"""
