@@ -14,7 +14,7 @@ from guppylang import guppy
 from guppylang.std.builtins import dagger
 from guppylang.std.debug import state_result
 from guppylang.std.quantum import discard, qubit
-from guppylang.std.quantum import x, h
+from guppylang.std.quantum import s, h
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
@@ -25,7 +25,7 @@ enable_experimental_features()
 
 @guppy(unitary=True)
 def bar(q: qubit) -> None:
-    x(q)
+    s(q)
 
 
 @guppy
