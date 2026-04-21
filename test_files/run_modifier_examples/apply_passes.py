@@ -35,6 +35,7 @@ input_paths = (
 )
 
 for input_path in input_paths:
+    print(f"Processing {input_path.name}")
     modifier_hugr = _hugr_from_path(str(input_path))
     normalized = modifier_hugr  # normalize(modifier_hugr)
     resolved: Hugr = mr_pass(normalized)

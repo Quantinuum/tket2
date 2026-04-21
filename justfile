@@ -96,6 +96,10 @@ recompile-test-hugrs:
     just test_files/modifier_examples/r
     just test_files/run_modifier_examples/r
 
+recompile-modifiers:
+    @echo "---- Recompiling modifier examples ----"
+    just test_files/modifier_examples/r
+    just test_files/run_modifier_examples/r
 
 recompile-modifier name:
     @echo "---- Compiling hugr {{name}} ----"
