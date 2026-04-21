@@ -13,7 +13,7 @@ alloca_block:
 entry_block:                                      ; preds = %alloca_block
   store i64 %0, ptr %"2_0", align 4
   %"2_01" = load i64, ptr %"2_0", align 4
-  call void @___qfree(i64 %"2_01"), !dbg !8
+  notail call void @___qfree(i64 %"2_01"), !dbg !8
   ret void
 }
 

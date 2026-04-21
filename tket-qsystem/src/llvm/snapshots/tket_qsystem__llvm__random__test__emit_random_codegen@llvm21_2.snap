@@ -10,7 +10,7 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  %rfloat = call double @random_float(), !dbg !12
+  %rfloat = notail call double @random_float(), !dbg !12
   %mrv = insertvalue { double, {} } poison, double %rfloat, 0
   %mrv6 = insertvalue { double, {} } %mrv, {} zeroinitializer, 1
   ret { double, {} } %mrv6

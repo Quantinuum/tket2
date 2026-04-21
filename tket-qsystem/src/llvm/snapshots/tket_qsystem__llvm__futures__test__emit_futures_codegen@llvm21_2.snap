@@ -10,7 +10,7 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  call void @___inc_future_refcount(i64 %0), !dbg !10
+  notail call void @___inc_future_refcount(i64 %0), !dbg !10
   %mrv = insertvalue { i64, i64 } poison, i64 %0, 0
   %mrv6 = insertvalue { i64, i64 } %mrv, i64 %0, 1
   ret { i64, i64 } %mrv6

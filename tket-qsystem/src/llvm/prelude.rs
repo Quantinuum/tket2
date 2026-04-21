@@ -11,7 +11,7 @@ use inkwell::AddressSpace;
 use inkwell::attributes::{Attribute, AttributeLoc};
 use inkwell::module::Linkage;
 use inkwell::types::{BasicType, IntType};
-use inkwell::values::{BasicValue, BasicValueEnum, FunctionValue, StructValue};
+use inkwell::values::{BasicValue, BasicValueEnum, FunctionValue, LLVMTailCallKind, StructValue};
 use tket::hugr::{HugrView, Node};
 
 #[derive(Clone)]
@@ -49,8 +49,10 @@ impl PreludeCodegen for QISPreludeCodegen {
 
         let msg = ctx.builder().build_extract_value(err, 1, "")?;
         let panic = Self::get_panic(ctx)?;
-        ctx.builder()
+        let call = ctx
+            .builder()
             .build_call(panic, &[return_code.into(), msg.into()], "")?;
+        call.set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
         Ok(())
     }
 
@@ -67,8 +69,10 @@ impl PreludeCodegen for QISPreludeCodegen {
         // https://github.com/quantinuum-dev/eldarion/issues/287
         let msg = ctx.builder().build_extract_value(err, 1, "")?;
         let panic = Self::get_panic(ctx)?;
-        ctx.builder()
+        let call = ctx
+            .builder()
             .build_call(panic, &[return_code.into(), msg.into()], "")?;
+        call.set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
         Ok(())
     }
 

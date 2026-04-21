@@ -10,7 +10,7 @@ use hugr::llvm::emit::func::EmitFuncContext;
 use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::types::{BasicTypeEnum, FloatType, IntType};
-use inkwell::values::{BasicValueEnum, FunctionValue};
+use inkwell::values::{BasicValueEnum, FunctionValue, LLVMTailCallKind};
 use tket::hugr::ops::ExtensionOp;
 use tket::hugr::{HugrView, Node};
 
@@ -79,15 +79,13 @@ impl<'c, H: HugrView<Node = Node>> RandomEmitter<'c, '_, '_, H> {
         input_indices: &[usize],
     ) -> Result<()> {
         let inputs: Vec<_> = input_indices.iter().map(|&i| args.inputs[i]).collect();
-        let result = self
-            .builder()
-            .build_call(
-                func?,
-                &inputs.iter().map(|&v| v.into()).collect::<Vec<_>>(),
-                name,
-            )?
-            .try_as_basic_value()
-            .unwrap_basic();
+        let call = self.builder().build_call(
+            func?,
+            &inputs.iter().map(|&v| v.into()).collect::<Vec<_>>(),
+            name,
+        )?;
+        call.set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
+        let result = call.try_as_basic_value().unwrap_basic();
         args.outputs
             .finish(self.builder(), [result, self.rng_context()])
     }
@@ -125,8 +123,10 @@ impl<'c, H: HugrView<Node = Node>> RandomEmitter<'c, '_, '_, H> {
                     .inputs
                     .try_into()
                     .map_err(|_| anyhow!("RandomAdvance expects a context and delta argument"))?;
-                self.builder()
+                let call = self
+                    .builder()
                     .build_call(fn_random_advance, &[delta.into()], "radv")?;
+                call.set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
                 args.outputs.finish(self.builder(), [ctx])
             }
             RandomOp::NewRNGContext => {
@@ -140,8 +140,10 @@ impl<'c, H: HugrView<Node = Node>> RandomEmitter<'c, '_, '_, H> {
                     .inputs
                     .try_into()
                     .map_err(|_| anyhow!("NewRNGContext expects a seed argument"))?;
-                self.builder()
+                let call = self
+                    .builder()
                     .build_call(fn_random_seed, &[seed.into()], "rseed")?;
+                call.set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
                 args.outputs.finish(
                     self.builder(),
                     [self.bool_type().const_int(1, false).into()],

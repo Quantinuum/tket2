@@ -10,7 +10,7 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  call void @___rz(i64 %0, double %1), !dbg !9
+  notail call void @___rz(i64 %0, double %1), !dbg !9
   ret i64 %0
 }
 

@@ -15,8 +15,8 @@ alloca_block:
 entry_block:                                      ; preds = %alloca_block
   store i64 %0, ptr %"2_0", align 4
   %"2_01" = load i64, ptr %"2_0", align 4
-  %lazy_measure = call i64 @___lazy_measure(i64 %"2_01"), !dbg !8
-  call void @___qfree(i64 %"2_01"), !dbg !8
+  %lazy_measure = notail call i64 @___lazy_measure(i64 %"2_01"), !dbg !8
+  notail call void @___qfree(i64 %"2_01"), !dbg !8
   store i64 %lazy_measure, ptr %"4_0", align 4, !dbg !8
   %"4_02" = load i64, ptr %"4_0", align 4
   store i64 %"4_02", ptr %"0", align 4

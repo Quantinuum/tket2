@@ -17,7 +17,7 @@ alloca_block:
 entry_block:                                      ; preds = %alloca_block
   store {} %0, ptr %"2_0", align 1
   %"2_01" = load {}, ptr %"2_0", align 1
-  %rfloat = call double @random_float(), !dbg !12
+  %rfloat = notail call double @random_float(), !dbg !12
   store double %rfloat, ptr %"4_0", align 8, !dbg !12
   store {} zeroinitializer, ptr %"4_1", align 1, !dbg !12
   %"4_02" = load double, ptr %"4_0", align 8

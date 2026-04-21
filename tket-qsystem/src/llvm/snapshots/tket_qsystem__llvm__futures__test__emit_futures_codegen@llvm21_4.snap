@@ -10,7 +10,7 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  %read_uint = call i64 @___read_future_uint(i64 %0), !dbg !8
+  %read_uint = notail call i64 @___read_future_uint(i64 %0), !dbg !8
   call void @___dec_future_refcount(i64 %0), !dbg !8
   ret i64 %read_uint
 }

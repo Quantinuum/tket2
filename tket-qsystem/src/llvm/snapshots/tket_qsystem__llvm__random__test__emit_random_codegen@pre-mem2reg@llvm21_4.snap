@@ -15,7 +15,7 @@ alloca_block:
 entry_block:                                      ; preds = %alloca_block
   store i64 %0, ptr %"2_0", align 4
   %"2_01" = load i64, ptr %"2_0", align 4
-  call void @random_seed(i64 %"2_01"), !dbg !9
+  notail call void @random_seed(i64 %"2_01"), !dbg !9
   store i1 true, ptr %"4_0", align 1, !dbg !9
   %"4_02" = load i1, ptr %"4_0", align 1
   store i1 %"4_02", ptr %"0", align 1

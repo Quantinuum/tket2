@@ -8,6 +8,7 @@ use hugr::llvm::custom::CodegenExtension;
 use hugr::llvm::emit::{EmitFuncContext, EmitOpArgs};
 use hugr::llvm::inkwell::AddressSpace;
 use hugr::llvm::inkwell::types::BasicType;
+use hugr::llvm::inkwell::values::LLVMTailCallKind;
 use hugr::ops::ExtensionOp;
 use hugr::{HugrView, Node};
 use tket::extension::debug::{DEBUG_EXTENSION_ID, STATE_RESULT_OP_ID, StateResult};
@@ -96,11 +97,12 @@ impl<AL: ArrayLowering> DebugCodegenExtension<AL> {
             void_t.fn_type(&[ptr_t.into(), i64_t.into(), ptr_t.into()], false),
         )?;
 
-        builder.build_call(
+        let call = builder.build_call(
             fn_state_result,
             &[tag_ptr.into(), tag_len.into(), qubits_ptr.into()],
             "print_state_result",
         )?;
+        call.set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
         args.outputs.finish(builder, [qubits])
     }
 }

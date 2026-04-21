@@ -13,7 +13,7 @@ use inkwell::AddressSpace;
 use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::types::{BasicMetadataTypeEnum, FloatType, IntType, PointerType, VoidType};
-use inkwell::values::{BasicValueEnum, FunctionValue, IntValue};
+use inkwell::values::{BasicValueEnum, FunctionValue, IntValue, LLVMTailCallKind};
 use tket::hugr::extension::simple_op::MakeExtensionOp;
 use tket::hugr::ops::ExtensionOp;
 use tket::hugr::{HugrView, Node};
@@ -179,12 +179,14 @@ impl<'c, H: HugrView<Node = Node>, AL: ArrayLowering + Clone> ResultEmitter<'c, 
         )?;
         let (array_ptr, _) =
             struct_1d_arr_alloc(self.iw_context(), self.builder(), length.try_into()?, array)?;
-        self.builder().build_call(
-            print_fn,
-            &[tag_ptr.into(), tag_len.into(), array_ptr.into()],
-            "",
-        )?;
-        Result::Ok(())
+        self.builder()
+            .build_call(
+                print_fn,
+                &[tag_ptr.into(), tag_len.into(), array_ptr.into()],
+                "",
+            )?
+            .set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
+        Ok(())
     }
 
     /// Function to help lower the tket result extension.
@@ -203,11 +205,13 @@ impl<'c, H: HugrView<Node = Node>, AL: ArrayLowering + Clone> ResultEmitter<'c, 
                     .build_get_tag(self.builder())?;
                 let b_type = self.bool_t();
                 let trunc_val = self.builder().build_int_truncate(val, b_type, "")?;
-                self.builder().build_call(
-                    print_fn,
-                    &[tag_ptr.into(), tag_len.into(), trunc_val.into()],
-                    "print_bool",
-                )?;
+                self.builder()
+                    .build_call(
+                        print_fn,
+                        &[tag_ptr.into(), tag_len.into(), trunc_val.into()],
+                        "print_bool",
+                    )?
+                    .set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
             }
             ResultOpDef::Int => {
                 let (tag_ptr, tag_len) = self.generate_global_tag(&args, "INT:").unwrap();
@@ -215,11 +219,13 @@ impl<'c, H: HugrView<Node = Node>, AL: ArrayLowering + Clone> ResultEmitter<'c, 
                     .inputs
                     .try_into()
                     .map_err(|_| anyhow!("result_int expects one input"))?;
-                self.builder().build_call(
-                    print_fn,
-                    &[tag_ptr.into(), tag_len.into(), val.into()],
-                    "print_int",
-                )?;
+                self.builder()
+                    .build_call(
+                        print_fn,
+                        &[tag_ptr.into(), tag_len.into(), val.into()],
+                        "print_int",
+                    )?
+                    .set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
             }
             ResultOpDef::UInt => {
                 let (tag_ptr, tag_len) = self.generate_global_tag(&args, "INT:").unwrap();
@@ -227,11 +233,13 @@ impl<'c, H: HugrView<Node = Node>, AL: ArrayLowering + Clone> ResultEmitter<'c, 
                     .inputs
                     .try_into()
                     .map_err(|_| anyhow!("result_uint expects one input"))?;
-                self.builder().build_call(
-                    print_fn,
-                    &[tag_ptr.into(), tag_len.into(), val.into()],
-                    "print_uint",
-                )?;
+                self.builder()
+                    .build_call(
+                        print_fn,
+                        &[tag_ptr.into(), tag_len.into(), val.into()],
+                        "print_uint",
+                    )?
+                    .set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
             }
             ResultOpDef::F64 => {
                 let (tag_ptr, tag_len) = self.generate_global_tag(&args, "FLOAT:").unwrap();
@@ -239,11 +247,13 @@ impl<'c, H: HugrView<Node = Node>, AL: ArrayLowering + Clone> ResultEmitter<'c, 
                     .inputs
                     .try_into()
                     .map_err(|_| anyhow!("result_float expects one input"))?;
-                self.builder().build_call(
-                    print_fn,
-                    &[tag_ptr.into(), tag_len.into(), val.into()],
-                    "print_int",
-                )?;
+                self.builder()
+                    .build_call(
+                        print_fn,
+                        &[tag_ptr.into(), tag_len.into(), val.into()],
+                        "print_int",
+                    )?
+                    .set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
             }
             ResultOpDef::ArrBool => {
                 let (tag_ptr, tag_len) = self.generate_global_tag(&args, "BOOLARR:").unwrap();
@@ -277,7 +287,7 @@ impl<'c, H: HugrView<Node = Node>, AL: ArrayLowering + Clone> ResultEmitter<'c, 
                     .map_err(|_| anyhow!("result_arr_float expects one input"))?;
                 self.build_print_array_call(val, op, &ElemType::Float, tag_ptr, tag_len)?;
             }
-        }
+        };
         args.outputs.finish(self.builder(), [])
     }
 }

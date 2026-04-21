@@ -18,7 +18,7 @@ entry_block:                                      ; preds = %alloca_block
   store double %1, ptr %"2_1", align 8
   %"2_01" = load i64, ptr %"2_0", align 4
   %"2_12" = load double, ptr %"2_1", align 8
-  call void @___rz(i64 %"2_01", double %"2_12"), !dbg !9
+  notail call void @___rz(i64 %"2_01", double %"2_12"), !dbg !9
   store i64 %"2_01", ptr %"4_0", align 4, !dbg !9
   %"4_03" = load i64, ptr %"4_0", align 4
   store i64 %"4_03", ptr %"0", align 4

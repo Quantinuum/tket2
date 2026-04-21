@@ -10,7 +10,7 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  %rint = call i32 @random_int(), !dbg !12
+  %rint = notail call i32 @random_int(), !dbg !12
   %mrv = insertvalue { i32, {} } poison, i32 %rint, 0
   %mrv6 = insertvalue { i32, {} } %mrv, {} zeroinitializer, 1
   ret { i32, {} } %mrv6

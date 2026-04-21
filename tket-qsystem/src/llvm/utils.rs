@@ -6,6 +6,7 @@ use anyhow::Result;
 use hugr::llvm::custom::CodegenExtension;
 use hugr::llvm::emit::EmitOpArgs;
 use hugr::llvm::emit::func::EmitFuncContext;
+use hugr::llvm::inkwell::values::LLVMTailCallKind;
 use tket::hugr::ops::ExtensionOp;
 use tket::hugr::{HugrView, Node};
 
@@ -40,12 +41,10 @@ fn emit_utils_op<H: HugrView<Node = Node>>(
                     .i64_type()
                     .fn_type(&[], false),
             )?;
-            let result = ctx
-                .builder()
-                .build_call(fn_get_cur_shot, &[], "shot")?
-                .try_as_basic_value()
-                .unwrap_basic();
-            args.outputs.finish(ctx.builder(), [result])
+            let call = ctx.builder().build_call(fn_get_cur_shot, &[], "shot")?;
+            call.set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
+            args.outputs
+                .finish(ctx.builder(), [call.try_as_basic_value().unwrap_basic()])
         }
     }
 }

@@ -20,7 +20,7 @@ entry_block:                                      ; preds = %alloca_block
   store i32 %1, ptr %"2_1", align 4
   %"2_01" = load {}, ptr %"2_0", align 1
   %"2_12" = load i32, ptr %"2_1", align 4
-  %rintb = call i32 @random_rng(i32 %"2_12"), !dbg !12
+  %rintb = notail call i32 @random_rng(i32 %"2_12"), !dbg !12
   store i32 %rintb, ptr %"4_0", align 4, !dbg !12
   store {} zeroinitializer, ptr %"4_1", align 1, !dbg !12
   %"4_03" = load i32, ptr %"4_0", align 4

@@ -15,7 +15,7 @@ use hugr_llvm::emit::{EmitOpArgs, emit_value};
 use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::types::{BasicTypeEnum, IntType};
-use inkwell::values::FunctionValue;
+use inkwell::values::{FunctionValue, LLVMTailCallKind};
 use tket::hugr::{
     self,
     llvm::{self as hugr_llvm, inkwell},
@@ -126,8 +126,10 @@ impl<'c, H: HugrView<Node = Node>> FuturesEmitter<'c, '_, '_, H> {
                     .try_into()
                     .map_err(|_| anyhow!("Dup expects a single input"))?;
                 let func = self.get_func_inc_refcount()?;
-                self.builder()
+                let call = self
+                    .builder()
                     .build_call(func, &[arg.into()], "inc_refcount")?;
+                call.set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
                 args.outputs.finish(self.builder(), [arg, arg])
             }
             (FutureOpDef::Free, _) => {
@@ -136,8 +138,10 @@ impl<'c, H: HugrView<Node = Node>> FuturesEmitter<'c, '_, '_, H> {
                     .try_into()
                     .map_err(|_| anyhow!("Free expects a single input"))?;
                 let func = self.get_func_dec_refcount()?;
-                self.builder()
+                let call = self
+                    .builder()
                     .build_call(func, &[arg.into()], "dec_refcount")?;
+                call.set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
                 args.outputs.finish(self.builder(), [])
             }
             (FutureOpDef::Read, ty) if *ty == bool_t() => {
@@ -153,8 +157,10 @@ impl<'c, H: HugrView<Node = Node>> FuturesEmitter<'c, '_, '_, H> {
                     .unwrap_basic()
                     .into_int_value();
                 let dec_refcount_func = self.get_func_dec_refcount()?;
-                self.builder()
-                    .build_call(dec_refcount_func, &[arg.into()], "dec_refcount")?;
+                let call =
+                    self.builder()
+                        .build_call(dec_refcount_func, &[arg.into()], "dec_refcount")?;
+                call.set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
                 let true_val = emit_value(self.0, &Value::true_val())?;
                 let false_val = emit_value(self.0, &Value::false_val())?;
                 let result = self
@@ -168,11 +174,11 @@ impl<'c, H: HugrView<Node = Node>> FuturesEmitter<'c, '_, '_, H> {
                     .try_into()
                     .map_err(|_| anyhow!("Read expects a single input"))?;
                 let read_func = self.get_func_read_uint()?;
-                let result = self
+                let call = self
                     .builder()
-                    .build_call(read_func, &[arg.into()], "read_uint")?
-                    .try_as_basic_value()
-                    .unwrap_basic();
+                    .build_call(read_func, &[arg.into()], "read_uint")?;
+                call.set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
+                let result = call.try_as_basic_value().unwrap_basic();
                 let dec_refcount_func = self.get_func_dec_refcount()?;
                 self.builder()
                     .build_call(dec_refcount_func, &[arg.into()], "dec_refcount")?;
