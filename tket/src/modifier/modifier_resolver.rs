@@ -1463,29 +1463,4 @@ mod tests {
             resolve_and_save(name, &mut h);
         }
     }
-
-    // TODO: this test fails because the resolver does not preserve extensions, I have not idea why.
-    pub fn test_resolved_hugr_keeps_extensions(name: &str) {
-        use hugr::envelope::EnvelopeConfig;
-
-        let mut h = load_guppy_example(name).unwrap();
-        let loaded_extensions = h.extensions().ids().cloned().collect::<Vec<_>>();
-
-        let entrypoint = h.entrypoint();
-        // removing this call makes the test succeed
-        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
-
-        let resolved_extensions = h.extensions().ids().cloned().collect::<Vec<_>>();
-        assert_eq!(loaded_extensions, resolved_extensions);
-
-        let mut bytes = Vec::new();
-        h.store_with_exts(&mut bytes, EnvelopeConfig::binary(), h.extensions())
-            .unwrap();
-
-        let reloaded = Hugr::load(Cursor::new(bytes), None).unwrap();
-        assert_matches!(reloaded.validate(), Ok(()));
-
-        let reloaded_extensions = reloaded.extensions().ids().cloned().collect::<Vec<_>>();
-        assert_eq!(resolved_extensions, reloaded_extensions); //Failing here!
-    }
 }

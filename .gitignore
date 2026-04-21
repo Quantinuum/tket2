@@ -45,9 +45,3 @@ jupyter_execute/
 
 # a reserved working dir for local experimentation
 /scratch
-
-# hugr results for modifier testing
-test_files/0_hugr_pdf
-test_files/modified_hugrs/*
-test_files/modifier_examples/*.hugr
-test_files/run_modifier_examples/hugr_results.txt
