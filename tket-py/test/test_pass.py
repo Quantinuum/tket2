@@ -1,4 +1,5 @@
 from pytket import Circuit, OpType
+from pytket.passes import RemoveRedundancies
 from typing import Callable, Any
 from tket._ops import TketOp
 from tket.passes import (
@@ -20,6 +21,8 @@ from hypothesis import given, settings
 from tket.passes import PytketHugrPass
 from pytket.passes import CliffordSimp, SquashRzPhasedX, SequencePass
 from hugr.build.base import Hugr
+from hugr.passes.scope import GlobalScope
+from selene_hugr_qis_compiler import check_hugr
 
 import pytest
 
@@ -256,3 +259,10 @@ def test_inline_functions() -> None:
     all = InlineFunctions(heuristic=inline_funcs.All())(hugr)
 
     assert _count_ops(all, "Call") == 0
+
+def test_valid_hugr_after_pass() -> None:
+    # https://github.com/Quantinuum/tket2/issues/1516
+    hugr = _hugr_from_path("test_files/guppy_examples/chfunc.hugr")
+    PytketHugrPass(RemoveRedundancies()).with_scope(GlobalScope.PRESERVE_ENTRYPOINT)(hugr)
+    check_hugr(hugr.to_bytes())
+
