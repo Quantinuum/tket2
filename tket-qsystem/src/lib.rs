@@ -254,9 +254,11 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for QSystemPass {
         // once we're done so that LLVM is not forced to compile them as callable.
         let pub_funcs = self.collect_pub_funcs(hugr);
 
-        ReplaceMeasurementPass::default_with_scope(self.scope.clone()).run(hugr)?;
-
+        // This pass should be run before replacing measurements, as it introduces
+        // functions which may have measurement types that need to be replaced.
         LowerTketToQSystemPass::default_with_scope(self.scope.clone()).run(hugr)?;
+
+        ReplaceMeasurementPass::default_with_scope(self.scope.clone()).run(hugr)?;
 
         LowerDropsPass::default_with_scope(self.scope.clone()).run(hugr)?;
 
