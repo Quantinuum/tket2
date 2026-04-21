@@ -55,7 +55,7 @@ else:
 
 result_execution_dir.mkdir(parents=True, exist_ok=True)
 for hugr_path in hugr_paths:
-    print(f"Processing {hugr_path}...")
+    print(f"Running {hugr_path.name}...")
     hugr_bytes = hugr_path.read_bytes()
     hugr = Hugr.from_bytes(hugr_bytes)
 
@@ -79,4 +79,3 @@ if len(args) < 2:
     result_path = Path(__file__).resolve().parent / "hugr_results.txt"
     result_path.parent.mkdir(parents=True, exist_ok=True)
     result_path.write_text("\n-----\n".join(all_results) + "\n")
-    print(f"Results saved to {result_path}")
