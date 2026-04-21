@@ -23,7 +23,7 @@ use hugr::{
     types::{Signature, TypeRow},
 };
 
-use super::common::{self, CommonOp, CommonOpBuilder, SharedOp};
+use super::common::{self, CommonOp, CommonOpBuilder, SharedOp, SharedTketOpSynthesis};
 use super::lower::pi_mul_f64;
 use super::synth_tket_op::SynthesizeTketOp;
 use derive_more::Display;
@@ -245,144 +245,19 @@ impl MakeOpDef for RuntimeBarrierDef {
     }
 }
 
-/// An extension trait for [Dataflow] providing methods to add
-/// "tket.qsystem.sol" operations.
-pub trait SolOpBuilder: CommonOpBuilder {
-    /// Add a "tket.qsystem.sol.LazyMeasure" op.
-    fn add_lazy_measure(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::add_lazy_measure_with::<SolOp>(self, qb)
-    }
-    /// Add a "tket.qsystem.sol.PhasedXX" op.
-    fn add_phased_xx(
-        &mut self,
-        qb1: Wire,
-        qb2: Wire,
-        angle1: Wire,
-        angle2: Wire,
-    ) -> Result<[Wire; 2], BuildError> {
-        Ok(self
-            .add_dataflow_op(SolOp::PhasedXX, [qb1, qb2, angle1, angle2])?
-            .outputs_arr())
-    }
-
-    /// Add a "tket.qsystem.sol.Tk2" op.
-    fn add_tk2(
-        &mut self,
-        qb1: Wire,
-        qb2: Wire,
-        angle1: Wire,
-        angle2: Wire,
-        angle3: Wire,
-    ) -> Result<[Wire; 2], BuildError> {
-        Ok(self
-            .add_dataflow_op(SolOp::Tk2, [qb1, qb2, angle1, angle2, angle3])?
-            .outputs_arr())
-    }
-
-    /// Add a "tket.qsystem.sol.LazyMeasureLeaked" op.
-    fn add_lazy_measure_leaked(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::add_lazy_measure_leaked_with::<SolOp>(self, qb)
-    }
-
-    /// Add a "tket.qsystem.sol.LazyMeasureReset" op.
-    fn add_lazy_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
-        CommonOpBuilder::add_lazy_measure_reset_with::<SolOp>(self, qb)
-    }
-
-    /// Add a "tket.qsystem.sol.Measure" op.
-    fn add_measure(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::add_measure_with::<SolOp>(self, qb)
-    }
-
-    /// Add a "tket.qsystem.sol.Reset" op.
-    fn add_reset(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::add_reset_with::<SolOp>(self, qb)
-    }
-
-    /// Add a maximally entangling "tket.qsystem.sol.ZZPhase(pi/2)" op.
-    fn build_zz_max(&mut self, qb1: Wire, qb2: Wire) -> Result<[Wire; 2], BuildError> {
-        let pi_2 = pi_mul_f64(self, 0.5);
-
-        self.build_zz_phase(qb1, qb2, pi_2)
-    }
-
-    /// Build a "tket.qsystem.helios.ZZPhase" op in terms of Sol primitives.
-    fn build_zz_phase(
-        &mut self,
-        qb1: Wire,
-        qb2: Wire,
-        angle: Wire,
-    ) -> Result<[Wire; 2], BuildError> {
-        let pi_minus = pi_mul_f64(self, -1.0);
-        let pi_2 = pi_mul_f64(self, 0.5);
-        let pi_minus_2 = pi_mul_f64(self, -0.5);
-
-        let qb1 = self.add_phased_x(qb1, pi_2, pi_minus_2)?;
-        let qb2 = self.add_phased_x(qb2, pi_2, pi_minus_2)?;
-        let [qb1, qb2] = self.add_phased_xx(qb1, qb2, angle, pi_minus)?;
-        let qb1 = self.add_phased_x(qb1, pi_2, pi_2)?;
-        let qb2 = self.add_phased_x(qb2, pi_2, pi_2)?;
-        Ok([qb1, qb2])
-    }
-
-    /// Add a "tket.qsystem.sol.PhasedX" op.
-    fn add_phased_x(&mut self, qb: Wire, angle1: Wire, angle2: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::add_phased_x_with::<SolOp>(self, qb, angle1, angle2)
-    }
-
-    /// Add a "tket.qsystem.sol.Rz" op.
-    fn add_rz(&mut self, qb: Wire, angle: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::add_rz_with::<SolOp>(self, qb, angle)
-    }
-
-    /// Add a "tket.qsystem.sol.TryQAlloc" op.
-    fn add_try_alloc(&mut self) -> Result<Wire, BuildError> {
-        CommonOpBuilder::add_try_alloc_with::<SolOp>(self)
-    }
-
-    /// Add a "tket.qsystem.sol.QFree" op.
-    fn add_qfree(&mut self, qb: Wire) -> Result<(), BuildError> {
-        CommonOpBuilder::add_qfree_with::<SolOp>(self, qb)
-    }
-
-    /// Add a "tket.qsystem.sol.MeasureReset" op.
-    /// This operation is equivalent to a `Measure` followed by a `Reset`.
-    fn add_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
-        CommonOpBuilder::add_measure_reset_with::<SolOp>(self, qb)
-    }
-
-    /// Add a "tket.qsystem.sol.RuntimeBarrier" op.
-    fn add_runtime_barrier(&mut self, qbs: Wire, array_size: u64) -> Result<Wire, BuildError> {
-        CommonOpBuilder::add_runtime_barrier_with(self, &EXTENSION, qbs, array_size)
-    }
-
-    /// Build an array from qubit wires, apply a barrier, and unwrap the array afterwards.
-    fn build_wrapped_barrier(
-        &mut self,
-        qbs: impl IntoIterator<Item = Wire>,
-    ) -> Result<Vec<Wire>, BuildError>
-    where
-        Self: Sized,
-    {
-        CommonOpBuilder::build_wrapped_barrier_with(self, &EXTENSION, qbs)
-    }
-}
-
-impl<D: Dataflow> SolOpBuilder for D {}
-
 #[derive(Debug)]
 /// Implmements traits for lowering operations in terms of Sol primitives.
-pub(super) struct SolBuilder<'a, D> {
+pub(super) struct SolSynthesizer<'a, D> {
     inner: &'a mut D,
 }
 
-impl<'a, D> SolBuilder<'a, D> {
+impl<'a, D> SolSynthesizer<'a, D> {
     pub(super) fn new(inner: &'a mut D) -> Self {
         Self { inner }
     }
 }
 
-impl<D> Container for SolBuilder<'_, D>
+impl<D> Container for SolSynthesizer<'_, D>
 where
     D: Container,
 {
@@ -395,7 +270,7 @@ where
     }
 }
 
-impl<D> Dataflow for SolBuilder<'_, D>
+impl<D> Dataflow for SolSynthesizer<'_, D>
 where
     D: Dataflow,
 {
@@ -406,56 +281,79 @@ where
     }
 }
 
-impl<D> SynthesizeTketOp for SolBuilder<'_, D>
+impl<D> SharedTketOpSynthesis for SolSynthesizer<'_, D>
 where
-    D: DataflowHugr + SolOpBuilder,
+    D: DataflowHugr + CommonOpBuilder,
+{
+    type Op = SolOp;
+
+    fn synth_phased_x(&mut self, qb: Wire, angle1: Wire, angle2: Wire) -> Result<Wire, BuildError> {
+        SynthesizeSolOp::build_phased_x(self, qb, angle1, angle2)
+    }
+
+    fn synth_rz(&mut self, qb: Wire, angle: Wire) -> Result<Wire, BuildError> {
+        SynthesizeSolOp::build_rz(self, qb, angle)
+    }
+
+    fn synth_try_alloc(&mut self) -> Result<Wire, BuildError> {
+        SynthesizeSolOp::build_try_alloc(self)
+    }
+
+    fn synth_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
+        SynthesizeSolOp::build_measure_reset(self, qb)
+    }
+}
+
+impl<D> SynthesizeTketOp for SolSynthesizer<'_, D>
+where
+    D: DataflowHugr + CommonOpBuilder,
 {
     fn build_h(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_h_with::<SolOp>(self.inner, qb)
+        self.build_h_shared(qb)
     }
 
     fn build_x(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_x_with::<SolOp>(self.inner, qb)
+        self.build_x_shared(qb)
     }
 
     fn build_y(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_y_with::<SolOp>(self.inner, qb)
+        self.build_y_shared(qb)
     }
 
     fn build_z(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_z_with::<SolOp>(self.inner, qb)
+        self.build_z_shared(qb)
     }
 
     fn build_s(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_s_with::<SolOp>(self.inner, qb)
+        self.build_s_shared(qb)
     }
 
     fn build_sdg(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_sdg_with::<SolOp>(self.inner, qb)
+        self.build_sdg_shared(qb)
     }
 
     fn build_v(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_v_with::<SolOp>(self.inner, qb)
+        self.build_v_shared(qb)
     }
 
     fn build_vdg(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_vdg_with::<SolOp>(self.inner, qb)
+        self.build_vdg_shared(qb)
     }
 
     fn build_t(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_t_with::<SolOp>(self.inner, qb)
+        self.build_t_shared(qb)
     }
 
     fn build_tdg(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_tdg_with::<SolOp>(self.inner, qb)
+        self.build_tdg_shared(qb)
     }
 
     fn build_measure_flip(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
-        CommonOpBuilder::build_measure_flip_with::<SolOp>(self.inner, qb)
+        self.build_measure_flip_shared(qb)
     }
 
     fn build_qalloc(&mut self) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_qalloc_with::<SolOp>(self.inner)
+        self.build_qalloc_shared()
     }
 
     fn build_cx(&mut self, c: Wire, t: Wire) -> Result<[Wire; 2], BuildError> {
@@ -463,11 +361,11 @@ where
         let pi_minus_2 = pi_mul_f64(self, -0.5);
         let zero = pi_mul_f64(self, 0.0);
 
-        let c = self.inner.add_phased_x(c, pi_2, pi_2)?;
-        let [c, t] = self.inner.add_phased_xx(c, t, pi_2, zero)?;
-        let c = self.inner.add_phased_x(c, pi_minus_2, pi_2)?;
-        let c = self.inner.add_rz(c, pi_minus_2)?;
-        let t = self.inner.add_phased_x(t, pi_minus_2, zero)?;
+        let c = SynthesizeSolOp::build_phased_x(self, c, pi_2, pi_2)?;
+        let [c, t] = SynthesizeSolOp::build_phased_xx(self, c, t, pi_2, zero)?;
+        let c = SynthesizeSolOp::build_phased_x(self, c, pi_minus_2, pi_2)?;
+        let c = SynthesizeSolOp::build_rz(self, c, pi_minus_2)?;
+        let t = SynthesizeSolOp::build_phased_x(self, t, pi_minus_2, zero)?;
         Ok([c, t])
     }
 
@@ -476,13 +374,13 @@ where
         let pi_minus_2 = pi_mul_f64(self, -0.5);
         let zero = pi_mul_f64(self, 0.0);
 
-        let a = self.inner.add_phased_x(a, pi_2, pi_2)?;
-        let b = self.inner.add_rz(b, pi_minus_2)?;
-        let [a, b] = self.inner.add_phased_xx(a, b, pi_2, zero)?;
-        let a = self.inner.add_phased_x(a, pi_minus_2, pi_2)?;
-        let a = self.inner.add_rz(a, pi_minus_2)?;
-        let b = self.inner.add_phased_x(b, pi_minus_2, zero)?;
-        let b = self.inner.add_rz(b, pi_2)?;
+        let a = SynthesizeSolOp::build_phased_x(self, a, pi_2, pi_2)?;
+        let b = SynthesizeSolOp::build_rz(self, b, pi_minus_2)?;
+        let [a, b] = SynthesizeSolOp::build_phased_xx(self, a, b, pi_2, zero)?;
+        let a = SynthesizeSolOp::build_phased_x(self, a, pi_minus_2, pi_2)?;
+        let a = SynthesizeSolOp::build_rz(self, a, pi_minus_2)?;
+        let b = SynthesizeSolOp::build_phased_x(self, b, pi_minus_2, zero)?;
+        let b = SynthesizeSolOp::build_rz(self, b, pi_2)?;
         Ok([a, b])
     }
 
@@ -491,26 +389,26 @@ where
         let pi_2 = pi_mul_f64(self, 0.5);
         let pi_minus_2 = pi_mul_f64(self, -0.5);
 
-        let a = self.inner.add_phased_x(a, pi_2, pi_minus_2)?;
-        let b = self.inner.add_phased_x(b, pi_2, pi_minus_2)?;
-        let [a, b] = self.inner.add_phased_xx(a, b, pi_2, pi_minus)?;
-        let a = self.inner.add_phased_x(a, pi_2, pi_2)?;
-        let b = self.inner.add_phased_x(b, pi_2, pi_2)?;
-        let a = self.inner.add_rz(a, pi_minus_2)?;
-        let b = self.inner.add_rz(b, pi_minus_2)?;
+        let a = SynthesizeSolOp::build_phased_x(self, a, pi_2, pi_minus_2)?;
+        let b = SynthesizeSolOp::build_phased_x(self, b, pi_2, pi_minus_2)?;
+        let [a, b] = SynthesizeSolOp::build_phased_xx(self, a, b, pi_2, pi_minus)?;
+        let a = SynthesizeSolOp::build_phased_x(self, a, pi_2, pi_2)?;
+        let b = SynthesizeSolOp::build_phased_x(self, b, pi_2, pi_2)?;
+        let a = SynthesizeSolOp::build_rz(self, a, pi_minus_2)?;
+        let b = SynthesizeSolOp::build_rz(self, b, pi_minus_2)?;
         Ok([a, b])
     }
 
     fn build_rx(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_rx_with::<SolOp>(self.inner, qb, theta)
+        self.build_rx_shared(qb, theta)
     }
 
     fn build_ry(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_ry_with::<SolOp>(self.inner, qb, theta)
+        self.build_ry_shared(qb, theta)
     }
 
     fn build_rz(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError> {
-        self.inner.add_rz(qb, theta)
+        SynthesizeSolOp::build_rz(self, qb, theta)
     }
 
     fn build_crz(&mut self, a: Wire, b: Wire, lambda: Wire) -> Result<[Wire; 2], BuildError> {
@@ -526,12 +424,12 @@ where
         let pi_2 = pi_mul_f64(self, 0.5);
         let pi_minus_2 = pi_mul_f64(self, -0.5);
 
-        let a = self.inner.add_phased_x(a, pi_2, pi_minus_2)?;
-        let b = self.inner.add_phased_x(b, pi_2, pi_minus_2)?;
-        let [a, b] = self.inner.add_phased_xx(a, b, lambda_minus_2, pi_minus)?;
-        let a = self.inner.add_phased_x(a, pi_2, pi_2)?;
-        let b = self.inner.add_phased_x(b, pi_2, pi_2)?;
-        let b = self.inner.add_rz(b, lambda_2)?;
+        let a = SynthesizeSolOp::build_phased_x(self, a, pi_2, pi_minus_2)?;
+        let b = SynthesizeSolOp::build_phased_x(self, b, pi_2, pi_minus_2)?;
+        let [a, b] = SynthesizeSolOp::build_phased_xx(self, a, b, lambda_minus_2, pi_minus)?;
+        let a = SynthesizeSolOp::build_phased_x(self, a, pi_2, pi_2)?;
+        let b = SynthesizeSolOp::build_phased_x(self, b, pi_2, pi_2)?;
+        let b = SynthesizeSolOp::build_rz(self, b, lambda_2)?;
         Ok([a, b])
     }
 
@@ -544,36 +442,167 @@ where
         let pi_minus_3_4 = pi_mul_f64(self, -0.75);
         let zero = pi_mul_f64(self, 0.0);
 
-        let a = self.inner.add_phased_x(a, pi_2, pi_minus_3_4)?;
-        let b = self.inner.add_phased_x(b, pi_2, pi_minus_3_4)?;
-        let a = self.inner.add_rz(a, pi_minus_3_4)?;
-        let b = self.inner.add_rz(b, pi_minus_3_4)?;
-        let c = self.inner.add_phased_x(c, pi_2, pi_minus_2)?;
-        let c = self.inner.add_rz(c, pi_minus_3_4)?;
+        let a = SynthesizeSolOp::build_phased_x(self, a, pi_2, pi_minus_3_4)?;
+        let b = SynthesizeSolOp::build_phased_x(self, b, pi_2, pi_minus_3_4)?;
+        let a = SynthesizeSolOp::build_rz(self, a, pi_minus_3_4)?;
+        let b = SynthesizeSolOp::build_rz(self, b, pi_minus_3_4)?;
+        let c = SynthesizeSolOp::build_phased_x(self, c, pi_2, pi_minus_2)?;
+        let c = SynthesizeSolOp::build_rz(self, c, pi_minus_3_4)?;
 
-        let [a, c] = self.inner.add_phased_xx(a, c, pi_2, zero)?;
+        let [a, c] = SynthesizeSolOp::build_phased_xx(self, a, c, pi_2, zero)?;
 
-        let a = self.inner.add_phased_x(a, pi_minus_2, zero)?;
-        let c = self.inner.add_phased_x(c, pi_4, pi_minus_2)?;
+        let a = SynthesizeSolOp::build_phased_x(self, a, pi_minus_2, zero)?;
+        let c = SynthesizeSolOp::build_phased_x(self, c, pi_4, pi_minus_2)?;
 
-        let [a, b] = self.inner.add_phased_xx(a, b, pi_minus_4, zero)?;
-        let c = self.inner.add_rz(c, pi_2)?;
+        let [a, b] = SynthesizeSolOp::build_phased_xx(self, a, b, pi_minus_4, zero)?;
+        let c = SynthesizeSolOp::build_rz(self, c, pi_2)?;
 
-        let [b, c] = self.inner.add_phased_xx(b, c, pi_4, zero)?;
-        let c = self.inner.add_phased_x(c, pi_2, pi_minus_2)?;
-        let c = self.inner.add_rz(c, pi)?;
+        let [b, c] = SynthesizeSolOp::build_phased_xx(self, b, c, pi_4, zero)?;
+        let c = SynthesizeSolOp::build_phased_x(self, c, pi_2, pi_minus_2)?;
+        let c = SynthesizeSolOp::build_rz(self, c, pi)?;
 
-        let [a, c] = self.inner.add_phased_xx(a, c, pi_2, zero)?;
-        let a = self.inner.add_phased_x(a, pi_2, pi_minus_2)?;
-        let c = self.inner.add_phased_x(c, pi_2, pi_minus_2)?;
-        let a = self.inner.add_rz(a, pi_2)?;
-        let c = self.inner.add_rz(c, pi_2)?;
+        let [a, c] = SynthesizeSolOp::build_phased_xx(self, a, c, pi_2, zero)?;
+        let a = SynthesizeSolOp::build_phased_x(self, a, pi_2, pi_minus_2)?;
+        let c = SynthesizeSolOp::build_phased_x(self, c, pi_2, pi_minus_2)?;
+        let a = SynthesizeSolOp::build_rz(self, a, pi_2)?;
+        let c = SynthesizeSolOp::build_rz(self, c, pi_2)?;
 
-        let [b, c] = self.inner.add_phased_xx(b, c, pi_minus_4, zero)?;
-        let b = self.inner.add_phased_x(b, pi_2, pi_minus_2)?;
-        let b = self.inner.add_rz(b, pi)?;
+        let [b, c] = SynthesizeSolOp::build_phased_xx(self, b, c, pi_minus_4, zero)?;
+        let b = SynthesizeSolOp::build_phased_x(self, b, pi_2, pi_minus_2)?;
+        let b = SynthesizeSolOp::build_rz(self, b, pi)?;
 
         Ok([a, b, c])
+    }
+}
+
+/// Builder trait for lowering `SolOp`s into a target operation set.
+pub trait SynthesizeSolOp: Dataflow {
+    /// Build a "tket.qsystem.sol.LazyMeasure" op.
+    fn build_lazy_measure(&mut self, qb: Wire) -> Result<Wire, BuildError>;
+
+    /// Build a "tket.qsystem.sol.LazyMeasureLeaked" op.
+    fn build_lazy_measure_leaked(&mut self, qb: Wire) -> Result<Wire, BuildError>;
+
+    /// Build a "tket.qsystem.sol.LazyMeasureReset" op.
+    fn build_lazy_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError>;
+
+    /// Build a "tket.qsystem.sol.Measure" op.
+    fn build_measure(&mut self, qb: Wire) -> Result<Wire, BuildError>;
+
+    /// Build a "tket.qsystem.sol.Reset" op.
+    fn build_reset(&mut self, qb: Wire) -> Result<Wire, BuildError>;
+
+    /// Build a "tket.qsystem.sol.PhasedXX" op.
+    fn build_phased_xx(
+        &mut self,
+        qb1: Wire,
+        qb2: Wire,
+        angle1: Wire,
+        angle2: Wire,
+    ) -> Result<[Wire; 2], BuildError>;
+
+    /// Build a "tket.qsystem.sol.Tk2" op.
+    fn build_tk2(
+        &mut self,
+        qb1: Wire,
+        qb2: Wire,
+        alpha: Wire,
+        beta: Wire,
+        gamma: Wire,
+    ) -> Result<[Wire; 2], BuildError>;
+
+    /// Build a "tket.qsystem.sol.PhasedX" op.
+    fn build_phased_x(&mut self, qb: Wire, angle1: Wire, angle2: Wire) -> Result<Wire, BuildError>;
+
+    /// Build a "tket.qsystem.sol.Rz" op.
+    fn build_rz(&mut self, qb: Wire, angle: Wire) -> Result<Wire, BuildError>;
+
+    /// Build a "tket.qsystem.sol.TryQAlloc" op.
+    fn build_try_alloc(&mut self) -> Result<Wire, BuildError>;
+
+    /// Build a "tket.qsystem.sol.QFree" op.
+    fn build_qfree(&mut self, qb: Wire) -> Result<(), BuildError>;
+
+    /// Build a "tket.qsystem.sol.MeasureReset" op.
+    fn build_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError>;
+
+    /// Build a "tket.qsystem.sol.RuntimeBarrier" op.
+    fn build_runtime_barrier(&mut self, qbs: Wire, array_size: u64) -> Result<Wire, BuildError>;
+}
+
+impl<D> SynthesizeSolOp for SolSynthesizer<'_, D>
+where
+    D: DataflowHugr + CommonOpBuilder,
+{
+    fn build_lazy_measure(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::add_lazy_measure_with::<SolOp>(self.inner, qb)
+    }
+
+    fn build_lazy_measure_leaked(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::add_lazy_measure_leaked_with::<SolOp>(self.inner, qb)
+    }
+
+    fn build_lazy_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
+        CommonOpBuilder::add_lazy_measure_reset_with::<SolOp>(self.inner, qb)
+    }
+
+    fn build_measure(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::add_measure_with::<SolOp>(self.inner, qb)
+    }
+
+    fn build_reset(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::add_reset_with::<SolOp>(self.inner, qb)
+    }
+
+    fn build_phased_xx(
+        &mut self,
+        qb1: Wire,
+        qb2: Wire,
+        angle1: Wire,
+        angle2: Wire,
+    ) -> Result<[Wire; 2], BuildError> {
+        Ok(self
+            .inner
+            .add_dataflow_op(SolOp::PhasedXX, [qb1, qb2, angle1, angle2])?
+            .outputs_arr())
+    }
+
+    fn build_tk2(
+        &mut self,
+        qb1: Wire,
+        qb2: Wire,
+        alpha: Wire,
+        beta: Wire,
+        gamma: Wire,
+    ) -> Result<[Wire; 2], BuildError> {
+        Ok(self
+            .inner
+            .add_dataflow_op(SolOp::Tk2, [qb1, qb2, alpha, beta, gamma])?
+            .outputs_arr())
+    }
+
+    fn build_phased_x(&mut self, qb: Wire, angle1: Wire, angle2: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::add_phased_x_with::<SolOp>(self.inner, qb, angle1, angle2)
+    }
+
+    fn build_rz(&mut self, qb: Wire, angle: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::add_rz_with::<SolOp>(self.inner, qb, angle)
+    }
+
+    fn build_try_alloc(&mut self) -> Result<Wire, BuildError> {
+        CommonOpBuilder::add_try_alloc_with::<SolOp>(self.inner)
+    }
+
+    fn build_qfree(&mut self, qb: Wire) -> Result<(), BuildError> {
+        CommonOpBuilder::add_qfree_with::<SolOp>(self.inner, qb)
+    }
+
+    fn build_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
+        CommonOpBuilder::add_measure_reset_with::<SolOp>(self.inner, qb)
+    }
+
+    fn build_runtime_barrier(&mut self, qbs: Wire, array_size: u64) -> Result<Wire, BuildError> {
+        CommonOpBuilder::add_runtime_barrier_with(self.inner, &EXTENSION, qbs, array_size)
     }
 }
 
@@ -583,6 +612,7 @@ mod test {
 
     use hugr::HugrView;
     use hugr::builder::{DataflowHugr, FunctionBuilder};
+    use hugr::std_extensions::collections::array::ArrayOpBuilder;
     use tket::extension::bool::bool_type;
 
     use super::*;
@@ -594,40 +624,56 @@ mod test {
 
     #[test]
     fn lazy_circuit() {
-        test_utils::assert_lazy_circuit(|builder, qb| builder.add_lazy_measure_reset(qb));
+        test_utils::assert_lazy_circuit(|builder, qb| {
+            let mut synthesizer = SolSynthesizer::new(builder);
+            synthesizer.build_lazy_measure_reset(qb)
+        });
     }
 
     #[test]
     fn leaked() {
-        test_utils::assert_leaked_measurement(|builder, qb| builder.add_lazy_measure_leaked(qb));
+        test_utils::assert_leaked_measurement(|builder, qb| {
+            let mut synthesizer = SolSynthesizer::new(builder);
+            synthesizer.build_lazy_measure_leaked(qb)
+        });
     }
 
     #[test]
     fn all_ops() {
         let hugr = {
-            // TODO use sol native ops rather than helios
             let mut func_builder = FunctionBuilder::new(
                 "all_ops",
                 Signature::new(vec![qb_t(), float64_type()], vec![bool_type()]),
             )
             .unwrap();
             let [q0, angle] = func_builder.input_wires_arr();
-            let q1 = CommonOpBuilder::build_qalloc_with::<SolOp>(&mut func_builder).unwrap();
-            let q0 = func_builder.add_reset(q0).unwrap();
-            let q1 = func_builder.add_phased_x(q1, angle, angle).unwrap();
-            let [q0, q1] = func_builder.build_zz_max(q0, q1).unwrap();
-            let [q0, q1] = func_builder.build_zz_phase(q0, q1, angle).unwrap();
-
+            let [q0, q1] = {
+                let mut synthesizer = SolSynthesizer::new(&mut func_builder);
+                let q1 = synthesizer.build_qalloc().unwrap();
+                let q0 = synthesizer.build_reset(q0).unwrap();
+                let q1 = synthesizer.build_phased_x(q1, angle, angle).unwrap();
+                let zero = pi_mul_f64(&mut synthesizer, 0.0);
+                synthesizer.build_phased_xx(q0, q1, angle, zero).unwrap()
+            };
+            let q_arr = func_builder.add_new_array(qb_t(), [q0, q1]).unwrap();
+            let q_arr = {
+                let mut synthesizer = SolSynthesizer::new(&mut func_builder);
+                synthesizer.build_runtime_barrier(q_arr, 2).unwrap()
+            };
             let [q0, q1] = func_builder
-                .build_wrapped_barrier([q0, q1])
+                .add_array_unpack(qb_t(), 2, q_arr)
                 .unwrap()
                 .try_into()
                 .unwrap();
 
-            let q0 = func_builder.add_rz(q0, angle).unwrap();
-            let [q0, _b] = func_builder.add_measure_reset(q0).unwrap();
-            let b = func_builder.add_measure(q0).unwrap();
-            func_builder.add_qfree(q1).unwrap();
+            let b = {
+                let mut synthesizer = SolSynthesizer::new(&mut func_builder);
+                let q0 = SynthesizeSolOp::build_rz(&mut synthesizer, q0, angle).unwrap();
+                let [q0, _b] = synthesizer.build_measure_reset(q0).unwrap();
+                let b = synthesizer.build_measure(q0).unwrap();
+                synthesizer.build_qfree(q1).unwrap();
+                b
+            };
 
             func_builder.finish_hugr_with_outputs([b]).unwrap()
         };

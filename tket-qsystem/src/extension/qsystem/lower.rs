@@ -27,8 +27,8 @@ use tket::{TketOp, extension::rotation::RotationOpBuilder};
 use crate::extension::qsystem::{self, QSystemOp, QSystemPlatform};
 
 use super::barrier::BarrierInserter;
-use super::helios::HeliosBuilder;
-use super::sol::SolBuilder;
+use super::helios::HeliosSynthesizer;
+use super::sol::SolSynthesizer;
 use super::synth_tket_op::SynthesizeTketOp;
 
 lazy_static! {
@@ -185,17 +185,25 @@ fn build_func(platform: QSystemPlatform, op: TketOp) -> Result<Hugr, LowerTk2Err
     // TODO check generated names are namespaced enough
     let f_name = format!("__tk2_{}", op.op_id().to_lowercase());
     let mut f_build = FunctionBuilder::new(f_name, sig)?;
-    let outputs = match platform {
+    let outputs = build_func_outputs(platform, &mut f_build, op)?;
+    Ok(f_build.finish_hugr_with_outputs(outputs)?)
+}
+
+fn build_func_outputs(
+    platform: QSystemPlatform,
+    f_build: &mut FunctionBuilder<Hugr>,
+    op: TketOp,
+) -> Result<Vec<Wire>, LowerTk2Error> {
+    match platform {
         QSystemPlatform::Helios => {
-            let mut builder = HeliosBuilder::new(&mut f_build);
-            build_func_with_builder(&mut builder, op)?
+            let mut synthesizer = HeliosSynthesizer::new(f_build);
+            build_func_with_builder(&mut synthesizer, op)
         }
         QSystemPlatform::Sol => {
-            let mut builder = SolBuilder::new(&mut f_build);
-            build_func_with_builder(&mut builder, op)?
+            let mut synthesizer = SolSynthesizer::new(f_build);
+            build_func_with_builder(&mut synthesizer, op)
         }
-    };
-    Ok(f_build.finish_hugr_with_outputs(outputs)?)
+    }
 }
 
 fn build_func_with_builder<B>(b: &mut B, op: TketOp) -> Result<Vec<Wire>, LowerTk2Error>

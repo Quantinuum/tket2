@@ -103,7 +103,7 @@ impl SharedOp {
     }
 }
 
-pub trait CommonOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
+pub(crate) trait CommonOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
     fn add_lazy_measure_with<Op>(&mut self, qb: Wire) -> Result<Wire, BuildError>
     where
         Op: CommonOp,
@@ -208,146 +208,6 @@ pub trait CommonOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
         Ok(self.add_dataflow_op(op, [qbs])?.out_wire(0))
     }
 
-    fn build_h_with<Op>(&mut self, qb: Wire) -> Result<Wire, BuildError>
-    where
-        Op: CommonOp,
-    {
-        let pi = pi_mul_f64(self, 1.0);
-        let pi_2 = pi_mul_f64(self, 0.5);
-        let pi_minus_2 = pi_mul_f64(self, -0.5);
-
-        let q = self.add_phased_x_with::<Op>(qb, pi_2, pi_minus_2)?;
-        self.add_rz_with::<Op>(q, pi)
-    }
-
-    fn build_x_with<Op>(&mut self, qb: Wire) -> Result<Wire, BuildError>
-    where
-        Op: CommonOp,
-    {
-        let pi = pi_mul_f64(self, 1.0);
-        let zero = pi_mul_f64(self, 0.0);
-        self.add_phased_x_with::<Op>(qb, pi, zero)
-    }
-
-    fn build_y_with<Op>(&mut self, qb: Wire) -> Result<Wire, BuildError>
-    where
-        Op: CommonOp,
-    {
-        let pi = pi_mul_f64(self, 1.0);
-        let pi_2 = pi_mul_f64(self, 0.5);
-        self.add_phased_x_with::<Op>(qb, pi, pi_2)
-    }
-
-    fn build_z_with<Op>(&mut self, qb: Wire) -> Result<Wire, BuildError>
-    where
-        Op: CommonOp,
-    {
-        let pi = pi_mul_f64(self, 1.0);
-        self.add_rz_with::<Op>(qb, pi)
-    }
-
-    fn build_s_with<Op>(&mut self, qb: Wire) -> Result<Wire, BuildError>
-    where
-        Op: CommonOp,
-    {
-        let pi_2 = pi_mul_f64(self, 0.5);
-        self.add_rz_with::<Op>(qb, pi_2)
-    }
-
-    fn build_sdg_with<Op>(&mut self, qb: Wire) -> Result<Wire, BuildError>
-    where
-        Op: CommonOp,
-    {
-        let pi_minus_2 = pi_mul_f64(self, -0.5);
-        self.add_rz_with::<Op>(qb, pi_minus_2)
-    }
-
-    fn build_v_with<Op>(&mut self, qb: Wire) -> Result<Wire, BuildError>
-    where
-        Op: CommonOp,
-    {
-        let pi_2 = pi_mul_f64(self, 0.5);
-        let zero = pi_mul_f64(self, 0.0);
-        self.add_phased_x_with::<Op>(qb, pi_2, zero)
-    }
-
-    fn build_vdg_with<Op>(&mut self, qb: Wire) -> Result<Wire, BuildError>
-    where
-        Op: CommonOp,
-    {
-        let pi_minus_2 = pi_mul_f64(self, -0.5);
-        let zero = pi_mul_f64(self, 0.0);
-        self.add_phased_x_with::<Op>(qb, pi_minus_2, zero)
-    }
-
-    fn build_t_with<Op>(&mut self, qb: Wire) -> Result<Wire, BuildError>
-    where
-        Op: CommonOp,
-    {
-        let pi_4 = pi_mul_f64(self, 0.25);
-        self.add_rz_with::<Op>(qb, pi_4)
-    }
-
-    fn build_tdg_with<Op>(&mut self, qb: Wire) -> Result<Wire, BuildError>
-    where
-        Op: CommonOp,
-    {
-        let pi_minus_4 = pi_mul_f64(self, -0.25);
-        self.add_rz_with::<Op>(qb, pi_minus_4)
-    }
-
-    fn build_rx_with<Op>(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError>
-    where
-        Op: CommonOp,
-    {
-        let zero = pi_mul_f64(self, 0.0);
-        self.add_phased_x_with::<Op>(qb, theta, zero)
-    }
-
-    fn build_ry_with<Op>(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError>
-    where
-        Op: CommonOp,
-    {
-        let pi_2 = pi_mul_f64(self, 0.5);
-        self.add_phased_x_with::<Op>(qb, theta, pi_2)
-    }
-
-    fn build_measure_flip_with<Op>(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError>
-    where
-        Op: CommonOp,
-    {
-        let [qb, b] = self.add_measure_reset_with::<Op>(qb)?;
-        let sum_b = self.add_dataflow_op(BoolOp::read, [b])?.out_wire(0);
-        let mut conditional = self.conditional_builder(
-            ([type_row![], type_row![]], sum_b),
-            [(qb_t(), qb)],
-            vec![qb_t()].into(),
-        )?;
-
-        let case0 = conditional.case_builder(0)?;
-        let [qb] = case0.input_wires_arr();
-        case0.finish_with_outputs([qb])?;
-
-        let mut case1 = conditional.case_builder(1)?;
-        let [qb] = case1.input_wires_arr();
-        let qb = CommonOpBuilder::build_x_with::<Op>(&mut case1, qb)?;
-        case1.finish_with_outputs([qb])?;
-
-        let [qb] = conditional.finish_sub_container()?.outputs_arr();
-        Ok([qb, sum_b])
-    }
-
-    fn build_qalloc_with<Op>(&mut self) -> Result<Wire, BuildError>
-    where
-        Op: CommonOp,
-    {
-        let maybe_qb = self.add_try_alloc_with::<Op>()?;
-        let [qb] = self.build_expect_sum(1, option_type(vec![qb_t()]), maybe_qb, |_| {
-            "No more qubits available to allocate.".to_string()
-        })?;
-        Ok(qb)
-    }
-
     fn build_wrapped_barrier_with(
         &mut self,
         extension: &Arc<Extension>,
@@ -366,6 +226,118 @@ pub trait CommonOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
 }
 
 impl<D> CommonOpBuilder for D where D: Dataflow + UnwrapBuilder + ArrayOpBuilder {}
+
+pub(crate) trait SharedTketOpSynthesis: CommonOpBuilder {
+    type Op: CommonOp;
+
+    fn synth_phased_x(&mut self, qb: Wire, angle1: Wire, angle2: Wire) -> Result<Wire, BuildError>;
+
+    fn synth_rz(&mut self, qb: Wire, angle: Wire) -> Result<Wire, BuildError>;
+
+    fn synth_try_alloc(&mut self) -> Result<Wire, BuildError>;
+
+    fn synth_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError>;
+
+    fn build_h_shared(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        let pi = pi_mul_f64(self, 1.0);
+        let pi_2 = pi_mul_f64(self, 0.5);
+        let pi_minus_2 = pi_mul_f64(self, -0.5);
+
+        let q = self.synth_phased_x(qb, pi_2, pi_minus_2)?;
+        self.synth_rz(q, pi)
+    }
+
+    fn build_x_shared(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        let pi = pi_mul_f64(self, 1.0);
+        let zero = pi_mul_f64(self, 0.0);
+        self.synth_phased_x(qb, pi, zero)
+    }
+
+    fn build_y_shared(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        let pi = pi_mul_f64(self, 1.0);
+        let pi_2 = pi_mul_f64(self, 0.5);
+        self.synth_phased_x(qb, pi, pi_2)
+    }
+
+    fn build_z_shared(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        let pi = pi_mul_f64(self, 1.0);
+        self.synth_rz(qb, pi)
+    }
+
+    fn build_s_shared(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        let pi_2 = pi_mul_f64(self, 0.5);
+        self.synth_rz(qb, pi_2)
+    }
+
+    fn build_sdg_shared(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        let pi_minus_2 = pi_mul_f64(self, -0.5);
+        self.synth_rz(qb, pi_minus_2)
+    }
+
+    fn build_v_shared(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        let pi_2 = pi_mul_f64(self, 0.5);
+        let zero = pi_mul_f64(self, 0.0);
+        self.synth_phased_x(qb, pi_2, zero)
+    }
+
+    fn build_vdg_shared(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        let pi_minus_2 = pi_mul_f64(self, -0.5);
+        let zero = pi_mul_f64(self, 0.0);
+        self.synth_phased_x(qb, pi_minus_2, zero)
+    }
+
+    fn build_t_shared(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        let pi_4 = pi_mul_f64(self, 0.25);
+        self.synth_rz(qb, pi_4)
+    }
+
+    fn build_tdg_shared(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        let pi_minus_4 = pi_mul_f64(self, -0.25);
+        self.synth_rz(qb, pi_minus_4)
+    }
+
+    fn build_rx_shared(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError> {
+        let zero = pi_mul_f64(self, 0.0);
+        self.synth_phased_x(qb, theta, zero)
+    }
+
+    fn build_ry_shared(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError> {
+        let pi_2 = pi_mul_f64(self, 0.5);
+        self.synth_phased_x(qb, theta, pi_2)
+    }
+
+    fn build_qalloc_shared(&mut self) -> Result<Wire, BuildError> {
+        let maybe_qb = self.synth_try_alloc()?;
+        let [qb] = self.build_expect_sum(1, option_type(vec![qb_t()]), maybe_qb, |_| {
+            "No more qubits available to allocate.".to_string()
+        })?;
+        Ok(qb)
+    }
+
+    fn build_measure_flip_shared(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
+        let [qb, b] = self.synth_measure_reset(qb)?;
+        let sum_b = self.add_dataflow_op(BoolOp::read, [b])?.out_wire(0);
+        let mut conditional = self.conditional_builder(
+            ([type_row![], type_row![]], sum_b),
+            [(qb_t(), qb)],
+            vec![qb_t()].into(),
+        )?;
+
+        let case0 = conditional.case_builder(0)?;
+        let [qb] = case0.input_wires_arr();
+        case0.finish_with_outputs([qb])?;
+
+        let mut case1 = conditional.case_builder(1)?;
+        let [qb] = case1.input_wires_arr();
+        let pi = pi_mul_f64(&mut case1, 1.0);
+        let zero = pi_mul_f64(&mut case1, 0.0);
+        let qb = case1.add_phased_x_with::<Self::Op>(qb, pi, zero)?;
+        case1.finish_with_outputs([qb])?;
+
+        let [qb] = conditional.finish_sub_container()?.outputs_arr();
+        Ok([qb, sum_b])
+    }
+}
 
 pub(crate) const RUNTIME_BARRIER_NAME: OpName = OpName::new_inline("RuntimeBarrier");
 

@@ -23,7 +23,7 @@ use hugr::{
     types::{Signature, TypeRow},
 };
 
-use super::common::{self, CommonOp, CommonOpBuilder, SharedOp};
+use super::common::{self, CommonOp, CommonOpBuilder, SharedOp, SharedTketOpSynthesis};
 use super::lower::pi_mul_f64;
 use super::synth_tket_op::SynthesizeTketOp;
 use derive_more::Display;
@@ -234,17 +234,17 @@ impl MakeOpDef for RuntimeBarrierDef {
 
 #[derive(Debug)]
 /// Implmements traits for lowering operations in terms of Helios primitives.
-pub(super) struct HeliosBuilder<'a, D> {
+pub(super) struct HeliosSynthesizer<'a, D> {
     inner: &'a mut D,
 }
 
-impl<'a, D> HeliosBuilder<'a, D> {
+impl<'a, D> HeliosSynthesizer<'a, D> {
     pub(super) fn new(inner: &'a mut D) -> Self {
         Self { inner }
     }
 }
 
-impl<D> Container for HeliosBuilder<'_, D>
+impl<D> Container for HeliosSynthesizer<'_, D>
 where
     D: Container,
 {
@@ -257,7 +257,7 @@ where
     }
 }
 
-impl<D> Dataflow for HeliosBuilder<'_, D>
+impl<D> Dataflow for HeliosSynthesizer<'_, D>
 where
     D: Dataflow,
 {
@@ -268,56 +268,79 @@ where
     }
 }
 
-impl<D> SynthesizeTketOp for HeliosBuilder<'_, D>
+impl<D> SharedTketOpSynthesis for HeliosSynthesizer<'_, D>
+where
+    D: DataflowHugr + CommonOpBuilder,
+{
+    type Op = HeliosOp;
+
+    fn synth_phased_x(&mut self, qb: Wire, angle1: Wire, angle2: Wire) -> Result<Wire, BuildError> {
+        SynthesizeHeliosOp::build_phased_x(self, qb, angle1, angle2)
+    }
+
+    fn synth_rz(&mut self, qb: Wire, angle: Wire) -> Result<Wire, BuildError> {
+        SynthesizeHeliosOp::build_rz(self, qb, angle)
+    }
+
+    fn synth_try_alloc(&mut self) -> Result<Wire, BuildError> {
+        SynthesizeHeliosOp::build_try_alloc(self)
+    }
+
+    fn synth_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
+        SynthesizeHeliosOp::build_measure_reset(self, qb)
+    }
+}
+
+impl<D> SynthesizeTketOp for HeliosSynthesizer<'_, D>
 where
     D: DataflowHugr + CommonOpBuilder,
 {
     fn build_h(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_h_with::<HeliosOp>(self.inner, qb)
+        self.build_h_shared(qb)
     }
 
     fn build_x(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_x_with::<HeliosOp>(self.inner, qb)
+        self.build_x_shared(qb)
     }
 
     fn build_y(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_y_with::<HeliosOp>(self.inner, qb)
+        self.build_y_shared(qb)
     }
 
     fn build_z(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_z_with::<HeliosOp>(self.inner, qb)
+        self.build_z_shared(qb)
     }
 
     fn build_s(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_s_with::<HeliosOp>(self.inner, qb)
+        self.build_s_shared(qb)
     }
 
     fn build_sdg(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_sdg_with::<HeliosOp>(self.inner, qb)
+        self.build_sdg_shared(qb)
     }
 
     fn build_v(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_v_with::<HeliosOp>(self.inner, qb)
+        self.build_v_shared(qb)
     }
 
     fn build_vdg(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_vdg_with::<HeliosOp>(self.inner, qb)
+        self.build_vdg_shared(qb)
     }
 
     fn build_t(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_t_with::<HeliosOp>(self.inner, qb)
+        self.build_t_shared(qb)
     }
 
     fn build_tdg(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_tdg_with::<HeliosOp>(self.inner, qb)
+        self.build_tdg_shared(qb)
     }
 
     fn build_measure_flip(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
-        CommonOpBuilder::build_measure_flip_with::<HeliosOp>(self.inner, qb)
+        self.build_measure_flip_shared(qb)
     }
 
     fn build_qalloc(&mut self) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_qalloc_with::<HeliosOp>(self.inner)
+        self.build_qalloc_shared()
     }
 
     fn build_cx(&mut self, c: Wire, t: Wire) -> Result<[Wire; 2], BuildError> {
@@ -357,11 +380,11 @@ where
     }
 
     fn build_rx(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_rx_with::<HeliosOp>(self.inner, qb, theta)
+        self.build_rx_shared(qb, theta)
     }
 
     fn build_ry(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_ry_with::<HeliosOp>(self.inner, qb, theta)
+        self.build_ry_shared(qb, theta)
     }
 
     fn build_rz(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError> {
@@ -458,7 +481,7 @@ pub trait SynthesizeHeliosOp: Dataflow {
     fn build_runtime_barrier(&mut self, qbs: Wire, array_size: u64) -> Result<Wire, BuildError>;
 }
 
-impl<D> SynthesizeHeliosOp for HeliosBuilder<'_, D>
+impl<D> SynthesizeHeliosOp for HeliosSynthesizer<'_, D>
 where
     D: DataflowHugr + CommonOpBuilder,
 {
@@ -547,7 +570,7 @@ mod test {
             .unwrap();
             let [qb] = func_builder.input_wires_arr();
             let [qb, lazy_b] = {
-                let mut builder = HeliosBuilder::new(&mut func_builder);
+                let mut builder = HeliosSynthesizer::new(&mut func_builder);
                 builder.build_lazy_measure_reset(qb).unwrap()
             };
             let [b] = func_builder.add_read(lazy_b, bool_t()).unwrap();
@@ -564,7 +587,7 @@ mod test {
                     .unwrap();
             let [qb] = func_builder.input_wires_arr();
             let lazy_i = {
-                let mut builder = HeliosBuilder::new(&mut func_builder);
+                let mut builder = HeliosSynthesizer::new(&mut func_builder);
                 builder.build_lazy_measure_leaked(qb).unwrap()
             };
             let [i] = func_builder.add_read(lazy_i, int_type(6)).unwrap();
@@ -583,7 +606,7 @@ mod test {
             .unwrap();
             let [q0, angle] = func_builder.input_wires_arr();
             let [q0, q1] = {
-                let mut builder = HeliosBuilder::new(&mut func_builder);
+                let mut builder = HeliosSynthesizer::new(&mut func_builder);
                 let try_q1 = builder.build_try_alloc().unwrap();
                 let [q1] = builder
                     .build_expect_sum(
@@ -601,7 +624,7 @@ mod test {
 
             let q_arr = func_builder.add_new_array(qb_t(), [q0, q1]).unwrap();
             let q_arr = {
-                let mut builder = HeliosBuilder::new(&mut func_builder);
+                let mut builder = HeliosSynthesizer::new(&mut func_builder);
                 builder.build_runtime_barrier(q_arr, 2).unwrap()
             };
             let [q0, q1] = func_builder
@@ -611,7 +634,7 @@ mod test {
                 .unwrap();
 
             let b = {
-                let mut builder = HeliosBuilder::new(&mut func_builder);
+                let mut builder = HeliosSynthesizer::new(&mut func_builder);
                 let q0 = SynthesizeHeliosOp::build_rz(&mut builder, q0, angle).unwrap();
                 let [q0, _b] = builder.build_measure_reset(q0).unwrap();
                 let b = builder.build_measure(q0).unwrap();
