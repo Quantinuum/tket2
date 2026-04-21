@@ -12,11 +12,9 @@ import numpy as np
 import numpy.typing as npt
 
 from hugr import Hugr
-from hugr.hugr.render import RenderConfig
 from guppylang.emulator import EmulatorBuilder
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
-from utility import hugr_pdf_directory
 
 
 def format_statevector(
@@ -60,9 +58,6 @@ for hugr_path in hugr_paths:
     print(f"Processing {hugr_path}...")
     hugr_bytes = hugr_path.read_bytes()
     hugr = Hugr.from_bytes(hugr_bytes)
-    hugr.render_dot(RenderConfig(display_node_id=True)).render(
-        f"{hugr_path.stem}", directory=hugr_pdf_directory, cleanup=True
-    )
 
     package = hugr.to_package()
 
@@ -81,7 +76,7 @@ for hugr_path in hugr_paths:
 
 # Save the result to a text file for easy viewing.
 if len(args) < 2:
-    result_path = result_execution_dir / "hugr_results.txt"
+    result_path = Path(__file__).resolve().parent / "hugr_results.txt"
     result_path.parent.mkdir(parents=True, exist_ok=True)
     result_path.write_text("\n-----\n".join(all_results) + "\n")
     print(f"Results saved to {result_path}")

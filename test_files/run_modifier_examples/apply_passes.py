@@ -1,25 +1,10 @@
-from pytket import Circuit, OpType
-from typing import Callable, Any
-from tket._ops import TketOp
 from tket.passes import (
-    _badger_optimise,
-    _greedy_depth_reduce,
     NormalizeGuppy,
     ModifierResolverPass,
 )
-from tket._state import CompilationState
-from tket_exts import tket_registry
 
-from tket._pattern import Rule, RuleMatcher
-import hypothesis.strategies as st
-from hypothesis.strategies._internal import SearchStrategy
-from hypothesis import given, settings
 
-from tket.passes import PytketHugrPass
-from pytket.passes import CliffordSimp, SquashRzPhasedX, SequencePass
 from hugr.build.base import Hugr
-
-import pytest
 
 
 from pathlib import Path
