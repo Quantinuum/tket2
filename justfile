@@ -95,12 +95,14 @@ recompile-test-hugrs:
 
 mod:
     @echo "---- Compiling hugrs ----"
+    uv run maturin develop --uv
     just test_files/modifier_examples/r
     just test_files/run_modifier_examples/r
 
 
 modh name:
     @echo "---- Compiling hugr {{name}} ----"
+    uv run maturin develop --uv
     just test_files/modifier_examples/rh "{{name}}.py"
     just test_files/run_modifier_examples/rh "{{name}}"
 
