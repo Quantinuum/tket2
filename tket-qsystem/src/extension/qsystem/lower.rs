@@ -179,11 +179,22 @@ pub fn lower_tk2_ops(
     Ok(replaced_nodes)
 }
 
+fn platform_str(platform: QSystemPlatform) -> &'static str {
+    match platform {
+        QSystemPlatform::Helios => "helios",
+        QSystemPlatform::Sol => "sol",
+    }
+}
+
 fn build_func(platform: QSystemPlatform, op: TketOp) -> Result<Hugr, LowerTk2Error> {
     let sig = op.into_extension_op().signature().into_owned();
     let sig = Signature::new(sig.input, sig.output); // ignore extension delta
     // TODO check generated names are namespaced enough
-    let f_name = format!("__tk2_{}", op.op_id().to_lowercase());
+    let f_name = format!(
+        "__tk2_{}_{}",
+        platform_str(platform),
+        op.op_id().to_lowercase()
+    );
     let mut f_build = FunctionBuilder::new(f_name, sig)?;
     let outputs = build_func_outputs(platform, &mut f_build, op)?;
     Ok(f_build.finish_hugr_with_outputs(outputs)?)
