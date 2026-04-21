@@ -7,6 +7,8 @@ from tket._ops import TketOp
 from tket.passes import (
     _badger_optimise,
     _greedy_depth_reduce,
+    InlineFunctions,
+    inline_funcs,
     NormalizeGuppy,
     ModifierResolverPass,
 )
@@ -280,3 +282,17 @@ def test_modifier_execution() -> None:
             computed_statevector = np.load(tmp_path)
             print(computed_statevector)
             np.testing.assert_allclose(computed_statevector, expected_statevector)
+
+
+def test_inline_functions() -> None:
+    hugr = _hugr_from_path("test_files/guppy_examples/fn_calls.hugr")
+
+    assert _count_ops(hugr, "Call") == 2
+
+    max_size = InlineFunctions(heuristic=inline_funcs.MaxSize(42))(hugr)
+
+    assert _count_ops(max_size, "Call") == 0
+
+    all = InlineFunctions(heuristic=inline_funcs.All())(hugr)
+
+    assert _count_ops(all, "Call") == 0

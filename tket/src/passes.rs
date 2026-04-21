@@ -43,6 +43,8 @@ pub use inline_dfgs::InlineDFGsPass;
 
 // Inline function calls.
 pub mod inline_funcs;
+pub use inline_funcs::InlineFunctionsPass;
+#[expect(deprecated)]
 pub use inline_funcs::inline_acyclic;
 
 // Lower and replace operations.
