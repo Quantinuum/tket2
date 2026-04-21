@@ -102,8 +102,7 @@
 use itertools::{Either, Itertools};
 use std::{
     collections::{HashMap, VecDeque},
-    fs, iter, mem,
-    path::Path,
+    iter, mem,
 };
 
 pub mod array_modify;
@@ -197,13 +196,10 @@ fn connect<N>(
     w1: &DirWire<Node>,
     w2: &DirWire<Node>,
 ) -> Result<(), ModifierResolverErrors<N>> {
-    println!("Connecting {} and {}", w1, w2);
-    println!("{} -> {}: ", w1.1.as_directed(), w2.1.as_directed());
     let (n_o, p_o, n_i, p_i) = match (w1.1.as_directed(), w2.1.as_directed()) {
         (Either::Right(p_o), Either::Left(p_i)) => (w1.0, p_o, w2.0, p_i),
         (Either::Left(p_i), Either::Right(p_o)) => (w2.0, p_o, w1.0, p_i),
         _ => {
-            // NICOLA(0) Here we fail with multiple modifier
             return Err(ModifierResolverErrors::unreachable(format!(
                 "Cannot connect the wires with the same direction: {} -> {}",
                 w1, w2
@@ -612,15 +608,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         new_dfg: &mut impl Container,
         parent: N,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        println!("\n§§§§");
-        println!("Correspondence map:");
-        for (old, new) in self.corresp_map() {
-            println!("{} -> {:?}", old, new);
-        }
-        println!("Connecting all wires for node {}", parent);
-        println!("{:?}", h.children(parent).collect_vec());
         for out_node in h.children(parent) {
-            println!(". Processing child node {}", out_node);
             for out_port in h.node_outputs(out_node) {
                 if let Some(EdgeKind::StateOrder) = h.get_optype(out_node).port_kind(out_port) {
                     // TODO: Currently, we just ignore StateOrder edges.
@@ -631,21 +619,14 @@ impl<N: HugrNode> ModifierResolver<N> {
                     // 2. Use another `HashMap` to keep track of StateOrder edges.
                     continue;
                 }
-                println!(". . Processing output port {}", out_port);
-                println!(
-                    ". . Linked inputs: {:?}",
-                    h.linked_inputs(out_node, out_port).collect_vec()
-                );
                 for (in_node, in_port) in h.linked_inputs(out_node, out_port) {
                     for w1 in self.map_get(&(in_node, in_port).into())? {
                         for w2 in self.map_get(&(out_node, out_port).into())? {
-                            // NICOLA (-1)
                             connect(new_dfg, w1, w2)?
                         }
                     }
                 }
             }
-            println!("...")
         }
         // FIXME: StateOrder is not preserved here.
         Ok(())
@@ -740,18 +721,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         new_dfg: &mut impl Dataflow,
     ) -> Result<(), ModifierResolverErrors<N>> {
         let optype = &h.get_optype(target_node).clone();
-        // println!(
-        //     "Modifying node {} with operation type {}... ",
-        //     target_node, optype
-        // );
-
-        let output = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")))
-            .join("current.mmd");
-        fs::write(output, h.mermaid_string()).unwrap();
-
-        // NICOLA Match
         match optype {
             // Skip input/output nodes: it should be handled by its parent as it sets control qubits.
             OpType::Input(_) | OpType::Output(_) => {}
@@ -769,10 +738,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             }
 
             // Function calls
-            OpType::Call(_) => {
-                println!("=======> Modifying Call node: {:?}", target_node);
-                self.modify_call(h, target_node, optype, new_dfg)?
-            }
+            OpType::Call(_) => self.modify_call(h, target_node, optype, new_dfg)?,
             OpType::CallIndirect(indir_call) => {
                 self.modify_indirect_call(h, target_node, indir_call, new_dfg)?
             }
@@ -1030,7 +996,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             );
             Ok(())
         } else if Modifier::from_optype(optype).is_some() {
-            // TODO: check if this is ok. (NICOLA)
+            // TODO: check if this is ok.
             self.forget_node(h, op_node)
         } else if self.modify_array_op(h, op_node, optype, new_dfg)?
             || self.try_array_convert(h, op_node, optype, new_dfg)?
@@ -1059,7 +1025,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             .children(n)
             .filter(|child| h.get_optype(*child).is_dataflow_block())
             .collect();
-        // this is breaking modifier applycation to branching or loops
+        // NOTE: this check prevents breaking modifier application to branching or loops
         if children.len() != 1 {
             return Err(ModifierResolverErrors::unresolvable(
                 n,
@@ -1109,10 +1075,8 @@ pub fn resolve_modifier_with_entrypoints(
 ) -> Result<(), ModifierResolverErrors<Node>> {
     use ModifierResolverErrors::*;
 
-    // Collect entry points into a deque so they can be cloned for later cleanup passes.
     let entry_points: VecDeque<_> = entry_points.into_iter().collect();
 
-    // --- Phase 1: Modifier resolution ---
     // Walk all nodes reachable from the entry points (children and neighbours)
     // and attempt to rewrite each modifier node it encounters.
     let mut resolver = ModifierResolver::new();
@@ -1137,7 +1101,6 @@ pub fn resolve_modifier_with_entrypoints(
         }
     }
 
-    // --- Phase 2: Modifier node removal ---
     // After all rewrites, some modifier nodes may still remain in the graph
     // (e.g. intermediate nodes in a chain whose last modifier was the one rewritten).
     // Walk the same reachable set again and delete any surviving modifier nodes,
@@ -1184,7 +1147,6 @@ pub fn resolve_modifier_with_entrypoints(
     //     }
     // }
 
-    // --- Phase 3: Global-phase cleanup ---
     // TODO: This as well.
     // Ad hoc cleanup procedure: remove any dangling global-phase nodes that
     // were produced or left behind by the resolution passes above.
@@ -1202,27 +1164,18 @@ pub fn resolve_modifier_with_entrypoints(
 // Definitions of helpers for tests
 #[cfg(test)]
 mod tests {
-    use std::{
-        fs,
-        io::{BufReader, BufWriter, Cursor},
-        path::Path,
-    };
 
     use cool_asserts::assert_matches;
     use hugr::{
         Hugr,
         builder::{DataflowSubContainer, HugrBuilder, ModuleBuilder},
-        extension::ExtensionRegistry,
         ops::{CallIndirect, ExtensionOp, handle::FuncID},
-        package::Package,
         std_extensions::collections::array::ArrayOpBuilder,
         types::Term,
     };
 
     use crate::{
         TketOp,
-        extension::REGISTRY,
-        extension::global_phase::GLOBAL_PHASE_EXTENSION,
         extension::modifier::{CONTROL_OP_ID, DAGGER_OP_ID, MODIFIER_EXTENSION},
         metadata,
     };
@@ -1259,9 +1212,7 @@ mod tests {
         ctrl_num: u64,
         foo: impl FnOnce(&mut ModuleBuilder<Hugr>, usize) -> FuncID<true>,
         dagger: bool,
-        name: &str,
     ) {
-        // --- Build the module ---
         let mut module = ModuleBuilder::new();
 
         // Signature used by the CallIndirect node:
@@ -1282,8 +1233,6 @@ mod tests {
                 .chain(iter::repeat_n(qb_t(), target_num))
                 .collect::<Vec<_>>(),
         );
-
-        // --- Instantiate modifier extension ops ---
 
         // Dagger modifier parameterised by the target qubit types.
         let dagger_op: ExtensionOp = {
@@ -1319,28 +1268,26 @@ mod tests {
         // Let the caller insert the function-under-test into the module.
         let foo = foo(&mut module, target_num);
 
-        // --- Build the "main" function body ---
+        // Build the "main" function body ---
         let _main = {
             let mut func = module.define_function("main", main_sig).unwrap();
-
-            // Load the function value; this is the wire that will be passed through modifiers.
             let mut call = func.load_func(&foo, &[]).unwrap();
 
-            // Optionally wrap with Dagger before Control.
             if dagger {
+                // Wrap with Dagger before Control.
                 call = func
                     .add_dataflow_op(dagger_op, vec![call])
                     .unwrap()
                     .out_wire(0);
             }
 
-            // Wrap the (possibly daggered) function reference with the Control modifier.
+            // Wrap the with the Control modifier.
             call = func
                 .add_dataflow_op(control_op, vec![call])
                 .unwrap()
                 .out_wire(0);
 
-            // Allocate ctrl_num fresh qubits to serve as control qubits.
+            // Allocate ctrl_num qubits
             let mut controls = Vec::new();
             for _ in 0..ctrl_num {
                 controls.push(
@@ -1349,8 +1296,7 @@ mod tests {
                         .out_wire(0),
                 );
             }
-
-            // Allocate target_num fresh qubits to serve as target qubits.
+            // Allocate target_num qubits
             let mut targ = Vec::new();
             for _ in 0..target_num {
                 targ.push(
@@ -1376,91 +1322,13 @@ mod tests {
             func.finish_with_outputs(fn_outs).unwrap()
         };
 
-        // --- Run the resolver and validate ---
-
+        // Run the resolver and validate
         let mut h = module.finish_hugr().unwrap();
-
-        // Dump the hugr before resolution for debugging.
-        let s = h.mermaid_string();
-        let _ = fs::write(format!("{}_before.mmd", name), &s);
         assert_matches!(h.validate(), Ok(()));
 
-        // Apply the modifier resolver starting from the module entrypoint.
         let entrypoint = h.entrypoint();
         resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
 
-        // Dump the hugr after resolution for debugging.
-        let s = h.mermaid_string();
-        let _ = fs::write(format!("{}_after.mmd", name), &s);
-
-        // The resolved hugr must still be structurally valid.
         assert_matches!(h.validate(), Ok(()));
-    }
-
-    const GUPPY_EXAMPLES_DIR: &str = "../test_files/modifier_examples";
-    const HUGR_OUTPUT_DIR: &str = "../test_files/modified_hugrs";
-
-    fn load_guppy_example(name: &str) -> std::io::Result<Hugr> {
-        let file = Path::new(GUPPY_EXAMPLES_DIR).join(format!("{name}.hugr"));
-        let reader = fs::File::open(file)?;
-        let reader = BufReader::new(reader);
-        Ok(Hugr::load(reader, None).unwrap())
-    }
-
-    fn load_guppy_examples() -> std::io::Result<Vec<(String, Hugr)>> {
-        let mut files = fs::read_dir(GUPPY_EXAMPLES_DIR)?
-            .filter_map(|entry| {
-                let path = entry.ok()?.path();
-                path.extension()
-                    .is_some_and(|ext| ext == "hugr")
-                    .then_some(path)
-            })
-            .collect::<Vec<_>>();
-        files.sort_unstable();
-
-        files
-            .into_iter()
-            .map(|file| {
-                let name = file.file_stem().unwrap().to_string_lossy().into_owned();
-                let h = load_guppy_example(&name)?;
-                Ok((name, h))
-            })
-            .collect()
-    }
-
-    /// Resolve modifiers in `h`, write the result to `HUGR_OUTPUT_DIR/{name}_solved.hugr`,
-    /// and assert that the hugr is valid both before and after resolution.
-    fn resolve_and_save(name: &str, h: &mut Hugr) {
-        use hugr::envelope::EnvelopeConfig;
-
-        assert_matches!(h.validate(), Ok(()));
-
-        let entrypoint = h.entrypoint();
-        resolve_modifier_with_entrypoints(h, [entrypoint]).unwrap();
-
-        fs::create_dir_all(HUGR_OUTPUT_DIR).unwrap();
-        let output = Path::new(HUGR_OUTPUT_DIR).join(format!("{name}_solved.hugr"));
-        let writer = fs::File::create(output).unwrap();
-        let writer = BufWriter::new(writer);
-        h.store_with_exts(writer, EnvelopeConfig::binary(), h.extensions())
-            .unwrap();
-        assert_matches!(h.validate(), Ok(()));
-    }
-
-    #[rstest::rstest]
-    #[case::call("double_modifier")]
-    //#[case::call("dagger_on_call")]
-    // #[case::call("all")]
-    // todo: this test panic, should not
-    pub fn test_saved_hugr(#[case] name: &str) {
-        if name == "all" {
-            for (name, mut h) in load_guppy_examples().unwrap() {
-                resolve_and_save(&name, &mut h);
-            }
-            return;
-        } else {
-            let mut h = load_guppy_example(name).unwrap();
-            resolve_and_save(name, &mut h);
-        }
     }
 }

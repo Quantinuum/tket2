@@ -42,7 +42,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         self.modify_dfg_children(h, parent_node, new_dfg)?;
 
         self.wire_control_to_output(h, parent_node, new_dfg)?;
-        // NICOLA(-2)
         self.connect_all(h, new_dfg, parent_node)?;
         mem::swap(self.controls(), &mut controls);
         mem::swap(self.corresp_map(), &mut corresp_map);
@@ -302,8 +301,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         func: N,
         signature: &Signature,
     ) -> Result<Option<N>, ModifierResolverErrors<N>> {
-        println!("   Modifying function {:?}", func);
-        println!("   Signature: {:?}", signature);
         let satisfies = ModifierFlags::from_metadata(h, func)
             .is_some_and(|flags| flags.satisfies(&self.modifiers));
         if !satisfies {
@@ -313,7 +310,6 @@ impl<N: HugrNode> ModifierResolver<N> {
                 return Ok(None);
             }
         }
-        // NICOLA(-4)
         Ok(Some(self.modify_fn(h, func)?))
     }
 
@@ -341,7 +337,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         )
         .unwrap();
 
-        // NICOLA(-3)
         self.modify_dfg_body(h, func, &mut new_fn)?;
 
         // Connect the global wires
@@ -812,7 +807,7 @@ mod test {
         #[case] foo: fn(&mut ModuleBuilder<Hugr>, usize) -> FuncID<true>,
         #[case] dagger: bool,
     ) {
-        test_modifier_resolver(t_num, c_num, foo, dagger, "name");
+        test_modifier_resolver(t_num, c_num, foo, dagger);
     }
 
     // This test checks the case where a modifier is not chained but duplicated.
