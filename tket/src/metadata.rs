@@ -1,4 +1,6 @@
 //! Collection of metadata keys used throughout tket.
+//
+// Changes to this file **MUST** be reflected in `tket-py/tket/metadata.py`
 
 use crate::rewrite::trace::RewriteTrace;
 use hugr_core::metadata::Metadata;
