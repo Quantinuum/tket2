@@ -457,7 +457,7 @@ fn lowerer() -> ReplaceTypes {
 
 #[cfg(test)]
 mod test {
-    use crate::extension::qsystem::{QSystemOp, QSystemOpBuilder};
+    use crate::extension::qsystem::QSystemOp;
 
     use super::*;
     use hugr::extension::prelude::{UnwrapBuilder, option_type, usize_t};
@@ -610,8 +610,8 @@ mod test {
     fn test_measure_reset() {
         let mut dfb = DFGBuilder::new(inout_sig(vec![qb_t()], vec![qb_t(), bool_type()])).unwrap();
         let [q] = dfb.input_wires_arr();
-        let output = dfb.add_measure_reset(q).unwrap();
-        let mut h = dfb.finish_hugr_with_outputs(output).unwrap();
+        let output = dfb.add_dataflow_op(QSystemOp::MeasureReset, [q]).unwrap();
+        let mut h = dfb.finish_hugr_with_outputs(output.outputs()).unwrap();
 
         let pass = ReplaceBoolPass::default();
         pass.run(&mut h).unwrap();

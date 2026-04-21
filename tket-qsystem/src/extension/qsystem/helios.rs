@@ -232,362 +232,6 @@ impl MakeOpDef for RuntimeBarrierDef {
     }
 }
 
-/// An extension trait for [Dataflow] providing methods to add
-/// "tket.qsystem.helios" operations.
-pub trait HeliosOpBuilder: CommonOpBuilder {
-    /// Add a "tket.qsystem.helios.LazyMeasure" op.
-    #[deprecated(since = "0.25.0", note = "Use the SynthesizeHeliosOp trait instead.")]
-    fn add_lazy_measure(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::add_lazy_measure_with::<HeliosOp>(self, qb)
-    }
-
-    /// Add a "tket.qsystem.helios.LazyMeasureLeaked" op.
-    #[deprecated(since = "0.25.0", note = "Use the SynthesizeHeliosOp trait instead.")]
-    fn add_lazy_measure_leaked(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::add_lazy_measure_leaked_with::<HeliosOp>(self, qb)
-    }
-
-    /// Add a "tket.qsystem.helios.LazyMeasureReset" op.
-    #[deprecated(since = "0.25.0", note = "Use the SynthesizeHeliosOp trait instead.")]
-    fn add_lazy_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
-        CommonOpBuilder::add_lazy_measure_reset_with::<HeliosOp>(self, qb)
-    }
-
-    /// Add a "tket.qsystem.helios.Measure" op.
-    #[deprecated(since = "0.25.0", note = "Use the SynthesizeHeliosOp trait instead.")]
-    fn add_measure(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::add_measure_with::<HeliosOp>(self, qb)
-    }
-
-    /// Add a "tket.qsystem.helios.Reset" op.
-    #[deprecated(since = "0.25.0", note = "Use the SynthesizeHeliosOp trait instead.")]
-    fn add_reset(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::add_reset_with::<HeliosOp>(self, qb)
-    }
-
-    /// Add a maximally entangling "tket.qsystem.ZZPhase(pi/2)" op.
-    #[expect(deprecated)]
-    fn build_zz_max(&mut self, qb1: Wire, qb2: Wire) -> Result<[Wire; 2], BuildError> {
-        let pi_2 = pi_mul_f64(self, 0.5);
-        self.add_zz_phase(qb1, qb2, pi_2)
-    }
-
-    /// Add a "tket.qsystem.helios.ZZPhase" op.
-    #[deprecated(since = "0.25.0", note = "Use the SynthesizeHeliosOp trait instead.")]
-    fn add_zz_phase(&mut self, qb1: Wire, qb2: Wire, angle: Wire) -> Result<[Wire; 2], BuildError> {
-        Ok(self
-            .add_dataflow_op(HeliosOp::ZZPhase, [qb1, qb2, angle])?
-            .outputs_arr())
-    }
-
-    /// Add a "tket.qsystem.helios.PhasedX" op.
-    #[deprecated(since = "0.25.0", note = "Use the SynthesizeHeliosOp trait instead.")]
-    fn add_phased_x(&mut self, qb: Wire, angle1: Wire, angle2: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::add_phased_x_with::<HeliosOp>(self, qb, angle1, angle2)
-    }
-
-    /// Add a "tket.qsystem.helios.Rz" op.
-    #[deprecated(since = "0.25.0", note = "Use the SynthesizeHeliosOp trait instead.")]
-    fn add_rz(&mut self, qb: Wire, angle: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::add_rz_with::<HeliosOp>(self, qb, angle)
-    }
-
-    /// Add a "tket.qsystem.helios.TryQAlloc" op.
-    #[deprecated(since = "0.25.0", note = "Use the SynthesizeHeliosOp trait instead.")]
-    fn add_try_alloc(&mut self) -> Result<Wire, BuildError> {
-        CommonOpBuilder::add_try_alloc_with::<HeliosOp>(self)
-    }
-
-    /// Add a "tket.qsystem.helios.QFree" op.
-    #[deprecated(since = "0.25.0", note = "Use the SynthesizeHeliosOp trait instead.")]
-    fn add_qfree(&mut self, qb: Wire) -> Result<(), BuildError> {
-        CommonOpBuilder::add_qfree_with::<HeliosOp>(self, qb)
-    }
-
-    /// Add a "tket.qsystem.helios.MeasureReset" op.
-    /// This operation is equivalent to a `Measure` followed by a `Reset`.
-    #[deprecated(since = "0.25.0", note = "Use the SynthesizeHeliosOp trait instead.")]
-    fn add_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
-        CommonOpBuilder::add_measure_reset_with::<HeliosOp>(self, qb)
-    }
-
-    /// Add a "tket.qsystem.helios.RuntimeBarrier" op.
-    #[deprecated(since = "0.25.0", note = "Use the SynthesizeHeliosOp trait instead.")]
-    fn add_runtime_barrier(&mut self, qbs: Wire, array_size: u64) -> Result<Wire, BuildError> {
-        CommonOpBuilder::add_runtime_barrier_with(self, &EXTENSION, qbs, array_size)
-    }
-
-    /// Build a hadamard gate in terms of QSystem primitives.
-    #[deprecated(
-        since = "0.25.0",
-        note = "Use lowering through SynthesizeTketOp instead."
-    )]
-    fn build_h(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_h_with::<HeliosOp>(self, qb)
-    }
-
-    /// Build an X gate in terms of QSystem primitives.
-    #[deprecated(
-        since = "0.25.0",
-        note = "Use lowering through SynthesizeTketOp instead."
-    )]
-    fn build_x(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_x_with::<HeliosOp>(self, qb)
-    }
-
-    /// Build a Y gate in terms of QSystem primitives.
-    #[deprecated(
-        since = "0.25.0",
-        note = "Use lowering through SynthesizeTketOp instead."
-    )]
-    fn build_y(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_y_with::<HeliosOp>(self, qb)
-    }
-
-    /// Build a Z gate in terms of QSystem primitives.
-    #[deprecated(
-        since = "0.25.0",
-        note = "Use lowering through SynthesizeTketOp instead."
-    )]
-    fn build_z(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_z_with::<HeliosOp>(self, qb)
-    }
-
-    /// Build an S gate in terms of QSystem primitives.
-    #[deprecated(
-        since = "0.25.0",
-        note = "Use lowering through SynthesizeTketOp instead."
-    )]
-    fn build_s(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_s_with::<HeliosOp>(self, qb)
-    }
-
-    /// Build an Sdg gate in terms of QSystem primitives.
-    #[deprecated(
-        since = "0.25.0",
-        note = "Use lowering through SynthesizeTketOp instead."
-    )]
-    fn build_sdg(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_sdg_with::<HeliosOp>(self, qb)
-    }
-
-    /// Build a V gate in terms of QSystem primitives.
-    #[deprecated(
-        since = "0.25.0",
-        note = "Use lowering through SynthesizeTketOp instead."
-    )]
-    fn build_v(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_v_with::<HeliosOp>(self, qb)
-    }
-
-    /// Build a Vdg gate in terms of QSystem primitives.
-    #[deprecated(
-        since = "0.25.0",
-        note = "Use lowering through SynthesizeTketOp instead."
-    )]
-    fn build_vdg(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_vdg_with::<HeliosOp>(self, qb)
-    }
-
-    /// Build a T gate in terms of QSystem primitives.
-    #[deprecated(
-        since = "0.25.0",
-        note = "Use lowering through SynthesizeTketOp instead."
-    )]
-    fn build_t(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_t_with::<HeliosOp>(self, qb)
-    }
-
-    /// Build a Tdg gate in terms of QSystem primitives.
-    #[deprecated(
-        since = "0.25.0",
-        note = "Use lowering through SynthesizeTketOp instead."
-    )]
-    fn build_tdg(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_tdg_with::<HeliosOp>(self, qb)
-    }
-
-    /// Build a CNOT gate in terms of QSystem primitives.
-    #[expect(deprecated)]
-    #[deprecated(
-        since = "0.25.0",
-        note = "Use lowering through SynthesizeTketOp instead."
-    )]
-    fn build_cx(&mut self, c: Wire, t: Wire) -> Result<[Wire; 2], BuildError> {
-        let pi = pi_mul_f64(self, 1.0);
-        let pi_2 = pi_mul_f64(self, 0.5);
-        let pi_minus_2 = pi_mul_f64(self, -0.5);
-
-        let t = self.add_phased_x(t, pi_minus_2, pi_2)?;
-        let [c, t] = self.build_zz_max(c, t)?;
-        let c = self.add_rz(c, pi_minus_2)?;
-        let t = self.add_phased_x(t, pi_2, pi)?;
-        let t = self.add_rz(t, pi_minus_2)?;
-        Ok([c, t])
-    }
-
-    /// Build a CY gate in terms of QSystem primitives.
-    #[expect(deprecated)]
-    #[deprecated(
-        since = "0.25.0",
-        note = "Use lowering through SynthesizeTketOp instead."
-    )]
-    fn build_cy(&mut self, a: Wire, b: Wire) -> Result<[Wire; 2], BuildError> {
-        let pi = pi_mul_f64(self, 1.0);
-        let pi_2 = pi_mul_f64(self, 0.5);
-        let pi_minus_2 = pi_mul_f64(self, -0.5);
-
-        let a = self.add_phased_x(a, pi, pi)?;
-        let b = self.add_phased_x(b, pi_minus_2, pi)?;
-        let [a, b] = self.build_zz_max(a, b)?;
-        let a = self.add_phased_x(a, pi, pi_2)?;
-        let b = self.add_phased_x(b, pi_minus_2, pi_minus_2)?;
-        let a = self.add_rz(a, pi_minus_2)?;
-        let b = self.add_rz(b, pi_2)?;
-        Ok([a, b])
-    }
-
-    /// Build a CZ gate in terms of QSystem primitives.
-    #[expect(deprecated)]
-    #[deprecated(
-        since = "0.25.0",
-        note = "Use lowering through SynthesizeTketOp instead."
-    )]
-    fn build_cz(&mut self, a: Wire, b: Wire) -> Result<[Wire; 2], BuildError> {
-        let pi_minus_2 = pi_mul_f64(self, -0.5);
-        let [a, b] = self.build_zz_max(a, b)?;
-        let b = self.add_rz(b, pi_minus_2)?;
-        let a = self.add_rz(a, pi_minus_2)?;
-        Ok([a, b])
-    }
-
-    /// Build a RX gate in terms of QSystem primitives.
-    #[deprecated(
-        since = "0.25.0",
-        note = "Use lowering through SynthesizeTketOp instead."
-    )]
-    fn build_rx(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_rx_with::<HeliosOp>(self, qb, theta)
-    }
-
-    /// Build a RY gate in terms of QSystem primitives.
-    #[deprecated(
-        since = "0.25.0",
-        note = "Use lowering through SynthesizeTketOp instead."
-    )]
-    fn build_ry(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_ry_with::<HeliosOp>(self, qb, theta)
-    }
-
-    /// Build a CRZ gate in terms of QSystem primitives.
-    #[deprecated(
-        since = "0.25.0",
-        note = "Use lowering through SynthesizeTketOp instead."
-    )]
-    fn build_crz(&mut self, a: Wire, b: Wire, lambda: Wire) -> Result<[Wire; 2], BuildError> {
-        let two = self.add_load_const(Value::from(ConstF64::new(2.0)));
-        let lambda_2 = self
-            .add_dataflow_op(FloatOps::fdiv, [lambda, two])?
-            .out_wire(0);
-        let lambda_minus_2 = self
-            .add_dataflow_op(FloatOps::fneg, [lambda_2])?
-            .out_wire(0);
-        #[expect(deprecated)]
-        let [a, b] = self.add_zz_phase(a, b, lambda_minus_2)?;
-        #[expect(deprecated)]
-        let b = self.add_rz(b, lambda_2)?;
-        Ok([a, b])
-    }
-
-    /// Build a Toffoli (CCX) gate in terms of QSystem primitives.
-    #[expect(deprecated)]
-    #[deprecated(
-        since = "0.25.0",
-        note = "Use lowering through SynthesizeTketOp instead."
-    )]
-    fn build_toffoli(&mut self, a: Wire, b: Wire, c: Wire) -> Result<[Wire; 3], BuildError> {
-        let pi = pi_mul_f64(self, 1.0);
-        let pi_2 = pi_mul_f64(self, 0.5);
-        let pi_minus_2 = pi_mul_f64(self, -0.5);
-        let pi_4 = pi_mul_f64(self, 0.25);
-        let pi_minus_4 = pi_mul_f64(self, -0.25);
-        let pi_minus_3_4 = pi_mul_f64(self, -0.75);
-        let zero = pi_mul_f64(self, 0.0);
-
-        let c = self.add_phased_x(c, pi, pi_minus_2)?;
-        let [b, c] = self.build_zz_max(b, c)?;
-        let c = self.add_phased_x(c, pi_4, pi_2)?;
-        let [a, c] = self.build_zz_max(a, c)?;
-        let c = self.add_phased_x(c, pi_4, zero)?;
-        let [b, c] = self.build_zz_max(b, c)?;
-        let c = self.add_phased_x(c, pi_4, pi_minus_2)?;
-        let [a, c] = self.build_zz_max(a, c)?;
-        let a = self.add_phased_x(a, pi, pi_4)?;
-        let c = self.add_phased_x(c, pi_minus_3_4, pi)?;
-        let [a, b] = self.add_zz_phase(a, b, pi_4)?;
-        let c = self.add_rz(c, pi)?;
-        let a = self.add_phased_x(a, pi, pi_minus_4)?;
-        let b = self.add_rz(b, pi_minus_3_4)?;
-        let a = self.add_rz(a, pi_4)?;
-
-        Ok([a, b, c])
-    }
-
-    /// Build a projective measurement with a conditional flip.
-    #[deprecated(
-        since = "0.25.0",
-        note = "Use lowering through SynthesizeTketOp instead."
-    )]
-    fn build_measure_flip(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
-        CommonOpBuilder::build_measure_flip_with::<HeliosOp>(self, qb)
-    }
-
-    /// Build a qalloc operation that panics on failure.
-    #[deprecated(
-        since = "0.25.0",
-        note = "Use lowering through SynthesizeTketOp instead."
-    )]
-    fn build_qalloc(&mut self) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_qalloc_with::<HeliosOp>(self)
-    }
-
-    /// Build an array from qubit wires, apply a barrier, and unwrap the array afterwards.
-    fn build_wrapped_barrier(
-        &mut self,
-        qbs: impl IntoIterator<Item = Wire>,
-    ) -> Result<Vec<Wire>, BuildError>
-    where
-        Self: Sized,
-    {
-        CommonOpBuilder::build_wrapped_barrier_with(self, &EXTENSION, qbs)
-    }
-
-    /// Build a "tket.qsystem.sol.PhasedXX" op in terms of Helios primitives.
-    fn build_phased_xx(
-        &mut self,
-        _qb1: Wire,
-        _qb2: Wire,
-        _angle1: Wire,
-        _angle2: Wire,
-    ) -> Result<[Wire; 2], BuildError> {
-        unimplemented!("PhasedXX lowering for Helios is not yet implemented")
-    }
-
-    /// Build a "tket.qsystem.sol.Tk2" op in terms of Helios primitives.
-    fn build_tk2(
-        &mut self,
-        _qb1: Wire,
-        _qb2: Wire,
-        _angle1: Wire,
-        _angle2: Wire,
-        _angle3: Wire,
-    ) -> Result<[Wire; 2], BuildError> {
-        unimplemented!("Tk2 lowering for Helios is not yet implemented")
-    }
-}
-
-impl<D: Dataflow> HeliosOpBuilder for D {}
-
 #[derive(Debug)]
 /// Implmements traits for lowering operations in terms of Helios primitives.
 pub(super) struct HeliosBuilder<D> {
@@ -635,40 +279,150 @@ where
     }
 }
 
-#[expect(deprecated)]
 impl<D> SynthesizeTketOp for HeliosBuilder<D>
 where
-    D: DataflowHugr + HeliosOpBuilder,
+    D: DataflowHugr + CommonOpBuilder,
 {
-    delegate! {
-        to self.inner {
-            fn build_h(&mut self, qb: Wire) -> Result<Wire, BuildError>;
-            fn build_x(&mut self, qb: Wire) -> Result<Wire, BuildError>;
-            fn build_y(&mut self, qb: Wire) -> Result<Wire, BuildError>;
-            fn build_z(&mut self, qb: Wire) -> Result<Wire, BuildError>;
-            fn build_s(&mut self, qb: Wire) -> Result<Wire, BuildError>;
-            fn build_sdg(&mut self, qb: Wire) -> Result<Wire, BuildError>;
-            fn build_v(&mut self, qb: Wire) -> Result<Wire, BuildError>;
-            fn build_vdg(&mut self, qb: Wire) -> Result<Wire, BuildError>;
-            fn build_t(&mut self, qb: Wire) -> Result<Wire, BuildError>;
-            fn build_tdg(&mut self, qb: Wire) -> Result<Wire, BuildError>;
-            fn build_measure_flip(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError>;
-            fn build_qalloc(&mut self) -> Result<Wire, BuildError>;
-            fn build_cx(&mut self, c: Wire, t: Wire) -> Result<[Wire; 2], BuildError>;
-            fn build_cy(&mut self, c: Wire, t: Wire) -> Result<[Wire; 2], BuildError>;
-            fn build_cz(&mut self, c: Wire, t: Wire) -> Result<[Wire; 2], BuildError>;
-            fn build_rx(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError>;
-            fn build_ry(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError>;
-            #[call(add_rz)]
-            fn build_rz(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError>;
-            fn build_crz(&mut self, c: Wire, t: Wire, theta: Wire) -> Result<[Wire; 2], BuildError>;
-            fn build_toffoli(&mut self, a: Wire, b: Wire, c: Wire) -> Result<[Wire; 3], BuildError>;
-        }
+    fn build_h(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::build_h_with::<HeliosOp>(&mut self.inner, qb)
+    }
+
+    fn build_x(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::build_x_with::<HeliosOp>(&mut self.inner, qb)
+    }
+
+    fn build_y(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::build_y_with::<HeliosOp>(&mut self.inner, qb)
+    }
+
+    fn build_z(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::build_z_with::<HeliosOp>(&mut self.inner, qb)
+    }
+
+    fn build_s(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::build_s_with::<HeliosOp>(&mut self.inner, qb)
+    }
+
+    fn build_sdg(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::build_sdg_with::<HeliosOp>(&mut self.inner, qb)
+    }
+
+    fn build_v(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::build_v_with::<HeliosOp>(&mut self.inner, qb)
+    }
+
+    fn build_vdg(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::build_vdg_with::<HeliosOp>(&mut self.inner, qb)
+    }
+
+    fn build_t(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::build_t_with::<HeliosOp>(&mut self.inner, qb)
+    }
+
+    fn build_tdg(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::build_tdg_with::<HeliosOp>(&mut self.inner, qb)
+    }
+
+    fn build_measure_flip(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
+        CommonOpBuilder::build_measure_flip_with::<HeliosOp>(&mut self.inner, qb)
+    }
+
+    fn build_qalloc(&mut self) -> Result<Wire, BuildError> {
+        CommonOpBuilder::build_qalloc_with::<HeliosOp>(&mut self.inner)
+    }
+
+    fn build_cx(&mut self, c: Wire, t: Wire) -> Result<[Wire; 2], BuildError> {
+        let pi = pi_mul_f64(self, 1.0);
+        let pi_2 = pi_mul_f64(self, 0.5);
+        let pi_minus_2 = pi_mul_f64(self, -0.5);
+
+        let t = self.build_phased_x(t, pi_minus_2, pi_2)?;
+        let [c, t] = self.build_zz_max(c, t)?;
+        let c = SynthesizeHeliosOp::build_rz(self, c, pi_minus_2)?;
+        let t = self.build_phased_x(t, pi_2, pi)?;
+        let t = SynthesizeHeliosOp::build_rz(self, t, pi_minus_2)?;
+        Ok([c, t])
+    }
+
+    fn build_cy(&mut self, a: Wire, b: Wire) -> Result<[Wire; 2], BuildError> {
+        let pi = pi_mul_f64(self, 1.0);
+        let pi_2 = pi_mul_f64(self, 0.5);
+        let pi_minus_2 = pi_mul_f64(self, -0.5);
+
+        let a = self.build_phased_x(a, pi, pi)?;
+        let b = self.build_phased_x(b, pi_minus_2, pi)?;
+        let [a, b] = self.build_zz_max(a, b)?;
+        let a = self.build_phased_x(a, pi, pi_2)?;
+        let b = self.build_phased_x(b, pi_minus_2, pi_minus_2)?;
+        let a = SynthesizeHeliosOp::build_rz(self, a, pi_minus_2)?;
+        let b = SynthesizeHeliosOp::build_rz(self, b, pi_2)?;
+        Ok([a, b])
+    }
+
+    fn build_cz(&mut self, a: Wire, b: Wire) -> Result<[Wire; 2], BuildError> {
+        let pi_minus_2 = pi_mul_f64(self, -0.5);
+        let [a, b] = self.build_zz_max(a, b)?;
+        let b = SynthesizeHeliosOp::build_rz(self, b, pi_minus_2)?;
+        let a = SynthesizeHeliosOp::build_rz(self, a, pi_minus_2)?;
+        Ok([a, b])
+    }
+
+    fn build_rx(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::build_rx_with::<HeliosOp>(&mut self.inner, qb, theta)
+    }
+
+    fn build_ry(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::build_ry_with::<HeliosOp>(&mut self.inner, qb, theta)
+    }
+
+    fn build_rz(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError> {
+        SynthesizeHeliosOp::build_rz(self, qb, theta)
+    }
+
+    fn build_crz(&mut self, a: Wire, b: Wire, lambda: Wire) -> Result<[Wire; 2], BuildError> {
+        let two = self.add_load_const(Value::from(ConstF64::new(2.0)));
+        let lambda_2 = self
+            .add_dataflow_op(FloatOps::fdiv, [lambda, two])?
+            .out_wire(0);
+        let lambda_minus_2 = self
+            .add_dataflow_op(FloatOps::fneg, [lambda_2])?
+            .out_wire(0);
+
+        let [a, b] = self.build_zz_phase(a, b, lambda_minus_2)?;
+        let b = SynthesizeHeliosOp::build_rz(self, b, lambda_2)?;
+        Ok([a, b])
+    }
+
+    fn build_toffoli(&mut self, a: Wire, b: Wire, c: Wire) -> Result<[Wire; 3], BuildError> {
+        let pi = pi_mul_f64(self, 1.0);
+        let pi_2 = pi_mul_f64(self, 0.5);
+        let pi_minus_2 = pi_mul_f64(self, -0.5);
+        let pi_4 = pi_mul_f64(self, 0.25);
+        let pi_minus_4 = pi_mul_f64(self, -0.25);
+        let pi_minus_3_4 = pi_mul_f64(self, -0.75);
+        let zero = pi_mul_f64(self, 0.0);
+
+        let c = self.build_phased_x(c, pi, pi_minus_2)?;
+        let [b, c] = self.build_zz_max(b, c)?;
+        let c = self.build_phased_x(c, pi_4, pi_2)?;
+        let [a, c] = self.build_zz_max(a, c)?;
+        let c = self.build_phased_x(c, pi_4, zero)?;
+        let [b, c] = self.build_zz_max(b, c)?;
+        let c = self.build_phased_x(c, pi_4, pi_minus_2)?;
+        let [a, c] = self.build_zz_max(a, c)?;
+        let a = self.build_phased_x(a, pi, pi_4)?;
+        let c = self.build_phased_x(c, pi_minus_3_4, pi)?;
+        let [a, b] = self.build_zz_phase(a, b, pi_4)?;
+        let c = SynthesizeHeliosOp::build_rz(self, c, pi)?;
+        let a = self.build_phased_x(a, pi, pi_minus_4)?;
+        let b = SynthesizeHeliosOp::build_rz(self, b, pi_minus_3_4)?;
+        let a = SynthesizeHeliosOp::build_rz(self, a, pi_4)?;
+        Ok([a, b, c])
     }
 }
 
 /// Builder trait for lowering `HeliosOp`s into a target operation set.
-pub(crate) trait SynthesizeHeliosOp: Dataflow {
+pub trait SynthesizeHeliosOp: Dataflow {
     /// Build a "tket.qsystem.helios.LazyMeasure" op.
     fn build_lazy_measure(&mut self, qb: Wire) -> Result<Wire, BuildError>;
 
@@ -692,6 +446,7 @@ pub(crate) trait SynthesizeHeliosOp: Dataflow {
         angle: Wire,
     ) -> Result<[Wire; 2], BuildError>;
 
+    /// Build a "tket.qsystem.helios.ZZPhase" op with the maximum angle of pi/2.
     fn build_zz_max(&mut self, qb1: Wire, qb2: Wire) -> Result<[Wire; 2], BuildError> {
         let pi_2 = pi_mul_f64(self, 0.5);
         self.build_zz_phase(qb1, qb2, pi_2)
@@ -714,51 +469,76 @@ pub(crate) trait SynthesizeHeliosOp: Dataflow {
     fn build_runtime_barrier(&mut self, qbs: Wire, array_size: u64) -> Result<Wire, BuildError>;
 }
 
-#[expect(deprecated)]
 impl<D> SynthesizeHeliosOp for HeliosBuilder<D>
 where
-    D: DataflowHugr + HeliosOpBuilder,
+    D: DataflowHugr + CommonOpBuilder,
 {
-    delegate! {
-        to self.inner {
-            #[call(add_lazy_measure)]
-            fn build_lazy_measure(&mut self, qb: Wire) -> Result<Wire, BuildError>;
-            #[call(add_lazy_measure_leaked)]
-            fn build_lazy_measure_leaked(&mut self, qb: Wire) -> Result<Wire, BuildError>;
-            #[call(add_lazy_measure_reset)]
-            fn build_lazy_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError>;
-            #[call(add_measure)]
-            fn build_measure(&mut self, qb: Wire) -> Result<Wire, BuildError>;
-            #[call(add_reset)]
-            fn build_reset(&mut self, qb: Wire) -> Result<Wire, BuildError>;
-            #[call(add_zz_phase)]
-            fn build_zz_phase(
-                &mut self,
-                qb1: Wire,
-                qb2: Wire,
-                angle: Wire,
-            ) -> Result<[Wire; 2], BuildError>;
-            #[call(add_phased_x)]
-            fn build_phased_x(&mut self, qb: Wire, angle1: Wire, angle2: Wire) -> Result<Wire, BuildError>;
-            #[call(add_rz)]
-            fn build_rz(&mut self, qb: Wire, angle: Wire) -> Result<Wire, BuildError>;
-            #[call(add_try_alloc)]
-            fn build_try_alloc(&mut self) -> Result<Wire, BuildError>;
-            #[call(add_qfree)]
-            fn build_qfree(&mut self, qb: Wire) -> Result<(), BuildError>;
-            #[call(add_measure_reset)]
-            fn build_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError>;
-            #[call(add_runtime_barrier)]
-            fn build_runtime_barrier(&mut self, qbs: Wire, array_size: u64) -> Result<Wire, BuildError>;
-        }
+    fn build_lazy_measure(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::add_lazy_measure_with::<HeliosOp>(&mut self.inner, qb)
+    }
+
+    fn build_lazy_measure_leaked(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::add_lazy_measure_leaked_with::<HeliosOp>(&mut self.inner, qb)
+    }
+
+    fn build_lazy_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
+        CommonOpBuilder::add_lazy_measure_reset_with::<HeliosOp>(&mut self.inner, qb)
+    }
+
+    fn build_measure(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::add_measure_with::<HeliosOp>(&mut self.inner, qb)
+    }
+
+    fn build_reset(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::add_reset_with::<HeliosOp>(&mut self.inner, qb)
+    }
+
+    fn build_zz_phase(
+        &mut self,
+        qb1: Wire,
+        qb2: Wire,
+        angle: Wire,
+    ) -> Result<[Wire; 2], BuildError> {
+        Ok(self
+            .inner
+            .add_dataflow_op(HeliosOp::ZZPhase, [qb1, qb2, angle])?
+            .outputs_arr())
+    }
+
+    fn build_phased_x(&mut self, qb: Wire, angle1: Wire, angle2: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::add_phased_x_with::<HeliosOp>(&mut self.inner, qb, angle1, angle2)
+    }
+
+    fn build_rz(&mut self, qb: Wire, angle: Wire) -> Result<Wire, BuildError> {
+        CommonOpBuilder::add_rz_with::<HeliosOp>(&mut self.inner, qb, angle)
+    }
+
+    fn build_try_alloc(&mut self) -> Result<Wire, BuildError> {
+        CommonOpBuilder::add_try_alloc_with::<HeliosOp>(&mut self.inner)
+    }
+
+    fn build_qfree(&mut self, qb: Wire) -> Result<(), BuildError> {
+        CommonOpBuilder::add_qfree_with::<HeliosOp>(&mut self.inner, qb)
+    }
+
+    fn build_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
+        CommonOpBuilder::add_measure_reset_with::<HeliosOp>(&mut self.inner, qb)
+    }
+
+    fn build_runtime_barrier(&mut self, qbs: Wire, array_size: u64) -> Result<Wire, BuildError> {
+        CommonOpBuilder::add_runtime_barrier_with(&mut self.inner, &EXTENSION, qbs, array_size)
     }
 }
 #[cfg(test)]
 mod test {
+    use crate::extension::futures::FutureOpBuilder;
     use crate::extension::qsystem::common::test_utils;
 
     use hugr::HugrView;
     use hugr::builder::{DataflowHugr, FunctionBuilder};
+    use hugr::extension::prelude::{UnwrapBuilder, bool_t};
+    use hugr::std_extensions::arithmetic::int_types::int_type;
+    use hugr::std_extensions::collections::array::ArrayOpBuilder;
     use tket::extension::bool::bool_type;
 
     use super::*;
@@ -770,47 +550,83 @@ mod test {
 
     #[test]
     fn lazy_circuit() {
-        test_utils::assert_lazy_circuit(|builder, qb| builder.add_lazy_measure_reset(qb));
+        let hugr = {
+            let mut builder = HeliosBuilder::new(
+                FunctionBuilder::new(
+                    "circuit",
+                    Signature::new(vec![qb_t()], vec![qb_t(), bool_t()]),
+                )
+                .unwrap(),
+            );
+            let [qb] = builder.input_wires_arr();
+            let [qb, lazy_b] = builder.build_lazy_measure_reset(qb).unwrap();
+            let [b] = builder.add_read(lazy_b, bool_t()).unwrap();
+            builder.finish_hugr_with_outputs([qb, b]).unwrap()
+        };
+        hugr.validate().unwrap();
     }
 
     #[test]
     fn leaked() {
-        test_utils::assert_leaked_measurement(|builder, qb| builder.add_lazy_measure_leaked(qb));
+        let hugr = {
+            let mut builder = HeliosBuilder::new(
+                FunctionBuilder::new("leaked", Signature::new(vec![qb_t()], vec![int_type(6)]))
+                    .unwrap(),
+            );
+            let [qb] = builder.input_wires_arr();
+            let lazy_i = builder.build_lazy_measure_leaked(qb).unwrap();
+            let [i] = builder.add_read(lazy_i, int_type(6)).unwrap();
+            builder.finish_hugr_with_outputs([i]).unwrap()
+        };
+        hugr.validate().unwrap();
     }
 
     #[test]
     fn all_ops() {
         let hugr = {
-            let mut func_builder = FunctionBuilder::new(
-                "all_ops",
-                Signature::new(vec![qb_t(), float64_type()], vec![bool_type()]),
-            )
-            .unwrap();
-            let [q0, angle] = func_builder.input_wires_arr();
-            let q1 = CommonOpBuilder::build_qalloc_with::<HeliosOp>(&mut func_builder).unwrap();
-            let q0 = func_builder.add_reset(q0).unwrap();
-            let q1 = func_builder.add_phased_x(q1, angle, angle).unwrap();
-            let [q0, q1] = func_builder.build_zz_max(q0, q1).unwrap();
-            let [q0, q1] = func_builder.add_zz_phase(q0, q1, angle).unwrap();
+            let mut builder = HeliosBuilder::new(
+                FunctionBuilder::new(
+                    "all_ops",
+                    Signature::new(vec![qb_t(), float64_type()], vec![bool_type()]),
+                )
+                .unwrap(),
+            );
+            let [q0, angle] = builder.input_wires_arr();
+            let try_q1 = builder.build_try_alloc().unwrap();
+            let [q1] = builder
+                .build_expect_sum(
+                    1,
+                    hugr::extension::prelude::option_type(vec![qb_t()]),
+                    try_q1,
+                    |_| "No more qubits available to allocate.".to_string(),
+                )
+                .unwrap();
+            let q0 = builder.build_reset(q0).unwrap();
+            let q1 = builder.build_phased_x(q1, angle, angle).unwrap();
+            let [q0, q1] = builder.build_zz_max(q0, q1).unwrap();
+            let [q0, q1] = builder.build_zz_phase(q0, q1, angle).unwrap();
 
-            let [q0, q1] = func_builder
-                .build_wrapped_barrier([q0, q1])
+            let q_arr = builder.inner.add_new_array(qb_t(), [q0, q1]).unwrap();
+            let q_arr = builder.build_runtime_barrier(q_arr, 2).unwrap();
+            let [q0, q1] = builder
+                .inner
+                .add_array_unpack(qb_t(), 2, q_arr)
                 .unwrap()
                 .try_into()
                 .unwrap();
 
-            let q0 = func_builder.add_rz(q0, angle).unwrap();
-            let [q0, _b] = func_builder.add_measure_reset(q0).unwrap();
-            let b = func_builder.add_measure(q0).unwrap();
-            func_builder.add_qfree(q1).unwrap();
+            let q0 = SynthesizeHeliosOp::build_rz(&mut builder, q0, angle).unwrap();
+            let [q0, _b] = builder.build_measure_reset(q0).unwrap();
+            let b = builder.build_measure(q0).unwrap();
+            builder.build_qfree(q1).unwrap();
 
-            func_builder.finish_hugr_with_outputs([b]).unwrap()
+            builder.finish_hugr_with_outputs([b]).unwrap()
         };
         hugr.validate().unwrap()
     }
 
     #[test]
     fn test_cast() {
-        test_utils::assert_cast_roundtrip::<HeliosOp>();
+        crate::extension::qsystem::common::test_utils::assert_cast_roundtrip::<HeliosOp>();
     }
 }

@@ -70,9 +70,3 @@ pub use helios::RUNTIME_BARRIER_NAME;
 
 #[deprecated(since = "0.25.0", note = "Use helios::RuntimeBarrierDef instead.")]
 pub use helios::RuntimeBarrierDef;
-
-#[deprecated(
-    since = "0.25.0",
-    note = "Use helios::HeliosOpBuilder instead of QSystemOpBuilder for Helios-specific operations"
-)]
-pub use helios::HeliosOpBuilder as QSystemOpBuilder;
