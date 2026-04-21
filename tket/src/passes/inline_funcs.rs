@@ -1,16 +1,137 @@
 //! Contains a pass to inline calls to selected functions in a Hugr.
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
+use hugr::HugrView;
 use itertools::Itertools;
 use petgraph::algo::tarjan_scc;
 
 use hugr_core::hugr::{hugrmut::HugrMut, patch::inline_call::InlineCall};
 use hugr_core::module_graph::{ModuleGraph, StaticNode};
 
+use crate::passes::{ComposablePass, PassScope, WithScope};
+
 /// Error raised by [inline_acyclic]
 #[derive(Clone, Debug, thiserror::Error, PartialEq)]
 #[non_exhaustive]
 pub enum InlineFuncsError {}
+
+/// Heuristic for deciding which functions to inline.
+///
+/// Note that recursive functions are never inlined.
+#[derive(Clone, Debug)]
+#[non_exhaustive]
+pub enum InlineFuncsHeuristic {
+    /// Inline functions that contain at most the specified number of children
+    /// nodes.
+    MaxSize(usize),
+    /// Inline all non-recursive functions.
+    All,
+    // TODO: Heuristic based on function signature. <https://github.com/Quantinuum/tket2/issues/1003>
+}
+
+impl InlineFuncsHeuristic {
+    /// Returns `True` if the function definition should be inlined.
+    fn should_inline<H: HugrView>(&self, func: H::Node, hugr: &H) -> bool {
+        match self {
+            InlineFuncsHeuristic::MaxSize(size) => hugr.descendants(func).count() <= *size,
+            InlineFuncsHeuristic::All => true,
+        }
+    }
+}
+
+impl Default for InlineFuncsHeuristic {
+    fn default() -> Self {
+        Self::MaxSize(64)
+    }
+}
+
+/// Inlines non-recursive function calls.
+///
+/// We use a heuristic to determine which functions to inline. Currently, we
+/// inline all functions whose number of descendant nodes is at most
+/// `max_inline_size` (defaults to 64).
+#[derive(Debug, Clone)]
+pub struct InlineFunctionsPass {
+    /// Heuristic for deciding which functions to inline.
+    heuristic: InlineFuncsHeuristic,
+    /// Whether to follow compiler hints for inlining functions.
+    //
+    // Note that the inline hint metadata has not been defined yet, so this is currently unused.
+    // TODO: <https://github.com/Quantinuum/hugr/issues/2328>
+    follow_inline_hints: bool,
+
+    scope: PassScope,
+}
+
+impl Default for InlineFunctionsPass {
+    fn default() -> Self {
+        Self {
+            heuristic: InlineFuncsHeuristic::default(),
+            follow_inline_hints: true,
+            scope: Default::default(),
+        }
+    }
+}
+
+impl InlineFunctionsPass {
+    /// Sets the heuristic for deciding which functions to inline.
+    pub fn with_heuristic(mut self, heuristic: InlineFuncsHeuristic) -> Self {
+        self.heuristic = heuristic;
+        self
+    }
+
+    /// Sets whether to follow compiler hints for inlining functions.
+    pub fn follow_inline_hints(mut self, follow_inline_hints: bool) -> Self {
+        self.follow_inline_hints = follow_inline_hints;
+        self
+    }
+}
+
+impl<H: HugrMut> ComposablePass<H> for InlineFunctionsPass {
+    type Error = InlineFuncsError;
+    type Result = ();
+
+    fn run(&self, h: &mut H) -> Result<(), Self::Error> {
+        let mut should_inline_cache: HashMap<H::Node, bool> = HashMap::new();
+        inline_acyclic_scoped(h, self.scope.clone(), |h, call| {
+            let Some(func) = h.static_source(call) else {
+                return false;
+            };
+            *should_inline_cache
+                .entry(func)
+                .or_insert_with(|| self.heuristic.should_inline(func, h))
+        })
+    }
+}
+
+impl WithScope for InlineFunctionsPass {
+    fn with_scope(mut self, scope: impl Into<PassScope>) -> Self {
+        self.scope = scope.into();
+        self
+    }
+}
+
+/// Inline (a subset of) [Call]s whose target [FuncDefn]s are not in cycles of the call
+/// graph.
+///
+/// Processes any call nodes that are descendants of the entrypoint.
+///
+/// The function `call_predicate` is passed each such [Call] node and can return
+/// `false` to prevent that Call from being inlined. (Note the [Call] may be created as
+/// a result of previous inlinings so may not have existed in the original Hugr).
+///
+/// [Call]: hugr_core::ops::Call
+/// [FuncDefn]: hugr_core::ops::FuncDefn
+#[deprecated(
+    since = "0.18.1",
+    note = "Use `inline_acyclic_scoped` with an appropriate `PassScope` instead. For module hugrs, use `PassScope::Global(Preserve::Entrypoint)`."
+)]
+pub fn inline_acyclic<H: HugrMut>(
+    h: &mut H,
+    call_predicate: impl FnMut(&H, H::Node) -> bool,
+) -> Result<(), InlineFuncsError> {
+    inline_acyclic_scoped(h, PassScope::EntrypointRecursive, call_predicate)
+}
 
 /// Inline (a subset of) [Call]s whose target [FuncDefn]s are not in cycles of the call
 /// graph.
@@ -21,10 +142,16 @@ pub enum InlineFuncsError {}
 ///
 /// [Call]: hugr_core::ops::Call
 /// [FuncDefn]: hugr_core::ops::FuncDefn
-pub fn inline_acyclic<H: HugrMut>(
+pub fn inline_acyclic_scoped<H: HugrMut>(
     h: &mut H,
-    call_predicate: impl Fn(&H, H::Node) -> bool,
+    scope: impl Into<PassScope>,
+    mut call_predicate: impl FnMut(&H, H::Node) -> bool,
 ) -> Result<(), InlineFuncsError> {
+    let scope: PassScope = scope.into();
+    let Some(scope_root) = scope.root(h) else {
+        return Ok(());
+    };
+
     let cg = ModuleGraph::new(&*h);
     let g = cg.graph();
     let all_funcs_in_cycles = tarjan_scc(g)
@@ -47,7 +174,8 @@ pub fn inline_acyclic<H: HugrMut>(
         .children(h.module_root())
         .filter(|n| h.get_optype(*n).is_func_defn() && !all_funcs_in_cycles.contains(n))
         .collect();
-    let mut q = VecDeque::from([h.entrypoint()]);
+
+    let mut q = VecDeque::from([scope_root]);
     while let Some(n) = q.pop_front() {
         if h.get_optype(n).is_call()
             && let Some(t) = h.static_source(n)
@@ -58,7 +186,9 @@ pub fn inline_acyclic<H: HugrMut>(
             h.apply_patch(InlineCall::new(n)).unwrap();
         }
         // Traverse children - including any resulting from turning Call into DFG
-        q.extend(h.children(n));
+        if scope.recursive() {
+            q.extend(h.children(n));
+        }
     }
     Ok(())
 }
@@ -77,7 +207,10 @@ mod test {
     use hugr_core::ops::OpType;
     use hugr_core::{Hugr, extension::prelude::qb_t, types::Signature};
 
-    use super::inline_acyclic;
+    use super::{InlineFunctionsPass, inline_acyclic_scoped};
+    use crate::passes::composable::test::run_validating;
+    use crate::passes::inline_funcs::InlineFuncsHeuristic;
+    use crate::passes::{PassScope, composable::Preserve};
 
     ///          /->-\
     /// main -> f     g -> b -> c
@@ -147,12 +280,16 @@ mod test {
             .into_iter()
             .map(|name| find_func(&h, name))
             .collect::<HashSet<_>>();
-        inline_acyclic(&mut h, |h, call| {
-            let tgt = h.static_source(call).unwrap();
-            // Check the callback is never asked about an impossible inlining
-            assert!(["a", "b", "c"].contains(&func_name(h, tgt).as_str()));
-            target_funcs.contains(&tgt)
-        })
+        inline_acyclic_scoped(
+            &mut h,
+            PassScope::Global(Preserve::Entrypoint),
+            |h, call| {
+                let tgt = h.static_source(call).unwrap();
+                // Check the callback is never asked about an impossible inlining
+                assert!(["a", "b", "c"].contains(&func_name(h, tgt).as_str()));
+                target_funcs.contains(&tgt)
+            },
+        )
         .unwrap();
         let cg = ModuleGraph::new(&h);
         for fname in check_not_called {
@@ -187,17 +324,21 @@ mod test {
         let mut h = make_test_hugr();
         let [g, b, c] = ["g", "b", "c"].map(|n| find_func(&h, n));
         // Inline calls contained within `g`
-        inline_acyclic(&mut h, |h, mut call| {
-            loop {
-                if call == g {
-                    return true;
-                };
-                let Some(parent) = h.get_parent(call) else {
-                    return false;
-                };
-                call = parent;
-            }
-        })
+        inline_acyclic_scoped(
+            &mut h,
+            PassScope::Global(Preserve::Entrypoint),
+            |h, mut call| {
+                loop {
+                    if call == g {
+                        return true;
+                    };
+                    let Some(parent) = h.get_parent(call) else {
+                        return false;
+                    };
+                    call = parent;
+                }
+            },
+        )
         .unwrap();
         let cg = ModuleGraph::new(&h);
         // b and then c should have been inlined into g, leaving only cyclic call to f
@@ -219,5 +360,31 @@ mod test {
             OpType::FuncDefn(fd) => fd.func_name(),
             _ => panic!(),
         }
+    }
+
+    #[rstest]
+    #[case::size_zero(InlineFuncsHeuristic::MaxSize(0), vec!["f", "b"])]
+    #[case::size_unlimited(InlineFuncsHeuristic::MaxSize(usize::MAX), vec!["f"])]
+    #[case::all(InlineFuncsHeuristic::All, vec!["f"])]
+    fn inline_functions_pass_respects_max_inline_size(
+        #[case] heuristic: InlineFuncsHeuristic,
+        #[case] g_targets: Vec<&'static str>,
+    ) {
+        let mut h = make_test_hugr();
+        run_validating(
+            InlineFunctionsPass::default().with_heuristic(heuristic),
+            &mut h,
+        )
+        .unwrap();
+
+        let cg = ModuleGraph::new(&h);
+        let g = find_func(&h, "g");
+        assert_eq!(
+            outgoing_calls(&cg, g)
+                .into_iter()
+                .map(|n| func_name(&h, n).as_str())
+                .collect::<HashSet<_>>(),
+            HashSet::from_iter(g_targets),
+        );
     }
 }
