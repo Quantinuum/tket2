@@ -87,7 +87,11 @@ impl WrappedBarrierBuilder {
         .unwrap();
         let mangle_args: &[TypeArg] = &[TypeArg::BoundedNat(size as u64)];
         self.func_map.insert_with(&op, mangle_args, |func_b| {
-            CommonOpBuilder::build_wrapped_barrier_with(func_b, &HELIOS_EXTENSION, func_b.input_wires())
+            CommonOpBuilder::build_wrapped_barrier_with(
+                func_b,
+                &HELIOS_EXTENSION,
+                func_b.input_wires(),
+            )
         })?;
         Ok(builder.add_dataflow_op(op, qubit_wires)?.outputs())
     }

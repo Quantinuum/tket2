@@ -1,10 +1,10 @@
 use hugr::{
     Wire,
-    builder::{BuildError, DataflowHugr},
+    builder::{BuildError, Dataflow},
 };
 
 /// Builder trait for lowering `TketOp`s into a target operation set.
-pub(super) trait SynthesizeTketOp: DataflowHugr {
+pub(super) trait SynthesizeTketOp: Dataflow {
     /// Build a hadamard gate.
     fn build_h(&mut self, qb: Wire) -> Result<Wire, BuildError>;
     /// Build an X gate.

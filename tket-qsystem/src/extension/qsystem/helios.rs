@@ -9,7 +9,7 @@ use std::{str::FromStr, sync::Arc};
 use delegate::delegate;
 use hugr::{
     Extension, Hugr, Node, Wire,
-    builder::{BuildError, Container, Dataflow, DataflowHugr, HugrBuilder},
+    builder::{BuildError, Container, Dataflow, DataflowHugr},
     extension::{
         ExtensionId, OpDef, SignatureFunc, Version,
         prelude::qb_t,
@@ -234,17 +234,17 @@ impl MakeOpDef for RuntimeBarrierDef {
 
 #[derive(Debug)]
 /// Implmements traits for lowering operations in terms of Helios primitives.
-pub(super) struct HeliosBuilder<D> {
-    inner: D,
+pub(super) struct HeliosBuilder<'a, D> {
+    inner: &'a mut D,
 }
 
-impl<D> HeliosBuilder<D> {
-    pub(super) fn new(inner: D) -> Self {
+impl<'a, D> HeliosBuilder<'a, D> {
+    pub(super) fn new(inner: &'a mut D) -> Self {
         Self { inner }
     }
 }
 
-impl<D> Container for HeliosBuilder<D>
+impl<D> Container for HeliosBuilder<'_, D>
 where
     D: Container,
 {
@@ -257,18 +257,7 @@ where
     }
 }
 
-impl<D> HugrBuilder for HeliosBuilder<D>
-where
-    D: HugrBuilder,
-{
-    delegate! {
-        to self.inner {
-            fn finish_hugr(self) -> Result<Hugr, hugr::hugr::validate::ValidationError<Node>>;
-        }
-    }
-}
-
-impl<D> Dataflow for HeliosBuilder<D>
+impl<D> Dataflow for HeliosBuilder<'_, D>
 where
     D: Dataflow,
 {
@@ -279,56 +268,56 @@ where
     }
 }
 
-impl<D> SynthesizeTketOp for HeliosBuilder<D>
+impl<D> SynthesizeTketOp for HeliosBuilder<'_, D>
 where
     D: DataflowHugr + CommonOpBuilder,
 {
     fn build_h(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_h_with::<HeliosOp>(&mut self.inner, qb)
+        CommonOpBuilder::build_h_with::<HeliosOp>(self.inner, qb)
     }
 
     fn build_x(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_x_with::<HeliosOp>(&mut self.inner, qb)
+        CommonOpBuilder::build_x_with::<HeliosOp>(self.inner, qb)
     }
 
     fn build_y(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_y_with::<HeliosOp>(&mut self.inner, qb)
+        CommonOpBuilder::build_y_with::<HeliosOp>(self.inner, qb)
     }
 
     fn build_z(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_z_with::<HeliosOp>(&mut self.inner, qb)
+        CommonOpBuilder::build_z_with::<HeliosOp>(self.inner, qb)
     }
 
     fn build_s(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_s_with::<HeliosOp>(&mut self.inner, qb)
+        CommonOpBuilder::build_s_with::<HeliosOp>(self.inner, qb)
     }
 
     fn build_sdg(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_sdg_with::<HeliosOp>(&mut self.inner, qb)
+        CommonOpBuilder::build_sdg_with::<HeliosOp>(self.inner, qb)
     }
 
     fn build_v(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_v_with::<HeliosOp>(&mut self.inner, qb)
+        CommonOpBuilder::build_v_with::<HeliosOp>(self.inner, qb)
     }
 
     fn build_vdg(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_vdg_with::<HeliosOp>(&mut self.inner, qb)
+        CommonOpBuilder::build_vdg_with::<HeliosOp>(self.inner, qb)
     }
 
     fn build_t(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_t_with::<HeliosOp>(&mut self.inner, qb)
+        CommonOpBuilder::build_t_with::<HeliosOp>(self.inner, qb)
     }
 
     fn build_tdg(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_tdg_with::<HeliosOp>(&mut self.inner, qb)
+        CommonOpBuilder::build_tdg_with::<HeliosOp>(self.inner, qb)
     }
 
     fn build_measure_flip(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
-        CommonOpBuilder::build_measure_flip_with::<HeliosOp>(&mut self.inner, qb)
+        CommonOpBuilder::build_measure_flip_with::<HeliosOp>(self.inner, qb)
     }
 
     fn build_qalloc(&mut self) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_qalloc_with::<HeliosOp>(&mut self.inner)
+        CommonOpBuilder::build_qalloc_with::<HeliosOp>(self.inner)
     }
 
     fn build_cx(&mut self, c: Wire, t: Wire) -> Result<[Wire; 2], BuildError> {
@@ -368,11 +357,11 @@ where
     }
 
     fn build_rx(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_rx_with::<HeliosOp>(&mut self.inner, qb, theta)
+        CommonOpBuilder::build_rx_with::<HeliosOp>(self.inner, qb, theta)
     }
 
     fn build_ry(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_ry_with::<HeliosOp>(&mut self.inner, qb, theta)
+        CommonOpBuilder::build_ry_with::<HeliosOp>(self.inner, qb, theta)
     }
 
     fn build_rz(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError> {
@@ -469,28 +458,28 @@ pub trait SynthesizeHeliosOp: Dataflow {
     fn build_runtime_barrier(&mut self, qbs: Wire, array_size: u64) -> Result<Wire, BuildError>;
 }
 
-impl<D> SynthesizeHeliosOp for HeliosBuilder<D>
+impl<D> SynthesizeHeliosOp for HeliosBuilder<'_, D>
 where
     D: DataflowHugr + CommonOpBuilder,
 {
     fn build_lazy_measure(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::add_lazy_measure_with::<HeliosOp>(&mut self.inner, qb)
+        CommonOpBuilder::add_lazy_measure_with::<HeliosOp>(self.inner, qb)
     }
 
     fn build_lazy_measure_leaked(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::add_lazy_measure_leaked_with::<HeliosOp>(&mut self.inner, qb)
+        CommonOpBuilder::add_lazy_measure_leaked_with::<HeliosOp>(self.inner, qb)
     }
 
     fn build_lazy_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
-        CommonOpBuilder::add_lazy_measure_reset_with::<HeliosOp>(&mut self.inner, qb)
+        CommonOpBuilder::add_lazy_measure_reset_with::<HeliosOp>(self.inner, qb)
     }
 
     fn build_measure(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::add_measure_with::<HeliosOp>(&mut self.inner, qb)
+        CommonOpBuilder::add_measure_with::<HeliosOp>(self.inner, qb)
     }
 
     fn build_reset(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::add_reset_with::<HeliosOp>(&mut self.inner, qb)
+        CommonOpBuilder::add_reset_with::<HeliosOp>(self.inner, qb)
     }
 
     fn build_zz_phase(
@@ -506,27 +495,27 @@ where
     }
 
     fn build_phased_x(&mut self, qb: Wire, angle1: Wire, angle2: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::add_phased_x_with::<HeliosOp>(&mut self.inner, qb, angle1, angle2)
+        CommonOpBuilder::add_phased_x_with::<HeliosOp>(self.inner, qb, angle1, angle2)
     }
 
     fn build_rz(&mut self, qb: Wire, angle: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::add_rz_with::<HeliosOp>(&mut self.inner, qb, angle)
+        CommonOpBuilder::add_rz_with::<HeliosOp>(self.inner, qb, angle)
     }
 
     fn build_try_alloc(&mut self) -> Result<Wire, BuildError> {
-        CommonOpBuilder::add_try_alloc_with::<HeliosOp>(&mut self.inner)
+        CommonOpBuilder::add_try_alloc_with::<HeliosOp>(self.inner)
     }
 
     fn build_qfree(&mut self, qb: Wire) -> Result<(), BuildError> {
-        CommonOpBuilder::add_qfree_with::<HeliosOp>(&mut self.inner, qb)
+        CommonOpBuilder::add_qfree_with::<HeliosOp>(self.inner, qb)
     }
 
     fn build_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
-        CommonOpBuilder::add_measure_reset_with::<HeliosOp>(&mut self.inner, qb)
+        CommonOpBuilder::add_measure_reset_with::<HeliosOp>(self.inner, qb)
     }
 
     fn build_runtime_barrier(&mut self, qbs: Wire, array_size: u64) -> Result<Wire, BuildError> {
-        CommonOpBuilder::add_runtime_barrier_with(&mut self.inner, &EXTENSION, qbs, array_size)
+        CommonOpBuilder::add_runtime_barrier_with(self.inner, &EXTENSION, qbs, array_size)
     }
 }
 #[cfg(test)]
@@ -551,17 +540,18 @@ mod test {
     #[test]
     fn lazy_circuit() {
         let hugr = {
-            let mut builder = HeliosBuilder::new(
-                FunctionBuilder::new(
-                    "circuit",
-                    Signature::new(vec![qb_t()], vec![qb_t(), bool_t()]),
-                )
-                .unwrap(),
-            );
-            let [qb] = builder.input_wires_arr();
-            let [qb, lazy_b] = builder.build_lazy_measure_reset(qb).unwrap();
-            let [b] = builder.add_read(lazy_b, bool_t()).unwrap();
-            builder.finish_hugr_with_outputs([qb, b]).unwrap()
+            let mut func_builder = FunctionBuilder::new(
+                "circuit",
+                Signature::new(vec![qb_t()], vec![qb_t(), bool_t()]),
+            )
+            .unwrap();
+            let [qb] = func_builder.input_wires_arr();
+            let [qb, lazy_b] = {
+                let mut builder = HeliosBuilder::new(&mut func_builder);
+                builder.build_lazy_measure_reset(qb).unwrap()
+            };
+            let [b] = func_builder.add_read(lazy_b, bool_t()).unwrap();
+            func_builder.finish_hugr_with_outputs([qb, b]).unwrap()
         };
         hugr.validate().unwrap();
     }
@@ -569,14 +559,16 @@ mod test {
     #[test]
     fn leaked() {
         let hugr = {
-            let mut builder = HeliosBuilder::new(
+            let mut func_builder =
                 FunctionBuilder::new("leaked", Signature::new(vec![qb_t()], vec![int_type(6)]))
-                    .unwrap(),
-            );
-            let [qb] = builder.input_wires_arr();
-            let lazy_i = builder.build_lazy_measure_leaked(qb).unwrap();
-            let [i] = builder.add_read(lazy_i, int_type(6)).unwrap();
-            builder.finish_hugr_with_outputs([i]).unwrap()
+                    .unwrap();
+            let [qb] = func_builder.input_wires_arr();
+            let lazy_i = {
+                let mut builder = HeliosBuilder::new(&mut func_builder);
+                builder.build_lazy_measure_leaked(qb).unwrap()
+            };
+            let [i] = func_builder.add_read(lazy_i, int_type(6)).unwrap();
+            func_builder.finish_hugr_with_outputs([i]).unwrap()
         };
         hugr.validate().unwrap();
     }
@@ -584,43 +576,50 @@ mod test {
     #[test]
     fn all_ops() {
         let hugr = {
-            let mut builder = HeliosBuilder::new(
-                FunctionBuilder::new(
-                    "all_ops",
-                    Signature::new(vec![qb_t(), float64_type()], vec![bool_type()]),
-                )
-                .unwrap(),
-            );
-            let [q0, angle] = builder.input_wires_arr();
-            let try_q1 = builder.build_try_alloc().unwrap();
-            let [q1] = builder
-                .build_expect_sum(
-                    1,
-                    hugr::extension::prelude::option_type(vec![qb_t()]),
-                    try_q1,
-                    |_| "No more qubits available to allocate.".to_string(),
-                )
-                .unwrap();
-            let q0 = builder.build_reset(q0).unwrap();
-            let q1 = builder.build_phased_x(q1, angle, angle).unwrap();
-            let [q0, q1] = builder.build_zz_max(q0, q1).unwrap();
-            let [q0, q1] = builder.build_zz_phase(q0, q1, angle).unwrap();
+            let mut func_builder = FunctionBuilder::new(
+                "all_ops",
+                Signature::new(vec![qb_t(), float64_type()], vec![bool_type()]),
+            )
+            .unwrap();
+            let [q0, angle] = func_builder.input_wires_arr();
+            let [q0, q1] = {
+                let mut builder = HeliosBuilder::new(&mut func_builder);
+                let try_q1 = builder.build_try_alloc().unwrap();
+                let [q1] = builder
+                    .build_expect_sum(
+                        1,
+                        hugr::extension::prelude::option_type(vec![qb_t()]),
+                        try_q1,
+                        |_| "No more qubits available to allocate.".to_string(),
+                    )
+                    .unwrap();
+                let q0 = builder.build_reset(q0).unwrap();
+                let q1 = builder.build_phased_x(q1, angle, angle).unwrap();
+                let [q0, q1] = builder.build_zz_max(q0, q1).unwrap();
+                builder.build_zz_phase(q0, q1, angle).unwrap()
+            };
 
-            let q_arr = builder.inner.add_new_array(qb_t(), [q0, q1]).unwrap();
-            let q_arr = builder.build_runtime_barrier(q_arr, 2).unwrap();
-            let [q0, q1] = builder
-                .inner
+            let q_arr = func_builder.add_new_array(qb_t(), [q0, q1]).unwrap();
+            let q_arr = {
+                let mut builder = HeliosBuilder::new(&mut func_builder);
+                builder.build_runtime_barrier(q_arr, 2).unwrap()
+            };
+            let [q0, q1] = func_builder
                 .add_array_unpack(qb_t(), 2, q_arr)
                 .unwrap()
                 .try_into()
                 .unwrap();
 
-            let q0 = SynthesizeHeliosOp::build_rz(&mut builder, q0, angle).unwrap();
-            let [q0, _b] = builder.build_measure_reset(q0).unwrap();
-            let b = builder.build_measure(q0).unwrap();
-            builder.build_qfree(q1).unwrap();
+            let b = {
+                let mut builder = HeliosBuilder::new(&mut func_builder);
+                let q0 = SynthesizeHeliosOp::build_rz(&mut builder, q0, angle).unwrap();
+                let [q0, _b] = builder.build_measure_reset(q0).unwrap();
+                let b = builder.build_measure(q0).unwrap();
+                builder.build_qfree(q1).unwrap();
+                b
+            };
 
-            builder.finish_hugr_with_outputs([b]).unwrap()
+            func_builder.finish_hugr_with_outputs([b]).unwrap()
         };
         hugr.validate().unwrap()
     }

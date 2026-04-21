@@ -9,7 +9,7 @@ use std::{str::FromStr, sync::Arc};
 use delegate::delegate;
 use hugr::{
     Extension, Hugr, Node, Wire,
-    builder::{BuildError, Container, Dataflow, DataflowHugr, HugrBuilder},
+    builder::{BuildError, Container, Dataflow, DataflowHugr},
     extension::{
         ExtensionId, OpDef, SignatureFunc, Version,
         prelude::qb_t,
@@ -372,17 +372,17 @@ impl<D: Dataflow> SolOpBuilder for D {}
 
 #[derive(Debug)]
 /// Implmements traits for lowering operations in terms of Sol primitives.
-pub(super) struct SolBuilder<D> {
-    inner: D,
+pub(super) struct SolBuilder<'a, D> {
+    inner: &'a mut D,
 }
 
-impl<D> SolBuilder<D> {
-    pub(super) fn new(inner: D) -> Self {
+impl<'a, D> SolBuilder<'a, D> {
+    pub(super) fn new(inner: &'a mut D) -> Self {
         Self { inner }
     }
 }
 
-impl<D> Container for SolBuilder<D>
+impl<D> Container for SolBuilder<'_, D>
 where
     D: Container,
 {
@@ -395,18 +395,7 @@ where
     }
 }
 
-impl<D> HugrBuilder for SolBuilder<D>
-where
-    D: HugrBuilder,
-{
-    delegate! {
-        to self.inner {
-            fn finish_hugr(self) -> Result<Hugr, hugr::hugr::validate::ValidationError<Node>>;
-        }
-    }
-}
-
-impl<D> Dataflow for SolBuilder<D>
+impl<D> Dataflow for SolBuilder<'_, D>
 where
     D: Dataflow,
 {
@@ -417,56 +406,56 @@ where
     }
 }
 
-impl<D> SynthesizeTketOp for SolBuilder<D>
+impl<D> SynthesizeTketOp for SolBuilder<'_, D>
 where
     D: DataflowHugr + SolOpBuilder,
 {
     fn build_h(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_h_with::<SolOp>(&mut self.inner, qb)
+        CommonOpBuilder::build_h_with::<SolOp>(self.inner, qb)
     }
 
     fn build_x(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_x_with::<SolOp>(&mut self.inner, qb)
+        CommonOpBuilder::build_x_with::<SolOp>(self.inner, qb)
     }
 
     fn build_y(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_y_with::<SolOp>(&mut self.inner, qb)
+        CommonOpBuilder::build_y_with::<SolOp>(self.inner, qb)
     }
 
     fn build_z(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_z_with::<SolOp>(&mut self.inner, qb)
+        CommonOpBuilder::build_z_with::<SolOp>(self.inner, qb)
     }
 
     fn build_s(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_s_with::<SolOp>(&mut self.inner, qb)
+        CommonOpBuilder::build_s_with::<SolOp>(self.inner, qb)
     }
 
     fn build_sdg(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_sdg_with::<SolOp>(&mut self.inner, qb)
+        CommonOpBuilder::build_sdg_with::<SolOp>(self.inner, qb)
     }
 
     fn build_v(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_v_with::<SolOp>(&mut self.inner, qb)
+        CommonOpBuilder::build_v_with::<SolOp>(self.inner, qb)
     }
 
     fn build_vdg(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_vdg_with::<SolOp>(&mut self.inner, qb)
+        CommonOpBuilder::build_vdg_with::<SolOp>(self.inner, qb)
     }
 
     fn build_t(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_t_with::<SolOp>(&mut self.inner, qb)
+        CommonOpBuilder::build_t_with::<SolOp>(self.inner, qb)
     }
 
     fn build_tdg(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_tdg_with::<SolOp>(&mut self.inner, qb)
+        CommonOpBuilder::build_tdg_with::<SolOp>(self.inner, qb)
     }
 
     fn build_measure_flip(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
-        CommonOpBuilder::build_measure_flip_with::<SolOp>(&mut self.inner, qb)
+        CommonOpBuilder::build_measure_flip_with::<SolOp>(self.inner, qb)
     }
 
     fn build_qalloc(&mut self) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_qalloc_with::<SolOp>(&mut self.inner)
+        CommonOpBuilder::build_qalloc_with::<SolOp>(self.inner)
     }
 
     fn build_cx(&mut self, c: Wire, t: Wire) -> Result<[Wire; 2], BuildError> {
@@ -513,11 +502,11 @@ where
     }
 
     fn build_rx(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_rx_with::<SolOp>(&mut self.inner, qb, theta)
+        CommonOpBuilder::build_rx_with::<SolOp>(self.inner, qb, theta)
     }
 
     fn build_ry(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::build_ry_with::<SolOp>(&mut self.inner, qb, theta)
+        CommonOpBuilder::build_ry_with::<SolOp>(self.inner, qb, theta)
     }
 
     fn build_rz(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError> {

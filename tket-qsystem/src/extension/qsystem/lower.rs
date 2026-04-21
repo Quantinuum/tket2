@@ -184,14 +184,21 @@ fn build_func(platform: QSystemPlatform, op: TketOp) -> Result<Hugr, LowerTk2Err
     let sig = Signature::new(sig.input, sig.output); // ignore extension delta
     // TODO check generated names are namespaced enough
     let f_name = format!("__tk2_{}", op.op_id().to_lowercase());
-    let inner = FunctionBuilder::new(f_name, sig)?;
-    match platform {
-        QSystemPlatform::Helios => build_func_with_builder(HeliosBuilder::new(inner), op),
-        QSystemPlatform::Sol => build_func_with_builder(SolBuilder::new(inner), op),
-    }
+    let mut f_build = FunctionBuilder::new(f_name, sig)?;
+    let outputs = match platform {
+        QSystemPlatform::Helios => {
+            let mut builder = HeliosBuilder::new(&mut f_build);
+            build_func_with_builder(&mut builder, op)?
+        }
+        QSystemPlatform::Sol => {
+            let mut builder = SolBuilder::new(&mut f_build);
+            build_func_with_builder(&mut builder, op)?
+        }
+    };
+    Ok(f_build.finish_hugr_with_outputs(outputs)?)
 }
 
-fn build_func_with_builder<B>(mut b: B, op: TketOp) -> Result<Hugr, LowerTk2Error>
+fn build_func_with_builder<B>(b: &mut B, op: TketOp) -> Result<Vec<Wire>, LowerTk2Error>
 where
     B: SynthesizeTketOp,
 {
@@ -213,25 +220,25 @@ where
         (TketOp::CY, [c, t]) => b.build_cy(*c, *t)?.into(),
         (TketOp::CZ, [c, t]) => b.build_cz(*c, *t)?.into(),
         (TketOp::Rx, [q, angle]) => {
-            let float = build_to_radians(&mut b, *angle)?;
+            let float = build_to_radians(b, *angle)?;
             vec![b.build_rx(*q, float)?]
         }
         (TketOp::Ry, [q, angle]) => {
-            let float = build_to_radians(&mut b, *angle)?;
+            let float = build_to_radians(b, *angle)?;
             vec![b.build_ry(*q, float)?]
         }
         (TketOp::Rz, [q, angle]) => {
-            let float = build_to_radians(&mut b, *angle)?;
+            let float = build_to_radians(b, *angle)?;
             vec![b.build_rz(*q, float)?]
         }
         (TketOp::CRz, [c, t, angle]) => {
-            let float = build_to_radians(&mut b, *angle)?;
+            let float = build_to_radians(b, *angle)?;
             b.build_crz(*c, *t, float)?.into()
         }
         (TketOp::Toffoli, [a, b_, c]) => b.build_toffoli(*a, *b_, *c)?.into(),
         _ => return Err(LowerTk2Error::UnknownOp(op, inputs.len())), // non-exhaustive
     };
-    Ok(b.finish_hugr_with_outputs(outputs)?)
+    Ok(outputs)
 }
 
 /// Given a hugr with a function definition as entrypoint, constructs a
