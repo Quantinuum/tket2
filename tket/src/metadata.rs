@@ -12,6 +12,24 @@ impl Metadata for MaxQubits {
     type Type<'hugr> = u32;
 }
 
+/// Metadata hinting the compiler that a function declaration should be inlined at its call sites.
+///
+/// When a function is not annotated, we use an heuristic to determine whether to inline.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
+#[serde(rename_all = "lowercase")]
+pub enum InlineHint {
+    /// Always inline the function, even if it is large or called from many places.
+    Always,
+    /// Never inline the function.
+    Never,
+}
+impl Metadata for InlineHint {
+    const KEY: &'static str = "tket.hint.inline";
+    type Type<'hugr> = Self;
+}
+
 /// Metadata key for traced rewrites that were applied during circuit transformation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CircuitRewriteTraces;
