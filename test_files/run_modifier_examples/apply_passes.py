@@ -51,7 +51,7 @@ input_paths = (
 
 for input_path in input_paths:
     modifier_hugr = _hugr_from_path(str(input_path))
-    normalized = normalize(modifier_hugr)
+    normalized = modifier_hugr  # normalize(modifier_hugr)
     resolved: Hugr = mr_pass(normalized)
 
     output_path = modified_hugrs_dir / f"{input_path.stem}_solved.hugr"

@@ -30,16 +30,13 @@ impl<N: HugrNode> ModifierResolver<N> {
             .single_linked_output(call_node, call.called_function_port())
             .unwrap();
 
+        // NICOLA (-5)
         // wire the callee
         let Some(new_callee) = self.modify_fn_if_needed(h, callee.0, &call.signature())? else {
             // If the function need not be modified, just copy the Call node as is.
             let new = self.add_node_no_modification(h, call_node, call.clone(), new_dfg)?;
             self.call_map()
                 .insert(callee.0, (new, call.called_function_port()));
-            println!(
-                "Copied Call node {} as is, no modification needed.",
-                call_node
-            );
             return Ok(());
         };
 

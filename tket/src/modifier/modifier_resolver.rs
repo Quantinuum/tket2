@@ -102,7 +102,8 @@
 use itertools::{Either, Itertools};
 use std::{
     collections::{HashMap, VecDeque},
-    iter, mem,
+    fs, iter, mem,
+    path::Path,
 };
 
 pub mod array_modify;
@@ -196,11 +197,13 @@ fn connect<N>(
     w1: &DirWire<Node>,
     w2: &DirWire<Node>,
 ) -> Result<(), ModifierResolverErrors<N>> {
+    println!("Connecting {} and {}", w1, w2);
+    println!("{} -> {}: ", w1.1.as_directed(), w2.1.as_directed());
     let (n_o, p_o, n_i, p_i) = match (w1.1.as_directed(), w2.1.as_directed()) {
         (Either::Right(p_o), Either::Left(p_i)) => (w1.0, p_o, w2.0, p_i),
         (Either::Left(p_i), Either::Right(p_o)) => (w2.0, p_o, w1.0, p_i),
         _ => {
-            // NICOLA Here we fail with multiple modifier
+            // NICOLA(0) Here we fail with multiple modifier
             return Err(ModifierResolverErrors::unreachable(format!(
                 "Cannot connect the wires with the same direction: {} -> {}",
                 w1, w2
@@ -609,7 +612,15 @@ impl<N: HugrNode> ModifierResolver<N> {
         new_dfg: &mut impl Container,
         parent: N,
     ) -> Result<(), ModifierResolverErrors<N>> {
+        println!("\n§§§§");
+        println!("Correspondence map:");
+        for (old, new) in self.corresp_map() {
+            println!("{} -> {:?}", old, new);
+        }
+        println!("Connecting all wires for node {}", parent);
+        println!("{:?}", h.children(parent).collect_vec());
         for out_node in h.children(parent) {
+            println!(". Processing child node {}", out_node);
             for out_port in h.node_outputs(out_node) {
                 if let Some(EdgeKind::StateOrder) = h.get_optype(out_node).port_kind(out_port) {
                     // TODO: Currently, we just ignore StateOrder edges.
@@ -620,14 +631,21 @@ impl<N: HugrNode> ModifierResolver<N> {
                     // 2. Use another `HashMap` to keep track of StateOrder edges.
                     continue;
                 }
+                println!(". . Processing output port {}", out_port);
+                println!(
+                    ". . Linked inputs: {:?}",
+                    h.linked_inputs(out_node, out_port).collect_vec()
+                );
                 for (in_node, in_port) in h.linked_inputs(out_node, out_port) {
-                    for a in self.map_get(&(in_node, in_port).into())? {
-                        for b in self.map_get(&(out_node, out_port).into())? {
-                            connect(new_dfg, a, b)?
+                    for w1 in self.map_get(&(in_node, in_port).into())? {
+                        for w2 in self.map_get(&(out_node, out_port).into())? {
+                            // NICOLA (-1)
+                            connect(new_dfg, w1, w2)?
                         }
                     }
                 }
             }
+            println!("...")
         }
         // FIXME: StateOrder is not preserved here.
         Ok(())
@@ -635,7 +653,6 @@ impl<N: HugrNode> ModifierResolver<N> {
 }
 
 impl<N: HugrNode> ModifierResolver<N> {
-    // NICOLA: Why is a different code block
     // FIXME: Shouldn't we check that there is a caller of the modified function?
     // We don't want to modify a function that is loaded and modified but never called.
     // When more than one modifier is chained, after the last modifier is resolved,
@@ -723,10 +740,18 @@ impl<N: HugrNode> ModifierResolver<N> {
         new_dfg: &mut impl Dataflow,
     ) -> Result<(), ModifierResolverErrors<N>> {
         let optype = &h.get_optype(target_node).clone();
-        println!(
-            "Modifying node {} with operation type {}... ",
-            target_node, optype
-        );
+        // println!(
+        //     "Modifying node {} with operation type {}... ",
+        //     target_node, optype
+        // );
+
+        let output = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")))
+            .join("current.mmd");
+        fs::write(output, h.mermaid_string()).unwrap();
+
+        // NICOLA Match
         match optype {
             // Skip input/output nodes: it should be handled by its parent as it sets control qubits.
             OpType::Input(_) | OpType::Output(_) => {}
@@ -744,8 +769,10 @@ impl<N: HugrNode> ModifierResolver<N> {
             }
 
             // Function calls
-            // NICOLA: call is not working at all.
-            OpType::Call(_) => self.modify_call(h, target_node, optype, new_dfg)?,
+            OpType::Call(_) => {
+                println!("=======> Modifying Call node: {:?}", target_node);
+                self.modify_call(h, target_node, optype, new_dfg)?
+            }
             OpType::CallIndirect(indir_call) => {
                 self.modify_indirect_call(h, target_node, indir_call, new_dfg)?
             }
@@ -1420,19 +1447,21 @@ mod tests {
         assert_matches!(h.validate(), Ok(()));
     }
 
-    #[test]
-    pub fn test_saved_hugrs() {
-        for (name, mut h) in load_guppy_examples().unwrap() {
-            resolve_and_save(&name, &mut h);
-        }
-    }
-
     #[rstest::rstest]
-    #[case::call("ctrl_on_call2")]
-    // #[case::call("ctrl_on_x")]
+    #[case::call("double_modifier")]
+    //#[case::call("dagger_on_call")]
+    // #[case::call("all")]
+    // todo: this test panic, should not
     pub fn test_saved_hugr(#[case] name: &str) {
-        let mut h = load_guppy_example(name).unwrap();
-        resolve_and_save(name, &mut h);
+        if name == "all" {
+            for (name, mut h) in load_guppy_examples().unwrap() {
+                resolve_and_save(&name, &mut h);
+            }
+            return;
+        } else {
+            let mut h = load_guppy_example(name).unwrap();
+            resolve_and_save(name, &mut h);
+        }
     }
 
     // TODO: this test fails because the resolver does not preserve extensions, I have not idea why.
