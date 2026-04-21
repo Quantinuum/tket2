@@ -9,7 +9,7 @@ use std::{str::FromStr, sync::Arc};
 use delegate::delegate;
 use hugr::{
     Extension, Hugr, Node, Wire,
-    builder::{BuildError, Container, Dataflow, DataflowHugr},
+    builder::{BuildError, Container, Dataflow},
     extension::{
         ExtensionId, OpDef, SignatureFunc, Version,
         prelude::qb_t,
@@ -23,9 +23,8 @@ use hugr::{
     types::{Signature, TypeRow},
 };
 
-use super::common::{self, CommonOp, CommonOpBuilder, SharedOp, SharedTketOpSynthesis};
+use super::common::{self, CommonOp, CommonOpBuilder, PhasedXRzSynth, SharedOp};
 use super::lower::pi_mul_f64;
-use super::synth_tket_op::SynthesizeTketOp;
 use derive_more::Display;
 use lazy_static::lazy_static;
 use strum::{EnumIter, EnumString, IntoStaticStr};
@@ -184,7 +183,11 @@ impl From<SharedOp> for HeliosOp {
         }
     }
 }
-impl CommonOp for HeliosOp {}
+impl CommonOp for HeliosOp {
+    fn platform_extension() -> Arc<Extension> {
+        EXTENSION.clone()
+    }
+}
 /// The name of the "tket.qsystem.RuntimeBarrier" operation.
 pub const RUNTIME_BARRIER_NAME: hugr::ops::OpName = common::RUNTIME_BARRIER_NAME;
 
@@ -268,11 +271,18 @@ where
     }
 }
 
-impl<D> SharedTketOpSynthesis for HeliosSynthesizer<'_, D>
+impl<D> PhasedXRzSynth for HeliosSynthesizer<'_, D>
 where
-    D: DataflowHugr + CommonOpBuilder,
+    D: CommonOpBuilder<HeliosOp>,
 {
     type Op = HeliosOp;
+    type Nested<'a, D2: CommonOpBuilder<HeliosOp> + 'a> = HeliosSynthesizer<'a, D2>;
+
+    fn synthesizer_for<'a, D2: CommonOpBuilder<HeliosOp>>(
+        inner: &'a mut D2,
+    ) -> HeliosSynthesizer<'a, D2> {
+        HeliosSynthesizer::new(inner)
+    }
 
     fn synth_phased_x(&mut self, qb: Wire, angle1: Wire, angle2: Wire) -> Result<Wire, BuildError> {
         SynthesizeHeliosOp::build_phased_x(self, qb, angle1, angle2)
@@ -289,70 +299,17 @@ where
     fn synth_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
         SynthesizeHeliosOp::build_measure_reset(self, qb)
     }
-}
-
-impl<D> SynthesizeTketOp for HeliosSynthesizer<'_, D>
-where
-    D: DataflowHugr + CommonOpBuilder,
-{
-    fn build_h(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        self.build_h_shared(qb)
-    }
-
-    fn build_x(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        self.build_x_shared(qb)
-    }
-
-    fn build_y(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        self.build_y_shared(qb)
-    }
-
-    fn build_z(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        self.build_z_shared(qb)
-    }
-
-    fn build_s(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        self.build_s_shared(qb)
-    }
-
-    fn build_sdg(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        self.build_sdg_shared(qb)
-    }
-
-    fn build_v(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        self.build_v_shared(qb)
-    }
-
-    fn build_vdg(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        self.build_vdg_shared(qb)
-    }
-
-    fn build_t(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        self.build_t_shared(qb)
-    }
-
-    fn build_tdg(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        self.build_tdg_shared(qb)
-    }
-
-    fn build_measure_flip(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
-        self.build_measure_flip_shared(qb)
-    }
-
-    fn build_qalloc(&mut self) -> Result<Wire, BuildError> {
-        self.build_qalloc_shared()
-    }
 
     fn build_cx(&mut self, c: Wire, t: Wire) -> Result<[Wire; 2], BuildError> {
         let pi = pi_mul_f64(self, 1.0);
         let pi_2 = pi_mul_f64(self, 0.5);
         let pi_minus_2 = pi_mul_f64(self, -0.5);
 
-        let t = self.build_phased_x(t, pi_minus_2, pi_2)?;
+        let t = self.synth_phased_x(t, pi_minus_2, pi_2)?;
         let [c, t] = self.build_zz_max(c, t)?;
-        let c = SynthesizeHeliosOp::build_rz(self, c, pi_minus_2)?;
-        let t = self.build_phased_x(t, pi_2, pi)?;
-        let t = SynthesizeHeliosOp::build_rz(self, t, pi_minus_2)?;
+        let c = self.synth_rz(c, pi_minus_2)?;
+        let t = self.synth_phased_x(t, pi_2, pi)?;
+        let t = self.synth_rz(t, pi_minus_2)?;
         Ok([c, t])
     }
 
@@ -361,34 +318,22 @@ where
         let pi_2 = pi_mul_f64(self, 0.5);
         let pi_minus_2 = pi_mul_f64(self, -0.5);
 
-        let a = self.build_phased_x(a, pi, pi)?;
-        let b = self.build_phased_x(b, pi_minus_2, pi)?;
+        let a = self.synth_phased_x(a, pi, pi)?;
+        let b = self.synth_phased_x(b, pi_minus_2, pi)?;
         let [a, b] = self.build_zz_max(a, b)?;
-        let a = self.build_phased_x(a, pi, pi_2)?;
-        let b = self.build_phased_x(b, pi_minus_2, pi_minus_2)?;
-        let a = SynthesizeHeliosOp::build_rz(self, a, pi_minus_2)?;
-        let b = SynthesizeHeliosOp::build_rz(self, b, pi_2)?;
+        let a = self.synth_phased_x(a, pi, pi_2)?;
+        let b = self.synth_phased_x(b, pi_minus_2, pi_minus_2)?;
+        let a = self.synth_rz(a, pi_minus_2)?;
+        let b = self.synth_rz(b, pi_2)?;
         Ok([a, b])
     }
 
     fn build_cz(&mut self, a: Wire, b: Wire) -> Result<[Wire; 2], BuildError> {
         let pi_minus_2 = pi_mul_f64(self, -0.5);
         let [a, b] = self.build_zz_max(a, b)?;
-        let b = SynthesizeHeliosOp::build_rz(self, b, pi_minus_2)?;
-        let a = SynthesizeHeliosOp::build_rz(self, a, pi_minus_2)?;
+        let b = self.synth_rz(b, pi_minus_2)?;
+        let a = self.synth_rz(a, pi_minus_2)?;
         Ok([a, b])
-    }
-
-    fn build_rx(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError> {
-        self.build_rx_shared(qb, theta)
-    }
-
-    fn build_ry(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError> {
-        self.build_ry_shared(qb, theta)
-    }
-
-    fn build_rz(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError> {
-        SynthesizeHeliosOp::build_rz(self, qb, theta)
     }
 
     fn build_crz(&mut self, a: Wire, b: Wire, lambda: Wire) -> Result<[Wire; 2], BuildError> {
@@ -401,7 +346,7 @@ where
             .out_wire(0);
 
         let [a, b] = self.build_zz_phase(a, b, lambda_minus_2)?;
-        let b = SynthesizeHeliosOp::build_rz(self, b, lambda_2)?;
+        let b = self.synth_rz(b, lambda_2)?;
         Ok([a, b])
     }
 
@@ -414,21 +359,21 @@ where
         let pi_minus_3_4 = pi_mul_f64(self, -0.75);
         let zero = pi_mul_f64(self, 0.0);
 
-        let c = self.build_phased_x(c, pi, pi_minus_2)?;
+        let c = self.synth_phased_x(c, pi, pi_minus_2)?;
         let [b, c] = self.build_zz_max(b, c)?;
-        let c = self.build_phased_x(c, pi_4, pi_2)?;
+        let c = self.synth_phased_x(c, pi_4, pi_2)?;
         let [a, c] = self.build_zz_max(a, c)?;
-        let c = self.build_phased_x(c, pi_4, zero)?;
+        let c = self.synth_phased_x(c, pi_4, zero)?;
         let [b, c] = self.build_zz_max(b, c)?;
-        let c = self.build_phased_x(c, pi_4, pi_minus_2)?;
+        let c = self.synth_phased_x(c, pi_4, pi_minus_2)?;
         let [a, c] = self.build_zz_max(a, c)?;
-        let a = self.build_phased_x(a, pi, pi_4)?;
-        let c = self.build_phased_x(c, pi_minus_3_4, pi)?;
+        let a = self.synth_phased_x(a, pi, pi_4)?;
+        let c = self.synth_phased_x(c, pi_minus_3_4, pi)?;
         let [a, b] = self.build_zz_phase(a, b, pi_4)?;
-        let c = SynthesizeHeliosOp::build_rz(self, c, pi)?;
-        let a = self.build_phased_x(a, pi, pi_minus_4)?;
-        let b = SynthesizeHeliosOp::build_rz(self, b, pi_minus_3_4)?;
-        let a = SynthesizeHeliosOp::build_rz(self, a, pi_4)?;
+        let c = self.synth_rz(c, pi)?;
+        let a = self.synth_phased_x(a, pi, pi_minus_4)?;
+        let b = self.synth_rz(b, pi_minus_3_4)?;
+        let a = self.synth_rz(a, pi_4)?;
         Ok([a, b, c])
     }
 }
@@ -483,26 +428,26 @@ pub trait SynthesizeHeliosOp: Dataflow {
 
 impl<D> SynthesizeHeliosOp for HeliosSynthesizer<'_, D>
 where
-    D: DataflowHugr + CommonOpBuilder,
+    D: CommonOpBuilder<HeliosOp>,
 {
     fn build_lazy_measure(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::add_lazy_measure_with::<HeliosOp>(self.inner, qb)
+        self.inner.add_lazy_measure(qb)
     }
 
     fn build_lazy_measure_leaked(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::add_lazy_measure_leaked_with::<HeliosOp>(self.inner, qb)
+        self.inner.add_lazy_measure_leaked(qb)
     }
 
     fn build_lazy_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
-        CommonOpBuilder::add_lazy_measure_reset_with::<HeliosOp>(self.inner, qb)
+        self.inner.add_lazy_measure_reset(qb)
     }
 
     fn build_measure(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::add_measure_with::<HeliosOp>(self.inner, qb)
+        self.inner.add_measure(qb)
     }
 
     fn build_reset(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::add_reset_with::<HeliosOp>(self.inner, qb)
+        self.inner.add_reset(qb)
     }
 
     fn build_zz_phase(
@@ -518,27 +463,27 @@ where
     }
 
     fn build_phased_x(&mut self, qb: Wire, angle1: Wire, angle2: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::add_phased_x_with::<HeliosOp>(self.inner, qb, angle1, angle2)
+        self.inner.add_phased_x(qb, angle1, angle2)
     }
 
     fn build_rz(&mut self, qb: Wire, angle: Wire) -> Result<Wire, BuildError> {
-        CommonOpBuilder::add_rz_with::<HeliosOp>(self.inner, qb, angle)
+        self.inner.add_rz(qb, angle)
     }
 
     fn build_try_alloc(&mut self) -> Result<Wire, BuildError> {
-        CommonOpBuilder::add_try_alloc_with::<HeliosOp>(self.inner)
+        self.inner.add_try_alloc()
     }
 
     fn build_qfree(&mut self, qb: Wire) -> Result<(), BuildError> {
-        CommonOpBuilder::add_qfree_with::<HeliosOp>(self.inner, qb)
+        self.inner.add_qfree(qb)
     }
 
     fn build_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
-        CommonOpBuilder::add_measure_reset_with::<HeliosOp>(self.inner, qb)
+        self.inner.add_measure_reset(qb)
     }
 
     fn build_runtime_barrier(&mut self, qbs: Wire, array_size: u64) -> Result<Wire, BuildError> {
-        CommonOpBuilder::add_runtime_barrier_with(self.inner, &EXTENSION, qbs, array_size)
+        self.inner.add_runtime_barrier(qbs, array_size)
     }
 }
 #[cfg(test)]

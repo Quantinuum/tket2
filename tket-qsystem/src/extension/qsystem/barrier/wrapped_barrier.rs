@@ -14,7 +14,7 @@ use hugr::{
 };
 
 use crate::extension::qsystem::common::CommonOpBuilder;
-use crate::extension::qsystem::helios::EXTENSION as HELIOS_EXTENSION;
+use crate::extension::qsystem::helios::HeliosOp;
 use tket::passes::utils::unpack_container::op_function_map::OpFunctionMap;
 
 /// Temporary extension name for barrier-specific operations.
@@ -87,11 +87,7 @@ impl WrappedBarrierBuilder {
         .unwrap();
         let mangle_args: &[TypeArg] = &[TypeArg::BoundedNat(size as u64)];
         self.func_map.insert_with(&op, mangle_args, |func_b| {
-            CommonOpBuilder::build_wrapped_barrier_with(
-                func_b,
-                &HELIOS_EXTENSION,
-                func_b.input_wires(),
-            )
+            <_ as CommonOpBuilder<HeliosOp>>::build_wrapped_barrier(func_b, func_b.input_wires())
         })?;
         Ok(builder.add_dataflow_op(op, qubit_wires)?.outputs())
     }
@@ -108,9 +104,8 @@ pub(super) fn build_runtime_barrier_op(array_size: u64) -> Result<Hugr, BuildErr
     let mut barr_builder =
         DFGBuilder::new(Signature::new_endo(vec![array_type(array_size, qb_t())]))?;
     let array_wire = barr_builder.input().out_wire(0);
-    let out = CommonOpBuilder::add_runtime_barrier_with(
+    let out = <DFGBuilder<Hugr> as CommonOpBuilder<HeliosOp>>::add_runtime_barrier(
         &mut barr_builder,
-        &HELIOS_EXTENSION,
         array_wire,
         array_size,
     )?;

@@ -219,7 +219,7 @@ fn build_func_outputs(
 
 fn build_func_with_builder<B>(b: &mut B, op: TketOp) -> Result<Vec<Wire>, LowerTk2Error>
 where
-    B: SynthesizeTketOp,
+    B: SynthesizeTketOp + Dataflow,
 {
     let inputs: Vec<_> = b.input_wires().collect();
     let outputs = match (op, inputs.as_slice()) {

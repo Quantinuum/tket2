@@ -1,11 +1,15 @@
-use hugr::{
-    Wire,
-    builder::{BuildError, Dataflow},
-};
+use hugr::{Wire, builder::BuildError};
 
 /// Builder trait for lowering `TketOp`s into a target operation set.
-pub(super) trait SynthesizeTketOp: Dataflow {
-    /// Build a hadamard gate.
+///
+/// This is a pure interface: implementors are free to use any underlying gate
+/// set. There are no constraints on the implementing type beyond what each
+/// method requires of its inputs and outputs.
+///
+/// For Quantinuum platforms (Helios, Sol), the blanket impl via
+/// [`PhasedXRzSynth`] provides all methods automatically.
+pub(super) trait SynthesizeTketOp {
+    /// Build a Hadamard gate.
     fn build_h(&mut self, qb: Wire) -> Result<Wire, BuildError>;
     /// Build an X gate.
     fn build_x(&mut self, qb: Wire) -> Result<Wire, BuildError>;
@@ -25,6 +29,12 @@ pub(super) trait SynthesizeTketOp: Dataflow {
     fn build_t(&mut self, qb: Wire) -> Result<Wire, BuildError>;
     /// Build a Tdg gate.
     fn build_tdg(&mut self, qb: Wire) -> Result<Wire, BuildError>;
+    /// Build an RX gate.
+    fn build_rx(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError>;
+    /// Build an RY gate.
+    fn build_ry(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError>;
+    /// Build an RZ gate.
+    fn build_rz(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError>;
     /// Build a projective measurement with a conditional flip.
     fn build_measure_flip(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError>;
     /// Build a qalloc operation that panics on failure.
@@ -35,12 +45,6 @@ pub(super) trait SynthesizeTketOp: Dataflow {
     fn build_cy(&mut self, c: Wire, t: Wire) -> Result<[Wire; 2], BuildError>;
     /// Build a CZ gate.
     fn build_cz(&mut self, c: Wire, t: Wire) -> Result<[Wire; 2], BuildError>;
-    /// Build a RX gate.
-    fn build_rx(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError>;
-    /// Build a RY gate.
-    fn build_ry(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError>;
-    /// Build a RZ gate.
-    fn build_rz(&mut self, qb: Wire, theta: Wire) -> Result<Wire, BuildError>;
     /// Build a CRZ gate.
     fn build_crz(&mut self, c: Wire, t: Wire, theta: Wire) -> Result<[Wire; 2], BuildError>;
     /// Build a Toffoli (CCX) gate.
