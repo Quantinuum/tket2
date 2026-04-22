@@ -23,6 +23,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, TypeAlias, TypedDict
 
 from hugr.metadata import Metadata
+from ._tket import metadata as _metadata
 
 if TYPE_CHECKING:
     from hugr.utils import JsonType
@@ -60,37 +61,37 @@ class RewriteTraceValue(TypedDict):
 class MaxQubits(Metadata[int]):
     """Metadata key for the number of qubits required to execute a HUGR node."""
 
-    KEY = "tket.hint.max_qubits"
+    KEY = _metadata.MAX_QUBITS
 
 
 class CircuitRewriteTraces(Metadata[list[RewriteTraceValue]]):
     """Metadata key for rewrite traces recorded during circuit transformation."""
 
-    KEY = "TKET.rewrites"
+    KEY = _metadata.CIRCUIT_REWRITE_TRACES
 
 
 class Unitary(Metadata[int]):
     """Metadata key for unitary/modifier flags stored on a HUGR node."""
 
-    KEY = "TKET.unitary"
+    KEY = _metadata.UNITARY
 
 
 class InputParameters(Metadata[list[str]]):
     """Metadata key for explicit names of input parameter wires."""
 
-    KEY = "TKET1.input_parameters"
+    KEY = _metadata.INPUT_PARAMETERS
 
 
 class OpGroup(Metadata[str]):
     """Metadata key for the pytket ``opgroup`` field on a decoded operation."""
 
-    KEY = "TKET1.opgroup"
+    KEY = _metadata.OP_GROUP
 
 
 class BitRegisters(Metadata[list[PytketBit]]):
     """Metadata key for explicit names of input bit registers."""
 
-    KEY = "TKET1.bit_registers"
+    KEY = _metadata.BIT_REGISTERS
 
     @classmethod
     def to_json(cls, value: list[PytketBit]) -> JsonType:
@@ -104,7 +105,7 @@ class BitRegisters(Metadata[list[PytketBit]]):
 class QubitRegisters(Metadata[list[PytketQubit]]):
     """Metadata key for explicit names of input qubit registers."""
 
-    KEY = "TKET1.qubit_registers"
+    KEY = _metadata.QUBIT_REGISTERS
 
     @classmethod
     def to_json(cls, value: list[PytketQubit]) -> JsonType:
@@ -118,7 +119,7 @@ class QubitRegisters(Metadata[list[PytketQubit]]):
 class Phase(Metadata[str]):
     """Metadata key for the serialized TKET1 global phase expression."""
 
-    KEY = "TKET1.phase"
+    KEY = _metadata.PHASE
 
 
 def _store_pytket_register(value: list[tuple[str, list[int]]]) -> JsonType:
