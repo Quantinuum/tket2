@@ -10,6 +10,7 @@ use hugr_core::core::HugrNode;
 use hugr_core::extension::{ExtensionId, ExtensionRegistry};
 use hugr_core::hugr::InvalidIdentifier;
 use hugr_core::hugr::hugrmut::HugrMut;
+use hugr_core::hugr::patch::inline_call::{InlineCall, InlineCallError};
 use hugr_core::hugr::patch::inline_dfg::{InlineDFG, InlineDFGError};
 use hugr_core::ops::{Call, DataflowOpTrait, ExtensionOp, OpName};
 use hugr_core::types::Signature;
@@ -38,7 +39,7 @@ pub enum RebaseError<N: HugrNode> {
     NoReplacementFromIntermediate(OpName, N),
     /// An error occurred when inlining the call node during the rebase
     #[display("Error inlining Call node {_0} during rebase")]
-    InlineCallError(#[from] patches::InlineCallError<N>),
+    InlineCallError(#[from] InlineCallError<N>),
     /// An error occurred when inlining the DFG node resulting from a call inline during the rebase
     #[display("Error inlining DFG node {_0} during rebase")]
     InlineDFGError(#[from] InlineDFGError<N>),
@@ -305,7 +306,7 @@ where
 
             replace_op(hugr, n, sig, func_node)?;
             if let InlineCallsConfig::Yes(inline_dfgs) = self.inline.intermediate {
-                let inlined_nodes = hugr.apply_patch(patches::InlineCall::new(n.into()))?;
+                let inlined_nodes = hugr.apply_patch(InlineCall::new(n.into()))?;
                 if inline_dfgs {
                     let [_, removed_in, removed_out] = hugr.apply_patch(InlineDFG(n.into()))?;
                     new_nodes.extend(
@@ -349,7 +350,7 @@ where
 
             replace_op(hugr, n, signature, func_node)?;
             if let InlineCallsConfig::Yes(inline_dfgs) = self.inline.new {
-                hugr.apply_patch(patches::InlineCall::new(n.into()))?;
+                hugr.apply_patch(InlineCall::new(n.into()))?;
                 if inline_dfgs {
                     hugr.apply_patch(InlineDFG(n.into()))?;
                 }
