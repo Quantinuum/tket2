@@ -71,10 +71,11 @@ def ext_futures() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
 
 def ext_globals() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
     ext = tket_exts.globals
+    bool_t = tket_exts.bool.bool_t
     return (
         ext,
         [],
-        [ext.swap],
+        [ext.swap("test-name", bool_t)],
     )
 
 
