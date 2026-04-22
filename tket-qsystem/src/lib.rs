@@ -8,7 +8,6 @@ pub mod extension;
 pub mod llvm;
 pub mod lower_drops;
 pub mod pytket;
-pub mod replace_bools;
 pub mod replace_measurement;
 
 use derive_more::{Display, Error, From};

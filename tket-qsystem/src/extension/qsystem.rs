@@ -569,7 +569,6 @@ mod test {
     use hugr::extension::simple_op::MakeExtensionOp;
     use hugr::ops::OpType;
     use strum::IntoEnumIterator as _;
-    use tket::extension::MeasurementOpBuilder;
 
     use super::*;
 
@@ -621,7 +620,10 @@ mod test {
         let hugr = {
             let mut func_builder = FunctionBuilder::new(
                 "all_ops",
-                Signature::new(vec![qb_t(), float64_type()], vec![measurement_type()]),
+                Signature::new(
+                    vec![qb_t(), float64_type()],
+                    vec![measurement_type(), measurement_type()],
+                ),
             )
             .unwrap();
             let [q0, angle] = func_builder.input_wires_arr();
@@ -638,12 +640,11 @@ mod test {
                 .unwrap();
 
             let q0 = func_builder.add_rz(q0, angle).unwrap();
-            let [q0, _b] = func_builder.add_measure_reset(q0).unwrap();
-            let b = func_builder.add_measure(q0).unwrap();
-            func_builder.add_measurement_free(b).unwrap();
+            let [q0, b1] = func_builder.add_measure_reset(q0).unwrap();
+            let b2 = func_builder.add_measure(q0).unwrap();
             func_builder.add_qfree(q1).unwrap();
 
-            func_builder.finish_hugr_with_outputs([b]).unwrap()
+            func_builder.finish_hugr_with_outputs([b1, b2]).unwrap()
         };
         hugr.validate().unwrap()
     }

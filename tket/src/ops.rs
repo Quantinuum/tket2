@@ -416,8 +416,8 @@ pub(crate) mod test {
         })
         .unwrap();
 
-        // 6 commands: alloc, reset, cx, measure, read, free
-        assert_eq!(h.commands().count(), 6);
+        // 6 commands: alloc, reset, cx, measure, free
+        assert_eq!(h.commands().count(), 5);
     }
 
     #[test]

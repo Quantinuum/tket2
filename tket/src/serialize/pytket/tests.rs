@@ -15,7 +15,7 @@ use std::sync::Arc;
 
 use super::TKETDecode;
 use crate::TketOp;
-use crate::extension::TKET1_EXTENSION_ID;
+use crate::extension::{MeasurementOp, TKET1_EXTENSION_ID};
 use crate::extension::bool::{ConstOpaqueBool, OpaqueBoolOp, opaque_bool_type};
 use crate::extension::rotation::{ConstRotation, RotationOp, rotation_type};
 use crate::extension::sympy::SympyOpDef;
@@ -625,7 +625,7 @@ fn circ_nested_dfgs() -> Hugr {
             .unwrap()
             .outputs_arr();
         let [bool] = inner_dfg
-            .add_dataflow_op(OpaqueBoolOp::read, [bool])
+            .add_dataflow_op(MeasurementOp::Read, [bool])
             .unwrap()
             .outputs_arr();
 
@@ -850,7 +850,8 @@ fn circ_discard_first_qubit() -> Hugr {
 
     let [q1, q2] = h.input_wires_arr();
 
-    h.add_dataflow_op(TketOp::MeasureFree, [q1]).unwrap();
+    let [msmt] = h.add_dataflow_op(TketOp::MeasureFree, [q1]).unwrap().outputs_arr();
+    let _ = h.add_dataflow_op(MeasurementOp::Free, [msmt]);
 
     let [q2] = h.add_dataflow_op(TketOp::X, [q2]).unwrap().outputs_arr();
 
