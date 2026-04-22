@@ -1,4 +1,21 @@
-"""Metadata values defined by the TKET compiler."""
+"""Metadata values defined by the TKET compiler.
+
+Examples:
+    >>> from hugr import Hugr
+    >>> from tket.metadata import InputParameters, MaxQubits, Phase, QubitRegisters
+    >>>
+    >>> hugr = Hugr()
+    >>> node = hugr[hugr.module_root]
+    >>>
+    >>> node.metadata[MaxQubits] = 3
+    >>> node.metadata[InputParameters] = ["theta", "phi"]
+    >>> node.metadata[QubitRegisters] = [("q", [0]), ("ancilla", [1])]
+    >>> node.metadata[Phase] = "1/2"
+    >>> node.metadata[MaxQubits]
+    3
+    >>> node.metadata.get(QubitRegisters)
+    [('q', [0]), ('ancilla', [1])]
+"""
 # Changes to this file **MUST** be reflected in `tket/src/metadata.rs`
 
 from __future__ import annotations

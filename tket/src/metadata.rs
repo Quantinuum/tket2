@@ -1,4 +1,30 @@
 //! Collection of metadata keys used throughout tket.
+//!
+//! # Example
+//!
+//! ```rust
+//! use tket::metadata;
+//! use hugr::{Hugr, HugrView};
+//! # use hugr::hugr::hugrmut::HugrMut;
+//! # use hugr::types::Signature;
+//! # use tket_json_rs::register::{ElementId, Qubit};
+//!
+//! let mut hugr = Hugr::new();
+//! let node = hugr.entrypoint();
+//!
+//! hugr.set_metadata::<metadata::MaxQubits>(node, 3);
+//! hugr.set_metadata::<metadata::InputParameters>(node, vec!["theta".to_string()]);
+//! hugr.set_metadata::<metadata::QubitRegisters>(
+//!     node,
+//!     vec![Qubit::from(ElementId("q".to_string(), vec![0]))],
+//! );
+//!
+//! assert_eq!(hugr.get_metadata::<metadata::MaxQubits>(node), Some(3));
+//! assert_eq!(
+//!     hugr.get_metadata::<metadata::InputParameters>(node),
+//!     Some(vec!["theta".to_string()]),
+//! );
+//! ```
 //
 // Changes to this file **MUST** be reflected in `tket-py/tket/metadata.py`
 
