@@ -21,7 +21,7 @@ entry_block:                                      ; preds = %alloca_block
   %"2_01" = load i64, ptr %"2_0", align 4
   %"2_12" = load double, ptr %"2_1", align 8
   %"2_23" = load double, ptr %"2_2", align 8
-  notail call void @___rxy(i64 %"2_01", double %"2_12", double %"2_23"), !dbg !9
+  call void @___rxy(i64 %"2_01", double %"2_12", double %"2_23"), !dbg !9
   store i64 %"2_01", ptr %"4_0", align 4, !dbg !9
   %"4_04" = load i64, ptr %"4_0", align 4
   store i64 %"4_04", ptr %"0", align 4

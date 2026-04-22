@@ -23,8 +23,8 @@ entry_block:                                      ; preds = %alloca_block
   %"2_01" = load i64, ptr %"2_0", align 4
   store i64 %"2_01", ptr %"6_0", align 4
   %"6_02" = load i64, ptr %"6_0", align 4
-  %lazy_measure = notail call i64 @___lazy_measure(i64 %"6_02"), !dbg !13
-  notail call void @___reset(i64 %"6_02"), !dbg !13
+  %lazy_measure = call i64 @___lazy_measure(i64 %"6_02"), !dbg !13
+  call void @___reset(i64 %"6_02"), !dbg !13
   store i64 %"6_02", ptr %"8_0", align 4, !dbg !13
   store i64 %lazy_measure, ptr %"8_1", align 4, !dbg !13
   %"8_13" = load i64, ptr %"8_1", align 4

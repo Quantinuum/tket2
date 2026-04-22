@@ -9,33 +9,33 @@ target triple = "x86_64-unknown-linux-gnu"
 
 define void @"__hugr__.__main__.postselect_panic.<locals>.main.1"() local_unnamed_addr !dbg !4 {
 alloca_block:
-  %qalloc.i = notail call i64 @___qalloc(), !dbg !8
+  %qalloc.i = tail call i64 @___qalloc(), !dbg !8
   %not_max.not.not.i = icmp eq i64 %qalloc.i, -1, !dbg !8
   br i1 %not_max.not.not.i, label %cond_43_case_0.i, label %__hugr__.__tk2_qalloc.39.exit, !dbg !8
 
 cond_43_case_0.i:                                 ; preds = %alloca_block
-  notail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0"), !dbg !8
+  tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0"), !dbg !8
   unreachable, !dbg !8
 
 __hugr__.__tk2_qalloc.39.exit:                    ; preds = %alloca_block
-  notail call void @___reset(i64 %qalloc.i), !dbg !8
-  notail call void @___rxy(i64 %qalloc.i, double 0x3FF921FB54442D18, double 0xBFF921FB54442D18), !dbg !9
-  notail call void @___rz(i64 %qalloc.i, double 0x400921FB54442D18), !dbg !9
-  %lazy_measure = notail call i64 @___lazy_measure(i64 %qalloc.i)
-  notail call void @___qfree(i64 %qalloc.i)
-  notail call void @___inc_future_refcount(i64 %lazy_measure)
+  tail call void @___reset(i64 %qalloc.i), !dbg !8
+  tail call void @___rxy(i64 %qalloc.i, double 0x3FF921FB54442D18, double 0xBFF921FB54442D18), !dbg !9
+  tail call void @___rz(i64 %qalloc.i, double 0x400921FB54442D18), !dbg !9
+  %lazy_measure = tail call i64 @___lazy_measure(i64 %qalloc.i)
+  tail call void @___qfree(i64 %qalloc.i)
+  tail call void @___inc_future_refcount(i64 %lazy_measure)
   %read_bool = tail call i1 @___read_future_bool(i64 %lazy_measure)
-  notail call void @___dec_future_refcount(i64 %lazy_measure)
+  tail call void @___dec_future_refcount(i64 %lazy_measure)
   br i1 %read_bool, label %0, label %cond_96_case_1
 
 cond_96_case_1:                                   ; preds = %__hugr__.__tk2_qalloc.39.exit
   %read_bool65 = tail call i1 @___read_future_bool(i64 %lazy_measure)
-  notail call void @___dec_future_refcount(i64 %lazy_measure)
-  notail call void @print_bool(ptr nonnull @res_c.1C9EF4D1.0, i64 11, i1 %read_bool65), !dbg !10
+  tail call void @___dec_future_refcount(i64 %lazy_measure)
+  tail call void @print_bool(ptr nonnull @res_c.1C9EF4D1.0, i64 11, i1 %read_bool65), !dbg !10
   ret void
 
 0:                                                ; preds = %__hugr__.__tk2_qalloc.39.exit
-  notail call void @panic(i32 1001, ptr nonnull @s_Postselect.13DF1CD0.0), !dbg !11
+  tail call void @panic(i32 1001, ptr nonnull @s_Postselect.13DF1CD0.0), !dbg !11
   unreachable
 }
 
@@ -65,7 +65,7 @@ declare void @___rz(i64, double) local_unnamed_addr
 define i64 @qmain(i64 %0) local_unnamed_addr !dbg !12 {
 entry:
   tail call void @setup(i64 %0), !dbg !17
-  notail call void @"__hugr__.__main__.postselect_panic.<locals>.main.1"(), !dbg !17
+  tail call void @"__hugr__.__main__.postselect_panic.<locals>.main.1"(), !dbg !17
   %1 = tail call i64 @teardown(), !dbg !17
   ret i64 %1, !dbg !17
 }

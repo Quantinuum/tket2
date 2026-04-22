@@ -10,7 +10,7 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  %shot = notail call i64 @get_current_shot(), !dbg !8
+  %shot = call i64 @get_current_shot(), !dbg !8
   ret i64 %shot
 }
 

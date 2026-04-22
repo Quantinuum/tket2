@@ -16,7 +16,6 @@ use inkwell::support::LLVMString;
 use inkwell::targets::{
     CodeModel, InitializationConfig, RelocMode, Target, TargetMachine, TargetTriple,
 };
-use inkwell::values::LLVMTailCallKind;
 use itertools::Itertools;
 use pyo3::prelude::*;
 use tket::hugr::ops::DataflowParent;
@@ -286,8 +285,7 @@ fn wrap_main<'c>(
         .ok_or_else(|| anyhow!("Entrypoint function '{hugr_entry}' not found in Module"))?;
 
     let _ = builder.build_call(setup, &[initial_tc.into()], "")?;
-    let main_call = builder.build_call(hugr_main, &[], "")?;
-    main_call.set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
+    let _ = builder.build_call(hugr_main, &[], "")?;
     let tc = builder
         .build_call(teardown, &[], "")?
         .try_as_basic_value()

@@ -10,8 +10,8 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  %lazy_measure = notail call i64 @___lazy_measure(i64 %0), !dbg !13
-  notail call void @___reset(i64 %0), !dbg !13
+  %lazy_measure = call i64 @___lazy_measure(i64 %0), !dbg !13
+  call void @___reset(i64 %0), !dbg !13
   %1 = insertvalue { i1, i64, i1 } { i1 true, i64 poison, i1 poison }, i64 %lazy_measure, 1
   %mrv = insertvalue { i64, { i1, i64, i1 } } poison, i64 %0, 0
   %mrv10 = insertvalue { i64, { i1, i64, i1 } } %mrv, { i1, i64, i1 } %1, 1

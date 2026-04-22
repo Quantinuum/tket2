@@ -15,7 +15,7 @@ alloca_block:
 entry_block:                                      ; preds = %alloca_block
   store i64 %0, ptr %"2_0", align 4
   %"2_01" = load i64, ptr %"2_0", align 4
-  %read_uint = notail call i64 @___read_future_uint(i64 %"2_01"), !dbg !8
+  %read_uint = call i64 @___read_future_uint(i64 %"2_01"), !dbg !8
   call void @___dec_future_refcount(i64 %"2_01"), !dbg !8
   store i64 %read_uint, ptr %"4_0", align 4, !dbg !8
   %"4_02" = load i64, ptr %"4_0", align 4

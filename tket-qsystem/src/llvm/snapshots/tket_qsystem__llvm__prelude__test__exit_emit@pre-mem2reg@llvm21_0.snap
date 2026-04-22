@@ -27,7 +27,7 @@ entry_block:                                      ; preds = %alloca_block
   %"2_13" = load i64, ptr %"2_1", align 4
   %2 = extractvalue { i32, ptr } %"5_01", 0, !dbg !10
   %3 = extractvalue { i32, ptr } %"5_01", 1, !dbg !10
-  notail call void @panic(i32 %2, ptr %3), !dbg !10
+  call void @panic(i32 %2, ptr %3), !dbg !10
   store i64 0, ptr %"6_0", align 4, !dbg !10
   store i64 0, ptr %"6_1", align 4, !dbg !10
   %"6_04" = load i64, ptr %"6_0", align 4

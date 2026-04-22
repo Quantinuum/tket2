@@ -15,7 +15,7 @@ entry_block:                                      ; preds = %alloca_block
   %2 = extractvalue { i32, ptr } { i32 42, ptr @e_PANIC.DF25FD88.0 }, 0, !dbg !10
   %shift_code = add i32 %2, 1000, !dbg !10
   %3 = extractvalue { i32, ptr } { i32 42, ptr @e_PANIC.DF25FD88.0 }, 1, !dbg !10
-  notail call void @panic(i32 %shift_code, ptr %3), !dbg !10
+  call void @panic(i32 %shift_code, ptr %3), !dbg !10
   %mrv = insertvalue { i64, i64 } poison, i64 0, 0
   %mrv8 = insertvalue { i64, i64 } %mrv, i64 0, 1
   ret { i64, i64 } %mrv8

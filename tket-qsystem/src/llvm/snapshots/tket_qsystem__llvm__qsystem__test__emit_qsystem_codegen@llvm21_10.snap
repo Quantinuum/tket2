@@ -10,8 +10,8 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  %lazy_measure_leaked = notail call i64 @___lazy_measure_leaked(i64 %0), !dbg !8
-  notail call void @___qfree(i64 %0), !dbg !8
+  %lazy_measure_leaked = call i64 @___lazy_measure_leaked(i64 %0), !dbg !8
+  call void @___qfree(i64 %0), !dbg !8
   ret i64 %lazy_measure_leaked
 }
 

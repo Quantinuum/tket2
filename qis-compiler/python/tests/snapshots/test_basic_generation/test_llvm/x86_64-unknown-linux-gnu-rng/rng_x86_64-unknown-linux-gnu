@@ -13,27 +13,27 @@ target triple = "x86_64-unknown-linux-gnu"
 
 define void @"__hugr__.__main__.rng.<locals>.main.1"() local_unnamed_addr !dbg !4 {
 alloca_block:
-  notail call void @random_seed(i64 42), !dbg !8
-  %rint = notail call i32 @random_int(), !dbg !17
-  %rint14 = notail call i32 @random_int(), !dbg !18
-  %rfloat = notail call double @random_float(), !dbg !19
-  %rintb = notail call i32 @random_rng(i32 100), !dbg !20
+  tail call void @random_seed(i64 42), !dbg !8
+  %rint = tail call i32 @random_int(), !dbg !17
+  %rint14 = tail call i32 @random_int(), !dbg !18
+  %rfloat = tail call double @random_float(), !dbg !19
+  %rintb = tail call i32 @random_rng(i32 100), !dbg !20
   %0 = sext i32 %rintb to i64, !dbg !20
   %1 = sext i32 %rint14 to i64, !dbg !18
   %2 = sext i32 %rint to i64, !dbg !17
-  notail call void @print_int(ptr nonnull @res_rint.B928E41E.0, i64 13, i64 %2), !dbg !21
-  notail call void @print_int(ptr nonnull @res_rint1.0884EC03.0, i64 14, i64 %1), !dbg !22
-  notail call void @print_float(ptr nonnull @res_rfloat.F0E4DD2C.0, i64 17, double %rfloat), !dbg !23
-  notail call void @print_int(ptr nonnull @res_rint_bnd.CB1E6B0D.0, i64 17, i64 %0), !dbg !24
-  notail call void @random_seed(i64 84), !dbg !25
-  %rint47 = notail call i32 @random_int(), !dbg !27
-  %rfloat49 = notail call double @random_float(), !dbg !28
-  %rintb52 = notail call i32 @random_rng(i32 200), !dbg !29
+  tail call void @print_int(ptr nonnull @res_rint.B928E41E.0, i64 13, i64 %2), !dbg !21
+  tail call void @print_int(ptr nonnull @res_rint1.0884EC03.0, i64 14, i64 %1), !dbg !22
+  tail call void @print_float(ptr nonnull @res_rfloat.F0E4DD2C.0, i64 17, double %rfloat), !dbg !23
+  tail call void @print_int(ptr nonnull @res_rint_bnd.CB1E6B0D.0, i64 17, i64 %0), !dbg !24
+  tail call void @random_seed(i64 84), !dbg !25
+  %rint47 = tail call i32 @random_int(), !dbg !27
+  %rfloat49 = tail call double @random_float(), !dbg !28
+  %rintb52 = tail call i32 @random_rng(i32 200), !dbg !29
   %3 = sext i32 %rintb52 to i64, !dbg !29
   %4 = sext i32 %rint47 to i64, !dbg !27
-  notail call void @print_int(ptr nonnull @res_rint2.F0335598.0, i64 14, i64 %4), !dbg !30
-  notail call void @print_float(ptr nonnull @res_rfloat2.4DAB941F.0, i64 18, double %rfloat49), !dbg !31
-  notail call void @print_int(ptr nonnull @res_rint_bnd2.169DE399.0, i64 18, i64 %3), !dbg !32
+  tail call void @print_int(ptr nonnull @res_rint2.F0335598.0, i64 14, i64 %4), !dbg !30
+  tail call void @print_float(ptr nonnull @res_rfloat2.4DAB941F.0, i64 18, double %rfloat49), !dbg !31
+  tail call void @print_int(ptr nonnull @res_rint_bnd2.169DE399.0, i64 18, i64 %3), !dbg !32
   ret void
 }
 
@@ -52,7 +52,7 @@ declare void @random_seed(i64) local_unnamed_addr
 define i64 @qmain(i64 %0) local_unnamed_addr !dbg !33 {
 entry:
   tail call void @setup(i64 %0), !dbg !37
-  notail call void @"__hugr__.__main__.rng.<locals>.main.1"(), !dbg !37
+  tail call void @"__hugr__.__main__.rng.<locals>.main.1"(), !dbg !37
   %1 = tail call i64 @teardown(), !dbg !37
   ret i64 %1, !dbg !37
 }

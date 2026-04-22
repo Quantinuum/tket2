@@ -13,34 +13,34 @@ alloca_block:
   %0 = tail call ptr @heap_alloc(i64 80), !dbg !8
   %1 = tail call ptr @heap_alloc(i64 8), !dbg !8
   store i64 -1, ptr %1, align 1, !dbg !8
-  %qalloc.i = notail call i64 @___qalloc(), !dbg !9
+  %qalloc.i = tail call i64 @___qalloc(), !dbg !9
   %not_max.not.not.i = icmp eq i64 %qalloc.i, -1, !dbg !9
   br i1 %not_max.not.not.i, label %cond_299_case_0.i, label %__hugr__.__tk2_qalloc.295.exit, !dbg !9
 
 cond_299_case_0.i:                                ; preds = %cond_exit_20.8, %cond_exit_20.7, %cond_exit_20.6, %cond_exit_20.5, %cond_exit_20.4, %cond_exit_20.3, %cond_exit_20.2, %cond_exit_20.1, %cond_exit_20, %alloca_block
-  notail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0"), !dbg !9
+  tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0"), !dbg !9
   unreachable, !dbg !9
 
 __hugr__.__tk2_qalloc.295.exit:                   ; preds = %alloca_block
-  notail call void @___reset(i64 %qalloc.i), !dbg !9
+  tail call void @___reset(i64 %qalloc.i), !dbg !9
   %2 = load i64, ptr %1, align 4
   %3 = trunc i64 %2 to i1
   br i1 %3, label %cond_exit_20, label %panic.i
 
 panic.i:                                          ; preds = %__barray_check_bounds.exit.9, %__hugr__.__tk2_qalloc.295.exit.8, %__hugr__.__tk2_qalloc.295.exit.7, %__hugr__.__tk2_qalloc.295.exit.6, %__hugr__.__tk2_qalloc.295.exit.5, %__hugr__.__tk2_qalloc.295.exit.4, %__hugr__.__tk2_qalloc.295.exit.3, %__hugr__.__tk2_qalloc.295.exit.2, %__hugr__.__tk2_qalloc.295.exit.1, %__hugr__.__tk2_qalloc.295.exit
-  notail call void @panic(i32 1002, ptr nonnull @"e_Array alre.5A300C2A.0")
+  tail call void @panic(i32 1002, ptr nonnull @"e_Array alre.5A300C2A.0")
   unreachable
 
 cond_exit_20:                                     ; preds = %__hugr__.__tk2_qalloc.295.exit
   %4 = and i64 %2, -2
   store i64 %4, ptr %1, align 4
   store i64 %qalloc.i, ptr %0, align 4
-  %qalloc.i.1 = notail call i64 @___qalloc(), !dbg !9
+  %qalloc.i.1 = tail call i64 @___qalloc(), !dbg !9
   %not_max.not.not.i.1 = icmp eq i64 %qalloc.i.1, -1, !dbg !9
   br i1 %not_max.not.not.i.1, label %cond_299_case_0.i, label %__hugr__.__tk2_qalloc.295.exit.1, !dbg !9
 
 __hugr__.__tk2_qalloc.295.exit.1:                 ; preds = %cond_exit_20
-  notail call void @___reset(i64 %qalloc.i.1), !dbg !9
+  tail call void @___reset(i64 %qalloc.i.1), !dbg !9
   %5 = load i64, ptr %1, align 4
   %6 = and i64 %5, 2
   %.not280 = icmp eq i64 %6, 0
@@ -51,12 +51,12 @@ cond_exit_20.1:                                   ; preds = %__hugr__.__tk2_qall
   store i64 %7, ptr %1, align 4
   %8 = getelementptr inbounds nuw i8, ptr %0, i64 8
   store i64 %qalloc.i.1, ptr %8, align 4
-  %qalloc.i.2 = notail call i64 @___qalloc(), !dbg !9
+  %qalloc.i.2 = tail call i64 @___qalloc(), !dbg !9
   %not_max.not.not.i.2 = icmp eq i64 %qalloc.i.2, -1, !dbg !9
   br i1 %not_max.not.not.i.2, label %cond_299_case_0.i, label %__hugr__.__tk2_qalloc.295.exit.2, !dbg !9
 
 __hugr__.__tk2_qalloc.295.exit.2:                 ; preds = %cond_exit_20.1
-  notail call void @___reset(i64 %qalloc.i.2), !dbg !9
+  tail call void @___reset(i64 %qalloc.i.2), !dbg !9
   %9 = load i64, ptr %1, align 4
   %10 = and i64 %9, 4
   %.not281 = icmp eq i64 %10, 0
@@ -67,12 +67,12 @@ cond_exit_20.2:                                   ; preds = %__hugr__.__tk2_qall
   store i64 %11, ptr %1, align 4
   %12 = getelementptr inbounds nuw i8, ptr %0, i64 16
   store i64 %qalloc.i.2, ptr %12, align 4
-  %qalloc.i.3 = notail call i64 @___qalloc(), !dbg !9
+  %qalloc.i.3 = tail call i64 @___qalloc(), !dbg !9
   %not_max.not.not.i.3 = icmp eq i64 %qalloc.i.3, -1, !dbg !9
   br i1 %not_max.not.not.i.3, label %cond_299_case_0.i, label %__hugr__.__tk2_qalloc.295.exit.3, !dbg !9
 
 __hugr__.__tk2_qalloc.295.exit.3:                 ; preds = %cond_exit_20.2
-  notail call void @___reset(i64 %qalloc.i.3), !dbg !9
+  tail call void @___reset(i64 %qalloc.i.3), !dbg !9
   %13 = load i64, ptr %1, align 4
   %14 = and i64 %13, 8
   %.not282 = icmp eq i64 %14, 0
@@ -83,12 +83,12 @@ cond_exit_20.3:                                   ; preds = %__hugr__.__tk2_qall
   store i64 %15, ptr %1, align 4
   %16 = getelementptr inbounds nuw i8, ptr %0, i64 24
   store i64 %qalloc.i.3, ptr %16, align 4
-  %qalloc.i.4 = notail call i64 @___qalloc(), !dbg !9
+  %qalloc.i.4 = tail call i64 @___qalloc(), !dbg !9
   %not_max.not.not.i.4 = icmp eq i64 %qalloc.i.4, -1, !dbg !9
   br i1 %not_max.not.not.i.4, label %cond_299_case_0.i, label %__hugr__.__tk2_qalloc.295.exit.4, !dbg !9
 
 __hugr__.__tk2_qalloc.295.exit.4:                 ; preds = %cond_exit_20.3
-  notail call void @___reset(i64 %qalloc.i.4), !dbg !9
+  tail call void @___reset(i64 %qalloc.i.4), !dbg !9
   %17 = load i64, ptr %1, align 4
   %18 = and i64 %17, 16
   %.not283 = icmp eq i64 %18, 0
@@ -99,12 +99,12 @@ cond_exit_20.4:                                   ; preds = %__hugr__.__tk2_qall
   store i64 %19, ptr %1, align 4
   %20 = getelementptr inbounds nuw i8, ptr %0, i64 32
   store i64 %qalloc.i.4, ptr %20, align 4
-  %qalloc.i.5 = notail call i64 @___qalloc(), !dbg !9
+  %qalloc.i.5 = tail call i64 @___qalloc(), !dbg !9
   %not_max.not.not.i.5 = icmp eq i64 %qalloc.i.5, -1, !dbg !9
   br i1 %not_max.not.not.i.5, label %cond_299_case_0.i, label %__hugr__.__tk2_qalloc.295.exit.5, !dbg !9
 
 __hugr__.__tk2_qalloc.295.exit.5:                 ; preds = %cond_exit_20.4
-  notail call void @___reset(i64 %qalloc.i.5), !dbg !9
+  tail call void @___reset(i64 %qalloc.i.5), !dbg !9
   %21 = load i64, ptr %1, align 4
   %22 = and i64 %21, 32
   %.not284 = icmp eq i64 %22, 0
@@ -115,12 +115,12 @@ cond_exit_20.5:                                   ; preds = %__hugr__.__tk2_qall
   store i64 %23, ptr %1, align 4
   %24 = getelementptr inbounds nuw i8, ptr %0, i64 40
   store i64 %qalloc.i.5, ptr %24, align 4
-  %qalloc.i.6 = notail call i64 @___qalloc(), !dbg !9
+  %qalloc.i.6 = tail call i64 @___qalloc(), !dbg !9
   %not_max.not.not.i.6 = icmp eq i64 %qalloc.i.6, -1, !dbg !9
   br i1 %not_max.not.not.i.6, label %cond_299_case_0.i, label %__hugr__.__tk2_qalloc.295.exit.6, !dbg !9
 
 __hugr__.__tk2_qalloc.295.exit.6:                 ; preds = %cond_exit_20.5
-  notail call void @___reset(i64 %qalloc.i.6), !dbg !9
+  tail call void @___reset(i64 %qalloc.i.6), !dbg !9
   %25 = load i64, ptr %1, align 4
   %26 = and i64 %25, 64
   %.not285 = icmp eq i64 %26, 0
@@ -131,12 +131,12 @@ cond_exit_20.6:                                   ; preds = %__hugr__.__tk2_qall
   store i64 %27, ptr %1, align 4
   %28 = getelementptr inbounds nuw i8, ptr %0, i64 48
   store i64 %qalloc.i.6, ptr %28, align 4
-  %qalloc.i.7 = notail call i64 @___qalloc(), !dbg !9
+  %qalloc.i.7 = tail call i64 @___qalloc(), !dbg !9
   %not_max.not.not.i.7 = icmp eq i64 %qalloc.i.7, -1, !dbg !9
   br i1 %not_max.not.not.i.7, label %cond_299_case_0.i, label %__hugr__.__tk2_qalloc.295.exit.7, !dbg !9
 
 __hugr__.__tk2_qalloc.295.exit.7:                 ; preds = %cond_exit_20.6
-  notail call void @___reset(i64 %qalloc.i.7), !dbg !9
+  tail call void @___reset(i64 %qalloc.i.7), !dbg !9
   %29 = load i64, ptr %1, align 4
   %30 = and i64 %29, 128
   %.not286 = icmp eq i64 %30, 0
@@ -147,12 +147,12 @@ cond_exit_20.7:                                   ; preds = %__hugr__.__tk2_qall
   store i64 %31, ptr %1, align 4
   %32 = getelementptr inbounds nuw i8, ptr %0, i64 56
   store i64 %qalloc.i.7, ptr %32, align 4
-  %qalloc.i.8 = notail call i64 @___qalloc(), !dbg !9
+  %qalloc.i.8 = tail call i64 @___qalloc(), !dbg !9
   %not_max.not.not.i.8 = icmp eq i64 %qalloc.i.8, -1, !dbg !9
   br i1 %not_max.not.not.i.8, label %cond_299_case_0.i, label %__hugr__.__tk2_qalloc.295.exit.8, !dbg !9
 
 __hugr__.__tk2_qalloc.295.exit.8:                 ; preds = %cond_exit_20.7
-  notail call void @___reset(i64 %qalloc.i.8), !dbg !9
+  tail call void @___reset(i64 %qalloc.i.8), !dbg !9
   %33 = load i64, ptr %1, align 4
   %34 = and i64 %33, 256
   %.not287 = icmp eq i64 %34, 0
@@ -163,12 +163,12 @@ cond_exit_20.8:                                   ; preds = %__hugr__.__tk2_qall
   store i64 %35, ptr %1, align 4
   %36 = getelementptr inbounds nuw i8, ptr %0, i64 64
   store i64 %qalloc.i.8, ptr %36, align 4
-  %qalloc.i.9 = notail call i64 @___qalloc(), !dbg !9
+  %qalloc.i.9 = tail call i64 @___qalloc(), !dbg !9
   %not_max.not.not.i.9 = icmp eq i64 %qalloc.i.9, -1, !dbg !9
   br i1 %not_max.not.not.i.9, label %cond_299_case_0.i, label %__barray_check_bounds.exit.9, !dbg !9
 
 __barray_check_bounds.exit.9:                     ; preds = %cond_exit_20.8
-  notail call void @___reset(i64 %qalloc.i.9), !dbg !9
+  tail call void @___reset(i64 %qalloc.i.9), !dbg !9
   %37 = load i64, ptr %1, align 4
   %38 = and i64 %37, 512
   %.not288 = icmp eq i64 %38, 0
@@ -187,20 +187,20 @@ cond_exit_20.9:                                   ; preds = %__barray_check_boun
   br i1 %42, label %panic.i238, label %__barray_mask_borrow.exit, !dbg !10
 
 panic.i238:                                       ; preds = %cond_exit_20.9
-  notail call void @panic(i32 1002, ptr nonnull @"e_Array elem.E746B1A3.0"), !dbg !10
+  tail call void @panic(i32 1002, ptr nonnull @"e_Array elem.E746B1A3.0"), !dbg !10
   unreachable, !dbg !10
 
 __barray_mask_borrow.exit:                        ; preds = %cond_exit_20.9
   %43 = or disjoint i64 %41, 1, !dbg !10
   store i64 %43, ptr %1, align 4, !dbg !10
   %44 = load i64, ptr %0, align 4, !dbg !12
-  notail call void @___rxy(i64 %44, double 0x400921FB54442D18, double 0.000000e+00), !dbg !13
+  tail call void @___rxy(i64 %44, double 0x400921FB54442D18, double 0.000000e+00), !dbg !13
   %45 = load i64, ptr %1, align 4, !dbg !12
   %46 = trunc i64 %45 to i1, !dbg !12
   br i1 %46, label %__barray_mask_return.exit240, label %panic.i239, !dbg !12
 
 panic.i239:                                       ; preds = %__barray_mask_borrow.exit
-  notail call void @panic(i32 1002, ptr nonnull @"e_Array alre.5A300C2A.0"), !dbg !12
+  tail call void @panic(i32 1002, ptr nonnull @"e_Array alre.5A300C2A.0"), !dbg !12
   unreachable, !dbg !12
 
 __barray_mask_return.exit240:                     ; preds = %__barray_mask_borrow.exit
@@ -213,21 +213,21 @@ __barray_mask_return.exit240:                     ; preds = %__barray_mask_borro
   br i1 %.not, label %__barray_mask_borrow.exit242, label %panic.i241, !dbg !14
 
 panic.i241:                                       ; preds = %__barray_mask_return.exit240
-  notail call void @panic(i32 1002, ptr nonnull @"e_Array elem.E746B1A3.0"), !dbg !14
+  tail call void @panic(i32 1002, ptr nonnull @"e_Array elem.E746B1A3.0"), !dbg !14
   unreachable, !dbg !14
 
 __barray_mask_borrow.exit242:                     ; preds = %__barray_mask_return.exit240
   %50 = or disjoint i64 %48, 4, !dbg !14
   store i64 %50, ptr %1, align 4, !dbg !14
   %51 = load i64, ptr %12, align 4, !dbg !16
-  notail call void @___rxy(i64 %51, double 0x400921FB54442D18, double 0.000000e+00), !dbg !17
+  tail call void @___rxy(i64 %51, double 0x400921FB54442D18, double 0.000000e+00), !dbg !17
   %52 = load i64, ptr %1, align 4, !dbg !16
   %53 = and i64 %52, 4, !dbg !16
   %.not268 = icmp eq i64 %53, 0, !dbg !16
   br i1 %.not268, label %panic.i243, label %__barray_mask_return.exit244, !dbg !16
 
 panic.i243:                                       ; preds = %__barray_mask_borrow.exit242
-  notail call void @panic(i32 1002, ptr nonnull @"e_Array alre.5A300C2A.0"), !dbg !16
+  tail call void @panic(i32 1002, ptr nonnull @"e_Array alre.5A300C2A.0"), !dbg !16
   unreachable, !dbg !16
 
 __barray_mask_return.exit244:                     ; preds = %__barray_mask_borrow.exit242
@@ -240,21 +240,21 @@ __barray_mask_return.exit244:                     ; preds = %__barray_mask_borro
   br i1 %.not269, label %__barray_mask_borrow.exit246, label %panic.i245, !dbg !18
 
 panic.i245:                                       ; preds = %__barray_mask_return.exit244
-  notail call void @panic(i32 1002, ptr nonnull @"e_Array elem.E746B1A3.0"), !dbg !18
+  tail call void @panic(i32 1002, ptr nonnull @"e_Array elem.E746B1A3.0"), !dbg !18
   unreachable, !dbg !18
 
 __barray_mask_borrow.exit246:                     ; preds = %__barray_mask_return.exit244
   %57 = or disjoint i64 %55, 8, !dbg !18
   store i64 %57, ptr %1, align 4, !dbg !18
   %58 = load i64, ptr %16, align 4, !dbg !20
-  notail call void @___rxy(i64 %58, double 0x400921FB54442D18, double 0.000000e+00), !dbg !21
+  tail call void @___rxy(i64 %58, double 0x400921FB54442D18, double 0.000000e+00), !dbg !21
   %59 = load i64, ptr %1, align 4, !dbg !20
   %60 = and i64 %59, 8, !dbg !20
   %.not270 = icmp eq i64 %60, 0, !dbg !20
   br i1 %.not270, label %panic.i247, label %__barray_mask_return.exit248, !dbg !20
 
 panic.i247:                                       ; preds = %__barray_mask_borrow.exit246
-  notail call void @panic(i32 1002, ptr nonnull @"e_Array alre.5A300C2A.0"), !dbg !20
+  tail call void @panic(i32 1002, ptr nonnull @"e_Array alre.5A300C2A.0"), !dbg !20
   unreachable, !dbg !20
 
 __barray_mask_return.exit248:                     ; preds = %__barray_mask_borrow.exit246
@@ -267,21 +267,21 @@ __barray_mask_return.exit248:                     ; preds = %__barray_mask_borro
   br i1 %.not271, label %__barray_mask_borrow.exit250, label %panic.i249, !dbg !22
 
 panic.i249:                                       ; preds = %__barray_mask_return.exit248
-  notail call void @panic(i32 1002, ptr nonnull @"e_Array elem.E746B1A3.0"), !dbg !22
+  tail call void @panic(i32 1002, ptr nonnull @"e_Array elem.E746B1A3.0"), !dbg !22
   unreachable, !dbg !22
 
 __barray_mask_borrow.exit250:                     ; preds = %__barray_mask_return.exit248
   %64 = or disjoint i64 %62, 512, !dbg !22
   store i64 %64, ptr %1, align 4, !dbg !22
   %65 = load i64, ptr %40, align 4, !dbg !24
-  notail call void @___rxy(i64 %65, double 0x400921FB54442D18, double 0.000000e+00), !dbg !25
+  tail call void @___rxy(i64 %65, double 0x400921FB54442D18, double 0.000000e+00), !dbg !25
   %66 = load i64, ptr %1, align 4, !dbg !24
   %67 = and i64 %66, 512, !dbg !24
   %.not272 = icmp eq i64 %67, 0, !dbg !24
   br i1 %.not272, label %panic.i251, label %__barray_mask_return.exit252, !dbg !24
 
 panic.i251:                                       ; preds = %__barray_mask_borrow.exit250
-  notail call void @panic(i32 1002, ptr nonnull @"e_Array alre.5A300C2A.0"), !dbg !24
+  tail call void @panic(i32 1002, ptr nonnull @"e_Array alre.5A300C2A.0"), !dbg !24
   unreachable, !dbg !24
 
 __barray_mask_return.exit252:                     ; preds = %__barray_mask_borrow.exit250
@@ -332,7 +332,7 @@ mask_block_ok.i.i.i:                              ; preds = %72, %90
   br i1 %93, label %90, label %mask_block_err.i.i.i, !dbg !44
 
 mask_block_err.i.i.i:                             ; preds = %mask_block_ok.i.i.i
-  notail call void @panic(i32 1002, ptr nonnull @"e_Array cont.EFA5AC45.0"), !dbg !44
+  tail call void @panic(i32 1002, ptr nonnull @"e_Array cont.EFA5AC45.0"), !dbg !44
   unreachable, !dbg !44
 
 __barray_check_bounds.exit.i.i:                   ; preds = %loop_body.i, %__barray_mask_return.exit252
@@ -352,7 +352,7 @@ __barray_check_bounds.exit.i.i:                   ; preds = %loop_body.i, %__bar
   br i1 %101, label %panic.i.i.i, label %__barray_check_bounds.exit.i, !dbg !56
 
 panic.i.i.i:                                      ; preds = %__barray_check_bounds.exit.i.i
-  notail call void @panic(i32 1002, ptr nonnull @"e_Array elem.E746B1A3.0"), !dbg !56
+  tail call void @panic(i32 1002, ptr nonnull @"e_Array elem.E746B1A3.0"), !dbg !56
   unreachable, !dbg !56
 
 __barray_check_bounds.exit.i:                     ; preds = %__barray_check_bounds.exit.i.i
@@ -361,15 +361,15 @@ __barray_check_bounds.exit.i:                     ; preds = %__barray_check_boun
   store i64 %103, ptr %97, align 4, !dbg !56
   %104 = getelementptr inbounds i64, ptr %.fca.0.extract80.i185.i, i64 %95, !dbg !55
   %105 = load i64, ptr %104, align 4, !dbg !55
-  %lazy_measure.i = notail call i64 @___lazy_measure(i64 %105)
-  notail call void @___qfree(i64 %105)
+  %lazy_measure.i = tail call i64 @___lazy_measure(i64 %105)
+  tail call void @___qfree(i64 %105)
   %106 = load i64, ptr %71, align 4
   %107 = lshr i64 %106, %"163_0.sroa.15.0184.i"
   %108 = trunc i64 %107 to i1
   br i1 %108, label %loop_body.i, label %panic.i.i
 
 panic.i.i:                                        ; preds = %__barray_check_bounds.exit.i
-  notail call void @panic(i32 1002, ptr nonnull @"e_Array alre.5A300C2A.0")
+  tail call void @panic(i32 1002, ptr nonnull @"e_Array alre.5A300C2A.0")
   unreachable
 
 loop_body.i:                                      ; preds = %__barray_check_bounds.exit.i
@@ -406,7 +406,7 @@ cond_exit_369:                                    ; preds = %cond_369_case_0
   ret void
 
 mask_block_err.i:                                 ; preds = %cond_369_case_0
-  notail call void @panic(i32 1002, ptr nonnull @"e_Array cont.EFA5AC45.0")
+  tail call void @panic(i32 1002, ptr nonnull @"e_Array cont.EFA5AC45.0")
   unreachable
 
 __barray_check_bounds.exit255:                    ; preds = %"__hugr__.guppylang.std.quantum.measure_array$10.149.exit", %cond_exit_369.thread
@@ -432,7 +432,7 @@ cond_exit_369.thread:                             ; preds = %cond_392_case_1, %_
 
 cond_392_case_1:                                  ; preds = %__barray_mask_borrow.exit259
   %.fca.1.extract = extractvalue { i1, i64, i1 } %124, 1
-  notail call void @___dec_future_refcount(i64 %.fca.1.extract)
+  tail call void @___dec_future_refcount(i64 %.fca.1.extract)
   br label %cond_exit_369.thread
 }
 
@@ -458,7 +458,7 @@ declare void @___reset(i64) local_unnamed_addr
 define i64 @qmain(i64 %0) local_unnamed_addr !dbg !59 {
 entry:
   tail call void @setup(i64 %0), !dbg !63
-  notail call void @"__hugr__.__main__.measure_qb_array.<locals>.main.1"(), !dbg !63
+  tail call void @"__hugr__.__main__.measure_qb_array.<locals>.main.1"(), !dbg !63
   %1 = tail call i64 @teardown(), !dbg !63
   ret i64 %1, !dbg !63
 }

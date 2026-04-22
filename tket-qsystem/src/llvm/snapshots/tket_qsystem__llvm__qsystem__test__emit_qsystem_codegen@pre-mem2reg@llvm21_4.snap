@@ -20,8 +20,8 @@ entry_block:                                      ; preds = %alloca_block
   %"2_01" = load i64, ptr %"2_0", align 4
   store i64 %"2_01", ptr %"6_0", align 4
   %"6_02" = load i64, ptr %"6_0", align 4
-  %lazy_measure = notail call i64 @___lazy_measure(i64 %"6_02"), !dbg !11
-  notail call void @___qfree(i64 %"6_02"), !dbg !11
+  %lazy_measure = call i64 @___lazy_measure(i64 %"6_02"), !dbg !11
+  call void @___qfree(i64 %"6_02"), !dbg !11
   store i64 %lazy_measure, ptr %"8_0", align 4, !dbg !11
   %"8_03" = load i64, ptr %"8_0", align 4
   %1 = insertvalue { i1, i64, i1 } { i1 true, i64 poison, i1 poison }, i64 %"8_03", 1

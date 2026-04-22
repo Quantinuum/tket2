@@ -12,7 +12,7 @@ use hugr::llvm::custom::CodegenExtension;
 use hugr::llvm::emit::func::{EmitFuncContext, build_option};
 use hugr::llvm::emit::{EmitOpArgs, emit_value};
 use inkwell::types::BasicType;
-use inkwell::values::{BasicValueEnum, FunctionValue, IntValue, LLVMTailCallKind};
+use inkwell::values::{BasicValueEnum, FunctionValue, IntValue};
 use tket::hugr::llvm::CodegenExtsBuilder;
 use tket::hugr::ops::ExtensionOp;
 use tket::hugr::ops::constant::Value;
@@ -138,10 +138,9 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
             .collect_vec();
         let outputs = output_indices.iter().map(|&i| args.inputs[i]).collect_vec();
         let func = self.runtime_func(context, runtime_func)?;
-        let call = context
+        context
             .builder()
             .build_call(func, &inputs, runtime_func.name())?;
-        call.set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
         args.outputs.finish(context.builder(), outputs)
     }
 
@@ -175,32 +174,32 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                     .inputs
                     .try_into()
                     .map_err(|_| anyhow!("Measure expects one input"))?;
-                let call = builder.build_call(
-                    self.runtime_func(context, RuntimeFunction::Measure)?,
-                    &[qb.into()],
-                    "measure_i1",
-                )?;
-                call.set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
-                let result_i1 = call.try_as_basic_value().unwrap_basic().into_int_value();
+                let result_i1 = builder
+                    .build_call(
+                        self.runtime_func(context, RuntimeFunction::Measure)?,
+                        &[qb.into()],
+                        "measure_i1",
+                    )?
+                    .try_as_basic_value()
+                    .unwrap_basic()
+                    .into_int_value();
                 let result = builder.build_select(result_i1, true_val, false_val, "measure")?;
                 if op == QSystemOp::Measure {
                     // normal measure may put the qubit in invalid state, so assume
                     // deallocation, don't return it
-                    let call = builder.build_call(
+                    builder.build_call(
                         self.runtime_func(context, RuntimeFunction::QFree)?,
                         &[qb.into()],
                         "qfree",
                     )?;
-                    call.set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
                     args.outputs.finish(builder, [result])
                 } else {
                     // MeasureReset will reset the qubit after measurement so safe to return
-                    let call = builder.build_call(
+                    builder.build_call(
                         self.runtime_func(context, RuntimeFunction::Reset)?,
                         &[qb.into()],
                         "reset",
                     )?;
-                    call.set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
                     args.outputs.finish(builder, [qb, result])
                 }
             }
@@ -211,19 +210,19 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                     .inputs
                     .try_into()
                     .map_err(|_| anyhow!("LazyMeasure expects one input"))?;
-                let meas_call = builder.build_call(
-                    self.runtime_func(context, RuntimeFunction::LazyMeasure)?,
-                    &[qb.into()],
-                    "lazy_measure",
-                )?;
-                meas_call.set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
-                let result = meas_call.try_as_basic_value().unwrap_basic();
-                let free_call = builder.build_call(
+                let result = builder
+                    .build_call(
+                        self.runtime_func(context, RuntimeFunction::LazyMeasure)?,
+                        &[qb.into()],
+                        "lazy_measure",
+                    )?
+                    .try_as_basic_value()
+                    .unwrap_basic();
+                builder.build_call(
                     self.runtime_func(context, RuntimeFunction::QFree)?,
                     &[qb.into()],
                     "qfree",
                 )?;
-                free_call.set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
                 args.outputs.finish(builder, [result])
             }
             // Measure qubit in Z basis or detect leakage, not forcing to a boolean
@@ -233,19 +232,19 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                     .inputs
                     .try_into()
                     .map_err(|_| anyhow!("LazyMeasureLeaked expects one input"))?;
-                let meas_call = builder.build_call(
-                    self.runtime_func(context, RuntimeFunction::LazyMeasureLeaked)?,
-                    &[qb.into()],
-                    "lazy_measure_leaked",
-                )?;
-                meas_call.set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
-                let result = meas_call.try_as_basic_value().unwrap_basic();
-                let free_call = builder.build_call(
+                let result = builder
+                    .build_call(
+                        self.runtime_func(context, RuntimeFunction::LazyMeasureLeaked)?,
+                        &[qb.into()],
+                        "lazy_measure_leaked",
+                    )?
+                    .try_as_basic_value()
+                    .unwrap_basic();
+                builder.build_call(
                     self.runtime_func(context, RuntimeFunction::QFree)?,
                     &[qb.into()],
                     "qfree",
                 )?;
-                free_call.set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
                 args.outputs.finish(builder, [result])
             }
             QSystemOp::LazyMeasureReset => {
@@ -254,19 +253,19 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                     .inputs
                     .try_into()
                     .map_err(|_| anyhow!("LazyMeasureReset expects one input"))?;
-                let meas_call = builder.build_call(
-                    self.runtime_func(context, RuntimeFunction::LazyMeasure)?,
-                    &[qb.into()],
-                    "lazy_measure",
-                )?;
-                meas_call.set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
-                let result = meas_call.try_as_basic_value().unwrap_basic();
-                let rst_call = builder.build_call(
+                let result = builder
+                    .build_call(
+                        self.runtime_func(context, RuntimeFunction::LazyMeasure)?,
+                        &[qb.into()],
+                        "lazy_measure",
+                    )?
+                    .try_as_basic_value()
+                    .unwrap_basic();
+                builder.build_call(
                     self.runtime_func(context, RuntimeFunction::Reset)?,
                     &[qb.into()],
                     "reset",
                 )?;
-                rst_call.set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
                 args.outputs.finish(builder, [qb, result])
             }
             // Reset a qubit
@@ -276,13 +275,15 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                     .inputs
                     .try_into()
                     .map_err(|_| anyhow!("QAlloc expects no inputs"))?;
-                let call = context.builder().build_call(
-                    self.runtime_func(context, RuntimeFunction::QAlloc)?,
-                    &[],
-                    "qalloc",
-                )?;
-                call.set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
-                let qb = call.try_as_basic_value().unwrap_basic();
+                let qb = context
+                    .builder()
+                    .build_call(
+                        self.runtime_func(context, RuntimeFunction::QAlloc)?,
+                        &[],
+                        "qalloc",
+                    )?
+                    .try_as_basic_value()
+                    .unwrap_basic();
 
                 let max_qb = self
                     .0
@@ -323,12 +324,11 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
 
         let reset_bb =
             context.build_positioned_new_block("reset_bb", Some(id_bb), |context, bb| {
-                let call = context.builder().build_call(
+                context.builder().build_call(
                     self.runtime_func(context, RuntimeFunction::Reset)?,
                     &[qb.into()],
                     "reset",
                 )?;
-                call.set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
                 context.builder().build_unconditional_branch(id_bb)?;
                 anyhow::Ok(bb)
             })?;

@@ -17,7 +17,7 @@ entry_block:                                      ; preds = %alloca_block
   %"2_01" = load i64, ptr %"2_0", align 4
   %tag_len = load i8, ptr @res_test_int.258C85C2.0, align 1, !dbg !8
   %tag_len2 = zext i8 %tag_len to i64, !dbg !8
-  notail call void @print_int(ptr @res_test_int.258C85C2.0, i64 %tag_len2, i64 %"2_01"), !dbg !8
+  call void @print_int(ptr @res_test_int.258C85C2.0, i64 %tag_len2, i64 %"2_01"), !dbg !8
   ret void
 }
 

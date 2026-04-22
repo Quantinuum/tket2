@@ -10,7 +10,7 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  notail call void @random_seed(i64 %0), !dbg !9
+  call void @random_seed(i64 %0), !dbg !9
   ret i1 true
 }
 

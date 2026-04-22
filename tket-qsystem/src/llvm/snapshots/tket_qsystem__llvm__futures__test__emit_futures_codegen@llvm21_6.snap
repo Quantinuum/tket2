@@ -10,7 +10,7 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  notail call void @___dec_future_refcount(i64 %0), !dbg !8
+  call void @___dec_future_refcount(i64 %0), !dbg !8
   ret void
 }
 
