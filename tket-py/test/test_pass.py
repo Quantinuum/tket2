@@ -1,5 +1,4 @@
 import tempfile
-import sys
 
 from pytket import Circuit, OpType
 from typing import Callable, Any
