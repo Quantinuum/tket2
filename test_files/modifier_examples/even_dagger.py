@@ -4,17 +4,18 @@
 #     "guppylang ==0.21.13",
 # ]
 # ///
-"""A simple controlled gate using modifiers"""
+"""An example with an even number of daggers, which should cancel out"""
 
 from pathlib import Path
 from sys import argv
 import sys
 
+from hugr.hugr.render import RenderConfig
 from guppylang import guppy
-from guppylang.std.builtins import control, dagger
+from guppylang.std.builtins import dagger
 from guppylang.std.debug import state_result
 from guppylang.std.quantum import discard, qubit, angle
-from guppylang.std.quantum import h, rx, x
+from guppylang.std.quantum import rx
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 from utility import hugr_pdf_directory
@@ -25,39 +26,25 @@ enable_experimental_features()
 
 
 @guppy(unitary=True)
-def bar(q: qubit) -> None:
-    rx(q, angle(1 / 3))
-
-
-@guppy
-def fuu(i: int) -> int:
-    return i + 1
+def rotation(q: qubit) -> None:
+    rx(q, angle(1 / 4))
 
 
 @guppy
 def main() -> None:
-    c1 = qubit()
     t = qubit()
-    c2 = qubit()
-    c3 = qubit()
-    h(c1)
-    x(c2)
-    x(c3)
-    with control(c1):
-        i = fuu(2)
-        bar(t)
 
-    state_result("r", c1, c2, c3, t)
-    discard(c1)
+    # Double dagger cancels out: dagger(dagger(rotation)) == rotation
+    with dagger:
+        with dagger:
+            rotation(t)
+
+    state_result("r", t)
     discard(t)
-    discard(c3)
-    discard(c2)
 
 
 program = main.compile()
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
-
-
-program.modules[0].render_dot().render(
+program.modules[0].render_dot(RenderConfig(display_node_id=True)).render(
     argv[0].removesuffix(".py") + "_before", directory=hugr_pdf_directory, cleanup=True
 )

@@ -1,5 +1,7 @@
 //! Modify nodes related to function calls.
 
+use std::{fs, path::Path};
+
 use hugr::{
     IncomingPort, Wire,
     builder::{BuildError, Dataflow},
@@ -30,8 +32,9 @@ impl<N: HugrNode> ModifierResolver<N> {
             .single_linked_output(call_node, call.called_function_port())
             .unwrap();
 
-        // NICOLA (-5)
+        // NICOLA(-5)
         // wire the callee
+        println!("NICOLA(-5)");
         let Some(new_callee) = self.modify_fn_if_needed(h, callee.0, &call.signature())? else {
             // If the function need not be modified, just copy the Call node as is.
             let new = self.add_node_no_modification(h, call_node, call.clone(), new_dfg)?;
@@ -77,22 +80,38 @@ impl<N: HugrNode> ModifierResolver<N> {
     pub(super) fn apply_modifier_chain_to_loaded_fn(
         &mut self,
         h: &mut impl HugrMut<Node = N>,
-        modifier_node: N, // modifier node
+        modifier_node: N,
     ) -> Result<N, ModifierResolverErrors<N>> {
         // The final target of modifiers to apply.
         // Collection of modifiers to apply.
+        println!(
+            "Entering apply_modifier_chain_to_loaded_fn with modifier_node: {:?}",
+            modifier_node
+        );
         let modifiers_and_targ = self.trace_modifiers_chain(h, modifier_node)?;
+
         let targ = modifiers_and_targ
             .last()
             .cloned()
             .ok_or(ModifierError::NoTarget(modifier_node))?;
 
-        // The function to apply the modifier to.
+        // printing
+        println!("Modifier chain traced:");
+        for node in &modifiers_and_targ {
+            println!(" {:?}: {}", node, h.get_optype(*node));
+        }
+        println!("Target: {}", targ);
+        // end printing
+
+        // The function to apply the modifier to. This is expected to be a LoadFunction node
         let (func, load) = Self::get_loaded_function(h, modifier_node, targ, h.get_optype(targ))?;
+        println!("Loaded function:\n - node {}", func);
+        // println!("  load {:?}", load);
 
         // Modify the function
         let modified_fn = self.modify_fn(h, func)?;
 
+        println!("Modified function node...");
         // Modify the function loader
         // Insert the new LoadFunction node to load the modified function
         let mut modified_sig = load.func_sig.clone();
@@ -137,7 +156,7 @@ impl<N: HugrNode> ModifierResolver<N> {
     /// Given a target node `targ` which is expected to be a `LoadFunction`, retrieve the function node it loads.
     pub(super) fn get_loaded_function(
         h: &impl HugrMut<Node = N>,
-        n: N,
+        modifier_node: N,
         targ: N,
         optype: &OpType,
     ) -> Result<(N, LoadFunction), ModifierError<N>> {
@@ -146,19 +165,25 @@ impl<N: HugrNode> ModifierResolver<N> {
                 let (fn_node, _) = h.single_linked_output(targ, 0).unwrap();
                 let fn_optype = h.get_optype(fn_node);
                 let OpType::FuncDefn(_) = fn_optype else {
-                    return Err(ModifierError::ModifierNotApplicable(n, fn_optype.clone()));
+                    return Err(ModifierError::ModifierNotApplicable(
+                        modifier_node,
+                        fn_optype.clone(),
+                    ));
                 };
                 // TODO: We want some machinery to prevent generating a lot of copies of modified functions
                 // from the same function.
                 Ok((fn_node, load.clone()))
             }
-            OpType::Input(_) => Err(ModifierError::NoTarget(n)),
+            OpType::Input(_) => Err(ModifierError::NoTarget(modifier_node)),
             // If the target is a function, we need to create a new dataflow block of it.
             _ => {
                 // TODO:
                 // In the future, we might want to handle modifiers provided from other nodes.
                 // For example, conditionals?
-                Err(ModifierError::ModifierNotApplicable(n, optype.clone()))
+                Err(ModifierError::ModifierNotApplicable(
+                    modifier_node,
+                    optype.clone(),
+                ))
             }
         }
     }

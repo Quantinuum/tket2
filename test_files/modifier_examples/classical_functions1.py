@@ -20,13 +20,9 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 from utility import hugr_pdf_directory
 
 from guppylang.experimental import enable_experimental_features
+from hugr.hugr.render import RenderConfig
 
 enable_experimental_features()
-
-
-@guppy(unitary=True)
-def bar(q: qubit) -> None:
-    rx(q, angle(1 / 3))
 
 
 @guppy
@@ -36,28 +32,30 @@ def fuu(i: int) -> int:
 
 @guppy
 def main() -> None:
-    c1 = qubit()
-    t = qubit()
-    c2 = qubit()
-    c3 = qubit()
-    h(c1)
-    x(c2)
-    x(c3)
-    with control(c1):
-        i = fuu(2)
-        bar(t)
+    q = qubit()
+    h(q)
+    with dagger:
+        rx(q, angle(1 / fuu(2)))
 
-    state_result("r", c1, c2, c3, t)
-    discard(c1)
-    discard(t)
-    discard(c3)
-    discard(c2)
+    state_result("r", q)
+    discard(q)
 
 
 program = main.compile()
+
+from hugr.ops import FuncDefn
+
+
+# hugr = program.modules[0]
+# for node, data in hugr.nodes():
+#     if isinstance(data.op, FuncDefn):
+#         if data.op.f_name.startswith("__WithBlock__"):
+#             data.metadata["unitary"] = 7
+
+
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
 
 
-program.modules[0].render_dot().render(
+program.modules[0].render_dot(RenderConfig(display_node_id=True)).render(
     argv[0].removesuffix(".py") + "_before", directory=hugr_pdf_directory, cleanup=True
 )

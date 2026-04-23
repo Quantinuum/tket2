@@ -4,17 +4,17 @@
 #     "guppylang ==0.21.13",
 # ]
 # ///
-"""A simple controlled gate using modifiers"""
+"""A controlled gate where the controller is an array of qubits"""
 
 from pathlib import Path
 from sys import argv
 import sys
 
 from guppylang import guppy
-from guppylang.std.builtins import control, dagger
+from guppylang.std.builtins import array, control
 from guppylang.std.debug import state_result
-from guppylang.std.quantum import discard, qubit, angle
-from guppylang.std.quantum import h, rx, x
+from guppylang.std.quantum import discard, discard_array, qubit
+from guppylang.std.quantum import h, x
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 from utility import hugr_pdf_directory
@@ -26,38 +26,29 @@ enable_experimental_features()
 
 @guppy(unitary=True)
 def bar(q: qubit) -> None:
-    rx(q, angle(1 / 3))
-
-
-@guppy
-def fuu(i: int) -> int:
-    return i + 1
+    x(q)
 
 
 @guppy
 def main() -> None:
-    c1 = qubit()
+    controllers: array[qubit, 3] = array(qubit(), qubit(), qubit())
     t = qubit()
-    c2 = qubit()
-    c3 = qubit()
-    h(c1)
-    x(c2)
-    x(c3)
-    with control(c1):
-        i = fuu(2)
+
+    h(controllers[0])
+    h(controllers[1])
+    h(controllers[2])
+
+    with control(controllers):
         bar(t)
 
-    state_result("r", c1, c2, c3, t)
-    discard(c1)
+    state_result("r", controllers[0], controllers[1], controllers[2], t)
+
+    discard_array(controllers)
     discard(t)
-    discard(c3)
-    discard(c2)
 
 
 program = main.compile()
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
-
-
 program.modules[0].render_dot().render(
     argv[0].removesuffix(".py") + "_before", directory=hugr_pdf_directory, cleanup=True
 )

@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang ==0.21.11",
+#     "guppylang ==0.21.13",
 # ]
 # ///
 """A simple controlled gate using modifiers"""
@@ -26,8 +26,14 @@ enable_experimental_features()
 
 
 @guppy(unitary=True)
-def bar(q: qubit) -> None:
+def bar(q: qubit, f: float) -> None:
     rx(q, angle(1 / 3))
+
+
+@guppy
+def fuu(i: int) -> float:
+    i = i + 1
+    return i / 2
 
 
 @guppy
@@ -35,7 +41,8 @@ def main() -> None:
     t = qubit()
 
     with dagger:
-        bar(t)
+        fuu(2)
+        bar(t, 4.3)
 
     state_result("r", t)
     discard(t)
