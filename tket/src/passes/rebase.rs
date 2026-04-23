@@ -1,7 +1,5 @@
 //! Pass for rebasing a Hugr by replacing ops with other HUGRs according to a provided mapping.
 
-mod patches;
-
 use crate::passes::composable::WithScope;
 use crate::passes::{ComposablePass, PassScope};
 use derive_more::Display;
@@ -464,12 +462,12 @@ mod test {
         let pass = RebasePass::new(
             PassScope::default(),
             HashMap::from_iter([
-                (TketOp::X.qualified_id(), x_replacement()),
-                (TketOp::CX.qualified_id(), cx_id_replacement()),
+                (TketOp::X.qualified_opdef_id(), x_replacement()),
+                (TketOp::CX.qualified_opdef_id(), cx_id_replacement()),
             ]),
             HashMap::from_iter([
-                (TketOp::Rx.qualified_id(), rx_replacement()),
-                (TketOp::CX.qualified_id(), cx_hh_replacement()),
+                (TketOp::Rx.qualified_opdef_id(), rx_replacement()),
+                (TketOp::CX.qualified_opdef_id(), cx_hh_replacement()),
             ]),
             InlineConfig::none(),
         );
