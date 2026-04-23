@@ -10,7 +10,7 @@ use hugr::ops::handle::{FuncID, NodeHandle};
 use hugr::{
     Hugr, HugrView, Node, Wire,
     builder::{BuildError, Dataflow, DataflowHugr, FunctionBuilder},
-    extension::ExtensionRegistry,
+    extension::{ExtensionId, ExtensionRegistry, ExtensionSet},
     hugr::{HugrError, hugrmut::HugrMut},
     ops::{self, DataflowOpTrait},
     std_extensions::arithmetic::{float_ops::FloatOps, float_types::ConstF64},
@@ -24,11 +24,12 @@ use tket::passes::replace_types::{NodeTemplate, ReplaceTypesError};
 use tket::passes::{ComposablePass, PassScope, ReplaceTypes};
 use tket::{TketOp, extension::rotation::RotationOpBuilder};
 
-use crate::extension::qsystem::{self, QSystemOp, QSystemPlatform};
+use crate::extension::qsystem::{self, QSystemPlatform};
 
 use super::barrier::BarrierInserter;
-use super::helios::HeliosSynthesizer;
-use super::sol::SolSynthesizer;
+use super::common::SharedOp;
+use super::helios::{HeliosOp, HeliosSynthesizer};
+use super::sol::{SolOp, SolSynthesizer};
 use super::synth_tket_op::SynthesizeTketOp;
 
 lazy_static! {
@@ -114,7 +115,7 @@ pub fn lower_tk2_ops(
     let scope = scope.into();
     let mut funcs: BTreeMap<TketOp, NodeTemplate> = BTreeMap::new();
     let mut lowerer = ReplaceTypes::new_empty().with_scope(scope.clone());
-    let mut barrier_funcs = BarrierInserter::new();
+    let mut barrier_funcs = BarrierInserter::new(platform);
 
     let replacements: Vec<_> = scope
         .regions(hugr)
@@ -136,10 +137,10 @@ pub fn lower_tk2_ops(
         match op {
             ReplaceOps::Tk2(tket_op) => {
                 // Handle TketOp replacements
-                if let Some(direct) = direct_map(tket_op) {
+                if let Some(direct) = direct_map(tket_op, platform) {
                     lowerer.set_replace_op(
                         &tket_op.into_extension_op(),
-                        NodeTemplate::SingleOp(direct.into()),
+                        NodeTemplate::SingleOp(direct),
                     );
 
                     replaced_nodes.push(node);
@@ -207,13 +208,9 @@ fn build_func_outputs(
 ) -> Result<Vec<Wire>, LowerTk2Error> {
     match platform {
         QSystemPlatform::Helios => {
-            let mut synthesizer = HeliosSynthesizer::new(f_build);
-            build_func_with_builder(&mut synthesizer, op)
+            build_func_with_builder(&mut HeliosSynthesizer::new(f_build), op)
         }
-        QSystemPlatform::Sol => {
-            let mut synthesizer = SolSynthesizer::new(f_build);
-            build_func_with_builder(&mut synthesizer, op)
-        }
+        QSystemPlatform::Sol => build_func_with_builder(&mut SolSynthesizer::new(f_build), op),
     }
 }
 
@@ -294,45 +291,73 @@ fn build_to_radians(b: &mut impl Dataflow, rotation: Wire) -> Result<Wire, Build
     Ok(float)
 }
 
-fn direct_map(op: TketOp) -> Option<QSystemOp> {
+/// Map a [`TketOp`] to the [`SharedOp`] it directly corresponds to, if any.
+///
+/// These are the ops that have a platform-independent 1:1 replacement and
+/// don't require a multi-op decomposition function.
+fn tket_to_shared_op(op: TketOp) -> Option<SharedOp> {
     Some(match op {
-        TketOp::TryQAlloc => QSystemOp::TryQAlloc,
-        TketOp::QFree => QSystemOp::QFree,
-        TketOp::Reset => QSystemOp::Reset,
-        TketOp::MeasureFree => QSystemOp::Measure,
+        TketOp::TryQAlloc => SharedOp::TryQAlloc,
+        TketOp::QFree => SharedOp::QFree,
+        TketOp::Reset => SharedOp::Reset,
+        TketOp::MeasureFree => SharedOp::Measure,
         _ => return None,
     })
 }
 
-/// Check there are no "tket.quantum" ops left in the HUGR that should have been
-/// lowered by [lower_tk2_ops] with the given scope.
+fn direct_map(op: TketOp, platform: QSystemPlatform) -> Option<hugr::ops::OpType> {
+    Some(platform.op_from_shared(tket_to_shared_op(op)?))
+}
+
+/// Returns true if `op` has a direct single-op replacement (regardless of platform).
+fn has_direct_map(op: TketOp) -> bool {
+    tket_to_shared_op(op).is_some()
+}
+
+impl QSystemPlatform {
+    /// Convert a [`SharedOp`] to this platform's native [`hugr::ops::OpType`].
+    fn op_from_shared(self, op: SharedOp) -> hugr::ops::OpType {
+        match self {
+            QSystemPlatform::Helios => HeliosOp::from(op).into(),
+            QSystemPlatform::Sol => SolOp::from(op).into(),
+        }
+    }
+}
+
+/// Check that no ops belonging to any extension in `forbidden_extensions` are
+/// present in the HUGR within `scope`.
 ///
-/// To check that there isn't any unlowered operations, use
-/// [`PassScope::Global`] as the scope.
-///
-/// See [`LowerTketToQSystemPass`] for details on which operations are affected
-/// depending on the scope.
+/// For `TketOp`s specifically, non-[`PassScope::Global`] scopes only flag the
+/// subset of ops that would have been lowered (i.e. those in [`direct_map`]),
+/// because multi-op replacements require adding functions at the global module
+/// level and are therefore skipped for local-entrypoint scopes.
 ///
 /// # Errors
 ///
-/// Returns vector of nodes that are not lowered.
+/// Returns the nodes whose ops are still present.
 pub fn check_lowered<H: HugrView>(
     hugr: &H,
     scope: impl Into<PassScope>,
+    forbidden_extensions: &ExtensionSet,
 ) -> Result<(), Vec<H::Node>> {
     let scope = scope.into();
     let unlowered: Vec<H::Node> = scope
         .regions(hugr)
         .flat_map(|region| hugr.children(region))
         .filter_map(|node| {
-            let tket_op = hugr.get_optype(node).cast::<TketOp>()?;
-
-            if !matches!(scope, PassScope::Global(_)) && direct_map(tket_op).is_none() {
-                // Local entrypoint scopes do not perform multi-op replacements,
-                // as those need to add functions at the global module level.
+            let optype = hugr.get_optype(node);
+            let ext_id: &ExtensionId = optype.as_extension_op()?.def().extension_id();
+            if !forbidden_extensions.contains(ext_id) {
                 return None;
             }
-
+            // For TketOps in non-global scopes, ops that require multi-op
+            // replacement are expected to remain.
+            if let Some(tket_op) = optype.cast::<TketOp>()
+                && !matches!(scope, PassScope::Global(_))
+                && !has_direct_map(tket_op)
+            {
+                return None;
+            }
             Some(node)
         })
         .collect();
@@ -391,8 +416,11 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for LowerTketToQSystemPass {
     fn run(&self, hugr: &mut H) -> Result<(), LowerTk2Error> {
         lower_tk2_ops(hugr, self.scope.clone(), self.platform)?;
         #[cfg(test)]
-        check_lowered(hugr, self.scope.clone())
-            .map_err(|missing_ops| LowerTk2Error::Unlowered { missing_ops })?;
+        {
+            let forbidden = ExtensionSet::from_iter([tket::extension::TKET_EXTENSION_ID]);
+            check_lowered(hugr, self.scope.clone(), &forbidden)
+                .map_err(|missing_ops| LowerTk2Error::Unlowered { missing_ops })?;
+        }
         Ok(())
     }
 }
@@ -417,6 +445,38 @@ mod test {
     enum ExpectedOp {
         Helios(HeliosOp),
         Sol(SolOp),
+    }
+
+    impl ExpectedOp {
+        fn cast(optype: &hugr::ops::OpType, platform: QSystemPlatform) -> Option<Self> {
+            match platform {
+                QSystemPlatform::Helios => optype.cast().map(Self::Helios),
+                QSystemPlatform::Sol => optype.cast().map(Self::Sol),
+            }
+        }
+
+        fn from_shared(shared: SharedOp, platform: QSystemPlatform) -> Self {
+            match platform {
+                QSystemPlatform::Helios => Self::Helios(HeliosOp::from(shared)),
+                QSystemPlatform::Sol => Self::Sol(SolOp::from(shared)),
+            }
+        }
+    }
+
+    /// Returns an [`ExtensionSet`] of extensions whose ops must not appear in
+    /// the HUGR after lowering to `platform`.
+    ///
+    /// This includes `tket.quantum` (all `TketOp`s should be gone) and the
+    /// extension belonging to the *other* platform (cross-contamination).
+    fn forbidden_extensions_for(platform: QSystemPlatform) -> ExtensionSet {
+        use crate::extension::qsystem::{helios, sol};
+        ExtensionSet::from_iter([
+            tket::extension::TKET_EXTENSION_ID,
+            match platform {
+                QSystemPlatform::Helios => sol::EXTENSION_ID,
+                QSystemPlatform::Sol => helios::EXTENSION_ID,
+            },
+        ])
     }
 
     #[rstest]
@@ -456,22 +516,28 @@ mod test {
         let lowered = lower_tk2_ops(&mut h, scope.clone(), platform).unwrap();
         assert_eq!(lowered.len(), 5);
         let circ = Circuit::new(&h);
-        let ops: Vec<QSystemOp> = circ
+        let ops: Vec<ExpectedOp> = circ
             .toposorted_children(circ.parent())
             .expect("circuit entrypoint should be dataflow region")
-            .filter_map(|n| circ.hugr().get_optype(n).cast())
+            .filter_map(|n| ExpectedOp::cast(circ.hugr().get_optype(n), platform))
             .collect();
         assert_eq!(
             ops,
-            vec![
-                QSystemOp::TryQAlloc,
-                QSystemOp::Measure,
-                QSystemOp::TryQAlloc,
-                QSystemOp::Reset,
-                QSystemOp::QFree,
+            [
+                SharedOp::TryQAlloc,
+                SharedOp::Measure,
+                SharedOp::TryQAlloc,
+                SharedOp::Reset,
+                SharedOp::QFree
             ]
+            .into_iter()
+            .map(|s| ExpectedOp::from_shared(s, platform))
+            .collect::<Vec<_>>()
         );
-        assert_eq!(check_lowered(&h, scope), Ok(()));
+        assert_eq!(
+            check_lowered(&h, scope, &forbidden_extensions_for(platform)),
+            Ok(())
+        );
     }
 
     #[rstest]
@@ -530,21 +596,22 @@ mod test {
         let circ = Circuit::new(&h);
         let ops: Vec<ExpectedOp> = match platform {
             QSystemPlatform::Helios => circ
-                .toposorted_children(circ.parent())
-                .expect("circuit entrypoint should be dataflow region")
-                .filter_map(|n| circ.hugr().get_optype(n).cast().map(ExpectedOp::Helios))
+                .commands()
+                .filter_map(|command| command.optype().cast().map(ExpectedOp::Helios))
                 .collect(),
             QSystemPlatform::Sol => circ
-                .toposorted_children(circ.parent())
-                .expect("circuit entrypoint should be dataflow region")
-                .filter_map(|n| circ.hugr().get_optype(n).cast().map(ExpectedOp::Sol))
+                .commands()
+                .filter_map(|command| command.optype().cast().map(ExpectedOp::Sol))
                 .collect(),
         };
         if let Some(qsystem_ops) = qsystem_ops {
             assert_eq!(ops, qsystem_ops);
         }
 
-        assert_eq!(check_lowered(&h, Preserve::Public), Ok(()));
+        assert_eq!(
+            check_lowered(&h, Preserve::Public, &forbidden_extensions_for(platform)),
+            Ok(())
+        );
     }
 
     #[test]
@@ -622,7 +689,10 @@ mod test {
         };
         assert_eq!(final_node_count, expected_node_count);
 
-        assert_eq!(check_lowered(&h, scope), Ok(()));
+        assert_eq!(
+            check_lowered(&h, scope, &forbidden_extensions_for(platform)),
+            Ok(())
+        );
         if let Err(e) = h.validate() {
             panic!("{}", e);
         }
