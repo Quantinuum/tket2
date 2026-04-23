@@ -138,7 +138,7 @@ fn optimize_guppy_ranges_array() {
         .find(|n| {
             hugr.get_optype(*n)
                 .as_func_defn()
-                .is_some_and(|fd| fd.func_name() == "f")
+                .is_some_and(|fd| fd.func_name() == "__main__.f")
         })
         .unwrap();
     hugr.set_entrypoint(f);
