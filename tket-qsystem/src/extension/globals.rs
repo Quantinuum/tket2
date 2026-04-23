@@ -141,8 +141,8 @@ impl MakeOpDef for GlobalsOpDef {
             Self::swap => {
                 "Swap the contents of the named global variable with the argument.".to_string()
             }
-            Self::with => unimplemented!(),
-            Self::map => unimplemented!(),
+            Self::with => "".to_string(),
+            Self::map => "".to_string(),
         }
     }
 
@@ -225,10 +225,16 @@ impl HasConcrete for GlobalsOpDef {
     type Concrete = GlobalsOp;
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
-        let [name_arg, ty_arg] = type_args else {
+        let expected_num_args = match self {
+            Self::swap => 2,
+            Self::with => 4,
+            Self::map => 4,
+        };
+
+        let [name_arg, ty_arg] = &type_args[..2] else {
             Err(SignatureError::from(TermTypeError::WrongNumberArgs(
                 type_args.len(),
-                2,
+                expected_num_args,
             )))?
         };
 
@@ -246,7 +252,51 @@ impl HasConcrete for GlobalsOpDef {
             }))?
         };
 
-        Ok(GlobalsOp::Swap { name, ty })
+        match self {
+            Self::swap => Ok(GlobalsOp::Swap { name, ty }),
+            Self::with => {
+                let Ok(inputs) = TypeRowRV::try_from(type_args[2].clone()) else {
+                    Err(SignatureError::from(TermTypeError::TypeMismatch {
+                        term: Box::new(type_args[2].clone()),
+                        type_: Box::new(INPUTS_PARAM.to_owned()),
+                    }))?
+                };
+                let Ok(outputs) = TypeRowRV::try_from(type_args[3].clone()) else {
+                    Err(SignatureError::from(TermTypeError::TypeMismatch {
+                        term: Box::new(type_args[3].clone()),
+                        type_: Box::new(OUTPUTS_PARAM.to_owned()),
+                    }))?
+                };
+
+                Ok(GlobalsOp::With {
+                    name,
+                    ty_arg: ty_arg.clone(),
+                    inputs,
+                    outputs,
+                })
+            }
+            Self::map => {
+                let Ok(inputs) = TypeRowRV::try_from(type_args[2].clone()) else {
+                    Err(SignatureError::from(TermTypeError::TypeMismatch {
+                        term: Box::new(type_args[2].clone()),
+                        type_: Box::new(INPUTS_PARAM.to_owned()),
+                    }))?
+                };
+                let Ok(outputs) = TypeRowRV::try_from(type_args[3].clone()) else {
+                    Err(SignatureError::from(TermTypeError::TypeMismatch {
+                        term: Box::new(type_args[3].clone()),
+                        type_: Box::new(OUTPUTS_PARAM.to_owned()),
+                    }))?
+                };
+
+                Ok(GlobalsOp::Map {
+                    name,
+                    ty_arg: ty_arg.clone(),
+                    inputs,
+                    outputs,
+                })
+            }
+        }
     }
 }
 
