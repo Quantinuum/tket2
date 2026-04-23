@@ -269,7 +269,11 @@ def test_modifier_execution() -> None:
             tmp_path = Path(tmp_dir) / f"{hugr_name}.npy"
             subprocess.run(
                 [
-                    sys.executable,
+                    "uv",
+                    "run",
+                    "--no-project",
+                    "--python",
+                    "3.13",
                     "run_hugrs.py",
                     hugr_name,
                     str(tmp_path),
