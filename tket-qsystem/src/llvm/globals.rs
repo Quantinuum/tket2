@@ -63,6 +63,8 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
             let _ = builder.build_store(global.as_pointer_value(), *new_value)?;
             args.outputs.finish(builder, [result])?
         }
+        GlobalsOp::With { .. } => unimplemented!(),
+        GlobalsOp::Map { .. } => unimplemented!(),
     }
 
     Ok(())
@@ -71,25 +73,26 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use hugr::extension::prelude::usize_t;
+    use hugr::extension::prelude::{bool_t, qb_t};
     use hugr::llvm::{
         check_emission,
         test::{TestContext, llvm_ctx, single_op_hugr},
     };
+    use hugr_core::extension::simple_op::MakeRegisteredOp;
 
     #[rstest::rstest]
-    fn emit_global_codegen(mut llvm_ctx: TestContext) {
-        llvm_ctx.add_extensions(move |ceb| {
-            ceb.add_default_prelude_extensions()
-                .add_extension(GlobalsCodegenExtension)
+    #[case::with(1,GlobalsOp::With { name: "my_global".to_string(), ty_arg: qb_t().into(), inputs: [qb_t(), bool_t()].into(), outputs: [qb_t(), bool_t()].into() })]
+    #[case::map(2,GlobalsOp::Map { name: "my_global".to_string(), ty_arg: qb_t().into(), inputs: [qb_t(), bool_t()].into(), outputs: [qb_t(), bool_t()].into() })]
+    fn emit_futures_codegen(
+        #[case] _i: i32,
+        #[with(_i)] mut llvm_ctx: TestContext,
+        #[case] op: GlobalsOp,
+    ) {
+        llvm_ctx.add_extensions(|ceb| {
+            ceb.add_extension(GlobalsCodegenExtension)
+                .add_default_prelude_extensions()
         });
-        let hugr = single_op_hugr(
-            GlobalsOp::Swap {
-                name: "my_global".to_string(),
-                ty: usize_t(),
-            }
-            .into(),
-        );
+        let hugr = single_op_hugr(op.to_extension_op().unwrap().into());
         check_emission!(hugr, llvm_ctx);
     }
 }
