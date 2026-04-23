@@ -32,7 +32,7 @@ def format_statevector(
         if abs(amp) > threshold:
             label = format(idx, f"0{n_qubits}b")
             parts.append(f"\t{label} -> {amp:.4g}")
-    return "\n".join(parts) if parts else "(all zero)"
+    return "\n".join(parts) if parts else "all amplitudes below threshold"
 
 
 modifier_examples_dir = Path(__file__).resolve().parents[1] / "modified_hugrs"

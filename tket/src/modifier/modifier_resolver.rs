@@ -1006,7 +1006,8 @@ impl<N: HugrNode> ModifierResolver<N> {
             // Some other Hugr extension operation.
             // Here, we do not know what is the modified version.
             // We try to place the original operation.
-            // NICOLA: Not sure, if we dont know what to do maybe an error is better?
+            // TODO: Revisit whether unknown extension operations should return
+            // an explicit error instead of falling back to the original operation.
             self.modify_dataflow_op(h, op_node, optype, new_dfg)
         }
     }
@@ -1152,11 +1153,8 @@ pub fn resolve_modifier_with_entrypoints(
     // were produced or left behind by the resolution passes above.
     delete_phase(h, entry_points)?;
 
-    // --- Phase 4: Validation ---
-    // Confirm that the resulting hugr is still structurally valid after all rewrites.
     h.validate()
         .map_err(|e| ModifierResolverErrors::BuildError(e.into()))?;
-    // h.extensions_mut() = original_extensions;
 
     Ok(())
 }
@@ -1274,7 +1272,7 @@ mod tests {
                     .out_wire(0);
             }
 
-            // Wrap the with the Control modifier.
+            // Wrap with the Control modifier.
             call = func
                 .add_dataflow_op(control_op, vec![call])
                 .unwrap()

@@ -28,7 +28,6 @@ modified_hugrs_dir.mkdir(parents=True, exist_ok=True)
 
 
 input_paths = (
-    # todo: the file as input must be found in modifier_examples_dir, not in the current directory
     [modifier_examples_dir / (sys.argv[1] + ".hugr")]
     if len(sys.argv) > 1
     else modifier_examples_dir.glob("*.hugr")

@@ -1,4 +1,5 @@
 import tempfile
+import sys
 
 from pytket import Circuit, OpType
 from typing import Callable, Any
@@ -264,23 +265,20 @@ def test_modifier_execution() -> None:
         hugr_name = hugr_path.stem.removesuffix("_solved")
         expected_statevector = expected_results[hugr_path.stem]
 
-        with tempfile.NamedTemporaryFile(suffix=".npy", delete=False) as f:
-            tmp_path = Path(f.name)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir) / f"{hugr_name}.npy"
             subprocess.run(
                 [
-                    "uv",
-                    "run",
-                    "--no-project",
+                    sys.executable,
                     "run_hugrs.py",
                     hugr_name,
-                    tmp_path,
+                    str(tmp_path),
                 ],
                 cwd=run_hugrs_dir,
                 check=True,
             )
 
             computed_statevector = np.load(tmp_path)
-            print(computed_statevector)
             np.testing.assert_allclose(computed_statevector, expected_statevector)
 
 
