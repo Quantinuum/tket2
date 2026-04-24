@@ -6,7 +6,7 @@
     "map": {
       "extension": "tket.globals",
       "name": "map",
-      "description": "",
+      "description": "Map a function over the contents of the named global variable.",
       "signature": {
         "params": [
           {
@@ -131,7 +131,7 @@
     "with": {
       "extension": "tket.globals",
       "name": "with",
-      "description": "",
+      "description": "Run a function with the set contents of the global variable.",
       "signature": {
         "params": [
           {

@@ -81,6 +81,7 @@ def tket_registry() -> ExtensionRegistry:
         tket.guppy.GuppyExtension(),
         tket.rotation.RotationExtension(),
         tket.futures.FuturesExtension(),
+        tket.globals.GlobalsExtension(),
         tket.qsystem.QSystemExtension(),
         tket.qsystem.QSystemRandomExtension(),
         tket.qsystem.QSystemUtilsExtension(),
