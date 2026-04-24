@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang ==0.21.13",
+#     "guppylang @ git+https://github.com/Quantinuum/guppylang.git@na/fix-modifier-metadata#subdirectory=guppylang",
 # ]
 # ///
 """A simple controlled gate using modifiers"""
@@ -15,10 +15,8 @@ from guppylang.std.builtins import control, dagger
 from guppylang.std.debug import state_result
 from guppylang.std.quantum import discard, qubit, angle
 from guppylang.std.quantum import h, rx
-from hugr.hugr.render import RenderConfig
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
-from utility import hugr_pdf_directory
 
 from guppylang.experimental import enable_experimental_features
 
@@ -41,19 +39,5 @@ def main() -> None:
 
 program = main.compile()
 
-from hugr.ops import FuncDefn
-
-
-hugr = program.modules[0]
-for node, data in hugr.nodes():
-    if isinstance(data.op, FuncDefn):
-        if data.op.f_name.startswith("__WithBlock__"):
-            data.metadata["unitary"] = 7
-
 
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
-
-
-program.modules[0].render_dot(RenderConfig(display_node_id=True)).render(
-    argv[0].removesuffix(".py") + "_before", directory=hugr_pdf_directory, cleanup=True
-)

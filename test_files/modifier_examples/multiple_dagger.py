@@ -39,12 +39,12 @@ def main() -> None:
         with dagger:
             rotation(t)
 
+    with dagger, dagger, dagger:
+        rotation(t)
+
     state_result("r", t)
     discard(t)
 
 
 program = main.compile()
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
-program.modules[0].render_dot(RenderConfig(display_node_id=True)).render(
-    argv[0].removesuffix(".py") + "_before", directory=hugr_pdf_directory, cleanup=True
-)
