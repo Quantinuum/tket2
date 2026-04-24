@@ -453,7 +453,7 @@ mod test {
                 ranges_array
                     .get_optype(*n)
                     .as_func_defn()
-                    .is_some_and(|fd| fd.func_name() == "f")
+                    .is_some_and(|fd| fd.func_name() == "__main__.f")
             })
             .unwrap();
 
@@ -505,7 +505,7 @@ mod test {
             .find(|n| {
                 h.get_optype(*n)
                     .as_func_defn()
-                    .is_some_and(|fd| fd.func_name() == "main")
+                    .is_some_and(|fd| fd.func_name() == "__main__.main")
             })
             .unwrap();
         h.set_entrypoint(array_func);

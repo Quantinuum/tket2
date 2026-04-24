@@ -2,6 +2,7 @@ from pathlib import Path
 
 from .optimiser import BadgerOptimiser
 from .state import CompilationState
+from ..passes import inline_funcs
 from hugr.passes.scope import PassScope, GlobalScope
 
 class CircuitChunks:
@@ -41,6 +42,15 @@ def normalize_guppy(
     - inline_dfgs: Whether to inline DFG operations.
     - remove_redundant_order_edges: Whether to remove redundant order edges.
     """
+
+def inline_functions(
+    circ: CompilationState,
+    *,
+    heuristic: inline_funcs.InlineFuncsHeuristic = inline_funcs.MaxSize(64),
+    follow_inline_hints: bool = True,
+    scope: PassScope = GlobalScope.PRESERVE_PUBLIC,
+) -> None:
+    """Inline acyclic function calls below the selected scope."""
 
 def greedy_depth_reduce(circ: CompilationState) -> int:
     """Greedy depth reduction of a circuit.

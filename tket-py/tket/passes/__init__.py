@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from pathlib import Path
-import json
 from dataclasses import dataclass
+import json
+from pathlib import Path
 
 from hugr import Hugr
 from pytket.passes import (
@@ -10,7 +10,8 @@ from pytket.passes import (
 )
 
 from tket import _state
-from ._tket import passes as _passes, optimiser as _optimiser
+from . import inline_funcs
+from .._tket import passes as _passes, optimiser as _optimiser
 
 from hugr.passes.composable import (
     ComposablePass,
@@ -21,7 +22,14 @@ from hugr.passes.composable import (
 from hugr.passes.scope import PassScope, GlobalScope
 
 
-__all__ = ["PytketHugrPass", "PassResult", "NormalizeGuppy", "ModifierResolverPass"]
+__all__ = [
+    "PytketHugrPass",
+    "PassResult",
+    "InlineFuncsHeuristic",
+    "InlineFunctions",
+    "NormalizeGuppy",
+    "ModifierResolverPass",
+]
 
 
 @dataclass
@@ -137,6 +145,50 @@ class NormalizeGuppy(ComposablePass):
             scope=self._scope,
         )
         return program
+
+
+@dataclass
+class InlineFunctions(ComposablePass):
+    """Inline acyclic function calls below the selected scope.
+
+    Parameters:
+    - heuristic: Heuristic used to choose which non-recursive functions to
+      inline. Defaults to `MaxSize(64)`.
+    - follow_inline_hints: Whether to follow compiler hints for inlining
+      functions.
+    """
+
+    heuristic: inline_funcs.InlineFuncsHeuristic = inline_funcs.MaxSize(64)
+    follow_inline_hints: bool = True
+    _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
+
+    def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
+        return implement_pass_run(
+            self,
+            hugr=hugr,
+            inplace=inplace,
+            copy_call=lambda h: self._inline_functions(h, inplace),
+        )
+
+    def with_scope(self, _scope: PassScope) -> InlineFunctions:
+        """Set the scope of this pass and return self."""
+        self._scope = _scope
+        return self
+
+    def _inline_functions(self, hugr: Hugr, inplace: bool) -> PassResult:
+        tk_program = _state.CompilationState.from_python(hugr)
+
+        _passes.inline_functions(
+            tk_program._inner,
+            heuristic=self.heuristic,
+            follow_inline_hints=self.follow_inline_hints,
+            scope=self._scope,
+        )
+
+        package = tk_program.to_python()
+        return PassResult.for_pass(
+            self, hugr=package.modules[0], inplace=inplace, result=None
+        )
 
 
 def _greedy_depth_reduce(program: _state.CompilationState) -> int:
