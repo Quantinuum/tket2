@@ -47,17 +47,14 @@ def main() -> None:
     h(c2)
     x(c3)
 
-    # Nested control: c1 controls a block that contains a c2-controlled gate
     with control(c1):
         with control(c2):
             flip(t1)
 
-    # Control with dagger inside: c3-controlled dagger rotation
     with control(c3):
         with dagger:
             rotation(t2)
 
-    # Dagger wrapping a controlled gate: dagger of (c1-controlled flip on t1)
     with dagger:
         with control(c1):
             rotation(t1)
