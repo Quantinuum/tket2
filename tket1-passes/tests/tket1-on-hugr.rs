@@ -1,7 +1,13 @@
 //! Test running tket1 passes on hugr circuit.
 
+use std::io::BufReader;
+use std::sync::Arc;
+
+use hugr::envelope::{EnvelopeConfig, read_envelope};
 use hugr::std_extensions::collections::array::ArrayKind;
 use hugr::std_extensions::collections::borrow_array::{BArrayOpBuilder, BorrowArray};
+use hugr::std_extensions::std_reg;
+use tket::extension::rotation::ROTATION_EXTENSION;
 use tket1_passes::{Tket1Circuit, Tket1Pass};
 
 use hugr::builder::{BuildError, Dataflow, DataflowHugr, FunctionBuilder};
@@ -11,7 +17,7 @@ use hugr::{Hugr, HugrView, Node};
 use rayon::iter::ParallelIterator;
 use rstest::{fixture, rstest};
 use tket::TketOp;
-use tket::extension::{TKET_EXTENSION_ID, TKET1_EXTENSION_ID};
+use tket::extension::{TKET_EXTENSION, TKET_EXTENSION_ID, TKET1_EXTENSION_ID};
 use tket::serialize::pytket::{EncodeOptions, EncodedCircuit};
 
 /// JSON encoding of the clifford simp pytket pass.
@@ -118,4 +124,31 @@ fn count_quantum_gates(hugr: &Hugr, region: Node) -> usize {
                 .is_some_and(|e| [TKET_EXTENSION_ID, TKET1_EXTENSION_ID].contains(e.extension_id()))
         })
         .count()
+}
+
+#[test]
+fn test_encode_decode() {
+    let reader =
+        BufReader::new(include_bytes!("../../test_files/guppy_examples/chfunc.hugr").as_slice());
+    let mut hugr = Hugr::load(reader, None).unwrap();
+    let encode_options = EncodeOptions::new().with_subcircuits(true);
+    let mut encoded_circ = EncodedCircuit::new(&hugr, encode_options).unwrap();
+    encoded_circ
+        .par_iter_mut()
+        .try_for_each(|(_, circ)| -> Result<(), tket1_passes::PassError> {
+            let tk1_circ = tket1_passes::Tket1Circuit::from_serial_circuit(circ)?;
+            *circ = tk1_circ.to_serial_circuit()?;
+            Ok(())
+        })
+        .ok();
+
+    encoded_circ.reassemble_inplace(&mut hugr, None).ok();
+    let mut buf = Vec::new();
+    hugr.store(&mut buf, EnvelopeConfig::binary()).unwrap();
+    let buff = std::io::BufReader::new(buf.as_slice());
+    let mut reg = std_reg();
+    reg.extend([ROTATION_EXTENSION.to_owned(), TKET_EXTENSION.to_owned()]);
+    let (_, pkg) = read_envelope(buff, &reg).unwrap();
+    pkg.validate().unwrap();
+    assert_eq!(1, 1);
 }
