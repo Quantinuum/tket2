@@ -325,7 +325,6 @@ impl<N: HugrNode> ModifierResolver<N> {
             func
         );
         println!("%> metadata: {:?}", h.node_metadata_map(func));
-        println!("%> mod flags: {:?}", ModifierFlags::from_metadata(h, func));
         println!("%> self.modifiers: {:?}", self.modifiers);
         println!("%> satisfies: {}", satisfies);
         // end printing
@@ -488,7 +487,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         self.wire_node_inout(
             n,
             new_dfg,
-            (signature.input.iter(), signature.output.iter()),
+            (dfg.signature.input.iter(), dfg.signature.output.iter()),
             (0, 0, offset),
         )?;
 

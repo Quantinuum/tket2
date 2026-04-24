@@ -510,7 +510,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         new: DirWire,
     ) -> Result<(), ModifierResolverErrors<N>> {
         // NICOLA Here map insertion
-        // println!("+   R: {} -> {}", old, new);
+        println!("+   R: {} -> {}", old, new);
         self.corresp_map()
             .insert(old, vec![new])
             .map_or(Ok(()), |former| {
@@ -616,7 +616,13 @@ impl<N: HugrNode> ModifierResolver<N> {
         new_dfg: &mut impl Container,
         parent: N,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        // let corr = self.corresp_map().clone();
+        // debug printing
+        let corr = self.corresp_map().clone();
+        // println!("-> Correspondence map:");
+        // for (old, new) in &corr {
+        //     println!("{} -> {:?}", old, new);
+        // }
+        // degub printing end
         for out_node in h.children(parent) {
             for out_port in h.node_outputs(out_node) {
                 if let Some(EdgeKind::StateOrder) = h.get_optype(out_node).port_kind(out_port) {
@@ -632,9 +638,6 @@ impl<N: HugrNode> ModifierResolver<N> {
                     for w1 in self.map_get(&(in_node, in_port).into())? {
                         for w2 in self.map_get(&(out_node, out_port).into())? {
                             // NICOLA(-1)
-                            // for (old, new) in &corr {
-                            //     println!("{} -> {}", old, new);
-                            // }
                             connect(new_dfg, w1, w2)?
                         }
                     }
@@ -894,21 +897,18 @@ impl<N: HugrNode> ModifierResolver<N> {
         let mut in_ty = inputs.next();
         let mut out_ty = outputs.next();
         // printing for debugging
-        // let input_tys = in_ty.into_iter().chain(inputs.by_ref()).collect_vec();
-        // let output_tys = out_ty.into_iter().chain(outputs.by_ref()).collect_vec();
-        // // todo print elements in input_tys and output_tys once per time
-        // println!(
-        //     "   $Node In: {} -> {}\n   $Node Out: {} -> {}",
-        //     old_in, new_in, old_out, new_out
-        // );
-        // println!("   $");
+        println!(
+            "   $Node In: {} -> {}\n   $Node Out: {} -> {}",
+            old_in, new_in, old_out, new_out
+        );
+        println!("   $");
         // end printing
         loop {
-            // println!(
-            //     "   $Current in_ty: {:?}, out_ty: {:?}",
-            //     in_ty.map(|t| t.to_string()).unwrap_or("None".to_string()),
-            //     out_ty.map(|t| t.to_string()).unwrap_or("None".to_string())
-            // );
+            println!(
+                "   $Current in_ty: {:?}, out_ty: {:?}",
+                in_ty.map(|t| t.to_string()).unwrap_or("None".to_string()),
+                out_ty.map(|t| t.to_string()).unwrap_or("None".to_string())
+            );
             // Wire inputs until the first quantum type
             while let Some(ty) = in_ty {
                 if self.qubit_finder.contains_element_type(ty) {
@@ -1097,7 +1097,6 @@ impl<N: HugrNode> ModifierResolver<N> {
 
         // let old_signature = cfg.signature.clone();
         let mut signature = cfg.signature.clone();
-        // THIS IS ADDING A QUBIT AS CONTROL QUBIT also on classical functions
         self.modify_signature(&mut signature, true);
         let mut new_cfg = CFGBuilder::new(signature.clone())?;
         let mut new_bb = new_cfg.entry_builder([type_row![]], signature.output.clone())?;
@@ -1135,7 +1134,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         self.wire_node_inout(
             cfg_node,
             new_node,
-            (signature.input.iter(), signature.output.iter()),
+            (cfg.signature.input.iter(), cfg.signature.output.iter()),
             (0, 0, offset),
         )?;
         // self.wire_others(n, cfg.into(), new, new_dfg.hugr().get_optype(new))?;
@@ -1186,7 +1185,6 @@ pub fn resolve_modifier_with_entrypoints(
         }
     }
 
-    // --- Phase 2: Modifier node removal ---
     // After all rewrites, some modifier nodes may still remain in the graph
     // (e.g. intermediate nodes in a chain whose last modifier was the one rewritten).
     // Walk the same reachable set again and delete any surviving modifier nodes,
@@ -1497,7 +1495,7 @@ mod tests {
     }
 
     #[rstest::rstest]
-    #[case::call("nested_ctrl_dagger1")]
+    #[case::call("classical_function2")]
     // #[case::call("dagger_on_call")]
     //#[case::call("all")]
     // NICOLA: double_mofier is failing because the inner modifier block is setted as dagger, not as control + dagger. Thus the `modify_fn_if_needed` cannot work properly.
