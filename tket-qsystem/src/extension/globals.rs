@@ -57,7 +57,7 @@ lazy_static::lazy_static! {
     strum::IntoStaticStr,
     strum::EnumString,
 )]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 #[non_exhaustive]
 pub enum GlobalsOpDef {
     /// Swap the contents of the named global variable with the argument.
@@ -111,8 +111,8 @@ impl MakeOpDef for GlobalsOpDef {
                 let input_row = TypeRV::new_row_var_use(2, TypeBound::Linear);
                 let output_row = TypeRV::new_row_var_use(3, TypeBound::Linear);
                 let func_ty = TypeRV::new_function(FuncValueType::new(
-                    [global_ty.clone(), input_row.clone().into()],
-                    [global_ty.clone(), output_row.clone().into()],
+                    [global_ty.clone(), input_row.clone()],
+                    [global_ty.clone(), output_row.clone()],
                 ));
                 PolyFuncTypeRV::new(
                     [
@@ -141,8 +141,12 @@ impl MakeOpDef for GlobalsOpDef {
             Self::swap => {
                 "Swap the contents of the named global variable with the argument.".to_string()
             }
-            Self::with => "".to_string(),
-            Self::map => "".to_string(),
+            Self::with => {
+                "Run a function with the set contents of the global variable.".to_string()
+            }
+            Self::map => {
+                "Map a function over the contents of the named global variable.".to_string()
+            }
         }
     }
 

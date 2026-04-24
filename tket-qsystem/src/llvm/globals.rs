@@ -3,8 +3,11 @@
 use crate::extension::globals::{GlobalsOp, GlobalsOpDef};
 use anyhow::{Result, bail, ensure};
 use hugr::llvm::emit::deaggregate_call_result;
+use hugr::llvm::inkwell::builder::Builder;
+use hugr::llvm::inkwell::module::Module;
 use hugr::llvm::inkwell::types::BasicTypeEnum;
-use hugr::llvm::inkwell::values::{BasicMetadataValueEnum, PointerValue};
+use hugr::llvm::inkwell::values::{BasicMetadataValueEnum, GlobalValue, PointerValue};
+use hugr::llvm::sum::LLVMSumType;
 use hugr::llvm::{
     CodegenExtension, CodegenExtsBuilder,
     emit::{EmitFuncContext, EmitOpArgs},
@@ -56,13 +59,8 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
 
             let module = context.get_current_module();
             let builder = context.builder();
-            let none_value = sym_ty.build_tag(builder, 0, vec![])?;
 
-            let global = module.get_global(&sym).unwrap_or_else(|| {
-                let global = module.add_global(sym_ty.clone(), Some(AddressSpace::default()), &sym);
-                global.set_initializer(&none_value);
-                global
-            });
+            let global = get_global_value(module, builder, sym.clone(), sym_ty.clone());
 
             let result = builder.build_load(sym_ty, global.as_pointer_value(), "current_value")?;
             let _ = builder.build_store(global.as_pointer_value(), *new_value)?;
@@ -85,20 +83,15 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
             let module = context.get_current_module();
             let builder = context.builder();
 
-            let global = module.get_global(&sym).unwrap_or_else(|| {
-                let none_value = sym_ty.build_tag(builder, 0, vec![]).unwrap();
-                let global = module.add_global(sym_ty.clone(), Some(AddressSpace::default()), &sym);
-                global.set_initializer(&none_value);
-                global
-            });
+            let global = get_global_value(module, builder, sym.clone(), sym_ty.clone());
 
             let global_ty: BasicTypeEnum = global.get_value_type().try_into().unwrap();
             ensure!(
                 global_ty == sym_ty.as_basic_type_enum(),
                 "Input type does not match global variable type. Found {global_ty}, Expected {sym_ty}"
             );
-            let old_value =
-                builder.build_load(sym_ty.clone(), global.as_pointer_value(), "old_value")?;
+            let start_value =
+                builder.build_load(sym_ty.clone(), global.as_pointer_value(), "start_value")?;
 
             let new_value = sym_ty.build_tag(builder, 1, vec![*init_global_value])?;
 
@@ -119,7 +112,7 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
             let end_value = sym_ty.value(end_value)?;
             let end_value = end_value.build_untag(builder, 1)?[0];
 
-            let _ = builder.build_store(global.as_pointer_value(), old_value)?;
+            let _ = builder.build_store(global.as_pointer_value(), start_value)?;
 
             let call_results =
                 deaggregate_call_result(builder, func_call, hugr_func_ty.output.len())?;
@@ -149,20 +142,39 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
             let builder = context.builder();
 
             // Get global variable
-            // This should be initialised already
-            let global = module
-                .get_global(&sym)
-                .ok_or_else(|| anyhow::anyhow!("Global '{sym}' not found"))?;
+            let global = get_global_value(module, builder, sym.clone(), sym_ty.clone());
+            let global_ty: BasicTypeEnum = global.get_value_type().try_into().unwrap();
+            ensure!(
+                global_ty == sym_ty.as_basic_type_enum(),
+                "Input type does not match global variable type. Found {global_ty}, Expected {sym_ty}"
+            );
 
-            let old_value =
-                builder.build_load(sym_ty.clone(), global.as_pointer_value(), "old_value")?;
+            let start_value =
+                builder.build_load(sym_ty.clone(), global.as_pointer_value(), "start_value")?;
+            let start_value = sym_ty.value(start_value)?;
+            let start_value = start_value.build_untag(builder, 1)?[0];
 
             // func_args should be [global, *func_args]
-            let mut real_args: Vec<BasicMetadataValueEnum> = vec![old_value.into()];
-            real_args.extend(func_args.iter().copied().map(BasicMetadataValueEnum::from));
+            let mut real_args: Vec<BasicMetadataValueEnum> = vec![start_value.into()];
+            real_args.extend(
+                func_args
+                    .iter()
+                    .copied()
+                    .map_into::<BasicMetadataValueEnum>(),
+            );
 
             let func_ptr = PointerValue::try_from(*func).unwrap();
-            let hugr_func_ty = FuncValueType::new(inputs.clone(), outputs.clone()).try_into()?;
+
+            let global_t = ty_arg
+                .as_runtime()
+                .ok_or_else(|| anyhow::anyhow!("Expected runtime type arg for GlobalsOp::Map"))?;
+
+            let mut in_types = inputs.iter().cloned().collect_vec();
+            in_types.insert(0, global_t.clone().into());
+            let mut out_types = outputs.iter().cloned().collect_vec();
+            out_types.insert(0, global_t.clone().into());
+
+            let hugr_func_ty = FuncValueType::new(in_types, out_types).try_into()?;
             let func_ty = context.llvm_func_type(&hugr_func_ty)?;
 
             let func_call =
@@ -175,7 +187,8 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
                 bail!("Global '{sym}' was not returned from function call")
             };
 
-            let _ = builder.build_store(global.as_pointer_value(), *end_value)?;
+            let end_value = sym_ty.build_tag(builder, 1, vec![*end_value])?;
+            let _ = builder.build_store(global.as_pointer_value(), end_value)?;
 
             args.outputs
                 .finish(builder, results.iter().copied().map_into().collect_vec())?
@@ -183,6 +196,20 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
     }
 
     Ok(())
+}
+
+fn get_global_value<'a>(
+    module: &Module<'a>,
+    builder: &Builder,
+    sym: String,
+    sym_ty: LLVMSumType<'a>,
+) -> GlobalValue<'a> {
+    module.get_global(&sym).unwrap_or_else(|| {
+        let none_value = sym_ty.build_tag(builder, 0, vec![]).unwrap();
+        let global = module.add_global(sym_ty.clone(), Some(AddressSpace::default()), &sym);
+        global.set_initializer(&none_value);
+        global
+    })
 }
 
 #[cfg(test)]
@@ -197,7 +224,7 @@ mod test {
 
     #[rstest::rstest]
     #[case::with(1,GlobalsOp::With { name: "my_global".to_string(), ty_arg: qb_t().into(), inputs: [qb_t(), bool_t()].into(), outputs: [qb_t(), bool_t()].into() })]
-    #[case::map(2,GlobalsOp::Map { name: "my_global".to_string(), ty_arg: qb_t().into(), inputs: [qb_t(), bool_t()].into(), outputs: [qb_t(), bool_t()].into() })]
+    #[case::map(2,GlobalsOp::Map { name: "my_global".to_string(), ty_arg: qb_t().into(), inputs: [bool_t()].into(), outputs: [bool_t()].into() })]
     fn emit_futures_codegen(
         #[case] _i: i32,
         #[with(_i)] mut llvm_ctx: TestContext,
