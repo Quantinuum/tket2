@@ -387,6 +387,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         Ok(new_function_node)
     }
 
+    /// NICOLA: seemes to be useless
     /// Generates a new function that does not essentially modify the function itself
     /// but changes the signature to match the modified calls.
     /// The generated function just calls the original function.
@@ -407,9 +408,12 @@ impl<N: HugrNode> ModifierResolver<N> {
             )));
         };
 
-        let mut poly_sig = fn_defn.signature().clone();
-        self.modify_signature(poly_sig.body_mut(), false);
-        let instantiate = poly_sig
+        // The original (unmodified) poly sig is used for the inner Call node,
+        // so it matches the signature of `func` being called.
+        let poly_sig = fn_defn.signature().clone();
+        let mut modified_poly_sig = poly_sig.clone();
+        self.modify_signature(modified_poly_sig.body_mut(), false);
+        let instantiate = modified_poly_sig
             .instantiate(type_args)
             .map_err(|e| ModifierResolverErrors::BuildError(e.into()))?;
 
@@ -419,12 +423,16 @@ impl<N: HugrNode> ModifierResolver<N> {
         let mut builder =
             FunctionBuilder::new(format!("__modified__{}", fn_defn.func_name()), instantiate)?;
         let [in_node, out_node] = builder.io();
+        // Call uses the original poly_sig: the wrapper calls the unmodified function.
         let call = Call::try_new(poly_sig, type_args.to_owned())
             .map_err(|e| ModifierResolverErrors::BuildError(e.into()))?;
         let call_port = call.called_function_port();
         let call_node = builder.add_child_node(call);
 
-        // connect wires
+        // connect wires:
+        // - first `offset` inputs are control arrays, passed through directly to output
+        // - remaining inputs are forwarded to the inner call
+        // - call outputs are forwarded to the remaining output ports
         for i in 0..offset {
             builder.hugr_mut().connect(in_node, i, out_node, i);
         }

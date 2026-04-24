@@ -1495,7 +1495,7 @@ mod tests {
     }
 
     #[rstest::rstest]
-    #[case::call("classical_function2")]
+    #[case::call("classical_function3")]
     // #[case::call("dagger_on_call")]
     //#[case::call("all")]
     // NICOLA: double_mofier is failing because the inner modifier block is setted as dagger, not as control + dagger. Thus the `modify_fn_if_needed` cannot work properly.
