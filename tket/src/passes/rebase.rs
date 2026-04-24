@@ -161,8 +161,8 @@ impl RebasePass {
         inline: InlineConfig,
     ) -> Result<Self, BuildDirectRebaseError> {
         let cur_to_inter: OpMap = cur_to_new
-            .iter()
-            .map(|(op_key, _)| {
+            .keys()
+            .map(|op_key| {
                 let Some((ext_id, op_name)) = op_key.rsplit_once(".") else {
                     return Err(BuildDirectRebaseError::CouldNotUnqualify(op_key.clone()));
                 };
@@ -171,7 +171,7 @@ impl RebasePass {
                         ext_id,
                     )?));
                 };
-                let Some(ext_op_def) = ext.get_op(&op_name) else {
+                let Some(ext_op_def) = ext.get_op(op_name) else {
                     return Err(BuildDirectRebaseError::OpNotFound(
                         ExtensionId::new(ext_id)?,
                         op_name.into(),
@@ -304,7 +304,7 @@ where
 
             replace_op(hugr, n, sig, func_node)?;
             if let InlineCallsConfig::Yes(inline_dfgs) = self.inline.intermediate {
-                let inlined_nodes = hugr.apply_patch(InlineCall::new(n.into()))?;
+                let inlined_nodes = hugr.apply_patch(InlineCall::new(n))?;
                 if inline_dfgs {
                     let [_, removed_in, removed_out] = hugr.apply_patch(InlineDFG(n.into()))?;
                     new_nodes.extend(
@@ -348,7 +348,7 @@ where
 
             replace_op(hugr, n, signature, func_node)?;
             if let InlineCallsConfig::Yes(inline_dfgs) = self.inline.new {
-                hugr.apply_patch(InlineCall::new(n.into()))?;
+                hugr.apply_patch(InlineCall::new(n))?;
                 if inline_dfgs {
                     hugr.apply_patch(InlineDFG(n.into()))?;
                 }
@@ -367,7 +367,6 @@ where
 
 #[cfg(test)]
 mod test {
-    use super::patches::test::HasQualifiedId;
     use super::{InlineConfig, RebasePass};
     use crate::TketOp;
     use crate::extension::rotation::{ConstRotation, rotation_type};
@@ -375,6 +374,7 @@ mod test {
     use crate::passes::composable::test::run_validating;
     use crate::utils::{build_circuit, build_simple_circuit};
     use hugr_core::extension::prelude::qb_t;
+    use hugr_core::extension::simple_op::MakeOpDef;
     use hugr_core::types::Signature;
     use hugr_core::{CircuitUnit, Hugr, HugrView};
     use std::collections::HashMap;
@@ -383,7 +383,7 @@ mod test {
 
     fn print_hugr<H: HugrView>(hugr: &H, name: &str) {
         let mut f = std::fs::File::create(format!("{}.mmd", name)).unwrap();
-        f.write(hugr.mermaid_string().as_ref()).unwrap();
+        f.write_all(hugr.mermaid_string().as_ref()).unwrap();
     }
 
     fn x_replacement() -> Hugr {
@@ -420,6 +420,7 @@ mod test {
         h.unwrap().into_hugr()
     }
 
+    #[expect(dead_code)]
     fn bad_rx_replacement() -> Hugr {
         let h = build_circuit(Signature::new([qb_t()], [qb_t()]), |_| Ok(()));
 
