@@ -27,7 +27,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         if (control != 0 || dagger) && !tket_op.is_quantum() {
             return Err(ModifierResolverErrors::unresolvable(
                 op_node,
-                "None quantum operation cannot be modified".to_string(),
+                "Non-quantum operation cannot be modified".to_string(),
                 tket_op.into(),
             ));
         }
@@ -69,7 +69,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                     let outgoing = control..new_fn.hugr().num_outputs(new);
                     Ok(PortVector::from_single_node(new, incoming, outgoing))
                 } else {
-                    // If dagered
+                    // If daggered
                     let halfturn = new_fn.add_child_node(RotationOp::to_halfturns);
                     let reversed_float = new_fn
                         .add_dataflow_op(FloatOps::fneg, vec![Wire::new(halfturn, 0)])
@@ -622,7 +622,7 @@ mod test {
                 inputs.splice(0..size, v);
                 *func.finish_with_outputs(inputs).unwrap().handle()
             };
-            test_modifier_resolver(3, c_num, foo, dagger, "name");
+            test_modifier_resolver(3, c_num, foo, dagger);
         }
     }
 

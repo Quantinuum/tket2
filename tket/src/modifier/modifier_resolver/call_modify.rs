@@ -29,9 +29,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             .single_linked_output(call_node, call.called_function_port())
             .unwrap();
 
-        // NICOLA(-5)
         // wire the callee
-        println!("NICOLA(-5)");
         let Some(new_callee) = self.modify_fn_if_needed(h, callee.0)? else {
             // If the function need not be modified, just copy the Call node as is.
             let new = self.add_node_no_modification(h, call_node, call.clone(), new_dfg)?;
@@ -81,10 +79,6 @@ impl<N: HugrNode> ModifierResolver<N> {
     ) -> Result<N, ModifierResolverErrors<N>> {
         // The final target of modifiers to apply.
         // Collection of modifiers to apply.
-        println!(
-            "Entering apply_modifier_chain_to_loaded_fn with modifier_node: {:?}",
-            modifier_node
-        );
         let modifiers_and_targ = self.trace_modifiers_chain(h, modifier_node)?;
 
         let targ = modifiers_and_targ
@@ -92,23 +86,12 @@ impl<N: HugrNode> ModifierResolver<N> {
             .cloned()
             .ok_or(ModifierError::NoTarget(modifier_node))?;
 
-        // printing
-        println!("Modifier chain traced:");
-        for node in &modifiers_and_targ {
-            println!(" {:?}: {}", node, h.get_optype(*node));
-        }
-        println!("Target: {}", targ);
-        // end printing
-
         // The function to apply the modifier to. This is expected to be a LoadFunction node
         let (func, load) = Self::get_loaded_function(h, modifier_node, targ, h.get_optype(targ))?;
-        println!("Loaded function:\n - node {}", func);
-        // println!("  load {:?}", load);
 
         // Modify the function
         let modified_fn = self.modify_fn(h, func)?;
 
-        println!("Modified function node...");
         // Modify the function loader
         // Insert the new LoadFunction node to load the modified function
         let mut modified_sig = load.func_sig.clone();
@@ -469,20 +452,19 @@ mod tests {
     }
 
     #[rstest::rstest]
-    #[case::call_twice(1, 1, foo_modifier_on_function, false, "foo_call_twice")]
-    #[case::call(1, 1, foo_call, false, "foo_call")]
-    #[case::call_dagger(1, 1, foo_call, true, "foo_call_dagger")]
-    #[case::indir_call(1, 1, foo_indir_call, false, "indir_call")]
-    #[case::indir_call_dagger(1, 1, foo_indir_call, true, "indir_call_dagger")]
-    #[case::load_fn(1, 1, foo_load_fn, false, "load_fn")]
-    #[case::nested_modifier(2, 2, foo_nested_modifier, false, "nested_modifier")]
+    #[case::call_twice(1, 1, foo_modifier_on_function, false)]
+    #[case::call(1, 1, foo_call, false)]
+    #[case::call_dagger(1, 1, foo_call, true)]
+    #[case::indir_call(1, 1, foo_indir_call, false)]
+    #[case::indir_call_dagger(1, 1, foo_indir_call, true)]
+    #[case::load_fn(1, 1, foo_load_fn, false)]
+    #[case::nested_modifier(2, 2, foo_nested_modifier, false)]
     pub fn test_call_modify(
         #[case] target_num: usize,
         #[case] ctrl_num: u64,
         #[case] foo: fn(&mut ModuleBuilder<Hugr>, usize) -> FuncID<true>,
         #[case] dagger: bool,
-        #[case] name: &str,
     ) {
-        test_modifier_resolver(target_num, ctrl_num, foo, dagger, name);
+        test_modifier_resolver(target_num, ctrl_num, foo, dagger);
     }
 }
