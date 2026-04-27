@@ -10,8 +10,6 @@ from pathlib import Path
 from sys import argv
 import sys
 
-from hugr import Hugr
-from hugr.hugr.render import RenderConfig
 from guppylang import guppy
 from guppylang.std.builtins import control, dagger
 from guppylang.std.debug import state_result
