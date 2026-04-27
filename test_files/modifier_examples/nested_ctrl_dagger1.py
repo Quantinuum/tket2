@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang @ git+https://github.com/Quantinuum/guppylang.git@na/fix-modifier-metadata#subdirectory=guppylang",
+#     "guppylang @ git+https://github.com/Quantinuum/guppylang.git@main#subdirectory=guppylang",
 # ]
 # ///
 """Nested control and dagger modifiers in various combinations"""
@@ -59,5 +59,4 @@ def main() -> None:
 
 
 program = main.compile()
-
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())

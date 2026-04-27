@@ -36,22 +36,16 @@ impl<N: HugrNode> ModifierResolver<N> {
         mem::swap(self.corresp_map(), &mut corresp_map);
         mem::swap(self.controls(), &mut controls);
 
-        // println!("START: {}", parent_node);
         // Modify the input/output nodes beforehand.
-        // println!("> modifing in_out_node");
         self.modify_in_out_node(h, parent_node, new_dfg)?;
-        // println!("> modified_in_out_node");
-        // Modify the children nodes.
-        // println!("> modifying dfg children");
-        self.modify_dfg_children(h, parent_node, new_dfg)?;
-        // println!("> modified_dfg_children");
 
-        // println!("> wiring control to output");
+        // Modify the children nodes.
+        self.modify_dfg_children(h, parent_node, new_dfg)?;
+
         self.wire_control_to_output(h, parent_node, new_dfg)?;
-        // println!("> wired_control_to_output");
+
         self.connect_all(h, new_dfg, parent_node)?;
-        // println!("> connect_all");
-        println!("END {}", parent_node);
+
         mem::swap(self.controls(), &mut controls);
         mem::swap(self.corresp_map(), &mut corresp_map);
 
@@ -77,7 +71,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                 worklist.push_back(node_map.from_portgraph(old_n_id));
             }
         }
-        // println!("=========");
+
         self.with_worklist(worklist, |this| {
             while let Some(working_node) = this.worklist().pop_front() {
                 this.modify_op(h, working_node, new_dfg)?;
@@ -100,7 +94,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         let optype = h.get_optype(n);
         match optype {
             OpType::FuncDefn(_) | OpType::DFG(_) => {
-                // println!("Here comes FuncDefn or DFG!");
                 let FuncTypeBase { input, output } = match optype {
                     OpType::FuncDefn(fndefn) => fndefn.signature().body(),
                     OpType::DFG(dfg) => &dfg.signature(),
@@ -143,7 +136,6 @@ impl<N: HugrNode> ModifierResolver<N> {
                 }
             }
             OpType::DataflowBlock(dfb) => {
-                println!("Here comes DataflowBlock!");
                 let DataflowBlock {
                     inputs: input,
                     other_outputs: output,
@@ -314,27 +306,9 @@ impl<N: HugrNode> ModifierResolver<N> {
     ) -> Result<Option<N>, ModifierResolverErrors<N>> {
         let satisfies = ModifierFlags::from_metadata(h, func)
             .is_some_and(|flags| flags.satisfies(&self.modifiers));
-        // start printing
-        println!("====");
-        println!(
-            "%> Checking whether the function node {} needs modification.",
-            func
-        );
-        println!("%> raw metadata: {:?}", h.node_metadata_map(func));
-        println!(
-            "%> parsed metadata: {:?}",
-            ModifierFlags::from_metadata(h, func)
-        );
-        println!("%> self.modifiers: {:?}", self.modifiers);
-        println!("%> satisfies: {}", satisfies);
-        // end printing
 
         if !satisfies {
-            // let in_out_match = signature.input == signature.output;
-            // if in_out_match {
-            // If the flag is not set and the signature does not show an evident problem, skip the modification.
             return Ok(None);
-            // }
         }
         Ok(Some(self.modify_fn(h, func)?))
     }
@@ -345,7 +319,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         h: &mut impl HugrMut<Node = N>,
         func: N,
     ) -> Result<N, ModifierResolverErrors<N>> {
-        // println!("%Modifying function node {}", func);
         let old_call_map = mem::take(self.call_map());
 
         // Old function definition
@@ -365,7 +338,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         .unwrap();
 
         self.modify_dfg_body(h, func, &mut new_fn)?;
-        // println!("Modified dfg body for node {}", func);
 
         // Connect the global wires
         let call_map = mem::replace(self.call_map(), old_call_map);
@@ -394,7 +366,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         func: N,
         type_args: &[TypeArg],
     ) -> Result<N, ModifierResolverErrors<N>> {
-        println!("%Wrapping function node {} with controls", func);
         if self.control_num() == 0 {
             return Ok(func);
         }
@@ -406,12 +377,9 @@ impl<N: HugrNode> ModifierResolver<N> {
             )));
         };
 
-        // The original (unmodified) poly sig is used for the inner Call node,
-        // so it matches the signature of `func` being called.
-        let poly_sig = fn_defn.signature().clone();
-        let mut modified_poly_sig = poly_sig.clone();
-        self.modify_signature(modified_poly_sig.body_mut(), false);
-        let instantiate = modified_poly_sig
+        let mut poly_sig = fn_defn.signature().clone();
+        self.modify_signature(poly_sig.body_mut(), false);
+        let instantiate = poly_sig
             .instantiate(type_args)
             .map_err(|e| ModifierResolverErrors::BuildError(e.into()))?;
 
@@ -421,7 +389,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         let mut builder =
             FunctionBuilder::new(format!("__modified__{}", fn_defn.func_name()), instantiate)?;
         let [in_node, out_node] = builder.io();
-        // Call uses the original poly_sig: the wrapper calls the unmodified function.
         let call = Call::try_new(poly_sig, type_args.to_owned())
             .map_err(|e| ModifierResolverErrors::BuildError(e.into()))?;
         let call_port = call.called_function_port();

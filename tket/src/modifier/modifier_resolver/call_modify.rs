@@ -79,10 +79,6 @@ impl<N: HugrNode> ModifierResolver<N> {
     ) -> Result<N, ModifierResolverErrors<N>> {
         // The final target of modifiers to apply.
         // Collection of modifiers to apply.
-        println!(
-            "Entering apply_modifier_chain_to_loaded_fn with modifier_node: {:?}",
-            modifier_node
-        );
         let modifiers_and_targ = self.trace_modifiers_chain(h, modifier_node)?;
 
         let targ = modifiers_and_targ
@@ -90,23 +86,12 @@ impl<N: HugrNode> ModifierResolver<N> {
             .cloned()
             .ok_or(ModifierError::NoTarget(modifier_node))?;
 
-        // printing
-        println!("Modifier chain traced:");
-        for node in &modifiers_and_targ {
-            println!(" {:?}: {}", node, h.get_optype(*node));
-        }
-        println!("Target: {}", targ);
-        // end printing
-
         // The function to apply the modifier to. This is expected to be a LoadFunction node
         let (func, load) = Self::get_loaded_function(h, modifier_node, targ, h.get_optype(targ))?;
-        // println!("Loaded function:\n - node {}", func);
-        // println!("  load {:?}", load);
 
         // Modify the function
         let modified_fn = self.modify_fn(h, func)?;
 
-        println!("Modified function node...");
         // Modify the function loader
         // Insert the new LoadFunction node to load the modified function
         let mut modified_sig = load.func_sig.clone();

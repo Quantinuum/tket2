@@ -102,8 +102,7 @@
 use itertools::{Either, Itertools};
 use std::{
     collections::{HashMap, VecDeque},
-    fs, iter, mem,
-    path::Path,
+    iter, mem,
 };
 
 pub mod array_modify;
@@ -506,8 +505,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         old: DirWire<N>,
         new: DirWire,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        // NICOLA Here map insertion
-        // println!("+   R: {} -> {}", old, new);
         self.corresp_map()
             .insert(old, vec![new])
             .map_or(Ok(()), |former| {
@@ -613,13 +610,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         new_dfg: &mut impl Container,
         parent: N,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        // debug printing
-        // let corr: HashMap<DirWire<N>, Vec<DirWire>> = self.corresp_map().clone();
-        // println!("-> Correspondence map:");
-        // for (old, new) in &corr {
-        //     println!("{} -> {:?}", old, new);
-        // }
-        // degub printing end
         for out_node in h.children(parent) {
             for out_port in h.node_outputs(out_node) {
                 if let Some(EdgeKind::StateOrder) = h.get_optype(out_node).port_kind(out_port) {
@@ -680,38 +670,15 @@ impl<N: HugrNode> ModifierResolver<N> {
         // Verify that the rewrite can be applied.
         self.verify(hugr, modifier_node)?;
 
-        println!(
-            "££££££\nRewriting modifier node {}, type {}",
-            modifier_node,
-            hugr.get_optype(modifier_node)
-        );
-
         // The ports that takes inputs from the modified function to the IndirectCall node.
         let modified_fn_loader: Vec<(_, Vec<_>)> = hugr
             .node_outputs(modifier_node)
             .map(|p| (p, hugr.linked_inputs(modifier_node, p).collect()))
             .collect();
 
-        // // printing
-        // println!("Modified function is loaded by:");
-        // for (out_port, inputs) in &modified_fn_loader {
-        //     for (recv, recv_port) in inputs {
-        //         println!(
-        //             "- {}, {}, {}, {}",
-        //             recv,
-        //             hugr.get_optype(*recv),
-        //             recv_port,
-        //             out_port
-        //         );
-        //     }
-        // }
-        // println!("BANANANANANA 1.");
-        // end printing
-
         // Modify the chain of modifiers.
         // Make sure that the modifiers are initially empty.
         let modifiers = CombinedModifier::default();
-        println!("Initial modifiers: {:?}", modifiers);
         let new_load = self.with_modifiers(modifiers, |this| {
             this.apply_modifier_chain_to_loaded_fn(hugr, modifier_node)
         })?;
@@ -723,15 +690,6 @@ impl<N: HugrNode> ModifierResolver<N> {
                 hugr.connect(new_load, out_port, recv, recv_port);
             }
         }
-
-        println!("FINISH");
-        // œœœœœ
-        let output = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")))
-            .join("current.mmd");
-        fs::write(output, hugr.mermaid_string()).unwrap();
-        // œœœœœ
         Ok(())
     }
 
@@ -764,44 +722,45 @@ impl<N: HugrNode> ModifierResolver<N> {
         new_dfg: &mut impl Dataflow,
     ) -> Result<(), ModifierResolverErrors<N>> {
         let optype = &h.get_optype(target_node).clone();
-        // println!("- node {}, type {}", target_node, optype);
-        // NICOLA Match
         match optype {
             // Skip input/output nodes: it should be handled by its parent as it sets control qubits.
             OpType::Input(_) | OpType::Output(_) => {}
-
             // CFG
             OpType::CFG(cfg) => self.modify_cfg(h, target_node, cfg, new_dfg)?,
-
             // DFGs
             OpType::DFG(dfg) => self.modify_dfg(h, target_node, dfg, new_dfg)?,
+            // TailLoop
             OpType::TailLoop(tail_loop) => {
                 self.modify_tail_loop(h, target_node, tail_loop, new_dfg)?
             }
+            // Conditional
             OpType::Conditional(conditional) => {
                 self.modify_conditional(h, target_node, conditional, new_dfg)?
             }
-
             // Function calls
             OpType::Call(_) => self.modify_call(h, target_node, optype, new_dfg)?,
+            // Indirect call
             OpType::CallIndirect(indir_call) => {
                 self.modify_indirect_call(h, target_node, indir_call, new_dfg)?
             }
+            // Load function
             OpType::LoadFunction(load) => {
                 self.modify_load_function(h, target_node, load, new_dfg)?
             }
-
             // Operations
             OpType::ExtensionOp(_) => {
                 self.modify_extension_op(h, target_node, optype, new_dfg)?;
             }
+            // Constants
             OpType::Const(constant) => {
                 self.modify_constant(target_node, constant, new_dfg)?;
             }
+            // Load constant
             OpType::LoadConstant(_) | OpType::OpaqueOp(_) | OpType::Tag(_) => {
                 self.add_node_no_modification(h, target_node, optype.clone(), new_dfg)?;
             }
 
+            // Invalid nodes
             OpType::FuncDefn(_) | OpType::FuncDecl(_) | OpType::Module(_) => {
                 return Err(ModifierResolverErrors::unreachable(format!(
                     "Invalid node found inside modified function (OpType = {})",
@@ -899,19 +858,8 @@ impl<N: HugrNode> ModifierResolver<N> {
         let mut new_out_wire = (new_out, OutgoingPort::from(output_offset + new_offset)).into();
         let mut in_ty = inputs.next();
         let mut out_ty = outputs.next();
-        // printing for debugging
-        // println!(
-        //     "   $Node In: {} -> {}\n   $Node Out: {} -> {}",
-        //     old_in, new_in, old_out, new_out
-        // );
-        // println!("   $");
-        // end printing
+
         loop {
-            // println!(
-            //     "   $Current in_ty: {:?}, out_ty: {:?}",
-            //     in_ty.map(|t| t.to_string()).unwrap_or("None".to_string()),
-            //     out_ty.map(|t| t.to_string()).unwrap_or("None".to_string())
-            // );
             // Wire inputs until the first quantum type
             while let Some(ty) = in_ty {
                 if self.qubit_finder.contains_element_type(ty) {
@@ -1077,12 +1025,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         cfg: &CFG,
         new_dfg: &mut impl Container,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        println!(
-            "@ modify_cfg(node = {}: {})",
-            cfg_node,
-            h.get_optype(cfg_node)
-        );
-
         // Check if the CFG contains only one block.
         let children: Vec<N> = h
             .children(cfg_node)
@@ -1101,11 +1043,11 @@ impl<N: HugrNode> ModifierResolver<N> {
         // let old_signature = cfg.signature.clone();
         let mut signature = cfg.signature.clone();
         self.modify_signature(&mut signature, true);
+
         let mut new_cfg = CFGBuilder::new(signature.clone())?;
         let mut new_bb = new_cfg.entry_builder([type_row![]], signature.output.clone())?;
-        // println!("@ OPEN recursive call for modifying dfg");
         self.modify_dfg_body(h, old_bb, &mut new_bb)?;
-        // println!("@ CLOSE");
+
         let bb_id = new_bb.finish_sub_container()?;
         new_cfg.branch(&bb_id, 0, &new_cfg.exit_block())?;
 
@@ -1119,12 +1061,6 @@ impl<N: HugrNode> ModifierResolver<N> {
             *c = Wire::new(new_node, i);
         }
 
-        // debbugging print
-        // println!("@ 4");
-        // println!("@ old signature: {:?}", old_signature);
-        // println!("@ signature: {:?}", signature);
-        // end debugging print
-
         let offset = self.control_num();
 
         self.wire_node_inout(
@@ -1135,7 +1071,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         )?;
         // self.wire_others(n, cfg.into(), new, new_dfg.hugr().get_optype(new))?;
         // TODO: handle other ports
-        println!("@ FINE");
         Ok(())
     }
 }
@@ -1488,8 +1423,8 @@ mod tests {
 
     #[rstest::rstest]
     // #[case::call("dagger_on_call")]
-    #[case::call("classical_function3")]
-    //#[case::call("all")]
+    // #[case::call("classical_function3")]
+    #[case::call("all")]
     pub fn test_saved_hugr(#[case] name: &str) {
         if name == "all" {
             for (name, mut h) in load_guppy_examples().unwrap() {
