@@ -7,6 +7,7 @@
 """Run on selene the passed hugrs"""
 
 from pathlib import Path
+import shutil
 import sys
 import numpy as np
 import numpy.typing as npt
@@ -36,7 +37,7 @@ def format_statevector(
     return "\n".join(parts) if parts else "all amplitudes below threshold"
 
 
-modifier_examples_dir = Path(__file__).resolve().parents[1] / "modified_hugrs"
+modifier_examples_dir = Path(__file__).resolve().parent / "modified_hugrs"
 result_execution_dir = Path(__file__).resolve().parent / "hugr_results"
 
 print(modifier_examples_dir)
@@ -80,3 +81,5 @@ if len(args) < 2:
     result_path = Path(__file__).resolve().parent / "hugr_results.txt"
     result_path.parent.mkdir(parents=True, exist_ok=True)
     result_path.write_text("\n-----\n".join(all_results) + "\n")
+
+shutil.rmtree(modifier_examples_dir)

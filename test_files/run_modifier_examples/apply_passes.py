@@ -4,11 +4,10 @@ from pathlib import Path
 from hugr.build.base import Hugr
 from tket.passes import (
     ModifierResolverPass,
-    NormalizeGuppy,
 )
 from selene_hugr_qis_compiler import check_hugr
 
-normalize = NormalizeGuppy()
+mr_pass = ModifierResolverPass()
 
 
 def _hugr_from_path(str_path: str) -> Hugr:
@@ -18,24 +17,24 @@ def _hugr_from_path(str_path: str) -> Hugr:
     return h
 
 
-mr_pass = ModifierResolverPass()
-modifier_examples_dir = Path(__file__).resolve().parents[1] / "modifier_examples"
-modified_hugrs_dir = Path(__file__).resolve().parents[1] / "modified_hugrs"
-modified_hugrs_dir.mkdir(parents=True, exist_ok=True)
+def apply_passes(input_paths: list[Path], output_dir: Path) -> None:
+    for input_path in input_paths:
+        print(f"Processing {input_path.name}")
+        hugr = _hugr_from_path(str(input_path))
+        resolved: Hugr = mr_pass(hugr)
+        check_hugr(resolved.to_package().to_bytes())
+
+        output_path = output_dir / f"{input_path.stem}_solved.hugr"
+        output_path.write_bytes(resolved.to_bytes())
 
 
-input_paths = (
-    [modifier_examples_dir / (sys.argv[1] + ".hugr")]
-    if len(sys.argv) > 1
-    else modifier_examples_dir.glob("*.hugr")
-)
-
-for input_path in input_paths:
-    print(f"Processing {input_path.name}")
-    hugr = _hugr_from_path(str(input_path))
-    # hugr = normalize(hugr)
-    resolved: Hugr = mr_pass(hugr)
-    check_hugr(resolved.to_package().to_bytes())
-
-    output_path = modified_hugrs_dir / f"{input_path.stem}_solved.hugr"
-    output_path.write_bytes(resolved.to_bytes())
+if __name__ == "__main__":
+    modifier_examples_dir = Path(__file__).resolve().parents[1] / "modifier_examples"
+    modified_hugrs_dir = Path(__file__).resolve().parent / "modified_hugrs"
+    modified_hugrs_dir.mkdir(parents=True, exist_ok=True)
+    input_paths = (
+        [modifier_examples_dir / (sys.argv[1] + ".hugr")]
+        if len(sys.argv) > 1
+        else modifier_examples_dir.glob("*.hugr")
+    )
+    apply_passes(input_paths, modified_hugrs_dir)

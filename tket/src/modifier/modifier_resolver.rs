@@ -1176,11 +1176,7 @@ pub fn resolve_modifier_with_entrypoints(
 #[cfg(test)]
 mod tests {
 
-    use std::{
-        fs,
-        io::{BufReader, BufWriter},
-        path::Path,
-    };
+    use std::{fs, io::BufReader, path::Path};
 
     use cool_asserts::assert_matches;
     use hugr::{
@@ -1348,7 +1344,6 @@ mod tests {
     }
 
     const GUPPY_EXAMPLES_DIR: &str = "../test_files/modifier_examples";
-    const HUGR_OUTPUT_DIR: &str = "../test_files/modified_hugrs";
 
     fn load_guppy_example(name: &str) -> std::io::Result<Hugr> {
         let file = Path::new(GUPPY_EXAMPLES_DIR).join(format!("{name}.hugr"));
@@ -1378,22 +1373,13 @@ mod tests {
             .collect()
     }
 
-    /// Resolve modifiers in `h`, write the result to `HUGR_OUTPUT_DIR/{name}_solved.hugr`,
-    /// and assert that the hugr is valid both before and after resolution.
-    fn resolve_and_save(name: &str, h: &mut Hugr) {
-        use hugr::envelope::EnvelopeConfig;
-
+    /// Resolve modifiers in `h`
+    fn test_resolve(h: &mut Hugr) {
         assert_matches!(h.validate(), Ok(()));
 
         let entrypoint = h.entrypoint();
         resolve_modifier_with_entrypoints(h, [entrypoint]).unwrap();
 
-        fs::create_dir_all(HUGR_OUTPUT_DIR).unwrap();
-        let output = Path::new(HUGR_OUTPUT_DIR).join(format!("{name}_solved.hugr"));
-        let writer = fs::File::create(output).unwrap();
-        let writer = BufWriter::new(writer);
-        h.store_with_exts(writer, EnvelopeConfig::binary(), h.extensions())
-            .unwrap();
         assert_matches!(h.validate(), Ok(()));
     }
 
@@ -1401,7 +1387,7 @@ mod tests {
     pub fn test_saved_hugr() {
         for (name, mut h) in load_guppy_examples().unwrap() {
             println!("Resolving example: {name}");
-            resolve_and_save(&name, &mut h);
+            test_resolve(&mut h);
         }
     }
 }
