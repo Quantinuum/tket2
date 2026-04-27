@@ -101,7 +101,6 @@
 //!   but this could result in an unexpected error.
 use itertools::{Either, Itertools};
 use std::{
-    clone,
     collections::{HashMap, VecDeque},
     fs, iter, mem,
     path::Path,
@@ -617,7 +616,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         parent: N,
     ) -> Result<(), ModifierResolverErrors<N>> {
         // debug printing
-        let corr = self.corresp_map().clone();
+        // let corr: HashMap<DirWire<N>, Vec<DirWire>> = self.corresp_map().clone();
         // println!("-> Correspondence map:");
         // for (old, new) in &corr {
         //     println!("{} -> {:?}", old, new);
@@ -1251,7 +1250,7 @@ pub fn resolve_modifier_with_entrypoints(
 mod tests {
     use std::{
         fs,
-        io::{BufReader, BufWriter, Cursor},
+        io::{BufReader, BufWriter},
         path::Path,
     };
 
@@ -1259,17 +1258,13 @@ mod tests {
     use hugr::{
         Hugr,
         builder::{DataflowSubContainer, HugrBuilder, ModuleBuilder},
-        extension::ExtensionRegistry,
         ops::{CallIndirect, ExtensionOp, handle::FuncID},
-        package::Package,
         std_extensions::collections::array::ArrayOpBuilder,
         types::Term,
     };
 
     use crate::{
         TketOp,
-        extension::REGISTRY,
-        extension::global_phase::GLOBAL_PHASE_EXTENSION,
         extension::modifier::{CONTROL_OP_ID, DAGGER_OP_ID, MODIFIER_EXTENSION},
         metadata,
     };
@@ -1498,7 +1493,6 @@ mod tests {
     #[case::call("classical_function3")]
     // #[case::call("dagger_on_call")]
     //#[case::call("all")]
-    // NICOLA: double_mofier is failing because the inner modifier block is setted as dagger, not as control + dagger. Thus the `modify_fn_if_needed` cannot work properly.
     pub fn test_saved_hugr(#[case] name: &str) {
         if name == "all" {
             for (name, mut h) in load_guppy_examples().unwrap() {
@@ -1509,32 +1503,5 @@ mod tests {
             let mut h = load_guppy_example(name).unwrap();
             resolve_and_save(name, &mut h);
         }
-    }
-    // DirWire(Node(63), Out(0)) -> [DirWire(Node(2), Port(Outgoing, 1))]
-    // DirWire(Node(65), In(0)) -> [DirWire(Node(5), Port(Outgoing, 1))]
-
-    // TODO: this test fails because the resolver does not preserve extensions, I have not idea why.
-    pub fn test_resolved_hugr_keeps_extensions(name: &str) {
-        use hugr::envelope::EnvelopeConfig;
-
-        let mut h = load_guppy_example(name).unwrap();
-        let loaded_extensions = h.extensions().ids().cloned().collect::<Vec<_>>();
-
-        let entrypoint = h.entrypoint();
-        // removing this call makes the test succeed
-        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
-
-        let resolved_extensions = h.extensions().ids().cloned().collect::<Vec<_>>();
-        assert_eq!(loaded_extensions, resolved_extensions);
-
-        let mut bytes = Vec::new();
-        h.store_with_exts(&mut bytes, EnvelopeConfig::binary(), h.extensions())
-            .unwrap();
-
-        let reloaded = Hugr::load(Cursor::new(bytes), None).unwrap();
-        assert_matches!(reloaded.validate(), Ok(()));
-
-        let reloaded_extensions = reloaded.extensions().ids().cloned().collect::<Vec<_>>();
-        assert_eq!(resolved_extensions, reloaded_extensions); //Failing here!
     }
 }

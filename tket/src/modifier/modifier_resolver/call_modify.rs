@@ -1,7 +1,4 @@
 //! Modify nodes related to function calls.
-
-use std::{fs, path::Path};
-
 use hugr::{
     IncomingPort, Wire,
     builder::{BuildError, Dataflow},
@@ -35,7 +32,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         // NICOLA(-5)
         // wire the callee
         println!("NICOLA(-5)");
-        let Some(new_callee) = self.modify_fn_if_needed(h, callee.0, &call.signature())? else {
+        let Some(new_callee) = self.modify_fn_if_needed(h, callee.0)? else {
             // If the function need not be modified, just copy the Call node as is.
             let new = self.add_node_no_modification(h, call_node, call.clone(), new_dfg)?;
             self.call_map()
@@ -217,7 +214,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             Self::get_loaded_function(h, n, targ, h.get_optype(targ)).map_err(wrap_err)?;
 
         // Modify the function
-        let modified_fn = match self.modify_fn_if_needed(h, func, &load.signature())? {
+        let modified_fn = match self.modify_fn_if_needed(h, func)? {
             Some(node) => node,
             None => self.wrap_fn_with_controls(h, func, &load.type_args)?,
         };
@@ -472,14 +469,13 @@ mod tests {
     }
 
     #[rstest::rstest]
-    // #[case::call_twice(1, 1, foo_modifier_on_function, false, "foo_call_twice")]
+    #[case::call_twice(1, 1, foo_modifier_on_function, false, "foo_call_twice")]
     #[case::call(1, 1, foo_call, false, "foo_call")]
-    // #[case::call_twice_dagger(1, 1, foo_call_twice, true, "foo_call_twice_dagger")]
-    // #[case::call_dagger(1, 1, foo_call, true, "foo_call_dagger")]
-    // #[case::indir_call(1, 1, foo_indir_call, false, "indir_call")]
-    // #[case::indir_call_dagger(1, 1, foo_indir_call, true, "indir_call_dagger")]
-    // #[case::load_fn(1, 1, foo_load_fn, false, "load_fn")]
-    // #[case::nested_modifier(2, 2, foo_nested_modifier, false, "nested_modifier")]
+    #[case::call_dagger(1, 1, foo_call, true, "foo_call_dagger")]
+    #[case::indir_call(1, 1, foo_indir_call, false, "indir_call")]
+    #[case::indir_call_dagger(1, 1, foo_indir_call, true, "indir_call_dagger")]
+    #[case::load_fn(1, 1, foo_load_fn, false, "load_fn")]
+    #[case::nested_modifier(2, 2, foo_nested_modifier, false, "nested_modifier")]
     pub fn test_call_modify(
         #[case] target_num: usize,
         #[case] ctrl_num: u64,

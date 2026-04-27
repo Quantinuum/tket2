@@ -15,12 +15,10 @@ use hugr::{
     hugr::hugrmut::HugrMut,
     ops::{Call, Conditional, DFG, DataflowBlock, DataflowOpTrait, OpType, TailLoop},
     std_extensions::collections::array::ArrayOpBuilder,
-    types::{FuncTypeBase, Signature, TypeArg, TypeRow},
+    types::{FuncTypeBase, TypeArg, TypeRow},
 };
 use hugr_core::hugr::internal::PortgraphNodeMap;
 use petgraph::visit::{Topo, Walker};
-
-use crate::metadata;
 
 use super::{DirWire, ModifierFlags, ModifierResolver, ModifierResolverErrors, PortExt};
 
@@ -315,7 +313,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         &mut self,
         h: &mut impl HugrMut<Node = N>,
         func: N,
-        signature: &Signature,
     ) -> Result<Option<N>, ModifierResolverErrors<N>> {
         let satisfies = ModifierFlags::from_metadata(h, func)
             .is_some_and(|flags| flags.satisfies(&self.modifiers));
