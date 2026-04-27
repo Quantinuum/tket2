@@ -219,7 +219,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         // Modify the function
         let modified_fn = match self.modify_fn_if_needed(h, func, &load.signature())? {
             Some(node) => node,
-            None => func, //self.wrap_fn_with_controls(h, func, &load.type_args)?,
+            None => self.wrap_fn_with_controls(h, func, &load.type_args)?,
         };
 
         // Make new LoadFunction
