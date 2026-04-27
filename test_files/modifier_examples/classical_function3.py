@@ -19,7 +19,6 @@ from guppylang.std.quantum import discard, qubit, angle, measure
 from guppylang.std.quantum import h, rx, x
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
-from utility import hugr_pdf_directory
 
 from guppylang.experimental import enable_experimental_features
 

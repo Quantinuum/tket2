@@ -1041,7 +1041,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         }
         let old_bb = children[0];
 
-        // let old_signature = cfg.signature.clone();
         let mut signature = cfg.signature.clone();
         self.modify_signature(&mut signature, true);
 
@@ -1405,7 +1404,7 @@ mod tests {
     #[rstest::rstest]
     // #[case::call("dagger_on_call")]
     // #[case::call("classical_function3")]
-    #[case::call("all")]
+    #[case::call("ctrl_array_controller")]
     pub fn test_saved_hugr(#[case] name: &str) {
         if name == "all" {
             for (name, mut h) in load_guppy_examples().unwrap() {

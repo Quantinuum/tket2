@@ -6,6 +6,7 @@ from tket.passes import (
     ModifierResolverPass,
     NormalizeGuppy,
 )
+from selene_hugr_qis_compiler import check_hugr
 
 normalize = NormalizeGuppy()
 
@@ -31,9 +32,10 @@ input_paths = (
 
 for input_path in input_paths:
     print(f"Processing {input_path.name}")
-    modifier_hugr = _hugr_from_path(str(input_path))
-    normalized = normalize(modifier_hugr)
-    resolved: Hugr = mr_pass(normalized)
+    hugr = _hugr_from_path(str(input_path))
+    # hugr = normalize(hugr)
+    resolved: Hugr = mr_pass(hugr)
+    check_hugr(resolved.to_package().to_bytes())
 
     output_path = modified_hugrs_dir / f"{input_path.stem}_solved.hugr"
     output_path.write_bytes(resolved.to_bytes())
