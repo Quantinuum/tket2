@@ -1181,6 +1181,12 @@ pub fn resolve_modifier_with_entrypoints(
 #[cfg(test)]
 mod tests {
 
+    use std::{
+        fs,
+        io::{BufReader, BufWriter},
+        path::Path,
+    };
+
     use cool_asserts::assert_matches;
     use hugr::{
         Hugr,
@@ -1221,7 +1227,6 @@ mod tests {
         ctrl_num: u64,
         foo: impl FnOnce(&mut ModuleBuilder<Hugr>, usize) -> FuncID<true>,
         dagger: bool,
-        name: &str,
     ) {
         // --- Build the module ---
         let mut module = ModuleBuilder::new();
@@ -1338,19 +1343,10 @@ mod tests {
 
         // Run the resolver and validate
         let mut h = module.finish_hugr().unwrap();
-
-        // Dump the hugr before resolution for debugging.
-        let s = h.mermaid_string();
-        let _ = fs::write(format!("{}_before.mmd", name), &s);
         assert_matches!(h.validate(), Ok(()));
 
-        // Apply the modifier resolver starting from the module entrypoint.
         let entrypoint = h.entrypoint();
         resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
-
-        // Dump the hugr after resolution for debugging.
-        let s = h.mermaid_string();
-        let _ = fs::write(format!("{}_after.mmd", name), &s);
 
         // The resolved hugr must still be structurally valid.
         assert_matches!(h.validate(), Ok(()));

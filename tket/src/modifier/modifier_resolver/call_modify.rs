@@ -452,20 +452,19 @@ mod tests {
     }
 
     #[rstest::rstest]
-    #[case::call_twice(1, 1, foo_modifier_on_function, false, "foo_call_twice")]
-    #[case::call(1, 1, foo_call, false, "foo_call")]
-    #[case::call_dagger(1, 1, foo_call, true, "foo_call_dagger")]
-    #[case::indir_call(1, 1, foo_indir_call, false, "indir_call")]
-    #[case::indir_call_dagger(1, 1, foo_indir_call, true, "indir_call_dagger")]
-    #[case::load_fn(1, 1, foo_load_fn, false, "load_fn")]
-    #[case::nested_modifier(2, 2, foo_nested_modifier, false, "nested_modifier")]
+    #[case::call_twice(1, 1, foo_modifier_on_function, false)]
+    #[case::call(1, 1, foo_call, false)]
+    #[case::call_dagger(1, 1, foo_call, true)]
+    #[case::indir_call(1, 1, foo_indir_call, false)]
+    #[case::indir_call_dagger(1, 1, foo_indir_call, true)]
+    #[case::load_fn(1, 1, foo_load_fn, false)]
+    #[case::nested_modifier(2, 2, foo_nested_modifier, false)]
     pub fn test_call_modify(
         #[case] target_num: usize,
         #[case] ctrl_num: u64,
         #[case] foo: fn(&mut ModuleBuilder<Hugr>, usize) -> FuncID<true>,
         #[case] dagger: bool,
-        #[case] name: &str,
     ) {
-        test_modifier_resolver(target_num, ctrl_num, foo, dagger, name);
+        test_modifier_resolver(target_num, ctrl_num, foo, dagger);
     }
 }

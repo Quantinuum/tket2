@@ -811,7 +811,7 @@ mod test {
         #[case] foo: fn(&mut ModuleBuilder<Hugr>, usize) -> FuncID<true>,
         #[case] dagger: bool,
     ) {
-        test_modifier_resolver(t_num, c_num, foo, dagger, "name");
+        test_modifier_resolver(t_num, c_num, foo, dagger);
     }
 
     // This test checks the case where a modifier is not chained but duplicated.

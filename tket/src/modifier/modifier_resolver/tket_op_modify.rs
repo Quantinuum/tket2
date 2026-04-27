@@ -622,7 +622,7 @@ mod test {
                 inputs.splice(0..size, v);
                 *func.finish_with_outputs(inputs).unwrap().handle()
             };
-            test_modifier_resolver(3, c_num, foo, dagger, "name");
+            test_modifier_resolver(3, c_num, foo, dagger);
         }
     }
 
