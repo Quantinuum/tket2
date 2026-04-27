@@ -36,20 +36,19 @@ impl<N: HugrNode> ModifierResolver<N> {
         mem::swap(self.corresp_map(), &mut corresp_map);
         mem::swap(self.controls(), &mut controls);
 
-        println!("START: {}", parent_node);
+        // println!("START: {}", parent_node);
         // Modify the input/output nodes beforehand.
         // println!("> modifing in_out_node");
         self.modify_in_out_node(h, parent_node, new_dfg)?;
         // println!("> modified_in_out_node");
         // Modify the children nodes.
-        println!("> modifying dfg children");
+        // println!("> modifying dfg children");
         self.modify_dfg_children(h, parent_node, new_dfg)?;
-        println!("> modified_dfg_children");
+        // println!("> modified_dfg_children");
 
         // println!("> wiring control to output");
         self.wire_control_to_output(h, parent_node, new_dfg)?;
         // println!("> wired_control_to_output");
-        // NICOLA(-2)
         self.connect_all(h, new_dfg, parent_node)?;
         // println!("> connect_all");
         println!("END {}", parent_node);
@@ -101,7 +100,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         let optype = h.get_optype(n);
         match optype {
             OpType::FuncDefn(_) | OpType::DFG(_) => {
-                println!("Here comes FuncDefn or DFG!");
+                // println!("Here comes FuncDefn or DFG!");
                 let FuncTypeBase { input, output } = match optype {
                     OpType::FuncDefn(fndefn) => fndefn.signature().body(),
                     OpType::DFG(dfg) => &dfg.signature(),
@@ -124,7 +123,6 @@ impl<N: HugrNode> ModifierResolver<N> {
                 )?;
             }
             OpType::TailLoop(tail_loop) => {
-                println!("Here comes TailLoop!");
                 let just_input_num = tail_loop.just_inputs.len();
                 let offset = self.control_num();
                 for port in h.node_outputs(old_in) {
@@ -317,11 +315,16 @@ impl<N: HugrNode> ModifierResolver<N> {
         let satisfies = ModifierFlags::from_metadata(h, func)
             .is_some_and(|flags| flags.satisfies(&self.modifiers));
         // start printing
+        println!("====");
         println!(
             "%> Checking whether the function node {} needs modification.",
             func
         );
-        println!("%> metadata: {:?}", h.node_metadata_map(func));
+        println!("%> raw metadata: {:?}", h.node_metadata_map(func));
+        println!(
+            "%> parsed metadata: {:?}",
+            ModifierFlags::from_metadata(h, func)
+        );
         println!("%> self.modifiers: {:?}", self.modifiers);
         println!("%> satisfies: {}", satisfies);
         // end printing
@@ -333,8 +336,6 @@ impl<N: HugrNode> ModifierResolver<N> {
             return Ok(None);
             // }
         }
-        // NICOLA(-4)
-        println!("NICOLA(-4)");
         Ok(Some(self.modify_fn(h, func)?))
     }
 
@@ -344,7 +345,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         h: &mut impl HugrMut<Node = N>,
         func: N,
     ) -> Result<N, ModifierResolverErrors<N>> {
-        println!("%Modifying function node {}", func);
+        // println!("%Modifying function node {}", func);
         let old_call_map = mem::take(self.call_map());
 
         // Old function definition
@@ -363,7 +364,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         )
         .unwrap();
 
-        // NICOLA(-3)
         self.modify_dfg_body(h, func, &mut new_fn)?;
         // println!("Modified dfg body for node {}", func);
 
@@ -394,6 +394,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         func: N,
         type_args: &[TypeArg],
     ) -> Result<N, ModifierResolverErrors<N>> {
+        println!("%Wrapping function node {} with controls", func);
         if self.control_num() == 0 {
             return Ok(func);
         }
@@ -492,7 +493,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         self.wire_node_inout(
             n,
             new_dfg,
-            (dfg.signature.input.iter(), dfg.signature.output.iter()),
+            (signature.input.iter(), signature.output.iter()),
             (0, 0, offset),
         )?;
 

@@ -201,8 +201,6 @@ fn connect<N>(
         (Either::Right(p_o), Either::Left(p_i)) => (w1.0, p_o, w2.0, p_i),
         (Either::Left(p_i), Either::Right(p_o)) => (w2.0, p_o, w1.0, p_i),
         _ => {
-            // NICOLA(0) Here we fail with multiple modifier
-            println!("WE are failing...");
             return Err(ModifierResolverErrors::unreachable(format!(
                 "Cannot connect the wires with the same direction: {} -> {}",
                 w1, w2
@@ -509,7 +507,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         new: DirWire,
     ) -> Result<(), ModifierResolverErrors<N>> {
         // NICOLA Here map insertion
-        println!("+   R: {} -> {}", old, new);
+        // println!("+   R: {} -> {}", old, new);
         self.corresp_map()
             .insert(old, vec![new])
             .map_or(Ok(()), |former| {
@@ -636,7 +634,6 @@ impl<N: HugrNode> ModifierResolver<N> {
                 for (in_node, in_port) in h.linked_inputs(out_node, out_port) {
                     for w1 in self.map_get(&(in_node, in_port).into())? {
                         for w2 in self.map_get(&(out_node, out_port).into())? {
-                            // NICOLA(-1)
                             connect(new_dfg, w1, w2)?
                         }
                     }
@@ -695,20 +692,20 @@ impl<N: HugrNode> ModifierResolver<N> {
             .map(|p| (p, hugr.linked_inputs(modifier_node, p).collect()))
             .collect();
 
-        // printing
-        println!("Modified function is loaded by:");
-        for (out_port, inputs) in &modified_fn_loader {
-            for (recv, recv_port) in inputs {
-                println!(
-                    "- {}, {}, {}, {}",
-                    recv,
-                    hugr.get_optype(*recv),
-                    recv_port,
-                    out_port
-                );
-            }
-        }
-        println!("BANANANANANA 1.");
+        // // printing
+        // println!("Modified function is loaded by:");
+        // for (out_port, inputs) in &modified_fn_loader {
+        //     for (recv, recv_port) in inputs {
+        //         println!(
+        //             "- {}, {}, {}, {}",
+        //             recv,
+        //             hugr.get_optype(*recv),
+        //             recv_port,
+        //             out_port
+        //         );
+        //     }
+        // }
+        // println!("BANANANANANA 1.");
         // end printing
 
         // Modify the chain of modifiers.
@@ -719,7 +716,6 @@ impl<N: HugrNode> ModifierResolver<N> {
             this.apply_modifier_chain_to_loaded_fn(hugr, modifier_node)
         })?;
         // NICOLA: the fail is before here!
-        println!("BANANANANANA 2.");
         // Connect the modified function to the inputs
         for (out_port, inputs) in modified_fn_loader {
             for (recv, recv_port) in inputs {
@@ -728,6 +724,14 @@ impl<N: HugrNode> ModifierResolver<N> {
             }
         }
 
+        println!("FINISH");
+        // œœœœœ
+        let output = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")))
+            .join("current.mmd");
+        fs::write(output, hugr.mermaid_string()).unwrap();
+        // œœœœœ
         Ok(())
     }
 
@@ -896,18 +900,18 @@ impl<N: HugrNode> ModifierResolver<N> {
         let mut in_ty = inputs.next();
         let mut out_ty = outputs.next();
         // printing for debugging
-        println!(
-            "   $Node In: {} -> {}\n   $Node Out: {} -> {}",
-            old_in, new_in, old_out, new_out
-        );
-        println!("   $");
+        // println!(
+        //     "   $Node In: {} -> {}\n   $Node Out: {} -> {}",
+        //     old_in, new_in, old_out, new_out
+        // );
+        // println!("   $");
         // end printing
         loop {
-            println!(
-                "   $Current in_ty: {:?}, out_ty: {:?}",
-                in_ty.map(|t| t.to_string()).unwrap_or("None".to_string()),
-                out_ty.map(|t| t.to_string()).unwrap_or("None".to_string())
-            );
+            // println!(
+            //     "   $Current in_ty: {:?}, out_ty: {:?}",
+            //     in_ty.map(|t| t.to_string()).unwrap_or("None".to_string()),
+            //     out_ty.map(|t| t.to_string()).unwrap_or("None".to_string())
+            // );
             // Wire inputs until the first quantum type
             while let Some(ty) = in_ty {
                 if self.qubit_finder.contains_element_type(ty) {
@@ -1099,9 +1103,9 @@ impl<N: HugrNode> ModifierResolver<N> {
         self.modify_signature(&mut signature, true);
         let mut new_cfg = CFGBuilder::new(signature.clone())?;
         let mut new_bb = new_cfg.entry_builder([type_row![]], signature.output.clone())?;
-        println!("@ OPEN recursive call for modifying dfg");
+        // println!("@ OPEN recursive call for modifying dfg");
         self.modify_dfg_body(h, old_bb, &mut new_bb)?;
-        println!("@ CLOSE");
+        // println!("@ CLOSE");
         let bb_id = new_bb.finish_sub_container()?;
         new_cfg.branch(&bb_id, 0, &new_cfg.exit_block())?;
 
@@ -1116,14 +1120,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         }
 
         // debbugging print
-        println!("@ 4");
-        // œœœœœ
-        let output = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")))
-            .join("current.mmd");
-        fs::write(output, h.mermaid_string()).unwrap();
-        // œœœœœ
+        // println!("@ 4");
         // println!("@ old signature: {:?}", old_signature);
         // println!("@ signature: {:?}", signature);
         // end debugging print
@@ -1490,8 +1487,8 @@ mod tests {
     }
 
     #[rstest::rstest]
-    #[case::call("classical_function3")]
     // #[case::call("dagger_on_call")]
+    #[case::call("classical_function3")]
     //#[case::call("all")]
     pub fn test_saved_hugr(#[case] name: &str) {
         if name == "all" {

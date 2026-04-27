@@ -64,8 +64,8 @@ impl ModifierFlags {
     fn from_metadata<N: HugrNode>(h: &impl HugrView<Node = N>, n: N) -> Option<Self> {
         h.get_metadata::<metadata::Unitary>(n)
             .map(|num| ModifierFlags {
-                dagger: (num & 1) != 0,
-                control: (num & 2) != 0,
+                control: (num & 1) != 0,
+                dagger: (num & 2) != 0,
                 power: (num & 4) != 0,
             })
     }

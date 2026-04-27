@@ -28,10 +28,10 @@ enable_experimental_features()
 
 @guppy
 def fuu(i: int) -> int:
-    # q = qubit()
-    # x(q)
-    # if measure(q):
-    #     i = i + 1
+    q = qubit()
+    x(q)
+    if measure(q):
+        i = i + 1
     return i
 
 
@@ -40,13 +40,13 @@ def main() -> None:
     t = qubit()
     c1 = qubit()
     c2 = qubit()
-    # h(c1)
-    # x(c2)
+    h(c1)
+    h(c2)
     with control(c1):
         d = fuu(2)
         with control(c2):
             with dagger:
-                x(t)  # rx(t, angle(1 / d))
+                rx(t, angle(1 / d))
 
     state_result("r", c1, c2, t)
     discard(c1)
