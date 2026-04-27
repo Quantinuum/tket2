@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use crate::extension::globals::{GlobalsOp, GlobalsOpDef};
+use crate::extension::globals::{GlobalsOp, GlobalsOpDef, TYPE_PARAM};
 use anyhow::{Result, bail, ensure};
 use hugr::llvm::emit::deaggregate_call_result;
 use hugr::llvm::inkwell::builder::Builder;
@@ -18,6 +18,8 @@ use hugr::{
     extension::{prelude::option_type, simple_op::HasConcrete as _},
     ops::ExtensionOp,
 };
+use hugr_core::extension::SignatureError;
+use hugr_core::types::type_param::TermTypeError;
 use hugr_core::types::{FuncValueType, Signature};
 use itertools::Itertools;
 
@@ -163,16 +165,21 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
                     .map_into::<BasicMetadataValueEnum>(),
             );
 
-            let func_ptr = PointerValue::try_from(*func).unwrap();
+            let func_ptr = PointerValue::try_from(*func)
+                .map_err(|e| anyhow::anyhow!("Invalid function pointer provided to Map: {e:?}"))?;
 
-            let global_t = ty_arg
-                .as_runtime()
-                .ok_or_else(|| anyhow::anyhow!("Expected runtime type arg for GlobalsOp::Map"))?;
+            let Some(global_ty_base) = ty_arg.as_runtime() else {
+                Err(SignatureError::from(TermTypeError::TypeMismatch {
+                    term: ty_arg.clone().into(),
+                    type_: TYPE_PARAM.to_owned().into(),
+                }))?
+            };
 
             let mut in_types = inputs.iter().cloned().collect_vec();
-            in_types.insert(0, global_t.clone().into());
+            in_types.insert(0, global_ty_base.clone().into());
+
             let mut out_types = outputs.iter().cloned().collect_vec();
-            out_types.insert(0, global_t.clone().into());
+            out_types.push(global_ty_base.clone().into());
 
             let hugr_func_ty = FuncValueType::new(in_types, out_types).try_into()?;
             let func_ty = context.llvm_func_type(&hugr_func_ty)?;
@@ -183,7 +190,7 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
             let call_results =
                 deaggregate_call_result(builder, func_call, hugr_func_ty.output.len())?;
 
-            let [end_value, results @ ..] = &call_results[..] else {
+            let [results @ .., end_value] = &call_results[..] else {
                 bail!("Global '{sym}' was not returned from function call")
             };
 

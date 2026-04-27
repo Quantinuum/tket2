@@ -112,7 +112,7 @@ impl MakeOpDef for GlobalsOpDef {
                 let output_row = TypeRV::new_row_var_use(3, TypeBound::Linear);
                 let func_ty = TypeRV::new_function(FuncValueType::new(
                     [global_ty.clone(), input_row.clone()],
-                    [global_ty.clone(), output_row.clone()],
+                    [output_row.clone(), global_ty.clone()],
                 ));
                 PolyFuncTypeRV::new(
                     [
@@ -179,7 +179,7 @@ impl MakeExtensionOp for GlobalsOp {
         match self {
             Self::Swap { .. } => GlobalsOpDef::swap.opdef_id(),
             Self::With { .. } => GlobalsOpDef::with.opdef_id(),
-            Self::Map { .. } => GlobalsOpDef::with.opdef_id(),
+            Self::Map { .. } => GlobalsOpDef::map.opdef_id(),
         }
     }
 
