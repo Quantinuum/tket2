@@ -1161,17 +1161,13 @@ pub fn resolve_modifier_with_entrypoints(
     //     }
     // }
 
-    // --- Phase 3: Global-phase cleanup ---
     // TODO: This as well.
     // Ad hoc cleanup procedure: remove any dangling global-phase nodes that
     // were produced or left behind by the resolution passes above.
     delete_phase(h, entry_points)?;
 
-    // --- Phase 4: Validation ---
-    // Confirm that the resulting hugr is still structurally valid after all rewrites.
     h.validate()
         .map_err(|e| ModifierResolverErrors::BuildError(e.into()))?;
-    // h.extensions_mut() = original_extensions;
 
     Ok(())
 }
@@ -1402,18 +1398,10 @@ mod tests {
     }
 
     #[rstest::rstest]
-    // #[case::call("dagger_on_call")]
-    // #[case::call("classical_function3")]
-    #[case::call("ctrl_array_controller")]
-    pub fn test_saved_hugr(#[case] name: &str) {
-        if name == "all" {
-            for (name, mut h) in load_guppy_examples().unwrap() {
-                resolve_and_save(&name, &mut h);
-            }
-            return;
-        } else {
-            let mut h = load_guppy_example(name).unwrap();
-            resolve_and_save(name, &mut h);
+    pub fn test_saved_hugr() {
+        for (name, mut h) in load_guppy_examples().unwrap() {
+            println!("Resolving example: {name}");
+            resolve_and_save(&name, &mut h);
         }
     }
 }
