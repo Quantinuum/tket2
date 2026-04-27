@@ -16,7 +16,9 @@ from hugr.hugr.render import RenderConfig
 from guppylang.emulator import EmulatorBuilder
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
-from utility import hugr_pdf_directory
+
+hugr_pdf_directory = Path(__file__).resolve().parent / "hugr_pdfs"
+hugr_pdf_directory.mkdir(exist_ok=True)
 
 
 def format_statevector(
