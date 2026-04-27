@@ -1001,7 +1001,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             );
             Ok(())
         } else if Modifier::from_optype(optype).is_some() {
-            // TODO: check if this is ok. (NICOLA)
+            // TODO: check if this is ok.
             self.forget_node(h, op_node)
         } else if self.modify_array_op(h, op_node, optype, new_dfg)?
             || self.try_array_convert(h, op_node, optype, new_dfg)?
@@ -1011,7 +1011,8 @@ impl<N: HugrNode> ModifierResolver<N> {
             // Some other Hugr extension operation.
             // Here, we do not know what is the modified version.
             // We try to place the original operation.
-            // NICOLA: Not sure, if we dont know what to do maybe an error is better?
+            // TODO: Revisit whether unknown extension operations should return
+            // an explicit error instead of falling back to the original operation.
             self.modify_dataflow_op(h, op_node, optype, new_dfg)
         }
     }
@@ -1030,7 +1031,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             .children(cfg_node)
             .filter(|child| h.get_optype(*child).is_dataflow_block())
             .collect();
-        // this is breaking modifier applycation to branching or loops
+        // NOTE: this check prevents breaking modifier application to branching or loops
         if children.len() != 1 {
             return Err(ModifierResolverErrors::unresolvable(
                 cfg_node,
@@ -1090,7 +1091,6 @@ pub fn resolve_modifier_with_entrypoints(
     // Collect entry points into a deque so they can be cloned for later cleanup passes.
     let entry_points: VecDeque<_> = entry_points.into_iter().collect();
 
-    // --- Phase 1: Modifier resolution ---
     // Walk all nodes reachable from the entry points (children and neighbours)
     // and attempt to rewrite each modifier node it encounters.
     let mut resolver = ModifierResolver::new();
@@ -1180,11 +1180,6 @@ pub fn resolve_modifier_with_entrypoints(
 // Definitions of helpers for tests
 #[cfg(test)]
 mod tests {
-    use std::{
-        fs,
-        io::{BufReader, BufWriter},
-        path::Path,
-    };
 
     use cool_asserts::assert_matches;
     use hugr::{
@@ -1221,13 +1216,6 @@ mod tests {
     /// ```
     /// where `foo` is supplied by the caller.
     ///
-    /// Parameters:
-    /// * `target_num`  – number of plain qubit (target) arguments that `foo` accepts.
-    /// * `ctrl_num`  – number of control qubits to wrap around `foo`.
-    /// * `foo`    – closure that inserts the function-under-test into the module and
-    ///              returns its `FuncID`.
-    /// * `dagger` – if `true`, a `Dagger` modifier is inserted before the `Control`
-    ///              modifier, so the full chain is `Dagger → Control`.
     pub(crate) fn test_modifier_resolver(
         target_num: usize,
         ctrl_num: u64,
@@ -1256,8 +1244,6 @@ mod tests {
                 .chain(iter::repeat_n(qb_t(), target_num))
                 .collect::<Vec<_>>(),
         );
-
-        // --- Instantiate modifier extension ops ---
 
         // Dagger modifier parameterised by the target qubit types.
         let dagger_op: ExtensionOp = {
@@ -1293,15 +1279,15 @@ mod tests {
         // Let the caller insert the function-under-test into the module.
         let foo = foo(&mut module, target_num);
 
-        // --- Build the "main" function body ---
+        // Build the "main" function body ---
         let _main = {
             let mut func = module.define_function("main", main_sig).unwrap();
 
             // Load the function value; this is the wire that will be passed through modifiers.
             let mut call = func.load_func(&foo, &[]).unwrap();
 
-            // Optionally wrap with Dagger before Control.
             if dagger {
+                // Wrap with Dagger before Control.
                 call = func
                     .add_dataflow_op(dagger_op, vec![call])
                     .unwrap()
@@ -1350,8 +1336,7 @@ mod tests {
             func.finish_with_outputs(fn_outs).unwrap()
         };
 
-        // --- Run the resolver and validate ---
-
+        // Run the resolver and validate
         let mut h = module.finish_hugr().unwrap();
 
         // Dump the hugr before resolution for debugging.

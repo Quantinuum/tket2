@@ -97,7 +97,7 @@ jobs:
             test-wheels: true
     steps:
       - uses: actions/checkout@v6
-      - uses: mozilla-actions/sccache-action@v0.0.9
+      - uses: mozilla-actions/sccache-action@v0.0.10
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -257,7 +257,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: mozilla-actions/sccache-action@v0.0.9
+      - uses: mozilla-actions/sccache-action@v0.0.10
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
         with:

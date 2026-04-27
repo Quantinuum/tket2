@@ -2,7 +2,7 @@
 help:
     @just --list --justfile {{justfile()}}
 
-# Re-generate all hugr files and their mermaid diagrams.
+# Re-generate all hugr files
 r: recompile-hugrs
 
 # Re-generate all hugr files.
