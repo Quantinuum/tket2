@@ -239,12 +239,12 @@ def test_modifier_resolver() -> None:
     mr_pass = ModifierResolverPass()
     modifier_hugr: Hugr = _hugr_from_path("test_files/guppy_examples/modifiers.hugr")
 
-    normalized = normalize(modifier_hugr)
+    # modifier_hugr = normalize(modifier_hugr)
 
-    assert _count_ops(normalized, "tket.modifier.ControlModifier") == 1
-    assert _count_ops(normalized, "tket.modifier.DaggerModifier") == 1
+    assert _count_ops(modifier_hugr, "tket.modifier.ControlModifier") == 1
+    assert _count_ops(modifier_hugr, "tket.modifier.DaggerModifier") == 1
 
-    resolved: Hugr = mr_pass(normalized)
+    resolved: Hugr = mr_pass(modifier_hugr)
 
     assert _count_ops(resolved, "tket.modifier.ControlModifier") == 0
     assert _count_ops(resolved, "tket.modifier.DaggerModifier") == 0
@@ -259,7 +259,7 @@ def test_modifier_execution() -> None:
         expected_path.stem: np.load(expected_path).copy()
         for expected_path in sorted(hugr_results_dir.glob("*.npy"))
     }
-
+    # TODO: we should also regenerate the modified hugr here, using test_files/run_modifier_examples/apply_passes.py
     for hugr_path in sorted(modified_hugrs_dir.glob("*.hugr")):
         hugr_name = hugr_path.stem.removesuffix("_solved")
         expected_statevector = expected_results[hugr_path.stem]
