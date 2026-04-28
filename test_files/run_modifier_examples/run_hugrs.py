@@ -89,9 +89,10 @@ def assert_statevector(
             )
 
 
-modifier_examples_dir = Path(__file__).resolve().parents[1] / "modified_hugrs"
+modifier_examples_dir = Path(__file__).resolve().parent / "modified_hugrs"
 
-
+result_execution_dir = Path(__file__).resolve().parent / "hugr_results"
+result_execution_dir.mkdir(exist_ok=True)
 hugr_pdf_directory = Path(__file__).resolve().parents[1] / "0_hugr_pdf"
 hugr_pdf_directory.mkdir(exist_ok=True)
 
