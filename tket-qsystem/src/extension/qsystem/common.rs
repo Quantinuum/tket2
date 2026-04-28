@@ -24,9 +24,9 @@ pub trait CommonOp: MakeRegisteredOp + Copy + From<SharedOp> {
     fn platform_extension() -> Arc<Extension>;
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 /// An enum representing operations that are shared between Quantinuum platforms.
-pub enum SharedOp {
+pub(crate) enum SharedOp {
     Measure,
     LazyMeasure,
     LazyMeasureReset,

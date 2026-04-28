@@ -21,6 +21,7 @@ pub mod helios;
 mod lower;
 pub mod sol;
 mod synth_tket_op;
+pub(crate) use common::SharedOp;
 pub use lower::{LowerTk2Error, LowerTketToQSystemPass, check_lowered, lower_tk2_ops};
 
 /// The "tket.qsystem" extension id.
@@ -58,6 +59,16 @@ pub enum QSystemPlatform {
     Helios,
     /// Quantinuum Sol, supporting rp, rpp, rpg, tk2
     Sol,
+}
+
+impl QSystemPlatform {
+    /// Convert a [`SharedOp`] into the platform-appropriate [`hugr::ops::OpType`].
+    pub(crate) fn shared_op_type(self, op: SharedOp) -> hugr::ops::OpType {
+        match self {
+            QSystemPlatform::Helios => helios::HeliosOp::from(op).into(),
+            QSystemPlatform::Sol => sol::SolOp::from(op).into(),
+        }
+    }
 }
 #[deprecated(
     since = "0.25.0",
