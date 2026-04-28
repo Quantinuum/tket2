@@ -330,16 +330,11 @@ where
                 })
             })
             .collect_vec();
-        let new_nodes = replace_nodes(
-            hugr,
-            nodes_to_replace,
-            self.inline.intermediate,
-            |ext_op_qual_id| {
-                self.cur_to_inter
-                    .get(ext_op_qual_id)
-                    .map_or_else(|| unreachable!("Should already be filtered!"), Ok)
-            },
-        )?;
+        let new_nodes = replace_nodes(hugr, nodes_to_replace, self.inline.intermediate, |op_id| {
+            self.cur_to_inter
+                .get(op_id)
+                .map_or_else(|| unreachable!("Should already be filtered!"), Ok)
+        })?;
 
         // Replace the intermediate ops from the calls that were just inserted with calls to the
         // new op set
@@ -347,21 +342,12 @@ where
             .into_iter()
             .filter_map(|n| op_data(hugr, n))
             .collect_vec();
-        replace_nodes(
-            hugr,
-            new_nodes_to_replace,
-            self.inline.new,
-            |ext_op_qual_id| {
-                self.inter_to_new.get(ext_op_qual_id).map_or_else(
-                    || {
-                        Err(RebaseError::NoIntermediateReplacement(
-                            ext_op_qual_id.clone(),
-                        ))
-                    },
-                    Ok,
-                )
-            },
-        )?;
+        replace_nodes(hugr, new_nodes_to_replace, self.inline.new, |op_id| {
+            self.inter_to_new.get(op_id).map_or_else(
+                || Err(RebaseError::NoIntermediateReplacement(op_id.clone())),
+                Ok,
+            )
+        })?;
 
         Ok(())
     }
