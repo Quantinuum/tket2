@@ -42,7 +42,7 @@
 //! When dagger is applied, the order of nodes to be processed is reversed,
 //! since the control qubits are passed in the reverse order.
 //! After visiting all children, `modify_dfg_body` calls
-//! [`connect_all`](ModifierResolver::connect_all) to connect all wires that are registered
+//! ModifierResolver::connect_all to connect all wires that are registered
 //! in the correspondence map.
 //!
 //! Importantly, when dagger is applied, not only the order of nodes is reversed,
@@ -1081,7 +1081,7 @@ impl<N: HugrNode> ModifierResolver<N> {
 // As we may want to change the order of resolving modifiers
 // but might want to rollback if the second last one is called in a different path,
 // this may be needed.
-pub(crate) fn resolve_modifier_with_entrypoints(
+pub fn resolve_modifier_with_entrypoints(
     h: &mut impl HugrMut<Node = Node>,
     entry_points: impl IntoIterator<Item = Node>,
 ) -> Result<(), ModifierResolverErrors<Node>> {
