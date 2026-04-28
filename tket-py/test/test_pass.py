@@ -7,6 +7,7 @@ from tket._ops import TketOp
 from tket.passes import (
     _badger_optimise,
     _greedy_depth_reduce,
+    InlineAlwaysPass,
     InlineFunctions,
     inline_funcs,
     NormalizeGuppy,
@@ -283,6 +284,38 @@ def test_modifier_execution() -> None:
 
             computed_statevector = np.load(tmp_path)
             np.testing.assert_allclose(computed_statevector, expected_statevector)
+
+
+@pytest.mark.parametrize("annotate", [True, False])
+def test_inline_always(annotate: bool) -> None:
+    import hugr.ops as ops
+    import hugr.tys as tys
+    from hugr.build.dfg import Dfg
+
+    d = Dfg(tys.Tuple(tys.Qubit, tys.Qubit))
+
+    f_id = d.module_root_builder().define_function(
+        "id",
+        [tys.Qubit],
+    )
+    f_id.set_outputs(f_id.input_node[0])
+
+    if annotate:
+        f_id.metadata["tket.inline"] = "always"
+
+    (tup,) = d.inputs()
+    (q1, q2) = d.add(ops.UnpackTuple()(tup))
+    call1 = d.call(f_id, q1)
+    call2 = d.call(f_id, q2)
+    (tup,) = d.add(ops.MakeTuple()(call1, call2))
+
+    d.set_outputs(tup)
+
+    # validate(d.hugr)
+
+    InlineAlwaysPass()(d.hugr)
+    # validate(d.hugr)
+    assert _count_ops(d.hugr, "Call") == 0 if annotate else 2
 
 
 def test_inline_functions() -> None:
