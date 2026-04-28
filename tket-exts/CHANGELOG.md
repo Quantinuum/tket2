@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.12.3](https://github.com/Quantinuum/tket2/compare/tket-exts-v0.12.2...tket-exts-v0.12.3) (2026-04-07)
+
+
+### Features
+
+* Pass scopes in python API, update to hugr-py 0.16 ([#1464](https://github.com/Quantinuum/tket2/issues/1464)) ([369aba2](https://github.com/Quantinuum/tket2/commit/369aba22aa31f0e819074af8d96e8b38704c51ee))
+
+
+### Documentation
+
+* fix tket-exts pyproject description ([#1436](https://github.com/Quantinuum/tket2/issues/1436)) ([6f68fe0](https://github.com/Quantinuum/tket2/commit/6f68fe0cd869e5493afba8a85e3306bfa3bc486a))
+
 ## [0.12.2](https://github.com/Quantinuum/tket2/compare/tket-exts-v0.12.1...tket-exts-v0.12.2) (2026-01-28)
 
 

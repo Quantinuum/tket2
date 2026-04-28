@@ -39,7 +39,7 @@ def test_check() -> None:
     package = Package.from_bytes(hugr_envelope)
     hugr = package.modules[0]
     hugr.add_node(CFG([], []))
-    with pytest.raises(HugrReadError, match="CFG must have children"):
+    with pytest.raises(ValueError, match="has no entry block"):
         check_hugr(package.to_str().encode("utf-8"))
 
 

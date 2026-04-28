@@ -2,11 +2,10 @@ from dataclasses import dataclass
 
 from pytket._tket.circuit import Circuit
 
-from tket.circuit import (
-    Tk2Circuit,
-    render_circuit_dot,
+from tket._state import (
+    CompilationState,
 )
-from tket.ops import TketOp
+from tket._ops import TketOp
 
 
 @dataclass
@@ -21,7 +20,7 @@ class CustomCost:
 
 
 def test_cost():
-    circ = Tk2Circuit(Circuit(4).CX(0, 1).H(1).CX(1, 2).CX(0, 3).H(0))
+    circ = CompilationState.from_tket1(Circuit(4).CX(0, 1).H(1).CX(1, 2).CX(0, 3).H(0))
 
     print(circ.circuit_cost(lambda op: int(op == TketOp.CX)))
 
@@ -32,9 +31,9 @@ def test_cost():
 
 
 def test_hash():
-    circA = Tk2Circuit(Circuit(4).CX(0, 1).CX(1, 2).CX(0, 3))
-    circB = Tk2Circuit(Circuit(4).CX(1, 2).CX(0, 1).CX(0, 3))
-    circC = Tk2Circuit(Circuit(4).CX(0, 1).CX(0, 3).CX(1, 2))
+    circA = CompilationState.from_tket1(Circuit(4).CX(0, 1).CX(1, 2).CX(0, 3))
+    circB = CompilationState.from_tket1(Circuit(4).CX(1, 2).CX(0, 1).CX(0, 3))
+    circC = CompilationState.from_tket1(Circuit(4).CX(0, 1).CX(0, 3).CX(1, 2))
 
     assert hash(circA) != hash(circB)
     assert hash(circA) == hash(circC)
@@ -42,13 +41,12 @@ def test_hash():
 
 def test_conversion():
     tk1 = Circuit(4).CX(0, 2).CX(1, 2).CX(1, 3)
-    tk1_dot = render_circuit_dot(tk1)
 
-    tk2 = Tk2Circuit(tk1)
-    tk2_dot = render_circuit_dot(tk2)
+    tk2 = CompilationState.from_tket1(tk1)
+    mermaid = tk2.render_mermaid()
 
-    assert type(tk2) is Tk2Circuit
-    assert tk1_dot == tk2_dot
+    assert type(tk2) is CompilationState
+    assert mermaid  # non-empty
 
     tk1_back = tk2.to_tket1()
 
@@ -58,20 +56,17 @@ def test_conversion():
 
 def test_conversion_qsystem():
     tk1 = Circuit(2).ZZPhase(0.75, 0, 1).PhasedX(0.25, 0.33, 1)
-    tk1_dot = render_circuit_dot(tk1)
 
-    tk2 = Tk2Circuit(tk1)
-    tk2_dot = render_circuit_dot(tk2)
+    tk2 = CompilationState.from_tket1(tk1)
+    mermaid = tk2.render_mermaid()
 
-    assert type(tk2) is Tk2Circuit
-    assert tk1_dot == tk2_dot
+    assert type(tk2) is CompilationState
+    assert mermaid  # non-empty
 
     # Check that we didn't use the opaque tk1 op fallback.
-
-    # TODO: There's no way to traverse the circuit nodes?
-    assert "TKET1.tk1op" not in tk1_dot
-    assert "tket.qsystem.PhasedX" in tk1_dot
-    assert "tket.qsystem.ZZPhase" in tk1_dot
+    assert "TKET1.tk1op" not in mermaid
+    assert "PhasedX" in mermaid
+    assert "ZZPhase" in mermaid
 
     tk1_back = tk2.to_tket1()
 

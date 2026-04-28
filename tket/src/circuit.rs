@@ -9,13 +9,13 @@ use std::borrow::Cow;
 use std::collections::HashSet;
 use std::iter::Sum;
 
+use crate::passes::utils::hash::{HashError, HugrHash};
 pub use command::{Command, CommandIterator};
 use hugr::extension::prelude::{NoopDef, TupleOpDef};
 use hugr::extension::simple_op::MakeOpDef;
 use hugr::hugr::views::sibling_subgraph::InvalidSubgraph;
 use hugr::hugr::views::{ExtractionResult, RootChecked, SiblingSubgraph};
 use hugr::ops::handle::DataflowParentID;
-use hugr_passes::hash::{HashError, HugrHash};
 use itertools::Either::{Left, Right};
 
 use derive_more::{Display, Error, From};

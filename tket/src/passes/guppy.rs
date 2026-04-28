@@ -1,18 +1,17 @@
 //! A pass that normalizes the structure of Guppy-generated circuits into something that can be optimized by tket.
 
+use crate::passes::composable::WithScope;
+use crate::passes::const_fold::{ConstFoldError, ConstantFoldPass};
+use crate::passes::dead_funcs::RemoveDeadFuncsError;
+use crate::passes::inline_dfgs::InlineDFGsPass;
+use crate::passes::normalize_cfgs::{NormalizeCFGError, NormalizeCFGPass};
+use crate::passes::redundant_order_edges::RedundantOrderEdgesPass;
+use crate::passes::untuple::UntupleError;
+use crate::passes::{ComposablePass, PassScope, RemoveDeadFuncsPass, UntuplePass};
 use hugr::Node;
 use hugr::hugr::HugrError;
 use hugr::hugr::hugrmut::HugrMut;
 use hugr::hugr::patch::inline_dfg::InlineDFGError;
-use hugr_passes::composable::WithScope;
-use hugr_passes::const_fold::{ConstFoldError, ConstantFoldPass};
-use hugr_passes::inline_dfgs::InlineDFGsPass;
-use hugr_passes::normalize_cfgs::{NormalizeCFGError, NormalizeCFGPass};
-use hugr_passes::redundant_order_edges::RedundantOrderEdgesPass;
-use hugr_passes::untuple::UntupleError;
-use hugr_passes::{
-    ComposablePass, PassScope, RemoveDeadFuncsError, RemoveDeadFuncsPass, UntuplePass,
-};
 
 use crate::passes::BorrowSquashPass;
 
@@ -96,7 +95,7 @@ impl Default for NormalizeGuppy {
 }
 
 impl WithScope for NormalizeGuppy {
-    fn with_scope(mut self, scope: impl Into<hugr_passes::PassScope>) -> Self {
+    fn with_scope(mut self, scope: impl Into<crate::passes::PassScope>) -> Self {
         self.scope = scope.into();
         self
     }

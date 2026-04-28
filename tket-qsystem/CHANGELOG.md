@@ -1,6 +1,23 @@
 # Changelog
 
 
+## [0.24.0](https://github.com/Quantinuum/tket2/compare/tket-qsystem-v0.23.0...tket-qsystem-v0.24.0) - 2026-04-02
+
+### Bug Fixes
+
+- pytket encoder drops order edges to the output node ([#1466](https://github.com/Quantinuum/tket2/pull/1466))
+- Constant Folding with PassScope::Global should act globally, not just beneath the entrypoint ([#1470](https://github.com/Quantinuum/tket2/pull/1470))
+
+### New Features
+
+- [**breaking**] Use raw Hugrs in pytket encoding/decoding API ([#1418](https://github.com/Quantinuum/tket2/pull/1418))
+- Add qsystem.rz pytket decoder ([#1432](https://github.com/Quantinuum/tket2/pull/1432))
+- [**breaking**] Update MSRV to rust 1.91 ([#1446](https://github.com/Quantinuum/tket2/pull/1446))
+- [**breaking**] Update to hugr 0.26.0 ([#1448](https://github.com/Quantinuum/tket2/pull/1448))
+- [**breaking**] Follow pass scopes in composable passes ([#1429](https://github.com/Quantinuum/tket2/pull/1429))
+- [**breaking**] Reorganize `tket::passes` and add `hugr_passes` re-exports ([#1472](https://github.com/Quantinuum/tket2/pull/1472))
+- Move hugr-passes implementations to tket::passes ([#1487](https://github.com/Quantinuum/tket2/pull/1487))
+
 ## [0.23.0](https://github.com/Quantinuum/tket2/compare/tket-qsystem-v0.22.0...tket-qsystem-v0.23.0) - 2026-02-02
 
 ### Bug Fixes

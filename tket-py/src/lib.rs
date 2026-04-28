@@ -1,10 +1,10 @@
 //! Python bindings for TKET.
-pub mod circuit;
 pub mod ops;
 pub mod optimiser;
 pub mod passes;
 pub mod pattern;
 pub mod rewrite;
+pub mod state;
 pub mod types;
 pub mod utils;
 
@@ -13,7 +13,7 @@ use pyo3::prelude::*;
 /// The Python bindings to TKET.
 #[pymodule]
 fn _tket(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
-    add_submodule(py, m, circuit::module(py)?)?;
+    add_submodule(py, m, state::module(py)?)?;
     add_submodule(py, m, ops::module(py)?)?;
     add_submodule(py, m, optimiser::module(py)?)?;
     add_submodule(py, m, passes::module(py)?)?;

@@ -1,11 +1,11 @@
 //! Pass to inline calls to functions, controlled by [InlineAnnotation] metadata.
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use hugr::hugr::patch::inline_call::InlineCallError;
-use hugr::hugr::patch::{Patch, inline_call::InlineCall};
+use crate::passes::{ComposablePass, InScope, PassScope, composable::WithScope};
+use hugr::hugr::patch::Patch;
+use hugr::hugr::patch::inline_call::{InlineCall, InlineCallError};
 use hugr_core::module_graph::{ModuleGraph, StaticNode};
 use hugr_core::{Node, hugr::hugrmut::HugrMut, metadata::Metadata};
-use hugr_passes::{ComposablePass, InScope, PassScope, composable::WithScope};
 
 use itertools::Itertools;
 use petgraph::algo::tarjan_scc;
@@ -79,7 +79,6 @@ impl<H: HugrMut> ComposablePass<H> for InlinePass {
                         .iter(&cg.graph())
                         .collect::<Vec<_>>(),
                 ),
-                p => todo!("Update to handle new {p:?}"),
             };
             hugr.children(hugr.module_root())
                 .filter_map(|n| cg.node_index(n).map(|ni| (n, ni)))
@@ -227,6 +226,7 @@ mod test {
     use rstest::rstest;
     use std::collections::HashSet;
 
+    use crate::passes::{ComposablePass, RemoveDeadFuncsPass, inline_dfgs::InlineDFGsPass};
     use hugr::{
         HugrView,
         builder::{
@@ -237,7 +237,6 @@ mod test {
         ops::handle::NodeHandle,
         types::Signature,
     };
-    use hugr_passes::{ComposablePass, RemoveDeadFuncsPass, inline_dfgs::InlineDFGsPass};
 
     use super::{InlineAnnotation, InlineError, InlinePass};
 

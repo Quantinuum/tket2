@@ -16,12 +16,12 @@ use hugr::{
     std_extensions::arithmetic::{float_ops::FloatOps, float_types::ConstF64},
     types::Signature,
 };
-use hugr_passes::composable::WithScope;
-use hugr_passes::replace_types::{NodeTemplate, ReplaceTypesError};
-use hugr_passes::{ComposablePass, PassScope, ReplaceTypes};
 use lazy_static::lazy_static;
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
+use tket::passes::composable::WithScope;
+use tket::passes::replace_types::{NodeTemplate, ReplaceTypesError};
+use tket::passes::{ComposablePass, PassScope, ReplaceTypes};
 use tket::{TketOp, extension::rotation::RotationOpBuilder};
 
 use crate::extension::qsystem::{self, QSystemOp, QSystemOpBuilder};
@@ -61,7 +61,7 @@ pub enum LowerTk2Error {
     OpReplacement(HugrError),
     /// An error raised when lowering operations.
     #[display("Error when lowering ops: {_0}")]
-    CircuitReplacement(hugr_passes::lower::LowerError),
+    CircuitReplacement(tket::passes::lower::LowerError),
     /// TketOps were not lowered after the pass.
     #[display("TketOps were not lowered: {missing_ops:?}")]
     #[from(ignore)]
@@ -350,7 +350,7 @@ mod test {
         extension::prelude::{UnwrapBuilder as _, bool_t, option_type, qb_t},
         type_row,
     };
-    use hugr_passes::composable::Preserve;
+    use tket::passes::composable::Preserve;
     use tket::{Circuit, extension::rotation::rotation_type};
 
     use super::*;

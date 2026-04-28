@@ -1,3 +1,5 @@
+//! Pass to commute operations in a region forward to reduce depth.
+
 use std::{collections::HashMap, rc::Rc};
 
 use derive_more::{Display, Error, From};

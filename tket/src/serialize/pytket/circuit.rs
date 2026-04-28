@@ -123,7 +123,28 @@ impl EncodedCircuit<Node> {
     ///
     /// See [`EncodeOptions`] for the options used by the encoder.
     pub fn new<H: AsRef<Hugr> + AsMut<Hugr> + HugrView<Node = Node>>(
-        circuit: &H,
+        hugr: &H,
+        options: EncodeOptions<H>,
+    ) -> Result<Self, PytketEncodeError<H::Node>> {
+        Self::new_with_entrypoint(hugr, hugr.entrypoint(), options)
+    }
+
+    /// Encode a HugrView into a [`EncodedCircuit`].
+    ///
+    /// Encodes the dataflow regions under the given entrypoint. If
+    /// [`EncodeOptions::encode_subcircuits`] is set, the descendants of any found
+    /// dataflow regions will be encoded as well.
+    ///
+    /// The circuit may contain opaque barriers referencing subgraphs in the
+    /// original HUGR. To obtain a fully standalone pytket circuit that can be
+    /// used independently, and stored permanently, use
+    /// [`EncodedCircuit::new_standalone`] or call
+    /// [`EncodedCircuit::ensure_standalone`].
+    ///
+    /// See [`EncodeOptions`] for the options used by the encoder.
+    pub fn new_with_entrypoint<H: AsRef<Hugr> + AsMut<Hugr> + HugrView<Node = Node>>(
+        hugr: &H,
+        entrypoint: H::Node,
         options: EncodeOptions<H>,
     ) -> Result<Self, PytketEncodeError<H::Node>> {
         let mut enc = Self {
@@ -131,7 +152,7 @@ impl EncodedCircuit<Node> {
             opaque_subgraphs: OpaqueSubgraphs::new(0),
         };
 
-        enc.encode_circuits(circuit, options)?;
+        enc.encode_circuits(hugr, entrypoint, options)?;
 
         Ok(enc)
     }
@@ -262,14 +283,31 @@ impl<Node: HugrNode> EncodedCircuit<Node> {
         hugr: &H,
         options: EncodeOptions<H>,
     ) -> Result<Self, PytketEncodeError<H::Node>> {
+        Self::new_standalone_with_entrypoint(hugr, hugr.entrypoint(), options)
+    }
+
+    /// Encode a HugrView into a [`EncodedCircuit`].
+    ///
+    /// Encodes the dataflow region under the given entrypoint.
+    ///
+    /// The circuit may contain opaque barriers referencing subgraphs in the
+    /// original HUGR. To obtain a fully standalone pytket circuit that can be
+    /// used independently, and stored permanently, use
+    /// [`EncodedCircuit::new_standalone`] or call
+    /// [`EncodedCircuit::ensure_standalone`].
+    ///
+    /// See [`EncodeOptions`] for the options used by the encoder.
+    pub fn new_standalone_with_entrypoint<H: HugrView<Node = Node>>(
+        hugr: &H,
+        entrypoint: H::Node,
+        options: EncodeOptions<H>,
+    ) -> Result<Self, PytketEncodeError<H::Node>> {
         let mut enc = Self {
             circuits: HashMap::new(),
             opaque_subgraphs: OpaqueSubgraphs::new(0),
         };
-
-        enc.encode_circuits(hugr, options)?;
+        enc.encode_circuits(hugr, entrypoint, options)?;
         enc.ensure_standalone(hugr)?;
-
         Ok(enc)
     }
 
@@ -282,6 +320,7 @@ impl<Node: HugrNode> EncodedCircuit<Node> {
     fn encode_circuits<H: HugrView<Node = Node>>(
         &mut self,
         hugr: &H,
+        entrypoint: H::Node,
         mut options: EncodeOptions<H>,
     ) -> Result<(), PytketEncodeError<H::Node>> {
         // List of nodes to check for subcircuits.
@@ -289,7 +328,7 @@ impl<Node: HugrNode> EncodedCircuit<Node> {
         // These may be either dataflow region parents that we can encode, or
         // any node with children that we should traverse recursively until we
         // find a dataflow region.
-        let mut candidate_nodes = VecDeque::from([hugr.entrypoint()]);
+        let mut candidate_nodes = VecDeque::from([entrypoint]);
         let config = options
             .config
             .take()

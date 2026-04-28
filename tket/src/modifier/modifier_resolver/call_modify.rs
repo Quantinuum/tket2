@@ -16,7 +16,7 @@ impl<N: HugrNode> ModifierResolver<N> {
     pub(super) fn modify_call(
         &mut self,
         h: &mut impl HugrMut<Node = N>,
-        n: N,
+        call_node: N,
         optype: &OpType,
         new_dfg: &mut impl Dataflow,
     ) -> Result<(), ModifierResolverErrors<N>> {
@@ -27,13 +27,13 @@ impl<N: HugrNode> ModifierResolver<N> {
         };
         let offset = self.modifiers().accum_ctrl.len();
         let callee = h
-            .single_linked_output(n, call.called_function_port())
+            .single_linked_output(call_node, call.called_function_port())
             .unwrap();
 
         // wire the callee
         let Some(new_callee) = self.modify_fn_if_needed(h, callee.0, &call.signature())? else {
             // If the function need not be modified, just copy the Call node as is.
-            let new = self.add_node_no_modification(h, n, call.clone(), new_dfg)?;
+            let new = self.add_node_no_modification(h, call_node, call.clone(), new_dfg)?;
             self.call_map()
                 .insert(callee.0, (new, call.called_function_port()));
             return Ok(());
@@ -61,7 +61,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         *self.controls() = controls;
         // wire the inputs/outputs
         self.wire_node_inout(
-            n,
+            call_node,
             new_call_node,
             (signature.input.iter(), signature.output.iter()),
             (0, 0, offset),
@@ -76,18 +76,18 @@ impl<N: HugrNode> ModifierResolver<N> {
     pub(super) fn apply_modifier_chain_to_loaded_fn(
         &mut self,
         h: &mut impl HugrMut<Node = N>,
-        n: N,
+        modifier_node: N,
     ) -> Result<N, ModifierResolverErrors<N>> {
         // The final target of modifiers to apply.
         // Collection of modifiers to apply.
-        let modifiers_and_targ = self.trace_modifiers_chain(h, n)?;
+        let modifiers_and_targ = self.trace_modifiers_chain(h, modifier_node)?;
         let targ = modifiers_and_targ
             .last()
             .cloned()
-            .ok_or(ModifierError::NoTarget(n))?;
+            .ok_or(ModifierError::NoTarget(modifier_node))?;
 
         // The function to apply the modifier to.
-        let (func, load) = Self::get_loaded_function(h, n, targ, h.get_optype(targ))?;
+        let (func, load) = Self::get_loaded_function(h, modifier_node, targ, h.get_optype(targ))?;
 
         // Modify the function
         let modified_fn = self.modify_fn(h, func)?;
@@ -97,7 +97,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         let mut modified_sig = load.func_sig.clone();
         self.modify_signature(modified_sig.body_mut(), false);
         let load = LoadFunction::try_new(modified_sig, load.type_args).map_err(BuildError::from)?;
-        let new_load = h.add_node_after(n, load);
+        let new_load = h.add_node_after(modifier_node, load);
         h.connect(modified_fn, 0, new_load, 0);
 
         Ok(new_load)
@@ -412,11 +412,11 @@ mod tests {
     #[case::load_fn(1, 1, foo_load_fn, false)]
     #[case::nested_modifier(2, 2, foo_nested_modifier, false)]
     pub fn test_call_modify(
-        #[case] t_num: usize,
-        #[case] c_num: u64,
+        #[case] target_num: usize,
+        #[case] ctrl_num: u64,
         #[case] foo: fn(&mut ModuleBuilder<Hugr>, usize) -> FuncID<true>,
         #[case] dagger: bool,
     ) {
-        test_modifier_resolver(t_num, c_num, foo, dagger);
+        test_modifier_resolver(target_num, ctrl_num, foo, dagger);
     }
 }

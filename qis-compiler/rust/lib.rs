@@ -8,7 +8,6 @@ use hugr::llvm::custom::CodegenExtsMap;
 use hugr::llvm::emit::{EmitHugr, Namer};
 use hugr::llvm::extension::int::IntCodegenExtension;
 use hugr::llvm::utils::fat::FatExt as _;
-use hugr_passes::composable::ComposablePass;
 use inkwell::OptimizationLevel;
 use inkwell::context::Context;
 use inkwell::module::Module;
@@ -20,6 +19,7 @@ use inkwell::targets::{
 use itertools::Itertools;
 use pyo3::prelude::*;
 use tket::hugr::ops::DataflowParent;
+use tket::passes::composable::ComposablePass;
 
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};

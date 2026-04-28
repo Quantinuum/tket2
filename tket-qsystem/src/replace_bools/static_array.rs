@@ -19,16 +19,16 @@ use hugr::{
     },
     types::{Transformable as _, Type, TypeEnum, TypeRow},
 };
-use hugr_passes::PassScope;
-use hugr_passes::composable::WithScope;
+use itertools::Itertools as _;
+use tket::extension::bool::{self, BOOL_TYPE_NAME, BoolOpBuilder as _, ConstBool, bool_type};
+use tket::passes::PassScope;
+use tket::passes::composable::WithScope;
 /// Provides a `ReplaceStaticArrayBoolPass` which replaces static arrays containing `tket.bool` with
 /// static arrays containing `bool_t` values.
-use hugr_passes::{
+use tket::passes::{
     ComposablePass, ReplaceTypes,
     replace_types::{NodeTemplate, ReplaceTypesError},
 };
-use itertools::Itertools as _;
-use tket::extension::bool::{self, BOOL_TYPE_NAME, BoolOpBuilder as _, ConstBool, bool_type};
 
 #[non_exhaustive]
 #[derive(Debug, derive_more::Error, derive_more::Display, derive_more::From)]
@@ -325,8 +325,8 @@ mod test {
         type_row,
         types::Signature,
     };
-    use hugr_passes::ComposablePass as _;
     use rstest::rstest;
+    use tket::passes::ComposablePass as _;
 
     use super::*;
 
