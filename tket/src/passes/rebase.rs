@@ -33,8 +33,8 @@ pub enum RebaseError<N: HugrNode> {
         actual: Signature,
     },
     /// An intermediate op was encountered for which no replacement was provided in the mapping
-    #[display("Residual intermediate op {_0} in node {_1} as no replacement was provided")]
-    NoReplacementFromIntermediate(OpName, N),
+    #[display("Residual intermediate op {_0} as no replacement was provided")]
+    NoIntermediateReplacement(OpName),
     /// An error occurred when inlining the call node during the rebase
     #[display("Error inlining Call node {_0} during rebase")]
     InlineCallError(#[from] InlineCallError<N>),
@@ -63,7 +63,7 @@ pub enum BuildDirectRebaseError {
 /// matching the signature of the op to be replaced.
 type OpMap = HashMap<OpName, Hugr>;
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 /// Configures whether function calls should be inlined after call creation
 pub enum InlineCallsConfig {
     /// Signals that calls should be inlined, further indicating whether the resulting DFG should
@@ -73,7 +73,7 @@ pub enum InlineCallsConfig {
     No,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 /// Configures which functions the pass should inline after insertion, and if so, whether the
 /// DFGs that result from the function inlining should also be inlined.
 pub struct InlineConfig {
@@ -198,10 +198,10 @@ impl WithScope for RebasePass {
     }
 }
 
-fn op_data<H: HugrView>(hugr: &H, n: H::Node) -> Option<(OpName, Signature)> {
+fn op_data<H: HugrView>(hugr: &H, n: H::Node) -> Option<(H::Node, OpName, Signature)> {
     hugr.get_optype(n)
         .as_extension_op()
-        .map(|ext_op| (ext_op.qualified_id(), (*ext_op.signature()).clone()))
+        .map(|ext_op| (n, ext_op.qualified_id(), (*ext_op.signature()).clone()))
 }
 
 fn replace_op<H: HugrMut>(
@@ -256,6 +256,54 @@ fn consume_hugr<H: HugrMut>(hugr: &mut H, from_hugr: &Hugr) -> (Vec<H::Node>, H:
     )
 }
 
+fn replace_nodes<'a, H: HugrMut>(
+    hugr: &mut H,
+    nodes: Vec<(H::Node, OpName, Signature)>,
+    inline: InlineCallsConfig,
+    get_hugr: impl Fn(&OpName) -> Result<&'a Hugr, RebaseError<H::Node>>,
+) -> Result<Vec<H::Node>, RebaseError<H::Node>> {
+    let mut inserted_hugrs = HashMap::<OpName, H::Node>::default();
+    let mut new_nodes = Vec::<H::Node>::new();
+    for (n, ext_op_qual_id, sig) in nodes {
+        let func_node = if let Some(&func_node) = inserted_hugrs.get(&ext_op_qual_id) {
+            func_node
+        } else {
+            let (inserted_nodes, inserted_entry) = consume_hugr(hugr, get_hugr(&ext_op_qual_id)?);
+            if inline == InlineCallsConfig::No {
+                // If we do not inline, we have to collect the new nodes here, if we inline
+                // they are collected after inlining since they are copied
+                new_nodes.extend(inserted_nodes);
+            }
+            inserted_hugrs.insert(ext_op_qual_id, inserted_entry);
+            inserted_entry
+        };
+
+        replace_op(hugr, n, sig, func_node)?;
+        if let InlineCallsConfig::Yes(inline_dfgs) = inline {
+            let inlined_nodes = hugr.apply_patch(InlineCall::new(n))?;
+            if inline_dfgs {
+                let [_, removed_in, removed_out] = hugr.apply_patch(InlineDFG(n.into()))?;
+                new_nodes.extend(
+                    inlined_nodes
+                        .into_iter()
+                        .filter(|&n| n != removed_in && n != removed_out),
+                );
+            } else {
+                new_nodes.extend(inlined_nodes);
+            }
+        }
+    }
+
+    if matches!(inline, InlineCallsConfig::Yes(_)) {
+        // Inlining calls orphaned these functions
+        inserted_hugrs
+            .into_values()
+            .for_each(|n| hugr.remove_subtree(n));
+    }
+
+    Ok(new_nodes)
+}
+
 impl<H: HugrMut> ComposablePass<H> for RebasePass
 where
     H::Node: 'static,
@@ -270,96 +318,50 @@ where
             PassScope::EntrypointRecursive => Box::new(hugr.descendants(hugr.entrypoint())),
         };
 
+        // Replace current ops with calls to the intermediate op set
         let nodes_to_replace = base_nodes
             .filter_map(|n| {
-                op_data(hugr, n).and_then(|(ext_op_qual_id, sig)| {
+                op_data(hugr, n).and_then(|(_, ext_op_qual_id, sig)| {
                     if self.cur_to_inter.contains_key(&ext_op_qual_id) {
-                        Some((n, sig, ext_op_qual_id))
+                        Some((n, ext_op_qual_id, sig))
                     } else {
                         None
                     }
                 })
             })
             .collect_vec();
-
-        // Replace current ops with calls to the intermediate op set
-        let mut inserted_hugrs = HashMap::<OpName, H::Node>::default();
-        let mut new_nodes = Vec::<H::Node>::new();
-        for (n, sig, ext_op_qual_id) in nodes_to_replace {
-            let func_node = if let Some(&func_node) = inserted_hugrs.get(&ext_op_qual_id) {
-                func_node
-            } else {
-                let Some(repl_hugr) = self.cur_to_inter.get(&ext_op_qual_id) else {
-                    unreachable!("Should already be filtered to only those with replacements");
-                };
-                let (inserted_nodes, inserted_entry) = consume_hugr(hugr, repl_hugr);
-                inserted_hugrs.insert(ext_op_qual_id, inserted_entry);
-                if self.inline.intermediate == InlineCallsConfig::No {
-                    // If we do not inline, we have to collect the new nodes here, if we inline
-                    // they are collected after inlining since they are copied
-                    new_nodes.extend(inserted_nodes);
-                }
-                inserted_entry
-            };
-
-            replace_op(hugr, n, sig, func_node)?;
-            if let InlineCallsConfig::Yes(inline_dfgs) = self.inline.intermediate {
-                let inlined_nodes = hugr.apply_patch(InlineCall::new(n))?;
-                if inline_dfgs {
-                    let [_, removed_in, removed_out] = hugr.apply_patch(InlineDFG(n.into()))?;
-                    new_nodes.extend(
-                        inlined_nodes
-                            .into_iter()
-                            .filter(|&n| n != removed_in && n != removed_out),
-                    );
-                } else {
-                    new_nodes.extend(inlined_nodes);
-                }
-            }
-        }
-        if matches!(self.inline.intermediate, InlineCallsConfig::Yes(_)) {
-            // Inlining calls orphaned these functions
-            inserted_hugrs
-                .into_values()
-                .for_each(|n| hugr.remove_subtree(n));
-        }
+        let new_nodes = replace_nodes(
+            hugr,
+            nodes_to_replace,
+            self.inline.intermediate,
+            |ext_op_qual_id| {
+                self.cur_to_inter
+                    .get(ext_op_qual_id)
+                    .map_or_else(|| unreachable!("Should already be filtered!"), Ok)
+            },
+        )?;
 
         // Replace the intermediate ops from the calls that were just inserted with calls to the
         // new op set
-        let mut inserted_hugrs = HashMap::<OpName, H::Node>::default();
-        for n in new_nodes.into_iter() {
-            let Some((ext_op_qual_id, signature)) = op_data(hugr, n) else {
-                continue;
-            };
-
-            let func_node = if let Some(&func_node) = inserted_hugrs.get(&ext_op_qual_id) {
-                func_node
-            } else {
-                let Some(repl_hugr) = self.inter_to_new.get(&ext_op_qual_id) else {
-                    return Err(RebaseError::NoReplacementFromIntermediate(
-                        ext_op_qual_id,
-                        n,
-                    ));
-                };
-                let (_, inserted_entry) = consume_hugr(hugr, repl_hugr);
-                inserted_hugrs.insert(ext_op_qual_id, inserted_entry);
-                inserted_entry
-            };
-
-            replace_op(hugr, n, signature, func_node)?;
-            if let InlineCallsConfig::Yes(inline_dfgs) = self.inline.new {
-                hugr.apply_patch(InlineCall::new(n))?;
-                if inline_dfgs {
-                    hugr.apply_patch(InlineDFG(n.into()))?;
-                }
-            }
-        }
-        if matches!(self.inline.new, InlineCallsConfig::Yes(_)) {
-            // Inlining calls orphaned these functions
-            inserted_hugrs
-                .into_values()
-                .for_each(|n| hugr.remove_subtree(n));
-        }
+        let new_nodes_to_replace = new_nodes
+            .into_iter()
+            .filter_map(|n| op_data(hugr, n))
+            .collect_vec();
+        replace_nodes(
+            hugr,
+            new_nodes_to_replace,
+            self.inline.new,
+            |ext_op_qual_id| {
+                self.inter_to_new.get(ext_op_qual_id).map_or_else(
+                    || {
+                        Err(RebaseError::NoIntermediateReplacement(
+                            ext_op_qual_id.clone(),
+                        ))
+                    },
+                    Ok,
+                )
+            },
+        )?;
 
         Ok(())
     }
