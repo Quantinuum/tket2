@@ -144,12 +144,12 @@ impl<N: HugrNode> std::fmt::Display for DirWire<N> {
 
 impl<N> DirWire<N> {
     /// Create a new DirWire.
-    pub fn new(node: N, port: Port) -> Self {
+    fn new(node: N, port: Port) -> Self {
         DirWire(node, port)
     }
 
     /// Reverse the direction of the wire.
-    pub fn reverse(self) -> Self {
+    pub(crate) fn reverse(self) -> Self {
         let index = self.1.index();
         let port = match self.1.as_directed() {
             Either::Left(_in) => OutgoingPort::from(index).into(),
@@ -328,7 +328,7 @@ pub struct ModifierResolver<N = Node> {
 
 impl<N> ModifierResolver<N> {
     /// Create a new modifier resolver.
-    pub fn new() -> Self {
+    fn new() -> Self {
         ModifierResolver {
             modifiers: CombinedModifier::default(),
             corresp_map: HashMap::default(),
@@ -414,12 +414,12 @@ pub enum ModifierResolverErrors<N = Node> {
 
 impl<N> ModifierResolverErrors<N> {
     /// Create an unreachable error.
-    pub fn unreachable(msg: impl Into<String>) -> Self {
+    fn unreachable(msg: impl Into<String>) -> Self {
         Self::Unreachable { msg: msg.into() }
     }
 
     /// Create an unresolvable error.
-    pub fn unresolvable(node: N, msg: impl Into<String>, optype: OpType) -> Self {
+    fn unresolvable(node: N, msg: impl Into<String>, optype: OpType) -> Self {
         Self::UnResolvable {
             node,
             msg: msg.into(),
@@ -604,7 +604,7 @@ impl<N: HugrNode> ModifierResolver<N> {
     }
 
     /// connects all the wires in the builder.
-    pub fn connect_all(
+    fn connect_all(
         &mut self,
         h: &impl HugrView<Node = N>,
         new_dfg: &mut impl Container,
@@ -697,7 +697,7 @@ impl<N: HugrNode> ModifierResolver<N> {
     /// flatten = true means that control qubits are represented as individual wires,
     /// while false means that they are packed to some arrays.
     /// This false mode is used for function definitions,
-    pub fn modify_signature(&self, signature: &mut Signature, flatten: bool) {
+    fn modify_signature(&self, signature: &mut Signature, flatten: bool) {
         let FuncTypeBase { input, output } = signature;
 
         if flatten {
@@ -1081,7 +1081,7 @@ impl<N: HugrNode> ModifierResolver<N> {
 // As we may want to change the order of resolving modifiers
 // but might want to rollback if the second last one is called in a different path,
 // this may be needed.
-pub fn resolve_modifier_with_entrypoints(
+pub(crate) fn resolve_modifier_with_entrypoints(
     h: &mut impl HugrMut<Node = Node>,
     entry_points: impl IntoIterator<Item = Node>,
 ) -> Result<(), ModifierResolverErrors<Node>> {
@@ -1391,7 +1391,7 @@ mod tests {
     }
 
     #[rstest::rstest]
-    pub fn test_saved_hugr() {
+    fn test_saved_hugr() {
         for (name, mut h) in load_guppy_examples().unwrap() {
             println!("Resolving example: {name}");
             test_resolve(&mut h);

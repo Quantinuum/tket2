@@ -299,7 +299,7 @@ impl<N: HugrNode> ModifierResolver<N> {
     //      if only dagger, just check signature
     //
     // Also, it may be better to check with the usage (how it is instantiated).
-    pub fn modify_fn_if_needed(
+    pub(crate) fn modify_fn_if_needed(
         &mut self,
         h: &mut impl HugrMut<Node = N>,
         func: N,
@@ -314,7 +314,7 @@ impl<N: HugrNode> ModifierResolver<N> {
     }
 
     /// Generates a new function modified by the combined modifier.
-    pub fn modify_fn(
+    pub(crate) fn modify_fn(
         &mut self,
         h: &mut impl HugrMut<Node = N>,
         func: N,
@@ -805,7 +805,7 @@ mod test {
     #[case::conditional_dagger(1, 1, foo_conditional, true)]
     #[case::cfg(1, 1, foo_cfg, false)]
     #[case::cfg_dagger(1, 1, foo_cfg, true)]
-    pub fn test_dfg_modify(
+    fn test_dfg_modify(
         #[case] t_num: usize,
         #[case] c_num: u64,
         #[case] foo: fn(&mut ModuleBuilder<Hugr>, usize) -> FuncID<true>,
