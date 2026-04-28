@@ -1,5 +1,5 @@
 //! Pass to inline calls to functions, controlled by [InlineAnnotation] metadata.
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashSet, VecDeque};
 
 use crate::metadata::InlineAnnotation;
 use crate::passes::{ComposablePass, PassScope, composable::WithScope};
@@ -50,41 +50,38 @@ impl<H: HugrMut> ComposablePass<H> for InlinePass {
             return Ok(()); // Nothing to do
         };
         let cg = ModuleGraph::new(hugr);
-        let reachable_always = {
-            let filter_reachable = match &self.scope {
-                PassScope::Global(_) => None,
-                PassScope::EntrypointFlat | PassScope::EntrypointRecursive => Some(
-                    Dfs::new(cg.graph(), cg.node_index(hugr.entrypoint()).unwrap())
-                        .iter(&cg.graph())
-                        .collect::<Vec<_>>(),
-                ),
-            };
-            hugr.children(hugr.module_root())
-                .filter_map(|n| cg.node_index(n).map(|ni| (n, ni)))
-                .filter(|(_, ni)| {
-                    filter_reachable
-                        .as_ref()
-                        .is_none_or(|reachable| reachable.contains(ni))
-                })
-                .filter(|(n, _)| {
-                    hugr.get_optype(*n).is_func_defn()
-                        && hugr.get_metadata::<InlineAnnotation>(*n)
-                            == Some(InlineAnnotation::Always)
-                })
-                .collect::<HashMap<_, _>>()
-        };
-
-        // If we inverted the map, we'd save a little here, but it'd get much worse in the reverse lookup below
-        if let Some(cycle) = cycles(&NodeFiltered::from_fn(cg.graph(), |n| {
-            match cg.graph().node_weight(n).unwrap() {
-                StaticNode::FuncDefn(func) => reachable_always.contains_key(func),
-                _ => false,
+        let always_funcs = hugr.children(hugr.module_root()).filter(|n| {
+            hugr.get_optype(*n).is_func_defn()
+                && hugr.get_metadata::<InlineAnnotation>(*n) == Some(InlineAnnotation::Always)
+        });
+        // We're going to object if there's a cycle of functions marked Always, as that would
+        // lead to an infinitely big Hugr. However, don't object unless such a cycle is reachable
+        // from the entrypoint...
+        let reachable_always: HashSet<H::Node> = match &self.scope {
+            PassScope::Global(_) => always_funcs.collect(),
+            PassScope::EntrypointFlat | PassScope::EntrypointRecursive => {
+                let reachable = Dfs::new(cg.graph(), cg.node_index(hugr.entrypoint()).unwrap())
+                    .iter(&cg.graph())
+                    .collect::<HashSet<_>>();
+                always_funcs
+                    .filter(|n| {
+                        let ni = cg.node_index(*n).unwrap();
+                        reachable.contains(&ni)
+                    })
+                    .collect()
             }
-        }))
-        .next()
-        {
+        };
+        let always_cg =
+            NodeFiltered::from_fn(cg.graph(), |n| match cg.graph().node_weight(n).unwrap() {
+                StaticNode::FuncDefn(func) => reachable_always.contains(func),
+                _ => false,
+            });
+        if let Some(cycle) = cycles(&always_cg).next() {
             return Err(InlineError::AlwaysCycle(cycle));
         }
+        // Proceed with inlining. Do outermost first within the scope root, as we cannot
+        // inline into functions that are outside the scope until they themselves are inlined
+        // beneath the root.
         let mut parents = VecDeque::from([root]);
         let mut seen = HashSet::new();
         while let Some(parent) = parents.pop_front() {
@@ -97,18 +94,16 @@ impl<H: HugrMut> ComposablePass<H> for InlinePass {
                     parents.push_back(child);
                 } else if hugr.get_optype(child).is_call()
                     && let Some(func) = hugr.static_source(child)
-                    && reachable_always.contains_key(&func)
+                    && reachable_always.contains(&func)
                 {
                     to_inline.push((child, func));
                 }
             }
             while let Some((call, func)) = to_inline.pop() {
                 do_inline(call, hugr);
-                // We have not inlined everything into `func` yet, so there may still be some work to do in the inlined copy.
-                // (Inlining in postorder traversal order would avoid this for PassScope::Global,
-                // but we cannot do that for PassScope::EntrypointFlat/Recursive, as there we cannot
-                // touch the functions until they are inlined into the entrypoint-subtree.)
                 if !seen.contains(&func) {
+                    // We have not inlined everything into `func` yet,
+                    // so there may still be some work to do in the inlined copy.
                     parents.push_back(call);
                 }
             }
@@ -116,9 +111,10 @@ impl<H: HugrMut> ComposablePass<H> for InlinePass {
         // Remove the always-inlined functions themselves, as they are now unreachable.
         let funcs_to_preserve = self.scope.preserve_interface(hugr).collect::<HashSet<_>>();
         if root == hugr.module_root() {
-            for func in reachable_always.keys() {
-                if !funcs_to_preserve.contains(func) {
-                    hugr.remove_subtree(*func);
+            for func in reachable_always {
+                debug_assert!(hugr.static_targets(func).unwrap().next().is_none());
+                if !funcs_to_preserve.contains(&func) {
+                    hugr.remove_subtree(func);
                 }
             }
         }
