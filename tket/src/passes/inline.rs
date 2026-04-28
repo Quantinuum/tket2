@@ -3,8 +3,7 @@ use std::collections::{HashSet, VecDeque};
 
 use crate::metadata::InlineAnnotation;
 use crate::passes::{ComposablePass, PassScope, composable::WithScope};
-use hugr::hugr::patch::Patch;
-use hugr::hugr::patch::inline_call::{InlineCall, InlineCallError};
+use hugr::hugr::patch::inline_call::InlineCall;
 use hugr_core::module_graph::{ModuleGraph, StaticNode};
 use hugr_core::{Node, hugr::hugrmut::HugrMut};
 
@@ -100,7 +99,8 @@ impl<H: HugrMut> ComposablePass<H> for InlinePass {
                 }
             }
             while let Some((call, func)) = to_inline.pop() {
-                do_inline(call, hugr);
+                // We've already checked the error conditions.
+                hugr.apply_patch(InlineCall::new(call)).unwrap();
                 if !seen.contains(&func) {
                     // We have not inlined everything into `func` yet,
                     // so there may still be some work to do in the inlined copy.
@@ -149,18 +149,6 @@ fn cycles<'a, N: Copy>(
                 })
                 .collect()
         })
-}
-
-fn do_inline<H: HugrMut>(call: H::Node, hugr: &mut H) {
-    match InlineCall::new(call).apply(hugr) {
-        Ok(()) => (),
-        Err(InlineCallError::NotCallNode(_, _) | InlineCallError::CallTargetNotFuncDefn(_, _)) => {
-            unreachable!();
-        }
-        Err(e) => {
-            todo!("Update to handle {e:?}")
-        }
-    }
 }
 
 #[cfg(test)]
