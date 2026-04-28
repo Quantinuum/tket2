@@ -12,13 +12,9 @@ import numpy as np
 import numpy.typing as npt
 
 from hugr import Hugr
-from hugr.hugr.render import RenderConfig
 from guppylang.emulator import EmulatorBuilder
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
-
-hugr_pdf_directory = Path(__file__).resolve().parent / "hugr_pdfs"
-hugr_pdf_directory.mkdir(exist_ok=True)
 
 
 def format_statevector(
@@ -93,6 +89,13 @@ def assert_statevector(
 
 modifier_examples_dir = Path(__file__).resolve().parents[1] / "modified_hugrs"
 
+from hugr.hugr.render import RenderConfig
+
+
+hugr_pdf_directory = Path(__file__).resolve().parents[1] / "0_hugr_pdf"
+hugr_pdf_directory.mkdir(exist_ok=True)
+
+
 print(modifier_examples_dir)
 all_results: list[str] = []
 if len(sys.argv) > 1:
@@ -108,10 +111,10 @@ for hugr_path in hugr_paths:
     print(f"Processing {hugr_path}...")
     hugr_bytes = hugr_path.read_bytes()
     hugr = Hugr.from_bytes(hugr_bytes)
+
     hugr.render_dot(RenderConfig(display_node_id=True)).render(
         f"{hugr_path.stem}", directory=hugr_pdf_directory, cleanup=True
     )
-
     package = hugr.to_package()
 
     builder = EmulatorBuilder()

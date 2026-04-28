@@ -1,25 +1,10 @@
-from pytket import Circuit, OpType
-from typing import Callable, Any
-from tket._ops import TketOp
 from tket.passes import (
-    _badger_optimise,
-    _greedy_depth_reduce,
     NormalizeGuppy,
     ModifierResolverPass,
 )
-from tket._state import CompilationState
-from tket_exts import tket_registry
 
-from tket._pattern import Rule, RuleMatcher
-import hypothesis.strategies as st
-from hypothesis.strategies._internal import SearchStrategy
-from hypothesis import given, settings
 
-from tket.passes import PytketHugrPass
-from pytket.passes import CliffordSimp, SquashRzPhasedX, SequencePass
 from hugr.build.base import Hugr
-
-import pytest
 
 
 from pathlib import Path
@@ -52,8 +37,8 @@ input_paths = (
 for input_path in input_paths:
     print(f"Processing {input_path.name}...")
     modifier_hugr = _hugr_from_path(str(input_path))
-    normalized = modifier_hugr  # normalize(modifier_hugr)
-    resolved: Hugr = mr_pass(normalized)
+    # modifier_hugr = normalize(modifier_hugr)
+    resolved: Hugr = mr_pass(modifier_hugr)
 
     output_path = modified_hugrs_dir / f"{input_path.stem}_solved.hugr"
     output_path.write_bytes(resolved.to_bytes())

@@ -102,7 +102,8 @@
 use itertools::{Either, Itertools};
 use std::{
     collections::{HashMap, VecDeque},
-    iter, mem,
+    fs, iter, mem,
+    path::Path,
 };
 
 pub mod array_modify;
@@ -1166,9 +1167,21 @@ pub fn resolve_modifier_with_entrypoints(
     // were produced or left behind by the resolution passes above.
     delete_phase(h, entry_points)?;
 
+    println!("HEEEERE");
+    // debbugging print
+    // œœœœœ
+    let output = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")))
+        .join("current.mmd");
+    fs::write(output, h.mermaid_string()).unwrap();
+    // œœœœœ
+    // end debugging print
+    // The validation here gives some problems
     h.validate()
         .map_err(|e| ModifierResolverErrors::BuildError(e.into()))?;
 
+    println!("HEEEERE2");
     Ok(())
 }
 
@@ -1391,9 +1404,17 @@ mod tests {
     }
 
     #[rstest::rstest]
-    pub fn test_saved_hugr() {
-        for (name, mut h) in load_guppy_examples().unwrap() {
-            println!("Resolving example: {name}");
+    #[case::call("nested_multiple_ctrl1")]
+    // #[case::call("dagger_on_call")]
+    //#[case::call("all")]
+    pub fn test_saved_hugr(#[case] name: &str) {
+        if name == "all" {
+            for (_, mut h) in load_guppy_examples().unwrap() {
+                test_resolve(&mut h);
+            }
+            return;
+        } else {
+            let mut h = load_guppy_example(name).unwrap();
             test_resolve(&mut h);
         }
     }

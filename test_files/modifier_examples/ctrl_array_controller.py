@@ -7,7 +7,6 @@
 """A controlled gate where the controller is an array of qubits"""
 
 from pathlib import Path
-from sys import argv
 import sys
 
 from guppylang import guppy
@@ -47,4 +46,3 @@ def main() -> None:
 
 
 program = main.compile()
-Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())

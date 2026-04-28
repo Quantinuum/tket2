@@ -24,6 +24,9 @@ from guppylang.experimental import enable_experimental_features
 
 enable_experimental_features()
 
+hugr_pdf_directory = Path(__file__).resolve().parents[1] / "0_hugr_pdf"
+hugr_pdf_directory.mkdir(exist_ok=True)
+
 
 @guppy
 def main() -> None:
@@ -31,9 +34,9 @@ def main() -> None:
     c1 = qubit()
     c2 = qubit()
     c3 = qubit()
-    rx(c1, angle(1 / 3))
-    h(c2)
-    x(c3)
+    # rx(c1, angle=angle(1 / 3))
+    # h(c2)
+    # x(c3)
     with control(c1, c2):
         with control(c3):
             # with dagger:
@@ -60,3 +63,6 @@ for node, data in hugr.nodes():
 
 
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
+program.modules[0].render_dot(RenderConfig(display_node_id=True)).render(
+    f"{Path(argv[0]).stem}_before", directory=hugr_pdf_directory, cleanup=True
+)
