@@ -1184,7 +1184,6 @@ pub fn resolve_modifier_with_entrypoints(
     h.validate()
         .map_err(|e| ModifierResolverErrors::BuildError(e.into()))?;
 
-    println!("HEEEERE2");
     Ok(())
 }
 
@@ -1409,7 +1408,7 @@ mod tests {
     #[rstest::rstest]
     #[case::call("nested_multiple_ctrl1")]
     // #[case::call("dagger_on_call")]
-    //#[case::call("all")]
+    #[case::call("all")]
     fn test_saved_hugr(#[case] name: &str) {
         if name == "all" {
             for (_, mut h) in load_guppy_examples().unwrap() {
