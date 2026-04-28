@@ -25,7 +25,7 @@ from hugr.passes.scope import PassScope, GlobalScope
 __all__ = [
     "PytketHugrPass",
     "PassResult",
-    "InlineAlwaysPass"
+    "InlineAlwaysPass",
     "InlineFuncsHeuristic",
     "InlineFunctions",
     "NormalizeGuppy",
@@ -179,6 +179,7 @@ class InlineAlwaysPass(ComposablePass):
         return PassResult.for_pass(
             self, hugr=package.modules[0], inplace=inplace, result=None
         )
+
 
 @dataclass
 class InlineFunctions(ComposablePass):
