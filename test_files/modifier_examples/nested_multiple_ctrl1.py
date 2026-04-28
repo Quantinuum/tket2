@@ -34,14 +34,13 @@ def main() -> None:
     c1 = qubit()
     c2 = qubit()
     c3 = qubit()
-    # rx(c1, angle=angle(1 / 3))
-    # h(c2)
-    # x(c3)
+    rx(c1, angle=angle(1 / 3))
+    h(c2)
+    x(c3)
     with control(c1, c2):
         with control(c3):
-            # with dagger:
-            x(t)
-            # rz(t, angle(1 / 2))
+            with dagger:
+                rz(t, angle(1 / 2))
 
     state_result("r", c1, c2, c3, t)
     discard(c1)
