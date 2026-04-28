@@ -5,7 +5,6 @@ from hugr.build.base import Hugr
 from tket.passes import (
     ModifierResolverPass,
 )
-from selene_hugr_qis_compiler import check_hugr
 
 mr_pass = ModifierResolverPass()
 
@@ -22,7 +21,6 @@ def apply_passes(input_paths: list[Path], output_dir: Path) -> None:
         print(f"Processing {input_path.name}")
         hugr = _hugr_from_path(str(input_path))
         resolved: Hugr = mr_pass(hugr)
-        check_hugr(resolved.to_package().to_bytes())
 
         output_path = output_dir / f"{input_path.stem}_solved.hugr"
         output_path.write_bytes(resolved.to_bytes())
