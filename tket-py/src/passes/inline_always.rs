@@ -8,13 +8,7 @@ use super::PyPassScope;
 use crate::state::CompilationState;
 use crate::utils::ConvertPyErr;
 
-/// Inline acyclic function calls below the selected scope.
-///
-/// Parameters:
-/// - heuristic: Heuristic used to choose which non-recursive functions to
-///   inline. Defaults to `tket.passes.MaxSize(64)`.
-/// - follow_inline_hints: Whether to follow compiler hints for inlining
-///   functions.
+/// Inline functions marked with the `inline="always"` decorator below the selected scope.
 #[pyfunction]
 #[pyo3(signature = (circ, *, scope = None))]
 pub(super) fn inline_always(
