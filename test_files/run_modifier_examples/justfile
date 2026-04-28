@@ -11,7 +11,6 @@ run-hugrs:
     uv run apply_passes.py
     @echo "---- Running hugrs ----"
     uv run --no-project "run_hugrs.py"
-    
 
 # Re-generate a single hugr file.
 rh example:

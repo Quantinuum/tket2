@@ -10,7 +10,6 @@ from pathlib import Path
 from sys import argv
 import sys
 
-from hugr.hugr.render import RenderConfig
 from guppylang import guppy
 from guppylang.std.builtins import dagger
 from guppylang.std.debug import state_result
@@ -18,7 +17,6 @@ from guppylang.std.quantum import discard, qubit, angle
 from guppylang.std.quantum import rx
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
-
 
 from guppylang.experimental import enable_experimental_features
 
@@ -34,7 +32,6 @@ def rotation(q: qubit) -> None:
 def main() -> None:
     t = qubit()
 
-    # Double dagger cancels out: dagger(dagger(rotation)) == rotation
     with dagger:
         with dagger:
             rotation(t)
