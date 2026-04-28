@@ -2,6 +2,8 @@
 # requires-python = ">=3.13"
 # dependencies = [
 #     "guppylang ==0.21.13",
+#     "selene-sim ==0.2.14",
+# "selene-core ==0.2.8",
 # ]
 # ///
 """Run on selene the passed hugrs"""
