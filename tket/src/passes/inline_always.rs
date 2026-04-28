@@ -153,10 +153,14 @@ fn cycles<'a, N: Copy>(
 
 #[cfg(test)]
 mod test {
+    use itertools::Itertools;
     use rstest::rstest;
     use std::collections::HashSet;
 
-    use crate::passes::{ComposablePass, RemoveDeadFuncsPass, inline_dfgs::InlineDFGsPass};
+    use crate::passes::{
+        ComposablePass, InlineDFGsPass, PassScope, RemoveDeadFuncsPass, WithScope,
+        composable::Preserve,
+    };
     use hugr::{
         HugrView,
         builder::{
@@ -258,9 +262,54 @@ mod test {
         );
     }
 
-    #[test]
-    fn entrypoint_scope() {
-        // TODO
+    #[rstest]
+    #[case(PassScope::EntrypointFlat)]
+    #[case(PassScope::EntrypointRecursive)]
+    #[case(Preserve::All)]
+    #[case(Preserve::Public)]
+    #[case(Preserve::Entrypoint)]
+    fn entrypoint_scope(#[case] ps: impl Into<PassScope>) {
+        let mut entry = FunctionBuilder::new("entry", Signature::new_endo([qb_t()])).unwrap();
+        let mut mb = entry.module_root_builder();
+        let mut cyclic = mb
+            .define_function("cyclic", Signature::new_endo([qb_t()]))
+            .unwrap();
+        let c = cyclic
+            .call::<true>(&cyclic.container_node().into(), &[], cyclic.input_wires())
+            .unwrap();
+        let cyclic = cyclic.finish_with_outputs(c.outputs()).unwrap();
+        let mut other = mb
+            .define_function("other", Signature::new_endo([qb_t()]))
+            .unwrap();
+        let c = other
+            .call(cyclic.handle(), &[], other.input_wires())
+            .unwrap();
+        other.finish_with_outputs(c.outputs()).unwrap();
+
+        let id = mb
+            .define_function("id", Signature::new_endo([qb_t()]))
+            .unwrap();
+        let inps = id.input_wires();
+        let id = id.finish_with_outputs(inps).unwrap();
+        let c = entry
+            .call::<true>(&id.handle(), &[], entry.input_wires())
+            .unwrap();
+        let mut h = entry.finish_hugr_with_outputs(c.outputs()).unwrap();
+        assert_eq!(h.static_targets(cyclic.node()).unwrap().count(), 2); // cyclic and entry
+        h.set_metadata::<InlineAnnotation>(cyclic.node(), InlineAnnotation::Always);
+        h.set_metadata::<InlineAnnotation>(id.node(), InlineAnnotation::Always);
+        let ps = ps.into();
+        let e = InlineAlwaysPass::default_with_scope(ps.clone()).run(&mut h);
+        if let PassScope::EntrypointFlat | PassScope::EntrypointRecursive = ps {
+            assert_eq!(e, Ok(()));
+            assert_eq!(h.static_targets(cyclic.node()).unwrap().count(), 2); // cyclic and entry
+            assert_eq!(h.static_targets(id.node()).unwrap().collect_vec(), []); // No calls, but can't be removed as outside scope
+            InlineDFGsPass::default_with_scope(ps).run(&mut h).unwrap();
+            let [inp, out] = h.get_io(h.entrypoint()).unwrap();
+            assert_eq!(h.output_neighbours(inp).collect_vec(), [out]);
+        } else {
+            assert_eq!(e, Err(InlineAlwaysError::AlwaysCycle(vec![cyclic.node()])));
+        };
     }
 
     // TODO cycle of one always func and one not always, should be inlined to a self-recursive func
