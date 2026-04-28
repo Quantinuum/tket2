@@ -2,7 +2,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::metadata::InlineAnnotation;
-use crate::passes::{ComposablePass, InScope, PassScope, composable::WithScope};
+use crate::passes::{ComposablePass, PassScope, composable::WithScope};
 use hugr::hugr::patch::Patch;
 use hugr::hugr::patch::inline_call::{InlineCall, InlineCallError};
 use hugr_core::module_graph::{ModuleGraph, StaticNode};
@@ -12,8 +12,7 @@ use itertools::Itertools;
 use petgraph::algo::tarjan_scc;
 use petgraph::data::DataMap;
 use petgraph::visit::{
-    Dfs, IntoNeighbors, IntoNodeIdentifiers, IntoNodeReferences, NodeFiltered, NodeIndexable,
-    Visitable, Walker,
+    Dfs, IntoNeighbors, IntoNodeIdentifiers, NodeFiltered, NodeIndexable, Visitable, Walker,
 };
 
 /// Errors that may be raised by [InlinePass]
@@ -114,43 +113,12 @@ impl<H: HugrMut> ComposablePass<H> for InlinePass {
                 }
             }
         }
-        // Also inline any function called only once.
-        // First remove the always-inlined functions themselves, as they are now unreachable.
+        // Remove the always-inlined functions themselves, as they are now unreachable.
         let funcs_to_preserve = self.scope.preserve_interface(hugr).collect::<HashSet<_>>();
         if root == hugr.module_root() {
             for func in reachable_always.keys() {
                 if !funcs_to_preserve.contains(func) {
                     hugr.remove_subtree(*func);
-                }
-            }
-        }
-        let cg = ModuleGraph::new(hugr);
-        let funcs_in_cycles = cycles(cg.graph()).flatten().collect::<HashSet<_>>();
-
-        let called_once = cg
-            .graph()
-            .node_references()
-            .filter_map(|(_, sn)| match sn {
-                StaticNode::FuncDefn(func)
-                    if !funcs_to_preserve.contains(func) && !funcs_in_cycles.contains(func) =>
-                {
-                    hugr.static_targets(*func)
-                        .unwrap()
-                        .exactly_one()
-                        .ok()
-                        .map(|(call, _port)| (*func, call))
-                }
-
-                _ => None,
-            })
-            .collect::<Vec<_>>();
-        for (func, call) in called_once {
-            if hugr.get_optype(call).is_call() // skip LoadFunctions
-                && self.scope.in_scope(hugr, call) != InScope::No
-            {
-                do_inline(call, hugr);
-                if self.scope.in_scope(hugr, func) == InScope::Yes {
-                    hugr.remove_subtree(func);
                 }
             }
         }
@@ -273,13 +241,13 @@ mod test {
     }
 
     #[rstest]
-    fn test_one_deep(#[values(1, 2, 5)] num_calls: usize, #[values(false, true)] always: bool) {
+    fn test_one_deep(#[values(1, 2, 5)] num_calls: usize) {
         let mut main =
             FunctionBuilder::new("main", Signature::new_endo([qb_t(), qb_t(), qb_t()])).unwrap();
 
         let mut mb = main.module_root_builder();
         let swap = mb
-            .define_function("called-once", Signature::new_endo([qb_t(), qb_t()]))
+            .define_function("swap", Signature::new_endo([qb_t(), qb_t()]))
             .unwrap();
         let [a, b] = swap.input_wires_arr();
         let swap = swap.finish_with_outputs([b, a]).unwrap();
@@ -289,28 +257,21 @@ mod test {
             [a, b] = main.call(swap.handle(), &[], [a, b]).unwrap().outputs_arr();
         }
         let mut hugr = main.finish_hugr_with_outputs([a, b, c]).unwrap();
-        if always {
-            hugr.set_metadata::<InlineAnnotation>(swap.node(), InlineAnnotation::Always);
-        }
-        let backup = hugr.clone();
+        hugr.set_metadata::<InlineAnnotation>(swap.node(), InlineAnnotation::Always);
 
         InlinePass::default().run(&mut hugr).unwrap();
         hugr.validate().unwrap();
-        let should_be_inlined = always || num_calls == 1;
-        if should_be_inlined {
-            let swap_present =
-                hugr.contains_node(swap.node()) && hugr.get_optype(swap.node()).is_func_defn();
-            assert!(!swap_present);
-            InlineDFGsPass::default().run(&mut hugr).unwrap();
-            hugr.validate().unwrap();
-            let [inp, outp] = hugr.get_io(hugr.entrypoint()).unwrap();
-            assert_eq!(
-                HashSet::from_iter(hugr.input_neighbours(outp)),
-                HashSet::from([inp])
-            );
-        } else {
-            assert_eq!(hugr, backup);
-        }
+
+        let swap_present =
+            hugr.contains_node(swap.node()) && hugr.get_optype(swap.node()).is_func_defn();
+        assert!(!swap_present);
+        InlineDFGsPass::default().run(&mut hugr).unwrap();
+        hugr.validate().unwrap();
+        let [inp, outp] = hugr.get_io(hugr.entrypoint()).unwrap();
+        assert_eq!(
+            HashSet::from_iter(hugr.input_neighbours(outp)),
+            HashSet::from([inp])
+        );
     }
 
     #[test]
