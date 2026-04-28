@@ -695,22 +695,37 @@ impl<N: HugrNode> ModifierResolver<N> {
     }
 
     /// Takes a signature and modifies it according to the combined modifier.
-    /// flatten = true means that control qubits are represented as individual wires,
-    /// while false means that they are packed to some arrays.
-    /// This false mode is used for function definitions,
+    /// Modifies a function signature to account for control qubits added by modifiers.
+    ///
+    /// # Arguments
+    /// * `signature` - The function signature to modify
+    /// * `flatten` - If true, control qubits are represented as individual `Qubit` types.
+    ///              If false, control qubits are packed into arrays (used for function definitions).
     pub fn modify_signature(&self, signature: &mut Signature, flatten: bool) {
         let FuncTypeBase { input, output } = signature;
 
         if flatten {
+            // Flattened mode: represent each control qubit as an individual Qubit type
             let n = self.control_num();
             input.to_mut().splice(0..0, iter::repeat_n(qb_t(), n));
             output.to_mut().splice(0..0, iter::repeat_n(qb_t(), n));
         } else {
-            for ctrls in &self.modifiers.accum_ctrl {
-                let n = *ctrls as u64;
-                input.to_mut().insert(0, array_type(n, qb_t()));
-                output.to_mut().insert(0, array_type(n, qb_t()));
-            }
+            // Non-flattened mode: pack control qubits into arrays (used for function definitions)
+            // Build array types for each control group: each element in accum_ctrl specifies
+            // how many qubits should be grouped together in a single array
+            let control_types = self
+                .modifiers
+                .accum_ctrl
+                .iter()
+                .map(|ctrls| array_type(*ctrls as u64, qb_t()))
+                .collect::<Vec<_>>();
+
+            // Insert the control array types at the beginning of the input signature
+            // splice(0..0, ...) inserts elements at position 0 without removing anything
+            input.to_mut().splice(0..0, control_types.iter().cloned());
+
+            // Insert the same control array types at the beginning of the output signature
+            output.to_mut().splice(0..0, control_types);
         }
     }
 
