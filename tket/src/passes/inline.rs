@@ -1,11 +1,12 @@
 //! Pass to inline calls to functions, controlled by [InlineAnnotation] metadata.
 use std::collections::{HashMap, HashSet, VecDeque};
 
+use crate::metadata::InlineAnnotation;
 use crate::passes::{ComposablePass, InScope, PassScope, composable::WithScope};
 use hugr::hugr::patch::Patch;
 use hugr::hugr::patch::inline_call::{InlineCall, InlineCallError};
 use hugr_core::module_graph::{ModuleGraph, StaticNode};
-use hugr_core::{Node, hugr::hugrmut::HugrMut, metadata::Metadata};
+use hugr_core::{Node, hugr::hugrmut::HugrMut};
 
 use itertools::Itertools;
 use petgraph::algo::tarjan_scc;
@@ -14,27 +15,6 @@ use petgraph::visit::{
     Dfs, IntoNeighbors, IntoNodeIdentifiers, IntoNodeReferences, NodeFiltered, NodeIndexable,
     Visitable, Walker,
 };
-use serde::{Deserialize, Serialize};
-
-/// Annotation that may be applied to functions to indicate
-/// that/when calls to it should be inlined.
-#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum InlineAnnotation {
-    /// Always inline calls to this function.
-    ///
-    /// If this cannot be done, an error will be raised.
-    Always,
-    /// Leave inlining to the discretion of the optimizer.
-    #[default]
-    Auto,
-}
-
-impl Metadata for InlineAnnotation {
-    type Type<'hugr> = InlineAnnotation;
-
-    const KEY: &'static str = "tket.inline";
-}
 
 /// Errors that may be raised by [InlinePass]
 #[derive(Clone, Debug, PartialEq, Eq, derive_more::Display)]
@@ -89,10 +69,8 @@ impl<H: HugrMut> ComposablePass<H> for InlinePass {
                 })
                 .filter(|(n, _)| {
                     hugr.get_optype(*n).is_func_defn()
-                        && hugr
-                            .get_metadata::<InlineAnnotation>(*n)
-                            .unwrap_or_default()
-                            == InlineAnnotation::Always
+                        && hugr.get_metadata::<InlineAnnotation>(*n)
+                            == Some(InlineAnnotation::Always)
                 })
                 .collect::<HashMap<_, _>>()
         };

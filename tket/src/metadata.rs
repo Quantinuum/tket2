@@ -12,6 +12,24 @@ impl Metadata for MaxQubits {
     type Type<'hugr> = u32;
 }
 
+/// Metadata that may be supplied for a function to indicate
+/// that/when calls to it should be inlined.
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+#[non_exhaustive]
+pub enum InlineAnnotation {
+    /// Always inline calls to this function.
+    ///
+    /// If this cannot be done, an error will be raised.
+    Always,
+}
+
+impl Metadata for InlineAnnotation {
+    type Type<'hugr> = Self;
+
+    const KEY: &'static str = "tket.inline";
+}
+
 /// Metadata key for traced rewrites that were applied during circuit transformation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CircuitRewriteTraces;
