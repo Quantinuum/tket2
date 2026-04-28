@@ -14,7 +14,7 @@ use petgraph::visit::{
     Dfs, IntoNeighbors, IntoNodeIdentifiers, NodeFiltered, NodeIndexable, Visitable, Walker,
 };
 
-/// Errors that may be raised by [InlinePass]
+/// Errors that may be raised by [`InlineAlwaysPass`]
 #[derive(Clone, Debug, PartialEq, Eq, derive_more::Display)]
 pub enum InlineAlwaysError<N = Node> {
     /// Functions annotated with [InlineAnnotation::Always] form a cycle
