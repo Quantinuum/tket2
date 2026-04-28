@@ -34,9 +34,10 @@ def main() -> None:
     c1 = qubit()
     c2 = qubit()
     c3 = qubit()
-    rx(c1, angle=angle(1 / 3))
+    h(c1)
     h(c2)
-    x(c3)
+    h(c3)
+    h(t)
     with control(c1, c2):
         with control(c3):
             with dagger:
