@@ -77,7 +77,8 @@ pub use replace_types::ReplaceTypes;
 
 // Rebase a HUGR from one set of operations onto another, via a common "pivot" set of operations.
 pub mod rebase;
-pub use rebase::RebasePass;
+pub use rebase::OneStepRebasePass;
+pub use rebase::TwoStepRebasePass;
 
 // Remove redundant tuple pack/unpack operations.
 pub mod untuple;

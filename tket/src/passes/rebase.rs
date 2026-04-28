@@ -3,14 +3,11 @@
 use crate::passes::composable::WithScope;
 use crate::passes::{ComposablePass, PassScope};
 use derive_more::Display;
-use hugr_core::builder::{Dataflow, DataflowHugr, FunctionBuilder};
 use hugr_core::core::HugrNode;
-use hugr_core::extension::{ExtensionId, ExtensionRegistry};
-use hugr_core::hugr::InvalidIdentifier;
 use hugr_core::hugr::hugrmut::HugrMut;
 use hugr_core::hugr::patch::inline_call::{InlineCall, InlineCallError};
 use hugr_core::hugr::patch::inline_dfg::{InlineDFG, InlineDFGError};
-use hugr_core::ops::{Call, DataflowOpTrait, ExtensionOp, OpName};
+use hugr_core::ops::{Call, DataflowOpTrait, OpName};
 use hugr_core::types::Signature;
 use hugr_core::{Direction, Hugr, HugrView, PortIndex};
 use itertools::Itertools;
@@ -43,22 +40,6 @@ pub enum RebaseError<N: HugrNode> {
     InlineDFGError(#[from] InlineDFGError<N>),
 }
 
-#[derive(Debug, thiserror::Error, Display)]
-#[non_exhaustive]
-#[expect(missing_docs)]
-/// Errors produced by [`RebasePass`].
-pub enum BuildDirectRebaseError {
-    #[display("Could not unqualify op name {_0}")]
-    CouldNotUnqualify(OpName),
-    #[display("Invalid extension id {_0} in qualified op name")]
-    InvalidExtensionId(#[from] InvalidIdentifier),
-    #[display("Could not find extension {_0} in provided registry")]
-    ExtensionNotFound(ExtensionId),
-    #[display("Could not find op {_1} in extension {_0} from provided registry")]
-    OpNotFound(ExtensionId, OpName),
-    BuildOpHugrError(#[from] hugr_core::builder::BuildError),
-}
-
 /// A mapping from a qualified op name to its replacement HUGR, containing a single entrypoint
 /// matching the signature of the op to be replaced.
 type OpMap = HashMap<OpName, Hugr>;
@@ -76,12 +57,12 @@ pub enum InlineCallsConfig {
 #[derive(Debug, Clone, Copy)]
 /// Configures which functions the pass should inline after insertion, and if so, whether the
 /// DFGs that result from the function inlining should also be inlined.
-pub struct InlineConfig {
+pub struct TwoStepInlineConfig {
     intermediate: InlineCallsConfig,
     new: InlineCallsConfig,
 }
 
-impl InlineConfig {
+impl TwoStepInlineConfig {
     /// Configures the pass to inline no functions at all
     pub fn none() -> Self {
         Self {
@@ -115,7 +96,7 @@ impl InlineConfig {
     }
 }
 
-impl Default for InlineConfig {
+impl Default for TwoStepInlineConfig {
     fn default() -> Self {
         Self::all(true)
     }
@@ -123,20 +104,20 @@ impl Default for InlineConfig {
 
 #[derive(Debug, Clone)]
 /// A configuration for the rebase pass
-pub struct RebasePass {
+pub struct TwoStepRebasePass {
     scope: PassScope,
     cur_to_inter: OpMap,
     inter_to_new: OpMap,
-    inline: InlineConfig,
+    inline: TwoStepInlineConfig,
 }
 
-impl RebasePass {
+impl TwoStepRebasePass {
     /// Create a new Rebase pass with the given scope and op rewrites.
     pub fn new(
         scope: impl Into<PassScope>,
         cur_to_inter: OpMap,
         inter_to_new: OpMap,
-        inline: InlineConfig,
+        inline: TwoStepInlineConfig,
     ) -> Self {
         Self {
             scope: scope.into(),
@@ -147,51 +128,13 @@ impl RebasePass {
     }
 
     /// Configures the pass to inline functions according to the provided config
-    pub fn with_inline_config(&mut self, inline_config: InlineConfig) -> &mut Self {
+    pub fn with_inline_config(&mut self, inline_config: TwoStepInlineConfig) -> &mut Self {
         self.inline = inline_config;
         self
     }
-
-    /// Builds a rebase pass directly from one set of ops to their replacements. Needs to include
-    /// the extensions necessary to construct intermediate replacements for the ops.
-    pub fn build_direct(
-        scope: impl Into<PassScope>,
-        reg: &ExtensionRegistry,
-        cur_to_new: OpMap,
-        inline: InlineConfig,
-    ) -> Result<Self, BuildDirectRebaseError> {
-        let cur_to_inter: OpMap = cur_to_new
-            .keys()
-            .map(|op_key| {
-                let Some((ext_id, op_name)) = op_key.rsplit_once(".") else {
-                    return Err(BuildDirectRebaseError::CouldNotUnqualify(op_key.clone()));
-                };
-                let Some(ext) = reg.get(ext_id) else {
-                    return Err(BuildDirectRebaseError::ExtensionNotFound(ExtensionId::new(
-                        ext_id,
-                    )?));
-                };
-                let Some(ext_op_def) = ext.get_op(op_name) else {
-                    return Err(BuildDirectRebaseError::OpNotFound(
-                        ExtensionId::new(ext_id)?,
-                        op_name.into(),
-                    ));
-                };
-                let op = ExtensionOp::new(ext_op_def.clone(), &[]).unwrap();
-
-                let mut func = FunctionBuilder::new(op_key.clone(), (*op.signature()).clone())?;
-                let inserted_op = func.add_dataflow_op(op, func.input_wires())?;
-                let hugr = func.finish_hugr_with_outputs(inserted_op.outputs())?;
-
-                Ok((op_key.clone(), hugr))
-            })
-            .try_collect()?;
-
-        Ok(Self::new(scope, cur_to_inter, cur_to_new, inline))
-    }
 }
 
-impl WithScope for RebasePass {
+impl WithScope for TwoStepRebasePass {
     fn with_scope(mut self, scope: impl Into<PassScope>) -> Self {
         self.scope = scope.into();
         self
@@ -304,7 +247,7 @@ fn replace_nodes<'a, H: HugrMut>(
     Ok(new_nodes)
 }
 
-impl<H: HugrMut> ComposablePass<H> for RebasePass
+impl<H: HugrMut> ComposablePass<H> for TwoStepRebasePass
 where
     H::Node: 'static,
 {
@@ -321,13 +264,7 @@ where
         // Replace current ops with calls to the intermediate op set
         let nodes_to_replace = base_nodes
             .filter_map(|n| {
-                op_data(hugr, n).and_then(|(_, ext_op_qual_id, sig)| {
-                    if self.cur_to_inter.contains_key(&ext_op_qual_id) {
-                        Some((n, ext_op_qual_id, sig))
-                    } else {
-                        None
-                    }
-                })
+                op_data(hugr, n).filter(|(_, op_id, _)| self.cur_to_inter.contains_key(op_id))
             })
             .collect_vec();
         let new_nodes = replace_nodes(hugr, nodes_to_replace, self.inline.intermediate, |op_id| {
@@ -353,9 +290,71 @@ where
     }
 }
 
+#[derive(Debug, Clone)]
+/// A configuration for the rebase pass
+pub struct OneStepRebasePass {
+    scope: PassScope,
+    op_map: OpMap,
+    inline: InlineCallsConfig,
+}
+
+impl OneStepRebasePass {
+    /// Create a new Rebase pass with the given scope and op rewrites.
+    pub fn new(scope: impl Into<PassScope>, op_map: OpMap, inline: InlineCallsConfig) -> Self {
+        Self {
+            scope: scope.into(),
+            op_map,
+            inline,
+        }
+    }
+
+    /// Configures the pass to inline functions according to the provided config
+    pub fn with_inline_config(&mut self, inline_config: InlineCallsConfig) -> &mut Self {
+        self.inline = inline_config;
+        self
+    }
+}
+
+impl WithScope for OneStepRebasePass {
+    fn with_scope(mut self, scope: impl Into<PassScope>) -> Self {
+        self.scope = scope.into();
+        self
+    }
+}
+
+impl<H: HugrMut> ComposablePass<H> for OneStepRebasePass
+where
+    H::Node: 'static,
+{
+    type Error = RebaseError<H::Node>;
+    type Result = ();
+
+    fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
+        let base_nodes: Box<dyn Iterator<Item = H::Node>> = match self.scope {
+            PassScope::Global(_) => Box::new(hugr.nodes()),
+            PassScope::EntrypointFlat => Box::new(hugr.children(hugr.entrypoint())),
+            PassScope::EntrypointRecursive => Box::new(hugr.descendants(hugr.entrypoint())),
+        };
+
+        // Replace current ops with calls to the intermediate op set
+        let nodes_to_replace = base_nodes
+            .filter_map(|n| {
+                op_data(hugr, n).filter(|(_, op_id, _)| self.op_map.contains_key(op_id))
+            })
+            .collect_vec();
+        replace_nodes(hugr, nodes_to_replace, self.inline, |op_id| {
+            self.op_map
+                .get(op_id)
+                .map_or_else(|| unreachable!("Should already be filtered!"), Ok)
+        })?;
+
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod test {
-    use super::{InlineConfig, RebasePass};
+    use super::{TwoStepInlineConfig, TwoStepRebasePass};
     use crate::TketOp;
     use crate::extension::rotation::{ConstRotation, rotation_type};
     use crate::passes::PassScope;
@@ -448,7 +447,7 @@ mod test {
         .into_hugr();
         print_hugr(&hugr, "hugr_before");
 
-        let pass = RebasePass::new(
+        let pass = TwoStepRebasePass::new(
             PassScope::default(),
             HashMap::from_iter([
                 (TketOp::X.qualified_opdef_id(), x_replacement()),
@@ -458,7 +457,7 @@ mod test {
                 (TketOp::Rx.qualified_opdef_id(), rx_replacement()),
                 (TketOp::CX.qualified_opdef_id(), cx_hh_replacement()),
             ]),
-            InlineConfig::none(),
+            TwoStepInlineConfig::none(),
         );
         run_validating(pass, &mut hugr)?;
 
