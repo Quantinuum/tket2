@@ -157,15 +157,17 @@ mod test {
     use rstest::rstest;
     use std::collections::HashSet;
 
+    use crate::TketOp;
     use crate::passes::{
         ComposablePass, InlineDFGsPass, PassScope, RemoveDeadFuncsPass, WithScope,
         composable::Preserve,
     };
+
+    use hugr::builder::{
+        Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder,
+    };
     use hugr::{
         HugrView,
-        builder::{
-            Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder,
-        },
         extension::prelude::{qb_t, usize_t},
         hugr::hugrmut::HugrMut,
         ops::handle::NodeHandle,
@@ -312,8 +314,63 @@ mod test {
         };
     }
 
-    // TODO cycle of one always func and one not always, should be inlined to a self-recursive func
+    #[test]
+    fn cycle_part_always() {
+        let mut main = FunctionBuilder::new("main", Signature::new_endo([qb_t()])).unwrap();
+        let main_h = main.container_node().into();
+        let mut mb = main.module_root_builder();
+        let mut f = mb
+            .define_function("f", Signature::new_endo([qb_t()]))
+            .unwrap();
+        let hada = f.add_dataflow_op(TketOp::H, f.input_wires()).unwrap();
+        let c = f.call::<true>(&main_h, &[], hada.outputs()).unwrap();
+        let f = f.finish_with_outputs(c.outputs()).unwrap();
+        let c = main.call(f.handle(), &[], main.input_wires()).unwrap();
+        let backup = main.finish_hugr_with_outputs(c.outputs()).unwrap();
 
-    // TODO cycle of two funcs where one has no other calls (and one has, or is preserved),
-    // should be inlined to a self-recursive func
+        // 1. Mark private callee f as Always, so it can be inlined into main and removed
+        let mut hugr = backup.clone();
+        hugr.set_metadata::<InlineAnnotation>(f.node(), InlineAnnotation::Always);
+        InlineAlwaysPass::default().run(&mut hugr).unwrap();
+        assert_eq!(
+            hugr.children(hugr.module_root()).collect_vec(),
+            [main_h.node()]
+        );
+        InlineDFGsPass::default().run(&mut hugr).unwrap();
+        hugr.validate().unwrap();
+        let [_in, _out, h, call] = hugr.children(main_h.node()).collect_array().unwrap();
+        assert_eq!(
+            hugr.get_optype(h).as_extension_op(),
+            Some(&TketOp::H.into_extension_op())
+        );
+        assert!(hugr.get_optype(call).is_call());
+        assert_eq!(hugr.static_source(call), Some(main_h.node()));
+
+        // 2. Mark entrypoint function main as Always; it can be inlined into f, but not removed.
+        let mut hugr = backup.clone();
+        hugr.set_metadata::<InlineAnnotation>(main_h.node(), InlineAnnotation::Always);
+        InlineAlwaysPass::default().run(&mut hugr).unwrap();
+        // No functions can be removed
+        assert_eq!(
+            hugr.children(hugr.module_root()).collect_vec(),
+            backup.children(backup.module_root()).collect_vec()
+        );
+        for n in hugr.children(hugr.module_root()) {
+            assert_eq!(hugr.get_optype(n), backup.get_optype(n));
+        }
+
+        // main inlined into f (inside DFG):
+        let [_in, _out, h, dfg] = hugr.children(f.node()).collect_array().unwrap();
+        assert_eq!(
+            hugr.get_optype(h).as_extension_op(),
+            Some(&TketOp::H.into_extension_op())
+        );
+        assert!(hugr.get_optype(dfg).is_dfg());
+        let [_in, _out, call] = hugr.children(dfg).collect_array().unwrap();
+        assert!(hugr.get_optype(call).is_call());
+        assert_eq!(hugr.static_source(call), Some(f.node()));
+
+        // No calls to main:
+        assert_eq!(hugr.static_targets(main_h.node()).unwrap().next(), None);
+    }
 }
