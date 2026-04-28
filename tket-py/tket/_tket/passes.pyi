@@ -43,6 +43,13 @@ def normalize_guppy(
     - remove_redundant_order_edges: Whether to remove redundant order edges.
     """
 
+def inline_always(
+    circ: CompilationState,
+    *,
+    scope: PassScope = GlobalScope.PRESERVE_PUBLIC,
+) -> None:
+    """Inline functions marked with the `inline="always"` decorator below the selected scope."""
+
 def inline_functions(
     circ: CompilationState,
     *,

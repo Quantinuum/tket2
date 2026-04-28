@@ -25,6 +25,7 @@ from hugr.passes.scope import PassScope, GlobalScope
 __all__ = [
     "PytketHugrPass",
     "PassResult",
+    "InlineAlwaysPass"
     "InlineFuncsHeuristic",
     "InlineFunctions",
     "NormalizeGuppy",
@@ -146,6 +147,38 @@ class NormalizeGuppy(ComposablePass):
         )
         return program
 
+
+@dataclass
+class InlineAlwaysPass(ComposablePass):
+    """Inline functions marked with the `inline="always"` decorator below the selected scope."""
+
+    _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
+
+    def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
+        return implement_pass_run(
+            self,
+            hugr=hugr,
+            inplace=inplace,
+            copy_call=lambda h: self._inline_always(h, inplace),
+        )
+
+    def with_scope(self, scope: PassScope) -> InlineAlwaysPass:
+        """Set the scope of this pass and return self."""
+        self._scope = scope
+        return self
+
+    def _inline_always(self, hugr: Hugr, inplace: bool) -> PassResult:
+        tk_program = _state.CompilationState.from_python(hugr)
+
+        _passes.inline_always(
+            tk_program._inner,
+            scope=self._scope,
+        )
+
+        package = tk_program.to_python()
+        return PassResult.for_pass(
+            self, hugr=package.modules[0], inplace=inplace, result=None
+        )
 
 @dataclass
 class InlineFunctions(ComposablePass):
