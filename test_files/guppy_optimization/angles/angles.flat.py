@@ -40,5 +40,5 @@ def f(q: qubit @ owned) -> qubit:
     return q
 
 
-program = main.compile()
+program = main.compile_function()
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())

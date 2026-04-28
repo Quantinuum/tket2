@@ -41,5 +41,5 @@ def f(qs: array[qubit, 4] @ owned) -> array[qubit, 4]:
     return qs
 
 
-program = main.compile()
+program = main.compile_function()
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())

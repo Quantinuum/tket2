@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang ==0.21.13",
+#     "guppylang >=0.21.6",
 # ]
 # ///
 
@@ -9,14 +9,14 @@ from pathlib import Path
 from sys import argv
 
 from guppylang import guppy
-from guppylang.std.builtins import result
+from guppylang.std.quantum import rz, qubit
+from guppylang.std.angles import angle
 
 
 @guppy
-def main() -> None:
-    result("b1", 0)
-    result("b2", 0)
+def rz_chain(q: qubit) -> None:
+    rz(q, angle(3 / 2))
 
 
-program = main.compile_function()
+program = rz_chain.compile_function()
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
