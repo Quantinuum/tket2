@@ -46,3 +46,4 @@ def main() -> None:
 
 
 program = main.compile()
+Path(sys.argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
