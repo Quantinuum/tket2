@@ -318,8 +318,10 @@ def test_inline_always(annotate: bool) -> None:
     # validate(d.hugr)
     assert _count_ops(d.hugr, "Call") == 0 if annotate else 2
 
+
 def test_inline_always_cycle() -> None:
     from hugr.build.function import Module
+
     mod = Module()
 
     f_recursive = mod.define_function("recurse", [tys.Qubit])
@@ -330,6 +332,7 @@ def test_inline_always_cycle() -> None:
     f_recursive.metadata["tket.inline"] = "always"
     with pytest.raises(InlineAlwaysError):
         InlineAlwaysPass()(mod.hugr)
+
 
 def test_inline_functions() -> None:
     hugr = _hugr_from_path("test_files/guppy_examples/fn_calls.hugr")
