@@ -294,7 +294,7 @@ mod test {
         let inps = id.input_wires();
         let id = id.finish_with_outputs(inps).unwrap();
         let c = entry
-            .call::<true>(&id.handle(), &[], entry.input_wires())
+            .call::<true>(id.handle(), &[], entry.input_wires())
             .unwrap();
         let mut h = entry.finish_hugr_with_outputs(c.outputs()).unwrap();
         assert_eq!(h.static_targets(cyclic.node()).unwrap().count(), 2); // cyclic and entry
