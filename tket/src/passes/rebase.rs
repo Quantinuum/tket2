@@ -199,7 +199,7 @@ fn consume_hugr<H: HugrMut>(hugr: &mut H, from_hugr: &Hugr) -> (Vec<H::Node>, H:
     )
 }
 
-fn replace_nodes<'a, H: HugrMut>(
+fn replace_ops<'a, H: HugrMut>(
     hugr: &mut H,
     nodes: Vec<(H::Node, OpName, Signature)>,
     inline: InlineCallsConfig,
@@ -267,7 +267,7 @@ where
                 op_data(hugr, n).filter(|(_, op_id, _)| self.cur_to_inter.contains_key(op_id))
             })
             .collect_vec();
-        let new_nodes = replace_nodes(hugr, nodes_to_replace, self.inline.intermediate, |op_id| {
+        let new_nodes = replace_ops(hugr, nodes_to_replace, self.inline.intermediate, |op_id| {
             self.cur_to_inter
                 .get(op_id)
                 .map_or_else(|| unreachable!("Should already be filtered!"), Ok)
@@ -279,7 +279,7 @@ where
             .into_iter()
             .filter_map(|n| op_data(hugr, n))
             .collect_vec();
-        replace_nodes(hugr, new_nodes_to_replace, self.inline.new, |op_id| {
+        replace_ops(hugr, new_nodes_to_replace, self.inline.new, |op_id| {
             self.inter_to_new.get(op_id).map_or_else(
                 || Err(RebaseError::NoIntermediateReplacement(op_id.clone())),
                 Ok,
@@ -342,7 +342,7 @@ where
                 op_data(hugr, n).filter(|(_, op_id, _)| self.op_map.contains_key(op_id))
             })
             .collect_vec();
-        replace_nodes(hugr, nodes_to_replace, self.inline, |op_id| {
+        replace_ops(hugr, nodes_to_replace, self.inline, |op_id| {
             self.op_map
                 .get(op_id)
                 .map_or_else(|| unreachable!("Should already be filtered!"), Ok)
