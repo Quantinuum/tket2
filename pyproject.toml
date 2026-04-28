@@ -7,10 +7,10 @@ dev = [
     "pytest>=9.0.3,<10",
     "pytest-cov ~=7.0",
     "ruff>=0.15.11,<0.16",
-    "mypy>=1.20.1,<2",
+    "mypy>=1.20.2,<2",
     "hypothesis>=6.152.1,<7",
     "graphviz ~=0.21.0",
-    "pre-commit ~=4.3",
+    "pre-commit~=4.6",
     # Required to run `maturin develop`
     "pip >=25",
     # Pyyaml 0.6.0 makes setuptools fail. This ensures we're using a newer version.

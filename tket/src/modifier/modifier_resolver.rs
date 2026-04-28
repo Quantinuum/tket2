@@ -1230,9 +1230,9 @@ mod tests {
     /// * `target_num`  – number of plain qubit (target) arguments that `foo` accepts.
     /// * `ctrl_num`  – number of control qubits to wrap around `foo`.
     /// * `foo`    – closure that inserts the function-under-test into the module and
-    ///              returns its `FuncID`.
+    ///    returns its `FuncID`.
     /// * `dagger` – if `true`, a `Dagger` modifier is inserted before the `Control`
-    ///              modifier, so the full chain is `Dagger → Control`.
+    ///    modifier, so the full chain is `Dagger → Control`.
     pub(crate) fn test_modifier_resolver(
         target_num: usize,
         ctrl_num: u64,
