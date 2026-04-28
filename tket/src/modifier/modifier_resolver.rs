@@ -42,7 +42,7 @@
 //! When dagger is applied, the order of nodes to be processed is reversed,
 //! since the control qubits are passed in the reverse order.
 //! After visiting all children, `modify_dfg_body` calls
-//! [`connect_all`](ModifierResolver::connect_all) to connect all wires that are registered
+//! ModifierResolver::connect_all to connect all wires that are registered
 //! in the correspondence map.
 //!
 //! Importantly, when dagger is applied, not only the order of nodes is reversed,
@@ -102,8 +102,7 @@
 use itertools::{Either, Itertools};
 use std::{
     collections::{HashMap, VecDeque},
-    fs, iter, mem,
-    path::Path,
+    iter, mem,
 };
 
 pub mod array_modify;
@@ -145,12 +144,12 @@ impl<N: HugrNode> std::fmt::Display for DirWire<N> {
 
 impl<N> DirWire<N> {
     /// Create a new DirWire.
-    pub fn new(node: N, port: Port) -> Self {
+    fn new(node: N, port: Port) -> Self {
         DirWire(node, port)
     }
 
     /// Reverse the direction of the wire.
-    pub fn reverse(self) -> Self {
+    pub(crate) fn reverse(self) -> Self {
         let index = self.1.index();
         let port = match self.1.as_directed() {
             Either::Left(_in) => OutgoingPort::from(index).into(),
@@ -329,7 +328,7 @@ pub struct ModifierResolver<N = Node> {
 
 impl<N> ModifierResolver<N> {
     /// Create a new modifier resolver.
-    pub fn new() -> Self {
+    fn new() -> Self {
         ModifierResolver {
             modifiers: CombinedModifier::default(),
             corresp_map: HashMap::default(),
@@ -415,12 +414,12 @@ pub enum ModifierResolverErrors<N = Node> {
 
 impl<N> ModifierResolverErrors<N> {
     /// Create an unreachable error.
-    pub fn unreachable(msg: impl Into<String>) -> Self {
+    fn unreachable(msg: impl Into<String>) -> Self {
         Self::Unreachable { msg: msg.into() }
     }
 
     /// Create an unresolvable error.
-    pub fn unresolvable(node: N, msg: impl Into<String>, optype: OpType) -> Self {
+    fn unresolvable(node: N, msg: impl Into<String>, optype: OpType) -> Self {
         Self::UnResolvable {
             node,
             msg: msg.into(),
@@ -605,7 +604,7 @@ impl<N: HugrNode> ModifierResolver<N> {
     }
 
     /// connects all the wires in the builder.
-    pub fn connect_all(
+    fn connect_all(
         &mut self,
         h: &impl HugrView<Node = N>,
         new_dfg: &mut impl Container,
@@ -1182,21 +1181,9 @@ pub fn resolve_modifier_with_entrypoints(
     // were produced or left behind by the resolution passes above.
     delete_phase(h, entry_points)?;
 
-    println!("HEEEERE");
-    // debbugging print
-    // œœœœœ
-    let output = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")))
-        .join("current.mmd");
-    fs::write(output, h.mermaid_string()).unwrap();
-    // œœœœœ
-    // end debugging print
-    // The validation here gives some problems
     h.validate()
         .map_err(|e| ModifierResolverErrors::BuildError(e.into()))?;
 
-    println!("HEEEERE2");
     Ok(())
 }
 
@@ -1244,10 +1231,10 @@ mod tests {
     /// Parameters:
     /// * `target_num`  – number of plain qubit (target) arguments that `foo` accepts.
     /// * `ctrl_num`  – number of control qubits to wrap around `foo`.
-    /// * `foo`    – closure that inserts the function-under-test into the module and
-    ///    returns its `FuncID`.
-    /// * `dagger` – if `true`, a `Dagger` modifier is inserted before the `Control`
-    ///    modifier, so the full chain is `Dagger → Control`.
+    /// * `foo`  – closure that inserts the function-under-test into the module and
+    ///   returns its `FuncID`.
+    /// * `dagger`  – if `true`, a `Dagger` modifier is inserted before the `Control`
+    ///   modifier, so the full chain is `Dagger → Control`.
     pub(crate) fn test_modifier_resolver(
         target_num: usize,
         ctrl_num: u64,
@@ -1421,8 +1408,8 @@ mod tests {
     #[rstest::rstest]
     #[case::call("nested_multiple_ctrl1")]
     // #[case::call("dagger_on_call")]
-    //#[case::call("all")]
-    pub fn test_saved_hugr(#[case] name: &str) {
+    #[case::call("all")]
+    fn test_saved_hugr(#[case] name: &str) {
         if name == "all" {
             for (_, mut h) in load_guppy_examples().unwrap() {
                 test_resolve(&mut h);

@@ -462,7 +462,7 @@ mod tests {
     #[case::indir_call_dagger(1, 1, foo_indir_call, true)]
     #[case::load_fn(1, 1, foo_load_fn, false)]
     #[case::nested_modifier(2, 2, foo_nested_modifier, false)]
-    pub fn test_call_modify(
+    fn test_call_modify(
         #[case] target_num: usize,
         #[case] ctrl_num: u64,
         #[case] foo: fn(&mut ModuleBuilder<Hugr>, usize) -> FuncID<true>,

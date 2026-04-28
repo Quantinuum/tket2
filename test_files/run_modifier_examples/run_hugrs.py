@@ -7,6 +7,7 @@
 """Run on selene the passed hugrs"""
 
 from pathlib import Path
+import shutil
 import sys
 import numpy as np
 import numpy.typing as npt
@@ -33,7 +34,7 @@ def format_statevector(
         if abs(amp) > threshold:
             label = format(idx, f"0{n_qubits}b")
             parts.append(f"\t{label} -> {amp:.4g}")
-    return "\n".join(parts) if parts else "(all zero)"
+    return "\n".join(parts) if parts else "all amplitudes below threshold"
 
 
 EXPECTED_RESULTS: dict[str, dict[str, complex]] = {
@@ -97,8 +98,12 @@ hugr_pdf_directory.mkdir(exist_ok=True)
 
 print(modifier_examples_dir)
 all_results: list[str] = []
-if len(sys.argv) > 1:
-    requested_hugr = Path(sys.argv[1] + "_solved.hugr")
+args = sys.argv[1:]
+if len(args) > 2:
+    raise SystemExit(f"Usage: {Path(sys.argv[0]).name} [hugr_name] [output_path]")
+
+if args:
+    requested_hugr = Path(args[0] + "_solved.hugr")
     hugr_path = requested_hugr
     if not hugr_path.is_absolute():
         hugr_path = modifier_examples_dir / requested_hugr
@@ -106,8 +111,9 @@ if len(sys.argv) > 1:
 else:
     hugr_paths = sorted(modifier_examples_dir.glob("*.hugr"))
 
+result_execution_dir.mkdir(parents=True, exist_ok=True)
 for hugr_path in hugr_paths:
-    print(f"Processing {hugr_path}...")
+    print(f"Running {hugr_path.name}...")
     hugr_bytes = hugr_path.read_bytes()
     hugr = Hugr.from_bytes(hugr_bytes)
 
@@ -120,9 +126,19 @@ for hugr_path in hugr_paths:
     emulator = builder.build(package, n_qubits=8)
     state = emulator.statevector_sim().run()
     res = state.partial_state_dicts()[0]["r"].as_single_state()
-    # assert_statevector(hugr_path.stem, res)
+    output_path = (
+        Path(args[1])
+        if len(args) >= 2
+        else result_execution_dir / f"{hugr_path.stem}.npy"
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    np.save(output_path, res)
     all_results.append(f"{hugr_path.stem}:\n{format_statevector(res)}")
 
-result_path = Path("hugr_results.txt")
-result_path.write_text("\n-----\n".join(all_results) + "\n")
-print(f"Results saved to {result_path}")
+# Save the result to a text file for easy viewing.
+if len(args) < 2:
+    result_path = Path(__file__).resolve().parent / "hugr_results.txt"
+    result_path.parent.mkdir(parents=True, exist_ok=True)
+    result_path.write_text("\n-----\n".join(all_results) + "\n")
+
+shutil.rmtree(modifier_examples_dir)

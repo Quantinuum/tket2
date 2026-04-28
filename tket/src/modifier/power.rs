@@ -13,7 +13,7 @@ pub struct ModifierPower;
 
 impl ModifierPower {
     /// Create a new ModifierPower.
-    pub fn new() -> Self {
+    fn new() -> Self {
         ModifierPower
     }
 }
@@ -36,7 +36,7 @@ impl FromStr for ModifierPower {
 impl ModifierPower {
     /// signature for the power modifier.
     /// The Copyable bound of the second parameter is needed while constructing `TailLoop`.
-    pub fn signature() -> SignatureFunc {
+    pub(crate) fn signature() -> SignatureFunc {
         PolyFuncTypeRV::new(
             [
                 TypeParam::new_list_type(TypeBound::Linear),
