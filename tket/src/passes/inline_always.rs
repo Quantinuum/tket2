@@ -16,23 +16,23 @@ use petgraph::visit::{
 
 /// Errors that may be raised by [InlinePass]
 #[derive(Clone, Debug, PartialEq, Eq, derive_more::Display)]
-pub enum InlineError<N = Node> {
+pub enum InlineAlwaysError<N = Node> {
     /// Functions annotated with [InlineAnnotation::Always] form a cycle
     /// so inlining would produce an infinitely-big program
     #[display("Cycle detected in functions marked to Always inline: {_0:?}")]
     AlwaysCycle(Vec<N>),
 }
 
-impl<N: std::fmt::Debug> std::error::Error for InlineError<N> {}
+impl<N: std::fmt::Debug> std::error::Error for InlineAlwaysError<N> {}
 
 /// A [ComposablePass] that inlines `Call`s to functions
 /// according to [InlineAnnotation]s.
 #[derive(Default, Clone, Debug)]
-pub struct InlinePass {
+pub struct InlineAlwaysPass {
     scope: PassScope,
 }
 
-impl WithScope for InlinePass {
+impl WithScope for InlineAlwaysPass {
     fn with_scope(self, scope: impl Into<PassScope>) -> Self {
         Self {
             scope: scope.into(),
@@ -40,11 +40,11 @@ impl WithScope for InlinePass {
     }
 }
 
-impl<H: HugrMut> ComposablePass<H> for InlinePass {
-    type Error = InlineError<H::Node>;
+impl<H: HugrMut> ComposablePass<H> for InlineAlwaysPass {
+    type Error = InlineAlwaysError<H::Node>;
     type Result = ();
 
-    fn run(&self, hugr: &mut H) -> Result<(), InlineError<H::Node>> {
+    fn run(&self, hugr: &mut H) -> Result<(), InlineAlwaysError<H::Node>> {
         let Some(root) = self.scope.root(hugr) else {
             return Ok(()); // Nothing to do
         };
@@ -76,7 +76,7 @@ impl<H: HugrMut> ComposablePass<H> for InlinePass {
                 _ => false,
             });
         if let Some(cycle) = cycles(&always_cg).next() {
-            return Err(InlineError::AlwaysCycle(cycle));
+            return Err(InlineAlwaysError::AlwaysCycle(cycle));
         }
         // Proceed with inlining. Do outermost first within the scope root, as we cannot
         // inline into functions that are outside the scope until they themselves are inlined
@@ -168,7 +168,7 @@ mod test {
         types::Signature,
     };
 
-    use super::{InlineAnnotation, InlineError, InlinePass};
+    use super::{InlineAlwaysError, InlineAlwaysPass, InlineAnnotation};
 
     #[test]
     fn test_single_cycle() {
@@ -187,8 +187,8 @@ mod test {
         let backup = hugr.clone();
 
         // We error even though the function is not called
-        let e = InlinePass::default().run(&mut hugr).unwrap_err();
-        assert_eq!(e, InlineError::AlwaysCycle(vec![fb.node()]));
+        let e = InlineAlwaysPass::default().run(&mut hugr).unwrap_err();
+        assert_eq!(e, InlineAlwaysError::AlwaysCycle(vec![fb.node()]));
         assert_eq!(hugr, backup);
 
         RemoveDeadFuncsPass::default().run(&mut hugr).unwrap();
@@ -197,7 +197,7 @@ mod test {
             [hugr.entrypoint()]
         );
         let backup = hugr.clone();
-        InlinePass::default().run(&mut hugr).unwrap();
+        InlineAlwaysPass::default().run(&mut hugr).unwrap();
         assert_eq!(hugr, backup);
     }
 
@@ -214,13 +214,13 @@ mod test {
         let c2 = main.call(fb1.handle(), &[], main.input_wires()).unwrap();
         let mut hugr = main.finish_hugr_with_outputs(c2.outputs()).unwrap();
         hugr.set_metadata::<InlineAnnotation>(hugr.entrypoint(), InlineAnnotation::Always);
-        InlinePass::default().run(&mut hugr.clone()).unwrap(); // Ok
+        InlineAlwaysPass::default().run(&mut hugr.clone()).unwrap(); // Ok
 
         hugr.set_metadata::<InlineAnnotation>(fb1.node(), InlineAnnotation::Always);
-        let e = InlinePass::default().run(&mut hugr).unwrap_err();
+        let e = InlineAlwaysPass::default().run(&mut hugr).unwrap_err();
         assert_eq!(
             e,
-            InlineError::AlwaysCycle(vec![fb1.node(), hugr.entrypoint()])
+            InlineAlwaysError::AlwaysCycle(vec![fb1.node(), hugr.entrypoint()])
         );
     }
 
@@ -243,7 +243,7 @@ mod test {
         let mut hugr = main.finish_hugr_with_outputs([a, b, c]).unwrap();
         hugr.set_metadata::<InlineAnnotation>(swap.node(), InlineAnnotation::Always);
 
-        InlinePass::default().run(&mut hugr).unwrap();
+        InlineAlwaysPass::default().run(&mut hugr).unwrap();
         hugr.validate().unwrap();
 
         let swap_present =
