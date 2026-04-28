@@ -88,6 +88,9 @@ impl<N: HugrNode> ModifierResolver<N> {
 
         // The function to apply the modifier to. This is expected to be a LoadFunction node
         let (func, load) = Self::get_loaded_function(h, modifier_node, targ, h.get_optype(targ))?;
+        // delete load (if you can. only used here)
+        // after deleting load, I can run delete dead functions pass:
+        // https://docs.rs/tket/latest/tket/passes/dead_funcs/struct.RemoveDeadFuncsPass.html
 
         // Modify the function
         let modified_fn = self.modify_fn(h, func)?;
