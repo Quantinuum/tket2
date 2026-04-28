@@ -12,7 +12,7 @@ from pytket.passes import (
 from tket import _state
 from . import inline_funcs
 from .._tket import passes as _passes, optimiser as _optimiser
-
+from .._tket.passes import InlineAlwaysError #type: ignore
 from hugr.passes.composable import (
     ComposablePass,
     ComposedPass,
@@ -25,6 +25,7 @@ from hugr.passes.scope import PassScope, GlobalScope
 __all__ = [
     "PytketHugrPass",
     "PassResult",
+    "InlineAlwaysError",
     "InlineAlwaysPass",
     "InlineFuncsHeuristic",
     "InlineFunctions",

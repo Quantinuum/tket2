@@ -7,6 +7,7 @@ from tket._ops import TketOp
 from tket.passes import (
     _badger_optimise,
     _greedy_depth_reduce,
+    InlineAlwaysError,
     InlineAlwaysPass,
     InlineFunctions,
     inline_funcs,
@@ -24,6 +25,7 @@ from hypothesis import given, settings
 from tket.passes import PytketHugrPass
 from pytket.passes import CliffordSimp, SquashRzPhasedX, SequencePass
 from hugr.build.base import Hugr
+import hugr.tys as tys
 
 import numpy as np
 import pytest
@@ -289,7 +291,6 @@ def test_modifier_execution() -> None:
 @pytest.mark.parametrize("annotate", [True, False])
 def test_inline_always(annotate: bool) -> None:
     import hugr.ops as ops
-    import hugr.tys as tys
     from hugr.build.dfg import Dfg
 
     d = Dfg(tys.Tuple(tys.Qubit, tys.Qubit))
@@ -317,6 +318,18 @@ def test_inline_always(annotate: bool) -> None:
     # validate(d.hugr)
     assert _count_ops(d.hugr, "Call") == 0 if annotate else 2
 
+def test_inline_always_cycle() -> None:
+    from hugr.build.function import Module
+    mod = Module()
+
+    f_recursive = mod.define_function("recurse", [tys.Qubit])
+    f_recursive.declare_outputs([tys.Qubit])
+    call = f_recursive.call(f_recursive, f_recursive.input_node[0])
+    f_recursive.set_outputs(call)
+
+    f_recursive.metadata["tket.inline"] = "always"
+    with pytest.raises(InlineAlwaysError):
+        InlineAlwaysPass()(mod.hugr)
 
 def test_inline_functions() -> None:
     hugr = _hugr_from_path("test_files/guppy_examples/fn_calls.hugr")
