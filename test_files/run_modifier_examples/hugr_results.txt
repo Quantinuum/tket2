@@ -1,3 +1,8 @@
+assign_in_dagger_solved:
+	00 -> 0.7071+0j
+	10 -> 0.6124+0j
+	11 -> 0+0.3536j
+-----
 classical_function1_solved:
 	0 -> 0.866+0j
 	1 -> 0+0.5j

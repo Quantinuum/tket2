@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang @ git+https://github.com/Quantinuum/guppylang.git@main#subdirectory=guppylang",
+#     "guppylang @ git+https://github.com/Quantinuum/guppylang.git@na/allowing-assigment-in-dagger#subdirectory=guppylang",
 # ]
 # ///
 """A simple controlled gate using modifiers"""
@@ -13,8 +13,8 @@ import sys
 from guppylang import guppy
 from guppylang.std.builtins import control, dagger
 from guppylang.std.debug import state_result
-from guppylang.std.quantum import discard, qubit, angle, measure
-from guppylang.std.quantum import h, rx, x
+from guppylang.std.quantum import discard, qubit, angle
+from guppylang.std.quantum import h, rx
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
@@ -24,23 +24,14 @@ enable_experimental_features()
 
 
 @guppy
-def fuu(i: int) -> int:
-    q = qubit()
-    x(q)
-    if measure(q):
-        i = i + 1
-    return i
-
-
-@guppy
 def main() -> None:
-    t = qubit()
     c1 = qubit()
+    t = qubit()
     h(c1)
-    with control(c1):
-        d = angle(fuu(2))
-        with dagger:
-            rx(t, d)
+    with dagger:
+        a = angle(1 / 3)
+        with control(c1):
+            rx(t, a)
 
     state_result("r", c1, t)
     discard(c1)
