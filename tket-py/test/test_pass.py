@@ -20,7 +20,7 @@ import hypothesis.strategies as st
 from hypothesis.strategies._internal import SearchStrategy
 from hypothesis import given, settings
 
-from tket.passes import PytketHugrPass
+from tket.passes import PytketHugrPass, QSystemPass
 from pytket.passes import CliffordSimp, SquashRzPhasedX, SequencePass
 from hugr.build.base import Hugr
 
@@ -299,5 +299,10 @@ def test_inline_functions() -> None:
     assert _count_ops(all, "Call") == 0
 
 
-def test_qsystem_pass() -> None:
-    pass
+def test_python_qsystem_pass() -> None:
+    circ = Circuit(2).H(0).Rz(0.75, 0).CX(0, 1)
+    c = CompilationState.from_tket1(circ)
+    hugr = Hugr.from_str(c.to_str(), tket_registry())
+    qsystem_pass = QSystemPass()
+    qsystem_hugr = qsystem_pass(hugr)
+    assert _count_ops(qsystem_hugr, "ZZPhase") == 1
