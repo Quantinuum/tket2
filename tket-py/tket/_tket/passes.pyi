@@ -18,6 +18,9 @@ class CircuitChunks:
 class PullForwardError(Exception):
     """Error from a `PullForward` operation."""
 
+class InlineAlwaysError(Exception):
+    """Error from `InlineAlwaysPass`."""
+
 def normalize_guppy(
     circ: CompilationState,
     *,
