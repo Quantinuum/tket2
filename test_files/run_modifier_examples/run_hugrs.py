@@ -124,7 +124,7 @@ for hugr_path in hugr_paths:
     package = hugr.to_package()
 
     builder = EmulatorBuilder()
-    emulator = builder.build(package, n_qubits=8)
+    emulator = builder.build(package, n_qubits=9)
     state = emulator.statevector_sim().run()
     res = state.partial_state_dicts()[0]["r"].as_single_state()
     output_path = (

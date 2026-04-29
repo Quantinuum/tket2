@@ -110,20 +110,6 @@ recompile-modifier name:
     just test_files/run_modifier_examples/rh "{{name}}"
 
 
-mod:
-    @echo "---- Compiling hugrs ----"
-    uv run maturin develop --uv
-    just test_files/modifier_examples/r
-    just test_files/run_modifier_examples/r
-
-
-modh name:
-    @echo "---- Compiling hugr {{name}} ----"
-    uv run maturin develop --uv
-    just test_files/modifier_examples/rh "{{name}}.py"
-    just test_files/run_modifier_examples/rh "{{name}}"
-
-
 # Generate serialized declarations for the tket extensions
 gen-extensions:
     cargo run -p tket-qsystem gen-extensions -o tket-exts/src/tket_exts/data
