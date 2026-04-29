@@ -38,7 +38,7 @@ def main() -> None:
     c1 = qubit()
     h(c1)
     with control(c1):
-        d = angle(fuu(2))
+        d = angle(1 / fuu(2))
         with dagger:
             rx(t, d)
 
