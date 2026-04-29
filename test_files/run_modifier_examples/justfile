@@ -1,0 +1,21 @@
+# List the available commands
+help:
+    @just --list --justfile {{justfile()}}
+
+# Re-generate all hugr files and their mermaid diagrams.
+r: run-hugrs
+
+# Re-generate all hugr files.
+run-hugrs:
+    @echo "---- Applying passes ----"
+    uv run apply_passes.py
+    @echo "---- Running hugrs ----"
+    uv run --no-project "run_hugrs.py"
+    
+
+# Re-generate a single hugr file.
+rh example:
+    @echo "---- Applying passes ----"
+    uv run apply_passes.py "{{example}}"
+    @echo "---- Running hugrs ----"
+    uv run --no-project "run_hugrs.py" "{{example}}"

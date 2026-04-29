@@ -92,6 +92,23 @@ recompile-test-hugrs:
     just test_files/guppy_examples/recompile
     @echo "---- Recompiling optimization-target guppy programs ----"
     just test_files/guppy_optimization/recompile
+    @echo "---- Recompiling modifier examples ----"
+    uv run maturin develop --uv
+    just test_files/modifier_examples/r
+    just test_files/run_modifier_examples/r
+
+recompile-modifiers:
+    @echo "---- Recompiling modifier examples ----"
+    uv run maturin develop --uv
+    just test_files/modifier_examples/r
+    just test_files/run_modifier_examples/r
+
+recompile-modifier name:
+    @echo "---- Compiling hugr {{name}} ----"
+    uv run maturin develop --uv
+    just test_files/modifier_examples/rh "{{name}}.py"
+    just test_files/run_modifier_examples/rh "{{name}}"
+
 
 # Generate serialized declarations for the tket extensions
 gen-extensions:
