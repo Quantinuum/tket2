@@ -14,7 +14,7 @@ from guppylang import guppy
 from guppylang.std.builtins import dagger
 from guppylang.std.debug import state_result
 from guppylang.std.quantum import discard, qubit
-from guppylang.std.quantum import s, h
+from guppylang.std.quantum import sdg, h
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
@@ -29,7 +29,7 @@ def main() -> None:
 
     with dagger:
         h(t)
-        s(t)
+        sdg(t)
         h(t)
 
     state_result("r", t)

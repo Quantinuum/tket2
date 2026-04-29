@@ -57,7 +57,7 @@ dagger_on_call_solved:
 -----
 dagger_on_multiple_gates1_solved:
 	0 -> 0.7071+0j
-	1 -> 0+0.7071j
+	1 -> 0-0.7071j
 -----
 dagger_on_multiple_gates2_solved:
 	0 -> 0.7071+0j
