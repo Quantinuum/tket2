@@ -88,6 +88,12 @@ impl<N: HugrNode> ModifierResolver<N> {
 
         // The function to apply the modifier to. This is expected to be a LoadFunction node
         let (func, load) = Self::get_loaded_function(h, modifier_node, targ, h.get_optype(targ))?;
+        h.remove_node(targ);
+        // if h.all_linked_inputs(targ)
+        //     .all(|(user, _)| modifiers_and_targ.contains(&user))
+        // {
+        //     h.remove_node(targ);
+        // }
 
         // Modify the function
         let modified_fn = self.modify_fn(h, func)?;

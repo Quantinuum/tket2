@@ -112,7 +112,10 @@ pub mod global_phase_modify;
 pub mod tket_op_modify;
 
 use super::{CombinedModifier, ModifierFlags};
-use crate::passes::utils::unpack_container::TypeUnpacker;
+use crate::passes::{
+    ComposablePass, RemoveDeadFuncsPass, WithScope, composable::Preserve,
+    utils::unpack_container::TypeUnpacker,
+};
 use crate::{TketOp, extension::global_phase::GlobalPhase, modifier::Modifier};
 use global_phase_modify::delete_phase;
 
@@ -1165,6 +1168,13 @@ pub fn resolve_modifier_with_entrypoints(
     // Ad hoc cleanup procedure: remove any dangling global-phase nodes that
     // were produced or left behind by the resolution passes above.
     delete_phase(h, entry_points)?;
+
+    // At end we delete dead code: i.e. old function blocks that have been replaced by modified
+    // versions but are still present as unreachable code.
+    RemoveDeadFuncsPass::default()
+        .with_scope(Preserve::Public)
+        .run(h)
+        .unwrap();
 
     h.validate()
         .map_err(|e| ModifierResolverErrors::BuildError(e.into()))?;
