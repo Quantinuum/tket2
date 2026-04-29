@@ -300,9 +300,8 @@ def test_inline_functions() -> None:
 
 
 def test_python_qsystem_pass() -> None:
-    circ = Circuit(2).H(0).Rz(0.75, 0).CX(0, 1)
-    c = CompilationState.from_tket1(circ)
-    hugr = Hugr.from_str(c.to_str(), tket_registry())
+    normalize = NormalizeGuppy()
+    hugr = normalize(_hugr_from_path("test_files/guppy_examples/flat_quantum.hugr"))
     qsystem_pass = QSystemPass()
     qsystem_hugr = qsystem_pass(hugr)
     assert _count_ops(qsystem_hugr, "ZZPhase") == 1
