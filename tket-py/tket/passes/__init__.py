@@ -294,3 +294,49 @@ class ModifierResolverPass(ComposablePass):
             scope=self._scope,
         )
         return program
+
+
+@dataclass
+class QSystemPass(ComposablePass):
+    """A pass to convert quantum ops to qsystem ops."""
+
+    constant_fold: bool = True
+    monomorphize: bool = True
+    force_order: bool = True
+    lazify: bool = True
+    _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
+
+    def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
+        return implement_pass_run(
+            self,
+            hugr=hugr,
+            inplace=inplace,
+            copy_call=lambda h: self._qsystem_rebase(h, inplace),
+        )
+
+    def with_scope(self, scope: PassScope) -> QSystemPass:
+        """Set the scope of this pass and return self."""
+        self._scope = scope
+        return self
+
+    def _qsystem_rebase(self, hugr: Hugr, inplace: bool) -> PassResult:
+        tk_program = _state.CompilationState.from_python(hugr)
+
+        self._run_tk(tk_program)
+
+        package = tk_program.to_python()
+        return PassResult.for_pass(
+            self, hugr=package.modules[0], inplace=inplace, result=None
+        )
+
+    def _run_tk(self, program: _state.CompilationState) -> _state.CompilationState:
+        """Run the pass in the CompilationState"""
+        _passes.qsystem_rebase_pass(
+            program._inner,
+            constant_fold=self.constant_fold,
+            monomorphize=self.monomorphize,
+            force_order=self.force_order,
+            lazify=self.lazify,
+            scope=self._scope,
+        )
+        return program

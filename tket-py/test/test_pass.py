@@ -297,3 +297,7 @@ def test_inline_functions() -> None:
     all = InlineFunctions(heuristic=inline_funcs.All())(hugr)
 
     assert _count_ops(all, "Call") == 0
+
+
+def test_qsystem_pass() -> None:
+    pass
