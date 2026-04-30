@@ -1,5 +1,8 @@
 use crate::metadata::QubitRegisters;
 use crate::passes::NormalizeGuppy;
+use crate::passes::PassScope;
+use crate::passes::WithScope;
+use crate::passes::composable::Preserve;
 use crate::passes::guppy::NormalizeGuppyErrors;
 use crate::passes::inline_funcs::InlineFuncsError;
 use crate::serialize::pytket::{
@@ -20,7 +23,7 @@ use petgraph::visit as pv;
 use pg_optimise::{GroupCommutingOpsPass, RotationMergingPass};
 
 use crate::passes::composable::ComposablePass;
-use crate::passes::inline_funcs::inline_acyclic;
+use crate::passes::inline_funcs::inline_acyclic_scoped;
 use hugr::HugrView;
 use hugr::hugr::OpType as TketOp;
 use hugr::{Hugr, Node};
@@ -35,12 +38,24 @@ use std::sync::Arc;
 
 #[derive(Clone, Debug)]
 pub struct GlobalTResynthesis {
+    /// The scope within which the pass will operate.
+    scope: PassScope,
     ancilla_budget: usize,
 }
 
 impl Default for GlobalTResynthesis {
     fn default() -> Self {
-        Self { ancilla_budget: 0 }
+        Self {
+            scope: PassScope::Global(Preserve::All),
+            ancilla_budget: 0,
+        }
+    }
+}
+
+impl WithScope for GlobalTResynthesis {
+    fn with_scope(mut self, scope: impl Into<crate::passes::PassScope>) -> Self {
+        self.scope = scope.into();
+        self
     }
 }
 
@@ -70,18 +85,16 @@ impl ComposablePass<Hugr> for GlobalTResynthesis {
             }
         }
 
-        inline_acyclic(hugr, |_, _| true).unwrap();
+        inline_acyclic_scoped(hugr, self.scope.clone(), |_, _| true).unwrap();
         NormalizeGuppy::default()
             .constant_folding(false)
             .run(hugr)?;
-
-        let mut circ = Circuit::try_new(hugr.clone())?;
 
         let encode_options = EncodeOptions::new()
             .with_subcircuits(true)
             .with_config(default_encoder_config());
 
-        let mut encoded_circs = EncodedCircuit::new(&circ, encode_options)?;
+        let mut encoded_circs = EncodedCircuit::new(&hugr, encode_options)?;
 
         for (_, serial_circ) in encoded_circs.iter_mut() {
             let pauli_graph = serial_circuit_to_pauli_graph(serial_circ)?;
@@ -106,14 +119,11 @@ impl ComposablePass<Hugr> for GlobalTResynthesis {
             serial_circ.commands = pauli_graph_to_cmds(pauli_graph, serial_circ)?;
         }
 
-        encoded_circs
-            .reassemble_inplace(circ.hugr_mut(), Some(Arc::new(default_decoder_config())))?;
+        encoded_circs.reassemble_inplace(hugr, Some(Arc::new(default_decoder_config())))?;
 
-        circ.hugr().validate()?;
+        hugr.validate()?;
 
-        let mermaid_string = circ.mermaid_string();
-
-        *hugr = circ.into_hugr();
+        let mermaid_string = hugr.mermaid_string();
 
         Ok(())
     }

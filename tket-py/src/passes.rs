@@ -213,19 +213,16 @@ fn resolve_modifiers(circ: &mut CompilationState, scope: Option<PyPassScope>) ->
 }
 
 #[pyfunction]
-#[pyo3(signature = (circ, ancilla_budget=0))]
-fn global_t_resynthesis<'py>(
-    circ: &Bound<'py, PyAny>,
+#[pyo3(signature = (circ, ancilla_budget=0, scope=None))]
+fn global_t_resynthesis(
+    circ: &mut CompilationState,
     ancilla_budget: usize,
-) -> PyResult<Bound<'py, PyAny>> {
-    let py = circ.py();
-    try_with_circ(circ, |mut circ, typ| {
-        let mut pass = tket::passes::GlobalTResynthesis::default();
+    scope: Option<PyPassScope>,
+) -> PyResult<()> {
+    let py_scope = scope.unwrap_or_default();
+    let mut pass = tket::passes::GlobalTResynthesis::default_with_scope(py_scope.scope);
 
-        pass.with_ancilla_budget(ancilla_budget);
-        pass.run(circ.hugr_mut()).convert_pyerrs()?;
-
-        let circ = typ.convert(py, circ)?;
-        PyResult::Ok(circ)
-    })
+    pass.with_ancilla_budget(ancilla_budget);
+    pass.run(&mut circ.hugr).convert_pyerrs()?;
+    Ok(())
 }

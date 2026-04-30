@@ -101,9 +101,10 @@ def resolve_modifiers(
     """
 
 def global_t_resynthesis(
-    circ: CircuitClass,
+    circ: CompilationState,
     ancilla_budget: int = 0,
-) -> CircuitClass:
+    scope: PassScope | None = None,
+) -> None:
     """Applies FastTODD and GreedyPauliSimp to a circuit.
 
     Parameters:

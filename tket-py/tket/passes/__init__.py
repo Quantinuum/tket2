@@ -191,6 +191,7 @@ class InlineFunctions(ComposablePass):
             self, hugr=package.modules[0], inplace=inplace, result=None
         )
 
+
 @dataclass
 class GlobalTResynthesis(ComposablePass):
     ancilla_budget: int = 0
@@ -213,14 +214,15 @@ class GlobalTResynthesis(ComposablePass):
         )
 
     def _global_t_resynthesis(self, hugr: Hugr, inplace: bool) -> PassResult:
-        compiler_state, registry = _hugr_to_tk2circuit(hugr)
-        opt_program = _passes.global_t_resynthesis(
-            compiler_state,
-            ancilla_budget=self.ancilla_budget,
+        tk_program = _state.CompilationState.from_python(hugr)
+        _passes.global_t_resynthesis(
+            tk_program._inner, ancilla_budget=self.ancilla_budget
         )
-        new_hugr = Hugr.from_str(opt_program.to_str())
-        new_hugr.resolve_extensions(registry)
-        return PassResult.for_pass(self, hugr=new_hugr, inplace=inplace, result=None)
+        package = tk_program.to_python()
+        return PassResult.for_pass(
+            self, hugr=package.modules[0], inplace=inplace, result=None
+        )
+
 
 def _greedy_depth_reduce(program: _state.CompilationState) -> int:
     return _passes.greedy_depth_reduce(program._inner)
