@@ -180,7 +180,7 @@ pub enum TketOp {
     /// - A qubit
     ///
     /// Outputs:
-    /// - A boolean indicating whether the qubit was measured as 1
+    /// - A measurement indicating whether the qubit was measured as 1
     MeasureFree,
     /// Allocate a qubit.
     ///
