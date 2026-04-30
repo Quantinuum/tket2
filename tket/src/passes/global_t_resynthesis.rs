@@ -1,12 +1,12 @@
 use crate::metadata::QubitRegisters;
 use crate::passes::NormalizeGuppy;
 use crate::passes::guppy::NormalizeGuppyErrors;
+use crate::passes::inline_funcs::InlineFuncsError;
 use crate::serialize::pytket::{
     EncodeOptions, EncodedCircuit, PytketDecodeError, PytketEncodeError, default_decoder_config,
     default_encoder_config,
 };
 use crate::{Circuit, CircuitError};
-use hugr::algorithms::inline_funcs::InlineFuncsError;
 use hugr::hugr::ValidationError;
 use hugr::hugr::hugrmut::HugrMut;
 
@@ -19,9 +19,9 @@ use pauli_graph::{BlackBoxData, GateData, GateType, Op, PauliGraph, PauliGraphPa
 use petgraph::visit as pv;
 use pg_optimise::{GroupCommutingOpsPass, RotationMergingPass};
 
+use crate::passes::composable::ComposablePass;
+use crate::passes::inline_funcs::inline_acyclic;
 use hugr::HugrView;
-use hugr::algorithms::ComposablePass;
-use hugr::algorithms::inline_acyclic;
 use hugr::hugr::OpType as TketOp;
 use hugr::{Hugr, Node};
 
