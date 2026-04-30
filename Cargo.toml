@@ -94,7 +94,7 @@ serde = "1.0.228"
 serde_json = "1.0.149"
 serde_with = "3.16.1"
 smol_str = "0.3.4"
-strum = "0.27.2"
+strum = "0.28.0"
 thiserror = "2.0.18"
 tracing = "0.1.44"
 tracing-appender = "0.2.4"
@@ -109,8 +109,7 @@ pauli-graph = { git = "https://github.com/Quantinuum/pg-libs", package = "pauli-
 basic-passes = { git = "https://github.com/Quantinuum/pg-libs", package = "basic-passes" }
 greedy-synth = { git = "https://github.com/quantinuum-dev/greedy-pauli-rs", branch = "refactor-pauli-graph-into-separate-crate", package = "greedy-synth" }
 pg-optimise = { git = "https://github.com/quantinuum-dev/greedy-pauli-rs", branch = "refactor-pauli-graph-into-separate-crate", package = "pg-optimise" }
-fast-todd = { path = "../fast-todd" }
-hugr-passes = { path = "../../hugr-passes-debug" }
+fast-todd = { git = "https://github.com/quantinuum-dev/fast-todd" }
 
 [profile.release.package.tket-py]
 # Some configurations to reduce the size of tket wheels

@@ -92,7 +92,7 @@ impl ComposablePass<Hugr> for GlobalTResynthesis {
             let canonical_pass = CanonicalFormPass::new().with_forward(true);
             let grouping_pass = GroupCommutingOpsPass::new();
             let rotation_merging_pass = RotationMergingPass::new();
-            let _fast_todd_pass = FastTODDPass::new();
+            let fast_todd_pass = FastTODDPass::new();
             let synth_pass = GreedySynthPass::new()
                 .with_window_size(100)
                 .with_pool_size(100)
@@ -102,6 +102,7 @@ impl ComposablePass<Hugr> for GlobalTResynthesis {
 
             let pauli_graph = canonical_pass.transform(&pauli_graph);
             let pauli_graph = rotation_merging_pass.transform(&pauli_graph);
+            let pauli_graph = fast_todd_pass.transform(&pauli_graph);
             let pauli_graph = grouping_pass.transform(&pauli_graph);
             let pauli_graph = synth_pass.transform(&pauli_graph);
             let pauli_graph = rebase_pass.transform(&pauli_graph);
