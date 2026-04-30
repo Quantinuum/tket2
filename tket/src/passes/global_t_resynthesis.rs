@@ -1,3 +1,4 @@
+use crate::metadata::QubitRegisters;
 use crate::passes::guppy::NormalizeGuppyErrors;
 use crate::passes::NormalizeGuppy;
 use crate::serialize::pytket::{
@@ -10,7 +11,9 @@ use crate::serialize::pytket::{
 use crate::{Circuit, CircuitError};
 use hugr::algorithms::inline_funcs::InlineFuncsError;
 use hugr::hugr::ValidationError;
+use hugr::hugr::hugrmut::HugrMut;
 
+use hugr::types::EdgeKind;
 use hugr_core::hugr::internal::{HugrInternals, PortgraphNodeMap};
 use pauli_graph::{BlackBoxData, GateData, GateType, Op, PauliGraph, PauliGraphPass};
 use basic_passes::CanonicalFormPass;
@@ -19,7 +22,7 @@ use petgraph::visit as pv;
 use pg_optimise::{GroupCommutingOpsPass, RotationMergingPass};
 use fast_todd::FastTODDPass;
 
-use hugr_passes::inline_acyclic;
+use hugr::algorithms::inline_acyclic;
 use hugr::algorithms::ComposablePass;
 use hugr::{Hugr, Node};
 use hugr::HugrView;
@@ -30,10 +33,9 @@ use tket_json_rs::register::{Bit, ElementId, Qubit};
 use tket_json_rs::{OpType, SerialCircuit};
 
 use std::sync::Arc;
+use std::cell::Cell;
+use std::collections::HashSet;
 
-pub fn count_t_gates_in_mermaid_string(input: &str) ->  usize {
-    input.matches("tket.quantum.T").count()
-}
 
 #[derive(Clone, Debug)]
 pub struct GlobalTResynthesis {
@@ -57,13 +59,26 @@ impl ComposablePass<Hugr> for GlobalTResynthesis {
     type Error = GlobalTResynthesisErrors;
     type Result = ();
     fn run(&self, hugr: &mut Hugr) -> Result<Self::Result, Self::Error> {
+
+        // TODO: think about what order edges we can/should remove
+        // (currently removing all call order edges)
+        for n in hugr.nodes().collect::<Vec<_>>() {
+            if hugr.get_optype(n).is_call() {
+                let outport = hugr.get_optype(n).other_output_port().unwrap();
+                let inport = hugr.get_optype(n).other_input_port().unwrap();
+
+                let func_node = hugr.static_source(n).unwrap();
+                let func_defn = hugr.get_optype(func_node).as_func_defn().unwrap();
+
+                hugr.disconnect(n, outport);
+                hugr.disconnect(n, inport);
+            }
+        }
+
         inline_acyclic(hugr, |_, _| true).unwrap();
-        NormalizeGuppy::default().run(hugr)?;
+        NormalizeGuppy::default().constant_folding(false).run(hugr)?;
 
         let mut circ = Circuit::try_new(hugr.clone())?;
-
-        let mermaid_string = circ.mermaid_string();
-        println!("Post inline and normalize T count {:?}", count_t_gates_in_mermaid_string(&mermaid_string));
         
         let encode_options = EncodeOptions::new()
             .with_subcircuits(true)
@@ -74,19 +89,14 @@ impl ComposablePass<Hugr> for GlobalTResynthesis {
         for (_, serial_circ) in encoded_circs.iter_mut() {
             let pauli_graph = serial_circuit_to_pauli_graph(serial_circ)?;
 
-            let mut t_count = 0;
-            for cmd in serial_circ.commands.iter() {
-                if cmd.op.op_type == OpType::T || cmd.op.op_type == OpType::Tdg {
-                    t_count += 1;
-                }
-            }
-            println!("T-count inside encoded region: {}", t_count);
-
             let canonical_pass = CanonicalFormPass::new().with_forward(true);
             let grouping_pass = GroupCommutingOpsPass::new();
             let rotation_merging_pass = RotationMergingPass::new();
-            let fast_todd_pass = FastTODDPass::new();
-            let synth_pass = GreedySynthPass::new(100, 100, 100);
+            let _fast_todd_pass = FastTODDPass::new();
+            let synth_pass = GreedySynthPass::new()
+                .with_window_size(100)
+                .with_pool_size(100)
+                .with_top_up_size(100);
             let rebase_pass = RebaseTQEToZXPass::new()
                 .with_allowed_tqes(vec![GateType::ZX]);
 
@@ -97,15 +107,6 @@ impl ComposablePass<Hugr> for GlobalTResynthesis {
             let pauli_graph = rebase_pass.transform(&pauli_graph);
 
             serial_circ.commands = pauli_graph_to_cmds(pauli_graph, serial_circ)?;
-
-            t_count = 0;
-            for cmd in serial_circ.commands.iter() {
-                if cmd.op.op_type == OpType::T || cmd.op.op_type == OpType::Tdg {
-                    t_count += 1;
-                }
-            }
-
-            println!("T-count inside encoded region after optimisation: {}", t_count);
         }
 
         encoded_circs
@@ -117,7 +118,6 @@ impl ComposablePass<Hugr> for GlobalTResynthesis {
         circ.hugr().validate()?;
 
         let mermaid_string = circ.mermaid_string();
-        println!("ReassembledT count {:?}", count_t_gates_in_mermaid_string(&mermaid_string));
 
         *hugr = circ.into_hugr();
 
@@ -160,12 +160,11 @@ fn serial_circuit_to_pauli_graph(
     let num_qubits = serial_circuit.qubits.len();
     let qubits = &serial_circuit.qubits;
     let bits = &serial_circuit.bits;
-    let ops: Vec<Op> = serial_circuit.commands
-        .iter()
-        .try_fold(Vec::new(), |mut acc, cmd| {
-            acc.extend(cmd_to_op(cmd, qubits, bits)?);
-            Ok(acc)
-        })?;
+
+    let mut ops = Vec::new();
+    for cmd in &serial_circuit.commands {
+        ops.extend(cmd_to_op(cmd, qubits, bits)?);
+    }
 
     Ok(PauliGraph::new(num_qubits).with_ops(ops))
 }
@@ -177,15 +176,20 @@ fn pauli_graph_to_cmds(
     let qubits = &serial_circuit.qubits;
     let bits = &serial_circuit.bits;
 
-    pauli_graph
-        .get_ops()
-        .iter()
-        .try_fold(Vec::new(), |mut acc, op| {
-            acc.extend(op_to_cmd(op, qubits, bits)?);
-            Ok(acc)
-        })
+    let (start_barriers, end_barriers) = sort_barriers(&serial_circuit.commands);
+    let mut cmds = start_barriers;
+
+    for op in pauli_graph.get_ops() {
+        cmds.extend(op_to_cmd(op, qubits, bits)?);
+    }
+
+    cmds.extend(end_barriers);
+
+    Ok(cmds)
 }
 
+// TODO: think about refactoring match to separate functions
+// (some of the cases are pretty long)
 fn cmd_to_op(
     cmd: &Command<String>,
     qubits: &[Qubit],
@@ -196,14 +200,13 @@ fn cmd_to_op(
         .iter()
         .filter_map(|id| qubits.iter().position(|q| q.id == *id))
         .collect();
-    let _bits: Vec<usize> = cmd
+    let bits: Vec<usize> = cmd
         .args
         .iter()
         .filter_map(|id| bits.iter().position(|b| b.id == *id))
         .collect();
     let params = cmd.op.params.clone();
 
-    // TODO: add support for classical gates
     match cmd.op.op_type {
         OpType::H => Ok(vec![Op::Gate {
             data: GateData::new(GateType::H, qubits),
@@ -221,7 +224,7 @@ fn cmd_to_op(
             let angle_string = params
                 .ok_or(ConversionError::RotationAngleRequired(cmd.op.op_type))?;
             
-            // TODO: this is a bit cumbersome, think about refactoring to parse_float
+            // TODO: this is a bit cumbersome, refactor to parse_float
             // and then putting the float into a vec
             let half_angle: Vec<f64> = parse_floats(angle_string)?
                 .iter()
@@ -314,26 +317,23 @@ fn cmd_to_op(
             Op::Gate { data: GateData::new(GateType::Z, vec![qubits[1]]).with_params(vec![-0.25]) },
             Op::Gate { data: GateData::new(GateType::ZX, vec![qubits[0], qubits[1]]) }
         ]),
-        // TODO: check if we can have barriers with classical bits
-        OpType::Barrier => {
-            Ok(vec![Op::BlackBox {
-            data: BlackBoxData::new(qubits, "".to_string())
-        }])}
+        OpType::Measure => Ok(vec![
+            Op::Gate { data: GateData::new(GateType::Measure, vec![qubits[0], bits[0]]) }
+        ]),
         OpType::Barrier => Ok(vec![]),
         _ => Err(ConversionError::UnsupportedOpType(cmd.op.op_type)),
     }
 }
 
+// TODO: think about refactoring match to separate functions
+// (some of the cases are pretty long)
 fn op_to_cmd(
     op: &Op,
     qubit_map: &[Qubit],
     bit_map: &[Bit],
 ) -> Result<Vec<Command<String>>, ConversionError> {
-    // TODO: add support for other gates
     match op {
         Op::Gate { data } => match data.get_gate_type() {
-            // TODO: think about refactoring the single qubit gates
-            // (they all have the same conversion)
             GateType::H => {
                 let qubits = apply_map(qubit_map, data.get_args());
                 Ok(vec![Command {
@@ -584,6 +584,7 @@ fn op_to_cmd(
             }
             // TODO: implement this with relabelling
             GateType::SWAP => {
+                println!("SWAP");
                 let qubits = apply_map(qubit_map, data.get_args());
                 let reversed_qubits = qubits.iter().rev().cloned().collect();
                 Ok(vec![
@@ -604,13 +605,23 @@ fn op_to_cmd(
                     }
                 ])
             }
+            GateType::Measure => {
+                let args = data.get_args();
+                let qubit = qubit_map[args[0]].clone();
+                let bit = bit_map[args[1]].clone();
+                Ok(vec![Command {
+                    op: Operation::from_optype(OpType::Measure),
+                    args: vec![qubit.into(), bit.into()],
+                    opgroup: None,
+                }])
+            }
             // TODO: check the difference between BlackBox gate and Op
             GateType::BlackBox => {
-                let qubits = apply_map(qubit_map, data.get_args());
+                let qubits_and_bits = apply_map(qubit_map, data.get_args());
 
                 Ok(vec![Command {
                     op: Operation::from_optype(OpType::Barrier),
-                    args: qubits,
+                    args: qubits_and_bits,
                     opgroup: None,
                 }])
             }
@@ -634,6 +645,39 @@ fn op_to_cmd(
     }
 }
 
+// This function will panic if there are any barriers in the middle of the circuit
+fn sort_barriers(commands: &[Command<String>]) -> (Vec<Command<String>>, Vec<Command<String>>) {
+    let mut start_barriers = Vec::new();
+    let mut end_barriers = Vec::new();
+    let mut qubits_with_gates: HashSet<ElementId> = HashSet::new();
+    let mut end_barrier_qubits: HashSet<ElementId> = HashSet::new();
+
+    for cmd in commands {
+        if cmd.op.op_type == OpType::Barrier {
+            if cmd.args.iter().any(|q| qubits_with_gates.contains(q)) {
+                end_barriers.push(cmd.clone());
+                end_barrier_qubits.extend(cmd.args.iter().cloned());
+            } else {
+                start_barriers.push(cmd.clone());
+            }
+        } else {
+            if cmd.args.iter().any(|q| end_barrier_qubits.contains(q)) {
+                panic!("Barrier is in the middle of a serial circuit: {:?}", cmd);
+            }
+            qubits_with_gates.extend(cmd.args.iter().cloned());
+        }
+    }
+
+    (start_barriers, end_barriers)
+}
+
+fn apply_map<T: Clone + Into<ElementId>>(map: &[T], indices: &[usize]) -> Vec<ElementId> {
+    indices
+        .iter()
+        .map(|i| map[*i].clone().into())
+        .collect()
+}
+
 fn parse_floats(values: Vec<String>) -> Result<Vec<f64>, ConversionError> {
     values
         .into_iter()
@@ -644,15 +688,9 @@ fn parse_floats(values: Vec<String>) -> Result<Vec<f64>, ConversionError> {
         .collect()
 }
 
-fn apply_map(map: &[Qubit], indices: &[usize]) -> Vec<ElementId> {
-    indices
-        .iter()
-        .map(|i| map[*i].clone().into())
-        .collect()
-}
 
 /// Errors that can occur when converting between serial circuit and pauli graph
-// TODO: check usage of derive_more::Error and error(ignore)
+// TODO: q4 usage of derive_more::Error and error(ignore)
 #[derive(derive_more::Error, Debug, derive_more::Display)]
 pub enum ConversionError {
     /// Circuit contains symbolic parameter
@@ -693,6 +731,10 @@ mod tests {
     use crate::utils::build_simple_circuit;
     use crate::TketOp;
 
+    fn count_t_gates_in_mermaid_string(input: &str) ->  usize {
+        input.matches("tket.quantum.T").count()
+    }
+
     #[fixture]
     fn simple_circ() -> Circuit {
         build_simple_circuit(2, |circ| {
@@ -703,13 +745,152 @@ mod tests {
         .unwrap()
     }
 
+    #[fixture]
+    fn hhl_circ() -> Circuit {
+        build_simple_circuit(5, |circ| {
+            circ.append(TketOp::H, [0])?; // h(q0)
+            circ.append(TketOp::H, [1])?; // h(q1)
+            circ.append(TketOp::S, [0])?; // s(q0)
+            circ.append(TketOp::Z, [1])?; // z(q1)
+            // mem_swap(q0, q1)
+            circ.append(TketOp::CX, [0, 1])?;
+            circ.append(TketOp::CX, [1, 0])?;
+            circ.append(TketOp::CX, [0, 1])?;
+            circ.append(TketOp::H, [1])?; // h(q1)
+            // csdg(q1, q0)
+            circ.append(TketOp::Tdg, [1])?;
+            circ.append(TketOp::Tdg, [0])?;
+            circ.append(TketOp::CX, [1, 0])?;
+            circ.append(TketOp::T, [0])?;
+            circ.append(TketOp::CX, [1, 0])?;
+            circ.append(TketOp::H, [0])?; // h(q0)
+
+            circ.append(TketOp::CX, [0, 1])?; // cx(q0, q1)
+            circ.append(TketOp::H, [2])?; // h(q2)
+            circ.append(TketOp::H, [3])?; // h(q3)
+            // cs(q3, q0)
+            circ.append(TketOp::T, [3])?;
+            circ.append(TketOp::T, [0])?;
+            circ.append(TketOp::CX, [3, 0])?;
+            circ.append(TketOp::Tdg, [0])?;
+            circ.append(TketOp::CX, [3, 0])?;
+            // cs(q3, q1)
+            circ.append(TketOp::T, [3])?;
+            circ.append(TketOp::T, [1])?;
+            circ.append(TketOp::CX, [3, 1])?;
+            circ.append(TketOp::Tdg, [1])?;
+            circ.append(TketOp::CX, [3, 1])?;
+            circ.append(TketOp::CX, [0, 1])?; // cx(q0, q1)
+            circ.append(TketOp::CZ, [1, 2])?; // cz(q1, q2)
+
+            circ.append(TketOp::H, [0])?; // h(q0)
+            // cs(q1, q0)
+            circ.append(TketOp::T, [1])?;
+            circ.append(TketOp::T, [0])?;
+            circ.append(TketOp::CX, [1, 0])?;
+            circ.append(TketOp::Tdg, [0])?;
+            circ.append(TketOp::CX, [1, 0])?;
+            circ.append(TketOp::H, [1])?; // h(q1)
+            // mem_swap(q0, q1)
+            circ.append(TketOp::CX, [0, 1])?;
+            circ.append(TketOp::CX, [1, 0])?;
+            circ.append(TketOp::CX, [0, 1])?;
+
+            // mem_swap(q2, q3)
+            circ.append(TketOp::CX, [2, 3])?;
+            circ.append(TketOp::CX, [3, 2])?;
+            circ.append(TketOp::CX, [2, 3])?;
+            circ.append(TketOp::H, [3])?; // h(q3)
+            // csdg(q3, q2)
+            circ.append(TketOp::Tdg, [3])?;
+            circ.append(TketOp::Tdg, [2])?;
+            circ.append(TketOp::CX, [3, 2])?;
+            circ.append(TketOp::T, [2])?;
+            circ.append(TketOp::CX, [3, 2])?;
+            circ.append(TketOp::H, [2])?; // h(q2)
+            circ.append(TketOp::CX, [3, 4])?; // cx(q3, q4)
+            circ.append(TketOp::X, [2])?; // x(q2)
+            circ.append(TketOp::CX, [2, 4])?; // cx(q2, q4)
+            circ.append(TketOp::X, [2])?; // x(q2)
+            circ.append(TketOp::V, [4])?; // v(q4)
+            circ.append(TketOp::T, [4])?; // t(q4)
+            circ.append(TketOp::CX, [2, 4])?; // cx(q2, q4)
+            circ.append(TketOp::Tdg, [4])?; // tdg(q4)
+            circ.append(TketOp::CX, [2, 4])?; // cx(q2, q4)
+            circ.append(TketOp::Vdg, [4])?; // vdg(q4)
+            // mem_swap(q0, q1)
+            circ.append(TketOp::CX, [0, 1])?;
+            circ.append(TketOp::CX, [1, 0])?;
+            circ.append(TketOp::CX, [0, 1])?;
+            circ.append(TketOp::H, [1])?; // h(q1)
+            // csdg(q1, q0)
+            circ.append(TketOp::Tdg, [1])?;
+            circ.append(TketOp::Tdg, [0])?;
+            circ.append(TketOp::CX, [1, 0])?;
+            circ.append(TketOp::T, [0])?;
+            circ.append(TketOp::CX, [1, 0])?;
+            circ.append(TketOp::H, [0])?; // h(q0)
+
+            circ.append(TketOp::H, [2])?; // h(q2)
+            // cs(q3, q2)
+            circ.append(TketOp::T, [3])?;
+            circ.append(TketOp::T, [2])?;
+            circ.append(TketOp::CX, [3, 2])?;
+            circ.append(TketOp::Tdg, [2])?;
+            circ.append(TketOp::CX, [3, 2])?;
+            circ.append(TketOp::H, [3])?; // h(q3)
+            // mem_swap(q2, q3)
+            circ.append(TketOp::CX, [2, 3])?;
+            circ.append(TketOp::CX, [3, 2])?;
+            circ.append(TketOp::CX, [2, 3])?;
+
+            circ.append(TketOp::CZ, [1, 2])?; // cz(q1, q2)
+            circ.append(TketOp::CX, [0, 1])?; // cx(q0, q1)
+            // csdg(q3, q1)
+            circ.append(TketOp::Tdg, [3])?;
+            circ.append(TketOp::Tdg, [1])?;
+            circ.append(TketOp::CX, [3, 1])?;
+            circ.append(TketOp::T, [1])?;
+            circ.append(TketOp::CX, [3, 1])?;
+            // csdg(q3, q0)
+            circ.append(TketOp::Tdg, [3])?;
+            circ.append(TketOp::Tdg, [0])?;
+            circ.append(TketOp::CX, [3, 0])?;
+            circ.append(TketOp::T, [0])?;
+            circ.append(TketOp::CX, [3, 0])?;
+            circ.append(TketOp::H, [2])?; // h(q2)
+            circ.append(TketOp::H, [3])?; // h(q3)
+            circ.append(TketOp::CX, [0, 1])?; // cx(q0, q1)
+
+            circ.append(TketOp::H, [0])?; // h(q0)
+            // cs(q1, q0)
+            circ.append(TketOp::T, [1])?;
+            circ.append(TketOp::T, [0])?;
+            circ.append(TketOp::CX, [1, 0])?;
+            circ.append(TketOp::Tdg, [0])?;
+            circ.append(TketOp::CX, [1, 0])?;
+            circ.append(TketOp::H, [1])?; // h(q1)
+            // mem_swap(q0, q1)
+            circ.append(TketOp::CX, [0, 1])?;
+            circ.append(TketOp::CX, [1, 0])?;
+            circ.append(TketOp::CX, [0, 1])?;
+            // We can't put the measures in the simple_circuit because
+            // they're not pureley quantum
+
+            Ok(())
+        })
+        .unwrap()
+    }
+
     #[rstest]
-    fn initial_test(mut simple_circ: Circuit) {
+    fn hhl_test(mut hhl_circ: Circuit) {
         GlobalTResynthesis::default()
             .with_ancilla_budget(0)
-            .run(simple_circ.hugr_mut())
+            .run(hhl_circ.hugr_mut())
             .unwrap();
 
-        println!("{}", simple_circ.mermaid_string());
+        let t_count = count_t_gates_in_mermaid_string(&hhl_circ.mermaid_string());
+
+        assert_eq!(t_count, 14);
     }
 }
