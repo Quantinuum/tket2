@@ -15,7 +15,6 @@ use itertools::Itertools;
 use tket_json_rs::circuit_json::ImplicitPermutation;
 use tket_json_rs::register::ElementId as PytketRegister;
 
-use crate::extension::bool::opaque_bool_type;
 use crate::extension::rotation::{ConstRotation, rotation_type};
 use crate::serialize::pytket::decoder::param::parser::{PytketParam, parse_pytket_param};
 use crate::serialize::pytket::decoder::{
@@ -712,9 +711,7 @@ impl WireTracker {
             // normally qubits/bits present in the pytket circuit definition,
             // but not in the region's input.
             _ if ty == &qb_t() => self.initialize_qubit_wire(builder, qubit_args[0].clone())?,
-            _ if ty == &bool_t() || ty == &opaque_bool_type() => {
-                self.initialize_bit_wire(builder, bit_args[0].clone())?
-            }
+            _ if ty == &bool_t() => self.initialize_bit_wire(builder, bit_args[0].clone())?,
             _ => {
                 return Err(PytketDecodeErrorInner::NoMatchingWire {
                     ty: ty.to_string(),

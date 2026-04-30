@@ -350,8 +350,8 @@ mod test {
         extension::prelude::{UnwrapBuilder as _, bool_t, option_type, qb_t},
         type_row,
     };
-    use tket::{extension::{MeasurementOp}, passes::composable::Preserve};
     use tket::{Circuit, extension::rotation::rotation_type};
+    use tket::{extension::MeasurementOp, passes::composable::Preserve};
 
     use super::*;
     use rstest::rstest;
@@ -384,7 +384,10 @@ mod test {
             .add_dataflow_op(TketOp::MeasureFree, [q])
             .unwrap()
             .outputs_arr();
-        let [_] = b.add_dataflow_op(MeasurementOp::Read, [r]).unwrap().outputs_arr();
+        let [_] = b
+            .add_dataflow_op(MeasurementOp::Read, [r])
+            .unwrap()
+            .outputs_arr();
         let mut h = b
             .finish_hugr_with_outputs([])
             .unwrap_or_else(|e| panic!("{}", e));

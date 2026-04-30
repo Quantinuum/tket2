@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 use std::sync::RwLock;
 
-use hugr::builder::{BuildError, DFGBuilder, Dataflow};
+use hugr::builder::{BuildError, DFGBuilder};
 use hugr::extension::ExtensionId;
 use hugr::extension::prelude::bool_t;
 use hugr::std_extensions::arithmetic::float_types;
@@ -14,7 +14,6 @@ use hugr::types::{Type, TypeEnum};
 use hugr::{Hugr, Wire};
 use itertools::Itertools;
 
-use crate::extension::bool::OpaqueBoolOp;
 use crate::extension::rotation;
 use crate::serialize::pytket::extension::{PytketTypeTranslator, RegisterCount};
 use crate::serialize::pytket::{PytketDecodeError, PytketDecodeErrorInner};
@@ -158,16 +157,6 @@ impl TypeTranslatorSet {
         if typ1 == typ2 {
             return true;
         }
-
-        // For now, we just hard-code this to the two kind of bits we support.
-        let native_bool = bool_t();
-        let tket_bool = crate::extension::bool::opaque_bool_type();
-        if (typ1 == &native_bool && typ2 == &tket_bool)
-            || (typ1 == &tket_bool && typ2 == &native_bool)
-        {
-            return true;
-        }
-
         false
     }
 
@@ -180,36 +169,18 @@ impl TypeTranslatorSet {
         wire: Wire,
         initial_type: &Type,
         target_type: &Type,
-        builder: &mut DFGBuilder<&mut Hugr>,
+        _builder: &mut DFGBuilder<&mut Hugr>,
     ) -> Result<Wire, PytketDecodeError> {
         if initial_type == target_type {
             return Ok(wire);
         }
 
-        let map_build_error = |e: BuildError| PytketDecodeErrorInner::CannotTranslateWire {
+        let _map_build_error = |e: BuildError| PytketDecodeErrorInner::CannotTranslateWire {
             wire,
             initial_type: initial_type.to_string(),
             target_type: target_type.to_string(),
             context: Some(e.to_string()),
         };
-
-        // Hard-coded transformations until customs calls are added to [`PytketTypeTranslator`].
-        let native_bool = bool_t();
-        let tket_bool = crate::extension::bool::opaque_bool_type();
-        if initial_type == &native_bool && target_type == &tket_bool {
-            let [wire] = builder
-                .add_dataflow_op(OpaqueBoolOp::make_opaque, [wire])
-                .map_err(map_build_error)?
-                .outputs_arr();
-            return Ok(wire);
-        }
-        if initial_type == &tket_bool && target_type == &native_bool {
-            let [wire] = builder
-                .add_dataflow_op(OpaqueBoolOp::read, [wire])
-                .map_err(map_build_error)?
-                .outputs_arr();
-            return Ok(wire);
-        }
 
         Err(PytketDecodeErrorInner::CannotTranslateWire {
             wire,
@@ -226,15 +197,13 @@ mod tests {
     use hugr::extension::prelude::{PRELUDE_ID, qb_t};
     use hugr::types::SumType;
 
-    use crate::extension::bool::OPAQUE_BOOL_EXTENSION_ID;
-
     use super::*;
 
     struct TestBoolTranslator;
 
     impl PytketTypeTranslator for TestBoolTranslator {
         fn extensions(&self) -> Vec<ExtensionId> {
-            vec![OPAQUE_BOOL_EXTENSION_ID, PRELUDE_ID]
+            vec![PRELUDE_ID]
         }
 
         fn type_to_pytket(
@@ -245,7 +214,6 @@ mod tests {
             match typ.name().as_str() {
                 "usize" => Some(RegisterCount::only_bits(64)),
                 "qubit" => Some(RegisterCount::only_qubits(1)),
-                "bool" => Some(RegisterCount::only_bits(1)),
                 _ => None,
             }
         }

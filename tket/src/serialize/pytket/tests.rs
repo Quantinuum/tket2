@@ -10,15 +10,15 @@ use hugr::builder::{
 };
 use hugr::extension::prelude::{UnwrapBuilder, bool_t, option_type, qb_t};
 use hugr::std_extensions::arithmetic::float_types::{ConstF64, float64_type};
+use hugr::std_extensions::logic::LogicOp;
 use rayon::iter::ParallelIterator;
 use std::sync::Arc;
 
 use super::TKETDecode;
 use crate::TketOp;
-use crate::extension::{MeasurementOp, TKET1_EXTENSION_ID};
-use crate::extension::bool::{ConstOpaqueBool, OpaqueBoolOp, opaque_bool_type};
 use crate::extension::rotation::{ConstRotation, RotationOp, rotation_type};
 use crate::extension::sympy::SympyOpDef;
+use crate::extension::{MeasurementOp, TKET1_EXTENSION_ID};
 use crate::metadata;
 use crate::serialize::pytket::PytketEncodeError;
 use crate::serialize::pytket::extension::{CoreDecoder, OpaqueTk1Op, PreludeEmitter};
@@ -291,14 +291,14 @@ fn circ_preset_qubits() -> Hugr {
 /// including multiple outputs of the same register.
 #[fixture]
 fn circ_preset_bits() -> Hugr {
-    let input_t = vec![opaque_bool_type()];
-    let output_t = vec![opaque_bool_type(), opaque_bool_type(), opaque_bool_type()];
+    let input_t = vec![bool_t()];
+    let output_t = vec![bool_t(), bool_t(), bool_t()];
     let mut h = FunctionBuilder::new("preset_bits", Signature::new(input_t, output_t)).unwrap();
 
     let [b0] = h.input_wires_arr();
-    let b1 = h.add_load_value(ConstOpaqueBool::new(false));
+    let b1 = h.add_load_value(Value::false_val());
     let [b_and] = h
-        .add_dataflow_op(OpaqueBoolOp::and, [b0, b1])
+        .add_dataflow_op(LogicOp::And, [b0, b1])
         .unwrap()
         .outputs_arr();
 
@@ -701,27 +701,6 @@ fn circ_order_edge() -> Hugr {
     h.finish_hugr_with_outputs([q1, q2]).unwrap()
 }
 
-// Bool types get converted automatically between native and tket representations.
-#[fixture]
-fn circ_bool_conversion() -> Hugr {
-    let input_t = vec![bool_t(), opaque_bool_type()];
-    let output_t = vec![bool_t(), opaque_bool_type()];
-    let mut h = FunctionBuilder::new("bool_conversion", Signature::new(input_t, output_t)).unwrap();
-
-    let [native_b0, tket_b1] = h.input_wires_arr();
-
-    let [tket_b0] = h
-        .add_dataflow_op(OpaqueBoolOp::make_opaque, [native_b0])
-        .unwrap()
-        .outputs_arr();
-    let [native_b1] = h
-        .add_dataflow_op(OpaqueBoolOp::read, [tket_b1])
-        .unwrap()
-        .outputs_arr();
-
-    h.finish_hugr_with_outputs([native_b1, tket_b0]).unwrap()
-}
-
 /// A circuit that requires tracking info in `extra_subgraph` or `straight_through_wires`
 /// (see `EncodedCircuitInfo`), for a nested circuit in a CircBox.
 #[fixture]
@@ -850,7 +829,10 @@ fn circ_discard_first_qubit() -> Hugr {
 
     let [q1, q2] = h.input_wires_arr();
 
-    let [msmt] = h.add_dataflow_op(TketOp::MeasureFree, [q1]).unwrap().outputs_arr();
+    let [msmt] = h
+        .add_dataflow_op(TketOp::MeasureFree, [q1])
+        .unwrap()
+        .outputs_arr();
     let _ = h.add_dataflow_op(MeasurementOp::Free, [msmt]);
 
     let [q2] = h.add_dataflow_op(TketOp::X, [q2]).unwrap().outputs_arr();
@@ -1111,7 +1093,6 @@ fn fail_on_modified_hugr(circ_tk1_ops: Hugr) {
 #[case::independent_subgraph(circ_independent_subgraph(), 3, CircuitRoundtripTestConfig::Default)]
 #[case::unsupported_io_wire(circ_unsupported_io_wire(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::order_edge(circ_order_edge(), 1, CircuitRoundtripTestConfig::Default)]
-#[case::bool_conversion(circ_bool_conversion(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::complex_param_type(circ_complex_param_type(), 1, CircuitRoundtripTestConfig::Default)]
 // TODO: We need to track [`EncodedCircuitInfo`] for nested CircBoxes too. We
 // have temporarily disabled encoding of DFG and function calls as CircBoxes to

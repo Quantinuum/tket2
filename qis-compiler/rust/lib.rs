@@ -27,7 +27,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::vec::Vec;
 use std::{fs, str, vec};
-use tket::extension::{TKET_EXTENSION, TKET1_EXTENSION, bool, debug, rotation, measurement};
+use tket::extension::{TKET_EXTENSION, TKET1_EXTENSION, debug, measurement, rotation};
 use tket::hugr::extension::{ExtensionRegistry, prelude};
 use tket::hugr::std_extensions::arithmetic::{
     conversions, float_ops, float_types, int_ops, int_types,
@@ -36,8 +36,11 @@ use tket::hugr::std_extensions::{collections, logic, ptr};
 use tket::hugr::{self, llvm::inkwell};
 use tket::hugr::{Hugr, HugrView, Node};
 use tket::llvm::rotation::RotationCodegenExtension;
-use tket_qsystem::{QSystemPass};
-use tket_qsystem::extension::{futures as qsystem_futures, qsystem, result as qsystem_result, gpu as qsystem_gpu, wasm as qsystem_wasm};
+use tket_qsystem::QSystemPass;
+use tket_qsystem::extension::{
+    futures as qsystem_futures, gpu as qsystem_gpu, qsystem, result as qsystem_result,
+    wasm as qsystem_wasm,
+};
 use tket_qsystem::llvm::array_utils::ArrayLowering;
 pub use tket_qsystem::llvm::futures::FuturesCodegenExtension;
 use tket_qsystem::llvm::{
@@ -74,7 +77,6 @@ static REGISTRY: std::sync::LazyLock<ExtensionRegistry> = std::sync::LazyLock::n
         rotation::ROTATION_EXTENSION.to_owned(),
         TKET_EXTENSION.to_owned(),
         TKET1_EXTENSION.to_owned(),
-        bool::OPAQUE_BOOL_EXTENSION.to_owned(),
         debug::DEBUG_EXTENSION.to_owned(),
         measurement::MEASUREMENT_EXTENSION.to_owned(),
         qsystem_gpu::EXTENSION.to_owned(),

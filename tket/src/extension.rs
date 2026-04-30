@@ -18,8 +18,6 @@ use hugr::types::{PolyFuncType, PolyFuncTypeRV};
 use lazy_static::lazy_static;
 use smol_str::SmolStr;
 
-/// Definition for bool type and ops.
-pub mod bool;
 /// Definition for debug ops.
 pub mod debug;
 pub mod global_phase;
@@ -64,7 +62,6 @@ pub(crate) static ref REGISTRY: ExtensionRegistry = ExtensionRegistry::new(
     STD_REG.iter().map(|e| e.to_owned()).chain([
     TKET1_EXTENSION.to_owned(),
     TKET_EXTENSION.to_owned(),
-    bool::OPAQUE_BOOL_EXTENSION.to_owned(),
     debug::DEBUG_EXTENSION.to_owned(),
     guppy::GUPPY_EXTENSION.to_owned(),
     measurement::MEASUREMENT_EXTENSION.to_owned(),

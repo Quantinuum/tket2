@@ -8,7 +8,7 @@ from tket_exts.tket._util import TketExtension
 
 
 def ext_bool() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
-    ext = tket_exts.bool
+    ext = tket_exts.bool()
     return (
         ext,
         [ext.bool_t],
@@ -51,7 +51,7 @@ def ext_gpu() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
 
 def ext_guppy() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
     ext = tket_exts.guppy
-    bool_t = tket_exts.bool.bool_t
+    bool_t = tket_exts.bool().bool_t
     return (
         ext,
         [],
@@ -61,7 +61,7 @@ def ext_guppy() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
 
 def ext_futures() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
     ext = tket_exts.futures
-    bool_t = tket_exts.bool.bool_t
+    bool_t = tket_exts.bool().bool_t
     return (
         ext,
         [ext.future_t(bool_t)],

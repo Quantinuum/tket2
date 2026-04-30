@@ -19,7 +19,7 @@ from tket_exts.tket.wasm import WasmExtension
 from tket_exts.tket.measurement import MeasurementExtension
 
 from typing_extensions import deprecated
-from hugr.ext import Extension, ExtensionRegistry
+from hugr.ext import ExtensionRegistry
 from tket_exts import tket
 
 # This is updated by our release-please workflow, triggered by this
@@ -44,7 +44,10 @@ __all__ = [
     "measurement",
 ]
 
-bool: BoolExtension = tket.bool.BoolExtension()
+@deprecated("Use the built-in `Bool` type instead")
+def bool() -> BoolExtension:
+    return tket.bool.BoolExtension()
+
 debug: DebugExtension = tket.debug.DebugExtension()
 gpu: GpuExtension = tket.gpu.GpuExtension()
 guppy: GuppyExtension = tket.guppy.GuppyExtension()
@@ -61,9 +64,6 @@ global_phase: GlobalPhaseExtension = tket.global_phase.GlobalPhaseExtension()
 measurement: MeasurementExtension = tket.measurement.MeasurementExtension()
 
 
-@deprecated("Use tket_exts.bool() instead")
-def opaque_bool() -> Extension:
-    return bool()
 
 
 def tket_registry() -> ExtensionRegistry:
