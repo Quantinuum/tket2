@@ -111,7 +111,7 @@ pauli-graph = { git = "ssh://git@github.com/Quantinuum/pg-libs", package = "paul
 basic-passes = { git = "ssh://git@github.com/Quantinuum/pg-libs", package = "basic-passes" }
 greedy-synth = { git = "ssh://git@github.com/quantinuum-dev/greedy-pauli-rs", branch = "ae/refactor", package = "greedy-synth" }
 pg-optimise = { git = "ssh://git@github.com/quantinuum-dev/greedy-pauli-rs", branch = "ae/refactor", package = "pg-optimise" }
-fast-todd = { git = "ssh://git@github.com/quantinuum-dev/fast-todd" }
+fast-todd = { git = "ssh://git@github.com/quantinuum-dev/fast-todd", branch = "ae/refactor" }
 
 [profile.release.package.tket-py]
 # Some configurations to reduce the size of tket wheels
