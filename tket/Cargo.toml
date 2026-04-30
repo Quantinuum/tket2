@@ -80,6 +80,13 @@ num-rational = { workspace = true }
 ascent = "0.8.0"
 pastey = { workspace = true }
 thiserror = { workspace = true }
+regex = { workspace = true }
+pauli-graph = { workspace = true }
+basic-passes = { workspace = true }
+greedy-synth = { workspace = true }
+pg-optimise = { workspace = true }
+fast-todd = { workspace = true }
+hugr-passes = { workspace = true }
 
 
 [dev-dependencies]

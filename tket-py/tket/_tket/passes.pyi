@@ -99,3 +99,13 @@ def resolve_modifiers(
     :param circ: The input program as a CompilationState.
     :param scope: A scope to control how the pass is applied to HUGR regions.
     """
+
+def global_t_resynthesis(
+    circ: CircuitClass,
+    ancilla_budget: int = 0,
+) -> CircuitClass:
+    """Applies FastTODD and GreedyPauliSimp to a circuit.
+
+    Parameters:
+    - ancilla_budget: number of ancillas available to increase size of phase_polynomial for FastTODD.
+    """

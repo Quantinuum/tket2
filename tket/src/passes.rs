@@ -33,6 +33,12 @@ pub use dead_funcs::{RemoveDeadFuncsError, RemoveDeadFuncsPass};
 pub mod force_order;
 pub use force_order::{force_order, force_order_by_key};
 
+// pub mod fast_todd;
+// pub use fast_todd::{apply_fast_todd, apply_fast_todd_to_pauli_graph, FastToddResult, FastToddError};
+
+pub mod global_t_resynthesis;
+pub use global_t_resynthesis::GlobalTResynthesis;
+
 // Normalize the structure of Guppy-generated programs.
 pub mod guppy;
 pub use guppy::NormalizeGuppy;

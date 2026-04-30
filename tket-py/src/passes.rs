@@ -32,6 +32,7 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     m.add_function(wrap_pyfunction!(self::chunks::chunks, &m)?)?;
     m.add_function(wrap_pyfunction!(self::tket1::tket1_pass, &m)?)?;
     m.add_function(wrap_pyfunction!(resolve_modifiers, &m)?)?;
+    m.add_function(wrap_pyfunction!(global_t_resynthesis, &m)?)?;
     m.add("PullForwardError", py.get_type::<PyPullForwardError>())?;
     m.add(
         "InlineFunctionsError",
@@ -64,6 +65,13 @@ create_py_exception!(
     PyInlineFunctionsError,
     "Errors from the function inlining pass."
 );
+
+create_py_exception!(
+    tket::passes::global_t_resynthesis::GlobalTResynthesisErrors,
+    PyGlobalTResynthesisError,
+    "Errors from the global-t resynthesis pass."
+);
+
 /// Flatten the structure of a Guppy-generated program to enable additional optimisations.
 ///
 /// This should normally be called first before other optimisations.
@@ -202,4 +210,22 @@ fn resolve_modifiers(circ: &mut CompilationState, scope: Option<PyPassScope>) ->
     let pass = tket::passes::ModifierResolverPass::default_with_scope(py_scope.scope);
     pass.run(&mut circ.hugr).convert_pyerrs()?;
     Ok(())
+}
+
+#[pyfunction]
+#[pyo3(signature = (circ, ancilla_budget=0))]
+fn global_t_resynthesis<'py>(
+    circ: &Bound<'py, PyAny>,
+    ancilla_budget: usize,
+) -> PyResult<Bound<'py, PyAny>> {
+    let py = circ.py();
+    try_with_circ(circ, |mut circ, typ| {
+        let mut pass = tket::passes::GlobalTResynthesis::default();
+
+        pass.with_ancilla_budget(ancilla_budget);
+        pass.run(circ.hugr_mut()).convert_pyerrs()?;
+
+        let circ = typ.convert(py, circ)?;
+        PyResult::Ok(circ)
+    })
 }
