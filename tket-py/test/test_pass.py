@@ -305,3 +305,5 @@ def test_python_qsystem_pass() -> None:
     qsystem_pass = QSystemPass()
     qsystem_hugr = qsystem_pass(hugr)
     assert _count_ops(qsystem_hugr, "ZZPhase") == 1
+    assert _count_ops(qsystem_hugr, "Custom") == 0
+    assert _count_ops(qsystem_hugr, "tket.quantum") == 0
