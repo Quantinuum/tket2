@@ -48,7 +48,7 @@ def test_llvm_multiplatform(
     hugr_envelope = load(hugr_file)
     ir = compile_to_llvm_ir(
         hugr_envelope, target_triple=target_triple, platform=platform
-    )  # type: ignore[call-arg]
+    )
     snapshot.assert_match(ir, f"{hugr_file}_{target_triple}_{platform}")
 
 
@@ -66,4 +66,4 @@ def test_llvm_multiplatform_todos(
     snapshot: Snapshot, hugr_file: str, target_triple: str
 ) -> None:
     hugr_envelope = load(hugr_file)
-    compile_to_llvm_ir(hugr_envelope, target_triple=target_triple, platform="Sol")  # type: ignore[call-arg]
+    compile_to_llvm_ir(hugr_envelope, target_triple=target_triple, platform="Sol")
