@@ -1,53 +1,27 @@
-"""QSystem extension operations."""
+"""QSystem Sol platform extension operations."""
 
 import functools
-import warnings
 from typing import List
-
-from .helios import QSystemHeliosExtension
-from .random import QSystemRandomExtension
-from .sol import QSystemSolExtension
-from .utils import QSystemUtilsExtension
 
 from hugr.ext import Extension, OpDef, TypeDef
 from hugr.ops import ExtOp
 from hugr.tys import BoundedNatArg
 from .._util import TketExtension, load_extension
 
-__all__ = [
-    "QSystemHeliosExtension",
-    "QSystemRandomExtension",
-    "QSystemSolExtension",
-    "QSystemUtilsExtension",
-    "QSystemGenericExtension",
-]
+__all__ = ["QSystemSolExtension"]
 
 
-class QSystemExtension(TketExtension):
-    """Deprecated: use :class:`QSystemHeliosExtension` or :class:`QSystemSolExtension` instead.
-
-    The combined ``tket.qsystem`` extension has been split into platform-specific
-    extensions. Use ``tket_exts.qsystem_helios`` or ``tket_exts.qsystem_sol`` instead.
-    """
+class QSystemSolExtension(TketExtension):
+    """Operations for the Sol platform (tket.qsystem.sol)."""
 
     @functools.cache
     def __call__(self) -> Extension:
-        """Returns the qsystem extension"""
-        warnings.warn(
-            "QSystemExtension (tket.qsystem) is deprecated. "
-            "Use QSystemHeliosExtension (tket.qsystem.helios) or "
-            "QSystemSolExtension (tket.qsystem.sol) instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return load_extension("tket.qsystem")
+        return load_extension("tket.qsystem.sol")
 
     def TYPES(self) -> List[TypeDef]:
-        """Return the types defined by this extension"""
         return []
 
     def OPS(self) -> List[OpDef]:
-        """Return the operations defined by this extension"""
         return [
             self.lazy_measure.op_def(),
             self.lazy_measure_leaked.op_def(),
@@ -55,14 +29,13 @@ class QSystemExtension(TketExtension):
             self.measure.op_def(),
             self.measure_reset.op_def(),
             self.phasedX.op_def(),
+            self.phasedXX.op_def(),
             self.qFree.op_def(),
             self.reset.op_def(),
             self.runtime_barrier_def,
             self.Rz.op_def(),
-            self.try_QAlloc.op_def(),
-            self.ZZPhase.op_def(),
-            self.phasedXX.op_def(),
             self.tk2.op_def(),
+            self.try_QAlloc.op_def(),
         ]
 
     @functools.cached_property
@@ -72,11 +45,7 @@ class QSystemExtension(TketExtension):
 
     @functools.cached_property
     def lazy_measure_leaked(self) -> ExtOp:
-        """Measure a qubit or detect leakage.
-
-        The returned Future is an integer between 0 and 3, where the first two values
-        are valid measurement results, and 2 is returned if the qubit was leaked.
-        """
+        """Measure a qubit or detect leakage."""
         return self().get_op("LazyMeasureLeaked").instantiate()
 
     @functools.cached_property
@@ -100,6 +69,11 @@ class QSystemExtension(TketExtension):
         return self().get_op("PhasedX").instantiate()
 
     @functools.cached_property
+    def phasedXX(self) -> ExtOp:
+        """Two-qubit PhasedXX gate (alias 'rpp'), specific to the Sol platform."""
+        return self().get_op("PhasedXX").instantiate()
+
+    @functools.cached_property
     def qFree(self) -> ExtOp:
         """Free a qubit (lose track of it)."""
         return self().get_op("QFree").instantiate()
@@ -111,19 +85,11 @@ class QSystemExtension(TketExtension):
 
     @functools.cached_property
     def runtime_barrier_def(self) -> OpDef:
-        """Runtime barrier between operations on argument qubits.
-
-        This is the generic operation definition. For the instantiated operation, see
-        `runtimeBarrier`.
-        """
+        """Runtime barrier operation definition."""
         return self().get_op("RuntimeBarrier")
 
     def runtime_barrier(self, size: int) -> ExtOp:
-        """Runtime barrier between operations on argument qubits.
-
-        Args:
-            size: Length of the qubit array.
-        """
+        """Runtime barrier between operations on argument qubits."""
         return self.runtime_barrier_def.instantiate([BoundedNatArg(size)])
 
     @functools.cached_property
@@ -132,21 +98,11 @@ class QSystemExtension(TketExtension):
         return self().get_op("Rz").instantiate()
 
     @functools.cached_property
+    def tk2(self) -> ExtOp:
+        """Tk2 gate (alias 'rxxyyzz'), specific to the Sol platform."""
+        return self().get_op("Tk2").instantiate()
+
+    @functools.cached_property
     def try_QAlloc(self) -> ExtOp:
         """Try allocate a qubit in Z |0> (returns Option-like result)."""
         return self().get_op("TryQAlloc").instantiate()
-
-    @functools.cached_property
-    def ZZPhase(self) -> ExtOp:
-        """Two-qubit ZZ gate with a float angle."""
-        return self().get_op("ZZPhase").instantiate()
-
-    @functools.cached_property
-    def phasedXX(self) -> ExtOp:
-        """Two-qubit XX gate (alias 'rpp')."""
-        return self().get_op("PhasedXX").instantiate()
-
-    @functools.cached_property
-    def tk2(self) -> ExtOp:
-        """Tk2 gate (alias 'rxxyyzz')."""
-        return self().get_op("Tk2").instantiate()
