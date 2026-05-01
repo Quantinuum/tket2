@@ -11,6 +11,7 @@ from tket.passes import (
     inline_funcs,
     NormalizeGuppy,
     ModifierResolverPass,
+    GlobalScope,
 )
 from tket._state import CompilationState
 from tket_exts import tket_registry
@@ -21,7 +22,12 @@ from hypothesis.strategies._internal import SearchStrategy
 from hypothesis import given, settings
 
 from tket.passes import PytketHugrPass
-from pytket.passes import CliffordSimp, SquashRzPhasedX, SequencePass
+from pytket.passes import (
+    CliffordSimp,
+    SquashRzPhasedX,
+    RemoveRedundancies,
+    SequencePass,
+)
 from hugr.build.base import Hugr
 
 import numpy as np
@@ -297,3 +303,23 @@ def test_inline_functions() -> None:
     all = InlineFunctions(heuristic=inline_funcs.All())(hugr)
 
     assert _count_ops(all, "Call") == 0
+
+
+def test_issue_1516() -> None:
+    """Regression test for issue 1516.
+
+    This was caused by a bug in the decoder that injected new parameter inputs when decoding a modified pytket circuit back into an existing region.
+
+    <https://github.com/quantinuum/tket2/issues/1516>
+    """
+    hugr = _hugr_from_path("test_files/guppy_examples/issue_1516.hugr")
+
+    # Ensure that the hugr is valid before we start.
+    CompilationState.from_python(hugr).validate()
+
+    opt = PytketHugrPass(RemoveRedundancies()).with_scope(
+        GlobalScope.PRESERVE_ENTRYPOINT
+    )
+    opt_hugr = opt(hugr, inplace=False)
+
+    CompilationState.from_python(opt_hugr).validate()
