@@ -698,8 +698,8 @@ impl<N: HugrNode> ModifierResolver<N> {
     ///
     /// # Arguments
     /// * `signature` - The function signature to modify
-    /// * `flatten` - If true, control qubits are represented as individual `Qubit` types.
-    ///              If false, control qubits are packed into arrays (used for function definitions).
+    /// * `flatten` - If true, control qubits are represented as individual `Qubit` types,
+    ///   if false, control qubits are packed into arrays (used for function definitions).
     pub fn modify_signature(&self, signature: &mut Signature, flatten: bool) {
         let FuncTypeBase { input, output } = signature;
 
