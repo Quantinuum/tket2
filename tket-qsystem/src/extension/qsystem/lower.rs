@@ -31,6 +31,7 @@ use super::common::SharedOp;
 use super::helios::{HeliosOp, HeliosSynthesizer};
 use super::sol::{SolOp, SolSynthesizer};
 use super::synth_tket_op::SynthesizeTketOp;
+use strum::IntoEnumIterator as _;
 
 lazy_static! {
     /// Extension registry including [crate::extension::qsystem::REGISTRY] and
@@ -89,6 +90,22 @@ enum ReplaceOps {
     Barrier(Barrier),
 }
 
+/// Register replacements for the deprecated `tket.qsystem` ops onto `lowerer`.
+///
+/// `tket.qsystem` was the original combined extension, superseded by the
+/// platform-specific `tket.qsystem.helios` and `tket.qsystem.sol` extensions.
+/// The two extensions share identical op names, so each legacy op maps 1:1 to
+/// its `tket.qsystem.helios` counterpart.
+fn register_legacy_qsystem_replacements(lowerer: &mut ReplaceTypes) {
+    for op in HeliosOp::iter() {
+        let op_name = <&'static str>::from(op);
+        let legacy_op = qsystem::EXTENSION
+            .instantiate_extension_op(op_name, &[])
+            .expect("tket.qsystem and tket.qsystem.helios share op names");
+        lowerer.set_replace_op(&legacy_op, NodeTemplate::SingleOp(op.into()));
+    }
+}
+
 /// Lower [`TketOp`] operations to [`QSystemOp`] operations.
 ///
 /// Single op replacements are done directly, while multi-op replacements are
@@ -115,6 +132,7 @@ pub fn lower_tk2_ops(
     let scope = scope.into();
     let mut funcs: BTreeMap<TketOp, NodeTemplate> = BTreeMap::new();
     let mut lowerer = ReplaceTypes::new_empty().with_scope(scope.clone());
+    register_legacy_qsystem_replacements(&mut lowerer);
     let mut barrier_funcs = BarrierInserter::new(platform);
 
     let replacements: Vec<_> = scope
@@ -696,5 +714,64 @@ mod test {
         if let Err(e) = h.validate() {
             panic!("{}", e);
         }
+    }
+
+    /// Build a HUGR containing legacy `tket.qsystem` ops (the old combined
+    /// extension) and verify they are migrated to `tket.qsystem.helios` ops
+    /// by [`lower_tk2_ops`].
+    #[test]
+    fn test_migrate_legacy_qsystem_ops() {
+        use crate::extension::qsystem as qs;
+
+        let mut b = FunctionBuilder::new("f", Signature::new_endo(type_row![])).unwrap();
+        let [maybe_q] = b
+            .add_dataflow_op(
+                qs::EXTENSION
+                    .instantiate_extension_op("TryQAlloc", &[])
+                    .unwrap(),
+                [],
+            )
+            .unwrap()
+            .outputs_arr();
+        let [q] = b
+            .build_unwrap_sum(1, option_type(vec![qb_t()]), maybe_q)
+            .unwrap();
+        let [q] = b
+            .add_dataflow_op(
+                qs::EXTENSION
+                    .instantiate_extension_op("Reset", &[])
+                    .unwrap(),
+                [q],
+            )
+            .unwrap()
+            .outputs_arr();
+        b.add_dataflow_op(
+            qs::EXTENSION
+                .instantiate_extension_op("QFree", &[])
+                .unwrap(),
+            [q],
+        )
+        .unwrap();
+        let mut h = b.finish_hugr_with_outputs([]).unwrap();
+
+        // Sanity-check: legacy ops are present before lowering.
+        let legacy_exts = ExtensionSet::from_iter([qs::EXTENSION_ID]);
+        assert!(check_lowered(&h, Preserve::Public, &legacy_exts).is_err());
+
+        lower_tk2_ops(&mut h, Preserve::Public, QSystemPlatform::Helios).unwrap();
+
+        // No tket.qsystem ops should remain after lowering.
+        assert_eq!(check_lowered(&h, Preserve::Public, &legacy_exts), Ok(()));
+
+        // The migrated ops should be tket.qsystem.helios variants.
+        let circ = Circuit::new(&h);
+        let helios_ops: Vec<HeliosOp> = circ
+            .commands()
+            .filter_map(|cmd| cmd.optype().cast())
+            .collect();
+        assert_eq!(
+            helios_ops,
+            vec![HeliosOp::TryQAlloc, HeliosOp::Reset, HeliosOp::QFree],
+        );
     }
 }
