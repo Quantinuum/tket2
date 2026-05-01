@@ -299,7 +299,14 @@ class ModifierResolverPass(ComposablePass):
 
 @dataclass
 class QSystemPass(ComposablePass):
-    """A pass to convert quantum ops to qsystem ops."""
+    """A pass to convert quantum ops to qsystem ops.
+
+     Parameters:
+    - constant_fold: Whether to perform constant folding.
+    - monomorphize: Whether to monomorphize generic functions.
+    - force_order: Whether to enforce total ordering of all HUGR operations.
+    - lazify: Whether to replace measurements with lazy measurements.
+    """
 
     constant_fold: bool = True
     monomorphize: bool = True
