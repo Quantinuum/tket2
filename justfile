@@ -92,10 +92,7 @@ recompile-test-hugrs:
     just test_files/guppy_examples/recompile
     @echo "---- Recompiling optimization-target guppy programs ----"
     just test_files/guppy_optimization/recompile
-    @echo "---- Recompiling modifier examples ----"
-    uv run maturin develop --uv
-    just test_files/modifier_examples/r
-    just test_files/run_modifier_examples/r
+    just recompile-modifiers
 
 recompile-modifiers:
     @echo "---- Recompiling modifier examples ----"

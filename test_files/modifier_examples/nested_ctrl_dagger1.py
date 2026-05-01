@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang @ git+https://github.com/Quantinuum/guppylang.git@main#subdirectory=guppylang",
+#     "guppylang ==0.21.14",
 # ]
 # ///
 """Nested control and dagger modifiers in various combinations"""
