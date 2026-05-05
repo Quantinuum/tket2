@@ -140,6 +140,16 @@ impl QSystemPass {
         self
     }
 
+    /// Makes all functions private.
+    ///
+    /// On by default
+    ///
+    /// When enabled all functions are marked as private. This enables LLVM to drop functions unless which are not called.
+    pub fn with_hide_funcs(mut self, hide_funcs: bool) -> Self {
+        self.hide_funcs = hide_funcs;
+        self
+    }
+
     /// Add order edges in the HUGR regions to force qubit frees to be as early
     /// as possible, quantum ops to be as early as possible, and Future::Reads
     /// to be as late as possible.

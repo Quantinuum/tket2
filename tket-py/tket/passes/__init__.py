@@ -312,6 +312,7 @@ class QSystemPass(ComposablePass):
     monomorphize: bool = True
     force_order: bool = True
     lazify: bool = True
+    hide_funcs: bool = True
     _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
 
     def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
@@ -345,6 +346,7 @@ class QSystemPass(ComposablePass):
             monomorphize=self.monomorphize,
             force_order=self.force_order,
             lazify=self.lazify,
+            hide_funcs=self.hide_funcs,
             scope=self._scope,
         )
         return program

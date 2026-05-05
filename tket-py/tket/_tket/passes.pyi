@@ -106,6 +106,7 @@ def qsystem_rebase_pass(
     monomorphize: bool = True,
     force_order: bool = True,
     lazify: bool = True,
+    hide_funcs: bool = True,
     scope: PassScope | None = None,
 ) -> None:
     """Runs a rust backed pass to convert quantum ops to qsystem ops.
@@ -114,4 +115,5 @@ def qsystem_rebase_pass(
     :param monomorphize: Whether to monomorphize generic functions.
     :param force_order: Whether to enforce total ordering of all HUGR operations.
     :param lazify: Whether to replace measurements with lazy measurements.
+    :param hide_funcs: Make all HUGR functions private.
     """
