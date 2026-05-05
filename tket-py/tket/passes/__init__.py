@@ -306,6 +306,7 @@ class QSystemPass(ComposablePass):
     - monomorphize: Whether to monomorphize generic functions.
     - force_order: Whether to enforce total ordering of all HUGR operations.
     - lazify: Whether to replace measurements with lazy measurements.
+    - hide_funcs: Whether to mark all functions as private.
     """
 
     constant_fold: bool = True
