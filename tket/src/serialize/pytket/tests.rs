@@ -792,6 +792,36 @@ fn circ_complex_param_type() -> Hugr {
     h.finish_hugr_with_outputs([float_tuple]).unwrap()
 }
 
+/// A prelude barrier carrying one unsupported value next to a qubit.
+///
+/// The barrier must be encoded as an opaque subgraph; trying to emit it as a
+/// native pytket barrier would require pytket register values for the
+/// unsupported tuple wire.
+#[fixture]
+fn circ_barrier_with_unsupported_value() -> Hugr {
+    let tuple_float_t = Type::from(SumType::new_tuple(vec![float64_type()]));
+    let input_t = vec![qb_t()];
+    let output_t = vec![qb_t()];
+    let mut h = FunctionBuilder::new(
+        "barrier_with_unsupported_value",
+        Signature::new(input_t, output_t),
+    )
+    .unwrap();
+    let [q] = h.input_wires_arr();
+
+    let float = h.add_load_value(ConstF64::new(1.0));
+    let tuple = h.make_tuple([float]).unwrap();
+    let [q, _tuple] = h
+        .add_dataflow_op(
+            hugr::extension::prelude::Barrier::new([qb_t(), tuple_float_t]),
+            [q, tuple],
+        )
+        .unwrap()
+        .outputs_arr();
+
+    h.finish_hugr_with_outputs([q]).unwrap()
+}
+
 /// A circuit with an unsupported subgraph whose first output is not exposed as
 /// a pytket parameter, followed by a float output used by a supported gate.
 ///
@@ -961,6 +991,29 @@ fn json_file_roundtrip(#[case] circ: impl AsRef<std::path::Path>) {
     compare_serial_circs(&ser, &reser);
 }
 
+#[test]
+fn decode_tuple_output_from_permuted_barrier_args() {
+    let ser: circuit_json::SerialCircuit = serde_json::from_str(
+        r#"{
+        "phase": "0",
+        "bits": [],
+        "qubits": [["q", [0]], ["q", [1]]],
+        "commands": [
+            {"args": [["q", [1]], ["q", [0]]], "op": {"type": "Barrier"}}
+        ],
+        "implicit_permutation": [[["q", [0]], ["q", [0]]], [["q", [1]], ["q", [1]]]]
+    }"#,
+    )
+    .unwrap();
+
+    let tuple_qubits = Type::from(SumType::new_tuple(vec![qb_t(), qb_t()]));
+    let hugr = ser
+        .decode(DecodeOptions::new().with_signature(Signature::new(vec![], vec![tuple_qubits])))
+        .unwrap();
+
+    hugr.validate().unwrap();
+}
+
 /// Test parameter to select which decoders/encoders to enable.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CircuitRoundtripTestConfig {
@@ -1108,6 +1161,21 @@ fn reject_standalone_complex_subgraphs(#[case] hugr: Hugr) {
         Err(PytketEncodeError::OpEncoding(
             PytketEncodeOpError::UnsupportedStandaloneSubgraph { .. }
         ))
+    );
+}
+
+#[rstest]
+fn unsupported_prelude_barrier_is_encoded_as_opaque_subgraph(
+    circ_barrier_with_unsupported_value: Hugr,
+) {
+    let ser =
+        SerialCircuit::encode(&circ_barrier_with_unsupported_value, EncodeOptions::new()).unwrap();
+
+    validate_serial_circ(&ser);
+    assert!(
+        ser.commands
+            .iter()
+            .any(|cmd| { cmd.op.op_type == optype::OpType::Barrier && cmd.op.data.is_some() })
     );
 }
 

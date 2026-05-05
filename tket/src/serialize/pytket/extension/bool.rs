@@ -227,6 +227,17 @@ mod tests {
         // Args layout for a BoolOp: [input_bits..., output_bit]
         // The output bit must use a fresh register, not one of the input bits.
         assert_eq!(clexpr_cmd.args.len(), num_inputs + 1);
+        let clexpr = clexpr_cmd
+            .op
+            .classical_expr
+            .as_ref()
+            .expect("ClExpr command must include expression data");
+        assert_eq!(
+            clexpr.bit_posn,
+            (0..num_inputs as u32).map(|i| (i, i)).collect_vec()
+        );
+        assert_eq!(clexpr.output_posn.0, vec![num_inputs as u32]);
+
         let input_args = &clexpr_cmd.args[..num_inputs];
         let output_args = &clexpr_cmd.args[num_inputs..];
         for output_arg in output_args {
