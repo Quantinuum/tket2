@@ -1,3 +1,5 @@
+//! Provides a pass to resynthesize circuits, minimizing T count.
+
 use crate::CircuitError;
 use crate::passes::NormalizeGuppy;
 use crate::passes::PassScope;
@@ -30,6 +32,7 @@ use tket_json_rs::{OpType, SerialCircuit};
 use std::collections::HashSet;
 use std::sync::Arc;
 
+/// A pass to resynthesize circuits, minimizing T count.
 #[derive(Clone, Debug)]
 pub struct GlobalTResynthesis {
     /// The scope within which the pass will operate.
@@ -54,6 +57,8 @@ impl WithScope for GlobalTResynthesis {
 }
 
 impl GlobalTResynthesis {
+    /// Returns a new `GlobalTResynthesis` with a given qubit ancilla budget
+    /// (0 by default),
     pub fn with_ancilla_budget(&mut self, ancilla_budget: usize) -> &mut Self {
         self.ancilla_budget = ancilla_budget;
         self
