@@ -659,7 +659,7 @@ fn op_to_cmd(
             let qubits = apply_map(qubit_map, data.get_qubits());
             let content = data.get_content().to_string();
 
-            if content != "" {
+            if !content.is_empty() {
                 return Err(ConversionError::UnsupportedBlackBox(content));
             }
 
