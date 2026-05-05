@@ -71,9 +71,6 @@ impl ComposablePass<Hugr> for GlobalTResynthesis {
                 let outport = hugr.get_optype(n).other_output_port().unwrap();
                 let inport = hugr.get_optype(n).other_input_port().unwrap();
 
-                let func_node = hugr.static_source(n).unwrap();
-                let func_defn = hugr.get_optype(func_node).as_func_defn().unwrap();
-
                 hugr.disconnect(n, outport);
                 hugr.disconnect(n, inport);
             }
@@ -116,8 +113,6 @@ impl ComposablePass<Hugr> for GlobalTResynthesis {
         encoded_circs.reassemble_inplace(hugr, Some(Arc::new(default_decoder_config())))?;
 
         hugr.validate()?;
-
-        let mermaid_string = hugr.mermaid_string();
 
         Ok(())
     }
