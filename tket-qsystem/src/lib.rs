@@ -454,9 +454,9 @@ mod test {
         // Run again without hiding...
         let mut hugr_public = orig;
         QSystemPass {
-            hide_funcs: false,
             ..Default::default()
         }
+        .with_hide_funcs(false)
         .run(&mut hugr_public)
         .unwrap();
 
