@@ -297,7 +297,7 @@ class ModifierResolverPass(ComposablePass):
         return program
 
 
-@dataclass
+@dataclass(kw_only=True)
 class QSystemPass(ComposablePass):
     """A pass to convert quantum ops to qsystem ops.
 
