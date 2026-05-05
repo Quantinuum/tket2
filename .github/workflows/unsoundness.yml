@@ -47,8 +47,10 @@ jobs:
       # Run miri unsoundness checks.
       #
       # Skip tests that take over 5mins in CI.
+
+      - name: Install nextest
+        uses: taiki-e/install-action@nextest
       - name: Test with Miri
-      - uses: taiki-e/install-action@nextest
         run: |
           cargo miri nextest run --no-default-features -- \
             `# -------- tket::passes` \
