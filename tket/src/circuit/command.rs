@@ -6,14 +6,14 @@ use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::iter::FusedIterator;
 
-use hugr::hugr::views::{SchedulingGraph, SynEdgeWrapper};
+use hugr::hugr::views::SchedulingGraph;
 use hugr::metadata::Metadata;
 use hugr::ops::{OpTag, OpTrait};
 use hugr::{HugrView, IncomingPort, OutgoingPort};
-use hugr_core::hugr::internal::HugrInternals;
 use itertools::Either::{self, Left, Right};
 use itertools::{EitherOrBoth, Itertools};
-use petgraph::visit::{self as pv, NodeCount};
+use petgraph::visit::{self as pv, IntoNeighborsDirected, NodeCount, Topo, Visitable};
+use portgraph::NodeIndex as PGIdx;
 
 use super::Circuit;
 use super::units::{DefaultUnitLabeller, LinearUnit, UnitLabeller, Units, filter};
@@ -231,25 +231,43 @@ impl<T: HugrView> std::hash::Hash for Command<'_, T> {
     }
 }
 
-/// A non-borrowing topological walker over the nodes of a circuit.
-type NodeWalker<'circ, T> = pv::Topo<
-    portgraph::NodeIndex,
-    <SynEdgeWrapper<
-        portgraph::view::FlatRegion<'circ, <T as HugrInternals>::RegionPortgraph<'circ>>,
-    > as petgraph::visit::Visitable>::Map,
->;
+trait CloneableIterator<'a>: Iterator {
+    fn clone_box(&self) -> Box<dyn CloneableIterator<'a, Item = Self::Item> + 'a>;
+}
+
+struct NodeWalker<'a, H: HugrView, PTG, VM> {
+    graph: SchedulingGraph<'a, H>,
+    petgraph: PTG,
+    topo: pv::Topo<PGIdx, VM>,
+}
+
+impl <'a, H: HugrView, NM: Visitable<NodeId = PGIdx> + IntoNeighborsDirected> Iterator for NodeWalker<'a, H, NM, NM::Map> {
+    type Item = H::Node;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.topo.next(&self.petgraph).map(|pg| self.graph.pg_to_node(pg))
+    }
+}
+
+
+//impl <'a, NM:PortgraphNodeMap<Node> + 'a, G: pv::Visitable<NodeId=PGIdx, Map: Clone> + IntoNeighborsDirected + 'a> CloneableIterator<'a> for NodeWalker<NM, G> {
+impl <'a, H: HugrView, NM: Visitable<NodeId = PGIdx, Map: Clone> + IntoNeighborsDirected + 'a + Clone> CloneableIterator<'a> for NodeWalker<'a, H, NM, NM::Map> {
+    fn clone_box(&self) -> Box<dyn CloneableIterator<'a, Item = Self::Item> + 'a> {
+        Box::new(Self {
+            petgraph: self.petgraph.clone(),
+            graph: self.graph.clone(),
+            topo: self.topo.clone(),
+        })
+    }
+}
 
 /// An iterator over the commands of a circuit.
 // TODO: this can only be made generic over node type once `SiblingGraph` is
 // generic over node type. See https://github.com/quantinuum/hugr/issues/1926
-#[derive(Clone)]
 pub struct CommandIterator<'circ, T: HugrView> {
     /// The circuit.
     circ: &'circ Circuit<T>,
-    /// A view of the top-level region of the circuit.
-    sched_graph: SchedulingGraph<'circ, T>,
     /// Toposorted nodes.
-    nodes: NodeWalker<'circ, T>,
+    nodes: Box<dyn CloneableIterator<'circ, Item = T::Node> + 'circ>,
     /// Last wire for each [`LinearUnit`] in the circuit.
     wire_unit: HashMap<Wire, usize>,
     /// Maximum number of remaining commands, not counting I/O nodes nor root nodes.
@@ -274,6 +292,20 @@ pub struct CommandIterator<'circ, T: HugrView> {
     delayed_node: Option<Node>,
 }
 
+impl<'circ, T: HugrView> Clone for CommandIterator<'_, T> {
+    fn clone(&self) -> Self {
+        Self {
+            circ: self.circ.clone(),
+            nodes: self.nodes.clone_box(),
+            wire_unit: self.wire_unit.clone(),
+            max_remaining: self.max_remaining.clone(),
+            delayed_consts: self.delayed_consts.clone(),
+            delayed_consumers: self.delayed_consumers.clone(),
+            delayed_node: self.delayed_node.clone(),
+        }
+    }
+}
+
 impl<'circ, T: HugrView<Node = Node>> CommandIterator<'circ, T> {
     /// Create a new iterator over the commands of a circuit.
     pub(super) fn new(circ: &'circ Circuit<T>) -> Self {
@@ -286,12 +318,17 @@ impl<'circ, T: HugrView<Node = Node>> CommandIterator<'circ, T> {
             .map(|(linear_unit, port, _)| (Wire::new(circ.input_node(), port), linear_unit.index()))
             .collect();
 
-        let sched_graph = circ.hugr().scheduling_graph(circ.parent());
-        let node_count = sched_graph.petgraph().node_count();
-        let nodes = pv::Topo::new(sched_graph.petgraph());
+        let region_graph = circ.hugr().scheduling_graph(circ.parent());
+        let topo = Topo::new(region_graph.petgraph());
+        let nodes = Box::new(NodeWalker {
+            graph: region_graph.clone(),
+            petgraph: region_graph.petgraph(),
+            topo,
+        });
+
+        let node_count = region_graph.petgraph().node_count();
         Self {
             circ,
-            sched_graph,
             nodes,
             wire_unit,
             // Ignore the input and output nodes, and the root.
@@ -307,10 +344,7 @@ impl<'circ, T: HugrView<Node = Node>> CommandIterator<'circ, T> {
     /// If the next node in the topological order is a constant or load const node,
     /// delay it until its consumers are processed.
     fn next_node(&mut self) -> Option<Node> {
-        let node = self.delayed_node.take().or_else(|| {
-            let pg_node = self.nodes.next(&self.sched_graph.petgraph())?;
-            Some(self.sched_graph.pg_to_node(pg_node))
-        })?;
+        let node = self.delayed_node.take().or_else(|| self.nodes.next())?;
         if node == self.circ.parent() {
             // Ignore the root of the circuit.
             // This will only happen once.

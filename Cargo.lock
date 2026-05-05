@@ -1129,7 +1129,7 @@ dependencies = [
 [[package]]
 name = "hugr"
 version = "0.27.1"
-source = "git+https://github.com/quantinuum/hugr?rev=cf374ccb7a8d8cc6a61c8910fa53dc67f8232eb5#cf374ccb7a8d8cc6a61c8910fa53dc67f8232eb5"
+source = "git+https://github.com/quantinuum/hugr?rev=316fe8d8686b30e3ee64a404d98fd34f66089c42#316fe8d8686b30e3ee64a404d98fd34f66089c42"
 dependencies = [
  "hugr-core",
  "hugr-llvm",
@@ -1139,7 +1139,7 @@ dependencies = [
 [[package]]
 name = "hugr-cli"
 version = "0.27.1"
-source = "git+https://github.com/quantinuum/hugr?rev=cf374ccb7a8d8cc6a61c8910fa53dc67f8232eb5#cf374ccb7a8d8cc6a61c8910fa53dc67f8232eb5"
+source = "git+https://github.com/quantinuum/hugr?rev=316fe8d8686b30e3ee64a404d98fd34f66089c42#316fe8d8686b30e3ee64a404d98fd34f66089c42"
 dependencies = [
  "anyhow",
  "clap",
@@ -1159,7 +1159,7 @@ dependencies = [
 [[package]]
 name = "hugr-core"
 version = "0.27.1"
-source = "git+https://github.com/quantinuum/hugr?rev=cf374ccb7a8d8cc6a61c8910fa53dc67f8232eb5#cf374ccb7a8d8cc6a61c8910fa53dc67f8232eb5"
+source = "git+https://github.com/quantinuum/hugr?rev=316fe8d8686b30e3ee64a404d98fd34f66089c42#316fe8d8686b30e3ee64a404d98fd34f66089c42"
 dependencies = [
  "base64",
  "cgmath",
@@ -1196,7 +1196,7 @@ dependencies = [
 [[package]]
 name = "hugr-llvm"
 version = "0.27.1"
-source = "git+https://github.com/quantinuum/hugr?rev=cf374ccb7a8d8cc6a61c8910fa53dc67f8232eb5#cf374ccb7a8d8cc6a61c8910fa53dc67f8232eb5"
+source = "git+https://github.com/quantinuum/hugr?rev=316fe8d8686b30e3ee64a404d98fd34f66089c42#316fe8d8686b30e3ee64a404d98fd34f66089c42"
 dependencies = [
  "anyhow",
  "cc",
@@ -1215,7 +1215,7 @@ dependencies = [
 [[package]]
 name = "hugr-model"
 version = "0.27.1"
-source = "git+https://github.com/quantinuum/hugr?rev=cf374ccb7a8d8cc6a61c8910fa53dc67f8232eb5#cf374ccb7a8d8cc6a61c8910fa53dc67f8232eb5"
+source = "git+https://github.com/quantinuum/hugr?rev=316fe8d8686b30e3ee64a404d98fd34f66089c42#316fe8d8686b30e3ee64a404d98fd34f66089c42"
 dependencies = [
  "base64",
  "bumpalo",
