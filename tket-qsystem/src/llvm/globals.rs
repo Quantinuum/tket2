@@ -154,10 +154,11 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
             let start_value =
                 builder.build_load(sym_ty.clone(), global.as_pointer_value(), "start_value")?;
             let start_value = sym_ty.value(start_value)?;
-            let start_value = start_value.build_untag(builder, 1)?[0];
+            let start_value = start_value.build_untag(builder, 1)?;
 
             // func_args should be [global, *func_args]
-            let mut real_args: Vec<BasicMetadataValueEnum> = vec![start_value.into()];
+            let mut real_args: Vec<BasicMetadataValueEnum> =
+                start_value.iter().copied().map_into().collect_vec();
             real_args.extend(
                 func_args
                     .iter()
