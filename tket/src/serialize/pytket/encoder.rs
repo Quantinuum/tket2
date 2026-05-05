@@ -7,6 +7,7 @@ mod value_tracker;
 use hugr::core::HugrNode;
 use hugr_core::hugr::internal::PortgraphNodeMap;
 use tket_json_rs::clexpr::InputClRegister;
+use tket_json_rs::clexpr::operator::{ClArgument, ClOperator, ClTerminal, ClVariable};
 use tket_json_rs::opbox::BoxID;
 pub use value_tracker::{
     TrackedBit, TrackedParam, TrackedQubit, TrackedValue, TrackedValues, ValueTracker,
@@ -1465,10 +1466,15 @@ pub fn make_tk1_classical_expression(
     bit_count: usize,
     output_bits: &[u32],
     registers: &[InputClRegister],
-    expression: tket_json_rs::clexpr::operator::ClOperator,
+    expression: ClOperator,
 ) -> tket_json_rs::circuit_json::Operation {
+    let mut bit_vars = Vec::new();
+    collect_clexpr_bit_vars(&expression, &mut bit_vars);
+    bit_vars.sort_unstable();
+    bit_vars.dedup();
+
     let mut clexpr = tket_json_rs::clexpr::ClExpr::default();
-    clexpr.bit_posn = (0..bit_count as u32).map(|i| (i, i)).collect();
+    clexpr.bit_posn = bit_vars.into_iter().map(|i| (i, i)).collect();
     clexpr.reg_posn = registers.to_vec();
     clexpr.output_posn = tket_json_rs::clexpr::ClRegisterBits(output_bits.to_vec());
     clexpr.expr = expression;
@@ -1481,4 +1487,23 @@ pub fn make_tk1_classical_expression(
     let mut op = make_tk1_operation(tket_json_rs::OpType::ClExpr, args);
     op.classical_expr = Some(clexpr);
     op
+}
+
+/// Collect the local bit variables referenced by a classical expression.
+///
+/// `ClExpr::bit_posn` describes variables used by the expression tree. Fresh
+/// output-only bits are listed in `output_posn`, but must not be declared as
+/// expression variables.
+fn collect_clexpr_bit_vars(expression: &ClOperator, bit_vars: &mut Vec<u32>) {
+    for arg in &expression.args {
+        match arg {
+            ClArgument::Terminal(ClTerminal::Variable(ClVariable::Bit { index })) => {
+                bit_vars.push(*index);
+            }
+            ClArgument::Expression(expression) => {
+                collect_clexpr_bit_vars(expression, bit_vars);
+            }
+            _ => {}
+        }
+    }
 }
