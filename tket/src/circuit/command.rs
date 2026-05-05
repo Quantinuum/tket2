@@ -10,11 +10,10 @@ use hugr::hugr::views::SchedulingGraph;
 use hugr::metadata::Metadata;
 use hugr::ops::{OpTag, OpTrait};
 use hugr::{HugrView, IncomingPort, OutgoingPort};
-use hugr_core::hugr::internal::{HugrInternals, PortgraphNodeMap};
 use itertools::Either::{self, Left, Right};
 use itertools::{EitherOrBoth, Itertools};
-use petgraph::visit::{self as pv, IntoNeighborsDirected, NodeCount, Topo, VisitMap, Visitable, Walker};
-use portgraph::PortView;
+use petgraph::visit::{self as pv, IntoNeighborsDirected, NodeCount, Topo, Visitable};
+use portgraph::NodeIndex as PGIdx;
 
 use super::Circuit;
 use super::units::{DefaultUnitLabeller, LinearUnit, UnitLabeller, Units, filter};
@@ -236,30 +235,25 @@ trait CloneableIterator<'a>: Iterator {
     fn clone_box(&self) -> Box<dyn CloneableIterator<'a, Item = Self::Item> + 'a>;
 }
 
-impl<'a, T: Iterator + Clone + 'a> CloneableIterator<'a> for T {
-    fn clone_box(&self) -> Box<dyn CloneableIterator<'a, Item = Self::Item> + 'a> {
-        Box::new(self.clone())
-    }
+struct NodeWalker<'a, H: HugrView, PTG, VM> {
+    graph: SchedulingGraph<'a, H>,
+    petgraph: PTG,
+    topo: pv::Topo<PGIdx, VM>,
 }
 
-struct NodeWalker<NM, G: Visitable> {
-    node_map: NM,
-    graph: G,
-    topo: pv::Topo<portgraph::NodeIndex, <G as Visitable>::Map>
-}
-
-impl <NM: PortgraphNodeMap<Node>, G: pv::Visitable<NodeId=portgraph::NodeIndex> + IntoNeighborsDirected> Iterator for NodeWalker<NM, G> {
-    type Item = Node;
+impl <'a, H: HugrView, NM: Visitable<NodeId = PGIdx> + IntoNeighborsDirected> Iterator for NodeWalker<'a, H, NM, NM::Map> {
+    type Item = H::Node;
     fn next(&mut self) -> Option<Self::Item> {
-        self.topo.next(&self.graph).map(|pg| self.node_map.from_portgraph(pg))
+        self.topo.next(&self.petgraph).map(|pg| self.graph.pg_to_node(pg))
     }
 }
 
 
-impl <'a, NM:PortgraphNodeMap<Node> + 'a, G: pv::Visitable<NodeId=portgraph::NodeIndex, Map: Clone> + IntoNeighborsDirected + 'a> CloneableIterator<'a> for NodeWalker<NM, G> {
+//impl <'a, NM:PortgraphNodeMap<Node> + 'a, G: pv::Visitable<NodeId=PGIdx, Map: Clone> + IntoNeighborsDirected + 'a> CloneableIterator<'a> for NodeWalker<NM, G> {
+impl <'a, H: HugrView, NM: Visitable<NodeId = PGIdx, Map: Clone> + IntoNeighborsDirected + 'a + Clone> CloneableIterator<'a> for NodeWalker<'a, H, NM, NM::Map> {
     fn clone_box(&self) -> Box<dyn CloneableIterator<'a, Item = Self::Item> + 'a> {
         Box::new(Self {
-            node_map: self.node_map.clone(),
+            petgraph: self.petgraph.clone(),
             graph: self.graph.clone(),
             topo: self.topo.clone(),
         })
@@ -327,8 +321,8 @@ impl<'circ, T: HugrView<Node = Node>> CommandIterator<'circ, T> {
         let region_graph = circ.hugr().scheduling_graph(circ.parent());
         let topo = Topo::new(region_graph.petgraph());
         let nodes = Box::new(NodeWalker {
-            node_map: region_graph,
-            graph: region_graph.petgraph(),
+            graph: region_graph.clone(),
+            petgraph: region_graph.petgraph(),
             topo,
         });
 
