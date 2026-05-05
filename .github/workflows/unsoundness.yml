@@ -44,12 +44,12 @@ jobs:
           cargo miri setup
       - uses: quantinuum/hugrverse-env/install-hugrenv-action@main
 
+      - name: Install nextest
+        uses: taiki-e/install-action@nextest
+
       # Run miri unsoundness checks.
       #
       # Skip tests that take over 5mins in CI.
-
-      - name: Install nextest
-        uses: taiki-e/install-action@nextest
       - name: Test with Miri
         run: |
           cargo miri nextest run --no-default-features -- \
