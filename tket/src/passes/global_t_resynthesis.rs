@@ -427,14 +427,6 @@ fn op_to_cmd(
                     opgroup: None,
                 }])
             }
-            GateType::Z => {
-                let qubits = apply_map(qubit_map, data.get_args());
-                Ok(vec![Command {
-                    op: Operation::from_optype(OpType::Z),
-                    args: qubits,
-                    opgroup: None,
-                }])
-            }
             GateType::ZX => {
                 let qubits = apply_map(qubit_map, data.get_args());
                 Ok(vec![Command {
