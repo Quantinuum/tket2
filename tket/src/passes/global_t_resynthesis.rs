@@ -1,4 +1,4 @@
-use crate::metadata::QubitRegisters;
+use crate::CircuitError;
 use crate::passes::NormalizeGuppy;
 use crate::passes::PassScope;
 use crate::passes::WithScope;
@@ -9,30 +9,24 @@ use crate::serialize::pytket::{
     EncodeOptions, EncodedCircuit, PytketDecodeError, PytketEncodeError, default_decoder_config,
     default_encoder_config,
 };
-use crate::{Circuit, CircuitError};
 use hugr::hugr::ValidationError;
 use hugr::hugr::hugrmut::HugrMut;
 
 use basic_passes::CanonicalFormPass;
 use fast_todd::FastTODDPass;
 use greedy_synth::{GreedySynthPass, RebaseTQEToZXPass};
-use hugr::types::EdgeKind;
-use hugr_core::hugr::internal::{HugrInternals, PortgraphNodeMap};
-use pauli_graph::{BlackBoxData, GateData, GateType, Op, PauliGraph, PauliGraphPass};
-use petgraph::visit as pv;
+use pauli_graph::{GateData, GateType, Op, PauliGraph, PauliGraphPass};
 use pg_optimise::{GroupCommutingOpsPass, RotationMergingPass};
 
 use crate::passes::composable::ComposablePass;
 use crate::passes::inline_funcs::inline_acyclic_scoped;
 use hugr::HugrView;
-use hugr::hugr::OpType as TketOp;
 use hugr::{Hugr, Node};
 
 use tket_json_rs::circuit_json::{Command, Operation};
 use tket_json_rs::register::{Bit, ElementId, Qubit};
 use tket_json_rs::{OpType, SerialCircuit};
 
-use std::cell::Cell;
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -766,8 +760,8 @@ mod tests {
     use super::*;
     use rstest::*;
 
-    use crate::TketOp;
     use crate::utils::build_simple_circuit;
+    use crate::{Circuit, TketOp};
 
     fn count_t_gates_in_mermaid_string(input: &str) -> usize {
         input.matches("tket.quantum.T").count()
