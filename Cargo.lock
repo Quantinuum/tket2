@@ -1128,9 +1128,9 @@ dependencies = [
 
 [[package]]
 name = "hugr"
-version = "0.27.0"
+version = "0.27.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c016d3b51aa136190cd5ff125a96ec32a94e0f2a736a3a668bfe084ec9d9a9e"
+checksum = "e91648ee98355c1d502a0d466eec0b67ca2612f81ef5d261e62fca8aa567ab52"
 dependencies = [
  "hugr-core",
  "hugr-llvm",
@@ -1139,9 +1139,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-cli"
-version = "0.27.0"
+version = "0.27.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d6f210455279ec319e42263cb1d9890295cd5a53fdc2f1f34cf4f6901453377"
+checksum = "b1c7b88b23e22f987c6f65cbfb1b23fd6573ccb2be50824b39baf8b421a7958c"
 dependencies = [
  "anyhow",
  "clap",
@@ -1160,9 +1160,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-core"
-version = "0.27.0"
+version = "0.27.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "827c0827ea0e1f6c606a17ba9926d3867b008d975688a6d4357d5847eb5826e5"
+checksum = "dbea3356943ad488326fcea465519c25d03ab792198331610d1292c324d209b8"
 dependencies = [
  "base64",
  "cgmath",
@@ -1198,9 +1198,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-llvm"
-version = "0.27.0"
+version = "0.27.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1aac6e08f12883f1d69c1f145c70251e755dde89821719741193c1f51259a59e"
+checksum = "de92b58fa5e8e0c2d03aab5a6a9cd50b4021ad5e3c0ca68d6ffeb604833337ca"
 dependencies = [
  "anyhow",
  "cc",
@@ -1218,9 +1218,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-model"
-version = "0.27.0"
+version = "0.27.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7878f4cb16c1f8d69ea9e832ff77694d9647aa5b963cb242b10969550b2d6e08"
+checksum = "9699c56c272a729b110e989d799e63beb6f077b5bcc118cd76c088453693615e"
 dependencies = [
  "base64",
  "bumpalo",
@@ -1319,22 +1319,22 @@ dependencies = [
 
 [[package]]
 name = "inkwell"
-version = "0.8.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1def4112dfb2ce2993db7027f7acdb43c1f4ee1c70a082a2eef306ed5d0df365"
+checksum = "7decbc9dfa45a4a827a6ff7b822c113b1285678a937e84213417d4ca8a095782"
 dependencies = [
+ "bitflags",
  "inkwell_internals",
  "libc",
  "llvm-sys",
- "once_cell",
  "thiserror 2.0.18",
 ]
 
 [[package]]
 name = "inkwell_internals"
-version = "0.13.0"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "63736175c9a30ea123f7018de9f26163e0b39cd6978990ae486b510c4f3bad69"
+checksum = "6cfe97ee860815a90ed17e09639513269e39420a7440f3f4c996f238c514cf8d"
 dependencies = [
  "proc-macro2",
  "quote",
