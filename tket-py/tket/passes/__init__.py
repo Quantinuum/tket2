@@ -29,6 +29,7 @@ __all__ = [
     "InlineFunctions",
     "NormalizeGuppy",
     "ModifierResolverPass",
+    "QSystemPass",
 ]
 
 
@@ -291,6 +292,62 @@ class ModifierResolverPass(ComposablePass):
         """Run the pass in the CompilationState"""
         _passes.resolve_modifiers(
             program._inner,
+            scope=self._scope,
+        )
+        return program
+
+
+@dataclass(kw_only=True)
+class QSystemPass(ComposablePass):
+    """A pass to convert quantum ops to qsystem ops.
+
+     Parameters:
+    - constant_fold: Whether to perform constant folding.
+    - monomorphize: Whether to monomorphize generic functions.
+    - force_order: Whether to enforce total ordering of all HUGR operations.
+    - lazify: Whether to replace measurements with lazy measurements.
+    - hide_funcs: Whether to mark all functions as private.
+    """
+
+    constant_fold: bool = True
+    monomorphize: bool = True
+    force_order: bool = True
+    lazify: bool = True
+    hide_funcs: bool = True
+    _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
+
+    def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
+        return implement_pass_run(
+            self,
+            hugr=hugr,
+            inplace=inplace,
+            copy_call=lambda h: self._qsystem_rebase(h, inplace),
+        )
+
+    def with_scope(self, scope: PassScope) -> QSystemPass:
+        """Set the scope of this pass and return self."""
+        self._scope = scope
+        return self
+
+    def _qsystem_rebase(self, hugr: Hugr, inplace: bool) -> PassResult:
+        tk_program = _state.CompilationState.from_python(hugr)
+
+        self._run_tk(tk_program)
+
+        package = tk_program.to_python()
+        return PassResult.for_pass(
+            self, hugr=package.modules[0], inplace=inplace, result=None
+        )
+
+    def _run_tk(self, program: _state.CompilationState) -> _state.CompilationState:
+        """Run the pass in the CompilationState"""
+        _passes.qsystem_rebase_pass(
+            program._inner,
+            constant_fold=self.constant_fold,
+            monomorphize=self.monomorphize,
+            force_order=self.force_order,
+            lazify=self.lazify,
+            hide_funcs=self.hide_funcs,
             scope=self._scope,
         )
         return program

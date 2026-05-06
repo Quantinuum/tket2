@@ -26,7 +26,7 @@ impl Metadata for CircuitRewriteTraces {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Unitary;
 impl Metadata for Unitary {
-    const KEY: &'static str = "TKET.unitary";
+    const KEY: &'static str = "unitary";
     type Type<'hugr> = u8;
 }
 

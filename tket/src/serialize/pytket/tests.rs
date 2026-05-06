@@ -31,7 +31,7 @@ use hugr::hugr::hugrmut::HugrMut;
 use hugr::ops::handle::FuncID;
 use hugr::ops::{OpParent, OpType, Value};
 use hugr::std_extensions::arithmetic::float_ops::FloatOps;
-use hugr::types::{Signature, SumType};
+use hugr::types::{Signature, SumType, Type};
 use hugr::{Hugr, HugrView};
 use itertools::Itertools;
 use rstest::{fixture, rstest};
@@ -792,6 +792,44 @@ fn circ_complex_param_type() -> Hugr {
     h.finish_hugr_with_outputs([float_tuple]).unwrap()
 }
 
+/// A circuit with an unsupported subgraph whose first output is not exposed as
+/// a pytket parameter, followed by a float output used by a supported gate.
+///
+/// Regression test for <https://github.com/Quantinuum/tket2/issues/1516>
+#[fixture]
+fn circ_unsupported_subgraph_skipped_output_before_param() -> Hugr {
+    let tuple_float_t = Type::from(SumType::new_tuple(vec![float64_type()]));
+    let input_t = vec![qb_t()];
+    let output_t = vec![qb_t(), tuple_float_t.clone()];
+    let mut h = FunctionBuilder::new(
+        "unsupported_subgraph_skipped_output_before_param",
+        Signature::new(input_t, output_t),
+    )
+    .unwrap();
+    let [q] = h.input_wires_arr();
+
+    let func = h
+        .module_root_builder()
+        .declare(
+            "tuple_and_float",
+            Signature::new(vec![], vec![tuple_float_t, float64_type()]).into(),
+        )
+        .unwrap();
+
+    let call = h.call(&func, &[], []).unwrap();
+    let [float_tuple, angle] = call.outputs_arr();
+    let [angle] = h
+        .add_dataflow_op(RotationOp::from_halfturns_unchecked, [angle])
+        .unwrap()
+        .outputs_arr();
+    let [q] = h
+        .add_dataflow_op(TketOp::Ry, [q, angle])
+        .unwrap()
+        .outputs_arr();
+
+    h.finish_hugr_with_outputs([q, float_tuple]).unwrap()
+}
+
 /// A program with two unsupported subgraphs not associated to any qubit or bit.
 /// <https://github.com/CQCL/tket2/issues/1294>
 #[fixture]
@@ -1112,6 +1150,11 @@ fn fail_on_modified_hugr(circ_tk1_ops: Hugr) {
 #[case::order_edge(circ_order_edge(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::bool_conversion(circ_bool_conversion(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::complex_param_type(circ_complex_param_type(), 1, CircuitRoundtripTestConfig::Default)]
+#[case::unsupported_subgraph_skipped_output_before_param(
+    circ_unsupported_subgraph_skipped_output_before_param(),
+    1,
+    CircuitRoundtripTestConfig::Default
+)]
 // TODO: We need to track [`EncodedCircuitInfo`] for nested CircBoxes too. We
 // have temporarily disabled encoding of DFG and function calls as CircBoxes to
 // avoid an error here.

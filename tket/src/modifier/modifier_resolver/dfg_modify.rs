@@ -28,21 +28,21 @@ impl<N: HugrNode> ModifierResolver<N> {
     pub(super) fn modify_dfg_body(
         &mut self,
         h: &mut impl HugrMut<Node = N>,
-        n: N,
+        parent_node: N,
         new_dfg: &mut impl Dataflow,
     ) -> Result<(), ModifierResolverErrors<N>> {
         let mut corresp_map = HashMap::new();
-        let mut controls = self.init_control_from_input(h, n, new_dfg)?;
+        let mut controls = self.init_control_from_input(h, parent_node, new_dfg)?;
         mem::swap(self.corresp_map(), &mut corresp_map);
         mem::swap(self.controls(), &mut controls);
 
         // Modify the input/output nodes beforehand.
-        self.modify_in_out_node(h, n, new_dfg)?;
+        self.modify_in_out_node(h, parent_node, new_dfg)?;
         // Modify the children nodes.
-        self.modify_dfg_children(h, n, new_dfg)?;
+        self.modify_dfg_children(h, parent_node, new_dfg)?;
 
-        self.wire_control_to_output(h, n, new_dfg)?;
-        self.connect_all(h, new_dfg, n)?;
+        self.wire_control_to_output(h, parent_node, new_dfg)?;
+        self.connect_all(h, new_dfg, parent_node)?;
         mem::swap(self.controls(), &mut controls);
         mem::swap(self.corresp_map(), &mut corresp_map);
 
@@ -69,8 +69,8 @@ impl<N: HugrNode> ModifierResolver<N> {
             }
         }
         self.with_worklist(worklist, |this| {
-            while let Some(old_n) = this.worklist().pop_front() {
-                this.modify_op(h, old_n, new_dfg)?;
+            while let Some(working_node) = this.worklist().pop_front() {
+                this.modify_op(h, working_node, new_dfg)?;
             }
             Ok::<(), ModifierResolverErrors<N>>(())
         })
