@@ -12,7 +12,9 @@ use hugr::ops::{OpTag, OpTrait};
 use hugr::{HugrView, IncomingPort, OutgoingPort};
 use itertools::Either::{self, Left, Right};
 use itertools::{EitherOrBoth, Itertools};
-use petgraph::visit::{self as pv, IntoNeighborsDirected, NodeCount, Topo, Visitable};
+use petgraph::visit::{
+    self as pv, IntoNeighborsDirected, IntoNodeIdentifiers, NodeCount, Visitable,
+};
 use portgraph::NodeIndex as PGIdx;
 
 use super::Circuit;
@@ -235,25 +237,51 @@ trait CloneableIterator<'a>: Iterator {
     fn clone_box(&self) -> Box<dyn CloneableIterator<'a, Item = Self::Item> + 'a>;
 }
 
-struct NodeWalker<'a, H: HugrView, PTG, VM> {
+struct NodeWalker<'a, H: HugrView, PGF, VM> {
     graph: SchedulingGraph<'a, H>,
-    petgraph: PTG,
-    topo: pv::Topo<PGIdx, VM>,
+    petgraph_func: PGF,
+    topo: Option<pv::Topo<PGIdx, VM>>,
 }
 
-impl <'a, H: HugrView, NM: Visitable<NodeId = PGIdx> + IntoNeighborsDirected> Iterator for NodeWalker<'a, H, NM, NM::Map> {
-    type Item = H::Node;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.topo.next(&self.petgraph).map(|pg| self.graph.pg_to_node(pg))
+impl<'a, H: HugrView, G: Visitable, PGF: Fn(&SchedulingGraph<'a, H>) -> G>
+    NodeWalker<'a, H, PGF, G::Map>
+{
+    fn new(graph: SchedulingGraph<'a, H>, petgraph_func: PGF) -> Self {
+        Self {
+            graph,
+            petgraph_func,
+            topo: None,
+        }
     }
 }
 
+impl<
+    'a,
+    H: HugrView,
+    G: Visitable<NodeId = PGIdx> + IntoNeighborsDirected + IntoNodeIdentifiers,
+    PGF: Fn(&SchedulingGraph<'a, H>) -> G,
+> Iterator for NodeWalker<'a, H, PGF, G::Map>
+{
+    type Item = H::Node;
+    fn next(&mut self) -> Option<Self::Item> {
+        let g: G = (self.petgraph_func)(&self.graph);
+        self.topo
+            .get_or_insert_with(|| pv::Topo::new(g))
+            .next(g)
+            .map(|pg| self.graph.pg_to_node(pg))
+    }
+}
 
-//impl <'a, NM:PortgraphNodeMap<Node> + 'a, G: pv::Visitable<NodeId=PGIdx, Map: Clone> + IntoNeighborsDirected + 'a> CloneableIterator<'a> for NodeWalker<NM, G> {
-impl <'a, H: HugrView, NM: Visitable<NodeId = PGIdx, Map: Clone> + IntoNeighborsDirected + 'a + Clone> CloneableIterator<'a> for NodeWalker<'a, H, NM, NM::Map> {
+impl<
+    'a,
+    H: HugrView,
+    G: Visitable<NodeId = PGIdx, Map: Clone + 'a> + IntoNodeIdentifiers + IntoNeighborsDirected,
+    PGF: 'a + Clone + Fn(&SchedulingGraph<'a, H>) -> G,
+> CloneableIterator<'a> for NodeWalker<'a, H, PGF, G::Map>
+{
     fn clone_box(&self) -> Box<dyn CloneableIterator<'a, Item = Self::Item> + 'a> {
         Box::new(Self {
-            petgraph: self.petgraph.clone(),
+            petgraph_func: self.petgraph_func.clone(),
             graph: self.graph.clone(),
             topo: self.topo.clone(),
         })
@@ -319,17 +347,12 @@ impl<'circ, T: HugrView<Node = Node>> CommandIterator<'circ, T> {
             .collect();
 
         let region_graph = circ.hugr().scheduling_graph(circ.parent());
-        let topo = Topo::new(region_graph.petgraph());
-        let nodes = Box::new(NodeWalker {
-            graph: region_graph.clone(),
-            petgraph: region_graph.petgraph(),
-            topo,
-        });
-
         let node_count = region_graph.petgraph().node_count();
+        let nodes = NodeWalker::new(region_graph, SchedulingGraph::petgraph);
+
         Self {
             circ,
-            nodes,
+            nodes: Box::new(nodes),
             wire_unit,
             // Ignore the input and output nodes, and the root.
             max_remaining: node_count - 2,
