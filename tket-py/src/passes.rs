@@ -229,7 +229,6 @@ fn qsystem_rebase_pass(
         .with_constant_fold(constant_fold)
         .with_monomorphize(monomorphize)
         .with_force_order(force_order)
-        .with_lazify(lazify)
         .with_hide_funcs(hide_funcs);
 
     qsystem_pass.run(&mut circ.hugr).convert_pyerrs()?;
