@@ -288,9 +288,12 @@ impl<'circ, T: HugrView<Node = Node>> CommandIterator<'circ, T> {
 
         #[expect(deprecated)] // When region_portgraph is removed from Hugr, either:
         // (1) if we've already deprecated CommandIterator + Circuit by then, remove them
-        // (2) reimplement using scheduling_graph - this will require caching the topsorted nodes
-        //     which will give poor performance/high memory usage - and deprecate CommandIterator
-        //     at that time.
+        //     (1a) We could remove CommandIterator but keep Circuit, with a method on Circuit
+        //          returning a new struct (borrowing the Circuit) that contains the SchedulingGraph,
+        //          where the new struct defines a method returning an Iterator<Item=Node/Command>
+        //          (actually returning a struct holding the Topo).
+        // (2) reimplement here caching a Vec of nodes topsorted from the scheduling_graph
+        //     - this will give poor perf/high memory usage - and deprecate CommandIterator at that time.
         let (region, region_node_map) = circ.hugr().region_portgraph(circ.parent());
         let node_count = region.node_count();
         let nodes = pv::Topo::new(&region);
