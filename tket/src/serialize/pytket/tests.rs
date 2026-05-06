@@ -863,12 +863,12 @@ fn check_no_tk1_ops(hugr: &Hugr) {
 
 #[rstest]
 #[case::simple(SIMPLE_JSON, 2, 2, false)]
-#[case::simple_measure(SIMPLE_MEASURE, 4, 2, false)]
+#[case::simple_measure(SIMPLE_MEASURE, 4, 2, true)]
 #[case::multi_register(MULTI_REGISTER, 2, 3, false)]
 #[case::unknown_op(UNKNOWN_OP, 2, 3, true)]
 #[case::small_parametrized(SMALL_PARAMETERIZED, 1, 1, false)]
 #[case::parametrized(PARAMETERIZED, 4, 2, true)] // TK1 op is not supported
-#[case::barrier(BARRIER, 3, 3, false)]
+#[case::barrier(BARRIER, 3, 3, true)]
 #[case::implicit_permutation(IMPLICIT_PERMUTATION, 1, 3, false)]
 fn json_roundtrip(
     #[case] circ_s: &str,
@@ -1248,13 +1248,15 @@ fn test_decoding_signature(#[case] signature: Signature) {
     // Hugr must be valid.
     hugr.validate().unwrap();
 
-    // Hugr must contain the two measurement ops.
+    // As we currently don't support decoding of measurements to measure ops (as this
+    // would also require inserting a read op), they are decoded as TK1 ops.
+    // See https://github.com/Quantinuum/tket2/issues/1570.
     let measure_op_count = hugr
         .children(hugr.entrypoint())
         .filter(|&child| {
             hugr.get_optype(child)
                 .as_extension_op()
-                .is_some_and(|op| op.unqualified_id() == "Measure")
+                .is_some_and(|op| op.unqualified_id() == "tk1op")
         })
         .count();
     assert_eq!(measure_op_count, 2);

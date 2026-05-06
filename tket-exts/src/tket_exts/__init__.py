@@ -44,9 +44,11 @@ __all__ = [
     "measurement",
 ]
 
+
 @deprecated("Use the built-in `Bool` type instead")
 def bool() -> BoolExtension:
     return tket.bool.BoolExtension()
+
 
 debug: DebugExtension = tket.debug.DebugExtension()
 gpu: GpuExtension = tket.gpu.GpuExtension()
@@ -62,8 +64,6 @@ wasm: WasmExtension = tket.wasm.WasmExtension()
 modifier: ModifierExtension = tket.modifier.ModifierExtension()
 global_phase: GlobalPhaseExtension = tket.global_phase.GlobalPhaseExtension()
 measurement: MeasurementExtension = tket.measurement.MeasurementExtension()
-
-
 
 
 def tket_registry() -> ExtensionRegistry:

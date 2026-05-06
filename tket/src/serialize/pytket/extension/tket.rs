@@ -78,8 +78,6 @@ impl TketOpEmitter {
                 return Ok(EncodeStatus::Unsupported);
             }
             // We translate `MeasureFree` the same way as a `Measure` operation.
-            // Since the node does not have outputs the qubit/bit will simply be ignored,
-            // but will appear when collecting the final pytket registers.
             TketOp::MeasureFree => {
                 // As the measurement type is not supported, we don't translate
                 // measure ops as well for now.
@@ -159,7 +157,6 @@ impl PytketDecoder for TketOpEmitter {
         _opgroup: Option<&str>,
         decoder: &mut PytketDecoderContext<'h>,
     ) -> Result<DecodeStatus, PytketDecodeError> {
-        let mut num_input_bits = 0;
         let op = match op.op_type {
             PytketOptype::H => TketOp::H,
             PytketOptype::CX => TketOp::CX,
@@ -180,10 +177,6 @@ impl PytketDecoder for TketOpEmitter {
             PytketOptype::Rz => TketOp::Rz,
             PytketOptype::CCX => TketOp::Toffoli,
             PytketOptype::Reset => TketOp::Reset,
-            PytketOptype::Measure => {
-                num_input_bits = 0;
-                TketOp::Measure
-            }
             _ => {
                 return Ok(DecodeStatus::Unsupported);
             }
@@ -195,6 +188,7 @@ impl PytketDecoder for TketOpEmitter {
             .map(|p| p.as_rotation(&mut decoder.builder))
             .collect_vec();
 
+        let num_input_bits = 0;
         let input_bits = &bits[..num_input_bits];
         let output_bits = &bits[num_input_bits..];
         decoder.add_node_with_wires(op, qubits, qubits, input_bits, output_bits, &params)?;
