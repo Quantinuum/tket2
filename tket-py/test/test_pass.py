@@ -21,7 +21,8 @@ import hypothesis.strategies as st
 from hypothesis.strategies._internal import SearchStrategy
 from hypothesis import given, settings
 
-from tket.passes import PytketHugrPass
+
+from tket.passes import PytketHugrPass, QSystemPass
 from pytket.passes import (
     CliffordSimp,
     SquashRzPhasedX,
@@ -323,3 +324,13 @@ def test_issue_1516() -> None:
     opt_hugr = opt(hugr, inplace=False)
 
     CompilationState.from_python(opt_hugr).validate()
+
+
+def test_python_qsystem_pass() -> None:
+    normalize = NormalizeGuppy()
+    hugr = normalize(_hugr_from_path("test_files/guppy_examples/flat_quantum.hugr"))
+    qsystem_pass = QSystemPass()
+    qsystem_hugr = qsystem_pass(hugr)
+    assert _count_ops(qsystem_hugr, "ZZPhase") == 1
+    assert _count_ops(qsystem_hugr, "Custom") == 0
+    assert _count_ops(qsystem_hugr, "tket.quantum") == 0
