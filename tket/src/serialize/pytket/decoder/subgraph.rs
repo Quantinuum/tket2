@@ -190,12 +190,12 @@ impl<'h> PytketDecoderContext<'h> {
 
         let mut output_qubits = qubits;
         let mut output_bits = bits;
+        let mut output_param_count = 0;
 
-        for ((out_idx, ty), (src, src_port)) in subgraph
+        for (ty, (src, src_port)) in subgraph
             .signature()
             .output()
             .iter()
-            .enumerate()
             .zip_eq(subgraph.outgoing_ports())
         {
             // Output wire from the subgraph. Depending on the type, we may need
@@ -225,7 +225,10 @@ impl<'h> PytketDecoderContext<'h> {
                     wire_bits.unwrap().iter().cloned(),
                 )?;
             } else if PARAMETER_TYPES.contains(ty) {
-                let param_name = id.output_parameter(out_idx);
+                // The encoder names opaque parameter outputs by the number of
+                // parameter values exposed to pytket.
+                let param_name = id.output_parameter(output_param_count);
+                output_param_count += 1;
                 let param = if ty == &rotation_type() {
                     LoadedParameter::rotation(wire)
                 } else {
