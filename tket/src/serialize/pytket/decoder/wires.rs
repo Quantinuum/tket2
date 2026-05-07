@@ -711,8 +711,10 @@ impl WireTracker {
             // Handle lazy initialization of qubit and bit wires. These are
             // normally qubits/bits present in the pytket circuit definition,
             // but not in the region's input.
-            _ if ty == &qb_t() => self.initialize_qubit_wire(builder, qubit_args[0].clone())?,
-            _ if ty == &bool_t() || ty == &bool_type() => {
+            _ if ty == &qb_t() && !qubit_args.is_empty() => {
+                self.initialize_qubit_wire(builder, qubit_args[0].clone())?
+            }
+            _ if (ty == &bool_t() || ty == &bool_type()) && !bit_args.is_empty() => {
                 self.initialize_bit_wire(builder, bit_args[0].clone())?
             }
             _ if matches!(ty.as_type_enum(), TypeEnum::Sum(sum) if sum.as_tuple().is_some()) => {

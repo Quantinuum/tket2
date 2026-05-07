@@ -1164,21 +1164,6 @@ fn reject_standalone_complex_subgraphs(#[case] hugr: Hugr) {
     );
 }
 
-#[rstest]
-fn unsupported_prelude_barrier_is_encoded_as_opaque_subgraph(
-    circ_barrier_with_unsupported_value: Hugr,
-) {
-    let ser =
-        SerialCircuit::encode(&circ_barrier_with_unsupported_value, EncodeOptions::new()).unwrap();
-
-    validate_serial_circ(&ser);
-    assert!(
-        ser.commands
-            .iter()
-            .any(|cmd| { cmd.op.op_type == optype::OpType::Barrier && cmd.op.data.is_some() })
-    );
-}
-
 /// Test that modifying the hugr before reassembling an EncodedCircuit fails.
 #[rstest]
 fn fail_on_modified_hugr(circ_tk1_ops: Hugr) {
@@ -1407,4 +1392,81 @@ fn test_qubit_elision() {
 
     // The circuit should have no alloc/frees or const definitions
     assert_eq!(crate::Circuit::new(&hugr).num_operations(), 0);
+}
+
+/// Test that HUGR barriers over unsupported types are encoded as opaque
+/// subgraphs, rather than trying to encode them as native pytket barriers.
+#[rstest]
+fn unsupported_prelude_barrier_is_encoded_as_opaque_subgraph(
+    circ_barrier_with_unsupported_value: Hugr,
+) {
+    let ser =
+        SerialCircuit::encode(&circ_barrier_with_unsupported_value, EncodeOptions::new()).unwrap();
+
+    validate_serial_circ(&ser);
+
+    let is_opaque_barrier = |cmd: &tket_json_rs::circuit_json::Command| {
+        cmd.op.op_type == optype::OpType::Barrier && cmd.op.data.is_some()
+    };
+    assert!(ser.commands.iter().any(is_opaque_barrier));
+}
+
+/// Trying to decode a circuit with missing output bits should be a decode error rather than a panic.
+///
+/// Regression test for a panic found in <https://github.com/Quantinuum/tket2/pull/1558>
+#[rstest]
+fn serial_decode_missing_output_bit_returns_decode_error() {
+    let serial = SerialCircuit::new(Some("missing_output_bit".to_string()), "0".to_string());
+    let decode_options =
+        DecodeOptions::new().with_signature(Signature::new(vec![], vec![bool_t()]));
+
+    let err = serial.decode(decode_options).unwrap_err();
+    assert_matches!(
+        err,
+        PytketDecodeError {
+            inner: PytketDecodeErrorInner::InvalidOutputSignature { .. },
+            ..
+        }
+    );
+}
+
+/// Standalone decoding roundtrip should preserve the output signature.
+///
+/// Regression test for a mismatched signature error found in
+/// <https://github.com/Quantinuum/tket2/pull/1558>
+#[rstest]
+fn standalone_reassemble_preserves_repeated_bit_outputs(circ_preset_bits: Hugr) {
+    let circ_signature = circ_preset_bits
+        .entrypoint_optype()
+        .inner_function_type()
+        .expect("Dataflow entrypoint")
+        .into_owned();
+    let decode_options = DecodeOptions::new().with_signature(circ_signature.clone());
+
+    let encoded = EncodedCircuit::new_standalone(
+        &circ_preset_bits,
+        EncodeOptions::new().with_subcircuits(true),
+    )
+    .unwrap_or_else(|e| panic!("{e}"));
+
+    let reassembled = encoded
+        .reassemble(
+            circ_preset_bits.entrypoint(),
+            Some("main".to_string()),
+            decode_options,
+        )
+        .unwrap_or_else(|e| panic!("{e}"));
+    reassembled.validate().unwrap_or_else(|e| panic!("{e}"));
+
+    let reassembled_function = reassembled
+        .children(reassembled.module_root())
+        .exactly_one()
+        .ok()
+        .expect("single reassembled function");
+    let reassembled_signature = reassembled
+        .get_optype(reassembled_function)
+        .inner_function_type()
+        .expect("Function definition")
+        .into_owned();
+    assert_eq!(&circ_signature.output, &reassembled_signature.output);
 }

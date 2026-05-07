@@ -399,7 +399,8 @@ impl<Node: HugrNode> EncodedCircuit<Node> {
             }
             .wrap());
         }
-        let serial_circuit = &self[region];
+        let encoded_info = &self.circuits[&region];
+        let serial_circuit = &encoded_info.serial_circuit;
 
         if self.len() > 1 {
             unimplemented!(
@@ -413,7 +414,7 @@ impl<Node: HugrNode> EncodedCircuit<Node> {
         let mut decoder =
             PytketDecoderContext::new(serial_circuit, &mut hugr, target, options, None)?;
         decoder.run_decoder(&serial_circuit.commands, None)?;
-        decoder.finish(None)?;
+        decoder.finish(Some(encoded_info))?;
         Ok(hugr)
     }
 
