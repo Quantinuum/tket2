@@ -2856,9 +2856,9 @@ dependencies = [
 
 [[package]]
 name = "tket-json-rs"
-version = "0.8.2"
+version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f94cdded1cb82aaf9e0c2508762753f72c60ce8c068853b8ecc6c1bcd21644b9"
+checksum = "d411ed63c40c69f147fb2ecfae59bc9c8e15aee1f0d916fb07f37465a7a4b2e9"
 dependencies = [
  "derive_more 2.1.1",
  "pyo3",
