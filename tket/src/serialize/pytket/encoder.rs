@@ -888,8 +888,18 @@ impl<H: HugrView> PytketEncoderContext<H> {
                     .type_to_pytket(constant.constant_type())
                     .is_some()
                 => {
-                    self.emit_transparent_node(node, hugr, |ps| ps.input_params.to_owned())?;
-                    return Ok(EncodeStatus::Success);
+                    let (const_node, const_port) = hugr
+                        .single_linked_output(node, constant.constant_port())
+                        .expect("LoadConstant node must have a constant input");
+                    let const_wire = Wire::new(const_node, const_port);
+                    // Loading a constant is transparent only when the constant
+                    // value is supported an has already been registered.
+                    // Otherwise the load belongs to the same opaque subgraph as
+                    // its unsupported constant.
+                    if self.values.peek_wire_values(const_wire).is_some() {
+                        self.emit_transparent_node(node, hugr, |ps| ps.input_params.to_owned())?;
+                        return Ok(EncodeStatus::Success);
+                    }
                 }
             OpType::Const(op) => {
                 let config = Arc::clone(&self.config);

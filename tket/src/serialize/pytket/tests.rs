@@ -8,7 +8,7 @@ use hugr::builder::{
     Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder,
     ModuleBuilder, SubContainer,
 };
-use hugr::extension::prelude::{UnwrapBuilder, bool_t, option_type, qb_t};
+use hugr::extension::prelude::{ConstExternalSymbol, UnwrapBuilder, bool_t, option_type, qb_t};
 use hugr::std_extensions::arithmetic::float_types::{ConstF64, float64_type};
 use rayon::iter::ParallelIterator;
 use std::sync::Arc;
@@ -778,6 +778,24 @@ fn circ_output_parameter_wire() -> Hugr {
         .unwrap()
 }
 
+// A circuit with external float symbols used as pytket parameters.
+#[fixture]
+fn circ_external_float_symbol() -> Hugr {
+    let input_t = vec![];
+    let output_t = vec![float64_type()];
+    let mut h =
+        FunctionBuilder::new("external_float_symbol", Signature::new(input_t, output_t)).unwrap();
+
+    let x = h.add_load_value(ConstExternalSymbol::new("ext", float64_type(), true));
+    let y = h.add_load_value(ConstExternalSymbol::new("ext", float64_type(), true));
+    let [sum] = h
+        .add_dataflow_op(FloatOps::fadd, [x, y])
+        .unwrap()
+        .outputs_arr();
+
+    h.finish_hugr_with_outputs([sum]).unwrap()
+}
+
 // A circuit with a [float64] wire, which should be treated as unsupported.
 #[fixture]
 fn circ_complex_param_type() -> Hugr {
@@ -1217,6 +1235,7 @@ fn fail_on_modified_hugr(circ_tk1_ops: Hugr) {
     CircuitRoundtripTestConfig::Default
 )]
 #[case::output_parameter_wire(circ_output_parameter_wire(), 1, CircuitRoundtripTestConfig::Default)]
+#[case::external_float_symbol(circ_external_float_symbol(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::non_local(circ_non_local(), 2, CircuitRoundtripTestConfig::Default)]
 #[case::unsupported_subgraph_no_registers(
     circ_unsupported_subgraph_no_registers(),
