@@ -533,6 +533,12 @@ impl WireTracker {
         }
     }
 
+    /// Return tracked metadata for a decoded wire, if it carries pytket
+    /// registers known to this tracker.
+    pub(super) fn wire_data(&self, wire: Wire) -> Option<&WireData> {
+        self.wires.get(&wire)
+    }
+
     /// Mark a qubit as outdated, without adding a new wire containing the fresh value.
     ///
     /// This is used when a hugr operation consumes pytket registers as its inputs, but doesn't use them in the outputs.

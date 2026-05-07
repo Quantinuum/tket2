@@ -22,7 +22,7 @@ use hugr::extension::prelude::{bool_t, qb_t};
 use hugr::ops::handle::{DataflowOpID, NodeHandle};
 use hugr::ops::{DFG, OpParent, OpTrait, OpType};
 use hugr::types::{Signature, Type, TypeRow};
-use hugr::{Hugr, HugrView, Node, OutgoingPort, Wire};
+use hugr::{Hugr, HugrView, IncomingPort, Node, OutgoingPort, Wire};
 use tracked_elem::{TrackedBitId, TrackedQubitId};
 
 use itertools::Itertools;
@@ -369,6 +369,15 @@ impl<'h> PytketDecoderContext<'h> {
             // (It's a wire from an unsupported operation, or was a connected
             // straight through wire)
             if self.builder.hugr().is_linked(output_node, port) {
+                self.consume_registers_for_prelinked_output(
+                    output_node,
+                    port,
+                    ty,
+                    &expected_output_types,
+                    &mut qubits_slice,
+                    &mut bits_slice,
+                    &mut params,
+                )?;
                 continue;
             }
 
@@ -433,7 +442,7 @@ impl<'h> PytketDecoderContext<'h> {
         }
 
         // Qubits not in the output need to be freed.
-        self.add_implicit_qfree_operations(qubits_slice);
+        self.add_implicit_qfree_operations(qubits_slice)?;
 
         // Store the name for the input parameter wires
         let input_params = self.wire_tracker.finish();
@@ -454,10 +463,75 @@ impl<'h> PytketDecoderContext<'h> {
             .node())
     }
 
-    /// Add the implicit QFree operations for a list of qubits that are not in the hugr output.
+    /// Account for a HUGR output port that was connected before `finish` filled
+    /// in the remaining outputs.
     ///
-    /// We only do this if there's a wire with type `qb_t` containing the qubit.
-    fn add_implicit_qfree_operations(&mut self, qubits: &[TrackedQubit]) {
+    /// Pre-linked outputs come from unsupported subgraphs or straight-through
+    /// wires. They are already valid HUGR edges, so `finish` must not reconnect
+    /// them, but it must still advance the pytket register cursors. Otherwise a
+    /// qubit carried by such an output is later mistaken for a leftover qubit
+    /// and gets an invalid implicit [`TketOp::QFree`].
+    #[expect(clippy::too_many_arguments)]
+    fn consume_registers_for_prelinked_output(
+        &self,
+        output_node: Node,
+        port: IncomingPort,
+        ty: &Type,
+        expected_output_types: &[Type],
+        qubits: &mut &[TrackedQubit],
+        bits: &mut &[TrackedBit],
+        params: &mut &[LoadedParameter],
+    ) -> Result<(), PytketDecodeError> {
+        let linked_registers = self
+            .linked_wire_register_count(output_node, port)
+            .or_else(|| self.config.type_to_pytket(ty));
+        let Some(reg_count) = linked_registers else {
+            return Ok(());
+        };
+
+        if qubits.len() < reg_count.qubits
+            || bits.len() < reg_count.bits
+            || params.len() < reg_count.params
+        {
+            return Err(PytketDecodeErrorInner::InvalidOutputSignature {
+                expected_types: expected_output_types
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect(),
+            }
+            .wrap()
+            .hugr_op("Output"));
+        }
+
+        *qubits = &qubits[reg_count.qubits..];
+        *bits = &bits[reg_count.bits..];
+        *params = &params[reg_count.params..];
+        Ok(())
+    }
+
+    /// Return the pytket register count for the wire already linked to an
+    /// output port, if that wire is tracked by the decoder.
+    fn linked_wire_register_count(
+        &self,
+        output_node: Node,
+        port: IncomingPort,
+    ) -> Option<RegisterCount> {
+        self.builder
+            .hugr()
+            .single_linked_output(output_node, port)
+            .and_then(|(node, port)| {
+                self.wire_tracker
+                    .wire_data(Wire::new(node, port))
+                    .map(|wire| RegisterCount::new(wire.num_qubits(), wire.num_bits(), 0))
+            })
+    }
+
+    /// Add the implicit QFree operations for a list of qubits that are not in
+    /// the hugr output and still have a registered wire in the tracker.
+    fn add_implicit_qfree_operations(
+        &mut self,
+        qubits: &[TrackedQubit],
+    ) -> Result<(), PytketDecodeError> {
         let qb_type = qb_t();
         let mut bit_args: &[TrackedBit] = &[];
         let mut params: &[LoadedParameter] = &[];
@@ -480,11 +554,28 @@ impl<'h> PytketDecoderContext<'h> {
                 continue;
             };
 
+            let wire = wire.wire();
+            // Check if the value wire is already consumed by another HUGR node.
+            //
+            // This may be the case if there's an unsupported subgraph at the
+            // end of the region.
+            if self
+                .builder
+                .hugr()
+                .linked_inputs(wire.node(), wire.source())
+                .next()
+                .is_some()
+            {
+                continue;
+            }
+
             self.builder
-                .add_dataflow_op(TketOp::QFree, [wire.wire()])
-                .unwrap()
+                .add_dataflow_op(TketOp::QFree, [wire])
+                .map_err(PytketDecodeError::custom)?
                 .out_wire(0);
         }
+
+        Ok(())
     }
 
     /// Decode a list of pytket commands.
