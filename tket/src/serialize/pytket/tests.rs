@@ -402,7 +402,7 @@ fn circ_recursive() -> Hugr {
 
     let [q] = h.input_wires_arr();
 
-    // Dummy quantum function to ensure this circuit gets encoded.
+    // Extra quantum op to ensure this circuit gets encoded.
     let [q] = h.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
 
     // Call itself recursively.
@@ -452,7 +452,7 @@ fn circ_non_local() -> Hugr {
 
     let [q, rot] = h.input_wires_arr();
 
-    // Dummy quantum function to ensure this circuit gets encoded.
+    // Extra quantum op to ensure this circuit gets encoded.
     let [q] = h.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
 
     let [q] = {
@@ -461,7 +461,7 @@ fn circ_non_local() -> Hugr {
             .unwrap();
         let [q] = dfg.input_wires_arr();
 
-        // Dummy quantum function to ensure this circuit gets encoded.
+        // Extra quantum op to ensure this circuit gets encoded.
         let [q] = dfg.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
 
         // Rx with non-local input
@@ -621,7 +621,7 @@ fn circ_nested_dfgs() -> Hugr {
     let [qb] = h.input_wires_arr();
     let rot = h.add_load_value(ConstRotation::new(0.5).unwrap());
 
-    // Dummy quantum function to ensure this circuit gets encoded.
+    // Extra quantum op to ensure this circuit gets encoded.
     let [qb] = h.add_dataflow_op(TketOp::H, [qb]).unwrap().outputs_arr();
 
     let inner_dfg = {
@@ -727,7 +727,7 @@ fn circ_bool_conversion() -> Hugr {
 
     let [q, native_b0, tket_b1] = h.input_wires_arr();
 
-    // Dummy quantum function to ensure this circuit gets encoded.
+    // Extra quantum op to ensure this circuit gets encoded.
     let [q] = h.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
 
     let [tket_b0] = h
@@ -760,7 +760,7 @@ fn circ_unsupported_extras_in_circ_box() -> Hugr {
 
     let [q, maybe_b, maybe_q] = h.input_wires_arr();
 
-    // Dummy quantum function to ensure this circuit gets encoded.
+    // Extra quantum op to ensure this circuit gets encoded.
     let [q] = h.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
 
     let [q, maybe_b, maybe_q] = {
@@ -769,7 +769,7 @@ fn circ_unsupported_extras_in_circ_box() -> Hugr {
             .unwrap();
         let [q, maybe_b, maybe_q] = nested.input_wires_arr();
 
-        // Dummy quantum function to ensure this circuit gets encoded.
+        // Extra quantum op to ensure this circuit gets encoded.
         let [q] = nested
             .add_dataflow_op(TketOp::H, [q])
             .unwrap()
@@ -796,7 +796,7 @@ fn circ_output_parameter_wire() -> Hugr {
     let mut h =
         FunctionBuilder::new("output_parameter_wire", Signature::new(input_t, output_t)).unwrap();
 
-    // Dummy quantum function to ensure this circuit gets encoded.
+    // Extra quantum op to ensure this circuit gets encoded.
     let [q] = h.input_wires_arr();
     let [q] = h.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
 
@@ -823,7 +823,7 @@ fn circ_complex_param_type() -> Hugr {
     let mut h =
         FunctionBuilder::new("complex_param_type", Signature::new(input_t, output_t)).unwrap();
 
-    // Dummy quantum function to ensure this circuit gets encoded.
+    // Extra quantum op to ensure this circuit gets encoded.
     let [q] = h.input_wires_arr();
     let [q] = h.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
 
@@ -1089,6 +1089,7 @@ fn circuit_standalone_roundtrip(#[case] hugr: Hugr, #[case] config: CircuitRound
         .with_config(config.decoder_config());
     let encode_options = EncodeOptions::new()
         .with_subcircuits(true)
+        .keep_empty_circuits(true)
         .with_config(config.encoder_config());
 
     let encoded = EncodedCircuit::new_standalone(&hugr, encode_options.clone())

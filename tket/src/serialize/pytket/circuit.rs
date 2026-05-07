@@ -152,7 +152,7 @@ impl EncodedCircuit<Node> {
             opaque_subgraphs: OpaqueSubgraphs::new(0),
         };
 
-        enc.encode_circuits(hugr, entrypoint, options, EncoderCircuitFilter::NonEmpty)?;
+        enc.encode_circuits(hugr, entrypoint, options)?;
 
         Ok(enc)
     }
@@ -307,7 +307,7 @@ impl<Node: HugrNode> EncodedCircuit<Node> {
             opaque_subgraphs: OpaqueSubgraphs::new(0),
         };
         // Encode the entrypoint circuit, ensuring it's not skipped even if it's empty.
-        enc.encode_circuits(hugr, entrypoint, options, EncoderCircuitFilter::All)?;
+        enc.encode_circuits(hugr, entrypoint, options)?;
         enc.ensure_standalone(hugr)?;
         Ok(enc)
     }
@@ -323,7 +323,6 @@ impl<Node: HugrNode> EncodedCircuit<Node> {
         hugr: &H,
         entrypoint: H::Node,
         mut options: EncodeOptions<H>,
-        filter_results: EncoderCircuitFilter,
     ) -> Result<(), PytketEncodeError<H::Node>> {
         // List of nodes to check for subcircuits.
         //
@@ -370,7 +369,16 @@ impl<Node: HugrNode> EncodedCircuit<Node> {
             }
 
             // Ignore empty circuits, for regions with no supported operation.
-            if !filter_results.filter(&encoded.serial_circuit) {
+            //
+            // A circuit is empty if it only contains barriers representing unsupported HUGR subgraphs, or plain
+            // pytket barriers (as they are effectively no-ops).
+            let is_empty_circuit = |encoded: &SerialCircuit| {
+                encoded
+                    .commands
+                    .iter()
+                    .all(|cmd| cmd.op.op_type == tket_json_rs::OpType::Barrier)
+            };
+            if !options.keep_empty_circuits && is_empty_circuit(&encoded.serial_circuit) {
                 continue;
             }
 
@@ -537,24 +545,5 @@ impl<Node: HugrNode> IndexMut<Node> for EncodedCircuit<Node> {
     fn index_mut(&mut self, index: Node) -> &mut Self::Output {
         self.get_circuit_mut(index)
             .unwrap_or_else(|| panic!("Indexing into a circuit that was not encoded: {index}"))
-    }
-}
-
-enum EncoderCircuitFilter {
-    /// Only keep non-empty circuits.
-    NonEmpty,
-    /// Keep all circuits, even if they have no supported operations.
-    All,
-}
-
-impl EncoderCircuitFilter {
-    fn filter(&self, circuit: &SerialCircuit) -> bool {
-        match self {
-            EncoderCircuitFilter::NonEmpty => circuit
-                .commands
-                .iter()
-                .any(|cmd| cmd.op.op_type != tket_json_rs::OpType::Barrier),
-            EncoderCircuitFilter::All => true,
-        }
     }
 }

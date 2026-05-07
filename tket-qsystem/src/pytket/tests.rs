@@ -266,7 +266,8 @@ fn circuit_standalone_roundtrip(#[case] hugr: Hugr) {
         .with_config(qsystem_decoder_config());
     let encode_options = EncodeOptions::new()
         .with_subcircuits(true)
-        .with_config(qsystem_encoder_config());
+        .with_config(qsystem_encoder_config())
+        .keep_empty_circuits(true);
 
     let encoded = EncodedCircuit::new_standalone(&hugr, encode_options.clone())
         .unwrap_or_else(|e| panic!("{e}"));

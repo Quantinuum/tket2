@@ -142,7 +142,7 @@ impl TKETDecode for SerialCircuit {
 
     fn encode<H: HugrView>(
         hugr: &H,
-        options: EncodeOptions<H>,
+        mut options: EncodeOptions<H>,
     ) -> Result<Self, Self::EncodeError<H::Node>> {
         if !OpTag::DataflowParent.is_superset(hugr.entrypoint_tag()) {
             return Err(PytketEncodeError::NonDataflowRegion {
@@ -150,6 +150,9 @@ impl TKETDecode for SerialCircuit {
                 optype: hugr.entrypoint_optype().to_string(),
             });
         }
+
+        // Make ruse we don't drop the entrypoint circuit if it's empty.
+        options.keep_empty_circuits = true;
 
         let mut encoded = EncodedCircuit::new_standalone(hugr, options)?;
 
