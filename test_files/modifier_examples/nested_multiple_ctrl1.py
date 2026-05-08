@@ -23,9 +23,6 @@ from guppylang.experimental import enable_experimental_features
 
 enable_experimental_features()
 
-hugr_pdf_directory = Path(__file__).resolve().parents[1] / "0_hugr_pdf"
-hugr_pdf_directory.mkdir(exist_ok=True)
-
 
 @guppy
 def main() -> None:
