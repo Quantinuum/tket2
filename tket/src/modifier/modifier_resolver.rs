@@ -692,7 +692,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         Ok(())
     }
 
-    /// Takes a signature and modifies it according to the combined modifier.
     /// Modifies a function signature to account for control qubits added by modifiers.
     ///
     /// # Arguments
