@@ -40,7 +40,6 @@ def format_statevector(
 modifier_examples_dir = Path(__file__).resolve().parent / "modified_hugrs"
 result_execution_dir = Path(__file__).resolve().parent / "hugr_results"
 
-print(modifier_examples_dir)
 all_results: list[str] = []
 args = sys.argv[1:]
 if len(args) > 2:
