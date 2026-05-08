@@ -4,7 +4,7 @@
 #     "guppylang ==0.21.14",
 # ]
 # ///
-"""A simple controlled gate using modifiers"""
+"""Controlling a quantum function"""
 
 from pathlib import Path
 from sys import argv

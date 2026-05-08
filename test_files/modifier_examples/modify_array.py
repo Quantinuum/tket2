@@ -4,7 +4,7 @@
 #     "guppylang ==0.21.14",
 # ]
 # ///
-"""A simple controlled gate using modifiers"""
+"""Test control modifiers on an array element"""
 
 from pathlib import Path
 from sys import argv
