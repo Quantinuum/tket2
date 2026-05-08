@@ -299,10 +299,6 @@ mod tests {
             .call(callee.handle(), &[], vec![inputs[0]])
             .unwrap()
             .out_wire(0);
-        // inputs[0] = func
-        //     .add_dataflow_op(TketOp::X, vec![inputs[0]])
-        //     .unwrap()
-        //     .out_wire(0);
         *func.finish_with_outputs(inputs).unwrap().handle()
     }
 

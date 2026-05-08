@@ -682,7 +682,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         let new_load = self.with_modifiers(modifiers, |this| {
             this.apply_modifier_chain_to_loaded_fn(hugr, modifier_node)
         })?;
-        // NICOLA: the fail is before here!
         // Connect the modified function to the inputs
         for (out_port, inputs) in modified_fn_loader {
             for (recv, recv_port) in inputs {
