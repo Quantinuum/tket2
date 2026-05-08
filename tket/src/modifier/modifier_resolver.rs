@@ -700,7 +700,7 @@ impl<N: HugrNode> ModifierResolver<N> {
     /// * `signature` - The function signature to modify
     /// * `flatten` - If true, control qubits are represented as individual `Qubit` types,
     ///   if false, control qubits are packed into arrays (used for function definitions).
-    pub fn modify_signature(&self, signature: &mut Signature, flatten: bool) {
+    fn modify_signature(&self, signature: &mut Signature, flatten: bool) {
         let FuncTypeBase { input, output } = signature;
 
         if flatten {
@@ -1406,17 +1406,9 @@ mod tests {
     }
 
     #[rstest::rstest]
-    #[case::call("nested_multiple_ctrl1")]
-    // #[case::call("dagger_on_call")]
-    #[case::call("all")]
-    fn test_saved_hugr(#[case] name: &str) {
-        if name == "all" {
-            for (_, mut h) in load_guppy_examples().unwrap() {
-                test_resolve(&mut h);
-            }
-            return;
-        } else {
-            let mut h = load_guppy_example(name).unwrap();
+    fn test_saved_hugr() {
+        for (name, mut h) in load_guppy_examples().unwrap() {
+            println!("Resolving example: {name}");
             test_resolve(&mut h);
         }
     }
