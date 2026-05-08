@@ -1192,7 +1192,10 @@ mod tests {
     use hugr::{
         Hugr,
         builder::{DataflowSubContainer, HugrBuilder, ModuleBuilder},
-        ops::{CallIndirect, ExtensionOp, handle::FuncID},
+        ops::{
+            CallIndirect, ExtensionOp,
+            handle::{FuncID, NodeHandle},
+        },
         std_extensions::collections::array::ArrayOpBuilder,
         types::Term,
     };
@@ -1291,6 +1294,7 @@ mod tests {
 
         // Let the caller insert the function-under-test into the module.
         let foo = foo(&mut module, target_num);
+        let foo_node = foo.node();
 
         // Build the "main" function body ---
         let _main = {
@@ -1355,6 +1359,15 @@ mod tests {
 
         let entrypoint = h.entrypoint();
         resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+
+        // We check that the original function node has been removed in the resolved hugr
+        assert!(!h.contains_node(foo_node));
+
+        // We also check that there is no modifier node in the resolved hugr.
+        assert!(
+            h.nodes()
+                .all(|node| Modifier::from_optype(h.get_optype(node)).is_none())
+        );
 
         // The resolved hugr must still be structurally valid.
         assert_matches!(h.validate(), Ok(()));
