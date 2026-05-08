@@ -70,11 +70,11 @@ pub enum HeliosOp {
     LazyMeasure,
     /// Lazily measure a qubit and reset it to the Z |0> eigenstate.
     LazyMeasureReset,
-    /// Rotate a qubit around the Z axis, not physical (alias 'rz')
+    /// Rotate a qubit around the Z axis, not physical (alias 'rz').
     Rz,
-    /// PhasedX gate (aliases 'rxy', 'rp').
+    /// PhasedX gate (alias 'rxy').
     PhasedX,
-    /// ZZ gate with an angle (alias 'rzz').
+    /// ZZPhase gate (alias 'rzz').
     ZZPhase,
     /// Allocate a qubit in the Z |0> eigenstate.
     TryQAlloc,

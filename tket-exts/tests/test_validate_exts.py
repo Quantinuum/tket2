@@ -108,7 +108,6 @@ def ext_qsystem_sol() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
             ext.reset,
             ext.runtime_barrier(1),
             ext.Rz,
-            ext.tk2,
             ext.try_QAlloc,
         ],
     )

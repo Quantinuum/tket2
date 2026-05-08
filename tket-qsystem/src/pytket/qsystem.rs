@@ -104,7 +104,6 @@ impl QSystemEmitter {
         // Sol-specific ops.
         let serial_op = match op {
             SolOp::PhasedXX => PytketOptype::PhasedXX,
-            SolOp::Tk2 => PytketOptype::TK2,
             _ => return Ok(EncodeStatus::Unsupported),
         };
         self.emit_radian_op(node, serial_op, hugr, encoder)
@@ -207,7 +206,7 @@ impl PytketDecoder for QSystemEmitter {
                 ops.extend([PytketOptype::ZZPhase, PytketOptype::ZZMax]);
             }
             QSystemPlatform::Sol => {
-                ops.extend([PytketOptype::PhasedXX, PytketOptype::TK2]);
+                ops.extend([PytketOptype::PhasedXX]);
             }
         }
         ops
@@ -246,7 +245,6 @@ impl PytketDecoder for QSystemEmitter {
             (QSystemPlatform::Sol, PytketOptype::PhasedXX) => {
                 (SolOp::PhasedXX.into(), float_params(decoder))
             }
-            (QSystemPlatform::Sol, PytketOptype::TK2) => (SolOp::Tk2.into(), float_params(decoder)),
             _ => return Ok(DecodeStatus::Unsupported),
         };
 

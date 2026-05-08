@@ -5,42 +5,35 @@ expression: mod_str
 ; ModuleID = 'test_context'
 source_filename = "test_context"
 
-define internal { i64, i64 } @_hl.main.1(i64 %0, i64 %1, double %2, double %3, double %4) {
+define internal { i1, i64, i1 } @_hl.main.1(i64 %0) {
 alloca_block:
-  %"0" = alloca i64, align 8
-  %"1" = alloca i64, align 8
+  %"0" = alloca { i1, i64, i1 }, align 8
   %"2_0" = alloca i64, align 8
-  %"2_1" = alloca i64, align 8
-  %"2_2" = alloca double, align 8
-  %"2_3" = alloca double, align 8
-  %"2_4" = alloca double, align 8
-  %"4_0" = alloca i64, align 8
-  %"4_1" = alloca i64, align 8
+  %"4_0" = alloca { i1, i64, i1 }, align 8
+  %"6_0" = alloca i64, align 8
+  %"8_0" = alloca i64, align 8
+  %"9_0" = alloca { i1, i64, i1 }, align 8
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
   store i64 %0, ptr %"2_0", align 4
-  store i64 %1, ptr %"2_1", align 4
-  store double %2, ptr %"2_2", align 8
-  store double %3, ptr %"2_3", align 8
-  store double %4, ptr %"2_4", align 8
   %"2_01" = load i64, ptr %"2_0", align 4
-  %"2_12" = load i64, ptr %"2_1", align 4
-  %"2_23" = load double, ptr %"2_2", align 8
-  %"2_34" = load double, ptr %"2_3", align 8
-  %"2_45" = load double, ptr %"2_4", align 8
-  call void @___rxxyyzz(i64 %"2_01", i64 %"2_12", double %"2_23", double %"2_34", double %"2_45")
-  store i64 %"2_01", ptr %"4_0", align 4
-  store i64 %"2_12", ptr %"4_1", align 4
-  %"4_06" = load i64, ptr %"4_0", align 4
-  %"4_17" = load i64, ptr %"4_1", align 4
-  store i64 %"4_06", ptr %"0", align 4
-  store i64 %"4_17", ptr %"1", align 4
-  %"08" = load i64, ptr %"0", align 4
-  %"19" = load i64, ptr %"1", align 4
-  %mrv = insertvalue { i64, i64 } poison, i64 %"08", 0
-  %mrv10 = insertvalue { i64, i64 } %mrv, i64 %"19", 1
-  ret { i64, i64 } %mrv10
+  store i64 %"2_01", ptr %"6_0", align 4
+  %"6_02" = load i64, ptr %"6_0", align 4
+  %lazy_measure = call i64 @___lazy_measure(i64 %"6_02")
+  call void @___qfree(i64 %"6_02")
+  store i64 %lazy_measure, ptr %"8_0", align 4
+  %"8_03" = load i64, ptr %"8_0", align 4
+  %1 = insertvalue { i1, i64, i1 } { i1 true, i64 poison, i1 poison }, i64 %"8_03", 1
+  store { i1, i64, i1 } %1, ptr %"9_0", align 4
+  %"9_04" = load { i1, i64, i1 }, ptr %"9_0", align 4
+  store { i1, i64, i1 } %"9_04", ptr %"4_0", align 4
+  %"4_05" = load { i1, i64, i1 }, ptr %"4_0", align 4
+  store { i1, i64, i1 } %"4_05", ptr %"0", align 4
+  %"06" = load { i1, i64, i1 }, ptr %"0", align 4
+  ret { i1, i64, i1 } %"06"
 }
 
-declare void @___rxxyyzz(i64, i64, double, double, double)
+declare i64 @___lazy_measure(i64)
+
+declare void @___qfree(i64)

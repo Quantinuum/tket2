@@ -55,9 +55,9 @@ lazy_static! {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum QSystemPlatform {
-    /// Quantinuum Helios, supporting rxy, rzz, rz
+    /// Quantinuum Helios, supporting PhasedX, ZZPhase, Rz
     Helios,
-    /// Quantinuum Sol, supporting rp, rpp, rpg, tk2
+    /// Quantinuum Sol, supporting PhasedX, PhasedXX
     Sol,
 }
 

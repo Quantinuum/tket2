@@ -34,7 +34,6 @@ class QSystemSolExtension(TketExtension):
             self.reset.op_def(),
             self.runtime_barrier_def,
             self.Rz.op_def(),
-            self.tk2.op_def(),
             self.try_QAlloc.op_def(),
         ]
 
@@ -96,11 +95,6 @@ class QSystemSolExtension(TketExtension):
     def Rz(self) -> ExtOp:
         """Rotate a qubit around the Z axis (not physical)."""
         return self().get_op("Rz").instantiate()
-
-    @functools.cached_property
-    def tk2(self) -> ExtOp:
-        """Tk2 gate (alias 'rxxyyzz'), specific to the Sol platform."""
-        return self().get_op("Tk2").instantiate()
 
     @functools.cached_property
     def try_QAlloc(self) -> ExtOp:

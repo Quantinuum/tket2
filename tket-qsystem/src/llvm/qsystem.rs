@@ -183,7 +183,6 @@ impl QSystemRuntimeFunction for HeliosGateFunction {
 enum SolGateFunction {
     Rp,
     Rpp,
-    Rxxyyzz,
 }
 
 impl QSystemRuntimeFunction for SolGateFunction {
@@ -191,7 +190,6 @@ impl QSystemRuntimeFunction for SolGateFunction {
         match self {
             SolGateFunction::Rp => "___rp",
             SolGateFunction::Rpp => "___rpp",
-            SolGateFunction::Rxxyyzz => "___rxxyyzz",
         }
     }
 
@@ -211,9 +209,6 @@ impl QSystemRuntimeFunction for SolGateFunction {
             SolGateFunction::Rpp => iwc
                 .void_type()
                 .fn_type(&[qubit, qubit, float, float], false),
-            SolGateFunction::Rxxyyzz => iwc
-                .void_type()
-                .fn_type(&[qubit, qubit, float, float, float], false),
         }
     }
 }
@@ -332,13 +327,6 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                 args,
                 RuntimeFunction::SolGate(SolGateFunction::Rpp),
                 &[0, 1, 2, 3],
-                &[0, 1],
-            ),
-            SolOp::Tk2 => self.emit_impl(
-                context,
-                args,
-                RuntimeFunction::SolGate(SolGateFunction::Rxxyyzz),
-                &[0, 1, 2, 3, 4],
                 &[0, 1],
             ),
             _ => {
@@ -648,14 +636,13 @@ mod test {
     #[case::rz(1, SolOp::Rz)]
     #[case::phased_x(2, SolOp::PhasedX)]
     #[case::phased_xx(3, SolOp::PhasedXX)]
-    #[case::tk2(4, SolOp::Tk2)]
-    #[case::measure(5, SolOp::Measure)]
-    #[case::lazy_measure(6, SolOp::LazyMeasure)]
-    #[case::try_qalloc(7, SolOp::TryQAlloc)]
-    #[case::qfree(8, SolOp::QFree)]
-    #[case::reset(9, SolOp::Reset)]
-    #[case::measure_reset(10, SolOp::MeasureReset)]
-    #[case::lazy_measure_leaked(11, SolOp::LazyMeasureLeaked)]
+    #[case::measure(4, SolOp::Measure)]
+    #[case::lazy_measure(5, SolOp::LazyMeasure)]
+    #[case::try_qalloc(6, SolOp::TryQAlloc)]
+    #[case::qfree(7, SolOp::QFree)]
+    #[case::reset(8, SolOp::Reset)]
+    #[case::measure_reset(9, SolOp::MeasureReset)]
+    #[case::lazy_measure_leaked(10, SolOp::LazyMeasureLeaked)]
     fn emit_sol_codegen(#[case] _i: i32, #[with(_i)] mut llvm_ctx: TestContext, #[case] op: SolOp) {
         use tket::passes::ComposablePass;
 

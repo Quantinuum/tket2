@@ -5,33 +5,23 @@ expression: mod_str
 ; ModuleID = 'test_context'
 source_filename = "test_context"
 
-define internal { i1, i64, i1 } @_hl.main.1(i64 %0) {
+define internal i64 @_hl.main.1(i64 %0) {
 alloca_block:
-  %"0" = alloca { i1, i64, i1 }, align 8
+  %"0" = alloca i64, align 8
   %"2_0" = alloca i64, align 8
-  %"4_0" = alloca { i1, i64, i1 }, align 8
-  %"6_0" = alloca i64, align 8
-  %"8_0" = alloca i64, align 8
-  %"9_0" = alloca { i1, i64, i1 }, align 8
+  %"4_0" = alloca i64, align 8
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
   store i64 %0, ptr %"2_0", align 4
   %"2_01" = load i64, ptr %"2_0", align 4
-  store i64 %"2_01", ptr %"6_0", align 4
-  %"6_02" = load i64, ptr %"6_0", align 4
-  %lazy_measure = call i64 @___lazy_measure(i64 %"6_02")
-  call void @___qfree(i64 %"6_02")
-  store i64 %lazy_measure, ptr %"8_0", align 4
-  %"8_03" = load i64, ptr %"8_0", align 4
-  %1 = insertvalue { i1, i64, i1 } { i1 true, i64 poison, i1 poison }, i64 %"8_03", 1
-  store { i1, i64, i1 } %1, ptr %"9_0", align 4
-  %"9_04" = load { i1, i64, i1 }, ptr %"9_0", align 4
-  store { i1, i64, i1 } %"9_04", ptr %"4_0", align 4
-  %"4_05" = load { i1, i64, i1 }, ptr %"4_0", align 4
-  store { i1, i64, i1 } %"4_05", ptr %"0", align 4
-  %"06" = load { i1, i64, i1 }, ptr %"0", align 4
-  ret { i1, i64, i1 } %"06"
+  %lazy_measure = call i64 @___lazy_measure(i64 %"2_01")
+  call void @___qfree(i64 %"2_01")
+  store i64 %lazy_measure, ptr %"4_0", align 4
+  %"4_02" = load i64, ptr %"4_0", align 4
+  store i64 %"4_02", ptr %"0", align 4
+  %"03" = load i64, ptr %"0", align 4
+  ret i64 %"03"
 }
 
 declare i64 @___lazy_measure(i64)

@@ -70,9 +70,9 @@ pub enum SolOp {
     LazyMeasure,
     /// Lazily measure a qubit and reset it to the Z |0> eigenstate.
     LazyMeasureReset,
-    /// Rotate a qubit around the Z axis, not physical (alias 'rz')
+    /// Rotate a qubit around the Z axis, not physical (alias 'rz').
     Rz,
-    /// PhasedX gate (aliases 'rxy', 'rp').
+    /// PhasedX gate (alias 'rp').
     PhasedX,
     /// Allocate a qubit in the Z |0> eigenstate.
     TryQAlloc,
@@ -86,8 +86,6 @@ pub enum SolOp {
     LazyMeasureLeaked,
     /// PhasedXX gate (alias 'rpp')
     PhasedXX,
-    /// Tk2 gate (alias 'rxxyyzz')
-    Tk2,
 }
 
 impl MakeOpDef for SolOp {
@@ -102,17 +100,6 @@ impl MakeOpDef for SolOp {
             match self {
                 SolOp::PhasedXX => Signature::new(
                     vec![qb_t(), qb_t(), float64_type(), float64_type()],
-                    TypeRow::from(vec![qb_t(), qb_t()]),
-                )
-                .into(),
-                SolOp::Tk2 => Signature::new(
-                    vec![
-                        qb_t(),
-                        qb_t(),
-                        float64_type(),
-                        float64_type(),
-                        float64_type(),
-                    ],
                     TypeRow::from(vec![qb_t(), qb_t()]),
                 )
                 .into(),
@@ -138,8 +125,7 @@ impl MakeOpDef for SolOp {
             shared_op.description()
         } else {
             match self {
-                SolOp::PhasedXX => "PhasedXX gate, a.k.a. rpp, specific to the Sol platform.",
-                SolOp::Tk2 => "Tk2 gate, a.k.a. rxxyyzz. Specific to the Sol platform.",
+                SolOp::PhasedXX => "PhasedXX gate, specific to the Sol platform.",
                 _ => unreachable!("All other SolOps should have been convertible to SharedOps."),
             }
         }
@@ -446,16 +432,6 @@ pub trait SynthesizeSolOp: Dataflow {
         angle2: Wire,
     ) -> Result<[Wire; 2], BuildError>;
 
-    /// Build a "tket.qsystem.sol.Tk2" op.
-    fn build_tk2(
-        &mut self,
-        qb1: Wire,
-        qb2: Wire,
-        alpha: Wire,
-        beta: Wire,
-        gamma: Wire,
-    ) -> Result<[Wire; 2], BuildError>;
-
     /// Build a "tket.qsystem.sol.PhasedX" op.
     fn build_phased_x(&mut self, qb: Wire, angle1: Wire, angle2: Wire) -> Result<Wire, BuildError>;
 
@@ -509,20 +485,6 @@ where
         Ok(self
             .inner
             .add_dataflow_op(SolOp::PhasedXX, [qb1, qb2, angle1, angle2])?
-            .outputs_arr())
-    }
-
-    fn build_tk2(
-        &mut self,
-        qb1: Wire,
-        qb2: Wire,
-        alpha: Wire,
-        beta: Wire,
-        gamma: Wire,
-    ) -> Result<[Wire; 2], BuildError> {
-        Ok(self
-            .inner
-            .add_dataflow_op(SolOp::Tk2, [qb1, qb2, alpha, beta, gamma])?
             .outputs_arr())
     }
 

@@ -267,7 +267,6 @@ const SOL_NATIVE_GATES_JSON: &str = r#"{
     "qubits": [["q", [0]], ["q", [1]]],
     "commands": [
         {"args": [["q", [0]], ["q", [1]]], "op": {"params": ["0.5", "0.25"], "type": "PhasedXX"}},
-        {"args": [["q", [0]], ["q", [1]]], "op": {"params": ["0.5", "0.25", "0.125"], "type": "TK2"}},
         {"args": [["q", [0]]], "op": {"params": ["0.5"], "type": "Rz"}}
     ],
     "implicit_permutation": [[["q", [0]], ["q", [0]]], [["q", [1]], ["q", [1]]]]
@@ -275,7 +274,7 @@ const SOL_NATIVE_GATES_JSON: &str = r#"{
 
 #[rstest]
 #[case::helios_native_gates(QSystemPlatform::Helios, NATIVE_GATES_JSON, 3, 2, false)]
-#[case::sol_native_gates(QSystemPlatform::Sol, SOL_NATIVE_GATES_JSON, 3, 2, false)]
+#[case::sol_native_gates(QSystemPlatform::Sol, SOL_NATIVE_GATES_JSON, 2, 2, false)]
 fn json_roundtrip(
     #[case] platform: QSystemPlatform,
     #[case] circ_s: &str,
