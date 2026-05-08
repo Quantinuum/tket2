@@ -97,8 +97,8 @@ recompile-test-hugrs:
 recompile-modifiers:
     @echo "---- Recompiling modifier examples ----"
     uv run maturin develop --uv
-    just test_files/modifier_examples/r
-    just test_files/run_modifier_examples/r
+    just test_files/modifier_examples/recompile-hugrs
+    just test_files/run_modifier_examples/run-hugrs
 
 recompile-modifier name:
     @echo "---- Compiling hugr {{name}} ----"

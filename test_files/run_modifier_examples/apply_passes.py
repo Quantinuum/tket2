@@ -1,10 +1,8 @@
-import sys
-from pathlib import Path
-
+from tket.passes import ModifierResolverPass
 from hugr.build.base import Hugr
-from tket.passes import (
-    ModifierResolverPass,
-)
+from pathlib import Path
+import sys
+
 
 mr_pass = ModifierResolverPass()
 

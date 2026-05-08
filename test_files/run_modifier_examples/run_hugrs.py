@@ -40,7 +40,6 @@ def format_statevector(
 modifier_examples_dir = Path(__file__).resolve().parent / "modified_hugrs"
 result_execution_dir = Path(__file__).resolve().parent / "hugr_results"
 
-print(modifier_examples_dir)
 all_results: list[str] = []
 args = sys.argv[1:]
 if len(args) > 2:
@@ -64,7 +63,7 @@ for hugr_path in hugr_paths:
     package = hugr.to_package()
 
     builder = EmulatorBuilder()
-    emulator = builder.build(package, n_qubits=8)
+    emulator = builder.build(package, n_qubits=9)
     state = emulator.statevector_sim().run()
     res = state.partial_state_dicts()[0]["r"].as_single_state()
     output_path = (
