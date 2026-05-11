@@ -292,7 +292,7 @@ impl<'circ, T: HugrView<Node = Node>> CommandIterator<'circ, T> {
         //          returning a new struct (borrowing the Circuit) that contains the SchedulingGraph,
         //          where the new struct defines a method returning an Iterator<Item=Node/Command>
         //          (actually returning a struct holding the Topo).
-        // (2) reimplement here caching a Vec of nodes topsorted from the scheduling_graph
+        // (2) reimplement here precomputing the Vec of nodes topsorted from the scheduling_graph
         //     - this will give poor perf/high memory usage - and deprecate CommandIterator at that time.
         let (region, region_node_map) = circ.hugr().region_portgraph(circ.parent());
         let node_count = region.node_count();
