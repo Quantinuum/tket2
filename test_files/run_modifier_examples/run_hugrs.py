@@ -39,6 +39,7 @@ def format_statevector(
 
 modifier_examples_dir = Path(__file__).resolve().parent / "modified_hugrs"
 result_execution_dir = Path(__file__).resolve().parent / "hugr_results"
+hugr_pdf_directory = Path(__file__).resolve().parents[1] / "0_hugr_pdf"
 
 all_results: list[str] = []
 args = sys.argv[1:]
@@ -55,11 +56,16 @@ else:
     hugr_paths = sorted(modifier_examples_dir.glob("*.hugr"))
 
 result_execution_dir.mkdir(parents=True, exist_ok=True)
+hugr_pdf_directory.mkdir(parents=True, exist_ok=True)
 for hugr_path in hugr_paths:
     print(f"Running {hugr_path.name}...")
     hugr_bytes = hugr_path.read_bytes()
     hugr = Hugr.from_bytes(hugr_bytes)
-
+    hugr.render_dot().render(
+        outfile=hugr_pdf_directory / f"{hugr_path.stem}.pdf",
+        cleanup=True,
+        quiet=True,
+    )
     package = hugr.to_package()
 
     builder = EmulatorBuilder()

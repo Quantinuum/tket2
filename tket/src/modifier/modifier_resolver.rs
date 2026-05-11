@@ -1186,7 +1186,7 @@ pub fn resolve_modifier_with_entrypoints(
     // At end we delete dead code: i.e. old function blocks that have been replaced by modified
     // versions but are still present as unreachable code.
     RemoveDeadFuncsPass::default()
-        .with_scope(Preserve::Public)
+        .with_scope(Preserve::All)
         .run(h)
         .unwrap();
 
