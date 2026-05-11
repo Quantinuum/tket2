@@ -1387,6 +1387,113 @@ mod tests {
         assert_matches!(h.validate(), Ok(()));
     }
 
+    #[test]
+    /// Test that a LoadFunction node that is shared between a modifier and a direct call is not removed during resolution.
+    fn shared_loaded_function_is_not_removed() {
+        let mut module = ModuleBuilder::new();
+
+        let foo_sig = Signature::new_endo(vec![qb_t()]);
+        let foo = {
+            let mut func = module.define_function("foo", foo_sig.clone()).unwrap();
+            func.set_unitary();
+            let mut inputs: Vec<Wire> = func.input_wires().collect();
+            inputs[0] = func
+                .add_dataflow_op(TketOp::X, vec![inputs[0]])
+                .unwrap()
+                .out_wire(0);
+            func.finish_with_outputs(inputs).unwrap()
+        };
+
+        let ctrl_num = 1;
+        let controlled_sig = Signature::new_endo(vec![array_type(ctrl_num, qb_t()), qb_t()]);
+        let main_sig = Signature::new(
+            type_row![],
+            vec![array_type(ctrl_num, qb_t()), qb_t(), qb_t()],
+        );
+        let control_op: ExtensionOp = MODIFIER_EXTENSION
+            .instantiate_extension_op(
+                &CONTROL_OP_ID,
+                [
+                    Term::BoundedNat(ctrl_num),
+                    vec![qb_t().into()].into(),
+                    vec![].into(),
+                ],
+            )
+            .unwrap();
+
+        let shared_load_node = {
+            let mut func = module.define_function("main", main_sig).unwrap();
+            let loaded = func.load_func(foo.handle(), &[]).unwrap();
+            let shared_load_node = loaded.node();
+
+            let modified_fn = func
+                .add_dataflow_op(control_op, vec![loaded])
+                .unwrap()
+                .out_wire(0);
+
+            let control = func
+                .add_dataflow_op(TketOp::QAlloc, vec![])
+                .unwrap()
+                .out_wire(0);
+            let controlled_target = func
+                .add_dataflow_op(TketOp::QAlloc, vec![])
+                .unwrap()
+                .out_wire(0);
+            let direct_target = func
+                .add_dataflow_op(TketOp::QAlloc, vec![])
+                .unwrap()
+                .out_wire(0);
+            let control_arr = func.add_new_array(qb_t(), [control]).unwrap();
+
+            let [control_arr, controlled_target] = func
+                .add_dataflow_op(
+                    CallIndirect {
+                        signature: controlled_sig,
+                    },
+                    [modified_fn, control_arr, controlled_target],
+                )
+                .unwrap()
+                .outputs_arr();
+
+            let direct_target = func
+                .add_dataflow_op(CallIndirect { signature: foo_sig }, [loaded, direct_target])
+                .unwrap()
+                .out_wire(0);
+
+            func.finish_with_outputs([control_arr, controlled_target, direct_target])
+                .unwrap();
+            shared_load_node
+        };
+
+        let mut h = module.finish_hugr().unwrap();
+        assert_matches!(h.validate(), Ok(()));
+
+        // save before
+        let mermaid_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/modifier/snapshots");
+        fs::create_dir_all(&mermaid_dir).unwrap();
+        let before_mermaid = h.mermaid_string();
+        fs::write(
+            mermaid_dir.join("before_resolve.mmd"),
+            before_mermaid.as_bytes(),
+        )
+        .unwrap();
+
+        let entrypoint = h.entrypoint();
+        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+
+        // save after
+        let after_mermaid = h.mermaid_string();
+        fs::write(
+            mermaid_dir.join("after_resolve.mmd"),
+            after_mermaid.as_bytes(),
+        )
+        .unwrap();
+
+        // Check that the shared load node is still present after resolution, and the hugr is valid.
+        assert!(h.contains_node(shared_load_node));
+        assert_matches!(h.validate(), Ok(()));
+    }
+
     const GUPPY_EXAMPLES_DIR: &str = "../test_files/modifier_examples";
 
     fn load_guppy_example(name: &str) -> std::io::Result<Hugr> {
