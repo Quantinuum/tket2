@@ -4,7 +4,7 @@ use hugr::HugrView;
 use hugr::extension::ExtensionId;
 use hugr::extension::simple_op::MakeExtensionOp;
 use hugr::ops::ExtensionOp;
-use hugr::types::Term;
+use hugr_core::types::Type;
 use itertools::Itertools;
 use tket::serialize::pytket::encoder::EncodeStatus;
 use tket::serialize::pytket::extension::{PytketTypeTranslator, RegisterCount};
@@ -71,13 +71,13 @@ impl PytketTypeTranslator for FutureEmitter {
         typ: &hugr::types::CustomType,
         type_translators: &TypeTranslatorSet,
     ) -> Option<RegisterCount> {
-        if typ.name() != futures::FUTURE_TYPE_NAME.as_str() {
-            return None;
+        if typ.name() == futures::FUTURE_TYPE_NAME.as_str()
+            && let Some(inner_term) = typ.args().first()
+            && let Ok(inner_ty) = Type::try_from(inner_term.clone())
+        {
+            type_translators.type_to_pytket(&inner_ty)
+        } else {
+            None
         }
-        let Some(Term::Runtime(inner_ty)) = typ.args().first() else {
-            return None;
-        };
-
-        type_translators.type_to_pytket(inner_ty)
     }
 }

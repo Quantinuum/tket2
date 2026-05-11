@@ -6,7 +6,6 @@ use hugr::extension::prelude::bool_t;
 use hugr::extension::simple_op::MakeExtensionOp;
 use hugr::ops::{ExtensionOp, Value};
 use hugr::std_extensions::arithmetic::int_types::INT_TYPES;
-use hugr::types::TypeArg;
 use hugr::{HugrView, Node};
 use hugr_llvm::CodegenExtsBuilder;
 use hugr_llvm::custom::CodegenExtension;
@@ -38,10 +37,10 @@ impl CodegenExtension for FuturesCodegenExtension {
                 |session, hugr_type| {
                     match (hugr_type.name().as_str(), hugr_type.args()) {
                         // For now, we only support future bools
-                        ("Future", [TypeArg::Runtime(ty)]) if *ty == bool_t() => {
+                        ("Future", [ty]) if *ty == bool_t().into() => {
                             Ok(future_type(session.iw_context()))
                         }
-                        ("Future", [TypeArg::Runtime(ty)]) if *ty == INT_TYPES[6] => {
+                        ("Future", [ty]) if *ty == INT_TYPES[6].clone().into() => {
                             Ok(future_type(session.iw_context()))
                         }
                         _ => Err(anyhow!(

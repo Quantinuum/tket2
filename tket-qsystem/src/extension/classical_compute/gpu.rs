@@ -66,8 +66,8 @@ use hugr::{
     },
     type_row,
     types::{
-        CustomType, FuncValueType, PolyFuncTypeRV, Signature, SumType, Type, TypeArg, TypeBound,
-        TypeEnum, TypeRV, TypeRow, TypeRowRV, type_param::TermTypeError,
+        CustomType, FuncValueType, PolyFuncTypeRV, Signature, SumType, Term, Type, TypeArg,
+        TypeBound, TypeRow, TypeRowRV, type_param::TermTypeError,
     },
 };
 use itertools::Itertools as _;
@@ -253,7 +253,7 @@ mod test {
     #[case(GpuType::Module)]
     #[case(GpuType::Context)]
     #[case(GpuType::new_func(type_row![], type_row![]))]
-    #[case(GpuType::new_func(vec![TypeRV::new_row_var_use(0, TypeBound::Linear)], vec![bool_t()]))]
+    #[case(GpuType::new_func(TypeRowRV::new_var_use(0, TypeBound::Linear), vec![bool_t()]))]
     fn gpu_type(#[case] gpu_t: GpuType) {
         let hugr_t: Type = gpu_t.clone().into();
         let roundtripped_t = hugr_t.try_into().unwrap();
@@ -278,8 +278,8 @@ mod test {
             ]),
             Ok(GpuOp::LookupByName {
                 name: "lookup_name".to_string(),
-                inputs: vec![TypeRV::new_row_var_use(0, TypeBound::Linear)].into(),
-                outputs: TypeRowRV::from(Vec::<TypeRV>::new())
+                inputs: TypeRowRV::new_var_use(0, TypeBound::Linear),
+                outputs: TypeRowRV::new()
             })
         );
         assert_eq!(
@@ -290,8 +290,8 @@ mod test {
             ]),
             Ok(GpuOp::LookupById {
                 id: 42,
-                inputs: vec![TypeRV::new_row_var_use(0, TypeBound::Linear)].into(),
-                outputs: TypeRowRV::from(Vec::<TypeRV>::new())
+                inputs: TypeRowRV::new_var_use(0, TypeBound::Linear),
+                outputs: TypeRowRV::new()
             })
         );
         assert_eq!(
@@ -307,8 +307,8 @@ mod test {
     #[case::concrete(type_row![], type_row![])]
     #[case::row_vars1(
         vec![
-            TypeRV::UNIT,
-            TypeRV::try_from(
+            Type::UNIT,
+            Type::try_from(
                 TypeArg::new_var_use(
                     0,
                     TypeParam::ListType (Box::new(TypeBound::Copyable.into()))
@@ -337,7 +337,7 @@ mod test {
             &extension,
         ));
         assert_eq!(
-            op.to_extension_op().unwrap().signature(),
+            op.to_extension_op().unwrap().signature().into_owned(),
             Signature::new(vec![module_ty], vec![func_ty])
         );
     }

@@ -17,8 +17,9 @@ use hugr::{
             StaticArrayValue, static_array_type,
         },
     },
-    types::{Transformable as _, Type, TypeEnum, TypeRow},
+    types::{Transformable as _, Type, TypeRow},
 };
+use hugr_core::types::Term;
 use itertools::Itertools as _;
 use tket::extension::bool::{self, BOOL_TYPE_NAME, BoolOpBuilder as _, ConstBool, bool_type};
 use tket::passes::PassScope;
@@ -136,7 +137,7 @@ fn outer_replace_types() -> ReplaceTypes {
                 let [element_ty_arg] = args else {
                     unreachable!()
                 };
-                element_ty_arg.as_runtime().unwrap()
+                Type::try_from(element_ty_arg.clone()).unwrap()
             };
             let changed = element_ty.transform(&inner).unwrap();
             changed.then_some(static_array_type(element_ty))
@@ -150,7 +151,10 @@ fn outer_replace_types() -> ReplaceTypes {
             let inner = inner.clone();
             move |args, _| {
                 let [element_ty] = args else { unreachable!() };
-                Ok(get_op_dest(&inner, element_ty.as_runtime().unwrap()))
+                Ok(get_op_dest(
+                    &inner,
+                    Type::try_from(element_ty.clone()).unwrap(),
+                ))
             }
         },
     );
@@ -160,7 +164,10 @@ fn outer_replace_types() -> ReplaceTypes {
             .unwrap(),
         move |args, _| {
             let [element_ty] = args else { unreachable!() };
-            Ok(len_op_dest(&inner, element_ty.as_runtime().unwrap()))
+            Ok(len_op_dest(
+                &inner,
+                Type::try_from(element_ty.clone()).unwrap(),
+            ))
         },
     );
     outer
@@ -209,8 +216,8 @@ fn build_new_to_old(
     val: Wire,
     old_ty: Type,
 ) -> Result<Wire> {
-    match old_ty.as_type_enum() {
-        TypeEnum::Extension(custom_ty) => {
+    match &*old_ty {
+        Term::RuntimeExtension(custom_ty) => {
             if (custom_ty.extension(), custom_ty.name())
                 == (&static_array::EXTENSION_ID, &STATIC_ARRAY_TYPENAME)
             {
@@ -224,7 +231,7 @@ fn build_new_to_old(
                 Ok(val)
             }
         }
-        TypeEnum::Sum(sum_ty) => {
+        Term::RuntimeSum(sum_ty) => {
             let mut new_sum_ty = sum_ty.clone();
 
             if !new_sum_ty.transform(rt)? {

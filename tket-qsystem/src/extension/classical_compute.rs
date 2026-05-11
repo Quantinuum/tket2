@@ -10,8 +10,6 @@ use smol_str::SmolStr;
 use std::marker::PhantomData;
 use std::sync::Weak;
 
-use super::utils::row_to_arg;
-
 lazy_static! {
     /// The name of the `module` type.
     pub static ref MODULE_TYPE_NAME: SmolStr = SmolStr::new_inline("module");
@@ -123,7 +121,7 @@ impl<T> ComputeType<T> {
     ) -> CustomType {
         CustomType::new(
             FUNC_TYPE_NAME.to_owned(),
-            [row_to_arg(inputs), row_to_arg(outputs)],
+            [inputs.into().into(), outputs.into().into()],
             extension_id,
             TypeBound::Copyable,
             extension_ref,
@@ -137,7 +135,7 @@ impl<T> ComputeType<T> {
     ) -> CustomType {
         CustomType::new(
             RESULT_TYPE_NAME.to_owned(),
-            [row_to_arg(outputs)],
+            [outputs.into().into()],
             extension_id,
             TypeBound::Linear,
             extension_ref,
@@ -277,7 +275,7 @@ macro_rules! compute_opdef {
             type Error = ();
 
             fn try_from(value: Type) -> Result<Self, Self::Error> {
-                let TypeEnum::Extension(custom_type) = value.as_type_enum() else {
+                let Some(custom_type) = value.as_extension() else {
                     Err(())?
                 };
 
@@ -309,12 +307,12 @@ macro_rules! compute_opdef {
                     Self::dispose_context => Signature::new(vec![context_type], type_row![]).into(),
                     // <id: usize, inputs: TypeRow, outputs: TypeRow> [Module] -> [ComputeType::Func { inputs, outputs }]
                     Self::lookup_by_id => {
-                        let inputs = TypeRV::new_row_var_use(1, TypeBound::Copyable);
-                        let outputs = TypeRV::new_row_var_use(2, TypeBound::Copyable);
+                        let inputs = TypeRowRV::new_var_use(1, TypeBound::Copyable);
+                        let outputs = TypeRowRV::new_var_use(2, TypeBound::Copyable);
 
                         let func_type = ComputeType::<$ext>::func_custom_type(
-                            vec![inputs],
-                            vec![outputs],
+                            inputs,
+                            outputs,
                             self.extension(),
                             extension_ref,
                         )
@@ -331,12 +329,12 @@ macro_rules! compute_opdef {
                     }
                     // <name: String, inputs: TypeRow, outputs: TypeRow> [Module] -> [ComputeType::Func { inputs, outputs }]
                     Self::lookup_by_name => {
-                        let inputs = TypeRV::new_row_var_use(1, TypeBound::Copyable);
-                        let outputs = TypeRV::new_row_var_use(2, TypeBound::Copyable);
+                        let inputs = TypeRowRV::new_var_use(1, TypeBound::Copyable);
+                        let outputs = TypeRowRV::new_var_use(2, TypeBound::Copyable);
 
                         let func_type = ComputeType::<$ext>::func_custom_type(
-                            vec![inputs],
-                            vec![outputs],
+                            inputs,
+                            outputs,
                             self.extension(),
                             extension_ref,
                         )
@@ -353,43 +351,49 @@ macro_rules! compute_opdef {
                     }
                     // <inputs: TypeRow, outputs: TypeRow> [Context, ComputeType::Func { inputs, outputs }, inputs] -> [Context, future<tuple<outputs>>>]
                     Self::call => {
-                        let context_type: TypeRV = context_type.into();
-                        let inputs = TypeRV::new_row_var_use(0, TypeBound::Copyable);
-                        let outputs = TypeRV::new_row_var_use(1, TypeBound::Copyable);
+                        let inputs = TypeRowRV::new_var_use(0, TypeBound::Copyable);
+                        let outputs = TypeRowRV::new_var_use(1, TypeBound::Copyable);
                         let func_type = Type::new_extension(ComputeType::<$ext>::func_custom_type(
-                            vec![inputs.clone()],
-                            vec![outputs.clone()],
+                            inputs.clone(),
+                            outputs.clone(),
                             self.extension(),
                             extension_ref,
                         ));
-                        let result_type =
-                            TypeRV::new_extension(ComputeType::<$ext>::result_custom_type(
-                                vec![outputs],
+                        let result_type: Type =
+                            Term::RuntimeExtension(ComputeType::<$ext>::result_custom_type(
+                                outputs,
                                 self.extension(),
                                 extension_ref,
-                            ));
+                            ))
+                            .try_into()
+                            .unwrap();
 
                         PolyFuncTypeRV::new(
                             [INPUTS_PARAM.to_owned(), OUTPUTS_PARAM.to_owned()],
                             FuncValueType::new(
-                                vec![context_type.clone(), func_type.into(), inputs],
+                                TypeRowRV::from(vec![context_type.clone(), func_type.into()])
+                                    .concat(inputs),
                                 vec![result_type],
                             ),
                         )
                         .into()
                     }
                     Self::read_result => {
-                        let context_type: TypeRV = context_type.into();
-                        let outputs = TypeRV::new_row_var_use(0, TypeBound::Copyable);
-                        let result_type =
-                            TypeRV::new_extension(ComputeType::<$ext>::result_custom_type(
-                                vec![outputs.clone()],
+                        let outputs = TypeRowRV::new_var_use(0, TypeBound::Copyable);
+                        let result_type: Type =
+                            Term::RuntimeExtension(ComputeType::<$ext>::result_custom_type(
+                                outputs.clone(),
                                 self.extension(),
                                 extension_ref,
-                            ));
+                            ))
+                            .try_into()
+                            .unwrap();
                         PolyFuncTypeRV::new(
                             [OUTPUTS_PARAM.to_owned()],
-                            FuncValueType::new(vec![result_type], vec![context_type, outputs]),
+                            FuncValueType::new(
+                                vec![result_type],
+                                TypeRowRV::from(vec![context_type]).concat(outputs),
+                            ),
                         )
                         .into()
                     }
