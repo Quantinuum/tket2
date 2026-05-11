@@ -59,6 +59,7 @@ for hugr_path in hugr_paths:
     print(f"Running {hugr_path.name}...")
     hugr_bytes = hugr_path.read_bytes()
     hugr = Hugr.from_bytes(hugr_bytes)
+
     package = hugr.to_package()
 
     builder = EmulatorBuilder()
