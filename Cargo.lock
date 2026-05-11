@@ -1129,8 +1129,7 @@ dependencies = [
 [[package]]
 name = "hugr"
 version = "0.27.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e91648ee98355c1d502a0d466eec0b67ca2612f81ef5d261e62fca8aa567ab52"
+source = "git+https://github.com/quantinuum/hugr?rev=d37274316d9e2adf4ac24ff51db02a742b6841f6#d37274316d9e2adf4ac24ff51db02a742b6841f6"
 dependencies = [
  "hugr-core",
  "hugr-llvm",
@@ -1140,8 +1139,7 @@ dependencies = [
 [[package]]
 name = "hugr-cli"
 version = "0.27.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1c7b88b23e22f987c6f65cbfb1b23fd6573ccb2be50824b39baf8b421a7958c"
+source = "git+https://github.com/quantinuum/hugr?rev=d37274316d9e2adf4ac24ff51db02a742b6841f6#d37274316d9e2adf4ac24ff51db02a742b6841f6"
 dependencies = [
  "anyhow",
  "clap",
@@ -1161,8 +1159,7 @@ dependencies = [
 [[package]]
 name = "hugr-core"
 version = "0.27.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dbea3356943ad488326fcea465519c25d03ab792198331610d1292c324d209b8"
+source = "git+https://github.com/quantinuum/hugr?rev=d37274316d9e2adf4ac24ff51db02a742b6841f6#d37274316d9e2adf4ac24ff51db02a742b6841f6"
 dependencies = [
  "base64",
  "cgmath",
@@ -1199,8 +1196,7 @@ dependencies = [
 [[package]]
 name = "hugr-llvm"
 version = "0.27.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de92b58fa5e8e0c2d03aab5a6a9cd50b4021ad5e3c0ca68d6ffeb604833337ca"
+source = "git+https://github.com/quantinuum/hugr?rev=d37274316d9e2adf4ac24ff51db02a742b6841f6#d37274316d9e2adf4ac24ff51db02a742b6841f6"
 dependencies = [
  "anyhow",
  "cc",
@@ -1219,8 +1215,7 @@ dependencies = [
 [[package]]
 name = "hugr-model"
 version = "0.27.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9699c56c272a729b110e989d799e63beb6f077b5bcc118cd76c088453693615e"
+source = "git+https://github.com/quantinuum/hugr?rev=d37274316d9e2adf4ac24ff51db02a742b6841f6#d37274316d9e2adf4ac24ff51db02a742b6841f6"
 dependencies = [
  "base64",
  "bumpalo",

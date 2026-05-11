@@ -106,7 +106,7 @@ pub trait Linearizer {
 
 /// A configuration for implementing [Linearizer] by delegating to
 /// type-specific callbacks, and by  composing them in order to handle compound types
-/// such as [`TypeEnum::Sum`]s.
+/// such as [`Term::RuntimeSum`]s.
 #[derive(Clone)]
 pub struct DelegatingLinearizer {
     // Keyed by lowered type, as only needed when there is an op outputting such
@@ -804,10 +804,11 @@ mod test {
         );
         let drop_op = drop_ext.get_op("drop").unwrap();
         lowerer.set_replace_parametrized_op(drop_op, |args, rt| {
-            let [TypeArg::Runtime(ty)] = args else {
+            let [ty] = args else {
                 panic!("Expected just one type")
             };
-            Ok(Some(rt.get_linearizer().copy_discard_op(ty, 0)?))
+            let ty = Type::try_from(ty.clone()).unwrap();
+            Ok(Some(rt.get_linearizer().copy_discard_op(&ty, 0)?))
         });
 
         let build_hugr = |ty: Type| {
