@@ -726,8 +726,10 @@ macro_rules! compute_builder {
                     // TODO Add an Error variant to BuildError for: Input wire has wrong type
                     panic!("func wire is not a func type: {func_wire_type}")
                 };
-                let (in_types, out_types) =
-                    (TypeRow::try_from(in_types)?, TypeRow::try_from(out_types)?);
+                let (in_types, out_types) = (
+                    TypeRow::try_from(in_types).map_err(SignatureError::from)?,
+                    TypeRow::try_from(out_types).map_err(SignatureError::from)?,
+                );
 
                 Ok(self
                     .add_dataflow_op(
@@ -749,7 +751,7 @@ macro_rules! compute_builder {
                     // TODO Add an Error variant to BuildError for: Input wire has wrong type
                     panic!("result wire is not a result type: {result_wire_type}")
                 };
-                let outputs = TypeRow::try_from(outputs)?;
+                let outputs = TypeRow::try_from(outputs).map_err(SignatureError::from)?;
 
                 let op =
                     self.add_dataflow_op(ComputeOp::<$ext>::ReadResult { outputs }, [result])?;

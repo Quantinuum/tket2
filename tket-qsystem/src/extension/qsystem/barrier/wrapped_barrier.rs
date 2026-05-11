@@ -2,18 +2,16 @@
 
 use std::sync::{Arc, LazyLock};
 
+use crate::extension::qsystem::QSystemOpBuilder;
 use hugr::{
     Hugr, Wire,
     builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
     extension::{Extension, prelude::qb_t},
     ops::ExtensionOp,
     std_extensions::collections::array::array_type,
-    types::{
-        FuncValueType, PolyFuncTypeRV, Signature, TypeArg, TypeBound, TypeRV, type_param::TypeParam,
-    },
+    types::{FuncValueType, PolyFuncTypeRV, Signature, TypeArg, TypeBound, type_param::TypeParam},
 };
-
-use crate::extension::qsystem::QSystemOpBuilder;
+use hugr_core::types::TypeRowRV;
 use tket::passes::utils::unpack_container::op_function_map::OpFunctionMap;
 
 /// Temporary extension name for barrier-specific operations.
@@ -35,7 +33,7 @@ static TEMP_BARRIER_EXT: LazyLock<Arc<Extension>> = LazyLock::new(|| {
                 Default::default(),
                 PolyFuncTypeRV::new(
                     vec![TypeParam::new_list_type(TypeBound::Linear)],
-                    FuncValueType::new_endo(vec![TypeRV::new_row_var_use(0, TypeBound::Linear)]),
+                    FuncValueType::new_endo(TypeRowRV::new_var_use(0, TypeBound::Linear)),
                 ),
                 ext_ref,
             )
