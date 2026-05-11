@@ -7,7 +7,7 @@ use hugr_core::builder::{
 use hugr_core::extension::{SignatureError, TypeDef};
 use hugr_core::std_extensions::collections::array::array_type_def;
 use hugr_core::std_extensions::collections::borrow_array::borrow_array_type_def;
-use hugr_core::types::{CustomType, Signature, Type, TypeArg, TypeEnum, TypeRow};
+use hugr_core::types::{CustomType, Signature, Term, Type, TypeArg, TypeEnum, TypeRow};
 use hugr_core::{HugrView, IncomingPort, Node, Wire, hugr::hugrmut::HugrMut, ops::Tag};
 use itertools::Itertools;
 
@@ -270,8 +270,8 @@ impl Linearizer for DelegatingLinearizer {
         }
         assert!(num_outports != 1);
 
-        match typ.as_type_enum() {
-            TypeEnum::Sum(sum_type) => {
+        match &**typ {
+            Term::RuntimeSum(sum_type) => {
                 let variants = sum_type
                     .variants()
                     .map(|trv| trv.clone().try_into())
@@ -317,7 +317,7 @@ impl Linearizer for DelegatingLinearizer {
                     cb.finish_hugr().unwrap(),
                 )))
             }
-            TypeEnum::Extension(cty) => {
+            Term::RuntimeExtension(cty) => {
                 if let Some((copy, discard)) = self.copy_discard.get(cty) {
                     Ok(if num_outports == 0 {
                         discard.clone()
@@ -350,7 +350,7 @@ impl Linearizer for DelegatingLinearizer {
                     Ok(tmpl)
                 }
             }
-            TypeEnum::Function(_) => panic!("Ruled out above as copyable"),
+            Term::RuntimeFunction(_) => panic!("Ruled out above as copyable"),
             _ => Err(LinearizeError::UnsupportedType(Box::new(typ.clone()))),
         }
     }

@@ -24,7 +24,7 @@ use hugr_core::ops::{
     ExtensionOp, Input, LoadConstant, LoadFunction, OpTrait, OpType, Output, Tag, TailLoop, Value,
 };
 use hugr_core::types::{
-    ConstTypeError, CustomType, Signature, Transformable, Type, TypeArg, TypeEnum, TypeRow,
+    ConstTypeError, CustomType, Signature, Term, Transformable, Type, TypeArg, TypeRow,
     TypeTransformer,
 };
 use hugr_core::{Direction, Hugr, HugrView, Node, PortIndex, Visibility, Wire};
@@ -719,8 +719,8 @@ impl ReplaceTypes {
                 Ok(any_change)
             }
             Value::Extension { e } => Ok({
-                let new_const = match e.get_type().as_type_enum() {
-                    TypeEnum::Extension(exty) => match self.consts.get(exty) {
+                let new_const = match &*e.get_type() {
+                    Term::RuntimeExtension(exty) => match self.consts.get(exty) {
                         Some(const_fn) => Some(const_fn(e, self)),
                         None => self
                             .param_consts
@@ -890,7 +890,7 @@ mod test {
     }
 
     fn just_elem_type(args: &[TypeArg]) -> &Type {
-        let [TypeArg::Runtime(ty)] = args else {
+        let [elem_term] = args else {
             panic!("Expected just elem type")
         };
         ty
@@ -1553,9 +1553,11 @@ mod test {
                 .unwrap()
                 .as_ref(),
             move |args, _| {
-                let [sz, Term::Runtime(ty)] = args else {
+                let [sz, ty_term] = args else {
                     panic!("Expected two args to array-get")
                 };
+                let ty: Type = ty_term.clone().try_into().expect("Expected a runtime type");
+
                 if sz != &Term::BoundedNat(64) {
                     return Ok(None);
                 }
@@ -1580,10 +1582,7 @@ mod test {
                     .unwrap()
                     .outputs_arr();
                 let [wrapped_elem] = dfb
-                    .add_dataflow_op(
-                        ops::Tag::new(1, vec![type_row![], [ty.clone()].into()]),
-                        [elem],
-                    )
+                    .add_dataflow_op(Tag::new(1, vec![type_row![], [ty].into()]), [elem])
                     .unwrap()
                     .outputs_arr();
                 Ok(Some(NodeTemplate::CompoundOp(Box::new(
