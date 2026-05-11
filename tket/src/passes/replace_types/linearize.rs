@@ -7,7 +7,7 @@ use hugr_core::builder::{
 use hugr_core::extension::{SignatureError, TypeDef};
 use hugr_core::std_extensions::collections::array::array_type_def;
 use hugr_core::std_extensions::collections::borrow_array::borrow_array_type_def;
-use hugr_core::types::{CustomType, Signature, Term, Type, TypeArg, TypeEnum, TypeRow};
+use hugr_core::types::{CustomType, Signature, Term, Type, TypeArg, TypeRow};
 use hugr_core::{HugrView, IncomingPort, Node, Wire, hugr::hugrmut::HugrMut, ops::Tag};
 use itertools::Itertools;
 
@@ -275,7 +275,8 @@ impl Linearizer for DelegatingLinearizer {
                 let variants = sum_type
                     .variants()
                     .map(|trv| trv.clone().try_into())
-                    .collect::<Result<Vec<TypeRow>, _>>()?;
+                    .collect::<Result<Vec<TypeRow>, _>>()
+                    .map_err(SignatureError::from)?;
                 let mut cb = ConditionalBuilder::new(
                     variants.clone(),
                     vec![],

@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use hugr::{
     extension::SignatureFunc,
-    types::{FuncValueType, PolyFuncTypeRV, TypeBound, TypeRV, type_param::TypeParam},
+    types::{FuncValueType, PolyFuncTypeRV, TypeBound, type_param::TypeParam},
 };
 
 /// Dagger modifier.

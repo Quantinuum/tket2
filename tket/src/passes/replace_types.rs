@@ -719,14 +719,16 @@ impl ReplaceTypes {
                 Ok(any_change)
             }
             Value::Extension { e } => Ok({
-                let new_const = e.get_type().as_extension().and_then(
-                    |exty| match self.consts.get(exty) {
-                        Some(const_fn) => Some(const_fn(e, self)),
-                        None => self
-                            .param_consts
-                            .get(&exty.into())
-                            .and_then(|const_fn| const_fn(e, self).transpose()),
-                    });
+                let new_const =
+                    e.get_type()
+                        .as_extension()
+                        .and_then(|exty| match self.consts.get(exty) {
+                            Some(const_fn) => Some(const_fn(e, self)),
+                            None => self
+                                .param_consts
+                                .get(&exty.into())
+                                .and_then(|const_fn| const_fn(e, self).transpose()),
+                        });
                 if let Some(new_const) = new_const {
                     *value = new_const?;
                     true

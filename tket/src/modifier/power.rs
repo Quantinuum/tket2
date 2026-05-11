@@ -4,7 +4,7 @@ use std::str::FromStr;
 use hugr::{
     extension::SignatureFunc,
     std_extensions::arithmetic::int_types::int_type,
-    types::{FuncValueType, PolyFuncTypeRV, TypeBound, TypeRV, type_param::TypeParam},
+    types::{FuncValueType, PolyFuncTypeRV, TypeBound, type_param::TypeParam},
 };
 
 /// Power modifier.
