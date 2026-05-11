@@ -5,6 +5,7 @@ use hugr::{
     extension::SignatureFunc,
     types::{FuncValueType, PolyFuncTypeRV, TypeBound, type_param::TypeParam},
 };
+use hugr_core::types::{Type, TypeRowRV};
 
 /// Dagger modifier.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
@@ -41,19 +42,15 @@ impl ModifierDagger {
                 TypeParam::new_list_type(TypeBound::Linear),
             ],
             FuncValueType::new(
-                [TypeRV::new_function(FuncValueType::new(
-                    vec![
-                        TypeRV::new_row_var_use(0, TypeBound::Linear),
-                        TypeRV::new_row_var_use(1, TypeBound::Linear),
-                    ],
-                    vec![TypeRV::new_row_var_use(0, TypeBound::Linear)],
+                [Type::new_function(FuncValueType::new(
+                    TypeRowRV::new_var_use(0, TypeBound::Linear)
+                        .concat(TypeRowRV::new_var_use(1, TypeBound::Linear)),
+                    TypeRowRV::new_var_use(0, TypeBound::Linear),
                 ))],
-                [TypeRV::new_function(FuncValueType::new(
-                    vec![
-                        TypeRV::new_row_var_use(0, TypeBound::Linear),
-                        TypeRV::new_row_var_use(1, TypeBound::Linear),
-                    ],
-                    [TypeRV::new_row_var_use(0, TypeBound::Linear)],
+                [Type::new_function(FuncValueType::new(
+                    TypeRowRV::new_var_use(0, TypeBound::Linear)
+                        .concat(TypeRowRV::new_var_use(1, TypeBound::Linear)),
+                    TypeRowRV::new_var_use(0, TypeBound::Linear),
                 ))],
             ),
         )
