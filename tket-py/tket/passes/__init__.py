@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from pathlib import Path
-import json
 from dataclasses import dataclass
+import json
+from pathlib import Path
 
 from hugr import Hugr
 from pytket.passes import (
@@ -10,7 +10,8 @@ from pytket.passes import (
 )
 
 from tket import _state
-from ._tket import passes as _passes, optimiser as _optimiser
+from . import inline_funcs
+from .._tket import passes as _passes, optimiser as _optimiser
 
 from hugr.passes.composable import (
     ComposablePass,
@@ -24,7 +25,11 @@ from hugr.passes.scope import PassScope, GlobalScope
 __all__ = [
     "PytketHugrPass",
     "PassResult",
+    "InlineFuncsHeuristic",
+    "InlineFunctions",
     "NormalizeGuppy",
+    "ModifierResolverPass",
+    "QSystemPass",
 ]
 
 
@@ -143,6 +148,50 @@ class NormalizeGuppy(ComposablePass):
         return program
 
 
+@dataclass
+class InlineFunctions(ComposablePass):
+    """Inline acyclic function calls below the selected scope.
+
+    Parameters:
+    - heuristic: Heuristic used to choose which non-recursive functions to
+      inline. Defaults to `MaxSize(64)`.
+    - follow_inline_hints: Whether to follow compiler hints for inlining
+      functions.
+    """
+
+    heuristic: inline_funcs.InlineFuncsHeuristic = inline_funcs.MaxSize(64)
+    follow_inline_hints: bool = True
+    _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
+
+    def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
+        return implement_pass_run(
+            self,
+            hugr=hugr,
+            inplace=inplace,
+            copy_call=lambda h: self._inline_functions(h, inplace),
+        )
+
+    def with_scope(self, _scope: PassScope) -> InlineFunctions:
+        """Set the scope of this pass and return self."""
+        self._scope = _scope
+        return self
+
+    def _inline_functions(self, hugr: Hugr, inplace: bool) -> PassResult:
+        tk_program = _state.CompilationState.from_python(hugr)
+
+        _passes.inline_functions(
+            tk_program._inner,
+            heuristic=self.heuristic,
+            follow_inline_hints=self.follow_inline_hints,
+            scope=self._scope,
+        )
+
+        package = tk_program.to_python()
+        return PassResult.for_pass(
+            self, hugr=package.modules[0], inplace=inplace, result=None
+        )
+
+
 def _greedy_depth_reduce(program: _state.CompilationState) -> int:
     return _passes.greedy_depth_reduce(program._inner)
 
@@ -208,3 +257,97 @@ def _badger_optimise(
         max_circuit_count=max_circuit_count,
         log_dir=log_dir,
     )
+
+
+@dataclass
+class ModifierResolverPass(ComposablePass):
+    """A pass to resolve Guppy modifiers (control, dagger, power)."""
+
+    _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
+
+    def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
+        return implement_pass_run(
+            self,
+            hugr=hugr,
+            inplace=inplace,
+            copy_call=lambda h: self._resolve(h, inplace),
+        )
+
+    def with_scope(self, scope: PassScope) -> ModifierResolverPass:
+        """Set the scope of this pass and return self."""
+        self._scope = scope
+        return self
+
+    def _resolve(self, hugr: Hugr, inplace: bool) -> PassResult:
+        tk_program = _state.CompilationState.from_python(hugr)
+
+        self._run_tk(tk_program)
+
+        package = tk_program.to_python()
+        return PassResult.for_pass(
+            self, hugr=package.modules[0], inplace=inplace, result=None
+        )
+
+    def _run_tk(self, program: _state.CompilationState) -> _state.CompilationState:
+        """Run the pass in the CompilationState"""
+        _passes.resolve_modifiers(
+            program._inner,
+            scope=self._scope,
+        )
+        return program
+
+
+@dataclass(kw_only=True)
+class QSystemPass(ComposablePass):
+    """A pass to convert quantum ops to qsystem ops.
+
+     Parameters:
+    - constant_fold: Whether to perform constant folding.
+    - monomorphize: Whether to monomorphize generic functions.
+    - force_order: Whether to enforce total ordering of all HUGR operations.
+    - lazify: Whether to replace measurements with lazy measurements.
+    - hide_funcs: Whether to mark all functions as private.
+    """
+
+    constant_fold: bool = True
+    monomorphize: bool = True
+    force_order: bool = True
+    lazify: bool = True
+    hide_funcs: bool = True
+    _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
+
+    def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
+        return implement_pass_run(
+            self,
+            hugr=hugr,
+            inplace=inplace,
+            copy_call=lambda h: self._qsystem_rebase(h, inplace),
+        )
+
+    def with_scope(self, scope: PassScope) -> QSystemPass:
+        """Set the scope of this pass and return self."""
+        self._scope = scope
+        return self
+
+    def _qsystem_rebase(self, hugr: Hugr, inplace: bool) -> PassResult:
+        tk_program = _state.CompilationState.from_python(hugr)
+
+        self._run_tk(tk_program)
+
+        package = tk_program.to_python()
+        return PassResult.for_pass(
+            self, hugr=package.modules[0], inplace=inplace, result=None
+        )
+
+    def _run_tk(self, program: _state.CompilationState) -> _state.CompilationState:
+        """Run the pass in the CompilationState"""
+        _passes.qsystem_rebase_pass(
+            program._inner,
+            constant_fold=self.constant_fold,
+            monomorphize=self.monomorphize,
+            force_order=self.force_order,
+            lazify=self.lazify,
+            hide_funcs=self.hide_funcs,
+            scope=self._scope,
+        )
+        return program

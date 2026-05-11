@@ -15,9 +15,8 @@ use hugr::{
     hugr::hugrmut::HugrMut,
     ops::{Call, Conditional, DFG, DataflowBlock, DataflowOpTrait, OpType, TailLoop},
     std_extensions::collections::array::ArrayOpBuilder,
-    types::{FuncTypeBase, Signature, TypeArg, TypeRow},
+    types::{FuncTypeBase, TypeArg, TypeRow},
 };
-use hugr_core::hugr::internal::PortgraphNodeMap;
 use petgraph::visit::{Topo, Walker};
 
 use super::{DirWire, ModifierFlags, ModifierResolver, ModifierResolverErrors, PortExt};
@@ -28,21 +27,24 @@ impl<N: HugrNode> ModifierResolver<N> {
     pub(super) fn modify_dfg_body(
         &mut self,
         h: &mut impl HugrMut<Node = N>,
-        n: N,
+        parent_node: N,
         new_dfg: &mut impl Dataflow,
     ) -> Result<(), ModifierResolverErrors<N>> {
         let mut corresp_map = HashMap::new();
-        let mut controls = self.init_control_from_input(h, n, new_dfg)?;
+        let mut controls = self.init_control_from_input(h, parent_node, new_dfg)?;
         mem::swap(self.corresp_map(), &mut corresp_map);
         mem::swap(self.controls(), &mut controls);
 
         // Modify the input/output nodes beforehand.
-        self.modify_in_out_node(h, n, new_dfg)?;
-        // Modify the children nodes.
-        self.modify_dfg_children(h, n, new_dfg)?;
+        self.modify_in_out_node(h, parent_node, new_dfg)?;
 
-        self.wire_control_to_output(h, n, new_dfg)?;
-        self.connect_all(h, new_dfg, n)?;
+        // Modify the children nodes.
+        self.modify_dfg_children(h, parent_node, new_dfg)?;
+
+        self.wire_control_to_output(h, parent_node, new_dfg)?;
+
+        self.connect_all(h, new_dfg, parent_node)?;
+
         mem::swap(self.controls(), &mut controls);
         mem::swap(self.corresp_map(), &mut corresp_map);
 
@@ -58,19 +60,20 @@ impl<N: HugrNode> ModifierResolver<N> {
         let mut worklist = VecDeque::new();
         // This block is needed to appease the borrow checker.
         {
-            let (region_graph, node_map) = h.region_portgraph(n);
-            let mut topo: Vec<_> = Topo::new(&region_graph).iter(&region_graph).collect();
+            let sg = h.scheduling_graph(n);
+            let mut topo: Vec<_> = Topo::new(sg.petgraph()).iter(sg.petgraph()).collect();
             // Reverse the topological order if dagger is applied.
             if self.modifiers.dagger {
                 topo.reverse();
             }
             for old_n_id in topo {
-                worklist.push_back(node_map.from_portgraph(old_n_id));
+                worklist.push_back(sg.pg_to_node(old_n_id));
             }
         }
+
         self.with_worklist(worklist, |this| {
-            while let Some(old_n) = this.worklist().pop_front() {
-                this.modify_op(h, old_n, new_dfg)?;
+            while let Some(working_node) = this.worklist().pop_front() {
+                this.modify_op(h, working_node, new_dfg)?;
             }
             Ok::<(), ModifierResolverErrors<N>>(())
         })
@@ -295,26 +298,22 @@ impl<N: HugrNode> ModifierResolver<N> {
     //      if only dagger, just check signature
     //
     // Also, it may be better to check with the usage (how it is instantiated).
-    pub fn modify_fn_if_needed(
+    pub(crate) fn modify_fn_if_needed(
         &mut self,
         h: &mut impl HugrMut<Node = N>,
         func: N,
-        signature: &Signature,
     ) -> Result<Option<N>, ModifierResolverErrors<N>> {
         let satisfies = ModifierFlags::from_metadata(h, func)
             .is_some_and(|flags| flags.satisfies(&self.modifiers));
+
         if !satisfies {
-            let in_out_match = signature.input == signature.output;
-            if in_out_match {
-                // If the flag is not set and the signature does not show an evident problem, skip the modification.
-                return Ok(None);
-            }
+            return Ok(None);
         }
         Ok(Some(self.modify_fn(h, func)?))
     }
 
     /// Generates a new function modified by the combined modifier.
-    pub fn modify_fn(
+    pub(crate) fn modify_fn(
         &mut self,
         h: &mut impl HugrMut<Node = N>,
         func: N,
@@ -393,7 +392,10 @@ impl<N: HugrNode> ModifierResolver<N> {
         let call_port = call.called_function_port();
         let call_node = builder.add_child_node(call);
 
-        // connect wires
+        // connect wires:
+        // - first `offset` inputs are control arrays, passed through directly to output
+        // - remaining inputs are forwarded to the inner call
+        // - call outputs are forwarded to the remaining output ports
         for i in 0..offset {
             builder.hugr_mut().connect(in_node, i, out_node, i);
         }
@@ -801,7 +803,7 @@ mod test {
     #[case::conditional_dagger(1, 1, foo_conditional, true)]
     #[case::cfg(1, 1, foo_cfg, false)]
     #[case::cfg_dagger(1, 1, foo_cfg, true)]
-    pub fn test_dfg_modify(
+    fn test_dfg_modify(
         #[case] t_num: usize,
         #[case] c_num: u64,
         #[case] foo: fn(&mut ModuleBuilder<Hugr>, usize) -> FuncID<true>,

@@ -1,10 +1,18 @@
+import importlib.util
+import tempfile
+
 from pytket import Circuit, OpType
 from typing import Callable, Any
+import subprocess
 from tket._ops import TketOp
 from tket.passes import (
     _badger_optimise,
     _greedy_depth_reduce,
+    InlineFunctions,
+    inline_funcs,
     NormalizeGuppy,
+    ModifierResolverPass,
+    GlobalScope,
 )
 from tket._state import CompilationState
 from tket_exts import tket_registry
@@ -14,11 +22,40 @@ import hypothesis.strategies as st
 from hypothesis.strategies._internal import SearchStrategy
 from hypothesis import given, settings
 
-from tket.passes import PytketHugrPass
-from pytket.passes import CliffordSimp, SquashRzPhasedX, SequencePass
+
+from tket.passes import PytketHugrPass, QSystemPass
+from pytket.passes import (
+    CliffordSimp,
+    SquashRzPhasedX,
+    RemoveRedundancies,
+    SequencePass,
+)
 from hugr.build.base import Hugr
 
+import numpy as np
 import pytest
+
+
+from pathlib import Path
+
+
+normalize = NormalizeGuppy()
+
+
+def _hugr_from_path(str_path: str) -> Hugr:
+    with open(Path(str_path), "rb") as f:
+        h = Hugr.from_bytes(f.read())
+
+    return h
+
+
+def _count_ops(hugr: Hugr, op_string_name: str) -> int:
+    count = 0
+    for _, data in hugr.nodes():
+        if op_string_name in data.op.name():
+            count += 1
+
+    return count
 
 
 @st.composite
@@ -203,3 +240,111 @@ def test_normalize_guppy():
     clean_hugr = normalize(hugr)
     normal_circ1 = CompilationState.from_bytes(clean_hugr.to_bytes())
     assert normal_circ1.circuit_cost(lambda op: int(op == TketOp.CX)) == 3
+
+
+def test_modifier_resolver() -> None:
+    normalize = NormalizeGuppy()
+    mr_pass = ModifierResolverPass()
+    modifier_hugr: Hugr = _hugr_from_path("test_files/guppy_examples/modifiers.hugr")
+
+    modifier_hugr = normalize(modifier_hugr)
+
+    assert _count_ops(modifier_hugr, "tket.modifier.ControlModifier") == 1
+    assert _count_ops(modifier_hugr, "tket.modifier.DaggerModifier") == 1
+
+    resolved: Hugr = mr_pass(modifier_hugr)
+
+    assert _count_ops(resolved, "tket.modifier.ControlModifier") == 0
+    assert _count_ops(resolved, "tket.modifier.DaggerModifier") == 0
+
+
+def test_modifier_execution() -> None:
+    modifier_examples_dir = Path("test_files/modifier_examples")
+    hugr_results_dir = Path("test_files/run_modifier_examples/hugr_results")
+    run_hugrs_dir = Path("test_files/run_modifier_examples")
+    apply_passes_path = run_hugrs_dir / "apply_passes.py"
+    spec = importlib.util.spec_from_file_location(
+        "run_modifier_examples_apply_passes", apply_passes_path
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    apply_passes_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(apply_passes_module)
+    apply_passes = apply_passes_module.apply_passes
+
+    expected_results = {
+        expected_path.stem: np.load(expected_path).copy()
+        for expected_path in sorted(hugr_results_dir.glob("*.npy"))
+    }
+    for hugr_path in sorted(modifier_examples_dir.glob("*.hugr")):
+        hugr_name = hugr_path.stem
+        expected_statevector = expected_results[f"{hugr_name}_solved"]
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            generated_hugrs_dir = Path(tmp_dir) / "modified_hugrs"
+            generated_hugrs_dir.mkdir()
+            apply_passes([hugr_path], generated_hugrs_dir)
+
+            (run_hugrs_dir / "modified_hugrs").mkdir(exist_ok=True)
+            tmp_path = Path(tmp_dir) / f"{hugr_name}.npy"
+            subprocess.run(
+                [
+                    "uv",
+                    "run",
+                    "--no-project",
+                    "--python",
+                    "3.13",
+                    "run_hugrs.py",
+                    str((generated_hugrs_dir / hugr_name).resolve()),
+                    str(tmp_path),
+                ],
+                cwd=run_hugrs_dir,
+                check=True,
+            )
+
+            computed_statevector = np.load(tmp_path)
+            np.testing.assert_allclose(computed_statevector, expected_statevector)
+
+
+def test_inline_functions() -> None:
+    hugr = _hugr_from_path("test_files/guppy_examples/fn_calls.hugr")
+
+    assert _count_ops(hugr, "Call") == 2
+
+    max_size = InlineFunctions(heuristic=inline_funcs.MaxSize(42))(hugr)
+
+    assert _count_ops(max_size, "Call") == 0
+
+    all = InlineFunctions(heuristic=inline_funcs.All())(hugr)
+
+    assert _count_ops(all, "Call") == 0
+
+
+def test_issue_1516() -> None:
+    """Regression test for issue 1516.
+
+    This was caused by a bug in the decoder that injected new parameter inputs when decoding a modified pytket circuit back into an existing region.
+
+    <https://github.com/quantinuum/tket2/issues/1516>
+    """
+    hugr = _hugr_from_path("test_files/guppy_examples/issue_1516.hugr")
+
+    # Ensure that the hugr is valid before we start.
+    CompilationState.from_python(hugr).validate()
+
+    opt = PytketHugrPass(RemoveRedundancies()).with_scope(
+        GlobalScope.PRESERVE_ENTRYPOINT
+    )
+    opt_hugr = opt(hugr, inplace=False)
+
+    CompilationState.from_python(opt_hugr).validate()
+
+
+def test_python_qsystem_pass() -> None:
+    normalize = NormalizeGuppy()
+    hugr = normalize(_hugr_from_path("test_files/guppy_examples/flat_quantum.hugr"))
+    qsystem_pass = QSystemPass()
+    qsystem_hugr = qsystem_pass(hugr)
+    assert _count_ops(qsystem_hugr, "ZZPhase") == 1
+    assert _count_ops(qsystem_hugr, "Custom") == 0
+    assert _count_ops(qsystem_hugr, "tket.quantum") == 0

@@ -1,27 +1,11 @@
-from pathlib import Path
-from hugr.hugr.base import Hugr
+from .test_pass import _hugr_from_path, _count_ops
+
 
 from pytket.passes import FullPeepholeOptimise
 from tket.passes import NormalizeGuppy, PytketHugrPass
 from hugr.passes.scope import GlobalScope, LocalScope
 
 normalize = NormalizeGuppy()
-
-
-def _hugr_from_path(str_path: str) -> Hugr:
-    with open(Path(str_path), "rb") as f:
-        h = Hugr.from_bytes(f.read())
-
-    return h
-
-
-def _count_ops(hugr: Hugr, op_string_name: str) -> int:
-    count = 0
-    for _, data in hugr.nodes():
-        if op_string_name in data.op.name():
-            count += 1
-
-    return count
 
 
 def test_nested_function_opt_global() -> None:

@@ -13,7 +13,7 @@ pub struct ModifierControl(usize);
 
 impl ModifierControl {
     /// Create a new ModifierControl with a specific number of controls.
-    pub fn new(num: usize) -> Self {
+    fn new(num: usize) -> Self {
         ModifierControl(num)
     }
 }
@@ -24,7 +24,7 @@ impl Default for ModifierControl {
 }
 impl ModifierControl {
     /// Signature for the control modifier.
-    pub fn signature() -> SignatureFunc {
+    pub(crate) fn signature() -> SignatureFunc {
         PolyFuncTypeRV::new(
             [
                 TypeParam::max_nat_type(),

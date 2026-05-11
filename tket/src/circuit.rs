@@ -14,7 +14,7 @@ pub use command::{Command, CommandIterator};
 use hugr::extension::prelude::{NoopDef, TupleOpDef};
 use hugr::extension::simple_op::MakeOpDef;
 use hugr::hugr::views::sibling_subgraph::InvalidSubgraph;
-use hugr::hugr::views::{ExtractionResult, RootChecked, SiblingSubgraph};
+use hugr::hugr::views::{ExtractionResult, RootChecked, SchedulingGraph, SiblingSubgraph};
 use hugr::ops::handle::DataflowParentID;
 use itertools::Either::{Left, Right};
 
@@ -108,6 +108,10 @@ impl<T: HugrView> Circuit<T> {
     /// Returns the node containing the circuit definition.
     pub fn parent(&self) -> T::Node {
         self.hugr.entrypoint()
+    }
+
+    pub(crate) fn sched_graph(&self) -> SchedulingGraph<'_, T> {
+        self.hugr.scheduling_graph(self.parent())
     }
 
     /// Get a reference to the HUGR containing the circuit.
