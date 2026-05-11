@@ -2,7 +2,9 @@
 use hugr::{
     extension::{SignatureFunc, prelude::qb_t},
     std_extensions::collections::array::array_type_parametric,
-    types::{FuncValueType, PolyFuncTypeRV, TypeArg, TypeBound, TypeRV, type_param::TypeParam},
+    types::{
+        FuncValueType, PolyFuncTypeRV, Type, TypeArg, TypeBound, TypeRowRV, type_param::TypeParam,
+    },
 };
 
 /// Control modifier.
@@ -32,33 +34,25 @@ impl ModifierControl {
                 TypeParam::new_list_type(TypeBound::Linear),
             ],
             FuncValueType::new(
-                [TypeRV::new_function(FuncValueType::new(
-                    vec![
-                        TypeRV::new_row_var_use(1, TypeBound::Linear),
-                        TypeRV::new_row_var_use(2, TypeBound::Linear),
-                    ],
-                    vec![TypeRV::new_row_var_use(1, TypeBound::Linear)],
+                [Type::new_function(FuncValueType::new(
+                    TypeRowRV::new_var_use(1, TypeBound::Linear)
+                        .concat(TypeRowRV::new_var_use(2, TypeBound::Linear)),
+                    TypeRowRV::new_var_use(1, TypeBound::Linear),
                 ))],
-                [TypeRV::new_function(FuncValueType::new(
-                    vec![
-                        array_type_parametric(
-                            TypeArg::new_var_use(0, TypeParam::max_nat_type()),
-                            qb_t(),
-                        )
-                        .unwrap()
-                        .into(),
-                        TypeRV::new_row_var_use(1, TypeBound::Linear),
-                        TypeRV::new_row_var_use(2, TypeBound::Linear),
-                    ],
-                    vec![
-                        array_type_parametric(
-                            TypeArg::new_var_use(0, TypeParam::max_nat_type()),
-                            qb_t(),
-                        )
-                        .unwrap()
-                        .into(),
-                        TypeRV::new_row_var_use(1, TypeBound::Linear),
-                    ],
+                [Type::new_function(FuncValueType::new(
+                    TypeRowRV::from([array_type_parametric(
+                        TypeArg::new_var_use(0, TypeParam::max_nat_type()),
+                        qb_t(),
+                    )
+                    .unwrap()])
+                    .concat(TypeRowRV::new_var_use(1, TypeBound::Linear))
+                    .concat(TypeRowRV::new_var_use(2, TypeBound::Linear)),
+                    TypeRowRV::from([array_type_parametric(
+                        TypeArg::new_var_use(0, TypeParam::max_nat_type()),
+                        qb_t(),
+                    )
+                    .unwrap()])
+                    .concat(TypeRowRV::new_var_use(1, TypeBound::Linear)),
                 ))],
             ),
         )
