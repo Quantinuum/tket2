@@ -16,6 +16,7 @@ from hugr import Hugr
 from guppylang.emulator import EmulatorBuilder
 from hugr.hugr.render import RenderConfig
 
+
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 
@@ -37,67 +38,13 @@ def format_statevector(
     return "\n".join(parts) if parts else "all amplitudes below threshold"
 
 
-EXPECTED_RESULTS: dict[str, dict[str, complex]] = {
-    "ctrl_on_call2_solved": {
-        "0110": 0.7071 + 0j,
-        "1110": 0.6124 + 0j,
-        "1111": 0 - 0.3536j,
-    },
-    "ctrl_on_call_solved": {
-        "00": 0.7071 + 0j,
-        "11": 0.7071 + 0j,
-    },
-    "ctrl_on_x_solved": {
-        "00": 0.7071 + 0j,
-        "11": 0.7071 + 0j,
-    },
-    "dagger_on_call_solved": {
-        "0": 0.866 + 0j,
-        "1": 0 + 0.5j,
-    },
-    # "double_call_solved": {
-    #     "00": 0.7071 + 0j,
-    #     "10": 0.6124 + 0j,
-    #     "11": 0 - 0.3536j,
-    # },
-}
-
-
-def assert_statevector(
-    name: str,
-    state: npt.NDArray[np.complexfloating],
-    atol: float = 1e-3,
-) -> None:
-    """Assert that *state* matches the expected amplitudes for *name*, if known."""
-    expected = EXPECTED_RESULTS.get(name)
-    if expected is None:
-        return
-    n_qubits = int(np.round(np.log2(len(state))))
-    for label, exp_amp in expected.items():
-        idx = int(label, 2)
-        actual = state[idx]
-        if not np.isclose(actual, exp_amp, atol=atol):
-            raise AssertionError(
-                f"{name}: basis state |{label}⟩ — "
-                f"expected {exp_amp:.4g}, got {actual:.4g}"
-            )
-    for idx, actual in enumerate(state):
-        label = format(idx, f"0{n_qubits}b")
-        if label not in expected and not np.isclose(actual, 0, atol=atol):
-            raise AssertionError(
-                f"{name}: basis state |{label}⟩ — expected 0, got {actual:.4g}"
-            )
-
-
 modifier_examples_dir = Path(__file__).resolve().parent / "modified_hugrs"
-
 result_execution_dir = Path(__file__).resolve().parent / "hugr_results"
 result_execution_dir.mkdir(exist_ok=True)
 hugr_pdf_directory = Path(__file__).resolve().parents[1] / "0_hugr_pdf"
 hugr_pdf_directory.mkdir(exist_ok=True)
 
 
-print(modifier_examples_dir)
 all_results: list[str] = []
 args = sys.argv[1:]
 if len(args) > 2:

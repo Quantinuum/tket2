@@ -5,7 +5,6 @@ mod unsupported_tracker;
 mod value_tracker;
 
 use hugr::core::HugrNode;
-use hugr_core::hugr::internal::PortgraphNodeMap;
 use tket_json_rs::clexpr::InputClRegister;
 use tket_json_rs::opbox::BoxID;
 pub use value_tracker::{
@@ -207,13 +206,13 @@ impl<H: HugrView> PytketEncoderContext<H> {
             cache.insert(region, CachedEncodedFunction::InEncodingStack);
         }
 
-        let (region, node_map) = hugr.region_portgraph(region);
+        let sg = hugr.scheduling_graph(region);
         // TODO: Use weighted topological sort to try and explore unsupported
         // ops first (that is, ops with no available emitter in `self.config`),
         // to ensure we group them as much as possible.
-        let mut topo = petgraph::visit::Topo::new(&region);
-        while let Some(pg_node) = topo.next(&region) {
-            let node = node_map.from_portgraph(pg_node);
+        let mut topo = petgraph::visit::Topo::new(sg.petgraph());
+        while let Some(pg_node) = topo.next(sg.petgraph()) {
+            let node = sg.pg_to_node(pg_node);
             self.try_encode_node(node, hugr)?;
         }
         Ok(())

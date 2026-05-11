@@ -3,7 +3,6 @@
 use derive_more::{Display, Error};
 use fxhash::{FxHashMap, FxHasher64};
 use hugr_core::HugrView;
-use hugr_core::hugr::internal::PortgraphNodeMap;
 use hugr_core::ops::OpType;
 use hugr_core::ops::{OpTag, OpTrait};
 use petgraph::visit::{self as pg, Walker};
@@ -56,9 +55,9 @@ fn dfg_hash<H: HugrView>(dfg_hugr: &H, node: H::Node) -> Result<u64, HashError> 
 
     let [_, output_node] = dfg_hugr.get_io(node).expect("DFG region missing I/O nodes");
 
-    let (region, node_map) = dfg_hugr.region_portgraph(node);
-    for pg_node in pg::Topo::new(&region).iter(&region) {
-        let child = node_map.from_portgraph(pg_node);
+    let sg = dfg_hugr.scheduling_graph(node);
+    for pg_node in pg::Topo::new(sg.petgraph()).iter(sg.petgraph()) {
+        let child = sg.pg_to_node(pg_node);
         let hash = dfg_hash_node(dfg_hugr, child, &mut node_hashes)?;
         if node_hashes.set_hash(child, hash).is_some() {
             panic!("Hash already set for node {node}");

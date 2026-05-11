@@ -1,12 +1,13 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang ==0.21.13",
+#     "guppylang ==0.21.14",
 # ]
 # ///
 """A controlled gate where the controller is an array of qubits"""
 
 from pathlib import Path
+from sys import argv
 import sys
 
 from guppylang import guppy
@@ -46,4 +47,4 @@ def main() -> None:
 
 
 program = main.compile()
-Path(sys.argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
+Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())

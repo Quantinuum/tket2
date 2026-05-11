@@ -683,7 +683,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         let new_load = self.with_modifiers(modifiers, |this| {
             this.apply_modifier_chain_to_loaded_fn(hugr, modifier_node)
         })?;
-        // NICOLA: the fail is before here!
         // Connect the modified function to the inputs
         for (out_port, inputs) in modified_fn_loader {
             for (recv, recv_port) in inputs {
@@ -694,14 +693,13 @@ impl<N: HugrNode> ModifierResolver<N> {
         Ok(())
     }
 
-    /// Takes a signature and modifies it according to the combined modifier.
     /// Modifies a function signature to account for control qubits added by modifiers.
     ///
     /// # Arguments
     /// * `signature` - The function signature to modify
-    /// * `flatten` - If true, control qubits are represented as individual `Qubit` types.
-    ///              If false, control qubits are packed into arrays (used for function definitions).
-    pub fn modify_signature(&self, signature: &mut Signature, flatten: bool) {
+    /// * `flatten` - If true, control qubits are represented as individual `Qubit` types,
+    ///   if false, control qubits are packed into arrays (used for function definitions).
+    fn modify_signature(&self, signature: &mut Signature, flatten: bool) {
         let FuncTypeBase { input, output } = signature;
 
         if flatten {

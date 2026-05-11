@@ -1,10 +1,10 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang @ git+https://github.com/Quantinuum/guppylang.git@main#subdirectory=guppylang",
+#     "guppylang ==0.21.14",
 # ]
 # ///
-"""A simple controlled gate using modifiers"""
+"""Test the use of a classical function inside modifiers"""
 
 from pathlib import Path
 from sys import argv
@@ -38,9 +38,9 @@ def main() -> None:
     c1 = qubit()
     h(c1)
     with control(c1):
-        d = angle(1 / fuu(2))
+        d = fuu(2)
         with dagger:
-            rx(t, d)
+            rx(t, angle(1 / d))
 
     state_result("r", c1, t)
     discard(c1)
