@@ -355,7 +355,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         Ok(new_function_node)
     }
 
-    /// NICOLA: seemes to be useless
     /// Generates a new function that does not essentially modify the function itself
     /// but changes the signature to match the modified calls.
     /// The generated function just calls the original function.

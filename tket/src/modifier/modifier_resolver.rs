@@ -102,8 +102,7 @@
 use itertools::{Either, Itertools};
 use std::{
     collections::{HashMap, VecDeque},
-    fs, iter, mem,
-    path::Path,
+    iter, mem,
 };
 
 pub mod array_modify;
@@ -1181,13 +1180,13 @@ pub fn resolve_modifier_with_entrypoints(
     delete_phase(h, entry_points)?;
 
     // debbugging print
-    println!("@ 4");
+    // println!("@ 4");
     // œœœœœ
-    let output = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")))
-        .join("current.mmd");
-    fs::write(output, h.mermaid_string()).unwrap();
+    // let output = Path::new(env!("CARGO_MANIFEST_DIR"))
+    //     .parent()
+    //     .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")))
+    //     .join("current.mmd");
+    // fs::write(output, h.mermaid_string()).unwrap();
     // œœœœœ
 
     h.validate()
@@ -1411,7 +1410,7 @@ mod tests {
         let entrypoint = h.entrypoint();
         resolve_modifier_with_entrypoints(h, [entrypoint]).unwrap();
 
-        // assert_matches!(h.validate(), Ok(()));
+        assert_matches!(h.validate(), Ok(()));
     }
 
     #[rstest::rstest]

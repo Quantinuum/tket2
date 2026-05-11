@@ -22,6 +22,7 @@
 //! `array.swap()` called in a controlled context is still classical swap.
 use super::{DirWire, ModifierResolver, ModifierResolverErrors};
 use hugr::{
+    IncomingPort, OutgoingPort,
     builder::Dataflow,
     core::HugrNode,
     extension::simple_op::MakeExtensionOp,
@@ -32,7 +33,9 @@ use hugr::{
             ArrayKind, ArrayOp, GenericArrayOp,
             GenericArrayOpDef::{self, *},
         },
-        borrow_array::{BArrayFromArray, BArrayOp, BArrayToArray},
+        borrow_array::{
+            BArrayFromArray, BArrayOp, BArrayToArray, BArrayUnsafeOp, BArrayUnsafeOpDef,
+        },
     },
 };
 
@@ -49,8 +52,63 @@ impl<N: HugrNode> ModifierResolver<N> {
             self.generic_modify_array_op(h, n, op, new_dfg)?;
         } else if let Some(op) = BArrayOp::from_optype(optype) {
             self.generic_modify_array_op(h, n, op, new_dfg)?;
+        } else if let Some(op) = BArrayUnsafeOp::from_optype(optype) {
+            return self.modify_borrow_array_unsafe_op(h, n, op, new_dfg);
         } else {
             return Ok(false);
+        }
+
+        Ok(true)
+    }
+
+    fn modify_borrow_array_unsafe_op(
+        &mut self,
+        h: &impl HugrMut<Node = N>,
+        n: N,
+        op: BArrayUnsafeOp,
+        new_dfg: &mut impl Dataflow,
+    ) -> Result<bool, ModifierResolverErrors<N>> {
+        if !self.modifiers().dagger {
+            self.add_node_no_modification(h, n, op, new_dfg)?;
+            return Ok(true);
+        }
+
+        let new_op_def = match op.def {
+            BArrayUnsafeOpDef::borrow => BArrayUnsafeOpDef::r#return,
+            BArrayUnsafeOpDef::r#return => BArrayUnsafeOpDef::borrow,
+            _ => return Ok(false),
+        };
+        let node = new_dfg.add_child_node(new_op_def.to_concrete(op.elem_ty, op.size));
+
+        // `borrow` and `return` are inverses. Under dagger, array and element
+        // value-flow reverses while the index remains a forward classical input.
+        self.map_insert(
+            (n, IncomingPort::from(0)).into(),
+            (node, OutgoingPort::from(0)).into(),
+        )?;
+        self.map_insert(
+            (n, IncomingPort::from(1)).into(),
+            (node, IncomingPort::from(1)).into(),
+        )?;
+        self.map_insert(
+            (n, OutgoingPort::from(0)).into(),
+            (node, IncomingPort::from(0)).into(),
+        )?;
+
+        match op.def {
+            BArrayUnsafeOpDef::borrow => {
+                self.map_insert(
+                    (n, OutgoingPort::from(1)).into(),
+                    (node, IncomingPort::from(2)).into(),
+                )?;
+            }
+            BArrayUnsafeOpDef::r#return => {
+                self.map_insert(
+                    (n, IncomingPort::from(2)).into(),
+                    (node, OutgoingPort::from(1)).into(),
+                )?;
+            }
+            _ => unreachable!(),
         }
 
         Ok(true)
