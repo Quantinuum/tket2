@@ -6,6 +6,7 @@ use hugr::{
     std_extensions::arithmetic::int_types::int_type,
     types::{FuncValueType, PolyFuncTypeRV, TypeBound, type_param::TypeParam},
 };
+use hugr_core::types::{Type, TypeRowRV};
 
 /// Power modifier.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
@@ -44,21 +45,17 @@ impl ModifierPower {
             ],
             FuncValueType::new(
                 vec![
-                    TypeRV::new_function(FuncValueType::new(
-                        vec![
-                            TypeRV::new_row_var_use(0, TypeBound::Linear),
-                            TypeRV::new_row_var_use(1, TypeBound::Copyable),
-                        ],
-                        vec![TypeRV::new_row_var_use(0, TypeBound::Linear)],
+                    Type::new_function(FuncValueType::new(
+                        TypeRowRV::new_var_use(0, TypeBound::Linear)
+                            .concat(TypeRowRV::new_var_use(1, TypeBound::Copyable)),
+                        TypeRowRV::new_var_use(0, TypeBound::Linear),
                     )),
                     int_type(6).into(),
                 ],
-                [TypeRV::new_function(FuncValueType::new(
-                    vec![
-                        TypeRV::new_row_var_use(0, TypeBound::Linear),
-                        TypeRV::new_row_var_use(1, TypeBound::Copyable),
-                    ],
-                    [TypeRV::new_row_var_use(0, TypeBound::Linear)],
+                [Type::new_function(FuncValueType::new(
+                    TypeRowRV::new_var_use(0, TypeBound::Linear)
+                        .concat(TypeRowRV::new_var_use(1, TypeBound::Copyable)),
+                    TypeRowRV::new_var_use(0, TypeBound::Linear),
                 ))],
             ),
         )
