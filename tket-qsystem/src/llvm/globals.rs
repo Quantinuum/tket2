@@ -233,7 +233,7 @@ mod test {
     #[rstest::rstest]
     #[case::with(1,GlobalsOp::With { name: "my_global".to_string(), ty_arg: qb_t().into(), inputs: [qb_t(), bool_t()].into(), outputs: [qb_t(), bool_t()].into() })]
     #[case::map(2,GlobalsOp::Map { name: "my_global".to_string(), ty_arg: qb_t().into(), inputs: [bool_t()].into(), outputs: [bool_t()].into() })]
-    fn emit_futures_codegen(
+    fn emit_globals_codegen(
         #[case] _i: i32,
         #[with(_i)] mut llvm_ctx: TestContext,
         #[case] op: GlobalsOp,
