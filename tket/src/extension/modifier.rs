@@ -207,10 +207,7 @@ mod test {
         let power_op = MODIFIER_EXTENSION
             .instantiate_extension_op(
                 &POWER_OP_ID,
-                [
-                    Term::new_list([inout]),
-                    Term::new_list([other_inputs]),
-                ],
+                [Term::new_list([inout]), Term::new_list([other_inputs])],
             )
             .unwrap();
         (power_op, modified_sig)

@@ -259,7 +259,7 @@ mod test {
             ]),
             Ok(WasmOp::LookupByName {
                 name: "lookup_name".to_string(),
-                inputs: TypeRowRV::new_var_use(0, TypeBound::Linear).into(),
+                inputs: TypeRowRV::new_var_use(0, TypeBound::Linear),
                 outputs: TypeRowRV::new()
             })
         );
@@ -271,7 +271,7 @@ mod test {
             ]),
             Ok(WasmOp::LookupById {
                 id: 42,
-                inputs: TypeRowRV::new_var_use(0, TypeBound::Linear).into(),
+                inputs: TypeRowRV::new_var_use(0, TypeBound::Linear),
                 outputs: TypeRowRV::new()
             })
         );
@@ -287,15 +287,8 @@ mod test {
     #[rstest]
     #[case::concrete(type_row![], type_row![])]
     #[case::row_vars1(
-        vec![
-            Type::UNIT,
-            Type::try_from(
-                TypeArg::new_var_use(
-                    0,
-                    TypeParam::ListType (Box::new(TypeBound::Copyable.into()))
-                )
-            ).unwrap()
-        ], TypeRowRV::try_from(
+        TypeRowRV::from(vec![Type::UNIT]).concat(TypeRowRV::new_var_use(0, TypeBound::Copyable)),
+        TypeRowRV::try_from(
             Term::from(vec![TypeArg::from(Type::UNIT), TypeArg::from(usize_t())])
         ).unwrap()
     )]

@@ -23,7 +23,7 @@ use hugr_core::std_extensions::arithmetic::{
 };
 use hugr_core::std_extensions::collections::list::ListOp;
 use hugr_core::std_extensions::logic::LogicOp;
-use hugr_core::types::{Signature, SumType, Type, TypeBound, TypeRow, TypeRowRV};
+use hugr_core::types::{Signature, SumType, Type, TypeBound, TypeRow};
 use hugr_core::{Hugr, HugrView, IncomingPort, Node, Visibility, type_row};
 use itertools::Itertools;
 use rstest::rstest;

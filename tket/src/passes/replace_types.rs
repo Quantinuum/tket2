@@ -960,7 +960,7 @@ mod test {
             .unwrap()
             .outputs_arr();
         let [res] = dfb
-            .build_unwrap_sum(1, option_type([Type::from(elem_ty)]), opt)
+            .build_unwrap_sum(1, option_type([elem_ty]), opt)
             .unwrap();
         dfb.set_outputs([res]).unwrap();
         dfb
@@ -1207,13 +1207,7 @@ mod test {
             h.get_optype(pred.node())
                 .as_load_constant()
                 .map(hugr_core::ops::LoadConstant::constant_type),
-            Some(&Type::new_sum(vec![
-                [Type::from(borrow_array_type(
-                    4,
-                    i64_t()
-                ))];
-                2
-            ]))
+            Some(&Type::new_sum(vec![[borrow_array_type(4, i64_t())]; 2]))
         );
     }
 

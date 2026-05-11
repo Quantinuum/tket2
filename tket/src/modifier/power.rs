@@ -50,7 +50,7 @@ impl ModifierPower {
                             .concat(TypeRowRV::new_var_use(1, TypeBound::Copyable)),
                         TypeRowRV::new_var_use(0, TypeBound::Linear),
                     )),
-                    int_type(6).into(),
+                    int_type(6),
                 ],
                 [Type::new_function(FuncValueType::new(
                     TypeRowRV::new_var_use(0, TypeBound::Linear)

@@ -114,7 +114,7 @@ impl TypeTranslatorSet {
             Term::RuntimeExtension(custom) => 'outer: {
                 let type_ext = custom.extension();
                 for encoder in self.translators_for_extension(type_ext) {
-                    if let Some(count) = encoder.type_to_pytket(&custom, self) {
+                    if let Some(count) = encoder.type_to_pytket(custom, self) {
                         // Don't allow user types with nested parameters
                         if count.params == 0 {
                             break 'outer Some(count);
