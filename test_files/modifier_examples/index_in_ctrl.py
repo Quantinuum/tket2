@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang @ git+https://github.com/Quantinuum/guppylang.git@na/allowing-assigment-in-dagger#subdirectory=guppylang",
+#     "guppylang @ git+https://github.com/Quantinuum/guppylang.git@main#subdirectory=guppylang",
 # ]
 # ///
 """A simple controlled gate using modifiers"""

@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang @ git+https://github.com/Quantinuum/guppylang.git@na/allowing-assigment-in-dagger#subdirectory=guppylang",
+#     "guppylang @ git+https://github.com/Quantinuum/guppylang.git@main#subdirectory=guppylang",
 # ]
 # ///
 """A simple controlled gate using modifiers"""
@@ -15,12 +15,17 @@ from guppylang.std.builtins import control, dagger
 from guppylang.std.debug import state_result
 from guppylang.std.quantum import discard, discard_array, qubit, angle
 from guppylang.std.quantum import h, rx
+from hugr import Hugr
+from hugr.hugr.render import RenderConfig
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from guppylang.experimental import enable_experimental_features
 
 enable_experimental_features()
+
+hugr_pdf_directory = Path(__file__).resolve().parents[1] / "0_hugr_pdf"
+hugr_pdf_directory.mkdir(exist_ok=True)
 
 
 @guppy
@@ -37,4 +42,9 @@ def main() -> None:
 
 
 program = main.compile()
-Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
+hugr_path = Path(argv[0]).with_suffix(".hugr")
+hugr_bytes = program.to_bytes()
+hugr_path.write_bytes(hugr_bytes)
+Hugr.from_bytes(hugr_bytes).render_dot(
+    RenderConfig(display_node_id=True, max_node_label_length=None)
+).render(f"{hugr_path.stem}", directory=hugr_pdf_directory, cleanup=True)
