@@ -64,7 +64,7 @@ hugr-core = { workspace = true }
 portgraph = { workspace = true, features = ["serde", "petgraph"] }
 strum = { workspace = true, features = ["derive"] }
 fxhash = { workspace = true }
-indexmap = { workspace = true }
+indexmap = { workspace = true, features = ["rayon"] }
 rmp-serde = { workspace = true, optional = true }
 delegate = { workspace = true }
 csv = { workspace = true }
