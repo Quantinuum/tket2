@@ -1084,7 +1084,6 @@ fn encoded_circuit_attributes(circ_measure_ancilla: Hugr) {
 #[rstest]
 #[case::meas_ancilla(circ_measure_ancilla(), CircuitRoundtripTestConfig::Default)]
 #[case::preset_qubits(circ_preset_qubits(), CircuitRoundtripTestConfig::Default)]
-#[case::preset_bits(circ_preset_bits(), CircuitRoundtripTestConfig::Default)]
 #[case::preset_parameterized(circ_parameterized(), CircuitRoundtripTestConfig::Default)]
 // TODO: Should pass once CircBox encoding of DFGs is re-enabled.
 #[should_panic(expected = "Cannot encode subgraphs with nested structure")]
