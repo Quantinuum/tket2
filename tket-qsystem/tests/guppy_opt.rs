@@ -15,12 +15,15 @@ use tket::passes::NormalizeGuppy;
 use tket::serialize::pytket::{EncodeOptions, EncodedCircuit};
 
 use tket_qsystem::QSystemPass;
+use tket_qsystem::pytket::{qsystem_decoder_config, qsystem_encoder_config};
 use tket1_passes::{Tket1Circuit, Tket1Pass};
 
 const GUPPY_EXAMPLES_DIR: &str = "../test_files/guppy_optimization";
 
 /// JSON encoding of the clifford simp pytket pass.
 const CLIFFORD_SIMP_STR: &str = r#"{"StandardPass": {"allow_swaps": true, "name": "CliffordSimp", "target_2qb_gate": "CX"}, "pass_class": "StandardPass"}"#;
+const REMOVE_BARRIERS_STR: &str =
+    r#"{"StandardPass": {"name": "RemoveBarriers"}, "pass_class": "StandardPass"}"#;
 
 enum HugrFileType {
     Original,
@@ -44,18 +47,25 @@ fn load_guppy_example(path: &str) -> std::io::Result<Hugr> {
     Ok(Hugr::load(reader, None).unwrap())
 }
 
-fn run_pytket(h: &mut Hugr) {
-    let mut encoded = EncodedCircuit::new(h, EncodeOptions::new().with_subcircuits(true)).unwrap();
+/// Run a json-encoded pytket pass on the given HUGR.
+fn run_pytket(h: &mut Hugr, pass_json: &str) {
+    let encode_options = EncodeOptions::new()
+        .with_subcircuits(true)
+        .with_config(qsystem_encoder_config());
+
+    let mut encoded = EncodedCircuit::new(h, encode_options).unwrap();
 
     encoded
         .par_iter_mut()
         .for_each(|(_region, serial_circuit)| {
             let mut circuit_ptr = Tket1Circuit::from_serial_circuit(serial_circuit).unwrap();
-            Tket1Pass::run_from_json(CLIFFORD_SIMP_STR, &mut circuit_ptr).unwrap();
+            Tket1Pass::run_from_json(pass_json, &mut circuit_ptr).unwrap();
             *serial_circuit = circuit_ptr.to_serial_circuit().unwrap();
         });
 
-    encoded.reassemble_inplace(h, None).unwrap();
+    encoded
+        .reassemble_inplace(h, Some(qsystem_decoder_config().into()))
+        .unwrap();
 }
 
 fn count_gates(h: &impl HugrView) -> HashMap<SmolStr, usize> {
@@ -108,7 +118,7 @@ fn optimize_flattened_guppy(#[case] name: &str, #[case] xfail: Option<Vec<(&str,
     // We don't need NormalizeGuppy to "flatten" control flow here, but we still want
     // to get rid of other guppy artifacts.
     NormalizeGuppy::default().run(&mut hugr).unwrap();
-    run_pytket(&mut hugr);
+    run_pytket(&mut hugr, CLIFFORD_SIMP_STR);
     let should_xfail = xfail.is_some();
     let expected_counts = match xfail {
         Some(counts) => counts.into_iter().map(|(k, v)| (k.into(), v)).collect(),
@@ -143,7 +153,7 @@ fn optimize_guppy_ranges_array() {
         .unwrap();
     hugr.set_entrypoint(f);
 
-    run_pytket(&mut hugr);
+    run_pytket(&mut hugr, CLIFFORD_SIMP_STR);
     let expected_counts =
         count_gates(&load_guppy_circuit("ranges", HugrFileType::Optimized).unwrap());
     assert_eq!(count_gates(&hugr), expected_counts);
@@ -189,12 +199,20 @@ fn optimize_guppy(#[case] name: &str) {
     NormalizeGuppy::default().run(&mut hugr).unwrap();
     assert_eq!(count_gates(&hugr), flat);
 
-    run_pytket(&mut hugr);
+    run_pytket(&mut hugr, CLIFFORD_SIMP_STR);
 
     assert_eq!(count_gates(&hugr), opt);
 
     // Lower to QSystem. This may blow up the HUGR size.
     QSystemPass::default().run(&mut hugr).unwrap();
 
+    hugr.validate().unwrap_or_else(|e| panic!("{e}"));
+}
+
+/// Regression test for <http://github.com/CQCL/tket2/issues/1577>
+#[rstest]
+fn issue_1577_remove_barriers_reassembles_nested_circuits() {
+    let mut hugr = load_guppy_example("../guppy_examples/issue_1577.hugr").unwrap();
+    run_pytket(&mut hugr, REMOVE_BARRIERS_STR);
     hugr.validate().unwrap_or_else(|e| panic!("{e}"));
 }
