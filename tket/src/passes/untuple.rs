@@ -2,12 +2,12 @@
 
 use std::collections::VecDeque;
 
+use hugr::hugr::views::sibling_subgraph::SchedGraphChecker;
 use hugr_core::builder::{DFGBuilder, Dataflow, DataflowHugr};
 use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
 use hugr_core::hugr::SimpleReplacementError;
 use hugr_core::hugr::hugrmut::HugrMut;
 use hugr_core::hugr::views::SiblingSubgraph;
-use hugr_core::hugr::views::sibling_subgraph::TopoConvexChecker;
 use hugr_core::ops::{OpTrait, OpType};
 use hugr_core::types::Type;
 use hugr_core::{HugrView, Node, PortIndex, SimpleReplacement};
@@ -80,8 +80,9 @@ fn find_rewrites<H: HugrView>(
 
     while let Some(parent) = children_queue.pop_front() {
         // Required to create SimpleReplacements.
-        // Reset for each parent as `TopoConvexChecker` is tied to a specific parent node.
-        let mut convex_checker: Option<TopoConvexChecker<H>> = None;
+        // Reset for each parent as `SchedGraphChecker` and all `HugrConvexChecker`s
+        // are tied to a specific parent node.
+        let mut convex_checker: Option<SchedGraphChecker<H>> = None;
 
         for node in hugr.children(parent) {
             let op = hugr.get_optype(node);
@@ -138,7 +139,7 @@ fn is_unpack_tuple(optype: &OpType) -> bool {
 /// Otherwise, return None.
 fn make_rewrite<'h, T: HugrView>(
     hugr: &'h T,
-    convex_checker: &mut Option<TopoConvexChecker<'h, T>>,
+    convex_checker: &mut Option<SchedGraphChecker<'h, T>>,
     node: T::Node,
     op: &OpType,
 ) -> Option<SimpleReplacement<T::Node>> {
@@ -203,14 +204,15 @@ fn make_rewrite<'h, T: HugrView>(
 /// and `other_tuple_links` other operations.
 fn remove_pack_unpack<'h, T: HugrView>(
     hugr: &'h T,
-    convex_checker: &mut Option<TopoConvexChecker<'h, T>>,
+    convex_checker: &mut Option<SchedGraphChecker<'h, T>>,
     tuple_types: &[Type],
     pack_node: T::Node,
     unpack_nodes: Vec<T::Node>,
     num_other_outputs: usize,
 ) -> SimpleReplacement<T::Node> {
     let parent = hugr.get_parent(pack_node).expect("pack_node has no parent");
-    let checker = convex_checker.get_or_insert_with(|| TopoConvexChecker::new(hugr, parent));
+    let checker =
+        convex_checker.get_or_insert_with(|| SchedGraphChecker::new(hugr.scheduling_graph(parent)));
 
     let mut nodes = unpack_nodes.clone();
     nodes.push(pack_node);

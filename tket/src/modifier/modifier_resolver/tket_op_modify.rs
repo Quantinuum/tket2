@@ -14,7 +14,7 @@ use crate::{
 impl<N: HugrNode> ModifierResolver<N> {
     /// Modify a TketOp operation. The returned `PortVector` contains the incoming and outgoing ports of the modified operation.
     /// Ancilla qubits are dirty qubits that are used to store intermediate results.
-    pub fn modify_tket_op(
+    pub(crate) fn modify_tket_op(
         &mut self,
         op_node: N,
         tket_op: TketOp,
@@ -602,7 +602,7 @@ mod test {
     #[case(3, false)]
     #[case(3, true)]
     #[case(7, false)]
-    pub fn test_single_tket_op(#[case] c_num: u64, #[case] dagger: bool) {
+    fn test_single_tket_op(#[case] c_num: u64, #[case] dagger: bool) {
         for op in TketOp::iter() {
             let Some((size, has_angle)) = size(op) else {
                 continue;

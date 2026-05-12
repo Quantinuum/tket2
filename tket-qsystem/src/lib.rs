@@ -323,7 +323,6 @@ mod test {
         types::Signature,
     };
 
-    use hugr_core::hugr::internal::{HugrInternals, PortgraphNodeMap};
     use petgraph::visit::{Topo, Walker as _};
     use rstest::rstest;
     use tket::extension::{
@@ -398,13 +397,13 @@ mod test {
         }
         QSystemPass::default().run(&mut hugr).unwrap();
 
-        let (pg, node_map) = hugr.region_portgraph(main_node);
-        let topo_sorted = Topo::new(&pg).iter(&pg).collect_vec();
+        let sg = hugr.scheduling_graph(main_node);
+        let topo_sorted = Topo::new(sg.petgraph()).iter(&sg.petgraph()).collect_vec();
 
         let get_pos = |x| {
             topo_sorted
                 .iter()
-                .position(|&y| y == node_map.to_portgraph(x))
+                .position(|&y| y == sg.node_to_pg(x))
                 .unwrap()
         };
         assert!(get_pos(h_node) < get_pos(f_node));
@@ -413,7 +412,7 @@ mod test {
 
         for n in topo_sorted
             .iter()
-            .map(|&pg_n| node_map.from_portgraph(pg_n))
+            .map(|&pg_n| sg.pg_to_node(pg_n))
             .filter(|&n| FutureOpDef::try_from(hugr.get_optype(n)) == Ok(FutureOpDef::Read))
         {
             assert!(get_pos(call_node) < get_pos(n));
