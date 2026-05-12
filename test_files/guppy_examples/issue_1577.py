@@ -3,6 +3,8 @@
 # dependencies = [
 #     "guppylang==0.21.11",
 # ]
+# [tool.uv.sources]
+# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", branch = "ts/future-measure"}
 # ///
 
 from pathlib import Path
@@ -12,7 +14,7 @@ import guppylang
 from guppylang import guppy
 from guppylang.std.builtins import array, result
 from guppylang.std.qsystem import *  # noqa: F403
-from guppylang.std.quantum import measure, measure_array, qubit
+from guppylang.std.quantum import measure, measure_array, qubit, collect_measurements
 from tket.passes import NormalizeGuppy
 
 
@@ -23,8 +25,8 @@ guppylang.enable_experimental_features()
 def main_() -> None:
     q1 = qubit()
     qreg1 = array(qubit() for _ in range(2))
-    result("q1", measure(q1))
-    result("qreg1", measure_array(qreg1))
+    result("q1", measure(q1).read())
+    result("qreg1", collect_measurements(measure_array(qreg1)))
 
 
 program = NormalizeGuppy()(main_.compile_function().modules[0])
