@@ -26,7 +26,7 @@
 //! );
 //! ```
 //
-// Changes to this file **MUST** be reflected in `tket-py/tket/metadata.py`
+// Changes to this file **SHOULD** be reflected in `tket-py/tket/metadata.py`.
 
 use crate::rewrite::trace::RewriteTrace;
 use hugr_core::metadata::Metadata;

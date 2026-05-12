@@ -16,13 +16,14 @@ Examples:
     >>> node.metadata.get(QubitRegisters)
     [('q', [0]), ('ancilla', [1])]
 """
-# Changes to this file **MUST** be reflected in `tket/src/metadata.rs`
+# Changes to this file **SHOULD** be reflected in `tket/src/metadata.rs`.
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, TypeAlias, TypedDict
 
 from hugr.metadata import Metadata
+
 from ._tket import metadata as _metadata
 
 if TYPE_CHECKING:
@@ -36,17 +37,19 @@ __all__ = [
     "Unitary",
     "InputParameters",
     "OpGroup",
+    "PytketBit",
+    "PytketQubit",
     "BitRegisters",
     "QubitRegisters",
     "Phase",
 ]
 
 
-# Identifier for a TKET1 qubit register element.
+# Identifier for a pytket qubit register element.
 #
 # This can be passed to `pytket.unit_id.Qubit.from_list`
 PytketQubit: TypeAlias = tuple[str, list[int]]
-# Identifier for a TKET1 bit register element.
+# Identifier for a pytket bit register element.
 #
 # This can be passed to `pytket.unit_id.Bit.from_list`
 PytketBit: TypeAlias = tuple[str, list[int]]
@@ -117,13 +120,13 @@ class QubitRegisters(Metadata[list[PytketQubit]]):
 
 
 class Phase(Metadata[str]):
-    """Metadata key for the serialized TKET1 global phase expression."""
+    """Metadata key for the serialized pytket global phase expression."""
 
     KEY = _metadata.PHASE
 
 
 def _store_pytket_register(value: list[tuple[str, list[int]]]) -> JsonType:
-    return [[name, indices] for name, indices in value]  # type: ignore
+    return [[name, list(indices)] for name, indices in value]
 
 
 def _read_pytket_register(key: str, value: JsonType) -> list[tuple[str, list[int]]]:
@@ -147,5 +150,12 @@ def _read_pytket_register(key: str, value: JsonType) -> list[tuple[str, list[int
             raise TypeError(
                 f"Expected {key} register indices to be a list of integers, but got {indices!r}"
             )
-        registers.append((name, indices))  # type: ignore
+        register_indices: list[int] = []
+        for index in indices:
+            if not isinstance(index, int):
+                raise TypeError(
+                    f"Expected {key} register index to be an integer, but got {type(index)}"
+                )
+            register_indices.append(index)
+        registers.append((name, register_indices))
     return registers
