@@ -306,7 +306,6 @@ impl<Node: HugrNode> EncodedCircuit<Node> {
             circuits: HashMap::new(),
             opaque_subgraphs: OpaqueSubgraphs::new(0),
         };
-        // Encode the entrypoint circuit, ensuring it's not skipped even if it's empty.
         enc.encode_circuits(hugr, entrypoint, options)?;
         enc.ensure_standalone(hugr)?;
         Ok(enc)

@@ -465,6 +465,9 @@ fn circ_non_local() -> Hugr {
         let [q] = dfg.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
 
         // Rx with non-local input
+        //
+        // Non-local parameters cannot be encoded as a pytket parameter, so the
+        // whole op will be encoded as an opaque subgraph.
         let [q] = dfg
             .add_dataflow_op(TketOp::Rx, [q, rot])
             .unwrap()
@@ -1196,9 +1199,6 @@ fn fail_on_modified_hugr(circ_tk1_ops: Hugr) {
     1,
     CircuitRoundtripTestConfig::Default
 )]
-// TODO: We need to track [`EncodedCircuitInfo`] for nested CircBoxes too. We
-// have temporarily disabled encoding of DFG and function calls as CircBoxes to
-// avoid an error here.
 #[case::unsupported_extras_in_circ_box(
     circ_unsupported_extras_in_circ_box(),
     2,

@@ -97,8 +97,12 @@ pub trait TKETDecode: Sized {
     /// pytket circuit.
     ///
     /// See [EncodeOptions] for the options used by the encoder.
+    /// [EncodeOptions::keep_empty_circuits] will be set to `true` regardless of
+    /// the provided options, to avoid dropping the target circuit if it's
+    /// empty.
     ///
-    /// If the entrypoint region is not a dataflow region, an error will be returned.
+    /// If the entrypoint region is not a dataflow region, an error will be
+    /// returned.
     ///
     /// # Arguments
     ///
@@ -151,7 +155,7 @@ impl TKETDecode for SerialCircuit {
             });
         }
 
-        // Make ruse we don't drop the entrypoint circuit if it's empty.
+        // Make sure we don't drop the entrypoint circuit if it's empty (or any other).
         options.keep_empty_circuits = true;
 
         let mut encoded = EncodedCircuit::new_standalone(hugr, options)?;
