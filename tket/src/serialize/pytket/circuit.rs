@@ -1,6 +1,6 @@
 //! Temporary structure linking an encoded pytket circuit and subcircuits, with their originating HUGR.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use std::ops::{Index, IndexMut};
 use std::sync::Arc;
 
@@ -11,6 +11,7 @@ use hugr::ops::{OpParent, OpTag, OpTrait};
 use hugr::types::EdgeKind;
 use hugr::{Hugr, HugrView, Node};
 use hugr_core::hugr::internal::HugrMutInternals;
+use indexmap::IndexMap;
 use itertools::Itertools;
 use rayon::iter::{IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator};
 use tket_json_rs::circuit_json::{Command as PytketCommand, SerialCircuit};
@@ -41,7 +42,9 @@ pub struct EncodedCircuit<Node: HugrNode> {
     ///
     /// These correspond to sections of the HUGR that can be optimized
     /// independently.
-    circuits: HashMap<Node, EncodedCircuitInfo>,
+    ///
+    /// Ordered as a depth-first pre-order.
+    circuits: IndexMap<Node, EncodedCircuitInfo>,
     /// Sets of subgraphs in the HUGR that have been encoded as opaque barriers
     /// in the pytket circuit.
     ///
@@ -148,7 +151,7 @@ impl EncodedCircuit<Node> {
         options: EncodeOptions<H>,
     ) -> Result<Self, PytketEncodeError<H::Node>> {
         let mut enc = Self {
-            circuits: HashMap::new(),
+            circuits: IndexMap::new(),
             opaque_subgraphs: OpaqueSubgraphs::new(0),
         };
 
@@ -196,7 +199,9 @@ impl EncodedCircuit<Node> {
                 .unwrap_or_else(|| Arc::new(default_decoder_config())),
         );
 
-        for (&original_region, encoded) in &self.circuits {
+        // Reassemble each circuit, processing the inner regions before their
+        // ancestors to ensure any external edge is kept valid.
+        for (&original_region, encoded) in self.circuits.iter().rev() {
             // Decode the circuit into a temporary function node.
             let Some(signature) = hugr.get_optype(original_region).inner_function_type() else {
                 return Err(PytketDecodeErrorInner::IncompatibleTargetRegion {
@@ -303,7 +308,7 @@ impl<Node: HugrNode> EncodedCircuit<Node> {
         options: EncodeOptions<H>,
     ) -> Result<Self, PytketEncodeError<H::Node>> {
         let mut enc = Self {
-            circuits: HashMap::new(),
+            circuits: IndexMap::new(),
             opaque_subgraphs: OpaqueSubgraphs::new(0),
         };
         enc.encode_circuits(hugr, entrypoint, options)?;
@@ -399,7 +404,8 @@ impl<Node: HugrNode> EncodedCircuit<Node> {
             }
             .wrap());
         }
-        let serial_circuit = &self[region];
+        let encoded_info = &self.circuits[&region];
+        let serial_circuit = &encoded_info.serial_circuit;
 
         if self.len() > 1 {
             unimplemented!(
@@ -413,7 +419,7 @@ impl<Node: HugrNode> EncodedCircuit<Node> {
         let mut decoder =
             PytketDecoderContext::new(serial_circuit, &mut hugr, target, options, None)?;
         decoder.run_decoder(&serial_circuit.commands, None)?;
-        decoder.finish(None)?;
+        decoder.finish(Some(encoded_info))?;
         Ok(hugr)
     }
 

@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use hugr::builder::{Dataflow, DataflowHugr, FunctionBuilder};
 use hugr::extension::prelude::{bool_t, qb_t};
+use hugr::std_extensions::arithmetic::int_types::int_type;
 
 use hugr::ops::OpParent;
 use hugr::types::Signature;
@@ -19,7 +20,7 @@ use tket::serialize::pytket::{DecodeOptions, EncodeOptions};
 use tket_json_rs::circuit_json::{self, SerialCircuit};
 use tket_json_rs::register;
 
-use crate::extension::futures::FutureOpBuilder;
+use crate::extension::futures::{FutureOpBuilder, future_type};
 use crate::extension::qsystem::QSystemOp;
 use crate::extension::result::ResultOp;
 use crate::pytket::{qsystem_decoder_config, qsystem_encoder_config};
@@ -157,17 +158,22 @@ fn circ_qsystem_native_gates() -> Hugr {
     let [qb0] = h.input_wires_arr();
     let [qb1] = h.add_dataflow_op(TketOp::QAlloc, []).unwrap().outputs_arr();
 
-    let [future_bit_0] = h
-        .add_dataflow_op(QSystemOp::LazyMeasure, [qb0])
+    let [bit_0] = h
+        .add_dataflow_op(QSystemOp::Measure, [qb0])
         .unwrap()
         .outputs_arr();
-    let [future_bit_1] = h
-        .add_dataflow_op(QSystemOp::LazyMeasure, [qb1])
+    let [bit_1] = h
+        .add_dataflow_op(QSystemOp::Measure, [qb1])
         .unwrap()
         .outputs_arr();
-
-    let [bit_0] = h.add_read(future_bit_0, bool_t()).unwrap();
-    let [bit_1] = h.add_read(future_bit_1, bool_t()).unwrap();
+    let [bit_0] = h
+        .add_dataflow_op(BoolOp::read, [bit_0])
+        .unwrap()
+        .outputs_arr();
+    let [bit_1] = h
+        .add_dataflow_op(BoolOp::read, [bit_1])
+        .unwrap()
+        .outputs_arr();
 
     h.finish_hugr_with_outputs([bit_0, bit_1]).unwrap()
 }
@@ -198,6 +204,24 @@ fn circ_dropped_order_edge() -> Hugr {
     h.set_order(&result, &h.output());
 
     h.finish_hugr_with_outputs([]).unwrap()
+}
+
+/// A circuit containing Future operations over a type that pytket cannot
+/// represent.
+fn circ_unsupported_future_payload() -> Hugr {
+    let int_t = int_type(6);
+    let future_int_t = future_type(int_t.clone());
+    let mut h = FunctionBuilder::new(
+        "unsupported_future_payload",
+        Signature::new(vec![future_int_t.clone()], vec![future_int_t]),
+    )
+    .unwrap();
+
+    let [future] = h.input_wires_arr();
+    let [future, duplicate] = h.add_dup(future, int_t.clone()).unwrap();
+    h.add_free(duplicate, int_t).unwrap();
+
+    h.finish_hugr_with_outputs([future]).unwrap()
 }
 
 /// Check that all circuit ops have been translated to a native gate.
@@ -318,6 +342,7 @@ fn circuit_standalone_roundtrip(#[case] hugr: Hugr) {
 #[rstest]
 #[case::native_gates(circ_qsystem_native_gates(), 1)]
 #[case::dropped_order_edge(circ_dropped_order_edge(), 1)]
+#[case::unsupported_future_payload(circ_unsupported_future_payload(), 1)]
 fn encoded_circuit_roundtrip(#[case] hugr: Hugr, #[case] num_circuits: usize) {
     let circ_signature = hugr
         .entrypoint_optype()

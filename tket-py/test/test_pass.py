@@ -1,3 +1,4 @@
+import importlib.util
 import tempfile
 
 from pytket import Circuit, OpType
@@ -246,32 +247,45 @@ def test_modifier_resolver() -> None:
     mr_pass = ModifierResolverPass()
     modifier_hugr: Hugr = _hugr_from_path("test_files/guppy_examples/modifiers.hugr")
 
-    normalized = normalize(modifier_hugr)
+    modifier_hugr = normalize(modifier_hugr)
 
-    assert _count_ops(normalized, "tket.modifier.ControlModifier") == 1
-    assert _count_ops(normalized, "tket.modifier.DaggerModifier") == 1
+    assert _count_ops(modifier_hugr, "tket.modifier.ControlModifier") == 1
+    assert _count_ops(modifier_hugr, "tket.modifier.DaggerModifier") == 1
 
-    resolved: Hugr = mr_pass(normalized)
+    resolved: Hugr = mr_pass(modifier_hugr)
 
     assert _count_ops(resolved, "tket.modifier.ControlModifier") == 0
     assert _count_ops(resolved, "tket.modifier.DaggerModifier") == 0
 
 
 def test_modifier_execution() -> None:
-    modified_hugrs_dir = Path("test_files/modified_hugrs")
+    modifier_examples_dir = Path("test_files/modifier_examples")
     hugr_results_dir = Path("test_files/run_modifier_examples/hugr_results")
     run_hugrs_dir = Path("test_files/run_modifier_examples")
+    apply_passes_path = run_hugrs_dir / "apply_passes.py"
+    spec = importlib.util.spec_from_file_location(
+        "run_modifier_examples_apply_passes", apply_passes_path
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    apply_passes_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(apply_passes_module)
+    apply_passes = apply_passes_module.apply_passes
 
     expected_results = {
         expected_path.stem: np.load(expected_path).copy()
         for expected_path in sorted(hugr_results_dir.glob("*.npy"))
     }
-
-    for hugr_path in sorted(modified_hugrs_dir.glob("*.hugr")):
-        hugr_name = hugr_path.stem.removesuffix("_solved")
-        expected_statevector = expected_results[hugr_path.stem]
+    for hugr_path in sorted(modifier_examples_dir.glob("*.hugr")):
+        hugr_name = hugr_path.stem
+        expected_statevector = expected_results[f"{hugr_name}_solved"]
 
         with tempfile.TemporaryDirectory() as tmp_dir:
+            generated_hugrs_dir = Path(tmp_dir) / "modified_hugrs"
+            generated_hugrs_dir.mkdir()
+            apply_passes([hugr_path], generated_hugrs_dir)
+
+            (run_hugrs_dir / "modified_hugrs").mkdir(exist_ok=True)
             tmp_path = Path(tmp_dir) / f"{hugr_name}.npy"
             subprocess.run(
                 [
@@ -281,7 +295,7 @@ def test_modifier_execution() -> None:
                     "--python",
                     "3.13",
                     "run_hugrs.py",
-                    hugr_name,
+                    str((generated_hugrs_dir / hugr_name).resolve()),
                     str(tmp_path),
                 ],
                 cwd=run_hugrs_dir,
