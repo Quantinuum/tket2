@@ -8,7 +8,7 @@ use hugr::builder::{
     Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder,
     ModuleBuilder, SubContainer,
 };
-use hugr::extension::prelude::{UnwrapBuilder, bool_t, option_type, qb_t};
+use hugr::extension::prelude::{ConstExternalSymbol, UnwrapBuilder, bool_t, option_type, qb_t};
 use hugr::std_extensions::arithmetic::float_types::{ConstF64, float64_type};
 use rayon::iter::ParallelIterator;
 use std::sync::Arc;
@@ -31,7 +31,7 @@ use hugr::hugr::hugrmut::HugrMut;
 use hugr::ops::handle::FuncID;
 use hugr::ops::{OpParent, OpType, Value};
 use hugr::std_extensions::arithmetic::float_ops::FloatOps;
-use hugr::types::{Signature, SumType};
+use hugr::types::{Signature, SumType, Type};
 use hugr::{Hugr, HugrView};
 use itertools::Itertools;
 use rstest::{fixture, rstest};
@@ -401,7 +401,13 @@ fn circ_recursive() -> Hugr {
     let func: FuncID<true> = h.container_node().into();
 
     let [q] = h.input_wires_arr();
+
+    // Extra quantum op to ensure this circuit gets encoded.
+    let [q] = h.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
+
+    // Call itself recursively.
     let [q] = h.call(&func, &[], [q]).unwrap().outputs_arr();
+
     h.finish_hugr_with_outputs([q]).unwrap()
 }
 
@@ -445,12 +451,23 @@ fn circ_non_local() -> Hugr {
         FunctionBuilder::new("non_local", Signature::new(input_t, output_t.clone())).unwrap();
 
     let [q, rot] = h.input_wires_arr();
+
+    // Extra quantum op to ensure this circuit gets encoded.
+    let [q] = h.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
+
     let [q] = {
         let mut dfg = h
             .dfg_builder(Signature::new(inner_input_t, output_t), [q])
             .unwrap();
-        // Rx with non-local input
         let [q] = dfg.input_wires_arr();
+
+        // Extra quantum op to ensure this circuit gets encoded.
+        let [q] = dfg.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
+
+        // Rx with non-local input
+        //
+        // Non-local parameters cannot be encoded as a pytket parameter, so the
+        // whole op will be encoded as an opaque subgraph.
         let [q] = dfg
             .add_dataflow_op(TketOp::Rx, [q, rot])
             .unwrap()
@@ -607,6 +624,9 @@ fn circ_nested_dfgs() -> Hugr {
     let [qb] = h.input_wires_arr();
     let rot = h.add_load_value(ConstRotation::new(0.5).unwrap());
 
+    // Extra quantum op to ensure this circuit gets encoded.
+    let [qb] = h.add_dataflow_op(TketOp::H, [qb]).unwrap().outputs_arr();
+
     let inner_dfg = {
         let mut inner_dfg = h
             .dfg_builder(
@@ -704,11 +724,14 @@ fn circ_order_edge() -> Hugr {
 // Bool types get converted automatically between native and tket representations.
 #[fixture]
 fn circ_bool_conversion() -> Hugr {
-    let input_t = vec![bool_t(), bool_type()];
-    let output_t = vec![bool_t(), bool_type()];
+    let input_t = vec![qb_t(), bool_t(), bool_type()];
+    let output_t = vec![qb_t(), bool_t(), bool_type()];
     let mut h = FunctionBuilder::new("bool_conversion", Signature::new(input_t, output_t)).unwrap();
 
-    let [native_b0, tket_b1] = h.input_wires_arr();
+    let [q, native_b0, tket_b1] = h.input_wires_arr();
+
+    // Extra quantum op to ensure this circuit gets encoded.
+    let [q] = h.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
 
     let [tket_b0] = h
         .add_dataflow_op(BoolOp::make_opaque, [native_b0])
@@ -719,49 +742,66 @@ fn circ_bool_conversion() -> Hugr {
         .unwrap()
         .outputs_arr();
 
-    h.finish_hugr_with_outputs([native_b1, tket_b0]).unwrap()
+    h.finish_hugr_with_outputs([q, native_b1, tket_b0]).unwrap()
 }
 
 /// A circuit that requires tracking info in `extra_subgraph` or `straight_through_wires`
 /// (see `EncodedCircuitInfo`), for a nested circuit in a CircBox.
 #[fixture]
 fn circ_unsupported_extras_in_circ_box() -> Hugr {
-    let input_t = vec![option_type([bool_t()]).into(), option_type([qb_t()]).into()];
-    let output_t = vec![bool_t(), option_type([qb_t()]).into()];
+    let input_t = vec![
+        qb_t(),
+        option_type([bool_t()]).into(),
+        option_type([qb_t()]).into(),
+    ];
+    let output_t = vec![qb_t(), bool_t(), option_type([qb_t()]).into()];
     let mut h = FunctionBuilder::new(
         "unsupported_extras_in_circ_box",
         Signature::new(input_t.clone(), output_t.clone()),
     )
     .unwrap();
 
-    let [maybe_b, maybe_q] = h.input_wires_arr();
+    let [q, maybe_b, maybe_q] = h.input_wires_arr();
 
-    let [maybe_b, maybe_q] = {
+    // Extra quantum op to ensure this circuit gets encoded.
+    let [q] = h.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
+
+    let [q, maybe_b, maybe_q] = {
         let mut nested = h
-            .dfg_builder(Signature::new(input_t, output_t), [maybe_b, maybe_q])
+            .dfg_builder(Signature::new(input_t, output_t), [q, maybe_b, maybe_q])
             .unwrap();
-        let [maybe_b, maybe_q] = nested.input_wires_arr();
+        let [q, maybe_b, maybe_q] = nested.input_wires_arr();
+
+        // Extra quantum op to ensure this circuit gets encoded.
+        let [q] = nested
+            .add_dataflow_op(TketOp::H, [q])
+            .unwrap()
+            .outputs_arr();
 
         let [maybe_b] = nested
             .build_unwrap_sum(1, option_type([bool_t()]), maybe_b)
             .unwrap();
 
         nested
-            .finish_with_outputs([maybe_b, maybe_q])
+            .finish_with_outputs([q, maybe_b, maybe_q])
             .unwrap()
             .outputs_arr()
     };
 
-    h.finish_hugr_with_outputs([maybe_b, maybe_q]).unwrap()
+    h.finish_hugr_with_outputs([q, maybe_b, maybe_q]).unwrap()
 }
 
 // A circuit with an output parameter wire.
 #[fixture]
 fn circ_output_parameter_wire() -> Hugr {
-    let input_t = vec![];
-    let output_t = vec![float64_type(), rotation_type()];
+    let input_t = vec![qb_t()];
+    let output_t = vec![qb_t(), float64_type(), rotation_type()];
     let mut h =
         FunctionBuilder::new("output_parameter_wire", Signature::new(input_t, output_t)).unwrap();
+
+    // Extra quantum op to ensure this circuit gets encoded.
+    let [q] = h.input_wires_arr();
+    let [q] = h.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
 
     let pi = h.add_load_value(ConstF64::new(std::f64::consts::PI));
     let two = h.add_load_value(ConstF64::new(2.0));
@@ -774,22 +814,116 @@ fn circ_output_parameter_wire() -> Hugr {
         .unwrap()
         .out_wire(0);
 
-    h.finish_hugr_with_outputs([two_pi, two_pi_rotation])
+    h.finish_hugr_with_outputs([q, two_pi, two_pi_rotation])
         .unwrap()
+}
+
+// A circuit with external float symbols used as pytket parameters.
+#[fixture]
+fn circ_external_float_symbol() -> Hugr {
+    let input_t = vec![qb_t()];
+    let output_t = vec![qb_t(), float64_type()];
+    let mut h =
+        FunctionBuilder::new("external_float_symbol", Signature::new(input_t, output_t)).unwrap();
+
+    // Extra quantum op to ensure this circuit gets encoded.
+    let [q] = h.input_wires_arr();
+    let [q] = h.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
+
+    let x = h.add_load_value(ConstExternalSymbol::new("ext", float64_type(), true));
+    let y = h.add_load_value(ConstExternalSymbol::new("ext", float64_type(), true));
+    let [sum] = h
+        .add_dataflow_op(FloatOps::fadd, [x, y])
+        .unwrap()
+        .outputs_arr();
+
+    h.finish_hugr_with_outputs([q, sum]).unwrap()
 }
 
 // A circuit with a [float64] wire, which should be treated as unsupported.
 #[fixture]
 fn circ_complex_param_type() -> Hugr {
-    let input_t = vec![];
-    let output_t = vec![SumType::new_tuple(vec![float64_type()]).into()];
+    let input_t = vec![qb_t()];
+    let output_t = vec![qb_t(), SumType::new_tuple(vec![float64_type()]).into()];
     let mut h =
         FunctionBuilder::new("complex_param_type", Signature::new(input_t, output_t)).unwrap();
+
+    // Extra quantum op to ensure this circuit gets encoded.
+    let [q] = h.input_wires_arr();
+    let [q] = h.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
 
     let float64 = h.add_load_value(ConstF64::new(1.0));
     let float_tuple = h.make_tuple([float64]).unwrap();
 
-    h.finish_hugr_with_outputs([float_tuple]).unwrap()
+    h.finish_hugr_with_outputs([q, float_tuple]).unwrap()
+}
+
+/// A prelude barrier carrying one unsupported value next to a qubit.
+///
+/// The barrier must be encoded as an opaque subgraph; trying to emit it as a
+/// native pytket barrier would require pytket register values for the
+/// unsupported tuple wire.
+#[fixture]
+fn circ_barrier_with_unsupported_value() -> Hugr {
+    let tuple_float_t = Type::from(SumType::new_tuple(vec![float64_type()]));
+    let input_t = vec![qb_t()];
+    let output_t = vec![qb_t()];
+    let mut h = FunctionBuilder::new(
+        "barrier_with_unsupported_value",
+        Signature::new(input_t, output_t),
+    )
+    .unwrap();
+    let [q] = h.input_wires_arr();
+
+    let float = h.add_load_value(ConstF64::new(1.0));
+    let tuple = h.make_tuple([float]).unwrap();
+    let [q, _tuple] = h
+        .add_dataflow_op(
+            hugr::extension::prelude::Barrier::new([qb_t(), tuple_float_t]),
+            [q, tuple],
+        )
+        .unwrap()
+        .outputs_arr();
+
+    h.finish_hugr_with_outputs([q]).unwrap()
+}
+
+/// A circuit with an unsupported subgraph whose first output is not exposed as
+/// a pytket parameter, followed by a float output used by a supported gate.
+///
+/// Regression test for <https://github.com/Quantinuum/tket2/issues/1516>
+#[fixture]
+fn circ_unsupported_subgraph_skipped_output_before_param() -> Hugr {
+    let tuple_float_t = Type::from(SumType::new_tuple(vec![float64_type()]));
+    let input_t = vec![qb_t()];
+    let output_t = vec![qb_t(), tuple_float_t.clone()];
+    let mut h = FunctionBuilder::new(
+        "unsupported_subgraph_skipped_output_before_param",
+        Signature::new(input_t, output_t),
+    )
+    .unwrap();
+    let [q] = h.input_wires_arr();
+
+    let func = h
+        .module_root_builder()
+        .declare(
+            "tuple_and_float",
+            Signature::new(vec![], vec![tuple_float_t, float64_type()]).into(),
+        )
+        .unwrap();
+
+    let call = h.call(&func, &[], []).unwrap();
+    let [float_tuple, angle] = call.outputs_arr();
+    let [angle] = h
+        .add_dataflow_op(RotationOp::from_halfturns_unchecked, [angle])
+        .unwrap()
+        .outputs_arr();
+    let [q] = h
+        .add_dataflow_op(TketOp::Ry, [q, angle])
+        .unwrap()
+        .outputs_arr();
+
+    h.finish_hugr_with_outputs([q, float_tuple]).unwrap()
 }
 
 /// A program with two unsupported subgraphs not associated to any qubit or bit.
@@ -923,6 +1057,29 @@ fn json_file_roundtrip(#[case] circ: impl AsRef<std::path::Path>) {
     compare_serial_circs(&ser, &reser);
 }
 
+#[test]
+fn decode_tuple_output_from_permuted_barrier_args() {
+    let ser: circuit_json::SerialCircuit = serde_json::from_str(
+        r#"{
+        "phase": "0",
+        "bits": [],
+        "qubits": [["q", [0]], ["q", [1]]],
+        "commands": [
+            {"args": [["q", [1]], ["q", [0]]], "op": {"type": "Barrier"}}
+        ],
+        "implicit_permutation": [[["q", [0]], ["q", [0]]], [["q", [1]], ["q", [1]]]]
+    }"#,
+    )
+    .unwrap();
+
+    let tuple_qubits = Type::from(SumType::new_tuple(vec![qb_t(), qb_t()]));
+    let hugr = ser
+        .decode(DecodeOptions::new().with_signature(Signature::new(vec![], vec![tuple_qubits])))
+        .unwrap();
+
+    hugr.validate().unwrap();
+}
+
 /// Test parameter to select which decoders/encoders to enable.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CircuitRoundtripTestConfig {
@@ -1010,6 +1167,7 @@ fn circuit_standalone_roundtrip(#[case] hugr: Hugr, #[case] config: CircuitRound
         .with_config(config.decoder_config());
     let encode_options = EncodeOptions::new()
         .with_subcircuits(true)
+        .keep_empty_circuits(true)
         .with_config(config.encoder_config());
 
     let encoded = EncodedCircuit::new_standalone(&hugr, encode_options.clone())
@@ -1060,7 +1218,6 @@ fn circuit_standalone_roundtrip(#[case] hugr: Hugr, #[case] config: CircuitRound
 
 /// Test that more complex unsupported subgraphs (nested structure, non-local edges) are rejected when encoding a standalone circuit.
 #[rstest]
-#[case::unsupported_subtree(circ_unsupported_subtree())]
 #[case::global_defs(circ_global_defs())]
 #[case::recursive(circ_recursive())]
 fn reject_standalone_complex_subgraphs(#[case] hugr: Hugr) {
@@ -1104,23 +1261,26 @@ fn fail_on_modified_hugr(circ_tk1_ops: Hugr) {
 #[case::preset_parameterized(circ_parameterized(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::nested_dfgs(circ_nested_dfgs(), 2, CircuitRoundtripTestConfig::Default)]
 #[case::flat_opaque(circ_tk1_ops(), 1, CircuitRoundtripTestConfig::Default)]
-#[case::unsupported_subtree(circ_unsupported_subtree(), 3, CircuitRoundtripTestConfig::Default)]
+#[case::unsupported_subtree(circ_unsupported_subtree(), 0, CircuitRoundtripTestConfig::Default)]
 #[case::global_defs(circ_global_defs(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::recursive(circ_recursive(), 1, CircuitRoundtripTestConfig::Default)]
-#[case::independent_subgraph(circ_independent_subgraph(), 3, CircuitRoundtripTestConfig::Default)]
+#[case::independent_subgraph(circ_independent_subgraph(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::unsupported_io_wire(circ_unsupported_io_wire(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::order_edge(circ_order_edge(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::bool_conversion(circ_bool_conversion(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::complex_param_type(circ_complex_param_type(), 1, CircuitRoundtripTestConfig::Default)]
-// TODO: We need to track [`EncodedCircuitInfo`] for nested CircBoxes too. We
-// have temporarily disabled encoding of DFG and function calls as CircBoxes to
-// avoid an error here.
+#[case::unsupported_subgraph_skipped_output_before_param(
+    circ_unsupported_subgraph_skipped_output_before_param(),
+    1,
+    CircuitRoundtripTestConfig::Default
+)]
 #[case::unsupported_extras_in_circ_box(
     circ_unsupported_extras_in_circ_box(),
-    4,
+    2,
     CircuitRoundtripTestConfig::Default
 )]
 #[case::output_parameter_wire(circ_output_parameter_wire(), 1, CircuitRoundtripTestConfig::Default)]
+#[case::external_float_symbol(circ_external_float_symbol(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::non_local(circ_non_local(), 2, CircuitRoundtripTestConfig::Default)]
 #[case::unsupported_subgraph_no_registers(
     circ_unsupported_subgraph_no_registers(),
@@ -1145,7 +1305,6 @@ fn encoded_circuit_roundtrip(
 
     let encoded = EncodedCircuit::new(&hugr, encode_options).unwrap_or_else(|e| panic!("{e}"));
 
-    assert!(encoded.contains_circuit(hugr.entrypoint()));
     assert_eq!(encoded.len(), num_circuits);
 
     let mut deser = hugr.clone();
@@ -1296,4 +1455,81 @@ fn test_qubit_elision() {
 
     // The circuit should have no alloc/frees or const definitions
     assert_eq!(crate::Circuit::new(&hugr).num_operations(), 0);
+}
+
+/// Test that HUGR barriers over unsupported types are encoded as opaque
+/// subgraphs, rather than trying to encode them as native pytket barriers.
+#[rstest]
+fn unsupported_prelude_barrier_is_encoded_as_opaque_subgraph(
+    circ_barrier_with_unsupported_value: Hugr,
+) {
+    let ser =
+        SerialCircuit::encode(&circ_barrier_with_unsupported_value, EncodeOptions::new()).unwrap();
+
+    validate_serial_circ(&ser);
+
+    let is_opaque_barrier = |cmd: &tket_json_rs::circuit_json::Command| {
+        cmd.op.op_type == optype::OpType::Barrier && cmd.op.data.is_some()
+    };
+    assert!(ser.commands.iter().any(is_opaque_barrier));
+}
+
+/// Trying to decode a circuit with missing output bits should be a decode error rather than a panic.
+///
+/// Regression test for a panic found in <https://github.com/Quantinuum/tket2/pull/1558>
+#[rstest]
+fn serial_decode_missing_output_bit_returns_decode_error() {
+    let serial = SerialCircuit::new(Some("missing_output_bit".to_string()), "0".to_string());
+    let decode_options =
+        DecodeOptions::new().with_signature(Signature::new(vec![], vec![bool_t()]));
+
+    let err = serial.decode(decode_options).unwrap_err();
+    assert_matches!(
+        err,
+        PytketDecodeError {
+            inner: PytketDecodeErrorInner::InvalidOutputSignature { .. },
+            ..
+        }
+    );
+}
+
+/// Standalone decoding roundtrip should preserve the output signature.
+///
+/// Regression test for a mismatched signature error found in
+/// <https://github.com/Quantinuum/tket2/pull/1558>
+#[rstest]
+fn standalone_reassemble_preserves_repeated_bit_outputs(circ_preset_bits: Hugr) {
+    let circ_signature = circ_preset_bits
+        .entrypoint_optype()
+        .inner_function_type()
+        .expect("Dataflow entrypoint")
+        .into_owned();
+    let decode_options = DecodeOptions::new().with_signature(circ_signature.clone());
+
+    let encoded = EncodedCircuit::new_standalone(
+        &circ_preset_bits,
+        EncodeOptions::new().with_subcircuits(true),
+    )
+    .unwrap_or_else(|e| panic!("{e}"));
+
+    let reassembled = encoded
+        .reassemble(
+            circ_preset_bits.entrypoint(),
+            Some("main".to_string()),
+            decode_options,
+        )
+        .unwrap_or_else(|e| panic!("{e}"));
+    reassembled.validate().unwrap_or_else(|e| panic!("{e}"));
+
+    let reassembled_function = reassembled
+        .children(reassembled.module_root())
+        .exactly_one()
+        .ok()
+        .expect("single reassembled function");
+    let reassembled_signature = reassembled
+        .get_optype(reassembled_function)
+        .inner_function_type()
+        .expect("Function definition")
+        .into_owned();
+    assert_eq!(&circ_signature.output, &reassembled_signature.output);
 }

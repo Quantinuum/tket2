@@ -11,9 +11,10 @@ use std::{cmp::min, convert::TryInto, fs, num::NonZeroUsize, path::PathBuf};
 
 use pyo3::prelude::*;
 use tket::optimiser::badger::BadgerOptions;
-use tket::passes;
 use tket::passes::composable::{ComposablePass, WithScope};
 use tket::{Circuit, TketOp, op_matches};
+
+use tket::passes;
 
 use crate::optimiser::PyBadgerOptimiser;
 use crate::state::CompilationState;
@@ -32,6 +33,7 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     m.add_function(wrap_pyfunction!(self::chunks::chunks, &m)?)?;
     m.add_function(wrap_pyfunction!(self::tket1::tket1_pass, &m)?)?;
     m.add_function(wrap_pyfunction!(resolve_modifiers, &m)?)?;
+    m.add_function(wrap_pyfunction!(qsystem_rebase_pass, &m)?)?;
     m.add("PullForwardError", py.get_type::<PyPullForwardError>())?;
     m.add(
         "InlineFunctionsError",
@@ -64,6 +66,13 @@ create_py_exception!(
     PyInlineFunctionsError,
     "Errors from the function inlining pass."
 );
+
+create_py_exception!(
+    tket_qsystem::QSystemPassError,
+    PyQSystemPassError,
+    "Errors from the QSystem rebase pass."
+);
+
 /// Flatten the structure of a Guppy-generated program to enable additional optimisations.
 ///
 /// This should normally be called first before other optimisations.
@@ -201,5 +210,28 @@ fn resolve_modifiers(circ: &mut CompilationState, scope: Option<PyPassScope>) ->
     let py_scope = scope.unwrap_or_default();
     let pass = tket::passes::ModifierResolverPass::default_with_scope(py_scope.scope);
     pass.run(&mut circ.hugr).convert_pyerrs()?;
+    Ok(())
+}
+
+#[pyfunction]
+#[pyo3(signature=(circ, *, constant_fold = true, monomorphize = true, force_order = true, lazify = true, hide_funcs = true, scope = None))]
+fn qsystem_rebase_pass(
+    circ: &mut CompilationState,
+    constant_fold: bool,
+    monomorphize: bool,
+    force_order: bool,
+    lazify: bool,
+    hide_funcs: bool,
+    scope: Option<PyPassScope>,
+) -> PyResult<()> {
+    let py_scope = scope.unwrap_or_default();
+    let qsystem_pass = tket_qsystem::QSystemPass::default_with_scope(py_scope.scope)
+        .with_constant_fold(constant_fold)
+        .with_monomorphize(monomorphize)
+        .with_force_order(force_order)
+        .with_lazify(lazify)
+        .with_hide_funcs(hide_funcs);
+
+    qsystem_pass.run(&mut circ.hugr).convert_pyerrs()?;
     Ok(())
 }
