@@ -55,9 +55,6 @@ impl QSystemEmitter {
     ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
         let serial_op = match qsystem_op {
             QSystemOp::Measure => PytketOptype::Measure,
-            // "Lazy" operations are translated as eager measurements in pytket,
-            // as there is no `Future<T>` type there.
-            QSystemOp::LazyMeasure => PytketOptype::Measure,
             QSystemOp::Rz => PytketOptype::Rz,
             QSystemOp::PhasedX => PytketOptype::PhasedX,
             QSystemOp::ZZPhase => PytketOptype::ZZPhase,
@@ -67,8 +64,14 @@ impl QSystemEmitter {
                 encoder.get_input_values(node, hugr)?;
                 return Ok(EncodeStatus::Success);
             }
-            QSystemOp::LazyMeasureReset | QSystemOp::MeasureReset => {
-                // These may require a pytket measurement followed by a reset.
+            QSystemOp::LazyMeasure | QSystemOp::LazyMeasureReset => {
+                // Lazy measurements return `Future<T>` values, and pytket has
+                // no future type. We keep them in opaque subgraphs instead of
+                // erasing the future boundary in the circuit encoding.
+                return Ok(EncodeStatus::Unsupported);
+            }
+            QSystemOp::MeasureReset => {
+                // This requires a pytket measurement followed by a reset.
                 return Ok(EncodeStatus::Unsupported);
             }
             QSystemOp::LazyMeasureLeaked => {

@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from hugr.envelope import EnvelopeConfig
 from hugr.ext import ExtensionRegistry
+from tket_exts import tket_registry
 from .._tket import state as _state
 from .build import CircBuild, Command
 
@@ -97,11 +98,10 @@ class CompilationState:
         """Convert this CompilationState back to a python Hugr package."""
         # Convert the inner hugr to bytes and load it in Python.
         hugr_bytes = self._inner.to_bytes()
-        package = Package.from_bytes(hugr_bytes, self._py_extensions)
+        package = Package.from_bytes(hugr_bytes, tket_registry())
         if self._py_extensions is not None:
             # Resolve the extensions in the loaded package using the python registry, if needed.
-            # TODO: Use the `package.resolve_extensions` for clarity once it's been released in `hugr-py 0.16.0`.
-            package.used_extensions(self._py_extensions)
+            package.resolve_extensions(self._py_extensions)
         return package
 
     @staticmethod

@@ -3,7 +3,6 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use hugr_core::core::HugrNode;
-use hugr_core::hugr::internal::PortgraphNodeMap;
 use hugr_core::hugr::{HugrError, hugrmut::HugrMut};
 use hugr_core::ops::{OpTag, OpTrait};
 use hugr_core::{HugrView, IncomingPort, Node, OutgoingPort};
@@ -67,10 +66,10 @@ impl RedundantOrderEdgesPass {
         let mut to_remove = Vec::new();
 
         // Traverse the region in topological order.
-        let (region, node_map) = hugr.region_portgraph(parent);
-        let postorder = petgraph::visit::Topo::new(&region);
-        for pg_child in postorder.iter(&region) {
-            let child = node_map.from_portgraph(pg_child);
+        let sg = hugr.scheduling_graph(parent);
+        let postorder = petgraph::visit::Topo::new(sg.petgraph());
+        for pg_child in postorder.iter(sg.petgraph()) {
+            let child = sg.pg_to_node(pg_child);
             let op = hugr.get_optype(child);
 
             // If the child itself is a region (parent) and we are running recursively, add the child to the region candidates.
@@ -142,7 +141,7 @@ impl RedundantOrderEdgesPass {
             to_remove.extend(removable_edges);
         }
         // Release the hugr borrow so we can mutate it.
-        drop(region);
+        drop(sg);
         let edges_removed = to_remove.len();
 
         for edge in to_remove {

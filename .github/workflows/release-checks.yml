@@ -35,7 +35,7 @@ jobs:
             python: "3.10"
     steps:
       - uses: actions/checkout@v6
-      - uses: mozilla-actions/sccache-action@v0.0.9
+      - uses: mozilla-actions/sccache-action@v0.0.10
       - uses: quantinuum/hugrverse-env/install-hugrenv-action@main
         with:
           packages: "tket"

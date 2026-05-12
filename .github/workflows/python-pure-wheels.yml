@@ -64,7 +64,7 @@ jobs:
         if: ${{ matrix.target.run == 'true' }}
       - name: Run sccache-cache
         if: ${{ matrix.target.run == 'true' }}
-        uses: mozilla-actions/sccache-action@v0.0.9
+        uses: mozilla-actions/sccache-action@v0.0.10
 
       - name: Set up uv
         if: ${{ matrix.target.run == 'true' }}
