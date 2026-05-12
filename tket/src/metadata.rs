@@ -18,15 +18,19 @@ impl Metadata for MaxQubits {
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
-#[serde(rename_all = "lowercase")]
-pub enum InlineHint {
-    /// Always inline the function, even if it is large or called from many places.
-    Always,
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum InlineAnnotation {
+    /// Inline the function if we know it won't produce an invalid Hugr.
+    ///
+    /// This is a best effort option; the compiler may choose not to inline
+    /// functions with this annotation.
+    BestEffort,
     /// Never inline the function.
     Never,
 }
-impl Metadata for InlineHint {
-    const KEY: &'static str = "tket.hint.inline";
+impl Metadata for InlineAnnotation {
+    const KEY: &'static str = "tket.inline";
     type Type<'hugr> = Self;
 }
 
