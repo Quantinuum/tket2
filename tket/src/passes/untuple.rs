@@ -262,13 +262,17 @@ fn remove_pack_unpack<'h, T: HugrView>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::passes::composable::WithScope;
+    use crate::passes::composable::{Preserve, WithScope};
     use hugr_core::Hugr;
-    use hugr_core::builder::FunctionBuilder;
+    use hugr_core::builder::{DataflowSubContainer, FunctionBuilder, HugrBuilder, ModuleBuilder};
     use hugr_core::extension::prelude::{UnpackTuple, bool_t, qb_t};
     use hugr_core::ops::handle::NodeHandle;
     use hugr_core::std_extensions::arithmetic::float_types::float64_type;
-    use hugr_core::types::Signature;
+    use hugr_core::std_extensions::collections::array::{
+        ArrayDiscard, ArrayOpBuilder, array_type_parametric,
+    };
+    use hugr_core::types::type_param::TypeParam;
+    use hugr_core::types::{PolyFuncType, Signature, TypeArg};
     use rstest::{fixture, rstest};
 
     /// A simple pack operation with unused output.
@@ -445,6 +449,51 @@ mod test {
         h.finish_hugr_with_outputs([f]).unwrap()
     }
 
+    /// A pack operation followed by an unpack, where at least one tuple member contains a type
+    /// argument that is declared in the contained function.
+    ///
+    /// Both operations can be removed.
+    ///
+    /// Regression smoke test for <https://github.com/Quantinuum/tket2/issues/1486>.
+    #[fixture]
+    fn unpack_type_parameters() -> Hugr {
+        let mut m = ModuleBuilder::new();
+        let arr_type =
+            array_type_parametric(TypeArg::new_var_use(0, TypeParam::max_nat_type()), bool_t())
+                .unwrap();
+        let mut inner = m
+            .define_function(
+                "inner",
+                PolyFuncType::new(
+                    vec![TypeParam::max_nat_type()],
+                    Signature::new_endo(vec![arr_type.clone(), bool_t()]),
+                ),
+            )
+            .unwrap();
+        let [arr, b] = inner.input_wires_arr();
+        let tuple = inner.make_tuple([arr, b]).unwrap();
+        let op = UnpackTuple::new(vec![arr_type, bool_t()].into());
+        let [arr, b] = inner.add_dataflow_op(op, [tuple]).unwrap().outputs_arr();
+        let inner_handle = inner.finish_with_outputs([arr, b]).unwrap();
+
+        let mut h = m
+            .define_function("test", Signature::new_endo(vec![bool_t()]))
+            .unwrap();
+        let [b] = h.input_wires_arr();
+        let arr = h.add_new_array(bool_t(), [b]).unwrap();
+        let call = h
+            .call(inner_handle.handle(), &[TypeArg::BoundedNat(1)], [arr, b])
+            .unwrap();
+        let [arr, b] = call.outputs_arr();
+        h.add_dataflow_op(ArrayDiscard::new(bool_t(), 1).unwrap(), [arr])
+            .unwrap();
+        h.finish_with_outputs([b]).unwrap();
+        m.finish_hugr().unwrap_or_else(|err| {
+            println!("{}", err);
+            panic!()
+        })
+    }
+
     #[rstest]
     #[case::unused(unused_pack(), 1, 2)]
     #[case::simple(simple_pack_unpack(), 1, 2)]
@@ -455,13 +504,14 @@ mod test {
     #[case::ordered(ordered_pack_unpack(), 0, 4)]
     #[case::outgoing_ordered(outgoing_ordered_pack_unpack(), 0, 4)]
     #[case::incoming_ordered(incoming_ordered_pack_unpack(), 0, 4)]
+    #[case::type_parameters(unpack_type_parameters(), 1, 4)]
     fn test_pack_unpack(
         #[case] mut hugr: Hugr,
         #[case] expected_rewrites: usize,
         #[case] remaining_nodes: usize,
     ) {
         let parent = hugr.entrypoint();
-        let pass = UntuplePass::default().with_scope(PassScope::EntrypointFlat);
+        let pass = UntuplePass::default().with_scope(PassScope::Global(Preserve::All));
         let res = pass.run(&mut hugr).unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(res.rewrites_applied, expected_rewrites);
         assert_eq!(hugr.children(parent).count(), remaining_nodes);
