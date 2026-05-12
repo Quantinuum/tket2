@@ -166,11 +166,11 @@ fn circ_qsystem_native_gates() -> Hugr {
         .unwrap()
         .outputs_arr();
     let [bit_0] = h
-        .add_dataflow_op(BoolOp::read, [bit_0])
+        .add_dataflow_op(MeasurementOp::Read, [bit_0])
         .unwrap()
         .outputs_arr();
     let [bit_1] = h
-        .add_dataflow_op(BoolOp::read, [bit_1])
+        .add_dataflow_op(MeasurementOp::Read, [bit_1])
         .unwrap()
         .outputs_arr();
 
