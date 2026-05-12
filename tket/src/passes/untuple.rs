@@ -3,7 +3,7 @@
 use std::collections::VecDeque;
 
 use hugr::hugr::views::sibling_subgraph::SchedGraphChecker;
-use hugr_core::builder::{DFGBuilder, Dataflow, DataflowHugr};
+use hugr_core::builder::{Dataflow, DataflowHugr, FunctionBuilder};
 use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
 use hugr_core::hugr::SimpleReplacementError;
 use hugr_core::hugr::hugrmut::HugrMut;
@@ -216,10 +216,10 @@ fn remove_pack_unpack<'h, T: HugrView>(
 
     let mut nodes = unpack_nodes.clone();
     nodes.push(pack_node);
-    let subcirc = SiblingSubgraph::try_from_nodes_with_checker(nodes, hugr, checker).unwrap();
-    let subcirc_signature = subcirc.signature(hugr);
+    let subgraph = SiblingSubgraph::try_from_nodes_with_checker(nodes, hugr, checker).unwrap();
+    let subgraph_type = subgraph.poly_func_type(hugr);
 
-    let mut replacement = DFGBuilder::new(subcirc_signature).unwrap();
+    let mut replacement = FunctionBuilder::new("<repl>", subgraph_type).unwrap();
 
     // Wire the inputs directly to the unpack outputs
     // We need to list the **connected** output ports from the unpack nodes.
@@ -252,7 +252,7 @@ fn remove_pack_unpack<'h, T: HugrView>(
         .unwrap_or_else(|e| {
             panic!("Failed to create replacement for removing tuple pack/unpack operations. {e}")
         });
-    subcirc
+    subgraph
         .create_simple_replacement(hugr, replacement)
         .unwrap_or_else(|e| {
             panic!("Failed to create rewrite for removing tuple pack/unpack operations. {e}")
@@ -262,15 +262,13 @@ fn remove_pack_unpack<'h, T: HugrView>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::passes::composable::{Preserve, WithScope};
+    use crate::passes::composable::WithScope;
     use hugr_core::Hugr;
-    use hugr_core::builder::{DataflowSubContainer, FunctionBuilder, HugrBuilder, ModuleBuilder};
+    use hugr_core::builder::{DFGBuilder, FunctionBuilder};
     use hugr_core::extension::prelude::{UnpackTuple, bool_t, qb_t};
     use hugr_core::ops::handle::NodeHandle;
     use hugr_core::std_extensions::arithmetic::float_types::float64_type;
-    use hugr_core::std_extensions::collections::array::{
-        ArrayDiscard, ArrayOpBuilder, array_type_parametric,
-    };
+    use hugr_core::std_extensions::collections::array::array_type_parametric;
     use hugr_core::types::type_param::TypeParam;
     use hugr_core::types::{PolyFuncType, Signature, TypeArg};
     use rstest::{fixture, rstest};
@@ -457,41 +455,22 @@ mod test {
     /// Regression smoke test for <https://github.com/Quantinuum/tket2/issues/1486>.
     #[fixture]
     fn unpack_type_parameters() -> Hugr {
-        let mut m = ModuleBuilder::new();
         let arr_type =
             array_type_parametric(TypeArg::new_var_use(0, TypeParam::max_nat_type()), bool_t())
                 .unwrap();
-        let mut inner = m
-            .define_function(
-                "inner",
-                PolyFuncType::new(
-                    vec![TypeParam::max_nat_type()],
-                    Signature::new_endo(vec![arr_type.clone(), bool_t()]),
-                ),
-            )
-            .unwrap();
-        let [arr, b] = inner.input_wires_arr();
-        let tuple = inner.make_tuple([arr, b]).unwrap();
+        let mut h = FunctionBuilder::new(
+            "inner",
+            PolyFuncType::new(
+                vec![TypeParam::max_nat_type()],
+                Signature::new_endo(vec![arr_type.clone(), bool_t()]),
+            ),
+        )
+        .unwrap();
+        let [arr, b] = h.input_wires_arr();
+        let tuple = h.make_tuple([arr, b]).unwrap();
         let op = UnpackTuple::new(vec![arr_type, bool_t()].into());
-        let [arr, b] = inner.add_dataflow_op(op, [tuple]).unwrap().outputs_arr();
-        let inner_handle = inner.finish_with_outputs([arr, b]).unwrap();
-
-        let mut h = m
-            .define_function("test", Signature::new_endo(vec![bool_t()]))
-            .unwrap();
-        let [b] = h.input_wires_arr();
-        let arr = h.add_new_array(bool_t(), [b]).unwrap();
-        let call = h
-            .call(inner_handle.handle(), &[TypeArg::BoundedNat(1)], [arr, b])
-            .unwrap();
-        let [arr, b] = call.outputs_arr();
-        h.add_dataflow_op(ArrayDiscard::new(bool_t(), 1).unwrap(), [arr])
-            .unwrap();
-        h.finish_with_outputs([b]).unwrap();
-        m.finish_hugr().unwrap_or_else(|err| {
-            println!("{}", err);
-            panic!()
-        })
+        let [arr, b] = h.add_dataflow_op(op, [tuple]).unwrap().outputs_arr();
+        h.finish_hugr_with_outputs([arr, b]).unwrap()
     }
 
     #[rstest]
@@ -504,14 +483,14 @@ mod test {
     #[case::ordered(ordered_pack_unpack(), 0, 4)]
     #[case::outgoing_ordered(outgoing_ordered_pack_unpack(), 0, 4)]
     #[case::incoming_ordered(incoming_ordered_pack_unpack(), 0, 4)]
-    #[case::type_parameters(unpack_type_parameters(), 1, 4)]
+    #[case::type_parameters(unpack_type_parameters(), 1, 2)]
     fn test_pack_unpack(
         #[case] mut hugr: Hugr,
         #[case] expected_rewrites: usize,
         #[case] remaining_nodes: usize,
     ) {
         let parent = hugr.entrypoint();
-        let pass = UntuplePass::default().with_scope(PassScope::Global(Preserve::All));
+        let pass = UntuplePass::default().with_scope(PassScope::EntrypointFlat);
         let res = pass.run(&mut hugr).unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(res.rewrites_applied, expected_rewrites);
         assert_eq!(hugr.children(parent).count(), remaining_nodes);
