@@ -1,7 +1,6 @@
 //! Provides [`force_order`], a tool for fixing the order of nodes in a Hugr.
 use std::{cmp::Reverse, collections::BinaryHeap, iter};
 
-use hugr_core::hugr::internal::PortgraphNodeMap;
 use hugr_core::{
     HugrView as _, Node,
     hugr::{HugrError, hugrmut::HugrMut},
@@ -56,15 +55,15 @@ pub fn force_order_by_key<H: HugrMut<Node = Node>, K: Ord>(
         // we filter out the input and output nodes from the topological sort
         let [i, o] = hugr.get_io(dp).unwrap();
         let ordered_nodes = {
-            let (region, node_map) = hugr.region_portgraph(dp);
-            let rank = |n| rank(hugr, node_map.from_portgraph(n));
-            let i_pg = node_map.to_portgraph(i);
-            let o_pg = node_map.to_portgraph(o);
-            let petgraph = NodeFiltered::from_fn(&region, |x| x != i_pg && x != o_pg);
+            let sg = hugr.scheduling_graph(dp);
+            let rank = |n| rank(hugr, sg.pg_to_node(n));
+            let i_pg = sg.node_to_pg(i);
+            let o_pg = sg.node_to_pg(o);
+            let petgraph = NodeFiltered::from_fn(sg.petgraph(), |x| x != i_pg && x != o_pg);
             ForceOrder::<_, portgraph::NodeIndex, _, _>::new(&petgraph, &rank)
                 .iter(&petgraph)
                 .filter_map(|x| {
-                    let x = node_map.from_portgraph(x);
+                    let x = sg.pg_to_node(x);
                     let expected_edge = Some(EdgeKind::StateOrder);
                     let optype = hugr.get_optype(x);
                     if optype.other_input() == expected_edge
@@ -208,7 +207,6 @@ mod test {
 
     use super::*;
     use hugr_core::builder::{BuildHandle, Dataflow, DataflowHugr, endo_sig};
-    use hugr_core::hugr::internal::HugrInternals;
     use hugr_core::ops::handle::{DataflowOpID, NodeHandle};
 
     use hugr_core::ops::{self, Value};
@@ -278,11 +276,11 @@ mod test {
         })
         .unwrap();
 
-        let (graph, node_map) = hugr.region_portgraph(hugr.entrypoint());
+        let sg = hugr.scheduling_graph(hugr.entrypoint());
 
-        let topo_sorted = Topo::new(&graph)
-            .iter(&graph)
-            .map(|n| node_map.from_portgraph(n))
+        let topo_sorted = Topo::new(sg.petgraph())
+            .iter(sg.petgraph())
+            .map(|n| sg.pg_to_node(n))
             .filter(|n| rank_map.contains_key(n))
             .collect_vec();
         hugr.validate().unwrap();

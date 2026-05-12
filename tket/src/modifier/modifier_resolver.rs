@@ -42,7 +42,7 @@
 //! When dagger is applied, the order of nodes to be processed is reversed,
 //! since the control qubits are passed in the reverse order.
 //! After visiting all children, `modify_dfg_body` calls
-//! [`connect_all`](ModifierResolver::connect_all) to connect all wires that are registered
+//! ModifierResolver::connect_all to connect all wires that are registered
 //! in the correspondence map.
 //!
 //! Importantly, when dagger is applied, not only the order of nodes is reversed,
@@ -144,12 +144,12 @@ impl<N: HugrNode> std::fmt::Display for DirWire<N> {
 
 impl<N> DirWire<N> {
     /// Create a new DirWire.
-    pub fn new(node: N, port: Port) -> Self {
+    fn new(node: N, port: Port) -> Self {
         DirWire(node, port)
     }
 
     /// Reverse the direction of the wire.
-    pub fn reverse(self) -> Self {
+    pub(crate) fn reverse(self) -> Self {
         let index = self.1.index();
         let port = match self.1.as_directed() {
             Either::Left(_in) => OutgoingPort::from(index).into(),
@@ -328,7 +328,7 @@ pub struct ModifierResolver<N = Node> {
 
 impl<N> ModifierResolver<N> {
     /// Create a new modifier resolver.
-    pub fn new() -> Self {
+    fn new() -> Self {
         ModifierResolver {
             modifiers: CombinedModifier::default(),
             corresp_map: HashMap::default(),
@@ -414,12 +414,12 @@ pub enum ModifierResolverErrors<N = Node> {
 
 impl<N> ModifierResolverErrors<N> {
     /// Create an unreachable error.
-    pub fn unreachable(msg: impl Into<String>) -> Self {
+    fn unreachable(msg: impl Into<String>) -> Self {
         Self::Unreachable { msg: msg.into() }
     }
 
     /// Create an unresolvable error.
-    pub fn unresolvable(node: N, msg: impl Into<String>, optype: OpType) -> Self {
+    fn unresolvable(node: N, msg: impl Into<String>, optype: OpType) -> Self {
         Self::UnResolvable {
             node,
             msg: msg.into(),
@@ -461,6 +461,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         *self.worklist() = worklist;
         r
     }
+
     fn with_modifiers<T>(
         &mut self,
         modifiers: CombinedModifier,
@@ -471,6 +472,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         *self.modifiers_mut() = modifiers;
         r
     }
+
     fn with_ancilla<T>(
         &mut self,
         wire: &mut Wire<Node>,
@@ -602,7 +604,7 @@ impl<N: HugrNode> ModifierResolver<N> {
     }
 
     /// connects all the wires in the builder.
-    pub fn connect_all(
+    fn connect_all(
         &mut self,
         h: &impl HugrView<Node = N>,
         new_dfg: &mut impl Container,
@@ -668,7 +670,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         // Verify that the rewrite can be applied.
         self.verify(hugr, modifier_node)?;
 
-        // the ports that takes inputs from the modified function.
+        // The ports that takes inputs from the modified function to the IndirectCall node.
         let modified_fn_loader: Vec<(_, Vec<_>)> = hugr
             .node_outputs(modifier_node)
             .map(|p| (p, hugr.linked_inputs(modifier_node, p).collect()))
@@ -680,7 +682,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         let new_load = self.with_modifiers(modifiers, |this| {
             this.apply_modifier_chain_to_loaded_fn(hugr, modifier_node)
         })?;
-
         // Connect the modified function to the inputs
         for (out_port, inputs) in modified_fn_loader {
             for (recv, recv_port) in inputs {
@@ -688,27 +689,40 @@ impl<N: HugrNode> ModifierResolver<N> {
                 hugr.connect(new_load, out_port, recv, recv_port);
             }
         }
-
         Ok(())
     }
 
-    /// Takes a signature and modifies it according to the combined modifier.
-    /// flatten = true means that control qubits are represented as individual wires,
-    /// while false means that they are packed to some arrays.
-    /// This false mode is used for function definitions,
-    pub fn modify_signature(&self, signature: &mut Signature, flatten: bool) {
+    /// Modifies a function signature to account for control qubits added by modifiers.
+    ///
+    /// # Arguments
+    /// * `signature` - The function signature to modify
+    /// * `flatten` - If true, control qubits are represented as individual `Qubit` types,
+    ///   if false, control qubits are packed into arrays (used for function definitions).
+    fn modify_signature(&self, signature: &mut Signature, flatten: bool) {
         let FuncTypeBase { input, output } = signature;
 
         if flatten {
+            // Flattened mode: represent each control qubit as an individual Qubit type
             let n = self.control_num();
             input.to_mut().splice(0..0, iter::repeat_n(qb_t(), n));
             output.to_mut().splice(0..0, iter::repeat_n(qb_t(), n));
         } else {
-            for ctrls in &self.modifiers.accum_ctrl {
-                let n = *ctrls as u64;
-                input.to_mut().insert(0, array_type(n, qb_t()));
-                output.to_mut().insert(0, array_type(n, qb_t()));
-            }
+            // Non-flattened mode: pack control qubits into arrays (used for function definitions)
+            // Build array types for each control group: each element in accum_ctrl specifies
+            // how many qubits should be grouped together in a single array
+            let control_types = self
+                .modifiers
+                .accum_ctrl
+                .iter()
+                .map(|ctrls| array_type(*ctrls as u64, qb_t()))
+                .collect::<Vec<_>>();
+
+            // Insert the control array types at the beginning of the input signature
+            // splice(0..0, ...) inserts elements at position 0 without removing anything
+            input.to_mut().splice(0..0, control_types.iter().cloned());
+
+            // Insert the same control array types at the beginning of the output signature
+            output.to_mut().splice(0..0, control_types);
         }
     }
 
@@ -724,39 +738,42 @@ impl<N: HugrNode> ModifierResolver<N> {
         match optype {
             // Skip input/output nodes: it should be handled by its parent as it sets control qubits.
             OpType::Input(_) | OpType::Output(_) => {}
-
             // CFG
             OpType::CFG(cfg) => self.modify_cfg(h, target_node, cfg, new_dfg)?,
-
             // DFGs
             OpType::DFG(dfg) => self.modify_dfg(h, target_node, dfg, new_dfg)?,
+            // TailLoop
             OpType::TailLoop(tail_loop) => {
                 self.modify_tail_loop(h, target_node, tail_loop, new_dfg)?
             }
+            // Conditional
             OpType::Conditional(conditional) => {
                 self.modify_conditional(h, target_node, conditional, new_dfg)?
             }
-
             // Function calls
             OpType::Call(_) => self.modify_call(h, target_node, optype, new_dfg)?,
+            // Indirect call
             OpType::CallIndirect(indir_call) => {
                 self.modify_indirect_call(h, target_node, indir_call, new_dfg)?
             }
+            // Load function
             OpType::LoadFunction(load) => {
                 self.modify_load_function(h, target_node, load, new_dfg)?
             }
-
             // Operations
             OpType::ExtensionOp(_) => {
                 self.modify_extension_op(h, target_node, optype, new_dfg)?;
             }
+            // Constants
             OpType::Const(constant) => {
                 self.modify_constant(target_node, constant, new_dfg)?;
             }
+            // Load constant
             OpType::LoadConstant(_) | OpType::OpaqueOp(_) | OpType::Tag(_) => {
                 self.add_node_no_modification(h, target_node, optype.clone(), new_dfg)?;
             }
 
+            // Invalid nodes
             OpType::FuncDefn(_) | OpType::FuncDecl(_) | OpType::Module(_) => {
                 return Err(ModifierResolverErrors::unreachable(format!(
                     "Invalid node found inside modified function (OpType = {})",
@@ -796,8 +813,8 @@ impl<N: HugrNode> ModifierResolver<N> {
     /// If the dagger is not applied, the ports are mapped directly.
     /// If the dagger is applied, the quantum input/output ports are swapped.
     /// Inputs:
-    /// * `n`: the old node
-    /// * `node`: the new node
+    /// * `old_node`: the old node
+    /// * `new_node`: the new node
     /// * `inputs`/`outputs`: the types of the input/output ports of the old node
     /// * `input_offset`/`output_offset`: the offset of the ports of the old and new node
     ///   - e.g., for IndirectCall, the first input port is the loaded function, which we want to ignore here.
@@ -822,8 +839,8 @@ impl<N: HugrNode> ModifierResolver<N> {
     /// TODO: Handle state order edges.
     fn wire_node_inout<'a>(
         &mut self,
-        n: N,
-        node: Node,
+        old_node: N,
+        new_node: Node,
         (inputs, outputs): (
             impl Iterator<Item = &'a Type>,
             impl Iterator<Item = &'a Type>,
@@ -831,8 +848,8 @@ impl<N: HugrNode> ModifierResolver<N> {
         (input_offset, output_offset, new_offset): (usize, usize, usize),
     ) -> Result<(), ModifierResolverErrors<N>> {
         self.wire_inout(
-            (n, n),
-            (node, node),
+            (old_node, old_node),
+            (new_node, new_node),
             (inputs, outputs),
             (input_offset, output_offset, new_offset),
         )
@@ -878,7 +895,8 @@ impl<N: HugrNode> ModifierResolver<N> {
                 out_ty = outputs.next();
             }
 
-            // If both are quantum types, wire them in the opposite direction until the next non-quantum type
+            // If both are quantum types, wire them in the opposite direction (if dagger is applied)
+            // until the next non-quantum type
             while let Some(ty) = in_ty {
                 if !self.qubit_finder.contains_element_type(ty) {
                     break;
@@ -1017,19 +1035,19 @@ impl<N: HugrNode> ModifierResolver<N> {
     fn modify_cfg(
         &mut self,
         h: &mut impl HugrMut<Node = N>,
-        n: N,
+        cfg_node: N,
         cfg: &CFG,
         new_dfg: &mut impl Container,
     ) -> Result<(), ModifierResolverErrors<N>> {
         // Check if the CFG contains only one block.
         let children: Vec<N> = h
-            .children(n)
+            .children(cfg_node)
             .filter(|child| h.get_optype(*child).is_dataflow_block())
             .collect();
         // NOTE: this check prevents breaking modifier application to branching or loops
         if children.len() != 1 {
             return Err(ModifierResolverErrors::unresolvable(
-                n,
+                cfg_node,
                 "CFG with more than one node found.".to_string(),
                 cfg.clone().into(),
             ));
@@ -1038,24 +1056,30 @@ impl<N: HugrNode> ModifierResolver<N> {
 
         let mut signature = cfg.signature.clone();
         self.modify_signature(&mut signature, true);
+
         let mut new_cfg = CFGBuilder::new(signature.clone())?;
         let mut new_bb = new_cfg.entry_builder([type_row![]], signature.output.clone())?;
         self.modify_dfg_body(h, old_bb, &mut new_bb)?;
+
         let bb_id = new_bb.finish_sub_container()?;
         new_cfg.branch(&bb_id, 0, &new_cfg.exit_block())?;
 
-        let new = self.insert_sub_dfg(new_dfg, new_cfg)?;
+        let new_node = self.insert_sub_dfg(new_dfg, new_cfg)?;
 
         // connect the controls and register the IOs
         for (i, c) in self.controls().iter_mut().enumerate() {
-            new_dfg.hugr_mut().connect(c.node(), c.source(), new, i);
-            *c = Wire::new(new, i);
+            new_dfg
+                .hugr_mut()
+                .connect(c.node(), c.source(), new_node, i);
+            *c = Wire::new(new_node, i);
         }
+
         let offset = self.control_num();
+
         self.wire_node_inout(
-            n,
-            new,
-            (signature.input.iter(), signature.output.iter()),
+            cfg_node,
+            new_node,
+            (cfg.signature.input.iter(), cfg.signature.output.iter()),
             (0, 0, offset),
         )?;
         // self.wire_others(n, cfg.into(), new, new_dfg.hugr().get_optype(new))?;
@@ -1076,6 +1100,7 @@ pub fn resolve_modifier_with_entrypoints(
 ) -> Result<(), ModifierResolverErrors<Node>> {
     use ModifierResolverErrors::*;
 
+    // Collect entry points into a deque so they can be cloned for later cleanup passes.
     let entry_points: VecDeque<_> = entry_points.into_iter().collect();
 
     // Walk all nodes reachable from the entry points (children and neighbours)
@@ -1083,6 +1108,7 @@ pub fn resolve_modifier_with_entrypoints(
     let mut resolver = ModifierResolver::new();
     let mut worklist = entry_points.clone();
     let mut visited = vec![];
+
     while let Some(node) = worklist.pop_front() {
         // Skip nodes that have been removed during previous rewrites or already visited.
         if !h.contains_node(node) || visited.contains(&node) {
@@ -1163,6 +1189,8 @@ pub fn resolve_modifier_with_entrypoints(
 #[cfg(test)]
 mod tests {
 
+    use std::{fs, io::BufReader, path::Path};
+
     use cool_asserts::assert_matches;
     use hugr::{
         Hugr,
@@ -1198,12 +1226,20 @@ mod tests {
     /// ```
     /// where `foo` is supplied by the caller.
     ///
+    /// Parameters:
+    /// * `target_num`  – number of plain qubit (target) arguments that `foo` accepts.
+    /// * `ctrl_num`  – number of control qubits to wrap around `foo`.
+    /// * `foo`  – closure that inserts the function-under-test into the module and
+    ///   returns its `FuncID`.
+    /// * `dagger`  – if `true`, a `Dagger` modifier is inserted before the `Control`
+    ///   modifier, so the full chain is `Dagger → Control`.
     pub(crate) fn test_modifier_resolver(
         target_num: usize,
         ctrl_num: u64,
         foo: impl FnOnce(&mut ModuleBuilder<Hugr>, usize) -> FuncID<true>,
         dagger: bool,
     ) {
+        // --- Build the module ---
         let mut module = ModuleBuilder::new();
 
         // Signature used by the CallIndirect node:
@@ -1262,6 +1298,8 @@ mod tests {
         // Build the "main" function body ---
         let _main = {
             let mut func = module.define_function("main", main_sig).unwrap();
+
+            // Load the function value; this is the wire that will be passed through modifiers.
             let mut call = func.load_func(&foo, &[]).unwrap();
 
             if dagger {
@@ -1272,13 +1310,13 @@ mod tests {
                     .out_wire(0);
             }
 
-            // Wrap with the Control modifier.
+            // Wrap the (possibly daggered) function reference with the Control modifier.
             call = func
                 .add_dataflow_op(control_op, vec![call])
                 .unwrap()
                 .out_wire(0);
 
-            // Allocate ctrl_num qubits
+            // Allocate ctrl_num fresh qubits to serve as control qubits.
             let mut controls = Vec::new();
             for _ in 0..ctrl_num {
                 controls.push(
@@ -1287,7 +1325,8 @@ mod tests {
                         .out_wire(0),
                 );
             }
-            // Allocate target_num qubits
+
+            // Allocate target_num fresh qubits to serve as target qubits.
             let mut targ = Vec::new();
             for _ in 0..target_num {
                 targ.push(
@@ -1320,6 +1359,55 @@ mod tests {
         let entrypoint = h.entrypoint();
         resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
 
+        // The resolved hugr must still be structurally valid.
         assert_matches!(h.validate(), Ok(()));
+    }
+
+    const GUPPY_EXAMPLES_DIR: &str = "../test_files/modifier_examples";
+
+    fn load_guppy_example(name: &str) -> std::io::Result<Hugr> {
+        let file = Path::new(GUPPY_EXAMPLES_DIR).join(format!("{name}.hugr"));
+        let reader = fs::File::open(file)?;
+        let reader = BufReader::new(reader);
+        Ok(Hugr::load(reader, None).unwrap())
+    }
+
+    fn load_guppy_examples() -> std::io::Result<Vec<(String, Hugr)>> {
+        let mut files = fs::read_dir(GUPPY_EXAMPLES_DIR)?
+            .filter_map(|entry| {
+                let path = entry.ok()?.path();
+                path.extension()
+                    .is_some_and(|ext| ext == "hugr")
+                    .then_some(path)
+            })
+            .collect::<Vec<_>>();
+        files.sort_unstable();
+
+        files
+            .into_iter()
+            .map(|file| {
+                let name = file.file_stem().unwrap().to_string_lossy().into_owned();
+                let h = load_guppy_example(&name)?;
+                Ok((name, h))
+            })
+            .collect()
+    }
+
+    /// Resolve modifiers in `h`
+    fn test_resolve(h: &mut Hugr) {
+        assert_matches!(h.validate(), Ok(()));
+
+        let entrypoint = h.entrypoint();
+        resolve_modifier_with_entrypoints(h, [entrypoint]).unwrap();
+
+        assert_matches!(h.validate(), Ok(()));
+    }
+
+    #[rstest::rstest]
+    fn test_saved_hugr() {
+        for (name, mut h) in load_guppy_examples().unwrap() {
+            println!("Resolving example: {name}");
+            test_resolve(&mut h);
+        }
     }
 }
