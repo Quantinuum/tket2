@@ -75,7 +75,6 @@ def tket_registry() -> ExtensionRegistry:
         An ExtensionRegistry containing all the tket extensions.
     """
     tket_exts = [
-        tket.bool.BoolExtension(),
         tket.debug.DebugExtension(),
         tket.gpu.GpuExtension(),
         tket.guppy.GuppyExtension(),
