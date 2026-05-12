@@ -15,6 +15,8 @@ import numpy.typing as npt
 from hugr import Hugr
 from guppylang.emulator import EmulatorBuilder
 
+# from hugr.hugr.render import RenderConfig
+
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
@@ -62,7 +64,13 @@ result_execution_dir.mkdir(parents=True, exist_ok=True)
 for hugr_path in hugr_paths:
     print(f"Running {hugr_path.name}...")
     hugr_bytes = hugr_path.read_bytes()
+
     hugr = Hugr.from_bytes(hugr_bytes)
+    # hugr.store_dot(
+    #     str(hugr_pdf_directory / hugr_path.stem),
+    #     format="pdf",
+    #     config=RenderConfig(max_node_label_length=None),
+    # )
 
     package = hugr.to_package()
 

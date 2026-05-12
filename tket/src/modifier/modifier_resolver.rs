@@ -102,7 +102,9 @@
 use itertools::{Either, Itertools};
 use std::{
     collections::{HashMap, VecDeque},
-    iter, mem,
+    iter,
+    mem,
+    // fs, path::Path,
 };
 
 pub mod array_modify;
@@ -314,8 +316,10 @@ pub struct ModifierResolver<N = Node> {
     /// The worklist of nodes to be processed.
     /// This is needed to avoid modifying a node that is generated during the process.
     worklist: VecDeque<N>,
-    /// A map of static edges to be added after insertion of subgraph.
-    call_map: HashMap<N, (Node, IncomingPort)>,
+    /// Static edges to be added after insertion of a subgraph.
+    /// Multiple calls can reference the same function node, so each source
+    /// maps to every copied static input that must be reconnected.
+    call_map: HashMap<N, Vec<(Node, IncomingPort)>>,
     // TODO:
     // Should keep track of the collection of modifiers that are applied to the same function.
     // This will prevent the duplicated generation of Controlled-functions.
@@ -451,8 +455,12 @@ impl<N: HugrNode> ModifierResolver<N> {
     fn corresp_map(&mut self) -> &mut HashMap<DirWire<N>, Vec<DirWire>> {
         &mut self.corresp_map
     }
-    fn call_map(&mut self) -> &mut HashMap<N, (Node, IncomingPort)> {
+    fn call_map(&mut self) -> &mut HashMap<N, Vec<(Node, IncomingPort)>> {
         &mut self.call_map
+    }
+
+    fn call_map_insert(&mut self, source: N, target: (Node, IncomingPort)) {
+        self.call_map().entry(source).or_default().push(target);
     }
 
     fn with_worklist<T>(&mut self, worklist: VecDeque<N>, f: impl FnOnce(&mut Self) -> T) -> T {
@@ -1180,13 +1188,13 @@ pub fn resolve_modifier_with_entrypoints(
     delete_phase(h, entry_points)?;
 
     // debbugging print
-    // println!("@ 4");
     // œœœœœ
     // let output = Path::new(env!("CARGO_MANIFEST_DIR"))
     //     .parent()
     //     .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")))
     //     .join("current.mmd");
     // fs::write(output, h.mermaid_string()).unwrap();
+    // println!("@ 4");
     // œœœœœ
 
     h.validate()
@@ -1249,6 +1257,15 @@ mod tests {
         foo: impl FnOnce(&mut ModuleBuilder<Hugr>, usize) -> FuncID<true>,
         dagger: bool,
     ) {
+        let _ = resolved_modifier_test_hugr(target_num, ctrl_num, foo, dagger);
+    }
+
+    pub(crate) fn resolved_modifier_test_hugr(
+        target_num: usize,
+        ctrl_num: u64,
+        foo: impl FnOnce(&mut ModuleBuilder<Hugr>, usize) -> FuncID<true>,
+        dagger: bool,
+    ) -> Hugr {
         // --- Build the module ---
         let mut module = ModuleBuilder::new();
 
@@ -1371,6 +1388,8 @@ mod tests {
 
         // The resolved hugr must still be structurally valid.
         assert_matches!(h.validate(), Ok(()));
+
+        h
     }
 
     const GUPPY_EXAMPLES_DIR: &str = "../test_files/modifier_examples";
@@ -1414,9 +1433,10 @@ mod tests {
     }
 
     #[rstest::rstest]
-    #[case::call("index_in_dagger")]
+    #[case::call("classical_array_op")]
+    #[case::call("dagger_on_multiple_gates3")]
     // #[case::call("dagger_on_call")]
-    // #[case::call("all")]
+    #[case::call("all")]
     fn test_saved_hugr(#[case] name: &str) {
         if name == "all" {
             for (_, mut h) in load_guppy_examples().unwrap() {

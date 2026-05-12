@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang ==0.21.13",
+#     "guppylang @ git+https://github.com/Quantinuum/guppylang.git@main#subdirectory=guppylang",
 # ]
 # ///
 """A simple controlled gate using modifiers"""
@@ -24,11 +24,24 @@ from guppylang.experimental import enable_experimental_features
 enable_experimental_features()
 
 
+@guppy
+def get_f() -> float:
+    return 1 / 3
+
+
 @guppy(unitary=True)
-def bar(q: qubit) -> None:
+def foo1(q: qubit) -> None:
     rx(q, angle(1 / 2))
+
+
+@guppy(unitary=True)
+def foo2(q: qubit) -> None:
     s(q)
-    rx(q, angle(1 / 3))
+
+
+@guppy(unitary=True)
+def foo3(q: qubit, f: float) -> None:
+    rx(q, angle(f))
 
 
 @guppy
@@ -36,7 +49,10 @@ def main() -> None:
     t = qubit()
 
     with dagger:
-        bar(t)
+        foo1(t)
+        f = get_f()
+        foo2(t)
+        foo3(t, f)
 
     state_result("r", t)
     discard(t)

@@ -33,8 +33,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         let Some(new_callee) = self.modify_fn_if_needed(h, callee.0)? else {
             // If the function need not be modified, just copy the Call node as is.
             let new = self.add_node_no_modification(h, call_node, call.clone(), new_dfg)?;
-            self.call_map()
-                .insert(callee.0, (new, call.called_function_port()));
+            self.call_map_insert(callee.0, (new, call.called_function_port()));
             return Ok(());
         };
 
@@ -46,8 +45,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         let new_call_fn_port = new_call.called_function_port();
         let new_call_node = new_dfg.add_child_node(new_call);
 
-        self.call_map()
-            .insert(new_callee, (new_call_node, new_call_fn_port));
+        self.call_map_insert(new_callee, (new_call_node, new_call_fn_port));
         // wire the controls
         let mut controls = self.pack_controls(new_dfg)?;
         for (i, control) in controls.iter_mut().enumerate() {
@@ -207,8 +205,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         self.modify_signature(modified_sig.body_mut(), false);
         let load = LoadFunction::try_new(modified_sig, load.type_args).map_err(BuildError::from)?;
         let new_load = new_dfg.add_child_node(load);
-        self.call_map()
-            .insert(modified_fn, (new_load, IncomingPort::from(0)));
+        self.call_map_insert(modified_fn, (new_load, IncomingPort::from(0)));
         *self.modifiers_mut() = modifiers;
 
         // Make new IndirectCall

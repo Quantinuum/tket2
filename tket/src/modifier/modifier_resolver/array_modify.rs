@@ -68,7 +68,8 @@ impl<N: HugrNode> ModifierResolver<N> {
         op: BArrayUnsafeOp,
         new_dfg: &mut impl Dataflow,
     ) -> Result<bool, ModifierResolverErrors<N>> {
-        if !self.modifiers().dagger {
+        // no modification is needed if not under dagger, or the array element type is not qubit
+        if !self.modifiers().dagger || !self.qubit_finder.contains_element_type(&op.elem_ty) {
             self.add_node_no_modification(h, n, op, new_dfg)?;
             return Ok(true);
         }
@@ -122,14 +123,15 @@ impl<N: HugrNode> ModifierResolver<N> {
         new_dfg: &mut impl Dataflow,
     ) -> Result<(), ModifierResolverErrors<N>> {
         let op_def = &op.def;
-        if !self.modifiers().dagger {
+        // no modification is needed if not under dagger, or the array element type is not qubit
+        if !self.modifiers().dagger || !self.qubit_finder.contains_element_type(&op.elem_ty) {
             self.add_node_no_modification(h, n, op, new_dfg)?;
         } else {
             let new_op_def: GenericArrayOpDef<AK> = match op_def {
                 swap => swap,
                 new_array => unpack,
                 unpack => new_array,
-                _ => unimplemented!("Dagger for {op_def:?} is not implemented"),
+                _ => *op_def, // => other operations are kept unchanged under dagger
             };
             let new_op = new_op_def.to_concrete(op.elem_ty, op.size);
             let node = new_dfg.add_child_node(new_op);
@@ -162,10 +164,18 @@ impl<N: HugrNode> ModifierResolver<N> {
             return Ok(false);
         };
 
-        // try some general array convert
+        // try some general array convert - no modification is needed if the array element type is not qubit
         let node = if let Ok(op) = BArrayToArray::from_extension_op(op) {
+            if !self.qubit_finder.contains_element_type(&op.elem_ty) {
+                self.add_node_no_modification(h, n, optype.clone(), new_dfg)?;
+                return Ok(true);
+            }
             new_dfg.add_child_node(BArrayFromArray::new(op.elem_ty, op.size))
         } else if let Ok(op) = BArrayFromArray::from_extension_op(op) {
+            if !self.qubit_finder.contains_element_type(&op.elem_ty) {
+                self.add_node_no_modification(h, n, optype.clone(), new_dfg)?;
+                return Ok(true);
+            }
             new_dfg.add_child_node(BArrayToArray::new(op.elem_ty, op.size))
         } else {
             return Ok(false);

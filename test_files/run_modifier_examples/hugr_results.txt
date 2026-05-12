@@ -3,6 +3,10 @@ assign_in_dagger_solved:
 	10 -> 0.6124+0j
 	11 -> 0+0.3536j
 -----
+classical_array_op_solved:
+	0 -> 0.7071+0j
+	1 -> -0.7071-0j
+-----
 classical_function1_solved:
 	0 -> 0.866+0j
 	1 -> 0+0.5j
@@ -314,6 +318,10 @@ dagger_on_call_solved:
 	0 -> 0.7071+0j
 	1 -> 0-0.7071j
 -----
+dagger_on_multiple_functions_solved:
+	0 -> 0.7071-4.304e-17j
+	1 -> 0.6124+0.3536j
+-----
 dagger_on_multiple_gates1_solved:
 	0 -> 0.7071+0j
 	1 -> 0-0.7071j
@@ -323,8 +331,8 @@ dagger_on_multiple_gates2_solved:
 	1 -> 0+0.7071j
 -----
 dagger_on_multiple_gates3_solved:
-	0 -> 0.7071+0j
-	1 -> 0+0.7071j
+	0 -> 0.7071-4.304e-17j
+	1 -> 0.6124+0.3536j
 -----
 double_modifier_solved:
 	00 -> 0.7071+0j
@@ -378,3 +386,7 @@ nested_multiple_ctrl1_solved:
 	1101 -> 0.25+0j
 	1110 -> 0.1768+0.1768j
 	1111 -> 0.1768-0.1768j
+-----
+swap_in_dagger_solved:
+	0 -> 0.7071+0j
+	1 -> 0.7071+0j
