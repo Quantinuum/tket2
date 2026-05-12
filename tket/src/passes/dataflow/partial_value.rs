@@ -107,6 +107,10 @@ impl<V: AbstractValue, N: PartialEq + PartialOrd> PartialSum<V, N> {
     /// whether `self` has changed.
     ///
     /// Fails (without mutation) with the conflicting tag if any common rows have different lengths.
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "join is pointwise over independent variant tags, so iteration order cannot affect the lattice result"
+    )]
     pub fn try_join_mut(&mut self, other: Self) -> Result<bool, usize> {
         for (k, v) in &other.0 {
             if self.0.get(k).is_some_and(|row| row.len() != v.len()) {
@@ -135,6 +139,10 @@ impl<V: AbstractValue, N: PartialEq + PartialOrd> PartialSum<V, N> {
     /// Fails without mutation, either:
     /// * `Some(tag)` if the two [`PartialSum`]s both had rows with that `tag` but of different lengths
     /// * `None` if the two instances had no rows in common (i.e., the result is "Bottom")
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "meet is pointwise over independent variant tags, so iteration order cannot affect the lattice result"
+    )]
     pub fn try_meet_mut(&mut self, other: Self) -> Result<bool, Option<usize>> {
         let mut changed = false;
         let mut keys_to_remove = vec![];
@@ -265,6 +273,10 @@ impl<V: Clone, N: Clone> PartialSum<V, N> {
 }
 
 impl<V: PartialEq, N: PartialEq + PartialOrd> PartialOrd for PartialSum<V, N> {
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "key iteration only fills presence bitmaps; value comparison below uses numeric tag order"
+    )]
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         let max_key = self.0.keys().chain(other.0.keys()).copied().max().unwrap();
         let (mut keys1, mut keys2) = (vec![0; max_key + 1], vec![0; max_key + 1]);
@@ -279,8 +291,11 @@ impl<V: PartialEq, N: PartialEq + PartialOrd> PartialOrd for PartialSum<V, N> {
         Some(match keys1.cmp(&keys2) {
             ord @ (Ordering::Greater | Ordering::Less) => ord,
             Ordering::Equal => {
-                for (k, lhs) in &self.0 {
-                    let Some(rhs) = other.0.get(k) else {
+                for k in 0..=max_key {
+                    let Some(lhs) = self.0.get(&k) else {
+                        continue;
+                    };
+                    let Some(rhs) = other.0.get(&k) else {
                         unreachable!()
                     };
                     let key_cmp = lhs.partial_cmp(rhs);
@@ -302,7 +317,16 @@ impl<V: std::fmt::Debug, N: std::fmt::Debug> std::fmt::Debug for PartialSum<V, N
 
 impl<V: Hash, N: Hash> Hash for PartialSum<V, N> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        for (k, v) in &self.0 {
+        // Highest tag present in the sum.
+        //
+        // Hashing must be independent of `HashMap` iteration order so that equal
+        // `PartialSum`s always feed the same sequence into the caller's hasher.
+        let max_variant_key = self.0.keys().copied().max().unwrap_or(0);
+
+        for k in 0..=max_variant_key {
+            let Some(v) = self.0.get(&k) else {
+                continue;
+            };
             k.hash(state);
             v.hash(state);
         }
@@ -567,6 +591,10 @@ mod test {
     }
 
     impl TestSumType {
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "test validation checks every possible tag independently, so iteration order cannot affect the result"
+        )]
         fn check_value(&self, pv: &PartialValue<TestValue>) -> bool {
             match (self, pv) {
                 (_, PartialValue::Bottom | PartialValue::Top) => true,

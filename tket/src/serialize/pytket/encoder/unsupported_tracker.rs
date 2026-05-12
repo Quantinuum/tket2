@@ -91,6 +91,11 @@ impl<N: HugrNode> UnsupportedTracker<N> {
         // and use it here. For now we just traverse all unextracted nodes.
         let mut nodes = BTreeSet::new();
         nodes.insert(node);
+
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "iteration only filters membership; nodes are collected into a BTreeSet before any output-affecting use"
+        )]
         for (&n, data) in &self.nodes {
             if self.components.find_mut(data.component) == representative {
                 nodes.insert(n);
