@@ -2,18 +2,23 @@
 
 Examples:
     >>> from hugr import Hugr
-    >>> from tket.metadata import InputParameters, MaxQubits, Phase, QubitRegisters
+    >>> from tket.metadata import (
+    ...     MaxQubitsHint,
+    ...     PytketInputParameters,
+    ...     PytketPhaseExpr,
+    ...     PytketQubitRegisterNames,
+    ... )
     >>>
     >>> hugr = Hugr()
     >>> node = hugr[hugr.module_root]
     >>>
-    >>> node.metadata[MaxQubits] = 3
-    >>> node.metadata[InputParameters] = ["theta", "phi"]
-    >>> node.metadata[QubitRegisters] = [("q", [0]), ("ancilla", [1])]
-    >>> node.metadata[Phase] = "1/2"
-    >>> node.metadata[MaxQubits]
+    >>> node.metadata[MaxQubitsHint] = 3
+    >>> node.metadata[PytketInputParameters] = ["theta", "phi"]
+    >>> node.metadata[PytketQubitRegisterNames] = [("q", [0]), ("ancilla", [1])]
+    >>> node.metadata[PytketPhaseExpr] = "1/2"
+    >>> node.metadata[MaxQubitsHint]
     3
-    >>> node.metadata.get(QubitRegisters)
+    >>> node.metadata.get(PytketQubitRegisterNames)
     [('q', [0]), ('ancilla', [1])]
 """
 # Changes to this file **SHOULD** be reflected in `tket/src/metadata.rs`.
@@ -32,16 +37,16 @@ if TYPE_CHECKING:
 
 __all__ = [
     "RewriteTraceValue",
-    "MaxQubits",
+    "MaxQubitsHint",
     "CircuitRewriteTraces",
-    "Unitary",
-    "InputParameters",
-    "OpGroup",
+    "UnitaryFlags",
+    "PytketInputParameters",
+    "PytketOpGroup",
     "PytketBit",
     "PytketQubit",
-    "BitRegisters",
-    "QubitRegisters",
-    "Phase",
+    "PytketBitRegisterNames",
+    "PytketQubitRegisterNames",
+    "PytketPhaseExpr",
 ]
 
 
@@ -61,10 +66,10 @@ class RewriteTraceValue(TypedDict):
     individual_matches: int
 
 
-class MaxQubits(Metadata[int]):
+class MaxQubitsHint(Metadata[int]):
     """Metadata key for the number of qubits required to execute a HUGR node."""
 
-    KEY = _metadata.MAX_QUBITS
+    KEY = _metadata.MAX_QUBITS_HINT
 
 
 class CircuitRewriteTraces(Metadata[list[RewriteTraceValue]]):
@@ -73,28 +78,28 @@ class CircuitRewriteTraces(Metadata[list[RewriteTraceValue]]):
     KEY = _metadata.CIRCUIT_REWRITE_TRACES
 
 
-class Unitary(Metadata[int]):
+class UnitaryFlags(Metadata[int]):
     """Metadata key for unitary/modifier flags stored on a HUGR node."""
 
-    KEY = _metadata.UNITARY
+    KEY = _metadata.UNITARY_FLAGS
 
 
-class InputParameters(Metadata[list[str]]):
+class PytketInputParameters(Metadata[list[str]]):
     """Metadata key for explicit names of input parameter wires."""
 
-    KEY = _metadata.INPUT_PARAMETERS
+    KEY = _metadata.PYTKET_INPUT_PARAMETERS
 
 
-class OpGroup(Metadata[str]):
+class PytketOpGroup(Metadata[str]):
     """Metadata key for the pytket ``opgroup`` field on a decoded operation."""
 
-    KEY = _metadata.OP_GROUP
+    KEY = _metadata.PYTKET_OP_GROUP
 
 
-class BitRegisters(Metadata[list[PytketBit]]):
+class PytketBitRegisterNames(Metadata[list[PytketBit]]):
     """Metadata key for explicit names of input bit registers."""
 
-    KEY = _metadata.BIT_REGISTERS
+    KEY = _metadata.PYTKET_BIT_REGISTER_NAMES
 
     @classmethod
     def to_json(cls, value: list[PytketBit]) -> JsonType:
@@ -105,10 +110,10 @@ class BitRegisters(Metadata[list[PytketBit]]):
         return _read_pytket_register(cls.KEY, value)
 
 
-class QubitRegisters(Metadata[list[PytketQubit]]):
+class PytketQubitRegisterNames(Metadata[list[PytketQubit]]):
     """Metadata key for explicit names of input qubit registers."""
 
-    KEY = _metadata.QUBIT_REGISTERS
+    KEY = _metadata.PYTKET_QUBIT_REGISTER_NAMES
 
     @classmethod
     def to_json(cls, value: list[PytketQubit]) -> JsonType:
@@ -119,10 +124,10 @@ class QubitRegisters(Metadata[list[PytketQubit]]):
         return _read_pytket_register(cls.KEY, value)
 
 
-class Phase(Metadata[str]):
+class PytketPhaseExpr(Metadata[str]):
     """Metadata key for the serialized pytket global phase expression."""
 
-    KEY = _metadata.PHASE
+    KEY = _metadata.PYTKET_PHASE_EXPR
 
 
 def _store_pytket_register(value: list[tuple[str, list[int]]]) -> JsonType:

@@ -171,7 +171,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
         .cloned();
 
         // Recover other parameters stored in the metadata
-        let phase = match hugr.get_metadata::<metadata::Phase>(region) {
+        let phase = match hugr.get_metadata::<metadata::PytketPhaseExpr>(region) {
             Some(p) => p.to_string(),
             None => "0".to_string(),
         };
@@ -459,7 +459,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
 
         // Preserve the pytket opgroup, if it got stored in the metadata.
         let opgroup: Option<String> = hugr
-            .get_metadata::<metadata::OpGroup>(node)
+            .get_metadata::<metadata::PytketOpGroup>(node)
             .map(ToString::to_string);
 
         let args = MakeOperationArgs {

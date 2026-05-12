@@ -1166,7 +1166,8 @@ mod tests {
     impl<T: Container> SetUnitary for T {
         fn set_unitary(&mut self) {
             let node = self.container_node();
-            self.hugr_mut().set_metadata::<metadata::Unitary>(node, 7);
+            self.hugr_mut()
+                .set_metadata::<metadata::UnitaryFlags>(node, 7);
         }
     }
 
