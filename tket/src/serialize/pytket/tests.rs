@@ -821,10 +821,14 @@ fn circ_output_parameter_wire() -> Hugr {
 // A circuit with external float symbols used as pytket parameters.
 #[fixture]
 fn circ_external_float_symbol() -> Hugr {
-    let input_t = vec![];
-    let output_t = vec![float64_type()];
+    let input_t = vec![qb_t()];
+    let output_t = vec![qb_t(), float64_type()];
     let mut h =
         FunctionBuilder::new("external_float_symbol", Signature::new(input_t, output_t)).unwrap();
+
+    // Extra quantum op to ensure this circuit gets encoded.
+    let [q] = h.input_wires_arr();
+    let [q] = h.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
 
     let x = h.add_load_value(ConstExternalSymbol::new("ext", float64_type(), true));
     let y = h.add_load_value(ConstExternalSymbol::new("ext", float64_type(), true));
@@ -833,7 +837,7 @@ fn circ_external_float_symbol() -> Hugr {
         .unwrap()
         .outputs_arr();
 
-    h.finish_hugr_with_outputs([sum]).unwrap()
+    h.finish_hugr_with_outputs([q, sum]).unwrap()
 }
 
 // A circuit with a [float64] wire, which should be treated as unsupported.
