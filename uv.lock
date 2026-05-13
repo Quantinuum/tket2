@@ -3106,9 +3106,13 @@ version = "0.13.0"
 source = { editable = "tket-py" }
 dependencies = [
     { name = "hugr" },
-    { name = "pytket" },
     { name = "tket-eccs" },
     { name = "tket-exts" },
+]
+
+[package.optional-dependencies]
+pytket = [
+    { name = "pytket" },
 ]
 
 [package.dev-dependencies]
@@ -3125,10 +3129,11 @@ docs = [
 [package.metadata]
 requires-dist = [
     { name = "hugr", specifier = "~=0.16.0" },
-    { name = "pytket", specifier = ">=2.1.0,<3" },
+    { name = "pytket", marker = "extra == 'pytket'", specifier = ">=2.1.0,<3" },
     { name = "tket-eccs", editable = "tket-eccs" },
     { name = "tket-exts", editable = "tket-exts" },
 ]
+provides-extras = ["pytket"]
 
 [package.metadata.requires-dev]
 docs = [
