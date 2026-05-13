@@ -198,9 +198,9 @@ def test_cat(propagate_matcher: RuleMatcher):
 
     assert apply_exhaustive(t2c, propagate_matcher) == 3
 
-    assert t2c.to_tket1() == pytket.Circuit(4).H(2).CX(2, 1).CX(2, 3).CX(1, 0).X(0).X(
-        1
-    ).X(2).X(3)
+    assert t2c.to_tket1() == (
+        pytket.Circuit(4).H(2).CX(2, 1).CX(2, 3).CX(1, 0).X(0).X(1).X(2).X(3)
+    )
 
     assert final_pauli_string(t2c) == "XXXX"
 

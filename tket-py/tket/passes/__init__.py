@@ -20,11 +20,7 @@ from hugr.passes.composable import (
 from hugr.passes.scope import PassScope, GlobalScope
 
 if TYPE_CHECKING:
-    try:
-        # Available via the `pytket` extra, and as a dev dependency for testing.
-        from pytket.passes import BasePass
-    except ImportError:
-        from typing import Any as BasePass  # type: ignore
+    from tket.util import PytketPassProto as PytketPass
 
 
 __all__ = [
@@ -40,7 +36,7 @@ __all__ = [
 
 @dataclass
 class PytketHugrPass(ComposablePass):
-    pytket_passes: list[BasePass]
+    pytket_passes: list[PytketPass]
     _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
 
     """
@@ -49,7 +45,7 @@ class PytketHugrPass(ComposablePass):
     The user can create a :py:class:`PytketHugrPass` object from any serializable member of `pytket.passes`.
     """
 
-    def __init__(self, *pytket_passes: BasePass) -> None:
+    def __init__(self, *pytket_passes: PytketPass) -> None:
         """Initialize a PytketHugrPass from a :py:class:`~pytket.passes.BasePass` instance."""
         self.pytket_passes = list(pytket_passes)
 
