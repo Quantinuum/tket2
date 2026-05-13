@@ -32,7 +32,7 @@ static TEMP_BARRIER_EXT: LazyLock<Arc<Extension>> = LazyLock::new(|| {
                 WRAPPED_BARRIER_NAME,
                 Default::default(),
                 PolyFuncTypeRV::new(
-                    vec![TypeParam::new_list_type(TypeBound::Linear)],
+                    vec![TypeParam::new_list_kind(TypeBound::Linear)],
                     FuncValueType::new_endo(TypeRowRV::new_var_use(0, TypeBound::Linear)),
                 ),
                 ext_ref,

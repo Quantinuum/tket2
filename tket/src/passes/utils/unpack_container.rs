@@ -36,13 +36,13 @@ fn invert_sig(sig: &PolyFuncTypeRV) -> PolyFuncTypeRV {
 fn generic_array_unpack_sig<AK: ArrayKind>() -> PolyFuncTypeRV {
     PolyFuncTypeRV::new(
         vec![
-            TypeParam::max_nat_type(),
-            TypeParam::RuntimeType(TypeBound::Linear),
-            TypeParam::new_list_type(TypeBound::Linear),
+            TypeParam::max_nat_kind(),
+            TypeParam::TypeKind(TypeBound::Linear),
+            TypeParam::new_list_kind(TypeBound::Linear),
         ],
         FuncValueType::new(
             [AK::ty_parametric(
-                TypeArg::new_var_use(0, TypeParam::max_nat_type()),
+                TypeArg::new_var_use(0, TypeParam::max_nat_kind()),
                 Type::new_var_use(1, TypeBound::Linear),
             )
             .unwrap()],
@@ -92,7 +92,7 @@ static TEMP_UNPACK_EXT: LazyLock<Arc<Extension>> = LazyLock::new(|| {
         |ext, ext_ref| {
             // Generic option unwrap/tag operations
             let opt_unwrap_sig = PolyFuncTypeRV::new(
-                vec![TypeParam::RuntimeType(TypeBound::Linear)],
+                vec![TypeParam::TypeKind(TypeBound::Linear)],
                 FuncValueType::new(
                     hugr::types::TypeRow::from(vec![Type::from(
                         hugr::extension::prelude::option_type([Type::new_var_use(
@@ -122,9 +122,9 @@ static TEMP_UNPACK_EXT: LazyLock<Arc<Extension>> = LazyLock::new(|| {
             let tuple_unpack_sig = PolyFuncTypeRV::new(
                 vec![
                     // incoming tuple row
-                    TypeParam::new_list_type(TypeBound::Linear),
+                    TypeParam::new_list_kind(TypeBound::Linear),
                     // unpacked row
-                    TypeParam::new_list_type(TypeBound::Linear),
+                    TypeParam::new_list_kind(TypeBound::Linear),
                 ],
                 FuncValueType::new(
                     [Type::new_tuple(TypeRowRV::new_var_use(

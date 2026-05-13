@@ -232,13 +232,11 @@ fn escape_dollar(str: impl AsRef<str>) -> String {
 
 fn write_type_arg_str(arg: &TypeArg, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match arg {
-        TypeArg::RuntimeExtension(cty) => {
+        TypeArg::ExtensionType(cty) => {
             f.write_fmt(format_args!("e({})", escape_dollar(cty.to_string())))
         }
-        TypeArg::RuntimeSum(sty) => {
-            f.write_fmt(format_args!("t({})", escape_dollar(sty.to_string())))
-        }
-        TypeArg::RuntimeFunction(fty) => {
+        TypeArg::SumType(sty) => f.write_fmt(format_args!("t({})", escape_dollar(sty.to_string()))),
+        TypeArg::FunctionType(fty) => {
             f.write_fmt(format_args!("f({})", escape_dollar(fty.to_string())))
         }
         TypeArg::BoundedNat(n) => f.write_fmt(format_args!("n({n})")),
@@ -426,7 +424,7 @@ mod test {
         //pf1 contains pf2 contains mono_func -> pf1<a> and pf1<b> share pf2's and they share mono_func
 
         let tv = |i| Type::new_var_use(i, TypeBound::Linear);
-        let sv = |i| TypeArg::new_var_use(i, TypeParam::max_nat_type());
+        let sv = |i| TypeArg::new_var_use(i, TypeParam::max_nat_kind());
         let sa = |n| TypeArg::BoundedNat(n);
         let n: u64 = 5;
 
@@ -458,7 +456,7 @@ mod test {
         // pf2[n, t] takes an array of size n of type t and return an element of type as well as the array to deal with it being linear
         let pf2 = {
             let pf2t = PolyFuncType::new(
-                [TypeParam::max_nat_type(), TypeBound::Linear.into()],
+                [TypeParam::max_nat_kind(), TypeBound::Linear.into()],
                 Signature::new(
                     [BorrowArray::ty_parametric(sv(0), tv(1)).unwrap()],
                     [tv(1), BorrowArray::ty_parametric(sv(0), tv(1)).unwrap()],
@@ -480,7 +478,7 @@ mod test {
 
         // pf1[n] takes the same input as the outer and returns one usize
         let pf1t = PolyFuncType::new(
-            [TypeParam::max_nat_type()],
+            [TypeParam::max_nat_kind()],
             Signature::new(
                 [BorrowArray::ty_parametric(sv(0), arr2u()).unwrap()],
                 [usize_t()],
@@ -652,7 +650,7 @@ mod test {
     #[case::sequence(vec![vec![0.into(), Type::UNIT.into()].into()], "$foo$$list($n(0)$t(Unit))")]
     #[case::sequence(vec![TypeArg::Tuple(vec![0.into(),Type::UNIT.into()])], "$foo$$tuple($n(0)$t(Unit))")]
     #[should_panic]
-    #[case::typeargvariable(vec![TypeArg::new_var_use(1, TypeParam::StringType)],
+    #[case::typeargvariable(vec![TypeArg::new_var_use(1, TypeParam::StringKind)],
                             "$foo$$v(1)")]
     #[case::multiple(vec![0.into(), "arg".into()], "$foo$$n(0)$s(arg)")]
     fn test_mangle_name(#[case] args: Vec<TypeArg>, #[case] expected: String) {

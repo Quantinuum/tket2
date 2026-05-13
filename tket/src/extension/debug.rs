@@ -58,18 +58,18 @@ impl MakeOpDef for StateResultDef {
 
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         PolyFuncTypeRV::new(
-            vec![TypeParam::StringType, TypeParam::max_nat_type()],
+            vec![TypeParam::StringKind, TypeParam::max_nat_kind()],
             FuncValueType::new(
                 vec![
                     array_type_parametric(
-                        TypeArg::new_var_use(1, TypeParam::max_nat_type()),
+                        TypeArg::new_var_use(1, TypeParam::max_nat_kind()),
                         qb_t(),
                     )
                     .unwrap(),
                 ],
                 vec![
                     array_type_parametric(
-                        TypeArg::new_var_use(1, TypeParam::max_nat_type()),
+                        TypeArg::new_var_use(1, TypeParam::max_nat_kind()),
                         qb_t(),
                     )
                     .unwrap(),

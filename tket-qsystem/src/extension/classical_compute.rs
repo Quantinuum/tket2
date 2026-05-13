@@ -22,14 +22,14 @@ lazy_static! {
     pub static ref RESULT_TYPE_NAME: SmolStr = SmolStr::new_inline("result");
 
     /// The [TypeParam] of `lookup_by_id` specifying the id of the function.
-    pub static ref ID_PARAM: TypeParam = TypeParam::max_nat_type();
+    pub static ref ID_PARAM: TypeParam = TypeParam::max_nat_kind();
     /// The [TypeParam] of `lookup_by_name` specifying the name of the function.
-    pub static ref NAME_PARAM: TypeParam = TypeParam::StringType;
+    pub static ref NAME_PARAM: TypeParam = TypeParam::StringKind;
     /// The [TypeParam] of various types and ops specifying the input signature of a function.
     pub static ref INPUTS_PARAM: TypeParam =
-        TypeParam::ListType(Box::new(TypeBound::Linear.into()));
+        TypeParam::new_list_kind(TypeBound::Linear);
     /// The [TypeParam] of various types and ops specifying the output signature of a function.
-    pub static ref OUTPUTS_PARAM: TypeParam = TypeParam::ListType(Box::new(TypeBound::Linear.into()));
+    pub static ref OUTPUTS_PARAM: TypeParam = TypeParam::new_list_kind(TypeBound::Linear);
 }
 
 pub(crate) fn add_compute_type_defs(
@@ -359,14 +359,12 @@ macro_rules! compute_opdef {
                             self.extension(),
                             extension_ref,
                         ));
-                        let result_type: Type =
-                            Term::RuntimeExtension(ComputeType::<$ext>::result_custom_type(
+                        let result_type =
+                            Type::new_extension(ComputeType::<$ext>::result_custom_type(
                                 outputs,
                                 self.extension(),
                                 extension_ref,
-                            ))
-                            .try_into()
-                            .unwrap();
+                            ));
 
                         PolyFuncTypeRV::new(
                             [INPUTS_PARAM.to_owned(), OUTPUTS_PARAM.to_owned()],
@@ -380,14 +378,12 @@ macro_rules! compute_opdef {
                     }
                     Self::read_result => {
                         let outputs = TypeRowRV::new_var_use(0, TypeBound::Copyable);
-                        let result_type: Type =
-                            Term::RuntimeExtension(ComputeType::<$ext>::result_custom_type(
+                        let result_type =
+                            Type::new_extension(ComputeType::<$ext>::result_custom_type(
                                 outputs.clone(),
                                 self.extension(),
                                 extension_ref,
-                            ))
-                            .try_into()
-                            .unwrap();
+                            ));
                         PolyFuncTypeRV::new(
                             [OUTPUTS_PARAM.to_owned()],
                             FuncValueType::new(
@@ -423,7 +419,7 @@ macro_rules! compute_opdef {
                 match self {
                     Self::get_context => {
                         let [] = type_args else {
-                            Err(SignatureError::from(TermTypeError::WrongNumberArgs(
+                            Err(SignatureError::from(TermKindError::WrongNumberArgs(
                                 type_args.len(),
                                 0,
                             )))?
@@ -432,7 +428,7 @@ macro_rules! compute_opdef {
                     }
                     Self::dispose_context => {
                         let [] = type_args else {
-                            Err(SignatureError::from(TermTypeError::WrongNumberArgs(
+                            Err(SignatureError::from(TermKindError::WrongNumberArgs(
                                 type_args.len(),
                                 0,
                             )))?
@@ -444,30 +440,30 @@ macro_rules! compute_opdef {
                         let Some([id_arg, inputs_arg, outputs_arg]): Option<[_; 3]> =
                             type_args.to_vec().try_into().ok()
                         else {
-                            Err(SignatureError::from(TermTypeError::WrongNumberArgs(
+                            Err(SignatureError::from(TermKindError::WrongNumberArgs(
                                 type_args.len(),
                                 3,
                             )))?
                         };
 
                         let Some(id) = id_arg.as_nat() else {
-                            Err(SignatureError::from(TermTypeError::TypeMismatch {
+                            Err(SignatureError::from(TermKindError::KindMismatch {
                                 term: Box::new(id_arg),
-                                type_: Box::new(ID_PARAM.to_owned()),
+                                kind: Box::new(ID_PARAM.to_owned()),
                             }))?
                         };
 
                         let Ok(inputs) = TypeRowRV::try_from(inputs_arg.clone()) else {
-                            Err(SignatureError::from(TermTypeError::TypeMismatch {
+                            Err(SignatureError::from(TermKindError::KindMismatch {
                                 term: Box::new(inputs_arg),
-                                type_: Box::new(INPUTS_PARAM.to_owned()),
+                                kind: Box::new(INPUTS_PARAM.to_owned()),
                             }))?
                         };
 
                         let Ok(outputs) = TypeRowRV::try_from(outputs_arg.clone()) else {
-                            Err(SignatureError::from(TermTypeError::TypeMismatch {
+                            Err(SignatureError::from(TermKindError::KindMismatch {
                                 term: Box::new(outputs_arg),
-                                type_: Box::new(OUTPUTS_PARAM.to_owned()),
+                                kind: Box::new(OUTPUTS_PARAM.to_owned()),
                             }))?
                         };
                         Ok(Self::Concrete::LookupById {
@@ -481,30 +477,30 @@ macro_rules! compute_opdef {
                         let Some([name_arg, inputs_arg, outputs_arg]): Option<[_; 3]> =
                             type_args.to_vec().try_into().ok()
                         else {
-                            Err(SignatureError::from(TermTypeError::WrongNumberArgs(
+                            Err(SignatureError::from(TermKindError::WrongNumberArgs(
                                 type_args.len(),
                                 3,
                             )))?
                         };
 
                         let Some(name) = name_arg.as_string() else {
-                            Err(SignatureError::from(TermTypeError::TypeMismatch {
+                            Err(SignatureError::from(TermKindError::KindMismatch {
                                 term: Box::new(name_arg),
-                                type_: Box::new(NAME_PARAM.to_owned()),
+                                kind: Box::new(NAME_PARAM.to_owned()),
                             }))?
                         };
 
                         let Ok(inputs) = TypeRowRV::try_from(inputs_arg.clone()) else {
-                            Err(SignatureError::from(TermTypeError::TypeMismatch {
+                            Err(SignatureError::from(TermKindError::KindMismatch {
                                 term: Box::new(inputs_arg),
-                                type_: Box::new(INPUTS_PARAM.to_owned()),
+                                kind: Box::new(INPUTS_PARAM.to_owned()),
                             }))?
                         };
 
                         let Ok(outputs) = TypeRowRV::try_from(outputs_arg.clone()) else {
-                            Err(SignatureError::from(TermTypeError::TypeMismatch {
+                            Err(SignatureError::from(TermKindError::KindMismatch {
                                 term: Box::new(outputs_arg),
-                                type_: Box::new(OUTPUTS_PARAM.to_owned()),
+                                kind: Box::new(OUTPUTS_PARAM.to_owned()),
                             }))?
                         };
                         Ok(Self::Concrete::LookupByName {
@@ -517,23 +513,23 @@ macro_rules! compute_opdef {
                         let Some([inputs_arg, outputs_arg]): Option<[_; 2]> =
                             type_args.to_vec().try_into().ok()
                         else {
-                            Err(SignatureError::from(TermTypeError::WrongNumberArgs(
+                            Err(SignatureError::from(TermKindError::WrongNumberArgs(
                                 type_args.len(),
                                 2,
                             )))?
                         };
 
                         let Ok(inputs) = TypeRowRV::try_from(inputs_arg.clone()) else {
-                            Err(SignatureError::from(TermTypeError::TypeMismatch {
+                            Err(SignatureError::from(TermKindError::KindMismatch {
                                 term: Box::new(inputs_arg),
-                                type_: Box::new(INPUTS_PARAM.to_owned()),
+                                kind: Box::new(INPUTS_PARAM.to_owned()),
                             }))?
                         };
 
                         let Ok(outputs) = TypeRowRV::try_from(outputs_arg.clone()) else {
-                            Err(SignatureError::from(TermTypeError::TypeMismatch {
+                            Err(SignatureError::from(TermKindError::KindMismatch {
                                 term: Box::new(outputs_arg),
-                                type_: Box::new(OUTPUTS_PARAM.to_owned()),
+                                kind: Box::new(OUTPUTS_PARAM.to_owned()),
                             }))?
                         };
 
@@ -546,16 +542,16 @@ macro_rules! compute_opdef {
                         let Some([outputs_arg]): Option<[_; 1]> =
                             type_args.to_vec().try_into().ok()
                         else {
-                            Err(SignatureError::from(TermTypeError::WrongNumberArgs(
+                            Err(SignatureError::from(TermKindError::WrongNumberArgs(
                                 type_args.len(),
                                 1,
                             )))?
                         };
 
                         let Ok(outputs) = TypeRowRV::try_from(outputs_arg.clone()) else {
-                            Err(SignatureError::from(TermTypeError::TypeMismatch {
+                            Err(SignatureError::from(TermKindError::KindMismatch {
                                 term: Box::new(outputs_arg),
-                                type_: Box::new(OUTPUTS_PARAM.to_owned()),
+                                kind: Box::new(OUTPUTS_PARAM.to_owned()),
                             }))?
                         };
                         Ok(Self::Concrete::ReadResult {

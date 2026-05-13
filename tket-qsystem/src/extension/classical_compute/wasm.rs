@@ -66,8 +66,8 @@ use hugr::{
     },
     type_row,
     types::{
-        CustomType, FuncValueType, PolyFuncTypeRV, Signature, SumType, Term, Type, TypeArg,
-        TypeBound, TypeRow, TypeRowRV, type_param::TermTypeError,
+        CustomType, FuncValueType, PolyFuncTypeRV, Signature, SumType, Type, TypeArg, TypeBound,
+        TypeRow, TypeRowRV, type_param::TermKindError,
     },
 };
 use itertools::Itertools as _;
@@ -254,7 +254,7 @@ mod test {
         assert_eq!(
             WasmOpDef::lookup_by_name.instantiate(&[
                 "lookup_name".into(),
-                TypeArg::new_var_use(0, TypeParam::ListType(Box::new(TypeBound::Linear.into()))),
+                TypeArg::new_var_use(0, TypeParam::new_list_kind(TypeBound::Linear)),
                 vec![].into()
             ]),
             Ok(WasmOp::LookupByName {
@@ -266,7 +266,7 @@ mod test {
         assert_eq!(
             WasmOpDef::lookup_by_id.instantiate(&[
                 TypeArg::BoundedNat(42),
-                TypeArg::new_var_use(0, TypeParam::ListType(Box::new(TypeBound::Linear.into()))),
+                TypeArg::new_var_use(0, TypeParam::new_list_kind(TypeBound::Linear)),
                 vec![].into()
             ]),
             Ok(WasmOp::LookupById {

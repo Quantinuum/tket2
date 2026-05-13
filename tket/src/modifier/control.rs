@@ -29,9 +29,9 @@ impl ModifierControl {
     pub(crate) fn signature() -> SignatureFunc {
         PolyFuncTypeRV::new(
             [
-                TypeParam::max_nat_type(),
-                TypeParam::new_list_type(TypeBound::Linear),
-                TypeParam::new_list_type(TypeBound::Linear),
+                TypeParam::max_nat_kind(),
+                TypeParam::new_list_kind(TypeBound::Linear),
+                TypeParam::new_list_kind(TypeBound::Linear),
             ],
             FuncValueType::new(
                 [Type::new_function(FuncValueType::new(
@@ -41,14 +41,14 @@ impl ModifierControl {
                 ))],
                 [Type::new_function(FuncValueType::new(
                     TypeRowRV::from([array_type_parametric(
-                        TypeArg::new_var_use(0, TypeParam::max_nat_type()),
+                        TypeArg::new_var_use(0, TypeParam::max_nat_kind()),
                         qb_t(),
                     )
                     .unwrap()])
                     .concat(TypeRowRV::new_var_use(1, TypeBound::Linear))
                     .concat(TypeRowRV::new_var_use(2, TypeBound::Linear)),
                     TypeRowRV::from([array_type_parametric(
-                        TypeArg::new_var_use(0, TypeParam::max_nat_type()),
+                        TypeArg::new_var_use(0, TypeParam::max_nat_kind()),
                         qb_t(),
                     )
                     .unwrap()])

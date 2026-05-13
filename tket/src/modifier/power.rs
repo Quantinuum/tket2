@@ -40,8 +40,8 @@ impl ModifierPower {
     pub(crate) fn signature() -> SignatureFunc {
         PolyFuncTypeRV::new(
             [
-                TypeParam::new_list_type(TypeBound::Linear),
-                TypeParam::new_list_type(TypeBound::Copyable),
+                TypeParam::new_list_kind(TypeBound::Linear),
+                TypeParam::new_list_kind(TypeBound::Copyable),
             ],
             FuncValueType::new(
                 vec![

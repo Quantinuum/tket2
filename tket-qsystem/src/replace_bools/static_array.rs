@@ -217,7 +217,7 @@ fn build_new_to_old(
     old_ty: Type,
 ) -> Result<Wire> {
     match &*old_ty {
-        Term::RuntimeExtension(custom_ty) => {
+        Term::ExtensionType(custom_ty) => {
             if (custom_ty.extension(), custom_ty.name())
                 == (&static_array::EXTENSION_ID, &STATIC_ARRAY_TYPENAME)
             {
@@ -231,7 +231,7 @@ fn build_new_to_old(
                 Ok(val)
             }
         }
-        Term::RuntimeSum(sum_ty) => {
+        Term::SumType(sum_ty) => {
             let mut new_sum_ty = sum_ty.clone();
 
             if !new_sum_ty.transform(rt)? {

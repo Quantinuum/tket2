@@ -38,8 +38,8 @@ impl ModifierDagger {
     pub(crate) fn signature() -> SignatureFunc {
         PolyFuncTypeRV::new(
             [
-                TypeParam::new_list_type(TypeBound::Linear),
-                TypeParam::new_list_type(TypeBound::Linear),
+                TypeParam::new_list_kind(TypeBound::Linear),
+                TypeParam::new_list_kind(TypeBound::Linear),
             ],
             FuncValueType::new(
                 [Type::new_function(FuncValueType::new(

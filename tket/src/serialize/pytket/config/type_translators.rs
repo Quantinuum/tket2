@@ -89,7 +89,7 @@ impl TypeTranslatorSet {
         }
 
         let res = match &**typ {
-            Term::RuntimeSum(sum) => {
+            Term::SumType(sum) => {
                 if sum.num_variants() == 0 {
                     return Some(RegisterCount::default());
                 }
@@ -111,7 +111,7 @@ impl TypeTranslatorSet {
                     None
                 }
             }
-            Term::RuntimeExtension(custom) => 'outer: {
+            Term::ExtensionType(custom) => 'outer: {
                 let type_ext = custom.extension();
                 for encoder in self.translators_for_extension(type_ext) {
                     if let Some(count) = encoder.type_to_pytket(custom, self) {
