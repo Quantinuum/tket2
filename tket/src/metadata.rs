@@ -42,7 +42,7 @@ impl Metadata for MaxQubitsHint {
 
 /// Metadata hinting the compiler that a function declaration should be inlined at its call sites.
 ///
-/// When a function is not annotated, we use an heuristic to determine whether to inline.
+/// When a function is not annotated, we use a heuristic to determine whether to inline.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]

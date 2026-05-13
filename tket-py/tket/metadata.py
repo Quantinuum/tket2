@@ -25,6 +25,7 @@ Examples:
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import TYPE_CHECKING, TypeAlias, TypedDict
 
 from hugr.metadata import Metadata
@@ -38,6 +39,8 @@ if TYPE_CHECKING:
 __all__ = [
     "RewriteTraceValue",
     "MaxQubitsHint",
+    "InlineAnnotationValue",
+    "InlineAnnotation",
     "CircuitRewriteTraces",
     "UnitaryFlags",
     "PytketInputParameters",
@@ -70,6 +73,41 @@ class MaxQubitsHint(Metadata[int]):
     """Metadata key for the number of qubits required to execute a HUGR node."""
 
     KEY = _metadata.MAX_QUBITS_HINT
+
+
+class InlineAnnotationValue(Enum):
+    """Metadata value hinting the compiler that a function declaration should be inlined at its call sites.
+
+    When a function is not annotated, we use a heuristic to determine whether to inline.
+
+    Values:
+    - "never": Never inline this function.
+    - "best_effort":
+        Inline the function if we know it won't produce an invalid Hugr.
+        This is a best effort option; the compiler may choose not to inline
+        functions with this annotation.
+    """
+
+    NEVER = "never"
+    BEST_EFFORT = "best_effort"
+
+
+class InlineAnnotation(Metadata[InlineAnnotationValue]):
+    """Metadata hinting the compiler that a function declaration should be inlined at its call sites."""
+
+    KEY = _metadata.INLINE_ANNOTATION
+
+    @classmethod
+    def to_json(cls, value: InlineAnnotationValue) -> JsonType:
+        return value.value
+
+    @classmethod
+    def from_json(cls, value: JsonType) -> InlineAnnotationValue:
+        if not isinstance(value, str):
+            raise TypeError(
+                f"Expected {cls.KEY} metadata to be a string, but got {type(value)}"
+            )
+        return InlineAnnotationValue(value)
 
 
 class CircuitRewriteTraces(Metadata[list[RewriteTraceValue]]):
