@@ -1400,6 +1400,7 @@ mod tests {
     #[case::multiple_dagger("../test_files/modifier_examples/multiple_dagger.hugr")]
     #[case::nested_ctrl_dagger1("../test_files/modifier_examples/nested_ctrl_dagger1.hugr")]
     #[case::nested_multiple_ctrl1("../test_files/modifier_examples/nested_multiple_ctrl1.hugr")]
+    #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     fn test_examples(#[case] example: &str) {
         let mut h = load_guppy_example(example).unwrap();
         test_resolve(&mut h);
