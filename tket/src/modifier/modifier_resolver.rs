@@ -27,8 +27,9 @@
 //! which is done in
 //! `apply_modifier_chain_to_loaded_fn`.
 //! After resolution, original function nodes that have been replaced by solved
-//! modified versions may be removed if they are no longer needed; public
-//! functions are preserved to keep the module API intact.
+//! modified versions may be removed if they are no longer needed and the pass
+//! scope allows removing them. Nodes whose interface must be preserved by the
+//! scope are kept.
 //!
 //! While resolving modifiers, we hold the original hugr `h` and the node to be modified `n`,
 //! and a builder `new_dfg` to construct the new graph.
@@ -102,6 +103,7 @@
 //! - User defined extension ops: There is no way to infer modified unknown extension ops.
 //!   We currently try to insert the original optype without any modification,
 //!   but this could result in an unexpected error.
+#[cfg(test)]
 use hugr_core::Visibility;
 use itertools::{Either, Itertools};
 use std::{
@@ -117,6 +119,7 @@ pub mod tket_op_modify;
 
 use super::{CombinedModifier, ModifierFlags};
 use crate::passes::utils::unpack_container::TypeUnpacker;
+use crate::passes::{InScope, PassScope};
 use crate::{TketOp, extension::global_phase::GlobalPhase, modifier::Modifier};
 use global_phase_modify::delete_phase;
 
@@ -1145,30 +1148,28 @@ fn candidate_static_dependencies<N: HugrNode>(
 
 /// Removes generated modified functions that are no longer reachable.
 ///
-/// A candidate is kept if it is the entrypoint's containing function, is used
-/// from outside the candidate set, is a static dependency of another kept
-/// candidate, or is public (to preserve exported API functions).
+/// A candidate is kept if it is the entrypoint's containing function, is not
+/// removable under `scope`, is used from outside the candidate set, or is a
+/// static dependency of another kept candidate.
 fn remove_unused_modified_functions<N: HugrNode>(
     h: &mut impl HugrMut<Node = N>,
     modified_functions: &HashSet<N>,
+    scope: &PassScope,
 ) {
     let mut candidates = modified_functions
         .iter()
         .copied()
-        .filter(|func| h.contains_node(*func) && h.get_optype(*func).as_func_defn().is_some())
+        .filter(|func| {
+            h.contains_node(*func)
+                && h.get_optype(*func).as_func_defn().is_some()
+                && scope.in_scope(h, *func) == InScope::Yes
+        })
         .collect::<HashSet<_>>();
 
     // Removing the function containing the entrypoint would leave an invalid HUGR.
     if let Some(entrypoint_owner) = module_child_containing(h, h.entrypoint()) {
         candidates.remove(&entrypoint_owner);
     }
-
-    // Remove public functions from candidates to preserve exported API functions.
-    candidates.retain(|func| {
-        h.get_optype(*func)
-            .as_func_defn()
-            .is_some_and(|func_defn| *func_defn.visibility() != Visibility::Public)
-    });
 
     let mut live = candidates
         .iter()
@@ -1198,8 +1199,11 @@ fn remove_unused_modified_functions<N: HugrNode>(
 ///
 /// When resolution creates modified replacements for loaded functions, the
 /// original solved function nodes are removed if they are no longer reachable
-/// from the entrypoint, from public functions, or from other preserved modified
-/// functions. Public function nodes are kept to preserve the exported API.
+/// from the entrypoint, from nodes whose interface is preserved by the default
+/// pass scope, or from other preserved modified functions.
+///
+/// Use [`resolve_modifier_with_entrypoints_and_scope`] to make cleanup follow a
+/// specific [`PassScope`].
 //
 // Shouldn't we use a worklist of nodes?
 // As we may want to change the order of resolving modifiers
@@ -1208,6 +1212,19 @@ fn remove_unused_modified_functions<N: HugrNode>(
 pub fn resolve_modifier_with_entrypoints(
     h: &mut impl HugrMut<Node = Node>,
     entry_points: impl IntoIterator<Item = Node>,
+) -> Result<(), ModifierResolverErrors<Node>> {
+    resolve_modifier_with_entrypoints_and_scope(h, entry_points, &PassScope::default())
+}
+
+/// Resolve modifiers in a circuit by applying them to each entry point.
+///
+/// Cleanup of solved original function nodes respects `scope`: a function is
+/// only removed when it is no longer needed and [`PassScope::in_scope`] says the
+/// function may be modified freely.
+pub fn resolve_modifier_with_entrypoints_and_scope(
+    h: &mut impl HugrMut<Node = Node>,
+    entry_points: impl IntoIterator<Item = Node>,
+    scope: &PassScope,
 ) -> Result<(), ModifierResolverErrors<Node>> {
     use ModifierResolverErrors::*;
 
@@ -1292,7 +1309,7 @@ pub fn resolve_modifier_with_entrypoints(
 
     // Remove only original functions for which this resolver generated modified
     // replacements, and only when no remaining non-obsolete function uses them.
-    remove_unused_modified_functions(h, &resolver.modified_functions);
+    remove_unused_modified_functions(h, &resolver.modified_functions, scope);
 
     h.validate()
         .map_err(|e| ModifierResolverErrors::BuildError(e.into()))?;
@@ -1322,6 +1339,7 @@ mod tests {
         TketOp,
         extension::modifier::{CONTROL_OP_ID, DAGGER_OP_ID, MODIFIER_EXTENSION},
         metadata,
+        passes::composable::Preserve,
     };
 
     use super::*;
@@ -1739,6 +1757,80 @@ mod tests {
         resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
 
         assert!(h.contains_node(foo_node));
+        assert_matches!(h.validate(), Ok(()));
+    }
+
+    #[test]
+    /// Test that public modified functions may be removed when the scope permits it.
+    fn modified_public_function_is_removed_when_not_preserved_by_scope() {
+        let mut module = ModuleBuilder::new();
+
+        let foo_sig = Signature::new_endo(vec![qb_t()]);
+        let foo = {
+            let mut func = module
+                .define_function_vis("foo", foo_sig, Visibility::Public)
+                .unwrap();
+            func.set_unitary();
+            let mut inputs: Vec<Wire> = func.input_wires().collect();
+            inputs[0] = func
+                .add_dataflow_op(TketOp::X, vec![inputs[0]])
+                .unwrap()
+                .out_wire(0);
+            func.finish_with_outputs(inputs).unwrap()
+        };
+        let foo_node = foo.node();
+
+        let ctrl_num = 1;
+        let controlled_sig = Signature::new_endo(vec![array_type(ctrl_num, qb_t()), qb_t()]);
+        let main_sig = Signature::new(type_row![], vec![array_type(ctrl_num, qb_t()), qb_t()]);
+        let control_op: ExtensionOp = MODIFIER_EXTENSION
+            .instantiate_extension_op(
+                &CONTROL_OP_ID,
+                [
+                    Term::BoundedNat(ctrl_num),
+                    vec![qb_t().into()].into(),
+                    vec![].into(),
+                ],
+            )
+            .unwrap();
+
+        let main_node = {
+            let mut func = module.define_function("main", main_sig).unwrap();
+            let loaded = func.load_func(foo.handle(), &[]).unwrap();
+            let modified_fn = func
+                .add_dataflow_op(control_op, vec![loaded])
+                .unwrap()
+                .out_wire(0);
+            let control = func
+                .add_dataflow_op(TketOp::QAlloc, vec![])
+                .unwrap()
+                .out_wire(0);
+            let target = func
+                .add_dataflow_op(TketOp::QAlloc, vec![])
+                .unwrap()
+                .out_wire(0);
+            let control_arr = func.add_new_array(qb_t(), [control]).unwrap();
+            let outputs = func
+                .add_dataflow_op(
+                    CallIndirect {
+                        signature: controlled_sig,
+                    },
+                    [modified_fn, control_arr, target],
+                )
+                .unwrap()
+                .outputs();
+            func.finish_with_outputs(outputs).unwrap().node()
+        };
+
+        let mut h = module.finish_hugr().unwrap();
+        h.set_entrypoint(main_node);
+        assert_matches!(h.validate(), Ok(()));
+
+        let scope = PassScope::Global(Preserve::Entrypoint);
+        let root = scope.root(&h).unwrap();
+        resolve_modifier_with_entrypoints_and_scope(&mut h, [root], &scope).unwrap();
+
+        assert!(!h.contains_node(foo_node));
         assert_matches!(h.validate(), Ok(()));
     }
 
