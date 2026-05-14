@@ -103,8 +103,6 @@
 //! - User defined extension ops: There is no way to infer modified unknown extension ops.
 //!   We currently try to insert the original optype without any modification,
 //!   but this could result in an unexpected error.
-#[cfg(test)]
-use hugr_core::Visibility;
 use itertools::{Either, Itertools};
 use std::{
     collections::{HashMap, HashSet, VecDeque},
@@ -1334,6 +1332,8 @@ mod tests {
         std_extensions::collections::array::ArrayOpBuilder,
         types::Term,
     };
+
+    use hugr_core::Visibility;
 
     use crate::{
         TketOp,
