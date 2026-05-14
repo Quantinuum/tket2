@@ -1187,16 +1187,6 @@ pub fn resolve_modifier_with_entrypoints(
     // were produced or left behind by the resolution passes above.
     delete_phase(h, entry_points)?;
 
-    // debbugging print
-    // œœœœœ
-    // let output = Path::new(env!("CARGO_MANIFEST_DIR"))
-    //     .parent()
-    //     .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")))
-    //     .join("current.mmd");
-    // fs::write(output, h.mermaid_string()).unwrap();
-    // println!("@ 4");
-    // œœœœœ
-
     h.validate()
         .map_err(|e| ModifierResolverErrors::BuildError(e.into()))?;
 
