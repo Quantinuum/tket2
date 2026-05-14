@@ -42,3 +42,6 @@ jupyter_execute/
 *.dylib
 *.dylib.yml
 *.plist
+
+# a reserved working dir for local experimentation
+/scratch

@@ -11,14 +11,10 @@ import sys
 
 from guppylang import guppy
 from guppylang.std.array import array_swap
-from guppylang.std.quantum import discard, qubit, h, x
-from guppylang.std.qsystem import zz_phase
-from guppylang.std.builtins import array, comptime, frozenarray, mem_swap
-from guppylang.std.angles import pi
-from guppylang.defs import GuppyFunctionDefinition
-from hugr.hugr.render import RenderConfig
+from guppylang.std.quantum import discard, qubit, h
+from guppylang.std.builtins import array
 import guppylang
-from guppylang.std.builtins import control, dagger
+from guppylang.std.builtins import dagger
 from guppylang.std.debug import state_result
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
