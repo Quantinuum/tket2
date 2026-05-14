@@ -17,7 +17,6 @@ use hugr::{
     std_extensions::collections::array::ArrayOpBuilder,
     types::{FuncTypeBase, TypeArg, TypeRow},
 };
-use hugr_core::hugr::internal::PortgraphNodeMap;
 use petgraph::visit::{Topo, Walker};
 
 use super::{DirWire, ModifierFlags, ModifierResolver, ModifierResolverErrors, PortExt};
@@ -61,14 +60,14 @@ impl<N: HugrNode> ModifierResolver<N> {
         let mut worklist = VecDeque::new();
         // This block is needed to appease the borrow checker.
         {
-            let (region_graph, node_map) = h.region_portgraph(n);
-            let mut topo: Vec<_> = Topo::new(&region_graph).iter(&region_graph).collect();
+            let sg = h.scheduling_graph(n);
+            let mut topo: Vec<_> = Topo::new(sg.petgraph()).iter(sg.petgraph()).collect();
             // Reverse the topological order if dagger is applied.
             if self.modifiers.dagger {
                 topo.reverse();
             }
             for old_n_id in topo {
-                worklist.push_back(node_map.from_portgraph(old_n_id));
+                worklist.push_back(sg.pg_to_node(old_n_id));
             }
         }
 

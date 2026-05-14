@@ -1,4 +1,32 @@
 //! Collection of metadata keys used throughout tket.
+//!
+//! # Example
+//!
+//! ```rust
+//! use tket::metadata;
+//! use hugr::{Hugr, HugrView};
+//! # use hugr::hugr::hugrmut::HugrMut;
+//! # use hugr::types::Signature;
+//! # use tket_json_rs::register::{ElementId, Qubit};
+//!
+//! let mut hugr = Hugr::new();
+//! let node = hugr.entrypoint();
+//!
+//! hugr.set_metadata::<metadata::MaxQubitsHint>(node, 3);
+//! hugr.set_metadata::<metadata::PytketInputParameters>(node, vec!["theta".to_string()]);
+//! hugr.set_metadata::<metadata::PytketQubitRegisterNames>(
+//!     node,
+//!     vec![Qubit::from(ElementId("q".to_string(), vec![0]))],
+//! );
+//!
+//! assert_eq!(hugr.get_metadata::<metadata::MaxQubitsHint>(node), Some(3));
+//! assert_eq!(
+//!     hugr.get_metadata::<metadata::PytketInputParameters>(node),
+//!     Some(vec!["theta".to_string()]),
+//! );
+//! ```
+//
+// Changes to this file **SHOULD** be reflected in `tket-py/tket/metadata.py`.
 
 use crate::rewrite::trace::RewriteTrace;
 use hugr_core::metadata::Metadata;
@@ -6,8 +34,8 @@ use tket_json_rs::register::{Bit, Qubit};
 
 /// Metadata key for the number of qubits that a HUGR node expects to be required for execution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct MaxQubits;
-impl Metadata for MaxQubits {
+pub struct MaxQubitsHint;
+impl Metadata for MaxQubitsHint {
     const KEY: &'static str = "tket.hint.max_qubits";
     type Type<'hugr> = u32;
 }
@@ -16,7 +44,7 @@ impl Metadata for MaxQubits {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CircuitRewriteTraces;
 impl Metadata for CircuitRewriteTraces {
-    const KEY: &'static str = "TKET.rewrites";
+    const KEY: &'static str = "tket.rewrites";
     type Type<'hugr> = Vec<RewriteTrace>;
 }
 
@@ -24,50 +52,93 @@ impl Metadata for CircuitRewriteTraces {
 ///
 /// See crate::modifier::ModifierFlags
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Unitary;
-impl Metadata for Unitary {
+pub struct UnitaryFlags;
+impl Metadata for UnitaryFlags {
     const KEY: &'static str = "unitary";
     type Type<'hugr> = u8;
 }
 
-// Metadata keys used for TKET1 compatibility
+// Metadata keys used for pytket compatibility.
 
 /// Metadata key for explicit names for the input parameter wires.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct InputParameters;
-impl Metadata for InputParameters {
+pub struct PytketInputParameters;
+impl Metadata for PytketInputParameters {
     const KEY: &'static str = "TKET1.input_parameters";
     type Type<'hugr> = Vec<String>;
 }
 
 /// Metadata key for a tket1 operation "opgroup" field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct OpGroup;
-impl Metadata for OpGroup {
+pub struct PytketOpGroup;
+impl Metadata for PytketOpGroup {
     const KEY: &'static str = "TKET1.opgroup";
     type Type<'hugr> = &'hugr str;
 }
 
 /// Metadata key for explicit names for the input bit registers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct BitRegisters;
-impl Metadata for BitRegisters {
+pub struct PytketBitRegisterNames;
+impl Metadata for PytketBitRegisterNames {
     const KEY: &'static str = "TKET1.bit_registers";
     type Type<'hugr> = Vec<Bit>;
 }
 
 /// Metadata key for explicit names for the input qubit registers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct QubitRegisters;
-impl Metadata for QubitRegisters {
+pub struct PytketQubitRegisterNames;
+impl Metadata for PytketQubitRegisterNames {
     const KEY: &'static str = "TKET1.qubit_registers";
     type Type<'hugr> = Vec<Qubit>;
 }
 
 /// Metadata key for the global phase
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Phase;
-impl Metadata for Phase {
+pub struct PytketPhaseExpr;
+impl Metadata for PytketPhaseExpr {
     const KEY: &'static str = "TKET1.phase";
     type Type<'hugr> = &'hugr str;
 }
+
+/// Deprecated alias for [`MaxQubitsHint`].
+#[deprecated(
+    since = "0.19.0",
+    note = "use MaxQubitsHint instead; this alias will be removed"
+)]
+pub type MaxQubits = MaxQubitsHint;
+/// Deprecated alias for [`UnitaryFlags`].
+#[deprecated(
+    since = "0.19.0",
+    note = "use UnitaryFlags instead; this alias will be removed"
+)]
+pub type Unitary = UnitaryFlags;
+/// Deprecated alias for [`PytketInputParameters`].
+#[deprecated(
+    since = "0.19.0",
+    note = "use PytketInputParameters instead; this alias will be removed"
+)]
+pub type InputParameters = PytketInputParameters;
+/// Deprecated alias for [`PytketOpGroup`].
+#[deprecated(
+    since = "0.19.0",
+    note = "use PytketOpGroup instead; this alias will be removed"
+)]
+pub type OpGroup = PytketOpGroup;
+/// Deprecated alias for [`PytketBitRegisterNames`].
+#[deprecated(
+    since = "0.19.0",
+    note = "use PytketBitRegisterNames instead; this alias will be removed"
+)]
+pub type BitRegisters = PytketBitRegisterNames;
+/// Deprecated alias for [`PytketQubitRegisterNames`].
+#[deprecated(
+    since = "0.19.0",
+    note = "use PytketQubitRegisterNames instead; this alias will be removed"
+)]
+pub type QubitRegisters = PytketQubitRegisterNames;
+/// Deprecated alias for [`PytketPhaseExpr`].
+#[deprecated(
+    since = "0.19.0",
+    note = "use PytketPhaseExpr instead; this alias will be removed"
+)]
+pub type Phase = PytketPhaseExpr;
