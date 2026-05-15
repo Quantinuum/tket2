@@ -134,7 +134,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                     self.map_insert((old_out, port).into(), DirWire::from((new_out, new_port)))?
                 }
             }
-            OpType::DataflowBlock(dfb) => {
+            OpType::DataflowBlock(dfb) if self.modifiers().dagger => {
                 let DataflowBlock {
                     inputs: input,
                     other_outputs: output,
@@ -153,6 +153,26 @@ impl<N: HugrNode> ModifierResolver<N> {
                     (new_out, new_in),
                     (output.iter(), input.iter()),
                     (1, 0, offset),
+                )?;
+            }
+            OpType::DataflowBlock(dfb) => {
+                let DataflowBlock {
+                    inputs: input,
+                    other_outputs: output,
+                    sum_rows: _sum_rows,
+                } = dfb;
+
+                // The branch sum is unchanged. In the non-dagger CFG path,
+                // controls are threaded as trailing block-carried values.
+                self.map_insert(
+                    (old_out, IncomingPort::from(0)).into(),
+                    (new_out, IncomingPort::from(0)).into(),
+                )?;
+                self.wire_inout(
+                    (old_out, old_in),
+                    (new_out, new_in),
+                    (output.iter(), input.iter()),
+                    (1, 0, 0),
                 )?;
             }
             OpType::Case(_) => {
@@ -183,7 +203,15 @@ impl<N: HugrNode> ModifierResolver<N> {
             OpType::FuncDefn(_fndefn) => {
                 self.unpack_controls(new_dfg, new_dfg.input_wires())?
             }
-            OpType::DFG(_) | OpType::DataflowBlock(_) => new_dfg.input_wires().take(self.control_num()).collect(),
+            OpType::DFG(_) => new_dfg.input_wires().take(self.control_num()).collect(),
+            OpType::DataflowBlock(_) if self.modifiers().dagger => {
+                new_dfg.input_wires().take(self.control_num()).collect()
+            }
+            OpType::DataflowBlock(dfb) => new_dfg
+                .input_wires()
+                .skip(dfb.inputs.len())
+                .take(self.control_num())
+                .collect(),
             OpType::TailLoop(tail_loop) => {
                 let just_input_num = tail_loop.just_inputs.len();
                 new_dfg
@@ -248,11 +276,28 @@ impl<N: HugrNode> ModifierResolver<N> {
                         .connect(ctrl.node(), ctrl.source(), out_node, i);
                 }
             }
-            OpType::TailLoop(_) | OpType::DataflowBlock(_) => {
+            OpType::TailLoop(_) => {
                 for (i, ctrl) in controls.iter().enumerate() {
                     new_dfg
                         .hugr_mut()
                         .connect(ctrl.node(), ctrl.source(), out_node, i + 1);
+                }
+            }
+            OpType::DataflowBlock(dfb) if self.modifiers().dagger => {
+                for (i, ctrl) in controls.iter().enumerate() {
+                    new_dfg
+                        .hugr_mut()
+                        .connect(ctrl.node(), ctrl.source(), out_node, i + 1);
+                }
+            }
+            OpType::DataflowBlock(dfb) => {
+                for (i, ctrl) in controls.iter().enumerate() {
+                    new_dfg.hugr_mut().connect(
+                        ctrl.node(),
+                        ctrl.source(),
+                        out_node,
+                        i + 1 + dfb.other_outputs.len(),
+                    );
                 }
             }
             optype => {
@@ -796,6 +841,44 @@ mod test {
         *func.finish_with_outputs(inputs).unwrap().handle()
     }
 
+    fn foo_cfg_two_blocks(module: &mut ModuleBuilder<Hugr>, t_num: usize) -> FuncID<true> {
+        let foo_sig = Signature::new_endo(iter::repeat_n(qb_t(), t_num).collect::<Vec<_>>());
+        let mut func = module.define_function("foo", foo_sig.clone()).unwrap();
+        func.set_unitary();
+        let mut inputs: Vec<_> = func.input_wires().collect();
+
+        let cfg = {
+            let mut cfg = func
+                .cfg_builder(vec![(qb_t(), inputs[0])], [qb_t()].into())
+                .unwrap();
+            let entry = {
+                let mut bb = cfg
+                    .entry_builder(vec![type_row![]], [qb_t()].into())
+                    .unwrap();
+                let q = bb.input_wires().next().unwrap();
+                let q = bb.add_dataflow_op(TketOp::X, vec![q]).unwrap().out_wire(0);
+                let tag = bb.make_sum(0, [type_row![]], []).unwrap();
+                bb.finish_with_outputs(tag, [q]).unwrap()
+            };
+            let second = {
+                let mut bb = cfg
+                    .block_builder([qb_t()].into(), vec![type_row![]], [qb_t()].into())
+                    .unwrap();
+                let q = bb.input_wires().next().unwrap();
+                let q = bb.add_dataflow_op(TketOp::X, vec![q]).unwrap().out_wire(0);
+                let tag = bb.make_sum(0, [type_row![]], []).unwrap();
+                bb.finish_with_outputs(tag, [q]).unwrap()
+            };
+            let exit = cfg.exit_block();
+            cfg.branch(&entry, 0, &second).unwrap();
+            cfg.branch(&second, 0, &exit).unwrap();
+            cfg.finish_sub_container().unwrap()
+        };
+        inputs[0] = cfg.outputs().next().unwrap();
+
+        *func.finish_with_outputs(inputs).unwrap().handle()
+    }
+
     #[rstest::rstest]
     #[case::dfg(1, 2, foo_dfg, false)]
     #[case::dfg_dagger(1, 2, foo_dfg, true)]
@@ -804,6 +887,7 @@ mod test {
     #[case::conditional_dagger(1, 1, foo_conditional, true)]
     #[case::cfg(1, 1, foo_cfg, false)]
     #[case::cfg_dagger(1, 1, foo_cfg, true)]
+    #[case::cfg_two_blocks(1, 1, foo_cfg_two_blocks, false)]
     fn test_dfg_modify(
         #[case] t_num: usize,
         #[case] c_num: u64,
