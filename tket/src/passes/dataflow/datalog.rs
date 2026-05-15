@@ -232,7 +232,6 @@ fn run_datalog<V: AbstractValue, H: HugrView>(
             out_wire_value(m, op, v);
 
         // Prepopulate in_wire_value from in_wire_value_proto.
-
         in_wire_value(n, p, v) <-- for (n, p, v) in &in_wire_value_proto,
           node(n),
           if let Some(sig) = hugr.signature(*n),
@@ -364,6 +363,17 @@ fn run_datalog<V: AbstractValue, H: HugrView>(
             node_in_value_row(out_n, out_in_row),
             if let Some(fields) = out_in_row.unpack_first(succ_n, df_block.sum_rows.get(succ_n).unwrap().len()),
             for (out_p, v) in fields.enumerate();
+
+        // Functions ---------------
+        // Any function that is loaded as a value is overapproximated to have possibly arbitrary
+        // inputs.
+        out_wire_value(inp, p, PV::top()) <--
+            node(n),
+            if hugr.get_optype(*n).is_load_function(),
+            out_wire_value(n, OutgoingPort::from(0), v),
+            if let PartialValue::LoadedFunction(LoadedFunction { func_node: func, .. }) = v,
+            input_child(func, inp),
+            out_wire(inp, p);
 
         // Call --------------------
         relation func_call(H::Node, H::Node); // <Node> is a `Call` to `FuncDefn` <Node>
