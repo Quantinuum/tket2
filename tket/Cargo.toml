@@ -64,7 +64,7 @@ hugr-core = { workspace = true }
 portgraph = { workspace = true, features = ["serde", "petgraph"] }
 strum = { workspace = true, features = ["derive"] }
 fxhash = { workspace = true }
-indexmap = { workspace = true }
+indexmap = { workspace = true, features = ["rayon"] }
 rmp-serde = { workspace = true, optional = true }
 delegate = { workspace = true }
 csv = { workspace = true }
@@ -98,7 +98,7 @@ proptest-recurse = { workspace = true }
 # Defined here so it can be overridden by the codspeed CI job
 # using `cargo add`.
 criterion = { version = "0.8.2", features = ["html_reports"] }
-insta = "1.47.0"
+insta = "1.47.2"
 
 [[bench]]
 name = "bench_main"

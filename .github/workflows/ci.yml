@@ -356,7 +356,7 @@ jobs:
       - uses: quantinuum/hugrverse-env/install-hugrenv-action@main
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
-      - uses: extractions/setup-just@v3
+      - uses: extractions/setup-just@v4
       - name: Generate the updated definitions
         run: just gen-extensions
       - name: Check if the declarations are up to date
