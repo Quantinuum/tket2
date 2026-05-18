@@ -607,12 +607,9 @@ impl<N: HugrNode> ModifierResolver<N> {
         conditional: &Conditional,
         new_dfg: &mut impl Container,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        // Dagger usually reverses qubit value flow through a conditional. That
-        // is wrong for conditionals that only do classical work while threading
-        // qubits through unchanged: reversing the qubit passthrough but leaving
-        // classical arrays forward can introduce cycles. Copy those subgraphs
-        // unchanged.
-        if self.modifiers().dagger && !self.subtree_has_quantum_operation(h, n) {
+        // If a conditional does not have quantum operations in its body, we can safely
+        // copy the whole conditional without modification.
+        if !self.subtree_has_quantum_operation(h, n) {
             self.copy_sub_container_no_modification(h, n, new_dfg)?;
             return Ok(());
         }
