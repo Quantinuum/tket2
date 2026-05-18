@@ -62,9 +62,9 @@ for hugr_path in hugr_paths:
     hugr_bytes = hugr_path.read_bytes()
     hugr = Hugr.from_bytes(hugr_bytes)
 
-    hugr.render_dot().render(
-        str(hugr_pdf_directory / hugr_path.stem), format="pdf", cleanup=True
-    )
+    # hugr.render_dot().render(
+    #     str(hugr_pdf_directory / hugr_path.stem), format="pdf", cleanup=True
+    # )
 
     package = hugr.to_package()
 
