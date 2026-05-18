@@ -11,10 +11,10 @@ from sys import argv
 import sys
 
 from guppylang import guppy
-from guppylang.std.builtins import dagger
+from guppylang.std.builtins import control, dagger
 from guppylang.std.debug import state_result
 from guppylang.std.quantum import discard, qubit
-from guppylang.std.quantum import s, rx
+from guppylang.std.quantum import s, rx, h
 from guppylang.std.angles import angle
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
@@ -43,14 +43,18 @@ def foo2(q: qubit, f: float) -> None:
 @guppy
 def main() -> None:
     t = qubit()
+    c = qubit()
+    h(c)
 
     with dagger:
-        foo1(t)
-        f = get_f()
-        foo2(t, f)
+        with control(c):
+            foo1(t)
+            f = get_f()
+            foo2(t, f)
 
-    state_result("r", t)
+    state_result("r", c, t)
     discard(t)
+    discard(c)
 
 
 program = main.compile()

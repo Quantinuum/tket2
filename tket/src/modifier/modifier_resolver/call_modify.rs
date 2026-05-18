@@ -25,6 +25,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             ));
         };
         let offset = self.modifiers().accum_ctrl.len();
+        let old_signature = (*call.signature()).clone();
         let callee = h
             .single_linked_output(call_node, call.called_function_port())
             .unwrap();
@@ -41,7 +42,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         let type_args = call.type_args.clone();
         self.modify_signature(poly_sig.body_mut(), false);
         let new_call = Call::try_new(poly_sig, type_args).map_err(BuildError::from)?;
-        let signature = (*new_call.signature()).clone();
         let new_call_fn_port = new_call.called_function_port();
         let new_call_node = new_dfg.add_child_node(new_call);
 
@@ -56,11 +56,11 @@ impl<N: HugrNode> ModifierResolver<N> {
         }
         let controls = self.unpack_controls(new_dfg, controls)?;
         *self.controls() = controls;
-        // wire the inputs/outputs
+        // wire the inputs/outputs - we use the original signature here because the information about the controller is already in the offset
         self.wire_node_inout(
             call_node,
             new_call_node,
-            (signature.input.iter(), signature.output.iter()),
+            (old_signature.input.iter(), old_signature.output.iter()),
             (0, 0, offset),
         )?;
 

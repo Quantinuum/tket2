@@ -36,4 +36,4 @@ def main() -> None:
 
 
 program = main.compile()
-hugr_path = Path(argv[0]).with_suffix(".hugr")
+Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())

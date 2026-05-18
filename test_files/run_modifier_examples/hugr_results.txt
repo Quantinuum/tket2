@@ -320,6 +320,11 @@ index_in_ctrl_solved:
 	101 -> 0+0.3536j
 	111 -> 0+0.3536j
 -----
+index_in_dagger_ctrl_solved:
+	000 -> 0.7071+0j
+	100 -> 0.5+0j
+	101 -> 0-0.5j
+-----
 index_in_dagger_solved:
 	00 -> 0.7071+0j
 	01 -> 0-0.7071j
@@ -333,8 +338,9 @@ multiple_dagger_solved:
 	0 -> 1+0j
 -----
 multiple_functions_in_ctrl_dagger_solved:
-	0 -> 0.7071-4.304e-17j
-	1 -> 0.6124+0.3536j
+	00 -> 0.7071+0j
+	10 -> 0.433+0.25j
+	11 -> 0.25+0.433j
 -----
 multiple_functions_in_dagger_solved:
 	0 -> 0.7071-4.304e-17j

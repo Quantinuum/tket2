@@ -33,10 +33,10 @@ def main() -> None:
             s(array_qubits[1])
             h(array_qubits[1])
 
-    state_result("r", array_qubits[0], array_qubits[1])
+    state_result("r", controller[0], array_qubits[0], array_qubits[1])
     discard_array(array_qubits)
     discard_array(controller)
 
 
 program = main.compile()
-hugr_path = Path(argv[0]).with_suffix(".hugr")
+Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
