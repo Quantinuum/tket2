@@ -40,6 +40,7 @@ def format_statevector(
 modifier_examples_dir = Path(__file__).resolve().parent / "modified_hugrs"
 result_execution_dir = Path(__file__).resolve().parent / "hugr_results"
 hugr_pdf_directory = Path(__file__).resolve().parents[1] / "0_hugr_pdf"
+result_execution_dir.mkdir(exist_ok=True)
 
 all_results: list[str] = []
 args = sys.argv[1:]
