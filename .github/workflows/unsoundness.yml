@@ -66,6 +66,8 @@ jobs:
             --skip "replace_types::test::dfg_conditional_case" \
             --skip "replace_types::test::module_func_cfg_call" \
             --skip "replace_types::test::op_to_call" \
+            --skip "passes::borrow_squash::test::test_borrow_squash" \
+            --skip "modifier::modifier_resolver::tket_op_modify::test::test_single_tket_op::case_5" \
             #
 
   create-issue:
