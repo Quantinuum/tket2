@@ -1,10 +1,10 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang ==0.21.13",
+#     "guppylang ==0.21.15",
 # ]
 # ///
-"""A simple controlled gate using modifiers"""
+"""Testing a dagger modifier on multiple gates"""
 
 from pathlib import Path
 from sys import argv

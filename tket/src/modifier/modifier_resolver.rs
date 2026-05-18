@@ -1405,7 +1405,7 @@ mod tests {
     #[case::classical_function1("../test_files/modifier_examples/classical_function1.hugr")]
     #[case::classical_function2("../test_files/modifier_examples/classical_function2.hugr")]
     #[case::classical_function3("../test_files/modifier_examples/classical_function3.hugr")]
-    #[case::ctrl_on_multiple_gates2("../test_files/modifier_examples/ctrl_on_multiple_gates2.hugr")]
+    #[case::multiple_gates2_in_ctrl("../test_files/modifier_examples/multiple_gates2_in_ctrl.hugr")]
     #[case::index_in_ctrl("../test_files/modifier_examples/index_in_ctrl.hugr")]
     #[case::index_in_dagger("../test_files/modifier_examples/index_in_dagger.hugr")]
     // TODO(perf): Investigate why this test is so slow (18s on my machine).
@@ -1413,22 +1413,22 @@ mod tests {
     #[ignore = "slow regression test"]
     #[case::complex_modifier_stress("../test_files/modifier_examples/complex_modifier_stress.hugr")]
     #[case::ctrl_array_controller("../test_files/modifier_examples/ctrl_array_controller.hugr")]
-    #[case::ctrl_on_call1("../test_files/modifier_examples/ctrl_on_call1.hugr")]
-    #[case::ctrl_on_call2("../test_files/modifier_examples/ctrl_on_call2.hugr")]
-    #[case::ctrl_on_multiple_gates1("../test_files/modifier_examples/ctrl_on_multiple_gates1.hugr")]
-    #[case::ctrl_on_x("../test_files/modifier_examples/ctrl_on_x.hugr")]
-    #[case::dagger_on_call("../test_files/modifier_examples/dagger_on_call.hugr")]
-    #[case::dagger_on_multiple_functions(
-        "../test_files/modifier_examples/dagger_on_multiple_functions.hugr"
+    #[case::call1_in_ctrl("../test_files/modifier_examples/call1_in_ctrl.hugr")]
+    #[case::call2_in_ctrl("../test_files/modifier_examples/call2_in_ctrl.hugr")]
+    #[case::multiple_gates1_in_ctrl("../test_files/modifier_examples/multiple_gates1_in_ctrl.hugr")]
+    #[case::x_in_ctrl("../test_files/modifier_examples/x_in_ctrl.hugr")]
+    #[case::call_in_dagger("../test_files/modifier_examples/call_in_dagger.hugr")]
+    #[case::multiple_functions_in_dagger(
+        "../test_files/modifier_examples/multiple_functions_in_dagger.hugr"
     )]
-    #[case::dagger_on_multiple_gates1(
-        "../test_files/modifier_examples/dagger_on_multiple_gates1.hugr"
+    #[case::multiple_gates1_in_dagger(
+        "../test_files/modifier_examples/multiple_gates1_in_dagger.hugr"
     )]
-    #[case::dagger_on_multiple_gates2(
-        "../test_files/modifier_examples/dagger_on_multiple_gates2.hugr"
+    #[case::multiple_gates2_in_dagger(
+        "../test_files/modifier_examples/multiple_gates2_in_dagger.hugr"
     )]
-    #[case::dagger_on_multiple_gates3(
-        "../test_files/modifier_examples/dagger_on_multiple_gates3.hugr"
+    #[case::multiple_gates3_in_dagger(
+        "../test_files/modifier_examples/multiple_gates3_in_dagger.hugr"
     )]
     #[case::double_modifier("../test_files/modifier_examples/double_modifier.hugr")]
     #[case::modify_array("../test_files/modifier_examples/modify_array.hugr")]
@@ -1436,6 +1436,10 @@ mod tests {
     #[case::nested_ctrl_dagger1("../test_files/modifier_examples/nested_ctrl_dagger1.hugr")]
     #[case::nested_multiple_ctrl1("../test_files/modifier_examples/nested_multiple_ctrl1.hugr")]
     #[case::swap_in_dagger("../test_files/modifier_examples/swap_in_dagger.hugr")]
+    #[case::index_in_dagger_ctrl("../test_files/modifier_examples/index_in_dagger_ctrl.hugr")]
+    #[case::multiple_functions_in_ctrl_dagger(
+        "../test_files/modifier_examples/multiple_functions_in_ctrl_dagger.hugr"
+    )]
     #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     fn test_examples(#[case] example: &str) {
         let mut h = load_guppy_example(example).unwrap();

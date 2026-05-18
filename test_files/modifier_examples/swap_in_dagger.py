@@ -1,9 +1,10 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang ==0.21.14",
+#     "guppylang ==0.21.15",
 # ]
 # ///
+"""Dagger of a swap on an array"""
 
 from pathlib import Path
 from sys import argv

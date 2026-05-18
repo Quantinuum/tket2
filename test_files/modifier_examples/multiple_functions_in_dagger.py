@@ -1,10 +1,10 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang @ git+https://github.com/Quantinuum/guppylang.git@na/cherry-pick-PR-1706-1708#subdirectory=guppylang",
+#     "guppylang ==0.21.15",
 # ]
 # ///
-"""A simple controlled gate using modifiers"""
+"""Testing a dagger modifier on multiple functions"""
 
 from pathlib import Path
 from sys import argv

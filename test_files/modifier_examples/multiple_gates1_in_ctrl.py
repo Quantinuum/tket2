@@ -1,20 +1,20 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang ==0.21.13",
+#     "guppylang ==0.21.15",
 # ]
 # ///
-"""A simple controlled gate using modifiers"""
+"""Testing a control modifier on multiple gates"""
 
 from pathlib import Path
 from sys import argv
 import sys
 
 from guppylang import guppy
-from guppylang.std.builtins import dagger
+from guppylang.std.builtins import control
 from guppylang.std.debug import state_result
 from guppylang.std.quantum import discard, qubit
-from guppylang.std.quantum import s, h
+from guppylang.std.quantum import rz, h, angle
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
@@ -23,22 +23,20 @@ from guppylang.experimental import enable_experimental_features
 enable_experimental_features()
 
 
-@guppy(unitary=True)
-def bar(q: qubit) -> None:
-    h(q)
-    s(q)
-    h(q)
-
-
 @guppy
 def main() -> None:
+    c = qubit()
     t = qubit()
+    h(c)
 
-    with dagger:
-        bar(t)
+    with control(c):
+        h(t)
+        rz(t, angle(1 / 3))
+        h(t)
 
-    state_result("r", t)
+    state_result("r", c, t)
     discard(t)
+    discard(c)
 
 
 program = main.compile()

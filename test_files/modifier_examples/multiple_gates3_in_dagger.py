@@ -4,17 +4,18 @@
 #     "guppylang ==0.21.15",
 # ]
 # ///
-"""Subscript indexing in dagger context"""
+"""Testing a dagger modifier on multiple gates"""
 
 from pathlib import Path
 from sys import argv
 import sys
 
-from guppylang import array, guppy
+from guppylang import guppy
 from guppylang.std.builtins import dagger
 from guppylang.std.debug import state_result
-from guppylang.std.quantum import qubit, discard_array
-from guppylang.std.quantum import h, s
+from guppylang.std.quantum import discard, qubit
+from guppylang.std.quantum import s, rx
+from guppylang.std.angles import angle
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
@@ -23,17 +24,23 @@ from guppylang.experimental import enable_experimental_features
 enable_experimental_features()
 
 
+@guppy(unitary=True)
+def bar(q: qubit) -> None:
+    rx(q, angle(1 / 2))
+    s(q)
+    rx(q, angle(1 / 3))
+
+
 @guppy
 def main() -> None:
-    array_qubits: array[qubit, 2] = array(qubit(), qubit())
+    t = qubit()
 
     with dagger:
-        s(array_qubits[1])
-        h(array_qubits[1])
+        bar(t)
 
-    state_result("r", array_qubits[0], array_qubits[1])
-    discard_array(array_qubits)
+    state_result("r", t)
+    discard(t)
 
 
 program = main.compile()
-hugr_path = Path(argv[0]).with_suffix(".hugr")
+Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
