@@ -1,2 +1,2 @@
 [requires]
-tket-c-api/2.1.76@tket/stable
+tket-c-api/2.1.84@tket/stable
