@@ -155,12 +155,9 @@ class InlineFunctions(ComposablePass):
     Parameters:
     - heuristic: Heuristic used to choose which non-recursive functions to
       inline. Defaults to `MaxSize(64)`.
-    - follow_inline_hints: Whether to follow compiler hints for inlining
-      functions.
     """
 
     heuristic: inline_funcs.InlineFuncsHeuristic = inline_funcs.MaxSize(64)
-    follow_inline_hints: bool = True
     _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
 
     def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
@@ -182,7 +179,6 @@ class InlineFunctions(ComposablePass):
         _passes.inline_functions(
             tk_program._inner,
             heuristic=self.heuristic,
-            follow_inline_hints=self.follow_inline_hints,
             scope=self._scope,
         )
 
