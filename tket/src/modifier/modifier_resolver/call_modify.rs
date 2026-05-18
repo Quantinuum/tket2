@@ -33,8 +33,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         let Some(new_callee) = self.modify_fn_if_needed(h, callee.0)? else {
             // If the function need not be modified, just copy the Call node as is.
             let new = self.add_node_no_modification(h, call_node, call.clone(), new_dfg)?;
-            self.call_map()
-                .insert(callee.0, (new, call.called_function_port()));
+            self.call_map_insert(callee.0, (new, call.called_function_port()));
             return Ok(());
         };
 
@@ -46,8 +45,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         let new_call_fn_port = new_call.called_function_port();
         let new_call_node = new_dfg.add_child_node(new_call);
 
-        self.call_map()
-            .insert(new_callee, (new_call_node, new_call_fn_port));
+        self.call_map_insert(new_callee, (new_call_node, new_call_fn_port));
         // wire the controls
         let mut controls = self.pack_controls(new_dfg)?;
         for (i, control) in controls.iter_mut().enumerate() {
@@ -214,8 +212,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         self.modify_signature(modified_sig.body_mut(), false);
         let load = LoadFunction::try_new(modified_sig, load.type_args).map_err(BuildError::from)?;
         let new_load = new_dfg.add_child_node(load);
-        self.call_map()
-            .insert(modified_fn, (new_load, IncomingPort::from(0)));
+        self.call_map_insert(modified_fn, (new_load, IncomingPort::from(0)));
         *self.modifiers_mut() = modifiers;
 
         // Make new IndirectCall
@@ -256,16 +253,27 @@ impl<N: HugrNode> ModifierResolver<N> {
 
     pub(super) fn modify_load_function(
         &mut self,
-        _h: &impl HugrMut<Node = N>,
-        _n: N,
-        _load: &LoadFunction,
-        _new_dfg: &mut impl Dataflow,
+        h: &impl HugrMut<Node = N>,
+        n: N,
+        load: &LoadFunction,
+        new_dfg: &mut impl Dataflow,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        // TODO:
-        // Indirect calles would be handled by its caller.
-        // However, when a loaded function is used in the other ways
-        // (e.g., passed to higher-order functions as `map` or `fold`),
-        // we need to modify it here.
+        // Modifier consumers rebuild their own LoadFunction nodes.
+        if h.linked_inputs(n, 0)
+            .any(|(consumer, _)| Modifier::from_optype(h.get_optype(consumer)).is_some())
+        {
+            return Ok(());
+        }
+        // Plain LoadFunction values still need their static edge restored.
+        let new = self.add_node_no_modification(h, n, load.clone(), new_dfg)?;
+        let (loaded_func, _) =
+            h.single_linked_output(n, load.function_port())
+                .ok_or_else(|| {
+                    ModifierResolverErrors::unreachable(
+                        "LoadFunction node has no linked static function.".to_string(),
+                    )
+                })?;
+        self.call_map_insert(loaded_func, (new, load.function_port()));
         Ok(())
     }
 }
