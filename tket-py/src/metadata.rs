@@ -3,14 +3,15 @@
 use hugr::metadata::Metadata;
 use pyo3::prelude::*;
 use tket::metadata::{
-    CircuitRewriteTraces, MaxQubitsHint, PytketBitRegisterNames, PytketInputParameters,
-    PytketOpGroup, PytketPhaseExpr, PytketQubitRegisterNames, UnitaryFlags,
+    CircuitRewriteTraces, InlineAnnotation, MaxQubitsHint, PytketBitRegisterNames,
+    PytketInputParameters, PytketOpGroup, PytketPhaseExpr, PytketQubitRegisterNames, UnitaryFlags,
 };
 
 /// The module definition.
 pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     let m = PyModule::new(py, "metadata")?;
     m.add("MAX_QUBITS_HINT", MaxQubitsHint::KEY)?;
+    m.add("INLINE_ANNOTATION", InlineAnnotation::KEY)?;
     m.add("CIRCUIT_REWRITE_TRACES", CircuitRewriteTraces::KEY)?;
     m.add("UNITARY_FLAGS", UnitaryFlags::KEY)?;
     m.add("PYTKET_INPUT_PARAMETERS", PytketInputParameters::KEY)?;

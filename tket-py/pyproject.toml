@@ -30,10 +30,13 @@ classifiers = [
 
 dependencies = [
     'hugr ~= 0.16.0',
-    "pytket>=2.1.0,<3",
     'tket_eccs ~= 0.5.1',
     'tket_exts >= 0.12.3, <0.13',
 ]
+
+[project.optional-dependencies]
+# The pytket python library is only used for type checking.
+pytket = ["pytket>=2.1.0,<3"]
 
 [tool.uv.sources]
 tket_eccs = { workspace = true }
