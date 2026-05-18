@@ -313,22 +313,6 @@ gate_in_ctrl_solved:
 	00 -> 0.7071+0j
 	11 -> 0.7071+0j
 -----
-index_in_ctrl_solved:
-	000 -> 0.7071+0j
-	001 -> 0.3536+0j
-	011 -> 0.3536+0j
-	101 -> 0+0.3536j
-	111 -> 0+0.3536j
------
-index_in_dagger_ctrl_solved:
-	000 -> 0.7071+0j
-	100 -> 0.5+0j
-	101 -> 0-0.5j
------
-index_in_dagger_solved:
-	00 -> 0.7071+0j
-	01 -> 0-0.7071j
------
 modify_array_solved:
 	000 -> 0.7071+0j
 	100 -> 0.5+0j
@@ -396,6 +380,22 @@ nested_multiple_ctrl1_solved:
 	1101 -> 0.25+0j
 	1110 -> 0.1768+0.1768j
 	1111 -> 0.1768-0.1768j
+-----
+subscript_in_ctrl_solved:
+	000 -> 0.7071+0j
+	001 -> 0.3536+0j
+	011 -> 0.3536+0j
+	101 -> 0+0.3536j
+	111 -> 0+0.3536j
+-----
+subscript_in_dagger_ctrl_solved:
+	000 -> 0.7071+0j
+	100 -> 0.5+0j
+	101 -> 0-0.5j
+-----
+subscript_in_dagger_solved:
+	00 -> 0.7071+0j
+	01 -> 0-0.7071j
 -----
 swap_in_dagger_solved:
 	0 -> 0.7071+0j

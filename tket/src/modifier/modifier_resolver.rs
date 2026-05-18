@@ -1980,8 +1980,8 @@ mod tests {
     #[case::classical_function2("../test_files/modifier_examples/classical_function2.hugr")]
     #[case::classical_function3("../test_files/modifier_examples/classical_function3.hugr")]
     #[case::multiple_gates2_in_ctrl("../test_files/modifier_examples/multiple_gates2_in_ctrl.hugr")]
-    #[case::index_in_ctrl("../test_files/modifier_examples/index_in_ctrl.hugr")]
-    #[case::index_in_dagger("../test_files/modifier_examples/index_in_dagger.hugr")]
+    #[case::subscript_in_ctrl("../test_files/modifier_examples/subscript_in_ctrl.hugr")]
+    #[case::subscript_in_dagger("../test_files/modifier_examples/subscript_in_dagger.hugr")]
     // TODO(perf): Investigate why this test is so slow (18s on my machine).
     // <https://github.com/Quantinuum/tket2/issues/1586>
     #[ignore = "slow regression test"]
@@ -2010,7 +2010,9 @@ mod tests {
     #[case::nested_ctrl_dagger1("../test_files/modifier_examples/nested_ctrl_dagger1.hugr")]
     #[case::nested_multiple_ctrl1("../test_files/modifier_examples/nested_multiple_ctrl1.hugr")]
     #[case::swap_in_dagger("../test_files/modifier_examples/swap_in_dagger.hugr")]
-    #[case::index_in_dagger_ctrl("../test_files/modifier_examples/index_in_dagger_ctrl.hugr")]
+    #[case::subscript_in_dagger_ctrl(
+        "../test_files/modifier_examples/subscript_in_dagger_ctrl.hugr"
+    )]
     #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     fn test_examples(#[case] example: &str) {
         let mut h = load_guppy_example(example).unwrap();
