@@ -5,8 +5,8 @@ mod unsupported_tracker;
 mod value_tracker;
 
 use hugr::core::HugrNode;
-use hugr_core::hugr::internal::PortgraphNodeMap;
 use tket_json_rs::clexpr::InputClRegister;
+use tket_json_rs::clexpr::operator::{ClArgument, ClOperator, ClTerminal, ClVariable};
 use tket_json_rs::opbox::BoxID;
 pub use value_tracker::{
     TrackedBit, TrackedParam, TrackedQubit, TrackedValue, TrackedValues, ValueTracker,
@@ -171,7 +171,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
         .cloned();
 
         // Recover other parameters stored in the metadata
-        let phase = match hugr.get_metadata::<metadata::Phase>(region) {
+        let phase = match hugr.get_metadata::<metadata::PytketPhaseExpr>(region) {
             Some(p) => p.to_string(),
             None => "0".to_string(),
         };
@@ -207,13 +207,13 @@ impl<H: HugrView> PytketEncoderContext<H> {
             cache.insert(region, CachedEncodedFunction::InEncodingStack);
         }
 
-        let (region, node_map) = hugr.region_portgraph(region);
+        let sg = hugr.scheduling_graph(region);
         // TODO: Use weighted topological sort to try and explore unsupported
         // ops first (that is, ops with no available emitter in `self.config`),
         // to ensure we group them as much as possible.
-        let mut topo = petgraph::visit::Topo::new(&region);
-        while let Some(pg_node) = topo.next(&region) {
-            let node = node_map.from_portgraph(pg_node);
+        let mut topo = petgraph::visit::Topo::new(sg.petgraph());
+        while let Some(pg_node) = topo.next(sg.petgraph()) {
+            let node = sg.pg_to_node(pg_node);
             self.try_encode_node(node, hugr)?;
         }
         Ok(())
@@ -459,7 +459,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
 
         // Preserve the pytket opgroup, if it got stored in the metadata.
         let opgroup: Option<String> = hugr
-            .get_metadata::<metadata::OpGroup>(node)
+            .get_metadata::<metadata::PytketOpGroup>(node)
             .map(ToString::to_string);
 
         let args = MakeOperationArgs {
@@ -887,8 +887,18 @@ impl<H: HugrView> PytketEncoderContext<H> {
                     .type_to_pytket(constant.constant_type())
                     .is_some()
                 => {
-                    self.emit_transparent_node(node, hugr, |ps| ps.input_params.to_owned())?;
-                    return Ok(EncodeStatus::Success);
+                    let (const_node, const_port) = hugr
+                        .single_linked_output(node, constant.constant_port())
+                        .expect("LoadConstant node must have a constant input");
+                    let const_wire = Wire::new(const_node, const_port);
+                    // Loading a constant is transparent only when the constant
+                    // value is supported an has already been registered.
+                    // Otherwise the load belongs to the same opaque subgraph as
+                    // its unsupported constant.
+                    if self.values.peek_wire_values(const_wire).is_some() {
+                        self.emit_transparent_node(node, hugr, |ps| ps.input_params.to_owned())?;
+                        return Ok(EncodeStatus::Success);
+                    }
                 }
             OpType::Const(op) => {
                 let config = Arc::clone(&self.config);
@@ -1465,10 +1475,15 @@ pub fn make_tk1_classical_expression(
     bit_count: usize,
     output_bits: &[u32],
     registers: &[InputClRegister],
-    expression: tket_json_rs::clexpr::operator::ClOperator,
+    expression: ClOperator,
 ) -> tket_json_rs::circuit_json::Operation {
+    let mut bit_vars = Vec::new();
+    collect_clexpr_bit_vars(&expression, &mut bit_vars);
+    bit_vars.sort_unstable();
+    bit_vars.dedup();
+
     let mut clexpr = tket_json_rs::clexpr::ClExpr::default();
-    clexpr.bit_posn = (0..bit_count as u32).map(|i| (i, i)).collect();
+    clexpr.bit_posn = bit_vars.into_iter().map(|i| (i, i)).collect();
     clexpr.reg_posn = registers.to_vec();
     clexpr.output_posn = tket_json_rs::clexpr::ClRegisterBits(output_bits.to_vec());
     clexpr.expr = expression;
@@ -1481,4 +1496,23 @@ pub fn make_tk1_classical_expression(
     let mut op = make_tk1_operation(tket_json_rs::OpType::ClExpr, args);
     op.classical_expr = Some(clexpr);
     op
+}
+
+/// Collect the local bit variables referenced by a classical expression.
+///
+/// `ClExpr::bit_posn` describes variables used by the expression tree. Fresh
+/// output-only bits are listed in `output_posn`, but must not be declared as
+/// expression variables.
+fn collect_clexpr_bit_vars(expression: &ClOperator, bit_vars: &mut Vec<u32>) {
+    for arg in &expression.args {
+        match arg {
+            ClArgument::Terminal(ClTerminal::Variable(ClVariable::Bit { index })) => {
+                bit_vars.push(*index);
+            }
+            ClArgument::Expression(expression) => {
+                collect_clexpr_bit_vars(expression, bit_vars);
+            }
+            _ => {}
+        }
+    }
 }
