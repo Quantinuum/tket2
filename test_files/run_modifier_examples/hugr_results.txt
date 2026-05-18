@@ -341,7 +341,7 @@ nested_multiple_ctrl1_solved:
 	1110 -> 0.1768+0.1768j
 	1111 -> 0.1768-0.1768j
 -----
-subscript_as_controler_solved:
+subscript_as_controller_solved:
 	0100 -> 0.7071+0j
 	1100 -> 0.5+0j
 	1110 -> 0.433+0j
