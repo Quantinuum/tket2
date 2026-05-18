@@ -319,8 +319,10 @@ pub struct ModifierResolver<N = Node> {
     /// The worklist of nodes to be processed.
     /// This is needed to avoid modifying a node that is generated during the process.
     worklist: VecDeque<N>,
-    /// A map of static edges to be added after insertion of subgraph.
-    call_map: HashMap<N, (Node, IncomingPort)>,
+    /// Static edges to be added after insertion of a subgraph.
+    /// Multiple calls can reference the same function node, so each source
+    /// maps to every copied static input that must be reconnected.
+    call_map: HashMap<N, Vec<(Node, IncomingPort)>>,
     // TODO:
     // Should keep track of the collection of modifiers that are applied to the same function.
     // This will prevent the duplicated generation of Controlled-functions.
@@ -459,8 +461,12 @@ impl<N: HugrNode> ModifierResolver<N> {
     fn corresp_map(&mut self) -> &mut HashMap<DirWire<N>, Vec<DirWire>> {
         &mut self.corresp_map
     }
-    fn call_map(&mut self) -> &mut HashMap<N, (Node, IncomingPort)> {
+    fn call_map(&mut self) -> &mut HashMap<N, Vec<(Node, IncomingPort)>> {
         &mut self.call_map
+    }
+
+    fn call_map_insert(&mut self, source: N, target: (Node, IncomingPort)) {
+        self.call_map().entry(source).or_default().push(target);
     }
 
     fn with_worklist<T>(&mut self, worklist: VecDeque<N>, f: impl FnOnce(&mut Self) -> T) -> T {
@@ -513,15 +519,23 @@ impl<N: HugrNode> ModifierResolver<N> {
         old: DirWire<N>,
         new: DirWire,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        self.corresp_map()
-            .insert(old, vec![new])
-            .map_or(Ok(()), |former| {
-                // If the old wire is already registered, raise an error.
+        match self.corresp_map().entry(old) {
+            std::collections::hash_map::Entry::Vacant(entry) => {
+                entry.insert(vec![new]);
+                Ok(())
+            }
+            std::collections::hash_map::Entry::Occupied(mut entry) if entry.get().is_empty() => {
+                entry.insert(vec![new]);
+                Ok(())
+            }
+            std::collections::hash_map::Entry::Occupied(entry) => {
+                let former = entry.get();
                 Err(ModifierResolverErrors::unreachable(format!(
                     "Wire already registered for node {}. Former [{},...], Latter {}.",
                     old.0, former[0], new
                 )))
-            })
+            }
+        }
     }
 
     /// Remember that old wire has no correspondence.
@@ -1039,6 +1053,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         }
     }
 
+    /// Returns a row with modifier controls in the layout expected by a CFG edge.
     fn cfg_control_types(
         &self,
         row: &hugr::types::TypeRow,
@@ -2039,7 +2054,9 @@ mod tests {
     #[ignore = "slow regression test"]
     #[case::complex_modifier_stress("../test_files/modifier_examples/complex_modifier_stress.hugr")]
     #[case::ctrl_array_controller("../test_files/modifier_examples/ctrl_array_controller.hugr")]
-    #[case::ctrl_on_cfg("../test_files/modifier_examples/ctrl_on_cfg.hugr")]
+    #[case::ctrl_on_cfg2("../test_files/modifier_examples/ctrl_on_cfg2.hugr")]
+    #[case::ctrl_on_cfg3("../test_files/modifier_examples/ctrl_on_cfg3.hugr")]
+    #[case::ctrl_on_cfg4("../test_files/modifier_examples/ctrl_on_cfg4.hugr")]
     #[case::ctrl_on_call1("../test_files/modifier_examples/ctrl_on_call1.hugr")]
     #[case::ctrl_on_call2("../test_files/modifier_examples/ctrl_on_call2.hugr")]
     #[case::ctrl_on_x("../test_files/modifier_examples/ctrl_on_x.hugr")]

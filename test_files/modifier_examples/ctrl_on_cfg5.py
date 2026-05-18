@@ -4,16 +4,17 @@
 #     "guppylang ==0.21.14",
 # ]
 # ///
-"""Controlling a function with internal control flow"""
+"""Controlling a function with internal while-loop control flow"""
 
 from pathlib import Path
 from sys import argv
 import sys
 
 from guppylang import guppy
+from guppylang.std.angles import angle
 from guppylang.std.builtins import control
 from guppylang.std.debug import state_result
-from guppylang.std.quantum import discard, h, qubit, x
+from guppylang.std.quantum import discard, h, qubit, rx
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
@@ -22,22 +23,16 @@ from guppylang.experimental import enable_experimental_features
 enable_experimental_features()
 
 
-@guppy(unitary=True)
-def branchy(q: qubit, flag: bool) -> None:
-    if flag:
-        x(q)
-    else:
-        h(q)
-
-
 @guppy
 def main() -> None:
     c = qubit()
     t = qubit()
-    flag = False
+    count = 3
     h(c)
     with control(c):
-        branchy(t, flag)
+        while count > 0:
+            rx(t, angle(1 / 4))
+            count = count - 1
 
     state_result("r", c, t)
     discard(c)

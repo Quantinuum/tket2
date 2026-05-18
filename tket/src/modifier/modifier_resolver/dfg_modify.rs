@@ -1,6 +1,6 @@
 //! Modifier for dataflow blocks.
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     iter, mem,
 };
 
@@ -15,7 +15,7 @@ use hugr::{
     hugr::hugrmut::HugrMut,
     ops::{Call, Conditional, DFG, DataflowBlock, DataflowOpTrait, OpType, TailLoop},
     std_extensions::collections::array::ArrayOpBuilder,
-    types::{FuncTypeBase, TypeArg, TypeRow},
+    types::{EdgeKind, FuncTypeBase, TypeArg, TypeRow},
 };
 use petgraph::visit::{Topo, Walker};
 
@@ -387,8 +387,10 @@ impl<N: HugrNode> ModifierResolver<N> {
         let call_map = mem::replace(self.call_map(), old_call_map);
         let insertion_result = h.insert_from_view(h.module_root(), new_fn.hugr());
         let new_call_map = update_call_map(&call_map, &insertion_result.node_map);
-        for (old_in, (new_n, new_port)) in new_call_map.into_iter() {
-            h.connect(old_in, 0, new_n, new_port);
+        for (old_in, targets) in new_call_map.into_iter() {
+            for (new_n, new_port) in targets {
+                h.connect(old_in, 0, new_n, new_port);
+            }
         }
 
         // set unitarity metadata
@@ -470,10 +472,26 @@ impl<N: HugrNode> ModifierResolver<N> {
         parent_dfg: &mut impl Container,
         builder: impl Container,
     ) -> Result<Node, ModifierResolverErrors<N>> {
+        // Only local function-port targets should be remapped into the parent.
+        let remap_targets = self
+            .call_map()
+            .values()
+            .flatten()
+            .filter(|(node, port)| {
+                builder.hugr().contains_node(*node)
+                    && builder.hugr().num_inputs(*node) > port.index()
+                    && matches!(
+                        builder.hugr().get_optype(*node).port_kind(*port),
+                        Some(EdgeKind::Function(_))
+                    )
+            })
+            .copied()
+            .collect::<HashSet<_>>();
         let insertion_result = parent_dfg.add_hugr_view(builder.hugr());
 
         let insertion_correspondence = insertion_result.node_map;
-        let new_call_map = update_call_map(self.call_map(), &insertion_correspondence);
+        let new_call_map =
+            update_call_map_preserve(self.call_map(), &insertion_correspondence, &remap_targets);
         *self.call_map() = new_call_map;
 
         Ok(insertion_result.inserted_entrypoint)
@@ -538,11 +556,12 @@ impl<N: HugrNode> ModifierResolver<N> {
         }
 
         // Build a new TailLoop with modified body.
+        let control_types: TypeRow = iter::repeat_n(qb_t(), self.control_num())
+            .collect::<Vec<_>>()
+            .into();
         let mut builder = TailLoopBuilder::new(
             tail_loop.just_inputs.clone(),
-            tail_loop
-                .rest
-                .extend(iter::repeat_n(&qb_t(), self.control_num())),
+            control_types.extend(tail_loop.rest.iter()),
             tail_loop.just_outputs.clone(),
         )?;
         self.modify_dfg_body(h, n, &mut builder)?;
@@ -672,7 +691,10 @@ impl<N: HugrNode> ModifierResolver<N> {
 }
 
 /// composition of two call maps
-fn update_call_map<A, B, C, D>(f: &HashMap<A, (B, C)>, g: &HashMap<B, D>) -> HashMap<A, (D, C)>
+fn update_call_map<A, B, C, D>(
+    f: &HashMap<A, Vec<(B, C)>>,
+    g: &HashMap<B, D>,
+) -> HashMap<A, Vec<(D, C)>>
 where
     A: Clone + Eq + std::hash::Hash,
     B: Clone + Eq + std::hash::Hash,
@@ -680,7 +702,40 @@ where
     D: Clone,
 {
     f.iter()
-        .filter_map(|(a, (b, c))| g.get(b).map(|d| (a.clone(), (d.clone(), c.clone()))))
+        .filter_map(|(a, targets)| {
+            let targets = targets
+                .iter()
+                .filter_map(|(b, c)| g.get(b).map(|d| (d.clone(), c.clone())))
+                .collect::<Vec<_>>();
+            (!targets.is_empty()).then(|| (a.clone(), targets))
+        })
+        .collect()
+}
+
+/// Remaps call-map targets that were inserted from `g`, preserving existing parent targets.
+fn update_call_map_preserve<A, C>(
+    f: &HashMap<A, Vec<(Node, C)>>,
+    g: &HashMap<Node, Node>,
+    remap_targets: &HashSet<(Node, C)>,
+) -> HashMap<A, Vec<(Node, C)>>
+where
+    A: Clone + Eq + std::hash::Hash,
+    C: Clone + Eq + std::hash::Hash,
+{
+    f.iter()
+        .map(|(a, targets)| {
+            let targets = targets
+                .iter()
+                .filter_map(|(b, c)| {
+                    if remap_targets.contains(&(*b, c.clone())) {
+                        g.get(b).copied().map(|d| (d, c.clone()))
+                    } else {
+                        Some((*b, c.clone()))
+                    }
+                })
+                .collect::<Vec<_>>();
+            (a.clone(), targets)
+        })
         .collect()
 }
 

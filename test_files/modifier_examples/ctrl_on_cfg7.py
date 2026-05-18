@@ -4,7 +4,7 @@
 #     "guppylang ==0.21.14",
 # ]
 # ///
-"""Controlling a function with internal control flow"""
+"""Controlling a function with internal while-loop control flow"""
 
 from pathlib import Path
 from sys import argv
@@ -22,14 +22,6 @@ from guppylang.experimental import enable_experimental_features
 enable_experimental_features()
 
 
-@guppy(unitary=True)
-def branchy(q: qubit, flag: bool) -> None:
-    if flag:
-        x(q)
-    else:
-        h(q)
-
-
 @guppy
 def main() -> None:
     c = qubit()
@@ -37,7 +29,10 @@ def main() -> None:
     flag = False
     h(c)
     with control(c):
-        branchy(t, flag)
+        if flag:
+            x(t)
+        else:
+            h(t)
 
     state_result("r", c, t)
     discard(c)
