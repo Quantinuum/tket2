@@ -261,7 +261,12 @@ def _badger_optimise(
 
 @dataclass
 class ModifierResolverPass(ComposablePass):
-    """A pass to resolve Guppy modifiers (control, dagger, power)."""
+    """A pass to resolve Guppy modifiers (control, dagger, power).
+
+    Original function nodes replaced by solved modified versions may be removed
+    when no longer needed and allowed by the pass scope. Nodes whose interface
+    is preserved by the scope are kept.
+    """
 
     _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
 
