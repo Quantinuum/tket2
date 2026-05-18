@@ -25,15 +25,11 @@ maintainers = [
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
-
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
-
     "Topic :: Scientific/Engineering :: Quantum Computing",
     "Topic :: Software Development :: Compilers",
-
     "License :: OSI Approved :: Apache Software License",
-
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
@@ -44,7 +40,7 @@ version = "0.2.10" # updated by release-please
 repository = "https://github.com/quantinuum/tket2/tree/main/qis-compiler"
 
 [tool.maturin]
-profile = "release"
+profile = "dev"
 features = ["pyo3/extension-module"]
 python-source = "python"
 manifest-path = "Cargo.toml"

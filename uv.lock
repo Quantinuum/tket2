@@ -3125,7 +3125,7 @@ docs = [
 [package.metadata]
 requires-dist = [
     { name = "hugr", specifier = "~=0.16.0" },
-    { name = "pytket", specifier = ">=2.17.0,<3" },
+    { name = "pytket", specifier = ">=2.1.0,<3" },
     { name = "tket-eccs", editable = "tket-eccs" },
     { name = "tket-exts", editable = "tket-exts" },
 ]
