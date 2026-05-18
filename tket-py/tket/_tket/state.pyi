@@ -1,8 +1,16 @@
 from typing import Any, Callable
-from pytket._tket.circuit import Circuit as Tk1Circuit
 
 from tket._tket.ops import TketOp
+from tket.util import PytketCircuitProto as Tk1Circuit
 from hugr.envelope import EnvelopeConfig
+
+try:
+    from pytket.circuit import Circuit as Tk1Circuit
+except ImportError:
+    # Pytket is installed as an optional dependency under the `pytket` extra.
+    #
+    # If it's not available, we use a duck-typed protocol for type hints instead.
+    pass
 
 class CompilationState:
     """Program state definition.
