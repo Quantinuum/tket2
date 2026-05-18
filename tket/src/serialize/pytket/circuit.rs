@@ -372,6 +372,20 @@ impl<Node: HugrNode> EncodedCircuit<Node> {
                 }
             }
 
+            // Ignore empty circuits, for regions with no supported operation.
+            //
+            // A circuit is empty if it only contains barriers representing unsupported HUGR subgraphs, or plain
+            // pytket barriers (as they are effectively no-ops).
+            let is_empty_circuit = |encoded: &SerialCircuit| {
+                encoded
+                    .commands
+                    .iter()
+                    .all(|cmd| cmd.op.op_type == tket_json_rs::OpType::Barrier)
+            };
+            if !options.keep_empty_circuits && is_empty_circuit(&encoded.serial_circuit) {
+                continue;
+            }
+
             self.circuits.insert(node, encoded);
             self.opaque_subgraphs.merge(opaque_subgraphs);
         }

@@ -215,15 +215,22 @@ fn circ_unsupported_future_payload() -> Hugr {
     let future_int_t = future_type(int_t.clone());
     let mut h = FunctionBuilder::new(
         "unsupported_future_payload",
-        Signature::new(vec![future_int_t.clone()], vec![future_int_t]),
+        Signature::new(
+            vec![qb_t(), future_int_t.clone()],
+            vec![qb_t(), future_int_t],
+        ),
     )
     .unwrap();
 
-    let [future] = h.input_wires_arr();
+    let [q, future] = h.input_wires_arr();
+
+    // Extra quantum op to ensure this circuit gets encoded.
+    let [q] = h.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
+
     let [future, duplicate] = h.add_dup(future, int_t.clone()).unwrap();
     h.add_free(duplicate, int_t).unwrap();
 
-    h.finish_hugr_with_outputs([future]).unwrap()
+    h.finish_hugr_with_outputs([q, future]).unwrap()
 }
 
 /// Check that all circuit ops have been translated to a native gate.
@@ -292,7 +299,8 @@ fn circuit_standalone_roundtrip(#[case] hugr: Hugr) {
         .with_config(qsystem_decoder_config());
     let encode_options = EncodeOptions::new()
         .with_subcircuits(true)
-        .with_config(qsystem_encoder_config());
+        .with_config(qsystem_encoder_config())
+        .keep_empty_circuits(true);
 
     let encoded = EncodedCircuit::new_standalone(&hugr, encode_options.clone())
         .unwrap_or_else(|e| panic!("{e}"));

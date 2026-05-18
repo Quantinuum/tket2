@@ -62,7 +62,7 @@ struct ModifierFlags {
 
 impl ModifierFlags {
     fn from_metadata<N: HugrNode>(h: &impl HugrView<Node = N>, n: N) -> Option<Self> {
-        h.get_metadata::<metadata::Unitary>(n)
+        h.get_metadata::<metadata::UnitaryFlags>(n)
             .map(|num| ModifierFlags {
                 control: (num & 1) != 0,
                 dagger: (num & 2) != 0,
@@ -81,7 +81,7 @@ impl ModifierFlags {
         if self.power {
             num |= 4;
         }
-        h.set_metadata::<metadata::Unitary>(n, num);
+        h.set_metadata::<metadata::UnitaryFlags>(n, num);
     }
 
     fn satisfies(&self, combined: &CombinedModifier) -> bool {
