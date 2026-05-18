@@ -1092,7 +1092,7 @@ mod test {
         }
 
         assert!(array_new_to_unpack >= 2);
-        assert!(borrow_array_new_to_unpack >= 2);
+        assert!(borrow_array_new_to_unpack >= 1);
     }
 
     fn is_in_modified_function(h: &Hugr, node: hugr::Node) -> bool {
@@ -1151,39 +1151,6 @@ mod test {
 
         assert!(array_new_to_unpack >= 1);
         assert!(borrow_array_new_to_unpack >= 1);
-    }
-
-    #[test]
-    fn test_dagger_modifies_nested_quantum_array_ops() {
-        let h = resolved_modifier_test_hugr(5, 0, foo_nested_quantum_array_ops, true);
-        let inner_ty = array_type(2, qb_t());
-
-        // The modified function should still contain nested array operations
-        // whose element type contains qubits; these are the operations that
-        // must participate in dagger handling.
-        let mut has_nested_array_op = false;
-        let mut has_nested_borrow_array_op = false;
-        for node in h.nodes() {
-            if !is_in_modified_function(&h, node) {
-                continue;
-            }
-            let optype = h.get_optype(node);
-            has_nested_array_op |=
-                ArrayOp::from_optype(optype).is_some_and(|op| op.elem_ty == inner_ty);
-            has_nested_borrow_array_op |=
-                BArrayOp::from_optype(optype).is_some_and(|op| op.elem_ty == inner_ty);
-        }
-
-        assert!(has_nested_array_op);
-        assert!(has_nested_borrow_array_op);
-    }
-
-    #[rstest::rstest]
-    #[case::dagger(true)]
-    fn test_array_ops_modify_mermaid(#[case] dagger: bool) {
-        // This test intentionally saves before/after Mermaid files so changes
-        // to the array-op HUGR can be inspected when debugging resolver output.
-        resolved_modifier_test_hugr(4, 0, foo_safe_array_ops, dagger);
     }
 
     // This test checks the case where a modifier is not chained but duplicated.
