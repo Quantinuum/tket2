@@ -74,10 +74,10 @@ class QSystemExtension(TketExtension):
     def reset(self) -> ExtOp:
         """Reset a qubit to the Z |0> eigenstate."""
         return self().get_op("Reset").instantiate()
-    
+
     @functools.cached_property
     def future_to_measure(self) -> ExtOp:
-        """Convert a future(bool) to a measurement (for compatibility with the 
+        """Convert a future(bool) to a measurement (for compatibility with the
         quantum extension).
         """
         return self().get_op("FutureToMeasure").instantiate()
