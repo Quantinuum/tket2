@@ -229,7 +229,7 @@ jobs:
           cargo llvm-cov --no-report --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --no-default-features --doctests
           cargo llvm-cov --no-report --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --all-features --doctests
       - name: Generate coverage report
-        run: cargo llvm-cov --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --all-features report --codecov --output-path coverage.json
+        run: cargo llvm-cov report --codecov --output-path coverage.json
       - name: Upload coverage to codecov.io
         uses: codecov/codecov-action@v6
         with:
