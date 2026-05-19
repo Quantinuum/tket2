@@ -162,6 +162,14 @@ jobs:
         run: rustup override set ${{steps.toolchain.outputs.name}}
       - uses: quantinuum/hugrverse-env/install-hugrenv-action@main
       - uses: taiki-e/install-action@nextest
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - name: Install Python ${{ env.PYTHON_HIGHEST }}
+        # Required to compile tests in crates that use pyo3.
+        run: uv python install ${{ env.PYTHON_HIGHEST }}
       - name: Build with all features
         run: cargo nextest r --verbose --workspace --all-features --no-run
       - name: Tests with all features
@@ -191,6 +199,14 @@ jobs:
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
       - uses: taiki-e/install-action@nextest
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - name: Install Python ${{ env.PYTHON_HIGHEST }}
+        # Required to compile tests in crates that use pyo3.
+        run: uv python install ${{ env.PYTHON_HIGHEST }}
       - name: Build with no features
         run: cargo nextest r --verbose --workspace --no-default-features --no-run
       - name: Tests with no features
@@ -217,6 +233,14 @@ jobs:
       - uses: quantinuum/hugrverse-env/install-hugrenv-action@main
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - name: Install Python ${{ env.PYTHON_HIGHEST }}
+        # Required to compile tests in crates that use pyo3.
+        run: uv python install ${{ env.PYTHON_HIGHEST }}
       - name: Run tests with coverage instrumentation
         run: |
           cargo llvm-cov clean --workspace
@@ -260,6 +284,14 @@ jobs:
         run: |
           cargo binstall cargo-hack --force
           cargo binstall cargo-minimal-versions --force
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - name: Install Python ${{ env.PYTHON_LOWEST }}
+        # Required to compile tests in crates that use pyo3.
+        run: uv python install ${{ env.PYTHON_LOWEST }}
       - name: Pin transitive dependencies not compatible with our MSRV
         # Add new dependencies as needed if the check fails due to
         # "package `XXX` cannot be built because it requires rustc YYY or newer, while the currently active rustc version is 1.91.0"
