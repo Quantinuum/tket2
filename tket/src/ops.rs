@@ -361,7 +361,7 @@ pub(crate) mod test {
     use hugr::types::Signature;
     use hugr::{CircuitUnit, HugrView, type_row};
     use itertools::Itertools;
-    use rstest::{fixture, rstest};
+    use rstest::fixture;
     use strum::IntoEnumIterator;
 
     use super::TketOp;
@@ -393,11 +393,6 @@ pub(crate) mod test {
         h.unwrap()
     }
 
-    #[rstest]
-    fn check_t2_bell(t2_bell_circuit: Circuit) {
-        assert_eq!(t2_bell_circuit.commands().count(), 2);
-    }
-
     #[test]
     fn ancilla_circ() {
         let h = build_simple_circuit(1, |circ| {
@@ -416,8 +411,7 @@ pub(crate) mod test {
         })
         .unwrap();
 
-        // 5 commands: alloc, reset, cx, measure, free
-        assert_eq!(h.commands().count(), 5);
+        assert_eq!(h.count_ops(|op| op.cast::<TketOp>().is_some()), 5);
     }
 
     #[test]

@@ -30,9 +30,9 @@
 //! assert_eq!(circ.qubit_count(), 9);
 //! assert_eq!(circ.num_operations(), 170);
 //!
-//! // Traverse the circuit and print the gates.
-//! for command in circ.commands() {
-//!     println!("{:?}", command.optype());
+//! // Traverse the circuit nodes and print the gates.
+//! for node in circ.toposorted_children(circ.parent()).unwrap() {
+//!     println!("{}", circ.hugr().get_optype(node));
 //! }
 //!
 //! // Render the circuit as a mermaid diagram.
