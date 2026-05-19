@@ -23,7 +23,7 @@ permissions:
 env:
   MODULE_DIR: tket-py
   # Pinned version for the uv package manager
-  UV_VERSION: "0.9.7"
+  UV_VERSION: "0.11.15"
   UV_FROZEN: 1
   # Python version used to build the wheels
   # We use abi3-compatible building, so this still supports newer Python versions
@@ -157,7 +157,8 @@ jobs:
             --strip
 
       - name: Build free-threaded wheels
-        # TODO: pytket is a required dependency of tket-py, but it doesn't build free-threaded wheels yet
+        # TODO: Waiting for hugr 0.16.1 / 0.17.0 to release python 3.14 free-threaded wheels.
+        # <https://github.com/Quantinuum/hugr/pull/3021>
         if: false
         shell: bash
         run: |

@@ -47,7 +47,6 @@ def inline_functions(
     circ: CompilationState,
     *,
     heuristic: inline_funcs.InlineFuncsHeuristic = inline_funcs.MaxSize(64),
-    follow_inline_hints: bool = True,
     scope: PassScope = GlobalScope.PRESERVE_PUBLIC,
 ) -> None:
     """Inline acyclic function calls below the selected scope."""

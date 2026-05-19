@@ -33,9 +33,7 @@ missing_docs = "warn"
 
 [workspace.lints.clippy]
 allow_attributes = "warn"
-
-# TODO: Fix warnings of this lint and set to "warn"
-iter_over_hash_type = "allow"
+iter_over_hash_type = "warn"
 
 # TODO: Reduce the size of error types.
 result_large_err = "allow"

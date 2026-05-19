@@ -153,6 +153,10 @@ const IMPLICIT_PERMUTATION: &str = r#"{
     }"#;
 
 /// Check some properties of the serial circuit.
+#[expect(
+    clippy::iter_over_hash_type,
+    reason = "test validation checks every permutation entry independently, so iteration order cannot affect the result"
+)]
 fn validate_serial_circ(circ: &SerialCircuit) {
     // Check that all commands have valid arguments.
     for command in &circ.commands {
@@ -193,6 +197,10 @@ fn validate_serial_circ(circ: &SerialCircuit) {
     );
 }
 
+#[expect(
+    clippy::iter_over_hash_type,
+    reason = "test comparison checks command multiplicities; iteration order only affects which mismatch is reported first"
+)]
 fn compare_serial_circs(a: &SerialCircuit, b: &SerialCircuit) {
     assert_eq!(a.name, b.name);
     assert_eq!(a.phase, b.phase);

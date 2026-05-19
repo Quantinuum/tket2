@@ -2,7 +2,7 @@
 //! An (example) use of the [dataflow analysis framework](crate::passes::dataflow).
 
 pub mod value_handle;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::BTreeMap, sync::Arc};
 use thiserror::Error;
 
 use hugr_core::{
@@ -28,7 +28,7 @@ pub struct ConstantFoldPass {
     /// Each outer key Node must be either:
     ///   - a `FuncDefn` child of the root, if the root is a module; or
     ///   - the entrypoint, if the entrypoint is not a Module
-    inputs: HashMap<Node, HashMap<IncomingPort, Value>>,
+    inputs: BTreeMap<Node, BTreeMap<IncomingPort, Value>>,
 }
 
 #[derive(Clone, Debug, Error, PartialEq)]

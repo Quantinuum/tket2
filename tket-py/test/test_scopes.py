@@ -1,7 +1,7 @@
+import pytest
+
 from .test_pass import _hugr_from_path, _count_ops
 
-
-from pytket.passes import FullPeepholeOptimise
 from tket.passes import NormalizeGuppy, PytketHugrPass
 from hugr.passes.scope import GlobalScope, LocalScope
 
@@ -9,10 +9,12 @@ normalize = NormalizeGuppy()
 
 
 def test_nested_function_opt_global() -> None:
+    pytket = pytest.importorskip("pytket")
+
     h = _hugr_from_path("test_files/guppy_optimization/nested/nested.flat.hugr")
     h_normalized = normalize(h)
 
-    fpo = PytketHugrPass(FullPeepholeOptimise())
+    fpo = PytketHugrPass(pytket.passes.FullPeepholeOptimise())
     fpo_preserve_entrypoint = fpo.with_scope(GlobalScope.PRESERVE_ENTRYPOINT)
 
     opt_hugr = fpo_preserve_entrypoint(h_normalized)
@@ -22,10 +24,12 @@ def test_nested_function_opt_global() -> None:
 
 
 def test_nested_function_opt_local() -> None:
+    pytket = pytest.importorskip("pytket")
+
     h = _hugr_from_path("test_files/guppy_optimization/nested/nested.flat.hugr")
     h_normalized = normalize(h)
 
-    fpo = PytketHugrPass(FullPeepholeOptimise())
+    fpo = PytketHugrPass(pytket.passes.FullPeepholeOptimise())
     fpo_local_flat = fpo.with_scope(LocalScope.FLAT)
 
     flat_opt_hugr = fpo_local_flat(h_normalized)
