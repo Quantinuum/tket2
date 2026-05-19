@@ -14,7 +14,6 @@ rust:
   - "compile-rewriter/**"
   - "tket1-passes/**"
   - "tket-qec/**"
-  - "qis-compiler/**"
 
 python:
   - *rust-core
