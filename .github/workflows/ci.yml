@@ -18,7 +18,7 @@ env:
   SCCACHE_GHA_ENABLED: "true"
   RUSTC_WRAPPER: "sccache"
   # Pinned version for the uv package manager
-  UV_VERSION: "0.9.7"
+  UV_VERSION: "0.11.15"
   UV_FROZEN: 1
   # The highest and lowest supported Python versions, used for testing
   PYTHON_HIGHEST: "3.14"
@@ -162,10 +162,12 @@ jobs:
         run: rustup override set ${{steps.toolchain.outputs.name}}
       - uses: quantinuum/hugrverse-env/install-hugrenv-action@main
       - uses: taiki-e/install-action@nextest
+      # Crates using pyo3 cdylib require libpython to link test binaries;
+      # they are tested separately in their own jobs.
       - name: Build with all features
-        run: cargo nextest r --verbose --workspace --all-features --no-run
+        run: cargo nextest r --verbose --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --all-features --no-run
       - name: Tests with all features
-        run: cargo nextest r --verbose --workspace --all-features
+        run: cargo nextest r --verbose --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --all-features
 
   # Run tests on other toolchains
   tests-rs-other:
@@ -191,14 +193,16 @@ jobs:
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
       - uses: taiki-e/install-action@nextest
+      # Crates using pyo3 cdylib require libpython to link test binaries;
+      # they are tested separately in their own jobs.
       - name: Build with no features
-        run: cargo nextest r --verbose --workspace --no-default-features --no-run
+        run: cargo nextest r --verbose --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --no-default-features --no-run
       - name: Tests with no features
-        run: cargo nextest r --verbose --workspace --no-default-features
+        run: cargo nextest r --verbose --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --no-default-features
       - name: Build with all features
-        run: cargo nextest r --verbose --workspace --all-features --no-run
+        run: cargo nextest r --verbose --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --all-features --no-run
       - name: Tests with all features
-        run: cargo nextest r --verbose --workspace --all-features
+        run: cargo nextest r --verbose --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --all-features
 
   tests-nightly-coverage:
     needs: [changes]
@@ -217,13 +221,15 @@ jobs:
       - uses: quantinuum/hugrverse-env/install-hugrenv-action@main
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
+      # Crates using pyo3 cdylib require libpython to link test binaries;
+      # they are tested separately in their own jobs.
       - name: Run tests with coverage instrumentation
         run: |
           cargo llvm-cov clean --workspace
-          cargo llvm-cov --no-report --workspace --no-default-features --doctests
-          cargo llvm-cov --no-report --workspace --all-features --doctests
+          cargo llvm-cov --no-report --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --no-default-features --doctests
+          cargo llvm-cov --no-report --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --all-features --doctests
       - name: Generate coverage report
-        run: cargo llvm-cov --all-features report --codecov --output-path coverage.json
+        run: cargo llvm-cov --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --all-features report --codecov --output-path coverage.json
       - name: Upload coverage to codecov.io
         uses: codecov/codecov-action@v6
         with:
@@ -266,14 +272,16 @@ jobs:
         run: |
           rm Cargo.lock
           # cargo add -p tket insta@2.4.1
+      # Crates using pyo3 cdylib require libpython to link test binaries;
+      # they are tested separately in their own jobs.
       - name: Build with no features
-        run: cargo minimal-versions --direct test --verbose  --no-default-features --no-run
+        run: cargo minimal-versions --direct test --verbose --exclude tket-py --exclude selene-hugr-qis-compiler --no-default-features --no-run
       - name: Tests with no features
-        run: cargo minimal-versions --direct test --verbose  --no-default-features
+        run: cargo minimal-versions --direct test --verbose --exclude tket-py --exclude selene-hugr-qis-compiler --no-default-features
       - name: Build with all features
-        run: cargo minimal-versions --direct test --verbose  --all-features --no-run
+        run: cargo minimal-versions --direct test --verbose --exclude tket-py --exclude selene-hugr-qis-compiler --all-features --no-run
       - name: Tests with all features
-        run: cargo minimal-versions --direct test --verbose  --all-features
+        run: cargo minimal-versions --direct test --verbose --exclude tket-py --exclude selene-hugr-qis-compiler --all-features
 
   tests-py:
     needs: changes
@@ -329,7 +337,13 @@ jobs:
           enable-cache: true
       - uses: quantinuum/hugrverse-env/install-hugrenv-action@main
       - name: Install Python ${{ env.PYTHON_LOWEST }}
-        run: uv python install ${{ env.PYTHON_LOWEST }}
+        run: |
+          uv python install ${{ env.PYTHON_LOWEST }}
+          PYTHON=$(uv python find ${{ env.PYTHON_LOWEST }})
+          echo "PYO3_PYTHON=$PYTHON" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$($PYTHON -c 'import sysconfig; print(sysconfig.get_config_var("LIBDIR"))')" >> "$GITHUB_ENV"
+      - name: Run Rust unit tests
+        run: cargo test -p selene-hugr-qis-compiler
       - name: Run qis-compiler tests
         run: uv run --python ${{ env.PYTHON_LOWEST }} --exact --package selene_hugr_qis_compiler pytest --cov=./ --cov-report=xml qis-compiler
       - name: Upload python coverage to codecov.io
