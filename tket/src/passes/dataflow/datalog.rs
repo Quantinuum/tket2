@@ -365,12 +365,20 @@ fn run_datalog<V: AbstractValue, H: HugrView>(
             for (out_p, v) in fields.enumerate();
 
         // Functions ---------------
-        // Any function that is loaded as a value is overapproximated to have possibly arbitrary
-        // inputs.
+        // Any function that is loaded as a value is intentionally overapproximated as being
+        // callable with arbitrary inputs.
+        //
+        // This is to prevent becoming unsound when running on programs that use unknown calling
+        // mechanisms or pass the function to the open world (e.g. by returning it). See
+        // https://github.com/Quantinuum/hugr/issues/3065 for possible precision increases.
         out_wire_value(inp, p, PV::top()) <--
             node(n),
             if hugr.get_optype(*n).is_load_function(),
             out_wire_value(n, OutgoingPort::from(0), v),
+            if {
+                assert!(matches!(v, PartialValue::LoadedFunction(_) | PartialValue::Bottom));
+                true
+            },
             if let PartialValue::LoadedFunction(LoadedFunction { func_node: func, .. }) = v,
             input_child(func, inp),
             out_wire(inp, p);
@@ -567,47 +575,41 @@ fn propagate_leaf_op<V: AbstractValue, H: HugrView>(
 
 #[cfg(test)]
 mod test {
-    use ascent::Lattice;
-
     use super::LatticeWrapper;
+    use ascent::Lattice;
+    use rstest::rstest;
 
-    #[test]
-    fn latwrap_join() {
-        for lv in [
-            LatticeWrapper::Value(3),
-            LatticeWrapper::Value(5),
-            LatticeWrapper::Top,
-        ] {
-            let mut subject = LatticeWrapper::Bottom;
-            assert!(subject.join_mut(lv.clone()));
-            assert_eq!(subject, lv);
-            assert!(!subject.join_mut(lv.clone()));
-            assert_eq!(subject, lv);
-            assert_eq!(
-                subject.join_mut(LatticeWrapper::Value(11)),
-                lv != LatticeWrapper::Top
-            );
-            assert_eq!(subject, LatticeWrapper::Top);
-        }
+    #[rstest]
+    #[case(LatticeWrapper::Value(3))]
+    #[case(LatticeWrapper::Value(5))]
+    #[case(LatticeWrapper::Top)]
+    fn wrapper_join(#[case] lv: LatticeWrapper<i32>) {
+        let mut subject = LatticeWrapper::Bottom;
+        assert!(subject.join_mut(lv.clone()));
+        assert_eq!(subject, lv);
+        assert!(!subject.join_mut(lv.clone()));
+        assert_eq!(subject, lv);
+        assert_eq!(
+            subject.join_mut(LatticeWrapper::Value(11)),
+            lv != LatticeWrapper::Top
+        );
+        assert_eq!(subject, LatticeWrapper::Top);
     }
 
-    #[test]
-    fn latwrap_meet() {
-        for lv in [
-            LatticeWrapper::Bottom,
-            LatticeWrapper::Value(3),
-            LatticeWrapper::Value(5),
-        ] {
-            let mut subject = LatticeWrapper::Top;
-            assert!(subject.meet_mut(lv.clone()));
-            assert_eq!(subject, lv);
-            assert!(!subject.meet_mut(lv.clone()));
-            assert_eq!(subject, lv);
-            assert_eq!(
-                subject.meet_mut(LatticeWrapper::Value(11)),
-                lv != LatticeWrapper::Bottom
-            );
-            assert_eq!(subject, LatticeWrapper::Bottom);
-        }
+    #[rstest]
+    #[case(LatticeWrapper::Bottom)]
+    #[case(LatticeWrapper::Value(3))]
+    #[case(LatticeWrapper::Value(5))]
+    fn wrapper_meet(#[case] lv: LatticeWrapper<i32>) {
+        let mut subject = LatticeWrapper::Top;
+        assert!(subject.meet_mut(lv.clone()));
+        assert_eq!(subject, lv);
+        assert!(!subject.meet_mut(lv.clone()));
+        assert_eq!(subject, lv);
+        assert_eq!(
+            subject.meet_mut(LatticeWrapper::Value(11)),
+            lv != LatticeWrapper::Bottom
+        );
+        assert_eq!(subject, LatticeWrapper::Bottom);
     }
 }
