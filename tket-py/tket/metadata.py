@@ -25,7 +25,7 @@ Examples:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypeAlias, TypedDict
+from typing import TYPE_CHECKING, Literal, TypeAlias, TypedDict
 
 from hugr.metadata import Metadata
 
@@ -38,6 +38,8 @@ if TYPE_CHECKING:
 __all__ = [
     "RewriteTraceValue",
     "MaxQubitsHint",
+    "InlineAnnotationValue",
+    "InlineAnnotation",
     "CircuitRewriteTraces",
     "UnitaryFlags",
     "PytketInputParameters",
@@ -70,6 +72,37 @@ class MaxQubitsHint(Metadata[int]):
     """Metadata key for the number of qubits required to execute a HUGR node."""
 
     KEY = _metadata.MAX_QUBITS_HINT
+
+
+InlineAnnotationValue: TypeAlias = Literal["never"] | Literal["best_effort"]
+
+
+class InlineAnnotation(Metadata[InlineAnnotationValue]):
+    """Metadata hinting the compiler that a function declaration should be inlined at its call sites.
+
+    When a function is not annotated, we use a heuristic to determine whether to inline.
+
+    Values:
+    - "never": Never inline this function.
+    - "best_effort":
+        Inline the function if possible.
+        This is not guaranteed, the compiler may choose not to inline functions with this annotation.
+    """
+
+    KEY = _metadata.INLINE_ANNOTATION
+
+    @classmethod
+    def to_json(cls, value: InlineAnnotationValue) -> JsonType:
+        return value
+
+    @classmethod
+    def from_json(cls, value: JsonType) -> InlineAnnotationValue:
+        match value:
+            case "never" | "best_effort":
+                return value
+            case _:
+                msg = f"Expected {cls.KEY} metadata to be 'never' or 'best_effort', but got {value!r}"
+                raise TypeError(msg)
 
 
 class CircuitRewriteTraces(Metadata[list[RewriteTraceValue]]):

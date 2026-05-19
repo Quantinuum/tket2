@@ -87,7 +87,7 @@ jobs:
         run: uv python install ${{ env.PYTHON_LOWEST }}
       - name: Setup dependencies
         # avoid building qis-compiler
-        run: uv sync --package=tket --exact --python ${{ env.PYTHON_LOWEST }}
+        run: uv sync --package=tket --exact --all-extras --python ${{ env.PYTHON_LOWEST }}
       - name: Type check with mypy
         run: uv run mypy .
       - name: Check formatting with ruff
@@ -297,7 +297,7 @@ jobs:
         run: uv python install ${{ env.PYTHON_LOWEST }}
       - name: Setup dependencies
         # avoid building qis-compiler
-        run: uv sync --package=tket --exact --python ${{ env.PYTHON_LOWEST }}
+        run: uv sync --package=tket --exact --all-extras --python ${{ env.PYTHON_LOWEST }}
       - name: Run python tests with coverage instrumentation
         run: uv run --no-project pytest --cov=./ --cov-report=xml ${{ env.PKGS }}
       - name: Upload python coverage to codecov.io

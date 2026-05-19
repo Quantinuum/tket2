@@ -157,7 +157,8 @@ jobs:
             --strip
 
       - name: Build free-threaded wheels
-        # TODO: pytket is a required dependency of tket-py, but it doesn't build free-threaded wheels yet
+        # TODO: Waiting for hugr 0.16.1 / 0.17.0 to release python 3.14 free-threaded wheels.
+        # <https://github.com/Quantinuum/hugr/pull/3021>
         if: false
         shell: bash
         run: |

@@ -8,6 +8,7 @@ use petgraph::algo::tarjan_scc;
 use hugr_core::hugr::{hugrmut::HugrMut, patch::inline_call::InlineCall};
 use hugr_core::module_graph::{ModuleGraph, StaticNode};
 
+use crate::metadata::InlineAnnotation;
 use crate::passes::{ComposablePass, PassScope, WithScope};
 
 /// Error raised by [inline_acyclic]
@@ -50,39 +51,18 @@ impl Default for InlineFuncsHeuristic {
 /// We use a heuristic to determine which functions to inline. Currently, we
 /// inline all functions whose number of descendant nodes is at most
 /// `max_inline_size` (defaults to 64).
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct InlineFunctionsPass {
     /// Heuristic for deciding which functions to inline.
     heuristic: InlineFuncsHeuristic,
-    /// Whether to follow compiler hints for inlining functions.
-    //
-    // Note that the inline hint metadata has not been defined yet, so this is currently unused.
-    // TODO: <https://github.com/Quantinuum/hugr/issues/2328>
-    follow_inline_hints: bool,
-
+    /// Where to apply the pass. See [PassScope] for details.
     scope: PassScope,
-}
-
-impl Default for InlineFunctionsPass {
-    fn default() -> Self {
-        Self {
-            heuristic: InlineFuncsHeuristic::default(),
-            follow_inline_hints: true,
-            scope: Default::default(),
-        }
-    }
 }
 
 impl InlineFunctionsPass {
     /// Sets the heuristic for deciding which functions to inline.
     pub fn with_heuristic(mut self, heuristic: InlineFuncsHeuristic) -> Self {
         self.heuristic = heuristic;
-        self
-    }
-
-    /// Sets whether to follow compiler hints for inlining functions.
-    pub fn follow_inline_hints(mut self, follow_inline_hints: bool) -> Self {
-        self.follow_inline_hints = follow_inline_hints;
         self
     }
 }
@@ -97,9 +77,13 @@ impl<H: HugrMut> ComposablePass<H> for InlineFunctionsPass {
             let Some(func) = h.static_source(call) else {
                 return false;
             };
-            *should_inline_cache
-                .entry(func)
-                .or_insert_with(|| self.heuristic.should_inline(func, h))
+            *should_inline_cache.entry(func).or_insert_with(|| {
+                match h.get_metadata::<InlineAnnotation>(func) {
+                    Some(InlineAnnotation::Never) => false,
+                    Some(InlineAnnotation::BestEffort) => true,
+                    None => self.heuristic.should_inline(func, h),
+                }
+            })
         })
     }
 }
@@ -203,11 +187,13 @@ mod test {
     use hugr_core::HugrView;
     use hugr_core::builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
     use hugr_core::core::HugrNode;
+    use hugr_core::hugr::hugrmut::HugrMut;
     use hugr_core::module_graph::{ModuleGraph, StaticNode};
     use hugr_core::ops::OpType;
     use hugr_core::{Hugr, extension::prelude::qb_t, types::Signature};
 
     use super::{InlineFunctionsPass, inline_acyclic_scoped};
+    use crate::metadata::InlineAnnotation;
     use crate::passes::composable::test::run_validating;
     use crate::passes::inline_funcs::InlineFuncsHeuristic;
     use crate::passes::{PassScope, composable::Preserve};
@@ -366,13 +352,45 @@ mod test {
     #[case::size_zero(InlineFuncsHeuristic::MaxSize(0), vec!["f", "b"])]
     #[case::size_unlimited(InlineFuncsHeuristic::MaxSize(usize::MAX), vec!["f"])]
     #[case::all(InlineFuncsHeuristic::All, vec!["f"])]
-    fn inline_functions_pass_respects_max_inline_size(
+    fn inline_functions_pass_heuristic(
         #[case] heuristic: InlineFuncsHeuristic,
         #[case] g_targets: Vec<&'static str>,
     ) {
         let mut h = make_test_hugr();
         run_validating(
             InlineFunctionsPass::default().with_heuristic(heuristic),
+            &mut h,
+        )
+        .unwrap();
+
+        let cg = ModuleGraph::new(&h);
+        let g = find_func(&h, "g");
+        assert_eq!(
+            outgoing_calls(&cg, g)
+                .into_iter()
+                .map(|n| func_name(&h, n).as_str())
+                .collect::<HashSet<_>>(),
+            HashSet::from_iter(g_targets),
+        );
+    }
+
+    #[rstest]
+    fn inline_functions_pass_hints() {
+        let g_targets = vec!["f", "c"];
+
+        let mut h = make_test_hugr();
+        let b = find_func(&h, "b");
+        let c = find_func(&h, "c");
+        let f = find_func(&h, "f");
+        // This should be inlined
+        h.set_metadata::<InlineAnnotation>(b, InlineAnnotation::BestEffort);
+        // This should never be inlined, even if `follow_hints` is false.
+        h.set_metadata::<InlineAnnotation>(c, InlineAnnotation::Never);
+        // This should be ignored, as `f` is in a double-recursive loop with `g`.
+        h.set_metadata::<InlineAnnotation>(f, InlineAnnotation::BestEffort);
+
+        run_validating(
+            InlineFunctionsPass::default().with_heuristic(InlineFuncsHeuristic::MaxSize(0)),
             &mut h,
         )
         .unwrap();

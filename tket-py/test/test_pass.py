@@ -1,7 +1,6 @@
 import importlib.util
 import tempfile
 
-from pytket import Circuit, OpType
 from typing import Callable, Any
 import subprocess
 from tket._ops import TketOp
@@ -22,21 +21,23 @@ import hypothesis.strategies as st
 from hypothesis.strategies._internal import SearchStrategy
 from hypothesis import given, settings
 
-
 from tket.passes import PytketHugrPass, QSystemPass
-from pytket.passes import (
+from hugr.build.base import Hugr
+
+import numpy as np
+import pytest
+from pathlib import Path
+
+# Import the pytket passes, if the `pytket` extra has been installed.
+# If not, skip all tests in this file.
+pytket = pytest.importorskip("pytket")
+from pytket import Circuit, OpType  # noqa: E402
+from pytket.passes import (  # noqa: E402
     CliffordSimp,
     SquashRzPhasedX,
     RemoveRedundancies,
     SequencePass,
 )
-from hugr.build.base import Hugr
-
-import numpy as np
-import pytest
-
-
-from pathlib import Path
 
 
 normalize = NormalizeGuppy()

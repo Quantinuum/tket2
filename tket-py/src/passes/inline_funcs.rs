@@ -18,18 +18,16 @@ use crate::utils::ConvertPyErr;
 /// - follow_inline_hints: Whether to follow compiler hints for inlining
 ///   functions.
 #[pyfunction]
-#[pyo3(signature = (circ, *, heuristic = None, follow_inline_hints = true, scope = None))]
+#[pyo3(signature = (circ, *, heuristic = None, scope = None))]
 pub(super) fn inline_functions(
     circ: &mut CompilationState,
     heuristic: Option<PyInlineFuncsHeuristic>,
-    follow_inline_hints: bool,
     scope: Option<PyPassScope>,
 ) -> PyResult<()> {
     let py_scope = scope.unwrap_or_default();
     let heuristic = heuristic.unwrap_or_default().0;
     let pass = tket::passes::InlineFunctionsPass::default_with_scope(py_scope.scope)
-        .with_heuristic(heuristic)
-        .follow_inline_hints(follow_inline_hints);
+        .with_heuristic(heuristic);
     pass.run(&mut circ.hugr).convert_pyerrs()?;
     Ok(())
 }
