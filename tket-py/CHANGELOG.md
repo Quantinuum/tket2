@@ -7,7 +7,7 @@
 
 * Add python definitions for the TKET metadata keys ([#1535](https://github.com/Quantinuum/tket2/issues/1535)) ([1bfef9a](https://github.com/Quantinuum/tket2/commit/1bfef9a3224e9bba1edcf6c5dba38d7157bd9040))
 * Clean Up by Deleting Unconnected Nodes after Modifier Solve ([#1557](https://github.com/Quantinuum/tket2/issues/1557)) ([d706867](https://github.com/Quantinuum/tket2/commit/d706867ef740c7faaa01b7e6dcf5d9074f954dbf))
-* expose the QSystemPass to Python ([#1556](https://github.com/Quantinuum/tket2/issues/1556)) ([394a610](https://github.com/Quantinuum/tket2/commit/394a610593818ab10a46e5febbc3ec7f6cd29cec))
+* Expose the QSystemPass to Python ([#1556](https://github.com/Quantinuum/tket2/issues/1556)) ([394a610](https://github.com/Quantinuum/tket2/commit/394a610593818ab10a46e5febbc3ec7f6cd29cec))
 * InlineFunctionsPass ([#1524](https://github.com/Quantinuum/tket2/issues/1524)) ([f40dcef](https://github.com/Quantinuum/tket2/commit/f40dcefdb8c1f36220e187789825c3e0d7f3412e))
 * InlineHint metadata ([#1532](https://github.com/Quantinuum/tket2/issues/1532)) ([e7949c2](https://github.com/Quantinuum/tket2/commit/e7949c2ae20bde5de0abdbc5e09f2e5ad7606849))
 
