@@ -45,6 +45,9 @@ typetag.workspace = true
 delegate.workspace = true
 indexmap.workspace = true
 anyhow = { workspace = true, optional = true }
+tket1-passes = { path = "../tket1-passes" }
+rayon.workspace = true
+serde_json.workspace = true
 
 [dev-dependencies]
 tket1-passes = { path = "../tket1-passes" }

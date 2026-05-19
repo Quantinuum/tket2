@@ -10,6 +10,15 @@ pub mod lower_drops;
 pub mod pytket;
 pub mod replace_bools;
 
+use hugr::Hugr;
+use pytket::qsystem_decoder_config;
+use rayon::iter::ParallelIterator;
+use replace_bools::{ReplaceBoolPass, ReplaceBoolPassError};
+use std::sync::Arc;
+use tket::TketOp;
+use tket::serialize::pytket::{EncodeOptions, EncodedCircuit};
+use tket1_passes::{Tket1Circuit, Tket1Pass};
+
 use derive_more::{Display, Error, From};
 use hugr::hugr::{HugrError, hugrmut::HugrMut};
 use hugr::{HugrView, Node, core::Visibility, ops::OpType};
@@ -19,12 +28,10 @@ use tket::passes::composable::WithScope;
 use tket::passes::const_fold::{ConstFoldError, ConstantFoldPass};
 use tket::passes::{
     ComposablePass, MonomorphizePass, PassScope, RemoveDeadFuncsError, RemoveDeadFuncsPass,
-    force_order, replace_types::ReplaceTypesError,
+    force_order, replace_types::ReplaceTypesError, NormalizeGuppy
 };
 
 use lower_drops::LowerDropsPass;
-use replace_bools::{ReplaceBoolPass, ReplaceBoolPassError};
-use tket::TketOp;
 
 use extension::{
     futures::FutureOpDef,
@@ -250,14 +257,14 @@ impl WithScope for QSystemPass {
     }
 }
 
-impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for QSystemPass {
+impl ComposablePass<Hugr> for QSystemPass {
     type Error = QSystemPassError;
     type Result = ();
 
     /// Run `QSystemPass` on the given Hugr. `registry` is used for
     /// validation, if enabled.
     /// Expects the HUGR to have a function entrypoint.
-    fn run(&self, hugr: &mut H) -> Result<(), QSystemPassError> {
+    fn run(&self, hugr: &mut Hugr) -> Result<(), QSystemPassError> {
         if !matches!(self.scope, PassScope::Global(_)) {
             return Err(QSystemPassError::LocalScopeError {
                 scope: self.scope.clone(),
@@ -302,6 +309,39 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for QSystemPass {
             hugr.set_entrypoint(main_n);
         }
 
+        // Apply NormalizeGuppy to simplify the HUGR before the 1Q squash pass.
+        let mut normalize_pass = NormalizeGuppy::default();
+
+        normalize_pass.simplify_cfgs(true)
+        .remove_tuple_untuple(true)
+        .constant_folding(true)
+        .remove_dead_funcs(true)
+        .inline_dfgs(true)
+        .remove_redundant_order_edges(true)
+        .squash_borrows(true);
+
+        normalize_pass.run(hugr).unwrap();
+
+        // Call the SquashRzPhasedX pass from pytket using the pass JSON
+        // https://docs.quantinuum.com/tket/api-docs/passes.html#pytket.passes.SquashRzPhasedX
+        // Squash single qubit gates after conversion to the Qsystem gate set.
+        let squash_pass_json_string =
+            serde_json::to_string(&tket_json_rs::pass::BasePass::StandardPass {
+                pass: tket_json_rs::pass::standard::StandardPass::SquashRzPhasedX,
+            })
+            .unwrap();
+        let mut encoded =
+            EncodedCircuit::new(hugr, EncodeOptions::new().with_subcircuits(true)).unwrap();
+        encoded
+            .par_iter_mut()
+            .for_each(|(_region, serial_circuit)| {
+                let mut circuit_ptr = Tket1Circuit::from_serial_circuit(serial_circuit).unwrap();
+                Tket1Pass::run_from_json(&squash_pass_json_string, &mut circuit_ptr).unwrap();
+                *serial_circuit = circuit_ptr.to_serial_circuit().unwrap();
+            });
+        encoded
+            .reassemble_inplace(hugr, Some(Arc::new(qsystem_decoder_config())))
+            .unwrap();
         Ok(())
     }
 }
