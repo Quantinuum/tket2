@@ -51,7 +51,7 @@ repos:
       - id: mypy-check
         name: mypy
         description: Check python code with `mypy`.
-        entry: uv run mypy .
+        entry: uv run --all-extras mypy .
         language: system
         files: \.py$
         pass_filenames: false

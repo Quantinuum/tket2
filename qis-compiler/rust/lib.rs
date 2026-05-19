@@ -210,6 +210,19 @@ fn optimize_module(module: &Module, args: &CompileArgs) -> Result<()> {
     Ok(())
 }
 
+/// Copy LLVM bitcode into a public byte buffer.
+///
+/// LLVM's in-memory bitcode writer appends an implicit trailing NUL byte. That
+/// terminator is required for some in-process LLVM APIs but must not be exposed
+/// in the public bitcode payload.
+fn public_bitcode_bytes(memory_buffer: &inkwell::memory_buffer::MemoryBuffer<'_>) -> Vec<u8> {
+    let bytes = memory_buffer.as_slice();
+    match bytes.last() {
+        Some(0) => bytes[..bytes.len() - 1].to_vec(),
+        _ => bytes.to_vec(),
+    }
+}
+
 fn get_entry_point_name(namer: &Namer, hugr: &impl HugrView<Node = Node>) -> Result<String> {
     const HUGR_MAIN: &str = "main";
     let (name, entry_point_node) = if hugr.entrypoint_optype().is_module() {
@@ -418,7 +431,7 @@ mod exceptions {
 mod selene_hugr_qis_compiler {
     use super::{
         CompileArgs, Context, Hugr, PyResult, compile, get_native_target_machine, get_opt_level,
-        get_target_machine_from_triple, pyfunction, read_hugr_envelope,
+        get_target_machine_from_triple, public_bitcode_bytes, pyfunction, read_hugr_envelope,
     };
 
     #[pymodule_export]
@@ -479,6 +492,56 @@ mod selene_hugr_qis_compiler {
             &ctx,
             &mut hugr,
         )?;
-        Ok(llvm_module.write_bitcode_to_memory().as_slice().to_vec())
+        Ok(public_bitcode_bytes(&llvm_module.write_bitcode_to_memory()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::selene_hugr_qis_compiler::compile_to_bitcode;
+    use std::{
+        fs,
+        time::{SystemTime, UNIX_EPOCH},
+    };
+    use tket::hugr::llvm::inkwell::{
+        context::Context, memory_buffer::MemoryBuffer, module::Module,
+    };
+
+    fn parse_bitcode_as_file(bitcode: &[u8]) -> Result<Module<'static>, String> {
+        let file_name = format!(
+            "selene-hugr-qis-compiler-{}.bc",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map_err(|e| format!("Failed to compute timestamp: {e}"))?
+                .as_nanos()
+        );
+        let path = std::env::temp_dir().join(file_name);
+        fs::write(&path, bitcode).map_err(|e| format!("Failed to write temp bitcode: {e}"))?;
+        let ctx: &'static Context = Box::leak(Box::new(Context::create()));
+        let result = MemoryBuffer::create_from_file(&path)
+            .map_err(|e| format!("Failed to read temp bitcode: {e}"))
+            .and_then(|memory_buffer| {
+                Module::parse_bitcode_from_buffer(&memory_buffer, ctx)
+                    .map_err(|e| format!("Failed to parse bitcode: {e}"))
+            });
+        let _ = fs::remove_file(&path);
+        result
+    }
+
+    #[test]
+    fn test_compile_to_bitcode_returns_file_safe_public_bytes() {
+        let hugr = include_bytes!("../python/tests/resources/check.hugr");
+        let bitcode = compile_to_bitcode(hugr, 2, "native")
+            .expect("compiling fixture to bitcode should work");
+
+        let module =
+            parse_bitcode_as_file(&bitcode).expect("returned bitcode should parse from file");
+        let raw_buffer = module.write_bitcode_to_memory();
+        assert_eq!(raw_buffer.as_slice().last(), Some(&0));
+        assert_eq!(
+            bitcode,
+            raw_buffer.as_slice()[..raw_buffer.as_slice().len() - 1],
+            "Public bitcode should match LLVM's raw buffer without the implicit trailing NUL"
+        );
     }
 }

@@ -1,7 +1,6 @@
 import itertools
 
 import pytest
-from pytket._tket.circuit import Circuit
 
 from hugr.ops import Custom
 from hugr.hugr import Wire
@@ -160,6 +159,8 @@ def final_pauli_string(circ: CompilationState) -> str:
 
 @pytest.mark.skip(reason="Broken with hugr 0.8.0. See comment in `propagate_matcher`.")
 def test_simple_z_prop(propagate_matcher: RuleMatcher):
+    pytket = pytest.importorskip("pytket")
+
     c = CircBuild.with_nqb(2)
 
     (h_node_e, *_) = c.extend(H(0), H(0), CX(0, 1))
@@ -169,17 +170,19 @@ def test_simple_z_prop(propagate_matcher: RuleMatcher):
 
     add_error_after(t2c, h_node_e[0], PauliX)
 
-    assert t2c.to_tket1() == Circuit(2).H(0).X(0).H(0).CX(0, 1)
+    assert t2c.to_tket1() == pytket.Circuit(2).H(0).X(0).H(0).CX(0, 1)
 
     assert apply_exhaustive(t2c, propagate_matcher) == 2
 
-    assert t2c.to_tket1() == Circuit(2).H(0).H(0).CX(0, 1).Z(0)
+    assert t2c.to_tket1() == pytket.Circuit(2).H(0).H(0).CX(0, 1).Z(0)
 
     assert final_pauli_string(t2c) == "ZI"
 
 
 @pytest.mark.skip(reason="Broken with hugr 0.8.0. See comment in `propagate_matcher`.")
 def test_cat(propagate_matcher: RuleMatcher):
+    pytket = pytest.importorskip("pytket")
+
     c = CircBuild.with_nqb(4)
     (h_node, *_) = c.extend(
         H(2),
@@ -191,13 +194,13 @@ def test_cat(propagate_matcher: RuleMatcher):
     t2c = c.finish()
 
     add_error_after(t2c, h_node[0], PauliX)
-    assert t2c.to_tket1() == Circuit(4).H(2).X(2).CX(2, 1).CX(2, 3).CX(1, 0)
+    assert t2c.to_tket1() == pytket.Circuit(4).H(2).X(2).CX(2, 1).CX(2, 3).CX(1, 0)
 
     assert apply_exhaustive(t2c, propagate_matcher) == 3
 
-    assert t2c.to_tket1() == Circuit(4).H(2).CX(2, 1).CX(2, 3).CX(1, 0).X(0).X(1).X(
-        2
-    ).X(3)
+    assert t2c.to_tket1() == (
+        pytket.Circuit(4).H(2).CX(2, 1).CX(2, 3).CX(1, 0).X(0).X(1).X(2).X(3)
+    )
 
     assert final_pauli_string(t2c) == "XXXX"
 
