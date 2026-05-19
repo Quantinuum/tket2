@@ -435,6 +435,7 @@ mod test {
     }
 
     #[rstest]
+    #[cfg_attr(miri, ignore)] // miri cannot analyze programs which use zstd
     fn test_borrow_squash(ranges_array: Hugr) {
         let counts = |h: &Hugr| {
             let mut brs = vec![(0, 0); 4];
