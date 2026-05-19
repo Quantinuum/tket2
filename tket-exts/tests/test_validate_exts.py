@@ -70,8 +70,6 @@ def ext_qsystem() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
             ext.lazy_measure,
             ext.lazy_measure_leaked,
             ext.lazy_measure_reset,
-            ext.measure,
-            ext.measure_reset,
             ext.phasedX,
             ext.qFree,
             ext.reset,

@@ -42,10 +42,10 @@ class MeasurementExtension(TketExtension):
 
     @functools.cached_property
     def free(self) -> ExtOp:
-        """Consume a measurement without reading it."""
+        """Discard (a copy of) measurement without reading it."""
         return self().get_op("Free").instantiate()
 
     @functools.cached_property
     def read(self) -> ExtOp:
-        """Read a measurement, consuming it and returning a Hugr bool."""
+        """Consumes a measurement, converting it into a bool."""
         return self().get_op("Read").instantiate()

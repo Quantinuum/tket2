@@ -39,7 +39,7 @@ pub const TKET1_EXTENSION_ID: ExtensionId = IdentList::new_unchecked("TKET1");
 pub const TKET1_OP_NAME: SmolStr = SmolStr::new_inline("tk1op");
 
 /// Current version of the legacy TKET 1 extension
-pub const TKET1_EXTENSION_VERSION: Version = Version::new(0, 3, 0);
+pub const TKET1_EXTENSION_VERSION: Version = Version::new(0, 2, 0);
 
 lazy_static! {
 /// The TKET1 extension, containing the opaque TKET1 operations.
@@ -93,7 +93,7 @@ impl CustomSignatureFunc for Tk1Signature {
 pub const TKET_EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("tket.quantum");
 
 /// Current version of the TKET extension
-pub const TKET_EXTENSION_VERSION: Version = Version::new(0, 2, 1);
+pub const TKET_EXTENSION_VERSION: Version = Version::new(0, 3, 0);
 
 lazy_static! {
     /// The extension definition for TKET ops and types.
