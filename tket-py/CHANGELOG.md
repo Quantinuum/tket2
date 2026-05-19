@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.13.1](https://github.com/Quantinuum/tket2/compare/tket-py-v0.13.0...tket-py-v0.13.1) (2026-05-19)
+
+
+### Features
+
+* Add python definitions for the TKET metadata keys ([#1535](https://github.com/Quantinuum/tket2/issues/1535)) ([1bfef9a](https://github.com/Quantinuum/tket2/commit/1bfef9a3224e9bba1edcf6c5dba38d7157bd9040))
+* Clean Up by Deleting Unconnected Nodes after Modifier Solve ([#1557](https://github.com/Quantinuum/tket2/issues/1557)) ([d706867](https://github.com/Quantinuum/tket2/commit/d706867ef740c7faaa01b7e6dcf5d9074f954dbf))
+* Expose the QSystemPass to Python ([#1556](https://github.com/Quantinuum/tket2/issues/1556)) ([394a610](https://github.com/Quantinuum/tket2/commit/394a610593818ab10a46e5febbc3ec7f6cd29cec))
+* InlineFunctionsPass ([#1524](https://github.com/Quantinuum/tket2/issues/1524)) ([f40dcef](https://github.com/Quantinuum/tket2/commit/f40dcefdb8c1f36220e187789825c3e0d7f3412e))
+* InlineHint metadata ([#1532](https://github.com/Quantinuum/tket2/issues/1532)) ([e7949c2](https://github.com/Quantinuum/tket2/commit/e7949c2ae20bde5de0abdbc5e09f2e5ad7606849))
+
+
+### Bug Fixes
+
+* Apply modifiers through function calls ([#1531](https://github.com/Quantinuum/tket2/issues/1531)) ([6a13f0c](https://github.com/Quantinuum/tket2/commit/6a13f0c40041bd841bbc8fe12d849b207f349fb2))
+* Incorrect matching of pytket parameters to unsupported graph ports ([#1561](https://github.com/Quantinuum/tket2/issues/1561)) ([4fc5a25](https://github.com/Quantinuum/tket2/commit/4fc5a25ad8e3d97b4ac47f5578b4e041b95d96fc))
+* Passes with Nested Modifier ([#1546](https://github.com/Quantinuum/tket2/issues/1546)) ([bf6df51](https://github.com/Quantinuum/tket2/commit/bf6df51b5c89a27f51887d301619af8918b01f79))
+* Update examples link in README.md ([#1506](https://github.com/Quantinuum/tket2/issues/1506)) ([9a25ec8](https://github.com/Quantinuum/tket2/commit/9a25ec8b83dc193aaa031a9f52e256ec85ee7bc2))
+
+
+### Documentation
+
+* Simplify package description. ([#1547](https://github.com/Quantinuum/tket2/issues/1547)) ([54e855f](https://github.com/Quantinuum/tket2/commit/54e855ffe9700fb73771f2d31026ea20a7c83120))
+
 ## [0.13.0](https://github.com/Quantinuum/tket2/compare/tket-py-v0.12.16...tket-py-v0.13.0) (2026-04-07)
 
 This release removes outdated APIs from the public interface. `Tk2Circuit` has been replaced with a temporarily unstable `CompilationState`.

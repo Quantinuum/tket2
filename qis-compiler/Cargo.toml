@@ -30,7 +30,6 @@ workspace = true
 
 [features]
 default = []
-extension-module = ["pyo3/extension-module"]
 
 [build-dependencies]
 cbindgen.workspace = true

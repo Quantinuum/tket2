@@ -89,6 +89,11 @@ pub fn transform_cfg_to_nested<T: Copy + Eq + Hash + std::fmt::Debug>(
 ) {
     let edge_classes = EdgeClassifier::get_edge_classes(view);
     let mut rem_edges: HashMap<usize, HashSet<(T, T)>> = HashMap::new();
+
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "edge-class iteration only groups edges by class; traversal later chooses edges from deterministic CFG successor order"
+    )]
     for (e, cls) in &edge_classes {
         rem_edges.entry(*cls).or_default().insert(*e);
     }
@@ -583,6 +588,10 @@ pub(crate) mod test {
     use hugr_core::types::{EdgeKind, Signature};
     use hugr_core::utils::depth;
 
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "test helper groups all entries and sorts each group before comparison"
+    )]
     pub fn group_by<E: Eq + Hash + Ord, V: Eq + Hash>(h: HashMap<E, V>) -> HashSet<Vec<E>> {
         let mut res = HashMap::new();
         for (k, v) in h {
