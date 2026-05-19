@@ -162,12 +162,12 @@ jobs:
         run: rustup override set ${{steps.toolchain.outputs.name}}
       - uses: quantinuum/hugrverse-env/install-hugrenv-action@main
       - uses: taiki-e/install-action@nextest
-      # qis-compiler requires libpython to link test binaries;
-      # it is tested separately in the tests-qis-compiler job.
+      # Crates using pyo3 cdylib require libpython to link test binaries;
+      # they are tested separately in their own jobs.
       - name: Build with all features
-        run: cargo nextest r --verbose -p badger-optimiser -p compile-rewriter -p tket -p tket1-passes -p tket-py -p tket-qsystem -p tket-qec --all-features --no-run
+        run: cargo nextest r --verbose --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --all-features --no-run
       - name: Tests with all features
-        run: cargo nextest r --verbose -p badger-optimiser -p compile-rewriter -p tket -p tket1-passes -p tket-py -p tket-qsystem -p tket-qec --all-features
+        run: cargo nextest r --verbose --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --all-features
 
   # Run tests on other toolchains
   tests-rs-other:
@@ -193,16 +193,16 @@ jobs:
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
       - uses: taiki-e/install-action@nextest
-      # qis-compiler requires libpython to link test binaries;
-      # it is tested separately in the tests-qis-compiler job.
+      # Crates using pyo3 cdylib require libpython to link test binaries;
+      # they are tested separately in their own jobs.
       - name: Build with no features
-        run: cargo nextest r --verbose -p badger-optimiser -p compile-rewriter -p tket -p tket1-passes -p tket-py -p tket-qsystem -p tket-qec --no-default-features --no-run
+        run: cargo nextest r --verbose --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --no-default-features --no-run
       - name: Tests with no features
-        run: cargo nextest r --verbose -p badger-optimiser -p compile-rewriter -p tket -p tket1-passes -p tket-py -p tket-qsystem -p tket-qec --no-default-features
+        run: cargo nextest r --verbose --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --no-default-features
       - name: Build with all features
-        run: cargo nextest r --verbose -p badger-optimiser -p compile-rewriter -p tket -p tket1-passes -p tket-py -p tket-qsystem -p tket-qec --all-features --no-run
+        run: cargo nextest r --verbose --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --all-features --no-run
       - name: Tests with all features
-        run: cargo nextest r --verbose -p badger-optimiser -p compile-rewriter -p tket -p tket1-passes -p tket-py -p tket-qsystem -p tket-qec --all-features
+        run: cargo nextest r --verbose --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --all-features
 
   tests-nightly-coverage:
     needs: [changes]
@@ -221,15 +221,15 @@ jobs:
       - uses: quantinuum/hugrverse-env/install-hugrenv-action@main
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
-      # qis-compiler requires libpython to link test binaries;
-      # it is tested separately in the tests-qis-compiler job.
+      # Crates using pyo3 cdylib require libpython to link test binaries;
+      # they are tested separately in their own jobs.
       - name: Run tests with coverage instrumentation
         run: |
           cargo llvm-cov clean --workspace
-          cargo llvm-cov --no-report -p badger-optimiser -p compile-rewriter -p tket -p tket1-passes -p tket-py -p tket-qsystem -p tket-qec --no-default-features --doctests
-          cargo llvm-cov --no-report -p badger-optimiser -p compile-rewriter -p tket -p tket1-passes -p tket-py -p tket-qsystem -p tket-qec --all-features --doctests
+          cargo llvm-cov --no-report --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --no-default-features --doctests
+          cargo llvm-cov --no-report --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --all-features --doctests
       - name: Generate coverage report
-        run: cargo llvm-cov -p badger-optimiser -p compile-rewriter -p tket -p tket1-passes -p tket-py -p tket-qsystem -p tket-qec --all-features report --codecov --output-path coverage.json
+        run: cargo llvm-cov --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --all-features report --codecov --output-path coverage.json
       - name: Upload coverage to codecov.io
         uses: codecov/codecov-action@v6
         with:
@@ -272,16 +272,16 @@ jobs:
         run: |
           rm Cargo.lock
           # cargo add -p tket insta@2.4.1
-      # qis-compiler requires libpython to link test binaries;
-      # it is tested separately in the tests-qis-compiler job.
+      # Crates using pyo3 cdylib require libpython to link test binaries;
+      # they are tested separately in their own jobs.
       - name: Build with no features
-        run: cargo minimal-versions --direct test --verbose -p badger-optimiser -p compile-rewriter -p tket -p tket1-passes -p tket-py -p tket-qsystem -p tket-qec --no-default-features --no-run
+        run: cargo minimal-versions --direct test --verbose --exclude tket-py --exclude selene-hugr-qis-compiler --no-default-features --no-run
       - name: Tests with no features
-        run: cargo minimal-versions --direct test --verbose -p badger-optimiser -p compile-rewriter -p tket -p tket1-passes -p tket-py -p tket-qsystem -p tket-qec --no-default-features
+        run: cargo minimal-versions --direct test --verbose --exclude tket-py --exclude selene-hugr-qis-compiler --no-default-features
       - name: Build with all features
-        run: cargo minimal-versions --direct test --verbose -p badger-optimiser -p compile-rewriter -p tket -p tket1-passes -p tket-py -p tket-qsystem -p tket-qec --all-features --no-run
+        run: cargo minimal-versions --direct test --verbose --exclude tket-py --exclude selene-hugr-qis-compiler --all-features --no-run
       - name: Tests with all features
-        run: cargo minimal-versions --direct test --verbose -p badger-optimiser -p compile-rewriter -p tket -p tket1-passes -p tket-py -p tket-qsystem -p tket-qec --all-features
+        run: cargo minimal-versions --direct test --verbose --exclude tket-py --exclude selene-hugr-qis-compiler --all-features
 
   tests-py:
     needs: changes
