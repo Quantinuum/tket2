@@ -4,9 +4,8 @@ on:
   push:
     branches:
       - main
-  release:
-    types:
-      - published
+    tags:
+      - "qis-compiler-v*"
   pull_request:
     # check builds work if qis-compiler build config changes
     paths:
@@ -23,7 +22,7 @@ env:
   UV_VERSION: "0.11.15"
 jobs:
   # Check if the tag matches the package name,
-  # or if the workflow is running on a non-release event.
+  # or if the workflow is running on a non-tag event.
   check-tag:
     name: Check tag
     runs-on: ubuntu-latest
@@ -35,7 +34,7 @@ jobs:
         run: |
           echo "run=$SHOULD_RUN" >> $GITHUB_OUTPUT
         env:
-          SHOULD_RUN: ${{ github.event_name != 'release' || ( github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/qis-compiler-v') ) }}
+          SHOULD_RUN: ${{ github.ref_type != 'tag' || startsWith(github.ref, 'refs/tags/qis-compiler-v') }}
 
   build_qis_compiler_wheels:
     needs: check-tag
@@ -80,7 +79,7 @@ jobs:
   release:
     name: Release qis-compiler
     needs: [check-tag, build_qis_compiler_wheels]
-    if: ${{ needs.check-tag.outputs.run == 'true' && github.event_name == 'release' }}
+    if: ${{ needs.check-tag.outputs.run == 'true' && github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/qis-compiler-v') }}
     runs-on: ubuntu-latest
     # always do a full build and test before release of any package
     environment: release
@@ -88,11 +87,26 @@ jobs:
       contents: write
       # IMPORTANT: this permission is mandatory for trusted publishing
       id-token: write
+      # Used to generate artifact attestation
+      attestations: write
     steps:
+      - name: Check if the tag has an associated release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view ${{ github.ref_name }}
+          if [ $? -ne 0 ]; then
+            echo "No release found for tag ${{ github.ref_name }}"
+            exit 1
+          fi
       - uses: actions/download-artifact@v8
         with:
           path: wheelhouse
           merge-multiple: true
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: "wheelhouse/*"
 
       - name: Publish package distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
@@ -100,3 +114,12 @@ jobs:
           verbose: true
           skip-existing: true
           packages-dir: wheelhouse
+
+      - name: Upload wheels to the release and un-draft it
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Upload wheels to the release assets
+          gh release upload ${{ github.ref_name }} wheelhouse/*
+          # Un-draft the release on GitHub now that the package has been published to PyPI
+          gh release edit ${{ github.ref_name }} --draft=false
