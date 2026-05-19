@@ -13,7 +13,8 @@
             "component": "tket-py",
             "package-name": "tket",
             "include-component-in-tag": true,
-            "draft": false,
+            "draft": true,
+            "force-tag-creation": true,
             "prerelease": false,
             "draft-pull-request": true,
             "extra-files": [
