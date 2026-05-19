@@ -1233,7 +1233,7 @@ dependencies = [
 [[package]]
 name = "fast-todd"
 version = "0.1.0"
-source = "git+ssh://git@github.com/quantinuum-dev/fast-todd?branch=ae%2Frefactor#005de8f8f04d67995fe0a5e1deb617b49bbce7aa"
+source = "git+ssh://git@github.com/quantinuum-dev/fast-todd#ad5f0caa5d6b76e9b61c45f54817529d6c7ce946"
 dependencies = [
  "pauli-graph",
  "petgraph 0.8.3",
@@ -1514,7 +1514,7 @@ dependencies = [
 [[package]]
 name = "greedy-synth"
 version = "0.1.0"
-source = "git+ssh://git@github.com/quantinuum-dev/greedy-pauli-rs?branch=ae%2Frefactor#6672c6fe2470d730ca3458957b58292d40c90d91"
+source = "git+ssh://git@github.com/quantinuum-dev/greedy-pauli-rs?branch=refactor-pauli-graph-into-separate-crate#9d03440173d7dfcb7287d9909b0bb39e0b0fae65"
 dependencies = [
  "approx_eq",
  "basic-passes",
@@ -2568,7 +2568,7 @@ dependencies = [
 [[package]]
 name = "pg-optimise"
 version = "0.1.0"
-source = "git+ssh://git@github.com/quantinuum-dev/greedy-pauli-rs?branch=ae%2Frefactor#6672c6fe2470d730ca3458957b58292d40c90d91"
+source = "git+ssh://git@github.com/quantinuum-dev/greedy-pauli-rs?branch=refactor-pauli-graph-into-separate-crate#9d03440173d7dfcb7287d9909b0bb39e0b0fae65"
 dependencies = [
  "criterion 0.8.2",
  "pauli-graph",
