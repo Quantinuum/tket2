@@ -87,7 +87,7 @@ jobs:
         run: uv python install ${{ env.PYTHON_LOWEST }}
       - name: Setup dependencies
         # avoid building qis-compiler
-        run: uv sync --package=tket --exact --python ${{ env.PYTHON_LOWEST }}
+        run: uv sync --package=tket --exact --all-extras --python ${{ env.PYTHON_LOWEST }}
       - name: Type check with mypy
         run: uv run mypy .
       - name: Check formatting with ruff
@@ -297,7 +297,7 @@ jobs:
         run: uv python install ${{ env.PYTHON_LOWEST }}
       - name: Setup dependencies
         # avoid building qis-compiler
-        run: uv sync --package=tket --exact --python ${{ env.PYTHON_LOWEST }}
+        run: uv sync --package=tket --exact --all-extras --python ${{ env.PYTHON_LOWEST }}
       - name: Run python tests with coverage instrumentation
         run: uv run --no-project pytest --cov=./ --cov-report=xml ${{ env.PKGS }}
       - name: Upload python coverage to codecov.io
@@ -356,7 +356,7 @@ jobs:
       - uses: quantinuum/hugrverse-env/install-hugrenv-action@main
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
-      - uses: extractions/setup-just@v3
+      - uses: extractions/setup-just@v4
       - name: Generate the updated definitions
         run: just gen-extensions
       - name: Check if the declarations are up to date

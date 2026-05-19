@@ -89,6 +89,13 @@ impl<N: HugrNode> ModifierResolver<N> {
         // The function to apply the modifier to. This is expected to be a LoadFunction node
         let (func, load) = Self::get_loaded_function(h, modifier_node, targ, h.get_optype(targ))?;
 
+        // Only remove targ if it has exactly one consumer (the modifier chain).
+        // If it has multiple consumers, leave it in place to preserve shared loads.
+        let node_consumers = h.linked_inputs(targ, 0).count();
+        if node_consumers == 1 {
+            h.remove_node(targ);
+        }
+
         // Modify the function
         let modified_fn = self.modify_fn(h, func)?;
 

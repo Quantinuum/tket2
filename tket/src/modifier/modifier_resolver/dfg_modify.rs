@@ -351,6 +351,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         ModifierFlags::from_combined(self.modifiers())
             .or(&ModifierFlags::from_metadata(h, func))
             .set_metadata(h, new_function_node);
+        self.modified_functions.insert(func);
 
         Ok(new_function_node)
     }
