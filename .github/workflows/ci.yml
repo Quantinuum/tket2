@@ -18,7 +18,7 @@ env:
   SCCACHE_GHA_ENABLED: "true"
   RUSTC_WRAPPER: "sccache"
   # Pinned version for the uv package manager
-  UV_VERSION: "0.9.7"
+  UV_VERSION: "0.11.15"
   UV_FROZEN: 1
   # The highest and lowest supported Python versions, used for testing
   PYTHON_HIGHEST: "3.14"
@@ -167,13 +167,15 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
-      - name: Install Python ${{ env.PYTHON_HIGHEST }}
-        # Required to compile tests in crates that use pyo3.
-        run: uv python install ${{ env.PYTHON_HIGHEST }}
+      - name: Install Python
+        # Required to link tests in crates that use pyo3.
+        run: |
+          uv python install ${{ env.PYTHON_HIGHEST }}
+          echo "UV_PYTHON=${{ env.PYTHON_HIGHEST }}" >> "$GITHUB_ENV"
       - name: Build with all features
-        run: cargo nextest r --verbose --workspace --all-features --no-run
+        run: uv run --no-project cargo nextest r --verbose --workspace --all-features --no-run
       - name: Tests with all features
-        run: cargo nextest r --verbose --workspace --all-features
+        run: uv run --no-project cargo nextest r --verbose --workspace --all-features
 
   # Run tests on other toolchains
   tests-rs-other:
@@ -204,17 +206,19 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
-      - name: Install Python ${{ env.PYTHON_HIGHEST }}
-        # Required to compile tests in crates that use pyo3.
-        run: uv python install ${{ env.PYTHON_HIGHEST }}
+      - name: Install Python
+        # Required to link tests in crates that use pyo3.
+        run: |
+          uv python install ${{ env.PYTHON_HIGHEST }}
+          echo "UV_PYTHON=${{ env.PYTHON_HIGHEST }}" >> "$GITHUB_ENV"
       - name: Build with no features
-        run: cargo nextest r --verbose --workspace --no-default-features --no-run
+        run: uv run --no-project cargo nextest r --verbose --workspace --no-default-features --no-run
       - name: Tests with no features
-        run: cargo nextest r --verbose --workspace --no-default-features
+        run: uv run --no-project cargo nextest r --verbose --workspace --no-default-features
       - name: Build with all features
-        run: cargo nextest r --verbose --workspace --all-features --no-run
+        run: uv run --no-project cargo nextest r --verbose --workspace --all-features --no-run
       - name: Tests with all features
-        run: cargo nextest r --verbose --workspace --all-features
+        run: uv run --no-project cargo nextest r --verbose --workspace --all-features
 
   tests-nightly-coverage:
     needs: [changes]
@@ -238,14 +242,16 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
-      - name: Install Python ${{ env.PYTHON_HIGHEST }}
-        # Required to compile tests in crates that use pyo3.
-        run: uv python install ${{ env.PYTHON_HIGHEST }}
+      - name: Install Python
+        # Required to link tests in crates that use pyo3.
+        run: |
+          uv python install ${{ env.PYTHON_HIGHEST }}
+          echo "UV_PYTHON=${{ env.PYTHON_HIGHEST }}" >> "$GITHUB_ENV"
       - name: Run tests with coverage instrumentation
         run: |
-          cargo llvm-cov clean --workspace
-          cargo llvm-cov --no-report --workspace --no-default-features --doctests
-          cargo llvm-cov --no-report --workspace --all-features --doctests
+          uv run --no-project cargo llvm-cov clean --workspace
+          uv run --no-project cargo llvm-cov --no-report --workspace --no-default-features --doctests
+          uv run --no-project cargo llvm-cov --no-report --workspace --all-features --doctests
       - name: Generate coverage report
         run: cargo llvm-cov --all-features report --codecov --output-path coverage.json
       - name: Upload coverage to codecov.io
@@ -289,9 +295,11 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
-      - name: Install Python ${{ env.PYTHON_LOWEST }}
-        # Required to compile tests in crates that use pyo3.
-        run: uv python install ${{ env.PYTHON_LOWEST }}
+      - name: Install Python
+        # Required to link tests in crates that use pyo3.
+        run: |
+          uv python install ${{ env.PYTHON_LOWEST }}
+          echo "UV_PYTHON=${{ env.PYTHON_LOWEST }}" >> "$GITHUB_ENV"
       - name: Pin transitive dependencies not compatible with our MSRV
         # Add new dependencies as needed if the check fails due to
         # "package `XXX` cannot be built because it requires rustc YYY or newer, while the currently active rustc version is 1.91.0"
@@ -299,13 +307,13 @@ jobs:
           rm Cargo.lock
           # cargo add -p tket insta@2.4.1
       - name: Build with no features
-        run: cargo minimal-versions --direct test --verbose  --no-default-features --no-run
+        run: uv run --no-project cargo minimal-versions --direct test --verbose  --no-default-features --no-run
       - name: Tests with no features
-        run: cargo minimal-versions --direct test --verbose  --no-default-features
+        run: uv run --no-project cargo minimal-versions --direct test --verbose  --no-default-features
       - name: Build with all features
-        run: cargo minimal-versions --direct test --verbose  --all-features --no-run
+        run: uv run --no-project cargo minimal-versions --direct test --verbose  --all-features --no-run
       - name: Tests with all features
-        run: cargo minimal-versions --direct test --verbose  --all-features
+        run: uv run --no-project cargo minimal-versions --direct test --verbose  --all-features
 
   tests-py:
     needs: changes

@@ -15,7 +15,7 @@ env:
   SCCACHE_GHA_ENABLED: "true"
   RUSTC_WRAPPER: "sccache"
   # Pinned version for the uv package manager
-  UV_VERSION: "0.9.7"
+  UV_VERSION: "0.11.15"
 
 jobs:
   py-release:
