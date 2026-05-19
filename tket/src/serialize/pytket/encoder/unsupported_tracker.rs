@@ -92,18 +92,11 @@ impl<N: HugrNode> UnsupportedTracker<N> {
         let mut nodes = BTreeSet::new();
         nodes.insert(node);
 
-        #[expect(
-            clippy::iter_over_hash_type,
-            reason = "iteration only filters membership; nodes are collected into a BTreeSet before any output-affecting use"
-        )]
-        for (&n, data) in &self.nodes {
-            if self.components.find_mut(data.component) == representative {
-                nodes.insert(n);
-            }
-        }
-        for n in &nodes {
-            self.nodes.remove(n);
-        }
+        nodes.extend(
+            self.nodes
+                .extract_if(|_, data| self.components.find_mut(data.component) == representative)
+                .map(|(n, _)| n),
+        );
 
         OpaqueSubgraph::try_from_nodes(nodes, hugr)
     }
