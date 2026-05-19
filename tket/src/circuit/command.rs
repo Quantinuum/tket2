@@ -274,22 +274,27 @@ impl<'circ, T: HugrView<Node = Node>> CommandIterator<'circ, T> {
             .map(|(linear_unit, port, _)| (Wire::new(circ.input_node(), port), linear_unit.index()))
             .collect();
 
-        let scheduling_graph = circ.hugr().scheduling_graph(circ.parent());
-        let pg = scheduling_graph.petgraph();
-        let node_count = pg.node_count();
+        // Eagerly compute the topological order of the nodes, to avoid requiring keeping a `SchedulingGraph` alive during iteration.
+        let nodes = {
+            let scheduling_graph = circ.hugr().scheduling_graph(circ.parent());
+            let pg = scheduling_graph.petgraph();
+            let node_count = pg.node_count();
 
-        let mut nodes = VecDeque::with_capacity(node_count);
-        let mut topo = pv::Topo::new(&pg);
-        while let Some(node) = topo.next(&pg) {
-            nodes.push_back(scheduling_graph.pg_to_node(node));
-        }
+            let mut nodes = VecDeque::with_capacity(node_count);
+            let mut topo = pv::Topo::new(&pg);
+            while let Some(node) = topo.next(&pg) {
+                nodes.push_back(scheduling_graph.pg_to_node(node));
+            }
+            nodes
+        };
 
+        let max_remaining = nodes.len() - 2; // I/O nodes are not yielded as commands.
         Self {
             circ,
             nodes,
             wire_unit,
             // Ignore the input and output nodes, and the root.
-            max_remaining: node_count - 2,
+            max_remaining,
             delayed_consts: HashSet::new(),
             delayed_consumers: HashMap::new(),
             delayed_node: None,
