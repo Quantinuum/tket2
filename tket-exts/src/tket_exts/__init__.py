@@ -1,6 +1,5 @@
 """HUGR extension definitions for tket circuits."""
 
-from tket_exts.tket.bool import BoolExtension
 from tket_exts.tket.debug import DebugExtension
 from tket_exts.tket.global_phase import GlobalPhaseExtension
 from tket_exts.tket.gpu import GpuExtension
@@ -18,7 +17,6 @@ from tket_exts.tket.result import ResultExtension
 from tket_exts.tket.wasm import WasmExtension
 from tket_exts.tket.measurement import MeasurementExtension
 
-from typing_extensions import deprecated
 from hugr.ext import ExtensionRegistry
 from tket_exts import tket
 
@@ -27,7 +25,6 @@ from tket_exts import tket
 __version__ = "0.12.3"
 
 __all__ = [
-    "bool",
     "debug",
     "gpu",
     "guppy",
@@ -43,12 +40,6 @@ __all__ = [
     "global_phase",
     "measurement",
 ]
-
-
-@deprecated("Use the built-in `Bool` type instead")
-def bool() -> BoolExtension:
-    return tket.bool.BoolExtension()
-
 
 debug: DebugExtension = tket.debug.DebugExtension()
 gpu: GpuExtension = tket.gpu.GpuExtension()

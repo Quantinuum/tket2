@@ -1,7 +1,6 @@
 """HUGR extension definitions for tket."""
 
 from . import (
-    bool,
     debug,
     guppy,
     futures,

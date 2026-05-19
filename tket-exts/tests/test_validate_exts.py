@@ -7,23 +7,6 @@ import pytest
 from tket_exts.tket._util import TketExtension
 
 
-def ext_bool() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
-    ext = tket_exts.bool()
-    return (
-        ext,
-        [ext.bool_t],
-        [
-            ext.and_op,
-            ext.eq,
-            ext.make_opaque,
-            ext.not_op,
-            ext.or_op,
-            ext.read,
-            ext.xor,
-        ],
-    )
-
-
 def ext_debug() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
     ext = tket_exts.debug
     return (
@@ -51,21 +34,30 @@ def ext_gpu() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
 
 def ext_guppy() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
     ext = tket_exts.guppy
-    bool_t = tket_exts.bool().bool_t
+    rot_t = tket_exts.rotation.rotation  # Arbitrary non-linear type for testing.
     return (
         ext,
         [],
-        [ext.drop(bool_t)],
+        [ext.drop(rot_t)],
     )
 
 
 def ext_futures() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
     ext = tket_exts.futures
-    bool_t = tket_exts.bool().bool_t
+    rot_t = tket_exts.rotation.rotation  # Arbitrary non-linear type for testing.
     return (
         ext,
-        [ext.future_t(bool_t)],
-        [ext.dup(bool_t), ext.free(bool_t), ext.read(bool_t)],
+        [ext.future_t(rot_t)],
+        [ext.dup(rot_t), ext.free(rot_t), ext.read(rot_t)],
+    )
+
+
+def ext_measurement() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
+    ext = tket_exts.measurement
+    return (
+        ext,
+        [ext.measurement_t],
+        [ext.read, ext.dup, ext.free],
     )
 
 
@@ -197,11 +189,11 @@ def ext_wasm() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
 @pytest.mark.parametrize(
     "ext_vals",
     [
-        ext_bool,
         ext_debug,
         ext_gpu,
         ext_guppy,
         ext_futures,
+        ext_measurement,
         ext_qsystem,
         ext_qsystem_random,
         ext_qsystem_utils,
