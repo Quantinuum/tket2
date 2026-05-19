@@ -178,11 +178,11 @@ impl<'h> PytketDecoderContext<'h> {
 
         let node = dfg.container_node();
         dfg.hugr_mut()
-            .set_metadata::<metadata::Phase>(node, &serialcirc.phase);
+            .set_metadata::<metadata::PytketPhaseExpr>(node, &serialcirc.phase);
         dfg.hugr_mut()
-            .set_metadata::<metadata::QubitRegisters>(node, serialcirc.qubits.clone());
+            .set_metadata::<metadata::PytketQubitRegisterNames>(node, serialcirc.qubits.clone());
         dfg.hugr_mut()
-            .set_metadata::<metadata::BitRegisters>(node, serialcirc.bits.clone());
+            .set_metadata::<metadata::PytketBitRegisterNames>(node, serialcirc.bits.clone());
     }
 
     /// Initialize the wire tracker with the input wires.
@@ -450,7 +450,7 @@ impl<'h> PytketDecoderContext<'h> {
             let node = self.builder.container_node();
             self.builder
                 .hugr_mut()
-                .set_metadata::<metadata::InputParameters>(
+                .set_metadata::<metadata::PytketInputParameters>(
                     node,
                     input_params.into_iter().collect_vec(),
                 );

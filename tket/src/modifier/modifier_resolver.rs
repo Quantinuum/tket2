@@ -26,6 +26,10 @@
 //! and starts resolving the function loaded by the `LoadFunction` node,
 //! which is done in
 //! `apply_modifier_chain_to_loaded_fn`.
+//! After resolution, original function nodes that have been replaced by solved
+//! modified versions may be removed if they are no longer needed and the pass
+//! scope allows removing them. Nodes whose interface must be preserved by the
+//! scope are kept.
 //!
 //! While resolving modifiers, we hold the original hugr `h` and the node to be modified `n`,
 //! and a builder `new_dfg` to construct the new graph.
@@ -101,7 +105,7 @@
 //!   but this could result in an unexpected error.
 use itertools::{Either, Itertools};
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     iter, mem,
 };
 
@@ -113,6 +117,7 @@ pub mod tket_op_modify;
 
 use super::{CombinedModifier, ModifierFlags};
 use crate::passes::utils::unpack_container::TypeUnpacker;
+use crate::passes::{InScope, PassScope};
 use crate::{TketOp, extension::global_phase::GlobalPhase, modifier::Modifier};
 use global_phase_modify::delete_phase;
 
@@ -323,6 +328,8 @@ pub struct ModifierResolver<N = Node> {
     // ```
     // _modified_functions: HashMap<N, (CombinedModifier, Node)>,
     // ```
+    /// Original functions for which the resolver generated modified replacements.
+    modified_functions: HashSet<N>,
     qubit_finder: TypeUnpacker,
 }
 
@@ -335,6 +342,7 @@ impl<N> ModifierResolver<N> {
             controls: Vec::default(),
             worklist: VecDeque::default(),
             call_map: HashMap::default(),
+            modified_functions: HashSet::default(),
             qubit_finder: TypeUnpacker::for_qubits(),
         }
     }
@@ -682,6 +690,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         let new_load = self.with_modifiers(modifiers, |this| {
             this.apply_modifier_chain_to_loaded_fn(hugr, modifier_node)
         })?;
+
         // Connect the modified function to the inputs
         for (out_port, inputs) in modified_fn_loader {
             for (recv, recv_port) in inputs {
@@ -1088,7 +1097,111 @@ impl<N: HugrNode> ModifierResolver<N> {
     }
 }
 
+/// Returns the direct child of the module root that contains `node`.
+///
+/// If `node` is not contained under the module root, returns `None`.
+fn module_child_containing<N: HugrNode>(h: &impl HugrView<Node = N>, node: N) -> Option<N> {
+    let mut child = node;
+    while let Some(parent) = h.get_parent(child) {
+        if parent == h.module_root() {
+            return Some(child);
+        }
+        child = parent;
+    }
+    None
+}
+
+/// Returns whether `func` has any static target outside `candidates`.
+///
+/// Functions without readable static targets are treated as used outside the
+/// candidate set, so they are preserved.
+fn has_static_use_outside_candidates<N: HugrNode>(
+    h: &impl HugrView<Node = N>,
+    func: N,
+    candidates: &HashSet<N>,
+) -> bool {
+    let Some(mut targets) = h.static_targets(func) else {
+        return true;
+    };
+    // Return true if:
+    // - any static target is outside the candidate set, or
+    // - any static target is not contained under the module root
+    targets.any(|(target, _)| {
+        module_child_containing(h, target)
+            .is_none_or(|target_owner| !candidates.contains(&target_owner))
+    })
+}
+
+/// Returns static dependencies of `func` that are also in `candidates`.
+fn candidate_static_dependencies<N: HugrNode>(
+    h: &impl HugrView<Node = N>,
+    func: N,
+    candidates: &HashSet<N>,
+) -> Vec<N> {
+    h.descendants(func)
+        .filter_map(|node| h.static_source(node))
+        .filter(|target| candidates.contains(target))
+        .collect_vec()
+}
+
+/// Removes generated modified functions that are no longer reachable.
+///
+/// A candidate is kept if it is the entrypoint's containing function, is not
+/// removable under `scope`, is used from outside the candidate set, or is a
+/// static dependency of another kept candidate.
+fn remove_unused_modified_functions<N: HugrNode>(
+    h: &mut impl HugrMut<Node = N>,
+    modified_functions: &HashSet<N>,
+    scope: &PassScope,
+) {
+    let mut candidates = modified_functions
+        .iter()
+        .copied()
+        .filter(|func| {
+            h.contains_node(*func)
+                && h.get_optype(*func).as_func_defn().is_some()
+                && scope.in_scope(h, *func) == InScope::Yes
+        })
+        .collect::<HashSet<_>>();
+
+    // Removing the function containing the entrypoint would leave an invalid HUGR.
+    if let Some(entrypoint_owner) = module_child_containing(h, h.entrypoint()) {
+        candidates.remove(&entrypoint_owner);
+    }
+
+    let mut live = candidates
+        .iter()
+        .copied()
+        .filter(|func| has_static_use_outside_candidates(h, *func, &candidates))
+        .collect::<HashSet<_>>();
+    let mut worklist = live.iter().copied().collect::<VecDeque<_>>();
+
+    while let Some(func) = worklist.pop_front() {
+        for dependency in candidate_static_dependencies(h, func, &candidates) {
+            if live.insert(dependency) {
+                worklist.push_back(dependency);
+            }
+        }
+    }
+
+    let unused = candidates.difference(&live).copied().collect_vec();
+
+    for func in unused {
+        if h.contains_node(func) {
+            h.remove_subtree(func);
+        }
+    }
+}
+
 /// Resolve modifiers in a circuit by applying them to each entry point.
+///
+/// When resolution creates modified replacements for loaded functions, the
+/// original solved function nodes are removed if they are no longer reachable
+/// from the entrypoint, from nodes whose interface is preserved by the default
+/// pass scope, or from other preserved modified functions.
+///
+/// Use [`resolve_modifier_with_entrypoints_and_scope`] to make cleanup follow a
+/// specific [`PassScope`].
 //
 // Shouldn't we use a worklist of nodes?
 // As we may want to change the order of resolving modifiers
@@ -1097,6 +1210,19 @@ impl<N: HugrNode> ModifierResolver<N> {
 pub fn resolve_modifier_with_entrypoints(
     h: &mut impl HugrMut<Node = Node>,
     entry_points: impl IntoIterator<Item = Node>,
+) -> Result<(), ModifierResolverErrors<Node>> {
+    resolve_modifier_with_entrypoints_and_scope(h, entry_points, &PassScope::default())
+}
+
+/// Resolve modifiers in a circuit by applying them to each entry point.
+///
+/// Cleanup of solved original function nodes respects `scope`: a function is
+/// only removed when it is no longer needed and [`PassScope::in_scope`] says the
+/// function may be modified freely.
+pub fn resolve_modifier_with_entrypoints_and_scope(
+    h: &mut impl HugrMut<Node = Node>,
+    entry_points: impl IntoIterator<Item = Node>,
+    scope: &PassScope,
 ) -> Result<(), ModifierResolverErrors<Node>> {
     use ModifierResolverErrors::*;
 
@@ -1179,6 +1305,10 @@ pub fn resolve_modifier_with_entrypoints(
     // were produced or left behind by the resolution passes above.
     delete_phase(h, entry_points)?;
 
+    // Remove only original functions for which this resolver generated modified
+    // replacements, and only when no remaining non-obsolete function uses them.
+    remove_unused_modified_functions(h, &resolver.modified_functions, scope);
+
     h.validate()
         .map_err(|e| ModifierResolverErrors::BuildError(e.into()))?;
 
@@ -1195,15 +1325,21 @@ mod tests {
     use hugr::{
         Hugr,
         builder::{DataflowSubContainer, HugrBuilder, ModuleBuilder},
-        ops::{CallIndirect, ExtensionOp, handle::FuncID},
+        ops::{
+            CallIndirect, ExtensionOp,
+            handle::{FuncID, NodeHandle},
+        },
         std_extensions::collections::array::ArrayOpBuilder,
         types::Term,
     };
+
+    use hugr_core::Visibility;
 
     use crate::{
         TketOp,
         extension::modifier::{CONTROL_OP_ID, DAGGER_OP_ID, MODIFIER_EXTENSION},
         metadata,
+        passes::composable::Preserve,
     };
 
     use super::*;
@@ -1214,7 +1350,8 @@ mod tests {
     impl<T: Container> SetUnitary for T {
         fn set_unitary(&mut self) {
             let node = self.container_node();
-            self.hugr_mut().set_metadata::<metadata::Unitary>(node, 7);
+            self.hugr_mut()
+                .set_metadata::<metadata::UnitaryFlags>(node, 7);
         }
     }
 
@@ -1294,6 +1431,7 @@ mod tests {
 
         // Let the caller insert the function-under-test into the module.
         let foo = foo(&mut module, target_num);
+        let foo_node = foo.node();
 
         // Build the "main" function body ---
         let _main = {
@@ -1359,38 +1497,448 @@ mod tests {
         let entrypoint = h.entrypoint();
         resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
 
+        // We check that the original function node has been removed in the resolved hugr
+        assert!(!h.contains_node(foo_node));
+
+        // We also check that there is no modifier node in the resolved hugr.
+        assert!(
+            h.nodes()
+                .all(|node| Modifier::from_optype(h.get_optype(node)).is_none())
+        );
+
         // The resolved hugr must still be structurally valid.
         assert_matches!(h.validate(), Ok(()));
     }
 
-    const GUPPY_EXAMPLES_DIR: &str = "../test_files/modifier_examples";
+    #[test]
+    /// Test that a LoadFunction node that is shared between a modifier and a direct call is not removed during resolution.
+    fn shared_loaded_function_is_not_removed() {
+        let mut module = ModuleBuilder::new();
 
-    fn load_guppy_example(name: &str) -> std::io::Result<Hugr> {
-        let file = Path::new(GUPPY_EXAMPLES_DIR).join(format!("{name}.hugr"));
+        let foo_sig = Signature::new_endo(vec![qb_t()]);
+        let foo = {
+            let mut func = module.define_function("foo", foo_sig.clone()).unwrap();
+            func.set_unitary();
+            let mut inputs: Vec<Wire> = func.input_wires().collect();
+            inputs[0] = func
+                .add_dataflow_op(TketOp::X, vec![inputs[0]])
+                .unwrap()
+                .out_wire(0);
+            func.finish_with_outputs(inputs).unwrap()
+        };
+        let foo_node = foo.node();
+
+        let ctrl_num = 1;
+        let controlled_sig = Signature::new_endo(vec![array_type(ctrl_num, qb_t()), qb_t()]);
+        let main_sig = Signature::new(
+            type_row![],
+            vec![array_type(ctrl_num, qb_t()), qb_t(), qb_t()],
+        );
+        let control_op: ExtensionOp = MODIFIER_EXTENSION
+            .instantiate_extension_op(
+                &CONTROL_OP_ID,
+                [
+                    Term::BoundedNat(ctrl_num),
+                    vec![qb_t().into()].into(),
+                    vec![].into(),
+                ],
+            )
+            .unwrap();
+
+        let shared_load_node = {
+            let mut func = module.define_function("main", main_sig).unwrap();
+            let loaded = func.load_func(foo.handle(), &[]).unwrap();
+            let shared_load_node = loaded.node();
+
+            let modified_fn = func
+                .add_dataflow_op(control_op, vec![loaded])
+                .unwrap()
+                .out_wire(0);
+
+            let control = func
+                .add_dataflow_op(TketOp::QAlloc, vec![])
+                .unwrap()
+                .out_wire(0);
+            let controlled_target = func
+                .add_dataflow_op(TketOp::QAlloc, vec![])
+                .unwrap()
+                .out_wire(0);
+            let direct_target = func
+                .add_dataflow_op(TketOp::QAlloc, vec![])
+                .unwrap()
+                .out_wire(0);
+            let control_arr = func.add_new_array(qb_t(), [control]).unwrap();
+
+            let [control_arr, controlled_target] = func
+                .add_dataflow_op(
+                    CallIndirect {
+                        signature: controlled_sig,
+                    },
+                    [modified_fn, control_arr, controlled_target],
+                )
+                .unwrap()
+                .outputs_arr();
+
+            let direct_target = func
+                .add_dataflow_op(CallIndirect { signature: foo_sig }, [loaded, direct_target])
+                .unwrap()
+                .out_wire(0);
+
+            func.finish_with_outputs([control_arr, controlled_target, direct_target])
+                .unwrap();
+            shared_load_node
+        };
+
+        let mut h = module.finish_hugr().unwrap();
+        assert_matches!(h.validate(), Ok(()));
+
+        let entrypoint = h.entrypoint();
+        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+
+        // Check that the shared load and original function are still present after resolution.
+        assert!(h.contains_node(shared_load_node));
+        assert!(h.contains_node(foo_node));
+        assert_matches!(h.validate(), Ok(()));
+    }
+
+    #[test]
+    /// Test that an unmodified function that is not used by any remaining modifier is preserved after resolution.
+    fn unused_unmodified_function_is_preserved() {
+        let mut module = ModuleBuilder::new();
+
+        // `foo` is loaded through a modifier in `main`, so resolving the modifier
+        // should create a replacement function and leave the original `foo` unused.
+        let foo_sig = Signature::new_endo(vec![qb_t()]);
+        let foo = {
+            let mut func = module.define_function("foo", foo_sig.clone()).unwrap();
+            func.set_unitary();
+            let mut inputs: Vec<Wire> = func.input_wires().collect();
+            inputs[0] = func
+                .add_dataflow_op(TketOp::X, vec![inputs[0]])
+                .unwrap()
+                .out_wire(0);
+            func.finish_with_outputs(inputs).unwrap()
+        };
+        let foo_node = foo.node();
+
+        // This function is unused before and after resolution, but it was not
+        // modified by the resolver and so must be preserved by this cleanup.
+        let unused = {
+            let func = module
+                .define_function("unused", Signature::new_endo(vec![qb_t()]))
+                .unwrap();
+            let inputs = func.input_wires();
+            func.finish_with_outputs(inputs).unwrap()
+        };
+        let unused_node = unused.node();
+
+        let ctrl_num = 1;
+        let controlled_sig = Signature::new_endo(vec![array_type(ctrl_num, qb_t()), qb_t()]);
+        let main_sig = Signature::new(type_row![], vec![array_type(ctrl_num, qb_t()), qb_t()]);
+        let control_op: ExtensionOp = MODIFIER_EXTENSION
+            .instantiate_extension_op(
+                &CONTROL_OP_ID,
+                [
+                    Term::BoundedNat(ctrl_num),
+                    vec![qb_t().into()].into(),
+                    vec![].into(),
+                ],
+            )
+            .unwrap();
+
+        {
+            let mut func = module.define_function("main", main_sig).unwrap();
+            // Build `LoadFunction(foo) -> Control -> CallIndirect`.
+            let loaded = func.load_func(foo.handle(), &[]).unwrap();
+            let modified_fn = func
+                .add_dataflow_op(control_op, vec![loaded])
+                .unwrap()
+                .out_wire(0);
+            let control = func
+                .add_dataflow_op(TketOp::QAlloc, vec![])
+                .unwrap()
+                .out_wire(0);
+            let target = func
+                .add_dataflow_op(TketOp::QAlloc, vec![])
+                .unwrap()
+                .out_wire(0);
+            let control_arr = func.add_new_array(qb_t(), [control]).unwrap();
+            let outputs = func
+                .add_dataflow_op(
+                    CallIndirect {
+                        signature: controlled_sig,
+                    },
+                    [modified_fn, control_arr, target],
+                )
+                .unwrap()
+                .outputs();
+            func.finish_with_outputs(outputs).unwrap();
+        }
+
+        let mut h = module.finish_hugr().unwrap();
+        assert_matches!(h.validate(), Ok(()));
+
+        let entrypoint = h.entrypoint();
+        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+
+        // Only the original function that was actually replaced is removed.
+        assert!(!h.contains_node(foo_node));
+        assert!(h.contains_node(unused_node));
+        assert_matches!(h.validate(), Ok(()));
+    }
+
+    #[test]
+    /// Test that a public function used through a modifier is preserved after resolution.
+    fn modified_public_function_is_not_removed_after_passes() {
+        let mut module = ModuleBuilder::new();
+
+        let foo_sig = Signature::new_endo(vec![qb_t()]);
+        let foo = {
+            let mut func = module
+                .define_function_vis("foo", foo_sig, Visibility::Public)
+                .unwrap();
+
+            func.set_unitary();
+            let mut inputs: Vec<Wire> = func.input_wires().collect();
+            inputs[0] = func
+                .add_dataflow_op(TketOp::X, vec![inputs[0]])
+                .unwrap()
+                .out_wire(0);
+            func.finish_with_outputs(inputs).unwrap()
+        };
+        let foo_node = foo.node();
+
+        let ctrl_num = 1;
+        let controlled_sig = Signature::new_endo(vec![array_type(ctrl_num, qb_t()), qb_t()]);
+        let main_sig = Signature::new(type_row![], vec![array_type(ctrl_num, qb_t()), qb_t()]);
+        let control_op: ExtensionOp = MODIFIER_EXTENSION
+            .instantiate_extension_op(
+                &CONTROL_OP_ID,
+                [
+                    Term::BoundedNat(ctrl_num),
+                    vec![qb_t().into()].into(),
+                    vec![].into(),
+                ],
+            )
+            .unwrap();
+
+        {
+            let mut func = module.define_function("main", main_sig).unwrap();
+            let loaded = func.load_func(foo.handle(), &[]).unwrap();
+            let modified_fn = func
+                .add_dataflow_op(control_op, vec![loaded])
+                .unwrap()
+                .out_wire(0);
+            let control = func
+                .add_dataflow_op(TketOp::QAlloc, vec![])
+                .unwrap()
+                .out_wire(0);
+            let target = func
+                .add_dataflow_op(TketOp::QAlloc, vec![])
+                .unwrap()
+                .out_wire(0);
+            let control_arr = func.add_new_array(qb_t(), [control]).unwrap();
+            let outputs = func
+                .add_dataflow_op(
+                    CallIndirect {
+                        signature: controlled_sig,
+                    },
+                    [modified_fn, control_arr, target],
+                )
+                .unwrap()
+                .outputs();
+            func.finish_with_outputs(outputs).unwrap();
+        }
+
+        let mut h = module.finish_hugr().unwrap();
+        assert_matches!(h.validate(), Ok(()));
+
+        let entrypoint = h.entrypoint();
+        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+
+        assert!(h.contains_node(foo_node));
+        assert_matches!(h.validate(), Ok(()));
+    }
+
+    #[test]
+    /// Test that public modified functions may be removed when the scope permits it.
+    fn modified_public_function_is_removed_when_not_preserved_by_scope() {
+        let mut module = ModuleBuilder::new();
+
+        let foo_sig = Signature::new_endo(vec![qb_t()]);
+        let foo = {
+            let mut func = module
+                .define_function_vis("foo", foo_sig, Visibility::Public)
+                .unwrap();
+            func.set_unitary();
+            let mut inputs: Vec<Wire> = func.input_wires().collect();
+            inputs[0] = func
+                .add_dataflow_op(TketOp::X, vec![inputs[0]])
+                .unwrap()
+                .out_wire(0);
+            func.finish_with_outputs(inputs).unwrap()
+        };
+        let foo_node = foo.node();
+
+        let ctrl_num = 1;
+        let controlled_sig = Signature::new_endo(vec![array_type(ctrl_num, qb_t()), qb_t()]);
+        let main_sig = Signature::new(type_row![], vec![array_type(ctrl_num, qb_t()), qb_t()]);
+        let control_op: ExtensionOp = MODIFIER_EXTENSION
+            .instantiate_extension_op(
+                &CONTROL_OP_ID,
+                [
+                    Term::BoundedNat(ctrl_num),
+                    vec![qb_t().into()].into(),
+                    vec![].into(),
+                ],
+            )
+            .unwrap();
+
+        let main_node = {
+            let mut func = module.define_function("main", main_sig).unwrap();
+            let loaded = func.load_func(foo.handle(), &[]).unwrap();
+            let modified_fn = func
+                .add_dataflow_op(control_op, vec![loaded])
+                .unwrap()
+                .out_wire(0);
+            let control = func
+                .add_dataflow_op(TketOp::QAlloc, vec![])
+                .unwrap()
+                .out_wire(0);
+            let target = func
+                .add_dataflow_op(TketOp::QAlloc, vec![])
+                .unwrap()
+                .out_wire(0);
+            let control_arr = func.add_new_array(qb_t(), [control]).unwrap();
+            let outputs = func
+                .add_dataflow_op(
+                    CallIndirect {
+                        signature: controlled_sig,
+                    },
+                    [modified_fn, control_arr, target],
+                )
+                .unwrap()
+                .outputs();
+            func.finish_with_outputs(outputs).unwrap().node()
+        };
+
+        let mut h = module.finish_hugr().unwrap();
+        h.set_entrypoint(main_node);
+        assert_matches!(h.validate(), Ok(()));
+
+        let scope = PassScope::Global(Preserve::Entrypoint);
+        let root = scope.root(&h).unwrap();
+        resolve_modifier_with_entrypoints_and_scope(&mut h, [root], &scope).unwrap();
+
+        assert!(!h.contains_node(foo_node));
+        assert_matches!(h.validate(), Ok(()));
+    }
+
+    #[test]
+    /// Test that a still used function is not removed
+    fn modified_dependency_is_preserved_when_original_caller_is_live() {
+        let mut module = ModuleBuilder::new();
+
+        // `foo` is a dependency of `bar`. Resolving the modified call to `bar`
+        // also creates a modified copy of `foo` for the replacement `bar`.
+        let foo_sig = Signature::new_endo(vec![qb_t()]);
+        let foo = {
+            let mut func = module.define_function("foo", foo_sig.clone()).unwrap();
+            func.set_unitary();
+            let mut inputs: Vec<Wire> = func.input_wires().collect();
+            inputs[0] = func
+                .add_dataflow_op(TketOp::X, vec![inputs[0]])
+                .unwrap()
+                .out_wire(0);
+            func.finish_with_outputs(inputs).unwrap()
+        };
+        let foo_node = foo.node();
+
+        // `bar` is used both through a modifier and by a plain direct call in
+        // `main`, so the original `bar` must remain live after resolution.
+        let bar = {
+            let mut func = module.define_function("bar", foo_sig.clone()).unwrap();
+            func.set_unitary();
+            let call = func.call(foo.handle(), &[], func.input_wires()).unwrap();
+            func.finish_with_outputs(call.outputs()).unwrap()
+        };
+        let bar_node = bar.node();
+
+        let ctrl_num = 1;
+        let controlled_sig = Signature::new_endo(vec![array_type(ctrl_num, qb_t()), qb_t()]);
+        let main_sig = Signature::new(
+            type_row![],
+            vec![array_type(ctrl_num, qb_t()), qb_t(), qb_t()],
+        );
+        let control_op: ExtensionOp = MODIFIER_EXTENSION
+            .instantiate_extension_op(
+                &CONTROL_OP_ID,
+                [
+                    Term::BoundedNat(ctrl_num),
+                    vec![qb_t().into()].into(),
+                    vec![].into(),
+                ],
+            )
+            .unwrap();
+
+        {
+            let mut func = module.define_function("main", main_sig).unwrap();
+            // One branch uses a controlled indirect call to `bar`; the other
+            // branch calls the original `bar` directly.
+            let loaded = func.load_func(bar.handle(), &[]).unwrap();
+            let modified_fn = func
+                .add_dataflow_op(control_op, vec![loaded])
+                .unwrap()
+                .out_wire(0);
+
+            let control = func
+                .add_dataflow_op(TketOp::QAlloc, vec![])
+                .unwrap()
+                .out_wire(0);
+            let controlled_target = func
+                .add_dataflow_op(TketOp::QAlloc, vec![])
+                .unwrap()
+                .out_wire(0);
+            let direct_target = func
+                .add_dataflow_op(TketOp::QAlloc, vec![])
+                .unwrap()
+                .out_wire(0);
+            let control_arr = func.add_new_array(qb_t(), [control]).unwrap();
+
+            let [control_arr, controlled_target] = func
+                .add_dataflow_op(
+                    CallIndirect {
+                        signature: controlled_sig,
+                    },
+                    [modified_fn, control_arr, controlled_target],
+                )
+                .unwrap()
+                .outputs_arr();
+            let direct_target = func
+                .call(bar.handle(), &[], [direct_target])
+                .unwrap()
+                .out_wire(0);
+
+            func.finish_with_outputs([control_arr, controlled_target, direct_target])
+                .unwrap();
+        }
+
+        let mut h = module.finish_hugr().unwrap();
+        assert_matches!(h.validate(), Ok(()));
+
+        let entrypoint = h.entrypoint();
+        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+
+        // Keeping original `bar` also requires keeping its original dependency `foo`.
+        assert!(h.contains_node(bar_node));
+        assert!(h.contains_node(foo_node));
+        assert_matches!(h.validate(), Ok(()));
+    }
+
+    fn load_guppy_example(file: impl AsRef<Path>) -> std::io::Result<Hugr> {
         let reader = fs::File::open(file)?;
         let reader = BufReader::new(reader);
         Ok(Hugr::load(reader, None).unwrap())
-    }
-
-    fn load_guppy_examples() -> std::io::Result<Vec<(String, Hugr)>> {
-        let mut files = fs::read_dir(GUPPY_EXAMPLES_DIR)?
-            .filter_map(|entry| {
-                let path = entry.ok()?.path();
-                path.extension()
-                    .is_some_and(|ext| ext == "hugr")
-                    .then_some(path)
-            })
-            .collect::<Vec<_>>();
-        files.sort_unstable();
-
-        files
-            .into_iter()
-            .map(|file| {
-                let name = file.file_stem().unwrap().to_string_lossy().into_owned();
-                let h = load_guppy_example(&name)?;
-                Ok((name, h))
-            })
-            .collect()
     }
 
     /// Resolve modifiers in `h`
@@ -1403,11 +1951,29 @@ mod tests {
         assert_matches!(h.validate(), Ok(()));
     }
 
+    /// Run the pass on hugrs generated by guppy.
     #[rstest::rstest]
-    fn test_saved_hugr() {
-        for (name, mut h) in load_guppy_examples().unwrap() {
-            println!("Resolving example: {name}");
-            test_resolve(&mut h);
-        }
+    #[case::guppy_modifiers("../test_files/guppy_examples/modifiers.hugr")]
+    #[case::classical_function1("../test_files/modifier_examples/classical_function1.hugr")]
+    #[case::classical_function2("../test_files/modifier_examples/classical_function2.hugr")]
+    #[case::classical_function3("../test_files/modifier_examples/classical_function3.hugr")]
+    // TODO(perf): Investigate why this test is so slow (18s on my machine).
+    // <https://github.com/Quantinuum/tket2/issues/1586>
+    #[ignore = "slow regression test"]
+    #[case::complex_modifier_stress("../test_files/modifier_examples/complex_modifier_stress.hugr")]
+    #[case::ctrl_array_controller("../test_files/modifier_examples/ctrl_array_controller.hugr")]
+    #[case::ctrl_on_call1("../test_files/modifier_examples/ctrl_on_call1.hugr")]
+    #[case::ctrl_on_call2("../test_files/modifier_examples/ctrl_on_call2.hugr")]
+    #[case::ctrl_on_x("../test_files/modifier_examples/ctrl_on_x.hugr")]
+    #[case::dagger_on_call("../test_files/modifier_examples/dagger_on_call.hugr")]
+    #[case::double_modifier("../test_files/modifier_examples/double_modifier.hugr")]
+    #[case::modify_array("../test_files/modifier_examples/modify_array.hugr")]
+    #[case::multiple_dagger("../test_files/modifier_examples/multiple_dagger.hugr")]
+    #[case::nested_ctrl_dagger1("../test_files/modifier_examples/nested_ctrl_dagger1.hugr")]
+    #[case::nested_multiple_ctrl1("../test_files/modifier_examples/nested_multiple_ctrl1.hugr")]
+    #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
+    fn test_examples(#[case] example: &str) {
+        let mut h = load_guppy_example(example).unwrap();
+        test_resolve(&mut h);
     }
 }

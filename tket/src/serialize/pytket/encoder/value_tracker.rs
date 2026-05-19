@@ -216,13 +216,15 @@ impl<N: HugrNode> ValueTracker<N> {
         config: &PytketEncoderConfig<H>,
     ) -> Result<Self, PytketEncodeError<N>> {
         let param_variable_names: Vec<String> =
-            read_metadata_json_list::<_, _, metadata::InputParameters>(hugr, region);
+            read_metadata_json_list::<_, _, metadata::PytketInputParameters>(hugr, region);
         let mut tracker = ValueTracker {
-            qubits: read_metadata_json_list::<_, _, metadata::QubitRegisters>(hugr, region)
-                .into_iter()
-                .map(|q| q.id)
-                .collect_vec(),
-            bits: read_metadata_json_list::<_, _, metadata::BitRegisters>(hugr, region)
+            qubits: read_metadata_json_list::<_, _, metadata::PytketQubitRegisterNames>(
+                hugr, region,
+            )
+            .into_iter()
+            .map(|q| q.id)
+            .collect_vec(),
+            bits: read_metadata_json_list::<_, _, metadata::PytketBitRegisterNames>(hugr, region)
                 .into_iter()
                 .map(|b| b.id)
                 .collect_vec(),

@@ -1,4 +1,5 @@
 //! Python bindings for TKET.
+pub mod metadata;
 pub mod ops;
 pub mod optimiser;
 pub mod passes;
@@ -13,6 +14,7 @@ use pyo3::prelude::*;
 /// The Python bindings to TKET.
 #[pymodule]
 fn _tket(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
+    add_submodule(py, m, metadata::module(py)?)?;
     add_submodule(py, m, state::module(py)?)?;
     add_submodule(py, m, ops::module(py)?)?;
     add_submodule(py, m, optimiser::module(py)?)?;

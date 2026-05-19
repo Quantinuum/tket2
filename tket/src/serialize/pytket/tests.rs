@@ -272,7 +272,7 @@ fn circ_preset_qubits() -> Hugr {
     let mut hugr = h.finish_hugr_with_outputs([qb0, qb1]).unwrap();
 
     // A preset register for the first qubit output
-    hugr.set_metadata::<metadata::QubitRegisters>(
+    hugr.set_metadata::<metadata::PytketQubitRegisterNames>(
         hugr.entrypoint(),
         vec![
             ElementId(String::from("q"), vec![2]),
@@ -305,7 +305,7 @@ fn circ_preset_bits() -> Hugr {
     let mut hugr = h.finish_hugr_with_outputs([b0, b_and, b0]).unwrap();
 
     // A preset register for the first qubit output
-    hugr.set_metadata::<metadata::BitRegisters>(
+    hugr.set_metadata::<metadata::PytketBitRegisterNames>(
         hugr.entrypoint(),
         vec![ElementId(String::from("b"), vec![1])]
             .into_iter()
@@ -341,7 +341,7 @@ fn circ_parameterized() -> Hugr {
     let mut hugr = h.finish_hugr_with_outputs([q]).unwrap();
 
     // Preset names for some of the inputs
-    hugr.set_metadata::<metadata::InputParameters>(
+    hugr.set_metadata::<metadata::PytketInputParameters>(
         hugr.entrypoint(),
         vec!["alpha".to_string(), "beta".to_string()],
     );
