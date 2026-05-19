@@ -1,8 +1,9 @@
 use std::sync::{Arc, Weak};
 
+use crate::extension::measurement::measurement_type;
 use crate::extension::rotation::rotation_type;
 use crate::extension::sympy::SympyOpDef;
-use crate::extension::{TKET_EXTENSION, TKET_EXTENSION_ID as EXTENSION_ID, measurement_type};
+use crate::extension::{TKET_EXTENSION, TKET_EXTENSION_ID as EXTENSION_ID};
 use hugr::extension::prelude::bool_t;
 use hugr::ops::custom::ExtensionOp;
 use hugr::types::Type;
@@ -172,7 +173,7 @@ pub enum TketOp {
     ///
     /// Outputs:
     /// - A qubit
-    /// - A boolean indicating whether the qubit was measured as 1
+    /// - A [`measurement_type`] indicating whether the qubit was measured as 1
     Measure,
     /// Measure a qubit and consume the qubit.
     ///
@@ -180,7 +181,7 @@ pub enum TketOp {
     /// - A qubit
     ///
     /// Outputs:
-    /// - A measurement indicating whether the qubit was measured as 1
+    /// - A [`measurement_type`] indicating whether the qubit was measured as 1
     MeasureFree,
     /// Allocate a qubit.
     ///
@@ -367,7 +368,7 @@ pub(crate) mod test {
     use super::TketOp;
     use crate::Pauli;
     use crate::circuit::Circuit;
-    use crate::extension::MeasurementOp;
+    use crate::extension::measurement::MeasurementOp;
     use crate::extension::{TKET_EXTENSION as EXTENSION, TKET_EXTENSION_ID as EXTENSION_ID};
     use crate::utils::build_simple_circuit;
     fn get_opdef(op: TketOp) -> Option<&'static Arc<OpDef>> {

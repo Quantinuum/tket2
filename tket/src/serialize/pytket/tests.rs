@@ -16,9 +16,10 @@ use std::sync::Arc;
 
 use super::TKETDecode;
 use crate::TketOp;
+use crate::extension::TKET1_EXTENSION_ID;
+use crate::extension::measurement::MeasurementOp;
 use crate::extension::rotation::{ConstRotation, RotationOp, rotation_type};
 use crate::extension::sympy::SympyOpDef;
-use crate::extension::{MeasurementOp, TKET1_EXTENSION_ID};
 use crate::metadata;
 use crate::serialize::pytket::PytketEncodeError;
 use crate::serialize::pytket::extension::{CoreDecoder, OpaqueTk1Op, PreludeEmitter};
@@ -292,7 +293,7 @@ fn circ_preset_qubits() -> Hugr {
 #[fixture]
 fn circ_preset_bits() -> Hugr {
     let input_t = vec![bool_t()];
-    let output_t = vec![bool_t(), bool_t(), bool_t()];
+    let output_t = vec![bool_t(); 3];
     let mut h = FunctionBuilder::new("preset_bits", Signature::new(input_t, output_t)).unwrap();
 
     let [b0] = h.input_wires_arr();

@@ -332,7 +332,7 @@ mod test {
             .unwrap();
 
         let (mut hugr, [call_node, h_node, f_node, rx_node, main_node]) = {
-            use tket::extension::MeasurementOp;
+            use tket::extension::measurement::MeasurementOp;
 
             let mut builder = mb
                 .define_function_vis(
@@ -369,7 +369,7 @@ mod test {
             // Reads will be added.  The Lazy Measure will be lifted and the
             // reads will be sunk.
             let [measure_result] = builder
-                .add_dataflow_op(QSystemOp::Measure, [qb])
+                .add_dataflow_op(QSystemOp::LazyMeasure, [qb])
                 .unwrap()
                 .outputs_arr();
 

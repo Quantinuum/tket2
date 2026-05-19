@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 use std::sync::RwLock;
 
-use hugr::builder::{BuildError, DFGBuilder};
+use hugr::builder::DFGBuilder;
 use hugr::extension::ExtensionId;
 use hugr::extension::prelude::bool_t;
 use hugr::std_extensions::arithmetic::float_types;
@@ -154,10 +154,7 @@ impl TypeTranslatorSet {
     // TODO: We should allow custom TypeTranslators to expand this checks,
     // and implement their own translations.
     pub fn types_are_isomorphic(&self, typ1: &Type, typ2: &Type) -> bool {
-        if typ1 == typ2 {
-            return true;
-        }
-        false
+        typ1 == typ2
     }
 
     /// Inserts the necessary operations to translate a type into an isomorphic
@@ -174,14 +171,6 @@ impl TypeTranslatorSet {
         if initial_type == target_type {
             return Ok(wire);
         }
-
-        let _map_build_error = |e: BuildError| PytketDecodeErrorInner::CannotTranslateWire {
-            wire,
-            initial_type: initial_type.to_string(),
-            target_type: target_type.to_string(),
-            context: Some(e.to_string()),
-        };
-
         Err(PytketDecodeErrorInner::CannotTranslateWire {
             wire,
             initial_type: initial_type.to_string(),

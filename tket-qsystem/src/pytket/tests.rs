@@ -12,7 +12,8 @@ use hugr::{Hugr, HugrView};
 use itertools::Itertools;
 use rstest::{fixture, rstest};
 use tket::TketOp;
-use tket::extension::{MeasurementOp, TKET1_EXTENSION_ID};
+use tket::extension::TKET1_EXTENSION_ID;
+use tket::extension::measurement::MeasurementOp;
 use tket::serialize::pytket::EncodedCircuit;
 use tket::serialize::pytket::TKETDecode;
 use tket::serialize::pytket::{DecodeOptions, EncodeOptions};
@@ -158,21 +159,15 @@ fn circ_qsystem_native_gates() -> Hugr {
     let [qb1] = h.add_dataflow_op(TketOp::QAlloc, []).unwrap().outputs_arr();
 
     let [bit_0] = h
-        .add_dataflow_op(QSystemOp::Measure, [qb0])
+        .add_dataflow_op(QSystemOp::LazyMeasure, [qb0])
         .unwrap()
         .outputs_arr();
     let [bit_1] = h
-        .add_dataflow_op(QSystemOp::Measure, [qb1])
+        .add_dataflow_op(QSystemOp::LazyMeasure, [qb1])
         .unwrap()
         .outputs_arr();
-    let [bit_0] = h
-        .add_dataflow_op(MeasurementOp::Read, [bit_0])
-        .unwrap()
-        .outputs_arr();
-    let [bit_1] = h
-        .add_dataflow_op(MeasurementOp::Read, [bit_1])
-        .unwrap()
-        .outputs_arr();
+    let [bit_0] = h.add_read(bit_0, bool_t()).unwrap();
+    let [bit_1] = h.add_read(bit_1, bool_t()).unwrap();
 
     h.finish_hugr_with_outputs([bit_0, bit_1]).unwrap()
 }

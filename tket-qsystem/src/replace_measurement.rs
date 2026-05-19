@@ -2,18 +2,16 @@
 //! a `Future<Bool>` and rewrites any ops using it.
 
 use derive_more::{Display, Error, From};
-use hugr::extension::prelude::bool_t;
+use hugr::extension::prelude::{Noop, bool_t};
 use hugr::extension::simple_op::MakeRegisteredOp;
 use hugr::{Node, hugr::hugrmut::HugrMut};
+use tket::TketOp;
+use tket::extension::measurement::{MeasurementOp, measurement_type};
 use tket::passes::PassScope;
 use tket::passes::composable::WithScope;
 use tket::passes::non_local::LocalizeEdges;
 use tket::passes::replace_types::{NodeTemplate, ReplaceTypesError};
 use tket::passes::{ComposablePass, ReplaceTypes, non_local::FindNonLocalEdgesError};
-use tket::{
-    TketOp,
-    extension::{MeasurementOp, measurement_type},
-};
 
 use crate::extension::futures::{FutureOp, FutureOpDef, future_type};
 use crate::extension::qsystem::QSystemOp;
@@ -30,9 +28,11 @@ pub enum ReplaceMeasurementPassError<N> {
 
 /// A HUGR -> HUGR pass replacing `tket.measurement` with `future(bool_t)`.
 ///
-/// [TketOp::MeasureFree] and [QSystemOp::Measure] ops are replaced by
-/// [QSystemOp::LazyMeasure], while [QSystemOp::MeasureReset] ops are
-/// replaced by [QSystemOp::LazyMeasureReset].
+/// [TketOp::MeasureFree] is replaced by [QSystemOp::LazyMeasure], and
+/// [QSystemOp::FutureToMeasurement] becomes a no-op. The linearizer ops for measurement
+/// types ([MeasurementOp::Read], [MeasurementOp::Dup], and [MeasurementOp::Free]) are
+/// replaced by the corresponding linearizer ops for future types ([FutureOpDef::Read],
+/// [FutureOpDef::Dup], and [FutureOpDef::Free]).
 #[derive(Default, Debug, Clone)]
 pub struct ReplaceMeasurementPass {
     /// Where to apply the pass.
@@ -106,13 +106,9 @@ fn lowerer() -> ReplaceTypes {
         NodeTemplate::SingleOp(QSystemOp::LazyMeasure.to_extension_op().unwrap().into()),
     );
     lw.set_replace_op(
-        &QSystemOp::Measure.to_extension_op().unwrap(),
-        NodeTemplate::SingleOp(QSystemOp::LazyMeasure.to_extension_op().unwrap().into()),
-    );
-    lw.set_replace_op(
-        &QSystemOp::MeasureReset.to_extension_op().unwrap(),
+        &QSystemOp::FutureToMeasurement.to_extension_op().unwrap(),
         NodeTemplate::SingleOp(
-            QSystemOp::LazyMeasureReset
+            Noop::new(future_type(bool_t()))
                 .to_extension_op()
                 .unwrap()
                 .into(),
@@ -127,129 +123,65 @@ mod test {
     use super::*;
     use hugr::HugrView;
     use hugr::builder::{DFGBuilder, Dataflow, DataflowHugr, inout_sig};
+    use hugr::extension::prelude::qb_t;
     use hugr::extension::simple_op::MakeOpDef;
-    use hugr::ops::OpType;
-    use hugr::types::Type;
-    use hugr::types::TypeRow;
-    use rstest::rstest;
-
-    use crate::extension::qsystem::QSystemOpBuilder;
 
     #[test]
-    fn test_replace_measurement_type_and_read() {
-        let mut dfb = DFGBuilder::new(inout_sig(vec![measurement_type()], vec![bool_t()])).unwrap();
-        let [m] = dfb.input_wires_arr();
-        let out = dfb.add_dataflow_op(MeasurementOp::Read, [m]).unwrap();
-        let mut h = dfb.finish_hugr_with_outputs(out.outputs()).unwrap();
+    fn test_replace_all_ops() {
+        let mut circuit = DFGBuilder::new(inout_sig(vec![qb_t(); 2], vec![bool_t()])).unwrap();
+        let [q1, q2] = circuit.input_wires_arr();
+
+        // TketOp::MeasureFree
+        let m1 = circuit
+            .add_dataflow_op(TketOp::MeasureFree, [q1])
+            .unwrap()
+            .out_wire(0);
+
+        // QSystemOp::LazyMeasure
+        let f2 = circuit
+            .add_dataflow_op(QSystemOp::LazyMeasure, [q2])
+            .unwrap()
+            .out_wire(0);
+
+        // QSystemOp::FutureToMeasurement
+        let m2 = circuit
+            .add_dataflow_op(QSystemOp::FutureToMeasurement, [f2])
+            .unwrap()
+            .out_wire(0);
+
+        // Duplicate one measurement
+        let [m1_1, m1_2] = circuit
+            .add_dataflow_op(MeasurementOp::Dup, [m1])
+            .unwrap()
+            .outputs_arr();
+
+        // Read one
+        let b1 = circuit
+            .add_dataflow_op(MeasurementOp::Read, [m1_1])
+            .unwrap()
+            .out_wire(0);
+
+        // Free the rest
+        circuit
+            .add_dataflow_op(MeasurementOp::Free, [m1_2])
+            .unwrap();
+        circuit.add_dataflow_op(MeasurementOp::Free, [m2]).unwrap();
+
+        let mut h = circuit.finish_hugr_with_outputs([b1]).unwrap();
         h.validate().unwrap();
 
         ReplaceMeasurementPass::default().run(&mut h).unwrap();
         h.validate().unwrap();
 
-        // Check that type was replaced.
+        // Check no measurement types remain
         let sig = h.signature(h.entrypoint()).unwrap();
-        assert_eq!(sig.input(), &TypeRow::from(vec![future_type(bool_t())]));
-        assert_eq!(sig.output(), &TypeRow::from(vec![bool_t()]));
+        assert!(!sig.input().iter().any(|t| t == &measurement_type()));
+        assert!(!sig.output().iter().any(|t| t == &measurement_type()));
 
-        // Check that the op was replaced.
-        assert!(
-            h.nodes()
-                .any(|n| FutureOpDef::try_from(h.get_optype(n)) == Ok(FutureOpDef::Read))
-        );
         assert!(
             !h.nodes()
                 .filter_map(|n| h.get_optype(n).as_extension_op())
-                .any(|op| MeasurementOp::from_op(op) == Ok(MeasurementOp::Read))
-        );
-    }
-
-    #[rstest]
-    #[case(MeasurementOp::Dup, FutureOpDef::Dup, vec![measurement_type(); 2])]
-    #[case(MeasurementOp::Free, FutureOpDef::Free, vec![])]
-    fn test_replace_measurement_lineariser_ops(
-        #[case] measurement_op: MeasurementOp,
-        #[case] expected_op: FutureOpDef,
-        #[case] outputs: Vec<Type>,
-    ) {
-        let mut dfb = DFGBuilder::new(inout_sig(vec![measurement_type()], outputs)).unwrap();
-        let [m] = dfb.input_wires_arr();
-        let op = dfb.add_dataflow_op(measurement_op, [m]).unwrap();
-        let mut h = dfb.finish_hugr_with_outputs(op.outputs()).unwrap();
-        h.validate().unwrap();
-
-        ReplaceMeasurementPass::default().run(&mut h).unwrap();
-        h.validate().unwrap();
-
-        assert!(
-            h.nodes()
-                .any(|n| FutureOpDef::try_from(h.get_optype(n)) == Ok(expected_op))
-        );
-    }
-
-    #[rstest]
-    #[case(TketOp::MeasureFree, QSystemOp::LazyMeasure)]
-    #[case(QSystemOp::Measure, QSystemOp::LazyMeasure)]
-    fn test_replace_measure_ops<T: Into<OpType>>(
-        #[case] measure_op: T,
-        #[case] expected_op: QSystemOp,
-    ) {
-        let mut dfb = DFGBuilder::new(inout_sig(
-            vec![hugr::extension::prelude::qb_t()],
-            vec![measurement_type()],
-        ))
-        .unwrap();
-        let [q] = dfb.input_wires_arr();
-        let out = dfb.add_dataflow_op(measure_op, [q]).unwrap();
-        let mut h = dfb.finish_hugr_with_outputs(out.outputs()).unwrap();
-        h.validate().unwrap();
-
-        ReplaceMeasurementPass::default().run(&mut h).unwrap();
-        h.validate().unwrap();
-
-        let sig = h.signature(h.entrypoint()).unwrap();
-        assert_eq!(sig.output(), &TypeRow::from(vec![future_type(bool_t())]));
-
-        assert!(
-            h.nodes()
-                .any(|n| h.get_optype(n).cast::<QSystemOp>() == Some(expected_op))
-        );
-        assert!(
-            !h.nodes()
-                .any(|n| h.get_optype(n).cast::<TketOp>() == Some(TketOp::MeasureFree))
-        );
-    }
-
-    #[test]
-    fn test_replace_measure_reset_op() {
-        let mut dfb = DFGBuilder::new(inout_sig(
-            vec![hugr::extension::prelude::qb_t()],
-            vec![hugr::extension::prelude::qb_t(), measurement_type()],
-        ))
-        .unwrap();
-        let [q] = dfb.input_wires_arr();
-        let out = dfb.add_measure_reset(q).unwrap();
-        let mut h = dfb.finish_hugr_with_outputs(out).unwrap();
-        h.validate().unwrap();
-
-        ReplaceMeasurementPass::default().run(&mut h).unwrap();
-        h.validate().unwrap();
-
-        let sig = h.signature(h.entrypoint()).unwrap();
-        assert_eq!(
-            sig.output(),
-            &TypeRow::from(vec![
-                hugr::extension::prelude::qb_t(),
-                future_type(bool_t()),
-            ])
-        );
-
-        assert!(
-            h.nodes()
-                .any(|n| h.get_optype(n).cast::<QSystemOp>() == Some(QSystemOp::LazyMeasureReset))
-        );
-        assert!(
-            !h.nodes()
-                .any(|n| h.get_optype(n).cast::<QSystemOp>() == Some(QSystemOp::MeasureReset))
+                .any(|op| MeasurementOp::from_op(op).is_ok())
         );
     }
 }

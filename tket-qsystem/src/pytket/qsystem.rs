@@ -54,7 +54,6 @@ impl QSystemEmitter {
         encoder: &mut PytketEncoderContext<H>,
     ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
         let serial_op = match qsystem_op {
-            QSystemOp::Measure => PytketOptype::Measure,
             QSystemOp::Rz => PytketOptype::Rz,
             QSystemOp::PhasedX => PytketOptype::PhasedX,
             QSystemOp::ZZPhase => PytketOptype::ZZPhase,
@@ -70,16 +69,16 @@ impl QSystemEmitter {
                 // erasing the future boundary in the circuit encoding.
                 return Ok(EncodeStatus::Unsupported);
             }
-            QSystemOp::MeasureReset => {
-                // This requires a pytket measurement followed by a reset.
-                return Ok(EncodeStatus::Unsupported);
-            }
             QSystemOp::LazyMeasureLeaked => {
                 // No equivalent pytket operation.
                 return Ok(EncodeStatus::Unsupported);
             }
             QSystemOp::TryQAlloc => {
                 // Pytket circuits don't support the optional type returned by `TryQAlloc`.
+                return Ok(EncodeStatus::Unsupported);
+            }
+            QSystemOp::FutureToMeasurement => {
+                // No equivalent pytket operation.
                 return Ok(EncodeStatus::Unsupported);
             }
         };

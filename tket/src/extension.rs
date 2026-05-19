@@ -30,9 +30,6 @@ pub mod modifier;
 pub mod rotation;
 pub mod sympy;
 
-pub use measurement::{
-    MeasurementOp, MeasurementOpBuilder, measurement_custom_type, measurement_type,
-};
 use sympy::SympyOpDef;
 
 /// The ID of the TKET1 extension.
@@ -42,7 +39,7 @@ pub const TKET1_EXTENSION_ID: ExtensionId = IdentList::new_unchecked("TKET1");
 pub const TKET1_OP_NAME: SmolStr = SmolStr::new_inline("tk1op");
 
 /// Current version of the legacy TKET 1 extension
-pub const TKET1_EXTENSION_VERSION: Version = Version::new(0, 2, 0);
+pub const TKET1_EXTENSION_VERSION: Version = Version::new(0, 3, 0);
 
 lazy_static! {
 /// The TKET1 extension, containing the opaque TKET1 operations.

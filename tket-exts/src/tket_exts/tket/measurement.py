@@ -11,7 +11,7 @@ from ._util import TketExtension, load_extension
 
 
 class MeasurementExtension(TketExtension):
-    """Measurement result operations."""
+    """Operations on measurement types."""
 
     @functools.cache
     def __call__(self) -> Extension:

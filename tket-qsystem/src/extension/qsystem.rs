@@ -1,4 +1,4 @@
-//! This module defines the Hugr extension used to represent H-series
+//! This module defines the Hugr extension used to represent Quantinuum system
 //! quantum operations.
 //!
 //! In the case of lazy operations,
@@ -29,9 +29,9 @@ use hugr::{
     type_row,
     types::{PolyFuncType, Signature, Type, TypeArg, TypeRow, type_param::TypeParam},
 };
-use tket::extension::{MeasurementOp, measurement::MEASUREMENT_EXTENSION, measurement_type};
+use tket::extension::measurement::{MEASUREMENT_EXTENSION, measurement_type};
 
-use crate::extension::futures;
+use crate::extension::futures::{self, FutureOpBuilder};
 use derive_more::Display;
 use lazy_static::lazy_static;
 use strum::{EnumIter, EnumString, IntoStaticStr};
@@ -46,7 +46,7 @@ pub use lower::{LowerTk2Error, LowerTketToQSystemPass, check_lowered, lower_tk2_
 /// The "tket.qsystem" extension id.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("tket.qsystem");
 /// The "tket.qsystem" extension version.
-pub const EXTENSION_VERSION: Version = Version::new(0, 5, 0);
+pub const EXTENSION_VERSION: Version = Version::new(0, 6, 0);
 
 lazy_static! {
     /// The "tket.qsystem" extension.
@@ -68,7 +68,7 @@ lazy_static! {
     ]);
 }
 
-/// Quantum operations for Quantinuum H-series quantum computers.
+/// Quantum operations for Quantinuum quantum computers.
 #[derive(
     Clone,
     Copy,
@@ -87,12 +87,6 @@ lazy_static! {
 )]
 #[non_exhaustive]
 pub enum QSystemOp {
-    /// Measure a qubit and lose it.
-    Measure,
-    /// Lazily measure a qubit and lose it.
-    LazyMeasure,
-    /// Lazily measure a qubit and reset it to the Z |0> eigenstate.
-    LazyMeasureReset,
     /// Rotate a qubit around the Z axis. Not physical.
     Rz,
     /// PhasedX gate.
@@ -105,10 +99,15 @@ pub enum QSystemOp {
     QFree,
     /// Reset a qubit to the Z |0> eigenstate.
     Reset,
-    /// Measure a qubit and reset it to the Z |0> eigenstate.
-    MeasureReset,
+    /// Lazily measure a qubit and lose it.
+    LazyMeasure,
+    /// Lazily measure a qubit and reset it to the Z |0> eigenstate.
+    LazyMeasureReset,
     /// Measure a qubit (return 0 or 1) or detect leakage (return 2).
     LazyMeasureLeaked,
+    /// Convert a `Future<Bool>` to a `Measurement`` (for compatibility with the TKET
+    /// quantum extension).
+    FutureToMeasurement,
 }
 
 impl MakeOpDef for QSystemOp {
@@ -121,25 +120,24 @@ impl MakeOpDef for QSystemOp {
         let one_qb_row = TypeRow::from(vec![qb_t()]);
         let two_qb_row = TypeRow::from(vec![qb_t(), qb_t()]);
         match self {
-            LazyMeasure => Signature::new(one_qb_row.clone(), vec![future_type(bool_t())]),
-            LazyMeasureLeaked => Signature::new(one_qb_row.clone(), vec![future_type(int_type(6))]),
-            LazyMeasureReset => {
-                Signature::new(one_qb_row.clone(), vec![qb_t(), future_type(bool_t())])
-            }
-            Reset => Signature::new(one_qb_row.clone(), one_qb_row.clone()),
-            ZZPhase => Signature::new(vec![qb_t(), qb_t(), float64_type()], two_qb_row),
-            Measure => Signature::new(one_qb_row.clone(), vec![measurement_type()]),
             Rz => Signature::new(vec![qb_t(), float64_type()], one_qb_row.clone()),
             PhasedX => Signature::new(
                 vec![qb_t(), float64_type(), float64_type()],
                 one_qb_row.clone(),
             ),
+            ZZPhase => Signature::new(vec![qb_t(), qb_t(), float64_type()], two_qb_row),
             TryQAlloc => Signature::new(
                 type_row![],
                 vec![Type::from(option_type(one_qb_row.clone()))],
             ),
             QFree => Signature::new(one_qb_row.clone(), type_row![]),
-            MeasureReset => Signature::new(one_qb_row, vec![qb_t(), measurement_type()]),
+            Reset => Signature::new(one_qb_row.clone(), one_qb_row.clone()),
+            LazyMeasure => Signature::new(one_qb_row.clone(), vec![future_type(bool_t())]),
+            LazyMeasureReset => Signature::new(one_qb_row, vec![qb_t(), future_type(bool_t())]),
+            LazyMeasureLeaked => Signature::new(one_qb_row.clone(), vec![future_type(int_type(6))]),
+            FutureToMeasurement => {
+                Signature::new(vec![future_type(bool_t())], vec![measurement_type()])
+            }
         }
         .into()
     }
@@ -158,21 +156,16 @@ impl MakeOpDef for QSystemOp {
 
     fn description(&self) -> String {
         match self {
-            QSystemOp::Measure => "Measure a qubit and lose it.",
-            QSystemOp::LazyMeasure => "Lazily measure a qubit and lose it.",
             QSystemOp::Rz => "Rotate a qubit around the Z axis. Not physical.",
             QSystemOp::PhasedX => "PhasedX gate.",
             QSystemOp::ZZPhase => "ZZ gate with an angle.",
             QSystemOp::TryQAlloc => "Allocate a qubit in the Z |0> eigenstate.",
             QSystemOp::QFree => "Free a qubit (lose track of it).",
             QSystemOp::Reset => "Reset a qubit to the Z |0> eigenstate.",
-            QSystemOp::MeasureReset => "Measure a qubit and reset it to the Z |0> eigenstate.",
-            QSystemOp::LazyMeasureLeaked => {
-                "Measure a qubit (return 0 or 1) or detect leakage (return 2)."
-            }
-            QSystemOp::LazyMeasureReset => {
-                "Lazily measure a qubit and reset it to the Z |0> eigenstate."
-            }
+            QSystemOp::LazyMeasure => "Lazily measure a qubit and lose it.",
+            QSystemOp::LazyMeasureReset => "Lazily measure a qubit and reset it to the Z |0> eigenstate.",
+            QSystemOp::LazyMeasureLeaked => "Measure a qubit (return 0 or 1) or detect leakage (return 2).",
+            QSystemOp::FutureToMeasurement => "Convert a Future<bool> to a Measurement (for compatibility with the TKET quantum extension).",
         }
         .to_string()
     }
@@ -245,31 +238,12 @@ impl MakeOpDef for RuntimeBarrierDef {
 
 /// An extension trait for [Dataflow] providing methods to add
 /// "tket.qsystem" operations.
-pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
-    /// Add a "tket.qsystem.LazyMeasure" op.
+pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder + FutureOpBuilder {
+    /// Add a "tket.qsystem.Measure" op.
     fn add_lazy_measure(&mut self, qb: Wire) -> Result<Wire, BuildError> {
         Ok(self
             .add_dataflow_op(QSystemOp::LazyMeasure, [qb])?
             .out_wire(0))
-    }
-
-    /// Add a "tket.qsystem.LazyMeasureLeaked" op.
-    fn add_lazy_measure_leaked(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        Ok(self
-            .add_dataflow_op(QSystemOp::LazyMeasureLeaked, [qb])?
-            .out_wire(0))
-    }
-
-    /// Add a "tket.qsystem.LazyMeasureReset" op.
-    fn add_lazy_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
-        Ok(self
-            .add_dataflow_op(QSystemOp::LazyMeasureReset, [qb])?
-            .outputs_arr())
-    }
-
-    /// Add a "tket.qsystem.Measure" op.
-    fn add_measure(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        Ok(self.add_dataflow_op(QSystemOp::Measure, [qb])?.out_wire(0))
     }
 
     /// Add a "tket.qsystem.Reset" op.
@@ -317,10 +291,24 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
 
     /// Add a "tket.qsystem.MeasureReset" op.
     /// This operation is equivalent to a `Measure` followed by a `Reset`.
-    fn add_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
+    fn add_lazy_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
         Ok(self
-            .add_dataflow_op(QSystemOp::MeasureReset, [qb])?
+            .add_dataflow_op(QSystemOp::LazyMeasureReset, [qb])?
             .outputs_arr())
+    }
+
+    /// Add a "tket.qsystem.LazyMeasureLeaked" op.
+    fn add_lazy_measure_leaked(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        Ok(self
+            .add_dataflow_op(QSystemOp::LazyMeasureLeaked, [qb])?
+            .out_wire(0))
+    }
+
+    /// Add a "tket.qsystem.FutureToMeasurement" op.
+    fn add_future_to_measurement(&mut self, future: Wire) -> Result<Wire, BuildError> {
+        Ok(self
+            .add_dataflow_op(QSystemOp::FutureToMeasurement, [future])?
+            .out_wire(0))
     }
 
     /// Add a "tket.qsystem.RuntimeBarrier" op.
@@ -497,8 +485,8 @@ pub trait QSystemOpBuilder: Dataflow + UnwrapBuilder + ArrayOpBuilder {
 
     /// Build a projective measurement with a conditional flip.
     fn build_measure_flip(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
-        let [qb, b] = self.add_measure_reset(qb)?;
-        let sum_b = self.add_dataflow_op(MeasurementOp::Read, [b])?.out_wire(0);
+        let [qb, b] = self.add_lazy_measure_reset(qb)?;
+        let sum_b = self.add_read(b, bool_t())?[0];
         let mut conditional = self.conditional_builder(
             ([type_row![], type_row![]], sum_b),
             [(qb_t(), qb)],
@@ -563,7 +551,6 @@ mod test {
     use std::sync::Arc;
 
     use cool_asserts::assert_matches;
-    use futures::FutureOpBuilder as _;
     use hugr::HugrView;
     use hugr::builder::{DataflowHugr, FunctionBuilder};
     use hugr::extension::simple_op::MakeExtensionOp;
@@ -583,22 +570,6 @@ mod test {
         for o in QSystemOp::iter() {
             assert_eq!(QSystemOp::from_def(get_opdef(o).unwrap()), Ok(o));
         }
-    }
-
-    #[test]
-    fn lazy_circuit() {
-        let hugr = {
-            let mut func_builder = FunctionBuilder::new(
-                "circuit",
-                Signature::new(vec![qb_t()], vec![qb_t(), bool_t()]),
-            )
-            .unwrap();
-            let [qb] = func_builder.input_wires_arr();
-            let [qb, lazy_b] = func_builder.add_lazy_measure_reset(qb).unwrap();
-            let [b] = func_builder.add_read(lazy_b, bool_t()).unwrap();
-            func_builder.finish_hugr_with_outputs([qb, b]).unwrap()
-        };
-        assert_matches!(hugr.validate(), Ok(_));
     }
 
     #[test]
@@ -622,7 +593,7 @@ mod test {
                 "all_ops",
                 Signature::new(
                     vec![qb_t(), float64_type()],
-                    vec![measurement_type(), measurement_type()],
+                    vec![bool_t(), measurement_type()],
                 ),
             )
             .unwrap();
@@ -640,11 +611,13 @@ mod test {
                 .unwrap();
 
             let q0 = func_builder.add_rz(q0, angle).unwrap();
-            let [q0, b1] = func_builder.add_measure_reset(q0).unwrap();
-            let b2 = func_builder.add_measure(q0).unwrap();
+            let [q0, f1] = func_builder.add_lazy_measure_reset(q0).unwrap();
+            let f2 = func_builder.add_lazy_measure(q0).unwrap();
+            let b1 = func_builder.add_read(f1, bool_t()).unwrap()[0];
+            let m2 = func_builder.add_future_to_measurement(f2).unwrap();
             func_builder.add_qfree(q1).unwrap();
 
-            func_builder.finish_hugr_with_outputs([b1, b2]).unwrap()
+            func_builder.finish_hugr_with_outputs([b1, m2]).unwrap()
         };
         hugr.validate().unwrap()
     }

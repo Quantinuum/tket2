@@ -1,5 +1,5 @@
 {
-  "version": "0.2.0",
+  "version": "0.1.0",
   "name": "tket.measurement",
   "types": {
     "Measurement": {
@@ -53,7 +53,7 @@
     "Free": {
       "extension": "tket.measurement",
       "name": "Free",
-      "description": "Consume a measurement without reading it.",
+      "description": "Discard (a copy of) measurement without reading it.",
       "signature": {
         "params": [],
         "body": {
@@ -74,7 +74,7 @@
     "Read": {
       "extension": "tket.measurement",
       "name": "Read",
-      "description": "Read a measurement, consuming it and returning a Hugr bool.",
+      "description": "Consumes a measurement, converting it into a bool.",
       "signature": {
         "params": [],
         "body": {

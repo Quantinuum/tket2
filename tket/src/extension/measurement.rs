@@ -17,7 +17,7 @@ use strum::{EnumIter, EnumString, IntoStaticStr};
 /// The ID of the `tket.measurement` extension.
 pub const MEASUREMENT_EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("tket.measurement");
 /// The `tket.measurement` extension version.
-pub const MEASUREMENT_EXTENSION_VERSION: Version = Version::new(0, 2, 0);
+pub const MEASUREMENT_EXTENSION_VERSION: Version = Version::new(0, 1, 0);
 
 lazy_static! {
     /// The `tket.measurement` extension.
@@ -119,11 +119,11 @@ impl MakeOpDef for MeasurementOp {
 
     fn description(&self) -> String {
         match self {
-			MeasurementOp::Read => "Read a measurement, consuming it and returning a Hugr bool.".into(),
+			MeasurementOp::Read => "Consumes a measurement, converting it into a bool.".into(),
 			MeasurementOp::Dup => {
 				"Duplicate a measurement. The original measurement is consumed and two measurements are returned.".into()
 			}
-			MeasurementOp::Free => "Consume a measurement without reading it.".into(),
+			MeasurementOp::Free => "Discard (a copy of) measurement without reading it.".into(),
 		}
     }
 

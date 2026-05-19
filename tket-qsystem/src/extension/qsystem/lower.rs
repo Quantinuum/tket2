@@ -259,7 +259,7 @@ fn direct_map(op: TketOp) -> Option<QSystemOp> {
         TketOp::TryQAlloc => QSystemOp::TryQAlloc,
         TketOp::QFree => QSystemOp::QFree,
         TketOp::Reset => QSystemOp::Reset,
-        TketOp::MeasureFree => QSystemOp::Measure,
+        TketOp::MeasureFree => QSystemOp::LazyMeasure,
         _ => return None,
     })
 }
@@ -351,7 +351,7 @@ mod test {
         type_row,
     };
     use tket::{Circuit, extension::rotation::rotation_type};
-    use tket::{extension::MeasurementOp, passes::composable::Preserve};
+    use tket::{extension::measurement::MeasurementOp, passes::composable::Preserve};
 
     use super::*;
     use rstest::rstest;
@@ -403,7 +403,7 @@ mod test {
             ops,
             vec![
                 QSystemOp::TryQAlloc,
-                QSystemOp::Measure,
+                QSystemOp::LazyMeasure,
                 QSystemOp::TryQAlloc,
                 QSystemOp::Reset,
                 QSystemOp::QFree,
