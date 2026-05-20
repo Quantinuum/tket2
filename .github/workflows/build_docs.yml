@@ -15,7 +15,7 @@ permissions:
   id-token: write
 
 env:
-  UV_VERSION: "0.9.7"
+  UV_VERSION: "0.11.15"
   UV_FROZEN: 1
 
 jobs:
@@ -45,7 +45,6 @@ jobs:
       - uses: extractions/setup-just@v4
         with:
           just-version: "1.40.0"
-
 
       - uses: quantinuum/hugrverse-env/install-hugrenv-action@main
         with:
