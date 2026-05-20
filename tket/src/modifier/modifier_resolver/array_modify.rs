@@ -131,7 +131,18 @@ impl<N: HugrNode> ModifierResolver<N> {
                 swap => swap,
                 new_array => unpack,
                 unpack => new_array,
-                _ => *op_def, // => other operations are kept unchanged under dagger
+                get => get,
+                set => set,
+                pop_left => pop_left,
+                pop_right => pop_right,
+                discard_empty => discard_empty,
+                _ => {
+                    return Err(ModifierResolverErrors::unresolvable(
+                        n,
+                        format!("Cannot modify array operation {op_def:?} under dagger"),
+                        OpType::from(op.clone()),
+                    ));
+                }
             };
             let new_op = new_op_def.to_concrete(op.elem_ty, op.size);
             let node = new_dfg.add_child_node(new_op);
