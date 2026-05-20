@@ -621,8 +621,6 @@ mod tests {
     fn rz_rz_cancellation(rz_rz: Circuit, #[case] badger_opt: ECCBadgerOptimiser) {
         use hugr::ops::OpType;
 
-        use crate::{extension::rotation::RotationOp, op_matches};
-
         let opt_rz = badger_opt.optimise(
             &rz_rz,
             BadgerOptions {
@@ -638,7 +636,7 @@ mod tests {
 
         // Rzs combined into a single one.
         assert_eq!(op1.cast(), Some(RotationOp::radd));
-        assert!(op_matches(op2, TketOp::Rz));
+        assert_eq!(op2.cast(), Some(TketOp::Rz));
     }
 
     #[rstest]

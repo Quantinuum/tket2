@@ -29,7 +29,7 @@ use hugr::{HugrView, Node};
 use itertools::Itertools;
 
 use crate::circuit::cost::{CircuitCost, CostDelta, LexicographicCost, is_cx, is_quantum};
-use crate::{Circuit, TketOp, op_matches};
+use crate::{Circuit, TketOp};
 
 use super::CircuitRewrite;
 use super::trace::RewriteTrace;
@@ -369,7 +369,7 @@ impl LexicographicCostFunction<fn(&OpType) -> usize, 2> {
     pub fn rz_count() -> Self {
         Self {
             cost_fns: [
-                |op| op_matches(op, TketOp::Rz) as usize,
+                |op| (op.cast() == Some(TketOp::Rz)) as usize,
                 |op| is_quantum(op) as usize,
             ],
         }

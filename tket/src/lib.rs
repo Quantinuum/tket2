@@ -68,7 +68,9 @@ mod utils;
 pub use circuit::{Circuit, CircuitError, CircuitMutError};
 pub use hugr;
 pub use hugr::Hugr;
-pub use ops::{Pauli, TketOp, op_matches, symbolic_constant_op};
+#[expect(deprecated)]
+pub use ops::op_matches;
+pub use ops::{Pauli, TketOp, symbolic_constant_op};
 
 #[doc = include_str!("../README.md")]
 #[cfg(doctest)]
