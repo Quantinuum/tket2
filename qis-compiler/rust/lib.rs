@@ -147,8 +147,7 @@ fn get_hugr_llvm_module<'c, 'hugr, 'a: 'c>(
 }
 
 fn process_hugr(hugr: &mut Hugr) -> Result<()> {
-    // TODO constant folding disabled for testing.
-    QSystemPass::default().with_constant_fold(false).run(hugr)?;
+    QSystemPass::default().run(hugr)?;
     Ok(())
 }
 
