@@ -1075,7 +1075,65 @@ impl<N: HugrNode> ModifierResolver<N> {
             .into()
     }
 
-    /// Modifies a CFG. Multi-block CFGs are only supported when dagger is not applied.
+    fn cfg_has_block_cycle(
+        &self,
+        h: &impl HugrView<Node = N>,
+        block: N,
+        blocks: &HashSet<N>,
+        visited: &mut HashSet<N>,
+        active: &mut HashSet<N>,
+    ) -> Result<bool, ModifierResolverErrors<N>> {
+        if active.contains(&block) {
+            return Ok(true);
+        }
+        if !visited.insert(block) {
+            return Ok(false);
+        }
+        active.insert(block);
+
+        let OpType::DataflowBlock(dfb) = h.get_optype(block) else {
+            return Err(ModifierResolverErrors::unreachable(
+                "Non-basic-block node found while checking CFG loops.".to_string(),
+            ));
+        };
+        for branch in 0..dfb.sum_rows.len() {
+            let (successor, _) = h
+                .linked_inputs(block, OutgoingPort::from(branch))
+                .exactly_one()
+                .map_err(|_| {
+                    ModifierResolverErrors::unreachable(format!(
+                        "Expected one successor for CFG block branch {branch}."
+                    ))
+                })?;
+            if blocks.contains(&successor)
+                && self.cfg_has_block_cycle(h, successor, blocks, visited, active)?
+            {
+                return Ok(true);
+            }
+        }
+
+        active.remove(&block);
+        Ok(false)
+    }
+
+    /// Checks if the CFG contains a loop among the given children blocks.
+    fn cfg_has_loop(
+        &self,
+        h: &impl HugrView<Node = N>,
+        children: &[N],
+    ) -> Result<bool, ModifierResolverErrors<N>> {
+        let blocks = children.iter().copied().collect::<HashSet<_>>();
+        let mut visited = HashSet::new();
+        let mut active = HashSet::new();
+        for block in children.iter().copied() {
+            if self.cfg_has_block_cycle(h, block, &blocks, &mut visited, &mut active)? {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    /// Modifies a CFG. Dagger is supported for acyclic CFGs only.
     fn modify_cfg(
         &mut self,
         h: &mut impl HugrMut<Node = N>,
@@ -1087,10 +1145,10 @@ impl<N: HugrNode> ModifierResolver<N> {
             .children(cfg_node)
             .filter(|child| h.get_optype(*child).is_dataflow_block())
             .collect();
-        if children.len() != 1 && self.modifiers().dagger {
+        if self.modifiers().dagger && self.cfg_has_loop(h, &children)? {
             return Err(ModifierResolverErrors::unresolvable(
                 cfg_node,
-                "CFG with more than one node cannot be daggered.".to_string(),
+                "CFG loops cannot be daggered.".to_string(),
                 cfg.clone().into(),
             ));
         }
@@ -1477,6 +1535,32 @@ mod tests {
         foo: impl FnOnce(&mut ModuleBuilder<Hugr>, usize) -> FuncID<true>,
         dagger: bool,
     ) -> Hugr {
+        let (mut h, foo_node) = modifier_test_hugr(target_num, ctrl_num, foo, dagger);
+
+        let entrypoint = h.entrypoint();
+        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+
+        // We check that the original function node has been removed in the resolved hugr
+        assert!(!h.contains_node(foo_node));
+
+        // We also check that there is no modifier node in the resolved hugr.
+        assert!(
+            h.nodes()
+                .all(|node| Modifier::from_optype(h.get_optype(node)).is_none())
+        );
+
+        // The resolved hugr must still be structurally valid.
+        assert_matches!(h.validate(), Ok(()));
+
+        h
+    }
+
+    pub(crate) fn modifier_test_hugr(
+        target_num: usize,
+        ctrl_num: u64,
+        foo: impl FnOnce(&mut ModuleBuilder<Hugr>, usize) -> FuncID<true>,
+        dagger: bool,
+    ) -> (Hugr, Node) {
         // --- Build the module ---
         let mut module = ModuleBuilder::new();
 
@@ -1592,25 +1676,9 @@ mod tests {
         };
 
         // Run the resolver and validate
-        let mut h = module.finish_hugr().unwrap();
+        let h = module.finish_hugr().unwrap();
         assert_matches!(h.validate(), Ok(()));
-
-        let entrypoint = h.entrypoint();
-        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
-
-        // We check that the original function node has been removed in the resolved hugr
-        assert!(!h.contains_node(foo_node));
-
-        // We also check that there is no modifier node in the resolved hugr.
-        assert!(
-            h.nodes()
-                .all(|node| Modifier::from_optype(h.get_optype(node)).is_none())
-        );
-
-        // The resolved hugr must still be structurally valid.
-        assert_matches!(h.validate(), Ok(()));
-
-        h
+        (h, foo_node)
     }
 
     #[test]
@@ -2086,6 +2154,8 @@ mod tests {
     #[case::multiple_gates1_in_ctrl("../test_files/modifier_examples/multiple_gates1_in_ctrl.hugr")]
     #[case::gate_in_ctrl("../test_files/modifier_examples/gate_in_ctrl.hugr")]
     #[case::call_in_dagger("../test_files/modifier_examples/call_in_dagger.hugr")]
+    #[case::dagger_on_cfg1("../test_files/modifier_examples/dagger_on_cfg1.hugr")]
+    #[case::dagger_on_cfg2("../test_files/modifier_examples/dagger_on_cfg2.hugr")]
     #[case::multiple_functions_in_dagger(
         "../test_files/modifier_examples/multiple_functions_in_dagger.hugr"
     )]

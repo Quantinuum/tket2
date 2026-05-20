@@ -603,20 +603,13 @@ impl<N: HugrNode> ModifierResolver<N> {
         let just_input_num = tail_loop.just_inputs.len();
         let just_output_num = tail_loop.just_outputs.len();
 
-        // TailLoop cannot be daggered as long as it is not the one generated from Power modifier.
-        // Every TailLoop that is generated from Power cannot have `just_outputs`.
-        if self.modifiers.dagger && !tail_loop.just_outputs.is_empty() {
+        if self.modifiers.dagger {
             let optype = h.get_optype(n);
             return Err(ModifierResolverErrors::unresolvable(
                 n,
-                "tail loop with outputs cannot be daggered.".to_string(),
+                "TailLoop cannot be daggered.".to_string(),
                 optype.clone(),
             ));
-        }
-        // TODO: Handle the case when TailLoop is generated from `Power` modifier.
-        // Currently, it is not implemented.
-        if self.modifiers.dagger {
-            unimplemented!("Dagger for TailLoop is not supported yet.");
         }
 
         // Build a new TailLoop with modified body.
@@ -812,7 +805,9 @@ where
 
 #[cfg(test)]
 mod test {
-    use super::super::tests::{SetUnitary, resolved_modifier_test_hugr, test_modifier_resolver};
+    use super::super::tests::{
+        SetUnitary, modifier_test_hugr, resolved_modifier_test_hugr, test_modifier_resolver,
+    };
     use super::super::*;
     use crate::TketOp;
     use crate::extension::{
@@ -1009,6 +1004,48 @@ mod test {
         *func.finish_with_outputs(inputs).unwrap().handle()
     }
 
+    fn foo_cfg_loop(module: &mut ModuleBuilder<Hugr>, t_num: usize) -> FuncID<true> {
+        let foo_sig = Signature::new_endo(iter::repeat_n(qb_t(), t_num).collect::<Vec<_>>());
+        let mut func = module.define_function("foo", foo_sig.clone()).unwrap();
+        func.set_unitary();
+        let mut inputs: Vec<_> = func.input_wires().collect();
+
+        let cfg = {
+            let mut cfg = func
+                .cfg_builder(vec![(qb_t(), inputs[0])], [qb_t()].into())
+                .unwrap();
+            let entry = {
+                let mut bb = cfg
+                    .entry_builder(vec![type_row![]], [qb_t()].into())
+                    .unwrap();
+                let q = bb.input_wires().next().unwrap();
+                let tag = bb.make_sum(0, [type_row![]], []).unwrap();
+                bb.finish_with_outputs(tag, [q]).unwrap()
+            };
+            let loop_block = {
+                let mut bb = cfg
+                    .block_builder(
+                        [qb_t()].into(),
+                        vec![type_row![], type_row![]],
+                        [qb_t()].into(),
+                    )
+                    .unwrap();
+                let q = bb.input_wires().next().unwrap();
+                let q = bb.add_dataflow_op(TketOp::X, vec![q]).unwrap().out_wire(0);
+                let tag = bb.make_sum(1, [type_row![], type_row![]], []).unwrap();
+                bb.finish_with_outputs(tag, [q]).unwrap()
+            };
+            let exit = cfg.exit_block();
+            cfg.branch(&entry, 0, &loop_block).unwrap();
+            cfg.branch(&loop_block, 0, &loop_block).unwrap();
+            cfg.branch(&loop_block, 1, &exit).unwrap();
+            cfg.finish_sub_container().unwrap()
+        };
+        inputs[0] = cfg.outputs().next().unwrap();
+
+        *func.finish_with_outputs(inputs).unwrap().handle()
+    }
+
     fn foo_safe_array_ops(module: &mut ModuleBuilder<Hugr>, t_num: usize) -> FuncID<true> {
         assert_eq!(t_num, 4);
 
@@ -1165,6 +1202,8 @@ mod test {
     #[case::cfg(1, 1, foo_cfg, false)]
     #[case::cfg_dagger(1, 1, foo_cfg, true)]
     #[case::cfg_two_blocks(1, 1, foo_cfg_two_blocks, false)]
+    #[case::cfg_two_blocks_dagger(1, 1, foo_cfg_two_blocks, true)]
+    #[case::cfg_loop(1, 1, foo_cfg_loop, false)]
     #[case::array_ops(4, 0, foo_array_ops, false)]
     #[case::array_ops_dagger(4, 0, foo_array_ops, true)]
     #[case::safe_array_ops(4, 0, foo_safe_array_ops, false)]
@@ -1178,6 +1217,41 @@ mod test {
         #[case] dagger: bool,
     ) {
         test_modifier_resolver(t_num, c_num, foo, dagger);
+    }
+
+    fn assert_unresolvable_message(
+        h: &mut Hugr,
+        expected: &str,
+    ) -> Result<(), ModifierResolverErrors> {
+        let entrypoint = h.entrypoint();
+        match resolve_modifier_with_entrypoints(h, [entrypoint]) {
+            Err(ModifierResolverErrors::UnResolvable { msg, .. }) => {
+                assert_eq!(msg, expected);
+                Ok(())
+            }
+            Err(err) => Err(err),
+            Ok(()) => Err(ModifierResolverErrors::unreachable(
+                "Expected modifier resolution to fail.".to_string(),
+            )),
+        }
+    }
+
+    #[test]
+    fn test_dagger_rejects_cfg_loop() {
+        let (mut h, _) = modifier_test_hugr(1, 1, foo_cfg_loop, true);
+        assert_matches!(
+            assert_unresolvable_message(&mut h, "CFG loops cannot be daggered."),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn test_dagger_rejects_tail_loop() {
+        let (mut h, _) = modifier_test_hugr(1, 1, foo_tail_loop, true);
+        assert_matches!(
+            assert_unresolvable_message(&mut h, "TailLoop cannot be daggered."),
+            Ok(())
+        );
     }
 
     #[test]
