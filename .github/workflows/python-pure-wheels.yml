@@ -97,7 +97,7 @@ jobs:
     name: Release
     needs: [check-tag, build]
     runs-on: ubuntu-latest
-    if: ${{ github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/tket-eccs-v') || github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/tket-exts-v') }}
+    if: ${{ github.ref_type == 'tag' && (startsWith(github.ref, 'refs/tags/tket-eccs-v') || startsWith(github.ref, 'refs/tags/tket-exts-v')) }}
     environment: release
     permissions:
       # IMPORTANT: this permission is mandatory for trusted publishing
