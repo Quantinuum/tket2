@@ -15,6 +15,7 @@ use hugr_core::{
 };
 
 use hugr_core::hugr::{HugrView, OpType, hugrmut::HugrMut};
+use indexmap::IndexMap;
 use itertools::Itertools as _;
 
 use crate::passes::composable::WithScope;
@@ -31,7 +32,7 @@ fn is_polymorphic_funcdefn(t: &OpType) -> bool {
 struct Instantiating<'a> {
     subst: &'a Substitution<'a>,
     target_container: Node,
-    node_map: &'a mut HashMap<Node, Node>,
+    node_map: &'a mut IndexMap<Node, Node>,
 }
 
 type Instantiations = HashMap<Node, HashMap<Vec<TypeArg>, Node>>;
@@ -130,7 +131,7 @@ fn instantiate(
     // Insert BEFORE we scan (in case of recursion), hence we cannot use Entry::or_insert
     ve.insert(mono_tgt);
     // Now make the instantiation
-    let mut node_map = HashMap::new();
+    let mut node_map = IndexMap::new();
     let mut inst = Instantiating {
         subst: &Substitution::new(&type_args),
         target_container: mono_tgt,

@@ -13,7 +13,8 @@
             "component": "tket-py",
             "package-name": "tket",
             "include-component-in-tag": true,
-            "draft": false,
+            "draft": true,
+            "force-tag-creation": true,
             "prerelease": false,
             "draft-pull-request": true,
             "extra-files": [
@@ -29,7 +30,8 @@
             "component": "tket-eccs",
             "package-name": "tket_eccs",
             "include-component-in-tag": true,
-            "draft": false,
+            "draft": true,
+            "force-tag-creation": true,
             "prerelease": false,
             "draft-pull-request": true,
             "extra-files": [
@@ -45,7 +47,8 @@
             "component": "tket-exts",
             "package-name": "tket_exts",
             "include-component-in-tag": true,
-            "draft": false,
+            "draft": true,
+            "force-tag-creation": true,
             "prerelease": false,
             "draft-pull-request": true,
             "extra-files": [
@@ -61,7 +64,8 @@
             "component": "qis-compiler",
             "package-name": "selene_hugr_qis_compiler",
             "include-component-in-tag": true,
-            "draft": false,
+            "draft": true,
+            "force-tag-creation": true,
             "prerelease": false,
             "draft-pull-request": true,
             "extra-files": [

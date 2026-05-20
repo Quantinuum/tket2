@@ -808,6 +808,7 @@ mod test {
     use super::super::tests::{
         SetUnitary, modifier_test_hugr, resolved_modifier_test_hugr, test_modifier_resolver,
     };
+    use super::super::tests::{SetUnitary, resolved_modifier_test_hugr, test_modifier_resolver};
     use super::super::*;
     use crate::TketOp;
     use crate::extension::{
