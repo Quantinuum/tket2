@@ -579,6 +579,8 @@ fn test_module() {
 #[case(pv_false(), pv_true())]
 #[case(pv_true(), pv_false())]
 #[case(pv_true(), pv_true())]
+// Expected to fail due low precision, see https://github.com/Quantinuum/hugr/issues/3065.
+#[should_panic]
 fn call_indirect(#[case] inp1: PartialValue<Void>, #[case] inp2: PartialValue<Void>) {
     let b2b = || Signature::new_endo([bool_t()]);
     let mut dfb = DFGBuilder::new(inout_sig(vec![bool_t(); 3], vec![bool_t(); 2])).unwrap();
@@ -651,6 +653,35 @@ fn call_indirect(#[case] inp1: PartialValue<Void>, #[case] inp2: PartialValue<Vo
     let out = Some(inp1.join(inp2));
     assert_eq!(results.read_out_wire(w1), out);
     assert_eq!(results.read_out_wire(w2), out);
+}
+
+#[test]
+fn expose_func_value() {
+    let b2b = || Signature::new_endo([bool_t()]);
+    let mut dfb = DFGBuilder::new(Signature::new(vec![], vec![Type::new_function(b2b())])).unwrap();
+
+    let func = {
+        let mut mb = dfb.module_root_builder();
+        let fb = mb.define_function("called_func", b2b()).unwrap();
+        let [inp] = fb.input_wires_arr();
+        fb.finish_with_outputs([inp]).unwrap()
+    };
+
+    let lf = dfb.load_func(func.handle(), &[]).unwrap();
+    let h = dfb.finish_hugr_with_outputs([lf]).unwrap();
+
+    let mut m = Machine::new(&h);
+    m.prepopulate_inputs(h.entrypoint(), []).unwrap();
+    let results = m.run_subtree(TestContext, h.module_root());
+
+    // Find input of the function (first child), and take its first output
+    let func_inp_first_out = Wire::new(h.children(func.node()).next().unwrap(), 0);
+
+    // Must be top, since the function may be called from anywhere
+    assert_eq!(
+        results.read_out_wire(func_inp_first_out),
+        Some(PartialValue::Top)
+    );
 }
 
 #[rstest]

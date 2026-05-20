@@ -91,14 +91,12 @@ impl<N: HugrNode> UnsupportedTracker<N> {
         // and use it here. For now we just traverse all unextracted nodes.
         let mut nodes = BTreeSet::new();
         nodes.insert(node);
-        for (&n, data) in &self.nodes {
-            if self.components.find_mut(data.component) == representative {
-                nodes.insert(n);
-            }
-        }
-        for n in &nodes {
-            self.nodes.remove(n);
-        }
+
+        nodes.extend(
+            self.nodes
+                .extract_if(|_, data| self.components.find_mut(data.component) == representative)
+                .map(|(n, _)| n),
+        );
 
         OpaqueSubgraph::try_from_nodes(nodes, hugr)
     }

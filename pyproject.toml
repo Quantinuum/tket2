@@ -37,8 +37,6 @@ build-backend = "hatchling.build"
 manifest-path = "tket-py/Cargo.toml"
 python-source = "tket-py"
 module-name = "tket._tket"
-# "extension-module" tells pyo3 we want to build an extension module (skips linking against libpython.so)
-features = ["pyo3/extension-module"]
 
 [tool.mypy]
 exclude = '''(?x)(
