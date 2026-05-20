@@ -6,14 +6,13 @@ use hugr::{
     Extension,
     extension::{
         ExtensionId, SignatureError, SignatureFunc, Version,
-        prelude::option_type,
         simple_op::{
             HasConcrete, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError, try_from_name,
         },
     },
     ops::{ExtensionOp, OpName},
     types::{
-        PolyFuncType, Signature, Type, TypeArg, TypeBound,
+        TypeArg, TypeBound,
         type_param::{TermTypeError, TypeParam},
     },
 };
@@ -60,8 +59,6 @@ lazy_static::lazy_static! {
 #[expect(non_camel_case_types)]
 #[non_exhaustive]
 pub enum GlobalsOpDef {
-    /// Swap the contents of the named global variable with the argument.
-    swap,
     /// Apply a function to the contents of the named global variable.
     with,
     /// Map a function over the contents of the named global variable.
@@ -75,14 +72,6 @@ impl MakeOpDef for GlobalsOpDef {
 
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         match self {
-            Self::swap => PolyFuncType::new(
-                [NAME_PARAM.to_owned(), TYPE_PARAM.to_owned()],
-                Signature::new_endo([Type::from(option_type([Type::new_var_use(
-                    1,
-                    TypeBound::Linear,
-                )]))]),
-            )
-            .into(),
             Self::with => {
                 let global_ty = TypeRV::new_var_use(1, TypeBound::Linear);
                 let input_row = TypeRV::new_row_var_use(2, TypeBound::Linear);
@@ -137,9 +126,6 @@ impl MakeOpDef for GlobalsOpDef {
 
     fn description(&self) -> String {
         match self {
-            Self::swap => {
-                "Swap the contents of the named global variable with the argument.".to_string()
-            }
             Self::with => {
                 "Run a function with the set contents of the global variable.".to_string()
             }
@@ -155,10 +141,6 @@ impl MakeOpDef for GlobalsOpDef {
 }
 
 pub enum GlobalsOp {
-    Swap {
-        name: String,
-        ty: Type,
-    },
     With {
         name: String,
         ty_arg: TypeArg,
@@ -176,7 +158,6 @@ pub enum GlobalsOp {
 impl MakeExtensionOp for GlobalsOp {
     fn op_id(&self) -> OpName {
         match self {
-            Self::Swap { .. } => GlobalsOpDef::swap.opdef_id(),
             Self::With { .. } => GlobalsOpDef::with.opdef_id(),
             Self::Map { .. } => GlobalsOpDef::map.opdef_id(),
         }
@@ -191,9 +172,6 @@ impl MakeExtensionOp for GlobalsOp {
 
     fn type_args(&self) -> Vec<TypeArg> {
         match self {
-            Self::Swap { name, ty } => {
-                vec![TypeArg::String(name.clone()), TypeArg::Runtime(ty.clone())]
-            }
             Self::With {
                 name,
                 ty_arg,
@@ -228,11 +206,7 @@ impl HasConcrete for GlobalsOpDef {
     type Concrete = GlobalsOp;
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
-        let expected_num_args = match self {
-            Self::swap => 2,
-            Self::with => 4,
-            Self::map => 4,
-        };
+        let expected_num_args = 4;
 
         let [name_arg, ty_arg] = &type_args[..2] else {
             Err(SignatureError::from(TermTypeError::WrongNumberArgs(
@@ -248,57 +222,32 @@ impl HasConcrete for GlobalsOpDef {
             }))?
         };
 
-        let Some(ty) = ty_arg.as_runtime() else {
+        let Ok(inputs) = TypeRowRV::try_from(type_args[2].clone()) else {
             Err(SignatureError::from(TermTypeError::TypeMismatch {
-                term: ty_arg.clone().into(),
-                type_: TYPE_PARAM.to_owned().into(),
+                term: Box::new(type_args[2].clone()),
+                type_: Box::new(INPUTS_PARAM.to_owned()),
+            }))?
+        };
+        let Ok(outputs) = TypeRowRV::try_from(type_args[3].clone()) else {
+            Err(SignatureError::from(TermTypeError::TypeMismatch {
+                term: Box::new(type_args[3].clone()),
+                type_: Box::new(OUTPUTS_PARAM.to_owned()),
             }))?
         };
 
         match self {
-            Self::swap => Ok(GlobalsOp::Swap { name, ty }),
-            Self::with => {
-                let Ok(inputs) = TypeRowRV::try_from(type_args[2].clone()) else {
-                    Err(SignatureError::from(TermTypeError::TypeMismatch {
-                        term: Box::new(type_args[2].clone()),
-                        type_: Box::new(INPUTS_PARAM.to_owned()),
-                    }))?
-                };
-                let Ok(outputs) = TypeRowRV::try_from(type_args[3].clone()) else {
-                    Err(SignatureError::from(TermTypeError::TypeMismatch {
-                        term: Box::new(type_args[3].clone()),
-                        type_: Box::new(OUTPUTS_PARAM.to_owned()),
-                    }))?
-                };
-
-                Ok(GlobalsOp::With {
-                    name,
-                    ty_arg: ty_arg.clone(),
-                    inputs,
-                    outputs,
-                })
-            }
-            Self::map => {
-                let Ok(inputs) = TypeRowRV::try_from(type_args[2].clone()) else {
-                    Err(SignatureError::from(TermTypeError::TypeMismatch {
-                        term: Box::new(type_args[2].clone()),
-                        type_: Box::new(INPUTS_PARAM.to_owned()),
-                    }))?
-                };
-                let Ok(outputs) = TypeRowRV::try_from(type_args[3].clone()) else {
-                    Err(SignatureError::from(TermTypeError::TypeMismatch {
-                        term: Box::new(type_args[3].clone()),
-                        type_: Box::new(OUTPUTS_PARAM.to_owned()),
-                    }))?
-                };
-
-                Ok(GlobalsOp::Map {
-                    name,
-                    ty_arg: ty_arg.clone(),
-                    inputs,
-                    outputs,
-                })
-            }
+            Self::with => Ok(GlobalsOp::With {
+                name,
+                ty_arg: ty_arg.clone(),
+                inputs,
+                outputs,
+            }),
+            Self::map => Ok(GlobalsOp::Map {
+                name,
+                ty_arg: ty_arg.clone(),
+                inputs,
+                outputs,
+            }),
         }
     }
 }

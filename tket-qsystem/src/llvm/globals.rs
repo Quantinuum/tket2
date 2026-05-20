@@ -46,28 +46,6 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
     const PREFIX: &str = "__globals__";
 
     match op {
-        GlobalsOp::Swap { name, ty } => {
-            let sym = format!("{PREFIX}.{name}");
-            let sym_ty = context.llvm_sum_type(option_type([ty.clone()]))?;
-
-            let [new_value] = &args.inputs[..] else {
-                bail!("Expected one input for GlobalsOp::Swap")
-            };
-            let new_value_ty = new_value.get_type();
-            ensure!(
-                new_value_ty == sym_ty.as_basic_type_enum(),
-                "Input type does not match global variable type. Found {new_value_ty}, Expected {sym_ty}"
-            );
-
-            let module = context.get_current_module();
-            let builder = context.builder();
-
-            let global = get_global_value(module, builder, sym.clone(), sym_ty.clone());
-
-            let result = builder.build_load(sym_ty, global.as_pointer_value(), "current_value")?;
-            let _ = builder.build_store(global.as_pointer_value(), *new_value)?;
-            args.outputs.finish(builder, [result])?
-        }
         GlobalsOp::With {
             name,
             ty_arg,
