@@ -76,7 +76,6 @@ for hugr_path in hugr_paths:
     np.save(output_path, res)
     all_results.append(f"{hugr_path.stem}:\n{format_statevector(res)}")
 
-
 # Save the result to a text file for easy viewing.
 if len(args) < 2:
     result_path = Path(__file__).resolve().parent / "hugr_results.txt"

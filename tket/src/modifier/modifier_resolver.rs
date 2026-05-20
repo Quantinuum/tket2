@@ -1054,16 +1054,9 @@ impl<N: HugrNode> ModifierResolver<N> {
     }
 
     /// Returns a row with modifier controls in the layout expected by a CFG edge.
-    fn cfg_control_types(
-        &self,
-        row: &hugr::types::TypeRow,
-        controls_first: bool,
-    ) -> hugr::types::TypeRow {
+    fn cfg_control_types(&self, row: &hugr::types::TypeRow) -> hugr::types::TypeRow {
         let mut signature = Signature::new(row.clone(), type_row![]);
         self.modify_signature(&mut signature, true);
-        if controls_first {
-            return signature.input;
-        }
         // CFG edges carry successor data before the threaded controls.
         signature
             .input
@@ -1153,12 +1146,10 @@ impl<N: HugrNode> ModifierResolver<N> {
             ));
         }
 
-        // Dagger uses the usual modifier layout; non-dagger CFGs thread controls
-        // as carried values after each block's data ports.
-        let is_dagger = self.modifiers().dagger;
+        // CFGs always thread controls as carried values after block data.
         let signature = Signature::new(
-            self.cfg_control_types(&cfg.signature.input, is_dagger),
-            self.cfg_control_types(&cfg.signature.output, is_dagger),
+            self.cfg_control_types(&cfg.signature.input),
+            self.cfg_control_types(&cfg.signature.output),
         );
         let mut new_cfg = CFGBuilder::new(signature)?;
         let mut bb_map = HashMap::new();
@@ -1170,8 +1161,8 @@ impl<N: HugrNode> ModifierResolver<N> {
                     "Non-basic-block node found while modifying CFG.".to_string(),
                 ));
             };
-            let input = self.cfg_control_types(&old_block.inputs, is_dagger);
-            let other_outputs = self.cfg_control_types(&old_block.other_outputs, is_dagger);
+            let input = self.cfg_control_types(&old_block.inputs);
+            let other_outputs = self.cfg_control_types(&old_block.other_outputs);
             let mut new_bb = if i == 0 {
                 new_cfg.entry_builder(old_block.sum_rows.clone(), other_outputs)?
             } else {
@@ -1217,25 +1208,16 @@ impl<N: HugrNode> ModifierResolver<N> {
 
         let new_node = self.insert_sub_dfg(new_dfg, new_cfg)?;
 
-        let wire_offset = if is_dagger { self.control_num() } else { 0 };
         self.wire_node_inout(
             cfg_node,
             new_node,
             (cfg.signature.input.iter(), cfg.signature.output.iter()),
-            (0, 0, wire_offset),
+            (0, 0, 0),
         )?;
 
-        // Expose the controls at the CFG boundary using the selected layout.
-        let input_offset = if is_dagger {
-            0
-        } else {
-            cfg.signature.input.len()
-        };
-        let output_offset = if is_dagger {
-            0
-        } else {
-            cfg.signature.output.len()
-        };
+        // Expose the controls after the CFG boundary data.
+        let input_offset = cfg.signature.input.len();
+        let output_offset = cfg.signature.output.len();
         for (i, c) in self.controls().iter_mut().enumerate() {
             new_dfg
                 .hugr_mut()

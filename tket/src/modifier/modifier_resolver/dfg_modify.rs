@@ -81,6 +81,19 @@ impl<N: HugrNode> ModifierResolver<N> {
         })
     }
 
+    fn block_input_control_offset(&self, dfb: &DataflowBlock) -> usize {
+        dfb.inputs.len()
+    }
+
+    fn block_output_control_offset(&self, dfb: &DataflowBlock) -> usize {
+        // Port 0 is the branch sum. Controls are threaded after block data.
+        1 + dfb.other_outputs.len()
+    }
+
+    fn block_wire_data_offset(&self) -> usize {
+        0
+    }
+
     /// Modifies the I/O nodes of a dataflow graph.
     /// These are handled separately from the other nodes since the place of control qubits
     /// may differ depending on the type of the dataflow graph.
@@ -136,16 +149,15 @@ impl<N: HugrNode> ModifierResolver<N> {
                     self.map_insert((old_out, port).into(), DirWire::from((new_out, new_port)))?
                 }
             }
-            OpType::DataflowBlock(dfb) if self.modifiers().dagger => {
+            OpType::DataflowBlock(dfb) => {
                 let DataflowBlock {
                     inputs: input,
                     other_outputs: output,
                     sum_rows: _sum_rows,
                 } = dfb;
-                let offset = self.control_num();
+                let offset = self.block_wire_data_offset();
 
-                // The wire for sum_rows always corresponds directly.
-                // Therefore, this wire is handled separately.
+                // The branch sum is unchanged.
                 self.map_insert(
                     (old_out, IncomingPort::from(0)).into(),
                     (new_out, IncomingPort::from(0)).into(),
@@ -155,26 +167,6 @@ impl<N: HugrNode> ModifierResolver<N> {
                     (new_out, new_in),
                     (output.iter(), input.iter()),
                     (1, 0, offset),
-                )?;
-            }
-            OpType::DataflowBlock(dfb) => {
-                let DataflowBlock {
-                    inputs: input,
-                    other_outputs: output,
-                    sum_rows: _sum_rows,
-                } = dfb;
-
-                // The branch sum is unchanged. In the non-dagger CFG path,
-                // controls are threaded as trailing block-carried values.
-                self.map_insert(
-                    (old_out, IncomingPort::from(0)).into(),
-                    (new_out, IncomingPort::from(0)).into(),
-                )?;
-                self.wire_inout(
-                    (old_out, old_in),
-                    (new_out, new_in),
-                    (output.iter(), input.iter()),
-                    (1, 0, 0),
                 )?;
             }
             OpType::Case(_) => {
@@ -206,12 +198,9 @@ impl<N: HugrNode> ModifierResolver<N> {
                 self.unpack_controls(new_dfg, new_dfg.input_wires())?
             }
             OpType::DFG(_) => new_dfg.input_wires().take(self.control_num()).collect(),
-            OpType::DataflowBlock(_) if self.modifiers().dagger => {
-                new_dfg.input_wires().take(self.control_num()).collect()
-            }
             OpType::DataflowBlock(dfb) => new_dfg
                 .input_wires()
-                .skip(dfb.inputs.len())
+                .skip(self.block_input_control_offset(dfb))
                 .take(self.control_num())
                 .collect(),
             OpType::TailLoop(tail_loop) => {
@@ -285,21 +274,12 @@ impl<N: HugrNode> ModifierResolver<N> {
                         .connect(ctrl.node(), ctrl.source(), out_node, i + 1);
                 }
             }
-            OpType::DataflowBlock(dfb) if self.modifiers().dagger => {
+            OpType::DataflowBlock(dfb) => {
+                let offset = self.block_output_control_offset(dfb);
                 for (i, ctrl) in controls.iter().enumerate() {
                     new_dfg
                         .hugr_mut()
-                        .connect(ctrl.node(), ctrl.source(), out_node, i + 1);
-                }
-            }
-            OpType::DataflowBlock(dfb) => {
-                for (i, ctrl) in controls.iter().enumerate() {
-                    new_dfg.hugr_mut().connect(
-                        ctrl.node(),
-                        ctrl.source(),
-                        out_node,
-                        i + 1 + dfb.other_outputs.len(),
-                    );
+                        .connect(ctrl.node(), ctrl.source(), out_node, i + offset);
                 }
             }
             optype => {
@@ -808,7 +788,6 @@ mod test {
     use super::super::tests::{
         SetUnitary, modifier_test_hugr, resolved_modifier_test_hugr, test_modifier_resolver,
     };
-    use super::super::tests::{SetUnitary, resolved_modifier_test_hugr, test_modifier_resolver};
     use super::super::*;
     use crate::TketOp;
     use crate::extension::{
