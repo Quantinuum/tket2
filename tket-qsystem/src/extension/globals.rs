@@ -87,7 +87,6 @@ impl MakeOpDef for GlobalsOpDef {
                 let global_ty = TypeRV::new_var_use(1, TypeBound::Linear);
                 let input_row = TypeRV::new_row_var_use(2, TypeBound::Linear);
                 let output_row = TypeRV::new_row_var_use(3, TypeBound::Linear);
-
                 let func_ty = TypeRV::new_function(FuncValueType::new(
                     [input_row.clone()],
                     [output_row.clone()],
@@ -100,8 +99,8 @@ impl MakeOpDef for GlobalsOpDef {
                         OUTPUTS_PARAM.to_owned(),
                     ],
                     FuncValueType::new(
-                        [global_ty.clone(), func_ty, input_row],
-                        [global_ty.clone(), output_row],
+                        [func_ty, input_row, global_ty.clone()],
+                        [output_row, global_ty.clone()],
                     ),
                 )
                 .into()
@@ -111,7 +110,7 @@ impl MakeOpDef for GlobalsOpDef {
                 let input_row = TypeRV::new_row_var_use(2, TypeBound::Linear);
                 let output_row = TypeRV::new_row_var_use(3, TypeBound::Linear);
                 let func_ty = TypeRV::new_function(FuncValueType::new(
-                    [global_ty.clone(), input_row.clone()],
+                    [input_row.clone(), global_ty.clone()],
                     [output_row.clone(), global_ty.clone()],
                 ));
                 PolyFuncTypeRV::new(

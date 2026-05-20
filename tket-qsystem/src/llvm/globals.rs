@@ -78,7 +78,7 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
             // TODO handle error if unwrap fails
             let sym_ty = context.llvm_sum_type(option_type([ty_arg.as_runtime().unwrap()]))?;
 
-            let [init_global_value, func, func_args @ ..] = &args.inputs[..] else {
+            let [func, func_args @ .., init_global_value] = &args.inputs[..] else {
                 bail!("No function provided as input for GlobalsOp::With")
             };
 
@@ -119,8 +119,8 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
             let call_results =
                 deaggregate_call_result(builder, func_call, hugr_func_ty.output.len())?;
 
-            let mut results = vec![end_value];
-            results.extend(call_results);
+            let mut results = call_results;
+            results.push(end_value);
 
             // Return results from function
             args.outputs.finish(builder, results)?
@@ -156,11 +156,14 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
             let start_value = sym_ty.value(start_value)?;
             let start_value = start_value.build_untag(builder, 1)?;
 
-            // func_args should be [global, *func_args]
-            let mut real_args: Vec<BasicMetadataValueEnum> =
-                start_value.iter().copied().map_into().collect_vec();
+            // real_args should be [*func_args, global]
+            let mut real_args: Vec<BasicMetadataValueEnum> = func_args
+                .iter()
+                .copied()
+                .map_into::<BasicMetadataValueEnum>()
+                .collect_vec();
             real_args.extend(
-                func_args
+                start_value
                     .iter()
                     .copied()
                     .map_into::<BasicMetadataValueEnum>(),
@@ -177,7 +180,7 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
             };
 
             let mut in_types = inputs.iter().cloned().collect_vec();
-            in_types.insert(0, global_ty_base.clone().into());
+            in_types.push(global_ty_base.clone().into());
 
             let mut out_types = outputs.iter().cloned().collect_vec();
             out_types.push(global_ty_base.clone().into());
@@ -231,8 +234,12 @@ mod test {
     use hugr_core::extension::simple_op::MakeRegisteredOp;
 
     #[rstest::rstest]
-    #[case::with(1,GlobalsOp::With { name: "my_global".to_string(), ty_arg: qb_t().into(), inputs: [qb_t(), bool_t()].into(), outputs: [qb_t(), bool_t()].into() })]
-    #[case::map(2,GlobalsOp::Map { name: "my_global".to_string(), ty_arg: qb_t().into(), inputs: [bool_t()].into(), outputs: [bool_t()].into() })]
+    #[case::with(1,
+        GlobalsOp::With{ name: "my_global".to_string(), ty_arg: qb_t().into(), inputs: [bool_t(), qb_t()].into(), outputs: [bool_t(), qb_t()].into() }
+    )]
+    #[case::map(2,
+        GlobalsOp::Map{ name: "my_global".to_string(), ty_arg: qb_t().into(), inputs: [bool_t()].into(), outputs: [bool_t()].into() }
+    )]
     fn emit_globals_codegen(
         #[case] _i: i32,
         #[with(_i)] mut llvm_ctx: TestContext,

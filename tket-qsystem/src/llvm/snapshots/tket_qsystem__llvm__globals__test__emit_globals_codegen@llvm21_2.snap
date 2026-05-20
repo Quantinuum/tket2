@@ -14,7 +14,7 @@ alloca_block:
 entry_block:                                      ; preds = %alloca_block
   %start_value = load { i1, i16 }, ptr @__globals__.my_global, align 2
   %2 = extractvalue { i1, i16 } %start_value, 1
-  %call_func = call { i1, i16 } %0(i16 %2, i1 %1)
+  %call_func = call { i1, i16 } %0(i1 %1, i16 %2)
   %3 = extractvalue { i1, i16 } %call_func, 0
   %4 = extractvalue { i1, i16 } %call_func, 1
   %5 = insertvalue { i1, i16 } { i1 true, i16 poison }, i16 %4, 1
