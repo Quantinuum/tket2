@@ -39,6 +39,7 @@ class QSystemExtension(TketExtension):
             self.Rz.op_def(),
             self.try_QAlloc.op_def(),
             self.ZZPhase.op_def(),
+            self.future_to_measure.op_def(),
         ]
 
     @functools.cached_property
@@ -80,7 +81,7 @@ class QSystemExtension(TketExtension):
         """Convert a future(bool) to a measurement (for compatibility with the
         quantum extension).
         """
-        return self().get_op("FutureToMeasure").instantiate()
+        return self().get_op("FutureToMeasurement").instantiate()
 
     @functools.cached_property
     def runtime_barrier_def(self) -> OpDef:

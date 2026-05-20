@@ -77,6 +77,7 @@ def ext_qsystem() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
             ext.Rz,
             ext.try_QAlloc,
             ext.ZZPhase,
+            ext.future_to_measure,
         ],
     )
 

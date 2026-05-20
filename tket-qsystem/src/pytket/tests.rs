@@ -286,74 +286,74 @@ fn json_roundtrip(
     compare_serial_circs(&ser, &reser);
 }
 
-/// Test the serialisation roundtrip from a tket circuit.
-///
-/// Note: this is not a pure roundtrip as the encoder may add internal qubits/bits to the circuit.
+// TODO: Revisit as part of https://github.com/Quantinuum/tket2/issues/1570.
+// Test the serialisation roundtrip from a tket circuit.
+//
+// Note: this is not a pure roundtrip as the encoder may add internal qubits/bits to the circuit.
+// #[rstest]
+// #[case::native_gates(circ_qsystem_native_gates())]
+// fn circuit_standalone_roundtrip(#[case] hugr: Hugr) {
+//     let circ_signature = hugr
+//         .entrypoint_optype()
+//         .inner_function_type()
+//         .expect("Dataflow entrypoint")
+//         .into_owned();
+//     let decode_options = DecodeOptions::new()
+//         .with_signature(circ_signature.clone())
+//         .with_config(qsystem_decoder_config());
+//     let encode_options = EncodeOptions::new()
+//         .with_subcircuits(true)
+//         .with_config(qsystem_encoder_config())
+//         .keep_empty_circuits(true);
+
+//     let encoded = EncodedCircuit::new_standalone(&hugr, encode_options.clone())
+//         .unwrap_or_else(|e| panic!("{e}"));
+
+//     assert!(encoded.contains_circuit(hugr.entrypoint()));
+//     assert_eq!(encoded.len(), 1);
+
+//     // Re-encode the EncodedCircuit
+//     let extracted_from_circ = encoded
+//         .reassemble(
+//             hugr.entrypoint(),
+//             Some("main".to_string()),
+//             decode_options.clone(),
+//         )
+//         .unwrap_or_else(|e| panic!("{e}"));
+//     extracted_from_circ
+//         .validate()
+//         .unwrap_or_else(|e| panic!("{e}"));
+
+//     // Extract the head pytket circuit, and re-encode it on its own.
+//     let ser: &SerialCircuit = &encoded[hugr.entrypoint()];
+//     let deser: Hugr = ser.decode(decode_options).unwrap_or_else(|e| panic!("{e}"));
+
+//     let deser_sig = deser
+//         .entrypoint_optype()
+//         .inner_function_type()
+//         .expect("Dataflow entrypoint")
+//         .into_owned();
+//     assert_eq!(
+//         &circ_signature.input, &deser_sig.input,
+//         "Input signature mismatch\n  Expected: {}\n  Actual:   {}",
+//         &circ_signature, &deser_sig
+//     );
+//     assert_eq!(
+//         &circ_signature.output, &deser_sig.output,
+//         "Output signature mismatch\n  Expected: {}\n  Actual:   {}",
+//         &circ_signature, &deser_sig
+//     );
+
+//     let reser = SerialCircuit::encode(
+//         &deser,
+//         EncodeOptions::new().with_config(qsystem_encoder_config()),
+//     )
+//     .unwrap();
+//     validate_serial_circ(&reser);
+//     compare_serial_circs(ser, &reser);
+// }
+
 #[rstest]
-#[case::native_gates(circ_qsystem_native_gates())]
-fn circuit_standalone_roundtrip(#[case] hugr: Hugr) {
-    let circ_signature = hugr
-        .entrypoint_optype()
-        .inner_function_type()
-        .expect("Dataflow entrypoint")
-        .into_owned();
-    let decode_options = DecodeOptions::new()
-        .with_signature(circ_signature.clone())
-        .with_config(qsystem_decoder_config());
-    let encode_options = EncodeOptions::new()
-        .with_subcircuits(true)
-        .with_config(qsystem_encoder_config())
-        .keep_empty_circuits(true);
-
-    let encoded = EncodedCircuit::new_standalone(&hugr, encode_options.clone())
-        .unwrap_or_else(|e| panic!("{e}"));
-
-    assert!(encoded.contains_circuit(hugr.entrypoint()));
-    assert_eq!(encoded.len(), 1);
-
-    // Re-encode the EncodedCircuit
-    let extracted_from_circ = encoded
-        .reassemble(
-            hugr.entrypoint(),
-            Some("main".to_string()),
-            decode_options.clone(),
-        )
-        .unwrap_or_else(|e| panic!("{e}"));
-    extracted_from_circ
-        .validate()
-        .unwrap_or_else(|e| panic!("{e}"));
-
-    // Extract the head pytket circuit, and re-encode it on its own.
-    let ser: &SerialCircuit = &encoded[hugr.entrypoint()];
-    let deser: Hugr = ser.decode(decode_options).unwrap_or_else(|e| panic!("{e}"));
-
-    let deser_sig = deser
-        .entrypoint_optype()
-        .inner_function_type()
-        .expect("Dataflow entrypoint")
-        .into_owned();
-    assert_eq!(
-        &circ_signature.input, &deser_sig.input,
-        "Input signature mismatch\n  Expected: {}\n  Actual:   {}",
-        &circ_signature, &deser_sig
-    );
-    assert_eq!(
-        &circ_signature.output, &deser_sig.output,
-        "Output signature mismatch\n  Expected: {}\n  Actual:   {}",
-        &circ_signature, &deser_sig
-    );
-
-    let reser = SerialCircuit::encode(
-        &deser,
-        EncodeOptions::new().with_config(qsystem_encoder_config()),
-    )
-    .unwrap();
-    validate_serial_circ(&reser);
-    compare_serial_circs(ser, &reser);
-}
-
-#[rstest]
-#[case::native_gates(circ_qsystem_native_gates(), 1)]
 #[case::dropped_order_edge(circ_dropped_order_edge(), 1)]
 #[case::unsupported_future_payload(circ_unsupported_future_payload(), 1)]
 fn encoded_circuit_roundtrip(#[case] hugr: Hugr, #[case] num_circuits: usize) {

@@ -318,7 +318,10 @@ mod test {
     use rstest::rstest;
     use tket::extension::guppy::{DROP_OP_NAME, GUPPY_EXTENSION};
 
-    use crate::extension::{futures::FutureOpDef, qsystem::QSystemOp};
+    use crate::extension::{
+        futures::{FutureOpBuilder, FutureOpDef},
+        qsystem::QSystemOp,
+    };
 
     #[rstest]
     #[case(false)]
@@ -332,8 +335,6 @@ mod test {
             .unwrap();
 
         let (mut hugr, [call_node, h_node, f_node, rx_node, main_node]) = {
-            use tket::extension::measurement::MeasurementOp;
-
             let mut builder = mb
                 .define_function_vis(
                     "main",
@@ -365,18 +366,12 @@ mod test {
                 .outputs_arr();
             let rx_node = qb.node();
 
-            // the Measure node will be removed. A Lazy Measure and two Future
-            // Reads will be added.  The Lazy Measure will be lifted and the
-            // reads will be sunk.
             let [measure_result] = builder
                 .add_dataflow_op(QSystemOp::LazyMeasure, [qb])
                 .unwrap()
                 .outputs_arr();
 
-            let [bool_result] = builder
-                .add_dataflow_op(MeasurementOp::Read, [measure_result])
-                .unwrap()
-                .outputs_arr();
+            let [bool_result] = builder.add_read(measure_result, bool_t()).unwrap();
 
             let main_n = builder
                 .finish_with_outputs([bool_result, bool_result])
