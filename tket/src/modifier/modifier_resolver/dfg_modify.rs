@@ -81,19 +81,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         })
     }
 
-    fn block_input_control_offset(&self, dfb: &DataflowBlock) -> usize {
-        dfb.inputs.len()
-    }
-
-    fn block_output_control_offset(&self, dfb: &DataflowBlock) -> usize {
-        // Port 0 is the branch sum. Controls are threaded after block data.
-        1 + dfb.other_outputs.len()
-    }
-
-    fn block_wire_data_offset(&self) -> usize {
-        0
-    }
-
     /// Modifies the I/O nodes of a dataflow graph.
     /// These are handled separately from the other nodes since the place of control qubits
     /// may differ depending on the type of the dataflow graph.
@@ -155,7 +142,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                     other_outputs: output,
                     sum_rows: _sum_rows,
                 } = dfb;
-                let offset = self.block_wire_data_offset();
+                let offset = 0;
 
                 // The branch sum is unchanged.
                 self.map_insert(
@@ -200,7 +187,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             OpType::DFG(_) => new_dfg.input_wires().take(self.control_num()).collect(),
             OpType::DataflowBlock(dfb) => new_dfg
                 .input_wires()
-                .skip(self.block_input_control_offset(dfb))
+                .skip(dfb.inputs.len())
                 .take(self.control_num())
                 .collect(),
             OpType::TailLoop(tail_loop) => {
@@ -275,7 +262,8 @@ impl<N: HugrNode> ModifierResolver<N> {
                 }
             }
             OpType::DataflowBlock(dfb) => {
-                let offset = self.block_output_control_offset(dfb);
+                // Port 0 is the branch sum. Controls are threaded after block data.
+                let offset = 1 + dfb.other_outputs.len();
                 for (i, ctrl) in controls.iter().enumerate() {
                     new_dfg
                         .hugr_mut()
@@ -1216,22 +1204,17 @@ mod test {
         }
     }
 
-    #[test]
-    fn test_dagger_rejects_cfg_loop() {
-        let (mut h, _) = modifier_test_hugr(1, 1, foo_cfg_loop, true);
-        assert_matches!(
-            assert_unresolvable_message(&mut h, "CFG loops cannot be daggered."),
-            Ok(())
-        );
-    }
-
-    #[test]
-    fn test_dagger_rejects_tail_loop() {
-        let (mut h, _) = modifier_test_hugr(1, 1, foo_tail_loop, true);
-        assert_matches!(
-            assert_unresolvable_message(&mut h, "TailLoop cannot be daggered."),
-            Ok(())
-        );
+    #[rstest::rstest]
+    #[case::cfg_loop(1, 1, foo_cfg_loop, "CFG loops cannot be daggered.")]
+    #[case::tail_loop(1, 1, foo_tail_loop, "TailLoop cannot be daggered.")]
+    fn test_dagger_rejects_loop_control_flow(
+        #[case] t_num: usize,
+        #[case] c_num: u64,
+        #[case] foo: fn(&mut ModuleBuilder<Hugr>, usize) -> FuncID<true>,
+        #[case] expected: &str,
+    ) {
+        let (mut h, _) = modifier_test_hugr(t_num, c_num, foo, true);
+        assert_matches!(assert_unresolvable_message(&mut h, expected), Ok(()));
     }
 
     #[test]
