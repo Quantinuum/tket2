@@ -25,6 +25,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             ));
         };
         let offset = self.modifiers().accum_ctrl.len();
+        let old_signature = (*call.signature()).clone();
         let callee = h
             .single_linked_output(call_node, call.called_function_port())
             .unwrap();
@@ -33,8 +34,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         let Some(new_callee) = self.modify_fn_if_needed(h, callee.0)? else {
             // If the function need not be modified, just copy the Call node as is.
             let new = self.add_node_no_modification(h, call_node, call.clone(), new_dfg)?;
-            self.call_map()
-                .insert(callee.0, (new, call.called_function_port()));
+            self.call_map_insert(callee.0, (new, call.called_function_port()));
             return Ok(());
         };
 
@@ -42,12 +42,10 @@ impl<N: HugrNode> ModifierResolver<N> {
         let type_args = call.type_args.clone();
         self.modify_signature(poly_sig.body_mut(), false);
         let new_call = Call::try_new(poly_sig, type_args).map_err(BuildError::from)?;
-        let signature = (*new_call.signature()).clone();
         let new_call_fn_port = new_call.called_function_port();
         let new_call_node = new_dfg.add_child_node(new_call);
 
-        self.call_map()
-            .insert(new_callee, (new_call_node, new_call_fn_port));
+        self.call_map_insert(new_callee, (new_call_node, new_call_fn_port));
         // wire the controls
         let mut controls = self.pack_controls(new_dfg)?;
         for (i, control) in controls.iter_mut().enumerate() {
@@ -58,11 +56,11 @@ impl<N: HugrNode> ModifierResolver<N> {
         }
         let controls = self.unpack_controls(new_dfg, controls)?;
         *self.controls() = controls;
-        // wire the inputs/outputs
+        // wire the inputs/outputs - we use the original signature here because the information about the controller is already in the offset
         self.wire_node_inout(
             call_node,
             new_call_node,
-            (signature.input.iter(), signature.output.iter()),
+            (old_signature.input.iter(), old_signature.output.iter()),
             (0, 0, offset),
         )?;
 
@@ -214,8 +212,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         self.modify_signature(modified_sig.body_mut(), false);
         let load = LoadFunction::try_new(modified_sig, load.type_args).map_err(BuildError::from)?;
         let new_load = new_dfg.add_child_node(load);
-        self.call_map()
-            .insert(modified_fn, (new_load, IncomingPort::from(0)));
+        self.call_map_insert(modified_fn, (new_load, IncomingPort::from(0)));
         *self.modifiers_mut() = modifiers;
 
         // Make new IndirectCall
