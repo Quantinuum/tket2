@@ -44,7 +44,7 @@ version = "0.2.10" # updated by release-please
 repository = "https://github.com/quantinuum/tket2/tree/main/qis-compiler"
 
 [tool.maturin]
-profile = "release"
+profile = "dev"
 python-source = "python"
 manifest-path = "Cargo.toml"
 include = ["python/selene_hugr_qis_compiler/py.typed"]
