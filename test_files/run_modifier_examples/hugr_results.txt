@@ -1,3 +1,25 @@
+assign_in_dagger_solved:
+	00 -> 0.7071+0j
+	10 -> 0.6124+0j
+	11 -> 0+0.3536j
+-----
+call1_in_ctrl_solved:
+	00 -> 0.7071+0j
+	11 -> 0.7071+0j
+-----
+call2_in_ctrl_solved:
+	0110 -> 0.7071+0j
+	1110 -> 0.6124+0j
+	1111 -> 0-0.3536j
+-----
+call_in_dagger_solved:
+	0 -> 0.7071+0j
+	1 -> 0-0.7071j
+-----
+classical_array_op_solved:
+	0 -> 0.7071+0j
+	1 -> -0.7071-0j
+-----
 classical_function1_solved:
 	0 -> 0.866+0j
 	1 -> 0+0.5j
@@ -282,27 +304,14 @@ ctrl_array_controller_solved:
 	1100 -> 0.3536+0j
 	1111 -> 0.3536+0j
 -----
-ctrl_on_call1_solved:
-	00 -> 0.7071+0j
-	11 -> 0.7071+0j
------
-ctrl_on_call2_solved:
-	0110 -> 0.7071+0j
-	1110 -> 0.6124+0j
-	1111 -> 0-0.3536j
------
-ctrl_on_x_solved:
-	00 -> 0.7071+0j
-	11 -> 0.7071+0j
------
-dagger_on_call_solved:
-	0 -> 0.7071+0j
-	1 -> 0-0.7071j
------
 double_modifier_solved:
 	00 -> 0.7071+0j
 	10 -> 0.6124+0j
 	11 -> 0+0.3536j
+-----
+gate_in_ctrl_solved:
+	00 -> 0.7071+0j
+	11 -> 0.7071+0j
 -----
 modify_array_solved:
 	000 -> 0.7071+0j
@@ -311,6 +320,37 @@ modify_array_solved:
 -----
 multiple_dagger_solved:
 	0 -> 1+0j
+-----
+multiple_functions_in_ctrl_dagger_solved:
+	00 -> 0.7071+0j
+	10 -> 0.433+0.25j
+	11 -> 0.25+0.433j
+-----
+multiple_functions_in_dagger_solved:
+	0 -> 0.7071-4.304e-17j
+	1 -> 0.6124+0.3536j
+-----
+multiple_gates1_in_ctrl_solved:
+	00 -> 0.7071+0j
+	10 -> 0.6124+0j
+	11 -> 0-0.3536j
+-----
+multiple_gates1_in_dagger_solved:
+	0 -> 0.7071+0j
+	1 -> 0-0.7071j
+-----
+multiple_gates2_in_ctrl_solved:
+	00 -> 0.7071+0j
+	10 -> 0.6124+0j
+	11 -> 0-0.3536j
+-----
+multiple_gates2_in_dagger_solved:
+	0 -> 0.7071+0j
+	1 -> 0+0.7071j
+-----
+multiple_gates3_in_dagger_solved:
+	0 -> 0.7071-4.304e-17j
+	1 -> 0.6124+0.3536j
 -----
 nested_ctrl_dagger1_solved:
 	0000 -> 0.5+0j
@@ -340,3 +380,23 @@ nested_multiple_ctrl1_solved:
 	1101 -> 0.25+0j
 	1110 -> 0.1768+0.1768j
 	1111 -> 0.1768-0.1768j
+-----
+subscript_in_ctrl_solved:
+	000 -> 0.7071+0j
+	001 -> 0.3536+0j
+	011 -> 0.3536+0j
+	101 -> 0+0.3536j
+	111 -> 0+0.3536j
+-----
+subscript_in_dagger_ctrl_solved:
+	000 -> 0.7071+0j
+	100 -> 0.5+0j
+	101 -> 0-0.5j
+-----
+subscript_in_dagger_solved:
+	00 -> 0.7071+0j
+	01 -> 0-0.7071j
+-----
+swap_in_dagger_solved:
+	0 -> 0.7071+0j
+	1 -> 0.7071+0j
