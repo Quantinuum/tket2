@@ -1,5 +1,5 @@
 //! Pass to inline calls to functions, controlled by [InlineAnnotation] metadata.
-use std::collections::{HashSet, VecDeque};
+use std::collections::{BTreeSet, HashSet, VecDeque};
 
 use crate::metadata::InlineAnnotation;
 use crate::passes::{ComposablePass, PassScope, composable::WithScope};
@@ -56,7 +56,7 @@ impl<H: HugrMut> ComposablePass<H> for InlineAlwaysPass {
         // We're going to object if there's a cycle of functions marked Always, as that would
         // lead to an infinitely big Hugr. However, don't object unless such a cycle is reachable
         // from the entrypoint...
-        let reachable_always: HashSet<H::Node> = match &self.scope {
+        let reachable_always: BTreeSet<H::Node> = match &self.scope {
             PassScope::Global(_) => always_funcs.collect(),
             PassScope::EntrypointFlat | PassScope::EntrypointRecursive => {
                 let reachable = Dfs::new(cg.graph(), cg.node_index(hugr.entrypoint()).unwrap())

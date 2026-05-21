@@ -81,7 +81,8 @@ impl<H: HugrMut> ComposablePass<H> for InlineFunctionsPass {
                 match h.get_metadata::<InlineAnnotation>(func) {
                     Some(InlineAnnotation::Never) => false,
                     Some(InlineAnnotation::BestEffort) => true,
-                    None => self.heuristic.should_inline(func, h),
+                    Some(InlineAnnotation::Always) // instruction to InlineAlwaysPass
+                    | None => self.heuristic.should_inline(func, h),
                 }
             })
         })
