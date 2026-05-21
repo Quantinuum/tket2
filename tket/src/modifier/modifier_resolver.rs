@@ -2061,7 +2061,6 @@ mod tests {
     #[case::classical_function2("../test_files/modifier_examples/classical_function2.hugr")]
     #[case::classical_function3("../test_files/modifier_examples/classical_function3.hugr")]
     #[case::ctrl_on_cfg("../test_files/modifier_examples/ctrl_on_cfg.hugr")]
-    #[case::double_on_cfg("../test_files/modifier_examples/double_on_cfg.hugr")]
     #[case::multiple_gates2_in_ctrl("../test_files/modifier_examples/multiple_gates2_in_ctrl.hugr")]
     #[case::subscript_in_ctrl("../test_files/modifier_examples/subscript_in_ctrl.hugr")]
     #[case::subscript_in_dagger("../test_files/modifier_examples/subscript_in_dagger.hugr")]

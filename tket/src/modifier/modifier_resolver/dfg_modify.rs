@@ -933,6 +933,7 @@ mod test {
         *func.finish_with_outputs(inputs).unwrap().handle()
     }
 
+    // A CFG with two sequential blocks
     fn foo_cfg_two_blocks(module: &mut ModuleBuilder<Hugr>, t_num: usize) -> FuncID<true> {
         let foo_sig = Signature::new_endo(iter::repeat_n(qb_t(), t_num).collect::<Vec<_>>());
         let mut func = module.define_function("foo", foo_sig.clone()).unwrap();
@@ -964,6 +965,55 @@ mod test {
             let exit = cfg.exit_block();
             cfg.branch(&entry, 0, &second).unwrap();
             cfg.branch(&second, 0, &exit).unwrap();
+            cfg.finish_sub_container().unwrap()
+        };
+        inputs[0] = cfg.outputs().next().unwrap();
+
+        *func.finish_with_outputs(inputs).unwrap().handle()
+    }
+
+    // A CFG with branching into two blocks, which then join back together.
+    fn foo_cfg_branching(module: &mut ModuleBuilder<Hugr>, t_num: usize) -> FuncID<true> {
+        let foo_sig = Signature::new_endo(iter::repeat_n(qb_t(), t_num).collect::<Vec<_>>());
+        let mut func = module.define_function("foo", foo_sig.clone()).unwrap();
+        func.set_unitary();
+        let mut inputs: Vec<_> = func.input_wires().collect();
+
+        let cfg = {
+            let mut cfg = func
+                .cfg_builder(vec![(qb_t(), inputs[0])], [qb_t()].into())
+                .unwrap();
+            let entry = {
+                let mut bb = cfg
+                    .entry_builder(vec![type_row![], type_row![]], [qb_t()].into())
+                    .unwrap();
+                let q = bb.input_wires().next().unwrap();
+                let tag = bb.make_sum(0, [type_row![], type_row![]], []).unwrap();
+                bb.finish_with_outputs(tag, [q]).unwrap()
+            };
+            let left = {
+                let mut bb = cfg
+                    .block_builder([qb_t()].into(), vec![type_row![]], [qb_t()].into())
+                    .unwrap();
+                let q = bb.input_wires().next().unwrap();
+                let q = bb.add_dataflow_op(TketOp::X, vec![q]).unwrap().out_wire(0);
+                let tag = bb.make_sum(0, [type_row![]], []).unwrap();
+                bb.finish_with_outputs(tag, [q]).unwrap()
+            };
+            let right = {
+                let mut bb = cfg
+                    .block_builder([qb_t()].into(), vec![type_row![]], [qb_t()].into())
+                    .unwrap();
+                let q = bb.input_wires().next().unwrap();
+                let q = bb.add_dataflow_op(TketOp::X, vec![q]).unwrap().out_wire(0);
+                let tag = bb.make_sum(0, [type_row![]], []).unwrap();
+                bb.finish_with_outputs(tag, [q]).unwrap()
+            };
+            let exit = cfg.exit_block();
+            cfg.branch(&entry, 0, &left).unwrap();
+            cfg.branch(&entry, 1, &right).unwrap();
+            cfg.branch(&left, 0, &exit).unwrap();
+            cfg.branch(&right, 0, &exit).unwrap();
             cfg.finish_sub_container().unwrap()
         };
         inputs[0] = cfg.outputs().next().unwrap();
@@ -1169,7 +1219,7 @@ mod test {
     #[case::cfg(1, 1, foo_cfg, false)]
     #[case::cfg_dagger(1, 1, foo_cfg, true)]
     #[case::cfg_two_blocks(1, 1, foo_cfg_two_blocks, false)]
-    #[case::cfg_two_blocks_dagger(1, 1, foo_cfg_two_blocks, true)]
+    #[case::cfg_branching(1, 1, foo_cfg_branching, false)]
     #[case::cfg_loop(1, 1, foo_cfg_loop, false)]
     #[case::array_ops(4, 0, foo_array_ops, false)]
     #[case::array_ops_dagger(4, 0, foo_array_ops, true)]
@@ -1204,9 +1254,22 @@ mod test {
     }
 
     #[rstest::rstest]
-    #[case::cfg_loop(1, 1, foo_cfg_loop, "CFG loops cannot be daggered.")]
+    #[case::cfg_branching(
+        1,
+        1,
+        foo_cfg_branching,
+        "CFG with more than one node cannot be daggered."
+    )]
+    #[case::cfg_loop(1, 1, foo_cfg_loop, "CFG with more than one node cannot be daggered.")]
     #[case::tail_loop(1, 1, foo_tail_loop, "TailLoop cannot be daggered.")]
-    fn test_dagger_rejects_loop_control_flow(
+    #[case::cfg_two_blocks_dagger(
+        1,
+        1,
+        foo_cfg_two_blocks,
+        "CFG with more than one node cannot be daggered."
+    )]
+
+    fn test_dagger_rejects_cfg_with_control_flow(
         #[case] t_num: usize,
         #[case] c_num: u64,
         #[case] foo: fn(&mut ModuleBuilder<Hugr>, usize) -> FuncID<true>,
