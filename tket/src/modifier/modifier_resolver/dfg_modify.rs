@@ -11,13 +11,15 @@ use hugr::{
         TailLoopBuilder,
     },
     core::HugrNode,
-    extension::prelude::qb_t,
+    extension::{prelude::qb_t, simple_op::MakeExtensionOp},
     hugr::hugrmut::HugrMut,
     ops::{Call, Conditional, DFG, DataflowBlock, DataflowOpTrait, OpType, TailLoop},
     std_extensions::collections::array::ArrayOpBuilder,
     types::{FuncTypeBase, TypeArg, TypeRow},
 };
 use petgraph::visit::{Topo, Walker};
+
+use crate::{TketOp, extension::global_phase::GlobalPhase};
 
 use super::{DirWire, ModifierFlags, ModifierResolver, ModifierResolverErrors, PortExt};
 
@@ -342,8 +344,10 @@ impl<N: HugrNode> ModifierResolver<N> {
         let call_map = mem::replace(self.call_map(), old_call_map);
         let insertion_result = h.insert_from_view(h.module_root(), new_fn.hugr());
         let new_call_map = update_call_map(&call_map, &insertion_result.node_map);
-        for (old_in, (new_n, new_port)) in new_call_map.into_iter() {
-            h.connect(old_in, 0, new_n, new_port);
+        for (old_in, targets) in new_call_map.into_iter() {
+            for (new_n, new_port) in targets {
+                h.connect(old_in, 0, new_n, new_port);
+            }
         }
 
         // set unitarity metadata
@@ -432,6 +436,68 @@ impl<N: HugrNode> ModifierResolver<N> {
         *self.call_map() = new_call_map;
 
         Ok(insertion_result.inserted_entrypoint)
+    }
+
+    fn copy_sub_container_no_modification(
+        &mut self,
+        h: &impl HugrView<Node = N>,
+        n: N,
+        new_dfg: &mut impl Container,
+    ) -> Result<Node, ModifierResolverErrors<N>> {
+        // Some containers have qubits in their signature but only pass them
+        // through while doing classical work. Copying the whole subtree keeps
+        // those classical dependencies intact instead of trying to dagger the
+        // boundary one port at a time.
+        let insertion_result = new_dfg.add_hugr_view(&h.with_entrypoint(n));
+
+        let new_node = insertion_result.inserted_entrypoint;
+        for port in h.all_node_ports(n) {
+            self.map_insert(DirWire(n, port), DirWire(new_node, port))?;
+        }
+
+        Ok(new_node)
+    }
+
+    fn subtree_has_quantum_operation(&self, h: &impl HugrView<Node = N>, n: N) -> bool {
+        // We need more than a type-level qubit check here: Guppy often emits
+        // bounds-check conditionals whose signature carries a qubit, but whose
+        // body only manipulates classical array indices and values.
+        h.descendants(n)
+            .chain(iter::once(n))
+            .any(|node| self.node_is_quantum_operation(h, node))
+    }
+
+    fn node_is_quantum_operation(&self, h: &impl HugrView<Node = N>, n: N) -> bool {
+        let optype = h.get_optype(n);
+        match optype {
+            OpType::Input(_)
+            | OpType::Output(_)
+            | OpType::CFG(_)
+            | OpType::DFG(_)
+            | OpType::TailLoop(_)
+            | OpType::Conditional(_)
+            | OpType::Case(_)
+            | OpType::DataflowBlock(_)
+            | OpType::FuncDefn(_)
+            | OpType::FuncDecl(_)
+            | OpType::Module(_) => false,
+            // tket quantum gates and global phases require the normal modifier
+            // logic. They are real operations, not just qubit-carrying IO.
+            _ if TketOp::from_optype(optype).is_some()
+                || GlobalPhase::from_optype(optype).is_some() =>
+            {
+                true
+            }
+            // Unknown operations are conservative: if their signature can carry
+            // qubits, treat them as quantum-sensitive so we do not silently copy
+            // an operation that may need dagger/control handling.
+            _ => h.signature(n).is_some_and(|sig| {
+                sig.input
+                    .iter()
+                    .chain(sig.output.iter())
+                    .any(|ty| self.qubit_finder.contains_element_type(ty))
+            }),
+        }
     }
 
     pub(super) fn modify_dfg(
@@ -541,6 +607,13 @@ impl<N: HugrNode> ModifierResolver<N> {
         conditional: &Conditional,
         new_dfg: &mut impl Container,
     ) -> Result<(), ModifierResolverErrors<N>> {
+        // If a conditional does not have quantum operations in its body, we can safely
+        // copy the whole conditional without modification.
+        if !self.subtree_has_quantum_operation(h, n) {
+            self.copy_sub_container_no_modification(h, n, new_dfg)?;
+            return Ok(());
+        }
+
         let offset = self.control_num();
 
         // Build a new Conditional with modified body.
@@ -627,7 +700,10 @@ impl<N: HugrNode> ModifierResolver<N> {
 }
 
 /// composition of two call maps
-fn update_call_map<A, B, C, D>(f: &HashMap<A, (B, C)>, g: &HashMap<B, D>) -> HashMap<A, (D, C)>
+fn update_call_map<A, B, C, D>(
+    f: &HashMap<A, Vec<(B, C)>>,
+    g: &HashMap<B, D>,
+) -> HashMap<A, Vec<(D, C)>>
 where
     A: Clone + Eq + std::hash::Hash,
     B: Clone + Eq + std::hash::Hash,
@@ -635,13 +711,19 @@ where
     D: Clone,
 {
     f.iter()
-        .filter_map(|(a, (b, c))| g.get(b).map(|d| (a.clone(), (d.clone(), c.clone()))))
+        .filter_map(|(a, targets)| {
+            let targets = targets
+                .iter()
+                .filter_map(|(b, c)| g.get(b).map(|d| (d.clone(), c.clone())))
+                .collect::<Vec<_>>();
+            (!targets.is_empty()).then(|| (a.clone(), targets))
+        })
         .collect()
 }
 
 #[cfg(test)]
 mod test {
-    use super::super::tests::{SetUnitary, test_modifier_resolver};
+    use super::super::tests::{SetUnitary, resolved_modifier_test_hugr, test_modifier_resolver};
     use super::super::*;
     use crate::TketOp;
     use crate::extension::{
@@ -652,9 +734,13 @@ mod test {
     use hugr::{
         Hugr,
         builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder, SubContainer},
-        extension::prelude::qb_t,
+        extension::prelude::{ConstUsize, qb_t, usize_t},
+        extension::simple_op::MakeExtensionOp,
         ops::{CallIndirect, ExtensionOp, handle::FuncID},
-        std_extensions::collections::array::{ArrayOpBuilder, array_type},
+        std_extensions::collections::{
+            array::{ArrayOp, ArrayOpBuilder, ArrayOpDef, array_type},
+            borrow_array::{BArrayOp, BArrayOpBuilder, BArrayOpDef},
+        },
         type_row,
         types::{Signature, Term},
     };
@@ -796,6 +882,153 @@ mod test {
         *func.finish_with_outputs(inputs).unwrap().handle()
     }
 
+    fn foo_safe_array_ops(module: &mut ModuleBuilder<Hugr>, t_num: usize) -> FuncID<true> {
+        assert_eq!(t_num, 4);
+
+        let foo_sig = Signature::new_endo(iter::repeat_n(qb_t(), t_num).collect::<Vec<_>>());
+        let mut func = module.define_function("foo", foo_sig).unwrap();
+        func.set_unitary();
+        let mut inputs: Vec<_> = func.input_wires().collect();
+
+        let array = func.add_new_array(qb_t(), [inputs[0], inputs[1]]).unwrap();
+        let array = func.add_array_unpack(qb_t(), 2, array).unwrap();
+        inputs[0] = array[0];
+        inputs[1] = array[1];
+
+        let borrow_array = func
+            .add_new_borrow_array(qb_t(), [inputs[2], inputs[3]])
+            .unwrap();
+        let borrow_array = func
+            .add_borrow_array_unpack(qb_t(), 2, borrow_array)
+            .unwrap();
+        inputs[2] = borrow_array[0];
+        inputs[3] = borrow_array[1];
+
+        *func.finish_with_outputs(inputs).unwrap().handle()
+    }
+
+    fn foo_array_ops(module: &mut ModuleBuilder<Hugr>, t_num: usize) -> FuncID<true> {
+        assert_eq!(t_num, 4);
+
+        let foo_sig = Signature::new_endo(iter::repeat_n(qb_t(), t_num).collect::<Vec<_>>());
+        let mut func = module.define_function("foo", foo_sig).unwrap();
+        func.set_unitary();
+        let mut inputs: Vec<_> = func.input_wires().collect();
+
+        let array = func.add_new_array(qb_t(), [inputs[0], inputs[1]]).unwrap();
+        let array = func.add_array_unpack(qb_t(), 2, array).unwrap();
+        inputs[0] = array[0];
+        inputs[1] = array[1];
+
+        let borrow_array = func
+            .add_new_borrow_array(qb_t(), [inputs[2], inputs[3]])
+            .unwrap();
+        let index = func.add_load_value(ConstUsize::new(1));
+        let (borrow_array, borrowed) = func
+            .add_borrow_array_borrow(qb_t(), 2, borrow_array, index)
+            .unwrap();
+        let borrowed = func
+            .add_dataflow_op(TketOp::H, [borrowed])
+            .unwrap()
+            .out_wire(0);
+        let borrow_array = func
+            .add_borrow_array_return(qb_t(), 2, borrow_array, index, borrowed)
+            .unwrap();
+        let borrow_array = func
+            .add_borrow_array_unpack(qb_t(), 2, borrow_array)
+            .unwrap();
+        inputs[2] = borrow_array[0];
+        inputs[3] = borrow_array[1];
+
+        *func.finish_with_outputs(inputs).unwrap().handle()
+    }
+
+    fn foo_non_quantum_array_ops(module: &mut ModuleBuilder<Hugr>, t_num: usize) -> FuncID<true> {
+        assert_eq!(t_num, 1);
+
+        let foo_sig = Signature::new_endo(iter::repeat_n(qb_t(), t_num).collect::<Vec<_>>());
+        let mut func = module.define_function("foo", foo_sig).unwrap();
+        func.set_unitary();
+        let inputs: Vec<_> = func.input_wires().collect();
+
+        // Classical ArrayOp and BArrayOp sequence. Under dagger this should
+        // remain new_array -> unpack, not become unpack -> new_array.
+        let one = func.add_load_value(ConstUsize::new(1));
+        let two = func.add_load_value(ConstUsize::new(2));
+        let array = func.add_new_array(usize_t(), [one, two]).unwrap();
+        let unpacked = func.add_array_unpack(usize_t(), 2, array).unwrap();
+        let borrow_array = func.add_new_borrow_array(usize_t(), unpacked).unwrap();
+        let unpacked = func
+            .add_borrow_array_unpack(usize_t(), 2, borrow_array)
+            .unwrap();
+        let array = func.add_new_array(usize_t(), unpacked).unwrap();
+        let _ = func.add_array_unpack(usize_t(), 2, array).unwrap();
+
+        *func.finish_with_outputs(inputs).unwrap().handle()
+    }
+
+    fn foo_nested_non_quantum_array_ops(
+        module: &mut ModuleBuilder<Hugr>,
+        t_num: usize,
+    ) -> FuncID<true> {
+        assert_eq!(t_num, 1);
+
+        let foo_sig = Signature::new_endo(iter::repeat_n(qb_t(), t_num).collect::<Vec<_>>());
+        let mut func = module.define_function("foo", foo_sig).unwrap();
+        func.set_unitary();
+        let inputs: Vec<_> = func.input_wires().collect();
+
+        // Nested classical arrays should still be detected as non-quantum:
+        // array[array[usize, 2], 2] contains no qubit element.
+        let [one, two, three, four] = [1, 2, 3, 4].map(|i| func.add_load_value(ConstUsize::new(i)));
+        let inner_ty = array_type(2, usize_t());
+        let array_1 = func.add_new_array(usize_t(), [one, two]).unwrap();
+        let array_2 = func.add_new_array(usize_t(), [three, four]).unwrap();
+        let nested = func
+            .add_new_array(inner_ty.clone(), [array_1, array_2])
+            .unwrap();
+        let nested = func.add_array_unpack(inner_ty.clone(), 2, nested).unwrap();
+        let nested = func.add_new_borrow_array(inner_ty.clone(), nested).unwrap();
+        let nested = func.add_borrow_array_unpack(inner_ty, 2, nested).unwrap();
+        let _ = func.add_array_unpack(usize_t(), 2, nested[0]).unwrap();
+        let _ = func.add_array_unpack(usize_t(), 2, nested[1]).unwrap();
+
+        *func.finish_with_outputs(inputs).unwrap().handle()
+    }
+
+    fn foo_nested_quantum_array_ops(
+        module: &mut ModuleBuilder<Hugr>,
+        t_num: usize,
+    ) -> FuncID<true> {
+        assert_eq!(t_num, 5);
+
+        let foo_sig = Signature::new_endo(iter::repeat_n(qb_t(), t_num).collect::<Vec<_>>());
+        let mut func = module.define_function("foo", foo_sig).unwrap();
+        func.set_unitary();
+        let mut inputs: Vec<_> = func.input_wires().collect();
+
+        // Nested quantum arrays should be treated as quantum-carrying even
+        // though the top-level element type is itself an array.
+        let inner_ty = array_type(2, qb_t());
+        let array_1 = func.add_new_array(qb_t(), [inputs[0], inputs[1]]).unwrap();
+        let array_2 = func.add_new_array(qb_t(), [inputs[2], inputs[3]]).unwrap();
+        let nested = func
+            .add_new_array(inner_ty.clone(), [array_1, array_2])
+            .unwrap();
+        let nested = func.add_array_unpack(inner_ty.clone(), 2, nested).unwrap();
+        let nested = func.add_new_borrow_array(inner_ty.clone(), nested).unwrap();
+        let nested = func.add_borrow_array_unpack(inner_ty, 2, nested).unwrap();
+        let [array_1, array_2] = [nested[0], nested[1]];
+        let array_1 = func.add_array_unpack(qb_t(), 2, array_1).unwrap();
+        let array_2 = func.add_array_unpack(qb_t(), 2, array_2).unwrap();
+        inputs[0] = array_1[0];
+        inputs[1] = array_1[1];
+        inputs[2] = array_2[0];
+        inputs[3] = array_2[1];
+
+        *func.finish_with_outputs(inputs).unwrap().handle()
+    }
+
     #[rstest::rstest]
     #[case::dfg(1, 2, foo_dfg, false)]
     #[case::dfg_dagger(1, 2, foo_dfg, true)]
@@ -804,6 +1037,12 @@ mod test {
     #[case::conditional_dagger(1, 1, foo_conditional, true)]
     #[case::cfg(1, 1, foo_cfg, false)]
     #[case::cfg_dagger(1, 1, foo_cfg, true)]
+    #[case::array_ops(4, 0, foo_array_ops, false)]
+    #[case::array_ops_dagger(4, 0, foo_array_ops, true)]
+    #[case::safe_array_ops(4, 0, foo_safe_array_ops, false)]
+    #[case::safe_array_ops_dagger(4, 0, foo_safe_array_ops, true)]
+    #[case::nested_safe_array_ops(5, 0, foo_nested_quantum_array_ops, false)]
+    #[case::nested_safe_array_ops_dagger(5, 0, foo_nested_quantum_array_ops, true)]
     fn test_dfg_modify(
         #[case] t_num: usize,
         #[case] c_num: u64,
@@ -811,6 +1050,104 @@ mod test {
         #[case] dagger: bool,
     ) {
         test_modifier_resolver(t_num, c_num, foo, dagger);
+    }
+
+    #[test]
+    fn test_dagger_keeps_non_quantum_array_ops_unchanged() {
+        let h = resolved_modifier_test_hugr(1, 0, foo_non_quantum_array_ops, true);
+
+        // If classical array ops were dagger-reversed, these direct
+        // new_array -> unpack edges would disappear in the modified function.
+        let mut array_new_to_unpack = 0;
+        let mut borrow_array_new_to_unpack = 0;
+        for node in h.nodes() {
+            let optype = h.get_optype(node);
+            if ArrayOp::from_optype(optype)
+                .is_some_and(|op| op.def == ArrayOpDef::new_array && op.elem_ty == usize_t())
+            {
+                array_new_to_unpack += h
+                    .linked_inputs(node, 0)
+                    .filter(|(target, _)| {
+                        ArrayOp::from_optype(h.get_optype(*target)).is_some_and(|op| {
+                            op.def == ArrayOpDef::unpack && op.elem_ty == usize_t()
+                        })
+                    })
+                    .count();
+            }
+            if BArrayOp::from_optype(optype)
+                .is_some_and(|op| op.def == BArrayOpDef::new_array && op.elem_ty == usize_t())
+            {
+                borrow_array_new_to_unpack += h
+                    .linked_inputs(node, 0)
+                    .filter(|(target, _)| {
+                        BArrayOp::from_optype(h.get_optype(*target)).is_some_and(|op| {
+                            op.def == BArrayOpDef::unpack && op.elem_ty == usize_t()
+                        })
+                    })
+                    .count();
+            }
+        }
+
+        assert!(array_new_to_unpack >= 2);
+        assert!(borrow_array_new_to_unpack >= 1);
+    }
+
+    fn is_in_modified_function(h: &Hugr, node: hugr::Node) -> bool {
+        let mut parent = h.get_parent(node);
+        while let Some(node) = parent {
+            if h.get_optype(node)
+                .as_func_defn()
+                .is_some_and(|func| func.func_name().starts_with("__modified__"))
+            {
+                return true;
+            }
+            parent = h.get_parent(node);
+        }
+        false
+    }
+
+    #[test]
+    fn test_dagger_keeps_nested_non_quantum_array_ops_unchanged() {
+        let h = resolved_modifier_test_hugr(1, 0, foo_nested_non_quantum_array_ops, true);
+        let inner_ty = array_type(2, usize_t());
+
+        // Same check as above, but for nested classical array element types.
+        // This guards the recursive qubit-element detection.
+        let mut array_new_to_unpack = 0;
+        let mut borrow_array_new_to_unpack = 0;
+        for node in h.nodes() {
+            if !is_in_modified_function(&h, node) {
+                continue;
+            }
+            let optype = h.get_optype(node);
+            if ArrayOp::from_optype(optype)
+                .is_some_and(|op| op.def == ArrayOpDef::new_array && op.elem_ty == inner_ty)
+            {
+                array_new_to_unpack += h
+                    .linked_inputs(node, 0)
+                    .filter(|(target, _)| {
+                        ArrayOp::from_optype(h.get_optype(*target)).is_some_and(|op| {
+                            op.def == ArrayOpDef::unpack && op.elem_ty == inner_ty
+                        })
+                    })
+                    .count();
+            }
+            if BArrayOp::from_optype(optype)
+                .is_some_and(|op| op.def == BArrayOpDef::new_array && op.elem_ty == inner_ty)
+            {
+                borrow_array_new_to_unpack += h
+                    .linked_inputs(node, 0)
+                    .filter(|(target, _)| {
+                        BArrayOp::from_optype(h.get_optype(*target)).is_some_and(|op| {
+                            op.def == BArrayOpDef::unpack && op.elem_ty == inner_ty
+                        })
+                    })
+                    .count();
+            }
+        }
+
+        assert!(array_new_to_unpack >= 1);
+        assert!(borrow_array_new_to_unpack >= 1);
     }
 
     // This test checks the case where a modifier is not chained but duplicated.

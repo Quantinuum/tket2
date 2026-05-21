@@ -17,6 +17,7 @@ use hugr::ops::handle::DataflowParentID;
 use hugr::types::Signature;
 use hugr::{HugrView, IncomingPort, Node, OutgoingPort, PortIndex, Wire};
 use hugr_core::hugr::internal::{HugrInternals, HugrMutInternals as _};
+use indexmap::IndexMap;
 use itertools::Itertools;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
 use rayon::slice::ParallelSliceMut;
@@ -115,8 +116,8 @@ impl Chunk {
                 .unwrap_or_else(|e| panic!("The chunk circuit is no longer a dataflow graph: {e}"));
         let node_map = circ.insert_subgraph(root, &chunk, &subgraph);
 
-        let mut input_map = HashMap::with_capacity(self.inputs.len());
-        let mut output_map = HashMap::with_capacity(self.outputs.len());
+        let mut input_map = IndexMap::with_capacity(self.inputs.len());
+        let mut output_map = IndexMap::with_capacity(self.outputs.len());
 
         // Translate each connection from the chunk input into a [`ConnectionTarget`].
         //
@@ -168,8 +169,8 @@ impl Chunk {
     fn empty_chunk_insert_result(&self) -> ChunkInsertResult {
         let hugr = self.circ.hugr();
         let [chunk_inp, chunk_out] = self.circ.io_nodes();
-        let mut input_map = HashMap::with_capacity(self.inputs.len());
-        let mut output_map = HashMap::with_capacity(self.outputs.len());
+        let mut input_map = IndexMap::with_capacity(self.inputs.len());
+        let mut output_map = IndexMap::with_capacity(self.outputs.len());
 
         for (&connection, chunk_inp_port) in self.inputs.iter().zip(hugr.node_outputs(chunk_inp)) {
             let connection_targets: Vec<ConnectionTarget> = hugr
@@ -207,12 +208,12 @@ impl Chunk {
 /// A map from the original input/output [`ChunkConnection`]s to an inserted chunk's inputs and outputs.
 #[derive(Debug, Clone)]
 struct ChunkInsertResult {
-    /// A map from incoming connections to a chunk, to the new node and incoming port targets.
+    /// Incoming connections to a chunk, in chunk input order, to the new node and incoming port targets.
     ///
     /// A chunk may specify multiple targets to be connected to a single incoming `ChunkConnection`.
-    pub incoming_connections: HashMap<ChunkConnection, Vec<ConnectionTarget>>,
-    /// A map from outgoing connections from a chunk, to the new node and outgoing port target.
-    pub outgoing_connections: HashMap<ChunkConnection, ConnectionTarget>,
+    pub incoming_connections: IndexMap<ChunkConnection, Vec<ConnectionTarget>>,
+    /// Outgoing connections from a chunk, in chunk output order, to the new node and outgoing port target.
+    pub outgoing_connections: IndexMap<ChunkConnection, ConnectionTarget>,
 }
 
 /// The target of a chunk connection in a reassembled circuit.
@@ -326,7 +327,7 @@ impl CircuitChunks {
         // The chunks input and outputs are each identified with a
         // [`ChunkConnection`]. We collect both sides first, and rewire them
         // after the chunks have been inserted.
-        let mut sources: HashMap<ChunkConnection, (Node, OutgoingPort)> = HashMap::new();
+        let mut sources: IndexMap<ChunkConnection, (Node, OutgoingPort)> = IndexMap::new();
         let mut targets: HashMap<ChunkConnection, Vec<(Node, IncomingPort)>> = HashMap::new();
 
         // A map for `ChunkConnection`s that have been merged into another (due

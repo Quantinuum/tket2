@@ -4,8 +4,8 @@ use hugr_core::Node;
 use hugr_core::types::{SumType, Type, TypeArg, TypeEnum, TypeRow};
 use itertools::{Itertools, zip_eq};
 use std::cmp::Ordering;
-use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
+use std::collections::BTreeMap;
+use std::hash::Hash;
 use thiserror::Error;
 
 use super::row_contains_bottom;
@@ -63,14 +63,14 @@ pub struct LoadedFunction<N> {
 
 /// A representation of a value of [`SumType`], that may have one or more possible tags,
 /// with a [`PartialValue`] representation of each element-value of each possible tag.
-#[derive(PartialEq, Clone, Eq)]
-pub struct PartialSum<V, N = Node>(pub HashMap<usize, Vec<PartialValue<V, N>>>);
+#[derive(PartialEq, Clone, Eq, Hash)]
+pub struct PartialSum<V, N = Node>(pub BTreeMap<usize, Vec<PartialValue<V, N>>>);
 
 impl<V, N> PartialSum<V, N> {
     /// New instance for a single known tag.
     /// (Multi-tag instances can be created via [`Self::try_join_mut`].)
     pub fn new_variant(tag: usize, values: impl IntoIterator<Item = PartialValue<V, N>>) -> Self {
-        Self(HashMap::from([(tag, Vec::from_iter(values))]))
+        Self(BTreeMap::from([(tag, Vec::from_iter(values))]))
     }
 
     /// The number of possible variants we know about. (NOT the number
@@ -266,46 +266,30 @@ impl<V: Clone, N: Clone> PartialSum<V, N> {
 
 impl<V: PartialEq, N: PartialEq + PartialOrd> PartialOrd for PartialSum<V, N> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        let max_key = self.0.keys().chain(other.0.keys()).copied().max().unwrap();
-        let (mut keys1, mut keys2) = (vec![0; max_key + 1], vec![0; max_key + 1]);
-        for k in self.0.keys() {
-            keys1[*k] = 1;
-        }
-
-        for k in other.0.keys() {
-            keys2[*k] = 1;
-        }
-
-        Some(match keys1.cmp(&keys2) {
-            ord @ (Ordering::Greater | Ordering::Less) => ord,
-            Ordering::Equal => {
-                for (k, lhs) in &self.0 {
-                    let Some(rhs) = other.0.get(k) else {
-                        unreachable!()
-                    };
-                    let key_cmp = lhs.partial_cmp(rhs);
-                    if key_cmp != Some(Ordering::Equal) {
-                        return key_cmp;
+        for e in self
+            .0
+            .iter()
+            .merge_join_by(other.0.iter(), |(k1, _), (k2, _)| k1.cmp(k2))
+        {
+            match e {
+                itertools::EitherOrBoth::Left(_) => return Some(Ordering::Greater),
+                itertools::EitherOrBoth::Right(_) => return Some(Ordering::Less),
+                itertools::EitherOrBoth::Both((_, v1), (_, v2)) => {
+                    let cmp = v1.partial_cmp(v2);
+                    if cmp != Some(Ordering::Equal) {
+                        return cmp;
                     }
                 }
-                Ordering::Equal
             }
-        })
+        }
+
+        Some(Ordering::Equal)
     }
 }
 
 impl<V: std::fmt::Debug, N: std::fmt::Debug> std::fmt::Debug for PartialSum<V, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
-    }
-}
-
-impl<V: Hash, N: Hash> Hash for PartialSum<V, N> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        for (k, v) in &self.0 {
-            k.hash(state);
-            v.hash(state);
-        }
     }
 }
 

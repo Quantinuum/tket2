@@ -26,6 +26,7 @@ TK1EncodeError = _state.TK1EncodeError
 
 if TYPE_CHECKING:
     from tket._rewrite import CircuitRewrite
+    from tket.util import PytketCircuitProto
 
 
 __all__ = [
@@ -64,7 +65,7 @@ class CompilationState:
     _py_extensions: ExtensionRegistry | None = None
 
     @staticmethod
-    def from_tket1(circ) -> CompilationState:
+    def from_tket1(circ: PytketCircuitProto) -> CompilationState:
         """Create a CompilationState from a legacy pytket Circuit."""
         return CompilationState(_inner=_state.CompilationState.from_tket1(circ))
 
@@ -192,6 +193,16 @@ class CompilationState:
         """Returns the number of operations in the circuit."""
         return self._inner.num_operations()
 
-    def to_tket1(self):
-        """Convert the program back to a legacy pytket Circuit."""
-        return self._inner.to_tket1()
+    try:
+        from pytket.circuit import Circuit as Tk1Circuit
+
+        def to_tket1(self) -> Tk1Circuit:
+            """Convert the program back to a legacy pytket Circuit."""
+            return self._inner.to_tket1()  # type: ignore[return-value]
+    except ImportError:
+        # Pytket is installed as an optional dependency under the `pytket`
+        # extra.
+        #
+        # If it's not available, trying to load a CompilationState back into a
+        # pytket Circuit would result in an ImportError.
+        pass

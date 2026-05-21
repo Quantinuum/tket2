@@ -3,11 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from hugr import Hugr
-from pytket.passes import (
-    BasePass,
-)
 
 from tket import _state
 from . import inline_funcs
@@ -20,6 +18,9 @@ from hugr.passes.composable import (
     PassResult,
 )
 from hugr.passes.scope import PassScope, GlobalScope
+
+if TYPE_CHECKING:
+    from tket.util import PytketPassProto as PytketPass
 
 
 __all__ = [
@@ -35,7 +36,7 @@ __all__ = [
 
 @dataclass
 class PytketHugrPass(ComposablePass):
-    pytket_passes: list[BasePass]
+    pytket_passes: list[PytketPass]
     _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
 
     """
@@ -44,7 +45,7 @@ class PytketHugrPass(ComposablePass):
     The user can create a :py:class:`PytketHugrPass` object from any serializable member of `pytket.passes`.
     """
 
-    def __init__(self, *pytket_passes: BasePass) -> None:
+    def __init__(self, *pytket_passes: PytketPass) -> None:
         """Initialize a PytketHugrPass from a :py:class:`~pytket.passes.BasePass` instance."""
         self.pytket_passes = list(pytket_passes)
 
