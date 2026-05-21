@@ -258,11 +258,16 @@ impl<N: HugrNode> ModifierResolver<N> {
         load: &LoadFunction,
         new_dfg: &mut impl Dataflow,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        // Modifier consumers rebuild their own LoadFunction nodes.
-        if h.linked_inputs(n, 0)
-            .any(|(consumer, _)| Modifier::from_optype(h.get_optype(consumer)).is_some())
+        let consumers = h.linked_inputs(n, 0).collect::<Vec<_>>();
+
+        // Check if all consumers are modifiers. If so, we can just forget the LoadFunction node and let the modifiers rebuild it.
+        if !consumers.is_empty()
+            && consumers
+                .iter()
+                .all(|(consumer, _)| Modifier::from_optype(h.get_optype(*consumer)).is_some())
         {
-            return Ok(());
+            // Modifier consumers rebuild their own LoadFunction nodes.
+            return self.forget_node(h, n);
         }
         // Plain LoadFunction values still need their static edge restored.
         let new = self.add_node_no_modification(h, n, load.clone(), new_dfg)?;
