@@ -50,7 +50,7 @@ def main() -> None:
             else:
                 s(t)
 
-    state_result("r", c,t)
+    state_result("r", c, t)
     discard(t)
     discard(c)
 
