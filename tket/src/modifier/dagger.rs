@@ -12,7 +12,7 @@ pub struct ModifierDagger;
 
 impl ModifierDagger {
     /// Create a new ModifierDagger.
-    pub fn new() -> Self {
+    fn new() -> Self {
         ModifierDagger
     }
 }
@@ -34,7 +34,7 @@ impl FromStr for ModifierDagger {
 }
 impl ModifierDagger {
     /// Signature for the dagger modifier.
-    pub fn signature() -> SignatureFunc {
+    pub(crate) fn signature() -> SignatureFunc {
         PolyFuncTypeRV::new(
             [
                 TypeParam::new_list_type(TypeBound::Linear),
