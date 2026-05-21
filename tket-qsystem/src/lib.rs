@@ -472,9 +472,6 @@ mod test {
         // Run again without hiding...
         let mut hugr_public = orig;
         QSystemPass {
-            ..Default::default()
-            hide_funcs: false,
-            ..Default::default()
             hide_funcs: false,
             ..QSystemPass::defaults(QSystemPlatform::Helios) // TODO: add Sol case?
         }

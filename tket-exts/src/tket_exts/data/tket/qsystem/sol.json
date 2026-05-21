@@ -206,7 +206,7 @@
     "PhasedXX": {
       "extension": "tket.qsystem.sol",
       "name": "PhasedXX",
-      "description": "PhasedXX gate, a.k.a. rpp, specific to the Sol platform.",
+      "description": "PhasedXX gate, specific to the Sol platform.",
       "signature": {
         "params": [],
         "body": {

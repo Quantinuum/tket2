@@ -117,7 +117,7 @@ impl QSystemEmitter {
         hugr: &H,
         encoder: &mut PytketEncoderContext<H>,
     ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
-        let serial_op = match qsystem_op {
+        let serial_op = match op {
             SharedOp::Measure => PytketOptype::Measure,
             SharedOp::Rz => PytketOptype::Rz,
             SharedOp::PhasedX => PytketOptype::PhasedX,

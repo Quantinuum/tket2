@@ -51,7 +51,7 @@ fn load_guppy_example(path: &str) -> std::io::Result<Hugr> {
 fn run_pytket(h: &mut Hugr, pass_json: &str) {
     let encode_options = EncodeOptions::new()
         .with_subcircuits(true)
-        .with_config(qsystem_encoder_config());
+        .with_config(qsystem_encoder_config(QSystemPlatform::Helios));
 
     let mut encoded = EncodedCircuit::new(h, encode_options).unwrap();
 
@@ -64,7 +64,10 @@ fn run_pytket(h: &mut Hugr, pass_json: &str) {
         });
 
     encoded
-        .reassemble_inplace(h, Some(qsystem_decoder_config().into()))
+        .reassemble_inplace(
+            h,
+            Some(qsystem_decoder_config(QSystemPlatform::Helios).into()),
+        )
         .unwrap();
 }
 

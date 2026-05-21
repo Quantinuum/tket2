@@ -106,7 +106,7 @@ fn register_legacy_qsystem_replacements(lowerer: &mut ReplaceTypes) {
     }
 }
 
-/// Lower [`TketOp`] operations to [`QSystemOp`] operations.
+/// Lower [`TketOp`] operations to target QSystem operations.
 ///
 /// Single op replacements are done directly, while multi-op replacements are
 /// done by lazily defining and calling functions that implement the
@@ -346,7 +346,7 @@ impl QSystemPlatform {
 /// present in the HUGR within `scope`.
 ///
 /// For `TketOp`s specifically, non-[`PassScope::Global`] scopes only flag the
-/// subset of ops that would have been lowered (i.e. those in [`direct_map`]),
+/// subset of ops that would have been lowered (i.e. those in `direct_map`),
 /// because multi-op replacements require adding functions at the global module
 /// level and are therefore skipped for local-entrypoint scopes.
 ///
@@ -387,8 +387,8 @@ pub fn check_lowered<H: HugrView>(
     }
 }
 
-/// A `Hugr -> Hugr` pass that replaces [tket::TketOp] nodes to equivalent
-/// graphs made of [QSystemOp]s.
+/// A `Hugr -> Hugr` pass that replaces [`tket::TketOp`] nodes with equivalent
+/// graphs made of target QSystem operations.
 ///
 /// Invokes [lower_tk2_ops]. If validation is enabled the resulting HUGR is
 /// checked with [check_lowered].

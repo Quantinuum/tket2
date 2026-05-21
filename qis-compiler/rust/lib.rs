@@ -551,7 +551,7 @@ mod tests {
     #[test]
     fn test_compile_to_bitcode_returns_file_safe_public_bytes() {
         let hugr = include_bytes!("../python/tests/resources/check.hugr");
-        let bitcode = compile_to_bitcode(hugr, 2, "native")
+        let bitcode = compile_to_bitcode(hugr, 2, "native", "helios")
             .expect("compiling fixture to bitcode should work");
 
         let module =

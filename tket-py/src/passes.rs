@@ -227,7 +227,8 @@ fn qsystem_rebase_pass(
     scope: Option<PyPassScope>,
 ) -> PyResult<()> {
     let py_scope = scope.unwrap_or_default();
-    let qsystem_pass = tket_qsystem::QSystemPass::default_with_scope(py_scope.scope)
+    let qsystem_pass = tket_qsystem::QSystemPass::defaults(tket_qsystem::QSystemPlatform::Helios)
+        .with_scope(py_scope.scope)
         .with_constant_fold(constant_fold)
         .with_monomorphize(monomorphize)
         .with_force_order(force_order)
