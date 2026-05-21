@@ -1070,65 +1070,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             .into()
     }
 
-    fn cfg_has_block_cycle(
-        &self,
-        h: &impl HugrView<Node = N>,
-        block: N,
-        blocks: &HashSet<N>,
-        visited: &mut HashSet<N>,
-        active: &mut HashSet<N>,
-    ) -> Result<bool, ModifierResolverErrors<N>> {
-        if active.contains(&block) {
-            return Ok(true);
-        }
-        if !visited.insert(block) {
-            return Ok(false);
-        }
-        active.insert(block);
-
-        let OpType::DataflowBlock(dfb) = h.get_optype(block) else {
-            return Err(ModifierResolverErrors::unreachable(
-                "Non-basic-block node found while checking CFG loops.".to_string(),
-            ));
-        };
-        for branch in 0..dfb.sum_rows.len() {
-            let (successor, _) = h
-                .linked_inputs(block, OutgoingPort::from(branch))
-                .exactly_one()
-                .map_err(|_| {
-                    ModifierResolverErrors::unreachable(format!(
-                        "Expected one successor for CFG block branch {branch}."
-                    ))
-                })?;
-            if blocks.contains(&successor)
-                && self.cfg_has_block_cycle(h, successor, blocks, visited, active)?
-            {
-                return Ok(true);
-            }
-        }
-
-        active.remove(&block);
-        Ok(false)
-    }
-
-    /// Checks if the CFG contains a loop among the given children blocks.
-    fn cfg_has_loop(
-        &self,
-        h: &impl HugrView<Node = N>,
-        children: &[N],
-    ) -> Result<bool, ModifierResolverErrors<N>> {
-        let blocks = children.iter().copied().collect::<HashSet<_>>();
-        let mut visited = HashSet::new();
-        let mut active = HashSet::new();
-        for block in children.iter().copied() {
-            if self.cfg_has_block_cycle(h, block, &blocks, &mut visited, &mut active)? {
-                return Ok(true);
-            }
-        }
-        Ok(false)
-    }
-
-    /// Modifies a CFG. Dagger is supported for acyclic CFGs only.
+    /// Modifies a CFG. Dagger is supported for single node CFGs only.
     fn modify_cfg(
         &mut self,
         h: &mut impl HugrMut<Node = N>,
@@ -1141,10 +1083,10 @@ impl<N: HugrNode> ModifierResolver<N> {
             .filter(|child| h.get_optype(*child).is_dataflow_block())
             .collect();
         // NOTE: Up to now we do not support daggering CFGs with loops. We may relax this restriction in the future.
-        if self.modifiers().dagger && self.cfg_has_loop(h, &children)? {
+        if children.len() != 1 && self.modifiers().dagger {
             return Err(ModifierResolverErrors::unresolvable(
                 cfg_node,
-                "CFG loops cannot be daggered.".to_string(),
+                "CFG with more than one node cannot be daggered.".to_string(),
                 cfg.clone().into(),
             ));
         }

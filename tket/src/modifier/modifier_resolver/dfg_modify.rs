@@ -142,7 +142,6 @@ impl<N: HugrNode> ModifierResolver<N> {
                     other_outputs: output,
                     sum_rows: _sum_rows,
                 } = dfb;
-                let offset = 0;
 
                 // The branch sum is unchanged.
                 self.map_insert(
@@ -153,7 +152,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                     (old_out, old_in),
                     (new_out, new_in),
                     (output.iter(), input.iter()),
-                    (1, 0, offset),
+                    (1, 0, 0),
                 )?;
             }
             OpType::Case(_) => {
