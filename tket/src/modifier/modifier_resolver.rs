@@ -1140,7 +1140,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             .children(cfg_node)
             .filter(|child| h.get_optype(*child).is_dataflow_block())
             .collect();
-        // NOTE: Up to now we do not support daggering CFGs with loops. We may relex this restriction in the future.
+        // NOTE: Up to now we do not support daggering CFGs with loops. We may relax this restriction in the future.
         if self.modifiers().dagger && self.cfg_has_loop(h, &children)? {
             return Err(ModifierResolverErrors::unresolvable(
                 cfg_node,
