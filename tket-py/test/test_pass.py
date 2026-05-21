@@ -4,6 +4,7 @@ import tempfile
 from typing import Callable, Any
 import subprocess
 from tket._ops import TketOp
+from tket.metadata import InlineAnnotation
 from tket.passes import (
     _badger_optimise,
     _greedy_depth_reduce,
@@ -334,10 +335,8 @@ def test_inline_always(annotate: bool) -> None:
 
     d.set_outputs(tup)
 
-    # validate(d.hugr)
-
     InlineAlwaysPass()(d.hugr)
-    # validate(d.hugr)
+    CompilationState.from_python(d.hugr).validate()
     assert _count_ops(d.hugr, "Call") == 0 if annotate else 2
 
 
@@ -351,7 +350,7 @@ def test_inline_always_cycle() -> None:
     call = f_recursive.call(f_recursive, f_recursive.input_node[0])
     f_recursive.set_outputs(call)
 
-    f_recursive.metadata["tket.inline"] = "always"
+    f_recursive.metadata[InlineAnnotation] = "always"
     with pytest.raises(InlineAlwaysError):
         InlineAlwaysPass()(mod.hugr)
 

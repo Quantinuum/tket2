@@ -74,7 +74,7 @@ class MaxQubitsHint(Metadata[int]):
     KEY = _metadata.MAX_QUBITS_HINT
 
 
-InlineAnnotationValue: TypeAlias = Literal["never"] | Literal["best_effort"]
+InlineAnnotationValue: TypeAlias = Literal["never", "best_effort", "always"]
 
 
 class InlineAnnotation(Metadata[InlineAnnotationValue]):
