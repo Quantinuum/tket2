@@ -524,10 +524,12 @@ impl<N: HugrNode> ModifierResolver<N> {
                 entry.insert(vec![new]);
                 Ok(())
             }
+            // Empty entry means that the old wire has no correspondence, so we can insert the new wire.
             std::collections::hash_map::Entry::Occupied(mut entry) if entry.get().is_empty() => {
                 entry.insert(vec![new]);
                 Ok(())
             }
+            // If the old wire is already registered, raise an error.
             std::collections::hash_map::Entry::Occupied(entry) => {
                 let former = entry.get();
                 Err(ModifierResolverErrors::unreachable(format!(
@@ -1138,6 +1140,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             .children(cfg_node)
             .filter(|child| h.get_optype(*child).is_dataflow_block())
             .collect();
+        // NOTE: Up to now we do not support daggering CFGs with loops. We may relex this restriction in the future.
         if self.modifiers().dagger && self.cfg_has_loop(h, &children)? {
             return Err(ModifierResolverErrors::unresolvable(
                 cfg_node,
