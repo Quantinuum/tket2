@@ -129,7 +129,6 @@ use hugr::{
     hugr::hugrmut::HugrMut,
     ops::{CFG, Const, OpType},
     std_extensions::collections::array::array_type,
-    type_row,
     types::{EdgeKind, FuncTypeBase, Signature, Type},
 };
 
@@ -1056,18 +1055,16 @@ impl<N: HugrNode> ModifierResolver<N> {
     }
 
     /// Returns a row with modifier controls in the layout expected by a CFG edge.
-    fn cfg_control_types(&self, row: &hugr::types::TypeRow) -> hugr::types::TypeRow {
-        let mut signature = Signature::new(row.clone(), type_row![]);
-        self.modify_signature(&mut signature, true);
-        // CFG edges carry successor data before the threaded controls.
-        signature
-            .input
-            .iter()
-            .skip(self.control_num())
-            .chain(signature.input.iter().take(self.control_num()))
-            .cloned()
-            .collect::<Vec<_>>()
-            .into()
+    fn cfg_control_types(&self, mut row: hugr::types::TypeRow) -> hugr::types::TypeRow {
+        let control_num = self.control_num();
+        if control_num == 0 {
+            return row;
+        }
+
+        let types = row.to_mut();
+        types.reserve(control_num);
+        types.extend(iter::repeat_n(qb_t(), control_num));
+        row
     }
 
     /// Modifies a CFG. Dagger is supported for single node CFGs only.
@@ -1093,8 +1090,8 @@ impl<N: HugrNode> ModifierResolver<N> {
 
         // CFGs always thread controls as carried values after block data.
         let signature = Signature::new(
-            self.cfg_control_types(&cfg.signature.input),
-            self.cfg_control_types(&cfg.signature.output),
+            self.cfg_control_types(cfg.signature.input.clone()),
+            self.cfg_control_types(cfg.signature.output.clone()),
         );
         let mut new_cfg = CFGBuilder::new(signature)?;
         let mut bb_map = HashMap::new();
@@ -1106,8 +1103,8 @@ impl<N: HugrNode> ModifierResolver<N> {
                     "Non-basic-block node found while modifying CFG.".to_string(),
                 ));
             };
-            let input = self.cfg_control_types(&old_block.inputs);
-            let other_outputs = self.cfg_control_types(&old_block.other_outputs);
+            let input = self.cfg_control_types(old_block.inputs.clone());
+            let other_outputs = self.cfg_control_types(old_block.other_outputs.clone());
             let mut new_bb = if i == 0 {
                 new_cfg.entry_builder(old_block.sum_rows.clone(), other_outputs)?
             } else {
@@ -1407,6 +1404,7 @@ mod tests {
             handle::{FuncID, NodeHandle},
         },
         std_extensions::collections::array::ArrayOpBuilder,
+        type_row,
         types::Term,
     };
 

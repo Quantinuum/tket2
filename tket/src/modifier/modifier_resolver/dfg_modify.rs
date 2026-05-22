@@ -723,8 +723,8 @@ impl<N: HugrNode> ModifierResolver<N> {
 
 /// composition of two call maps
 fn update_call_map<A, B, C, D>(
-    f: &HashMap<A, Vec<(B, C)>>,
-    g: &HashMap<B, D>,
+    call_map: &HashMap<A, Vec<(B, C)>>,
+    inserted_node_map: &HashMap<B, D>,
 ) -> HashMap<A, Vec<(D, C)>>
 where
     A: Clone + Eq + std::hash::Hash,
@@ -732,40 +732,45 @@ where
     C: Clone,
     D: Clone,
 {
-    f.iter()
+    call_map
+        .iter()
         .filter_map(|(a, targets)| {
             let targets = targets
                 .iter()
-                .filter_map(|(b, c)| g.get(b).map(|d| (d.clone(), c.clone())))
+                .filter_map(|(b, c)| inserted_node_map.get(b).map(|d| (d.clone(), c.clone())))
                 .collect::<Vec<_>>();
             (!targets.is_empty()).then(|| (a.clone(), targets))
         })
         .collect()
 }
 
-/// Remaps call-map targets that were inserted from `g`, preserving existing parent targets.
+/// Remaps call-map targets that were inserted from `inserted_node_map`, preserving existing parent targets.
 fn update_call_map_preserve<A, C>(
-    f: &HashMap<A, Vec<(Node, C)>>,
-    g: &HashMap<Node, Node>,
+    call_map: &HashMap<A, Vec<(Node, C)>>,
+    inserted_node_map: &HashMap<Node, Node>,
     remap_targets: &HashSet<(Node, C)>,
 ) -> HashMap<A, Vec<(Node, C)>>
 where
     A: Clone + Eq + std::hash::Hash,
     C: Clone + Eq + std::hash::Hash,
 {
-    f.iter()
-        .map(|(a, targets)| {
+    call_map
+        .iter()
+        .map(|(caller, targets)| {
             let targets = targets
                 .iter()
-                .filter_map(|(b, c)| {
-                    if remap_targets.contains(&(*b, c.clone())) {
-                        g.get(b).copied().map(|d| (d, c.clone()))
+                .filter_map(|(target_node, port)| {
+                    if remap_targets.contains(&(*target_node, port.clone())) {
+                        inserted_node_map
+                            .get(target_node)
+                            .copied()
+                            .map(|remapped_node| (remapped_node, port.clone()))
                     } else {
-                        Some((*b, c.clone()))
+                        Some((*target_node, port.clone()))
                     }
                 })
                 .collect::<Vec<_>>();
-            (a.clone(), targets)
+            (caller.clone(), targets)
         })
         .collect()
 }
