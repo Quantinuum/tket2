@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 import pytest
 from hugr.ops import CFG
@@ -17,7 +18,9 @@ triples = [
     "x86_64-windows-msvc",
 ]
 
-platforms = ["helios", "sol"]
+Platform = Literal["helios", "sol"]
+
+platforms: list[Platform] = ["helios", "sol"]
 
 
 def load(name: str) -> bytes:
@@ -73,7 +76,7 @@ def test_unsupported_pytket_ops() -> None:
 @pytest.mark.parametrize("target_triple", triples)
 @pytest.mark.parametrize("platform", platforms)
 def test_llvm(
-    snapshot: Snapshot, hugr_file: str, target_triple: str, platform: str
+    snapshot: Snapshot, hugr_file: str, target_triple: str, platform: Platform
 ) -> None:
     hugr_envelope = load(hugr_file)
     ir = compile_to_llvm_ir(

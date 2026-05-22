@@ -86,6 +86,7 @@ def tket_registry() -> ExtensionRegistry:
         tket.futures.FuturesExtension(),
         tket.qsystem.QSystemHeliosExtension(),
         tket.qsystem.QSystemSolExtension(),
+        tket.qsystem.QSystemExtension(),
         tket.qsystem.QSystemRandomExtension(),
         tket.qsystem.QSystemUtilsExtension(),
         tket.quantum.QuantumExtension(),

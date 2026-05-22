@@ -55,6 +55,8 @@ pub(crate) fn tket1_pass(
     encoded_circ
         .reassemble_inplace(
             &mut program.hugr,
+            // TODO: Make the decoder set configurable.
+            // <https://github.com/Quantinuum/tket2/issues/1619>
             Some(Arc::new(qsystem_decoder_config(QSystemPlatform::Helios))),
         )
         .convert_pyerrs()?;

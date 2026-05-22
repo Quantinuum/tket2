@@ -4,7 +4,6 @@ use std::sync::Arc;
 
 use hugr::builder::{Dataflow, DataflowHugr, FunctionBuilder};
 use hugr::extension::prelude::{bool_t, qb_t};
-use hugr::std_extensions::arithmetic::int_types::int_type;
 
 use hugr::ops::OpParent;
 use hugr::types::Signature;
@@ -20,8 +19,7 @@ use tket::serialize::pytket::{DecodeOptions, EncodeOptions};
 use tket_json_rs::circuit_json::{self, SerialCircuit};
 use tket_json_rs::register;
 
-use crate::extension::futures::{FutureOpBuilder, future_type};
-use crate::extension::qsystem::{QSystemOp, QSystemPlatform};
+use crate::extension::qsystem::{QSystemPlatform, helios::HeliosOp};
 use crate::extension::result::ResultOp;
 use crate::pytket::{qsystem_decoder_config, qsystem_encoder_config};
 
@@ -38,10 +36,6 @@ const NATIVE_GATES_JSON: &str = r#"{
     }"#;
 
 /// Check some properties of the serial circuit.
-#[expect(
-    clippy::iter_over_hash_type,
-    reason = "test validation checks every permutation entry independently, so iteration order cannot affect the result"
-)]
 fn validate_serial_circ(circ: &SerialCircuit) {
     // Check that all commands have valid arguments.
     for command in &circ.commands {
@@ -80,10 +74,6 @@ fn validate_serial_circ(circ: &SerialCircuit) {
     );
 }
 
-#[expect(
-    clippy::iter_over_hash_type,
-    reason = "test comparison checks command multiplicities; iteration order only affects which mismatch is reported first"
-)]
 fn compare_serial_circs(a: &SerialCircuit, b: &SerialCircuit) {
     assert_eq!(a.name, b.name);
     assert_eq!(a.phase, b.phase);
@@ -167,11 +157,11 @@ fn circ_qsystem_native_gates() -> Hugr {
     let [qb1] = h.add_dataflow_op(TketOp::QAlloc, []).unwrap().outputs_arr();
 
     let [bit_0] = h
-        .add_dataflow_op(QSystemOp::Measure, [qb0])
+        .add_dataflow_op(HeliosOp::Measure, [qb0])
         .unwrap()
         .outputs_arr();
     let [bit_1] = h
-        .add_dataflow_op(QSystemOp::Measure, [qb1])
+        .add_dataflow_op(HeliosOp::Measure, [qb1])
         .unwrap()
         .outputs_arr();
     let [bit_0] = h
@@ -212,31 +202,6 @@ fn circ_dropped_order_edge() -> Hugr {
     h.set_order(&result, &h.output());
 
     h.finish_hugr_with_outputs([]).unwrap()
-}
-
-/// A circuit containing Future operations over a type that pytket cannot
-/// represent.
-fn circ_unsupported_future_payload() -> Hugr {
-    let int_t = int_type(6);
-    let future_int_t = future_type(int_t.clone());
-    let mut h = FunctionBuilder::new(
-        "unsupported_future_payload",
-        Signature::new(
-            vec![qb_t(), future_int_t.clone()],
-            vec![qb_t(), future_int_t],
-        ),
-    )
-    .unwrap();
-
-    let [q, future] = h.input_wires_arr();
-
-    // Extra quantum op to ensure this circuit gets encoded.
-    let [q] = h.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
-
-    let [future, duplicate] = h.add_dup(future, int_t.clone()).unwrap();
-    h.add_free(duplicate, int_t).unwrap();
-
-    h.finish_hugr_with_outputs([q, future]).unwrap()
 }
 
 /// Check that all circuit ops have been translated to a native gate.
@@ -319,8 +284,7 @@ fn circuit_standalone_roundtrip(#[case] hugr: Hugr) {
         .with_config(qsystem_decoder_config(QSystemPlatform::Helios));
     let encode_options = EncodeOptions::new()
         .with_subcircuits(true)
-        .with_config(qsystem_encoder_config(QSystemPlatform::Helios))
-        .keep_empty_circuits(true);
+        .with_config(qsystem_encoder_config(QSystemPlatform::Helios));
 
     let encoded = EncodedCircuit::new_standalone(&hugr, encode_options.clone())
         .unwrap_or_else(|e| panic!("{e}"));
@@ -372,7 +336,6 @@ fn circuit_standalone_roundtrip(#[case] hugr: Hugr) {
 #[rstest]
 #[case::native_gates(circ_qsystem_native_gates(), 1)]
 #[case::dropped_order_edge(circ_dropped_order_edge(), 1)]
-#[case::unsupported_future_payload(circ_unsupported_future_payload(), 1)]
 fn encoded_circuit_roundtrip(#[case] hugr: Hugr, #[case] num_circuits: usize) {
     let circ_signature = hugr
         .entrypoint_optype()

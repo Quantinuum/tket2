@@ -118,28 +118,19 @@ impl QSystemEmitter {
         encoder: &mut PytketEncoderContext<H>,
     ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
         let serial_op = match op {
-            SharedOp::Measure => PytketOptype::Measure,
+            // "Lazy" operations are translated as eager measurements in pytket,
+            // as there is no `Future<T>` type there.
+            SharedOp::Measure | SharedOp::LazyMeasure => PytketOptype::Measure,
             SharedOp::Rz => PytketOptype::Rz,
             SharedOp::PhasedX => PytketOptype::PhasedX,
-            // TODO Sol codegenF
-            // SharedOp::PhasedXX => {
-            //     return Ok(EncodeStatus::Unsupported);
-            // }
-            // SharedOp::Tk2 => PytketOptype::TK2,
             SharedOp::Reset => PytketOptype::Reset,
             SharedOp::QFree => {
                 // Mark the qubit inputs as explored and forget about them.
                 encoder.get_input_values(node, hugr)?;
                 return Ok(EncodeStatus::Success);
             }
-            SharedOp::LazyMeasure | SharedOp::LazyMeasureReset => {
-                // Lazy measurements return `Future<T>` values, and pytket has
-                // no future type. We keep them in opaque subgraphs instead of
-                // erasing the future boundary in the circuit encoding.
-                return Ok(EncodeStatus::Unsupported);
-            }
-            SharedOp::MeasureReset => {
-                // This requires a pytket measurement followed by a reset.
+            SharedOp::LazyMeasureReset | SharedOp::MeasureReset => {
+                // These may require a pytket measurement followed by a reset.
                 return Ok(EncodeStatus::Unsupported);
             }
             SharedOp::LazyMeasureLeaked => {

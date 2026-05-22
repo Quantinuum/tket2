@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 import pytest
 from pytest_snapshot.plugin import Snapshot
@@ -16,7 +17,9 @@ triples = [
     "x86_64-windows-msvc",
 ]
 
-platforms = ["helios", "sol"]
+Platform = Literal["helios", "sol"]
+
+platforms: list[Platform] = ["helios", "sol"]
 
 
 def load(name: str) -> bytes:
@@ -43,7 +46,7 @@ def load(name: str) -> bytes:
 @pytest.mark.parametrize("target_triple", triples)
 @pytest.mark.parametrize("platform", platforms)
 def test_llvm_multiplatform(
-    snapshot: Snapshot, hugr_file: str, target_triple: str, platform: str
+    snapshot: Snapshot, hugr_file: str, target_triple: str, platform: Platform
 ) -> None:
     hugr_envelope = load(hugr_file)
     ir = compile_to_llvm_ir(
@@ -66,4 +69,4 @@ def test_llvm_multiplatform_todos(
     snapshot: Snapshot, hugr_file: str, target_triple: str
 ) -> None:
     hugr_envelope = load(hugr_file)
-    compile_to_llvm_ir(hugr_envelope, target_triple=target_triple, platform="Sol")
+    compile_to_llvm_ir(hugr_envelope, target_triple=target_triple, platform="sol")

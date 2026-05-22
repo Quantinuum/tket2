@@ -19,7 +19,6 @@ __all__ = [
     "QSystemRandomExtension",
     "QSystemSolExtension",
     "QSystemUtilsExtension",
-    "QSystemGenericExtension",
 ]
 
 
