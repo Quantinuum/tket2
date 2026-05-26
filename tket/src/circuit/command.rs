@@ -233,7 +233,7 @@ impl<T: HugrView> std::hash::Hash for Command<'_, T> {
 #[derive(Clone)]
 #[deprecated(
     since = "0.19.0",
-    note = "This is a limited API that will be dropped soon. Use toposorting over `hugr.scheduling_graph()` instead."
+    note = "This is a limited API that will be dropped soon. Use toposorting over `HugrView::scheduling_graph` instead.\n<https://docs.rs/hugr/latest/hugr/trait.HugrView.html#method.scheduling_graph>"
 )]
 pub struct CommandIterator<'circ, T: HugrView> {
     /// The circuit.
