@@ -55,7 +55,6 @@ fn simple_circ() -> Circuit {
 }
 
 #[rstest]
-//#[ignore = "Takes 200ms"]
 fn badger_termination(simple_circ: Circuit, nam_4_2: ECCBadgerOptimiser) {
     let opt_circ = nam_4_2.optimise(
         &simple_circ,
