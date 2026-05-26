@@ -353,7 +353,7 @@ pub fn symbolic_constant_op(arg: String) -> OpType {
 }
 
 #[cfg(test)]
-pub(crate) mod test {
+pub mod test {
 
     use std::str::FromStr;
     use std::sync::Arc;
@@ -365,12 +365,10 @@ pub(crate) mod test {
     use hugr::types::Signature;
     use hugr::{CircuitUnit, HugrView, type_row};
     use itertools::Itertools;
-    use rstest::fixture;
     use strum::IntoEnumIterator;
 
     use super::TketOp;
     use crate::Pauli;
-    use crate::circuit::Circuit;
     use crate::extension::bool::bool_type;
     use crate::extension::{TKET_EXTENSION as EXTENSION, TKET_EXTENSION_ID as EXTENSION_ID};
     use crate::utils::build_simple_circuit;
@@ -384,17 +382,6 @@ pub(crate) mod test {
         for o in TketOp::iter() {
             assert_eq!(TketOp::from_def(get_opdef(o).unwrap()), Ok(o));
         }
-    }
-
-    #[fixture]
-    pub(crate) fn t2_bell_circuit() -> Circuit {
-        let h = build_simple_circuit(2, |circ| {
-            circ.append(TketOp::H, [0])?;
-            circ.append(TketOp::CX, [0, 1])?;
-            Ok(())
-        });
-
-        h.unwrap()
     }
 
     #[test]

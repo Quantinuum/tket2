@@ -538,8 +538,9 @@ mod tests {
 
     use super::{BadgerOptimiser, ECCBadgerOptimiser};
 
-    /// Returns a vector of `TketOp` nodes in the entrypoint region, in topological order.
-    fn entrypoint_tket_ops(circ: &Circuit) -> Vec<Node> {
+    /// Returns a vector of `TketOp` or `RotationOp` nodes in the entrypoint
+    /// region, in topological order.
+    fn entrypoint_tket_or_rotation_ops(circ: &Circuit) -> Vec<Node> {
         circ.toposorted_children(circ.parent())
             .expect("circuit entrypoint should be dataflow region")
             .filter(|&n| {
@@ -619,8 +620,6 @@ mod tests {
     #[case::compiled(badger_opt_compiled())]
     #[case::json(badger_opt_json())]
     fn rz_rz_cancellation(rz_rz: Circuit, #[case] badger_opt: ECCBadgerOptimiser) {
-        use hugr::ops::OpType;
-
         let opt_rz = badger_opt.optimise(
             &rz_rz,
             BadgerOptions {
@@ -628,7 +627,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        let [op1, op2]: [&OpType; 2] = entrypoint_tket_ops(&opt_rz)
+        let [op1, op2] = entrypoint_tket_or_rotation_ops(&opt_rz)
             .into_iter()
             .map(|node| opt_rz.hugr().get_optype(node))
             .collect_array()
@@ -670,7 +669,7 @@ mod tests {
             },
         );
         opt_rz.hugr().validate().unwrap();
-        assert_eq!(entrypoint_tket_ops(&opt_rz).len(), 2);
+        assert_eq!(entrypoint_tket_or_rotation_ops(&opt_rz).len(), 2);
     }
 
     #[rstest]

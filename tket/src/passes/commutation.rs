@@ -367,9 +367,7 @@ pub fn apply_greedy_commutation(circ: &mut Circuit) -> Result<u32, PullForwardEr
 #[cfg(test)]
 mod test {
 
-    use crate::{
-        extension::rotation::rotation_type, ops::test::t2_bell_circuit, utils::build_simple_circuit,
-    };
+    use crate::{extension::rotation::rotation_type, utils::build_simple_circuit};
     use hugr::{
         CircuitUnit,
         builder::{DFGBuilder, Dataflow, DataflowHugr},
@@ -516,6 +514,17 @@ mod test {
             dfg.finish_hugr_with_outputs(outs)
         };
         build().unwrap().into()
+    }
+
+    #[fixture]
+    fn t2_bell_circuit() -> Circuit {
+        let h = build_simple_circuit(2, |circ| {
+            circ.append(TketOp::H, [0])?;
+            circ.append(TketOp::CX, [0, 1])?;
+            Ok(())
+        });
+
+        h.unwrap()
     }
 
     // bug https://github.com/quantinuum/tket2/issues/253
