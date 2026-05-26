@@ -1982,6 +1982,7 @@ mod tests {
     #[case::multiple_gates2_in_ctrl("../test_files/modifier_examples/multiple_gates2_in_ctrl.hugr")]
     #[case::subscript_in_ctrl("../test_files/modifier_examples/subscript_in_ctrl.hugr")]
     #[case::subscript_in_dagger("../test_files/modifier_examples/subscript_in_dagger.hugr")]
+    #[case::subscript_as_controller("../test_files/modifier_examples/subscript_as_controller.hugr")]
     // TODO(perf): Investigate why this test is so slow (18s on my machine).
     // <https://github.com/Quantinuum/tket2/issues/1586>
     #[ignore = "slow regression test"]

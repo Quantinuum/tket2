@@ -6,9 +6,9 @@ dev = [
     "maturin>=1.13.3,<2",
     "pytest>=9.0.3,<10",
     "pytest-cov ~=7.0",
-    "ruff>=0.15.13,<0.16",
+    "ruff>=0.15.14,<0.16",
     "mypy>=2.1.0,<3",
-    "hypothesis>=6.152.7,<7",
+    "hypothesis>=6.152.9,<7",
     "graphviz ~=0.21.0",
     "pre-commit~=4.6",
     # Required to run `maturin develop`
