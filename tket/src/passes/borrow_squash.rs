@@ -493,6 +493,7 @@ mod test {
     }
 
     #[rstest]
+    #[cfg_attr(miri, ignore)]
     fn test_nested_array() {
         let inner_array_type = BorrowArray::ty(5, qb_t());
         let outer_array_type = BorrowArray::ty(3, inner_array_type.clone());
