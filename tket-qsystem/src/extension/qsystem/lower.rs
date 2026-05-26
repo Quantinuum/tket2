@@ -533,6 +533,13 @@ mod test {
         ])
     }
 
+    fn toposorted_circuit_nodes<H: HugrView<Node = Node>>(
+        circ: &Circuit<H>,
+    ) -> impl Iterator<Item = Node> + '_ {
+        circ.toposorted_children(circ.parent())
+            .expect("circuit entrypoint should be dataflow region")
+    }
+
     #[rstest]
     #[case::global_helios(PassScope::Global(Preserve::Public), QSystemPlatform::Helios)]
     #[case::entrypoint_flat_helios(PassScope::EntrypointFlat, QSystemPlatform::Helios)]
@@ -648,14 +655,13 @@ mod test {
 
         let h = build_func(platform, t2op).unwrap();
         let circ = Circuit::new(&h);
+        let nodes = toposorted_circuit_nodes(&circ);
         let ops: Vec<ExpectedOp> = match platform {
-            QSystemPlatform::Helios => circ
-                .commands()
-                .filter_map(|command| command.optype().cast().map(ExpectedOp::Helios))
+            QSystemPlatform::Helios => nodes
+                .filter_map(|node| circ.hugr().get_optype(node).cast().map(ExpectedOp::Helios))
                 .collect(),
-            QSystemPlatform::Sol => circ
-                .commands()
-                .filter_map(|command| command.optype().cast().map(ExpectedOp::Sol))
+            QSystemPlatform::Sol => nodes
+                .filter_map(|node| circ.hugr().get_optype(node).cast().map(ExpectedOp::Sol))
                 .collect(),
         };
         if let Some(qsystem_ops) = qsystem_ops {
@@ -673,28 +679,28 @@ mod test {
         let helios = build_func(QSystemPlatform::Helios, TketOp::CX).unwrap();
         let helios_circuit = Circuit::new(&helios);
         assert!(
-            helios_circuit
-                .commands()
-                .any(|command| matches!(command.optype().cast(), Some(HeliosOp::ZZPhase)))
+            toposorted_circuit_nodes(&helios_circuit).any(|node| matches!(
+                helios_circuit.hugr().get_optype(node).cast(),
+                Some(HeliosOp::ZZPhase)
+            ))
         );
         assert!(
-            !helios_circuit
-                .commands()
-                .any(|command| matches!(command.optype().cast(), Some(SolOp::PhasedXX)))
+            !toposorted_circuit_nodes(&helios_circuit).any(|node| matches!(
+                helios_circuit.hugr().get_optype(node).cast(),
+                Some(SolOp::PhasedXX)
+            ))
         );
 
         let sol = build_func(QSystemPlatform::Sol, TketOp::CX).unwrap();
         let sol_circuit = Circuit::new(&sol);
-        assert!(
-            sol_circuit
-                .commands()
-                .any(|command| matches!(command.optype().cast(), Some(SolOp::PhasedXX)))
-        );
-        assert!(
-            !sol_circuit
-                .commands()
-                .any(|command| matches!(command.optype().cast(), Some(HeliosOp::ZZPhase)))
-        );
+        assert!(toposorted_circuit_nodes(&sol_circuit).any(|node| matches!(
+            sol_circuit.hugr().get_optype(node).cast(),
+            Some(SolOp::PhasedXX)
+        )));
+        assert!(!toposorted_circuit_nodes(&sol_circuit).any(|node| matches!(
+            sol_circuit.hugr().get_optype(node).cast(),
+            Some(HeliosOp::ZZPhase)
+        )));
     }
 
     #[rstest]
@@ -836,9 +842,8 @@ mod test {
 
         // The migrated ops should be tket.qsystem.helios variants.
         let circ = Circuit::new(&h);
-        let helios_ops: Vec<HeliosOp> = circ
-            .commands()
-            .filter_map(|cmd| cmd.optype().cast())
+        let helios_ops: Vec<HeliosOp> = toposorted_circuit_nodes(&circ)
+            .filter_map(|node| circ.hugr().get_optype(node).cast())
             .collect();
         assert_eq!(
             helios_ops,
@@ -911,13 +916,9 @@ mod test {
         assert_eq!(check_lowered(&h, Preserve::Public, &legacy_exts), Ok(()));
 
         let circ = Circuit::new(&h);
-        let sol_ops: Vec<SolOp> = circ
-            .commands()
-            .filter_map(|cmd| cmd.optype().cast())
+        let sol_ops: Vec<SolOp> = toposorted_circuit_nodes(&circ)
+            .filter_map(|node| circ.hugr().get_optype(node).cast())
             .collect();
-        assert_eq!(
-            sol_ops,
-            vec![SolOp::TryQAlloc, SolOp::Reset, SolOp::QFree],
-        );
+        assert_eq!(sol_ops, vec![SolOp::TryQAlloc, SolOp::Reset, SolOp::QFree],);
     }
 }

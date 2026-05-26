@@ -54,7 +54,9 @@ fn validate_serial_circ(circ: &SerialCircuit) {
         .iter()
         .map(|p| (p.0.clone().id, p.1.clone().id))
         .collect();
-    for (key, value) in &perm {
+    for permutation in &circ.implicit_permutation {
+        let key = &permutation.0.id;
+        let value = &permutation.1.id;
         let valid_qubits = circ.qubits.contains(&register::Qubit::from(key.clone()))
             && circ.qubits.contains(&register::Qubit::from(value.clone()));
         assert!(
@@ -135,6 +137,11 @@ fn compare_serial_circs(a: &SerialCircuit, b: &SerialCircuit) {
     let a_command_count: HashMap<CommandInfo, usize> = a.commands.iter().map_into().counts();
     let b_command_count: HashMap<CommandInfo, usize> = b.commands.iter().map_into().counts();
 
+    // Treat the commands as a multiset; iteration order is irrelevant here.
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "commands are compared as a multiset"
+    )]
     for (a, &count_a) in &a_command_count {
         let count_b = b_command_count.get(a).copied().unwrap_or_default();
         assert_eq!(
