@@ -392,8 +392,9 @@ mod test {
         assert_eq!(lowered.len(), 5);
         let circ = Circuit::new(&h);
         let ops: Vec<QSystemOp> = circ
-            .commands()
-            .filter_map(|com| com.optype().cast())
+            .toposorted_children(circ.parent())
+            .expect("circuit entrypoint should be dataflow region")
+            .filter_map(|n| circ.hugr().get_optype(n).cast())
             .collect();
         assert_eq!(
             ops,
@@ -437,8 +438,9 @@ mod test {
         let h = build_func(t2op).unwrap();
         let circ = Circuit::new(&h);
         let ops: Vec<QSystemOp> = circ
-            .commands()
-            .filter_map(|com| com.optype().cast())
+            .toposorted_children(circ.parent())
+            .expect("circuit entrypoint should be dataflow region")
+            .filter_map(|n| circ.hugr().get_optype(n).cast())
             .collect();
         if let Some(qsystem_ops) = qsystem_ops {
             assert_eq!(ops, qsystem_ops);

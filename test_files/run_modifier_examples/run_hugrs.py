@@ -11,10 +11,8 @@ import shutil
 import sys
 import numpy as np
 import numpy.typing as npt
-
 from hugr import Hugr
 from guppylang.emulator import EmulatorBuilder
-
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 

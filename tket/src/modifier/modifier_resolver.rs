@@ -129,7 +129,6 @@ use hugr::{
     hugr::hugrmut::HugrMut,
     ops::{CFG, Const, OpType},
     std_extensions::collections::array::array_type,
-    type_row,
     types::{EdgeKind, FuncTypeBase, Signature, Type},
 };
 
@@ -519,15 +518,25 @@ impl<N: HugrNode> ModifierResolver<N> {
         old: DirWire<N>,
         new: DirWire,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        self.corresp_map()
-            .insert(old, vec![new])
-            .map_or(Ok(()), |former| {
-                // If the old wire is already registered, raise an error.
+        match self.corresp_map().entry(old) {
+            std::collections::hash_map::Entry::Vacant(entry) => {
+                entry.insert(vec![new]);
+                Ok(())
+            }
+            // Empty entry means that the old wire has no correspondence, so we can insert the new wire.
+            std::collections::hash_map::Entry::Occupied(mut entry) if entry.get().is_empty() => {
+                entry.insert(vec![new]);
+                Ok(())
+            }
+            // If the old wire is already registered, raise an error.
+            std::collections::hash_map::Entry::Occupied(entry) => {
+                let former = entry.get();
                 Err(ModifierResolverErrors::unreachable(format!(
                     "Wire already registered for node {}. Former [{},...], Latter {}.",
                     old.0, former[0], new
                 )))
-            })
+            }
+        }
     }
 
     /// Remember that old wire has no correspondence.
@@ -1045,8 +1054,20 @@ impl<N: HugrNode> ModifierResolver<N> {
         }
     }
 
-    /// This modifier expects that the CFG contains only one block.
-    /// If not, it returns an error.
+    /// Returns a row with modifier controls in the layout expected by a CFG edge.
+    fn cfg_control_types(&self, mut row: hugr::types::TypeRow) -> hugr::types::TypeRow {
+        let control_num = self.control_num();
+        if control_num == 0 {
+            return row;
+        }
+
+        let types = row.to_mut();
+        types.reserve(control_num);
+        types.extend(iter::repeat_n(qb_t(), control_num));
+        row
+    }
+
+    /// Modifies a CFG. Dagger is supported for single node CFGs only.
     fn modify_cfg(
         &mut self,
         h: &mut impl HugrMut<Node = N>,
@@ -1054,51 +1075,98 @@ impl<N: HugrNode> ModifierResolver<N> {
         cfg: &CFG,
         new_dfg: &mut impl Container,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        // Check if the CFG contains only one block.
         let children: Vec<N> = h
             .children(cfg_node)
             .filter(|child| h.get_optype(*child).is_dataflow_block())
             .collect();
-        // NOTE: this check prevents breaking modifier application to branching or loops
-        if children.len() != 1 {
+        // NOTE: Up to now we support dagger only on CFG with a single node. We may relax this restriction in the future.
+        if children.len() != 1 && self.modifiers().dagger {
             return Err(ModifierResolverErrors::unresolvable(
                 cfg_node,
-                "CFG with more than one node found.".to_string(),
+                "CFG with more than one node cannot be daggered.".to_string(),
                 cfg.clone().into(),
             ));
         }
-        let old_bb = children[0];
 
-        let mut signature = cfg.signature.clone();
-        self.modify_signature(&mut signature, true);
+        // CFGs always thread controls as carried values after block data.
+        let signature = Signature::new(
+            self.cfg_control_types(cfg.signature.input.clone()),
+            self.cfg_control_types(cfg.signature.output.clone()),
+        );
+        let mut new_cfg = CFGBuilder::new(signature)?;
+        let mut bb_map = HashMap::new();
 
-        let mut new_cfg = CFGBuilder::new(signature.clone())?;
-        let mut new_bb = new_cfg.entry_builder([type_row![]], signature.output.clone())?;
-        self.modify_dfg_body(h, old_bb, &mut new_bb)?;
-
-        let bb_id = new_bb.finish_sub_container()?;
-        new_cfg.branch(&bb_id, 0, &new_cfg.exit_block())?;
-
-        let new_node = self.insert_sub_dfg(new_dfg, new_cfg)?;
-
-        // connect the controls and register the IOs
-        for (i, c) in self.controls().iter_mut().enumerate() {
-            new_dfg
-                .hugr_mut()
-                .connect(c.node(), c.source(), new_node, i);
-            *c = Wire::new(new_node, i);
+        // Rebuild each basic block with modified body and adjusted block IO.
+        for (i, old_bb) in children.iter().copied().enumerate() {
+            let OpType::DataflowBlock(old_block) = h.get_optype(old_bb).clone() else {
+                return Err(ModifierResolverErrors::unreachable(
+                    "Non-basic-block node found while modifying CFG.".to_string(),
+                ));
+            };
+            let input = self.cfg_control_types(old_block.inputs.clone());
+            let other_outputs = self.cfg_control_types(old_block.other_outputs.clone());
+            let mut new_bb = if i == 0 {
+                new_cfg.entry_builder(old_block.sum_rows.clone(), other_outputs)?
+            } else {
+                new_cfg.block_builder(input, old_block.sum_rows.clone(), other_outputs)?
+            };
+            self.modify_dfg_body(h, old_bb, &mut new_bb)?;
+            let new_bb_id = new_bb.finish_sub_container()?;
+            bb_map.insert(old_bb, new_bb_id);
         }
 
-        let offset = self.control_num();
+        // Recreate the original CFG branch graph over the rebuilt blocks.
+        for old_bb in children.iter().copied() {
+            let OpType::DataflowBlock(old_block) = h.get_optype(old_bb) else {
+                return Err(ModifierResolverErrors::unreachable(
+                    "Non-basic-block node found while connecting CFG branches.".to_string(),
+                ));
+            };
+            let new_bb = bb_map.get(&old_bb).ok_or_else(|| {
+                ModifierResolverErrors::unreachable("Missing modified basic block.".to_string())
+            })?;
+            for branch in 0..old_block.sum_rows.len() {
+                let (successor, _) = h
+                    .linked_inputs(old_bb, OutgoingPort::from(branch))
+                    .exactly_one()
+                    .map_err(|_| {
+                        ModifierResolverErrors::unreachable(format!(
+                            "Expected one successor for CFG block branch {branch}."
+                        ))
+                    })?;
+                let new_successor = if let Some(successor) = bb_map.get(&successor) {
+                    *successor
+                } else if matches!(h.get_optype(successor), OpType::ExitBlock(_)) {
+                    new_cfg.exit_block()
+                } else {
+                    return Err(ModifierResolverErrors::unreachable(
+                        "CFG branch successor is neither a basic block nor the exit block."
+                            .to_string(),
+                    ));
+                };
+                new_cfg.branch(new_bb, branch, &new_successor)?;
+            }
+        }
+
+        let new_node = self.insert_sub_dfg(new_dfg, new_cfg)?;
 
         self.wire_node_inout(
             cfg_node,
             new_node,
             (cfg.signature.input.iter(), cfg.signature.output.iter()),
-            (0, 0, offset),
+            (0, 0, 0),
         )?;
-        // self.wire_others(n, cfg.into(), new, new_dfg.hugr().get_optype(new))?;
-        // TODO: handle other ports
+
+        // Expose the controls after the CFG boundary data.
+        let input_offset = cfg.signature.input.len();
+        let output_offset = cfg.signature.output.len();
+        for (i, c) in self.controls().iter_mut().enumerate() {
+            new_dfg
+                .hugr_mut()
+                .connect(c.node(), c.source(), new_node, input_offset + i);
+            *c = Wire::new(new_node, OutgoingPort::from(output_offset + i));
+        }
+
         Ok(())
     }
 }
@@ -1336,6 +1404,7 @@ mod tests {
             handle::{FuncID, NodeHandle},
         },
         std_extensions::collections::array::ArrayOpBuilder,
+        type_row,
         types::Term,
     };
 
@@ -1391,6 +1460,32 @@ mod tests {
         foo: impl FnOnce(&mut ModuleBuilder<Hugr>, usize) -> FuncID<true>,
         dagger: bool,
     ) -> Hugr {
+        let (mut h, foo_node) = modifier_test_hugr(target_num, ctrl_num, foo, dagger);
+
+        let entrypoint = h.entrypoint();
+        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+
+        // We check that the original function node has been removed in the resolved hugr
+        assert!(!h.contains_node(foo_node));
+
+        // We also check that there is no modifier node in the resolved hugr.
+        assert!(
+            h.nodes()
+                .all(|node| Modifier::from_optype(h.get_optype(node)).is_none())
+        );
+
+        // The resolved hugr must still be structurally valid.
+        assert_matches!(h.validate(), Ok(()));
+
+        h
+    }
+
+    pub(crate) fn modifier_test_hugr(
+        target_num: usize,
+        ctrl_num: u64,
+        foo: impl FnOnce(&mut ModuleBuilder<Hugr>, usize) -> FuncID<true>,
+        dagger: bool,
+    ) -> (Hugr, Node) {
         // --- Build the module ---
         let mut module = ModuleBuilder::new();
 
@@ -1506,25 +1601,9 @@ mod tests {
         };
 
         // Run the resolver and validate
-        let mut h = module.finish_hugr().unwrap();
+        let h = module.finish_hugr().unwrap();
         assert_matches!(h.validate(), Ok(()));
-
-        let entrypoint = h.entrypoint();
-        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
-
-        // We check that the original function node has been removed in the resolved hugr
-        assert!(!h.contains_node(foo_node));
-
-        // We also check that there is no modifier node in the resolved hugr.
-        assert!(
-            h.nodes()
-                .all(|node| Modifier::from_optype(h.get_optype(node)).is_none())
-        );
-
-        // The resolved hugr must still be structurally valid.
-        assert_matches!(h.validate(), Ok(()));
-
-        h
+        (h, foo_node)
     }
 
     #[test]
@@ -1979,6 +2058,7 @@ mod tests {
     #[case::classical_function1("../test_files/modifier_examples/classical_function1.hugr")]
     #[case::classical_function2("../test_files/modifier_examples/classical_function2.hugr")]
     #[case::classical_function3("../test_files/modifier_examples/classical_function3.hugr")]
+    #[case::ctrl_on_cfg("../test_files/modifier_examples/ctrl_on_cfg.hugr")]
     #[case::multiple_gates2_in_ctrl("../test_files/modifier_examples/multiple_gates2_in_ctrl.hugr")]
     #[case::subscript_in_ctrl("../test_files/modifier_examples/subscript_in_ctrl.hugr")]
     #[case::subscript_in_dagger("../test_files/modifier_examples/subscript_in_dagger.hugr")]
