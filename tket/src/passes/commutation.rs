@@ -18,7 +18,7 @@ use crate::{
 type Qb = ResourceId;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-// remove once https://github.com/quantinuum-DEV/tket2/issues/126 is resolved
+// remove once https://github.com/quantinuum/tket2/issues/126 is resolved
 struct ComCommand {
     /// The operation node.
     node: Node,
