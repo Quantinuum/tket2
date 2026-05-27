@@ -5,6 +5,9 @@
 #     "tket",
 #     "pytket >=2.1.0,<3",
 # ]
+# [tool.uv.sources]
+# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang",
+#    rev = "dcc1ed1a868b28bdebf81184fbe946d3126ae49f"}  # noqa: E501
 # ///
 
 from pathlib import Path
