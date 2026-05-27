@@ -304,6 +304,11 @@ ctrl_array_controller_solved:
 	1100 -> 0.3536+0j
 	1111 -> 0.3536+0j
 -----
+ctrl_on_cfg_solved:
+	00 -> 0.7071+0j
+	10 -> -0.1913+0.1913j
+	11 -> -0.4619-0.4619j
+-----
 double_modifier_solved:
 	00 -> 0.7071+0j
 	10 -> 0.6124+0j
@@ -380,6 +385,12 @@ nested_multiple_ctrl1_solved:
 	1101 -> 0.25+0j
 	1110 -> 0.1768+0.1768j
 	1111 -> 0.1768-0.1768j
+-----
+subscript_as_controller_solved:
+	0100 -> 0.7071+0j
+	1100 -> 0.5+0j
+	1110 -> 0.433+0j
+	1111 -> 0-0.25j
 -----
 subscript_in_ctrl_solved:
 	000 -> 0.7071+0j
