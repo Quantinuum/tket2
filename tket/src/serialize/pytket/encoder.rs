@@ -268,6 +268,11 @@ impl<H: HugrView> PytketEncoderContext<H> {
         &self.config
     }
 
+    /// Peek values associated with a wire without marking the connection as explored.
+    pub fn peek_wire_values(&self, wire: Wire<H::Node>) -> Option<&[TrackedValue]> {
+        self.values.peek_wire_values(wire)
+    }
+
     /// Returns the values associated with a wire.
     ///
     /// Marks the port connection as explored. When all ports connected to the

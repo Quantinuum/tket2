@@ -173,7 +173,7 @@ pub enum TketOp {
     ///
     /// Outputs:
     /// - A qubit
-    /// - A [`measurement_type`] indicating whether the qubit was measured as 1
+    /// - A bool indicating whether the qubit was measured as 1
     Measure,
     /// Measure a qubit and consume the qubit.
     ///

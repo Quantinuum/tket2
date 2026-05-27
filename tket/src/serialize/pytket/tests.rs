@@ -664,6 +664,27 @@ fn circ_nested_dfgs() -> Hugr {
     h.finish_hugr_with_outputs([bool]).unwrap()
 }
 
+/// A circuit that measures a qubit with `MeasureFree` and immediately reads it.
+#[fixture]
+fn circ_measure_and_read() -> Hugr {
+    let input_t = vec![qb_t()];
+    let output_t = vec![bool_t()];
+    let mut h =
+        FunctionBuilder::new("measure_and_read", Signature::new(input_t, output_t)).unwrap();
+
+    let [qb] = h.input_wires_arr();
+    let [measurement] = h
+        .add_dataflow_op(TketOp::MeasureFree, [qb])
+        .unwrap()
+        .outputs_arr();
+    let [bit] = h
+        .add_dataflow_op(MeasurementOp::Read, [measurement])
+        .unwrap()
+        .outputs_arr();
+
+    h.finish_hugr_with_outputs([bit]).unwrap()
+}
+
 // A circuit with some simple circuit and an unsupported subgraph that does not interact with it.
 #[fixture]
 fn circ_independent_subgraph() -> Hugr {
@@ -1120,6 +1141,7 @@ impl CircuitRoundtripTestConfig {
 #[case::nested_dfgs(circ_nested_dfgs(), CircuitRoundtripTestConfig::Default)]
 #[case::tk1_ops(circ_tk1_ops(), CircuitRoundtripTestConfig::Default)]
 #[case::missing_decoders(circ_measure_ancilla(), CircuitRoundtripTestConfig::NoStd)]
+#[case::preset_bits(circ_preset_bits(), CircuitRoundtripTestConfig::Default)]
 fn circuit_standalone_roundtrip(#[case] hugr: Hugr, #[case] config: CircuitRoundtripTestConfig) {
     let circ_signature = hugr
         .entrypoint_optype()
@@ -1219,6 +1241,7 @@ fn fail_on_modified_hugr(circ_tk1_ops: Hugr) {
 
 /// Test the serialisation roundtrip from a tket circuit into an EncodedCircuit and back.
 #[rstest]
+#[case::measure_and_read(circ_measure_and_read(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::preset_qubits(circ_preset_qubits(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::preset_parameterized(circ_parameterized(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::nested_dfgs(circ_nested_dfgs(), 2, CircuitRoundtripTestConfig::Default)]
@@ -1249,7 +1272,8 @@ fn fail_on_modified_hugr(circ_tk1_ops: Hugr) {
     CircuitRoundtripTestConfig::Default
 )]
 #[case::discard_first_qubit(circ_discard_first_qubit(), 1, CircuitRoundtripTestConfig::Default)]
-
+#[case::meas_ancilla(circ_measure_ancilla(), 1, CircuitRoundtripTestConfig::Default)]
+#[case::preset_bits(circ_preset_bits(), 1, CircuitRoundtripTestConfig::Default)]
 fn encoded_circuit_roundtrip(
     #[case] hugr: Hugr,
     #[case] num_circuits: usize,
@@ -1265,6 +1289,8 @@ fn encoded_circuit_roundtrip(
         .with_config(config.encoder_config());
 
     let encoded = EncodedCircuit::new(&hugr, encode_options).unwrap_or_else(|e| panic!("{e}"));
+
+    println!("Encoded circuit info: {encoded:#?}");
 
     assert_eq!(encoded.len(), num_circuits);
 
@@ -1386,15 +1412,12 @@ fn test_decoding_signature(#[case] signature: Signature) {
     // Hugr must be valid.
     hugr.validate().unwrap();
 
-    // As we currently don't support decoding of measurements to measure ops (as this
-    // would also require inserting a read op), they are decoded as TK1 ops.
-    // See https://github.com/Quantinuum/tket2/issues/1570.
     let measure_op_count = hugr
         .children(hugr.entrypoint())
         .filter(|&child| {
             hugr.get_optype(child)
                 .as_extension_op()
-                .is_some_and(|op| op.unqualified_id() == "tk1op")
+                .is_some_and(|op| op.unqualified_id() == "Measure")
         })
         .count();
     assert_eq!(measure_op_count, 2);
@@ -1456,44 +1479,43 @@ fn serial_decode_missing_output_bit_returns_decode_error() {
     );
 }
 
-// TODO: Revisit as part of https://github.com/Quantinuum/tket2/issues/1570.
-// Standalone decoding roundtrip should preserve the output signature.
-//
-// Regression test for a mismatched signature error found in
-// <https://github.com/Quantinuum/tket2/pull/1558>
-// #[rstest]
-// fn standalone_reassemble_preserves_repeated_bit_outputs(circ_preset_bits: Hugr) {
-//     let circ_signature = circ_preset_bits
-//         .entrypoint_optype()
-//         .inner_function_type()
-//         .expect("Dataflow entrypoint")
-//         .into_owned();
-//     let decode_options = DecodeOptions::new().with_signature(circ_signature.clone());
+/// Standalone decoding roundtrip should preserve the output signature.
+///
+/// Regression test for a mismatched signature error found in
+/// <https://github.com/Quantinuum/tket2/pull/1558>
+#[rstest]
+fn standalone_reassemble_preserves_repeated_bit_outputs(circ_preset_bits: Hugr) {
+    let circ_signature = circ_preset_bits
+        .entrypoint_optype()
+        .inner_function_type()
+        .expect("Dataflow entrypoint")
+        .into_owned();
+    let decode_options = DecodeOptions::new().with_signature(circ_signature.clone());
 
-//     let encoded = EncodedCircuit::new_standalone(
-//         &circ_preset_bits,
-//         EncodeOptions::new().with_subcircuits(true),
-//     )
-//     .unwrap_or_else(|e| panic!("{e}"));
+    let encoded = EncodedCircuit::new_standalone(
+        &circ_preset_bits,
+        EncodeOptions::new().with_subcircuits(true),
+    )
+    .unwrap_or_else(|e| panic!("{e}"));
 
-//     let reassembled = encoded
-//         .reassemble(
-//             circ_preset_bits.entrypoint(),
-//             Some("main".to_string()),
-//             decode_options,
-//         )
-//         .unwrap_or_else(|e| panic!("{e}"));
-//     reassembled.validate().unwrap_or_else(|e| panic!("{e}"));
+    let reassembled = encoded
+        .reassemble(
+            circ_preset_bits.entrypoint(),
+            Some("main".to_string()),
+            decode_options,
+        )
+        .unwrap_or_else(|e| panic!("{e}"));
+    reassembled.validate().unwrap_or_else(|e| panic!("{e}"));
 
-//     let reassembled_function = reassembled
-//         .children(reassembled.module_root())
-//         .exactly_one()
-//         .ok()
-//         .expect("single reassembled function");
-//     let reassembled_signature = reassembled
-//         .get_optype(reassembled_function)
-//         .inner_function_type()
-//         .expect("Function definition")
-//         .into_owned();
-//     assert_eq!(&circ_signature.output, &reassembled_signature.output);
-// }
+    let reassembled_function = reassembled
+        .children(reassembled.module_root())
+        .exactly_one()
+        .ok()
+        .expect("single reassembled function");
+    let reassembled_signature = reassembled
+        .get_optype(reassembled_function)
+        .inner_function_type()
+        .expect("Function definition")
+        .into_owned();
+    assert_eq!(&circ_signature.output, &reassembled_signature.output);
+}
