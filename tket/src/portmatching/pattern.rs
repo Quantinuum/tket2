@@ -36,27 +36,31 @@ impl CircuitPattern {
             return Err(InvalidPattern::EmptyCircuit);
         }
         let mut pattern = Pattern::new();
-        for cmd in circuit.commands() {
-            let op = cmd.optype().clone();
-            pattern.require(cmd.node().into(), op.into());
-            for in_offset in 0..cmd.input_count() {
+        for node in circuit
+            .toposorted_children(circuit.parent())
+            .expect("circuit entrypoint should be dataflow region")
+        {
+            let op = hugr.get_optype(node).clone();
+            let input_count = op.value_input_count() + op.static_input_port().is_some() as usize;
+            pattern.require(node.into(), op.into());
+            for in_offset in 0..input_count {
                 let in_offset: IncomingPort = in_offset.into();
-                let edge_prop = PEdge::try_from_port(cmd.node(), in_offset.into(), circuit)
+                let edge_prop = PEdge::try_from_port(node, in_offset.into(), circuit)
                     .unwrap_or_else(|e| panic!("Invalid HUGR, {e}"));
                 let (prev_node, prev_port) = hugr
-                    .linked_outputs(cmd.node(), in_offset)
+                    .linked_outputs(node, in_offset)
                     .exactly_one()
                     .unwrap_or_else(|_| {
                         panic!(
                             "{} input port {in_offset} does not have a single neighbour",
-                            cmd.node()
+                            node
                         )
                     });
                 let prev_node = match edge_prop {
                     PEdge::InternalEdge { .. } => NodeID::HugrNode(prev_node),
                     PEdge::InputEdge { .. } => NodeID::new_copy(prev_node, prev_port),
                 };
-                pattern.add_edge(cmd.node().into(), prev_node, edge_prop);
+                pattern.add_edge(node.into(), prev_node, edge_prop);
             }
         }
         pattern.set_any_root()?;

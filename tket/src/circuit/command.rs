@@ -230,9 +230,11 @@ impl<T: HugrView> std::hash::Hash for Command<'_, T> {
 }
 
 /// An iterator over the commands of a circuit.
-// TODO: this can only be made generic over node type once `SiblingGraph` is
-// generic over node type. See https://github.com/quantinuum/hugr/issues/1926
 #[derive(Clone)]
+#[deprecated(
+    since = "0.19.0",
+    note = "This is a limited API that will be dropped soon. Use toposorting over `HugrView::scheduling_graph` instead.\n<https://docs.rs/hugr/latest/hugr/trait.HugrView.html#method.scheduling_graph>"
+)]
 pub struct CommandIterator<'circ, T: HugrView> {
     /// The circuit.
     circ: &'circ Circuit<T>,
@@ -262,13 +264,12 @@ pub struct CommandIterator<'circ, T: HugrView> {
     delayed_node: Option<Node>,
 }
 
+#[expect(deprecated)]
 impl<'circ, T: HugrView<Node = Node>> CommandIterator<'circ, T> {
     /// Create a new iterator over the commands of a circuit.
     pub(super) fn new(circ: &'circ Circuit<T>) -> Self {
         // Initialize the map assigning linear units to the input's linear
         // ports.
-        //
-        // TODO: `with_wires` combinator for `Units`?
         let wire_unit = circ
             .linear_units()
             .map(|(linear_unit, port, _)| (Wire::new(circ.input_node(), port), linear_unit.index()))
@@ -443,6 +444,7 @@ impl<'circ, T: HugrView<Node = Node>> CommandIterator<'circ, T> {
     }
 }
 
+#[expect(deprecated)]
 impl<'circ, T: HugrView<Node = Node>> Iterator for CommandIterator<'circ, T> {
     type Item = Command<'circ, T>;
 
@@ -469,8 +471,10 @@ impl<'circ, T: HugrView<Node = Node>> Iterator for CommandIterator<'circ, T> {
     }
 }
 
+#[expect(deprecated)]
 impl<T: HugrView<Node = Node>> FusedIterator for CommandIterator<'_, T> {}
 
+#[expect(deprecated)]
 impl<T: HugrView<Node = Node>> std::fmt::Debug for CommandIterator<'_, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CommandIterator")
@@ -482,6 +486,7 @@ impl<T: HugrView<Node = Node>> std::fmt::Debug for CommandIterator<'_, T> {
 }
 
 #[cfg(test)]
+#[expect(deprecated)]
 mod test {
     use hugr::builder::{Container, DFGBuilder, Dataflow, DataflowHugr};
     use hugr::extension::prelude::qb_t;

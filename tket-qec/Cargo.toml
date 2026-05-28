@@ -20,4 +20,4 @@ workspace = true
 hugr.workspace = true
 semver = "1.0.28"
 strum = { workspace = true, features = ["derive"] }
-tket-qsystem = { version = "0.24.0", path = "../tket-qsystem" }
+tket-qsystem = { version = "0.25.0", path = "../tket-qsystem" }

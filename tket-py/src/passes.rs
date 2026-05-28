@@ -5,6 +5,7 @@ mod inline_funcs;
 mod scope;
 pub mod tket1;
 
+use hugr::HugrView;
 pub(crate) use scope::PyPassScope;
 
 use std::{cmp::min, convert::TryInto, fs, num::NonZeroUsize, path::PathBuf};
@@ -12,7 +13,7 @@ use std::{cmp::min, convert::TryInto, fs, num::NonZeroUsize, path::PathBuf};
 use pyo3::prelude::*;
 use tket::optimiser::badger::BadgerOptions;
 use tket::passes::composable::{ComposablePass, WithScope};
-use tket::{Circuit, TketOp, op_matches};
+use tket::{Circuit, TketOp};
 
 use tket::passes;
 
@@ -175,8 +176,9 @@ fn badger_optimise(
     // Optimise
     let c = Circuit::new(&circ.hugr);
     let n_cx = c
-        .commands()
-        .filter(|c| op_matches(c.optype(), TketOp::CX))
+        .toposorted_children(c.parent())
+        .expect("circuit entrypoint should be dataflow region")
+        .filter(|&n| c.hugr().get_optype(n).cast::<TketOp>() == Some(TketOp::CX))
         .count();
     let n_threads = min(
         (n_cx / 50).try_into().unwrap_or(1.try_into().unwrap()),
@@ -225,7 +227,8 @@ fn qsystem_rebase_pass(
     scope: Option<PyPassScope>,
 ) -> PyResult<()> {
     let py_scope = scope.unwrap_or_default();
-    let qsystem_pass = tket_qsystem::QSystemPass::default_with_scope(py_scope.scope)
+    let qsystem_pass = tket_qsystem::QSystemPass::defaults(tket_qsystem::QSystemPlatform::Helios)
+        .with_scope(py_scope.scope)
         .with_constant_fold(constant_fold)
         .with_monomorphize(monomorphize)
         .with_force_order(force_order)

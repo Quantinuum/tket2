@@ -4,7 +4,6 @@ use std::sync::Arc;
 
 use hugr::builder::{Dataflow, DataflowHugr, FunctionBuilder};
 use hugr::extension::prelude::{bool_t, qb_t};
-use hugr::std_extensions::arithmetic::int_types::int_type;
 
 use hugr::ops::OpParent;
 use hugr::types::Signature;
@@ -20,8 +19,7 @@ use tket::serialize::pytket::{DecodeOptions, EncodeOptions};
 use tket_json_rs::circuit_json::{self, SerialCircuit};
 use tket_json_rs::register;
 
-use crate::extension::futures::{FutureOpBuilder, future_type};
-use crate::extension::qsystem::QSystemOp;
+use crate::extension::qsystem::{QSystemPlatform, helios::HeliosOp};
 use crate::extension::result::ResultOp;
 use crate::pytket::{qsystem_decoder_config, qsystem_encoder_config};
 
@@ -38,10 +36,6 @@ const NATIVE_GATES_JSON: &str = r#"{
     }"#;
 
 /// Check some properties of the serial circuit.
-#[expect(
-    clippy::iter_over_hash_type,
-    reason = "test validation checks every permutation entry independently, so iteration order cannot affect the result"
-)]
 fn validate_serial_circ(circ: &SerialCircuit) {
     // Check that all commands have valid arguments.
     for command in &circ.commands {
@@ -60,7 +54,9 @@ fn validate_serial_circ(circ: &SerialCircuit) {
         .iter()
         .map(|p| (p.0.clone().id, p.1.clone().id))
         .collect();
-    for (key, value) in &perm {
+    for permutation in &circ.implicit_permutation {
+        let key = &permutation.0.id;
+        let value = &permutation.1.id;
         let valid_qubits = circ.qubits.contains(&register::Qubit::from(key.clone()))
             && circ.qubits.contains(&register::Qubit::from(value.clone()));
         assert!(
@@ -80,10 +76,6 @@ fn validate_serial_circ(circ: &SerialCircuit) {
     );
 }
 
-#[expect(
-    clippy::iter_over_hash_type,
-    reason = "test comparison checks command multiplicities; iteration order only affects which mismatch is reported first"
-)]
 fn compare_serial_circs(a: &SerialCircuit, b: &SerialCircuit) {
     assert_eq!(a.name, b.name);
     assert_eq!(a.phase, b.phase);
@@ -145,6 +137,11 @@ fn compare_serial_circs(a: &SerialCircuit, b: &SerialCircuit) {
     let a_command_count: HashMap<CommandInfo, usize> = a.commands.iter().map_into().counts();
     let b_command_count: HashMap<CommandInfo, usize> = b.commands.iter().map_into().counts();
 
+    // Treat the commands as a multiset; iteration order is irrelevant here.
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "commands are compared as a multiset"
+    )]
     for (a, &count_a) in &a_command_count {
         let count_b = b_command_count.get(a).copied().unwrap_or_default();
         assert_eq!(
@@ -167,11 +164,11 @@ fn circ_qsystem_native_gates() -> Hugr {
     let [qb1] = h.add_dataflow_op(TketOp::QAlloc, []).unwrap().outputs_arr();
 
     let [bit_0] = h
-        .add_dataflow_op(QSystemOp::Measure, [qb0])
+        .add_dataflow_op(HeliosOp::Measure, [qb0])
         .unwrap()
         .outputs_arr();
     let [bit_1] = h
-        .add_dataflow_op(QSystemOp::Measure, [qb1])
+        .add_dataflow_op(HeliosOp::Measure, [qb1])
         .unwrap()
         .outputs_arr();
     let [bit_0] = h
@@ -214,31 +211,6 @@ fn circ_dropped_order_edge() -> Hugr {
     h.finish_hugr_with_outputs([]).unwrap()
 }
 
-/// A circuit containing Future operations over a type that pytket cannot
-/// represent.
-fn circ_unsupported_future_payload() -> Hugr {
-    let int_t = int_type(6);
-    let future_int_t = future_type(int_t.clone());
-    let mut h = FunctionBuilder::new(
-        "unsupported_future_payload",
-        Signature::new(
-            vec![qb_t(), future_int_t.clone()],
-            vec![qb_t(), future_int_t],
-        ),
-    )
-    .unwrap();
-
-    let [q, future] = h.input_wires_arr();
-
-    // Extra quantum op to ensure this circuit gets encoded.
-    let [q] = h.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
-
-    let [future, duplicate] = h.add_dup(future, int_t.clone()).unwrap();
-    h.add_free(duplicate, int_t).unwrap();
-
-    h.finish_hugr_with_outputs([q, future]).unwrap()
-}
-
 /// Check that all circuit ops have been translated to a native gate.
 ///
 /// Panics if there are tk1 ops in the circuit.
@@ -260,9 +232,23 @@ fn check_no_tk1_ops(hugr: &Hugr) {
     }
 }
 
+/// A simple Sol circuit with PhasedXX and Rz.
+const SOL_NATIVE_GATES_JSON: &str = r#"{
+    "phase": "0",
+    "bits": [],
+    "qubits": [["q", [0]], ["q", [1]]],
+    "commands": [
+        {"args": [["q", [0]], ["q", [1]]], "op": {"params": ["0.5", "0.25"], "type": "PhasedXX"}},
+        {"args": [["q", [0]]], "op": {"params": ["0.5"], "type": "Rz"}}
+    ],
+    "implicit_permutation": [[["q", [0]], ["q", [0]]], [["q", [1]], ["q", [1]]]]
+}"#;
+
 #[rstest]
-#[case::native_gates(NATIVE_GATES_JSON, 3, 2, false)]
+#[case::helios_native_gates(QSystemPlatform::Helios, NATIVE_GATES_JSON, 3, 2, false)]
+#[case::sol_native_gates(QSystemPlatform::Sol, SOL_NATIVE_GATES_JSON, 2, 2, false)]
 fn json_roundtrip(
+    #[case] platform: QSystemPlatform,
     #[case] circ_s: &str,
     #[case] num_commands: usize,
     #[case] num_qubits: usize,
@@ -272,7 +258,7 @@ fn json_roundtrip(
     assert_eq!(ser.commands.len(), num_commands);
 
     let hugr: Hugr = ser
-        .decode(DecodeOptions::new().with_config(qsystem_decoder_config()))
+        .decode(DecodeOptions::new().with_config(qsystem_decoder_config(platform)))
         .unwrap();
     assert_eq!(tket::Circuit::new(&hugr).qubit_count(), num_qubits);
 
@@ -282,7 +268,7 @@ fn json_roundtrip(
 
     let reser: SerialCircuit = SerialCircuit::encode(
         &hugr,
-        EncodeOptions::new().with_config(qsystem_encoder_config()),
+        EncodeOptions::new().with_config(qsystem_encoder_config(platform)),
     )
     .unwrap();
     validate_serial_circ(&reser);
@@ -302,11 +288,10 @@ fn circuit_standalone_roundtrip(#[case] hugr: Hugr) {
         .into_owned();
     let decode_options = DecodeOptions::new()
         .with_signature(circ_signature.clone())
-        .with_config(qsystem_decoder_config());
+        .with_config(qsystem_decoder_config(QSystemPlatform::Helios));
     let encode_options = EncodeOptions::new()
         .with_subcircuits(true)
-        .with_config(qsystem_encoder_config())
-        .keep_empty_circuits(true);
+        .with_config(qsystem_encoder_config(QSystemPlatform::Helios));
 
     let encoded = EncodedCircuit::new_standalone(&hugr, encode_options.clone())
         .unwrap_or_else(|e| panic!("{e}"));
@@ -348,7 +333,7 @@ fn circuit_standalone_roundtrip(#[case] hugr: Hugr) {
 
     let reser = SerialCircuit::encode(
         &deser,
-        EncodeOptions::new().with_config(qsystem_encoder_config()),
+        EncodeOptions::new().with_config(qsystem_encoder_config(QSystemPlatform::Helios)),
     )
     .unwrap();
     validate_serial_circ(&reser);
@@ -358,7 +343,6 @@ fn circuit_standalone_roundtrip(#[case] hugr: Hugr) {
 #[rstest]
 #[case::native_gates(circ_qsystem_native_gates(), 1)]
 #[case::dropped_order_edge(circ_dropped_order_edge(), 1)]
-#[case::unsupported_future_payload(circ_unsupported_future_payload(), 1)]
 fn encoded_circuit_roundtrip(#[case] hugr: Hugr, #[case] num_circuits: usize) {
     let circ_signature = hugr
         .entrypoint_optype()
@@ -367,7 +351,7 @@ fn encoded_circuit_roundtrip(#[case] hugr: Hugr, #[case] num_circuits: usize) {
         .into_owned();
     let encode_options = EncodeOptions::new()
         .with_subcircuits(true)
-        .with_config(qsystem_encoder_config());
+        .with_config(qsystem_encoder_config(QSystemPlatform::Helios));
 
     let encoded = EncodedCircuit::new(&hugr, encode_options).unwrap_or_else(|e| panic!("{e}"));
 
@@ -376,7 +360,10 @@ fn encoded_circuit_roundtrip(#[case] hugr: Hugr, #[case] num_circuits: usize) {
 
     let mut deser = hugr.clone();
     encoded
-        .reassemble_inplace(&mut deser, Some(Arc::new(qsystem_decoder_config())))
+        .reassemble_inplace(
+            &mut deser,
+            Some(Arc::new(qsystem_decoder_config(QSystemPlatform::Helios))),
+        )
         .unwrap_or_else(|e| panic!("{e}"));
 
     deser.validate().unwrap_or_else(|e| panic!("{e}"));
@@ -408,13 +395,16 @@ fn regression_dropped_order_edge(circ_dropped_order_edge: Hugr) {
 
     let encode_options = EncodeOptions::new()
         .with_subcircuits(true)
-        .with_config(qsystem_encoder_config());
+        .with_config(qsystem_encoder_config(QSystemPlatform::Helios));
     let encoded = EncodedCircuit::new(&hugr, encode_options).unwrap_or_else(|e| panic!("{e}"));
     assert!(encoded.contains_circuit(hugr.entrypoint()));
 
     let mut deser = hugr.clone();
     encoded
-        .reassemble_inplace(&mut deser, Some(Arc::new(qsystem_decoder_config())))
+        .reassemble_inplace(
+            &mut deser,
+            Some(Arc::new(qsystem_decoder_config(QSystemPlatform::Helios))),
+        )
         .unwrap_or_else(|e| panic!("{e}"));
 
     deser.validate().unwrap_or_else(|e| panic!("{e}"));

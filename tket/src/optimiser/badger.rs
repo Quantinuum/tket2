@@ -520,20 +520,35 @@ pub use badger_default::{DefaultBadgerStrategy, ECCBadgerOptimiser};
 #[cfg(test)]
 #[cfg(feature = "portmatching")]
 mod tests {
+    use hugr::Node;
     use hugr::{
         HugrView,
         builder::{DFGBuilder, Dataflow, DataflowHugr},
         extension::prelude::qb_t,
         types::Signature,
     };
+    use itertools::Itertools;
     use rstest::{fixture, rstest};
 
+    use crate::extension::rotation::RotationOp;
     use crate::serialize::load_tk1_json_str;
     use crate::serialize::pytket::DecodeOptions;
     use crate::{Circuit, TketOp};
     use crate::{extension::rotation::rotation_type, optimiser::badger::BadgerOptions};
 
     use super::{BadgerOptimiser, ECCBadgerOptimiser};
+
+    /// Returns a vector of `TketOp` or `RotationOp` nodes in the entrypoint
+    /// region, in topological order.
+    fn entrypoint_tket_or_rotation_ops(circ: &Circuit) -> Vec<Node> {
+        circ.toposorted_children(circ.parent())
+            .expect("circuit entrypoint should be dataflow region")
+            .filter(|&n| {
+                let op = circ.hugr().get_optype(n);
+                op.cast::<TketOp>().is_some() || op.cast::<RotationOp>().is_some()
+            })
+            .collect_vec()
+    }
 
     #[fixture]
     fn rz_rz() -> Circuit {
@@ -605,10 +620,6 @@ mod tests {
     #[case::compiled(badger_opt_compiled())]
     #[case::json(badger_opt_json())]
     fn rz_rz_cancellation(rz_rz: Circuit, #[case] badger_opt: ECCBadgerOptimiser) {
-        use hugr::ops::OpType;
-
-        use crate::{extension::rotation::RotationOp, op_matches};
-
         let opt_rz = badger_opt.optimise(
             &rz_rz,
             BadgerOptions {
@@ -616,16 +627,15 @@ mod tests {
                 ..Default::default()
             },
         );
-        let [op1, op2]: [&OpType; 2] = opt_rz
-            .commands()
-            .map(|cmd| cmd.optype())
-            .collect::<Vec<_>>()
-            .try_into()
+        let [op1, op2] = entrypoint_tket_or_rotation_ops(&opt_rz)
+            .into_iter()
+            .map(|node| opt_rz.hugr().get_optype(node))
+            .collect_array()
             .unwrap();
 
         // Rzs combined into a single one.
         assert_eq!(op1.cast(), Some(RotationOp::radd));
-        assert!(op_matches(op2, TketOp::Rz));
+        assert_eq!(op2.cast(), Some(TketOp::Rz));
     }
 
     #[rstest]
@@ -659,7 +669,7 @@ mod tests {
             },
         );
         opt_rz.hugr().validate().unwrap();
-        assert_eq!(opt_rz.commands().count(), 2);
+        assert_eq!(entrypoint_tket_or_rotation_ops(&opt_rz).len(), 2);
     }
 
     #[rstest]

@@ -253,16 +253,32 @@ impl<N: HugrNode> ModifierResolver<N> {
 
     pub(super) fn modify_load_function(
         &mut self,
-        _h: &impl HugrMut<Node = N>,
-        _n: N,
-        _load: &LoadFunction,
-        _new_dfg: &mut impl Dataflow,
+        h: &impl HugrMut<Node = N>,
+        n: N,
+        load: &LoadFunction,
+        new_dfg: &mut impl Dataflow,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        // TODO:
-        // Indirect calles would be handled by its caller.
-        // However, when a loaded function is used in the other ways
-        // (e.g., passed to higher-order functions as `map` or `fold`),
-        // we need to modify it here.
+        let consumers = h.linked_inputs(n, 0).collect::<Vec<_>>();
+
+        // Check if all consumers are modifiers. If so, we can just forget the LoadFunction node and let the modifiers rebuild it.
+        if !consumers.is_empty()
+            && consumers
+                .iter()
+                .all(|(consumer, _)| Modifier::from_optype(h.get_optype(*consumer)).is_some())
+        {
+            // Modifier consumers rebuild their own LoadFunction nodes.
+            return self.forget_node(h, n);
+        }
+        // Plain LoadFunction values still need their static edge restored.
+        let new = self.add_node_no_modification(h, n, load.clone(), new_dfg)?;
+        let (loaded_func, _) =
+            h.single_linked_output(n, load.function_port())
+                .ok_or_else(|| {
+                    ModifierResolverErrors::unreachable(
+                        "LoadFunction node has no linked static function.".to_string(),
+                    )
+                })?;
+        self.call_map_insert(loaded_func, (new, load.function_port()));
         Ok(())
     }
 }

@@ -1,0 +1,19 @@
+---
+source: tket-qsystem/src/llvm/qsystem.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define internal { i64, i64 } @_hl.main.1(i64 %0, i64 %1, double %2, double %3) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  call void @___rpp(i64 %0, i64 %1, double %2, double %3)
+  %mrv = insertvalue { i64, i64 } poison, i64 %0, 0
+  %mrv9 = insertvalue { i64, i64 } %mrv, i64 %1, 1
+  ret { i64, i64 } %mrv9
+}
+
+declare void @___rpp(i64, i64, double, double)

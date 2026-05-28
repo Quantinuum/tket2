@@ -1,5 +1,5 @@
-//! Provides a `ReplaceBoolPass` which replaces the tket.bool type and
-//! lazifies measure operations.
+//! Provides a [`ReplaceBoolPass`] which replaces the `tket.bool` type and
+//! lazifies measure operations for all supported platforms (Helios and Sol).
 mod static_array;
 
 use derive_more::{Display, Error, From};
@@ -34,7 +34,7 @@ use tket::passes::{ComposablePass, ReplaceTypes, non_local::FindNonLocalEdgesErr
 
 use crate::extension::{
     futures::{FutureOp, FutureOpBuilder, FutureOpDef, future_type},
-    qsystem::QSystemOp,
+    qsystem::{helios::HeliosOp, sol::SolOp},
 };
 
 #[derive(Error, Debug, Display, From)]
@@ -50,22 +50,29 @@ pub enum ReplaceBoolPassError<N> {
     ReplaceStaticArrayBoolPassError(ReplaceStaticArrayBoolPassError),
 }
 
-/// A HUGR -> HUGR pass which replaces the `tket.bool`, enabling lazifying of measure
+/// A HUGR -> HUGR pass which replaces the `tket.bool` type, enabling lazifying of measure
 /// operations.
 ///
 /// The `tket.bool` type is replaced by a sum type of `bool_t` (the standard
 /// HUGR bool type represented by a unit sum) and `future(bool_t)`, with its operations
 /// being turned into conditionals that read the future if necessary.
 ///
-/// [TketOp::Measure], [QSystemOp::Measure], and [QSystemOp::MeasureReset] nodes
-/// are replaced by [QSystemOp::LazyMeasure] and [QSystemOp::LazyMeasureReset]
-/// nodes.
+/// Measure ops are replaced by their lazy equivalents on all supported platforms:
+/// - [`TketOp::MeasureFree`] → [`HeliosOp::LazyMeasure`]
+/// - [`HeliosOp::Measure`] → [`HeliosOp::LazyMeasure`]
+/// - [`HeliosOp::MeasureReset`] → [`HeliosOp::LazyMeasureReset`]
+/// - [`SolOp::Measure`] → [`SolOp::LazyMeasure`]
+/// - [`SolOp::MeasureReset`] → [`SolOp::LazyMeasureReset`]
 ///
-/// [TketOp::Measure]: tket::TketOp::Measure
-/// [QSystemOp::Measure]: crate::extension::qsystem::QSystemOp::Measure
-/// [QSystemOp::MeasureReset]: crate::extension::qsystem::QSystemOp::MeasureReset
-/// [QSystemOp::LazyMeasure]: crate::extension::qsystem::QSystemOp::LazyMeasure
-/// [QSystemOp::LazyMeasureReset]: crate::extension::qsystem::QSystemOp::LazyMeasureReset
+/// [`TketOp::MeasureFree`]: tket::TketOp::MeasureFree
+/// [`HeliosOp::Measure`]: crate::extension::qsystem::helios::HeliosOp::Measure
+/// [`HeliosOp::MeasureReset`]: crate::extension::qsystem::helios::HeliosOp::MeasureReset
+/// [`HeliosOp::LazyMeasure`]: crate::extension::qsystem::helios::HeliosOp::LazyMeasure
+/// [`HeliosOp::LazyMeasureReset`]: crate::extension::qsystem::helios::HeliosOp::LazyMeasureReset
+/// [`SolOp::Measure`]: crate::extension::qsystem::sol::SolOp::Measure
+/// [`SolOp::MeasureReset`]: crate::extension::qsystem::sol::SolOp::MeasureReset
+/// [`SolOp::LazyMeasure`]: crate::extension::qsystem::sol::SolOp::LazyMeasure
+/// [`SolOp::LazyMeasureReset`]: crate::extension::qsystem::sol::SolOp::LazyMeasureReset
 #[derive(Default, Debug, Clone)]
 pub struct ReplaceBoolPass {
     /// Where to apply the pass.
@@ -202,9 +209,7 @@ fn not_op_dest() -> NodeTemplate {
     NodeTemplate::CompoundOp(Box::new(h))
 }
 
-fn measure_dest() -> NodeTemplate {
-    let lazy_measure = QSystemOp::LazyMeasure.to_extension_op().unwrap();
-
+fn measure_dest(lazy_measure: hugr::ops::ExtensionOp) -> NodeTemplate {
     let mut dfb = DFGBuilder::new(inout_sig(vec![qb_t()], vec![bool_dest()])).unwrap();
     let [q] = dfb.input_wires_arr();
     let measure = dfb.add_dataflow_op(lazy_measure, vec![q]).unwrap();
@@ -223,9 +228,7 @@ fn measure_dest() -> NodeTemplate {
     NodeTemplate::CompoundOp(Box::new(h))
 }
 
-fn measure_reset_dest() -> NodeTemplate {
-    let lazy_measure_reset = QSystemOp::LazyMeasureReset.to_extension_op().unwrap();
-
+fn measure_reset_dest(lazy_measure_reset: hugr::ops::ExtensionOp) -> NodeTemplate {
     let mut dfb = DFGBuilder::new(inout_sig(vec![qb_t()], vec![qb_t(), bool_dest()])).unwrap();
     let [q] = dfb.input_wires_arr();
     let measure = dfb.add_dataflow_op(lazy_measure_reset, vec![q]).unwrap();
@@ -380,11 +383,30 @@ fn lowerer() -> ReplaceTypes {
 
     // Replace measure ops with lazy versions.
     let tket_measure_free = TketOp::MeasureFree.to_extension_op().unwrap();
-    let qsystem_measure = QSystemOp::Measure.to_extension_op().unwrap();
-    let qsystem_measure_reset = QSystemOp::MeasureReset.to_extension_op().unwrap();
-    lw.set_replace_op(&tket_measure_free, measure_dest());
-    lw.set_replace_op(&qsystem_measure, measure_dest());
-    lw.set_replace_op(&qsystem_measure_reset, measure_reset_dest());
+    let helios_measure = HeliosOp::Measure.to_extension_op().unwrap();
+    let helios_measure_reset = HeliosOp::MeasureReset.to_extension_op().unwrap();
+    let sol_measure = SolOp::Measure.to_extension_op().unwrap();
+    let sol_measure_reset = SolOp::MeasureReset.to_extension_op().unwrap();
+    lw.set_replace_op(
+        &tket_measure_free,
+        measure_dest(HeliosOp::LazyMeasure.to_extension_op().unwrap()),
+    );
+    lw.set_replace_op(
+        &helios_measure,
+        measure_dest(HeliosOp::LazyMeasure.to_extension_op().unwrap()),
+    );
+    lw.set_replace_op(
+        &helios_measure_reset,
+        measure_reset_dest(HeliosOp::LazyMeasureReset.to_extension_op().unwrap()),
+    );
+    lw.set_replace_op(
+        &sol_measure,
+        measure_dest(SolOp::LazyMeasure.to_extension_op().unwrap()),
+    );
+    lw.set_replace_op(
+        &sol_measure_reset,
+        measure_reset_dest(SolOp::LazyMeasureReset.to_extension_op().unwrap()),
+    );
 
     // Replace (borrow/)array ops that used to have with copyable bounds with DFGs that
     // the linearizer can act on now that the elements are no longer copyable.
@@ -457,7 +479,7 @@ fn lowerer() -> ReplaceTypes {
 
 #[cfg(test)]
 mod test {
-    use crate::extension::qsystem::{QSystemOp, QSystemOpBuilder};
+    use crate::extension::qsystem::{helios::HeliosOp, sol::SolOp};
 
     use super::*;
     use hugr::extension::prelude::{UnwrapBuilder, option_type, usize_t};
@@ -581,7 +603,8 @@ mod test {
 
     #[rstest]
     #[case(TketOp::MeasureFree)]
-    #[case(QSystemOp::Measure)]
+    #[case(HeliosOp::Measure)]
+    #[case(SolOp::Measure)]
     fn test_measure<T: Into<OpType>>(#[case] measure_op: T) {
         let mut dfb = DFGBuilder::new(inout_sig(vec![qb_t()], vec![bool_type()])).unwrap();
         let [q] = dfb.input_wires_arr();
@@ -606,12 +629,14 @@ mod test {
         //}));
     }
 
-    #[test]
-    fn test_measure_reset() {
+    #[rstest]
+    #[case(HeliosOp::MeasureReset)]
+    #[case(SolOp::MeasureReset)]
+    fn test_measure_reset<T: Into<OpType>>(#[case] measure_reset_op: T) {
         let mut dfb = DFGBuilder::new(inout_sig(vec![qb_t()], vec![qb_t(), bool_type()])).unwrap();
         let [q] = dfb.input_wires_arr();
-        let output = dfb.add_measure_reset(q).unwrap();
-        let mut h = dfb.finish_hugr_with_outputs(output).unwrap();
+        let output = dfb.add_dataflow_op(measure_reset_op, [q]).unwrap();
+        let mut h = dfb.finish_hugr_with_outputs(output.outputs()).unwrap();
 
         let pass = ReplaceBoolPass::default();
         pass.run(&mut h).unwrap();
