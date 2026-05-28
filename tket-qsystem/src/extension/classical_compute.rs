@@ -10,8 +10,6 @@ use smol_str::SmolStr;
 use std::marker::PhantomData;
 use std::sync::Weak;
 
-use super::utils::row_to_arg;
-
 lazy_static! {
     /// The name of the `module` type.
     pub static ref MODULE_TYPE_NAME: SmolStr = SmolStr::new_inline("module");
@@ -24,14 +22,14 @@ lazy_static! {
     pub static ref RESULT_TYPE_NAME: SmolStr = SmolStr::new_inline("result");
 
     /// The [TypeParam] of `lookup_by_id` specifying the id of the function.
-    pub static ref ID_PARAM: TypeParam = TypeParam::max_nat_type();
+    pub static ref ID_PARAM: TypeParam = TypeParam::max_nat_kind();
     /// The [TypeParam] of `lookup_by_name` specifying the name of the function.
-    pub static ref NAME_PARAM: TypeParam = TypeParam::StringType;
+    pub static ref NAME_PARAM: TypeParam = TypeParam::StringKind;
     /// The [TypeParam] of various types and ops specifying the input signature of a function.
     pub static ref INPUTS_PARAM: TypeParam =
-        TypeParam::ListType(Box::new(TypeBound::Linear.into()));
+        TypeParam::new_list_kind(TypeBound::Linear);
     /// The [TypeParam] of various types and ops specifying the output signature of a function.
-    pub static ref OUTPUTS_PARAM: TypeParam = TypeParam::ListType(Box::new(TypeBound::Linear.into()));
+    pub static ref OUTPUTS_PARAM: TypeParam = TypeParam::new_list_kind(TypeBound::Linear);
 }
 
 pub(crate) fn add_compute_type_defs(
@@ -123,7 +121,7 @@ impl<T> ComputeType<T> {
     ) -> CustomType {
         CustomType::new(
             FUNC_TYPE_NAME.to_owned(),
-            [row_to_arg(inputs), row_to_arg(outputs)],
+            [inputs.into().into(), outputs.into().into()],
             extension_id,
             TypeBound::Copyable,
             extension_ref,
@@ -137,7 +135,7 @@ impl<T> ComputeType<T> {
     ) -> CustomType {
         CustomType::new(
             RESULT_TYPE_NAME.to_owned(),
-            [row_to_arg(outputs)],
+            [outputs.into().into()],
             extension_id,
             TypeBound::Linear,
             extension_ref,
@@ -277,7 +275,7 @@ macro_rules! compute_opdef {
             type Error = ();
 
             fn try_from(value: Type) -> Result<Self, Self::Error> {
-                let TypeEnum::Extension(custom_type) = value.as_type_enum() else {
+                let Some(custom_type) = value.as_extension() else {
                     Err(())?
                 };
 
@@ -309,12 +307,12 @@ macro_rules! compute_opdef {
                     Self::dispose_context => Signature::new(vec![context_type], type_row![]).into(),
                     // <id: usize, inputs: TypeRow, outputs: TypeRow> [Module] -> [ComputeType::Func { inputs, outputs }]
                     Self::lookup_by_id => {
-                        let inputs = TypeRV::new_row_var_use(1, TypeBound::Copyable);
-                        let outputs = TypeRV::new_row_var_use(2, TypeBound::Copyable);
+                        let inputs = TypeRowRV::new_var_use(1, TypeBound::Copyable);
+                        let outputs = TypeRowRV::new_var_use(2, TypeBound::Copyable);
 
                         let func_type = ComputeType::<$ext>::func_custom_type(
-                            vec![inputs],
-                            vec![outputs],
+                            inputs,
+                            outputs,
                             self.extension(),
                             extension_ref,
                         )
@@ -331,12 +329,12 @@ macro_rules! compute_opdef {
                     }
                     // <name: String, inputs: TypeRow, outputs: TypeRow> [Module] -> [ComputeType::Func { inputs, outputs }]
                     Self::lookup_by_name => {
-                        let inputs = TypeRV::new_row_var_use(1, TypeBound::Copyable);
-                        let outputs = TypeRV::new_row_var_use(2, TypeBound::Copyable);
+                        let inputs = TypeRowRV::new_var_use(1, TypeBound::Copyable);
+                        let outputs = TypeRowRV::new_var_use(2, TypeBound::Copyable);
 
                         let func_type = ComputeType::<$ext>::func_custom_type(
-                            vec![inputs],
-                            vec![outputs],
+                            inputs,
+                            outputs,
                             self.extension(),
                             extension_ref,
                         )
@@ -353,18 +351,17 @@ macro_rules! compute_opdef {
                     }
                     // <inputs: TypeRow, outputs: TypeRow> [Context, ComputeType::Func { inputs, outputs }, inputs] -> [Context, future<tuple<outputs>>>]
                     Self::call => {
-                        let context_type: TypeRV = context_type.into();
-                        let inputs = TypeRV::new_row_var_use(0, TypeBound::Copyable);
-                        let outputs = TypeRV::new_row_var_use(1, TypeBound::Copyable);
+                        let inputs = TypeRowRV::new_var_use(0, TypeBound::Copyable);
+                        let outputs = TypeRowRV::new_var_use(1, TypeBound::Copyable);
                         let func_type = Type::new_extension(ComputeType::<$ext>::func_custom_type(
-                            vec![inputs.clone()],
-                            vec![outputs.clone()],
+                            inputs.clone(),
+                            outputs.clone(),
                             self.extension(),
                             extension_ref,
                         ));
                         let result_type =
-                            TypeRV::new_extension(ComputeType::<$ext>::result_custom_type(
-                                vec![outputs],
+                            Type::new_extension(ComputeType::<$ext>::result_custom_type(
+                                outputs,
                                 self.extension(),
                                 extension_ref,
                             ));
@@ -372,24 +369,27 @@ macro_rules! compute_opdef {
                         PolyFuncTypeRV::new(
                             [INPUTS_PARAM.to_owned(), OUTPUTS_PARAM.to_owned()],
                             FuncValueType::new(
-                                vec![context_type.clone(), func_type.into(), inputs],
+                                TypeRowRV::from(vec![context_type.clone(), func_type.into()])
+                                    .concat(inputs),
                                 vec![result_type],
                             ),
                         )
                         .into()
                     }
                     Self::read_result => {
-                        let context_type: TypeRV = context_type.into();
-                        let outputs = TypeRV::new_row_var_use(0, TypeBound::Copyable);
+                        let outputs = TypeRowRV::new_var_use(0, TypeBound::Copyable);
                         let result_type =
-                            TypeRV::new_extension(ComputeType::<$ext>::result_custom_type(
-                                vec![outputs.clone()],
+                            Type::new_extension(ComputeType::<$ext>::result_custom_type(
+                                outputs.clone(),
                                 self.extension(),
                                 extension_ref,
                             ));
                         PolyFuncTypeRV::new(
                             [OUTPUTS_PARAM.to_owned()],
-                            FuncValueType::new(vec![result_type], vec![context_type, outputs]),
+                            FuncValueType::new(
+                                vec![result_type],
+                                TypeRowRV::from(vec![context_type]).concat(outputs),
+                            ),
                         )
                         .into()
                     }
@@ -419,7 +419,7 @@ macro_rules! compute_opdef {
                 match self {
                     Self::get_context => {
                         let [] = type_args else {
-                            Err(SignatureError::from(TermTypeError::WrongNumberArgs(
+                            Err(SignatureError::from(TermKindError::WrongNumberArgs(
                                 type_args.len(),
                                 0,
                             )))?
@@ -428,7 +428,7 @@ macro_rules! compute_opdef {
                     }
                     Self::dispose_context => {
                         let [] = type_args else {
-                            Err(SignatureError::from(TermTypeError::WrongNumberArgs(
+                            Err(SignatureError::from(TermKindError::WrongNumberArgs(
                                 type_args.len(),
                                 0,
                             )))?
@@ -440,30 +440,30 @@ macro_rules! compute_opdef {
                         let Some([id_arg, inputs_arg, outputs_arg]): Option<[_; 3]> =
                             type_args.to_vec().try_into().ok()
                         else {
-                            Err(SignatureError::from(TermTypeError::WrongNumberArgs(
+                            Err(SignatureError::from(TermKindError::WrongNumberArgs(
                                 type_args.len(),
                                 3,
                             )))?
                         };
 
                         let Some(id) = id_arg.as_nat() else {
-                            Err(SignatureError::from(TermTypeError::TypeMismatch {
+                            Err(SignatureError::from(TermKindError::KindMismatch {
                                 term: Box::new(id_arg),
-                                type_: Box::new(ID_PARAM.to_owned()),
+                                kind: Box::new(ID_PARAM.to_owned()),
                             }))?
                         };
 
                         let Ok(inputs) = TypeRowRV::try_from(inputs_arg.clone()) else {
-                            Err(SignatureError::from(TermTypeError::TypeMismatch {
+                            Err(SignatureError::from(TermKindError::KindMismatch {
                                 term: Box::new(inputs_arg),
-                                type_: Box::new(INPUTS_PARAM.to_owned()),
+                                kind: Box::new(INPUTS_PARAM.to_owned()),
                             }))?
                         };
 
                         let Ok(outputs) = TypeRowRV::try_from(outputs_arg.clone()) else {
-                            Err(SignatureError::from(TermTypeError::TypeMismatch {
+                            Err(SignatureError::from(TermKindError::KindMismatch {
                                 term: Box::new(outputs_arg),
-                                type_: Box::new(OUTPUTS_PARAM.to_owned()),
+                                kind: Box::new(OUTPUTS_PARAM.to_owned()),
                             }))?
                         };
                         Ok(Self::Concrete::LookupById {
@@ -477,30 +477,30 @@ macro_rules! compute_opdef {
                         let Some([name_arg, inputs_arg, outputs_arg]): Option<[_; 3]> =
                             type_args.to_vec().try_into().ok()
                         else {
-                            Err(SignatureError::from(TermTypeError::WrongNumberArgs(
+                            Err(SignatureError::from(TermKindError::WrongNumberArgs(
                                 type_args.len(),
                                 3,
                             )))?
                         };
 
                         let Some(name) = name_arg.as_string() else {
-                            Err(SignatureError::from(TermTypeError::TypeMismatch {
+                            Err(SignatureError::from(TermKindError::KindMismatch {
                                 term: Box::new(name_arg),
-                                type_: Box::new(NAME_PARAM.to_owned()),
+                                kind: Box::new(NAME_PARAM.to_owned()),
                             }))?
                         };
 
                         let Ok(inputs) = TypeRowRV::try_from(inputs_arg.clone()) else {
-                            Err(SignatureError::from(TermTypeError::TypeMismatch {
+                            Err(SignatureError::from(TermKindError::KindMismatch {
                                 term: Box::new(inputs_arg),
-                                type_: Box::new(INPUTS_PARAM.to_owned()),
+                                kind: Box::new(INPUTS_PARAM.to_owned()),
                             }))?
                         };
 
                         let Ok(outputs) = TypeRowRV::try_from(outputs_arg.clone()) else {
-                            Err(SignatureError::from(TermTypeError::TypeMismatch {
+                            Err(SignatureError::from(TermKindError::KindMismatch {
                                 term: Box::new(outputs_arg),
-                                type_: Box::new(OUTPUTS_PARAM.to_owned()),
+                                kind: Box::new(OUTPUTS_PARAM.to_owned()),
                             }))?
                         };
                         Ok(Self::Concrete::LookupByName {
@@ -513,23 +513,23 @@ macro_rules! compute_opdef {
                         let Some([inputs_arg, outputs_arg]): Option<[_; 2]> =
                             type_args.to_vec().try_into().ok()
                         else {
-                            Err(SignatureError::from(TermTypeError::WrongNumberArgs(
+                            Err(SignatureError::from(TermKindError::WrongNumberArgs(
                                 type_args.len(),
                                 2,
                             )))?
                         };
 
                         let Ok(inputs) = TypeRowRV::try_from(inputs_arg.clone()) else {
-                            Err(SignatureError::from(TermTypeError::TypeMismatch {
+                            Err(SignatureError::from(TermKindError::KindMismatch {
                                 term: Box::new(inputs_arg),
-                                type_: Box::new(INPUTS_PARAM.to_owned()),
+                                kind: Box::new(INPUTS_PARAM.to_owned()),
                             }))?
                         };
 
                         let Ok(outputs) = TypeRowRV::try_from(outputs_arg.clone()) else {
-                            Err(SignatureError::from(TermTypeError::TypeMismatch {
+                            Err(SignatureError::from(TermKindError::KindMismatch {
                                 term: Box::new(outputs_arg),
-                                type_: Box::new(OUTPUTS_PARAM.to_owned()),
+                                kind: Box::new(OUTPUTS_PARAM.to_owned()),
                             }))?
                         };
 
@@ -542,16 +542,16 @@ macro_rules! compute_opdef {
                         let Some([outputs_arg]): Option<[_; 1]> =
                             type_args.to_vec().try_into().ok()
                         else {
-                            Err(SignatureError::from(TermTypeError::WrongNumberArgs(
+                            Err(SignatureError::from(TermKindError::WrongNumberArgs(
                                 type_args.len(),
                                 1,
                             )))?
                         };
 
                         let Ok(outputs) = TypeRowRV::try_from(outputs_arg.clone()) else {
-                            Err(SignatureError::from(TermTypeError::TypeMismatch {
+                            Err(SignatureError::from(TermKindError::KindMismatch {
                                 term: Box::new(outputs_arg),
-                                type_: Box::new(OUTPUTS_PARAM.to_owned()),
+                                kind: Box::new(OUTPUTS_PARAM.to_owned()),
                             }))?
                         };
                         Ok(Self::Concrete::ReadResult {
@@ -722,8 +722,10 @@ macro_rules! compute_builder {
                     // TODO Add an Error variant to BuildError for: Input wire has wrong type
                     panic!("func wire is not a func type: {func_wire_type}")
                 };
-                let (in_types, out_types) =
-                    (TypeRow::try_from(in_types)?, TypeRow::try_from(out_types)?);
+                let (in_types, out_types) = (
+                    TypeRow::try_from(in_types).map_err(SignatureError::from)?,
+                    TypeRow::try_from(out_types).map_err(SignatureError::from)?,
+                );
 
                 Ok(self
                     .add_dataflow_op(
@@ -745,7 +747,7 @@ macro_rules! compute_builder {
                     // TODO Add an Error variant to BuildError for: Input wire has wrong type
                     panic!("result wire is not a result type: {result_wire_type}")
                 };
-                let outputs = TypeRow::try_from(outputs)?;
+                let outputs = TypeRow::try_from(outputs).map_err(SignatureError::from)?;
 
                 let op =
                     self.add_dataflow_op(ComputeOp::<$ext>::ReadResult { outputs }, [result])?;

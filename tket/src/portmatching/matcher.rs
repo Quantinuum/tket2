@@ -9,9 +9,12 @@ use std::{
 
 use super::{CircuitPattern, NodeID, PEdge, PNode};
 use derive_more::{Display, Error, From};
-use hugr::hugr::views::SiblingSubgraph;
 use hugr::hugr::views::sibling_subgraph::{
-    InvalidReplacement, InvalidSubgraph, InvalidSubgraphBoundary, TopoConvexChecker,
+    InvalidReplacement, InvalidSubgraph, InvalidSubgraphBoundary,
+};
+use hugr::hugr::views::{
+    SiblingSubgraph,
+    sibling_subgraph::{HugrConvexChecker, SchedGraphChecker},
 };
 use hugr::ops::OpType;
 use hugr::{HugrView, IncomingPort, Node, OutgoingPort, Port, PortIndex};
@@ -122,7 +125,7 @@ impl PatternMatch {
         circ: &Circuit,
         matcher: &PatternMatcher,
     ) -> Result<Self, InvalidPatternMatch> {
-        let checker = TopoConvexChecker::new(circ.hugr(), circ.parent());
+        let checker = SchedGraphChecker::new(circ.sched_graph());
         Self::try_from_root_match_with_checker(root, pattern, circ, matcher, &checker)
     }
 
@@ -137,7 +140,7 @@ impl PatternMatch {
         pattern: PatternID,
         circ: &Circuit<H>,
         matcher: &PatternMatcher,
-        checker: &TopoConvexChecker<'_, H>,
+        checker: &impl HugrConvexChecker<Node>,
     ) -> Result<Self, InvalidPatternMatch> {
         let pattern_ref = matcher
             .get_pattern(pattern)
@@ -180,7 +183,7 @@ impl PatternMatch {
         inputs: Vec<Vec<(Node, IncomingPort)>>,
         outputs: Vec<(Node, OutgoingPort)>,
     ) -> Result<Self, InvalidPatternMatch> {
-        let checker = TopoConvexChecker::new(circ.hugr(), circ.parent());
+        let checker = SchedGraphChecker::new(circ.sched_graph());
         Self::try_from_io_with_checker(root, pattern, circ, inputs, outputs, &checker)
     }
 
@@ -198,7 +201,7 @@ impl PatternMatch {
         circ: &Circuit<H>,
         inputs: Vec<Vec<(Node, IncomingPort)>>,
         outputs: Vec<(Node, OutgoingPort)>,
-        checker: &TopoConvexChecker<'_, H>,
+        checker: &impl HugrConvexChecker<Node>,
     ) -> Result<Self, InvalidPatternMatch> {
         let subgraph =
             SiblingSubgraph::try_new_with_checker(inputs, outputs, circ.hugr(), checker)?;
@@ -272,7 +275,7 @@ impl PatternMatcher {
         &'a self,
         circuit: &'c Circuit<impl HugrView<Node = Node>>,
     ) -> impl Iterator<Item = PatternMatch> + 'a {
-        let checker = TopoConvexChecker::new(circuit.hugr(), circuit.parent());
+        let checker = SchedGraphChecker::new(circuit.sched_graph());
         circuit
             .commands()
             .flat_map(move |cmd| self.find_rooted_matches(circuit, cmd.node(), &checker))
@@ -288,7 +291,7 @@ impl PatternMatcher {
         &self,
         circ: &Circuit<H>,
         root: Node,
-        checker: &TopoConvexChecker<'_, H>,
+        checker: &impl HugrConvexChecker<Node>,
     ) -> Vec<PatternMatch> {
         self.automaton
             .run(

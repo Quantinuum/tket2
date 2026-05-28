@@ -299,7 +299,7 @@ impl ValidateJustArgs for InterBlockArgsValidator {
 /// with a given ID.
 fn bool_array_tv(var_id: usize) -> Type {
     Array::ty_parametric(
-        TypeArg::new_var_use(var_id, TypeParam::max_nat_type()),
+        TypeArg::new_var_use(var_id, TypeParam::max_nat_kind()),
         future_type(bool_t()),
     )
     .unwrap()
@@ -347,7 +347,7 @@ fn block_with_ints_and_angles_sig(n_indices: usize, n_angles: usize) -> FuncValu
 fn sig_1_block(n_angles: usize, n_indices: usize) -> SignatureFunc {
     CustomValidator::new(
         PolyFuncTypeRV::new(
-            vec![TypeParam::max_nat_type(); 1 + n_indices],
+            vec![TypeParam::max_nat_kind(); 1 + n_indices],
             block_with_angles_sig(n_angles),
         ),
         ArgsValidator { n_idx: n_indices },
@@ -359,7 +359,7 @@ fn sig_1_block(n_angles: usize, n_indices: usize) -> SignatureFunc {
 /// additional angle inputs and a number of index inputs.
 fn sig_1_block_d(n_angles: usize, n_indices: usize) -> SignatureFunc {
     PolyFuncTypeRV::new(
-        vec![TypeParam::max_nat_type()],
+        vec![TypeParam::max_nat_kind()],
         block_with_ints_and_angles_sig(n_indices, n_angles),
     )
     .into()
@@ -434,7 +434,7 @@ impl MakeOpDef for IcebergOpDef {
             swap_d => sig_1_block_d(0, 2),
             zz_phase_between_blocks => CustomValidator::new(
                 PolyFuncTypeRV::new(
-                    vec![TypeParam::max_nat_type(); 3],
+                    vec![TypeParam::max_nat_kind(); 3],
                     FuncValueType::new(
                         vec_of_blocks_and_angles(2, 1),
                         vec_of_blocks_and_angles(2, 0),
@@ -444,7 +444,7 @@ impl MakeOpDef for IcebergOpDef {
             )
             .into(),
             zz_phase_between_blocks_d => PolyFuncTypeRV::new(
-                vec![TypeParam::max_nat_type()],
+                vec![TypeParam::max_nat_kind()],
                 FuncValueType::new(
                     vec_of_blocks_and_ints_and_angles(2, 2, 1),
                     vec_of_blocks_and_ints_and_angles(2, 0, 0),
@@ -453,7 +453,7 @@ impl MakeOpDef for IcebergOpDef {
             .into(),
             cx_transverse => CustomValidator::new(
                 PolyFuncTypeRV::new(
-                    vec![TypeParam::max_nat_type()],
+                    vec![TypeParam::max_nat_kind()],
                     FuncValueType::new_endo(vec_of_blocks_and_angles(2, 0)),
                 ),
                 ArgsValidator { n_idx: 0 },
@@ -461,7 +461,7 @@ impl MakeOpDef for IcebergOpDef {
             .into(),
             alloc_zero => CustomValidator::new(
                 PolyFuncTypeRV::new(
-                    vec![TypeParam::max_nat_type()],
+                    vec![TypeParam::max_nat_kind()],
                     FuncValueType::new(
                         vec_of_blocks_and_angles(0, 0),
                         vec_of_blocks_and_angles(1, 0),
@@ -472,7 +472,7 @@ impl MakeOpDef for IcebergOpDef {
             .into(),
             free => CustomValidator::new(
                 PolyFuncTypeRV::new(
-                    vec![TypeParam::max_nat_type()],
+                    vec![TypeParam::max_nat_kind()],
                     FuncValueType::new(
                         vec_of_blocks_and_angles(1, 0),
                         vec_of_blocks_and_angles(0, 0),
@@ -483,7 +483,7 @@ impl MakeOpDef for IcebergOpDef {
             .into(),
             measure_syndrome => CustomValidator::new(
                 PolyFuncTypeRV::new(
-                    vec![TypeParam::max_nat_type()],
+                    vec![TypeParam::max_nat_kind()],
                     FuncValueType::new(
                         vec_of_blocks_and_angles(1, 0),
                         vec_of_blocks_and_bools(1, 2),
@@ -494,7 +494,7 @@ impl MakeOpDef for IcebergOpDef {
             .into(),
             measure_all => CustomValidator::new(
                 PolyFuncTypeRV::new(
-                    vec![TypeParam::max_nat_type()],
+                    vec![TypeParam::max_nat_kind()],
                     FuncValueType::new(vec_of_blocks_and_angles(1, 0), vec![bool_array_tv(0)]),
                 ),
                 ArgsValidator { n_idx: 0 },
@@ -502,7 +502,7 @@ impl MakeOpDef for IcebergOpDef {
             .into(),
             measure_one_x => CustomValidator::new(
                 PolyFuncTypeRV::new(
-                    vec![TypeParam::max_nat_type(); 2],
+                    vec![TypeParam::max_nat_kind(); 2],
                     FuncValueType::new(
                         vec_of_blocks_and_angles(1, 0),
                         vec_of_blocks_and_bools(1, 1),
@@ -512,7 +512,7 @@ impl MakeOpDef for IcebergOpDef {
             )
             .into(),
             measure_one_x_d => PolyFuncTypeRV::new(
-                vec![TypeParam::max_nat_type()],
+                vec![TypeParam::max_nat_kind()],
                 FuncValueType::new(
                     vec_of_blocks_and_ints_and_angles(1, 1, 0),
                     vec_of_blocks_and_bools(1, 1),
@@ -521,7 +521,7 @@ impl MakeOpDef for IcebergOpDef {
             .into(),
             measure_one_z => CustomValidator::new(
                 PolyFuncTypeRV::new(
-                    vec![TypeParam::max_nat_type(); 2],
+                    vec![TypeParam::max_nat_kind(); 2],
                     FuncValueType::new(
                         vec_of_blocks_and_angles(1, 0),
                         vec_of_blocks_and_bools(1, 1),
@@ -531,7 +531,7 @@ impl MakeOpDef for IcebergOpDef {
             )
             .into(),
             measure_one_z_d => PolyFuncTypeRV::new(
-                vec![TypeParam::max_nat_type()],
+                vec![TypeParam::max_nat_kind()],
                 FuncValueType::new(
                     vec_of_blocks_and_ints_and_angles(1, 1, 0),
                     vec_of_blocks_and_bools(1, 1),

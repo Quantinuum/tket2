@@ -405,7 +405,7 @@ fn lowerer() -> ReplaceTypes {
                     unreachable!()
                 };
                 let size = size.as_nat().unwrap();
-                let elem_ty = elem_ty.as_runtime().unwrap();
+                let elem_ty = Type::try_from(elem_ty.clone()).unwrap();
                 if elem_ty.copyable() {
                     return Ok(None);
                 }
@@ -423,7 +423,7 @@ fn lowerer() -> ReplaceTypes {
                     unreachable!()
                 };
                 let size = size.as_nat().unwrap();
-                let elem_ty = elem_ty.as_runtime().unwrap();
+                let elem_ty = Type::try_from(elem_ty.clone()).unwrap();
                 if elem_ty.copyable() {
                     return Ok(None);
                 }
@@ -442,9 +442,13 @@ fn lowerer() -> ReplaceTypes {
             .get_op(GenericArrayOpDef::<BorrowArray>::get.opdef_id().as_str())
             .unwrap(),
         |args, rt| {
-            let [Term::BoundedNat(size), Term::Runtime(elem_ty)] = args else {
+            let [Term::BoundedNat(size), elem_term] = args else {
                 unreachable!()
             };
+            let Ok(elem_ty) = Type::try_from(elem_term.clone()) else {
+                unreachable!()
+            };
+
             if elem_ty.copyable() {
                 return Ok(None);
             }

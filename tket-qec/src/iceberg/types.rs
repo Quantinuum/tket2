@@ -36,7 +36,7 @@ fn extension() -> Arc<Extension> {
         extension
             .add_type(
                 BLOCK_TYPENAME,
-                vec![TypeParam::max_nat_type()],
+                vec![TypeParam::max_nat_kind()],
                 "logical iceberg block".to_owned(),
                 TypeBound::Linear.into(),
                 extension_ref,
@@ -57,7 +57,7 @@ pub fn block_tv(var_id: usize) -> Type {
             .unwrap()
             .instantiate(vec![TypeArg::new_var_use(
                 var_id,
-                TypeParam::max_nat_type(),
+                TypeParam::max_nat_kind(),
             )])
             .unwrap(),
     )

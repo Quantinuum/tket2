@@ -37,6 +37,17 @@ impl<H: HugrView> PytketEmitter<H> for PreludeEmitter {
             return self.tuple_op_to_pytket(node, op, &tuple_op, hugr, encoder);
         };
         if let Ok(_barrier) = BarrierDef::from_extension_op(op) {
+            // Check if the barrier has encodable types in its signature.
+            // If not, fallback to marking it as unsupported.
+            if hugr.signature(node).is_none_or(|sig| {
+                sig.input()
+                    .iter()
+                    .chain(sig.output().iter())
+                    .any(|ty| encoder.config().type_to_pytket(ty).is_none())
+            }) {
+                return Ok(EncodeStatus::Unsupported);
+            }
+
             encoder.emit_node(
                 PytketOptype::Barrier,
                 node,
@@ -99,10 +110,10 @@ impl PreludeEmitter {
                 }
 
                 for arg in elems {
-                    let TypeArg::Runtime(ty) = arg else {
+                    let Ok(ty) = arg.clone().try_into() else {
                         return Ok(EncodeStatus::Unsupported);
                     };
-                    let count = encoder.config().type_to_pytket(ty);
+                    let count = encoder.config().type_to_pytket(&ty);
                     if count.is_none_or(|c| c.params > 0) {
                         return Ok(EncodeStatus::Unsupported);
                     }

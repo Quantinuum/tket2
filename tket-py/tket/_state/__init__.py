@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from hugr.envelope import EnvelopeConfig
 from hugr.ext import ExtensionRegistry
+from tket_exts import tket_registry
 from .._tket import state as _state
 from .build import CircBuild, Command
 
@@ -25,6 +26,7 @@ TK1EncodeError = _state.TK1EncodeError
 
 if TYPE_CHECKING:
     from tket._rewrite import CircuitRewrite
+    from tket.util import PytketCircuitProto
 
 
 __all__ = [
@@ -63,7 +65,7 @@ class CompilationState:
     _py_extensions: ExtensionRegistry | None = None
 
     @staticmethod
-    def from_tket1(circ) -> CompilationState:
+    def from_tket1(circ: PytketCircuitProto) -> CompilationState:
         """Create a CompilationState from a legacy pytket Circuit."""
         return CompilationState(_inner=_state.CompilationState.from_tket1(circ))
 
@@ -97,11 +99,10 @@ class CompilationState:
         """Convert this CompilationState back to a python Hugr package."""
         # Convert the inner hugr to bytes and load it in Python.
         hugr_bytes = self._inner.to_bytes()
-        package = Package.from_bytes(hugr_bytes, self._py_extensions)
+        package = Package.from_bytes(hugr_bytes, tket_registry())
         if self._py_extensions is not None:
             # Resolve the extensions in the loaded package using the python registry, if needed.
-            # TODO: Use the `package.resolve_extensions` for clarity once it's been released in `hugr-py 0.16.0`.
-            package.used_extensions(self._py_extensions)
+            package.resolve_extensions(self._py_extensions)
         return package
 
     @staticmethod
@@ -192,6 +193,16 @@ class CompilationState:
         """Returns the number of operations in the circuit."""
         return self._inner.num_operations()
 
-    def to_tket1(self):
-        """Convert the program back to a legacy pytket Circuit."""
-        return self._inner.to_tket1()
+    try:
+        from pytket.circuit import Circuit as Tk1Circuit
+
+        def to_tket1(self) -> Tk1Circuit:
+            """Convert the program back to a legacy pytket Circuit."""
+            return self._inner.to_tket1()  # type: ignore[return-value]
+    except ImportError:
+        # Pytket is installed as an optional dependency under the `pytket`
+        # extra.
+        #
+        # If it's not available, trying to load a CompilationState back into a
+        # pytket Circuit would result in an ImportError.
+        pass

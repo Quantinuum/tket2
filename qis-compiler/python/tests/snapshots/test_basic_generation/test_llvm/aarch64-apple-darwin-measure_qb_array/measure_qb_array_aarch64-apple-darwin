@@ -393,47 +393,47 @@ loop_body.i:                                      ; preds = %__barray_check_boun
   tail call void @heap_free(ptr nonnull %.fca.1.extract81.i.i), !dbg !44
   br label %__barray_check_bounds.exit255
 
-cond_369_case_0:                                  ; preds = %cond_exit_369.thread
+cond_368_case_0:                                  ; preds = %cond_exit_368.thread
   %114 = load i64, ptr %71, align 4
   %115 = or i64 %114, -1024
   store i64 %115, ptr %71, align 4
   %116 = icmp eq i64 %115, -1
-  br i1 %116, label %cond_exit_369, label %mask_block_err.i
+  br i1 %116, label %cond_exit_368, label %mask_block_err.i
 
-cond_exit_369:                                    ; preds = %cond_369_case_0
+cond_exit_368:                                    ; preds = %cond_368_case_0
   tail call void @heap_free(ptr %70)
   tail call void @heap_free(ptr nonnull %71)
   ret void
 
-mask_block_err.i:                                 ; preds = %cond_369_case_0
+mask_block_err.i:                                 ; preds = %cond_368_case_0
   tail call void @panic(i32 1002, ptr nonnull @"e_Array cont.EFA5AC45.0")
   unreachable
 
-__barray_check_bounds.exit255:                    ; preds = %"__hugr__.guppylang.std.quantum.measure_array$10.149.exit", %cond_exit_369.thread
-  %"366_0.0279" = phi i64 [ 0, %"__hugr__.guppylang.std.quantum.measure_array$10.149.exit" ], [ %117, %cond_exit_369.thread ]
-  %117 = add nuw nsw i64 %"366_0.0279", 1
+__barray_check_bounds.exit255:                    ; preds = %"__hugr__.guppylang.std.quantum.measure_array$10.149.exit", %cond_exit_368.thread
+  %"365_0.0279" = phi i64 [ 0, %"__hugr__.guppylang.std.quantum.measure_array$10.149.exit" ], [ %117, %cond_exit_368.thread ]
+  %117 = add nuw nsw i64 %"365_0.0279", 1
   %118 = load i64, ptr %71, align 4
-  %119 = lshr i64 %118, %"366_0.0279"
+  %119 = lshr i64 %118, %"365_0.0279"
   %120 = trunc i64 %119 to i1
-  br i1 %120, label %cond_exit_369.thread, label %__barray_mask_borrow.exit259
+  br i1 %120, label %cond_exit_368.thread, label %__barray_mask_borrow.exit259
 
 __barray_mask_borrow.exit259:                     ; preds = %__barray_check_bounds.exit255
-  %121 = shl nuw nsw i64 1, %"366_0.0279", !dbg !12
+  %121 = shl nuw nsw i64 1, %"365_0.0279", !dbg !12
   %122 = xor i64 %118, %121, !dbg !12
   store i64 %122, ptr %71, align 4, !dbg !12
-  %123 = getelementptr inbounds nuw { i1, i64, i1 }, ptr %70, i64 %"366_0.0279"
+  %123 = getelementptr inbounds nuw { i1, i64, i1 }, ptr %70, i64 %"365_0.0279"
   %124 = load { i1, i64, i1 }, ptr %123, align 4
   %.fca.0.extract167 = extractvalue { i1, i64, i1 } %124, 0
-  br i1 %.fca.0.extract167, label %cond_392_case_1, label %cond_exit_369.thread
+  br i1 %.fca.0.extract167, label %cond_389_case_1, label %cond_exit_368.thread
 
-cond_exit_369.thread:                             ; preds = %cond_392_case_1, %__barray_mask_borrow.exit259, %__barray_check_bounds.exit255
+cond_exit_368.thread:                             ; preds = %cond_389_case_1, %__barray_mask_borrow.exit259, %__barray_check_bounds.exit255
   %exitcond = icmp eq i64 %117, 10
-  br i1 %exitcond, label %cond_369_case_0, label %__barray_check_bounds.exit255
+  br i1 %exitcond, label %cond_368_case_0, label %__barray_check_bounds.exit255
 
-cond_392_case_1:                                  ; preds = %__barray_mask_borrow.exit259
+cond_389_case_1:                                  ; preds = %__barray_mask_borrow.exit259
   %.fca.1.extract = extractvalue { i1, i64, i1 } %124, 1
   tail call void @___dec_future_refcount(i64 %.fca.1.extract)
-  br label %cond_exit_369.thread
+  br label %cond_exit_368.thread
 }
 
 declare ptr @heap_alloc(i64) local_unnamed_addr
@@ -504,9 +504,9 @@ attributes #0 = { noreturn }
 !28 = !DIFile(filename: "/Users/george.hodgkins/proj/clone-anduril/.venv/lib/python3.10/site-packages/guppylang/std/array.py", directory: "")
 !29 = !DISubroutineType(types: !30)
 !30 = !{!31, !33}
-!31 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ { ptr, ptr, i64 }, i64 }", file: !2, size: 32, align: 8, elements: !32)
+!31 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ { ptr, ptr, i64 }, i64 }", file: !2, size: 256, align: 8, elements: !32)
 !32 = !{!33, !36}
-!33 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ ptr, ptr, i64 }", file: !2, size: 24, align: 8, elements: !34)
+!33 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ ptr, ptr, i64 }", file: !2, size: 192, align: 8, elements: !34)
 !34 = !{!35, !35, !36}
 !35 = !DIBasicType(name: "ptr", size: 64, encoding: DW_ATE_address)
 !36 = !DIBasicType(name: "i64", size: 64, encoding: DW_ATE_unsigned)
@@ -521,10 +521,10 @@ attributes #0 = { noreturn }
 !45 = distinct !DISubprogram(name: "std.array.ArrayIter.__next__$qubit&10", linkageName: "__hugr__.guppylang.std.array.ArrayIter.__next__$qubit&10.202", scope: null, file: !28, line: 270, type: !46, scopeLine: 273, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
 !46 = !DISubroutineType(types: !47)
 !47 = !{!48, !31}
-!48 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ i1, { { { ptr, ptr, i64 }, i64 }, i64 } }", file: !2, size: 40, align: 8, elements: !49)
+!48 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ i1, { { { ptr, ptr, i64 }, i64 }, i64 } }", file: !2, size: 320, align: 8, elements: !49)
 !49 = !{!50, !51}
 !50 = !DIBasicType(name: "i1", size: 1, encoding: DW_ATE_unsigned)
-!51 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ { { ptr, ptr, i64 }, i64 }, i64 }", file: !2, size: 40, align: 8, elements: !52)
+!51 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ { { ptr, ptr, i64 }, i64 }, i64 }", file: !2, size: 320, align: 8, elements: !52)
 !52 = !{!31, !36}
 !53 = distinct !DILocation(line: 382, column: 37, scope: !38, inlinedAt: !42)
 !54 = !DILocation(line: 275, column: 50, scope: !45, inlinedAt: !53)

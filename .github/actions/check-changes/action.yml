@@ -14,13 +14,13 @@ description: Checks if any relevant files have changed in the current pull reque
 outputs:
   extensions:
     description: "The extension definitions have changed"
-    value: ${{ steps.override.outputs.out == 'true' || steps.change-filters.outputs.std-extensions == 'true' }}
+    value: ${{ steps.override.outputs.out == 'true' || steps.change-filters.outputs.extensions == 'true' }}
   rust:
     description: "Rust files have changed"
     value: ${{ steps.override.outputs.out == 'true' || steps.change-filters.outputs.rust == 'true' }}
   rust-core:
     description: "The main tket rust library has changed"
-    value: ${{ steps.override.outputs.out == 'true' || steps.change-filters.outputs.rust == 'true' }}
+    value: ${{ steps.override.outputs.out == 'true' || steps.change-filters.outputs.rust-core == 'true' }}
   python:
     description: "Python files have changed"
     value: ${{ steps.override.outputs.out == 'true' || steps.change-filters.outputs.python == 'true' }}

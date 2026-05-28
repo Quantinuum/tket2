@@ -48,7 +48,7 @@ pub static ref TKET1_EXTENSION: Arc<Extension>  = {
         res.add_op(
             TKET1_OP_NAME,
             "An opaque TKET1 operation.".into(),
-            Tk1Signature([TypeParam::StringType]),
+            Tk1Signature([TypeParam::StringKind]),
             ext_ref
         ).unwrap();
     })

@@ -48,7 +48,7 @@ declare void @___qfree(i64)
 !4 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "")
 !5 = !DISubroutineType(types: !6)
 !6 = !{!7, !10}
-!7 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ i1, i64, i1 }", file: !2, size: 8, align: 8, elements: !8)
+!7 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ i1, i64, i1 }", file: !2, size: 64, align: 8, elements: !8)
 !8 = !{!9, !10, !9}
 !9 = !DIBasicType(name: "i1", size: 1, encoding: DW_ATE_unsigned)
 !10 = !DIBasicType(name: "i64", size: 64, encoding: DW_ATE_unsigned)

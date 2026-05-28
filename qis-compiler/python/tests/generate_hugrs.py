@@ -1,9 +1,10 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#     "guppylang==0.21.9",
+#     "guppylang ==0.21.13",
 #     "guppylang-internals",
 #     "tket",
+#     "pytket >=2.1.0,<3",
 # ]
 # ///
 # TODO: point at re-released guppylang(-internals) once available with debug info. right

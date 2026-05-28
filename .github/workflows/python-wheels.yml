@@ -12,9 +12,8 @@ on:
   push:
     branches:
       - main
-  release:
-    types:
-      - published
+    tags:
+      - "tket-py-v*"
   workflow_dispatch:
 
 permissions:
@@ -23,7 +22,7 @@ permissions:
 env:
   MODULE_DIR: tket-py
   # Pinned version for the uv package manager
-  UV_VERSION: "0.9.7"
+  UV_VERSION: "0.11.15"
   UV_FROZEN: 1
   # Python version used to build the wheels
   # We use abi3-compatible building, so this still supports newer Python versions
@@ -34,7 +33,7 @@ env:
 
 jobs:
   # Check if the tag matches the package name,
-  # or if the workflow is running on a non-release event.
+  # or if the workflow is running on a non-tag event.
   check-tag:
     name: Check tag
     runs-on: ubuntu-latest
@@ -46,7 +45,7 @@ jobs:
         run: |
           echo "run=$SHOULD_RUN" >> $GITHUB_OUTPUT
         env:
-          SHOULD_RUN: ${{ github.event_name != 'release' || ( github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/tket-py-v') ) }}
+          SHOULD_RUN: ${{ github.ref_type != 'tag' || startsWith(github.ref, 'refs/tags/tket-py-v') }}
 
   build:
     name: ${{ matrix.platform.target }}
@@ -97,7 +96,7 @@ jobs:
             test-wheels: true
     steps:
       - uses: actions/checkout@v6
-      - uses: mozilla-actions/sccache-action@v0.0.9
+      - uses: mozilla-actions/sccache-action@v0.0.10
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -157,7 +156,8 @@ jobs:
             --strip
 
       - name: Build free-threaded wheels
-        # TODO: pytket is a required dependency of tket-py, but it doesn't build free-threaded wheels yet
+        # TODO: Waiting for hugr 0.16.1 / 0.17.0 to release python 3.14 free-threaded wheels.
+        # <https://github.com/Quantinuum/hugr/pull/3021>
         if: false
         shell: bash
         run: |
@@ -257,7 +257,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: mozilla-actions/sccache-action@v0.0.9
+      - uses: mozilla-actions/sccache-action@v0.0.10
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
         with:
@@ -282,7 +282,7 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    if: ${{ (github.event_name == 'release' && github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/tket-py-v') ) || (github.event_name == 'workflow_dispatch' && github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/tket-py-v') ) }}
+    if: ${{ github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/tket-py-v') }}
     needs: [build, sdist]
     environment: release
     permissions:
@@ -293,10 +293,23 @@ jobs:
       # Used to generate artifact attestation
       attestations: write
     steps:
+      - name: Check if the tag has an associated release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view ${{ github.ref_name }}
+          if [ $? -ne 0 ]; then
+            echo "No release found for tag ${{ github.ref_name }}"
+            exit 1
+          fi
       - uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: 'dist/*'
       - name: Report
         run: |
           echo "Publishing to PyPI..."
@@ -309,3 +322,12 @@ jobs:
         with:
           verbose: true
           skip-existing: true
+
+      - name: Upload wheels to the release and un-draft it
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Upload wheels to the release assets
+          gh release upload ${{ github.ref_name }} dist/*
+          # Un-draft the release on GitHub now that the package has been published to PyPI
+          gh release edit ${{ github.ref_name }} --draft=false

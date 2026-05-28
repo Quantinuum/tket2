@@ -224,9 +224,9 @@ impl MakeOpDef for RuntimeBarrierDef {
 
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         PolyFuncType::new(
-            [TypeParam::max_nat_type()],
+            [TypeParam::max_nat_kind()],
             Signature::new_endo(vec![
-                array_type_parametric(TypeArg::new_var_use(0, TypeParam::max_nat_type()), qb_t())
+                array_type_parametric(TypeArg::new_var_use(0, TypeParam::max_nat_kind()), qb_t())
                     .unwrap(),
             ]),
         )

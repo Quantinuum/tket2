@@ -2,6 +2,7 @@ from pathlib import Path
 
 from .optimiser import BadgerOptimiser
 from .state import CompilationState
+from ..passes import inline_funcs
 from hugr.passes.scope import PassScope, GlobalScope
 
 class CircuitChunks:
@@ -41,6 +42,14 @@ def normalize_guppy(
     - inline_dfgs: Whether to inline DFG operations.
     - remove_redundant_order_edges: Whether to remove redundant order edges.
     """
+
+def inline_functions(
+    circ: CompilationState,
+    *,
+    heuristic: inline_funcs.InlineFuncsHeuristic = inline_funcs.MaxSize(64),
+    scope: PassScope = GlobalScope.PRESERVE_PUBLIC,
+) -> None:
+    """Inline acyclic function calls below the selected scope."""
 
 def greedy_depth_reduce(circ: CompilationState) -> int:
     """Greedy depth reduction of a circuit.
@@ -88,4 +97,22 @@ def resolve_modifiers(
 
     :param circ: The input program as a CompilationState.
     :param scope: A scope to control how the pass is applied to HUGR regions.
+    """
+
+def qsystem_rebase_pass(
+    circ: CompilationState,
+    constant_fold: bool = True,
+    monomorphize: bool = True,
+    force_order: bool = True,
+    lazify: bool = True,
+    hide_funcs: bool = True,
+    scope: PassScope | None = None,
+) -> None:
+    """Runs a rust backed pass to convert quantum ops to qsystem ops.
+
+    :param constant_fold: Whether to perform constant folding.
+    :param monomorphize: Whether to monomorphize generic functions.
+    :param force_order: Whether to enforce total ordering of all HUGR operations.
+    :param lazify: Whether to replace measurements with lazy measurements.
+    :param hide_funcs: Make all HUGR functions private.
     """
