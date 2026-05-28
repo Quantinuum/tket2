@@ -1,0 +1,72 @@
+# /// script
+# requires-python = ">=3.13"
+# dependencies = [
+#     "guppylang @ git+https://github.com/Quantinuum/guppylang.git@na/1637-allow-unitary-flag-with-higher-order-function#subdirectory=guppylang",
+# ]
+# ///
+"""A simple controlled gate using modifiers"""
+
+from pathlib import Path
+from sys import argv
+import sys
+
+from guppylang import array, guppy
+from guppylang.std.builtins import (
+    Controllable,
+    Daggerable,
+    PowerControllable,
+    Unitary,
+    control,
+    dagger,
+    owned,
+    power,
+)
+from guppylang.std.debug import state_result
+from guppylang.std.quantum import discard, discard_array, qubit, angle
+from guppylang.std.quantum import h, x, rx, s
+
+from hugr.hugr.render import RenderConfig
+
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+
+from guppylang.experimental import enable_experimental_features
+
+enable_experimental_features()
+
+
+@guppy(unitary=True)
+def apply(f: Unitary[[qubit], None], q: qubit) -> None:
+    apply1(f, q)
+
+
+@guppy(unitary=True)
+def apply1(f: Unitary[[qubit], None], q: qubit) -> None:
+    apply2(f, q)
+
+
+@guppy(unitary=True)
+def apply2(f: Unitary[[qubit], None], q: qubit) -> None:
+    f(q)
+
+
+@guppy
+def main() -> None:
+    q = qubit()
+    c = qubit()
+    h(c)
+
+    with control(c), dagger:
+        apply(s, q)
+        apply(h, q)
+
+    state_result("r", c, q)
+    discard(q)
+    discard(c)
+
+
+program = main.compile()
+# program.modules[0].render_dot(
+#     RenderConfig(display_node_id=True, max_node_label_length=None)
+# ).render(f"{Path(argv[0]).stem}", directory=Path(argv[0]).parent, cleanup=True)
+
+Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())

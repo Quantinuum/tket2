@@ -1,6 +1,8 @@
 //! Modify nodes related to function calls.
+use std::collections::HashSet;
+
 use hugr::{
-    IncomingPort, Wire,
+    IncomingPort, PortIndex, Wire,
     builder::{BuildError, Dataflow},
     core::HugrNode,
     extension::simple_op::MakeExtensionOp,
@@ -38,14 +40,40 @@ impl<N: HugrNode> ModifierResolver<N> {
             return Ok(());
         };
 
-        let mut poly_sig = call.func_sig.clone();
+        // Modified higher-order functions may require some function-valued
+        // inputs to be supplied already modified. When the caller provides a
+        // static LoadFunction, solve that modifier here and wire the modified
+        // load directly into the new call.
+        let input_modifiers = self.function_input_modifiers(new_callee).to_vec();
+        let OpType::FuncDefn(new_callee_defn) = h.get_optype(new_callee) else {
+            return Err(ModifierResolverErrors::unreachable(format!(
+                "Modified callee is not a function definition: {}",
+                h.get_optype(new_callee)
+            )));
+        };
+        let poly_sig = new_callee_defn.signature().clone();
         let type_args = call.type_args.clone();
-        self.modify_signature(poly_sig.body_mut(), false);
         let new_call = Call::try_new(poly_sig, type_args).map_err(BuildError::from)?;
         let new_call_fn_port = new_call.called_function_port();
         let new_call_node = new_dfg.add_child_node(new_call);
 
         self.call_map_insert(new_callee, (new_call_node, new_call_fn_port));
+        let skip_inputs = input_modifiers
+            .iter()
+            .map(|(input, _)| *input)
+            .collect::<HashSet<_>>();
+        for (input, modifiers) in input_modifiers {
+            self.modify_loaded_function_argument(
+                h,
+                call_node,
+                input,
+                modifiers,
+                new_call_node,
+                offset,
+                new_dfg,
+            )?;
+        }
+
         // wire the controls
         let mut controls = self.pack_controls(new_dfg)?;
         for (i, control) in controls.iter_mut().enumerate() {
@@ -56,15 +84,114 @@ impl<N: HugrNode> ModifierResolver<N> {
         }
         let controls = self.unpack_controls(new_dfg, controls)?;
         *self.controls() = controls;
-        // wire the inputs/outputs - we use the original signature here because the information about the controller is already in the offset
-        self.wire_node_inout(
-            call_node,
-            new_call_node,
+
+        // Wire the inputs/outputs using the original signature; controller
+        // information is already represented by `offset`. Inputs handled above
+        // are skipped so connect_all will not also wire the original function
+        // value into the call.
+        // self.wire_node_inout_skipping_inputs(
+        //     call_node,
+        //     new_call_node,
+        //     (old_signature.input.iter(), old_signature.output.iter()),
+        //     (0, 0, offset),
+        //     &skip_inputs,
+        // )?;
+        self.wire_inout(
+            (call_node, call_node),
+            (new_call_node, new_call_node),
             (old_signature.input.iter(), old_signature.output.iter()),
             (0, 0, offset),
+            &skip_inputs,
         )?;
 
         Ok(())
+    }
+
+    fn modify_loaded_function_argument(
+        &mut self,
+        h: &mut impl HugrMut<Node = N>,
+        call_node: N,
+        input: usize,
+        modifiers: crate::modifier::CombinedModifier,
+        new_call_node: hugr::Node,
+        input_offset: usize,
+        new_dfg: &mut impl Dataflow,
+    ) -> Result<(), ModifierResolverErrors<N>> {
+        if modifiers.power {
+            return Err(ModifierResolverErrors::unresolvable(
+                call_node,
+                "Cannot statically resolve powered higher-order argument.".to_string(),
+                h.get_optype(call_node).clone(),
+            ));
+        }
+
+        let saved_modifiers = std::mem::replace(self.modifiers_mut(), modifiers);
+        let result = (|| {
+            let source = h.single_linked_output(call_node, input).ok_or_else(|| {
+                ModifierResolverErrors::unreachable(format!(
+                    "Call input {input} has no source while resolving higher-order modifier."
+                ))
+            })?;
+            let trace = self
+                .trace_modifiers_chain(h, source.0)
+                .map_err(ModifierResolverErrors::ModifierError)?;
+            let targ = trace.last().cloned().ok_or_else(|| {
+                ModifierResolverErrors::unreachable(
+                    "Higher-order modifier argument trace was empty.".to_string(),
+                )
+            })?;
+            if matches!(h.get_optype(targ), OpType::Input(_)) {
+                // The argument is another higher-order input of the function
+                // currently being rewritten, so this call cannot solve the
+                // requirement yet. Propagate it to callers and wire the input
+                // through with its modified type.
+                let target_port = if trace.len() == 1 {
+                    source.1
+                } else {
+                    h.single_linked_output(trace[trace.len() - 2], 0)
+                        .ok_or_else(|| {
+                            ModifierResolverErrors::unreachable(
+                                "Higher-order modifier argument trace ended at an input without an input port."
+                                    .to_string(),
+                            )
+                        })?
+                        .1
+                };
+                let modifiers = self.modifiers().clone();
+                self.dynamic_input_modifiers()
+                    .push((target_port.index(), modifiers));
+                self.map_insert(
+                    (call_node, IncomingPort::from(input)).into(),
+                    (new_call_node, IncomingPort::from(input + input_offset)).into(),
+                )?;
+                return Ok(());
+            }
+            let (func, load) = Self::get_loaded_function(h, call_node, targ, h.get_optype(targ))
+                .map_err(ModifierResolverErrors::ModifierError)?;
+
+            let modified_fn = match self.modify_fn_if_needed(h, func)? {
+                Some(node) => node,
+                None => self.modify_fn(h, func)?,
+            };
+
+            let mut modified_sig = load.func_sig.clone();
+            self.modify_signature(modified_sig.body_mut(), false);
+            let load =
+                LoadFunction::try_new(modified_sig, load.type_args).map_err(BuildError::from)?;
+            let new_load = new_dfg.add_child_node(load);
+            self.call_map_insert(modified_fn, (new_load, IncomingPort::from(0)));
+            new_dfg
+                .hugr_mut()
+                .connect(new_load, 0, new_call_node, input + input_offset);
+            self.map_insert_none((call_node, IncomingPort::from(input)).into())?;
+
+            for node in trace {
+                self.forget_node(h, node)?;
+            }
+            Ok(())
+        })();
+        *self.modifiers_mut() = saved_modifiers;
+        result
     }
 
     /// Apply the collected chain of modifiers to the function loaded by the `LoadFunction` node.
@@ -83,7 +210,6 @@ impl<N: HugrNode> ModifierResolver<N> {
             .last()
             .cloned()
             .ok_or(ModifierError::NoTarget(modifier_node))?;
-
         // The function to apply the modifier to. This is expected to be a LoadFunction node
         let (func, load) = Self::get_loaded_function(h, modifier_node, targ, h.get_optype(targ))?;
 
@@ -198,6 +324,14 @@ impl<N: HugrNode> ModifierResolver<N> {
             .trace_modifiers_chain(h, chain_tail.0)
             .map_err(wrap_err)?;
         let targ = trace.last().cloned().unwrap();
+        // If the target is a function input, we cannot solve the modifier chain here.
+        // Instead, we record the modifiers to be applied to that input and propagate
+        // the requirement to callers.
+        if matches!(h.get_optype(targ), OpType::Input(_)) {
+            *self.modifiers_mut() = modifiers;
+            return self.modify_input_indirect_call(n, chain_tail.1.index(), indir_call, new_dfg);
+        }
+
         let (func, load) =
             Self::get_loaded_function(h, n, targ, h.get_optype(targ)).map_err(wrap_err)?;
 
@@ -247,6 +381,50 @@ impl<N: HugrNode> ModifierResolver<N> {
         for node in trace {
             self.forget_node(h, node)?
         }
+
+        Ok(())
+    }
+
+    fn modify_input_indirect_call(
+        &mut self,
+        n: N,
+        function_input: usize,
+        indir_call: &CallIndirect,
+        new_dfg: &mut impl Dataflow,
+    ) -> Result<(), ModifierResolverErrors<N>> {
+        let mut new_call = indir_call.clone();
+        self.modify_signature(&mut new_call.signature, false);
+        let new_call_node = new_dfg.add_child_node(new_call);
+
+        // The callee is a function input, so there is no LoadFunction to solve
+        // inside this body. Record that callers of the generated function must
+        // pass a statically modified value for this input, then call that input
+        // directly in the rewritten body.
+        let modifiers = self.modifiers().clone();
+        self.dynamic_input_modifiers()
+            .push((function_input, modifiers));
+        self.map_insert(
+            (n, IncomingPort::from(0)).into(),
+            (new_call_node, IncomingPort::from(0)).into(),
+        )?;
+
+        let mut controls = self.pack_controls(new_dfg)?;
+        let offset = self.modifiers().accum_ctrl.len();
+        for (i, ctrl) in controls.iter_mut().enumerate() {
+            new_dfg
+                .hugr_mut()
+                .connect(ctrl.node(), ctrl.source(), new_call_node, i + 1);
+            *ctrl = Wire::new(new_call_node, i);
+        }
+        *self.controls() = self.unpack_controls(new_dfg, controls)?;
+
+        let signature = indir_call.signature();
+        self.wire_node_inout(
+            n,
+            new_call_node,
+            (signature.input.iter().skip(1), signature.output.iter()),
+            (1, 0, offset),
+        )?;
 
         Ok(())
     }

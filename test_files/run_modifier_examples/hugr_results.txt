@@ -318,6 +318,21 @@ gate_in_ctrl_solved:
 	00 -> 0.7071+0j
 	11 -> 0.7071+0j
 -----
+higher_order_function_w_array_solved:
+	000 -> 0.7071+0j
+	100 -> 0.5+0j
+	111 -> 0-0.5j
+-----
+higher_order_function_w_loops_solved:
+	00 -> 0.7071+0j
+	10 -> 0.4619-0.1913j
+	11 -> -0.4619-0.1913j
+-----
+higher_order_recursive_solved:
+	00 -> 0.7071+0j
+	10 -> 0.5+0j
+	11 -> 0-0.5j
+-----
 modify_array_solved:
 	000 -> 0.7071+0j
 	100 -> 0.5+0j

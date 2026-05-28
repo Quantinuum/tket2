@@ -1,0 +1,74 @@
+# /// script
+# requires-python = ">=3.13"
+# dependencies = [
+#     "guppylang @ git+https://github.com/Quantinuum/guppylang.git@na/1637-allow-unitary-flag-with-higher-order-function#subdirectory=guppylang",
+# ]
+# ///
+"""A simple controlled gate using modifiers"""
+
+from pathlib import Path
+from sys import argv
+import sys
+
+from guppylang import guppy
+from guppylang.std.builtins import (
+    Controllable,
+    Unitary,
+    array,
+    control,
+    dagger,
+)
+from guppylang.std.debug import state_result
+from guppylang.std.quantum import discard_array, qubit, angle, rz
+from guppylang.std.quantum import h, rx
+
+
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+
+from guppylang.experimental import enable_experimental_features
+
+enable_experimental_features()
+
+
+@guppy(unitary=True)
+def apply_r(f: Unitary[[qubit, angle], None], q: array[qubit, 2], angle: angle) -> None:
+    f(q[1], angle)
+
+
+@guppy(control=True)
+def apply_c(
+    f: Controllable[[qubit], None], g: Unitary[[qubit, angle], None], q: qubit, b: bool
+) -> None:
+    n = 3
+    if b:
+        while n > 0:
+            f(q)
+            n -= 1
+    else:
+        for _ in range(2):
+            g(q, angle(0.5))
+
+
+@guppy
+def main() -> None:
+    qs: array[qubit, 2] = array(qubit(), qubit())
+    h(qs[0])
+    flag = 2 > 10
+    with control(qs[0]):
+        apply_c(h, rx, qs[1], True)
+        apply_c(h, rx, qs[1], flag)
+
+    with control(qs[0]), dagger:
+        apply_r(rz, qs, angle(0.25))
+        apply_r(rz, qs, angle(0.5))
+
+    state_result("r", qs[0], qs[1])
+    discard_array(qs)
+
+
+program = main.compile()
+# program.modules[0].render_dot(
+#     RenderConfig(display_node_id=True, max_node_label_length=None)
+# ).render(f"{Path(argv[0]).stem}", directory=Path(argv[0]).parent, cleanup=True)
+
+Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
