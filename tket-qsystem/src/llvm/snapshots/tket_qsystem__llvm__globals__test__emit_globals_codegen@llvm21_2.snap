@@ -7,17 +7,20 @@ source_filename = "test_context"
 
 @__globals__.my_global = global { i1, i16 } { i1 false, i16 poison }
 
-define internal i1 @_hl.main.1(ptr %0, i1 %1) {
+define internal { i1, i16 } @_hl.main.1(ptr %0, i1 %1, i16 %2) {
 alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
   %start_value = load { i1, i16 }, ptr @__globals__.my_global, align 2
-  %2 = extractvalue { i1, i16 } %start_value, 1
-  %call_func = call { i1, i16 } %0(i1 %1, i16 %2)
-  %3 = extractvalue { i1, i16 } %call_func, 0
-  %4 = extractvalue { i1, i16 } %call_func, 1
-  %5 = insertvalue { i1, i16 } { i1 true, i16 poison }, i16 %4, 1
-  store { i1, i16 } %5, ptr @__globals__.my_global, align 2
-  ret i1 %3
+  %3 = extractvalue { i1, i16 } %start_value, 1
+  %call_func = call { i1, i16, i16 } %0(i16 %3, i1 %1, i16 %2)
+  %4 = extractvalue { i1, i16, i16 } %call_func, 0
+  %5 = extractvalue { i1, i16, i16 } %call_func, 1
+  %6 = extractvalue { i1, i16, i16 } %call_func, 2
+  %7 = insertvalue { i1, i16 } { i1 true, i16 poison }, i16 %5, 1
+  store { i1, i16 } %7, ptr @__globals__.my_global, align 2
+  %mrv = insertvalue { i1, i16 } poison, i1 %4, 0
+  %mrv8 = insertvalue { i1, i16 } %mrv, i16 %6, 1
+  ret { i1, i16 } %mrv8
 }

@@ -23,15 +23,9 @@ class GlobalsExtension(TketExtension):
     def OPS(self) -> List[OpDef]:
         """Return the operations defined by this extension"""
         return [
-            self.swap_def,
             self.with_def,
             self.map_def,
         ]
-
-    @functools.cached_property
-    def swap_def(self) -> OpDef:
-        """Swap the contents of the named global variable with the argument."""
-        return self().get_op("swap")
 
     @functools.cached_property
     def with_def(self) -> OpDef:
@@ -43,12 +37,13 @@ class GlobalsExtension(TketExtension):
         """Map a function over the contents of the named global variable."""
         return self().get_op("map")
 
-    def swap(self, name: str, ty: Type) -> ExtOp:
-        """Swap the contents of the named global variable with the argument."""
-        return self().get_op("swap").instantiate([StringArg(name), TypeTypeArg(ty)])
-
     def with_op(
-        self, name: str, ty_arg: TypeArg, inputs: List[Type], outputs: List[Type]
+        self,
+        name: str,
+        ty_arg: TypeArg,
+        inputs: List[Type],
+        outputs: List[Type],
+        impl_outputs: List[Type],
     ) -> ExtOp:
         return (
             self()
@@ -59,11 +54,19 @@ class GlobalsExtension(TketExtension):
                     ty_arg,
                     ListArg([TypeTypeArg(t) for t in inputs]),
                     ListArg([TypeTypeArg(t) for t in outputs]),
+                    ListArg([TypeTypeArg(t) for t in impl_outputs]),
                 ]
             )
         )
 
-    def map(self, name: str, ty_arg: TypeArg, inputs, outputs) -> ExtOp:
+    def map(
+        self,
+        name: str,
+        ty_arg: TypeArg,
+        inputs: List[Type],
+        outputs: List[Type],
+        impl_outputs: List[Type],
+    ) -> ExtOp:
         return (
             self()
             .get_op("map")
@@ -73,6 +76,7 @@ class GlobalsExtension(TketExtension):
                     ty_arg,
                     ListArg([TypeTypeArg(t) for t in inputs]),
                     ListArg([TypeTypeArg(t) for t in outputs]),
+                    ListArg([TypeTypeArg(t) for t in impl_outputs]),
                 ]
             )
         )

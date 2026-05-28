@@ -76,11 +76,12 @@ def ext_globals() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
         ext,
         [],
         [
-            ext.swap("test-name", bool_t),
             ext.with_op(
-                "test-name", bool_t.type_arg(), [bool_t, bool_t], [bool_t, bool_t]
+                "test-name", bool_t.type_arg(), [bool_t, bool_t], [bool_t, bool_t], []
             ),
-            ext.map("test-name", bool_t.type_arg(), [bool_t, bool_t], [bool_t, bool_t]),
+            ext.map(
+                "test-name", bool_t.type_arg(), [bool_t, bool_t], [bool_t, bool_t], []
+            ),
         ],
     )
 

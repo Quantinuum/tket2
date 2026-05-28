@@ -51,12 +51,13 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
             ty_arg,
             inputs,
             outputs,
+            impl_outputs,
         } => {
             let sym = format!("{PREFIX}.{name}");
             // TODO handle error if unwrap fails
             let sym_ty = context.llvm_sum_type(option_type([ty_arg.as_runtime().unwrap()]))?;
 
-            let [func, func_args @ .., init_global_value] = &args.inputs[..] else {
+            let [init_global_value, func, func_args @ ..] = &args.inputs[..] else {
                 bail!("No function provided as input for GlobalsOp::With")
             };
 
@@ -79,8 +80,12 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
 
             let real_args = func_args.iter().copied().map_into().collect_vec();
             let func_ptr = PointerValue::try_from(*func).unwrap();
+
+            let mut out_types = outputs.iter().cloned().collect_vec();
+            out_types.extend(impl_outputs.iter().cloned().map_into());
+
             let hugr_func_ty: Signature =
-                FuncValueType::new(inputs.clone(), outputs.clone()).try_into()?;
+                FuncValueType::new(inputs.clone(), out_types).try_into()?;
             let func_ty = context.llvm_func_type(&hugr_func_ty)?;
 
             let func_call =
@@ -94,20 +99,21 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
 
             let _ = builder.build_store(global.as_pointer_value(), start_value)?;
 
-            let call_results =
+            let mut call_results =
                 deaggregate_call_result(builder, func_call, hugr_func_ty.output.len())?;
 
-            let mut results = call_results;
-            results.push(end_value);
+            let explicit_outputs_len = outputs.len();
+            call_results.insert(explicit_outputs_len, end_value);
 
             // Return results from function
-            args.outputs.finish(builder, results)?
+            args.outputs.finish(builder, call_results)?
         }
         GlobalsOp::Map {
             name,
             ty_arg,
             inputs,
             outputs,
+            impl_outputs,
         } => {
             let sym = format!("{PREFIX}.{name}");
             // TODO handle error if unwrap fails
@@ -132,20 +138,12 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
             let start_value =
                 builder.build_load(sym_ty.clone(), global.as_pointer_value(), "start_value")?;
             let start_value = sym_ty.value(start_value)?;
-            let start_value = start_value.build_untag(builder, 1)?;
+            let start_value = start_value.build_untag(builder, 1)?[0];
 
-            // real_args should be [*func_args, global]
-            let mut real_args: Vec<BasicMetadataValueEnum> = func_args
-                .iter()
-                .copied()
-                .map_into::<BasicMetadataValueEnum>()
-                .collect_vec();
-            real_args.extend(
-                start_value
-                    .iter()
-                    .copied()
-                    .map_into::<BasicMetadataValueEnum>(),
-            );
+            // real_args should be [global, *func_args]
+            let mut real_args: Vec<BasicMetadataValueEnum> =
+                func_args.iter().copied().map_into().collect_vec();
+            real_args.insert(0, start_value.into());
 
             let func_ptr = PointerValue::try_from(*func)
                 .map_err(|e| anyhow::anyhow!("Invalid function pointer provided to Map: {e:?}"))?;
@@ -158,10 +156,13 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
             };
 
             let mut in_types = inputs.iter().cloned().collect_vec();
-            in_types.push(global_ty_base.clone().into());
+            in_types.insert(0, global_ty_base.clone().into());
 
             let mut out_types = outputs.iter().cloned().collect_vec();
             out_types.push(global_ty_base.clone().into());
+            out_types.extend(impl_outputs.iter().cloned().map_into());
+
+            let global_position = outputs.len();
 
             let hugr_func_ty = FuncValueType::new(in_types, out_types).try_into()?;
             let func_ty = context.llvm_func_type(&hugr_func_ty)?;
@@ -172,15 +173,18 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
             let call_results =
                 deaggregate_call_result(builder, func_call, hugr_func_ty.output.len())?;
 
-            let [results @ .., end_value] = &call_results[..] else {
+            let (explicit_returns, rest) = call_results.split_at(global_position);
+            let [end_value, implicit_returns @ ..] = &rest else {
                 bail!("Global '{sym}' was not returned from function call")
             };
+
+            let mut results = explicit_returns.to_vec();
+            results.extend_from_slice(implicit_returns);
 
             let end_value = sym_ty.build_tag(builder, 1, vec![*end_value])?;
             let _ = builder.build_store(global.as_pointer_value(), end_value)?;
 
-            args.outputs
-                .finish(builder, results.iter().copied().map_into().collect_vec())?
+            args.outputs.finish(builder, results)?
         }
     }
 
@@ -213,10 +217,10 @@ mod test {
 
     #[rstest::rstest]
     #[case::with(1,
-        GlobalsOp::With{ name: "my_global".to_string(), ty_arg: qb_t().into(), inputs: [bool_t(), qb_t()].into(), outputs: [bool_t(), qb_t()].into() }
+        GlobalsOp::With{ name: "my_global".to_string(), ty_arg: qb_t().into(), inputs: [bool_t(), qb_t()].into(), outputs: [bool_t()].into(), impl_outputs: [qb_t()].into() }
     )]
     #[case::map(2,
-        GlobalsOp::Map{ name: "my_global".to_string(), ty_arg: qb_t().into(), inputs: [bool_t()].into(), outputs: [bool_t()].into() }
+        GlobalsOp::Map{ name: "my_global".to_string(), ty_arg: qb_t().into(), inputs: [bool_t(), qb_t()].into(), outputs: [bool_t()].into(), impl_outputs: [qb_t()].into() }
     )]
     fn emit_globals_codegen(
         #[case] _i: i32,

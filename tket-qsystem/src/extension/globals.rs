@@ -35,10 +35,12 @@ lazy_static::lazy_static! {
     pub static ref TYPE_PARAM: TypeParam = TypeParam::RuntimeType(TypeBound::Linear);
 
     /// The [TypeParam] of various types and ops specifying the input signature of a function.
-    pub static ref INPUTS_PARAM: TypeParam =
-    TypeParam::ListType(Box::new(TypeBound::Linear.into()));
-    /// The [TypeParam] of various types and ops specifying the output signature of a function.
+    pub static ref INPUTS_PARAM: TypeParam = TypeParam::ListType(Box::new(TypeBound::Linear.into()));
+    /// The [TypeParam] of various types and ops specifying the explicit output signature of a function.
     pub static ref OUTPUTS_PARAM: TypeParam = TypeParam::ListType(Box::new(TypeBound::Linear.into()));
+
+    /// The [TypeParam] of various types and ops specifying the implicit output signature of a function.
+    pub static ref IMPL_OUTPUTS_PARAM: TypeParam = TypeParam::ListType(Box::new(TypeBound::Linear.into()));
 }
 
 #[derive(
@@ -76,20 +78,22 @@ impl MakeOpDef for GlobalsOpDef {
                 let global_ty = TypeRV::new_var_use(1, TypeBound::Linear);
                 let input_row = TypeRV::new_row_var_use(2, TypeBound::Linear);
                 let output_row = TypeRV::new_row_var_use(3, TypeBound::Linear);
+                let impl_output_row = TypeRV::new_row_var_use(4, TypeBound::Linear);
                 let func_ty = TypeRV::new_function(FuncValueType::new(
                     [input_row.clone()],
-                    [output_row.clone()],
+                    [output_row.clone(), impl_output_row.clone()],
                 ));
                 PolyFuncTypeRV::new(
                     [
                         NAME_PARAM.to_owned(),
                         TYPE_PARAM.to_owned(),
                         INPUTS_PARAM.to_owned(),
+                        IMPL_OUTPUTS_PARAM.to_owned(),
                         OUTPUTS_PARAM.to_owned(),
                     ],
                     FuncValueType::new(
-                        [func_ty, input_row, global_ty.clone()],
-                        [output_row, global_ty.clone()],
+                        [global_ty.clone(), func_ty, input_row],
+                        [output_row, global_ty.clone(), impl_output_row],
                     ),
                 )
                 .into()
@@ -98,9 +102,14 @@ impl MakeOpDef for GlobalsOpDef {
                 let global_ty = TypeRV::new_var_use(1, TypeBound::Linear);
                 let input_row = TypeRV::new_row_var_use(2, TypeBound::Linear);
                 let output_row = TypeRV::new_row_var_use(3, TypeBound::Linear);
+                let impl_output_row = TypeRV::new_row_var_use(4, TypeBound::Linear);
                 let func_ty = TypeRV::new_function(FuncValueType::new(
-                    [input_row.clone(), global_ty.clone()],
-                    [output_row.clone(), global_ty.clone()],
+                    [global_ty.clone(), input_row.clone()],
+                    [
+                        output_row.clone(),
+                        global_ty.clone(),
+                        impl_output_row.clone(),
+                    ],
                 ));
                 PolyFuncTypeRV::new(
                     [
@@ -108,8 +117,9 @@ impl MakeOpDef for GlobalsOpDef {
                         TYPE_PARAM.to_owned(),
                         INPUTS_PARAM.to_owned(),
                         OUTPUTS_PARAM.to_owned(),
+                        IMPL_OUTPUTS_PARAM.to_owned(),
                     ],
-                    FuncValueType::new([func_ty, input_row], [output_row]),
+                    FuncValueType::new([func_ty, input_row], [output_row, impl_output_row]),
                 )
                 .into()
             }
@@ -146,12 +156,14 @@ pub enum GlobalsOp {
         ty_arg: TypeArg,
         inputs: TypeRowRV,
         outputs: TypeRowRV,
+        impl_outputs: TypeRowRV,
     },
     Map {
         name: String,
         ty_arg: TypeArg,
         inputs: TypeRowRV,
         outputs: TypeRowRV,
+        impl_outputs: TypeRowRV,
     },
 }
 
@@ -177,12 +189,14 @@ impl MakeExtensionOp for GlobalsOp {
                 ty_arg,
                 inputs,
                 outputs,
+                impl_outputs,
             } => {
                 vec![
                     TypeArg::String(name.clone()),
                     ty_arg.clone(),
                     inputs.clone().into(),
                     outputs.clone().into(),
+                    impl_outputs.clone().into(),
                 ]
             }
             Self::Map {
@@ -190,12 +204,14 @@ impl MakeExtensionOp for GlobalsOp {
                 ty_arg,
                 inputs,
                 outputs,
+                impl_outputs,
             } => {
                 vec![
                     TypeArg::String(name.clone()),
                     ty_arg.clone(),
                     inputs.clone().into(),
                     outputs.clone().into(),
+                    impl_outputs.clone().into(),
                 ]
             }
         }
@@ -234,6 +250,12 @@ impl HasConcrete for GlobalsOpDef {
                 type_: Box::new(OUTPUTS_PARAM.to_owned()),
             }))?
         };
+        let Ok(impl_outputs) = TypeRowRV::try_from(type_args[4].clone()) else {
+            Err(SignatureError::from(TermTypeError::TypeMismatch {
+                term: Box::new(type_args[4].clone()),
+                type_: Box::new(IMPL_OUTPUTS_PARAM.to_owned()),
+            }))?
+        };
 
         match self {
             Self::with => Ok(GlobalsOp::With {
@@ -241,12 +263,14 @@ impl HasConcrete for GlobalsOpDef {
                 ty_arg: ty_arg.clone(),
                 inputs,
                 outputs,
+                impl_outputs,
             }),
             Self::map => Ok(GlobalsOp::Map {
                 name,
                 ty_arg: ty_arg.clone(),
                 inputs,
                 outputs,
+                impl_outputs,
             }),
         }
     }
