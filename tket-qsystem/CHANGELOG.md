@@ -1,6 +1,28 @@
 # Changelog
 
 
+## [0.25.0](https://github.com/Quantinuum/tket2/compare/tket-qsystem-v0.24.0...tket-qsystem-v0.25.0) - 2026-05-28
+
+### Bug Fixes
+
+- Multiple fixes to the pytket encoder ([#1566](https://github.com/Quantinuum/tket2/pull/1566))
+- [**breaking**] Replace non-deterministic iterations on hash maps ([#1582](https://github.com/Quantinuum/tket2/pull/1582))
+
+### New Features
+
+- expose the QSystemPass to Python ([#1556](https://github.com/Quantinuum/tket2/pull/1556))
+- upgrade to hugr v0.27.1 ([#1568](https://github.com/Quantinuum/tket2/pull/1568))
+- [**breaking**] Ignore empty circuits when encoding Hugr regions into pytket ([#1562](https://github.com/Quantinuum/tket2/pull/1562))
+- *(qsystem)* [**breaking**] multiple platform extensions ([#1567](https://github.com/Quantinuum/tket2/pull/1567))
+
+### Refactor
+
+- [**breaking**] Deprecate commands iterator ([#1611](https://github.com/Quantinuum/tket2/pull/1611))
+
+### Testing
+
+- Pin guppy version in example files, fix test ([#1534](https://github.com/Quantinuum/tket2/pull/1534))
+
 ## [0.24.0](https://github.com/Quantinuum/tket2/compare/tket-qsystem-v0.23.0...tket-qsystem-v0.24.0) - 2026-04-02
 
 ### Bug Fixes

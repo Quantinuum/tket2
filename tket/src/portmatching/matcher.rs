@@ -277,8 +277,9 @@ impl PatternMatcher {
     ) -> impl Iterator<Item = PatternMatch> + 'a {
         let checker = SchedGraphChecker::new(circuit.sched_graph());
         circuit
-            .commands()
-            .flat_map(move |cmd| self.find_rooted_matches(circuit, cmd.node(), &checker))
+            .toposorted_children(circuit.parent())
+            .expect("circuit entrypoint should be dataflow region")
+            .flat_map(move |node| self.find_rooted_matches(circuit, node, &checker))
     }
 
     /// Find all convex pattern matches in a circuit.and collect in to a vector

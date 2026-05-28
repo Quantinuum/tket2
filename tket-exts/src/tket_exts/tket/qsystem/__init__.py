@@ -1,9 +1,12 @@
 """QSystem extension operations."""
 
 import functools
+import warnings
 from typing import List
 
+from .helios import QSystemHeliosExtension
 from .random import QSystemRandomExtension
+from .sol import QSystemSolExtension
 from .utils import QSystemUtilsExtension
 
 from hugr.ext import Extension, OpDef, TypeDef
@@ -11,15 +14,31 @@ from hugr.ops import ExtOp
 from hugr.tys import BoundedNatArg
 from .._util import TketExtension, load_extension
 
-__all__ = ["QSystemRandomExtension", "QSystemUtilsExtension", "QSystemExtension"]
+__all__ = [
+    "QSystemHeliosExtension",
+    "QSystemRandomExtension",
+    "QSystemSolExtension",
+    "QSystemUtilsExtension",
+]
 
 
 class QSystemExtension(TketExtension):
-    """QSystem extension operations."""
+    """Deprecated: use :class:`QSystemHeliosExtension` or :class:`QSystemSolExtension` instead.
+
+    The combined ``tket.qsystem`` extension has been split into platform-specific
+    extensions. Use ``tket_exts.qsystem_helios`` or ``tket_exts.qsystem_sol`` instead.
+    """
 
     @functools.cache
     def __call__(self) -> Extension:
         """Returns the qsystem extension"""
+        warnings.warn(
+            "QSystemExtension (tket.qsystem) is deprecated. "
+            "Use QSystemHeliosExtension (tket.qsystem.helios) or "
+            "QSystemSolExtension (tket.qsystem.sol) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return load_extension("tket.qsystem")
 
     def TYPES(self) -> List[TypeDef]:

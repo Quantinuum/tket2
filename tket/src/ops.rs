@@ -241,6 +241,10 @@ impl TketOp {
 }
 
 /// Whether an op is a given TketOp.
+#[deprecated(
+    since = "0.19.0",
+    note = "Use `op.cast::<TketOp>() == Some(TketOp::...)` instead"
+)]
 pub fn op_matches(op: &OpType, tket_op: TketOp) -> bool {
     op.to_string() == tket_op.exposed_name()
 }
@@ -350,7 +354,7 @@ pub fn symbolic_constant_op(arg: String) -> OpType {
 }
 
 #[cfg(test)]
-pub(crate) mod test {
+pub mod test {
 
     use std::str::FromStr;
     use std::sync::Arc;
@@ -362,15 +366,14 @@ pub(crate) mod test {
     use hugr::types::Signature;
     use hugr::{CircuitUnit, HugrView, type_row};
     use itertools::Itertools;
-    use rstest::{fixture, rstest};
     use strum::IntoEnumIterator;
 
     use super::TketOp;
     use crate::Pauli;
-    use crate::circuit::Circuit;
     use crate::extension::measurement::MeasurementOp;
     use crate::extension::{TKET_EXTENSION as EXTENSION, TKET_EXTENSION_ID as EXTENSION_ID};
     use crate::utils::build_simple_circuit;
+
     fn get_opdef(op: TketOp) -> Option<&'static Arc<OpDef>> {
         EXTENSION.get_op(&op.op_id())
     }
@@ -381,22 +384,6 @@ pub(crate) mod test {
         for o in TketOp::iter() {
             assert_eq!(TketOp::from_def(get_opdef(o).unwrap()), Ok(o));
         }
-    }
-
-    #[fixture]
-    pub(crate) fn t2_bell_circuit() -> Circuit {
-        let h = build_simple_circuit(2, |circ| {
-            circ.append(TketOp::H, [0])?;
-            circ.append(TketOp::CX, [0, 1])?;
-            Ok(())
-        });
-
-        h.unwrap()
-    }
-
-    #[rstest]
-    fn check_t2_bell(t2_bell_circuit: Circuit) {
-        assert_eq!(t2_bell_circuit.commands().count(), 2);
     }
 
     #[test]
@@ -417,8 +404,7 @@ pub(crate) mod test {
         })
         .unwrap();
 
-        // 6 commands: alloc, reset, cx, measure, free
-        assert_eq!(h.commands().count(), 5);
+        assert_eq!(h.count_ops(|op| op.cast::<TketOp>().is_some()), 5);
     }
 
     #[test]

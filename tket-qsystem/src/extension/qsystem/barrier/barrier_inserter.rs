@@ -16,7 +16,7 @@ use tket::passes::replace_types::ReplaceTypes;
 use tket::passes::utils::unpack_container::type_unpack::{TypeUnpacker, is_array_of};
 
 use crate::extension::qsystem::{
-    LowerTk2Error,
+    LowerTk2Error, QSystemPlatform,
     barrier::wrapped_barrier::{WrappedBarrierBuilder, build_runtime_barrier_op},
 };
 use tket::passes::utils::unpack_container::UnpackContainerBuilder;
@@ -34,14 +34,17 @@ pub struct BarrierInserter {
     barrier_builder: WrappedBarrierBuilder,
     /// Container operation factory for generic unpacking/repacking
     container_unpacker: UnpackContainerBuilder,
+    /// Platform to lower for
+    platform: QSystemPlatform,
 }
 
 impl BarrierInserter {
     /// Create a new BarrierInserter instance
-    pub fn new() -> Self {
+    pub fn new(platform: QSystemPlatform) -> Self {
         Self {
-            barrier_builder: WrappedBarrierBuilder::new(),
+            barrier_builder: WrappedBarrierBuilder::new(platform),
             container_unpacker: UnpackContainerBuilder::new(TypeUnpacker::for_qubits()),
+            platform,
         }
     }
 
@@ -85,7 +88,7 @@ impl BarrierInserter {
         // TODO if other array type, convert
 
         // Build and insert the barrier
-        Some(match build_runtime_barrier_op(size) {
+        Some(match build_runtime_barrier_op(size, self.platform) {
             Ok(barr_hugr) => {
                 let insert = InsertCut::new(parent, vec![target], barr_hugr);
                 insert.apply_hugr_mut(hugr).map(|_| ()).map_err(Into::into)
@@ -202,7 +205,7 @@ impl BarrierInserter {
 
 impl Default for BarrierInserter {
     fn default() -> Self {
-        Self::new()
+        Self::new(QSystemPlatform::Helios)
     }
 }
 
@@ -214,6 +217,7 @@ mod tests {
         ops::handle::NodeHandle,
         std_extensions::collections::array::array_type,
     };
+    use rstest::rstest;
 
     use super::*;
 
@@ -231,15 +235,17 @@ mod tests {
         Ok((h, barrier_node.node()))
     }
 
-    #[test]
-    fn test_barrier_insertion() -> Result<(), LowerTk2Error> {
+    #[rstest]
+    #[case(QSystemPlatform::Helios)]
+    #[case(QSystemPlatform::Sol)]
+    fn test_barrier_insertion(#[case] platform: QSystemPlatform) -> Result<(), LowerTk2Error> {
         let (mut hugr, barrier_node) = create_test_hugr().unwrap();
         let barrier = hugr.get_optype(barrier_node).as_extension_op().unwrap();
 
         let barrier = Barrier::from_extension_op(barrier).unwrap();
 
         let node_count_before = hugr.num_nodes();
-        let mut inserter = BarrierInserter::new();
+        let mut inserter = BarrierInserter::new(platform);
         inserter.insert_runtime_barrier(&mut hugr, barrier_node, barrier)?;
 
         // Verify the barrier was inserted
@@ -252,8 +258,10 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn test_qubit_array_barrier() -> Result<(), LowerTk2Error> {
+    #[rstest]
+    #[case(QSystemPlatform::Helios)]
+    #[case(QSystemPlatform::Sol)]
+    fn test_qubit_array_barrier(#[case] platform: QSystemPlatform) -> Result<(), LowerTk2Error> {
         // Create a dataflow graph with a qubit array as input and output
         let array_size = 3;
         let array_ty = array_type(array_size, qb_t());
@@ -274,7 +282,7 @@ mod tests {
 
         let barrier = Barrier::from_extension_op(barrier).unwrap();
 
-        let mut inserter = BarrierInserter::new();
+        let mut inserter = BarrierInserter::new(platform);
         inserter.insert_runtime_barrier(&mut hugr, barrier_node.node(), barrier)?;
 
         // The array shortcut should have been used
@@ -282,8 +290,10 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn test_empty_barrier() -> Result<(), LowerTk2Error> {
+    #[rstest]
+    #[case(QSystemPlatform::Helios)]
+    #[case(QSystemPlatform::Sol)]
+    fn test_empty_barrier(#[case] platform: QSystemPlatform) -> Result<(), LowerTk2Error> {
         let mut builder = DFGBuilder::new(Signature::new_endo(vec![]))?;
 
         // Create a barrier with no qubits
@@ -299,7 +309,7 @@ mod tests {
         let barrier = Barrier::from_extension_op(barrier).unwrap();
         let node_count_before = hugr.num_nodes();
 
-        let mut inserter = BarrierInserter::new();
+        let mut inserter = BarrierInserter::new(platform);
         inserter.insert_runtime_barrier(&mut hugr, barrier_node.node(), barrier)?;
 
         // Check that no nodes were added
@@ -312,9 +322,11 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn test_build_packing_hugr() -> Result<(), LowerTk2Error> {
-        let mut inserter = BarrierInserter::new();
+    #[rstest]
+    #[case(QSystemPlatform::Helios)]
+    #[case(QSystemPlatform::Sol)]
+    fn test_build_packing_hugr(#[case] platform: QSystemPlatform) -> Result<(), LowerTk2Error> {
+        let mut inserter = BarrierInserter::new(platform);
 
         // Test with mixed types: qubit, bool, qubit array
         let array_size = 2;
@@ -336,6 +348,7 @@ mod tests {
         let BarrierInserter {
             barrier_builder: op_factory,
             container_unpacker: container_factory,
+            platform: _,
         } = inserter;
         assert_eq!(
             op_factory.into_function_map().len() + container_factory.into_function_map().len(),

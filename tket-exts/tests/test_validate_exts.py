@@ -61,8 +61,8 @@ def ext_measurement() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
     )
 
 
-def ext_qsystem() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
-    ext = tket_exts.qsystem
+def ext_qsystem_helios() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
+    ext = tket_exts.qsystem_helios
     return (
         ext,
         [],
@@ -78,6 +78,28 @@ def ext_qsystem() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
             ext.try_QAlloc,
             ext.ZZPhase,
             ext.future_to_measure,
+        ],
+    )
+
+
+def ext_qsystem_sol() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
+    ext = tket_exts.qsystem_sol
+    return (
+        ext,
+        [],
+        [
+            ext.lazy_measure,
+            ext.lazy_measure_leaked,
+            ext.lazy_measure_reset,
+            ext.measure,
+            ext.measure_reset,
+            ext.phasedX,
+            ext.phasedXX,
+            ext.qFree,
+            ext.reset,
+            ext.runtime_barrier(1),
+            ext.Rz,
+            ext.try_QAlloc,
         ],
     )
 
@@ -193,7 +215,8 @@ def ext_wasm() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
         ext_guppy,
         ext_futures,
         ext_measurement,
-        ext_qsystem,
+        ext_qsystem_helios,
+        ext_qsystem_sol,
         ext_qsystem_random,
         ext_qsystem_utils,
         ext_quantum,

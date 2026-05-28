@@ -16,6 +16,8 @@ use tket::serialize::TKETDecode;
 use tket::serialize::pytket::{DecodeOptions, EncodeOptions};
 use tket::{Circuit, TketOp};
 use tket_json_rs::circuit_json::SerialCircuit;
+use tket_qsystem::QSystemPlatform;
+use tket_qsystem::pytket::{qsystem_decoder_config, qsystem_encoder_config};
 
 use crate::ops::PyTketOp;
 use crate::rewrite::PyCircuitRewrite;
@@ -47,7 +49,7 @@ impl CompilationState {
     pub fn from_tket1(circ: &Bound<PyAny>) -> anyhow::Result<Self> {
         let hugr = SerialCircuit::from_tket1(circ)?
             .decode(
-                DecodeOptions::new().with_config(tket_qsystem::pytket::qsystem_decoder_config()),
+                DecodeOptions::new().with_config(qsystem_decoder_config(QSystemPlatform::Helios)),
             )
             .context("Could not decode a CompilationState from a pytket circuit")?;
         Ok(CompilationState { hugr })
@@ -57,7 +59,7 @@ impl CompilationState {
     pub fn to_tket1<'py>(&self, py: Python<'py>) -> anyhow::Result<Bound<'py, PyAny>> {
         let serial = SerialCircuit::encode(
             &self.hugr,
-            EncodeOptions::new().with_config(tket_qsystem::pytket::qsystem_encoder_config()),
+            EncodeOptions::new().with_config(qsystem_encoder_config(QSystemPlatform::Helios)),
         )?;
         let pytket = serial.to_tket1(py)?;
         Ok(pytket.into_any())

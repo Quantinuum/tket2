@@ -1,6 +1,6 @@
 //! Modifier for dataflow blocks.
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     iter, mem,
 };
 
@@ -15,7 +15,7 @@ use hugr::{
     hugr::hugrmut::HugrMut,
     ops::{Call, Conditional, DFG, DataflowBlock, DataflowOpTrait, OpType, TailLoop},
     std_extensions::collections::array::ArrayOpBuilder,
-    types::{FuncTypeBase, TypeArg, TypeRow},
+    types::{EdgeKind, FuncTypeBase, TypeArg, TypeRow},
 };
 use petgraph::visit::{Topo, Walker};
 
@@ -142,10 +142,8 @@ impl<N: HugrNode> ModifierResolver<N> {
                     other_outputs: output,
                     sum_rows: _sum_rows,
                 } = dfb;
-                let offset = self.control_num();
 
-                // The wire for sum_rows always corresponds directly.
-                // Therefore, this wire is handled separately.
+                // The branch sum is unchanged.
                 self.map_insert(
                     (old_out, IncomingPort::from(0)).into(),
                     (new_out, IncomingPort::from(0)).into(),
@@ -154,7 +152,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                     (old_out, old_in),
                     (new_out, new_in),
                     (output.iter(), input.iter()),
-                    (1, 0, offset),
+                    (1, 0, 0),
                 )?;
             }
             OpType::Case(_) => {
@@ -185,7 +183,12 @@ impl<N: HugrNode> ModifierResolver<N> {
             OpType::FuncDefn(_fndefn) => {
                 self.unpack_controls(new_dfg, new_dfg.input_wires())?
             }
-            OpType::DFG(_) | OpType::DataflowBlock(_) => new_dfg.input_wires().take(self.control_num()).collect(),
+            OpType::DFG(_) => new_dfg.input_wires().take(self.control_num()).collect(),
+            OpType::DataflowBlock(dfb) => new_dfg
+                .input_wires()
+                .skip(dfb.inputs.len())
+                .take(self.control_num())
+                .collect(),
             OpType::TailLoop(tail_loop) => {
                 let just_input_num = tail_loop.just_inputs.len();
                 new_dfg
@@ -250,11 +253,20 @@ impl<N: HugrNode> ModifierResolver<N> {
                         .connect(ctrl.node(), ctrl.source(), out_node, i);
                 }
             }
-            OpType::TailLoop(_) | OpType::DataflowBlock(_) => {
+            OpType::TailLoop(_) => {
                 for (i, ctrl) in controls.iter().enumerate() {
                     new_dfg
                         .hugr_mut()
                         .connect(ctrl.node(), ctrl.source(), out_node, i + 1);
+                }
+            }
+            OpType::DataflowBlock(dfb) => {
+                // Port 0 is the branch sum. Controls are threaded after block data.
+                let offset = 1 + dfb.other_outputs.len();
+                for (i, ctrl) in controls.iter().enumerate() {
+                    new_dfg
+                        .hugr_mut()
+                        .connect(ctrl.node(), ctrl.source(), out_node, i + offset);
                 }
             }
             optype => {
@@ -429,10 +441,26 @@ impl<N: HugrNode> ModifierResolver<N> {
         parent_dfg: &mut impl Container,
         builder: impl Container,
     ) -> Result<Node, ModifierResolverErrors<N>> {
+        // Only local function-port targets should be remapped into the parent.
+        let remap_targets = self
+            .call_map()
+            .values()
+            .flatten()
+            .filter(|(node, port)| {
+                builder.hugr().contains_node(*node)
+                    && builder.hugr().num_inputs(*node) > port.index()
+                    && matches!(
+                        builder.hugr().get_optype(*node).port_kind(*port),
+                        Some(EdgeKind::Function(_))
+                    )
+            })
+            .copied()
+            .collect::<HashSet<_>>();
         let insertion_result = parent_dfg.add_hugr_view(builder.hugr());
 
         let insertion_correspondence = insertion_result.node_map;
-        let new_call_map = update_call_map(self.call_map(), &insertion_correspondence);
+        let new_call_map =
+            update_call_map_preserve(self.call_map(), &insertion_correspondence, &remap_targets);
         *self.call_map() = new_call_map;
 
         Ok(insertion_result.inserted_entrypoint)
@@ -542,28 +570,22 @@ impl<N: HugrNode> ModifierResolver<N> {
         let just_input_num = tail_loop.just_inputs.len();
         let just_output_num = tail_loop.just_outputs.len();
 
-        // TailLoop cannot be daggered as long as it is not the one generated from Power modifier.
-        // Every TailLoop that is generated from Power cannot have `just_outputs`.
-        if self.modifiers.dagger && !tail_loop.just_outputs.is_empty() {
+        if self.modifiers.dagger {
             let optype = h.get_optype(n);
             return Err(ModifierResolverErrors::unresolvable(
                 n,
-                "tail loop with outputs cannot be daggered.".to_string(),
+                "TailLoop cannot be daggered.".to_string(),
                 optype.clone(),
             ));
         }
-        // TODO: Handle the case when TailLoop is generated from `Power` modifier.
-        // Currently, it is not implemented.
-        if self.modifiers.dagger {
-            unimplemented!("Dagger for TailLoop is not supported yet.");
-        }
 
         // Build a new TailLoop with modified body.
+        let control_types: TypeRow = iter::repeat_n(qb_t(), self.control_num())
+            .collect::<Vec<_>>()
+            .into();
         let mut builder = TailLoopBuilder::new(
             tail_loop.just_inputs.clone(),
-            tail_loop
-                .rest
-                .extend(iter::repeat_n(&qb_t(), self.control_num())),
+            control_types.extend(tail_loop.rest.iter()),
             tail_loop.just_outputs.clone(),
         )?;
         self.modify_dfg_body(h, n, &mut builder)?;
@@ -701,8 +723,8 @@ impl<N: HugrNode> ModifierResolver<N> {
 
 /// composition of two call maps
 fn update_call_map<A, B, C, D>(
-    f: &HashMap<A, Vec<(B, C)>>,
-    g: &HashMap<B, D>,
+    call_map: &HashMap<A, Vec<(B, C)>>,
+    inserted_node_map: &HashMap<B, D>,
 ) -> HashMap<A, Vec<(D, C)>>
 where
     A: Clone + Eq + std::hash::Hash,
@@ -710,20 +732,54 @@ where
     C: Clone,
     D: Clone,
 {
-    f.iter()
+    call_map
+        .iter()
         .filter_map(|(a, targets)| {
             let targets = targets
                 .iter()
-                .filter_map(|(b, c)| g.get(b).map(|d| (d.clone(), c.clone())))
+                .filter_map(|(b, c)| inserted_node_map.get(b).map(|d| (d.clone(), c.clone())))
                 .collect::<Vec<_>>();
             (!targets.is_empty()).then(|| (a.clone(), targets))
         })
         .collect()
 }
 
+/// Remaps call-map targets that were inserted from `inserted_node_map`, preserving existing parent targets.
+fn update_call_map_preserve<A, C>(
+    call_map: &HashMap<A, Vec<(Node, C)>>,
+    inserted_node_map: &HashMap<Node, Node>,
+    remap_targets: &HashSet<(Node, C)>,
+) -> HashMap<A, Vec<(Node, C)>>
+where
+    A: Clone + Eq + std::hash::Hash,
+    C: Clone + Eq + std::hash::Hash,
+{
+    call_map
+        .iter()
+        .map(|(caller, targets)| {
+            let targets = targets
+                .iter()
+                .filter_map(|(target_node, port)| {
+                    if remap_targets.contains(&(*target_node, port.clone())) {
+                        inserted_node_map
+                            .get(target_node)
+                            .copied()
+                            .map(|remapped_node| (remapped_node, port.clone()))
+                    } else {
+                        Some((*target_node, port.clone()))
+                    }
+                })
+                .collect::<Vec<_>>();
+            (caller.clone(), targets)
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod test {
-    use super::super::tests::{SetUnitary, resolved_modifier_test_hugr, test_modifier_resolver};
+    use super::super::tests::{
+        SetUnitary, modifier_test_hugr, resolved_modifier_test_hugr, test_modifier_resolver,
+    };
     use super::super::*;
     use crate::TketOp;
     use crate::extension::{
@@ -875,6 +931,136 @@ mod test {
             };
             let exit = cfg.exit_block();
             cfg.branch(&bb, 0, &exit).unwrap();
+            cfg.finish_sub_container().unwrap()
+        };
+        inputs[0] = cfg.outputs().next().unwrap();
+
+        *func.finish_with_outputs(inputs).unwrap().handle()
+    }
+
+    // A CFG with two sequential blocks
+    fn foo_cfg_two_blocks(module: &mut ModuleBuilder<Hugr>, t_num: usize) -> FuncID<true> {
+        let foo_sig = Signature::new_endo(iter::repeat_n(qb_t(), t_num).collect::<Vec<_>>());
+        let mut func = module.define_function("foo", foo_sig.clone()).unwrap();
+        func.set_unitary();
+        let mut inputs: Vec<_> = func.input_wires().collect();
+
+        let cfg = {
+            let mut cfg = func
+                .cfg_builder(vec![(qb_t(), inputs[0])], [qb_t()].into())
+                .unwrap();
+            let entry = {
+                let mut bb = cfg
+                    .entry_builder(vec![type_row![]], [qb_t()].into())
+                    .unwrap();
+                let q = bb.input_wires().next().unwrap();
+                let q = bb.add_dataflow_op(TketOp::X, vec![q]).unwrap().out_wire(0);
+                let tag = bb.make_sum(0, [type_row![]], []).unwrap();
+                bb.finish_with_outputs(tag, [q]).unwrap()
+            };
+            let second = {
+                let mut bb = cfg
+                    .block_builder([qb_t()].into(), vec![type_row![]], [qb_t()].into())
+                    .unwrap();
+                let q = bb.input_wires().next().unwrap();
+                let q = bb.add_dataflow_op(TketOp::X, vec![q]).unwrap().out_wire(0);
+                let tag = bb.make_sum(0, [type_row![]], []).unwrap();
+                bb.finish_with_outputs(tag, [q]).unwrap()
+            };
+            let exit = cfg.exit_block();
+            cfg.branch(&entry, 0, &second).unwrap();
+            cfg.branch(&second, 0, &exit).unwrap();
+            cfg.finish_sub_container().unwrap()
+        };
+        inputs[0] = cfg.outputs().next().unwrap();
+
+        *func.finish_with_outputs(inputs).unwrap().handle()
+    }
+
+    // A CFG with branching into two blocks, which then join back together.
+    fn foo_cfg_branching(module: &mut ModuleBuilder<Hugr>, t_num: usize) -> FuncID<true> {
+        let foo_sig = Signature::new_endo(iter::repeat_n(qb_t(), t_num).collect::<Vec<_>>());
+        let mut func = module.define_function("foo", foo_sig.clone()).unwrap();
+        func.set_unitary();
+        let mut inputs: Vec<_> = func.input_wires().collect();
+
+        let cfg = {
+            let mut cfg = func
+                .cfg_builder(vec![(qb_t(), inputs[0])], [qb_t()].into())
+                .unwrap();
+            let entry = {
+                let mut bb = cfg
+                    .entry_builder(vec![type_row![], type_row![]], [qb_t()].into())
+                    .unwrap();
+                let q = bb.input_wires().next().unwrap();
+                let tag = bb.make_sum(0, [type_row![], type_row![]], []).unwrap();
+                bb.finish_with_outputs(tag, [q]).unwrap()
+            };
+            let left = {
+                let mut bb = cfg
+                    .block_builder([qb_t()].into(), vec![type_row![]], [qb_t()].into())
+                    .unwrap();
+                let q = bb.input_wires().next().unwrap();
+                let q = bb.add_dataflow_op(TketOp::X, vec![q]).unwrap().out_wire(0);
+                let tag = bb.make_sum(0, [type_row![]], []).unwrap();
+                bb.finish_with_outputs(tag, [q]).unwrap()
+            };
+            let right = {
+                let mut bb = cfg
+                    .block_builder([qb_t()].into(), vec![type_row![]], [qb_t()].into())
+                    .unwrap();
+                let q = bb.input_wires().next().unwrap();
+                let q = bb.add_dataflow_op(TketOp::X, vec![q]).unwrap().out_wire(0);
+                let tag = bb.make_sum(0, [type_row![]], []).unwrap();
+                bb.finish_with_outputs(tag, [q]).unwrap()
+            };
+            let exit = cfg.exit_block();
+            cfg.branch(&entry, 0, &left).unwrap();
+            cfg.branch(&entry, 1, &right).unwrap();
+            cfg.branch(&left, 0, &exit).unwrap();
+            cfg.branch(&right, 0, &exit).unwrap();
+            cfg.finish_sub_container().unwrap()
+        };
+        inputs[0] = cfg.outputs().next().unwrap();
+
+        *func.finish_with_outputs(inputs).unwrap().handle()
+    }
+
+    fn foo_cfg_loop(module: &mut ModuleBuilder<Hugr>, t_num: usize) -> FuncID<true> {
+        let foo_sig = Signature::new_endo(iter::repeat_n(qb_t(), t_num).collect::<Vec<_>>());
+        let mut func = module.define_function("foo", foo_sig.clone()).unwrap();
+        func.set_unitary();
+        let mut inputs: Vec<_> = func.input_wires().collect();
+
+        let cfg = {
+            let mut cfg = func
+                .cfg_builder(vec![(qb_t(), inputs[0])], [qb_t()].into())
+                .unwrap();
+            let entry = {
+                let mut bb = cfg
+                    .entry_builder(vec![type_row![]], [qb_t()].into())
+                    .unwrap();
+                let q = bb.input_wires().next().unwrap();
+                let tag = bb.make_sum(0, [type_row![]], []).unwrap();
+                bb.finish_with_outputs(tag, [q]).unwrap()
+            };
+            let loop_block = {
+                let mut bb = cfg
+                    .block_builder(
+                        [qb_t()].into(),
+                        vec![type_row![], type_row![]],
+                        [qb_t()].into(),
+                    )
+                    .unwrap();
+                let q = bb.input_wires().next().unwrap();
+                let q = bb.add_dataflow_op(TketOp::X, vec![q]).unwrap().out_wire(0);
+                let tag = bb.make_sum(1, [type_row![], type_row![]], []).unwrap();
+                bb.finish_with_outputs(tag, [q]).unwrap()
+            };
+            let exit = cfg.exit_block();
+            cfg.branch(&entry, 0, &loop_block).unwrap();
+            cfg.branch(&loop_block, 0, &loop_block).unwrap();
+            cfg.branch(&loop_block, 1, &exit).unwrap();
             cfg.finish_sub_container().unwrap()
         };
         inputs[0] = cfg.outputs().next().unwrap();
@@ -1037,6 +1223,9 @@ mod test {
     #[case::conditional_dagger(1, 1, foo_conditional, true)]
     #[case::cfg(1, 1, foo_cfg, false)]
     #[case::cfg_dagger(1, 1, foo_cfg, true)]
+    #[case::cfg_two_blocks(1, 1, foo_cfg_two_blocks, false)]
+    #[case::cfg_branching(1, 1, foo_cfg_branching, false)]
+    #[case::cfg_loop(1, 1, foo_cfg_loop, false)]
     #[case::array_ops(4, 0, foo_array_ops, false)]
     #[case::array_ops_dagger(4, 0, foo_array_ops, true)]
     #[case::safe_array_ops(4, 0, foo_safe_array_ops, false)]
@@ -1050,6 +1239,49 @@ mod test {
         #[case] dagger: bool,
     ) {
         test_modifier_resolver(t_num, c_num, foo, dagger);
+    }
+
+    fn assert_unresolvable_message(
+        h: &mut Hugr,
+        expected: &str,
+    ) -> Result<(), ModifierResolverErrors> {
+        let entrypoint = h.entrypoint();
+        match resolve_modifier_with_entrypoints(h, [entrypoint]) {
+            Err(ModifierResolverErrors::UnResolvable { msg, .. }) => {
+                assert_eq!(msg, expected);
+                Ok(())
+            }
+            Err(err) => Err(err),
+            Ok(()) => Err(ModifierResolverErrors::unreachable(
+                "Expected modifier resolution to fail.".to_string(),
+            )),
+        }
+    }
+
+    #[rstest::rstest]
+    #[case::cfg_branching(
+        1,
+        1,
+        foo_cfg_branching,
+        "CFG with more than one node cannot be daggered."
+    )]
+    #[case::cfg_loop(1, 1, foo_cfg_loop, "CFG with more than one node cannot be daggered.")]
+    #[case::tail_loop(1, 1, foo_tail_loop, "TailLoop cannot be daggered.")]
+    #[case::cfg_two_blocks_dagger(
+        1,
+        1,
+        foo_cfg_two_blocks,
+        "CFG with more than one node cannot be daggered."
+    )]
+
+    fn test_dagger_rejects_cfg_with_control_flow(
+        #[case] t_num: usize,
+        #[case] c_num: u64,
+        #[case] foo: fn(&mut ModuleBuilder<Hugr>, usize) -> FuncID<true>,
+        #[case] expected: &str,
+    ) {
+        let (mut h, _) = modifier_test_hugr(t_num, c_num, foo, true);
+        assert_matches!(assert_unresolvable_message(&mut h, expected), Ok(()));
     }
 
     #[test]
