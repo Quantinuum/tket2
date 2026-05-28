@@ -1290,8 +1290,6 @@ fn encoded_circuit_roundtrip(
 
     let encoded = EncodedCircuit::new(&hugr, encode_options).unwrap_or_else(|e| panic!("{e}"));
 
-    println!("Encoded circuit info: {encoded:#?}");
-
     assert_eq!(encoded.len(), num_circuits);
 
     let mut deser = hugr.clone();
