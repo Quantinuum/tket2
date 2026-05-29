@@ -59,8 +59,4 @@ def main() -> None:
 
 
 program = main.compile()
-# program.modules[0].render_dot(
-#     RenderConfig(display_node_id=True, max_node_label_length=None)
-# ).render(f"{Path(argv[0]).stem}", directory=Path(argv[0]).parent, cleanup=True)
-
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
