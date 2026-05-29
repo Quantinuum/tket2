@@ -165,13 +165,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         // information is already represented by `offset`. Inputs handled above
         // are skipped so connect_all will not also wire the original function
         // value into the call.
-        // self.wire_node_inout_skipping_inputs(
-        //     call_node,
-        //     new_call_node,
-        //     (old_signature.input.iter(), old_signature.output.iter()),
-        //     (0, 0, offset),
-        //     &skip_inputs,
-        // )?;
         self.wire_inout(
             (call_node, call_node),
             (new_call_node, new_call_node),
