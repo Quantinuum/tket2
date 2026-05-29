@@ -433,9 +433,10 @@ impl<N: HugrNode> ModifierResolver<N> {
             )));
         };
 
-        let mut poly_sig = fn_defn.signature().clone();
-        self.modify_signature(poly_sig.body_mut(), false);
-        let instantiate = poly_sig
+        let poly_sig = fn_defn.signature().clone();
+        let mut wrapper_sig = poly_sig.clone();
+        self.modify_signature(wrapper_sig.body_mut(), false);
+        let instantiate = wrapper_sig
             .instantiate(type_args)
             .map_err(|e| ModifierResolverErrors::BuildError(e.into()))?;
 
@@ -457,7 +458,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         for i in 0..offset {
             builder.hugr_mut().connect(in_node, i, out_node, i);
         }
-        for i in 0..builder.hugr().num_inputs(call_node) {
+        for i in 0..call_port.index() {
             builder
                 .hugr_mut()
                 .connect(in_node, i + offset, call_node, i);

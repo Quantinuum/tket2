@@ -10,7 +10,7 @@ use hugr::{
     ops::{Call, CallIndirect, DataflowOpTrait, LoadFunction, OpType},
 };
 
-use super::{ModifierError, ModifierResolver, ModifierResolverErrors};
+use super::{ModifierError, ModifierFlags, ModifierResolver, ModifierResolverErrors};
 use crate::extension::modifier::Modifier;
 
 impl<N: HugrNode> ModifierResolver<N> {
@@ -128,10 +128,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                 let (func, load) =
                     Self::get_loaded_function(h, call_node, targ, h.get_optype(targ))
                         .map_err(ModifierResolverErrors::ModifierError)?;
-                let modified_fn = match self.modify_fn_if_needed(h, func)? {
-                    Some(node) => node,
-                    None => self.modify_fn(h, func)?,
-                };
+                let modified_fn = self.modify_fn(h, func).unwrap();
 
                 let mut modified_sig = load.func_sig.clone();
                 self.modify_signature(modified_sig.body_mut(), false);
@@ -298,6 +295,11 @@ impl<N: HugrNode> ModifierResolver<N> {
         indir_call: &CallIndirect,
         new_dfg: &mut impl Dataflow,
     ) -> Result<(), ModifierResolverErrors<N>> {
+        if !self.signature_has_quantum_data(&indir_call.signature) {
+            self.add_node_no_modification(h, n, indir_call.clone(), new_dfg)?;
+            return Ok(());
+        }
+
         // Wrapper to convert ModifierError to UnResolvable with the indir_call node.
         // This is because, even if we find an error in the process immediately,
         // we cannot stop processing here.
@@ -327,10 +329,19 @@ impl<N: HugrNode> ModifierResolver<N> {
         let (func, load) =
             Self::get_loaded_function(h, n, targ, h.get_optype(targ)).map_err(wrap_err)?;
 
-        // Modify the function
-        let modified_fn = match self.modify_fn_if_needed(h, func)? {
-            Some(node) => node,
-            None => self.wrap_fn_with_controls(h, func, &load.type_args)?,
+        let satisfies = ModifierFlags::from_metadata(h, func)
+            .is_some_and(|flags| flags.satisfies(self.modifiers()));
+        let modified_fn = if satisfies {
+            self.modify_fn(h, func)?
+        } else if self.control_num() == 0 {
+            *self.modifiers_mut() = modifiers;
+            let new_call = self.add_node_no_modification(h, n, indir_call.clone(), new_dfg)?;
+            let new_load = new_dfg.add_child_node(load.clone());
+            self.call_map_insert(func, (new_load, load.function_port()));
+            new_dfg.hugr_mut().connect(new_load, 0, new_call, 0);
+            return Ok(());
+        } else {
+            self.wrap_fn_with_controls(h, func, &load.type_args)?
         };
 
         // Make new LoadFunction

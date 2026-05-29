@@ -561,11 +561,20 @@ impl<N: HugrNode> ModifierResolver<N> {
                 matches!(ty.as_type_enum(), TypeEnum::Function(_)).then_some(index)
             })
             .collect::<HashSet<_>>();
+        let mut quantum_function_input_indices = HashSet::new();
+        for (index, ty) in function_inputs.iter().enumerate() {
+            if self.function_type_has_quantum_data(ty)? {
+                quantum_function_input_indices.insert(index);
+            }
+        }
 
         let mut requirements = Vec::new();
         for node in h.descendants(func) {
             match h.get_optype(node) {
-                OpType::CallIndirect(_) => {
+                OpType::CallIndirect(call) => {
+                    if !self.signature_has_quantum_data(&call.signature) {
+                        continue;
+                    }
                     // A modified indirect call through a function input cannot
                     // be solved inside this function body. The generated
                     // function must instead require that input to already have
@@ -619,7 +628,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         requirements.retain(|(input, _)| function_input_indices.contains(input));
         if !requirements.is_empty() {
             requirements.extend(
-                function_input_indices
+                quantum_function_input_indices
                     .iter()
                     .copied()
                     .map(|input| (input, self.modifiers().clone())),
@@ -638,6 +647,22 @@ impl<N: HugrNode> ModifierResolver<N> {
         let mut signature = Signature::try_from((**func_ty).clone()).map_err(BuildError::from)?;
         self.modify_signature(&mut signature, false);
         Ok(Type::new_function(signature))
+    }
+
+    fn signature_has_quantum_data(&self, signature: &Signature) -> bool {
+        signature
+            .input
+            .iter()
+            .chain(signature.output.iter())
+            .any(|ty| self.qubit_finder.contains_element_type(ty))
+    }
+
+    fn function_type_has_quantum_data(&self, ty: &Type) -> Result<bool, ModifierResolverErrors<N>> {
+        let TypeEnum::Function(func_ty) = ty.as_type_enum() else {
+            return Ok(false);
+        };
+        let signature = Signature::try_from((**func_ty).clone()).map_err(BuildError::from)?;
+        Ok(self.signature_has_quantum_data(&signature))
     }
 
     /// Rewrite function-valued inputs that must be supplied already modified.
@@ -719,7 +744,7 @@ impl<N: HugrNode> ModifierResolver<N> {
 
         for ty in row.to_mut() {
             match ty.as_type_enum() {
-                TypeEnum::Function(_) => {
+                TypeEnum::Function(_) if self.function_type_has_quantum_data(ty)? => {
                     let modified_ty = self.modified_function_input_type(ty)?;
                     *ty = modified_ty;
                 }

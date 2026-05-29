@@ -318,6 +318,11 @@ gate_in_ctrl_solved:
 	00 -> 0.7071+0j
 	11 -> 0.7071+0j
 -----
+higher_order_classical_solved:
+	00 -> 0.7071+0j
+	10 -> 0.3536+0.3536j
+	11 -> 0.3536+0.3536j
+-----
 higher_order_function_w_arrays_solved:
 	000 -> 0.7071+0j
 	100 -> 0.5+0j
