@@ -13,14 +13,12 @@ from typing import Callable
 
 from guppylang import guppy
 from guppylang.std.builtins import (
-    Controllable,
     Unitary,
-    array,
     control,
     dagger,
 )
 from guppylang.std.debug import state_result
-from guppylang.std.quantum import discard, discard_array, qubit, angle, rz
+from guppylang.std.quantum import discard, qubit, angle, rz
 from guppylang.std.quantum import h, rx
 
 
