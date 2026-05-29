@@ -10,22 +10,16 @@ from pathlib import Path
 from sys import argv
 import sys
 
-from guppylang import array, guppy
+from guppylang import guppy
 from guppylang.std.builtins import (
-    Controllable,
-    Daggerable,
-    PowerControllable,
     Unitary,
     control,
     dagger,
-    owned,
-    power,
 )
 from guppylang.std.debug import state_result
-from guppylang.std.quantum import discard, discard_array, qubit, angle
-from guppylang.std.quantum import h, x, rx, s
+from guppylang.std.quantum import discard, qubit
+from guppylang.std.quantum import h, s
 
-from hugr.hugr.render import RenderConfig
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
