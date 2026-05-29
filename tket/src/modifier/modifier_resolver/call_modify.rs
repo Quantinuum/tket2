@@ -322,6 +322,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         let (func, load) =
             Self::get_loaded_function(h, n, targ, h.get_optype(targ)).map_err(wrap_err)?;
 
+        // Modify the function (if needed)
         let satisfies = ModifierFlags::from_metadata(h, func)
             .is_some_and(|flags| flags.satisfies(self.modifiers()));
         let modified_fn = if satisfies {
