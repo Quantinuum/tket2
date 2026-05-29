@@ -62,16 +62,95 @@ impl<N: HugrNode> ModifierResolver<N> {
             .iter()
             .map(|(input, _)| *input)
             .collect::<HashSet<_>>();
+
+        // Handle one function arguments that must be modified before calling `new_call_node`.
+        // If the argument comes from another function input, we cannot solve it here,
+        // so we record that requirement for the caller.
+        // If the argument is a `LoadFunction`, we create the modified version of that
+        // loaded function and connect it directly to the new call.
         for (input, modifiers) in input_modifiers {
-            self.modify_loaded_function_argument(
-                h,
-                call_node,
-                input,
-                modifiers,
-                new_call_node,
-                offset,
-                new_dfg,
-            )?;
+            if modifiers.power {
+                return Err(ModifierResolverErrors::unresolvable(
+                    call_node,
+                    "Cannot statically resolve powered higher-order argument.".to_string(),
+                    h.get_optype(call_node).clone(),
+                ));
+            }
+
+            // Resolve this argument in the modifier context required by the
+            // callee. The previous modifier state must be restored even if the
+            // argument cannot be resolved.
+            let saved_modifiers = std::mem::replace(self.modifiers_mut(), modifiers);
+            let result: Result<(), ModifierResolverErrors<N>> = (|| {
+                let source = h.single_linked_output(call_node, input).ok_or_else(|| {
+                    ModifierResolverErrors::unreachable(format!(
+                        "Call input {input} has no source while resolving higher-order modifier."
+                    ))
+                })?;
+                let trace = self
+                    .trace_modifiers_chain(h, source.0)
+                    .map_err(ModifierResolverErrors::ModifierError)?;
+                let targ = trace.last().cloned().ok_or_else(|| {
+                    ModifierResolverErrors::unreachable(
+                        "Higher-order modifier argument trace was empty.".to_string(),
+                    )
+                })?;
+                if matches!(h.get_optype(targ), OpType::Input(_)) {
+                    // The argument is another higher-order input of the function
+                    // currently being rewritten. This call cannot solve the
+                    // requirement yet, so record it for callers and wire the
+                    // function value through to the modified call input.
+                    let target_port = if trace.len() == 1 {
+                        source.1
+                    } else {
+                        h.single_linked_output(trace[trace.len() - 2], 0)
+                        .ok_or_else(|| {
+                            ModifierResolverErrors::unreachable(
+                                "Higher-order modifier argument trace ended at an input without an input port."
+                                    .to_string(),
+                            )
+                        })?
+                        .1
+                    };
+                    let modifiers = self.modifiers().clone();
+                    self.dynamic_input_modifiers()
+                        .push((target_port.index(), modifiers));
+                    self.map_insert(
+                        (call_node, IncomingPort::from(input)).into(),
+                        (new_call_node, IncomingPort::from(input + offset)).into(),
+                    )?;
+                    return Ok(());
+                }
+
+                // The caller supplied a concrete LoadFunction. Build/load the
+                // modified version now and connect that value directly into the
+                // rewritten call.
+                let (func, load) =
+                    Self::get_loaded_function(h, call_node, targ, h.get_optype(targ))
+                        .map_err(ModifierResolverErrors::ModifierError)?;
+                let modified_fn = match self.modify_fn_if_needed(h, func)? {
+                    Some(node) => node,
+                    None => self.modify_fn(h, func)?,
+                };
+
+                let mut modified_sig = load.func_sig.clone();
+                self.modify_signature(modified_sig.body_mut(), false);
+                let load = LoadFunction::try_new(modified_sig, load.type_args)
+                    .map_err(BuildError::from)?;
+                let new_load = new_dfg.add_child_node(load);
+                self.call_map_insert(modified_fn, (new_load, IncomingPort::from(0)));
+                new_dfg
+                    .hugr_mut()
+                    .connect(new_load, 0, new_call_node, input + offset);
+                self.map_insert_none((call_node, IncomingPort::from(input)).into())?;
+
+                for node in trace {
+                    self.forget_node(h, node)?;
+                }
+                Ok(())
+            })();
+            *self.modifiers_mut() = saved_modifiers;
+            result?;
         }
 
         // wire the controls
@@ -105,93 +184,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         )?;
 
         Ok(())
-    }
-
-    fn modify_loaded_function_argument(
-        &mut self,
-        h: &mut impl HugrMut<Node = N>,
-        call_node: N,
-        input: usize,
-        modifiers: crate::modifier::CombinedModifier,
-        new_call_node: hugr::Node,
-        input_offset: usize,
-        new_dfg: &mut impl Dataflow,
-    ) -> Result<(), ModifierResolverErrors<N>> {
-        if modifiers.power {
-            return Err(ModifierResolverErrors::unresolvable(
-                call_node,
-                "Cannot statically resolve powered higher-order argument.".to_string(),
-                h.get_optype(call_node).clone(),
-            ));
-        }
-
-        let saved_modifiers = std::mem::replace(self.modifiers_mut(), modifiers);
-        let result = (|| {
-            let source = h.single_linked_output(call_node, input).ok_or_else(|| {
-                ModifierResolverErrors::unreachable(format!(
-                    "Call input {input} has no source while resolving higher-order modifier."
-                ))
-            })?;
-            let trace = self
-                .trace_modifiers_chain(h, source.0)
-                .map_err(ModifierResolverErrors::ModifierError)?;
-            let targ = trace.last().cloned().ok_or_else(|| {
-                ModifierResolverErrors::unreachable(
-                    "Higher-order modifier argument trace was empty.".to_string(),
-                )
-            })?;
-            if matches!(h.get_optype(targ), OpType::Input(_)) {
-                // The argument is another higher-order input of the function
-                // currently being rewritten, so this call cannot solve the
-                // requirement yet. Propagate it to callers and wire the input
-                // through with its modified type.
-                let target_port = if trace.len() == 1 {
-                    source.1
-                } else {
-                    h.single_linked_output(trace[trace.len() - 2], 0)
-                        .ok_or_else(|| {
-                            ModifierResolverErrors::unreachable(
-                                "Higher-order modifier argument trace ended at an input without an input port."
-                                    .to_string(),
-                            )
-                        })?
-                        .1
-                };
-                let modifiers = self.modifiers().clone();
-                self.dynamic_input_modifiers()
-                    .push((target_port.index(), modifiers));
-                self.map_insert(
-                    (call_node, IncomingPort::from(input)).into(),
-                    (new_call_node, IncomingPort::from(input + input_offset)).into(),
-                )?;
-                return Ok(());
-            }
-            let (func, load) = Self::get_loaded_function(h, call_node, targ, h.get_optype(targ))
-                .map_err(ModifierResolverErrors::ModifierError)?;
-
-            let modified_fn = match self.modify_fn_if_needed(h, func)? {
-                Some(node) => node,
-                None => self.modify_fn(h, func)?,
-            };
-
-            let mut modified_sig = load.func_sig.clone();
-            self.modify_signature(modified_sig.body_mut(), false);
-            let load =
-                LoadFunction::try_new(modified_sig, load.type_args).map_err(BuildError::from)?;
-            let new_load = new_dfg.add_child_node(load);
-            self.call_map_insert(modified_fn, (new_load, IncomingPort::from(0)));
-            new_dfg
-                .hugr_mut()
-                .connect(new_load, 0, new_call_node, input + input_offset);
-            self.map_insert_none((call_node, IncomingPort::from(input)).into())?;
-
-            for node in trace {
-                self.forget_node(h, node)?;
-            }
-            Ok(())
-        })();
-        *self.modifiers_mut() = saved_modifiers;
-        result
     }
 
     /// Apply the collected chain of modifiers to the function loaded by the `LoadFunction` node.
