@@ -52,9 +52,7 @@ impl CombinedModifier {
             Ok(Modifier::DaggerModifier) => self.dagger = !self.dagger,
             Ok(Modifier::PowerModifier) => {
                 return Err(
-                    modifier_resolver::ModifierResolverErrors::PowerModifierNotSupported {
-                        node: node,
-                    },
+                    modifier_resolver::ModifierResolverErrors::PowerModifierNotSupported { node },
                 );
             }
             Err(_) => {}
