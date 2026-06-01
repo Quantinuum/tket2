@@ -94,6 +94,7 @@ recompile-test-hugrs:
     just test_files/guppy_optimization/recompile
     just recompile-modifiers
 
+# Regenerates all hugrs inside `test_files/modifier_examples/` and run the passes on them
 recompile-modifiers:
     @echo "---- Recompiling modifier examples ----"
     uv run maturin develop --uv

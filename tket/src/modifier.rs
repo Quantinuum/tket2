@@ -38,7 +38,10 @@ pub struct CombinedModifier {
 
 impl CombinedModifier {
     /// Add a modifier
-    pub fn push(&mut self, ext_op: &ExtensionOp) {
+    pub fn push<N>(
+        &mut self,
+        ext_op: &ExtensionOp,
+    ) -> Result<(), modifier_resolver::ModifierResolverErrors<N>> {
         match Modifier::from_extension_op(ext_op) {
             Ok(Modifier::ControlModifier) => {
                 let ctrl = ext_op.args()[0].as_nat().unwrap() as usize;
@@ -46,9 +49,12 @@ impl CombinedModifier {
                 self.accum_ctrl.push(ctrl);
             }
             Ok(Modifier::DaggerModifier) => self.dagger = !self.dagger,
-            Ok(Modifier::PowerModifier) => self.power = !self.power,
+            Ok(Modifier::PowerModifier) => {
+                return Err(modifier_resolver::ModifierResolverErrors::PowerModifierNotSupported);
+            }
             Err(_) => {}
         }
+        Ok(())
     }
 }
 

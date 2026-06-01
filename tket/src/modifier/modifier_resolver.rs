@@ -357,6 +357,7 @@ impl<N> Default for ModifierResolver<N> {
 }
 
 /// Error that can occur when resolving modifiers.
+/// NICOLA: todo update the docs
 #[derive(Debug, derive_more::Error, derive_more::Display)]
 pub enum ModifierError<N = Node> {
     /// The node is not a modifier
@@ -420,6 +421,9 @@ pub enum ModifierResolverErrors<N = Node> {
     /// The node cannot be modified.
     #[display("Modification by {_0:?} is not defined for the node {_1}")]
     Unimplemented(Modifier, OpType),
+    /// The power modifier is not supported.
+    #[display("Power modifier is not supported")]
+    PowerModifierNotSupported,
 }
 
 impl<N> ModifierResolverErrors<N> {
@@ -2096,5 +2100,19 @@ mod tests {
     fn test_examples(#[case] example: &str) {
         let mut h = load_guppy_example(example).unwrap();
         test_resolve(&mut h);
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
+    fn test_power_modifier_error() {
+        let mut h = load_guppy_example("../test_files/guppy_examples/use_of_power.hugr").unwrap();
+        assert_matches!(h.validate(), Ok(()));
+
+        let entrypoint = h.entrypoint();
+        let result = resolve_modifier_with_entrypoints(&mut h, [entrypoint]);
+        assert_matches!(
+            result,
+            Err(ModifierResolverErrors::PowerModifierNotSupported)
+        );
     }
 }
