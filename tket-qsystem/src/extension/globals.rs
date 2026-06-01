@@ -224,7 +224,7 @@ impl HasConcrete for GlobalsOpDef {
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         let expected_num_args = 5;
 
-        let [name_arg, ty_arg] = &type_args[..2] else {
+        let [name_arg, ty_arg, inputs_arg, outputs_arg, impl_outputs_arg] = type_args else {
             Err(SignatureError::from(TermTypeError::WrongNumberArgs(
                 type_args.len(),
                 expected_num_args,
@@ -238,21 +238,21 @@ impl HasConcrete for GlobalsOpDef {
             }))?
         };
 
-        let Ok(inputs) = TypeRowRV::try_from(type_args[2].clone()) else {
+        let Ok(inputs) = TypeRowRV::try_from(inputs_arg.clone()) else {
             Err(SignatureError::from(TermTypeError::TypeMismatch {
-                term: Box::new(type_args[2].clone()),
+                term: Box::new(inputs_arg.clone()),
                 type_: Box::new(INPUTS_PARAM.to_owned()),
             }))?
         };
-        let Ok(outputs) = TypeRowRV::try_from(type_args[3].clone()) else {
+        let Ok(outputs) = TypeRowRV::try_from(outputs_arg.clone()) else {
             Err(SignatureError::from(TermTypeError::TypeMismatch {
-                term: Box::new(type_args[3].clone()),
+                term: Box::new(outputs_arg.clone()),
                 type_: Box::new(OUTPUTS_PARAM.to_owned()),
             }))?
         };
-        let Ok(impl_outputs) = TypeRowRV::try_from(type_args[4].clone()) else {
+        let Ok(impl_outputs) = TypeRowRV::try_from(impl_outputs_arg.clone()) else {
             Err(SignatureError::from(TermTypeError::TypeMismatch {
-                term: Box::new(type_args[4].clone()),
+                term: Box::new(impl_outputs_arg.clone()),
                 type_: Box::new(IMPL_OUTPUTS_PARAM.to_owned()),
             }))?
         };
@@ -309,6 +309,20 @@ mod test {
             );
         }
     }
+
+    #[test]
+    fn globals_op_def_instantiate_wrong_number_args() {
+        match GlobalsOpDef::with.instantiate(&[]) {
+            Ok(_) => panic!("expected instantiate to fail with wrong number of args"),
+            Err(err) => {
+                let debug = format!("{err:?}");
+                assert!(debug.contains("WrongNumberArgs"));
+                assert!(debug.contains("0"));
+                assert!(debug.contains("5"));
+            }
+        }
+    }
+
     #[test]
     fn test_with_op_builder() {
         let mut module_builder = ModuleBuilder::new();
