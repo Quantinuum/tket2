@@ -77,7 +77,7 @@ def ext_qsystem_helios() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
             ext.Rz,
             ext.try_QAlloc,
             ext.ZZPhase,
-            ext.future_to_measure,
+            ext.future_to_measurement,
         ],
     )
 
@@ -91,8 +91,6 @@ def ext_qsystem_sol() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
             ext.lazy_measure,
             ext.lazy_measure_leaked,
             ext.lazy_measure_reset,
-            ext.measure,
-            ext.measure_reset,
             ext.phasedX,
             ext.phasedXX,
             ext.qFree,
@@ -100,6 +98,7 @@ def ext_qsystem_sol() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
             ext.runtime_barrier(1),
             ext.Rz,
             ext.try_QAlloc,
+            ext.future_to_measurement,
         ],
     )
 

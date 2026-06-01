@@ -24,7 +24,6 @@ use tket::passes::replace_types::{NodeTemplate, ReplaceTypesError};
 use tket::passes::{ComposablePass, PassScope, ReplaceTypes};
 use tket::{TketOp, extension::rotation::RotationOpBuilder};
 
-use crate::extension::qsystem::common::CommonOpBuilder;
 use crate::extension::qsystem::{self, QSystemPlatform};
 
 use super::barrier::BarrierInserter;
@@ -286,7 +285,6 @@ where
         (TketOp::T, [q]) => vec![b.build_t(*q)?],
         (TketOp::Tdg, [q]) => vec![b.build_tdg(*q)?],
         (TketOp::Measure, [q]) => b.build_measure_flip(*q)?.into(),
-        (TketOp::MeasureFree, [q]) => todo!(),
         (TketOp::QAlloc, []) => vec![b.build_qalloc()?],
         (TketOp::CX, [c, t]) => b.build_cx(*c, *t)?.into(),
         (TketOp::CY, [c, t]) => b.build_cy(*c, *t)?.into(),
@@ -340,13 +338,6 @@ fn func_as_node_template(func_def: Hugr) -> NodeTemplate {
     )
 }
 
-fn build_measure_free<B>(b: &mut impl Dataflow, q: Wire) -> Result<Vec<Wire>, BuildError>{
-    // let lazy_measure = b.add_lazy_measure(q)?;
-    // let future = b.add_future_to_measurement(lazy_measure)?;
-    // Ok(vec![future])
-    todo!()
-}
-
 fn build_to_radians(b: &mut impl Dataflow, rotation: Wire) -> Result<Wire, BuildError> {
     let turns = b.add_to_halfturns(rotation)?;
     let pi = pi_mul_f64(b, 1.0);
@@ -363,6 +354,7 @@ fn tket_to_shared_op(op: TketOp) -> Option<SharedOp> {
         TketOp::TryQAlloc => SharedOp::TryQAlloc,
         TketOp::QFree => SharedOp::QFree,
         TketOp::Reset => SharedOp::Reset,
+        TketOp::MeasureFree => SharedOp::LazyMeasure,
         _ => return None,
     })
 }

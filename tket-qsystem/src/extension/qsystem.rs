@@ -11,12 +11,9 @@ use hugr::{
     extension::{ExtensionId, ExtensionRegistry, PRELUDE, Version, simple_op::MakeOpDef},
     std_extensions::arithmetic::float_types::EXTENSION as FLOAT_TYPES,
 };
-use tket::extension::measurement::{MEASUREMENT_EXTENSION, measurement_type};
+use tket::extension::measurement::MEASUREMENT_EXTENSION;
 
-use crate::extension::futures::{self, FutureOpBuilder, future_type};
-use derive_more::Display;
 use lazy_static::lazy_static;
-use strum::{EnumIter, EnumString, IntoStaticStr};
 
 mod barrier;
 mod common;
@@ -87,3 +84,5 @@ pub use helios::RUNTIME_BARRIER_NAME;
 
 #[deprecated(since = "0.25.0", note = "Use helios::RuntimeBarrierDef instead.")]
 pub use helios::RuntimeBarrierDef;
+
+use crate::extension::futures;

@@ -163,12 +163,6 @@ pub(crate) trait CommonOpBuilder<Op: CommonOp>:
         Ok(self.add_dataflow_op(op, [qbs])?.out_wire(0))
     }
 
-    fn add_future_to_measurement(&mut self, future: Wire) -> Result<Wire, BuildError> {
-        Ok(self
-            .add_dataflow_op(Op::from(SharedOp::FutureToMeasurement), [future])?
-            .out_wire(0))
-    }
-
     fn build_wrapped_barrier(
         &mut self,
         qbs: impl IntoIterator<Item = Wire>,

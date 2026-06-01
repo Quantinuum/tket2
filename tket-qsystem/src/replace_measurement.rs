@@ -29,10 +29,12 @@ pub enum ReplaceMeasurementPassError<N> {
 /// A HUGR -> HUGR pass replacing `tket.measurement` with `future(bool_t)`.
 ///
 /// [TketOp::MeasureFree] is replaced by [QSystemOp::LazyMeasure], and
-/// [QSystemOp::FutureToMeasurement] becomes a no-op. The linearizer ops for measurement
-/// types ([MeasurementOp::Read], [MeasurementOp::Dup], and [MeasurementOp::Free]) are
-/// replaced by the corresponding linearizer ops for future types ([FutureOpDef::Read],
-/// [FutureOpDef::Dup], and [FutureOpDef::Free]).
+/// [QSystemOp::FutureToMeasurement] becomes a no-op. 
+/// 
+/// The linearizer ops for measurement types ([MeasurementOp::Read], 
+/// [MeasurementOp::Dup], and [MeasurementOp::Free]) are replaced by the corresponding 
+/// linearizer ops for future types ([FutureOpDef::Read], [FutureOpDef::Dup], and 
+/// [FutureOpDef::Free]).
 #[derive(Default, Debug, Clone)]
 pub struct ReplaceMeasurementPass {
     /// Where to apply the pass.
