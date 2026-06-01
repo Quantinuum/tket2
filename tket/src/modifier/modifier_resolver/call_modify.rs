@@ -69,14 +69,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         // If the argument is a `LoadFunction`, we create the modified version of that
         // loaded function and connect it directly to the new call.
         for (input, modifiers) in input_modifiers {
-            if modifiers.power {
-                return Err(ModifierResolverErrors::unresolvable(
-                    call_node,
-                    "Cannot statically resolve powered higher-order argument.".to_string(),
-                    h.get_optype(call_node).clone(),
-                ));
-            }
-
             // Resolve this argument in the modifier context required by the
             // callee. The previous modifier state must be restored even if the
             // argument cannot be resolved.
