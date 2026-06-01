@@ -296,13 +296,14 @@ impl<N: HugrNode> ModifierResolver<N> {
             )
         };
 
-        // Trace the chain of modifiers starting from the one before the indirect call.
+        // Trace the chain of modifiers starting from the one before the indirect call, if present.
         let chain_tail = h.single_linked_output(n, 0).unwrap();
         let modifiers = self.modifiers().clone();
         let trace = self
             .trace_modifiers_chain(h, chain_tail.0)
             .map_err(wrap_err)?;
         let targ = trace.last().cloned().unwrap();
+
         // If the target is a function input, we cannot solve the modifier chain here.
         // Instead, we record the modifiers to be applied to that input and propagate
         // the requirement to callers.
