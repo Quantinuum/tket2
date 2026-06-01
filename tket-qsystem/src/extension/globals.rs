@@ -88,8 +88,8 @@ impl MakeOpDef for GlobalsOpDef {
                         NAME_PARAM.to_owned(),
                         TYPE_PARAM.to_owned(),
                         INPUTS_PARAM.to_owned(),
-                        IMPL_OUTPUTS_PARAM.to_owned(),
                         OUTPUTS_PARAM.to_owned(),
+                        IMPL_OUTPUTS_PARAM.to_owned(),
                     ],
                     FuncValueType::new(
                         [global_ty.clone(), func_ty, input_row],
@@ -311,16 +311,15 @@ mod test {
     }
 
     #[test]
-    fn globals_op_def_instantiate_wrong_number_args() {
-        match GlobalsOpDef::with.instantiate(&[]) {
-            Ok(_) => panic!("expected instantiate to fail with wrong number of args"),
-            Err(err) => {
-                let debug = format!("{err:?}");
-                assert!(debug.contains("WrongNumberArgs"));
-                assert!(debug.contains("0"));
-                assert!(debug.contains("5"));
-            }
-        }
+    fn test_globals_op_def_instantiate_wrong_number_args() {
+        let err = GlobalsOpDef::with
+            .instantiate(&[])
+            .err()
+            .expect("expected instantiate to fail with wrong number of args");
+        let debug = format!("{err:?}");
+        assert!(debug.contains("WrongNumberArgs"));
+        assert!(debug.contains("0"));
+        assert!(debug.contains("5"));
     }
 
     #[test]

@@ -54,8 +54,13 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
             impl_outputs,
         } => {
             let sym = format!("{PREFIX}.{name}");
-            // TODO handle error if unwrap fails
-            let sym_ty = context.llvm_sum_type(option_type([ty_arg.as_runtime().unwrap()]))?;
+            let Some(global_ty_base) = ty_arg.as_runtime() else {
+                Err(SignatureError::from(TermTypeError::TypeMismatch {
+                    term: ty_arg.clone().into(),
+                    type_: TYPE_PARAM.to_owned().into(),
+                }))?
+            };
+            let sym_ty = context.llvm_sum_type(option_type([global_ty_base]))?;
 
             let [init_global_value, func, func_args @ ..] = &args.inputs[..] else {
                 bail!("No function provided as input for GlobalsOp::With")
@@ -64,9 +69,12 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
             let module = context.get_current_module();
             let builder = context.builder();
 
-            let global = get_global_value(module, builder, sym.clone(), sym_ty.clone());
+            let global = get_global_value(module, builder, sym.clone(), sym_ty.clone())?;
 
-            let global_ty: BasicTypeEnum = global.get_value_type().try_into().unwrap();
+            let global_ty: BasicTypeEnum = global
+                .get_value_type()
+                .try_into()
+                .map_err(|e| anyhow::anyhow!("Global {sym} has non-basic LLVM type: {e:?}"))?;
             ensure!(
                 global_ty == sym_ty.as_basic_type_enum(),
                 "Input type does not match global variable type. Found {global_ty}, Expected {sym_ty}"
@@ -79,7 +87,8 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
             let _ = builder.build_store(global.as_pointer_value(), new_value)?;
 
             let real_args = func_args.iter().copied().map_into().collect_vec();
-            let func_ptr = PointerValue::try_from(*func).unwrap();
+            let func_ptr = PointerValue::try_from(*func)
+                .map_err(|e| anyhow::anyhow!("Invalid function pointer provided to With: {e:?}"))?;
 
             let mut out_types = outputs.iter().cloned().collect_vec();
             out_types.extend(impl_outputs.iter().cloned().map_into());
@@ -116,8 +125,13 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
             impl_outputs,
         } => {
             let sym = format!("{PREFIX}.{name}");
-            // TODO handle error if unwrap fails
-            let sym_ty = context.llvm_sum_type(option_type([ty_arg.as_runtime().unwrap()]))?;
+            let Some(global_ty_base) = ty_arg.as_runtime() else {
+                Err(SignatureError::from(TermTypeError::TypeMismatch {
+                    term: ty_arg.clone().into(),
+                    type_: TYPE_PARAM.to_owned().into(),
+                }))?
+            };
+            let sym_ty = context.llvm_sum_type(option_type([global_ty_base.clone()]))?;
 
             // Get function and args
             let [func, func_args @ ..] = &args.inputs[..] else {
@@ -128,8 +142,11 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
             let builder = context.builder();
 
             // Get global variable
-            let global = get_global_value(module, builder, sym.clone(), sym_ty.clone());
-            let global_ty: BasicTypeEnum = global.get_value_type().try_into().unwrap();
+            let global = get_global_value(module, builder, sym.clone(), sym_ty.clone())?;
+            let global_ty: BasicTypeEnum = global
+                .get_value_type()
+                .try_into()
+                .map_err(|e| anyhow::anyhow!("Global {sym} has non-basic LLVM type: {e:?}"))?;
             ensure!(
                 global_ty == sym_ty.as_basic_type_enum(),
                 "Input type does not match global variable type. Found {global_ty}, Expected {sym_ty}"
@@ -147,13 +164,6 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
 
             let func_ptr = PointerValue::try_from(*func)
                 .map_err(|e| anyhow::anyhow!("Invalid function pointer provided to Map: {e:?}"))?;
-
-            let Some(global_ty_base) = ty_arg.as_runtime() else {
-                Err(SignatureError::from(TermTypeError::TypeMismatch {
-                    term: ty_arg.clone().into(),
-                    type_: TYPE_PARAM.to_owned().into(),
-                }))?
-            };
 
             let mut in_types = inputs.iter().cloned().collect_vec();
             in_types.insert(0, global_ty_base.clone().into());
@@ -196,13 +206,17 @@ fn get_global_value<'a>(
     builder: &Builder,
     sym: String,
     sym_ty: LLVMSumType<'a>,
-) -> GlobalValue<'a> {
-    module.get_global(&sym).unwrap_or_else(|| {
-        let none_value = sym_ty.build_tag(builder, 0, vec![]).unwrap();
-        let global = module.add_global(sym_ty.clone(), Some(AddressSpace::default()), &sym);
-        global.set_initializer(&none_value);
-        global
-    })
+) -> Result<GlobalValue<'a>> {
+    if let Some(global) = module.get_global(&sym) {
+        return Ok(global);
+    }
+
+    let none_value = sym_ty
+        .build_tag(builder, 0, vec![])
+        .map_err(|e| anyhow::anyhow!("Failed to build None value for global '{sym}': {e:?}"))?;
+    let global = module.add_global(sym_ty.clone(), Some(AddressSpace::default()), &sym);
+    global.set_initializer(&none_value);
+    Ok(global)
 }
 
 #[cfg(test)]
