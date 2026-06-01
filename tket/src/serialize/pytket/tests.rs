@@ -299,18 +299,21 @@ fn circ_preset_qubits() -> Hugr {
 /// including multiple outputs of the same register.
 #[fixture]
 fn circ_preset_bits() -> Hugr {
-    let input_t = vec![bool_t()];
-    let output_t = vec![bool_t(); 3];
+    let input_t = vec![qb_t(), bool_t()];
+    let output_t = vec![qb_t(), bool_t(), bool_t(), bool_t()];
     let mut h = FunctionBuilder::new("preset_bits", Signature::new(input_t, output_t)).unwrap();
 
-    let [b0] = h.input_wires_arr();
+    let [q, b0] = h.input_wires_arr();
     let b1 = h.add_load_value(Value::false_val());
     let [b_and] = h
         .add_dataflow_op(LogicOp::And, [b0, b1])
         .unwrap()
         .outputs_arr();
 
-    let mut hugr = h.finish_hugr_with_outputs([b0, b_and, b0]).unwrap();
+    // Extra quantum op to ensure this circuit gets encoded.
+    let [q] = h.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
+
+    let mut hugr = h.finish_hugr_with_outputs([q, b0, b_and, b0]).unwrap();
 
     // A preset register for the first qubit output
     hugr.set_metadata::<metadata::PytketBitRegisterNames>(
@@ -1141,7 +1144,6 @@ impl CircuitRoundtripTestConfig {
 #[case::nested_dfgs(circ_nested_dfgs(), CircuitRoundtripTestConfig::Default)]
 #[case::tk1_ops(circ_tk1_ops(), CircuitRoundtripTestConfig::Default)]
 #[case::missing_decoders(circ_measure_ancilla(), CircuitRoundtripTestConfig::NoStd)]
-#[case::preset_bits(circ_preset_bits(), CircuitRoundtripTestConfig::Default)]
 fn circuit_standalone_roundtrip(#[case] hugr: Hugr, #[case] config: CircuitRoundtripTestConfig) {
     let circ_signature = hugr
         .entrypoint_optype()

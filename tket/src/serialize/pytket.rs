@@ -16,7 +16,8 @@ pub use config::{
 };
 pub use encoder::PytketEncoderContext;
 pub use error::{
-    PytketDecodeError, PytketDecodeErrorInner, PytketEncodeError, PytketEncodeOpError,
+    BarrierPayloadError, PytketDecodeError, PytketDecodeErrorInner, PytketEncodeError,
+    PytketEncodeOpError,
 };
 pub use extension::PytketEmitter;
 use hugr::core::HugrNode;

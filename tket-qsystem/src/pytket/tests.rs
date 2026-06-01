@@ -22,6 +22,7 @@ use tket_json_rs::register;
 
 use crate::extension::futures::{FutureOpBuilder, future_type};
 use crate::extension::qsystem::QSystemOp;
+use crate::extension::qsystem::REGISTRY;
 use crate::extension::result::ResultOp;
 use crate::pytket::{qsystem_decoder_config, qsystem_encoder_config};
 
@@ -299,7 +300,8 @@ fn circuit_standalone_roundtrip(#[case] hugr: Hugr) {
         .into_owned();
     let decode_options = DecodeOptions::new()
         .with_signature(circ_signature.clone())
-        .with_config(qsystem_decoder_config());
+        .with_config(qsystem_decoder_config())
+        .with_extensions(REGISTRY.clone());
     let encode_options = EncodeOptions::new()
         .with_subcircuits(true)
         .with_config(qsystem_encoder_config())
