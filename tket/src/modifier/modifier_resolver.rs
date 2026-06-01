@@ -358,6 +358,7 @@ impl<N> Default for ModifierResolver<N> {
 
 /// Errors that can occur when tracing validating chain of modifiers and their target.
 #[derive(Debug, derive_more::Error, derive_more::Display)]
+#[non_exhaustive]
 pub enum ModifierError<N = Node> {
     /// The node is not a modifier
     #[display("Node to modify {_0} expected to be a modifier but actually {_1}")]
@@ -392,6 +393,7 @@ impl<N> ModifierError<N> {
 
 /// Possible errors that can occur during the modifier resolution process.
 #[derive(Debug, derive_more::Display, derive_more::Error, derive_more::From)]
+#[non_exhaustive]
 pub enum ModifierResolverErrors<N = Node> {
     /// Cannot modify the node.
     #[display("{_0}")]
