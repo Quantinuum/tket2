@@ -4,7 +4,7 @@
 #     "guppylang ==0.21.15",
 # ]
 # ///
-"""Testing assignment in dagger context"""
+"""Example program that uses the `power` modifier (expected to be rejected by tket)."""
 
 from pathlib import Path
 from sys import argv

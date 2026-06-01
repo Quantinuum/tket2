@@ -356,7 +356,7 @@ impl<N> Default for ModifierResolver<N> {
     }
 }
 
-/// Error that can occur when tracing a chain of modifiers and their target.
+/// Errors that can occur when tracing validating chain of modifiers and their target.
 #[derive(Debug, derive_more::Error, derive_more::Display)]
 pub enum ModifierError<N = Node> {
     /// The node is not a modifier
@@ -371,7 +371,7 @@ pub enum ModifierError<N = Node> {
     #[error(ignore)]
     NoTarget(N),
     /// Not the first modifier in a chain.
-    #[display("Node {_0} is not the first modifier in a chain. It is called by {_0}")]
+    #[display("Node {_0} is not the first modifier in a chain.")]
     NotInitialModifier(N, OpType),
     /// The modifier cannot be applied to the node.
     #[display("Modifier cannot be applied to the node {_0} of type {_1}")]

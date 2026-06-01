@@ -24,7 +24,7 @@ use crate::metadata;
 
 /// An accumulated modifier that combines control, dagger, and power modifiers.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
-pub struct CombinedModifier {
+struct CombinedModifier {
     // Number of all control qubits
     control: usize,
     // Control arrays applied so far
@@ -38,7 +38,7 @@ pub struct CombinedModifier {
 
 impl CombinedModifier {
     /// Add a modifier
-    pub fn push<N>(
+    fn push<N>(
         &mut self,
         ext_op: &ExtensionOp,
     ) -> Result<(), modifier_resolver::ModifierResolverErrors<N>> {
