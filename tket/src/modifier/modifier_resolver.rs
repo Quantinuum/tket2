@@ -356,8 +356,7 @@ impl<N> Default for ModifierResolver<N> {
     }
 }
 
-/// Error that can occur when resolving modifiers.
-/// NICOLA: todo update the docs
+/// Error that can occur when tracing a chain of modifiers and their target.
 #[derive(Debug, derive_more::Error, derive_more::Display)]
 pub enum ModifierError<N = Node> {
     /// The node is not a modifier
@@ -367,8 +366,8 @@ pub enum ModifierError<N = Node> {
     #[display("No caller of the modified function exists for node {_0}")]
     #[error(ignore)]
     NoCaller(N),
-    /// No target of this modifer exists.
-    #[display("No caller of the modified function exists for node {_0}")]
+    /// No target of this modifier exists.
+    #[display("The modifier node {_0} chain has no target")]
     #[error(ignore)]
     NoTarget(N),
     /// Not the first modifier in a chain.
