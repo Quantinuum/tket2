@@ -129,7 +129,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                 break;
             }
 
-            modifiers.push(optype.as_extension_op().unwrap())?;
+            modifiers.push(optype.as_extension_op().unwrap(), current)?;
             let next = h
                 .single_linked_output(current, 0)
                 .ok_or(ModifierError::NoTarget(n))?;

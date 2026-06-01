@@ -423,8 +423,11 @@ pub enum ModifierResolverErrors<N = Node> {
     #[display("Modification by {_0:?} is not defined for the node {_1}")]
     Unimplemented(Modifier, OpType),
     /// The power modifier is not supported.
-    #[display("Power modifier is not supported")]
-    PowerModifierNotSupported,
+    #[display("Found power modifier in node: {node}. Power modifier is not supported yet.")]
+    PowerModifierNotSupported {
+        /// The `power` node
+        node: N,
+    },
 }
 
 impl<N> ModifierResolverErrors<N> {
@@ -2113,7 +2116,7 @@ mod tests {
         let result = resolve_modifier_with_entrypoints(&mut h, [entrypoint]);
         assert_matches!(
             result,
-            Err(ModifierResolverErrors::PowerModifierNotSupported)
+            Err(ModifierResolverErrors::PowerModifierNotSupported { node: _ })
         );
     }
 }

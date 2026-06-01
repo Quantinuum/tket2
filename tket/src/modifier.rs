@@ -41,6 +41,7 @@ impl CombinedModifier {
     fn push<N>(
         &mut self,
         ext_op: &ExtensionOp,
+        node: N,
     ) -> Result<(), modifier_resolver::ModifierResolverErrors<N>> {
         match Modifier::from_extension_op(ext_op) {
             Ok(Modifier::ControlModifier) => {
@@ -50,7 +51,11 @@ impl CombinedModifier {
             }
             Ok(Modifier::DaggerModifier) => self.dagger = !self.dagger,
             Ok(Modifier::PowerModifier) => {
-                return Err(modifier_resolver::ModifierResolverErrors::PowerModifierNotSupported);
+                return Err(
+                    modifier_resolver::ModifierResolverErrors::PowerModifierNotSupported {
+                        node: node,
+                    },
+                );
             }
             Err(_) => {}
         }
