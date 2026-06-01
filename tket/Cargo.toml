@@ -11,7 +11,7 @@ homepage = { workspace = true }
 repository = { workspace = true }
 description = "Quantinuum's TKET Quantum Compiler"
 keywords = ["Quantum", "Quantinuum"]
-categories = ["compilers"]
+categories = ["compilers", "science::quantum-computing"]
 
 [lints]
 workspace = true

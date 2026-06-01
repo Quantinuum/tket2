@@ -11,7 +11,7 @@ homepage.workspace = true
 repository.workspace = true
 description = "HUGR extensions for logical operations on QEC codes."
 keywords = ["Quantum", "Quantinuum"]
-categories = ["compilers"]
+categories = ["compilers", "science::quantum-computing"]
 
 [lints]
 workspace = true
