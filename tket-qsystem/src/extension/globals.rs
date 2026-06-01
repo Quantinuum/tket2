@@ -222,7 +222,7 @@ impl HasConcrete for GlobalsOpDef {
     type Concrete = GlobalsOp;
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
-        let expected_num_args = 4;
+        let expected_num_args = 5;
 
         let [name_arg, ty_arg] = &type_args[..2] else {
             Err(SignatureError::from(TermTypeError::WrongNumberArgs(
@@ -283,5 +283,66 @@ impl MakeRegisteredOp for GlobalsOp {
 
     fn extension_ref(&self) -> Arc<Extension> {
         EXTENSION.clone()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use hugr::{
+        HugrView,
+        builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
+        extension::{prelude::qb_t, simple_op::MakeExtensionOp},
+        types::Signature,
+    };
+    use strum::IntoEnumIterator;
+
+    use super::*;
+
+    #[test]
+    fn create_extension() {
+        assert_eq!(EXTENSION.name(), &EXTENSION_ID);
+
+        for o in GlobalsOpDef::iter() {
+            assert_eq!(
+                GlobalsOpDef::from_def(EXTENSION.get_op(&o.op_id()).unwrap()),
+                Ok(o)
+            );
+        }
+    }
+    #[test]
+    fn test_with_op_builder() {
+        let mut module_builder = ModuleBuilder::new();
+
+        // Function to be called in `with`
+        let my_prog = module_builder
+            .define_function("my_prog", Signature::new(vec![], vec![]))
+            .unwrap()
+            .finish_with_outputs([])
+            .unwrap();
+
+        // Function under test
+        let mut func_builder = module_builder
+            .define_function(
+                "with_op_builder",
+                Signature::new(vec![qb_t()], vec![qb_t()]),
+            )
+            .unwrap();
+        let [global_in] = func_builder.input_wires_arr();
+        let loaded_func = func_builder.load_func(my_prog.handle(), &[]).unwrap();
+        let with_op = GlobalsOp::With {
+            name: "my_global".to_string(),
+            ty_arg: qb_t().into(),
+            inputs: TypeRowRV::new(),
+            outputs: TypeRowRV::new(),
+            impl_outputs: TypeRowRV::new(),
+        };
+        let [global_out] = func_builder
+            .add_dataflow_op(with_op, [global_in, loaded_func])
+            .unwrap()
+            .outputs_arr();
+        func_builder.finish_with_outputs([global_out]).unwrap();
+
+        let hugr = module_builder.finish_hugr().unwrap();
+        hugr.validate().unwrap();
     }
 }
