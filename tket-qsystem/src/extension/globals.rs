@@ -150,6 +150,7 @@ impl MakeOpDef for GlobalsOpDef {
     }
 }
 
+#[derive(Debug)]
 pub enum GlobalsOp {
     With {
         name: String,
@@ -310,28 +311,106 @@ mod test {
         }
     }
 
-    #[test]
-    fn test_globals_op_def_instantiate_wrong_number_args() {
-        let err = GlobalsOpDef::with
-            .instantiate(&[])
-            .err()
-            .expect("expected instantiate to fail with wrong number of args");
-        let debug = format!("{err:?}");
-        assert!(debug.contains("WrongNumberArgs"));
-        assert!(debug.contains("0"));
-        assert!(debug.contains("5"));
+    #[rstest::rstest]
+    #[case::wrong_num_args(
+        &[],
+        OpLoadError::InvalidArgs(SignatureError::TypeArgMismatch(
+            TermTypeError::WrongNumberArgs(0, 5)
+        ))
+    )]
+    #[case::name_type_mismatch(
+        &[
+            TypeArg::BoundedNat(0),
+            qb_t().into(),
+            TypeRowRV::new().into(),
+            TypeRowRV::new().into(),
+            TypeRowRV::new().into(),
+        ],
+        OpLoadError::InvalidArgs(SignatureError::TypeArgMismatch(TermTypeError::TypeMismatch {
+            term: Box::new(TypeArg::BoundedNat(0)),
+            type_: Box::new(TypeParam::StringType),
+        }))
+    )]
+    #[case::inputs_type_mismatch(
+        &[
+            TypeArg::String("g".to_string()),
+            qb_t().into(),
+            TypeArg::BoundedNat(1),
+            TypeRowRV::new().into(),
+            TypeRowRV::new().into(),
+        ],
+        OpLoadError::InvalidArgs(SignatureError::TypeArgMismatch(TermTypeError::TypeMismatch {
+            term: Box::new(TypeArg::BoundedNat(1)),
+            type_: Box::new(TypeParam::ListType(Box::new(TypeBound::Linear.into()))),
+        }))
+    )]
+    #[case::outputs_type_mismatch(
+        &[
+            TypeArg::String("g".to_string()),
+            qb_t().into(),
+            TypeRowRV::new().into(),
+            TypeArg::BoundedNat(2),
+            TypeRowRV::new().into(),
+        ],
+        OpLoadError::InvalidArgs(SignatureError::TypeArgMismatch(TermTypeError::TypeMismatch {
+            term: Box::new(TypeArg::BoundedNat(2)),
+            type_: Box::new(TypeParam::ListType(Box::new(TypeBound::Linear.into()))),
+        }))
+    )]
+    #[case::impl_outputs_type_mismatch(
+        &[
+            TypeArg::String("g".to_string()),
+            qb_t().into(),
+            TypeRowRV::new().into(),
+            TypeRowRV::new().into(),
+            TypeArg::BoundedNat(3),
+        ],
+        OpLoadError::InvalidArgs(SignatureError::TypeArgMismatch(TermTypeError::TypeMismatch {
+            term: Box::new(TypeArg::BoundedNat(3)),
+            type_: Box::new(TypeParam::ListType(Box::new(TypeBound::Linear.into()))),
+        }))
+    )]
+    fn test_globals_op_instantiate_errors(
+        #[case] type_args: &[TypeArg],
+        #[case] error: OpLoadError,
+    ) {
+        assert_eq!(
+            GlobalsOpDef::with.instantiate(type_args).unwrap_err(),
+            error,
+        );
     }
 
     #[test]
-    fn test_with_op_builder() {
+    fn test_with_map_op_builder() {
         let mut module_builder = ModuleBuilder::new();
 
-        // Function to be called in `with`
-        let my_prog = module_builder
-            .define_function("my_prog", Signature::new(vec![], vec![]))
-            .unwrap()
-            .finish_with_outputs([])
+        // Function to be called by `map` op
+        let map_func = {
+            let map_func_builder = module_builder
+                .define_function("map_func", Signature::new(vec![qb_t()], vec![qb_t()]))
+                .unwrap();
+            let [global_state] = map_func_builder.input_wires_arr();
+            map_func_builder
+                .finish_with_outputs([global_state])
+                .unwrap()
+        };
+
+        // Function to be called by `with` op
+        let mut with_func_builder = module_builder
+            .define_function("with_func", Signature::new(vec![], vec![]))
             .unwrap();
+        let loaded_map_func = with_func_builder.load_func(map_func.handle(), &[]).unwrap();
+        let map_op = GlobalsOp::Map {
+            name: "my_global".to_string(),
+            ty_arg: qb_t().into(),
+            inputs: TypeRowRV::new(),
+            outputs: TypeRowRV::new(),
+            impl_outputs: TypeRowRV::new(),
+        };
+        with_func_builder
+            .add_dataflow_op(map_op, [loaded_map_func])
+            .unwrap();
+        let with_func = with_func_builder.finish_with_outputs([]).unwrap();
 
         // Function under test
         let mut func_builder = module_builder
@@ -341,7 +420,7 @@ mod test {
             )
             .unwrap();
         let [global_in] = func_builder.input_wires_arr();
-        let loaded_func = func_builder.load_func(my_prog.handle(), &[]).unwrap();
+        let loaded_func = func_builder.load_func(with_func.handle(), &[]).unwrap();
         let with_op = GlobalsOp::With {
             name: "my_global".to_string(),
             ty_arg: qb_t().into(),
