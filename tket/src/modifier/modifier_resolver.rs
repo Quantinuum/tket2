@@ -372,7 +372,7 @@ pub enum ModifierError<N = Node> {
     #[error(ignore)]
     NoTarget(N),
     /// Not the first modifier in a chain.
-    #[display("Node {_0} is not the first modifier in a chain.")]
+    #[display("Node {_0} of type {_1} is not the first modifier in a chain.")]
     NotInitialModifier(N, OpType),
     /// The modifier cannot be applied to the node.
     #[display("Modifier cannot be applied to the node {_0} of type {_1}")]

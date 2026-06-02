@@ -180,9 +180,8 @@ impl<N: HugrNode> ModifierResolver<N> {
         indir_call: &CallIndirect,
         new_dfg: &mut impl Dataflow,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        // Wrappers to convert ModifierError and ModifierResolverErrors(ModifierError) to UnResolvable with the
-        // indir_call node. This is because, even if we find an error in the process immediately,
-        // we cannot stop processing here.
+        // Wrap ModifierError as UnResolvable, using the ModifierError node as the error
+        // location and the IndirectCall OpType for context.
         let wrap_modifier_err = |e: ModifierError<N>| {
             ModifierResolverErrors::unresolvable(
                 e.node(),
@@ -190,6 +189,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                 indir_call.clone().into(),
             )
         };
+        // Wrap ModifierResolverErrors::ModifierError as UnResolvable
         let wrap_resolver_err = |e: ModifierResolverErrors<N>| match e {
             ModifierResolverErrors::ModifierError(inner) => wrap_modifier_err(inner),
             other => other,
