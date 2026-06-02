@@ -1099,16 +1099,11 @@ mod test {
         );
     }
 
-    /// Legacy `tket.qsystem::ZZPhase` ops targeting Sol are now routed through
-    /// the cross-platform decomposition path (issue #1620). Once
-    /// `build_zz_phase` is implemented the lowering should succeed; until then
-    /// it panics at the `todo!()` inside the decomposition builder.
+    /// Legacy `tket.qsystem::ZZPhase` ops targeting Sol are lowered via the
+    /// cross-platform decomposition path (issue #1620).
     #[test]
-    #[should_panic(expected = "Decompose ZZPhase into Sol ops")]
     fn test_legacy_qsystem_zz_phase_lowers_via_cross_platform_to_sol() {
         let mut h = legacy_qsystem_hugr();
-        // Panics inside build_zz_phase until the decomposition is implemented (issue #1620).
-        // Once implemented, remove #[should_panic] and this check will verify correct output.
         lower_tk2_ops(&mut h, Preserve::Public, QSystemPlatform::Sol).unwrap();
         assert_eq!(
             check_lowered(
@@ -1121,10 +1116,8 @@ mod test {
     }
 
     /// A `tket.qsystem.helios::ZZPhase` op targeting Sol is lowered via the
-    /// cross-platform decomposition path. Until `build_zz_phase` is
-    /// implemented (issue #1620) this panics inside the builder.
+    /// cross-platform decomposition path (issue #1620).
     #[test]
-    #[should_panic(expected = "Decompose ZZPhase into Sol ops")]
     fn test_helios_zz_phase_lowers_to_sol() {
         use crate::extension::qsystem::helios;
 
@@ -1179,8 +1172,6 @@ mod test {
         .unwrap();
         let mut h = b.finish_hugr_with_outputs([]).unwrap();
 
-        // Panics inside build_zz_phase until the decomposition is implemented (issue #1620).
-        // Once implemented, remove #[should_panic] and this check will verify correct output.
         lower_tk2_ops(&mut h, Preserve::Public, QSystemPlatform::Sol).unwrap();
         assert_eq!(
             check_lowered(
