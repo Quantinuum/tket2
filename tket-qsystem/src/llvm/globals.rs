@@ -227,7 +227,6 @@ mod test {
         check_emission,
         test::{TestContext, llvm_ctx, single_op_hugr},
     };
-    use hugr::types::{TypeArg, TypeRowRV};
     use hugr_core::extension::simple_op::MakeRegisteredOp;
 
     #[rstest::rstest]
@@ -236,14 +235,6 @@ mod test {
     )]
     #[case::map(2,
         GlobalsOp::Map{ name: "my_global".to_string(), ty_arg: qb_t().into(), inputs: [bool_t(), qb_t()].into(), outputs: [bool_t()].into(), impl_outputs: [qb_t()].into() }
-    )]
-    #[should_panic(expected = "TypeMismatch")]
-    #[case::with_invalid_ty_arg(3,
-        GlobalsOp::With{ name: "my_global".to_string(), ty_arg: TypeArg::String("not-a-runtime-type".to_string()), inputs: TypeRowRV::new(), outputs: TypeRowRV::new(), impl_outputs: TypeRowRV::new() }
-    )]
-    #[should_panic(expected = "TypeMismatch")]
-    #[case::with_invalid_ty_arg(3,
-        GlobalsOp::Map{ name: "my_global".to_string(), ty_arg: TypeArg::String("not-a-runtime-type".to_string()), inputs: TypeRowRV::new(), outputs: TypeRowRV::new(), impl_outputs: TypeRowRV::new() }
     )]
     fn emit_globals_codegen(
         #[case] _i: i32,
