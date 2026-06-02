@@ -356,8 +356,9 @@ impl<N> Default for ModifierResolver<N> {
     }
 }
 
-/// Error that can occur when resolving modifiers.
+/// Errors that can occur when tracing and validating a chain of modifiers and its target.
 #[derive(Debug, derive_more::Error, derive_more::Display)]
+#[non_exhaustive]
 pub enum ModifierError<N = Node> {
     /// The node is not a modifier
     #[display("Node to modify {_0} expected to be a modifier but actually {_1}")]
@@ -366,12 +367,12 @@ pub enum ModifierError<N = Node> {
     #[display("No caller of the modified function exists for node {_0}")]
     #[error(ignore)]
     NoCaller(N),
-    /// No target of this modifer exists.
-    #[display("No caller of the modified function exists for node {_0}")]
+    /// No target of this modifier exists.
+    #[display("The modifier node {_0} chain has no target")]
     #[error(ignore)]
     NoTarget(N),
     /// Not the first modifier in a chain.
-    #[display("Node {_0} is not the first modifier in a chain. It is called by {_0}")]
+    #[display("Node {_0} of type {_1} is not the first modifier in a chain.")]
     NotInitialModifier(N, OpType),
     /// The modifier cannot be applied to the node.
     #[display("Modifier cannot be applied to the node {_0} of type {_1}")]
@@ -392,6 +393,7 @@ impl<N> ModifierError<N> {
 
 /// Possible errors that can occur during the modifier resolution process.
 #[derive(Debug, derive_more::Display, derive_more::Error, derive_more::From)]
+#[non_exhaustive]
 pub enum ModifierResolverErrors<N = Node> {
     /// Cannot modify the node.
     #[display("{_0}")]
@@ -420,6 +422,12 @@ pub enum ModifierResolverErrors<N = Node> {
     /// The node cannot be modified.
     #[display("Modification by {_0:?} is not defined for the node {_1}")]
     Unimplemented(Modifier, OpType),
+    /// The power modifier is not supported.
+    #[display("Found power modifier in node: {node}. Power modifier is not supported yet.")]
+    PowerModifierNotSupported {
+        /// The `power` node
+        node: N,
+    },
 }
 
 impl<N> ModifierResolverErrors<N> {
@@ -2096,5 +2104,19 @@ mod tests {
     fn test_examples(#[case] example: &str) {
         let mut h = load_guppy_example(example).unwrap();
         test_resolve(&mut h);
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
+    fn test_power_modifier_error() {
+        let mut h = load_guppy_example("../test_files/guppy_examples/use_of_power.hugr").unwrap();
+        assert_matches!(h.validate(), Ok(()));
+
+        let entrypoint = h.entrypoint();
+        let result = resolve_modifier_with_entrypoints(&mut h, [entrypoint]);
+        assert_matches!(
+            result,
+            Err(ModifierResolverErrors::PowerModifierNotSupported { node: _ })
+        );
     }
 }
