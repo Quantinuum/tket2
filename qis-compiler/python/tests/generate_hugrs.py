@@ -235,7 +235,7 @@ def qft_32() -> bytes:
             for j in range(31 - i):
                 crz(qs[i], qs[i + j + 1], angle)
                 angle /= 2
-        result("cs", measure_array(qs))
+        result("cs", collect_measurements(measure_array(qs)))
 
     return main.compile().to_bytes()
 

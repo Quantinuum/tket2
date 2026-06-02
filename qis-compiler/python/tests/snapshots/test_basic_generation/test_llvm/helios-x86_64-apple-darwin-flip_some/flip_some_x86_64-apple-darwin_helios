@@ -13,45 +13,45 @@ define void @"__hugr__.__main__.flip_some.<locals>.main.1"() local_unnamed_addr 
 alloca_block:
   %qalloc.i = tail call i64 @___qalloc()
   %not_max.not.not.i = icmp eq i64 %qalloc.i, -1
-  br i1 %not_max.not.not.i, label %cond_40_case_0.i, label %__hugr__.__tk2_qalloc.36.exit
+  br i1 %not_max.not.not.i, label %cond_40_case_0.i, label %__hugr__.__tk2_helios_qalloc.36.exit
 
 cond_40_case_0.i:                                 ; preds = %alloca_block
   tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0")
   unreachable
 
-__hugr__.__tk2_qalloc.36.exit:                    ; preds = %alloca_block
+__hugr__.__tk2_helios_qalloc.36.exit:             ; preds = %alloca_block
   tail call void @___reset(i64 %qalloc.i)
   tail call void @___rxy(i64 %qalloc.i, double 0x400921FB54442D18, double 0.000000e+00)
   %qalloc.i34 = tail call i64 @___qalloc()
   %not_max.not.not.i35 = icmp eq i64 %qalloc.i34, -1
-  br i1 %not_max.not.not.i35, label %cond_54_case_0.i, label %__hugr__.__tk2_qalloc.50.exit
+  br i1 %not_max.not.not.i35, label %cond_54_case_0.i, label %__hugr__.__tk2_helios_qalloc.50.exit
 
-cond_54_case_0.i:                                 ; preds = %__hugr__.__tk2_qalloc.36.exit
+cond_54_case_0.i:                                 ; preds = %__hugr__.__tk2_helios_qalloc.36.exit
   tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0")
   unreachable
 
-__hugr__.__tk2_qalloc.50.exit:                    ; preds = %__hugr__.__tk2_qalloc.36.exit
+__hugr__.__tk2_helios_qalloc.50.exit:             ; preds = %__hugr__.__tk2_helios_qalloc.36.exit
   tail call void @___reset(i64 %qalloc.i34)
   %qalloc.i36 = tail call i64 @___qalloc()
   %not_max.not.not.i37 = icmp eq i64 %qalloc.i36, -1
-  br i1 %not_max.not.not.i37, label %cond_68_case_0.i, label %__hugr__.__tk2_qalloc.64.exit
+  br i1 %not_max.not.not.i37, label %cond_68_case_0.i, label %__hugr__.__tk2_helios_qalloc.64.exit
 
-cond_68_case_0.i:                                 ; preds = %__hugr__.__tk2_qalloc.50.exit
+cond_68_case_0.i:                                 ; preds = %__hugr__.__tk2_helios_qalloc.50.exit
   tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0")
   unreachable
 
-__hugr__.__tk2_qalloc.64.exit:                    ; preds = %__hugr__.__tk2_qalloc.50.exit
+__hugr__.__tk2_helios_qalloc.64.exit:             ; preds = %__hugr__.__tk2_helios_qalloc.50.exit
   tail call void @___reset(i64 %qalloc.i36)
   tail call void @___rxy(i64 %qalloc.i36, double 0x400921FB54442D18, double 0.000000e+00)
   %qalloc.i38 = tail call i64 @___qalloc()
   %not_max.not.not.i39 = icmp eq i64 %qalloc.i38, -1
-  br i1 %not_max.not.not.i39, label %cond_82_case_0.i, label %__hugr__.__tk2_qalloc.78.exit
+  br i1 %not_max.not.not.i39, label %cond_82_case_0.i, label %__hugr__.__tk2_helios_qalloc.78.exit
 
-cond_82_case_0.i:                                 ; preds = %__hugr__.__tk2_qalloc.64.exit
+cond_82_case_0.i:                                 ; preds = %__hugr__.__tk2_helios_qalloc.64.exit
   tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0")
   unreachable
 
-__hugr__.__tk2_qalloc.78.exit:                    ; preds = %__hugr__.__tk2_qalloc.64.exit
+__hugr__.__tk2_helios_qalloc.78.exit:             ; preds = %__hugr__.__tk2_helios_qalloc.64.exit
   tail call void @___reset(i64 %qalloc.i38)
   %lazy_measure = tail call i64 @___lazy_measure(i64 %qalloc.i)
   tail call void @___qfree(i64 %qalloc.i)
