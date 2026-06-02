@@ -25,6 +25,7 @@ use hugr::{
 
 use super::common::{self, CommonOp, CommonOpBuilder, PhasedXRzSynth, SharedOp};
 use super::lower::pi_mul_f64;
+use super::sol::SynthesizeSolOp;
 use derive_more::Display;
 use lazy_static::lazy_static;
 use strum::{EnumIter, EnumString, IntoStaticStr};
@@ -471,18 +472,78 @@ where
         self.inner.add_runtime_barrier(qbs, array_size)
     }
 }
+
+/// Implement [`SynthesizeSolOp`] for [`HeliosSynthesizer`] so that a Sol
+/// operation can be expressed in terms of Helios primitives.
+///
+/// All shared ops delegate to the corresponding [`SynthesizeHeliosOp`] method.
+/// The Sol-specific `PhasedXX` gate is not yet implemented — see issue #1620.
+impl<D> SynthesizeSolOp for HeliosSynthesizer<'_, D>
+where
+    D: CommonOpBuilder<HeliosOp>,
+{
+    fn build_lazy_measure(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        SynthesizeHeliosOp::build_lazy_measure(self, qb)
+    }
+
+    fn build_lazy_measure_leaked(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        SynthesizeHeliosOp::build_lazy_measure_leaked(self, qb)
+    }
+
+    fn build_lazy_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
+        SynthesizeHeliosOp::build_lazy_measure_reset(self, qb)
+    }
+
+    fn build_reset(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        SynthesizeHeliosOp::build_reset(self, qb)
+    }
+
+    fn build_phased_xx(
+        &mut self,
+        _qb1: Wire,
+        _qb2: Wire,
+        _angle1: Wire,
+        _angle2: Wire,
+    ) -> Result<[Wire; 2], BuildError> {
+        todo!("Decompose PhasedXX into Helios ops — see issue #1620")
+    }
+
+    fn build_phased_x(&mut self, qb: Wire, angle1: Wire, angle2: Wire) -> Result<Wire, BuildError> {
+        SynthesizeHeliosOp::build_phased_x(self, qb, angle1, angle2)
+    }
+
+    fn build_rz(&mut self, qb: Wire, angle: Wire) -> Result<Wire, BuildError> {
+        SynthesizeHeliosOp::build_rz(self, qb, angle)
+    }
+
+    fn build_try_alloc(&mut self) -> Result<Wire, BuildError> {
+        SynthesizeHeliosOp::build_try_alloc(self)
+    }
+
+    fn build_qfree(&mut self, qb: Wire) -> Result<(), BuildError> {
+        SynthesizeHeliosOp::build_qfree(self, qb)
+    }
+
+    fn build_runtime_barrier(&mut self, qbs: Wire, array_size: u64) -> Result<Wire, BuildError> {
+        SynthesizeHeliosOp::build_runtime_barrier(self, qbs, array_size)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::extension::futures::FutureOpBuilder;
     use crate::extension::qsystem::common::test_utils;
 
     use hugr::HugrView;
-    use hugr::builder::{DataflowHugr, FunctionBuilder};
+    use hugr::builder::{Dataflow, DataflowHugr, FunctionBuilder};
     use hugr::extension::prelude::{UnwrapBuilder, bool_t};
     use hugr::std_extensions::arithmetic::int_types::int_type;
     use hugr::std_extensions::collections::array::ArrayOpBuilder;
 
-    use super::*;
+    use super::{EXTENSION, EXTENSION_ID, HeliosOp, HeliosSynthesizer, SynthesizeHeliosOp};
+    use hugr::extension::prelude::qb_t;
+    use hugr::std_extensions::arithmetic::float_types::float64_type;
+    use hugr::types::Signature;
 
     #[test]
     fn create_extension() {
