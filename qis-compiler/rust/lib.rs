@@ -38,7 +38,10 @@ use tket::hugr::{self, llvm::inkwell};
 use tket::hugr::{Hugr, HugrView, Node};
 use tket::llvm::rotation::RotationCodegenExtension;
 use tket_qsystem::QSystemPass;
-use tket_qsystem::extension::{futures as qsystem_futures, qsystem, result as qsystem_result};
+use tket_qsystem::extension::{
+    futures as qsystem_futures, qsystem, random as qsystem_random, result as qsystem_result,
+    utils as qsystem_utils,
+};
 use tket_qsystem::llvm::array_utils::ArrayLowering;
 pub use tket_qsystem::llvm::futures::FuturesCodegenExtension;
 use tket_qsystem::llvm::{
@@ -72,11 +75,14 @@ static REGISTRY: std::sync::LazyLock<ExtensionRegistry> = std::sync::LazyLock::n
         qsystem_futures::EXTENSION.to_owned(),
         qsystem_result::EXTENSION.to_owned(),
         qsystem::EXTENSION.to_owned(),
+        qsystem_random::EXTENSION.to_owned(),
+        qsystem_utils::EXTENSION.to_owned(),
         ROTATION_EXTENSION.to_owned(),
         TKET_EXTENSION.to_owned(),
         TKET1_EXTENSION.to_owned(),
         tket::extension::bool::BOOL_EXTENSION.to_owned(),
         tket::extension::debug::DEBUG_EXTENSION.to_owned(),
+        tket::extension::guppy::GUPPY_EXTENSION.to_owned(),
         tket_qsystem::extension::gpu::EXTENSION.to_owned(),
         tket_qsystem::extension::wasm::EXTENSION.to_owned(),
     ])
@@ -138,8 +144,10 @@ fn get_hugr_llvm_module<'c, 'hugr, 'a: 'c>(
     let module = context.create_module(module_name.as_ref());
     let emit = EmitHugr::new(context, module, namer, exts);
     Ok(emit
-        .emit_module(hugr.try_fat(hugr.module_root()).unwrap())?
-        .finish())
+        // TODO: Add debug info support <https://github.com/Quantinuum/tket2/pull/1521>
+        .emit_module(hugr.try_fat(hugr.module_root()).unwrap(), false, 0)?
+        .finish()
+        .0) // Discard DebugInfoContext
 }
 
 fn process_hugr(platform: qsystem::QSystemPlatform, hugr: &mut Hugr) -> Result<()> {

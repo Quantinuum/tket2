@@ -227,7 +227,7 @@ mod test {
             .instantiate_extension_op(&PANIC_OP_ID, [type_arg_2q.clone(), type_arg_2q.clone()])
             .unwrap();
 
-        let hugr = SimpleHugrConfig::new()
+        let mut hugr = SimpleHugrConfig::new()
             .with_ins(vec![qb_t(), qb_t()])
             .with_outs(vec![qb_t(), qb_t()])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
@@ -257,7 +257,7 @@ mod test {
             .instantiate_extension_op(&EXIT_OP_ID, [type_arg_2q.clone(), type_arg_2q.clone()])
             .unwrap();
 
-        let hugr = SimpleHugrConfig::new()
+        let mut hugr = SimpleHugrConfig::new()
             .with_ins(vec![qb_t(), qb_t()])
             .with_outs(vec![qb_t(), qb_t()])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())

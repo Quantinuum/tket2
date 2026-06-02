@@ -56,6 +56,7 @@ pub fn bool_custom_type(extension_ref: &Weak<Extension>) -> CustomType {
         BOOL_TYPE_NAME.to_owned(),
         vec![],
         BOOL_EXTENSION_ID,
+        BOOL_EXTENSION_VERSION,
         TypeBound::Copyable,
         extension_ref,
     )

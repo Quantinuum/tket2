@@ -38,7 +38,7 @@ lazy_static! {
     /// [tket::extension::rotation::ROTATION_EXTENSION].
     pub static ref REGISTRY: ExtensionRegistry = {
         let mut registry = qsystem::REGISTRY.to_owned();
-        registry.register(tket::extension::rotation::ROTATION_EXTENSION.to_owned()).unwrap();
+        registry.register(tket::extension::rotation::ROTATION_EXTENSION.to_owned());
         registry
     };
 }

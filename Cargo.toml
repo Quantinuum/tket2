@@ -46,7 +46,6 @@ hugr = { git = "https://github.com/quantinuum/hugr", "rev" = "bded52e1f35c4f318f
 hugr-core = { git = "https://github.com/quantinuum/hugr", "rev" = "bded52e1f35c4f318f36accae10c7e9e7b0cf05e" }
 hugr-cli = { git = "https://github.com/quantinuum/hugr", "rev" = "bded52e1f35c4f318f36accae10c7e9e7b0cf05e" }
 hugr-llvm = { git = "https://github.com/quantinuum/hugr", "rev" = "bded52e1f35c4f318f36accae10c7e9e7b0cf05e" }
-hugr-model = { git = "https://github.com/quantinuum/hugr", "rev" = "bded52e1f35c4f318f36accae10c7e9e7b0cf05e" }
 # portgraph = { git = "https://github.com/quantinuum/portgraph", rev = "68b96ac737e0c285d8c543b2d74a7aa80a18202c" }
 
 [workspace.dependencies]

@@ -24,6 +24,7 @@ pub fn block_type(k_arg: impl Into<TypeArg>) -> Type {
         BLOCK_TYPENAME,
         [k_arg.into()],
         EXTENSION_ID,
+        VERSION,
         TypeBound::Linear,
         &Arc::<Extension>::downgrade(&EXTENSION),
     )

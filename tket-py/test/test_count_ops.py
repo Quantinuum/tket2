@@ -29,11 +29,9 @@ testdata = [
     ("one_rz", 2),
     ("loop_conditional", 8),
     ("conditional_loop", 8),
-    ("fn_calls", 2),
+    ("fn_calls", 3),
     ("repeat_until_success", 21),
-    # TODO: Requires this fix from hugr-rs
-    # <https://github.com/Quantinuum/hugr/pull/2986>
-    # ("extern_def", 2),
+    ("extern_def", 2),
 ]
 
 

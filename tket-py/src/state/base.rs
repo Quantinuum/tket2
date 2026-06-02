@@ -247,5 +247,5 @@ pub static REGISTRY: LazyLock<ExtensionRegistry> = LazyLock::new(|| {
 /// loading a CompilationState.
 #[pyfunction]
 pub fn embedded_extensions() -> Vec<String> {
-    REGISTRY.iter().map(|e| e.name.to_string()).collect()
+    REGISTRY.ids().map(ToString::to_string).collect()
 }

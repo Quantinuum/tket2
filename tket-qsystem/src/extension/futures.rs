@@ -61,6 +61,7 @@ pub fn future_custom_type(t: Type, extension_ref: &Weak<Extension>) -> CustomTyp
         FUTURE_TYPE_NAME.to_owned(),
         vec![t.into()],
         EXTENSION_ID,
+        EXTENSION_VERSION,
         TypeBound::Linear,
         extension_ref,
     )
