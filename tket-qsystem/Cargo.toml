@@ -11,7 +11,7 @@ homepage.workspace = true
 repository.workspace = true
 description = "TKET tool for preparing and validating `Hugr`s for compilation targeting Quantinuum H-series  quantum computers"
 keywords = ["Quantum", "Quantinuum"]
-categories = ["compilers"]
+categories = ["compilers", "science::quantum-computing"]
 
 [features]
 default = ["cli"]
