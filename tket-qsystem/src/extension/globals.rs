@@ -1,4 +1,4 @@
-#![allow(missing_docs)]
+//! This module defines the `tket.globals` extension.
 
 use std::sync::{Arc, Weak};
 
@@ -31,7 +31,9 @@ lazy_static::lazy_static! {
         })
     };
 
+    /// The [TypeParam] specifying the name of a global variable.
     pub static ref NAME_PARAM: TypeParam = TypeParam::StringType;
+    /// The [TypeParam] specifying the runtime type of a global variable.
     pub static ref TYPE_PARAM: TypeParam = TypeParam::RuntimeType(TypeBound::Linear);
 
     /// The [TypeParam] of various types and ops specifying the input signature of a function.
@@ -60,6 +62,7 @@ lazy_static::lazy_static! {
 )]
 #[expect(non_camel_case_types)]
 #[non_exhaustive]
+/// Op definitions exposed by the `tket.globals` extension.
 pub enum GlobalsOpDef {
     /// Apply a function to the contents of the named global variable.
     with,
@@ -151,19 +154,32 @@ impl MakeOpDef for GlobalsOpDef {
 }
 
 #[derive(Debug)]
+/// Concrete instantiations of operations in the `tket.globals` extension.
 pub enum GlobalsOp {
+    /// Run a function with the contents of a named global variable.
     With {
+        /// Global variable identifier.
         name: String,
+        /// Runtime type argument of the global variable.
         ty_arg: TypeArg,
+        /// Input row of the called function.
         inputs: TypeRowRV,
+        /// Explicit output row of the called function.
         outputs: TypeRowRV,
+        /// Implicit output row of the called function.
         impl_outputs: TypeRowRV,
     },
+    /// Map a function over the contents of a named global variable.
     Map {
+        /// Global variable identifier.
         name: String,
+        /// Runtime type argument of the global variable.
         ty_arg: TypeArg,
+        /// Input row of the mapped function.
         inputs: TypeRowRV,
+        /// Explicit output row of the mapped function.
         outputs: TypeRowRV,
+        /// Implicit output row of the mapped function.
         impl_outputs: TypeRowRV,
     },
 }
