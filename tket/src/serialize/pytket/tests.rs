@@ -968,11 +968,10 @@ fn circ_discard_first_qubit() -> Hugr {
 
     let [q1, q2] = h.input_wires_arr();
 
-    let [msmt] = h
+    let [_msmt] = h
         .add_dataflow_op(TketOp::MeasureFree, [q1])
         .unwrap()
         .outputs_arr();
-    let _ = h.add_dataflow_op(MeasurementOp::Free, [msmt]);
 
     let [q2] = h.add_dataflow_op(TketOp::X, [q2]).unwrap().outputs_arr();
 

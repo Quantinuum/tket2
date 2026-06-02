@@ -34,7 +34,7 @@
               "extension": "tket.measurement",
               "id": "Measurement",
               "args": [],
-              "bound": "A"
+              "bound": "C"
             }
           ]
         }

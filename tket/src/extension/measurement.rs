@@ -44,7 +44,7 @@ fn add_measurement_type_def(
         MEASUREMENT_TYPE_ID.to_owned(),
         vec![],
         "A type representing the result of a measurement operation".into(),
-        TypeBound::Linear.into(),
+        TypeBound::Copyable.into(),
         &extension_ref,
     )
 }
@@ -55,7 +55,7 @@ pub fn measurement_custom_type(extension_ref: &Weak<Extension>) -> CustomType {
         MEASUREMENT_TYPE_ID.to_owned(),
         vec![],
         MEASUREMENT_EXTENSION_ID,
-        TypeBound::Linear,
+        TypeBound::Copyable,
         extension_ref,
     )
 }
@@ -85,10 +85,6 @@ pub fn measurement_type() -> Type {
 pub enum MeasurementOp {
     /// Read a measurement, consuming it and returning a Hugr bool.
     Read,
-    /// Duplicate a measurement into two measurements.
-    Dup,
-    /// Consume a measurement without reading it.
-    Free,
 }
 
 impl MakeOpDef for MeasurementOp {
@@ -100,12 +96,6 @@ impl MakeOpDef for MeasurementOp {
         let measurement_type = Type::new_extension(measurement_custom_type(extension_ref));
         match self {
             MeasurementOp::Read => Signature::new([measurement_type], [bool_t()]).into(),
-            MeasurementOp::Dup => Signature::new(
-                [measurement_type.clone()],
-                [measurement_type.clone(), measurement_type],
-            )
-            .into(),
-            MeasurementOp::Free => Signature::new([measurement_type], []).into(),
         }
     }
 
@@ -119,12 +109,8 @@ impl MakeOpDef for MeasurementOp {
 
     fn description(&self) -> String {
         match self {
-			MeasurementOp::Read => "Consumes a measurement, converting it into a bool.".into(),
-			MeasurementOp::Dup => {
-				"Duplicate a measurement. The original measurement is consumed and two measurements are returned.".into()
-			}
-			MeasurementOp::Free => "Discard (a copy of) measurement without reading it.".into(),
-		}
+            MeasurementOp::Read => "Consumes a measurement, converting it into a bool.".into(),
+        }
     }
 
     fn extension_ref(&self) -> Weak<Extension> {
@@ -150,20 +136,6 @@ pub trait MeasurementOpBuilder: Dataflow {
         Ok(self
             .add_dataflow_op(MeasurementOp::Read, [measurement])?
             .outputs_arr())
-    }
-
-    /// Add a `tket.measurement.Dup` op.
-    fn add_measurement_dup(&mut self, measurement: Wire) -> Result<[Wire; 2], BuildError> {
-        Ok(self
-            .add_dataflow_op(MeasurementOp::Dup, [measurement])?
-            .outputs_arr())
-    }
-
-    /// Add a `tket.measurement.Free` op.
-    fn add_measurement_free(&mut self, measurement: Wire) -> Result<(), BuildError> {
-        let op = self.add_dataflow_op(MeasurementOp::Free, [measurement])?;
-        assert!(op.outputs().len() == 0);
-        Ok(())
     }
 }
 
@@ -198,10 +170,8 @@ mod test {
     fn measurement_ops_validate() {
         let mut builder =
             DFGBuilder::new(Signature::new(vec![measurement_type()], vec![bool_t()])).unwrap();
-        let [measurement] = builder.input_wires_arr();
-        let [lhs, rhs] = builder.add_measurement_dup(measurement).unwrap();
-        builder.add_measurement_free(lhs).unwrap();
-        let [bit] = builder.add_measurement_read(rhs).unwrap();
+        let [msmt] = builder.input_wires_arr();
+        let [bit] = builder.add_measurement_read(msmt).unwrap();
         let hugr = builder.finish_hugr_with_outputs([bit]).unwrap();
         hugr.validate().unwrap();
     }

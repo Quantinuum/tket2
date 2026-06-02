@@ -57,7 +57,7 @@ def ext_measurement() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
     return (
         ext,
         [ext.measurement_t],
-        [ext.read, ext.dup, ext.free],
+        [ext.read],
     )
 
 
