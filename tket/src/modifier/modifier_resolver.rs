@@ -356,7 +356,7 @@ impl<N> Default for ModifierResolver<N> {
     }
 }
 
-/// Errors that can occur when tracing validating chain of modifiers and their target.
+/// Errors that can occur when tracing and validating a chain of modifiers and its target.
 #[derive(Debug, derive_more::Error, derive_more::Display)]
 #[non_exhaustive]
 pub enum ModifierError<N = Node> {
