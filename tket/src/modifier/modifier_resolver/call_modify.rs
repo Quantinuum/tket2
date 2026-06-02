@@ -115,7 +115,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         &mut self,
         h: &impl HugrMut<Node = N>,
         n: N,
-    ) -> Result<Vec<N>, ModifierError<N>> {
+    ) -> Result<Vec<N>, ModifierResolverErrors<N>> {
         // The final target of modifiers to apply.
         let mut current = n;
         // Collection of modifiers to apply.
@@ -129,7 +129,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                 break;
             }
 
-            modifiers.push(optype.as_extension_op().unwrap());
+            modifiers.push(optype.as_extension_op().unwrap(), current)?;
             let next = h
                 .single_linked_output(current, 0)
                 .ok_or(ModifierError::NoTarget(n))?;
@@ -180,15 +180,19 @@ impl<N: HugrNode> ModifierResolver<N> {
         indir_call: &CallIndirect,
         new_dfg: &mut impl Dataflow,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        // Wrapper to convert ModifierError to UnResolvable with the indir_call node.
-        // This is because, even if we find an error in the process immediately,
-        // we cannot stop processing here.
-        let wrap_err = |e: ModifierError<N>| {
+        // Wrap ModifierError as UnResolvable, using the ModifierError node as the error
+        // location and the IndirectCall OpType for context.
+        let wrap_modifier_err = |e: ModifierError<N>| {
             ModifierResolverErrors::unresolvable(
                 e.node(),
                 "Cannot modify indirect call.".to_string(),
                 indir_call.clone().into(),
             )
+        };
+        // Wrap ModifierResolverErrors::ModifierError as UnResolvable
+        let wrap_resolver_err = |e: ModifierResolverErrors<N>| match e {
+            ModifierResolverErrors::ModifierError(inner) => wrap_modifier_err(inner),
+            other => other,
         };
 
         // Trace the chain of modifiers starting from the one before the indirect call.
@@ -196,10 +200,10 @@ impl<N: HugrNode> ModifierResolver<N> {
         let modifiers = self.modifiers().clone();
         let trace = self
             .trace_modifiers_chain(h, chain_tail.0)
-            .map_err(wrap_err)?;
+            .map_err(wrap_resolver_err)?;
         let targ = trace.last().cloned().unwrap();
         let (func, load) =
-            Self::get_loaded_function(h, n, targ, h.get_optype(targ)).map_err(wrap_err)?;
+            Self::get_loaded_function(h, n, targ, h.get_optype(targ)).map_err(wrap_modifier_err)?;
 
         // Modify the function
         let modified_fn = match self.modify_fn_if_needed(h, func)? {
