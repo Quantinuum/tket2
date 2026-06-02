@@ -11,7 +11,7 @@ homepage.workspace = true
 repository.workspace = true
 description = "HUGR extensions for logical operations on QEC codes."
 keywords = ["Quantum", "Quantinuum"]
-categories = ["compilers"]
+categories = ["compilers", "science::quantum-computing"]
 
 [lints]
 workspace = true
@@ -20,4 +20,4 @@ workspace = true
 hugr.workspace = true
 semver = "1.0.28"
 strum = { workspace = true, features = ["derive"] }
-tket-qsystem = { version = "0.24.0", path = "../tket-qsystem" }
+tket-qsystem = { version = "0.25.0", path = "../tket-qsystem" }

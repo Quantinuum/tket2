@@ -602,6 +602,7 @@ mod test {
     #[case(3, false)]
     #[case(3, true)]
     #[case(7, false)]
+    #[cfg_attr(miri, ignore)] // miri takes a long time to analyze this test.
     fn test_single_tket_op(#[case] c_num: u64, #[case] dagger: bool) {
         for op in TketOp::iter() {
             let Some((size, has_angle)) = size(op) else {

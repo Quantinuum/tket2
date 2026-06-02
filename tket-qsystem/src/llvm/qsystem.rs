@@ -5,8 +5,10 @@ use hugr::llvm::inkwell::types::FunctionType;
 use itertools::Itertools as _;
 use tket::hugr::{self, llvm::inkwell};
 
-use crate::extension::qsystem::{self, QSystemOp};
-use anyhow::{Result, anyhow};
+use crate::extension::qsystem::helios::{self as qsystem_helios, HeliosOp};
+use crate::extension::qsystem::sol::{self as qsystem_sol, SolOp};
+use crate::extension::qsystem::{QSystemPlatform, SharedOp};
+use anyhow::{Result, anyhow, bail};
 use hugr::extension::prelude::qb_t;
 use hugr::llvm::custom::CodegenExtension;
 use hugr::llvm::emit::func::{EmitFuncContext, build_option};
@@ -22,7 +24,16 @@ use super::futures::future_type;
 
 /// Codegen extension for quantum operations.
 #[derive(derive_more::From)]
-pub struct QSystemCodegenExtension<PCG>(PCG);
+pub struct QSystemCodegenExtension<PCG: PreludeCodegen> {
+    platform: QSystemPlatform,
+    codegen: PCG,
+}
+impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
+    /// Create a new `QSystemCodegenExtension` for the desired qsystem platform
+    pub fn new(platform: QSystemPlatform, codegen: PCG) -> Self {
+        Self { platform, codegen }
+    }
+}
 
 impl<PCG: PreludeCodegen> CodegenExtension for QSystemCodegenExtension<PCG> {
     fn add_extension<'a, H: HugrView<Node = Node> + 'a>(
@@ -32,43 +43,77 @@ impl<PCG: PreludeCodegen> CodegenExtension for QSystemCodegenExtension<PCG> {
     where
         Self: 'a,
     {
-        builder
-            .simple_extension_op(move |context, args, op| self.emit(context, args, op))
-            .extension_op(qsystem::EXTENSION_ID, qsystem::RUNTIME_BARRIER_NAME, {
-                move |context, args| {
-                    // Do nothing
-                    // TODO don't lower to RuntimeBarrier
-                    args.outputs.finish(context.builder(), args.inputs)
-                }
-            })
+        match self.platform {
+            QSystemPlatform::Helios => builder
+                .simple_extension_op(move |context, args, op| self.emit_helios(context, args, op))
+                .extension_op(
+                    qsystem_helios::EXTENSION_ID,
+                    qsystem_helios::RUNTIME_BARRIER_NAME,
+                    {
+                        |context, args| {
+                            // Do nothing
+                            // TODO don't lower to RuntimeBarrier
+                            args.outputs.finish(context.builder(), args.inputs)
+                        }
+                    },
+                ),
+            QSystemPlatform::Sol => builder
+                .simple_extension_op::<SolOp>(move |context, args, op| {
+                    self.emit_sol(context, args, op)
+                })
+                .extension_op(
+                    qsystem_sol::EXTENSION_ID,
+                    qsystem_sol::RUNTIME_BARRIER_NAME,
+                    |context, args| {
+                        // Do nothing
+                        // TODO don't lower to RuntimeBarrier
+                        args.outputs.finish(context.builder(), args.inputs)
+                    },
+                ),
+        }
+    }
+}
+
+trait QSystemRuntimeFunction {
+    fn name(&self) -> &str;
+
+    fn func_type<'c>(
+        &self,
+        context: &EmitFuncContext<'c, '_, impl HugrView<Node = Node>>,
+        pcg: &impl PreludeCodegen,
+    ) -> FunctionType<'c>;
+
+    fn get_func<'c, H: HugrView<Node = Node>>(
+        &self,
+        context: &EmitFuncContext<'c, '_, H>,
+        pcg: &impl PreludeCodegen,
+    ) -> Result<FunctionValue<'c>> {
+        let func_type = self.func_type(context, pcg);
+        context.get_extern_func(self.name(), func_type)
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum RuntimeFunction {
-    Rz,
-    Rzz,
-    Rxy,
+enum GenericRuntimeFunction {
     QAlloc,
     QFree,
     Measure,
     LazyMeasureLeaked,
     LazyMeasure,
     Reset,
+    Rz,
 }
 
-impl RuntimeFunction {
+impl QSystemRuntimeFunction for GenericRuntimeFunction {
     fn name(&self) -> &str {
         match self {
-            RuntimeFunction::Rz => "___rz",
-            RuntimeFunction::Rzz => "___rzz",
-            RuntimeFunction::Rxy => "___rxy",
-            RuntimeFunction::QAlloc => "___qalloc",
-            RuntimeFunction::QFree => "___qfree",
-            RuntimeFunction::Measure => "___measure",
-            RuntimeFunction::LazyMeasureLeaked => "___lazy_measure_leaked",
-            RuntimeFunction::LazyMeasure => "___lazy_measure",
-            RuntimeFunction::Reset => "___reset",
+            GenericRuntimeFunction::QAlloc => "___qalloc",
+            GenericRuntimeFunction::QFree => "___qfree",
+            GenericRuntimeFunction::Measure => "___measure",
+            GenericRuntimeFunction::LazyMeasureLeaked => "___lazy_measure_leaked",
+            GenericRuntimeFunction::LazyMeasure => "___lazy_measure",
+            GenericRuntimeFunction::Reset => "___reset",
+            GenericRuntimeFunction::Rz => "___rz",
         }
     }
 
@@ -82,36 +127,97 @@ impl RuntimeFunction {
             .as_basic_type_enum();
         let iwc = context.iw_context();
         match self {
-            RuntimeFunction::Rz => iwc
-                .void_type()
-                .fn_type(&[qb_type.into(), iwc.f64_type().into()], false),
-            RuntimeFunction::Rzz => iwc.void_type().fn_type(
-                &[qb_type.into(), qb_type.into(), iwc.f64_type().into()],
-                false,
-            ),
-            RuntimeFunction::Rxy => iwc.void_type().fn_type(
-                &[qb_type.into(), iwc.f64_type().into(), iwc.f64_type().into()],
-                false,
-            ),
-            RuntimeFunction::QAlloc => qb_type.fn_type(&[], false),
-            RuntimeFunction::QFree => iwc.void_type().fn_type(&[qb_type.into()], false),
-            RuntimeFunction::Measure => iwc.bool_type().fn_type(&[qb_type.into()], false),
-            RuntimeFunction::LazyMeasureLeaked => {
+            GenericRuntimeFunction::QAlloc => qb_type.fn_type(&[], false),
+            GenericRuntimeFunction::QFree => iwc.void_type().fn_type(&[qb_type.into()], false),
+            GenericRuntimeFunction::Measure => iwc.bool_type().fn_type(&[qb_type.into()], false),
+            GenericRuntimeFunction::LazyMeasureLeaked => {
                 future_type(iwc).fn_type(&[qb_type.into()], false)
             }
-            RuntimeFunction::LazyMeasure => future_type(iwc).fn_type(&[qb_type.into()], false),
-            RuntimeFunction::Reset => iwc.void_type().fn_type(&[qb_type.into()], false),
+            GenericRuntimeFunction::LazyMeasure => {
+                future_type(iwc).fn_type(&[qb_type.into()], false)
+            }
+            GenericRuntimeFunction::Reset => iwc.void_type().fn_type(&[qb_type.into()], false),
+            GenericRuntimeFunction::Rz => iwc
+                .void_type()
+                .fn_type(&[qb_type.into(), iwc.f64_type().into()], false),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HeliosGateFunction {
+    Rzz,
+    Rxy,
+}
+impl QSystemRuntimeFunction for HeliosGateFunction {
+    fn name(&self) -> &str {
+        match self {
+            HeliosGateFunction::Rzz => "___rzz",
+            HeliosGateFunction::Rxy => "___rxy",
         }
     }
 
-    fn get_func<'c, H: HugrView<Node = Node>>(
+    fn func_type<'c>(
         &self,
-        context: &EmitFuncContext<'c, '_, H>,
+        context: &EmitFuncContext<'c, '_, impl HugrView<Node = Node>>,
         pcg: &impl PreludeCodegen,
-    ) -> Result<FunctionValue<'c>> {
-        let func_type = self.func_type(context, pcg);
-        context.get_extern_func(self.name(), func_type)
+    ) -> FunctionType<'c> {
+        let qb_type = pcg
+            .qubit_type(&context.typing_session())
+            .as_basic_type_enum();
+        let iwc = context.iw_context();
+        match self {
+            HeliosGateFunction::Rzz => iwc.void_type().fn_type(
+                &[qb_type.into(), qb_type.into(), iwc.f64_type().into()],
+                false,
+            ),
+            HeliosGateFunction::Rxy => iwc.void_type().fn_type(
+                &[qb_type.into(), iwc.f64_type().into(), iwc.f64_type().into()],
+                false,
+            ),
+        }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SolGateFunction {
+    Rp,
+    Rpp,
+}
+
+impl QSystemRuntimeFunction for SolGateFunction {
+    fn name(&self) -> &str {
+        match self {
+            SolGateFunction::Rp => "___rp",
+            SolGateFunction::Rpp => "___rpp",
+        }
+    }
+
+    fn func_type<'c>(
+        &self,
+        context: &EmitFuncContext<'c, '_, impl HugrView<Node = Node>>,
+        pcg: &impl PreludeCodegen,
+    ) -> FunctionType<'c> {
+        let qubit = pcg
+            .qubit_type(&context.typing_session())
+            .as_basic_type_enum()
+            .into();
+        let iwc = context.iw_context();
+        let float = iwc.f64_type().into();
+        match self {
+            SolGateFunction::Rp => iwc.void_type().fn_type(&[qubit, float, float], false),
+            SolGateFunction::Rpp => iwc
+                .void_type()
+                .fn_type(&[qubit, qubit, float, float], false),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RuntimeFunction {
+    Generic(GenericRuntimeFunction),
+    HeliosGate(HeliosGateFunction),
+    SolGate(SolGateFunction),
 }
 
 impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
@@ -120,7 +226,34 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
         context: &EmitFuncContext<'c, '_, impl HugrView<Node = Node>>,
         rf: RuntimeFunction,
     ) -> Result<FunctionValue<'c>> {
-        rf.get_func(context, &self.0)
+        match (self.platform, rf) {
+            (QSystemPlatform::Helios, RuntimeFunction::HeliosGate(gf)) => {
+                gf.get_func(context, &self.codegen)
+            }
+            (QSystemPlatform::Sol, RuntimeFunction::SolGate(gf)) => {
+                gf.get_func(context, &self.codegen)
+            }
+            (_, RuntimeFunction::Generic(gf)) => gf.get_func(context, &self.codegen),
+            (QSystemPlatform::Helios, RuntimeFunction::SolGate(_)) => {
+                bail!("Sol gate function called on Helios platform")
+            }
+            (QSystemPlatform::Sol, RuntimeFunction::HeliosGate(_)) => {
+                bail!("Helios gate function called on Sol platform")
+            }
+        }
+    }
+    fn runtime_func_name<'c>(&self, rf: &'c RuntimeFunction) -> Result<&'c str> {
+        match (self.platform, rf) {
+            (QSystemPlatform::Helios, RuntimeFunction::HeliosGate(gf)) => Ok(gf.name()),
+            (QSystemPlatform::Sol, RuntimeFunction::SolGate(gf)) => Ok(gf.name()),
+            (_, RuntimeFunction::Generic(gf)) => Ok(gf.name()),
+            (QSystemPlatform::Helios, RuntimeFunction::SolGate(_)) => {
+                bail!("Sol gate function called on Helios platform")
+            }
+            (QSystemPlatform::Sol, RuntimeFunction::HeliosGate(_)) => {
+                bail!("Helios gate function called on Sol platform")
+            }
+        }
     }
 
     /// Helper function to `emit` a qsystem operation.
@@ -138,35 +271,93 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
             .collect_vec();
         let outputs = output_indices.iter().map(|&i| args.inputs[i]).collect_vec();
         let func = self.runtime_func(context, runtime_func)?;
-        context
-            .builder()
-            .build_call(func, &inputs, runtime_func.name())?;
+        let func_name = self.runtime_func_name(&runtime_func)?;
+        context.builder().build_call(func, &inputs, func_name)?;
         args.outputs.finish(context.builder(), outputs)
     }
 
-    /// Function to help lower the `tket.qsystem` extension.
-    fn emit<'c, H: HugrView<Node = Node>>(
+    /// Function to help lower the `tket.qsystem.helios` extension.
+    fn emit_helios<'c, H: HugrView<Node = Node>>(
         &self,
         context: &mut EmitFuncContext<'c, '_, H>,
         args: EmitOpArgs<'c, '_, ExtensionOp, H>,
-        op: QSystemOp,
+        op: HeliosOp,
     ) -> Result<()> {
         match op {
-            // Rotation about Z
-            QSystemOp::Rz => self.emit_impl(context, args, RuntimeFunction::Rz, &[0, 1], &[0]),
-            // Rotation about ZZ (aka "ZZPhase")
-            QSystemOp::ZZPhase => {
-                self.emit_impl(context, args, RuntimeFunction::Rzz, &[0, 1, 2], &[0, 1])
+            // PhasedX uses a different LLVM function on Helios (___rxy) vs Sol (___rp).
+            HeliosOp::PhasedX => self.emit_impl(
+                context,
+                args,
+                RuntimeFunction::HeliosGate(HeliosGateFunction::Rxy),
+                &[0, 1, 2],
+                &[0],
+            ),
+            HeliosOp::ZZPhase => self.emit_impl(
+                context,
+                args,
+                RuntimeFunction::HeliosGate(HeliosGateFunction::Rzz),
+                &[0, 1, 2],
+                &[0, 1],
+            ),
+            _ => {
+                let shared = SharedOp::try_from(op).map_err(|e| anyhow!(e))?;
+                self.emit_shared(context, args, shared)
             }
-            // Rotation in X and Y
-            // (α,β) ↦ Rz(β)Rx(α)Rz(−β)
-            //
-            // aka "PhasedX", "R1XY", "U1q"
-            QSystemOp::PhasedX => {
-                self.emit_impl(context, args, RuntimeFunction::Rxy, &[0, 1, 2], &[0])
+        }
+    }
+
+    /// Function to help lower the `tket.qsystem.sol` extension.
+    fn emit_sol<'c, H: HugrView<Node = Node>>(
+        &self,
+        context: &mut EmitFuncContext<'c, '_, H>,
+        args: EmitOpArgs<'c, '_, ExtensionOp, H>,
+        op: SolOp,
+    ) -> Result<()> {
+        match op {
+            // PhasedX uses a different LLVM function on Sol (___rp) vs Helios (___rxy).
+            SolOp::PhasedX => self.emit_impl(
+                context,
+                args,
+                RuntimeFunction::SolGate(SolGateFunction::Rp),
+                &[0, 1, 2],
+                &[0],
+            ),
+            SolOp::PhasedXX => self.emit_impl(
+                context,
+                args,
+                RuntimeFunction::SolGate(SolGateFunction::Rpp),
+                &[0, 1, 2, 3],
+                &[0, 1],
+            ),
+            _ => {
+                let shared = SharedOp::try_from(op).map_err(|e| anyhow!(e))?;
+                self.emit_shared(context, args, shared)
             }
-            // Measure qubit in Z basis
-            QSystemOp::Measure | QSystemOp::MeasureReset => {
+        }
+    }
+
+    /// Lower a [`SharedOp`] that has identical LLVM behaviour on all platforms.
+    ///
+    /// Note: [`SharedOp::PhasedX`] is excluded — it uses different runtime functions
+    /// per platform (`___rxy` on Helios, `___rp` on Sol) and must be handled by the
+    /// platform-specific method before calling this one.
+    fn emit_shared<'c, H: HugrView<Node = Node>>(
+        &self,
+        context: &mut EmitFuncContext<'c, '_, H>,
+        args: EmitOpArgs<'c, '_, ExtensionOp, H>,
+        op: SharedOp,
+    ) -> Result<()> {
+        match op {
+            // Rz uses the same runtime function (___rz) on all platforms.
+            SharedOp::Rz => self.emit_impl(
+                context,
+                args,
+                RuntimeFunction::Generic(GenericRuntimeFunction::Rz),
+                &[0, 1],
+                &[0],
+            ),
+            // Measure qubit in Z basis.
+            SharedOp::Measure | SharedOp::MeasureReset => {
                 let true_val = emit_value(context, &Value::true_val())?;
                 let false_val = emit_value(context, &Value::false_val())?;
                 let builder = context.builder();
@@ -176,7 +367,10 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                     .map_err(|_| anyhow!("Measure expects one input"))?;
                 let result_i1 = builder
                     .build_call(
-                        self.runtime_func(context, RuntimeFunction::Measure)?,
+                        self.runtime_func(
+                            context,
+                            RuntimeFunction::Generic(GenericRuntimeFunction::Measure),
+                        )?,
                         &[qb.into()],
                         "measure_i1",
                     )?
@@ -184,27 +378,33 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                     .unwrap_basic()
                     .into_int_value();
                 let result = builder.build_select(result_i1, true_val, false_val, "measure")?;
-                if op == QSystemOp::Measure {
-                    // normal measure may put the qubit in invalid state, so assume
-                    // deallocation, don't return it
+                if op == SharedOp::Measure {
+                    // Normal measure may put the qubit in an invalid state, so assume
+                    // deallocation and don't return it.
                     builder.build_call(
-                        self.runtime_func(context, RuntimeFunction::QFree)?,
+                        self.runtime_func(
+                            context,
+                            RuntimeFunction::Generic(GenericRuntimeFunction::QFree),
+                        )?,
                         &[qb.into()],
                         "qfree",
                     )?;
                     args.outputs.finish(builder, [result])
                 } else {
-                    // MeasureReset will reset the qubit after measurement so safe to return
+                    // MeasureReset resets the qubit after measurement so it is safe to return.
                     builder.build_call(
-                        self.runtime_func(context, RuntimeFunction::Reset)?,
+                        self.runtime_func(
+                            context,
+                            RuntimeFunction::Generic(GenericRuntimeFunction::Reset),
+                        )?,
                         &[qb.into()],
                         "reset",
                     )?;
                     args.outputs.finish(builder, [qb, result])
                 }
             }
-            // Measure qubit in Z basis, not forcing to a boolean
-            QSystemOp::LazyMeasure => {
+            // Measure qubit in Z basis, not forcing to a boolean.
+            SharedOp::LazyMeasure => {
                 let builder = context.builder();
                 let [qb] = args
                     .inputs
@@ -212,21 +412,27 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                     .map_err(|_| anyhow!("LazyMeasure expects one input"))?;
                 let result = builder
                     .build_call(
-                        self.runtime_func(context, RuntimeFunction::LazyMeasure)?,
+                        self.runtime_func(
+                            context,
+                            RuntimeFunction::Generic(GenericRuntimeFunction::LazyMeasure),
+                        )?,
                         &[qb.into()],
                         "lazy_measure",
                     )?
                     .try_as_basic_value()
                     .unwrap_basic();
                 builder.build_call(
-                    self.runtime_func(context, RuntimeFunction::QFree)?,
+                    self.runtime_func(
+                        context,
+                        RuntimeFunction::Generic(GenericRuntimeFunction::QFree),
+                    )?,
                     &[qb.into()],
                     "qfree",
                 )?;
                 args.outputs.finish(builder, [result])
             }
-            // Measure qubit in Z basis or detect leakage, not forcing to a boolean
-            QSystemOp::LazyMeasureLeaked => {
+            // Measure qubit in Z basis or detect leakage, not forcing to a boolean.
+            SharedOp::LazyMeasureLeaked => {
                 let builder = context.builder();
                 let [qb] = args
                     .inputs
@@ -234,20 +440,26 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                     .map_err(|_| anyhow!("LazyMeasureLeaked expects one input"))?;
                 let result = builder
                     .build_call(
-                        self.runtime_func(context, RuntimeFunction::LazyMeasureLeaked)?,
+                        self.runtime_func(
+                            context,
+                            RuntimeFunction::Generic(GenericRuntimeFunction::LazyMeasureLeaked),
+                        )?,
                         &[qb.into()],
                         "lazy_measure_leaked",
                     )?
                     .try_as_basic_value()
                     .unwrap_basic();
                 builder.build_call(
-                    self.runtime_func(context, RuntimeFunction::QFree)?,
+                    self.runtime_func(
+                        context,
+                        RuntimeFunction::Generic(GenericRuntimeFunction::QFree),
+                    )?,
                     &[qb.into()],
                     "qfree",
                 )?;
                 args.outputs.finish(builder, [result])
             }
-            QSystemOp::LazyMeasureReset => {
+            SharedOp::LazyMeasureReset => {
                 let builder = context.builder();
                 let [qb] = args
                     .inputs
@@ -255,22 +467,34 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                     .map_err(|_| anyhow!("LazyMeasureReset expects one input"))?;
                 let result = builder
                     .build_call(
-                        self.runtime_func(context, RuntimeFunction::LazyMeasure)?,
+                        self.runtime_func(
+                            context,
+                            RuntimeFunction::Generic(GenericRuntimeFunction::LazyMeasure),
+                        )?,
                         &[qb.into()],
                         "lazy_measure",
                     )?
                     .try_as_basic_value()
                     .unwrap_basic();
                 builder.build_call(
-                    self.runtime_func(context, RuntimeFunction::Reset)?,
+                    self.runtime_func(
+                        context,
+                        RuntimeFunction::Generic(GenericRuntimeFunction::Reset),
+                    )?,
                     &[qb.into()],
                     "reset",
                 )?;
                 args.outputs.finish(builder, [qb, result])
             }
-            // Reset a qubit
-            QSystemOp::Reset => self.emit_impl(context, args, RuntimeFunction::Reset, &[0], &[0]),
-            QSystemOp::TryQAlloc => {
+            // Reset a qubit.
+            SharedOp::Reset => self.emit_impl(
+                context,
+                args,
+                RuntimeFunction::Generic(GenericRuntimeFunction::Reset),
+                &[0],
+                &[0],
+            ),
+            SharedOp::TryQAlloc => {
                 let [] = args
                     .inputs
                     .try_into()
@@ -278,15 +502,17 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                 let qb = context
                     .builder()
                     .build_call(
-                        self.runtime_func(context, RuntimeFunction::QAlloc)?,
+                        self.runtime_func(
+                            context,
+                            RuntimeFunction::Generic(GenericRuntimeFunction::QAlloc),
+                        )?,
                         &[],
                         "qalloc",
                     )?
                     .try_as_basic_value()
                     .unwrap_basic();
-
                 let max_qb = self
-                    .0
+                    .codegen
                     .qubit_type(&context.typing_session())
                     .as_basic_type_enum()
                     .into_int_type()
@@ -298,11 +524,22 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                     "not_max",
                 )?;
                 self.reset_if_qb(context, qb, not_max)?;
-
                 let result = build_option(context, not_max, qb, qb_t())?;
                 args.outputs.finish(context.builder(), [result])
             }
-            QSystemOp::QFree => self.emit_impl(context, args, RuntimeFunction::QFree, &[0], &[]),
+            SharedOp::QFree => self.emit_impl(
+                context,
+                args,
+                RuntimeFunction::Generic(GenericRuntimeFunction::QFree),
+                &[0],
+                &[],
+            ),
+            SharedOp::PhasedX => {
+                unreachable!(
+                    "PhasedX uses different LLVM functions per platform \
+                     and must be handled before dispatching to emit_shared"
+                )
+            }
         }
     }
 
@@ -325,7 +562,10 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
         let reset_bb =
             context.build_positioned_new_block("reset_bb", Some(id_bb), |context, bb| {
                 context.builder().build_call(
-                    self.runtime_func(context, RuntimeFunction::Reset)?,
+                    self.runtime_func(
+                        context,
+                        RuntimeFunction::Generic(GenericRuntimeFunction::Reset),
+                    )?,
                     &[qb.into()],
                     "reset",
                 )?;
@@ -342,7 +582,8 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
 
 #[cfg(test)]
 mod test {
-    use crate::extension::qsystem::QSystemOp;
+    use crate::extension::qsystem::helios::HeliosOp;
+    use crate::extension::qsystem::sol::SolOp;
 
     use hugr::extension::simple_op::MakeRegisteredOp;
     use hugr::llvm::check_emission;
@@ -354,31 +595,68 @@ mod test {
     use super::*;
 
     #[rstest]
-    #[case::rz(1, QSystemOp::Rz)]
-    #[case::zzphase(2, QSystemOp::ZZPhase)]
-    #[case::phased_x(3, QSystemOp::PhasedX)]
-    #[case::measure(4, QSystemOp::Measure)]
-    #[case::lazy_measure(5, QSystemOp::LazyMeasure)]
-    #[case::try_qalloc(6, QSystemOp::TryQAlloc)]
-    #[case::qfree(7, QSystemOp::QFree)]
-    #[case::reset(8, QSystemOp::Reset)]
-    #[case::measure_reset(9, QSystemOp::MeasureReset)]
-    #[case::lazy_measure_leaked(10, QSystemOp::LazyMeasureLeaked)]
-    fn emit_qsystem_codegen(
+    #[case::rz(1, HeliosOp::Rz)]
+    #[case::zzphase(2, HeliosOp::ZZPhase)]
+    #[case::phased_x(3, HeliosOp::PhasedX)]
+    #[case::measure(4, HeliosOp::Measure)]
+    #[case::lazy_measure(5, HeliosOp::LazyMeasure)]
+    #[case::try_qalloc(6, HeliosOp::TryQAlloc)]
+    #[case::qfree(7, HeliosOp::QFree)]
+    #[case::reset(8, HeliosOp::Reset)]
+    #[case::measure_reset(9, HeliosOp::MeasureReset)]
+    #[case::lazy_measure_leaked(10, HeliosOp::LazyMeasureLeaked)]
+    fn emit_helios_codegen(
         #[case] _i: i32,
         #[with(_i)] mut llvm_ctx: TestContext,
-        #[case] op: QSystemOp,
+        #[case] op: HeliosOp,
     ) {
         use tket::passes::ComposablePass;
 
         use crate::llvm::{futures::FuturesCodegenExtension, prelude::QISPreludeCodegen};
 
         llvm_ctx.add_extensions(|ceb| {
-            ceb.add_extension(QSystemCodegenExtension(QISPreludeCodegen))
-                .add_extension(FuturesCodegenExtension)
-                .add_prelude_extensions(QISPreludeCodegen)
-                .add_float_extensions()
-                .add_logic_extensions()
+            ceb.add_extension(QSystemCodegenExtension::new(
+                QSystemPlatform::Helios,
+                QISPreludeCodegen,
+            ))
+            .add_extension(FuturesCodegenExtension)
+            .add_prelude_extensions(QISPreludeCodegen)
+            .add_float_extensions()
+            .add_logic_extensions()
+        });
+        let ext_op = op.to_extension_op().unwrap().into();
+        let mut hugr = single_op_hugr(ext_op);
+        crate::replace_bools::ReplaceBoolPass::default()
+            .run(&mut hugr)
+            .unwrap();
+        check_emission!(hugr, llvm_ctx);
+    }
+
+    #[rstest]
+    #[case::rz(1, SolOp::Rz)]
+    #[case::phased_x(2, SolOp::PhasedX)]
+    #[case::phased_xx(3, SolOp::PhasedXX)]
+    #[case::measure(4, SolOp::Measure)]
+    #[case::lazy_measure(5, SolOp::LazyMeasure)]
+    #[case::try_qalloc(6, SolOp::TryQAlloc)]
+    #[case::qfree(7, SolOp::QFree)]
+    #[case::reset(8, SolOp::Reset)]
+    #[case::measure_reset(9, SolOp::MeasureReset)]
+    #[case::lazy_measure_leaked(10, SolOp::LazyMeasureLeaked)]
+    fn emit_sol_codegen(#[case] _i: i32, #[with(_i)] mut llvm_ctx: TestContext, #[case] op: SolOp) {
+        use tket::passes::ComposablePass;
+
+        use crate::llvm::{futures::FuturesCodegenExtension, prelude::QISPreludeCodegen};
+
+        llvm_ctx.add_extensions(|ceb| {
+            ceb.add_extension(QSystemCodegenExtension::new(
+                QSystemPlatform::Sol,
+                QISPreludeCodegen,
+            ))
+            .add_extension(FuturesCodegenExtension)
+            .add_prelude_extensions(QISPreludeCodegen)
+            .add_float_extensions()
+            .add_logic_extensions()
         });
         let ext_op = op.to_extension_op().unwrap().into();
         let mut hugr = single_op_hugr(ext_op);

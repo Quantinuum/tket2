@@ -103,6 +103,7 @@
 //! - User defined extension ops: There is no way to infer modified unknown extension ops.
 //!   We currently try to insert the original optype without any modification,
 //!   but this could result in an unexpected error.
+use fxhash::FxHashSet;
 use itertools::{Either, Itertools};
 use std::{
     collections::{HashMap, HashSet, VecDeque},
@@ -129,7 +130,6 @@ use hugr::{
     hugr::hugrmut::HugrMut,
     ops::{CFG, Const, OpType},
     std_extensions::collections::array::array_type,
-    type_row,
     types::{EdgeKind, FuncTypeBase, Signature, Type},
 };
 
@@ -319,8 +319,10 @@ pub struct ModifierResolver<N = Node> {
     /// The worklist of nodes to be processed.
     /// This is needed to avoid modifying a node that is generated during the process.
     worklist: VecDeque<N>,
-    /// A map of static edges to be added after insertion of subgraph.
-    call_map: HashMap<N, (Node, IncomingPort)>,
+    /// Static edges to be added after insertion of a subgraph.
+    /// Multiple calls can reference the same function node, so each source
+    /// maps to every copied static input that must be reconnected.
+    call_map: HashMap<N, Vec<(Node, IncomingPort)>>,
     // TODO:
     // Should keep track of the collection of modifiers that are applied to the same function.
     // This will prevent the duplicated generation of Controlled-functions.
@@ -354,8 +356,9 @@ impl<N> Default for ModifierResolver<N> {
     }
 }
 
-/// Error that can occur when resolving modifiers.
+/// Errors that can occur when tracing and validating a chain of modifiers and its target.
 #[derive(Debug, derive_more::Error, derive_more::Display)]
+#[non_exhaustive]
 pub enum ModifierError<N = Node> {
     /// The node is not a modifier
     #[display("Node to modify {_0} expected to be a modifier but actually {_1}")]
@@ -364,12 +367,12 @@ pub enum ModifierError<N = Node> {
     #[display("No caller of the modified function exists for node {_0}")]
     #[error(ignore)]
     NoCaller(N),
-    /// No target of this modifer exists.
-    #[display("No caller of the modified function exists for node {_0}")]
+    /// No target of this modifier exists.
+    #[display("The modifier node {_0} chain has no target")]
     #[error(ignore)]
     NoTarget(N),
     /// Not the first modifier in a chain.
-    #[display("Node {_0} is not the first modifier in a chain. It is called by {_0}")]
+    #[display("Node {_0} of type {_1} is not the first modifier in a chain.")]
     NotInitialModifier(N, OpType),
     /// The modifier cannot be applied to the node.
     #[display("Modifier cannot be applied to the node {_0} of type {_1}")]
@@ -390,6 +393,7 @@ impl<N> ModifierError<N> {
 
 /// Possible errors that can occur during the modifier resolution process.
 #[derive(Debug, derive_more::Display, derive_more::Error, derive_more::From)]
+#[non_exhaustive]
 pub enum ModifierResolverErrors<N = Node> {
     /// Cannot modify the node.
     #[display("{_0}")]
@@ -418,6 +422,12 @@ pub enum ModifierResolverErrors<N = Node> {
     /// The node cannot be modified.
     #[display("Modification by {_0:?} is not defined for the node {_1}")]
     Unimplemented(Modifier, OpType),
+    /// The power modifier is not supported.
+    #[display("Found power modifier in node: {node}. Power modifier is not supported yet.")]
+    PowerModifierNotSupported {
+        /// The `power` node
+        node: N,
+    },
 }
 
 impl<N> ModifierResolverErrors<N> {
@@ -459,8 +469,12 @@ impl<N: HugrNode> ModifierResolver<N> {
     fn corresp_map(&mut self) -> &mut HashMap<DirWire<N>, Vec<DirWire>> {
         &mut self.corresp_map
     }
-    fn call_map(&mut self) -> &mut HashMap<N, (Node, IncomingPort)> {
+    fn call_map(&mut self) -> &mut HashMap<N, Vec<(Node, IncomingPort)>> {
         &mut self.call_map
+    }
+
+    fn call_map_insert(&mut self, source: N, target: (Node, IncomingPort)) {
+        self.call_map().entry(source).or_default().push(target);
     }
 
     fn with_worklist<T>(&mut self, worklist: VecDeque<N>, f: impl FnOnce(&mut Self) -> T) -> T {
@@ -513,15 +527,25 @@ impl<N: HugrNode> ModifierResolver<N> {
         old: DirWire<N>,
         new: DirWire,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        self.corresp_map()
-            .insert(old, vec![new])
-            .map_or(Ok(()), |former| {
-                // If the old wire is already registered, raise an error.
+        match self.corresp_map().entry(old) {
+            std::collections::hash_map::Entry::Vacant(entry) => {
+                entry.insert(vec![new]);
+                Ok(())
+            }
+            // Empty entry means that the old wire has no correspondence, so we can insert the new wire.
+            std::collections::hash_map::Entry::Occupied(mut entry) if entry.get().is_empty() => {
+                entry.insert(vec![new]);
+                Ok(())
+            }
+            // If the old wire is already registered, raise an error.
+            std::collections::hash_map::Entry::Occupied(entry) => {
+                let former = entry.get();
                 Err(ModifierResolverErrors::unreachable(format!(
                     "Wire already registered for node {}. Former [{},...], Latter {}.",
                     old.0, former[0], new
                 )))
-            })
+            }
+        }
     }
 
     /// Remember that old wire has no correspondence.
@@ -1039,8 +1063,20 @@ impl<N: HugrNode> ModifierResolver<N> {
         }
     }
 
-    /// This modifier expects that the CFG contains only one block.
-    /// If not, it returns an error.
+    /// Returns a row with modifier controls in the layout expected by a CFG edge.
+    fn cfg_control_types(&self, mut row: hugr::types::TypeRow) -> hugr::types::TypeRow {
+        let control_num = self.control_num();
+        if control_num == 0 {
+            return row;
+        }
+
+        let types = row.to_mut();
+        types.reserve(control_num);
+        types.extend(iter::repeat_n(qb_t(), control_num));
+        row
+    }
+
+    /// Modifies a CFG. Dagger is supported for single node CFGs only.
     fn modify_cfg(
         &mut self,
         h: &mut impl HugrMut<Node = N>,
@@ -1048,51 +1084,98 @@ impl<N: HugrNode> ModifierResolver<N> {
         cfg: &CFG,
         new_dfg: &mut impl Container,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        // Check if the CFG contains only one block.
         let children: Vec<N> = h
             .children(cfg_node)
             .filter(|child| h.get_optype(*child).is_dataflow_block())
             .collect();
-        // NOTE: this check prevents breaking modifier application to branching or loops
-        if children.len() != 1 {
+        // NOTE: Up to now we support dagger only on CFG with a single node. We may relax this restriction in the future.
+        if children.len() != 1 && self.modifiers().dagger {
             return Err(ModifierResolverErrors::unresolvable(
                 cfg_node,
-                "CFG with more than one node found.".to_string(),
+                "CFG with more than one node cannot be daggered.".to_string(),
                 cfg.clone().into(),
             ));
         }
-        let old_bb = children[0];
 
-        let mut signature = cfg.signature.clone();
-        self.modify_signature(&mut signature, true);
+        // CFGs always thread controls as carried values after block data.
+        let signature = Signature::new(
+            self.cfg_control_types(cfg.signature.input.clone()),
+            self.cfg_control_types(cfg.signature.output.clone()),
+        );
+        let mut new_cfg = CFGBuilder::new(signature)?;
+        let mut bb_map = HashMap::new();
 
-        let mut new_cfg = CFGBuilder::new(signature.clone())?;
-        let mut new_bb = new_cfg.entry_builder([type_row![]], signature.output.clone())?;
-        self.modify_dfg_body(h, old_bb, &mut new_bb)?;
-
-        let bb_id = new_bb.finish_sub_container()?;
-        new_cfg.branch(&bb_id, 0, &new_cfg.exit_block())?;
-
-        let new_node = self.insert_sub_dfg(new_dfg, new_cfg)?;
-
-        // connect the controls and register the IOs
-        for (i, c) in self.controls().iter_mut().enumerate() {
-            new_dfg
-                .hugr_mut()
-                .connect(c.node(), c.source(), new_node, i);
-            *c = Wire::new(new_node, i);
+        // Rebuild each basic block with modified body and adjusted block IO.
+        for (i, old_bb) in children.iter().copied().enumerate() {
+            let OpType::DataflowBlock(old_block) = h.get_optype(old_bb).clone() else {
+                return Err(ModifierResolverErrors::unreachable(
+                    "Non-basic-block node found while modifying CFG.".to_string(),
+                ));
+            };
+            let input = self.cfg_control_types(old_block.inputs.clone());
+            let other_outputs = self.cfg_control_types(old_block.other_outputs.clone());
+            let mut new_bb = if i == 0 {
+                new_cfg.entry_builder(old_block.sum_rows.clone(), other_outputs)?
+            } else {
+                new_cfg.block_builder(input, old_block.sum_rows.clone(), other_outputs)?
+            };
+            self.modify_dfg_body(h, old_bb, &mut new_bb)?;
+            let new_bb_id = new_bb.finish_sub_container()?;
+            bb_map.insert(old_bb, new_bb_id);
         }
 
-        let offset = self.control_num();
+        // Recreate the original CFG branch graph over the rebuilt blocks.
+        for old_bb in children.iter().copied() {
+            let OpType::DataflowBlock(old_block) = h.get_optype(old_bb) else {
+                return Err(ModifierResolverErrors::unreachable(
+                    "Non-basic-block node found while connecting CFG branches.".to_string(),
+                ));
+            };
+            let new_bb = bb_map.get(&old_bb).ok_or_else(|| {
+                ModifierResolverErrors::unreachable("Missing modified basic block.".to_string())
+            })?;
+            for branch in 0..old_block.sum_rows.len() {
+                let (successor, _) = h
+                    .linked_inputs(old_bb, OutgoingPort::from(branch))
+                    .exactly_one()
+                    .map_err(|_| {
+                        ModifierResolverErrors::unreachable(format!(
+                            "Expected one successor for CFG block branch {branch}."
+                        ))
+                    })?;
+                let new_successor = if let Some(successor) = bb_map.get(&successor) {
+                    *successor
+                } else if matches!(h.get_optype(successor), OpType::ExitBlock(_)) {
+                    new_cfg.exit_block()
+                } else {
+                    return Err(ModifierResolverErrors::unreachable(
+                        "CFG branch successor is neither a basic block nor the exit block."
+                            .to_string(),
+                    ));
+                };
+                new_cfg.branch(new_bb, branch, &new_successor)?;
+            }
+        }
+
+        let new_node = self.insert_sub_dfg(new_dfg, new_cfg)?;
 
         self.wire_node_inout(
             cfg_node,
             new_node,
             (cfg.signature.input.iter(), cfg.signature.output.iter()),
-            (0, 0, offset),
+            (0, 0, 0),
         )?;
-        // self.wire_others(n, cfg.into(), new, new_dfg.hugr().get_optype(new))?;
-        // TODO: handle other ports
+
+        // Expose the controls after the CFG boundary data.
+        let input_offset = cfg.signature.input.len();
+        let output_offset = cfg.signature.output.len();
+        for (i, c) in self.controls().iter_mut().enumerate() {
+            new_dfg
+                .hugr_mut()
+                .connect(c.node(), c.source(), new_node, input_offset + i);
+            *c = Wire::new(new_node, OutgoingPort::from(output_offset + i));
+        }
+
         Ok(())
     }
 }
@@ -1233,7 +1316,7 @@ pub fn resolve_modifier_with_entrypoints_and_scope(
     // and attempt to rewrite each modifier node it encounters.
     let mut resolver = ModifierResolver::new();
     let mut worklist = entry_points.clone();
-    let mut visited = vec![];
+    let mut visited = FxHashSet::default();
 
     while let Some(node) = worklist.pop_front() {
         // Skip nodes that have been removed during previous rewrites or already visited.
@@ -1243,7 +1326,7 @@ pub fn resolve_modifier_with_entrypoints_and_scope(
         // Expand the frontier: enqueue children and dataflow neighbours not yet visited.
         worklist.extend(h.children(node).filter(|n| !visited.contains(n)));
         worklist.extend(h.all_neighbours(node).filter(|n| !visited.contains(n)));
-        visited.push(node);
+        visited.insert(node);
         if let Err(e) = resolver.try_rewrite(h, node) {
             // ModifierError means this node is not a modifier (or is not the first
             // in its chain) and can safely be skipped.
@@ -1263,11 +1346,11 @@ pub fn resolve_modifier_with_entrypoints_and_scope(
     // generate nodes that are not reachable from the entry points.
     // If more thorough cleanup is needed, we should run dead code elimination.
     let mut deletelist = entry_points.clone();
-    let mut visited = vec![];
+    let mut visited = FxHashSet::default();
     while let Some(node) = deletelist.pop_front() {
         deletelist.extend(h.children(node).filter(|n| !visited.contains(n)));
         deletelist.extend(h.all_neighbours(node).filter(|n| !visited.contains(n)));
-        visited.push(node);
+        visited.insert(node);
         if h.contains_node(node) {
             let optype = h.get_optype(node);
             if Modifier::from_optype(optype).is_some() {
@@ -1330,6 +1413,7 @@ mod tests {
             handle::{FuncID, NodeHandle},
         },
         std_extensions::collections::array::ArrayOpBuilder,
+        type_row,
         types::Term,
     };
 
@@ -1376,6 +1460,41 @@ mod tests {
         foo: impl FnOnce(&mut ModuleBuilder<Hugr>, usize) -> FuncID<true>,
         dagger: bool,
     ) {
+        let _ = resolved_modifier_test_hugr(target_num, ctrl_num, foo, dagger);
+    }
+
+    pub(crate) fn resolved_modifier_test_hugr(
+        target_num: usize,
+        ctrl_num: u64,
+        foo: impl FnOnce(&mut ModuleBuilder<Hugr>, usize) -> FuncID<true>,
+        dagger: bool,
+    ) -> Hugr {
+        let (mut h, foo_node) = modifier_test_hugr(target_num, ctrl_num, foo, dagger);
+
+        let entrypoint = h.entrypoint();
+        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+
+        // We check that the original function node has been removed in the resolved hugr
+        assert!(!h.contains_node(foo_node));
+
+        // We also check that there is no modifier node in the resolved hugr.
+        assert!(
+            h.nodes()
+                .all(|node| Modifier::from_optype(h.get_optype(node)).is_none())
+        );
+
+        // The resolved hugr must still be structurally valid.
+        assert_matches!(h.validate(), Ok(()));
+
+        h
+    }
+
+    pub(crate) fn modifier_test_hugr(
+        target_num: usize,
+        ctrl_num: u64,
+        foo: impl FnOnce(&mut ModuleBuilder<Hugr>, usize) -> FuncID<true>,
+        dagger: bool,
+    ) -> (Hugr, Node) {
         // --- Build the module ---
         let mut module = ModuleBuilder::new();
 
@@ -1491,23 +1610,9 @@ mod tests {
         };
 
         // Run the resolver and validate
-        let mut h = module.finish_hugr().unwrap();
+        let h = module.finish_hugr().unwrap();
         assert_matches!(h.validate(), Ok(()));
-
-        let entrypoint = h.entrypoint();
-        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
-
-        // We check that the original function node has been removed in the resolved hugr
-        assert!(!h.contains_node(foo_node));
-
-        // We also check that there is no modifier node in the resolved hugr.
-        assert!(
-            h.nodes()
-                .all(|node| Modifier::from_optype(h.get_optype(node)).is_none())
-        );
-
-        // The resolved hugr must still be structurally valid.
-        assert_matches!(h.validate(), Ok(()));
+        (h, foo_node)
     }
 
     #[test]
@@ -1951,29 +2056,67 @@ mod tests {
         assert_matches!(h.validate(), Ok(()));
     }
 
-    /// Run the pass on hugrs generated by guppy.
+    /// Run the pass on hugrs generated by guppy and modifier examples.
     #[rstest::rstest]
+    #[case::multiple_functions_in_ctrl_dagger(
+        "../test_files/modifier_examples/multiple_functions_in_ctrl_dagger.hugr"
+    )]
     #[case::guppy_modifiers("../test_files/guppy_examples/modifiers.hugr")]
+    #[case::assign_in_dagger("../test_files/modifier_examples/assign_in_dagger.hugr")]
+    #[case::classical_array_op("../test_files/modifier_examples/classical_array_op.hugr")]
     #[case::classical_function1("../test_files/modifier_examples/classical_function1.hugr")]
     #[case::classical_function2("../test_files/modifier_examples/classical_function2.hugr")]
     #[case::classical_function3("../test_files/modifier_examples/classical_function3.hugr")]
-    // TODO(perf): Investigate why this test is so slow (18s on my machine).
-    // <https://github.com/Quantinuum/tket2/issues/1586>
-    #[ignore = "slow regression test"]
+    #[case::ctrl_on_cfg("../test_files/modifier_examples/ctrl_on_cfg.hugr")]
+    #[case::multiple_gates2_in_ctrl("../test_files/modifier_examples/multiple_gates2_in_ctrl.hugr")]
+    #[case::subscript_in_ctrl("../test_files/modifier_examples/subscript_in_ctrl.hugr")]
+    #[case::subscript_in_dagger("../test_files/modifier_examples/subscript_in_dagger.hugr")]
+    #[case::subscript_as_controller("../test_files/modifier_examples/subscript_as_controller.hugr")]
     #[case::complex_modifier_stress("../test_files/modifier_examples/complex_modifier_stress.hugr")]
     #[case::ctrl_array_controller("../test_files/modifier_examples/ctrl_array_controller.hugr")]
-    #[case::ctrl_on_call1("../test_files/modifier_examples/ctrl_on_call1.hugr")]
-    #[case::ctrl_on_call2("../test_files/modifier_examples/ctrl_on_call2.hugr")]
-    #[case::ctrl_on_x("../test_files/modifier_examples/ctrl_on_x.hugr")]
-    #[case::dagger_on_call("../test_files/modifier_examples/dagger_on_call.hugr")]
+    #[case::call1_in_ctrl("../test_files/modifier_examples/call1_in_ctrl.hugr")]
+    #[case::call2_in_ctrl("../test_files/modifier_examples/call2_in_ctrl.hugr")]
+    #[case::multiple_gates1_in_ctrl("../test_files/modifier_examples/multiple_gates1_in_ctrl.hugr")]
+    #[case::gate_in_ctrl("../test_files/modifier_examples/gate_in_ctrl.hugr")]
+    #[case::call_in_dagger("../test_files/modifier_examples/call_in_dagger.hugr")]
+    #[case::multiple_functions_in_dagger(
+        "../test_files/modifier_examples/multiple_functions_in_dagger.hugr"
+    )]
+    #[case::multiple_gates1_in_dagger(
+        "../test_files/modifier_examples/multiple_gates1_in_dagger.hugr"
+    )]
+    #[case::multiple_gates2_in_dagger(
+        "../test_files/modifier_examples/multiple_gates2_in_dagger.hugr"
+    )]
+    #[case::multiple_gates3_in_dagger(
+        "../test_files/modifier_examples/multiple_gates3_in_dagger.hugr"
+    )]
     #[case::double_modifier("../test_files/modifier_examples/double_modifier.hugr")]
     #[case::modify_array("../test_files/modifier_examples/modify_array.hugr")]
     #[case::multiple_dagger("../test_files/modifier_examples/multiple_dagger.hugr")]
     #[case::nested_ctrl_dagger1("../test_files/modifier_examples/nested_ctrl_dagger1.hugr")]
     #[case::nested_multiple_ctrl1("../test_files/modifier_examples/nested_multiple_ctrl1.hugr")]
+    #[case::swap_in_dagger("../test_files/modifier_examples/swap_in_dagger.hugr")]
+    #[case::subscript_in_dagger_ctrl(
+        "../test_files/modifier_examples/subscript_in_dagger_ctrl.hugr"
+    )]
     #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     fn test_examples(#[case] example: &str) {
         let mut h = load_guppy_example(example).unwrap();
         test_resolve(&mut h);
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
+    fn test_power_modifier_error() {
+        let mut h = load_guppy_example("../test_files/guppy_examples/use_of_power.hugr").unwrap();
+        assert_matches!(h.validate(), Ok(()));
+
+        let entrypoint = h.entrypoint();
+        let result = resolve_modifier_with_entrypoints(&mut h, [entrypoint]);
+        assert_matches!(
+            result,
+            Err(ModifierResolverErrors::PowerModifierNotSupported { node: _ })
+        );
     }
 }

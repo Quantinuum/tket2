@@ -25,6 +25,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             ));
         };
         let offset = self.modifiers().accum_ctrl.len();
+        let old_signature = (*call.signature()).clone();
         let callee = h
             .single_linked_output(call_node, call.called_function_port())
             .unwrap();
@@ -33,8 +34,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         let Some(new_callee) = self.modify_fn_if_needed(h, callee.0)? else {
             // If the function need not be modified, just copy the Call node as is.
             let new = self.add_node_no_modification(h, call_node, call.clone(), new_dfg)?;
-            self.call_map()
-                .insert(callee.0, (new, call.called_function_port()));
+            self.call_map_insert(callee.0, (new, call.called_function_port()));
             return Ok(());
         };
 
@@ -42,12 +42,10 @@ impl<N: HugrNode> ModifierResolver<N> {
         let type_args = call.type_args.clone();
         self.modify_signature(poly_sig.body_mut(), false);
         let new_call = Call::try_new(poly_sig, type_args).map_err(BuildError::from)?;
-        let signature = (*new_call.signature()).clone();
         let new_call_fn_port = new_call.called_function_port();
         let new_call_node = new_dfg.add_child_node(new_call);
 
-        self.call_map()
-            .insert(new_callee, (new_call_node, new_call_fn_port));
+        self.call_map_insert(new_callee, (new_call_node, new_call_fn_port));
         // wire the controls
         let mut controls = self.pack_controls(new_dfg)?;
         for (i, control) in controls.iter_mut().enumerate() {
@@ -58,11 +56,11 @@ impl<N: HugrNode> ModifierResolver<N> {
         }
         let controls = self.unpack_controls(new_dfg, controls)?;
         *self.controls() = controls;
-        // wire the inputs/outputs
+        // wire the inputs/outputs - we use the original signature here because the information about the controller is already in the offset
         self.wire_node_inout(
             call_node,
             new_call_node,
-            (signature.input.iter(), signature.output.iter()),
+            (old_signature.input.iter(), old_signature.output.iter()),
             (0, 0, offset),
         )?;
 
@@ -117,7 +115,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         &mut self,
         h: &impl HugrMut<Node = N>,
         n: N,
-    ) -> Result<Vec<N>, ModifierError<N>> {
+    ) -> Result<Vec<N>, ModifierResolverErrors<N>> {
         // The final target of modifiers to apply.
         let mut current = n;
         // Collection of modifiers to apply.
@@ -131,7 +129,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                 break;
             }
 
-            modifiers.push(optype.as_extension_op().unwrap());
+            modifiers.push(optype.as_extension_op().unwrap(), current)?;
             let next = h
                 .single_linked_output(current, 0)
                 .ok_or(ModifierError::NoTarget(n))?;
@@ -182,15 +180,19 @@ impl<N: HugrNode> ModifierResolver<N> {
         indir_call: &CallIndirect,
         new_dfg: &mut impl Dataflow,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        // Wrapper to convert ModifierError to UnResolvable with the indir_call node.
-        // This is because, even if we find an error in the process immediately,
-        // we cannot stop processing here.
-        let wrap_err = |e: ModifierError<N>| {
+        // Wrap ModifierError as UnResolvable, using the ModifierError node as the error
+        // location and the IndirectCall OpType for context.
+        let wrap_modifier_err = |e: ModifierError<N>| {
             ModifierResolverErrors::unresolvable(
                 e.node(),
                 "Cannot modify indirect call.".to_string(),
                 indir_call.clone().into(),
             )
+        };
+        // Wrap ModifierResolverErrors::ModifierError as UnResolvable
+        let wrap_resolver_err = |e: ModifierResolverErrors<N>| match e {
+            ModifierResolverErrors::ModifierError(inner) => wrap_modifier_err(inner),
+            other => other,
         };
 
         // Trace the chain of modifiers starting from the one before the indirect call.
@@ -198,10 +200,10 @@ impl<N: HugrNode> ModifierResolver<N> {
         let modifiers = self.modifiers().clone();
         let trace = self
             .trace_modifiers_chain(h, chain_tail.0)
-            .map_err(wrap_err)?;
+            .map_err(wrap_resolver_err)?;
         let targ = trace.last().cloned().unwrap();
         let (func, load) =
-            Self::get_loaded_function(h, n, targ, h.get_optype(targ)).map_err(wrap_err)?;
+            Self::get_loaded_function(h, n, targ, h.get_optype(targ)).map_err(wrap_modifier_err)?;
 
         // Modify the function
         let modified_fn = match self.modify_fn_if_needed(h, func)? {
@@ -214,8 +216,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         self.modify_signature(modified_sig.body_mut(), false);
         let load = LoadFunction::try_new(modified_sig, load.type_args).map_err(BuildError::from)?;
         let new_load = new_dfg.add_child_node(load);
-        self.call_map()
-            .insert(modified_fn, (new_load, IncomingPort::from(0)));
+        self.call_map_insert(modified_fn, (new_load, IncomingPort::from(0)));
         *self.modifiers_mut() = modifiers;
 
         // Make new IndirectCall
@@ -256,16 +257,32 @@ impl<N: HugrNode> ModifierResolver<N> {
 
     pub(super) fn modify_load_function(
         &mut self,
-        _h: &impl HugrMut<Node = N>,
-        _n: N,
-        _load: &LoadFunction,
-        _new_dfg: &mut impl Dataflow,
+        h: &impl HugrMut<Node = N>,
+        n: N,
+        load: &LoadFunction,
+        new_dfg: &mut impl Dataflow,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        // TODO:
-        // Indirect calles would be handled by its caller.
-        // However, when a loaded function is used in the other ways
-        // (e.g., passed to higher-order functions as `map` or `fold`),
-        // we need to modify it here.
+        let consumers = h.linked_inputs(n, 0).collect::<Vec<_>>();
+
+        // Check if all consumers are modifiers. If so, we can just forget the LoadFunction node and let the modifiers rebuild it.
+        if !consumers.is_empty()
+            && consumers
+                .iter()
+                .all(|(consumer, _)| Modifier::from_optype(h.get_optype(*consumer)).is_some())
+        {
+            // Modifier consumers rebuild their own LoadFunction nodes.
+            return self.forget_node(h, n);
+        }
+        // Plain LoadFunction values still need their static edge restored.
+        let new = self.add_node_no_modification(h, n, load.clone(), new_dfg)?;
+        let (loaded_func, _) =
+            h.single_linked_output(n, load.function_port())
+                .ok_or_else(|| {
+                    ModifierResolverErrors::unreachable(
+                        "LoadFunction node has no linked static function.".to_string(),
+                    )
+                })?;
+        self.call_map_insert(loaded_func, (new, load.function_port()));
         Ok(())
     }
 }

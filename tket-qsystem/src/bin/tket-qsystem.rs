@@ -18,6 +18,8 @@ fn main() -> Result<()> {
                 tket::extension::modifier::MODIFIER_EXTENSION.to_owned(),
                 tket_qsystem::extension::gpu::EXTENSION.to_owned(),
                 tket_qsystem::extension::qsystem::EXTENSION.to_owned(),
+                tket_qsystem::extension::qsystem::helios::EXTENSION.to_owned(),
+                tket_qsystem::extension::qsystem::sol::EXTENSION.to_owned(),
                 tket_qsystem::extension::futures::EXTENSION.to_owned(),
                 tket_qsystem::extension::random::EXTENSION.to_owned(),
                 tket_qsystem::extension::result::EXTENSION.to_owned(),

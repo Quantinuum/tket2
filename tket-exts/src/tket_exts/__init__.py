@@ -10,7 +10,9 @@ from tket_exts.tket.rotation import RotationExtension
 from tket_exts.tket.futures import FuturesExtension
 from tket_exts.tket.qsystem import (
     QSystemExtension,
+    QSystemHeliosExtension,
     QSystemRandomExtension,
+    QSystemSolExtension,
     QSystemUtilsExtension,
 )
 from tket_exts.tket.quantum import QuantumExtension
@@ -33,6 +35,8 @@ __all__ = [
     "rotation",
     "futures",
     "qsystem",
+    "qsystem_helios",
+    "qsystem_sol",
     "qsystem_random",
     "qsystem_utils",
     "quantum",
@@ -48,6 +52,8 @@ gpu: GpuExtension = tket.gpu.GpuExtension()
 guppy: GuppyExtension = tket.guppy.GuppyExtension()
 rotation: RotationExtension = tket.rotation.RotationExtension()
 futures: FuturesExtension = tket.futures.FuturesExtension()
+qsystem_helios: QSystemHeliosExtension = tket.qsystem.QSystemHeliosExtension()
+qsystem_sol: QSystemSolExtension = tket.qsystem.QSystemSolExtension()
 qsystem: QSystemExtension = tket.qsystem.QSystemExtension()
 qsystem_random: QSystemRandomExtension = tket.qsystem.QSystemRandomExtension()
 qsystem_utils: QSystemUtilsExtension = tket.qsystem.QSystemUtilsExtension()
@@ -78,6 +84,8 @@ def tket_registry() -> ExtensionRegistry:
         tket.guppy.GuppyExtension(),
         tket.rotation.RotationExtension(),
         tket.futures.FuturesExtension(),
+        tket.qsystem.QSystemHeliosExtension(),
+        tket.qsystem.QSystemSolExtension(),
         tket.qsystem.QSystemExtension(),
         tket.qsystem.QSystemRandomExtension(),
         tket.qsystem.QSystemUtilsExtension(),

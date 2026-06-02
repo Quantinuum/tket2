@@ -26,6 +26,7 @@ use lower_drops::LowerDropsPass;
 use replace_bools::{ReplaceBoolPass, ReplaceBoolPassError};
 use tket::TketOp;
 
+pub use extension::qsystem::QSystemPlatform;
 use extension::{
     futures::FutureOpDef,
     qsystem::{LowerTk2Error, LowerTketToQSystemPass, QSystemOp},
@@ -46,15 +47,19 @@ pub struct QSystemPass {
     force_order: bool,
     lazify: bool,
     hide_funcs: bool,
-
     /// Where to apply the pass.
     ///
     /// Configurable via [`WithScope::with_scope`].
     scope: PassScope,
+    /// Target platform, which may affect how certain operations are lowered.
+    ///
+    /// Configurable via [`WithPlatform::with_platform`].
+    platform: QSystemPlatform,
 }
 
-impl Default for QSystemPass {
-    fn default() -> Self {
+impl QSystemPass {
+    /// Load default settings for `QSystemPass` given the target qsystem platform.
+    pub fn defaults(platform: QSystemPlatform) -> Self {
         Self {
             constant_fold: true,
             monomorphize: true,
@@ -62,6 +67,7 @@ impl Default for QSystemPass {
             lazify: true,
             hide_funcs: true,
             scope: PassScope::default(),
+            platform,
         }
     }
 }
@@ -276,7 +282,9 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for QSystemPass {
         // once we're done so that LLVM is not forced to compile them as callable.
         let pub_funcs = self.collect_pub_funcs(hugr);
 
-        LowerTketToQSystemPass::default_with_scope(self.scope.clone()).run(hugr)?;
+        LowerTketToQSystemPass::new(self.platform)
+            .with_scope(self.scope.clone())
+            .run(hugr)?;
         if self.lazify {
             ReplaceBoolPass::default_with_scope(self.scope.clone()).run(hugr)?;
         }
@@ -330,12 +338,20 @@ mod test {
         guppy::{DROP_OP_NAME, GUPPY_EXTENSION},
     };
 
-    use crate::extension::{futures::FutureOpDef, qsystem::QSystemOp};
+    use crate::{
+        QSystemPass,
+        extension::{
+            futures::FutureOpDef,
+            qsystem::{QSystemOp, QSystemPlatform},
+        },
+    };
 
     #[rstest]
-    #[case(false)]
-    #[case(true)]
-    fn qsystem_pass(#[case] set_entrypoint: bool) {
+    #[case(QSystemPlatform::Helios, false)]
+    #[case(QSystemPlatform::Helios, true)]
+    #[case(QSystemPlatform::Sol, false)]
+    #[case(QSystemPlatform::Sol, true)]
+    fn qsystem_pass(#[case] platform: QSystemPlatform, #[case] set_entrypoint: bool) {
         let mut mb = hugr::builder::ModuleBuilder::new();
         let func = mb
             .define_function("func", Signature::new_endo(type_row![]))
@@ -395,7 +411,7 @@ mod test {
             // if this is not done the "backwards compatibility" code is triggered
             hugr.set_entrypoint(main_node);
         }
-        QSystemPass::default().run(&mut hugr).unwrap();
+        QSystemPass::defaults(platform).run(&mut hugr).unwrap();
 
         let sg = hugr.scheduling_graph(main_node);
         let topo_sorted = Topo::new(sg.petgraph()).iter(&sg.petgraph()).collect_vec();
@@ -447,13 +463,17 @@ mod test {
 
         // Check there are no public funcs (after hiding)
         let mut hugr = orig.clone();
-        QSystemPass::default().run(&mut hugr).unwrap();
+        // TODO: add sol case?
+        QSystemPass::defaults(QSystemPlatform::Helios)
+            .run(&mut hugr)
+            .unwrap();
         assert_eq!(count_pub_funcs(&hugr), 0);
 
         // Run again without hiding...
         let mut hugr_public = orig;
         QSystemPass {
-            ..Default::default()
+            hide_funcs: false,
+            ..QSystemPass::defaults(QSystemPlatform::Helios) // TODO: add Sol case?
         }
         .with_hide_funcs(false)
         .run(&mut hugr_public)
