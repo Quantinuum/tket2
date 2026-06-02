@@ -499,13 +499,13 @@ where
 #[cfg(test)]
 mod test {
     use crate::extension::futures::FutureOpBuilder;
-use crate::extension::qsystem::common::test_utils;
+    use crate::extension::qsystem::common::test_utils;
     use crate::extension::qsystem::synth_tket_op::SynthesizeTketOp as _;
 
     use hugr::HugrView;
     use hugr::builder::{DataflowHugr, FunctionBuilder};
     use hugr::extension::prelude::bool_t;
-use hugr::std_extensions::collections::array::ArrayOpBuilder;
+    use hugr::std_extensions::collections::array::ArrayOpBuilder;
 
     use super::*;
 

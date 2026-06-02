@@ -1,8 +1,8 @@
 use derive_more::{Display, Error, From};
 use hugr::builder::{Container, HugrBuilder};
 use hugr::core::Visibility;
-use hugr::extension::prelude::Barrier;
-use hugr::extension::simple_op::MakeExtensionOp;
+use hugr::extension::prelude::{Barrier, Noop, bool_t};
+use hugr::extension::simple_op::{MakeExtensionOp, MakeRegisteredOp};
 use hugr::hugr::linking::NameLinkingPolicy;
 use hugr::hugr::linking::OnMultiDefn;
 use hugr::hugr::patch::insert_cut::InsertCutError;
@@ -19,11 +19,13 @@ use hugr::{
 use lazy_static::lazy_static;
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
+use tket::extension::measurement::{MeasurementOp, measurement_type};
 use tket::passes::composable::WithScope;
 use tket::passes::replace_types::{NodeTemplate, ReplaceTypesError};
 use tket::passes::{ComposablePass, PassScope, ReplaceTypes};
 use tket::{TketOp, extension::rotation::RotationOpBuilder};
 
+use crate::extension::futures::{FutureOp, FutureOpDef, future_type};
 use crate::extension::qsystem::{self, QSystemPlatform};
 
 use super::barrier::BarrierInserter;
@@ -127,11 +129,53 @@ fn register_legacy_qsystem_replacements(lowerer: &mut ReplaceTypes, platform: QS
     }
 }
 
+/// Register any replacements related to the `Measurement` type.
+fn register_measurement_replacements(lowerer: &mut ReplaceTypes) {
+    // As the measurement type acts like an alias for `Future<Bool>`, all the
+    // replacements are straightforward.
+    lowerer.set_replace_type(
+        measurement_type().as_extension().unwrap().clone(),
+        future_type(bool_t()),
+    );
+
+    for (future_def, measurement_op) in [
+        (FutureOpDef::Read, MeasurementOp::Read),
+        (FutureOpDef::Dup, MeasurementOp::Dup),
+        (FutureOpDef::Free, MeasurementOp::Free),
+    ] {
+        let future_bool_op = FutureOp {
+            op: future_def,
+            typ: bool_t(),
+        }
+        .to_extension_op()
+        .unwrap();
+        lowerer.set_replace_op(
+            &measurement_op.to_extension_op().unwrap(),
+            NodeTemplate::SingleOp(future_bool_op.into()),
+        );
+    }
+
+    let noop = NodeTemplate::SingleOp(
+        Noop::new(future_type(bool_t()))
+            .to_extension_op()
+            .unwrap()
+            .into(),
+    );
+    lowerer.set_replace_op(
+        &HeliosOp::FutureToMeasurement.to_extension_op().unwrap(),
+        noop.clone(),
+    );
+    lowerer.set_replace_op(&SolOp::FutureToMeasurement.to_extension_op().unwrap(), noop);
+}
+
 /// Lower [`TketOp`] operations to target QSystem operations.
 ///
 /// Single op replacements are done directly, while multi-op replacements are
 /// done by lazily defining and calling functions that implement the
 /// decomposition. Returns the nodes that were replaced.
+///
+/// This pass also replaces `tket.measurement` with `future(bool_t)` and
+/// [HeliosOp::FutureToMeasurement] / [SolOp::FutureToMeasurement] becomes a no-op.
 ///
 /// The operation is parameterized by a `scope`. For non-[`PassScope::Global`]
 /// passes multi-op replacement will not be performed, as they require adding
@@ -154,6 +198,7 @@ pub fn lower_tk2_ops(
     let mut funcs: BTreeMap<TketOp, NodeTemplate> = BTreeMap::new();
     let mut lowerer = ReplaceTypes::new_empty().with_scope(scope.clone());
     register_legacy_qsystem_replacements(&mut lowerer, platform);
+    register_measurement_replacements(&mut lowerer);
     let mut barrier_funcs = BarrierInserter::new(platform);
 
     let replacements: Vec<_> = scope
@@ -483,8 +528,10 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for LowerTketToQSystemPass {
 mod test {
     use hugr::{
         HugrView,
-        builder::{DFGBuilder, FunctionBuilder},
+        builder::{DFGBuilder, FunctionBuilder, inout_sig},
         extension::prelude::{UnwrapBuilder as _, bool_t, option_type, qb_t},
+        extension::simple_op::MakeOpDef,
+        ops::OpType,
         type_row,
     };
     use tket::{Circuit, extension::rotation::rotation_type};
@@ -579,6 +626,7 @@ mod test {
             .unwrap_or_else(|e| panic!("{}", e));
 
         let lowered = lower_tk2_ops(&mut h, scope.clone(), platform).unwrap();
+        h.validate().unwrap();
         assert_eq!(lowered.len(), 5);
         let circ = Circuit::new(&h);
         let ops: Vec<ExpectedOp> = circ
@@ -591,7 +639,6 @@ mod test {
             [
                 SharedOp::TryQAlloc,
                 SharedOp::LazyMeasure,
-                SharedOp::FutureToMeasurement,
                 SharedOp::TryQAlloc,
                 SharedOp::Reset,
                 SharedOp::QFree
@@ -925,5 +972,77 @@ mod test {
             .filter_map(|node| circ.hugr().get_optype(node).cast())
             .collect();
         assert_eq!(sol_ops, vec![SolOp::TryQAlloc, SolOp::Reset, SolOp::QFree],);
+    }
+
+    /// Build a HUGR containing measurement ops (both from `tket.quantum` and
+    /// `tket.qsystem`) and verify that it no longer contains any measurement types
+    /// after the pass.
+    #[rstest]
+    #[case::helios(QSystemPlatform::Helios)]
+    #[case::helios(QSystemPlatform::Sol)]
+    fn test_measurements_removed(#[case] platform: QSystemPlatform) {
+        let mut circuit = DFGBuilder::new(inout_sig(vec![qb_t(); 2], vec![bool_t()])).unwrap();
+        let [q1, q2] = circuit.input_wires_arr();
+
+        // MeasureFree
+        let m1 = circuit
+            .add_dataflow_op(TketOp::MeasureFree, [q1])
+            .unwrap()
+            .out_wire(0);
+
+        // LazyMeasure
+        let lazy_measure: OpType = match platform {
+            QSystemPlatform::Helios => HeliosOp::LazyMeasure.into(),
+            QSystemPlatform::Sol => SolOp::LazyMeasure.into(),
+        };
+        let f2 = circuit
+            .add_dataflow_op(lazy_measure, [q2])
+            .unwrap()
+            .out_wire(0);
+
+        // FutureToMeasurement
+        let future_to_msmt: OpType = match platform {
+            QSystemPlatform::Helios => HeliosOp::FutureToMeasurement.into(),
+            QSystemPlatform::Sol => SolOp::FutureToMeasurement.into(),
+        };
+        let m2 = circuit
+            .add_dataflow_op(future_to_msmt, [f2])
+            .unwrap()
+            .out_wire(0);
+
+        // Duplicate one measurement
+        let [m1_1, m1_2] = circuit
+            .add_dataflow_op(MeasurementOp::Dup, [m1])
+            .unwrap()
+            .outputs_arr();
+
+        // Read one
+        let b1 = circuit
+            .add_dataflow_op(MeasurementOp::Read, [m1_1])
+            .unwrap()
+            .out_wire(0);
+
+        // Free the rest
+        circuit
+            .add_dataflow_op(MeasurementOp::Free, [m1_2])
+            .unwrap();
+        circuit.add_dataflow_op(MeasurementOp::Free, [m2]).unwrap();
+
+        let mut h = circuit.finish_hugr_with_outputs([b1]).unwrap();
+        h.validate().unwrap();
+
+        lower_tk2_ops(&mut h, PassScope::Global(Preserve::Public), platform).unwrap();
+        h.validate().unwrap();
+
+        // Check no measurement types remain
+        let sig = h.signature(h.entrypoint()).unwrap();
+        assert!(!sig.input().iter().any(|t| t == &measurement_type()));
+        assert!(!sig.output().iter().any(|t| t == &measurement_type()));
+
+        assert!(
+            !h.nodes()
+                .filter_map(|n| h.get_optype(n).as_extension_op())
+                .any(|op| MeasurementOp::from_op(op).is_ok())
+        );
     }
 }

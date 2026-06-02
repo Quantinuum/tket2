@@ -386,7 +386,6 @@ pub trait SynthesizeHeliosOp: Dataflow {
     /// Build a "tket.qsystem.helios.LazyMeasureReset" op.
     fn build_lazy_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError>;
 
-
     /// Build a "tket.qsystem.helios.Reset" op.
     fn build_reset(&mut self, qb: Wire) -> Result<Wire, BuildError>;
 

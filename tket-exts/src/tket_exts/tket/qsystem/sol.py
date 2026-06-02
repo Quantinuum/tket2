@@ -51,7 +51,6 @@ class QSystemSolExtension(TketExtension):
         """Lazily measure a qubit and reset it to Z |0> (returns a Future)."""
         return self().get_op("LazyMeasureReset").instantiate()
 
-
     @functools.cached_property
     def phasedX(self) -> ExtOp:
         """PhasedX gate with two float parameters."""
@@ -90,7 +89,7 @@ class QSystemSolExtension(TketExtension):
     def try_QAlloc(self) -> ExtOp:
         """Try allocate a qubit in Z |0> (returns Option-like result)."""
         return self().get_op("TryQAlloc").instantiate()
-    
+
     @functools.cached_property
     def future_to_measurement(self) -> ExtOp:
         """Convert a Future[bool] to a Measurement."""

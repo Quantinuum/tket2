@@ -560,8 +560,6 @@ mod test {
         #[with(_i)] mut llvm_ctx: TestContext,
         #[case] op: HeliosOp,
     ) {
-        use tket::passes::ComposablePass;
-
         use crate::llvm::{futures::FuturesCodegenExtension, prelude::QISPreludeCodegen};
 
         llvm_ctx.add_extensions(|ceb| {
@@ -575,10 +573,7 @@ mod test {
             .add_logic_extensions()
         });
         let ext_op = op.to_extension_op().unwrap().into();
-        let mut hugr = single_op_hugr(ext_op);
-        crate::replace_measurement::ReplaceMeasurementPass::default()
-            .run(&mut hugr)
-            .unwrap();
+        let hugr = single_op_hugr(ext_op);
         check_emission!(hugr, llvm_ctx);
     }
 
@@ -592,8 +587,6 @@ mod test {
     #[case::reset(8, SolOp::Reset)]
     #[case::lazy_measure_leaked(10, SolOp::LazyMeasureLeaked)]
     fn emit_sol_codegen(#[case] _i: i32, #[with(_i)] mut llvm_ctx: TestContext, #[case] op: SolOp) {
-        use tket::passes::ComposablePass;
-
         use crate::llvm::{futures::FuturesCodegenExtension, prelude::QISPreludeCodegen};
 
         llvm_ctx.add_extensions(|ceb| {
@@ -607,10 +600,7 @@ mod test {
             .add_logic_extensions()
         });
         let ext_op = op.to_extension_op().unwrap().into();
-        let mut hugr = single_op_hugr(ext_op);
-        crate::replace_measurement::ReplaceMeasurementPass::default()
-            .run(&mut hugr)
-            .unwrap();
+        let hugr = single_op_hugr(ext_op);
         check_emission!(hugr, llvm_ctx);
     }
 }

@@ -29,7 +29,6 @@ pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("tket.qsystem")
 /// The "tket.qsystem" extension version.
 pub const EXTENSION_VERSION: Version = Version::new(0, 6, 0);
 
-
 lazy_static! {
     /// The "tket.qsystem" extension.
     pub static ref EXTENSION: Arc<Extension> = {
@@ -51,7 +50,6 @@ lazy_static! {
         FLOAT_TYPES.to_owned(),
     ]);
 }
-
 
 /// Target platform for QSystem operations. This can determine supported operations,
 /// the native gateset, and steer optimisation choices.

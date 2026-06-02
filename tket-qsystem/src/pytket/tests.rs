@@ -273,7 +273,6 @@ fn json_roundtrip(
     compare_serial_circs(&ser, &reser);
 }
 
-
 // TODO: Revisit as part of https://github.com/Quantinuum/tket2/issues/1570.
 // Test the serialisation roundtrip from a tket circuit.
 //
@@ -338,7 +337,6 @@ fn json_roundtrip(
 //     validate_serial_circ(&reser);
 //     compare_serial_circs(ser, &reser);
 // }
-
 
 #[rstest]
 #[case::dropped_order_edge(circ_dropped_order_edge(), 1)]

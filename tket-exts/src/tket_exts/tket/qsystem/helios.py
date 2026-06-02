@@ -89,7 +89,7 @@ class QSystemHeliosExtension(TketExtension):
     def ZZPhase(self) -> ExtOp:
         """Two-qubit ZZ gate with a float angle, specific to the Helios platform."""
         return self().get_op("ZZPhase").instantiate()
-    
+
     @functools.cached_property
     def future_to_measurement(self) -> ExtOp:
         """Convert a Future[bool] to a Measurement."""

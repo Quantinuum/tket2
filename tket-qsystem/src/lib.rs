@@ -8,7 +8,6 @@ pub mod extension;
 pub mod llvm;
 pub mod lower_drops;
 pub mod pytket;
-pub mod replace_measurement;
 
 use derive_more::{Display, Error, From};
 use hugr::hugr::{HugrError, hugrmut::HugrMut};
@@ -23,7 +22,6 @@ use tket::passes::{
 };
 
 use lower_drops::LowerDropsPass;
-use replace_measurement::{ReplaceMeasurementPass, ReplaceMeasurementPassError};
 use tket::TketOp;
 
 pub use extension::qsystem::QSystemPlatform;
@@ -73,9 +71,7 @@ impl QSystemPass {
 #[derive(Error, Debug, Display, From)]
 #[non_exhaustive]
 /// An error reported from [QSystemPass].
-pub enum QSystemPassError<N = Node> {
-    /// An error from the component [ReplaceMeasurementPass].
-    ReplaceMeasurementError(ReplaceMeasurementPassError<N>),
+pub enum QSystemPassError {
     /// An error from the component [force_order()] pass.
     ForceOrderError(HugrError),
     /// An error from the component [LowerTketToQSystemPass] pass.
@@ -269,13 +265,9 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for QSystemPass {
         // once we're done so that LLVM is not forced to compile them as callable.
         let pub_funcs = self.collect_pub_funcs(hugr);
 
-        // This pass should be run before replacing measurements, as it introduces
-        // functions which may have measurement types that need to be replaced.
         LowerTketToQSystemPass::new(self.platform)
             .with_scope(self.scope.clone())
             .run(hugr)?;
-
-        ReplaceMeasurementPass::default_with_scope(self.scope.clone()).run(hugr)?;
 
         LowerDropsPass::default_with_scope(self.scope.clone()).run(hugr)?;
 
@@ -329,7 +321,7 @@ mod test {
     use crate::{
         QSystemPass,
         extension::{
-        futures::{FutureOpBuilder, FutureOpDef},
+            futures::{FutureOpBuilder, FutureOpDef},
             qsystem::{QSystemOp, QSystemPlatform},
         },
     };

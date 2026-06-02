@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::extension::futures::{FutureOpBuilder, future_type};
 use hugr::{
     Extension, Wire,
     builder::{BuildError, Dataflow, DataflowSubContainer, SubContainer},
@@ -14,7 +15,6 @@ use hugr::{
     types::{PolyFuncType, Signature, Type, TypeArg, TypeRow, type_param::TypeParam},
 };
 use tket::extension::measurement::measurement_type;
-use crate::extension::futures::{FutureOpBuilder, future_type};
 
 use super::lower::pi_mul_f64;
 use super::synth_tket_op::SynthesizeTketOp;
