@@ -210,7 +210,7 @@ mod test {
             ceb.add_extension(FuturesCodegenExtension)
                 .add_default_int_extensions()
         });
-        let hugr = single_op_hugr(op.to_extension_op().unwrap().into());
+        let mut hugr = single_op_hugr(op.to_extension_op().unwrap().into());
         check_emission!(hugr, llvm_ctx);
     }
 }

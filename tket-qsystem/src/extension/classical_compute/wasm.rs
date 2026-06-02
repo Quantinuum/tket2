@@ -158,7 +158,7 @@ impl TryFrom<CustomType> for WasmType {
     }
 }
 
-compute_opdef!(EXTENSION_ID, WasmExtension, WasmOpDef);
+compute_opdef!(EXTENSION_ID, EXTENSION_VERSION, WasmExtension, WasmOpDef);
 
 impl MakeRegisteredOp for WasmOp {
     fn extension_id(&self) -> ExtensionId {
@@ -188,7 +188,7 @@ impl CustomConst for ConstWasmModule {
     }
 
     fn get_type(&self) -> Type {
-        WasmType::Module.get_type(EXTENSION_ID, &EXTENSION_REF)
+        WasmType::Module.get_type(EXTENSION_ID, EXTENSION_VERSION, &EXTENSION_REF)
     }
 }
 
@@ -303,11 +303,12 @@ mod test {
             outputs: outputs.clone(),
         };
         let extension = Arc::downgrade(&op.extension_ref());
-        let module_ty = WasmType::Module.get_type(op.extension_id(), &extension);
+        let module_ty = WasmType::Module.get_type(op.extension_id(), EXTENSION_VERSION, &extension);
         let func_ty = Type::new_extension(WasmType::func_custom_type(
             inputs.clone(),
             outputs.clone(),
             op.extension_id(),
+            EXTENSION_VERSION,
             &extension,
         ));
         assert_eq!(

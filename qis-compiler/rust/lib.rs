@@ -138,8 +138,9 @@ fn get_hugr_llvm_module<'c, 'hugr, 'a: 'c>(
     let module = context.create_module(module_name.as_ref());
     let emit = EmitHugr::new(context, module, namer, exts);
     Ok(emit
-        .emit_module(hugr.try_fat(hugr.module_root()).unwrap())?
-        .finish())
+        .emit_module(hugr.try_fat(hugr.module_root()).unwrap(), false)?
+        .finish()
+        .0) // Discard DebugInfoContext
 }
 
 fn process_hugr(platform: qsystem::QSystemPlatform, hugr: &mut Hugr) -> Result<()> {

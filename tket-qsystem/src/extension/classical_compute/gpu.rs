@@ -158,7 +158,7 @@ impl TryFrom<CustomType> for GpuType {
     }
 }
 
-compute_opdef!(EXTENSION_ID, GpuExtension, GpuOpDef);
+compute_opdef!(EXTENSION_ID, EXTENSION_VERSION, GpuExtension, GpuOpDef);
 
 impl MakeRegisteredOp for GpuOp {
     fn extension_id(&self) -> ExtensionId {
@@ -198,7 +198,7 @@ impl CustomConst for ConstGpuModule {
     }
 
     fn get_type(&self) -> Type {
-        GpuType::Module.get_type(EXTENSION_ID, &EXTENSION_REF)
+        GpuType::Module.get_type(EXTENSION_ID, EXTENSION_VERSION, &EXTENSION_REF)
     }
 }
 
@@ -322,11 +322,12 @@ mod test {
             outputs: outputs.clone(),
         };
         let extension = Arc::downgrade(&op.extension_ref());
-        let module_ty = GpuType::Module.get_type(op.extension_id(), &extension);
+        let module_ty = GpuType::Module.get_type(op.extension_id(), EXTENSION_VERSION, &extension);
         let func_ty = Type::new_extension(GpuType::func_custom_type(
             inputs.clone(),
             outputs.clone(),
             op.extension_id(),
+            EXTENSION_VERSION,
             &extension,
         ));
         assert_eq!(
