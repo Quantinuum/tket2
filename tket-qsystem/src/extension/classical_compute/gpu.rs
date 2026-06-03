@@ -93,7 +93,7 @@ pub type GpuType = ComputeType<GpuExtension>;
 /// The "tket.gpu" extension id.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("tket.gpu");
 /// The "tket.gpu" extension version.
-pub const EXTENSION_VERSION: Version = Version::new(0, 1, 1);
+pub const EXTENSION_VERSION: Version = Version::new(0, 2, 0);
 
 lazy_static! {
     /// The `tket.gpu` extension.
