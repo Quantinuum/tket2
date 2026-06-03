@@ -1184,10 +1184,8 @@ mod test {
     }
 
     /// A `tket.qsystem.sol::PhasedXX` op targeting Helios is lowered via the
-    /// cross-platform decomposition path. Until `build_phased_xx` is
-    /// implemented (issue #1620) this panics inside the builder.
+    /// cross-platform decomposition path. 
     #[test]
-    #[should_panic(expected = "Decompose PhasedXX into Helios ops")]
     fn test_sol_phased_xx_lowers_to_helios() {
         use crate::extension::qsystem::sol;
 
