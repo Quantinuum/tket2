@@ -23,7 +23,7 @@ members = [
 conan = [{ name = "conan", specifier = ">=2.29.0,<3" }]
 dev = [
     { name = "graphviz", specifier = "~=0.21.0" },
-    { name = "hugr", git = "https://github.com/quantinuum/hugr?subdirectory=hugr-py&rev=4878755b" },
+    { name = "hugr", git = "https://github.com/quantinuum/hugr?subdirectory=hugr-py&rev=19210620" },
     { name = "hypothesis", specifier = ">=6.155.0,<7" },
     { name = "maturin", specifier = ">=1.13.3,<2" },
     { name = "mypy", specifier = ">=2.1.0,<3" },
@@ -837,7 +837,7 @@ wheels = [
 [[package]]
 name = "hugr"
 version = "0.16.0"
-source = { git = "https://github.com/quantinuum/hugr?subdirectory=hugr-py&rev=4878755b#4878755b85c2540831c314b6417eb6882755f54e" }
+source = { git = "https://github.com/quantinuum/hugr?subdirectory=hugr-py&rev=19210620#1921062031ce6e0b271e14e476f6f5d59d4d2188" }
 dependencies = [
     { name = "graphviz" },
     { name = "pydantic" },
@@ -2675,7 +2675,7 @@ dev = [
 [package.metadata.requires-dev]
 dev = [
     { name = "cibuildwheel", specifier = ">=2.23.2" },
-    { name = "hugr", git = "https://github.com/quantinuum/hugr?subdirectory=hugr-py&rev=4878755b" },
+    { name = "hugr", git = "https://github.com/quantinuum/hugr?subdirectory=hugr-py&rev=19210620" },
     { name = "pytest", specifier = ">=8.4.2" },
     { name = "pytest-snapshot", specifier = "~=0.9.0" },
 ]
@@ -3079,7 +3079,7 @@ docs = [
 
 [package.metadata]
 requires-dist = [
-    { name = "hugr", git = "https://github.com/quantinuum/hugr?subdirectory=hugr-py&rev=4878755b" },
+    { name = "hugr", git = "https://github.com/quantinuum/hugr?subdirectory=hugr-py&rev=19210620" },
     { name = "pytket", marker = "extra == 'pytket'", specifier = ">=2.1.0,<3" },
     { name = "tket-eccs", editable = "tket-eccs" },
     { name = "tket-exts", editable = "tket-exts" },
@@ -3109,7 +3109,7 @@ dependencies = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "hugr", git = "https://github.com/quantinuum/hugr?subdirectory=hugr-py&rev=4878755b" }]
+requires-dist = [{ name = "hugr", git = "https://github.com/quantinuum/hugr?subdirectory=hugr-py&rev=19210620" }]
 
 [[package]]
 name = "tomli"

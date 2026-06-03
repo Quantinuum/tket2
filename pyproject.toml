@@ -23,7 +23,7 @@ conan = ["conan>=2.29.0,<3"]
 prerelease = "explicit"
 
 [tool.uv.sources]
-hugr = { git = "https://github.com/quantinuum/hugr", subdirectory = "hugr-py", rev = "4878755b" }
+hugr = { git = "https://github.com/quantinuum/hugr", subdirectory = "hugr-py", rev = "19210620" }
 
 
 [build-system]
