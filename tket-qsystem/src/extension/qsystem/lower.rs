@@ -1184,7 +1184,7 @@ mod test {
     }
 
     /// A `tket.qsystem.sol::PhasedXX` op targeting Helios is lowered via the
-    /// cross-platform decomposition path. 
+    /// cross-platform decomposition path.
     #[test]
     fn test_sol_phased_xx_lowers_to_helios() {
         use crate::extension::qsystem::sol;
