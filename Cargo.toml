@@ -42,10 +42,11 @@ large_enum_variant = "allow"
 [patch.crates-io]
 
 # Uncomment to use unreleased versions of hugr
-hugr = { git = "https://github.com/quantinuum/hugr", "rev" = "6742c53505b2e13c3234dd847a6201759e73b757" }
-hugr-core = { git = "https://github.com/quantinuum/hugr", "rev" = "6742c53505b2e13c3234dd847a6201759e73b757" }
-hugr-cli = { git = "https://github.com/quantinuum/hugr", "rev" = "6742c53505b2e13c3234dd847a6201759e73b757" }
-hugr-llvm = { git = "https://github.com/quantinuum/hugr", "rev" = "6742c53505b2e13c3234dd847a6201759e73b757" }
+hugr = { git = "https://github.com/quantinuum/hugr", "rev" = "bded52e1f35c4f318f36accae10c7e9e7b0cf05e" }
+hugr-core = { git = "https://github.com/quantinuum/hugr", "rev" = "bded52e1f35c4f318f36accae10c7e9e7b0cf05e" }
+hugr-cli = { git = "https://github.com/quantinuum/hugr", "rev" = "bded52e1f35c4f318f36accae10c7e9e7b0cf05e" }
+hugr-llvm = { git = "https://github.com/quantinuum/hugr", "rev" = "bded52e1f35c4f318f36accae10c7e9e7b0cf05e" }
+hugr-model = { git = "https://github.com/quantinuum/hugr", "rev" = "bded52e1f35c4f318f36accae10c7e9e7b0cf05e" }
 # portgraph = { git = "https://github.com/quantinuum/portgraph", rev = "68b96ac737e0c285d8c543b2d74a7aa80a18202c" }
 
 [workspace.dependencies]
