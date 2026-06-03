@@ -310,18 +310,19 @@ mod test {
             collections::array::{ArrayOpBuilder, array_type},
         },
         type_row,
-        types::Signature,
+        types::{Signature, Type},
     };
 
     use hugr::extension::prelude::bool_t;
     use petgraph::visit::{Topo, Walker as _};
     use rstest::rstest;
     use tket::extension::guppy::{DROP_OP_NAME, GUPPY_EXTENSION};
+    use tket::extension::measurement::measurement_type;
 
     use crate::{
         QSystemPass,
         extension::{
-            futures::{FutureOpBuilder, FutureOpDef},
+            futures::{FutureOpBuilder, FutureOpDef, future_type},
             qsystem::{QSystemOp, QSystemPlatform},
         },
     };
@@ -463,5 +464,33 @@ mod test {
             hugr_public.children(hugr_public.module_root()).count()
         );
         assert_eq!(hugr.num_nodes(), hugr_public.num_nodes());
+    }
+
+    #[test]
+    fn measurement_drop_lowering() {
+        // Additional test outside of the `LowerTketToQSystemPass` to check the
+        // interaction with `LowerDropsPass`.
+        let mut hugr = {
+            let arr_t = || array_type(4, measurement_type());
+            let mut dfb =
+                FunctionBuilder::new("main", Signature::new(vec![arr_t()], vec![])).unwrap();
+            let [arr] = dfb.input_wires_arr();
+            dfb.add_array_discard(measurement_type(), 4, arr).unwrap();
+            dfb.finish_hugr_with_outputs([]).unwrap()
+        };
+
+        QSystemPass::defaults(QSystemPlatform::Helios)
+            .run(&mut hugr)
+            .unwrap();
+
+        // Check a function for discarding measurements has been introduced.
+        let expected_sig = Signature::new(vec![future_type(bool_t())], vec![Type::UNIT]);
+        let has_discard_load_fn = hugr.nodes().any(|n| {
+            matches!(
+                hugr.get_optype(n),
+                OpType::LoadFunction(lf) if lf.instantiation == expected_sig
+            )
+        });
+        assert!(has_discard_load_fn);
     }
 }
