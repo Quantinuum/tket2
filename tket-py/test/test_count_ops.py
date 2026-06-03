@@ -29,7 +29,7 @@ testdata = [
     ("one_rz", 2),
     ("loop_conditional", 8),
     ("conditional_loop", 8),
-    ("fn_calls", 3),
+    ("fn_calls", 2),
     ("repeat_until_success", 21),
     ("extern_def", 1),
 ]

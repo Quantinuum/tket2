@@ -1159,7 +1159,7 @@ dependencies = [
 [[package]]
 name = "hugr"
 version = "0.27.1"
-source = "git+https://github.com/quantinuum/hugr?rev=19210620#1921062031ce6e0b271e14e476f6f5d59d4d2188"
+source = "git+https://github.com/quantinuum/hugr?rev=1787e12#1787e12bda8ac53e83392454ddc9b23986f1362d"
 dependencies = [
  "hugr-core",
  "hugr-llvm",
@@ -1169,7 +1169,7 @@ dependencies = [
 [[package]]
 name = "hugr-cli"
 version = "0.27.1"
-source = "git+https://github.com/quantinuum/hugr?rev=19210620#1921062031ce6e0b271e14e476f6f5d59d4d2188"
+source = "git+https://github.com/quantinuum/hugr?rev=1787e12#1787e12bda8ac53e83392454ddc9b23986f1362d"
 dependencies = [
  "anyhow",
  "clap",
@@ -1189,7 +1189,7 @@ dependencies = [
 [[package]]
 name = "hugr-core"
 version = "0.27.1"
-source = "git+https://github.com/quantinuum/hugr?rev=19210620#1921062031ce6e0b271e14e476f6f5d59d4d2188"
+source = "git+https://github.com/quantinuum/hugr?rev=1787e12#1787e12bda8ac53e83392454ddc9b23986f1362d"
 dependencies = [
  "base64",
  "cgmath",
@@ -1226,7 +1226,7 @@ dependencies = [
 [[package]]
 name = "hugr-llvm"
 version = "0.27.1"
-source = "git+https://github.com/quantinuum/hugr?rev=19210620#1921062031ce6e0b271e14e476f6f5d59d4d2188"
+source = "git+https://github.com/quantinuum/hugr?rev=1787e12#1787e12bda8ac53e83392454ddc9b23986f1362d"
 dependencies = [
  "anyhow",
  "cc",
@@ -1246,7 +1246,7 @@ dependencies = [
 [[package]]
 name = "hugr-model"
 version = "0.27.1"
-source = "git+https://github.com/quantinuum/hugr?rev=19210620#1921062031ce6e0b271e14e476f6f5d59d4d2188"
+source = "git+https://github.com/quantinuum/hugr?rev=1787e12#1787e12bda8ac53e83392454ddc9b23986f1362d"
 dependencies = [
  "base64",
  "bumpalo",
@@ -1660,9 +1660,9 @@ dependencies = [
 
 [[package]]
 name = "papergrid"
-version = "0.17.0"
+version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6978128c8b51d8f4080631ceb2302ab51e32cc6e8615f735ee2f83fd269ae3f1"
+checksum = "d0984e668274d34691bc2b262ef0d115de5fa9973bcdee7ae32213f93099153e"
 dependencies = [
  "bytecount",
  "fnv",
@@ -2694,9 +2694,9 @@ dependencies = [
 
 [[package]]
 name = "tabled"
-version = "0.20.0"
+version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e39a2ee1fbcd360805a771e1b300f78cc88fec7b8d3e2f71cd37bbf23e725c7d"
+checksum = "b5dc662e6da844ad6e428ad16b57967c9d33c82e16bb1c258326c0c078605dff"
 dependencies = [
  "papergrid",
  "tabled_derive",
