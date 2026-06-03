@@ -510,7 +510,7 @@ where
 
         let _qb1 = SynthesizeHeliosOp::build_phased_x(self, _qb1, pi_2, pi_minus_2 + _angle1)?;
         let _qb2 = SynthesizeHeliosOp::build_phased_x(self, _qb2, pi_2, pi_minus_2 + _angle1)?;
-        let [qb1, qb2] = SynthesizeHeliosOp::build_zz_phase(self, qb1, qb2, _angle2)?;
+        let [_qb1, _qb2] = SynthesizeHeliosOp::build_zz_phase(self, _qb1, _qb2, _angle2)?;
         let _qb1 = SynthesizeHeliosOp::build_phased_x(self, _qb1, pi_minus_2, pi_minus_2 + _angle1)?;
         let _qb2 = SynthesizeHeliosOp::build_phased_x(self, _qb2, pi_minus_2, pi_minus_2 + _angle1)?;
         Ok([_qb1, _qb2])
