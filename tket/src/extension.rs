@@ -61,7 +61,9 @@ pub(crate) static ref REGISTRY: ExtensionRegistry = ExtensionRegistry::new(
     TKET_EXTENSION.to_owned(),
     bool::BOOL_EXTENSION.to_owned(),
     debug::DEBUG_EXTENSION.to_owned(),
+    global_phase::GLOBAL_PHASE_EXTENSION.to_owned(),
     guppy::GUPPY_EXTENSION.to_owned(),
+    modifier::MODIFIER_EXTENSION.to_owned(),
     rotation::ROTATION_EXTENSION.to_owned()
 ]));
 
