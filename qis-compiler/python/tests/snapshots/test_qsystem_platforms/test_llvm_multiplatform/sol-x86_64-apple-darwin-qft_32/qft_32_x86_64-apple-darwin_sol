@@ -189,39 +189,39 @@ mask_block_err.i905:                              ; preds = %mask_block_ok.i902
   tail call void @heap_free(ptr nonnull %120)
   br label %__barray_check_bounds.exit914
 
-cond_662_case_0:                                  ; preds = %cond_exit_662
+cond_661_case_0:                                  ; preds = %cond_exit_661
   %46 = load i64, ptr %37, align 4
   %47 = or i64 %46, -4294967296
   store i64 %47, ptr %37, align 4
   %48 = icmp eq i64 %47, -1
   br i1 %48, label %loop_out141, label %mask_block_err.i911
 
-mask_block_err.i911:                              ; preds = %cond_662_case_0
+mask_block_err.i911:                              ; preds = %cond_661_case_0
   tail call void @panic(i32 1002, ptr nonnull @"e_Array cont.EFA5AC45.0")
   unreachable
 
-__barray_check_bounds.exit914:                    ; preds = %45, %cond_exit_662
-  %"659_0.0998" = phi i64 [ 0, %45 ], [ %49, %cond_exit_662 ]
-  %49 = add nuw nsw i64 %"659_0.0998", 1
+__barray_check_bounds.exit914:                    ; preds = %45, %cond_exit_661
+  %"658_0.0998" = phi i64 [ 0, %45 ], [ %49, %cond_exit_661 ]
+  %49 = add nuw nsw i64 %"658_0.0998", 1
   %50 = load i64, ptr %37, align 4
-  %51 = lshr i64 %50, %"659_0.0998"
+  %51 = lshr i64 %50, %"658_0.0998"
   %52 = trunc i64 %51 to i1
-  br i1 %52, label %cond_exit_662, label %__barray_mask_borrow.exit918
+  br i1 %52, label %cond_exit_661, label %__barray_mask_borrow.exit918
 
 __barray_mask_borrow.exit918:                     ; preds = %__barray_check_bounds.exit914
-  %53 = shl nuw nsw i64 1, %"659_0.0998"
+  %53 = shl nuw nsw i64 1, %"658_0.0998"
   %54 = xor i64 %50, %53
   store i64 %54, ptr %37, align 4
-  %55 = getelementptr inbounds nuw { i1, i64, i1 }, ptr %36, i64 %"659_0.0998"
+  %55 = getelementptr inbounds nuw { i1, i64, i1 }, ptr %36, i64 %"658_0.0998"
   %56 = load { i1, i64, i1 }, ptr %55, align 4
   %.fca.0.extract604 = extractvalue { i1, i64, i1 } %56, 0
-  br i1 %.fca.0.extract604, label %cond_685_case_1, label %cond_exit_662
+  br i1 %.fca.0.extract604, label %cond_682_case_1, label %cond_exit_661
 
-cond_exit_662:                                    ; preds = %cond_685_case_1, %__barray_mask_borrow.exit918, %__barray_check_bounds.exit914
-  %57 = icmp samesign ugt i64 %"659_0.0998", 30
-  br i1 %57, label %cond_662_case_0, label %__barray_check_bounds.exit914
+cond_exit_661:                                    ; preds = %cond_682_case_1, %__barray_mask_borrow.exit918, %__barray_check_bounds.exit914
+  %57 = icmp samesign ugt i64 %"658_0.0998", 30
+  br i1 %57, label %cond_661_case_0, label %__barray_check_bounds.exit914
 
-loop_out141:                                      ; preds = %cond_662_case_0
+loop_out141:                                      ; preds = %cond_661_case_0
   tail call void @heap_free(ptr %36)
   tail call void @heap_free(ptr nonnull %37)
   %58 = load i64, ptr %22, align 4
@@ -240,10 +240,10 @@ mask_block_err.i922:                              ; preds = %loop_out141
   tail call void @panic(i32 1002, ptr nonnull @"e_Some array.A77EF32E.0")
   unreachable
 
-cond_685_case_1:                                  ; preds = %__barray_mask_borrow.exit918
+cond_682_case_1:                                  ; preds = %__barray_mask_borrow.exit918
   %.fca.1.extract605 = extractvalue { i1, i64, i1 } %56, 1
   tail call void @___dec_future_refcount(i64 %.fca.1.extract605)
-  br label %cond_exit_662
+  br label %cond_exit_661
 
 63:                                               ; preds = %__barray_check_none_borrowed.exit924, %63
   %storemerge841988 = phi i64 [ 0, %__barray_check_none_borrowed.exit924 ], [ %69, %63 ]

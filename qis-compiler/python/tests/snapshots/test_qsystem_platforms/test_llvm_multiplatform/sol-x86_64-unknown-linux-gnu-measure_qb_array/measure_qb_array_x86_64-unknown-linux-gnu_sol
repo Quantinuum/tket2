@@ -413,9 +413,9 @@ loop_body.i.i:                                    ; preds = %__barray_check_boun
   tail call void @heap_free(ptr nonnull %.fca.1.extract81.i.i.i)
   %115 = load i64, ptr %72, align 4
   %116 = trunc i64 %115 to i1
-  br i1 %116, label %cond_exit_89.thread.i, label %__barray_mask_borrow.exit259.i
+  br i1 %116, label %cond_exit_90.thread.i, label %__barray_mask_borrow.exit259.i
 
-mask_block_err.i.i:                               ; preds = %cond_exit_89.thread.9.i
+mask_block_err.i.i:                               ; preds = %cond_exit_90.thread.9.i
   tail call void @panic(i32 1002, ptr nonnull @"e_Array cont.EFA5AC45.0")
   unreachable
 
@@ -424,202 +424,202 @@ __barray_mask_borrow.exit259.i:                   ; preds = %"__hugr__.$measure_
   store i64 %117, ptr %72, align 4
   %118 = load { i1, i64, i1 }, ptr %71, align 4
   %.fca.0.extract167.i = extractvalue { i1, i64, i1 } %118, 0
-  br i1 %.fca.0.extract167.i, label %cond_392_case_1.i, label %cond_exit_89.thread.i
+  br i1 %.fca.0.extract167.i, label %cond_389_case_1.i, label %cond_exit_90.thread.i
 
-cond_exit_89.thread.i:                            ; preds = %cond_392_case_1.i, %__barray_mask_borrow.exit259.i, %"__hugr__.$measure_array$$n(10).280.exit.i"
-  %119 = phi i64 [ %.pre.i, %cond_392_case_1.i ], [ %117, %__barray_mask_borrow.exit259.i ], [ %115, %"__hugr__.$measure_array$$n(10).280.exit.i" ]
+cond_exit_90.thread.i:                            ; preds = %cond_389_case_1.i, %__barray_mask_borrow.exit259.i, %"__hugr__.$measure_array$$n(10).280.exit.i"
+  %119 = phi i64 [ %.pre.i, %cond_389_case_1.i ], [ %117, %__barray_mask_borrow.exit259.i ], [ %115, %"__hugr__.$measure_array$$n(10).280.exit.i" ]
   %120 = and i64 %119, 2
   %.not290.i = icmp eq i64 %120, 0
-  br i1 %.not290.i, label %__barray_mask_borrow.exit259.1.i, label %cond_exit_89.thread.1.i
+  br i1 %.not290.i, label %__barray_mask_borrow.exit259.1.i, label %cond_exit_90.thread.1.i
 
-__barray_mask_borrow.exit259.1.i:                 ; preds = %cond_exit_89.thread.i
+__barray_mask_borrow.exit259.1.i:                 ; preds = %cond_exit_90.thread.i
   %121 = or disjoint i64 %119, 2
   store i64 %121, ptr %72, align 4
   %122 = getelementptr inbounds nuw i8, ptr %71, i64 24
   %123 = load { i1, i64, i1 }, ptr %122, align 4
   %.fca.0.extract167.1.i = extractvalue { i1, i64, i1 } %123, 0
-  br i1 %.fca.0.extract167.1.i, label %cond_392_case_1.1.i, label %cond_exit_89.thread.1.i
+  br i1 %.fca.0.extract167.1.i, label %cond_389_case_1.1.i, label %cond_exit_90.thread.1.i
 
-cond_392_case_1.1.i:                              ; preds = %__barray_mask_borrow.exit259.1.i
+cond_389_case_1.1.i:                              ; preds = %__barray_mask_borrow.exit259.1.i
   %.fca.1.extract.1.i = extractvalue { i1, i64, i1 } %123, 1
   tail call void @___dec_future_refcount(i64 %.fca.1.extract.1.i)
   %.pre281.i = load i64, ptr %72, align 4
-  br label %cond_exit_89.thread.1.i
+  br label %cond_exit_90.thread.1.i
 
-cond_exit_89.thread.1.i:                          ; preds = %cond_392_case_1.1.i, %__barray_mask_borrow.exit259.1.i, %cond_exit_89.thread.i
-  %124 = phi i64 [ %.pre281.i, %cond_392_case_1.1.i ], [ %121, %__barray_mask_borrow.exit259.1.i ], [ %119, %cond_exit_89.thread.i ]
+cond_exit_90.thread.1.i:                          ; preds = %cond_389_case_1.1.i, %__barray_mask_borrow.exit259.1.i, %cond_exit_90.thread.i
+  %124 = phi i64 [ %.pre281.i, %cond_389_case_1.1.i ], [ %121, %__barray_mask_borrow.exit259.1.i ], [ %119, %cond_exit_90.thread.i ]
   %125 = and i64 %124, 4
   %.not291.i = icmp eq i64 %125, 0
-  br i1 %.not291.i, label %__barray_mask_borrow.exit259.2.i, label %cond_exit_89.thread.2.i
+  br i1 %.not291.i, label %__barray_mask_borrow.exit259.2.i, label %cond_exit_90.thread.2.i
 
-__barray_mask_borrow.exit259.2.i:                 ; preds = %cond_exit_89.thread.1.i
+__barray_mask_borrow.exit259.2.i:                 ; preds = %cond_exit_90.thread.1.i
   %126 = or disjoint i64 %124, 4
   store i64 %126, ptr %72, align 4
   %127 = getelementptr inbounds nuw i8, ptr %71, i64 48
   %128 = load { i1, i64, i1 }, ptr %127, align 4
   %.fca.0.extract167.2.i = extractvalue { i1, i64, i1 } %128, 0
-  br i1 %.fca.0.extract167.2.i, label %cond_392_case_1.2.i, label %cond_exit_89.thread.2.i
+  br i1 %.fca.0.extract167.2.i, label %cond_389_case_1.2.i, label %cond_exit_90.thread.2.i
 
-cond_392_case_1.2.i:                              ; preds = %__barray_mask_borrow.exit259.2.i
+cond_389_case_1.2.i:                              ; preds = %__barray_mask_borrow.exit259.2.i
   %.fca.1.extract.2.i = extractvalue { i1, i64, i1 } %128, 1
   tail call void @___dec_future_refcount(i64 %.fca.1.extract.2.i)
   %.pre282.i = load i64, ptr %72, align 4
-  br label %cond_exit_89.thread.2.i
+  br label %cond_exit_90.thread.2.i
 
-cond_exit_89.thread.2.i:                          ; preds = %cond_392_case_1.2.i, %__barray_mask_borrow.exit259.2.i, %cond_exit_89.thread.1.i
-  %129 = phi i64 [ %.pre282.i, %cond_392_case_1.2.i ], [ %126, %__barray_mask_borrow.exit259.2.i ], [ %124, %cond_exit_89.thread.1.i ]
+cond_exit_90.thread.2.i:                          ; preds = %cond_389_case_1.2.i, %__barray_mask_borrow.exit259.2.i, %cond_exit_90.thread.1.i
+  %129 = phi i64 [ %.pre282.i, %cond_389_case_1.2.i ], [ %126, %__barray_mask_borrow.exit259.2.i ], [ %124, %cond_exit_90.thread.1.i ]
   %130 = and i64 %129, 8
   %.not292.i = icmp eq i64 %130, 0
-  br i1 %.not292.i, label %__barray_mask_borrow.exit259.3.i, label %cond_exit_89.thread.3.i
+  br i1 %.not292.i, label %__barray_mask_borrow.exit259.3.i, label %cond_exit_90.thread.3.i
 
-__barray_mask_borrow.exit259.3.i:                 ; preds = %cond_exit_89.thread.2.i
+__barray_mask_borrow.exit259.3.i:                 ; preds = %cond_exit_90.thread.2.i
   %131 = or disjoint i64 %129, 8
   store i64 %131, ptr %72, align 4
   %132 = getelementptr inbounds nuw i8, ptr %71, i64 72
   %133 = load { i1, i64, i1 }, ptr %132, align 4
   %.fca.0.extract167.3.i = extractvalue { i1, i64, i1 } %133, 0
-  br i1 %.fca.0.extract167.3.i, label %cond_392_case_1.3.i, label %cond_exit_89.thread.3.i
+  br i1 %.fca.0.extract167.3.i, label %cond_389_case_1.3.i, label %cond_exit_90.thread.3.i
 
-cond_392_case_1.3.i:                              ; preds = %__barray_mask_borrow.exit259.3.i
+cond_389_case_1.3.i:                              ; preds = %__barray_mask_borrow.exit259.3.i
   %.fca.1.extract.3.i = extractvalue { i1, i64, i1 } %133, 1
   tail call void @___dec_future_refcount(i64 %.fca.1.extract.3.i)
   %.pre283.i = load i64, ptr %72, align 4
-  br label %cond_exit_89.thread.3.i
+  br label %cond_exit_90.thread.3.i
 
-cond_exit_89.thread.3.i:                          ; preds = %cond_392_case_1.3.i, %__barray_mask_borrow.exit259.3.i, %cond_exit_89.thread.2.i
-  %134 = phi i64 [ %.pre283.i, %cond_392_case_1.3.i ], [ %131, %__barray_mask_borrow.exit259.3.i ], [ %129, %cond_exit_89.thread.2.i ]
+cond_exit_90.thread.3.i:                          ; preds = %cond_389_case_1.3.i, %__barray_mask_borrow.exit259.3.i, %cond_exit_90.thread.2.i
+  %134 = phi i64 [ %.pre283.i, %cond_389_case_1.3.i ], [ %131, %__barray_mask_borrow.exit259.3.i ], [ %129, %cond_exit_90.thread.2.i ]
   %135 = and i64 %134, 16
   %.not293.i = icmp eq i64 %135, 0
-  br i1 %.not293.i, label %__barray_mask_borrow.exit259.4.i, label %cond_exit_89.thread.4.i
+  br i1 %.not293.i, label %__barray_mask_borrow.exit259.4.i, label %cond_exit_90.thread.4.i
 
-__barray_mask_borrow.exit259.4.i:                 ; preds = %cond_exit_89.thread.3.i
+__barray_mask_borrow.exit259.4.i:                 ; preds = %cond_exit_90.thread.3.i
   %136 = or disjoint i64 %134, 16
   store i64 %136, ptr %72, align 4
   %137 = getelementptr inbounds nuw i8, ptr %71, i64 96
   %138 = load { i1, i64, i1 }, ptr %137, align 4
   %.fca.0.extract167.4.i = extractvalue { i1, i64, i1 } %138, 0
-  br i1 %.fca.0.extract167.4.i, label %cond_392_case_1.4.i, label %cond_exit_89.thread.4.i
+  br i1 %.fca.0.extract167.4.i, label %cond_389_case_1.4.i, label %cond_exit_90.thread.4.i
 
-cond_392_case_1.4.i:                              ; preds = %__barray_mask_borrow.exit259.4.i
+cond_389_case_1.4.i:                              ; preds = %__barray_mask_borrow.exit259.4.i
   %.fca.1.extract.4.i = extractvalue { i1, i64, i1 } %138, 1
   tail call void @___dec_future_refcount(i64 %.fca.1.extract.4.i)
   %.pre284.i = load i64, ptr %72, align 4
-  br label %cond_exit_89.thread.4.i
+  br label %cond_exit_90.thread.4.i
 
-cond_exit_89.thread.4.i:                          ; preds = %cond_392_case_1.4.i, %__barray_mask_borrow.exit259.4.i, %cond_exit_89.thread.3.i
-  %139 = phi i64 [ %.pre284.i, %cond_392_case_1.4.i ], [ %136, %__barray_mask_borrow.exit259.4.i ], [ %134, %cond_exit_89.thread.3.i ]
+cond_exit_90.thread.4.i:                          ; preds = %cond_389_case_1.4.i, %__barray_mask_borrow.exit259.4.i, %cond_exit_90.thread.3.i
+  %139 = phi i64 [ %.pre284.i, %cond_389_case_1.4.i ], [ %136, %__barray_mask_borrow.exit259.4.i ], [ %134, %cond_exit_90.thread.3.i ]
   %140 = and i64 %139, 32
   %.not294.i = icmp eq i64 %140, 0
-  br i1 %.not294.i, label %__barray_mask_borrow.exit259.5.i, label %cond_exit_89.thread.5.i
+  br i1 %.not294.i, label %__barray_mask_borrow.exit259.5.i, label %cond_exit_90.thread.5.i
 
-__barray_mask_borrow.exit259.5.i:                 ; preds = %cond_exit_89.thread.4.i
+__barray_mask_borrow.exit259.5.i:                 ; preds = %cond_exit_90.thread.4.i
   %141 = or disjoint i64 %139, 32
   store i64 %141, ptr %72, align 4
   %142 = getelementptr inbounds nuw i8, ptr %71, i64 120
   %143 = load { i1, i64, i1 }, ptr %142, align 4
   %.fca.0.extract167.5.i = extractvalue { i1, i64, i1 } %143, 0
-  br i1 %.fca.0.extract167.5.i, label %cond_392_case_1.5.i, label %cond_exit_89.thread.5.i
+  br i1 %.fca.0.extract167.5.i, label %cond_389_case_1.5.i, label %cond_exit_90.thread.5.i
 
-cond_392_case_1.5.i:                              ; preds = %__barray_mask_borrow.exit259.5.i
+cond_389_case_1.5.i:                              ; preds = %__barray_mask_borrow.exit259.5.i
   %.fca.1.extract.5.i = extractvalue { i1, i64, i1 } %143, 1
   tail call void @___dec_future_refcount(i64 %.fca.1.extract.5.i)
   %.pre285.i = load i64, ptr %72, align 4
-  br label %cond_exit_89.thread.5.i
+  br label %cond_exit_90.thread.5.i
 
-cond_exit_89.thread.5.i:                          ; preds = %cond_392_case_1.5.i, %__barray_mask_borrow.exit259.5.i, %cond_exit_89.thread.4.i
-  %144 = phi i64 [ %.pre285.i, %cond_392_case_1.5.i ], [ %141, %__barray_mask_borrow.exit259.5.i ], [ %139, %cond_exit_89.thread.4.i ]
+cond_exit_90.thread.5.i:                          ; preds = %cond_389_case_1.5.i, %__barray_mask_borrow.exit259.5.i, %cond_exit_90.thread.4.i
+  %144 = phi i64 [ %.pre285.i, %cond_389_case_1.5.i ], [ %141, %__barray_mask_borrow.exit259.5.i ], [ %139, %cond_exit_90.thread.4.i ]
   %145 = and i64 %144, 64
   %.not295.i = icmp eq i64 %145, 0
-  br i1 %.not295.i, label %__barray_mask_borrow.exit259.6.i, label %cond_exit_89.thread.6.i
+  br i1 %.not295.i, label %__barray_mask_borrow.exit259.6.i, label %cond_exit_90.thread.6.i
 
-__barray_mask_borrow.exit259.6.i:                 ; preds = %cond_exit_89.thread.5.i
+__barray_mask_borrow.exit259.6.i:                 ; preds = %cond_exit_90.thread.5.i
   %146 = or disjoint i64 %144, 64
   store i64 %146, ptr %72, align 4
   %147 = getelementptr inbounds nuw i8, ptr %71, i64 144
   %148 = load { i1, i64, i1 }, ptr %147, align 4
   %.fca.0.extract167.6.i = extractvalue { i1, i64, i1 } %148, 0
-  br i1 %.fca.0.extract167.6.i, label %cond_392_case_1.6.i, label %cond_exit_89.thread.6.i
+  br i1 %.fca.0.extract167.6.i, label %cond_389_case_1.6.i, label %cond_exit_90.thread.6.i
 
-cond_392_case_1.6.i:                              ; preds = %__barray_mask_borrow.exit259.6.i
+cond_389_case_1.6.i:                              ; preds = %__barray_mask_borrow.exit259.6.i
   %.fca.1.extract.6.i = extractvalue { i1, i64, i1 } %148, 1
   tail call void @___dec_future_refcount(i64 %.fca.1.extract.6.i)
   %.pre286.i = load i64, ptr %72, align 4
-  br label %cond_exit_89.thread.6.i
+  br label %cond_exit_90.thread.6.i
 
-cond_exit_89.thread.6.i:                          ; preds = %cond_392_case_1.6.i, %__barray_mask_borrow.exit259.6.i, %cond_exit_89.thread.5.i
-  %149 = phi i64 [ %.pre286.i, %cond_392_case_1.6.i ], [ %146, %__barray_mask_borrow.exit259.6.i ], [ %144, %cond_exit_89.thread.5.i ]
+cond_exit_90.thread.6.i:                          ; preds = %cond_389_case_1.6.i, %__barray_mask_borrow.exit259.6.i, %cond_exit_90.thread.5.i
+  %149 = phi i64 [ %.pre286.i, %cond_389_case_1.6.i ], [ %146, %__barray_mask_borrow.exit259.6.i ], [ %144, %cond_exit_90.thread.5.i ]
   %150 = and i64 %149, 128
   %.not296.i = icmp eq i64 %150, 0
-  br i1 %.not296.i, label %__barray_mask_borrow.exit259.7.i, label %cond_exit_89.thread.7.i
+  br i1 %.not296.i, label %__barray_mask_borrow.exit259.7.i, label %cond_exit_90.thread.7.i
 
-__barray_mask_borrow.exit259.7.i:                 ; preds = %cond_exit_89.thread.6.i
+__barray_mask_borrow.exit259.7.i:                 ; preds = %cond_exit_90.thread.6.i
   %151 = or disjoint i64 %149, 128
   store i64 %151, ptr %72, align 4
   %152 = getelementptr inbounds nuw i8, ptr %71, i64 168
   %153 = load { i1, i64, i1 }, ptr %152, align 4
   %.fca.0.extract167.7.i = extractvalue { i1, i64, i1 } %153, 0
-  br i1 %.fca.0.extract167.7.i, label %cond_392_case_1.7.i, label %cond_exit_89.thread.7.i
+  br i1 %.fca.0.extract167.7.i, label %cond_389_case_1.7.i, label %cond_exit_90.thread.7.i
 
-cond_392_case_1.7.i:                              ; preds = %__barray_mask_borrow.exit259.7.i
+cond_389_case_1.7.i:                              ; preds = %__barray_mask_borrow.exit259.7.i
   %.fca.1.extract.7.i = extractvalue { i1, i64, i1 } %153, 1
   tail call void @___dec_future_refcount(i64 %.fca.1.extract.7.i)
   %.pre287.i = load i64, ptr %72, align 4
-  br label %cond_exit_89.thread.7.i
+  br label %cond_exit_90.thread.7.i
 
-cond_exit_89.thread.7.i:                          ; preds = %cond_392_case_1.7.i, %__barray_mask_borrow.exit259.7.i, %cond_exit_89.thread.6.i
-  %154 = phi i64 [ %.pre287.i, %cond_392_case_1.7.i ], [ %151, %__barray_mask_borrow.exit259.7.i ], [ %149, %cond_exit_89.thread.6.i ]
+cond_exit_90.thread.7.i:                          ; preds = %cond_389_case_1.7.i, %__barray_mask_borrow.exit259.7.i, %cond_exit_90.thread.6.i
+  %154 = phi i64 [ %.pre287.i, %cond_389_case_1.7.i ], [ %151, %__barray_mask_borrow.exit259.7.i ], [ %149, %cond_exit_90.thread.6.i ]
   %155 = and i64 %154, 256
   %.not297.i = icmp eq i64 %155, 0
-  br i1 %.not297.i, label %__barray_mask_borrow.exit259.8.i, label %cond_exit_89.thread.8.i
+  br i1 %.not297.i, label %__barray_mask_borrow.exit259.8.i, label %cond_exit_90.thread.8.i
 
-__barray_mask_borrow.exit259.8.i:                 ; preds = %cond_exit_89.thread.7.i
+__barray_mask_borrow.exit259.8.i:                 ; preds = %cond_exit_90.thread.7.i
   %156 = or disjoint i64 %154, 256
   store i64 %156, ptr %72, align 4
   %157 = getelementptr inbounds nuw i8, ptr %71, i64 192
   %158 = load { i1, i64, i1 }, ptr %157, align 4
   %.fca.0.extract167.8.i = extractvalue { i1, i64, i1 } %158, 0
-  br i1 %.fca.0.extract167.8.i, label %cond_392_case_1.8.i, label %cond_exit_89.thread.8.i
+  br i1 %.fca.0.extract167.8.i, label %cond_389_case_1.8.i, label %cond_exit_90.thread.8.i
 
-cond_392_case_1.8.i:                              ; preds = %__barray_mask_borrow.exit259.8.i
+cond_389_case_1.8.i:                              ; preds = %__barray_mask_borrow.exit259.8.i
   %.fca.1.extract.8.i = extractvalue { i1, i64, i1 } %158, 1
   tail call void @___dec_future_refcount(i64 %.fca.1.extract.8.i)
   %.pre288.i = load i64, ptr %72, align 4
-  br label %cond_exit_89.thread.8.i
+  br label %cond_exit_90.thread.8.i
 
-cond_exit_89.thread.8.i:                          ; preds = %cond_392_case_1.8.i, %__barray_mask_borrow.exit259.8.i, %cond_exit_89.thread.7.i
-  %159 = phi i64 [ %.pre288.i, %cond_392_case_1.8.i ], [ %156, %__barray_mask_borrow.exit259.8.i ], [ %154, %cond_exit_89.thread.7.i ]
+cond_exit_90.thread.8.i:                          ; preds = %cond_389_case_1.8.i, %__barray_mask_borrow.exit259.8.i, %cond_exit_90.thread.7.i
+  %159 = phi i64 [ %.pre288.i, %cond_389_case_1.8.i ], [ %156, %__barray_mask_borrow.exit259.8.i ], [ %154, %cond_exit_90.thread.7.i ]
   %160 = and i64 %159, 512
   %.not298.i = icmp eq i64 %160, 0
-  br i1 %.not298.i, label %__barray_mask_borrow.exit259.9.i, label %cond_exit_89.thread.9.i
+  br i1 %.not298.i, label %__barray_mask_borrow.exit259.9.i, label %cond_exit_90.thread.9.i
 
-__barray_mask_borrow.exit259.9.i:                 ; preds = %cond_exit_89.thread.8.i
+__barray_mask_borrow.exit259.9.i:                 ; preds = %cond_exit_90.thread.8.i
   %161 = or disjoint i64 %159, 512
   store i64 %161, ptr %72, align 4
   %162 = getelementptr inbounds nuw i8, ptr %71, i64 216
   %163 = load { i1, i64, i1 }, ptr %162, align 4
   %.fca.0.extract167.9.i = extractvalue { i1, i64, i1 } %163, 0
-  br i1 %.fca.0.extract167.9.i, label %cond_392_case_1.9.i, label %cond_exit_89.thread.9.i
+  br i1 %.fca.0.extract167.9.i, label %cond_389_case_1.9.i, label %cond_exit_90.thread.9.i
 
-cond_392_case_1.9.i:                              ; preds = %__barray_mask_borrow.exit259.9.i
+cond_389_case_1.9.i:                              ; preds = %__barray_mask_borrow.exit259.9.i
   %.fca.1.extract.9.i = extractvalue { i1, i64, i1 } %163, 1
   tail call void @___dec_future_refcount(i64 %.fca.1.extract.9.i)
   %.pre289.i = load i64, ptr %72, align 4
-  br label %cond_exit_89.thread.9.i
+  br label %cond_exit_90.thread.9.i
 
-cond_exit_89.thread.9.i:                          ; preds = %cond_392_case_1.9.i, %__barray_mask_borrow.exit259.9.i, %cond_exit_89.thread.8.i
-  %164 = phi i64 [ %.pre289.i, %cond_392_case_1.9.i ], [ %161, %__barray_mask_borrow.exit259.9.i ], [ %159, %cond_exit_89.thread.8.i ]
+cond_exit_90.thread.9.i:                          ; preds = %cond_389_case_1.9.i, %__barray_mask_borrow.exit259.9.i, %cond_exit_90.thread.8.i
+  %164 = phi i64 [ %.pre289.i, %cond_389_case_1.9.i ], [ %161, %__barray_mask_borrow.exit259.9.i ], [ %159, %cond_exit_90.thread.8.i ]
   %165 = or i64 %164, -1024
   store i64 %165, ptr %72, align 4
   %166 = icmp eq i64 %165, -1
   br i1 %166, label %__hugr__.main.1.exit, label %mask_block_err.i.i
 
-cond_392_case_1.i:                                ; preds = %__barray_mask_borrow.exit259.i
+cond_389_case_1.i:                                ; preds = %__barray_mask_borrow.exit259.i
   %.fca.1.extract.i = extractvalue { i1, i64, i1 } %118, 1
   tail call void @___dec_future_refcount(i64 %.fca.1.extract.i)
   %.pre.i = load i64, ptr %72, align 4
-  br label %cond_exit_89.thread.i
+  br label %cond_exit_90.thread.i
 
-__hugr__.main.1.exit:                             ; preds = %cond_exit_89.thread.9.i
+__hugr__.main.1.exit:                             ; preds = %cond_exit_90.thread.9.i
   tail call void @heap_free(ptr %71)
   tail call void @heap_free(ptr nonnull %72)
   %167 = tail call i64 @teardown()

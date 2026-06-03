@@ -199,7 +199,7 @@ cond_exit_20.9.i:                                 ; preds = %__barray_check_boun
   %42 = insertvalue { { ptr, ptr, i64 }, i64 } poison, { ptr, ptr, i64 } %"116.fca.2.insert.i", 0
   br label %__barray_check_bounds.exit.i.i.i
 
-43:                                               ; preds = %"__hugr__.$ArrayIter.__next__$$t(qubit)$n(10).302.exit.thread.i.i"
+43:                                               ; preds = %"__hugr__.$ArrayIter.__next__$$e(qubit)$n(10).302.exit.thread.i.i"
   %44 = lshr i64 %.fca.1.0.0.2.extract.i.i.i, 6
   %45 = getelementptr i64, ptr %.fca.1.0.0.1.extract.i.i.i, i64 %44
   %46 = load i64, ptr %45, align 4
@@ -240,12 +240,12 @@ mask_block_err.i.i.i.i:                           ; preds = %mask_block_ok.i.i.i
   tail call void @panic(i32 1002, ptr nonnull @"e_Array cont.EFA5AC45.0")
   unreachable
 
-__barray_check_bounds.exit.i.i.i:                 ; preds = %"__hugr__.$ArrayIter.__next__$$t(qubit)$n(10).302.exit.thread.i.i", %cond_exit_20.9.i
-  %.fca.2.extract82.i185.i.i = phi i64 [ 0, %cond_exit_20.9.i ], [ %.fca.1.0.0.2.extract.i.i.i, %"__hugr__.$ArrayIter.__next__$$t(qubit)$n(10).302.exit.thread.i.i" ]
-  %.fca.1.extract81.i184.i.i = phi ptr [ %2, %cond_exit_20.9.i ], [ %.fca.1.0.0.1.extract.i.i.i, %"__hugr__.$ArrayIter.__next__$$t(qubit)$n(10).302.exit.thread.i.i" ]
-  %.fca.0.extract80.i183.i.i = phi ptr [ %1, %cond_exit_20.9.i ], [ %.fca.1.0.0.0.extract.i.i.i, %"__hugr__.$ArrayIter.__next__$$t(qubit)$n(10).302.exit.thread.i.i" ]
-  %"294_0.0182.i.i" = phi i64 [ 0, %cond_exit_20.9.i ], [ %72, %"__hugr__.$ArrayIter.__next__$$t(qubit)$n(10).302.exit.thread.i.i" ]
-  %.pn181.i.i = phi { { ptr, ptr, i64 }, i64 } [ %42, %cond_exit_20.9.i ], [ %80, %"__hugr__.$ArrayIter.__next__$$t(qubit)$n(10).302.exit.thread.i.i" ]
+__barray_check_bounds.exit.i.i.i:                 ; preds = %"__hugr__.$ArrayIter.__next__$$e(qubit)$n(10).302.exit.thread.i.i", %cond_exit_20.9.i
+  %.fca.2.extract82.i185.i.i = phi i64 [ 0, %cond_exit_20.9.i ], [ %.fca.1.0.0.2.extract.i.i.i, %"__hugr__.$ArrayIter.__next__$$e(qubit)$n(10).302.exit.thread.i.i" ]
+  %.fca.1.extract81.i184.i.i = phi ptr [ %2, %cond_exit_20.9.i ], [ %.fca.1.0.0.1.extract.i.i.i, %"__hugr__.$ArrayIter.__next__$$e(qubit)$n(10).302.exit.thread.i.i" ]
+  %.fca.0.extract80.i183.i.i = phi ptr [ %1, %cond_exit_20.9.i ], [ %.fca.1.0.0.0.extract.i.i.i, %"__hugr__.$ArrayIter.__next__$$e(qubit)$n(10).302.exit.thread.i.i" ]
+  %"294_0.0182.i.i" = phi i64 [ 0, %cond_exit_20.9.i ], [ %72, %"__hugr__.$ArrayIter.__next__$$e(qubit)$n(10).302.exit.thread.i.i" ]
+  %.pn181.i.i = phi { { ptr, ptr, i64 }, i64 } [ %42, %cond_exit_20.9.i ], [ %80, %"__hugr__.$ArrayIter.__next__$$e(qubit)$n(10).302.exit.thread.i.i" ]
   %65 = add i64 %"294_0.0182.i.i", %.fca.2.extract82.i185.i.i
   %66 = lshr i64 %65, 6
   %67 = getelementptr inbounds nuw i64, ptr %.fca.1.extract81.i184.i.i, i64 %66
@@ -253,13 +253,13 @@ __barray_check_bounds.exit.i.i.i:                 ; preds = %"__hugr__.$ArrayIte
   %69 = and i64 %65, 63
   %70 = lshr i64 %68, %69
   %71 = trunc i64 %70 to i1
-  br i1 %71, label %panic.i.i.i.i, label %"__hugr__.$ArrayIter.__next__$$t(qubit)$n(10).302.exit.thread.i.i"
+  br i1 %71, label %panic.i.i.i.i, label %"__hugr__.$ArrayIter.__next__$$e(qubit)$n(10).302.exit.thread.i.i"
 
 panic.i.i.i.i:                                    ; preds = %__barray_check_bounds.exit.i.i.i
   tail call void @panic(i32 1002, ptr nonnull @"e_Array elem.E746B1A3.0")
   unreachable
 
-"__hugr__.$ArrayIter.__next__$$t(qubit)$n(10).302.exit.thread.i.i": ; preds = %__barray_check_bounds.exit.i.i.i
+"__hugr__.$ArrayIter.__next__$$e(qubit)$n(10).302.exit.thread.i.i": ; preds = %__barray_check_bounds.exit.i.i.i
   %72 = add nuw nsw i64 %"294_0.0182.i.i", 1
   %73 = shl nuw i64 1, %69
   %74 = xor i64 %73, %68

@@ -413,44 +413,44 @@ loop_body.i.i:                                    ; preds = %__barray_check_boun
   tail call void @heap_free(ptr nonnull %.fca.1.extract81.i.i.i)
   br label %__barray_check_bounds.exit255.i
 
-cond_89_case_0.i:                                 ; preds = %cond_exit_89.thread.i
+cond_90_case_0.i:                                 ; preds = %cond_exit_90.thread.i
   %115 = load i64, ptr %72, align 4
   %116 = or i64 %115, -1024
   store i64 %116, ptr %72, align 4
   %117 = icmp eq i64 %116, -1
   br i1 %117, label %__hugr__.main.1.exit, label %mask_block_err.i.i
 
-mask_block_err.i.i:                               ; preds = %cond_89_case_0.i
+mask_block_err.i.i:                               ; preds = %cond_90_case_0.i
   tail call void @panic(i32 1002, ptr nonnull @"e_Array cont.EFA5AC45.0")
   unreachable
 
-__barray_check_bounds.exit255.i:                  ; preds = %cond_exit_89.thread.i, %"__hugr__.$measure_array$$n(10).280.exit.i"
-  %"92_0.0279.i" = phi i64 [ 0, %"__hugr__.$measure_array$$n(10).280.exit.i" ], [ %118, %cond_exit_89.thread.i ]
-  %118 = add nuw nsw i64 %"92_0.0279.i", 1
+__barray_check_bounds.exit255.i:                  ; preds = %cond_exit_90.thread.i, %"__hugr__.$measure_array$$n(10).280.exit.i"
+  %"93_0.0279.i" = phi i64 [ 0, %"__hugr__.$measure_array$$n(10).280.exit.i" ], [ %118, %cond_exit_90.thread.i ]
+  %118 = add nuw nsw i64 %"93_0.0279.i", 1
   %119 = load i64, ptr %72, align 4
-  %120 = lshr i64 %119, %"92_0.0279.i"
+  %120 = lshr i64 %119, %"93_0.0279.i"
   %121 = trunc i64 %120 to i1
-  br i1 %121, label %cond_exit_89.thread.i, label %__barray_mask_borrow.exit259.i
+  br i1 %121, label %cond_exit_90.thread.i, label %__barray_mask_borrow.exit259.i
 
 __barray_mask_borrow.exit259.i:                   ; preds = %__barray_check_bounds.exit255.i
-  %122 = shl nuw nsw i64 1, %"92_0.0279.i"
+  %122 = shl nuw nsw i64 1, %"93_0.0279.i"
   %123 = xor i64 %119, %122
   store i64 %123, ptr %72, align 4
-  %124 = getelementptr inbounds nuw { i1, i64, i1 }, ptr %71, i64 %"92_0.0279.i"
+  %124 = getelementptr inbounds nuw { i1, i64, i1 }, ptr %71, i64 %"93_0.0279.i"
   %125 = load { i1, i64, i1 }, ptr %124, align 4
   %.fca.0.extract167.i = extractvalue { i1, i64, i1 } %125, 0
-  br i1 %.fca.0.extract167.i, label %cond_392_case_1.i, label %cond_exit_89.thread.i
+  br i1 %.fca.0.extract167.i, label %cond_389_case_1.i, label %cond_exit_90.thread.i
 
-cond_exit_89.thread.i:                            ; preds = %cond_392_case_1.i, %__barray_mask_borrow.exit259.i, %__barray_check_bounds.exit255.i
+cond_exit_90.thread.i:                            ; preds = %cond_389_case_1.i, %__barray_mask_borrow.exit259.i, %__barray_check_bounds.exit255.i
   %exitcond.i = icmp eq i64 %118, 10
-  br i1 %exitcond.i, label %cond_89_case_0.i, label %__barray_check_bounds.exit255.i
+  br i1 %exitcond.i, label %cond_90_case_0.i, label %__barray_check_bounds.exit255.i
 
-cond_392_case_1.i:                                ; preds = %__barray_mask_borrow.exit259.i
+cond_389_case_1.i:                                ; preds = %__barray_mask_borrow.exit259.i
   %.fca.1.extract.i = extractvalue { i1, i64, i1 } %125, 1
   tail call void @___dec_future_refcount(i64 %.fca.1.extract.i)
-  br label %cond_exit_89.thread.i
+  br label %cond_exit_90.thread.i
 
-__hugr__.main.1.exit:                             ; preds = %cond_89_case_0.i
+__hugr__.main.1.exit:                             ; preds = %cond_90_case_0.i
   tail call void @heap_free(ptr %71)
   tail call void @heap_free(ptr nonnull %72)
   %126 = tail call i64 @teardown()
