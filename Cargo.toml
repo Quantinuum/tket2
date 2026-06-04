@@ -11,7 +11,6 @@ members = [
     "tket1-passes",
     "tket-py",
     "tket-qsystem",
-    "tket-qec",
 ]
 default-members = ["tket", "tket-qsystem"]
 
