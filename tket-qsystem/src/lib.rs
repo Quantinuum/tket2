@@ -4,6 +4,7 @@
 #[cfg(feature = "cli")]
 pub mod cli;
 pub mod extension;
+pub(crate) mod helpers;
 #[cfg(feature = "llvm")]
 pub mod llvm;
 pub mod lower_drops;
