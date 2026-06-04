@@ -116,6 +116,8 @@ gen-extensions:
 update-snapshots: update-snapshots-rs update-snapshots-py
 # Interactively update snapshot tests (requires `cargo-insta`)
 update-snapshots-rs:
+    cargo insta test
+    cargo insta test -p selene-hugr-qis-compiler
     cargo insta review
 # Update python snapshot tests.
 update-snapshots-py *TEST_ARGS:
