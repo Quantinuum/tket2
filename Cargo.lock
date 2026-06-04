@@ -2903,6 +2903,7 @@ dependencies = [
  "cool_asserts",
  "derive_more 2.1.1",
  "hugr",
+ "hugr-core",
  "itertools 0.14.0",
  "num_cpus",
  "portmatching",

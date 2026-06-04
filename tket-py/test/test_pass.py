@@ -7,12 +7,14 @@ from tket._ops import TketOp
 from tket.passes import (
     _badger_optimise,
     _greedy_depth_reduce,
+    Cliffordize,
     InlineFunctions,
     inline_funcs,
     NormalizeGuppy,
     ModifierResolverPass,
     GlobalScope,
 )
+from hugr.passes.scope import LocalScope
 from tket._state import CompilationState
 from tket_exts import tket_registry
 
@@ -209,6 +211,45 @@ def test_squash_phasedx_rz():
     # TODO: We cannot use circuit_cost due to a panic on non-tket ops and there
     # being some parameter loads...
     assert opt_circ.num_operations() == 0
+
+
+def test_cliffordize_replaces_supported_non_clifford_ops() -> None:
+    tk_program = CompilationState.from_tket1(Circuit(1).T(0).Tdg(0).T(0).Tdg(0).H(0))
+    hugr = Hugr.from_str(tk_program.to_str(), tket_registry())
+
+    result = Cliffordize().run(hugr, inplace=False)
+    opt_circ = CompilationState.from_bytes(result.hugr.to_bytes())
+
+    assert opt_circ.circuit_cost(lambda op: int(op in (TketOp.T, TketOp.Tdg))) == 0
+    assert opt_circ.circuit_cost(lambda op: int(op in (TketOp.S, TketOp.Sdg))) == 4
+    assert result.results[-1][1] == 4
+
+
+def test_cliffordize_respects_scope() -> None:
+    guppylang = pytest.importorskip("guppylang")
+    from guppylang.std.quantum import qubit, t
+
+    @guppylang.guppy
+    def helper(q: qubit) -> None:
+        t(q)
+
+    @guppylang.guppy
+    def main(q: qubit) -> None:
+        helper(q)
+
+    hugr = normalize(main.compile_function().modules[0])
+
+    flat_result = Cliffordize().with_scope(LocalScope.FLAT).run(hugr, inplace=False)
+    assert flat_result.results[-1][1] == 0
+    assert _count_ops(flat_result.hugr, "tket.quantum.T") == 1
+
+    global_result = (
+        Cliffordize()
+        .with_scope(GlobalScope.PRESERVE_ENTRYPOINT)
+        .run(hugr, inplace=False)
+    )
+    assert global_result.results[-1][1] == 1
+    assert _count_ops(global_result.hugr, "tket.quantum.T") == 0
 
 
 def test_sequence_pass():

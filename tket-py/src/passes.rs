@@ -6,6 +6,7 @@ mod scope;
 pub mod tket1;
 
 use hugr::HugrView;
+use hugr_core::hugr::internal::HugrMutInternals;
 pub(crate) use scope::PyPassScope;
 
 use std::{cmp::min, convert::TryInto, fs, num::NonZeroUsize, path::PathBuf};
@@ -35,6 +36,7 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     m.add_function(wrap_pyfunction!(self::tket1::tket1_pass, &m)?)?;
     m.add_function(wrap_pyfunction!(resolve_modifiers, &m)?)?;
     m.add_function(wrap_pyfunction!(qsystem_rebase_pass, &m)?)?;
+    m.add_function(wrap_pyfunction!(cliffordize, &m)?)?;
     m.add("PullForwardError", py.get_type::<PyPullForwardError>())?;
     m.add(
         "InlineFunctionsError",
@@ -213,6 +215,47 @@ fn resolve_modifiers(circ: &mut CompilationState, scope: Option<PyPassScope>) ->
     let pass = tket::passes::ModifierResolverPass::default_with_scope(py_scope.scope);
     pass.run(&mut circ.hugr).convert_pyerrs()?;
     Ok(())
+}
+
+fn clifford_replacement(op: TketOp) -> Option<TketOp> {
+    match op {
+        TketOp::T => Some(TketOp::S),
+        TketOp::Tdg => Some(TketOp::Sdg),
+        _ => None,
+    }
+}
+
+/// Replace selected non-Clifford quantum operations with Clifford operations.
+#[pyfunction]
+#[pyo3(signature = (circ, scope = None))]
+fn cliffordize(circ: &mut CompilationState, scope: Option<PyPassScope>) -> PyResult<usize> {
+    let py_scope = scope.unwrap_or_default();
+    let nodes = py_scope
+        .scope
+        .regions(&circ.hugr)
+        .flat_map(|region| circ.hugr.children(region))
+        .filter(|&node| {
+            circ.hugr
+                .get_optype(node)
+                .cast::<TketOp>()
+                .is_some_and(|op| clifford_replacement(op).is_some())
+        })
+        .collect::<Vec<_>>();
+
+    let mut rewrite_count = 0;
+    for node in nodes {
+        if let Some(replacement) = circ
+            .hugr
+            .get_optype(node)
+            .cast::<TketOp>()
+            .and_then(clifford_replacement)
+        {
+            *circ.hugr.optype_mut(node) = replacement.into();
+            rewrite_count += 1;
+        }
+    }
+
+    Ok(rewrite_count)
 }
 
 #[pyfunction]

@@ -57,6 +57,14 @@ def greedy_depth_reduce(circ: CompilationState) -> int:
     Mutates the circuit in place and returns the number of moves made.
     """
 
+def cliffordize(
+    circ: CompilationState, scope: PassScope = GlobalScope.PRESERVE_PUBLIC
+) -> int:
+    """Replace selected non-Clifford quantum operations with Clifford operations.
+
+    Mutates the circuit in place and returns the number of rewrites applied.
+    """
+
 def badger_optimise(
     circ: CompilationState,
     optimiser: BadgerOptimiser,

@@ -28,6 +28,7 @@ __all__ = [
     "PassResult",
     "InlineFuncsHeuristic",
     "InlineFunctions",
+    "Cliffordize",
     "NormalizeGuppy",
     "ModifierResolverPass",
     "QSystemPass",
@@ -186,6 +187,44 @@ class InlineFunctions(ComposablePass):
         package = tk_program.to_python()
         return PassResult.for_pass(
             self, hugr=package.modules[0], inplace=inplace, result=None
+        )
+
+
+@dataclass
+class Cliffordize(ComposablePass):
+    """Replace selected non-Clifford operations with Clifford operations.
+
+    This pass is intended for testing and debugging workflows, such as feeding a
+    program into Clifford-only simulators. It is not semantics-preserving.
+
+    Currently supported ``tket.quantum`` replacements:
+    - ``T`` -> ``S``
+    - ``Tdg`` -> ``Sdg``
+    """
+
+    _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
+
+    def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
+        return implement_pass_run(
+            self,
+            hugr=hugr,
+            inplace=inplace,
+            copy_call=lambda h: self._cliffordize(h, inplace),
+        )
+
+    def with_scope(self, scope: PassScope) -> Cliffordize:
+        """Set the scope of this pass and return self."""
+        self._scope = scope
+        return self
+
+    def _cliffordize(self, hugr: Hugr, inplace: bool) -> PassResult:
+        tk_program = _state.CompilationState.from_python(hugr)
+
+        rewrite_count = _passes.cliffordize(tk_program._inner, scope=self._scope)
+
+        package = tk_program.to_python()
+        return PassResult.for_pass(
+            self, hugr=package.modules[0], inplace=inplace, result=rewrite_count
         )
 
 

@@ -19,6 +19,7 @@
 .. toctree::
    :caption: Examples
 
+   examples/Cliffordize
    examples/Guppy-opt-example
 
 ```
