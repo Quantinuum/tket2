@@ -968,10 +968,7 @@ fn circ_discard_first_qubit() -> Hugr {
 
     let [q1, q2] = h.input_wires_arr();
 
-    let [_msmt] = h
-        .add_dataflow_op(TketOp::MeasureFree, [q1])
-        .unwrap()
-        .outputs_arr();
+    h.add_dataflow_op(TketOp::MeasureFree, [q1]).unwrap();
 
     let [q2] = h.add_dataflow_op(TketOp::X, [q2]).unwrap().outputs_arr();
 
@@ -1454,45 +1451,3 @@ fn serial_decode_missing_output_bit_returns_decode_error() {
         }
     );
 }
-
-// TODO: Revisit as part of https://github.com/Quantinuum/tket2/issues/1570.
-// Standalone decoding roundtrip should preserve the output signature.
-//
-// Regression test for a mismatched signature error found in
-// <https://github.com/Quantinuum/tket2/pull/1558>
-// #[rstest]
-// fn standalone_reassemble_preserves_repeated_bit_outputs(circ_preset_bits: Hugr) {
-//     let circ_signature = circ_preset_bits
-//         .entrypoint_optype()
-//         .inner_function_type()
-//         .expect("Dataflow entrypoint")
-//         .into_owned();
-//     let decode_options = DecodeOptions::new().with_signature(circ_signature.clone());
-
-//     let encoded = EncodedCircuit::new_standalone(
-//         &circ_preset_bits,
-//         EncodeOptions::new().with_subcircuits(true),
-//     )
-//     .unwrap_or_else(|e| panic!("{e}"));
-
-//     let reassembled = encoded
-//         .reassemble(
-//             circ_preset_bits.entrypoint(),
-//             Some("main".to_string()),
-//             decode_options,
-//         )
-//         .unwrap_or_else(|e| panic!("{e}"));
-//     reassembled.validate().unwrap_or_else(|e| panic!("{e}"));
-
-//     let reassembled_function = reassembled
-//         .children(reassembled.module_root())
-//         .exactly_one()
-//         .ok()
-//         .expect("single reassembled function");
-//     let reassembled_signature = reassembled
-//         .get_optype(reassembled_function)
-//         .inner_function_type()
-//         .expect("Function definition")
-//         .into_owned();
-//     assert_eq!(&circ_signature.output, &reassembled_signature.output);
-// }

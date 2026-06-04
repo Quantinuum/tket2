@@ -30,7 +30,7 @@ class MeasurementExtension(TketExtension):
 
     @functools.cached_property
     def measurement_t(self) -> ExtType:
-        """A type representing the result of a measurement operation."""
+        """A copyable type representing the result of a measurement operation."""
         return self().get_type("Measurement").instantiate([])
 
     @functools.cached_property

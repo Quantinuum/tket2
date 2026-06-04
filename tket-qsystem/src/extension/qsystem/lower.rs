@@ -177,8 +177,8 @@ fn register_measurement_replacements(lowerer: &mut ReplaceTypes) {
     );
 
     // The following replacements and lineariser registrations are needed in order to
-    // allow the copyable `Measurement` type to be replaced with the non-copyable
-    // `Future` type.
+    // allow the copyable `Measurement` type to be replaced with the linear `Future`
+    // type.
     let dup_op = FutureOp {
         op: FutureOpDef::Dup,
         typ: bool_t(),
@@ -1261,9 +1261,9 @@ mod test {
         h.validate().unwrap();
 
         let sig = h.signature(h.entrypoint()).unwrap();
-        let future_arr_ty = AK::ty(size, future_type(bool_t()));
-        assert_eq!(sig.input(), &TypeRow::from(vec![future_arr_ty.clone()]));
-        assert_eq!(sig.output(), &TypeRow::from(vec![future_arr_ty]));
+        let future_arr_ty = &TypeRow::from(vec![AK::ty(size, future_type(bool_t()))]);
+        assert_eq!(sig.input(), future_arr_ty);
+        assert_eq!(sig.output(), future_arr_ty);
     }
 
     #[rstest]

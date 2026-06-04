@@ -73,14 +73,14 @@ impl TketOpEmitter {
             TketOp::Toffoli => PytketOptype::CCX,
             TketOp::Reset => PytketOptype::Reset,
             TketOp::Measure => {
-                // As the measurement type is not supported, we don't translate
-                // measure ops as well for now.
+                // Don't translate `Measure` ops for now (the `Measurement` type they
+                // they return is currently unsupported).
                 return Ok(EncodeStatus::Unsupported);
             }
             // We translate `MeasureFree` the same way as a `Measure` operation.
             TketOp::MeasureFree => {
-                // As the measurement type is not supported, we don't translate
-                // measure ops as well for now.
+                // Don't translate `Measure` ops for now (the `Measurement` type they
+                // they return is currently unsupported).
                 return Ok(EncodeStatus::Unsupported);
             }
             // These operations are implicitly supported by the encoding,

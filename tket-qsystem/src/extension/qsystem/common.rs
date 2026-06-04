@@ -101,7 +101,7 @@ impl SharedOp {
             ),
             SharedOp::QFree => Signature::new(one_qb_row.clone(), type_row![]),
             SharedOp::FutureToMeasurement => {
-                Signature::new(vec![future_type(bool_t())], vec![measurement_type()])
+                Signature::new([future_type(bool_t())], [measurement_type()])
             }
         }
         .into()
@@ -207,7 +207,7 @@ pub(crate) trait PhasedXRzSynth: CommonOpBuilder<Self::Op> {
     fn synth_rz(&mut self, qb: Wire, angle: Wire) -> Result<Wire, BuildError>;
     /// Build a TryQAlloc gate using the platform's native operation.
     fn synth_try_alloc(&mut self) -> Result<Wire, BuildError>;
-    /// Build a MeasureReset gate using the platform's native operation.
+    /// Build a LazyMeasureReset gate using the platform's native operation.
     fn synth_lazy_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError>;
 
     /// Build a CNOT gate.

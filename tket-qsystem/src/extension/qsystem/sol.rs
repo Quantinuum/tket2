@@ -82,7 +82,7 @@ pub enum SolOp {
     LazyMeasureLeaked,
     /// PhasedXX gate (alias 'rpp')
     PhasedXX,
-    /// Convert a `Future<Bool>` to a `Measurement`` (for compatibility with the TKET
+    /// Convert a `Future<Bool>` to a `Measurement` (for compatibility with the TKET
     /// quantum extension).
     FutureToMeasurement,
 }

@@ -82,7 +82,7 @@ pub enum HeliosOp {
     Reset,
     /// Measure a qubit (return 0 or 1) or detect leakage (return 2).
     LazyMeasureLeaked,
-    /// Convert a `Future<Bool>` to a `Measurement`` (for compatibility with the TKET
+    /// Convert a `Future<Bool>` to a `Measurement` (for compatibility with the TKET
     /// quantum extension).
     FutureToMeasurement,
 }
@@ -492,11 +492,9 @@ mod test {
     #[test]
     fn lazy_circuit() {
         let hugr = {
-            let mut func_builder = FunctionBuilder::new(
-                "circuit",
-                Signature::new(vec![qb_t()], vec![qb_t(), bool_t()]),
-            )
-            .unwrap();
+            let mut func_builder =
+                FunctionBuilder::new("circuit", Signature::new([qb_t()], [qb_t(), bool_t()]))
+                    .unwrap();
             let [qb] = func_builder.input_wires_arr();
             let [qb, lazy_b] = {
                 let mut builder = HeliosSynthesizer::new(&mut func_builder);
@@ -512,8 +510,7 @@ mod test {
     fn leaked() {
         let hugr = {
             let mut func_builder =
-                FunctionBuilder::new("leaked", Signature::new(vec![qb_t()], vec![int_type(6)]))
-                    .unwrap();
+                FunctionBuilder::new("leaked", Signature::new([qb_t()], [int_type(6)])).unwrap();
             let [qb] = func_builder.input_wires_arr();
             let lazy_i = {
                 let mut builder = HeliosSynthesizer::new(&mut func_builder);
@@ -530,7 +527,7 @@ mod test {
         let hugr = {
             let mut func_builder = FunctionBuilder::new(
                 "all_ops",
-                Signature::new(vec![qb_t(), float64_type()], vec![bool_t()]),
+                Signature::new([qb_t(), float64_type()], [bool_t()]),
             )
             .unwrap();
             let [q0, angle] = func_builder.input_wires_arr();

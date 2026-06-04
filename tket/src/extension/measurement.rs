@@ -43,7 +43,7 @@ fn add_measurement_type_def(
     ext.add_type(
         MEASUREMENT_TYPE_ID.to_owned(),
         vec![],
-        "A type representing the result of a measurement operation".into(),
+        "A copyable type representing the result of a measurement operation".into(),
         TypeBound::Copyable.into(),
         &extension_ref,
     )

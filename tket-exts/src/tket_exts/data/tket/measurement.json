@@ -6,7 +6,7 @@
       "extension": "tket.measurement",
       "name": "Measurement",
       "params": [],
-      "description": "A type representing the result of a measurement operation",
+      "description": "A copyable type representing the result of a measurement operation",
       "bound": {
         "b": "Explicit",
         "bound": "C"
