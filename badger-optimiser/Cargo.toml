@@ -16,14 +16,14 @@ tket = { path = "../tket", features = [
     "rewrite-tracing",
     "binary-eccs",
 ] }
-tket-qsystem = { path = "../tket-qsystem", version = "0.24.0" }
+tket-qsystem = { path = "../tket-qsystem", version = "0.25.0" }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 tracing-appender = { workspace = true }
 peak_alloc = { workspace = true, optional = true }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
-tikv-jemallocator = "0.6"
+tikv-jemallocator = "0.7"
 
 [features]
 default = []

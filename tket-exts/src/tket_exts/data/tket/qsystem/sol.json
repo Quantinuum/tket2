@@ -1,0 +1,404 @@
+{
+  "version": "0.5.1",
+  "name": "tket.qsystem.sol",
+  "types": {},
+  "operations": {
+    "LazyMeasure": {
+      "extension": "tket.qsystem.sol",
+      "name": "LazyMeasure",
+      "description": "Lazily measure a qubit and lose it.",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Q"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "tket.futures",
+              "id": "Future",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "Sum",
+                    "s": "Unit",
+                    "size": 2
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "LazyMeasureLeaked": {
+      "extension": "tket.qsystem.sol",
+      "name": "LazyMeasureLeaked",
+      "description": "Measure a qubit (return 0 or 1) or detect leakage (return 2).",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Q"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "tket.futures",
+              "id": "Future",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "Opaque",
+                    "extension": "arithmetic.int.types",
+                    "id": "int",
+                    "args": [
+                      {
+                        "tya": "BoundedNat",
+                        "n": 6
+                      }
+                    ],
+                    "bound": "C"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "LazyMeasureReset": {
+      "extension": "tket.qsystem.sol",
+      "name": "LazyMeasureReset",
+      "description": "Lazily measure a qubit and reset it to the Z |0> eigenstate.",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Q"
+            }
+          ],
+          "output": [
+            {
+              "t": "Q"
+            },
+            {
+              "t": "Opaque",
+              "extension": "tket.futures",
+              "id": "Future",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "Sum",
+                    "s": "Unit",
+                    "size": 2
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "Measure": {
+      "extension": "tket.qsystem.sol",
+      "name": "Measure",
+      "description": "Measure a qubit and lose it.",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Q"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "tket.bool",
+              "id": "bool",
+              "args": [],
+              "bound": "C"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "MeasureReset": {
+      "extension": "tket.qsystem.sol",
+      "name": "MeasureReset",
+      "description": "Measure a qubit and reset it to the Z |0> eigenstate.",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Q"
+            }
+          ],
+          "output": [
+            {
+              "t": "Q"
+            },
+            {
+              "t": "Opaque",
+              "extension": "tket.bool",
+              "id": "bool",
+              "args": [],
+              "bound": "C"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "PhasedX": {
+      "extension": "tket.qsystem.sol",
+      "name": "PhasedX",
+      "description": "PhasedX gate.",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Q"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Q"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "PhasedXX": {
+      "extension": "tket.qsystem.sol",
+      "name": "PhasedXX",
+      "description": "PhasedXX gate, specific to the Sol platform.",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Q"
+            },
+            {
+              "t": "Q"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Q"
+            },
+            {
+              "t": "Q"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "QFree": {
+      "extension": "tket.qsystem.sol",
+      "name": "QFree",
+      "description": "Free a qubit (lose track of it).",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Q"
+            }
+          ],
+          "output": []
+        }
+      },
+      "binary": false
+    },
+    "Reset": {
+      "extension": "tket.qsystem.sol",
+      "name": "Reset",
+      "description": "Reset a qubit to the Z |0> eigenstate.",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Q"
+            }
+          ],
+          "output": [
+            {
+              "t": "Q"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "RuntimeBarrier": {
+      "extension": "tket.qsystem.sol",
+      "name": "RuntimeBarrier",
+      "description": "Acts as a runtime barrier between operations on argument qubits.",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": null
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections.array",
+              "id": "array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "Q"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "collections.array",
+              "id": "array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "Q"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "Rz": {
+      "extension": "tket.qsystem.sol",
+      "name": "Rz",
+      "description": "Rotate a qubit around the Z axis. Not physical on Helios or Sol platforms.",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Q"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Q"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "TryQAlloc": {
+      "extension": "tket.qsystem.sol",
+      "name": "TryQAlloc",
+      "description": "Allocate a qubit in the Z |0> eigenstate.",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "General",
+              "rows": [
+                [],
+                [
+                  {
+                    "t": "Q"
+                  }
+                ]
+              ]
+            }
+          ]
+        }
+      },
+      "binary": false
+    }
+  }
+}

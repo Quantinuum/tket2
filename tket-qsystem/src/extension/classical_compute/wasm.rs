@@ -93,7 +93,7 @@ pub type WasmType = ComputeType<WasmExtension>;
 /// The "tket.wasm" extension id.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("tket.wasm");
 /// The "tket.wasm" extension version.
-pub const EXTENSION_VERSION: Version = Version::new(0, 4, 1);
+pub const EXTENSION_VERSION: Version = Version::new(0, 5, 0);
 
 lazy_static! {
     /// The `tket.wasm` extension.
@@ -158,7 +158,7 @@ impl TryFrom<CustomType> for WasmType {
     }
 }
 
-compute_opdef!(EXTENSION_ID, WasmExtension, WasmOpDef);
+compute_opdef!(EXTENSION_ID, EXTENSION_VERSION, WasmExtension, WasmOpDef);
 
 impl MakeRegisteredOp for WasmOp {
     fn extension_id(&self) -> ExtensionId {
@@ -188,7 +188,7 @@ impl CustomConst for ConstWasmModule {
     }
 
     fn get_type(&self) -> Type {
-        WasmType::Module.get_type(EXTENSION_ID, &EXTENSION_REF)
+        WasmType::Module.get_type(EXTENSION_ID, EXTENSION_VERSION, &EXTENSION_REF)
     }
 }
 
@@ -303,11 +303,12 @@ mod test {
             outputs: outputs.clone(),
         };
         let extension = Arc::downgrade(&op.extension_ref());
-        let module_ty = WasmType::Module.get_type(op.extension_id(), &extension);
+        let module_ty = WasmType::Module.get_type(op.extension_id(), EXTENSION_VERSION, &extension);
         let func_ty = Type::new_extension(WasmType::func_custom_type(
             inputs.clone(),
             outputs.clone(),
             op.extension_id(),
+            EXTENSION_VERSION,
             &extension,
         ));
         assert_eq!(

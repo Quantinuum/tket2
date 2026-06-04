@@ -236,7 +236,7 @@ jobs:
           files: coverage.json
           name: rust
           flags: rust
-          fail_ci_if_error: true
+          fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
 
   # Run tests on the minimum supported rust version, with minimal dependency versions
@@ -317,7 +317,7 @@ jobs:
           disable_search: true
           name: python
           flags: python
-          fail_ci_if_error: true
+          fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
 
   tests-qis-compiler:
@@ -355,7 +355,7 @@ jobs:
           disable_search: true
           name: python
           flags: qis-compiler
-          fail_ci_if_error: true
+          fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
 
   # Ensure that serialized extensions match rust implementation

@@ -1,0 +1,141 @@
+; ModuleID = 'hugr'
+source_filename = "hugr"
+target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
+target triple = "x86_64-windows-msvc"
+
+@res_c0.7C14CD6E.0 = private constant [13 x i8] c"\0CUSER:BOOL:c0"
+@res_c1.1F7A6571.0 = private constant [13 x i8] c"\0CUSER:BOOL:c1"
+@res_c2.60825383.0 = private constant [13 x i8] c"\0CUSER:BOOL:c2"
+@res_c3.B223E16D.0 = private constant [13 x i8] c"\0CUSER:BOOL:c3"
+@"e_No more qu.3B2EEBF0.0" = private constant [47 x i8] c".EXIT:INT:No more qubits available to allocate."
+
+define void @"__hugr__.__main__.flip_some.<locals>.main.1"() local_unnamed_addr !dbg !4 {
+alloca_block:
+  %qalloc.i = tail call i64 @___qalloc(), !dbg !8
+  %not_max.not.not.i = icmp eq i64 %qalloc.i, -1, !dbg !8
+  br i1 %not_max.not.not.i, label %cond_40_case_0.i, label %__hugr__.__tk2_helios_qalloc.36.exit, !dbg !8
+
+cond_40_case_0.i:                                 ; preds = %alloca_block
+  tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0"), !dbg !8
+  unreachable, !dbg !8
+
+__hugr__.__tk2_helios_qalloc.36.exit:             ; preds = %alloca_block
+  tail call void @___reset(i64 %qalloc.i), !dbg !8
+  tail call void @___rxy(i64 %qalloc.i, double 0x400921FB54442D18, double 0.000000e+00), !dbg !9
+  %qalloc.i101 = tail call i64 @___qalloc(), !dbg !10
+  %not_max.not.not.i102 = icmp eq i64 %qalloc.i101, -1, !dbg !10
+  br i1 %not_max.not.not.i102, label %cond_54_case_0.i, label %__hugr__.__tk2_helios_qalloc.50.exit, !dbg !10
+
+cond_54_case_0.i:                                 ; preds = %__hugr__.__tk2_helios_qalloc.36.exit
+  tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0"), !dbg !10
+  unreachable, !dbg !10
+
+__hugr__.__tk2_helios_qalloc.50.exit:             ; preds = %__hugr__.__tk2_helios_qalloc.36.exit
+  tail call void @___reset(i64 %qalloc.i101), !dbg !10
+  %qalloc.i103 = tail call i64 @___qalloc(), !dbg !11
+  %not_max.not.not.i104 = icmp eq i64 %qalloc.i103, -1, !dbg !11
+  br i1 %not_max.not.not.i104, label %cond_68_case_0.i, label %__hugr__.__tk2_helios_qalloc.64.exit, !dbg !11
+
+cond_68_case_0.i:                                 ; preds = %__hugr__.__tk2_helios_qalloc.50.exit
+  tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0"), !dbg !11
+  unreachable, !dbg !11
+
+__hugr__.__tk2_helios_qalloc.64.exit:             ; preds = %__hugr__.__tk2_helios_qalloc.50.exit
+  tail call void @___reset(i64 %qalloc.i103), !dbg !11
+  tail call void @___rxy(i64 %qalloc.i103, double 0x400921FB54442D18, double 0.000000e+00), !dbg !12
+  %qalloc.i105 = tail call i64 @___qalloc(), !dbg !13
+  %not_max.not.not.i106 = icmp eq i64 %qalloc.i105, -1, !dbg !13
+  br i1 %not_max.not.not.i106, label %cond_82_case_0.i, label %__hugr__.__tk2_helios_qalloc.78.exit, !dbg !13
+
+cond_82_case_0.i:                                 ; preds = %__hugr__.__tk2_helios_qalloc.64.exit
+  tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0"), !dbg !13
+  unreachable, !dbg !13
+
+__hugr__.__tk2_helios_qalloc.78.exit:             ; preds = %__hugr__.__tk2_helios_qalloc.64.exit
+  tail call void @___reset(i64 %qalloc.i105), !dbg !13
+  %lazy_measure = tail call i64 @___lazy_measure(i64 %qalloc.i)
+  tail call void @___qfree(i64 %qalloc.i)
+  %read_bool = tail call i1 @___read_future_bool(i64 %lazy_measure)
+  tail call void @___dec_future_refcount(i64 %lazy_measure)
+  tail call void @print_bool(ptr nonnull @res_c0.7C14CD6E.0, i64 12, i1 %read_bool), !dbg !14
+  %lazy_measure22 = tail call i64 @___lazy_measure(i64 %qalloc.i101)
+  tail call void @___qfree(i64 %qalloc.i101)
+  %read_bool35 = tail call i1 @___read_future_bool(i64 %lazy_measure22)
+  tail call void @___dec_future_refcount(i64 %lazy_measure22)
+  tail call void @print_bool(ptr nonnull @res_c1.1F7A6571.0, i64 12, i1 %read_bool35), !dbg !15
+  %lazy_measure44 = tail call i64 @___lazy_measure(i64 %qalloc.i103)
+  tail call void @___qfree(i64 %qalloc.i103)
+  %read_bool57 = tail call i1 @___read_future_bool(i64 %lazy_measure44)
+  tail call void @___dec_future_refcount(i64 %lazy_measure44)
+  tail call void @print_bool(ptr nonnull @res_c2.60825383.0, i64 12, i1 %read_bool57), !dbg !16
+  tail call void @___rxy(i64 %qalloc.i105, double 0x400921FB54442D18, double 0.000000e+00), !dbg !17
+  %lazy_measure67 = tail call i64 @___lazy_measure(i64 %qalloc.i105)
+  tail call void @___qfree(i64 %qalloc.i105)
+  %read_bool80 = tail call i1 @___read_future_bool(i64 %lazy_measure67)
+  tail call void @___dec_future_refcount(i64 %lazy_measure67)
+  tail call void @print_bool(ptr nonnull @res_c3.B223E16D.0, i64 12, i1 %read_bool80), !dbg !18
+  ret void
+}
+
+declare i64 @___lazy_measure(i64) local_unnamed_addr
+
+declare void @___qfree(i64) local_unnamed_addr
+
+declare i1 @___read_future_bool(i64) local_unnamed_addr
+
+declare void @___dec_future_refcount(i64) local_unnamed_addr
+
+declare void @print_bool(ptr, i64, i1) local_unnamed_addr
+
+declare i64 @___qalloc() local_unnamed_addr
+
+declare void @___reset(i64) local_unnamed_addr
+
+; Function Attrs: noreturn
+declare void @panic(i32, ptr) local_unnamed_addr #0
+
+declare void @___rxy(i64, double, double) local_unnamed_addr
+
+define i64 @qmain(i64 %0) local_unnamed_addr !dbg !19 {
+entry:
+  tail call void @setup(i64 %0), !dbg !24
+  tail call void @"__hugr__.__main__.flip_some.<locals>.main.1"(), !dbg !24
+  %1 = tail call i64 @teardown(), !dbg !24
+  ret i64 %1, !dbg !24
+}
+
+declare void @setup(i64) local_unnamed_addr
+
+declare i64 @teardown() local_unnamed_addr
+
+attributes #0 = { noreturn }
+
+!llvm.module.flags = !{!0}
+!llvm.dbg.cu = !{!1}
+!name = !{!3}
+
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "guppylang (guppylang-internals-v0.32.0)-v0.21.11", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "/Users/george.hodgkins/proj/tket2/qis-compiler/python/tests/generate_hugrs.py", directory: "file:///Users/george.hodgkins/proj/clone-anduril")
+!3 = !{!"mainlib"}
+!4 = distinct !DISubprogram(name: "flip_some.<locals>.main", linkageName: "__hugr__.__main__.flip_some.<locals>.main.1", scope: null, file: !5, line: 74, type: !6, scopeLine: 75, spFlags: DISPFlagDefinition, unit: !1)
+!5 = !DIFile(filename: "/Users/george.hodgkins/proj/tket2/qis-compiler/python/tests/generate_hugrs.py", directory: "")
+!6 = !DISubroutineType(types: !7)
+!7 = !{null}
+!8 = !DILocation(line: 75, column: 20, scope: !4)
+!9 = !DILocation(line: 79, column: 8, scope: !4)
+!10 = !DILocation(line: 76, column: 20, scope: !4)
+!11 = !DILocation(line: 77, column: 20, scope: !4)
+!12 = !DILocation(line: 80, column: 8, scope: !4)
+!13 = !DILocation(line: 78, column: 20, scope: !4)
+!14 = !DILocation(line: 82, column: 8, scope: !4)
+!15 = !DILocation(line: 83, column: 8, scope: !4)
+!16 = !DILocation(line: 84, column: 8, scope: !4)
+!17 = !DILocation(line: 81, column: 8, scope: !4)
+!18 = !DILocation(line: 85, column: 8, scope: !4)
+!19 = distinct !DISubprogram(name: "qmain", linkageName: "qmain", scope: null, file: !20, type: !21, spFlags: DISPFlagDefinition, unit: !1)
+!20 = !DIFile(filename: "COMPILER_GENERATED_CODE", directory: "")
+!21 = !DISubroutineType(types: !22)
+!22 = !{!23, !23}
+!23 = !DIBasicType(name: "i64", size: 64, encoding: DW_ATE_unsigned)
+!24 = !DILocation(line: 0, scope: !19)

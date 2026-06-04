@@ -435,6 +435,7 @@ mod test {
     }
 
     #[rstest]
+    #[cfg_attr(miri, ignore)] // miri cannot analyze programs which use zstd
     fn test_borrow_squash(ranges_array: Hugr) {
         let counts = |h: &Hugr| {
             let mut brs = vec![(0, 0); 4];
@@ -492,6 +493,7 @@ mod test {
     }
 
     #[rstest]
+    #[cfg_attr(miri, ignore)] // Opening compressed HUGR files is not supported in (isolated) miri
     fn test_nested_array() {
         let inner_array_type = BorrowArray::ty(5, qb_t());
         let outer_array_type = BorrowArray::ty(3, inner_array_type.clone());

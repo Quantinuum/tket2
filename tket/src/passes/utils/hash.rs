@@ -3,9 +3,13 @@
 use derive_more::{Display, Error};
 use fxhash::{FxHashMap, FxHasher64};
 use hugr_core::HugrView;
+use hugr_core::extension::ExtensionId;
+use hugr_core::ops::OpNameRef;
 use hugr_core::ops::OpType;
 use hugr_core::ops::{OpTag, OpTrait};
+use hugr_core::types::type_param::TypeArg;
 use petgraph::visit::{self as pg, Walker};
+use std::fmt::{self, Write};
 use std::hash::{Hash, Hasher};
 
 /// Hugr hashing utilities.
@@ -34,7 +38,7 @@ impl<H: HugrView> HugrHash for H {
         let mut hasher = FxHasher64::default();
 
         let op: &OpType = self.get_optype(node);
-        hashable_op(op).hash(&mut hasher);
+        hash_op_type(op, &mut hasher);
 
         if OpTag::DataflowParent.is_superset(node_op.tag()) {
             // In this case, we have a dataflow container
@@ -104,27 +108,45 @@ impl<H: HugrView> HashState<H> {
     }
 }
 
-/// Returns a hashable representation of an operation.
+/// Hash the identity of an operation (extension, name, and type arguments).
+fn hash_extension_identity(
+    hasher: &mut impl Hasher,
+    extension: &ExtensionId,
+    name: &OpNameRef,
+    args: &[TypeArg],
+) {
+    extension.hash(hasher);
+    name.hash(hasher);
+    args.hash(hasher);
+}
+
+/// Hash an operation for use in region hashes.
 ///
-/// TODO(perf): String formatting here is a big bottleneck
-fn hashable_op(op: &OpType) -> impl Hash + use<> {
+/// Extension and opaque ops are hashed structurally (no JSON formatting).
+/// Other ops use their tag and name; graph context distinguishes calls etc.
+fn hash_op_type(op: &OpType, hasher: &mut impl Hasher) {
     match op {
-        OpType::ExtensionOp(op) if !op.args().is_empty() => {
-            // TODO: Require hashing for TypeParams?
-            format!(
-                "{}[{}]",
-                op.def().name(),
-                serde_json::to_string(op.args()).unwrap()
-            )
+        OpType::ExtensionOp(ext) => {
+            hash_extension_identity(hasher, ext.extension_id(), ext.unqualified_id(), ext.args());
         }
-        OpType::OpaqueOp(op) if !op.args().is_empty() => {
-            format!(
-                "{}[{}]",
-                op.qualified_id(),
-                serde_json::to_string(op.args()).unwrap()
-            )
+        OpType::OpaqueOp(op) => {
+            hash_extension_identity(hasher, op.extension(), op.unqualified_id(), op.args());
         }
-        _ => op.to_string(),
+        _ => {
+            op.tag().hash(hasher);
+            // `NamedOp::name` is crate-private in hugr; hash via `Display` without allocating.
+            write!(FmtHasher(hasher), "{op}").expect("hashing op name must not fail");
+        }
+    }
+}
+
+/// [`Write`] adapter that feeds formatted text into a [`Hasher`].
+struct FmtHasher<'a, H: Hasher>(&'a mut H);
+
+impl<H: Hasher> Write for FmtHasher<'_, H> {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        s.hash(self.0);
+        Ok(())
     }
 }
 
@@ -229,5 +251,22 @@ mod test {
         let hash3 = hugr3.hugr_hash().unwrap();
 
         assert_ne!(hash1, hash3);
+    }
+
+    #[test]
+    fn hash_distinguishes_type_args() {
+        use hugr_core::std_extensions::arithmetic::int_ops::IntOpDef;
+
+        let op5: OpType = IntOpDef::iadd.with_log_width(5).into();
+        let op6: OpType = IntOpDef::iadd.with_log_width(6).into();
+
+        let hash_of = |op: &OpType| {
+            let mut hasher = FxHasher64::default();
+            hash_op_type(op, &mut hasher);
+            hasher.finish()
+        };
+
+        assert_eq!(hash_of(&op5), hash_of(&op5));
+        assert_ne!(hash_of(&op5), hash_of(&op6));
     }
 }

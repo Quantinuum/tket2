@@ -11,10 +11,8 @@ import shutil
 import sys
 import numpy as np
 import numpy.typing as npt
-
 from hugr import Hugr
 from guppylang.emulator import EmulatorBuilder
-
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
@@ -39,6 +37,7 @@ def format_statevector(
 
 modifier_examples_dir = Path(__file__).resolve().parent / "modified_hugrs"
 result_execution_dir = Path(__file__).resolve().parent / "hugr_results"
+result_execution_dir.mkdir(exist_ok=True)
 
 all_results: list[str] = []
 args = sys.argv[1:]

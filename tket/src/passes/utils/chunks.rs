@@ -287,16 +287,20 @@ impl CircuitChunks {
         let convex_checker = SchedGraphChecker::new(circ.sched_graph());
         let mut running_cost = C::default();
         let mut current_group = 0;
-        for (_, commands) in &circ.commands().map(|cmd| cmd.node()).chunk_by(|&node| {
-            let new_cost = running_cost.clone() + op_cost(hugr.get_optype(node));
-            if new_cost.sub_cost(&max_cost).as_isize() > 0 {
-                running_cost = C::default();
-                current_group += 1;
-            } else {
-                running_cost = new_cost;
-            }
-            current_group
-        }) {
+        for (_, commands) in &circ
+            .toposorted_children(circ.parent())
+            .expect("circuit entrypoint should be a dataflow region")
+            .chunk_by(|&node| {
+                let new_cost = running_cost.clone() + op_cost(hugr.get_optype(node));
+                if new_cost.sub_cost(&max_cost).as_isize() > 0 {
+                    running_cost = C::default();
+                    current_group += 1;
+                } else {
+                    running_cost = new_cost;
+                }
+                current_group
+            })
+        {
             chunks.push(Chunk::extract(circ, commands, &convex_checker));
         }
         Self {
@@ -553,8 +557,19 @@ mod test {
 
         reassembled.hugr_mut().validate().unwrap();
 
-        assert_eq!(reassembled.commands().count(), 1);
-        let h = reassembled.commands().next().unwrap().node();
+        let ops = reassembled
+            .toposorted_children(reassembled.parent())
+            .expect("circuit entrypoint should be dataflow region")
+            .filter(|&node| {
+                reassembled
+                    .hugr()
+                    .get_optype(node)
+                    .cast::<TketOp>()
+                    .is_some()
+            })
+            .collect_vec();
+        assert_eq!(ops.len(), 1);
+        let h = ops[0];
 
         let [inp, out] = reassembled.io_nodes();
         assert_eq!(

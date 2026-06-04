@@ -3,6 +3,7 @@
 use rayon::iter::ParallelIterator;
 use std::sync::Arc;
 use tket::passes::composable::PassScope;
+use tket_qsystem::QSystemPlatform;
 
 use crate::passes::PyPassScope;
 use pyo3::prelude::*;
@@ -31,7 +32,7 @@ pub(crate) fn tket1_pass(
     // <https://github.com/Quantinuum/tket2/issues/1494>
     let scope: PassScope = scope.unwrap_or_default().scope;
     let encode_options = EncodeOptions::new()
-        .with_config(qsystem_encoder_config())
+        .with_config(qsystem_encoder_config(QSystemPlatform::Helios))
         .with_subcircuits(scope.recursive());
 
     let Some(root) = scope.root(&program.hugr) else {
@@ -52,7 +53,12 @@ pub(crate) fn tket1_pass(
         .convert_pyerrs()?;
 
     encoded_circ
-        .reassemble_inplace(&mut program.hugr, Some(Arc::new(qsystem_decoder_config())))
+        .reassemble_inplace(
+            &mut program.hugr,
+            // TODO: Make the decoder set configurable.
+            // <https://github.com/Quantinuum/tket2/issues/1619>
+            Some(Arc::new(qsystem_decoder_config(QSystemPlatform::Helios))),
+        )
         .convert_pyerrs()?;
 
     Ok(())

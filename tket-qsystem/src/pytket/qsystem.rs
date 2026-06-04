@@ -16,15 +16,28 @@ use tket::serialize::pytket::{
 use tket_json_rs::optype::OpType as PytketOptype;
 
 use crate::extension;
-use crate::extension::qsystem::{QSystemOp, RuntimeBarrierDef};
+use crate::extension::qsystem::{
+    QSystemPlatform, SharedOp,
+    helios::{HeliosOp, RuntimeBarrierDef as HeliosRuntimeBarrierDef},
+    sol::{RuntimeBarrierDef as SolRuntimeBarrierDef, SolOp},
+};
 
-/// Encoder for [futures](crate::extension::futures) operations.
-#[derive(Debug, Clone, Default)]
-pub struct QSystemEmitter;
+/// Encoder/decoder for the native qsystem operations, parametrised by platform.
+#[derive(Debug, Clone)]
+pub struct QSystemEmitter(pub QSystemPlatform);
+
+impl Default for QSystemEmitter {
+    fn default() -> Self {
+        Self(QSystemPlatform::Helios)
+    }
+}
 
 impl<H: HugrView> PytketEmitter<H> for QSystemEmitter {
     fn extensions(&self) -> Option<Vec<ExtensionId>> {
-        Some(vec![extension::qsystem::EXTENSION_ID])
+        Some(match self.0 {
+            QSystemPlatform::Helios => vec![extension::qsystem::helios::EXTENSION_ID],
+            QSystemPlatform::Sol => vec![extension::qsystem::sol::EXTENSION_ID],
+        })
     }
 
     fn op_to_pytket(
@@ -34,56 +47,112 @@ impl<H: HugrView> PytketEmitter<H> for QSystemEmitter {
         hugr: &H,
         encoder: &mut PytketEncoderContext<H>,
     ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
-        if let Ok(tket_op) = QSystemOp::from_extension_op(op) {
-            self.encode_qsystem_op(node, tket_op, hugr, encoder)
-        } else if let Ok(sympy_op) = RuntimeBarrierDef::from_extension_op(op) {
-            self.encode_runtime_barrier_op(node, sympy_op, hugr, encoder)
-        } else {
-            Ok(EncodeStatus::Unsupported)
+        match self.0 {
+            QSystemPlatform::Helios => {
+                if let Ok(helios_op) = HeliosOp::from_extension_op(op) {
+                    self.encode_helios_op(node, helios_op, hugr, encoder)
+                } else if let Ok(barrier) = HeliosRuntimeBarrierDef::from_extension_op(op) {
+                    self.encode_runtime_barrier_op(node, barrier, hugr, encoder)
+                } else {
+                    Ok(EncodeStatus::Unsupported)
+                }
+            }
+            QSystemPlatform::Sol => {
+                if let Ok(sol_op) = SolOp::from_extension_op(op) {
+                    self.encode_sol_op(node, sol_op, hugr, encoder)
+                } else if let Ok(barrier) = SolRuntimeBarrierDef::from_extension_op(op) {
+                    self.encode_runtime_barrier_op(node, barrier, hugr, encoder)
+                } else {
+                    Ok(EncodeStatus::Unsupported)
+                }
+            }
         }
     }
 }
 
 impl QSystemEmitter {
-    /// Encode a tket operation into a pytket operation.
-    fn encode_qsystem_op<H: HugrView>(
+    /// Encode a Helios operation into a pytket operation.
+    fn encode_helios_op<H: HugrView>(
         &self,
         node: H::Node,
-        qsystem_op: QSystemOp,
+        op: HeliosOp,
         hugr: &H,
         encoder: &mut PytketEncoderContext<H>,
     ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
-        let serial_op = match qsystem_op {
-            QSystemOp::Measure => PytketOptype::Measure,
-            QSystemOp::Rz => PytketOptype::Rz,
-            QSystemOp::PhasedX => PytketOptype::PhasedX,
-            QSystemOp::ZZPhase => PytketOptype::ZZPhase,
-            QSystemOp::Reset => PytketOptype::Reset,
-            QSystemOp::QFree => {
+        if let Ok(shared) = SharedOp::try_from(op) {
+            return self.encode_shared_op(node, shared, hugr, encoder);
+        }
+        // Helios-specific ops.
+        let serial_op = match op {
+            HeliosOp::ZZPhase => PytketOptype::ZZPhase,
+            _ => return Ok(EncodeStatus::Unsupported),
+        };
+        self.emit_radian_op(node, serial_op, hugr, encoder)
+    }
+
+    /// Encode a Sol operation into a pytket operation.
+    fn encode_sol_op<H: HugrView>(
+        &self,
+        node: H::Node,
+        op: SolOp,
+        hugr: &H,
+        encoder: &mut PytketEncoderContext<H>,
+    ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
+        if let Ok(shared) = SharedOp::try_from(op) {
+            return self.encode_shared_op(node, shared, hugr, encoder);
+        }
+        // Sol-specific ops.
+        let serial_op = match op {
+            SolOp::PhasedXX => PytketOptype::PhasedXX,
+            _ => return Ok(EncodeStatus::Unsupported),
+        };
+        self.emit_radian_op(node, serial_op, hugr, encoder)
+    }
+
+    /// Encode a shared operation into a pytket operation.
+    fn encode_shared_op<H: HugrView>(
+        &self,
+        node: H::Node,
+        op: SharedOp,
+        hugr: &H,
+        encoder: &mut PytketEncoderContext<H>,
+    ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
+        let serial_op = match op {
+            // "Lazy" operations are translated as eager measurements in pytket,
+            // as there is no `Future<T>` type there.
+            SharedOp::Measure | SharedOp::LazyMeasure => PytketOptype::Measure,
+            SharedOp::Rz => PytketOptype::Rz,
+            SharedOp::PhasedX => PytketOptype::PhasedX,
+            SharedOp::Reset => PytketOptype::Reset,
+            SharedOp::QFree => {
                 // Mark the qubit inputs as explored and forget about them.
                 encoder.get_input_values(node, hugr)?;
                 return Ok(EncodeStatus::Success);
             }
-            QSystemOp::LazyMeasure | QSystemOp::LazyMeasureReset => {
-                // Lazy measurements return `Future<T>` values, and pytket has
-                // no future type. We keep them in opaque subgraphs instead of
-                // erasing the future boundary in the circuit encoding.
+            SharedOp::LazyMeasureReset | SharedOp::MeasureReset => {
+                // These may require a pytket measurement followed by a reset.
                 return Ok(EncodeStatus::Unsupported);
             }
-            QSystemOp::MeasureReset => {
-                // This requires a pytket measurement followed by a reset.
-                return Ok(EncodeStatus::Unsupported);
-            }
-            QSystemOp::LazyMeasureLeaked => {
+            SharedOp::LazyMeasureLeaked => {
                 // No equivalent pytket operation.
                 return Ok(EncodeStatus::Unsupported);
             }
-            QSystemOp::TryQAlloc => {
+            SharedOp::TryQAlloc => {
                 // Pytket circuits don't support the optional type returned by `TryQAlloc`.
                 return Ok(EncodeStatus::Unsupported);
             }
         };
+        self.emit_radian_op(node, serial_op, hugr, encoder)
+    }
 
+    /// Emit a node command, converting parameter radians to half-turns.
+    fn emit_radian_op<H: HugrView>(
+        &self,
+        node: H::Node,
+        serial_op: PytketOptype,
+        hugr: &H,
+        encoder: &mut PytketEncoderContext<H>,
+    ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
         // pytket parameters are always in half-turns.
         // Since the `tket.qsystem` op inputs are in radians, we have to convert them here.
         encoder.emit_node_command(node, hugr, EmitCommandOptions::new(), move |mut inputs| {
@@ -95,14 +164,13 @@ impl QSystemEmitter {
             }
             make_tk1_operation(serial_op, inputs)
         })?;
-
         Ok(EncodeStatus::Success)
     }
 
-    fn encode_runtime_barrier_op<H: HugrView>(
+    fn encode_runtime_barrier_op<H: HugrView, B>(
         &self,
         node: H::Node,
-        _runtime_barrier_op: RuntimeBarrierDef,
+        _runtime_barrier_op: B,
         hugr: &H,
         encoder: &mut PytketEncoderContext<H>,
     ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
@@ -112,7 +180,6 @@ impl QSystemEmitter {
             hugr,
             EmitCommandOptions::new().reuse_all_bits(),
         )?;
-
         Ok(EncodeStatus::Success)
     }
 }
@@ -124,12 +191,16 @@ impl PytketDecoder for QSystemEmitter {
         // Some of these overlap with what the `TketOp` emitter can decode. The
         // decoder used for those cases will be the first one registered in the
         // [`PytketDecoderConfig`].
-        vec![
-            PytketOptype::Rz,
-            PytketOptype::PhasedX,
-            PytketOptype::ZZPhase,
-            PytketOptype::ZZMax,
-        ]
+        let mut ops = vec![PytketOptype::Rz, PytketOptype::PhasedX];
+        match self.0 {
+            QSystemPlatform::Helios => {
+                ops.extend([PytketOptype::ZZPhase, PytketOptype::ZZMax]);
+            }
+            QSystemPlatform::Sol => {
+                ops.extend([PytketOptype::PhasedXX]);
+            }
+        }
+        ops
     }
 
     fn op_to_hugr<'h>(
@@ -141,36 +212,34 @@ impl PytketDecoder for QSystemEmitter {
         _opgroup: Option<&str>,
         decoder: &mut PytketDecoderContext<'h>,
     ) -> Result<DecodeStatus, PytketDecodeError> {
-        let op = match op.op_type {
-            PytketOptype::Rz => QSystemOp::Rz,
-            PytketOptype::PhasedX => QSystemOp::PhasedX,
-            PytketOptype::ZZPhase => QSystemOp::ZZPhase,
-            PytketOptype::ZZMax => {
-                // This is a ZZPhase with a 1/2 angle.
-                let param = decoder.load_half_turns_with_type("0.5", ParameterType::FloatRadians);
-                decoder.add_node_with_wires(
-                    QSystemOp::ZZPhase,
-                    qubits,
-                    qubits,
-                    bits,
-                    &[],
-                    &[param],
-                )?;
-                return Ok(DecodeStatus::Success);
-            }
-            _ => {
-                return Ok(DecodeStatus::Unsupported);
-            }
+        // Converts a SharedOp to the platform-appropriate OpType.
+        let platform_op = |s: SharedOp| self.0.shared_op_type(s);
+        // Collects all parameters as floats in radians.
+        let float_params = |decoder: &mut PytketDecoderContext<'h>| {
+            params
+                .iter()
+                .map(|p| p.as_float_radians(&mut decoder.builder))
+                .collect_vec()
         };
 
-        // We expect all parameters to be floats in radians.
-        let params = params
-            .iter()
-            .map(|p| p.as_float_radians(&mut decoder.builder))
-            .collect_vec();
+        let (hugr_op, p): (hugr::ops::OpType, Vec<LoadedParameter>) = match (self.0, op.op_type) {
+            (_, PytketOptype::Rz) => (platform_op(SharedOp::Rz), float_params(decoder)),
+            (_, PytketOptype::PhasedX) => (platform_op(SharedOp::PhasedX), float_params(decoder)),
+            (QSystemPlatform::Helios, PytketOptype::ZZPhase) => {
+                (HeliosOp::ZZPhase.into(), float_params(decoder))
+            }
+            (QSystemPlatform::Helios, PytketOptype::ZZMax) => {
+                // ZZPhase with a 1/2 angle.
+                let param = decoder.load_half_turns_with_type("0.5", ParameterType::FloatRadians);
+                (HeliosOp::ZZPhase.into(), vec![param])
+            }
+            (QSystemPlatform::Sol, PytketOptype::PhasedXX) => {
+                (SolOp::PhasedXX.into(), float_params(decoder))
+            }
+            _ => return Ok(DecodeStatus::Unsupported),
+        };
 
-        decoder.add_node_with_wires(op, qubits, qubits, bits, &[], &params)?;
-
+        decoder.add_node_with_wires(hugr_op, qubits, qubits, bits, &[], &p)?;
         Ok(DecodeStatus::Success)
     }
 }
