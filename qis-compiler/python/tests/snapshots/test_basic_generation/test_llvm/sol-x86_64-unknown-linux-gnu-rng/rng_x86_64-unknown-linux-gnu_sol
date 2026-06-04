@@ -67,15 +67,12 @@ declare i64 @teardown() local_unnamed_addr
 
 !0 = !{i32 2, !"Debug Info Version", i32 3}
 !1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "guppylang (guppylang-internals-v0.32.0)-v0.21.11", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "/Users/george.hodgkins/proj/tket2/qis-compiler/python/tests/generate_hugrs.py", directory: "file:///Users/george.hodgkins/proj/clone-anduril")
 !3 = !{!"mainlib"}
 !4 = distinct !DISubprogram(name: "rng.<locals>.main", linkageName: "__hugr__.__main__.rng.<locals>.main.1", scope: null, file: !5, line: 202, type: !6, scopeLine: 203, spFlags: DISPFlagDefinition, unit: !1)
-!5 = !DIFile(filename: "/Users/george.hodgkins/proj/tket2/qis-compiler/python/tests/generate_hugrs.py", directory: "")
 !6 = !DISubroutineType(types: !7)
 !7 = !{null}
 !8 = !DILocation(line: 44, column: 15, scope: !9, inlinedAt: !16)
 !9 = distinct !DISubprogram(name: "std.qsystem.random.RNG.__new__", linkageName: "__hugr__.guppylang.std.qsystem.random.RNG.__new__.72", scope: null, file: !10, line: 42, type: !11, scopeLine: 44, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
-!10 = !DIFile(filename: "/Users/george.hodgkins/proj/clone-anduril/.venv/lib/python3.10/site-packages/guppylang/std/qsystem/random.py", directory: "")
 !11 = !DISubroutineType(types: !12)
 !12 = !{!13, !15}
 !13 = !DICompositeType(tag: DW_TAG_structure_type, name: "{}", file: !2, align: 8, elements: !14)
@@ -99,7 +96,6 @@ declare i64 @teardown() local_unnamed_addr
 !31 = !DILocation(line: 219, column: 8, scope: !4)
 !32 = !DILocation(line: 220, column: 8, scope: !4)
 !33 = distinct !DISubprogram(name: "qmain", linkageName: "qmain", scope: null, file: !34, type: !35, spFlags: DISPFlagDefinition, unit: !1)
-!34 = !DIFile(filename: "COMPILER_GENERATED_CODE", directory: "")
 !35 = !DISubroutineType(types: !36)
 !36 = !{!15, !15}
 !37 = !DILocation(line: 0, scope: !33)
