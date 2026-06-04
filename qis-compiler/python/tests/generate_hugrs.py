@@ -1,14 +1,12 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#     "guppylang ==0.21.13",
+#     "guppylang ==0.21.14",
 #     "guppylang-internals",
 #     "tket",
 #     "pytket >=2.1.0,<3",
 # ]
 # ///
-# TODO: point at re-released guppylang(-internals) once available with debug info. right
-# now the code below is not compatible with the version specified above.
 
 from pathlib import Path
 
