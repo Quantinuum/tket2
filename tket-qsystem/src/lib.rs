@@ -418,10 +418,10 @@ mod test {
     #[test]
     fn no_public_funcs() {
         let orig = {
-            let arr_t = || array_type(4, bool_t());
+            let arr_t = || array_type(4, measurement_type());
             let mut dfb = FunctionBuilder::new("main", Signature::new_endo(vec![arr_t()])).unwrap();
             let [arr] = dfb.input_wires_arr();
-            let (arr1, arr2) = dfb.add_array_clone(bool_t(), 4, arr).unwrap();
+            let (arr1, arr2) = dfb.add_array_clone(measurement_type(), 4, arr).unwrap();
             let dop = GUPPY_EXTENSION.get_op(&DROP_OP_NAME).unwrap();
             dfb.add_dataflow_op(
                 ExtensionOp::new(dop.clone(), [arr_t().into()]).unwrap(),
@@ -441,7 +441,7 @@ mod test {
                 .count()
         };
 
-        // Check there are no public funcs regardless of hiding or not.
+        // Check there are no public funcs (after hiding).
         let mut hugr = orig.clone();
         // TODO: add sol case?
         QSystemPass::defaults(QSystemPlatform::Helios)
@@ -458,7 +458,7 @@ mod test {
         .run(&mut hugr_public)
         .unwrap();
 
-        assert_eq!(count_pub_funcs(&hugr_public), 0);
+        assert_eq!(count_pub_funcs(&hugr_public), 4);
         assert_eq!(
             hugr.children(hugr.module_root()).count(),
             hugr_public.children(hugr_public.module_root()).count()

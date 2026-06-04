@@ -48,21 +48,18 @@ fn add_measurement_type_def(
         &extension_ref,
     )
 }
-
 /// Returns a `Measurement` [CustomType].
-pub fn measurement_custom_type(extension_ref: &Weak<Extension>) -> CustomType {
-    CustomType::new(
-        MEASUREMENT_TYPE_ID.to_owned(),
-        vec![],
-        MEASUREMENT_EXTENSION_ID,
-        TypeBound::Copyable,
-        extension_ref,
-    )
+pub fn measurement_custom_type() -> CustomType {
+    MEASUREMENT_EXTENSION
+        .get_type(&MEASUREMENT_TYPE_ID)
+        .unwrap()
+        .instantiate([])
+        .unwrap()
 }
 
 /// Returns a `Measurement` [Type].
 pub fn measurement_type() -> Type {
-    measurement_custom_type(&Arc::downgrade(&MEASUREMENT_EXTENSION)).into()
+    measurement_custom_type().into()
 }
 
 #[derive(
@@ -93,7 +90,13 @@ impl MakeOpDef for MeasurementOp {
     }
 
     fn init_signature(&self, extension_ref: &Weak<Extension>) -> SignatureFunc {
-        let measurement_type = Type::new_extension(measurement_custom_type(extension_ref));
+        let measurement_type = Type::new_extension(CustomType::new(
+            MEASUREMENT_TYPE_ID.to_owned(),
+            vec![],
+            MEASUREMENT_EXTENSION_ID,
+            TypeBound::Copyable,
+            extension_ref,
+        ));
         match self {
             MeasurementOp::Read => Signature::new([measurement_type], [bool_t()]).into(),
         }

@@ -34,7 +34,7 @@ use lazy_static::lazy_static;
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
 use tket::extension::guppy::{DROP_OP_NAME, GUPPY_EXTENSION};
-use tket::extension::measurement::{MeasurementOp, measurement_type};
+use tket::extension::measurement::{MeasurementOp, measurement_custom_type};
 use tket::passes::composable::WithScope;
 use tket::passes::replace_types::{Linearizer, NodeTemplate, ReplaceTypesError};
 use tket::passes::{ComposablePass, PassScope, ReplaceTypes};
@@ -149,7 +149,7 @@ fn register_measurement_replacements(lowerer: &mut ReplaceTypes) {
     // As the measurement type acts like an alias for `Future<Bool>`, most replacements
     // are straightforward.
     lowerer.set_replace_type(
-        measurement_type().as_extension().unwrap().clone(),
+        measurement_custom_type(),
         future_type(bool_t()),
     );
 
