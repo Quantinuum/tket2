@@ -3,8 +3,8 @@ source_filename = "hugr"
 target datalayout = "e-m:o-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-n32:64-S128-Fn32"
 target triple = "aarch64-apple-darwin"
 
-@"sa.static_pyarray.%tmp160.17a1e035.0" = constant { i64, [4 x i1] } { i64 4, [4 x i1] [i1 true, i1 true, i1 false, i1 true] }
-@"sa.static_pyarray.%tmp159.4c0da556.0" = constant { i64, [4 x i1] } { i64 4, [4 x i1] [i1 true, i1 true, i1 false, i1 false] }
+@"sa.static_pyarray.%tmp160.4ca4897.0" = constant { i64, [4 x i1] } { i64 4, [4 x i1] [i1 true, i1 true, i1 false, i1 true] }
+@"sa.static_pyarray.%tmp159.96252fb8.0" = constant { i64, [4 x i1] } { i64 4, [4 x i1] [i1 true, i1 true, i1 false, i1 false] }
 @"e_Some array.A77EF32E.0" = private constant [48 x i8] c"/EXIT:INT:Some array elements have been borrowed"
 @"e_Array cont.EFA5AC45.0" = private constant [70 x i8] c"EEXIT:INT:Array contains non-borrowed elements and cannot be discarded"
 @"e_Index out .DD115165.0" = private constant [29 x i8] c"\1CEXIT:INT:Index out of bounds"
@@ -98,7 +98,7 @@ cond_exit_2178.3.i:                               ; preds = %__barray_check_boun
   %"127.fca.0.insert.i" = insertvalue { ptr, ptr, i64 } poison, ptr %2, 0
   %"127.fca.1.insert.i" = insertvalue { ptr, ptr, i64 } %"127.fca.0.insert.i", ptr %3, 1
   %"127.fca.2.insert.i" = insertvalue { ptr, ptr, i64 } %"127.fca.1.insert.i", i64 0, 2
-  %19 = tail call fastcc { ptr, ptr, i64 } @"__hugr__.$apply_bitstring$$n(4).2199"({ ptr, ptr, i64 } %"127.fca.2.insert.i", ptr nonnull @"sa.static_pyarray.%tmp159.4c0da556.0")
+  %19 = tail call fastcc { ptr, ptr, i64 } @"__hugr__.$apply_bitstring$$n(4).2199"({ ptr, ptr, i64 } %"127.fca.2.insert.i", ptr nonnull @"sa.static_pyarray.%tmp159.96252fb8.0")
   %qalloc.i284.i = tail call i64 @___qalloc()
   %not_max.not.not.i285.i = icmp eq i64 %qalloc.i284.i, -1
   br i1 %not_max.not.not.i285.i, label %cond_1491_case_0.i.i, label %__hugr__.__tk2_sol_qalloc.1494.exit.i
@@ -172,7 +172,7 @@ cond_exit_2340.3.i:                               ; preds = %__barray_check_boun
   %"188.fca.0.insert.i" = insertvalue { ptr, ptr, i64 } poison, ptr %0, 0
   %"188.fca.1.insert.i" = insertvalue { ptr, ptr, i64 } %"188.fca.0.insert.i", ptr %1, 1
   %"188.fca.2.insert.i" = insertvalue { ptr, ptr, i64 } %"188.fca.1.insert.i", i64 0, 2
-  %35 = tail call fastcc { ptr, ptr, i64 } @"__hugr__.$apply_bitstring$$n(4).2199"({ ptr, ptr, i64 } %"188.fca.2.insert.i", ptr nonnull @"sa.static_pyarray.%tmp160.17a1e035.0")
+  %35 = tail call fastcc { ptr, ptr, i64 } @"__hugr__.$apply_bitstring$$n(4).2199"({ ptr, ptr, i64 } %"188.fca.2.insert.i", ptr nonnull @"sa.static_pyarray.%tmp160.4ca4897.0")
   %qalloc.i290.i = tail call i64 @___qalloc()
   %not_max.not.not.i291.i = icmp eq i64 %qalloc.i290.i, -1
   br i1 %not_max.not.not.i291.i, label %cond_1981_case_0.i.i, label %"__hugr__.$crc_prep_regs$$n(4).2143.exit"

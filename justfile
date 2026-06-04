@@ -123,6 +123,7 @@ update-snapshots-rs:
 update-snapshots-py *TEST_ARGS:
     uv run maturin develop --uv
     uv run pytest --snapshot-update {{TEST_ARGS}}
+    uv run --package selene_hugr_qis_compiler pytest --snapshot-update {{TEST_ARGS}}
 
 
 
