@@ -1158,8 +1158,9 @@ dependencies = [
 
 [[package]]
 name = "hugr"
-version = "0.27.1"
-source = "git+https://github.com/quantinuum/hugr?rev=1787e12#1787e12bda8ac53e83392454ddc9b23986f1362d"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4d532f930b38a7550b1134a0dcdf7170701a361c2df4334865a113b8000895c2"
 dependencies = [
  "hugr-core",
  "hugr-llvm",
@@ -1168,8 +1169,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-cli"
-version = "0.27.1"
-source = "git+https://github.com/quantinuum/hugr?rev=1787e12#1787e12bda8ac53e83392454ddc9b23986f1362d"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05db7bfd3598d3a0046f773b45e25e3d547462d9d18f38c401a44935274e3e4e"
 dependencies = [
  "anyhow",
  "clap",
@@ -1184,12 +1186,14 @@ dependencies = [
  "thiserror 2.0.18",
  "tracing",
  "tracing-subscriber",
+ "walkdir",
 ]
 
 [[package]]
 name = "hugr-core"
-version = "0.27.1"
-source = "git+https://github.com/quantinuum/hugr?rev=1787e12#1787e12bda8ac53e83392454ddc9b23986f1362d"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "363948429e03480342c09a28fdaef8ddb4efe828855100ca9bce5166a1998217"
 dependencies = [
  "base64",
  "cgmath",
@@ -1225,8 +1229,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-llvm"
-version = "0.27.1"
-source = "git+https://github.com/quantinuum/hugr?rev=1787e12#1787e12bda8ac53e83392454ddc9b23986f1362d"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4351515797a1d38340bc641ab94c0f7f2629b8e7d4b0dca27ac8bf1575b381be"
 dependencies = [
  "anyhow",
  "cc",
@@ -1245,8 +1250,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-model"
-version = "0.27.1"
-source = "git+https://github.com/quantinuum/hugr?rev=1787e12#1787e12bda8ac53e83392454ddc9b23986f1362d"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "22f25a79fbd17235d1c4fdc8b6db2f362b91161bd420d8785893ede1764e012a"
 dependencies = [
  "base64",
  "bumpalo",

@@ -18,6 +18,7 @@ use inkwell::targets::{
 };
 use itertools::Itertools;
 use pyo3::prelude::*;
+use tket::hugr::llvm::emit::EmitDebugInfo;
 use tket::hugr::ops::DataflowParent;
 use tket::passes::composable::ComposablePass;
 
@@ -145,7 +146,10 @@ fn get_hugr_llvm_module<'c, 'hugr, 'a: 'c>(
     let emit = EmitHugr::new(context, module, namer, exts);
     Ok(emit
         // TODO: Add debug info support <https://github.com/Quantinuum/tket2/pull/1521>
-        .emit_module(hugr.try_fat(hugr.module_root()).unwrap(), false, 0)?
+        .emit_module(
+            hugr.try_fat(hugr.module_root()).unwrap(),
+            EmitDebugInfo::Exclude,
+        )?
         .finish()
         .0) // Discard DebugInfoContext
 }
