@@ -27,7 +27,9 @@ use tket::{TketOp, extension::rotation::RotationOpBuilder};
 
 use crate::extension::futures::{FutureOp, FutureOpDef, future_type};
 use crate::extension::qsystem::{self, QSystemPlatform};
-use crate::helpers::replace_types_with_qsystem_defaults;
+use crate::helpers::{
+    lowerer_with_future_linearization, replace_array_ops_requiring_copyable_bounds,
+};
 
 use super::barrier::BarrierInserter;
 use super::common::SharedOp;
@@ -158,6 +160,11 @@ fn register_measurement_replacements(lowerer: &mut ReplaceTypes) {
         &MeasurementOp::Read.to_extension_op().unwrap(),
         NodeTemplate::SingleOp(future_bool_op.into()),
     );
+
+    // This is required as copyable `Measurements` are replaced by linear
+    // `Futures`. Note we don't need to deal with static arrays as you cannot
+    // create static arrays of `Measurement`` values in Guppy.
+    replace_array_ops_requiring_copyable_bounds(lowerer);
 }
 
 /// Lower [`TketOp`] operations to target QSystem operations.
@@ -188,7 +195,7 @@ pub fn lower_tk2_ops(
 ) -> Result<Vec<Node>, LowerTk2Error> {
     let scope = scope.into();
     let mut funcs: BTreeMap<TketOp, NodeTemplate> = BTreeMap::new();
-    let mut lowerer = replace_types_with_qsystem_defaults().with_scope(scope.clone());
+    let mut lowerer = lowerer_with_future_linearization().with_scope(scope.clone());
     register_legacy_qsystem_replacements(&mut lowerer, platform);
     register_measurement_replacements(&mut lowerer);
     let mut barrier_funcs = BarrierInserter::new(platform);

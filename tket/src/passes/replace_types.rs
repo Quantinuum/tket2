@@ -30,13 +30,10 @@ use hugr_core::types::{
 use hugr_core::{Direction, Hugr, HugrView, Node, PortIndex, Visibility, Wire};
 
 use crate::passes::composable::WithScope;
-use crate::passes::replace_types::helpers::replace_array_ops_requiring_copyable_bounds;
 use crate::passes::{ComposablePass, PassScope};
 
 mod linearize;
 pub use linearize::{CallbackHandler, DelegatingLinearizer, LinearizeError, Linearizer};
-
-mod helpers;
 
 /// A recipe for creating a dataflow Node - as a new child of a [`DataflowParent`]
 /// or in order to replace an existing node.
@@ -348,7 +345,6 @@ impl Default for ReplaceTypes {
         res.linearize = DelegatingLinearizer::default();
         res.replace_consts_parametrized(array_type_def(), handlers::array_const);
         res.replace_consts_parametrized(list_type_def(), list_const);
-        replace_array_ops_requiring_copyable_bounds(&mut res);
         res
     }
 }

@@ -6,7 +6,7 @@ use tket::passes::composable::WithScope;
 use tket::passes::replace_types::{Linearizer, ReplaceTypesError};
 use tket::passes::{ComposablePass, PassScope};
 
-use crate::helpers::replace_types_with_qsystem_defaults;
+use crate::helpers::lowerer_with_future_linearization;
 
 /// A pass that lowers "drop" ops from [GUPPY_EXTENSION]
 #[derive(Default, Debug, Clone)]
@@ -31,7 +31,7 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for LowerDropsPass {
     type Result = bool;
 
     fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
-        let mut rt = replace_types_with_qsystem_defaults().with_scope(self.scope.clone());
+        let mut rt = lowerer_with_future_linearization().with_scope(self.scope.clone());
 
         rt.set_replace_parametrized_op(
             GUPPY_EXTENSION.get_op(DROP_OP_NAME.as_str()).unwrap(),
