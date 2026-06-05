@@ -324,7 +324,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             *self.modifiers_mut() = modifiers;
             if trace.len() > 1 {
                 return Err(ModifierResolverErrors::unresolvable(
-                    trace[0].clone(),
+                    trace[0],
                     "Cannot modify indirect call.",
                     indir_call.clone().into(),
                 ));
