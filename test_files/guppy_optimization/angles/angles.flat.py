@@ -3,6 +3,8 @@
 # dependencies = [
 #     "guppylang ==0.21.13",
 # ]
+# [tool.uv.sources]
+# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", branch = "ts/future-measure"}
 # ///
 
 from pathlib import Path
@@ -20,7 +22,7 @@ def main() -> None:
     q = f(q)
     b = measure(q)
 
-    result("b", b)
+    result("b", b.read())
 
 
 @guppy.comptime

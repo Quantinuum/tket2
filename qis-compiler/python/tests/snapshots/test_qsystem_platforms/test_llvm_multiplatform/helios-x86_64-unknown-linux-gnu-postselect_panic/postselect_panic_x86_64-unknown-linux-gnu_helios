@@ -11,30 +11,27 @@ define void @"__hugr__.__main__.postselect_panic.<locals>.main.1"() local_unname
 alloca_block:
   %qalloc.i = tail call i64 @___qalloc()
   %not_max.not.not.i = icmp eq i64 %qalloc.i, -1
-  br i1 %not_max.not.not.i, label %cond_43_case_0.i, label %__hugr__.__tk2_helios_qalloc.39.exit
+  br i1 %not_max.not.not.i, label %cond_42_case_0.i, label %__hugr__.__tk2_helios_qalloc.38.exit
 
-cond_43_case_0.i:                                 ; preds = %alloca_block
+cond_42_case_0.i:                                 ; preds = %alloca_block
   tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0")
   unreachable
 
-__hugr__.__tk2_helios_qalloc.39.exit:             ; preds = %alloca_block
+__hugr__.__tk2_helios_qalloc.38.exit:             ; preds = %alloca_block
   tail call void @___reset(i64 %qalloc.i)
   tail call void @___rxy(i64 %qalloc.i, double 0x3FF921FB54442D18, double 0xBFF921FB54442D18)
   tail call void @___rz(i64 %qalloc.i, double 0x400921FB54442D18)
   %lazy_measure = tail call i64 @___lazy_measure(i64 %qalloc.i)
   tail call void @___qfree(i64 %qalloc.i)
-  tail call void @___inc_future_refcount(i64 %lazy_measure)
   %read_bool = tail call i1 @___read_future_bool(i64 %lazy_measure)
   tail call void @___dec_future_refcount(i64 %lazy_measure)
-  br i1 %read_bool, label %0, label %cond_96_case_1
+  br i1 %read_bool, label %1, label %0
 
-cond_96_case_1:                                   ; preds = %__hugr__.__tk2_helios_qalloc.39.exit
-  %read_bool65 = tail call i1 @___read_future_bool(i64 %lazy_measure)
-  tail call void @___dec_future_refcount(i64 %lazy_measure)
-  tail call void @print_bool(ptr nonnull @res_c.1C9EF4D1.0, i64 11, i1 %read_bool65)
+0:                                                ; preds = %__hugr__.__tk2_helios_qalloc.38.exit
+  tail call void @print_bool(ptr nonnull @res_c.1C9EF4D1.0, i64 11, i1 false)
   ret void
 
-0:                                                ; preds = %__hugr__.__tk2_helios_qalloc.39.exit
+1:                                                ; preds = %__hugr__.__tk2_helios_qalloc.38.exit
   tail call void @panic(i32 1001, ptr nonnull @s_Postselect.13DF1CD0.0)
   unreachable
 }
@@ -42,8 +39,6 @@ cond_96_case_1:                                   ; preds = %__hugr__.__tk2_heli
 declare i64 @___lazy_measure(i64) local_unnamed_addr
 
 declare void @___qfree(i64) local_unnamed_addr
-
-declare void @___inc_future_refcount(i64) local_unnamed_addr
 
 declare i1 @___read_future_bool(i64) local_unnamed_addr
 

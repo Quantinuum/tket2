@@ -10,8 +10,8 @@ use hugr::extension::{ExtensionId, ExtensionSet};
 use hugr::ops::{ExtensionOp, Value};
 use hugr::types::{SumType, Type};
 
-use crate::serialize::pytket::encoder::EncodeStatus;
-use crate::serialize::pytket::extension::{PytketTypeTranslator, RegisterCount, set_bits_op};
+use crate::serialize::pytket::encoder::{EncodeStatus, make_tk1_classical_operation};
+use crate::serialize::pytket::extension::{PytketTypeTranslator, RegisterCount};
 use crate::serialize::pytket::{PytketEmitter, PytketEncodeError};
 
 use super::super::encoder::{PytketEncoderContext, TrackedValues};
@@ -38,6 +38,17 @@ pub struct PytketEncoderConfig<H: HugrView> {
     no_extension_emitters: Vec<usize>,
     /// Set of type translators used to translate HUGR types into pytket registers.
     type_translators: TypeTranslatorSet,
+}
+
+/// Return a pytket operation setting the values of a list of bits.
+pub(crate) fn set_bits_op(values: &[bool]) -> tket_json_rs::circuit_json::Operation {
+    make_tk1_classical_operation(
+        tket_json_rs::OpType::SetBits,
+        values.len(),
+        tket_json_rs::circuit_json::Classical::SetBits {
+            values: values.to_vec(),
+        },
+    )
 }
 
 impl<H: HugrView> PytketEncoderConfig<H> {

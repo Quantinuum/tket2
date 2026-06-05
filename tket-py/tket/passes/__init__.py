@@ -307,14 +307,12 @@ class QSystemPass(ComposablePass):
     - constant_fold: Whether to perform constant folding.
     - monomorphize: Whether to monomorphize generic functions.
     - force_order: Whether to enforce total ordering of all HUGR operations.
-    - lazify: Whether to replace measurements with lazy measurements.
     - hide_funcs: Whether to mark all functions as private.
     """
 
     constant_fold: bool = True
     monomorphize: bool = True
     force_order: bool = True
-    lazify: bool = True
     hide_funcs: bool = True
     _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
 
@@ -348,7 +346,6 @@ class QSystemPass(ComposablePass):
             constant_fold=self.constant_fold,
             monomorphize=self.monomorphize,
             force_order=self.force_order,
-            lazify=self.lazify,
             hide_funcs=self.hide_funcs,
             scope=self._scope,
         )

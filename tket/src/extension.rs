@@ -18,13 +18,13 @@ use hugr::types::{PolyFuncType, PolyFuncTypeRV};
 use lazy_static::lazy_static;
 use smol_str::SmolStr;
 
-/// Definition for bool type and ops.
-pub mod bool;
 /// Definition for debug ops.
 pub mod debug;
 pub mod global_phase;
 /// Definition for ops used by Guppy.
 pub mod guppy;
+/// Definition for measurement types.
+pub mod measurement;
 pub mod modifier;
 /// Definition for Angle ops and types.
 pub mod rotation;
@@ -59,11 +59,11 @@ pub(crate) static ref REGISTRY: ExtensionRegistry = ExtensionRegistry::new(
     STD_REG.iter_all().cloned().chain([
     TKET1_EXTENSION.to_owned(),
     TKET_EXTENSION.to_owned(),
-    bool::BOOL_EXTENSION.to_owned(),
     debug::DEBUG_EXTENSION.to_owned(),
     global_phase::GLOBAL_PHASE_EXTENSION.to_owned(),
     guppy::GUPPY_EXTENSION.to_owned(),
     modifier::MODIFIER_EXTENSION.to_owned(),
+    measurement::MEASUREMENT_EXTENSION.to_owned(),
     rotation::ROTATION_EXTENSION.to_owned()
 ]));
 
@@ -95,7 +95,7 @@ impl CustomSignatureFunc for Tk1Signature {
 pub const TKET_EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("tket.quantum");
 
 /// Current version of the TKET extension
-pub const TKET_EXTENSION_VERSION: Version = Version::new(0, 2, 1);
+pub const TKET_EXTENSION_VERSION: Version = Version::new(0, 3, 0);
 
 lazy_static! {
     /// The extension definition for TKET ops and types.
