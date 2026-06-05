@@ -509,7 +509,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         n: N,
         port: OutgoingPort,
         mut modifiers: CombinedModifier,
-    ) -> Result<(N, OutgoingPort, CombinedModifier), ModifierError<N>> {
+    ) -> Result<(N, OutgoingPort, CombinedModifier), ModifierResolverErrors<N>> {
         let mut current = n;
         let mut current_port = port;
         loop {
@@ -518,7 +518,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                 break;
             }
 
-            modifiers.push(optype.as_extension_op().unwrap());
+            modifiers.push(optype.as_extension_op().unwrap(), current)?;
             let next = h
                 .single_linked_output(current, 0)
                 .ok_or(ModifierError::NoTarget(n))?;
@@ -593,9 +593,12 @@ impl<N: HugrNode> ModifierResolver<N> {
                             "CallIndirect function input has no source.".to_string(),
                         )
                     })?;
-                    let (target, target_port, modifiers) = self
-                        .trace_modifier_chain_with(h, source.0, source.1, self.modifiers().clone())
-                        .map_err(ModifierResolverErrors::ModifierError)?;
+                    let (target, target_port, modifiers) = self.trace_modifier_chain_with(
+                        h,
+                        source.0,
+                        source.1,
+                        self.modifiers().clone(),
+                    )?;
                     if matches!(h.get_optype(target), OpType::Input(_)) {
                         requirements.push((target_port.index(), modifiers));
                     }
@@ -621,9 +624,8 @@ impl<N: HugrNode> ModifierResolver<N> {
                                 "Call input {callee_input} has no source while propagating higher-order modifiers."
                             ))
                         })?;
-                        let (target, target_port, modifiers) = self
-                            .trace_modifier_chain_with(h, source.0, source.1, modifiers)
-                            .map_err(ModifierResolverErrors::ModifierError)?;
+                        let (target, target_port, modifiers) =
+                            self.trace_modifier_chain_with(h, source.0, source.1, modifiers)?;
                         if matches!(h.get_optype(target), OpType::Input(_)) {
                             requirements.push((target_port.index(), modifiers));
                         }

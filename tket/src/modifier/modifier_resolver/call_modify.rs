@@ -79,9 +79,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                         "Call input {input} has no source while resolving higher-order modifier."
                     ))
                 })?;
-                let trace = self
-                    .trace_modifiers_chain(h, source.0)
-                    .map_err(ModifierResolverErrors::ModifierError)?;
+                let trace = self.trace_modifiers_chain(h, source.0)?;
                 let targ = trace.last().cloned().ok_or_else(|| {
                     ModifierResolverErrors::unreachable(
                         "Higher-order modifier argument trace was empty.".to_string(),
