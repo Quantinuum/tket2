@@ -13,9 +13,9 @@ use hugr::{
     core::HugrNode,
     extension::{prelude::qb_t, simple_op::MakeExtensionOp},
     hugr::hugrmut::HugrMut,
-    ops::{Call, Conditional, DFG, DataflowBlock, DataflowOpTrait, OpType, TailLoop},
+    ops::{Conditional, DFG, DataflowBlock, DataflowOpTrait, OpType, TailLoop},
     std_extensions::collections::array::ArrayOpBuilder,
-    types::{EdgeKind, FuncTypeBase, TypeArg, TypeRow},
+    types::{EdgeKind, FuncTypeBase, TypeRow},
 };
 use itertools::Itertools;
 use petgraph::visit::{Topo, Walker};
@@ -411,70 +411,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         self.modified_functions.insert(func);
 
         Ok(new_function_node)
-    }
-
-    /// Generates a new function that does not essentially modify the function itself
-    /// but changes the signature to match the modified calls.
-    /// The generated function just calls the original function.
-    pub(super) fn wrap_fn_with_controls(
-        &mut self,
-        h: &mut impl HugrMut<Node = N>,
-        func: N,
-        type_args: &[TypeArg],
-    ) -> Result<N, ModifierResolverErrors<N>> {
-        if self.control_num() == 0 {
-            return Ok(func);
-        }
-        let optype = h.get_optype(func);
-        let Some(fn_defn) = optype.as_func_defn() else {
-            return Err(ModifierResolverErrors::unreachable(format!(
-                "Cannot modify a non-function node. {}",
-                optype
-            )));
-        };
-
-        let poly_sig = fn_defn.signature().clone();
-        let mut wrapper_sig = poly_sig.clone();
-        self.modify_signature(wrapper_sig.body_mut(), false);
-        let instantiate = wrapper_sig
-            .instantiate(type_args)
-            .map_err(|e| ModifierResolverErrors::BuildError(e.into()))?;
-
-        let offset = self.modifiers.accum_ctrl.len();
-
-        // make a wrapper function with a single Call node
-        let mut builder =
-            FunctionBuilder::new(format!("__modified__{}", fn_defn.func_name()), instantiate)?;
-        let [in_node, out_node] = builder.io();
-        let call = Call::try_new(poly_sig, type_args.to_owned())
-            .map_err(|e| ModifierResolverErrors::BuildError(e.into()))?;
-        let call_port = call.called_function_port();
-        let call_node = builder.add_child_node(call);
-
-        // connect wires:
-        // - first `offset` inputs are control arrays, passed through directly to output
-        // - remaining inputs are forwarded to the inner call
-        // - call outputs are forwarded to the remaining output ports
-        for i in 0..offset {
-            builder.hugr_mut().connect(in_node, i, out_node, i);
-        }
-        for i in 0..call_port.index() {
-            builder
-                .hugr_mut()
-                .connect(in_node, i + offset, call_node, i);
-        }
-        for i in 0..builder.hugr().num_outputs(call_node) {
-            builder
-                .hugr_mut()
-                .connect(call_node, i, out_node, i + offset);
-        }
-
-        let insertion_result = h.insert_from_view(h.module_root(), builder.hugr());
-        let call_node = insertion_result.node_map[&call_node];
-        h.connect(func, 0, call_node, call_port);
-        let dummy_fn_node = insertion_result.inserted_entrypoint;
-
-        Ok(dummy_fn_node)
     }
 
     /// Inserts a sub DFG into the given parent DFG, updating the call map accordingly.
