@@ -1179,29 +1179,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         )
     }
 
-    // fn wire_node_inout_skipping_inputs<'a>(
-    //     &mut self,
-    //     old_node: N,
-    //     new_node: Node,
-    //     (inputs, outputs): (
-    //         impl Iterator<Item = &'a Type>,
-    //         impl Iterator<Item = &'a Type>,
-    //     ),
-    //     (input_offset, output_offset, new_offset): (usize, usize, usize),
-    //     skip_inputs: &HashSet<usize>,
-    // ) -> Result<(), ModifierResolverErrors<N>> {
-    //     // Some inputs can be wired explicitly by specialised rewrites before
-    //     // the generic correspondence pass runs. Skipping them here prevents
-    //     // connect_all from adding a second edge for the original input.
-    //     self.wire_inout(
-    //         (old_node, old_node),
-    //         (new_node, new_node),
-    //         (inputs, outputs),
-    //         (input_offset, output_offset, new_offset),
-    //         skip_inputs,
-    //     )
-    // }
-
     fn wire_inout<'a>(
         &mut self,
         (old_in, old_out): (N, N),

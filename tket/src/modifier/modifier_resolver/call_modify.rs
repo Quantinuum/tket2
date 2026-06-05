@@ -63,7 +63,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             .map(|(input, _)| *input)
             .collect::<HashSet<_>>();
 
-        // Handle one function arguments that must be modified before calling `new_call_node`.
+        // Handle function arguments that must be modified before calling `new_call_node`.
         // If the argument comes from another function input, we cannot solve it here,
         // so we record that requirement for the caller.
         // If the argument is a `LoadFunction`, we create the modified version of that

@@ -4,11 +4,10 @@
 #     "guppylang @ git+https://github.com/Quantinuum/guppylang.git@na/1637-allow-unitary-flag-with-higher-order-function#subdirectory=guppylang",
 # ]
 # ///
-"""A simple controlled gate using modifiers"""
+"""Some simple nested higher order functions inside modifiers"""
 
 from pathlib import Path
 from sys import argv
-import sys
 
 from guppylang import guppy
 from guppylang.std.builtins import (
@@ -19,10 +18,6 @@ from guppylang.std.builtins import (
 from guppylang.std.debug import state_result
 from guppylang.std.quantum import discard, qubit
 from guppylang.std.quantum import h, s
-
-
-sys.path.append(str(Path(__file__).resolve().parents[1]))
-
 from guppylang.experimental import enable_experimental_features
 
 enable_experimental_features()
