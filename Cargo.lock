@@ -1159,7 +1159,7 @@ dependencies = [
 [[package]]
 name = "hugr"
 version = "0.27.1"
-source = "git+https://github.com/quantinuum/hugr?rev=1787e12#1787e12bda8ac53e83392454ddc9b23986f1362d"
+source = "git+https://github.com/quantinuum/hugr?rev=ebaba12#ebaba129dbbd1bab2c464a6e80dd9fc9953be46c"
 dependencies = [
  "hugr-core",
  "hugr-llvm",
@@ -1169,7 +1169,7 @@ dependencies = [
 [[package]]
 name = "hugr-cli"
 version = "0.27.1"
-source = "git+https://github.com/quantinuum/hugr?rev=1787e12#1787e12bda8ac53e83392454ddc9b23986f1362d"
+source = "git+https://github.com/quantinuum/hugr?rev=ebaba12#ebaba129dbbd1bab2c464a6e80dd9fc9953be46c"
 dependencies = [
  "anyhow",
  "clap",
@@ -1184,12 +1184,13 @@ dependencies = [
  "thiserror 2.0.18",
  "tracing",
  "tracing-subscriber",
+ "walkdir",
 ]
 
 [[package]]
 name = "hugr-core"
 version = "0.27.1"
-source = "git+https://github.com/quantinuum/hugr?rev=1787e12#1787e12bda8ac53e83392454ddc9b23986f1362d"
+source = "git+https://github.com/quantinuum/hugr?rev=ebaba12#ebaba129dbbd1bab2c464a6e80dd9fc9953be46c"
 dependencies = [
  "base64",
  "cgmath",
@@ -1226,7 +1227,7 @@ dependencies = [
 [[package]]
 name = "hugr-llvm"
 version = "0.27.1"
-source = "git+https://github.com/quantinuum/hugr?rev=1787e12#1787e12bda8ac53e83392454ddc9b23986f1362d"
+source = "git+https://github.com/quantinuum/hugr?rev=ebaba12#ebaba129dbbd1bab2c464a6e80dd9fc9953be46c"
 dependencies = [
  "anyhow",
  "cc",
@@ -1246,7 +1247,7 @@ dependencies = [
 [[package]]
 name = "hugr-model"
 version = "0.27.1"
-source = "git+https://github.com/quantinuum/hugr?rev=1787e12#1787e12bda8ac53e83392454ddc9b23986f1362d"
+source = "git+https://github.com/quantinuum/hugr?rev=ebaba12#ebaba129dbbd1bab2c464a6e80dd9fc9953be46c"
 dependencies = [
  "base64",
  "bumpalo",

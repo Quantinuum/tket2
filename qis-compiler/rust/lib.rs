@@ -5,7 +5,7 @@ use anyhow::{Result, anyhow};
 use hugr::envelope::EnvelopeConfig;
 use hugr::llvm::CodegenExtsBuilder;
 use hugr::llvm::custom::CodegenExtsMap;
-use hugr::llvm::emit::{EmitHugr, Namer, debug_info::DebugInfoContext};
+use hugr::llvm::emit::{EmitDebugInfo, EmitHugr, Namer, debug_info::DebugInfoContext};
 use hugr::llvm::extension::int::IntCodegenExtension;
 use hugr::llvm::utils::fat::FatExt as _;
 use inkwell::OptimizationLevel;
@@ -142,17 +142,12 @@ fn get_hugr_llvm_module<'c, 'hugr, 'a: 'c>(
     hugr: &'hugr Hugr,
     module_name: impl AsRef<str>,
     exts: Rc<CodegenExtsMap<'a, Hugr>>,
-    emit_debug: bool,
-    ptr_bits: u32,
+    emit_debug: EmitDebugInfo,
 ) -> Result<(Module<'c>, Option<DebugInfoContext<'c>>)> {
     let module = context.create_module(module_name.as_ref());
     let emit = EmitHugr::new(context, module, namer, exts);
     Ok(emit
-        .emit_module(
-            hugr.try_fat(hugr.module_root()).unwrap(),
-            emit_debug,
-            ptr_bits,
-        )?
+        .emit_module(hugr.try_fat(hugr.module_root()).unwrap(), emit_debug)?
         .finish())
 }
 
@@ -195,24 +190,19 @@ fn get_module_with_std_exts<'c>(
     context: &'c Context,
     namer: Rc<Namer>,
     hugr: &'c mut Hugr,
-    emit_debug: bool,
 ) -> Result<(Module<'c>, Option<DebugInfoContext<'c>>)> {
     process_hugr(args.platform, hugr)?;
     if let Some(filename) = &args.save_hugr {
         let file = fs::File::create(PathBuf::from(filename))?;
         hugr.store(file, EnvelopeConfig::text())?;
     }
-    let ptr_bits = context
-        .ptr_sized_int_type(&args.target_machine.get_target_data(), Default::default())
-        .get_bit_width();
     get_hugr_llvm_module(
         context,
         namer,
         hugr,
         &args.name,
         Rc::new(codegen_extensions(args.platform)),
-        emit_debug,
-        ptr_bits,
+        args.emit_debug,
     )
 }
 
@@ -335,6 +325,8 @@ struct CompileArgs<'a> {
     opt_level: OptimizationLevel,
     /// Target quantum platform
     platform: qsystem::QSystemPlatform,
+    /// Debug info configuration
+    emit_debug: EmitDebugInfo,
 }
 
 impl<'a> CompileArgs<'a> {
@@ -343,7 +335,19 @@ impl<'a> CompileArgs<'a> {
         target_machine: &'a TargetMachine,
         opt_level: OptimizationLevel,
         platform: qsystem::QSystemPlatform,
+        iw_ctx: &Context,
+        emit_debug: bool,
     ) -> Self {
+        let emit_debug_arg = if emit_debug {
+            EmitDebugInfo::Include {
+                ptr_bits: iw_ctx
+                    .ptr_sized_int_type(&target_machine.get_target_data(), Default::default())
+                    .get_bit_width(),
+            }
+        } else {
+            EmitDebugInfo::Exclude
+        };
+
         Self {
             entry: None,
             name: name.to_string(),
@@ -351,6 +355,7 @@ impl<'a> CompileArgs<'a> {
             target_machine,
             opt_level,
             platform,
+            emit_debug: emit_debug_arg,
         }
     }
 }
@@ -362,7 +367,6 @@ fn compile<'c, 'hugr: 'c>(
     args: &CompileArgs,
     ctx: &'c Context,
     hugr: &'hugr mut Hugr,
-    emit_debug: bool,
 ) -> Result<Module<'c>> {
     event!(Level::DEBUG, "starting primary compilation");
     let namer = Rc::new(Namer::new("__hugr__.", true));
@@ -376,7 +380,7 @@ fn compile<'c, 'hugr: 'c>(
     let module_entry = args.entry.as_ref().map_or(LLVM_MAIN, |x| x.as_ref());
 
     // Create a new LLVM module using hugr-llvm
-    let (module, mut maybe_di_ctx) = get_module_with_std_exts(args, ctx, namer, hugr, emit_debug)?;
+    let (module, mut maybe_di_ctx) = get_module_with_std_exts(args, ctx, namer, hugr)?;
 
     wrap_main(
         ctx,
@@ -525,10 +529,9 @@ mod selene_hugr_qis_compiler {
         let mut hugr = py_read_envelope(pkg_bytes)?;
         let ctx = Context::create();
         let llvm_module = compile(
-            &CompileArgs::new(&"hugr", &target_machine, opt, platform),
+            &CompileArgs::new(&"hugr", &target_machine, opt, platform, &ctx, emit_debug),
             &ctx,
             &mut hugr,
-            emit_debug,
         )?;
         Ok(llvm_module.to_string())
     }
@@ -553,10 +556,9 @@ mod selene_hugr_qis_compiler {
         let mut hugr = py_read_envelope(pkg_bytes)?;
         let ctx = Context::create();
         let llvm_module = compile(
-            &CompileArgs::new(&"hugr", &target_machine, opt, platform),
+            &CompileArgs::new(&"hugr", &target_machine, opt, platform, &ctx, emit_debug),
             &ctx,
             &mut hugr,
-            emit_debug,
         )?;
         Ok(public_bitcode_bytes(&llvm_module.write_bitcode_to_memory()))
     }
