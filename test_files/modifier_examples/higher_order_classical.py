@@ -18,8 +18,7 @@ from guppylang.std.builtins import (
     dagger,
 )
 from guppylang.std.debug import state_result
-from guppylang.std.quantum import discard, qubit, angle, rz
-from guppylang.std.quantum import h, rx
+from guppylang.std.quantum import discard, qubit, angle, ry, rz, h, rx
 
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
@@ -45,11 +44,17 @@ def fun(f: float) -> angle:
 
 
 @guppy
+def gun(f: float) -> angle:
+    return angle(-f)
+
+
+@guppy
 def main() -> None:
     q = qubit()
     c = qubit()
 
-    h(c)
+    with dagger:
+        apply_c(ry, gun, c)
 
     with control(c), dagger():
         apply_c(rz, fun, q)
