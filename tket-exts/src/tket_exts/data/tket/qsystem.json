@@ -1,8 +1,46 @@
 {
-  "version": "0.5.1",
+  "version": "0.6.0",
   "name": "tket.qsystem",
   "types": {},
   "operations": {
+    "FutureToMeasurement": {
+      "extension": "tket.qsystem",
+      "name": "FutureToMeasurement",
+      "description": "Convert a Future<bool> to a Measurement (for compatibility with the TKET quantum extension).",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "tket.futures",
+              "id": "Future",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "Sum",
+                    "s": "Unit",
+                    "size": 2
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "tket.measurement",
+              "id": "Measurement",
+              "args": [],
+              "bound": "C"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
     "LazyMeasure": {
       "extension": "tket.qsystem",
       "name": "LazyMeasure",
@@ -109,59 +147,6 @@
                 }
               ],
               "bound": "A"
-            }
-          ]
-        }
-      },
-      "binary": false
-    },
-    "Measure": {
-      "extension": "tket.qsystem",
-      "name": "Measure",
-      "description": "Measure a qubit and lose it.",
-      "signature": {
-        "params": [],
-        "body": {
-          "input": [
-            {
-              "t": "Q"
-            }
-          ],
-          "output": [
-            {
-              "t": "Opaque",
-              "extension": "tket.bool",
-              "id": "bool",
-              "args": [],
-              "bound": "C"
-            }
-          ]
-        }
-      },
-      "binary": false
-    },
-    "MeasureReset": {
-      "extension": "tket.qsystem",
-      "name": "MeasureReset",
-      "description": "Measure a qubit and reset it to the Z |0> eigenstate.",
-      "signature": {
-        "params": [],
-        "body": {
-          "input": [
-            {
-              "t": "Q"
-            }
-          ],
-          "output": [
-            {
-              "t": "Q"
-            },
-            {
-              "t": "Opaque",
-              "extension": "tket.bool",
-              "id": "bool",
-              "args": [],
-              "bound": "C"
             }
           ]
         }

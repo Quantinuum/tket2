@@ -3,6 +3,8 @@
 # dependencies = [
 #     "guppylang ==0.21.14",
 # ]
+# [tool.uv.sources]
+# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", branch = "ts/future-measure"}
 # ///
 """Dagger modifier on a function call"""
 

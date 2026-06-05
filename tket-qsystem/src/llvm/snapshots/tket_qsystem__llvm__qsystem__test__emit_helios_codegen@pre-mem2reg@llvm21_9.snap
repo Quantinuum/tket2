@@ -8,14 +8,10 @@ source_filename = "test_context"
 define internal { i64, { i1, i64, i1 } } @_hl.main.1(i64 %0) !dbg !3 {
 alloca_block:
   %"0" = alloca i64, align 8
-  %"1" = alloca { i1, i64, i1 }, align 8
+  %"1" = alloca i64, align 8
   %"2_0" = alloca i64, align 8
   %"4_0" = alloca i64, align 8
-  %"4_1" = alloca { i1, i64, i1 }, align 8
-  %"6_0" = alloca i64, align 8
-  %"8_0" = alloca i64, align 8
-  %"8_1" = alloca i64, align 8
-  %"9_0" = alloca { i1, i64, i1 }, align 8
+  %"4_1" = alloca i64, align 8
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block

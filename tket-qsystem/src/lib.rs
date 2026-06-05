@@ -4,11 +4,11 @@
 #[cfg(feature = "cli")]
 pub mod cli;
 pub mod extension;
+pub(crate) mod helpers;
 #[cfg(feature = "llvm")]
 pub mod llvm;
 pub mod lower_drops;
 pub mod pytket;
-pub mod replace_bools;
 
 use derive_more::{Display, Error, From};
 use hugr::hugr::{HugrError, hugrmut::HugrMut};
@@ -23,7 +23,6 @@ use tket::passes::{
 };
 
 use lower_drops::LowerDropsPass;
-use replace_bools::{ReplaceBoolPass, ReplaceBoolPassError};
 use tket::TketOp;
 
 pub use extension::qsystem::QSystemPlatform;
@@ -45,7 +44,6 @@ pub struct QSystemPass {
     constant_fold: bool,
     monomorphize: bool,
     force_order: bool,
-    lazify: bool,
     hide_funcs: bool,
     /// Where to apply the pass.
     ///
@@ -64,7 +62,6 @@ impl QSystemPass {
             constant_fold: true,
             monomorphize: true,
             force_order: true,
-            lazify: true,
             hide_funcs: true,
             scope: PassScope::default(),
             platform,
@@ -75,9 +72,7 @@ impl QSystemPass {
 #[derive(Error, Debug, Display, From)]
 #[non_exhaustive]
 /// An error reported from [QSystemPass].
-pub enum QSystemPassError<N = Node> {
-    /// An error from the component [ReplaceBoolPass].
-    ReplaceBoolError(ReplaceBoolPassError<N>),
+pub enum QSystemPassError {
     /// An error from the component [force_order()] pass.
     ForceOrderError(HugrError),
     /// An error from the component [LowerTketToQSystemPass] pass.
@@ -132,17 +127,6 @@ impl QSystemPass {
     /// `tket.futures.read` ops as late as possible.
     pub fn with_force_order(mut self, force_order: bool) -> Self {
         self.force_order = force_order;
-        self
-    }
-
-    /// Enables or disables lazification of quantum measurement ops.
-    ///
-    /// On by default.
-    ///
-    /// When enabled we replace strict measurement ops with lazy equivalents
-    /// from `tket.qsystem`.
-    pub fn with_lazify(mut self, lazify: bool) -> Self {
-        self.lazify = lazify;
         self
     }
 
@@ -285,9 +269,6 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for QSystemPass {
         LowerTketToQSystemPass::new(self.platform)
             .with_scope(self.scope.clone())
             .run(hugr)?;
-        if self.lazify {
-            ReplaceBoolPass::default_with_scope(self.scope.clone()).run(hugr)?;
-        }
 
         LowerDropsPass::default_with_scope(self.scope.clone()).run(hugr)?;
 
@@ -324,24 +305,25 @@ mod test {
         core::Visibility,
         extension::prelude::qb_t,
         hugr::hugrmut::HugrMut,
-        ops::{ExtensionOp, OpType, handle::NodeHandle},
-        std_extensions::arithmetic::float_types::ConstF64,
-        std_extensions::collections::array::{ArrayOpBuilder, array_type},
+        ops::{ExtensionOp, handle::NodeHandle},
+        std_extensions::{
+            arithmetic::float_types::ConstF64,
+            collections::array::{ArrayOpBuilder, array_type},
+        },
         type_row,
-        types::Signature,
+        types::{Signature, Type},
     };
 
+    use hugr::extension::prelude::bool_t;
     use petgraph::visit::{Topo, Walker as _};
     use rstest::rstest;
-    use tket::extension::{
-        bool::bool_type,
-        guppy::{DROP_OP_NAME, GUPPY_EXTENSION},
-    };
+    use tket::extension::guppy::{DROP_OP_NAME, GUPPY_EXTENSION};
+    use tket::extension::measurement::measurement_type;
 
     use crate::{
         QSystemPass,
         extension::{
-            futures::FutureOpDef,
+            futures::{FutureOpBuilder, FutureOpDef, future_type},
             qsystem::{QSystemOp, QSystemPlatform},
         },
     };
@@ -363,7 +345,7 @@ mod test {
             let mut builder = mb
                 .define_function_vis(
                     "main",
-                    Signature::new(vec![qb_t()], vec![bool_type(), bool_type()]),
+                    Signature::new(vec![qb_t()], vec![bool_t(), bool_t()]),
                     Visibility::Public,
                 )
                 .unwrap();
@@ -391,16 +373,15 @@ mod test {
                 .outputs_arr();
             let rx_node = qb.node();
 
-            // the Measure node will be removed. A Lazy Measure and two Future
-            // Reads will be added.  The Lazy Measure will be lifted and the
-            // reads will be sunk.
             let [measure_result] = builder
-                .add_dataflow_op(QSystemOp::Measure, [qb])
+                .add_dataflow_op(QSystemOp::LazyMeasure, [qb])
                 .unwrap()
                 .outputs_arr();
 
+            let [bool_result] = builder.add_read(measure_result, bool_t()).unwrap();
+
             let main_n = builder
-                .finish_with_outputs([measure_result, measure_result])
+                .finish_with_outputs([bool_result, bool_result])
                 .unwrap()
                 .node();
             let hugr = mb.finish_hugr().unwrap();
@@ -436,12 +417,12 @@ mod test {
     }
 
     #[test]
-    fn hide_funcs() {
+    fn no_public_funcs() {
         let orig = {
-            let arr_t = || array_type(4, bool_type());
+            let arr_t = || array_type(4, measurement_type());
             let mut dfb = FunctionBuilder::new("main", Signature::new_endo(vec![arr_t()])).unwrap();
             let [arr] = dfb.input_wires_arr();
-            let (arr1, arr2) = dfb.add_array_clone(bool_type(), 4, arr).unwrap();
+            let (arr1, arr2) = dfb.add_array_clone(measurement_type(), 4, arr).unwrap();
             let dop = GUPPY_EXTENSION.get_op(&DROP_OP_NAME).unwrap();
             dfb.add_dataflow_op(
                 ExtensionOp::new(dop.clone(), [arr_t().into()]).unwrap(),
@@ -461,7 +442,7 @@ mod test {
                 .count()
         };
 
-        // Check there are no public funcs (after hiding)
+        // Check there are no public funcs (after hiding).
         let mut hugr = orig.clone();
         // TODO: add sol case?
         QSystemPass::defaults(QSystemPlatform::Helios)
@@ -469,7 +450,6 @@ mod test {
             .unwrap();
         assert_eq!(count_pub_funcs(&hugr), 0);
 
-        // Run again without hiding...
         let mut hugr_public = orig;
         QSystemPass {
             hide_funcs: false,
@@ -485,5 +465,33 @@ mod test {
             hugr_public.children(hugr_public.module_root()).count()
         );
         assert_eq!(hugr.num_nodes(), hugr_public.num_nodes());
+    }
+
+    #[test]
+    fn measurement_drop_lowering() {
+        // Additional test outside of the `LowerTketToQSystemPass` to check the
+        // interaction with `LowerDropsPass`.
+        let mut hugr = {
+            let arr_t = || array_type(4, measurement_type());
+            let mut dfb =
+                FunctionBuilder::new("main", Signature::new(vec![arr_t()], vec![])).unwrap();
+            let [arr] = dfb.input_wires_arr();
+            dfb.add_array_discard(measurement_type(), 4, arr).unwrap();
+            dfb.finish_hugr_with_outputs([]).unwrap()
+        };
+
+        QSystemPass::defaults(QSystemPlatform::Helios)
+            .run(&mut hugr)
+            .unwrap();
+
+        // Check a function for discarding measurements has been introduced.
+        let expected_sig = Signature::new(vec![future_type(bool_t())], vec![Type::UNIT]);
+        let has_discard_load_fn = hugr.nodes().any(|n| {
+            matches!(
+                hugr.get_optype(n),
+                OpType::LoadFunction(lf) if lf.instantiation == expected_sig
+            )
+        });
+        assert!(has_discard_load_fn);
     }
 }

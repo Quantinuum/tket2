@@ -1,4 +1,4 @@
-//! This module defines the Hugr extension used to represent H-series
+//! This module defines the Hugr extension used to represent Quantinuum system
 //! quantum operations.
 //!
 //! In the case of lazy operations,
@@ -11,8 +11,8 @@ use hugr::{
     extension::{ExtensionId, ExtensionRegistry, PRELUDE, Version, simple_op::MakeOpDef},
     std_extensions::arithmetic::float_types::EXTENSION as FLOAT_TYPES,
 };
+use tket::extension::measurement::MEASUREMENT_EXTENSION;
 
-use crate::extension::futures;
 use lazy_static::lazy_static;
 
 mod barrier;
@@ -27,7 +27,7 @@ pub use lower::{LowerTk2Error, LowerTketToQSystemPass, check_lowered, lower_tk2_
 /// The "tket.qsystem" extension id.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("tket.qsystem");
 /// The "tket.qsystem" extension version.
-pub const EXTENSION_VERSION: Version = Version::new(0, 5, 1);
+pub const EXTENSION_VERSION: Version = Version::new(0, 6, 0);
 
 lazy_static! {
     /// The "tket.qsystem" extension.
@@ -45,6 +45,7 @@ lazy_static! {
         helios::EXTENSION.to_owned(),
         sol::EXTENSION.to_owned(),
         futures::EXTENSION.to_owned(),
+        MEASUREMENT_EXTENSION.to_owned(),
         PRELUDE.to_owned(),
         FLOAT_TYPES.to_owned(),
     ]);
@@ -81,3 +82,5 @@ pub use helios::RUNTIME_BARRIER_NAME;
 
 #[deprecated(since = "0.25.0", note = "Use helios::RuntimeBarrierDef instead.")]
 pub use helios::RuntimeBarrierDef;
+
+use crate::extension::futures;
