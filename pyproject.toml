@@ -16,6 +16,8 @@ dev = [
     # Pyyaml 0.6.0 makes setuptools fail. This ensures we're using a newer version.
     "pyyaml >=6.0.2",
     "hugr>=0.16",
+    # used for tests in tket-py
+    "numpy>=2.2.0",
 ]
 conan = ["conan>=2.29.0,<3"]
 

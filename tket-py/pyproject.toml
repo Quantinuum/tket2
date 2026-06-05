@@ -52,9 +52,6 @@ requires = ["maturin~=1.7"]
 build-backend = "maturin"
 
 [dependency-groups]
-dev = [
-    "numpy" # used for tests
-]
 docs = [
     "furo>=2024.8.6",
     "myst-nb>=1.1.2",
