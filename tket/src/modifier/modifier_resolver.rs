@@ -103,6 +103,7 @@
 //! - User defined extension ops: There is no way to infer modified unknown extension ops.
 //!   We currently try to insert the original optype without any modification,
 //!   but this could result in an unexpected error.
+use fxhash::FxHashSet;
 use itertools::{Either, Itertools};
 use std::{
     collections::{HashMap, HashSet, VecDeque},
@@ -366,8 +367,9 @@ impl<N> Default for ModifierResolver<N> {
     }
 }
 
-/// Error that can occur when resolving modifiers.
+/// Errors that can occur when tracing and validating a chain of modifiers and its target.
 #[derive(Debug, derive_more::Error, derive_more::Display)]
+#[non_exhaustive]
 pub enum ModifierError<N = Node> {
     /// The node is not a modifier
     #[display("Node to modify {_0} expected to be a modifier but actually {_1}")]
@@ -376,12 +378,12 @@ pub enum ModifierError<N = Node> {
     #[display("No caller of the modified function exists for node {_0}")]
     #[error(ignore)]
     NoCaller(N),
-    /// No target of this modifer exists.
-    #[display("No caller of the modified function exists for node {_0}")]
+    /// No target of this modifier exists.
+    #[display("The modifier node {_0} chain has no target")]
     #[error(ignore)]
     NoTarget(N),
     /// Not the first modifier in a chain.
-    #[display("Node {_0} is not the first modifier in a chain. It is called by {_0}")]
+    #[display("Node {_0} of type {_1} is not the first modifier in a chain.")]
     NotInitialModifier(N, OpType),
     /// The modifier cannot be applied to the node.
     #[display("Modifier cannot be applied to the node {_0} of type {_1}")]
@@ -402,6 +404,7 @@ impl<N> ModifierError<N> {
 
 /// Possible errors that can occur during the modifier resolution process.
 #[derive(Debug, derive_more::Display, derive_more::Error, derive_more::From)]
+#[non_exhaustive]
 pub enum ModifierResolverErrors<N = Node> {
     /// Cannot modify the node.
     #[display("{_0}")]
@@ -430,6 +433,12 @@ pub enum ModifierResolverErrors<N = Node> {
     /// The node cannot be modified.
     #[display("Modification by {_0:?} is not defined for the node {_1}")]
     Unimplemented(Modifier, OpType),
+    /// The power modifier is not supported.
+    #[display("Found power modifier in node: {node}. Power modifier is not supported yet.")]
+    PowerModifierNotSupported {
+        /// The `power` node
+        node: N,
+    },
 }
 
 impl<N> ModifierResolverErrors<N> {
@@ -1630,7 +1639,7 @@ pub fn resolve_modifier_with_entrypoints_and_scope(
     // and attempt to rewrite each modifier node it encounters.
     let mut resolver = ModifierResolver::new();
     let mut worklist = entry_points.clone();
-    let mut visited = vec![];
+    let mut visited = FxHashSet::default();
 
     while let Some(node) = worklist.pop_front() {
         // Skip nodes that have been removed during previous rewrites or already visited.
@@ -1640,7 +1649,7 @@ pub fn resolve_modifier_with_entrypoints_and_scope(
         // Expand the frontier: enqueue children and dataflow neighbours not yet visited.
         worklist.extend(h.children(node).filter(|n| !visited.contains(n)));
         worklist.extend(h.all_neighbours(node).filter(|n| !visited.contains(n)));
-        visited.push(node);
+        visited.insert(node);
         if let Err(e) = resolver.try_rewrite(h, node) {
             // ModifierError means this node is not a modifier (or is not the first
             // in its chain) and can safely be skipped.
@@ -1660,11 +1669,11 @@ pub fn resolve_modifier_with_entrypoints_and_scope(
     // generate nodes that are not reachable from the entry points.
     // If more thorough cleanup is needed, we should run dead code elimination.
     let mut deletelist = entry_points.clone();
-    let mut visited = vec![];
+    let mut visited = FxHashSet::default();
     while let Some(node) = deletelist.pop_front() {
         deletelist.extend(h.children(node).filter(|n| !visited.contains(n)));
         deletelist.extend(h.all_neighbours(node).filter(|n| !visited.contains(n)));
-        visited.push(node);
+        visited.insert(node);
         if h.contains_node(node) {
             let optype = h.get_optype(node);
             if Modifier::from_optype(optype).is_some() {
@@ -2398,9 +2407,6 @@ mod tests {
     #[case::subscript_in_ctrl("../test_files/modifier_examples/subscript_in_ctrl.hugr")]
     #[case::subscript_in_dagger("../test_files/modifier_examples/subscript_in_dagger.hugr")]
     #[case::subscript_as_controller("../test_files/modifier_examples/subscript_as_controller.hugr")]
-    // TODO(perf): Investigate why this test is so slow (18s on my machine).
-    // <https://github.com/Quantinuum/tket2/issues/1586>
-    #[ignore = "slow regression test"]
     #[case::complex_modifier_stress("../test_files/modifier_examples/complex_modifier_stress.hugr")]
     #[case::ctrl_array_controller("../test_files/modifier_examples/ctrl_array_controller.hugr")]
     #[case::call1_in_ctrl("../test_files/modifier_examples/call1_in_ctrl.hugr")]
@@ -2433,5 +2439,19 @@ mod tests {
     fn test_examples(#[case] example: &str) {
         let mut h = load_guppy_example(example).unwrap();
         test_resolve(&mut h);
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
+    fn test_power_modifier_error() {
+        let mut h = load_guppy_example("../test_files/guppy_examples/use_of_power.hugr").unwrap();
+        assert_matches!(h.validate(), Ok(()));
+
+        let entrypoint = h.entrypoint();
+        let result = resolve_modifier_with_entrypoints(&mut h, [entrypoint]);
+        assert_matches!(
+            result,
+            Err(ModifierResolverErrors::PowerModifierNotSupported { node: _ })
+        );
     }
 }

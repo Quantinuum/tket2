@@ -72,11 +72,17 @@ impl TketOpEmitter {
             TketOp::Ry => PytketOptype::Ry,
             TketOp::Toffoli => PytketOptype::CCX,
             TketOp::Reset => PytketOptype::Reset,
-            TketOp::Measure => PytketOptype::Measure,
+            TketOp::Measure => {
+                // Don't translate `Measure` ops for now (the `Measurement` type they
+                // they return is currently unsupported).
+                return Ok(EncodeStatus::Unsupported);
+            }
             // We translate `MeasureFree` the same way as a `Measure` operation.
-            // Since the node does not have outputs the qubit/bit will simply be ignored,
-            // but will appear when collecting the final pytket registers.
-            TketOp::MeasureFree => PytketOptype::Measure,
+            TketOp::MeasureFree => {
+                // Don't translate `Measure` ops for now (the `Measurement` type they
+                // they return is currently unsupported).
+                return Ok(EncodeStatus::Unsupported);
+            }
             // These operations are implicitly supported by the encoding,
             // they do not create a new command but just modify the value trackers.
             TketOp::QAlloc => {
@@ -151,7 +157,6 @@ impl PytketDecoder for TketOpEmitter {
         _opgroup: Option<&str>,
         decoder: &mut PytketDecoderContext<'h>,
     ) -> Result<DecodeStatus, PytketDecodeError> {
-        let mut num_input_bits = 0;
         let op = match op.op_type {
             PytketOptype::H => TketOp::H,
             PytketOptype::CX => TketOp::CX,
@@ -172,10 +177,6 @@ impl PytketDecoder for TketOpEmitter {
             PytketOptype::Rz => TketOp::Rz,
             PytketOptype::CCX => TketOp::Toffoli,
             PytketOptype::Reset => TketOp::Reset,
-            PytketOptype::Measure => {
-                num_input_bits = 0;
-                TketOp::Measure
-            }
             _ => {
                 return Ok(DecodeStatus::Unsupported);
             }
@@ -187,6 +188,7 @@ impl PytketDecoder for TketOpEmitter {
             .map(|p| p.as_rotation(&mut decoder.builder))
             .collect_vec();
 
+        let num_input_bits = 0;
         let input_bits = &bits[..num_input_bits];
         let output_bits = &bits[num_input_bits..];
         decoder.add_node_with_wires(op, qubits, qubits, input_bits, output_bits, &params)?;

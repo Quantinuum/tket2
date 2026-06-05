@@ -15,7 +15,6 @@ use itertools::Itertools;
 use tket_json_rs::circuit_json::ImplicitPermutation;
 use tket_json_rs::register::ElementId as PytketRegister;
 
-use crate::extension::bool::bool_type;
 use crate::extension::rotation::{ConstRotation, rotation_type};
 use crate::serialize::pytket::decoder::param::parser::{PytketParam, parse_pytket_param};
 use crate::serialize::pytket::decoder::{
@@ -720,7 +719,7 @@ impl WireTracker {
             _ if ty == &qb_t() && !qubit_args.is_empty() => {
                 self.initialize_qubit_wire(builder, qubit_args[0].clone())?
             }
-            _ if (ty == &bool_t() || ty == &bool_type()) && !bit_args.is_empty() => {
+            _ if ty == &bool_t() && !bit_args.is_empty() => {
                 self.initialize_bit_wire(builder, bit_args[0].clone())?
             }
             _ if matches!(ty.as_type_enum(), TypeEnum::Sum(sum) if sum.as_tuple().is_some()) => {
