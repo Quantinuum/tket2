@@ -10,6 +10,7 @@ from tket.passes import (
     InlineFunctions,
     inline_funcs,
     NormalizeGuppy,
+    ReplaceNonCliffordWithClifford,
     ModifierResolverPass,
     GlobalScope,
 )
@@ -222,6 +223,26 @@ def test_sequence_pass():
     opt_circ = CompilationState.from_bytes(res_hugr.to_bytes())
     assert opt_circ.num_operations() == 1
     assert opt_circ.circuit_cost(lambda op: int(op == TketOp.CX)) == 1
+
+
+def test_replace_non_clifford_with_clifford_pass() -> None:
+    c = CompilationState.from_tket1(Circuit(2).H(0).T(0).Rz(0.25, 1).CX(0, 1))
+    hugr = Hugr.from_str(c.to_str(), tket_registry())
+
+    res = ReplaceNonCliffordWithClifford().run(hugr)
+    out = CompilationState.from_bytes(res.hugr.to_bytes()).to_tket1()
+
+    assert out == Circuit(2).H(0).S(0).S(1).CX(0, 1)
+
+
+def test_replace_non_clifford_wide_gate_with_clifford_scaffold() -> None:
+    c = CompilationState.from_tket1(Circuit(3).CCX(0, 1, 2))
+    hugr = Hugr.from_str(c.to_str(), tket_registry())
+
+    res = ReplaceNonCliffordWithClifford().run(hugr)
+    out = CompilationState.from_bytes(res.hugr.to_bytes()).to_tket1()
+
+    assert out == Circuit(3).CX(0, 1).CX(0, 2).CX(0, 2).CX(0, 1)
 
 
 def test_normalize_guppy():

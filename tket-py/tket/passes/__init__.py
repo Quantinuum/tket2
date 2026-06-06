@@ -29,6 +29,7 @@ __all__ = [
     "InlineFuncsHeuristic",
     "InlineFunctions",
     "NormalizeGuppy",
+    "ReplaceNonCliffordWithClifford",
     "ModifierResolverPass",
     "QSystemPass",
 ]
@@ -254,6 +255,129 @@ def _badger_optimise(
         max_circuit_count=max_circuit_count,
         log_dir=log_dir,
     )
+
+
+_CLIFFORD_OP_NAMES = {
+    "H",
+    "S",
+    "Sdg",
+    "X",
+    "Y",
+    "Z",
+    "V",
+    "Vdg",
+    "CX",
+    "CY",
+    "CZ",
+    "SWAP",
+}
+
+_NON_UNITARY_OP_NAMES = {
+    "Barrier",
+    "Measure",
+    "MeasureFree",
+    "noop",
+    "Reset",
+}
+
+
+def _op_name(op: object) -> str:
+    return getattr(getattr(op, "type", op), "name", str(getattr(op, "type", op)))
+
+
+def _empty_like_pytket_circuit(circuit):
+    from pytket import Circuit
+
+    replacement = Circuit()
+    for qubit in circuit.qubits:
+        replacement.add_qubit(qubit)
+    for bit in circuit.bits:
+        replacement.add_bit(bit)
+    return replacement
+
+
+def _add_clifford_placeholder(circuit, qubits, *, one_qubit: str, two_qubit: str) -> None:
+    from pytket import OpType
+
+    if len(qubits) == 1:
+        circuit.add_gate(getattr(OpType, one_qubit), qubits)
+        return
+
+    if len(qubits) == 2:
+        circuit.add_gate(getattr(OpType, two_qubit), qubits)
+        return
+
+    # For wider non-Clifford operations, insert a deterministic Clifford scaffold
+    # over the same qubits instead of leaving an unsupported operation behind.
+    for target in qubits[1:]:
+        circuit.add_gate(getattr(OpType, two_qubit), [qubits[0], target])
+    for target in reversed(qubits[1:]):
+        circuit.add_gate(getattr(OpType, two_qubit), [qubits[0], target])
+
+
+def _replace_non_clifford_ops(circuit, *, one_qubit: str, two_qubit: str):
+    replacement = _empty_like_pytket_circuit(circuit)
+    qubit_set = set(circuit.qubits)
+
+    for command in circuit.get_commands():
+        name = _op_name(command.op)
+        command_qubits = [arg for arg in command.args if arg in qubit_set]
+
+        if not command_qubits or name in _CLIFFORD_OP_NAMES or name in _NON_UNITARY_OP_NAMES:
+            replacement.add_gate(command.op, command.args)
+            continue
+
+        _add_clifford_placeholder(
+            replacement,
+            command_qubits,
+            one_qubit=one_qubit,
+            two_qubit=two_qubit,
+        )
+
+    return replacement
+
+
+@dataclass
+class ReplaceNonCliffordWithClifford(ComposablePass):
+    """Replace non-Clifford quantum operations with Clifford stand-ins.
+
+    This is intended for generating Clifford-only HUGRs that can be sent through
+    Clifford simulators such as Stim for testing and debugging.
+    """
+
+    one_qubit_replacement: str = "S"
+    two_qubit_replacement: str = "CX"
+    _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
+
+    def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
+        return implement_pass_run(
+            self,
+            hugr=hugr,
+            inplace=inplace,
+            copy_call=lambda h: self._replace(h, inplace),
+        )
+
+    def with_scope(self, scope: PassScope) -> ReplaceNonCliffordWithClifford:
+        self._scope = scope
+        return self
+
+    def _replace(self, hugr: Hugr, inplace: bool) -> PassResult:
+        tk_program = _state.CompilationState.from_python(hugr)
+        self._run_tk(tk_program)
+        package = tk_program.to_python()
+        return PassResult.for_pass(
+            self, hugr=package.modules[0], inplace=inplace, result=None
+        )
+
+    def _run_tk(self, program: _state.CompilationState) -> _state.CompilationState:
+        circuit = program.to_tket1()
+        replacement = _replace_non_clifford_ops(
+            circuit,
+            one_qubit=self.one_qubit_replacement,
+            two_qubit=self.two_qubit_replacement,
+        )
+        program._inner = _state.CompilationState.from_tket1(replacement)
+        return program
 
 
 @dataclass
