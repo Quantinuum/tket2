@@ -3,6 +3,8 @@
 # dependencies = [
 #     "guppylang ==0.21.13",
 # ]
+# [tool.uv.sources]
+# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", branch = "ts/future-measure"}
 # ///
 """An function with a Rz operation"""
 

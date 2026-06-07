@@ -120,7 +120,7 @@ impl QSystemEmitter {
         let serial_op = match op {
             // "Lazy" operations are translated as eager measurements in pytket,
             // as there is no `Future<T>` type there.
-            SharedOp::Measure | SharedOp::LazyMeasure => PytketOptype::Measure,
+            SharedOp::LazyMeasure => PytketOptype::Measure,
             SharedOp::Rz => PytketOptype::Rz,
             SharedOp::PhasedX => PytketOptype::PhasedX,
             SharedOp::Reset => PytketOptype::Reset,
@@ -129,7 +129,7 @@ impl QSystemEmitter {
                 encoder.get_input_values(node, hugr)?;
                 return Ok(EncodeStatus::Success);
             }
-            SharedOp::LazyMeasureReset | SharedOp::MeasureReset => {
+            SharedOp::LazyMeasureReset => {
                 // These may require a pytket measurement followed by a reset.
                 return Ok(EncodeStatus::Unsupported);
             }
@@ -139,6 +139,10 @@ impl QSystemEmitter {
             }
             SharedOp::TryQAlloc => {
                 // Pytket circuits don't support the optional type returned by `TryQAlloc`.
+                return Ok(EncodeStatus::Unsupported);
+            }
+            SharedOp::FutureToMeasurement => {
+                // No equivalent pytket operation.
                 return Ok(EncodeStatus::Unsupported);
             }
         };

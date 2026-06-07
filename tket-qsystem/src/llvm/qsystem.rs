@@ -11,13 +11,12 @@ use crate::extension::qsystem::{QSystemPlatform, SharedOp};
 use anyhow::{Result, anyhow, bail};
 use hugr::extension::prelude::qb_t;
 use hugr::llvm::custom::CodegenExtension;
+use hugr::llvm::emit::EmitOpArgs;
 use hugr::llvm::emit::func::{EmitFuncContext, build_option};
-use hugr::llvm::emit::{EmitOpArgs, emit_value};
 use inkwell::types::BasicType;
 use inkwell::values::{BasicValueEnum, FunctionValue, IntValue};
 use tket::hugr::llvm::CodegenExtsBuilder;
 use tket::hugr::ops::ExtensionOp;
-use tket::hugr::ops::constant::Value;
 use tket::hugr::{HugrView, Node};
 
 use super::futures::future_type;
@@ -97,7 +96,6 @@ trait QSystemRuntimeFunction {
 enum GenericRuntimeFunction {
     QAlloc,
     QFree,
-    Measure,
     LazyMeasureLeaked,
     LazyMeasure,
     Reset,
@@ -109,7 +107,6 @@ impl QSystemRuntimeFunction for GenericRuntimeFunction {
         match self {
             GenericRuntimeFunction::QAlloc => "___qalloc",
             GenericRuntimeFunction::QFree => "___qfree",
-            GenericRuntimeFunction::Measure => "___measure",
             GenericRuntimeFunction::LazyMeasureLeaked => "___lazy_measure_leaked",
             GenericRuntimeFunction::LazyMeasure => "___lazy_measure",
             GenericRuntimeFunction::Reset => "___reset",
@@ -129,7 +126,6 @@ impl QSystemRuntimeFunction for GenericRuntimeFunction {
         match self {
             GenericRuntimeFunction::QAlloc => qb_type.fn_type(&[], false),
             GenericRuntimeFunction::QFree => iwc.void_type().fn_type(&[qb_type.into()], false),
-            GenericRuntimeFunction::Measure => iwc.bool_type().fn_type(&[qb_type.into()], false),
             GenericRuntimeFunction::LazyMeasureLeaked => {
                 future_type(iwc).fn_type(&[qb_type.into()], false)
             }
@@ -356,53 +352,6 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                 &[0, 1],
                 &[0],
             ),
-            // Measure qubit in Z basis.
-            SharedOp::Measure | SharedOp::MeasureReset => {
-                let true_val = emit_value(context, &Value::true_val())?;
-                let false_val = emit_value(context, &Value::false_val())?;
-                let builder = context.builder();
-                let [qb] = args
-                    .inputs
-                    .try_into()
-                    .map_err(|_| anyhow!("Measure expects one input"))?;
-                let result_i1 = builder
-                    .build_call(
-                        self.runtime_func(
-                            context,
-                            RuntimeFunction::Generic(GenericRuntimeFunction::Measure),
-                        )?,
-                        &[qb.into()],
-                        "measure_i1",
-                    )?
-                    .try_as_basic_value()
-                    .unwrap_basic()
-                    .into_int_value();
-                let result = builder.build_select(result_i1, true_val, false_val, "measure")?;
-                if op == SharedOp::Measure {
-                    // Normal measure may put the qubit in an invalid state, so assume
-                    // deallocation and don't return it.
-                    builder.build_call(
-                        self.runtime_func(
-                            context,
-                            RuntimeFunction::Generic(GenericRuntimeFunction::QFree),
-                        )?,
-                        &[qb.into()],
-                        "qfree",
-                    )?;
-                    args.outputs.finish(builder, [result])
-                } else {
-                    // MeasureReset resets the qubit after measurement so it is safe to return.
-                    builder.build_call(
-                        self.runtime_func(
-                            context,
-                            RuntimeFunction::Generic(GenericRuntimeFunction::Reset),
-                        )?,
-                        &[qb.into()],
-                        "reset",
-                    )?;
-                    args.outputs.finish(builder, [qb, result])
-                }
-            }
             // Measure qubit in Z basis, not forcing to a boolean.
             SharedOp::LazyMeasure => {
                 let builder = context.builder();
@@ -540,6 +489,9 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                      and must be handled before dispatching to emit_shared"
                 )
             }
+            SharedOp::FutureToMeasurement => {
+                unreachable!("FutureToMeasurement should have been removed before codegen")
+            }
         }
     }
 
@@ -598,20 +550,16 @@ mod test {
     #[case::rz(1, HeliosOp::Rz)]
     #[case::zzphase(2, HeliosOp::ZZPhase)]
     #[case::phased_x(3, HeliosOp::PhasedX)]
-    #[case::measure(4, HeliosOp::Measure)]
     #[case::lazy_measure(5, HeliosOp::LazyMeasure)]
     #[case::try_qalloc(6, HeliosOp::TryQAlloc)]
     #[case::qfree(7, HeliosOp::QFree)]
     #[case::reset(8, HeliosOp::Reset)]
-    #[case::measure_reset(9, HeliosOp::MeasureReset)]
     #[case::lazy_measure_leaked(10, HeliosOp::LazyMeasureLeaked)]
     fn emit_helios_codegen(
         #[case] _i: i32,
         #[with(_i)] mut llvm_ctx: TestContext,
         #[case] op: HeliosOp,
     ) {
-        use tket::passes::ComposablePass;
-
         use crate::llvm::{futures::FuturesCodegenExtension, prelude::QISPreludeCodegen};
 
         llvm_ctx.add_extensions(|ceb| {
@@ -625,10 +573,7 @@ mod test {
             .add_logic_extensions()
         });
         let ext_op = op.to_extension_op().unwrap().into();
-        let mut hugr = single_op_hugr(ext_op);
-        crate::replace_bools::ReplaceBoolPass::default()
-            .run(&mut hugr)
-            .unwrap();
+        let hugr = single_op_hugr(ext_op);
         check_emission!(hugr, llvm_ctx);
     }
 
@@ -636,16 +581,12 @@ mod test {
     #[case::rz(1, SolOp::Rz)]
     #[case::phased_x(2, SolOp::PhasedX)]
     #[case::phased_xx(3, SolOp::PhasedXX)]
-    #[case::measure(4, SolOp::Measure)]
     #[case::lazy_measure(5, SolOp::LazyMeasure)]
     #[case::try_qalloc(6, SolOp::TryQAlloc)]
     #[case::qfree(7, SolOp::QFree)]
     #[case::reset(8, SolOp::Reset)]
-    #[case::measure_reset(9, SolOp::MeasureReset)]
     #[case::lazy_measure_leaked(10, SolOp::LazyMeasureLeaked)]
     fn emit_sol_codegen(#[case] _i: i32, #[with(_i)] mut llvm_ctx: TestContext, #[case] op: SolOp) {
-        use tket::passes::ComposablePass;
-
         use crate::llvm::{futures::FuturesCodegenExtension, prelude::QISPreludeCodegen};
 
         llvm_ctx.add_extensions(|ceb| {
@@ -659,10 +600,7 @@ mod test {
             .add_logic_extensions()
         });
         let ext_op = op.to_extension_op().unwrap().into();
-        let mut hugr = single_op_hugr(ext_op);
-        crate::replace_bools::ReplaceBoolPass::default()
-            .run(&mut hugr)
-            .unwrap();
+        let hugr = single_op_hugr(ext_op);
         check_emission!(hugr, llvm_ctx);
     }
 }

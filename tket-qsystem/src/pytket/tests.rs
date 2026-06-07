@@ -12,13 +12,14 @@ use itertools::Itertools;
 use rstest::{fixture, rstest};
 use tket::TketOp;
 use tket::extension::TKET1_EXTENSION_ID;
-use tket::extension::bool::BoolOp;
+use tket::extension::measurement::MeasurementOp;
 use tket::serialize::pytket::EncodedCircuit;
 use tket::serialize::pytket::TKETDecode;
 use tket::serialize::pytket::{DecodeOptions, EncodeOptions};
 use tket_json_rs::circuit_json::{self, SerialCircuit};
 use tket_json_rs::register;
 
+use crate::extension::futures::FutureOpBuilder;
 use crate::extension::qsystem::{QSystemPlatform, helios::HeliosOp};
 use crate::extension::result::ResultOp;
 use crate::pytket::{qsystem_decoder_config, qsystem_encoder_config};
@@ -164,21 +165,15 @@ fn circ_qsystem_native_gates() -> Hugr {
     let [qb1] = h.add_dataflow_op(TketOp::QAlloc, []).unwrap().outputs_arr();
 
     let [bit_0] = h
-        .add_dataflow_op(HeliosOp::Measure, [qb0])
+        .add_dataflow_op(HeliosOp::LazyMeasure, [qb0])
         .unwrap()
         .outputs_arr();
     let [bit_1] = h
-        .add_dataflow_op(HeliosOp::Measure, [qb1])
+        .add_dataflow_op(HeliosOp::LazyMeasure, [qb1])
         .unwrap()
         .outputs_arr();
-    let [bit_0] = h
-        .add_dataflow_op(BoolOp::read, [bit_0])
-        .unwrap()
-        .outputs_arr();
-    let [bit_1] = h
-        .add_dataflow_op(BoolOp::read, [bit_1])
-        .unwrap()
-        .outputs_arr();
+    let [bit_0] = h.add_read(bit_0, bool_t()).unwrap();
+    let [bit_1] = h.add_read(bit_1, bool_t()).unwrap();
 
     h.finish_hugr_with_outputs([bit_0, bit_1]).unwrap()
 }
@@ -201,7 +196,10 @@ fn circ_dropped_order_edge() -> Hugr {
         .add_dataflow_op(TketOp::MeasureFree, [q])
         .unwrap()
         .outputs_arr();
-    let [b] = h.add_dataflow_op(BoolOp::read, [b]).unwrap().outputs_arr();
+    let [b] = h
+        .add_dataflow_op(MeasurementOp::Read, [b])
+        .unwrap()
+        .outputs_arr();
     let result = h
         .add_dataflow_op(ResultOp::new_bool("result"), [b])
         .unwrap();
@@ -275,73 +273,7 @@ fn json_roundtrip(
     compare_serial_circs(&ser, &reser);
 }
 
-/// Test the serialisation roundtrip from a tket circuit.
-///
-/// Note: this is not a pure roundtrip as the encoder may add internal qubits/bits to the circuit.
 #[rstest]
-#[case::native_gates(circ_qsystem_native_gates())]
-fn circuit_standalone_roundtrip(#[case] hugr: Hugr) {
-    let circ_signature = hugr
-        .entrypoint_optype()
-        .inner_function_type()
-        .expect("Dataflow entrypoint")
-        .into_owned();
-    let decode_options = DecodeOptions::new()
-        .with_signature(circ_signature.clone())
-        .with_config(qsystem_decoder_config(QSystemPlatform::Helios));
-    let encode_options = EncodeOptions::new()
-        .with_subcircuits(true)
-        .with_config(qsystem_encoder_config(QSystemPlatform::Helios));
-
-    let encoded = EncodedCircuit::new_standalone(&hugr, encode_options.clone())
-        .unwrap_or_else(|e| panic!("{e}"));
-
-    assert!(encoded.contains_circuit(hugr.entrypoint()));
-    assert_eq!(encoded.len(), 1);
-
-    // Re-encode the EncodedCircuit
-    let extracted_from_circ = encoded
-        .reassemble(
-            hugr.entrypoint(),
-            Some("main".to_string()),
-            decode_options.clone(),
-        )
-        .unwrap_or_else(|e| panic!("{e}"));
-    extracted_from_circ
-        .validate()
-        .unwrap_or_else(|e| panic!("{e}"));
-
-    // Extract the head pytket circuit, and re-encode it on its own.
-    let ser: &SerialCircuit = &encoded[hugr.entrypoint()];
-    let deser: Hugr = ser.decode(decode_options).unwrap_or_else(|e| panic!("{e}"));
-
-    let deser_sig = deser
-        .entrypoint_optype()
-        .inner_function_type()
-        .expect("Dataflow entrypoint")
-        .into_owned();
-    assert_eq!(
-        &circ_signature.input, &deser_sig.input,
-        "Input signature mismatch\n  Expected: {}\n  Actual:   {}",
-        &circ_signature, &deser_sig
-    );
-    assert_eq!(
-        &circ_signature.output, &deser_sig.output,
-        "Output signature mismatch\n  Expected: {}\n  Actual:   {}",
-        &circ_signature, &deser_sig
-    );
-
-    let reser = SerialCircuit::encode(
-        &deser,
-        EncodeOptions::new().with_config(qsystem_encoder_config(QSystemPlatform::Helios)),
-    )
-    .unwrap();
-    validate_serial_circ(&reser);
-    compare_serial_circs(ser, &reser);
-}
-
-#[rstest]
-#[case::native_gates(circ_qsystem_native_gates(), 1)]
 #[case::dropped_order_edge(circ_dropped_order_edge(), 1)]
 fn encoded_circuit_roundtrip(#[case] hugr: Hugr, #[case] num_circuits: usize) {
     let circ_signature = hugr

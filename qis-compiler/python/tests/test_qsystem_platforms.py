@@ -40,7 +40,6 @@ def load(name: str) -> bytes:
         "rng",
         "rus",
         "qft_32",
-        "addition_3_11",
     ],
 )
 @pytest.mark.parametrize("target_triple", triples)

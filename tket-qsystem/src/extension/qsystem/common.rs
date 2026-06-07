@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::extension::futures::{FutureOpBuilder, future_type};
 use hugr::{
     Extension, Wire,
     builder::{BuildError, Dataflow, DataflowSubContainer, SubContainer},
@@ -13,7 +14,7 @@ use hugr::{
     type_row,
     types::{PolyFuncType, Signature, Type, TypeArg, TypeRow, type_param::TypeParam},
 };
-use tket::extension::bool::{BoolOp, bool_type};
+use tket::extension::measurement::measurement_type;
 
 use super::lower::pi_mul_f64;
 use super::synth_tket_op::SynthesizeTketOp;
@@ -27,7 +28,6 @@ pub trait CommonOp: MakeRegisteredOp + Copy + From<SharedOp> {
 #[derive(Clone, Copy, PartialEq, Eq)]
 /// An enum representing operations that are shared between Quantinuum platforms.
 pub(crate) enum SharedOp {
-    Measure,
     LazyMeasure,
     LazyMeasureReset,
     Rz,
@@ -35,14 +35,13 @@ pub(crate) enum SharedOp {
     TryQAlloc,
     QFree,
     Reset,
-    MeasureReset,
     LazyMeasureLeaked,
+    FutureToMeasurement,
 }
 
 impl SharedOp {
     pub(crate) fn description(&self) -> &'static str {
         match self {
-            SharedOp::Measure => "Measure a qubit and lose it.",
             SharedOp::LazyMeasure => "Lazily measure a qubit and lose it.",
             SharedOp::LazyMeasureReset => {
                 "Lazily measure a qubit and reset it to the Z |0> eigenstate."
@@ -54,9 +53,11 @@ impl SharedOp {
             SharedOp::TryQAlloc => "Allocate a qubit in the Z |0> eigenstate.",
             SharedOp::QFree => "Free a qubit (lose track of it).",
             SharedOp::Reset => "Reset a qubit to the Z |0> eigenstate.",
-            SharedOp::MeasureReset => "Measure a qubit and reset it to the Z |0> eigenstate.",
             SharedOp::LazyMeasureLeaked => {
                 "Measure a qubit (return 0 or 1) or detect leakage (return 2)."
+            }
+            SharedOp::FutureToMeasurement => {
+                "Convert a Future<bool> to a Measurement (for compatibility with the TKET quantum extension)."
             }
         }
     }
@@ -79,7 +80,6 @@ impl SharedOp {
                 vec![qb_t(), super::futures::future_type(bool_t())],
             ),
             SharedOp::Reset => Signature::new(one_qb_row.clone(), one_qb_row.clone()),
-            SharedOp::Measure => Signature::new(one_qb_row.clone(), vec![bool_type()]),
             SharedOp::Rz => Signature::new(
                 vec![
                     qb_t(),
@@ -100,7 +100,9 @@ impl SharedOp {
                 vec![Type::from(option_type(one_qb_row.clone()))],
             ),
             SharedOp::QFree => Signature::new(one_qb_row.clone(), type_row![]),
-            SharedOp::MeasureReset => Signature::new(one_qb_row, vec![qb_t(), bool_type()]),
+            SharedOp::FutureToMeasurement => {
+                Signature::new([future_type(bool_t())], [measurement_type()])
+            }
         }
         .into()
     }
@@ -125,12 +127,6 @@ pub(crate) trait CommonOpBuilder<Op: CommonOp>:
         Ok(self
             .add_dataflow_op(Op::from(SharedOp::LazyMeasureReset), [qb])?
             .outputs_arr())
-    }
-
-    fn add_measure(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        Ok(self
-            .add_dataflow_op(Op::from(SharedOp::Measure), [qb])?
-            .out_wire(0))
     }
 
     fn add_reset(&mut self, qb: Wire) -> Result<Wire, BuildError> {
@@ -160,12 +156,6 @@ pub(crate) trait CommonOpBuilder<Op: CommonOp>:
     fn add_qfree(&mut self, qb: Wire) -> Result<(), BuildError> {
         self.add_dataflow_op(Op::from(SharedOp::QFree), [qb])?;
         Ok(())
-    }
-
-    fn add_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
-        Ok(self
-            .add_dataflow_op(Op::from(SharedOp::MeasureReset), [qb])?
-            .outputs_arr())
     }
 
     fn add_runtime_barrier(&mut self, qbs: Wire, array_size: u64) -> Result<Wire, BuildError> {
@@ -217,8 +207,8 @@ pub(crate) trait PhasedXRzSynth: CommonOpBuilder<Self::Op> {
     fn synth_rz(&mut self, qb: Wire, angle: Wire) -> Result<Wire, BuildError>;
     /// Build a TryQAlloc gate using the platform's native operation.
     fn synth_try_alloc(&mut self) -> Result<Wire, BuildError>;
-    /// Build a MeasureReset gate using the platform's native operation.
-    fn synth_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError>;
+    /// Build a LazyMeasureReset gate using the platform's native operation.
+    fn synth_lazy_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError>;
 
     /// Build a CNOT gate.
     fn build_cx(&mut self, c: Wire, t: Wire) -> Result<[Wire; 2], BuildError>;
@@ -313,8 +303,8 @@ impl<T: PhasedXRzSynth> SynthesizeTketOp for T {
     }
 
     fn build_measure_flip(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
-        let [qb, b] = self.synth_measure_reset(qb)?;
-        let sum_b = self.add_dataflow_op(BoolOp::read, [b])?.out_wire(0);
+        let [qb, b] = self.synth_lazy_measure_reset(qb)?;
+        let [sum_b] = self.add_read(b, bool_t())?;
         let mut conditional = self.conditional_builder(
             ([type_row![], type_row![]], sum_b),
             [(qb_t(), qb)],
