@@ -291,11 +291,11 @@ macro_rules! compute_opdef {
             type Error = ();
 
             fn try_from(value: Type) -> Result<Self, Self::Error> {
-                let Some(custom_type) = value.as_extension() else {
+                let hugr_core::types::Term::ExtensionType(custom_type) = value.into() else {
                     Err(())?
                 };
 
-                custom_type.to_owned().try_into().map_err(|_| ())
+                custom_type.try_into().map_err(|_| ())
             }
         }
 
