@@ -253,7 +253,7 @@ mod test {
     #[case(GpuType::Module)]
     #[case(GpuType::Context)]
     #[case(GpuType::new_func(type_row![], type_row![]))]
-    #[case(GpuType::new_func(TypeRowRV::new_var_use(0, TypeBound::Linear), vec![bool_t()]))]
+    #[case(GpuType::new_func(TypeRowRV::new_var_use(0, TypeBound::Linear), [bool_t()]))]
     fn gpu_type(#[case] gpu_t: GpuType) {
         let hugr_t: Type = gpu_t.clone().into();
         let roundtripped_t = hugr_t.try_into().unwrap();

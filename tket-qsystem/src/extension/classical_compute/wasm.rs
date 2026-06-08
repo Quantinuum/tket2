@@ -234,7 +234,7 @@ mod test {
     #[case(WasmType::Module)]
     #[case(WasmType::Context)]
     #[case(WasmType::new_func(type_row![], type_row![]))]
-    #[case(WasmType::new_func(TypeRowRV::new_var_use(0, TypeBound::Linear), vec![bool_t()]))]
+    #[case(WasmType::new_func(TypeRowRV::new_var_use(0, TypeBound::Linear), [bool_t()]))]
     fn wasm_type(#[case] wasm_t: WasmType) {
         let hugr_t: Type = wasm_t.clone().into();
         let roundtripped_t = hugr_t.try_into().unwrap();
