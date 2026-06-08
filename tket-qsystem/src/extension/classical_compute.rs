@@ -394,7 +394,7 @@ macro_rules! compute_opdef {
                             FuncValueType::new(
                                 TypeRowRV::from([context_type.clone(), func_type.into()])
                                     .concat(inputs),
-                                vec![result_type],
+                                [result_type],
                             ),
                         )
                         .into()
@@ -411,7 +411,7 @@ macro_rules! compute_opdef {
                         PolyFuncTypeRV::new(
                             [OUTPUTS_PARAM.to_owned()],
                             FuncValueType::new(
-                                vec![result_type],
+                                [result_type],
                                 TypeRowRV::from([context_type]).concat(outputs),
                             ),
                         )

@@ -94,13 +94,10 @@ static TEMP_UNPACK_EXT: LazyLock<Arc<Extension>> = LazyLock::new(|| {
             let opt_unwrap_sig = PolyFuncTypeRV::new(
                 vec![TypeParam::TypeKind(TypeBound::Linear)],
                 FuncValueType::new(
-                    hugr::types::TypeRow::from(vec![Type::from(
-                        hugr::extension::prelude::option_type([Type::new_var_use(
-                            0,
-                            TypeBound::Linear,
-                        )]),
-                    )]),
-                    hugr::types::TypeRow::from(vec![Type::new_var_use(0, TypeBound::Linear)]),
+                    [Type::from(hugr::extension::prelude::option_type([
+                        Type::new_var_use(0, TypeBound::Linear),
+                    ]))],
+                    [Type::new_var_use(0, TypeBound::Linear)],
                 ),
             );
             // produce option of element
