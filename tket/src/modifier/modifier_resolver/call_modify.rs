@@ -219,6 +219,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         // Collection of modifiers to apply.
         let modifiers = self.modifiers_mut();
         let mut chain: Vec<N> = Vec::new();
+
         loop {
             chain.push(current);
             let optype = h.get_optype(current);
