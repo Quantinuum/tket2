@@ -287,10 +287,8 @@ mod test {
     #[rstest]
     #[case::concrete(type_row![], type_row![])]
     #[case::row_vars1(
-        TypeRowRV::from(vec![Type::UNIT]).concat(TypeRowRV::new_var_use(0, TypeBound::Copyable)),
-        TypeRowRV::try_from(
-            Term::from(vec![TypeArg::from(Type::UNIT), TypeArg::from(usize_t())])
-        ).unwrap()
+        TypeRowRV::from([Type::UNIT]).concat(TypeRowRV::new_var_use(0, TypeBound::Copyable)),
+        TypeRowRV::from([Type::UNIT, usize_t()])
     )]
     fn lookup_signature(
         #[case] inputs: impl Into<TypeRowRV>,
