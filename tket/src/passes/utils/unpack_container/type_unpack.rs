@@ -27,9 +27,7 @@ pub fn array_args<AT: ArrayKind>(ext: &CustomType) -> Option<(u64, Type)> {
         .ok()
         .and_then(|_| match ext.args() {
             [TypeArg::BoundedNat(n), elem_term] => {
-                let Ok(t) = Type::try_from(elem_term.clone()) else {
-                    return None;
-                };
+                let t = Type::try_from(elem_term.clone()).ok()?;
                 Some((*n, t))
             }
             _ => None,
