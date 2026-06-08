@@ -1,8 +1,20 @@
 { pkgs, lib, inputs, ... }:
 let
-  hugrenv = pkgs.callPackage ./hugrenv.nix {
+  hugrenv-unwrapped = pkgs.callPackage ./hugrenv.nix {
     packages = ["tket" "llvm"];
   };
+  hugrenv = pkgs.stdenv.mkDerivation {
+    name = "hugrenv-wrapped";
+    nativeBuildInputs = [ pkgs.autoPatchelfHook ];
+    buildInputs = [ pkgs.stdenv.cc.cc.lib pkgs.gfortran.cc.lib ];
+    src = hugrenv-unwrapped;
+    installPhase = ''
+        mkdir -p $out
+        cp -rL $src/* $out/
+        chmod +w -R $out/*
+        rm $out/lib64/cmake -fr
+    '';
+    };
 in {
   # https://devenv.sh/packages/
   # on macos frameworks have to be explicitly specified

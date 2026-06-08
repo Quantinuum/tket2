@@ -43,7 +43,6 @@ class GlobalsExtension(TketExtension):
         ty_arg: TypeArg,
         inputs: List[Type],
         outputs: List[Type],
-        impl_outputs: List[Type],
     ) -> ExtOp:
         return (
             self()
@@ -54,7 +53,6 @@ class GlobalsExtension(TketExtension):
                     ty_arg,
                     ListArg([TypeTypeArg(t) for t in inputs]),
                     ListArg([TypeTypeArg(t) for t in outputs]),
-                    ListArg([TypeTypeArg(t) for t in impl_outputs]),
                 ]
             )
         )
@@ -65,7 +63,6 @@ class GlobalsExtension(TketExtension):
         ty_arg: TypeArg,
         inputs: List[Type],
         outputs: List[Type],
-        impl_outputs: List[Type],
     ) -> ExtOp:
         return (
             self()
@@ -76,7 +73,6 @@ class GlobalsExtension(TketExtension):
                     ty_arg,
                     ListArg([TypeTypeArg(t) for t in inputs]),
                     ListArg([TypeTypeArg(t) for t in outputs]),
-                    ListArg([TypeTypeArg(t) for t in impl_outputs]),
                 ]
             )
         )
