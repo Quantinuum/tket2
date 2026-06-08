@@ -189,6 +189,7 @@ fn flatten_guppy(#[case] name: &str) {
 #[case::nested("nested")]
 #[should_panic]
 #[case::ranges("ranges")]
+#[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
 fn optimize_guppy(#[case] name: &str) {
     let mut hugr = load_guppy_circuit(name, HugrFileType::Original).unwrap();
     let flat = count_gates(
@@ -217,6 +218,7 @@ fn optimize_guppy(#[case] name: &str) {
 
 /// Regression test for <http://github.com/CQCL/tket2/issues/1577>
 #[rstest]
+#[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
 fn issue_1577_remove_barriers_reassembles_nested_circuits() {
     let mut hugr = load_guppy_example("../guppy_examples/issue_1577.hugr").unwrap();
     run_pytket(&mut hugr, REMOVE_BARRIERS_STR);
