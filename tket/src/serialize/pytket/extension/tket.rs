@@ -87,12 +87,13 @@ impl TketOpEmitter {
             // check whether it is directly followed by a `Read` turning it into a
             // bool before we can translate it.
             TketOp::MeasureFree => {
-                let is_read = hugr.node_outputs(node).any(|out_port| {
-                    hugr.single_linked_input(node, out_port)
-                        .and_then(|(next_node, _)| hugr.get_optype(next_node).as_extension_op())
-                        .and_then(|op| MeasurementOp::from_extension_op(op).ok())
-                        .is_some_and(|op| op == MeasurementOp::Read)
-                });
+                let is_read = hugr
+                    .node_outputs(node)
+                    .next()
+                    .and_then(|out_port| hugr.single_linked_input(node, out_port))
+                    .and_then(|(next_node, _)| hugr.get_optype(next_node).as_extension_op())
+                    .and_then(|op| MeasurementOp::from_extension_op(op).ok())
+                    .is_some_and(|op| op == MeasurementOp::Read);
                 if !is_read {
                     // `MeasureFree` not immediately followed by a `Read` is not
                     // supported as we cannot directly translate the `Measurement` type.
