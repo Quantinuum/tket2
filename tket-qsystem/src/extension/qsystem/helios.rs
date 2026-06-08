@@ -507,14 +507,17 @@ where
     ) -> Result<[Wire; 2], BuildError> {
         let pi_2 = pi_mul_f64(self, 0.5);
         let pi_minus_2 = pi_mul_f64(self, -0.5);
+        let [added] = self
+            .builder
+            .add_dataflow_op(FloatOps::fadd, [pi_minus_2, _angle1])
+            .unwrap()
+            .outputs_arr();
 
         let _qb1 = SynthesizeHeliosOp::build_phased_x(self, _qb1, pi_2, pi_minus_2 + _angle1)?;
         let _qb2 = SynthesizeHeliosOp::build_phased_x(self, _qb2, pi_2, pi_minus_2 + _angle1)?;
         let [_qb1, _qb2] = SynthesizeHeliosOp::build_zz_phase(self, _qb1, _qb2, _angle2)?;
-        let _qb1 =
-            SynthesizeHeliosOp::build_phased_x(self, _qb1, pi_minus_2, pi_minus_2 + _angle1)?;
-        let _qb2 =
-            SynthesizeHeliosOp::build_phased_x(self, _qb2, pi_minus_2, pi_minus_2 + _angle1)?;
+        let _qb1 = SynthesizeHeliosOp::build_phased_x(self, _qb1, pi_minus_2, added)?;
+        let _qb2 = SynthesizeHeliosOp::build_phased_x(self, _qb2, pi_minus_2, added)?;
         Ok([_qb1, _qb2])
     }
 
