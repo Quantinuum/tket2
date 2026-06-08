@@ -5,6 +5,13 @@ target triple = "x86_64-apple-darwin"
 
 @res_shot.6D86EAF7.0 = private constant [14 x i8] c"\0DUSER:INT:shot"
 
+define void @"__hugr__.__main__.print_current_shot.<locals>.main.1"() local_unnamed_addr {
+alloca_block:
+  %shot = tail call i64 @get_current_shot()
+  tail call void @print_int(ptr nonnull @res_shot.6D86EAF7.0, i64 13, i64 %shot)
+  ret void
+}
+
 declare i64 @get_current_shot() local_unnamed_addr
 
 declare void @print_int(ptr, i64, i64) local_unnamed_addr

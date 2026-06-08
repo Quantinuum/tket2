@@ -1,6 +1,5 @@
 """HUGR extension definitions for tket circuits."""
 
-from tket_exts.tket.bool import BoolExtension
 from tket_exts.tket.debug import DebugExtension
 from tket_exts.tket.global_phase import GlobalPhaseExtension
 from tket_exts.tket.globals import GlobalsExtension
@@ -19,9 +18,9 @@ from tket_exts.tket.qsystem import (
 from tket_exts.tket.quantum import QuantumExtension
 from tket_exts.tket.result import ResultExtension
 from tket_exts.tket.wasm import WasmExtension
+from tket_exts.tket.measurement import MeasurementExtension
 
-from typing_extensions import deprecated
-from hugr.ext import Extension, ExtensionRegistry
+from hugr.ext import ExtensionRegistry
 from tket_exts import tket
 
 # This is updated by our release-please workflow, triggered by this
@@ -29,7 +28,6 @@ from tket_exts import tket
 __version__ = "0.12.3"
 
 __all__ = [
-    "bool",
     "debug",
     "gpu",
     "guppy",
@@ -46,9 +44,9 @@ __all__ = [
     "modifier",
     "global_phase",
     "globals",
+    "measurement",
 ]
 
-bool: BoolExtension = tket.bool.BoolExtension()
 debug: DebugExtension = tket.debug.DebugExtension()
 gpu: GpuExtension = tket.gpu.GpuExtension()
 guppy: GuppyExtension = tket.guppy.GuppyExtension()
@@ -65,11 +63,7 @@ wasm: WasmExtension = tket.wasm.WasmExtension()
 modifier: ModifierExtension = tket.modifier.ModifierExtension()
 global_phase: GlobalPhaseExtension = tket.global_phase.GlobalPhaseExtension()
 globals: GlobalsExtension = tket.globals.GlobalsExtension()
-
-
-@deprecated("Use tket_exts.bool() instead")
-def opaque_bool() -> Extension:
-    return bool()
+measurement: MeasurementExtension = tket.measurement.MeasurementExtension()
 
 
 def tket_registry() -> ExtensionRegistry:
@@ -81,7 +75,6 @@ def tket_registry() -> ExtensionRegistry:
         An ExtensionRegistry containing all the tket extensions.
     """
     tket_exts = [
-        tket.bool.BoolExtension(),
         tket.debug.DebugExtension(),
         tket.gpu.GpuExtension(),
         tket.guppy.GuppyExtension(),
@@ -98,6 +91,7 @@ def tket_registry() -> ExtensionRegistry:
         tket.wasm.WasmExtension(),
         tket.modifier.ModifierExtension(),
         tket.global_phase.GlobalPhaseExtension(),
+        tket.measurement.MeasurementExtension(),
     ]
 
     registry = ExtensionRegistry()

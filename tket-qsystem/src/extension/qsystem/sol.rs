@@ -32,7 +32,7 @@ use strum::{EnumIter, EnumString, IntoStaticStr};
 /// The "tket.qsystem.sol" extension id.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("tket.qsystem.sol");
 /// The "tket.qsystem.sol" extension version.
-pub const EXTENSION_VERSION: Version = Version::new(0, 5, 1);
+pub const EXTENSION_VERSION: Version = Version::new(0, 6, 0);
 
 lazy_static! {
     /// The "tket.qsystem.sol" extension.
@@ -64,8 +64,6 @@ lazy_static! {
 )]
 #[non_exhaustive]
 pub enum SolOp {
-    /// Measure a qubit and lose it.
-    Measure,
     /// Lazily measure a qubit and lose it.
     LazyMeasure,
     /// Lazily measure a qubit and reset it to the Z |0> eigenstate.
@@ -80,12 +78,13 @@ pub enum SolOp {
     QFree,
     /// Reset a qubit to the Z |0> eigenstate.
     Reset,
-    /// Measure a qubit and reset it to the Z |0> eigenstate.
-    MeasureReset,
     /// Measure a qubit (return 0 or 1) or detect leakage (return 2).
     LazyMeasureLeaked,
     /// PhasedXX gate (alias 'rpp')
     PhasedXX,
+    /// Convert a `Future<Bool>` to a `Measurement` (for compatibility with the TKET
+    /// quantum extension).
+    FutureToMeasurement,
 }
 
 impl MakeOpDef for SolOp {
@@ -149,16 +148,15 @@ impl TryFrom<SolOp> for SharedOp {
     fn try_from(sol_op: SolOp) -> Result<Self, Self::Error> {
         use SolOp::*;
         match sol_op {
-            Measure => Ok(SharedOp::Measure),
             LazyMeasure => Ok(SharedOp::LazyMeasure),
             Reset => Ok(SharedOp::Reset),
             Rz => Ok(SharedOp::Rz),
             PhasedX => Ok(SharedOp::PhasedX),
             TryQAlloc => Ok(SharedOp::TryQAlloc),
             QFree => Ok(SharedOp::QFree),
-            MeasureReset => Ok(SharedOp::MeasureReset),
             LazyMeasureLeaked => Ok(SharedOp::LazyMeasureLeaked),
             LazyMeasureReset => Ok(SharedOp::LazyMeasureReset),
+            FutureToMeasurement => Ok(SharedOp::FutureToMeasurement),
             _ => Err("Sol-specific ops don't have a corresponding SharedOp."),
         }
     }
@@ -168,16 +166,15 @@ impl From<SharedOp> for SolOp {
     fn from(shared_op: SharedOp) -> Self {
         use SharedOp::*;
         match shared_op {
-            Measure => SolOp::Measure,
             LazyMeasure => SolOp::LazyMeasure,
             Reset => SolOp::Reset,
             Rz => SolOp::Rz,
             PhasedX => SolOp::PhasedX,
             TryQAlloc => SolOp::TryQAlloc,
             QFree => SolOp::QFree,
-            MeasureReset => SolOp::MeasureReset,
             LazyMeasureLeaked => SolOp::LazyMeasureLeaked,
             LazyMeasureReset => SolOp::LazyMeasureReset,
+            FutureToMeasurement => SolOp::FutureToMeasurement,
         }
     }
 }
@@ -295,8 +292,8 @@ where
         SynthesizeSolOp::build_try_alloc(self)
     }
 
-    fn synth_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
-        SynthesizeSolOp::build_measure_reset(self, qb)
+    fn synth_lazy_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
+        SynthesizeSolOp::build_lazy_measure_reset(self, qb)
     }
 
     fn build_cx(&mut self, c: Wire, t: Wire) -> Result<[Wire; 2], BuildError> {
@@ -417,9 +414,6 @@ pub trait SynthesizeSolOp: Dataflow {
     /// Build a "tket.qsystem.sol.LazyMeasureReset" op.
     fn build_lazy_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError>;
 
-    /// Build a "tket.qsystem.sol.Measure" op.
-    fn build_measure(&mut self, qb: Wire) -> Result<Wire, BuildError>;
-
     /// Build a "tket.qsystem.sol.Reset" op.
     fn build_reset(&mut self, qb: Wire) -> Result<Wire, BuildError>;
 
@@ -444,9 +438,6 @@ pub trait SynthesizeSolOp: Dataflow {
     /// Build a "tket.qsystem.sol.QFree" op.
     fn build_qfree(&mut self, qb: Wire) -> Result<(), BuildError>;
 
-    /// Build a "tket.qsystem.sol.MeasureReset" op.
-    fn build_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError>;
-
     /// Build a "tket.qsystem.sol.RuntimeBarrier" op.
     fn build_runtime_barrier(&mut self, qbs: Wire, array_size: u64) -> Result<Wire, BuildError>;
 }
@@ -465,10 +456,6 @@ where
 
     fn build_lazy_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
         self.inner.add_lazy_measure_reset(qb)
-    }
-
-    fn build_measure(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        self.inner.add_measure(qb)
     }
 
     fn build_reset(&mut self, qb: Wire) -> Result<Wire, BuildError> {
@@ -504,10 +491,6 @@ where
         self.inner.add_qfree(qb)
     }
 
-    fn build_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
-        self.inner.add_measure_reset(qb)
-    }
-
     fn build_runtime_barrier(&mut self, qbs: Wire, array_size: u64) -> Result<Wire, BuildError> {
         self.inner.add_runtime_barrier(qbs, array_size)
     }
@@ -515,13 +498,14 @@ where
 
 #[cfg(test)]
 mod test {
+    use crate::extension::futures::FutureOpBuilder;
     use crate::extension::qsystem::common::test_utils;
     use crate::extension::qsystem::synth_tket_op::SynthesizeTketOp as _;
 
     use hugr::HugrView;
     use hugr::builder::{DataflowHugr, FunctionBuilder};
+    use hugr::extension::prelude::bool_t;
     use hugr::std_extensions::collections::array::ArrayOpBuilder;
-    use tket::extension::bool::bool_type;
 
     use super::*;
 
@@ -551,7 +535,7 @@ mod test {
         let hugr = {
             let mut func_builder = FunctionBuilder::new(
                 "all_ops",
-                Signature::new(vec![qb_t(), float64_type()], vec![bool_type()]),
+                Signature::new(vec![qb_t(), float64_type()], vec![bool_t()]),
             )
             .unwrap();
             let [q0, angle] = func_builder.input_wires_arr();
@@ -577,8 +561,10 @@ mod test {
             let b = {
                 let mut synthesizer = SolSynthesizer::new(&mut func_builder);
                 let q0 = SynthesizeSolOp::build_rz(&mut synthesizer, q0, angle).unwrap();
-                let [q0, _b] = synthesizer.build_measure_reset(q0).unwrap();
-                let b = synthesizer.build_measure(q0).unwrap();
+                let [q0, f1] = synthesizer.build_lazy_measure_reset(q0).unwrap();
+                let f2 = synthesizer.build_lazy_measure(q0).unwrap();
+                let [_b] = synthesizer.add_read(f1, bool_t()).unwrap();
+                let [b] = synthesizer.add_read(f2, bool_t()).unwrap();
                 synthesizer.build_qfree(q1).unwrap();
                 b
             };

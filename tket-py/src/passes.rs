@@ -216,13 +216,12 @@ fn resolve_modifiers(circ: &mut CompilationState, scope: Option<PyPassScope>) ->
 }
 
 #[pyfunction]
-#[pyo3(signature=(circ, *, constant_fold = true, monomorphize = true, force_order = true, lazify = true, hide_funcs = true, scope = None))]
+#[pyo3(signature=(circ, *, constant_fold = true, monomorphize = true, force_order = true, hide_funcs = true, scope = None))]
 fn qsystem_rebase_pass(
     circ: &mut CompilationState,
     constant_fold: bool,
     monomorphize: bool,
     force_order: bool,
-    lazify: bool,
     hide_funcs: bool,
     scope: Option<PyPassScope>,
 ) -> PyResult<()> {
@@ -232,7 +231,6 @@ fn qsystem_rebase_pass(
         .with_constant_fold(constant_fold)
         .with_monomorphize(monomorphize)
         .with_force_order(force_order)
-        .with_lazify(lazify)
         .with_hide_funcs(hide_funcs);
 
     qsystem_pass.run(&mut circ.hugr).convert_pyerrs()?;

@@ -5,6 +5,8 @@
 #     "tket",
 #     "pytket >=2.1.0,<3",
 # ]
+# [tool.uv.sources]
+# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", branch = "ts/future-measure"}  # noqa: E501
 # ///
 
 from pathlib import Path
@@ -15,6 +17,7 @@ from guppylang.std.builtins import array, exit, panic, result
 from guppylang.std.qsystem.random import RNG
 from guppylang.std.qsystem.utils import get_current_shot
 from guppylang.std.quantum import (
+    collect_measurements,
     crz,
     cx,
     discard,
@@ -64,7 +67,7 @@ def no_results() -> bytes:
     def bar() -> None:
         q0: qubit = qubit()
         h(q0)
-        measure(q0)
+        measure(q0).read()
 
     return bar.compile().to_bytes()
 
@@ -79,10 +82,10 @@ def flip_some() -> bytes:
         x(q0)
         x(q2)
         x(q3)
-        result("c0", measure(q0))
-        result("c1", measure(q1))
-        result("c2", measure(q2))
-        result("c3", measure(q3))
+        result("c0", measure(q0).read())
+        result("c1", measure(q1).read())
+        result("c2", measure(q2).read())
+        result("c3", measure(q3).read())
 
     return main.compile().to_bytes()
 
@@ -104,7 +107,7 @@ def measure_qb_array() -> bytes:
         x(qs[2])
         x(qs[3])
         x(qs[9])
-        measure_array(qs)
+        collect_measurements(measure_array(qs))
 
     return main.compile().to_bytes()
 
@@ -118,7 +121,7 @@ def print_array() -> bytes:
         x(qs[2])
         x(qs[3])
         x(qs[9])
-        cs = measure_array(qs)
+        cs = collect_measurements(measure_array(qs))
         result("cs", cs)
         result("is", array(i for i in range(100)))
         result("fs", array(i * 0.0625 for i in range(100)))
@@ -131,7 +134,7 @@ def postselect_exit() -> bytes:
     def main() -> None:
         q = qubit()
         h(q)
-        outcome = measure(q)
+        outcome = measure(q).read()
         if outcome:
             exit("Postselection failed", 42)
         result("c", outcome)
@@ -144,7 +147,7 @@ def postselect_panic() -> bytes:
     def main() -> None:
         q = qubit()
         h(q)
-        outcome = measure(q)
+        outcome = measure(q).read()
         if outcome:
             panic("Postselection failed")
         result("c", outcome)
@@ -184,7 +187,7 @@ def rus() -> bytes:
     def main() -> None:
         q = qubit()
         rus(q)
-        result("result", measure(q))
+        result("result", measure(q).read())
 
     return main.compile().to_bytes()
 
@@ -232,7 +235,7 @@ def qft_32() -> bytes:
             for j in range(31 - i):
                 crz(qs[i], qs[i + j + 1], angle)
                 angle /= 2
-        result("cs", measure_array(qs))
+        result("cs", collect_measurements(measure_array(qs)))
 
     return main.compile().to_bytes()
 

@@ -32,7 +32,7 @@ use strum::{EnumIter, EnumString, IntoStaticStr};
 /// The "tket.qsystem.helios" extension id.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("tket.qsystem.helios");
 /// The "tket.qsystem.helios" extension version.
-pub const EXTENSION_VERSION: Version = Version::new(0, 5, 1);
+pub const EXTENSION_VERSION: Version = Version::new(0, 6, 0);
 
 lazy_static! {
     /// The "tket.qsystem.helios" extension.
@@ -64,8 +64,6 @@ lazy_static! {
 )]
 #[non_exhaustive]
 pub enum HeliosOp {
-    /// Measure a qubit and lose it.
-    Measure,
     /// Lazily measure a qubit and lose it.
     LazyMeasure,
     /// Lazily measure a qubit and reset it to the Z |0> eigenstate.
@@ -82,10 +80,11 @@ pub enum HeliosOp {
     QFree,
     /// Reset a qubit to the Z |0> eigenstate.
     Reset,
-    /// Measure a qubit and reset it to the Z |0> eigenstate.
-    MeasureReset,
     /// Measure a qubit (return 0 or 1) or detect leakage (return 2).
     LazyMeasureLeaked,
+    /// Convert a `Future<Bool>` to a `Measurement` (for compatibility with the TKET
+    /// quantum extension).
+    FutureToMeasurement,
 }
 
 impl MakeOpDef for HeliosOp {
@@ -151,16 +150,15 @@ impl TryFrom<HeliosOp> for SharedOp {
     fn try_from(helios_op: HeliosOp) -> Result<Self, Self::Error> {
         use HeliosOp::*;
         match helios_op {
-            Measure => Ok(SharedOp::Measure),
             LazyMeasure => Ok(SharedOp::LazyMeasure),
             Rz => Ok(SharedOp::Rz),
             PhasedX => Ok(SharedOp::PhasedX),
             TryQAlloc => Ok(SharedOp::TryQAlloc),
             QFree => Ok(SharedOp::QFree),
             Reset => Ok(SharedOp::Reset),
-            MeasureReset => Ok(SharedOp::MeasureReset),
             LazyMeasureLeaked => Ok(SharedOp::LazyMeasureLeaked),
             LazyMeasureReset => Ok(SharedOp::LazyMeasureReset),
+            FutureToMeasurement => Ok(SharedOp::FutureToMeasurement),
             ZZPhase => Err("Helios-specific ops don't have a corresponding SharedOp."),
         }
     }
@@ -170,16 +168,15 @@ impl From<SharedOp> for HeliosOp {
     fn from(shared_op: SharedOp) -> Self {
         use SharedOp::*;
         match shared_op {
-            Measure => HeliosOp::Measure,
             LazyMeasure => HeliosOp::LazyMeasure,
             Rz => HeliosOp::Rz,
             PhasedX => HeliosOp::PhasedX,
             TryQAlloc => HeliosOp::TryQAlloc,
             QFree => HeliosOp::QFree,
             Reset => HeliosOp::Reset,
-            MeasureReset => HeliosOp::MeasureReset,
             LazyMeasureLeaked => HeliosOp::LazyMeasureLeaked,
             LazyMeasureReset => HeliosOp::LazyMeasureReset,
+            FutureToMeasurement => HeliosOp::FutureToMeasurement,
         }
     }
 }
@@ -296,8 +293,8 @@ where
         SynthesizeHeliosOp::build_try_alloc(self)
     }
 
-    fn synth_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
-        SynthesizeHeliosOp::build_measure_reset(self, qb)
+    fn synth_lazy_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
+        SynthesizeHeliosOp::build_lazy_measure_reset(self, qb)
     }
 
     fn build_cx(&mut self, c: Wire, t: Wire) -> Result<[Wire; 2], BuildError> {
@@ -389,9 +386,6 @@ pub trait SynthesizeHeliosOp: Dataflow {
     /// Build a "tket.qsystem.helios.LazyMeasureReset" op.
     fn build_lazy_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError>;
 
-    /// Build a "tket.qsystem.helios.Measure" op.
-    fn build_measure(&mut self, qb: Wire) -> Result<Wire, BuildError>;
-
     /// Build a "tket.qsystem.helios.Reset" op.
     fn build_reset(&mut self, qb: Wire) -> Result<Wire, BuildError>;
 
@@ -414,13 +408,12 @@ pub trait SynthesizeHeliosOp: Dataflow {
 
     /// Build a "tket.qsystem.helios.Rz" op.
     fn build_rz(&mut self, qb: Wire, angle: Wire) -> Result<Wire, BuildError>;
+
     /// Build a "tket.qsystem.helios.TryQAlloc" op.
     fn build_try_alloc(&mut self) -> Result<Wire, BuildError>;
+
     /// Build a "tket.qsystem.helios.QFree" op.
     fn build_qfree(&mut self, qb: Wire) -> Result<(), BuildError>;
-    /// Build a "tket.qsystem.helios.MeasureReset" op.
-    /// This operation is equivalent to a `Measure` followed by a `Reset`.
-    fn build_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError>;
 
     /// Build a "tket.qsystem.helios.RuntimeBarrier" op.
     fn build_runtime_barrier(&mut self, qbs: Wire, array_size: u64) -> Result<Wire, BuildError>;
@@ -440,10 +433,6 @@ where
 
     fn build_lazy_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
         self.inner.add_lazy_measure_reset(qb)
-    }
-
-    fn build_measure(&mut self, qb: Wire) -> Result<Wire, BuildError> {
-        self.inner.add_measure(qb)
     }
 
     fn build_reset(&mut self, qb: Wire) -> Result<Wire, BuildError> {
@@ -478,10 +467,6 @@ where
         self.inner.add_qfree(qb)
     }
 
-    fn build_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
-        self.inner.add_measure_reset(qb)
-    }
-
     fn build_runtime_barrier(&mut self, qbs: Wire, array_size: u64) -> Result<Wire, BuildError> {
         self.inner.add_runtime_barrier(qbs, array_size)
     }
@@ -496,7 +481,6 @@ mod test {
     use hugr::extension::prelude::{UnwrapBuilder, bool_t};
     use hugr::std_extensions::arithmetic::int_types::int_type;
     use hugr::std_extensions::collections::array::ArrayOpBuilder;
-    use tket::extension::bool::bool_type;
 
     use super::*;
 
@@ -508,11 +492,9 @@ mod test {
     #[test]
     fn lazy_circuit() {
         let hugr = {
-            let mut func_builder = FunctionBuilder::new(
-                "circuit",
-                Signature::new(vec![qb_t()], vec![qb_t(), bool_t()]),
-            )
-            .unwrap();
+            let mut func_builder =
+                FunctionBuilder::new("circuit", Signature::new([qb_t()], [qb_t(), bool_t()]))
+                    .unwrap();
             let [qb] = func_builder.input_wires_arr();
             let [qb, lazy_b] = {
                 let mut builder = HeliosSynthesizer::new(&mut func_builder);
@@ -528,8 +510,7 @@ mod test {
     fn leaked() {
         let hugr = {
             let mut func_builder =
-                FunctionBuilder::new("leaked", Signature::new(vec![qb_t()], vec![int_type(6)]))
-                    .unwrap();
+                FunctionBuilder::new("leaked", Signature::new([qb_t()], [int_type(6)])).unwrap();
             let [qb] = func_builder.input_wires_arr();
             let lazy_i = {
                 let mut builder = HeliosSynthesizer::new(&mut func_builder);
@@ -546,7 +527,7 @@ mod test {
         let hugr = {
             let mut func_builder = FunctionBuilder::new(
                 "all_ops",
-                Signature::new(vec![qb_t(), float64_type()], vec![bool_type()]),
+                Signature::new([qb_t(), float64_type()], [bool_t()]),
             )
             .unwrap();
             let [q0, angle] = func_builder.input_wires_arr();
@@ -581,8 +562,10 @@ mod test {
             let b = {
                 let mut builder = HeliosSynthesizer::new(&mut func_builder);
                 let q0 = SynthesizeHeliosOp::build_rz(&mut builder, q0, angle).unwrap();
-                let [q0, _b] = builder.build_measure_reset(q0).unwrap();
-                let b = builder.build_measure(q0).unwrap();
+                let [q0, f1] = builder.build_lazy_measure_reset(q0).unwrap();
+                let f2 = builder.build_lazy_measure(q0).unwrap();
+                let [_b] = builder.add_read(f1, bool_t()).unwrap();
+                let [b] = builder.add_read(f2, bool_t()).unwrap();
                 builder.build_qfree(q1).unwrap();
                 b
             };

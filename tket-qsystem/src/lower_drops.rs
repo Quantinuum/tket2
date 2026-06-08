@@ -1,14 +1,12 @@
 //! Contains a pass to lower "drop" ops from the Guppy extension
-use hugr::extension::prelude::bool_t;
-use hugr::extension::simple_op::MakeRegisteredOp;
 use hugr::types::Term;
 use hugr::{Node, hugr::hugrmut::HugrMut};
 use tket::extension::guppy::{DROP_OP_NAME, GUPPY_EXTENSION};
 use tket::passes::composable::WithScope;
-use tket::passes::replace_types::{Linearizer, NodeTemplate, ReplaceTypesError};
-use tket::passes::{ComposablePass, PassScope, ReplaceTypes};
+use tket::passes::replace_types::{Linearizer, ReplaceTypesError};
+use tket::passes::{ComposablePass, PassScope};
 
-use crate::extension::futures::{FutureOp, FutureOpDef, future_type};
+use crate::helpers::lowerer_with_future_linearization;
 
 /// A pass that lowers "drop" ops from [GUPPY_EXTENSION]
 #[derive(Default, Debug, Clone)]
@@ -33,30 +31,7 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for LowerDropsPass {
     type Result = bool;
 
     fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
-        let mut rt = ReplaceTypes::default().with_scope(self.scope.clone());
-
-        // future(bool) is not in the default linearizer handler so we add it here.
-        // TODO: Create ReplaceTypes with future(bool) linearized by default to avoid
-        // code duplication with ReplaceBools pass.
-        let dup_op = FutureOp {
-            op: FutureOpDef::Dup,
-            typ: bool_t(),
-        }
-        .to_extension_op()
-        .unwrap();
-        let free_op = FutureOp {
-            op: FutureOpDef::Free,
-            typ: bool_t(),
-        }
-        .to_extension_op()
-        .unwrap();
-        rt.linearizer_mut()
-            .register_simple(
-                future_type(bool_t()).as_extension().unwrap().clone(),
-                NodeTemplate::SingleOp(dup_op.into()),
-                NodeTemplate::SingleOp(free_op.into()),
-            )
-            .unwrap();
+        let mut rt = lowerer_with_future_linearization().with_scope(self.scope.clone());
 
         rt.set_replace_parametrized_op(
             GUPPY_EXTENSION.get_op(DROP_OP_NAME.as_str()).unwrap(),

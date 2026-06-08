@@ -5,17 +5,16 @@ expression: mod_str
 ; ModuleID = 'test_context'
 source_filename = "test_context"
 
-define internal { i64, { i1, i64, i1 } } @_hl.main.1(i64 %0) {
+define internal { i64, i64 } @_hl.main.1(i64 %0) {
 alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
   %lazy_measure = call i64 @___lazy_measure(i64 %0)
   call void @___reset(i64 %0)
-  %1 = insertvalue { i1, i64, i1 } { i1 true, i64 poison, i1 poison }, i64 %lazy_measure, 1
-  %mrv = insertvalue { i64, { i1, i64, i1 } } poison, i64 %0, 0
-  %mrv10 = insertvalue { i64, { i1, i64, i1 } } %mrv, { i1, i64, i1 } %1, 1
-  ret { i64, { i1, i64, i1 } } %mrv10
+  %mrv = insertvalue { i64, i64 } poison, i64 %0, 0
+  %mrv6 = insertvalue { i64, i64 } %mrv, i64 %lazy_measure, 1
+  ret { i64, i64 } %mrv6
 }
 
 declare i64 @___lazy_measure(i64)

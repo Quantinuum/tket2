@@ -3,6 +3,8 @@
 # dependencies = [
 #     "guppylang ==0.21.15",
 # ]
+# [tool.uv.sources]
+# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", branch = "ts/future-measure"}
 # ///
 """Example program that uses the `power` modifier (expected to be rejected by tket)."""
 

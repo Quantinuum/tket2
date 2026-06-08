@@ -1,10 +1,10 @@
 """HUGR extension definitions for tket."""
 
 from . import (
-    bool,
     debug,
     guppy,
     futures,
+    measurement,
     qsystem,
     quantum,
     result,
@@ -21,6 +21,7 @@ __all__ = [
     "gpu",
     "guppy",
     "futures",
+    "measurement",
     "qsystem",
     "quantum",
     "result",

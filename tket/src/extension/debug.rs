@@ -24,7 +24,7 @@ pub const DEBUG_EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("tket.deb
 pub const DEBUG_EXTENSION_VERSION: Version = Version::new(0, 2, 0);
 
 lazy_static! {
-    /// The "tket.bool" extension.
+    /// The "tket.debug" extension.
     pub static ref DEBUG_EXTENSION: Arc<Extension>  = {
         Extension::new_arc(DEBUG_EXTENSION_ID, DEBUG_EXTENSION_VERSION, |ext, ext_ref| {
             StateResultDef.add_to_extension(ext, ext_ref).unwrap();
