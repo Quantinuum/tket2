@@ -180,6 +180,13 @@ fn classify_node(
         {
             Some(Ok((n, ReplaceOps::CrossPlatformHelios(HeliosOp::ZZPhase))))
         }
+        // Note: `helios::RuntimeBarrierDef` is not a `HeliosOp` variant, so a
+        // pre-existing `helios::RuntimeBarrier` op in the HUGR would be silently
+        // skipped here (cast returns None). This is fine for the current use case
+        // where `lower_tk2_ops` is always called on a fresh HUGR containing only
+        // generic tket `Barrier` ops. If re-lowering an already-platform-lowered
+        // HUGR to a different platform becomes a requirement, cross-platform
+        // `RuntimeBarrier` remapping will need to be added here.
         _ => None,
     }
 }
