@@ -1119,6 +1119,20 @@ mod test {
             ),
             Ok(())
         );
+        // TryQAlloc and QFree are shared ops; assert they were remapped to their
+        // Sol equivalents (exercises the Ok(shared) arm of apply_cross_platform_helios).
+        let circ = Circuit::new(&h);
+        let sol_ops: Vec<SolOp> = toposorted_circuit_nodes(&circ)
+            .filter_map(|node| circ.hugr().get_optype(node).cast())
+            .collect();
+        assert!(sol_ops.contains(&SolOp::TryQAlloc));
+        assert!(sol_ops.contains(&SolOp::QFree));
+        // ZZPhase must have been decomposed into PhasedXX (inside the replacement function).
+        // ZZPhase decomposes into a called function, so scan all hugr nodes.
+        assert!(
+            h.nodes()
+                .any(|n| h.get_optype(n).cast() == Some(SolOp::PhasedXX))
+        );
     }
 
     /// A `tket.qsystem.sol::PhasedXX` op targeting Helios is lowered via the
@@ -1158,6 +1172,20 @@ mod test {
                 &forbidden_extensions_for(QSystemPlatform::Helios)
             ),
             Ok(())
+        );
+        // TryQAlloc and QFree are shared ops; assert they were remapped to their
+        // Helios equivalents (exercises the Ok(shared) arm of apply_cross_platform_sol).
+        let circ = Circuit::new(&h);
+        let helios_ops: Vec<HeliosOp> = toposorted_circuit_nodes(&circ)
+            .filter_map(|node| circ.hugr().get_optype(node).cast())
+            .collect();
+        assert!(helios_ops.contains(&HeliosOp::TryQAlloc));
+        assert!(helios_ops.contains(&HeliosOp::QFree));
+        // PhasedXX must have been decomposed into ZZPhase (inside the replacement function).
+        // PhasedXX decomposes into a called function, so scan all hugr nodes.
+        assert!(
+            h.nodes()
+                .any(|n| h.get_optype(n).cast() == Some(HeliosOp::ZZPhase))
         );
     }
 
