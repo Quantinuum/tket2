@@ -30,7 +30,7 @@ def funz(t: qubit, a: angle) -> None:
     rz(t, a)
 
 
-@guppy(unitary=True)
+@guppy(control=True)
 def branchy(q: qubit, flag: bool) -> None:
     if flag:
         x(q)
