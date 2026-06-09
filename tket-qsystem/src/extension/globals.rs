@@ -16,7 +16,7 @@ use hugr::{
         type_param::{TermTypeError, TypeParam},
     },
 };
-use hugr_core::types::{FuncValueType, PolyFuncTypeRV, TypeRV, TypeRowRV};
+use hugr_core::types::{FuncValueType, PolyFuncTypeRV, Type, TypeRV, TypeRowRV};
 
 /// The ID of the `tket.globals` extension.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("tket.globals");
@@ -81,10 +81,9 @@ impl MakeOpDef for GlobalsOpDef {
                 let global_ty = TypeRV::new_var_use(1, TypeBound::Linear);
                 let input_row = TypeRV::new_row_var_use(2, TypeBound::Linear);
                 let output_row = TypeRV::new_row_var_use(3, TypeBound::Linear);
-                let func_ty = TypeRV::new_function(FuncValueType::new(
-                    [input_row.clone()],
-                    [output_row.clone()],
-                ));
+                let output_tuple: TypeRV = Type::new_tuple([output_row.clone()]).into();
+                let func_ty =
+                    TypeRV::new_function(FuncValueType::new([input_row.clone()], [output_tuple]));
                 PolyFuncTypeRV::new(
                     [
                         NAME_PARAM.to_owned(),
@@ -103,9 +102,10 @@ impl MakeOpDef for GlobalsOpDef {
                 let global_ty = TypeRV::new_var_use(1, TypeBound::Linear);
                 let input_row = TypeRV::new_row_var_use(2, TypeBound::Linear);
                 let output_row = TypeRV::new_row_var_use(3, TypeBound::Linear);
+                let output_tuple: TypeRV = Type::new_tuple([output_row.clone()]).into();
                 let func_ty = TypeRV::new_function(FuncValueType::new(
                     [global_ty.clone(), input_row.clone()],
-                    [global_ty.clone(), output_row.clone()],
+                    [global_ty.clone(), output_tuple],
                 ));
                 PolyFuncTypeRV::new(
                     [
@@ -287,6 +287,8 @@ mod test {
         extension::{prelude::qb_t, simple_op::MakeExtensionOp},
         types::Signature,
     };
+    use hugr_core::builder::Container;
+    use hugr_core::type_row;
     use strum::IntoEnumIterator;
 
     use super::*;
@@ -359,21 +361,27 @@ mod test {
     #[test]
     fn test_with_map_op_builder() {
         let mut module_builder = ModuleBuilder::new();
+        let none_type = Type::new_unit_sum(1);
 
         // Function to be called by `map` op
+        // Signature: (global_state: qb_t) -> (global_state: qb_t, output: none)
         let map_func = {
-            let map_func_builder = module_builder
-                .define_function("map_func", Signature::new(vec![qb_t()], vec![qb_t()]))
+            let mut map_func_builder = module_builder
+                .define_function(
+                    "map_func",
+                    Signature::new(vec![qb_t()], vec![qb_t(), none_type.clone()]),
+                )
                 .unwrap();
             let [global_state] = map_func_builder.input_wires_arr();
+            let none_return = map_func_builder.add_load_value(hugr::ops::Value::unit());
             map_func_builder
-                .finish_with_outputs([global_state])
+                .finish_with_outputs([global_state, none_return])
                 .unwrap()
         };
 
         // Function to be called by `with` op
         let mut with_func_builder = module_builder
-            .define_function("with_func", Signature::new(vec![], vec![]))
+            .define_function("with_func", Signature::new(vec![], vec![none_type]))
             .unwrap();
         let loaded_map_func = with_func_builder.load_func(map_func.handle(), &[]).unwrap();
         let map_op = GlobalsOp::Map {
@@ -385,7 +393,10 @@ mod test {
         with_func_builder
             .add_dataflow_op(map_op, [loaded_map_func])
             .unwrap();
-        let with_func = with_func_builder.finish_with_outputs([]).unwrap();
+        let none_return = with_func_builder.add_load_value(hugr::ops::Value::unit());
+        let with_func = with_func_builder
+            .finish_with_outputs([none_return])
+            .unwrap();
 
         // Function under test
         let mut func_builder = module_builder
