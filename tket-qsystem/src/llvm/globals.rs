@@ -20,7 +20,7 @@ use hugr::{
 };
 use hugr_core::extension::SignatureError;
 use hugr_core::types::type_param::TermTypeError;
-use hugr_core::types::{FuncValueType, Signature};
+use hugr_core::types::{FuncValueType, Signature, Type, TypeRV};
 use itertools::Itertools;
 
 pub struct GlobalsCodegenExtension;
@@ -89,10 +89,10 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
             let func_ptr = PointerValue::try_from(*func)
                 .map_err(|e| anyhow::anyhow!("Invalid function pointer provided to With: {e:?}"))?;
 
-            let out_types = outputs.iter().cloned().collect_vec();
+            let output_tuple: TypeRV = Type::new_tuple(outputs.clone()).into();
 
             let hugr_func_ty: Signature =
-                FuncValueType::new(inputs.clone(), out_types).try_into()?;
+                FuncValueType::new(inputs.clone(), vec![output_tuple]).try_into()?;
             let func_ty = context.llvm_func_type(&hugr_func_ty)?;
 
             let func_call =

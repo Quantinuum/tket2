@@ -16,7 +16,9 @@ use hugr::{
         type_param::{TermTypeError, TypeParam},
     },
 };
+use hugr_core::types::Term::Tuple;
 use hugr_core::types::{FuncValueType, PolyFuncTypeRV, Type, TypeRV, TypeRowRV};
+use itertools::Itertools;
 
 /// The ID of the `tket.globals` extension.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("tket.globals");
@@ -82,8 +84,10 @@ impl MakeOpDef for GlobalsOpDef {
                 let input_row = TypeRV::new_row_var_use(2, TypeBound::Linear);
                 let output_row = TypeRV::new_row_var_use(3, TypeBound::Linear);
                 let output_tuple: TypeRV = Type::new_tuple([output_row.clone()]).into();
-                let func_ty =
-                    TypeRV::new_function(FuncValueType::new([input_row.clone()], [output_tuple]));
+                let func_ty = TypeRV::new_function(FuncValueType::new(
+                    [input_row.clone()],
+                    [output_row.clone()],
+                ));
                 PolyFuncTypeRV::new(
                     [
                         NAME_PARAM.to_owned(),
@@ -93,7 +97,7 @@ impl MakeOpDef for GlobalsOpDef {
                     ],
                     FuncValueType::new(
                         [global_ty.clone(), func_ty, input_row],
-                        [global_ty.clone(), output_row],
+                        [global_ty.clone(), output_tuple],
                     ),
                 )
                 .into()
