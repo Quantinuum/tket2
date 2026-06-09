@@ -508,8 +508,7 @@ where
         let pi_minus_2 = pi_mul_f64(self, -0.5);
         let [added] = self
             .inner
-            .add_dataflow_op(FloatOps::fadd, [pi_minus_2, angle1])
-            .unwrap()
+            .add_dataflow_op(FloatOps::fadd, [pi_minus_2, angle1])?
             .outputs_arr();
 
         let qb1 = SynthesizeHeliosOp::build_phased_x(self, qb1, pi_2, added)?;
