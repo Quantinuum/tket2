@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang ==0.21.13",
+#     "guppylang ==0.21.15",
 # ]
 # [tool.uv.sources]
 # guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", branch = "ts/future-measure"}
@@ -15,8 +15,6 @@ import numpy as np
 import numpy.typing as npt
 from hugr import Hugr
 from guppylang.emulator import EmulatorBuilder
-
-sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 
 def format_statevector(

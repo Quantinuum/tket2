@@ -92,7 +92,7 @@ fn count_gates(h: &impl HugrView) -> HashMap<SmolStr, usize> {
 #[case::nested_array("nested_array", None)]
 #[should_panic = "xfail"]
 #[case::angles("angles", Some(vec![
-    ("tket.quantum.Rz", 2), ("tket.quantum.MeasureFree", 1), ("tket.quantum.H", 2), ("tket.quantum.QAlloc", 1)
+    ("tket.quantum.Rz", 2), ("tket.quantum.Measure", 1), ("tket.quantum.H", 2), ("tket.quantum.QAlloc", 1), ("tket.quantum.QFree", 1)
 ]))]
 #[should_panic = "xfail"]
 #[case::simple_cx("simple_cx", Some(vec![
@@ -108,7 +108,7 @@ fn count_gates(h: &impl HugrView) -> HashMap<SmolStr, usize> {
 ]))]
 #[should_panic = "xfail"]
 #[case::false_branch("false_branch", Some(vec![
-    ("tket.quantum.MeasureFree", 1), ("tket.quantum.QAlloc", 1)
+ ("tket.quantum.Measure", 1), ("tket.quantum.QAlloc", 1), ("tket.quantum.QFree", 1)
 ]))]
 #[should_panic = "xfail"]
 #[case::func_decls("func_decls", Some(vec![
@@ -189,6 +189,7 @@ fn flatten_guppy(#[case] name: &str) {
 #[case::nested("nested")]
 #[should_panic]
 #[case::ranges("ranges")]
+#[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
 fn optimize_guppy(#[case] name: &str) {
     let mut hugr = load_guppy_circuit(name, HugrFileType::Original).unwrap();
     let flat = count_gates(
@@ -217,6 +218,7 @@ fn optimize_guppy(#[case] name: &str) {
 
 /// Regression test for <http://github.com/CQCL/tket2/issues/1577>
 #[rstest]
+#[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
 fn issue_1577_remove_barriers_reassembles_nested_circuits() {
     let mut hugr = load_guppy_example("../guppy_examples/issue_1577.hugr").unwrap();
     run_pytket(&mut hugr, REMOVE_BARRIERS_STR);
