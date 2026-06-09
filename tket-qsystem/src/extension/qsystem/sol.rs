@@ -501,7 +501,6 @@ where
 /// operation can be expressed in terms of Sol primitives.
 ///
 /// All shared ops delegate to the corresponding [`SynthesizeSolOp`] method.
-/// The Helios-specific `ZZPhase` gate is not yet implemented — see issue #1620.
 impl<D> SynthesizeHeliosOp for SolSynthesizer<'_, D>
 where
     D: CommonOpBuilder<SolOp>,

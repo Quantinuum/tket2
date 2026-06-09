@@ -477,7 +477,6 @@ where
 /// operation can be expressed in terms of Helios primitives.
 ///
 /// All shared ops delegate to the corresponding [`SynthesizeHeliosOp`] method.
-/// The Sol-specific `PhasedXX` gate is not yet implemented — see issue #1620.
 impl<D> SynthesizeSolOp for HeliosSynthesizer<'_, D>
 where
     D: CommonOpBuilder<HeliosOp>,
