@@ -118,7 +118,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                 let (func, load) =
                     Self::get_loaded_function(h, call_node, targ, h.get_optype(targ))
                         .map_err(ModifierResolverErrors::ModifierError)?;
-                let modified_fn = self.modify_fn(h, func).unwrap();
+                let modified_fn = self.modify_fn(h, func)?;
 
                 let mut modified_sig = load.func_sig.clone();
                 self.modify_signature(modified_sig.body_mut(), false);
@@ -322,6 +322,8 @@ impl<N: HugrNode> ModifierResolver<N> {
         let Some(modified_fn) = self.modify_fn_if_needed(h, func)? else {
             // The loaded function does not satisfy the active modifier, so keep
             // it unchanged.
+            // If same modifier are present, we raise an error instead of silently skipping modification,
+            // since that likely indicates a mistake in the input graph
             *self.modifiers_mut() = modifiers;
             if trace.len() > 1 {
                 return Err(ModifierResolverErrors::unresolvable(
@@ -330,8 +332,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                     indir_call.clone().into(),
                 ));
             }
-            let new_func = self.add_node_no_modification(h, func, indir_call.clone(), new_dfg)?;
-            self.call_map_insert(func, (new_func, load.function_port()));
+            self.add_node_no_modification(h, n, indir_call.clone(), new_dfg)?;
             return Ok(());
         };
 
