@@ -1,7 +1,6 @@
 import importlib.util
 import tempfile
 
-from pytket import Circuit, OpType
 from typing import Callable, Any
 import subprocess
 from tket._ops import TketOp
@@ -22,21 +21,23 @@ import hypothesis.strategies as st
 from hypothesis.strategies._internal import SearchStrategy
 from hypothesis import given, settings
 
-
 from tket.passes import PytketHugrPass, QSystemPass
-from pytket.passes import (
+from hugr.build.base import Hugr
+
+import numpy as np
+import pytest
+from pathlib import Path
+
+# Import the pytket passes, if the `pytket` extra has been installed.
+# If not, skip all tests in this file.
+pytket = pytest.importorskip("pytket")
+from pytket import Circuit, OpType  # noqa: E402
+from pytket.passes import (  # noqa: E402
     CliffordSimp,
     SquashRzPhasedX,
     RemoveRedundancies,
     SequencePass,
 )
-from hugr.build.base import Hugr
-
-import numpy as np
-import pytest
-
-
-from pathlib import Path
 
 
 normalize = NormalizeGuppy()
@@ -258,6 +259,13 @@ def test_modifier_resolver() -> None:
     assert _count_ops(resolved, "tket.modifier.DaggerModifier") == 0
 
 
+# This test uses downstream selene to execute and verify the result of the modifier resolver pass.
+#
+# That's problematic when updating hugr/tket, as we can only use a selene executor that knows nothing
+# about the changes.
+#
+# TODO: Replace with a local mini-executor test. <https://github.com/Quantinuum/tket2/issues/1648>
+@pytest.mark.skip(reason="Uses downstream dependencies, breaks with tket changes.")
 def test_modifier_execution() -> None:
     modifier_examples_dir = Path("test_files/modifier_examples")
     hugr_results_dir = Path("test_files/run_modifier_examples/hugr_results")

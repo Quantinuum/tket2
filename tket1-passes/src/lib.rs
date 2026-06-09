@@ -234,6 +234,14 @@ mod tests {
     }
 
     #[test]
+    fn test_tket1_null_command_args_decode_as_empty() {
+        let circuit_json = r#"{"bits":[],"commands":[{"args":null,"op":{"data":"","signature":[],"type":"Barrier"}}],"implicit_permutation":[],"phase":"0","qubits":[]}"#;
+        let circuit: SerialCircuit = serde_json::from_str(circuit_json).unwrap();
+        assert_eq!(circuit.commands.len(), 1);
+        assert!(circuit.commands[0].args.is_empty());
+    }
+
+    #[test]
     fn test_error_null_circ() {
         let mut null_circ = Tket1Circuit {
             inner: ptr::null_mut(),

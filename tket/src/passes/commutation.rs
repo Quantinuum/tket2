@@ -6,58 +6,64 @@ use derive_more::{Display, Error, From};
 use hugr::hugr::Patch;
 use hugr::hugr::patch::PatchVerification;
 use hugr::hugr::{HugrError, hugrmut::HugrMut};
-use hugr::{CircuitUnit, Direction, HugrView, Node, Port, PortIndex};
+use hugr::{Direction, HugrView, Node, Port, PortIndex};
 use itertools::Itertools;
-use portgraph::PortOffset;
 
 use crate::Circuit;
 use crate::{
-    circuit::command::Command,
     ops::{Pauli, TketOp},
+    resource::{ResourceId, ResourceScope},
 };
 
-type Qb = crate::circuit::units::LinearUnit;
+type Qb = ResourceId;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-// remove once https://github.com/quantinuum-DEV/tket2/issues/126 is resolved
+// remove once https://github.com/quantinuum/tket2/issues/126 is resolved
 struct ComCommand {
     /// The operation node.
     node: Node,
-    /// An assignment of linear units to the node's ports.
+    /// The resources connected to the node's input ports.
     //
     // We'll need something more complex if `follow_linear_port` stops being a
     // direct map from input to output.
-    inputs: Vec<CircuitUnit>,
+    resources: Vec<ResourcePorts>,
 }
 
-impl<'c, T: HugrView<Node = Node>> From<Command<'c, T>> for ComCommand {
-    fn from(com: Command<'c, T>) -> Self {
-        ComCommand {
-            node: com.node(),
-            inputs: com.inputs().map(|(c, _, _)| c).collect(),
-        }
-    }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+struct ResourcePorts {
+    resource: Qb,
+    input: Port,
+    output: Option<Port>,
 }
+
 impl ComCommand {
+    fn from_scope<H: HugrView<Node = Node>>(scope: &ResourceScope<H>, node: Node) -> Option<Self> {
+        let resources = scope
+            .get_resources(node, Direction::Incoming)
+            .map(|resource| ResourcePorts {
+                resource,
+                input: scope
+                    .get_port(node, resource, Direction::Incoming)
+                    .expect("resource comes from an input port"),
+                output: scope.get_port(node, resource, Direction::Outgoing),
+            })
+            .collect_vec();
+
+        (!resources.is_empty()).then_some(Self { node, resources })
+    }
+
     fn node(&self) -> Node {
         self.node
     }
     fn qubits(&self) -> impl Iterator<Item = Qb> + '_ {
-        self.inputs.iter().filter_map(|u| {
-            let CircuitUnit::Linear(i) = u else {
-                return None;
-            };
-            Some(Qb::new(*i))
-        })
+        self.resources.iter().map(|ports| ports.resource)
     }
     fn port_of_qb(&self, qb: Qb, direction: Direction) -> Option<Port> {
-        self.inputs
-            .iter()
-            .position(|cu| {
-                let q_cu: CircuitUnit = qb.into();
-                cu == &q_cu
-            })
-            .map(|i| PortOffset::new(direction, i).into())
+        let ports = self.resources.iter().find(|ports| ports.resource == qb)?;
+        match direction {
+            Direction::Incoming => Some(ports.input),
+            Direction::Outgoing => ports.output,
+        }
     }
 }
 
@@ -66,33 +72,54 @@ type SliceVec = Vec<Slice>;
 
 fn add_to_slice(slice: &mut Slice, com: Rc<ComCommand>) {
     for q in com.qubits() {
-        slice[q.index()] = Some(com.clone());
+        slice[q.as_usize()] = Some(com.clone());
     }
 }
 
-fn load_slices(circ: &Circuit<impl HugrView<Node = Node>>) -> SliceVec {
+fn ensure_resource_slot(
+    qubit_free_slice: &mut Vec<usize>,
+    slices: &mut SliceVec,
+    resource: ResourceId,
+) {
+    let resource_index = resource.as_usize();
+    if resource_index < qubit_free_slice.len() {
+        return;
+    }
+    let new_len = resource_index + 1;
+    qubit_free_slice.resize(new_len, 0);
+    for slice in slices {
+        slice.resize(new_len, None);
+    }
+}
+
+fn load_slices(circ: &Circuit) -> SliceVec {
     let mut slices = vec![];
+    let scope = ResourceScope::from_circuit_ref(circ);
 
     let n_qbs = circ.qubit_count();
     let mut qubit_free_slice = vec![0; n_qbs];
 
     for command in circ
-        .commands()
-        .filter(|c| is_slice_op(circ.hugr(), c.node()))
+        .toposorted_children(circ.parent())
+        .expect("circuit entrypoint should be dataflow region")
+        .filter(|&node| is_slice_op(circ.hugr(), node))
+        .filter_map(|node| ComCommand::from_scope(&scope, node))
     {
-        let command: ComCommand = command.into();
+        for q in command.qubits() {
+            ensure_resource_slot(&mut qubit_free_slice, &mut slices, q);
+        }
         let free_slice = command
             .qubits()
-            .map(|qb| qubit_free_slice[qb.index()])
+            .map(|qb| qubit_free_slice[qb.as_usize()])
             .max()
             .unwrap();
 
         for q in command.qubits() {
-            qubit_free_slice[q.index()] = free_slice + 1;
+            qubit_free_slice[q.as_usize()] = free_slice + 1;
         }
         if free_slice >= slices.len() {
             debug_assert!(free_slice == slices.len());
-            slices.push(vec![None; n_qbs]);
+            slices.push(vec![None; qubit_free_slice.len()]);
         }
         let command = Rc::new(command);
         add_to_slice(&mut slices[free_slice], command);
@@ -120,7 +147,7 @@ fn available_slice(
         // if all qubit slots are empty here the command can be moved here
         if command
             .qubits()
-            .all(|q| slice_vec[slice_index][q.index()].is_none())
+            .all(|q| slice_vec[slice_index][q.as_usize()].is_none())
         {
             available = Some((slice_index, prev_nodes.clone()));
         } else if slice_index == 0 {
@@ -152,7 +179,7 @@ fn commutes_at_slice(
 
     for q in command.qubits() {
         // if slot is empty, continue checking.
-        let Some(other_com) = &slice[q.index()] else {
+        let Some(other_com) = &slice[q.as_usize()] else {
             continue;
         };
 
@@ -241,7 +268,9 @@ impl<H: HugrMut<Node = Node>> Patch<H> for PullForward {
         let qb_port = |command: &ComCommand, qb, direction| {
             command
                 .port_of_qb(qb, direction)
-                .ok_or(PullForwardError::NoQbInCommand { qubit: qb.index() })
+                .ok_or(PullForwardError::NoQbInCommand {
+                    qubit: qb.as_usize(),
+                })
         };
         // for each qubit, disconnect node and reconnect at destination.
         for qb in command.qubits() {
@@ -260,7 +289,9 @@ impl<H: HugrMut<Node = Node>> Patch<H> for PullForward {
                 .unwrap();
 
             let Some(new_neighbour_com) = new_nexts.get(&qb) else {
-                return Err(PullForwardError::NoCommandForQb { qubit: qb.index() });
+                return Err(PullForwardError::NoCommandForQb {
+                    qubit: qb.as_usize(),
+                });
             };
             if new_neighbour_com == &command {
                 // do not need to commute along this qubit.
@@ -322,8 +353,8 @@ pub fn apply_greedy_commutation(circ: &mut Circuit) -> Result<u32, PullForwardEr
                 "Avoid mutating slices we haven't got to yet."
             );
             for q in command.qubits() {
-                let com = slice_vec[slice_index][q.index()].take();
-                slice_vec[destination][q.index()] = com;
+                let com = slice_vec[slice_index][q.as_usize()].take();
+                slice_vec[destination][q.as_usize()] = com;
             }
             let rewrite = PullForward { command, new_nexts };
             circ.hugr_mut().apply_patch(rewrite)?;
@@ -336,10 +367,9 @@ pub fn apply_greedy_commutation(circ: &mut Circuit) -> Result<u32, PullForwardEr
 #[cfg(test)]
 mod test {
 
-    use crate::{
-        extension::rotation::rotation_type, ops::test::t2_bell_circuit, utils::build_simple_circuit,
-    };
+    use crate::{extension::rotation::rotation_type, utils::build_simple_circuit};
     use hugr::{
+        CircuitUnit,
         builder::{DFGBuilder, Dataflow, DataflowHugr},
         extension::prelude::{bool_t, qb_t},
         types::Signature,
@@ -486,6 +516,17 @@ mod test {
         build().unwrap().into()
     }
 
+    #[fixture]
+    fn t2_bell_circuit() -> Circuit {
+        let h = build_simple_circuit(2, |circ| {
+            circ.append(TketOp::H, [0])?;
+            circ.append(TketOp::CX, [0, 1])?;
+            Ok(())
+        });
+
+        h.unwrap()
+    }
+
     // bug https://github.com/quantinuum/tket2/issues/253
     fn cx_commute_bug() -> Circuit {
         build_simple_circuit(3, |circ| {
@@ -516,10 +557,19 @@ mod test {
             .collect()
     }
 
+    fn slice_commands(circ: &Circuit) -> Vec<ComCommand> {
+        let scope = ResourceScope::from_circuit_ref(circ);
+        circ.toposorted_children(circ.parent())
+            .expect("circuit entrypoint should be dataflow region")
+            .filter(|&node| is_slice_op(circ.hugr(), node))
+            .filter_map(|node| ComCommand::from_scope(&scope, node))
+            .collect()
+    }
+
     #[rstest]
     fn test_load_slices_cx(example_cx: Circuit) {
         let circ = example_cx;
-        let commands: Vec<ComCommand> = circ.commands().map_into().collect();
+        let commands = slice_commands(&circ);
         let slices = load_slices(&circ);
         let correct = slice_from_command(&commands, 4, &[&[0], &[1], &[2]]);
 
@@ -529,7 +579,7 @@ mod test {
     #[rstest]
     fn test_load_slices_cx_better(example_cx_better: Circuit) {
         let circ = example_cx_better;
-        let commands: Vec<ComCommand> = circ.commands().map_into().collect();
+        let commands = slice_commands(&circ);
 
         let slices = load_slices(&circ);
         let correct = slice_from_command(&commands, 4, &[&[0, 1], &[2]]);
@@ -540,7 +590,7 @@ mod test {
     #[rstest]
     fn test_load_slices_bell(t2_bell_circuit: Circuit) {
         let circ = t2_bell_circuit;
-        let commands: Vec<ComCommand> = circ.commands().map_into().collect();
+        let commands = slice_commands(&circ);
 
         let slices = load_slices(&circ);
         let correct = slice_from_command(&commands, 2, &[&[0], &[1]]);

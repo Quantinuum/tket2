@@ -1,6 +1,6 @@
-from dataclasses import dataclass
+import pytest
 
-from pytket._tket.circuit import Circuit
+from dataclasses import dataclass
 
 from tket._state import (
     CompilationState,
@@ -20,7 +20,11 @@ class CustomCost:
 
 
 def test_cost():
-    circ = CompilationState.from_tket1(Circuit(4).CX(0, 1).H(1).CX(1, 2).CX(0, 3).H(0))
+    pytket = pytest.importorskip("pytket")
+
+    circ = CompilationState.from_tket1(
+        pytket.Circuit(4).CX(0, 1).H(1).CX(1, 2).CX(0, 3).H(0)
+    )
 
     print(circ.circuit_cost(lambda op: int(op == TketOp.CX)))
 
@@ -31,16 +35,19 @@ def test_cost():
 
 
 def test_hash():
-    circA = CompilationState.from_tket1(Circuit(4).CX(0, 1).CX(1, 2).CX(0, 3))
-    circB = CompilationState.from_tket1(Circuit(4).CX(1, 2).CX(0, 1).CX(0, 3))
-    circC = CompilationState.from_tket1(Circuit(4).CX(0, 1).CX(0, 3).CX(1, 2))
+    pytket = pytest.importorskip("pytket")
+
+    circA = CompilationState.from_tket1(pytket.Circuit(4).CX(0, 1).CX(1, 2).CX(0, 3))
+    circB = CompilationState.from_tket1(pytket.Circuit(4).CX(1, 2).CX(0, 1).CX(0, 3))
+    circC = CompilationState.from_tket1(pytket.Circuit(4).CX(0, 1).CX(0, 3).CX(1, 2))
 
     assert hash(circA) != hash(circB)
     assert hash(circA) == hash(circC)
 
 
 def test_conversion():
-    tk1 = Circuit(4).CX(0, 2).CX(1, 2).CX(1, 3)
+    pytket = pytest.importorskip("pytket")
+    tk1 = pytket.Circuit(4).CX(0, 2).CX(1, 2).CX(1, 3)
 
     tk2 = CompilationState.from_tket1(tk1)
     mermaid = tk2.render_mermaid()
@@ -51,11 +58,12 @@ def test_conversion():
     tk1_back = tk2.to_tket1()
 
     assert tk1_back == tk1
-    assert type(tk1_back) is Circuit
+    assert type(tk1_back) is pytket.Circuit
 
 
 def test_conversion_qsystem():
-    tk1 = Circuit(2).ZZPhase(0.75, 0, 1).PhasedX(0.25, 0.33, 1)
+    pytket = pytest.importorskip("pytket")
+    tk1 = pytket.Circuit(2).ZZPhase(0.75, 0, 1).PhasedX(0.25, 0.33, 1)
 
     tk2 = CompilationState.from_tket1(tk1)
     mermaid = tk2.render_mermaid()
@@ -71,4 +79,4 @@ def test_conversion_qsystem():
     tk1_back = tk2.to_tket1()
 
     assert tk1_back == tk1
-    assert type(tk1_back) is Circuit
+    assert type(tk1_back) is pytket.Circuit

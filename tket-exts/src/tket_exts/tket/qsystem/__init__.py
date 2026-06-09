@@ -1,9 +1,12 @@
 """QSystem extension operations."""
 
 import functools
+import warnings
 from typing import List
 
+from .helios import QSystemHeliosExtension
 from .random import QSystemRandomExtension
+from .sol import QSystemSolExtension
 from .utils import QSystemUtilsExtension
 
 from hugr.ext import Extension, OpDef, TypeDef
@@ -11,15 +14,31 @@ from hugr.ops import ExtOp
 from hugr.tys import BoundedNatArg
 from .._util import TketExtension, load_extension
 
-__all__ = ["QSystemRandomExtension", "QSystemUtilsExtension", "QSystemExtension"]
+__all__ = [
+    "QSystemHeliosExtension",
+    "QSystemRandomExtension",
+    "QSystemSolExtension",
+    "QSystemUtilsExtension",
+]
 
 
 class QSystemExtension(TketExtension):
-    """QSystem extension operations."""
+    """Deprecated: use :class:`QSystemHeliosExtension` or :class:`QSystemSolExtension` instead.
+
+    The combined ``tket.qsystem`` extension has been split into platform-specific
+    extensions. Use ``tket_exts.qsystem_helios`` or ``tket_exts.qsystem_sol`` instead.
+    """
 
     @functools.cache
     def __call__(self) -> Extension:
         """Returns the qsystem extension"""
+        warnings.warn(
+            "QSystemExtension (tket.qsystem) is deprecated. "
+            "Use QSystemHeliosExtension (tket.qsystem.helios) or "
+            "QSystemSolExtension (tket.qsystem.sol) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return load_extension("tket.qsystem")
 
     def TYPES(self) -> List[TypeDef]:
@@ -32,8 +51,6 @@ class QSystemExtension(TketExtension):
             self.lazy_measure.op_def(),
             self.lazy_measure_leaked.op_def(),
             self.lazy_measure_reset.op_def(),
-            self.measure.op_def(),
-            self.measure_reset.op_def(),
             self.phasedX.op_def(),
             self.qFree.op_def(),
             self.reset.op_def(),
@@ -41,6 +58,7 @@ class QSystemExtension(TketExtension):
             self.Rz.op_def(),
             self.try_QAlloc.op_def(),
             self.ZZPhase.op_def(),
+            self.future_to_measure.op_def(),
         ]
 
     @functools.cached_property
@@ -63,16 +81,6 @@ class QSystemExtension(TketExtension):
         return self().get_op("LazyMeasureReset").instantiate()
 
     @functools.cached_property
-    def measure(self) -> ExtOp:
-        """Measure a qubit and lose it (returns an opaque bool)."""
-        return self().get_op("Measure").instantiate()
-
-    @functools.cached_property
-    def measure_reset(self) -> ExtOp:
-        """Measure a qubit and reset it to Z |0> (returns an opaque bool)."""
-        return self().get_op("MeasureReset").instantiate()
-
-    @functools.cached_property
     def phasedX(self) -> ExtOp:
         """PhasedX gate with two float parameters."""
         return self().get_op("PhasedX").instantiate()
@@ -86,6 +94,13 @@ class QSystemExtension(TketExtension):
     def reset(self) -> ExtOp:
         """Reset a qubit to the Z |0> eigenstate."""
         return self().get_op("Reset").instantiate()
+
+    @functools.cached_property
+    def future_to_measure(self) -> ExtOp:
+        """Convert a future(bool) to a measurement (for compatibility with the
+        quantum extension).
+        """
+        return self().get_op("FutureToMeasurement").instantiate()
 
     @functools.cached_property
     def runtime_barrier_def(self) -> OpDef:

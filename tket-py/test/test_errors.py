@@ -26,5 +26,5 @@ def test_unresolved_op() -> None:
     err = str(excinfo.value)
     assert "Could not read CompilationState from bytes" in err
     assert "Error reading package payload in envelope." in err
-    assert "OpaqueOp:unknown.unresolved" in err
+    assert "unknown.unresolved" in err
     assert "requires extension unknown" in err

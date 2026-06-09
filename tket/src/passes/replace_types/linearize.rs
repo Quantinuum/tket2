@@ -106,7 +106,7 @@ pub trait Linearizer {
 
 /// A configuration for implementing [Linearizer] by delegating to
 /// type-specific callbacks, and by  composing them in order to handle compound types
-/// such as [`Term::RuntimeSum`]s.
+/// such as [`Term::SumType`]s.
 #[derive(Clone)]
 pub struct DelegatingLinearizer {
     // Keyed by lowered type, as only needed when there is an op outputting such
@@ -189,7 +189,7 @@ impl DelegatingLinearizer {
 
     /// Configures this instance that the specified monomorphic type can be copied and/or
     /// discarded via the provided [`NodeTemplate`]s - directly or as part of a compound type
-    /// e.g. [`Term::RuntimeSum`].
+    /// e.g. [`Term::SumType`].
     /// `copy` should have exactly one inport, of type `src`, and two outports, of same type;
     /// `discard` should have exactly one inport, of type 'src', and no outports.
     ///
@@ -269,7 +269,7 @@ impl Linearizer for DelegatingLinearizer {
         assert!(num_outports != 1);
 
         match &**typ {
-            Term::RuntimeSum(sum_type) => {
+            Term::SumType(sum_type) => {
                 let variants = sum_type
                     .variants()
                     .map(|trv| trv.clone().try_into())
@@ -316,7 +316,7 @@ impl Linearizer for DelegatingLinearizer {
                     cb.finish_hugr().unwrap(),
                 )))
             }
-            Term::RuntimeExtension(cty) => {
+            Term::ExtensionType(cty) => {
                 if let Some((copy, discard)) = self.copy_discard.get(cty) {
                     Ok(if num_outports == 0 {
                         discard.clone()
@@ -349,7 +349,7 @@ impl Linearizer for DelegatingLinearizer {
                     Ok(tmpl)
                 }
             }
-            Term::RuntimeFunction(_) => panic!("Ruled out above as copyable"),
+            Term::FunctionType(_) => panic!("Ruled out above as copyable"),
             _ => Err(LinearizeError::UnsupportedType(Box::new(typ.clone()))),
         }
     }
@@ -418,7 +418,7 @@ mod test {
         }
 
         fn static_params(&self) -> &[TypeParam] {
-            const JUST_NAT: &[TypeParam] = &[TypeParam::max_nat_type()];
+            const JUST_NAT: &[TypeParam] = &[TypeParam::max_nat_kind()];
             JUST_NAT
         }
     }

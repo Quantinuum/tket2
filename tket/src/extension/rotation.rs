@@ -43,6 +43,7 @@ pub fn rotation_custom_type(extension_ref: &Weak<Extension>) -> CustomType {
         ROTATION_TYPE_ID,
         [],
         ROTATION_EXTENSION_ID,
+        ROTATION_EXTENSION_VERSION,
         TypeBound::Copyable,
         extension_ref,
     )

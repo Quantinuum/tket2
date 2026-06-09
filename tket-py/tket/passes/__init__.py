@@ -3,11 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from hugr import Hugr
-from pytket.passes import (
-    BasePass,
-)
 
 from tket import _state
 from . import inline_funcs
@@ -20,6 +18,9 @@ from hugr.passes.composable import (
     PassResult,
 )
 from hugr.passes.scope import PassScope, GlobalScope
+
+if TYPE_CHECKING:
+    from tket.util import PytketPassProto as PytketPass
 
 
 __all__ = [
@@ -35,7 +36,7 @@ __all__ = [
 
 @dataclass
 class PytketHugrPass(ComposablePass):
-    pytket_passes: list[BasePass]
+    pytket_passes: list[PytketPass]
     _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
 
     """
@@ -44,7 +45,7 @@ class PytketHugrPass(ComposablePass):
     The user can create a :py:class:`PytketHugrPass` object from any serializable member of `pytket.passes`.
     """
 
-    def __init__(self, *pytket_passes: BasePass) -> None:
+    def __init__(self, *pytket_passes: PytketPass) -> None:
         """Initialize a PytketHugrPass from a :py:class:`~pytket.passes.BasePass` instance."""
         self.pytket_passes = list(pytket_passes)
 
@@ -155,12 +156,9 @@ class InlineFunctions(ComposablePass):
     Parameters:
     - heuristic: Heuristic used to choose which non-recursive functions to
       inline. Defaults to `MaxSize(64)`.
-    - follow_inline_hints: Whether to follow compiler hints for inlining
-      functions.
     """
 
     heuristic: inline_funcs.InlineFuncsHeuristic = inline_funcs.MaxSize(64)
-    follow_inline_hints: bool = True
     _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
 
     def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
@@ -182,7 +180,6 @@ class InlineFunctions(ComposablePass):
         _passes.inline_functions(
             tk_program._inner,
             heuristic=self.heuristic,
-            follow_inline_hints=self.follow_inline_hints,
             scope=self._scope,
         )
 
@@ -261,7 +258,12 @@ def _badger_optimise(
 
 @dataclass
 class ModifierResolverPass(ComposablePass):
-    """A pass to resolve Guppy modifiers (control, dagger, power)."""
+    """A pass to resolve Guppy modifiers (control, dagger, power).
+
+    Original function nodes replaced by solved modified versions may be removed
+    when no longer needed and allowed by the pass scope. Nodes whose interface
+    is preserved by the scope are kept.
+    """
 
     _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
 
@@ -305,14 +307,12 @@ class QSystemPass(ComposablePass):
     - constant_fold: Whether to perform constant folding.
     - monomorphize: Whether to monomorphize generic functions.
     - force_order: Whether to enforce total ordering of all HUGR operations.
-    - lazify: Whether to replace measurements with lazy measurements.
     - hide_funcs: Whether to mark all functions as private.
     """
 
     constant_fold: bool = True
     monomorphize: bool = True
     force_order: bool = True
-    lazify: bool = True
     hide_funcs: bool = True
     _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
 
@@ -346,7 +346,6 @@ class QSystemPass(ComposablePass):
             constant_fold=self.constant_fold,
             monomorphize=self.monomorphize,
             force_order=self.force_order,
-            lazify=self.lazify,
             hide_funcs=self.hide_funcs,
             scope=self._scope,
         )

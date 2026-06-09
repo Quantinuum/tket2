@@ -172,6 +172,10 @@ pub struct EncodeOptions<H: HugrView = Hugr> {
     /// Whether to encode independent subcircuits for subregions of the HUGR
     /// that are descendants of unsupported operations.
     pub encode_subcircuits: bool,
+    /// Whether to keep empty circuits in the set of encoded circuits.
+    ///
+    /// Defaults to `false` to avoid unnecessary processing.
+    pub keep_empty_circuits: bool,
 }
 
 impl<H: HugrView> EncodeOptions<H> {
@@ -192,6 +196,12 @@ impl<H: HugrView> EncodeOptions<H> {
         self.encode_subcircuits = encode_subcircuits;
         self
     }
+
+    /// Set whether to keep empty circuits in the set of encoded circuits.
+    pub fn keep_empty_circuits(mut self, keep_empty_circuits: bool) -> Self {
+        self.keep_empty_circuits = keep_empty_circuits;
+        self
+    }
 }
 
 impl<H: HugrView> Default for EncodeOptions<H> {
@@ -199,6 +209,7 @@ impl<H: HugrView> Default for EncodeOptions<H> {
         Self {
             config: Default::default(),
             encode_subcircuits: Default::default(),
+            keep_empty_circuits: false,
         }
     }
 }

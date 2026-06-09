@@ -244,7 +244,7 @@ mod test {
         #[with(_id)] mut llvm_ctx: TestContext,
         #[case] prelude: impl PreludeCodegen + 'static,
     ) {
-        let hugr = SimpleHugrConfig::new()
+        let mut hugr = SimpleHugrConfig::new()
             .with_ins(vec![float64_type()])
             .finish_with_exts(|mut builder, _reg| {
                 let [a1] = builder.input_wires_arr();
