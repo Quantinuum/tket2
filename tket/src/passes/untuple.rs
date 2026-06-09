@@ -456,12 +456,12 @@ mod test {
     #[fixture]
     fn unpack_type_parameters() -> Hugr {
         let arr_type =
-            array_type_parametric(TypeArg::new_var_use(0, TypeParam::max_nat_type()), bool_t())
+            array_type_parametric(TypeArg::new_var_use(0, TypeParam::max_nat_kind()), bool_t())
                 .unwrap();
         let mut h = FunctionBuilder::new(
             "inner",
             PolyFuncType::new(
-                vec![TypeParam::max_nat_type()],
+                vec![TypeParam::max_nat_kind()],
                 Signature::new_endo(vec![arr_type.clone(), bool_t()]),
             ),
         )
