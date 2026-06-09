@@ -500,25 +500,25 @@ where
 
     fn build_phased_xx(
         &mut self,
-        _qb1: Wire,
-        _qb2: Wire,
-        _angle1: Wire,
-        _angle2: Wire,
+        qb1: Wire,
+        qb2: Wire,
+        angle1: Wire,
+        angle2: Wire,
     ) -> Result<[Wire; 2], BuildError> {
         let pi_2 = pi_mul_f64(self, 0.5);
         let pi_minus_2 = pi_mul_f64(self, -0.5);
         let [added] = self
             .inner
-            .add_dataflow_op(FloatOps::fadd, [pi_minus_2, _angle1])
+            .add_dataflow_op(FloatOps::fadd, [pi_minus_2, angle1])
             .unwrap()
             .outputs_arr();
 
-        let _qb1 = SynthesizeHeliosOp::build_phased_x(self, _qb1, pi_2, added)?;
-        let _qb2 = SynthesizeHeliosOp::build_phased_x(self, _qb2, pi_2, added)?;
-        let [_qb1, _qb2] = SynthesizeHeliosOp::build_zz_phase(self, _qb1, _qb2, _angle2)?;
-        let _qb1 = SynthesizeHeliosOp::build_phased_x(self, _qb1, pi_minus_2, added)?;
-        let _qb2 = SynthesizeHeliosOp::build_phased_x(self, _qb2, pi_minus_2, added)?;
-        Ok([_qb1, _qb2])
+        let qb1 = SynthesizeHeliosOp::build_phased_x(self, qb1, pi_2, added)?;
+        let qb2 = SynthesizeHeliosOp::build_phased_x(self, qb2, pi_2, added)?;
+        let [qb1, qb2] = SynthesizeHeliosOp::build_zz_phase(self, qb1, qb2, angle2)?;
+        let qb1 = SynthesizeHeliosOp::build_phased_x(self, qb1, pi_minus_2, added)?;
+        let qb2 = SynthesizeHeliosOp::build_phased_x(self, qb2, pi_minus_2, added)?;
+        Ok([qb1, qb2])
     }
 
     fn build_phased_x(&mut self, qb: Wire, angle1: Wire, angle2: Wire) -> Result<Wire, BuildError> {
