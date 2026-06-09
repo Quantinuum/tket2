@@ -13,6 +13,7 @@ use hugr::llvm::{
     emit::{EmitFuncContext, EmitOpArgs},
     inkwell::{AddressSpace, types::BasicType as _},
 };
+use hugr::types::{SumType, TypeRow};
 use hugr::{
     HugrView, Node,
     extension::{prelude::option_type, simple_op::HasConcrete as _},
@@ -89,10 +90,10 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
             let func_ptr = PointerValue::try_from(*func)
                 .map_err(|e| anyhow::anyhow!("Invalid function pointer provided to With: {e:?}"))?;
 
-            let output_tuple: TypeRV = Type::new_tuple(outputs.clone()).into();
+            let output_tuple: SumType = SumType::new_tuple(TypeRow::try_from(outputs.clone())?);
 
             let hugr_func_ty: Signature =
-                FuncValueType::new(inputs.clone(), vec![output_tuple]).try_into()?;
+                FuncValueType::new(inputs.clone(), vec![Type::from(output_tuple.clone())]).try_into()?;
             let func_ty = context.llvm_func_type(&hugr_func_ty)?;
 
             let func_call =
@@ -106,13 +107,13 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
 
             let _ = builder.build_store(global.as_pointer_value(), start_value)?;
 
-            let mut call_results =
+            let call_results =
                 deaggregate_call_result(builder, func_call, hugr_func_ty.output.len())?;
 
-            call_results.insert(0, end_value);
+            let result_tuple = context.llvm_sum_type(output_tuple)?.build_tag(&builder, 0, call_results)?.into();
 
             // Return results from function
-            args.outputs.finish(builder, call_results)?
+            args.outputs.finish(builder, [end_value, result_tuple])?
         }
         GlobalsOp::Map {
             name,

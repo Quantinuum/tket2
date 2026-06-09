@@ -286,13 +286,8 @@ impl MakeRegisteredOp for GlobalsOp {
 #[cfg(test)]
 mod test {
     use hugr::{
-        HugrView,
-        builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
-        extension::{prelude::qb_t, simple_op::MakeExtensionOp},
-        types::Signature,
+        HugrView, builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder}, extension::{prelude::qb_t, simple_op::MakeExtensionOp}, ops::Value, types::Signature
     };
-    use hugr_core::builder::Container;
-    use hugr_core::type_row;
     use strum::IntoEnumIterator;
 
     use super::*;
@@ -365,7 +360,6 @@ mod test {
     #[test]
     fn test_with_map_op_builder() {
         let mut module_builder = ModuleBuilder::new();
-        let none_type = Type::new_unit_sum(1);
 
         // Function to be called by `map` op
         // Signature: (global_state: qb_t) -> (global_state: qb_t, output: none)
@@ -373,11 +367,11 @@ mod test {
             let mut map_func_builder = module_builder
                 .define_function(
                     "map_func",
-                    Signature::new(vec![qb_t()], vec![qb_t(), none_type.clone()]),
+                    Signature::new(vec![qb_t()], vec![qb_t(), Type::UNIT]),
                 )
                 .unwrap();
             let [global_state] = map_func_builder.input_wires_arr();
-            let none_return = map_func_builder.add_load_value(hugr::ops::Value::unit());
+            let none_return = map_func_builder.add_load_value(Value::unit());
             map_func_builder
                 .finish_with_outputs([global_state, none_return])
                 .unwrap()
@@ -385,7 +379,7 @@ mod test {
 
         // Function to be called by `with` op
         let mut with_func_builder = module_builder
-            .define_function("with_func", Signature::new(vec![], vec![none_type]))
+            .define_function("with_func", Signature::new(vec![], vec![]))
             .unwrap();
         let loaded_map_func = with_func_builder.load_func(map_func.handle(), &[]).unwrap();
         let map_op = GlobalsOp::Map {
@@ -397,9 +391,8 @@ mod test {
         with_func_builder
             .add_dataflow_op(map_op, [loaded_map_func])
             .unwrap();
-        let none_return = with_func_builder.add_load_value(hugr::ops::Value::unit());
         let with_func = with_func_builder
-            .finish_with_outputs([none_return])
+            .finish_with_outputs([])
             .unwrap();
 
         // Function under test
@@ -417,7 +410,7 @@ mod test {
             inputs: TypeRowRV::new(),
             outputs: TypeRowRV::new(),
         };
-        let [global_out] = func_builder
+        let [global_out, _tuple] = func_builder
             .add_dataflow_op(with_op, [global_in, loaded_func])
             .unwrap()
             .outputs_arr();
