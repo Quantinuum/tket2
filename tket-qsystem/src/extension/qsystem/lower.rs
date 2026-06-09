@@ -104,6 +104,7 @@ pub enum LowerTk2Error {
     LegacyQSystemToSolUnsupported,
 }
 
+/// Ops detected for replacement, classified by type.
 enum ReplaceOps {
     /// A `tket.quantum` op that must be decomposed into platform-native primitives.
     Tk2(TketOp),
