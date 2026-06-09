@@ -90,15 +90,16 @@ pub enum LowerTk2Error {
     RuntimeBarrierError(#[from] InsertCutError),
 
     /// Legacy `tket.qsystem` ops that are Helios-specific (i.e. have no shared
-    /// qsystem equivalent, such as `ZZPhase`) cannot be lowered to Sol.
+    /// qsystem equivalent) could not previously be lowered to Sol via direct
+    /// remapping.
     ///
-    /// Deprecated: ZZPhase is now handled via the cross-platform lowering path;
-    /// `lower_tk2_ops` will no longer return this error.
-    #[deprecated = "ZZPhase is now handled by the cross-platform lowering path; \
+    /// Deprecated: Helios-specific ops are now handled via the cross-platform
+    /// lowering path; `lower_tk2_ops` will no longer return this error.
+    #[deprecated = "Helios-specific ops are now handled by the cross-platform lowering path; \
                     this error variant will no longer be returned by lower_tk2_ops."]
     #[display(
-        "Helios-specific legacy tket.qsystem ops (e.g. ZZPhase) cannot be lowered to Sol; \
-         cross-compilation is not yet supported (see issue #1620)."
+        "Helios-specific legacy tket.qsystem ops cannot be lowered to Sol via direct remapping; \
+         use cross-platform lowering instead."
     )]
     LegacyQSystemToSolUnsupported,
 }
@@ -108,9 +109,9 @@ enum ReplaceOps {
     Tk2(TketOp),
     /// A runtime barrier that must be lowered to a platform-specific barrier call.
     Barrier(Barrier),
-    /// A `tket.qsystem.helios` op encountered while targeting Sol.
+    /// A `tket.qsystem.helios` op encountered while targeting another platform.
     CrossPlatformHelios(HeliosOp),
-    /// A `tket.qsystem.sol` op encountered while targeting Helios.
+    /// A `tket.qsystem.sol` op encountered while targeting another platform.
     CrossPlatformSol(SolOp),
 }
 
@@ -1241,8 +1242,6 @@ mod test {
         .unwrap();
         let mut h = b.finish_hugr_with_outputs([]).unwrap();
 
-        // Panics inside build_phased_xx until the decomposition is implemented (issue #1620).
-        // Once implemented, remove #[should_panic] and this check will verify correct output.
         lower_tk2_ops(&mut h, Preserve::Public, QSystemPlatform::Helios).unwrap();
         assert_eq!(
             check_lowered(
@@ -1255,8 +1254,8 @@ mod test {
     }
 
     /// Legacy `tket.qsystem` ops that correspond to [`SharedOp`] variants
-    /// (e.g. `Reset`, `TryQAlloc`) can be lowered to Sol. Only the
-    /// Helios-specific ops (currently only `ZZPhase`) require cross-platform decomposition.
+    /// (e.g. `Reset`, `TryQAlloc`) can be lowered to Sol directly. Helios-specific
+    /// ops are remapped via the cross-platform decomposition path.
     #[test]
     fn test_legacy_shared_qsystem_ops_lower_to_sol() {
         use crate::extension::qsystem as qs;
