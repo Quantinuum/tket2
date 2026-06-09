@@ -171,27 +171,17 @@ fn classify_node(
         QSystemPlatform::Helios if ext_id == &sol::EXTENSION_ID => optype
             .cast::<SolOp>()
             .map(|s_op| Ok((n, ReplaceOps::CrossPlatformSol(s_op)))),
-        QSystemPlatform::Sol if ext_id == &qsystem::EXTENSION_ID => {
-            classify_legacy_sol_op(n, optype)
+        // ZZPhase is the only Helios-specific legacy op; all others are shared
+        // and already registered by register_legacy_qsystem_replacements.
+        QSystemPlatform::Sol
+            if ext_id == &qsystem::EXTENSION_ID
+                && optype.as_extension_op()?.def().name().as_str()
+                    == <&'static str>::from(HeliosOp::ZZPhase) =>
+        {
+            Some(Ok((n, ReplaceOps::CrossPlatformHelios(HeliosOp::ZZPhase))))
         }
         _ => None,
     }
-}
-
-/// Classify a legacy `tket.qsystem` op for cross-platform routing to Sol.
-///
-/// Returns `CrossPlatformHelios` for Helios-specific ops (e.g. `ZZPhase`);
-/// shared legacy ops are already handled by
-/// [`register_legacy_qsystem_replacements`] and return `None` here.
-fn classify_legacy_sol_op(
-    n: Node,
-    optype: &ops::OpType,
-) -> Option<Result<(Node, ReplaceOps), LowerTk2Error>> {
-    let op_name = optype.as_extension_op()?.def().name();
-    let h_op = HeliosOp::iter().find(|&h| <&'static str>::from(h) == op_name.as_str())?;
-    SharedOp::try_from(h_op)
-        .is_err()
-        .then(|| Ok((n, ReplaceOps::CrossPlatformHelios(h_op))))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -299,6 +289,10 @@ pub fn lower_tk2_ops(
                 (None, _) => {} // non-global multi-op: leave unchanged
             },
             ReplaceOps::Barrier(barrier) => {
+                // Handle barrier replacements
+                //
+                // Only perform the replacement for global passes, as we
+                // cannot define the barrier function for local entrypoint scopes.
                 if let PassScope::Global(_) = &scope {
                     barrier_funcs.insert_runtime_barrier(hugr, node, barrier)?;
                     replaced_nodes.push(node);
@@ -770,6 +764,14 @@ mod test {
         ])
     }
 
+    fn legacy_op(name: &str) -> hugr::ops::OpType {
+        use crate::extension::qsystem as qs;
+        qs::EXTENSION
+            .instantiate_extension_op(name, &[])
+            .unwrap()
+            .into()
+    }
+
     fn toposorted_circuit_nodes<H: HugrView<Node = Node>>(
         circ: &Circuit<H>,
     ) -> impl Iterator<Item = Node> + '_ {
@@ -1001,37 +1003,20 @@ mod test {
     }
 
     fn legacy_qsystem_hugr() -> hugr::Hugr {
-        use crate::extension::qsystem as qs;
-
         let mut b = FunctionBuilder::new("f", Signature::new_endo(type_row![])).unwrap();
         let [maybe_q] = b
-            .add_dataflow_op(
-                qs::EXTENSION
-                    .instantiate_extension_op("TryQAlloc", &[])
-                    .unwrap(),
-                [],
-            )
+            .add_dataflow_op(legacy_op("TryQAlloc"), [])
             .unwrap()
             .outputs_arr();
         let [q] = b
             .build_unwrap_sum(1, option_type(vec![qb_t()]), maybe_q)
             .unwrap();
         let [q] = b
-            .add_dataflow_op(
-                qs::EXTENSION
-                    .instantiate_extension_op("Reset", &[])
-                    .unwrap(),
-                [q],
-            )
+            .add_dataflow_op(legacy_op("Reset"), [q])
             .unwrap()
             .outputs_arr();
         let [maybe_q2] = b
-            .add_dataflow_op(
-                qs::EXTENSION
-                    .instantiate_extension_op("TryQAlloc", &[])
-                    .unwrap(),
-                [],
-            )
+            .add_dataflow_op(legacy_op("TryQAlloc"), [])
             .unwrap()
             .outputs_arr();
         let [q2] = b
@@ -1039,28 +1024,11 @@ mod test {
             .unwrap();
         let angle = const_f64(&mut b, 1.0);
         let [q, q2] = b
-            .add_dataflow_op(
-                qs::EXTENSION
-                    .instantiate_extension_op("ZZPhase", &[])
-                    .unwrap(),
-                [q, q2, angle],
-            )
+            .add_dataflow_op(legacy_op("ZZPhase"), [q, q2, angle])
             .unwrap()
             .outputs_arr();
-        b.add_dataflow_op(
-            qs::EXTENSION
-                .instantiate_extension_op("QFree", &[])
-                .unwrap(),
-            [q],
-        )
-        .unwrap();
-        b.add_dataflow_op(
-            qs::EXTENSION
-                .instantiate_extension_op("QFree", &[])
-                .unwrap(),
-            [q2],
-        )
-        .unwrap();
+        b.add_dataflow_op(legacy_op("QFree"), [q]).unwrap();
+        b.add_dataflow_op(legacy_op("QFree"), [q2]).unwrap();
         b.finish_hugr_with_outputs([]).unwrap()
     }
 
@@ -1069,12 +1037,10 @@ mod test {
     /// by [`lower_tk2_ops`].
     #[test]
     fn test_migrate_legacy_qsystem_ops() {
-        use crate::extension::qsystem as qs;
-
         let mut h = legacy_qsystem_hugr();
 
         // Sanity-check: legacy ops are present before lowering.
-        let legacy_exts = ExtensionSet::from_iter([qs::EXTENSION_ID]);
+        let legacy_exts = ExtensionSet::from_iter([qsystem::EXTENSION_ID]);
         assert!(check_lowered(&h, Preserve::Public, &legacy_exts).is_err());
 
         lower_tk2_ops(&mut h, Preserve::Public, QSystemPlatform::Helios).unwrap();
@@ -1120,28 +1086,16 @@ mod test {
     /// cross-platform decomposition path (issue #1620).
     #[test]
     fn test_helios_zz_phase_lowers_to_sol() {
-        use crate::extension::qsystem::helios;
-
         let mut b = FunctionBuilder::new("f", Signature::new_endo(type_row![])).unwrap();
         let [maybe_q1] = b
-            .add_dataflow_op(
-                helios::EXTENSION
-                    .instantiate_extension_op("TryQAlloc", &[])
-                    .unwrap(),
-                [],
-            )
+            .add_dataflow_op(HeliosOp::TryQAlloc, [])
             .unwrap()
             .outputs_arr();
         let [q1] = b
             .build_unwrap_sum(1, option_type(vec![qb_t()]), maybe_q1)
             .unwrap();
         let [maybe_q2] = b
-            .add_dataflow_op(
-                helios::EXTENSION
-                    .instantiate_extension_op("TryQAlloc", &[])
-                    .unwrap(),
-                [],
-            )
+            .add_dataflow_op(HeliosOp::TryQAlloc, [])
             .unwrap()
             .outputs_arr();
         let [q2] = b
@@ -1149,28 +1103,11 @@ mod test {
             .unwrap();
         let angle = const_f64(&mut b, 1.0);
         let [q1, q2] = b
-            .add_dataflow_op(
-                helios::EXTENSION
-                    .instantiate_extension_op("ZZPhase", &[])
-                    .unwrap(),
-                [q1, q2, angle],
-            )
+            .add_dataflow_op(HeliosOp::ZZPhase, [q1, q2, angle])
             .unwrap()
             .outputs_arr();
-        b.add_dataflow_op(
-            helios::EXTENSION
-                .instantiate_extension_op("QFree", &[])
-                .unwrap(),
-            [q1],
-        )
-        .unwrap();
-        b.add_dataflow_op(
-            helios::EXTENSION
-                .instantiate_extension_op("QFree", &[])
-                .unwrap(),
-            [q2],
-        )
-        .unwrap();
+        b.add_dataflow_op(HeliosOp::QFree, [q1]).unwrap();
+        b.add_dataflow_op(HeliosOp::QFree, [q2]).unwrap();
         let mut h = b.finish_hugr_with_outputs([]).unwrap();
 
         lower_tk2_ops(&mut h, Preserve::Public, QSystemPlatform::Sol).unwrap();
@@ -1188,28 +1125,16 @@ mod test {
     /// cross-platform decomposition path.
     #[test]
     fn test_sol_phased_xx_lowers_to_helios() {
-        use crate::extension::qsystem::sol;
-
         let mut b = FunctionBuilder::new("f", Signature::new_endo(type_row![])).unwrap();
         let [maybe_q1] = b
-            .add_dataflow_op(
-                sol::EXTENSION
-                    .instantiate_extension_op("TryQAlloc", &[])
-                    .unwrap(),
-                [],
-            )
+            .add_dataflow_op(SolOp::TryQAlloc, [])
             .unwrap()
             .outputs_arr();
         let [q1] = b
             .build_unwrap_sum(1, option_type(vec![qb_t()]), maybe_q1)
             .unwrap();
         let [maybe_q2] = b
-            .add_dataflow_op(
-                sol::EXTENSION
-                    .instantiate_extension_op("TryQAlloc", &[])
-                    .unwrap(),
-                [],
-            )
+            .add_dataflow_op(SolOp::TryQAlloc, [])
             .unwrap()
             .outputs_arr();
         let [q2] = b
@@ -1218,28 +1143,11 @@ mod test {
         let angle1 = const_f64(&mut b, 0.5);
         let angle2 = const_f64(&mut b, 0.25);
         let [q1, q2] = b
-            .add_dataflow_op(
-                sol::EXTENSION
-                    .instantiate_extension_op("PhasedXX", &[])
-                    .unwrap(),
-                [q1, q2, angle1, angle2],
-            )
+            .add_dataflow_op(SolOp::PhasedXX, [q1, q2, angle1, angle2])
             .unwrap()
             .outputs_arr();
-        b.add_dataflow_op(
-            sol::EXTENSION
-                .instantiate_extension_op("QFree", &[])
-                .unwrap(),
-            [q1],
-        )
-        .unwrap();
-        b.add_dataflow_op(
-            sol::EXTENSION
-                .instantiate_extension_op("QFree", &[])
-                .unwrap(),
-            [q2],
-        )
-        .unwrap();
+        b.add_dataflow_op(SolOp::QFree, [q1]).unwrap();
+        b.add_dataflow_op(SolOp::QFree, [q2]).unwrap();
         let mut h = b.finish_hugr_with_outputs([]).unwrap();
 
         lower_tk2_ops(&mut h, Preserve::Public, QSystemPlatform::Helios).unwrap();
@@ -1258,44 +1166,26 @@ mod test {
     /// ops are remapped via the cross-platform decomposition path.
     #[test]
     fn test_legacy_shared_qsystem_ops_lower_to_sol() {
-        use crate::extension::qsystem as qs;
-
         // Build a HUGR with only shared legacy ops (no ZZPhase).
         let mut b = FunctionBuilder::new("f", Signature::new_endo(type_row![])).unwrap();
         let [maybe_q] = b
-            .add_dataflow_op(
-                qs::EXTENSION
-                    .instantiate_extension_op("TryQAlloc", &[])
-                    .unwrap(),
-                [],
-            )
+            .add_dataflow_op(legacy_op("TryQAlloc"), [])
             .unwrap()
             .outputs_arr();
         let [q] = b
             .build_unwrap_sum(1, option_type(vec![qb_t()]), maybe_q)
             .unwrap();
         let [q] = b
-            .add_dataflow_op(
-                qs::EXTENSION
-                    .instantiate_extension_op("Reset", &[])
-                    .unwrap(),
-                [q],
-            )
+            .add_dataflow_op(legacy_op("Reset"), [q])
             .unwrap()
             .outputs_arr();
-        b.add_dataflow_op(
-            qs::EXTENSION
-                .instantiate_extension_op("QFree", &[])
-                .unwrap(),
-            [q],
-        )
-        .unwrap();
+        b.add_dataflow_op(legacy_op("QFree"), [q]).unwrap();
         let mut h = b.finish_hugr_with_outputs([]).unwrap();
 
         lower_tk2_ops(&mut h, Preserve::Public, QSystemPlatform::Sol).unwrap();
 
         // Legacy ops should have been replaced with Sol equivalents.
-        let legacy_exts = ExtensionSet::from_iter([qs::EXTENSION_ID]);
+        let legacy_exts = ExtensionSet::from_iter([qsystem::EXTENSION_ID]);
         assert_eq!(check_lowered(&h, Preserve::Public, &legacy_exts), Ok(()));
 
         let circ = Circuit::new(&h);
