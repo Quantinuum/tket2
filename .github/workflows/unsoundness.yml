@@ -46,7 +46,7 @@ jobs:
 
       # Run miri unsoundness checks.
       #
-      # Skip tests that take over 5mins in CI.
+      # Skip tests that take over 60s in CI.
       - name: Test with Miri
         run: |
           cargo miri nextest run --no-default-features --no-fail-fast -- \
