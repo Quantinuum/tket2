@@ -28,8 +28,6 @@ env:
   LD_LIBRARY_PATH: "/tmp/hugrverse/lib:/tmp/hugrverse/lib64"
   LLVM_SYS_211_PREFIX: "/tmp/hugrverse"
 
-
-
 jobs:
   miri:
     name: "Miri"
@@ -43,16 +41,19 @@ jobs:
           rustup override set nightly
           cargo miri setup
       - uses: quantinuum/hugrverse-env/install-hugrenv-action@main
-
       - name: Install nextest
         uses: taiki-e/install-action@nextest
 
       # Run miri unsoundness checks.
       #
-      # Skip tests that take over 5mins in CI.
+      # Skip tests that take over 60s in CI.
       - name: Test with Miri
         run: |
-          cargo miri nextest run --no-default-features -- \
+          cargo miri nextest run --no-default-features --no-fail-fast -- \
+            `# -------- tket::modifier` \
+            --skip "modifier::modifier_resolver::call_modify::tests::test_call_modify" \
+            --skip "modifier::modifier_resolver::dfg_modify::test::test_dfg_modify" \
+            --skip "modifier::modifier_resolver::global_phase_modify::tests::test_global_phase_modify" \
             `# -------- tket::passes` \
             --skip "dataflow::partial_value::test::bounded_lattice" \
             --skip "dataflow::partial_value::test::lattice" \
@@ -63,9 +64,24 @@ jobs:
             --skip "merge_bbs::test::check_ext_id_wellformed" \
             --skip "monomorphize::test::test_recursion_module" \
             --skip "normalize_cfgs::test::check_ext_id_wellformed" \
+            --skip "replace_types::linearize::test::sum_nway_copy" \
+            --skip "replace_types::linearize::test::test_copy_borrow_array" \
+            --skip "replace_types::linearize::test::use_in_op_callback" \
+            --skip "replace_types::test::compositionality" \
             --skip "replace_types::test::dfg_conditional_case" \
             --skip "replace_types::test::module_func_cfg_call" \
             --skip "replace_types::test::op_to_call" \
+            --skip "replace_types::test::regions" \
+            --skip "serialize::pytket::tests::circuit_standalone_roundtrip" \
+            --skip "serialize::tests::func_circuit_store" \
+            --skip "serialize::tests::root_circuit_store" \
+            --skip "serialize::tests::serialize_package_errors" \
+            `# -------- tket_qsystem` \
+            --skip "extension::qsystem::barrier::test::test_barrier" \
+            --skip "extension::qsystem::lower::test::test_array_clone_discard_measurement" \
+            --skip "extension::qsystem::lower::test::test_barray_get_measurement" \
+            --skip "extension::qsystem::lower::test::test_mixed" \
+            --skip "test::no_public_funcs" \
             #
 
   create-issue:

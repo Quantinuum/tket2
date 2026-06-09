@@ -96,16 +96,12 @@ impl TypeTranslatorSet {
                     return Some(RegisterCount::only_bits(1));
                 }
                 if let Some(tuple) = sum.as_tuple() {
-                    match TypeRow::try_from(tuple.clone()) {
-                        Ok(t) => {
-                            let count: Option<RegisterCount> =
-                                t.iter().map(|ty| self.type_to_pytket_internal(ty)).sum();
-                            // Don't allow parameters nested inside other types
-                            count.filter(|c| c.params == 0)
-                        }
-                        // Sum types with row variables (variable tuple lengths) are not supported.
-                        Err(_) => None,
-                    }
+                    TypeRow::try_from(tuple.clone()).ok().and_then(|t| {
+                        let count: Option<RegisterCount> =
+                            t.iter().map(|ty| self.type_to_pytket_internal(ty)).sum();
+                        // Don't allow parameters nested inside other types
+                        count.filter(|c| c.params == 0)
+                    })
                 } else {
                     None
                 }

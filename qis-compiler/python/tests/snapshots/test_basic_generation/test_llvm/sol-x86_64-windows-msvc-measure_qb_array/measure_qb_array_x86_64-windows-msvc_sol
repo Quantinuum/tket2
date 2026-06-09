@@ -585,7 +585,7 @@ attributes #0 = { noreturn }
 !name = !{!3}
 
 !0 = !{i32 2, !"Debug Info Version", i32 3}
-!1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "guppylang (guppylang-internals-v0.33.0)-v0.21.12", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "guppylang (guppylang-internals-v1.0.0-a1)-v1.0.0-a1", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
 !3 = !{!"mainlib"}
 !4 = distinct !DISubprogram(name: "measure_qb_array.<locals>.main", linkageName: "__hugr__.__main__.measure_qb_array.<locals>.main.1", scope: null, file: !5, line: 106, type: !6, scopeLine: 107, spFlags: DISPFlagDefinition, unit: !1)
 !6 = !DISubroutineType(types: !7)

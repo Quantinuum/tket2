@@ -291,11 +291,11 @@ macro_rules! compute_opdef {
             type Error = ();
 
             fn try_from(value: Type) -> Result<Self, Self::Error> {
-                let Some(custom_type) = value.as_extension() else {
+                let hugr_core::types::Term::ExtensionType(custom_type) = value.into() else {
                     Err(())?
                 };
 
-                custom_type.to_owned().try_into().map_err(|_| ())
+                custom_type.try_into().map_err(|_| ())
             }
         }
 
@@ -392,9 +392,9 @@ macro_rules! compute_opdef {
                         PolyFuncTypeRV::new(
                             [INPUTS_PARAM.to_owned(), OUTPUTS_PARAM.to_owned()],
                             FuncValueType::new(
-                                TypeRowRV::from(vec![context_type.clone(), func_type.into()])
+                                TypeRowRV::from([context_type.clone(), func_type.into()])
                                     .concat(inputs),
-                                vec![result_type],
+                                [result_type],
                             ),
                         )
                         .into()
@@ -411,8 +411,8 @@ macro_rules! compute_opdef {
                         PolyFuncTypeRV::new(
                             [OUTPUTS_PARAM.to_owned()],
                             FuncValueType::new(
-                                vec![result_type],
-                                TypeRowRV::from(vec![context_type]).concat(outputs),
+                                [result_type],
+                                TypeRowRV::from([context_type]).concat(outputs),
                             ),
                         )
                         .into()

@@ -15,6 +15,7 @@
 
 mod core;
 mod float;
+mod measurement;
 mod prelude;
 mod rotation;
 mod tk1;
@@ -22,6 +23,7 @@ mod tket;
 
 pub use core::CoreDecoder;
 pub use float::FloatEmitter;
+pub use measurement::MeasurementEmitter;
 pub use prelude::PreludeEmitter;
 pub use rotation::RotationEmitter;
 pub use tk1::Tk1Emitter;

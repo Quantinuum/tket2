@@ -234,7 +234,7 @@ mod test {
     #[case(WasmType::Module)]
     #[case(WasmType::Context)]
     #[case(WasmType::new_func(type_row![], type_row![]))]
-    #[case(WasmType::new_func(TypeRowRV::new_var_use(0, TypeBound::Linear), vec![bool_t()]))]
+    #[case(WasmType::new_func(TypeRowRV::new_var_use(0, TypeBound::Linear), [bool_t()]))]
     fn wasm_type(#[case] wasm_t: WasmType) {
         let hugr_t: Type = wasm_t.clone().into();
         let roundtripped_t = hugr_t.try_into().unwrap();
@@ -287,10 +287,8 @@ mod test {
     #[rstest]
     #[case::concrete(type_row![], type_row![])]
     #[case::row_vars1(
-        TypeRowRV::from(vec![Type::UNIT]).concat(TypeRowRV::new_var_use(0, TypeBound::Copyable)),
-        TypeRowRV::try_from(
-            Term::from(vec![TypeArg::from(Type::UNIT), TypeArg::from(usize_t())])
-        ).unwrap()
+        TypeRowRV::from([Type::UNIT]).concat(TypeRowRV::new_var_use(0, TypeBound::Copyable)),
+        TypeRowRV::from([Type::UNIT, usize_t()])
     )]
     fn lookup_signature(
         #[case] inputs: impl Into<TypeRowRV>,

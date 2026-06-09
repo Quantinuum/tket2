@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang ==0.21.14",
+#     "guppylang ==0.21.15",
 # ]
 # [tool.uv.sources]
 # guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", branch = "ts/future-measure"}
@@ -15,8 +15,17 @@ import sys
 from guppylang import guppy
 from guppylang.std.builtins import array, control, dagger
 from guppylang.std.debug import state_result
-from guppylang.std.quantum import angle, discard, discard_array, measure, qubit
-from guppylang.std.quantum import h, rx, rz, x
+from guppylang.std.quantum import (
+    angle,
+    discard,
+    discard_array,
+    measure,
+    qubit,
+    h,
+    rx,
+    rz,
+    x,
+)
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
