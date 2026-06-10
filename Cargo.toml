@@ -109,7 +109,8 @@ pauli-graph = { git = "https://github.com/Quantinuum/pg-libs", package = "pauli-
 basic-passes = { git = "https://github.com/Quantinuum/pg-libs", package = "basic-passes" }
 greedy-synth = { git = "https://github.com/quantinuum-dev/greedy-pauli-rs", branch = "refactor-pauli-graph-into-separate-crate", package = "greedy-synth" }
 pg-optimise = { git = "https://github.com/quantinuum-dev/greedy-pauli-rs", branch = "refactor-pauli-graph-into-separate-crate", package = "pg-optimise" }
-fast-todd = { git = "https://github.com/quantinuum-dev/fast-todd" }
+# fast-todd = { git = "https://github.com/quantinuum-dev/fast-todd" }
+fast-todd = { path = "../fast-todd" }
 
 [profile.release.package.tket-py]
 # Some configurations to reduce the size of tket wheels

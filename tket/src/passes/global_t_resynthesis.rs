@@ -36,6 +36,61 @@ use std::sync::Arc;
 use std::cell::Cell;
 use std::collections::HashSet;
 
+use std::fs::OpenOptions;
+use std::io::Write;
+
+// Only works for purely quantum circuits with no measurements
+fn write_pytket_circ(commands: Vec<Command>, qubits:&[Qubit], filename: &str, circ_name: &str) {
+        let mut file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(filename)
+        .unwrap();
+
+    writeln!(file, "from pytket import Circuit").unwrap();
+    writeln!(file, "{} = Circuit({:?})", circ_name, qubits.len()).unwrap();
+
+    for cmd in commands {
+        let pytket_cmd = to_pytket(&cmd, qubits, circ_name);
+        writeln!(file, "{}", pytket_cmd).unwrap();
+    }
+}
+
+fn to_pytket(cmd: &Command<String>, qubits: &[Qubit], circ_name: &str) -> String {
+    let op = match cmd.op.op_type {
+        OpType::H => "H",
+        OpType::S => "S",
+        OpType::Sdg => "Sdg",
+        OpType::Z => "Z",
+        OpType::V => "V",
+        OpType::Vdg => "Vdg",
+        OpType::X => "X",
+        OpType::Y => "Y",
+        OpType::Z => "Z",
+        OpType::CX => "CX",
+        OpType::CY => "CY",
+        OpType::CZ => "CZ",
+        OpType::CRz => "CRz",
+        OpType::T => "T",
+        OpType::Tdg => "Tdg",
+        OpType::Barrier => return "".to_string(),
+        _ => return panic!("cannot convert to pytket due to: {}", cmd.op.op_type),
+    };
+
+    let args = cmd
+        .args
+        .iter()
+        .filter_map(|id| {
+            qubits.iter()
+                .position(|q| q.id == *id)
+                .map(|n| n.to_string())
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    format!("{}.{}({})", circ_name, op, args)
+}
 
 #[derive(Clone, Debug)]
 pub struct GlobalTResynthesis {
@@ -89,10 +144,12 @@ impl ComposablePass<Hugr> for GlobalTResynthesis {
         for (_, serial_circ) in encoded_circs.iter_mut() {
             let pauli_graph = serial_circuit_to_pauli_graph(serial_circ)?;
 
+            write_pytket_circ(serial_circ.commands.clone(), &serial_circ.qubits, "before.py", "circ_1");
+
             let canonical_pass = CanonicalFormPass::new().with_forward(true);
             let grouping_pass = GroupCommutingOpsPass::new();
             let rotation_merging_pass = RotationMergingPass::new();
-            let fast_todd_pass = FastTODDPass::new();
+            let fast_todd_pass = FastTODDPass::new().with_ancilla_budget(self.ancilla_budget);
             let synth_pass = GreedySynthPass::new()
                 .with_window_size(100)
                 .with_pool_size(100)
@@ -102,12 +159,14 @@ impl ComposablePass<Hugr> for GlobalTResynthesis {
 
             let pauli_graph = canonical_pass.transform(&pauli_graph);
             let pauli_graph = rotation_merging_pass.transform(&pauli_graph);
-            let pauli_graph = fast_todd_pass.transform(&pauli_graph);
+            // let pauli_graph = fast_todd_pass.transform(&pauli_graph);
             let pauli_graph = grouping_pass.transform(&pauli_graph);
             let pauli_graph = synth_pass.transform(&pauli_graph);
             let pauli_graph = rebase_pass.transform(&pauli_graph);
 
-            serial_circ.commands = pauli_graph_to_cmds(pauli_graph, serial_circ)?;
+            serial_circ.commands = pauli_graph_to_cmds(pauli_graph, serial_circ, self.ancilla_budget)?;
+            
+            write_pytket_circ(serial_circ.commands.clone(), &serial_circ.qubits, "after.py", "circ_2");
         }
 
         encoded_circs
@@ -173,12 +232,23 @@ fn serial_circuit_to_pauli_graph(
 fn pauli_graph_to_cmds(
     pauli_graph: PauliGraph,
     serial_circuit: &mut SerialCircuit,
+    ancilla_budget: usize,
 ) -> Result<Vec<Command<String>>, ConversionError> {
-    let qubits = &serial_circuit.qubits;
-    let bits = &serial_circuit.bits;
-
     let (start_barriers, end_barriers) = sort_barriers(&serial_circuit.commands);
     let mut cmds = start_barriers;
+
+    for i in 0..ancilla_budget {
+        let ancilla = Qubit::from(ElementId("anc".to_string(), vec![i as i64]));
+        serial_circuit.qubits.push(ancilla.clone());
+        cmds.push(Command {
+            op: Operation::from_optype(OpType::Create),
+            args: vec![ancilla.into()],
+            opgroup: None,
+        });
+    }
+
+    let qubits = &serial_circuit.qubits;
+    let bits = &serial_circuit.bits;
 
     for op in pauli_graph.get_ops() {
         cmds.extend(op_to_cmd(op, qubits, bits)?);
@@ -458,7 +528,7 @@ fn op_to_cmd(
                             opgroup: None,
                         },
                         Command {
-                            op: Operation::from_optype(OpType::T),
+                            op: Operation::from_optype(OpType::Tdg),
                             args: qubits.clone(),
                             opgroup: None,
                         },
@@ -495,12 +565,12 @@ fn op_to_cmd(
                 match params[0] {
                     0.25 => Ok(vec![
                         Command {
-                            op: Operation::from_optype(OpType::H),
+                            op: Operation::from_optype(OpType::Sdg),
                             args: qubits.clone(),
                             opgroup: None,
                         },
                         Command {
-                            op: Operation::from_optype(OpType::Sdg),
+                            op: Operation::from_optype(OpType::H),
                             args: qubits.clone(),
                             opgroup: None,
                         },
@@ -510,24 +580,24 @@ fn op_to_cmd(
                             opgroup: None,
                         },
                         Command {
-                            op: Operation::from_optype(OpType::S),
+                            op: Operation::from_optype(OpType::H),
                             args: qubits.clone(),
                             opgroup: None,
                         },
                         Command {
-                            op: Operation::from_optype(OpType::H),
+                            op: Operation::from_optype(OpType::S),
                             args: qubits,
                             opgroup: None,
                         }
                     ]),
                 -0.25 => Ok(vec![
                         Command {
-                            op: Operation::from_optype(OpType::H),
+                            op: Operation::from_optype(OpType::Sdg),
                             args: qubits.clone(),
                             opgroup: None,
                         },
                         Command {
-                            op: Operation::from_optype(OpType::Sdg),
+                            op: Operation::from_optype(OpType::H),
                             args: qubits.clone(),
                             opgroup: None,
                         },
@@ -537,12 +607,12 @@ fn op_to_cmd(
                             opgroup: None,
                         },
                         Command {
-                            op: Operation::from_optype(OpType::S),
+                            op: Operation::from_optype(OpType::H),
                             args: qubits.clone(),
                             opgroup: None,
                         },
                         Command {
-                            op: Operation::from_optype(OpType::H),
+                            op: Operation::from_optype(OpType::S),
                             args: qubits,
                             opgroup: None,
                         }
@@ -737,10 +807,76 @@ mod tests {
     }
 
     #[fixture]
-    fn simple_circ() -> Circuit {
+    fn identity_circ() -> Circuit {
+        build_simple_circuit(3, |circ| {
+            circ.append(TketOp::Z, [0])?;
+            Ok(())
+        })
+        .unwrap()
+    }
+
+    #[fixture]
+    fn debug_circ() -> Circuit {
         build_simple_circuit(2, |circ| {
             circ.append(TketOp::Z, [0])?;
+            circ.append(TketOp::S, [0])?;
+            circ.append(TketOp::H, [1])?;
+            circ.append(TketOp::CX, [1, 0])?;
+            circ.append(TketOp::H, [1])?;
+            Ok(())
+        })
+        .unwrap()
+    }
+
+    #[fixture]
+    fn local_clifford_circ() -> Circuit {
+        build_simple_circuit(3, |circ| {
+            circ.append(TketOp::Z, [0])?;
+            circ.append(TketOp::S, [0])?;
+            circ.append(TketOp::X, [1])?;
+            circ.append(TketOp::H, [1])?;
+            circ.append(TketOp::S, [1])?;
             circ.append(TketOp::CX, [0, 1])?;
+            circ.append(TketOp::S, [1])?;
+            circ.append(TketOp::CX, [0, 1])?;
+            circ.append(TketOp::CX, [1, 0])?;
+            circ.append(TketOp::H, [0])?;
+            Ok(())
+        })
+        .unwrap()
+    }
+    
+    #[fixture]
+    fn shared_clifford_circ() -> Circuit {
+        build_simple_circuit(3, |circ| {
+            circ.append(TketOp::Z, [0])?;
+            circ.append(TketOp::S, [0])?;
+            circ.append(TketOp::X, [1])?;
+            circ.append(TketOp::H, [1])?;
+            circ.append(TketOp::S, [1])?;
+            // circ.append(TketOp::CX, [0, 1])?;
+            // circ.append(TketOp::S, [1])?;
+            // circ.append(TketOp::CX, [0, 1])?;
+            // circ.append(TketOp::CX, [1, 0])?;
+            // circ.append(TketOp::H, [0])?;
+            Ok(())
+        })
+        .unwrap()
+    }
+
+    #[fixture]
+    fn simple_circ() -> Circuit {
+        build_simple_circuit(3, |circ| {
+            // circ.append(TketOp::Tdg, [2])?;
+            circ.append(TketOp::H, [0])?;
+            circ.append(TketOp::CX, [0, 1])?;
+            circ.append(TketOp::T, [1])?;
+            circ.append(TketOp::H, [1])?;
+            circ.append(TketOp::Tdg, [0])?;
+            circ.append(TketOp::H, [2])?;
+            circ.append(TketOp::CX, [1, 0])?;
+            circ.append(TketOp::T, [1])?;
+            circ.append(TketOp::H, [2])?;
             Ok(())
         })
         .unwrap()
@@ -759,124 +895,122 @@ mod tests {
             circ.append(TketOp::CX, [0, 1])?;
             circ.append(TketOp::H, [1])?; // h(q1)
             // csdg(q1, q0)
-            circ.append(TketOp::Tdg, [1])?;
-            circ.append(TketOp::Tdg, [0])?;
-            circ.append(TketOp::CX, [1, 0])?;
-            circ.append(TketOp::T, [0])?;
-            circ.append(TketOp::CX, [1, 0])?;
-            circ.append(TketOp::H, [0])?; // h(q0)
-
-            circ.append(TketOp::CX, [0, 1])?; // cx(q0, q1)
-            circ.append(TketOp::H, [2])?; // h(q2)
-            circ.append(TketOp::H, [3])?; // h(q3)
-            // cs(q3, q0)
-            circ.append(TketOp::T, [3])?;
-            circ.append(TketOp::T, [0])?;
-            circ.append(TketOp::CX, [3, 0])?;
-            circ.append(TketOp::Tdg, [0])?;
-            circ.append(TketOp::CX, [3, 0])?;
-            // cs(q3, q1)
-            circ.append(TketOp::T, [3])?;
-            circ.append(TketOp::T, [1])?;
-            circ.append(TketOp::CX, [3, 1])?;
-            circ.append(TketOp::Tdg, [1])?;
-            circ.append(TketOp::CX, [3, 1])?;
-            circ.append(TketOp::CX, [0, 1])?; // cx(q0, q1)
-            circ.append(TketOp::CZ, [1, 2])?; // cz(q1, q2)
-
-            circ.append(TketOp::H, [0])?; // h(q0)
-            // cs(q1, q0)
-            circ.append(TketOp::T, [1])?;
-            circ.append(TketOp::T, [0])?;
-            circ.append(TketOp::CX, [1, 0])?;
-            circ.append(TketOp::Tdg, [0])?;
-            circ.append(TketOp::CX, [1, 0])?;
-            circ.append(TketOp::H, [1])?; // h(q1)
-            // mem_swap(q0, q1)
-            circ.append(TketOp::CX, [0, 1])?;
-            circ.append(TketOp::CX, [1, 0])?;
-            circ.append(TketOp::CX, [0, 1])?;
-
-            // mem_swap(q2, q3)
-            circ.append(TketOp::CX, [2, 3])?;
-            circ.append(TketOp::CX, [3, 2])?;
-            circ.append(TketOp::CX, [2, 3])?;
-            circ.append(TketOp::H, [3])?; // h(q3)
-            // csdg(q3, q2)
-            circ.append(TketOp::Tdg, [3])?;
-            circ.append(TketOp::Tdg, [2])?;
-            circ.append(TketOp::CX, [3, 2])?;
-            circ.append(TketOp::T, [2])?;
-            circ.append(TketOp::CX, [3, 2])?;
-            circ.append(TketOp::H, [2])?; // h(q2)
-            circ.append(TketOp::CX, [3, 4])?; // cx(q3, q4)
-            circ.append(TketOp::X, [2])?; // x(q2)
-            circ.append(TketOp::CX, [2, 4])?; // cx(q2, q4)
-            circ.append(TketOp::X, [2])?; // x(q2)
-            circ.append(TketOp::V, [4])?; // v(q4)
-            circ.append(TketOp::T, [4])?; // t(q4)
-            circ.append(TketOp::CX, [2, 4])?; // cx(q2, q4)
-            circ.append(TketOp::Tdg, [4])?; // tdg(q4)
-            circ.append(TketOp::CX, [2, 4])?; // cx(q2, q4)
-            circ.append(TketOp::Vdg, [4])?; // vdg(q4)
-            // mem_swap(q0, q1)
-            circ.append(TketOp::CX, [0, 1])?;
-            circ.append(TketOp::CX, [1, 0])?;
-            circ.append(TketOp::CX, [0, 1])?;
-            circ.append(TketOp::H, [1])?; // h(q1)
-            // csdg(q1, q0)
-            circ.append(TketOp::Tdg, [1])?;
-            circ.append(TketOp::Tdg, [0])?;
-            circ.append(TketOp::CX, [1, 0])?;
-            circ.append(TketOp::T, [0])?;
-            circ.append(TketOp::CX, [1, 0])?;
-            circ.append(TketOp::H, [0])?; // h(q0)
-
-            circ.append(TketOp::H, [2])?; // h(q2)
-            // cs(q3, q2)
-            circ.append(TketOp::T, [3])?;
-            circ.append(TketOp::T, [2])?;
-            circ.append(TketOp::CX, [3, 2])?;
-            circ.append(TketOp::Tdg, [2])?;
-            circ.append(TketOp::CX, [3, 2])?;
-            circ.append(TketOp::H, [3])?; // h(q3)
-            // mem_swap(q2, q3)
-            circ.append(TketOp::CX, [2, 3])?;
-            circ.append(TketOp::CX, [3, 2])?;
-            circ.append(TketOp::CX, [2, 3])?;
-
-            circ.append(TketOp::CZ, [1, 2])?; // cz(q1, q2)
-            circ.append(TketOp::CX, [0, 1])?; // cx(q0, q1)
-            // csdg(q3, q1)
-            circ.append(TketOp::Tdg, [3])?;
-            circ.append(TketOp::Tdg, [1])?;
-            circ.append(TketOp::CX, [3, 1])?;
-            circ.append(TketOp::T, [1])?;
-            circ.append(TketOp::CX, [3, 1])?;
-            // csdg(q3, q0)
-            circ.append(TketOp::Tdg, [3])?;
-            circ.append(TketOp::Tdg, [0])?;
-            circ.append(TketOp::CX, [3, 0])?;
-            circ.append(TketOp::T, [0])?;
-            circ.append(TketOp::CX, [3, 0])?;
-            circ.append(TketOp::H, [2])?; // h(q2)
-            circ.append(TketOp::H, [3])?; // h(q3)
-            circ.append(TketOp::CX, [0, 1])?; // cx(q0, q1)
-
-            circ.append(TketOp::H, [0])?; // h(q0)
-            // cs(q1, q0)
-            circ.append(TketOp::T, [1])?;
-            circ.append(TketOp::T, [0])?;
-            circ.append(TketOp::CX, [1, 0])?;
-            circ.append(TketOp::Tdg, [0])?;
-            circ.append(TketOp::CX, [1, 0])?;
-            circ.append(TketOp::H, [1])?; // h(q1)
-            // mem_swap(q0, q1)
-            circ.append(TketOp::CX, [0, 1])?;
-            circ.append(TketOp::CX, [1, 0])?;
-            circ.append(TketOp::CX, [0, 1])?;
-            // We can't put the measures in the simple_circuit because
-            // they're not pureley quantum
+            // circ.append(TketOp::Tdg, [1])?;
+            // circ.append(TketOp::Tdg, [0])?;
+            // circ.append(TketOp::CX, [1, 0])?;
+            // circ.append(TketOp::T, [0])?;
+            // circ.append(TketOp::CX, [1, 0])?;
+            // circ.append(TketOp::H, [0])?; // h(q0)
+            //
+            // circ.append(TketOp::CX, [0, 1])?; // cx(q0, q1)
+            // circ.append(TketOp::H, [2])?; // h(q2)
+            // circ.append(TketOp::H, [3])?; // h(q3)
+            // // cs(q3, q0)
+            // circ.append(TketOp::T, [3])?;
+            // circ.append(TketOp::T, [0])?;
+            // circ.append(TketOp::CX, [3, 0])?;
+            // // circ.append(TketOp::Tdg, [0])?;
+            // circ.append(TketOp::CX, [3, 0])?;
+            // // cs(q3, q1)
+            // circ.append(TketOp::T, [3])?;
+            // circ.append(TketOp::T, [1])?;
+            // circ.append(TketOp::CX, [3, 1])?;
+            // // circ.append(TketOp::Tdg, [1])?;
+            // circ.append(TketOp::CX, [3, 1])?;
+            // circ.append(TketOp::CX, [0, 1])?; // cx(q0, q1)
+            // circ.append(TketOp::CZ, [1, 2])?; // cz(q1, q2)
+            //
+            // circ.append(TketOp::H, [0])?; // h(q0)
+            // // cs(q1, q0)
+            // circ.append(TketOp::T, [1])?;
+            // circ.append(TketOp::T, [0])?;
+            // circ.append(TketOp::CX, [1, 0])?;
+            // // circ.append(TketOp::Tdg, [0])?;
+            // circ.append(TketOp::CX, [1, 0])?;
+            // circ.append(TketOp::H, [1])?; // h(q1)
+            // // mem_swap(q0, q1)
+            // circ.append(TketOp::CX, [0, 1])?;
+            // circ.append(TketOp::CX, [1, 0])?;
+            // circ.append(TketOp::CX, [0, 1])?;
+            //
+            // // mem_swap(q2, q3)
+            // circ.append(TketOp::CX, [2, 3])?;
+            // circ.append(TketOp::CX, [3, 2])?;
+            // circ.append(TketOp::CX, [2, 3])?;
+            // circ.append(TketOp::H, [3])?; // h(q3)
+            // // csdg(q3, q2)
+            // // circ.append(TketOp::Tdg, [3])?;
+            // // circ.append(TketOp::Tdg, [2])?;
+            // circ.append(TketOp::CX, [3, 2])?;
+            // circ.append(TketOp::T, [2])?;
+            // circ.append(TketOp::CX, [3, 2])?;
+            // circ.append(TketOp::H, [2])?; // h(q2)
+            // circ.append(TketOp::CX, [3, 4])?; // cx(q3, q4)
+            // circ.append(TketOp::X, [2])?; // x(q2)
+            // circ.append(TketOp::CX, [2, 4])?; // cx(q2, q4)
+            // circ.append(TketOp::X, [2])?; // x(q2)
+            // circ.append(TketOp::V, [4])?; // v(q4)
+            // circ.append(TketOp::T, [4])?; // t(q4)
+            // circ.append(TketOp::CX, [2, 4])?; // cx(q2, q4)
+            // // circ.append(TketOp::Tdg, [4])?; // tdg(q4)
+            // circ.append(TketOp::CX, [2, 4])?; // cx(q2, q4)
+            // circ.append(TketOp::Vdg, [4])?; // vdg(q4)
+            // // mem_swap(q0, q1)
+            // circ.append(TketOp::CX, [0, 1])?;
+            // circ.append(TketOp::CX, [1, 0])?;
+            // circ.append(TketOp::CX, [0, 1])?;
+            // circ.append(TketOp::H, [1])?; // h(q1)
+            // // csdg(q1, q0)
+            // // circ.append(TketOp::Tdg, [1])?;
+            // // circ.append(TketOp::Tdg, [0])?;
+            // circ.append(TketOp::CX, [1, 0])?;
+            // circ.append(TketOp::T, [0])?;
+            // circ.append(TketOp::CX, [1, 0])?;
+            // circ.append(TketOp::H, [0])?; // h(q0)
+            //
+            // circ.append(TketOp::H, [2])?; // h(q2)
+            // // cs(q3, q2)
+            // circ.append(TketOp::T, [3])?;
+            // circ.append(TketOp::T, [2])?;
+            // circ.append(TketOp::CX, [3, 2])?;
+            // // circ.append(TketOp::Tdg, [2])?;
+            // circ.append(TketOp::CX, [3, 2])?;
+            // circ.append(TketOp::H, [3])?; // h(q3)
+            // // mem_swap(q2, q3)
+            // circ.append(TketOp::CX, [2, 3])?;
+            // circ.append(TketOp::CX, [3, 2])?;
+            // circ.append(TketOp::CX, [2, 3])?;
+            //
+            // circ.append(TketOp::CZ, [1, 2])?; // cz(q1, q2)
+            // circ.append(TketOp::CX, [0, 1])?; // cx(q0, q1)
+            // // csdg(q3, q1)
+            // // circ.append(TketOp::Tdg, [3])?;
+            // // circ.append(TketOp::Tdg, [1])?;
+            // circ.append(TketOp::CX, [3, 1])?;
+            // circ.append(TketOp::T, [1])?;
+            // circ.append(TketOp::CX, [3, 1])?;
+            // // csdg(q3, q0)
+            // // circ.append(TketOp::Tdg, [3])?;
+            // // circ.append(TketOp::Tdg, [0])?;
+            // circ.append(TketOp::CX, [3, 0])?;
+            // circ.append(TketOp::T, [0])?;
+            // circ.append(TketOp::CX, [3, 0])?;
+            // circ.append(TketOp::H, [2])?; // h(q2)
+            // circ.append(TketOp::H, [3])?; // h(q3)
+            // circ.append(TketOp::CX, [0, 1])?; // cx(q0, q1)
+            //
+            // circ.append(TketOp::H, [0])?; // h(q0)
+            // // cs(q1, q0)
+            // circ.append(TketOp::T, [1])?;
+            // circ.append(TketOp::T, [0])?;
+            // circ.append(TketOp::CX, [1, 0])?;
+            // // circ.append(TketOp::Tdg, [0])?;
+            // circ.append(TketOp::CX, [1, 0])?;
+            // circ.append(TketOp::H, [1])?; // h(q1)
+            // // mem_swap(q0, q1)
+            // circ.append(TketOp::CX, [0, 1])?;
+            // circ.append(TketOp::CX, [1, 0])?;
+            // circ.append(TketOp::CX, [0, 1])?;
 
             Ok(())
         })
@@ -884,14 +1018,15 @@ mod tests {
     }
 
     #[rstest]
-    fn hhl_test(mut hhl_circ: Circuit) {
+    fn hhl_test(mut shared_clifford_circ: Circuit) {
         GlobalTResynthesis::default()
             .with_ancilla_budget(0)
-            .run(hhl_circ.hugr_mut())
+            .run(shared_clifford_circ.hugr_mut())
             .unwrap();
 
-        let t_count = count_t_gates_in_mermaid_string(&hhl_circ.mermaid_string());
-
-        assert_eq!(t_count, 14);
+        // let t_count = count_t_gates_in_mermaid_string(&hhl_circ.mermaid_string());
+        //
+        // assert_eq!(t_count, 14);
+        assert!(false);
     }
 }

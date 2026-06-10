@@ -115,3 +115,12 @@ def global_t_resynthesis(
     Parameters:
     - ancilla_budget: number of ancillas available to increase size of phase_polynomial for FastTODD.
     """
+
+# def inline_all(
+#     circ: CircuitClass,
+#     ancilla_budget: int = 0,
+# ) -> CircuitClass:
+#     """Temporary inlining pass to debug global-t resynthesis.
+#
+#     Parameters: None
+#     """

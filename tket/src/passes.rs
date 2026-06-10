@@ -15,6 +15,7 @@ pub use chunks::CircuitChunks;
 
 pub mod global_t_resynthesis;
 pub use global_t_resynthesis::GlobalTResynthesis;
+// pub use global_t_resynthesis::InlineAll;
 
 pub mod guppy;
 pub use guppy::NormalizeGuppy;

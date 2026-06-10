@@ -32,6 +32,7 @@ from ._tket.passes import (
     normalize_guppy,
     PullForwardError,
     global_t_resynthesis,
+    # inline_all,
 )
 
 __all__ = [
@@ -50,6 +51,7 @@ __all__ = [
     "PassResult",
     "NormalizeGuppy",
     "GlobalTResynthesis",
+    # "InlineAll",
 ]
 
 
@@ -222,3 +224,29 @@ class GlobalTResynthesis(ComposablePass):
         new_hugr = Hugr.from_str(opt_program.to_str())
         new_hugr.resolve_extensions(registry)
         return PassResult.for_pass(self, hugr=new_hugr, inplace=inplace, result=None)
+
+# @dataclass
+# class InlineAll(ComposablePass):
+#
+#     """Temporary inlining pass to debug global-t resynthesis.
+#
+#     Parameters:
+#     - None
+#     """
+#
+#     def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
+#         return implement_pass_run(
+#             self,
+#             hugr=hugr,
+#             inplace=inplace,
+#             copy_call=lambda h: self._inline_all(h, inplace),
+#         )
+#
+#     def _inline_all(self, hugr: Hugr, inplace: bool) -> PassResult:
+#         compiler_state, registry = _hugr_to_tk2circuit(hugr)
+#         opt_program = inline_all(
+#             compiler_state,
+#         )
+#         new_hugr = Hugr.from_str(opt_program.to_str())
+#         new_hugr.resolve_extensions(registry)
+#         return PassResult.for_pass(self, hugr=new_hugr, inplace=inplace, result=None)

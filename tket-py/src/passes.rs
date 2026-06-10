@@ -31,6 +31,7 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     m.add_function(wrap_pyfunction!(self::chunks::chunks, &m)?)?;
     m.add_function(wrap_pyfunction!(self::tket1::tket1_pass, &m)?)?;
     m.add_function(wrap_pyfunction!(global_t_resynthesis, &m)?)?;
+    // m.add_function(wrap_pyfunction!(inline_all, &m)?)?;
     m.add("PullForwardError", py.get_type::<PyPullForwardError>())?;
     m.add("TK1PassError", py.get_type::<tket1::PytketPassError>())?;
     Ok(m)
@@ -58,6 +59,12 @@ create_py_exception!(
     tket::passes::global_t_resynthesis::GlobalTResynthesisErrors,
     PyGlobalTResynthesisError,
     "Errors from the global-t resynthesis pass."
+);
+
+create_py_exception!(
+    hugr::algorithms::inline_funcs::InlineFuncsError,
+    PyInlineFuncsError,
+    "Errors from inlining pass."
 );
 
 /// Flatten the structure of a Guppy-generated program to enable additional optimisations.
@@ -255,3 +262,20 @@ fn global_t_resynthesis<'py>(
         PyResult::Ok(circ)
     })
 }
+
+// #[pyfunction]
+// #[pyo3(signature = (circ, ancilla_budget=0))]
+// fn inline_all<'py>(
+//     circ: &Bound<'py, PyAny>,
+//     ancilla_budget: usize,
+// ) -> PyResult<Bound<'py, PyAny>> {
+//     let py = circ.py();
+//     try_with_circ(circ, |mut circ, typ| {
+//         let mut pass = tket::passes::InlineAll::default();
+//         
+//         pass.run(circ.hugr_mut()).convert_pyerrs()?;
+//         
+//         let circ = typ.convert(py, circ)?;
+//         PyResult::Ok(circ)
+//     })
+// }
