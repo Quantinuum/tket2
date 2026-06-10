@@ -3,7 +3,7 @@
 use hugr::HugrView;
 use hugr::hugr::hugrmut::HugrMut;
 use hugr::ops::{DFG, OpTrait, OpType, Output};
-use hugr::types::{Signature, SumType, TypeEnum};
+use hugr::types::{Signature, SumType};
 use hugr_core::hugr::internal::HugrMutInternals;
 use itertools::Itertools;
 
@@ -59,8 +59,8 @@ fn remove_cfg_empty_output_tuple(
 
     // Only remove the port if it's an empty sum type.
     if !matches!(
-        output_sig.input[0].as_type_enum(),
-        TypeEnum::Sum(SumType::Unit { size: 1 })
+        output_sig.input[0].as_sum(),
+        Some(SumType::Unit { size: 1 })
     ) {
         return Ok(sig);
     }

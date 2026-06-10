@@ -1,7 +1,6 @@
 //! Encoder and decoder for tket operations with native pytket counterparts.
 
 use super::PytketEmitter;
-use crate::Circuit;
 use crate::serialize::pytket::config::TypeTranslatorSet;
 use crate::serialize::pytket::decoder::{
     DecodeStatus, LoadedParameter, PytketDecoderContext, TrackedBit, TrackedQubit,
@@ -31,17 +30,28 @@ impl<H: HugrView> PytketEmitter<H> for PreludeEmitter {
         &self,
         node: H::Node,
         op: &ExtensionOp,
-        circ: &Circuit<H>,
+        hugr: &H,
         encoder: &mut PytketEncoderContext<H>,
     ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
         if let Ok(tuple_op) = TupleOpDef::from_extension_op(op) {
-            return self.tuple_op_to_pytket(node, op, &tuple_op, circ, encoder);
+            return self.tuple_op_to_pytket(node, op, &tuple_op, hugr, encoder);
         };
         if let Ok(_barrier) = BarrierDef::from_extension_op(op) {
+            // Check if the barrier has encodable types in its signature.
+            // If not, fallback to marking it as unsupported.
+            if hugr.signature(node).is_none_or(|sig| {
+                sig.input()
+                    .iter()
+                    .chain(sig.output().iter())
+                    .any(|ty| encoder.config().type_to_pytket(ty).is_none())
+            }) {
+                return Ok(EncodeStatus::Unsupported);
+            }
+
             encoder.emit_node(
                 PytketOptype::Barrier,
                 node,
-                circ,
+                hugr,
                 EmitCommandOptions::new().reuse_all_bits(),
             )?;
             return Ok(EncodeStatus::Success);
@@ -80,7 +90,7 @@ impl PreludeEmitter {
         node: H::Node,
         op: &ExtensionOp,
         tuple_op: &TupleOpDef,
-        circ: &Circuit<H>,
+        hugr: &H,
         encoder: &mut PytketEncoderContext<H>,
     ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
         if !matches!(tuple_op, TupleOpDef::MakeTuple | TupleOpDef::UnpackTuple) {
@@ -100,10 +110,10 @@ impl PreludeEmitter {
                 }
 
                 for arg in elems {
-                    let TypeArg::Runtime(ty) = arg else {
+                    let Ok(ty) = arg.clone().try_into() else {
                         return Ok(EncodeStatus::Unsupported);
                     };
-                    let count = encoder.config().type_to_pytket(ty);
+                    let count = encoder.config().type_to_pytket(&ty);
                     if count.is_none_or(|c| c.params > 0) {
                         return Ok(EncodeStatus::Unsupported);
                     }
@@ -113,7 +123,7 @@ impl PreludeEmitter {
         };
 
         // Now we can gather all inputs and assign them to the node outputs transparently.
-        encoder.emit_transparent_node(node, circ, |ps| ps.input_params.to_owned())?;
+        encoder.emit_transparent_node(node, hugr, |ps| ps.input_params.to_owned())?;
 
         Ok(EncodeStatus::Success)
     }

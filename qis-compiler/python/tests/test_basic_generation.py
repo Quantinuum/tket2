@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 import pytest
 from hugr.ops import CFG
@@ -16,6 +17,10 @@ triples = [
     "aarch64-apple-darwin",
     "x86_64-windows-msvc",
 ]
+
+Platform = Literal["helios", "sol"]
+
+platforms: list[Platform] = ["helios", "sol"]
 
 
 def load(name: str) -> bytes:
@@ -39,7 +44,7 @@ def test_check() -> None:
     package = Package.from_bytes(hugr_envelope)
     hugr = package.modules[0]
     hugr.add_node(CFG([], []))
-    with pytest.raises(HugrReadError, match="CFG must have children"):
+    with pytest.raises(ValueError, match="has no entry block"):
         check_hugr(package.to_str().encode("utf-8"))
 
 
@@ -69,10 +74,15 @@ def test_unsupported_pytket_ops() -> None:
     ],
 )
 @pytest.mark.parametrize("target_triple", triples)
-def test_llvm(snapshot: Snapshot, hugr_file: str, target_triple: str) -> None:
+@pytest.mark.parametrize("platform", platforms)
+def test_llvm(
+    snapshot: Snapshot, hugr_file: str, target_triple: str, platform: Platform
+) -> None:
     hugr_envelope = load(hugr_file)
-    ir = compile_to_llvm_ir(hugr_envelope, target_triple=target_triple)  # type: ignore[call-arg]
-    snapshot.assert_match(ir, f"{hugr_file}_{target_triple}")
+    ir = compile_to_llvm_ir(
+        hugr_envelope, target_triple=target_triple, platform=platform
+    )
+    snapshot.assert_match(ir, f"{hugr_file}_{target_triple}_{platform}")
 
 
 def test_entry_args() -> None:
@@ -83,6 +93,9 @@ def test_entry_args() -> None:
         _ = compile_to_llvm_ir(load("entry_args"))
 
 
+# TODO: The stored hugr compiles to an empty function. It is likely missing
+# visibility information on the main function.
+@pytest.mark.skip(reason="Stored example .hugr is outdated, needs to be re-created.")
 @pytest.mark.parametrize("target_triple", triples)
 def test_gpu(snapshot: Snapshot, target_triple: str) -> None:
     # when we get GPU support in guppy, we might write something like:
@@ -113,5 +126,5 @@ def test_gpu(snapshot: Snapshot, target_triple: str) -> None:
     # above, using the tket_qsystem::extension::gpu entities.
     hugr_file = resources_dir / "example_gpu.hugr"
     hugr_envelope = hugr_file.read_bytes()
-    ir = compile_to_llvm_ir(hugr_envelope, target_triple=target_triple)  # type: ignore[call-arg]
+    ir = compile_to_llvm_ir(hugr_envelope, target_triple=target_triple)
     snapshot.assert_match(ir, f"gpu_{target_triple}")

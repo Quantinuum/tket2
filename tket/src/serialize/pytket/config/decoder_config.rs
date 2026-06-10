@@ -1,5 +1,5 @@
 //! Configuration for converting [`tket_json_rs::circuit_json::SerialCircuit`]
-//! into [`Circuit`]s.
+//! into Hugrs.
 //!
 //! A configuration struct contains a list of custom decoders that define
 //! translations of legacy tket primitives into HUGR operations.
@@ -19,7 +19,7 @@ use crate::serialize::pytket::extension::{PytketDecoder, PytketTypeTranslator, R
 use super::TypeTranslatorSet;
 
 /// Configuration for converting [`tket_json_rs::circuit_json::SerialCircuit`]
-/// into [`Circuit`][crate::Circuit].
+/// into Hugrs.
 ///
 /// Contains custom decoders that define translations for HUGR operations,
 /// types, and consts into pytket primitives.

@@ -1,7 +1,6 @@
 //! Encoder and decoder for rotation operations.
 
 use super::PytketEmitter;
-use crate::Circuit;
 use crate::extension::rotation::{
     ConstRotation, ROTATION_EXTENSION_ID, ROTATION_TYPE_ID, RotationOp,
 };
@@ -29,7 +28,7 @@ impl<H: HugrView> PytketEmitter<H> for RotationEmitter {
         &self,
         node: H::Node,
         op: &ExtensionOp,
-        circ: &Circuit<H>,
+        hugr: &H,
         encoder: &mut PytketEncoderContext<H>,
     ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
         let Ok(rot_op) = RotationOp::from_extension_op(op) else {
@@ -38,7 +37,7 @@ impl<H: HugrView> PytketEmitter<H> for RotationEmitter {
 
         match rot_op {
             RotationOp::from_halfturns_unchecked | RotationOp::to_halfturns => {
-                encoder.emit_transparent_node(node, circ, |ps| vec![ps.input_params[0].clone()])?;
+                encoder.emit_transparent_node(node, hugr, |ps| vec![ps.input_params[0].clone()])?;
                 Ok(EncodeStatus::Success)
             }
             RotationOp::from_halfturns => {
@@ -46,7 +45,7 @@ impl<H: HugrView> PytketEmitter<H> for RotationEmitter {
                 Ok(EncodeStatus::Unsupported)
             }
             _ => {
-                encoder.emit_transparent_node(node, circ, |ps| {
+                encoder.emit_transparent_node(node, hugr, |ps| {
                     RotationEmitter::encode_rotation_op(&rot_op, ps.input_params)
                         .into_iter()
                         .collect_vec()

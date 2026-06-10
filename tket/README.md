@@ -24,13 +24,18 @@ encoding.
 Defining a circuit in TKET is currently done by using the low-level [hugr Builder] API, or by loading tket1 circuits from JSON files.
 
 ```rust
-use tket::{Circuit, Hugr};
+use std::io::BufReader;
+use tket::Circuit;
+use tket::serialize::{TKETDecode, pytket::DecodeOptions};
+use tket_json_rs::circuit_json::SerialCircuit;
 
 // Load a tket1 circuit.
-let mut circ: Hugr = tket::json::load_tk1_json_file("test_files/pytket/barenco_tof_5.json").unwrap();
+let reader = BufReader::new(std::fs::File::open("../test_files/pytket/barenco_tof_5.json").unwrap());
+let ser: SerialCircuit = serde_json::from_reader(reader).unwrap();
+let mut circ: Circuit = ser.decode(DecodeOptions::new()).unwrap().into();
 
 assert_eq!(circ.qubit_count(), 9);
-assert_eq!(circ.num_gates(), 170);
+assert_eq!(circ.num_operations(), 170);
 
 // Traverse the circuit and print the gates.
 for command in circ.commands() {
@@ -41,7 +46,7 @@ for command in circ.commands() {
 println!("{}", circ.mermaid_string());
 
 // Optimise the circuit.
-tket::passes::apply_greedy_commutation(&mut circ);
+tket::passes::apply_greedy_commutation(&mut circ).unwrap();
 ```
 
 Please read the [API documentation here][].

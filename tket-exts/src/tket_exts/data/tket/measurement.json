@@ -1,0 +1,45 @@
+{
+  "version": "0.1.0",
+  "name": "tket.measurement",
+  "types": {
+    "Measurement": {
+      "extension": "tket.measurement",
+      "name": "Measurement",
+      "params": [],
+      "description": "A copyable type representing the result of a measurement operation",
+      "bound": {
+        "b": "Explicit",
+        "bound": "C"
+      }
+    }
+  },
+  "operations": {
+    "Read": {
+      "extension": "tket.measurement",
+      "name": "Read",
+      "description": "Consumes a measurement, converting it into a bool.",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "tket.measurement",
+              "id": "Measurement",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ]
+        }
+      },
+      "binary": false
+    }
+  }
+}

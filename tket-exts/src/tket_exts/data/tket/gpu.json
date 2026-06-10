@@ -1,5 +1,5 @@
 {
-  "version": "0.1.1",
+  "version": "0.2.0",
   "name": "tket.gpu",
   "types": {
     "context": {
@@ -103,36 +103,26 @@
               "id": "func",
               "args": [
                 {
-                  "tya": "List",
-                  "elems": [
-                    {
-                      "tya": "Variable",
-                      "idx": 0,
-                      "cached_decl": {
-                        "tp": "List",
-                        "param": {
-                          "tp": "Type",
-                          "b": "C"
-                        }
-                      }
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "List",
+                    "param": {
+                      "tp": "Type",
+                      "b": "C"
                     }
-                  ]
+                  }
                 },
                 {
-                  "tya": "List",
-                  "elems": [
-                    {
-                      "tya": "Variable",
-                      "idx": 1,
-                      "cached_decl": {
-                        "tp": "List",
-                        "param": {
-                          "tp": "Type",
-                          "b": "C"
-                        }
-                      }
+                  "tya": "Variable",
+                  "idx": 1,
+                  "cached_decl": {
+                    "tp": "List",
+                    "param": {
+                      "tp": "Type",
+                      "b": "C"
                     }
-                  ]
+                  }
                 }
               ],
               "bound": "C"
@@ -150,20 +140,15 @@
               "id": "result",
               "args": [
                 {
-                  "tya": "List",
-                  "elems": [
-                    {
-                      "tya": "Variable",
-                      "idx": 1,
-                      "cached_decl": {
-                        "tp": "List",
-                        "param": {
-                          "tp": "Type",
-                          "b": "C"
-                        }
-                      }
+                  "tya": "Variable",
+                  "idx": 1,
+                  "cached_decl": {
+                    "tp": "List",
+                    "param": {
+                      "tp": "Type",
+                      "b": "C"
                     }
-                  ]
+                  }
                 }
               ],
               "bound": "A"
@@ -270,36 +255,26 @@
               "id": "func",
               "args": [
                 {
-                  "tya": "List",
-                  "elems": [
-                    {
-                      "tya": "Variable",
-                      "idx": 1,
-                      "cached_decl": {
-                        "tp": "List",
-                        "param": {
-                          "tp": "Type",
-                          "b": "C"
-                        }
-                      }
+                  "tya": "Variable",
+                  "idx": 1,
+                  "cached_decl": {
+                    "tp": "List",
+                    "param": {
+                      "tp": "Type",
+                      "b": "C"
                     }
-                  ]
+                  }
                 },
                 {
-                  "tya": "List",
-                  "elems": [
-                    {
-                      "tya": "Variable",
-                      "idx": 2,
-                      "cached_decl": {
-                        "tp": "List",
-                        "param": {
-                          "tp": "Type",
-                          "b": "C"
-                        }
-                      }
+                  "tya": "Variable",
+                  "idx": 2,
+                  "cached_decl": {
+                    "tp": "List",
+                    "param": {
+                      "tp": "Type",
+                      "b": "C"
                     }
-                  ]
+                  }
                 }
               ],
               "bound": "C"
@@ -350,36 +325,26 @@
               "id": "func",
               "args": [
                 {
-                  "tya": "List",
-                  "elems": [
-                    {
-                      "tya": "Variable",
-                      "idx": 1,
-                      "cached_decl": {
-                        "tp": "List",
-                        "param": {
-                          "tp": "Type",
-                          "b": "C"
-                        }
-                      }
+                  "tya": "Variable",
+                  "idx": 1,
+                  "cached_decl": {
+                    "tp": "List",
+                    "param": {
+                      "tp": "Type",
+                      "b": "C"
                     }
-                  ]
+                  }
                 },
                 {
-                  "tya": "List",
-                  "elems": [
-                    {
-                      "tya": "Variable",
-                      "idx": 2,
-                      "cached_decl": {
-                        "tp": "List",
-                        "param": {
-                          "tp": "Type",
-                          "b": "C"
-                        }
-                      }
+                  "tya": "Variable",
+                  "idx": 2,
+                  "cached_decl": {
+                    "tp": "List",
+                    "param": {
+                      "tp": "Type",
+                      "b": "C"
                     }
-                  ]
+                  }
                 }
               ],
               "bound": "C"
@@ -411,20 +376,15 @@
               "id": "result",
               "args": [
                 {
-                  "tya": "List",
-                  "elems": [
-                    {
-                      "tya": "Variable",
-                      "idx": 0,
-                      "cached_decl": {
-                        "tp": "List",
-                        "param": {
-                          "tp": "Type",
-                          "b": "C"
-                        }
-                      }
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "List",
+                    "param": {
+                      "tp": "Type",
+                      "b": "C"
                     }
-                  ]
+                  }
                 }
               ],
               "bound": "A"

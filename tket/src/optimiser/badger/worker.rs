@@ -2,7 +2,6 @@
 
 use std::thread::{self, JoinHandle};
 
-use crate::circuit::CircuitHash;
 use crate::rewrite::Rewriter;
 use crate::rewrite::strategy::RewriteStrategy;
 use crate::{Circuit, circuit::cost::CircuitCost};

@@ -1,8 +1,10 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang ==0.21.6",
+#     "guppylang ==0.21.13",
 # ]
+# [tool.uv.sources]
+# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", branch = "ts/future-measure"}
 # ///
 """Nested function calls"""
 
@@ -33,5 +35,5 @@ def outer(q0: qubit @ owned) -> qubit:
     return mid(q0)
 
 
-program = inner.compile_function()
+program = outer.compile_function()
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())

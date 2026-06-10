@@ -20,7 +20,7 @@ pub const GUPPY_EXTENSION_VERSION: Version = Version::new(0, 2, 0);
 pub const DROP_OP_NAME: SmolStr = SmolStr::new_inline("drop");
 
 lazy_static! {
-    /// The "tket.bool" extension.
+    /// The "tket.guppy" extension.
     pub static ref GUPPY_EXTENSION: Arc<Extension>  = {
         Extension::new_arc(GUPPY_EXTENSION_ID, GUPPY_EXTENSION_VERSION, |ext, ext_ref| {
             ext.add_op(DROP_OP_NAME,

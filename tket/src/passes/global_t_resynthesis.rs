@@ -1,6 +1,6 @@
 use crate::metadata::QubitRegisters;
 use crate::passes::guppy::NormalizeGuppyErrors;
-use crate::passes::NormalizeGuppy;
+use crate::passes::{ComposablePass, NormalizeGuppy, inline_acyclic};
 use crate::serialize::pytket::{
     default_decoder_config,
     default_encoder_config,
@@ -9,7 +9,6 @@ use crate::serialize::pytket::{
     PytketDecodeError, PytketEncodeError,
 };
 use crate::{Circuit, CircuitError};
-use hugr::algorithms::inline_funcs::InlineFuncsError;
 use hugr::hugr::ValidationError;
 use hugr::hugr::hugrmut::HugrMut;
 
@@ -22,8 +21,6 @@ use petgraph::visit as pv;
 use pg_optimise::{GroupCommutingOpsPass, RotationMergingPass};
 use fast_todd::FastTODDPass;
 
-use hugr::algorithms::inline_acyclic;
-use hugr::algorithms::ComposablePass;
 use hugr::{Hugr, Node};
 use hugr::HugrView;
 use hugr::hugr::OpType as TketOp;

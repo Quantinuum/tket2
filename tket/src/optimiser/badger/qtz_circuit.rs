@@ -135,25 +135,6 @@ pub(super) fn load_ecc_set(
 mod tests {
     use super::*;
 
-    fn load_representative_set(path: &str) -> HashMap<String, Circuit<Hugr>> {
-        let jsons = std::fs::read_to_string(path).unwrap();
-        // read_rep_json(&jsons).unwrap();
-        let st: Vec<RepCircData> = serde_json::from_str(&jsons).unwrap();
-        st.into_iter()
-            .map(|mut rcd| (rcd.meta.id.remove(0), rcd.into()))
-            .collect()
-    }
-
-    #[test]
-    #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
-    fn test_read_rep() {
-        let rep_map = load_representative_set("../test_files/eccs/h_rz_cxrepresentative_set.json");
-
-        for c in rep_map.values().take(1) {
-            println!("{}", c.dot_string());
-        }
-    }
-
     #[test]
     #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     fn test_read_complete() {

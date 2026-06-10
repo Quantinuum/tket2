@@ -1,0 +1,35 @@
+---
+source: tket-qsystem/src/llvm/debug.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+@res_test_state.900F7606.0 = private constant [29 x i8] c"\1CUSER:STATE:test_state_result"
+
+define private [2 x i64] @_hl.main.1([2 x i64] %0) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %tag_len = load i8, ptr @res_test_state.900F7606.0, align 1
+  %tag_len2 = zext i8 %tag_len to i64
+  %1 = alloca i64, i32 2, align 8
+  store [2 x i64] %0, ptr %1, align 4
+  %out_arr_alloca = alloca <{ i32, i32, ptr, ptr }>, align 8
+  %x_ptr = getelementptr inbounds nuw <{ i32, i32, ptr, ptr }>, ptr %out_arr_alloca, i32 0, i32 0
+  %y_ptr = getelementptr inbounds nuw <{ i32, i32, ptr, ptr }>, ptr %out_arr_alloca, i32 0, i32 1
+  %arr_ptr = getelementptr inbounds nuw <{ i32, i32, ptr, ptr }>, ptr %out_arr_alloca, i32 0, i32 2
+  %mask_ptr = getelementptr inbounds nuw <{ i32, i32, ptr, ptr }>, ptr %out_arr_alloca, i32 0, i32 3
+  %2 = alloca i1, i32 2, align 1
+  store [2 x i1] zeroinitializer, ptr %2, align 1
+  store i32 2, ptr %x_ptr, align 4
+  store i32 1, ptr %y_ptr, align 4
+  store ptr %1, ptr %arr_ptr, align 8
+  store ptr %2, ptr %mask_ptr, align 8
+  %3 = load <{ i32, i32, ptr, ptr }>, ptr %out_arr_alloca, align 1
+  call void @print_state_result(ptr @res_test_state.900F7606.0, i64 %tag_len2, ptr %out_arr_alloca)
+  ret [2 x i64] %0
+}
+
+declare void @print_state_result(ptr, i64, ptr)

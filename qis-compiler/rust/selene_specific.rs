@@ -22,7 +22,7 @@ pub fn panic_str_fn<'c>(
     let panic_str_type = iwc.void_type().fn_type(
         &[
             iwc.i32_type().into(),
-            iwc.i8_type().ptr_type(AddressSpace::default()).into(),
+            iwc.ptr_type(AddressSpace::default()).into(),
         ],
         false,
     );

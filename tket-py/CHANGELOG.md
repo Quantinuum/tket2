@@ -1,5 +1,63 @@
 # Changelog
 
+## [0.13.1](https://github.com/Quantinuum/tket2/compare/tket-py-v0.13.0...tket-py-v0.13.1) (2026-05-19)
+
+
+### Features
+
+* Add python definitions for the TKET metadata keys ([#1535](https://github.com/Quantinuum/tket2/issues/1535)) ([1bfef9a](https://github.com/Quantinuum/tket2/commit/1bfef9a3224e9bba1edcf6c5dba38d7157bd9040))
+* Clean Up by Deleting Unconnected Nodes after Modifier Solve ([#1557](https://github.com/Quantinuum/tket2/issues/1557)) ([d706867](https://github.com/Quantinuum/tket2/commit/d706867ef740c7faaa01b7e6dcf5d9074f954dbf))
+* Expose the QSystemPass to Python ([#1556](https://github.com/Quantinuum/tket2/issues/1556)) ([394a610](https://github.com/Quantinuum/tket2/commit/394a610593818ab10a46e5febbc3ec7f6cd29cec))
+* InlineFunctionsPass ([#1524](https://github.com/Quantinuum/tket2/issues/1524)) ([f40dcef](https://github.com/Quantinuum/tket2/commit/f40dcefdb8c1f36220e187789825c3e0d7f3412e))
+* InlineHint metadata ([#1532](https://github.com/Quantinuum/tket2/issues/1532)) ([e7949c2](https://github.com/Quantinuum/tket2/commit/e7949c2ae20bde5de0abdbc5e09f2e5ad7606849))
+
+
+### Bug Fixes
+
+* Apply modifiers through function calls ([#1531](https://github.com/Quantinuum/tket2/issues/1531)) ([6a13f0c](https://github.com/Quantinuum/tket2/commit/6a13f0c40041bd841bbc8fe12d849b207f349fb2))
+* Incorrect matching of pytket parameters to unsupported graph ports ([#1561](https://github.com/Quantinuum/tket2/issues/1561)) ([4fc5a25](https://github.com/Quantinuum/tket2/commit/4fc5a25ad8e3d97b4ac47f5578b4e041b95d96fc))
+* Passes with Nested Modifier ([#1546](https://github.com/Quantinuum/tket2/issues/1546)) ([bf6df51](https://github.com/Quantinuum/tket2/commit/bf6df51b5c89a27f51887d301619af8918b01f79))
+* Update examples link in README.md ([#1506](https://github.com/Quantinuum/tket2/issues/1506)) ([9a25ec8](https://github.com/Quantinuum/tket2/commit/9a25ec8b83dc193aaa031a9f52e256ec85ee7bc2))
+
+
+### Documentation
+
+* Simplify package description. ([#1547](https://github.com/Quantinuum/tket2/issues/1547)) ([54e855f](https://github.com/Quantinuum/tket2/commit/54e855ffe9700fb73771f2d31026ea20a7c83120))
+
+## [0.13.0](https://github.com/Quantinuum/tket2/compare/tket-py-v0.12.16...tket-py-v0.13.0) (2026-04-07)
+
+This release removes outdated APIs from the public interface. `Tk2Circuit` has been replaced with a temporarily unstable `CompilationState`.
+The `hugr` dependency has been updated to `0.26.0`, adding support for pass scopes in the `CompositePass` framework.
+
+### ⚠ BREAKING CHANGES
+
+* Removed `Tk2Circuit` use `CompilationState` instead. Non-stable APIs have been marked as internal. They will be re-designed and stabilized in future releases.
+* Moved `tket::modifier::ModifierResolverPass` to `tket::passes`.
+* Renamed `tket_qsystem::extension::qsystem::lower_tket_op` to `lower_tket_ops`.
+* Updated public `hugr` dependency to `0.26.0`.
+* Minimum supported Rust version bumped to 1.91
+* Removed `CircuitHash` trait, use `Circuit::circuit_hash` or `hugr::algorithms::hash::HugrHash` instead.
+* Removed `tket::passes::lower_to_pytket`. Use `NormalizeGuppy` instead.
+* Renamed `TKETDecode::decode_inplace` to `decode_into`.
+* Removed deprecated `find_tuple_unpack_rewrites`. Use `tket::passes::UntuplePass` instead.
+
+### Features
+
+* expose ModifierResolverPass to Python ([#1502](https://github.com/Quantinuum/tket2/issues/1502)) ([9e3e0de](https://github.com/Quantinuum/tket2/commit/9e3e0de6d5590e3c1455cd95efc52d838e043b5b)), closes [#1452](https://github.com/Quantinuum/tket2/issues/1452)
+* Expose NormalizeGuppy::squash_borrows flag in python ([#1412](https://github.com/Quantinuum/tket2/issues/1412)) ([ba25fa1](https://github.com/Quantinuum/tket2/commit/ba25fa1e7cdc746692f56fbeb37114bbbff27f24))
+* Follow pass scopes in composable passes ([#1429](https://github.com/Quantinuum/tket2/issues/1429)) ([ae0016c](https://github.com/Quantinuum/tket2/commit/ae0016ce15182daedde0cca4f871178a80d5901c))
+* Move hugr-passes implementations to tket::passes ([#1487](https://github.com/Quantinuum/tket2/issues/1487)) ([cc5ca5c](https://github.com/Quantinuum/tket2/commit/cc5ca5ca8ce2492be11dcd0fc2c8504a02f5e82e))
+* Pass scopes in python API, update to hugr-py 0.16 ([#1464](https://github.com/Quantinuum/tket2/issues/1464)) ([369aba2](https://github.com/Quantinuum/tket2/commit/369aba22aa31f0e819074af8d96e8b38704c51ee))
+* Print full traceback for rust-originated errors ([#1435](https://github.com/Quantinuum/tket2/issues/1435)) ([9c03ee0](https://github.com/Quantinuum/tket2/commit/9c03ee0d7fa7e6f4257214d2173c56c41116a5be))
+* Remove deprecated unpack tuple pass ([#1387](https://github.com/Quantinuum/tket2/issues/1387)) ([86ac8f9](https://github.com/Quantinuum/tket2/commit/86ac8f994af3d7d8fa0c36f731b89832330842a9))
+* Remove unused `lower_to_pytket` pass ([#1431](https://github.com/Quantinuum/tket2/issues/1431)) ([a214abc](https://github.com/Quantinuum/tket2/commit/a214abca21d2ca731c55bc8ff2bf3e617d08e4c7))
+* Reorganize `tket::passes` and add `hugr_passes` re-exports ([#1472](https://github.com/Quantinuum/tket2/issues/1472)) ([b3bc669](https://github.com/Quantinuum/tket2/commit/b3bc6695ed4499578e44c57eb0a591d6e19155a3))
+* Replace `Tk2Circuit` with a simpler `CompilationState` definition ([#1482](https://github.com/Quantinuum/tket2/issues/1482)) ([e814f35](https://github.com/Quantinuum/tket2/commit/e814f35d8ab02bcafce72cd82dba19bc681a2431))
+* Replace CircuitHash with hugr's implementation ([#1420](https://github.com/Quantinuum/tket2/issues/1420)) ([e2b4991](https://github.com/Quantinuum/tket2/commit/e2b4991e05548ee35ad88e1ba5ff2d827781de49))
+* Update MSRV to rust 1.91 ([#1446](https://github.com/Quantinuum/tket2/issues/1446)) ([b82a771](https://github.com/Quantinuum/tket2/commit/b82a7711729f4d41c29bec55ab1adbaed0fe5bb1))
+* Update to hugr 0.26.0 ([#1448](https://github.com/Quantinuum/tket2/issues/1448)) ([f43a877](https://github.com/Quantinuum/tket2/commit/f43a877e2a5295a88de1bd9f13d83d8fe238df35))
+* Use raw Hugrs in pytket encoding/decoding API ([#1418](https://github.com/Quantinuum/tket2/issues/1418)) ([9df9993](https://github.com/Quantinuum/tket2/commit/9df9993292a59c8b8433ceead99ed7246c19dd02))
+
 ## [0.12.16](https://github.com/Quantinuum/tket2/compare/tket-py-v0.12.15...tket-py-v0.12.16) (2026-01-29)
 
 

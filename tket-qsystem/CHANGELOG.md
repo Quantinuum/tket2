@@ -1,6 +1,66 @@
 # Changelog
 
 
+## [0.25.0](https://github.com/Quantinuum/tket2/compare/tket-qsystem-v0.24.0...tket-qsystem-v0.25.0) - 2026-05-28
+
+### Bug Fixes
+
+- Multiple fixes to the pytket encoder ([#1566](https://github.com/Quantinuum/tket2/pull/1566))
+- [**breaking**] Replace non-deterministic iterations on hash maps ([#1582](https://github.com/Quantinuum/tket2/pull/1582))
+
+### New Features
+
+- expose the QSystemPass to Python ([#1556](https://github.com/Quantinuum/tket2/pull/1556))
+- upgrade to hugr v0.27.1 ([#1568](https://github.com/Quantinuum/tket2/pull/1568))
+- [**breaking**] Ignore empty circuits when encoding Hugr regions into pytket ([#1562](https://github.com/Quantinuum/tket2/pull/1562))
+- *(qsystem)* [**breaking**] multiple platform extensions ([#1567](https://github.com/Quantinuum/tket2/pull/1567))
+
+### Refactor
+
+- [**breaking**] Deprecate commands iterator ([#1611](https://github.com/Quantinuum/tket2/pull/1611))
+
+### Testing
+
+- Pin guppy version in example files, fix test ([#1534](https://github.com/Quantinuum/tket2/pull/1534))
+
+## [0.24.0](https://github.com/Quantinuum/tket2/compare/tket-qsystem-v0.23.0...tket-qsystem-v0.24.0) - 2026-04-02
+
+### Bug Fixes
+
+- pytket encoder drops order edges to the output node ([#1466](https://github.com/Quantinuum/tket2/pull/1466))
+- Constant Folding with PassScope::Global should act globally, not just beneath the entrypoint ([#1470](https://github.com/Quantinuum/tket2/pull/1470))
+
+### New Features
+
+- [**breaking**] Use raw Hugrs in pytket encoding/decoding API ([#1418](https://github.com/Quantinuum/tket2/pull/1418))
+- Add qsystem.rz pytket decoder ([#1432](https://github.com/Quantinuum/tket2/pull/1432))
+- [**breaking**] Update MSRV to rust 1.91 ([#1446](https://github.com/Quantinuum/tket2/pull/1446))
+- [**breaking**] Update to hugr 0.26.0 ([#1448](https://github.com/Quantinuum/tket2/pull/1448))
+- [**breaking**] Follow pass scopes in composable passes ([#1429](https://github.com/Quantinuum/tket2/pull/1429))
+- [**breaking**] Reorganize `tket::passes` and add `hugr_passes` re-exports ([#1472](https://github.com/Quantinuum/tket2/pull/1472))
+- Move hugr-passes implementations to tket::passes ([#1487](https://github.com/Quantinuum/tket2/pull/1487))
+
+## [0.23.0](https://github.com/Quantinuum/tket2/compare/tket-qsystem-v0.22.0...tket-qsystem-v0.23.0) - 2026-02-02
+
+### Bug Fixes
+
+- [**breaking**] Don't rely on command params for pytket barriers ([#1298](https://github.com/Quantinuum/tket2/pull/1298))
+- Wrongly reused qubit IDs in pytket encoding ([#1358](https://github.com/Quantinuum/tket2/pull/1358))
+
+### New Features
+
+- `NormalizeGuppy` pass to simplify generated structure ([#1220](https://github.com/Quantinuum/tket2/pull/1220))
+- Allow running arbitrary serializable pytket passes on hugrs ([#1266](https://github.com/Quantinuum/tket2/pull/1266))
+- BorrowSquashPass to elide redundant borrow/return ops ([#1159](https://github.com/Quantinuum/tket2/pull/1159))
+- [**breaking**] Bump hugr to 0.25.0 ([#1325](https://github.com/Quantinuum/tket2/pull/1325))
+- Remove order edges in NormalizeGuppy pass ([#1326](https://github.com/Quantinuum/tket2/pull/1326))
+- hide new public funcs introduced by linearization ([#1333](https://github.com/Quantinuum/tket2/pull/1333))
+
+### Testing
+
+- regenerate guppy_opt examples, and count gates ([#1249](https://github.com/Quantinuum/tket2/pull/1249))
+- run pytket on guppy_opt tests, measure (very limited) success ([#1250](https://github.com/Quantinuum/tket2/pull/1250))
+
 ## [0.22.0](https://github.com/quantinuum/tket2/compare/tket-qsystem-v0.21.0...tket-qsystem-v0.22.0) - 2025-10-20
 
 ### New Features

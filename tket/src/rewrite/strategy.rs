@@ -29,7 +29,7 @@ use hugr::{HugrView, Node};
 use itertools::Itertools;
 
 use crate::circuit::cost::{CircuitCost, CostDelta, LexicographicCost, is_cx, is_quantum};
-use crate::{Circuit, TketOp, op_matches};
+use crate::{Circuit, TketOp};
 
 use super::CircuitRewrite;
 use super::trace::RewriteTrace;
@@ -369,7 +369,7 @@ impl LexicographicCostFunction<fn(&OpType) -> usize, 2> {
     pub fn rz_count() -> Self {
         Self {
             cost_fns: [
-                |op| op_matches(op, TketOp::Rz) as usize,
+                |op| (op.cast() == Some(TketOp::Rz)) as usize,
                 |op| is_quantum(op) as usize,
             ],
         }
@@ -520,10 +520,18 @@ mod tests {
         create_rewrite(&subcirc, circ, n_cx(10))
     }
 
+    /// Returns a vector of `TketOp` nodes in the entrypoint region, in topological order.
+    fn entrypoint_tket_ops(circ: &Circuit) -> Vec<Node> {
+        circ.toposorted_children(circ.parent())
+            .expect("circuit entrypoint should be dataflow region")
+            .filter(|&n| circ.hugr().get_optype(n).cast::<TketOp>().is_some())
+            .collect_vec()
+    }
+
     #[test]
     fn test_greedy_strategy() {
         let mut circ = n_cx(10);
-        let cx_gates = circ.commands().map(|cmd| cmd.node()).collect_vec();
+        let cx_gates = entrypoint_tket_ops(&circ);
 
         assert!(circ.rewrite_trace().is_none());
         circ.enable_rewrite_tracing();
@@ -552,7 +560,7 @@ mod tests {
     #[test]
     fn test_exhaustive_default_strategy() {
         let mut circ = n_cx(10);
-        let cx_gates = circ.commands().map(|cmd| cmd.node()).collect_vec();
+        let cx_gates = entrypoint_tket_ops(&circ);
         circ.enable_rewrite_tracing();
 
         let rws = [
@@ -589,7 +597,7 @@ mod tests {
     #[test]
     fn test_exhaustive_gamma_strategy() {
         let circ = n_cx(10);
-        let cx_gates = circ.commands().map(|cmd| cmd.node()).collect_vec();
+        let cx_gates = entrypoint_tket_ops(&circ);
 
         let rws = [
             rw_to_empty(&circ, cx_gates[0..2].to_vec()),

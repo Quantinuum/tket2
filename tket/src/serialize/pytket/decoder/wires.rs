@@ -1,6 +1,7 @@
 //! Structures to keep track of pytket [`ElementId`][tket_json_rs::register::ElementId]s and
 //! their correspondence to wires in the hugr being defined.
 use std::collections::{BTreeMap, VecDeque};
+use std::ops::Deref;
 use std::sync::Arc;
 
 use hugr::builder::{DFGBuilder, Dataflow as _};
@@ -10,12 +11,12 @@ use hugr::ops::Value;
 use hugr::std_extensions::arithmetic::float_types::{ConstF64, float64_type};
 use hugr::types::Type;
 use hugr::{Hugr, IncomingPort, Node, Wire};
+use hugr_core::types::{Term, TypeRow};
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 use tket_json_rs::circuit_json::ImplicitPermutation;
 use tket_json_rs::register::ElementId as PytketRegister;
 
-use crate::extension::bool::bool_type;
 use crate::extension::rotation::{ConstRotation, rotation_type};
 use crate::serialize::pytket::decoder::param::parser::{PytketParam, parse_pytket_param};
 use crate::serialize::pytket::decoder::{
@@ -533,6 +534,12 @@ impl WireTracker {
         }
     }
 
+    /// Return tracked metadata for a decoded wire, if it carries pytket
+    /// registers known to this tracker.
+    pub(super) fn wire_data(&self, wire: Wire) -> Option<&WireData> {
+        self.wires.get(&wire)
+    }
+
     /// Mark a qubit as outdated, without adding a new wire containing the fresh value.
     ///
     /// This is used when a hugr operation consumes pytket registers as its inputs, but doesn't use them in the outputs.
@@ -540,15 +547,6 @@ impl WireTracker {
         self.qubits[qubit.id().0].mark_outdated();
         qubit.mark_outdated();
         qubit
-    }
-
-    /// Mark a bit as outdated, without adding a new wire containing the fresh value.
-    ///
-    /// This is used when a hugr operation consumes pytket registers as its inputs, but doesn't use them in the outputs.
-    pub fn mark_bit_outdated(&mut self, mut bit: TrackedBit) -> TrackedBit {
-        self.bits[bit.id().0].mark_outdated();
-        bit.mark_outdated();
-        bit
     }
 
     /// Returns the latest tracked qubit for a pytket register.
@@ -689,10 +687,12 @@ impl WireTracker {
         let qubit_candidates = qubit_args
             .first()
             .into_iter()
+            .filter(|_| reg_count.qubits > 0 && !qubit_args.is_empty())
             .flat_map(|qb| self.qubit_wires(qb));
         let bit_candidates = bit_args
             .first()
             .into_iter()
+            .filter(|_| reg_count.bits > 0 && !bit_args.is_empty())
             .flat_map(|bit| self.bit_wires(bit));
         let candidates = qubit_candidates.chain(bit_candidates).collect_vec();
 
@@ -718,9 +718,14 @@ impl WireTracker {
             // Handle lazy initialization of qubit and bit wires. These are
             // normally qubits/bits present in the pytket circuit definition,
             // but not in the region's input.
-            _ if ty == &qb_t() => self.initialize_qubit_wire(builder, qubit_args[0].clone())?,
-            _ if ty == &bool_t() || ty == &bool_type() => {
+            _ if ty == &qb_t() && !qubit_args.is_empty() => {
+                self.initialize_qubit_wire(builder, qubit_args[0].clone())?
+            }
+            _ if ty == &bool_t() && !bit_args.is_empty() => {
                 self.initialize_bit_wire(builder, bit_args[0].clone())?
+            }
+            _ if matches!(ty.deref(), Term::SumType(sum) if sum.as_tuple().is_some()) => {
+                return self.find_tuple_wire(config, builder, ty, qubit_args, bit_args, params);
             }
             _ => {
                 return Err(PytketDecodeErrorInner::NoMatchingWire {
@@ -765,17 +770,105 @@ impl WireTracker {
         *bit_args = &bit_args[reg_count.bits..];
 
         // Convert the wire type, if needed.
-        let wire_data = &self.wires[&wire];
-        let new_wire = config.transform_typed_value(wire, wire_data.ty(), ty, builder)?;
+        let found_wire_data = &self.wires[&wire];
+        let new_wire = config.transform_typed_value(wire, found_wire_data.ty(), ty, builder)?;
 
         if wire == new_wire {
             Ok(FoundWire::Register(self.wires[&wire].clone()))
         } else {
-            let ty: Arc<Type> = wire_data.ty.clone();
-            self.track_wire(new_wire, ty, wire_qubits, wire_bits)?;
+            self.track_wire(new_wire, Arc::new(ty.clone()), wire_qubits, wire_bits)?;
             self.mark_wire_outdated(wire);
             Ok(FoundWire::Register(self.wires[&new_wire].clone()))
         }
+    }
+
+    /// Build a tuple wire from its tracked element wires when no matching
+    /// aggregate wire exists.
+    ///
+    /// Pytket passes may preserve an opaque barrier while presenting its qubit
+    /// arguments in an order that does not match any aggregate tuple wire
+    /// already tracked from the original HUGR. In that case, we can rebuild the
+    /// tuple explicitly from the individual decoded wires.
+    fn find_tuple_wire(
+        &mut self,
+        config: &PytketDecoderConfig,
+        builder: &mut DFGBuilder<&mut Hugr>,
+        ty: &Type,
+        qubit_args: &mut &[TrackedQubit],
+        bit_args: &mut &[TrackedBit],
+        params: &mut &[LoadedParameter],
+    ) -> Result<FoundWire, PytketDecodeError> {
+        let Term::SumType(sum) = ty.deref() else {
+            unreachable!("find_tuple_wire called with non-sum type");
+        };
+        let Some(tuple) = sum.as_tuple() else {
+            unreachable!("find_tuple_wire called with non-tuple sum type");
+        };
+        let tuple = TypeRow::try_from(tuple.clone()).map_err(|_| {
+            PytketDecodeErrorInner::NoMatchingWire {
+                ty: ty.to_string(),
+                qubit_args: qubit_args
+                    .iter()
+                    .map(|q| q.pytket_register().to_string())
+                    .collect(),
+                bit_args: bit_args
+                    .iter()
+                    .map(|bit| bit.pytket_register().to_string())
+                    .collect(),
+            }
+            .wrap()
+        })?;
+
+        let mut tuple_qubits = *qubit_args;
+        let mut tuple_bits = *bit_args;
+        let mut tuple_params = *params;
+        let mut element_wires = Vec::with_capacity(tuple.len());
+        for elem_ty in tuple.iter() {
+            let FoundWire::Register(wire) = self.find_typed_wire(
+                config,
+                builder,
+                elem_ty,
+                &mut tuple_qubits,
+                &mut tuple_bits,
+                &mut tuple_params,
+                None,
+            )?
+            else {
+                return Err(PytketDecodeErrorInner::NoMatchingWire {
+                    ty: ty.to_string(),
+                    qubit_args: qubit_args
+                        .iter()
+                        .map(|q| q.pytket_register().to_string())
+                        .collect(),
+                    bit_args: bit_args
+                        .iter()
+                        .map(|bit| bit.pytket_register().to_string())
+                        .collect(),
+                }
+                .wrap());
+            };
+            element_wires.push(wire.wire());
+        }
+
+        let reg_count = config
+            .type_to_pytket(ty)
+            .expect("tuple fallback requires a pytket-representable type");
+        let wire_qubits = qubit_args
+            .iter()
+            .take(reg_count.qubits)
+            .cloned()
+            .collect_vec();
+        let wire_bits = bit_args.iter().take(reg_count.bits).cloned().collect_vec();
+        let tuple_wire = builder
+            .make_tuple(element_wires)
+            .map_err(PytketDecodeError::custom)?;
+        self.track_wire(tuple_wire, Arc::new(ty.clone()), wire_qubits, wire_bits)?;
+
+        *qubit_args = tuple_qubits;
+        *bit_args = tuple_bits;
+        *params = tuple_params;
+
+        Ok(FoundWire::Register(self.wires[&tuple_wire].clone()))
     }
 
     /// Returns a new [TrackedWires] set for a list of [`TrackedQubit`]s,

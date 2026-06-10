@@ -74,7 +74,7 @@ mod test {
                 .add_default_int_extensions()
         });
         let ext_op = op.to_extension_op().unwrap().into();
-        let hugr = single_op_hugr(ext_op);
+        let mut hugr = single_op_hugr(ext_op);
         check_emission!(hugr, llvm_ctx);
     }
 }

@@ -19,7 +19,7 @@ use crate::{
 impl<N: HugrNode> ModifierResolver<N> {
     /// Modify a global phase operation.
     /// This returns the incoming port for the rotation of the modified operation.
-    pub fn modify_global_phase(
+    pub(crate) fn modify_global_phase(
         &mut self,
         n: N,
         new_fn: &mut impl Dataflow,
@@ -103,7 +103,7 @@ impl<N: HugrNode> ModifierResolver<N> {
 }
 
 /// Delete all global phase operations in the subgraph reachable from the given entry points.
-pub fn delete_phase<N: HugrNode>(
+pub(crate) fn delete_phase<N: HugrNode>(
     h: &mut impl HugrMut<Node = N>,
     entry_points: impl IntoIterator<Item = N>,
 ) -> Result<(), ModifierResolverErrors<N>> {
@@ -151,7 +151,7 @@ mod tests {
     #[case(1, foo, true)]
     #[case(5, foo, false)]
     #[case(5, foo, true)]
-    pub fn test_global_phase_modify(
+    fn test_global_phase_modify(
         #[case] c_num: u64,
         #[case] foo: fn(&mut ModuleBuilder<Hugr>, usize) -> FuncID<true>,
         #[case] dagger: bool,

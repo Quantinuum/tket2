@@ -265,7 +265,6 @@ fn find_function(mut hugr: Hugr, function_name: &str) -> Result<Circuit, Circuit
 #[cfg(test)]
 mod tests {
     use crate::TketOp;
-    use crate::circuit::CircuitHash;
 
     use super::*;
 

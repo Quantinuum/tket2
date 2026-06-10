@@ -1,13 +1,10 @@
-from typing import TypeVar, Literal, TYPE_CHECKING
-from .circuit import Tk2Circuit
-from pytket._tket.circuit import Circuit
+from typing import Literal, TYPE_CHECKING
+from .state import CompilationState
 
 if TYPE_CHECKING:
-    from ..rewrite import Rewriter
+    from .._rewrite import Rewriter
 
 from pathlib import Path
-
-CircuitClass = TypeVar("CircuitClass", Circuit, Tk2Circuit)
 
 class BadgerOptimiser:
     def __init__(
@@ -16,7 +13,7 @@ class BadgerOptimiser:
         """Create a new Badger optimiser.
 
         :param rewriter: The rewriter to use.
-        :param rebase: Whether to rebase the circuit before optimising.
+        :param cost_fn: The cost function to use.
         """
 
     @staticmethod
@@ -43,19 +40,21 @@ class BadgerOptimiser:
 
     def optimise(
         self,
-        circ: CircuitClass,
+        circ: CompilationState,
         timeout: int | None = None,
         progress_timeout: int | None = None,
+        max_circuit_count: int | None = None,
         n_threads: int | None = None,
         split_circ: bool = False,
         queue_size: int | None = None,
         log_progress: Path | None = None,
-    ) -> CircuitClass:
-        """Optimise a circuit.
+    ) -> None:
+        """Optimise a circuit in place.
 
         :param circ: The circuit to optimise.
         :param timeout: Maximum time to spend on the optimisation.
         :param progress_timeout: Maximum time to wait between new best results.
+        :param max_circuit_count: Maximum number of circuits to process.
         :param n_threads: Number of threads to use.
         :param split_circ: Split the circuit into subcircuits and optimise them separately.
         :param queue_size: Maximum number of circuits to keep in the queue of candidates.

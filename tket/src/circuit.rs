@@ -3,19 +3,19 @@
 pub mod command;
 pub mod cost;
 mod extract_dfg;
-mod hash;
 pub mod units;
 
 use std::borrow::Cow;
 use std::collections::HashSet;
 use std::iter::Sum;
 
+use crate::passes::utils::hash::{HashError, HugrHash};
+#[expect(deprecated)]
 pub use command::{Command, CommandIterator};
-pub use hash::CircuitHash;
 use hugr::extension::prelude::{NoopDef, TupleOpDef};
 use hugr::extension::simple_op::MakeOpDef;
 use hugr::hugr::views::sibling_subgraph::InvalidSubgraph;
-use hugr::hugr::views::{ExtractionResult, RootChecked, SiblingSubgraph};
+use hugr::hugr::views::{ExtractionResult, RootChecked, SchedulingGraph, SiblingSubgraph};
 use hugr::ops::handle::DataflowParentID;
 use itertools::Either::{Left, Right};
 
@@ -28,6 +28,7 @@ use hugr::{Hugr, PortIndex};
 use hugr::{HugrView, OutgoingPort};
 use itertools::Itertools;
 use lazy_static::lazy_static;
+use petgraph::visit::{Topo, Walker as _};
 
 pub use hugr::ops::OpType;
 pub use hugr::types::{EdgeKind, Type, TypeRow};
@@ -109,6 +110,10 @@ impl<T: HugrView> Circuit<T> {
     /// Returns the node containing the circuit definition.
     pub fn parent(&self) -> T::Node {
         self.hugr.entrypoint()
+    }
+
+    pub(crate) fn sched_graph(&self) -> SchedulingGraph<'_, T> {
+        self.hugr.scheduling_graph(self.parent())
     }
 
     /// Get a reference to the HUGR containing the circuit.
@@ -269,6 +274,11 @@ impl<T: HugrView> Circuit<T> {
             .sum()
     }
 
+    /// Compute the hash of the circuit.
+    pub fn circuit_hash(&self, node: T::Node) -> Result<u64, HashError> {
+        self.hugr.region_hash(node)
+    }
+
     /// Return the graphviz representation of the underlying graph and hierarchy side by side.
     ///
     /// For a simpler representation, use the [`Circuit::mermaid_string`] format instead.
@@ -306,6 +316,11 @@ impl<T: HugrView<Node = Node>> Circuit<T> {
     ///
     /// Ignores the Input and Output nodes.
     #[inline]
+    #[deprecated(
+        since = "0.19.0",
+        note = "This is a limited API that will be dropped soon. Use toposorting over `HugrView::scheduling_graph` instead.\n<https://docs.rs/hugr/latest/hugr/trait.HugrView.html#method.scheduling_graph>"
+    )]
+    #[expect(deprecated)]
     pub fn commands(&self) -> CommandIterator<'_, T>
     where
         Self: Sized,
@@ -322,6 +337,11 @@ impl<T: HugrView<Node = Node>> Circuit<T> {
     ///
     ///   [`TketOp`]: crate::TketOp
     #[inline]
+    #[deprecated(
+        since = "0.19.0",
+        note = "This is a limited API that will be dropped soon. Use toposorting over `HugrView::scheduling_graph` instead.\n<https://docs.rs/hugr/latest/hugr/trait.HugrView.html#method.scheduling_graph>"
+    )]
+    #[expect(deprecated)]
     pub fn operations(&self) -> impl Iterator<Item = Command<'_, T>> + '_
     where
         Self: Sized,
@@ -358,6 +378,8 @@ impl<T: HugrView<Node = Node>> Circuit<T> {
     }
 
     /// Compute the cost of the circuit based on a per-operation cost function.
+    ///
+    /// This will include all operations in the circuit, including nested regions.
     #[inline]
     pub fn circuit_cost<F, C>(&self, op_cost: F) -> C
     where
@@ -365,7 +387,53 @@ impl<T: HugrView<Node = Node>> Circuit<T> {
         C: Sum,
         F: Fn(&OpType) -> C,
     {
-        self.commands().map(|cmd| op_cost(cmd.optype())).sum()
+        self.hugr
+            .entry_descendants()
+            .map(|node| op_cost(self.hugr.get_optype(node)))
+            .sum()
+    }
+
+    /// Count the number of operations that match the predicate in the Hugr.
+    ///
+    /// This will include all operations in the circuit, including nested regions.
+    #[inline]
+    pub fn count_ops<P>(&self, predicate: P) -> usize
+    where
+        Self: Sized,
+        P: Fn(&OpType) -> bool,
+    {
+        self.hugr
+            .entry_descendants()
+            .filter(|&node| predicate(self.hugr.get_optype(node)))
+            .count()
+    }
+
+    /// Returns the nodes in a dataflow region, in topological order.
+    ///
+    /// The region Input and Output nodes are omitted.
+    ///
+    /// Returns `None` if `parent` is not a dataflow region.
+    pub fn toposorted_children(&self, parent: Node) -> Option<impl Iterator<Item = Node> + '_>
+    where
+        Self: Sized,
+    {
+        let io_nodes = self.hugr.get_io(parent)?;
+        let scheduling_graph = self.hugr.scheduling_graph(parent);
+        let petgraph = scheduling_graph.petgraph();
+        Some(
+            Topo::new(petgraph)
+                .iter(petgraph)
+                .filter_map(|pg_node| {
+                    let node = scheduling_graph.pg_to_node(pg_node);
+                    (node != io_nodes[0] && node != io_nodes[1]).then_some(node)
+                })
+                // We cannot currently keep a `Topo` alive outside of this function,
+                // since the return type of `SchedulingGraph::petgraph` cannot be named.
+                //
+                // Instead we are forced to eagerly compute the node list.
+                .collect_vec()
+                .into_iter(),
+        )
     }
 }
 
@@ -681,7 +749,7 @@ mod tests {
 
     #[fixture]
     fn tk1_circuit() -> Circuit {
-        load_tk1_json_str(
+        let hugr = load_tk1_json_str(
             r#"{
             "name": "MyCirc",
             "phase": "0",
@@ -696,7 +764,8 @@ mod tests {
         }"#,
             DecodeOptions::new(),
         )
-        .unwrap()
+        .unwrap();
+        hugr.into()
     }
 
     /// 2-qubit circuit with a Hadamard, a CNOT, and an Rz gate.

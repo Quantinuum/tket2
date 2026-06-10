@@ -14,9 +14,8 @@ use hugr::{
     },
     std_extensions::arithmetic::int_types::int_type,
     type_row,
-    types::{Signature, TypeArg, TypeRowRV},
+    types::Signature,
 };
-use itertools::Itertools;
 use lazy_static::lazy_static;
 use strum::{EnumIter, EnumString, IntoStaticStr};
 
@@ -71,7 +70,7 @@ impl MakeOpDef for UtilsOp {
 
     fn init_signature(&self, _extension_ref: &std::sync::Weak<Extension>) -> SignatureFunc {
         match self {
-            UtilsOp::GetCurrentShot => Signature::new(type_row![], int_type(6)),
+            UtilsOp::GetCurrentShot => Signature::new(type_row![], vec![int_type(6)]),
         }
         .into()
     }
@@ -115,10 +114,6 @@ pub trait UtilsOpBuilder: Dataflow + UnwrapBuilder {
             .add_dataflow_op(UtilsOp::GetCurrentShot, [])?
             .out_wire(0))
     }
-}
-
-pub(crate) fn row_to_arg(row: impl Into<TypeRowRV>) -> TypeArg {
-    TypeArg::List(row.into().into_owned().into_iter().map_into().collect())
 }
 
 impl<D: Dataflow> UtilsOpBuilder for D {}

@@ -64,7 +64,7 @@ impl MakeOpDef for SympyOpDef {
 
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         PolyFuncType::new(
-            vec![TypeParam::StringType],
+            vec![TypeParam::StringKind],
             Signature::new(type_row![], vec![rotation_type()]),
         )
         .into()

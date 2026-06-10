@@ -1,5 +1,5 @@
 {
-  "version": "0.2.1",
+  "version": "0.3.0",
   "name": "tket.quantum",
   "types": {},
   "operations": {
@@ -224,8 +224,8 @@
           "output": [
             {
               "t": "Opaque",
-              "extension": "tket.bool",
-              "id": "bool",
+              "extension": "tket.measurement",
+              "id": "Measurement",
               "args": [],
               "bound": "C"
             }

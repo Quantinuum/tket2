@@ -61,6 +61,7 @@ pub fn future_custom_type(t: Type, extension_ref: &Weak<Extension>) -> CustomTyp
         FUTURE_TYPE_NAME.to_owned(),
         vec![t.into()],
         EXTENSION_ID,
+        EXTENSION_VERSION,
         TypeBound::Linear,
         extension_ref,
     )
@@ -108,15 +109,19 @@ impl MakeOpDef for FutureOpDef {
         let future_type = Type::new_extension(future_custom_type(t_type.clone(), extension_ref));
         match self {
             FutureOpDef::Read => {
-                PolyFuncType::new([t_param], Signature::new(future_type, t_type)).into()
+                PolyFuncType::new([t_param], Signature::new(vec![future_type], vec![t_type])).into()
             }
             FutureOpDef::Dup => PolyFuncType::new(
                 [t_param],
-                Signature::new(future_type.clone(), vec![future_type.clone(), future_type]),
+                Signature::new(
+                    vec![future_type.clone()],
+                    vec![future_type.clone(), future_type],
+                ),
             )
             .into(),
             FutureOpDef::Free => {
-                PolyFuncType::new([t_param], Signature::new(future_type.clone(), vec![])).into()
+                PolyFuncType::new([t_param], Signature::new(vec![future_type.clone()], vec![]))
+                    .into()
             }
         }
     }
@@ -150,10 +155,13 @@ impl HasConcrete for FutureOpDef {
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         match type_args {
-            [TypeArg::Runtime(ty)] => Ok(FutureOp {
-                op: *self,
-                typ: ty.clone(),
-            }),
+            [ty] => {
+                if let Ok(ty) = Type::try_from(ty.clone()) {
+                    Ok(FutureOp { op: *self, typ: ty })
+                } else {
+                    Err(SignatureError::InvalidTypeArgs.into())
+                }
+            }
             _ => Err(SignatureError::InvalidTypeArgs.into()),
         }
     }
@@ -307,7 +315,10 @@ pub(crate) mod test {
         let hugr = {
             let mut func_builder = FunctionBuilder::new(
                 "circuit",
-                PolyFuncType::new(vec![t_param], Signature::new(future_type, t.clone())),
+                PolyFuncType::new(
+                    vec![t_param],
+                    Signature::new(vec![future_type], vec![t.clone()]),
+                ),
             )
             .unwrap();
             let [future_w] = func_builder.input_wires_arr();

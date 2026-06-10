@@ -1,15 +1,16 @@
 use std::sync::{Arc, Weak};
 
-use crate::extension::bool::bool_type;
+use crate::extension::measurement::measurement_type;
 use crate::extension::rotation::rotation_type;
 use crate::extension::sympy::SympyOpDef;
 use crate::extension::{TKET_EXTENSION, TKET_EXTENSION_ID as EXTENSION_ID};
+use hugr::extension::prelude::bool_t;
 use hugr::ops::custom::ExtensionOp;
 use hugr::types::Type;
 use hugr::{
     extension::{
         ExtensionId, OpDef, SignatureFunc,
-        prelude::{bool_t, option_type, qb_t},
+        prelude::{option_type, qb_t},
         simple_op::{MakeOpDef, MakeRegisteredOp, try_from_name},
     },
     ops::OpType,
@@ -22,7 +23,7 @@ use serde::{Deserialize, Serialize};
 use smol_str::ToSmolStr;
 use strum::{EnumIter, EnumString, IntoStaticStr};
 
-/// Standar TKET quantum operations.
+/// Standard TKET quantum operations.
 #[derive(
     Clone,
     Copy,
@@ -172,7 +173,7 @@ pub enum TketOp {
     ///
     /// Outputs:
     /// - A qubit
-    /// - A boolean indicating whether the qubit was measured as 1
+    /// - A bool indicating whether the qubit was measured as 1
     Measure,
     /// Measure a qubit and consume the qubit.
     ///
@@ -180,7 +181,7 @@ pub enum TketOp {
     /// - A qubit
     ///
     /// Outputs:
-    /// - A boolean indicating whether the qubit was measured as 1
+    /// - A [`measurement_type`] indicating whether the qubit was measured as 1
     MeasureFree,
     /// Allocate a qubit.
     ///
@@ -240,6 +241,10 @@ impl TketOp {
 }
 
 /// Whether an op is a given TketOp.
+#[deprecated(
+    since = "0.19.0",
+    note = "Use `op.cast::<TketOp>() == Some(TketOp::...)` instead"
+)]
 pub fn op_matches(op: &OpType, tket_op: TketOp) -> bool {
     op.to_string() == tket_op.exposed_name()
 }
@@ -273,16 +278,16 @@ impl MakeOpDef for TketOp {
     fn init_signature(&self, _extension_ref: &std::sync::Weak<hugr::Extension>) -> SignatureFunc {
         use TketOp::*;
         match self {
-            H | T | S | V | X | Y | Z | Tdg | Sdg | Vdg | Reset => Signature::new_endo(qb_t()),
+            H | T | S | V | X | Y | Z | Tdg | Sdg | Vdg | Reset => Signature::new_endo([qb_t()]),
             CX | CZ | CY => Signature::new_endo(vec![qb_t(); 2]),
             Toffoli => Signature::new_endo(vec![qb_t(); 3]),
-            Measure => Signature::new(qb_t(), vec![qb_t(), bool_t()]),
-            MeasureFree => Signature::new(qb_t(), bool_type()),
-            Rz | Rx | Ry => Signature::new(vec![qb_t(), rotation_type()], qb_t()),
+            Measure => Signature::new([qb_t()], vec![qb_t(), bool_t()]),
+            MeasureFree => Signature::new([qb_t()], [measurement_type()]),
+            Rz | Rx | Ry => Signature::new(vec![qb_t(), rotation_type()], [qb_t()]),
             CRz => Signature::new(vec![qb_t(), qb_t(), rotation_type()], vec![qb_t(); 2]),
-            QAlloc => Signature::new(type_row![], qb_t()),
-            TryQAlloc => Signature::new(type_row![], Type::from(option_type(qb_t()))),
-            QFree => Signature::new(qb_t(), type_row![]),
+            QAlloc => Signature::new(type_row![], [qb_t()]),
+            TryQAlloc => Signature::new(type_row![], [Type::from(option_type([qb_t()]))]),
+            QFree => Signature::new([qb_t()], type_row![]),
         }
         .into()
     }
@@ -349,27 +354,26 @@ pub fn symbolic_constant_op(arg: String) -> OpType {
 }
 
 #[cfg(test)]
-pub(crate) mod test {
+pub mod test {
 
     use std::str::FromStr;
     use std::sync::Arc;
 
     use hugr::builder::{DFGBuilder, Dataflow, DataflowHugr};
-    use hugr::extension::prelude::{option_type, qb_t};
+    use hugr::extension::prelude::{bool_t, option_type, qb_t};
     use hugr::extension::simple_op::{MakeExtensionOp, MakeOpDef};
     use hugr::extension::{OpDef, prelude::UnwrapBuilder as _};
     use hugr::types::Signature;
     use hugr::{CircuitUnit, HugrView, type_row};
     use itertools::Itertools;
-    use rstest::{fixture, rstest};
     use strum::IntoEnumIterator;
 
     use super::TketOp;
     use crate::Pauli;
-    use crate::circuit::Circuit;
-    use crate::extension::bool::bool_type;
+    use crate::extension::measurement::MeasurementOp;
     use crate::extension::{TKET_EXTENSION as EXTENSION, TKET_EXTENSION_ID as EXTENSION_ID};
     use crate::utils::build_simple_circuit;
+
     fn get_opdef(op: TketOp) -> Option<&'static Arc<OpDef>> {
         EXTENSION.get_op(&op.op_id())
     }
@@ -380,22 +384,6 @@ pub(crate) mod test {
         for o in TketOp::iter() {
             assert_eq!(TketOp::from_def(get_opdef(o).unwrap()), Ok(o));
         }
-    }
-
-    #[fixture]
-    pub(crate) fn t2_bell_circuit() -> Circuit {
-        let h = build_simple_circuit(2, |circ| {
-            circ.append(TketOp::H, [0])?;
-            circ.append(TketOp::CX, [0, 1])?;
-            Ok(())
-        });
-
-        h.unwrap()
-    }
-
-    #[rstest]
-    fn check_t2_bell(t2_bell_circuit: Circuit) {
-        assert_eq!(t2_bell_circuit.commands().count(), 2);
     }
 
     #[test]
@@ -416,31 +404,34 @@ pub(crate) mod test {
         })
         .unwrap();
 
-        // 5 commands: alloc, reset, cx, measure, free
-        assert_eq!(h.commands().count(), 5);
+        assert_eq!(h.count_ops(|op| op.cast::<TketOp>().is_some()), 5);
     }
 
     #[test]
     fn try_qalloc_measure_free() {
-        let mut b = DFGBuilder::new(Signature::new(type_row![], bool_type())).unwrap();
+        let mut b = DFGBuilder::new(Signature::new(type_row![], [bool_t()])).unwrap();
 
         let try_q = b
             .add_dataflow_op(TketOp::TryQAlloc, [])
             .unwrap()
             .out_wire(0);
-        let [q] = b.build_unwrap_sum(1, option_type(qb_t()), try_q).unwrap();
+        let [q] = b.build_unwrap_sum(1, option_type([qb_t()]), try_q).unwrap();
         let measured = b
             .add_dataflow_op(TketOp::MeasureFree, [q])
             .unwrap()
             .out_wire(0);
-        let h = b.finish_hugr_with_outputs([measured]).unwrap();
+        let measured_result = b
+            .add_dataflow_op(MeasurementOp::Read, [measured])
+            .unwrap()
+            .out_wire(0);
+        let h = b.finish_hugr_with_outputs([measured_result]).unwrap();
 
         let top_ops = h
             .children(h.entrypoint())
             .map(|n| h.get_optype(n))
             .collect_vec();
 
-        assert_eq!(top_ops.len(), 5);
+        assert_eq!(top_ops.len(), 6);
         // first two are I/O
         assert_eq!(
             TketOp::from_op(top_ops[2].as_extension_op().unwrap()).unwrap(),
@@ -451,7 +442,12 @@ pub(crate) mod test {
             TketOp::from_op(top_ops[4].as_extension_op().unwrap()).unwrap(),
             TketOp::MeasureFree
         );
+        assert_eq!(
+            MeasurementOp::from_op(top_ops[5].as_extension_op().unwrap()).unwrap(),
+            MeasurementOp::Read
+        );
     }
+
     #[test]
     fn tket_op_properties() {
         for op in TketOp::iter() {
