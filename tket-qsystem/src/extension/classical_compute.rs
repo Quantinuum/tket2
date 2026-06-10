@@ -2,15 +2,13 @@
 //! devices in a program - see the [compute/wasm.rs] or [compute/gpu.rs] for
 //! details.
 use hugr::{
-    extension::{Extension, ExtensionBuildError, ExtensionId, TypeDefBound},
+    extension::{Extension, ExtensionBuildError, ExtensionId, TypeDefBound, Version},
     types::{CustomType, Type, TypeBound, TypeRow, TypeRowRV, type_param::TypeParam},
 };
 use lazy_static::lazy_static;
 use smol_str::SmolStr;
 use std::marker::PhantomData;
 use std::sync::Weak;
-
-use super::utils::row_to_arg;
 
 lazy_static! {
     /// The name of the `module` type.
@@ -24,14 +22,14 @@ lazy_static! {
     pub static ref RESULT_TYPE_NAME: SmolStr = SmolStr::new_inline("result");
 
     /// The [TypeParam] of `lookup_by_id` specifying the id of the function.
-    pub static ref ID_PARAM: TypeParam = TypeParam::max_nat_type();
+    pub static ref ID_PARAM: TypeParam = TypeParam::max_nat_kind();
     /// The [TypeParam] of `lookup_by_name` specifying the name of the function.
-    pub static ref NAME_PARAM: TypeParam = TypeParam::StringType;
+    pub static ref NAME_PARAM: TypeParam = TypeParam::StringKind;
     /// The [TypeParam] of various types and ops specifying the input signature of a function.
     pub static ref INPUTS_PARAM: TypeParam =
-        TypeParam::ListType(Box::new(TypeBound::Linear.into()));
+        TypeParam::new_list_kind(TypeBound::Linear);
     /// The [TypeParam] of various types and ops specifying the output signature of a function.
-    pub static ref OUTPUTS_PARAM: TypeParam = TypeParam::ListType(Box::new(TypeBound::Linear.into()));
+    pub static ref OUTPUTS_PARAM: TypeParam = TypeParam::new_list_kind(TypeBound::Linear);
 }
 
 pub(crate) fn add_compute_type_defs(
@@ -110,21 +108,25 @@ impl<T> ComputeType<T> {
     pub(crate) fn get_type(
         &self,
         extension_id: ExtensionId,
+        extension_version: Version,
         extension_ref: &Weak<Extension>,
     ) -> Type {
-        self.custom_type(extension_id, extension_ref).into()
+        self.custom_type(extension_id, extension_version, extension_ref)
+            .into()
     }
 
     pub(crate) fn func_custom_type(
         inputs: impl Into<TypeRowRV>,
         outputs: impl Into<TypeRowRV>,
         extension_id: ExtensionId,
+        extension_version: Version,
         extension_ref: &Weak<Extension>,
     ) -> CustomType {
         CustomType::new(
             FUNC_TYPE_NAME.to_owned(),
-            [row_to_arg(inputs), row_to_arg(outputs)],
+            [inputs.into().into(), outputs.into().into()],
             extension_id,
+            extension_version,
             TypeBound::Copyable,
             extension_ref,
         )
@@ -133,12 +135,14 @@ impl<T> ComputeType<T> {
     pub(crate) fn result_custom_type(
         outputs: impl Into<TypeRowRV>,
         extension_id: ExtensionId,
+        extension_version: Version,
         extension_ref: &Weak<Extension>,
     ) -> CustomType {
         CustomType::new(
             RESULT_TYPE_NAME.to_owned(),
-            [row_to_arg(outputs)],
+            [outputs.into().into()],
             extension_id,
+            extension_version,
             TypeBound::Linear,
             extension_ref,
         )
@@ -147,6 +151,7 @@ impl<T> ComputeType<T> {
     pub(crate) fn custom_type(
         &self,
         extension_id: ExtensionId,
+        extension_version: Version,
         extension_ref: &Weak<Extension>,
     ) -> CustomType {
         match self {
@@ -154,6 +159,7 @@ impl<T> ComputeType<T> {
                 MODULE_TYPE_NAME.to_owned(),
                 [],
                 extension_id,
+                extension_version,
                 TypeBound::Copyable,
                 extension_ref,
             ),
@@ -161,15 +167,23 @@ impl<T> ComputeType<T> {
                 CONTEXT_TYPE_NAME.to_owned(),
                 [],
                 extension_id,
+                extension_version,
                 TypeBound::Linear,
                 extension_ref,
             ),
-            Self::Func { inputs, outputs } => {
-                Self::func_custom_type(inputs.clone(), outputs.clone(), extension_id, extension_ref)
-            }
-            Self::Result { outputs } => {
-                Self::result_custom_type(outputs.clone(), extension_id, extension_ref)
-            }
+            Self::Func { inputs, outputs } => Self::func_custom_type(
+                inputs.clone(),
+                outputs.clone(),
+                extension_id,
+                extension_version,
+                extension_ref,
+            ),
+            Self::Result { outputs } => Self::result_custom_type(
+                outputs.clone(),
+                extension_id,
+                extension_version,
+                extension_ref,
+            ),
             Self::_Unreachable(x, _) => match *x {},
         }
     }
@@ -224,7 +238,7 @@ pub enum ComputeOp<T> {
 }
 
 macro_rules! compute_opdef {
-    ($ext_id:expr, $ext:ty, $opdef:ident) => {
+    ($ext_id:expr, $ext_ver:expr, $ext:ty, $opdef:ident) => {
         use serde::{Deserialize, Serialize};
         use strum::{EnumIter, EnumString, IntoStaticStr};
 
@@ -263,13 +277,13 @@ macro_rules! compute_opdef {
 
         impl From<ComputeType<$ext>> for CustomType {
             fn from(value: ComputeType<$ext>) -> Self {
-                value.custom_type($ext_id, &EXTENSION_REF)
+                value.custom_type($ext_id, $ext_ver, &EXTENSION_REF)
             }
         }
 
         impl From<ComputeType<$ext>> for Type {
             fn from(value: ComputeType<$ext>) -> Self {
-                value.get_type($ext_id, &EXTENSION_REF)
+                value.get_type($ext_id, $ext_ver, &EXTENSION_REF)
             }
         }
 
@@ -277,11 +291,11 @@ macro_rules! compute_opdef {
             type Error = ();
 
             fn try_from(value: Type) -> Result<Self, Self::Error> {
-                let TypeEnum::Extension(custom_type) = value.as_type_enum() else {
+                let hugr_core::types::Term::ExtensionType(custom_type) = value.into() else {
                     Err(())?
                 };
 
-                custom_type.to_owned().try_into().map_err(|_| ())
+                custom_type.try_into().map_err(|_| ())
             }
         }
 
@@ -291,10 +305,13 @@ macro_rules! compute_opdef {
             }
 
             fn init_signature(&self, extension_ref: &Weak<Extension>) -> SignatureFunc {
-                let context_type =
-                    ComputeType::<$ext>::Context.get_type(self.extension(), extension_ref);
+                let context_type = ComputeType::<$ext>::Context.get_type(
+                    self.extension(),
+                    $ext_ver,
+                    extension_ref,
+                );
                 let module_type =
-                    ComputeType::<$ext>::Module.get_type(self.extension(), extension_ref);
+                    ComputeType::<$ext>::Module.get_type(self.extension(), $ext_ver, extension_ref);
                 match self {
                     // [usize] -> [Context]
                     Self::get_context => Signature::new(
@@ -309,13 +326,14 @@ macro_rules! compute_opdef {
                     Self::dispose_context => Signature::new(vec![context_type], type_row![]).into(),
                     // <id: usize, inputs: TypeRow, outputs: TypeRow> [Module] -> [ComputeType::Func { inputs, outputs }]
                     Self::lookup_by_id => {
-                        let inputs = TypeRV::new_row_var_use(1, TypeBound::Copyable);
-                        let outputs = TypeRV::new_row_var_use(2, TypeBound::Copyable);
+                        let inputs = TypeRowRV::new_var_use(1, TypeBound::Copyable);
+                        let outputs = TypeRowRV::new_var_use(2, TypeBound::Copyable);
 
                         let func_type = ComputeType::<$ext>::func_custom_type(
-                            vec![inputs],
-                            vec![outputs],
+                            inputs,
+                            outputs,
                             self.extension(),
+                            $ext_ver,
                             extension_ref,
                         )
                         .into();
@@ -331,13 +349,14 @@ macro_rules! compute_opdef {
                     }
                     // <name: String, inputs: TypeRow, outputs: TypeRow> [Module] -> [ComputeType::Func { inputs, outputs }]
                     Self::lookup_by_name => {
-                        let inputs = TypeRV::new_row_var_use(1, TypeBound::Copyable);
-                        let outputs = TypeRV::new_row_var_use(2, TypeBound::Copyable);
+                        let inputs = TypeRowRV::new_var_use(1, TypeBound::Copyable);
+                        let outputs = TypeRowRV::new_var_use(2, TypeBound::Copyable);
 
                         let func_type = ComputeType::<$ext>::func_custom_type(
-                            vec![inputs],
-                            vec![outputs],
+                            inputs,
+                            outputs,
                             self.extension(),
+                            $ext_ver,
                             extension_ref,
                         )
                         .into();
@@ -353,43 +372,48 @@ macro_rules! compute_opdef {
                     }
                     // <inputs: TypeRow, outputs: TypeRow> [Context, ComputeType::Func { inputs, outputs }, inputs] -> [Context, future<tuple<outputs>>>]
                     Self::call => {
-                        let context_type: TypeRV = context_type.into();
-                        let inputs = TypeRV::new_row_var_use(0, TypeBound::Copyable);
-                        let outputs = TypeRV::new_row_var_use(1, TypeBound::Copyable);
+                        let inputs = TypeRowRV::new_var_use(0, TypeBound::Copyable);
+                        let outputs = TypeRowRV::new_var_use(1, TypeBound::Copyable);
                         let func_type = Type::new_extension(ComputeType::<$ext>::func_custom_type(
-                            vec![inputs.clone()],
-                            vec![outputs.clone()],
+                            inputs.clone(),
+                            outputs.clone(),
                             self.extension(),
+                            $ext_ver,
                             extension_ref,
                         ));
                         let result_type =
-                            TypeRV::new_extension(ComputeType::<$ext>::result_custom_type(
-                                vec![outputs],
+                            Type::new_extension(ComputeType::<$ext>::result_custom_type(
+                                outputs,
                                 self.extension(),
+                                $ext_ver,
                                 extension_ref,
                             ));
 
                         PolyFuncTypeRV::new(
                             [INPUTS_PARAM.to_owned(), OUTPUTS_PARAM.to_owned()],
                             FuncValueType::new(
-                                vec![context_type.clone(), func_type.into(), inputs],
-                                vec![result_type],
+                                TypeRowRV::from([context_type.clone(), func_type.into()])
+                                    .concat(inputs),
+                                [result_type],
                             ),
                         )
                         .into()
                     }
                     Self::read_result => {
-                        let context_type: TypeRV = context_type.into();
-                        let outputs = TypeRV::new_row_var_use(0, TypeBound::Copyable);
+                        let outputs = TypeRowRV::new_var_use(0, TypeBound::Copyable);
                         let result_type =
-                            TypeRV::new_extension(ComputeType::<$ext>::result_custom_type(
-                                vec![outputs.clone()],
+                            Type::new_extension(ComputeType::<$ext>::result_custom_type(
+                                outputs.clone(),
                                 self.extension(),
+                                $ext_ver,
                                 extension_ref,
                             ));
                         PolyFuncTypeRV::new(
                             [OUTPUTS_PARAM.to_owned()],
-                            FuncValueType::new(vec![result_type], vec![context_type, outputs]),
+                            FuncValueType::new(
+                                [result_type],
+                                TypeRowRV::from([context_type]).concat(outputs),
+                            ),
                         )
                         .into()
                     }
@@ -419,7 +443,7 @@ macro_rules! compute_opdef {
                 match self {
                     Self::get_context => {
                         let [] = type_args else {
-                            Err(SignatureError::from(TermTypeError::WrongNumberArgs(
+                            Err(SignatureError::from(TermKindError::WrongNumberArgs(
                                 type_args.len(),
                                 0,
                             )))?
@@ -428,7 +452,7 @@ macro_rules! compute_opdef {
                     }
                     Self::dispose_context => {
                         let [] = type_args else {
-                            Err(SignatureError::from(TermTypeError::WrongNumberArgs(
+                            Err(SignatureError::from(TermKindError::WrongNumberArgs(
                                 type_args.len(),
                                 0,
                             )))?
@@ -440,30 +464,30 @@ macro_rules! compute_opdef {
                         let Some([id_arg, inputs_arg, outputs_arg]): Option<[_; 3]> =
                             type_args.to_vec().try_into().ok()
                         else {
-                            Err(SignatureError::from(TermTypeError::WrongNumberArgs(
+                            Err(SignatureError::from(TermKindError::WrongNumberArgs(
                                 type_args.len(),
                                 3,
                             )))?
                         };
 
                         let Some(id) = id_arg.as_nat() else {
-                            Err(SignatureError::from(TermTypeError::TypeMismatch {
+                            Err(SignatureError::from(TermKindError::KindMismatch {
                                 term: Box::new(id_arg),
-                                type_: Box::new(ID_PARAM.to_owned()),
+                                kind: Box::new(ID_PARAM.to_owned()),
                             }))?
                         };
 
                         let Ok(inputs) = TypeRowRV::try_from(inputs_arg.clone()) else {
-                            Err(SignatureError::from(TermTypeError::TypeMismatch {
+                            Err(SignatureError::from(TermKindError::KindMismatch {
                                 term: Box::new(inputs_arg),
-                                type_: Box::new(INPUTS_PARAM.to_owned()),
+                                kind: Box::new(INPUTS_PARAM.to_owned()),
                             }))?
                         };
 
                         let Ok(outputs) = TypeRowRV::try_from(outputs_arg.clone()) else {
-                            Err(SignatureError::from(TermTypeError::TypeMismatch {
+                            Err(SignatureError::from(TermKindError::KindMismatch {
                                 term: Box::new(outputs_arg),
-                                type_: Box::new(OUTPUTS_PARAM.to_owned()),
+                                kind: Box::new(OUTPUTS_PARAM.to_owned()),
                             }))?
                         };
                         Ok(Self::Concrete::LookupById {
@@ -477,30 +501,30 @@ macro_rules! compute_opdef {
                         let Some([name_arg, inputs_arg, outputs_arg]): Option<[_; 3]> =
                             type_args.to_vec().try_into().ok()
                         else {
-                            Err(SignatureError::from(TermTypeError::WrongNumberArgs(
+                            Err(SignatureError::from(TermKindError::WrongNumberArgs(
                                 type_args.len(),
                                 3,
                             )))?
                         };
 
                         let Some(name) = name_arg.as_string() else {
-                            Err(SignatureError::from(TermTypeError::TypeMismatch {
+                            Err(SignatureError::from(TermKindError::KindMismatch {
                                 term: Box::new(name_arg),
-                                type_: Box::new(NAME_PARAM.to_owned()),
+                                kind: Box::new(NAME_PARAM.to_owned()),
                             }))?
                         };
 
                         let Ok(inputs) = TypeRowRV::try_from(inputs_arg.clone()) else {
-                            Err(SignatureError::from(TermTypeError::TypeMismatch {
+                            Err(SignatureError::from(TermKindError::KindMismatch {
                                 term: Box::new(inputs_arg),
-                                type_: Box::new(INPUTS_PARAM.to_owned()),
+                                kind: Box::new(INPUTS_PARAM.to_owned()),
                             }))?
                         };
 
                         let Ok(outputs) = TypeRowRV::try_from(outputs_arg.clone()) else {
-                            Err(SignatureError::from(TermTypeError::TypeMismatch {
+                            Err(SignatureError::from(TermKindError::KindMismatch {
                                 term: Box::new(outputs_arg),
-                                type_: Box::new(OUTPUTS_PARAM.to_owned()),
+                                kind: Box::new(OUTPUTS_PARAM.to_owned()),
                             }))?
                         };
                         Ok(Self::Concrete::LookupByName {
@@ -513,23 +537,23 @@ macro_rules! compute_opdef {
                         let Some([inputs_arg, outputs_arg]): Option<[_; 2]> =
                             type_args.to_vec().try_into().ok()
                         else {
-                            Err(SignatureError::from(TermTypeError::WrongNumberArgs(
+                            Err(SignatureError::from(TermKindError::WrongNumberArgs(
                                 type_args.len(),
                                 2,
                             )))?
                         };
 
                         let Ok(inputs) = TypeRowRV::try_from(inputs_arg.clone()) else {
-                            Err(SignatureError::from(TermTypeError::TypeMismatch {
+                            Err(SignatureError::from(TermKindError::KindMismatch {
                                 term: Box::new(inputs_arg),
-                                type_: Box::new(INPUTS_PARAM.to_owned()),
+                                kind: Box::new(INPUTS_PARAM.to_owned()),
                             }))?
                         };
 
                         let Ok(outputs) = TypeRowRV::try_from(outputs_arg.clone()) else {
-                            Err(SignatureError::from(TermTypeError::TypeMismatch {
+                            Err(SignatureError::from(TermKindError::KindMismatch {
                                 term: Box::new(outputs_arg),
-                                type_: Box::new(OUTPUTS_PARAM.to_owned()),
+                                kind: Box::new(OUTPUTS_PARAM.to_owned()),
                             }))?
                         };
 
@@ -542,16 +566,16 @@ macro_rules! compute_opdef {
                         let Some([outputs_arg]): Option<[_; 1]> =
                             type_args.to_vec().try_into().ok()
                         else {
-                            Err(SignatureError::from(TermTypeError::WrongNumberArgs(
+                            Err(SignatureError::from(TermKindError::WrongNumberArgs(
                                 type_args.len(),
                                 1,
                             )))?
                         };
 
                         let Ok(outputs) = TypeRowRV::try_from(outputs_arg.clone()) else {
-                            Err(SignatureError::from(TermTypeError::TypeMismatch {
+                            Err(SignatureError::from(TermKindError::KindMismatch {
                                 term: Box::new(outputs_arg),
-                                type_: Box::new(OUTPUTS_PARAM.to_owned()),
+                                kind: Box::new(OUTPUTS_PARAM.to_owned()),
                             }))?
                         };
                         Ok(Self::Concrete::ReadResult {
@@ -590,9 +614,11 @@ macro_rules! compute_opdef {
                 extension_id: ExtensionId,
                 extension_ref: &Weak<Extension>,
             ) -> SumType {
-                option_type(vec![
-                    ComputeType::<$ext>::Context.get_type(extension_id, extension_ref),
-                ])
+                option_type(vec![ComputeType::<$ext>::Context.get_type(
+                    extension_id,
+                    $ext_ver,
+                    extension_ref,
+                )])
             }
         }
 
@@ -722,8 +748,10 @@ macro_rules! compute_builder {
                     // TODO Add an Error variant to BuildError for: Input wire has wrong type
                     panic!("func wire is not a func type: {func_wire_type}")
                 };
-                let (in_types, out_types) =
-                    (TypeRow::try_from(in_types)?, TypeRow::try_from(out_types)?);
+                let (in_types, out_types) = (
+                    TypeRow::try_from(in_types).map_err(SignatureError::from)?,
+                    TypeRow::try_from(out_types).map_err(SignatureError::from)?,
+                );
 
                 Ok(self
                     .add_dataflow_op(
@@ -745,7 +773,7 @@ macro_rules! compute_builder {
                     // TODO Add an Error variant to BuildError for: Input wire has wrong type
                     panic!("result wire is not a result type: {result_wire_type}")
                 };
-                let outputs = TypeRow::try_from(outputs)?;
+                let outputs = TypeRow::try_from(outputs).map_err(SignatureError::from)?;
 
                 let op =
                     self.add_dataflow_op(ComputeOp::<$ext>::ReadResult { outputs }, [result])?;

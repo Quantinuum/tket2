@@ -244,7 +244,7 @@ mod test {
         #[with(_id)] mut llvm_ctx: TestContext,
         #[case] prelude: impl PreludeCodegen + 'static,
     ) {
-        let hugr = SimpleHugrConfig::new()
+        let mut hugr = SimpleHugrConfig::new()
             .with_ins(vec![float64_type()])
             .finish_with_exts(|mut builder, _reg| {
                 let [a1] = builder.input_wires_arr();
@@ -274,7 +274,7 @@ mod test {
     #[rstest]
     #[case(ConstRotation::new(1.0).unwrap(), ConstRotation::new(0.5).unwrap(), 1.5)]
     #[case(ConstRotation::PI, ConstRotation::new(1.5).unwrap(), 2.5)]
-    fn exec_aadd(
+    fn exec_radd(
         mut exec_ctx: TestContext,
         #[case] angle1: ConstRotation,
         #[case] angle2: ConstRotation,

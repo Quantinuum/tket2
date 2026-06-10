@@ -360,9 +360,9 @@ pub(crate) fn runtime_barrier_from_str(s: &str) -> Result<(), ()> {
 
 pub(crate) fn runtime_barrier_signature() -> SignatureFunc {
     PolyFuncType::new(
-        [TypeParam::max_nat_type()],
+        [TypeParam::max_nat_kind()],
         Signature::new_endo(vec![
-            array_type_parametric(TypeArg::new_var_use(0, TypeParam::max_nat_type()), qb_t())
+            array_type_parametric(TypeArg::new_var_use(0, TypeParam::max_nat_kind()), qb_t())
                 .unwrap(),
         ]),
     )

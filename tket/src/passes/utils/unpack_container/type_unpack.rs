@@ -4,26 +4,32 @@ use hugr::extension::prelude::qb_t;
 use hugr::std_extensions::collections::array::{Array, ArrayKind};
 use hugr::std_extensions::collections::borrow_array::BorrowArray;
 use hugr::types::{CustomType, SumType, Type, TypeArg, TypeRowRV};
+use hugr_core::types::TypeRow;
+use itertools::Itertools;
 use std::cell::RefCell;
 use std::collections::HashMap;
 
 /// If a type is an option of the given element type.
 pub fn is_opt_of(ty: &Type, elem_type: &Type) -> bool {
     if let Some(sum) = ty.as_sum()
-        && let Some(inner) = sum.as_unary_option()
+        && let Some(inner) = sum.as_option()
+        && let TypeArg::List(t) = &**inner
     {
-        return inner == elem_type;
-    }
+        return t.iter().exactly_one().ok() == Some(elem_type);
+    };
     false
 }
 
 /// If a custom type is an array, return size and element type.
-pub fn array_args<AT: ArrayKind>(ext: &CustomType) -> Option<(u64, &Type)> {
+pub fn array_args<AT: ArrayKind>(ext: &CustomType) -> Option<(u64, Type)> {
     AT::type_def()
         .check_custom(ext)
         .ok()
         .and_then(|_| match ext.args() {
-            [TypeArg::BoundedNat(n), TypeArg::Runtime(elem_ty)] => Some((*n, elem_ty)),
+            [TypeArg::BoundedNat(n), elem_term] => {
+                let t = Type::try_from(elem_term.clone()).ok()?;
+                Some((*n, t))
+            }
             _ => None,
         })
 }
@@ -97,10 +103,10 @@ impl TypeUnpacker {
             // TODO remove and only support borrow arrays
             // Not sure how this can be improved without runtime operations being able to
             // take a compile time unknown number of elements.
-            if is_opt_of(elem_ty, &self.element_type) {
+            if is_opt_of(&elem_ty, &self.element_type) {
                 Some(vec![self.element_type.clone(); size as usize])
             } else {
-                self.unpack_type(elem_ty).map(|inner| {
+                self.unpack_type(&elem_ty).map(|inner| {
                     let total_size = size as usize * inner.len();
                     let mut result = Vec::with_capacity(total_size);
                     for _ in 0..size {
@@ -116,17 +122,15 @@ impl TypeUnpacker {
 
     fn tuple_row(&self, row: &TypeRowRV) -> Option<Vec<Type>> {
         let mut any_element = false;
-        let unpacked_row = row
+        let unpacked_row = TypeRow::try_from(row.clone())
+            .expect("unexpected row variable.")
             .iter()
-            .flat_map(|t| {
-                let t = &t.clone().try_into_type().expect("unexpected row variable.");
-                match self.unpack_type(t) {
-                    Some(inner) => {
-                        any_element = true;
-                        inner
-                    }
-                    None => vec![t.clone()],
+            .flat_map(|t| match self.unpack_type(t) {
+                Some(inner) => {
+                    any_element = true;
+                    inner
                 }
+                None => vec![t.clone()],
             })
             .collect::<Vec<_>>();
         any_element.then_some(unpacked_row)
@@ -152,7 +156,7 @@ impl TypeUnpacker {
 pub fn is_array_of<AT: ArrayKind>(ty: &Type, elem_type: &Type) -> Option<u64> {
     ty.as_extension()
         .and_then(array_args::<AT>)
-        .and_then(|(size, e_ty)| (e_ty == elem_type).then_some(size))
+        .and_then(|(size, e_ty)| (&e_ty == elem_type).then_some(size))
 }
 
 impl Default for TypeUnpacker {

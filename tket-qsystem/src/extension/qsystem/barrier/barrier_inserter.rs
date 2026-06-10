@@ -337,7 +337,10 @@ mod tests {
 
         // Check the signature matches what we expect
         assert_eq!(
-            hugr.entrypoint_optype().dataflow_signature().unwrap(),
+            hugr.entrypoint_optype()
+                .dataflow_signature()
+                .unwrap()
+                .into_owned(),
             Signature::new_endo(container_row),
             "Packing HUGR should have matching signature"
         );

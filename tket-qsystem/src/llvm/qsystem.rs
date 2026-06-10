@@ -573,7 +573,7 @@ mod test {
             .add_logic_extensions()
         });
         let ext_op = op.to_extension_op().unwrap().into();
-        let hugr = single_op_hugr(ext_op);
+        let mut hugr = single_op_hugr(ext_op);
         check_emission!(hugr, llvm_ctx);
     }
 
@@ -600,7 +600,7 @@ mod test {
             .add_logic_extensions()
         });
         let ext_op = op.to_extension_op().unwrap().into();
-        let hugr = single_op_hugr(ext_op);
+        let mut hugr = single_op_hugr(ext_op);
         check_emission!(hugr, llvm_ctx);
     }
 }

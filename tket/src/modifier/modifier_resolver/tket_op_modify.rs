@@ -654,8 +654,8 @@ mod test {
                 &CONTROL_OP_ID,
                 [
                     Term::BoundedNat(1),
-                    Term::new_list([qb_t().into(), qb_t().into(), qb_t().into()]),
-                    Term::new_list([rotation_type().into()]),
+                    Term::new_list([qb_t(), qb_t(), qb_t()]),
+                    Term::new_list([rotation_type()]),
                 ],
             )
             .unwrap();
@@ -663,13 +663,8 @@ mod test {
             .instantiate_extension_op(
                 &DAGGER_OP_ID,
                 [
-                    Term::new_list([
-                        array_type(1, qb_t()).into(),
-                        qb_t().into(),
-                        qb_t().into(),
-                        qb_t().into(),
-                    ]),
-                    Term::new_list([rotation_type().into()]),
+                    Term::new_list([array_type(1, qb_t()), qb_t(), qb_t(), qb_t()]),
+                    Term::new_list([rotation_type()]),
                 ],
             )
             .unwrap();

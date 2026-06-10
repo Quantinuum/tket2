@@ -94,6 +94,7 @@ impl MakeOpDef for MeasurementOp {
             MEASUREMENT_TYPE_ID.to_owned(),
             vec![],
             MEASUREMENT_EXTENSION_ID,
+            MEASUREMENT_EXTENSION_VERSION,
             TypeBound::Copyable,
             extension_ref,
         ));

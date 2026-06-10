@@ -130,7 +130,7 @@ use hugr::{
     hugr::hugrmut::HugrMut,
     ops::{CFG, Const, OpType},
     std_extensions::collections::array::array_type,
-    types::{EdgeKind, FuncTypeBase, Signature, Type, TypeEnum, TypeRow},
+    types::{EdgeKind, FuncTypeBase, Signature, Term, Type, TypeRow},
 };
 
 /// A wire of eigher direction.
@@ -566,9 +566,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         let function_input_indices = function_inputs
             .iter()
             .enumerate()
-            .filter_map(|(index, ty)| {
-                matches!(ty.as_type_enum(), TypeEnum::Function(_)).then_some(index)
-            })
+            .filter_map(|(index, ty)| matches!(**ty, Term::FunctionType(_)).then_some(index))
             .collect::<HashSet<_>>();
         let mut quantum_function_input_indices = HashSet::new();
         for (index, ty) in function_inputs.iter().enumerate() {
@@ -650,7 +648,7 @@ impl<N: HugrNode> ModifierResolver<N> {
     }
 
     fn modified_function_input_type(&self, ty: &Type) -> Result<Type, ModifierResolverErrors<N>> {
-        let TypeEnum::Function(func_ty) = ty.as_type_enum() else {
+        let Term::FunctionType(func_ty) = &**ty else {
             return Err(ModifierResolverErrors::unreachable(format!(
                 "Higher-order modifier requirement found for a non-function input: {ty:?}"
             )));
@@ -669,7 +667,7 @@ impl<N: HugrNode> ModifierResolver<N> {
     }
 
     fn function_type_has_quantum_data(&self, ty: &Type) -> Result<bool, ModifierResolverErrors<N>> {
-        let TypeEnum::Function(func_ty) = ty.as_type_enum() else {
+        let Term::FunctionType(func_ty) = &**ty else {
             return Ok(false);
         };
         let signature = Signature::try_from((**func_ty).clone()).map_err(BuildError::from)?;
@@ -699,12 +697,12 @@ impl<N: HugrNode> ModifierResolver<N> {
                     "Higher-order modifier requirement refers to missing input {index}"
                 )));
             };
-            if !matches!(input_ty.as_type_enum(), TypeEnum::Function(_)) {
+            let Term::FunctionType(_) = &*input_ty else {
                 *self.modifiers_mut() = saved_modifiers;
                 return Err(ModifierResolverErrors::unreachable(format!(
                     "Higher-order modifier requirement found for a non-function input: {input_ty:?}"
                 )));
-            }
+            };
             let input_ty = input[index].clone();
             let modified_input_ty = self.modified_function_input_type(&input_ty);
             *self.modifiers_mut() = saved_modifiers;
@@ -724,18 +722,19 @@ impl<N: HugrNode> ModifierResolver<N> {
         &mut self,
         ty: &mut Type,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        let Some(variants) = (match ty.as_type_enum() {
-            TypeEnum::Sum(sum) => Some(
-                sum.variants()
-                    .cloned()
-                    .map(TypeRow::try_from)
-                    .collect::<Result<Vec<_>, _>>()
-                    .map_err(BuildError::from)?,
-            ),
-            _ => None,
-        }) else {
+        let Some(sum) = ty.as_sum() else {
             return Ok(());
         };
+        let variants = sum
+            .variants()
+            .cloned()
+            .map(TypeRow::try_from)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| {
+                ModifierResolverErrors::unreachable(format!(
+                    "Higher-order modifier rewrite found an open sum variant row: {e}"
+                ))
+            })?;
 
         let mut variants = variants;
         for row in &mut variants {
@@ -754,12 +753,12 @@ impl<N: HugrNode> ModifierResolver<N> {
         }
 
         for ty in row.to_mut() {
-            match ty.as_type_enum() {
-                TypeEnum::Function(_) if self.function_type_has_quantum_data(ty)? => {
+            match &**ty {
+                Term::FunctionType(_) if self.function_type_has_quantum_data(ty)? => {
                     let modified_ty = self.modified_function_input_type(ty)?;
                     *ty = modified_ty;
                 }
-                TypeEnum::Sum(_) => self.modify_higher_order_sum_type_if_present(ty)?,
+                Term::SumType(_) => self.modify_higher_order_sum_type_if_present(ty)?,
                 _ => {}
             }
         }
