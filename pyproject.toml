@@ -9,13 +9,15 @@ dev = [
     "ruff>=0.15.16,<0.16",
     "mypy>=2.1.0,<3",
     "hypothesis>=6.155.1,<7",
+    "hugr~=0.17.0",
     "graphviz ~=0.21.0",
     "pre-commit~=4.6",
     # Required to run `maturin develop`
     "pip>=26.1.2",
     # Pyyaml 0.6.0 makes setuptools fail. This ensures we're using a newer version.
     "pyyaml >=6.0.2",
-    "hugr~=0.17.0",
+    # used for tests in tket-py
+    "numpy>=2.2.0",
 ]
 conan = ["conan>=2.29.0,<3"]
 
@@ -23,7 +25,7 @@ conan = ["conan>=2.29.0,<3"]
 prerelease = "explicit"
 
 [tool.uv.sources]
-hugr = { git = "https://github.com/quantinuum/hugr", subdirectory = "hugr-py", rev = "1787e12" }
+#hugr = { git = "https://github.com/quantinuum/hugr", subdirectory = "hugr-py", rev = "1787e12" }
 
 
 [build-system]
