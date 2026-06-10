@@ -2,11 +2,11 @@
 #![cfg(feature = "portmatching")]
 
 use rstest::{fixture, rstest};
-use tket::Circuit;
 use tket::optimiser::badger::BadgerOptions;
 use tket::optimiser::{BadgerOptimiser, ECCBadgerOptimiser};
 use tket::serialize::TKETDecode;
 use tket::serialize::pytket::DecodeOptions;
+use tket::{Circuit, TketOp};
 use tket_json_rs::circuit_json::SerialCircuit;
 
 /// A set of equivalence circuit classes (ECC)
@@ -55,7 +55,6 @@ fn simple_circ() -> Circuit {
 }
 
 #[rstest]
-//#[ignore = "Takes 200ms"]
 fn badger_termination(simple_circ: Circuit, nam_4_2: ECCBadgerOptimiser) {
     let opt_circ = nam_4_2.optimise(
         &simple_circ,
@@ -64,5 +63,6 @@ fn badger_termination(simple_circ: Circuit, nam_4_2: ECCBadgerOptimiser) {
             ..Default::default()
         },
     );
-    assert_eq!(opt_circ.commands().count(), 11);
+
+    assert_eq!(opt_circ.count_ops(|op| op.cast::<TketOp>().is_some()), 4);
 }

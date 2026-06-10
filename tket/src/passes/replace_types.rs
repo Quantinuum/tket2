@@ -1229,10 +1229,15 @@ mod test {
                 .unwrap();
             },
         );
-        fn option_contents(ty: Type) -> Option<Type> {
-            let row = ty.as_sum()?.get_variant(1).unwrap().clone();
-            let elems = TypeRow::try_from(row).unwrap();
-            Some(elems.into_owned().into_iter().exactly_one().unwrap())
+        fn option_contents(tys: &[Term]) -> Option<Type> {
+            match tys {
+                [Term::SumType(st)] => {
+                    let row = st.get_variant(1).unwrap().clone();
+                    let elems = TypeRow::try_from(row).unwrap();
+                    Some(elems.into_owned().into_iter().exactly_one().unwrap())
+                }
+                _ => None,
+            }
         }
         let i32_t = || INT_TYPES[5].clone();
         let opt_i32 = Type::from(option_type([i32_t()]));
@@ -1258,11 +1263,11 @@ mod test {
         lowerer.set_replace_type(i32_custom_t, qb_t());
         // Lower list<option<x>> to list<x>
         lowerer.set_replace_parametrized_type(list_type_def(), |args| {
-            option_contents(just_elem_type(args)).map(list_type)
+            option_contents(args).map(list_type)
         });
         // and read<option<x>> to get<x> - the latter has the expected option<x> return type
         lowerer.set_replace_parametrized_op(e.get_op(READ).unwrap().as_ref(), |args, _| {
-            Ok(option_contents(just_elem_type(args)).map(|elem| {
+            Ok(option_contents(args).map(|elem| {
                 NodeTemplate::SingleOp(
                     ListOp::get
                         .with_type(elem)

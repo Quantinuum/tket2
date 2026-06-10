@@ -93,7 +93,7 @@ pub type WasmType = ComputeType<WasmExtension>;
 /// The "tket.wasm" extension id.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("tket.wasm");
 /// The "tket.wasm" extension version.
-pub const EXTENSION_VERSION: Version = Version::new(0, 4, 1);
+pub const EXTENSION_VERSION: Version = Version::new(0, 5, 0);
 
 lazy_static! {
     /// The `tket.wasm` extension.
@@ -158,7 +158,7 @@ impl TryFrom<CustomType> for WasmType {
     }
 }
 
-compute_opdef!(EXTENSION_ID, WasmExtension, WasmOpDef);
+compute_opdef!(EXTENSION_ID, EXTENSION_VERSION, WasmExtension, WasmOpDef);
 
 impl MakeRegisteredOp for WasmOp {
     fn extension_id(&self) -> ExtensionId {
@@ -188,7 +188,7 @@ impl CustomConst for ConstWasmModule {
     }
 
     fn get_type(&self) -> Type {
-        WasmType::Module.get_type(EXTENSION_ID, &EXTENSION_REF)
+        WasmType::Module.get_type(EXTENSION_ID, EXTENSION_VERSION, &EXTENSION_REF)
     }
 }
 
@@ -234,7 +234,7 @@ mod test {
     #[case(WasmType::Module)]
     #[case(WasmType::Context)]
     #[case(WasmType::new_func(type_row![], type_row![]))]
-    #[case(WasmType::new_func(TypeRowRV::new_var_use(0, TypeBound::Linear), vec![bool_t()]))]
+    #[case(WasmType::new_func(TypeRowRV::new_var_use(0, TypeBound::Linear), [bool_t()]))]
     fn wasm_type(#[case] wasm_t: WasmType) {
         let hugr_t: Type = wasm_t.clone().into();
         let roundtripped_t = hugr_t.try_into().unwrap();
@@ -287,10 +287,8 @@ mod test {
     #[rstest]
     #[case::concrete(type_row![], type_row![])]
     #[case::row_vars1(
-        TypeRowRV::from(vec![Type::UNIT]).concat(TypeRowRV::new_var_use(0, TypeBound::Copyable)),
-        TypeRowRV::try_from(
-            Term::from(vec![TypeArg::from(Type::UNIT), TypeArg::from(usize_t())])
-        ).unwrap()
+        TypeRowRV::from([Type::UNIT]).concat(TypeRowRV::new_var_use(0, TypeBound::Copyable)),
+        TypeRowRV::from([Type::UNIT, usize_t()])
     )]
     fn lookup_signature(
         #[case] inputs: impl Into<TypeRowRV>,
@@ -303,11 +301,12 @@ mod test {
             outputs: outputs.clone(),
         };
         let extension = Arc::downgrade(&op.extension_ref());
-        let module_ty = WasmType::Module.get_type(op.extension_id(), &extension);
+        let module_ty = WasmType::Module.get_type(op.extension_id(), EXTENSION_VERSION, &extension);
         let func_ty = Type::new_extension(WasmType::func_custom_type(
             inputs.clone(),
             outputs.clone(),
             op.extension_id(),
+            EXTENSION_VERSION,
             &extension,
         ));
         assert_eq!(

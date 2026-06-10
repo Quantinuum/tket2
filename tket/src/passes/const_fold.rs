@@ -2,7 +2,7 @@
 //! An (example) use of the [dataflow analysis framework](crate::passes::dataflow).
 
 pub mod value_handle;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::BTreeMap, sync::Arc};
 use thiserror::Error;
 
 use hugr_core::ops::Tag;
@@ -30,7 +30,7 @@ pub struct ConstantFoldPass {
     /// Each outer key Node must be either:
     ///   - a `FuncDefn` child of the root, if the root is a module; or
     ///   - the entrypoint, if the entrypoint is not a Module
-    inputs: HashMap<Node, HashMap<IncomingPort, Value>>,
+    inputs: BTreeMap<Node, BTreeMap<IncomingPort, Value>>,
 }
 
 #[derive(Clone, Debug, Error, PartialEq)]
@@ -183,7 +183,7 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
                 hugr.connect(cst, OutgoingPort::from(0), lcst, IncomingPort::from(0));
                 Some(lcst)
             } else if let Value::Sum(sum) = v
-                && sum.values.len() == 0
+                && sum.values.is_empty()
             {
                 let variants: Result<Vec<_>, _> = sum
                     .sum_type

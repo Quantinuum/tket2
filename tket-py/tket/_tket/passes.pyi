@@ -104,7 +104,6 @@ def qsystem_rebase_pass(
     constant_fold: bool = True,
     monomorphize: bool = True,
     force_order: bool = True,
-    lazify: bool = True,
     hide_funcs: bool = True,
     scope: PassScope | None = None,
 ) -> None:
@@ -113,6 +112,5 @@ def qsystem_rebase_pass(
     :param constant_fold: Whether to perform constant folding.
     :param monomorphize: Whether to monomorphize generic functions.
     :param force_order: Whether to enforce total ordering of all HUGR operations.
-    :param lazify: Whether to replace measurements with lazy measurements.
     :param hide_funcs: Make all HUGR functions private.
     """

@@ -39,7 +39,10 @@ in {
     "LLVM_SYS_211_PREFIX" = "${hugrenv}";
     "TKET_C_API_PATH" = "${hugrenv}";
     "LIBCLANG_PATH" = "${hugrenv}/lib";
-    "JEMALLOC_OVERRIDE" = "${pkgs.jemalloc}/lib/libjemalloc.so";
+    "JEMALLOC_OVERRIDE" =
+      if pkgs.stdenv.isDarwin
+      then "${pkgs.jemalloc}/lib/libjemalloc.dylib"
+      else "${pkgs.jemalloc}/lib/libjemalloc.so";
   };
 
   # https://devenv.sh/languages/

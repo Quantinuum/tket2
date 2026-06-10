@@ -13,10 +13,10 @@ use std::collections::HashMap;
 pub fn is_opt_of(ty: &Type, elem_type: &Type) -> bool {
     if let Some(sum) = ty.as_sum()
         && let Some(inner) = sum.as_option()
-        && let Ok(t) = TypeRow::try_from(inner.clone())
+        && let TypeArg::List(t) = &**inner
     {
         return t.iter().exactly_one().ok() == Some(elem_type);
-    }
+    };
     false
 }
 
@@ -27,9 +27,7 @@ pub fn array_args<AT: ArrayKind>(ext: &CustomType) -> Option<(u64, Type)> {
         .ok()
         .and_then(|_| match ext.args() {
             [TypeArg::BoundedNat(n), elem_term] => {
-                let Ok(t) = Type::try_from(elem_term.clone()) else {
-                    return None;
-                };
+                let t = Type::try_from(elem_term.clone()).ok()?;
                 Some((*n, t))
             }
             _ => None,

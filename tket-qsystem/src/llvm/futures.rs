@@ -37,10 +37,10 @@ impl CodegenExtension for FuturesCodegenExtension {
                 |session, hugr_type| {
                     match (hugr_type.name().as_str(), hugr_type.args()) {
                         // For now, we only support future bools
-                        ("Future", [ty]) if *ty == bool_t().into() => {
+                        ("Future", [ty]) if ty == &*bool_t() => {
                             Ok(future_type(session.iw_context()))
                         }
-                        ("Future", [ty]) if *ty == INT_TYPES[6].clone().into() => {
+                        ("Future", [ty]) if ty == &*INT_TYPES[6] => {
                             Ok(future_type(session.iw_context()))
                         }
                         _ => Err(anyhow!(
@@ -210,7 +210,7 @@ mod test {
             ceb.add_extension(FuturesCodegenExtension)
                 .add_default_int_extensions()
         });
-        let hugr = single_op_hugr(op.to_extension_op().unwrap().into());
+        let mut hugr = single_op_hugr(op.to_extension_op().unwrap().into());
         check_emission!(hugr, llvm_ctx);
     }
 }

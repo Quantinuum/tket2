@@ -1,6 +1,48 @@
 # Changelog
 
 
+## [0.19.0](https://github.com/Quantinuum/tket2/compare/tket-v0.18.0...tket-v0.19.0) - 2026-05-28
+
+### Bug Fixes
+
+- Apply modifiers through function calls ([#1531](https://github.com/Quantinuum/tket2/pull/1531))
+- Incorrect matching of pytket parameters to unsupported graph ports ([#1561](https://github.com/Quantinuum/tket2/pull/1561))
+- [**breaking**] Passes with Nested Modifier ([#1546](https://github.com/Quantinuum/tket2/pull/1546))
+- bug in hugr building when `control` modifiers are nested ([#1550](https://github.com/Quantinuum/tket2/pull/1550))
+- Multiple fixes to the pytket encoder ([#1566](https://github.com/Quantinuum/tket2/pull/1566))
+- [**breaking**] Replace non-deterministic iterations on hash maps ([#1582](https://github.com/Quantinuum/tket2/pull/1582))
+- Set inputs of functions loaded as values to top during dataflow analysis ([#1595](https://github.com/Quantinuum/tket2/pull/1595))
+- Using indexes inside dagger modifier ([#1588](https://github.com/Quantinuum/tket2/pull/1588))
+- address Miri unsoundness by installing nextest and skipping FFI/long running tests ([#1565](https://github.com/Quantinuum/tket2/pull/1565))
+- skip test_nested_array to resolve miri unsoundness ([#1623](https://github.com/Quantinuum/tket2/pull/1623))
+
+### New Features
+
+- *(const-fold)* combine Consts for each out-port; write prepopulated inputs ([#1489](https://github.com/Quantinuum/tket2/pull/1489))
+- InlineFunctionsPass ([#1524](https://github.com/Quantinuum/tket2/pull/1524))
+- upgrade to hugr v0.27.1 ([#1568](https://github.com/Quantinuum/tket2/pull/1568))
+- [**breaking**] Ignore empty circuits when encoding Hugr regions into pytket ([#1562](https://github.com/Quantinuum/tket2/pull/1562))
+- Add python definitions for the TKET metadata keys ([#1535](https://github.com/Quantinuum/tket2/pull/1535))
+- Clean Up by Deleting Unconnected Nodes after Modifier Solve ([#1557](https://github.com/Quantinuum/tket2/pull/1557))
+- InlineHint metadata ([#1532](https://github.com/Quantinuum/tket2/pull/1532))
+- Allowing control flow in `control` ([#1603](https://github.com/Quantinuum/tket2/pull/1603))
+
+### Performance
+
+- Improve modifier resolver pass by visiting nodes in a set ([#1621](https://github.com/Quantinuum/tket2/pull/1621))
+- Avoid string formatting in Hugr op hashing ([#1624](https://github.com/Quantinuum/tket2/pull/1624))
+
+### Refactor
+
+- Replace portgraph toposort in CommandIterator with node vector ([#1608](https://github.com/Quantinuum/tket2/pull/1608))
+- [**breaking**] Deprecate commands iterator ([#1611](https://github.com/Quantinuum/tket2/pull/1611))
+
+### Testing
+
+- Pin guppy version in example files, fix test ([#1534](https://github.com/Quantinuum/tket2/pull/1534))
+- Skip slow modifier test ([#1587](https://github.com/Quantinuum/tket2/pull/1587))
+- Add modifier test for subscripted control qubits ([#1601](https://github.com/Quantinuum/tket2/pull/1601))
+
 ## [0.18.0](https://github.com/Quantinuum/tket2/compare/tket-v0.17.0...tket-v0.18.0) - 2026-04-02
 
 This release bumps `hugr` to 0.27.0 and reworks the pytket encoding/decoding API to use raw `Hugr`s.

@@ -10,13 +10,13 @@ use hugr::builder::{
 };
 use hugr::extension::prelude::{ConstExternalSymbol, UnwrapBuilder, bool_t, option_type, qb_t};
 use hugr::std_extensions::arithmetic::float_types::{ConstF64, float64_type};
-use rayon::iter::ParallelIterator;
+use hugr::std_extensions::logic::LogicOp;
 use std::sync::Arc;
 
 use super::TKETDecode;
 use crate::TketOp;
 use crate::extension::TKET1_EXTENSION_ID;
-use crate::extension::bool::{BoolOp, ConstBool, bool_type};
+use crate::extension::measurement::MeasurementOp;
 use crate::extension::rotation::{ConstRotation, RotationOp, rotation_type};
 use crate::extension::sympy::SympyOpDef;
 use crate::metadata;
@@ -152,6 +152,10 @@ const IMPLICIT_PERMUTATION: &str = r#"{
     }"#;
 
 /// Check some properties of the serial circuit.
+#[expect(
+    clippy::iter_over_hash_type,
+    reason = "test validation checks every permutation entry independently, so iteration order cannot affect the result"
+)]
 fn validate_serial_circ(circ: &SerialCircuit) {
     // Check that all commands have valid arguments.
     for command in &circ.commands {
@@ -192,6 +196,10 @@ fn validate_serial_circ(circ: &SerialCircuit) {
     );
 }
 
+#[expect(
+    clippy::iter_over_hash_type,
+    reason = "test comparison checks command multiplicities; iteration order only affects which mismatch is reported first"
+)]
 fn compare_serial_circs(a: &SerialCircuit, b: &SerialCircuit) {
     assert_eq!(a.name, b.name);
     assert_eq!(a.phase, b.phase);
@@ -291,18 +299,21 @@ fn circ_preset_qubits() -> Hugr {
 /// including multiple outputs of the same register.
 #[fixture]
 fn circ_preset_bits() -> Hugr {
-    let input_t = vec![bool_type()];
-    let output_t = vec![bool_type(), bool_type(), bool_type()];
+    let input_t = vec![qb_t(), bool_t()];
+    let output_t = vec![qb_t(), bool_t(), bool_t(), bool_t()];
     let mut h = FunctionBuilder::new("preset_bits", Signature::new(input_t, output_t)).unwrap();
 
-    let [b0] = h.input_wires_arr();
-    let b1 = h.add_load_value(ConstBool::new(false));
+    let [q, b0] = h.input_wires_arr();
+    let b1 = h.add_load_value(Value::false_val());
     let [b_and] = h
-        .add_dataflow_op(BoolOp::and, [b0, b1])
+        .add_dataflow_op(LogicOp::And, [b0, b1])
         .unwrap()
         .outputs_arr();
 
-    let mut hugr = h.finish_hugr_with_outputs([b0, b_and, b0]).unwrap();
+    // Extra quantum op to ensure this circuit gets encoded.
+    let [q] = h.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
+
+    let mut hugr = h.finish_hugr_with_outputs([q, b0, b_and, b0]).unwrap();
 
     // A preset register for the first qubit output
     hugr.set_metadata::<metadata::PytketBitRegisterNames>(
@@ -645,7 +656,7 @@ fn circ_nested_dfgs() -> Hugr {
             .unwrap()
             .outputs_arr();
         let [bool] = inner_dfg
-            .add_dataflow_op(BoolOp::read, [bool])
+            .add_dataflow_op(MeasurementOp::Read, [bool])
             .unwrap()
             .outputs_arr();
 
@@ -719,30 +730,6 @@ fn circ_order_edge() -> Hugr {
     h.set_order(&cx1, &cx3);
 
     h.finish_hugr_with_outputs([q1, q2]).unwrap()
-}
-
-// Bool types get converted automatically between native and tket representations.
-#[fixture]
-fn circ_bool_conversion() -> Hugr {
-    let input_t = vec![qb_t(), bool_t(), bool_type()];
-    let output_t = vec![qb_t(), bool_t(), bool_type()];
-    let mut h = FunctionBuilder::new("bool_conversion", Signature::new(input_t, output_t)).unwrap();
-
-    let [q, native_b0, tket_b1] = h.input_wires_arr();
-
-    // Extra quantum op to ensure this circuit gets encoded.
-    let [q] = h.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
-
-    let [tket_b0] = h
-        .add_dataflow_op(BoolOp::make_opaque, [native_b0])
-        .unwrap()
-        .outputs_arr();
-    let [native_b1] = h
-        .add_dataflow_op(BoolOp::read, [tket_b1])
-        .unwrap()
-        .outputs_arr();
-
-    h.finish_hugr_with_outputs([q, native_b1, tket_b0]).unwrap()
 }
 
 /// A circuit that requires tracking info in `extra_subgraph` or `straight_through_wires`
@@ -991,6 +978,27 @@ fn circ_discard_first_qubit() -> Hugr {
     h.finish_hugr_with_outputs([q2]).unwrap()
 }
 
+/// A circuit that measures a qubit with `MeasureFree` and immediately reads it.
+#[fixture]
+fn circ_measure_and_read() -> Hugr {
+    let input_t = vec![qb_t()];
+    let output_t = vec![bool_t()];
+    let mut h =
+        FunctionBuilder::new("measure_and_read", Signature::new(input_t, output_t)).unwrap();
+
+    let [qb] = h.input_wires_arr();
+    let [measurement] = h
+        .add_dataflow_op(TketOp::MeasureFree, [qb])
+        .unwrap()
+        .outputs_arr();
+    let [bit] = h
+        .add_dataflow_op(MeasurementOp::Read, [measurement])
+        .unwrap()
+        .outputs_arr();
+
+    h.finish_hugr_with_outputs([bit]).unwrap()
+}
+
 /// Check that all circuit ops have been translated to a native gate.
 ///
 /// Panics if there are tk1 ops in the circuit.
@@ -1014,12 +1022,12 @@ fn check_no_tk1_ops(hugr: &Hugr) {
 
 #[rstest]
 #[case::simple(SIMPLE_JSON, 2, 2, false)]
-#[case::simple_measure(SIMPLE_MEASURE, 4, 2, false)]
+#[case::simple_measure(SIMPLE_MEASURE, 4, 2, true)]
 #[case::multi_register(MULTI_REGISTER, 2, 3, false)]
 #[case::unknown_op(UNKNOWN_OP, 2, 3, true)]
 #[case::small_parametrized(SMALL_PARAMETERIZED, 1, 1, false)]
 #[case::parametrized(PARAMETERIZED, 4, 2, true)] // TK1 op is not supported
-#[case::barrier(BARRIER, 3, 3, false)]
+#[case::barrier(BARRIER, 3, 3, true)]
 #[case::implicit_permutation(IMPLICIT_PERMUTATION, 1, 3, false)]
 fn json_roundtrip(
     #[case] circ_s: &str,
@@ -1116,29 +1124,6 @@ impl CircuitRoundtripTestConfig {
     }
 }
 
-#[rstest]
-fn encoded_circuit_attributes(circ_measure_ancilla: Hugr) {
-    let hugr = circ_measure_ancilla;
-
-    let encode_options = EncodeOptions::new().with_subcircuits(true);
-
-    let encoded = EncodedCircuit::new(&hugr, encode_options).unwrap_or_else(|e| panic!("{e}"));
-
-    assert!(encoded.contains_circuit(hugr.entrypoint()));
-    assert_eq!(encoded.len(), 1);
-    assert!(!encoded.is_empty());
-
-    let (region, serial_circ) = encoded.iter().exactly_one().ok().unwrap();
-    assert_eq!(region, hugr.entrypoint());
-    assert_eq!(serial_circ.commands.len(), 2);
-
-    let par_sum: usize = encoded
-        .par_iter()
-        .map(|(_, circ)| circ.commands.len())
-        .sum();
-    assert_eq!(par_sum, 2);
-}
-
 /// Test the standalone serialisation roundtrip from a tket circuit.
 ///
 /// This is not a pure roundtrip as the encoder may add internal qubits/bits to
@@ -1149,7 +1134,6 @@ fn encoded_circuit_attributes(circ_measure_ancilla: Hugr) {
 #[rstest]
 #[case::meas_ancilla(circ_measure_ancilla(), CircuitRoundtripTestConfig::Default)]
 #[case::preset_qubits(circ_preset_qubits(), CircuitRoundtripTestConfig::Default)]
-#[case::preset_bits(circ_preset_bits(), CircuitRoundtripTestConfig::Default)]
 #[case::preset_parameterized(circ_parameterized(), CircuitRoundtripTestConfig::Default)]
 // TODO: Should pass once CircBox encoding of DFGs is re-enabled.
 #[should_panic(expected = "Cannot encode subgraphs with nested structure")]
@@ -1255,9 +1239,7 @@ fn fail_on_modified_hugr(circ_tk1_ops: Hugr) {
 
 /// Test the serialisation roundtrip from a tket circuit into an EncodedCircuit and back.
 #[rstest]
-#[case::meas_ancilla(circ_measure_ancilla(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::preset_qubits(circ_preset_qubits(), 1, CircuitRoundtripTestConfig::Default)]
-#[case::preset_bits(circ_preset_bits(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::preset_parameterized(circ_parameterized(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::nested_dfgs(circ_nested_dfgs(), 2, CircuitRoundtripTestConfig::Default)]
 #[case::flat_opaque(circ_tk1_ops(), 1, CircuitRoundtripTestConfig::Default)]
@@ -1267,7 +1249,6 @@ fn fail_on_modified_hugr(circ_tk1_ops: Hugr) {
 #[case::independent_subgraph(circ_independent_subgraph(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::unsupported_io_wire(circ_unsupported_io_wire(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::order_edge(circ_order_edge(), 1, CircuitRoundtripTestConfig::Default)]
-#[case::bool_conversion(circ_bool_conversion(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::complex_param_type(circ_complex_param_type(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::unsupported_subgraph_skipped_output_before_param(
     circ_unsupported_subgraph_skipped_output_before_param(),
@@ -1288,6 +1269,9 @@ fn fail_on_modified_hugr(circ_tk1_ops: Hugr) {
     CircuitRoundtripTestConfig::Default
 )]
 #[case::discard_first_qubit(circ_discard_first_qubit(), 1, CircuitRoundtripTestConfig::Default)]
+#[case::measure_and_read(circ_measure_and_read(), 1, CircuitRoundtripTestConfig::Default)]
+#[case::meas_ancilla(circ_measure_ancilla(), 1, CircuitRoundtripTestConfig::Default)]
+#[case::preset_bits(circ_preset_bits(), 1, CircuitRoundtripTestConfig::Default)]
 
 fn encoded_circuit_roundtrip(
     #[case] hugr: Hugr,
@@ -1425,7 +1409,6 @@ fn test_decoding_signature(#[case] signature: Signature) {
     // Hugr must be valid.
     hugr.validate().unwrap();
 
-    // Hugr must contain the two measurement ops.
     let measure_op_count = hugr
         .children(hugr.entrypoint())
         .filter(|&child| {

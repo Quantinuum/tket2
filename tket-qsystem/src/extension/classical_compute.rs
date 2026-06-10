@@ -2,7 +2,7 @@
 //! devices in a program - see the [compute/wasm.rs] or [compute/gpu.rs] for
 //! details.
 use hugr::{
-    extension::{Extension, ExtensionBuildError, ExtensionId, TypeDefBound},
+    extension::{Extension, ExtensionBuildError, ExtensionId, TypeDefBound, Version},
     types::{CustomType, Type, TypeBound, TypeRow, TypeRowRV, type_param::TypeParam},
 };
 use lazy_static::lazy_static;
@@ -108,21 +108,25 @@ impl<T> ComputeType<T> {
     pub(crate) fn get_type(
         &self,
         extension_id: ExtensionId,
+        extension_version: Version,
         extension_ref: &Weak<Extension>,
     ) -> Type {
-        self.custom_type(extension_id, extension_ref).into()
+        self.custom_type(extension_id, extension_version, extension_ref)
+            .into()
     }
 
     pub(crate) fn func_custom_type(
         inputs: impl Into<TypeRowRV>,
         outputs: impl Into<TypeRowRV>,
         extension_id: ExtensionId,
+        extension_version: Version,
         extension_ref: &Weak<Extension>,
     ) -> CustomType {
         CustomType::new(
             FUNC_TYPE_NAME.to_owned(),
             [inputs.into().into(), outputs.into().into()],
             extension_id,
+            extension_version,
             TypeBound::Copyable,
             extension_ref,
         )
@@ -131,12 +135,14 @@ impl<T> ComputeType<T> {
     pub(crate) fn result_custom_type(
         outputs: impl Into<TypeRowRV>,
         extension_id: ExtensionId,
+        extension_version: Version,
         extension_ref: &Weak<Extension>,
     ) -> CustomType {
         CustomType::new(
             RESULT_TYPE_NAME.to_owned(),
             [outputs.into().into()],
             extension_id,
+            extension_version,
             TypeBound::Linear,
             extension_ref,
         )
@@ -145,6 +151,7 @@ impl<T> ComputeType<T> {
     pub(crate) fn custom_type(
         &self,
         extension_id: ExtensionId,
+        extension_version: Version,
         extension_ref: &Weak<Extension>,
     ) -> CustomType {
         match self {
@@ -152,6 +159,7 @@ impl<T> ComputeType<T> {
                 MODULE_TYPE_NAME.to_owned(),
                 [],
                 extension_id,
+                extension_version,
                 TypeBound::Copyable,
                 extension_ref,
             ),
@@ -159,15 +167,23 @@ impl<T> ComputeType<T> {
                 CONTEXT_TYPE_NAME.to_owned(),
                 [],
                 extension_id,
+                extension_version,
                 TypeBound::Linear,
                 extension_ref,
             ),
-            Self::Func { inputs, outputs } => {
-                Self::func_custom_type(inputs.clone(), outputs.clone(), extension_id, extension_ref)
-            }
-            Self::Result { outputs } => {
-                Self::result_custom_type(outputs.clone(), extension_id, extension_ref)
-            }
+            Self::Func { inputs, outputs } => Self::func_custom_type(
+                inputs.clone(),
+                outputs.clone(),
+                extension_id,
+                extension_version,
+                extension_ref,
+            ),
+            Self::Result { outputs } => Self::result_custom_type(
+                outputs.clone(),
+                extension_id,
+                extension_version,
+                extension_ref,
+            ),
             Self::_Unreachable(x, _) => match *x {},
         }
     }
@@ -222,7 +238,7 @@ pub enum ComputeOp<T> {
 }
 
 macro_rules! compute_opdef {
-    ($ext_id:expr, $ext:ty, $opdef:ident) => {
+    ($ext_id:expr, $ext_ver:expr, $ext:ty, $opdef:ident) => {
         use serde::{Deserialize, Serialize};
         use strum::{EnumIter, EnumString, IntoStaticStr};
 
@@ -261,13 +277,13 @@ macro_rules! compute_opdef {
 
         impl From<ComputeType<$ext>> for CustomType {
             fn from(value: ComputeType<$ext>) -> Self {
-                value.custom_type($ext_id, &EXTENSION_REF)
+                value.custom_type($ext_id, $ext_ver, &EXTENSION_REF)
             }
         }
 
         impl From<ComputeType<$ext>> for Type {
             fn from(value: ComputeType<$ext>) -> Self {
-                value.get_type($ext_id, &EXTENSION_REF)
+                value.get_type($ext_id, $ext_ver, &EXTENSION_REF)
             }
         }
 
@@ -275,11 +291,11 @@ macro_rules! compute_opdef {
             type Error = ();
 
             fn try_from(value: Type) -> Result<Self, Self::Error> {
-                let Some(custom_type) = value.as_extension() else {
+                let hugr_core::types::Term::ExtensionType(custom_type) = value.into() else {
                     Err(())?
                 };
 
-                custom_type.to_owned().try_into().map_err(|_| ())
+                custom_type.try_into().map_err(|_| ())
             }
         }
 
@@ -289,10 +305,13 @@ macro_rules! compute_opdef {
             }
 
             fn init_signature(&self, extension_ref: &Weak<Extension>) -> SignatureFunc {
-                let context_type =
-                    ComputeType::<$ext>::Context.get_type(self.extension(), extension_ref);
+                let context_type = ComputeType::<$ext>::Context.get_type(
+                    self.extension(),
+                    $ext_ver,
+                    extension_ref,
+                );
                 let module_type =
-                    ComputeType::<$ext>::Module.get_type(self.extension(), extension_ref);
+                    ComputeType::<$ext>::Module.get_type(self.extension(), $ext_ver, extension_ref);
                 match self {
                     // [usize] -> [Context]
                     Self::get_context => Signature::new(
@@ -314,6 +333,7 @@ macro_rules! compute_opdef {
                             inputs,
                             outputs,
                             self.extension(),
+                            $ext_ver,
                             extension_ref,
                         )
                         .into();
@@ -336,6 +356,7 @@ macro_rules! compute_opdef {
                             inputs,
                             outputs,
                             self.extension(),
+                            $ext_ver,
                             extension_ref,
                         )
                         .into();
@@ -357,21 +378,23 @@ macro_rules! compute_opdef {
                             inputs.clone(),
                             outputs.clone(),
                             self.extension(),
+                            $ext_ver,
                             extension_ref,
                         ));
                         let result_type =
                             Type::new_extension(ComputeType::<$ext>::result_custom_type(
                                 outputs,
                                 self.extension(),
+                                $ext_ver,
                                 extension_ref,
                             ));
 
                         PolyFuncTypeRV::new(
                             [INPUTS_PARAM.to_owned(), OUTPUTS_PARAM.to_owned()],
                             FuncValueType::new(
-                                TypeRowRV::from(vec![context_type.clone(), func_type.into()])
+                                TypeRowRV::from([context_type.clone(), func_type.into()])
                                     .concat(inputs),
-                                vec![result_type],
+                                [result_type],
                             ),
                         )
                         .into()
@@ -382,13 +405,14 @@ macro_rules! compute_opdef {
                             Type::new_extension(ComputeType::<$ext>::result_custom_type(
                                 outputs.clone(),
                                 self.extension(),
+                                $ext_ver,
                                 extension_ref,
                             ));
                         PolyFuncTypeRV::new(
                             [OUTPUTS_PARAM.to_owned()],
                             FuncValueType::new(
-                                vec![result_type],
-                                TypeRowRV::from(vec![context_type]).concat(outputs),
+                                [result_type],
+                                TypeRowRV::from([context_type]).concat(outputs),
                             ),
                         )
                         .into()
@@ -590,9 +614,11 @@ macro_rules! compute_opdef {
                 extension_id: ExtensionId,
                 extension_ref: &Weak<Extension>,
             ) -> SumType {
-                option_type(vec![
-                    ComputeType::<$ext>::Context.get_type(extension_id, extension_ref),
-                ])
+                option_type(vec![ComputeType::<$ext>::Context.get_type(
+                    extension_id,
+                    $ext_ver,
+                    extension_ref,
+                )])
             }
         }
 

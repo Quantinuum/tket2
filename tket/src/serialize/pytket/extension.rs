@@ -13,23 +13,22 @@
 //! creates a configuration with the decoders for the standard library and tket
 //! extension.
 
-mod bool;
 mod core;
 mod float;
+mod measurement;
 mod prelude;
 mod rotation;
 mod tk1;
 mod tket;
 
-pub use bool::BoolEmitter;
 pub use core::CoreDecoder;
 pub use float::FloatEmitter;
+pub use measurement::MeasurementEmitter;
 pub use prelude::PreludeEmitter;
 pub use rotation::RotationEmitter;
 pub use tk1::Tk1Emitter;
 pub use tket::TketOpEmitter;
 
-pub(crate) use bool::set_bits_op;
 pub(crate) use tk1::{OpaqueTk1Op, build_opaque_tket_op};
 
 use super::encoder::TrackedValues;
