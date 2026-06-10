@@ -1,0 +1,50 @@
+# /// script
+# requires-python = ">=3.13"
+# dependencies = [
+#     "guppylang",
+# ]
+# [tool.uv.sources]
+# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", branch = "na/temporary-flag-renamed"}
+# ///
+"""Testing assignment in dagger context"""
+
+from pathlib import Path
+from sys import argv
+import sys
+
+from guppylang import guppy
+from guppylang.std.builtins import control, dagger
+from guppylang.std.debug import state_result
+from guppylang.std.quantum import discard, qubit, angle
+from guppylang.std.quantum import h, rx
+
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+
+from guppylang.experimental import enable_experimental_features
+
+enable_experimental_features()
+
+
+@guppy(daggerable=True, controllable=True)
+def bar(q: qubit) -> None:
+    pass
+
+
+@guppy
+def main() -> None:
+    c1 = qubit()
+    t = qubit()
+    h(c1)
+    with dagger:
+        a = angle(1 / 3)
+        with control(c1):
+            bar(t)
+            rx(t, a)
+
+    state_result("r", c1, t)
+    discard(c1)
+    discard(t)
+
+
+program = main.compile()
+Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
