@@ -83,9 +83,10 @@ impl CompilationState {
             Some(cfg) => envelope_config_from_py(cfg)?,
             None => EnvelopeConfig::binary(),
         };
+        let bundled_extensions = extra_extensions(&self.hugr);
         let mut buf = Vec::new();
         self.hugr
-            .store(&mut buf, config)
+            .store_with_exts(&mut buf, config, &bundled_extensions)
             .context("Could not encode CompilationState to bytes")?;
         Ok(buf)
     }
@@ -99,8 +100,9 @@ impl CompilationState {
             Some(cfg) => envelope_config_from_py(cfg)?,
             None => EnvelopeConfig::text(),
         };
+        let bundled_extensions = extra_extensions(&self.hugr);
         self.hugr
-            .store_str(config)
+            .store_str_with_exts(config, &bundled_extensions)
             .context("Could not encode CompilationState to string")
     }
 
@@ -215,6 +217,20 @@ pub fn envelope_config_from_py(config: Bound<'_, PyAny>) -> anyhow::Result<Envel
     });
 
     Ok(res)
+}
+
+/// Returns an extension registry with the extensions required to load a Hugr,
+/// minus the ones in [`embedded_extensions`].
+fn extra_extensions(hugr: &Hugr) -> ExtensionRegistry {
+    let mut registry = ExtensionRegistry::default();
+
+    for ext in hugr.extensions().iter_all() {
+        if REGISTRY.get_compatible(&ext.name, &ext.version).is_none() {
+            registry.register(ext.clone());
+        }
+    }
+
+    registry
 }
 
 /// Extension registry used for loading circuits.
