@@ -28,7 +28,7 @@ type NodeOutputs<V, N> = Vec<(OutgoingPort, PV<V, N>)>;
 ///    For example, to analyse a [Module](OpType::Module)-rooted Hugr,
 ///    [`Self::prepopulate_inputs`] can be used on each externally-callable
 ///    [`FuncDefn`](OpType::FuncDefn) to set all inputs to [`PartialValue::Top`].
-/// 3. Call [`Self::run`] to produce [`AnalysisResults`]
+/// 3. Call [`Self::run_subtree`] to produce [`AnalysisResults`]
 pub struct Machine<H: HugrView, V: AbstractValue> {
     pub(super) hugr: H,
     in_wire_proto: HashMap<H::Node, NodeInputs<V, H::Node>>,

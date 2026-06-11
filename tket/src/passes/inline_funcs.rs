@@ -11,7 +11,7 @@ use hugr_core::module_graph::{ModuleGraph, StaticNode};
 use crate::metadata::InlineAnnotation;
 use crate::passes::{ComposablePass, PassScope, WithScope};
 
-/// Error raised by [inline_acyclic]
+/// Error raised by [InlineFunctionsPass]
 #[derive(Clone, Debug, thiserror::Error, PartialEq)]
 #[non_exhaustive]
 pub enum InlineFuncsError {}
