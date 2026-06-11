@@ -51,7 +51,6 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
             ty_arg,
             inputs,
             outputs,
-            impl_outputs,
         } => {
             let sym = format!("{PREFIX}.{name}");
             let Some(global_ty_base) = ty_arg.as_runtime() else {
@@ -90,11 +89,7 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
             let func_ptr = PointerValue::try_from(*func)
                 .map_err(|e| anyhow::anyhow!("Invalid function pointer provided to With: {e:?}"))?;
 
-            let mut out_types = outputs.iter().cloned().collect_vec();
-            out_types.extend(impl_outputs.iter().cloned().map_into());
-
-            let hugr_func_ty: Signature =
-                FuncValueType::new(inputs.clone(), out_types).try_into()?;
+            let hugr_func_ty: Signature = FuncValueType::new(inputs.clone(), outputs).try_into()?;
             let func_ty = context.llvm_func_type(&hugr_func_ty)?;
 
             let func_call =
@@ -110,9 +105,7 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
 
             let mut call_results =
                 deaggregate_call_result(builder, func_call, hugr_func_ty.output.len())?;
-
-            let explicit_outputs_len = outputs.len();
-            call_results.insert(explicit_outputs_len, end_value);
+            call_results.insert(0, end_value);
 
             // Return results from function
             args.outputs.finish(builder, call_results)?
@@ -122,7 +115,6 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
             ty_arg,
             inputs,
             outputs,
-            impl_outputs,
         } => {
             let sym = format!("{PREFIX}.{name}");
             let Some(global_ty_base) = ty_arg.as_runtime() else {
@@ -169,10 +161,7 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
             in_types.insert(0, global_ty_base.clone().into());
 
             let mut out_types = outputs.iter().cloned().collect_vec();
-            out_types.push(global_ty_base.clone().into());
-            out_types.extend(impl_outputs.iter().cloned().map_into());
-
-            let global_position = outputs.len();
+            out_types.insert(0, global_ty_base.clone().into());
 
             let hugr_func_ty = FuncValueType::new(in_types, out_types).try_into()?;
             let func_ty = context.llvm_func_type(&hugr_func_ty)?;
@@ -183,18 +172,15 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
             let call_results =
                 deaggregate_call_result(builder, func_call, hugr_func_ty.output.len())?;
 
-            let (explicit_returns, rest) = call_results.split_at(global_position);
-            let [end_value, implicit_returns @ ..] = &rest else {
+            let [end_value, results @ ..] = &call_results[..] else {
                 bail!("Global '{sym}' was not returned from function call")
             };
-
-            let mut results = explicit_returns.to_vec();
-            results.extend_from_slice(implicit_returns);
 
             let end_value = sym_ty.build_tag(builder, 1, vec![*end_value])?;
             let _ = builder.build_store(global.as_pointer_value(), end_value)?;
 
-            args.outputs.finish(builder, results)?
+            args.outputs
+                .finish(builder, results.iter().copied().map_into().collect_vec())?;
         }
     }
 
@@ -231,10 +217,10 @@ mod test {
 
     #[rstest::rstest]
     #[case::with(1,
-        GlobalsOp::With{ name: "my_global".to_string(), ty_arg: qb_t().into(), inputs: [bool_t(), qb_t()].into(), outputs: [bool_t()].into(), impl_outputs: [qb_t()].into() }
+        GlobalsOp::With{ name: "my_global".to_string(), ty_arg: qb_t().into(), inputs: [bool_t(), qb_t()].into(), outputs: [bool_t()].into() }
     )]
     #[case::map(2,
-        GlobalsOp::Map{ name: "my_global".to_string(), ty_arg: qb_t().into(), inputs: [bool_t(), qb_t()].into(), outputs: [bool_t()].into(), impl_outputs: [qb_t()].into() }
+        GlobalsOp::Map{ name: "my_global".to_string(), ty_arg: qb_t().into(), inputs: [bool_t(), qb_t()].into(), outputs: [bool_t()].into() }
     )]
     fn emit_globals_codegen(
         #[case] _i: i32,
