@@ -7,6 +7,7 @@ use hugr::extension::ExtensionRegistry;
 pub mod classical_compute;
 pub use classical_compute::gpu;
 pub use classical_compute::wasm;
+pub mod argreader;
 pub mod futures;
 pub mod globals;
 pub mod qsystem;

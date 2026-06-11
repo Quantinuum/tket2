@@ -77,6 +77,8 @@ cache-keys = [
     { file = "pyproject.toml" },
     { file = "Cargo.toml" },
     { file = "rust/**/*.rs" },
+    { file = "../tket/**/*.rs" },
+    { file = "../tket-qsystem/**/*.rs" },
 ]
 
 [tool.cibuildwheel]

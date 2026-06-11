@@ -242,8 +242,13 @@ def qft_32() -> bytes:
 
 def entry_args() -> bytes:
     @guppy
-    def foo(a: int) -> None:
+    def foo(a: int, b: float, c: bool, d: array[int, 5], e: array[float, 3], f: array[bool, 8]) -> None:
         result("a", a)
+        result("b", b)
+        result("c", c)
+        result("d", d)
+        result("e", e)
+        result("f", f)
 
     return foo.compile_function().to_bytes()
 

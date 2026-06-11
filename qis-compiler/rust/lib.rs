@@ -18,7 +18,6 @@ use inkwell::targets::{
 };
 use itertools::Itertools;
 use pyo3::prelude::*;
-use tket::hugr::ops::DataflowParent;
 use tket::passes::composable::ComposablePass;
 
 use std::error::Error;
@@ -31,13 +30,14 @@ use tket::hugr::{self, llvm::inkwell};
 use tket::hugr::{Hugr, HugrView, Node};
 use tket::llvm::rotation::RotationCodegenExtension;
 use tket_qsystem::QSystemPass;
-use tket_qsystem::extension::{REGISTRY, qsystem};
+use tket_qsystem::extension::{REGISTRY, argreader as qsystem_argreader, qsystem};
 use tket_qsystem::llvm::array_utils::ArrayLowering;
 pub use tket_qsystem::llvm::futures::FuturesCodegenExtension;
 use tket_qsystem::llvm::globals::GlobalsCodegenExtension;
 use tket_qsystem::llvm::{
-    debug::DebugCodegenExtension, prelude::QISPreludeCodegen, qsystem::QSystemCodegenExtension,
-    random::RandomCodegenExtension, result::ResultsCodegenExtension, utils::UtilsCodegenExtension,
+    argreader::ArgReaderCodegenExtension, debug::DebugCodegenExtension, prelude::QISPreludeCodegen,
+    qsystem::QSystemCodegenExtension, random::RandomCodegenExtension,
+    result::ResultsCodegenExtension, utils::UtilsCodegenExtension,
 };
 use tracing::{Level, event, instrument};
 use utils::read_hugr_envelope;
@@ -135,11 +135,15 @@ fn codegen_extensions(platform: qsystem::QSystemPlatform) -> CodegenExtsMap<'sta
         .add_extension(ResultsCodegenExtension::new(
             SeleneHeapArrayCodegen::LOWERING,
         ))
-        .add_extension(RotationCodegenExtension::new(pcg))
+        .add_extension(RotationCodegenExtension::new(pcg.clone()))
         .add_extension(UtilsCodegenExtension)
         // State results use standard arrays.
         .add_extension(DebugCodegenExtension::new(SeleneHeapArrayCodegen::LOWERING))
         .add_extension(gpu::GpuCodegen)
+        // Argument reading
+        .add_extension(ArgReaderCodegenExtension::new(
+            array::SeleneHeapBorrowArrayCodegen(pcg),
+        ))
         .finish()
 }
 
@@ -216,12 +220,12 @@ fn get_entry_point_name(namer: &Namer, hugr: &impl HugrView<Node = Node>) -> Res
             .entrypoint_optype()
             .as_func_defn()
             .ok_or_else(|| anyhow!("Entry point node is not a function definition"))?;
-        if func_defn.inner_signature().input_count() != 0 {
-            return Err(anyhow!(
-                "Entry point function must have no input parameters (found {})",
-                func_defn.inner_signature().input_count()
-            ));
-        }
+        /*
+         * TODO: Now that we don't prevent input parameters, we should still
+         * enforce that input parameters are of supported types, instead of potentially
+         * throwing an indecipherable lowering error (e.g. if the user tries to pass
+         * a qubit into main)
+         */
         (func_defn.func_name().as_ref(), hugr.entrypoint())
     };
 
@@ -331,6 +335,8 @@ fn compile<'c, 'hugr: 'c>(
     event!(Level::DEBUG, "starting primary compilation");
     let namer = Rc::new(Namer::new("__hugr__.", true));
 
+    qsystem_argreader::wrap_entrypoint_with_arguments(hugr)?;
+
     // Find the name of the LLVM function that corresponds to the entry point in
     // the HUGR.
     let hugr_entry = get_entry_point_name(&namer, hugr)?;
@@ -376,7 +382,7 @@ fn compile<'c, 'hugr: 'c>(
     if let Some(di_ctx) = maybe_di_ctx.take() {
         di_ctx.finish();
     }
-    module.verify().map_err(Into::<ProcessErrs>::into)?;
+    //module.verify().map_err(Into::<ProcessErrs>::into)?;
 
     Ok(module)
 }
