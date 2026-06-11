@@ -7,7 +7,7 @@ use ascent::lattice::BoundedLattice;
 use itertools::Itertools;
 
 use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
-use hugr_core::ops::{DataflowOpTrait, OpTag, OpTrait, OpType, TailLoop};
+use hugr_core::ops::{DataflowOpTrait, OpTrait, OpType, TailLoop};
 use hugr_core::{HugrView, IncomingPort, OutgoingPort, PortIndex as _, Wire};
 
 use super::value_row::ValueRow;
@@ -104,53 +104,6 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
             op => return Err(op.clone()),
         }
         Ok(())
-    }
-
-    /// Run the analysis (iterate until a lattice fixpoint is reached)
-    /// and return results for the entrypoint-subtree.
-    ///
-    /// As a shortcut, for Hugrs whose [HugrView::entrypoint] is a
-    /// [`FuncDefn`](OpType::FuncDefn), [CFG](OpType::CFG), [DFG](OpType::DFG),
-    /// [Conditional](OpType::Conditional) or [`TailLoop`](OpType::TailLoop) only
-    /// (that is: *not* [Module](OpType::Module),
-    /// [`DataflowBlock`](OpType::DataflowBlock) or [Case](OpType::Case)),
-    /// `in_values` may provide initial values for the entrypoint-node inputs,
-    ///  equivalent to calling `prepopulate_inputs` with the entrypoint node.
-    ///
-    /// The context passed in allows interpretation of leaf operations.
-    ///
-    /// See also [`Self::run_subtree`] for running the analysis on an arbitrary subtree.
-    ///
-    /// # Panics
-    /// May panic in various ways if the Hugr is invalid;
-    /// or if any `in_values` are provided for a module-rooted Hugr.
-    #[deprecated(
-        note = "Use `run_subtree` and `prepopulate_wire` / `prepopulate_inputs` instead",
-        since = "0.18.0"
-    )]
-    pub fn run(
-        mut self,
-        context: impl DFContext<V, Node = H::Node>,
-        in_values: impl IntoIterator<Item = (IncomingPort, PartialValue<V, H::Node>)>,
-    ) -> AnalysisResults<V, H> {
-        if self.hugr.entrypoint_optype().is_module() {
-            assert!(
-                in_values.into_iter().next().is_none(),
-                "No inputs possible for Module"
-            );
-        } else {
-            let ep = self.hugr.entrypoint();
-            let have_value_for_entry = self.in_wire_proto.contains_key(&ep)
-                || (self.hugr.entrypoint_optype().tag() <= OpTag::DataflowParent
-                    && self.out_wire_proto.contains_key(&ep));
-            let mut p = in_values.into_iter().peekable();
-            // We must provide some inputs to the root so that they are Top rather than Bottom.
-            if p.peek().is_some() || !have_value_for_entry {
-                self.prepopulate_inputs(ep, p).unwrap();
-            }
-        }
-        let ep = self.hugr.entrypoint();
-        self.run_subtree(context, ep)
     }
 
     /// Run the analysis (iterate until a lattice fixpoint is reached).

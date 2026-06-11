@@ -149,7 +149,7 @@ impl QSystemPass {
             return Ok(());
         };
 
-        force_order(hugr, root, |hugr, node| {
+        force_order::force_order(hugr, root, |hugr, node| {
             let optype = hugr.get_optype(node);
 
             let is_quantum =
