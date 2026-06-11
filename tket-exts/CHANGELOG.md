@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.13.0](https://github.com/Quantinuum/tket2/compare/tket-exts-v0.12.3...tket-exts-v0.13.0) (2026-06-11)
+
+
+### ⚠ BREAKING CHANGES
+
+* Removed deprecated definitions.
+* Updated public dependency `hugr` to `0.28.0`
+* (tket-exts) `opaque_bool` and `bool` removed
+* **qsystem:** tket-qsystem conversion, lowering and codegen methods take additional `QSystemPlatform` parameter to choose target platform.
+* **tket-qsystem:** add `RandomOp:RandomAdvance` and make `RandomOp` non-exhaustive.
+* Move `add_const_module` from `WasmOpBuilder` into new trait, `ConstWasmBuilder`. Update descriptions of wasm ops json.
+* This is a breaking change to the WASM extension and its serialised representation
+
+### Features
+
+* Add `measurement` extension and change `tket.quantum` / `tket.qsystem` extension measurement ops return type ([#1558](https://github.com/Quantinuum/tket2/issues/1558)) ([7e35ecf](https://github.com/Quantinuum/tket2/commit/7e35ecf592db05e51e9b4d4b577afc2c93bd291d))
+* Add gpu module ([#1090](https://github.com/Quantinuum/tket2/issues/1090)) ([6f035f6](https://github.com/Quantinuum/tket2/commit/6f035f6ce1e281310fd6903bffb3a98099ee4ae0))
+* Definition of extension ops for modifiers and global phases ([#1137](https://github.com/Quantinuum/tket2/issues/1137)) ([ffc507b](https://github.com/Quantinuum/tket2/commit/ffc507b22c462aab3d5ddf837b86e5ac3325e731))
+* Explicit exports for tket_exts ops and types ([#1046](https://github.com/Quantinuum/tket2/issues/1046)) ([a32873e](https://github.com/Quantinuum/tket2/commit/a32873e3543b7d77f3bed08016485ab292f5204a))
+* **exts:** loosen dependency to allow hugr-py 0.15 ([#1344](https://github.com/Quantinuum/tket2/issues/1344)) ([1efcfa6](https://github.com/Quantinuum/tket2/commit/1efcfa6d04c3f9de7f994d50f0a2867c0062d79a))
+* Pass scopes in python API, update to hugr-py 0.16 ([#1464](https://github.com/Quantinuum/tket2/issues/1464)) ([369aba2](https://github.com/Quantinuum/tket2/commit/369aba22aa31f0e819074af8d96e8b38704c51ee))
+* **qsystem:** multiple platform extensions ([#1567](https://github.com/Quantinuum/tket2/issues/1567)) ([b60553f](https://github.com/Quantinuum/tket2/commit/b60553fec5e81b698c75916658bae7d1c527907e))
+* Remove deprecated definitions ([#1670](https://github.com/Quantinuum/tket2/issues/1670)) ([e25102e](https://github.com/Quantinuum/tket2/commit/e25102ea58df7531187f89c8c04104e3ec2bb71b))
+* Switch borrow array lowering from type replacement to llvm ([ab3e020](https://github.com/Quantinuum/tket2/commit/ab3e02063ad8794a93c255f7c9198a16e73c572b))
+* **tket-exts:** Export an ExtensionRegistry with all tket extensions ([#1371](https://github.com/Quantinuum/tket2/issues/1371)) ([c908427](https://github.com/Quantinuum/tket2/commit/c90842757dca3d4169be3c87fe4b1469b22fa194))
+* **tket-qsystem:** Support `random_advance` platform call ([#1170](https://github.com/Quantinuum/tket2/issues/1170)) ([eed16e8](https://github.com/Quantinuum/tket2/commit/eed16e8c57541ea23af6241290aa47d37583cfc4))
+* Update WASM extension ([#1047](https://github.com/Quantinuum/tket2/issues/1047)) ([5f9560d](https://github.com/Quantinuum/tket2/commit/5f9560de30b797f718b2071f0615f3f3d55205e1))
+* Upgrade hugr dependency to 0.28.0 ([#1580](https://github.com/Quantinuum/tket2/issues/1580)) ([68e7fd7](https://github.com/Quantinuum/tket2/commit/68e7fd76705f3e221deaeea9b602c16ec9c6046b))
+
+
+### Documentation
+
+* Correct docstrings for two extensions ([#1378](https://github.com/Quantinuum/tket2/issues/1378)) ([a9c859a](https://github.com/Quantinuum/tket2/commit/a9c859a6b1c3ebd1f867b8da55d82b38f0ff9fee))
+* fix tket-exts pyproject description ([#1436](https://github.com/Quantinuum/tket2/issues/1436)) ([6f68fe0](https://github.com/Quantinuum/tket2/commit/6f68fe0cd869e5493afba8a85e3306bfa3bc486a))
+
+
+### Code Refactoring
+
+* Factor out wasm extension code into compute module ([#1089](https://github.com/Quantinuum/tket2/issues/1089)) ([9ea1b1e](https://github.com/Quantinuum/tket2/commit/9ea1b1ecab84a72fbf545c4f8871f5b70f0e9776))
+
 ## [0.12.3](https://github.com/Quantinuum/tket2/compare/tket-exts-v0.12.2...tket-exts-v0.12.3) (2026-04-07)
 
 
