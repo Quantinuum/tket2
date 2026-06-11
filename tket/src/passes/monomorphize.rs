@@ -132,6 +132,8 @@ fn instantiate(
         &type_args,
     );
     let mono_tgt = h.add_node_after(poly_func, FuncDefn::new(name, mono_sig));
+    // Copy metadata onto the monomorphized FuncDefn
+    *h.node_metadata_map_mut(mono_tgt) = h.node_metadata_map(poly_func).clone();
     // Insert BEFORE we scan (in case of recursion), hence we cannot use Entry::or_insert
     ve.insert(mono_tgt);
     // Now make the instantiation
@@ -747,7 +749,6 @@ mod test {
     /// Debug info attached to a polymorphic `FuncDefn` should be copied to every
     /// monomorphized instance of that function.
     #[test]
-    #[should_panic]
     fn test_func_debug_info_copied_on_monomorphization() {
         use hugr_core::hugr::hugrmut::HugrMut;
         use hugr_core::metadata::SubprogramRecord;
