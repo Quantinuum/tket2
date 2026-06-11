@@ -59,8 +59,7 @@ fn mono_scan(
                 h.add_node_with_parent(inst.target_container, ch_op.substitute(inst.subst));
 
             // Copy metadata onto the monomorphized node
-            let meta = h.node_metadata_map_mut(old_ch).clone();
-            h.node_metadata_map_mut(new_ch).extend(meta);
+            *h.node_metadata_map_mut(new_ch) = h.node_metadata_map(old_ch).clone();
 
             inst.node_map.insert(old_ch, new_ch);
             let mut inst = Instantiating {
