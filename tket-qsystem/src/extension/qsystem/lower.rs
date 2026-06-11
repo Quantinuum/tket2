@@ -95,8 +95,11 @@ pub enum LowerTk2Error {
     ///
     /// Deprecated: Helios-specific ops are now handled via the cross-platform
     /// lowering path; `lower_tk2_ops` will no longer return this error.
-    #[deprecated = "Helios-specific ops are now handled by the cross-platform lowering path; \
-                    this error variant will no longer be returned by lower_tk2_ops."]
+    #[deprecated(
+        since = "0.26.0",
+        note = "Helios-specific ops are now handled by the cross-platform lowering path; \
+                    this error variant will no longer be returned by lower_tk2_ops."
+    )]
     #[display(
         "Helios-specific legacy tket.qsystem ops cannot be lowered to Sol via direct remapping; \
          use cross-platform lowering instead."

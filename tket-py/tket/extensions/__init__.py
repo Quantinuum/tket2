@@ -1,8 +1,11 @@
 from tket_exts import (
     debug,
-    guppy,
-    rotation,
     futures,
+    global_phase,
+    gpu,
+    guppy,
+    measurement,
+    modifier,
     qsystem,
     qsystem_helios,
     qsystem_sol,
@@ -10,23 +13,19 @@ from tket_exts import (
     qsystem_utils,
     quantum,
     result,
+    rotation,
     wasm,
 )
-
-# TODO: Remove once tket no longer supports tket-exts 0.10.*
-try:
-    from tket_exts import gpu  # type: ignore[attr-defined] # noqa: F401
-
-    new_exts = ["gpu"]
-except ImportError:
-    new_exts = []
 
 
 __all__ = [
     "debug",
-    "guppy",
-    "rotation",
     "futures",
+    "global_phase",
+    "gpu",
+    "guppy",
+    "measurement",
+    "modifier",
     "qsystem",
     "qsystem_helios",
     "qsystem_sol",
@@ -34,6 +33,6 @@ __all__ = [
     "qsystem_utils",
     "quantum",
     "result",
+    "rotation",
     "wasm",
-    *new_exts,
 ]
