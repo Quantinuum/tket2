@@ -222,6 +222,7 @@ pub fn envelope_config_from_py(config: Bound<'_, PyAny>) -> anyhow::Result<Envel
 /// TODO: If we want to keep these synchronized with the extensions defined in
 /// tket and tket-qsystem, we should consider exporting public
 /// ExtensionRegistries from the crates.
+/// <https://github.com/Quantinuum/tket2/issues/1679>
 pub static REGISTRY: LazyLock<ExtensionRegistry> = LazyLock::new(|| {
     let mut registry = hugr::std_extensions::std_reg();
     registry.extend([
