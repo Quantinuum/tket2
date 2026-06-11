@@ -642,6 +642,110 @@ mod test {
         assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));
     }
 
+    /// Reproducer for <https://github.com/Quantinuum/tket2/issues/1652>.
+    ///
+    /// Debug info (LocationRecord metadata) on nodes inside a polymorphic
+    /// function should be copied to every monomorphized instance of that node.
+    #[test]
+    #[should_panic]
+    fn test_debug_info_copied_on_monomorphization() {
+        //) -> Result<(), Box<dyn std::error::Error>> {
+        use hugr_core::hugr::hugrmut::HugrMut;
+        use hugr_core::metadata::LocationRecord;
+        use hugr_core::ops::OpType;
+        use hugr_core::ops::handle::NodeHandle;
+
+        let tv0 = || Type::new_var_use(0, TypeBound::Copyable);
+        let mut mb = ModuleBuilder::new();
+
+        // monomorphic helper
+        let helper = {
+            let fb = mb
+                .define_function("helper", Signature::new([], []))
+                .unwrap();
+            fb.finish_with_outputs([]).unwrap()
+        };
+
+        // poly_fn[T: Copyable](x: T) -> T — calls helper
+        let poly_fn = {
+            let pfty = PolyFuncType::new(
+                [TypeBound::Copyable.into()],
+                Signature::new([tv0()], [tv0()]),
+            );
+            let mut fb = mb.define_function("poly_fn", pfty).unwrap();
+            let [elem] = fb.input_wires_arr();
+            fb.call(helper.handle(), &[], []).unwrap(); // Call node to tag
+            fb.finish_with_outputs([elem]).unwrap()
+        };
+
+        // main(x: usize, y: Unit) -> (usize, Unit)
+        // Calls poly_fn with two distinct type args, producing two disjoint
+        // monomorphizations of the Call node.
+        {
+            let mut fb = mb
+                .define_function_vis(
+                    "main",
+                    Signature::new([usize_t(), Type::UNIT], [usize_t(), Type::UNIT]),
+                    Visibility::Public,
+                )
+                .unwrap();
+            let [u, unit] = fb.input_wires_arr();
+            // First monomorphization:  T = usize
+            let [u2] = fb
+                .call(poly_fn.handle(), &[usize_t().into()], [u])
+                .unwrap()
+                .outputs_arr();
+            // Second monomorphization: T = Unit
+            let [unit2] = fb
+                .call(poly_fn.handle(), &[Type::UNIT.into()], [unit])
+                .unwrap()
+                .outputs_arr();
+            fb.finish_with_outputs([u2, unit2]).unwrap();
+        };
+
+        let mut hugr = mb.finish_hugr().unwrap();
+
+        // Attach LocationRecord debug metadata to the Call node inside poly_fn.
+        let call_node = hugr
+            .children(poly_fn.node())
+            .find(|&n| matches!(hugr.get_optype(n), OpType::Call(_)))
+            .expect("Call node inside poly_fn");
+
+        let loc = LocationRecord {
+            kind: "location".into(),
+            column: 3,
+            line_no: 42,
+        };
+        hugr.set_metadata::<LocationRecord>(call_node, loc);
+
+        // Sanity-check: the metadata was written.
+        assert!(
+            hugr.get_metadata::<LocationRecord>(call_node).is_some(),
+            "LocationRecord should be present on the Call node before monomorphization"
+        );
+
+        MonomorphizePass::default().run(&mut hugr).unwrap();
+        hugr.validate().unwrap();
+
+        let funcs = list_funcs(&hugr);
+        let mangled_usize = mangle_name("poly_fn", &[usize_t().into()]);
+        let mangled_unit = mangle_name("poly_fn", &[Type::UNIT.into()]);
+
+        for name in [&mangled_usize, &mangled_unit] {
+            let (func_node, _) = funcs[name];
+            let mono_call_node = hugr
+                .descendants(func_node)
+                .find(|&n| matches!(hugr.get_optype(n), OpType::Call(_)))
+                .unwrap_or_else(|| panic!("Call node missing in monomorphized function {name}"));
+
+            assert!(
+                hugr.get_metadata::<LocationRecord>(mono_call_node)
+                    .is_some(),
+                "LocationRecord should be copied to the Call node in monomorphized function {name}"
+            );
+        }
+    }
+
     #[rstest]
     #[case::bounded_nat(vec![0.into()], "$foo$$n(0)")]
     #[case::type_unit(vec![Type::UNIT.into()], "$foo$$t(Unit)")]
