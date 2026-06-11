@@ -3127,7 +3127,7 @@ docs = [
 
 [[package]]
 name = "tket-eccs"
-version = "0.5.1"
+version = "0.6.0"
 source = { editable = "tket-eccs" }
 
 [[package]]
