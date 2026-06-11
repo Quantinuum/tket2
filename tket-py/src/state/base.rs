@@ -218,11 +218,16 @@ pub fn envelope_config_from_py(config: Bound<'_, PyAny>) -> anyhow::Result<Envel
 }
 
 /// Extension registry used for loading circuits.
+///
+/// TODO: If we want to keep these synchronized with the extensions defined in
+/// tket and tket-qsystem, we should consider exporting public
+/// ExtensionRegistries from the crates.
 pub static REGISTRY: LazyLock<ExtensionRegistry> = LazyLock::new(|| {
     let mut registry = hugr::std_extensions::std_reg();
     registry.extend([
         // tket extensions
         tket::extension::TKET_EXTENSION.to_owned(),
+        tket::extension::TKET1_EXTENSION.to_owned(),
         tket::extension::rotation::ROTATION_EXTENSION.to_owned(),
         tket::extension::debug::DEBUG_EXTENSION.to_owned(),
         tket::extension::guppy::GUPPY_EXTENSION.to_owned(),
@@ -232,6 +237,8 @@ pub static REGISTRY: LazyLock<ExtensionRegistry> = LazyLock::new(|| {
         // tket-qsystem extensions
         tket_qsystem::extension::gpu::EXTENSION.to_owned(),
         tket_qsystem::extension::qsystem::EXTENSION.to_owned(),
+        tket_qsystem::extension::qsystem::helios::EXTENSION.to_owned(),
+        tket_qsystem::extension::qsystem::sol::EXTENSION.to_owned(),
         tket_qsystem::extension::futures::EXTENSION.to_owned(),
         tket_qsystem::extension::random::EXTENSION.to_owned(),
         tket_qsystem::extension::result::EXTENSION.to_owned(),
