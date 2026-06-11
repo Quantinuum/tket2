@@ -1,0 +1,34 @@
+{
+  "version": "0.3.0",
+  "name": "tket.qsystem.utils",
+  "types": {},
+  "operations": {
+    "GetCurrentShot": {
+      "extension": "tket.qsystem.utils",
+      "name": "GetCurrentShot",
+      "description": "Get current shot number.",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "extension_version": "0.1.0",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "BoundedNat",
+                  "n": 6
+                }
+              ],
+              "bound": "C"
+            }
+          ]
+        }
+      },
+      "binary": false
+    }
+  }
+}

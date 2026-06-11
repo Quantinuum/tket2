@@ -1,0 +1,269 @@
+{
+  "version": "0.2.1",
+  "name": "tket.qsystem.random",
+  "types": {
+    "context": {
+      "extension": "tket.qsystem.random",
+      "name": "context",
+      "params": [],
+      "description": "The linear RNG context type",
+      "bound": {
+        "b": "Explicit",
+        "bound": "A"
+      }
+    }
+  },
+  "operations": {
+    "DeleteRNGContext": {
+      "extension": "tket.qsystem.random",
+      "name": "DeleteRNGContext",
+      "description": "Discard the given RNG context.",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "tket.qsystem.random",
+              "extension_version": "0.2.1",
+              "id": "context",
+              "args": [],
+              "bound": "A"
+            }
+          ],
+          "output": []
+        }
+      },
+      "binary": false
+    },
+    "NewRNGContext": {
+      "extension": "tket.qsystem.random",
+      "name": "NewRNGContext",
+      "description": "Seed the RNG and return a new RNG context. Required before using other RNG ops, can be called only once.",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "extension_version": "0.1.0",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "BoundedNat",
+                  "n": 6
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "General",
+              "rows": [
+                [],
+                [
+                  {
+                    "t": "Opaque",
+                    "extension": "tket.qsystem.random",
+                    "extension_version": "0.2.1",
+                    "id": "context",
+                    "args": [],
+                    "bound": "A"
+                  }
+                ]
+              ]
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "RandomAdvance": {
+      "extension": "tket.qsystem.random",
+      "name": "RandomAdvance",
+      "description": "Advance or backtrack the RNG state by `delta` steps",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "tket.qsystem.random",
+              "extension_version": "0.2.1",
+              "id": "context",
+              "args": [],
+              "bound": "A"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "extension_version": "0.1.0",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "BoundedNat",
+                  "n": 6
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "tket.qsystem.random",
+              "extension_version": "0.2.1",
+              "id": "context",
+              "args": [],
+              "bound": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "RandomFloat": {
+      "extension": "tket.qsystem.random",
+      "name": "RandomFloat",
+      "description": "Generate a random floating point value in the range [0,1).",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "tket.qsystem.random",
+              "extension_version": "0.2.1",
+              "id": "context",
+              "args": [],
+              "bound": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "extension_version": "0.1.0",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "tket.qsystem.random",
+              "extension_version": "0.2.1",
+              "id": "context",
+              "args": [],
+              "bound": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "RandomInt": {
+      "extension": "tket.qsystem.random",
+      "name": "RandomInt",
+      "description": "Generate a random 32-bit unsigned integer.",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "tket.qsystem.random",
+              "extension_version": "0.2.1",
+              "id": "context",
+              "args": [],
+              "bound": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "extension_version": "0.1.0",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "BoundedNat",
+                  "n": 5
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "tket.qsystem.random",
+              "extension_version": "0.2.1",
+              "id": "context",
+              "args": [],
+              "bound": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "RandomIntBounded": {
+      "extension": "tket.qsystem.random",
+      "name": "RandomIntBounded",
+      "description": "Generate a random 32-bit unsigned integer less than `bound`.",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "tket.qsystem.random",
+              "extension_version": "0.2.1",
+              "id": "context",
+              "args": [],
+              "bound": "A"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "extension_version": "0.1.0",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "BoundedNat",
+                  "n": 5
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "extension_version": "0.1.0",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "BoundedNat",
+                  "n": 5
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "tket.qsystem.random",
+              "extension_version": "0.2.1",
+              "id": "context",
+              "args": [],
+              "bound": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    }
+  }
+}

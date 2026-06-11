@@ -1,0 +1,172 @@
+{
+  "version": "0.2.0",
+  "name": "tket.futures",
+  "types": {
+    "Future": {
+      "extension": "tket.futures",
+      "name": "Future",
+      "params": [
+        {
+          "tp": "Type",
+          "b": "A"
+        }
+      ],
+      "description": "A value that is computed asynchronously",
+      "bound": {
+        "b": "Explicit",
+        "bound": "A"
+      }
+    }
+  },
+  "operations": {
+    "Dup": {
+      "extension": "tket.futures",
+      "name": "Dup",
+      "description": "Duplicate a Future. The original Future is consumed and two Futures are returned",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "tket.futures",
+              "extension_version": "0.2.0",
+              "id": "Future",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "tket.futures",
+              "extension_version": "0.2.0",
+              "id": "Future",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "Opaque",
+              "extension": "tket.futures",
+              "extension_version": "0.2.0",
+              "id": "Future",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "Free": {
+      "extension": "tket.futures",
+      "name": "Free",
+      "description": "Consume a future without reading it.",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "tket.futures",
+              "extension_version": "0.2.0",
+              "id": "Future",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ],
+          "output": []
+        }
+      },
+      "binary": false
+    },
+    "Read": {
+      "extension": "tket.futures",
+      "name": "Read",
+      "description": "Read a value from a Future, consuming it",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "tket.futures",
+              "extension_version": "0.2.0",
+              "id": "Future",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "V",
+              "i": 0,
+              "b": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    }
+  }
+}

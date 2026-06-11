@@ -1,0 +1,155 @@
+{
+  "version": "0.1.0",
+  "name": "tket.globals",
+  "types": {},
+  "operations": {
+    "map": {
+      "extension": "tket.globals",
+      "name": "map",
+      "description": "Map a function over the contents of the named global variable.",
+      "signature": {
+        "params": [
+          {
+            "tp": "String"
+          },
+          {
+            "tp": "Type",
+            "b": "A"
+          },
+          {
+            "tp": "List",
+            "param": {
+              "tp": "Type",
+              "b": "A"
+            }
+          },
+          {
+            "tp": "List",
+            "param": {
+              "tp": "Type",
+              "b": "A"
+            }
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "G",
+              "input": [
+                {
+                  "t": "V",
+                  "i": 1,
+                  "b": "A"
+                },
+                {
+                  "t": "R",
+                  "i": 2,
+                  "b": "A"
+                }
+              ],
+              "output": [
+                {
+                  "t": "V",
+                  "i": 1,
+                  "b": "A"
+                },
+                {
+                  "t": "R",
+                  "i": 3,
+                  "b": "A"
+                }
+              ]
+            },
+            {
+              "t": "R",
+              "i": 2,
+              "b": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "R",
+              "i": 3,
+              "b": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "with": {
+      "extension": "tket.globals",
+      "name": "with",
+      "description": "Run a function with the set contents of the global variable.",
+      "signature": {
+        "params": [
+          {
+            "tp": "String"
+          },
+          {
+            "tp": "Type",
+            "b": "A"
+          },
+          {
+            "tp": "List",
+            "param": {
+              "tp": "Type",
+              "b": "A"
+            }
+          },
+          {
+            "tp": "List",
+            "param": {
+              "tp": "Type",
+              "b": "A"
+            }
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "V",
+              "i": 1,
+              "b": "A"
+            },
+            {
+              "t": "G",
+              "input": [
+                {
+                  "t": "R",
+                  "i": 2,
+                  "b": "A"
+                }
+              ],
+              "output": [
+                {
+                  "t": "R",
+                  "i": 3,
+                  "b": "A"
+                }
+              ]
+            },
+            {
+              "t": "R",
+              "i": 2,
+              "b": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "V",
+              "i": 1,
+              "b": "A"
+            },
+            {
+              "t": "R",
+              "i": 3,
+              "b": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    }
+  }
+}
