@@ -1,6 +1,7 @@
 //! Structures to keep track of pytket [`ElementId`][tket_json_rs::register::ElementId]s and
 //! their correspondence to wires in the hugr being defined.
 use std::collections::{BTreeMap, VecDeque};
+use std::ops::Deref;
 use std::sync::Arc;
 
 use hugr::builder::{DFGBuilder, Dataflow as _};
@@ -8,8 +9,9 @@ use hugr::extension::prelude::{bool_t, qb_t};
 use hugr::hugr::hugrmut::HugrMut;
 use hugr::ops::Value;
 use hugr::std_extensions::arithmetic::float_types::{ConstF64, float64_type};
-use hugr::types::{Type, TypeEnum};
+use hugr::types::Type;
 use hugr::{Hugr, IncomingPort, Node, Wire};
+use hugr_core::types::{Term, TypeRow};
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 use tket_json_rs::circuit_json::ImplicitPermutation;
@@ -722,7 +724,7 @@ impl WireTracker {
             _ if ty == &bool_t() && !bit_args.is_empty() => {
                 self.initialize_bit_wire(builder, bit_args[0].clone())?
             }
-            _ if matches!(ty.as_type_enum(), TypeEnum::Sum(sum) if sum.as_tuple().is_some()) => {
+            _ if matches!(ty.deref(), Term::SumType(sum) if sum.as_tuple().is_some()) => {
                 return self.find_tuple_wire(config, builder, ty, qubit_args, bit_args, params);
             }
             _ => {
@@ -796,36 +798,36 @@ impl WireTracker {
         bit_args: &mut &[TrackedBit],
         params: &mut &[LoadedParameter],
     ) -> Result<FoundWire, PytketDecodeError> {
-        let TypeEnum::Sum(sum) = ty.as_type_enum() else {
+        let Term::SumType(sum) = ty.deref() else {
             unreachable!("find_tuple_wire called with non-sum type");
         };
         let Some(tuple) = sum.as_tuple() else {
             unreachable!("find_tuple_wire called with non-tuple sum type");
         };
+        let tuple = TypeRow::try_from(tuple.clone()).map_err(|_| {
+            PytketDecodeErrorInner::NoMatchingWire {
+                ty: ty.to_string(),
+                qubit_args: qubit_args
+                    .iter()
+                    .map(|q| q.pytket_register().to_string())
+                    .collect(),
+                bit_args: bit_args
+                    .iter()
+                    .map(|bit| bit.pytket_register().to_string())
+                    .collect(),
+            }
+            .wrap()
+        })?;
 
         let mut tuple_qubits = *qubit_args;
         let mut tuple_bits = *bit_args;
         let mut tuple_params = *params;
         let mut element_wires = Vec::with_capacity(tuple.len());
         for elem_ty in tuple.iter() {
-            let elem_ty: Type = elem_ty.clone().try_into().map_err(|_| {
-                PytketDecodeErrorInner::NoMatchingWire {
-                    ty: ty.to_string(),
-                    qubit_args: qubit_args
-                        .iter()
-                        .map(|q| q.pytket_register().to_string())
-                        .collect(),
-                    bit_args: bit_args
-                        .iter()
-                        .map(|bit| bit.pytket_register().to_string())
-                        .collect(),
-                }
-                .wrap()
-            })?;
             let FoundWire::Register(wire) = self.find_typed_wire(
                 config,
                 builder,
-                &elem_ty,
+                elem_ty,
                 &mut tuple_qubits,
                 &mut tuple_bits,
                 &mut tuple_params,

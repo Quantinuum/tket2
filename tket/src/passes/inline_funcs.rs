@@ -11,7 +11,7 @@ use hugr_core::module_graph::{ModuleGraph, StaticNode};
 use crate::metadata::InlineAnnotation;
 use crate::passes::{ComposablePass, PassScope, WithScope};
 
-/// Error raised by [inline_acyclic]
+/// Error raised by [InlineFunctionsPass]
 #[derive(Clone, Debug, thiserror::Error, PartialEq)]
 #[non_exhaustive]
 pub enum InlineFuncsError {}
@@ -93,28 +93,6 @@ impl WithScope for InlineFunctionsPass {
         self.scope = scope.into();
         self
     }
-}
-
-/// Inline (a subset of) [Call]s whose target [FuncDefn]s are not in cycles of the call
-/// graph.
-///
-/// Processes any call nodes that are descendants of the entrypoint.
-///
-/// The function `call_predicate` is passed each such [Call] node and can return
-/// `false` to prevent that Call from being inlined. (Note the [Call] may be created as
-/// a result of previous inlinings so may not have existed in the original Hugr).
-///
-/// [Call]: hugr_core::ops::Call
-/// [FuncDefn]: hugr_core::ops::FuncDefn
-#[deprecated(
-    since = "0.18.1",
-    note = "Use `inline_acyclic_scoped` with an appropriate `PassScope` instead. For module hugrs, use `PassScope::Global(Preserve::Entrypoint)`."
-)]
-pub fn inline_acyclic<H: HugrMut>(
-    h: &mut H,
-    call_predicate: impl FnMut(&H, H::Node) -> bool,
-) -> Result<(), InlineFuncsError> {
-    inline_acyclic_scoped(h, PassScope::EntrypointRecursive, call_predicate)
 }
 
 /// Inline (a subset of) [Call]s whose target [FuncDefn]s are not in cycles of the call

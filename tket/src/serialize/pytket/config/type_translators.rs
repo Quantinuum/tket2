@@ -10,8 +10,9 @@ use hugr::builder::DFGBuilder;
 use hugr::extension::ExtensionId;
 use hugr::extension::prelude::bool_t;
 use hugr::std_extensions::arithmetic::float_types;
-use hugr::types::{Type, TypeEnum};
+use hugr::types::Type;
 use hugr::{Hugr, Wire};
+use hugr_core::types::{Term, TypeRow};
 use itertools::Itertools;
 
 use crate::extension::rotation;
@@ -86,8 +87,8 @@ impl TypeTranslatorSet {
             return Some(RegisterCount::only_params(1));
         }
 
-        let res = match typ.as_type_enum() {
-            TypeEnum::Sum(sum) => {
+        let res = match &**typ {
+            Term::SumType(sum) => {
                 if sum.num_variants() == 0 {
                     return Some(RegisterCount::default());
                 }
@@ -95,23 +96,17 @@ impl TypeTranslatorSet {
                     return Some(RegisterCount::only_bits(1));
                 }
                 if let Some(tuple) = sum.as_tuple() {
-                    let count: Option<RegisterCount> = tuple
-                        .iter()
-                        .map(|ty| {
-                            match ty.clone().try_into() {
-                                Ok(ty) => self.type_to_pytket_internal(&ty),
-                                // Sum types with row variables (variable tuple lengths) are not supported.
-                                Err(_) => None,
-                            }
-                        })
-                        .sum();
-                    // Don't allow parameters nested inside other types
-                    count.filter(|c| c.params == 0)
+                    TypeRow::try_from(tuple.clone()).ok().and_then(|t| {
+                        let count: Option<RegisterCount> =
+                            t.iter().map(|ty| self.type_to_pytket_internal(ty)).sum();
+                        // Don't allow parameters nested inside other types
+                        count.filter(|c| c.params == 0)
+                    })
                 } else {
                     None
                 }
             }
-            TypeEnum::Extension(custom) => 'outer: {
+            Term::ExtensionType(custom) => 'outer: {
                 let type_ext = custom.extension();
                 for encoder in self.translators_for_extension(type_ext) {
                     if let Some(count) = encoder.type_to_pytket(custom, self) {

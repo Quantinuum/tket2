@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.14.0](https://github.com/Quantinuum/tket2/compare/tket-py-v0.13.1...tket-py-v0.14.0) (2026-06-11)
+
+
+### ⚠ BREAKING CHANGES
+
+* Updated the public `hugr` Python dependency to `~=0.17.1`
+* Removed the deprecated `tket.extensions.bool` and `tket.extensions.opaque_bool` re-exports
+* Removed the `lazify` option from `QSystemPass` and `qsystem_rebase_pass`; qsystem lowering now uses the measurement extension directly
+* `CompilationState.circuit_cost` now computes the cost of all descendant operations, not just direct `TketOp`s
+
+### Features
+
+* Add the measurement extension to the embedded registry and qsystem lowering pipeline ([#1558](https://github.com/Quantinuum/tket2/issues/1558)) ([7e35ecf](https://github.com/Quantinuum/tket2/commit/7e35ecf592db05e51e9b4d4b577afc2c93bd291d))
+* Encode measurement/read pairs as pytket measurements when converting back to pytket circuits ([#1658](https://github.com/Quantinuum/tket2/issues/1658)) ([00cf6ec](https://github.com/Quantinuum/tket2/commit/00cf6ec025f48a3bbc9ecacb0e913fcfc8c669c0))
+* Expose the Helios and Sol qsystem extensions as `tket.extensions.qsystem_helios` and `tket.extensions.qsystem_sol` ([#1567](https://github.com/Quantinuum/tket2/issues/1567)) ([b60553f](https://github.com/Quantinuum/tket2/commit/b60553fec5e81b698c75916658bae7d1c527907e))
+* Add `UnitaryFlags` alias support for metadata written with the previous `unitary` key ([#1669](https://github.com/Quantinuum/tket2/issues/1669)) ([b97704c](https://github.com/Quantinuum/tket2/commit/b97704caa73c049eaee444d6e768a165e64436fd))
+* Upgrade the Python `hugr` dependency to `~=0.17.1` ([#1580](https://github.com/Quantinuum/tket2/issues/1580)) ([68e7fd7](https://github.com/Quantinuum/tket2/commit/68e7fd76705f3e221deaeea9b602c16ec9c6046b)), ([#1668](https://github.com/Quantinuum/tket2/issues/1668)) ([86b81b6](https://github.com/Quantinuum/tket2/commit/86b81b6285e073b12c87f67f354ee8b887ee1c6f))
+
+
 ## [0.13.1](https://github.com/Quantinuum/tket2/compare/tket-py-v0.13.0...tket-py-v0.13.1) (2026-05-19)
 
 

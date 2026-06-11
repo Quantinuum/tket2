@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.13.0](https://github.com/Quantinuum/tket2/compare/tket-exts-v0.12.3...tket-exts-v0.13.0) (2026-06-11)
+
+
+### ⚠ BREAKING CHANGES
+
+* Updated public dependency `hugr` to `0.28.0`.
+* Removed `tket.bool` extension.
+* Breaking version bump for extensions `tket.wasm`, `tket.gpu`, `tket.qsystem`, and `tket.quantum`.
+
+### Features
+
+* Add `measurement` extension and change `tket.quantum` / `tket.qsystem` extension measurement ops return type ([#1558](https://github.com/Quantinuum/tket2/issues/1558)) ([7e35ecf](https://github.com/Quantinuum/tket2/commit/7e35ecf592db05e51e9b4d4b577afc2c93bd291d))
+* `QSystemExtension` has been deprecated ([#1670](https://github.com/Quantinuum/tket2/issues/1670)) ([e25102e](https://github.com/Quantinuum/tket2/commit/e25102ea58df7531187f89c8c04104e3ec2bb71b))
+* Add multiple platform-specific qsystem extensions ([#1567](https://github.com/Quantinuum/tket2/issues/1567)) ([b60553f](https://github.com/Quantinuum/tket2/commit/b60553fec5e81b698c75916658bae7d1c527907e))
+* Add `RandomAdvance` platform call to `tket.qsystem.random` ([#1170](https://github.com/Quantinuum/tket2/issues/1170)) ([eed16e8](https://github.com/Quantinuum/tket2/commit/eed16e8c57541ea23af6241290aa47d37583cfc4))
+* Upgrade hugr dependency to 0.28.0 ([#1580](https://github.com/Quantinuum/tket2/issues/1580)) ([68e7fd7](https://github.com/Quantinuum/tket2/commit/68e7fd76705f3e221deaeea9b602c16ec9c6046b))
+
+
 ## [0.12.3](https://github.com/Quantinuum/tket2/compare/tket-exts-v0.12.2...tket-exts-v0.12.3) (2026-04-07)
 
 

@@ -7,7 +7,7 @@ source_filename = "test_context"
 
 @no_gpu_error = private unnamed_addr constant [27 x i8] c"No error message available\00", align 1
 
-define internal { i64, double } @_hl.main.1(i64 %0) {
+define internal { i64, double } @_hl.main.1(i64 %0) !dbg !3 {
 alloca_block:
   %"0" = alloca i64, align 8
   %"1" = alloca double, align 8
@@ -19,12 +19,12 @@ alloca_block:
 entry_block:                                      ; preds = %alloca_block
   store i64 %0, ptr %"2_0", align 4
   %"2_01" = load i64, ptr %"2_0", align 4
-  %int_result = alloca i64, align 8
-  %read_status = call i8 @gpu_get_result(i64 %"2_01", i64 8, ptr %int_result)
-  call void @validate_gpu_response(i8 %read_status)
-  %result = load double, ptr %int_result, align 8
-  store i64 %"2_01", ptr %"4_0", align 4
-  store double %result, ptr %"4_1", align 8
+  %int_result = alloca i64, align 8, !dbg !11
+  %read_status = call i8 @gpu_get_result(i64 %"2_01", i64 8, ptr %int_result), !dbg !11
+  call void @validate_gpu_response(i8 %read_status), !dbg !11
+  %result = load double, ptr %int_result, align 8, !dbg !11
+  store i64 %"2_01", ptr %"4_0", align 4, !dbg !11
+  store double %result, ptr %"4_1", align 8, !dbg !11
   %"4_02" = load i64, ptr %"4_0", align 4
   %"4_13" = load double, ptr %"4_1", align 8
   store i64 %"4_02", ptr %"0", align 4
@@ -41,25 +41,25 @@ declare i8 @gpu_get_result(i64, i64, ptr)
 ; Function Attrs: noinline
 define void @validate_gpu_response(i8 %0) #0 {
 entry:
-  %success = icmp ne i8 %0, 0
-  br i1 %success, label %ok, label %err
+  %success = icmp ne i8 %0, 0, !dbg !11
+  br i1 %success, label %ok, label %err, !dbg !11
 
 ok:                                               ; preds = %entry
-  ret void
+  ret void, !dbg !11
 
 err:                                              ; preds = %entry
-  call void @gpu_error_handler()
-  unreachable
+  call void @gpu_error_handler(), !dbg !11
+  unreachable, !dbg !11
 }
 
 ; Function Attrs: noinline
 define void @gpu_error_handler() #0 {
 entry:
-  %error_message = call ptr @gpu_get_error()
-  %is_null = icmp eq ptr %error_message, null
-  %error_message_nonnull = select i1 %is_null, ptr @no_gpu_error, ptr %error_message
-  call void @panic_str(i32 70002, ptr %error_message_nonnull)
-  unreachable
+  %error_message = call ptr @gpu_get_error(), !dbg !11
+  %is_null = icmp eq ptr %error_message, null, !dbg !11
+  %error_message_nonnull = select i1 %is_null, ptr @no_gpu_error, ptr %error_message, !dbg !11
+  call void @panic_str(i32 70002, ptr %error_message_nonnull), !dbg !11
+  unreachable, !dbg !11
 }
 
 declare ptr @gpu_get_error()
@@ -69,3 +69,19 @@ declare void @panic_str(i32, ptr) #1
 
 attributes #0 = { noinline }
 attributes #1 = { noreturn }
+
+!llvm.module.flags = !{!0}
+!llvm.dbg.cu = !{!1}
+
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "hugr_llvm_test", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "/lPNzlV/ClAphFG/yrhvZs/eDgUn/eIVwAutKJHaZEPSZwPXPeycUvnujGxZ")
+!3 = distinct !DISubprogram(name: "_hl.main.1", linkageName: "_hl.main.1", scope: null, file: !4, line: 25254, type: !5, scopeLine: 25255, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
+!4 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "")
+!5 = !DISubroutineType(types: !6)
+!6 = !{!7, !9}
+!7 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ i64, double }", file: !2, size: 128, align: 8, elements: !8)
+!8 = !{!9, !10}
+!9 = !DIBasicType(name: "i64", size: 64, encoding: DW_ATE_unsigned)
+!10 = !DIBasicType(name: "f64", size: 64, encoding: DW_ATE_float)
+!11 = !DILocation(line: 27062, column: 402, scope: !3)

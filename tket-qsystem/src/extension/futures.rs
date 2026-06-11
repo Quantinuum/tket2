@@ -61,6 +61,7 @@ pub fn future_custom_type(t: Type, extension_ref: &Weak<Extension>) -> CustomTyp
         FUTURE_TYPE_NAME.to_owned(),
         vec![t.into()],
         EXTENSION_ID,
+        EXTENSION_VERSION,
         TypeBound::Linear,
         extension_ref,
     )
@@ -154,10 +155,13 @@ impl HasConcrete for FutureOpDef {
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         match type_args {
-            [TypeArg::Runtime(ty)] => Ok(FutureOp {
-                op: *self,
-                typ: ty.clone(),
-            }),
+            [ty] => {
+                if let Ok(ty) = Type::try_from(ty.clone()) {
+                    Ok(FutureOp { op: *self, typ: ty })
+                } else {
+                    Err(SignatureError::InvalidTypeArgs.into())
+                }
+            }
             _ => Err(SignatureError::InvalidTypeArgs.into()),
         }
     }

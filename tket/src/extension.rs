@@ -48,7 +48,7 @@ pub static ref TKET1_EXTENSION: Arc<Extension>  = {
         res.add_op(
             TKET1_OP_NAME,
             "An opaque TKET1 operation.".into(),
-            Tk1Signature([TypeParam::StringType]),
+            Tk1Signature([TypeParam::StringKind]),
             ext_ref
         ).unwrap();
     })
@@ -56,11 +56,13 @@ pub static ref TKET1_EXTENSION: Arc<Extension>  = {
 
 /// Extension registry including the prelude, std, TKET1, and TketOps extensions.
 pub(crate) static ref REGISTRY: ExtensionRegistry = ExtensionRegistry::new(
-    STD_REG.iter().map(|e| e.to_owned()).chain([
+    STD_REG.iter_all().cloned().chain([
     TKET1_EXTENSION.to_owned(),
     TKET_EXTENSION.to_owned(),
     debug::DEBUG_EXTENSION.to_owned(),
+    global_phase::GLOBAL_PHASE_EXTENSION.to_owned(),
     guppy::GUPPY_EXTENSION.to_owned(),
+    modifier::MODIFIER_EXTENSION.to_owned(),
     measurement::MEASUREMENT_EXTENSION.to_owned(),
     rotation::ROTATION_EXTENSION.to_owned()
 ]));

@@ -8,35 +8,35 @@ source_filename = "test_context"
 @gpu_validated = thread_local global i8 0
 @no_gpu_error = private unnamed_addr constant [27 x i8] c"No error message available\00", align 1
 
-define internal { i1, i64 } @_hl.main.1(i64 %0) {
+define internal { i1, i64 } @_hl.main.1(i64 %0) !dbg !3 {
 alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  call void @run_gpu_validation()
-  %gpu_ref_ptr = alloca i64, align 8
-  %gpu_ref_call = call i8 @gpu_init(i64 %0, ptr %gpu_ref_ptr)
-  call void @validate_gpu_response(i8 %gpu_ref_call)
-  %gpu_ref = load i64, ptr %gpu_ref_ptr, align 4
-  %1 = insertvalue { i1, i64 } { i1 true, i64 poison }, i64 %gpu_ref, 1
+  call void @run_gpu_validation(), !dbg !11
+  %gpu_ref_ptr = alloca i64, align 8, !dbg !11
+  %gpu_ref_call = call i8 @gpu_init(i64 %0, ptr %gpu_ref_ptr), !dbg !11
+  call void @validate_gpu_response(i8 %gpu_ref_call), !dbg !11
+  %gpu_ref = load i64, ptr %gpu_ref_ptr, align 4, !dbg !11
+  %1 = insertvalue { i1, i64 } { i1 true, i64 poison }, i64 %gpu_ref, 1, !dbg !11
   ret { i1, i64 } %1
 }
 
 ; Function Attrs: noinline
 define void @run_gpu_validation() #0 {
 entry:
-  %validated = load i8, ptr @gpu_validated, align 1
-  %already_validated = icmp ne i8 %validated, 0
-  br i1 %already_validated, label %done, label %validate
+  %validated = load i8, ptr @gpu_validated, align 1, !dbg !11
+  %already_validated = icmp ne i8 %validated, 0, !dbg !11
+  br i1 %already_validated, label %done, label %validate, !dbg !11
 
 done:                                             ; preds = %entry
-  ret void
+  ret void, !dbg !11
 
 validate:                                         ; preds = %entry
-  %validate_call = call i8 @gpu_validate_api(i64 0, i64 1, i64 0)
-  call void @validate_gpu_response(i8 %validate_call)
-  store i8 1, ptr @gpu_validated, align 1
-  ret void
+  %validate_call = call i8 @gpu_validate_api(i64 0, i64 1, i64 0), !dbg !11
+  call void @validate_gpu_response(i8 %validate_call), !dbg !11
+  store i8 1, ptr @gpu_validated, align 1, !dbg !11
+  ret void, !dbg !11
 }
 
 declare i8 @gpu_validate_api(i64, i64, i64)
@@ -44,25 +44,25 @@ declare i8 @gpu_validate_api(i64, i64, i64)
 ; Function Attrs: noinline
 define void @validate_gpu_response(i8 %0) #0 {
 entry:
-  %success = icmp ne i8 %0, 0
-  br i1 %success, label %ok, label %err
+  %success = icmp ne i8 %0, 0, !dbg !11
+  br i1 %success, label %ok, label %err, !dbg !11
 
 ok:                                               ; preds = %entry
-  ret void
+  ret void, !dbg !11
 
 err:                                              ; preds = %entry
-  call void @gpu_error_handler()
-  unreachable
+  call void @gpu_error_handler(), !dbg !11
+  unreachable, !dbg !11
 }
 
 ; Function Attrs: noinline
 define void @gpu_error_handler() #0 {
 entry:
-  %error_message = call ptr @gpu_get_error()
-  %is_null = icmp eq ptr %error_message, null
-  %error_message_nonnull = select i1 %is_null, ptr @no_gpu_error, ptr %error_message
-  call void @panic_str(i32 70002, ptr %error_message_nonnull)
-  unreachable
+  %error_message = call ptr @gpu_get_error(), !dbg !11
+  %is_null = icmp eq ptr %error_message, null, !dbg !11
+  %error_message_nonnull = select i1 %is_null, ptr @no_gpu_error, ptr %error_message, !dbg !11
+  call void @panic_str(i32 70002, ptr %error_message_nonnull), !dbg !11
+  unreachable, !dbg !11
 }
 
 declare ptr @gpu_get_error()
@@ -74,3 +74,19 @@ declare i8 @gpu_init(i64, ptr)
 
 attributes #0 = { noinline }
 attributes #1 = { noreturn }
+
+!llvm.module.flags = !{!0}
+!llvm.dbg.cu = !{!1}
+
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "hugr_llvm_test", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "/lPNzlV/ClAphFG/yrhvZs/eDgUn/eIVwAutKJHaZEPSZwPXPeycUvnujGxZ")
+!3 = distinct !DISubprogram(name: "_hl.main.1", linkageName: "_hl.main.1", scope: null, file: !4, line: 25254, type: !5, scopeLine: 25255, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
+!4 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "")
+!5 = !DISubroutineType(types: !6)
+!6 = !{!7, !10}
+!7 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ i1, i64 }", file: !2, size: 64, align: 8, elements: !8)
+!8 = !{!9, !10}
+!9 = !DIBasicType(name: "i1", size: 1, encoding: DW_ATE_unsigned)
+!10 = !DIBasicType(name: "i64", size: 64, encoding: DW_ATE_unsigned)
+!11 = !DILocation(line: 27062, column: 402, scope: !3)

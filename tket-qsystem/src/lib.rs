@@ -73,7 +73,7 @@ impl QSystemPass {
 #[non_exhaustive]
 /// An error reported from [QSystemPass].
 pub enum QSystemPassError {
-    /// An error from the component [force_order()] pass.
+    /// An error from the component [force_order] pass.
     ForceOrderError(HugrError),
     /// An error from the component [LowerTketToQSystemPass] pass.
     LowerTk2Error(LowerTk2Error),
@@ -149,7 +149,7 @@ impl QSystemPass {
             return Ok(());
         };
 
-        force_order(hugr, root, |hugr, node| {
+        force_order::force_order(hugr, root, |hugr, node| {
             let optype = hugr.get_optype(node);
 
             let is_quantum =

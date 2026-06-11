@@ -11,10 +11,9 @@ use hugr::{
     },
     ops::ExtensionOp,
     std_extensions::collections::array::{ArrayOpBuilder, array_type},
-    types::{
-        FuncValueType, PolyFuncTypeRV, Signature, TypeArg, TypeBound, TypeRV, type_param::TypeParam,
-    },
+    types::{FuncValueType, PolyFuncTypeRV, Signature, TypeArg, TypeBound, type_param::TypeParam},
 };
+use hugr_core::types::TypeRowRV;
 
 use crate::extension::qsystem::QSystemPlatform;
 use crate::extension::qsystem::common::CommonOpBuilder;
@@ -40,8 +39,8 @@ static TEMP_BARRIER_EXT: LazyLock<Arc<Extension>> = LazyLock::new(|| {
                 WRAPPED_BARRIER_NAME,
                 Default::default(),
                 PolyFuncTypeRV::new(
-                    vec![TypeParam::new_list_type(TypeBound::Linear)],
-                    FuncValueType::new_endo(vec![TypeRV::new_row_var_use(0, TypeBound::Linear)]),
+                    vec![TypeParam::new_list_kind(TypeBound::Linear)],
+                    FuncValueType::new_endo(TypeRowRV::new_var_use(0, TypeBound::Linear)),
                 ),
                 ext_ref,
             )
