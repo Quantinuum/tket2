@@ -19,8 +19,8 @@ use hugr::{
     ops::ExtensionOp,
 };
 use hugr_core::extension::SignatureError;
-use hugr_core::types::type_param::TermTypeError;
-use hugr_core::types::{FuncValueType, Signature};
+use hugr_core::types::type_param::TermKindError;
+use hugr_core::types::{FuncValueType, Signature, Term, Type, TypeBound, TypeRowRV};
 use itertools::Itertools;
 
 pub struct GlobalsCodegenExtension;
@@ -53,13 +53,14 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
             outputs,
         } => {
             let sym = format!("{PREFIX}.{name}");
-            let Some(global_ty_base) = ty_arg.as_runtime() else {
-                Err(SignatureError::from(TermTypeError::TypeMismatch {
-                    term: ty_arg.clone().into(),
-                    type_: TYPE_PARAM.to_owned().into(),
-                }))?
+            let global_ty_base = match ty_arg.is_runtime_type() {
+                true => Ok(Type::try_from(ty_arg)?),
+                false => Err(TermKindError::KindMismatch {
+                    term: Box::new(ty_arg),
+                    kind: Box::new(TypeBound::Linear.into()),
+                }),
             };
-            let sym_ty = context.llvm_sum_type(option_type([global_ty_base]))?;
+            let sym_ty = context.llvm_sum_type(option_type(global_ty_base.clone().into()))?;
 
             let [init_global_value, func, func_args @ ..] = &args.inputs[..] else {
                 bail!("No function provided as input for GlobalsOp::With")
@@ -117,13 +118,14 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
             outputs,
         } => {
             let sym = format!("{PREFIX}.{name}");
-            let Some(global_ty_base) = ty_arg.as_runtime() else {
-                Err(SignatureError::from(TermTypeError::TypeMismatch {
-                    term: ty_arg.clone().into(),
-                    type_: TYPE_PARAM.to_owned().into(),
-                }))?
+            let global_ty_base = match ty_arg.is_runtime_type() {
+                true => Ok(Type::try_from(ty_arg)?),
+                false => Err(TermKindError::KindMismatch {
+                    term: Box::new(ty_arg),
+                    kind: Box::new(TypeBound::Linear.into()),
+                }),
             };
-            let sym_ty = context.llvm_sum_type(option_type([global_ty_base.clone()]))?;
+            let sym_ty = context.llvm_sum_type(option_type(global_ty_base.clone().into()))?;
 
             // Get function and args
             let [func, func_args @ ..] = &args.inputs[..] else {
@@ -157,11 +159,14 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
             let func_ptr = PointerValue::try_from(*func)
                 .map_err(|e| anyhow::anyhow!("Invalid function pointer provided to Map: {e:?}"))?;
 
-            let mut in_types = inputs.iter().cloned().collect_vec();
-            in_types.insert(0, global_ty_base.clone().into());
+            // let mut in_types = inputs.iter().cloned().collect_vec();
+            // in_types.insert(0, global_ty_base.clone().into());
+            let in_types = TypeRowRV::from([global_ty_base.clone()?.into()]).concat(inputs.clone());
 
-            let mut out_types = outputs.iter().cloned().collect_vec();
-            out_types.insert(0, global_ty_base.clone().into());
+            // let mut out_types = outputs.iter().cloned().collect_vec();
+            // out_types.insert(0, global_ty_base.clone().into());
+            let out_types =
+                TypeRowRV::from([global_ty_base.clone()?.into()]).concat(outputs.clone());
 
             let hugr_func_ty = FuncValueType::new(in_types, out_types).try_into()?;
             let func_ty = context.llvm_func_type(&hugr_func_ty)?;
@@ -231,7 +236,7 @@ mod test {
             ceb.add_extension(GlobalsCodegenExtension)
                 .add_default_prelude_extensions()
         });
-        let hugr = single_op_hugr(op.to_extension_op().unwrap().into());
+        let mut hugr = single_op_hugr(op.to_extension_op().unwrap().into());
         check_emission!(hugr, llvm_ctx);
     }
 }

@@ -39,7 +39,8 @@ use tket::llvm::rotation::RotationCodegenExtension;
 use tket_qsystem::QSystemPass;
 use tket_qsystem::extension::{
     futures as qsystem_futures, globals as qsystem_globals, gpu as qsystem_gpu, qsystem,
-   random as qsystem_random, result as qsystem_result,utils as qsystem_utils, wasm as qsystem_wasm,
+    random as qsystem_random, result as qsystem_result, utils as qsystem_utils,
+    wasm as qsystem_wasm,
 };
 use tket_qsystem::llvm::array_utils::ArrayLowering;
 pub use tket_qsystem::llvm::futures::FuturesCodegenExtension;

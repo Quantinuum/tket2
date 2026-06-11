@@ -13,10 +13,10 @@ use hugr::{
     ops::{ExtensionOp, OpName},
     types::{
         TypeArg, TypeBound,
-        type_param::{TermTypeError, TypeParam},
+        type_param::{TermKindError, TypeParam},
     },
 };
-use hugr_core::types::{FuncValueType, PolyFuncTypeRV, TypeRV, TypeRowRV};
+use hugr_core::types::{FuncValueType, PolyFuncTypeRV, Type, TypeRowRV};
 
 /// The ID of the `tket.globals` extension.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("tket.globals");
@@ -32,14 +32,14 @@ lazy_static::lazy_static! {
     };
 
     /// The [TypeParam] specifying the name of a global variable.
-    pub static ref NAME_PARAM: TypeParam = TypeParam::StringType;
+    pub static ref NAME_PARAM: TypeParam = TypeParam::StringKind;
     /// The [TypeParam] specifying the runtime type of a global variable.
-    pub static ref TYPE_PARAM: TypeParam = TypeParam::RuntimeType(TypeBound::Linear);
+    pub static ref TYPE_PARAM: TypeParam = TypeParam::TypeKind(TypeBound::Linear);
 
     /// The [TypeParam] of various types and ops specifying the input signature of a function.
-    pub static ref INPUTS_PARAM: TypeParam = TypeParam::ListType(Box::new(TypeBound::Linear.into()));
+    pub static ref INPUTS_PARAM: TypeParam = TypeParam::new_list_kind(TypeBound::Linear);
     /// The [TypeParam] of various types and ops specifying the explicit output signature of a function.
-    pub static ref OUTPUTS_PARAM: TypeParam = TypeParam::ListType(Box::new(TypeBound::Linear.into()));
+    pub static ref OUTPUTS_PARAM: TypeParam = TypeParam::new_list_kind(TypeBound::Linear);
 }
 
 #[derive(
@@ -75,13 +75,13 @@ impl MakeOpDef for GlobalsOpDef {
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         match self {
             Self::with => {
-                let global_ty = TypeRV::new_var_use(1, TypeBound::Linear);
-                let input_row = TypeRV::new_row_var_use(2, TypeBound::Linear);
-                let output_row = TypeRV::new_row_var_use(3, TypeBound::Linear);
-                let func_ty = TypeRV::new_function(FuncValueType::new(
-                    [input_row.clone()],
-                    [output_row.clone()],
-                ));
+                let global_ty = Type::new_var_use(1, TypeBound::Linear);
+                let input_row = TypeRowRV::new_var_use(2, TypeBound::Linear);
+                let output_row = TypeRowRV::new_var_use(3, TypeBound::Linear);
+                let func_ty = TypeRowRV::from([Type::new_function(FuncValueType::new(
+                    input_row.clone(),
+                    output_row.clone(),
+                ))]);
                 PolyFuncTypeRV::new(
                     [
                         NAME_PARAM.to_owned(),
@@ -90,20 +90,22 @@ impl MakeOpDef for GlobalsOpDef {
                         OUTPUTS_PARAM.to_owned(),
                     ],
                     FuncValueType::new(
-                        [global_ty.clone(), func_ty, input_row],
-                        [global_ty.clone(), output_row],
+                        TypeRowRV::from([global_ty.clone()])
+                            .concat(func_ty)
+                            .concat(input_row),
+                        TypeRowRV::from([global_ty]).concat(output_row),
                     ),
                 )
                 .into()
             }
             Self::map => {
-                let global_ty = TypeRV::new_var_use(1, TypeBound::Linear);
-                let input_row = TypeRV::new_row_var_use(2, TypeBound::Linear);
-                let output_row = TypeRV::new_row_var_use(3, TypeBound::Linear);
-                let func_ty = TypeRV::new_function(FuncValueType::new(
-                    [global_ty.clone(), input_row.clone()],
-                    [global_ty.clone(), output_row.clone()],
-                ));
+                let global_ty = Type::new_var_use(1, TypeBound::Linear);
+                let input_row = TypeRowRV::new_var_use(2, TypeBound::Linear);
+                let output_row = TypeRowRV::new_var_use(3, TypeBound::Linear);
+                let func_ty = TypeRowRV::from([Type::new_function(FuncValueType::new(
+                    TypeRowRV::from([global_ty.clone()]).concat(input_row.clone()),
+                    TypeRowRV::from([global_ty.clone()]).concat(output_row.clone()),
+                ))]);
                 PolyFuncTypeRV::new(
                     [
                         NAME_PARAM.to_owned(),
@@ -111,7 +113,7 @@ impl MakeOpDef for GlobalsOpDef {
                         INPUTS_PARAM.to_owned(),
                         OUTPUTS_PARAM.to_owned(),
                     ],
-                    FuncValueType::new([func_ty, input_row], [output_row]),
+                    FuncValueType::new(func_ty.concat(input_row), output_row),
                 )
                 .into()
             }
@@ -223,29 +225,29 @@ impl HasConcrete for GlobalsOpDef {
         let expected_num_args = 4;
 
         let [name_arg, ty_arg, inputs_arg, outputs_arg] = type_args else {
-            Err(SignatureError::from(TermTypeError::WrongNumberArgs(
+            Err(SignatureError::from(TermKindError::WrongNumberArgs(
                 type_args.len(),
                 expected_num_args,
             )))?
         };
 
         let Some(name) = name_arg.as_string() else {
-            Err(SignatureError::from(TermTypeError::TypeMismatch {
+            Err(SignatureError::from(TermKindError::KindMismatch {
                 term: name_arg.clone().into(),
-                type_: NAME_PARAM.to_owned().into(),
+                kind: NAME_PARAM.to_owned().into(),
             }))?
         };
 
         let Ok(inputs) = TypeRowRV::try_from(inputs_arg.clone()) else {
-            Err(SignatureError::from(TermTypeError::TypeMismatch {
+            Err(SignatureError::from(TermKindError::KindMismatch {
                 term: Box::new(inputs_arg.clone()),
-                type_: Box::new(INPUTS_PARAM.to_owned()),
+                kind: Box::new(INPUTS_PARAM.to_owned()),
             }))?
         };
         let Ok(outputs) = TypeRowRV::try_from(outputs_arg.clone()) else {
-            Err(SignatureError::from(TermTypeError::TypeMismatch {
+            Err(SignatureError::from(TermKindError::KindMismatch {
                 term: Box::new(outputs_arg.clone()),
-                type_: Box::new(OUTPUTS_PARAM.to_owned()),
+                kind: Box::new(OUTPUTS_PARAM.to_owned()),
             }))?
         };
 
@@ -304,7 +306,7 @@ mod test {
     #[case::wrong_num_args(
         &[],
         OpLoadError::InvalidArgs(SignatureError::TypeArgMismatch(
-            TermTypeError::WrongNumberArgs(0, 4)
+            TermKindError::WrongNumberArgs(0, 4)
         ))
     )]
     #[case::name_type_mismatch(
@@ -314,9 +316,9 @@ mod test {
             TypeRowRV::new().into(),
             TypeRowRV::new().into(),
         ],
-        OpLoadError::InvalidArgs(SignatureError::TypeArgMismatch(TermTypeError::TypeMismatch {
+        OpLoadError::InvalidArgs(SignatureError::TypeArgMismatch(TermKindError::KindMismatch {
             term: Box::new(TypeArg::BoundedNat(0)),
-            type_: Box::new(TypeParam::StringType),
+            kind: Box::new(TypeParam::StringKind),
         }))
     )]
     #[case::inputs_type_mismatch(
@@ -326,9 +328,9 @@ mod test {
             TypeArg::BoundedNat(1),
             TypeRowRV::new().into(),
         ],
-        OpLoadError::InvalidArgs(SignatureError::TypeArgMismatch(TermTypeError::TypeMismatch {
+        OpLoadError::InvalidArgs(SignatureError::TypeArgMismatch(TermKindError::KindMismatch {
             term: Box::new(TypeArg::BoundedNat(1)),
-            type_: Box::new(TypeParam::ListType(Box::new(TypeBound::Linear.into()))),
+            kind: Box::new(TypeParam::ListKind(Box::new(TypeBound::Linear.into()))),
         }))
     )]
     #[case::outputs_type_mismatch(
@@ -338,9 +340,9 @@ mod test {
             TypeRowRV::new().into(),
             TypeArg::BoundedNat(2),
         ],
-        OpLoadError::InvalidArgs(SignatureError::TypeArgMismatch(TermTypeError::TypeMismatch {
+        OpLoadError::InvalidArgs(SignatureError::TypeArgMismatch(TermKindError::KindMismatch {
             term: Box::new(TypeArg::BoundedNat(2)),
-            type_: Box::new(TypeParam::ListType(Box::new(TypeBound::Linear.into()))),
+            kind: Box::new(TypeParam::ListKind(Box::new(TypeBound::Linear.into()))),
         }))
     )]
     fn test_globals_op_instantiate_errors(
