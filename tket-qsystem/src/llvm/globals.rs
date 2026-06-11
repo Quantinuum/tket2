@@ -206,7 +206,7 @@ mod test {
         GlobalsOp::With{ name: "my_global".to_string(), ty_arg: qb_t().into(), inputs: [bool_t(), qb_t()].into(), outputs: [bool_t()].into() }
     )]
     #[case::map(2,
-        GlobalsOp::Map{ name: "my_global".to_string(), ty_arg: qb_t().into(), inputs: [bool_t(), qb_t()].into(), outputs: [bool_t()].into() }
+        GlobalsOp::Map{ name: "my_global".to_string(), ty_arg: qb_t().into(), inputs: TypeRowRV::new(), outputs: TypeRowRV::new() }
     )]
     fn emit_globals_codegen(
         #[case] _i: i32,

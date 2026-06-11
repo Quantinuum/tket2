@@ -1164,7 +1164,7 @@ checksum = "fea26a2751aaf406c046f733333dcc7b035d3a7ae72d604215d47f4728a7d349"
 dependencies = [
  "hugr-core",
  "hugr-llvm",
- "hugr-model",
+ "hugr-model 0.28.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1192,8 +1192,7 @@ dependencies = [
 [[package]]
 name = "hugr-core"
 version = "0.28.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a2cc58ed1e185c553dd724397f06b5c957f50ee0ab00011d1a793859e136bfd"
+source = "git+https://github.com/quantinuum/hugr?rev=4f133bc#4f133bca6586a741846e22c6774a29dab1ccf9b9"
 dependencies = [
  "base64",
  "cgmath",
@@ -1202,7 +1201,7 @@ dependencies = [
  "downcast-rs",
  "enum_dispatch",
  "html-escape",
- "hugr-model",
+ "hugr-model 0.28.1 (git+https://github.com/quantinuum/hugr?rev=4f133bc)",
  "indexmap 2.14.0",
  "itertools 0.14.0",
  "ordered-float",
@@ -1253,6 +1252,27 @@ name = "hugr-model"
 version = "0.28.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "00709a8fb1f7820455bbae46bb03d30aaa41a548c78bd71109bbe1a329c8f278"
+dependencies = [
+ "base64",
+ "bumpalo",
+ "capnp",
+ "derive_more 2.1.1",
+ "indexmap 2.14.0",
+ "itertools 0.14.0",
+ "ordered-float",
+ "pest",
+ "pest_derive",
+ "pretty",
+ "rustc-hash 2.1.2",
+ "semver",
+ "smol_str",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "hugr-model"
+version = "0.28.1"
+source = "git+https://github.com/quantinuum/hugr?rev=4f133bc#4f133bca6586a741846e22c6774a29dab1ccf9b9"
 dependencies = [
  "base64",
  "bumpalo",

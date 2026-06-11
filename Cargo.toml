@@ -42,7 +42,7 @@ large_enum_variant = "allow"
 
 # Uncomment to use unreleased versions of hugr
 #hugr = { git = "https://github.com/quantinuum/hugr", "rev" = "1787e12" }
-#hugr-core = { git = "https://github.com/quantinuum/hugr", "rev" = "1787e12" }
+hugr-core = { git = "https://github.com/quantinuum/hugr", "rev" = "4f133bc" }
 #hugr-cli = { git = "https://github.com/quantinuum/hugr", "rev" = "1787e12" }
 #hugr-llvm = { git = "https://github.com/quantinuum/hugr", "rev" = "1787e12" }
 # portgraph = { git = "https://github.com/quantinuum/portgraph", rev = "68b96ac737e0c285d8c543b2d74a7aa80a18202c" }
