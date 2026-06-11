@@ -78,6 +78,7 @@ def normalize_ir_snapshot(ir: str) -> str:
         "rus",
         "print_current_shot",
         "rng",
+        "entry_args",
     ],
 )
 @pytest.mark.parametrize("target_triple", triples)
@@ -89,16 +90,9 @@ def test_llvm(
     ir = compile_to_llvm_ir(
         hugr_envelope, target_triple=target_triple, platform=platform, emit_debug=True
     )
-    ir = normalize_ir_snapshot(ir)
+    #TODO uncomment this, I need to keep debug info in for testing
+    #ir = normalize_ir_snapshot(ir)
     snapshot.assert_match(ir, f"{hugr_file}_{target_triple}_{platform}")
-
-
-def test_entry_args() -> None:
-    with pytest.raises(
-        RuntimeError,
-        match="Entry point function must have no input parameters",
-    ):
-        _ = compile_to_llvm_ir(load("entry_args"))
 
 
 # TODO: The stored hugr compiles to an empty function. It is likely missing
