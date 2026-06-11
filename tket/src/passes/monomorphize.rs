@@ -57,6 +57,11 @@ fn mono_scan(
         let ch = if let Some(ref mut inst) = subst_into {
             let new_ch =
                 h.add_node_with_parent(inst.target_container, ch_op.substitute(inst.subst));
+
+            // Copy metadata onto the monomorphized node
+            let meta = h.node_metadata_map_mut(old_ch).clone();
+            h.node_metadata_map_mut(new_ch).extend(meta);
+
             inst.node_map.insert(old_ch, new_ch);
             let mut inst = Instantiating {
                 target_container: new_ch,
@@ -647,9 +652,7 @@ mod test {
     /// Debug info (LocationRecord metadata) on nodes inside a polymorphic
     /// function should be copied to every monomorphized instance of that node.
     #[test]
-    #[should_panic]
-    fn test_debug_info_copied_on_monomorphization() {
-        //) -> Result<(), Box<dyn std::error::Error>> {
+    fn test_debug_info_copied_on_monomorphization() -> Result<(), Box<dyn std::error::Error>> {
         use hugr_core::hugr::hugrmut::HugrMut;
         use hugr_core::metadata::LocationRecord;
         use hugr_core::ops::OpType;
@@ -660,10 +663,8 @@ mod test {
 
         // monomorphic helper
         let helper = {
-            let fb = mb
-                .define_function("helper", Signature::new([], []))
-                .unwrap();
-            fb.finish_with_outputs([]).unwrap()
+            let fb = mb.define_function("helper", Signature::new([], []))?;
+            fb.finish_with_outputs([])?
         };
 
         // poly_fn[T: Copyable](x: T) -> T — calls helper
@@ -672,38 +673,34 @@ mod test {
                 [TypeBound::Copyable.into()],
                 Signature::new([tv0()], [tv0()]),
             );
-            let mut fb = mb.define_function("poly_fn", pfty).unwrap();
+            let mut fb = mb.define_function("poly_fn", pfty)?;
             let [elem] = fb.input_wires_arr();
-            fb.call(helper.handle(), &[], []).unwrap(); // Call node to tag
-            fb.finish_with_outputs([elem]).unwrap()
+            fb.call(helper.handle(), &[], [])?; // Call node to tag
+            fb.finish_with_outputs([elem])?
         };
 
         // main(x: usize, y: Unit) -> (usize, Unit)
         // Calls poly_fn with two distinct type args, producing two disjoint
         // monomorphizations of the Call node.
         {
-            let mut fb = mb
-                .define_function_vis(
-                    "main",
-                    Signature::new([usize_t(), Type::UNIT], [usize_t(), Type::UNIT]),
-                    Visibility::Public,
-                )
-                .unwrap();
+            let mut fb = mb.define_function_vis(
+                "main",
+                Signature::new([usize_t(), Type::UNIT], [usize_t(), Type::UNIT]),
+                Visibility::Public,
+            )?;
             let [u, unit] = fb.input_wires_arr();
             // First monomorphization:  T = usize
             let [u2] = fb
-                .call(poly_fn.handle(), &[usize_t().into()], [u])
-                .unwrap()
+                .call(poly_fn.handle(), &[usize_t().into()], [u])?
                 .outputs_arr();
             // Second monomorphization: T = Unit
             let [unit2] = fb
-                .call(poly_fn.handle(), &[Type::UNIT.into()], [unit])
-                .unwrap()
+                .call(poly_fn.handle(), &[Type::UNIT.into()], [unit])?
                 .outputs_arr();
-            fb.finish_with_outputs([u2, unit2]).unwrap();
+            fb.finish_with_outputs([u2, unit2])?;
         };
 
-        let mut hugr = mb.finish_hugr().unwrap();
+        let mut hugr = mb.finish_hugr()?;
 
         // Attach LocationRecord debug metadata to the Call node inside poly_fn.
         let call_node = hugr
@@ -724,8 +721,8 @@ mod test {
             "LocationRecord should be present on the Call node before monomorphization"
         );
 
-        MonomorphizePass::default().run(&mut hugr).unwrap();
-        hugr.validate().unwrap();
+        MonomorphizePass::default().run(&mut hugr)?;
+        hugr.validate()?;
 
         let funcs = list_funcs(&hugr);
         let mangled_usize = mangle_name("poly_fn", &[usize_t().into()]);
@@ -744,6 +741,8 @@ mod test {
                 "LocationRecord should be copied to the Call node in monomorphized function {name}"
             );
         }
+
+        Ok(())
     }
 
     #[rstest]
