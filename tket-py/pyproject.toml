@@ -28,7 +28,7 @@ classifiers = [
 ]
 
 
-dependencies = ['hugr ~= 0.17.1', 'tket_eccs ~= 0.5.1', 'tket_exts ~= 0.13.0']
+dependencies = ['hugr ~= 0.17.1', 'tket_eccs ~= 0.6.0', 'tket_exts ~= 0.13.0']
 
 [project.optional-dependencies]
 # The pytket python library is only used for type checking.
