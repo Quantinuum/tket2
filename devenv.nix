@@ -1,9 +1,15 @@
-{ pkgs, lib, inputs, ... }:
-let
-  hugrenv = pkgs.callPackage ./hugrenv.nix {
-    packages = ["tket" "llvm"];
-  };
+{ pkgs, lib, inputs, config, ... }:
+let hugrenv = config.hugrenv.package;
 in {
+
+  options.hugrenv.package = lib.mkOption {
+    type = lib.types.package;
+    default =  pkgs.callPackage ./hugrenv.nix {
+        packages = ["tket" "llvm"];
+    };
+  };
+
+  config = {
   # https://devenv.sh/packages/
   # on macos frameworks have to be explicitly specified
   # otherwise a linker error occurs on rust packages
@@ -62,5 +68,6 @@ in {
     venv.enable = true;
   };
 
+  };
 
 }

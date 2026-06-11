@@ -53,14 +53,8 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
             outputs,
         } => {
             let sym = format!("{PREFIX}.{name}");
-            let global_ty_base = match ty_arg.is_runtime_type() {
-                true => Ok(Type::try_from(ty_arg)?),
-                false => Err(TermKindError::KindMismatch {
-                    term: Box::new(ty_arg),
-                    kind: Box::new(TypeBound::Linear.into()),
-                }),
-            };
-            let sym_ty = context.llvm_sum_type(option_type(global_ty_base.clone().into()))?;
+            let global_ty_base = Type::try_from(ty_arg)?;
+            let sym_ty = context.llvm_sum_type(option_type([global_ty_base.clone().into()]))?;
 
             let [init_global_value, func, func_args @ ..] = &args.inputs[..] else {
                 bail!("No function provided as input for GlobalsOp::With")
@@ -118,14 +112,8 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
             outputs,
         } => {
             let sym = format!("{PREFIX}.{name}");
-            let global_ty_base = match ty_arg.is_runtime_type() {
-                true => Ok(Type::try_from(ty_arg)?),
-                false => Err(TermKindError::KindMismatch {
-                    term: Box::new(ty_arg),
-                    kind: Box::new(TypeBound::Linear.into()),
-                }),
-            };
-            let sym_ty = context.llvm_sum_type(option_type(global_ty_base.clone().into()))?;
+            let global_ty_base = Type::try_from(ty_arg)?;
+            let sym_ty = context.llvm_sum_type(option_type([global_ty_base.clone()]))?;
 
             // Get function and args
             let [func, func_args @ ..] = &args.inputs[..] else {
@@ -161,12 +149,11 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
 
             // let mut in_types = inputs.iter().cloned().collect_vec();
             // in_types.insert(0, global_ty_base.clone().into());
-            let in_types = TypeRowRV::from([global_ty_base.clone()?.into()]).concat(inputs.clone());
+            let in_types = TypeRowRV::from([global_ty_base.clone()]).concat(inputs.clone());
 
             // let mut out_types = outputs.iter().cloned().collect_vec();
             // out_types.insert(0, global_ty_base.clone().into());
-            let out_types =
-                TypeRowRV::from([global_ty_base.clone()?.into()]).concat(outputs.clone());
+            let out_types = TypeRowRV::from([global_ty_base]).concat(outputs.clone());
 
             let hugr_func_ty = FuncValueType::new(in_types, out_types).try_into()?;
             let func_ty = context.llvm_func_type(&hugr_func_ty)?;
