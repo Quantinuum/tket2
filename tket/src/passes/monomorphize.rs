@@ -650,14 +650,15 @@ mod test {
 
     /// Reproducer for <https://github.com/Quantinuum/tket2/issues/1652>.
     ///
-    /// Debug info (LocationRecord metadata) on nodes inside a polymorphic
-    /// function should be copied to every monomorphized instance of that node.
+    /// Debug info on a polymorphic function and its contained nodes
+    /// should be copied to the monomorphized instances.
     #[test]
-    fn test_node_debug_info_copied_on_monomorphization() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_debug_info_copied_by_monomorphization() -> Result<(), Box<dyn std::error::Error>> {
         use hugr_core::hugr::hugrmut::HugrMut;
-        use hugr_core::metadata::LocationRecord;
+        use hugr_core::metadata::{LocationRecord, SubprogramRecord};
         use hugr_core::ops::OpType;
         use hugr_core::ops::handle::NodeHandle;
+        use serde_json::ser;
 
         let tv0 = || Type::new_var_use(0, TypeBound::Copyable);
         let mut mb = ModuleBuilder::new();
@@ -682,7 +683,7 @@ mod test {
 
         // main(x: usize, y: Unit) -> (usize, Unit)
         // Calls poly_fn with two distinct type args, producing two disjoint
-        // monomorphizations of the Call node.
+        // monomorphizations.
         {
             let mut fb = mb.define_function_vis(
                 "main",
@@ -703,24 +704,37 @@ mod test {
 
         let mut hugr = mb.finish_hugr()?;
 
+        // Attach SubprogramRecord metadata to the polymorphic FuncDefn
+        let sub = SubprogramRecord {
+            kind: "subprogram".into(),
+            file: 0,
+            line_no: 42,
+            scope_line: 43,
+        };
+        let sub_copy = SubprogramRecord {
+            kind: "subprogram".into(),
+            file: 0,
+            line_no: 42,
+            scope_line: 43,
+        };
+        hugr.set_metadata::<SubprogramRecord>(poly_fn.node(), sub);
+
         // Attach LocationRecord debug metadata to the Call node inside poly_fn.
         let call_node = hugr
             .children(poly_fn.node())
             .find(|&n| matches!(hugr.get_optype(n), OpType::Call(_)))
             .expect("Call node inside poly_fn");
-
         let loc = LocationRecord {
             kind: "location".into(),
             column: 3,
             line_no: 42,
         };
+        let loc_copy = LocationRecord {
+            kind: "location".into(),
+            column: 3,
+            line_no: 42,
+        };
         hugr.set_metadata::<LocationRecord>(call_node, loc);
-
-        // Sanity-check: the metadata was written.
-        assert!(
-            hugr.get_metadata::<LocationRecord>(call_node).is_some(),
-            "LocationRecord should be present on the Call node before monomorphization"
-        );
 
         MonomorphizePass::default().run(&mut hugr)?;
         hugr.validate()?;
@@ -736,87 +750,30 @@ mod test {
                 .find(|&n| matches!(hugr.get_optype(n), OpType::Call(_)))
                 .unwrap_or_else(|| panic!("Call node missing in monomorphized function {name}"));
 
+            // note: the metadata objects do not impl PartialEq
+            // so we compare the JSON strings instead.
+            let subprog_ser = ser::to_string(
+                &hugr
+                    .get_metadata::<SubprogramRecord>(func_node)
+                    .expect("SubprogramRecord should have been copied onto this node"),
+            )?;
             assert!(
-                hugr.get_metadata::<LocationRecord>(mono_call_node)
-                    .is_some(),
+                subprog_ser == ser::to_string(&sub_copy)?,
+                "SubprogramRecord should be copied onto monomorphized FuncDefn {name}"
+            );
+
+            let location_ser = ser::to_string(
+                &hugr
+                    .get_metadata::<LocationRecord>(mono_call_node)
+                    .expect("LocationRecord should have been copied onto this node"),
+            )?;
+            assert!(
+                location_ser == ser::to_string(&loc_copy)?,
                 "LocationRecord should be copied to the Call node in monomorphized function {name}"
             );
         }
 
         Ok(())
-    }
-
-    /// Debug info attached to a polymorphic `FuncDefn` should be copied to every
-    /// monomorphized instance of that function.
-    #[test]
-    fn test_func_debug_info_copied_on_monomorphization() {
-        use hugr_core::hugr::hugrmut::HugrMut;
-        use hugr_core::metadata::SubprogramRecord;
-        use hugr_core::ops::handle::NodeHandle;
-
-        let tv0 = || Type::new_var_use(0, TypeBound::Copyable);
-        let mut mb = ModuleBuilder::new();
-
-        let poly_fn = {
-            let pfty = PolyFuncType::new(
-                [TypeBound::Copyable.into()],
-                Signature::new([tv0()], [tv0()]),
-            );
-            let fb = mb.define_function("poly_fn", pfty).unwrap();
-            let [elem] = fb.input_wires_arr();
-            fb.finish_with_outputs([elem]).unwrap()
-        };
-
-        {
-            let mut fb = mb
-                .define_function_vis(
-                    "main",
-                    Signature::new([usize_t(), Type::UNIT], [usize_t(), Type::UNIT]),
-                    Visibility::Public,
-                )
-                .unwrap();
-            let [u, unit] = fb.input_wires_arr();
-            let [u2] = fb
-                .call(poly_fn.handle(), &[usize_t().into()], [u])
-                .unwrap()
-                .outputs_arr();
-            let [unit2] = fb
-                .call(poly_fn.handle(), &[Type::UNIT.into()], [unit])
-                .unwrap()
-                .outputs_arr();
-            fb.finish_with_outputs([u2, unit2]).unwrap();
-        };
-
-        let mut hugr = mb.finish_hugr().unwrap();
-
-        // Attach SubprogramRecord debug metadata to the polymorphic FuncDefn itself.
-        let sub = SubprogramRecord {
-            kind: "subprogram".into(),
-            file: 0,
-            line_no: 42,
-            scope_line: 43,
-        };
-        hugr.set_metadata::<SubprogramRecord>(poly_fn.node(), sub);
-        assert!(
-            hugr.get_metadata::<SubprogramRecord>(poly_fn.node())
-                .is_some(),
-            "SubprogramRecord should be present on the polymorphic FuncDefn before monomorphization"
-        );
-
-        MonomorphizePass::default().run(&mut hugr).unwrap();
-        hugr.validate().unwrap();
-
-        let funcs = list_funcs(&hugr);
-        let mangled_usize = mangle_name("poly_fn", &[usize_t().into()]);
-        let mangled_unit = mangle_name("poly_fn", &[Type::UNIT.into()]);
-
-        for name in [&mangled_usize, &mangled_unit] {
-            let (func_node, _) = funcs[name];
-            assert!(
-                hugr.get_metadata::<SubprogramRecord>(func_node).is_some(),
-                "SubprogramRecord should be copied onto monomorphized FuncDefn {name}"
-            );
-        }
     }
 
     #[rstest]
