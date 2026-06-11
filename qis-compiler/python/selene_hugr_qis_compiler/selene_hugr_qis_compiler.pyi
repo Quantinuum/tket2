@@ -2,6 +2,7 @@ from typing import Literal
 
 def compile_to_bitcode(
     pkg_bytes: bytes,
+    *,
     opt_level: int = 2,
     target_triple: str = "native",
     platform: Literal["helios", "sol"] = "helios",
@@ -12,6 +13,7 @@ def compile_to_bitcode(
 
 def compile_to_llvm_ir(
     pkg_bytes: bytes,
+    *,
     opt_level: int = 2,
     target_triple: str = "native",
     platform: Literal["helios", "sol"] = "helios",

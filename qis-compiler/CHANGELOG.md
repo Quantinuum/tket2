@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.3.0](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.2.10...qis-compiler-v0.3.0) (2026-06-11)
+
+
+### ⚠ BREAKING CHANGES
+
+* Updated the HUGR Python dependency to `0.17.1`
+* The compiler now targets explicit qsystem platforms. `compile_to_bitcode` and `compile_to_llvm_ir` accept a `platform` argument for `"helios"` or `"sol"`.
+* `compile_to_bitcode` and `compile_to_llvm_ir` now require keyword arguments for `opt_level` and `target_triple`.
+
+### Features
+
+* Add `emit_debug` support to `compile_to_bitcode` and `compile_to_llvm_ir` ([#1521](https://github.com/Quantinuum/tket2/issues/1521)) ([db2e530](https://github.com/Quantinuum/tket2/commit/db2e5306deee1b3d8aff7723eb5ae7a91d9d9235))
+* Add Helios and Sol qsystem platform support to the compiler ([#1567](https://github.com/Quantinuum/tket2/issues/1567)) ([b60553f](https://github.com/Quantinuum/tket2/commit/b60553fec5e81b698c75916658bae7d1c527907e))
+* Add support for HUGRs using the `measurement` extension ([#1558](https://github.com/Quantinuum/tket2/issues/1558)) ([7e35ecf](https://github.com/Quantinuum/tket2/commit/7e35ecf592db05e51e9b4d4b577afc2c93bd291d))
+* Use compliant LLVM and TKET artifacts from `hugrverse-env` for wheel builds ([#1471](https://github.com/Quantinuum/tket2/issues/1471)) ([6faaf41](https://github.com/Quantinuum/tket2/commit/6faaf417b76c4aee5d34faa82121832df10a75af))
+
+
+### Bug Fixes
+
+* Include Helios and Sol qsystem extensions in the compiler registry ([#1646](https://github.com/Quantinuum/tket2/issues/1646)) ([8800257](https://github.com/Quantinuum/tket2/commit/88002572d2f5af63233c2c0179c25da477a5a4e4)), closes [#1645](https://github.com/Quantinuum/tket2/issues/1645)
+* Trim trailing NUL bytes from public bitcode ([#1602](https://github.com/Quantinuum/tket2/issues/1602)) ([68dd0c3](https://github.com/Quantinuum/tket2/commit/68dd0c3ad289d3bbe84201dfbbf7ec9a76a5a696))
+
 ## [0.2.10](https://github.com/quantinuum/tket2/compare/qis-compiler-v0.2.9...qis-compiler-v0.2.10) (2025-11-10)
 
 
