@@ -1,0 +1,12 @@
+[workspace]
+resolver = "3"
+members = [
+    "pg-core",
+    ]
+
+[profile.test]
+opt-level = 1
+
+[workspace.lints.clippy]
+type_complexity = "allow"
+too_many_arguments = "allow"
