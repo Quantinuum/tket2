@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.14.0](https://github.com/Quantinuum/tket2/compare/tket-py-v0.13.1...tket-py-v0.14.0) (2026-06-11)
+
+
+### ⚠ BREAKING CHANGES
+
+* Updated public dependency `hugr` to `0.28.0`
+* (tket-exts) `opaque_bool` and `bool` removed
+* **qsystem:** tket-qsystem conversion, lowering and codegen methods take additional `QSystemPlatform` parameter to choose target platform.
+* `Circuit::circuit_cost` now computes the cost of all descendant nodes of a circuit, not just `TketOp`s.
+
+### Features
+
+* Add `measurement` extension and change `tket.quantum` / `tket.qsystem` extension measurement ops return type ([#1558](https://github.com/Quantinuum/tket2/issues/1558)) ([7e35ecf](https://github.com/Quantinuum/tket2/commit/7e35ecf592db05e51e9b4d4b577afc2c93bd291d))
+* Encode measurements followed by reads as pytket measurements ([#1658](https://github.com/Quantinuum/tket2/issues/1658)) ([00cf6ec](https://github.com/Quantinuum/tket2/commit/00cf6ec025f48a3bbc9ecacb0e913fcfc8c669c0))
+* **qsystem:** multiple platform extensions ([#1567](https://github.com/Quantinuum/tket2/issues/1567)) ([b60553f](https://github.com/Quantinuum/tket2/commit/b60553fec5e81b698c75916658bae7d1c527907e))
+* Rename `unitary` metadata to `tket.unitary` ([#1669](https://github.com/Quantinuum/tket2/issues/1669)) ([b97704c](https://github.com/Quantinuum/tket2/commit/b97704caa73c049eaee444d6e768a165e64436fd))
+* Upgrade hugr dependency to 0.28.0 ([#1580](https://github.com/Quantinuum/tket2/issues/1580)) ([68e7fd7](https://github.com/Quantinuum/tket2/commit/68e7fd76705f3e221deaeea9b602c16ec9c6046b))
+
+
+### Code Refactoring
+
+* Deprecate commands iterator ([#1611](https://github.com/Quantinuum/tket2/issues/1611)) ([8a43301](https://github.com/Quantinuum/tket2/commit/8a43301d6f0d257a29ba1128504c6a6405af7beb))
+
 ## [0.13.1](https://github.com/Quantinuum/tket2/compare/tket-py-v0.13.0...tket-py-v0.13.1) (2026-05-19)
 
 
