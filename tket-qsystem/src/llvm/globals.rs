@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use crate::extension::globals::{GlobalsOp, GlobalsOpDef, TYPE_PARAM};
+use crate::extension::globals::{GlobalsOp, GlobalsOpDef};
 use anyhow::{Result, bail, ensure};
 use hugr::llvm::emit::deaggregate_call_result;
 use hugr::llvm::inkwell::builder::Builder;
@@ -18,9 +18,7 @@ use hugr::{
     extension::{prelude::option_type, simple_op::HasConcrete as _},
     ops::ExtensionOp,
 };
-use hugr_core::extension::SignatureError;
-use hugr_core::types::type_param::TermKindError;
-use hugr_core::types::{FuncValueType, Signature, Term, Type, TypeBound, TypeRowRV};
+use hugr_core::types::{FuncValueType, Signature, Type, TypeRowRV};
 use itertools::Itertools;
 
 pub struct GlobalsCodegenExtension;
@@ -54,7 +52,7 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
         } => {
             let sym = format!("{PREFIX}.{name}");
             let global_ty_base = Type::try_from(ty_arg)?;
-            let sym_ty = context.llvm_sum_type(option_type([global_ty_base.clone().into()]))?;
+            let sym_ty = context.llvm_sum_type(option_type([global_ty_base.clone()]))?;
 
             let [init_global_value, func, func_args @ ..] = &args.inputs[..] else {
                 bail!("No function provided as input for GlobalsOp::With")
@@ -147,12 +145,8 @@ fn emit_globals_op<'c, H: HugrView<Node = Node>>(
             let func_ptr = PointerValue::try_from(*func)
                 .map_err(|e| anyhow::anyhow!("Invalid function pointer provided to Map: {e:?}"))?;
 
-            // let mut in_types = inputs.iter().cloned().collect_vec();
-            // in_types.insert(0, global_ty_base.clone().into());
             let in_types = TypeRowRV::from([global_ty_base.clone()]).concat(inputs.clone());
 
-            // let mut out_types = outputs.iter().cloned().collect_vec();
-            // out_types.insert(0, global_ty_base.clone().into());
             let out_types = TypeRowRV::from([global_ty_base]).concat(outputs.clone());
 
             let hugr_func_ty = FuncValueType::new(in_types, out_types).try_into()?;
