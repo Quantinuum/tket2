@@ -1,6 +1,6 @@
 //! Contains a pass to lower "drop" ops from the Guppy extension
-use hugr::types::Term;
 use hugr::{Node, hugr::hugrmut::HugrMut};
+use hugr_core::types::Type;
 use tket::extension::guppy::{DROP_OP_NAME, GUPPY_EXTENSION};
 use tket::passes::composable::WithScope;
 use tket::passes::replace_types::{Linearizer, ReplaceTypesError};
@@ -36,10 +36,11 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for LowerDropsPass {
         rt.set_replace_parametrized_op(
             GUPPY_EXTENSION.get_op(DROP_OP_NAME.as_str()).unwrap(),
             |args, rt| {
-                let [Term::Runtime(ty)] = args else {
+                let [ty] = args else {
                     panic!("Expected just one type")
                 };
-                Ok(Some(rt.get_linearizer().copy_discard_op(ty, 0)?))
+                let ty = Type::try_from(ty.clone()).unwrap();
+                Ok(Some(rt.get_linearizer().copy_discard_op(&ty, 0)?))
             },
         );
         rt.run(hugr)

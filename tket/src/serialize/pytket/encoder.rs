@@ -309,6 +309,11 @@ impl<H: HugrView> PytketEncoderContext<H> {
         Err(PytketEncodeOpError::WireHasNoValues { wire }.into())
     }
 
+    /// Peek values associated with a wire without marking the connection as explored.
+    pub fn peek_wire_values(&self, wire: Wire<H::Node>) -> Option<&[TrackedValue]> {
+        self.values.peek_wire_values(wire)
+    }
+
     /// Given a node in the HUGR, returns all the [`TrackedValue`]s associated
     /// with its inputs.
     ///

@@ -7,21 +7,21 @@ target triple = "x86_64-unknown-linux-gnu"
 @"e_Array cont.EFA5AC45.0" = private constant [70 x i8] c"EEXIT:INT:Array contains non-borrowed elements and cannot be discarded"
 @"e_No more qu.3B2EEBF0.0" = private constant [47 x i8] c".EXIT:INT:No more qubits available to allocate."
 
-define void @"__hugr__.__main__.discard_qb_array.<locals>.main.1"() local_unnamed_addr {
+define void @"__hugr__.__main__.discard_qb_array.<locals>.main.1"() local_unnamed_addr !dbg !4 {
 alloca_block:
-  %0 = tail call ptr @heap_alloc(i64 80)
-  %1 = tail call ptr @heap_alloc(i64 8)
-  store i64 -1, ptr %1, align 1
-  %qalloc.i = tail call i64 @___qalloc()
-  %not_max.not.not.i = icmp eq i64 %qalloc.i, -1
-  br i1 %not_max.not.not.i, label %cond_225_case_0.i, label %__barray_check_bounds.exit
+  %0 = tail call ptr @heap_alloc(i64 80), !dbg !8
+  %1 = tail call ptr @heap_alloc(i64 8), !dbg !8
+  store i64 -1, ptr %1, align 1, !dbg !8
+  %qalloc.i = tail call i64 @___qalloc(), !dbg !9
+  %not_max.not.not.i = icmp eq i64 %qalloc.i, -1, !dbg !9
+  br i1 %not_max.not.not.i, label %cond_225_case_0.i, label %__barray_check_bounds.exit, !dbg !9
 
 cond_225_case_0.i:                                ; preds = %cond_exit_20.8, %cond_exit_20.7, %cond_exit_20.6, %cond_exit_20.5, %cond_exit_20.4, %cond_exit_20.3, %cond_exit_20.2, %cond_exit_20.1, %cond_exit_20, %alloca_block
-  tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0")
-  unreachable
+  tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0"), !dbg !9
+  unreachable, !dbg !9
 
 __barray_check_bounds.exit:                       ; preds = %alloca_block
-  tail call void @___reset(i64 %qalloc.i)
+  tail call void @___reset(i64 %qalloc.i), !dbg !9
   %2 = load i64, ptr %1, align 4
   %3 = trunc i64 %2 to i1
   br i1 %3, label %cond_exit_20, label %panic.i
@@ -34,12 +34,12 @@ cond_exit_20:                                     ; preds = %__barray_check_boun
   %4 = and i64 %2, -2
   store i64 %4, ptr %1, align 4
   store i64 %qalloc.i, ptr %0, align 4
-  %qalloc.i.1 = tail call i64 @___qalloc()
-  %not_max.not.not.i.1 = icmp eq i64 %qalloc.i.1, -1
-  br i1 %not_max.not.not.i.1, label %cond_225_case_0.i, label %__barray_check_bounds.exit.1
+  %qalloc.i.1 = tail call i64 @___qalloc(), !dbg !9
+  %not_max.not.not.i.1 = icmp eq i64 %qalloc.i.1, -1, !dbg !9
+  br i1 %not_max.not.not.i.1, label %cond_225_case_0.i, label %__barray_check_bounds.exit.1, !dbg !9
 
 __barray_check_bounds.exit.1:                     ; preds = %cond_exit_20
-  tail call void @___reset(i64 %qalloc.i.1)
+  tail call void @___reset(i64 %qalloc.i.1), !dbg !9
   %5 = load i64, ptr %1, align 4
   %6 = and i64 %5, 2
   %.not125 = icmp eq i64 %6, 0
@@ -50,12 +50,12 @@ cond_exit_20.1:                                   ; preds = %__barray_check_boun
   store i64 %7, ptr %1, align 4
   %8 = getelementptr inbounds nuw i8, ptr %0, i64 8
   store i64 %qalloc.i.1, ptr %8, align 4
-  %qalloc.i.2 = tail call i64 @___qalloc()
-  %not_max.not.not.i.2 = icmp eq i64 %qalloc.i.2, -1
-  br i1 %not_max.not.not.i.2, label %cond_225_case_0.i, label %__barray_check_bounds.exit.2
+  %qalloc.i.2 = tail call i64 @___qalloc(), !dbg !9
+  %not_max.not.not.i.2 = icmp eq i64 %qalloc.i.2, -1, !dbg !9
+  br i1 %not_max.not.not.i.2, label %cond_225_case_0.i, label %__barray_check_bounds.exit.2, !dbg !9
 
 __barray_check_bounds.exit.2:                     ; preds = %cond_exit_20.1
-  tail call void @___reset(i64 %qalloc.i.2)
+  tail call void @___reset(i64 %qalloc.i.2), !dbg !9
   %9 = load i64, ptr %1, align 4
   %10 = and i64 %9, 4
   %.not126 = icmp eq i64 %10, 0
@@ -66,12 +66,12 @@ cond_exit_20.2:                                   ; preds = %__barray_check_boun
   store i64 %11, ptr %1, align 4
   %12 = getelementptr inbounds nuw i8, ptr %0, i64 16
   store i64 %qalloc.i.2, ptr %12, align 4
-  %qalloc.i.3 = tail call i64 @___qalloc()
-  %not_max.not.not.i.3 = icmp eq i64 %qalloc.i.3, -1
-  br i1 %not_max.not.not.i.3, label %cond_225_case_0.i, label %__barray_check_bounds.exit.3
+  %qalloc.i.3 = tail call i64 @___qalloc(), !dbg !9
+  %not_max.not.not.i.3 = icmp eq i64 %qalloc.i.3, -1, !dbg !9
+  br i1 %not_max.not.not.i.3, label %cond_225_case_0.i, label %__barray_check_bounds.exit.3, !dbg !9
 
 __barray_check_bounds.exit.3:                     ; preds = %cond_exit_20.2
-  tail call void @___reset(i64 %qalloc.i.3)
+  tail call void @___reset(i64 %qalloc.i.3), !dbg !9
   %13 = load i64, ptr %1, align 4
   %14 = and i64 %13, 8
   %.not127 = icmp eq i64 %14, 0
@@ -82,12 +82,12 @@ cond_exit_20.3:                                   ; preds = %__barray_check_boun
   store i64 %15, ptr %1, align 4
   %16 = getelementptr inbounds nuw i8, ptr %0, i64 24
   store i64 %qalloc.i.3, ptr %16, align 4
-  %qalloc.i.4 = tail call i64 @___qalloc()
-  %not_max.not.not.i.4 = icmp eq i64 %qalloc.i.4, -1
-  br i1 %not_max.not.not.i.4, label %cond_225_case_0.i, label %__barray_check_bounds.exit.4
+  %qalloc.i.4 = tail call i64 @___qalloc(), !dbg !9
+  %not_max.not.not.i.4 = icmp eq i64 %qalloc.i.4, -1, !dbg !9
+  br i1 %not_max.not.not.i.4, label %cond_225_case_0.i, label %__barray_check_bounds.exit.4, !dbg !9
 
 __barray_check_bounds.exit.4:                     ; preds = %cond_exit_20.3
-  tail call void @___reset(i64 %qalloc.i.4)
+  tail call void @___reset(i64 %qalloc.i.4), !dbg !9
   %17 = load i64, ptr %1, align 4
   %18 = and i64 %17, 16
   %.not128 = icmp eq i64 %18, 0
@@ -98,12 +98,12 @@ cond_exit_20.4:                                   ; preds = %__barray_check_boun
   store i64 %19, ptr %1, align 4
   %20 = getelementptr inbounds nuw i8, ptr %0, i64 32
   store i64 %qalloc.i.4, ptr %20, align 4
-  %qalloc.i.5 = tail call i64 @___qalloc()
-  %not_max.not.not.i.5 = icmp eq i64 %qalloc.i.5, -1
-  br i1 %not_max.not.not.i.5, label %cond_225_case_0.i, label %__barray_check_bounds.exit.5
+  %qalloc.i.5 = tail call i64 @___qalloc(), !dbg !9
+  %not_max.not.not.i.5 = icmp eq i64 %qalloc.i.5, -1, !dbg !9
+  br i1 %not_max.not.not.i.5, label %cond_225_case_0.i, label %__barray_check_bounds.exit.5, !dbg !9
 
 __barray_check_bounds.exit.5:                     ; preds = %cond_exit_20.4
-  tail call void @___reset(i64 %qalloc.i.5)
+  tail call void @___reset(i64 %qalloc.i.5), !dbg !9
   %21 = load i64, ptr %1, align 4
   %22 = and i64 %21, 32
   %.not129 = icmp eq i64 %22, 0
@@ -114,12 +114,12 @@ cond_exit_20.5:                                   ; preds = %__barray_check_boun
   store i64 %23, ptr %1, align 4
   %24 = getelementptr inbounds nuw i8, ptr %0, i64 40
   store i64 %qalloc.i.5, ptr %24, align 4
-  %qalloc.i.6 = tail call i64 @___qalloc()
-  %not_max.not.not.i.6 = icmp eq i64 %qalloc.i.6, -1
-  br i1 %not_max.not.not.i.6, label %cond_225_case_0.i, label %__barray_check_bounds.exit.6
+  %qalloc.i.6 = tail call i64 @___qalloc(), !dbg !9
+  %not_max.not.not.i.6 = icmp eq i64 %qalloc.i.6, -1, !dbg !9
+  br i1 %not_max.not.not.i.6, label %cond_225_case_0.i, label %__barray_check_bounds.exit.6, !dbg !9
 
 __barray_check_bounds.exit.6:                     ; preds = %cond_exit_20.5
-  tail call void @___reset(i64 %qalloc.i.6)
+  tail call void @___reset(i64 %qalloc.i.6), !dbg !9
   %25 = load i64, ptr %1, align 4
   %26 = and i64 %25, 64
   %.not130 = icmp eq i64 %26, 0
@@ -130,12 +130,12 @@ cond_exit_20.6:                                   ; preds = %__barray_check_boun
   store i64 %27, ptr %1, align 4
   %28 = getelementptr inbounds nuw i8, ptr %0, i64 48
   store i64 %qalloc.i.6, ptr %28, align 4
-  %qalloc.i.7 = tail call i64 @___qalloc()
-  %not_max.not.not.i.7 = icmp eq i64 %qalloc.i.7, -1
-  br i1 %not_max.not.not.i.7, label %cond_225_case_0.i, label %__barray_check_bounds.exit.7
+  %qalloc.i.7 = tail call i64 @___qalloc(), !dbg !9
+  %not_max.not.not.i.7 = icmp eq i64 %qalloc.i.7, -1, !dbg !9
+  br i1 %not_max.not.not.i.7, label %cond_225_case_0.i, label %__barray_check_bounds.exit.7, !dbg !9
 
 __barray_check_bounds.exit.7:                     ; preds = %cond_exit_20.6
-  tail call void @___reset(i64 %qalloc.i.7)
+  tail call void @___reset(i64 %qalloc.i.7), !dbg !9
   %29 = load i64, ptr %1, align 4
   %30 = and i64 %29, 128
   %.not131 = icmp eq i64 %30, 0
@@ -146,12 +146,12 @@ cond_exit_20.7:                                   ; preds = %__barray_check_boun
   store i64 %31, ptr %1, align 4
   %32 = getelementptr inbounds nuw i8, ptr %0, i64 56
   store i64 %qalloc.i.7, ptr %32, align 4
-  %qalloc.i.8 = tail call i64 @___qalloc()
-  %not_max.not.not.i.8 = icmp eq i64 %qalloc.i.8, -1
-  br i1 %not_max.not.not.i.8, label %cond_225_case_0.i, label %__barray_check_bounds.exit.8
+  %qalloc.i.8 = tail call i64 @___qalloc(), !dbg !9
+  %not_max.not.not.i.8 = icmp eq i64 %qalloc.i.8, -1, !dbg !9
+  br i1 %not_max.not.not.i.8, label %cond_225_case_0.i, label %__barray_check_bounds.exit.8, !dbg !9
 
 __barray_check_bounds.exit.8:                     ; preds = %cond_exit_20.7
-  tail call void @___reset(i64 %qalloc.i.8)
+  tail call void @___reset(i64 %qalloc.i.8), !dbg !9
   %33 = load i64, ptr %1, align 4
   %34 = and i64 %33, 256
   %.not132 = icmp eq i64 %34, 0
@@ -162,12 +162,12 @@ cond_exit_20.8:                                   ; preds = %__barray_check_boun
   store i64 %35, ptr %1, align 4
   %36 = getelementptr inbounds nuw i8, ptr %0, i64 64
   store i64 %qalloc.i.8, ptr %36, align 4
-  %qalloc.i.9 = tail call i64 @___qalloc()
-  %not_max.not.not.i.9 = icmp eq i64 %qalloc.i.9, -1
-  br i1 %not_max.not.not.i.9, label %cond_225_case_0.i, label %__barray_check_bounds.exit.9
+  %qalloc.i.9 = tail call i64 @___qalloc(), !dbg !9
+  %not_max.not.not.i.9 = icmp eq i64 %qalloc.i.9, -1, !dbg !9
+  br i1 %not_max.not.not.i.9, label %cond_225_case_0.i, label %__barray_check_bounds.exit.9, !dbg !9
 
 __barray_check_bounds.exit.9:                     ; preds = %cond_exit_20.8
-  tail call void @___reset(i64 %qalloc.i.9)
+  tail call void @___reset(i64 %qalloc.i.9), !dbg !9
   %37 = load i64, ptr %1, align 4
   %38 = and i64 %37, 512
   %.not133 = icmp eq i64 %38, 0
@@ -178,167 +178,167 @@ cond_exit_20.9:                                   ; preds = %__barray_check_boun
   store i64 %39, ptr %1, align 4
   %40 = getelementptr inbounds nuw i8, ptr %0, i64 72
   store i64 %qalloc.i.9, ptr %40, align 4
-  %41 = load i64, ptr %1, align 4
-  %42 = trunc i64 %41 to i1
+  %41 = load i64, ptr %1, align 4, !dbg !10
+  %42 = trunc i64 %41 to i1, !dbg !10
   br i1 %42, label %__barray_check_bounds.exit.i.1, label %__barray_mask_borrow.exit.i
 
 __barray_check_bounds.exit.i.1:                   ; preds = %__barray_mask_borrow.exit.i, %cond_exit_20.9
-  %43 = phi i64 [ %.pre, %__barray_mask_borrow.exit.i ], [ %41, %cond_exit_20.9 ]
-  %44 = and i64 %43, 2
-  %.not = icmp eq i64 %44, 0
+  %43 = phi i64 [ %.pre, %__barray_mask_borrow.exit.i ], [ %41, %cond_exit_20.9 ], !dbg !10
+  %44 = and i64 %43, 2, !dbg !10
+  %.not = icmp eq i64 %44, 0, !dbg !10
   br i1 %.not, label %__barray_mask_borrow.exit.i.1, label %__barray_check_bounds.exit.i.2
 
 __barray_mask_borrow.exit.i.1:                    ; preds = %__barray_check_bounds.exit.i.1
-  %45 = or disjoint i64 %43, 2
-  store i64 %45, ptr %1, align 4
-  %46 = getelementptr inbounds nuw i8, ptr %0, i64 8
-  %47 = load i64, ptr %46, align 4
-  tail call void @___qfree(i64 %47)
-  %.pre108 = load i64, ptr %1, align 4
+  %45 = or disjoint i64 %43, 2, !dbg !21
+  store i64 %45, ptr %1, align 4, !dbg !21
+  %46 = getelementptr inbounds nuw i8, ptr %0, i64 8, !dbg !23
+  %47 = load i64, ptr %46, align 4, !dbg !23
+  tail call void @___qfree(i64 %47), !dbg !24
+  %.pre108 = load i64, ptr %1, align 4, !dbg !10
   br label %__barray_check_bounds.exit.i.2
 
 __barray_check_bounds.exit.i.2:                   ; preds = %__barray_mask_borrow.exit.i.1, %__barray_check_bounds.exit.i.1
-  %48 = phi i64 [ %.pre108, %__barray_mask_borrow.exit.i.1 ], [ %43, %__barray_check_bounds.exit.i.1 ]
-  %49 = and i64 %48, 4
-  %.not117 = icmp eq i64 %49, 0
+  %48 = phi i64 [ %.pre108, %__barray_mask_borrow.exit.i.1 ], [ %43, %__barray_check_bounds.exit.i.1 ], !dbg !10
+  %49 = and i64 %48, 4, !dbg !10
+  %.not117 = icmp eq i64 %49, 0, !dbg !10
   br i1 %.not117, label %__barray_mask_borrow.exit.i.2, label %__barray_check_bounds.exit.i.3
 
 __barray_mask_borrow.exit.i.2:                    ; preds = %__barray_check_bounds.exit.i.2
-  %50 = or disjoint i64 %48, 4
-  store i64 %50, ptr %1, align 4
-  %51 = getelementptr inbounds nuw i8, ptr %0, i64 16
-  %52 = load i64, ptr %51, align 4
-  tail call void @___qfree(i64 %52)
-  %.pre109 = load i64, ptr %1, align 4
+  %50 = or disjoint i64 %48, 4, !dbg !21
+  store i64 %50, ptr %1, align 4, !dbg !21
+  %51 = getelementptr inbounds nuw i8, ptr %0, i64 16, !dbg !23
+  %52 = load i64, ptr %51, align 4, !dbg !23
+  tail call void @___qfree(i64 %52), !dbg !24
+  %.pre109 = load i64, ptr %1, align 4, !dbg !10
   br label %__barray_check_bounds.exit.i.3
 
 __barray_check_bounds.exit.i.3:                   ; preds = %__barray_mask_borrow.exit.i.2, %__barray_check_bounds.exit.i.2
-  %53 = phi i64 [ %.pre109, %__barray_mask_borrow.exit.i.2 ], [ %48, %__barray_check_bounds.exit.i.2 ]
-  %54 = and i64 %53, 8
-  %.not118 = icmp eq i64 %54, 0
+  %53 = phi i64 [ %.pre109, %__barray_mask_borrow.exit.i.2 ], [ %48, %__barray_check_bounds.exit.i.2 ], !dbg !10
+  %54 = and i64 %53, 8, !dbg !10
+  %.not118 = icmp eq i64 %54, 0, !dbg !10
   br i1 %.not118, label %__barray_mask_borrow.exit.i.3, label %__barray_check_bounds.exit.i.4
 
 __barray_mask_borrow.exit.i.3:                    ; preds = %__barray_check_bounds.exit.i.3
-  %55 = or disjoint i64 %53, 8
-  store i64 %55, ptr %1, align 4
-  %56 = getelementptr inbounds nuw i8, ptr %0, i64 24
-  %57 = load i64, ptr %56, align 4
-  tail call void @___qfree(i64 %57)
-  %.pre110 = load i64, ptr %1, align 4
+  %55 = or disjoint i64 %53, 8, !dbg !21
+  store i64 %55, ptr %1, align 4, !dbg !21
+  %56 = getelementptr inbounds nuw i8, ptr %0, i64 24, !dbg !23
+  %57 = load i64, ptr %56, align 4, !dbg !23
+  tail call void @___qfree(i64 %57), !dbg !24
+  %.pre110 = load i64, ptr %1, align 4, !dbg !10
   br label %__barray_check_bounds.exit.i.4
 
 __barray_check_bounds.exit.i.4:                   ; preds = %__barray_mask_borrow.exit.i.3, %__barray_check_bounds.exit.i.3
-  %58 = phi i64 [ %.pre110, %__barray_mask_borrow.exit.i.3 ], [ %53, %__barray_check_bounds.exit.i.3 ]
-  %59 = and i64 %58, 16
-  %.not119 = icmp eq i64 %59, 0
+  %58 = phi i64 [ %.pre110, %__barray_mask_borrow.exit.i.3 ], [ %53, %__barray_check_bounds.exit.i.3 ], !dbg !10
+  %59 = and i64 %58, 16, !dbg !10
+  %.not119 = icmp eq i64 %59, 0, !dbg !10
   br i1 %.not119, label %__barray_mask_borrow.exit.i.4, label %__barray_check_bounds.exit.i.5
 
 __barray_mask_borrow.exit.i.4:                    ; preds = %__barray_check_bounds.exit.i.4
-  %60 = or disjoint i64 %58, 16
-  store i64 %60, ptr %1, align 4
-  %61 = getelementptr inbounds nuw i8, ptr %0, i64 32
-  %62 = load i64, ptr %61, align 4
-  tail call void @___qfree(i64 %62)
-  %.pre111 = load i64, ptr %1, align 4
+  %60 = or disjoint i64 %58, 16, !dbg !21
+  store i64 %60, ptr %1, align 4, !dbg !21
+  %61 = getelementptr inbounds nuw i8, ptr %0, i64 32, !dbg !23
+  %62 = load i64, ptr %61, align 4, !dbg !23
+  tail call void @___qfree(i64 %62), !dbg !24
+  %.pre111 = load i64, ptr %1, align 4, !dbg !10
   br label %__barray_check_bounds.exit.i.5
 
 __barray_check_bounds.exit.i.5:                   ; preds = %__barray_mask_borrow.exit.i.4, %__barray_check_bounds.exit.i.4
-  %63 = phi i64 [ %.pre111, %__barray_mask_borrow.exit.i.4 ], [ %58, %__barray_check_bounds.exit.i.4 ]
-  %64 = and i64 %63, 32
-  %.not120 = icmp eq i64 %64, 0
+  %63 = phi i64 [ %.pre111, %__barray_mask_borrow.exit.i.4 ], [ %58, %__barray_check_bounds.exit.i.4 ], !dbg !10
+  %64 = and i64 %63, 32, !dbg !10
+  %.not120 = icmp eq i64 %64, 0, !dbg !10
   br i1 %.not120, label %__barray_mask_borrow.exit.i.5, label %__barray_check_bounds.exit.i.6
 
 __barray_mask_borrow.exit.i.5:                    ; preds = %__barray_check_bounds.exit.i.5
-  %65 = or disjoint i64 %63, 32
-  store i64 %65, ptr %1, align 4
-  %66 = getelementptr inbounds nuw i8, ptr %0, i64 40
-  %67 = load i64, ptr %66, align 4
-  tail call void @___qfree(i64 %67)
-  %.pre112 = load i64, ptr %1, align 4
+  %65 = or disjoint i64 %63, 32, !dbg !21
+  store i64 %65, ptr %1, align 4, !dbg !21
+  %66 = getelementptr inbounds nuw i8, ptr %0, i64 40, !dbg !23
+  %67 = load i64, ptr %66, align 4, !dbg !23
+  tail call void @___qfree(i64 %67), !dbg !24
+  %.pre112 = load i64, ptr %1, align 4, !dbg !10
   br label %__barray_check_bounds.exit.i.6
 
 __barray_check_bounds.exit.i.6:                   ; preds = %__barray_mask_borrow.exit.i.5, %__barray_check_bounds.exit.i.5
-  %68 = phi i64 [ %.pre112, %__barray_mask_borrow.exit.i.5 ], [ %63, %__barray_check_bounds.exit.i.5 ]
-  %69 = and i64 %68, 64
-  %.not121 = icmp eq i64 %69, 0
+  %68 = phi i64 [ %.pre112, %__barray_mask_borrow.exit.i.5 ], [ %63, %__barray_check_bounds.exit.i.5 ], !dbg !10
+  %69 = and i64 %68, 64, !dbg !10
+  %.not121 = icmp eq i64 %69, 0, !dbg !10
   br i1 %.not121, label %__barray_mask_borrow.exit.i.6, label %__barray_check_bounds.exit.i.7
 
 __barray_mask_borrow.exit.i.6:                    ; preds = %__barray_check_bounds.exit.i.6
-  %70 = or disjoint i64 %68, 64
-  store i64 %70, ptr %1, align 4
-  %71 = getelementptr inbounds nuw i8, ptr %0, i64 48
-  %72 = load i64, ptr %71, align 4
-  tail call void @___qfree(i64 %72)
-  %.pre113 = load i64, ptr %1, align 4
+  %70 = or disjoint i64 %68, 64, !dbg !21
+  store i64 %70, ptr %1, align 4, !dbg !21
+  %71 = getelementptr inbounds nuw i8, ptr %0, i64 48, !dbg !23
+  %72 = load i64, ptr %71, align 4, !dbg !23
+  tail call void @___qfree(i64 %72), !dbg !24
+  %.pre113 = load i64, ptr %1, align 4, !dbg !10
   br label %__barray_check_bounds.exit.i.7
 
 __barray_check_bounds.exit.i.7:                   ; preds = %__barray_mask_borrow.exit.i.6, %__barray_check_bounds.exit.i.6
-  %73 = phi i64 [ %.pre113, %__barray_mask_borrow.exit.i.6 ], [ %68, %__barray_check_bounds.exit.i.6 ]
-  %74 = and i64 %73, 128
-  %.not122 = icmp eq i64 %74, 0
+  %73 = phi i64 [ %.pre113, %__barray_mask_borrow.exit.i.6 ], [ %68, %__barray_check_bounds.exit.i.6 ], !dbg !10
+  %74 = and i64 %73, 128, !dbg !10
+  %.not122 = icmp eq i64 %74, 0, !dbg !10
   br i1 %.not122, label %__barray_mask_borrow.exit.i.7, label %__barray_check_bounds.exit.i.8
 
 __barray_mask_borrow.exit.i.7:                    ; preds = %__barray_check_bounds.exit.i.7
-  %75 = or disjoint i64 %73, 128
-  store i64 %75, ptr %1, align 4
-  %76 = getelementptr inbounds nuw i8, ptr %0, i64 56
-  %77 = load i64, ptr %76, align 4
-  tail call void @___qfree(i64 %77)
-  %.pre114 = load i64, ptr %1, align 4
+  %75 = or disjoint i64 %73, 128, !dbg !21
+  store i64 %75, ptr %1, align 4, !dbg !21
+  %76 = getelementptr inbounds nuw i8, ptr %0, i64 56, !dbg !23
+  %77 = load i64, ptr %76, align 4, !dbg !23
+  tail call void @___qfree(i64 %77), !dbg !24
+  %.pre114 = load i64, ptr %1, align 4, !dbg !10
   br label %__barray_check_bounds.exit.i.8
 
 __barray_check_bounds.exit.i.8:                   ; preds = %__barray_mask_borrow.exit.i.7, %__barray_check_bounds.exit.i.7
-  %78 = phi i64 [ %.pre114, %__barray_mask_borrow.exit.i.7 ], [ %73, %__barray_check_bounds.exit.i.7 ]
-  %79 = and i64 %78, 256
-  %.not123 = icmp eq i64 %79, 0
+  %78 = phi i64 [ %.pre114, %__barray_mask_borrow.exit.i.7 ], [ %73, %__barray_check_bounds.exit.i.7 ], !dbg !10
+  %79 = and i64 %78, 256, !dbg !10
+  %.not123 = icmp eq i64 %79, 0, !dbg !10
   br i1 %.not123, label %__barray_mask_borrow.exit.i.8, label %__barray_check_bounds.exit.i.9
 
 __barray_mask_borrow.exit.i.8:                    ; preds = %__barray_check_bounds.exit.i.8
-  %80 = or disjoint i64 %78, 256
-  store i64 %80, ptr %1, align 4
-  %81 = getelementptr inbounds nuw i8, ptr %0, i64 64
-  %82 = load i64, ptr %81, align 4
-  tail call void @___qfree(i64 %82)
-  %.pre115 = load i64, ptr %1, align 4
+  %80 = or disjoint i64 %78, 256, !dbg !21
+  store i64 %80, ptr %1, align 4, !dbg !21
+  %81 = getelementptr inbounds nuw i8, ptr %0, i64 64, !dbg !23
+  %82 = load i64, ptr %81, align 4, !dbg !23
+  tail call void @___qfree(i64 %82), !dbg !24
+  %.pre115 = load i64, ptr %1, align 4, !dbg !10
   br label %__barray_check_bounds.exit.i.9
 
 __barray_check_bounds.exit.i.9:                   ; preds = %__barray_mask_borrow.exit.i.8, %__barray_check_bounds.exit.i.8
-  %83 = phi i64 [ %.pre115, %__barray_mask_borrow.exit.i.8 ], [ %78, %__barray_check_bounds.exit.i.8 ]
-  %84 = and i64 %83, 512
-  %.not124 = icmp eq i64 %84, 0
+  %83 = phi i64 [ %.pre115, %__barray_mask_borrow.exit.i.8 ], [ %78, %__barray_check_bounds.exit.i.8 ], !dbg !10
+  %84 = and i64 %83, 512, !dbg !10
+  %.not124 = icmp eq i64 %84, 0, !dbg !10
   br i1 %.not124, label %__barray_mask_borrow.exit.i.9, label %cond_exit_150.i
 
 __barray_mask_borrow.exit.i.9:                    ; preds = %__barray_check_bounds.exit.i.9
-  %85 = or disjoint i64 %83, 512
-  store i64 %85, ptr %1, align 4
-  %86 = getelementptr inbounds nuw i8, ptr %0, i64 72
-  %87 = load i64, ptr %86, align 4
-  tail call void @___qfree(i64 %87)
-  %.pre116 = load i64, ptr %1, align 4
+  %85 = or disjoint i64 %83, 512, !dbg !21
+  store i64 %85, ptr %1, align 4, !dbg !21
+  %86 = getelementptr inbounds nuw i8, ptr %0, i64 72, !dbg !23
+  %87 = load i64, ptr %86, align 4, !dbg !23
+  tail call void @___qfree(i64 %87), !dbg !24
+  %.pre116 = load i64, ptr %1, align 4, !dbg !25
   br label %cond_exit_150.i
 
 cond_exit_150.i:                                  ; preds = %__barray_mask_borrow.exit.i.9, %__barray_check_bounds.exit.i.9
-  %88 = phi i64 [ %.pre116, %__barray_mask_borrow.exit.i.9 ], [ %83, %__barray_check_bounds.exit.i.9 ]
-  %89 = or i64 %88, -1024
-  store i64 %89, ptr %1, align 4
-  %90 = icmp eq i64 %89, -1
-  br i1 %90, label %"__hugr__.guppylang.std.quantum.discard_array$10.108.exit", label %mask_block_err.i.i
+  %88 = phi i64 [ %.pre116, %__barray_mask_borrow.exit.i.9 ], [ %83, %__barray_check_bounds.exit.i.9 ], !dbg !25
+  %89 = or i64 %88, -1024, !dbg !25
+  store i64 %89, ptr %1, align 4, !dbg !25
+  %90 = icmp eq i64 %89, -1, !dbg !25
+  br i1 %90, label %"__hugr__.guppylang.std.quantum.discard_array$10.108.exit", label %mask_block_err.i.i, !dbg !25
 
 mask_block_err.i.i:                               ; preds = %cond_exit_150.i
-  tail call void @panic(i32 1002, ptr nonnull @"e_Array cont.EFA5AC45.0")
-  unreachable
+  tail call void @panic(i32 1002, ptr nonnull @"e_Array cont.EFA5AC45.0"), !dbg !25
+  unreachable, !dbg !25
 
 __barray_mask_borrow.exit.i:                      ; preds = %cond_exit_20.9
-  %91 = or disjoint i64 %41, 1
-  store i64 %91, ptr %1, align 4
-  %92 = load i64, ptr %0, align 4
-  tail call void @___qfree(i64 %92)
-  %.pre = load i64, ptr %1, align 4
+  %91 = or disjoint i64 %41, 1, !dbg !21
+  store i64 %91, ptr %1, align 4, !dbg !21
+  %92 = load i64, ptr %0, align 4, !dbg !23
+  tail call void @___qfree(i64 %92), !dbg !24
+  %.pre = load i64, ptr %1, align 4, !dbg !10
   br label %__barray_check_bounds.exit.i.1
 
 "__hugr__.guppylang.std.quantum.discard_array$10.108.exit": ; preds = %cond_exit_150.i
-  tail call void @heap_free(ptr nonnull %0)
-  tail call void @heap_free(ptr nonnull %1)
+  tail call void @heap_free(ptr nonnull %0), !dbg !27
+  tail call void @heap_free(ptr nonnull %1), !dbg !27
   ret void
 }
 
@@ -355,12 +355,12 @@ declare i64 @___qalloc() local_unnamed_addr
 
 declare void @___reset(i64) local_unnamed_addr
 
-define i64 @qmain(i64 %0) local_unnamed_addr {
+define i64 @qmain(i64 %0) local_unnamed_addr !dbg !28 {
 entry:
-  tail call void @setup(i64 %0)
-  tail call void @"__hugr__.__main__.discard_qb_array.<locals>.main.1"()
-  %1 = tail call i64 @teardown()
-  ret i64 %1
+  tail call void @setup(i64 %0), !dbg !32
+  tail call void @"__hugr__.__main__.discard_qb_array.<locals>.main.1"(), !dbg !32
+  %1 = tail call i64 @teardown(), !dbg !32
+  ret i64 %1, !dbg !32
 }
 
 declare void @setup(i64) local_unnamed_addr
@@ -369,6 +369,36 @@ declare i64 @teardown() local_unnamed_addr
 
 attributes #0 = { noreturn }
 
-!name = !{!0}
+!llvm.module.flags = !{!0}
+!llvm.dbg.cu = !{!1}
+!name = !{!3}
 
-!0 = !{!"mainlib"}
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "guppylang (guppylang-internals-v1.0.0-a1)-v1.0.0-a1", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!3 = !{!"mainlib"}
+!4 = distinct !DISubprogram(name: "discard_qb_array.<locals>.main", linkageName: "__hugr__.__main__.discard_qb_array.<locals>.main.1", scope: null, file: !5, line: 97, type: !6, scopeLine: 98, spFlags: DISPFlagDefinition, unit: !1)
+!6 = !DISubroutineType(types: !7)
+!7 = !{null}
+!8 = !DILocation(line: 98, column: 13, scope: !4)
+!9 = !DILocation(line: 98, column: 19, scope: !4)
+!10 = !DILocation(line: 418, column: 15, scope: !11, inlinedAt: !19)
+!11 = distinct !DISubprogram(name: "std.quantum.discard_array$10", linkageName: "__hugr__.guppylang.std.quantum.discard_array$10.108", scope: null, file: !12, line: 415, type: !13, scopeLine: 417, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
+!13 = !DISubroutineType(types: !14)
+!14 = !{null, !15}
+!15 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ ptr, ptr, i64 }", file: !2, size: 192, align: 8, elements: !16)
+!16 = !{!17, !17, !18}
+!17 = !DIBasicType(name: "ptr", size: 64, encoding: DW_ATE_address)
+!18 = !DIBasicType(name: "i64", size: 64, encoding: DW_ATE_unsigned)
+!19 = distinct !DILocation(line: 418, column: 15, scope: !11, inlinedAt: !20)
+!20 = distinct !DILocation(line: 99, column: 8, scope: !4)
+!21 = !DILocation(line: 419, column: 20, scope: !11, inlinedAt: !22)
+!22 = distinct !DILocation(line: 419, column: 20, scope: !11, inlinedAt: !20)
+!23 = !DILocation(line: 419, column: 20, scope: !11, inlinedAt: !20)
+!24 = !DILocation(line: 419, column: 12, scope: !11, inlinedAt: !20)
+!25 = !DILocation(line: 420, column: 4, scope: !11, inlinedAt: !26)
+!26 = distinct !DILocation(line: 420, column: 4, scope: !11, inlinedAt: !20)
+!27 = !DILocation(line: 420, column: 4, scope: !11, inlinedAt: !20)
+!28 = distinct !DISubprogram(name: "qmain", linkageName: "qmain", scope: null, file: !29, type: !30, spFlags: DISPFlagDefinition, unit: !1)
+!30 = !DISubroutineType(types: !31)
+!31 = !{!18, !18}
+!32 = !DILocation(line: 0, scope: !28)

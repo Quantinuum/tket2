@@ -20,6 +20,7 @@ use tket_json_rs::circuit_json::{self, SerialCircuit};
 use tket_json_rs::register;
 
 use crate::extension::futures::FutureOpBuilder;
+use crate::extension::qsystem::REGISTRY;
 use crate::extension::qsystem::{QSystemPlatform, helios::HeliosOp};
 use crate::extension::result::ResultOp;
 use crate::pytket::{qsystem_decoder_config, qsystem_encoder_config};
@@ -271,6 +272,73 @@ fn json_roundtrip(
     .unwrap();
     validate_serial_circ(&reser);
     compare_serial_circs(&ser, &reser);
+}
+
+/// We currently cannot encode any measurement ops in the Helios/Sol extensions, as
+/// they all return futures that cannot be translated.
+#[rstest]
+#[ignore]
+#[case::native_gates(circ_qsystem_native_gates())]
+fn circuit_standalone_roundtrip(#[case] hugr: Hugr) {
+    let circ_signature = hugr
+        .entrypoint_optype()
+        .inner_function_type()
+        .expect("Dataflow entrypoint")
+        .into_owned();
+    let decode_options = DecodeOptions::new()
+        .with_signature(circ_signature.clone())
+        .with_config(qsystem_decoder_config(QSystemPlatform::Helios))
+        .with_extensions(REGISTRY.clone());
+    let encode_options = EncodeOptions::new()
+        .with_subcircuits(true)
+        .with_config(qsystem_encoder_config(QSystemPlatform::Helios))
+        .keep_empty_circuits(true);
+
+    let encoded = EncodedCircuit::new_standalone(&hugr, encode_options.clone())
+        .unwrap_or_else(|e| panic!("{e}"));
+
+    assert!(encoded.contains_circuit(hugr.entrypoint()));
+    assert_eq!(encoded.len(), 1);
+
+    // Re-encode the EncodedCircuit
+    let extracted_from_circ = encoded
+        .reassemble(
+            hugr.entrypoint(),
+            Some("main".to_string()),
+            decode_options.clone(),
+        )
+        .unwrap_or_else(|e| panic!("{e}"));
+    extracted_from_circ
+        .validate()
+        .unwrap_or_else(|e| panic!("{e}"));
+
+    // Extract the head pytket circuit, and re-encode it on its own.
+    let ser: &SerialCircuit = &encoded[hugr.entrypoint()];
+    let deser: Hugr = ser.decode(decode_options).unwrap_or_else(|e| panic!("{e}"));
+
+    let deser_sig = deser
+        .entrypoint_optype()
+        .inner_function_type()
+        .expect("Dataflow entrypoint")
+        .into_owned();
+    assert_eq!(
+        &circ_signature.input, &deser_sig.input,
+        "Input signature mismatch\n  Expected: {}\n  Actual:   {}",
+        &circ_signature, &deser_sig
+    );
+    assert_eq!(
+        &circ_signature.output, &deser_sig.output,
+        "Output signature mismatch\n  Expected: {}\n  Actual:   {}",
+        &circ_signature, &deser_sig
+    );
+
+    let reser = SerialCircuit::encode(
+        &deser,
+        EncodeOptions::new().with_config(qsystem_encoder_config(QSystemPlatform::Helios)),
+    )
+    .unwrap();
+    validate_serial_circ(&reser);
+    compare_serial_circs(ser, &reser);
 }
 
 #[rstest]

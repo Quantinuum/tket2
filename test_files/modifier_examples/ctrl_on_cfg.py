@@ -1,10 +1,10 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang ==0.21.14",
+#     "guppylang",
 # ]
 # [tool.uv.sources]
-# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", branch = "ts/future-measure"}
+# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", branch = "na/temporary-cherrypicked"}
 # ///
 """Controlling a function with internal control flow"""
 
@@ -30,7 +30,7 @@ def funz(t: qubit, a: angle) -> None:
     rz(t, a)
 
 
-@guppy(unitary=True)
+@guppy(control=True)
 def branchy(q: qubit, flag: bool) -> None:
     if flag:
         x(q)

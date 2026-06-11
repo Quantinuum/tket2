@@ -1010,7 +1010,7 @@ mod test {
                 .add_float_extensions()
                 .add_extension(GpuCodegen)
         });
-        let hugr = single_op_hugr(op.into());
+        let mut hugr = single_op_hugr(op.into());
         check_emission!(hugr, llvm_ctx);
     }
 }

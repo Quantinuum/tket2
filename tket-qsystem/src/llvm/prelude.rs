@@ -221,13 +221,13 @@ mod test {
 
         // Create a hugr that has a panic message
         let error_val = ConstError::new(42, "PANIC");
-        let type_arg_q = TypeArg::Runtime(qb_t());
+        let type_arg_q = TypeArg::from(qb_t());
         let type_arg_2q = TypeArg::List(vec![type_arg_q.clone(), type_arg_q]);
         let panic_op = PRELUDE
             .instantiate_extension_op(&PANIC_OP_ID, [type_arg_2q.clone(), type_arg_2q.clone()])
             .unwrap();
 
-        let hugr = SimpleHugrConfig::new()
+        let mut hugr = SimpleHugrConfig::new()
             .with_ins(vec![qb_t(), qb_t()])
             .with_outs(vec![qb_t(), qb_t()])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
@@ -251,13 +251,13 @@ mod test {
         llvm_ctx.add_extensions(move |ceb| ceb.add_prelude_extensions(prelude_codegen.clone()));
 
         let error_val = ConstError::new(42, "EXIT");
-        let type_arg_q: TypeArg = TypeArg::Runtime(qb_t());
-        let type_arg_2q: TypeArg = TypeArg::List(vec![type_arg_q.clone(), type_arg_q]);
+        let type_arg_q = TypeArg::from(qb_t());
+        let type_arg_2q = TypeArg::List(vec![type_arg_q; 2]);
         let exit_op = PRELUDE
-            .instantiate_extension_op(&EXIT_OP_ID, [type_arg_2q.clone(), type_arg_2q.clone()])
+            .instantiate_extension_op(&EXIT_OP_ID, vec![type_arg_2q; 2])
             .unwrap();
 
-        let hugr = SimpleHugrConfig::new()
+        let mut hugr = SimpleHugrConfig::new()
             .with_ins(vec![qb_t(), qb_t()])
             .with_outs(vec![qb_t(), qb_t()])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())

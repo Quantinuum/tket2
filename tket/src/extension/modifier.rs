@@ -177,8 +177,8 @@ mod test {
                 &CONTROL_OP_ID,
                 [
                     Term::BoundedNat(1),
-                    Term::new_list([inout.into()]),
-                    Term::new_list([other_inputs.into()]),
+                    Term::new_list([inout]),
+                    Term::new_list([other_inputs]),
                 ],
             )
             .unwrap();
@@ -193,10 +193,7 @@ mod test {
         let dagger_op = MODIFIER_EXTENSION
             .instantiate_extension_op(
                 &DAGGER_OP_ID,
-                [
-                    Term::new_list([inout.into()]),
-                    Term::new_list([other_inputs.into()]),
-                ],
+                [Term::new_list([inout]), Term::new_list([other_inputs])],
             )
             .unwrap();
         (dagger_op, modified_sig)
@@ -210,10 +207,7 @@ mod test {
         let power_op = MODIFIER_EXTENSION
             .instantiate_extension_op(
                 &POWER_OP_ID,
-                [
-                    Term::new_list([inout.into()]),
-                    Term::new_list([other_inputs.into()]),
-                ],
+                [Term::new_list([inout]), Term::new_list([other_inputs])],
             )
             .unwrap();
         (power_op, modified_sig)

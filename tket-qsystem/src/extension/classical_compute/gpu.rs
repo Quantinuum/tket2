@@ -67,7 +67,7 @@ use hugr::{
     type_row,
     types::{
         CustomType, FuncValueType, PolyFuncTypeRV, Signature, SumType, Type, TypeArg, TypeBound,
-        TypeEnum, TypeRV, TypeRow, TypeRowRV, type_param::TermTypeError,
+        TypeRow, TypeRowRV, type_param::TermKindError,
     },
 };
 use itertools::Itertools as _;
@@ -93,7 +93,7 @@ pub type GpuType = ComputeType<GpuExtension>;
 /// The "tket.gpu" extension id.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("tket.gpu");
 /// The "tket.gpu" extension version.
-pub const EXTENSION_VERSION: Version = Version::new(0, 1, 1);
+pub const EXTENSION_VERSION: Version = Version::new(0, 2, 0);
 
 lazy_static! {
     /// The `tket.gpu` extension.
@@ -158,7 +158,7 @@ impl TryFrom<CustomType> for GpuType {
     }
 }
 
-compute_opdef!(EXTENSION_ID, GpuExtension, GpuOpDef);
+compute_opdef!(EXTENSION_ID, EXTENSION_VERSION, GpuExtension, GpuOpDef);
 
 impl MakeRegisteredOp for GpuOp {
     fn extension_id(&self) -> ExtensionId {
@@ -198,7 +198,7 @@ impl CustomConst for ConstGpuModule {
     }
 
     fn get_type(&self) -> Type {
-        GpuType::Module.get_type(EXTENSION_ID, &EXTENSION_REF)
+        GpuType::Module.get_type(EXTENSION_ID, EXTENSION_VERSION, &EXTENSION_REF)
     }
 }
 
@@ -253,7 +253,7 @@ mod test {
     #[case(GpuType::Module)]
     #[case(GpuType::Context)]
     #[case(GpuType::new_func(type_row![], type_row![]))]
-    #[case(GpuType::new_func(vec![TypeRV::new_row_var_use(0, TypeBound::Linear)], vec![bool_t()]))]
+    #[case(GpuType::new_func(TypeRowRV::new_var_use(0, TypeBound::Linear), [bool_t()]))]
     fn gpu_type(#[case] gpu_t: GpuType) {
         let hugr_t: Type = gpu_t.clone().into();
         let roundtripped_t = hugr_t.try_into().unwrap();
@@ -273,25 +273,25 @@ mod test {
         assert_eq!(
             GpuOpDef::lookup_by_name.instantiate(&[
                 "lookup_name".into(),
-                TypeArg::new_var_use(0, TypeParam::ListType(Box::new(TypeBound::Linear.into()))),
+                TypeArg::new_var_use(0, TypeParam::new_list_kind(TypeBound::Linear)),
                 vec![].into()
             ]),
             Ok(GpuOp::LookupByName {
                 name: "lookup_name".to_string(),
-                inputs: vec![TypeRV::new_row_var_use(0, TypeBound::Linear)].into(),
-                outputs: TypeRowRV::from(Vec::<TypeRV>::new())
+                inputs: TypeRowRV::new_var_use(0, TypeBound::Linear),
+                outputs: TypeRowRV::new()
             })
         );
         assert_eq!(
             GpuOpDef::lookup_by_id.instantiate(&[
                 TypeArg::BoundedNat(42),
-                TypeArg::new_var_use(0, TypeParam::ListType(Box::new(TypeBound::Linear.into()))),
+                TypeArg::new_var_use(0, TypeParam::new_list_kind(TypeBound::Linear)),
                 vec![].into()
             ]),
             Ok(GpuOp::LookupById {
                 id: 42,
-                inputs: vec![TypeRV::new_row_var_use(0, TypeBound::Linear)].into(),
-                outputs: TypeRowRV::from(Vec::<TypeRV>::new())
+                inputs: TypeRowRV::new_var_use(0, TypeBound::Linear),
+                outputs: TypeRowRV::new()
             })
         );
         assert_eq!(
@@ -306,17 +306,8 @@ mod test {
     #[rstest]
     #[case::concrete(type_row![], type_row![])]
     #[case::row_vars1(
-        vec![
-            TypeRV::UNIT,
-            TypeRV::try_from(
-                TypeArg::new_var_use(
-                    0,
-                    TypeParam::ListType (Box::new(TypeBound::Copyable.into()))
-                )
-            ).unwrap()
-        ], TypeRowRV::try_from(
-            Term::from(vec![TypeArg::from(Type::UNIT), TypeArg::from(usize_t())])
-        ).unwrap()
+        TypeRowRV::from([Type::UNIT]).concat(TypeRowRV::new_var_use(0, TypeBound::Copyable)),
+        TypeRowRV::from([Type::UNIT, usize_t()])
     )]
     fn lookup_signature(
         #[case] inputs: impl Into<TypeRowRV>,
@@ -329,15 +320,16 @@ mod test {
             outputs: outputs.clone(),
         };
         let extension = Arc::downgrade(&op.extension_ref());
-        let module_ty = GpuType::Module.get_type(op.extension_id(), &extension);
+        let module_ty = GpuType::Module.get_type(op.extension_id(), EXTENSION_VERSION, &extension);
         let func_ty = Type::new_extension(GpuType::func_custom_type(
             inputs.clone(),
             outputs.clone(),
             op.extension_id(),
+            EXTENSION_VERSION,
             &extension,
         ));
         assert_eq!(
-            op.to_extension_op().unwrap().signature(),
+            op.to_extension_op().unwrap().signature().into_owned(),
             Signature::new(vec![module_ty], vec![func_ty])
         );
     }

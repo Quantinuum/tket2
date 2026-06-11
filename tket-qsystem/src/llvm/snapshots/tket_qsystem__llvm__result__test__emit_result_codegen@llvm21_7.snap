@@ -7,30 +7,46 @@ source_filename = "test_context"
 
 @res_test_arr_i.DFD30452.0 = private constant [25 x i8] c"\18USER:INTARR:test_arr_int"
 
-define internal void @_hl.main.1({ ptr, i64 } %0) {
+define internal void @_hl.main.1({ ptr, i64 } %0) !dbg !3 {
 alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  %tag_len = load i8, ptr @res_test_arr_i.DFD30452.0, align 1
-  %tag_len2 = zext i8 %tag_len to i64
-  %array_ptr = extractvalue { ptr, i64 } %0, 0
-  %array_offset = extractvalue { ptr, i64 } %0, 1
-  %1 = getelementptr inbounds [10 x i64], ptr %array_ptr, i64 %array_offset
-  %out_arr_alloca = alloca <{ i32, i32, ptr, ptr }>, align 8
-  %x_ptr = getelementptr inbounds nuw <{ i32, i32, ptr, ptr }>, ptr %out_arr_alloca, i32 0, i32 0
-  %y_ptr = getelementptr inbounds nuw <{ i32, i32, ptr, ptr }>, ptr %out_arr_alloca, i32 0, i32 1
-  %arr_ptr = getelementptr inbounds nuw <{ i32, i32, ptr, ptr }>, ptr %out_arr_alloca, i32 0, i32 2
-  %mask_ptr = getelementptr inbounds nuw <{ i32, i32, ptr, ptr }>, ptr %out_arr_alloca, i32 0, i32 3
-  %2 = alloca i1, i32 10, align 1
-  store [10 x i1] zeroinitializer, ptr %2, align 1
-  store i32 10, ptr %x_ptr, align 4
-  store i32 1, ptr %y_ptr, align 4
-  store ptr %1, ptr %arr_ptr, align 8
-  store ptr %2, ptr %mask_ptr, align 8
-  %3 = load <{ i32, i32, ptr, ptr }>, ptr %out_arr_alloca, align 1
-  call void @print_int_arr(ptr @res_test_arr_i.DFD30452.0, i64 %tag_len2, ptr %out_arr_alloca)
+  %tag_len = load i8, ptr @res_test_arr_i.DFD30452.0, align 1, !dbg !11
+  %tag_len2 = zext i8 %tag_len to i64, !dbg !11
+  %array_ptr = extractvalue { ptr, i64 } %0, 0, !dbg !11
+  %array_offset = extractvalue { ptr, i64 } %0, 1, !dbg !11
+  %1 = getelementptr inbounds [10 x i64], ptr %array_ptr, i64 %array_offset, !dbg !11
+  %out_arr_alloca = alloca <{ i32, i32, ptr, ptr }>, align 8, !dbg !11
+  %x_ptr = getelementptr inbounds nuw <{ i32, i32, ptr, ptr }>, ptr %out_arr_alloca, i32 0, i32 0, !dbg !11
+  %y_ptr = getelementptr inbounds nuw <{ i32, i32, ptr, ptr }>, ptr %out_arr_alloca, i32 0, i32 1, !dbg !11
+  %arr_ptr = getelementptr inbounds nuw <{ i32, i32, ptr, ptr }>, ptr %out_arr_alloca, i32 0, i32 2, !dbg !11
+  %mask_ptr = getelementptr inbounds nuw <{ i32, i32, ptr, ptr }>, ptr %out_arr_alloca, i32 0, i32 3, !dbg !11
+  %2 = alloca i1, i32 10, align 1, !dbg !11
+  store [10 x i1] zeroinitializer, ptr %2, align 1, !dbg !11
+  store i32 10, ptr %x_ptr, align 4, !dbg !11
+  store i32 1, ptr %y_ptr, align 4, !dbg !11
+  store ptr %1, ptr %arr_ptr, align 8, !dbg !11
+  store ptr %2, ptr %mask_ptr, align 8, !dbg !11
+  %3 = load <{ i32, i32, ptr, ptr }>, ptr %out_arr_alloca, align 1, !dbg !11
+  call void @print_int_arr(ptr @res_test_arr_i.DFD30452.0, i64 %tag_len2, ptr %out_arr_alloca), !dbg !11
   ret void
 }
 
 declare void @print_int_arr(ptr, i64, ptr)
+
+!llvm.module.flags = !{!0}
+!llvm.dbg.cu = !{!1}
+
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "hugr_llvm_test", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "/lPNzlV/ClAphFG/yrhvZs/eDgUn/eIVwAutKJHaZEPSZwPXPeycUvnujGxZ")
+!3 = distinct !DISubprogram(name: "_hl.main.1", linkageName: "_hl.main.1", scope: null, file: !4, line: 25254, type: !5, scopeLine: 25255, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
+!4 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "")
+!5 = !DISubroutineType(types: !6)
+!6 = !{null, !7}
+!7 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ ptr, i64 }", file: !2, size: 128, align: 8, elements: !8)
+!8 = !{!9, !10}
+!9 = !DIBasicType(name: "ptr", size: 64, encoding: DW_ATE_address)
+!10 = !DIBasicType(name: "i64", size: 64, encoding: DW_ATE_unsigned)
+!11 = !DILocation(line: 27062, column: 402, scope: !3)

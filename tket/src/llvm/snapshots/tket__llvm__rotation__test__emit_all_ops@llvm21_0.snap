@@ -10,23 +10,23 @@ source_filename = "test_context"
 @1 = private unnamed_addr constant [37 x i8] c"Expected variant 1 but got variant 0\00", align 1
 @prelude.panic_template.1 = private unnamed_addr constant [34 x i8] c"Program panicked (signal %i): %s\0A\00", align 1
 
-define internal void @_hl.main.1(double %0) {
+define internal void @_hl.main.1(double %0) !dbg !3 {
 alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  %1 = call i1 @llvm.is.fpclass.f64(double %0, i32 504)
-  br i1 %1, label %4, label %2
+  %1 = call i1 @llvm.is.fpclass.f64(double %0, i32 504), !dbg !8
+  br i1 %1, label %4, label %2, !dbg !8
 
 2:                                                ; preds = %entry_block
-  %3 = call i32 (ptr, ...) @printf(ptr @prelude.panic_template, i32 1, ptr @0)
-  call void @abort()
-  unreachable
+  %3 = call i32 (ptr, ...) @printf(ptr @prelude.panic_template, i32 1, ptr @0), !dbg !8
+  call void @abort(), !dbg !8
+  unreachable, !dbg !8
 
 4:                                                ; preds = %entry_block
-  %5 = call i1 @llvm.is.fpclass.f64(double %0, i32 504)
-  %6 = insertvalue { i1, double } { i1 true, double poison }, double %0, 1
-  %7 = select i1 %5, { i1, double } %6, { i1, double } { i1 false, double poison }
+  %5 = call i1 @llvm.is.fpclass.f64(double %0, i32 504), !dbg !9
+  %6 = insertvalue { i1, double } { i1 true, double poison }, double %0, 1, !dbg !9
+  %7 = select i1 %5, { i1, double } %6, { i1, double } { i1 false, double poison }, !dbg !9
   %8 = extractvalue { i1, double } %7, 0
   switch i1 %8, label %9 [
     i1 true, label %10
@@ -40,10 +40,10 @@ entry_block:                                      ; preds = %alloca_block
   br label %cond_7_case_1
 
 cond_7_case_0:                                    ; preds = %9
-  %12 = extractvalue { i32, ptr } { i32 1, ptr @1 }, 0
-  %13 = extractvalue { i32, ptr } { i32 1, ptr @1 }, 1
-  %14 = call i32 (ptr, ...) @printf(ptr @prelude.panic_template.1, i32 %12, ptr %13)
-  call void @abort()
+  %12 = extractvalue { i32, ptr } { i32 1, ptr @1 }, 0, !dbg !10
+  %13 = extractvalue { i32, ptr } { i32 1, ptr @1 }, 1, !dbg !10
+  %14 = call i32 (ptr, ...) @printf(ptr @prelude.panic_template.1, i32 %12, ptr %13), !dbg !10
+  call void @abort(), !dbg !10
   br label %cond_exit_7
 
 cond_7_case_1:                                    ; preds = %10
@@ -51,7 +51,7 @@ cond_7_case_1:                                    ; preds = %10
 
 cond_exit_7:                                      ; preds = %cond_7_case_1, %cond_7_case_0
   %"0.0" = phi double [ 0.000000e+00, %cond_7_case_0 ], [ %11, %cond_7_case_1 ]
-  %15 = fadd double %0, %"0.0"
+  %15 = fadd double %0, %"0.0", !dbg !11
   ret void
 }
 
@@ -63,3 +63,19 @@ declare i32 @printf(ptr, ...)
 declare void @abort()
 
 attributes #0 = { nocallback nofree nosync nounwind speculatable willreturn memory(none) }
+
+!llvm.module.flags = !{!0}
+!llvm.dbg.cu = !{!1}
+
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "hugr_llvm_test", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "/lA")
+!3 = distinct !DISubprogram(name: "_hl.main.1", linkageName: "_hl.main.1", scope: null, file: !4, line: 25254, type: !5, scopeLine: 25255, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
+!4 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "")
+!5 = !DISubroutineType(types: !6)
+!6 = !{null, !7}
+!7 = !DIBasicType(name: "f64", size: 64, encoding: DW_ATE_float)
+!8 = !DILocation(line: 27062, column: 402, scope: !3)
+!9 = !DILocation(line: 10060, column: 368, scope: !3)
+!10 = !DILocation(line: 32551, column: 131, scope: !3)
+!11 = !DILocation(line: 13582, column: 372, scope: !3)
