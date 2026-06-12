@@ -1,10 +1,9 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang"
+#     "guppylang==1.0.0a4",
+#     "guppylang-internals>=1.0.0a4",
 # ]
-# [tool.uv.sources]
-
 # ///
 """Test the use of a higher-order function with arrays inside modifiers"""
 
