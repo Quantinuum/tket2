@@ -56,7 +56,7 @@ portgraph = "0.16.1"
 # There can only be one `pyo3` version in the whole workspace, so we use a
 # loose version constraint to prevent breaking changes in dependent crates where possible.
 pyo3 = ">= 0.28.2, < 0.29"
-pyo3-build-config = ">= 0.28.2, < 0.29"
+pyo3-build-config = ">= 0.28.2, < 0.30"
 
 bindgen = "0.72"
 cbindgen = "0.29"
