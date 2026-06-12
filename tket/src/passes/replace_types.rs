@@ -17,7 +17,6 @@ use hugr_core::builder::{
 };
 use hugr_core::extension::{ExtensionId, OpDef, SignatureError, TypeDef};
 use hugr_core::hugr::hugrmut::HugrMut;
-use hugr_core::hugr::internal::HugrInternals;
 use hugr_core::ops::constant::{OpaqueValue, Sum};
 use hugr_core::ops::handle::{DataflowOpID, FuncID, NodeHandle};
 use hugr_core::ops::{
@@ -30,6 +29,7 @@ use hugr_core::types::{
 use hugr_core::{Direction, Hugr, HugrView, Node, PortIndex, Visibility, Wire};
 
 use crate::passes::composable::WithScope;
+use crate::passes::metadata::MetadataPropagationPolicy;
 use crate::passes::{ComposablePass, PassScope};
 
 mod linearize;
@@ -161,6 +161,7 @@ impl NodeTemplate {
     ) -> Result<(), ReplaceTypesError> {
         let ef = |e| ReplaceTypesError::AddTemplateError(n, Box::new(e));
         assert_eq!(hugr.children(n).count(), 0);
+        let old_optype = hugr.get_optype(n).clone();
         let (new_optype, static_source, static_inport) = match self {
             NodeTemplate::SingleOp(op_type) => {
                 if op_type.static_input_port().is_some() {
@@ -231,27 +232,7 @@ impl NodeTemplate {
             }
         }
         rt.process_subtree_opts(hugr, n, opts)?;
-        // When n becomes a container, propagate its metadata to all inner
-        // Call and ExtensionOp nodes. The container itself is not a leaf op
-        // and backends will not read location metadata from it.
-        if hugr.children(n).next().is_some() {
-            let meta = hugr.node_metadata_map(n).clone();
-            if !meta.is_empty() {
-                let inner_ops: Vec<Node> = hugr
-                    .descendants(n)
-                    .filter(|&d| {
-                        matches!(hugr.get_optype(d), OpType::Call(_) | OpType::ExtensionOp(_))
-                    })
-                    .collect();
-                for op_node in inner_ops {
-                    for (key, value) in &meta {
-                        if !hugr.node_metadata_map(op_node).contains_key(key) {
-                            hugr.set_metadata_any(op_node, key, value.clone());
-                        }
-                    }
-                }
-            }
-        }
+        rt.meta_policy.apply(hugr, n, &old_optype);
         Ok(())
     }
 
@@ -358,12 +339,14 @@ pub struct ReplaceTypes {
         Arc<dyn Fn(&OpaqueValue, &ReplaceTypes) -> Result<Option<Value>, ReplaceTypesError>>,
     >,
     scope: Either<PassScope, Vec<Node>>,
+    meta_policy: MetadataPropagationPolicy,
 }
 
 impl Default for ReplaceTypes {
     fn default() -> Self {
         let mut res = Self::new_empty();
         res.linearize = DelegatingLinearizer::default();
+        res.meta_policy = MetadataPropagationPolicy::default();
         res.replace_consts_parametrized(array_type_def(), handlers::array_const);
         res.replace_consts_parametrized(list_type_def(), list_const);
         res
@@ -427,6 +410,7 @@ impl ReplaceTypes {
             // Not really clear what "preserve" means for a pass that changes signatures,
             // but default to running on whole hugr not just entrypoint.
             scope: Either::Left(PassScope::default()),
+            meta_policy: MetadataPropagationPolicy::new(),
         }
     }
 
@@ -511,6 +495,12 @@ impl ReplaceTypes {
     /// [Self::set_replace_parametrized_op])
     pub fn get_linearizer(&self) -> &impl Linearizer {
         &self.linearize
+    }
+
+    /// Sets the metadata propagation policy used when an op is replaced by a
+    /// container. See [`MetadataPropagationPolicy`] for details.
+    pub fn set_metadata_policy(&mut self, policy: MetadataPropagationPolicy) {
+        self.meta_policy = policy;
     }
 
     /// Configures this instance to change occurrences of `src` to `dest`.
