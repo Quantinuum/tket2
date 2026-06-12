@@ -57,6 +57,10 @@ fn mono_scan(
         let ch = if let Some(ref mut inst) = subst_into {
             let new_ch =
                 h.add_node_with_parent(inst.target_container, ch_op.substitute(inst.subst));
+
+            // Copy metadata onto the monomorphized node
+            *h.node_metadata_map_mut(new_ch) = h.node_metadata_map(old_ch).clone();
+
             inst.node_map.insert(old_ch, new_ch);
             let mut inst = Instantiating {
                 target_container: new_ch,
@@ -128,6 +132,8 @@ fn instantiate(
         &type_args,
     );
     let mono_tgt = h.add_node_after(poly_func, FuncDefn::new(name, mono_sig));
+    // Copy metadata onto the monomorphized FuncDefn
+    *h.node_metadata_map_mut(mono_tgt) = h.node_metadata_map(poly_func).clone();
     // Insert BEFORE we scan (in case of recursion), hence we cannot use Entry::or_insert
     ve.insert(mono_tgt);
     // Now make the instantiation
@@ -640,6 +646,134 @@ mod test {
 
         let funcs = list_funcs(&hugr);
         assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));
+    }
+
+    /// Reproducer for <https://github.com/Quantinuum/tket2/issues/1652>.
+    ///
+    /// Debug info on a polymorphic function and its contained nodes
+    /// should be copied to the monomorphized instances.
+    #[test]
+    fn test_debug_info_copied_by_monomorphization() -> Result<(), Box<dyn std::error::Error>> {
+        use hugr_core::hugr::hugrmut::HugrMut;
+        use hugr_core::metadata::{LocationRecord, SubprogramRecord};
+        use hugr_core::ops::OpType;
+        use hugr_core::ops::handle::NodeHandle;
+        use serde_json::ser;
+
+        let tv0 = || Type::new_var_use(0, TypeBound::Copyable);
+        let mut mb = ModuleBuilder::new();
+
+        // monomorphic helper
+        let helper = {
+            let fb = mb.define_function("helper", Signature::new([], []))?;
+            fb.finish_with_outputs([])?
+        };
+
+        // poly_fn[T: Copyable](x: T) -> T — calls helper
+        let poly_fn = {
+            let pfty = PolyFuncType::new(
+                [TypeBound::Copyable.into()],
+                Signature::new([tv0()], [tv0()]),
+            );
+            let mut fb = mb.define_function("poly_fn", pfty)?;
+            let [elem] = fb.input_wires_arr();
+            fb.call(helper.handle(), &[], [])?; // Call node to tag
+            fb.finish_with_outputs([elem])?
+        };
+
+        // main(x: usize, y: Unit) -> (usize, Unit)
+        // Calls poly_fn with two distinct type args, producing two disjoint
+        // monomorphizations.
+        {
+            let mut fb = mb.define_function_vis(
+                "main",
+                Signature::new([usize_t(), Type::UNIT], [usize_t(), Type::UNIT]),
+                Visibility::Public,
+            )?;
+            let [u, unit] = fb.input_wires_arr();
+            // First monomorphization:  T = usize
+            let [u2] = fb
+                .call(poly_fn.handle(), &[usize_t().into()], [u])?
+                .outputs_arr();
+            // Second monomorphization: T = Unit
+            let [unit2] = fb
+                .call(poly_fn.handle(), &[Type::UNIT.into()], [unit])?
+                .outputs_arr();
+            fb.finish_with_outputs([u2, unit2])?;
+        };
+
+        let mut hugr = mb.finish_hugr()?;
+
+        // Attach SubprogramRecord metadata to the polymorphic FuncDefn
+        let sub = SubprogramRecord {
+            kind: "subprogram".into(),
+            file: 0,
+            line_no: 42,
+            scope_line: 43,
+        };
+        let sub_copy = SubprogramRecord {
+            kind: "subprogram".into(),
+            file: 0,
+            line_no: 42,
+            scope_line: 43,
+        };
+        hugr.set_metadata::<SubprogramRecord>(poly_fn.node(), sub);
+
+        // Attach LocationRecord debug metadata to the Call node inside poly_fn.
+        let call_node = hugr
+            .children(poly_fn.node())
+            .find(|&n| matches!(hugr.get_optype(n), OpType::Call(_)))
+            .expect("Call node inside poly_fn");
+        let loc = LocationRecord {
+            kind: "location".into(),
+            column: 3,
+            line_no: 42,
+        };
+        let loc_copy = LocationRecord {
+            kind: "location".into(),
+            column: 3,
+            line_no: 42,
+        };
+        hugr.set_metadata::<LocationRecord>(call_node, loc);
+
+        MonomorphizePass::default().run(&mut hugr)?;
+        hugr.validate()?;
+
+        let funcs = list_funcs(&hugr);
+        let mangled_usize = mangle_name("poly_fn", &[usize_t().into()]);
+        let mangled_unit = mangle_name("poly_fn", &[Type::UNIT.into()]);
+
+        for name in [&mangled_usize, &mangled_unit] {
+            let (func_node, _) = funcs[name];
+            let mono_call_node = hugr
+                .descendants(func_node)
+                .find(|&n| matches!(hugr.get_optype(n), OpType::Call(_)))
+                .unwrap_or_else(|| panic!("Call node missing in monomorphized function {name}"));
+
+            // note: the metadata objects do not impl PartialEq
+            // so we compare the JSON strings instead.
+            let subprog_ser = ser::to_string(
+                &hugr
+                    .get_metadata::<SubprogramRecord>(func_node)
+                    .expect("SubprogramRecord should have been copied onto this node"),
+            )?;
+            assert!(
+                subprog_ser == ser::to_string(&sub_copy)?,
+                "SubprogramRecord should be copied onto monomorphized FuncDefn {name}"
+            );
+
+            let location_ser = ser::to_string(
+                &hugr
+                    .get_metadata::<LocationRecord>(mono_call_node)
+                    .expect("LocationRecord should have been copied onto this node"),
+            )?;
+            assert!(
+                location_ser == ser::to_string(&loc_copy)?,
+                "LocationRecord should be copied to the Call node in monomorphized function {name}"
+            );
+        }
+
+        Ok(())
     }
 
     #[rstest]
