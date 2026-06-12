@@ -1615,4 +1615,219 @@ mod test {
 
         h.validate().unwrap();
     }
+
+    /// Builds a DFG hugr containing a single `read<usize>` op with a
+    /// [`LocationRecord`] attached, returning the hugr and the op node.
+    fn build_read_hugr_with_location(ext: &Arc<Extension>) -> (hugr_core::Hugr, hugr_core::Node) {
+        use hugr_core::hugr::hugrmut::HugrMut;
+        use hugr_core::metadata::LocationRecord;
+        use hugr_core::ops::OpType;
+
+        let elem_ty = usize_t();
+        let coln = ext.get_type(PACKED_VEC).unwrap();
+        let pv_usize = Type::new_extension(coln.instantiate([elem_ty.clone().into()]).unwrap());
+        let mut dfb = DFGBuilder::new(Signature::new(
+            vec![pv_usize, i64_t()],
+            vec![elem_ty.clone()],
+        ))
+        .unwrap();
+        let [pv, idx] = dfb.input_wires_arr();
+        let read = dfb
+            .add_dataflow_op(read_op(ext, elem_ty.clone()), [pv, idx])
+            .unwrap();
+        let mut h = dfb.finish_hugr_with_outputs(read.outputs()).unwrap();
+
+        let read_node = h
+            .entry_descendants()
+            .find(|&n| matches!(h.get_optype(n), OpType::ExtensionOp(_)))
+            .expect("read op node");
+        h.set_metadata::<LocationRecord>(
+            read_node,
+            LocationRecord {
+                kind: "location".into(),
+                column: 5,
+                line_no: 10,
+            },
+        );
+        (h, read_node)
+    }
+
+    /// Part of the reproducer for <https://github.com/Quantinuum/tket2/issues/1651>.
+    ///
+    /// When the replacement is a [`NodeTemplate::LinkedHugr`] whose entrypoint is
+    /// a `Call` node (the `call_to_function` pattern), the debug location stays on
+    /// that call node and is correctly preserved.
+    #[test]
+    fn linked_hugr_preserves_debug_location_on_call() {
+        use hugr_core::metadata::LocationRecord;
+        use hugr_core::ops::OpType;
+        use serde_json::ser;
+
+        let ext = ext();
+        let (mut h, read_node) = build_read_hugr_with_location(&ext);
+
+        // Configure a lowerer that replaces read<usize> with a LinkedHugr
+        // whose entrypoint is a Call node (call_to_function pattern).
+        let pv = ext.get_type(PACKED_VEC).unwrap();
+        let mut lw = ReplaceTypes::default();
+        lw.set_replace_type(pv.instantiate([bool_t().into()]).unwrap(), i64_t());
+        lw.set_replace_parametrized_type(
+            pv,
+            Box::new(|args: &[TypeArg]| Some(list_type(just_elem_type(args).clone()))),
+        );
+        lw.set_replace_parametrized_op(ext.get_op(READ).unwrap().as_ref(), move |args, _| {
+            let ty: Type = just_elem_type(args).clone();
+            let func_hugr = lowered_read(ty, |sig| {
+                FunctionBuilder::new_vis("lowered_read_usize", sig, Visibility::Public)
+            })
+            .finish_hugr()
+            .unwrap();
+            Ok(Some(
+                NodeTemplate::call_to_function(func_hugr, &[]).unwrap(),
+            ))
+        });
+        lw.run(&mut h).unwrap();
+        h.validate().unwrap();
+
+        // read_node is now a Call; the debug location is directly on it.
+        assert!(
+            matches!(h.get_optype(read_node), OpType::Call(_)),
+            "Expected read_node to become a Call after LinkedHugr(Call) replacement"
+        );
+        let expected = LocationRecord {
+            kind: "location".into(),
+            column: 5,
+            line_no: 10,
+        };
+        let actual = h
+            .get_metadata::<LocationRecord>(read_node)
+            .expect("LocationRecord should be preserved on the Call node");
+        assert_eq!(
+            ser::to_string(&actual).unwrap(),
+            ser::to_string(&expected).unwrap(),
+        );
+    }
+
+    /// Reproducer for <https://github.com/Quantinuum/tket2/issues/1651>.
+    ///
+    /// When the replacement is a [`NodeTemplate::CompoundOp`] whose entrypoint is a
+    /// container (DFG), the debug location is left on the container and not propagated
+    /// to the `ExtensionOp` nodes inside it.
+    #[test]
+    #[should_panic]
+    fn compound_op_propagates_debug_location_to_inner_extension_ops() {
+        use hugr_core::metadata::LocationRecord;
+        use hugr_core::ops::OpType;
+        use serde_json::ser;
+
+        let ext = ext();
+        let (mut h, read_node) = build_read_hugr_with_location(&ext);
+
+        // lowerer() replaces read<usize> with CompoundOp(DFG containing ExtensionOps).
+        lowerer(&ext).run(&mut h).unwrap();
+        h.validate().unwrap();
+
+        assert!(
+            matches!(h.get_optype(read_node), OpType::DFG(_)),
+            "Expected read_node to become a DFG after CompoundOp replacement"
+        );
+
+        // The inner ExtensionOp children (itousize, list.get) should carry the location.
+        let inner_ops: Vec<_> = h
+            .children(read_node)
+            .filter(|&n| matches!(h.get_optype(n), OpType::ExtensionOp(_)))
+            .collect();
+        assert!(
+            !inner_ops.is_empty(),
+            "Replacement DFG should contain ExtensionOps"
+        );
+
+        let expected = LocationRecord {
+            kind: "location".into(),
+            column: 5,
+            line_no: 10,
+        };
+        let expected_ser = ser::to_string(&expected).unwrap();
+        for op_node in inner_ops {
+            let actual = h
+                .get_metadata::<LocationRecord>(op_node)
+                .expect("LocationRecord should have been propagated to inner ExtensionOp");
+            assert_eq!(
+                ser::to_string(&actual).unwrap(),
+                expected_ser,
+                "LocationRecord on inner op {op_node:?} should match original"
+            );
+        }
+    }
+
+    /// Reproducer for <https://github.com/Quantinuum/tket2/issues/1651>.
+    ///
+    /// When the replacement is a [`NodeTemplate::LinkedHugr`] whose entrypoint is
+    /// a container (DFG), the debug location is left on the container and not
+    /// propagated to the `ExtensionOp` nodes inside it — the same bug as with
+    /// [`NodeTemplate::CompoundOp`].
+    #[test]
+    #[should_panic]
+    fn linked_hugr_propagates_debug_location_into_container() {
+        use hugr_core::hugr::linking::NameLinkingPolicy;
+        use hugr_core::metadata::LocationRecord;
+        use hugr_core::ops::OpType;
+        use serde_json::ser;
+
+        let ext = ext();
+        let (mut h, read_node) = build_read_hugr_with_location(&ext);
+
+        // Configure a lowerer that replaces read<usize> with a LinkedHugr whose
+        // entrypoint is a DFG (the same body used for CompoundOp in lowerer()),
+        // exercising the LinkedHugr code path in NodeTemplate::replace.
+        let pv = ext.get_type(PACKED_VEC).unwrap();
+        let mut lw = ReplaceTypes::default();
+        lw.set_replace_type(pv.instantiate([bool_t().into()]).unwrap(), i64_t());
+        lw.set_replace_parametrized_type(
+            pv,
+            Box::new(|args: &[TypeArg]| Some(list_type(just_elem_type(args).clone()))),
+        );
+        lw.set_replace_parametrized_op(ext.get_op(READ).unwrap().as_ref(), move |args, _| {
+            let ty: Type = just_elem_type(args).clone();
+            let dfg_hugr = lowered_read(ty, DFGBuilder::new).finish_hugr().unwrap();
+            Ok(Some(NodeTemplate::LinkedHugr(
+                Box::new(dfg_hugr),
+                NameLinkingPolicy::default(),
+            )))
+        });
+        lw.run(&mut h).unwrap();
+        h.validate().unwrap();
+
+        assert!(
+            matches!(h.get_optype(read_node), OpType::DFG(_)),
+            "Expected read_node to become a DFG after LinkedHugr(DFG) replacement"
+        );
+
+        // The inner ExtensionOp children (itousize, list.get) should carry the location.
+        let inner_ops: Vec<_> = h
+            .children(read_node)
+            .filter(|&n| matches!(h.get_optype(n), OpType::ExtensionOp(_)))
+            .collect();
+        assert!(
+            !inner_ops.is_empty(),
+            "Replacement DFG should contain ExtensionOps"
+        );
+
+        let expected = LocationRecord {
+            kind: "location".into(),
+            column: 5,
+            line_no: 10,
+        };
+        let expected_ser = ser::to_string(&expected).unwrap();
+        for op_node in inner_ops {
+            let actual = h
+                .get_metadata::<LocationRecord>(op_node)
+                .expect("LocationRecord should have been propagated to inner ExtensionOp");
+            assert_eq!(
+                ser::to_string(&actual).unwrap(),
+                expected_ser,
+                "LocationRecord on inner op {op_node:?} should match original"
+            );
+        }
+    }
 }
