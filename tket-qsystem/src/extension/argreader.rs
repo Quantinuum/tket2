@@ -26,7 +26,6 @@ use hugr::{
 };
 
 use anyhow::{Result, bail};
-use derive_more::{Display, Error, From};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use strum::{EnumIter, EnumString, IntoStaticStr};
@@ -94,6 +93,7 @@ fn int_tv(int_tv_idx: usize) -> Type {
 }
 
 impl ArgumentReadOpDef {
+    /// Type of the return value of this argument
     pub fn output_type(&self) -> Type {
         match self {
             Self::Bool => bool_t(),
@@ -106,6 +106,9 @@ impl ArgumentReadOpDef {
             Self::ArrInt | Self::ArrUInt => borrow_array_type(int_tv(2)),
         }
     }
+
+    /// If the operation is on an array type, returns the inner element.
+    /// Otherwise returns itself.
     pub fn simple_type_op(&self) -> Self {
         match self {
             Self::ArrBool => Self::Bool,
@@ -115,6 +118,8 @@ impl ArgumentReadOpDef {
             _ => *self,
         }
     }
+    /// If the operation is a scalar, returns the corresponding array type.
+    /// Otherwise, it is already an array and returns itself.
     pub fn array_type_op(&self) -> Self {
         match self {
             Self::Bool => Self::ArrBool,
@@ -124,27 +129,7 @@ impl ArgumentReadOpDef {
             _ => *self,
         }
     }
-    pub fn is_scalar_type(&self) -> bool {
-        matches!(self, Self::Bool | Self::Int | Self::UInt | Self::F64)
-    }
-    pub fn is_array_type(&self) -> bool {
-        matches!(
-            self,
-            Self::ArrBool | Self::ArrInt | Self::ArrUInt | Self::ArrF64
-        )
-    }
-    pub fn get_op_id(&self) -> OpName {
-        match self {
-            Self::Bool => OpName::new_inline("ArgumentReadBool"),
-            Self::Int => OpName::new_inline("ArgumentReadInt"),
-            Self::UInt => OpName::new_inline("ArgumentReadUInt"),
-            Self::F64 => OpName::new_inline("ArgumentReadF64"),
-            Self::ArrBool => OpName::new_inline("ArgumentReadBoolArray"),
-            Self::ArrInt => OpName::new_inline("ArgumentReadIntArray"),
-            Self::ArrUInt => OpName::new_inline("ArgumentReadU64Array"),
-            Self::ArrF64 => OpName::new_inline("ArgumentReadF64Array"),
-        }
-    }
+    /// Get the description of this operation, for use in documentation and error messages.
     pub fn get_description(&self) -> String {
         match self {
             Self::Bool => "Read a boolean argument",
@@ -197,16 +182,25 @@ impl MakeOpDef for ArgumentReadOpDef {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq)]
+/// The possible scalar arguments for an `ArgumentReadOpDef`.
 pub enum SimpleArgs {
+    /// The read is of a boolean
     Bool,
+    /// The read is of a signed integer, with the given bit width (e.g. 8 for i8, 64 for i64)
     Int(u8),
+    /// The read is of an unsigned integer, with the given bit width (e.g. 8 for u8, 64 for u64)
     UInt(u8),
+    /// The read is of a 64-bit floating point number
     F64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
+/// The arguments for an `ArgumentReadOpDef`, which may be either a simple scalar argument or an
+/// array argument with a size.
 pub enum ReadArgs {
+    /// A simple scalar argument
     Simple(SimpleArgs),
+    /// An array of a simple scalar argument, with the given length
     Array(SimpleArgs, u64),
 }
 
@@ -222,7 +216,7 @@ pub struct ArgumentReadOp {
 }
 
 impl ArgumentReadOp {
-    /// Create a new `ArgumentRead` operation.
+    /// Create a new `ArgumentRead` operation for an unsigned integer return value
     pub fn new_uint(tag: impl Into<String>, int_width: u8) -> Self {
         Self {
             tag: tag.into(),
@@ -230,6 +224,7 @@ impl ArgumentReadOp {
             args: ReadArgs::Simple(SimpleArgs::UInt(int_width)),
         }
     }
+    /// Create a new `ArgumentRead` operation for a signed integer return value
     pub fn new_int(tag: impl Into<String>, int_width: u8) -> Self {
         Self {
             tag: tag.into(),
@@ -237,6 +232,7 @@ impl ArgumentReadOp {
             args: ReadArgs::Simple(SimpleArgs::Int(int_width)),
         }
     }
+    /// Create a new `ArgumentRead` operation for a boolean return value
     pub fn new_bool(tag: impl Into<String>) -> Self {
         Self {
             tag: tag.into(),
@@ -244,6 +240,7 @@ impl ArgumentReadOp {
             args: ReadArgs::Simple(SimpleArgs::Bool),
         }
     }
+    /// Create a new `ArgumentRead` operation for a 64-bit floating point return value
     pub fn new_f64(tag: impl Into<String>) -> Self {
         Self {
             tag: tag.into(),
@@ -251,6 +248,8 @@ impl ArgumentReadOp {
             args: ReadArgs::Simple(SimpleArgs::F64),
         }
     }
+    /// Convert this `ArgumentRead` operation to one that reads an array of the same type, with the
+    /// given size.
     pub fn array_op(mut self, size: u64) -> Self {
         match &mut self.args {
             ReadArgs::Simple(s_args) => {
@@ -323,7 +322,9 @@ impl TryFrom<&OpType> for ArgumentReadOpDef {
     }
 }
 
+/// A builder trait for adding `ArgumentReadOp`s to a dataflow.
 pub trait ArgumentReadOpBuilder: Dataflow {
+    /// Add an `ArgumentReadOp` to this dataflow, returning the output wire of the operation.
     fn add_read(&mut self, op: ArgumentReadOp) -> Result<Wire, BuildError> {
         let handle = self.add_dataflow_op(op, [])?;
         debug_assert!(handle.outputs().len() == 1);
@@ -384,17 +385,12 @@ impl HasConcrete for ArgumentReadOpDef {
     }
 }
 
-#[derive(Debug, Display, Error, From)]
-#[non_exhaustive]
-pub enum ArgumentReadError {
-    #[display("Unsupported parameter type")]
-    UnsupportedParamType(),
-}
-
+/// Map a HUGR type to an `ArgumentReadOp` that can read an argument of that type at runtime.
+///
+/// TODO: This function requires a lot of attention. It feels like
+/// it must be the wrong way to do it, but the right way isn't clear
+/// to me.
 pub fn map_type(hugr_type: &Type, idx: usize) -> Result<ArgumentReadOp> {
-    // TODO: This function requires a lot of attention. It feels like
-    // it must be the wrong way to do it, but the right way isn't clear
-    // to me.
     match &**hugr_type {
         Term::ExtensionType(custom) => {
             if *custom.extension() == int_types::EXTENSION_ID {
@@ -533,16 +529,8 @@ pub fn wrap_entrypoint_with_arguments(hugr: &mut Hugr) -> Result<()> {
 
 #[cfg(test)]
 pub(crate) mod test {
-    use hugr::HugrView;
-    use hugr::{
-        builder::{DFGBuilder, Dataflow, DataflowHugr},
-        ops::OpType,
-        std_extensions::collections::array::array_type,
-        types::Signature,
-    };
-
-    use super::*;
-
     #[test]
-    fn test_entrypoint_args() {}
+    fn test_entrypoint_args() {
+        // TODO
+    }
 }
