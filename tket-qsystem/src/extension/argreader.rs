@@ -2,11 +2,10 @@
 use std::sync::{Arc, Weak};
 
 use hugr::{
-    Extension, Wire, HugrView,
-    builder::{BuildError, Dataflow, FunctionBuilder, DataflowSubContainer},
+    Extension, HugrView, Wire,
+    builder::{BuildError, Dataflow, DataflowSubContainer, FunctionBuilder},
     extension::{
-        OpDef,
-        ExtensionId, SignatureError, SignatureFunc, Version,
+        ExtensionId, OpDef, SignatureError, SignatureFunc, Version,
         prelude::bool_t,
         simple_op::{
             HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
@@ -14,23 +13,23 @@ use hugr::{
         },
     },
     hugr::{Hugr, hugrmut::HugrMut},
-    ops::{self, OpType, OpName},
     ops::handle::NodeHandle,
+    ops::{self, OpName, OpType},
     std_extensions::{
         arithmetic::{
             float_types::{self, float64_type},
             int_types::{self, LOG_WIDTH_TYPE_PARAM, int_type},
         },
-        collections::borrow_array
+        collections::borrow_array,
     },
-    types::{Term, Signature, PolyFuncTypeRV, TypeArg, Type, type_param::TypeParam, SumType},
+    types::{PolyFuncTypeRV, Signature, SumType, Term, Type, TypeArg, type_param::TypeParam},
 };
 
 use anyhow::{Result, bail};
+use derive_more::{Display, Error, From};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use strum::{EnumIter, EnumString, IntoStaticStr};
-use derive_more::{Display, Error, From};
 
 /// The ID of the `tket.argreader` extension.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("tket.argreader");
@@ -63,7 +62,7 @@ lazy_static! {
 )]
 #[non_exhaustive]
 /// Runtime argument reading operations
-pub enum ArgumentReadOpDef{
+pub enum ArgumentReadOpDef {
     /// Read a boolean argument
     Bool,
     /// Read a signed integer argument
@@ -86,15 +85,15 @@ fn borrow_array_type(inner_t: Type) -> Type {
     borrow_array::borrow_array_type_parametric(
         TypeArg::new_var_use(1, TypeParam::max_nat_kind()),
         inner_t,
-    ).unwrap()
+    )
+    .unwrap()
 }
-
 
 fn int_tv(int_tv_idx: usize) -> Type {
     int_type(TypeArg::new_var_use(int_tv_idx, LOG_WIDTH_TYPE_PARAM))
 }
 
-impl ArgumentReadOpDef{
+impl ArgumentReadOpDef {
     pub fn output_type(&self) -> Type {
         match self {
             Self::Bool => bool_t(),
@@ -126,10 +125,7 @@ impl ArgumentReadOpDef{
         }
     }
     pub fn is_scalar_type(&self) -> bool {
-        matches!(
-            self,
-            Self::Bool | Self::Int | Self::UInt | Self::F64
-        )
+        matches!(self, Self::Bool | Self::Int | Self::UInt | Self::F64)
     }
     pub fn is_array_type(&self) -> bool {
         matches!(
@@ -159,7 +155,8 @@ impl ArgumentReadOpDef{
             Self::ArrInt => "Read an array of i64 arguments",
             Self::ArrUInt => "Read an array of u64 arguments",
             Self::ArrF64 => "Read an array of f64 arguments",
-        }.to_string()
+        }
+        .to_string()
     }
 }
 impl MakeOpDef for ArgumentReadOpDef {
@@ -173,12 +170,13 @@ impl MakeOpDef for ArgumentReadOpDef {
             Self::Bool | Self::F64 => vec![TypeParam::StringKind],
             Self::Int | Self::UInt => vec![TypeParam::StringKind, LOG_WIDTH_TYPE_PARAM],
             Self::ArrBool | Self::ArrF64 => vec![TypeParam::StringKind, TypeParam::max_nat_kind()],
-            Self::ArrInt | Self::ArrUInt => vec![TypeParam::StringKind, LOG_WIDTH_TYPE_PARAM, TypeParam::max_nat_kind()],
+            Self::ArrInt | Self::ArrUInt => vec![
+                TypeParam::StringKind,
+                LOG_WIDTH_TYPE_PARAM,
+                TypeParam::max_nat_kind(),
+            ],
         };
-        PolyFuncTypeRV::new(
-            params,
-            Signature::new(vec![], vec![self.output_type()]),
-        ).into()
+        PolyFuncTypeRV::new(params, Signature::new(vec![], vec![self.output_type()])).into()
     }
 
     fn from_def(op_def: &OpDef) -> Result<Self, hugr::extension::simple_op::OpLoadError> {
@@ -286,10 +284,12 @@ impl MakeExtensionOp for ArgumentReadOp {
     fn type_args(&self) -> Vec<TypeArg> {
         let mut type_args = vec![self.tag.clone().into()];
         match self.args {
-            ReadArgs::Simple(SimpleArgs::Int(width)) | ReadArgs::Simple(SimpleArgs::UInt(width)) => {
+            ReadArgs::Simple(SimpleArgs::Int(width))
+            | ReadArgs::Simple(SimpleArgs::UInt(width)) => {
                 type_args.push(TypeArg::BoundedNat(width as u64));
             }
-            ReadArgs::Array(SimpleArgs::Int(width), size) | ReadArgs::Array(SimpleArgs::UInt(width), size) => {
+            ReadArgs::Array(SimpleArgs::Int(width), size)
+            | ReadArgs::Array(SimpleArgs::UInt(width), size) => {
                 type_args.push(TypeArg::BoundedNat(size));
                 type_args.push(TypeArg::BoundedNat(width as u64));
             }
@@ -341,13 +341,9 @@ impl HasConcrete for ArgumentReadOpDef {
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         match (self, type_args) {
-            (Self::Bool, [TypeArg::String(arg)]) => {
-                Ok(ArgumentReadOp::new_bool(arg))
-            }
+            (Self::Bool, [TypeArg::String(arg)]) => Ok(ArgumentReadOp::new_bool(arg)),
 
-            (Self::F64, [TypeArg::String(arg)]) => {
-                Ok(ArgumentReadOp::new_f64(arg))
-            }
+            (Self::F64, [TypeArg::String(arg)]) => Ok(ArgumentReadOp::new_f64(arg)),
 
             (Self::Int, [TypeArg::String(arg), TypeArg::BoundedNat(log_width)]) => {
                 Ok(ArgumentReadOp::new_int(arg, *log_width as u8))
@@ -372,9 +368,7 @@ impl HasConcrete for ArgumentReadOpDef {
                     TypeArg::BoundedNat(size),
                     TypeArg::BoundedNat(log_width),
                 ],
-            ) => {
-                Ok(ArgumentReadOp::new_int(arg, *log_width as u8).array_op(*size))
-            }
+            ) => Ok(ArgumentReadOp::new_int(arg, *log_width as u8).array_op(*size)),
 
             (
                 Self::ArrUInt,
@@ -383,15 +377,12 @@ impl HasConcrete for ArgumentReadOpDef {
                     TypeArg::BoundedNat(size),
                     TypeArg::BoundedNat(log_width),
                 ],
-            ) => {
-                Ok(ArgumentReadOp::new_uint(arg, *log_width as u8).array_op(*size))
-            }
+            ) => Ok(ArgumentReadOp::new_uint(arg, *log_width as u8).array_op(*size)),
 
             _ => Err(SignatureError::InvalidTypeArgs.into()),
         }
     }
 }
-
 
 #[derive(Debug, Display, Error, From)]
 #[non_exhaustive]
@@ -416,64 +407,70 @@ pub fn map_type(hugr_type: &Type, idx: usize) -> Result<ArgumentReadOp> {
                 let log_width: u64 = *log_width;
                 let log_width = log_width as u8;
                 Ok(ArgumentReadOp::new_int(format!("arg_{idx}"), log_width))
-            }else if *custom.extension() == float_types::EXTENSION_ID {
+            } else if *custom.extension() == float_types::EXTENSION_ID {
                 if custom.name() != "float64" {
                     bail!("Can only handle float64");
                 }
                 Ok(ArgumentReadOp::new_f64(format!("arg_{idx}")))
-            }else if *custom.extension() == borrow_array::EXTENSION_ID {
+            } else if *custom.extension() == borrow_array::EXTENSION_ID {
                 if custom.name() != "borrow_array" {
                     bail!("Can only handle borrow_array");
                 }
                 match custom.args() {
-                    [TypeArg::BoundedNat(n_elements), element_type] => {
-                        match element_type {
-                            Term::ExtensionType(elem) => {
-                                if *elem.extension() == int_types::EXTENSION_ID {
-                                    if elem.name() != "int" {
-                                        bail!("Can only handle int element types in borrow array");
-                                    }
-                                    let [TypeArg::BoundedNat(log_width)] = elem.args() else {
-                                        bail!("Expected a log width type argument for int element type in borrow array");
-                                    };
-                                    let log_width: u64 = *log_width;
-                                    let log_width = log_width as u8;
-                                    Ok(ArgumentReadOp::new_int(format!("arg_{idx}"), log_width).array_op(*n_elements))
-                                } else if *elem.extension() == float_types::EXTENSION_ID {
-                                    if elem.name() != "float64" {
-                                        bail!("Can only handle float64 element types in borrow array");
-                                    }
-                                    Ok(ArgumentReadOp::new_f64(format!("arg_{idx}")).array_op(*n_elements))
-                                } else {
-                                    bail!("Unsupported element type in borrow array: {:?}", elem);
+                    [TypeArg::BoundedNat(n_elements), element_type] => match element_type {
+                        Term::ExtensionType(elem) => {
+                            if *elem.extension() == int_types::EXTENSION_ID {
+                                if elem.name() != "int" {
+                                    bail!("Can only handle int element types in borrow array");
                                 }
-                            }
-                            Term::SumType(st) => match st {
-                                SumType::Unit { size: 2 } => {
-                                    Ok(ArgumentReadOp::new_bool(format!("arg_{idx}")).array_op(*n_elements))
+                                let [TypeArg::BoundedNat(log_width)] = elem.args() else {
+                                    bail!(
+                                        "Expected a log width type argument for int element type in borrow array"
+                                    );
+                                };
+                                let log_width: u64 = *log_width;
+                                let log_width = log_width as u8;
+                                Ok(ArgumentReadOp::new_int(format!("arg_{idx}"), log_width)
+                                    .array_op(*n_elements))
+                            } else if *elem.extension() == float_types::EXTENSION_ID {
+                                if elem.name() != "float64" {
+                                    bail!("Can only handle float64 element types in borrow array");
                                 }
-                                _ => bail!("Unsupported element type in borrow array: {:?}", st)
+                                Ok(ArgumentReadOp::new_f64(format!("arg_{idx}"))
+                                    .array_op(*n_elements))
+                            } else {
+                                bail!("Unsupported element type in borrow array: {:?}", elem);
                             }
-                            _ => bail!("Unsupported element type in borrow array: {:?}", element_type)
                         }
-
-                    }
+                        Term::SumType(st) => match st {
+                            SumType::Unit { size: 2 } => {
+                                Ok(ArgumentReadOp::new_bool(format!("arg_{idx}"))
+                                    .array_op(*n_elements))
+                            }
+                            _ => bail!("Unsupported element type in borrow array: {:?}", st),
+                        },
+                        _ => bail!(
+                            "Unsupported element type in borrow array: {:?}",
+                            element_type
+                        ),
+                    },
                     _ => {
-                        bail!("Expected a borrow_array with a bounded nat and an element type as arguments");
+                        bail!(
+                            "Expected a borrow_array with a bounded nat and an element type as arguments"
+                        );
                     }
                 }
             } else {
                 bail!("Unsupported extension type: {:?}", custom.extension());
             }
-        },
-        Term::SumType(st) => match st{
-            SumType::Unit{ size: 2 } => Ok(ArgumentReadOp::new_bool(format!("arg_{idx}"))),
+        }
+        Term::SumType(st) => match st {
+            SumType::Unit { size: 2 } => Ok(ArgumentReadOp::new_bool(format!("arg_{idx}"))),
             _ => bail!("Unsupported sum type: {:?}", st),
         },
         _ => bail!("Unsupported type: {:?}", hugr_type),
     }
 }
-
 
 /// If the incoming HUGR has an entrypoint function with arguments, this function
 /// replaces the entrypoint with one that takes no arguments, instead reading them
@@ -486,9 +483,7 @@ pub fn wrap_entrypoint_with_arguments(hugr: &mut Hugr) -> Result<()> {
     let original_entrypoint = hugr.entrypoint();
 
     let original_sig = {
-        let Some(original_func_defn) =
-            hugr.get_optype(original_entrypoint).as_func_defn()
-        else {
+        let Some(original_func_defn) = hugr.get_optype(original_entrypoint).as_func_defn() else {
             bail!("Entrypoint is not a function");
         };
 
@@ -498,8 +493,8 @@ pub fn wrap_entrypoint_with_arguments(hugr: &mut Hugr) -> Result<()> {
     // The wrapper takes no ordinary inputs; it reads them via your ArgumentReadOp-like ops.
     // It returns exactly what the original entrypoint returns.
     let wrapper_sig = Signature::new(
-        [],                                      // wrapper inputs
-        original_sig.body().output().clone(),   // wrapper outputs
+        [],                                   // wrapper inputs
+        original_sig.body().output().clone(), // wrapper outputs
     );
 
     // Direct Call has a static/function input after its normal dataflow inputs.
@@ -513,11 +508,8 @@ pub fn wrap_entrypoint_with_arguments(hugr: &mut Hugr) -> Result<()> {
     };
 
     let wrapper_node = {
-        let mut f_build = FunctionBuilder::with_hugr(
-            &mut *hugr,
-            "__wrapped_entrypoint",
-            wrapper_sig,
-        )?;
+        let mut f_build =
+            FunctionBuilder::with_hugr(&mut *hugr, "__wrapped_entrypoint", wrapper_sig)?;
 
         let mut call_inputs = Vec::new();
 
@@ -539,7 +531,6 @@ pub fn wrap_entrypoint_with_arguments(hugr: &mut Hugr) -> Result<()> {
     Ok(())
 }
 
-
 #[cfg(test)]
 pub(crate) mod test {
     use hugr::HugrView;
@@ -553,6 +544,5 @@ pub(crate) mod test {
     use super::*;
 
     #[test]
-    fn test_entrypoint_args() {
-    }
+    fn test_entrypoint_args() {}
 }

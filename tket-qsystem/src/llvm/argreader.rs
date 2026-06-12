@@ -11,7 +11,7 @@ use hugr::llvm::inkwell;
 use inkwell::AddressSpace;
 use inkwell::builder::Builder;
 use inkwell::context::Context;
-use inkwell::types::{FloatType, IntType, PointerType, VoidType, BasicType};
+use inkwell::types::{BasicType, FloatType, IntType, PointerType, VoidType};
 use inkwell::values::FunctionValue;
 use tket::hugr::extension::simple_op::MakeExtensionOp;
 use tket::hugr::ops::ExtensionOp;
@@ -26,7 +26,9 @@ pub struct ArgReaderCodegenExtension<BAC: BorrowArrayCodegen> {
 impl<BAC: BorrowArrayCodegen> ArgReaderCodegenExtension<BAC> {
     /// Creates a new [ArgReaderCodegenExtension] with specified array lowering.
     pub const fn new(borrow_array_codegen: BAC) -> Self {
-        Self { borrow_array_codegen }
+        Self {
+            borrow_array_codegen,
+        }
     }
 }
 
@@ -40,10 +42,7 @@ impl<BAC: BorrowArrayCodegen + Clone> CodegenExtension for ArgReaderCodegenExten
     {
         builder.simple_extension_op::<ArgumentReadOpDef>(move |context, args, _op| {
             let op = ArgumentReadOp::from_extension_op(args.node().as_ref())?;
-            ArgReaderEmitter(
-                context,
-                self.borrow_array_codegen.clone(),
-            ).emit(args, &op)
+            ArgReaderEmitter(context, self.borrow_array_codegen.clone()).emit(args, &op)
         })
     }
 }
@@ -53,7 +52,9 @@ struct ArgReaderEmitter<'c, 'd, 'e, H: HugrView<Node = Node>, BAC: BorrowArrayCo
     BAC,
 );
 
-impl<'c, H: HugrView<Node = Node>, BAC: BorrowArrayCodegen + Clone> ArgReaderEmitter<'c, '_, '_, H, BAC> {
+impl<'c, H: HugrView<Node = Node>, BAC: BorrowArrayCodegen + Clone>
+    ArgReaderEmitter<'c, '_, '_, H, BAC>
+{
     fn iw_context(&self) -> &'c Context {
         self.0.typing_session().iw_context()
     }
@@ -82,10 +83,7 @@ impl<'c, H: HugrView<Node = Node>, BAC: BorrowArrayCodegen + Clone> ArgReaderEmi
         self.0.builder()
     }
 
-    pub fn get_argreader_func(
-        &self,
-        op: &ArgumentReadOp,
-    ) -> Result<FunctionValue<'c>> {
+    pub fn get_argreader_func(&self, op: &ArgumentReadOp) -> Result<FunctionValue<'c>> {
         let (fn_type, func_name) = match op.read_op {
             ArgumentReadOpDef::Bool => (
                 self.bool_t().fn_type(&[self.ptr_t().into()], false),
@@ -152,7 +150,11 @@ impl<'c, H: HugrView<Node = Node>, BAC: BorrowArrayCodegen + Clone> ArgReaderEmi
     }
 
     /// Function to help lower the tket result extension.
-    fn emit(&mut self, args: EmitOpArgs<'c, '_, ExtensionOp, H>, op: &ArgumentReadOp) -> Result<()> {
+    fn emit(
+        &mut self,
+        args: EmitOpArgs<'c, '_, ExtensionOp, H>,
+        op: &ArgumentReadOp,
+    ) -> Result<()> {
         let argread_fn = self.get_argreader_func(op)?;
         let op = ArgumentReadOp::from_extension_op(args.node().as_ref())?;
         let tag = op.tag;
@@ -161,65 +163,42 @@ impl<'c, H: HugrView<Node = Node>, BAC: BorrowArrayCodegen + Clone> ArgReaderEmi
         }
         let tag_ptr = emit_global_string(self.0, tag, "argument_", "")?;
         let result = match op.read_op {
-            ArgumentReadOpDef::Bool => {
-                self.builder().build_call(
-                    argread_fn,
-                    &[tag_ptr.into()],
-                    "read_arg_bool",
-                )?
+            ArgumentReadOpDef::Bool => self
+                .builder()
+                .build_call(argread_fn, &[tag_ptr.into()], "read_arg_bool")?
                 .try_as_basic_value()
-                .unwrap_basic()
-            }
-            ArgumentReadOpDef::Int => {
-                self.builder().build_call(
-                    argread_fn,
-                    &[tag_ptr.into()],
-                    "read_arg_int",
-                )?
+                .unwrap_basic(),
+            ArgumentReadOpDef::Int => self
+                .builder()
+                .build_call(argread_fn, &[tag_ptr.into()], "read_arg_int")?
                 .try_as_basic_value()
-                .unwrap_basic()
-            }
-            ArgumentReadOpDef::UInt => {
-                self.builder().build_call(
-                    argread_fn,
-                    &[tag_ptr.into()],
-                    "read_arg_uint",
-                )?
+                .unwrap_basic(),
+            ArgumentReadOpDef::UInt => self
+                .builder()
+                .build_call(argread_fn, &[tag_ptr.into()], "read_arg_uint")?
                 .try_as_basic_value()
-                .unwrap_basic()
-            }
-            ArgumentReadOpDef::F64 => {
-                self.builder().build_call(
-                    argread_fn,
-                    &[tag_ptr.into()],
-                    "read_arg_f64",
-                )?
+                .unwrap_basic(),
+            ArgumentReadOpDef::F64 => self
+                .builder()
+                .build_call(argread_fn, &[tag_ptr.into()], "read_arg_f64")?
                 .try_as_basic_value()
-                .unwrap_basic()
-            }
+                .unwrap_basic(),
             ArgumentReadOpDef::ArrBool => {
                 let ReadArgs::Array(_, len) = op.args else {
                     bail!("Expected array read args for ArrBool");
                 };
-                let len: u32 = len.try_into().map_err(|_| anyhow!("Array length exceeds u32::MAX"))?;
+                let len: u32 = len
+                    .try_into()
+                    .map_err(|_| anyhow!("Array length exceeds u32::MAX"))?;
                 let elem_ty = self.bool_t().as_basic_type_enum();
                 let len_val = self.i64_t().const_int(len as u64, false);
 
-                let (elems_ptr, barray_value) = borrow_array::build_barray_alloc(
-                    self.0,
-                    &self.1,
-                    elem_ty,
-                    len as u64,
-                    false,
-                )?;
+                let (elems_ptr, barray_value) =
+                    borrow_array::build_barray_alloc(self.0, &self.1, elem_ty, len as u64, false)?;
 
                 self.builder().build_call(
                     argread_fn,
-                    &[
-                        tag_ptr.into(),
-                        elems_ptr.into(),
-                        len_val.into(),
-                    ],
+                    &[tag_ptr.into(), elems_ptr.into(), len_val.into()],
                     "read_arg_bool_array",
                 )?;
 
@@ -229,25 +208,18 @@ impl<'c, H: HugrView<Node = Node>, BAC: BorrowArrayCodegen + Clone> ArgReaderEmi
                 let ReadArgs::Array(_, len) = op.args else {
                     bail!("Expected array read args for ArrInt");
                 };
-                let len: u32 = len.try_into().map_err(|_| anyhow!("Array length exceeds u32::MAX"))?;
+                let len: u32 = len
+                    .try_into()
+                    .map_err(|_| anyhow!("Array length exceeds u32::MAX"))?;
                 let elem_ty = self.i64_t().as_basic_type_enum();
                 let len_val = self.i64_t().const_int(len as u64, false);
 
-                let (elems_ptr, barray_value) = borrow_array::build_barray_alloc(
-                    self.0,
-                    &self.1,
-                    elem_ty,
-                    len as u64,
-                    false,
-                )?;
+                let (elems_ptr, barray_value) =
+                    borrow_array::build_barray_alloc(self.0, &self.1, elem_ty, len as u64, false)?;
 
                 self.builder().build_call(
                     argread_fn,
-                    &[
-                        tag_ptr.into(),
-                        elems_ptr.into(),
-                        len_val.into(),
-                    ],
+                    &[tag_ptr.into(), elems_ptr.into(), len_val.into()],
                     "read_arg_int_array",
                 )?;
                 barray_value.into()
@@ -256,25 +228,18 @@ impl<'c, H: HugrView<Node = Node>, BAC: BorrowArrayCodegen + Clone> ArgReaderEmi
                 let ReadArgs::Array(_, len) = op.args else {
                     bail!("Expected array read args for ArrUInt");
                 };
-                let len: u32 = len.try_into().map_err(|_| anyhow!("Array length exceeds u32::MAX"))?;
+                let len: u32 = len
+                    .try_into()
+                    .map_err(|_| anyhow!("Array length exceeds u32::MAX"))?;
                 let elem_ty = self.i64_t().as_basic_type_enum();
                 let len_val = self.i64_t().const_int(len as u64, false);
 
-                let (elems_ptr, barray_value) = borrow_array::build_barray_alloc(
-                    self.0,
-                    &self.1,
-                    elem_ty,
-                    len as u64,
-                    false,
-                )?;
+                let (elems_ptr, barray_value) =
+                    borrow_array::build_barray_alloc(self.0, &self.1, elem_ty, len as u64, false)?;
 
                 self.builder().build_call(
                     argread_fn,
-                    &[
-                        tag_ptr.into(),
-                        elems_ptr.into(),
-                        len_val.into(),
-                    ],
+                    &[tag_ptr.into(), elems_ptr.into(), len_val.into()],
                     "read_arg_uint_array",
                 )?;
                 barray_value.into()
@@ -283,25 +248,18 @@ impl<'c, H: HugrView<Node = Node>, BAC: BorrowArrayCodegen + Clone> ArgReaderEmi
                 let ReadArgs::Array(_, len) = op.args else {
                     bail!("Expected array read args for ArrF64");
                 };
-                let len: u32 = len.try_into().map_err(|_| anyhow!("Array length exceeds u32::MAX"))?;
+                let len: u32 = len
+                    .try_into()
+                    .map_err(|_| anyhow!("Array length exceeds u32::MAX"))?;
                 let elem_ty = self.f64_t().as_basic_type_enum();
                 let len_val = self.i64_t().const_int(len as u64, false);
 
-                let (elems_ptr, barray_value) = borrow_array::build_barray_alloc(
-                    self.0,
-                    &self.1,
-                    elem_ty,
-                    len as u64,
-                    false,
-                )?;
+                let (elems_ptr, barray_value) =
+                    borrow_array::build_barray_alloc(self.0, &self.1, elem_ty, len as u64, false)?;
 
                 self.builder().build_call(
                     argread_fn,
-                    &[
-                        tag_ptr.into(),
-                        elems_ptr.into(),
-                        len_val.into(),
-                    ],
+                    &[tag_ptr.into(), elems_ptr.into(), len_val.into()],
                     "read_arg_f64_array",
                 )?;
                 barray_value.into()
