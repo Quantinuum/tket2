@@ -17,6 +17,7 @@ use hugr_core::builder::{
 };
 use hugr_core::extension::{ExtensionId, OpDef, SignatureError, TypeDef};
 use hugr_core::hugr::hugrmut::HugrMut;
+use hugr_core::hugr::internal::HugrInternals;
 use hugr_core::ops::constant::{OpaqueValue, Sum};
 use hugr_core::ops::handle::{DataflowOpID, FuncID, NodeHandle};
 use hugr_core::ops::{
@@ -230,6 +231,27 @@ impl NodeTemplate {
             }
         }
         rt.process_subtree_opts(hugr, n, opts)?;
+        // When n becomes a container, propagate its metadata to all inner
+        // Call and ExtensionOp nodes. The container itself is not a leaf op
+        // and backends will not read location metadata from it.
+        if hugr.children(n).next().is_some() {
+            let meta = hugr.node_metadata_map(n).clone();
+            if !meta.is_empty() {
+                let inner_ops: Vec<Node> = hugr
+                    .descendants(n)
+                    .filter(|&d| {
+                        matches!(hugr.get_optype(d), OpType::Call(_) | OpType::ExtensionOp(_))
+                    })
+                    .collect();
+                for op_node in inner_ops {
+                    for (key, value) in &meta {
+                        if !hugr.node_metadata_map(op_node).contains_key(key) {
+                            hugr.set_metadata_any(op_node, key, value.clone());
+                        }
+                    }
+                }
+            }
+        }
         Ok(())
     }
 
@@ -1708,13 +1730,12 @@ mod test {
         );
     }
 
-    /// Reproducer for <https://github.com/Quantinuum/tket2/issues/1651>.
+    /// Regression test for <https://github.com/Quantinuum/tket2/issues/1651>.
     ///
     /// When the replacement is a [`NodeTemplate::CompoundOp`] whose entrypoint is a
-    /// container (DFG), the debug location is left on the container and not propagated
-    /// to the `ExtensionOp` nodes inside it.
+    /// container (DFG), the debug location should be propagated to the `ExtensionOp`
+    /// nodes inside it.
     #[test]
-    #[should_panic]
     fn compound_op_propagates_debug_location_to_inner_extension_ops() {
         use hugr_core::metadata::LocationRecord;
         use hugr_core::ops::OpType;
@@ -1760,14 +1781,12 @@ mod test {
         }
     }
 
-    /// Reproducer for <https://github.com/Quantinuum/tket2/issues/1651>.
+    /// Regression test for <https://github.com/Quantinuum/tket2/issues/1651>.
     ///
     /// When the replacement is a [`NodeTemplate::LinkedHugr`] whose entrypoint is
-    /// a container (DFG), the debug location is left on the container and not
-    /// propagated to the `ExtensionOp` nodes inside it — the same bug as with
-    /// [`NodeTemplate::CompoundOp`].
+    /// a container (DFG), the debug location should be propagated to the `ExtensionOp`
+    /// nodes inside it.
     #[test]
-    #[should_panic]
     fn linked_hugr_propagates_debug_location_into_container() {
         use hugr_core::hugr::linking::NameLinkingPolicy;
         use hugr_core::metadata::LocationRecord;
