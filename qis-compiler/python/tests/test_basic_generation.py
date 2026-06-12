@@ -61,9 +61,15 @@ def test_unsupported_pytket_ops() -> None:
 
 def normalize_ir_snapshot(ir: str) -> str:
     """Remove unstable or localized output from IR snapshots."""
-    # remove debug file entries with absolute paths
-    new_lines = filter(lambda line: "DIFile" not in line, ir.split("\n"))
-    return "\n".join(new_lines)
+    import re
+    reg = re.compile(r'(filename|directory):\s*"[^"]*"')
+    result = ""
+    for line in ir.split("\n"):
+        if "DIFile" in line and "COMPILER_GENERATED_CODE" not in line:
+            # empty the quotes
+            line = reg.sub(r'\1: "/stripped/for/reproducibility"', line)
+        result += line + "\n"
+    return result.strip()
 
 
 @pytest.mark.parametrize(
@@ -90,8 +96,7 @@ def test_llvm(
     ir = compile_to_llvm_ir(
         hugr_envelope, target_triple=target_triple, platform=platform, emit_debug=True
     )
-    #TODO uncomment this, I need to keep debug info in for testing
-    #ir = normalize_ir_snapshot(ir)
+    ir = normalize_ir_snapshot(ir)
     snapshot.assert_match(ir, f"{hugr_file}_{target_triple}_{platform}")
 
 

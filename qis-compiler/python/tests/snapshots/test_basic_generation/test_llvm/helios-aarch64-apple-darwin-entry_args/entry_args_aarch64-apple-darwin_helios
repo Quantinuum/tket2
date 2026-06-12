@@ -369,10 +369,10 @@ attributes #2 = { mustprogress nocallback nofree nounwind willreturn memory(argm
 
 !0 = !{i32 2, !"Debug Info Version", i32 3}
 !1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "guppylang (guppylang-internals-v1.0.0-a3)-v1.0.0-a3", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "/home/jake/tket2/qis-compiler/python/tests/generate_hugrs.py", directory: "file:///home/jake/tket2/qis-compiler/python/tests")
+!2 = !DIFile(filename: "/stripped/for/reproducibility", directory: "/stripped/for/reproducibility")
 !3 = !{!"mainlib"}
 !4 = distinct !DISubprogram(name: "entry_args.<locals>.foo", linkageName: "__hugr__.__main__.entry_args.<locals>.foo.1", scope: null, file: !5, line: 247, type: !6, scopeLine: 248, spFlags: DISPFlagDefinition, unit: !1)
-!5 = !DIFile(filename: "/home/jake/tket2/qis-compiler/python/tests/generate_hugrs.py", directory: "")
+!5 = !DIFile(filename: "/stripped/for/reproducibility", directory: "/stripped/for/reproducibility")
 !6 = !DISubroutineType(types: !7)
 !7 = !{!8, !13, !14, !15, !10, !10, !10}
 !8 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ { ptr, ptr, i64 }, { ptr, ptr, i64 }, { ptr, ptr, i64 } }", file: !2, size: 576, align: 8, elements: !9)
