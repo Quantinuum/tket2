@@ -4,7 +4,7 @@
 #     "guppylang"
 # ]
 # [tool.uv.sources]
-# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", branch = "na/temporary-cherrypicked"}
+# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", branch = "na/temporary-flag-renamed"}
 # ///
 """Test the use of a higher-order function with loops inside modifiers"""
 
@@ -32,7 +32,7 @@ def apply_r(f: Unitary[[qubit, angle], None], q: array[qubit, 2], angle: angle) 
     f(q[1], angle)
 
 
-@guppy(control=True)
+@guppy(controllable=True)
 def apply_c(
     f: Controllable[[qubit], None], g: Unitary[[qubit, angle], None], q: qubit, b: bool
 ) -> None:

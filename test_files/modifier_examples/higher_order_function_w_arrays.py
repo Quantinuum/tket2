@@ -4,7 +4,7 @@
 #     "guppylang"
 # ]
 # [tool.uv.sources]
-# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", branch = "na/temporary-cherrypicked"}
+# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", branch = "na/temporary-flag-renamed"}
 # ///
 """Test the use of a higher-order function with arrays inside modifiers"""
 
@@ -30,7 +30,7 @@ def apply_2qubit_gate(f: Unitary[[qubit, qubit], None], q: array[qubit, 3]) -> N
     f(q[1], q[2])
 
 
-@guppy(dagger=True, control=True)
+@guppy(daggerable=True, controllable=True)
 def apply_dagger(f: Unitary[[qubit], None], q: array[qubit, 3]) -> None:
     f(q[1])
     apply_2qubit_gate(cx, q)

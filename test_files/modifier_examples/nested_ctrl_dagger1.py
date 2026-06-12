@@ -4,7 +4,7 @@
 #     "guppylang",
 # ]
 # [tool.uv.sources]
-# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", branch = "na/temporary-cherrypicked"}
+# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", branch = "na/temporary-flag-renamed"}
 # ///
 """Nested control and dagger modifiers in various combinations"""
 
