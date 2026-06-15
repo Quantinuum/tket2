@@ -31,7 +31,6 @@ pub use dead_funcs::{RemoveDeadFuncsError, RemoveDeadFuncsPass};
 
 // Force a topological order on nodes.
 pub mod force_order;
-pub use force_order::{force_order, force_order_by_key};
 
 // pub mod fast_todd;
 // pub use fast_todd::{apply_fast_todd, apply_fast_todd_to_pauli_graph, FastToddResult, FastToddError};
@@ -50,8 +49,6 @@ pub use inline_dfgs::InlineDFGsPass;
 // Inline function calls.
 pub mod inline_funcs;
 pub use inline_funcs::InlineFunctionsPass;
-#[expect(deprecated)]
-pub use inline_funcs::inline_acyclic;
 
 // Lower and replace operations.
 pub mod lower;

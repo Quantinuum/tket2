@@ -4,8 +4,9 @@ use std::str::FromStr;
 use hugr::{
     extension::SignatureFunc,
     std_extensions::arithmetic::int_types::int_type,
-    types::{FuncValueType, PolyFuncTypeRV, TypeBound, TypeRV, type_param::TypeParam},
+    types::{FuncValueType, PolyFuncTypeRV, TypeBound, type_param::TypeParam},
 };
+use hugr_core::types::{Type, TypeRowRV};
 
 /// Power modifier.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
@@ -39,26 +40,22 @@ impl ModifierPower {
     pub(crate) fn signature() -> SignatureFunc {
         PolyFuncTypeRV::new(
             [
-                TypeParam::new_list_type(TypeBound::Linear),
-                TypeParam::new_list_type(TypeBound::Copyable),
+                TypeParam::new_list_kind(TypeBound::Linear),
+                TypeParam::new_list_kind(TypeBound::Copyable),
             ],
             FuncValueType::new(
                 vec![
-                    TypeRV::new_function(FuncValueType::new(
-                        vec![
-                            TypeRV::new_row_var_use(0, TypeBound::Linear),
-                            TypeRV::new_row_var_use(1, TypeBound::Copyable),
-                        ],
-                        vec![TypeRV::new_row_var_use(0, TypeBound::Linear)],
+                    Type::new_function(FuncValueType::new(
+                        TypeRowRV::new_var_use(0, TypeBound::Linear)
+                            .concat(TypeRowRV::new_var_use(1, TypeBound::Copyable)),
+                        TypeRowRV::new_var_use(0, TypeBound::Linear),
                     )),
-                    int_type(6).into(),
+                    int_type(6),
                 ],
-                [TypeRV::new_function(FuncValueType::new(
-                    vec![
-                        TypeRV::new_row_var_use(0, TypeBound::Linear),
-                        TypeRV::new_row_var_use(1, TypeBound::Copyable),
-                    ],
-                    [TypeRV::new_row_var_use(0, TypeBound::Linear)],
+                [Type::new_function(FuncValueType::new(
+                    TypeRowRV::new_var_use(0, TypeBound::Linear)
+                        .concat(TypeRowRV::new_var_use(1, TypeBound::Copyable)),
+                    TypeRowRV::new_var_use(0, TypeBound::Linear),
                 ))],
             ),
         )

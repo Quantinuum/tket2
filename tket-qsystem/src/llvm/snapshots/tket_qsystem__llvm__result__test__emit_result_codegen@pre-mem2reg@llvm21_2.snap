@@ -7,7 +7,7 @@ source_filename = "test_context"
 
 @res_test_int.258C85C2.0 = private constant [18 x i8] c"\11USER:INT:test_int"
 
-define internal void @_hl.main.1(i64 %0) {
+define internal void @_hl.main.1(i64 %0) !dbg !3 {
 alloca_block:
   %"2_0" = alloca i64, align 8
   br label %entry_block
@@ -15,10 +15,23 @@ alloca_block:
 entry_block:                                      ; preds = %alloca_block
   store i64 %0, ptr %"2_0", align 4
   %"2_01" = load i64, ptr %"2_0", align 4
-  %tag_len = load i8, ptr @res_test_int.258C85C2.0, align 1
-  %tag_len2 = zext i8 %tag_len to i64
-  call void @print_int(ptr @res_test_int.258C85C2.0, i64 %tag_len2, i64 %"2_01")
+  %tag_len = load i8, ptr @res_test_int.258C85C2.0, align 1, !dbg !8
+  %tag_len2 = zext i8 %tag_len to i64, !dbg !8
+  call void @print_int(ptr @res_test_int.258C85C2.0, i64 %tag_len2, i64 %"2_01"), !dbg !8
   ret void
 }
 
 declare void @print_int(ptr, i64, i64)
+
+!llvm.module.flags = !{!0}
+!llvm.dbg.cu = !{!1}
+
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "hugr_llvm_test", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "/lPNzlV/ClAphFG/yrhvZs/eDgUn/eIVwAutKJHaZEPSZwPXPeycUvnujGxZ")
+!3 = distinct !DISubprogram(name: "_hl.main.1", linkageName: "_hl.main.1", scope: null, file: !4, line: 25254, type: !5, scopeLine: 25255, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
+!4 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "")
+!5 = !DISubroutineType(types: !6)
+!6 = !{null, !7}
+!7 = !DIBasicType(name: "i64", size: 64, encoding: DW_ATE_unsigned)
+!8 = !DILocation(line: 27062, column: 402, scope: !3)

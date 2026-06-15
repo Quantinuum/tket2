@@ -20,12 +20,11 @@ use hugr::{
         borrow_array::BorrowArray,
     },
     types::{
-        FuncValueType, PolyFuncTypeRV, SumType, Type, TypeArg, TypeBound, TypeRV,
-        type_param::TypeParam,
+        FuncValueType, PolyFuncTypeRV, SumType, Type, TypeArg, TypeBound, type_param::TypeParam,
     },
 };
+use hugr_core::types::TypeRowRV;
 use std::sync::{Arc, LazyLock};
-
 use type_unpack::{array_args, is_opt_of};
 
 /// Invert the signature of a function type.
@@ -37,17 +36,17 @@ fn invert_sig(sig: &PolyFuncTypeRV) -> PolyFuncTypeRV {
 fn generic_array_unpack_sig<AK: ArrayKind>() -> PolyFuncTypeRV {
     PolyFuncTypeRV::new(
         vec![
-            TypeParam::max_nat_type(),
-            TypeParam::RuntimeType(TypeBound::Linear),
-            TypeParam::new_list_type(TypeBound::Linear),
+            TypeParam::max_nat_kind(),
+            TypeParam::TypeKind(TypeBound::Linear),
+            TypeParam::new_list_kind(TypeBound::Linear),
         ],
         FuncValueType::new(
             [AK::ty_parametric(
-                TypeArg::new_var_use(0, TypeParam::max_nat_type()),
+                TypeArg::new_var_use(0, TypeParam::max_nat_kind()),
                 Type::new_var_use(1, TypeBound::Linear),
             )
             .unwrap()],
-            [TypeRV::new_row_var_use(2, TypeBound::Linear)],
+            TypeRowRV::new_var_use(2, TypeBound::Linear),
         ),
     )
 }
@@ -93,15 +92,12 @@ static TEMP_UNPACK_EXT: LazyLock<Arc<Extension>> = LazyLock::new(|| {
         |ext, ext_ref| {
             // Generic option unwrap/tag operations
             let opt_unwrap_sig = PolyFuncTypeRV::new(
-                vec![TypeParam::RuntimeType(TypeBound::Linear)],
+                vec![TypeParam::TypeKind(TypeBound::Linear)],
                 FuncValueType::new(
-                    hugr::types::TypeRow::from(vec![Type::from(
-                        hugr::extension::prelude::option_type([Type::new_var_use(
-                            0,
-                            TypeBound::Linear,
-                        )]),
-                    )]),
-                    hugr::types::TypeRow::from(vec![Type::new_var_use(0, TypeBound::Linear)]),
+                    [Type::from(hugr::extension::prelude::option_type([
+                        Type::new_var_use(0, TypeBound::Linear),
+                    ]))],
+                    [Type::new_var_use(0, TypeBound::Linear)],
                 ),
             );
             // produce option of element
@@ -123,16 +119,16 @@ static TEMP_UNPACK_EXT: LazyLock<Arc<Extension>> = LazyLock::new(|| {
             let tuple_unpack_sig = PolyFuncTypeRV::new(
                 vec![
                     // incoming tuple row
-                    TypeParam::new_list_type(TypeBound::Linear),
+                    TypeParam::new_list_kind(TypeBound::Linear),
                     // unpacked row
-                    TypeParam::new_list_type(TypeBound::Linear),
+                    TypeParam::new_list_kind(TypeBound::Linear),
                 ],
                 FuncValueType::new(
-                    [Type::new_tuple([TypeRV::new_row_var_use(
+                    [Type::new_tuple(TypeRowRV::new_var_use(
                         0,
                         TypeBound::Linear,
-                    )])],
-                    [TypeRV::new_row_var_use(1, TypeBound::Linear)],
+                    ))],
+                    TypeRowRV::new_var_use(1, TypeBound::Linear),
                 ),
             );
             // pack some wires into a tuple
@@ -472,7 +468,7 @@ impl UnpackContainerBuilder {
                         builder,
                         container_wire,
                         n,
-                        elem_ty,
+                        &elem_ty,
                         &$unpack_op,
                     );
                 }
@@ -519,7 +515,7 @@ impl UnpackContainerBuilder {
                         builder,
                         unpacked_wires,
                         n,
-                        elem_ty,
+                        &elem_ty,
                         &$repack_op,
                     );
                 }

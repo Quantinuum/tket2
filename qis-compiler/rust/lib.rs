@@ -5,7 +5,7 @@ use anyhow::{Result, anyhow};
 use hugr::envelope::EnvelopeConfig;
 use hugr::llvm::CodegenExtsBuilder;
 use hugr::llvm::custom::CodegenExtsMap;
-use hugr::llvm::emit::{EmitHugr, Namer};
+use hugr::llvm::emit::{EmitDebugInfo, EmitHugr, Namer, debug_info::DebugInfoContext};
 use hugr::llvm::extension::int::IntCodegenExtension;
 use hugr::llvm::utils::fat::FatExt as _;
 use inkwell::OptimizationLevel;
@@ -27,8 +27,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::vec::Vec;
 use std::{fs, str, vec};
-use tket::extension::rotation::ROTATION_EXTENSION;
-use tket::extension::{TKET_EXTENSION, TKET1_EXTENSION};
+use tket::extension::{TKET_EXTENSION, TKET1_EXTENSION, rotation};
 use tket::hugr::extension::{ExtensionRegistry, prelude};
 use tket::hugr::std_extensions::arithmetic::{
     conversions, float_ops, float_types, int_ops, int_types,
@@ -38,7 +37,10 @@ use tket::hugr::{self, llvm::inkwell};
 use tket::hugr::{Hugr, HugrView, Node};
 use tket::llvm::rotation::RotationCodegenExtension;
 use tket_qsystem::QSystemPass;
-use tket_qsystem::extension::{futures as qsystem_futures, qsystem, result as qsystem_result};
+use tket_qsystem::extension::{
+    futures as qsystem_futures, gpu as qsystem_gpu, qsystem, random as qsystem_random,
+    result as qsystem_result, utils as qsystem_utils, wasm as qsystem_wasm,
+};
 use tket_qsystem::llvm::array_utils::ArrayLowering;
 pub use tket_qsystem::llvm::futures::FuturesCodegenExtension;
 use tket_qsystem::llvm::{
@@ -72,13 +74,17 @@ static REGISTRY: std::sync::LazyLock<ExtensionRegistry> = std::sync::LazyLock::n
         qsystem_futures::EXTENSION.to_owned(),
         qsystem_result::EXTENSION.to_owned(),
         qsystem::EXTENSION.to_owned(),
-        ROTATION_EXTENSION.to_owned(),
+        qsystem::helios::EXTENSION.to_owned(),
+        qsystem::sol::EXTENSION.to_owned(),
+        qsystem_random::EXTENSION.to_owned(),
+        qsystem_utils::EXTENSION.to_owned(),
+        qsystem_gpu::EXTENSION.to_owned(),
+        qsystem_wasm::EXTENSION.to_owned(),
+        rotation::ROTATION_EXTENSION.to_owned(),
         TKET_EXTENSION.to_owned(),
         TKET1_EXTENSION.to_owned(),
-        tket::extension::bool::BOOL_EXTENSION.to_owned(),
         tket::extension::debug::DEBUG_EXTENSION.to_owned(),
-        tket_qsystem::extension::gpu::EXTENSION.to_owned(),
-        tket_qsystem::extension::wasm::EXTENSION.to_owned(),
+        tket::extension::guppy::GUPPY_EXTENSION.to_owned(),
     ])
 });
 
@@ -134,20 +140,21 @@ fn get_hugr_llvm_module<'c, 'hugr, 'a: 'c>(
     hugr: &'hugr Hugr,
     module_name: impl AsRef<str>,
     exts: Rc<CodegenExtsMap<'a, Hugr>>,
-) -> Result<Module<'c>> {
+    emit_debug: EmitDebugInfo,
+) -> Result<(Module<'c>, Option<DebugInfoContext<'c>>)> {
     let module = context.create_module(module_name.as_ref());
     let emit = EmitHugr::new(context, module, namer, exts);
     Ok(emit
-        .emit_module(hugr.try_fat(hugr.module_root()).unwrap())?
+        .emit_module(hugr.try_fat(hugr.module_root()).unwrap(), emit_debug)?
         .finish())
 }
 
-fn process_hugr(hugr: &mut Hugr) -> Result<()> {
-    QSystemPass::default().run(hugr)?;
+fn process_hugr(platform: qsystem::QSystemPlatform, hugr: &mut Hugr) -> Result<()> {
+    QSystemPass::defaults(platform).run(hugr)?;
     Ok(())
 }
 
-fn codegen_extensions() -> CodegenExtsMap<'static, Hugr> {
+fn codegen_extensions(platform: qsystem::QSystemPlatform) -> CodegenExtsMap<'static, Hugr> {
     use array::SeleneHeapArrayCodegen;
     let pcg = QISPreludeCodegen;
     CodegenExtsBuilder::default()
@@ -160,7 +167,7 @@ fn codegen_extensions() -> CodegenExtsMap<'static, Hugr> {
         .add_default_static_array_extensions()
         .add_borrow_array_extensions(array::SeleneHeapBorrowArrayCodegen(pcg.clone()))
         .add_extension(FuturesCodegenExtension)
-        .add_extension(QSystemCodegenExtension::from(pcg.clone()))
+        .add_extension(QSystemCodegenExtension::new(platform, pcg.clone()))
         .add_extension(RandomCodegenExtension)
         // Results use standard arrays.
         .add_extension(ResultsCodegenExtension::new(
@@ -181,8 +188,8 @@ fn get_module_with_std_exts<'c>(
     context: &'c Context,
     namer: Rc<Namer>,
     hugr: &'c mut Hugr,
-) -> Result<Module<'c>> {
-    process_hugr(hugr)?;
+) -> Result<(Module<'c>, Option<DebugInfoContext<'c>>)> {
+    process_hugr(args.platform, hugr)?;
     if let Some(filename) = &args.save_hugr {
         let file = fs::File::create(PathBuf::from(filename))?;
         hugr.store(file, EnvelopeConfig::text())?;
@@ -192,7 +199,8 @@ fn get_module_with_std_exts<'c>(
         namer,
         hugr,
         &args.name,
-        Rc::new(codegen_extensions()),
+        Rc::new(codegen_extensions(args.platform)),
+        args.emit_debug,
     )
 }
 
@@ -263,6 +271,7 @@ fn wrap_main<'c>(
     module: &Module<'c>,
     hugr_entry: &str,
     module_entry: &str,
+    mut maybe_di_ctx: Option<&mut DebugInfoContext<'c>>,
 ) -> Result<()> {
     let entry_ty = ctx.i64_type().fn_type(&[ctx.i64_type().into()], false);
     let entry_fun = module.add_function(module_entry, entry_ty, None);
@@ -272,6 +281,11 @@ fn wrap_main<'c>(
     let teardown = module.add_function("teardown", teardown_type, None);
     let block = ctx.append_basic_block(entry_fun, "entry");
     let builder = ctx.create_builder();
+
+    if let Some(ref mut di_ctx) = maybe_di_ctx {
+        di_ctx.set_compiler_generated(entry_fun, ctx, &builder)?;
+    }
+
     builder.position_at_end(block);
 
     let initial_tc = entry_fun.get_nth_param(0).unwrap().into_int_value();
@@ -288,6 +302,10 @@ fn wrap_main<'c>(
         .ok_or_else(|| anyhow!("get_tc has no return value"))?;
     // Return the initial time cursor
     let _ = builder.build_return(Some(&tc))?;
+
+    if let Some(di_ctx) = maybe_di_ctx {
+        di_ctx.unset_debug_loc(&builder)?;
+    }
     Ok(())
 }
 
@@ -303,6 +321,10 @@ struct CompileArgs<'a> {
     target_machine: &'a TargetMachine,
     /// Optimization level
     opt_level: OptimizationLevel,
+    /// Target quantum platform
+    platform: qsystem::QSystemPlatform,
+    /// Debug info configuration
+    emit_debug: EmitDebugInfo,
 }
 
 impl<'a> CompileArgs<'a> {
@@ -310,13 +332,28 @@ impl<'a> CompileArgs<'a> {
         name: &impl ToString,
         target_machine: &'a TargetMachine,
         opt_level: OptimizationLevel,
+        platform: qsystem::QSystemPlatform,
+        iw_ctx: &Context,
+        emit_debug: bool,
     ) -> Self {
+        let emit_debug_arg = if emit_debug {
+            EmitDebugInfo::Include {
+                ptr_bits: iw_ctx
+                    .ptr_sized_int_type(&target_machine.get_target_data(), Default::default())
+                    .get_bit_width(),
+            }
+        } else {
+            EmitDebugInfo::Exclude
+        };
+
         Self {
             entry: None,
             name: name.to_string(),
             save_hugr: None,
             target_machine,
             opt_level,
+            platform,
+            emit_debug: emit_debug_arg,
         }
     }
 }
@@ -341,9 +378,15 @@ fn compile<'c, 'hugr: 'c>(
     let module_entry = args.entry.as_ref().map_or(LLVM_MAIN, |x| x.as_ref());
 
     // Create a new LLVM module using hugr-llvm
-    let module = get_module_with_std_exts(args, ctx, namer, hugr)?;
+    let (module, mut maybe_di_ctx) = get_module_with_std_exts(args, ctx, namer, hugr)?;
 
-    wrap_main(ctx, &module, &hugr_entry, module_entry)?;
+    wrap_main(
+        ctx,
+        &module,
+        &hugr_entry,
+        module_entry,
+        maybe_di_ctx.as_mut(),
+    )?;
 
     let (data_layout, triple) = {
         (
@@ -367,7 +410,12 @@ fn compile<'c, 'hugr: 'c>(
             .add_global_metadata(key, &node)
             .map_err(ProcessErrs::from);
     }
+
+    if let Some(di_ctx) = maybe_di_ctx.take() {
+        di_ctx.finish();
+    }
     module.verify().map_err(Into::<ProcessErrs>::into)?;
+
     Ok(module)
 }
 
@@ -421,6 +469,17 @@ pub fn get_opt_level(opt_level: u32) -> Result<OptimizationLevel> {
     }
 }
 
+/// Get the QSystemPlatform from the given string. Can be "helios" or "sol".
+pub fn get_platform(platform: &str) -> Result<qsystem::QSystemPlatform> {
+    match platform.to_lowercase().as_str() {
+        "helios" => Ok(qsystem::QSystemPlatform::Helios),
+        "sol" => Ok(qsystem::QSystemPlatform::Sol),
+        _ => Err(anyhow!(
+            "Unknown platform: {platform} (expected 'helios' or 'sol')"
+        )),
+    }
+}
+
 // -------------------- Python bindings -----------------------
 mod exceptions {
     use pyo3::exceptions::PyException;
@@ -431,7 +490,8 @@ mod exceptions {
 mod selene_hugr_qis_compiler {
     use super::{
         CompileArgs, Context, Hugr, PyResult, compile, get_native_target_machine, get_opt_level,
-        get_target_machine_from_triple, public_bitcode_bytes, pyfunction, read_hugr_envelope,
+        get_platform, get_target_machine_from_triple, public_bitcode_bytes, pyfunction,
+        read_hugr_envelope,
     };
 
     #[pymodule_export]
@@ -449,11 +509,13 @@ mod selene_hugr_qis_compiler {
 
     /// Compile HUGR package to LLVM IR string
     #[pyfunction]
-    #[pyo3(signature = (pkg_bytes, opt_level=2, target_triple="native"))]
+    #[pyo3(signature = (pkg_bytes, *, opt_level=2, target_triple="native", platform="helios", emit_debug=false))]
     pub fn compile_to_llvm_ir(
         pkg_bytes: &[u8],
         opt_level: u32,
         target_triple: &str,
+        platform: &str,
+        emit_debug: bool,
     ) -> PyResult<String> {
         let opt = get_opt_level(opt_level)?;
         let target_machine = if target_triple == "native" {
@@ -461,10 +523,11 @@ mod selene_hugr_qis_compiler {
         } else {
             get_target_machine_from_triple(target_triple, opt)
         }?;
+        let platform = get_platform(platform)?;
         let mut hugr = py_read_envelope(pkg_bytes)?;
         let ctx = Context::create();
         let llvm_module = compile(
-            &CompileArgs::new(&"hugr", &target_machine, opt),
+            &CompileArgs::new(&"hugr", &target_machine, opt, platform, &ctx, emit_debug),
             &ctx,
             &mut hugr,
         )?;
@@ -473,11 +536,13 @@ mod selene_hugr_qis_compiler {
 
     /// Compile HUGR package to LLVM bitcode
     #[pyfunction]
-    #[pyo3(signature = (pkg_bytes, opt_level=2, target_triple="native"))]
+    #[pyo3(signature = (pkg_bytes, *, opt_level=2, target_triple="native", platform="helios", emit_debug=false))]
     pub fn compile_to_bitcode(
         pkg_bytes: &[u8],
         opt_level: u32,
         target_triple: &str,
+        platform: &str,
+        emit_debug: bool,
     ) -> PyResult<Vec<u8>> {
         let opt = get_opt_level(opt_level)?;
         let target_machine = if target_triple == "native" {
@@ -485,10 +550,11 @@ mod selene_hugr_qis_compiler {
         } else {
             get_target_machine_from_triple(target_triple, opt)
         }?;
+        let platform = get_platform(platform)?;
         let mut hugr = py_read_envelope(pkg_bytes)?;
         let ctx = Context::create();
         let llvm_module = compile(
-            &CompileArgs::new(&"hugr", &target_machine, opt),
+            &CompileArgs::new(&"hugr", &target_machine, opt, platform, &ctx, emit_debug),
             &ctx,
             &mut hugr,
         )?;
@@ -531,7 +597,7 @@ mod tests {
     #[test]
     fn test_compile_to_bitcode_returns_file_safe_public_bytes() {
         let hugr = include_bytes!("../python/tests/resources/check.hugr");
-        let bitcode = compile_to_bitcode(hugr, 2, "native")
+        let bitcode = compile_to_bitcode(hugr, 2, "native", "helios", false)
             .expect("compiling fixture to bitcode should work");
 
         let module =

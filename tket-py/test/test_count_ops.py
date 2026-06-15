@@ -27,13 +27,11 @@ testdata = [
     ("empty_func", 0),
     ("const_op", 0),
     ("one_rz", 2),
-    ("loop_conditional", 8),
-    ("conditional_loop", 8),
+    ("loop_conditional", 5),
+    ("conditional_loop", 5),
     ("fn_calls", 2),
-    ("repeat_until_success", 21),
-    # TODO: Requires this fix from hugr-rs
-    # <https://github.com/Quantinuum/hugr/pull/2986>
-    # ("extern_def", 2),
+    ("repeat_until_success", 20),
+    ("extern_def", 1),
 ]
 
 

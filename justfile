@@ -94,6 +94,7 @@ recompile-test-hugrs:
     just test_files/guppy_optimization/recompile
     just recompile-modifiers
 
+# Regenerates all hugrs inside `test_files/modifier_examples/` and run the passes on them
 recompile-modifiers:
     @echo "---- Recompiling modifier examples ----"
     uv run maturin develop --uv
@@ -115,11 +116,14 @@ gen-extensions:
 update-snapshots: update-snapshots-rs update-snapshots-py
 # Interactively update snapshot tests (requires `cargo-insta`)
 update-snapshots-rs:
+    cargo insta test
+    cargo insta test -p selene-hugr-qis-compiler
     cargo insta review
 # Update python snapshot tests.
 update-snapshots-py *TEST_ARGS:
     uv run maturin develop --uv
     uv run pytest --snapshot-update {{TEST_ARGS}}
+    uv run --package selene_hugr_qis_compiler pytest --snapshot-update {{TEST_ARGS}}
 
 
 

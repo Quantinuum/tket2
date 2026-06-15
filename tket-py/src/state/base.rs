@@ -16,6 +16,8 @@ use tket::serialize::TKETDecode;
 use tket::serialize::pytket::{DecodeOptions, EncodeOptions};
 use tket::{Circuit, TketOp};
 use tket_json_rs::circuit_json::SerialCircuit;
+use tket_qsystem::QSystemPlatform;
+use tket_qsystem::pytket::{qsystem_decoder_config, qsystem_encoder_config};
 
 use crate::ops::PyTketOp;
 use crate::rewrite::PyCircuitRewrite;
@@ -47,7 +49,7 @@ impl CompilationState {
     pub fn from_tket1(circ: &Bound<PyAny>) -> anyhow::Result<Self> {
         let hugr = SerialCircuit::from_tket1(circ)?
             .decode(
-                DecodeOptions::new().with_config(tket_qsystem::pytket::qsystem_decoder_config()),
+                DecodeOptions::new().with_config(qsystem_decoder_config(QSystemPlatform::Helios)),
             )
             .context("Could not decode a CompilationState from a pytket circuit")?;
         Ok(CompilationState { hugr })
@@ -57,7 +59,7 @@ impl CompilationState {
     pub fn to_tket1<'py>(&self, py: Python<'py>) -> anyhow::Result<Bound<'py, PyAny>> {
         let serial = SerialCircuit::encode(
             &self.hugr,
-            EncodeOptions::new().with_config(tket_qsystem::pytket::qsystem_encoder_config()),
+            EncodeOptions::new().with_config(qsystem_encoder_config(QSystemPlatform::Helios)),
         )?;
         let pytket = serial.to_tket1(py)?;
         Ok(pytket.into_any())
@@ -81,9 +83,10 @@ impl CompilationState {
             Some(cfg) => envelope_config_from_py(cfg)?,
             None => EnvelopeConfig::binary(),
         };
+        let bundled_extensions = extra_extensions(&self.hugr);
         let mut buf = Vec::new();
         self.hugr
-            .store(&mut buf, config)
+            .store_with_exts(&mut buf, config, &bundled_extensions)
             .context("Could not encode CompilationState to bytes")?;
         Ok(buf)
     }
@@ -97,8 +100,9 @@ impl CompilationState {
             Some(cfg) => envelope_config_from_py(cfg)?,
             None => EnvelopeConfig::text(),
         };
+        let bundled_extensions = extra_extensions(&self.hugr);
         self.hugr
-            .store_str(config)
+            .store_str_with_exts(config, &bundled_extensions)
             .context("Could not encode CompilationState to string")
     }
 
@@ -215,21 +219,43 @@ pub fn envelope_config_from_py(config: Bound<'_, PyAny>) -> anyhow::Result<Envel
     Ok(res)
 }
 
+/// Returns an extension registry with the extensions required to load a Hugr,
+/// minus the ones in [`embedded_extensions`].
+fn extra_extensions(hugr: &Hugr) -> ExtensionRegistry {
+    let mut registry = ExtensionRegistry::default();
+
+    for ext in hugr.extensions().iter_all() {
+        if REGISTRY.get_compatible(&ext.name, &ext.version).is_none() {
+            registry.register(ext.clone());
+        }
+    }
+
+    registry
+}
+
 /// Extension registry used for loading circuits.
+///
+/// TODO: If we want to keep these synchronized with the extensions defined in
+/// tket and tket-qsystem, we should consider exporting public
+/// ExtensionRegistries from the crates.
+/// <https://github.com/Quantinuum/tket2/issues/1679>
 pub static REGISTRY: LazyLock<ExtensionRegistry> = LazyLock::new(|| {
     let mut registry = hugr::std_extensions::std_reg();
     registry.extend([
         // tket extensions
         tket::extension::TKET_EXTENSION.to_owned(),
+        tket::extension::TKET1_EXTENSION.to_owned(),
         tket::extension::rotation::ROTATION_EXTENSION.to_owned(),
-        tket::extension::bool::BOOL_EXTENSION.to_owned(),
         tket::extension::debug::DEBUG_EXTENSION.to_owned(),
         tket::extension::guppy::GUPPY_EXTENSION.to_owned(),
         tket::extension::global_phase::GLOBAL_PHASE_EXTENSION.to_owned(),
         tket::extension::modifier::MODIFIER_EXTENSION.to_owned(),
+        tket::extension::measurement::MEASUREMENT_EXTENSION.to_owned(),
         // tket-qsystem extensions
         tket_qsystem::extension::gpu::EXTENSION.to_owned(),
         tket_qsystem::extension::qsystem::EXTENSION.to_owned(),
+        tket_qsystem::extension::qsystem::helios::EXTENSION.to_owned(),
+        tket_qsystem::extension::qsystem::sol::EXTENSION.to_owned(),
         tket_qsystem::extension::futures::EXTENSION.to_owned(),
         tket_qsystem::extension::random::EXTENSION.to_owned(),
         tket_qsystem::extension::result::EXTENSION.to_owned(),
@@ -245,5 +271,5 @@ pub static REGISTRY: LazyLock<ExtensionRegistry> = LazyLock::new(|| {
 /// loading a CompilationState.
 #[pyfunction]
 pub fn embedded_extensions() -> Vec<String> {
-    REGISTRY.iter().map(|e| e.name.to_string()).collect()
+    REGISTRY.ids().map(ToString::to_string).collect()
 }

@@ -4,6 +4,7 @@ use std::cmp::Ordering;
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Sub};
 
+use pyo3::types::PyAnyMethods;
 use pyo3::{Py, PyAny, PyResult, Python, pyclass, pymethods};
 use tket::circuit::cost::{CircuitCost, CostDelta};
 
@@ -31,11 +32,22 @@ impl Default for PyCircuitCost {
     }
 }
 
+/// Returns whether `cost` is the internal no-cost sentinel (a python `None` value).
+fn is_no_cost(cost: &Py<PyAny>, py: Python<'_>) -> bool {
+    cost.bind(py).is_none()
+}
+
 impl Add for PyCircuitCost {
     type Output = PyCircuitCost;
 
     fn add(self, rhs: PyCircuitCost) -> Self::Output {
         Python::attach(|py| {
+            if is_no_cost(&self.cost, py) {
+                return rhs;
+            }
+            if is_no_cost(&rhs.cost, py) {
+                return self;
+            }
             let cost = self
                 .cost
                 .call_method1(py, "__add__", (rhs.cost,))
@@ -48,6 +60,13 @@ impl Add for PyCircuitCost {
 impl AddAssign for PyCircuitCost {
     fn add_assign(&mut self, rhs: Self) {
         Python::attach(|py| {
+            if is_no_cost(&rhs.cost, py) {
+                return;
+            }
+            if is_no_cost(&self.cost, py) {
+                self.cost = rhs.cost;
+                return;
+            }
             let cost = self
                 .cost
                 .call_method1(py, "__add__", (rhs.cost,))
@@ -62,6 +81,9 @@ impl Sub for PyCircuitCost {
 
     fn sub(self, rhs: PyCircuitCost) -> Self::Output {
         Python::attach(|py| {
+            if is_no_cost(&rhs.cost, py) {
+                return self;
+            }
             let cost = self
                 .cost
                 .call_method1(py, "__sub__", (rhs.cost,))
@@ -76,6 +98,9 @@ impl Sum for PyCircuitCost {
         Python::attach(|py| {
             let cost = iter
                 .fold(None, |acc: Option<Py<PyAny>>, c| {
+                    if is_no_cost(&c.cost, py) {
+                        return acc;
+                    }
                     Some(match acc {
                         None => c.cost,
                         Some(cost) => cost
