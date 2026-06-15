@@ -1203,8 +1203,7 @@ mod test {
     }
 
     /// A pre-existing `helios::RuntimeBarrier` op is silently skipped when
-    /// lowering to Sol, because `RuntimeBarrierDef` is not a `HeliosOp` variant
-    /// and `classify_node` does not recognise it as a cross-platform op.
+    /// lowering to Sol, or the other way around.
     ///
     /// This test documents the current limitation (see comment in
     /// `classify_node`). If cross-platform RuntimeBarrier remapping is added in
@@ -1219,9 +1218,9 @@ mod test {
 
         // Build a RuntimeBarrier from the *opposite* platform's extension.
         let (barrier_ext, foreign_ext_id) = match target {
-            // Targeting Sol → the foreign barrier comes from Helios.
+            // Targeting Sol: the barrier comes from Helios.
             QSystemPlatform::Sol => (&*helios::EXTENSION, &helios::EXTENSION_ID),
-            // Targeting Helios → the foreign barrier comes from Sol.
+            // Targeting Helios: the barrier comes from Sol.
             QSystemPlatform::Helios => (&*sol::EXTENSION, &sol::EXTENSION_ID),
         };
 
@@ -1244,7 +1243,7 @@ mod test {
             .build_unwrap_sum(1, option_type(vec![qb_t()]), maybe_q2)
             .unwrap();
 
-        // Pack qubits into an array and apply the foreign RuntimeBarrier.
+        // Pack qubits into an array and apply the RuntimeBarrier.
         let q_arr = b.add_new_array(qb_t(), [q1, q2]).unwrap();
         let [q_arr] = b
             .add_dataflow_op(barrier_op.clone(), [q_arr])
@@ -1274,6 +1273,82 @@ mod test {
             "Expected the foreign-platform RuntimeBarrier to remain untouched; \
              if cross-platform RuntimeBarrier remapping has been implemented, \
              update this test to assert the op was replaced instead."
+        );
+    }
+
+    /// Lowering a HUGR to one platform and then re-lowering the result to the
+    /// other platform (round-trip) should produce a valid HUGR containing only
+    /// ops from the final target platform.
+    ///
+    /// This exercises the cross-platform path on a HUGR that was already fully
+    /// lowered (i.e. contains decomposition function definitions with
+    /// platform-specific ops inside them).
+    #[rstest]
+    #[case::helios_then_sol(QSystemPlatform::Helios, QSystemPlatform::Sol)]
+    #[case::sol_then_helios(QSystemPlatform::Sol, QSystemPlatform::Helios)]
+    fn test_cross_platform_round_trip(
+        #[case] first: QSystemPlatform,
+        #[case] second: QSystemPlatform,
+    ) {
+        use hugr::std_extensions::collections::array::ArrayOpBuilder;
+        use tket::extension::rotation::rotation_type;
+
+        // Build a HUGR with a multi-qubit TketOp (CX) which will decompose into
+        // the platform-specific 2-qubit gate (ZZPhase on Helios, PhasedXX on Sol),
+        // plus a single-qubit rotation and direct-mapped ops.
+        let mut b =
+            FunctionBuilder::new("round_trip", Signature::new([rotation_type()], type_row![]))
+                .unwrap();
+        let [angle] = b.input_wires_arr();
+        let [maybe_q1] = b
+            .add_dataflow_op(TketOp::TryQAlloc, [])
+            .unwrap()
+            .outputs_arr();
+        let [q1] = b
+            .build_unwrap_sum(1, option_type(vec![qb_t()]), maybe_q1)
+            .unwrap();
+        let [maybe_q2] = b
+            .add_dataflow_op(TketOp::TryQAlloc, [])
+            .unwrap()
+            .outputs_arr();
+        let [q2] = b
+            .build_unwrap_sum(1, option_type(vec![qb_t()]), maybe_q2)
+            .unwrap();
+        let [q1, q2] = b
+            .add_dataflow_op(TketOp::CX, [q1, q2])
+            .unwrap()
+            .outputs_arr();
+        let [q1] = b
+            .add_dataflow_op(TketOp::Rx, [q1, angle])
+            .unwrap()
+            .outputs_arr();
+        b.add_dataflow_op(TketOp::QFree, [q1]).unwrap();
+        b.add_dataflow_op(TketOp::QFree, [q2]).unwrap();
+        let mut h = b.finish_hugr_with_outputs([]).unwrap();
+
+        // First lowering: TketOps to first platform.
+        lower_tk2_ops(&mut h, Preserve::Public, first).unwrap();
+        assert_eq!(
+            check_lowered(&h, Preserve::Public, &forbidden_extensions_for(first)),
+            Ok(()),
+            "HUGR should contain only {first:?} ops after first lowering"
+        );
+        h.validate().unwrap();
+
+        // Second lowering: first platform to second platform (cross-platform).
+        lower_tk2_ops(&mut h, Preserve::Public, second).unwrap();
+        assert_eq!(
+            check_lowered(&h, Preserve::Public, &forbidden_extensions_for(second)),
+            Ok(()),
+            "After re-lowering from {first:?} to {second:?}, only {second:?} ops should remain"
+        );
+        h.validate().unwrap();
+
+        // Re-lowering to the same platform should be a no-op.
+        let lowered_again = lower_tk2_ops(&mut h, Preserve::Public, second).unwrap();
+        assert!(
+            lowered_again.is_empty(),
+            "Re-lowering to the same platform should be a no-op"
         );
     }
 
