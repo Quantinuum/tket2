@@ -77,13 +77,22 @@ impl CompilationState {
     /// Encode the circuit as a HUGR envelope.
     ///
     /// If no config is given, it defaults to the default binary envelope.
-    #[pyo3(signature = (config = None))]
-    pub fn to_bytes(&self, config: Option<Bound<'_, PyAny>>) -> anyhow::Result<Vec<u8>> {
+    ///
+    /// If `omit_tket_exts` is true, the extensions in [`embedded_extensions`]
+    /// will not be not be included in the envelope even when they are used in the
+    /// HUGR. This is useful when sending the HUGR to other components that
+    /// already have the tket extensions available.
+    #[pyo3(signature = (config = None, *, omit_tket_exts = true))]
+    pub fn to_bytes(
+        &self,
+        config: Option<Bound<'_, PyAny>>,
+        omit_tket_exts: bool,
+    ) -> anyhow::Result<Vec<u8>> {
         let config = match config {
             Some(cfg) => envelope_config_from_py(cfg)?,
             None => EnvelopeConfig::binary(),
         };
-        let bundled_extensions = extra_extensions(&self.hugr);
+        let bundled_extensions = extra_extensions(&self.hugr, omit_tket_exts);
         let mut buf = Vec::new();
         self.hugr
             .store_with_exts(&mut buf, config, &bundled_extensions)
@@ -94,13 +103,22 @@ impl CompilationState {
     /// Encode the circuit as a HUGR envelope.
     ///
     /// If no config is given, it defaults to the default text envelope.
-    #[pyo3(signature = (config = None))]
-    pub fn to_str(&self, config: Option<Bound<'_, PyAny>>) -> anyhow::Result<String> {
+    ///
+    /// If `omit_tket_exts` is true, the extensions in [`embedded_extensions`]
+    /// will not be not be included in the envelope even when they are used in the
+    /// HUGR. This is useful when sending the HUGR to other components that
+    /// already have the tket extensions available.
+    #[pyo3(signature = (config = None, *, omit_tket_exts = true))]
+    pub fn to_str(
+        &self,
+        config: Option<Bound<'_, PyAny>>,
+        omit_tket_exts: bool,
+    ) -> anyhow::Result<String> {
         let config = match config {
             Some(cfg) => envelope_config_from_py(cfg)?,
             None => EnvelopeConfig::text(),
         };
-        let bundled_extensions = extra_extensions(&self.hugr);
+        let bundled_extensions = extra_extensions(&self.hugr, omit_tket_exts);
         self.hugr
             .store_str_with_exts(config, &bundled_extensions)
             .context("Could not encode CompilationState to string")
@@ -219,9 +237,14 @@ pub fn envelope_config_from_py(config: Bound<'_, PyAny>) -> anyhow::Result<Envel
     Ok(res)
 }
 
-/// Returns an extension registry with the extensions required to load a Hugr,
-/// minus the ones in [`embedded_extensions`].
-fn extra_extensions(hugr: &Hugr) -> ExtensionRegistry {
+/// Returns an extension registry with the extensions required to load a Hugr.
+///
+/// If `omit_tket_exts` is true, ignore the extensions in [`embedded_extensions`].
+fn extra_extensions(hugr: &Hugr, omit_tket_exts: bool) -> ExtensionRegistry {
+    if !omit_tket_exts {
+        return hugr.extensions().clone();
+    }
+
     let mut registry = ExtensionRegistry::default();
 
     for ext in hugr.extensions().iter_all() {
