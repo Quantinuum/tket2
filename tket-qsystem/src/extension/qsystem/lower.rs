@@ -1148,6 +1148,7 @@ mod test {
             h.nodes()
                 .any(|n| h.get_optype(n).cast() == Some(SolOp::PhasedXX))
         );
+        h.validate().unwrap();
     }
 
     /// A `tket.qsystem.sol::PhasedXX` op targeting Helios is lowered via the
@@ -1201,6 +1202,82 @@ mod test {
         assert!(
             h.nodes()
                 .any(|n| h.get_optype(n).cast() == Some(HeliosOp::ZZPhase))
+        );
+        h.validate().unwrap();
+    }
+
+    /// A pre-existing `helios::RuntimeBarrier` op is silently skipped when
+    /// lowering to Sol, because `RuntimeBarrierDef` is not a `HeliosOp` variant
+    /// and `classify_node` does not recognise it as a cross-platform op.
+    ///
+    /// This test documents the current limitation (see comment in
+    /// `classify_node`). If cross-platform RuntimeBarrier remapping is added in
+    /// the future, this test should be updated to assert the op is replaced.
+    #[rstest]
+    #[case::helios_barrier_targeting_sol(QSystemPlatform::Sol)]
+    #[case::sol_barrier_targeting_helios(QSystemPlatform::Helios)]
+    fn test_runtime_barrier_skipped_cross_platform(#[case] target: QSystemPlatform) {
+        use crate::extension::qsystem::common::runtime_barrier_ext_op;
+        use crate::extension::qsystem::{helios, sol};
+        use hugr::std_extensions::collections::array::ArrayOpBuilder;
+
+        // Build a RuntimeBarrier from the *opposite* platform's extension.
+        let (barrier_ext, foreign_ext_id) = match target {
+            // Targeting Sol → the foreign barrier comes from Helios.
+            QSystemPlatform::Sol => (&*helios::EXTENSION, &helios::EXTENSION_ID),
+            // Targeting Helios → the foreign barrier comes from Sol.
+            QSystemPlatform::Helios => (&*sol::EXTENSION, &sol::EXTENSION_ID),
+        };
+
+        let array_size: u64 = 2;
+        let barrier_op = runtime_barrier_ext_op(barrier_ext, array_size).unwrap();
+
+        let mut b = FunctionBuilder::new("f", Signature::new_endo(type_row![])).unwrap();
+        let [maybe_q1] = b
+            .add_dataflow_op(TketOp::TryQAlloc, [])
+            .unwrap()
+            .outputs_arr();
+        let [q1] = b
+            .build_unwrap_sum(1, option_type(vec![qb_t()]), maybe_q1)
+            .unwrap();
+        let [maybe_q2] = b
+            .add_dataflow_op(TketOp::TryQAlloc, [])
+            .unwrap()
+            .outputs_arr();
+        let [q2] = b
+            .build_unwrap_sum(1, option_type(vec![qb_t()]), maybe_q2)
+            .unwrap();
+
+        // Pack qubits into an array and apply the foreign RuntimeBarrier.
+        let q_arr = b.add_new_array(qb_t(), [q1, q2]).unwrap();
+        let [q_arr] = b
+            .add_dataflow_op(barrier_op.clone(), [q_arr])
+            .unwrap()
+            .outputs_arr();
+        let [q1, q2]: [Wire; 2] = b
+            .add_array_unpack(qb_t(), array_size, q_arr)
+            .unwrap()
+            .try_into()
+            .unwrap();
+        b.add_dataflow_op(TketOp::QFree, [q1]).unwrap();
+        b.add_dataflow_op(TketOp::QFree, [q2]).unwrap();
+        let mut h = b.finish_hugr_with_outputs([]).unwrap();
+
+        // Lowering succeeds (does not error on the foreign RuntimeBarrier).
+        lower_tk2_ops(&mut h, Preserve::Public, target).unwrap();
+        h.validate().unwrap();
+
+        // The foreign RuntimeBarrier op should still be present (not remapped).
+        let foreign_barrier_still_present = h.nodes().any(|n| {
+            h.get_optype(n)
+                .as_extension_op()
+                .is_some_and(|op| op.def().extension_id() == foreign_ext_id)
+        });
+        assert!(
+            foreign_barrier_still_present,
+            "Expected the foreign-platform RuntimeBarrier to remain untouched; \
+             if cross-platform RuntimeBarrier remapping has been implemented, \
+             update this test to assert the op was replaced instead."
         );
     }
 
