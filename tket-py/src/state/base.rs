@@ -1,7 +1,6 @@
 //! Rust-backed representation of circuits
 
 use std::num::NonZeroU8;
-use std::sync::LazyLock;
 
 use anyhow::Context;
 use hugr::envelope::{EnvelopeConfig, EnvelopeFormat, ZstdConfig};
@@ -17,6 +16,7 @@ use tket::serialize::pytket::{DecodeOptions, EncodeOptions};
 use tket::{Circuit, TketOp};
 use tket_json_rs::circuit_json::SerialCircuit;
 use tket_qsystem::QSystemPlatform;
+use tket_qsystem::extension::REGISTRY;
 use tket_qsystem::pytket::{qsystem_decoder_config, qsystem_encoder_config};
 
 use crate::ops::PyTketOp;
@@ -232,38 +232,6 @@ fn extra_extensions(hugr: &Hugr) -> ExtensionRegistry {
 
     registry
 }
-
-/// Extension registry used for loading circuits.
-///
-/// TODO: If we want to keep these synchronized with the extensions defined in
-/// tket and tket-qsystem, we should consider exporting public
-/// ExtensionRegistries from the crates.
-/// <https://github.com/Quantinuum/tket2/issues/1679>
-pub static REGISTRY: LazyLock<ExtensionRegistry> = LazyLock::new(|| {
-    let mut registry = hugr::std_extensions::std_reg();
-    registry.extend([
-        // tket extensions
-        tket::extension::TKET_EXTENSION.to_owned(),
-        tket::extension::TKET1_EXTENSION.to_owned(),
-        tket::extension::rotation::ROTATION_EXTENSION.to_owned(),
-        tket::extension::debug::DEBUG_EXTENSION.to_owned(),
-        tket::extension::guppy::GUPPY_EXTENSION.to_owned(),
-        tket::extension::global_phase::GLOBAL_PHASE_EXTENSION.to_owned(),
-        tket::extension::modifier::MODIFIER_EXTENSION.to_owned(),
-        tket::extension::measurement::MEASUREMENT_EXTENSION.to_owned(),
-        // tket-qsystem extensions
-        tket_qsystem::extension::gpu::EXTENSION.to_owned(),
-        tket_qsystem::extension::qsystem::EXTENSION.to_owned(),
-        tket_qsystem::extension::qsystem::helios::EXTENSION.to_owned(),
-        tket_qsystem::extension::qsystem::sol::EXTENSION.to_owned(),
-        tket_qsystem::extension::futures::EXTENSION.to_owned(),
-        tket_qsystem::extension::random::EXTENSION.to_owned(),
-        tket_qsystem::extension::result::EXTENSION.to_owned(),
-        tket_qsystem::extension::utils::EXTENSION.to_owned(),
-        tket_qsystem::extension::wasm::EXTENSION.to_owned(),
-    ]);
-    registry
-});
 
 /// Returns a list of extension ids supported by the CompilationState loader.
 ///
