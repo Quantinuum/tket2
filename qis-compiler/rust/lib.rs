@@ -27,20 +27,12 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::vec::Vec;
 use std::{fs, str, vec};
-use tket::extension::{TKET_EXTENSION, TKET1_EXTENSION, rotation};
-use tket::hugr::extension::{ExtensionRegistry, prelude};
-use tket::hugr::std_extensions::arithmetic::{
-    conversions, float_ops, float_types, int_ops, int_types,
-};
-use tket::hugr::std_extensions::{collections, logic, ptr};
+use tket::hugr::extension::ExtensionRegistry;
 use tket::hugr::{self, llvm::inkwell};
 use tket::hugr::{Hugr, HugrView, Node};
 use tket::llvm::rotation::RotationCodegenExtension;
 use tket_qsystem::QSystemPass;
-use tket_qsystem::extension::{
-    futures as qsystem_futures, gpu as qsystem_gpu, qsystem, random as qsystem_random,
-    result as qsystem_result, utils as qsystem_utils, wasm as qsystem_wasm,
-};
+use tket_qsystem::extension::qsystem;
 use tket_qsystem::llvm::array_utils::ArrayLowering;
 pub use tket_qsystem::llvm::futures::FuturesCodegenExtension;
 use tket_qsystem::llvm::{
@@ -58,34 +50,29 @@ const LLVM_MAIN: &str = "qmain";
 const METADATA: &[(&str, &[&str])] = &[("name", &["mainlib"])];
 
 static REGISTRY: std::sync::LazyLock<ExtensionRegistry> = std::sync::LazyLock::new(|| {
-    ExtensionRegistry::new([
-        prelude::PRELUDE.to_owned(),
-        int_types::EXTENSION.to_owned(),
-        int_ops::EXTENSION.to_owned(),
-        float_types::EXTENSION.to_owned(),
-        float_ops::EXTENSION.to_owned(),
-        conversions::EXTENSION.to_owned(),
-        logic::EXTENSION.to_owned(),
-        ptr::EXTENSION.to_owned(),
-        collections::list::EXTENSION.to_owned(),
-        collections::array::EXTENSION.to_owned(),
-        collections::static_array::EXTENSION.to_owned(),
-        collections::borrow_array::EXTENSION.to_owned(),
-        qsystem_futures::EXTENSION.to_owned(),
-        qsystem_result::EXTENSION.to_owned(),
-        qsystem::EXTENSION.to_owned(),
-        qsystem::helios::EXTENSION.to_owned(),
-        qsystem::sol::EXTENSION.to_owned(),
-        qsystem_random::EXTENSION.to_owned(),
-        qsystem_utils::EXTENSION.to_owned(),
-        qsystem_gpu::EXTENSION.to_owned(),
-        qsystem_wasm::EXTENSION.to_owned(),
-        rotation::ROTATION_EXTENSION.to_owned(),
-        TKET_EXTENSION.to_owned(),
-        TKET1_EXTENSION.to_owned(),
+    let mut registry = hugr::std_extensions::std_reg();
+    registry.extend([
+        // tket extensions
+        tket::extension::TKET_EXTENSION.to_owned(),
+        tket::extension::TKET1_EXTENSION.to_owned(),
+        tket::extension::rotation::ROTATION_EXTENSION.to_owned(),
         tket::extension::debug::DEBUG_EXTENSION.to_owned(),
         tket::extension::guppy::GUPPY_EXTENSION.to_owned(),
-    ])
+        tket::extension::global_phase::GLOBAL_PHASE_EXTENSION.to_owned(),
+        tket::extension::modifier::MODIFIER_EXTENSION.to_owned(),
+        tket::extension::measurement::MEASUREMENT_EXTENSION.to_owned(),
+        // tket-qsystem extensions
+        tket_qsystem::extension::gpu::EXTENSION.to_owned(),
+        tket_qsystem::extension::qsystem::EXTENSION.to_owned(),
+        tket_qsystem::extension::qsystem::helios::EXTENSION.to_owned(),
+        tket_qsystem::extension::qsystem::sol::EXTENSION.to_owned(),
+        tket_qsystem::extension::futures::EXTENSION.to_owned(),
+        tket_qsystem::extension::random::EXTENSION.to_owned(),
+        tket_qsystem::extension::result::EXTENSION.to_owned(),
+        tket_qsystem::extension::utils::EXTENSION.to_owned(),
+        tket_qsystem::extension::wasm::EXTENSION.to_owned(),
+    ]);
+    registry
 });
 
 #[derive(Debug)]
