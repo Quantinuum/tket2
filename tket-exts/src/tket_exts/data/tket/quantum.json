@@ -23,7 +23,6 @@
             {
               "t": "Opaque",
               "extension": "tket.rotation",
-              "extension_version": "0.2.0",
               "id": "rotation",
               "args": [],
               "bound": "C"
@@ -226,7 +225,6 @@
             {
               "t": "Opaque",
               "extension": "tket.measurement",
-              "extension_version": "0.1.0",
               "id": "Measurement",
               "args": [],
               "bound": "C"
@@ -322,7 +320,6 @@
             {
               "t": "Opaque",
               "extension": "tket.rotation",
-              "extension_version": "0.2.0",
               "id": "rotation",
               "args": [],
               "bound": "C"
@@ -354,7 +351,6 @@
             {
               "t": "Opaque",
               "extension": "tket.rotation",
-              "extension_version": "0.2.0",
               "id": "rotation",
               "args": [],
               "bound": "C"
@@ -391,7 +387,6 @@
             {
               "t": "Opaque",
               "extension": "tket.rotation",
-              "extension_version": "0.2.0",
               "id": "rotation",
               "args": [],
               "bound": "C"
@@ -748,7 +743,6 @@
             {
               "t": "Opaque",
               "extension": "tket.rotation",
-              "extension_version": "0.2.0",
               "id": "rotation",
               "args": [],
               "bound": "C"
