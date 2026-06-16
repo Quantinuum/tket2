@@ -4,23 +4,23 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum GateType {
     // TQE gates
-    /// A $X$ controlled $X$ gate. i.e. H(0);CX;H(0)
+    /// An $X$-controlled $X$ gate, i.e. H(0);CX(0,1);H(0)
     XX,
-    /// A $X$ controlled $Y$ gate. i.e. H(0);CY;H(0)
+    /// An $X$-controlled $Y$ gate, i.e. H(0);CY(0,1);H(0)
     XY,
-    /// A $X$ controlled $Z$ gate. i.e. CX(1,0)
+    /// An $X$-controlled $Z$ gate, i.e. CX(1,0)
     XZ,
-    /// A $Y$ controlled $X$ gate. i.e. V(0);CX;Vdg(0);
+    /// A $Y$-controlled $X$ gate, i.e. V(0);CX(0,1);Vdg(0)
     YX,
-    /// A $Y$ controlled $Y$ gate. i.e. V(0);CY;Vdg(0);
+    /// A $Y$-controlled $Y$ gate, i.e. V(0);CY(0,1);Vdg(0)
     YY,
-    /// A $Y$ controlled $Z$ gate. i.e. CY(1,0);
+    /// A $Y$-controlled $Z$ gate, i.e. CY(1,0)
     YZ,
-    /// A $Z$ controlled $X$ gate. i.e. CX
+    /// A $Z$-controlled $X$ gate, i.e. CX(0,1)
     ZX,
-    /// A $Z$ controlled $Y$ gate. i.e. CY
+    /// A $Z$-controlled $Y$ gate, i.e. CY(0,1)
     ZY,
-    /// A $Z$ controlled $Z$ gate. i.e. CZ
+    /// A $Z$-controlled $Z$ gate, i.e. CZ(0,1)
     ZZ,
     // Single-qubit Clifford gates
     /// The Hadamard gate.
@@ -47,7 +47,7 @@ pub enum GateType {
     Reset,
     /// A swap gate.
     SWAP,
-    /// An opaque gate with implementation-defined behavior.
+    /// An opaque gate with implementation-defined behaviour.
     BlackBox,
     // Rotation gates
     /// A rotation around the $X$ axis.
