@@ -110,7 +110,7 @@ recompile-modifier name:
 
 # Generate serialized declarations for the tket extensions
 gen-extensions:
-    cargo run -p tket-qsystem gen-extensions -o tket-exts/src/tket_exts/data
+    cargo run -p tket-qsystem gen-extensions -o tket-exts/src/tket_exts/data --unversioned
 
 # Update snapshot tests for both rust and python (requires `cargo-insta`)
 update-snapshots: update-snapshots-rs update-snapshots-py

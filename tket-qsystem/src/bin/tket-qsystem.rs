@@ -2,12 +2,14 @@
 
 use anyhow::Result;
 use clap::Parser as _;
+use hugr_core::extension::ExtensionRegistry;
 use tket_qsystem::cli::CliArgs;
 
 fn main() -> Result<()> {
     match CliArgs::parse() {
         CliArgs::GenExtensions(args) => {
-            args.run_dump(&tket_qsystem::extension::REGISTRY)?;
+            let registry = ExtensionRegistry::new(tket_qsystem::extension::qsystem_extensions());
+            args.run_dump(&registry)?;
         }
         _ => {
             eprintln!("Unknown command");
