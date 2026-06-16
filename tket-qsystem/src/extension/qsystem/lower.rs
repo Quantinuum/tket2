@@ -790,6 +790,56 @@ mod test {
             .expect("circuit entrypoint should be dataflow region")
     }
 
+    fn assert_helios_lowered(h: &hugr::Hugr) {
+        assert_eq!(
+            check_lowered(
+                h,
+                Preserve::Public,
+                &forbidden_extensions_for(QSystemPlatform::Helios)
+            ),
+            Ok(())
+        );
+        // TryQAlloc and QFree are shared ops; assert they were remapped to their
+        // Helios equivalents (exercises the Ok(shared) arm of apply_cross_platform_sol).
+        let circ = Circuit::new(h);
+        let helios_ops: Vec<HeliosOp> = toposorted_circuit_nodes(&circ)
+            .filter_map(|node| circ.hugr().get_optype(node).cast())
+            .collect();
+        assert!(helios_ops.contains(&HeliosOp::TryQAlloc));
+        assert!(helios_ops.contains(&HeliosOp::QFree));
+        // PhasedXX must have been decomposed into ZZPhase (inside the replacement function).
+        // PhasedXX decomposes into a called function, so scan all hugr nodes.
+        assert!(
+            h.nodes()
+                .any(|n| h.get_optype(n).cast() == Some(HeliosOp::ZZPhase))
+        );
+    }
+
+    fn assert_sol_lowered(h: &hugr::Hugr) {
+        assert_eq!(
+            check_lowered(
+                h,
+                Preserve::Public,
+                &forbidden_extensions_for(QSystemPlatform::Sol)
+            ),
+            Ok(())
+        );
+        // TryQAlloc and QFree are shared ops; assert they were remapped to their
+        // Sol equivalents (exercises the Ok(shared) arm of apply_cross_platform_helios).
+        let circ = Circuit::new(h);
+        let sol_ops: Vec<SolOp> = toposorted_circuit_nodes(&circ)
+            .filter_map(|node| circ.hugr().get_optype(node).cast())
+            .collect();
+        assert!(sol_ops.contains(&SolOp::TryQAlloc));
+        assert!(sol_ops.contains(&SolOp::QFree));
+        // ZZPhase must have been decomposed into PhasedXX (inside the replacement function).
+        // ZZPhase decomposes into a called function, so scan all hugr nodes.
+        assert!(
+            h.nodes()
+                .any(|n| h.get_optype(n).cast() == Some(SolOp::PhasedXX))
+        );
+    }
+
     #[rstest]
     #[case::global_helios(PassScope::Global(Preserve::Public), QSystemPlatform::Helios)]
     #[case::entrypoint_flat_helios(PassScope::EntrypointFlat, QSystemPlatform::Helios)]
@@ -1011,6 +1061,7 @@ mod test {
         if let Err(e) = h.validate() {
             panic!("{}", e);
         }
+        h.validate().unwrap();
     }
 
     fn legacy_qsystem_hugr() -> hugr::Hugr {
@@ -1055,6 +1106,7 @@ mod test {
         assert!(check_lowered(&h, Preserve::Public, &legacy_exts).is_err());
 
         lower_tk2_ops(&mut h, Preserve::Public, QSystemPlatform::Helios).unwrap();
+        h.validate().unwrap();
 
         // No tket.qsystem ops should remain after lowering.
         assert_eq!(check_lowered(&h, Preserve::Public, &legacy_exts), Ok(()));
@@ -1083,6 +1135,7 @@ mod test {
     fn test_legacy_qsystem_zz_phase_lowers_via_cross_platform_to_sol() {
         let mut h = legacy_qsystem_hugr();
         lower_tk2_ops(&mut h, Preserve::Public, QSystemPlatform::Sol).unwrap();
+        h.validate().unwrap();
         assert_eq!(
             check_lowered(
                 &h,
@@ -1122,29 +1175,8 @@ mod test {
         let mut h = b.finish_hugr_with_outputs([]).unwrap();
 
         lower_tk2_ops(&mut h, Preserve::Public, QSystemPlatform::Sol).unwrap();
-        assert_eq!(
-            check_lowered(
-                &h,
-                Preserve::Public,
-                &forbidden_extensions_for(QSystemPlatform::Sol)
-            ),
-            Ok(())
-        );
-        // TryQAlloc and QFree are shared ops; assert they were remapped to their
-        // Sol equivalents (exercises the Ok(shared) arm of apply_cross_platform_helios).
-        let circ = Circuit::new(&h);
-        let sol_ops: Vec<SolOp> = toposorted_circuit_nodes(&circ)
-            .filter_map(|node| circ.hugr().get_optype(node).cast())
-            .collect();
-        assert!(sol_ops.contains(&SolOp::TryQAlloc));
-        assert!(sol_ops.contains(&SolOp::QFree));
-        // ZZPhase must have been decomposed into PhasedXX (inside the replacement function).
-        // ZZPhase decomposes into a called function, so scan all hugr nodes.
-        assert!(
-            h.nodes()
-                .any(|n| h.get_optype(n).cast() == Some(SolOp::PhasedXX))
-        );
         h.validate().unwrap();
+        assert_sol_lowered(&h);
     }
 
     /// A `tket.qsystem.sol::PhasedXX` op targeting Helios is lowered via the
@@ -1177,33 +1209,12 @@ mod test {
         let mut h = b.finish_hugr_with_outputs([]).unwrap();
 
         lower_tk2_ops(&mut h, Preserve::Public, QSystemPlatform::Helios).unwrap();
-        assert_eq!(
-            check_lowered(
-                &h,
-                Preserve::Public,
-                &forbidden_extensions_for(QSystemPlatform::Helios)
-            ),
-            Ok(())
-        );
-        // TryQAlloc and QFree are shared ops; assert they were remapped to their
-        // Helios equivalents (exercises the Ok(shared) arm of apply_cross_platform_sol).
-        let circ = Circuit::new(&h);
-        let helios_ops: Vec<HeliosOp> = toposorted_circuit_nodes(&circ)
-            .filter_map(|node| circ.hugr().get_optype(node).cast())
-            .collect();
-        assert!(helios_ops.contains(&HeliosOp::TryQAlloc));
-        assert!(helios_ops.contains(&HeliosOp::QFree));
-        // PhasedXX must have been decomposed into ZZPhase (inside the replacement function).
-        // PhasedXX decomposes into a called function, so scan all hugr nodes.
-        assert!(
-            h.nodes()
-                .any(|n| h.get_optype(n).cast() == Some(HeliosOp::ZZPhase))
-        );
         h.validate().unwrap();
+        assert_helios_lowered(&h);
     }
 
     /// A pre-existing `helios::RuntimeBarrier` op is silently skipped when
-    /// lowering to Sol, or the other way around.
+    /// lowering to Sol, and viceversa.
     ///
     /// This test documents the current limitation (see comment in
     /// `classify_node`). If cross-platform RuntimeBarrier remapping is added in
@@ -1258,18 +1269,18 @@ mod test {
         b.add_dataflow_op(TketOp::QFree, [q2]).unwrap();
         let mut h = b.finish_hugr_with_outputs([]).unwrap();
 
-        // Lowering succeeds (does not error on the foreign RuntimeBarrier).
+        // Lowering succeeds (does not error on the RuntimeBarrier).
         lower_tk2_ops(&mut h, Preserve::Public, target).unwrap();
         h.validate().unwrap();
 
-        // The foreign RuntimeBarrier op should still be present (not remapped).
-        let foreign_barrier_still_present = h.nodes().any(|n| {
+        // The RuntimeBarrier op should still be present (not remapped).
+        let barrier_still_present = h.nodes().any(|n| {
             h.get_optype(n)
                 .as_extension_op()
                 .is_some_and(|op| op.def().extension_id() == foreign_ext_id)
         });
         assert!(
-            foreign_barrier_still_present,
+            barrier_still_present,
             "Expected the foreign-platform RuntimeBarrier to remain untouched; \
              if cross-platform RuntimeBarrier remapping has been implemented, \
              update this test to assert the op was replaced instead."
@@ -1532,5 +1543,165 @@ mod test {
             })
         });
         assert_eq!(contains_dup, expect_dup);
+    }
+
+    // Comprehensive fixture: all supported ops
+    //
+    /// Build a HUGR containing all TketOps supported plus platform-specific ops
+    /// (HeliosOp::ZZPhase, SolOp::PhasedXX), and shared ops (PhasedX/Rz).
+    #[fixture]
+    fn all_ops_hugr() -> hugr::Hugr {
+        use hugr::std_extensions::arithmetic::float_types::float64_type;
+        use tket::extension::rotation::rotation_type;
+
+        // Inputs: one rotation (for parametric gates) and two f64s (for platform ops)
+        let mut b = FunctionBuilder::new(
+            "all_ops",
+            Signature::new(
+                vec![rotation_type(), float64_type(), float64_type()],
+                vec![bool_t()],
+            ),
+        )
+        .unwrap();
+        let [angle, float1, float2] = b.input_wires_arr();
+
+        // Allocate 3 qubits
+        let [maybe_q0] = b
+            .add_dataflow_op(TketOp::TryQAlloc, [])
+            .unwrap()
+            .outputs_arr();
+        let [q0] = b
+            .build_unwrap_sum(1, option_type(vec![qb_t()]), maybe_q0)
+            .unwrap();
+        let [q1] = b.add_dataflow_op(TketOp::QAlloc, []).unwrap().outputs_arr();
+        let [q2] = b.add_dataflow_op(TketOp::QAlloc, []).unwrap().outputs_arr();
+
+        // Single-qubit gates
+        let [q0] = b.add_dataflow_op(TketOp::H, [q0]).unwrap().outputs_arr();
+        let [q1] = b.add_dataflow_op(TketOp::X, [q1]).unwrap().outputs_arr();
+        let [q2] = b.add_dataflow_op(TketOp::Y, [q2]).unwrap().outputs_arr();
+        let [q0] = b.add_dataflow_op(TketOp::Z, [q0]).unwrap().outputs_arr();
+        let [q1] = b.add_dataflow_op(TketOp::S, [q1]).unwrap().outputs_arr();
+        let [q2] = b.add_dataflow_op(TketOp::Sdg, [q2]).unwrap().outputs_arr();
+        let [q0] = b.add_dataflow_op(TketOp::T, [q0]).unwrap().outputs_arr();
+        let [q1] = b.add_dataflow_op(TketOp::Tdg, [q1]).unwrap().outputs_arr();
+        let [q2] = b.add_dataflow_op(TketOp::V, [q2]).unwrap().outputs_arr();
+        let [q0] = b.add_dataflow_op(TketOp::Vdg, [q0]).unwrap().outputs_arr();
+
+        // Single-qubit rotation gates
+        let [q0] = b
+            .add_dataflow_op(TketOp::Rx, [q0, angle])
+            .unwrap()
+            .outputs_arr();
+        let [q1] = b
+            .add_dataflow_op(TketOp::Ry, [q1, angle])
+            .unwrap()
+            .outputs_arr();
+        let [q2] = b
+            .add_dataflow_op(TketOp::Rz, [q2, angle])
+            .unwrap()
+            .outputs_arr();
+
+        // Two-qubit gates
+        let [q0, q1] = b
+            .add_dataflow_op(TketOp::CX, [q0, q1])
+            .unwrap()
+            .outputs_arr();
+        let [q0, q2] = b
+            .add_dataflow_op(TketOp::CY, [q0, q2])
+            .unwrap()
+            .outputs_arr();
+        let [q1, q2] = b
+            .add_dataflow_op(TketOp::CZ, [q1, q2])
+            .unwrap()
+            .outputs_arr();
+
+        // Two-qubit rotation gate
+        let [q1, q2] = b
+            .add_dataflow_op(TketOp::CRz, [q0, q1, angle])
+            .unwrap()
+            .outputs_arr();
+
+        // Three-qubit gate
+        let [q0, q1, q2] = b
+            .add_dataflow_op(TketOp::Toffoli, [q0, q1, q2])
+            .unwrap()
+            .outputs_arr();
+
+        // Helios ZZPhase
+        let [q0, q2] = b
+            .add_dataflow_op(HeliosOp::ZZPhase, [q0, q2, float1])
+            .unwrap()
+            .outputs_arr();
+
+        // Sol PhasedXX
+        let [q1, q2] = b
+            .add_dataflow_op(SolOp::PhasedXX, [ql, q2, float1, float2])
+            .unwrap()
+            .outputs_arr();
+
+        // Shared platform op: PhasedX
+        let [q0] = b
+            .add_dataflow_op(HeliosOp::PhasedX, [q0, float1, float2])
+            .unwrap()
+            .outputs_arr();
+        let [q1] = b
+            .add_dataflow_op(SolOp::PhasedX, [q1, float1, float2])
+            .unwrap()
+            .outputs_arr();
+
+        // Shared platform op: Rz
+        let [q1] = b
+            .add_dataflow_op(HeliosOp::Rz, [q1, float1])
+            .unwrap()
+            .outputs_arr();
+        let [q2] = b
+            .add_dataflow_op(SolOp::Rz, [q2, float1])
+            .unwrap()
+            .outputs_arr();
+
+        // Measure and QFree
+        let [q0, result0] = b
+            .add_dataflow_op(TketOp::Measure, [q0])
+            .unwrap()
+            .outputs_arr();
+        let [q1, result1] = b
+            .add_dataflow_op(TketOp::Measure, [q1])
+            .unwrap()
+            .outputs_arr();
+        let [q2, result2] = b
+            .add_dataflow_op(TketOp::Measure, [q2])
+            .unwrap()
+            .outputs_arr();
+        b.add_dataflow_op(TketOp::QFree, [q0]).unwrap();
+        b.add_dataflow_op(TketOp::QFree, [q1]).unwrap();
+        b.add_dataflow_op(TketOp::QFree, [q2]).unwrap();
+
+        b.finish_hugr_with_outputs([result0, result1, result2])
+            .unwrap()
+    }
+
+    /// Verify the fixture HUGR is valid before any lowering.
+    #[test]
+    fn test_all_ops_hugr_is_valid(all_ops_hugr: hugr::Hugr) {
+        all_ops_hugr.validate().unwrap();
+    }
+
+    /// Lower the all-ops fixture to Helios and verify no TketOps remain.
+    #[test]
+    fn test_lower_all_ops_to_helios(all_ops_hugr: hugr::Hugr) {
+        let mut h = all_ops_hugr;
+        lower_tk2_ops(&mut h, Preserve::Public, QSystemPlatform::Helios).unwrap();
+        h.validate().unwrap();
+        assert_helios_lowered(&h);
+    }
+
+    /// Lower the all-ops fixture to Sol and verify no TketOps remain.
+    #[test]
+    fn test_lower_all_ops_to_sol() {
+        let mut h = build_all_ops_fixture();
+        lower_tk2_ops(&mut h, Preserve::Public, QSystemPlatform::Sol).unwrap();
+        h.validate().unwrap();
+        assert_sol_lowered(&h);
     }
 }
