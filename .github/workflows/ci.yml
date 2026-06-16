@@ -426,7 +426,7 @@ jobs:
         tests-rs-stable-all-features,
         tests-py,
         tket-extensions,
-        # extension-versions,
+        extension-versions,
         tests-qis-compiler,
       ]
     if: ${{ !cancelled() }}
