@@ -46,7 +46,9 @@ impl<PCG: PreludeCodegen> GlobalsCodegenExtension<PCG> {
     pub fn new(pcg: PCG) -> Self {
         Self {
             pcg,
-            no_global_error: ConstError::new(10001, "No global provided for GlobalsOp::With"),
+            no_global_error: ConstError::new_default_signal(
+                "No global provided for GlobalsOp::With",
+            ),
         }
     }
 
