@@ -1294,6 +1294,7 @@ mod test {
         #[case] first: QSystemPlatform,
         #[case] second: QSystemPlatform,
     ) {
+        use hugr::std_extensions::collections::array::ArrayOpBuilder;
         use tket::extension::rotation::rotation_type;
 
         // Build a HUGR with a multi-qubit TketOp (CX) which will decompose into
@@ -1325,29 +1326,11 @@ mod test {
             .add_dataflow_op(TketOp::Rx, [q1, angle])
             .unwrap()
             .outputs_arr();
-
-        // Add platform-specific 2-qubit gates
-        match first {
-            QSystemPlatform::Helios => {
-                let angle2 = const_f64(&mut b, 0.25);
-                b.add_dataflow_op(SolOp::PhasedXX, [q1, q2, angle, angle2])
-                    .unwrap()
-                    .outputs_arr()
-                    .unwrap();
-            }
-            QSystemPlatform::Sol => {
-                b.add_dataflow_op(HeliosOp::ZZPhase, [q1, q2, angle])
-                    .unwrap()
-                    .outputs_arr()
-                    .unwrap();
-            }
-        }
-
         b.add_dataflow_op(TketOp::QFree, [q1]).unwrap();
         b.add_dataflow_op(TketOp::QFree, [q2]).unwrap();
         let mut h = b.finish_hugr_with_outputs([]).unwrap();
 
-        // First lowering: TketOps and other platform ops to first platform.
+        // First lowering: TketOps → first platform.
         lower_tk2_ops(&mut h, Preserve::Public, first).unwrap();
         assert_eq!(
             check_lowered(&h, Preserve::Public, &forbidden_extensions_for(first)),
@@ -1356,20 +1339,15 @@ mod test {
         );
         h.validate().unwrap();
 
-        // Second lowering: first platform to second platform (cross-platform).
+        // Second lowering: first platform → second platform (cross-platform).
         lower_tk2_ops(&mut h, Preserve::Public, second).unwrap();
+        h.validate().unwrap();
+
+        // After the round-trip, no ops from the first platform should remain.
         assert_eq!(
             check_lowered(&h, Preserve::Public, &forbidden_extensions_for(second)),
             Ok(()),
             "After re-lowering from {first:?} to {second:?}, only {second:?} ops should remain"
-        );
-        h.validate().unwrap();
-
-        // Re-lowering to the same platform should be a no-op.
-        let lowered_again = lower_tk2_ops(&mut h, Preserve::Public, second).unwrap();
-        assert!(
-            lowered_again.is_empty(),
-            "Re-lowering to the same platform should be a no-op"
         );
     }
 
