@@ -62,6 +62,16 @@ pub enum GateType {
     PHASEDX,
 }
 
+/// Returns the number of arguments for a given gate type.
+///
+/// # Arguments
+///
+/// - `gate_type` (`&GateType`) - The gate type for which to determine the number of arguments.
+///
+/// # Returns
+///
+/// - `Option<usize>` - The number of arguments for the given gate type. Returns `None` if the gate type has an undefined number of arguments.
+///
 pub(crate) fn gate_type_n_args(gate_type: &GateType) -> Option<usize> {
     match gate_type {
         GateType::XX
@@ -93,7 +103,17 @@ pub(crate) fn gate_type_n_args(gate_type: &GateType) -> Option<usize> {
     }
 }
 
-pub(crate) fn gate_type_n_params(gate_type: &GateType) -> Option<usize> {
+/// Describes the number of parameters for a given gate type.
+///
+/// # Arguments
+///
+/// - `gate_type` (`&GateType`) - The gate type for which to determine the number of parameters.
+///
+/// # Returns
+///
+/// - `usize` - The number of parameters for the given gate type.
+///
+pub(crate) fn gate_type_n_params(gate_type: &GateType) -> usize {
     match gate_type {
         GateType::XX
         | GateType::XY
@@ -112,11 +132,11 @@ pub(crate) fn gate_type_n_params(gate_type: &GateType) -> Option<usize> {
         | GateType::Vdg
         | GateType::X
         | GateType::Y
-        | GateType::Z => Some(0),
-        GateType::RX | GateType::RY | GateType::RZ | GateType::ZZPHASE => Some(1),
-        GateType::PHASEDX => Some(2),
-        GateType::Measure => Some(0),
-        GateType::Reset => Some(0),
-        GateType::BlackBox => Some(0),
+        | GateType::Z => 0,
+        GateType::RX | GateType::RY | GateType::RZ | GateType::ZZPHASE => 1,
+        GateType::PHASEDX => 2,
+        GateType::Measure => 0,
+        GateType::Reset => 0,
+        GateType::BlackBox => 0,
     }
 }

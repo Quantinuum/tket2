@@ -228,9 +228,8 @@ fn validate_op(op: &Op, pg_nqubits: usize) {
                     op
                 );
             }
-            if let Some(expected_param_counts) = gate_type_n_params(data.get_gate_type())
-                && data.get_params().len() != expected_param_counts
-            {
+            let expected_param_counts = gate_type_n_params(data.get_gate_type());
+            if data.get_params().len() != expected_param_counts {
                 panic!(
                     "Gate has wrong number of parameters.\nExpected: {}\nGot: {}\nOp: {:?}",
                     expected_param_counts,
@@ -267,6 +266,9 @@ fn validate_op(op: &Op, pg_nqubits: usize) {
                 );
             }
             if data.get_gate_type() == &GateType::BlackBox {
+                if data.get_args().is_empty() {
+                    panic!("BlackBox gate cannot have empty arguments.\nOp: {:?}", op);
+                }
                 if !data.get_conditional_bits().is_empty()
                     || !data.get_conditional_values().is_empty()
                 {
