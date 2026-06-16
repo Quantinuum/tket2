@@ -1,0 +1,367 @@
+{
+  "version": "0.2.2",
+  "name": "prelude",
+  "types": {
+    "error": {
+      "extension": "prelude",
+      "name": "error",
+      "params": [],
+      "description": "Simple opaque error type.",
+      "bound": {
+        "b": "Explicit",
+        "bound": "C"
+      }
+    },
+    "qubit": {
+      "extension": "prelude",
+      "name": "qubit",
+      "params": [],
+      "description": "qubit",
+      "bound": {
+        "b": "Explicit",
+        "bound": "A"
+      }
+    },
+    "string": {
+      "extension": "prelude",
+      "name": "string",
+      "params": [],
+      "description": "string",
+      "bound": {
+        "b": "Explicit",
+        "bound": "C"
+      }
+    },
+    "usize": {
+      "extension": "prelude",
+      "name": "usize",
+      "params": [],
+      "description": "usize",
+      "bound": {
+        "b": "Explicit",
+        "bound": "C"
+      }
+    }
+  },
+  "operations": {
+    "Barrier": {
+      "extension": "prelude",
+      "name": "Barrier",
+      "description": "Add a barrier to a row of values",
+      "signature": {
+        "params": [
+          {
+            "tp": "List",
+            "param": {
+              "tp": "Type",
+              "b": "A"
+            }
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "R",
+              "i": 0,
+              "b": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "R",
+              "i": 0,
+              "b": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "MakeError": {
+      "extension": "prelude",
+      "name": "MakeError",
+      "description": "Create an error value",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "I"
+            },
+            {
+              "t": "Opaque",
+              "extension": "prelude",
+              "extension_version": "0.2.2",
+              "id": "string",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "prelude",
+              "extension_version": "0.2.2",
+              "id": "error",
+              "args": [],
+              "bound": "C"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "MakeTuple": {
+      "extension": "prelude",
+      "name": "MakeTuple",
+      "description": "MakeTuple operation",
+      "signature": {
+        "params": [
+          {
+            "tp": "List",
+            "param": {
+              "tp": "Type",
+              "b": "A"
+            }
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "R",
+              "i": 0,
+              "b": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "General",
+              "rows": [
+                [
+                  {
+                    "t": "R",
+                    "i": 0,
+                    "b": "A"
+                  }
+                ]
+              ]
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "Noop": {
+      "extension": "prelude",
+      "name": "Noop",
+      "description": "Noop gate",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "V",
+              "i": 0,
+              "b": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "V",
+              "i": 0,
+              "b": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "UnpackTuple": {
+      "extension": "prelude",
+      "name": "UnpackTuple",
+      "description": "UnpackTuple operation",
+      "signature": {
+        "params": [
+          {
+            "tp": "List",
+            "param": {
+              "tp": "Type",
+              "b": "A"
+            }
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Sum",
+              "s": "General",
+              "rows": [
+                [
+                  {
+                    "t": "R",
+                    "i": 0,
+                    "b": "A"
+                  }
+                ]
+              ]
+            }
+          ],
+          "output": [
+            {
+              "t": "R",
+              "i": 0,
+              "b": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "exit": {
+      "extension": "prelude",
+      "name": "exit",
+      "description": "Exit with input error",
+      "signature": {
+        "params": [
+          {
+            "tp": "List",
+            "param": {
+              "tp": "Type",
+              "b": "A"
+            }
+          },
+          {
+            "tp": "List",
+            "param": {
+              "tp": "Type",
+              "b": "A"
+            }
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "prelude",
+              "extension_version": "0.2.2",
+              "id": "error",
+              "args": [],
+              "bound": "C"
+            },
+            {
+              "t": "R",
+              "i": 0,
+              "b": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "R",
+              "i": 1,
+              "b": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "load_nat": {
+      "extension": "prelude",
+      "name": "load_nat",
+      "description": "Loads a generic bounded nat parameter into a usize runtime value.",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": null
+          }
+        ],
+        "body": {
+          "input": [],
+          "output": [
+            {
+              "t": "I"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "panic": {
+      "extension": "prelude",
+      "name": "panic",
+      "description": "Panic with input error",
+      "signature": {
+        "params": [
+          {
+            "tp": "List",
+            "param": {
+              "tp": "Type",
+              "b": "A"
+            }
+          },
+          {
+            "tp": "List",
+            "param": {
+              "tp": "Type",
+              "b": "A"
+            }
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "prelude",
+              "extension_version": "0.2.2",
+              "id": "error",
+              "args": [],
+              "bound": "C"
+            },
+            {
+              "t": "R",
+              "i": 0,
+              "b": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "R",
+              "i": 1,
+              "b": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "print": {
+      "extension": "prelude",
+      "name": "print",
+      "description": "Print the string to standard output",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "prelude",
+              "extension_version": "0.2.2",
+              "id": "string",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": []
+        }
+      },
+      "binary": false
+    }
+  }
+}
