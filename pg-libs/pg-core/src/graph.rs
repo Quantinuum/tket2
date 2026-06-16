@@ -17,12 +17,14 @@ pub enum Pauli {
 }
 
 /// A pg-core program consisting of a qubit count and an ordered list of operations.
-/// - All Op::Gate operations have valid parameter counts for their gate type.
-/// - All Op::Gate operations have valid arguments for their gate type, and the arguments are within the valid range.
+///
+/// The following structural validity checks are performed at `Op` insertion time:
+/// - All `Op::Gate` operations have valid parameter counts for their gate type.
+/// - All `Op::Gate` operations have valid arguments for their gate type, within the valid range.
 /// - All Pauli graph native operations have Pauli strings with length matching the graph's qubit count.
-/// - Conditional bits/values lengths match
-/// - Op::BlackBox operations have all argument qubits within the valid range
-/// - GateType::BlackBox gates have no conditions and have an associated payload
+/// - Conditional bits/values lengths match.
+/// - `Op::BlackBox` operations have all argument qubits within the valid range.
+/// - `GateType::BlackBox` gates have no conditions.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(from = "PauliGraphRaw")]
 pub struct PauliGraph {
