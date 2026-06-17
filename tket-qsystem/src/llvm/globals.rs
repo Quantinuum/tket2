@@ -46,9 +46,9 @@ impl<PCG: PreludeCodegen> GlobalsCodegenExtension<PCG> {
     pub fn new(pcg: PCG) -> Self {
         Self {
             pcg,
-            // Using signal of 1001 for now
-            // See https://github.com/Quantinuum/tket2/issues/1707
-            no_global_error: ConstError::new(1001, "No global provided for GlobalsOp::With"),
+            no_global_error: ConstError::new_default_signal(
+                "No global provided for GlobalsOp::With",
+            ),
         }
     }
 
