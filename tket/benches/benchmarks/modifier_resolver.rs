@@ -23,12 +23,6 @@ fn run_modifier_resolver_through_normalize_guppy(hugr: &mut Hugr) {
     normalize.run(hugr).unwrap();
 }
 
-fn run_normalize_guppy_without_modifier_resolver(hugr: &mut Hugr) {
-    let mut normalize = NormalizeGuppy::default();
-    normalize.resolve_modifiers(false);
-    normalize.run(hugr).unwrap();
-}
-
 fn bench_modifier_resolver(c: &mut Criterion) {
     let mut group = c.benchmark_group("modifier resolver");
     group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
@@ -60,30 +54,6 @@ fn bench_modifier_resolver(c: &mut Criterion) {
             BatchSize::SmallInput,
         )
     });
-
-    group.bench_function("double_modifier_normalize_without_resolve", |b| {
-        b.iter_batched(
-            || double_modifier_hugr.clone(),
-            |mut hugr| {
-                run_normalize_guppy_without_modifier_resolver(&mut hugr);
-                black_box(hugr)
-            },
-            BatchSize::SmallInput,
-        )
-    });
-    group.bench_function(
-        "higher_order_function_w_arrays_normalize_without_resolve",
-        |b| {
-            b.iter_batched(
-                || higher_order_hugr.clone(),
-                |mut hugr| {
-                    run_normalize_guppy_without_modifier_resolver(&mut hugr);
-                    black_box(hugr)
-                },
-                BatchSize::SmallInput,
-            )
-        },
-    );
 
     let guppy_no_modifier_hugr = load_hugr(include_bytes!(
         "../../../test_files/guppy_examples/conditional_loop.hugr"
