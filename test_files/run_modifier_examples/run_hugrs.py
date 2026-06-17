@@ -1,10 +1,9 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang ==0.21.15",
+#     "guppylang==1.0.0a4",
+#     "guppylang-internals>=1.0.0a4",
 # ]
-# [tool.uv.sources]
-# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", branch = "na/temporary-cherrypicked"}
 # ///
 """Run on selene the passed hugrs"""
 

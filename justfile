@@ -101,6 +101,7 @@ recompile-modifiers:
     just test_files/modifier_examples/recompile-hugrs
     just test_files/run_modifier_examples/run-hugrs
 
+# Regenerates one the hugr corresponding to `test_files/modifier_examples/{{name}}` and run the passes on it
 recompile-modifier name:
     @echo "---- Compiling hugr {{name}} ----"
     uv run maturin develop --uv
