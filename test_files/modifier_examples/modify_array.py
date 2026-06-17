@@ -1,10 +1,8 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang",
+#     "guppylang==1.0.0a4",
 # ]
-# [tool.uv.sources]
-# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", branch = "na/temporary-cherrypicked"}
 # ///
 """Test control modifiers on an array element"""
 

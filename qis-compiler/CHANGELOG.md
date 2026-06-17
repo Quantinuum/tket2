@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.3.0...qis-compiler-v0.3.1) (2026-06-15)
+
+
+### Bug Fixes
+
+* Add missing `tket.measurement` extension to loading registry ([#1692](https://github.com/Quantinuum/tket2/issues/1692)) ([6cdbd54](https://github.com/Quantinuum/tket2/commit/6cdbd54a03fbaf2da370c01647925bf4c5098a58))
+
 ## [0.3.0](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.2.10...qis-compiler-v0.3.0) (2026-06-11)
 
 

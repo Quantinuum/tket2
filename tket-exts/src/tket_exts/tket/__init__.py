@@ -12,6 +12,7 @@ from . import (
     wasm,
     modifier,
     global_phase,
+    globals,
 )
 
 __all__ = [
@@ -28,4 +29,5 @@ __all__ = [
     "wasm",
     "modifier",
     "global_phase",
+    "globals",
 ]

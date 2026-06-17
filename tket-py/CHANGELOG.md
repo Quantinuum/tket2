@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.14.1](https://github.com/Quantinuum/tket2/compare/tket-py-v0.14.0...tket-py-v0.14.1) (2026-06-12)
+
+
+### Bug Fixes
+
+* Add missing extensions in `tket-py`'s registry ([#1678](https://github.com/Quantinuum/tket2/issues/1678)) ([0c551ce](https://github.com/Quantinuum/tket2/commit/0c551cee98b1a233757676c34e4f4f3eaac5c8bf))
+* Bundle extra extensions when exporting a CompilationState ([#1680](https://github.com/Quantinuum/tket2/issues/1680)) ([6ae9d4f](https://github.com/Quantinuum/tket2/commit/6ae9d4f4867e80cd4e90ed27ed694f182d108fb5))
+* Propagate metadata to monomorphized nodes ([#1683](https://github.com/Quantinuum/tket2/pull/1683))
+
 ## [0.14.0](https://github.com/Quantinuum/tket2/compare/tket-py-v0.13.1...tket-py-v0.14.0) (2026-06-11)
 
 
