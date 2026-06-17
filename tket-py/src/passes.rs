@@ -85,8 +85,8 @@ create_py_exception!(
 /// - constant_folding: Whether to constant fold the program.
 /// - remove_dead_funcs: Whether to remove dead functions.
 /// - inline_dfgs: Whether to inline DFG operations.
-/// - squash_borrows: Whether to squash return-borrow pairs on BorrowArrays.
 /// - remove_redundant_order_edges: Whether to remove redundant order edges.
+/// - squash_borrows: Whether to squash return-borrow pairs on BorrowArrays.
 #[pyfunction]
 #[pyo3(signature = (circ, *, resolve_modifiers = true, simplify_cfgs = true, remove_tuple_untuple = true, constant_folding = true, remove_dead_funcs = true, inline_dfgs = true, remove_redundant_order_edges = true, squash_borrows = true, scope = None))]
 #[expect(clippy::too_many_arguments)]
