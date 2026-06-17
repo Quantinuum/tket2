@@ -1,0 +1,65 @@
+# /// script
+# requires-python = ">=3.13"
+# dependencies = [
+#     "guppylang==1.0.0a4",
+# ]
+# ///
+"""Testing a dagger modifier on multiple functions"""
+
+from pathlib import Path
+from sys import argv
+import sys
+
+from guppylang import guppy
+from guppylang.std.builtins import dagger, control
+from guppylang.std.debug import state_result
+from guppylang.std.quantum import discard, qubit
+from guppylang.std.quantum import s, rx
+from guppylang.std.angles import angle
+
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+
+from guppylang.experimental import enable_experimental_features
+
+enable_experimental_features()
+
+
+@guppy
+def get_f() -> float:
+    return 1 / 3
+
+
+@guppy(unitary=True)
+def foo1(q: qubit) -> None:
+    rx(q, angle(1 / 2))
+
+
+@guppy(unitary=True)
+def foo2(q: qubit) -> None:
+    s(q)
+
+
+@guppy(unitary=True)
+def foo3(q: qubit, f: float) -> None:
+    rx(q, angle(f))
+
+
+@guppy
+def main() -> None:
+    c = qubit()
+    t = qubit()
+
+    with dagger:
+        with control(c):
+            f = get_f()
+            foo2(t)
+            foo3(t, f)
+        foo1(c)
+
+    state_result("r", c, t)
+    discard(t)
+    discard(c)
+
+
+program = main.compile()
+Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
