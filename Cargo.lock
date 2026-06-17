@@ -267,16 +267,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "basic-passes"
-version = "0.1.0"
-source = "git+https://github.com/Quantinuum/pg-libs#f2b6509f0054dff3ee76b1294db5b8b60c942d3d"
-dependencies = [
- "pauli-graph 0.1.0 (git+https://github.com/Quantinuum/pg-libs)",
- "pg-functions 0.1.0 (git+https://github.com/Quantinuum/pg-libs)",
- "qubit-major-tableau 0.1.0 (git+https://github.com/Quantinuum/pg-libs)",
-]
-
-[[package]]
 name = "bimap"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1253,9 +1243,9 @@ dependencies = [
 name = "fast-todd"
 version = "0.1.0"
 dependencies = [
- "pauli-graph 0.1.0 (git+https://github.com/Quantinuum/pg-libs)",
+ "pauli-graph 0.1.0 (git+https://github.com/quantinuum/pg-libs.git)",
  "petgraph 0.8.3",
- "qubit-major-tableau 0.1.0 (git+https://github.com/Quantinuum/pg-libs)",
+ "qubit-major-tableau 0.1.0 (git+https://github.com/quantinuum/pg-libs.git)",
 ]
 
 [[package]]
@@ -1536,7 +1526,7 @@ version = "0.1.0"
 source = "git+https://github.com/quantinuum-dev/greedy-pauli-rs?branch=refactor-pauli-graph-into-separate-crate#9d03440173d7dfcb7287d9909b0bb39e0b0fae65"
 dependencies = [
  "approx_eq",
- "basic-passes 0.1.0 (git+ssh://git@github.com/Quantinuum/pg-libs.git)",
+ "basic-passes",
  "bytemuck",
  "cblas",
  "clap",
@@ -2499,7 +2489,7 @@ dependencies = [
 [[package]]
 name = "pauli-graph"
 version = "0.1.0"
-source = "git+https://github.com/Quantinuum/pg-libs#f2b6509f0054dff3ee76b1294db5b8b60c942d3d"
+source = "git+https://github.com/quantinuum/pg-libs.git#f2b6509f0054dff3ee76b1294db5b8b60c942d3d"
 dependencies = [
  "serde",
 ]
@@ -2588,10 +2578,10 @@ dependencies = [
 [[package]]
 name = "pg-functions"
 version = "0.1.0"
-source = "git+https://github.com/Quantinuum/pg-libs#f2b6509f0054dff3ee76b1294db5b8b60c942d3d"
+source = "git+https://github.com/quantinuum/pg-libs.git#f2b6509f0054dff3ee76b1294db5b8b60c942d3d"
 dependencies = [
  "approx_eq",
- "pauli-graph 0.1.0 (git+https://github.com/Quantinuum/pg-libs)",
+ "pauli-graph 0.1.0 (git+https://github.com/quantinuum/pg-libs.git)",
  "rand 0.9.4",
 ]
 
@@ -3006,10 +2996,10 @@ dependencies = [
 [[package]]
 name = "qubit-major-tableau"
 version = "0.1.0"
-source = "git+https://github.com/Quantinuum/pg-libs#f2b6509f0054dff3ee76b1294db5b8b60c942d3d"
+source = "git+https://github.com/quantinuum/pg-libs.git#f2b6509f0054dff3ee76b1294db5b8b60c942d3d"
 dependencies = [
- "pauli-graph 0.1.0 (git+https://github.com/Quantinuum/pg-libs)",
- "pg-functions 0.1.0 (git+https://github.com/Quantinuum/pg-libs)",
+ "pauli-graph 0.1.0 (git+https://github.com/quantinuum/pg-libs.git)",
+ "pg-functions 0.1.0 (git+https://github.com/quantinuum/pg-libs.git)",
  "rand 0.9.4",
  "rayon",
 ]
@@ -3987,7 +3977,7 @@ version = "0.19.0"
 dependencies = [
  "anyhow",
  "ascent",
- "basic-passes 0.1.0 (git+https://github.com/Quantinuum/pg-libs)",
+ "basic-passes",
  "bytemuck",
  "cgmath",
  "chrono",
@@ -4008,7 +3998,7 @@ dependencies = [
  "lazy_static",
  "num-rational",
  "pastey",
- "pauli-graph 0.1.0 (git+https://github.com/Quantinuum/pg-libs)",
+ "pauli-graph 0.1.0 (git+ssh://git@github.com/Quantinuum/pg-libs.git)",
  "pest",
  "pest_derive",
  "petgraph 0.8.3",

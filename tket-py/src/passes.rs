@@ -39,7 +39,7 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     m.add("PullForwardError", py.get_type::<PyPullForwardError>())?;
     m.add(
         "InlineFunctionsError",
-        py.get_type::<PyInlineFunctionsError>(),
+        py.get_type::<PyInlineFuncsError>(),
     )?;
     m.add("TK1PassError", py.get_type::<tket1::PytketPassError>())?;
     Ok(m)
@@ -64,7 +64,7 @@ create_py_exception!(
 );
 
 create_py_exception!(
-    hugr::algorithms::inline_funcs::InlineFuncsError,
+    tket::passes::inline_funcs::InlineFuncsError,
     PyInlineFuncsError,
     "Errors from inlining pass."
 );
@@ -245,36 +245,29 @@ fn qsystem_rebase_pass(
 }
 
 #[pyfunction]
-#[pyo3(signature = (circ, ancilla_budget=0))]
-fn global_t_resynthesis<'py>(
-    circ: &Bound<'py, PyAny>,
+#[pyo3(signature = (circ, ancilla_budget=0, scope = None))]
+fn global_t_resynthesis(
+    circ: &mut CompilationState,
     ancilla_budget: usize,
-) -> PyResult<Bound<'py, PyAny>> {
-    let py = circ.py();
-    try_with_circ(circ, |mut circ, typ| {
-        let mut pass = tket::passes::GlobalTResynthesis::default();
-        
-        pass.with_ancilla_budget(ancilla_budget);
-        pass.run(circ.hugr_mut()).convert_pyerrs()?;
-        
-        let circ = typ.convert(py, circ)?;
-        PyResult::Ok(circ)
-    })
+    scope: Option<PyPassScope>,
+) -> PyResult<()> {
+    let py_scope = scope.unwrap_or_default();
+    let global_t_resynthesis_pass = tket::passes::GlobalTResynthesis::default_with_scope(py_scope.scope)
+        .with_ancilla_budget(ancilla_budget);
+
+    global_t_resynthesis_pass.run(&mut circ.hugr).convert_pyerrs()?;
+    Ok(())
 }
 
-// #[pyfunction]
-// #[pyo3(signature = (circ, ancilla_budget=0))]
-// fn inline_all<'py>(
-//     circ: &Bound<'py, PyAny>,
-//     ancilla_budget: usize,
-// ) -> PyResult<Bound<'py, PyAny>> {
-//     let py = circ.py();
-//     try_with_circ(circ, |mut circ, typ| {
-//         let mut pass = tket::passes::InlineAll::default();
-//         
-//         pass.run(circ.hugr_mut()).convert_pyerrs()?;
-//         
-//         let circ = typ.convert(py, circ)?;
-//         PyResult::Ok(circ)
-//     })
-// }
+fn global_t_resynthesis(
+    circ: &mut CompilationState,
+    ancilla_budget: usize,
+    scope: Option<PyPassScope>,
+) -> PyResult<()> {
+    let py_scope = scope. unwrap_or_default();
+    let globa_t_resynthesis_pass = tket::passes::GlobalTResynthesis::default_with_scope(py_scope.scope)
+        .with_ancilla_budget(ancilla_budget);
+
+    global_t_resynthesis_pass.run(&mut circ.hugr).convert_pyerrs()?;
+    Ok(())
+}
