@@ -244,10 +244,16 @@ def test_normalize_guppy():
 
 
 def test_modifier_resolver() -> None:
-    normalize = NormalizeGuppy()
+    normalize = NormalizeGuppy(resolve_modifiers=False)
+    normalize_with_modifier_resolution = NormalizeGuppy()
     mr_pass = ModifierResolverPass()
     modifier_hugr: Hugr = _hugr_from_path("test_files/guppy_examples/modifiers.hugr")
 
+    normalized_and_resolved: Hugr = normalize_with_modifier_resolution(modifier_hugr)
+    assert _count_ops(normalized_and_resolved, "tket.modifier.ControlModifier") == 0
+    assert _count_ops(normalized_and_resolved, "tket.modifier.DaggerModifier") == 0
+
+    modifier_hugr = _hugr_from_path("test_files/guppy_examples/modifiers.hugr")
     modifier_hugr = normalize(modifier_hugr)
 
     assert _count_ops(modifier_hugr, "tket.modifier.ControlModifier") == 1
