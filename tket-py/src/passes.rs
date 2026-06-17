@@ -79,6 +79,7 @@ create_py_exception!(
 /// This should normally be called first before other optimisations.
 ///
 /// Parameters:
+/// - resolve_modifiers: Whether to resolve modifier operations.
 /// - simplify_cfgs: Whether to simplify CFG control flow.
 /// - remove_tuple_untuple: Whether to remove tuple/untuple operations.
 /// - constant_folding: Whether to constant fold the program.
@@ -87,10 +88,11 @@ create_py_exception!(
 /// - squash_borrows: Whether to squash return-borrow pairs on BorrowArrays.
 /// - remove_redundant_order_edges: Whether to remove redundant order edges.
 #[pyfunction]
-#[pyo3(signature = (circ, *, simplify_cfgs = true, remove_tuple_untuple = true, constant_folding = true, remove_dead_funcs = true, inline_dfgs = true, remove_redundant_order_edges = true, squash_borrows = true, scope = None))]
+#[pyo3(signature = (circ, *, resolve_modifiers = true, simplify_cfgs = true, remove_tuple_untuple = true, constant_folding = true, remove_dead_funcs = true, inline_dfgs = true, remove_redundant_order_edges = true, squash_borrows = true, scope = None))]
 #[expect(clippy::too_many_arguments)]
 fn normalize_guppy(
     circ: &mut CompilationState,
+    resolve_modifiers: bool,
     simplify_cfgs: bool,
     remove_tuple_untuple: bool,
     constant_folding: bool,
@@ -103,7 +105,8 @@ fn normalize_guppy(
     let py_scope = scope.unwrap_or_default();
     let mut pass = tket::passes::NormalizeGuppy::default_with_scope(py_scope.scope);
 
-    pass.simplify_cfgs(simplify_cfgs)
+    pass.resolve_modifiers(resolve_modifiers)
+        .simplify_cfgs(simplify_cfgs)
         .remove_tuple_untuple(remove_tuple_untuple)
         .constant_folding(constant_folding)
         .remove_dead_funcs(remove_dead_funcs)
