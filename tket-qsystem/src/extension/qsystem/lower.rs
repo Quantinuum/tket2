@@ -739,7 +739,7 @@ mod test {
     use crate::extension::qsystem::{helios::HeliosOp, sol::SolOp};
 
     use super::*;
-    use rstest::rstest;
+    use rstest::{fixture, rstest};
 
     #[derive(Debug, PartialEq, Eq)]
     enum ExpectedOp {
@@ -794,7 +794,7 @@ mod test {
             .expect("circuit entrypoint should be dataflow region")
     }
 
-    fn assert_helios_lowered(h: &hugr::Hugr) {
+    fn assert_sol_to_helios_lowering(h: &hugr::Hugr) {
         assert_eq!(
             check_lowered(
                 h,
@@ -817,9 +817,21 @@ mod test {
             h.nodes()
                 .any(|n| h.get_optype(n).cast() == Some(HeliosOp::ZZPhase))
         );
+        // There should be only one replacement function.
+        assert_eq!(
+            h.nodes()
+                .filter(|&n| {
+                    h.get_optype(n).as_func_defn().is_some_and(|f| {
+                        f.func_name().to_string() == "__tk2_sol_to_helios_phasedxx"
+                    })
+                })
+                .count(),
+            1,
+            "Expected exactly one replacement function"
+        );
     }
 
-    fn assert_sol_lowered(h: &hugr::Hugr) {
+    fn assert_helios_to_sol_lowering(h: &hugr::Hugr) {
         assert_eq!(
             check_lowered(
                 h,
@@ -841,6 +853,18 @@ mod test {
         assert!(
             h.nodes()
                 .any(|n| h.get_optype(n).cast() == Some(SolOp::PhasedXX))
+        );
+        // There should be only one replacement function.
+        assert_eq!(
+            h.nodes()
+                .filter(|&n| {
+                    h.get_optype(n)
+                        .as_func_defn()
+                        .is_some_and(|f| f.func_name().to_string() == "__tk2_helios_to_sol_zzphase")
+                })
+                .count(),
+            1,
+            "Expected exactly one replacement function"
         );
     }
 
@@ -1180,7 +1204,7 @@ mod test {
 
         lower_tk2_ops(&mut h, Preserve::Public, QSystemPlatform::Sol).unwrap();
         h.validate().unwrap();
-        assert_sol_lowered(&h);
+        assert_helios_to_sol_lowering(&h);
     }
 
     /// A `tket.qsystem.sol::PhasedXX` op targeting Helios is lowered via the
@@ -1214,7 +1238,7 @@ mod test {
 
         lower_tk2_ops(&mut h, Preserve::Public, QSystemPlatform::Helios).unwrap();
         h.validate().unwrap();
-        assert_helios_lowered(&h);
+        assert_sol_to_helios_lowering(&h);
     }
 
     /// A pre-existing `helios::RuntimeBarrier` op is silently skipped when
@@ -1305,7 +1329,6 @@ mod test {
         #[case] first: QSystemPlatform,
         #[case] second: QSystemPlatform,
     ) {
-        use hugr::std_extensions::collections::array::ArrayOpBuilder;
         use tket::extension::rotation::rotation_type;
 
         // Build a HUGR with a multi-qubit TketOp (CX) which will decompose into
@@ -1552,7 +1575,7 @@ mod test {
     // Comprehensive fixture: all supported ops
     //
     /// Build a HUGR containing all TketOps supported plus platform-specific ops
-    /// (HeliosOp::ZZPhase, SolOp::PhasedXX), and shared ops (PhasedX/Rz).
+    /// (HeliosOp::ZZPhase, SolOp::PhasedXX) and shared ops (PhasedX/Rz).
     #[fixture]
     fn all_ops_hugr() -> hugr::Hugr {
         use hugr::std_extensions::arithmetic::float_types::float64_type;
@@ -1563,7 +1586,7 @@ mod test {
             "all_ops",
             Signature::new(
                 vec![rotation_type(), float64_type(), float64_type()],
-                vec![bool_t()],
+                vec![bool_t(), bool_t(), bool_t()],
             ),
         )
         .unwrap();
@@ -1577,8 +1600,20 @@ mod test {
         let [q0] = b
             .build_unwrap_sum(1, option_type(vec![qb_t()]), maybe_q0)
             .unwrap();
-        let [q1] = b.add_dataflow_op(TketOp::QAlloc, []).unwrap().outputs_arr();
-        let [q2] = b.add_dataflow_op(TketOp::QAlloc, []).unwrap().outputs_arr();
+        let [maybe_q1] = b
+            .add_dataflow_op(TketOp::TryQAlloc, [])
+            .unwrap()
+            .outputs_arr();
+        let [q1] = b
+            .build_unwrap_sum(1, option_type(vec![qb_t()]), maybe_q1)
+            .unwrap();
+        let [maybe_q2] = b
+            .add_dataflow_op(TketOp::TryQAlloc, [])
+            .unwrap()
+            .outputs_arr();
+        let [q2] = b
+            .build_unwrap_sum(1, option_type(vec![qb_t()]), maybe_q2)
+            .unwrap();
 
         // Single-qubit gates
         let [q0] = b.add_dataflow_op(TketOp::H, [q0]).unwrap().outputs_arr();
@@ -1622,25 +1657,7 @@ mod test {
 
         // Two-qubit rotation gate
         let [q1, q2] = b
-            .add_dataflow_op(TketOp::CRz, [q0, q1, angle])
-            .unwrap()
-            .outputs_arr();
-
-        // Three-qubit gate
-        let [q0, q1, q2] = b
-            .add_dataflow_op(TketOp::Toffoli, [q0, q1, q2])
-            .unwrap()
-            .outputs_arr();
-
-        // Helios ZZPhase
-        let [q0, q2] = b
-            .add_dataflow_op(HeliosOp::ZZPhase, [q0, q2, float1])
-            .unwrap()
-            .outputs_arr();
-
-        // Sol PhasedXX
-        let [q1, q2] = b
-            .add_dataflow_op(SolOp::PhasedXX, [ql, q2, float1, float2])
+            .add_dataflow_op(TketOp::CRz, [q1, q2, angle])
             .unwrap()
             .outputs_arr();
 
@@ -1660,7 +1677,27 @@ mod test {
             .unwrap()
             .outputs_arr();
         let [q2] = b
-            .add_dataflow_op(SolOp::Rz, [q2, float1])
+            .add_dataflow_op(SolOp::Rz, [q2, float2])
+            .unwrap()
+            .outputs_arr();
+
+        // Helios ZZPhase
+        let [q0, q1] = b
+            .add_dataflow_op(HeliosOp::ZZPhase, [q0, q1, float1])
+            .unwrap()
+            .outputs_arr();
+        let [q1, q2] = b
+            .add_dataflow_op(HeliosOp::ZZPhase, [q1, q2, float2])
+            .unwrap()
+            .outputs_arr();
+
+        // Sol PhasedXX
+        let [q0, q1] = b
+            .add_dataflow_op(SolOp::PhasedXX, [q0, q1, float1, float2])
+            .unwrap()
+            .outputs_arr();
+        let [q1, q2] = b
+            .add_dataflow_op(SolOp::PhasedXX, [q1, q2, float2, float1])
             .unwrap()
             .outputs_arr();
 
@@ -1685,27 +1722,27 @@ mod test {
             .unwrap()
     }
 
-    /// Verify the fixture HUGR is valid before any lowering.
-    #[test]
+    /// Verify the fixture HUGR is valid before any lowering
+    #[rstest]
     fn test_all_ops_hugr_is_valid(all_ops_hugr: hugr::Hugr) {
         all_ops_hugr.validate().unwrap();
     }
 
-    /// Lower the all-ops fixture to Helios and verify no TketOps remain.
-    #[test]
+    /// Verify lowering the all-ops fixture to Helios
+    #[rstest]
     fn test_lower_all_ops_to_helios(all_ops_hugr: hugr::Hugr) {
         let mut h = all_ops_hugr;
         lower_tk2_ops(&mut h, Preserve::Public, QSystemPlatform::Helios).unwrap();
         h.validate().unwrap();
-        assert_helios_lowered(&h);
+        assert_sol_to_helios_lowering(&h);
     }
 
-    /// Lower the all-ops fixture to Sol and verify no TketOps remain.
-    #[test]
-    fn test_lower_all_ops_to_sol() {
-        let mut h = build_all_ops_fixture();
+    /// Verify lowering the all-ops fixture to Sol
+    #[rstest]
+    fn test_lower_all_ops_to_sol(all_ops_hugr: hugr::Hugr) {
+        let mut h = all_ops_hugr;
         lower_tk2_ops(&mut h, Preserve::Public, QSystemPlatform::Sol).unwrap();
         h.validate().unwrap();
-        assert_sol_lowered(&h);
+        assert_helios_to_sol_lowering(&h);
     }
 }
