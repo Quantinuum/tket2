@@ -3,8 +3,7 @@ use hugr::builder::{Container, HugrBuilder};
 use hugr::core::Visibility;
 use hugr::extension::prelude::{Barrier, Noop, bool_t};
 use hugr::extension::simple_op::{MakeExtensionOp, MakeRegisteredOp};
-use hugr::hugr::linking::NameLinkingPolicy;
-use hugr::hugr::linking::OnMultiDefn;
+use hugr::hugr::linking::{NameLinkingPolicy, OnMultiDefn};
 use hugr::hugr::patch::insert_cut::InsertCutError;
 use hugr::ops::handle::{FuncID, NodeHandle};
 use hugr::{
@@ -357,7 +356,7 @@ fn build_func(platform: QSystemPlatform, op: TketOp) -> Result<Hugr, LowerTk2Err
         platform_str(platform),
         op.op_id().to_lowercase()
     );
-    let mut f_build = FunctionBuilder::new(f_name, sig)?;
+    let mut f_build = FunctionBuilder::new_vis(f_name, sig, hugr::core::Visibility::Public)?;
     let outputs = build_func_outputs(platform, &mut f_build, op)?;
     Ok(f_build.finish_hugr_with_outputs(outputs)?)
 }
@@ -418,6 +417,13 @@ where
     Ok(outputs)
 }
 
+fn build_to_radians(b: &mut impl Dataflow, rotation: Wire) -> Result<Wire, BuildError> {
+    let turns = b.add_to_halfturns(rotation)?;
+    let pi = pi_mul_f64(b, 1.0);
+    let float = b.add_dataflow_op(FloatOps::fmul, [turns, pi])?.out_wire(0);
+    Ok(float)
+}
+
 /// Given a hugr with a function definition as entrypoint, constructs a
 /// [`NodeTemplate::LinkedHugr`] that produces a call to the function.
 //
@@ -443,13 +449,6 @@ fn func_as_node_template(func_def: Hugr) -> NodeTemplate {
         Box::new(call_hugr),
         NameLinkingPolicy::default().on_multiple_defn(OnMultiDefn::UseTarget),
     )
-}
-
-fn build_to_radians(b: &mut impl Dataflow, rotation: Wire) -> Result<Wire, BuildError> {
-    let turns = b.add_to_halfturns(rotation)?;
-    let pi = pi_mul_f64(b, 1.0);
-    let float = b.add_dataflow_op(FloatOps::fmul, [turns, pi])?.out_wire(0);
-    Ok(float)
 }
 
 /// Map a [`TketOp`] to the [`SharedOp`] it directly corresponds to, if any.
@@ -627,9 +626,10 @@ fn build_helios_op_for_sol() -> Result<Hugr, LowerTk2Error> {
         .expect("valid registered HeliosOp")
         .signature()
         .into_owned();
-    let mut f_build = FunctionBuilder::new(
+    let mut f_build = FunctionBuilder::new_vis(
         "__tk2_helios_to_sol_zzphase",
         Signature::new(sig.input, sig.output),
+        hugr::core::Visibility::Public,
     )?;
     let [qb1, qb2, angle] = f_build.input_wires_arr();
     let mut synth = SolSynthesizer::new(&mut f_build);
@@ -646,9 +646,10 @@ fn build_sol_op_for_helios() -> Result<Hugr, LowerTk2Error> {
         .expect("valid registered SolOp")
         .signature()
         .into_owned();
-    let mut f_build = FunctionBuilder::new(
+    let mut f_build = FunctionBuilder::new_vis(
         "__tk2_sol_to_helios_phasedxx",
         Signature::new(sig.input, sig.output),
+        hugr::core::Visibility::Public,
     )?;
     let [qb1, qb2, angle1, angle2] = f_build.input_wires_arr();
     let mut synth = HeliosSynthesizer::new(&mut f_build);
@@ -1207,7 +1208,6 @@ mod test {
     /// Two `TketOp::H` ops lowered to Helios should share exactly one
     /// `__tk2_helios_h` replacement function (deduplication via `OnMultiDefn::UseTarget`).
     #[test]
-    #[should_panic(expected = "Expected exactly one __tk2_helios_h replacement function")]
     fn test_duplicate_tket_ops_produce_single_replacement_func() {
         let mut b = FunctionBuilder::new("f", Signature::new_endo(type_row![])).unwrap();
         let [q] = b.add_dataflow_op(TketOp::QAlloc, []).unwrap().outputs_arr();
