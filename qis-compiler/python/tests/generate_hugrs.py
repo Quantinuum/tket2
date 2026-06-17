@@ -1,13 +1,11 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#     "guppylang ==0.21.14",
-#     "guppylang-internals",
+#     "guppylang==1.0.0a4",
+#     "guppylang-internals>=1.0.0a4",
 #     "tket",
 #     "pytket >=2.1.0,<3",
 # ]
-# [tool.uv.sources]
-# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", branch = "ts/future-measure"}  # noqa: E501
 # ///
 
 from pathlib import Path
