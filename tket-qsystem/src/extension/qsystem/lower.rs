@@ -1204,6 +1204,35 @@ mod test {
         );
     }
 
+    /// Two `TketOp::H` ops lowered to Helios should share exactly one
+    /// `__tk2_helios_h` replacement function (deduplication via `OnMultiDefn::UseTarget`).
+    #[test]
+    #[should_panic(expected = "Expected exactly one __tk2_helios_h replacement function")]
+    fn test_duplicate_tket_ops_produce_single_replacement_func() {
+        let mut b = FunctionBuilder::new("f", Signature::new_endo(type_row![])).unwrap();
+        let [q] = b.add_dataflow_op(TketOp::QAlloc, []).unwrap().outputs_arr();
+        let [q] = b.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
+        let [q] = b.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
+        b.add_dataflow_op(TketOp::QFree, [q]).unwrap();
+        let mut h = b.finish_hugr_with_outputs([]).unwrap();
+
+        lower_tk2_ops(&mut h, Preserve::Public, QSystemPlatform::Helios).unwrap();
+        h.validate().unwrap();
+
+        let h_func_count = h
+            .nodes()
+            .filter(|&n| {
+                h.get_optype(n)
+                    .as_func_defn()
+                    .is_some_and(|f| *f.func_name() == "__tk2_helios_h")
+            })
+            .count();
+        assert_eq!(
+            h_func_count, 1,
+            "Expected exactly one __tk2_helios_h replacement function"
+        );
+    }
+
     /// Legacy `tket.qsystem` ops that correspond to [`SharedOp`] variants
     /// (e.g. `Reset`, `TryQAlloc`) can be lowered to Sol directly. Helios-specific
     /// ops are remapped via the cross-platform decomposition path.
