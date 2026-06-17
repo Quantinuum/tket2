@@ -1,8 +1,10 @@
+mod errors;
 mod gates;
 mod graph;
 mod ops;
 mod traits;
 
+pub use errors::PauliGraphError;
 pub use gates::GateType;
 pub use graph::{Pauli, PauliGraph};
 pub use ops::{

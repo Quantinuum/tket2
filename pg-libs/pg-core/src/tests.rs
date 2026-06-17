@@ -4,8 +4,13 @@ use std::collections::HashSet;
 
 #[test]
 fn string_to_paulis_parses_all_symbols() {
-    let paulis = string_to_paulis("IXYZ");
+    let paulis = string_to_paulis("IXYZ").unwrap();
     assert_eq!(paulis, vec![Pauli::I, Pauli::X, Pauli::Y, Pauli::Z]);
+}
+
+#[test]
+fn string_to_paulis_panics_on_invalid_symbol() {
+    assert!(string_to_paulis("+IXYZ").is_err());
 }
 
 #[test]
@@ -374,7 +379,7 @@ fn add_qubit_preserves_graph_validity_for_mixed_ops() {
     });
 
     pg.add_qubit();
-    pg.validate();
+    assert!(pg.try_validate().is_ok());
 }
 
 #[test]
@@ -459,7 +464,7 @@ fn validate_valid_graph_does_not_panic() {
     pg.add_op(Op::Gate {
         data: GateData::new(GateType::RZ, vec![0]).with_params(vec![0.5]),
     });
-    pg.validate();
+    assert!(pg.try_validate().is_ok());
 }
 
 #[test]
@@ -665,10 +670,9 @@ fn serde_rotation_uses_compact_pauli_string() {
 }
 
 #[test]
-#[should_panic]
 fn serde_deserialize_mismatched_rotation_string_fails_validation() {
     // n_qubits = 2 but the Rotation Pauli string is length 1 ("X").
     // Deserialization succeeds; validate() should panic.
     let json = r#"{"n_qubits":2,"ops":[{"type":"Rotation","data":{"string":"X","angle":0.25}}]}"#;
-    let _pg: PauliGraph = serde_json::from_str(json).unwrap();
+    assert!(serde_json::from_str::<PauliGraph>(json).is_err());
 }

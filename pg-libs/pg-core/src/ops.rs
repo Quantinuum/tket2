@@ -1,15 +1,21 @@
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+use crate::errors::PauliGraphError;
 use crate::{GateType, Pauli};
 
-pub(crate) fn string_to_paulis(pstr: &str) -> Vec<Pauli> {
+pub(crate) fn string_to_paulis(pstr: &str) -> Result<Vec<Pauli>, PauliGraphError> {
     pstr.chars()
-        .map(|p_str| match p_str {
-            'I' => Pauli::I,
-            'X' => Pauli::X,
-            'Y' => Pauli::Y,
-            'Z' => Pauli::Z,
-            _ => panic!("Wrong Pauli letter"),
+        .map(|pauli| match pauli {
+            'I' => Ok(Pauli::I),
+            'X' => Ok(Pauli::X),
+            'Y' => Ok(Pauli::Y),
+            'Z' => Ok(Pauli::Z),
+            _ => Err(PauliGraphError::InvalidInputJson {
+                message: format!(
+                    "Invalid Pauli string: contains invalid character: {}",
+                    pauli
+                ),
+            }),
         })
         .collect()
 }
@@ -50,7 +56,7 @@ where
     D: Deserializer<'de>,
 {
     let s = String::deserialize(deserializer)?;
-    Ok(string_to_paulis(&s))
+    string_to_paulis(&s).map_err(serde::de::Error::custom)
 }
 
 fn deserialize_pauli_string_bool_vec<'de, D>(
@@ -60,10 +66,15 @@ where
     D: Deserializer<'de>,
 {
     let items = Vec::<(String, bool)>::deserialize(deserializer)?;
-    Ok(items
+    items
         .into_iter()
-        .map(|(s, sign)| (string_to_paulis(&s), sign))
-        .collect())
+        .map(|(s, sign)| {
+            Ok((
+                string_to_paulis(&s).map_err(serde::de::Error::custom)?,
+                sign,
+            ))
+        })
+        .collect()
 }
 
 /// An operation node in a Pauli graph.
