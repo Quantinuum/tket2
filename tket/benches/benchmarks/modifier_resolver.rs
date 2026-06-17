@@ -13,6 +13,7 @@ fn load_hugr(bytes: &[u8]) -> Hugr {
 fn run_modifier_resolver_through_normalize_guppy(hugr: &mut Hugr) {
     let mut normalize = NormalizeGuppy::default();
     normalize
+        .resolve_modifiers(true)
         .simplify_cfgs(false)
         .remove_tuple_untuple(false)
         .constant_folding(false)
@@ -30,7 +31,7 @@ fn bench_modifier_resolver(c: &mut Criterion) {
     let double_modifier_hugr = load_hugr(include_bytes!(
         "../../../test_files/modifier_examples/double_modifier.hugr"
     ));
-    group.bench_function("double_modifier_no_modifiers", |b| {
+    group.bench_function("double_modifier_resolve", |b| {
         b.iter_batched(
             || double_modifier_hugr.clone(),
             |mut hugr| {
