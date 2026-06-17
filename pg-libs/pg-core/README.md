@@ -6,3 +6,10 @@ This crate provides:
 - The `PGPass` trait, which defines passes over a `PauliGraph`.
 
 `pg-core` provides the core types and pass trait used throughout the stack.
+
+
+## License
+
+This project is licensed under Apache License, Version 2.0 ([LICENSE][] or http://www.apache.org/licenses/LICENSE-2.0).
+
+  [LICENSE]: https://github.com/quantinuum/tket2/blob/main/LICENCE

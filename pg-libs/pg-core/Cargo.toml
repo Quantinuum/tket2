@@ -1,11 +1,21 @@
 [package]
 name = "pg-core"
 version = "0.1.0"
-edition = "2024"
+edition = { workspace = true }
+rust-version = { workspace = true }
+
+license = { workspace = true }
+readme = "README.md"
+documentation = "https://docs.rs/pg-libs"
+homepage = { workspace = true }
+repository = { workspace = true }
+description = "..."
+keywords = ["Quantum", "Quantinuum"]
+categories = ["compilers", "science::quantum-computing"]
 
 [dependencies]
-serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1"
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
 thiserror = "2.0.18"
 
 [lints]
