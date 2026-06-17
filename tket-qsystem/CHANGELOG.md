@@ -1,6 +1,17 @@
 # Changelog
 
 
+## [0.26.0](https://github.com/Quantinuum/tket2/compare/tket-qsystem-v0.25.0...tket-qsystem-v0.26.0) - 2026-06-11
+
+### New Features
+
+- [**breaking**] Add `measurement` extension and change `tket.quantum` / `tket.qsystem` extension measurement ops return type ([#1558](https://github.com/Quantinuum/tket2/pull/1558))
+- Encode measurements followed by reads as pytket measurements ([#1658](https://github.com/Quantinuum/tket2/pull/1658))
+- [**breaking**] Upgrade hugr dependency to 0.28.0 ([#1580](https://github.com/Quantinuum/tket2/pull/1580))
+- *(qsystem)* Cross-compilation between Helios and Sol extensions ([#1647](https://github.com/Quantinuum/tket2/pull/1647))
+- Support debug info in qis-compiler ([#1521](https://github.com/Quantinuum/tket2/pull/1521))
+- [**breaking**] Remove deprecated definitions ([#1670](https://github.com/Quantinuum/tket2/pull/1670))
+
 ## [0.25.0](https://github.com/Quantinuum/tket2/compare/tket-qsystem-v0.24.0...tket-qsystem-v0.25.0) - 2026-05-28
 
 ### Bug Fixes

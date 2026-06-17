@@ -85,6 +85,7 @@ class PytketHugrPass(ComposablePass):
 
 @dataclass
 class NormalizeGuppy(ComposablePass):
+    resolve_modifiers: bool = True
     simplify_cfgs: bool = True
     remove_tuple_untuple: bool = True
     constant_folding: bool = True
@@ -99,6 +100,7 @@ class NormalizeGuppy(ComposablePass):
     This should normally be called first before other optimisations.
 
     Parameters:
+    - resolve_modifiers: Whether to resolve modifier operations.
     - simplify_cfgs: Whether to simplify CFG control flow.
     - remove_tuple_untuple: Whether to remove tuple/untuple operations.
     - constant_folding: Whether to constant fold the program.
@@ -137,6 +139,7 @@ class NormalizeGuppy(ComposablePass):
         TODO: This should be part of a protocol."""
         _passes.normalize_guppy(
             program._inner,
+            resolve_modifiers=self.resolve_modifiers,
             simplify_cfgs=self.simplify_cfgs,
             remove_tuple_untuple=self.remove_tuple_untuple,
             constant_folding=self.constant_folding,

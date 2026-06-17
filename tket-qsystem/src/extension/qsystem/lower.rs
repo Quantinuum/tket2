@@ -95,8 +95,11 @@ pub enum LowerTk2Error {
     ///
     /// Deprecated: Helios-specific ops are now handled via the cross-platform
     /// lowering path; `lower_tk2_ops` will no longer return this error.
-    #[deprecated = "Helios-specific ops are now handled by the cross-platform lowering path; \
-                    this error variant will no longer be returned by lower_tk2_ops."]
+    #[deprecated(
+        since = "0.26.0",
+        note = "Helios-specific ops are now handled by the cross-platform lowering path; \
+                    this error variant will no longer be returned by lower_tk2_ops."
+    )]
     #[display(
         "Helios-specific legacy tket.qsystem ops cannot be lowered to Sol via direct remapping; \
          use cross-platform lowering instead."
@@ -183,11 +186,15 @@ fn classify_node(
         }
         // Note: `helios::RuntimeBarrierDef` is not a `HeliosOp` variant, so a
         // pre-existing `helios::RuntimeBarrier` op in the HUGR would be silently
-        // skipped here (cast returns None). This is fine for the current use case
-        // where `lower_tk2_ops` is always called on a fresh HUGR containing only
-        // generic tket `Barrier` ops. If re-lowering an already-platform-lowered
-        // HUGR to a different platform becomes a requirement, cross-platform
-        // `RuntimeBarrier` remapping will need to be added here.
+        // skipped here (cast returns None). This is fine for the current use
+        // case: `RuntimeBarrier` is introduced by this lowering pass when it
+        // lowers generic tket `Barrier` ops, while other qsystem platform ops
+        // may already be present in the input HUGR and are handled above.
+        // Relowering a fresh HUGR with generic barriers and platform ops is
+        // supported, but relowering an already-platform-lowered HUGR that
+        // contains runtime barriers to a different platform is not. If that
+        // becomes a requirement, cross-platform `RuntimeBarrier` remapping will
+        // need to be added here.
         _ => None,
     }
 }

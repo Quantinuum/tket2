@@ -76,7 +76,8 @@ impl Metadata for CircuitRewriteTraces {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UnitaryFlags;
 impl Metadata for UnitaryFlags {
-    const KEY: &'static str = "unitary";
+    const KEY: &'static str = "tket.unitary";
+    const ALIASES: &'static [&'static str] = &["unitary"];
     type Type<'hugr> = u8;
 }
 

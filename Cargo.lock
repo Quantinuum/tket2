@@ -1158,20 +1158,20 @@ dependencies = [
 
 [[package]]
 name = "hugr"
-version = "0.28.0"
+version = "0.28.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d532f930b38a7550b1134a0dcdf7170701a361c2df4334865a113b8000895c2"
+checksum = "fea26a2751aaf406c046f733333dcc7b035d3a7ae72d604215d47f4728a7d349"
 dependencies = [
  "hugr-core",
  "hugr-llvm",
- "hugr-model",
+ "hugr-model 0.28.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "hugr-cli"
-version = "0.28.0"
+version = "0.28.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05db7bfd3598d3a0046f773b45e25e3d547462d9d18f38c401a44935274e3e4e"
+checksum = "528a7793aa15b5078aa21453dce1049056ae64d406d2c036609e9f71d0bd374e"
 dependencies = [
  "anyhow",
  "clap",
@@ -1191,9 +1191,8 @@ dependencies = [
 
 [[package]]
 name = "hugr-core"
-version = "0.28.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "363948429e03480342c09a28fdaef8ddb4efe828855100ca9bce5166a1998217"
+version = "0.28.1"
+source = "git+https://github.com/quantinuum/hugr?rev=4f133bc#4f133bca6586a741846e22c6774a29dab1ccf9b9"
 dependencies = [
  "base64",
  "cgmath",
@@ -1202,7 +1201,7 @@ dependencies = [
  "downcast-rs",
  "enum_dispatch",
  "html-escape",
- "hugr-model",
+ "hugr-model 0.28.1 (git+https://github.com/quantinuum/hugr?rev=4f133bc)",
  "indexmap 2.14.0",
  "itertools 0.14.0",
  "ordered-float",
@@ -1229,9 +1228,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-llvm"
-version = "0.28.0"
+version = "0.28.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4351515797a1d38340bc641ab94c0f7f2629b8e7d4b0dca27ac8bf1575b381be"
+checksum = "1c0e75d9f46f7289ac6768a84f6ea5549fe1966a0bacdac0be6552a1978507be"
 dependencies = [
  "anyhow",
  "cc",
@@ -1250,9 +1249,30 @@ dependencies = [
 
 [[package]]
 name = "hugr-model"
-version = "0.28.0"
+version = "0.28.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22f25a79fbd17235d1c4fdc8b6db2f362b91161bd420d8785893ede1764e012a"
+checksum = "00709a8fb1f7820455bbae46bb03d30aaa41a548c78bd71109bbe1a329c8f278"
+dependencies = [
+ "base64",
+ "bumpalo",
+ "capnp",
+ "derive_more 2.1.1",
+ "indexmap 2.14.0",
+ "itertools 0.14.0",
+ "ordered-float",
+ "pest",
+ "pest_derive",
+ "pretty",
+ "rustc-hash 2.1.2",
+ "semver",
+ "smol_str",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "hugr-model"
+version = "0.28.1"
+source = "git+https://github.com/quantinuum/hugr?rev=4f133bc#4f133bca6586a741846e22c6774a29dab1ccf9b9"
 dependencies = [
  "base64",
  "bumpalo",
@@ -1376,9 +1396,9 @@ dependencies = [
 
 [[package]]
 name = "insta"
-version = "1.47.2"
+version = "1.48.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b4a6248eb93a4401ed2f37dfe8ea592d3cf05b7cf4f8efa867b6895af7e094e"
+checksum = "86f0f8fee8c926415c58d6ae43a08523a26faccb2323f5e6b644fe7dd4ef6b82"
 dependencies = [
  "console",
  "once_cell",
@@ -2883,7 +2903,7 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "tket"
-version = "0.19.0"
+version = "0.20.0"
 dependencies = [
  "anyhow",
  "ascent",
@@ -2968,7 +2988,7 @@ dependencies = [
 
 [[package]]
 name = "tket-qsystem"
-version = "0.25.0"
+version = "0.26.0"
 dependencies = [
  "anyhow",
  "clap",

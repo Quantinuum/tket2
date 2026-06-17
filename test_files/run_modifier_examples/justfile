@@ -7,11 +7,15 @@ r: run-hugrs
 
 # Re-generate all hugr files.
 run-hugrs:
-    @echo "---- Applying passes ----"
-    uv run apply_passes.py
+    just apply-passes
     @echo "---- Running hugrs ----"
     uv run --no-project "run_hugrs.py"
 
+# Apply the passes to all the hugr files
+apply-passes:
+    @echo "---- Applying passes ----"
+    uv run apply_passes.py
+    
 # Re-generate a single hugr file.
 rh example:
     @echo "---- Applying passes ----"

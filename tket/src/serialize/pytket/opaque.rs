@@ -8,9 +8,6 @@ pub use subgraph::OpaqueSubgraph;
 
 pub use payload::{EncodedEdgeID, OpaqueSubgraphPayload};
 
-#[expect(deprecated)]
-pub use payload::OPGROUP_OPAQUE_HUGR;
-
 use std::collections::BTreeMap;
 use std::ops::Index;
 
