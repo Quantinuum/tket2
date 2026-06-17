@@ -33,7 +33,7 @@ entry_block:                                      ; preds = %alloca_block
   br label %global_is_some, !dbg !8
 
 global_is_none:                                   ; preds = %2
-  %5 = call i32 (ptr, ...) @printf(ptr @prelude.panic_template, i32 1, ptr @0), !dbg !8
+  %5 = call i32 (ptr, ...) @printf(ptr @prelude.panic_template, i32 1001, ptr @0), !dbg !8
   call void @abort(), !dbg !8
   unreachable, !dbg !8
 
