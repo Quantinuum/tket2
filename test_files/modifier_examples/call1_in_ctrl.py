@@ -2,7 +2,6 @@
 # requires-python = ">=3.13"
 # dependencies = [
 #     "guppylang==1.0.0a4",
-#     "guppylang-internals>=1.0.0a4",
 # ]
 # ///
 """Controlling a quantum function"""
