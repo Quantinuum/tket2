@@ -5,7 +5,7 @@ This package is intended to be used as an internal dependency for `tket`.
 
 # This is updated by our release-please workflow, triggered by this
 # annotation: x-release-please-version
-__version__ = "0.5.1"
+__version__ = "0.6.0"
 
 from importlib import resources
 from pathlib import Path

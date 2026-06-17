@@ -107,12 +107,12 @@ jobs:
       # Used to generate artifact attestation
       attestations: write
     steps:
+      - uses: actions/checkout@v6
       - name: Check if the tag has an associated release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view ${{ github.ref_name }}
-          if [ $? -ne 0 ]; then
+          if ! gh release view ${{ github.ref_name }}; then
             echo "No release found for tag ${{ github.ref_name }}"
             exit 1
           fi

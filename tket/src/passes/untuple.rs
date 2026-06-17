@@ -3,7 +3,7 @@
 use std::collections::VecDeque;
 
 use hugr::hugr::views::sibling_subgraph::SchedGraphChecker;
-use hugr_core::builder::{DFGBuilder, Dataflow, DataflowHugr};
+use hugr_core::builder::{Dataflow, DataflowHugr, FunctionBuilder};
 use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
 use hugr_core::hugr::SimpleReplacementError;
 use hugr_core::hugr::hugrmut::HugrMut;
@@ -216,10 +216,10 @@ fn remove_pack_unpack<'h, T: HugrView>(
 
     let mut nodes = unpack_nodes.clone();
     nodes.push(pack_node);
-    let subcirc = SiblingSubgraph::try_from_nodes_with_checker(nodes, hugr, checker).unwrap();
-    let subcirc_signature = subcirc.signature(hugr);
+    let subgraph = SiblingSubgraph::try_from_nodes_with_checker(nodes, hugr, checker).unwrap();
+    let subgraph_type = subgraph.poly_func_type(hugr);
 
-    let mut replacement = DFGBuilder::new(subcirc_signature).unwrap();
+    let mut replacement = FunctionBuilder::new("<repl>", subgraph_type).unwrap();
 
     // Wire the inputs directly to the unpack outputs
     // We need to list the **connected** output ports from the unpack nodes.
@@ -252,7 +252,7 @@ fn remove_pack_unpack<'h, T: HugrView>(
         .unwrap_or_else(|e| {
             panic!("Failed to create replacement for removing tuple pack/unpack operations. {e}")
         });
-    subcirc
+    subgraph
         .create_simple_replacement(hugr, replacement)
         .unwrap_or_else(|e| {
             panic!("Failed to create rewrite for removing tuple pack/unpack operations. {e}")
@@ -264,11 +264,13 @@ mod test {
     use super::*;
     use crate::passes::composable::WithScope;
     use hugr_core::Hugr;
-    use hugr_core::builder::FunctionBuilder;
+    use hugr_core::builder::{DFGBuilder, FunctionBuilder};
     use hugr_core::extension::prelude::{UnpackTuple, bool_t, qb_t};
     use hugr_core::ops::handle::NodeHandle;
     use hugr_core::std_extensions::arithmetic::float_types::float64_type;
-    use hugr_core::types::Signature;
+    use hugr_core::std_extensions::collections::array::array_type_parametric;
+    use hugr_core::types::type_param::TypeParam;
+    use hugr_core::types::{PolyFuncType, Signature, TypeArg};
     use rstest::{fixture, rstest};
 
     /// A simple pack operation with unused output.
@@ -445,6 +447,32 @@ mod test {
         h.finish_hugr_with_outputs([f]).unwrap()
     }
 
+    /// A pack operation followed by an unpack, where at least one tuple member contains a type
+    /// argument that is declared in the contained function.
+    ///
+    /// Both operations can be removed.
+    ///
+    /// Regression smoke test for <https://github.com/Quantinuum/tket2/issues/1486>.
+    #[fixture]
+    fn unpack_type_parameters() -> Hugr {
+        let arr_type =
+            array_type_parametric(TypeArg::new_var_use(0, TypeParam::max_nat_kind()), bool_t())
+                .unwrap();
+        let mut h = FunctionBuilder::new(
+            "inner",
+            PolyFuncType::new(
+                vec![TypeParam::max_nat_kind()],
+                Signature::new_endo(vec![arr_type.clone(), bool_t()]),
+            ),
+        )
+        .unwrap();
+        let [arr, b] = h.input_wires_arr();
+        let tuple = h.make_tuple([arr, b]).unwrap();
+        let op = UnpackTuple::new(vec![arr_type, bool_t()].into());
+        let [arr, b] = h.add_dataflow_op(op, [tuple]).unwrap().outputs_arr();
+        h.finish_hugr_with_outputs([arr, b]).unwrap()
+    }
+
     #[rstest]
     #[case::unused(unused_pack(), 1, 2)]
     #[case::simple(simple_pack_unpack(), 1, 2)]
@@ -455,6 +483,7 @@ mod test {
     #[case::ordered(ordered_pack_unpack(), 0, 4)]
     #[case::outgoing_ordered(outgoing_ordered_pack_unpack(), 0, 4)]
     #[case::incoming_ordered(incoming_ordered_pack_unpack(), 0, 4)]
+    #[case::type_parameters(unpack_type_parameters(), 1, 2)]
     fn test_pack_unpack(
         #[case] mut hugr: Hugr,
         #[case] expected_rewrites: usize,

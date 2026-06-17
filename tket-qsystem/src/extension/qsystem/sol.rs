@@ -24,6 +24,7 @@ use hugr::{
 };
 
 use super::common::{self, CommonOp, CommonOpBuilder, PhasedXRzSynth, SharedOp};
+use super::helios::SynthesizeHeliosOp;
 use super::lower::pi_mul_f64;
 use derive_more::Display;
 use lazy_static::lazy_static;
@@ -496,6 +497,69 @@ where
     }
 }
 
+/// Implement [`SynthesizeHeliosOp`] for [`SolSynthesizer`] so that a Helios
+/// operation can be expressed in terms of Sol primitives.
+///
+/// All shared ops delegate to the corresponding [`SynthesizeSolOp`] method.
+impl<D> SynthesizeHeliosOp for SolSynthesizer<'_, D>
+where
+    D: CommonOpBuilder<SolOp>,
+{
+    fn build_lazy_measure(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        SynthesizeSolOp::build_lazy_measure(self, qb)
+    }
+
+    fn build_lazy_measure_leaked(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        SynthesizeSolOp::build_lazy_measure_leaked(self, qb)
+    }
+
+    fn build_lazy_measure_reset(&mut self, qb: Wire) -> Result<[Wire; 2], BuildError> {
+        SynthesizeSolOp::build_lazy_measure_reset(self, qb)
+    }
+
+    fn build_reset(&mut self, qb: Wire) -> Result<Wire, BuildError> {
+        SynthesizeSolOp::build_reset(self, qb)
+    }
+
+    fn build_zz_phase(
+        &mut self,
+        qb1: Wire,
+        qb2: Wire,
+        angle: Wire,
+    ) -> Result<[Wire; 2], BuildError> {
+        let pi_minus = pi_mul_f64(self, -1.0);
+        let pi_2 = pi_mul_f64(self, 0.5);
+        let pi_minus_2 = pi_mul_f64(self, -0.5);
+
+        let qb1 = SynthesizeSolOp::build_phased_x(self, qb1, pi_2, pi_minus_2)?;
+        let qb2 = SynthesizeSolOp::build_phased_x(self, qb2, pi_2, pi_minus_2)?;
+        let [qb1, qb2] = SynthesizeSolOp::build_phased_xx(self, qb1, qb2, angle, pi_minus)?;
+        let qb1 = SynthesizeSolOp::build_phased_x(self, qb1, pi_2, pi_2)?;
+        let qb2 = SynthesizeSolOp::build_phased_x(self, qb2, pi_2, pi_2)?;
+        Ok([qb1, qb2])
+    }
+
+    fn build_phased_x(&mut self, qb: Wire, angle1: Wire, angle2: Wire) -> Result<Wire, BuildError> {
+        SynthesizeSolOp::build_phased_x(self, qb, angle1, angle2)
+    }
+
+    fn build_rz(&mut self, qb: Wire, angle: Wire) -> Result<Wire, BuildError> {
+        SynthesizeSolOp::build_rz(self, qb, angle)
+    }
+
+    fn build_try_alloc(&mut self) -> Result<Wire, BuildError> {
+        SynthesizeSolOp::build_try_alloc(self)
+    }
+
+    fn build_qfree(&mut self, qb: Wire) -> Result<(), BuildError> {
+        SynthesizeSolOp::build_qfree(self, qb)
+    }
+
+    fn build_runtime_barrier(&mut self, qbs: Wire, array_size: u64) -> Result<Wire, BuildError> {
+        SynthesizeSolOp::build_runtime_barrier(self, qbs, array_size)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::extension::futures::FutureOpBuilder;
@@ -503,11 +567,15 @@ mod test {
     use crate::extension::qsystem::synth_tket_op::SynthesizeTketOp as _;
 
     use hugr::HugrView;
-    use hugr::builder::{DataflowHugr, FunctionBuilder};
+    use hugr::builder::{Dataflow, DataflowHugr, FunctionBuilder};
     use hugr::extension::prelude::bool_t;
     use hugr::std_extensions::collections::array::ArrayOpBuilder;
 
-    use super::*;
+    use super::super::lower::pi_mul_f64;
+    use super::{EXTENSION, EXTENSION_ID, SolOp, SolSynthesizer, SynthesizeSolOp};
+    use hugr::extension::prelude::qb_t;
+    use hugr::std_extensions::arithmetic::float_types::float64_type;
+    use hugr::types::Signature;
 
     #[test]
     fn create_extension() {

@@ -11,29 +11,29 @@ target triple = "x86_64-windows-msvc"
 @res_rfloat2.4DAB941F.0 = private constant [19 x i8] c"\12USER:FLOAT:rfloat2"
 @res_rint_bnd2.169DE399.0 = private constant [19 x i8] c"\12USER:INT:rint_bnd2"
 
-define void @"__hugr__.__main__.rng.<locals>.main.1"() local_unnamed_addr {
+define void @"__hugr__.__main__.rng.<locals>.main.1"() local_unnamed_addr !dbg !4 {
 alloca_block:
-  tail call void @random_seed(i64 42)
-  %rint = tail call i32 @random_int()
-  %rint14 = tail call i32 @random_int()
-  %rfloat = tail call double @random_float()
-  %rintb = tail call i32 @random_rng(i32 100)
-  %0 = sext i32 %rintb to i64
-  %1 = sext i32 %rint14 to i64
-  %2 = sext i32 %rint to i64
-  tail call void @print_int(ptr nonnull @res_rint.B928E41E.0, i64 13, i64 %2)
-  tail call void @print_int(ptr nonnull @res_rint1.0884EC03.0, i64 14, i64 %1)
-  tail call void @print_float(ptr nonnull @res_rfloat.F0E4DD2C.0, i64 17, double %rfloat)
-  tail call void @print_int(ptr nonnull @res_rint_bnd.CB1E6B0D.0, i64 17, i64 %0)
-  tail call void @random_seed(i64 84)
-  %rint47 = tail call i32 @random_int()
-  %rfloat49 = tail call double @random_float()
-  %rintb52 = tail call i32 @random_rng(i32 200)
-  %3 = sext i32 %rintb52 to i64
-  %4 = sext i32 %rint47 to i64
-  tail call void @print_int(ptr nonnull @res_rint2.F0335598.0, i64 14, i64 %4)
-  tail call void @print_float(ptr nonnull @res_rfloat2.4DAB941F.0, i64 18, double %rfloat49)
-  tail call void @print_int(ptr nonnull @res_rint_bnd2.169DE399.0, i64 18, i64 %3)
+  tail call void @random_seed(i64 42), !dbg !8
+  %rint = tail call i32 @random_int(), !dbg !17
+  %rint14 = tail call i32 @random_int(), !dbg !18
+  %rfloat = tail call double @random_float(), !dbg !19
+  %rintb = tail call i32 @random_rng(i32 100), !dbg !20
+  %0 = sext i32 %rintb to i64, !dbg !20
+  %1 = sext i32 %rint14 to i64, !dbg !18
+  %2 = sext i32 %rint to i64, !dbg !17
+  tail call void @print_int(ptr nonnull @res_rint.B928E41E.0, i64 13, i64 %2), !dbg !21
+  tail call void @print_int(ptr nonnull @res_rint1.0884EC03.0, i64 14, i64 %1), !dbg !22
+  tail call void @print_float(ptr nonnull @res_rfloat.F0E4DD2C.0, i64 17, double %rfloat), !dbg !23
+  tail call void @print_int(ptr nonnull @res_rint_bnd.CB1E6B0D.0, i64 17, i64 %0), !dbg !24
+  tail call void @random_seed(i64 84), !dbg !25
+  %rint47 = tail call i32 @random_int(), !dbg !27
+  %rfloat49 = tail call double @random_float(), !dbg !28
+  %rintb52 = tail call i32 @random_rng(i32 200), !dbg !29
+  %3 = sext i32 %rintb52 to i64, !dbg !29
+  %4 = sext i32 %rint47 to i64, !dbg !27
+  tail call void @print_int(ptr nonnull @res_rint2.F0335598.0, i64 14, i64 %4), !dbg !30
+  tail call void @print_float(ptr nonnull @res_rfloat2.4DAB941F.0, i64 18, double %rfloat49), !dbg !31
+  tail call void @print_int(ptr nonnull @res_rint_bnd2.169DE399.0, i64 18, i64 %3), !dbg !32
   ret void
 }
 
@@ -49,18 +49,53 @@ declare void @print_float(ptr, i64, double) local_unnamed_addr
 
 declare void @random_seed(i64) local_unnamed_addr
 
-define i64 @qmain(i64 %0) local_unnamed_addr {
+define i64 @qmain(i64 %0) local_unnamed_addr !dbg !33 {
 entry:
-  tail call void @setup(i64 %0)
-  tail call void @"__hugr__.__main__.rng.<locals>.main.1"()
-  %1 = tail call i64 @teardown()
-  ret i64 %1
+  tail call void @setup(i64 %0), !dbg !37
+  tail call void @"__hugr__.__main__.rng.<locals>.main.1"(), !dbg !37
+  %1 = tail call i64 @teardown(), !dbg !37
+  ret i64 %1, !dbg !37
 }
 
 declare void @setup(i64) local_unnamed_addr
 
 declare i64 @teardown() local_unnamed_addr
 
-!name = !{!0}
+!llvm.module.flags = !{!0}
+!llvm.dbg.cu = !{!1}
+!name = !{!3}
 
-!0 = !{!"mainlib"}
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "guppylang (guppylang-internals-v1.0.0-a1)-v1.0.0-a1", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!3 = !{!"mainlib"}
+!4 = distinct !DISubprogram(name: "rng.<locals>.main", linkageName: "__hugr__.__main__.rng.<locals>.main.1", scope: null, file: !5, line: 207, type: !6, scopeLine: 208, spFlags: DISPFlagDefinition, unit: !1)
+!6 = !DISubroutineType(types: !7)
+!7 = !{null}
+!8 = !DILocation(line: 44, column: 15, scope: !9, inlinedAt: !16)
+!9 = distinct !DISubprogram(name: "std.qsystem.random.RNG.__new__", linkageName: "__hugr__.guppylang.std.qsystem.random.RNG.__new__.72", scope: null, file: !10, line: 42, type: !11, scopeLine: 44, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
+!11 = !DISubroutineType(types: !12)
+!12 = !{!13, !15}
+!13 = !DICompositeType(tag: DW_TAG_structure_type, name: "{}", file: !2, align: 8, elements: !14)
+!14 = !{}
+!15 = !DIBasicType(name: "i64", size: 64, encoding: DW_ATE_unsigned)
+!16 = distinct !DILocation(line: 208, column: 14, scope: !4)
+!17 = !DILocation(line: 209, column: 15, scope: !4)
+!18 = !DILocation(line: 210, column: 16, scope: !4)
+!19 = !DILocation(line: 211, column: 17, scope: !4)
+!20 = !DILocation(line: 212, column: 19, scope: !4)
+!21 = !DILocation(line: 214, column: 8, scope: !4)
+!22 = !DILocation(line: 215, column: 8, scope: !4)
+!23 = !DILocation(line: 216, column: 8, scope: !4)
+!24 = !DILocation(line: 217, column: 8, scope: !4)
+!25 = !DILocation(line: 44, column: 15, scope: !9, inlinedAt: !26)
+!26 = distinct !DILocation(line: 218, column: 14, scope: !4)
+!27 = !DILocation(line: 219, column: 15, scope: !4)
+!28 = !DILocation(line: 220, column: 17, scope: !4)
+!29 = !DILocation(line: 221, column: 19, scope: !4)
+!30 = !DILocation(line: 223, column: 8, scope: !4)
+!31 = !DILocation(line: 224, column: 8, scope: !4)
+!32 = !DILocation(line: 225, column: 8, scope: !4)
+!33 = distinct !DISubprogram(name: "qmain", linkageName: "qmain", scope: null, file: !34, type: !35, spFlags: DISPFlagDefinition, unit: !1)
+!35 = !DISubroutineType(types: !36)
+!36 = !{!15, !15}
+!37 = !DILocation(line: 0, scope: !33)

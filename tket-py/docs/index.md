@@ -8,13 +8,10 @@
    :template: autosummary/module.rst
    :recursive:
 
-   tket.circuit
-   tket.ops
-   tket.optimiser
-   tket.pattern
-   tket.rewrite
+   tket.extensions
+   tket.metadata
    tket.passes
-   tket.types
+   tket.util
 
 .. toctree::
    :caption: Examples

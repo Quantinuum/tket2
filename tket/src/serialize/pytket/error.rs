@@ -102,16 +102,6 @@ pub enum PytketEncodeError<N: HugrNode = hugr::Node> {
         /// The head region operation that is not a dataflow container.
         head_op: String,
     },
-    /// No qubits or bits to attach the barrier command to for unsupported nodes.
-    #[display("An unsupported subgraph has no qubits or bits to attach the barrier command to{}",
-        if params.is_empty() {"".to_string()} else {format!(" alongside its parameters [{}]", params.iter().join(", "))}
-    )]
-    #[deprecated(since = "0.17.0", note = "No longer emitted since 0.17.0")]
-    #[from(ignore)]
-    UnsupportedSubgraphHasNoRegisters {
-        /// Parameter inputs to the unsupported subgraph.
-        params: Vec<String>,
-    },
 }
 
 impl<N: HugrNode> PytketEncodeError<N> {

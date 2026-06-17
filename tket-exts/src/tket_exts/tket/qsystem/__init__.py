@@ -23,7 +23,7 @@ __all__ = [
 
 
 class QSystemExtension(TketExtension):
-    """Deprecated: use :class:`QSystemHeliosExtension` or :class:`QSystemSolExtension` instead.
+    """Deprecated (since 0.13.0): use :class:`QSystemHeliosExtension` or :class:`QSystemSolExtension` instead.
 
     The combined ``tket.qsystem`` extension has been split into platform-specific
     extensions. Use ``tket_exts.qsystem_helios`` or ``tket_exts.qsystem_sol`` instead.

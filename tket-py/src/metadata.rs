@@ -14,6 +14,7 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     m.add("INLINE_ANNOTATION", InlineAnnotation::KEY)?;
     m.add("CIRCUIT_REWRITE_TRACES", CircuitRewriteTraces::KEY)?;
     m.add("UNITARY_FLAGS", UnitaryFlags::KEY)?;
+    m.add("UNITARY_FLAGS_ALIAS", UnitaryFlags::ALIASES)?;
     m.add("PYTKET_INPUT_PARAMETERS", PytketInputParameters::KEY)?;
     m.add("PYTKET_OP_GROUP", PytketOpGroup::KEY)?;
     m.add("PYTKET_BIT_REGISTER_NAMES", PytketBitRegisterNames::KEY)?;

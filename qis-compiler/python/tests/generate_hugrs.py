@@ -1,7 +1,8 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#     "guppylang ==0.21.13",
+#     "guppylang ==0.21.14",
+#     "guppylang-internals",
 #     "tket",
 #     "pytket >=2.1.0,<3",
 # ]
@@ -31,6 +32,7 @@ from guppylang.std.quantum import (
     x,
     z,
 )
+from guppylang_internals.debug_mode import turn_off_debug_mode, turn_on_debug_mode
 
 resources_dir = Path(__file__).parent / "resources"
 
@@ -266,5 +268,7 @@ if __name__ == "__main__":
         rng,
         entry_args,
     ]:
+        turn_on_debug_mode()
         envelope = func()
+        turn_off_debug_mode()
         (resources_dir / f"{func.__name__}.hugr").write_bytes(envelope)

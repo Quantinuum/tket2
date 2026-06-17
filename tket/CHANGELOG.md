@@ -1,6 +1,27 @@
 # Changelog
 
 
+## [0.20.0](https://github.com/Quantinuum/tket2/compare/tket-v0.19.0...tket-v0.20.0) - 2026-06-11
+
+### Bug Fixes
+
+- Modifier passes bugs with indirect call node ([#1634](https://github.com/Quantinuum/tket2/pull/1634))
+- Support type arguments in tuple/untuple pass ([#1583](https://github.com/Quantinuum/tket2/pull/1583))
+
+### New Features
+
+- [**breaking**] Raise an error when `power` modifier is present ([#1644](https://github.com/Quantinuum/tket2/pull/1644))
+- [**breaking**] Add `measurement` extension and change `tket.quantum` / `tket.qsystem` extension measurement ops return type ([#1558](https://github.com/Quantinuum/tket2/pull/1558))
+- Encode measurements followed by reads as pytket measurements ([#1658](https://github.com/Quantinuum/tket2/pull/1658))
+- [**breaking**] Upgrade hugr dependency to 0.28.0 ([#1580](https://github.com/Quantinuum/tket2/pull/1580))
+- Support debug info in qis-compiler ([#1521](https://github.com/Quantinuum/tket2/pull/1521))
+- Rename `unitary` metadata to `tket.unitary` ([#1669](https://github.com/Quantinuum/tket2/pull/1669))
+- [**breaking**] Remove deprecated definitions ([#1670](https://github.com/Quantinuum/tket2/pull/1670))
+
+### Refactor
+
+- Remove `power` from unitary metadata ([#1666](https://github.com/Quantinuum/tket2/pull/1666))
+
 ## [0.19.0](https://github.com/Quantinuum/tket2/compare/tket-v0.18.0...tket-v0.19.0) - 2026-05-28
 
 ### Bug Fixes

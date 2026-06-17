@@ -32,8 +32,6 @@ struct CombinedModifier {
     accum_ctrl: Vec<usize>,
     /// Whether the dagger modifier has been applied.
     dagger: bool,
-    /// Whether the power modifier has been applied.
-    power: bool,
 }
 
 impl CombinedModifier {
@@ -66,7 +64,6 @@ impl CombinedModifier {
 struct ModifierFlags {
     control: bool,
     dagger: bool,
-    power: bool,
 }
 
 impl ModifierFlags {
@@ -75,7 +72,6 @@ impl ModifierFlags {
             .map(|num| ModifierFlags {
                 control: (num & 1) != 0,
                 dagger: (num & 2) != 0,
-                power: (num & 4) != 0,
             })
     }
 
@@ -87,23 +83,17 @@ impl ModifierFlags {
         if self.control {
             num |= 2;
         }
-        if self.power {
-            num |= 4;
-        }
         h.set_metadata::<metadata::UnitaryFlags>(n, num);
     }
 
     fn satisfies(&self, combined: &CombinedModifier) -> bool {
-        (combined.control == 0 || self.control)
-            && (!combined.dagger || self.dagger)
-            && (!combined.power || self.power)
+        (combined.control == 0 || self.control) && (!combined.dagger || self.dagger)
     }
 
     fn from_combined(combined: &CombinedModifier) -> Self {
         ModifierFlags {
             control: combined.control > 0,
             dagger: combined.dagger,
-            power: combined.power,
         }
     }
 
@@ -113,7 +103,6 @@ impl ModifierFlags {
             Some(other) => ModifierFlags {
                 control: self.control || other.control,
                 dagger: self.dagger || other.dagger,
-                power: self.power || other.power,
             },
         }
     }

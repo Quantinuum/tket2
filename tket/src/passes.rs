@@ -34,7 +34,6 @@ pub use dead_funcs::{RemoveDeadFuncsError, RemoveDeadFuncsPass};
 
 // Force a topological order on nodes.
 pub mod force_order;
-pub use force_order::{force_order, force_order_by_key};
 
 // Normalize the structure of Guppy-generated programs.
 pub mod guppy;
@@ -47,8 +46,6 @@ pub use inline_dfgs::InlineDFGsPass;
 // Inline function calls.
 pub mod inline_funcs;
 pub use inline_funcs::InlineFunctionsPass;
-#[expect(deprecated)]
-pub use inline_funcs::inline_acyclic;
 
 // Lower and replace operations.
 pub mod lower;

@@ -59,6 +59,13 @@ def test_unsupported_pytket_ops() -> None:
         check_hugr(hugr_envelope)
 
 
+def normalize_ir_snapshot(ir: str) -> str:
+    """Remove unstable or localized output from IR snapshots."""
+    # remove debug file entries with absolute paths
+    new_lines = filter(lambda line: "DIFile" not in line, ir.split("\n"))
+    return "\n".join(new_lines)
+
+
 @pytest.mark.parametrize(
     "hugr_file",
     [
@@ -80,8 +87,9 @@ def test_llvm(
 ) -> None:
     hugr_envelope = load(hugr_file)
     ir = compile_to_llvm_ir(
-        hugr_envelope, target_triple=target_triple, platform=platform
+        hugr_envelope, target_triple=target_triple, platform=platform, emit_debug=True
     )
+    ir = normalize_ir_snapshot(ir)
     snapshot.assert_match(ir, f"{hugr_file}_{target_triple}_{platform}")
 
 
