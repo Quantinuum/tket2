@@ -2,6 +2,7 @@
 
 from tket_exts.tket.debug import DebugExtension
 from tket_exts.tket.global_phase import GlobalPhaseExtension
+from tket_exts.tket.globals import GlobalsExtension
 from tket_exts.tket.gpu import GpuExtension
 from tket_exts.tket.guppy import GuppyExtension
 from tket_exts.tket.modifier import ModifierExtension
@@ -42,6 +43,7 @@ __all__ = [
     "wasm",
     "modifier",
     "global_phase",
+    "globals",
     "measurement",
 ]
 
@@ -60,6 +62,7 @@ result: ResultExtension = tket.result.ResultExtension()
 wasm: WasmExtension = tket.wasm.WasmExtension()
 modifier: ModifierExtension = tket.modifier.ModifierExtension()
 global_phase: GlobalPhaseExtension = tket.global_phase.GlobalPhaseExtension()
+globals: GlobalsExtension = tket.globals.GlobalsExtension()
 measurement: MeasurementExtension = tket.measurement.MeasurementExtension()
 
 
@@ -77,6 +80,7 @@ def tket_registry() -> ExtensionRegistry:
         tket.guppy.GuppyExtension(),
         tket.rotation.RotationExtension(),
         tket.futures.FuturesExtension(),
+        tket.globals.GlobalsExtension(),
         tket.qsystem.QSystemHeliosExtension(),
         tket.qsystem.QSystemSolExtension(),
         tket.qsystem.QSystemExtension(),
