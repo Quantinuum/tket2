@@ -60,3 +60,5 @@ def main() -> None:
 
 program = main.compile()
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
+
+# NICOLA: DELETE THIS

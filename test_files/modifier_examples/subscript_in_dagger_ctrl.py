@@ -10,11 +10,12 @@ from pathlib import Path
 from sys import argv
 import sys
 
+
 from guppylang import array, guppy
 from guppylang.std.builtins import control, dagger
 from guppylang.std.debug import state_result
-from guppylang.std.quantum import qubit, discard_array
-from guppylang.std.quantum import h, s
+from guppylang.std.quantum import qubit, discard_array, angle
+from guppylang.std.quantum import h, s, rx, x
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
@@ -23,17 +24,26 @@ from guppylang.experimental import enable_experimental_features
 enable_experimental_features()
 
 
+@guppy(unitary=True)
+def f(controller: qubit, target: qubit) -> None:
+    a = angle(1 / 3)
+    with control(controller):
+        rx(target, a)
+
+
 @guppy
 def main() -> None:
     controller = array(qubit())
-    array_qubits: array[qubit, 2] = array(qubit(), qubit())
+    array_qubits = array(qubit(), qubit(), qubit())
     h(controller[0])
+    x(array_qubits[0])
     with dagger:
-        with control(controller[0]):
+        with control(controller[0], array_qubits[0]):
+            f(array_qubits[1], array_qubits[2])
             s(array_qubits[1])
             h(array_qubits[1])
 
-    state_result("r", controller[0], array_qubits[0], array_qubits[1])
+    state_result("r", controller[0], array_qubits[0], array_qubits[1], array_qubits[2])
     discard_array(array_qubits)
     discard_array(controller)
 

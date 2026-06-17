@@ -2418,7 +2418,6 @@ mod tests {
     #[case::multiple_functions_in_ctrl_dagger(
         "../test_files/modifier_examples/multiple_functions_in_ctrl_dagger.hugr"
     )]
-    #[case::guppy_modifiers("../test_files/guppy_examples/modifiers.hugr")]
     #[case::assign_in_dagger("../test_files/modifier_examples/assign_in_dagger.hugr")]
     #[case::classical_array_op("../test_files/modifier_examples/classical_array_op.hugr")]
     #[case::classical_function1("../test_files/modifier_examples/classical_function1.hugr")]

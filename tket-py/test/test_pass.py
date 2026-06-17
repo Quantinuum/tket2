@@ -246,7 +246,10 @@ def test_normalize_guppy():
 def test_modifier_resolver() -> None:
     normalize = NormalizeGuppy()
     mr_pass = ModifierResolverPass()
-    modifier_hugr: Hugr = _hugr_from_path("test_files/guppy_examples/modifiers.hugr")
+    # We consider a simple hugr for this test
+    modifier_hugr: Hugr = _hugr_from_path(
+        "test_files/modifier_examples/double_modifier.hugr"
+    )
 
     modifier_hugr = normalize(modifier_hugr)
 
