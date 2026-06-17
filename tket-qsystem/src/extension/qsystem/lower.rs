@@ -817,9 +817,9 @@ mod test {
         assert_eq!(
             h.nodes()
                 .filter(|&n| {
-                    h.get_optype(n).as_func_defn().is_some_and(|f| {
-                        f.func_name().to_string() == "__tk2_sol_to_helios_phasedxx"
-                    })
+                    h.get_optype(n)
+                        .as_func_defn()
+                        .is_some_and(|f| f.func_name() == "__tk2_sol_to_helios_phasedxx")
                 })
                 .count(),
             1,
@@ -856,7 +856,7 @@ mod test {
                 .filter(|&n| {
                     h.get_optype(n)
                         .as_func_defn()
-                        .is_some_and(|f| f.func_name().to_string() == "__tk2_helios_to_sol_zzphase")
+                        .is_some_and(|f| f.func_name() == "__tk2_helios_to_sol_zzphase")
                 })
                 .count(),
             1,
@@ -1321,15 +1321,12 @@ mod test {
     #[rstest]
     #[case::helios_then_sol(QSystemPlatform::Helios, QSystemPlatform::Sol)]
     #[case::sol_then_helios(QSystemPlatform::Sol, QSystemPlatform::Helios)]
-    fn test_cross_platform_round_trip(
+    fn test_cross_platform_lowering_round_trip(
         #[case] first: QSystemPlatform,
         #[case] second: QSystemPlatform,
     ) {
         use tket::extension::rotation::rotation_type;
 
-        // Build a HUGR with a multi-qubit TketOp (CX) which will decompose into
-        // the platform-specific 2-qubit gate (ZZPhase on Helios, PhasedXX on Sol),
-        // plus a single-qubit rotation and direct-mapped ops.
         let mut b =
             FunctionBuilder::new("round_trip", Signature::new([rotation_type()], type_row![]))
                 .unwrap();
@@ -1360,24 +1357,30 @@ mod test {
         b.add_dataflow_op(TketOp::QFree, [q2]).unwrap();
         let mut h = b.finish_hugr_with_outputs([]).unwrap();
 
-        // First lowering: TketOps → first platform.
+        // First lowering: TketOps to first platform.
         lower_tk2_ops(&mut h, Preserve::Public, first).unwrap();
+        h.validate().unwrap();
         assert_eq!(
             check_lowered(&h, Preserve::Public, &forbidden_extensions_for(first)),
             Ok(()),
             "HUGR should contain only {first:?} ops after first lowering"
         );
-        h.validate().unwrap();
 
-        // Second lowering: first platform → second platform (cross-platform).
+        // Second lowering: first platform to second platform (cross-platform).
         lower_tk2_ops(&mut h, Preserve::Public, second).unwrap();
         h.validate().unwrap();
 
-        // After the round-trip, no ops from the first platform should remain.
-        assert_eq!(
-            check_lowered(&h, Preserve::Public, &forbidden_extensions_for(second)),
-            Ok(()),
-            "After re-lowering from {first:?} to {second:?}, only {second:?} ops should remain"
+        match first {
+            QSystemPlatform::Helios => assert_helios_to_sol_lowering(&h),
+            QSystemPlatform::Sol => assert_sol_to_helios_lowering(&h),
+        }
+
+        // Re-lowering to the same platform should be a no-op (idempotent).
+        let lowered_again = lower_tk2_ops(&mut h, Preserve::Public, second).unwrap();
+        h.validate().unwrap();
+        assert!(
+            lowered_again.is_empty(),
+            "Re-lowering to the same platform should be a no-op"
         );
     }
 
@@ -1654,6 +1657,12 @@ mod test {
         // Two-qubit rotation gate
         let [q1, q2] = b
             .add_dataflow_op(TketOp::CRz, [q1, q2, angle])
+            .unwrap()
+            .outputs_arr();
+
+        // Toffoli gate
+        let [q0, q1, q2] = b
+            .add_dataflow_op(TketOp::Toffoli, [q0, q1, q2])
             .unwrap()
             .outputs_arr();
 
