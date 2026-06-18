@@ -5,8 +5,6 @@ pub mod value_handle;
 use std::{collections::BTreeMap, sync::Arc};
 use thiserror::Error;
 
-use hugr_core::ops::Tag;
-use hugr_core::types::TypeRow;
 use hugr_core::{
     HugrView, IncomingPort, Node, NodeIndex, OutgoingPort, PortIndex, Wire,
     hugr::hugrmut::HugrMut,
@@ -185,14 +183,9 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
             } else if let Value::Sum(sum) = v
                 && sum.values.is_empty()
             {
-                let variants: Result<Vec<_>, _> = sum
-                    .sum_type
-                    .variants()
-                    .map(|rv_row| TypeRow::try_from(rv_row.clone()))
-                    .collect();
-                variants
-                    .map(|vs| hugr.add_node_with_parent(parent, Tag::new(sum.tag, vs)))
-                    .ok()
+                // TODO Can only do "None" until constant folding stops folding sum variants that
+                //      are linear. See https://github.com/Quantinuum/tket2/issues/1724.
+                None
             } else {
                 None
             };
