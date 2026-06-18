@@ -719,7 +719,7 @@ mod test {
         HugrView,
         builder::{DFGBuilder, FunctionBuilder, inout_sig},
         extension::{
-            prelude::{UnwrapBuilder as _, bool_t, option_type, qb_t, usize_t},
+            prelude::{Barrier, UnwrapBuilder as _, bool_t, option_type, qb_t, usize_t},
             simple_op::{HasDef, MakeOpDef},
         },
         ops::OpType,
@@ -815,7 +815,7 @@ mod test {
         // PhasedXX decomposes into a called function, so scan all hugr nodes.
         assert!(
             h.nodes()
-                .any(|n| h.get_optype(n).cast() == Some(HeliosOp::ZZPhase))
+                .any(|n| h.get_optype(n).cast() == Some(HeliosOp::ZZPhase)),
         );
         // There should be only one replacement function.
         assert_eq!(
@@ -1241,30 +1241,27 @@ mod test {
         assert_sol_to_helios_lowering(&h);
     }
 
-    /// A pre-existing `helios::RuntimeBarrier` op is silently skipped when
-    /// lowering to Sol, and viceversa.
+    /// Test that runtime `Barrier` and `<platform>::RuntimeBarrier` ops
+    /// are correctly lowered and/or skipped when lowering to <platform>.
+    /// Also, check that re-lowering the HUGR to a different platform fails.
     ///
-    /// This test documents the current limitation (see comment in
-    /// `classify_node`). If cross-platform RuntimeBarrier remapping is added in
-    /// the future, this test should be updated to assert the op is replaced.
+    /// See the comment in `classify_node` for further details.
     #[rstest]
-    #[case::helios_barrier_targeting_sol(QSystemPlatform::Sol)]
-    #[case::sol_barrier_targeting_helios(QSystemPlatform::Helios)]
-    fn test_runtime_barrier_skipped_cross_platform(#[case] target: QSystemPlatform) {
+    #[case::helios(QSystemPlatform::Helios)]
+    #[case::sol(QSystemPlatform::Sol)]
+    fn test_lowering_runtime_barriers(#[case] platform: QSystemPlatform) {
         use crate::extension::qsystem::common::runtime_barrier_ext_op;
         use crate::extension::qsystem::{helios, sol};
         use hugr::std_extensions::collections::array::ArrayOpBuilder;
 
-        // Build a RuntimeBarrier from the *opposite* platform's extension.
-        let (barrier_ext, foreign_ext_id) = match target {
-            // Targeting Sol: the barrier comes from Helios.
-            QSystemPlatform::Sol => (&*helios::EXTENSION, &helios::EXTENSION_ID),
-            // Targeting Helios: the barrier comes from Sol.
-            QSystemPlatform::Helios => (&*sol::EXTENSION, &sol::EXTENSION_ID),
+        // Build a RuntimeBarrier from the target platform's extension.
+        let (barrier_ext, ext_id) = match platform {
+            QSystemPlatform::Sol => (&*sol::EXTENSION, &sol::EXTENSION_ID),
+            QSystemPlatform::Helios => (&*helios::EXTENSION, &helios::EXTENSION_ID),
         };
 
         let array_size: u64 = 2;
-        let barrier_op = runtime_barrier_ext_op(barrier_ext, array_size).unwrap();
+        let platform_barrier_op = runtime_barrier_ext_op(barrier_ext, array_size).unwrap();
 
         let mut b = FunctionBuilder::new("f", Signature::new_endo(type_row![])).unwrap();
         let [maybe_q1] = b
@@ -1282,10 +1279,34 @@ mod test {
             .build_unwrap_sum(1, option_type(vec![qb_t()]), maybe_q2)
             .unwrap();
 
-        // Pack qubits into an array and apply the RuntimeBarrier.
+        // Add some gates and apply a generic runtime barrier
+        let [q1] = b.add_dataflow_op(TketOp::H, [q1]).unwrap().outputs_arr();
+        let [q1, q2] = b
+            .add_dataflow_op(TketOp::CX, [q1, q2])
+            .unwrap()
+            .outputs_arr();
+        let barrier_op = Barrier::new(vec![qb_t(), qb_t()]);
+        let [q1, q2] = b
+            .add_dataflow_op(barrier_op, [q1, q2])
+            .unwrap()
+            .outputs_arr();
+
+        // Add more platform specific gates
+        let angle1 = const_f64(&mut b, 0.5);
+        let angle2 = const_f64(&mut b, 0.25);
+        let [q1, q2] = b
+            .add_dataflow_op(SolOp::PhasedXX, [q1, q2, angle1, angle2])
+            .unwrap()
+            .outputs_arr();
+        let [q1, q2] = b
+            .add_dataflow_op(HeliosOp::ZZPhase, [q1, q2, angle2])
+            .unwrap()
+            .outputs_arr();
+
+        // Pack qubits into an array and apply the <platform> RuntimeBarrier.
         let q_arr = b.add_new_array(qb_t(), [q1, q2]).unwrap();
         let [q_arr] = b
-            .add_dataflow_op(barrier_op.clone(), [q_arr])
+            .add_dataflow_op(platform_barrier_op.clone(), [q_arr])
             .unwrap()
             .outputs_arr();
         let [q1, q2]: [Wire; 2] = b
@@ -1293,25 +1314,80 @@ mod test {
             .unwrap()
             .try_into()
             .unwrap();
+
         b.add_dataflow_op(TketOp::QFree, [q1]).unwrap();
         b.add_dataflow_op(TketOp::QFree, [q2]).unwrap();
         let mut h = b.finish_hugr_with_outputs([]).unwrap();
 
-        // Lowering succeeds (does not error on the RuntimeBarrier).
-        lower_tk2_ops(&mut h, Preserve::Public, target).unwrap();
+        // Lowering succeeds
+        lower_tk2_ops(&mut h, Preserve::Public, platform).unwrap();
         h.validate().unwrap();
 
-        // The RuntimeBarrier op should still be present (not remapped).
+        // The <platform>::RuntimeBarrier op should still be present (not remapped).
         let barrier_still_present = h.nodes().any(|n| {
             h.get_optype(n)
                 .as_extension_op()
-                .is_some_and(|op| op.def().extension_id() == foreign_ext_id)
+                .is_some_and(|op| op.def().extension_id() == ext_id)
         });
         assert!(
             barrier_still_present,
-            "Expected the foreign-platform RuntimeBarrier to remain untouched; \
+            "Expected the {platform:?} RuntimeBarrier to remain untouched; \
              if cross-platform RuntimeBarrier remapping has been implemented, \
              update this test to assert the op was replaced instead."
+        );
+    }
+
+    /// Re-lowering a HUGR with a platform-specific RuntimeBarrier to a different
+    /// platform is not supported.
+    #[rstest]
+    #[case::from_helios_to_sol(QSystemPlatform::Helios, QSystemPlatform::Sol)]
+    #[case::from_sol_to_helios(QSystemPlatform::Sol, QSystemPlatform::Helios)]
+    fn test_relowering_runtime_barrier_to_different_platform_fails(
+        #[case] from_platform: QSystemPlatform,
+        #[case] to_platform: QSystemPlatform,
+    ) {
+        use crate::extension::qsystem::{
+            helios::RuntimeBarrierDef as HeliosRuntimeBarrierDef,
+            sol::RuntimeBarrierDef as SolRuntimeBarrierDef,
+        };
+
+        let mut b = DFGBuilder::new(Signature::new([rotation_type()], [bool_t()])).unwrap();
+        let [angle] = b.input_wires_arr();
+        let qalloc = b.add_dataflow_op(TketOp::QAlloc, []).unwrap();
+        let [q] = qalloc.outputs_arr();
+        let [q] = b.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
+        let q = b.add_barrier([q]).unwrap().out_wire(0);
+        let rx = b.add_dataflow_op(TketOp::Rx, [q, angle]).unwrap();
+        let [q] = rx.outputs_arr();
+        let [q, bool] = b
+            .add_dataflow_op(TketOp::Measure, [q])
+            .unwrap()
+            .outputs_arr();
+        b.add_dataflow_op(TketOp::QFree, [q]).unwrap();
+        let mut h = b.finish_hugr_with_outputs([bool]).unwrap();
+
+        lower_tk2_ops(&mut h, PassScope::Global(Preserve::Public), from_platform).unwrap();
+        h.validate().unwrap();
+
+        // Re-lowering to the other platform completes, but it should contain
+        // barriers from the wrong platform.
+        lower_tk2_ops(&mut h, Preserve::Public, to_platform).unwrap();
+        h.validate().unwrap();
+        let unlowered = check_lowered(&h, Preserve::Public, &forbidden_extensions_for(to_platform));
+        assert!(
+            unlowered.unwrap_err().iter().all(|&n| {
+                let Some(ext_op) = h.get_optype(n).as_extension_op() else {
+                    return false;
+                };
+                // The barriers left over should belong to the `from_platform`
+                match from_platform {
+                    QSystemPlatform::Helios => {
+                        HeliosRuntimeBarrierDef::from_extension_op(ext_op).is_ok()
+                    }
+                    QSystemPlatform::Sol => SolRuntimeBarrierDef::from_extension_op(ext_op).is_ok(),
+                }
+            }),
+            "Expected only {from_platform:?} RuntimeBarrier ops to remain unlowered"
         );
     }
 
@@ -1427,7 +1503,7 @@ mod test {
     /// after the pass.
     #[rstest]
     #[case::helios(QSystemPlatform::Helios)]
-    #[case::helios(QSystemPlatform::Sol)]
+    #[case::sol(QSystemPlatform::Sol)]
     fn test_measurements_removed(#[case] platform: QSystemPlatform) {
         let mut circuit = DFGBuilder::new(inout_sig(vec![qb_t(); 2], vec![bool_t()])).unwrap();
         let [q1, q2] = circuit.input_wires_arr();
