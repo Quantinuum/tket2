@@ -1,12 +1,7 @@
 use derive_more::{Display, Error, From};
-use hugr::builder::{Container, HugrBuilder};
-use hugr::core::Visibility;
 use hugr::extension::prelude::{Barrier, Noop, bool_t};
 use hugr::extension::simple_op::{MakeExtensionOp, MakeRegisteredOp};
-use hugr::hugr::linking::NameLinkingPolicy;
-use hugr::hugr::linking::OnMultiDefn;
 use hugr::hugr::patch::insert_cut::InsertCutError;
-use hugr::ops::handle::{FuncID, NodeHandle};
 use hugr::{
     Hugr, HugrView, Node, Wire,
     builder::{BuildError, Dataflow, DataflowHugr, FunctionBuilder},
@@ -294,7 +289,9 @@ pub fn lower_tk2_ops(
                     let template = match funcs.entry(tket_op) {
                         Entry::Occupied(e) => e.get().clone(),
                         Entry::Vacant(e) => {
-                            let t = func_as_node_template(build_func(platform, tket_op)?);
+                            let t =
+                                NodeTemplate::call_to_function(build_func(platform, tket_op)?, &[])
+                                    .map_err(LowerTk2Error::BuildError)?;
                             e.insert(t).clone()
                         }
                     };
@@ -357,7 +354,7 @@ fn build_func(platform: QSystemPlatform, op: TketOp) -> Result<Hugr, LowerTk2Err
         platform_str(platform),
         op.op_id().to_lowercase()
     );
-    let mut f_build = FunctionBuilder::new(f_name, sig)?;
+    let mut f_build = FunctionBuilder::new_vis(f_name, sig, hugr::core::Visibility::Public)?;
     let outputs = build_func_outputs(platform, &mut f_build, op)?;
     Ok(f_build.finish_hugr_with_outputs(outputs)?)
 }
@@ -416,33 +413,6 @@ where
         _ => return Err(LowerTk2Error::UnknownOp(op, inputs.len())), // non-exhaustive
     };
     Ok(outputs)
-}
-
-/// Given a hugr with a function definition as entrypoint, constructs a
-/// [`NodeTemplate::LinkedHugr`] that produces a call to the function.
-//
-// TODO: Use [`NodeTemplate::call_to_function`] once it gets released in `hugr 0.25.6`.
-fn func_as_node_template(func_def: Hugr) -> NodeTemplate {
-    // Create a replacement hugr for the op nodes: Add a `call` node in the `func_def` hugr and set it as entrypoint.
-    let func_signature = func_def.inner_function_type().unwrap().into_owned();
-
-    // Build a new hugr and insert the function definition into it
-    let mut b = FunctionBuilder::new_vis("", func_signature, Visibility::Private).unwrap();
-    let func_id = FuncID::<true>::from(
-        b.module_root_builder()
-            .add_hugr(func_def)
-            .inserted_entrypoint,
-    );
-
-    // Build a call to the function in the new separate function.
-    let call = b.call(&func_id, &[], b.input_wires()).unwrap();
-    let mut call_hugr = b.finish_hugr_with_outputs(call.outputs()).unwrap();
-    call_hugr.set_entrypoint(call.node());
-
-    NodeTemplate::LinkedHugr(
-        Box::new(call_hugr),
-        NameLinkingPolicy::default().on_multiple_defn(OnMultiDefn::UseTarget),
-    )
 }
 
 fn build_to_radians(b: &mut impl Dataflow, rotation: Wire) -> Result<Wire, BuildError> {
@@ -566,7 +536,8 @@ fn apply_cross_platform_helios(
             let template = match cache.entry(h_op) {
                 Entry::Occupied(e) => e.get().clone(),
                 Entry::Vacant(e) => {
-                    let t = func_as_node_template(build_helios_op_for_sol()?);
+                    let t = NodeTemplate::call_to_function(build_helios_op_for_sol()?, &[])
+                        .map_err(LowerTk2Error::BuildError)?;
                     e.insert(t).clone()
                 }
             };
@@ -604,7 +575,8 @@ fn apply_cross_platform_sol(
             let template = match cache.entry(s_op) {
                 Entry::Occupied(e) => e.get().clone(),
                 Entry::Vacant(e) => {
-                    let t = func_as_node_template(build_sol_op_for_helios()?);
+                    let t = NodeTemplate::call_to_function(build_sol_op_for_helios()?, &[])
+                        .map_err(LowerTk2Error::BuildError)?;
                     e.insert(t).clone()
                 }
             };
@@ -627,9 +599,10 @@ fn build_helios_op_for_sol() -> Result<Hugr, LowerTk2Error> {
         .expect("valid registered HeliosOp")
         .signature()
         .into_owned();
-    let mut f_build = FunctionBuilder::new(
+    let mut f_build = FunctionBuilder::new_vis(
         "__tk2_helios_to_sol_zzphase",
         Signature::new(sig.input, sig.output),
+        hugr::core::Visibility::Public,
     )?;
     let [qb1, qb2, angle] = f_build.input_wires_arr();
     let mut synth = SolSynthesizer::new(&mut f_build);
@@ -646,9 +619,10 @@ fn build_sol_op_for_helios() -> Result<Hugr, LowerTk2Error> {
         .expect("valid registered SolOp")
         .signature()
         .into_owned();
-    let mut f_build = FunctionBuilder::new(
+    let mut f_build = FunctionBuilder::new_vis(
         "__tk2_sol_to_helios_phasedxx",
         Signature::new(sig.input, sig.output),
+        hugr::core::Visibility::Public,
     )?;
     let [qb1, qb2, angle1, angle2] = f_build.input_wires_arr();
     let mut synth = HeliosSynthesizer::new(&mut f_build);
@@ -1201,6 +1175,34 @@ mod test {
         assert!(
             h.nodes()
                 .any(|n| h.get_optype(n).cast() == Some(HeliosOp::ZZPhase))
+        );
+    }
+
+    /// Two `TketOp::H` ops lowered to Helios should share exactly one
+    /// `__tk2_helios_h` replacement function (deduplication via `OnMultiDefn::UseTarget`).
+    #[test]
+    fn test_duplicate_tket_ops_produce_single_replacement_func() {
+        let mut b = FunctionBuilder::new("f", Signature::new_endo(type_row![])).unwrap();
+        let [q] = b.add_dataflow_op(TketOp::QAlloc, []).unwrap().outputs_arr();
+        let [q] = b.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
+        let [q] = b.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
+        b.add_dataflow_op(TketOp::QFree, [q]).unwrap();
+        let mut h = b.finish_hugr_with_outputs([]).unwrap();
+
+        lower_tk2_ops(&mut h, Preserve::Public, QSystemPlatform::Helios).unwrap();
+        h.validate().unwrap();
+
+        let h_func_count = h
+            .nodes()
+            .filter(|&n| {
+                h.get_optype(n)
+                    .as_func_defn()
+                    .is_some_and(|f| *f.func_name() == "__tk2_helios_h")
+            })
+            .count();
+        assert_eq!(
+            h_func_count, 1,
+            "Expected exactly one __tk2_helios_h replacement function"
         );
     }
 
