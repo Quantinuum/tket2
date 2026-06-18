@@ -2981,6 +2981,7 @@ dependencies = [
  "anyhow",
  "clap",
  "cool_asserts",
+ "criterion",
  "delegate 0.13.5",
  "derive_more 2.1.1",
  "hugr",
