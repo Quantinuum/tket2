@@ -1217,7 +1217,6 @@ mod test {
 
     /// Test that runtime `Barrier` and `<platform>::RuntimeBarrier` ops
     /// are correctly lowered and/or skipped when lowering to <platform>.
-    /// Also, check that re-lowering the HUGR to a different platform fails.
     ///
     /// See the comment in `classify_node` for further details.
     #[rstest]
