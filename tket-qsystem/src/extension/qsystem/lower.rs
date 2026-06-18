@@ -815,7 +815,7 @@ mod test {
         // PhasedXX decomposes into a called function, so scan all hugr nodes.
         assert!(
             h.nodes()
-                .any(|n| h.get_optype(n).cast() == Some(HeliosOp::ZZPhase)),
+                .any(|n| h.get_optype(n).cast() == Some(HeliosOp::ZZPhase))
         );
         // There should be only one replacement function.
         assert_eq!(
