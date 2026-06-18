@@ -21,7 +21,7 @@ use tket::extension::rotation::rotation_type;
 /// a replacement for every occurrence) with the direct-map path, so the total
 /// op count grows linearly with `layers` while the set of distinct ops stays
 /// tiny.
-pub fn make_quantum_layers(num_qubits: usize, layers: usize) -> Hugr {
+pub fn make_h_cx_rx_reset_layers(num_qubits: usize, layers: usize) -> Hugr {
     let qb_row = vec![qb_t(); num_qubits];
     let mut inputs = qb_row.clone();
     inputs.push(rotation_type());

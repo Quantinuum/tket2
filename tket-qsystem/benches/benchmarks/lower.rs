@@ -6,7 +6,7 @@ use criterion::{AxisScale, BenchmarkId, Criterion, PlotConfiguration, criterion_
 use tket::passes::ComposablePass;
 use tket_qsystem::extension::qsystem::{LowerTketToQSystemPass, QSystemPlatform};
 
-use super::generators::make_quantum_layers;
+use super::generators::make_h_cx_rx_reset_layers;
 
 const NUM_QUBITS: usize = 8;
 
@@ -15,7 +15,7 @@ fn bench_lower_platform(c: &mut Criterion, platform: QSystemPlatform, name: &str
     g.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
 
     for layers in [10, 100, 1_000] {
-        let hugr = make_quantum_layers(NUM_QUBITS, layers);
+        let hugr = make_h_cx_rx_reset_layers(NUM_QUBITS, layers);
         let pass = LowerTketToQSystemPass::new(platform);
         g.bench_with_input(BenchmarkId::new("layers", layers), &layers, |b, _| {
             b.iter_batched(
