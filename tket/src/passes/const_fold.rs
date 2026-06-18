@@ -168,34 +168,19 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
 
             // If the type does NOT reference type parameters, the constant can be loaded as a
             // constant node linked with a static edge to a LoadConstant. However, if the type DOES
-            // reference type parameters, the only case in which we can still use the result of
-            // constant folding is when encountering a sum variant, as we know how to represent this
-            // as a single non-static value (with a Tag op).
-            //
-            // To avoid having to recursively reconstruct the value tree, we only do this for
-            // variants that take no child values.
-            let const_node_opt = if !datatype.is_parametrized() {
+            // reference type parameters, we have to give up since static edges do not support
+            // types using type arguments.
+            if !datatype.is_parametrized() {
                 // We could try hash-consing identical Consts, but not ATM
                 let cst = hugr.add_node_with_parent(parent, Const::new(v));
                 let lcst = hugr.add_node_with_parent(parent, LoadConstant { datatype });
                 hugr.connect(cst, OutgoingPort::from(0), lcst, IncomingPort::from(0));
-                Some(lcst)
-            } else if let Value::Sum(sum) = v
-                && sum.values.is_empty()
-            {
-                // TODO Can only do "None" until constant folding stops folding sum variants that
-                //      are linear. See https://github.com/Quantinuum/tket2/issues/1724.
-                None
-            } else {
-                None
-            };
 
-            if let Some(const_node) = const_node_opt {
                 for (n, inport) in hugr.linked_inputs(n, outport).collect::<Vec<_>>() {
                     hugr.disconnect(n, inport);
-                    hugr.connect(const_node, OutgoingPort::from(0), n, inport);
+                    hugr.connect(lcst, OutgoingPort::from(0), n, inport);
                 }
-            }
+            };
         }
         // Eliminate dead code not required for the same entry points.
         let dce = DeadCodeElimPass::<H>::default_with_scope(self.scope.clone());

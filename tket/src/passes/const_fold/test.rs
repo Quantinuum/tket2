@@ -1991,15 +1991,13 @@ fn test_propagate_not_parametrized() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[rstest]
-// TODO This should be `true`, see https://github.com/Quantinuum/tket2/issues/1724.
-#[case::variant_without_parameter_use_no_children(0, false)]
-#[case::variant_without_parameter_use_with_children(1, false)]
-#[case::variant_with_parameter_use(2, false)]
+#[case::variant_without_parameter_use_no_children(0)]
+#[case::variant_without_parameter_use_with_children(1)]
+#[case::variant_with_parameter_use(2)]
 /// Test that values with datatypes that are parametrized sumtypes, where the used variants don't/do
 /// use parameters or have child values, are/aren't propagated by constant folding
 fn test_propagate_parametrized_sum_type(
     #[case] variant: usize,
-    #[case] is_propagated: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let array_ty = array_type_parametric(0, Type::new_var_use(0, TypeBound::Copyable))?;
     // A sum type with an empty variant, an int variant and a parametrised variant
@@ -2062,9 +2060,8 @@ fn test_propagate_parametrized_sum_type(
         (OpTag::Input, 1),
         (OpTag::Output, 1),
         (OpTag::FnCall, 1),
-        // If the constant has been propagated through the call, it is duplicated since it is
-        // still passed in, and has been reconstructed as a tag (op tag is a leaf operation)
-        (OpTag::Leaf, if is_propagated { 2 } else { 1 }),
+        // One leaf: No propagation (just the original value remains)
+        (OpTag::Leaf, 1),
     ];
     expected_tags.extend(additional_tags);
     assert_eq!(
