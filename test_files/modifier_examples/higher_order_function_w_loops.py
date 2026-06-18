@@ -8,6 +8,7 @@
 
 from pathlib import Path
 from sys import argv
+from typing import Callable
 
 from guppylang import guppy
 from guppylang.std.builtins import (
@@ -25,14 +26,28 @@ from guppylang.experimental import enable_experimental_features
 enable_experimental_features()
 
 
+@guppy
+def get_angle(f: float) -> angle:
+    return angle(f)
+
+
 @guppy(unitary=True)
-def apply_r(f: Unitary[[qubit, angle], None], q: array[qubit, 2], angle: angle) -> None:
-    f(q[1], angle)
+def apply_r(
+    f: Unitary[[qubit, angle], None],
+    q: array[qubit, 2],
+    fun_angle: Callable[[float], angle],
+    radiant: float,
+) -> None:
+    f(q[1], fun_angle(radiant))
 
 
 @guppy(controllable=True)
 def apply_c(
-    f: Controllable[[qubit], None], g: Unitary[[qubit, angle], None], q: qubit, b: bool
+    f: Controllable[[qubit], None],
+    g: Unitary[[qubit, angle], None],
+    classic_fun: Callable[[float], angle],
+    q: qubit,
+    b: bool,
 ) -> None:
     n = 3
     if b:
@@ -40,8 +55,9 @@ def apply_c(
             f(q)
             n -= 1
     else:
+        a = classic_fun(0.5)
         for _ in range(2):
-            g(q, angle(0.5))
+            g(q, a)
 
 
 @guppy
@@ -50,12 +66,12 @@ def main() -> None:
     h(qs[0])
     flag = 2 > 10
     with control(qs[0]):
-        apply_c(h, rx, qs[1], True)
-        apply_c(h, rx, qs[1], flag)
+        apply_c(h, rx, get_angle, qs[1], True)
+        apply_c(h, rx, get_angle, qs[1], flag)
 
     with control(qs[0]), dagger:
-        apply_r(rz, qs, angle(0.25))
-        apply_r(rz, qs, angle(0.5))
+        apply_r(rz, qs, get_angle, 0.25)
+        apply_r(rz, qs, get_angle, 0.5)
 
     state_result("r", qs[0], qs[1])
     discard_array(qs)

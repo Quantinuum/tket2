@@ -133,7 +133,7 @@ use hugr::{
     types::{EdgeKind, FuncTypeBase, Signature, Term, Type, TypeRow},
 };
 
-/// A wire of eigher direction.
+/// A wire of either direction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct DirWire<N = Node>(N, Port);
 
@@ -281,7 +281,7 @@ impl<N: HugrNode> PortVector<N> {
         outputs: impl Iterator<Item = usize>,
         iter: impl Iterator<Item = usize>,
     ) -> Self {
-        let iter = iter.collect::<Vec<_>>();
+        let iter = iter.collect::<HashSet<_>>();
         let incoming = inputs
             .map(|p| {
                 if iter.contains(&p) {
@@ -457,6 +457,23 @@ impl<N> ModifierResolverErrors<N> {
     }
 }
 
+/// Shared traversal context for the recursive function-input-requirement search.
+///
+/// Bundles the parameters that are constant across recursive calls to
+/// [`ModifierResolver::function_input_requirements_for_value`],
+/// [`ModifierResolver::function_input_requirements_for_sum_field`], and
+/// [`ModifierResolver::function_input_requirements_from_input`].
+struct FunctionInputContext<'a, N> {
+    /// Indices of function-typed inputs in the top-level function signature.
+    function_input_indices: &'a HashSet<usize>,
+    /// The top-level function node whose inputs are being analysed.
+    func: N,
+    /// Visited (node, port) pairs to prevent infinite recursion through values.
+    visited_values: &'a mut HashSet<(N, OutgoingPort)>,
+    /// Visited (node, port, variant, field) tuples to prevent infinite recursion through sum fields.
+    visited_sum_fields: &'a mut HashSet<(N, OutgoingPort, usize, usize)>,
+}
+
 // Utility functions for ModifierResolver
 impl<N: HugrNode> ModifierResolver<N> {
     fn modifiers_mut(&mut self) -> &mut CombinedModifier {
@@ -471,7 +488,7 @@ impl<N: HugrNode> ModifierResolver<N> {
     fn controls(&mut self) -> &mut Vec<Wire> {
         &mut self.controls
     }
-    fn controls_ref(&self) -> &Vec<Wire> {
+    fn controls_ref(&self) -> &[Wire] {
         &self.controls
     }
     fn worklist(&mut self) -> &mut VecDeque<N> {
@@ -503,6 +520,11 @@ impl<N: HugrNode> ModifierResolver<N> {
             .unwrap_or_default()
     }
 
+    /// Follow a value through consecutive modifier nodes.
+    ///
+    /// This only consumes nodes such as `Control` and `Dagger`, accumulating
+    /// them into `modifiers`. It stops at the first non-modifier node, which is
+    /// often an `Input` node local to a nested container.
     fn trace_modifier_chain_with(
         &self,
         h: &impl HugrMut<Node = N>,
@@ -546,6 +568,269 @@ impl<N: HugrNode> ModifierResolver<N> {
         self.higher_order_input_modifiers_inner(h, func, &mut visiting)
     }
 
+    /// Trace a plain value back to the top-level function input that provides it.
+    ///
+    /// Higher-order modifier requirements are stored against `func`'s original
+    /// input indices. A value used by a nested indirect call may have crossed
+    /// DFG, CFG, loop, or conditional boundaries before reaching the call, so a
+    /// local `Input` port number is not enough. This helper first strips any
+    /// modifier chain from `source`, then delegates to
+    /// [`Self::function_input_requirements_from_input`] when the remaining value
+    /// is a container input.
+    fn function_input_requirements_for_value(
+        &self,
+        h: &impl HugrMut<Node = N>,
+        ctx: &mut FunctionInputContext<'_, N>,
+        source: Wire<N>,
+        modifiers: CombinedModifier,
+    ) -> Result<Vec<(usize, CombinedModifier)>, ModifierResolverErrors<N>> {
+        let (target, target_port, modifiers) =
+            self.trace_modifier_chain_with(h, source.node(), source.source(), modifiers)?;
+        if !ctx.visited_values.insert((target, target_port)) {
+            return Ok(Vec::new());
+        }
+
+        if matches!(h.get_optype(target), OpType::Input(_)) {
+            self.function_input_requirements_from_input(
+                h,
+                ctx,
+                Wire::new(target, target_port),
+                modifiers,
+            )
+        } else {
+            Ok(Vec::new())
+        }
+    }
+
+    /// Trace one field of a sum value back to the top-level function input that
+    /// provides it.
+    ///
+    /// Conditionals and CFG branches pass values through sum rows. When a local
+    /// input comes from variant `variant`, field `field`, this helper follows
+    /// the sum-producing operation (`Tag`, or a nested `Conditional`) until it
+    /// reaches the ordinary value that supplied that field.
+    fn function_input_requirements_for_sum_field(
+        &self,
+        h: &impl HugrMut<Node = N>,
+        ctx: &mut FunctionInputContext<'_, N>,
+        source: Wire<N>,
+        variant: usize,
+        field: usize,
+        modifiers: CombinedModifier,
+    ) -> Result<Vec<(usize, CombinedModifier)>, ModifierResolverErrors<N>> {
+        if !ctx
+            .visited_sum_fields
+            .insert((source.node(), source.source(), variant, field))
+        {
+            return Ok(Vec::new());
+        }
+
+        match h.get_optype(source.node()) {
+            OpType::Tag(tag) if source.source().index() == 0 && tag.tag == variant => {
+                if h.num_inputs(source.node()) <= field {
+                    return Ok(Vec::new());
+                }
+                let Some((field_source, field_source_port)) =
+                    h.single_linked_output(source.node(), field)
+                else {
+                    return Ok(Vec::new());
+                };
+                self.function_input_requirements_for_value(
+                    h,
+                    ctx,
+                    Wire::new(field_source, field_source_port),
+                    modifiers,
+                )
+            }
+            OpType::Conditional(_) => {
+                let Some(case) = h.children(source.node()).nth(variant) else {
+                    return Ok(Vec::new());
+                };
+                let Some([_, case_output]) = h.get_io(case) else {
+                    return Ok(Vec::new());
+                };
+                let Some((case_source, case_source_port)) =
+                    h.single_linked_output(case_output, source.source().index())
+                else {
+                    return Ok(Vec::new());
+                };
+                self.function_input_requirements_for_sum_field(
+                    h,
+                    ctx,
+                    Wire::new(case_source, case_source_port),
+                    variant,
+                    field,
+                    modifiers,
+                )
+            }
+            _ => Ok(Vec::new()),
+        }
+    }
+
+    /// Lift a local container input back to an input of `func`.
+    ///
+    /// `input_node` may be the `Input` of `func` itself, or it may belong to a
+    /// nested `Case`, `DFG`, `TailLoop`, `CFG`, or `DataflowBlock`. The function
+    /// walks outward through those container boundaries, following the actual
+    /// incoming edge or carried branch payload instead of reusing the local port
+    /// number as a top-level function input index.
+    fn function_input_requirements_from_input(
+        &self,
+        h: &impl HugrMut<Node = N>,
+        ctx: &mut FunctionInputContext<'_, N>,
+        input: Wire<N>,
+        modifiers: CombinedModifier,
+    ) -> Result<Vec<(usize, CombinedModifier)>, ModifierResolverErrors<N>> {
+        let Some(parent) = h.get_parent(input.node()) else {
+            return Ok(Vec::new());
+        };
+        let input_index = input.source().index();
+        if parent == ctx.func {
+            return Ok(ctx
+                .function_input_indices
+                .contains(&input_index)
+                .then_some((input_index, modifiers))
+                .into_iter()
+                .collect());
+        }
+
+        match h.get_optype(parent) {
+            OpType::Case(_) => {
+                let Some(conditional) = h.get_parent(parent) else {
+                    return Ok(Vec::new());
+                };
+                let OpType::Conditional(conditional_op) = h.get_optype(conditional) else {
+                    return Ok(Vec::new());
+                };
+                let Some(case_index) = h.children(conditional).position(|case| case == parent)
+                else {
+                    return Ok(Vec::new());
+                };
+                let tag_inputs = conditional_op
+                    .sum_rows
+                    .get(case_index)
+                    .map(TypeRow::len)
+                    .unwrap_or_default();
+                if input_index < tag_inputs {
+                    let Some((sum_source, sum_source_port)) =
+                        h.single_linked_output(conditional, 0)
+                    else {
+                        return Ok(Vec::new());
+                    };
+                    self.function_input_requirements_for_sum_field(
+                        h,
+                        ctx,
+                        Wire::new(sum_source, sum_source_port),
+                        case_index,
+                        input_index,
+                        modifiers,
+                    )
+                } else {
+                    let Some((source, source_port)) =
+                        h.single_linked_output(conditional, input_index - tag_inputs + 1)
+                    else {
+                        return Ok(Vec::new());
+                    };
+                    self.function_input_requirements_for_value(
+                        h,
+                        ctx,
+                        Wire::new(source, source_port),
+                        modifiers,
+                    )
+                }
+            }
+            OpType::DFG(_) | OpType::TailLoop(_) | OpType::CFG(_) => {
+                if h.num_inputs(parent) <= input_index {
+                    return Ok(Vec::new());
+                }
+                let Some((source, source_port)) = h.single_linked_output(parent, input_index)
+                else {
+                    return Ok(Vec::new());
+                };
+                self.function_input_requirements_for_value(
+                    h,
+                    ctx,
+                    Wire::new(source, source_port),
+                    modifiers,
+                )
+            }
+            OpType::DataflowBlock(_) => {
+                let predecessors = if h.num_inputs(parent) > 0 {
+                    h.linked_outputs(parent, IncomingPort::from(0))
+                        .collect::<Vec<_>>()
+                } else {
+                    Vec::new()
+                };
+                if predecessors.is_empty() {
+                    let Some(cfg) = h.get_parent(parent) else {
+                        return Ok(Vec::new());
+                    };
+                    if h.num_inputs(cfg) <= input_index {
+                        return Ok(Vec::new());
+                    }
+                    let Some((source, source_port)) = h.single_linked_output(cfg, input_index)
+                    else {
+                        return Ok(Vec::new());
+                    };
+                    return self.function_input_requirements_for_value(
+                        h,
+                        ctx,
+                        Wire::new(source, source_port),
+                        modifiers,
+                    );
+                }
+
+                let mut requirements = Vec::new();
+                for (predecessor, branch_port) in predecessors {
+                    let OpType::DataflowBlock(predecessor_block) = h.get_optype(predecessor) else {
+                        continue;
+                    };
+                    let Some([_, predecessor_output]) = h.get_io(predecessor) else {
+                        continue;
+                    };
+                    let Some((sum_source, sum_source_port)) =
+                        h.single_linked_output(predecessor_output, 0)
+                    else {
+                        continue;
+                    };
+                    // CFG blocks carry branch data in two equivalent shapes:
+                    // the first output is the branch sum value, while following
+                    // output ports flatten every variant payload. Trace both so
+                    // provenance is recovered for HUGRs using either encoding.
+                    requirements.extend(self.function_input_requirements_for_sum_field(
+                        h,
+                        ctx,
+                        Wire::new(sum_source, sum_source_port),
+                        branch_port.index(),
+                        input_index,
+                        modifiers.clone(),
+                    )?);
+                    let field_input = 1
+                        + predecessor_block
+                            .sum_rows
+                            .iter()
+                            .take(branch_port.index())
+                            .map(TypeRow::len)
+                            .sum::<usize>()
+                        + input_index;
+                    if h.num_inputs(predecessor_output) > field_input
+                        && let Some((field_source, field_source_port)) =
+                            h.single_linked_output(predecessor_output, field_input)
+                    {
+                        requirements.extend(self.function_input_requirements_for_value(
+                            h,
+                            ctx,
+                            Wire::new(field_source, field_source_port),
+                            modifiers.clone(),
+                        )?);
+                    }
+                }
+                Ok(requirements)
+            }
+            _ => Ok(Vec::new()),
+        }
+    }
+
     fn higher_order_input_modifiers_inner(
         &self,
         h: &impl HugrMut<Node = N>,
@@ -568,12 +853,6 @@ impl<N: HugrNode> ModifierResolver<N> {
             .enumerate()
             .filter_map(|(index, ty)| matches!(**ty, Term::FunctionType(_)).then_some(index))
             .collect::<HashSet<_>>();
-        let mut quantum_function_input_indices = HashSet::new();
-        for (index, ty) in function_inputs.iter().enumerate() {
-            if self.function_type_has_quantum_data(ty)? {
-                quantum_function_input_indices.insert(index);
-            }
-        }
 
         let mut requirements = Vec::new();
         for node in h.descendants(func) {
@@ -598,7 +877,17 @@ impl<N: HugrNode> ModifierResolver<N> {
                         self.modifiers().clone(),
                     )?;
                     if matches!(h.get_optype(target), OpType::Input(_)) {
-                        requirements.push((target_port.index(), modifiers));
+                        requirements.extend(self.function_input_requirements_from_input(
+                            h,
+                            &mut FunctionInputContext {
+                                function_input_indices: &function_input_indices,
+                                func,
+                                visited_values: &mut HashSet::new(),
+                                visited_sum_fields: &mut HashSet::new(),
+                            },
+                            Wire::new(target, target_port),
+                            modifiers,
+                        )?);
                     }
                 }
                 OpType::Call(call) => {
@@ -625,7 +914,17 @@ impl<N: HugrNode> ModifierResolver<N> {
                         let (target, target_port, modifiers) =
                             self.trace_modifier_chain_with(h, source.0, source.1, modifiers)?;
                         if matches!(h.get_optype(target), OpType::Input(_)) {
-                            requirements.push((target_port.index(), modifiers));
+                            requirements.extend(self.function_input_requirements_from_input(
+                                h,
+                                &mut FunctionInputContext {
+                                    function_input_indices: &function_input_indices,
+                                    func,
+                                    visited_values: &mut HashSet::new(),
+                                    visited_sum_fields: &mut HashSet::new(),
+                                },
+                                Wire::new(target, target_port),
+                                modifiers,
+                            )?);
                         }
                     }
                 }
@@ -635,14 +934,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         visiting.remove(&func);
 
         requirements.retain(|(input, _)| function_input_indices.contains(input));
-        if !requirements.is_empty() {
-            requirements.extend(
-                quantum_function_input_indices
-                    .iter()
-                    .copied()
-                    .map(|input| (input, self.modifiers().clone())),
-            );
-        }
 
         Ok(requirements.into_iter().unique().collect())
     }
@@ -815,24 +1106,15 @@ impl<N: HugrNode> ModifierResolver<N> {
         old: DirWire<N>,
         new: DirWire,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        match self.corresp_map().entry(old) {
-            std::collections::hash_map::Entry::Vacant(entry) => {
-                entry.insert(vec![new]);
-                Ok(())
-            }
-            // Empty entry means that the old wire has no correspondence, so we can insert the new wire.
-            std::collections::hash_map::Entry::Occupied(mut entry) if entry.get().is_empty() => {
-                entry.insert(vec![new]);
-                Ok(())
-            }
-            // If the old wire is already registered, raise an error.
-            std::collections::hash_map::Entry::Occupied(entry) => {
-                let former = entry.get();
-                Err(ModifierResolverErrors::unreachable(format!(
-                    "Wire already registered for node {}. Former [{},...], Latter {}.",
-                    old.0, former[0], new
-                )))
-            }
+        let vec = self.corresp_map().entry(old).or_default();
+        if vec.is_empty() {
+            vec.push(new);
+            Ok(())
+        } else {
+            Err(ModifierResolverErrors::unreachable(format!(
+                "Wire already registered for node {}. Former [{},...], Latter {}.",
+                old.0, vec[0], new
+            )))
         }
     }
 
@@ -866,7 +1148,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         Ok(())
     }
 
-    /// This function adds a node to the builder, that does not affected by the modifiers.
+    /// This function adds a node to the builder that is not affected by the modifiers.
     fn add_node_no_modification(
         &mut self,
         h: &impl HugrMut<Node = N>,
@@ -978,9 +1260,9 @@ impl<N: HugrNode> ModifierResolver<N> {
         Ok(())
     }
 
-    /// Apply the resolver the current node `n`.
+    /// Apply the resolver to the current node `n`.
     /// It first checks if the node is a modifier and can be applied.
-    /// If not, it returns an [`ModifierError`].
+    /// If not, it returns a [`ModifierError`].
     /// If yes, it applies the modifier to the loaded function,
     fn try_rewrite(
         &mut self,
@@ -1047,7 +1329,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         }
     }
 
-    // We take arbitral topological order of the circuit so that we can plug the control qubits
+    // We take an arbitrary topological order of the circuit so that we can plug the control qubits
     // and pass around them in that order. This might not be ideal, as it may produce an inefficient order.
     fn modify_op(
         &mut self,
@@ -1155,7 +1437,7 @@ impl<N: HugrNode> ModifierResolver<N> {
     /// * `new_offset`: the offset of the ports of the new node, especially the number of control qubits.
     ///
     /// The order of the resulting ports is determined as follows:
-    /// - Every ports are devided into quantum ports and non-quantum ports.
+    /// - Every port is divided into quantum ports and non-quantum ports.
     /// - Until the first quantum port is reached, the non-quantum ports are wired in order.
     /// - When a quantum port is reached for both inputs and outputs,
     ///   if the dagger is applied, the quantum input is wired to the output,
