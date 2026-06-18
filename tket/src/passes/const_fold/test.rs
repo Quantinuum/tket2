@@ -1,8 +1,3 @@
-use std::{
-    collections::{HashMap, HashSet, hash_map::RandomState},
-    sync::LazyLock,
-};
-
 use hugr_core::builder::{
     Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
     HugrBuilder, ModuleBuilder, SubContainer, endo_sig, inout_sig,
@@ -14,6 +9,7 @@ use hugr_core::extension::prelude::{
 use hugr_core::hugr::hugrmut::HugrMut;
 use hugr_core::ops::constant::{CustomConst, CustomSerialized};
 use hugr_core::ops::{Const, OpTag, OpTrait, OpType, Tag, Value, handle::NodeHandle};
+use hugr_core::std_extensions::arithmetic::int_types::int_type;
 use hugr_core::std_extensions::arithmetic::{
     conversions::ConvertOpDef,
     float_ops::FloatOps,
@@ -21,6 +17,7 @@ use hugr_core::std_extensions::arithmetic::{
     int_ops::IntOpDef,
     int_types::{ConstInt, INT_TYPES},
 };
+use hugr_core::std_extensions::collections::array::{ArrayOpBuilder, array_type_parametric};
 use hugr_core::std_extensions::collections::list::ListOp;
 use hugr_core::std_extensions::logic::LogicOp;
 use hugr_core::types::type_param::TypeParam;
@@ -28,28 +25,20 @@ use hugr_core::types::{PolyFuncType, Signature, SumType, Type, TypeArg, TypeBoun
 use hugr_core::{Hugr, HugrView, IncomingPort, Node, Visibility, type_row};
 use itertools::Itertools;
 use rstest::rstest;
+use std::{
+    collections::{HashMap, HashSet, hash_map::RandomState},
+    sync::LazyLock,
+};
 
 use crate::passes::ComposablePass as _;
-use crate::passes::composable::{
-    PassScope, Preserve, ValidatePassError, ValidatingPass, WithScope,
-};
+use crate::passes::composable::{PassScope, Preserve, ValidatingPass, WithScope};
 use crate::passes::dataflow::{DFContext, PartialValue, partial_from_const};
 
 use super::{ConstFoldContext, ConstantFoldPass, ValueHandle};
 
 fn constant_fold_pass(h: &mut (impl HugrMut<Node = Node> + 'static)) {
     let c = ConstantFoldPass::default();
-    println!("{}", h.mermaid_string());
-    ValidatingPass::new(c)
-        .run(h)
-        .map_err(|e| match e {
-            ValidatePassError::Output { err, pretty_hugr } => {
-                println!("{}", err);
-                println!("{}", pretty_hugr);
-            }
-            _ => unreachable!(),
-        })
-        .unwrap();
+    ValidatingPass::new(c).run(h).unwrap();
 }
 
 #[rstest]
@@ -1965,44 +1954,23 @@ fn two_funcs_entrypoint(
 }
 
 #[test]
-fn test_load_const_right_with_left_parametrized() -> Result<(), Box<dyn std::error::Error>> {
-    let gen_param = TypeParam::TypeKind(TypeBound::Linear);
-    let sum_type_variants = vec![
-        vec![Type::new_var_use(0, TypeBound::Linear)].into(),
-        type_row![],
-    ];
-    let sumtype_type_row = vec![SumType::new(sum_type_variants.clone()).into()];
-
+/// Test that values with datatypes without parameters are propagated by constant folding
+fn test_propagate_not_parametrized() -> Result<(), Box<dyn std::error::Error>> {
     let mut mb = ModuleBuilder::new();
-    // A function that wires all its inputs straight through
-    let callee = mb.define_function(
-        "callee",
-        PolyFuncType::new(
-            vec![gen_param.clone()],
-            Signature::new(sumtype_type_row.clone(), sumtype_type_row.clone()),
-        ),
+    let identity_f = mb.define_function(
+        "identity",
+        Signature::new(vec![int_type(5)], vec![int_type(5)]),
     )?;
-    let [inp] = callee.input_wires_arr();
-    let callee = callee.finish_with_outputs([inp])?;
+    let [inp] = identity_f.input_wires_arr();
+    let identity_f = identity_f.finish_with_outputs([inp])?;
     let mut main = mb.define_function_vis(
         "main",
-        PolyFuncType::new(
-            vec![gen_param.clone()],
-            Signature::new(vec![], sumtype_type_row.clone()),
-        ),
+        Signature::new(vec![], vec![int_type(5)]),
         Visibility::Public,
     )?;
-    let [right_tag] = main
-        .add_dataflow_op(Tag::new(1, sum_type_variants), [])?
-        .outputs_arr();
-    let [right_tag] = main
-        .call(
-            callee.handle(),
-            &[TypeArg::new_var_use(0, gen_param)],
-            [right_tag],
-        )?
-        .outputs_arr();
-    let main = main.finish_with_outputs([right_tag])?;
+    let value = main.add_load_value(Value::from(ConstInt::new_u(5, 7)?));
+    let [value] = main.call(identity_f.handle(), &[], [value])?.outputs_arr();
+    let main = main.finish_with_outputs([value])?;
     let mut hugr = mb.finish_hugr()?;
 
     constant_fold_pass(&mut hugr);
@@ -2013,9 +1981,97 @@ fn test_load_const_right_with_left_parametrized() -> Result<(), Box<dyn std::err
         HashMap::from([
             (OpTag::Input, 1),
             (OpTag::Output, 1),
-            (OpTag::Const, 1),
-            (OpTag::LoadConst, 1),
+            (OpTag::FnCall, 1),
+            // Constant has been propagated through the call, duplicated since it is still passed in
+            (OpTag::Const, 2),
+            (OpTag::LoadConst, 2),
         ])
+    );
+    Ok(())
+}
+
+#[rstest]
+#[case::variant_without_parameter_use_no_children(0, true)]
+#[case::variant_without_parameter_use_with_children(1, false)]
+#[case::variant_with_parameter_use(2, false)]
+/// Test that values with datatypes that are parametrized sumtypes, where the used variants don't/do
+/// use parameters or have child values, are/aren't propagated by constant folding
+fn test_propagate_parametrized_sum_type(
+    #[case] variant: usize,
+    #[case] is_propagated: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let array_ty = array_type_parametric(0, Type::new_var_use(0, TypeBound::Copyable))?;
+    // A sum type with an empty variant, an int variant and a parametrised variant
+    let sum_type_variants = vec![
+        type_row![],
+        vec![INT_TYPES[5].clone()].into(),
+        vec![array_ty].into(),
+    ];
+    let sumtype_type_row = vec![SumType::new(sum_type_variants.clone()).into()];
+    let gen_param = TypeParam::TypeKind(TypeBound::Copyable);
+
+    let mut mb = ModuleBuilder::new();
+    // A function that wires all its inputs straight through
+    let identity_f = mb.define_function(
+        "identity",
+        PolyFuncType::new(
+            vec![gen_param.clone()],
+            Signature::new(sumtype_type_row.clone(), sumtype_type_row.clone()),
+        ),
+    )?;
+    let [inp] = identity_f.input_wires_arr();
+    let identity_f = identity_f.finish_with_outputs([inp])?;
+    let mut main = mb.define_function_vis(
+        "main",
+        PolyFuncType::new(
+            vec![gen_param.clone()],
+            Signature::new(vec![], sumtype_type_row.clone()),
+        ),
+        Visibility::Public,
+    )?;
+    let (tag_inputs, additional_tags) = match variant {
+        0 => (vec![], vec![]),
+        1 => {
+            let value = main.add_load_value(Value::from(ConstInt::new_u(5, 7)?));
+            (vec![value], vec![(OpTag::LoadConst, 1), (OpTag::Const, 1)])
+        }
+        2 => {
+            let arr = main.add_new_array(Type::new_var_use(0, TypeBound::Copyable), [])?;
+            (vec![arr], vec![(OpTag::Leaf, 1)])
+        }
+        _ => unreachable!(),
+    };
+    let [tag_value] = main
+        .add_dataflow_op(Tag::new(variant, sum_type_variants), tag_inputs)?
+        .outputs_arr();
+    let [tag_value] = main
+        .call(
+            identity_f.handle(),
+            &[TypeArg::new_var_use(0, gen_param)],
+            [tag_value],
+        )?
+        .outputs_arr();
+    let main = main.finish_with_outputs([tag_value])?;
+    let mut hugr = mb.finish_hugr()?;
+
+    constant_fold_pass(&mut hugr);
+
+    assert!(hugr.get_optype(main.node()).is_func_defn());
+    let mut expected_tags = vec![
+        (OpTag::Input, 1),
+        (OpTag::Output, 1),
+        (OpTag::FnCall, 1),
+        // If the constant has been propagated through the call, it is duplicated since it is
+        // still passed in, and has been reconstructed as a tag (op tag is a leaf operation)
+        (OpTag::Leaf, if is_propagated { 2 } else { 1 }),
+    ];
+    expected_tags.extend(additional_tags);
+    assert_eq!(
+        get_child_tags(&hugr, main.node()),
+        expected_tags
+            .iter()
+            .into_grouping_map_by(|(tag, _)| *tag)
+            .fold(0, |sum, _, (_, count)| sum + count),
     );
     Ok(())
 }
