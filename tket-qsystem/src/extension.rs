@@ -8,7 +8,6 @@ pub mod classical_compute;
 pub use classical_compute::gpu;
 pub use classical_compute::wasm;
 pub mod futures;
-pub mod globals;
 pub mod qsystem;
 pub mod random;
 pub mod result;
@@ -29,7 +28,7 @@ pub static REGISTRY: LazyLock<ExtensionRegistry> = LazyLock::new(|| {
 /// The list intentionally excludes std and base tket extensions so callers can
 /// combine it with [`tket::extension::tket_extensions`] or another base
 /// registry without duplicating either list.
-pub fn qsystem_extensions() -> [Arc<Extension>; 10] {
+pub fn qsystem_extensions() -> [Arc<Extension>; 9] {
     [
         gpu::EXTENSION.to_owned(),
         qsystem::EXTENSION.to_owned(),
@@ -40,6 +39,5 @@ pub fn qsystem_extensions() -> [Arc<Extension>; 10] {
         result::EXTENSION.to_owned(),
         utils::EXTENSION.to_owned(),
         wasm::EXTENSION.to_owned(),
-        globals::EXTENSION.to_owned(),
     ]
 }

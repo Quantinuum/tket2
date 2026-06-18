@@ -1,6 +1,6 @@
 from typing import Callable, List, Tuple
 from hugr.ops import ExtOp
-from hugr.tys import ExtType, Bool
+from hugr.tys import ExtType
 import tket_exts
 
 import pytest
@@ -58,18 +58,6 @@ def ext_measurement() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
         ext,
         [ext.measurement_t],
         [ext.read],
-    )
-
-
-def ext_globals() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
-    ext = tket_exts.globals
-    return (
-        ext,
-        [],
-        [
-            ext.with_op("test-name", Bool.type_arg(), [], [Bool, Bool], []),
-            ext.map("test-name", Bool.type_arg(), [Bool, Bool], [Bool, Bool], []),
-        ],
     )
 
 
@@ -225,7 +213,6 @@ def ext_wasm() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
         ext_gpu,
         ext_guppy,
         ext_futures,
-        ext_globals,
         ext_measurement,
         ext_qsystem_helios,
         ext_qsystem_sol,
