@@ -1,0 +1,30 @@
+---
+source: tket-qsystem/src/llvm/qsystem.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define internal i64 @_hl.main.1(i64 %0) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %1 = call i64 @_hl.__tk2_helios_h.6(i64 %0)
+  %2 = call i64 @_hl.__tk2_helios_h.6(i64 %1)
+  ret i64 %2
+}
+
+define i64 @_hl.__tk2_helios_h.6(i64 %0) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  call void @___rxy(i64 %0, double 0x3FF921FB54442D18, double 0xBFF921FB54442D18)
+  call void @___rz(i64 %0, double 0x400921FB54442D18)
+  ret i64 %0
+}
+
+declare void @___rxy(i64, double, double)
+
+declare void @___rz(i64, double)
