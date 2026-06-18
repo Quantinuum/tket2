@@ -31,6 +31,11 @@ def get_angle(f: float) -> angle:
     return angle(f)
 
 
+@guppy
+def get_get_angle() -> Callable[[float], angle]:
+    return get_angle
+
+
 @guppy(unitary=True)
 def apply_r(
     f: Unitary[[qubit, angle], None],
@@ -45,7 +50,7 @@ def apply_r(
 def apply_c(
     f: Controllable[[qubit], None],
     g: Unitary[[qubit, angle], None],
-    classic_fun: Callable[[float], angle],
+    classic_fun: Callable[[], Callable[[float], angle]],
     q: qubit,
     b: bool,
 ) -> None:
@@ -55,9 +60,9 @@ def apply_c(
             f(q)
             n -= 1
     else:
-        a = classic_fun(0.5)
+        get_a = classic_fun()
         for _ in range(2):
-            g(q, a)
+            g(q, get_a(0.5))
 
 
 @guppy
@@ -66,8 +71,8 @@ def main() -> None:
     h(qs[0])
     flag = 2 > 10
     with control(qs[0]):
-        apply_c(h, rx, get_angle, qs[1], True)
-        apply_c(h, rx, get_angle, qs[1], flag)
+        apply_c(h, rx, get_get_angle, qs[1], True)
+        apply_c(h, rx, get_get_angle, qs[1], flag)
 
     with control(qs[0]), dagger:
         apply_r(rz, qs, get_angle, 0.25)

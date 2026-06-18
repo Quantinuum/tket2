@@ -306,24 +306,37 @@ impl<N: HugrNode> ModifierResolver<N> {
         // Instead, we record the modifiers to be applied to that input and propagate
         // the requirement to callers.
         if matches!(h.get_optype(targ), OpType::Input(_)) {
-            // If no quantum data is involved, we can skip modifying the call
+            // If no quantum data is involved, we can skip modifying the call.
             if !self.signature_has_quantum_data(&indir_call.signature) {
+                *self.modifiers_mut() = modifiers;
                 self.add_node_no_modification(h, n, indir_call.clone(), new_dfg)?;
                 return Ok(());
             }
             *self.modifiers_mut() = modifiers;
             return self.modify_input_indirect_call(n, chain_tail.1.index(), indir_call, new_dfg);
         }
+        if let OpType::CallIndirect(source_indir_call) = h.get_optype(targ) {
+            *self.modifiers_mut() = modifiers;
+            if self.signature_has_quantum_data(&source_indir_call.signature) {
+                return Err(ModifierResolverErrors::unresolvable(
+                    n,
+                    "Cannot modify consecutive indirect calls with a quantum signature: 
+                    the produced callable consumes or allocates qubits, so this pattern is not allowed 
+                    in a modifier context.",
+                    indir_call.clone().into(),
+                ));
+            }
+            self.add_node_no_modification(h, n, indir_call.clone(), new_dfg)?;
+            return Ok(());
+        }
         // If the target is not a input, we expect it to be a LoadFunction node loading the function to call.
         let (func, load) =
             Self::get_loaded_function(h, n, targ, h.get_optype(targ)).map_err(wrap_modifier_err)?;
-
         // Modify the function (if needed)
         let Some(modified_fn) = self.modify_fn_if_needed(h, func)? else {
             // The loaded function does not satisfy the active modifier, so keep
-            // it unchanged.
-            // If same modifier are present, we raise an error instead of silently skipping modification,
-            // since that likely indicates a mistake in the input graph
+            // it unchanged. If same modifier are present, we raise an error instead
+            // of silently skipping modification.
             *self.modifiers_mut() = modifiers;
             if trace.len() > 1 {
                 return Err(ModifierResolverErrors::unresolvable(
