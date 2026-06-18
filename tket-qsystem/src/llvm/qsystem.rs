@@ -577,6 +577,54 @@ mod test {
         check_emission!(hugr, llvm_ctx);
     }
 
+    /// Lowering two `TketOp::H` gates should produce a single shared
+    /// `__tk2_helios_h` replacement function. The emitted LLVM (snapshot
+    /// taken pre-inlining via `check_emission!`) should therefore contain
+    /// exactly one definition of that function rather than one per gate.
+    #[rstest]
+    fn emit_duplicate_h_codegen(mut llvm_ctx: TestContext) {
+        use crate::extension::qsystem::lower_tk2_ops;
+        use crate::llvm::{futures::FuturesCodegenExtension, prelude::QISPreludeCodegen};
+        use hugr::builder::{Dataflow, DataflowHugr, FunctionBuilder};
+        use hugr::extension::prelude::qb_t;
+        use hugr::types::Signature;
+        use tket::TketOp;
+        use tket::passes::composable::Preserve;
+
+        llvm_ctx.add_extensions(|ceb| {
+            ceb.add_extension(QSystemCodegenExtension::new(
+                QSystemPlatform::Helios,
+                QISPreludeCodegen,
+            ))
+            .add_extension(FuturesCodegenExtension)
+            .add_prelude_extensions(QISPreludeCodegen)
+            .add_float_extensions()
+            .add_logic_extensions()
+        });
+
+        let mut b = FunctionBuilder::new("main", Signature::new_endo(vec![qb_t()])).unwrap();
+        let [q] = b.input_wires_arr();
+        let [q] = b.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
+        let [q] = b.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
+        let mut hugr = b.finish_hugr_with_outputs([q]).unwrap();
+
+        // We invoke `lower_tk2_ops` directly rather than the full `QSystemPass`
+        // so that the snapshot stays small and pre-inlining (no monomorphize /
+        // dead-func / constant-fold passes to obscure the duplication). The
+        // meaningful signal here is the *number* of `__tk2_helios_h`
+        // definitions: one (shared) after the fix, two (one per gate) before.
+        //
+        // A side effect of skipping the full pass is that the replacement
+        // function keeps `external` (public) linkage in the snapshot. In the
+        // real `QSystemPass` pipeline `hide_non_pub_funcs` re-marks these new
+        // helpers private after lowering (giving `internal` linkage), as
+        // asserted by `lib::test::no_public_funcs`. So the linkage shown here
+        // does not reflect what ships; only the definition count does.
+        lower_tk2_ops(&mut hugr, Preserve::Public, QSystemPlatform::Helios).unwrap();
+
+        check_emission!(hugr, llvm_ctx);
+    }
+
     #[rstest]
     #[case::rz(1, SolOp::Rz)]
     #[case::phased_x(2, SolOp::PhasedX)]
