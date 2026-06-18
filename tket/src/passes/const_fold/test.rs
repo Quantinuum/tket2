@@ -13,7 +13,7 @@ use hugr_core::extension::prelude::{
 };
 use hugr_core::hugr::hugrmut::HugrMut;
 use hugr_core::ops::constant::{CustomConst, CustomSerialized};
-use hugr_core::ops::{Const, OpTag, OpTrait, OpType, Value, handle::NodeHandle};
+use hugr_core::ops::{Const, OpTag, OpTrait, OpType, Tag, Value, handle::NodeHandle};
 use hugr_core::std_extensions::arithmetic::{
     conversions::ConvertOpDef,
     float_ops::FloatOps,
@@ -23,20 +23,33 @@ use hugr_core::std_extensions::arithmetic::{
 };
 use hugr_core::std_extensions::collections::list::ListOp;
 use hugr_core::std_extensions::logic::LogicOp;
-use hugr_core::types::{Signature, SumType, Type, TypeBound, TypeRow};
+use hugr_core::types::type_param::TypeParam;
+use hugr_core::types::{PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound, TypeRow};
 use hugr_core::{Hugr, HugrView, IncomingPort, Node, Visibility, type_row};
 use itertools::Itertools;
 use rstest::rstest;
 
 use crate::passes::ComposablePass as _;
-use crate::passes::composable::{PassScope, Preserve, ValidatingPass, WithScope};
+use crate::passes::composable::{
+    PassScope, Preserve, ValidatePassError, ValidatingPass, WithScope,
+};
 use crate::passes::dataflow::{DFContext, PartialValue, partial_from_const};
 
 use super::{ConstFoldContext, ConstantFoldPass, ValueHandle};
 
 fn constant_fold_pass(h: &mut (impl HugrMut<Node = Node> + 'static)) {
     let c = ConstantFoldPass::default();
-    ValidatingPass::new(c).run(h).unwrap();
+    println!("{}", h.mermaid_string());
+    ValidatingPass::new(c)
+        .run(h)
+        .map_err(|e| match e {
+            ValidatePassError::Output { err, pretty_hugr } => {
+                println!("{}", err);
+                println!("{}", pretty_hugr);
+            }
+            _ => unreachable!(),
+        })
+        .unwrap();
 }
 
 #[rstest]
@@ -1949,4 +1962,60 @@ fn two_funcs_entrypoint(
         .unwrap();
     check_identical(&hugr, &backup, main);
     two_funcs_check_f_respects_argument(&hugr, callee);
+}
+
+#[test]
+fn test_load_const_right_with_left_parametrized() -> Result<(), Box<dyn std::error::Error>> {
+    let gen_param = TypeParam::TypeKind(TypeBound::Linear);
+    let sum_type_variants = vec![
+        vec![Type::new_var_use(0, TypeBound::Linear)].into(),
+        type_row![],
+    ];
+    let sumtype_type_row = vec![SumType::new(sum_type_variants.clone()).into()];
+
+    let mut mb = ModuleBuilder::new();
+    // A function that wires all its inputs straight through
+    let callee = mb.define_function(
+        "callee",
+        PolyFuncType::new(
+            vec![gen_param.clone()],
+            Signature::new(sumtype_type_row.clone(), sumtype_type_row.clone()),
+        ),
+    )?;
+    let [inp] = callee.input_wires_arr();
+    let callee = callee.finish_with_outputs([inp])?;
+    let mut main = mb.define_function_vis(
+        "main",
+        PolyFuncType::new(
+            vec![gen_param.clone()],
+            Signature::new(vec![], sumtype_type_row.clone()),
+        ),
+        Visibility::Public,
+    )?;
+    let [right_tag] = main
+        .add_dataflow_op(Tag::new(1, sum_type_variants), [])?
+        .outputs_arr();
+    let [right_tag] = main
+        .call(
+            callee.handle(),
+            &[TypeArg::new_var_use(0, gen_param)],
+            [right_tag],
+        )?
+        .outputs_arr();
+    let main = main.finish_with_outputs([right_tag])?;
+    let mut hugr = mb.finish_hugr()?;
+
+    constant_fold_pass(&mut hugr);
+
+    assert!(hugr.get_optype(main.node()).is_func_defn());
+    assert_eq!(
+        get_child_tags(&hugr, main.node()),
+        HashMap::from([
+            (OpTag::Input, 1),
+            (OpTag::Output, 1),
+            (OpTag::Const, 1),
+            (OpTag::LoadConst, 1),
+        ])
+    );
+    Ok(())
 }
