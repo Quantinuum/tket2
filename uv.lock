@@ -20,17 +20,17 @@ members = [
 ]
 
 [manifest.dependency-groups]
-conan = [{ name = "conan", specifier = ">=2.29.0,<3" }]
+conan = [{ name = "conan", specifier = ">=2.29.1,<3" }]
 dev = [
     { name = "graphviz", specifier = "~=0.21.0" },
     { name = "hugr", specifier = "~=0.17.1" },
-    { name = "hypothesis", specifier = ">=6.155.2,<7" },
+    { name = "hypothesis", specifier = ">=6.155.3,<7" },
     { name = "maturin", specifier = ">=1.14.0,<2" },
     { name = "mypy", specifier = ">=2.1.0,<3" },
     { name = "numpy", specifier = ">=2.2.0" },
     { name = "pip", specifier = ">=26.1.2" },
     { name = "pre-commit", specifier = "~=4.6" },
-    { name = "pytest", specifier = ">=9.0.3,<10" },
+    { name = "pytest", specifier = ">=9.1.0,<10" },
     { name = "pytest-cov", specifier = "~=7.0" },
     { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "ruff", specifier = ">=0.15.17,<0.16" },
@@ -475,7 +475,7 @@ wheels = [
 
 [[package]]
 name = "conan"
-version = "2.29.0"
+version = "2.29.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "colorama" },
@@ -488,9 +488,9 @@ dependencies = [
     { name = "requests" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/27/ea/35f166de5d0edf010bc97c36645c2745cb9a1dff2de031d899b20b4c96b6/conan-2.29.0.tar.gz", hash = "sha256:9ead81365d2779eef80c7d772f56a7e12023ac4ee871eb528d4c0f9bf986e908", size = 577942, upload-time = "2026-05-28T16:28:24.672Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1d/89/4bc94f3736d1b0a0f2d639b152192bb036afb6186af1ed246710b109e6e0/conan-2.29.1.tar.gz", hash = "sha256:3a3bc1bfda462237c537d0dd8baa9dd68f6ac29c3ecc98dbb4a668ccc943ff33", size = 577849, upload-time = "2026-06-12T10:56:25.667Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8e/6e/a6f5ba0e035522e239a8403e34455705ff4fb6f2d251cc48ae2f649ca36d/conan-2.29.0-py3-none-any.whl", hash = "sha256:f617c057fa76a4d92823fa14f9376f520dba72db73f401499737f4a8313ccbe3", size = 718581, upload-time = "2026-05-28T16:28:23.21Z" },
+    { url = "https://files.pythonhosted.org/packages/fd/f6/305bf22e60b9058f63e56046ebd16d55764c3bdd4c6c6ce4267d1e289bf3/conan-2.29.1-py3-none-any.whl", hash = "sha256:9e5bf69e2782f456019a9ff4ae5282cfa6068159c5139f299c3db441232135dc", size = 718589, upload-time = "2026-06-12T10:56:23.899Z" },
 ]
 
 [[package]]
@@ -887,15 +887,15 @@ wheels = [
 
 [[package]]
 name = "hypothesis"
-version = "6.155.2"
+version = "6.155.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "exceptiongroup", marker = "python_full_version < '3.11'" },
     { name = "sortedcontainers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f5/04/64032a1dccd2233615c8a3f701bbb563558575ed017496a24b6d81762c91/hypothesis-6.155.2.tar.gz", hash = "sha256:ae36880287c9c5defe9f199d3d2b67d9947a4da2a46e6c57373cbdf2345b20e1", size = 477765, upload-time = "2026-06-05T16:32:23.63Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/36/77/13ec9b6390bce44f5badab39837dd6789bbfe6342a2ac611a71537a7756f/hypothesis-6.155.3.tar.gz", hash = "sha256:1e34b17ae9873515384312cb7640abd773eb096c7eef8c0d9c614fa2c306e9bb", size = 477961, upload-time = "2026-06-16T00:33:23.273Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ec/6e/e735f27ac1a530a4cd0a31cd970ec495a3a11830fdc5d281cc292593b330/hypothesis-6.155.2-py3-none-any.whl", hash = "sha256:c85ce6dcd630a90ce501f1d1dd1bc84b97f5649ca8a27e134c8cbf5aa480b1a5", size = 544213, upload-time = "2026-06-05T16:32:21.15Z" },
+    { url = "https://files.pythonhosted.org/packages/a2/23/ce3a543935a01e478349e82f6c1440776f92d4cb346662c4d81574878fed/hypothesis-6.155.3-py3-none-any.whl", hash = "sha256:ede5a3d142d9c5c9f70cb3075541905b228d6c3a682bcec3d4fe0722e9eda127", size = 544401, upload-time = "2026-06-16T00:33:20.497Z" },
 ]
 
 [[package]]
@@ -2114,7 +2114,7 @@ wheels = [
 
 [[package]]
 name = "pytest"
-version = "9.0.3"
+version = "9.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "colorama", marker = "sys_platform == 'win32'" },
@@ -2125,9 +2125,9 @@ dependencies = [
     { name = "pygments" },
     { name = "tomli", marker = "python_full_version < '3.11'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7d/0d/549bd94f1a0a402dc8cf64563a117c0f3765662e2e668477624baeec44d5/pytest-9.0.3.tar.gz", hash = "sha256:b86ada508af81d19edeb213c681b1d48246c1a91d304c6c81a427674c17eb91c", size = 1572165, upload-time = "2026-04-07T17:16:18.027Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/84/0e/b5858858d74958632c49b72cb25a3976ff9f632397626715be71c89d3971/pytest-9.1.0.tar.gz", hash = "sha256:41dd9148c08072446394cefd3d79701701335a9f4cae69ba92e39f6c7f5c061c", size = 1634181, upload-time = "2026-06-13T18:52:45.983Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d4/24/a372aaf5c9b7208e7112038812994107bc65a84cd00e0354a88c2c77a617/pytest-9.0.3-py3-none-any.whl", hash = "sha256:2c5efc453d45394fdd706ade797c0a81091eccd1d6e4bccfcd476e2b8e0ab5d9", size = 375249, upload-time = "2026-04-07T17:16:16.13Z" },
+    { url = "https://files.pythonhosted.org/packages/8b/5a/ba30a81239b909821b3153e303e7def45178bf353da4f72380e6c5e8793b/pytest-9.1.0-py3-none-any.whl", hash = "sha256:8ebb0e7888bdf2bdfc602ec51f8f62d50200af37356c74e503c79a94f5c81f32", size = 386453, upload-time = "2026-06-13T18:52:44.045Z" },
 ]
 
 [[package]]
