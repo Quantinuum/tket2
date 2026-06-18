@@ -1,11 +1,7 @@
 use derive_more::{Display, Error, From};
-use hugr::builder::{Container, HugrBuilder};
-use hugr::core::Visibility;
 use hugr::extension::prelude::{Barrier, Noop, bool_t};
 use hugr::extension::simple_op::{MakeExtensionOp, MakeRegisteredOp};
-use hugr::hugr::linking::{NameLinkingPolicy, OnMultiDefn};
 use hugr::hugr::patch::insert_cut::InsertCutError;
-use hugr::ops::handle::{FuncID, NodeHandle};
 use hugr::{
     Hugr, HugrView, Node, Wire,
     builder::{BuildError, Dataflow, DataflowHugr, FunctionBuilder},
@@ -293,7 +289,9 @@ pub fn lower_tk2_ops(
                     let template = match funcs.entry(tket_op) {
                         Entry::Occupied(e) => e.get().clone(),
                         Entry::Vacant(e) => {
-                            let t = func_as_node_template(build_func(platform, tket_op)?);
+                            let t =
+                                NodeTemplate::call_to_function(build_func(platform, tket_op)?, &[])
+                                    .map_err(LowerTk2Error::BuildError)?;
                             e.insert(t).clone()
                         }
                     };
@@ -424,33 +422,6 @@ fn build_to_radians(b: &mut impl Dataflow, rotation: Wire) -> Result<Wire, Build
     Ok(float)
 }
 
-/// Given a hugr with a function definition as entrypoint, constructs a
-/// [`NodeTemplate::LinkedHugr`] that produces a call to the function.
-//
-// TODO: Use [`NodeTemplate::call_to_function`] once it gets released in `hugr 0.25.6`.
-fn func_as_node_template(func_def: Hugr) -> NodeTemplate {
-    // Create a replacement hugr for the op nodes: Add a `call` node in the `func_def` hugr and set it as entrypoint.
-    let func_signature = func_def.inner_function_type().unwrap().into_owned();
-
-    // Build a new hugr and insert the function definition into it
-    let mut b = FunctionBuilder::new_vis("", func_signature, Visibility::Private).unwrap();
-    let func_id = FuncID::<true>::from(
-        b.module_root_builder()
-            .add_hugr(func_def)
-            .inserted_entrypoint,
-    );
-
-    // Build a call to the function in the new separate function.
-    let call = b.call(&func_id, &[], b.input_wires()).unwrap();
-    let mut call_hugr = b.finish_hugr_with_outputs(call.outputs()).unwrap();
-    call_hugr.set_entrypoint(call.node());
-
-    NodeTemplate::LinkedHugr(
-        Box::new(call_hugr),
-        NameLinkingPolicy::default().on_multiple_defn(OnMultiDefn::UseTarget),
-    )
-}
-
 /// Map a [`TketOp`] to the [`SharedOp`] it directly corresponds to, if any.
 ///
 /// These are the ops that have a platform-independent 1:1 replacement and
@@ -565,7 +536,8 @@ fn apply_cross_platform_helios(
             let template = match cache.entry(h_op) {
                 Entry::Occupied(e) => e.get().clone(),
                 Entry::Vacant(e) => {
-                    let t = func_as_node_template(build_helios_op_for_sol()?);
+                    let t = NodeTemplate::call_to_function(build_helios_op_for_sol()?, &[])
+                        .map_err(LowerTk2Error::BuildError)?;
                     e.insert(t).clone()
                 }
             };
@@ -603,7 +575,8 @@ fn apply_cross_platform_sol(
             let template = match cache.entry(s_op) {
                 Entry::Occupied(e) => e.get().clone(),
                 Entry::Vacant(e) => {
-                    let t = func_as_node_template(build_sol_op_for_helios()?);
+                    let t = NodeTemplate::call_to_function(build_sol_op_for_helios()?, &[])
+                        .map_err(LowerTk2Error::BuildError)?;
                     e.insert(t).clone()
                 }
             };
