@@ -15,7 +15,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 anyhow.workspace = true
-pyo3 = { workspace = true, features = ["abi3-py310", "anyhow"] }
+pyo3 = { workspace = true, features = ["abi3-py310", "anyhow"], optional = true }
 serde_json.workspace = true
 tracing.workspace = true
 itertools.workspace = true
@@ -30,7 +30,8 @@ tket-qsystem = { path = "../tket-qsystem", version = "0.27.1", features = [
 workspace = true
 
 [features]
-default = []
+default = ["py"]
+py = ["dep:pyo3"]
 
 [build-dependencies]
 cbindgen.workspace = true
