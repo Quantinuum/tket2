@@ -4,24 +4,10 @@ use std::hint::black_box;
 
 use criterion::{AxisScale, BatchSize, Criterion, PlotConfiguration, criterion_group};
 use hugr::Hugr;
-use tket::passes::{ComposablePass, NormalizeGuppy};
+use tket::passes::{ComposablePass, ModifierResolverPass};
 
 fn load_hugr(bytes: &[u8]) -> Hugr {
     Hugr::load(bytes, None).unwrap()
-}
-
-fn run_modifier_resolver_through_normalize_guppy(hugr: &mut Hugr) {
-    let mut normalize = NormalizeGuppy::default();
-    normalize
-        .resolve_modifiers(true)
-        .simplify_cfgs(false)
-        .remove_tuple_untuple(false)
-        .constant_folding(false)
-        .remove_dead_funcs(false)
-        .inline_dfgs(false)
-        .squash_borrows(false)
-        .remove_redundant_order_edges(false);
-    normalize.run(hugr).unwrap();
 }
 
 fn bench_modifier_resolver(c: &mut Criterion) {
@@ -35,7 +21,7 @@ fn bench_modifier_resolver(c: &mut Criterion) {
         b.iter_batched(
             || double_modifier_hugr.clone(),
             |mut hugr| {
-                run_modifier_resolver_through_normalize_guppy(&mut hugr);
+                ModifierResolverPass::default().run(&mut hugr).unwrap();
                 black_box(hugr)
             },
             BatchSize::SmallInput,
@@ -49,7 +35,7 @@ fn bench_modifier_resolver(c: &mut Criterion) {
         b.iter_batched(
             || higher_order_hugr.clone(),
             |mut hugr| {
-                run_modifier_resolver_through_normalize_guppy(&mut hugr);
+                ModifierResolverPass::default().run(&mut hugr).unwrap();
                 black_box(hugr)
             },
             BatchSize::SmallInput,
@@ -63,7 +49,7 @@ fn bench_modifier_resolver(c: &mut Criterion) {
         b.iter_batched(
             || guppy_no_modifier_hugr.clone(),
             |mut hugr| {
-                run_modifier_resolver_through_normalize_guppy(&mut hugr);
+                ModifierResolverPass::default().run(&mut hugr).unwrap();
                 black_box(hugr)
             },
             BatchSize::SmallInput,
