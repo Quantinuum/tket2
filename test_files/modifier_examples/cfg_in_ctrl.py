@@ -5,21 +5,17 @@
 #    "guppylang-internals==1.0.0a5",
 # ]
 # ///
-"""Controlling a function with internal control flow"""
+"""Test control modifier on functions with internal control flow"""
 
 from pathlib import Path
 from sys import argv
-import sys
 
 from guppylang import guppy
+from guppylang.experimental import enable_experimental_features
+from guppylang.std.angles import angle
 from guppylang.std.builtins import control
 from guppylang.std.debug import state_result
-from guppylang.std.quantum import discard, h, qubit, rx, x, rz
-from guppylang.std.angles import angle
-
-sys.path.append(str(Path(__file__).resolve().parents[1]))
-
-from guppylang.experimental import enable_experimental_features
+from guppylang.std.quantum import discard, h, qubit, rx, rz, x
 
 enable_experimental_features()
 

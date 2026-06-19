@@ -36,10 +36,12 @@ def main() -> None:
     h(c3)
     x(t)
     with control(c1, c2):
+        f = 1 / 3
         with dagger:
+            a = angle(-f)
             with control(c3):
                 x(t)
-                rz(t, angle(-1 / 3))
+                rz(t, a)
                 h(t)
 
     state_result("r", c1, c2, c3, t)

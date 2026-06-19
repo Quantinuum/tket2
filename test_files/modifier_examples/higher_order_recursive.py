@@ -18,7 +18,7 @@ from guppylang.std.builtins import (
 )
 from guppylang.std.debug import state_result
 from guppylang.std.quantum import discard, qubit
-from guppylang.std.quantum import h, s
+from guppylang.std.quantum import h, s, x
 from guppylang.experimental import enable_experimental_features
 
 enable_experimental_features()
@@ -39,12 +39,23 @@ def apply2(f: Unitary[[qubit], None], q: qubit) -> None:
     f(q)
 
 
+@guppy(controllable=True)
+def apply_if(f: Unitary[[qubit], None], q: qubit, b: bool) -> None:
+    if b:
+        apply(f, q)
+
+
 @guppy
 def main() -> None:
     q = qubit()
     c = qubit()
-    h(c)
+    x(c)
+    flag = True
+    with control(c):
+        apply_if(x, q, flag)
+        apply_if(h, q, not flag)
 
+    h(c)
     with control(c), dagger:
         apply(s, q)
         apply(h, q)

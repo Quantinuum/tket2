@@ -5,7 +5,10 @@
 #    "guppylang-internals==1.0.0a5",
 # ]
 # ///
-"""Testing nested modifiers"""
+"""Testing nested modifiers
+
+The hugr generated from this script is also used to benchmark the performance of modifier passes resolver
+"""
 
 from pathlib import Path
 from sys import argv

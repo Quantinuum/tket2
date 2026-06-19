@@ -5,22 +5,17 @@
 #    "guppylang-internals==1.0.0a5",
 # ]
 # ///
-"""Dagger of a swap on an array"""
+"""Test that array swap in a dagger and control context works correctly"""
 
 from pathlib import Path
 from sys import argv
-import sys
 
+import guppylang
 from guppylang import guppy
 from guppylang.std.array import array_swap
-from guppylang.std.quantum import discard, qubit, h
-from guppylang.std.builtins import array
-import guppylang
-from guppylang.std.builtins import dagger
+from guppylang.std.builtins import array, control, dagger
 from guppylang.std.debug import state_result
-
-sys.path.append(str(Path(__file__).resolve().parents[1]))
-
+from guppylang.std.quantum import discard, h, qubit
 
 guppylang.enable_experimental_features()
 
@@ -28,10 +23,11 @@ guppylang.enable_experimental_features()
 @guppy
 def main() -> None:
     arr = array(1, 1, 2, 1, 1)
+    q = qubit()
     with dagger:
         array_swap(arr, 2, 4)
-        array_swap(arr, 0, 4)
-    q = qubit()
+        with control(q):
+            array_swap(arr, 0, 4)
     if arr[0] == 2:
         h(q)
     state_result("r", q)

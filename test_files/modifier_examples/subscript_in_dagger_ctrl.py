@@ -34,17 +34,17 @@ def f(controller: qubit, target: qubit) -> None:
 
 @guppy
 def main() -> None:
-    controller = array(qubit())
-    array_qubits = array(qubit(), qubit(), qubit())
+    controller = array(qubit(), qubit())
+    array_qubits = array(qubit(), qubit())
     h(controller[0])
     x(array_qubits[0])
     with dagger:
-        with control(controller[0], array_qubits[0]):
-            f(array_qubits[1], array_qubits[2])
-            s(array_qubits[1])
-            h(array_qubits[1])
+        with control(controller):
+            f(array_qubits[0], array_qubits[1])
+            s(array_qubits[0])
+            h(array_qubits[0])
 
-    state_result("r", controller[0], array_qubits[0], array_qubits[1], array_qubits[2])
+    state_result("r", controller[0], controller[1], array_qubits[0], array_qubits[1])
     discard_array(array_qubits)
     discard_array(controller)
 
