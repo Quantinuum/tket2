@@ -2653,6 +2653,7 @@ mod tests {
     #[case::higher_order_function_w_arrays(
         "../test_files/modifier_examples/higher_order_function_w_arrays.hugr"
     )]
+    #[case::simple_higher_order("../test_files/modifier_examples/simple_higher_order.hugr")]
     #[case::multiple_functions_in_ctrl_dagger(
         "../test_files/modifier_examples/multiple_functions_in_ctrl_dagger.hugr"
     )]
