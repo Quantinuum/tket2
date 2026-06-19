@@ -256,7 +256,7 @@ def test_modifier_resolver() -> None:
     assert _count_ops(normalized_and_resolved, "tket.modifier.ControlModifier") == 0
     assert _count_ops(normalized_and_resolved, "tket.modifier.DaggerModifier") == 0
 
-    modifier_hugr = _hugr_from_path("test_files/guppy_examples/modifiers.hugr")
+    modifier_hugr = _hugr_from_path("test_files/modifier_examples/double_modifier.hugr")
     modifier_hugr = normalize(modifier_hugr)
 
     assert _count_ops(modifier_hugr, "tket.modifier.ControlModifier") == 1
