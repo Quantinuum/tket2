@@ -51,7 +51,7 @@ jobs:
     name: "qis-compiler wheels (${{matrix.os}})"
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up UV
         uses: astral-sh/setup-uv@v7
@@ -90,7 +90,7 @@ jobs:
       # Used to generate artifact attestation
       attestations: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Check if the tag has an associated release
         env:
           GH_TOKEN: ${{ github.token }}
