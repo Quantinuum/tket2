@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.14.2](https://github.com/Quantinuum/tket2/compare/tket-py-v0.14.1...tket-py-v0.14.2) (2026-06-19)
+
+
+### Features
+
+* Add modifier resolver to normalize guppy ([#1703](https://github.com/Quantinuum/tket2/issues/1703)) ([c54a9d1](https://github.com/Quantinuum/tket2/commit/c54a9d111eb996fe6b282aaf472794339273a26a))
+* add scoped exhaustive rule matching and Cliffordize pass ([#1654](https://github.com/Quantinuum/tket2/issues/1654)) ([70e618b](https://github.com/Quantinuum/tket2/commit/70e618b1519768d76f8d6f454d7049075353afd9))
+* Export extension registries from tket and tket-qsystem ([#1692](https://github.com/Quantinuum/tket2/issues/1692)) ([6cdbd54](https://github.com/Quantinuum/tket2/commit/6cdbd54a03fbaf2da370c01647925bf4c5098a58))
+* Option to include/omit tket registers in CompilerState.to_bytes ([#1696](https://github.com/Quantinuum/tket2/issues/1696)) ([0885204](https://github.com/Quantinuum/tket2/commit/0885204869d7bf40d6c6bddbb1116e6519cb2d50))
+
 ## [0.14.1](https://github.com/Quantinuum/tket2/compare/tket-py-v0.14.0...tket-py-v0.14.1) (2026-06-12)
 
 
