@@ -12,8 +12,8 @@ use crate::utils::{ConvertPyErr, create_py_exception};
 use hugr::{HugrView, Node, hugr::hugrmut::HugrMut};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use tket::{Circuit, CircuitError};
 use tket::portmatching::{CircuitPattern, PatternMatch, PatternMatcher};
+use tket::{Circuit, CircuitError};
 
 /// The module definition
 pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
