@@ -37,7 +37,7 @@ def main() -> None:
     with dagger, dagger:
         f = 1 / 4
         with dagger:
-            rotation(c, f)
+            rx(c, angle(f))
 
     h(c)
     with dagger:
