@@ -30,7 +30,7 @@ pub static REGISTRY: LazyLock<ExtensionRegistry> = LazyLock::new(|| {
 /// The list intentionally excludes std and base tket extensions so callers can
 /// combine it with [`tket::extension::tket_extensions`] or another base
 /// registry without duplicating either list.
-pub fn qsystem_extensions() -> [Arc<Extension>; 10] {
+pub fn qsystem_extensions() -> [Arc<Extension>; 11] {
     [
         gpu::EXTENSION.to_owned(),
         qsystem::EXTENSION.to_owned(),
@@ -42,5 +42,6 @@ pub fn qsystem_extensions() -> [Arc<Extension>; 10] {
         utils::EXTENSION.to_owned(),
         wasm::EXTENSION.to_owned(),
         globals::EXTENSION.to_owned(),
+        argreader::EXTENSION.to_owned(),
     ]
 }

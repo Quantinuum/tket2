@@ -218,6 +218,15 @@ def ext_wasm() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
     )
 
 
+def ext_argreader() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
+    ext = tket_exts.argreader
+    return (
+        ext,
+        [],
+        [ext.read_arg("test", Bool)],
+    )
+
+
 @pytest.mark.parametrize(
     "ext_vals",
     [
@@ -235,6 +244,7 @@ def ext_wasm() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
         ext_result,
         ext_rotation,
         ext_wasm,
+        ext_argreader,
     ],
 )
 def test_exported_extension(
