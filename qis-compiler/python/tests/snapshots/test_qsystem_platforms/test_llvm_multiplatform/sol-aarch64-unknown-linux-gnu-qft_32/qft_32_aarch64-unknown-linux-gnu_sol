@@ -29,9 +29,9 @@ cond_20_case_1:                                   ; preds = %alloca_block, %cond
   %2 = add nuw nsw i64 %"15_0.sroa.0.0824", 1
   %qalloc.i = tail call i64 @___qalloc()
   %not_max.not.not.i = icmp eq i64 %qalloc.i, -1
-  br i1 %not_max.not.not.i, label %cond_616_case_0.i, label %__barray_check_bounds.exit
+  br i1 %not_max.not.not.i, label %cond_612_case_0.i, label %__barray_check_bounds.exit
 
-cond_616_case_0.i:                                ; preds = %cond_20_case_1
+cond_612_case_0.i:                                ; preds = %cond_20_case_1
   tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0")
   unreachable
 
@@ -208,9 +208,9 @@ loop_body.i:                                      ; preds = %__barray_check_boun
   br label %__barray_check_bounds.exit.i.i761
 
 loop_body.preheader.i.i:                          ; preds = %loop_body.i764
-  %"636_1.sroa.10.0.i.i" = extractvalue { ptr, ptr, i64 } %126, 2
-  %"636_1.sroa.5.0.i.i" = extractvalue { ptr, ptr, i64 } %126, 1
-  %"636_1.sroa.0.0.i.i" = extractvalue { ptr, ptr, i64 } %126, 0
+  %"632_1.sroa.10.0.i.i" = extractvalue { ptr, ptr, i64 } %126, 2
+  %"632_1.sroa.5.0.i.i" = extractvalue { ptr, ptr, i64 } %126, 1
+  %"632_1.sroa.0.0.i.i" = extractvalue { ptr, ptr, i64 } %126, 0
   br label %__barray_check_bounds.exit224.i.i
 
 __barray_check_bounds.exit.i.i761:                ; preds = %loop_body.i764, %"__hugr__.guppylang.std.quantum.measure_array$32.327.exit"
@@ -250,20 +250,20 @@ panic.i222.i.i:                                   ; preds = %__barray_check_boun
   tail call void @panic(i32 1002, ptr nonnull @"e_Array alre.5A300C2A.0")
   unreachable
 
-cond_639_case_0.i.i:                              ; preds = %cond_exit_639.thread.i.i
-  %85 = lshr i64 %"636_1.sroa.10.0.i.i", 6
-  %86 = getelementptr i64, ptr %"636_1.sroa.5.0.i.i", i64 %85
+cond_635_case_0.i.i:                              ; preds = %cond_exit_635.thread.i.i
+  %85 = lshr i64 %"632_1.sroa.10.0.i.i", 6
+  %86 = getelementptr i64, ptr %"632_1.sroa.5.0.i.i", i64 %85
   %87 = load i64, ptr %86, align 4
-  %88 = and i64 %"636_1.sroa.10.0.i.i", 63
+  %88 = and i64 %"632_1.sroa.10.0.i.i", 63
   %89 = sub nuw nsw i64 64, %88
   %90 = lshr i64 -1, %89
   %91 = icmp eq i64 %88, 0
   %92 = select i1 %91, i64 0, i64 %90
   %93 = or i64 %87, %92
   store i64 %93, ptr %86, align 4
-  %last_valid.i.i.i766 = add i64 %"636_1.sroa.10.0.i.i", 31
+  %last_valid.i.i.i766 = add i64 %"632_1.sroa.10.0.i.i", 31
   %94 = lshr i64 %last_valid.i.i.i766, 6
-  %95 = getelementptr inbounds nuw i64, ptr %"636_1.sroa.5.0.i.i", i64 %94
+  %95 = getelementptr inbounds nuw i64, ptr %"632_1.sroa.5.0.i.i", i64 %94
   %96 = load i64, ptr %95, align 4
   %97 = and i64 %last_valid.i.i.i766, 63
   %98 = shl nsw i64 -2, %97
@@ -280,8 +280,8 @@ cond_639_case_0.i.i:                              ; preds = %cond_exit_639.threa
   %exitcond.not.i.i.i773 = icmp eq i64 %.02.i.i.i770, %reass.sub.i.i.i767
   br i1 %exitcond.not.i.i.i773, label %"__hugr__.guppylang.std.quantum.collect_measurements$32.286.exit", label %mask_block_ok.i.i.i769
 
-mask_block_ok.i.i.i769:                           ; preds = %cond_639_case_0.i.i, %102
-  %.02.i.i.i770 = phi i64 [ %103, %102 ], [ 0, %cond_639_case_0.i.i ]
+mask_block_ok.i.i.i769:                           ; preds = %cond_635_case_0.i.i, %102
+  %.02.i.i.i770 = phi i64 [ %103, %102 ], [ 0, %cond_635_case_0.i.i ]
   %gep.i.i.i771 = getelementptr i64, ptr %86, i64 %.02.i.i.i770
   %104 = load i64, ptr %gep.i.i.i771, align 4
   %105 = icmp eq i64 %104, -1
@@ -291,30 +291,30 @@ mask_block_err.i.i.i772:                          ; preds = %mask_block_ok.i.i.i
   tail call void @panic(i32 1002, ptr nonnull @"e_Array cont.EFA5AC45.0")
   unreachable
 
-__barray_check_bounds.exit224.i.i:                ; preds = %cond_exit_639.thread.i.i, %loop_body.preheader.i.i
-  %"636_0.0239.i.i" = phi i64 [ 0, %loop_body.preheader.i.i ], [ %106, %cond_exit_639.thread.i.i ]
-  %106 = add nuw nsw i64 %"636_0.0239.i.i", 1
-  %107 = add i64 %"636_0.0239.i.i", %"636_1.sroa.10.0.i.i"
+__barray_check_bounds.exit224.i.i:                ; preds = %cond_exit_635.thread.i.i, %loop_body.preheader.i.i
+  %"632_0.0239.i.i" = phi i64 [ 0, %loop_body.preheader.i.i ], [ %106, %cond_exit_635.thread.i.i ]
+  %106 = add nuw nsw i64 %"632_0.0239.i.i", 1
+  %107 = add i64 %"632_0.0239.i.i", %"632_1.sroa.10.0.i.i"
   %108 = lshr i64 %107, 6
-  %109 = getelementptr inbounds nuw i64, ptr %"636_1.sroa.5.0.i.i", i64 %108
+  %109 = getelementptr inbounds nuw i64, ptr %"632_1.sroa.5.0.i.i", i64 %108
   %110 = load i64, ptr %109, align 4
   %111 = and i64 %107, 63
   %112 = lshr i64 %110, %111
   %113 = trunc i64 %112 to i1
-  br i1 %113, label %cond_exit_639.thread.i.i, label %__barray_mask_borrow.exit228.i.i
+  br i1 %113, label %cond_exit_635.thread.i.i, label %__barray_mask_borrow.exit228.i.i
 
 __barray_mask_borrow.exit228.i.i:                 ; preds = %__barray_check_bounds.exit224.i.i
   %114 = shl nuw i64 1, %111
   %115 = xor i64 %114, %110
   store i64 %115, ptr %109, align 4
-  %116 = getelementptr inbounds i64, ptr %"636_1.sroa.0.0.i.i", i64 %107
+  %116 = getelementptr inbounds i64, ptr %"632_1.sroa.0.0.i.i", i64 %107
   %117 = load i64, ptr %116, align 4
   tail call void @___dec_future_refcount(i64 %117)
-  br label %cond_exit_639.thread.i.i
+  br label %cond_exit_635.thread.i.i
 
-cond_exit_639.thread.i.i:                         ; preds = %__barray_mask_borrow.exit228.i.i, %__barray_check_bounds.exit224.i.i
+cond_exit_635.thread.i.i:                         ; preds = %__barray_mask_borrow.exit228.i.i, %__barray_check_bounds.exit224.i.i
   %exitcond.i.i = icmp eq i64 %106, 32
-  br i1 %exitcond.i.i, label %cond_639_case_0.i.i, label %__barray_check_bounds.exit224.i.i
+  br i1 %exitcond.i.i, label %cond_635_case_0.i.i, label %__barray_check_bounds.exit224.i.i
 
 __barray_check_bounds.exit.i762:                  ; preds = %__barray_check_bounds.exit221.i.i
   %118 = xor i64 %82, %78
@@ -342,9 +342,9 @@ loop_body.i764:                                   ; preds = %__barray_check_boun
   %exitcond.not.i765 = icmp eq i64 %70, 32
   br i1 %exitcond.not.i765, label %loop_body.preheader.i.i, label %__barray_check_bounds.exit.i.i761
 
-"__hugr__.guppylang.std.quantum.collect_measurements$32.286.exit": ; preds = %102, %cond_639_case_0.i.i
-  tail call void @heap_free(ptr %"636_1.sroa.0.0.i.i")
-  tail call void @heap_free(ptr nonnull %"636_1.sroa.5.0.i.i")
+"__hugr__.guppylang.std.quantum.collect_measurements$32.286.exit": ; preds = %102, %cond_635_case_0.i.i
+  tail call void @heap_free(ptr %"632_1.sroa.0.0.i.i")
+  tail call void @heap_free(ptr nonnull %"632_1.sroa.5.0.i.i")
   %127 = load i64, ptr %68, align 4
   %128 = and i64 %127, 4294967295
   store i64 %128, ptr %68, align 4

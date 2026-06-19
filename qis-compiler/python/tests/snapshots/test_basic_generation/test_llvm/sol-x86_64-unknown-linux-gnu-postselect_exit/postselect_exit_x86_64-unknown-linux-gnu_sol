@@ -11,13 +11,13 @@ define void @"__hugr__.__main__.postselect_exit.<locals>.main.1"() local_unnamed
 alloca_block:
   %qalloc.i = tail call i64 @___qalloc(), !dbg !8
   %not_max.not.not.i = icmp eq i64 %qalloc.i, -1, !dbg !8
-  br i1 %not_max.not.not.i, label %cond_48_case_0.i, label %__hugr__.__tk2_sol_qalloc.44.exit, !dbg !8
+  br i1 %not_max.not.not.i, label %cond_44_case_0.i, label %__hugr__.__tk2_sol_qalloc.40.exit, !dbg !8
 
-cond_48_case_0.i:                                 ; preds = %alloca_block
+cond_44_case_0.i:                                 ; preds = %alloca_block
   tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0"), !dbg !8
   unreachable, !dbg !8
 
-__hugr__.__tk2_sol_qalloc.44.exit:                ; preds = %alloca_block
+__hugr__.__tk2_sol_qalloc.40.exit:                ; preds = %alloca_block
   tail call void @___reset(i64 %qalloc.i), !dbg !8
   tail call void @___rp(i64 %qalloc.i, double 0x3FF921FB54442D18, double 0xBFF921FB54442D18), !dbg !9
   tail call void @___rz(i64 %qalloc.i, double 0x400921FB54442D18), !dbg !9
@@ -27,11 +27,11 @@ __hugr__.__tk2_sol_qalloc.44.exit:                ; preds = %alloca_block
   tail call void @___dec_future_refcount(i64 %lazy_measure), !dbg !10
   br i1 %read_bool, label %1, label %0
 
-0:                                                ; preds = %__hugr__.__tk2_sol_qalloc.44.exit
+0:                                                ; preds = %__hugr__.__tk2_sol_qalloc.40.exit
   tail call void @print_bool(ptr nonnull @res_c.1C9EF4D1.0, i64 11, i1 false), !dbg !11
   ret void
 
-1:                                                ; preds = %__hugr__.__tk2_sol_qalloc.44.exit
+1:                                                ; preds = %__hugr__.__tk2_sol_qalloc.40.exit
   tail call void @panic(i32 42, ptr nonnull @s_Postselect.13DF1CD0.0), !dbg !12
   unreachable
 }

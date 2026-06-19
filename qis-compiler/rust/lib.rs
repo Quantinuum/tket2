@@ -18,6 +18,7 @@ use inkwell::targets::{
 };
 use itertools::Itertools;
 use pyo3::prelude::*;
+use tket::hugr::ops::DataflowParent;
 use tket::passes::composable::ComposablePass;
 
 use std::error::Error;
@@ -30,7 +31,7 @@ use tket::hugr::{self, llvm::inkwell};
 use tket::hugr::{Hugr, HugrView, Node};
 use tket::llvm::rotation::RotationCodegenExtension;
 use tket_qsystem::QSystemPass;
-use tket_qsystem::extension::{REGISTRY, argreader as qsystem_argreader, qsystem};
+use tket_qsystem::extension::{REGISTRY, qsystem};
 use tket_qsystem::llvm::array_utils::ArrayLowering;
 pub use tket_qsystem::llvm::futures::FuturesCodegenExtension;
 use tket_qsystem::llvm::globals::GlobalsCodegenExtension;
@@ -220,12 +221,12 @@ fn get_entry_point_name(namer: &Namer, hugr: &impl HugrView<Node = Node>) -> Res
             .entrypoint_optype()
             .as_func_defn()
             .ok_or_else(|| anyhow!("Entry point node is not a function definition"))?;
-        /*
-         * TODO: Now that we don't prevent input parameters, we should still
-         * enforce that input parameters are of supported types, instead of potentially
-         * throwing an indecipherable lowering error (e.g. if the user tries to pass
-         * a qubit into main)
-         */
+        if func_defn.inner_signature().input_count() != 0 {
+            return Err(anyhow!(
+                "Entry point function must have no input parameters (found {})",
+                func_defn.inner_signature().input_count()
+            ));
+        }
         (func_defn.func_name().as_ref(), hugr.entrypoint())
     };
 
@@ -334,8 +335,6 @@ fn compile<'c, 'hugr: 'c>(
 ) -> Result<Module<'c>> {
     event!(Level::DEBUG, "starting primary compilation");
     let namer = Rc::new(Namer::new("__hugr__.", true));
-
-    qsystem_argreader::wrap_entrypoint_with_arguments(hugr)?;
 
     // Find the name of the LLVM function that corresponds to the entry point in
     // the HUGR.
