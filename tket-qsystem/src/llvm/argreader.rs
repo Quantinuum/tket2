@@ -1,13 +1,22 @@
 //! LLVM lowering implementations for the "tket.argreader" extension.
 
-use crate::extension::argreader::{ArgKind, ReadArgOp, ReadArgOpDef, classify_arg_type};
+use crate::extension::argreader::{ReadArgOp, ReadArgOpDef};
 use crate::llvm::prelude::emit_global_string;
-use anyhow::{Result, bail};
+use anyhow::{Result, anyhow, bail};
+use hugr::extension::prelude::bool_t;
 use hugr::llvm::CodegenExtsBuilder;
 use hugr::llvm::custom::CodegenExtension;
 use hugr::llvm::emit::{EmitFuncContext, EmitOpArgs};
-use hugr::llvm::extension::collections::borrow_array::{self, BorrowArrayCodegen};
+use hugr::llvm::extension::collections::borrow_array::{
+    self as llvm_borrow_array, BorrowArrayCodegen,
+};
 use hugr::llvm::inkwell;
+use hugr::std_extensions::arithmetic::float_types::float64_type;
+use hugr::std_extensions::arithmetic::int_types::{INT_TYPES, LOG_WIDTH_MAX};
+use hugr::std_extensions::collections::borrow_array::{
+    EXTENSION_ID as BORROW_ARRAY_EXTENSION_ID, borrow_array_type_def,
+};
+use hugr::types::{Term, Type, TypeArg};
 use inkwell::AddressSpace;
 use inkwell::builder::Builder;
 use inkwell::context::Context;
@@ -16,6 +25,123 @@ use inkwell::values::{BasicValueEnum, FunctionValue};
 use tket::hugr::extension::simple_op::MakeExtensionOp;
 use tket::hugr::ops::ExtensionOp;
 use tket::hugr::{HugrView, Node};
+
+/// The concrete variant of an argument type, used to select the selene extern function.
+///
+/// Produced by [`classify_arg_type`]; lives here because it is purely a codegen concept.
+#[derive(Debug, Clone, PartialEq)]
+enum ArgKind {
+    /// A boolean argument.
+    Bool,
+    /// A signed 64-bit integer argument (i64 / log-width 6 only).
+    Int,
+    /// A 64-bit floating-point argument.
+    F64,
+    /// An array of booleans with a fixed length.
+    ArrBool(u64),
+    /// An array of signed 64-bit integers with a fixed length.
+    ArrInt(u64),
+    /// An array of 64-bit floats with a fixed length.
+    ArrF64(u64),
+}
+
+/// A leaf (non-array) argument type, identifying the corresponding selene extern.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Scalar {
+    Bool,
+    Int,
+    F64,
+}
+
+impl Scalar {
+    const fn scalar_kind(self) -> ArgKind {
+        match self {
+            Scalar::Bool => ArgKind::Bool,
+            Scalar::Int => ArgKind::Int,
+            Scalar::F64 => ArgKind::F64,
+        }
+    }
+
+    const fn array_kind(self, size: u64) -> ArgKind {
+        match self {
+            Scalar::Bool => ArgKind::ArrBool(size),
+            Scalar::Int => ArgKind::ArrInt(size),
+            Scalar::F64 => ArgKind::ArrF64(size),
+        }
+    }
+}
+
+/// If `ty` is a HUGR integer type, return its log-width.
+///
+/// Compares against the canonical [`INT_TYPES`] table rather than just the extension
+/// id, so it cannot be confused with another type from the same extension.
+fn as_int_log_width(ty: &Type) -> Option<u8> {
+    INT_TYPES
+        .iter()
+        .position(|int_ty| int_ty == ty)
+        .map(|w| w as u8)
+}
+
+/// If `ty` is a `borrow_array`, return its `(size, element type)`.
+///
+/// Verifies both the extension id and the type name against the canonical type def,
+/// and recovers the element type via [`Type::try_from`].
+fn as_borrow_array(ty: &Type) -> Option<(u64, Type)> {
+    let Term::ExtensionType(custom) = &**ty else {
+        return None;
+    };
+    if *custom.extension() != BORROW_ARRAY_EXTENSION_ID
+        || custom.name() != borrow_array_type_def().name()
+    {
+        return None;
+    }
+    match custom.args() {
+        [TypeArg::BoundedNat(size), elem] => {
+            Type::try_from(elem.clone()).ok().map(|elem| (*size, elem))
+        }
+        _ => None,
+    }
+}
+
+/// Classify a scalar (non-array) argument type.
+///
+/// Returns `None` if `ty` is not a supported scalar shape, or `Some(Err(..))` if it is
+/// recognisably an integer but not the supported i64 width (`argreader_get_i64` is the
+/// only integer extern, so narrower widths must be rejected at codegen time).
+fn classify_scalar(ty: &Type) -> Option<Result<Scalar>> {
+    if *ty == bool_t() {
+        Some(Ok(Scalar::Bool))
+    } else if *ty == float64_type() {
+        Some(Ok(Scalar::F64))
+    } else {
+        as_int_log_width(ty).map(|log_width| {
+            if log_width == LOG_WIDTH_MAX {
+                Ok(Scalar::Int)
+            } else {
+                Err(anyhow!(
+                    "Only i64 (log-width {LOG_WIDTH_MAX}) is supported as an integer argument; \
+                     got log-width {log_width}"
+                ))
+            }
+        })
+    }
+}
+
+/// Map the concrete output type of a [`ReadArgOp`] to the selene extern function variant.
+///
+/// Errors on unsupported types, including integer types other than i64.
+fn classify_arg_type(ty: &Type) -> Result<ArgKind> {
+    if let Some(scalar) = classify_scalar(ty) {
+        return scalar.map(Scalar::scalar_kind);
+    }
+    if let Some((size, elem)) = as_borrow_array(ty) {
+        return match classify_scalar(&elem) {
+            Some(scalar) => scalar.map(|s| s.array_kind(size)),
+            None => bail!("Unsupported borrow_array element type for argument reading: {elem}"),
+        };
+    }
+    bail!("Unsupported type for argument reading: {ty}")
+}
 
 /// Codegen extension for the argreader
 #[derive(Default)]
@@ -134,11 +260,7 @@ impl<'c, H: HugrView<Node = Node>, BAC: BorrowArrayCodegen + Clone>
         self.0.get_extern_func(func_name, fn_type)
     }
 
-    fn emit(
-        &mut self,
-        args: EmitOpArgs<'c, '_, ExtensionOp, H>,
-        op: &ReadArgOp,
-    ) -> Result<()> {
+    fn emit(&mut self, args: EmitOpArgs<'c, '_, ExtensionOp, H>, op: &ReadArgOp) -> Result<()> {
         if op.tag.is_empty() {
             bail!("Empty argument name tag received");
         }
@@ -201,7 +323,7 @@ impl<'c, H: HugrView<Node = Node>, BAC: BorrowArrayCodegen + Clone>
         }
         let len_val = self.i64_t().const_int(len, false);
         let (elems_ptr, barray_value) =
-            borrow_array::build_barray_alloc(self.0, &self.1, elem_ty, len, false)?;
+            llvm_borrow_array::build_barray_alloc(self.0, &self.1, elem_ty, len, false)?;
         self.builder().build_call(
             argread_fn,
             &[tag_ptr.into(), elems_ptr.into(), len_val.into()],
@@ -234,10 +356,29 @@ mod test {
     #[case::int(2, ReadArgOp::new("test_int", int_type(TypeArg::BoundedNat(6))))]
     #[case::f64(3, ReadArgOp::new("test_f64", float64_type()))]
     #[case::arr_bool(4, ReadArgOp::new("test_arr_bool", borrow_array_type(10, bool_t())))]
-    #[case::arr_int(5, ReadArgOp::new("test_arr_int", borrow_array_type(10, int_type(TypeArg::BoundedNat(6)))))]
-    #[case::arr_f64(6, ReadArgOp::new("test_arr_f64", borrow_array_type(10, float64_type())))]
+    #[case::arr_int(
+        5,
+        ReadArgOp::new(
+            "test_arr_int",
+            borrow_array_type(10, int_type(TypeArg::BoundedNat(6)))
+        )
+    )]
+    #[case::arr_f64(
+        6,
+        ReadArgOp::new("test_arr_f64", borrow_array_type(10, float64_type()))
+    )]
     #[should_panic(expected = "Empty argument name tag received")]
     #[case::empty_tag(7, ReadArgOp::new("", bool_t()))]
+    #[should_panic(expected = "log-width 6")]
+    #[case::narrow_int(8, ReadArgOp::new("test_narrow", int_type(TypeArg::BoundedNat(3))))]
+    #[should_panic(expected = "log-width 6")]
+    #[case::narrow_int_arr(
+        9,
+        ReadArgOp::new(
+            "test_narrow_arr",
+            borrow_array_type(4, int_type(TypeArg::BoundedNat(3)))
+        )
+    )]
     fn emit_argreader_codegen(
         #[case] _i: i32,
         #[with(_i)] mut llvm_ctx: TestContext,
@@ -255,5 +396,65 @@ mod test {
         let ext_op = op.to_extension_op().unwrap().into();
         let mut hugr = single_op_hugr(ext_op);
         check_emission!(hugr, llvm_ctx);
+    }
+
+    #[test]
+    fn test_classify_bool() {
+        assert_eq!(classify_arg_type(&bool_t()).unwrap(), ArgKind::Bool);
+    }
+
+    #[test]
+    fn test_classify_int_i64() {
+        assert_eq!(
+            classify_arg_type(&int_type(TypeArg::BoundedNat(6))).unwrap(),
+            ArgKind::Int
+        );
+    }
+
+    #[test]
+    fn test_classify_int_rejects_narrow() {
+        for log_width in 0u64..=5 {
+            let err = classify_arg_type(&int_type(TypeArg::BoundedNat(log_width))).unwrap_err();
+            assert!(
+                err.to_string().contains("log-width 6"),
+                "log_width={log_width}: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_classify_f64() {
+        assert_eq!(classify_arg_type(&float64_type()).unwrap(), ArgKind::F64);
+    }
+
+    #[test]
+    fn test_classify_arr_bool() {
+        assert_eq!(
+            classify_arg_type(&borrow_array_type(10, bool_t())).unwrap(),
+            ArgKind::ArrBool(10)
+        );
+    }
+
+    #[test]
+    fn test_classify_arr_int_i64() {
+        assert_eq!(
+            classify_arg_type(&borrow_array_type(10, int_type(TypeArg::BoundedNat(6)))).unwrap(),
+            ArgKind::ArrInt(10)
+        );
+    }
+
+    #[test]
+    fn test_classify_arr_int_rejects_narrow() {
+        let err =
+            classify_arg_type(&borrow_array_type(4, int_type(TypeArg::BoundedNat(3)))).unwrap_err();
+        assert!(err.to_string().contains("log-width 6"), "{err}");
+    }
+
+    #[test]
+    fn test_classify_arr_f64() {
+        assert_eq!(
+            classify_arg_type(&borrow_array_type(10, float64_type())).unwrap(),
+            ArgKind::ArrF64(10)
+        );
     }
 }

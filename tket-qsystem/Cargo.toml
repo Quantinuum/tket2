@@ -15,8 +15,8 @@ categories = ["compilers", "science::quantum-computing"]
 
 [features]
 default = ["cli"]
-cli = ["dep:clap", "dep:hugr-cli"]
-llvm = ["tket/llvm"]
+cli = ["dep:clap", "dep:hugr-cli", "dep:anyhow"]
+llvm = ["tket/llvm", "dep:anyhow"]
 
 [[bin]]
 name = "tket-qsystem"
@@ -44,7 +44,7 @@ derive_more = { workspace = true, features = [
 typetag.workspace = true
 delegate.workspace = true
 indexmap.workspace = true
-anyhow = { workspace = true }
+anyhow = { workspace = true, optional = true }
 
 [dev-dependencies]
 tket1-passes = { path = "../tket1-passes" }

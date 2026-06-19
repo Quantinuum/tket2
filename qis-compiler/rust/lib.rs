@@ -1,7 +1,7 @@
 //! The compiler for HUGR to QIS
 pub mod array;
 
-use anyhow::{Result, anyhow};
+use anyhow::{Result, anyhow, bail};
 use hugr::envelope::EnvelopeConfig;
 use hugr::llvm::CodegenExtsBuilder;
 use hugr::llvm::custom::CodegenExtsMap;
@@ -381,7 +381,7 @@ fn compile<'c, 'hugr: 'c>(
     if let Some(di_ctx) = maybe_di_ctx.take() {
         di_ctx.finish();
     }
-    //module.verify().map_err(Into::<ProcessErrs>::into)?;
+    module.verify().map_err(Into::<ProcessErrs>::into)?;
 
     Ok(module)
 }

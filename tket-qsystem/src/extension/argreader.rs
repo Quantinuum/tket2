@@ -12,17 +12,9 @@ use hugr::{
         },
     },
     ops::OpName,
-    std_extensions::{
-        arithmetic::{float_types, int_types},
-        collections::borrow_array,
-    },
-    types::{
-        PolyFuncTypeRV, Signature, SumType, Term, Type, TypeArg, TypeBound,
-        type_param::TypeParam,
-    },
+    types::{PolyFuncTypeRV, Signature, Term, Type, TypeArg, TypeBound, type_param::TypeParam},
 };
 
-use anyhow::{Result, bail};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use strum::{EnumIter, EnumString, IntoStaticStr};
@@ -186,74 +178,14 @@ pub trait ReadArgBuilder: Dataflow {
 }
 impl<D: Dataflow> ReadArgBuilder for D {}
 
-/// The concrete variant of an argument type, used to select the selene extern function.
-#[derive(Debug, Clone, PartialEq)]
-pub enum ArgKind {
-    /// A boolean argument
-    Bool,
-    /// A signed 64-bit integer argument (any int log-width)
-    Int,
-    /// A 64-bit floating-point argument
-    F64,
-    /// An array of booleans with a fixed length
-    ArrBool(u64),
-    /// An array of signed 64-bit integers with a fixed length
-    ArrInt(u64),
-    /// An array of 64-bit floats with a fixed length
-    ArrF64(u64),
-}
-
-/// Classify the concrete output type of a [`ReadArgOp`] into the corresponding
-/// selene runtime function variant.
-///
-/// Returns an error for types not supported as entrypoint arguments.
-pub fn classify_arg_type(ty: &Type) -> Result<ArgKind> {
-    match &**ty {
-        Term::SumType(SumType::Unit { size: 2 }) => Ok(ArgKind::Bool),
-        Term::ExtensionType(custom) => {
-            if *custom.extension() == int_types::EXTENSION_ID {
-                Ok(ArgKind::Int)
-            } else if *custom.extension() == float_types::EXTENSION_ID {
-                Ok(ArgKind::F64)
-            } else if *custom.extension() == borrow_array::EXTENSION_ID {
-                match custom.args() {
-                    [TypeArg::BoundedNat(n), elem] => classify_borrow_array_elem(elem, *n),
-                    _ => bail!("Unexpected borrow_array type args: {:?}", custom.args()),
-                }
-            } else {
-                bail!(
-                    "Unsupported extension type for argument reading: {:?}",
-                    custom.extension()
-                )
-            }
-        }
-        other => bail!("Unsupported type for argument reading: {:?}", other),
-    }
-}
-
-fn classify_borrow_array_elem(elem: &Term, len: u64) -> Result<ArgKind> {
-    match elem {
-        Term::SumType(SumType::Unit { size: 2 }) => Ok(ArgKind::ArrBool(len)),
-        Term::ExtensionType(e) if *e.extension() == int_types::EXTENSION_ID => {
-            Ok(ArgKind::ArrInt(len))
-        }
-        Term::ExtensionType(e) if *e.extension() == float_types::EXTENSION_ID => {
-            Ok(ArgKind::ArrF64(len))
-        }
-        other => bail!(
-            "Unsupported element type in borrow_array for argument reading: {:?}",
-            other
-        ),
-    }
-}
-
 #[cfg(test)]
 pub(crate) mod test {
     use super::*;
     use hugr::extension::prelude::bool_t;
     use hugr::extension::simple_op::{HasConcrete, MakeRegisteredOp};
-    use hugr::std_extensions::arithmetic::{float_types::float64_type, int_types::int_type};
+    use hugr::std_extensions::arithmetic::int_types::int_type;
     use hugr::std_extensions::collections::borrow_array::borrow_array_type;
+    use hugr::types::TypeArg;
 
     fn roundtrip(op: ReadArgOp) -> ReadArgOp {
         let type_args = op.type_args();
@@ -274,6 +206,7 @@ pub(crate) mod test {
 
     #[test]
     fn test_f64_roundtrip() {
+        use hugr::std_extensions::arithmetic::float_types::float64_type;
         let op = ReadArgOp::new("my_f64", float64_type());
         assert_eq!(roundtrip(op.clone()), op);
     }
@@ -295,56 +228,18 @@ pub(crate) mod test {
 
     #[test]
     fn test_arr_f64_roundtrip() {
+        use hugr::std_extensions::arithmetic::float_types::float64_type;
         let op = ReadArgOp::new("my_arr_f64", borrow_array_type(10, float64_type()));
         assert_eq!(roundtrip(op.clone()), op);
     }
 
     #[test]
-    fn test_classify_bool() {
-        assert_eq!(classify_arg_type(&bool_t()).unwrap(), ArgKind::Bool);
-    }
-
-    #[test]
-    fn test_classify_int() {
-        assert_eq!(
-            classify_arg_type(&int_type(TypeArg::BoundedNat(6))).unwrap(),
-            ArgKind::Int
-        );
-    }
-
-    #[test]
-    fn test_classify_f64() {
-        assert_eq!(classify_arg_type(&float64_type()).unwrap(), ArgKind::F64);
-    }
-
-    #[test]
-    fn test_classify_arr_bool() {
-        assert_eq!(
-            classify_arg_type(&borrow_array_type(10, bool_t())).unwrap(),
-            ArgKind::ArrBool(10)
-        );
-    }
-
-    #[test]
-    fn test_classify_arr_int() {
-        assert_eq!(
-            classify_arg_type(&borrow_array_type(10, int_type(TypeArg::BoundedNat(6)))).unwrap(),
-            ArgKind::ArrInt(10)
-        );
-    }
-
-    #[test]
-    fn test_classify_arr_f64() {
-        assert_eq!(
-            classify_arg_type(&borrow_array_type(10, float64_type())).unwrap(),
-            ArgKind::ArrF64(10)
-        );
-    }
-
-    #[test]
     fn test_to_extension_op_roundtrip() {
         let op = ReadArgOp::new("my_bool", bool_t());
-        let ext_op = op.clone().to_extension_op().expect("should build extension op");
+        let ext_op = op
+            .clone()
+            .to_extension_op()
+            .expect("should build extension op");
         let roundtripped = ReadArgOp::from_extension_op(&ext_op).expect("should decode");
         assert_eq!(roundtripped, op);
     }
