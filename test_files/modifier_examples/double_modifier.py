@@ -16,7 +16,7 @@ from sys import argv
 from guppylang import enable_experimental_features, guppy
 from guppylang.std.builtins import control, dagger
 from guppylang.std.debug import state_result
-from guppylang.std.quantum import angle, discard, h, qubit, rx
+from guppylang.std.quantum import angle, discard, h, qubit, ry
 
 enable_experimental_features()
 
@@ -28,7 +28,7 @@ def main() -> None:
     h(c1)
     with control(c1):
         with dagger:
-            rx(t, angle(1 / 3))
+            ry(t, angle(1 / 3))
 
     state_result("r", c1, t)
     discard(c1)

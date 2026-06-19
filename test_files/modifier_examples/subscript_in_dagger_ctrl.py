@@ -30,7 +30,7 @@ def main() -> None:
     controller = array(qubit(), qubit())
     array_qubits = array(qubit(), qubit())
     h(controller[0])
-    x(array_qubits[0])
+    x(controller[1])
     with dagger:
         with control(controller):
             f(array_qubits[0], array_qubits[1])
