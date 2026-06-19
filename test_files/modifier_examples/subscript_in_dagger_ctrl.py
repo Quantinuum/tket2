@@ -9,18 +9,11 @@
 
 from pathlib import Path
 from sys import argv
-import sys
 
-
-from guppylang import array, guppy
+from guppylang import array, enable_experimental_features, guppy
 from guppylang.std.builtins import control, dagger
 from guppylang.std.debug import state_result
-from guppylang.std.quantum import qubit, discard_array, angle
-from guppylang.std.quantum import h, s, rx, x
-
-sys.path.append(str(Path(__file__).resolve().parents[1]))
-
-from guppylang.experimental import enable_experimental_features
+from guppylang.std.quantum import angle, discard_array, h, qubit, rx, s, x
 
 enable_experimental_features()
 

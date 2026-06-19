@@ -12,17 +12,11 @@ The hugr generated from this script is also used to benchmark the performance of
 
 from pathlib import Path
 from sys import argv
-import sys
 
-from guppylang import guppy
+from guppylang import enable_experimental_features, guppy
 from guppylang.std.builtins import control, dagger
 from guppylang.std.debug import state_result
-from guppylang.std.quantum import discard, qubit, angle
-from guppylang.std.quantum import h, rx
-
-sys.path.append(str(Path(__file__).resolve().parents[1]))
-
-from guppylang.experimental import enable_experimental_features
+from guppylang.std.quantum import angle, discard, h, qubit, rx
 
 enable_experimental_features()
 

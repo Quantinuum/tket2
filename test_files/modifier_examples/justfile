@@ -2,9 +2,6 @@
 help:
     @just --list --justfile {{justfile()}}
 
-# Re-generate all hugr files
-r: recompile-hugrs
-
 # Re-generate all hugr files.
 recompile-hugrs:
     #!/usr/bin/env sh

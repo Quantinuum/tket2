@@ -7,13 +7,14 @@
 # ///
 """Run on selene the passed hugrs"""
 
-from pathlib import Path
 import shutil
 import sys
+from pathlib import Path
+
 import numpy as np
 import numpy.typing as npt
-from hugr import Hugr
 from guppylang.emulator import EmulatorBuilder
+from hugr import Hugr
 
 
 def format_statevector(

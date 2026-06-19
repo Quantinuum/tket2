@@ -10,16 +10,14 @@
 from pathlib import Path
 from sys import argv
 
-from guppylang import guppy
+from guppylang import enable_experimental_features, guppy
 from guppylang.std.builtins import (
     Unitary,
     control,
     dagger,
 )
 from guppylang.std.debug import state_result
-from guppylang.std.quantum import discard, qubit
-from guppylang.std.quantum import h, s, x
-from guppylang.experimental import enable_experimental_features
+from guppylang.std.quantum import discard, h, qubit, s, x
 
 enable_experimental_features()
 

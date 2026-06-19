@@ -5,24 +5,16 @@
 #    "guppylang-internals==1.0.0a5",
 # ]
 # ///
-"""Test the use of a higher-order function with loops inside modifiers"""
+"""Test the use of a higher-order function with complex control flow inside modifiers"""
 
+from collections.abc import Callable
 from pathlib import Path
 from sys import argv
-from typing import Callable
 
-from guppylang import guppy
-from guppylang.std.builtins import (
-    Controllable,
-    Unitary,
-    array,
-    control,
-    dagger,
-)
+from guppylang import enable_experimental_features, guppy
+from guppylang.std.builtins import Controllable, Unitary, array, control, dagger
 from guppylang.std.debug import state_result
-from guppylang.std.quantum import discard_array, qubit, angle, rz
-from guppylang.std.quantum import h, rx
-from guppylang.experimental import enable_experimental_features
+from guppylang.std.quantum import angle, discard_array, h, qubit, rx, rz
 
 enable_experimental_features()
 

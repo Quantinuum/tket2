@@ -5,22 +5,17 @@
 #    "guppylang-internals==1.0.0a5",
 # ]
 # ///
-"""Testing a dagger modifier on multiple functions"""
+"""Testing a dagger modifier on multiple functions, to ensure that the dagger is
+reversing the order of quantum operations"""
 
 from pathlib import Path
 from sys import argv
-import sys
 
-from guppylang import guppy
-from guppylang.std.builtins import dagger, control
-from guppylang.std.debug import state_result
-from guppylang.std.quantum import discard, qubit
-from guppylang.std.quantum import s, rx
+from guppylang import enable_experimental_features, guppy
 from guppylang.std.angles import angle
-
-sys.path.append(str(Path(__file__).resolve().parents[1]))
-
-from guppylang.experimental import enable_experimental_features
+from guppylang.std.builtins import control, dagger
+from guppylang.std.debug import state_result
+from guppylang.std.quantum import discard, qubit, rx, s
 
 enable_experimental_features()
 
@@ -38,11 +33,12 @@ def foo1(q: qubit) -> None:
 @guppy(unitary=True)
 def foo2(q: qubit) -> None:
     s(q)
+    rx(q, angle(1 / 6))
 
 
 @guppy(unitary=True)
 def foo3(q: qubit, f: float) -> None:
-    rx(q, angle(f))
+    rx(q, angle(f / 2))
 
 
 @guppy
