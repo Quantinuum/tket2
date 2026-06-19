@@ -1,10 +1,14 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang==1.0.0a4",
+#    "guppylang==1.0.0a5",
+#    "guppylang-internals==1.0.0a5",
 # ]
 # ///
-"""Test the use of a higher-order function with arrays inside modifiers"""
+"""Test the a simple use of a higher-order function with inside modifiers
+
+The hugr generated from this script is also used to benchmark the performance of modifier passes resolver
+"""
 
 from pathlib import Path
 from sys import argv

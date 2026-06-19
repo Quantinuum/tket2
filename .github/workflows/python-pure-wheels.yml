@@ -55,7 +55,7 @@ jobs:
             run: ${{ needs.check-tag.outputs.run_exts }}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         if: ${{ matrix.target.run == 'true' }}
       - name: Run sccache-cache
         if: ${{ matrix.target.run == 'true' }}
@@ -107,7 +107,7 @@ jobs:
       # Used to generate artifact attestation
       attestations: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Check if the tag has an associated release
         env:
           GH_TOKEN: ${{ github.token }}

@@ -328,11 +328,6 @@ higher_order_classical_solved:
 	10 -> 0.3536+0.3536j
 	11 -> 0.3536+0.3536j
 -----
-higher_order_function_w_arrays_solved:
-	000 -> 0.7071+0j
-	100 -> 0.5+0j
-	111 -> 0-0.5j
------
 higher_order_function_w_loops_solved:
 	00 -> 0.7071+0j
 	10 -> 0.4619-0.1913j
@@ -410,6 +405,11 @@ nested_multiple_ctrl1_solved:
 	1101 -> 0.25+0j
 	1110 -> 0.1768+0.1768j
 	1111 -> 0.1768-0.1768j
+-----
+simple_higher_order_solved:
+	000 -> 0.7071+0j
+	100 -> 0.5+0j
+	111 -> 0-0.5j
 -----
 subscript_as_controller_solved:
 	0100 -> 0.7071+0j
