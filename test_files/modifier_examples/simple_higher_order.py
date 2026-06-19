@@ -7,7 +7,7 @@
 # ///
 """Test the a simple use of a higher-order function with inside modifiers
 
-The hugr generate from this script is also used to benchmark the performance of modifier passes resolver
+The hugr generated from this script is also used to benchmark the performance of modifier passes resolver
 """
 
 from pathlib import Path
