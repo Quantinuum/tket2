@@ -38,21 +38,18 @@ fn bench_modifier_resolver(c: &mut Criterion) {
     });
 
     let higher_order_hugr = load_hugr(include_bytes!(
-        "../../../test_files/modifier_examples/higher_order_function_w_arrays.hugr"
+        "../../../test_files/modifier_examples/simple_higher_order.hugr"
     ));
-    group.bench_function(
-        "modifier_passes[higher_order_function_w_arrays.hugr]",
-        |b| {
-            b.iter_batched(
-                || higher_order_hugr.clone(),
-                |mut hugr| {
-                    ModifierResolverPass::default().run(&mut hugr).unwrap();
-                    black_box(hugr)
-                },
-                BatchSize::SmallInput,
-            )
-        },
-    );
+    group.bench_function("modifier_passes[simple_higher_order.hugr]", |b| {
+        b.iter_batched(
+            || higher_order_hugr.clone(),
+            |mut hugr| {
+                ModifierResolverPass::default().run(&mut hugr).unwrap();
+                black_box(hugr)
+            },
+            BatchSize::SmallInput,
+        )
+    });
 
     let guppy_no_modifier_hugr = load_hugr(include_bytes!(
         "../../../test_files/guppy_examples/conditional_loop.hugr"
