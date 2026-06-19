@@ -55,15 +55,15 @@ hugr-cli = "0.28.2"
 portgraph = "0.16.1"
 # There can only be one `pyo3` version in the whole workspace, so we use a
 # loose version constraint to prevent breaking changes in dependent crates where possible.
-pyo3 = ">= 0.28.2, < 0.29"
-pyo3-build-config = ">= 0.28.2, < 0.29"
+pyo3 = ">= 0.28.2, < 0.30"
+pyo3-build-config = ">= 0.28.2, < 0.30"
 
 bindgen = "0.72"
 cbindgen = "0.29"
 cc = "1.2.63"
 conan2 = "0.1.9"
 itertools = "0.14.0"
-tket-json-rs = "0.8.3"
+tket-json-rs = "0.8.4"
 portmatching = "0.3.3"
 bytemuck = "1.25.0"
 cgmath = "0.18.0"
