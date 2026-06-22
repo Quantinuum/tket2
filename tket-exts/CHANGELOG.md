@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.13.1](https://github.com/Quantinuum/tket2/compare/tket-exts-v0.13.0...tket-exts-v0.13.1) (2026-06-19)
+
+
+### Features
+
+* HUGR extension for global variables ([#1530](https://github.com/Quantinuum/tket2/issues/1530)) ([4209df1](https://github.com/Quantinuum/tket2/commit/4209df1130f092d0936de71154bc98c78745a2ac))
+
+
+### Bug Fixes
+
+* add `--unversioned` flag to justfile, update extensions ([#1697](https://github.com/Quantinuum/tket2/issues/1697)) ([17a0f84](https://github.com/Quantinuum/tket2/commit/17a0f84ccb7f3c5a2ecb74b64436cdba4f339374))
+
 ## [0.13.0](https://github.com/Quantinuum/tket2/compare/tket-exts-v0.12.3...tket-exts-v0.13.0) (2026-06-11)
 
 

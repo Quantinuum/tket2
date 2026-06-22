@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.3.1...qis-compiler-v0.3.2) (2026-06-19)
+
+
+### Features
+
+* HUGR extension for global variables ([#1530](https://github.com/Quantinuum/tket2/issues/1530)) ([4209df1](https://github.com/Quantinuum/tket2/commit/4209df1130f092d0936de71154bc98c78745a2ac))
+
 ## [0.3.1](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.3.0...qis-compiler-v0.3.1) (2026-06-15)
 
 

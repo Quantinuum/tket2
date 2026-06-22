@@ -1158,9 +1158,9 @@ dependencies = [
 
 [[package]]
 name = "hugr"
-version = "0.28.2"
+version = "0.28.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c6d0884573422dfd31d3738f98434d13cfe331c2fdc24a3fd1c24880b3f8aaf4"
+checksum = "e3f4ee8c86d356d26d4f9f560da549cda97c0a1964fdeddff124467dda41d8cc"
 dependencies = [
  "hugr-core",
  "hugr-llvm",
@@ -1169,9 +1169,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-cli"
-version = "0.28.2"
+version = "0.28.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85704e015f4fa50e1ddd065b35963caf43be15c552de6dc1a8b318fa74176be5"
+checksum = "d275666819ec05ec051b26cb79f221827225b1fb20437b5eea8e75391054566a"
 dependencies = [
  "anyhow",
  "clap",
@@ -1191,9 +1191,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-core"
-version = "0.28.2"
+version = "0.28.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54a0213682f08e5a41f884eebb5cd1de6522c97c8df2d94832c0e282dc1b0027"
+checksum = "6cf94f955bf4cb90eeadbac537089c11e8d5ee8685be87f6dc73157cac3065a4"
 dependencies = [
  "base64",
  "cgmath",
@@ -1229,9 +1229,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-llvm"
-version = "0.28.2"
+version = "0.28.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09296a72c920d33a44f8b0f4fdfa9b13154752f1d59766c587827cf1179ae7f3"
+checksum = "2e3933fd135a944172e751d58808b32d40cd4ecd5d85cc98bc8345410912c6c2"
 dependencies = [
  "anyhow",
  "cc",
@@ -1250,9 +1250,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-model"
-version = "0.28.2"
+version = "0.28.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dbbde7fdb869340be2437c71e063fa10556fe4f76e2c79152fa0e5ffaa5b7d4f"
+checksum = "c3c3bc3a87ee6cfa2c8c619bafb2828aeabb8cb4fba7b4958c58355208ed17da"
 dependencies = [
  "base64",
  "bumpalo",
@@ -2749,7 +2749,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.2",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",
