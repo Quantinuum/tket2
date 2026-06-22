@@ -320,8 +320,8 @@ impl<N: HugrNode> ModifierResolver<N> {
             if self.signature_has_quantum_data(&source_indir_call.signature) {
                 return Err(ModifierResolverErrors::unresolvable(
                     n,
-                    "Cannot modify consecutive indirect calls with a quantum signature: 
-                    the produced callable consumes or allocates qubits, so this pattern is not allowed 
+                    "Cannot modify consecutive indirect calls with a quantum signature:
+                    the produced callable consumes or allocates qubits, so this pattern is not allowed
                     in a modifier context.",
                     indir_call.clone().into(),
                 ));
