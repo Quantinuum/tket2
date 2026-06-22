@@ -1,20 +1,18 @@
 //! LLVM lowering implementations for the "tket.argreader" extension.
 
 use crate::extension::argreader::{ReadArgOp, ReadArgOpDef};
+use crate::llvm::array_utils::ArrayLowering;
 use crate::llvm::prelude::emit_global_string;
 use anyhow::{Result, anyhow, bail};
 use hugr::extension::prelude::bool_t;
 use hugr::llvm::CodegenExtsBuilder;
 use hugr::llvm::custom::CodegenExtension;
 use hugr::llvm::emit::{EmitFuncContext, EmitOpArgs};
-use hugr::llvm::extension::collections::borrow_array::{
-    self as llvm_borrow_array, BorrowArrayCodegen,
-};
 use hugr::llvm::inkwell;
 use hugr::std_extensions::arithmetic::float_types::float64_type;
 use hugr::std_extensions::arithmetic::int_types::{INT_TYPES, LOG_WIDTH_MAX};
-use hugr::std_extensions::collections::borrow_array::{
-    EXTENSION_ID as BORROW_ARRAY_EXTENSION_ID, borrow_array_type_def,
+use hugr::std_extensions::collections::array::{
+    EXTENSION_ID as ARRAY_EXTENSION_ID, array_type_def,
 };
 use hugr::types::{Term, Type, TypeArg};
 use inkwell::AddressSpace;
@@ -115,17 +113,15 @@ fn as_int_log_width(ty: &Type) -> Option<u8> {
         .map(|w| w as u8)
 }
 
-/// If `ty` is a `borrow_array`, return its `(size, element type)`.
+/// If `ty` is a standard `array`, return its `(size, element type)`.
 ///
 /// Verifies both the extension id and the type name against the canonical type def,
 /// and recovers the element type via [`Type::try_from`].
-fn as_borrow_array(ty: &Type) -> Option<(u64, Type)> {
+fn as_std_array(ty: &Type) -> Option<(u64, Type)> {
     let Term::ExtensionType(custom) = &**ty else {
         return None;
     };
-    if *custom.extension() != BORROW_ARRAY_EXTENSION_ID
-        || custom.name() != borrow_array_type_def().name()
-    {
+    if *custom.extension() != ARRAY_EXTENSION_ID || custom.name() != array_type_def().name() {
         return None;
     }
     match custom.args() {
@@ -166,10 +162,10 @@ fn classify_scalar(ty: &Type) -> Option<Result<Scalar>> {
 fn classify_arg_type(ty: &Type) -> Result<ArgKind> {
     if let Some(scalar) = classify_scalar(ty) {
         scalar.map(Scalar::scalar_kind)
-    } else if let Some((size, elem)) = as_borrow_array(ty) {
+    } else if let Some((size, elem)) = as_std_array(ty) {
         match classify_scalar(&elem) {
             Some(scalar) => scalar.map(|s| s.array_kind(size)),
-            None => bail!("Unsupported borrow_array element type for argument reading: {elem}"),
+            None => bail!("Unsupported array element type for argument reading: {elem}"),
         }
     } else {
         bail!("Unsupported type for argument reading: {ty}");
@@ -178,20 +174,18 @@ fn classify_arg_type(ty: &Type) -> Result<ArgKind> {
 
 /// Codegen extension for the argreader
 #[derive(Default)]
-pub struct ArgReaderCodegenExtension<BAC: BorrowArrayCodegen> {
-    borrow_array_codegen: BAC,
+pub struct ArgReaderCodegenExtension<AL: ArrayLowering> {
+    array_lowering: AL,
 }
 
-impl<BAC: BorrowArrayCodegen> ArgReaderCodegenExtension<BAC> {
+impl<AL: ArrayLowering> ArgReaderCodegenExtension<AL> {
     /// Creates a new [ArgReaderCodegenExtension] with specified array lowering.
-    pub const fn new(borrow_array_codegen: BAC) -> Self {
-        Self {
-            borrow_array_codegen,
-        }
+    pub const fn new(array_lowering: AL) -> Self {
+        Self { array_lowering }
     }
 }
 
-impl<BAC: BorrowArrayCodegen + Clone> CodegenExtension for ArgReaderCodegenExtension<BAC> {
+impl<AL: ArrayLowering + Clone> CodegenExtension for ArgReaderCodegenExtension<AL> {
     fn add_extension<'a, H: HugrView<Node = Node> + 'a>(
         self,
         builder: CodegenExtsBuilder<'a, H>,
@@ -201,19 +195,17 @@ impl<BAC: BorrowArrayCodegen + Clone> CodegenExtension for ArgReaderCodegenExten
     {
         builder.simple_extension_op::<ReadArgOpDef>(move |context, args, _op| {
             let op = ReadArgOp::from_extension_op(args.node().as_ref())?;
-            ArgReaderEmitter(context, self.borrow_array_codegen.clone()).emit(args, &op)
+            ArgReaderEmitter(context, self.array_lowering.clone()).emit(args, &op)
         })
     }
 }
 
-struct ArgReaderEmitter<'c, 'd, 'e, H: HugrView<Node = Node>, BAC: BorrowArrayCodegen>(
+struct ArgReaderEmitter<'c, 'd, 'e, H: HugrView<Node = Node>, AL: ArrayLowering>(
     &'d mut EmitFuncContext<'c, 'e, H>,
-    BAC,
+    AL,
 );
 
-impl<'c, H: HugrView<Node = Node>, BAC: BorrowArrayCodegen + Clone>
-    ArgReaderEmitter<'c, '_, '_, H, BAC>
-{
+impl<'c, H: HugrView<Node = Node>, AL: ArrayLowering + Clone> ArgReaderEmitter<'c, '_, '_, H, AL> {
     fn iw_context(&self) -> &'c Context {
         self.0.typing_session().iw_context()
     }
@@ -328,18 +320,16 @@ impl<'c, H: HugrView<Node = Node>, BAC: BorrowArrayCodegen + Clone>
         elem_ty: BasicTypeEnum<'c>,
         call_name: &str,
     ) -> Result<BasicValueEnum<'c>> {
-        if len > u32::MAX as u64 {
-            bail!("Array length {} exceeds u32::MAX", len);
-        }
+        let len_u32 =
+            u32::try_from(len).map_err(|_| anyhow!("Array length {len} exceeds u32::MAX"))?;
         let len_val = self.i64_t().const_int(len, false);
-        let (elems_ptr, barray_value) =
-            llvm_borrow_array::build_barray_alloc(self.0, &self.1, elem_ty, len, false)?;
+        let (elems_ptr, array_value) = self.1.alloc_array(self.0, elem_ty, len_u32)?;
         self.builder().build_call(
             argread_fn,
             &[tag_ptr.into(), elems_ptr.into(), len_val.into()],
             call_name,
         )?;
-        Ok(barray_value.into())
+        Ok(array_value)
     }
 }
 
@@ -347,58 +337,53 @@ impl<'c, H: HugrView<Node = Node>, BAC: BorrowArrayCodegen + Clone>
 mod test {
     use super::*;
     use crate::extension::argreader::ReadArgOp;
+    use crate::llvm::array_utils::DEFAULT_HEAP_ARRAY_LOWERING;
     use hugr::extension::prelude::bool_t;
     use hugr::extension::simple_op::MakeRegisteredOp;
     use hugr::llvm::check_emission;
-    use hugr::llvm::extension::collections::borrow_array::{
-        BorrowArrayCodegenExtension, DefaultBorrowArrayCodegen,
-    };
     use hugr::llvm::test::{TestContext, llvm_ctx, single_op_hugr};
     use hugr::std_extensions::arithmetic::{float_types::float64_type, int_types::int_type};
-    use hugr::std_extensions::collections::borrow_array::borrow_array_type;
+    use hugr::std_extensions::collections::array::array_type;
     use hugr::types::TypeArg;
     use rstest::rstest;
 
     use crate::llvm::prelude::QISPreludeCodegen;
 
     #[rstest]
-    #[case::bool(1, ReadArgOp::new("test_bool", bool_t()))]
-    #[case::int(2, ReadArgOp::new("test_int", int_type(TypeArg::BoundedNat(6))))]
-    #[case::f64(3, ReadArgOp::new("test_f64", float64_type()))]
-    #[case::arr_bool(4, ReadArgOp::new("test_arr_bool", borrow_array_type(10, bool_t())))]
+    #[case::bool(1, ReadArgOp::new("test_bool", bool_t()), &DEFAULT_HEAP_ARRAY_LOWERING)]
+    #[case::int(2, ReadArgOp::new("test_int", int_type(TypeArg::BoundedNat(6))), &DEFAULT_HEAP_ARRAY_LOWERING)]
+    #[case::f64(3, ReadArgOp::new("test_f64", float64_type()), &DEFAULT_HEAP_ARRAY_LOWERING)]
+    #[case::arr_bool(4, ReadArgOp::new("test_arr_bool", array_type(10, bool_t())), &DEFAULT_HEAP_ARRAY_LOWERING)]
     #[case::arr_int(
         5,
-        ReadArgOp::new(
-            "test_arr_int",
-            borrow_array_type(10, int_type(TypeArg::BoundedNat(6)))
-        )
+        ReadArgOp::new("test_arr_int", array_type(10, int_type(TypeArg::BoundedNat(6)))),
+        &DEFAULT_HEAP_ARRAY_LOWERING
     )]
     #[case::arr_f64(
         6,
-        ReadArgOp::new("test_arr_f64", borrow_array_type(10, float64_type()))
+        ReadArgOp::new("test_arr_f64", array_type(10, float64_type())),
+        &DEFAULT_HEAP_ARRAY_LOWERING
     )]
     #[should_panic(expected = "Empty argument name tag received")]
-    #[case::empty_tag(7, ReadArgOp::new("", bool_t()))]
+    #[case::empty_tag(7, ReadArgOp::new("", bool_t()), &DEFAULT_HEAP_ARRAY_LOWERING)]
     #[should_panic(expected = "log-width 6")]
-    #[case::narrow_int(8, ReadArgOp::new("test_narrow", int_type(TypeArg::BoundedNat(3))))]
+    #[case::narrow_int(8, ReadArgOp::new("test_narrow", int_type(TypeArg::BoundedNat(3))), &DEFAULT_HEAP_ARRAY_LOWERING)]
     #[should_panic(expected = "log-width 6")]
     #[case::narrow_int_arr(
         9,
-        ReadArgOp::new(
-            "test_narrow_arr",
-            borrow_array_type(4, int_type(TypeArg::BoundedNat(3)))
-        )
+        ReadArgOp::new("test_narrow_arr", array_type(4, int_type(TypeArg::BoundedNat(3)))),
+        &DEFAULT_HEAP_ARRAY_LOWERING
     )]
     fn emit_argreader_codegen(
         #[case] _i: i32,
         #[with(_i)] mut llvm_ctx: TestContext,
         #[case] op: ReadArgOp,
+        #[case] array_lowering: &'static (impl ArrayLowering + Clone),
     ) {
         let pcg = QISPreludeCodegen;
-        let bac = DefaultBorrowArrayCodegen::<QISPreludeCodegen>::default();
         llvm_ctx.add_extensions(move |ceb| {
-            ceb.add_extension(ArgReaderCodegenExtension::new(bac.clone()))
-                .add_extension(BorrowArrayCodegenExtension::from(bac.clone()))
+            ceb.add_extension(ArgReaderCodegenExtension::new(array_lowering.clone()))
+                .add_extension(array_lowering.codegen_extension())
                 .add_prelude_extensions(pcg.clone())
                 .add_default_int_extensions()
                 .add_float_extensions()
@@ -412,12 +397,9 @@ mod test {
     #[case::bool(bool_t(), ArgKind::Bool)]
     #[case::int(int_type(TypeArg::BoundedNat(6)), ArgKind::Int)]
     #[case::f64(float64_type(), ArgKind::F64)]
-    #[case::arr_bool(borrow_array_type(10, bool_t()), ArgKind::ArrBool(10))]
-    #[case::arr_int(
-        borrow_array_type(10, int_type(TypeArg::BoundedNat(6))),
-        ArgKind::ArrInt(10)
-    )]
-    #[case::arr_f64(borrow_array_type(10, float64_type()), ArgKind::ArrF64(10))]
+    #[case::arr_bool(array_type(10, bool_t()), ArgKind::ArrBool(10))]
+    #[case::arr_int(array_type(10, int_type(TypeArg::BoundedNat(6))), ArgKind::ArrInt(10))]
+    #[case::arr_f64(array_type(10, float64_type()), ArgKind::ArrF64(10))]
     fn test_classify(#[case] ty: Type, #[case] expected: ArgKind) {
         assert_eq!(classify_arg_type(&ty).unwrap(), expected);
     }
@@ -435,8 +417,7 @@ mod test {
 
     #[test]
     fn test_classify_arr_int_rejects_narrow() {
-        let err =
-            classify_arg_type(&borrow_array_type(4, int_type(TypeArg::BoundedNat(3)))).unwrap_err();
+        let err = classify_arg_type(&array_type(4, int_type(TypeArg::BoundedNat(3)))).unwrap_err();
         assert!(err.to_string().contains("log-width 6"), "{err}");
     }
 }

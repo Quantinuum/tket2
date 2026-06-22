@@ -141,9 +141,9 @@ fn codegen_extensions(platform: qsystem::QSystemPlatform) -> CodegenExtsMap<'sta
         // State results use standard arrays.
         .add_extension(DebugCodegenExtension::new(SeleneHeapArrayCodegen::LOWERING))
         .add_extension(gpu::GpuCodegen)
-        // Argument reading
+        // Argument reading uses standard arrays.
         .add_extension(ArgReaderCodegenExtension::new(
-            array::SeleneHeapBorrowArrayCodegen(pcg),
+            SeleneHeapArrayCodegen::LOWERING,
         ))
         .finish()
 }
@@ -222,10 +222,10 @@ fn get_entry_point_name(namer: &Namer, hugr: &impl HugrView<Node = Node>) -> Res
             .as_func_defn()
             .ok_or_else(|| anyhow!("Entry point node is not a function definition"))?;
         if func_defn.inner_signature().input_count() != 0 {
-            return Err(anyhow!(
+            bail!(
                 "Entry point function must have no input parameters (found {})",
                 func_defn.inner_signature().input_count()
-            ));
+            );
         }
         (func_defn.func_name().as_ref(), hugr.entrypoint())
     };

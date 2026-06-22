@@ -185,7 +185,7 @@ pub(crate) mod test {
     use hugr::extension::simple_op::{HasConcrete, MakeRegisteredOp};
     use hugr::std_extensions::arithmetic::float_types::float64_type;
     use hugr::std_extensions::arithmetic::int_types::int_type;
-    use hugr::std_extensions::collections::borrow_array::borrow_array_type;
+    use hugr::std_extensions::collections::array::array_type;
     use hugr::types::TypeArg;
     use rstest::rstest;
 
@@ -198,9 +198,9 @@ pub(crate) mod test {
     #[case("my_bool", bool_t())]
     #[case("my_int", int_type(TypeArg::BoundedNat(6)))]
     #[case("my_f64", float64_type())]
-    #[case("my_arr_bool", borrow_array_type(10, bool_t()))]
-    #[case("my_arr_int", borrow_array_type(10, int_type(TypeArg::BoundedNat(6))))]
-    #[case("my_arr_f64", borrow_array_type(10, float64_type()))]
+    #[case("my_arr_bool", array_type(10, bool_t()))]
+    #[case("my_arr_int", array_type(10, int_type(TypeArg::BoundedNat(6))))]
+    #[case("my_arr_f64", array_type(10, float64_type()))]
     fn test_roundtrip(#[case] tag: &str, #[case] output_type: Type) {
         let op = ReadArgOp::new(tag, output_type);
         assert_eq!(roundtrip(op.clone()), op);
