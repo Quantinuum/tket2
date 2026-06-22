@@ -183,53 +183,26 @@ pub(crate) mod test {
     use super::*;
     use hugr::extension::prelude::bool_t;
     use hugr::extension::simple_op::{HasConcrete, MakeRegisteredOp};
+    use hugr::std_extensions::arithmetic::float_types::float64_type;
     use hugr::std_extensions::arithmetic::int_types::int_type;
     use hugr::std_extensions::collections::borrow_array::borrow_array_type;
     use hugr::types::TypeArg;
+    use rstest::rstest;
 
     fn roundtrip(op: ReadArgOp) -> ReadArgOp {
         let type_args = op.type_args();
         ReadArgOpDef::ReadArg.instantiate(&type_args).unwrap()
     }
 
-    #[test]
-    fn test_bool_roundtrip() {
-        let op = ReadArgOp::new("my_bool", bool_t());
-        assert_eq!(roundtrip(op.clone()), op);
-    }
-
-    #[test]
-    fn test_int_roundtrip() {
-        let op = ReadArgOp::new("my_int", int_type(TypeArg::BoundedNat(6)));
-        assert_eq!(roundtrip(op.clone()), op);
-    }
-
-    #[test]
-    fn test_f64_roundtrip() {
-        use hugr::std_extensions::arithmetic::float_types::float64_type;
-        let op = ReadArgOp::new("my_f64", float64_type());
-        assert_eq!(roundtrip(op.clone()), op);
-    }
-
-    #[test]
-    fn test_arr_bool_roundtrip() {
-        let op = ReadArgOp::new("my_arr_bool", borrow_array_type(10, bool_t()));
-        assert_eq!(roundtrip(op.clone()), op);
-    }
-
-    #[test]
-    fn test_arr_int_roundtrip() {
-        let op = ReadArgOp::new(
-            "my_arr_int",
-            borrow_array_type(10, int_type(TypeArg::BoundedNat(6))),
-        );
-        assert_eq!(roundtrip(op.clone()), op);
-    }
-
-    #[test]
-    fn test_arr_f64_roundtrip() {
-        use hugr::std_extensions::arithmetic::float_types::float64_type;
-        let op = ReadArgOp::new("my_arr_f64", borrow_array_type(10, float64_type()));
+    #[rstest]
+    #[case("my_bool", bool_t())]
+    #[case("my_int", int_type(TypeArg::BoundedNat(6)))]
+    #[case("my_f64", float64_type())]
+    #[case("my_arr_bool", borrow_array_type(10, bool_t()))]
+    #[case("my_arr_int", borrow_array_type(10, int_type(TypeArg::BoundedNat(6))))]
+    #[case("my_arr_f64", borrow_array_type(10, float64_type()))]
+    fn test_roundtrip(#[case] tag: &str, #[case] output_type: Type) {
+        let op = ReadArgOp::new(tag, output_type);
         assert_eq!(roundtrip(op.clone()), op);
     }
 

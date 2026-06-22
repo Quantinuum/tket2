@@ -26,7 +26,7 @@ use tket::hugr::extension::simple_op::MakeExtensionOp;
 use tket::hugr::ops::ExtensionOp;
 use tket::hugr::{HugrView, Node};
 
-/// The concrete variant of an argument type, used to select the selene extern function.
+/// The concrete variant of an argument type, used to select the extern function.
 ///
 /// Produced by [`classify_arg_type`]; lives here because it is purely a codegen concept.
 #[derive(Debug, Clone, PartialEq)]
@@ -45,7 +45,31 @@ enum ArgKind {
     ArrF64(u64),
 }
 
-/// A leaf (non-array) argument type, identifying the corresponding selene extern.
+impl ArgKind {
+    /// The LLVM IR call-instruction name for this kind.
+    const fn call_name(&self) -> &'static str {
+        match self {
+            ArgKind::Bool => "read_arg_bool",
+            ArgKind::Int => "read_arg_int",
+            ArgKind::F64 => "read_arg_f64",
+            ArgKind::ArrBool(_) => "read_arg_bool_array",
+            ArgKind::ArrInt(_) => "read_arg_int_array",
+            ArgKind::ArrF64(_) => "read_arg_f64_array",
+        }
+    }
+
+    /// If this is an array kind, return `(length, element scalar)`.
+    const fn as_array(&self) -> Option<(u64, Scalar)> {
+        match self {
+            ArgKind::ArrBool(len) => Some((*len, Scalar::Bool)),
+            ArgKind::ArrInt(len) => Some((*len, Scalar::Int)),
+            ArgKind::ArrF64(len) => Some((*len, Scalar::F64)),
+            _ => None,
+        }
+    }
+}
+
+/// A leaf (non-array) argument type, identifying the corresponding extern.
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Scalar {
     Bool,
@@ -67,6 +91,15 @@ impl Scalar {
             Scalar::Bool => ArgKind::ArrBool(size),
             Scalar::Int => ArgKind::ArrInt(size),
             Scalar::F64 => ArgKind::ArrF64(size),
+        }
+    }
+
+    /// The LLVM basic type for this scalar.
+    fn llvm_type<'c>(self, ctx: &'c Context) -> BasicTypeEnum<'c> {
+        match self {
+            Scalar::Bool => ctx.bool_type().as_basic_type_enum(),
+            Scalar::Int => ctx.i64_type().as_basic_type_enum(),
+            Scalar::F64 => ctx.f64_type().as_basic_type_enum(),
         }
     }
 }
@@ -127,20 +160,20 @@ fn classify_scalar(ty: &Type) -> Option<Result<Scalar>> {
     }
 }
 
-/// Map the concrete output type of a [`ReadArgOp`] to the selene extern function variant.
+/// Map the concrete output type of a [`ReadArgOp`] to the extern function variant.
 ///
 /// Errors on unsupported types, including integer types other than i64.
 fn classify_arg_type(ty: &Type) -> Result<ArgKind> {
     if let Some(scalar) = classify_scalar(ty) {
-        return scalar.map(Scalar::scalar_kind);
-    }
-    if let Some((size, elem)) = as_borrow_array(ty) {
-        return match classify_scalar(&elem) {
+        scalar.map(Scalar::scalar_kind)
+    } else if let Some((size, elem)) = as_borrow_array(ty) {
+        match classify_scalar(&elem) {
             Some(scalar) => scalar.map(|s| s.array_kind(size)),
             None => bail!("Unsupported borrow_array element type for argument reading: {elem}"),
-        };
+        }
+    } else {
+        bail!("Unsupported type for argument reading: {ty}");
     }
-    bail!("Unsupported type for argument reading: {ty}")
 }
 
 /// Codegen extension for the argreader
@@ -267,44 +300,21 @@ impl<'c, H: HugrView<Node = Node>, BAC: BorrowArrayCodegen + Clone>
         let kind = classify_arg_type(&op.output_type)?;
         let argread_fn = self.get_argreader_func(&kind)?;
         let tag_ptr = emit_global_string(self.0, &op.tag, "argument_", "")?;
+        let call_name = kind.call_name();
 
-        let result = match kind {
-            ArgKind::Bool => self
-                .builder()
-                .build_call(argread_fn, &[tag_ptr.into()], "read_arg_bool")?
-                .try_as_basic_value()
-                .unwrap_basic(),
-            ArgKind::Int => self
-                .builder()
-                .build_call(argread_fn, &[tag_ptr.into()], "read_arg_int")?
-                .try_as_basic_value()
-                .unwrap_basic(),
-            ArgKind::F64 => self
-                .builder()
-                .build_call(argread_fn, &[tag_ptr.into()], "read_arg_f64")?
-                .try_as_basic_value()
-                .unwrap_basic(),
-            ArgKind::ArrBool(len) => self.emit_array_read(
+        let result = if let Some((len, scalar)) = kind.as_array() {
+            self.emit_array_read(
                 argread_fn,
                 tag_ptr,
                 len,
-                self.bool_t().as_basic_type_enum(),
-                "read_arg_bool_array",
-            )?,
-            ArgKind::ArrInt(len) => self.emit_array_read(
-                argread_fn,
-                tag_ptr,
-                len,
-                self.i64_t().as_basic_type_enum(),
-                "read_arg_int_array",
-            )?,
-            ArgKind::ArrF64(len) => self.emit_array_read(
-                argread_fn,
-                tag_ptr,
-                len,
-                self.f64_t().as_basic_type_enum(),
-                "read_arg_f64_array",
-            )?,
+                scalar.llvm_type(self.iw_context()),
+                call_name,
+            )?
+        } else {
+            self.builder()
+                .build_call(argread_fn, &[tag_ptr.into()], call_name)?
+                .try_as_basic_value()
+                .unwrap_basic()
         };
 
         args.outputs.finish(self.builder(), [result])
@@ -398,17 +408,18 @@ mod test {
         check_emission!(hugr, llvm_ctx);
     }
 
-    #[test]
-    fn test_classify_bool() {
-        assert_eq!(classify_arg_type(&bool_t()).unwrap(), ArgKind::Bool);
-    }
-
-    #[test]
-    fn test_classify_int_i64() {
-        assert_eq!(
-            classify_arg_type(&int_type(TypeArg::BoundedNat(6))).unwrap(),
-            ArgKind::Int
-        );
+    #[rstest]
+    #[case::bool(bool_t(), ArgKind::Bool)]
+    #[case::int(int_type(TypeArg::BoundedNat(6)), ArgKind::Int)]
+    #[case::f64(float64_type(), ArgKind::F64)]
+    #[case::arr_bool(borrow_array_type(10, bool_t()), ArgKind::ArrBool(10))]
+    #[case::arr_int(
+        borrow_array_type(10, int_type(TypeArg::BoundedNat(6))),
+        ArgKind::ArrInt(10)
+    )]
+    #[case::arr_f64(borrow_array_type(10, float64_type()), ArgKind::ArrF64(10))]
+    fn test_classify(#[case] ty: Type, #[case] expected: ArgKind) {
+        assert_eq!(classify_arg_type(&ty).unwrap(), expected);
     }
 
     #[test]
@@ -423,38 +434,9 @@ mod test {
     }
 
     #[test]
-    fn test_classify_f64() {
-        assert_eq!(classify_arg_type(&float64_type()).unwrap(), ArgKind::F64);
-    }
-
-    #[test]
-    fn test_classify_arr_bool() {
-        assert_eq!(
-            classify_arg_type(&borrow_array_type(10, bool_t())).unwrap(),
-            ArgKind::ArrBool(10)
-        );
-    }
-
-    #[test]
-    fn test_classify_arr_int_i64() {
-        assert_eq!(
-            classify_arg_type(&borrow_array_type(10, int_type(TypeArg::BoundedNat(6)))).unwrap(),
-            ArgKind::ArrInt(10)
-        );
-    }
-
-    #[test]
     fn test_classify_arr_int_rejects_narrow() {
         let err =
             classify_arg_type(&borrow_array_type(4, int_type(TypeArg::BoundedNat(3)))).unwrap_err();
         assert!(err.to_string().contains("log-width 6"), "{err}");
-    }
-
-    #[test]
-    fn test_classify_arr_f64() {
-        assert_eq!(
-            classify_arg_type(&borrow_array_type(10, float64_type())).unwrap(),
-            ArgKind::ArrF64(10)
-        );
     }
 }
