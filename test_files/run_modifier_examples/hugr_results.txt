@@ -30,6 +30,13 @@ higher_order_recursive_solved:
 	10 -> -0.5+0j
 	11 -> 0-0.5j
 -----
+loaded_pytket_solved:
+	000 -> 0.7071+0j
+	100 -> 0.25-0.25j
+	101 -> 0.25-0.25j
+	110 -> 0.25+0.25j
+	111 -> 0.25+0.25j
+-----
 multiple_functions_solved:
 	00 -> 0.7071+0j
 	10 -> 0+0.6124j
