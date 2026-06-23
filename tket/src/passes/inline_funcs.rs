@@ -238,9 +238,10 @@ fn inline_always_scoped<H: HugrMut>(
             }
         }
     }
-    // Remove the always-inlined functions themselves, as they are now unreachable.
-    let funcs_to_preserve = scope.preserve_interface(hugr).collect::<HashSet<_>>();
+
     if root == hugr.module_root() {
+        // Remove the always-inlined functions themselves, as they are now unreachable.
+        let funcs_to_preserve = scope.preserve_interface(hugr).collect::<HashSet<_>>();
         for func in reachable_always {
             debug_assert!(hugr.static_targets(func).unwrap().next().is_none());
             if !funcs_to_preserve.contains(&func) {
@@ -303,9 +304,7 @@ mod test {
     use crate::TketOp;
     use crate::metadata::InlineAnnotation;
     use crate::passes::composable::{Preserve, test::run_validating};
-    use crate::passes::{
-        ComposablePass, InlineDFGsPass, PassScope, RemoveDeadFuncsPass, WithScope,
-    };
+    use crate::passes::{ComposablePass, InlineDFGsPass, PassScope, WithScope};
 
     ///          /->-\
     /// main -> f     g -> b -> c
@@ -536,7 +535,7 @@ mod test {
         assert_eq!(e, InlineFuncsError::AlwaysCycle(vec![fb.node()]));
         assert_eq!(hugr, backup);
 
-        RemoveDeadFuncsPass::default().run(&mut hugr).unwrap();
+        hugr.remove_subtree(fb.node());
         assert_eq!(
             hugr.children(hugr.module_root()).collect::<Vec<_>>(),
             [hugr.entrypoint()]
