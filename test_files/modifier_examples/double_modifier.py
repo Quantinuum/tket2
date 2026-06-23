@@ -1,7 +1,8 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang ==0.21.14",
+#    "guppylang==1.0.0a5",
+#    "guppylang-internals==1.0.0a5",
 # ]
 # ///
 """Testing nested modifiers"""

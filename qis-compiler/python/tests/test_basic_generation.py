@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 import pytest
 from hugr.ops import CFG
@@ -16,6 +17,10 @@ triples = [
     "aarch64-apple-darwin",
     "x86_64-windows-msvc",
 ]
+
+Platform = Literal["helios", "sol"]
+
+platforms: list[Platform] = ["helios", "sol"]
 
 
 def load(name: str) -> bytes:
@@ -54,6 +59,13 @@ def test_unsupported_pytket_ops() -> None:
         check_hugr(hugr_envelope)
 
 
+def normalize_ir_snapshot(ir: str) -> str:
+    """Remove unstable or localized output from IR snapshots."""
+    # remove debug file entries with absolute paths
+    new_lines = filter(lambda line: "DIFile" not in line, ir.split("\n"))
+    return "\n".join(new_lines)
+
+
 @pytest.mark.parametrize(
     "hugr_file",
     [
@@ -69,10 +81,16 @@ def test_unsupported_pytket_ops() -> None:
     ],
 )
 @pytest.mark.parametrize("target_triple", triples)
-def test_llvm(snapshot: Snapshot, hugr_file: str, target_triple: str) -> None:
+@pytest.mark.parametrize("platform", platforms)
+def test_llvm(
+    snapshot: Snapshot, hugr_file: str, target_triple: str, platform: Platform
+) -> None:
     hugr_envelope = load(hugr_file)
-    ir = compile_to_llvm_ir(hugr_envelope, target_triple=target_triple)  # type: ignore[call-arg]
-    snapshot.assert_match(ir, f"{hugr_file}_{target_triple}")
+    ir = compile_to_llvm_ir(
+        hugr_envelope, target_triple=target_triple, platform=platform, emit_debug=True
+    )
+    ir = normalize_ir_snapshot(ir)
+    snapshot.assert_match(ir, f"{hugr_file}_{target_triple}_{platform}")
 
 
 def test_entry_args() -> None:
@@ -116,5 +134,5 @@ def test_gpu(snapshot: Snapshot, target_triple: str) -> None:
     # above, using the tket_qsystem::extension::gpu entities.
     hugr_file = resources_dir / "example_gpu.hugr"
     hugr_envelope = hugr_file.read_bytes()
-    ir = compile_to_llvm_ir(hugr_envelope, target_triple=target_triple)  # type: ignore[call-arg]
+    ir = compile_to_llvm_ir(hugr_envelope, target_triple=target_triple)
     snapshot.assert_match(ir, f"gpu_{target_triple}")

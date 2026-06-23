@@ -1,9 +1,15 @@
-{ pkgs, lib, inputs, ... }:
-let
-  hugrenv = pkgs.callPackage ./hugrenv.nix {
-    packages = ["tket" "llvm"];
-  };
+{ pkgs, lib, inputs, config, ... }:
+let hugrenv = config.hugrenv.package;
 in {
+
+  options.hugrenv.package = lib.mkOption {
+    type = lib.types.package;
+    default =  pkgs.callPackage ./hugrenv.nix {
+        packages = ["tket" "llvm"];
+    };
+  };
+
+  config = {
   # https://devenv.sh/packages/
   # on macos frameworks have to be explicitly specified
   # otherwise a linker error occurs on rust packages
@@ -39,7 +45,10 @@ in {
     "LLVM_SYS_211_PREFIX" = "${hugrenv}";
     "TKET_C_API_PATH" = "${hugrenv}";
     "LIBCLANG_PATH" = "${hugrenv}/lib";
-    "JEMALLOC_OVERRIDE" = "${pkgs.jemalloc}/lib/libjemalloc.so";
+    "JEMALLOC_OVERRIDE" =
+      if pkgs.stdenv.isDarwin
+      then "${pkgs.jemalloc}/lib/libjemalloc.dylib"
+      else "${pkgs.jemalloc}/lib/libjemalloc.so";
   };
 
   # https://devenv.sh/languages/
@@ -59,5 +68,6 @@ in {
     venv.enable = true;
   };
 
+  };
 
 }

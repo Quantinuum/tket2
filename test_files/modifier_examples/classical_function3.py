@@ -1,7 +1,8 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang ==0.21.14",
+#    "guppylang==1.0.0a5",
+#    "guppylang-internals==1.0.0a5",
 # ]
 # ///
 """Test the use of a classical function inside modifiers"""
@@ -40,9 +41,9 @@ def main() -> None:
     h(c1)
     h(c2)
     with control(c1):
-        d = fuu(2)
         with control(c2):
             with dagger:
+                d = fuu(2)
                 rx(t, angle(1 / d))
 
     state_result("r", c1, c2, t)

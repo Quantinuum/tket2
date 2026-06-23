@@ -31,7 +31,7 @@ To setup the environment manually you will need:
 - Just: <https://just.systems/>
 - Rust `>=1.91`: <https://www.rust-lang.org/tools/install>
 - cargo-nextest: <https://nexte.st/docs/installation/pre-built-binaries/>
-- uv `>=0.3`: docs.astral.sh/uv/getting-started/installation
+- uv `>=0.11`: docs.astral.sh/uv/getting-started/installation
 - conan `>=2.0.0,<3`: This gets installed by `just setup` / `uv tool install conan`
 - Optional: [llvm](https://llvm.org/) `== 21.1`. The "llvm" feature (backed by the sub-crate `hugr-llvm`)
   requires LLVM 21.1 installed. We use the rust bindings from
@@ -190,6 +190,19 @@ We accept the following contribution types:
 - ci: CI related changes. These changes are not published in the changelog.
 - chore: Updating build tasks, package manager configs, etc. These changes are not published in the changelog.
 - revert: Reverting previous commits.
+
+## 🛠️ Common problems and solutions
+
+Here is a list of common problems found during development, and how to solve them.
+
+- `ImportError: cannot import name 'metadata' from 'tket._tket' (.../tket/_tket.abi3.so)` when running python tests.
+
+  The Rust bindings need to be recompiled. Run `uv run maturin develop` to recompile them manually or use `just test-python` instead of `pytest` to do it automatically.
+
+- `ValueError: Missing 'project' metadata table in configuration` when running `maturin develop`.
+
+  This is caused by an outdated version of `uv`. Run `uv self update` to update to the latest version.
+
 
 ## :shipit: Releasing new versions
 

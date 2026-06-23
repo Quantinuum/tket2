@@ -6,6 +6,7 @@ mod inline_funcs;
 mod scope;
 pub mod tket1;
 
+use hugr::HugrView;
 pub(crate) use scope::PyPassScope;
 
 use std::{cmp::min, convert::TryInto, fs, num::NonZeroUsize, path::PathBuf};
@@ -13,7 +14,7 @@ use std::{cmp::min, convert::TryInto, fs, num::NonZeroUsize, path::PathBuf};
 use pyo3::prelude::*;
 use tket::optimiser::badger::BadgerOptions;
 use tket::passes::composable::{ComposablePass, WithScope};
-use tket::{Circuit, TketOp, op_matches};
+use tket::{Circuit, TketOp};
 
 use tket::passes;
 
@@ -87,18 +88,20 @@ create_py_exception!(
 /// This should normally be called first before other optimisations.
 ///
 /// Parameters:
+/// - resolve_modifiers: Whether to resolve modifier operations.
 /// - simplify_cfgs: Whether to simplify CFG control flow.
 /// - remove_tuple_untuple: Whether to remove tuple/untuple operations.
 /// - constant_folding: Whether to constant fold the program.
 /// - remove_dead_funcs: Whether to remove dead functions.
 /// - inline_dfgs: Whether to inline DFG operations.
-/// - squash_borrows: Whether to squash return-borrow pairs on BorrowArrays.
 /// - remove_redundant_order_edges: Whether to remove redundant order edges.
+/// - squash_borrows: Whether to squash return-borrow pairs on BorrowArrays.
 #[pyfunction]
-#[pyo3(signature = (circ, *, simplify_cfgs = true, remove_tuple_untuple = true, constant_folding = true, remove_dead_funcs = true, inline_dfgs = true, remove_redundant_order_edges = true, squash_borrows = true, scope = None))]
+#[pyo3(signature = (circ, *, resolve_modifiers = true, simplify_cfgs = true, remove_tuple_untuple = true, constant_folding = true, remove_dead_funcs = true, inline_dfgs = true, remove_redundant_order_edges = true, squash_borrows = true, scope = None))]
 #[expect(clippy::too_many_arguments)]
 fn normalize_guppy(
     circ: &mut CompilationState,
+    resolve_modifiers: bool,
     simplify_cfgs: bool,
     remove_tuple_untuple: bool,
     constant_folding: bool,
@@ -111,7 +114,8 @@ fn normalize_guppy(
     let py_scope = scope.unwrap_or_default();
     let mut pass = tket::passes::NormalizeGuppy::default_with_scope(py_scope.scope);
 
-    pass.simplify_cfgs(simplify_cfgs)
+    pass.resolve_modifiers(resolve_modifiers)
+        .simplify_cfgs(simplify_cfgs)
         .remove_tuple_untuple(remove_tuple_untuple)
         .constant_folding(constant_folding)
         .remove_dead_funcs(remove_dead_funcs)
@@ -184,8 +188,9 @@ fn badger_optimise(
     // Optimise
     let c = Circuit::new(&circ.hugr);
     let n_cx = c
-        .commands()
-        .filter(|c| op_matches(c.optype(), TketOp::CX))
+        .toposorted_children(c.parent())
+        .expect("circuit entrypoint should be dataflow region")
+        .filter(|&n| c.hugr().get_optype(n).cast::<TketOp>() == Some(TketOp::CX))
         .count();
     let n_threads = min(
         (n_cx / 50).try_into().unwrap_or(1.try_into().unwrap()),
@@ -223,22 +228,21 @@ fn resolve_modifiers(circ: &mut CompilationState, scope: Option<PyPassScope>) ->
 }
 
 #[pyfunction]
-#[pyo3(signature=(circ, *, constant_fold = true, monomorphize = true, force_order = true, lazify = true, hide_funcs = true, scope = None))]
+#[pyo3(signature=(circ, *, constant_fold = true, monomorphize = true, force_order = true, hide_funcs = true, scope = None))]
 fn qsystem_rebase_pass(
     circ: &mut CompilationState,
     constant_fold: bool,
     monomorphize: bool,
     force_order: bool,
-    lazify: bool,
     hide_funcs: bool,
     scope: Option<PyPassScope>,
 ) -> PyResult<()> {
     let py_scope = scope.unwrap_or_default();
-    let qsystem_pass = tket_qsystem::QSystemPass::default_with_scope(py_scope.scope)
+    let qsystem_pass = tket_qsystem::QSystemPass::defaults(tket_qsystem::QSystemPlatform::Helios)
+        .with_scope(py_scope.scope)
         .with_constant_fold(constant_fold)
         .with_monomorphize(monomorphize)
         .with_force_order(force_order)
-        .with_lazify(lazify)
         .with_hide_funcs(hide_funcs);
 
     qsystem_pass.run(&mut circ.hugr).convert_pyerrs()?;

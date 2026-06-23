@@ -4,10 +4,13 @@ use crate::passes::composable::WithScope;
 use crate::passes::const_fold::{ConstFoldError, ConstantFoldPass};
 use crate::passes::dead_funcs::RemoveDeadFuncsError;
 use crate::passes::inline_dfgs::InlineDFGsPass;
+use crate::passes::modifier_resolver::ModifierResolverErrors;
 use crate::passes::normalize_cfgs::{NormalizeCFGError, NormalizeCFGPass};
 use crate::passes::redundant_order_edges::RedundantOrderEdgesPass;
 use crate::passes::untuple::UntupleError;
-use crate::passes::{ComposablePass, PassScope, RemoveDeadFuncsPass, UntuplePass};
+use crate::passes::{
+    ComposablePass, ModifierResolverPass, PassScope, RemoveDeadFuncsPass, UntuplePass,
+};
 use hugr::Node;
 use hugr::hugr::HugrError;
 use hugr::hugr::hugrmut::HugrMut;
@@ -20,6 +23,8 @@ use crate::passes::BorrowSquashPass;
 /// This is a mixture of global optimization passes, and operations that optimize the entrypoint.
 #[derive(Clone, Debug)]
 pub struct NormalizeGuppy {
+    /// Whether to resolve modifier operations.
+    resolve_modifiers: bool,
     /// Whether to simplify CFG control flow.
     simplify_cfgs: bool,
     /// Whether to remove tuple/untuple operations.
@@ -42,6 +47,11 @@ pub struct NormalizeGuppy {
 }
 
 impl NormalizeGuppy {
+    /// Set whether to resolve modifier operations.
+    pub fn resolve_modifiers(&mut self, resolve_modifiers: bool) -> &mut Self {
+        self.resolve_modifiers = resolve_modifiers;
+        self
+    }
     /// Set whether to simplify CFG control flow.
     pub fn simplify_cfgs(&mut self, simplify_cfgs: bool) -> &mut Self {
         self.simplify_cfgs = simplify_cfgs;
@@ -82,6 +92,7 @@ impl NormalizeGuppy {
 impl Default for NormalizeGuppy {
     fn default() -> Self {
         Self {
+            resolve_modifiers: true,
             simplify_cfgs: true,
             constant_fold: true,
             untuple: true,
@@ -106,6 +117,12 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for NormalizeGuppy {
     type Result = ();
 
     fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
+        // Run modifier resolution
+        if self.resolve_modifiers {
+            ModifierResolverPass::default()
+                .with_scope(self.scope.clone())
+                .run(hugr)?;
+        }
         if self.simplify_cfgs {
             NormalizeCFGPass::default()
                 .with_scope(self.scope.clone())
@@ -158,6 +175,8 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for NormalizeGuppy {
 /// Errors that can occur during the guppy-program normalization process.
 #[derive(derive_more::Error, Debug, derive_more::Display, derive_more::From)]
 pub enum NormalizeGuppyErrors {
+    /// Error while resolving modifier operations.
+    ModifierResolver(ModifierResolverErrors),
     /// Error while simplifying CFG control flow.
     SimplifyCFG(NormalizeCFGError),
     /// Error while removing tuple/untuple operations.
@@ -193,6 +212,7 @@ mod test {
 
         let mut hugr2 = hugr.clone();
         NormalizeGuppy::default()
+            .resolve_modifiers(false)
             .simplify_cfgs(false)
             .remove_tuple_untuple(false)
             .constant_folding(false)

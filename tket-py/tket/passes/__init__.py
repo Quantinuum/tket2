@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import cache
 import json
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -9,6 +10,8 @@ from hugr import Hugr
 
 from tket import _state
 from . import inline_funcs
+from .._pattern import Rule, RuleMatcher
+from .._state.build import OneQbGate, from_coms
 from .._tket import passes as _passes, optimiser as _optimiser
 from .._tket.passes import InlineAlwaysError
 from hugr.passes.composable import (
@@ -33,6 +36,7 @@ __all__ = [
     "NormalizeGuppy",
     "ModifierResolverPass",
     "QSystemPass",
+    "Cliffordize",
 ]
 
 
@@ -87,6 +91,7 @@ class PytketHugrPass(ComposablePass):
 
 @dataclass
 class NormalizeGuppy(ComposablePass):
+    resolve_modifiers: bool = True
     simplify_cfgs: bool = True
     remove_tuple_untuple: bool = True
     constant_folding: bool = True
@@ -101,6 +106,7 @@ class NormalizeGuppy(ComposablePass):
     This should normally be called first before other optimisations.
 
     Parameters:
+    - resolve_modifiers: Whether to resolve modifier operations.
     - simplify_cfgs: Whether to simplify CFG control flow.
     - remove_tuple_untuple: Whether to remove tuple/untuple operations.
     - constant_folding: Whether to constant fold the program.
@@ -139,6 +145,7 @@ class NormalizeGuppy(ComposablePass):
         TODO: This should be part of a protocol."""
         _passes.normalize_guppy(
             program._inner,
+            resolve_modifiers=self.resolve_modifiers,
             simplify_cfgs=self.simplify_cfgs,
             remove_tuple_untuple=self.remove_tuple_untuple,
             constant_folding=self.constant_folding,
@@ -149,6 +156,78 @@ class NormalizeGuppy(ComposablePass):
             scope=self._scope,
         )
         return program
+
+
+@cache
+def _cliffordize_matcher() -> RuleMatcher:
+    """Build the matcher containing the supported Cliffordize rules."""
+    replacements = [
+        ("T", "S"),
+        ("Tdg", "Sdg"),
+    ]
+
+    rules = [
+        Rule(
+            from_coms(OneQbGate(source)(0))._inner,
+            from_coms(OneQbGate(replacement)(0))._inner,
+        )
+        for source, replacement in replacements
+    ]
+
+    return RuleMatcher(rules)
+
+
+@dataclass
+class Cliffordize(ComposablePass):
+    """Replace supported non-Clifford operations with Clifford operations.
+
+    This pass is intended for debugging and workflows that require Clifford-only
+    circuits. It is not semantics-preserving.
+
+    The currently supported replacements are:
+
+    - `T` with `S`
+    - `Tdg` with `Sdg`
+
+    Other non-Clifford operations, including arbitrary rotations, symbolic
+    rotations, `PhasedX`, and `ZZPhase`, are left unchanged.
+    """
+
+    _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
+
+    def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
+        """Run the pass and return the transformed HUGR and rewrite count."""
+        return implement_pass_run(
+            self,
+            hugr=hugr,
+            inplace=inplace,
+            copy_call=lambda h: self._cliffordize(h, inplace),
+        )
+
+    def with_scope(self, scope: PassScope) -> Cliffordize:
+        """Set the scope of this pass and return self."""
+        self._scope = scope
+        return self
+
+    def _cliffordize(self, hugr: Hugr, inplace: bool) -> PassResult:
+        tk_program = _state.CompilationState.from_python(hugr)
+
+        rewrite_count = self._run_tk(tk_program)
+
+        package = tk_program.to_python()
+        return PassResult.for_pass(
+            self,
+            hugr=package.modules[0],
+            inplace=inplace,
+            result=rewrite_count,
+        )
+
+    def _run_tk(self, program: _state.CompilationState) -> int:
+        """Run the pass on a CompilationState and return the rewrite count."""
+        return _cliffordize_matcher().apply_exhaustive(
+            program._inner,
+            scope=self._scope,
+        )
 
 
 @dataclass
@@ -342,14 +421,12 @@ class QSystemPass(ComposablePass):
     - constant_fold: Whether to perform constant folding.
     - monomorphize: Whether to monomorphize generic functions.
     - force_order: Whether to enforce total ordering of all HUGR operations.
-    - lazify: Whether to replace measurements with lazy measurements.
     - hide_funcs: Whether to mark all functions as private.
     """
 
     constant_fold: bool = True
     monomorphize: bool = True
     force_order: bool = True
-    lazify: bool = True
     hide_funcs: bool = True
     _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
 
@@ -383,7 +460,6 @@ class QSystemPass(ComposablePass):
             constant_fold=self.constant_fold,
             monomorphize=self.monomorphize,
             force_order=self.force_order,
-            lazify=self.lazify,
             hide_funcs=self.hide_funcs,
             scope=self._scope,
         )

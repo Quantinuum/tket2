@@ -172,15 +172,29 @@ def test_multiple_rules():
     )
     matcher = RuleMatcher([rule1, rule2])
 
-    match_count = 0
-    while match := matcher.find_match(circ._inner):
-        match_count += 1
-        circ._inner.apply_rewrite(match)
+    match_count = matcher.apply_exhaustive(circ._inner)
 
     assert match_count == 3
 
     out = circ.to_tket1()
     assert out == Circuit(3).CX(0, 1).X(0)
+
+
+def test_apply_exhaustive_reaches_fixed_point() -> None:
+    circ = CompilationState.from_tket1(Circuit(3).H(0).H(0).H(1).H(1).H(2).H(2))
+
+    rule = Rule(
+        CompilationState.from_tket1(Circuit(1).H(0).H(0))._inner,
+        CompilationState.from_tket1(Circuit(1).X(0))._inner,
+    )
+    matcher = RuleMatcher([rule])
+
+    rewrite_count = matcher.apply_exhaustive(circ._inner)
+
+    assert rewrite_count == 3
+    assert circ.to_tket1() == Circuit(3).X(0).X(1).X(2)
+
+    assert matcher.apply_exhaustive(circ._inner) == 0
 
 
 def test_clifford_simp_no_swaps():
@@ -248,10 +262,16 @@ def test_normalize_guppy():
 
 
 def test_modifier_resolver() -> None:
-    normalize = NormalizeGuppy()
+    normalize = NormalizeGuppy(resolve_modifiers=False)
+    normalize_with_modifier_resolution = NormalizeGuppy()
     mr_pass = ModifierResolverPass()
     modifier_hugr: Hugr = _hugr_from_path("test_files/guppy_examples/modifiers.hugr")
 
+    normalized_and_resolved: Hugr = normalize_with_modifier_resolution(modifier_hugr)
+    assert _count_ops(normalized_and_resolved, "tket.modifier.ControlModifier") == 0
+    assert _count_ops(normalized_and_resolved, "tket.modifier.DaggerModifier") == 0
+
+    modifier_hugr = _hugr_from_path("test_files/guppy_examples/modifiers.hugr")
     modifier_hugr = normalize(modifier_hugr)
 
     assert _count_ops(modifier_hugr, "tket.modifier.ControlModifier") == 1
@@ -263,6 +283,13 @@ def test_modifier_resolver() -> None:
     assert _count_ops(resolved, "tket.modifier.DaggerModifier") == 0
 
 
+# This test uses downstream selene to execute and verify the result of the modifier resolver pass.
+#
+# That's problematic when updating hugr/tket, as we can only use a selene executor that knows nothing
+# about the changes.
+#
+# TODO: Replace with a local mini-executor test. <https://github.com/Quantinuum/tket2/issues/1648>
+@pytest.mark.skip(reason="Uses downstream dependencies, breaks with tket changes.")
 def test_modifier_execution() -> None:
     modifier_examples_dir = Path("test_files/modifier_examples")
     hugr_results_dir = Path("test_files/run_modifier_examples/hugr_results")

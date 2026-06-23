@@ -1,5 +1,5 @@
 {
-  "version": "0.1.1",
+  "version": "0.2.0",
   "name": "tket.gpu",
   "types": {
     "context": {
@@ -93,6 +93,7 @@
             {
               "t": "Opaque",
               "extension": "tket.gpu",
+              "extension_version": "0.2.0",
               "id": "context",
               "args": [],
               "bound": "A"
@@ -100,39 +101,30 @@
             {
               "t": "Opaque",
               "extension": "tket.gpu",
+              "extension_version": "0.2.0",
               "id": "func",
               "args": [
                 {
-                  "tya": "List",
-                  "elems": [
-                    {
-                      "tya": "Variable",
-                      "idx": 0,
-                      "cached_decl": {
-                        "tp": "List",
-                        "param": {
-                          "tp": "Type",
-                          "b": "C"
-                        }
-                      }
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "List",
+                    "param": {
+                      "tp": "Type",
+                      "b": "C"
                     }
-                  ]
+                  }
                 },
                 {
-                  "tya": "List",
-                  "elems": [
-                    {
-                      "tya": "Variable",
-                      "idx": 1,
-                      "cached_decl": {
-                        "tp": "List",
-                        "param": {
-                          "tp": "Type",
-                          "b": "C"
-                        }
-                      }
+                  "tya": "Variable",
+                  "idx": 1,
+                  "cached_decl": {
+                    "tp": "List",
+                    "param": {
+                      "tp": "Type",
+                      "b": "C"
                     }
-                  ]
+                  }
                 }
               ],
               "bound": "C"
@@ -147,23 +139,19 @@
             {
               "t": "Opaque",
               "extension": "tket.gpu",
+              "extension_version": "0.2.0",
               "id": "result",
               "args": [
                 {
-                  "tya": "List",
-                  "elems": [
-                    {
-                      "tya": "Variable",
-                      "idx": 1,
-                      "cached_decl": {
-                        "tp": "List",
-                        "param": {
-                          "tp": "Type",
-                          "b": "C"
-                        }
-                      }
+                  "tya": "Variable",
+                  "idx": 1,
+                  "cached_decl": {
+                    "tp": "List",
+                    "param": {
+                      "tp": "Type",
+                      "b": "C"
                     }
-                  ]
+                  }
                 }
               ],
               "bound": "A"
@@ -184,6 +172,7 @@
             {
               "t": "Opaque",
               "extension": "tket.gpu",
+              "extension_version": "0.2.0",
               "id": "context",
               "args": [],
               "bound": "A"
@@ -216,6 +205,7 @@
                   {
                     "t": "Opaque",
                     "extension": "tket.gpu",
+                    "extension_version": "0.2.0",
                     "id": "context",
                     "args": [],
                     "bound": "A"
@@ -258,6 +248,7 @@
             {
               "t": "Opaque",
               "extension": "tket.gpu",
+              "extension_version": "0.2.0",
               "id": "module",
               "args": [],
               "bound": "C"
@@ -267,39 +258,30 @@
             {
               "t": "Opaque",
               "extension": "tket.gpu",
+              "extension_version": "0.2.0",
               "id": "func",
               "args": [
                 {
-                  "tya": "List",
-                  "elems": [
-                    {
-                      "tya": "Variable",
-                      "idx": 1,
-                      "cached_decl": {
-                        "tp": "List",
-                        "param": {
-                          "tp": "Type",
-                          "b": "C"
-                        }
-                      }
+                  "tya": "Variable",
+                  "idx": 1,
+                  "cached_decl": {
+                    "tp": "List",
+                    "param": {
+                      "tp": "Type",
+                      "b": "C"
                     }
-                  ]
+                  }
                 },
                 {
-                  "tya": "List",
-                  "elems": [
-                    {
-                      "tya": "Variable",
-                      "idx": 2,
-                      "cached_decl": {
-                        "tp": "List",
-                        "param": {
-                          "tp": "Type",
-                          "b": "C"
-                        }
-                      }
+                  "tya": "Variable",
+                  "idx": 2,
+                  "cached_decl": {
+                    "tp": "List",
+                    "param": {
+                      "tp": "Type",
+                      "b": "C"
                     }
-                  ]
+                  }
                 }
               ],
               "bound": "C"
@@ -338,6 +320,7 @@
             {
               "t": "Opaque",
               "extension": "tket.gpu",
+              "extension_version": "0.2.0",
               "id": "module",
               "args": [],
               "bound": "C"
@@ -347,39 +330,30 @@
             {
               "t": "Opaque",
               "extension": "tket.gpu",
+              "extension_version": "0.2.0",
               "id": "func",
               "args": [
                 {
-                  "tya": "List",
-                  "elems": [
-                    {
-                      "tya": "Variable",
-                      "idx": 1,
-                      "cached_decl": {
-                        "tp": "List",
-                        "param": {
-                          "tp": "Type",
-                          "b": "C"
-                        }
-                      }
+                  "tya": "Variable",
+                  "idx": 1,
+                  "cached_decl": {
+                    "tp": "List",
+                    "param": {
+                      "tp": "Type",
+                      "b": "C"
                     }
-                  ]
+                  }
                 },
                 {
-                  "tya": "List",
-                  "elems": [
-                    {
-                      "tya": "Variable",
-                      "idx": 2,
-                      "cached_decl": {
-                        "tp": "List",
-                        "param": {
-                          "tp": "Type",
-                          "b": "C"
-                        }
-                      }
+                  "tya": "Variable",
+                  "idx": 2,
+                  "cached_decl": {
+                    "tp": "List",
+                    "param": {
+                      "tp": "Type",
+                      "b": "C"
                     }
-                  ]
+                  }
                 }
               ],
               "bound": "C"
@@ -408,23 +382,19 @@
             {
               "t": "Opaque",
               "extension": "tket.gpu",
+              "extension_version": "0.2.0",
               "id": "result",
               "args": [
                 {
-                  "tya": "List",
-                  "elems": [
-                    {
-                      "tya": "Variable",
-                      "idx": 0,
-                      "cached_decl": {
-                        "tp": "List",
-                        "param": {
-                          "tp": "Type",
-                          "b": "C"
-                        }
-                      }
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "List",
+                    "param": {
+                      "tp": "Type",
+                      "b": "C"
                     }
-                  ]
+                  }
                 }
               ],
               "bound": "A"
@@ -434,6 +404,7 @@
             {
               "t": "Opaque",
               "extension": "tket.gpu",
+              "extension_version": "0.2.0",
               "id": "context",
               "args": [],
               "bound": "A"

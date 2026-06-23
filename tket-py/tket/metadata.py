@@ -115,6 +115,7 @@ class UnitaryFlags(Metadata[int]):
     """Metadata key for unitary/modifier flags stored on a HUGR node."""
 
     KEY = _metadata.UNITARY_FLAGS
+    ALIASES = _metadata.UNITARY_FLAGS_ALIAS
 
 
 class PytketInputParameters(Metadata[list[str]]):

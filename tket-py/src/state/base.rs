@@ -1,7 +1,6 @@
 //! Rust-backed representation of circuits
 
 use std::num::NonZeroU8;
-use std::sync::LazyLock;
 
 use anyhow::Context;
 use hugr::envelope::{EnvelopeConfig, EnvelopeFormat, ZstdConfig};
@@ -16,6 +15,9 @@ use tket::serialize::TKETDecode;
 use tket::serialize::pytket::{DecodeOptions, EncodeOptions};
 use tket::{Circuit, TketOp};
 use tket_json_rs::circuit_json::SerialCircuit;
+use tket_qsystem::QSystemPlatform;
+use tket_qsystem::extension::REGISTRY;
+use tket_qsystem::pytket::{qsystem_decoder_config, qsystem_encoder_config};
 
 use crate::ops::PyTketOp;
 use crate::rewrite::PyCircuitRewrite;
@@ -47,7 +49,7 @@ impl CompilationState {
     pub fn from_tket1(circ: &Bound<PyAny>) -> anyhow::Result<Self> {
         let hugr = SerialCircuit::from_tket1(circ)?
             .decode(
-                DecodeOptions::new().with_config(tket_qsystem::pytket::qsystem_decoder_config()),
+                DecodeOptions::new().with_config(qsystem_decoder_config(QSystemPlatform::Helios)),
             )
             .context("Could not decode a CompilationState from a pytket circuit")?;
         Ok(CompilationState { hugr })
@@ -57,7 +59,7 @@ impl CompilationState {
     pub fn to_tket1<'py>(&self, py: Python<'py>) -> anyhow::Result<Bound<'py, PyAny>> {
         let serial = SerialCircuit::encode(
             &self.hugr,
-            EncodeOptions::new().with_config(tket_qsystem::pytket::qsystem_encoder_config()),
+            EncodeOptions::new().with_config(qsystem_encoder_config(QSystemPlatform::Helios)),
         )?;
         let pytket = serial.to_tket1(py)?;
         Ok(pytket.into_any())
@@ -75,15 +77,25 @@ impl CompilationState {
     /// Encode the circuit as a HUGR envelope.
     ///
     /// If no config is given, it defaults to the default binary envelope.
-    #[pyo3(signature = (config = None))]
-    pub fn to_bytes(&self, config: Option<Bound<'_, PyAny>>) -> anyhow::Result<Vec<u8>> {
+    ///
+    /// If `omit_tket_exts` is true, the extensions in [`embedded_extensions`]
+    /// will not be not be included in the envelope even when they are used in the
+    /// HUGR. This is useful when sending the HUGR to other components that
+    /// already have the tket extensions available.
+    #[pyo3(signature = (config = None, *, omit_tket_exts = true))]
+    pub fn to_bytes(
+        &self,
+        config: Option<Bound<'_, PyAny>>,
+        omit_tket_exts: bool,
+    ) -> anyhow::Result<Vec<u8>> {
         let config = match config {
             Some(cfg) => envelope_config_from_py(cfg)?,
             None => EnvelopeConfig::binary(),
         };
+        let bundled_extensions = extra_extensions(&self.hugr, omit_tket_exts);
         let mut buf = Vec::new();
         self.hugr
-            .store(&mut buf, config)
+            .store_with_exts(&mut buf, config, &bundled_extensions)
             .context("Could not encode CompilationState to bytes")?;
         Ok(buf)
     }
@@ -91,14 +103,24 @@ impl CompilationState {
     /// Encode the circuit as a HUGR envelope.
     ///
     /// If no config is given, it defaults to the default text envelope.
-    #[pyo3(signature = (config = None))]
-    pub fn to_str(&self, config: Option<Bound<'_, PyAny>>) -> anyhow::Result<String> {
+    ///
+    /// If `omit_tket_exts` is true, the extensions in [`embedded_extensions`]
+    /// will not be not be included in the envelope even when they are used in the
+    /// HUGR. This is useful when sending the HUGR to other components that
+    /// already have the tket extensions available.
+    #[pyo3(signature = (config = None, *, omit_tket_exts = true))]
+    pub fn to_str(
+        &self,
+        config: Option<Bound<'_, PyAny>>,
+        omit_tket_exts: bool,
+    ) -> anyhow::Result<String> {
         let config = match config {
             Some(cfg) => envelope_config_from_py(cfg)?,
             None => EnvelopeConfig::text(),
         };
+        let bundled_extensions = extra_extensions(&self.hugr, omit_tket_exts);
         self.hugr
-            .store_str(config)
+            .store_str_with_exts(config, &bundled_extensions)
             .context("Could not encode CompilationState to string")
     }
 
@@ -215,29 +237,24 @@ pub fn envelope_config_from_py(config: Bound<'_, PyAny>) -> anyhow::Result<Envel
     Ok(res)
 }
 
-/// Extension registry used for loading circuits.
-pub static REGISTRY: LazyLock<ExtensionRegistry> = LazyLock::new(|| {
-    let mut registry = hugr::std_extensions::std_reg();
-    registry.extend([
-        // tket extensions
-        tket::extension::TKET_EXTENSION.to_owned(),
-        tket::extension::rotation::ROTATION_EXTENSION.to_owned(),
-        tket::extension::bool::BOOL_EXTENSION.to_owned(),
-        tket::extension::debug::DEBUG_EXTENSION.to_owned(),
-        tket::extension::guppy::GUPPY_EXTENSION.to_owned(),
-        tket::extension::global_phase::GLOBAL_PHASE_EXTENSION.to_owned(),
-        tket::extension::modifier::MODIFIER_EXTENSION.to_owned(),
-        // tket-qsystem extensions
-        tket_qsystem::extension::gpu::EXTENSION.to_owned(),
-        tket_qsystem::extension::qsystem::EXTENSION.to_owned(),
-        tket_qsystem::extension::futures::EXTENSION.to_owned(),
-        tket_qsystem::extension::random::EXTENSION.to_owned(),
-        tket_qsystem::extension::result::EXTENSION.to_owned(),
-        tket_qsystem::extension::utils::EXTENSION.to_owned(),
-        tket_qsystem::extension::wasm::EXTENSION.to_owned(),
-    ]);
+/// Returns an extension registry with the extensions required to load a Hugr.
+///
+/// If `omit_tket_exts` is true, ignore the extensions in [`embedded_extensions`].
+fn extra_extensions(hugr: &Hugr, omit_tket_exts: bool) -> ExtensionRegistry {
+    if !omit_tket_exts {
+        return hugr.extensions().clone();
+    }
+
+    let mut registry = ExtensionRegistry::default();
+
+    for ext in hugr.extensions().iter_all() {
+        if REGISTRY.get_compatible(&ext.name, &ext.version).is_none() {
+            registry.register(ext.clone());
+        }
+    }
+
     registry
-});
+}
 
 /// Returns a list of extension ids supported by the CompilationState loader.
 ///
@@ -245,5 +262,5 @@ pub static REGISTRY: LazyLock<ExtensionRegistry> = LazyLock::new(|| {
 /// loading a CompilationState.
 #[pyfunction]
 pub fn embedded_extensions() -> Vec<String> {
-    REGISTRY.iter().map(|e| e.name.to_string()).collect()
+    REGISTRY.ids().map(ToString::to_string).collect()
 }

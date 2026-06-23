@@ -94,12 +94,14 @@ recompile-test-hugrs:
     just test_files/guppy_optimization/recompile
     just recompile-modifiers
 
+# Regenerates all hugrs inside `test_files/modifier_examples/` and run the passes on them
 recompile-modifiers:
     @echo "---- Recompiling modifier examples ----"
     uv run maturin develop --uv
     just test_files/modifier_examples/recompile-hugrs
     just test_files/run_modifier_examples/run-hugrs
 
+# Regenerates one the hugr corresponding to `test_files/modifier_examples/{{name}}` and run the passes on it
 recompile-modifier name:
     @echo "---- Compiling hugr {{name}} ----"
     uv run maturin develop --uv
@@ -109,17 +111,20 @@ recompile-modifier name:
 
 # Generate serialized declarations for the tket extensions
 gen-extensions:
-    cargo run -p tket-qsystem gen-extensions -o tket-exts/src/tket_exts/data
+    cargo run -p tket-qsystem gen-extensions -o tket-exts/src/tket_exts/data --unversioned
 
 # Update snapshot tests for both rust and python (requires `cargo-insta`)
 update-snapshots: update-snapshots-rs update-snapshots-py
 # Interactively update snapshot tests (requires `cargo-insta`)
 update-snapshots-rs:
+    cargo insta test
+    cargo insta test -p selene-hugr-qis-compiler
     cargo insta review
 # Update python snapshot tests.
 update-snapshots-py *TEST_ARGS:
     uv run maturin develop --uv
     uv run pytest --snapshot-update {{TEST_ARGS}}
+    uv run --package selene_hugr_qis_compiler pytest --snapshot-update {{TEST_ARGS}}
 
 
 

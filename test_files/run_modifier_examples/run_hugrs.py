@@ -1,7 +1,8 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang ==0.21.13",
+#    "guppylang==1.0.0a5",
+#    "guppylang-internals==1.0.0a5",
 # ]
 # ///
 """Run on selene the passed hugrs"""
@@ -11,12 +12,8 @@ import shutil
 import sys
 import numpy as np
 import numpy.typing as npt
-
 from hugr import Hugr
 from guppylang.emulator import EmulatorBuilder
-
-
-sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 
 def format_statevector(

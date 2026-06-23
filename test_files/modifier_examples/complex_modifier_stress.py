@@ -1,7 +1,8 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang ==0.21.14",
+#    "guppylang==1.0.0a5",
+#    "guppylang-internals==1.0.0a5",
 # ]
 # ///
 """A stress test for nested control and dagger modifiers."""
@@ -13,8 +14,17 @@ import sys
 from guppylang import guppy
 from guppylang.std.builtins import array, control, dagger
 from guppylang.std.debug import state_result
-from guppylang.std.quantum import angle, discard, discard_array, measure, qubit
-from guppylang.std.quantum import h, rx, rz, x
+from guppylang.std.quantum import (
+    angle,
+    discard,
+    discard_array,
+    measure,
+    qubit,
+    h,
+    rx,
+    rz,
+    x,
+)
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 

@@ -110,10 +110,10 @@ impl PreludeEmitter {
                 }
 
                 for arg in elems {
-                    let TypeArg::Runtime(ty) = arg else {
+                    let Ok(ty) = arg.clone().try_into() else {
                         return Ok(EncodeStatus::Unsupported);
                     };
-                    let count = encoder.config().type_to_pytket(ty);
+                    let count = encoder.config().type_to_pytket(&ty);
                     if count.is_none_or(|c| c.params > 0) {
                         return Ok(EncodeStatus::Unsupported);
                     }

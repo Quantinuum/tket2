@@ -9,7 +9,7 @@ pub use encoder_config::PytketEncoderConfig;
 pub use type_translators::TypeTranslatorSet;
 
 use crate::serialize::pytket::extension::{
-    BoolEmitter, CoreDecoder, FloatEmitter, PreludeEmitter, RotationEmitter, Tk1Emitter,
+    CoreDecoder, FloatEmitter, MeasurementEmitter, PreludeEmitter, RotationEmitter, Tk1Emitter,
     TketOpEmitter,
 };
 use hugr::HugrView;
@@ -22,11 +22,9 @@ pub fn default_decoder_config() -> PytketDecoderConfig {
     let mut config = PytketDecoderConfig::new();
     config.add_decoder(CoreDecoder);
     config.add_decoder(PreludeEmitter);
-    config.add_decoder(BoolEmitter);
     config.add_decoder(TketOpEmitter);
 
     config.add_type_translator(PreludeEmitter);
-    config.add_type_translator(BoolEmitter);
     config.add_type_translator(FloatEmitter);
     config.add_type_translator(RotationEmitter);
 
@@ -39,14 +37,13 @@ pub fn default_decoder_config() -> PytketDecoderConfig {
 pub fn default_encoder_config<H: HugrView>() -> PytketEncoderConfig<H> {
     let mut config = PytketEncoderConfig::new();
     config.add_emitter(PreludeEmitter);
-    config.add_emitter(BoolEmitter);
     config.add_emitter(FloatEmitter);
+    config.add_emitter(MeasurementEmitter);
     config.add_emitter(RotationEmitter);
     config.add_emitter(Tk1Emitter);
     config.add_emitter(TketOpEmitter);
 
     config.add_type_translator(PreludeEmitter);
-    config.add_type_translator(BoolEmitter);
     config.add_type_translator(FloatEmitter);
     config.add_type_translator(RotationEmitter);
 

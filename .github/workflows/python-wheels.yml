@@ -95,7 +95,7 @@ jobs:
             target: x86_64-pc-windows-msvc
             test-wheels: true
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: mozilla-actions/sccache-action@v0.0.10
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -256,7 +256,7 @@ jobs:
     if: ${{ needs.check-tag.outputs.run == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: mozilla-actions/sccache-action@v0.0.10
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
@@ -293,12 +293,12 @@ jobs:
       # Used to generate artifact attestation
       attestations: write
     steps:
+      - uses: actions/checkout@v7
       - name: Check if the tag has an associated release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view ${{ github.ref_name }}
-          if [ $? -ne 0 ]; then
+          if ! gh release view ${{ github.ref_name }}; then
             echo "No release found for tag ${{ github.ref_name }}"
             exit 1
           fi
@@ -307,7 +307,7 @@ jobs:
           path: dist
           merge-multiple: true
       - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest@v4
         with:
           subject-path: 'dist/*'
       - name: Report

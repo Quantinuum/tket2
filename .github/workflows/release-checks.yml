@@ -34,7 +34,7 @@ jobs:
           - resolution: "lowest-direct"
             python: "3.10"
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: mozilla-actions/sccache-action@v0.0.10
       - uses: quantinuum/hugrverse-env/install-hugrenv-action@main
         with:

@@ -602,6 +602,7 @@ mod test {
     #[case(3, false)]
     #[case(3, true)]
     #[case(7, false)]
+    #[cfg_attr(miri, ignore)] // miri takes a long time to analyze this test.
     fn test_single_tket_op(#[case] c_num: u64, #[case] dagger: bool) {
         for op in TketOp::iter() {
             let Some((size, has_angle)) = size(op) else {
@@ -653,8 +654,8 @@ mod test {
                 &CONTROL_OP_ID,
                 [
                     Term::BoundedNat(1),
-                    Term::new_list([qb_t().into(), qb_t().into(), qb_t().into()]),
-                    Term::new_list([rotation_type().into()]),
+                    Term::new_list([qb_t(), qb_t(), qb_t()]),
+                    Term::new_list([rotation_type()]),
                 ],
             )
             .unwrap();
@@ -662,13 +663,8 @@ mod test {
             .instantiate_extension_op(
                 &DAGGER_OP_ID,
                 [
-                    Term::new_list([
-                        array_type(1, qb_t()).into(),
-                        qb_t().into(),
-                        qb_t().into(),
-                        qb_t().into(),
-                    ]),
-                    Term::new_list([rotation_type().into()]),
+                    Term::new_list([array_type(1, qb_t()), qb_t(), qb_t(), qb_t()]),
+                    Term::new_list([rotation_type()]),
                 ],
             )
             .unwrap();

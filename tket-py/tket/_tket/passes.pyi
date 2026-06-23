@@ -24,6 +24,7 @@ class InlineAlwaysError(Exception):
 def normalize_guppy(
     circ: CompilationState,
     *,
+    resolve_modifiers: bool = True,
     simplify_cfgs: bool = True,
     remove_tuple_untuple: bool = True,
     constant_folding: bool = True,
@@ -38,12 +39,14 @@ def normalize_guppy(
     This should normally be called first before other optimisations.
 
     Parameters:
+    - resolve_modifiers: Whether to resolve modifier operations.
     - simplify_cfgs: Whether to simplify CFG control flow.
     - remove_tuple_untuple: Whether to remove tuple/untuple operations.
     - constant_folding: Whether to constant fold the program.
     - remove_dead_funcs: Whether to remove dead functions.
     - inline_dfgs: Whether to inline DFG operations.
     - remove_redundant_order_edges: Whether to remove redundant order edges.
+    - squash_borrows: Whether to squash return-borrow pairs on BorrowArrays.
     """
 
 def inline_always(
@@ -114,7 +117,6 @@ def qsystem_rebase_pass(
     constant_fold: bool = True,
     monomorphize: bool = True,
     force_order: bool = True,
-    lazify: bool = True,
     hide_funcs: bool = True,
     scope: PassScope | None = None,
 ) -> None:
@@ -123,6 +125,5 @@ def qsystem_rebase_pass(
     :param constant_fold: Whether to perform constant folding.
     :param monomorphize: Whether to monomorphize generic functions.
     :param force_order: Whether to enforce total ordering of all HUGR operations.
-    :param lazify: Whether to replace measurements with lazy measurements.
     :param hide_funcs: Make all HUGR functions private.
     """

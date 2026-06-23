@@ -7,15 +7,28 @@ source_filename = "test_context"
 
 @"res_\F0\9F\9A\80\F0\9F\91\A8\E2\80\8D\F0\9F\91\A9\E2\80\8D\F0\9F\91\A7\E2\80\8D\F0\9F\91\A6\F0\9F\8C\8D.F7EE3FAA.0" = private constant [44 x i8] c"+USER:BOOL:\F0\9F\9A\80\F0\9F\91\A8\E2\80\8D\F0\9F\91\A9\E2\80\8D\F0\9F\91\A7\E2\80\8D\F0\9F\91\A6\F0\9F\8C\8D"
 
-define internal void @_hl.main.1(i1 %0) {
+define internal void @_hl.main.1(i1 %0) !dbg !3 {
 alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  %tag_len = load i8, ptr @"res_\F0\9F\9A\80\F0\9F\91\A8\E2\80\8D\F0\9F\91\A9\E2\80\8D\F0\9F\91\A7\E2\80\8D\F0\9F\91\A6\F0\9F\8C\8D.F7EE3FAA.0", align 1
-  %tag_len2 = zext i8 %tag_len to i64
-  call void @print_bool(ptr @"res_\F0\9F\9A\80\F0\9F\91\A8\E2\80\8D\F0\9F\91\A9\E2\80\8D\F0\9F\91\A7\E2\80\8D\F0\9F\91\A6\F0\9F\8C\8D.F7EE3FAA.0", i64 %tag_len2, i1 %0)
+  %tag_len = load i8, ptr @"res_\F0\9F\9A\80\F0\9F\91\A8\E2\80\8D\F0\9F\91\A9\E2\80\8D\F0\9F\91\A7\E2\80\8D\F0\9F\91\A6\F0\9F\8C\8D.F7EE3FAA.0", align 1, !dbg !8
+  %tag_len2 = zext i8 %tag_len to i64, !dbg !8
+  call void @print_bool(ptr @"res_\F0\9F\9A\80\F0\9F\91\A8\E2\80\8D\F0\9F\91\A9\E2\80\8D\F0\9F\91\A7\E2\80\8D\F0\9F\91\A6\F0\9F\8C\8D.F7EE3FAA.0", i64 %tag_len2, i1 %0), !dbg !8
   ret void
 }
 
 declare void @print_bool(ptr, i64, i1)
+
+!llvm.module.flags = !{!0}
+!llvm.dbg.cu = !{!1}
+
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "hugr_llvm_test", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "/lPNzlV/ClAphFG/yrhvZs/eDgUn/eIVwAutKJHaZEPSZwPXPeycUvnujGxZ")
+!3 = distinct !DISubprogram(name: "_hl.main.1", linkageName: "_hl.main.1", scope: null, file: !4, line: 25254, type: !5, scopeLine: 25255, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
+!4 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "")
+!5 = !DISubroutineType(types: !6)
+!6 = !{null, !7}
+!7 = !DIBasicType(name: "i1", size: 1, encoding: DW_ATE_unsigned)
+!8 = !DILocation(line: 27062, column: 402, scope: !3)

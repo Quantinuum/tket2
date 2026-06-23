@@ -24,7 +24,7 @@ use crate::metadata;
 
 /// An accumulated modifier that combines control, dagger, and power modifiers.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
-pub struct CombinedModifier {
+struct CombinedModifier {
     // Number of all control qubits
     control: usize,
     // Control arrays applied so far
@@ -32,13 +32,15 @@ pub struct CombinedModifier {
     accum_ctrl: Vec<usize>,
     /// Whether the dagger modifier has been applied.
     dagger: bool,
-    /// Whether the power modifier has been applied.
-    power: bool,
 }
 
 impl CombinedModifier {
     /// Add a modifier
-    pub fn push(&mut self, ext_op: &ExtensionOp) {
+    fn push<N>(
+        &mut self,
+        ext_op: &ExtensionOp,
+        node: N,
+    ) -> Result<(), modifier_resolver::ModifierResolverErrors<N>> {
         match Modifier::from_extension_op(ext_op) {
             Ok(Modifier::ControlModifier) => {
                 let ctrl = ext_op.args()[0].as_nat().unwrap() as usize;
@@ -46,9 +48,14 @@ impl CombinedModifier {
                 self.accum_ctrl.push(ctrl);
             }
             Ok(Modifier::DaggerModifier) => self.dagger = !self.dagger,
-            Ok(Modifier::PowerModifier) => self.power = !self.power,
+            Ok(Modifier::PowerModifier) => {
+                return Err(
+                    modifier_resolver::ModifierResolverErrors::PowerModifierNotSupported { node },
+                );
+            }
             Err(_) => {}
         }
+        Ok(())
     }
 }
 
@@ -57,7 +64,6 @@ impl CombinedModifier {
 struct ModifierFlags {
     control: bool,
     dagger: bool,
-    power: bool,
 }
 
 impl ModifierFlags {
@@ -66,7 +72,6 @@ impl ModifierFlags {
             .map(|num| ModifierFlags {
                 control: (num & 1) != 0,
                 dagger: (num & 2) != 0,
-                power: (num & 4) != 0,
             })
     }
 
@@ -78,23 +83,17 @@ impl ModifierFlags {
         if self.control {
             num |= 2;
         }
-        if self.power {
-            num |= 4;
-        }
         h.set_metadata::<metadata::UnitaryFlags>(n, num);
     }
 
     fn satisfies(&self, combined: &CombinedModifier) -> bool {
-        (combined.control == 0 || self.control)
-            && (!combined.dagger || self.dagger)
-            && (!combined.power || self.power)
+        (combined.control == 0 || self.control) && (!combined.dagger || self.dagger)
     }
 
     fn from_combined(combined: &CombinedModifier) -> Self {
         ModifierFlags {
             control: combined.control > 0,
             dagger: combined.dagger,
-            power: combined.power,
         }
     }
 
@@ -104,7 +103,6 @@ impl ModifierFlags {
             Some(other) => ModifierFlags {
                 control: self.control || other.control,
                 dagger: self.dagger || other.dagger,
-                power: self.power || other.power,
             },
         }
     }
