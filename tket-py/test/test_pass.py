@@ -351,7 +351,7 @@ def test_inline_always(annotate: bool) -> None:
     f_id.set_outputs(f_id.input_node[0])
 
     if annotate:
-        f_id.metadata["tket.inline"] = "always"
+        f_id.metadata[InlineAnnotation] = "always"
 
     (tup,) = d.inputs()
     (q1, q2) = d.add(ops.UnpackTuple()(tup))
