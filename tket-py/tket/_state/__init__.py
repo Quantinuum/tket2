@@ -148,20 +148,40 @@ class CompilationState:
             _py_extensions=None,
         )
 
-    def to_bytes(self, config: EnvelopeConfig | None = None) -> bytes:
+    def to_bytes(
+        self, config: EnvelopeConfig | None = None, *, omit_tket_exts: bool = True
+    ) -> bytes:
         """Serialize the program to a HUGR envelope byte string.
 
         Some envelope formats can be encoded into a string. See :meth:`to_str`.
-        """
-        return self._inner.to_bytes(config)
 
-    def to_str(self, config: EnvelopeConfig | None = None) -> str:
+        Args:
+            config: The envelope configuration to use.
+                If not given, uses the default binary encoding.
+            omit_tket_exts: If true, the extensions in :meth:`embedded_extensions`
+                will not be not be included in the envelope even when they are used in the
+                HUGR. This is useful when sending the HUGR to other components that
+                already have the tket extensions available.
+        """
+        return self._inner.to_bytes(config, omit_tket_exts=omit_tket_exts)
+
+    def to_str(
+        self, config: EnvelopeConfig | None = None, *, omit_tket_exts: bool = True
+    ) -> str:
         """Serialize the program to a HUGR envelope string.
 
         Not all envelope formats can be encoded into a string.
         See :meth:`to_bytes` for a more general method.
+
+        Args:
+            config: The envelope configuration to use.
+                If not given, uses the default textual encoding.
+            omit_tket_exts: If true, the extensions in :meth:`embedded_extensions`
+                will not be not be included in the envelope even when they are used in the
+                HUGR. This is useful when sending the HUGR to other components that
+                already have the tket extensions available.
         """
-        return self._inner.to_str(config)
+        return self._inner.to_str(config, omit_tket_exts=omit_tket_exts)
 
     def apply_rewrite(self, rewrite: CircuitRewrite) -> None:
         """Apply a rewrite command to this program."""
