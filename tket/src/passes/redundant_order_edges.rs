@@ -74,10 +74,9 @@ impl RedundantOrderEdgesPass {
                 let order_preds = hugr
                     .linked_outputs(child, ord_in)
                     .collect::<BTreeMap<_, _>>();
-                for (order_pred, _) in order_preds.iter() {
+                for (order_pred, pred_in) in order_preds.iter() {
                     let (pred_count, reaching_pred) =
                         order_nodes_reaching.get_mut(order_pred).unwrap();
-                    (*pred_count) -= 1;
                     for (&other_pred, &other_pred_port) in order_preds.iter() {
                         if reaching_pred.contains(&(other_pred, other_pred_port)) {
                             // `other_pred` reaches predecessor `order_pred` of child, and has a direct edge to child.
@@ -86,6 +85,8 @@ impl RedundantOrderEdgesPass {
                         }
                     }
                     reaching_child.extend(reaching_pred.iter().copied());
+                    reaching_child.insert((*order_pred, *pred_in));
+                    (*pred_count) -= 1;
                     if *pred_count == 0 {
                         order_nodes_reaching.remove(order_pred);
                     }
@@ -160,8 +161,15 @@ mod tests {
     ///       noop4 --> noop5 --> output
     /// ```
     #[rstest]
-    #[case(vec![("input", "noop2"), ("noop1", "output"), ("noop4", "noop3"), ("noop5", "noop2"), ("noop3", "nested_op")],
-           vec![("noop1", "output"), ("noop5", "noop2"), ("noop3", "nested_op")])]
+    #[case([("input", "noop2"), ("noop1", "output"), ("noop4", "noop3"), ("noop5", "noop2"), ("noop3", "nested_op")],
+           [("input", "noop2"), ("noop1", "output"), ("noop4", "noop3"), ("noop5", "noop2"), ("noop3", "nested_op")])]
+    #[case([("input", "noop2"), ("noop2", "output"), ("input", "output")],
+           [("input", "noop2"), ("noop2", "output")])]
+    #[case([("input", "noop1"), ("noop1", "noop5"), ("input", "noop4"), ("noop4", "noop5"), ("noop5", "output")],
+           [("input", "noop1"), ("noop1", "noop5"), ("input", "noop4"), ("noop4", "noop5"), ("noop5", "output")])]
+    #[case([("input", "noop1"), ("noop1", "noop5"), ("input", "noop4"), ("noop4", "noop5"), ("noop5", "output"),
+            ("input", "noop5"), ("noop1", "output"), ("noop4", "output")],
+           [("input", "noop1"), ("noop1", "noop5"), ("input", "noop4"), ("noop4", "noop5"), ("noop5", "output")])]
     fn test_redundant_order_edges(
         #[case] start_edges: impl IntoIterator<Item = (&'static str, &'static str)>,
         #[case] end_edges: impl IntoIterator<Item = (&'static str, &'static str)>,
