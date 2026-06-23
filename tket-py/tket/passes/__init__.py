@@ -231,7 +231,7 @@ class Cliffordize(ComposablePass):
 
 @dataclass
 class InlineFunctions(ComposablePass):
-    """Inline function calls below the selected scope.
+    """Inline acyclic function calls below the selected scope.
 
     Parameters:
     - heuristic: Heuristic used to choose which non-recursive functions to
