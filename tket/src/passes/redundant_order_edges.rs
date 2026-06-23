@@ -184,6 +184,8 @@ impl WithScope for RedundantOrderEdgesPass {
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+
     use hugr_core::builder::{Dataflow, DataflowHugr, FunctionBuilder, SubContainer};
     use hugr_core::extension::prelude::{Noop, bool_t};
     use hugr_core::ops::handle::NodeHandle;
@@ -199,72 +201,78 @@ mod tests {
     ///       v
     ///       noop4 --> noop5 --> output
     /// ```
-    ///
-    /// With order edges
-    /// - input -> noop2
-    /// - noop1 -> output
-    /// - noop4 -> noop3
-    /// - noop5 -> noop2
-    /// - noop3 -> nested_op
-    ///
-    /// After running the pass, only the following order edges should remain:
-    /// - noop1 -> output
-    /// - noop5 -> noop2
-    /// - noop3 -> nested_op
-    #[test]
-    fn test_redundant_order_edges() {
+    #[rstest]
+    #[case(vec![("input", "noop2"), ("noop1", "output"), ("noop4", "noop3"), ("noop5", "noop2"), ("noop3", "nested_op")],
+           vec![("noop1", "output"), ("noop5", "noop2"), ("noop3", "nested_op")])]
+    fn test_redundant_order_edges(
+        #[case] start_edges: impl IntoIterator<Item = (&'static str, &'static str)>,
+        #[case] end_edges: impl IntoIterator<Item = (&'static str, &'static str)>,
+    ) {
         let mut hugr = FunctionBuilder::new("f", Signature::new_endo([bool_t()])).unwrap();
         let op = Noop::new(bool_t());
 
         let [input, output] = hugr.io();
+        let mut named_nodes = HashMap::from([("input", input.node()), ("output", output.node())]);
+
         let [b1] = hugr.input_wires_arr();
         let noop1 = hugr.add_dataflow_op(Noop::new(bool_t()), [b1]).unwrap();
+        named_nodes.insert("noop1", noop1.node());
         let noop2 = hugr
             .add_dataflow_op(op.clone(), [noop1.out_wire(0)])
             .unwrap();
+        named_nodes.insert("noop2", noop2.node());
         let noop3 = hugr
             .add_dataflow_op(op.clone(), [noop2.out_wire(0)])
             .unwrap();
+        named_nodes.insert("noop3", noop3.node());
         let noop4 = hugr.add_dataflow_op(op.clone(), [b1]).unwrap();
+        named_nodes.insert("noop4", noop4.node());
         let noop5 = hugr
             .add_dataflow_op(op.clone(), [noop4.out_wire(0)])
             .unwrap();
+        named_nodes.insert("noop5", noop5.node());
         let nested_op = hugr
             .dfg_builder(Signature::new(vec![bool_t()], vec![]), [noop5.out_wire(0)])
             .unwrap()
             .finish_sub_container()
             .unwrap();
+        named_nodes.insert("nested_op", nested_op.node());
 
-        // Set the order edges as described in the test description.
-        hugr.set_order(&input, &noop2);
-        hugr.set_order(&noop1, &output);
-        hugr.set_order(&noop4, &noop3);
-        hugr.set_order(&noop5, &noop2);
-        hugr.set_order(&noop3, &nested_op.node());
+        // Set the order edges before optimization
+        let start_edges = start_edges.into_iter().collect::<Vec<_>>();
+        for (src, tgt) in &start_edges {
+            let src_node = named_nodes.get(src).unwrap();
+            let tgt_node = named_nodes.get(tgt).unwrap();
+            hugr.set_order(src_node, tgt_node);
+        }
 
         let mut hugr = hugr.finish_hugr_with_outputs([noop5.out_wire(0)]).unwrap();
 
         // Run the pass
         let result = RedundantOrderEdgesPass::default().run(&mut hugr).unwrap();
-        assert_eq!(result.edges_removed, 2);
+        let end_edges = end_edges
+            .into_iter()
+            .map(|(src, tgt)| {
+                let src_node = named_nodes.get(src).unwrap();
+                let tgt_node = named_nodes.get(tgt).unwrap();
+                (*src_node, *tgt_node)
+            })
+            .collect::<HashSet<_>>();
+        assert_eq!(result.edges_removed, start_edges.len() - end_edges.len());
 
-        // Check that we removed the correct order edges.
-        // We know all order edge ports here will have the same index, since we are using the same op types.
-        let order_in = IncomingPort::from(1);
-        let order_out = OutgoingPort::from(1);
-        assert_eq!(hugr.single_linked_input(input, order_out), None);
-        assert_eq!(
-            hugr.single_linked_input(noop1.node(), order_out),
-            Some((output, order_in))
-        );
-        assert_eq!(hugr.single_linked_input(noop4.node(), order_out), None);
-        assert_eq!(
-            hugr.single_linked_input(noop5.node(), order_out),
-            Some((noop2.node(), order_in))
-        );
-        assert_eq!(
-            hugr.single_linked_input(noop3.node(), order_out),
-            Some((nested_op.node(), order_in))
-        );
+        let remaining_edges = hugr
+            .nodes()
+            .filter_map(|src| {
+                hugr.get_optype(src)
+                    .other_output_port()
+                    .map(|ord_out| (src, ord_out))
+            })
+            .flat_map(|(src, ord_out)| {
+                hugr.linked_inputs(src, ord_out)
+                    .map(move |(tgt, _ord_in)| (src, tgt))
+            })
+            .collect::<HashSet<_>>();
+
+        assert_eq!(remaining_edges, end_edges);
     }
 }
