@@ -648,8 +648,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                                 "Call input {callee_input} has no source while propagating higher-order modifiers."
                             ))
                         })?;
-                        let (target, target_port, modifiers) =
-                            self.trace_modifier_chain_with(h, source.0, source.1, modifiers)?;
+                        let (target, target_port) = (source.0, source.1);
                         if matches!(h.get_optype(target), OpType::Input(_)) {
                             requirements.extend(self.function_input_requirements_from_input(
                                 h,
