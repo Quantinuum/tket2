@@ -1228,9 +1228,9 @@ mod test {
         use hugr::std_extensions::collections::array::ArrayOpBuilder;
 
         // Build a RuntimeBarrier from the target platform's extension.
-        let (barrier_ext, ext_id) = match platform {
-            QSystemPlatform::Sol => (&*sol::EXTENSION, &sol::EXTENSION_ID),
-            QSystemPlatform::Helios => (&*helios::EXTENSION, &helios::EXTENSION_ID),
+        let barrier_ext = match platform {
+            QSystemPlatform::Sol => &*sol::EXTENSION,
+            QSystemPlatform::Helios => &*helios::EXTENSION,
         };
 
         let array_size: u64 = 2;
@@ -1300,7 +1300,7 @@ mod test {
         let barrier_still_present = h.nodes().any(|n| {
             h.get_optype(n)
                 .as_extension_op()
-                .is_some_and(|op| op.def().extension_id() == ext_id)
+                .is_some_and(|op| platform_barrier_op == *op)
         });
         assert!(
             barrier_still_present,
