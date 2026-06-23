@@ -676,7 +676,7 @@ mod test {
         let mut hugr = backup.clone();
         hugr.set_metadata::<InlineAnnotation>(f.node(), InlineAnnotation::Always);
         hugr.set_metadata::<InlineAnnotation>(main_h.node(), InlineAnnotation::Never);
-        InlineFunctionsPass::default() //.with_heuristic(InlineFuncsHeuristic::MaxSize(0))
+        InlineFunctionsPass::default()
             .run(&mut hugr)
             .unwrap();
         assert_eq!(
