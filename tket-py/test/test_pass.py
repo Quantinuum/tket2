@@ -8,8 +8,7 @@ from tket.metadata import InlineAnnotation
 from tket.passes import (
     _badger_optimise,
     _greedy_depth_reduce,
-    InlineAlwaysError,
-    InlineAlwaysPass,
+    InlineFunctionsError,
     InlineFunctions,
     inline_funcs,
     NormalizeGuppy,
@@ -362,7 +361,7 @@ def test_inline_always(annotate: bool) -> None:
 
     d.set_outputs(tup)
 
-    InlineAlwaysPass()(d.hugr)
+    InlineFunctions(heuristic=inline_funcs.MaxSize(0))(d.hugr)
     CompilationState.from_python(d.hugr).validate()
     assert _count_ops(d.hugr, "Call") == 0 if annotate else 2
 
@@ -378,8 +377,8 @@ def test_inline_always_cycle() -> None:
     f_recursive.set_outputs(call)
 
     f_recursive.metadata[InlineAnnotation] = "always"
-    with pytest.raises(InlineAlwaysError):
-        InlineAlwaysPass()(mod.hugr)
+    with pytest.raises(InlineFunctionsError):
+        InlineFunctions(heuristic=inline_funcs.MaxSize(0))(mod.hugr)
 
 
 def test_inline_functions() -> None:

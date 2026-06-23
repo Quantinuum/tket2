@@ -18,8 +18,8 @@ class CircuitChunks:
 class PullForwardError(Exception):
     """Error from a `PullForward` operation."""
 
-class InlineAlwaysError(Exception):
-    """Error from `InlineAlwaysPass`."""
+class InlineFunctionsError(Exception):
+    """Errors from the function inlining pass."""
 
 def normalize_guppy(
     circ: CompilationState,
@@ -48,13 +48,6 @@ def normalize_guppy(
     - remove_redundant_order_edges: Whether to remove redundant order edges.
     - squash_borrows: Whether to squash return-borrow pairs on BorrowArrays.
     """
-
-def inline_always(
-    circ: CompilationState,
-    *,
-    scope: PassScope = GlobalScope.PRESERVE_PUBLIC,
-) -> None:
-    """Inline functions marked with the `inline="always"` decorator below the selected scope."""
 
 def inline_functions(
     circ: CompilationState,

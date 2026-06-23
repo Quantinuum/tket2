@@ -13,7 +13,7 @@ from . import inline_funcs
 from .._pattern import Rule, RuleMatcher
 from .._state.build import OneQbGate, from_coms
 from .._tket import passes as _passes, optimiser as _optimiser
-from .._tket.passes import InlineAlwaysError
+from .._tket.passes import InlineFunctionsError
 from hugr.passes.composable import (
     ComposablePass,
     ComposedPass,
@@ -29,8 +29,7 @@ if TYPE_CHECKING:
 __all__ = [
     "PytketHugrPass",
     "PassResult",
-    "InlineAlwaysError",
-    "InlineAlwaysPass",
+    "InlineFunctionsError",
     "InlineFuncsHeuristic",
     "InlineFunctions",
     "NormalizeGuppy",
@@ -231,45 +230,14 @@ class Cliffordize(ComposablePass):
 
 
 @dataclass
-class InlineAlwaysPass(ComposablePass):
-    """Inline functions marked with the `inline="always"` decorator below the selected scope."""
-
-    _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
-
-    def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
-        return implement_pass_run(
-            self,
-            hugr=hugr,
-            inplace=inplace,
-            copy_call=lambda h: self._inline_always(h, inplace),
-        )
-
-    def with_scope(self, scope: PassScope) -> InlineAlwaysPass:
-        """Set the scope of this pass and return self."""
-        self._scope = scope
-        return self
-
-    def _inline_always(self, hugr: Hugr, inplace: bool) -> PassResult:
-        tk_program = _state.CompilationState.from_python(hugr)
-
-        _passes.inline_always(
-            tk_program._inner,
-            scope=self._scope,
-        )
-
-        package = tk_program.to_python()
-        return PassResult.for_pass(
-            self, hugr=package.modules[0], inplace=inplace, result=None
-        )
-
-
-@dataclass
 class InlineFunctions(ComposablePass):
-    """Inline acyclic function calls below the selected scope.
+    """Inline function calls below the selected scope.
 
     Parameters:
     - heuristic: Heuristic used to choose which non-recursive functions to
       inline. Defaults to `MaxSize(64)`.
+
+    Calls to functions annotated with `inline="always"` are processed first.
     """
 
     heuristic: inline_funcs.InlineFuncsHeuristic = inline_funcs.MaxSize(64)

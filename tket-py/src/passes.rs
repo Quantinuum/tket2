@@ -1,7 +1,6 @@
 //! Passes for optimising circuits.
 
 pub mod chunks;
-mod inline_always;
 mod inline_funcs;
 mod scope;
 pub mod tket1;
@@ -30,7 +29,6 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     m.add_function(wrap_pyfunction!(greedy_depth_reduce, &m)?)?;
     m.add_function(wrap_pyfunction!(badger_optimise, &m)?)?;
     m.add_function(wrap_pyfunction!(normalize_guppy, &m)?)?;
-    m.add_function(wrap_pyfunction!(self::inline_always::inline_always, &m)?)?;
     m.add_function(wrap_pyfunction!(self::inline_funcs::inline_functions, &m)?)?;
     m.add_class::<self::chunks::PyCircuitChunks>()?;
     m.add_function(wrap_pyfunction!(self::chunks::chunks, &m)?)?;
@@ -38,7 +36,6 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     m.add_function(wrap_pyfunction!(resolve_modifiers, &m)?)?;
     m.add_function(wrap_pyfunction!(qsystem_rebase_pass, &m)?)?;
     m.add("PullForwardError", py.get_type::<PyPullForwardError>())?;
-    m.add("InlineAlwaysError", py.get_type::<PyInlineAlwaysError>())?;
     m.add(
         "InlineFunctionsError",
         py.get_type::<PyInlineFunctionsError>(),
@@ -63,12 +60,6 @@ create_py_exception!(
     tket::passes::modifier_resolver::ModifierResolverErrors,
     PyModifierResolverError,
     "Errors from the modifer resolver pass."
-);
-
-create_py_exception!(
-    tket::passes::inline_always::InlineAlwaysError,
-    PyInlineAlwaysError,
-    "Error from `InlineAlwaysPass`"
 );
 
 create_py_exception!(
