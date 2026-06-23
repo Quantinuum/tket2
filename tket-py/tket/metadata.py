@@ -80,10 +80,13 @@ InlineAnnotationValue: TypeAlias = Literal["never", "best_effort", "always"]
 class InlineAnnotation(Metadata[InlineAnnotationValue]):
     """Metadata hinting the compiler that a function declaration should be inlined at its call sites.
 
+    For functions annotated with "always", an error will be raised if the function is on a cycle.
+
     When a function is not annotated, we use a heuristic to determine whether to inline.
 
     Values:
     - "never": Never inline this function.
+    - "always": Always inline this function; raise an error if this is not possible.
     - "best_effort":
         Inline the function if possible.
         This is not guaranteed, the compiler may choose not to inline functions with this annotation.
@@ -98,10 +101,10 @@ class InlineAnnotation(Metadata[InlineAnnotationValue]):
     @classmethod
     def from_json(cls, value: JsonType) -> InlineAnnotationValue:
         match value:
-            case "never" | "best_effort":
+            case "never" | "best_effort" | "always":
                 return value
             case _:
-                msg = f"Expected {cls.KEY} metadata to be 'never' or 'best_effort', but got {value!r}"
+                msg = f"Expected {cls.KEY} metadata to be 'never', 'best_effort', or 'always', but got {value!r}"
                 raise TypeError(msg)
 
 
