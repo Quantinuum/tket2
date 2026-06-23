@@ -1,0 +1,132 @@
+; ModuleID = 'hugr'
+source_filename = "hugr"
+target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
+target triple = "x86_64-unknown-linux-gnu"
+
+@"e_Some array.A77EF32E.0" = private constant [48 x i8] c"/EXIT:INT:Some array elements have been borrowed"
+@res_c0.7C14CD6E.0 = private constant [13 x i8] c"\0CUSER:BOOL:c0"
+@res_c1.1F7A6571.0 = private constant [13 x i8] c"\0CUSER:BOOL:c1"
+@"e_No more qu.3B2EEBF0.0" = private constant [47 x i8] c".EXIT:INT:No more qubits available to allocate."
+
+define void @"__hugr__.__main__.simple_modifier.<locals>.main.1"() local_unnamed_addr !dbg !4 {
+alloca_block:
+  %qalloc.i = tail call i64 @___qalloc(), !dbg !8
+  %not_max.not.not.i = icmp eq i64 %qalloc.i, -1, !dbg !8
+  br i1 %not_max.not.not.i, label %cond_35_case_0.i, label %__hugr__.__tk2_helios_qalloc.39.exit, !dbg !8
+
+cond_35_case_0.i:                                 ; preds = %alloca_block
+  tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0"), !dbg !8
+  unreachable, !dbg !8
+
+__hugr__.__tk2_helios_qalloc.39.exit:             ; preds = %alloca_block
+  tail call void @___reset(i64 %qalloc.i), !dbg !8
+  tail call void @___rxy(i64 %qalloc.i, double 0x3FF921FB54442D18, double 0xBFF921FB54442D18), !dbg !9
+  tail call void @___rz(i64 %qalloc.i, double 0x400921FB54442D18), !dbg !9
+  %0 = tail call ptr @heap_alloc(i64 8)
+  %1 = tail call ptr @heap_alloc(i64 8)
+  store i64 0, ptr %1, align 1
+  store i64 %qalloc.i, ptr %0, align 4
+  %2 = load i64, ptr %1, align 4
+  %3 = and i64 %2, 1
+  store i64 %3, ptr %1, align 4
+  %4 = icmp eq i64 %3, 0
+  br i1 %4, label %__barray_check_none_borrowed.exit, label %mask_block_err.i
+
+mask_block_err.i:                                 ; preds = %__hugr__.__tk2_helios_qalloc.39.exit
+  tail call void @panic(i32 1002, ptr nonnull @"e_Some array.A77EF32E.0")
+  unreachable
+
+__barray_check_none_borrowed.exit:                ; preds = %__hugr__.__tk2_helios_qalloc.39.exit
+  %qalloc.i35 = tail call i64 @___qalloc(), !dbg !10
+  %not_max.not.not.i36 = icmp eq i64 %qalloc.i35, -1, !dbg !10
+  br i1 %not_max.not.not.i36, label %cond_35_case_0.i37, label %__hugr__.__tk2_helios_qalloc.39.exit38, !dbg !10
+
+cond_35_case_0.i37:                               ; preds = %__barray_check_none_borrowed.exit
+  tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0"), !dbg !10
+  unreachable, !dbg !10
+
+__hugr__.__tk2_helios_qalloc.39.exit38:           ; preds = %__barray_check_none_borrowed.exit
+  tail call void @___reset(i64 %qalloc.i35), !dbg !10
+  %5 = load i64, ptr %0, align 4
+  tail call void @___rzz(i64 %5, i64 %qalloc.i35, double 0x3FD921FB54442D18)
+  tail call void @___rz(i64 %qalloc.i35, double 0xBFD921FB54442D18)
+  tail call void @___rz(i64 %5, double 0xBFD921FB54442D18)
+  %6 = tail call ptr @heap_alloc(i64 8)
+  store i64 %5, ptr %6, align 4
+  %7 = tail call ptr @heap_alloc(i64 8)
+  store i64 0, ptr %7, align 1
+  %8 = load i64, ptr %6, align 4
+  %lazy_measure = tail call i64 @___lazy_measure(i64 %8), !dbg !11
+  tail call void @___qfree(i64 %8), !dbg !11
+  %read_bool = tail call i1 @___read_future_bool(i64 %lazy_measure), !dbg !11
+  tail call void @___dec_future_refcount(i64 %lazy_measure), !dbg !11
+  tail call void @print_bool(ptr nonnull @res_c0.7C14CD6E.0, i64 12, i1 %read_bool), !dbg !12
+  %lazy_measure19 = tail call i64 @___lazy_measure(i64 %qalloc.i35), !dbg !13
+  tail call void @___qfree(i64 %qalloc.i35), !dbg !13
+  %read_bool21 = tail call i1 @___read_future_bool(i64 %lazy_measure19), !dbg !13
+  tail call void @___dec_future_refcount(i64 %lazy_measure19), !dbg !13
+  tail call void @print_bool(ptr nonnull @res_c1.1F7A6571.0, i64 12, i1 %read_bool21), !dbg !14
+  ret void
+}
+
+declare ptr @heap_alloc(i64) local_unnamed_addr
+
+; Function Attrs: noreturn
+declare void @panic(i32, ptr) local_unnamed_addr #0
+
+declare i64 @___lazy_measure(i64) local_unnamed_addr
+
+declare void @___qfree(i64) local_unnamed_addr
+
+declare i1 @___read_future_bool(i64) local_unnamed_addr
+
+declare void @___dec_future_refcount(i64) local_unnamed_addr
+
+declare void @print_bool(ptr, i64, i1) local_unnamed_addr
+
+declare i64 @___qalloc() local_unnamed_addr
+
+declare void @___reset(i64) local_unnamed_addr
+
+declare void @___rxy(i64, double, double) local_unnamed_addr
+
+declare void @___rz(i64, double) local_unnamed_addr
+
+declare void @___rzz(i64, i64, double) local_unnamed_addr
+
+define i64 @qmain(i64 %0) local_unnamed_addr !dbg !15 {
+entry:
+  tail call void @setup(i64 %0), !dbg !20
+  tail call void @"__hugr__.__main__.simple_modifier.<locals>.main.1"(), !dbg !20
+  %1 = tail call i64 @teardown(), !dbg !20
+  ret i64 %1, !dbg !20
+}
+
+declare void @setup(i64) local_unnamed_addr
+
+declare i64 @teardown() local_unnamed_addr
+
+attributes #0 = { noreturn }
+
+!llvm.module.flags = !{!0}
+!llvm.dbg.cu = !{!1}
+!name = !{!3}
+
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "guppylang (guppylang-internals-v1.0.0-a5)-v1.0.0-a5", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!3 = !{!"mainlib"}
+!4 = distinct !DISubprogram(name: "simple_modifier.<locals>.main", linkageName: "__hugr__.__main__.simple_modifier.<locals>.main.1", scope: null, file: !5, line: 255, type: !6, scopeLine: 256, spFlags: DISPFlagDefinition, unit: !1)
+!6 = !DISubroutineType(types: !7)
+!7 = !{null}
+!8 = !DILocation(line: 256, column: 13, scope: !4)
+!9 = !DILocation(line: 258, column: 8, scope: !4)
+!10 = !DILocation(line: 257, column: 13, scope: !4)
+!11 = !DILocation(line: 261, column: 21, scope: !4)
+!12 = !DILocation(line: 261, column: 8, scope: !4)
+!13 = !DILocation(line: 262, column: 21, scope: !4)
+!14 = !DILocation(line: 262, column: 8, scope: !4)
+!15 = distinct !DISubprogram(name: "qmain", linkageName: "qmain", scope: null, file: !16, type: !17, spFlags: DISPFlagDefinition, unit: !1)
+!17 = !DISubroutineType(types: !18)
+!18 = !{!19, !19}
+!19 = !DIBasicType(name: "i64", size: 64, encoding: DW_ATE_unsigned)
+!20 = !DILocation(line: 0, scope: !15)
