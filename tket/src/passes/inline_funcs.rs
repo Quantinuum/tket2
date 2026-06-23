@@ -3,16 +3,15 @@ use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 
 use hugr::HugrView;
 use hugr::ops::OpType;
+use hugr_core::Node;
+use hugr_core::hugr::{hugrmut::HugrMut, patch::inline_call::InlineCall};
+use hugr_core::module_graph::{ModuleGraph, StaticNode};
 use itertools::Itertools;
 use petgraph::algo::tarjan_scc;
 use petgraph::data::DataMap;
 use petgraph::visit::{
     Dfs, IntoNeighbors, IntoNodeIdentifiers, NodeFiltered, NodeIndexable, Visitable, Walker,
 };
-
-use hugr_core::Node;
-use hugr_core::hugr::{hugrmut::HugrMut, patch::inline_call::InlineCall};
-use hugr_core::module_graph::{ModuleGraph, StaticNode};
 
 use crate::metadata::InlineAnnotation;
 use crate::passes::{ComposablePass, PassScope, WithScope};
