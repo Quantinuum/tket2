@@ -1,22 +1,18 @@
 //! A pass for removing redundant order edges in a Hugr region.
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
-use hugr_core::core::HugrNode;
+use hugr::{IncomingPort, OutgoingPort};
 use hugr_core::hugr::{HugrError, hugrmut::HugrMut};
 use hugr_core::ops::{OpTag, OpTrait};
-use hugr_core::{HugrView, IncomingPort, Node, OutgoingPort};
-use itertools::Itertools;
+use hugr_core::{HugrView, Node};
 use petgraph::visit::Walker;
 
 use crate::passes::composable::WithScope;
 use crate::passes::{ComposablePass, PassScope};
 
 /// A pass for removing order edges in a Hugr region that are already implied by
-/// other order or dataflow dependencies.
-///
-/// Ignores order edges to region parents, as they may be required for keeping
-/// external edges valid.
+/// other order dependencies.
 ///
 /// Each evaluation on a region runs in `O(e + n log(n) * #order_edges)` time,
 /// where `e` and `n` are the number of edges and nodes in the region,
@@ -50,26 +46,22 @@ impl RedundantOrderEdgesPass {
         parent: H::Node,
         region_candidates: &mut VecDeque<H::Node>,
     ) -> Result<RedundantOrderEdgesResult, HugrError> {
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        struct PredecessorOrderEdges<N: HugrNode> {
-            from_node: N,
-            from_port: OutgoingPort,
-            to_node: N,
-            to_port: IncomingPort,
-        }
-
-        // A map with order edges that originate from predecessors of each node.
-        // We only store this for nodes that will be visited next (i.e. unexplored neighbors of explored nodes).
-        let mut predecessor_order_edges: HashMap<H::Node, HashSet<PredecessorOrderEdges<H::Node>>> =
-            HashMap::new();
+        type OutPorts<N> = HashSet<(N, OutgoingPort)>;
+        // A map that for node n contains both
+        // * a count of the unprocessed order-successors of n (allowing to clear the map as these are processed)
+        // * a set of nodes that reach n via (chains of) order edges.
+        let mut order_nodes_reaching: HashMap<H::Node, (usize, OutPorts<H::Node>)> = HashMap::new();
         // Order edges to be removed.
-        let mut to_remove = Vec::new();
+        let mut to_remove = BTreeMap::<(H::Node, H::Node), (OutgoingPort, IncomingPort)>::new();
 
-        // Traverse the region in topological order.
+        // Traverse the region in topological order. We actually only need an order
+        // that respects the order edges, but this is a simple (albeit expensive) way
+        // to get one.
         let sg = hugr.scheduling_graph(parent);
         let postorder = petgraph::visit::Topo::new(sg.petgraph());
         for pg_child in postorder.iter(sg.petgraph()) {
             let child = sg.pg_to_node(pg_child);
+
             let op = hugr.get_optype(child);
 
             // If the child itself is a region (parent) and we are running recursively, add the child to the region candidates.
@@ -77,75 +69,41 @@ impl RedundantOrderEdgesPass {
                 region_candidates.push_back(child);
             }
 
-            let predecessor_edges = predecessor_order_edges.remove(&child).unwrap_or_default();
-
-            // If we have reached the target of an order edge by exploring
-            // connected nodes from the source, then mark the order edge for
-            // removal.
-            let removable_edges: HashSet<PredecessorOrderEdges<H::Node>> = predecessor_edges
-                .iter()
-                .filter(|edge| edge.to_node == child)
-                .copied()
-                .collect();
-
-            // Remove the removable edges from the set of predecessor edges we'll pass to the forward neighbors.
-            let predecessor_edges: HashSet<PredecessorOrderEdges<H::Node>> = predecessor_edges
-                .difference(&removable_edges)
-                .copied()
-                .collect();
-
-            // Collect the order edges originating from this node that do not lead to a node with children.
-            //
-            // The latter may be necessary for keeping external edges valid.
-            let new_edges = match op.other_output_port() {
-                Some(out_order_port) => hugr
-                    .linked_inputs(child, out_order_port)
-                    .filter(|(to_node, _)| {
-                        hugr.get_parent(*to_node) == Some(parent)
-                            && hugr.first_child(*to_node).is_none()
-                    })
-                    .map(|(to_node, to_port)| PredecessorOrderEdges {
-                        from_node: child,
-                        from_port: out_order_port,
-                        to_node,
-                        to_port,
-                    })
-                    .collect_vec(),
-                None => vec![],
-            };
-
-            // Add the order edges to the `predecessor_order_edges` of the forward neighbors of the node.
-            for out_port in op.value_output_ports().chain(op.static_output_port()) {
-                for (to_node, _) in hugr.linked_inputs(child, out_port) {
-                    if hugr.get_parent(to_node) != Some(parent) {
-                        continue;
+            let mut reaching_child = HashSet::new();
+            if let Some(ord_in) = op.other_input_port() {
+                let order_preds = hugr
+                    .linked_outputs(child, ord_in)
+                    .collect::<BTreeMap<_, _>>();
+                for (order_pred, _) in order_preds.iter() {
+                    let (pred_count, reaching_pred) =
+                        order_nodes_reaching.get_mut(order_pred).unwrap();
+                    (*pred_count) -= 1;
+                    for (&other_pred, &other_pred_port) in order_preds.iter() {
+                        if reaching_pred.contains(&(other_pred, other_pred_port)) {
+                            // `other_pred` reaches predecessor `order_pred` of child, and has a direct edge to child.
+                            assert!(!to_remove.contains_key(&(*order_pred, child))); // this would mean a cycle
+                            to_remove.insert((other_pred, child), (other_pred_port, ord_in));
+                        }
                     }
-                    let neigh_predecessor_order_edges =
-                        predecessor_order_edges.entry(to_node).or_default();
-                    neigh_predecessor_order_edges.extend(predecessor_edges.clone());
-                    neigh_predecessor_order_edges.extend(new_edges.clone());
+                    reaching_child.extend(reaching_pred.iter().copied());
+                    if *pred_count == 0 {
+                        order_nodes_reaching.remove(order_pred);
+                    }
                 }
             }
-            // Do not propagate new order edges through themselves (otherwise we'd always remove them).
-            if let Some(out_port) = op.other_output_port() {
-                for (to_node, _) in hugr.linked_inputs(child, out_port) {
-                    if hugr.get_parent(to_node) != Some(parent) {
-                        continue;
-                    }
-                    let neigh_predecessor_order_edges =
-                        predecessor_order_edges.entry(to_node).or_default();
-                    neigh_predecessor_order_edges.extend(predecessor_edges.clone());
-                }
+            if let Some(ord_out) = op.other_output_port() {
+                order_nodes_reaching.insert(
+                    child,
+                    (hugr.linked_inputs(child, ord_out).count(), reaching_child),
+                );
             }
-
-            to_remove.extend(removable_edges);
         }
         // Release the hugr borrow so we can mutate it.
         drop(sg);
         let edges_removed = to_remove.len();
 
-        for edge in to_remove {
-            hugr.disconnect_edge(edge.from_node, edge.from_port, edge.to_node, edge.to_port);
+        for ((src_n, tgt_n), (src_p, tgt_p)) in to_remove {
+            hugr.disconnect_edge(src_n, src_p, tgt_n, tgt_p);
         }
 
         Ok(RedundantOrderEdgesResult { edges_removed })
