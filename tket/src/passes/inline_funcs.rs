@@ -2,6 +2,7 @@
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 
 use hugr::HugrView;
+use hugr::ops::OpType;
 use itertools::Itertools;
 use petgraph::algo::tarjan_scc;
 use petgraph::data::DataMap;
@@ -187,9 +188,24 @@ fn inline_always_scoped<H: HugrMut>(
     let reachable_always: BTreeSet<H::Node> = match &scope {
         PassScope::Global(_) => always_funcs.collect(),
         PassScope::EntrypointFlat | PassScope::EntrypointRecursive => {
-            let reachable = Dfs::new(cg.graph(), cg.node_index(hugr.entrypoint()).unwrap())
-                .iter(&cg.graph())
-                .collect::<HashSet<_>>();
+            let mut dfs = Dfs::empty(cg.graph());
+            let nodes_in_scope = if scope.recursive() {
+                hugr.descendants(hugr.entrypoint()).collect::<Vec<_>>()
+            } else {
+                let mut v = vec![hugr.entrypoint()];
+                v.extend(hugr.children(hugr.entrypoint()));
+                v
+            };
+            dfs.stack.extend(
+                nodes_in_scope
+                    .into_iter()
+                    .filter_map(|n| match hugr.get_optype(n) {
+                        OpType::Call(_) | OpType::LoadFunction(_) => hugr.static_source(n),
+                        _ => None,
+                    })
+                    .map(|n| cg.node_index(n).unwrap()),
+            );
+            let reachable = dfs.iter(&cg.graph()).collect::<HashSet<_>>();
             always_funcs
                 .filter(|n| {
                     let ni = cg.node_index(*n).unwrap();
@@ -676,9 +692,7 @@ mod test {
         let mut hugr = backup.clone();
         hugr.set_metadata::<InlineAnnotation>(f.node(), InlineAnnotation::Always);
         hugr.set_metadata::<InlineAnnotation>(main_h.node(), InlineAnnotation::Never);
-        InlineFunctionsPass::default()
-            .run(&mut hugr)
-            .unwrap();
+        InlineFunctionsPass::default().run(&mut hugr).unwrap();
         assert_eq!(
             hugr.children(hugr.module_root()).collect_vec(),
             [main_h.node()]
