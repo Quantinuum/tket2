@@ -41,8 +41,6 @@ pub mod inline_dfgs;
 pub use inline_dfgs::InlineDFGsPass;
 
 // Inline function calls.
-pub mod inline_always;
-pub use inline_always::InlineAlwaysPass;
 pub mod inline_funcs;
 pub use inline_funcs::InlineFunctionsPass;
 
