@@ -35,6 +35,17 @@ struct CombinedModifier {
 }
 
 impl CombinedModifier {
+    /// Return the modifier obtained by applying `next` after `self`.
+    fn compose(&self, next: &Self) -> Self {
+        let mut accum_ctrl = self.accum_ctrl.clone();
+        accum_ctrl.extend(next.accum_ctrl.iter().copied());
+        Self {
+            control: self.control + next.control,
+            accum_ctrl,
+            dagger: self.dagger ^ next.dagger,
+        }
+    }
+
     /// Add a modifier
     fn push<N>(
         &mut self,

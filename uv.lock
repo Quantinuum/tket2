@@ -9,7 +9,7 @@ resolution-markers = [
 ]
 
 [options]
-prerelease-mode = "explicit"
+prerelease-mode = "allow"
 
 [manifest]
 members = [

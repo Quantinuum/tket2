@@ -323,13 +323,10 @@ pub struct ModifierResolver<N = Node> {
     /// Multiple calls can reference the same function node, so each source
     /// maps to every copied static input that must be reconnected.
     call_map: HashMap<N, Vec<(Node, IncomingPort)>>,
-    // TODO:
-    // Should keep track of the collection of modifiers that are applied to the same function.
-    // This will prevent the duplicated generation of Controlled-functions.
-    // Some HashMap should be held here so that we remember such information.
-    // ```
-    // _modified_functions: HashMap<N, (CombinedModifier, Node)>,
-    // ```
+    /// Generated function for each original function and accumulated modifier.
+    modified_function_cache: HashMap<(N, CombinedModifier), N>,
+    /// Original function and accumulated modifier represented by each generated function.
+    modified_function_origins: HashMap<N, (N, CombinedModifier)>,
     /// Original functions for which the resolver generated modified replacements.
     modified_functions: HashSet<N>,
     /// Function input ports that must receive already-modified function values
@@ -338,6 +335,10 @@ pub struct ModifierResolver<N = Node> {
     /// Function input ports of the function currently being rewritten whose
     /// value types must be changed to match their required modifiers.
     active_function_input_modifiers: Vec<(usize, CombinedModifier)>,
+    /// New function input wires for active higher-order modifier requirements.
+    active_function_input_wires: Vec<(usize, CombinedModifier, Wire<Node>)>,
+    /// Modifier-specific local input wires in the container currently being rewritten.
+    active_local_input_wires: Vec<(N, OutgoingPort, CombinedModifier, Wire<Node>)>,
     /// Requirements for function-valued inputs of generated modified functions.
     function_input_modifiers: HashMap<N, Vec<(usize, CombinedModifier)>>,
     qubit_finder: TypeUnpacker,
@@ -352,9 +353,13 @@ impl<N> ModifierResolver<N> {
             controls: Vec::default(),
             worklist: VecDeque::default(),
             call_map: HashMap::default(),
+            modified_function_cache: HashMap::default(),
+            modified_function_origins: HashMap::default(),
             modified_functions: HashSet::default(),
             dynamic_input_modifiers: Vec::default(),
             active_function_input_modifiers: Vec::default(),
+            active_function_input_wires: Vec::default(),
+            active_local_input_wires: Vec::default(),
             function_input_modifiers: HashMap::default(),
             qubit_finder: TypeUnpacker::for_qubits(),
         }
@@ -513,6 +518,35 @@ impl<N: HugrNode> ModifierResolver<N> {
         &mut self.active_function_input_modifiers
     }
 
+    fn active_function_input_wires(&mut self) -> &mut Vec<(usize, CombinedModifier, Wire<Node>)> {
+        &mut self.active_function_input_wires
+    }
+
+    fn active_local_input_wires(
+        &mut self,
+    ) -> &mut Vec<(N, OutgoingPort, CombinedModifier, Wire<Node>)> {
+        &mut self.active_local_input_wires
+    }
+
+    /// Return the generated input wire for a higher-order function input that
+    /// must already be modified by `modifiers`.
+    ///
+    /// Function values are classical values in the HUGR, so the same modified
+    /// function input can feed more than one call in the generated body. The
+    /// entry is therefore looked up without being consumed.
+    fn active_function_input_wire(
+        &mut self,
+        input: usize,
+        modifiers: &CombinedModifier,
+    ) -> Option<Wire<Node>> {
+        self.active_function_input_wires
+            .iter()
+            .find(|(wire_input, wire_modifiers, _)| {
+                *wire_input == input && wire_modifiers == modifiers
+            })
+            .map(|(_, _, wire)| *wire)
+    }
+
     fn function_input_modifiers(&self, func: N) -> &[(usize, CombinedModifier)] {
         self.function_input_modifiers
             .get(&func)
@@ -565,16 +599,17 @@ impl<N: HugrNode> ModifierResolver<N> {
         func: N,
     ) -> Result<Vec<(usize, CombinedModifier)>, ModifierResolverErrors<N>> {
         let mut visiting = HashSet::new();
-        self.higher_order_input_modifiers_inner(h, func, &mut visiting)
+        self.higher_order_input_modifiers_inner(h, func, &mut visiting, self.modifiers().clone())
     }
 
     fn higher_order_input_modifiers_inner(
         &self,
         h: &impl HugrMut<Node = N>,
         func: N,
-        visiting: &mut HashSet<N>,
+        visiting: &mut HashSet<(N, CombinedModifier)>,
+        modifiers: CombinedModifier,
     ) -> Result<Vec<(usize, CombinedModifier)>, ModifierResolverErrors<N>> {
-        if !visiting.insert(func) {
+        if !visiting.insert((func, modifiers.clone())) {
             return Ok(Vec::new());
         }
 
@@ -607,12 +642,8 @@ impl<N: HugrNode> ModifierResolver<N> {
                             "CallIndirect function input has no source.".to_string(),
                         )
                     })?;
-                    let (target, target_port, modifiers) = self.trace_modifier_chain_with(
-                        h,
-                        source.0,
-                        source.1,
-                        self.modifiers().clone(),
-                    )?;
+                    let (target, target_port, modifiers) =
+                        self.trace_modifier_chain_with(h, source.0, source.1, modifiers.clone())?;
                     if matches!(h.get_optype(target), OpType::Input(_)) {
                         requirements.extend(self.function_input_requirements_from_input(
                             h,
@@ -625,14 +656,65 @@ impl<N: HugrNode> ModifierResolver<N> {
                             Wire::new(target, target_port),
                             modifiers,
                         )?);
+                    } else if let Ok((callee, _)) =
+                        Self::get_loaded_function(h, node, target, h.get_optype(target))
+                        && matches!(h.get_optype(callee), OpType::FuncDefn(_))
+                    {
+                        let (analysis_callee, analysis_modifiers) = self
+                            .modified_function_origins
+                            .get(&callee)
+                            .cloned()
+                            .map(|(source_func, source_modifiers)| {
+                                (source_func, modifiers.compose(&source_modifiers))
+                            })
+                            .unwrap_or((callee, modifiers.clone()));
+                        let OpType::FuncDefn(analysis_callee_defn) = h.get_optype(analysis_callee)
+                        else {
+                            continue;
+                        };
+                        let explicit_input_offset =
+                            call.signature.input.len().saturating_sub(
+                                analysis_callee_defn.signature().body().input.len(),
+                            );
+                        for (callee_input, modifiers) in self.higher_order_input_modifiers_inner(
+                            h,
+                            analysis_callee,
+                            visiting,
+                            analysis_modifiers.clone(),
+                        )? {
+                            let input_port = 1 + explicit_input_offset + callee_input;
+                            let Some((source, source_port)) =
+                                h.single_linked_output(node, input_port)
+                            else {
+                                continue;
+                            };
+                            let propagated = self.function_input_requirements_for_value(
+                                h,
+                                &mut FunctionInputContext {
+                                    function_input_indices: &function_input_indices,
+                                    func,
+                                    visited_values: &mut HashSet::new(),
+                                    visited_sum_fields: &mut HashSet::new(),
+                                },
+                                Wire::new(source, source_port),
+                                modifiers,
+                            )?;
+                            requirements.extend(propagated);
+                        }
                     }
                 }
                 OpType::Call(call) => {
-                    let Some((callee, _)) =
+                    let Some((callee_source, callee_source_port)) =
                         h.single_linked_output(node, call.called_function_port())
                     else {
                         continue;
                     };
+                    let (callee, _, call_modifiers) = self.trace_modifier_chain_with(
+                        h,
+                        callee_source,
+                        callee_source_port,
+                        modifiers.clone(),
+                    )?;
                     if !matches!(h.get_optype(callee), OpType::FuncDefn(_)) {
                         continue;
                     }
@@ -640,9 +722,12 @@ impl<N: HugrNode> ModifierResolver<N> {
                     // A direct call to a higher-order function can force one of
                     // this function's own inputs to be pre-modified. This is the
                     // recursive case for wrappers such as f -> g(f) -> h(f).
-                    for (callee_input, modifiers) in
-                        self.higher_order_input_modifiers_inner(h, callee, visiting)?
-                    {
+                    for (callee_input, modifiers) in self.higher_order_input_modifiers_inner(
+                        h,
+                        callee,
+                        visiting,
+                        call_modifiers.clone(),
+                    )? {
                         let source = h.single_linked_output(node, callee_input).ok_or_else(|| {
                             ModifierResolverErrors::unreachable(format!(
                                 "Call input {callee_input} has no source while propagating higher-order modifiers."
@@ -667,11 +752,33 @@ impl<N: HugrNode> ModifierResolver<N> {
                 _ => {}
             }
         }
-        visiting.remove(&func);
+        visiting.remove(&(func, modifiers));
 
         requirements.retain(|(input, _)| function_input_indices.contains(input));
 
         Ok(requirements.into_iter().unique().collect())
+    }
+
+    pub(super) fn higher_order_input_slots(
+        &self,
+        input_len: usize,
+        offset: usize,
+        modifiers: &[(usize, CombinedModifier)],
+    ) -> Vec<(usize, CombinedModifier, usize, bool)> {
+        let mut seen = HashSet::new();
+        let mut extra = 0;
+        modifiers
+            .iter()
+            .map(|(input, modifiers)| {
+                if seen.insert(*input) {
+                    (*input, modifiers.clone(), offset + input, true)
+                } else {
+                    let port = offset + input_len + extra;
+                    extra += 1;
+                    (*input, modifiers.clone(), port, false)
+                }
+            })
+            .collect()
     }
 
     /// Trace a plain value back to the top-level function input that provides it.
@@ -934,13 +1041,14 @@ impl<N: HugrNode> ModifierResolver<N> {
         offset: usize,
     ) -> Result<(), ModifierResolverErrors<N>> {
         let modifiers = self.active_function_input_modifiers().clone();
-        for (input_index, modifier) in modifiers {
+        let original_inputs = input.iter().skip(offset).cloned().collect_vec();
+        let slots = self.higher_order_input_slots(original_inputs.len(), offset, &modifiers);
+        for (input_index, modifier, port, replace_existing) in slots {
             let saved_modifiers = mem::replace(self.modifiers_mut(), modifier);
-            let index = input_index + offset;
-            let Some(input_ty) = input.get(index).cloned() else {
+            let Some(input_ty) = original_inputs.get(input_index).cloned() else {
                 *self.modifiers_mut() = saved_modifiers;
                 return Err(ModifierResolverErrors::unreachable(format!(
-                    "Higher-order modifier requirement refers to missing input {index}"
+                    "Higher-order modifier requirement refers to missing input {input_index}"
                 )));
             };
             let Term::FunctionType(_) = &*input_ty else {
@@ -949,10 +1057,14 @@ impl<N: HugrNode> ModifierResolver<N> {
                     "Higher-order modifier requirement found for a non-function input: {input_ty:?}"
                 )));
             };
-            let input_ty = input[index].clone();
             let modified_input_ty = self.modified_function_input_type(&input_ty);
             *self.modifiers_mut() = saved_modifiers;
-            input.to_mut()[index] = modified_input_ty?;
+            if replace_existing {
+                input.to_mut()[port] = modified_input_ty?;
+            } else {
+                debug_assert_eq!(port, input.len());
+                input.to_mut().push(modified_input_ty?);
+            }
         }
         Ok(())
     }
@@ -1009,6 +1121,52 @@ impl<N: HugrNode> ModifierResolver<N> {
             }
         }
         Ok(())
+    }
+
+    /// Rewrite function-typed carried inputs and add extra slots when the same
+    /// function value is required under more than one modifier context.
+    fn modify_carried_higher_order_input_types(
+        &mut self,
+        row: &mut TypeRow,
+    ) -> Result<Vec<(usize, CombinedModifier, usize, bool)>, ModifierResolverErrors<N>> {
+        if self.active_function_input_modifiers().is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut modifiers = Vec::new();
+        for (_, modifier) in self.active_function_input_modifiers().clone() {
+            if !modifiers.contains(&modifier) {
+                modifiers.push(modifier);
+            }
+        }
+
+        let original = row.iter().cloned().collect_vec();
+        let mut slots = Vec::new();
+        for (input_index, input_ty) in original.iter().enumerate() {
+            match &**input_ty {
+                Term::FunctionType(_) if self.function_type_has_quantum_data(input_ty)? => {
+                    for (modifier_index, modifier) in modifiers.iter().cloned().enumerate() {
+                        let saved_modifiers = mem::replace(self.modifiers_mut(), modifier.clone());
+                        let modified_input_ty = self.modified_function_input_type(input_ty);
+                        *self.modifiers_mut() = saved_modifiers;
+
+                        if modifier_index == 0 {
+                            row.to_mut()[input_index] = modified_input_ty?;
+                            slots.push((input_index, modifier, input_index, true));
+                        } else {
+                            let port = row.len();
+                            row.to_mut().push(modified_input_ty?);
+                            slots.push((input_index, modifier, port, false));
+                        }
+                    }
+                }
+                Term::SumType(_) => self.modify_higher_order_sum_type_if_present(
+                    row.to_mut().get_mut(input_index).unwrap(),
+                )?,
+                _ => {}
+            }
+        }
+        Ok(slots)
     }
 
     fn with_worklist<T>(&mut self, worklist: VecDeque<N>, f: impl FnOnce(&mut Self) -> T) -> T {
@@ -1088,6 +1246,46 @@ impl<N: HugrNode> ModifierResolver<N> {
                 "No correspondence for the wire: {}",
                 key
             )))
+    }
+
+    /// Return the rewritten local output wire corresponding to `old_wire`, if
+    /// that value is still present in the current generated container.
+    fn mapped_output_wire(
+        &self,
+        old_wire: Wire<N>,
+    ) -> Result<Option<Wire<Node>>, ModifierResolverErrors<N>> {
+        let mapped = self.map_get(&old_wire.into())?;
+        let Some(new_wire) = mapped.first() else {
+            return Ok(None);
+        };
+        let Either::Right(port) = new_wire.1.as_directed() else {
+            return Err(ModifierResolverErrors::unreachable(format!(
+                "Expected output correspondence for {}, found {}",
+                DirWire::from(old_wire),
+                new_wire
+            )));
+        };
+        Ok(Some(Wire::new(new_wire.0, port)))
+    }
+
+    /// Return a rewritten local output wire for a specific modifier context.
+    fn mapped_output_wire_with_modifier(
+        &self,
+        old_wire: Wire<N>,
+        modifiers: &CombinedModifier,
+    ) -> Result<Option<Wire<Node>>, ModifierResolverErrors<N>> {
+        if let Some((_, _, _, wire)) =
+            self.active_local_input_wires
+                .iter()
+                .find(|(node, port, local_modifiers, _)| {
+                    *node == old_wire.node()
+                        && *port == old_wire.source()
+                        && local_modifiers == modifiers
+                })
+        {
+            return Ok(Some(*wire));
+        }
+        self.mapped_output_wire(old_wire)
     }
 
     fn forget_node(
@@ -1648,13 +1846,15 @@ impl<N: HugrNode> ModifierResolver<N> {
 
         // CFGs always thread controls as carried values after block data.
         let mut cfg_input = cfg.signature.input.clone();
-        self.modify_carried_higher_order_types_if_present(&mut cfg_input)?;
+        let cfg_input_slots = self.modify_carried_higher_order_input_types(&mut cfg_input)?;
         let mut cfg_output = cfg.signature.output.clone();
         self.modify_carried_higher_order_types_if_present(&mut cfg_output)?;
         let signature = Signature::new(
             self.cfg_control_types(cfg_input),
             self.cfg_control_types(cfg_output),
         );
+        let cfg_input_offset = signature.input.len() - self.control_num();
+        let cfg_output_offset = signature.output.len() - self.control_num();
         let mut new_cfg = CFGBuilder::new(signature)?;
         let mut bb_map = HashMap::new();
 
@@ -1666,7 +1866,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                 ));
             };
             let mut input = old_block.inputs.clone();
-            self.modify_carried_higher_order_types_if_present(&mut input)?;
+            self.modify_carried_higher_order_input_types(&mut input)?;
             let input = self.cfg_control_types(input);
             let mut other_outputs = old_block.other_outputs.clone();
             self.modify_carried_higher_order_types_if_present(&mut other_outputs)?;
@@ -1727,9 +1927,33 @@ impl<N: HugrNode> ModifierResolver<N> {
             (0, 0, 0),
         )?;
 
+        // `wire_node_inout` can only map ports that existed on the original
+        // CFG. Extra higher-order slots are new inputs, so feed them from the
+        // same original value under the modifier required by that slot.
+        for (input_index, modifiers, port, replace_existing) in cfg_input_slots {
+            if replace_existing {
+                continue;
+            }
+            let Some((source, source_port)) = h.single_linked_output(cfg_node, input_index) else {
+                return Err(ModifierResolverErrors::unreachable(format!(
+                    "CFG higher-order input {input_index} has no source."
+                )));
+            };
+            let Some(wire) =
+                self.mapped_output_wire_with_modifier(Wire::new(source, source_port), &modifiers)?
+            else {
+                return Err(ModifierResolverErrors::unreachable(format!(
+                    "CFG higher-order input {input_index} has no mapped source for modifiers {modifiers:?}."
+                )));
+            };
+            new_dfg
+                .hugr_mut()
+                .connect(wire.node(), wire.source(), new_node, port);
+        }
+
         // Expose the controls after the CFG boundary data.
-        let input_offset = cfg.signature.input.len();
-        let output_offset = cfg.signature.output.len();
+        let input_offset = cfg_input_offset;
+        let output_offset = cfg_output_offset;
         for (i, c) in self.controls().iter_mut().enumerate() {
             new_dfg
                 .hugr_mut()
@@ -2643,11 +2867,12 @@ mod tests {
 
     /// Run the pass on hugrs generated by guppy and modifier examples.
     #[rstest::rstest]
+    #[case::higher_order_recursive("../test_files/modifier_examples/higher_order_recursive.hugr")]
+    #[case::same_twice("../test_files/modifier_examples/same_twice.hugr")]
     #[case::higher_order_function_w_loops(
         "../test_files/modifier_examples/higher_order_function_w_loops.hugr"
     )]
     #[case::even_dagger("../test_files/modifier_examples/even_dagger.hugr")]
-    #[case::higher_order_recursive("../test_files/modifier_examples/higher_order_recursive.hugr")]
     #[case::higher_order_classical("../test_files/modifier_examples/higher_order_classical.hugr")]
     #[case::simple_higher_order("../test_files/modifier_examples/simple_higher_order.hugr")]
     #[case::multiple_functions_in_ctrl_dagger(

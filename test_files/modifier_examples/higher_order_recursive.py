@@ -47,7 +47,7 @@ def main() -> None:
     c = qubit()
     c1 = qubit()
     h(c)
-    x(c1)
+    h(c1)
 
     with control(c), dagger:
         apply(s, q, c1)

@@ -334,9 +334,11 @@ higher_order_function_w_loops_solved:
 	11 -> -0.4619-0.1913j
 -----
 higher_order_recursive_solved:
-	00 -> 0.7071+0j
-	10 -> 0.5+0j
-	11 -> 0-0.5j
+	000 -> 0.5+0j
+	010 -> 0.5+0j
+	100 -> 0.3536+0j
+	101 -> 0-0.3536j
+	110 -> 0.5+0j
 -----
 modify_array_solved:
 	000 -> 0.7071+0j
@@ -405,6 +407,12 @@ nested_multiple_ctrl1_solved:
 	1101 -> 0.25+0j
 	1110 -> 0.1768+0.1768j
 	1111 -> 0.1768-0.1768j
+-----
+same_twice_solved:
+	000 -> 0.5+0j
+	010 -> 0.5+0j
+	101 -> 0.5+0j
+	110 -> 0.5+0j
 -----
 simple_higher_order_solved:
 	000 -> 0.7071+0j
