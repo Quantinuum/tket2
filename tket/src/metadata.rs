@@ -49,10 +49,6 @@ impl Metadata for MaxQubitsHint {
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum InlineAnnotation {
-    /// Always inline calls to this function.
-    ///
-    /// If this cannot be done, an error will be raised.
-    Always,
     /// Inline the function if we know it won't produce an invalid Hugr.
     ///
     /// This is a best effort option; the compiler may choose not to inline
@@ -60,6 +56,10 @@ pub enum InlineAnnotation {
     BestEffort,
     /// Never inline the function.
     Never,
+    /// Always inline calls to this function.
+    ///
+    /// If this cannot be done, an error will be raised.
+    Always,
 }
 impl Metadata for InlineAnnotation {
     const KEY: &'static str = "tket.inline";
