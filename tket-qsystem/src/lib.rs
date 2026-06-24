@@ -15,8 +15,10 @@ use hugr::hugr::{HugrError, hugrmut::HugrMut};
 use hugr::{HugrView, Node, core::Visibility, ops::OpType};
 use itertools::Itertools as _;
 use std::collections::HashSet;
+use tket::passes::ModifierResolverPass;
 use tket::passes::composable::WithScope;
 use tket::passes::const_fold::{ConstFoldError, ConstantFoldPass};
+use tket::passes::modifier_resolver::ModifierResolverErrors;
 use tket::passes::{
     ComposablePass, MonomorphizePass, PassScope, RemoveDeadFuncsError, RemoveDeadFuncsPass,
     force_order, replace_types::ReplaceTypesError,
@@ -86,6 +88,8 @@ pub enum QSystemPassError {
     ///
     ///  [RemoveDeadFuncsPass]: tket::passes::RemoveDeadFuncsError
     DCEError(RemoveDeadFuncsError),
+    /// Error while resolving modifier operations.
+    ModifierResolver(ModifierResolverErrors),
     /// No [FuncDefn] named "main" in [Module].
     ///
     /// [FuncDefn]: hugr::ops::FuncDefn
@@ -254,6 +258,10 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for QSystemPass {
             });
         }
 
+        ModifierResolverPass::default()
+            .with_scope(self.scope.clone())
+            .run(hugr)?;
+
         if self.monomorphize {
             MonomorphizePass::default_with_scope(self.scope.clone())
                 .run(hugr)
@@ -301,11 +309,14 @@ mod test {
 
     use hugr::{
         Hugr,
-        builder::{Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder},
+        builder::{
+            Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder,
+        },
         core::Visibility,
         extension::prelude::qb_t,
+        extension::simple_op::MakeExtensionOp,
         hugr::hugrmut::HugrMut,
-        ops::{ExtensionOp, handle::NodeHandle},
+        ops::{CallIndirect, ExtensionOp, handle::NodeHandle},
         std_extensions::{
             arithmetic::float_types::ConstF64,
             collections::array::{ArrayOpBuilder, array_type},
@@ -319,6 +330,8 @@ mod test {
     use rstest::rstest;
     use tket::extension::guppy::{DROP_OP_NAME, GUPPY_EXTENSION};
     use tket::extension::measurement::measurement_type;
+    use tket::extension::modifier::{CONTROL_OP_ID, MODIFIER_EXTENSION, Modifier};
+    use tket::metadata;
 
     use crate::{
         QSystemPass,
@@ -493,5 +506,74 @@ mod test {
             )
         });
         assert!(has_discard_load_fn);
+    }
+
+    #[rstest]
+    #[case(QSystemPlatform::Helios)]
+    #[case(QSystemPlatform::Sol)]
+    fn qsystem_pass_resolves_modifiers(#[case] platform: QSystemPlatform) {
+        let mut module = hugr::builder::ModuleBuilder::new();
+
+        let foo_sig = Signature::new_endo([qb_t()]);
+        let foo = {
+            let mut func = module.define_function("foo", foo_sig.clone()).unwrap();
+            let func_node = func.container_node();
+            func.hugr_mut()
+                .set_metadata::<metadata::UnitaryFlags>(func_node, 7);
+            let [qb] = func.input_wires_arr();
+            let [qb] = func.add_dataflow_op(TketOp::X, [qb]).unwrap().outputs_arr();
+            func.finish_with_outputs([qb]).unwrap()
+        };
+
+        let ctrl_num = 1;
+        let controlled_sig = Signature::new_endo([array_type(ctrl_num, qb_t()), qb_t()]);
+        let control_op = MODIFIER_EXTENSION
+            .instantiate_extension_op(
+                &CONTROL_OP_ID,
+                [
+                    hugr::types::Term::BoundedNat(ctrl_num),
+                    vec![qb_t().into()].into(),
+                    vec![].into(),
+                ],
+            )
+            .unwrap();
+
+        {
+            let mut func = module
+                .define_function_vis("main", controlled_sig.clone(), Visibility::Public)
+                .unwrap();
+            let [controls, target] = func.input_wires_arr();
+
+            let loaded = func.load_func(foo.handle(), &[]).unwrap();
+            let modified = func
+                .add_dataflow_op(control_op, [loaded])
+                .unwrap()
+                .out_wire(0);
+            let [controls, target] = func
+                .add_dataflow_op(
+                    CallIndirect {
+                        signature: controlled_sig,
+                    },
+                    [modified, controls, target],
+                )
+                .unwrap()
+                .outputs_arr();
+
+            func.finish_with_outputs([controls, target]).unwrap();
+        }
+
+        let mut hugr = module.finish_hugr().unwrap();
+        assert!(
+            hugr.nodes()
+                .any(|node| Modifier::from_optype(hugr.get_optype(node)).is_some())
+        );
+
+        QSystemPass::defaults(platform).run(&mut hugr).unwrap();
+
+        assert!(
+            hugr.nodes()
+                .all(|node| Modifier::from_optype(hugr.get_optype(node)).is_none())
+        );
+        hugr.validate().unwrap();
     }
 }

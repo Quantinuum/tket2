@@ -28,6 +28,18 @@ def load(name: str) -> bytes:
     return hugr_file.read_bytes()
 
 
+def contains_modifiers(hugr_envelope: bytes) -> bool:
+    package = Package.from_bytes(hugr_envelope)
+    for module in package.modules:
+        for _, node_data in module.nodes():
+            if (
+                "tket.modifier.ControlModifier" in node_data.op.name()
+                or "tket.modifier.DaggerModifier" in node_data.op.name()
+            ):
+                return True
+    return False
+
+
 def test_check() -> None:
     """Test the check_hugr function to ensure it can load a HUGR envelope."""
     hugr_envelope = load("check")
@@ -78,6 +90,7 @@ def normalize_ir_snapshot(ir: str) -> str:
         "rus",
         "print_current_shot",
         "rng",
+        "simple_modifier",
     ],
 )
 @pytest.mark.parametrize("target_triple", triples)
@@ -99,6 +112,21 @@ def test_entry_args() -> None:
         match="Entry point function must have no input parameters",
     ):
         _ = compile_to_llvm_ir(load("entry_args"))
+
+
+@pytest.mark.parametrize("platform", platforms)
+def test_compile_modifiers(platform: Platform) -> None:
+    hugr_envelope = load("simple_modifier")
+    assert contains_modifiers(hugr_envelope)
+
+    ir = compile_to_llvm_ir(
+        hugr_envelope,
+        target_triple="x86_64-unknown-linux-gnu",
+        platform=platform,
+    )
+    assert "define i64 @qmain" in ir
+    assert "ControlModifier" not in ir
+    assert "DaggerModifier" not in ir
 
 
 # TODO: The stored hugr compiles to an empty function. It is likely missing
