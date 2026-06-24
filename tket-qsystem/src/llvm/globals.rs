@@ -1,4 +1,7 @@
 //! LLVM lowering implementations for "tket.globals" operations.
+//!
+//! Construct the extension with [`GlobalsCodegenExtension::new`].
+//! Provides custom panic error [`GlobalsCodegenExtension::with_no_global_error`] to override the default.
 
 use crate::extension::globals::{GlobalsOp, GlobalsOpDef};
 use anyhow::{Result, bail, ensure};
@@ -24,7 +27,7 @@ use hugr::{
 use hugr_core::types::{FuncValueType, Signature, Type, TypeRowRV};
 use itertools::Itertools;
 
-/// Codegen extension for globals
+/// Codegen extension for globals.
 pub struct GlobalsCodegenExtension<PCG> {
     pcg: PCG,
     no_global_error: ConstError,
