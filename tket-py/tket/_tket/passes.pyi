@@ -21,6 +21,7 @@ class PullForwardError(Exception):
 def normalize_guppy(
     circ: CompilationState,
     *,
+    resolve_modifiers: bool = True,
     simplify_cfgs: bool = True,
     remove_tuple_untuple: bool = True,
     constant_folding: bool = True,
@@ -35,6 +36,7 @@ def normalize_guppy(
     This should normally be called first before other optimisations.
 
     Parameters:
+    - resolve_modifiers: Whether to resolve modifier operations.
     - simplify_cfgs: Whether to simplify CFG control flow.
     - remove_tuple_untuple: Whether to remove tuple/untuple operations.
     - constant_folding: Whether to constant fold the program.
