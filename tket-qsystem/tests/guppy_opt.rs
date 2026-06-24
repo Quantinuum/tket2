@@ -1,6 +1,5 @@
 //! Tests optimizing Guppy-generated programs.
 
-use hugr::hugr::hugrmut::HugrMut;
 use rayon::iter::ParallelIterator;
 use smol_str::SmolStr;
 use std::collections::HashMap;
