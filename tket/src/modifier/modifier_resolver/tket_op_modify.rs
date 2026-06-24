@@ -476,7 +476,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             Measure | MeasureFree | QAlloc | TryQAlloc | QFree | Reset => {
                 Err(ModifierResolverErrors::unresolvable(
                     op_node,
-                    format!("{tket_op:?} operation cannot be modified"),
+                    format!("of type {tket_op:?}"),
                     tket_op.into(),
                 ))
             }
@@ -649,7 +649,7 @@ mod test {
             match result {
                 Err(ModifierResolverErrors::UnResolvable { node, msg, optype }) => {
                     assert_eq!(node, op_node);
-                    assert_eq!(msg, format!("{op:?} operation cannot be modified"));
+                    assert_eq!(msg, format!("of type {op:?}"));
                     assert_eq!(optype, op.into());
                 }
                 Err(error) => panic!("expected {op:?} to be unresolvable, got {error:?}"),
