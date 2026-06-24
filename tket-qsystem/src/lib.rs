@@ -258,7 +258,6 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for QSystemPass {
             });
         }
 
-        // todo: apply modifier resolver passes here
         ModifierResolverPass::default()
             .with_scope(self.scope.clone())
             .run(hugr)?;

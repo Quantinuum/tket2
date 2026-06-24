@@ -27,14 +27,6 @@ def load(name: str) -> bytes:
     return hugr_file.read_bytes()
 
 
-# def normalize_simple_modifier_ir(ir: str) -> str:
-#     ir = re.sub(r"cond_\d+_case_0", "cond_QALLOC_case_0", ir)
-#     ir = re.sub(r"(__tk2_(?:helios|sol)_qalloc)\.\d+", r"\1.N", ir)
-#     ir = re.sub(r"qalloc\.i\d*", "qalloc.iN", ir)
-#     ir = re.sub(r"not_max\.not\.not\.i\d*", "not_max.not.not.iN", ir)
-#     return ir
-
-
 @pytest.mark.parametrize(
     "hugr_file",
     [
@@ -60,8 +52,6 @@ def test_llvm_multiplatform(
     ir = compile_to_llvm_ir(
         hugr_envelope, target_triple=target_triple, platform=platform
     )
-    # if hugr_file == "simple_modifier":
-    #     ir = normalize_simple_modifier_ir(ir)
     snapshot.assert_match(ir, f"{hugr_file}_{target_triple}_{platform}")
 
 
