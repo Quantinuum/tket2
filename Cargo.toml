@@ -42,28 +42,28 @@ large_enum_variant = "allow"
 
 # Uncomment to use unreleased versions of hugr
 #hugr = { git = "https://github.com/quantinuum/hugr", "rev" = "1787e12" }
-hugr-core = { git = "https://github.com/quantinuum/hugr", "rev" = "4f133bc" }
+#hugr-core = { git = "https://github.com/quantinuum/hugr", "rev" = "1787e12" }
 #hugr-cli = { git = "https://github.com/quantinuum/hugr", "rev" = "1787e12" }
 #hugr-llvm = { git = "https://github.com/quantinuum/hugr", "rev" = "1787e12" }
 # portgraph = { git = "https://github.com/quantinuum/portgraph", rev = "68b96ac737e0c285d8c543b2d74a7aa80a18202c" }
 
 [workspace.dependencies]
 # Make sure to run `just recompile-eccs` if the hugr serialisation format changes.
-hugr = "0.28.1"
-hugr-core = "0.28.1"
-hugr-cli = "0.28.1"
+hugr = "0.28.3"
+hugr-core = "0.28.3"
+hugr-cli = "0.28.3"
 portgraph = "0.16.1"
 # There can only be one `pyo3` version in the whole workspace, so we use a
 # loose version constraint to prevent breaking changes in dependent crates where possible.
-pyo3 = ">= 0.28.2, < 0.29"
-pyo3-build-config = ">= 0.28.2, < 0.29"
+pyo3 = ">= 0.28.2, < 0.30"
+pyo3-build-config = ">= 0.28.2, < 0.30"
 
 bindgen = "0.72"
 cbindgen = "0.29"
 cc = "1.2.63"
 conan2 = "0.1.9"
 itertools = "0.14.0"
-tket-json-rs = "0.8.3"
+tket-json-rs = "0.8.4"
 portmatching = "0.3.3"
 bytemuck = "1.25.0"
 cgmath = "0.18.0"

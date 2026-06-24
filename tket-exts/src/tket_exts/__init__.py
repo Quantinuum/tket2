@@ -25,7 +25,7 @@ from tket_exts import tket
 
 # This is updated by our release-please workflow, triggered by this
 # annotation: x-release-please-version
-__version__ = "0.13.0"
+__version__ = "0.13.1"
 
 __all__ = [
     "debug",

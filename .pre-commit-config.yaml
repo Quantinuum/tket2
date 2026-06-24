@@ -16,14 +16,16 @@ repos:
             test_files/.*|
             .*.snap|
             .*.snap.new|
-            .release-please-manifest.json
+            .release-please-manifest.json|
+            .*.lock
           )$
       - id: trailing-whitespace
         exclude: |
           (?x)^(
             test_files/.*|
             .*.snap|
-            .*.snap.new
+            .*.snap.new|
+            .*.lock
           )$
       - id: fix-byte-order-marker
       - id: mixed-line-ending
