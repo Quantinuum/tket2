@@ -3,6 +3,8 @@ from hugr.build.base import Hugr
 from pathlib import Path
 import sys
 
+from hugr.hugr.render import RenderConfig
+
 
 mr_pass = ModifierResolverPass()
 
@@ -19,6 +21,8 @@ def apply_passes(input_paths: list[Path], output_dir: Path) -> None:
         print(f"Processing {input_path.name}")
         hugr = _hugr_from_path(str(input_path))
         resolved: Hugr = mr_pass(hugr)
+
+        # resolved.render_dot(RenderConfig(max_node_label_length=None)).view("aaaa")
 
         output_path = output_dir / f"{input_path.stem}_solved.hugr"
         output_path.write_bytes(resolved.to_bytes())

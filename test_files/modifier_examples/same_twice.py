@@ -5,7 +5,7 @@
 #    "guppylang-internals==1.0.0a5",
 # ]
 # ///
-"""Some simple nested higher order functions inside modifiers"""
+"""Testing modifying same function twice"""
 
 from pathlib import Path
 from sys import argv
@@ -20,25 +20,15 @@ from guppylang.std.debug import state_result
 from guppylang.std.quantum import discard, qubit
 from guppylang.std.quantum import h, s, x
 from guppylang.experimental import enable_experimental_features
+from guppylang.std.angles import angle
+
 
 enable_experimental_features()
 
 
 @guppy(unitary=True)
-def apply(f: Unitary[[qubit], None], q: qubit, c1: qubit) -> None:
-    apply1(f, q, c1)
-
-
-@guppy(unitary=True)
-def apply1(f: Unitary[[qubit], None], q: qubit, c1: qubit) -> None:
-    f(q)
-    with control(c1):
-        apply2(f, q)
-
-
-@guppy(unitary=True)
-def apply2(f: Unitary[[qubit], None], q: qubit) -> None:
-    f(q)
+def fun(q: qubit) -> None:
+    x(q)
 
 
 @guppy
@@ -47,11 +37,12 @@ def main() -> None:
     c = qubit()
     c1 = qubit()
     h(c)
-    x(c1)
+    h(c1)
 
-    with control(c), dagger:
-        apply(s, q, c1)
-        apply(h, q, c1)
+    with control(c):
+        fun(q)
+        with control(c1):
+            fun(q)
 
     state_result("r", c, c1, q)
     discard(q)
