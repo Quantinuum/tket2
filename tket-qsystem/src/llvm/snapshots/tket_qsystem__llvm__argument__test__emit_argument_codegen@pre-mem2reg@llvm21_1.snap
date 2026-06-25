@@ -1,28 +1,28 @@
 ---
-source: tket-qsystem/src/llvm/argreader.rs
+source: tket-qsystem/src/llvm/argument.rs
 expression: mod_str
 ---
 ; ModuleID = 'test_context'
 source_filename = "test_context"
 
-@argument_test_arr_i.EF2BFDB2.0 = private constant [13 x i8] c"\0Ctest_arr_int"
+@argument_test_bool.07B15E44.0 = private constant [10 x i8] c"\09test_bool"
 
-define internal { ptr, i64 } @_hl.main.1() !dbg !3 {
+define internal i1 @_hl.main.1() !dbg !3 {
 alloca_block:
+  %"0" = alloca i1, align 1
+  %"4_0" = alloca i1, align 1
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  %0 = mul i64 10, ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), !dbg !11
-  %1 = call ptr @malloc(i64 %0), !dbg !11
-  %2 = insertvalue { ptr, i64 } poison, ptr %1, 0, !dbg !11
-  %3 = insertvalue { ptr, i64 } %2, i64 0, 1, !dbg !11
-  call void @argreader_get_i64_array(ptr @argument_test_arr_i.EF2BFDB2.0, ptr %1, i64 10), !dbg !11
-  ret { ptr, i64 } %3
+  %read_arg_bool = call i1 @argreader_get_bool(ptr @argument_test_bool.07B15E44.0), !dbg !8
+  store i1 %read_arg_bool, ptr %"4_0", align 1, !dbg !8
+  %"4_01" = load i1, ptr %"4_0", align 1
+  store i1 %"4_01", ptr %"0", align 1
+  %"02" = load i1, ptr %"0", align 1
+  ret i1 %"02"
 }
 
-declare void @argreader_get_i64_array(ptr, ptr, i64)
-
-declare ptr @malloc(i64)
+declare i1 @argreader_get_bool(ptr)
 
 !llvm.module.flags = !{!0}
 !llvm.dbg.cu = !{!1}
@@ -34,8 +34,5 @@ declare ptr @malloc(i64)
 !4 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "")
 !5 = !DISubroutineType(types: !6)
 !6 = !{!7}
-!7 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ ptr, i64 }", file: !2, size: 128, align: 8, elements: !8)
-!8 = !{!9, !10}
-!9 = !DIBasicType(name: "ptr", size: 64, encoding: DW_ATE_address)
-!10 = !DIBasicType(name: "i64", size: 64, encoding: DW_ATE_unsigned)
-!11 = !DILocation(line: 27062, column: 402, scope: !3)
+!7 = !DIBasicType(name: "i1", size: 1, encoding: DW_ATE_unsigned)
+!8 = !DILocation(line: 27062, column: 402, scope: !3)

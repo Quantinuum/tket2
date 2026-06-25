@@ -19,13 +19,13 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use strum::{EnumIter, EnumString, IntoStaticStr};
 
-/// The ID of the `tket.argreader` extension.
-pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("tket.argreader");
-/// The "tket.argreader" extension version
+/// The ID of the `tket.argument` extension.
+pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("tket.argument");
+/// The "tket.argument" extension version
 pub const EXTENSION_VERSION: Version = Version::new(0, 1, 0);
 
 lazy_static! {
-    /// The "tket.argreader" extension.
+    /// The "tket.argument" extension.
     pub static ref EXTENSION: Arc<Extension> = {
         Extension::new_arc(EXTENSION_ID, EXTENSION_VERSION, |ext, ext_ref| {
             ReadArgOpDef::load_all_ops(ext, ext_ref).unwrap();

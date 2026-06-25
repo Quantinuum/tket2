@@ -36,7 +36,7 @@ use tket_qsystem::llvm::array_utils::ArrayLowering;
 pub use tket_qsystem::llvm::futures::FuturesCodegenExtension;
 use tket_qsystem::llvm::globals::GlobalsCodegenExtension;
 use tket_qsystem::llvm::{
-    argreader::ArgReaderCodegenExtension, debug::DebugCodegenExtension, prelude::QISPreludeCodegen,
+    argument::ArgumentCodegenExtension, debug::DebugCodegenExtension, prelude::QISPreludeCodegen,
     qsystem::QSystemCodegenExtension, random::RandomCodegenExtension,
     result::ResultsCodegenExtension, utils::UtilsCodegenExtension,
 };
@@ -142,7 +142,7 @@ fn codegen_extensions(platform: qsystem::QSystemPlatform) -> CodegenExtsMap<'sta
         .add_extension(DebugCodegenExtension::new(SeleneHeapArrayCodegen::LOWERING))
         .add_extension(gpu::GpuCodegen)
         // Argument reading uses standard arrays.
-        .add_extension(ArgReaderCodegenExtension::new(
+        .add_extension(ArgumentCodegenExtension::new(
             SeleneHeapArrayCodegen::LOWERING,
         ))
         .finish()

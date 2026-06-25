@@ -1,26 +1,32 @@
 ---
-source: tket-qsystem/src/llvm/argreader.rs
+source: tket-qsystem/src/llvm/argument.rs
 expression: mod_str
 ---
 ; ModuleID = 'test_context'
 source_filename = "test_context"
 
-@argument_test_arr_b.A74DBE76.0 = private constant [14 x i8] c"\0Dtest_arr_bool"
+@argument_test_arr_i.EF2BFDB2.0 = private constant [13 x i8] c"\0Ctest_arr_int"
 
 define internal { ptr, i64 } @_hl.main.1() !dbg !3 {
 alloca_block:
+  %"0" = alloca { ptr, i64 }, align 8
+  %"4_0" = alloca { ptr, i64 }, align 8
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  %0 = mul i64 10, ptrtoint (ptr getelementptr (i1, ptr null, i32 1) to i64), !dbg !11
+  %0 = mul i64 10, ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), !dbg !11
   %1 = call ptr @malloc(i64 %0), !dbg !11
   %2 = insertvalue { ptr, i64 } poison, ptr %1, 0, !dbg !11
   %3 = insertvalue { ptr, i64 } %2, i64 0, 1, !dbg !11
-  call void @argreader_get_bool_array(ptr @argument_test_arr_b.A74DBE76.0, ptr %1, i64 10), !dbg !11
-  ret { ptr, i64 } %3
+  call void @argreader_get_i64_array(ptr @argument_test_arr_i.EF2BFDB2.0, ptr %1, i64 10), !dbg !11
+  store { ptr, i64 } %3, ptr %"4_0", align 8, !dbg !11
+  %"4_01" = load { ptr, i64 }, ptr %"4_0", align 8
+  store { ptr, i64 } %"4_01", ptr %"0", align 8
+  %"02" = load { ptr, i64 }, ptr %"0", align 8
+  ret { ptr, i64 } %"02"
 }
 
-declare void @argreader_get_bool_array(ptr, ptr, i64)
+declare void @argreader_get_i64_array(ptr, ptr, i64)
 
 declare ptr @malloc(i64)
 

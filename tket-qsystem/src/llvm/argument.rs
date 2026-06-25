@@ -1,6 +1,6 @@
-//! LLVM lowering implementations for the "tket.argreader" extension.
+//! LLVM lowering implementations for the "tket.argument" extension.
 
-use crate::extension::argreader::{ReadArgOp, ReadArgOpDef};
+use crate::extension::argument::{ReadArgOp, ReadArgOpDef};
 use crate::llvm::array_utils::ArrayLowering;
 use crate::llvm::prelude::emit_global_string;
 use anyhow::{Result, anyhow, bail};
@@ -172,20 +172,20 @@ fn classify_arg_type(ty: &Type) -> Result<ArgKind> {
     }
 }
 
-/// Codegen extension for the argreader
+/// Codegen extension for the `tket.argument` extension.
 #[derive(Default)]
-pub struct ArgReaderCodegenExtension<AL: ArrayLowering> {
+pub struct ArgumentCodegenExtension<AL: ArrayLowering> {
     array_lowering: AL,
 }
 
-impl<AL: ArrayLowering> ArgReaderCodegenExtension<AL> {
-    /// Creates a new [ArgReaderCodegenExtension] with specified array lowering.
+impl<AL: ArrayLowering> ArgumentCodegenExtension<AL> {
+    /// Creates a new [ArgumentCodegenExtension] with specified array lowering.
     pub const fn new(array_lowering: AL) -> Self {
         Self { array_lowering }
     }
 }
 
-impl<AL: ArrayLowering + Clone> CodegenExtension for ArgReaderCodegenExtension<AL> {
+impl<AL: ArrayLowering + Clone> CodegenExtension for ArgumentCodegenExtension<AL> {
     fn add_extension<'a, H: HugrView<Node = Node> + 'a>(
         self,
         builder: CodegenExtsBuilder<'a, H>,
@@ -195,17 +195,17 @@ impl<AL: ArrayLowering + Clone> CodegenExtension for ArgReaderCodegenExtension<A
     {
         builder.simple_extension_op::<ReadArgOpDef>(move |context, args, _op| {
             let op = ReadArgOp::from_extension_op(args.node().as_ref())?;
-            ArgReaderEmitter(context, self.array_lowering.clone()).emit(args, &op)
+            ArgumentEmitter(context, self.array_lowering.clone()).emit(args, &op)
         })
     }
 }
 
-struct ArgReaderEmitter<'c, 'd, 'e, H: HugrView<Node = Node>, AL: ArrayLowering>(
+struct ArgumentEmitter<'c, 'd, 'e, H: HugrView<Node = Node>, AL: ArrayLowering>(
     &'d mut EmitFuncContext<'c, 'e, H>,
     AL,
 );
 
-impl<'c, H: HugrView<Node = Node>, AL: ArrayLowering + Clone> ArgReaderEmitter<'c, '_, '_, H, AL> {
+impl<'c, H: HugrView<Node = Node>, AL: ArrayLowering + Clone> ArgumentEmitter<'c, '_, '_, H, AL> {
     fn iw_context(&self) -> &'c Context {
         self.0.typing_session().iw_context()
     }
@@ -346,7 +346,7 @@ impl<'c, H: HugrView<Node = Node>, AL: ArrayLowering + Clone> ArgReaderEmitter<'
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::extension::argreader::ReadArgOp;
+    use crate::extension::argument::ReadArgOp;
     use crate::llvm::array_utils::DEFAULT_HEAP_ARRAY_LOWERING;
     use hugr::extension::prelude::bool_t;
     use hugr::extension::simple_op::MakeRegisteredOp;
@@ -378,7 +378,7 @@ mod test {
         9,
         ReadArgOp::new("test_narrow_arr", array_type(4, int_type(TypeArg::BoundedNat(3))))
     )]
-    fn emit_argreader_codegen(
+    fn emit_argument_codegen(
         // `_i` seeds the `TestContext` so each case emits to its own snapshot file
         // (`…_1.snap` … `…_9.snap`); without distinct ids the cases would collide.
         #[case] _i: i32,
@@ -387,7 +387,7 @@ mod test {
     ) {
         let pcg = QISPreludeCodegen;
         llvm_ctx.add_extensions(move |ceb| {
-            ceb.add_extension(ArgReaderCodegenExtension::new(DEFAULT_HEAP_ARRAY_LOWERING))
+            ceb.add_extension(ArgumentCodegenExtension::new(DEFAULT_HEAP_ARRAY_LOWERING))
                 .add_extension(DEFAULT_HEAP_ARRAY_LOWERING.codegen_extension())
                 .add_prelude_extensions(pcg.clone())
                 .add_default_int_extensions()

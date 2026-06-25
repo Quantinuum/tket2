@@ -13,7 +13,7 @@ from . import (
     modifier,
     global_phase,
     globals,
-    argreader,
+    argument,
 )
 
 __all__ = [
@@ -31,5 +31,5 @@ __all__ = [
     "modifier",
     "global_phase",
     "globals",
-    "argreader",
+    "argument",
 ]

@@ -1,5 +1,5 @@
 ---
-source: tket-qsystem/src/llvm/argreader.rs
+source: tket-qsystem/src/llvm/argument.rs
 expression: mod_str
 ---
 ; ModuleID = 'test_context'

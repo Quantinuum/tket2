@@ -1,10 +1,10 @@
 {
   "version": "0.1.0",
-  "name": "tket.argreader",
+  "name": "tket.argument",
   "types": {},
   "operations": {
     "read_arg": {
-      "extension": "tket.argreader",
+      "extension": "tket.argument",
       "name": "read_arg",
       "description": "Read a runtime argument of the given type identified by a string tag",
       "signature": {

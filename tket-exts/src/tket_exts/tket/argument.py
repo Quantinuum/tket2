@@ -10,13 +10,13 @@ from hugr.tys import FunctionType, StringArg, Type, TypeTypeArg
 from ._util import TketExtension, load_extension
 
 
-class ArgReaderExtension(TketExtension):
+class ArgumentExtension(TketExtension):
     """Operations for reading runtime entrypoint arguments."""
 
     @functools.cache
     def __call__(self) -> Extension:
-        """Returns the argreader extension"""
-        return load_extension("tket.argreader")
+        """Returns the argument extension"""
+        return load_extension("tket.argument")
 
     def TYPES(self) -> List[TypeDef]:
         """Return the types defined by this extension"""
