@@ -380,7 +380,7 @@ mod test {
     )]
     fn emit_argument_codegen(
         // `_i` seeds the `TestContext` so each case emits to its own snapshot file
-        // (`…_1.snap` … `…_9.snap`); without distinct ids the cases would collide.
+        // (`..._1.snap` ... `..._9.snap`); without distinct ids the cases would collide.
         #[case] _i: i32,
         #[with(_i)] mut llvm_ctx: TestContext,
         #[case] op: ReadArgOp,
