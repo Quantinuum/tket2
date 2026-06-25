@@ -1,7 +1,7 @@
 //! The compiler for HUGR to QIS
 pub mod array;
 
-use anyhow::{Result, anyhow, bail};
+use anyhow::{Result, anyhow};
 use hugr::envelope::EnvelopeConfig;
 use hugr::llvm::CodegenExtsBuilder;
 use hugr::llvm::custom::CodegenExtsMap;
@@ -136,7 +136,7 @@ fn codegen_extensions(platform: qsystem::QSystemPlatform) -> CodegenExtsMap<'sta
         .add_extension(ResultsCodegenExtension::new(
             SeleneHeapArrayCodegen::LOWERING,
         ))
-        .add_extension(RotationCodegenExtension::new(pcg.clone()))
+        .add_extension(RotationCodegenExtension::new(pcg))
         .add_extension(UtilsCodegenExtension)
         // State results use standard arrays.
         .add_extension(DebugCodegenExtension::new(SeleneHeapArrayCodegen::LOWERING))
@@ -222,10 +222,10 @@ fn get_entry_point_name(namer: &Namer, hugr: &impl HugrView<Node = Node>) -> Res
             .as_func_defn()
             .ok_or_else(|| anyhow!("Entry point node is not a function definition"))?;
         if func_defn.inner_signature().input_count() != 0 {
-            bail!(
+            return Err(anyhow!(
                 "Entry point function must have no input parameters (found {})",
                 func_defn.inner_signature().input_count()
-            );
+            ));
         }
         (func_defn.func_name().as_ref(), hugr.entrypoint())
     };

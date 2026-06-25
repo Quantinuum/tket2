@@ -32,13 +32,13 @@ enum ArgKind {
     /// A boolean argument.
     Bool,
     /// A signed 64-bit integer argument (i64 / log-width 6 only).
-    Int,
+    I64,
     /// A 64-bit floating-point argument.
     F64,
     /// An array of booleans with a fixed length.
     ArrBool(u64),
     /// An array of signed 64-bit integers with a fixed length.
-    ArrInt(u64),
+    ArrI64(u64),
     /// An array of 64-bit floats with a fixed length.
     ArrF64(u64),
 }
@@ -48,10 +48,10 @@ impl ArgKind {
     const fn call_name(&self) -> &'static str {
         match self {
             ArgKind::Bool => "read_arg_bool",
-            ArgKind::Int => "read_arg_int",
+            ArgKind::I64 => "read_arg_int",
             ArgKind::F64 => "read_arg_f64",
             ArgKind::ArrBool(_) => "read_arg_bool_array",
-            ArgKind::ArrInt(_) => "read_arg_int_array",
+            ArgKind::ArrI64(_) => "read_arg_int_array",
             ArgKind::ArrF64(_) => "read_arg_f64_array",
         }
     }
@@ -60,7 +60,7 @@ impl ArgKind {
     const fn as_array(&self) -> Option<(u64, Scalar)> {
         match self {
             ArgKind::ArrBool(len) => Some((*len, Scalar::Bool)),
-            ArgKind::ArrInt(len) => Some((*len, Scalar::Int)),
+            ArgKind::ArrI64(len) => Some((*len, Scalar::I64)),
             ArgKind::ArrF64(len) => Some((*len, Scalar::F64)),
             _ => None,
         }
@@ -71,7 +71,7 @@ impl ArgKind {
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Scalar {
     Bool,
-    Int,
+    I64,
     F64,
 }
 
@@ -79,7 +79,7 @@ impl Scalar {
     const fn scalar_kind(self) -> ArgKind {
         match self {
             Scalar::Bool => ArgKind::Bool,
-            Scalar::Int => ArgKind::Int,
+            Scalar::I64 => ArgKind::I64,
             Scalar::F64 => ArgKind::F64,
         }
     }
@@ -87,7 +87,7 @@ impl Scalar {
     const fn array_kind(self, size: u64) -> ArgKind {
         match self {
             Scalar::Bool => ArgKind::ArrBool(size),
-            Scalar::Int => ArgKind::ArrInt(size),
+            Scalar::I64 => ArgKind::ArrI64(size),
             Scalar::F64 => ArgKind::ArrF64(size),
         }
     }
@@ -96,7 +96,7 @@ impl Scalar {
     fn llvm_type<'c>(self, ctx: &'c Context) -> BasicTypeEnum<'c> {
         match self {
             Scalar::Bool => ctx.bool_type().as_basic_type_enum(),
-            Scalar::Int => ctx.i64_type().as_basic_type_enum(),
+            Scalar::I64 => ctx.i64_type().as_basic_type_enum(),
             Scalar::F64 => ctx.f64_type().as_basic_type_enum(),
         }
     }
@@ -145,7 +145,7 @@ fn classify_scalar(ty: &Type) -> Option<Result<Scalar>> {
     } else {
         as_int_log_width(ty).map(|log_width| {
             if log_width == LOG_WIDTH_MAX {
-                Ok(Scalar::Int)
+                Ok(Scalar::I64)
             } else {
                 Err(anyhow!(
                     "Only i64 (log-width {LOG_WIDTH_MAX}) is supported as an integer argument; \
@@ -234,13 +234,23 @@ impl<'c, H: HugrView<Node = Node>, AL: ArrayLowering + Clone> ArgReaderEmitter<'
         self.0.builder()
     }
 
+    /// Declare (or retrieve) the Selene-provided extern for reading an argument of
+    /// `kind`, returning its [`FunctionValue`].
+    ///
+    /// These `argreader_get_*` functions are implemented by the Selene runtime. Their
+    /// ABI is:
+    /// - scalars: `fn(tag: ptr) -> T`, where `tag` is the NUL-terminated argument name
+    ///   and `T` is the scalar (`i1`/`i64`/`f64`).
+    /// - arrays: `fn(tag: ptr, out: ptr, len: i64)`, where `out` is a caller-allocated
+    ///   buffer the runtime fills (arrays cannot be returned by value across the C ABI)
+    ///   and `len` is the element count.
     fn get_argreader_func(&self, kind: &ArgKind) -> Result<FunctionValue<'c>> {
         let (fn_type, func_name) = match kind {
             ArgKind::Bool => (
                 self.bool_t().fn_type(&[self.ptr_t().into()], false),
                 "argreader_get_bool",
             ),
-            ArgKind::Int => (
+            ArgKind::I64 => (
                 self.i64_t().fn_type(&[self.ptr_t().into()], false),
                 "argreader_get_i64",
             ),
@@ -259,7 +269,7 @@ impl<'c, H: HugrView<Node = Node>, AL: ArrayLowering + Clone> ArgReaderEmitter<'
                 ),
                 "argreader_get_bool_array",
             ),
-            ArgKind::ArrInt(_) => (
+            ArgKind::ArrI64(_) => (
                 self.void_t().fn_type(
                     &[
                         self.ptr_t().into(),
@@ -350,40 +360,35 @@ mod test {
     use crate::llvm::prelude::QISPreludeCodegen;
 
     #[rstest]
-    #[case::bool(1, ReadArgOp::new("test_bool", bool_t()), &DEFAULT_HEAP_ARRAY_LOWERING)]
-    #[case::int(2, ReadArgOp::new("test_int", int_type(TypeArg::BoundedNat(6))), &DEFAULT_HEAP_ARRAY_LOWERING)]
-    #[case::f64(3, ReadArgOp::new("test_f64", float64_type()), &DEFAULT_HEAP_ARRAY_LOWERING)]
-    #[case::arr_bool(4, ReadArgOp::new("test_arr_bool", array_type(10, bool_t())), &DEFAULT_HEAP_ARRAY_LOWERING)]
+    #[case::bool(1, ReadArgOp::new("test_bool", bool_t()))]
+    #[case::int(2, ReadArgOp::new("test_int", int_type(TypeArg::BoundedNat(6))))]
+    #[case::f64(3, ReadArgOp::new("test_f64", float64_type()))]
+    #[case::arr_bool(4, ReadArgOp::new("test_arr_bool", array_type(10, bool_t())))]
     #[case::arr_int(
         5,
-        ReadArgOp::new("test_arr_int", array_type(10, int_type(TypeArg::BoundedNat(6)))),
-        &DEFAULT_HEAP_ARRAY_LOWERING
+        ReadArgOp::new("test_arr_int", array_type(10, int_type(TypeArg::BoundedNat(6))))
     )]
-    #[case::arr_f64(
-        6,
-        ReadArgOp::new("test_arr_f64", array_type(10, float64_type())),
-        &DEFAULT_HEAP_ARRAY_LOWERING
-    )]
+    #[case::arr_f64(6, ReadArgOp::new("test_arr_f64", array_type(10, float64_type())))]
     #[should_panic(expected = "Empty argument name tag received")]
-    #[case::empty_tag(7, ReadArgOp::new("", bool_t()), &DEFAULT_HEAP_ARRAY_LOWERING)]
+    #[case::empty_tag(7, ReadArgOp::new("", bool_t()))]
     #[should_panic(expected = "log-width 6")]
-    #[case::narrow_int(8, ReadArgOp::new("test_narrow", int_type(TypeArg::BoundedNat(3))), &DEFAULT_HEAP_ARRAY_LOWERING)]
+    #[case::narrow_int(8, ReadArgOp::new("test_narrow", int_type(TypeArg::BoundedNat(3))))]
     #[should_panic(expected = "log-width 6")]
     #[case::narrow_int_arr(
         9,
-        ReadArgOp::new("test_narrow_arr", array_type(4, int_type(TypeArg::BoundedNat(3)))),
-        &DEFAULT_HEAP_ARRAY_LOWERING
+        ReadArgOp::new("test_narrow_arr", array_type(4, int_type(TypeArg::BoundedNat(3))))
     )]
     fn emit_argreader_codegen(
+        // `_i` seeds the `TestContext` so each case emits to its own snapshot file
+        // (`…_1.snap` … `…_9.snap`); without distinct ids the cases would collide.
         #[case] _i: i32,
         #[with(_i)] mut llvm_ctx: TestContext,
         #[case] op: ReadArgOp,
-        #[case] array_lowering: &'static (impl ArrayLowering + Clone),
     ) {
         let pcg = QISPreludeCodegen;
         llvm_ctx.add_extensions(move |ceb| {
-            ceb.add_extension(ArgReaderCodegenExtension::new(array_lowering.clone()))
-                .add_extension(array_lowering.codegen_extension())
+            ceb.add_extension(ArgReaderCodegenExtension::new(DEFAULT_HEAP_ARRAY_LOWERING))
+                .add_extension(DEFAULT_HEAP_ARRAY_LOWERING.codegen_extension())
                 .add_prelude_extensions(pcg.clone())
                 .add_default_int_extensions()
                 .add_float_extensions()
@@ -395,29 +400,33 @@ mod test {
 
     #[rstest]
     #[case::bool(bool_t(), ArgKind::Bool)]
-    #[case::int(int_type(TypeArg::BoundedNat(6)), ArgKind::Int)]
+    #[case::int(int_type(TypeArg::BoundedNat(6)), ArgKind::I64)]
     #[case::f64(float64_type(), ArgKind::F64)]
     #[case::arr_bool(array_type(10, bool_t()), ArgKind::ArrBool(10))]
-    #[case::arr_int(array_type(10, int_type(TypeArg::BoundedNat(6))), ArgKind::ArrInt(10))]
+    #[case::arr_int(array_type(10, int_type(TypeArg::BoundedNat(6))), ArgKind::ArrI64(10))]
     #[case::arr_f64(array_type(10, float64_type()), ArgKind::ArrF64(10))]
     fn test_classify(#[case] ty: Type, #[case] expected: ArgKind) {
         assert_eq!(classify_arg_type(&ty).unwrap(), expected);
     }
 
-    #[test]
-    fn test_classify_int_rejects_narrow() {
-        for log_width in 0u64..=5 {
-            let err = classify_arg_type(&int_type(TypeArg::BoundedNat(log_width))).unwrap_err();
-            assert!(
-                err.to_string().contains("log-width 6"),
-                "log_width={log_width}: {err}"
-            );
-        }
-    }
-
-    #[test]
-    fn test_classify_arr_int_rejects_narrow() {
-        let err = classify_arg_type(&array_type(4, int_type(TypeArg::BoundedNat(3)))).unwrap_err();
-        assert!(err.to_string().contains("log-width 6"), "{err}");
+    #[rstest]
+    #[case(0)]
+    #[case(1)]
+    #[case(2)]
+    #[case(3)]
+    #[case(4)]
+    #[case(5)]
+    fn test_classify_rejects_narrow_int(#[case] log_width: u64) {
+        let scalar_err = classify_arg_type(&int_type(TypeArg::BoundedNat(log_width))).unwrap_err();
+        assert!(
+            scalar_err.to_string().contains("log-width 6"),
+            "scalar log_width={log_width}: {scalar_err}"
+        );
+        let array_err = classify_arg_type(&array_type(4, int_type(TypeArg::BoundedNat(log_width))))
+            .unwrap_err();
+        assert!(
+            array_err.to_string().contains("log-width 6"),
+            "array log_width={log_width}: {array_err}"
+        );
     }
 }
