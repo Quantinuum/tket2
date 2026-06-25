@@ -128,7 +128,7 @@ use hugr::{
     core::HugrNode,
     extension::{prelude::qb_t, simple_op::MakeExtensionOp},
     hugr::hugrmut::HugrMut,
-    ops::{CFG, Const, OpType},
+    ops::{CFG, Call, CallIndirect, Const, LoadFunction, OpType},
     std_extensions::collections::array::array_type,
     types::{EdgeKind, FuncTypeBase, Signature, Term, Type, TypeRow},
 };
@@ -1425,6 +1425,22 @@ impl<N: HugrNode> ModifierResolver<N> {
         // Verify that the rewrite can be applied.
         self.verify(hugr, modifier_node)?;
 
+        if let Some(owner) = module_child_containing(hugr, modifier_node)
+            && matches!(hugr.get_optype(owner), OpType::FuncDefn(_))
+            && !self.modified_functions.contains(&owner)
+            && ModifierFlags::from_metadata(hugr, owner)
+                .is_some_and(|flags| flags.control && !flags.dagger)
+        {
+            let owner_input_modifiers = self.higher_order_input_modifiers(hugr, owner)?;
+            if !owner_input_modifiers.is_empty() {
+                let new_func = self.with_modifiers(CombinedModifier::default(), |this| {
+                    this.modify_fn(hugr, owner)
+                })?;
+                self.retarget_function_consumers(hugr, owner, new_func)?;
+                return Ok(());
+            }
+        }
+
         // The ports that takes inputs from the modified function to the IndirectCall node.
         let modified_fn_loader: Vec<(_, Vec<_>)> = hugr
             .node_outputs(modifier_node)
@@ -1437,14 +1453,179 @@ impl<N: HugrNode> ModifierResolver<N> {
         let new_load = self.with_modifiers(modifiers, |this| {
             this.apply_modifier_chain_to_loaded_fn(hugr, modifier_node)
         })?;
+        let new_load_signature = match hugr.get_optype(new_load) {
+            OpType::LoadFunction(load) => Some(load.func_sig.body().clone()),
+            _ => None,
+        };
+        let new_loaded_func = match hugr.get_optype(new_load) {
+            OpType::LoadFunction(load) => hugr
+                .single_linked_output(new_load, load.function_port())
+                .map(|(func, _)| func),
+            _ => None,
+        };
 
         // Connect the modified function to the inputs
         for (out_port, inputs) in modified_fn_loader {
             for (recv, recv_port) in inputs {
+                if recv_port.index() == 0
+                    && let Some(signature) = &new_load_signature
+                    && matches!(hugr.get_optype(recv), OpType::CallIndirect(_))
+                {
+                    // The loaded function's value type may have changed, for
+                    // example because a higher-order function input was
+                    // rewritten to an already-controlled function type. The
+                    // indirect call consuming it must use the same body
+                    // signature as the new load.
+                    hugr.replace_op(
+                        recv,
+                        OpType::CallIndirect(CallIndirect {
+                            signature: signature.clone(),
+                        }),
+                    );
+                    if let Some(new_loaded_func) = new_loaded_func {
+                        self.refresh_indirect_call_higher_order_args(hugr, recv, new_loaded_func)?;
+                    }
+                }
                 hugr.disconnect(recv, recv_port);
                 hugr.connect(new_load, out_port, recv, recv_port);
             }
         }
+        Ok(())
+    }
+
+    fn retarget_function_consumers(
+        &mut self,
+        h: &mut impl HugrMut<Node = N>,
+        old_func: N,
+        new_func: N,
+    ) -> Result<(), ModifierResolverErrors<N>> {
+        let consumers = h.linked_inputs(old_func, 0).collect::<Vec<_>>();
+        for (consumer, port) in consumers {
+            if consumer == new_func {
+                continue;
+            }
+            self.refresh_existing_function_consumer_signature(h, new_func, consumer)?;
+            h.disconnect(consumer, port);
+            h.connect(new_func, 0, consumer, port);
+            match h.get_optype(consumer) {
+                OpType::Call(_) => {
+                    self.refresh_direct_call_higher_order_args(h, consumer, new_func)?;
+                }
+                OpType::LoadFunction(_) => {
+                    let load_consumers = h.linked_inputs(consumer, 0).collect::<Vec<_>>();
+                    for (load_consumer, load_consumer_port) in load_consumers {
+                        if load_consumer_port.index() == 0
+                            && matches!(h.get_optype(load_consumer), OpType::CallIndirect(_))
+                        {
+                            self.refresh_indirect_call_signature(h, load_consumer, new_func)?;
+                            self.refresh_indirect_call_higher_order_args(
+                                h,
+                                load_consumer,
+                                new_func,
+                            )?;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    fn refresh_existing_function_consumer_signature(
+        &self,
+        h: &mut impl HugrMut<Node = N>,
+        func: N,
+        consumer: N,
+    ) -> Result<(), ModifierResolverErrors<N>> {
+        let OpType::FuncDefn(defn) = h.get_optype(func) else {
+            return Ok(());
+        };
+        let signature = defn.signature().clone();
+        match h.get_optype(consumer).clone() {
+            OpType::Call(call) => {
+                let call = Call::try_new(signature, call.type_args).map_err(BuildError::from)?;
+                h.replace_op(consumer, call);
+            }
+            OpType::LoadFunction(load) => {
+                let load =
+                    LoadFunction::try_new(signature, load.type_args).map_err(BuildError::from)?;
+                h.replace_op(consumer, load);
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn refresh_indirect_call_signature(
+        &self,
+        h: &mut impl HugrMut<Node = N>,
+        call_node: N,
+        func: N,
+    ) -> Result<(), ModifierResolverErrors<N>> {
+        let OpType::FuncDefn(defn) = h.get_optype(func) else {
+            return Ok(());
+        };
+        h.replace_op(
+            call_node,
+            CallIndirect {
+                signature: defn.signature().body().clone(),
+            },
+        );
+        Ok(())
+    }
+
+    fn refresh_direct_call_higher_order_args(
+        &mut self,
+        h: &mut impl HugrMut<Node = N>,
+        call_node: N,
+        func: N,
+    ) -> Result<(), ModifierResolverErrors<N>> {
+        for (input, modifiers) in self.function_input_modifiers(func).to_vec() {
+            let Some((source, _)) = h.single_linked_output(call_node, input) else {
+                continue;
+            };
+            self.modify_loaded_function_value(h, source, modifiers)?;
+        }
+        Ok(())
+    }
+
+    fn refresh_indirect_call_higher_order_args(
+        &mut self,
+        h: &mut impl HugrMut<Node = N>,
+        call_node: N,
+        func: N,
+    ) -> Result<(), ModifierResolverErrors<N>> {
+        for (input, modifiers) in self.function_input_modifiers(func).to_vec() {
+            let call_input = IncomingPort::from(input + 1);
+            let Some((source, _)) = h.single_linked_output(call_node, call_input) else {
+                continue;
+            };
+            self.modify_loaded_function_value(h, source, modifiers)?;
+        }
+        Ok(())
+    }
+
+    fn modify_loaded_function_value(
+        &mut self,
+        h: &mut impl HugrMut<Node = N>,
+        load_node: N,
+        modifiers: CombinedModifier,
+    ) -> Result<(), ModifierResolverErrors<N>> {
+        let Ok((func, load)) =
+            Self::get_loaded_function(h, load_node, load_node, h.get_optype(load_node))
+        else {
+            return Ok(());
+        };
+        let function_port = load.function_port();
+        let saved_modifiers = mem::replace(self.modifiers_mut(), modifiers);
+        let modified_func = self.modify_fn(h, func);
+        *self.modifiers_mut() = saved_modifiers;
+        let modified_func = modified_func?;
+        let load = self.load_for_modified_function(h, modified_func, load)?;
+        h.replace_op(load_node, load);
+        h.disconnect(load_node, function_port);
+        h.connect(modified_func, 0, load_node, function_port);
         Ok(())
     }
 

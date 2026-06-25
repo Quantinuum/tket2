@@ -308,7 +308,7 @@ impl<N: HugrNode> ModifierResolver<N> {
     /// inputs as well as add control arrays. Reconstructing the load signature
     /// from the old `LoadFunction` can therefore miss those higher-order input
     /// changes; the generated `FuncDefn` is the source of truth.
-    fn load_for_modified_function(
+    pub(super) fn load_for_modified_function(
         &self,
         h: &impl HugrMut<Node = N>,
         modified_fn: N,

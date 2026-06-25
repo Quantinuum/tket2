@@ -414,6 +414,11 @@ same_twice_solved:
 	101 -> 0.5+0j
 	110 -> 0.5+0j
 -----
+simple_higher_order_1_solved:
+	00 -> 0.7071+0j
+	10 -> 0.5+0j
+	11 -> 0.5+0j
+-----
 simple_higher_order_solved:
 	000 -> 0.7071+0j
 	100 -> 0.5+0j

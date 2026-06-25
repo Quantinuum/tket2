@@ -7,13 +7,13 @@ use std::{
 use hugr::{
     HugrView, IncomingPort, Node, OutgoingPort, PortIndex, Wire,
     builder::{
-        ConditionalBuilder, Container, DFGBuilder, Dataflow, FunctionBuilder, SubContainer,
-        TailLoopBuilder,
+        BuildError, ConditionalBuilder, Container, DFGBuilder, Dataflow, FunctionBuilder,
+        SubContainer, TailLoopBuilder,
     },
     core::HugrNode,
     extension::{prelude::qb_t, simple_op::MakeExtensionOp},
     hugr::hugrmut::HugrMut,
-    ops::{Conditional, DFG, DataflowBlock, DataflowOpTrait, OpType, TailLoop},
+    ops::{Call, Conditional, DFG, DataflowBlock, DataflowOpTrait, LoadFunction, OpType, TailLoop},
     std_extensions::collections::array::ArrayOpBuilder,
     types::{EdgeKind, FuncTypeBase, TypeRow},
 };
@@ -462,6 +462,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         let new_call_map = update_call_map(&call_map, &insertion_result.node_map);
         for (old_in, targets) in new_call_map.into_iter() {
             for (new_n, new_port) in targets {
+                self.refresh_function_consumer_signature(h, old_in, new_n)?;
                 h.connect(old_in, 0, new_n, new_port);
             }
         }
@@ -489,6 +490,37 @@ impl<N: HugrNode> ModifierResolver<N> {
         self.modified_functions.insert(func);
 
         Ok(new_function_node)
+    }
+
+    /// Rebuild a function consumer so its function port type matches `func`.
+    ///
+    /// Some generated functions change higher-order argument types even when no
+    /// extra control arrays are added to the caller itself. If a copied
+    /// `Call`/`LoadFunction` still carries the old function type, reconnecting
+    /// the generated function would make the HUGR invalid.
+    fn refresh_function_consumer_signature(
+        &self,
+        h: &mut impl HugrMut<Node = N>,
+        func: N,
+        consumer: N,
+    ) -> Result<(), ModifierResolverErrors<N>> {
+        let OpType::FuncDefn(defn) = h.get_optype(func) else {
+            return Ok(());
+        };
+        let signature = defn.signature().clone();
+        match h.get_optype(consumer).clone() {
+            OpType::Call(call) => {
+                let call = Call::try_new(signature, call.type_args).map_err(BuildError::from)?;
+                h.replace_op(consumer, call);
+            }
+            OpType::LoadFunction(load) => {
+                let load =
+                    LoadFunction::try_new(signature, load.type_args).map_err(BuildError::from)?;
+                h.replace_op(consumer, load);
+            }
+            _ => {}
+        }
+        Ok(())
     }
 
     /// Inserts a sub DFG into the given parent DFG, updating the call map accordingly.
