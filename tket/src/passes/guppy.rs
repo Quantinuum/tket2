@@ -3,7 +3,7 @@
 use crate::passes::composable::WithScope;
 use crate::passes::const_fold::{ConstFoldError, ConstantFoldPass};
 use crate::passes::dead_funcs::RemoveDeadFuncsError;
-use crate::passes::inline_funcs::{InlineFuncsError, InlineFunctionsPass};
+use crate::passes::inline_funcs::{InlineFuncsError, InlineFuncsHeuristic, InlineFunctionsPass};
 use crate::passes::modifier_resolver::{ModifierResolverErrors, ModifierResolverPass};
 use crate::passes::normalize_cfgs::{NormalizeCFGError, NormalizeCFGPass};
 use crate::passes::redundant_order_edges::RedundantOrderEdgesPass;
@@ -32,7 +32,7 @@ pub struct NormalizeGuppy {
     /// Whether to remove dead functions.
     dead_funcs: bool,
     /// Whether to inline function calls (converting to DFGs).
-    inline_funcs: bool,
+    inline_funcs: Option<InlineFuncsHeuristic>,
     /// Whether to inline DFG operations.
     inline_dfgs: bool,
     /// Whether to squash BorrowArray borrow/return ops
@@ -79,7 +79,7 @@ impl NormalizeGuppy {
     }
     /// Set whether to inline Function calls. (Does not include [Self::inline_dfgs]
     /// but generates DFGs so the latter is strongly recommended.)
-    pub fn inline_funcs(&mut self, inline: bool) -> &mut Self {
+    pub fn inline_funcs(&mut self, inline: Option<InlineFuncsHeuristic>) -> &mut Self {
         self.inline_funcs = inline;
         self
     }
@@ -99,7 +99,7 @@ impl Default for NormalizeGuppy {
     fn default() -> Self {
         Self {
             resolve_modifiers: true,
-            inline_funcs: true,
+            inline_funcs: Some(InlineFuncsHeuristic::default()),
             simplify_cfgs: true,
             constant_fold: true,
             untuple: true,
@@ -140,8 +140,9 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for NormalizeGuppy {
         }
         // Inline function calls creates many opportunities for optimization by other
         // passes by producing copies that can be optimized in a specific context
-        if self.inline_funcs {
+        if let Some(inline_funcs) = &self.inline_funcs {
             InlineFunctionsPass::default_with_scope(self.scope.clone())
+                .with_heuristic(inline_funcs.clone())
                 .run(hugr)
                 .map_err(NormalizeGuppyErrors::InlineFuncs)?;
         }
