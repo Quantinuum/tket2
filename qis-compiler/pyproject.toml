@@ -8,6 +8,7 @@ dev = [
     "pytest-snapshot~=0.9.0",
     "cibuildwheel>=2.23.2",
     "hugr~=0.17.1",
+    "tket-exts>=0.13.1",
 ]
 
 [project]
@@ -70,6 +71,9 @@ select = [
 ]
 ignore = ["F403", "F405", "PYI021", "PYI048"]
 
+
+[tool.uv.sources]
+tket-exts = { workspace = true }
 
 [tool.uv]
 # Rebuild package when any rust files change

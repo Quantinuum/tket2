@@ -2698,6 +2698,7 @@ dev = [
     { name = "hugr" },
     { name = "pytest" },
     { name = "pytest-snapshot" },
+    { name = "tket-exts" },
 ]
 
 [package.metadata]
@@ -2708,6 +2709,7 @@ dev = [
     { name = "hugr", specifier = "~=0.17.1" },
     { name = "pytest", specifier = ">=8.4.2" },
     { name = "pytest-snapshot", specifier = "~=0.9.0" },
+    { name = "tket-exts", editable = "tket-exts" },
 ]
 
 [[package]]
