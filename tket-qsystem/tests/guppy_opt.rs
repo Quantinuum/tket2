@@ -94,7 +94,7 @@ fn count_gates(h: &impl HugrView) -> HashMap<SmolStr, usize> {
 // Following is https://github.com/Quantinuum/tket2/issues/1747:
 #[should_panic = "PytketDecodeError { inner: DuplicatedParameter"]
 #[case::angles("angles", Some(vec![
-    ("tket.quantum.Rz", 2), ("tket.quantum.MeasureFree", 1), ("tket.quantum.H", 2), ("tket.quantum.QAlloc", 1),
+    ("tket.quantum.Rz", 2), ("tket.quantum.Measure", 1), ("tket.quantum.H", 2), ("tket.quantum.QAlloc", 1), ("tket.quantum.QFree", 1)
 ]))]
 #[should_panic = "xfail"]
 #[case::simple_cx("simple_cx", Some(vec![
