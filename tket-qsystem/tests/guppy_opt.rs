@@ -202,3 +202,28 @@ fn issue_1577_remove_barriers_reassembles_nested_circuits() {
     run_pytket(&mut hugr, REMOVE_BARRIERS_STR);
     hugr.validate().unwrap_or_else(|e| panic!("{e}"));
 }
+
+#[rstest]
+fn decode_error_1747() {
+    use tket_qsystem::extension::REGISTRY;
+
+    let file = fs::File::open(Path::new(
+        "../test_files/guppy_examples/normalized_angles_1747.hugr",
+    ))
+    .unwrap();
+    let reader = BufReader::new(file);
+    let mut hugr = Hugr::load(reader, Some(&REGISTRY)).unwrap();
+
+    run_pytket(&mut hugr, CLIFFORD_SIMP_STR);
+    /*let encode_options = EncodeOptions::new()
+        .with_subcircuits(true)
+        .with_config(qsystem_encoder_config(QSystemPlatform::Helios));
+
+    let mut encoded =
+        EncodedCircuit::new_with_entrypoint(h, h.module_root(), encode_options).unwrap();
+    for (region, serial_circuit) in encoded.iter() {
+        let mut circuit_ptr = Tket1Circuit::from_serial_circuit(serial_circuit).unwrap();
+        Tket1Pass::run_from_json(pass_json, &mut circuit_ptr).unwrap();
+        *serial_circuit = circuit_ptr.to_serial_circuit().unwrap();
+    }*/
+}
