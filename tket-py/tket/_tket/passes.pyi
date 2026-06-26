@@ -2,7 +2,6 @@ from pathlib import Path
 
 from .optimiser import BadgerOptimiser
 from .state import CompilationState
-from .inline_funcs import InlineFuncsHeuristic
 from ..passes import inline_funcs
 from hugr.passes.scope import PassScope, GlobalScope
 
