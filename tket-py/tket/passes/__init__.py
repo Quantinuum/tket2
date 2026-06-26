@@ -142,6 +142,7 @@ class NormalizeGuppy(ComposablePass):
 
     def _run_tk(self, program: _state.CompilationState) -> _state.CompilationState:
         """Run the pass in the CompilationState
+
         TODO: This should be part of a protocol."""
         inline_funcs_heuristic = (
             inline_funcs.MaxSize(64)
