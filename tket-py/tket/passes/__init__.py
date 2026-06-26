@@ -33,7 +33,8 @@ __all__ = [
     "InlineFunctions",
     "NormalizeGuppy",
     "ModifierResolverPass",
-    "QSystemPass",
+    "QSystemRebasePass",
+    "QSystemLLVMPass",
     "Cliffordize",
 ]
 
@@ -379,19 +380,17 @@ class ModifierResolverPass(ComposablePass):
 
 
 @dataclass(kw_only=True)
-class QSystemPass(ComposablePass):
-    """A pass to convert quantum ops to qsystem ops.
+class QSystemRebasePass(ComposablePass):
+    """Convert quantum operations to QSystem operations.
 
-     Parameters:
-    - constant_fold: Whether to perform constant folding.
-    - monomorphize: Whether to monomorphize generic functions.
-    - force_order: Whether to enforce total ordering of all HUGR operations.
-    - hide_funcs: Whether to mark all functions as private.
+    Parameters:
+    - resolve_modifiers: Whether to resolve Guppy modifiers.
+    - lower_drops: Whether to lower qubit drops to QSystem operations.
+    - hide_funcs: Whether to mark generated helper functions as private.
     """
 
-    constant_fold: bool = True
-    monomorphize: bool = True
-    force_order: bool = True
+    resolve_modifiers: bool = True
+    lower_drops: bool = True
     hide_funcs: bool = True
     _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
 
@@ -403,7 +402,7 @@ class QSystemPass(ComposablePass):
             copy_call=lambda h: self._qsystem_rebase(h, inplace),
         )
 
-    def with_scope(self, scope: PassScope) -> QSystemPass:
+    def with_scope(self, scope: PassScope) -> QSystemRebasePass:
         """Set the scope of this pass and return self."""
         self._scope = scope
         return self
@@ -422,10 +421,59 @@ class QSystemPass(ComposablePass):
         """Run the pass in the CompilationState"""
         _passes.qsystem_rebase_pass(
             program._inner,
+            resolve_modifiers=self.resolve_modifiers,
+            lower_drops=self.lower_drops,
+            hide_funcs=self.hide_funcs,
+            scope=self._scope,
+        )
+        return program
+
+
+@dataclass(kw_only=True)
+class QSystemLLVMPass(ComposablePass):
+    """Prepare a QSystem program for LLVM lowering.
+
+    Parameters:
+    - constant_fold: Whether to perform constant folding.
+    - monomorphize: Whether to monomorphize generic functions.
+    - force_order: Whether to enforce total ordering of all HUGR operations.
+    """
+
+    constant_fold: bool = True
+    monomorphize: bool = True
+    force_order: bool = True
+    _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
+
+    def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
+        return implement_pass_run(
+            self,
+            hugr=hugr,
+            inplace=inplace,
+            copy_call=lambda h: self._qsystem_llvm(h, inplace),
+        )
+
+    def with_scope(self, scope: PassScope) -> QSystemLLVMPass:
+        """Set the scope of this pass and return self."""
+        self._scope = scope
+        return self
+
+    def _qsystem_llvm(self, hugr: Hugr, inplace: bool) -> PassResult:
+        tk_program = _state.CompilationState.from_python(hugr)
+
+        self._run_tk(tk_program)
+
+        package = tk_program.to_python()
+        return PassResult.for_pass(
+            self, hugr=package.modules[0], inplace=inplace, result=None
+        )
+
+    def _run_tk(self, program: _state.CompilationState) -> _state.CompilationState:
+        """Run the pass in the CompilationState"""
+        _passes.qsystem_llvm_pass(
+            program._inner,
             constant_fold=self.constant_fold,
             monomorphize=self.monomorphize,
             force_order=self.force_order,
-            hide_funcs=self.hide_funcs,
             scope=self._scope,
         )
         return program

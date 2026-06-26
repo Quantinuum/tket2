@@ -20,6 +20,7 @@ use itertools::Itertools;
 use pyo3::prelude::*;
 use tket::hugr::ops::DataflowParent;
 use tket::passes::composable::ComposablePass;
+use tket_qsystem::{QSystemLLVMPass, QSystemRebasePass};
 
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
@@ -30,7 +31,6 @@ use std::{fs, str, vec};
 use tket::hugr::{self, llvm::inkwell};
 use tket::hugr::{Hugr, HugrView, Node};
 use tket::llvm::rotation::RotationCodegenExtension;
-use tket_qsystem::QSystemPass;
 use tket_qsystem::extension::{REGISTRY, qsystem};
 use tket_qsystem::llvm::array_utils::ArrayLowering;
 pub use tket_qsystem::llvm::futures::FuturesCodegenExtension;
@@ -112,7 +112,8 @@ fn get_hugr_llvm_module<'c, 'hugr, 'a: 'c>(
 }
 
 fn process_hugr(platform: qsystem::QSystemPlatform, hugr: &mut Hugr) -> Result<()> {
-    QSystemPass::defaults(platform).run(hugr)?;
+    QSystemRebasePass::defaults(platform).run(hugr)?;
+    QSystemLLVMPass::default().run(hugr)?;
     Ok(())
 }
 

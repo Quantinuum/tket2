@@ -15,7 +15,7 @@ use tket::passes::NormalizeGuppy;
 use tket::serialize::pytket::{EncodeOptions, EncodedCircuit};
 
 use tket_qsystem::pytket::{qsystem_decoder_config, qsystem_encoder_config};
-use tket_qsystem::{QSystemPass, QSystemPlatform};
+use tket_qsystem::{QSystemLLVMPass, QSystemPlatform, QSystemRebasePass};
 use tket1_passes::{Tket1Circuit, Tket1Pass};
 
 const GUPPY_EXAMPLES_DIR: &str = "../test_files/guppy_optimization";
@@ -191,9 +191,10 @@ fn optimize_guppy(#[case] name: &str) {
 
     // Lower to QSystem. This may blow up the HUGR size.
     //TODO: add Sol case
-    QSystemPass::defaults(QSystemPlatform::Helios)
+    QSystemRebasePass::defaults(QSystemPlatform::Helios)
         .run(&mut hugr)
         .unwrap();
+    QSystemLLVMPass::default().run(&mut hugr).unwrap();
 
     hugr.validate().unwrap_or_else(|e| panic!("{e}"));
 }

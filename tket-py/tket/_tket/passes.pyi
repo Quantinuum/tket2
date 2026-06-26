@@ -104,16 +104,31 @@ def resolve_modifiers(
 
 def qsystem_rebase_pass(
     circ: CompilationState,
-    constant_fold: bool = True,
-    monomorphize: bool = True,
-    force_order: bool = True,
+    *,
+    resolve_modifiers: bool = True,
+    lower_drops: bool = True,
     hide_funcs: bool = True,
     scope: PassScope | None = None,
 ) -> None:
     """Runs a rust backed pass to convert quantum ops to qsystem ops.
 
+    :param resolve_modifiers: Whether to resolve modifier operations.
+    :param lower_drops: Whether to lower drop operations.
+    :param hide_funcs: Make all HUGR functions private.
+    """
+
+def qsystem_llvm_pass(
+    circ: CompilationState,
+    *,
+    constant_fold: bool = True,
+    monomorphize: bool = True,
+    force_order: bool = True,
+    scope: PassScope | None = None,
+) -> None:
+    """Runs a rust backed pass to convert qsystem ops to llvm ops.
+
     :param constant_fold: Whether to perform constant folding.
     :param monomorphize: Whether to monomorphize generic functions.
     :param force_order: Whether to enforce total ordering of all HUGR operations.
-    :param hide_funcs: Make all HUGR functions private.
+    :param scope: A scope to control how the pass is applied to HUGR regions.
     """
