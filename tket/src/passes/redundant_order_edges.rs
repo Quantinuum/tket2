@@ -14,6 +14,13 @@ use crate::passes::{ComposablePass, PassScope};
 /// A pass for removing order edges in a Hugr region that are already implied by
 /// other order dependencies.
 ///
+/// Note we cannot remove order edges that are implied by value edges: the former
+/// enforce an order on side effects, whereas the latter only on the values themselves,
+/// and do not imply an order of (pure functional, invisible) "evaluation".
+///
+/// TODO: consider adding a whitelist of ops that have no side effects, for which
+/// we can remove order edges entirely (i.e. reroute around the node).
+///
 /// Each evaluation on a region runs in `O(e + n log(n) * #order_edges)` time,
 /// where `e` and `n` are the number of edges and nodes in the region,
 /// respectively.
