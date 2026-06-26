@@ -6,7 +6,7 @@ from hugr.ops import CFG
 from hugr.package import Package
 from pytest_snapshot.plugin import Snapshot
 from selene_hugr_qis_compiler import HugrReadError, check_hugr, compile_to_llvm_ir
-from tket.extensions import modifier
+from tket_exts import modifier
 
 resources_dir = Path(__file__).parent / "resources"
 
