@@ -1,4 +1,5 @@
 //! LLVM lowerings for HUGR extensions defined in this crate.
+pub mod argument;
 pub mod array_utils;
 pub mod debug;
 pub mod futures;

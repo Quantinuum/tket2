@@ -36,8 +36,9 @@ use tket_qsystem::llvm::array_utils::ArrayLowering;
 pub use tket_qsystem::llvm::futures::FuturesCodegenExtension;
 use tket_qsystem::llvm::globals::GlobalsCodegenExtension;
 use tket_qsystem::llvm::{
-    debug::DebugCodegenExtension, prelude::QISPreludeCodegen, qsystem::QSystemCodegenExtension,
-    random::RandomCodegenExtension, result::ResultsCodegenExtension, utils::UtilsCodegenExtension,
+    argument::ArgumentCodegenExtension, debug::DebugCodegenExtension, prelude::QISPreludeCodegen,
+    qsystem::QSystemCodegenExtension, random::RandomCodegenExtension,
+    result::ResultsCodegenExtension, utils::UtilsCodegenExtension,
 };
 use tracing::{Level, event, instrument};
 use utils::read_hugr_envelope;
@@ -140,6 +141,10 @@ fn codegen_extensions(platform: qsystem::QSystemPlatform) -> CodegenExtsMap<'sta
         // State results use standard arrays.
         .add_extension(DebugCodegenExtension::new(SeleneHeapArrayCodegen::LOWERING))
         .add_extension(gpu::GpuCodegen)
+        // Argument reading uses standard arrays.
+        .add_extension(ArgumentCodegenExtension::new(
+            SeleneHeapArrayCodegen::LOWERING,
+        ))
         .finish()
 }
 
