@@ -69,8 +69,14 @@ impl<H: HugrMut> ComposablePass<H> for RemoveDeadFuncsPass {
             }
             PassScope::Global(_) => {
                 for n in hugr.children(hugr.module_root()) {
-                    if hugr.get_optype(n).as_func_defn().is_some_and(|fd| fd.visibility() == &Visibility::Public)
-                    {
+                    let optype = hugr.get_optype(n);
+                    let is_public_func = optype
+                        .as_func_defn()
+                        .is_some_and(|fd| fd.visibility() == &Visibility::Public)
+                        || optype
+                            .as_func_decl()
+                            .is_some_and(|fd| fd.visibility() == &Visibility::Public);
+                    if is_public_func {
                         entry_points.push(n);
                     }
                 }
@@ -192,5 +198,43 @@ mod test {
             .sorted()
             .collect_vec();
         assert_eq!(remaining_funcs, retained_funcs);
+    }
+
+    /// Public function declarations should be preserved.
+    ///
+    /// Regression test for <https://github.com/Quantinuum/tket2/issues/1755>
+    #[rstest]
+    fn preserve_public_func_decl() {
+        let mut hb = ModuleBuilder::new();
+        hb.declare_vis(
+            "public_decl",
+            Signature::new_endo([]).into(),
+            Visibility::Public,
+        )
+        .unwrap();
+        hb.declare_vis(
+            "private_decl",
+            Signature::new_endo([]).into(),
+            Visibility::Private,
+        )
+        .unwrap();
+        let mut hugr = hb.finish_hugr().unwrap();
+
+        run_validating(
+            RemoveDeadFuncsPass::default().with_scope(Preserve::Public),
+            &mut hugr,
+        )
+        .unwrap();
+
+        let remaining_decls = hugr
+            .children(hugr.module_root())
+            .filter_map(|n| {
+                hugr.get_optype(n)
+                    .as_func_decl()
+                    .map(|fd| fd.func_name().as_str())
+            })
+            .sorted()
+            .collect_vec();
+        assert_eq!(remaining_decls, vec!["public_decl"]);
     }
 }
