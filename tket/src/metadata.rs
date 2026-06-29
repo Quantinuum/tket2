@@ -138,7 +138,7 @@ pub type MaxQubits = ExpectedQubitsHint;
 pub type MaxQubitsHint = ExpectedQubitsHint;
 /// Deprecated alias for [`UnitaryFlags`].
 #[deprecated(
-    since = "0.19.0",
+    since = "0.21.0",
     note = "use UnitaryFlags instead; this alias will be removed"
 )]
 pub type Unitary = UnitaryFlags;
