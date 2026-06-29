@@ -34,9 +34,10 @@ use tket_json_rs::register::{Bit, Qubit};
 
 /// Metadata key for the number of qubits that a HUGR node expects to be required for execution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct MaxQubitsHint;
-impl Metadata for MaxQubitsHint {
-    const KEY: &'static str = "tket.hint.max_qubits";
+pub struct ExpectedQubitsHint;
+impl Metadata for ExpectedQubitsHint {
+    const KEY: &'static str = "tket.hint.expected_qubits";
+    const ALIASES: &'static [&'static str] = &["tket.hint.max_qubits"];
     type Type<'hugr> = u32;
 }
 
@@ -123,12 +124,18 @@ impl Metadata for PytketPhaseExpr {
     type Type<'hugr> = &'hugr str;
 }
 
-/// Deprecated alias for [`MaxQubitsHint`].
+/// Deprecated alias for [`ExpectedQubitsHint`].
 #[deprecated(
     since = "0.19.0",
-    note = "use MaxQubitsHint instead; this alias will be removed"
+    note = "use ExpectedQubitsHint instead; this alias will be removed"
 )]
-pub type MaxQubits = MaxQubitsHint;
+pub type MaxQubits = ExpectedQubitsHint;
+/// Deprecated alias for [`ExpectedQubitsHint`].
+#[deprecated(
+    since = "0.19.0",
+    note = "use ExpectedQubitsHint instead; this alias will be removed"
+)]
+pub type MaxQubitsHint = ExpectedQubitsHint;
 /// Deprecated alias for [`UnitaryFlags`].
 #[deprecated(
     since = "0.19.0",
