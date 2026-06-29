@@ -125,7 +125,7 @@ def qsystem_llvm_pass(
     force_order: bool = True,
     scope: PassScope | None = None,
 ) -> None:
-    """Runs a rust backed pass to convert qsystem ops to llvm ops.
+    """Runs a rust backed pass to prepare the HUGR for LLVM code generation.
 
     :param constant_fold: Whether to perform constant folding.
     :param monomorphize: Whether to monomorphize generic functions.
