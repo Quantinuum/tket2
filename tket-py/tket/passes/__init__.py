@@ -144,13 +144,14 @@ class NormalizeGuppy(ComposablePass):
         """Run the pass in the CompilationState
 
         TODO: This should be part of a protocol."""
-        inline_funcs_heuristic = (
-            inline_funcs.MaxSize(64)
-            if self.inline_funcs is True
-            else None
-            if self.inline_funcs is False
-            else self.inline_funcs
-        )
+        inline_funcs_heuristic: inline_funcs.InlineFuncsHeuristic | None
+        match self.inline_funcs:
+            case True:
+                inline_funcs_heuristic = inline_funcs.MaxSize(64)
+            case False:
+                inline_funcs_heuristic = None
+            case _:
+                inline_funcs_heuristic = self.inline_funcs
         _passes.normalize_guppy(
             program._inner,
             resolve_modifiers=self.resolve_modifiers,
