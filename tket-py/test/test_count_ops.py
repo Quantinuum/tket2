@@ -30,7 +30,7 @@ testdata = [
     ("loop_conditional", 5),
     ("conditional_loop", 5),
     ("fn_calls", 2),
-    ("repeat_until_success", 19),
+    ("repeat_until_success", 20),
     ("extern_def", 1),
 ]
 

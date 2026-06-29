@@ -95,6 +95,7 @@ class NormalizeGuppy(ComposablePass):
     remove_tuple_untuple: bool = True
     constant_folding: bool = True
     remove_dead_funcs: bool = True
+    inline_funcs: inline_funcs.InlineFuncsHeuristic | bool = True
     inline_dfgs: bool = True
     remove_redundant_order_edges: bool = True
     squash_borrows: bool = True
@@ -111,6 +112,8 @@ class NormalizeGuppy(ComposablePass):
     - constant_folding: Whether to constant fold the program.
     - remove_dead_funcs: Whether to remove dead functions.
     - inline_dfgs: Whether to inline DFG operations.
+    - inline_funcs: Heuristic for inlining function calls, or True for default heuristic,
+      or False to disable inlining.
     - remove_redundant_order_edges: Whether to remove redundant order edges.
     - squash_borrows: Whether to squash return-borrow pairs on BorrowArrays.
     """
@@ -142,6 +145,14 @@ class NormalizeGuppy(ComposablePass):
         """Run the pass in the CompilationState
 
         TODO: This should be part of a protocol."""
+        inline_funcs_heuristic: inline_funcs.InlineFuncsHeuristic | None
+        match self.inline_funcs:
+            case True:
+                inline_funcs_heuristic = inline_funcs.MaxSize(64)
+            case False:
+                inline_funcs_heuristic = None
+            case _:
+                inline_funcs_heuristic = self.inline_funcs
         _passes.normalize_guppy(
             program._inner,
             resolve_modifiers=self.resolve_modifiers,
@@ -150,6 +161,7 @@ class NormalizeGuppy(ComposablePass):
             constant_folding=self.constant_folding,
             remove_dead_funcs=self.remove_dead_funcs,
             inline_dfgs=self.inline_dfgs,
+            inline_funcs=inline_funcs_heuristic,
             remove_redundant_order_edges=self.remove_redundant_order_edges,
             squash_borrows=self.squash_borrows,
             scope=self._scope,

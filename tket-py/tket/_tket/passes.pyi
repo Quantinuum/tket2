@@ -27,6 +27,7 @@ def normalize_guppy(
     constant_folding: bool = True,
     remove_dead_funcs: bool = True,
     inline_dfgs: bool = True,
+    inline_funcs: inline_funcs.InlineFuncsHeuristic | None = inline_funcs.MaxSize(64),
     remove_redundant_order_edges: bool = True,
     squash_borrows: bool = True,
     scope: PassScope = GlobalScope.PRESERVE_PUBLIC,
@@ -42,6 +43,7 @@ def normalize_guppy(
     - constant_folding: Whether to constant fold the program.
     - remove_dead_funcs: Whether to remove dead functions.
     - inline_dfgs: Whether to inline DFG operations.
+    - inline_funcs: a heuristic for inlining functions. If None, no inlining is performed.
     - remove_redundant_order_edges: Whether to remove redundant order edges.
     - squash_borrows: Whether to squash return-borrow pairs on BorrowArrays.
     """
