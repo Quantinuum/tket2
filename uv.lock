@@ -3134,14 +3134,14 @@ source = { editable = "tket-eccs" }
 
 [[package]]
 name = "tket-exts"
-version = "0.13.1"
+version = "0.14.0"
 source = { editable = "tket-exts" }
 dependencies = [
     { name = "hugr" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "hugr", specifier = "~=0.18.0" }]
+requires-dist = [{ name = "hugr", specifier = ">=0.17.1,<0.19" }]
 
 [[package]]
 name = "tomli"
