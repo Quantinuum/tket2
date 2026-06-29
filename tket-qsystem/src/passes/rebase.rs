@@ -23,7 +23,7 @@ pub enum QSystemRebasePassError {
     /// An error from the component [`LowerTketToQSystemPass`] pass.
     LowerTk2Error(LowerTk2Error),
     /// An error from the component [`LowerDropsPass`] pass.
-    LinearizeArrayError(ReplaceTypesError),
+    LowerDropsError(ReplaceTypesError),
 }
 
 /// Lower a HUGR to operations supported by a concrete QSystem platform.

@@ -63,7 +63,7 @@ impl From<QSystemRebasePassError> for QSystemPassError {
         match error {
             QSystemRebasePassError::ModifierResolver(error) => Self::ModifierResolver(error),
             QSystemRebasePassError::LowerTk2Error(error) => Self::LowerTk2Error(error),
-            QSystemRebasePassError::LinearizeArrayError(error) => Self::LinearizeArrayError(error),
+            QSystemRebasePassError::LowerDropsError(error) => Self::LinearizeArrayError(error),
         }
     }
 }
