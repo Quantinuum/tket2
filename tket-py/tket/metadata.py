@@ -37,7 +37,6 @@ if TYPE_CHECKING:
 
 __all__ = [
     "RewriteTraceValue",
-    "MaxQubitsHint",
     "InlineAnnotationValue",
     "InlineAnnotation",
     "CircuitRewriteTraces",
