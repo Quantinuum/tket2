@@ -96,7 +96,10 @@ create_py_exception!(
 /// - remove_redundant_order_edges: Whether to remove redundant order edges.
 /// - squash_borrows: Whether to squash return-borrow pairs on BorrowArrays.
 #[pyfunction]
-#[pyo3(signature = (circ, *, resolve_modifiers = true, simplify_cfgs = true, remove_tuple_untuple = true, constant_folding = true, remove_dead_funcs = true, inline_dfgs = true, remove_redundant_order_edges = true, squash_borrows = true, scope = None))]
+#[pyo3(signature = (circ, *, resolve_modifiers = true, simplify_cfgs = true,
+    remove_tuple_untuple = true, constant_folding = true, remove_dead_funcs = true,
+    inline_dfgs = true, inline_funcs = Some(Default::default()),
+    remove_redundant_order_edges = true, squash_borrows = true, scope = None))]
 #[expect(clippy::too_many_arguments)]
 fn normalize_guppy(
     circ: &mut CompilationState,
@@ -106,6 +109,7 @@ fn normalize_guppy(
     constant_folding: bool,
     remove_dead_funcs: bool,
     inline_dfgs: bool,
+    inline_funcs: Option<inline_funcs::PyInlineFuncsHeuristic>,
     remove_redundant_order_edges: bool,
     squash_borrows: bool,
     scope: Option<PyPassScope>,
@@ -119,6 +123,7 @@ fn normalize_guppy(
         .constant_folding(constant_folding)
         .remove_dead_funcs(remove_dead_funcs)
         .inline_dfgs(inline_dfgs)
+        .inline_funcs(inline_funcs.map(|h| h.0))
         .remove_redundant_order_edges(remove_redundant_order_edges)
         .squash_borrows(squash_borrows);
 
