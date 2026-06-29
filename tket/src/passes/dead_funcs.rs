@@ -67,6 +67,8 @@ impl<H: HugrMut> ComposablePass<H> for RemoveDeadFuncsPass {
             PassScope::Global(Preserve::Entrypoint) if hugr.entrypoint() != hugr.module_root() => {
                 entry_points.push(hugr.entrypoint());
             }
+            // Either Preserve::Public, or Preserve::Entrypoint with module-entrypoint Hugr,
+            // which is the same as Preserve::Public.
             PassScope::Global(_) => {
                 for n in hugr.children(hugr.module_root()) {
                     let optype = hugr.get_optype(n);
