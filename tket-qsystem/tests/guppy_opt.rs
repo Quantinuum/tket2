@@ -103,9 +103,7 @@ fn count_gates(h: &impl HugrView) -> HashMap<SmolStr, usize> {
 #[case::nested("nested", None)]
 #[case::ranges("ranges", None)]
 #[should_panic = "xfail"]
-#[case::false_branch("false_branch", Some(vec![
- ("tket.quantum.Measure", 1), ("tket.quantum.QAlloc", 1), ("tket.quantum.QFree", 1)
-]))]
+#[case::false_branch("false_branch", Some(vec![]))]
 #[should_panic = "xfail"]
 #[case::func_decls("func_decls", Some(vec![
     ("TKET1.tk1op", 2), ("tket.quantum.symbolic_angle", 1)
