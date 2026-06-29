@@ -13,7 +13,7 @@ from . import inline_funcs
 from .._pattern import Rule, RuleMatcher
 from .._state.build import OneQbGate, from_coms
 from .._tket import passes as _passes, optimiser as _optimiser
-
+from .._tket.passes import InlineFunctionsError
 from hugr.passes.composable import (
     ComposablePass,
     ComposedPass,
@@ -29,6 +29,7 @@ if TYPE_CHECKING:
 __all__ = [
     "PytketHugrPass",
     "PassResult",
+    "InlineFunctionsError",
     "InlineFuncsHeuristic",
     "InlineFunctions",
     "NormalizeGuppy",
@@ -235,6 +236,8 @@ class InlineFunctions(ComposablePass):
     Parameters:
     - heuristic: Heuristic used to choose which non-recursive functions to
       inline. Defaults to `MaxSize(64)`.
+
+    Calls to functions annotated with `inline="always"` are processed first.
     """
 
     heuristic: inline_funcs.InlineFuncsHeuristic = inline_funcs.MaxSize(64)

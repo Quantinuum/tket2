@@ -4,9 +4,11 @@ import tempfile
 from typing import Callable, Any
 import subprocess
 from tket._ops import TketOp
+from tket.metadata import InlineAnnotation
 from tket.passes import (
     _badger_optimise,
     _greedy_depth_reduce,
+    InlineFunctionsError,
     InlineFunctions,
     inline_funcs,
     NormalizeGuppy,
@@ -23,6 +25,7 @@ from hypothesis import given, settings
 
 from tket.passes import PytketHugrPass, QSystemPass
 from hugr.build.base import Hugr
+import hugr.tys as tys
 
 import numpy as np
 import pytest
@@ -332,6 +335,50 @@ def test_modifier_execution() -> None:
 
             computed_statevector = np.load(tmp_path)
             np.testing.assert_allclose(computed_statevector, expected_statevector)
+
+
+@pytest.mark.parametrize("annotate", [True, False])
+def test_inline_always(annotate: bool) -> None:
+    import hugr.ops as ops
+    from hugr.build.dfg import Dfg
+
+    d = Dfg(tys.Tuple(tys.Qubit, tys.Qubit))
+
+    f_id = d.module_root_builder().define_function(
+        "id",
+        [tys.Qubit],
+    )
+    f_id.set_outputs(f_id.input_node[0])
+
+    if annotate:
+        f_id.metadata[InlineAnnotation] = "always"
+
+    (tup,) = d.inputs()
+    (q1, q2) = d.add(ops.UnpackTuple()(tup))
+    call1 = d.call(f_id, q1)
+    call2 = d.call(f_id, q2)
+    (tup,) = d.add(ops.MakeTuple()(call1, call2))
+
+    d.set_outputs(tup)
+
+    InlineFunctions(heuristic=inline_funcs.MaxSize(0))(d.hugr)
+    CompilationState.from_python(d.hugr).validate()
+    assert _count_ops(d.hugr, "Call") == 0 if annotate else 2
+
+
+def test_inline_always_cycle() -> None:
+    from hugr.build.function import Module
+
+    mod = Module()
+
+    f_recursive = mod.define_function("recurse", [tys.Qubit])
+    f_recursive.declare_outputs([tys.Qubit])
+    call = f_recursive.call(f_recursive, f_recursive.input_node[0])
+    f_recursive.set_outputs(call)
+
+    f_recursive.metadata[InlineAnnotation] = "always"
+    with pytest.raises(InlineFunctionsError):
+        InlineFunctions(heuristic=inline_funcs.MaxSize(0))(mod.hugr)
 
 
 def test_inline_functions() -> None:

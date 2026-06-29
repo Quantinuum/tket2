@@ -56,6 +56,10 @@ pub enum InlineAnnotation {
     BestEffort,
     /// Never inline the function.
     Never,
+    /// Always inline calls to this function.
+    ///
+    /// If this cannot be done, an error will be raised.
+    Always,
 }
 impl Metadata for InlineAnnotation {
     const KEY: &'static str = "tket.inline";
