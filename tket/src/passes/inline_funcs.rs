@@ -5,12 +5,13 @@ use hugr::HugrView;
 use hugr::ops::OpType;
 use hugr_core::Node;
 use hugr_core::hugr::{hugrmut::HugrMut, patch::inline_call::InlineCall};
-use hugr_core::module_graph::{ModuleGraph, StaticNode};
+use hugr_core::module_graph::{ModuleGraph, StaticEdge, StaticNode};
 use itertools::Itertools;
 use petgraph::algo::tarjan_scc;
 use petgraph::data::DataMap;
 use petgraph::visit::{
-    Dfs, IntoNeighbors, IntoNodeIdentifiers, NodeFiltered, NodeIndexable, Visitable, Walker,
+    Dfs, EdgeFiltered, EdgeRef, IntoNeighbors, IntoNodeIdentifiers, NodeFiltered, NodeIndexable,
+    Visitable, Walker,
 };
 
 use crate::metadata::InlineAnnotation;
@@ -181,9 +182,10 @@ fn inline_always_scoped<H: HugrMut>(
         hugr.get_optype(*n).is_func_defn()
             && hugr.get_metadata::<InlineAnnotation>(*n) == Some(InlineAnnotation::Always)
     });
-    // We're going to object if there's a cycle of functions marked Always, as that would
-    // lead to an infinitely big Hugr. However, don't object unless such a cycle is reachable
-    // from the entrypoint...
+    // We'll raise an error if there's a cycle of calls to functions marked Always, as
+    // that would lead to an infinitely big Hugr. However, no need to error unless such
+    // a cycle is reachable from a node in scope. So first determine which functions are
+    // reachable...
     let reachable_always: BTreeSet<H::Node> = match &scope {
         PassScope::Global(_) => always_funcs.collect(),
         PassScope::EntrypointFlat | PassScope::EntrypointRecursive => {
@@ -214,13 +216,26 @@ fn inline_always_scoped<H: HugrMut>(
         }
     };
 
-    let always_cg =
+    // Now look for cycles, considering only calls (as LoadFunctions cannot be inlined)
+    let always_g =
         NodeFiltered::from_fn(cg.graph(), |n| match cg.graph().node_weight(n).unwrap() {
             StaticNode::FuncDefn(func) => reachable_always.contains(func),
             _ => false,
         });
-    if let Some(cycle) = cycles(&always_cg).next() {
-        return Err(InlineFuncsError::AlwaysCycle(cycle));
+    let always_calls_g = EdgeFiltered::from_fn(&always_g, |e| {
+        matches!(cg.graph().edge_weight(e.id()).unwrap(), StaticEdge::Call(_))
+    });
+
+    if let Some(cycle) = cycles(&always_calls_g).next() {
+        return Err(InlineFuncsError::AlwaysCycle(
+            cycle
+                .into_iter()
+                .map(|n| match cg.graph().node_weight(n).unwrap() {
+                    StaticNode::FuncDefn(func) => *func,
+                    _ => panic!("Expected only FuncDefns in sccs"),
+                })
+                .collect(),
+        ));
     }
 
     // Proceed with inlining. Do outermost first within the scope root, as we cannot
@@ -236,7 +251,7 @@ fn inline_always_scoped<H: HugrMut>(
         for child in hugr.children(parent) {
             if hugr.first_child(child).is_some() {
                 parents.push_back(child);
-            } else if hugr.get_optype(child).is_call()
+            } else if matches!(hugr.get_optype(child), OpType::Call(_))
                 && let Some(func) = hugr.static_source(child)
                 && reachable_always.contains(&func)
             {
@@ -258,41 +273,32 @@ fn inline_always_scoped<H: HugrMut>(
         // Remove the always-inlined functions themselves, as they are now unreachable.
         let funcs_to_preserve = scope.preserve_interface(hugr).collect::<HashSet<_>>();
         for func in reachable_always {
-            debug_assert!(hugr.static_targets(func).unwrap().next().is_none());
-            if !funcs_to_preserve.contains(&func) {
+            if funcs_to_preserve.contains(&func) {
+                continue; // for entrypoint-scope, all funcs will be preserved.
+            }
+            if hugr.static_targets(func).unwrap().next().is_none() {
                 hugr.remove_subtree(func);
+            } else {
+                debug_assert!(
+                    hugr.static_targets(func)
+                        .unwrap()
+                        .all(|(n, _)| hugr.get_optype(n).is_load_function())
+                );
             }
         }
     }
     Ok(())
 }
 
-fn cycles<'a, N: Copy>(
-    g: impl Copy
-    + Visitable
-    + DataMap<NodeWeight = StaticNode<N>>
-    + IntoNeighbors
-    + IntoNodeIdentifiers
-    + NodeIndexable
-    + 'a,
-) -> impl Iterator<Item = Vec<N>> + 'a {
-    tarjan_scc(g)
-        .into_iter()
-        .filter(move |ns| {
-            ns.iter()
-                .exactly_one()
-                .ok()
-                .is_none_or(|n| g.neighbors(*n).contains(n))
-        })
-        .map(move |cycle| {
-            cycle
-                .into_iter()
-                .map(|n| match g.node_weight(n).unwrap() {
-                    StaticNode::FuncDefn(fd) => *fd,
-                    _ => panic!("Expected only FuncDefns in sccs"),
-                })
-                .collect()
-        })
+fn cycles<'a, G: Copy + Visitable + IntoNeighbors + IntoNodeIdentifiers + NodeIndexable + 'a>(
+    g: G,
+) -> impl Iterator<Item = Vec<G::NodeId>> + 'a {
+    tarjan_scc(g).into_iter().filter(move |ns| {
+        ns.iter()
+            .exactly_one()
+            .ok()
+            .is_none_or(|n| g.neighbors(*n).contains(n))
+    })
 }
 
 #[cfg(test)]
