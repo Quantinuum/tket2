@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.14.0](https://github.com/Quantinuum/tket2/compare/tket-exts-v0.13.1...tket-exts-v0.14.0) (2026-06-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* updates to public dependencies, specifically hugr 0.29.0 and hugr-py 0.18.0
+* ArrayLowering trait has new required method alloc_array for allocating a fresh array.
+
+### Features
+
+* runtime entrypoint arguments via generic tket.argreader op ([#1731](https://github.com/Quantinuum/tket2/issues/1731)) ([3583b4e](https://github.com/Quantinuum/tket2/commit/3583b4ea93d732ffe927d74ee7d959d7f04f7b43))
+* update to hugr 0.29.0/hugr-py 0.18.0, tone down RedundantOrderEdgesPass ([#1742](https://github.com/Quantinuum/tket2/issues/1742)) ([1de66a2](https://github.com/Quantinuum/tket2/commit/1de66a29a10758fe3ddac564cfa51653c632fe3a))
+
 ## [0.13.1](https://github.com/Quantinuum/tket2/compare/tket-exts-v0.13.0...tket-exts-v0.13.1) (2026-06-19)
 
 
