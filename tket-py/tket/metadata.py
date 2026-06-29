@@ -68,10 +68,11 @@ class RewriteTraceValue(TypedDict):
     individual_matches: int
 
 
-class MaxQubitsHint(Metadata[int]):
+class ExpectedQubitsHint(Metadata[int]):
     """Metadata key for the number of qubits required to execute a HUGR node."""
 
-    KEY = _metadata.MAX_QUBITS_HINT
+    KEY = _metadata.EXPECTED_QUBITS_HINT
+    ALIASES = _metadata.EXPECTED_QUBITS_HINT_ALIASES
 
 
 InlineAnnotationValue: TypeAlias = Literal["never"] | Literal["best_effort"]

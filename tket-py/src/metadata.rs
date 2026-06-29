@@ -11,6 +11,7 @@ use tket::metadata::{
 pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     let m = PyModule::new(py, "metadata")?;
     m.add("EXPECTED_QUBITS_HINT", ExpectedQubitsHint::KEY)?;
+    m.add("EXPECTED_QUBITS_HINT_ALIASES", ExpectedQubitsHint::ALIASES)?;
     m.add("INLINE_ANNOTATION", InlineAnnotation::KEY)?;
     m.add("CIRCUIT_REWRITE_TRACES", CircuitRewriteTraces::KEY)?;
     m.add("UNITARY_FLAGS", UnitaryFlags::KEY)?;

@@ -126,49 +126,7 @@ impl Metadata for PytketPhaseExpr {
 
 /// Deprecated alias for [`ExpectedQubitsHint`].
 #[deprecated(
-    since = "0.19.0",
-    note = "use ExpectedQubitsHint instead; this alias will be removed"
-)]
-pub type MaxQubits = ExpectedQubitsHint;
-/// Deprecated alias for [`ExpectedQubitsHint`].
-#[deprecated(
-    since = "0.19.0",
+    since = "0.21.0",
     note = "use ExpectedQubitsHint instead; this alias will be removed"
 )]
 pub type MaxQubitsHint = ExpectedQubitsHint;
-/// Deprecated alias for [`UnitaryFlags`].
-#[deprecated(
-    since = "0.21.0",
-    note = "use UnitaryFlags instead; this alias will be removed"
-)]
-pub type Unitary = UnitaryFlags;
-/// Deprecated alias for [`PytketInputParameters`].
-#[deprecated(
-    since = "0.19.0",
-    note = "use PytketInputParameters instead; this alias will be removed"
-)]
-pub type InputParameters = PytketInputParameters;
-/// Deprecated alias for [`PytketOpGroup`].
-#[deprecated(
-    since = "0.19.0",
-    note = "use PytketOpGroup instead; this alias will be removed"
-)]
-pub type OpGroup = PytketOpGroup;
-/// Deprecated alias for [`PytketBitRegisterNames`].
-#[deprecated(
-    since = "0.19.0",
-    note = "use PytketBitRegisterNames instead; this alias will be removed"
-)]
-pub type BitRegisters = PytketBitRegisterNames;
-/// Deprecated alias for [`PytketQubitRegisterNames`].
-#[deprecated(
-    since = "0.19.0",
-    note = "use PytketQubitRegisterNames instead; this alias will be removed"
-)]
-pub type QubitRegisters = PytketQubitRegisterNames;
-/// Deprecated alias for [`PytketPhaseExpr`].
-#[deprecated(
-    since = "0.19.0",
-    note = "use PytketPhaseExpr instead; this alias will be removed"
-)]
-pub type Phase = PytketPhaseExpr;
