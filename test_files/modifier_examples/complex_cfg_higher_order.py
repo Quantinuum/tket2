@@ -1,19 +1,18 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#    "guppylang==1.0.0a5",
-#    "guppylang-internals==1.0.0a5",
+#    "guppylang==1.0.0a7",
 # ]
 # ///
 """Test the use of a higher-order function with complex control flow inside modifiers"""
 
-from collections.abc import Callable
 from pathlib import Path
 from sys import argv
 
 from guppylang import enable_experimental_features, guppy
 from guppylang.std.builtins import Controllable, Unitary, array, control, dagger
 from guppylang.std.debug import state_result
+from guppylang.std.lang import Function
 from guppylang.std.quantum import angle, discard_array, h, qubit, rx, rz
 
 enable_experimental_features()
@@ -25,7 +24,7 @@ def get_angle(f: float) -> angle:
 
 
 @guppy
-def get_get_angle() -> Callable[[float], angle]:
+def get_get_angle() -> Function[[float], angle]:
     return get_angle
 
 
@@ -33,7 +32,7 @@ def get_get_angle() -> Callable[[float], angle]:
 def apply_r(
     f: Unitary[[qubit, angle], None],
     q: array[qubit, 2],
-    fun_angle: Callable[[float], angle],
+    fun_angle: Function[[float], angle],
     radiant: float,
 ) -> None:
     f(q[1], fun_angle(radiant))
@@ -43,7 +42,7 @@ def apply_r(
 def apply_c(
     f: Controllable[[qubit], None],
     g: Unitary[[qubit, angle], None],
-    classic_fun: Callable[[], Callable[[float], angle]],
+    classic_fun: Function[[], Function[[float], angle]],
     q: qubit,
     b: bool,
 ) -> None:
