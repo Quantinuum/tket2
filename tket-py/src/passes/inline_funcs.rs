@@ -14,7 +14,7 @@ use crate::utils::ConvertPyErr;
 ///
 /// Parameters:
 /// - heuristic: Heuristic used to choose which non-recursive functions to
-///   inline. Defaults to `tket.passes.MaxSize(64)`.
+///   inline. Defaults to `tket.passes.MaxSize(128)`.
 /// - follow_inline_hints: Whether to follow compiler hints for inlining
 ///   functions.
 #[pyfunction]

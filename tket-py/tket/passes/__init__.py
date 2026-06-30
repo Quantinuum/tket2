@@ -148,7 +148,7 @@ class NormalizeGuppy(ComposablePass):
         inline_funcs_heuristic: inline_funcs.InlineFuncsHeuristic | None
         match self.inline_funcs:
             case True:
-                inline_funcs_heuristic = inline_funcs.MaxSize(64)
+                inline_funcs_heuristic = inline_funcs.MaxSize(128)
             case False:
                 inline_funcs_heuristic = None
             case _:
@@ -247,10 +247,10 @@ class InlineFunctions(ComposablePass):
 
     Parameters:
     - heuristic: Heuristic used to choose which non-recursive functions to
-      inline. Defaults to `MaxSize(64)`.
+      inline. Defaults to `MaxSize(128)`.
     """
 
-    heuristic: inline_funcs.InlineFuncsHeuristic = inline_funcs.MaxSize(64)
+    heuristic: inline_funcs.InlineFuncsHeuristic = inline_funcs.MaxSize(128)
     _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
 
     def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
