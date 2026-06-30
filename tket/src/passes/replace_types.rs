@@ -1955,8 +1955,10 @@ mod test {
         let mut lw = lowerer(&ext);
         // Start fresh so we only observe our custom rule.
         lw.set_metadata_policy(MetadataPropagationPolicy::empty());
-        lw.metadata_policy_mut()
-            .add_rule(|_, _, _, _| vec![("custom.tag".into(), Value::Bool(true))]);
+        lw.metadata_policy_mut().add_rule(
+            |_, _, _, _| vec![("custom.tag".into(), Value::Bool(true))],
+            std::iter::empty(),
+        );
         lw.run(&mut h).unwrap();
         h.validate().unwrap();
 
@@ -1972,6 +1974,50 @@ mod test {
                 h.get_optype(child)
             );
         }
+    }
+
+    /// The default policy moves `core.debug_info` off the container after
+    /// propagating it onto descendants, so backends don't see a stale entry
+    /// on the new `DFG`/`CFG`/etc.
+    #[test]
+    fn default_policy_removes_propagated_key_from_container() {
+        use hugr_core::metadata::DEBUGINFO_META_KEY;
+
+        let ext = ext();
+        let (mut h, read_node) = build_read_hugr_with_location(&ext);
+
+        lowerer(&ext).run(&mut h).unwrap();
+        h.validate().unwrap();
+
+        assert!(
+            h.get_metadata_any(read_node, DEBUGINFO_META_KEY).is_none(),
+            "Default policy left a stale debug_info entry on the container",
+        );
+    }
+
+    /// `remove_from_old` keys passed to `add_rule` should be deleted from the
+    /// container after propagation, even when the rule itself sets nothing on
+    /// any descendant (policy that only strips keys).
+    #[test]
+    fn custom_policy_remove_from_old_is_honoured() {
+        use hugr_core::hugr::hugrmut::HugrMut;
+        use serde_json::Value;
+
+        let ext = ext();
+        let (mut h, read_node) = build_read_hugr_with_location(&ext);
+        h.set_metadata_any(read_node, "scratch.key", Value::String("v".into()));
+
+        let mut lw = lowerer(&ext);
+        lw.set_metadata_policy(MetadataPropagationPolicy::empty());
+        lw.metadata_policy_mut()
+            .add_rule(|_, _, _, _| vec![], ["scratch.key".to_string()]);
+        lw.run(&mut h).unwrap();
+        h.validate().unwrap();
+
+        assert!(
+            h.get_metadata_any(read_node, "scratch.key").is_none(),
+            "remove_from_old did not delete the key from the container",
+        );
     }
 
     /// The default policy walks all descendants of the replacement container,
