@@ -37,6 +37,7 @@ use hugr_core::Node;
 use hugr_core::hugr::NodeMetadataMap;
 use hugr_core::hugr::hugrmut::HugrMut;
 use hugr_core::hugr::internal::HugrInternals;
+use hugr_core::metadata::DEBUGINFO_META_KEY;
 use hugr_core::metadata::RawMetadataValue;
 use hugr_core::ops::OpType;
 
@@ -139,12 +140,12 @@ pub fn default_location_policy() -> MetadataPropagationPolicy {
     policy.add_rule(|old_optype, old_meta, inner_optype, inner_meta| {
         if matches!(old_optype, OpType::Call(_) | OpType::ExtensionOp(_))
             && matches!(inner_optype, OpType::Call(_) | OpType::ExtensionOp(_))
+            && !inner_meta.contains_key(DEBUGINFO_META_KEY)
         {
             old_meta
-                .iter()
-                .filter(|(k, _)| !inner_meta.contains_key(*k))
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect()
+                .get(DEBUGINFO_META_KEY)
+                .map(|v| vec![(DEBUGINFO_META_KEY.to_string(), v.clone())])
+                .unwrap_or_default()
         } else {
             vec![]
         }
