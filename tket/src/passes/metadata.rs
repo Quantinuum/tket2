@@ -53,12 +53,11 @@ type Rule = Arc<
 /// nodes of its replacement container.
 ///
 /// Each rule is a function `(old_optype, old_meta, inner_optype, inner_meta)`
-/// called once per direct child of the replacement container. It returns the
-/// key-value pairs to write onto that child. All returned pairs are applied
-/// unconditionally, so rules are responsible for checking `inner_meta` if they
-/// want to avoid overwriting existing keys. Rules are **not** applied
-/// recursively; if propagation into nested containers is desired, the rule
-/// itself should handle that.
+/// called once per descendant of the replacement container (the container
+/// itself is excluded; descendants are visited in breadth-first order). It
+/// returns the key-value pairs to write onto that descendant. All returned
+/// pairs are applied unconditionally, so rules are responsible for checking
+/// `inner_meta` if they want to avoid overwriting existing keys.
 ///
 /// Rules are applied in the order they were added.
 #[derive(Clone)]
@@ -82,11 +81,11 @@ impl MetadataPropagationPolicy {
     /// The rule receives `(old_optype, old_meta, inner_optype, inner_meta)`:
     /// - `old_optype` — optype of the original node that was replaced
     /// - `old_meta` — metadata of the original node
-    /// - `inner_optype` — optype of a direct child of the replacement container
-    /// - `inner_meta` — current metadata of that child
+    /// - `inner_optype` — optype of a descendant of the replacement container
+    /// - `inner_meta` — current metadata of that descendant
     ///
-    /// Returns the key-value pairs to set on the child. All returned pairs are
-    /// applied unconditionally.
+    /// Returns the key-value pairs to set on the descendant. All returned
+    /// pairs are applied unconditionally.
     pub fn add_rule(
         &mut self,
         rule: impl Fn(
@@ -102,11 +101,12 @@ impl MetadataPropagationPolicy {
         self.rules.push(Arc::new(rule));
     }
 
-    /// Applies all rules to the direct children of `container_node`.
+    /// Applies all rules to every descendant of `container_node` (the
+    /// container itself is not visited).
     ///
     /// `old_optype` is the optype the replaced node had *before* replacement.
-    /// Each rule is called once per direct child and the returned key-value
-    /// pairs are written to that child unconditionally.
+    /// Each rule is called once per descendant and the returned key-value
+    /// pairs are written to that descendant unconditionally.
     pub(crate) fn apply<H: HugrMut<Node = Node>>(
         &self,
         hugr: &mut H,
@@ -122,13 +122,15 @@ impl MetadataPropagationPolicy {
             return;
         }
 
-        let children: Vec<Node> = hugr.children(container_node).collect();
-        for child in children {
-            let inner_optype = hugr.get_optype(child).clone();
-            let inner_meta = hugr.node_metadata_map(child).clone();
+        // `descendants` yields the node itself first; skip it so rules only
+        // see the inner nodes of the replacement.
+        let descendants: Vec<Node> = hugr.descendants(container_node).skip(1).collect();
+        for inner in descendants {
+            let inner_optype = hugr.get_optype(inner).clone();
+            let inner_meta = hugr.node_metadata_map(inner).clone();
             for rule in &self.rules {
                 for (key, value) in rule(old_optype, &old_meta, &inner_optype, &inner_meta) {
-                    hugr.set_metadata_any(child, &key, value);
+                    hugr.set_metadata_any(inner, &key, value);
                 }
             }
         }
@@ -136,8 +138,8 @@ impl MetadataPropagationPolicy {
 }
 
 /// Returns a [`MetadataPropagationPolicy`] that propagates `core.debug_info`
-/// metadata from replaced `Call` and `ExtensionOp` nodes to the `Call` and
-/// `ExtensionOp` direct children of the replacement container.
+/// metadata from replaced `Call` and `ExtensionOp` nodes onto every `Call`
+/// and `ExtensionOp` descendant of the replacement container.
 ///
 /// Metadata entries that are already present on the inner node are not
 /// overwritten. This is used as the default policy for

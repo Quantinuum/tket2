@@ -1972,16 +1972,11 @@ mod test {
         }
     }
 
-    /// Documents a known limitation of [`default_debuginfo_policy`]: it only
-    /// touches *direct* children of the replacement container. If the
-    /// replacement nests another container (e.g. `DFG { DFG { ExtensionOps } }`)
-    /// the inner-inner `ExtensionOp`s receive nothing. This test will start
-    /// failing if/when the default policy is changed to recurse — at which
-    /// point flip the assertion (or delete this test) and update the policy's
-    /// doc comment accordingly.
+    /// The default policy walks all descendants of the replacement container,
+    /// so `core.debug_info` should reach `ExtensionOp`s even when they are
+    /// nested several containers deep (e.g. `DFG { DFG { ExtensionOps } }`).
     #[test]
-    fn default_policy_does_not_recurse_into_nested_containers() {
-        use hugr_core::metadata::LocationRecord;
+    fn default_policy_recurses_into_nested_containers() {
         use hugr_core::ops::OpType;
 
         let ext = ext();
@@ -2008,28 +2003,23 @@ mod test {
         lw.run(&mut h).unwrap();
         h.validate().unwrap();
 
-        // The direct child of read_node is the inner DFG (no ExtensionOp).
-        let direct_inner_dfg = h
+        // The direct child of read_node is the inner DFG (no ExtensionOps).
+        let inner_dfg = h
             .children(read_node)
             .find(|&n| matches!(h.get_optype(n), OpType::DFG(_)))
             .expect("expected an inner DFG as a direct child");
 
-        // ExtensionOps inside the inner DFG should NOT have the debug info
-        // (documenting the current non-recursive behaviour).
-        let inner_inner_ops: Vec<_> = h
-            .children(direct_inner_dfg)
+        // ExtensionOps two levels deep should still carry the debug location.
+        let nested_ops: Vec<_> = h
+            .children(inner_dfg)
             .filter(|&n| matches!(h.get_optype(n), OpType::ExtensionOp(_)))
             .collect();
         assert!(
-            !inner_inner_ops.is_empty(),
+            !nested_ops.is_empty(),
             "test setup: expected ExtensionOps inside the nested DFG"
         );
-        for op_node in inner_inner_ops {
-            assert!(
-                h.get_metadata::<LocationRecord>(op_node).is_none(),
-                "default policy unexpectedly propagated debug_info into nested container at {op_node:?}; \
-                 if you taught the policy to recurse, please update this test."
-            );
+        for op_node in nested_ops {
+            assert_location(&h, op_node);
         }
     }
 }
