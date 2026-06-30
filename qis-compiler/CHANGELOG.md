@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.4.0](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.3.2...qis-compiler-v0.4.0) (2026-06-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* updates to public dependencies, specifically hugr 0.29.0 and hugr-py 0.18.0
+* ArrayLowering trait has new required method alloc_array for allocating a fresh array.
+
+### Features
+
+* Move modifier resolver pass from NormalizeGuppy to QSystemPass ([#1741](https://github.com/Quantinuum/tket2/issues/1741)) ([2be1be9](https://github.com/Quantinuum/tket2/commit/2be1be938638c5718690dfa2eaa0fbbcf034cd8f))
+* runtime entrypoint arguments via generic tket.argreader op ([#1731](https://github.com/Quantinuum/tket2/issues/1731)) ([3583b4e](https://github.com/Quantinuum/tket2/commit/3583b4ea93d732ffe927d74ee7d959d7f04f7b43))
+* update to hugr 0.29.0/hugr-py 0.18.0, tone down RedundantOrderEdgesPass ([#1742](https://github.com/Quantinuum/tket2/issues/1742)) ([1de66a2](https://github.com/Quantinuum/tket2/commit/1de66a29a10758fe3ddac564cfa51653c632fe3a))
+
+## [0.3.2](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.3.1...qis-compiler-v0.3.2) (2026-06-19)
+
+
+### Features
+
+* HUGR extension for global variables ([#1530](https://github.com/Quantinuum/tket2/issues/1530)) ([4209df1](https://github.com/Quantinuum/tket2/commit/4209df1130f092d0936de71154bc98c78745a2ac))
+
+## [0.3.1](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.3.0...qis-compiler-v0.3.1) (2026-06-15)
+
+
+### Bug Fixes
+
+* Add missing `tket.measurement` extension to loading registry ([#1692](https://github.com/Quantinuum/tket2/issues/1692)) ([6cdbd54](https://github.com/Quantinuum/tket2/commit/6cdbd54a03fbaf2da370c01647925bf4c5098a58))
+
 ## [0.3.0](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.2.10...qis-compiler-v0.3.0) (2026-06-11)
 
 

@@ -7,7 +7,7 @@ use hugr::extension::prelude::usize_t;
 use hugr::llvm::emit::EmitFuncContext;
 use hugr::llvm::extension::collections::array;
 use hugr::llvm::extension::collections::array::{
-    build_array_fat_pointer, decompose_array_fat_pointer,
+    build_array_alloc, build_array_fat_pointer, decompose_array_fat_pointer,
 };
 use hugr::llvm::inkwell::types::{BasicType, BasicTypeEnum};
 use hugr::llvm::inkwell::values::BasicValueEnum;
@@ -44,6 +44,18 @@ pub trait ArrayLowering {
         elem_type: BasicTypeEnum<'c>,
         length: u32,
     ) -> Result<BasicValueEnum<'c>>;
+
+    /// Allocates a fresh array of `length` elements of type `elem_type` in the given lowering.
+    ///
+    /// Returns a pointer to the first element (for writing the contents) together with the
+    /// array value in the lowering. Unlike [`ArrayLowering::array_from_ptr`], this owns the
+    /// allocation, so it is used by codegen that *produces* arrays.
+    fn alloc_array<'c, H: HugrView<Node = Node>>(
+        &self,
+        ctx: &mut EmitFuncContext<'c, '_, H>,
+        elem_type: BasicTypeEnum<'c>,
+        length: u32,
+    ) -> Result<(PointerValue<'c>, BasicValueEnum<'c>)>;
 }
 
 /// Array lowering via a heap as implemented in [mod@array].
@@ -94,6 +106,16 @@ impl<ACG: array::ArrayCodegen + Clone> ArrayLowering for HeapArrayLowering<ACG> 
         let offset = usize_ty.const_zero();
         let array = build_array_fat_pointer(ctx, ptr, offset)?;
         Ok(array.into())
+    }
+
+    fn alloc_array<'c, H: HugrView<Node = Node>>(
+        &self,
+        ctx: &mut EmitFuncContext<'c, '_, H>,
+        elem_type: BasicTypeEnum<'c>,
+        length: u32,
+    ) -> Result<(PointerValue<'c>, BasicValueEnum<'c>)> {
+        let (elem_ptr, array_v) = build_array_alloc(ctx, &self.0, elem_type, u64::from(length))?;
+        Ok((elem_ptr, array_v.into()))
     }
 }
 

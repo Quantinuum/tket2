@@ -474,10 +474,11 @@ impl<N: HugrNode> ModifierResolver<N> {
                 }
             }
             Measure | MeasureFree | QAlloc | TryQAlloc | QFree | Reset => {
-                let new = new_fn.add_child_node(tket_op);
-                let incoming = 0..new_fn.hugr().num_inputs(new);
-                let outgoing = 0..new_fn.hugr().num_outputs(new);
-                Ok(PortVector::from_single_node(new, incoming, outgoing))
+                Err(ModifierResolverErrors::unresolvable(
+                    op_node,
+                    format!("of type {tket_op:?}"),
+                    tket_op.into(),
+                ))
             }
         }
     }
@@ -624,6 +625,36 @@ mod test {
                 *func.finish_with_outputs(inputs).unwrap().handle()
             };
             test_modifier_resolver(3, c_num, foo, dagger);
+        }
+    }
+
+    #[test]
+    fn non_unitary_tket_ops_cannot_be_modified() {
+        for op in [
+            TketOp::Measure,
+            TketOp::MeasureFree,
+            TketOp::QAlloc,
+            TketOp::TryQAlloc,
+            TketOp::QFree,
+            TketOp::Reset,
+        ] {
+            let mut module = ModuleBuilder::new();
+            let mut func = module
+                .define_function("foo", Signature::new_endo([]))
+                .unwrap();
+            let op_node = func.add_child_node(op);
+            let mut resolver = ModifierResolver::new();
+
+            let result = resolver.modify_tket_op(op_node, op, &mut func, &mut vec![]);
+            match result {
+                Err(ModifierResolverErrors::UnResolvable { node, msg, optype }) => {
+                    assert_eq!(node, op_node);
+                    assert_eq!(msg, format!("of type {op:?}"));
+                    assert_eq!(optype, op.into());
+                }
+                Err(error) => panic!("expected {op:?} to be unresolvable, got {error:?}"),
+                Ok(_) => panic!("expected {op:?} to be rejected"),
+            }
         }
     }
 

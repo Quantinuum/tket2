@@ -2,14 +2,18 @@
 
 pub mod portmatching;
 
+use anyhow::Context;
+
+use crate::passes::PyPassScope;
 use crate::rewrite::PyCircuitRewrite;
 use crate::state::CompilationState;
 use crate::utils::{ConvertPyErr, create_py_exception};
 
-use hugr::{HugrView, Node};
+use hugr::{HugrView, Node, hugr::hugrmut::HugrMut};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use tket::Circuit;
 use tket::portmatching::{CircuitPattern, PatternMatch, PatternMatcher};
+use tket::{Circuit, CircuitError};
 
 /// The module definition
 pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
@@ -50,12 +54,38 @@ create_py_exception!(
 /// A rewrite rule defined by a left hand side and right hand side of an equation.
 pub struct Rule(pub [Circuit; 2]);
 
+fn rule_circuit(state: &CompilationState) -> PyResult<Circuit> {
+    let mut hugr = state.hugr.clone();
+
+    if hugr.get_optype(hugr.entrypoint()).is_module() {
+        let module = hugr.entrypoint();
+        let entrypoint = {
+            let mut children = hugr.children(module);
+            let entrypoint = children
+                .next()
+                .ok_or_else(|| PyValueError::new_err("Rule module contains no circuit"))?;
+
+            if children.next().is_some() {
+                return Err(PyValueError::new_err(
+                    "Rule module must contain exactly one circuit",
+                ));
+            }
+
+            entrypoint
+        };
+
+        hugr.set_entrypoint(entrypoint);
+    }
+
+    Circuit::try_new(hugr).map_err(|error| PyValueError::new_err(error.to_string()))
+}
+
 #[pymethods]
 impl Rule {
     #[new]
     fn new_rule(l: &CompilationState, r: &CompilationState) -> PyResult<Rule> {
-        let l = Circuit::new(l.hugr.clone());
-        let r = Circuit::new(r.hugr.clone());
+        let l = rule_circuit(l)?;
+        let r = rule_circuit(r)?;
         Ok(Rule([l, r]))
     }
 
@@ -97,7 +127,8 @@ impl RuleMatcher {
     }
 
     pub fn find_match(&self, target: &CompilationState) -> PyResult<Option<PyCircuitRewrite>> {
-        let circ = Circuit::new(&target.hugr);
+        let circ = Circuit::try_new(&target.hugr)
+            .map_err(|error| PyValueError::new_err(error.to_string()))?;
         let Some(pmatch) = self.matcher.find_matches_iter(&circ).next() else {
             return Ok(None);
         };
@@ -105,11 +136,53 @@ impl RuleMatcher {
     }
 
     pub fn find_matches(&self, target: &CompilationState) -> PyResult<Vec<PyCircuitRewrite>> {
-        let circ = Circuit::new(&target.hugr);
+        let circ = Circuit::try_new(&target.hugr)
+            .map_err(|error| PyValueError::new_err(error.to_string()))?;
         self.matcher
             .find_matches_iter(&circ)
             .map(|m| self.match_to_rewrite(m, &circ))
             .collect()
+    }
+
+    /// Apply the first matching rule repeatedly within each circuit-compatible
+    /// region in the selected scope.
+    ///
+    /// Non-circuit regions are skipped. Returns the number of rewrites applied
+    /// and restores the original HUGR entrypoint before returning.
+    ///
+    /// Returns a count of applied rewrites.
+    #[pyo3(signature = (target, scope = None))]
+    pub fn apply_exhaustive(
+        &self,
+        target: &mut CompilationState,
+        scope: Option<PyPassScope>,
+    ) -> anyhow::Result<usize> {
+        let scope = scope.unwrap_or_default().scope;
+        let original_entrypoint = target.hugr.entrypoint();
+        let regions: Vec<_> = scope.regions(&target.hugr).collect();
+
+        let result = (|| {
+            let mut rewrite_count = 0;
+            for region in regions {
+                target.hugr.set_entrypoint(region);
+                match Circuit::try_new(&target.hugr) {
+                    Ok(_) => {}
+                    Err(CircuitError::InvalidParentOp { .. }) => continue,
+                    Err(error) => return Err(anyhow::Error::msg(error.to_string())),
+                }
+
+                while let Some(rewrite) = self.find_match(target)? {
+                    target
+                        .apply_rewrite(rewrite)
+                        .context("Could not apply exhaustive rule rewrite")?;
+                    rewrite_count += 1;
+                }
+            }
+            Ok(rewrite_count)
+        })();
+
+        target.hugr.set_entrypoint(original_entrypoint);
+        result
     }
 }
 

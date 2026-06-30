@@ -1,12 +1,14 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang"
+#    "guppylang==1.0.0a5",
+#    "guppylang-internals==1.0.0a5",
 # ]
-# [tool.uv.sources]
-# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", branch = "na/temporary-cherrypicked"}
 # ///
-"""Test the use of a higher-order function with arrays inside modifiers"""
+"""Test the a simple use of a higher-order function with inside modifiers
+
+The hugr generated from this script is also used to benchmark the performance of modifier passes resolver
+"""
 
 from pathlib import Path
 from sys import argv
@@ -30,7 +32,7 @@ def apply_2qubit_gate(f: Unitary[[qubit, qubit], None], q: array[qubit, 3]) -> N
     f(q[1], q[2])
 
 
-@guppy(dagger=True, control=True)
+@guppy(daggerable=True, controllable=True)
 def apply_dagger(f: Unitary[[qubit], None], q: array[qubit, 3]) -> None:
     f(q[1])
     apply_2qubit_gate(cx, q)

@@ -1,10 +1,9 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang",
+#    "guppylang==1.0.0a5",
+#    "guppylang-internals==1.0.0a5",
 # ]
-# [tool.uv.sources]
-# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", branch = "na/temporary-cherrypicked"}
 # ///
 """Controlling a function with internal control flow"""
 
@@ -25,12 +24,12 @@ from guppylang.experimental import enable_experimental_features
 enable_experimental_features()
 
 
-@guppy(control=True)
+@guppy(controllable=True)
 def funz(t: qubit, a: angle) -> None:
     rz(t, a)
 
 
-@guppy(control=True)
+@guppy(controllable=True)
 def branchy(q: qubit, flag: bool) -> None:
     if flag:
         x(q)

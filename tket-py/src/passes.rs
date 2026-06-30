@@ -2,6 +2,7 @@
 
 pub mod chunks;
 mod inline_funcs;
+mod qsystem;
 mod scope;
 pub mod tket1;
 
@@ -34,7 +35,8 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     m.add_function(wrap_pyfunction!(self::chunks::chunks, &m)?)?;
     m.add_function(wrap_pyfunction!(self::tket1::tket1_pass, &m)?)?;
     m.add_function(wrap_pyfunction!(resolve_modifiers, &m)?)?;
-    m.add_function(wrap_pyfunction!(qsystem_rebase_pass, &m)?)?;
+    m.add_function(wrap_pyfunction!(qsystem::qsystem_rebase_pass, &m)?)?;
+    m.add_function(wrap_pyfunction!(qsystem::qsystem_llvm_pass, &m)?)?;
     m.add("PullForwardError", py.get_type::<PyPullForwardError>())?;
     m.add(
         "InlineFunctionsError",
@@ -69,9 +71,15 @@ create_py_exception!(
 );
 
 create_py_exception!(
-    tket_qsystem::QSystemPassError,
-    PyQSystemPassError,
+    tket_qsystem::QSystemRebasePassError,
+    PyQSystemRebasePassError,
     "Errors from the QSystem rebase pass."
+);
+
+create_py_exception!(
+    tket_qsystem::QSystemLLVMPassError,
+    PyQSystemLLVMPassError,
+    "Errors from the QSystem pre-LLVM pass."
 );
 
 /// Flatten the structure of a Guppy-generated program to enable additional optimisations.
@@ -79,23 +87,29 @@ create_py_exception!(
 /// This should normally be called first before other optimisations.
 ///
 /// Parameters:
+/// - resolve_modifiers: Whether to resolve modifier operations.
 /// - simplify_cfgs: Whether to simplify CFG control flow.
 /// - remove_tuple_untuple: Whether to remove tuple/untuple operations.
 /// - constant_folding: Whether to constant fold the program.
 /// - remove_dead_funcs: Whether to remove dead functions.
 /// - inline_dfgs: Whether to inline DFG operations.
-/// - squash_borrows: Whether to squash return-borrow pairs on BorrowArrays.
 /// - remove_redundant_order_edges: Whether to remove redundant order edges.
+/// - squash_borrows: Whether to squash return-borrow pairs on BorrowArrays.
 #[pyfunction]
-#[pyo3(signature = (circ, *, simplify_cfgs = true, remove_tuple_untuple = true, constant_folding = true, remove_dead_funcs = true, inline_dfgs = true, remove_redundant_order_edges = true, squash_borrows = true, scope = None))]
+#[pyo3(signature = (circ, *, resolve_modifiers = true, simplify_cfgs = true,
+    remove_tuple_untuple = true, constant_folding = true, remove_dead_funcs = true,
+    inline_dfgs = true, inline_funcs = Some(Default::default()),
+    remove_redundant_order_edges = true, squash_borrows = true, scope = None))]
 #[expect(clippy::too_many_arguments)]
 fn normalize_guppy(
     circ: &mut CompilationState,
+    resolve_modifiers: bool,
     simplify_cfgs: bool,
     remove_tuple_untuple: bool,
     constant_folding: bool,
     remove_dead_funcs: bool,
     inline_dfgs: bool,
+    inline_funcs: Option<inline_funcs::PyInlineFuncsHeuristic>,
     remove_redundant_order_edges: bool,
     squash_borrows: bool,
     scope: Option<PyPassScope>,
@@ -103,11 +117,13 @@ fn normalize_guppy(
     let py_scope = scope.unwrap_or_default();
     let mut pass = tket::passes::NormalizeGuppy::default_with_scope(py_scope.scope);
 
-    pass.simplify_cfgs(simplify_cfgs)
+    pass.resolve_modifiers(resolve_modifiers)
+        .simplify_cfgs(simplify_cfgs)
         .remove_tuple_untuple(remove_tuple_untuple)
         .constant_folding(constant_folding)
         .remove_dead_funcs(remove_dead_funcs)
         .inline_dfgs(inline_dfgs)
+        .inline_funcs(inline_funcs.map(|h| h.0))
         .remove_redundant_order_edges(remove_redundant_order_edges)
         .squash_borrows(squash_borrows);
 
@@ -212,27 +228,5 @@ fn resolve_modifiers(circ: &mut CompilationState, scope: Option<PyPassScope>) ->
     let py_scope = scope.unwrap_or_default();
     let pass = tket::passes::ModifierResolverPass::default_with_scope(py_scope.scope);
     pass.run(&mut circ.hugr).convert_pyerrs()?;
-    Ok(())
-}
-
-#[pyfunction]
-#[pyo3(signature=(circ, *, constant_fold = true, monomorphize = true, force_order = true, hide_funcs = true, scope = None))]
-fn qsystem_rebase_pass(
-    circ: &mut CompilationState,
-    constant_fold: bool,
-    monomorphize: bool,
-    force_order: bool,
-    hide_funcs: bool,
-    scope: Option<PyPassScope>,
-) -> PyResult<()> {
-    let py_scope = scope.unwrap_or_default();
-    let qsystem_pass = tket_qsystem::QSystemPass::defaults(tket_qsystem::QSystemPlatform::Helios)
-        .with_scope(py_scope.scope)
-        .with_constant_fold(constant_fold)
-        .with_monomorphize(monomorphize)
-        .with_force_order(force_order)
-        .with_hide_funcs(hide_funcs);
-
-    qsystem_pass.run(&mut circ.hugr).convert_pyerrs()?;
     Ok(())
 }

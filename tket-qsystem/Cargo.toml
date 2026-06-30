@@ -1,6 +1,6 @@
 [package]
 name = "tket-qsystem"
-version = "0.26.0"
+version = "0.27.0"
 edition.workspace = true
 rust-version.workspace = true
 
@@ -23,7 +23,7 @@ name = "tket-qsystem"
 required-features = ["cli"]
 
 [dependencies]
-tket = { path = "../tket", version = "0.20.0" }
+tket = { path = "../tket", version = "0.21.0" }
 
 hugr.workspace = true
 hugr-core.workspace = true
@@ -55,5 +55,13 @@ rstest.workspace = true
 serde_json.workspace = true
 rayon.workspace = true
 
+# Defined here so it can be overridden by the codspeed CI job
+# using `cargo add`.
+criterion = { version = "0.8.2", features = ["html_reports"] }
+
 [lints]
 workspace = true
+
+[[bench]]
+name = "bench_main"
+harness = false
