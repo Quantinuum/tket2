@@ -62,6 +62,14 @@ fn estimated_inline_size<H: HugrView>(
     estimated_inline_size_inner(func, hugr, cache, &mut HashSet::new(), limit)
 }
 
+/// Recursive worker for [`estimated_inline_size`].
+///
+/// Arguments:
+/// - `cache` memoizes completed function estimates across calls in the pass,
+/// - `visiting` tracks the current recursion stack so cyclic call graphs are
+///   treated as over budget.
+/// - `limit` is only used to cut the estimation early if we already exceeded
+///   the max size.
 fn estimated_inline_size_inner<H: HugrView>(
     func: H::Node,
     hugr: &H,
