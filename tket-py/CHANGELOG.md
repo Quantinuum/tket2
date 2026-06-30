@@ -5,17 +5,16 @@
 
 ### ⚠ BREAKING CHANGES
 
-* Renamed `MaxQubitsHint` to `ExpectedQubitsHint` in `tket/src/metadata.rs` Deleted deprecated exports from `tket/src/metadata.rs` removed `MAX_QUBITS_HINT` from `tket-py/tket/_tket/metadata.pyi` renamed `MaxQubitsHint` to `ExpectedQubitsHint` in `tket-py/tket/metadata.py`
-* (rust) NormalizeGuppyErrors is now `non_exhaustive`
+* Renamed `MaxQubitsHint` to `ExpectedQubitsHint` in `tket-py/tket/metadata.py`
 * `QSystemPass` was split into `QSystemRebasePass` and `QSystemLLVMPass`.
-* updates to public dependencies, specifically hugr 0.29.0 and hugr-py 0.18.0
+* Updates to public dependencies, specifically hugr 0.29.0 and hugr-py 0.18.0
 
 ### Features
 
-* include InlineFuncsPass in NormalizeGuppy and improve pass ordering ([#1754](https://github.com/Quantinuum/tket2/issues/1754)) ([16cfe32](https://github.com/Quantinuum/tket2/commit/16cfe328519fddd179e673cf6be257ab4e24edbb))
+* Include InlineFuncsPass in NormalizeGuppy and improve pass ordering ([#1754](https://github.com/Quantinuum/tket2/issues/1754)) ([16cfe32](https://github.com/Quantinuum/tket2/commit/16cfe328519fddd179e673cf6be257ab4e24edbb))
 * Rename `tket.hint.max_qubits` to `tket.hint.expected_qubits` ([#1765](https://github.com/Quantinuum/tket2/issues/1765)) ([574c969](https://github.com/Quantinuum/tket2/commit/574c969b794fcbe69a302ae2703cfbc133deba2d))
 * Split QSystemPass into QSRebasePass and QSLLVMPass ([#1758](https://github.com/Quantinuum/tket2/issues/1758)) ([fd7b7d4](https://github.com/Quantinuum/tket2/commit/fd7b7d4b0d08551ec87ae5b4fcb26e9cef60de6e))
-* update to hugr 0.29.0/hugr-py 0.18.0, tone down RedundantOrderEdgesPass ([#1742](https://github.com/Quantinuum/tket2/issues/1742)) ([1de66a2](https://github.com/Quantinuum/tket2/commit/1de66a29a10758fe3ddac564cfa51653c632fe3a))
+* Update to hugr 0.29.0/hugr-py 0.18.0, tone down RedundantOrderEdgesPass ([#1742](https://github.com/Quantinuum/tket2/issues/1742)) ([1de66a2](https://github.com/Quantinuum/tket2/commit/1de66a29a10758fe3ddac564cfa51653c632fe3a))
 
 
 ### Bug Fixes
