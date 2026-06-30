@@ -87,7 +87,6 @@ impl RedundantOrderEdgesPass {
                     for (&other_pred, &other_pred_port) in order_preds.iter() {
                         if reaching_pred.contains(&(other_pred, other_pred_port)) {
                             // `other_pred` reaches predecessor `order_pred` of child, and has a direct edge to child.
-                            assert!(!to_remove.contains_key(&(*order_pred, child))); // this would mean a cycle
                             to_remove.insert((other_pred, child), (other_pred_port, ord_in));
                         }
                     }
@@ -177,6 +176,8 @@ mod tests {
     #[case([("input", "noop1"), ("noop1", "noop5"), ("input", "noop4"), ("noop4", "noop5"), ("noop5", "output"),
             ("input", "noop5"), ("noop1", "output"), ("noop4", "output")],
            [("input", "noop1"), ("noop1", "noop5"), ("input", "noop4"), ("noop4", "noop5"), ("noop5", "output")])]
+    #[case([("noop1", "noop4"), ("noop4", "noop2"), ("noop2", "noop5"), ("noop4", "noop5"), ("noop1", "noop5")],
+           [("noop1", "noop4"), ("noop4", "noop2"), ("noop2", "noop5"), ("noop1", "noop4")])]
     fn test_redundant_order_edges(
         #[case] start_edges: impl IntoIterator<Item = (&'static str, &'static str)>,
         #[case] end_edges: impl IntoIterator<Item = (&'static str, &'static str)>,
