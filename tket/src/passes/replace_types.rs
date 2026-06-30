@@ -865,6 +865,7 @@ impl From<&OpDef> for ParametricOp {
 mod test {
     use std::sync::Arc;
 
+    use crate::passes::MetadataPropagationPolicy;
     use crate::passes::replace_types::handlers::generic_array_const;
     use hugr_core::builder::{
         BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
@@ -1641,8 +1642,19 @@ mod test {
         h.validate().unwrap();
     }
 
-    /// Builds a DFG hugr containing a single `read<usize>` op with a
-    /// [`LocationRecord`] attached, returning the hugr and the op node.
+    // --- Metadata propagation tests for issue #1651 ---
+
+    /// Common expected debug-info record used by the metadata propagation tests.
+    fn expected_location() -> hugr_core::metadata::LocationRecord {
+        hugr_core::metadata::LocationRecord {
+            kind: "location".into(),
+            column: 5,
+            line_no: 10,
+        }
+    }
+
+    /// Builds a DFG hugr containing a single `read<usize>` op with
+    /// [`expected_location`] attached, returning the hugr and the op node.
     fn build_read_hugr_with_location(ext: &Arc<Extension>) -> (hugr_core::Hugr, hugr_core::Node) {
         use hugr_core::hugr::hugrmut::HugrMut;
         use hugr_core::metadata::LocationRecord;
@@ -1666,15 +1678,64 @@ mod test {
             .entry_descendants()
             .find(|&n| matches!(h.get_optype(n), OpType::ExtensionOp(_)))
             .expect("read op node");
-        h.set_metadata::<LocationRecord>(
-            read_node,
-            LocationRecord {
-                kind: "location".into(),
-                column: 5,
-                line_no: 10,
-            },
-        );
+        h.set_metadata::<LocationRecord>(read_node, expected_location());
         (h, read_node)
+    }
+
+    /// Builds a `ReplaceTypes` configured to lower `PackedVec`/`read` using a
+    /// caller-supplied template factory for the parametrised `read` op. Used to
+    /// share the boilerplate across the three propagation tests that need
+    /// different `NodeTemplate` variants.
+    fn build_lw_with_read_template<F>(ext: &Arc<Extension>, template_for_read: F) -> ReplaceTypes
+    where
+        F: Fn(&[TypeArg]) -> NodeTemplate + Send + Sync + 'static,
+    {
+        let pv = ext.get_type(PACKED_VEC).unwrap();
+        let mut lw = ReplaceTypes::default();
+        lw.set_replace_type(pv.instantiate([bool_t().into()]).unwrap(), i64_t());
+        lw.set_replace_parametrized_type(
+            pv,
+            Box::new(|args: &[TypeArg]| Some(list_type(just_elem_type(args).clone()))),
+        );
+        lw.set_replace_parametrized_op(ext.get_op(READ).unwrap().as_ref(), move |args, _| {
+            Ok(Some(template_for_read(args)))
+        });
+        lw
+    }
+
+    /// Asserts that `node` carries metadata equal to [`expected_location`].
+    #[track_caller]
+    fn assert_location(h: &impl HugrView<Node = hugr_core::Node>, node: hugr_core::Node) {
+        use hugr_core::metadata::LocationRecord;
+        let actual = h
+            .get_metadata::<LocationRecord>(node)
+            .expect("LocationRecord expected on node");
+        assert_eq!(
+            serde_json::to_value(&actual).unwrap(),
+            serde_json::to_value(expected_location()).unwrap(),
+            "LocationRecord on {node:?} differs from expected"
+        );
+    }
+
+    /// Asserts every direct `ExtensionOp` child of `container` carries
+    /// metadata equal to [`expected_location`]; panics if there are none.
+    #[track_caller]
+    fn assert_all_inner_ext_ops_have_location(
+        h: &impl HugrView<Node = hugr_core::Node>,
+        container: hugr_core::Node,
+    ) {
+        use hugr_core::ops::OpType;
+        let inner_ops: Vec<_> = h
+            .children(container)
+            .filter(|&n| matches!(h.get_optype(n), OpType::ExtensionOp(_)))
+            .collect();
+        assert!(
+            !inner_ops.is_empty(),
+            "Replacement container {container:?} should contain ExtensionOps"
+        );
+        for op_node in inner_ops {
+            assert_location(h, op_node);
+        }
     }
 
     /// Part of the reproducer for <https://github.com/Quantinuum/tket2/issues/1651>.
@@ -1684,53 +1745,29 @@ mod test {
     /// that call node and is correctly preserved.
     #[test]
     fn linked_hugr_preserves_debug_location_on_call() {
-        use hugr_core::metadata::LocationRecord;
         use hugr_core::ops::OpType;
-        use serde_json::ser;
 
         let ext = ext();
         let (mut h, read_node) = build_read_hugr_with_location(&ext);
 
-        // Configure a lowerer that replaces read<usize> with a LinkedHugr
-        // whose entrypoint is a Call node (call_to_function pattern).
-        let pv = ext.get_type(PACKED_VEC).unwrap();
-        let mut lw = ReplaceTypes::default();
-        lw.set_replace_type(pv.instantiate([bool_t().into()]).unwrap(), i64_t());
-        lw.set_replace_parametrized_type(
-            pv,
-            Box::new(|args: &[TypeArg]| Some(list_type(just_elem_type(args).clone()))),
-        );
-        lw.set_replace_parametrized_op(ext.get_op(READ).unwrap().as_ref(), move |args, _| {
+        // Replacement: LinkedHugr whose entrypoint is a Call node.
+        let lw = build_lw_with_read_template(&ext, |args| {
             let ty: Type = just_elem_type(args).clone();
             let func_hugr = lowered_read(ty, |sig| {
                 FunctionBuilder::new_vis("lowered_read_usize", sig, Visibility::Public)
             })
             .finish_hugr()
             .unwrap();
-            Ok(Some(
-                NodeTemplate::call_to_function(func_hugr, &[]).unwrap(),
-            ))
+            NodeTemplate::call_to_function(func_hugr, &[]).unwrap()
         });
         lw.run(&mut h).unwrap();
         h.validate().unwrap();
 
-        // read_node is now a Call; the debug location is directly on it.
         assert!(
             matches!(h.get_optype(read_node), OpType::Call(_)),
             "Expected read_node to become a Call after LinkedHugr(Call) replacement"
         );
-        let expected = LocationRecord {
-            kind: "location".into(),
-            column: 5,
-            line_no: 10,
-        };
-        let actual = h
-            .get_metadata::<LocationRecord>(read_node)
-            .expect("LocationRecord should be preserved on the Call node");
-        assert_eq!(
-            ser::to_string(&actual).unwrap(),
-            ser::to_string(&expected).unwrap(),
-        );
+        assert_location(&h, read_node);
     }
 
     /// Regression test for <https://github.com/Quantinuum/tket2/issues/1651>.
@@ -1740,9 +1777,7 @@ mod test {
     /// nodes inside it.
     #[test]
     fn compound_op_propagates_debug_location_to_inner_extension_ops() {
-        use hugr_core::metadata::LocationRecord;
         use hugr_core::ops::OpType;
-        use serde_json::ser;
 
         let ext = ext();
         let (mut h, read_node) = build_read_hugr_with_location(&ext);
@@ -1755,33 +1790,7 @@ mod test {
             matches!(h.get_optype(read_node), OpType::DFG(_)),
             "Expected read_node to become a DFG after CompoundOp replacement"
         );
-
-        // The inner ExtensionOp children (itousize, list.get) should carry the location.
-        let inner_ops: Vec<_> = h
-            .children(read_node)
-            .filter(|&n| matches!(h.get_optype(n), OpType::ExtensionOp(_)))
-            .collect();
-        assert!(
-            !inner_ops.is_empty(),
-            "Replacement DFG should contain ExtensionOps"
-        );
-
-        let expected = LocationRecord {
-            kind: "location".into(),
-            column: 5,
-            line_no: 10,
-        };
-        let expected_ser = ser::to_string(&expected).unwrap();
-        for op_node in inner_ops {
-            let actual = h
-                .get_metadata::<LocationRecord>(op_node)
-                .expect("LocationRecord should have been propagated to inner ExtensionOp");
-            assert_eq!(
-                ser::to_string(&actual).unwrap(),
-                expected_ser,
-                "LocationRecord on inner op {op_node:?} should match original"
-            );
-        }
+        assert_all_inner_ext_ops_have_location(&h, read_node);
     }
 
     /// Regression test for <https://github.com/Quantinuum/tket2/issues/1651>.
@@ -1792,30 +1801,15 @@ mod test {
     #[test]
     fn linked_hugr_propagates_debug_location_into_container() {
         use hugr_core::hugr::linking::NameLinkingPolicy;
-        use hugr_core::metadata::LocationRecord;
         use hugr_core::ops::OpType;
-        use serde_json::ser;
 
         let ext = ext();
         let (mut h, read_node) = build_read_hugr_with_location(&ext);
 
-        // Configure a lowerer that replaces read<usize> with a LinkedHugr whose
-        // entrypoint is a DFG (the same body used for CompoundOp in lowerer()),
-        // exercising the LinkedHugr code path in NodeTemplate::replace.
-        let pv = ext.get_type(PACKED_VEC).unwrap();
-        let mut lw = ReplaceTypes::default();
-        lw.set_replace_type(pv.instantiate([bool_t().into()]).unwrap(), i64_t());
-        lw.set_replace_parametrized_type(
-            pv,
-            Box::new(|args: &[TypeArg]| Some(list_type(just_elem_type(args).clone()))),
-        );
-        lw.set_replace_parametrized_op(ext.get_op(READ).unwrap().as_ref(), move |args, _| {
+        let lw = build_lw_with_read_template(&ext, |args| {
             let ty: Type = just_elem_type(args).clone();
             let dfg_hugr = lowered_read(ty, DFGBuilder::new).finish_hugr().unwrap();
-            Ok(Some(NodeTemplate::LinkedHugr(
-                Box::new(dfg_hugr),
-                NameLinkingPolicy::default(),
-            )))
+            NodeTemplate::LinkedHugr(Box::new(dfg_hugr), NameLinkingPolicy::default())
         });
         lw.run(&mut h).unwrap();
         h.validate().unwrap();
@@ -1824,31 +1818,217 @@ mod test {
             matches!(h.get_optype(read_node), OpType::DFG(_)),
             "Expected read_node to become a DFG after LinkedHugr(DFG) replacement"
         );
+        assert_all_inner_ext_ops_have_location(&h, read_node);
+    }
 
-        // The inner ExtensionOp children (itousize, list.get) should carry the location.
+    /// The default policy only propagates the `core.debug_info` key. Other
+    /// metadata entries on the replaced node must not leak onto inner ops.
+    #[test]
+    fn default_policy_does_not_propagate_non_debug_metadata() {
+        use hugr_core::hugr::hugrmut::HugrMut;
+        use hugr_core::ops::OpType;
+        use serde_json::Value;
+
+        let ext = ext();
+        let (mut h, read_node) = build_read_hugr_with_location(&ext);
+        // Attach an unrelated metadata key on the op node before lowering.
+        h.set_metadata_any(read_node, "unrelated.key", Value::String("hello".into()));
+
+        lowerer(&ext).run(&mut h).unwrap();
+        h.validate().unwrap();
+
+        // Debug info IS propagated (sanity check), but the unrelated key is NOT.
         let inner_ops: Vec<_> = h
             .children(read_node)
             .filter(|&n| matches!(h.get_optype(n), OpType::ExtensionOp(_)))
             .collect();
-        assert!(
-            !inner_ops.is_empty(),
-            "Replacement DFG should contain ExtensionOps"
-        );
+        assert!(!inner_ops.is_empty());
+        for op_node in inner_ops {
+            assert!(
+                h.get_metadata_any(op_node, "unrelated.key").is_none(),
+                "Non-debug metadata leaked onto inner op {op_node:?}"
+            );
+        }
+    }
 
-        let expected = LocationRecord {
+    /// The default rule's `!inner_meta.contains_key` guard must prevent
+    /// overwriting a `core.debug_info` value already present on an inner op.
+    #[test]
+    fn default_policy_does_not_overwrite_existing_debug_info() {
+        use hugr_core::hugr::hugrmut::HugrMut;
+        use hugr_core::metadata::LocationRecord;
+        use hugr_core::ops::OpType;
+
+        let ext = ext();
+        let (mut h, read_node) = build_read_hugr_with_location(&ext);
+
+        // Pre-seed one of the inner ops with a *different* LocationRecord by
+        // building the replacement separately and writing metadata before
+        // running the pass via a custom template factory. We attach the
+        // pre-existing record after the pass by intercepting the inner op,
+        // so the simplest path is: run the pass, overwrite metadata, then
+        // run again. Instead we use a custom CompoundOp built here.
+        let preexisting = LocationRecord {
             kind: "location".into(),
-            column: 5,
-            line_no: 10,
+            column: 999,
+            line_no: 999,
         };
-        let expected_ser = ser::to_string(&expected).unwrap();
+        let lw = build_lw_with_read_template(&ext, {
+            let preexisting = serde_json::to_value(&preexisting).unwrap();
+            move |args| {
+                let ty: Type = just_elem_type(args).clone();
+                let mut body = lowered_read(ty, DFGBuilder::new).finish_hugr().unwrap();
+                // Seed every inner ExtensionOp with the pre-existing debug record.
+                let inner: Vec<_> = body
+                    .entry_descendants()
+                    .filter(|&n| matches!(body.get_optype(n), OpType::ExtensionOp(_)))
+                    .collect();
+                for n in inner {
+                    body.set_metadata_any(
+                        n,
+                        hugr_core::metadata::DEBUGINFO_META_KEY,
+                        preexisting.clone(),
+                    );
+                }
+                NodeTemplate::CompoundOp(Box::new(body))
+            }
+        });
+        lw.run(&mut h).unwrap();
+        h.validate().unwrap();
+
+        let inner_ops: Vec<_> = h
+            .children(read_node)
+            .filter(|&n| matches!(h.get_optype(n), OpType::ExtensionOp(_)))
+            .collect();
+        assert!(!inner_ops.is_empty());
+        let preexisting_json = serde_json::to_value(&preexisting).unwrap();
         for op_node in inner_ops {
             let actual = h
                 .get_metadata::<LocationRecord>(op_node)
-                .expect("LocationRecord should have been propagated to inner ExtensionOp");
+                .expect("inner op should still carry the pre-existing record");
             assert_eq!(
-                ser::to_string(&actual).unwrap(),
-                expected_ser,
-                "LocationRecord on inner op {op_node:?} should match original"
+                serde_json::to_value(&actual).unwrap(),
+                preexisting_json,
+                "Default policy overwrote pre-existing debug_info on {op_node:?}",
+            );
+        }
+    }
+
+    /// An empty propagation policy must not write any metadata onto inner ops.
+    #[test]
+    fn empty_policy_propagates_nothing() {
+        use hugr_core::metadata::DEBUGINFO_META_KEY;
+        use hugr_core::ops::OpType;
+
+        let ext = ext();
+        let (mut h, read_node) = build_read_hugr_with_location(&ext);
+
+        let mut lw = lowerer(&ext);
+        lw.set_metadata_policy(MetadataPropagationPolicy::empty());
+        lw.run(&mut h).unwrap();
+        h.validate().unwrap();
+
+        let inner_ops: Vec<_> = h
+            .children(read_node)
+            .filter(|&n| matches!(h.get_optype(n), OpType::ExtensionOp(_)))
+            .collect();
+        assert!(!inner_ops.is_empty());
+        for op_node in inner_ops {
+            assert!(
+                h.get_metadata_any(op_node, DEBUGINFO_META_KEY).is_none(),
+                "Empty policy propagated debug_info onto {op_node:?}"
+            );
+        }
+    }
+
+    /// A user-supplied rule added via `metadata_policy_mut()` should run and
+    /// write the keys it returns onto every direct child unconditionally.
+    #[test]
+    fn custom_policy_rule_is_applied() {
+        use serde_json::Value;
+
+        let ext = ext();
+        let (mut h, read_node) = build_read_hugr_with_location(&ext);
+
+        let mut lw = lowerer(&ext);
+        // Start fresh so we only observe our custom rule.
+        lw.set_metadata_policy(MetadataPropagationPolicy::empty());
+        lw.metadata_policy_mut()
+            .add_rule(|_, _, _, _| vec![("custom.tag".into(), Value::Bool(true))]);
+        lw.run(&mut h).unwrap();
+        h.validate().unwrap();
+
+        // Every direct child of the new container (not just ExtensionOps) gets
+        // the custom key.
+        let children: Vec<_> = h.children(read_node).collect();
+        assert!(!children.is_empty());
+        for child in children {
+            assert_eq!(
+                h.get_metadata_any(child, "custom.tag"),
+                Some(&Value::Bool(true)),
+                "Custom rule did not write key onto {child:?} ({:?})",
+                h.get_optype(child)
+            );
+        }
+    }
+
+    /// Documents a known limitation of [`default_debuginfo_policy`]: it only
+    /// touches *direct* children of the replacement container. If the
+    /// replacement nests another container (e.g. `DFG { DFG { ExtensionOps } }`)
+    /// the inner-inner `ExtensionOp`s receive nothing. This test will start
+    /// failing if/when the default policy is changed to recurse — at which
+    /// point flip the assertion (or delete this test) and update the policy's
+    /// doc comment accordingly.
+    #[test]
+    fn default_policy_does_not_recurse_into_nested_containers() {
+        use hugr_core::metadata::LocationRecord;
+        use hugr_core::ops::OpType;
+
+        let ext = ext();
+        let (mut h, read_node) = build_read_hugr_with_location(&ext);
+
+        // Build a replacement whose body is an *outer* DFG that wraps the
+        // normal lowered_read body in an *inner* DFG. The inner DFG's
+        // ExtensionOps are descendants but not direct children of read_node.
+        let lw = build_lw_with_read_template(&ext, |args| {
+            let ty: Type = just_elem_type(args).clone();
+            let inner_body = lowered_read(ty.clone(), DFGBuilder::new)
+                .finish_hugr()
+                .unwrap();
+            let mut outer = DFGBuilder::new(Signature::new(
+                [list_type(ty.clone()), i64_t()],
+                [ty.clone()],
+            ))
+            .unwrap();
+            let [val, idx] = outer.input_wires_arr();
+            let handle = outer.add_hugr_with_wires(inner_body, [val, idx]).unwrap();
+            let [res] = handle.outputs_arr();
+            NodeTemplate::CompoundOp(Box::new(outer.finish_hugr_with_outputs([res]).unwrap()))
+        });
+        lw.run(&mut h).unwrap();
+        h.validate().unwrap();
+
+        // The direct child of read_node is the inner DFG (no ExtensionOp).
+        let direct_inner_dfg = h
+            .children(read_node)
+            .find(|&n| matches!(h.get_optype(n), OpType::DFG(_)))
+            .expect("expected an inner DFG as a direct child");
+
+        // ExtensionOps inside the inner DFG should NOT have the debug info
+        // (documenting the current non-recursive behaviour).
+        let inner_inner_ops: Vec<_> = h
+            .children(direct_inner_dfg)
+            .filter(|&n| matches!(h.get_optype(n), OpType::ExtensionOp(_)))
+            .collect();
+        assert!(
+            !inner_inner_ops.is_empty(),
+            "test setup: expected ExtensionOps inside the nested DFG"
+        );
+        for op_node in inner_inner_ops {
+            assert!(
+                h.get_metadata::<LocationRecord>(op_node).is_none(),
+                "default policy unexpectedly propagated debug_info into nested container at {op_node:?}; \
+                 if you taught the policy to recurse, please update this test."
             );
         }
     }
