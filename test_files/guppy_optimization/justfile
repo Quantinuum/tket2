@@ -11,7 +11,7 @@ recompile-hugrs:
     # Find all examples in subdirectories and re-run them.
     for example in $(find . -type f -name "*.py"); do
         echo "Re-generating $example"
-        uv run --no-project "$example"
+        uv run --prerelease=allow --no-project "$example"
     done
 
 # Generate the mermaid diagrams from hugr files, for examples directories containing a `.generate_mmd` empty file.

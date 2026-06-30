@@ -33,7 +33,8 @@ __all__ = [
     "InlineFunctions",
     "NormalizeGuppy",
     "ModifierResolverPass",
-    "QSystemPass",
+    "QSystemRebasePass",
+    "_QSystemLLVMPass",
     "Cliffordize",
 ]
 
@@ -94,6 +95,7 @@ class NormalizeGuppy(ComposablePass):
     remove_tuple_untuple: bool = True
     constant_folding: bool = True
     remove_dead_funcs: bool = True
+    inline_funcs: inline_funcs.InlineFuncsHeuristic | bool = True
     inline_dfgs: bool = True
     remove_redundant_order_edges: bool = True
     squash_borrows: bool = True
@@ -110,6 +112,8 @@ class NormalizeGuppy(ComposablePass):
     - constant_folding: Whether to constant fold the program.
     - remove_dead_funcs: Whether to remove dead functions.
     - inline_dfgs: Whether to inline DFG operations.
+    - inline_funcs: Heuristic for inlining function calls, or True for default heuristic,
+      or False to disable inlining.
     - remove_redundant_order_edges: Whether to remove redundant order edges.
     - squash_borrows: Whether to squash return-borrow pairs on BorrowArrays.
     """
@@ -141,6 +145,14 @@ class NormalizeGuppy(ComposablePass):
         """Run the pass in the CompilationState
 
         TODO: This should be part of a protocol."""
+        inline_funcs_heuristic: inline_funcs.InlineFuncsHeuristic | None
+        match self.inline_funcs:
+            case True:
+                inline_funcs_heuristic = inline_funcs.MaxSize(64)
+            case False:
+                inline_funcs_heuristic = None
+            case _:
+                inline_funcs_heuristic = self.inline_funcs
         _passes.normalize_guppy(
             program._inner,
             resolve_modifiers=self.resolve_modifiers,
@@ -149,6 +161,7 @@ class NormalizeGuppy(ComposablePass):
             constant_folding=self.constant_folding,
             remove_dead_funcs=self.remove_dead_funcs,
             inline_dfgs=self.inline_dfgs,
+            inline_funcs=inline_funcs_heuristic,
             remove_redundant_order_edges=self.remove_redundant_order_edges,
             squash_borrows=self.squash_borrows,
             scope=self._scope,
@@ -379,19 +392,17 @@ class ModifierResolverPass(ComposablePass):
 
 
 @dataclass(kw_only=True)
-class QSystemPass(ComposablePass):
-    """A pass to convert quantum ops to qsystem ops.
+class QSystemRebasePass(ComposablePass):
+    """Convert quantum operations to QSystem operations.
 
-     Parameters:
-    - constant_fold: Whether to perform constant folding.
-    - monomorphize: Whether to monomorphize generic functions.
-    - force_order: Whether to enforce total ordering of all HUGR operations.
-    - hide_funcs: Whether to mark all functions as private.
+    Parameters:
+    - resolve_modifiers: Whether to resolve Guppy modifiers.
+    - lower_drops: Whether to lower qubit drops to QSystem operations.
+    - hide_funcs: Whether to mark generated helper functions as private.
     """
 
-    constant_fold: bool = True
-    monomorphize: bool = True
-    force_order: bool = True
+    resolve_modifiers: bool = True
+    lower_drops: bool = True
     hide_funcs: bool = True
     _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
 
@@ -403,7 +414,7 @@ class QSystemPass(ComposablePass):
             copy_call=lambda h: self._qsystem_rebase(h, inplace),
         )
 
-    def with_scope(self, scope: PassScope) -> QSystemPass:
+    def with_scope(self, scope: PassScope) -> QSystemRebasePass:
         """Set the scope of this pass and return self."""
         self._scope = scope
         return self
@@ -422,10 +433,61 @@ class QSystemPass(ComposablePass):
         """Run the pass in the CompilationState"""
         _passes.qsystem_rebase_pass(
             program._inner,
+            resolve_modifiers=self.resolve_modifiers,
+            lower_drops=self.lower_drops,
+            hide_funcs=self.hide_funcs,
+            scope=self._scope,
+        )
+        return program
+
+
+@dataclass(kw_only=True)
+class _QSystemLLVMPass(ComposablePass):
+    """Prepare a QSystem program for LLVM lowering.
+
+    This is normally called automatically by the tools before LLVM lowering.
+
+    Parameters:
+    - constant_fold: Whether to perform constant folding.
+    - monomorphize: Whether to monomorphize generic functions.
+    - force_order: Whether to enforce total ordering of all HUGR operations.
+    """
+
+    constant_fold: bool = True
+    monomorphize: bool = True
+    force_order: bool = True
+    _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
+
+    def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
+        return implement_pass_run(
+            self,
+            hugr=hugr,
+            inplace=inplace,
+            copy_call=lambda h: self._qsystem_llvm(h, inplace),
+        )
+
+    def with_scope(self, scope: PassScope) -> _QSystemLLVMPass:
+        """Set the scope of this pass and return self."""
+        self._scope = scope
+        return self
+
+    def _qsystem_llvm(self, hugr: Hugr, inplace: bool) -> PassResult:
+        tk_program = _state.CompilationState.from_python(hugr)
+
+        self._run_tk(tk_program)
+
+        package = tk_program.to_python()
+        return PassResult.for_pass(
+            self, hugr=package.modules[0], inplace=inplace, result=None
+        )
+
+    def _run_tk(self, program: _state.CompilationState) -> _state.CompilationState:
+        """Run the pass in the CompilationState"""
+        _passes.qsystem_llvm_pass(
+            program._inner,
             constant_fold=self.constant_fold,
             monomorphize=self.monomorphize,
             force_order=self.force_order,
-            hide_funcs=self.hide_funcs,
             scope=self._scope,
         )
         return program

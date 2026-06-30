@@ -20,6 +20,7 @@ use itertools::Itertools;
 use pyo3::prelude::*;
 use tket::hugr::ops::DataflowParent;
 use tket::passes::composable::ComposablePass;
+use tket_qsystem::{QSystemLLVMPass, QSystemRebasePass};
 
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
@@ -30,14 +31,14 @@ use std::{fs, str, vec};
 use tket::hugr::{self, llvm::inkwell};
 use tket::hugr::{Hugr, HugrView, Node};
 use tket::llvm::rotation::RotationCodegenExtension;
-use tket_qsystem::QSystemPass;
 use tket_qsystem::extension::{REGISTRY, qsystem};
 use tket_qsystem::llvm::array_utils::ArrayLowering;
 pub use tket_qsystem::llvm::futures::FuturesCodegenExtension;
 use tket_qsystem::llvm::globals::GlobalsCodegenExtension;
 use tket_qsystem::llvm::{
-    debug::DebugCodegenExtension, prelude::QISPreludeCodegen, qsystem::QSystemCodegenExtension,
-    random::RandomCodegenExtension, result::ResultsCodegenExtension, utils::UtilsCodegenExtension,
+    argument::ArgumentCodegenExtension, debug::DebugCodegenExtension, prelude::QISPreludeCodegen,
+    qsystem::QSystemCodegenExtension, random::RandomCodegenExtension,
+    result::ResultsCodegenExtension, utils::UtilsCodegenExtension,
 };
 use tracing::{Level, event, instrument};
 use utils::read_hugr_envelope;
@@ -111,7 +112,8 @@ fn get_hugr_llvm_module<'c, 'hugr, 'a: 'c>(
 }
 
 fn process_hugr(platform: qsystem::QSystemPlatform, hugr: &mut Hugr) -> Result<()> {
-    QSystemPass::defaults(platform).run(hugr)?;
+    QSystemRebasePass::defaults(platform).run(hugr)?;
+    QSystemLLVMPass::default().run(hugr)?;
     Ok(())
 }
 
@@ -140,6 +142,10 @@ fn codegen_extensions(platform: qsystem::QSystemPlatform) -> CodegenExtsMap<'sta
         // State results use standard arrays.
         .add_extension(DebugCodegenExtension::new(SeleneHeapArrayCodegen::LOWERING))
         .add_extension(gpu::GpuCodegen)
+        // Argument reading uses standard arrays.
+        .add_extension(ArgumentCodegenExtension::new(
+            SeleneHeapArrayCodegen::LOWERING,
+        ))
         .finish()
 }
 

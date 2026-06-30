@@ -33,7 +33,7 @@ pub(super) fn inline_functions(
 }
 
 #[derive(Clone, Debug, Default)]
-pub(super) struct PyInlineFuncsHeuristic(InlineFuncsHeuristic);
+pub(super) struct PyInlineFuncsHeuristic(pub(super) InlineFuncsHeuristic);
 
 impl<'a, 'py> FromPyObject<'a, 'py> for PyInlineFuncsHeuristic {
     type Error = PyErr;

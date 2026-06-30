@@ -12,8 +12,6 @@ use hugr::{
     types::Signature,
 };
 use lazy_static::lazy_static;
-use std::collections::BTreeMap;
-use std::collections::btree_map::Entry;
 use tket::extension::measurement::{MeasurementOp, measurement_custom_type};
 use tket::passes::composable::WithScope;
 use tket::passes::replace_types::{NodeTemplate, ReplaceTypesError};
@@ -234,8 +232,8 @@ fn register_measurement_replacements(lowerer: &mut ReplaceTypes) {
 /// Lower [`TketOp`] operations to target QSystem operations.
 ///
 /// Single op replacements are done directly, while multi-op replacements are
-/// done by lazily defining and calling functions that implement the
-/// decomposition. Returns the nodes that were replaced.
+/// done by defining and calling functions that implement the decomposition.
+/// Returns the nodes that were replaced.
 ///
 /// This pass also replaces `tket.measurement` with `future(bool_t)` and
 /// [HeliosOp::FutureToMeasurement] / [SolOp::FutureToMeasurement] becomes a no-op.
@@ -258,75 +256,54 @@ pub fn lower_tk2_ops(
     platform: QSystemPlatform,
 ) -> Result<Vec<Node>, LowerTk2Error> {
     let scope = scope.into();
-    let mut funcs: BTreeMap<TketOp, NodeTemplate> = BTreeMap::new();
+    let global = matches!(scope, PassScope::Global(_));
     let mut lowerer = lowerer_with_future_linearization().with_scope(scope.clone());
     register_measurement_replacements(&mut lowerer);
+    register_legacy_qsystem_replacements(&mut lowerer, platform);
+    register_cross_platform_replacements(&mut lowerer, platform, &scope)?;
+    register_tket_op_replacements(&mut lowerer, platform, &scope)?;
+
     let mut barrier_funcs = BarrierInserter::new(platform);
 
-    // Cross-platform decomposition templates are built lazily in the processing
-    // loop, only when a cross-platform op is actually encountered.
-    let mut helios_cross_funcs: BTreeMap<HeliosOp, NodeTemplate> = BTreeMap::new();
-    let mut sol_cross_funcs: BTreeMap<SolOp, NodeTemplate> = BTreeMap::new();
-    register_legacy_qsystem_replacements(&mut lowerer, platform);
-
+    // Single traversal: collect the nodes that will be replaced and perform the
+    // per-node barrier insertion. All op replacements are already registered
+    // above, so the `ReplaceTypes::run` below does the actual op rewriting.
     let replacements: Vec<_> = scope
         .regions(hugr)
         .flat_map(|region| hugr.children(region))
         .filter_map(|n| classify_node(n, hugr.get_optype(n), platform))
         .collect::<Result<Vec<_>, LowerTk2Error>>()?;
-    let mut replaced_nodes = Vec::with_capacity(replacements.len());
+    let mut nodes_to_replace = Vec::with_capacity(replacements.len());
     for (node, op) in replacements {
         match op {
-            ReplaceOps::Tk2(tket_op) => match (direct_map(tket_op, platform), &scope) {
-                (Some(direct), _) => {
-                    lowerer.set_replace_op(
-                        &tket_op.into_extension_op(),
-                        NodeTemplate::SingleOp(direct),
-                    );
-                    replaced_nodes.push(node);
-                }
-                (None, PassScope::Global(_)) => {
-                    let template = match funcs.entry(tket_op) {
-                        Entry::Occupied(e) => e.get().clone(),
-                        Entry::Vacant(e) => {
-                            let t =
-                                NodeTemplate::call_to_function(build_func(platform, tket_op)?, &[])
-                                    .map_err(LowerTk2Error::BuildError)?;
-                            e.insert(t).clone()
-                        }
-                    };
-                    lowerer.set_replace_op(&tket_op.into_extension_op(), template);
-                    replaced_nodes.push(node);
-                }
-                (None, _) => {} // non-global multi-op: leave unchanged
-            },
-            ReplaceOps::Barrier(barrier) => {
-                // Handle barrier replacements
-                //
-                // Only perform the replacement for global passes, as we
-                // cannot define the barrier function for local entrypoint scopes.
-                if let PassScope::Global(_) = &scope {
-                    barrier_funcs.insert_runtime_barrier(hugr, node, barrier)?;
-                    replaced_nodes.push(node);
+            // Tk2 ops with a direct map are replaced in any scope; multi-op
+            // decompositions are only registered (and so only replaced) for
+            // global scopes.
+            ReplaceOps::Tk2(tket_op) => {
+                if direct_map(tket_op, platform).is_some() || global {
+                    nodes_to_replace.push(node);
                 }
             }
-            ReplaceOps::CrossPlatformHelios(h_op) => apply_cross_platform_helios(
-                node,
-                h_op,
-                hugr.get_optype(node),
-                &scope,
-                &mut lowerer,
-                &mut helios_cross_funcs,
-                &mut replaced_nodes,
-            )?,
-            ReplaceOps::CrossPlatformSol(s_op) => apply_cross_platform_sol(
-                node,
-                s_op,
-                &scope,
-                &mut lowerer,
-                &mut sol_cross_funcs,
-                &mut replaced_nodes,
-            )?,
+            ReplaceOps::Barrier(barrier) => {
+                // Only perform the replacement for global passes, as we cannot
+                // define the barrier function for local entrypoint scopes.
+                if global {
+                    barrier_funcs.insert_runtime_barrier(hugr, node, barrier)?;
+                    nodes_to_replace.push(node);
+                }
+            }
+            // Cross-platform shared ops remap in any scope; the platform
+            // specific decompositions are only registered for global scopes.
+            ReplaceOps::CrossPlatformHelios(h_op) => {
+                if SharedOp::try_from(h_op).is_ok() || global {
+                    nodes_to_replace.push(node);
+                }
+            }
+            ReplaceOps::CrossPlatformSol(s_op) => {
+                if SharedOp::try_from(s_op).is_ok() || global {
+                    nodes_to_replace.push(node);
+                }
+            }
         }
     }
 
@@ -335,7 +312,99 @@ pub fn lower_tk2_ops(
     // Replace the operations.
     lowerer.with_scope(scope.clone()).run(hugr)?;
 
-    Ok(replaced_nodes)
+    Ok(nodes_to_replace)
+}
+
+/// Pre-register a replacement for every [`TketOp`] onto `lowerer`.
+///
+/// Direct-map ops (see [`direct_map`]) get a single-op replacement in any
+/// scope. Multi-op ops get a call to their generated decomposition function,
+/// but only for [`PassScope::Global`] scopes, since non-global scopes cannot
+/// add module-level functions.
+fn register_tket_op_replacements(
+    lowerer: &mut ReplaceTypes,
+    platform: QSystemPlatform,
+    scope: &PassScope,
+) -> Result<(), LowerTk2Error> {
+    let global = matches!(scope, PassScope::Global(_));
+    for op in TketOp::iter() {
+        if let Some(direct) = direct_map(op, platform) {
+            lowerer.set_replace_op(&op.into_extension_op(), NodeTemplate::SingleOp(direct));
+        } else if global {
+            let template = NodeTemplate::call_to_function(build_func(platform, op)?, &[])
+                .map_err(LowerTk2Error::BuildError)?;
+            lowerer.set_replace_op(&op.into_extension_op(), template);
+        }
+    }
+    Ok(())
+}
+
+/// Pre-register cross-platform op remappings onto `lowerer`.
+///
+/// When targeting one platform, ops belonging to the *other* platform's
+/// extension may be present in the HUGR (e.g. a `tket.qsystem.helios` op while
+/// lowering to Sol). Shared ops are remapped 1:1 in any scope; the platform
+/// specific ops (`ZZPhase` / `PhasedXX`) are decomposed via a call to a
+/// generated function and only for [`PassScope::Global`] scopes.
+fn register_cross_platform_replacements(
+    lowerer: &mut ReplaceTypes,
+    platform: QSystemPlatform,
+    scope: &PassScope,
+) -> Result<(), LowerTk2Error> {
+    let global = matches!(scope, PassScope::Global(_));
+    match platform {
+        // Targeting Sol: remap Helios ops to their Sol counterparts.
+        QSystemPlatform::Sol => {
+            for h_op in HeliosOp::iter() {
+                match SharedOp::try_from(h_op) {
+                    Ok(shared) => lowerer.set_replace_op(
+                        &h_op.to_extension_op().expect("valid registered HeliosOp"),
+                        NodeTemplate::SingleOp(SolOp::from(shared).into()),
+                    ),
+                    Err(_) if global => {
+                        debug_assert_eq!(h_op, HeliosOp::ZZPhase, "unexpected Helios-specific op");
+                        let template =
+                            NodeTemplate::call_to_function(build_helios_zzphase_for_sol()?, &[])
+                                .map_err(LowerTk2Error::BuildError)?;
+                        // Register for both the native `tket.qsystem.helios` and
+                        // the legacy `tket.qsystem` extension op keys.
+                        lowerer.set_replace_op(
+                            &h_op.to_extension_op().expect("valid registered HeliosOp"),
+                            template.clone(),
+                        );
+                        let legacy = qsystem::EXTENSION
+                            .instantiate_extension_op(<&'static str>::from(h_op), &[])
+                            .expect("tket.qsystem and tket.qsystem.helios share op names");
+                        lowerer.set_replace_op(&legacy, template);
+                    }
+                    Err(_) => {} // non-global scope: leave the op unchanged
+                }
+            }
+        }
+        // Targeting Helios: remap Sol ops to their Helios counterparts.
+        QSystemPlatform::Helios => {
+            for s_op in SolOp::iter() {
+                match SharedOp::try_from(s_op) {
+                    Ok(shared) => lowerer.set_replace_op(
+                        &s_op.to_extension_op().expect("valid registered SolOp"),
+                        NodeTemplate::SingleOp(HeliosOp::from(shared).into()),
+                    ),
+                    Err(_) if global => {
+                        debug_assert_eq!(s_op, SolOp::PhasedXX, "unexpected Sol-specific op");
+                        let template =
+                            NodeTemplate::call_to_function(build_sol_phasedxx_for_helios()?, &[])
+                                .map_err(LowerTk2Error::BuildError)?;
+                        lowerer.set_replace_op(
+                            &s_op.to_extension_op().expect("valid registered SolOp"),
+                            template,
+                        );
+                    }
+                    Err(_) => {} // non-global scope: leave the op unchanged
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 fn platform_str(platform: QSystemPlatform) -> &'static str {
@@ -502,98 +571,9 @@ pub fn check_lowered<H: HugrView>(
 
 // ── Cross-platform decomposition helpers ────────────────────────────────────
 
-/// Register a cross-platform Helios→Sol replacement in `lowerer`.
-///
-/// For shared ops, registers a direct 1:1 remap. For Helios-specific ops
-/// (e.g. `ZZPhase`), lazily builds the Sol decomposition template on first
-/// encounter (Global scope only; non-Global scopes leave the op unchanged).
-/// `optype` is read from the node so that both native `tket.qsystem.helios`
-/// and legacy `tket.qsystem` ops are handled with the correct [`ExtensionOp`]
-/// key.
-fn apply_cross_platform_helios(
-    node: Node,
-    h_op: HeliosOp,
-    optype: &ops::OpType,
-    scope: &PassScope,
-    lowerer: &mut ReplaceTypes,
-    cache: &mut BTreeMap<HeliosOp, NodeTemplate>,
-    replaced_nodes: &mut Vec<Node>,
-) -> Result<(), LowerTk2Error> {
-    match SharedOp::try_from(h_op) {
-        Ok(shared) => {
-            lowerer.set_replace_op(
-                &h_op.to_extension_op().expect("valid registered HeliosOp"),
-                NodeTemplate::SingleOp(SolOp::from(shared).into()),
-            );
-            replaced_nodes.push(node);
-        }
-        Err(_) if matches!(scope, PassScope::Global(_)) => {
-            debug_assert_eq!(h_op, HeliosOp::ZZPhase, "unexpected Helios-specific op");
-            let ext_op = optype
-                .as_extension_op()
-                .expect("CrossPlatformHelios node must be an extension op")
-                .clone();
-            let template = match cache.entry(h_op) {
-                Entry::Occupied(e) => e.get().clone(),
-                Entry::Vacant(e) => {
-                    let t = NodeTemplate::call_to_function(build_helios_op_for_sol()?, &[])
-                        .map_err(LowerTk2Error::BuildError)?;
-                    e.insert(t).clone()
-                }
-            };
-            lowerer.set_replace_op(&ext_op, template);
-            replaced_nodes.push(node);
-        }
-        Err(_) => {} // non-Global scope: leave unchanged
-    }
-    Ok(())
-}
-
-/// Register a cross-platform Sol→Helios replacement in `lowerer`.
-///
-/// For shared ops, registers a direct 1:1 remap. For Sol-specific ops
-/// (e.g. `PhasedXX`), lazily builds the Helios decomposition template on first
-/// encounter (Global scope only; non-Global scopes leave the op unchanged).
-fn apply_cross_platform_sol(
-    node: Node,
-    s_op: SolOp,
-    scope: &PassScope,
-    lowerer: &mut ReplaceTypes,
-    cache: &mut BTreeMap<SolOp, NodeTemplate>,
-    replaced_nodes: &mut Vec<Node>,
-) -> Result<(), LowerTk2Error> {
-    match SharedOp::try_from(s_op) {
-        Ok(shared) => {
-            lowerer.set_replace_op(
-                &s_op.to_extension_op().expect("valid registered SolOp"),
-                NodeTemplate::SingleOp(HeliosOp::from(shared).into()),
-            );
-            replaced_nodes.push(node);
-        }
-        Err(_) if matches!(scope, PassScope::Global(_)) => {
-            debug_assert_eq!(s_op, SolOp::PhasedXX, "unexpected Sol-specific op");
-            let template = match cache.entry(s_op) {
-                Entry::Occupied(e) => e.get().clone(),
-                Entry::Vacant(e) => {
-                    let t = NodeTemplate::call_to_function(build_sol_op_for_helios()?, &[])
-                        .map_err(LowerTk2Error::BuildError)?;
-                    e.insert(t).clone()
-                }
-            };
-            lowerer.set_replace_op(
-                &s_op.to_extension_op().expect("valid registered SolOp"),
-                template,
-            );
-            replaced_nodes.push(node);
-        }
-        Err(_) => {} // non-Global scope: leave unchanged
-    }
-    Ok(())
-}
-
 /// Build a [`Hugr`] function that decomposes [`HeliosOp::ZZPhase`] into Sol ops
 /// via [`SynthesizeHeliosOp`] implemented on [`SolSynthesizer`].
-fn build_helios_op_for_sol() -> Result<Hugr, LowerTk2Error> {
+fn build_helios_zzphase_for_sol() -> Result<Hugr, LowerTk2Error> {
     let sig = HeliosOp::ZZPhase
         .to_extension_op()
         .expect("valid registered HeliosOp")
@@ -613,7 +593,7 @@ fn build_helios_op_for_sol() -> Result<Hugr, LowerTk2Error> {
 
 /// Build a [`Hugr`] function that decomposes [`SolOp::PhasedXX`] into Helios ops
 /// via [`SynthesizeSolOp`] implemented on [`HeliosSynthesizer`].
-fn build_sol_op_for_helios() -> Result<Hugr, LowerTk2Error> {
+fn build_sol_phasedxx_for_helios() -> Result<Hugr, LowerTk2Error> {
     let sig = SolOp::PhasedXX
         .to_extension_op()
         .expect("valid registered SolOp")
@@ -693,7 +673,7 @@ mod test {
         HugrView,
         builder::{DFGBuilder, FunctionBuilder, inout_sig},
         extension::{
-            prelude::{UnwrapBuilder as _, bool_t, option_type, qb_t, usize_t},
+            prelude::{Barrier, UnwrapBuilder as _, bool_t, option_type, qb_t, usize_t},
             simple_op::{HasDef, MakeOpDef},
         },
         ops::OpType,
@@ -713,7 +693,7 @@ mod test {
     use crate::extension::qsystem::{helios::HeliosOp, sol::SolOp};
 
     use super::*;
-    use rstest::rstest;
+    use rstest::{fixture, rstest};
 
     #[derive(Debug, PartialEq, Eq)]
     enum ExpectedOp {
@@ -766,6 +746,80 @@ mod test {
     ) -> impl Iterator<Item = Node> + '_ {
         circ.toposorted_children(circ.parent())
             .expect("circuit entrypoint should be dataflow region")
+    }
+
+    fn assert_sol_to_helios_lowering(h: &hugr::Hugr) {
+        assert_eq!(
+            check_lowered(
+                h,
+                Preserve::Public,
+                &forbidden_extensions_for(QSystemPlatform::Helios)
+            ),
+            Ok(())
+        );
+        // TryQAlloc and QFree are shared ops; assert they were remapped to their
+        // Helios equivalents (exercises the shared-op arm of register_cross_platform_replacements).
+        let circ = Circuit::new(h);
+        let helios_ops: Vec<HeliosOp> = toposorted_circuit_nodes(&circ)
+            .filter_map(|node| circ.hugr().get_optype(node).cast())
+            .collect();
+        assert!(helios_ops.contains(&HeliosOp::TryQAlloc));
+        assert!(helios_ops.contains(&HeliosOp::QFree));
+        // PhasedXX must have been decomposed into ZZPhase (inside the replacement function).
+        // PhasedXX decomposes into a called function, so scan all hugr nodes.
+        assert!(
+            h.nodes()
+                .any(|n| h.get_optype(n).cast() == Some(HeliosOp::ZZPhase))
+        );
+        // There should be only one replacement function.
+        assert_eq!(
+            h.nodes()
+                .filter(|&n| {
+                    h.get_optype(n)
+                        .as_func_defn()
+                        .is_some_and(|f| f.func_name() == "__tk2_sol_to_helios_phasedxx")
+                })
+                .count(),
+            1,
+            "Expected exactly one replacement function"
+        );
+    }
+
+    fn assert_helios_to_sol_lowering(h: &hugr::Hugr) {
+        assert_eq!(
+            check_lowered(
+                h,
+                Preserve::Public,
+                &forbidden_extensions_for(QSystemPlatform::Sol)
+            ),
+            Ok(())
+        );
+        // TryQAlloc and QFree are shared ops; assert they were remapped to their
+        // Sol equivalents (exercises the shared-op arm of register_cross_platform_replacements).
+        let circ = Circuit::new(h);
+        let sol_ops: Vec<SolOp> = toposorted_circuit_nodes(&circ)
+            .filter_map(|node| circ.hugr().get_optype(node).cast())
+            .collect();
+        assert!(sol_ops.contains(&SolOp::TryQAlloc));
+        assert!(sol_ops.contains(&SolOp::QFree));
+        // ZZPhase must have been decomposed into PhasedXX (inside the replacement function).
+        // ZZPhase decomposes into a called function, so scan all hugr nodes.
+        assert!(
+            h.nodes()
+                .any(|n| h.get_optype(n).cast() == Some(SolOp::PhasedXX))
+        );
+        // There should be only one replacement function.
+        assert_eq!(
+            h.nodes()
+                .filter(|&n| {
+                    h.get_optype(n)
+                        .as_func_defn()
+                        .is_some_and(|f| f.func_name() == "__tk2_helios_to_sol_zzphase")
+                })
+                .count(),
+            1,
+            "Expected exactly one replacement function"
+        );
     }
 
     #[rstest]
@@ -989,6 +1043,7 @@ mod test {
         if let Err(e) = h.validate() {
             panic!("{}", e);
         }
+        h.validate().unwrap();
     }
 
     fn legacy_qsystem_hugr() -> hugr::Hugr {
@@ -1033,6 +1088,7 @@ mod test {
         assert!(check_lowered(&h, Preserve::Public, &legacy_exts).is_err());
 
         lower_tk2_ops(&mut h, Preserve::Public, QSystemPlatform::Helios).unwrap();
+        h.validate().unwrap();
 
         // No tket.qsystem ops should remain after lowering.
         assert_eq!(check_lowered(&h, Preserve::Public, &legacy_exts), Ok(()));
@@ -1061,6 +1117,7 @@ mod test {
     fn test_legacy_qsystem_zz_phase_lowers_via_cross_platform_to_sol() {
         let mut h = legacy_qsystem_hugr();
         lower_tk2_ops(&mut h, Preserve::Public, QSystemPlatform::Sol).unwrap();
+        h.validate().unwrap();
         assert_eq!(
             check_lowered(
                 &h,
@@ -1100,28 +1157,8 @@ mod test {
         let mut h = b.finish_hugr_with_outputs([]).unwrap();
 
         lower_tk2_ops(&mut h, Preserve::Public, QSystemPlatform::Sol).unwrap();
-        assert_eq!(
-            check_lowered(
-                &h,
-                Preserve::Public,
-                &forbidden_extensions_for(QSystemPlatform::Sol)
-            ),
-            Ok(())
-        );
-        // TryQAlloc and QFree are shared ops; assert they were remapped to their
-        // Sol equivalents (exercises the Ok(shared) arm of apply_cross_platform_helios).
-        let circ = Circuit::new(&h);
-        let sol_ops: Vec<SolOp> = toposorted_circuit_nodes(&circ)
-            .filter_map(|node| circ.hugr().get_optype(node).cast())
-            .collect();
-        assert!(sol_ops.contains(&SolOp::TryQAlloc));
-        assert!(sol_ops.contains(&SolOp::QFree));
-        // ZZPhase must have been decomposed into PhasedXX (inside the replacement function).
-        // ZZPhase decomposes into a called function, so scan all hugr nodes.
-        assert!(
-            h.nodes()
-                .any(|n| h.get_optype(n).cast() == Some(SolOp::PhasedXX))
-        );
+        h.validate().unwrap();
+        assert_helios_to_sol_lowering(&h);
     }
 
     /// A `tket.qsystem.sol::PhasedXX` op targeting Helios is lowered via the
@@ -1154,27 +1191,230 @@ mod test {
         let mut h = b.finish_hugr_with_outputs([]).unwrap();
 
         lower_tk2_ops(&mut h, Preserve::Public, QSystemPlatform::Helios).unwrap();
-        assert_eq!(
-            check_lowered(
-                &h,
-                Preserve::Public,
-                &forbidden_extensions_for(QSystemPlatform::Helios)
-            ),
-            Ok(())
-        );
-        // TryQAlloc and QFree are shared ops; assert they were remapped to their
-        // Helios equivalents (exercises the Ok(shared) arm of apply_cross_platform_sol).
-        let circ = Circuit::new(&h);
-        let helios_ops: Vec<HeliosOp> = toposorted_circuit_nodes(&circ)
-            .filter_map(|node| circ.hugr().get_optype(node).cast())
-            .collect();
-        assert!(helios_ops.contains(&HeliosOp::TryQAlloc));
-        assert!(helios_ops.contains(&HeliosOp::QFree));
-        // PhasedXX must have been decomposed into ZZPhase (inside the replacement function).
-        // PhasedXX decomposes into a called function, so scan all hugr nodes.
+        h.validate().unwrap();
+        assert_sol_to_helios_lowering(&h);
+    }
+
+    /// Test that runtime `Barrier` and `<platform>::RuntimeBarrier` ops
+    /// are correctly lowered and/or skipped when lowering to <platform>.
+    ///
+    /// See the comment in `classify_node` for further details.
+    #[rstest]
+    #[case::helios(QSystemPlatform::Helios)]
+    #[case::sol(QSystemPlatform::Sol)]
+    fn test_lowering_runtime_barriers(#[case] platform: QSystemPlatform) {
+        use crate::extension::qsystem::common::runtime_barrier_ext_op;
+        use crate::extension::qsystem::{helios, sol};
+        use hugr::std_extensions::collections::array::ArrayOpBuilder;
+
+        // Build a RuntimeBarrier from the target platform's extension.
+        let barrier_ext = match platform {
+            QSystemPlatform::Sol => &*sol::EXTENSION,
+            QSystemPlatform::Helios => &*helios::EXTENSION,
+        };
+
+        let array_size: u64 = 2;
+        let platform_barrier_op = runtime_barrier_ext_op(barrier_ext, array_size).unwrap();
+
+        let mut b = FunctionBuilder::new("f", Signature::new_endo(type_row![])).unwrap();
+        let [maybe_q1] = b
+            .add_dataflow_op(TketOp::TryQAlloc, [])
+            .unwrap()
+            .outputs_arr();
+        let [q1] = b
+            .build_unwrap_sum(1, option_type(vec![qb_t()]), maybe_q1)
+            .unwrap();
+        let [maybe_q2] = b
+            .add_dataflow_op(TketOp::TryQAlloc, [])
+            .unwrap()
+            .outputs_arr();
+        let [q2] = b
+            .build_unwrap_sum(1, option_type(vec![qb_t()]), maybe_q2)
+            .unwrap();
+
+        // Add some gates and apply a generic runtime barrier
+        let [q1] = b.add_dataflow_op(TketOp::H, [q1]).unwrap().outputs_arr();
+        let [q1, q2] = b
+            .add_dataflow_op(TketOp::CX, [q1, q2])
+            .unwrap()
+            .outputs_arr();
+        let barrier_op = Barrier::new(vec![qb_t(), qb_t()]);
+        let [q1, q2] = b
+            .add_dataflow_op(barrier_op, [q1, q2])
+            .unwrap()
+            .outputs_arr();
+
+        // Add more platform specific gates
+        let angle1 = const_f64(&mut b, 0.5);
+        let angle2 = const_f64(&mut b, 0.25);
+        let [q1, q2] = b
+            .add_dataflow_op(SolOp::PhasedXX, [q1, q2, angle1, angle2])
+            .unwrap()
+            .outputs_arr();
+        let [q1, q2] = b
+            .add_dataflow_op(HeliosOp::ZZPhase, [q1, q2, angle2])
+            .unwrap()
+            .outputs_arr();
+
+        // Pack qubits into an array and apply the <platform> RuntimeBarrier.
+        let q_arr = b.add_new_array(qb_t(), [q1, q2]).unwrap();
+        let [q_arr] = b
+            .add_dataflow_op(platform_barrier_op.clone(), [q_arr])
+            .unwrap()
+            .outputs_arr();
+        let [q1, q2]: [Wire; 2] = b
+            .add_array_unpack(qb_t(), array_size, q_arr)
+            .unwrap()
+            .try_into()
+            .unwrap();
+
+        b.add_dataflow_op(TketOp::QFree, [q1]).unwrap();
+        b.add_dataflow_op(TketOp::QFree, [q2]).unwrap();
+        let mut h = b.finish_hugr_with_outputs([]).unwrap();
+
+        // Lowering succeeds
+        lower_tk2_ops(&mut h, Preserve::Public, platform).unwrap();
+        h.validate().unwrap();
+
+        // The <platform>::RuntimeBarrier op should still be present (not remapped).
+        let barrier_still_present = h.nodes().any(|n| {
+            h.get_optype(n)
+                .as_extension_op()
+                .is_some_and(|op| platform_barrier_op == *op)
+        });
         assert!(
-            h.nodes()
-                .any(|n| h.get_optype(n).cast() == Some(HeliosOp::ZZPhase))
+            barrier_still_present,
+            "Expected the {platform:?} RuntimeBarrier to remain untouched; \
+             if cross-platform RuntimeBarrier remapping has been implemented, \
+             update this test to assert the op was replaced instead."
+        );
+    }
+
+    /// Re-lowering a HUGR with a platform-specific RuntimeBarrier to a different
+    /// platform is not supported.
+    #[rstest]
+    #[case::from_helios_to_sol(QSystemPlatform::Helios, QSystemPlatform::Sol)]
+    #[case::from_sol_to_helios(QSystemPlatform::Sol, QSystemPlatform::Helios)]
+    fn test_relowering_runtime_barrier_to_different_platform_fails(
+        #[case] from_platform: QSystemPlatform,
+        #[case] to_platform: QSystemPlatform,
+    ) {
+        use crate::extension::qsystem::{
+            helios::RuntimeBarrierDef as HeliosRuntimeBarrierDef,
+            sol::RuntimeBarrierDef as SolRuntimeBarrierDef,
+        };
+
+        let mut b = DFGBuilder::new(Signature::new([rotation_type()], [bool_t()])).unwrap();
+        let [angle] = b.input_wires_arr();
+        let qalloc = b.add_dataflow_op(TketOp::QAlloc, []).unwrap();
+        let [q] = qalloc.outputs_arr();
+        let [q] = b.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
+        let q = b.add_barrier([q]).unwrap().out_wire(0);
+        let rx = b.add_dataflow_op(TketOp::Rx, [q, angle]).unwrap();
+        let [q] = rx.outputs_arr();
+        let [q, bool] = b
+            .add_dataflow_op(TketOp::Measure, [q])
+            .unwrap()
+            .outputs_arr();
+        b.add_dataflow_op(TketOp::QFree, [q]).unwrap();
+        let mut h = b.finish_hugr_with_outputs([bool]).unwrap();
+
+        lower_tk2_ops(&mut h, PassScope::Global(Preserve::Public), from_platform).unwrap();
+        h.validate().unwrap();
+
+        // Re-lowering to the other platform completes, but it should contain
+        // barriers from the wrong platform.
+        lower_tk2_ops(&mut h, Preserve::Public, to_platform).unwrap();
+        h.validate().unwrap();
+        let unlowered = check_lowered(&h, Preserve::Public, &forbidden_extensions_for(to_platform));
+        assert!(
+            unlowered.unwrap_err().iter().all(|&n| {
+                let Some(ext_op) = h.get_optype(n).as_extension_op() else {
+                    return false;
+                };
+                // The barriers left over should belong to the `from_platform`
+                match from_platform {
+                    QSystemPlatform::Helios => {
+                        HeliosRuntimeBarrierDef::from_extension_op(ext_op).is_ok()
+                    }
+                    QSystemPlatform::Sol => SolRuntimeBarrierDef::from_extension_op(ext_op).is_ok(),
+                }
+            }),
+            "Expected only {from_platform:?} RuntimeBarrier ops to remain unlowered"
+        );
+    }
+
+    /// Lowering a HUGR to one platform and then re-lowering the result to the
+    /// other platform (round-trip) should produce a valid HUGR containing only
+    /// ops from the final target platform.
+    ///
+    /// This exercises the cross-platform path on a HUGR that was already fully
+    /// lowered (i.e. contains decomposition function definitions with
+    /// platform-specific ops inside them).
+    #[rstest]
+    #[case::helios_then_sol(QSystemPlatform::Helios, QSystemPlatform::Sol)]
+    #[case::sol_then_helios(QSystemPlatform::Sol, QSystemPlatform::Helios)]
+    fn test_cross_platform_lowering_round_trip(
+        #[case] first: QSystemPlatform,
+        #[case] second: QSystemPlatform,
+    ) {
+        use tket::extension::rotation::rotation_type;
+
+        let mut b =
+            FunctionBuilder::new("round_trip", Signature::new([rotation_type()], type_row![]))
+                .unwrap();
+        let [angle] = b.input_wires_arr();
+        let [maybe_q1] = b
+            .add_dataflow_op(TketOp::TryQAlloc, [])
+            .unwrap()
+            .outputs_arr();
+        let [q1] = b
+            .build_unwrap_sum(1, option_type(vec![qb_t()]), maybe_q1)
+            .unwrap();
+        let [maybe_q2] = b
+            .add_dataflow_op(TketOp::TryQAlloc, [])
+            .unwrap()
+            .outputs_arr();
+        let [q2] = b
+            .build_unwrap_sum(1, option_type(vec![qb_t()]), maybe_q2)
+            .unwrap();
+        let [q1, q2] = b
+            .add_dataflow_op(TketOp::CX, [q1, q2])
+            .unwrap()
+            .outputs_arr();
+        let [q1] = b
+            .add_dataflow_op(TketOp::Rx, [q1, angle])
+            .unwrap()
+            .outputs_arr();
+        b.add_dataflow_op(TketOp::QFree, [q1]).unwrap();
+        b.add_dataflow_op(TketOp::QFree, [q2]).unwrap();
+        let mut h = b.finish_hugr_with_outputs([]).unwrap();
+
+        // First lowering: TketOps to first platform.
+        lower_tk2_ops(&mut h, Preserve::Public, first).unwrap();
+        h.validate().unwrap();
+        assert_eq!(
+            check_lowered(&h, Preserve::Public, &forbidden_extensions_for(first)),
+            Ok(()),
+            "HUGR should contain only {first:?} ops after first lowering"
+        );
+
+        // Second lowering: first platform to second platform (cross-platform).
+        lower_tk2_ops(&mut h, Preserve::Public, second).unwrap();
+        h.validate().unwrap();
+
+        match first {
+            QSystemPlatform::Helios => assert_helios_to_sol_lowering(&h),
+            QSystemPlatform::Sol => assert_sol_to_helios_lowering(&h),
+        }
+
+        // Re-lowering to the same platform should be a no-op (idempotent).
+        let lowered_again = lower_tk2_ops(&mut h, Preserve::Public, second).unwrap();
+        h.validate().unwrap();
+
+        assert!(
+            lowered_again.is_empty(),
+            "Re-lowering to the same platform should be a no-op"
         );
     }
 
@@ -1245,7 +1485,7 @@ mod test {
     /// after the pass.
     #[rstest]
     #[case::helios(QSystemPlatform::Helios)]
-    #[case::helios(QSystemPlatform::Sol)]
+    #[case::sol(QSystemPlatform::Sol)]
     fn test_measurements_removed(#[case] platform: QSystemPlatform) {
         let mut circuit = DFGBuilder::new(inout_sig(vec![qb_t(); 2], vec![bool_t()])).unwrap();
         let [q1, q2] = circuit.input_wires_arr();
@@ -1391,5 +1631,185 @@ mod test {
             })
         });
         assert_eq!(contains_dup, expect_dup);
+    }
+
+    // Comprehensive fixture: all supported ops
+    //
+    /// Build a HUGR containing all TketOps supported plus platform-specific ops
+    /// (HeliosOp::ZZPhase, SolOp::PhasedXX) and shared ops (PhasedX/Rz).
+    #[fixture]
+    fn all_ops_hugr() -> hugr::Hugr {
+        use hugr::std_extensions::arithmetic::float_types::float64_type;
+        use tket::extension::rotation::rotation_type;
+
+        // Inputs: one rotation (for parametric gates) and two f64s (for platform ops)
+        let mut b = FunctionBuilder::new(
+            "all_ops",
+            Signature::new(
+                vec![rotation_type(), float64_type(), float64_type()],
+                vec![bool_t(), bool_t(), bool_t()],
+            ),
+        )
+        .unwrap();
+        let [angle, float1, float2] = b.input_wires_arr();
+
+        // Allocate 3 qubits
+        let [maybe_q0] = b
+            .add_dataflow_op(TketOp::TryQAlloc, [])
+            .unwrap()
+            .outputs_arr();
+        let [q0] = b
+            .build_unwrap_sum(1, option_type(vec![qb_t()]), maybe_q0)
+            .unwrap();
+        let [maybe_q1] = b
+            .add_dataflow_op(TketOp::TryQAlloc, [])
+            .unwrap()
+            .outputs_arr();
+        let [q1] = b
+            .build_unwrap_sum(1, option_type(vec![qb_t()]), maybe_q1)
+            .unwrap();
+        let [maybe_q2] = b
+            .add_dataflow_op(TketOp::TryQAlloc, [])
+            .unwrap()
+            .outputs_arr();
+        let [q2] = b
+            .build_unwrap_sum(1, option_type(vec![qb_t()]), maybe_q2)
+            .unwrap();
+
+        // Single-qubit gates
+        let [q0] = b.add_dataflow_op(TketOp::H, [q0]).unwrap().outputs_arr();
+        let [q1] = b.add_dataflow_op(TketOp::X, [q1]).unwrap().outputs_arr();
+        let [q2] = b.add_dataflow_op(TketOp::Y, [q2]).unwrap().outputs_arr();
+        let [q0] = b.add_dataflow_op(TketOp::Z, [q0]).unwrap().outputs_arr();
+        let [q1] = b.add_dataflow_op(TketOp::S, [q1]).unwrap().outputs_arr();
+        let [q2] = b.add_dataflow_op(TketOp::Sdg, [q2]).unwrap().outputs_arr();
+        let [q0] = b.add_dataflow_op(TketOp::T, [q0]).unwrap().outputs_arr();
+        let [q1] = b.add_dataflow_op(TketOp::Tdg, [q1]).unwrap().outputs_arr();
+        let [q2] = b.add_dataflow_op(TketOp::V, [q2]).unwrap().outputs_arr();
+        let [q0] = b.add_dataflow_op(TketOp::Vdg, [q0]).unwrap().outputs_arr();
+
+        // Single-qubit rotation gates
+        let [q0] = b
+            .add_dataflow_op(TketOp::Rx, [q0, angle])
+            .unwrap()
+            .outputs_arr();
+        let [q1] = b
+            .add_dataflow_op(TketOp::Ry, [q1, angle])
+            .unwrap()
+            .outputs_arr();
+        let [q2] = b
+            .add_dataflow_op(TketOp::Rz, [q2, angle])
+            .unwrap()
+            .outputs_arr();
+
+        // Two-qubit gates
+        let [q0, q1] = b
+            .add_dataflow_op(TketOp::CX, [q0, q1])
+            .unwrap()
+            .outputs_arr();
+        let [q0, q2] = b
+            .add_dataflow_op(TketOp::CY, [q0, q2])
+            .unwrap()
+            .outputs_arr();
+        let [q1, q2] = b
+            .add_dataflow_op(TketOp::CZ, [q1, q2])
+            .unwrap()
+            .outputs_arr();
+
+        // Two-qubit rotation gate
+        let [q1, q2] = b
+            .add_dataflow_op(TketOp::CRz, [q1, q2, angle])
+            .unwrap()
+            .outputs_arr();
+
+        // Toffoli gate
+        let [q0, q1, q2] = b
+            .add_dataflow_op(TketOp::Toffoli, [q0, q1, q2])
+            .unwrap()
+            .outputs_arr();
+
+        // Shared platform op: PhasedX
+        let [q0] = b
+            .add_dataflow_op(HeliosOp::PhasedX, [q0, float1, float2])
+            .unwrap()
+            .outputs_arr();
+        let [q1] = b
+            .add_dataflow_op(SolOp::PhasedX, [q1, float1, float2])
+            .unwrap()
+            .outputs_arr();
+
+        // Shared platform op: Rz
+        let [q1] = b
+            .add_dataflow_op(HeliosOp::Rz, [q1, float1])
+            .unwrap()
+            .outputs_arr();
+        let [q2] = b
+            .add_dataflow_op(SolOp::Rz, [q2, float2])
+            .unwrap()
+            .outputs_arr();
+
+        // Helios ZZPhase
+        let [q0, q1] = b
+            .add_dataflow_op(HeliosOp::ZZPhase, [q0, q1, float1])
+            .unwrap()
+            .outputs_arr();
+        let [q1, q2] = b
+            .add_dataflow_op(HeliosOp::ZZPhase, [q1, q2, float2])
+            .unwrap()
+            .outputs_arr();
+
+        // Sol PhasedXX
+        let [q0, q1] = b
+            .add_dataflow_op(SolOp::PhasedXX, [q0, q1, float1, float2])
+            .unwrap()
+            .outputs_arr();
+        let [q1, q2] = b
+            .add_dataflow_op(SolOp::PhasedXX, [q1, q2, float2, float1])
+            .unwrap()
+            .outputs_arr();
+
+        // Measure and QFree
+        let [q0, result0] = b
+            .add_dataflow_op(TketOp::Measure, [q0])
+            .unwrap()
+            .outputs_arr();
+        let [q1, result1] = b
+            .add_dataflow_op(TketOp::Measure, [q1])
+            .unwrap()
+            .outputs_arr();
+        let [q2, result2] = b
+            .add_dataflow_op(TketOp::Measure, [q2])
+            .unwrap()
+            .outputs_arr();
+        b.add_dataflow_op(TketOp::QFree, [q0]).unwrap();
+        b.add_dataflow_op(TketOp::QFree, [q1]).unwrap();
+        b.add_dataflow_op(TketOp::QFree, [q2]).unwrap();
+
+        b.finish_hugr_with_outputs([result0, result1, result2])
+            .unwrap()
+    }
+
+    /// Verify the fixture HUGR is valid before any lowering
+    #[rstest]
+    fn test_all_ops_hugr_is_valid(all_ops_hugr: hugr::Hugr) {
+        all_ops_hugr.validate().unwrap();
+    }
+
+    /// Verify lowering the all-ops fixture to Helios
+    #[rstest]
+    fn test_lower_all_ops_to_helios(all_ops_hugr: hugr::Hugr) {
+        let mut h = all_ops_hugr;
+        lower_tk2_ops(&mut h, Preserve::Public, QSystemPlatform::Helios).unwrap();
+        h.validate().unwrap();
+        assert_sol_to_helios_lowering(&h);
+    }
+
+    /// Verify lowering the all-ops fixture to Sol
+    #[rstest]
+    fn test_lower_all_ops_to_sol(all_ops_hugr: hugr::Hugr) {
+        let mut h = all_ops_hugr;
+        lower_tk2_ops(&mut h, Preserve::Public, QSystemPlatform::Sol).unwrap();
+        h.validate().unwrap();
+        assert_helios_to_sol_lowering(&h);
     }
 }

@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.15.0](https://github.com/Quantinuum/tket2/compare/tket-py-v0.14.2...tket-py-v0.15.0) (2026-06-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* Renamed `MaxQubitsHint` to `ExpectedQubitsHint` in `tket-py/tket/metadata.py`
+* `QSystemPass` was split into `QSystemRebasePass` and `QSystemLLVMPass`.
+* Updates to public dependencies, specifically hugr 0.29.0 and hugr-py 0.18.0
+
+### Features
+
+* Include InlineFuncsPass in NormalizeGuppy and improve pass ordering ([#1754](https://github.com/Quantinuum/tket2/issues/1754)) ([16cfe32](https://github.com/Quantinuum/tket2/commit/16cfe328519fddd179e673cf6be257ab4e24edbb))
+* Rename `tket.hint.max_qubits` to `tket.hint.expected_qubits` ([#1765](https://github.com/Quantinuum/tket2/issues/1765)) ([574c969](https://github.com/Quantinuum/tket2/commit/574c969b794fcbe69a302ae2703cfbc133deba2d))
+* Split QSystemPass into QSRebasePass and QSLLVMPass ([#1758](https://github.com/Quantinuum/tket2/issues/1758)) ([fd7b7d4](https://github.com/Quantinuum/tket2/commit/fd7b7d4b0d08551ec87ae5b4fcb26e9cef60de6e))
+* Update to hugr 0.29.0/hugr-py 0.18.0, tone down RedundantOrderEdgesPass ([#1742](https://github.com/Quantinuum/tket2/issues/1742)) ([1de66a2](https://github.com/Quantinuum/tket2/commit/1de66a29a10758fe3ddac564cfa51653c632fe3a))
+
+
+### Bug Fixes
+
+* Add missing `argument` extension reexport ([#1766](https://github.com/Quantinuum/tket2/issues/1766)) ([1363ab1](https://github.com/Quantinuum/tket2/commit/1363ab1a2f6f5f8834db0003660b0e723a126e64))
+
 ## [0.14.2](https://github.com/Quantinuum/tket2/compare/tket-py-v0.14.1...tket-py-v0.14.2) (2026-06-19)
 
 
