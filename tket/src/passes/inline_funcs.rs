@@ -32,17 +32,80 @@ pub enum InlineFuncsHeuristic {
 
 impl InlineFuncsHeuristic {
     /// Returns `True` if the function definition should be inlined.
-    fn should_inline<H: HugrView>(&self, func: H::Node, hugr: &H) -> bool {
+    fn should_inline<H: HugrView>(
+        &self,
+        func: H::Node,
+        hugr: &H,
+        size_cache: &mut HashMap<H::Node, usize>,
+    ) -> bool {
         match self {
-            InlineFuncsHeuristic::MaxSize(size) => hugr.descendants(func).count() <= *size,
+            InlineFuncsHeuristic::MaxSize(size) => {
+                estimated_inline_size(func, hugr, size_cache, *size) <= *size
+            }
             InlineFuncsHeuristic::All => true,
         }
     }
 }
 
+/// Estimate the expanded size of inlining a function under a max-size heuristic.
+///
+/// The direct descendant count alone can underestimate wrappers that call other
+/// inlineable helpers. Counting reachable static callees keeps those wrappers
+/// from repeatedly expanding medium-sized helper graphs before later cleanup
+/// passes get a chance to simplify them.
+fn estimated_inline_size<H: HugrView>(
+    func: H::Node,
+    hugr: &H,
+    cache: &mut HashMap<H::Node, usize>,
+    limit: usize,
+) -> usize {
+    estimated_inline_size_inner(func, hugr, cache, &mut HashSet::new(), limit)
+}
+
+/// Recursive worker for [`estimated_inline_size`].
+///
+/// Arguments:
+/// - `cache` memoizes completed function estimates across calls in the pass,
+/// - `visiting` tracks the current recursion stack so cyclic call graphs are
+///   treated as over budget.
+/// - `limit` is only used to cut the estimation early if we already exceeded
+///   the max size.
+fn estimated_inline_size_inner<H: HugrView>(
+    func: H::Node,
+    hugr: &H,
+    cache: &mut HashMap<H::Node, usize>,
+    visiting: &mut HashSet<H::Node>,
+    limit: usize,
+) -> usize {
+    if let Some(size) = cache.get(&func) {
+        return *size;
+    }
+    if !visiting.insert(func) {
+        return limit.saturating_add(1);
+    }
+
+    let mut size = hugr.descendants(func).count();
+    for call in hugr
+        .descendants(func)
+        .filter(|node| hugr.get_optype(*node).is_call())
+    {
+        if let Some(callee) = hugr.static_source(call) {
+            size = size.saturating_add(estimated_inline_size_inner(
+                callee, hugr, cache, visiting, limit,
+            ));
+            if size > limit {
+                break;
+            }
+        }
+    }
+    visiting.remove(&func);
+    cache.insert(func, size);
+    size
+}
+
 impl Default for InlineFuncsHeuristic {
     fn default() -> Self {
-        Self::MaxSize(64)
+        Self::MaxSize(128)
     }
 }
 
@@ -73,6 +136,7 @@ impl<H: HugrMut> ComposablePass<H> for InlineFunctionsPass {
 
     fn run(&self, h: &mut H) -> Result<(), Self::Error> {
         let mut should_inline_cache: HashMap<H::Node, bool> = HashMap::new();
+        let mut size_cache: HashMap<H::Node, usize> = HashMap::new();
         inline_acyclic_scoped(h, self.scope.clone(), |h, call| {
             let Some(func) = h.static_source(call) else {
                 return false;
@@ -81,7 +145,7 @@ impl<H: HugrMut> ComposablePass<H> for InlineFunctionsPass {
                 match h.get_metadata::<InlineAnnotation>(func) {
                     Some(InlineAnnotation::Never) => false,
                     Some(InlineAnnotation::BestEffort) => true,
-                    None => self.heuristic.should_inline(func, h),
+                    None => self.heuristic.should_inline(func, h, &mut size_cache),
                 }
             })
         })
@@ -157,7 +221,7 @@ pub fn inline_acyclic_scoped<H: HugrMut>(
 
 #[cfg(test)]
 mod test {
-    use std::collections::HashSet;
+    use std::collections::{HashMap, HashSet};
 
     use itertools::Itertools;
     use rstest::rstest;
@@ -170,7 +234,7 @@ mod test {
     use hugr_core::ops::OpType;
     use hugr_core::{Hugr, extension::prelude::qb_t, types::Signature};
 
-    use super::{InlineFunctionsPass, inline_acyclic_scoped};
+    use super::{InlineFunctionsPass, estimated_inline_size, inline_acyclic_scoped};
     use crate::metadata::InlineAnnotation;
     use crate::passes::composable::test::run_validating;
     use crate::passes::inline_funcs::InlineFuncsHeuristic;
@@ -350,6 +414,21 @@ mod test {
                 .collect::<HashSet<_>>(),
             HashSet::from_iter(g_targets),
         );
+    }
+
+    #[test]
+    fn max_size_heuristic_counts_transitive_callees() {
+        let h = make_test_hugr();
+        let b = find_func(&h, "b");
+        let direct_size = h.descendants(b).count();
+        let expanded_size = estimated_inline_size(b, &h, &mut HashMap::new(), usize::MAX);
+
+        assert!(expanded_size > direct_size);
+        assert!(!InlineFuncsHeuristic::MaxSize(direct_size).should_inline(
+            b,
+            &h,
+            &mut HashMap::new()
+        ));
     }
 
     #[rstest]

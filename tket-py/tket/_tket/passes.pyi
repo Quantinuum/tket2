@@ -27,7 +27,7 @@ def normalize_guppy(
     constant_folding: bool = True,
     remove_dead_funcs: bool = True,
     inline_dfgs: bool = True,
-    inline_funcs: inline_funcs.InlineFuncsHeuristic | None = inline_funcs.MaxSize(64),
+    inline_funcs: inline_funcs.InlineFuncsHeuristic | None = inline_funcs.MaxSize(128),
     remove_redundant_order_edges: bool = True,
     squash_borrows: bool = True,
     scope: PassScope = GlobalScope.PRESERVE_PUBLIC,
@@ -51,7 +51,7 @@ def normalize_guppy(
 def inline_functions(
     circ: CompilationState,
     *,
-    heuristic: inline_funcs.InlineFuncsHeuristic = inline_funcs.MaxSize(64),
+    heuristic: inline_funcs.InlineFuncsHeuristic = inline_funcs.MaxSize(128),
     scope: PassScope = GlobalScope.PRESERVE_PUBLIC,
 ) -> None:
     """Inline acyclic function calls below the selected scope."""

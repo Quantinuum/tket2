@@ -513,11 +513,12 @@ impl<N: HugrNode> ModifierResolver<N> {
         dfg: &DFG,
         parent_dfg: &mut impl Container,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        let mut signature = dfg.signature.clone();
+        let mut boundary_signature = dfg.signature.clone();
+        self.modify_carried_higher_order_types_if_present(&mut boundary_signature.input)?;
+        self.modify_carried_higher_order_types_if_present(&mut boundary_signature.output)?;
+        let mut signature = boundary_signature.clone();
         // Build a new DFG with modified body.
         self.modify_signature(&mut signature, true);
-        self.modify_carried_higher_order_types_if_present(&mut signature.input)?;
-        self.modify_carried_higher_order_types_if_present(&mut signature.output)?;
         let mut builder = DFGBuilder::new(signature.clone()).unwrap();
         self.modify_dfg_body(h, n, &mut builder)?;
         let new_dfg = self.insert_sub_dfg(parent_dfg, builder)?;
@@ -533,7 +534,10 @@ impl<N: HugrNode> ModifierResolver<N> {
         self.wire_node_inout(
             n,
             new_dfg,
-            (signature.input.iter(), signature.output.iter()),
+            (
+                boundary_signature.input.iter(),
+                boundary_signature.output.iter(),
+            ),
             (0, 0, offset),
         )?;
 
@@ -938,6 +942,92 @@ mod test {
         inputs[0] = cfg.outputs().next().unwrap();
 
         *func.finish_with_outputs(inputs).unwrap().handle()
+    }
+
+    #[test]
+    fn daggered_controlled_dfg_keeps_classical_boundary_input_forward() {
+        let mut module = ModuleBuilder::new();
+        let foo_sig = Signature::new([qb_t(), usize_t()], [qb_t()]);
+        let foo = {
+            let mut func = module.define_function("foo", foo_sig.clone()).unwrap();
+            func.set_unitary();
+            let mut inputs = func.input_wires();
+            let q = inputs.next().unwrap();
+            let index = inputs.next().unwrap();
+            let dfg = {
+                let mut dfg = func
+                    .dfg_builder(Signature::new([qb_t(), usize_t()], [qb_t()]), [q, index])
+                    .unwrap();
+                let mut inputs = dfg.input_wires();
+                let q = inputs.next().unwrap();
+                let _index = inputs.next().unwrap();
+                let q = dfg.add_dataflow_op(TketOp::X, [q]).unwrap().out_wire(0);
+                dfg.finish_with_outputs([q]).unwrap()
+            };
+            func.finish_with_outputs(dfg.outputs()).unwrap()
+        };
+
+        let dagger_op: ExtensionOp = MODIFIER_EXTENSION
+            .instantiate_extension_op(
+                &DAGGER_OP_ID,
+                [vec![qb_t().into()].into(), vec![usize_t().into()].into()],
+            )
+            .unwrap();
+        let control_op: ExtensionOp = MODIFIER_EXTENSION
+            .instantiate_extension_op(
+                &CONTROL_OP_ID,
+                [
+                    Term::BoundedNat(1),
+                    vec![qb_t().into()].into(),
+                    vec![usize_t().into()].into(),
+                ],
+            )
+            .unwrap();
+        let controlled_sig = Signature::new(
+            [array_type(1, qb_t()), qb_t(), usize_t()],
+            [array_type(1, qb_t()), qb_t()],
+        );
+        {
+            let mut func = module
+                .define_function(
+                    "main",
+                    Signature::new(type_row![], [array_type(1, qb_t()), qb_t()]),
+                )
+                .unwrap();
+            let loaded = func.load_func(foo.handle(), &[]).unwrap();
+            let daggered = func
+                .add_dataflow_op(dagger_op, [loaded])
+                .unwrap()
+                .out_wire(0);
+            let controlled = func
+                .add_dataflow_op(control_op, [daggered])
+                .unwrap()
+                .out_wire(0);
+            let control = func
+                .add_dataflow_op(TketOp::QAlloc, [])
+                .unwrap()
+                .out_wire(0);
+            let target = func
+                .add_dataflow_op(TketOp::QAlloc, [])
+                .unwrap()
+                .out_wire(0);
+            let index = func.add_load_value(ConstUsize::new(1));
+            let controls = func.add_new_array(qb_t(), [control]).unwrap();
+            let call = func
+                .add_dataflow_op(
+                    CallIndirect {
+                        signature: controlled_sig,
+                    },
+                    [controlled, controls, target, index],
+                )
+                .unwrap();
+            func.finish_with_outputs(call.outputs()).unwrap();
+        }
+
+        let mut h = module.finish_hugr().unwrap();
+        let entrypoint = h.entrypoint();
+        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        assert_matches!(h.validate(), Ok(()));
     }
 
     // A CFG with two sequential blocks
