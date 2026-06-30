@@ -7,7 +7,8 @@ dev = [
     "pytest>=8.4.2",
     "pytest-snapshot~=0.9.0",
     "cibuildwheel>=2.23.2",
-    "hugr~=0.17.1",
+    "hugr~=0.18.0",
+    "tket-exts>=0.13.1, <0.15.0",
 ]
 
 [project]
@@ -38,7 +39,7 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
-version = "0.3.2" # updated by release-please
+version = "0.4.0" # updated by release-please
 
 [project.urls]
 repository = "https://github.com/quantinuum/tket2/tree/main/qis-compiler"
@@ -71,12 +72,17 @@ select = [
 ignore = ["F403", "F405", "PYI021", "PYI048"]
 
 
+[tool.uv.sources]
+tket-exts = { workspace = true }
+
 [tool.uv]
 # Rebuild package when any rust files change
 cache-keys = [
     { file = "pyproject.toml" },
     { file = "Cargo.toml" },
     { file = "rust/**/*.rs" },
+    { file = "../tket/**/*.rs" },
+    { file = "../tket-qsystem/**/*.rs" },
 ]
 
 [tool.cibuildwheel]

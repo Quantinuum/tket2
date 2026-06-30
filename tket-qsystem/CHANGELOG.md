@@ -1,6 +1,36 @@
 # Changelog
 
 
+## [0.27.0](https://github.com/Quantinuum/tket2/compare/tket-qsystem-v0.26.0...tket-qsystem-v0.27.0) - 2026-06-29
+
+### Bug Fixes
+
+- add `--unversioned` flag to justfile, update extensions ([#1697](https://github.com/Quantinuum/tket2/pull/1697))
+- Deduplicate lowering replacement functions by using Visibility::Public ([#1706](https://github.com/Quantinuum/tket2/pull/1706))
+
+### Documentation
+
+- Add docs to globals llvm lowering ([#1743](https://github.com/Quantinuum/tket2/pull/1743))
+
+### New Features
+
+- Export extension registries from tket and tket-qsystem ([#1692](https://github.com/Quantinuum/tket2/pull/1692))
+- HUGR extension for global variables ([#1530](https://github.com/Quantinuum/tket2/pull/1530))
+- Move modifier resolver pass from NormalizeGuppy to QSystemPass ([#1741](https://github.com/Quantinuum/tket2/pull/1741))
+- [**breaking**] runtime entrypoint arguments via generic tket.argreader op ([#1731](https://github.com/Quantinuum/tket2/pull/1731))
+- [**breaking**] update to hugr 0.29.0/hugr-py 0.18.0, tone down RedundantOrderEdgesPass ([#1742](https://github.com/Quantinuum/tket2/pull/1742))
+- [**breaking**] Split QSystemPass into QSRebasePass and QSLLVMPass ([#1758](https://github.com/Quantinuum/tket2/pull/1758))
+- [**breaking**] include InlineFuncsPass in NormalizeGuppy and improve pass ordering ([#1754](https://github.com/Quantinuum/tket2/pull/1754))
+
+### Performance
+
+- *(qsystem)* pre-load lowerer with all replacements ([#1717](https://github.com/Quantinuum/tket2/pull/1717)) ([#1720](https://github.com/Quantinuum/tket2/pull/1720))
+
+### Testing
+
+- add cross compilation test cases ([#1719](https://github.com/Quantinuum/tket2/pull/1719))
+- *(guppy_opt.rs)* `run_pytket` applies to entire hugr instead of just the entrypoint ([#1305](https://github.com/Quantinuum/tket2/pull/1305))
+
 ## [0.26.0](https://github.com/Quantinuum/tket2/compare/tket-qsystem-v0.25.0...tket-qsystem-v0.26.0) - 2026-06-11
 
 ### New Features

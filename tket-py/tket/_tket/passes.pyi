@@ -27,6 +27,7 @@ def normalize_guppy(
     constant_folding: bool = True,
     remove_dead_funcs: bool = True,
     inline_dfgs: bool = True,
+    inline_funcs: inline_funcs.InlineFuncsHeuristic | None = inline_funcs.MaxSize(128),
     remove_redundant_order_edges: bool = True,
     squash_borrows: bool = True,
     scope: PassScope = GlobalScope.PRESERVE_PUBLIC,
@@ -42,6 +43,7 @@ def normalize_guppy(
     - constant_folding: Whether to constant fold the program.
     - remove_dead_funcs: Whether to remove dead functions.
     - inline_dfgs: Whether to inline DFG operations.
+    - inline_funcs: a heuristic for inlining functions. If None, no inlining is performed.
     - remove_redundant_order_edges: Whether to remove redundant order edges.
     - squash_borrows: Whether to squash return-borrow pairs on BorrowArrays.
     """
@@ -49,7 +51,7 @@ def normalize_guppy(
 def inline_functions(
     circ: CompilationState,
     *,
-    heuristic: inline_funcs.InlineFuncsHeuristic = inline_funcs.MaxSize(64),
+    heuristic: inline_funcs.InlineFuncsHeuristic = inline_funcs.MaxSize(128),
     scope: PassScope = GlobalScope.PRESERVE_PUBLIC,
 ) -> None:
     """Inline acyclic function calls below the selected scope."""
@@ -104,16 +106,31 @@ def resolve_modifiers(
 
 def qsystem_rebase_pass(
     circ: CompilationState,
-    constant_fold: bool = True,
-    monomorphize: bool = True,
-    force_order: bool = True,
+    *,
+    resolve_modifiers: bool = True,
+    lower_drops: bool = True,
     hide_funcs: bool = True,
     scope: PassScope | None = None,
 ) -> None:
     """Runs a rust backed pass to convert quantum ops to qsystem ops.
 
+    :param resolve_modifiers: Whether to resolve modifier operations.
+    :param lower_drops: Whether to lower drop operations.
+    :param hide_funcs: Make all HUGR functions private.
+    """
+
+def qsystem_llvm_pass(
+    circ: CompilationState,
+    *,
+    constant_fold: bool = True,
+    monomorphize: bool = True,
+    force_order: bool = True,
+    scope: PassScope | None = None,
+) -> None:
+    """Runs a rust backed pass to prepare the HUGR for LLVM code generation.
+
     :param constant_fold: Whether to perform constant folding.
     :param monomorphize: Whether to monomorphize generic functions.
     :param force_order: Whether to enforce total ordering of all HUGR operations.
-    :param hide_funcs: Make all HUGR functions private.
+    :param scope: A scope to control how the pass is applied to HUGR regions.
     """

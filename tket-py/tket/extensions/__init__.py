@@ -1,4 +1,5 @@
 from tket_exts import (
+    argument,
     debug,
     futures,
     global_phase,
@@ -19,6 +20,7 @@ from tket_exts import (
 
 
 __all__ = [
+    "argument",
     "debug",
     "futures",
     "global_phase",

@@ -15,7 +15,7 @@ use tket::passes::NormalizeGuppy;
 use tket::serialize::pytket::{EncodeOptions, EncodedCircuit};
 
 use tket_qsystem::pytket::{qsystem_decoder_config, qsystem_encoder_config};
-use tket_qsystem::{QSystemPass, QSystemPlatform};
+use tket_qsystem::{QSystemLLVMPass, QSystemPlatform, QSystemRebasePass};
 use tket1_passes::{Tket1Circuit, Tket1Pass};
 
 const GUPPY_EXAMPLES_DIR: &str = "../test_files/guppy_optimization";
@@ -53,7 +53,8 @@ fn run_pytket(h: &mut Hugr, pass_json: &str) {
         .with_subcircuits(true)
         .with_config(qsystem_encoder_config(QSystemPlatform::Helios));
 
-    let mut encoded = EncodedCircuit::new(h, encode_options).unwrap();
+    let mut encoded =
+        EncodedCircuit::new_with_entrypoint(h, h.module_root(), encode_options).unwrap();
 
     encoded
         .par_iter_mut()
@@ -92,24 +93,15 @@ fn count_gates(h: &impl HugrView) -> HashMap<SmolStr, usize> {
 #[case::nested_array("nested_array", None)]
 #[should_panic = "xfail"]
 #[case::angles("angles", Some(vec![
-    ("tket.quantum.Rz", 2), ("tket.quantum.Measure", 1), ("tket.quantum.H", 2), ("tket.quantum.QAlloc", 1), ("tket.quantum.QFree", 1)
+    ("tket.quantum.MeasureFree", 1),("tket.quantum.QAlloc", 1),
 ]))]
 #[should_panic = "xfail"]
 #[case::simple_cx("simple_cx", Some(vec![
     ("tket.quantum.QAlloc", 2), ("tket.quantum.MeasureFree", 2),
 ]))]
-#[should_panic = "xfail"]
-#[case::nested("nested", Some(vec![
-    ("tket.quantum.CZ", 6), ("tket.quantum.QAlloc", 3), ("tket.quantum.MeasureFree", 3), ("tket.quantum.H", 6)
-]))]
-#[should_panic = "xfail"]
-#[case::ranges("ranges", Some(vec![
-    ("tket.quantum.H", 8), ("tket.quantum.MeasureFree", 4), ("tket.quantum.QAlloc", 4), ("tket.quantum.CX", 6)
-]))]
-#[should_panic = "xfail"]
-#[case::false_branch("false_branch", Some(vec![
- ("tket.quantum.Measure", 1), ("tket.quantum.QAlloc", 1), ("tket.quantum.QFree", 1)
-]))]
+#[case::nested("nested", None)]
+#[case::ranges("ranges", None)]
+#[case::false_branch("false_branch", None)]
 #[should_panic = "xfail"]
 #[case::func_decls("func_decls", Some(vec![
     ("TKET1.tk1op", 2), ("tket.quantum.symbolic_angle", 1)
@@ -137,26 +129,12 @@ fn optimize_flattened_guppy(#[case] name: &str, #[case] xfail: Option<Vec<(&str,
 #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
 fn optimize_guppy_ranges_array() {
     // Demonstrates we can fully optimize the array operations in ranges
-    // (after control flow is flattened) if we play around with the entrypoint.
-    use hugr::hugr::hugrmut::HugrMut;
-    use tket::passes::BorrowSquashPass;
-    use tket::passes::const_fold::ConstantFoldPass;
+    // (i.e. after control flow is flattened, but the array ops are not)
     let mut hugr = load_guppy_example("ranges/ranges.flat.array.hugr").unwrap();
 
-    ConstantFoldPass::default().run(&mut hugr).unwrap();
-    BorrowSquashPass::default().run(&mut hugr).unwrap();
-
-    let f = hugr
-        .children(hugr.module_root())
-        .find(|n| {
-            hugr.get_optype(*n)
-                .as_func_defn()
-                .is_some_and(|fd| fd.func_name() == "__main__.f")
-        })
-        .unwrap();
-    hugr.set_entrypoint(f);
-
+    NormalizeGuppy::default().run(&mut hugr).unwrap();
     run_pytket(&mut hugr, CLIFFORD_SIMP_STR);
+
     let expected_counts =
         count_gates(&load_guppy_circuit("ranges", HugrFileType::Optimized).unwrap());
     assert_eq!(count_gates(&hugr), expected_counts);
@@ -209,9 +187,10 @@ fn optimize_guppy(#[case] name: &str) {
 
     // Lower to QSystem. This may blow up the HUGR size.
     //TODO: add Sol case
-    QSystemPass::defaults(QSystemPlatform::Helios)
+    QSystemRebasePass::defaults(QSystemPlatform::Helios)
         .run(&mut hugr)
         .unwrap();
+    QSystemLLVMPass::default().run(&mut hugr).unwrap();
 
     hugr.validate().unwrap_or_else(|e| panic!("{e}"));
 }

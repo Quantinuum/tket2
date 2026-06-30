@@ -1,6 +1,28 @@
 # Changelog
 
 
+## [0.21.0](https://github.com/Quantinuum/tket2/compare/tket-v0.20.0...tket-v0.21.0) - 2026-06-29
+
+### Bug Fixes
+
+- Propagate metadata to monomorphized nodes ([#1683](https://github.com/Quantinuum/tket2/pull/1683))
+- Gracefully handle datatypes containing type arguments in constant folding ([#1609](https://github.com/Quantinuum/tket2/pull/1609))
+- RemoveDeadFuncsPass removed public function declarations ([#1759](https://github.com/Quantinuum/tket2/pull/1759))
+
+### New Features
+
+- Export extension registries from tket and tket-qsystem ([#1692](https://github.com/Quantinuum/tket2/pull/1692))
+- [**breaking**] Add modifier resolver to normalize guppy ([#1703](https://github.com/Quantinuum/tket2/pull/1703))
+- Add modifier passes to benchmarks ([#1708](https://github.com/Quantinuum/tket2/pull/1708))
+- Added an error if non quantum tket-op are modified ([#1739](https://github.com/Quantinuum/tket2/pull/1739))
+- [**breaking**] update to hugr 0.29.0/hugr-py 0.18.0, tone down RedundantOrderEdgesPass ([#1742](https://github.com/Quantinuum/tket2/pull/1742))
+- [**breaking**] include InlineFuncsPass in NormalizeGuppy and improve pass ordering ([#1754](https://github.com/Quantinuum/tket2/pull/1754))
+- [**breaking**] Rename `tket.hint.max_qubits` to `tket.hint.expected_qubits` ([#1765](https://github.com/Quantinuum/tket2/pull/1765))
+
+### Refactor
+
+- *(trivial)* RemoveDeadFuncs: add comment ([#1760](https://github.com/Quantinuum/tket2/pull/1760))
+
 ## [0.20.0](https://github.com/Quantinuum/tket2/compare/tket-v0.19.0...tket-v0.20.0) - 2026-06-11
 
 ### Bug Fixes
