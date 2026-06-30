@@ -107,6 +107,18 @@ impl MetadataPropagationPolicy {
     /// `old_optype` is the optype the replaced node had *before* replacement.
     /// Each rule is called once per descendant and the returned key-value
     /// pairs are written to that descendant unconditionally.
+    ///
+    /// # Stale entries on the container
+    ///
+    /// This method copies metadata onto descendants but does **not** delete
+    /// it from `container_node`. After replacement, any metadata that was on
+    /// the original op node is therefore present in two places: on the
+    /// container (where most backends will ignore it because containers like
+    /// `DFG`/`CFG` aren't expected to carry per-op debug info) and on the
+    /// descendants selected by the policy. For the default
+    /// [`default_debuginfo_policy`] this duplication is harmless; bespoke
+    /// rules that propagate other metadata should be aware that the
+    /// container will still hold the original entries.
     pub(crate) fn apply<H: HugrMut<Node = Node>>(
         &self,
         hugr: &mut H,
@@ -117,6 +129,9 @@ impl MetadataPropagationPolicy {
             return;
         }
 
+        // NOTE: this read relies on `NodeTemplate::replace`
+        // not mutating the metadata of `container_node` while rewriting its
+        // optype and reparenting children.
         let old_meta = hugr.node_metadata_map(container_node).clone();
         if old_meta.is_empty() {
             return;

@@ -238,6 +238,8 @@ impl NodeTemplate {
         }
         rt.process_subtree_opts(hugr, n, opts)?;
         if let Some(old_optype) = old_optype.as_ref() {
+            // NOTE: `apply` reads the original metadata back from `n`. Any changes
+            // made to the metadata by prior replacements will be reflected.
             rt.meta_policy.apply(hugr, n, old_optype);
         }
         Ok(())
