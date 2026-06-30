@@ -161,7 +161,12 @@ impl NodeTemplate {
     ) -> Result<(), ReplaceTypesError> {
         let ef = |e| ReplaceTypesError::AddTemplateError(n, Box::new(e));
         assert_eq!(hugr.children(n).count(), 0);
-        let old_optype = hugr.get_optype(n).clone();
+        // Snapshot the original optype for the metadata policy. SingleOp
+        // replacements stay as leaf ops, so the policy (which propagates to
+        // children of a replacement container) has nothing to do; skip the
+        // clone in that case.
+        let old_optype = (!matches!(self, NodeTemplate::SingleOp(_)) && !rt.meta_policy.is_empty())
+            .then(|| hugr.get_optype(n).clone());
         let (new_optype, static_source, static_inport) = match self {
             NodeTemplate::SingleOp(op_type) => {
                 if op_type.static_input_port().is_some() {
@@ -232,7 +237,9 @@ impl NodeTemplate {
             }
         }
         rt.process_subtree_opts(hugr, n, opts)?;
-        rt.meta_policy.apply(hugr, n, &old_optype);
+        if let Some(old_optype) = old_optype.as_ref() {
+            rt.meta_policy.apply(hugr, n, old_optype);
+        }
         Ok(())
     }
 
@@ -410,7 +417,7 @@ impl ReplaceTypes {
             // Not really clear what "preserve" means for a pass that changes signatures,
             // but default to running on whole hugr not just entrypoint.
             scope: Either::Left(PassScope::default()),
-            meta_policy: MetadataPropagationPolicy::new(),
+            meta_policy: MetadataPropagationPolicy::empty(),
         }
     }
 
@@ -501,6 +508,12 @@ impl ReplaceTypes {
     /// container. See [`MetadataPropagationPolicy`] for details.
     pub fn set_metadata_policy(&mut self, policy: MetadataPropagationPolicy) {
         self.meta_policy = policy;
+    }
+
+    /// Returns a mutable reference to the metadata propagation policy, for
+    /// incremental customisation (e.g. adding rules to the default policy).
+    pub fn metadata_policy_mut(&mut self) -> &mut MetadataPropagationPolicy {
+        &mut self.meta_policy
     }
 
     /// Configures this instance to change occurrences of `src` to `dest`.

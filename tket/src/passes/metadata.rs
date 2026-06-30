@@ -16,9 +16,11 @@
 //! use hugr_core::hugr::NodeMetadataMap;
 //! use hugr_core::ops::OpType;
 //!
-//! // Start from the default policy and add a custom rule that copies all
-//! // metadata from any replaced Call node to any inner Call node.
-//! let mut policy = MetadataPropagationPolicy::default();
+//! // Build a policy from scratch with a single rule that copies all metadata
+//! // from any replaced Call node to any inner Call node. (Starting from
+//! // `empty()` avoids interactions with the default rules, which apply
+//! // unconditionally and could overwrite entries written by later rules.)
+//! let mut policy = MetadataPropagationPolicy::empty();
 //! policy.add_rule(
 //!     |old_optype, old_meta, inner_optype, _inner_meta| {
 //!         if matches!(old_optype, OpType::Call(_)) && matches!(inner_optype, OpType::Call(_)) {
@@ -66,8 +68,13 @@ pub struct MetadataPropagationPolicy {
 
 impl MetadataPropagationPolicy {
     /// Creates a new policy with no rules.
-    pub fn new() -> Self {
+    pub fn empty() -> Self {
         Self { rules: Vec::new() }
+    }
+
+    /// Returns `true` if the policy has no rules and is guaranteed to be a no-op.
+    pub fn is_empty(&self) -> bool {
+        self.rules.is_empty()
     }
 
     /// Adds a propagation rule.
@@ -128,15 +135,15 @@ impl MetadataPropagationPolicy {
     }
 }
 
-/// Returns a [`MetadataPropagationPolicy`] that propagates metadata from
-/// replaced `Call` and `ExtensionOp` nodes to the `Call` and `ExtensionOp`
-/// direct children of the replacement container.
+/// Returns a [`MetadataPropagationPolicy`] that propagates `core.debug_info`
+/// metadata from replaced `Call` and `ExtensionOp` nodes to the `Call` and
+/// `ExtensionOp` direct children of the replacement container.
 ///
 /// Metadata entries that are already present on the inner node are not
 /// overwritten. This is used as the default policy for
 /// [`ReplaceTypes::default`](super::replace_types::ReplaceTypes).
-pub fn default_location_policy() -> MetadataPropagationPolicy {
-    let mut policy = MetadataPropagationPolicy::new();
+pub fn default_debuginfo_policy() -> MetadataPropagationPolicy {
+    let mut policy = MetadataPropagationPolicy::empty();
     policy.add_rule(|old_optype, old_meta, inner_optype, inner_meta| {
         if matches!(old_optype, OpType::Call(_) | OpType::ExtensionOp(_))
             && matches!(inner_optype, OpType::Call(_) | OpType::ExtensionOp(_))
@@ -155,6 +162,6 @@ pub fn default_location_policy() -> MetadataPropagationPolicy {
 
 impl Default for MetadataPropagationPolicy {
     fn default() -> Self {
-        default_location_policy()
+        default_debuginfo_policy()
     }
 }
