@@ -105,8 +105,9 @@ impl MetadataPropagationPolicy {
             return;
         }
 
-        // NOTE: this read relies on `NodeTemplate::replace`
-        // not mutating the metadata of `container_node` when rewriting ops
+        // Snapshot the container's metadata. `apply` is invoked immediately
+        // after the container is installed and *before* recursing into its
+        // subtree, so this is the metadata inherited from the replaced node.
         let old_meta = hugr.node_metadata_map(container_node).clone();
         if old_meta.is_empty() {
             return;
@@ -618,6 +619,113 @@ mod test {
             "test setup: expected ExtensionOps inside the nested DFG"
         );
         for op_node in nested_ops {
+            assert_location(&h, op_node);
+        }
+    }
+
+    /// Regression test for the chained-replacement propagation case discussed
+    /// in the review of the metadata policy.
+    ///
+    /// If node `A` is replaced with container `B`, and then op `C` inside `B`
+    /// is itself replaced with container `D`, metadata attached to `A` should
+    /// end up on `D`'s leaf descendants: `A` -> `C` -> `D`'s children.
+    ///
+    /// This requires `MetadataPropagationPolicy::apply` to run *before*
+    /// recursing into the freshly installed container (so that `C` inherits
+    /// `A`'s debug info before the nested replacement snapshots `C`'s
+    /// metadata and propagates it into `D`).
+    #[test]
+    fn chained_replacement_propagates_metadata_through_intermediate_container() {
+        use hugr_core::extension::TypeDefBound;
+        use hugr_core::extension::Version;
+        use hugr_core::extension::prelude::{Noop, usize_t};
+        use hugr_core::hugr::IdentList;
+        use hugr_core::hugr::hugrmut::HugrMut;
+        use hugr_core::metadata::LocationRecord;
+        use hugr_core::ops::{ExtensionOp, OpType};
+
+        // Mini extension with two ops `foo` and `bar`, both `usize -> usize`.
+        let ext = Extension::new_arc(
+            IdentList::new("MetaChainTest").unwrap(),
+            Version::new(0, 0, 1),
+            |ext, w| {
+                let _ = TypeDefBound::any();
+                ext.add_op(
+                    "foo".into(),
+                    String::new(),
+                    Signature::new(vec![usize_t()], vec![usize_t()]),
+                    w,
+                )
+                .unwrap();
+                ext.add_op(
+                    "bar".into(),
+                    String::new(),
+                    Signature::new(vec![usize_t()], vec![usize_t()]),
+                    w,
+                )
+                .unwrap();
+            },
+        );
+
+        let foo_op = ExtensionOp::new(ext.get_op("foo").unwrap().clone(), []).unwrap();
+        let bar_op = ExtensionOp::new(ext.get_op("bar").unwrap().clone(), []).unwrap();
+
+        // Build a hugr containing a single `foo` op and attach a debug record.
+        let mut dfb = DFGBuilder::new(Signature::new(vec![usize_t()], vec![usize_t()])).unwrap();
+        let [x] = dfb.input_wires_arr();
+        let foo_node = dfb.add_dataflow_op(foo_op.clone(), [x]).unwrap();
+        let mut h = dfb.finish_hugr_with_outputs(foo_node.outputs()).unwrap();
+        let foo_node = h
+            .entry_descendants()
+            .find(|&n| matches!(h.get_optype(n), OpType::ExtensionOp(_)))
+            .expect("foo op node");
+        h.set_metadata::<LocationRecord>(foo_node, expected_location());
+
+        // foo -> CompoundOp(DFG containing a single `bar` op).
+        let bar_compound = {
+            let mut dfb =
+                DFGBuilder::new(Signature::new(vec![usize_t()], vec![usize_t()])).unwrap();
+            let [y] = dfb.input_wires_arr();
+            let inner_bar = dfb.add_dataflow_op(bar_op.clone(), [y]).unwrap();
+            dfb.finish_hugr_with_outputs(inner_bar.outputs()).unwrap()
+        };
+
+        // bar -> CompoundOp(DFG containing a single Noop<usize>).
+        let noop_compound = {
+            let mut dfb =
+                DFGBuilder::new(Signature::new(vec![usize_t()], vec![usize_t()])).unwrap();
+            let [y] = dfb.input_wires_arr();
+            let noop = dfb.add_dataflow_op(Noop::new(usize_t()), [y]).unwrap();
+            dfb.finish_hugr_with_outputs(noop.outputs()).unwrap()
+        };
+
+        let mut lw = ReplaceTypes::default();
+        lw.set_replace_op(&foo_op, NodeTemplate::CompoundOp(Box::new(bar_compound)));
+        lw.set_replace_op(&bar_op, NodeTemplate::CompoundOp(Box::new(noop_compound)));
+        lw.run(&mut h).unwrap();
+        h.validate().unwrap();
+
+        // After the pass:
+        //  - `foo_node` is now the outer DFG (B).
+        //  - Its child is a DFG (D, the result of bar being replaced).
+        //  - Inside D there is a Noop; its debug_info should equal what was on foo.
+        assert!(
+            matches!(h.get_optype(foo_node), OpType::DFG(_)),
+            "expected foo to become a DFG after CompoundOp replacement"
+        );
+        let inner_dfg = h
+            .children(foo_node)
+            .find(|&n| matches!(h.get_optype(n), OpType::DFG(_)))
+            .expect("expected an inner DFG (bar's replacement) as a child of foo's container");
+        let noop_nodes: Vec<_> = h
+            .children(inner_dfg)
+            .filter(|&n| matches!(h.get_optype(n), OpType::ExtensionOp(_)))
+            .collect();
+        assert!(
+            !noop_nodes.is_empty(),
+            "test setup: expected an ExtensionOp (Noop) inside the innermost DFG"
+        );
+        for op_node in noop_nodes {
             assert_location(&h, op_node);
         }
     }

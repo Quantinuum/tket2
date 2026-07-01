@@ -237,12 +237,16 @@ impl NodeTemplate {
                 hugr.connect(static_source, 0, n, static_inport);
             }
         }
-        rt.process_subtree_opts(hugr, n, opts)?;
+        // Apply the metadata propagation policy *before* recursing into the
+        // replacement subtree. This way, if an inner op is itself replaced by a
+        // further container, the metadata propagated onto that inner op will be
+        // observed as the "old" metadata when the nested replacement runs its
+        // own policy — so the chain A -> C -> D propagates correctly all the
+        // way down to D's descendants.
         if let Some(old_optype) = old_optype.as_ref() {
-            // NOTE: `apply` reads the original metadata back from `n`. Any changes
-            // made to the metadata by prior replacements will be reflected.
             rt.meta_policy.apply(hugr, n, old_optype);
         }
+        rt.process_subtree_opts(hugr, n, opts)?;
         Ok(())
     }
 
