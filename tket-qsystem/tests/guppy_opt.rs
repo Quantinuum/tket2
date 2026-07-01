@@ -7,6 +7,7 @@ use std::fs;
 use std::io::BufReader;
 use std::path::Path;
 use tket::extension::{TKET_EXTENSION_ID, TKET1_EXTENSION_ID};
+use tket_qsystem::extension::result::EXTENSION_ID as RESULT_EXTENSION_ID;
 
 use hugr::{Hugr, HugrView};
 use rstest::rstest;
@@ -76,7 +77,8 @@ fn count_gates(h: &impl HugrView) -> HashMap<SmolStr, usize> {
     let mut counts = HashMap::new();
     for n in h.nodes() {
         if let Some(eop) = h.get_optype(n).as_extension_op()
-            && [TKET_EXTENSION_ID, TKET1_EXTENSION_ID].contains(eop.extension_id())
+            && [TKET_EXTENSION_ID, TKET1_EXTENSION_ID, RESULT_EXTENSION_ID]
+                .contains(eop.extension_id())
         {
             *counts.entry(eop.qualified_id()).or_default() += 1;
         }
@@ -93,15 +95,18 @@ fn count_gates(h: &impl HugrView) -> HashMap<SmolStr, usize> {
 #[case::nested_array("nested_array", None)]
 #[should_panic = "xfail"]
 #[case::angles("angles", Some(vec![
-    ("tket.quantum.MeasureFree", 1),("tket.quantum.QAlloc", 1),
+    ("tket.quantum.MeasureFree", 1), ("tket.quantum.QAlloc", 1), ("tket.result.result_bool", 1)
 ]))]
 #[should_panic = "xfail"]
 #[case::simple_cx("simple_cx", Some(vec![
-    ("tket.quantum.QAlloc", 2), ("tket.quantum.MeasureFree", 2),
+    ("tket.quantum.QAlloc", 2), ("tket.quantum.MeasureFree", 2), ("tket.result.result_bool", 2)
 ]))]
 #[case::nested("nested", None)]
 #[case::ranges("ranges", None)]
-#[case::false_branch("false_branch", None)]
+// false_branch fails because the optimized hugr still has a result,
+// but we have removed that - https://github.com/Quantinuum/tket2/issues/1779
+#[should_panic = "xfail"]
+#[case::false_branch("false_branch", Some(vec![]))]
 #[should_panic = "xfail"]
 #[case::func_decls("func_decls", Some(vec![
     ("TKET1.tk1op", 2), ("tket.quantum.symbolic_angle", 1)
