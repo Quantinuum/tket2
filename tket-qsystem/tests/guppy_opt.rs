@@ -103,10 +103,10 @@ fn count_gates(h: &impl HugrView) -> HashMap<SmolStr, usize> {
 ]))]
 #[case::nested("nested", None)]
 #[case::ranges("ranges", None)]
-// false_branch fails because the optimized hugr still has a result,
-// but we have removed that - https://github.com/Quantinuum/tket2/issues/1779
 #[should_panic = "xfail"]
-#[case::false_branch("false_branch", Some(vec![]))]
+#[case::false_branch("false_branch", Some(vec![
+    ("tket.quantum.QAlloc", 1), ("tket.quantum.MeasureFree", 1), ("tket.result.result_bool", 1)
+]))]
 #[should_panic = "xfail"]
 #[case::func_decls("func_decls", Some(vec![
     ("TKET1.tk1op", 2), ("tket.quantum.symbolic_angle", 1)

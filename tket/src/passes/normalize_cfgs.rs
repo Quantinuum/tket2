@@ -372,8 +372,8 @@ fn mk_rep<H: HugrView>(
             signature: pred_ty.inner_signature().into_owned(),
         },
     );
-    for (i, _) in pred_ty.inputs.iter().enumerate() {
-        replacement.connect(input, i, dfg1, i);
+    for inport in replacement.node_inputs(dfg1).collect::<Vec<_>>() {
+        replacement.connect(input, inport.index(), dfg1, inport);
     }
 
     let dfg2 = replacement.add_node_with_parent(
@@ -382,8 +382,8 @@ fn mk_rep<H: HugrView>(
             signature: succ_sig.as_ref().clone(),
         },
     );
-    for (i, _) in succ_sig.output.iter().enumerate() {
-        replacement.connect(dfg2, i, output, i);
+    for outport in replacement.node_outputs(dfg2).collect::<Vec<_>>() {
+        replacement.connect(dfg2, outport, output, outport.index());
     }
 
     // At the junction, must unpack the first (tuple, branch predicate) output
@@ -394,8 +394,7 @@ fn mk_rep<H: HugrView>(
         .collect::<Vec<_>>();
 
     let dfg_order_out = replacement.get_optype(dfg1).other_output_port().unwrap();
-    let order_srcs = (dfg1_outs.is_empty()).then_some((dfg1, dfg_order_out));
-    // Do not add Order edges between DFGs unless there are no value edges
+    let order_srcs = Some((dfg1, dfg_order_out));
     wire_unpack_first(&mut replacement, dfg1_outs, order_srcs, dfg2);
 
     // If there are edges from succ back to pred, we cannot do these via the mu_inp/out/new
