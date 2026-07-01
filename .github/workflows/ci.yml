@@ -306,6 +306,10 @@ jobs:
       - name: Setup dependencies
         # avoid building qis-compiler
         run: uv sync --package=tket --exact --all-extras --python ${{ env.PYTHON_LOWEST }}
+      - name: pytest version
+        run: uv run pytest --version
+      - name: pytest version w/ --no-project
+        run: uv run --no-project pytest --version
       - name: Run python tests with coverage instrumentation
         run: uv run --no-project pytest --cov=./ --cov-report=xml ${{ env.PKGS }}
       - name: Upload python coverage to codecov.io
