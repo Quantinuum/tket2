@@ -74,9 +74,7 @@ pub use redundant_order_edges::RedundantOrderEdgesPass;
 pub mod replace_types;
 pub use replace_types::ReplaceTypes;
 
-// Metadata propagation policy for node replacements.
-pub mod metadata;
-pub use metadata::MetadataPropagationPolicy;
+// Metadata propagation policy for node replacements (see `replace_types::MetadataPropagationPolicy`).
 
 // Remove redundant tuple pack/unpack operations.
 pub mod untuple;
