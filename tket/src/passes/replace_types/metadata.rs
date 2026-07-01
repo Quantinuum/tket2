@@ -19,12 +19,16 @@ use hugr_core::metadata::DEBUGINFO_META_KEY;
 use hugr_core::metadata::RawMetadataValue;
 use hugr_core::ops::OpType;
 
-type UpdateFn = Arc<
+/// Shared closure signature used by [`MetadataPropagationPolicy`] rules.
+///
+/// See [`MetadataPropagationPolicy::add_rule`] for the meaning of the arguments.
+pub type UpdateFn = Arc<
     dyn Fn(&OpType, &NodeMetadataMap, &OpType, &NodeMetadataMap) -> Vec<(String, RawMetadataValue)>
         + Send
         + Sync,
 >;
 
+#[derive(Clone)]
 struct RuleEntry {
     update_new: UpdateFn,
     remove_from_old: Vec<String>,
@@ -48,7 +52,7 @@ struct RuleEntry {
 /// Rules are applied in the order they were added.
 #[derive(Clone)]
 pub struct MetadataPropagationPolicy {
-    rules: Vec<Arc<RuleEntry>>,
+    rules: Vec<RuleEntry>,
 }
 
 impl MetadataPropagationPolicy {
@@ -88,10 +92,22 @@ impl MetadataPropagationPolicy {
         + 'static,
         remove_from_old: impl IntoIterator<Item = String>,
     ) {
-        self.rules.push(Arc::new(RuleEntry {
-            update_new: Arc::new(update_new_fn),
+        self.add_shared_rule(Arc::new(update_new_fn), remove_from_old);
+    }
+
+    /// Like [`Self::add_rule`], but takes an already-shared [`UpdateFn`].
+    ///
+    /// Useful for installing rules whose components are returned by helper
+    /// functions such as [`default_debuginfo_rule`].
+    pub fn add_shared_rule(
+        &mut self,
+        update_new: UpdateFn,
+        remove_from_old: impl IntoIterator<Item = String>,
+    ) {
+        self.rules.push(RuleEntry {
+            update_new,
             remove_from_old: remove_from_old.into_iter().collect(),
-        }));
+        });
     }
 
     /// Applies the propagation policy to a container node and its descendants.
@@ -105,6 +121,14 @@ impl MetadataPropagationPolicy {
             return;
         }
 
+        // `descendants` yields the node itself first, skip it.
+        // This function shouldn't get called at all for SingleOp replacements, but
+        // LinkedHugr can also replace with a single non-container op (e.g. Call),
+        // in which case we do not want to apply the propagation policy.
+        if hugr.children(container_node).next().is_none() {
+            return;
+        }
+
         // Snapshot the container's metadata. `apply` is invoked immediately
         // after the container is installed and *before* recursing into its
         // subtree, so this is the metadata inherited from the replaced node.
@@ -113,14 +137,7 @@ impl MetadataPropagationPolicy {
             return;
         }
 
-        // `descendants` yields the node itself first, skip it
         let descendants: Vec<Node> = hugr.descendants(container_node).skip(1).collect();
-        // This function shouldn't get called at all for SingleOp replacements, but
-        // LinkedHugr can also replace with a single non-container op (e.g. Call),
-        // in which case we do not want to apply the propagation policy.
-        if descendants.is_empty() {
-            return;
-        }
         for inner in descendants {
             let inner_optype = hugr.get_optype(inner).clone();
             let inner_meta = hugr.node_metadata_map(inner).clone();
@@ -144,19 +161,24 @@ impl MetadataPropagationPolicy {
     }
 }
 
-/// Returns a [`MetadataPropagationPolicy`] that propagates `core.debug_info`
-/// metadata from replaced `Call` and `ExtensionOp` nodes onto every `Call`
-/// and `ExtensionOp` descendant of the replacement container. The key is
-/// removed from the container once propagation finishes so backends don't
-/// see a stale entry on a `DFG`/`CFG`/etc.
+/// Returns the components of the built-in `core.debug_info` propagation rule
+/// as `(update_fn, remove_from_old)`, suitable for passing to
+/// [`MetadataPropagationPolicy::add_rule`].
 ///
-/// Metadata entries that are already present on the inner node are not
-/// overwritten. This is used as the default policy for
-/// [`ReplaceTypes::default`](super::replace_types::ReplaceTypes).
-pub fn default_debuginfo_policy() -> MetadataPropagationPolicy {
-    let mut policy = MetadataPropagationPolicy::empty();
-    policy.add_rule(
-        |old_optype, old_meta, inner_optype, inner_meta| {
+/// The rule copies `core.debug_info` from a replaced `Call` or `ExtensionOp`
+/// onto every `Call`/`ExtensionOp` descendant of the replacement container
+/// that does not already carry the key, and marks `core.debug_info` for
+/// removal from the container so backends don't see a stale entry on the new
+/// `DFG`/`CFG`/etc.
+///
+/// Exposed as a free function so callers can install it at any position
+/// among their own rules (rule order is significant).
+pub fn default_debuginfo_rule() -> (UpdateFn, Vec<String>) {
+    let update: UpdateFn = Arc::new(
+        |old_optype: &OpType,
+         old_meta: &NodeMetadataMap,
+         inner_optype: &OpType,
+         inner_meta: &NodeMetadataMap| {
             if matches!(old_optype, OpType::Call(_) | OpType::ExtensionOp(_))
                 && matches!(inner_optype, OpType::Call(_) | OpType::ExtensionOp(_))
                 && !inner_meta.contains_key(DEBUGINFO_META_KEY)
@@ -169,8 +191,17 @@ pub fn default_debuginfo_policy() -> MetadataPropagationPolicy {
                 vec![]
             }
         },
-        [DEBUGINFO_META_KEY.to_string()],
     );
+    (update, vec![DEBUGINFO_META_KEY.to_string()])
+}
+
+/// Returns a [`MetadataPropagationPolicy`] containing only the built-in
+/// `core.debug_info` rule (see [`default_debuginfo_rule`]). This is the
+/// default policy for [`ReplaceTypes::default`](super::ReplaceTypes).
+pub fn default_debuginfo_policy() -> MetadataPropagationPolicy {
+    let mut policy = MetadataPropagationPolicy::empty();
+    let (update, remove_from_old) = default_debuginfo_rule();
+    policy.add_shared_rule(update, remove_from_old);
     policy
 }
 

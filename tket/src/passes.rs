@@ -72,9 +72,7 @@ pub use redundant_order_edges::RedundantOrderEdgesPass;
 
 // Replace types, ops, and constants across a HUGR.
 pub mod replace_types;
-pub use replace_types::ReplaceTypes;
-
-// Metadata propagation policy for node replacements (see `replace_types::MetadataPropagationPolicy`).
+pub use replace_types::{MetadataPropagationPolicy, ReplaceTypes};
 
 // Remove redundant tuple pack/unpack operations.
 pub mod untuple;
