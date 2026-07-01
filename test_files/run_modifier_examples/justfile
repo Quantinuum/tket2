@@ -2,9 +2,6 @@
 help:
     @just --list --justfile {{justfile()}}
 
-# Re-generate all hugr files and their mermaid diagrams.
-r: run-hugrs
-
 # Re-generate all hugr files.
 run-hugrs:
     just apply-passes

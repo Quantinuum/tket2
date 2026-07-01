@@ -4,10 +4,7 @@
 #    "guppylang==1.0.0a8",
 # ]
 # ///
-"""Testing nested modifiers
-
-The hugr generated from this script is also used to benchmark the performance of modifier passes resolver
-"""
+"""Multiple modifiers nested"""
 
 from pathlib import Path
 from sys import argv
@@ -15,22 +12,34 @@ from sys import argv
 from guppylang import enable_experimental_features, guppy
 from guppylang.std.builtins import control, dagger
 from guppylang.std.debug import state_result
-from guppylang.std.quantum import angle, discard, h, qubit, ry
+from guppylang.std.quantum import angle, discard, h, qubit, rz, x
 
 enable_experimental_features()
 
 
 @guppy
 def main() -> None:
-    c1 = qubit()
     t = qubit()
+    c1 = qubit()
+    c2 = qubit()
+    c3 = qubit()
     h(c1)
-    with control(c1):
+    x(c2)
+    h(c3)
+    x(t)
+    with control(c1, c2):
+        f = 1 / 3
         with dagger:
-            ry(t, angle(1 / 3))
+            a = angle(-f)
+            with control(c3):
+                x(t)
+                rz(t, a)
+                h(t)
 
-    state_result("r", c1, t)
+    state_result("r", c1, c2, c3, t)
     discard(c1)
+    discard(c2)
+    discard(c3)
     discard(t)
 
 

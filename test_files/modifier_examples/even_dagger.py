@@ -1,35 +1,49 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#    "guppylang==1.0.0a5",
-#    "guppylang-internals==1.0.0a5",
+#    "guppylang==1.0.0a8",
 # ]
 # ///
-"""A stress test for nested control and dagger modifiers."""
+"""Test that an even number of daggers is equivalent to no dagger at all"""
 
 from pathlib import Path
 from sys import argv
 
-from guppylang import guppy
+from guppylang import enable_experimental_features, guppy
 from guppylang.std.builtins import control, dagger
 from guppylang.std.debug import state_result
-from guppylang.std.quantum import angle, discard, qubit, rx, h
-
-
-from guppylang.experimental import enable_experimental_features
+from guppylang.std.quantum import angle, discard, h, qubit, rx
 
 enable_experimental_features()
+
+
+@guppy(controllable=True)
+def rotation(q: qubit, f: float) -> None:
+    rx(q, angle(f))
 
 
 @guppy
 def main() -> None:
     c = qubit()
     q = qubit()
+    flag = True
+
+    with dagger, dagger:
+        # cfg is normally forbidden in a dagger context
+        if flag:
+            rotation(c, 1 / 4)
+
+    with dagger, dagger:
+        f = 1 / 4
+        with dagger:
+            rx(c, angle(f))
+
     h(c)
     with dagger:
         with control(c):
             with dagger:
-                rx(q, angle(1 / 3))
+                # rotation is only `controllable`: fine since we have 2 daggers
+                rotation(q, 1 / 3)
 
     state_result("r", c, q)
 
