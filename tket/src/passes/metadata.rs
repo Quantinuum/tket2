@@ -1,40 +1,12 @@
 //! Policy for propagating node metadata when an op node is replaced by a
 //! container during a [`ReplaceTypes`](super::replace_types::ReplaceTypes) pass.
 //!
-//! # Overview
+//! A policy is a list of rules, where each rule consists of:
+//! 1) A function which updates metadata for each node within the container given its optype,
+//!    the replaced node's optype, and the replaced node's metadata.
+//! 2) A set of metadata keys to be removed from the container node after propagation.
 //!
-//! When [`ReplaceTypes`] replaces an op node with a container (e.g. a DFG),
-//! any metadata on the original op node ends up on the container, where most
-//! backends will not read it. A [`MetadataPropagationPolicy`] defines rules
-//! that copy or transform that metadata onto the inner nodes of the replacement
-//! container.
-//!
-//! # Example
-//!
-//! ```rust
-//! use tket::passes::metadata::MetadataPropagationPolicy;
-//! use hugr_core::hugr::NodeMetadataMap;
-//! use hugr_core::ops::OpType;
-//!
-//! // Build a policy from scratch with a single rule that *moves* all metadata
-//! // from any replaced Call node to any inner Call node. (Starting from
-//! // `empty()` avoids interactions with the default rules, which apply
-//! // unconditionally and could overwrite entries written by later rules.)
-//! let mut policy = MetadataPropagationPolicy::empty();
-//! policy.add_rule(
-//!     |old_optype, old_meta, inner_optype, _inner_meta| {
-//!         if matches!(old_optype, OpType::Call(_)) && matches!(inner_optype, OpType::Call(_)) {
-//!             old_meta.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
-//!         } else {
-//!             vec![]
-//!         }
-//!     },
-//!     // After all descendants are visited, strip every key from the
-//!     // container so backends don't see stale entries.
-//!     ["some.key".to_string()],
-//! );
-//! ```
-
+//! See `default_debuginfo_policy` in this module for an example rule.
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
@@ -47,30 +19,29 @@ use hugr_core::metadata::DEBUGINFO_META_KEY;
 use hugr_core::metadata::RawMetadataValue;
 use hugr_core::ops::OpType;
 
-type Rule = Arc<
+type UpdateFn = Arc<
     dyn Fn(&OpType, &NodeMetadataMap, &OpType, &NodeMetadataMap) -> Vec<(String, RawMetadataValue)>
         + Send
         + Sync,
 >;
 
 struct RuleEntry {
-    rule: Rule,
+    update_new: UpdateFn,
     remove_from_old: Vec<String>,
 }
 
 /// Defines how metadata is propagated from a replaced op node to the inner
 /// nodes of its replacement container.
 ///
-/// Each rule is a function `(old_optype, old_meta, inner_optype, inner_meta)`
-/// called once per descendant of the replacement container (the container
-/// itself is excluded; descendants are visited in breadth-first order). It
-/// returns the key-value pairs to write onto that descendant. All returned
+/// `update_new` is a function `(old_optype, old_meta, inner_optype, inner_meta)`
+/// called once per descendant of the replacement container. It
+/// returns metadata key-value pairs to write onto that descendant. All returned
 /// pairs are applied unconditionally, so rules are responsible for checking
 /// `inner_meta` if they want to avoid overwriting existing keys.
 ///
-/// Each rule additionally has a static list of `remove_from_old` keys that
-/// are deleted from the *container* once the rule has been applied to every
-/// descendant. Use this when a rule fully relocates metadata onto descendants
+/// `remove_from_old` is a list of keys that
+/// are deleted from the container once all update rules has been applied to its
+/// descendants. Use this when a rule fully relocates metadata onto descendants
 /// and wants to avoid leaving a stale copy on the container. Removals from
 /// all rules are deduplicated and applied once at the very end.
 ///
@@ -93,7 +64,7 @@ impl MetadataPropagationPolicy {
 
     /// Adds a propagation rule.
     ///
-    /// The rule receives `(old_optype, old_meta, inner_optype, inner_meta)`:
+    /// `update_new` receives `(old_optype, old_meta, inner_optype, inner_meta)`:
     /// - `old_optype` — optype of the original node that was replaced
     /// - `old_meta` — metadata of the original node
     /// - `inner_optype` — optype of a descendant of the replacement container
@@ -102,14 +73,11 @@ impl MetadataPropagationPolicy {
     /// and returns the key-value pairs to write onto that descendant; all
     /// returned pairs are applied unconditionally.
     ///
-    /// `remove_from_old` lists keys to delete from the *container* once the
-    /// rule has been applied to every descendant. Pass an empty iterator
-    /// (e.g. `[] as [String; 0]` or `std::iter::empty()`) if the rule should
-    /// not strip anything; the container's metadata is otherwise left
-    /// untouched.
+    /// `remove_from_old` lists keys to delete from the container node once
+    /// *all* update rules have been applied.
     pub fn add_rule(
         &mut self,
-        rule: impl Fn(
+        update_new_fn: impl Fn(
             &OpType,
             &NodeMetadataMap,
             &OpType,
@@ -121,20 +89,12 @@ impl MetadataPropagationPolicy {
         remove_from_old: impl IntoIterator<Item = String>,
     ) {
         self.rules.push(Arc::new(RuleEntry {
-            rule: Arc::new(rule),
+            update_new: Arc::new(update_new_fn),
             remove_from_old: remove_from_old.into_iter().collect(),
         }));
     }
 
-    /// Applies all rules to every descendant of `container_node` (the
-    /// container itself is not visited).
-    ///
-    /// `old_optype` is the optype the replaced node had *before* replacement.
-    /// Each rule is called once per descendant and its returned key-value
-    /// pairs are written to that descendant unconditionally. Once every
-    /// descendant has been visited, the union of all rules'
-    /// `remove_from_old` keys is deleted from the container in a single
-    /// post-pass.
+    /// Applies the propagation policy to a container node and its descendants.
     pub(crate) fn apply<H: HugrMut<Node = Node>>(
         &self,
         hugr: &mut H,
@@ -152,8 +112,7 @@ impl MetadataPropagationPolicy {
             return;
         }
 
-        // `descendants` yields the node itself first; skip it so rules only
-        // see the inner nodes of the replacement.
+        // `descendants` yields the node itself first, skip it
         let descendants: Vec<Node> = hugr.descendants(container_node).skip(1).collect();
         // This function shouldn't get called at all for SingleOp replacements, but
         // LinkedHugr can also replace with a single non-container op (e.g. Call),
@@ -165,7 +124,8 @@ impl MetadataPropagationPolicy {
             let inner_optype = hugr.get_optype(inner).clone();
             let inner_meta = hugr.node_metadata_map(inner).clone();
             for entry in &self.rules {
-                for (key, value) in (entry.rule)(old_optype, &old_meta, &inner_optype, &inner_meta)
+                for (key, value) in
+                    (entry.update_new)(old_optype, &old_meta, &inner_optype, &inner_meta)
                 {
                     hugr.set_metadata_any(inner, &key, value);
                 }

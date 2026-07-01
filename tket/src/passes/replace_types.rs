@@ -161,10 +161,9 @@ impl NodeTemplate {
     ) -> Result<(), ReplaceTypesError> {
         let ef = |e| ReplaceTypesError::AddTemplateError(n, Box::new(e));
         assert_eq!(hugr.children(n).count(), 0);
-        // Snapshot the original optype for the metadata policy. SingleOp
-        // replacements stay as leaf ops, so the policy (which propagates to
-        // children of a replacement container) has nothing to do; skip the
-        // clone in that case.
+        // Snapshot the original optype for the metadata propagation policy.  Will be
+        // None for a SingleOp replacement, indicating that there is no container to
+        // propagate into.
         let old_optype = (!matches!(self, NodeTemplate::SingleOp(_)) && !rt.meta_policy.is_empty())
             .then(|| hugr.get_optype(n).clone());
         let (new_optype, static_source, static_inport) = match self {
