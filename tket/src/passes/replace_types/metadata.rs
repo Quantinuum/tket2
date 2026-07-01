@@ -302,6 +302,25 @@ mod test {
         );
     }
 
+    /// Returns the direct `ExtensionOp` children of `container`, panicking if
+    /// there are none (guards against accidentally vacuous assertions).
+    #[track_caller]
+    fn ext_op_children(
+        h: &impl HugrView<Node = hugr_core::Node>,
+        container: hugr_core::Node,
+    ) -> Vec<hugr_core::Node> {
+        use hugr_core::ops::OpType;
+        let ops: Vec<_> = h
+            .children(container)
+            .filter(|&n| matches!(h.get_optype(n), OpType::ExtensionOp(_)))
+            .collect();
+        assert!(
+            !ops.is_empty(),
+            "expected ExtensionOp children inside {container:?}"
+        );
+        ops
+    }
+
     /// Asserts every direct `ExtensionOp` child of `container` carries
     /// metadata equal to [`expected_location`]; panics if there are none.
     #[track_caller]
@@ -309,16 +328,7 @@ mod test {
         h: &impl HugrView<Node = hugr_core::Node>,
         container: hugr_core::Node,
     ) {
-        use hugr_core::ops::OpType;
-        let inner_ops: Vec<_> = h
-            .children(container)
-            .filter(|&n| matches!(h.get_optype(n), OpType::ExtensionOp(_)))
-            .collect();
-        assert!(
-            !inner_ops.is_empty(),
-            "Replacement container {container:?} should contain ExtensionOps"
-        );
-        for op_node in inner_ops {
+        for op_node in ext_op_children(h, container) {
             assert_location(h, op_node);
         }
     }
@@ -411,7 +421,6 @@ mod test {
     #[test]
     fn default_policy_does_not_propagate_non_debug_metadata() {
         use hugr_core::hugr::hugrmut::HugrMut;
-        use hugr_core::ops::OpType;
         use serde_json::Value;
 
         let ext = ext();
@@ -423,12 +432,8 @@ mod test {
         h.validate().unwrap();
 
         // Debug info IS propagated (sanity check), but the unrelated key is NOT.
-        let inner_ops: Vec<_> = h
-            .children(read_node)
-            .filter(|&n| matches!(h.get_optype(n), OpType::ExtensionOp(_)))
-            .collect();
-        assert!(!inner_ops.is_empty());
-        for op_node in inner_ops {
+        assert_all_inner_ext_ops_have_location(&h, read_node);
+        for op_node in ext_op_children(&h, read_node) {
             assert!(
                 h.get_metadata_any(op_node, "unrelated.key").is_none(),
                 "Non-debug metadata leaked onto inner op {op_node:?}"
@@ -481,13 +486,8 @@ mod test {
         lw.run(&mut h).unwrap();
         h.validate().unwrap();
 
-        let inner_ops: Vec<_> = h
-            .children(read_node)
-            .filter(|&n| matches!(h.get_optype(n), OpType::ExtensionOp(_)))
-            .collect();
-        assert!(!inner_ops.is_empty());
         let preexisting_json = serde_json::to_value(&preexisting).unwrap();
-        for op_node in inner_ops {
+        for op_node in ext_op_children(&h, read_node) {
             let actual = h
                 .get_metadata::<LocationRecord>(op_node)
                 .expect("inner op should still carry the pre-existing record");
@@ -503,7 +503,6 @@ mod test {
     #[test]
     fn empty_policy_propagates_nothing() {
         use hugr_core::metadata::DEBUGINFO_META_KEY;
-        use hugr_core::ops::OpType;
 
         let ext = ext();
         let (mut h, read_node) = build_read_hugr_with_location(&ext);
@@ -513,12 +512,7 @@ mod test {
         lw.run(&mut h).unwrap();
         h.validate().unwrap();
 
-        let inner_ops: Vec<_> = h
-            .children(read_node)
-            .filter(|&n| matches!(h.get_optype(n), OpType::ExtensionOp(_)))
-            .collect();
-        assert!(!inner_ops.is_empty());
-        for op_node in inner_ops {
+        for op_node in ext_op_children(&h, read_node) {
             assert!(
                 h.get_metadata_any(op_node, DEBUGINFO_META_KEY).is_none(),
                 "Empty policy propagated debug_info onto {op_node:?}"
@@ -641,30 +635,14 @@ mod test {
             .expect("expected an inner DFG as a direct child");
 
         // ExtensionOps two levels deep should still carry the debug location.
-        let nested_ops: Vec<_> = h
-            .children(inner_dfg)
-            .filter(|&n| matches!(h.get_optype(n), OpType::ExtensionOp(_)))
-            .collect();
-        assert!(
-            !nested_ops.is_empty(),
-            "test setup: expected ExtensionOps inside the nested DFG"
-        );
-        for op_node in nested_ops {
+        for op_node in ext_op_children(&h, inner_dfg) {
             assert_location(&h, op_node);
         }
     }
 
-    /// Regression test for the chained-replacement propagation case discussed
-    /// in the review of the metadata policy.
-    ///
     /// If node `A` is replaced with container `B`, and then op `C` inside `B`
     /// is itself replaced with container `D`, metadata attached to `A` should
     /// end up on `D`'s leaf descendants: `A` -> `C` -> `D`'s children.
-    ///
-    /// This requires `MetadataPropagationPolicy::apply` to run *before*
-    /// recursing into the freshly installed container (so that `C` inherits
-    /// `A`'s debug info before the nested replacement snapshots `C`'s
-    /// metadata and propagates it into `D`).
     #[test]
     fn chained_replacement_propagates_metadata_through_intermediate_container() {
         use hugr_core::extension::TypeDefBound;
@@ -748,15 +726,7 @@ mod test {
             .children(foo_node)
             .find(|&n| matches!(h.get_optype(n), OpType::DFG(_)))
             .expect("expected an inner DFG (bar's replacement) as a child of foo's container");
-        let noop_nodes: Vec<_> = h
-            .children(inner_dfg)
-            .filter(|&n| matches!(h.get_optype(n), OpType::ExtensionOp(_)))
-            .collect();
-        assert!(
-            !noop_nodes.is_empty(),
-            "test setup: expected an ExtensionOp (Noop) inside the innermost DFG"
-        );
-        for op_node in noop_nodes {
+        for op_node in ext_op_children(&h, inner_dfg) {
             assert_location(&h, op_node);
         }
     }
