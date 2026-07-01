@@ -513,6 +513,25 @@ impl<N: HugrNode> ModifierResolver<N> {
         dfg: &DFG,
         parent_dfg: &mut impl Container,
     ) -> Result<(), ModifierResolverErrors<N>> {
+        let has_indirect_call = h
+            .descendants(n)
+            .any(|node| matches!(h.get_optype(node), OpType::CallIndirect(_)));
+        let has_active_higher_order_inputs = !self.active_function_input_modifiers().is_empty();
+        let boundary_has_qubits = dfg
+            .signature
+            .input
+            .iter()
+            .chain(dfg.signature.output.iter())
+            .any(|ty| self.qubit_finder.contains_element_type(ty));
+        if !boundary_has_qubits
+            && !self.subtree_has_quantum_operation(h, n)
+            && !has_indirect_call
+            && !has_active_higher_order_inputs
+        {
+            self.copy_sub_container_no_modification(h, n, parent_dfg)?;
+            return Ok(());
+        }
+
         let mut boundary_signature = dfg.signature.clone();
         self.modify_carried_higher_order_types_if_present(&mut boundary_signature.input)?;
         self.modify_carried_higher_order_types_if_present(&mut boundary_signature.output)?;
