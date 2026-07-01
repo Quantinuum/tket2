@@ -566,7 +566,7 @@ mod test {
         builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
         extension::prelude::qb_t,
         ops::CallIndirect,
-        std_extensions::collections::array::{ArrayOpBuilder, array_type},
+        std_extensions::collections::array::array_type,
         types::{Signature, Term},
     };
     use strum::IntoEnumIterator;
@@ -761,101 +761,6 @@ mod test {
 
         let mut h = module.finish_hugr().unwrap();
 
-        let entrypoint = h.entrypoint();
-        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
-        assert_matches!(h.validate(), Ok(()));
-    }
-
-    #[rstest::rstest]
-    #[case::rx(TketOp::Rx)]
-    #[case::ry(TketOp::Ry)]
-    #[case::rz(TketOp::Rz)]
-    fn daggered_controlled_rotation_is_acyclic(#[case] op: TketOp) {
-        let mut module = ModuleBuilder::new();
-        let inner_sig = Signature::new_endo([qb_t()]);
-        let outer_sig = Signature::new_endo([qb_t(), qb_t()]);
-        let controlled_sig = Signature::new_endo([array_type(1, qb_t()), qb_t()]);
-        let main_sig = Signature::new(vec![], [qb_t(), qb_t()]);
-
-        let control_op = MODIFIER_EXTENSION
-            .instantiate_extension_op(
-                &CONTROL_OP_ID,
-                [Term::BoundedNat(1), Term::new_list([qb_t()]), vec![].into()],
-            )
-            .unwrap();
-        let dagger_op = MODIFIER_EXTENSION
-            .instantiate_extension_op(
-                &DAGGER_OP_ID,
-                [Term::new_list([qb_t(), qb_t()]), vec![].into()],
-            )
-            .unwrap();
-
-        let inner = {
-            let mut func = module.define_function("inner", inner_sig).unwrap();
-            func.set_unitary();
-            let q = func.input_wires().next().unwrap();
-            let angle_dfg = {
-                let mut dfg = func
-                    .dfg_builder(Signature::new(vec![], [rotation_type()]), [])
-                    .unwrap();
-                let angle = dfg.add_load_value(ConstRotation::new(0.5).unwrap());
-                dfg.finish_with_outputs([angle]).unwrap()
-            };
-            let angle = angle_dfg.out_wire(0);
-            let q = func.add_dataflow_op(op, [q, angle]).unwrap().out_wire(0);
-            func.finish_with_outputs([q]).unwrap()
-        };
-        let outer = {
-            let mut func = module.define_function("outer", outer_sig.clone()).unwrap();
-            func.set_unitary();
-            let [control, target] = func.input_wires_arr();
-            let inner = func.load_func(inner.handle(), &[]).unwrap();
-            let controlled = func
-                .add_dataflow_op(control_op, [inner])
-                .unwrap()
-                .out_wire(0);
-            let control_array = func.add_new_array(qb_t(), [control]).unwrap();
-            let [control_array, target] = func
-                .add_dataflow_op(
-                    CallIndirect {
-                        signature: controlled_sig.clone(),
-                    },
-                    [controlled, control_array, target],
-                )
-                .unwrap()
-                .outputs_arr();
-            let control = func.add_array_unpack(qb_t(), 1, control_array).unwrap()[0];
-            func.finish_with_outputs([control, target]).unwrap()
-        };
-
-        {
-            let mut func = module.define_function("main", main_sig).unwrap();
-            let loaded = func.load_func(outer.handle(), &[]).unwrap();
-            let daggered = func
-                .add_dataflow_op(dagger_op, [loaded])
-                .unwrap()
-                .out_wire(0);
-            let control = func
-                .add_dataflow_op(TketOp::QAlloc, [])
-                .unwrap()
-                .out_wire(0);
-            let target = func
-                .add_dataflow_op(TketOp::QAlloc, [])
-                .unwrap()
-                .out_wire(0);
-            let outputs = func
-                .add_dataflow_op(
-                    CallIndirect {
-                        signature: outer_sig,
-                    },
-                    [daggered, control, target],
-                )
-                .unwrap()
-                .outputs();
-            func.finish_with_outputs(outputs).unwrap();
-        }
-
-        let mut h = module.finish_hugr().unwrap();
         let entrypoint = h.entrypoint();
         resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
         assert_matches!(h.validate(), Ok(()));

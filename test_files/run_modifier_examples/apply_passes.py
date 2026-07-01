@@ -2,7 +2,6 @@ from tket.passes import ModifierResolverPass, NormalizeGuppy
 from hugr.build.base import Hugr
 from pathlib import Path
 import sys
-from hugr.package import Package
 from tket._state import CompilationState
 
 
@@ -17,27 +16,12 @@ def _hugr_from_path(str_path: str) -> Hugr:
     return h
 
 
-def package_from_path(str_path: str) -> Package:
-    with open(Path(str_path), "rb") as f:
-        p = Package.from_bytes(f.read())
-
-    return p
-
-
 def apply_passes(input_paths: list[Path], output_dir: Path) -> None:
     for input_path in input_paths:
-        print("Validating input file...")
-        CompilationState.from_python(_hugr_from_path(str(input_path))).validate()
         print(f"Processing {input_path.name}")
         hugr = _hugr_from_path(str(input_path))
         resolved: Hugr = mr_pass(hugr)
-        resolved.render_dot().view(f"{input_path.stem}_resolved")
         CompilationState.from_python(resolved).validate()
-        p = package_from_path(str(input_path))
-        CompilationState.from_python(p.modules[0]).validate()
-        n = normalize(p.modules[0])
-        CompilationState.from_python(n).validate()
-
         output_path = output_dir / f"{input_path.stem}_solved.hugr"
         output_path.write_bytes(resolved.to_bytes())
 

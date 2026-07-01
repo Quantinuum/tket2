@@ -8,6 +8,7 @@
 
 from pathlib import Path
 from sys import argv
+from hugr.hugr.render import RenderConfig
 
 from guppylang import enable_experimental_features, guppy
 from guppylang.std.builtins import control, dagger
@@ -28,12 +29,13 @@ def main() -> None:
     h(c3)
     x(t)
     with control(c1, c2):
-        f = 1 / 3
+        f = 1 / 6
         with dagger:
             a = angle(-f)
             with control(c3):
                 x(t)
                 rz(t, a)
+                rz(t, angle(-1 / 6))
                 h(t)
 
     state_result("r", c1, c2, c3, t)
@@ -45,3 +47,4 @@ def main() -> None:
 
 program = main.compile()
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
+program.modules[0].render_dot(RenderConfig(max_node_label_length=None)).view("tmp2")
