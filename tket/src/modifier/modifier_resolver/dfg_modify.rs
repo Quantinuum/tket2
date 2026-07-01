@@ -513,6 +513,13 @@ impl<N: HugrNode> ModifierResolver<N> {
         dfg: &DFG,
         parent_dfg: &mut impl Container,
     ) -> Result<(), ModifierResolverErrors<N>> {
+        // Check if the DFG input or output are carrying qubits: only DFGs with quantum effects need to be modified.
+        let boundary_has_qubits = self.signature_has_quantum_data(&dfg.signature);
+        if !boundary_has_qubits {
+            self.copy_sub_container_no_modification(h, n, parent_dfg)?;
+            return Ok(());
+        }
+
         let mut boundary_signature = dfg.signature.clone();
         self.modify_carried_higher_order_types_if_present(&mut boundary_signature.input)?;
         self.modify_carried_higher_order_types_if_present(&mut boundary_signature.output)?;
@@ -789,6 +796,7 @@ mod test {
     use super::super::*;
     use crate::TketOp;
     use crate::extension::{
+        measurement::MeasurementOpBuilder,
         modifier::{CONTROL_OP_ID, DAGGER_OP_ID, MODIFIER_EXTENSION},
         rotation::{ConstRotation, rotation_type},
     };
@@ -796,7 +804,7 @@ mod test {
     use hugr::{
         Hugr,
         builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder, SubContainer},
-        extension::prelude::{ConstUsize, qb_t, usize_t},
+        extension::prelude::{ConstUsize, bool_t, qb_t, usize_t},
         extension::simple_op::MakeExtensionOp,
         ops::{CallIndirect, ExtensionOp, handle::FuncID},
         std_extensions::collections::{
@@ -1022,6 +1030,130 @@ mod test {
                 )
                 .unwrap();
             func.finish_with_outputs(call.outputs()).unwrap();
+        }
+
+        let mut h = module.finish_hugr().unwrap();
+        let entrypoint = h.entrypoint();
+        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        assert_matches!(h.validate(), Ok(()));
+    }
+
+    #[rstest::rstest]
+    #[case::rx(TketOp::Rx)]
+    // #[case::ry(TketOp::Ry)]
+    // #[case::rz(TketOp::Rz)]
+    /// Test that modifying a DFG representing a computation with no quantum effects (no input/output qubits)
+    /// does not introduce invalid hugr.
+    fn daggered_controlled_rotation_is_acyclic(#[case] op: TketOp) {
+        let mut module = ModuleBuilder::new();
+        let inner_sig = Signature::new_endo([qb_t()]);
+        let outer_sig = Signature::new_endo([qb_t(), qb_t()]);
+        let controlled_sig = Signature::new_endo([array_type(1, qb_t()), qb_t()]);
+        let main_sig = Signature::new(vec![], [qb_t(), qb_t()]);
+
+        let control_op = MODIFIER_EXTENSION
+            .instantiate_extension_op(
+                &CONTROL_OP_ID,
+                [Term::BoundedNat(1), Term::new_list([qb_t()]), vec![].into()],
+            )
+            .unwrap();
+        let dagger_op = MODIFIER_EXTENSION
+            .instantiate_extension_op(
+                &DAGGER_OP_ID,
+                [Term::new_list([qb_t(), qb_t()]), vec![].into()],
+            )
+            .unwrap();
+
+        let inner = {
+            let mut func = module.define_function("inner", inner_sig).unwrap();
+            func.set_unitary();
+            let q = func.input_wires().next().unwrap();
+            let measurement_dfg = {
+                let mut measurement_dfg = func
+                    .dfg_builder(Signature::new(type_row![], [bool_t()]), [])
+                    .unwrap();
+                let q = measurement_dfg
+                    .add_dataflow_op(TketOp::QAlloc, [])
+                    .unwrap()
+                    .out_wire(0);
+                let measured = measurement_dfg
+                    .add_dataflow_op(TketOp::MeasureFree, [q])
+                    .unwrap()
+                    .out_wire(0);
+                let [measured_result] = measurement_dfg.add_measurement_read(measured).unwrap();
+                measurement_dfg
+                    .finish_with_outputs([measured_result])
+                    .unwrap()
+            };
+            func.dfg_builder(
+                Signature::new([bool_t()], type_row![]),
+                [measurement_dfg.out_wire(0)],
+            )
+            .unwrap()
+            .finish_sub_container()
+            .unwrap();
+            let angle_dfg = {
+                let mut dfg = func
+                    .dfg_builder(
+                        Signature::new([bool_t()], [rotation_type()]),
+                        [measurement_dfg.out_wire(0)],
+                    )
+                    .unwrap();
+                let angle = dfg.add_load_value(ConstRotation::new(0.5).unwrap());
+                dfg.finish_with_outputs([angle]).unwrap()
+            };
+            let angle = angle_dfg.out_wire(0);
+            let q = func.add_dataflow_op(op, [q, angle]).unwrap().out_wire(0);
+            func.finish_with_outputs([q]).unwrap()
+        };
+        let outer = {
+            let mut func = module.define_function("outer", outer_sig.clone()).unwrap();
+            func.set_unitary();
+            let [control, target] = func.input_wires_arr();
+            let inner = func.load_func(inner.handle(), &[]).unwrap();
+            let controlled = func
+                .add_dataflow_op(control_op, [inner])
+                .unwrap()
+                .out_wire(0);
+            let control_array = func.add_new_array(qb_t(), [control]).unwrap();
+            let [control_array, target] = func
+                .add_dataflow_op(
+                    CallIndirect {
+                        signature: controlled_sig.clone(),
+                    },
+                    [controlled, control_array, target],
+                )
+                .unwrap()
+                .outputs_arr();
+            let control = func.add_array_unpack(qb_t(), 1, control_array).unwrap()[0];
+            func.finish_with_outputs([control, target]).unwrap()
+        };
+
+        {
+            let mut func = module.define_function("main", main_sig).unwrap();
+            let loaded = func.load_func(outer.handle(), &[]).unwrap();
+            let daggered = func
+                .add_dataflow_op(dagger_op, [loaded])
+                .unwrap()
+                .out_wire(0);
+            let control = func
+                .add_dataflow_op(TketOp::QAlloc, [])
+                .unwrap()
+                .out_wire(0);
+            let target = func
+                .add_dataflow_op(TketOp::QAlloc, [])
+                .unwrap()
+                .out_wire(0);
+            let outputs = func
+                .add_dataflow_op(
+                    CallIndirect {
+                        signature: outer_sig,
+                    },
+                    [daggered, control, target],
+                )
+                .unwrap()
+                .outputs();
+            func.finish_with_outputs(outputs).unwrap();
         }
 
         let mut h = module.finish_hugr().unwrap();
