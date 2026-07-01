@@ -23,6 +23,7 @@ from hypothesis import given, settings
 
 from tket.passes import PytketHugrPass, _QSystemLLVMPass, QSystemRebasePass
 from hugr.build.base import Hugr
+from hugr.package import Package
 
 import numpy as np
 import pytest
@@ -45,9 +46,9 @@ normalize = NormalizeGuppy()
 
 def _hugr_from_path(str_path: str) -> Hugr:
     with open(Path(str_path), "rb") as f:
-        h = Hugr.from_bytes(f.read())
+        h = Package.from_bytes(f.read())
 
-    return h
+    return h.modules[0]
 
 
 def _count_ops(hugr: Hugr, op_string_name: str) -> int:
@@ -355,8 +356,10 @@ def test_normalize_guppy_on_modifier() -> None:
     runs without errors."""
     normalize = NormalizeGuppy()
     for hugr_path in sorted(Path("test_files/modifier_examples").glob("*.hugr")):
+        print(f"Testing NormalizeGuppy on {hugr_path}")
         try:
             normalized = normalize(_hugr_from_path(str(hugr_path)))
+            CompilationState.from_python(normalized).validate()
         except Exception as exc:
             raise AssertionError(f"NormalizeGuppy failed for {hugr_path}") from exc
         assert not _contains_modifiers(normalized), (
@@ -419,6 +422,8 @@ def test_python_qsystem_pass_with_modifiers() -> None:
     for hugr_path in sorted(Path("test_files/modifier_examples").glob("*.hugr")):
         try:
             qsystem_hugr = qsystem_llvm(qsystem_rebase(_hugr_from_path(str(hugr_path))))
+            CompilationState.from_python(qsystem_hugr).validate()
+
         except Exception as exc:
             raise AssertionError(f"QSystem passes failed for {hugr_path}") from exc
         assert not _contains_modifiers(qsystem_hugr), (
