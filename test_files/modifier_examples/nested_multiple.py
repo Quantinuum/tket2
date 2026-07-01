@@ -4,11 +4,10 @@
 #    "guppylang==1.0.0a8",
 # ]
 # ///
-"""Multiple modifiers nested"""
+"""Testing multiple modifiers nested and assigment in control and dagger context."""
 
 from pathlib import Path
 from sys import argv
-from hugr.hugr.render import RenderConfig
 
 from guppylang import enable_experimental_features, guppy
 from guppylang.std.builtins import control, dagger
@@ -47,4 +46,3 @@ def main() -> None:
 
 program = main.compile()
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
-program.modules[0].render_dot(RenderConfig(max_node_label_length=None)).view("tmp2")
