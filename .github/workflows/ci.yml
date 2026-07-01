@@ -308,8 +308,14 @@ jobs:
         run: uv sync --package=tket --exact --all-extras --python ${{ env.PYTHON_LOWEST }}
       - name: pytest version
         run: uv run pytest --version
+      - name: which pytest
+        run: uv run which pytest
       - name: pytest version w/ --no-project
         run: uv run --no-project pytest --version
+      - name: which pytest w/ --no-project
+        run: uv run --no-project which pytest
+      - name: which pytest inside bash
+        run: uv run --no-project bash -c 'which pytest'
       - name: Run python tests with coverage instrumentation
         run: uv run --no-project pytest --cov=./ --cov-report=xml ${{ env.PKGS }}
       - name: Upload python coverage to codecov.io
