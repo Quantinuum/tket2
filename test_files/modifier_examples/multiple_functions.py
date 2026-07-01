@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#    "guppylang==1.0.0a7",
+#    "guppylang==1.0.0a8",
 # ]
 # ///
 """Testing a dagger modifier on multiple functions, to ensure that the dagger is
