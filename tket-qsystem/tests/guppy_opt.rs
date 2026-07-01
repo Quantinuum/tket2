@@ -114,14 +114,17 @@ fn optimize_flattened_guppy(#[case] name: &str, #[case] xfail: Option<Vec<(&str,
     // to get rid of other guppy artifacts.
     NormalizeGuppy::default().run(&mut hugr).unwrap();
     run_pytket(&mut hugr, CLIFFORD_SIMP_STR);
-    let should_xfail = xfail.is_some();
-    let expected_counts = match xfail {
-        Some(counts) => counts.into_iter().map(|(k, v)| (k.into(), v)).collect(),
-        None => count_gates(&load_guppy_circuit(name, HugrFileType::Optimized).unwrap()),
-    };
-    assert_eq!(count_gates(&hugr), expected_counts);
-    if should_xfail {
-        panic!("xfail");
+
+    let actual_counts = count_gates(&hugr);
+    let optimized_counts = count_gates(&load_guppy_circuit(name, HugrFileType::Optimized).unwrap());
+
+    if let Some(expected) = xfail {
+        assert_ne!(actual_counts, optimized_counts);
+        let expected = expected.into_iter().map(|(k, v)| (k.into(), v)).collect();
+        assert_eq!(actual_counts, expected);
+        panic!("xfail")
+    } else {
+        assert_eq!(actual_counts, optimized_counts);
     }
 }
 
