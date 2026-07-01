@@ -273,7 +273,6 @@ impl<N: HugrNode> ModifierResolver<N> {
     }
 
     pub(super) fn modify_indirect_call(
-        //NICOLA: a part of the input case should be fine
         &mut self,
         h: &mut impl HugrMut<Node = N>,
         n: N,
@@ -312,9 +311,8 @@ impl<N: HugrNode> ModifierResolver<N> {
                 self.add_node_no_modification(h, n, indir_call.clone(), new_dfg)?;
                 return Ok(());
             }
-            // NICOLA: NO QUANTUM FUNCTION AS INPUT?
-            // *self.modifiers_mut() = modifiers;
-            // return self.modify_input_indirect_call(n, chain_tail.1.index(), indir_call, new_dfg);
+            *self.modifiers_mut() = modifiers;
+            return self.modify_input_indirect_call(n, chain_tail.1.index(), indir_call, new_dfg);
         }
         // If the target is not a input, we expect it to be a LoadFunction node loading the function to call.
         let (func, load) =

@@ -3,8 +3,6 @@
 # dependencies = [
 #    "guppylang"
 # ]
-# [tool.uv.sources]
-# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", branch = "na/1325-inferflag"}
 # ///
 """Testing modifier on a loaded pytket circuit"""
 
