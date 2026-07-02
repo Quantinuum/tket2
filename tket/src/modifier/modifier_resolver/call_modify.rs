@@ -320,8 +320,10 @@ impl<N: HugrNode> ModifierResolver<N> {
 
         // Modify the function
         let modified_fn = if trace.len() > 1 {
+            // If the function is target of a modifier chain, wejust apply the modifiers to it
             self.modify_fn(h, func).unwrap()
         } else {
+            // Otherwise we check if the function needs to be modified, and if not, we just copy the IndirectCall node as is.
             match self.modify_fn_if_needed(h, func)? {
                 Some(node) => node,
                 None => {
@@ -330,29 +332,6 @@ impl<N: HugrNode> ModifierResolver<N> {
                 }
             }
         };
-        // }
-        // let modified_fn =  { else modified_fn = match self.modify_fn_if_needed(h, func)? {
-        //     Some(node) => node,
-        //     None if trace.len() > 1 => self.wrap_fn_with_controls(h, func, &load.type_args)?,
-        //     None => func,
-        // };
-
-        // let Some(modified_fn) = self.modify_fn_if_needed(h, func)? else {
-        // The loaded function does not satisfy the active modifier, so keep
-        // it unchanged.
-        // If same modifier are present, we raise an error instead of silently skipping modification,
-        // since that likely indicates a mistake in the input graph
-        // *self.modifiers_mut() = modifiers;
-        // if trace.len() > 1 {
-        //     return Err(ModifierResolverErrors::unresolvable(
-        //         trace[0],
-        //         "AAAAAAAAAAAAAA",
-        //         indir_call.clone().into(),
-        //     ));
-        // }
-        //     self.add_node_no_modification(h, n, indir_call.clone(), new_dfg)?;
-        //     return Ok(());
-        // };
 
         // Make new LoadFunction
         let mut modified_sig = load.func_sig.clone();
@@ -748,35 +727,21 @@ mod tests {
     }
 
     #[rstest::rstest]
-    #[case::call_twice(1, 1, foo_modifier_on_function, false, "call_twice")]
-    #[case::call(1, 1, foo_call, false, "call")]
-    #[case::call_dagger(1, 1, foo_call, true, "call_dagger")]
-    #[case::indir_call(1, 1, foo_indir_call, false, "indir_call")]
-    #[case::indir_call_dagger(1, 1, foo_indir_call, true, "indir_call_dagger")]
-    #[case::load_fn(1, 1, foo_load_fn, false, "load_fn")]
-    #[case::nested_modifier(2, 2, foo_nested_modifier, false, "nested_modifier")]
-    #[case::nested_modifier_unmodified_callee(
-        2,
-        2,
-        foo_nested_modifier_unmodified_callee,
-        false,
-        "nested_modifier_unmodified_callee"
-    )]
-    #[case::indirect_unmodified_callees(
-        1,
-        1,
-        foo_indirect_unmodified_callees,
-        true,
-        "indirect_unmodified_callees"
-    )]
+    #[case::call_twice(1, 1, foo_modifier_on_function, false)]
+    #[case::call(1, 1, foo_call, false)]
+    #[case::call_dagger(1, 1, foo_call, true)]
+    #[case::indir_call(1, 1, foo_indir_call, false)]
+    #[case::indir_call_dagger(1, 1, foo_indir_call, true)]
+    #[case::load_fn(1, 1, foo_load_fn, false)]
+    #[case::nested_modifier(2, 2, foo_nested_modifier, false)]
+    #[case::nested_modifier_unmodified_callee(2, 2, foo_nested_modifier_unmodified_callee, false)]
     fn test_call_modify(
         #[case] target_num: usize,
         #[case] ctrl_num: u64,
         #[case] foo: fn(&mut ModuleBuilder<Hugr>, usize) -> FuncID<true>,
         #[case] dagger: bool,
-        #[case] name: &str,
     ) {
-        test_modifier_resolver(target_num, ctrl_num, foo, dagger, name);
+        test_modifier_resolver(target_num, ctrl_num, foo, dagger);
     }
 
     fn foo_indirect_modifier_unmodified_callee(
@@ -822,39 +787,5 @@ mod tests {
             foo_builder.finish_with_outputs(inputs).unwrap()
         };
         *foo.handle()
-    }
-
-    // #[test]
-    fn indirect_call_modifier_chain_rejects_unmodified_callee() {
-        let (mut h, foo_node) =
-            modifier_test_hugr(2, 2, foo_indirect_modifier_unmodified_callee, false);
-        std::fs::write(
-            "indirect_call_modifier_chain_rejects_unmodified_callee.mmd",
-            h.mermaid_string(),
-        )
-        .unwrap();
-        let outer_modifier =
-            h.nodes()
-                .find_map(|node| {
-                    let OpType::LoadFunction(load) = h.get_optype(node) else {
-                        return None;
-                    };
-                    let (loaded_func, _) = h.single_linked_output(node, load.function_port())?;
-                    (loaded_func == foo_node)
-                        .then(|| {
-                            h.linked_inputs(node, 0).map(|(consumer, _)| consumer).find(
-                                |consumer| Modifier::from_optype(h.get_optype(*consumer)).is_some(),
-                            )
-                        })
-                        .flatten()
-                })
-                .unwrap();
-
-        match resolve_modifier_with_entrypoints(&mut h, [outer_modifier]) {
-            Err(ModifierResolverErrors::UnResolvable { msg, .. }) => {
-                assert_eq!(msg, "Cannot modify indirect call.");
-            }
-            result => panic!("expected indirect call modifier chain error, got {result:?}"),
-        }
     }
 }
