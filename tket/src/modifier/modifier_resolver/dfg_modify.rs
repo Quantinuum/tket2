@@ -13,9 +13,9 @@ use hugr::{
     core::HugrNode,
     extension::{prelude::qb_t, simple_op::MakeExtensionOp},
     hugr::hugrmut::HugrMut,
-    ops::{Conditional, DFG, DataflowBlock, DataflowOpTrait, OpType, TailLoop},
+    ops::{Call, Conditional, DFG, DataflowBlock, DataflowOpTrait, OpType, TailLoop},
     std_extensions::collections::array::ArrayOpBuilder,
-    types::{EdgeKind, FuncTypeBase, TypeRow},
+    types::{EdgeKind, FuncTypeBase, TypeArg, TypeRow},
 };
 use itertools::Itertools;
 use petgraph::visit::{Topo, Walker};
@@ -312,7 +312,7 @@ impl<N: HugrNode> ModifierResolver<N> {
     }
 
     /// Modifies a function if necessary.
-    /// When unitary flags satisfies the current modifier, the function needs to be modified.
+    /// When the function signature contains qubits, the function needs to be modified.
     /// If not, we don't know whether the function needs modification or not.
     /// e.g. A polymorphic function that converts array kinds needs no modification if
     /// it is instantiated with `array[int, n]`, but needs modification if instantiated with
@@ -327,18 +327,82 @@ impl<N: HugrNode> ModifierResolver<N> {
     //      if only dagger, just check signature
     //
     // Also, it may be better to check with the usage (how it is instantiated).
+
     pub(crate) fn modify_fn_if_needed(
         &mut self,
         h: &mut impl HugrMut<Node = N>,
         func: N,
     ) -> Result<Option<N>, ModifierResolverErrors<N>> {
-        let satisfies = ModifierFlags::from_metadata(h, func)
-            .is_some_and(|flags| flags.satisfies(&self.modifiers));
-
-        if !satisfies {
+        let OpType::FuncDefn(fn_defn) = h.get_optype(func) else {
+            return Err(ModifierResolverErrors::unreachable(format!(
+                "Cannot modify a non-function node. {}",
+                h.get_optype(func)
+            )));
+        };
+        if !self.signature_has_quantum_data(fn_defn.signature().body()) {
             return Ok(None);
         }
         Ok(Some(self.modify_fn(h, func)?))
+    }
+
+    pub(super) fn wrap_fn_with_controls(
+        &mut self,
+        h: &mut impl HugrMut<Node = N>,
+        func: N,
+        type_args: &[TypeArg],
+    ) -> Result<N, ModifierResolverErrors<N>> {
+        if self.control_num() == 0 {
+            return Ok(func);
+        }
+        let optype = h.get_optype(func);
+        let Some(fn_defn) = optype.as_func_defn() else {
+            return Err(ModifierResolverErrors::unreachable(format!(
+                "Cannot modify a non-function node. {}",
+                optype
+            )));
+        };
+
+        let mut poly_sig = fn_defn.signature().clone();
+        self.modify_signature(poly_sig.body_mut(), false);
+        let instantiate = poly_sig
+            .instantiate(type_args)
+            .map_err(|e| ModifierResolverErrors::BuildError(e.into()))?;
+
+        let offset = self.modifiers.accum_ctrl.len();
+
+        // make a wrapper function with a single Call node
+        let mut builder =
+            FunctionBuilder::new(format!("__modified__{}", fn_defn.func_name()), instantiate)?;
+        let [in_node, out_node] = builder.io();
+        let call = Call::try_new(poly_sig, type_args.to_owned())
+            .map_err(|e| ModifierResolverErrors::BuildError(e.into()))?;
+        let call_port = call.called_function_port();
+        let call_node = builder.add_child_node(call);
+
+        // connect wires:
+        // - first `offset` inputs are control arrays, passed through directly to output
+        // - remaining inputs are forwarded to the inner call
+        // - call outputs are forwarded to the remaining output ports
+        for i in 0..offset {
+            builder.hugr_mut().connect(in_node, i, out_node, i);
+        }
+        for i in 0..builder.hugr().num_inputs(call_node) {
+            builder
+                .hugr_mut()
+                .connect(in_node, i + offset, call_node, i);
+        }
+        for i in 0..builder.hugr().num_outputs(call_node) {
+            builder
+                .hugr_mut()
+                .connect(call_node, i, out_node, i + offset);
+        }
+
+        let insertion_result = h.insert_from_view(h.module_root(), builder.hugr());
+        let call_node = insertion_result.node_map[&call_node];
+        h.connect(func, 0, call_node, call_port);
+        let dummy_fn_node = insertion_result.inserted_entrypoint;
+
+        Ok(dummy_fn_node)
     }
 
     /// Generates a new function modified by the combined modifier.
@@ -1462,7 +1526,7 @@ mod test {
         #[case] foo: fn(&mut ModuleBuilder<Hugr>, usize) -> FuncID<true>,
         #[case] dagger: bool,
     ) {
-        test_modifier_resolver(t_num, c_num, foo, dagger);
+        test_modifier_resolver(t_num, c_num, foo, dagger, "dfg");
     }
 
     fn assert_unresolvable_message(
@@ -1510,7 +1574,7 @@ mod test {
 
     #[test]
     fn test_dagger_keeps_non_quantum_array_ops_unchanged() {
-        let h = resolved_modifier_test_hugr(1, 0, foo_non_quantum_array_ops, true);
+        let h = resolved_modifier_test_hugr(1, 0, foo_non_quantum_array_ops, true, "dfg");
 
         // If classical array ops were dagger-reversed, these direct
         // new_array -> unpack edges would disappear in the modified function.
@@ -1564,7 +1628,7 @@ mod test {
 
     #[test]
     fn test_dagger_keeps_nested_non_quantum_array_ops_unchanged() {
-        let h = resolved_modifier_test_hugr(1, 0, foo_nested_non_quantum_array_ops, true);
+        let h = resolved_modifier_test_hugr(1, 0, foo_nested_non_quantum_array_ops, true, "dfg");
         let inner_ty = array_type(2, usize_t());
 
         // Same check as above, but for nested classical array element types.
