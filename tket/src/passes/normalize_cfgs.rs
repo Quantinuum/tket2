@@ -520,20 +520,24 @@ fn unpack_before_output<H: HugrMut>(h: &mut H, output_node: H::Node, new_types: 
 
 #[cfg(test)]
 mod test {
+    use hugr::builder::Container;
+    use itertools::Itertools;
+    use rstest::rstest;
     use std::collections::HashSet;
     use std::sync::Arc;
 
-    use hugr_core::extension::simple_op::MakeExtensionOp;
-    use itertools::Itertools;
-    use rstest::rstest;
-
+    use hugr::extension::simple_op::MakeExtensionOp;
+    use hugr::extension::{ExtensionId, Version};
     use hugr_core::builder::{
         CFGBuilder, Dataflow, HugrBuilder, SubContainer, endo_sig, inout_sig,
     };
-    use hugr_core::extension::prelude::{ConstUsize, Noop, PRELUDE_ID, UnpackTuple, qb_t, usize_t};
+    use hugr_core::extension::prelude::{
+        ConstUsize, Noop, PRELUDE_ID, UnpackTuple, bool_t, qb_t, usize_t,
+    };
+    use hugr_core::ops::{ExtensionOp, OpName, constant::Value, handle::NodeHandle};
     use hugr_core::ops::{LoadConstant, OpTag, OpTrait, OpType, Tag};
-    use hugr_core::ops::{constant::Value, handle::NodeHandle};
-    use hugr_core::types::{Signature, Type, TypeRow};
+
+    use hugr_core::types::{PolyFuncTypeRV, Signature, Type, TypeBound, TypeRow};
     use hugr_core::{Extension, HugrView, const_extension_ids, type_row};
 
     use super::{NormalizeCFGPass, NormalizeCFGResult, merge_basic_blocks, normalize_cfg};
@@ -1015,5 +1019,92 @@ mod test {
                 op => format!("{:?}", op.tag()),
             })
             .collect()
+    }
+
+    #[test]
+    fn order_edges() {
+        // A local Extension with a result op
+        const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("test.result");
+
+        const RESULT_OP_ID: OpName = OpName::new_inline("result");
+
+        let e = Extension::new_arc(EXTENSION_ID, Version::new(0, 0, 0), |ext, extension_ref| {
+            let tv = Type::new_var_use(0, TypeBound::Linear);
+            let signature = PolyFuncTypeRV::new(
+                [TypeBound::Linear.into()],
+                Signature::new(vec![tv], type_row![]),
+            );
+            ext.add_op(
+                RESULT_OP_ID,
+                "Record a value with type provided as a type argument".into(),
+                signature,
+                extension_ref,
+            )
+            .unwrap();
+        });
+
+        let result_opdef = e.get_op(&RESULT_OP_ID).unwrap();
+
+        let mut h = CFGBuilder::new(inout_sig([usize_t(), bool_t()], [])).unwrap();
+        let res1_op: OpType = ExtensionOp::new(result_opdef.clone(), &[usize_t().into()])
+            .unwrap()
+            .into();
+        let res2_op: OpType = ExtensionOp::new(result_opdef.clone(), &[bool_t().into()])
+            .unwrap()
+            .into();
+        let [(bb1, res1), (bb2, res2)] = [
+            (None, &res1_op, vec![bool_t()]),
+            (Some([bool_t()]), &res2_op, vec![]),
+        ]
+        .map(|(input_tys, res_op, output_tys)| {
+            let mut bb = match input_tys {
+                Some(input_tys) => h
+                    .simple_block_builder(inout_sig(input_tys, output_tys), 1)
+                    .unwrap(),
+                None => h.simple_entry_builder(output_tys.into(), 1).unwrap(),
+            };
+            let mut input_wires = bb.input_wires();
+            let res = bb
+                .add_dataflow_op(res_op.clone(), [input_wires.next().unwrap()])
+                .unwrap()
+                .node();
+            let pred = bb.add_load_value(Value::unary_unit_sum());
+            bb.add_other_wire(bb.input().node(), res);
+            bb.add_other_wire(res, bb.output().node());
+            (bb.finish_with_outputs(pred, input_wires).unwrap(), res)
+        });
+        let exit_bb = h.exit_block();
+        h.branch(&bb1, 0, &bb2).unwrap();
+        h.branch(&bb2, 0, &exit_bb).unwrap();
+        let mut h = h.finish_hugr().unwrap();
+        merge_basic_blocks(&mut h).unwrap();
+        h.validate().unwrap();
+        assert_eq!(h.get_optype(res1), &res1_op);
+        assert_eq!(h.get_optype(res2), &res2_op);
+        //assert_eq!(h.get_parent(res1.node()), Some(h.entrypoint()));
+        let [(inp, _)] = h
+            .linked_outputs(res1, res1_op.other_input_port().unwrap())
+            .collect_array()
+            .unwrap();
+        let [(outp, _)] = h
+            .linked_inputs(res2, res2_op.other_output_port().unwrap())
+            .collect_array()
+            .unwrap();
+        assert_eq!(h.get_io(h.get_parent(res1).unwrap()), Some([inp, outp]));
+
+        let res1_out = res1_op.other_output_port().unwrap();
+        let res2_in = res2_op.other_input_port().unwrap();
+        let inp_out = h.get_optype(inp).other_output_port().unwrap();
+        let outp_in = h.get_optype(outp).other_input_port().unwrap();
+        // Extra order edges Input->res2 and res1->Output are harmless
+        // and would be removed by RendundantOrderEdgesPass, but we haven't run that
+        assert_eq!(
+            h.linked_inputs(res1, res1_out).collect_vec(),
+            vec![(res2, res2_in), (outp, outp_in)]
+        );
+        assert_eq!(
+            h.linked_outputs(res2, res2_in).collect_vec(),
+            vec![(res1, res1_out), (inp, inp_out)]
+        );
     }
 }
