@@ -13,9 +13,9 @@ use hugr::{
     core::HugrNode,
     extension::{prelude::qb_t, simple_op::MakeExtensionOp},
     hugr::hugrmut::HugrMut,
-    ops::{Call, Conditional, DFG, DataflowBlock, DataflowOpTrait, OpType, TailLoop},
+    ops::{Conditional, DFG, DataflowBlock, DataflowOpTrait, OpType, TailLoop},
     std_extensions::collections::array::ArrayOpBuilder,
-    types::{EdgeKind, FuncTypeBase, TypeArg, TypeRow},
+    types::{EdgeKind, FuncTypeBase, TypeRow},
 };
 use itertools::Itertools;
 use petgraph::visit::{Topo, Walker};
