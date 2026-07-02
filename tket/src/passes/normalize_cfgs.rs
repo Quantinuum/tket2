@@ -1077,11 +1077,12 @@ mod test {
         h.branch(&bb1, 0, &bb2).unwrap();
         h.branch(&bb2, 0, &exit_bb).unwrap();
         let mut h = h.finish_hugr().unwrap();
-        merge_basic_blocks(&mut h).unwrap();
+        NormalizeCFGPass::default().run(&mut h).unwrap();
         h.validate().unwrap();
         assert_eq!(h.get_optype(res1), &res1_op);
         assert_eq!(h.get_optype(res2), &res2_op);
-        //assert_eq!(h.get_parent(res1.node()), Some(h.entrypoint()));
+        assert_eq!(h.get_parent(res1.node()), Some(h.entrypoint()));
+        assert!(h.entrypoint_optype().is_dfg());
         let [(inp, _)] = h
             .linked_outputs(res1, res1_op.other_input_port().unwrap())
             .collect_array()
