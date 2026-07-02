@@ -1023,6 +1023,9 @@ mod test {
 
     #[test]
     fn order_edges() {
+        // BB1 -> BB2 -> Exit    =>   DFG
+        // ...where each BB has an Input->result->Output chain of order edges
+
         // A local Extension with a result op
         const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("test.result");
 
@@ -1077,8 +1080,10 @@ mod test {
         h.branch(&bb1, 0, &bb2).unwrap();
         h.branch(&bb2, 0, &exit_bb).unwrap();
         let mut h = h.finish_hugr().unwrap();
+
         NormalizeCFGPass::default().run(&mut h).unwrap();
         h.validate().unwrap();
+        // We should have Input -> result1 -> result2 -> Output with Order edges
         assert_eq!(h.get_optype(res1), &res1_op);
         assert_eq!(h.get_optype(res2), &res2_op);
         assert_eq!(h.get_parent(res1.node()), Some(h.entrypoint()));
@@ -1098,7 +1103,7 @@ mod test {
         let inp_out = h.get_optype(inp).other_output_port().unwrap();
         let outp_in = h.get_optype(outp).other_input_port().unwrap();
         // Extra order edges Input->res2 and res1->Output are harmless
-        // and would be removed by RendundantOrderEdgesPass, but we haven't run that
+        // and would be removed by RedundantOrderEdgesPass, but we haven't run that
         assert_eq!(
             h.linked_inputs(res1, res1_out).collect_vec(),
             vec![(res2, res2_in), (outp, outp_in)]
