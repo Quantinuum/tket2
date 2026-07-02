@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pathlib import Path
 
 from .optimiser import BadgerOptimiser
@@ -81,6 +83,7 @@ def tket1_pass(
     pass_json: str,
     *,
     scope: PassScope | None = None,
+    target: Literal["tket", "sol", "helios"] | None = None,
 ) -> None:
     """Runs a pytket pass on all circuit-like regions under the entrypoint of the
     HUGR.
@@ -92,6 +95,9 @@ def tket1_pass(
     - traverse_subcircuits: Whether to recurse into the children of the
       circuit-like regions, and optimise them too.
       nested inside other subregions of the circuit.
+    - target: The platform target identifier selecting which encoder/decoder
+      extension set to use. One of ``"tket"``, ``"sol"``, or ``"helios"``.
+      Defaults to the platform-agnostic ``"tket"`` target.
     """
 
 def resolve_modifiers(
