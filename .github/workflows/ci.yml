@@ -91,9 +91,9 @@ jobs:
       - name: Type check with mypy
         run: uv run mypy .
       - name: Check formatting with ruff
-        run: uv run --no-project ruff format --check
+        run: uv run ruff format --check
       - name: Lint with ruff
-        run: uv run --no-project ruff check
+        run: uv run ruff check
 
   benches:
     name: Continuous benchmarking 🏋️
@@ -307,7 +307,7 @@ jobs:
         # avoid building qis-compiler
         run: uv sync --package=tket --exact --all-extras --python ${{ env.PYTHON_LOWEST }}
       - name: Run python tests with coverage instrumentation
-        run: uv run --no-project pytest --cov=./ --cov-report=xml ${{ env.PKGS }}
+        run: uv run pytest --cov=./ --cov-report=xml ${{ env.PKGS }}
       - name: Upload python coverage to codecov.io
         if: github.event_name != 'merge_group'
         uses: codecov/codecov-action@v7
