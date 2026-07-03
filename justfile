@@ -104,9 +104,9 @@ recompile-modifiers:
 # Regenerates one the hugr corresponding to `test_files/modifier_examples/{{name}}` and run the passes on it
 recompile-modifier name:
     @echo "---- Compiling hugr {{name}} ----"
-    # uv run maturin develop --uv
+    uv run maturin develop --uv
     just test_files/modifier_examples/rh "{{name}}.py"
-    # just test_files/run_modifier_examples/rh "{{name}}"
+    just test_files/run_modifier_examples/rh "{{name}}"
 
 
 # Generate serialized declarations for the tket extensions
