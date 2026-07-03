@@ -354,58 +354,16 @@ def test_normalize_guppy_on_modifier() -> None:
 
     This won't actually do anything useful, we just want to check that the pass
     runs without errors."""
-    from hugr.hugr.render import RenderConfig
-
-    normalize = NormalizeGuppy(
-        remove_tuple_untuple=False,
-        remove_dead_funcs=False,
-        remove_redundant_order_edges=False,
-        squash_borrows=False,
-        inline_funcs=False,
-        resolve_modifiers=False,
-        # Causes errors in the notebook examples;
-        # Emulation succeeds but shots lose expected result entries
-        # (`eigenvalue` / `attempts`), producing `KeyError` in the
-        # plotting cells.
-        simplify_cfgs=True,
-        # fails `test_arithmetic.py::test_float_to_int`
-        # Selene reports package validation error:
-        # `Node(...) has an unconnected port Port(Outgoing, 0)`
-        constant_folding=False,
-        # when combined with `inline_funcs=True` fails
-        # `test_qsystem_sol_functional`: tket/portgraph panic
-        # with `Outgoing port count exceeds maximum`
-        inline_dfgs=False,
-    )
-    for hugr_path in ["test_files/modifier_examples/classical_function.hugr"]:
-        # try:
-        print(hugr_path)
-
-        hugr = _hugr_from_path(str(hugr_path))
-        hugr.render_dot(
-            RenderConfig(max_node_label_length=None, display_node_id=True)
-        ).view("before", quiet=True)
-        normalized = normalize(hugr)
-        normalized.render_dot(
-            RenderConfig(max_node_label_length=None, display_node_id=True)
-        ).view("normalized", quiet=True)
-        CompilationState.from_python(normalized).validate()
-        print("1")
-        mr_pass = ModifierResolverPass()
-        mr_pass(normalized)
-        hhh = CompilationState.from_python(normalized)
-        # Path(f"{hugr_path.stem}.mmd").write_text(hhh.render_mermaid())
-        # normalized.render_dot(
-        #     RenderConfig(max_node_label_length=None, display_node_id=True)
-        # ).view("cccccc")
-        # hhh.validate()
-        # except Exception as exc:
-        #     print(f"Testing NormalizeGuppy on {hugr_path}")
-        #     normalized.render_dot(RenderConfig(max_node_label_length=None,display_node_id=True))
-        #     raise AssertionError(f"NormalizeGuppy failed for {hugr_path}") from exc
-        # assert not _contains_modifiers(normalized), (
-        #     f"NormalizeGuppy left modifiers in {hugr_path}"
-        # )
+    normalize = NormalizeGuppy()
+    for hugr_path in sorted(Path("test_files/modifier_examples").glob("*.hugr")):
+        try:
+            normalized = normalize(_hugr_from_path(str(hugr_path)))
+            CompilationState.from_python(normalized).validate()
+        except Exception as exc:
+            raise AssertionError(f"NormalizeGuppy failed for {hugr_path}") from exc
+        assert not _contains_modifiers(normalized), (
+            f"NormalizeGuppy left modifiers in {hugr_path}"
+        )
 
 
 def test_inline_functions() -> None:

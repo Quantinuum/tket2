@@ -1736,9 +1736,6 @@ pub fn resolve_modifier_with_entrypoints_and_scope(
     // replacements, and only when no remaining non-obsolete function uses them.
     remove_unused_modified_functions(h, &resolver.modified_functions, scope);
 
-    std::fs::write("modifier_resolver.mmd", h.mermaid_string()).map_err(|e| {
-        ModifierResolverErrors::unreachable(format!("Failed to write mermaid: {e}"))
-    })?;
     h.validate()
         .map_err(|e| ModifierResolverErrors::BuildError(e.into()))?;
 
