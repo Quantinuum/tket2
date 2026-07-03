@@ -89,6 +89,9 @@ fn main() {
     } else if target.is_some_and(|t| t == SupportedPlatform::WindowsX86) {
         // On Windows with MSVC, don't link stdc++ - MSVC runtime is used by default
         // The tket-c-api library should already be linked against the correct runtime
+    } else if target.is_some_and(|t| t == SupportedPlatform::Emscripten) {
+        // On Emscripten the `em++` linker driver provides its own libc++
+        // automatically, so we must not request a system `stdc++`.
     } else {
         println!("cargo:rustc-link-lib=stdc++");
     }
@@ -122,6 +125,9 @@ enum SupportedPlatform {
     LinuxI686Gnu,
     LinuxI686Musl,
     LinuxX86_64Musl,
+    // WebAssembly / Emscripten (built from source in hugrverse-env, consumed
+    // via TKET_C_API_PATH; no pre-built conan binaries).
+    Emscripten,
 }
 
 impl SupportedPlatform {
@@ -135,6 +141,8 @@ impl SupportedPlatform {
             "i686-unknown-linux-gnu" => Some(SupportedPlatform::LinuxI686Gnu),
             "i686-unknown-linux-musl" => Some(SupportedPlatform::LinuxI686Musl),
             "x86_64-unknown-linux-musl" => Some(SupportedPlatform::LinuxX86_64Musl),
+            // WebAssembly / Emscripten target.
+            t if t.contains("emscripten") => Some(SupportedPlatform::Emscripten),
             // Fallback patterns for platforms with pre-built binaries
             t if t.contains("apple") && t.contains("x86") => Some(SupportedPlatform::MacOsX86),
             t if t.contains("apple") && t.contains("aarch64") => Some(SupportedPlatform::MacOsArm),
@@ -171,6 +179,9 @@ impl SupportedPlatform {
             SupportedPlatform::LinuxI686Gnu => "linux-i686-gcc14",
             SupportedPlatform::LinuxI686Musl => "linux-i686-gcc14",
             SupportedPlatform::LinuxX86_64Musl => "linux-x86_64-gcc14",
+            // Emscripten is always consumed via `TKET_C_API_PATH` (built in
+            // hugrverse-env), so this conan profile is never actually used.
+            SupportedPlatform::Emscripten => "default",
         }
     }
 
