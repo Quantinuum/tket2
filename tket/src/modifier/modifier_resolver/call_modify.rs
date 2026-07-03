@@ -455,15 +455,15 @@ impl<N: HugrNode> ModifierResolver<N> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::tests::{SetUnitary, modifier_test_hugr, test_modifier_resolver};
+    use super::super::tests::{SetUnitary, test_modifier_resolver};
     use super::super::*;
     use crate::TketOp;
-    use crate::extension::modifier::{CONTROL_OP_ID, MODIFIER_EXTENSION, Modifier};
+    use crate::extension::modifier::{CONTROL_OP_ID, MODIFIER_EXTENSION};
     use hugr::{
         Hugr,
         builder::{Dataflow, DataflowSubContainer, ModuleBuilder},
         extension::prelude::qb_t,
-        ops::{CallIndirect, ExtensionOp, OpType, handle::FuncID},
+        ops::{CallIndirect, ExtensionOp, handle::FuncID},
         std_extensions::arithmetic::{
             int_ops::IntOpDef,
             int_types::{ConstInt, INT_TYPES},
