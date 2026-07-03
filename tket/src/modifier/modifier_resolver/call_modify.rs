@@ -667,6 +667,7 @@ mod tests {
         *foo.handle()
     }
 
+    /// Test quantum and classical indirect calls in modifier context
     fn foo_indirect_unmodified_callees(
         module: &mut ModuleBuilder<Hugr>,
         t_num: usize,
@@ -735,6 +736,7 @@ mod tests {
     #[case::load_fn(1, 1, foo_load_fn, false)]
     #[case::nested_modifier(2, 2, foo_nested_modifier, false)]
     #[case::nested_modifier_unmodified_callee(2, 2, foo_nested_modifier_unmodified_callee, false)]
+    #[case::indirect_unmodified_callees(1, 1, foo_indirect_unmodified_callees, true)]
     fn test_call_modify(
         #[case] target_num: usize,
         #[case] ctrl_num: u64,
@@ -742,50 +744,5 @@ mod tests {
         #[case] dagger: bool,
     ) {
         test_modifier_resolver(target_num, ctrl_num, foo, dagger);
-    }
-
-    fn foo_indirect_modifier_unmodified_callee(
-        module: &mut ModuleBuilder<Hugr>,
-        t_num: usize,
-    ) -> FuncID<true> {
-        let bar_sig = Signature::new_endo(vec![qb_t()]);
-        let bar = {
-            let bar_builder = module.define_function("bar", bar_sig).unwrap();
-            let inputs: Vec<Wire> = bar_builder.input_wires().collect();
-            bar_builder.finish_with_outputs(inputs).unwrap()
-        };
-
-        let controlled_sig = Signature::new_endo(vec![array_type(1, qb_t()), qb_t()]);
-        let foo_sig = Signature::new_endo(iter::repeat_n(qb_t(), t_num).collect::<Vec<_>>());
-        let foo = {
-            let mut foo_builder = module.define_function("foo", foo_sig).unwrap();
-            foo_builder.set_unitary();
-            let mut inputs: Vec<Wire> = foo_builder.input_wires().collect();
-            let load = foo_builder.load_func(bar.handle(), &[]).unwrap();
-
-            let control_op: ExtensionOp = MODIFIER_EXTENSION
-                .instantiate_extension_op(
-                    &CONTROL_OP_ID,
-                    [Term::BoundedNat(1), [qb_t().into()].into(), [].into()],
-                )
-                .unwrap();
-            let controlled = foo_builder
-                .add_dataflow_op(control_op, vec![load])
-                .unwrap()
-                .out_wire(0);
-            let mut ctrl = foo_builder.add_new_array(qb_t(), [inputs[0]]).unwrap();
-            [ctrl, inputs[1]] = foo_builder
-                .add_dataflow_op(
-                    CallIndirect {
-                        signature: controlled_sig,
-                    },
-                    [controlled, ctrl, inputs[1]],
-                )
-                .unwrap()
-                .outputs_arr();
-            inputs[0] = foo_builder.add_array_unpack(qb_t(), 1, ctrl).unwrap()[0];
-            foo_builder.finish_with_outputs(inputs).unwrap()
-        };
-        *foo.handle()
     }
 }
