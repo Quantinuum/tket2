@@ -447,21 +447,49 @@ impl<N: HugrNode> ModifierResolver<N> {
         Ok(insertion_result.inserted_entrypoint)
     }
 
+    /// Copies a sub-container into the parent DFG without modification, preserving non-local function call edges.
     fn copy_sub_container_no_modification(
         &mut self,
         h: &impl HugrView<Node = N>,
         n: N,
-        new_dfg: &mut impl Container,
+        dfg: &mut impl Container,
     ) -> Result<Node, ModifierResolverErrors<N>> {
-        // Some containers have qubits in their signature but only pass them
-        // through while doing classical work. Copying the whole subtree keeps
-        // those classical dependencies intact instead of trying to dagger the
-        // boundary one port at a time.
-        let insertion_result = new_dfg.add_hugr_view(&h.with_entrypoint(n));
+        let nodes = h
+            .descendants(n)
+            .chain(iter::once(n))
+            .collect::<HashSet<_>>();
+
+        let static_edges = nodes
+            .iter()
+            .flat_map(|node| {
+                h.node_inputs(*node)
+                    .filter(|port| {
+                        matches!(
+                            h.get_optype(*node).port_kind(*port),
+                            Some(EdgeKind::Function(_))
+                        )
+                    })
+                    .filter_map(|port| {
+                        h.single_linked_output(*node, port)
+                            .filter(|(source, _)| h.get_parent(*node) != h.get_parent(*source))
+                            .map(|(source, _)| (source, *node, port))
+                    })
+            })
+            .collect::<Vec<_>>();
+
+        let insertion_result = dfg.add_hugr_view(&h.with_entrypoint(n));
 
         let new_node = insertion_result.inserted_entrypoint;
         for port in h.all_node_ports(n) {
             self.map_insert(DirWire(n, port), DirWire(new_node, port))?;
+        }
+        for (source, old_target, target_port) in static_edges {
+            let Some(new_target) = insertion_result.node_map.get(&old_target).copied() else {
+                return Err(ModifierResolverErrors::unreachable(format!(
+                    "Copied subtree is missing static-edge target {old_target}."
+                )));
+            };
+            self.call_map_insert(source, (new_target, target_port));
         }
 
         Ok(new_node)

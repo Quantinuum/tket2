@@ -281,7 +281,6 @@ impl<N: HugrNode> ModifierResolver<N> {
     ) -> Result<(), ModifierResolverErrors<N>> {
         // Wrap ModifierError as UnResolvable, using the ModifierError node as the error
         // location and the IndirectCall OpType for context.
-        println!("§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§\n\n\n");
         let wrap_modifier_err = |e: ModifierError<N>| {
             ModifierResolverErrors::unresolvable(
                 e.node(),
