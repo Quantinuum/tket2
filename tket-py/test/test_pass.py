@@ -381,16 +381,15 @@ def test_normalize_guppy_on_modifier() -> None:
         # try:
         print(hugr_path)
 
-        hugr = _hugr_from_path(str(hugr_path))
-        hugr.render_dot(
-            RenderConfig(max_node_label_length=None, display_node_id=True)
-        ).view("before", quiet=True)
-        normalized = normalize(hugr)
+        normalized = _hugr_from_path(str(hugr_path))
+        # hugr.render_dot(
+        #     RenderConfig(max_node_label_length=None, display_node_id=True)
+        # ).view("before", quiet=True)
+        # normalized = normalize(hugr)
         normalized.render_dot(
             RenderConfig(max_node_label_length=None, display_node_id=True)
         ).view("normalized", quiet=True)
         CompilationState.from_python(normalized).validate()
-        print("1")
         mr_pass = ModifierResolverPass()
         mr_pass(normalized)
         hhh = CompilationState.from_python(normalized)

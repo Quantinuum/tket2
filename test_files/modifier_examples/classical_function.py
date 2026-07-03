@@ -82,4 +82,28 @@ def main() -> None:
 
 
 program = main.compile()
+from tket.passes import NormalizeGuppy
+
+normalize = NormalizeGuppy(
+    remove_tuple_untuple=False,
+    remove_dead_funcs=False,
+    remove_redundant_order_edges=False,
+    squash_borrows=False,
+    inline_funcs=False,
+    resolve_modifiers=False,
+    # Causes errors in the notebook examples;
+    # Emulation succeeds but shots lose expected result entries
+    # (`eigenvalue` / `attempts`), producing `KeyError` in the
+    # plotting cells.
+    simplify_cfgs=True,
+    # fails `test_arithmetic.py::test_float_to_int`
+    # Selene reports package validation error:
+    # `Node(...) has an unconnected port Port(Outgoing, 0)`
+    constant_folding=False,
+    # when combined with `inline_funcs=True` fails
+    # `test_qsystem_sol_functional`: tket/portgraph panic
+    # with `Outgoing port count exceeds maximum`
+    inline_dfgs=False,
+)
+program = normalize(program.modules[0])
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
