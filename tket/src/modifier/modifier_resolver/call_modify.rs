@@ -321,7 +321,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         // Modify the function
         let modified_fn = if trace.len() > 1 {
             // If the function is target of a modifier chain, we must apply the modifiers to it
-            self.modify_fn(h, func).unwrap()
+            self.modify_fn(h, func).map_err(wrap_resolver_err)?
         } else {
             // Otherwise we check if the function needs to be modified, and if not, we just copy the IndirectCall node as is.
             match self.modify_fn_if_needed(h, func)? {
