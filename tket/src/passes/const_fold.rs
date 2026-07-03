@@ -142,7 +142,14 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
         assert_eq!(root_descs.next(), Some(root), "Could not skip root");
         let wires_to_break = root_descs
             .filter(|n| !hugr.get_optype(*n).is_load_constant()) // no point in adding another Const!
-            .flat_map(|n| hugr.out_value_types(n).map(move |(outp, _ty)| (n, outp)))
+            .flat_map(|n| {
+                hugr.out_value_types(n)
+                    // Do not consider breaking wires from outports of linear type.
+                    // (We would need to remove the outport, or make a Sum type linear by removing unused variants;
+                    // although it would be ok to disconnect if the source node could be removed,
+                    // but that depends on reachability forwards and backwards, not done here.)
+                    .flat_map(move |(outp, ty)| ty.copyable().then_some((n, outp)))
+            })
             .filter_map(|(src, outp)| {
                 hugr.linked_inputs(src, outp).next()?; // Skip unconnected outputs
                 Some((
