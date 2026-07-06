@@ -4,9 +4,25 @@ members = [
     "pg-core",
     ]
 
+[workspace.package]
+rust-version = "1.91"
+edition = "2024"
+homepage = "https://github.com/quantinuum/tket2"
+repository = "https://github.com/quantinuum/tket2"
+license = "Apache-2.0"
+
 [profile.test]
 opt-level = 1
 
+[workspace.lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [
+    # Set by our CI
+    'cfg(ci_run)',
+    # Set by codecov
+    'cfg(coverage,coverage_nightly)',
+] }
+missing_docs = "warn"
+
 [workspace.lints.clippy]
-type_complexity = "allow"
-too_many_arguments = "allow"
+allow_attributes = "warn"
+iter_over_hash_type = "warn"
