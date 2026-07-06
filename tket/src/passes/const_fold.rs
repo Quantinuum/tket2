@@ -147,7 +147,7 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
                     // Do not consider breaking wires from outports of linear type.
                     // Overly conservative: see https://github.com/Quantinuum/tket2/issues/1794,
                     // https://github.com/Quantinuum/tket2/issues/1795,
-                    // https://github.com/Quantinuum/hugr/issues/2245
+                    // https://github.com/Quantinuum/tket2/issues/1796
                     .flat_map(move |(outp, ty)| ty.copyable().then_some((n, outp)))
             })
             .filter_map(|(src, outp)| {
