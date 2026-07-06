@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 from functools import cache
 import json
 from pathlib import Path
@@ -28,6 +29,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "PytketHugrPass",
+    "PlatformTarget",
     "PassResult",
     "InlineFuncsHeuristic",
     "InlineFunctions",
@@ -39,20 +41,69 @@ __all__ = [
 ]
 
 
+class PlatformTarget(Enum):
+    """A hardware platform that passes can target.
+
+    Passes use this to decide which platform-specific gate sets and extensions
+    to produce or accept. See the individual passes (e.g.
+    :py:class:`PytketHugrPass`) for the behaviour associated with each target.
+    """
+
+    Tket = "tket"  # Platform-agnostic target using only the base `tket` extensions.
+    Sol = "sol"  # Quantinuum Sol platform (base tket + Sol operations).
+    Helios = "helios"  # Quantinuum Helios platform (base tket + Helios operations).
+
+
 @dataclass
 class PytketHugrPass(ComposablePass):
     pytket_passes: list[PytketPass]
+    target: PlatformTarget = PlatformTarget.Tket
     _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
 
     """
     A class which provides an interface to apply pytket passes to Hugr programs.
 
-    The user can create a :py:class:`PytketHugrPass` object from any serializable member of `pytket.passes`.
+    The user can create a :py:class:`PytketHugrPass` object from any
+    serializable member of `pytket.passes`.
+
+    The ``target`` selects which set of encoder/decoder extensions is used when
+    translating between HUGRs and pytket circuits, controlling which operations
+    get encoded as pytket commands and which pytket commands get decoded back
+    into HUGR operations:
+
+    - :py:attr:`PlatformTarget.Tket` (default):
+        Only base ``tket`` operations are encoded.
+        When decoding, pytket commands are translated into base ``tket.quantum``
+        operations, falling back to Helios qsystem operations for
+        commands without a base counterpart (e.g. ``ZZPhase``).
+    - :py:attr:`PlatformTarget.Sol`:
+        Base ``tket`` and native Sol operations are encoded.
+        When decoding, commands are translated into native Sol qsystem operations
+        where possible, falling back to base ``tket.quantum`` operations.
+    - :py:attr:`PlatformTarget.Helios`:
+        Base ``tket`` and native Helios operations are encoded.
+        When decoding, commands are translated into native Helios qsystem operations
+        where possible, falling back to base ``tket.quantum`` operations.
+
+    Operations without a valid encoder are kept as-is on a pytket roundtrip.
+    Pytket commands without a valid decoder produce an unsupported
+    ``TKET1.tk1op`` operation in the decoded HUGR.
+
+    Parameters:
+    - pytket_passes: The pytket passes to run.
+    - target: The platform target selecting which encoder/decoder extension set
+      to use when translating between HUGRs and pytket circuits. Defaults to the
+      platform-agnostic :py:attr:`PlatformTarget.Tket`.
     """
 
-    def __init__(self, *pytket_passes: PytketPass) -> None:
+    def __init__(
+        self,
+        *pytket_passes: PytketPass,
+        target: PlatformTarget = PlatformTarget.Tket,
+    ) -> None:
         """Initialize a PytketHugrPass from a :py:class:`~pytket.passes.BasePass` instance."""
         self.pytket_passes = list(pytket_passes)
+        self.target = target
 
     def with_scope(self, scope: PassScope) -> PytketHugrPass:
         """Set the scope configuration for the composed pass."""
@@ -70,10 +121,11 @@ class PytketHugrPass(ComposablePass):
 
     def then(self, other: ComposablePass) -> ComposablePass:
         """Perform another composable pass after this pass."""
-        if isinstance(other, PytketHugrPass):
-            return PytketHugrPass(*self.pytket_passes, *other.pytket_passes).with_scope(
-                self._scope
+        if isinstance(other, PytketHugrPass) and self.target == other.target:
+            combined = PytketHugrPass(
+                *self.pytket_passes, *other.pytket_passes, target=self.target
             )
+            return combined.with_scope(self._scope)
         else:
             return ComposedPass(self, other)
 
@@ -81,7 +133,12 @@ class PytketHugrPass(ComposablePass):
         tk_program = _state.CompilationState.from_python(hugr)
         for py_pass in self.pytket_passes:
             pass_json = json.dumps(py_pass.to_dict())
-            _passes.tket1_pass(tk_program._inner, pass_json, scope=self._scope)
+            _passes.tket1_pass(
+                tk_program._inner,
+                pass_json,
+                scope=self._scope,
+                target=self.target.value,
+            )
 
         package = tk_program.to_python()
         new_hugr = package.modules[0]

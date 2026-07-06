@@ -4,7 +4,7 @@
 #    "guppylang==1.0.0a8",
 # ]
 # ///
-"""Multiple modifiers nested"""
+"""Testing multiple modifiers nested and assigment in control and dagger context."""
 
 from pathlib import Path
 from sys import argv
@@ -28,12 +28,13 @@ def main() -> None:
     h(c3)
     x(t)
     with control(c1, c2):
-        f = 1 / 3
+        f = 1 / 6
         with dagger:
             a = angle(-f)
             with control(c3):
                 x(t)
                 rz(t, a)
+                rz(t, angle(-1 / 6))
                 h(t)
 
     state_result("r", c1, c2, c3, t)

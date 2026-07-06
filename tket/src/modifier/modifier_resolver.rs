@@ -2414,6 +2414,7 @@ mod tests {
     #[case::double_modifier("../test_files/modifier_examples/double_modifier.hugr")]
     #[case::even_dagger("../test_files/modifier_examples/even_dagger.hugr")]
     #[case::higher_order_recursive("../test_files/modifier_examples/higher_order_recursive.hugr")]
+    #[case::loaded_pytket("../test_files/modifier_examples/loaded_pytket.hugr")]
     #[case::multiple_functions("../test_files/modifier_examples/multiple_functions.hugr")]
     #[case::nested_multiple("../test_files/modifier_examples/nested_multiple.hugr")]
     #[case::simple_higher_order("../test_files/modifier_examples/simple_higher_order.hugr")]

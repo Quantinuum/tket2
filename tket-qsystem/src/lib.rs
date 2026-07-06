@@ -10,6 +10,7 @@ pub mod llvm;
 pub mod lower_drops;
 pub mod passes;
 pub mod pytket;
+mod target;
 
 pub use extension::qsystem::QSystemPlatform;
 pub use passes::{
@@ -17,6 +18,7 @@ pub use passes::{
 };
 #[expect(deprecated)]
 pub use passes::{QSystemPass, QSystemPassError};
+pub use target::PlatformTarget;
 
 #[cfg(test)]
 mod test {
