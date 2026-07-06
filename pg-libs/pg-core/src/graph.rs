@@ -367,7 +367,7 @@ fn try_validate_op(op: &Op, pg_nqubits: usize) -> Result<(), PauliGraphError> {
                 if data.get_args().is_empty() {
                     return Err(PauliGraphError::InvalidOp {
                         op: op.clone(),
-                        message: "BlackBox gate cannot have empty arguments.".to_string(),
+                        message: "BlackBox gate cannot have empty arguments.".into(),
                     });
                 }
                 if !data.get_conditional_bits().is_empty()
@@ -375,13 +375,13 @@ fn try_validate_op(op: &Op, pg_nqubits: usize) -> Result<(), PauliGraphError> {
                 {
                     return Err(PauliGraphError::InvalidOp {
                         op: op.clone(),
-                        message: "BlackBox gates cannot have conditions.".to_string(),
+                        message: "BlackBox gates cannot have conditions.".into(),
                     });
                 }
                 if data.get_data().is_none() {
                     return Err(PauliGraphError::InvalidOp {
                         op: op.clone(),
-                        message: "BlackBox gate is missing payload data.".to_string(),
+                        message: "BlackBox gate is missing payload data.".into(),
                     });
                 }
             }
@@ -412,7 +412,7 @@ fn try_validate_op(op: &Op, pg_nqubits: usize) -> Result<(), PauliGraphError> {
                 return Err(PauliGraphError::InvalidOp {
                     op: op.clone(),
                     message: "ConditionalBox must have non-empty conditional bits and values."
-                        .to_string(),
+                        .into(),
                 });
             }
             for inner_op in data.get_ops() {

@@ -1,12 +1,18 @@
 use crate::Op;
+
+/// Error type for PauliGraph operations and input validation.
 #[derive(Debug, thiserror::Error)]
 pub enum PauliGraphError {
+    /// Invalid operation within a PauliGraph.
     #[error("Invalid PauliGraph Op: {op:?}, {message}")]
-    InvalidOp { op: Op, message: String },
+    InvalidOp {
+        /// The invalid operation.
+        op: Op,
+        /// The error message.
+        message: String,
+    },
 
-    #[error("Invalid input JSON: {message}")]
-    InvalidInputJson { message: String },
-    // Everything else: "invalid input, here's why"
-    #[error("{message}")]
-    Invalid { message: String },
+    /// Invalid input JSON during deserialization.
+    #[error("Invalid input JSON: {0}")]
+    InvalidInputJson(String),
 }

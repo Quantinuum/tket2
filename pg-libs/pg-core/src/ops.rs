@@ -10,12 +10,10 @@ pub(crate) fn string_to_paulis(pstr: &str) -> Result<Vec<Pauli>, PauliGraphError
             'X' => Ok(Pauli::X),
             'Y' => Ok(Pauli::Y),
             'Z' => Ok(Pauli::Z),
-            _ => Err(PauliGraphError::InvalidInputJson {
-                message: format!(
-                    "Invalid Pauli string: contains invalid character: {}",
-                    pauli
-                ),
-            }),
+            _ => Err(PauliGraphError::InvalidInputJson(format!(
+                "Invalid Pauli string: contains invalid character: {}",
+                pauli
+            ))),
         })
         .collect()
 }
@@ -83,33 +81,40 @@ where
 pub enum Op {
     /// A Pauli rotation.
     Rotation {
+        /// rotation data
         data: RotationData,
     },
     /// A measurement operation.
     Measure {
+        /// measurement data
         data: MeasureData,
     },
     /// A reset operation.
     Reset {
+        /// reset data
         data: ResetData,
     },
     /// An opaque operation.
     BlackBox {
+        /// blackbox data
         data: BlackBoxData,
     },
     /// A box of operations with classical conditions.
     ConditionalBox {
+        /// conditional box data
         data: ConditionalBoxData,
     },
     /// A forward facing Clifford tableau operation.
     Tableau {
+        /// tableau data
         data: TableauData,
     },
     /// A gate operation.
     Gate {
+        /// gate data
         data: GateData,
     },
-    // special op to indicate commuting boundaries, which can be treated as identities in many passes
+    /// Special op to indicate commuting boundaries, which can be treated as identities in many passes.
     SetBoundary,
 }
 
