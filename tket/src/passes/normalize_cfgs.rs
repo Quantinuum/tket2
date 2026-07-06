@@ -1130,7 +1130,10 @@ mod test {
             .into();
         let mut entry_bb = h.simple_entry_builder(type_row![], 1).unwrap();
         let [i, b] = entry_bb.input_wires_arr();
-        let res = entry_bb.add_dataflow_op(res_op.clone(), [i]).unwrap().node();
+        let res = entry_bb
+            .add_dataflow_op(res_op.clone(), [i])
+            .unwrap()
+            .node();
         let pred = entry_bb.add_load_value(Value::unary_unit_sum());
         entry_bb.add_other_wire(entry_bb.input().node(), res);
         entry_bb.add_other_wire(res, entry_bb.output().node());
