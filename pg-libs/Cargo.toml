@@ -31,3 +31,5 @@ missing_docs = "warn"
 [workspace.lints.clippy]
 allow_attributes = "warn"
 iter_over_hash_type = "warn"
+result_large_err = "allow"
+large_enum_variant = "allow"
