@@ -32,8 +32,9 @@ impl<N: HugrNode> ModifierResolver<N> {
             .single_linked_output(call_node, call.called_function_port())
             .unwrap();
 
-        // wire the callee
-        let Some(new_callee) = self.modify_fn_if_needed(h, callee.0)? else {
+        let Some(new_callee) =
+            self.modify_fn_if_needed(h, callee.0, Some(&old_signature), false)?
+        else {
             // If the function need not be modified, just copy the Call node as is.
             let new = self.add_node_no_modification(h, call_node, call.clone(), new_dfg)?;
             self.call_map_insert(callee.0, (new, call.called_function_port()));
@@ -318,19 +319,12 @@ impl<N: HugrNode> ModifierResolver<N> {
         let (func, load) =
             Self::get_loaded_function(h, n, targ, h.get_optype(targ)).map_err(wrap_modifier_err)?;
 
-        // Modify the function
-        let modified_fn = if trace.len() > 1 {
-            // If the function is target of a modifier chain, we must apply the modifiers to it
-            self.modify_fn(h, func).map_err(wrap_resolver_err)?
-        } else {
-            // Otherwise we check if the function needs to be modified, and if not, we just copy the IndirectCall node as is.
-            match self.modify_fn_if_needed(h, func)? {
-                Some(node) => node,
-                None => {
-                    self.add_node_no_modification(h, n, indir_call.clone(), new_dfg)?;
-                    return Ok(());
-                }
-            }
+        let Some(modified_fn) = self
+            .modify_fn_if_needed(h, func, Some(&indir_call.signature), trace.len() > 1)
+            .map_err(wrap_resolver_err)?
+        else {
+            self.add_node_no_modification(h, n, indir_call.clone(), new_dfg)?;
+            return Ok(());
         };
 
         // Make new LoadFunction
