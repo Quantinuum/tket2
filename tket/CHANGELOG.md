@@ -1,6 +1,34 @@
 # Changelog
 
 
+## [0.21.1](https://github.com/Quantinuum/tket2/compare/tket-v0.21.0...tket-v0.21.1) - 2026-07-06
+
+### Bug Fixes
+
+- Modifier pass trying to connect outputs to outputs ([#1769](https://github.com/Quantinuum/tket2/pull/1769))
+- RedundantOrderEdges pass finding loops when there are none ([#1768](https://github.com/Quantinuum/tket2/pull/1768))
+- ModifierResolverPass generates loops in DFG ([#1777](https://github.com/Quantinuum/tket2/pull/1777))
+- merge_basic_blocks keeps Order edges ([#1782](https://github.com/Quantinuum/tket2/pull/1782))
+- IndirectCall nodes solving in ModifierResolverPass ([#1784](https://github.com/Quantinuum/tket2/pull/1784))
+
+### New Features
+
+- Improve InlineFuncs size heuristic ([#1771](https://github.com/Quantinuum/tket2/pull/1771))
+- Target platform option in PytketHugrPass ([#1787](https://github.com/Quantinuum/tket2/pull/1787))
+
+### Performance
+
+- Improve rule evaluation order in dataflow analysis ([#1806](https://github.com/Quantinuum/tket2/pull/1806))
+- Pre-compute edge neighbours in dataflow analysis ([#1805](https://github.com/Quantinuum/tket2/pull/1805))
+
+### Refactor
+
+- Deleted redundant modifier guppy tests files ([#1737](https://github.com/Quantinuum/tket2/pull/1737))
+
+### Testing
+
+- Added a test for PyTket loaded circuits ([#1738](https://github.com/Quantinuum/tket2/pull/1738))
+
 ## [0.21.0](https://github.com/Quantinuum/tket2/compare/tket-v0.20.0...tket-v0.21.0) - 2026-06-29
 
 ### Bug Fixes
