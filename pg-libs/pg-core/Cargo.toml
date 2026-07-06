@@ -16,7 +16,7 @@ categories = ["compilers", "science::quantum-computing"]
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-thiserror = "2.0.18"
+thiserror = { workspace = true }
 
 [lints]
 workspace = true
