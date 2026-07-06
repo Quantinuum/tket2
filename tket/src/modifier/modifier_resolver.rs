@@ -1761,7 +1761,7 @@ mod tests {
         },
         std_extensions::collections::array::ArrayOpBuilder,
         type_row,
-        types::Term,
+        types::{Term, TypeBound},
     };
 
     use hugr_core::Visibility;
@@ -1987,6 +1987,13 @@ mod tests {
                 .function_type_has_quantum_data(&Type::new_function(outer_signature))
                 .unwrap()
         );
+
+        let generic_ty = || Type::new_var_use(0, TypeBound::Linear);
+        let generic_quantum_signature = Signature::new([generic_ty(), qb_t()], [generic_ty()]);
+        assert!(resolver.signature_has_quantum_data(&generic_quantum_signature));
+
+        let generic_classical_signature = Signature::new_endo([generic_ty()]);
+        assert!(!resolver.signature_has_quantum_data(&generic_classical_signature));
     }
 
     #[test]

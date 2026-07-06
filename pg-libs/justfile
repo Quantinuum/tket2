@@ -1,0 +1,23 @@
+test-rust:
+    cargo test --workspace
+
+
+fix:
+    just fix-rust
+    just fix-python
+
+fix-rust:
+    cargo clippy --all-targets --all-features --workspace --fix --allow-staged --allow-dirty
+
+fix-python:
+    uv run ruff check --fix
+
+format:
+    just format-rust
+    just format-python
+
+format-rust:
+    cargo fmt
+
+format-python:
+    uv run ruff format

@@ -372,8 +372,8 @@ fn mk_rep<H: HugrView>(
             signature: pred_ty.inner_signature().into_owned(),
         },
     );
-    for (i, _) in pred_ty.inputs.iter().enumerate() {
-        replacement.connect(input, i, dfg1, i);
+    for inport in replacement.node_inputs(dfg1).collect::<Vec<_>>() {
+        replacement.connect(input, inport.index(), dfg1, inport);
     }
 
     let dfg2 = replacement.add_node_with_parent(
@@ -382,8 +382,8 @@ fn mk_rep<H: HugrView>(
             signature: succ_sig.as_ref().clone(),
         },
     );
-    for (i, _) in succ_sig.output.iter().enumerate() {
-        replacement.connect(dfg2, i, output, i);
+    for outport in replacement.node_outputs(dfg2).collect::<Vec<_>>() {
+        replacement.connect(dfg2, outport, output, outport.index());
     }
 
     // At the junction, must unpack the first (tuple, branch predicate) output
@@ -394,8 +394,7 @@ fn mk_rep<H: HugrView>(
         .collect::<Vec<_>>();
 
     let dfg_order_out = replacement.get_optype(dfg1).other_output_port().unwrap();
-    let order_srcs = (dfg1_outs.is_empty()).then_some((dfg1, dfg_order_out));
-    // Do not add Order edges between DFGs unless there are no value edges
+    let order_srcs = Some((dfg1, dfg_order_out));
     wire_unpack_first(&mut replacement, dfg1_outs, order_srcs, dfg2);
 
     // If there are edges from succ back to pred, we cannot do these via the mu_inp/out/new
@@ -521,20 +520,25 @@ fn unpack_before_output<H: HugrMut>(h: &mut H, output_node: H::Node, new_types: 
 
 #[cfg(test)]
 mod test {
+    use hugr::builder::Container;
+    use hugr::hugr::hugrmut::HugrMut;
+    use itertools::Itertools;
+    use rstest::rstest;
     use std::collections::HashSet;
     use std::sync::Arc;
 
-    use hugr_core::extension::simple_op::MakeExtensionOp;
-    use itertools::Itertools;
-    use rstest::rstest;
-
+    use hugr::extension::simple_op::MakeExtensionOp;
+    use hugr::extension::{ExtensionId, OpDef, Version};
     use hugr_core::builder::{
         CFGBuilder, Dataflow, HugrBuilder, SubContainer, endo_sig, inout_sig,
     };
-    use hugr_core::extension::prelude::{ConstUsize, Noop, PRELUDE_ID, UnpackTuple, qb_t, usize_t};
+    use hugr_core::extension::prelude::{
+        ConstUsize, Noop, PRELUDE_ID, UnpackTuple, bool_t, qb_t, usize_t,
+    };
+    use hugr_core::ops::{ExtensionOp, OpName, constant::Value, handle::NodeHandle};
     use hugr_core::ops::{LoadConstant, OpTag, OpTrait, OpType, Tag};
-    use hugr_core::ops::{constant::Value, handle::NodeHandle};
-    use hugr_core::types::{Signature, Type, TypeRow};
+
+    use hugr_core::types::{PolyFuncTypeRV, Signature, Type, TypeBound, TypeRow};
     use hugr_core::{Extension, HugrView, const_extension_ids, type_row};
 
     use super::{NormalizeCFGPass, NormalizeCFGResult, merge_basic_blocks, normalize_cfg};
@@ -1016,5 +1020,229 @@ mod test {
                 op => format!("{:?}", op.tag()),
             })
             .collect()
+    }
+
+    // A local extension with a result op
+    fn result_ext_and_op() -> (Arc<Extension>, Arc<OpDef>) {
+        const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("test.result");
+        const RESULT_OP_ID: OpName = OpName::new_inline("result");
+        let e = Extension::new_arc(EXTENSION_ID, Version::new(0, 0, 0), |ext, extension_ref| {
+            let tv = Type::new_var_use(0, TypeBound::Linear);
+            let signature = PolyFuncTypeRV::new(
+                [TypeBound::Linear.into()],
+                Signature::new(vec![tv], type_row![]),
+            );
+            ext.add_op(
+                RESULT_OP_ID,
+                "Record a value with type provided as a type argument".into(),
+                signature,
+                extension_ref,
+            )
+            .unwrap();
+        });
+        let result_opdef = e.get_op(&RESULT_OP_ID).unwrap().clone();
+        (e, result_opdef)
+    }
+
+    #[test]
+    fn order_edges() {
+        // BB1 -> BB2 -> Exit    =>   DFG
+        // ...where each BB has an Input->result->Output chain of order edges
+        let (_e, result_opdef) = result_ext_and_op();
+
+        let mut h = CFGBuilder::new(inout_sig([usize_t(), bool_t()], [])).unwrap();
+        let res1_op: OpType = ExtensionOp::new(result_opdef.clone(), &[usize_t().into()])
+            .unwrap()
+            .into();
+        let res2_op: OpType = ExtensionOp::new(result_opdef.clone(), &[bool_t().into()])
+            .unwrap()
+            .into();
+        let [(bb1, res1), (bb2, res2)] = [
+            (None, &res1_op, vec![bool_t()]),
+            (Some([bool_t()]), &res2_op, vec![]),
+        ]
+        .map(|(input_tys, res_op, output_tys)| {
+            let mut bb = match input_tys {
+                Some(input_tys) => h
+                    .simple_block_builder(inout_sig(input_tys, output_tys), 1)
+                    .unwrap(),
+                None => h.simple_entry_builder(output_tys.into(), 1).unwrap(),
+            };
+            let mut input_wires = bb.input_wires();
+            let res = bb
+                .add_dataflow_op(res_op.clone(), [input_wires.next().unwrap()])
+                .unwrap()
+                .node();
+            let pred = bb.add_load_value(Value::unary_unit_sum());
+            bb.add_other_wire(bb.input().node(), res);
+            bb.add_other_wire(res, bb.output().node());
+            (bb.finish_with_outputs(pred, input_wires).unwrap(), res)
+        });
+        let exit_bb = h.exit_block();
+        h.branch(&bb1, 0, &bb2).unwrap();
+        h.branch(&bb2, 0, &exit_bb).unwrap();
+        let mut h = h.finish_hugr().unwrap();
+
+        NormalizeCFGPass::default().run(&mut h).unwrap();
+        h.validate().unwrap();
+        // We should have Input -> result1 -> result2 -> Output with Order edges
+        assert_eq!(h.get_optype(res1), &res1_op);
+        assert_eq!(h.get_optype(res2), &res2_op);
+        assert_eq!(h.get_parent(res1.node()), Some(h.entrypoint()));
+        assert!(h.entrypoint_optype().is_dfg());
+        let [(inp, _)] = h
+            .linked_outputs(res1, res1_op.other_input_port().unwrap())
+            .collect_array()
+            .unwrap();
+        let [(outp, _)] = h
+            .linked_inputs(res2, res2_op.other_output_port().unwrap())
+            .collect_array()
+            .unwrap();
+        assert_eq!(h.get_io(h.get_parent(res1).unwrap()), Some([inp, outp]));
+
+        let res1_out = res1_op.other_output_port().unwrap();
+        let res2_in = res2_op.other_input_port().unwrap();
+        let inp_out = h.get_optype(inp).other_output_port().unwrap();
+        let outp_in = h.get_optype(outp).other_input_port().unwrap();
+        // Extra order edges Input->res2 and res1->Output are harmless
+        // and would be removed by RedundantOrderEdgesPass, but we haven't run that
+        assert_eq!(
+            h.linked_inputs(res1, res1_out).collect_vec(),
+            vec![(res2, res2_in), (outp, outp_in)]
+        );
+        assert_eq!(
+            h.linked_outputs(res2, res2_in).collect_vec(),
+            vec![(res1, res1_out), (inp, inp_out)]
+        );
+    }
+
+    #[rstest]
+    fn order_edges_loop_after() {
+        // entry_bb -> loop_bb -> Exit
+        //              /   \
+        //              \-<-/
+        // ...where entry_bb has a result op => moved before CFG
+        let (_e, result_opdef) = result_ext_and_op();
+
+        let mut h = CFGBuilder::new(inout_sig([usize_t(), bool_t()], [])).unwrap();
+        let res_op: OpType = ExtensionOp::new(result_opdef.clone(), &[usize_t().into()])
+            .unwrap()
+            .into();
+        let mut entry_bb = h.simple_entry_builder(type_row![], 1).unwrap();
+        let [i, b] = entry_bb.input_wires_arr();
+        let res = entry_bb
+            .add_dataflow_op(res_op.clone(), [i])
+            .unwrap()
+            .node();
+        let pred = entry_bb.add_load_value(Value::unary_unit_sum());
+        entry_bb.add_other_wire(entry_bb.input().node(), res);
+        entry_bb.add_other_wire(res, entry_bb.output().node());
+        let entry_bb = entry_bb.finish_with_outputs(pred, []).unwrap();
+
+        let loop_bb = h
+            .simple_block_builder(endo_sig([]), 2)
+            .unwrap()
+            .finish_with_outputs(b, []) // `Dom` edge from entry block
+            .unwrap();
+
+        h.branch(&entry_bb, 0, &loop_bb).unwrap();
+        h.branch(&loop_bb, 0, &h.exit_block()).unwrap();
+        h.branch(&loop_bb, 1, &loop_bb).unwrap();
+        let mut h = h.finish_hugr().unwrap();
+
+        // Ensure the CFG is Ordered between Input/Output of containing FuncDefn
+        let fd = h.get_parent(h.entrypoint()).unwrap();
+        assert!(h.get_optype(fd).is_func_defn());
+        let [inp, outp] = h.get_io(fd).unwrap();
+        h.add_other_edge(inp, h.entrypoint());
+        h.add_other_edge(h.entrypoint(), outp);
+        h.validate().unwrap();
+
+        NormalizeCFGPass::default().run(&mut h).unwrap();
+        h.validate().unwrap();
+
+        assert_eq!(h.get_optype(res), &res_op);
+        assert!(h.entrypoint_optype().is_cfg()); // remains, but result node lifted outside:
+        assert_eq!(h.get_parent(res.node()), Some(fd));
+
+        assert_eq!(
+            h.linked_outputs(res, res_op.other_input_port().unwrap())
+                .collect_vec(),
+            [(inp, h.get_optype(inp).other_output_port().unwrap())]
+        );
+        assert_eq!(
+            h.linked_inputs(res, res_op.other_output_port().unwrap())
+                .collect_vec(),
+            [(h.entrypoint(), 0.into())]
+        );
+    }
+
+    #[rstest]
+    fn order_edges_loop_before() {
+        // loop_bb -> BB1 -> Exit
+        //  /   \
+        //  \-<-/
+        // ...where BB1 has a result op => moved into DFG after CFG
+        let (_e, result_opdef) = result_ext_and_op();
+
+        let mut h = CFGBuilder::new(inout_sig([usize_t(), bool_t()], [])).unwrap();
+        let res_op: OpType = ExtensionOp::new(result_opdef.clone(), &[usize_t().into()])
+            .unwrap()
+            .into();
+        let loop_bb = h
+            .simple_entry_builder([usize_t(), bool_t()].into(), 2)
+            .unwrap();
+        let [i, b] = loop_bb.input_wires_arr();
+        let loop_bb = loop_bb.finish_with_outputs(b, [i, b]).unwrap();
+
+        let mut bb = h
+            .simple_block_builder(inout_sig([usize_t(), bool_t()], []), 1)
+            .unwrap();
+        let [i, _] = bb.input_wires_arr();
+        let res = bb.add_dataflow_op(res_op.clone(), [i]).unwrap().node();
+        let pred = bb.add_load_value(Value::unary_unit_sum());
+        bb.add_other_wire(bb.input().node(), res);
+        bb.add_other_wire(res, bb.output().node());
+        let bb1 = bb.finish_with_outputs(pred, []).unwrap();
+
+        h.branch(&bb1, 0, &h.exit_block()).unwrap();
+        h.branch(&loop_bb, 0, &bb1).unwrap();
+        h.branch(&loop_bb, 1, &loop_bb).unwrap();
+        let mut h = h.finish_hugr().unwrap();
+
+        // Ensure the CFG is Ordered between Input/Output of containing FuncDefn
+        let fd = h.get_parent(h.entrypoint()).unwrap();
+        assert!(h.get_optype(fd).is_func_defn());
+        let [inp, outp] = h.get_io(fd).unwrap();
+        h.add_other_edge(inp, h.entrypoint());
+        h.add_other_edge(h.entrypoint(), outp);
+        h.validate().unwrap();
+
+        NormalizeCFGPass::default().run(&mut h).unwrap();
+        h.validate().unwrap();
+        assert_eq!(h.get_optype(res), &res_op);
+        assert!(h.entrypoint_optype().is_cfg()); // remains, but result nodes in DFG outside:
+        let parent = h.get_parent(res.node()).unwrap();
+        assert!(h.get_optype(parent).is_dfg());
+        assert_order_single_chain(&h, [inp, h.entrypoint(), parent, outp]);
+        let [inp, outp] = h.get_io(parent).unwrap();
+        assert_order_single_chain(&h, [inp, res, outp]);
+    }
+
+    /// Assert that the given nodes are linked in a single chain of order edges
+    /// (nodes[0] -> nodes[1] -> nodes[2], without e.g. nodes[0] -> nodes[2])
+    fn assert_order_single_chain<H: HugrView>(h: &H, nodes: impl IntoIterator<Item = H::Node>) {
+        for (prev, succ) in nodes.into_iter().tuple_windows() {
+            let prev_out = h.get_optype(prev).other_output_port().unwrap();
+            let succ_in = h.get_optype(succ).other_input_port().unwrap();
+            assert_eq!(
+                h.linked_inputs(prev, prev_out).collect_vec(),
+                [(succ, succ_in)]
+            );
+            assert_eq!(
+                h.linked_outputs(succ, succ_in).collect_vec(),
+                [(prev, prev_out)]
+            );
+        }
     }
 }
