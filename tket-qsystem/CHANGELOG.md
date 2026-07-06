@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [0.25.1](https://github.com/quantinuum/tket2/compare/tket-qsystem-v0.25.0...tket-qsystem-v0.25.1) - 2026-07-06
+
+### Performance
+
+- Improve rule evaluation order in dataflow analysis ([#1806](https://github.com/quantinuum/tket2/pull/1806))
+- Pre-compute edge neighbours in dataflow analysis ([#1805](https://github.com/quantinuum/tket2/pull/1805))
+
 ## [0.25.0](https://github.com/Quantinuum/tket2/compare/tket-qsystem-v0.24.0...tket-qsystem-v0.25.0) - 2026-05-28
 
 ### Bug Fixes
