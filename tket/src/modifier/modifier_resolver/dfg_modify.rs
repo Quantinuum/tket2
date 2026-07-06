@@ -313,20 +313,8 @@ impl<N: HugrNode> ModifierResolver<N> {
 
     /// Modifies a function if necessary.
     /// When the function signature contains qubits, the function needs to be modified.
-    /// If not, we don't know whether the function needs modification or not.
-    /// e.g. A polymorphic function that converts array kinds needs no modification if
-    /// it is instantiated with `array[int, n]`, but needs modification if instantiated with
-    /// `array[qubit, n]`.
-    ///
-    /// Since we want to avoid unnecessary modification,
-    /// we implement some logic to find an evident reason that modification is not needed.
-    // TODO: Add more logic so that we can recognize more cases where no modification is needed.
-    // It's better to change the behavior depending on the modifier.
-    // e.g. if only power, do nothing
-    //      if only control, just wrap with controls (IO do not need to match)
-    //      if only dagger, just check signature
-    //
-    // Also, it may be better to check with the usage (how it is instantiated).
+    /// Otherwise, from the caller point of view, the function is just a classical function,
+    /// and no modification is needed.
     pub(crate) fn modify_fn_if_needed(
         &mut self,
         h: &mut impl HugrMut<Node = N>,
@@ -407,7 +395,15 @@ impl<N: HugrNode> ModifierResolver<N> {
             self.function_input_modifiers
                 .insert(new_function_node, input_modifiers);
         }
-        // set unitarity metadata
+        // Set unitarity metadata
+        // TODO: ModifierFlags indicate whether a function satisfies the controllable or daggerable
+        // constraints after Guppy type checking.
+        //
+        // These flags previously determined whether modifier resolution should modify a function.
+        // This is no longer the case; see [`Self::modify_fn_if_needed`]. They may therefore be removed
+        // in the future.
+        //
+        // See: https://github.com/Quantinuum/tket2/issues/1790
         ModifierFlags::from_combined(self.modifiers())
             .or(&ModifierFlags::from_metadata(h, func))
             .set_metadata(h, new_function_node);
