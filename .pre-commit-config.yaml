@@ -65,6 +65,7 @@ repos:
         entry: uv run -- cargo fmt --all -- --check
         language: system
         files: \.rs$
+        exclude: ^pg-libs/
         pass_filenames: false
       - id: cargo-check
         name: cargo check
@@ -72,6 +73,7 @@ repos:
         entry: env RUSTFLAGS="-Dwarnings" uv run -- cargo check --all --all-features --workspace
         language: system
         files: \.rs$
+        exclude: ^pg-libs/
         pass_filenames: false
       - id: cargo-test
         name: cargo nextest r
@@ -79,6 +81,7 @@ repos:
         entry: uv run -- cargo nextest r --all-features
         language: system
         files: \.rs$
+        exclude: ^pg-libs/
         pass_filenames: false
       - id: cargo-clippy
         name: cargo clippy
@@ -86,6 +89,7 @@ repos:
         entry: uv run -- cargo clippy --all-features --all-targets --workspace -- -D warnings
         language: system
         files: \.rs$
+        exclude: ^pg-libs/
         pass_filenames: false
       - id: cargo-doc
         name: cargo doc
@@ -93,6 +97,36 @@ repos:
         entry: uv run -- cargo doc --no-deps --all-features --workspace
         language: system
         files: \.rs$
+        exclude: ^pg-libs/
+        pass_filenames: false
+      # pg-libs hooks (separate Cargo workspace)
+      - id: cargo-fmt-pg-libs
+        name: cargo format (pg-libs)
+        description: Format pg-libs rust code with `cargo fmt`.
+        entry: cargo fmt --all --manifest-path pg-libs/Cargo.toml -- --check
+        language: system
+        files: ^pg-libs/.*\.rs$
+        pass_filenames: false
+      - id: cargo-check-pg-libs
+        name: cargo check (pg-libs)
+        description: Check pg-libs rust code with `cargo check`.
+        entry: env RUSTFLAGS="-Dwarnings" cargo check --all-features --workspace --manifest-path pg-libs/Cargo.toml
+        language: system
+        files: ^pg-libs/.*\.rs$
+        pass_filenames: false
+      - id: cargo-clippy-pg-libs
+        name: cargo clippy (pg-libs)
+        description: Run clippy lints on pg-libs with `cargo clippy`.
+        entry: cargo clippy --all-features --all-targets --workspace --manifest-path pg-libs/Cargo.toml -- -D warnings
+        language: system
+        files: ^pg-libs/.*\.rs$
+        pass_filenames: false
+      - id: cargo-test-pg-libs
+        name: cargo nextest r (pg-libs)
+        description: Run pg-libs tests with `cargo nextest r`.
+        entry: cargo nextest r --all-features --manifest-path pg-libs/Cargo.toml
+        language: system
+        files: ^pg-libs/.*\.rs$
         pass_filenames: false
       - id: py-test
         name: pytest

@@ -33,6 +33,7 @@ jobs:
     permissions:
       pull-requests: read
     outputs:
+      pg-libs: ${{ steps.filter.outputs.pg-libs }}
       rust: ${{ steps.filter.outputs.rust }}
       python: ${{ steps.filter.outputs.python }}
       extensions: ${{ steps.filter.outputs.extensions }}
@@ -94,6 +95,36 @@ jobs:
         run: uv run ruff format --check
       - name: Lint with ruff
         run: uv run ruff check
+
+  check-pg-libs:
+    name: Check pg-libs
+    needs: [changes]
+    if: ${{ needs.changes.outputs.pg-libs == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: mozilla-actions/sccache-action@v0.0.10
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Check formatting
+        working-directory: pg-libs
+        run: cargo fmt -- --check
+
+  tests-pg-libs:
+    name: pg-libs tests
+    needs: [changes]
+    if: ${{ needs.changes.outputs.pg-libs == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: mozilla-actions/sccache-action@v0.0.10
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Run stable tests
+        working-directory: pg-libs
+        run: cargo test --workspace
 
   benches:
     name: Continuous benchmarking 🏋️
@@ -420,8 +451,10 @@ jobs:
     needs:
       [
         changes,
+        check-pg-libs,
         check-rs,
         check-py,
+        tests-pg-libs,
         tests-rs-stable-no-features,
         tests-rs-stable-all-features,
         tests-py,
