@@ -318,6 +318,9 @@ impl<N: HugrNode> ModifierResolver<N> {
     /// functions whose uninstantiated definition may not reveal quantum data.
     /// force is used to indicate that the function is being called after a modifiers chain,
     /// so it must be modified even if the concrete signature does not contain qubits.
+    ///
+    /// NOTE: When a polymorphic functions has a polymorphic input, the function is considered
+    /// to have classical data (there are no quantum generic types or generic quantum operations).
     pub(crate) fn modify_fn_if_needed(
         &mut self,
         h: &mut impl HugrMut<Node = N>,
