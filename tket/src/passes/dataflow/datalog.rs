@@ -147,6 +147,17 @@ fn run_datalog<V: AbstractValue, H: HugrView>(
         clippy::unused_enumerate_index,
         clippy::collapsible_if
     )]
+
+    // Pre-compute all value edges in the Hugr, as this is used in multiple rules.
+    let mut value_edges = Vec::with_capacity(hugr.num_edges());
+    for target in hugr.nodes() {
+        for (input, _) in hugr.in_value_types(target) {
+            if let Some((source, output)) = hugr.single_linked_output(target, input) {
+                value_edges.push((target, input, source, output));
+            }
+        }
+    }
+
     let all_results = ascent::ascent_run! {
         pub(super) struct AscentProgram<V: AbstractValue, H: HugrView>;
         relation node(H::Node); // <Node> exists in the hugr
@@ -155,6 +166,7 @@ fn run_datalog<V: AbstractValue, H: HugrView>(
         relation parent_of_node(H::Node, H::Node); // <Node> is parent of <Node>
         relation input_child(H::Node, H::Node); // <Node> has 1st child <Node> that is its `Input`
         relation output_child(H::Node, H::Node); // <Node> has 2nd child <Node> that is its `Output`
+        relation value_edge(H::Node, IncomingPort, H::Node, OutgoingPort); // <Target node/port> is linked to <Source node/port>
         lattice out_wire_value(H::Node, OutgoingPort, PV<V, H::Node>); // <Node> produces, on <OutgoingPort>, the value <PV>
         lattice in_wire_value(H::Node, IncomingPort, PV<V, H::Node>); // <Node> receives, on <IncomingPort>, the value <PV>
         lattice node_in_value_row(H::Node, ValueRow<V, H::Node>); // <Node>'s inputs are <ValueRow>
@@ -174,15 +186,14 @@ fn run_datalog<V: AbstractValue, H: HugrView>(
 
         input_child(parent, input) <-- node(parent), if let Some([input, _output]) = hugr.get_io(*parent);
         output_child(parent, output) <-- node(parent), if let Some([_input, output]) = hugr.get_io(*parent);
+        value_edge(target, input, source, output) <-- for &(target, input, source, output) in &value_edges;
 
         // Initialize all wires to bottom
         out_wire_value(n, p, PV::bottom()) <-- out_wire(n, p);
         in_wire_value(n, p, PV::bottom()) <-- in_wire(n, p);
 
         // Outputs to inputs
-        in_wire_value(n, ip, v) <-- in_wire(n, ip),
-            if let Some((m, op)) = hugr.single_linked_output(*n, *ip),
-            out_wire_value(m, op, v);
+        in_wire_value(n, ip, v) <-- value_edge(n, ip, m, op), out_wire_value(m, op, v);
 
         // Prepopulate in_wire_value from in_wire_value_proto.
         in_wire_value(n, p, v) <-- for (n, p, v) in &in_wire_value_proto,
