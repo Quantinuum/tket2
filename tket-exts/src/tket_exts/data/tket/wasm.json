@@ -93,6 +93,7 @@
             {
               "t": "Opaque",
               "extension": "tket.wasm",
+              "extension_version": "0.5.0",
               "id": "context",
               "args": [],
               "bound": "A"
@@ -100,6 +101,7 @@
             {
               "t": "Opaque",
               "extension": "tket.wasm",
+              "extension_version": "0.5.0",
               "id": "func",
               "args": [
                 {
@@ -137,6 +139,7 @@
             {
               "t": "Opaque",
               "extension": "tket.wasm",
+              "extension_version": "0.5.0",
               "id": "result",
               "args": [
                 {
@@ -169,6 +172,7 @@
             {
               "t": "Opaque",
               "extension": "tket.wasm",
+              "extension_version": "0.5.0",
               "id": "context",
               "args": [],
               "bound": "A"
@@ -201,6 +205,7 @@
                   {
                     "t": "Opaque",
                     "extension": "tket.wasm",
+                    "extension_version": "0.5.0",
                     "id": "context",
                     "args": [],
                     "bound": "A"
@@ -243,6 +248,7 @@
             {
               "t": "Opaque",
               "extension": "tket.wasm",
+              "extension_version": "0.5.0",
               "id": "module",
               "args": [],
               "bound": "C"
@@ -252,6 +258,7 @@
             {
               "t": "Opaque",
               "extension": "tket.wasm",
+              "extension_version": "0.5.0",
               "id": "func",
               "args": [
                 {
@@ -313,6 +320,7 @@
             {
               "t": "Opaque",
               "extension": "tket.wasm",
+              "extension_version": "0.5.0",
               "id": "module",
               "args": [],
               "bound": "C"
@@ -322,6 +330,7 @@
             {
               "t": "Opaque",
               "extension": "tket.wasm",
+              "extension_version": "0.5.0",
               "id": "func",
               "args": [
                 {
@@ -373,6 +382,7 @@
             {
               "t": "Opaque",
               "extension": "tket.wasm",
+              "extension_version": "0.5.0",
               "id": "result",
               "args": [
                 {
@@ -394,6 +404,7 @@
             {
               "t": "Opaque",
               "extension": "tket.wasm",
+              "extension_version": "0.5.0",
               "id": "context",
               "args": [],
               "bound": "A"

@@ -165,14 +165,22 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
         for (n, outport, v) in wires_to_break {
             let parent = hugr.get_parent(n).unwrap();
             let datatype = v.get_type();
-            // We could try hash-consing identical Consts, but not ATM
-            let cst = hugr.add_node_with_parent(parent, Const::new(v));
-            let lcst = hugr.add_node_with_parent(parent, LoadConstant { datatype });
-            hugr.connect(cst, OutgoingPort::from(0), lcst, IncomingPort::from(0));
-            for (n, inport) in hugr.linked_inputs(n, outport).collect::<Vec<_>>() {
-                hugr.disconnect(n, inport);
-                hugr.connect(lcst, OutgoingPort::from(0), n, inport);
-            }
+
+            // If the type does NOT reference type parameters, the constant can be loaded as a
+            // constant node linked with a static edge to a LoadConstant. However, if the type DOES
+            // reference type parameters, we have to give up since static edges do not support
+            // types using type arguments.
+            if !datatype.is_parametrized() {
+                // We could try hash-consing identical Consts, but not ATM
+                let cst = hugr.add_node_with_parent(parent, Const::new(v));
+                let lcst = hugr.add_node_with_parent(parent, LoadConstant { datatype });
+                hugr.connect(cst, OutgoingPort::from(0), lcst, IncomingPort::from(0));
+
+                for (n, inport) in hugr.linked_inputs(n, outport).collect::<Vec<_>>() {
+                    hugr.disconnect(n, inport);
+                    hugr.connect(lcst, OutgoingPort::from(0), n, inport);
+                }
+            };
         }
         // Eliminate dead code not required for the same entry points.
         let dce = DeadCodeElimPass::<H>::default_with_scope(self.scope.clone());

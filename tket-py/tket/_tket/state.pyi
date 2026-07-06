@@ -1,4 +1,4 @@
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 
 from tket._tket.ops import TketOp
 from tket.util import PytketCircuitProto as Tk1Circuit
@@ -23,13 +23,25 @@ class CompilationState:
         """Create a new empty program."""
 
     @staticmethod
-    def from_tket1(circ: Tk1Circuit) -> CompilationState:
-        """Load a program from a legacy pytket Circuit."""
+    def from_tket1(
+        circ: Tk1Circuit, *, target: Literal["tket", "sol", "helios"] | None = None
+    ) -> CompilationState:
+        """Load a program from a legacy pytket Circuit.
+
+        Parameters:
+        - circ: The legacy pytket circuit to load.
+        - target: The platform target identifier selecting which decoder
+          extension set to use when translating pytket commands into HUGR
+          operations. One of ``"tket"``, ``"sol"``, or ``"helios"``. Defaults to
+          the platform-agnostic ``"tket"`` target.
+        """
 
     def apply_rewrite(self, rw) -> None:
         """Apply a rewrite on the circuit."""
 
-    def to_bytes(self, config: EnvelopeConfig | None = None) -> bytes:
+    def to_bytes(
+        self, config: EnvelopeConfig | None = None, *, omit_tket_exts: bool = True
+    ) -> bytes:
         """Encode the circuit as a HUGR envelope.
 
         Some envelope formats can be encoded into a string. See :meth:`to_str`.
@@ -37,9 +49,15 @@ class CompilationState:
         Args:
             config: The envelope configuration to use.
                 If not given, uses the default binary encoding.
+            omit_tket_exts: If true, the extensions in :meth:`embedded_extensions`
+                will not be not be included in the envelope even when they are used in the
+                HUGR. This is useful when sending the HUGR to other components that
+                already have the tket extensions available.
         """
 
-    def to_str(self, config: EnvelopeConfig | None = None) -> str:
+    def to_str(
+        self, config: EnvelopeConfig | None = None, *, omit_tket_exts: bool = True
+    ) -> str:
         """Encode the circuit as a HUGR envelope string.
 
         Not all envelope formats can be encoded into a string.
@@ -48,6 +66,10 @@ class CompilationState:
         Args:
             config: The envelope configuration to use.
                 If not given, uses the default textual encoding.
+            omit_tket_exts: If true, the extensions in :meth:`embedded_extensions`
+                will not be not be included in the envelope even when they are used in the
+                HUGR. This is useful when sending the HUGR to other components that
+                already have the tket extensions available.
         """
 
     @staticmethod

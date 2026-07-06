@@ -20,6 +20,7 @@ use itertools::Itertools;
 use pyo3::prelude::*;
 use tket::hugr::ops::DataflowParent;
 use tket::passes::composable::ComposablePass;
+use tket_qsystem::{QSystemLLVMPass, QSystemRebasePass};
 
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
@@ -27,25 +28,17 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::vec::Vec;
 use std::{fs, str, vec};
-use tket::extension::{TKET_EXTENSION, TKET1_EXTENSION, rotation};
-use tket::hugr::extension::{ExtensionRegistry, prelude};
-use tket::hugr::std_extensions::arithmetic::{
-    conversions, float_ops, float_types, int_ops, int_types,
-};
-use tket::hugr::std_extensions::{collections, logic, ptr};
 use tket::hugr::{self, llvm::inkwell};
 use tket::hugr::{Hugr, HugrView, Node};
 use tket::llvm::rotation::RotationCodegenExtension;
-use tket_qsystem::QSystemPass;
-use tket_qsystem::extension::{
-    futures as qsystem_futures, gpu as qsystem_gpu, qsystem, random as qsystem_random,
-    result as qsystem_result, utils as qsystem_utils, wasm as qsystem_wasm,
-};
+use tket_qsystem::extension::{REGISTRY, qsystem};
 use tket_qsystem::llvm::array_utils::ArrayLowering;
 pub use tket_qsystem::llvm::futures::FuturesCodegenExtension;
+use tket_qsystem::llvm::globals::GlobalsCodegenExtension;
 use tket_qsystem::llvm::{
-    debug::DebugCodegenExtension, prelude::QISPreludeCodegen, qsystem::QSystemCodegenExtension,
-    random::RandomCodegenExtension, result::ResultsCodegenExtension, utils::UtilsCodegenExtension,
+    argument::ArgumentCodegenExtension, debug::DebugCodegenExtension, prelude::QISPreludeCodegen,
+    qsystem::QSystemCodegenExtension, random::RandomCodegenExtension,
+    result::ResultsCodegenExtension, utils::UtilsCodegenExtension,
 };
 use tracing::{Level, event, instrument};
 use utils::read_hugr_envelope;
@@ -56,37 +49,6 @@ mod utils;
 
 const LLVM_MAIN: &str = "qmain";
 const METADATA: &[(&str, &[&str])] = &[("name", &["mainlib"])];
-
-static REGISTRY: std::sync::LazyLock<ExtensionRegistry> = std::sync::LazyLock::new(|| {
-    ExtensionRegistry::new([
-        prelude::PRELUDE.to_owned(),
-        int_types::EXTENSION.to_owned(),
-        int_ops::EXTENSION.to_owned(),
-        float_types::EXTENSION.to_owned(),
-        float_ops::EXTENSION.to_owned(),
-        conversions::EXTENSION.to_owned(),
-        logic::EXTENSION.to_owned(),
-        ptr::EXTENSION.to_owned(),
-        collections::list::EXTENSION.to_owned(),
-        collections::array::EXTENSION.to_owned(),
-        collections::static_array::EXTENSION.to_owned(),
-        collections::borrow_array::EXTENSION.to_owned(),
-        qsystem_futures::EXTENSION.to_owned(),
-        qsystem_result::EXTENSION.to_owned(),
-        qsystem::EXTENSION.to_owned(),
-        qsystem::helios::EXTENSION.to_owned(),
-        qsystem::sol::EXTENSION.to_owned(),
-        qsystem_random::EXTENSION.to_owned(),
-        qsystem_utils::EXTENSION.to_owned(),
-        qsystem_gpu::EXTENSION.to_owned(),
-        qsystem_wasm::EXTENSION.to_owned(),
-        rotation::ROTATION_EXTENSION.to_owned(),
-        TKET_EXTENSION.to_owned(),
-        TKET1_EXTENSION.to_owned(),
-        tket::extension::debug::DEBUG_EXTENSION.to_owned(),
-        tket::extension::guppy::GUPPY_EXTENSION.to_owned(),
-    ])
-});
 
 #[derive(Debug)]
 /// Handles a series of errors
@@ -150,7 +112,8 @@ fn get_hugr_llvm_module<'c, 'hugr, 'a: 'c>(
 }
 
 fn process_hugr(platform: qsystem::QSystemPlatform, hugr: &mut Hugr) -> Result<()> {
-    QSystemPass::defaults(platform).run(hugr)?;
+    QSystemRebasePass::defaults(platform).run(hugr)?;
+    QSystemLLVMPass::default().run(hugr)?;
     Ok(())
 }
 
@@ -167,6 +130,7 @@ fn codegen_extensions(platform: qsystem::QSystemPlatform) -> CodegenExtsMap<'sta
         .add_default_static_array_extensions()
         .add_borrow_array_extensions(array::SeleneHeapBorrowArrayCodegen(pcg.clone()))
         .add_extension(FuturesCodegenExtension)
+        .add_extension(GlobalsCodegenExtension::new(pcg.clone()))
         .add_extension(QSystemCodegenExtension::new(platform, pcg.clone()))
         .add_extension(RandomCodegenExtension)
         // Results use standard arrays.
@@ -178,6 +142,10 @@ fn codegen_extensions(platform: qsystem::QSystemPlatform) -> CodegenExtsMap<'sta
         // State results use standard arrays.
         .add_extension(DebugCodegenExtension::new(SeleneHeapArrayCodegen::LOWERING))
         .add_extension(gpu::GpuCodegen)
+        // Argument reading uses standard arrays.
+        .add_extension(ArgumentCodegenExtension::new(
+            SeleneHeapArrayCodegen::LOWERING,
+        ))
         .finish()
 }
 

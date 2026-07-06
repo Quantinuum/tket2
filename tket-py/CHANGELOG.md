@@ -1,5 +1,77 @@
 # Changelog
 
+## [0.15.1](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.0...tket-py-v0.15.1) (2026-06-30)
+
+
+### Features
+
+* Improve InlineFuncs size heuristic ([#1771](https://github.com/Quantinuum/tket2/issues/1771)) ([724e011](https://github.com/Quantinuum/tket2/commit/724e011e1737e02742eea9a96626093fa539e0e8))
+
+
+### Bug Fixes
+
+* Modifier pass trying to connect outputs to outputs ([#1769](https://github.com/Quantinuum/tket2/pull/1769))
+* RedundantOrderEdges pass finding loops when there are none ([#1768](https://github.com/Quantinuum/tket2/pull/1768))
+
+## [0.15.0](https://github.com/Quantinuum/tket2/compare/tket-py-v0.14.2...tket-py-v0.15.0) (2026-06-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* Renamed `MaxQubitsHint` to `ExpectedQubitsHint` in `tket-py/tket/metadata.py`
+* `QSystemPass` was split into `QSystemRebasePass` and `QSystemLLVMPass`.
+* Updates to public dependencies, specifically hugr 0.29.0 and hugr-py 0.18.0
+
+### Features
+
+* Include InlineFuncsPass in NormalizeGuppy and improve pass ordering ([#1754](https://github.com/Quantinuum/tket2/issues/1754)) ([16cfe32](https://github.com/Quantinuum/tket2/commit/16cfe328519fddd179e673cf6be257ab4e24edbb))
+* Rename `tket.hint.max_qubits` to `tket.hint.expected_qubits` ([#1765](https://github.com/Quantinuum/tket2/issues/1765)) ([574c969](https://github.com/Quantinuum/tket2/commit/574c969b794fcbe69a302ae2703cfbc133deba2d))
+* Split QSystemPass into QSRebasePass and QSLLVMPass ([#1758](https://github.com/Quantinuum/tket2/issues/1758)) ([fd7b7d4](https://github.com/Quantinuum/tket2/commit/fd7b7d4b0d08551ec87ae5b4fcb26e9cef60de6e))
+* Update to hugr 0.29.0/hugr-py 0.18.0, tone down RedundantOrderEdgesPass ([#1742](https://github.com/Quantinuum/tket2/issues/1742)) ([1de66a2](https://github.com/Quantinuum/tket2/commit/1de66a29a10758fe3ddac564cfa51653c632fe3a))
+
+
+### Bug Fixes
+
+* Add missing `argument` extension reexport ([#1766](https://github.com/Quantinuum/tket2/issues/1766)) ([1363ab1](https://github.com/Quantinuum/tket2/commit/1363ab1a2f6f5f8834db0003660b0e723a126e64))
+
+## [0.14.2](https://github.com/Quantinuum/tket2/compare/tket-py-v0.14.1...tket-py-v0.14.2) (2026-06-19)
+
+
+### Features
+
+* Add modifier resolver to normalize guppy ([#1703](https://github.com/Quantinuum/tket2/issues/1703)) ([c54a9d1](https://github.com/Quantinuum/tket2/commit/c54a9d111eb996fe6b282aaf472794339273a26a))
+* add scoped exhaustive rule matching and Cliffordize pass ([#1654](https://github.com/Quantinuum/tket2/issues/1654)) ([70e618b](https://github.com/Quantinuum/tket2/commit/70e618b1519768d76f8d6f454d7049075353afd9))
+* Export extension registries from tket and tket-qsystem ([#1692](https://github.com/Quantinuum/tket2/issues/1692)) ([6cdbd54](https://github.com/Quantinuum/tket2/commit/6cdbd54a03fbaf2da370c01647925bf4c5098a58))
+* Option to include/omit tket registers in CompilerState.to_bytes ([#1696](https://github.com/Quantinuum/tket2/issues/1696)) ([0885204](https://github.com/Quantinuum/tket2/commit/0885204869d7bf40d6c6bddbb1116e6519cb2d50))
+
+## [0.14.1](https://github.com/Quantinuum/tket2/compare/tket-py-v0.14.0...tket-py-v0.14.1) (2026-06-12)
+
+
+### Bug Fixes
+
+* Add missing extensions in `tket-py`'s registry ([#1678](https://github.com/Quantinuum/tket2/issues/1678)) ([0c551ce](https://github.com/Quantinuum/tket2/commit/0c551cee98b1a233757676c34e4f4f3eaac5c8bf))
+* Bundle extra extensions when exporting a CompilationState ([#1680](https://github.com/Quantinuum/tket2/issues/1680)) ([6ae9d4f](https://github.com/Quantinuum/tket2/commit/6ae9d4f4867e80cd4e90ed27ed694f182d108fb5))
+* Propagate metadata to monomorphized nodes ([#1683](https://github.com/Quantinuum/tket2/pull/1683))
+
+## [0.14.0](https://github.com/Quantinuum/tket2/compare/tket-py-v0.13.1...tket-py-v0.14.0) (2026-06-11)
+
+
+### ⚠ BREAKING CHANGES
+
+* Updated the public `hugr` Python dependency to `~=0.17.1`
+* Removed the deprecated `tket.extensions.bool` and `tket.extensions.opaque_bool` re-exports
+* Removed the `lazify` option from `QSystemPass` and `qsystem_rebase_pass`; qsystem lowering now uses the measurement extension directly
+* `CompilationState.circuit_cost` now computes the cost of all descendant operations, not just direct `TketOp`s
+
+### Features
+
+* Add the measurement extension to the embedded registry and qsystem lowering pipeline ([#1558](https://github.com/Quantinuum/tket2/issues/1558)) ([7e35ecf](https://github.com/Quantinuum/tket2/commit/7e35ecf592db05e51e9b4d4b577afc2c93bd291d))
+* Encode measurement/read pairs as pytket measurements when converting back to pytket circuits ([#1658](https://github.com/Quantinuum/tket2/issues/1658)) ([00cf6ec](https://github.com/Quantinuum/tket2/commit/00cf6ec025f48a3bbc9ecacb0e913fcfc8c669c0))
+* Expose the Helios and Sol qsystem extensions as `tket.extensions.qsystem_helios` and `tket.extensions.qsystem_sol` ([#1567](https://github.com/Quantinuum/tket2/issues/1567)) ([b60553f](https://github.com/Quantinuum/tket2/commit/b60553fec5e81b698c75916658bae7d1c527907e))
+* Add `UnitaryFlags` alias support for metadata written with the previous `unitary` key ([#1669](https://github.com/Quantinuum/tket2/issues/1669)) ([b97704c](https://github.com/Quantinuum/tket2/commit/b97704caa73c049eaee444d6e768a165e64436fd))
+* Upgrade the Python `hugr` dependency to `~=0.17.1` ([#1580](https://github.com/Quantinuum/tket2/issues/1580)) ([68e7fd7](https://github.com/Quantinuum/tket2/commit/68e7fd76705f3e221deaeea9b602c16ec9c6046b)), ([#1668](https://github.com/Quantinuum/tket2/issues/1668)) ([86b81b6](https://github.com/Quantinuum/tket2/commit/86b81b6285e073b12c87f67f354ee8b887ee1c6f))
+
+
 ## [0.13.1](https://github.com/Quantinuum/tket2/compare/tket-py-v0.13.0...tket-py-v0.13.1) (2026-05-19)
 
 

@@ -1,20 +1,19 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang ==0.21.15",
+#    "guppylang==1.0.0a8",
 # ]
-# [tool.uv.sources]
-# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", branch = "na/temporary-cherrypicked"}
 # ///
 """Run on selene the passed hugrs"""
 
-from pathlib import Path
 import shutil
 import sys
+from pathlib import Path
+
 import numpy as np
 import numpy.typing as npt
-from hugr import Hugr
 from guppylang.emulator import EmulatorBuilder
+from hugr import Hugr
 
 
 def format_statevector(

@@ -14,15 +14,21 @@ from tket.passes import (
     GlobalScope,
 )
 from tket._state import CompilationState
-from tket_exts import tket_registry
+from tket_exts import modifier, tket_registry
 
 from tket._pattern import Rule, RuleMatcher
 import hypothesis.strategies as st
 from hypothesis.strategies._internal import SearchStrategy
 from hypothesis import given, settings
 
-from tket.passes import PytketHugrPass, QSystemPass
+from tket.passes import (
+    PytketHugrPass,
+    _QSystemLLVMPass,
+    QSystemRebasePass,
+    PlatformTarget,
+)
 from hugr.build.base import Hugr
+from hugr.package import Package
 
 import numpy as np
 import pytest
@@ -45,9 +51,9 @@ normalize = NormalizeGuppy()
 
 def _hugr_from_path(str_path: str) -> Hugr:
     with open(Path(str_path), "rb") as f:
-        h = Hugr.from_bytes(f.read())
+        h = Package.from_bytes(f.read())
 
-    return h
+    return h.modules[0]
 
 
 def _count_ops(hugr: Hugr, op_string_name: str) -> int:
@@ -57,6 +63,17 @@ def _count_ops(hugr: Hugr, op_string_name: str) -> int:
             count += 1
 
     return count
+
+
+def _contains_modifiers(module: Hugr) -> bool:
+    for _, node_data in module.nodes():
+        if (
+            modifier.control.qualified_name() in node_data.op.name()
+            or modifier.dagger.qualified_name() in node_data.op.name()
+        ):
+            return True
+
+    return False
 
 
 @st.composite
@@ -168,15 +185,29 @@ def test_multiple_rules():
     )
     matcher = RuleMatcher([rule1, rule2])
 
-    match_count = 0
-    while match := matcher.find_match(circ._inner):
-        match_count += 1
-        circ._inner.apply_rewrite(match)
+    match_count = matcher.apply_exhaustive(circ._inner)
 
     assert match_count == 3
 
     out = circ.to_tket1()
     assert out == Circuit(3).CX(0, 1).X(0)
+
+
+def test_apply_exhaustive_reaches_fixed_point() -> None:
+    circ = CompilationState.from_tket1(Circuit(3).H(0).H(0).H(1).H(1).H(2).H(2))
+
+    rule = Rule(
+        CompilationState.from_tket1(Circuit(1).H(0).H(0))._inner,
+        CompilationState.from_tket1(Circuit(1).X(0))._inner,
+    )
+    matcher = RuleMatcher([rule])
+
+    rewrite_count = matcher.apply_exhaustive(circ._inner)
+
+    assert rewrite_count == 3
+    assert circ.to_tket1() == Circuit(3).X(0).X(1).X(2)
+
+    assert matcher.apply_exhaustive(circ._inner) == 0
 
 
 def test_clifford_simp_no_swaps():
@@ -203,7 +234,7 @@ def test_squash_phasedx_rz():
         Circuit(1).Rz(0.25, 0).Rz(0.75, 0).Rz(0.25, 0).Rz(-1.25, 0)
     )
     hugr = Hugr.from_str(c.to_str(), tket_registry())
-    squash_pass = PytketHugrPass(SquashRzPhasedX())
+    squash_pass = PytketHugrPass(SquashRzPhasedX(), target=PlatformTarget.Tket)
     opt_hugr = squash_pass(hugr)
     opt_circ = CompilationState.from_bytes(opt_hugr.to_bytes())
     # TODO: We cannot use circuit_cost due to a panic on non-tket ops and there
@@ -222,6 +253,25 @@ def test_sequence_pass():
     opt_circ = CompilationState.from_bytes(res_hugr.to_bytes())
     assert opt_circ.num_operations() == 1
     assert opt_circ.circuit_cost(lambda op: int(op == TketOp.CX)) == 1
+
+
+@pytest.mark.parametrize(
+    ("target", "expected_rz"),
+    [
+        (PlatformTarget.Tket, "tket.quantum.Rz"),
+        (PlatformTarget.Sol, "tket.qsystem.sol.Rz"),
+        (PlatformTarget.Helios, "tket.qsystem.helios.Rz"),
+    ],
+)
+def test_platform_target_decoding(target: PlatformTarget, expected_rz: str):
+    """The platform target controls which extension the ambiguous `Rz`
+    operation is decoded into."""
+    c = CompilationState.from_tket1(Circuit(1).Rz(0.25, 0).Rz(0.25, 0))
+    hugr = Hugr.from_str(c.to_str(), tket_registry())
+
+    res = PytketHugrPass(RemoveRedundancies(), target=target).run(hugr)
+
+    assert _count_ops(res.hugr, expected_rz) == 1
 
 
 def test_normalize_guppy():
@@ -244,10 +294,19 @@ def test_normalize_guppy():
 
 
 def test_modifier_resolver() -> None:
-    normalize = NormalizeGuppy()
+    normalize = NormalizeGuppy(resolve_modifiers=False)
+    normalize_with_modifier_resolution = NormalizeGuppy()
     mr_pass = ModifierResolverPass()
-    modifier_hugr: Hugr = _hugr_from_path("test_files/guppy_examples/modifiers.hugr")
+    # We consider a simple hugr for this test
+    modifier_hugr: Hugr = _hugr_from_path(
+        "test_files/modifier_examples/double_modifier.hugr"
+    )
 
+    normalized_and_resolved: Hugr = normalize_with_modifier_resolution(modifier_hugr)
+    assert _count_ops(normalized_and_resolved, "tket.modifier.ControlModifier") == 0
+    assert _count_ops(normalized_and_resolved, "tket.modifier.DaggerModifier") == 0
+
+    modifier_hugr = _hugr_from_path("test_files/modifier_examples/double_modifier.hugr")
     modifier_hugr = normalize(modifier_hugr)
 
     assert _count_ops(modifier_hugr, "tket.modifier.ControlModifier") == 1
@@ -314,6 +373,23 @@ def test_modifier_execution() -> None:
             np.testing.assert_allclose(computed_statevector, expected_statevector)
 
 
+def test_normalize_guppy_on_modifier() -> None:
+    """Test the normalize_guppy pass on a hugr with modifiers.
+
+    This won't actually do anything useful, we just want to check that the pass
+    runs without errors."""
+    normalize = NormalizeGuppy()
+    for hugr_path in sorted(Path("test_files/modifier_examples").glob("*.hugr")):
+        try:
+            normalized = normalize(_hugr_from_path(str(hugr_path)))
+            CompilationState.from_python(normalized).validate()
+        except Exception as exc:
+            raise AssertionError(f"NormalizeGuppy failed for {hugr_path}") from exc
+        assert not _contains_modifiers(normalized), (
+            f"NormalizeGuppy left modifiers in {hugr_path}"
+        )
+
+
 def test_inline_functions() -> None:
     hugr = _hugr_from_path("test_files/guppy_examples/fn_calls.hugr")
 
@@ -351,8 +427,27 @@ def test_issue_1516() -> None:
 def test_python_qsystem_pass() -> None:
     normalize = NormalizeGuppy()
     hugr = normalize(_hugr_from_path("test_files/guppy_examples/flat_quantum.hugr"))
-    qsystem_pass = QSystemPass()
-    qsystem_hugr = qsystem_pass(hugr)
+    qsystem_rebase = QSystemRebasePass()
+    qsystem_llvm = _QSystemLLVMPass()
+    qsystem_hugr = qsystem_llvm(qsystem_rebase(hugr))
     assert _count_ops(qsystem_hugr, "ZZPhase") == 1
     assert _count_ops(qsystem_hugr, "Custom") == 0
     assert _count_ops(qsystem_hugr, "tket.quantum") == 0
+
+
+def test_python_qsystem_pass_with_modifiers() -> None:
+    """Test that the QSystem passes work on hugrs with modifiers.
+
+    This won't actually do anything useful, we just want to check that the pass
+    runs without errors."""
+    qsystem_rebase = QSystemRebasePass()
+    qsystem_llvm = _QSystemLLVMPass()
+    for hugr_path in sorted(Path("test_files/modifier_examples").glob("*.hugr")):
+        try:
+            qsystem_hugr = qsystem_llvm(qsystem_rebase(_hugr_from_path(str(hugr_path))))
+            CompilationState.from_python(qsystem_hugr).validate()
+        except Exception as exc:
+            raise AssertionError(f"QSystem passes failed for {hugr_path}") from exc
+        assert not _contains_modifiers(qsystem_hugr), (
+            f"QSystem passes left modifiers in {hugr_path}"
+        )

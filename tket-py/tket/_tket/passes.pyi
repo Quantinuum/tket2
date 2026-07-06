@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pathlib import Path
 
 from .optimiser import BadgerOptimiser
@@ -21,11 +23,13 @@ class PullForwardError(Exception):
 def normalize_guppy(
     circ: CompilationState,
     *,
+    resolve_modifiers: bool = True,
     simplify_cfgs: bool = True,
     remove_tuple_untuple: bool = True,
     constant_folding: bool = True,
     remove_dead_funcs: bool = True,
     inline_dfgs: bool = True,
+    inline_funcs: inline_funcs.InlineFuncsHeuristic | None = inline_funcs.MaxSize(128),
     remove_redundant_order_edges: bool = True,
     squash_borrows: bool = True,
     scope: PassScope = GlobalScope.PRESERVE_PUBLIC,
@@ -35,18 +39,21 @@ def normalize_guppy(
     This should normally be called first before other optimisations.
 
     Parameters:
+    - resolve_modifiers: Whether to resolve modifier operations.
     - simplify_cfgs: Whether to simplify CFG control flow.
     - remove_tuple_untuple: Whether to remove tuple/untuple operations.
     - constant_folding: Whether to constant fold the program.
     - remove_dead_funcs: Whether to remove dead functions.
     - inline_dfgs: Whether to inline DFG operations.
+    - inline_funcs: a heuristic for inlining functions. If None, no inlining is performed.
     - remove_redundant_order_edges: Whether to remove redundant order edges.
+    - squash_borrows: Whether to squash return-borrow pairs on BorrowArrays.
     """
 
 def inline_functions(
     circ: CompilationState,
     *,
-    heuristic: inline_funcs.InlineFuncsHeuristic = inline_funcs.MaxSize(64),
+    heuristic: inline_funcs.InlineFuncsHeuristic = inline_funcs.MaxSize(128),
     scope: PassScope = GlobalScope.PRESERVE_PUBLIC,
 ) -> None:
     """Inline acyclic function calls below the selected scope."""
@@ -76,6 +83,7 @@ def tket1_pass(
     pass_json: str,
     *,
     scope: PassScope | None = None,
+    target: Literal["tket", "sol", "helios"] | None = None,
 ) -> None:
     """Runs a pytket pass on all circuit-like regions under the entrypoint of the
     HUGR.
@@ -87,6 +95,9 @@ def tket1_pass(
     - traverse_subcircuits: Whether to recurse into the children of the
       circuit-like regions, and optimise them too.
       nested inside other subregions of the circuit.
+    - target: The platform target identifier selecting which encoder/decoder
+      extension set to use. One of ``"tket"``, ``"sol"``, or ``"helios"``.
+      Defaults to the platform-agnostic ``"tket"`` target.
     """
 
 def resolve_modifiers(
@@ -101,16 +112,31 @@ def resolve_modifiers(
 
 def qsystem_rebase_pass(
     circ: CompilationState,
-    constant_fold: bool = True,
-    monomorphize: bool = True,
-    force_order: bool = True,
+    *,
+    resolve_modifiers: bool = True,
+    lower_drops: bool = True,
     hide_funcs: bool = True,
     scope: PassScope | None = None,
 ) -> None:
     """Runs a rust backed pass to convert quantum ops to qsystem ops.
 
+    :param resolve_modifiers: Whether to resolve modifier operations.
+    :param lower_drops: Whether to lower drop operations.
+    :param hide_funcs: Make all HUGR functions private.
+    """
+
+def qsystem_llvm_pass(
+    circ: CompilationState,
+    *,
+    constant_fold: bool = True,
+    monomorphize: bool = True,
+    force_order: bool = True,
+    scope: PassScope | None = None,
+) -> None:
+    """Runs a rust backed pass to prepare the HUGR for LLVM code generation.
+
     :param constant_fold: Whether to perform constant folding.
     :param monomorphize: Whether to monomorphize generic functions.
     :param force_order: Whether to enforce total ordering of all HUGR operations.
-    :param hide_funcs: Make all HUGR functions private.
+    :param scope: A scope to control how the pass is applied to HUGR regions.
     """

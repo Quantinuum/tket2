@@ -2,19 +2,20 @@
 help:
     @just --list --justfile {{justfile()}}
 
-# Re-generate all hugr files and their mermaid diagrams.
-r: run-hugrs
-
 # Re-generate all hugr files.
 run-hugrs:
+    just apply-passes
+    @echo "---- Running hugrs ----"
+    uv run --prerelease=allow --no-project "run_hugrs.py"
+
+# Apply the passes to all the hugr files
+apply-passes:
     @echo "---- Applying passes ----"
     uv run apply_passes.py
-    @echo "---- Running hugrs ----"
-    uv run --no-project "run_hugrs.py"
-
+    
 # Re-generate a single hugr file.
 rh example:
     @echo "---- Applying passes ----"
     uv run apply_passes.py "{{example}}"
     @echo "---- Running hugrs ----"
-    uv run --no-project "run_hugrs.py" "{{example}}"
+    uv run --prerelease=allow --no-project "run_hugrs.py" "{{example}}"

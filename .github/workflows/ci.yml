@@ -39,7 +39,7 @@ jobs:
       extensions: ${{ steps.filter.outputs.extensions }}
       qis: ${{ steps.filter.outputs.qis }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/check-changes
         id: filter
 
@@ -52,7 +52,7 @@ jobs:
       # Fail on rust compiler warnings.
       RUSTFLAGS: -D warnings
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: mozilla-actions/sccache-action@v0.0.10
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -74,7 +74,7 @@ jobs:
     if: ${{ needs.changes.outputs.python == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: mozilla-actions/sccache-action@v0.0.10
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -92,9 +92,9 @@ jobs:
       - name: Type check with mypy
         run: uv run mypy .
       - name: Check formatting with ruff
-        run: uv run --no-project ruff format --check
+        run: uv run ruff format --check
       - name: Lint with ruff
-        run: uv run --no-project ruff check
+        run: uv run ruff check
 
   check-pg-libs:
     name: Check pg-libs
@@ -134,7 +134,7 @@ jobs:
     permissions:
       checks: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: mozilla-actions/sccache-action@v0.0.10
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -161,7 +161,7 @@ jobs:
     runs-on: ubuntu-latest
     name: tests (Rust stable, no features)
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: mozilla-actions/sccache-action@v0.0.10
       - id: toolchain
         uses: dtolnay/rust-toolchain@master
@@ -183,7 +183,7 @@ jobs:
     runs-on: ubuntu-latest
     name: tests (Rust stable, all features)
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: mozilla-actions/sccache-action@v0.0.10
       - id: toolchain
         uses: dtolnay/rust-toolchain@master
@@ -214,7 +214,7 @@ jobs:
         rust: [beta]
     name: tests (Rust ${{ matrix.rust }})
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: mozilla-actions/sccache-action@v0.0.10
       - id: toolchain
         uses: dtolnay/rust-toolchain@master
@@ -242,7 +242,7 @@ jobs:
     runs-on: ubuntu-latest
     name: tests (Rust nightly, coverage)
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: mozilla-actions/sccache-action@v0.0.10
       - uses: dtolnay/rust-toolchain@master
         with:
@@ -262,7 +262,7 @@ jobs:
       - name: Generate coverage report
         run: cargo llvm-cov report --codecov --output-path coverage.json
       - name: Upload coverage to codecov.io
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           files: coverage.json
           name: rust
@@ -277,7 +277,7 @@ jobs:
     runs-on: ubuntu-latest
     name: tests (Rust MSRV, min dependencies)
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: mozilla-actions/sccache-action@v0.0.10
       - name: Install MSRV toolchain
         id: toolchain
@@ -322,7 +322,7 @@ jobs:
     env:
       PKGS: tket-py tket-eccs tket-exts
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: mozilla-actions/sccache-action@v0.0.10
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -338,10 +338,10 @@ jobs:
         # avoid building qis-compiler
         run: uv sync --package=tket --exact --all-extras --python ${{ env.PYTHON_LOWEST }}
       - name: Run python tests with coverage instrumentation
-        run: uv run --no-project pytest --cov=./ --cov-report=xml ${{ env.PKGS }}
+        run: uv run pytest --cov=./ --cov-report=xml ${{ env.PKGS }}
       - name: Upload python coverage to codecov.io
         if: github.event_name != 'merge_group'
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           files: ./coverage.xml
           # Ensures we only upload this file
@@ -357,7 +357,7 @@ jobs:
     runs-on: ubuntu-latest
     name: qis-compiler test
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: mozilla-actions/sccache-action@v0.0.10
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -379,7 +379,7 @@ jobs:
         run: uv run --python ${{ env.PYTHON_LOWEST }} --exact --package selene_hugr_qis_compiler pytest --cov=./ --cov-report=xml qis-compiler
       - name: Upload python coverage to codecov.io
         if: github.event_name != 'merge_group'
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           files: ./coverage.xml
           # Ensures we only upload this file
@@ -396,7 +396,7 @@ jobs:
     name: Check standard extensions
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: mozilla-actions/sccache-action@v0.0.10
       - uses: quantinuum/hugrverse-env/install-hugrenv-action@main
       - name: Install stable toolchain
@@ -420,7 +420,7 @@ jobs:
     if: ${{ needs.changes.outputs.extensions == 'true' }}
     name: Check extension versions
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # Need full history to compare with main
 

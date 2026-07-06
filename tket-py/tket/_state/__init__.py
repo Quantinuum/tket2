@@ -27,6 +27,7 @@ TK1EncodeError = _state.TK1EncodeError
 if TYPE_CHECKING:
     from tket._rewrite import CircuitRewrite
     from tket.util import PytketCircuitProto
+    from tket.passes import PlatformTarget
 
 
 __all__ = [
@@ -65,9 +66,21 @@ class CompilationState:
     _py_extensions: ExtensionRegistry | None = None
 
     @staticmethod
-    def from_tket1(circ: PytketCircuitProto) -> CompilationState:
-        """Create a CompilationState from a legacy pytket Circuit."""
-        return CompilationState(_inner=_state.CompilationState.from_tket1(circ))
+    def from_tket1(
+        circ: PytketCircuitProto, *, target: PlatformTarget | None = None
+    ) -> CompilationState:
+        """Create a CompilationState from a legacy pytket Circuit.
+
+        Parameters:
+        - circ: The legacy pytket circuit to load.
+        - target: The platform target selecting which decoder extension set is
+          used when translating pytket commands into HUGR operations. Defaults
+          to the platform-agnostic ``PlatformTarget.Tket``.
+        """
+        target_str = target.value if target is not None else None
+        return CompilationState(
+            _inner=_state.CompilationState.from_tket1(circ, target=target_str)  # type: ignore[arg-type]
+        )
 
     @staticmethod
     def from_python(hugr: Hugr | Package) -> CompilationState:
@@ -148,20 +161,40 @@ class CompilationState:
             _py_extensions=None,
         )
 
-    def to_bytes(self, config: EnvelopeConfig | None = None) -> bytes:
+    def to_bytes(
+        self, config: EnvelopeConfig | None = None, *, omit_tket_exts: bool = True
+    ) -> bytes:
         """Serialize the program to a HUGR envelope byte string.
 
         Some envelope formats can be encoded into a string. See :meth:`to_str`.
-        """
-        return self._inner.to_bytes(config)
 
-    def to_str(self, config: EnvelopeConfig | None = None) -> str:
+        Args:
+            config: The envelope configuration to use.
+                If not given, uses the default binary encoding.
+            omit_tket_exts: If true, the extensions in :meth:`embedded_extensions`
+                will not be not be included in the envelope even when they are used in the
+                HUGR. This is useful when sending the HUGR to other components that
+                already have the tket extensions available.
+        """
+        return self._inner.to_bytes(config, omit_tket_exts=omit_tket_exts)
+
+    def to_str(
+        self, config: EnvelopeConfig | None = None, *, omit_tket_exts: bool = True
+    ) -> str:
         """Serialize the program to a HUGR envelope string.
 
         Not all envelope formats can be encoded into a string.
         See :meth:`to_bytes` for a more general method.
+
+        Args:
+            config: The envelope configuration to use.
+                If not given, uses the default textual encoding.
+            omit_tket_exts: If true, the extensions in :meth:`embedded_extensions`
+                will not be not be included in the envelope even when they are used in the
+                HUGR. This is useful when sending the HUGR to other components that
+                already have the tket extensions available.
         """
-        return self._inner.to_str(config)
+        return self._inner.to_str(config, omit_tket_exts=omit_tket_exts)
 
     def apply_rewrite(self, rewrite: CircuitRewrite) -> None:
         """Apply a rewrite command to this program."""

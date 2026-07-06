@@ -2,6 +2,7 @@
 
 from tket_exts.tket.debug import DebugExtension
 from tket_exts.tket.global_phase import GlobalPhaseExtension
+from tket_exts.tket.globals import GlobalsExtension
 from tket_exts.tket.gpu import GpuExtension
 from tket_exts.tket.guppy import GuppyExtension
 from tket_exts.tket.modifier import ModifierExtension
@@ -18,13 +19,14 @@ from tket_exts.tket.quantum import QuantumExtension
 from tket_exts.tket.result import ResultExtension
 from tket_exts.tket.wasm import WasmExtension
 from tket_exts.tket.measurement import MeasurementExtension
+from tket_exts.tket.argument import ArgumentExtension
 
 from hugr.ext import ExtensionRegistry
 from tket_exts import tket
 
 # This is updated by our release-please workflow, triggered by this
 # annotation: x-release-please-version
-__version__ = "0.13.0"
+__version__ = "0.14.0"
 
 __all__ = [
     "debug",
@@ -42,7 +44,9 @@ __all__ = [
     "wasm",
     "modifier",
     "global_phase",
+    "globals",
     "measurement",
+    "argument",
 ]
 
 debug: DebugExtension = tket.debug.DebugExtension()
@@ -60,7 +64,9 @@ result: ResultExtension = tket.result.ResultExtension()
 wasm: WasmExtension = tket.wasm.WasmExtension()
 modifier: ModifierExtension = tket.modifier.ModifierExtension()
 global_phase: GlobalPhaseExtension = tket.global_phase.GlobalPhaseExtension()
+globals: GlobalsExtension = tket.globals.GlobalsExtension()
 measurement: MeasurementExtension = tket.measurement.MeasurementExtension()
+argument: ArgumentExtension = tket.argument.ArgumentExtension()
 
 
 def tket_registry() -> ExtensionRegistry:
@@ -77,6 +83,7 @@ def tket_registry() -> ExtensionRegistry:
         tket.guppy.GuppyExtension(),
         tket.rotation.RotationExtension(),
         tket.futures.FuturesExtension(),
+        tket.globals.GlobalsExtension(),
         tket.qsystem.QSystemHeliosExtension(),
         tket.qsystem.QSystemSolExtension(),
         tket.qsystem.QSystemExtension(),
@@ -88,6 +95,7 @@ def tket_registry() -> ExtensionRegistry:
         tket.modifier.ModifierExtension(),
         tket.global_phase.GlobalPhaseExtension(),
         tket.measurement.MeasurementExtension(),
+        tket.argument.ArgumentExtension(),
     ]
 
     registry = ExtensionRegistry()

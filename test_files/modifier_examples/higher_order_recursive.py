@@ -1,26 +1,22 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang"
+#    "guppylang==1.0.0a7",
 # ]
-# [tool.uv.sources]
-# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", branch = "na/temporary-cherrypicked"}
 # ///
 """Some simple nested higher order functions inside modifiers"""
 
 from pathlib import Path
 from sys import argv
 
-from guppylang import guppy
+from guppylang import enable_experimental_features, guppy
 from guppylang.std.builtins import (
     Unitary,
     control,
     dagger,
 )
 from guppylang.std.debug import state_result
-from guppylang.std.quantum import discard, qubit
-from guppylang.std.quantum import h, s
-from guppylang.experimental import enable_experimental_features
+from guppylang.std.quantum import discard, h, qubit, s, x
 
 enable_experimental_features()
 
@@ -40,12 +36,23 @@ def apply2(f: Unitary[[qubit], None], q: qubit) -> None:
     f(q)
 
 
+@guppy(controllable=True)
+def apply_if(f: Unitary[[qubit], None], q: qubit, b: bool) -> None:
+    if b:
+        apply(f, q)
+
+
 @guppy
 def main() -> None:
     q = qubit()
     c = qubit()
-    h(c)
+    x(c)
+    flag = True
+    with control(c):
+        apply_if(x, q, flag)
+        apply_if(h, q, not flag)
 
+    h(c)
     with control(c), dagger:
         apply(s, q)
         apply(h, q)

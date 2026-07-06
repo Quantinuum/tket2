@@ -3,11 +3,12 @@
 use crate::passes::composable::WithScope;
 use crate::passes::const_fold::{ConstFoldError, ConstantFoldPass};
 use crate::passes::dead_funcs::RemoveDeadFuncsError;
-use crate::passes::inline_dfgs::InlineDFGsPass;
+use crate::passes::inline_funcs::{InlineFuncsError, InlineFuncsHeuristic, InlineFunctionsPass};
+use crate::passes::modifier_resolver::{ModifierResolverErrors, ModifierResolverPass};
 use crate::passes::normalize_cfgs::{NormalizeCFGError, NormalizeCFGPass};
 use crate::passes::redundant_order_edges::RedundantOrderEdgesPass;
-use crate::passes::untuple::UntupleError;
-use crate::passes::{ComposablePass, PassScope, RemoveDeadFuncsPass, UntuplePass};
+use crate::passes::untuple::{UntupleError, UntuplePass};
+use crate::passes::{ComposablePass, InlineDFGsPass, PassScope, RemoveDeadFuncsPass};
 use hugr::Node;
 use hugr::hugr::HugrError;
 use hugr::hugr::hugrmut::HugrMut;
@@ -20,6 +21,8 @@ use crate::passes::BorrowSquashPass;
 /// This is a mixture of global optimization passes, and operations that optimize the entrypoint.
 #[derive(Clone, Debug)]
 pub struct NormalizeGuppy {
+    /// Whether to resolve modifier operations.
+    resolve_modifiers: bool,
     /// Whether to simplify CFG control flow.
     simplify_cfgs: bool,
     /// Whether to remove tuple/untuple operations.
@@ -28,6 +31,8 @@ pub struct NormalizeGuppy {
     constant_fold: bool,
     /// Whether to remove dead functions.
     dead_funcs: bool,
+    /// Whether to inline function calls (converting to DFGs).
+    inline_funcs: Option<InlineFuncsHeuristic>,
     /// Whether to inline DFG operations.
     inline_dfgs: bool,
     /// Whether to squash BorrowArray borrow/return ops
@@ -42,6 +47,11 @@ pub struct NormalizeGuppy {
 }
 
 impl NormalizeGuppy {
+    /// Set whether to resolve modifier operations.
+    pub fn resolve_modifiers(&mut self, resolve_modifiers: bool) -> &mut Self {
+        self.resolve_modifiers = resolve_modifiers;
+        self
+    }
     /// Set whether to simplify CFG control flow.
     pub fn simplify_cfgs(&mut self, simplify_cfgs: bool) -> &mut Self {
         self.simplify_cfgs = simplify_cfgs;
@@ -67,6 +77,12 @@ impl NormalizeGuppy {
         self.inline_dfgs = inline;
         self
     }
+    /// Set whether to inline Function calls. (Does not include [Self::inline_dfgs]
+    /// but generates DFGs so the latter is strongly recommended.)
+    pub fn inline_funcs(&mut self, inline: Option<InlineFuncsHeuristic>) -> &mut Self {
+        self.inline_funcs = inline;
+        self
+    }
     /// Set whether to squash BorrowArray borrow/return ops
     pub fn squash_borrows(&mut self, squash: bool) -> &mut Self {
         self.squash_borrows = squash;
@@ -82,6 +98,8 @@ impl NormalizeGuppy {
 impl Default for NormalizeGuppy {
     fn default() -> Self {
         Self {
+            resolve_modifiers: true,
+            inline_funcs: Some(InlineFuncsHeuristic::default()),
             simplify_cfgs: true,
             constant_fold: true,
             untuple: true,
@@ -106,34 +124,52 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for NormalizeGuppy {
     type Result = ();
 
     fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
+        // Simplify CFGs first, as (until we start removing statically-impossible branches)
+        // nothing else affects CFG structure or creates new opportunities for this.
+        // (Possibly also this may assist modifier resolution??)
         if self.simplify_cfgs {
             NormalizeCFGPass::default()
                 .with_scope(self.scope.clone())
                 .run(hugr)?;
         }
-        // When we do function inlining, do this after, to sort out argument marshalling
-        if self.untuple {
-            UntuplePass::default_with_scope(self.scope.clone()).run(hugr)?;
-        }
-        // Should propagate through untuple, so could do earlier, and must be before BorrowSquash
-        if self.constant_fold {
-            ConstantFoldPass::default()
+        // Run modifier resolution
+        if self.resolve_modifiers {
+            ModifierResolverPass::default()
                 .with_scope(self.scope.clone())
                 .run(hugr)?;
         }
-        // Only improves compilation speed, not affected by anything else
-        // until we start removing untaken branches
+        // Inline function calls creates many opportunities for optimization by other
+        // passes by producing copies that can be optimized in a specific context
+        if let Some(inline_funcs) = &self.inline_funcs {
+            InlineFunctionsPass::default_with_scope(self.scope.clone())
+                .with_heuristic(inline_funcs.clone())
+                .run(hugr)
+                .map_err(NormalizeGuppyErrors::InlineFuncs)?;
+        }
+        // Clean up after inlining - only to improve compilation speed, not affected by
+        // anything else until we start removing untaken branches.
         if self.dead_funcs {
             RemoveDeadFuncsPass::default()
                 .with_scope(self.scope.clone())
                 .run(hugr)?;
         }
-        // Do earlier? Nothing creates DFGs
+        // Function inlining produces lots of DFGs, so merge those into their surrounds
         if self.inline_dfgs {
             InlineDFGsPass::default()
                 .with_scope(self.scope.clone())
                 .run(hugr)
                 .unwrap_or_else(|e| match e {})
+        }
+        // This should sort out argument marshalling for function calls (esp. inlined ones)
+        if self.untuple {
+            UntuplePass::default_with_scope(self.scope.clone()).run(hugr)?;
+        }
+        // Should propagate through untuple, so could do earlier, but not clear earlier
+        // would be any advantage. Must be before BorrowSquash as that needs constant indices.
+        if self.constant_fold {
+            ConstantFoldPass::default()
+                .with_scope(self.scope.clone())
+                .run(hugr)?;
         }
         // Potentially, could (need to) do fixpoint here with untuple,
         // as both create opportunities for the other
@@ -157,7 +193,10 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for NormalizeGuppy {
 
 /// Errors that can occur during the guppy-program normalization process.
 #[derive(derive_more::Error, Debug, derive_more::Display, derive_more::From)]
+#[non_exhaustive]
 pub enum NormalizeGuppyErrors {
+    /// Error while resolving modifier operations.
+    ModifierResolver(ModifierResolverErrors),
     /// Error while simplifying CFG control flow.
     SimplifyCFG(NormalizeCFGError),
     /// Error while removing tuple/untuple operations.
@@ -167,7 +206,9 @@ pub enum NormalizeGuppyErrors {
     /// Error while removing dead functions.
     DeadFuncs(RemoveDeadFuncsError),
     /// Error while inlining DFG operations.
-    Inline(InlineDFGError),
+    InlineDFGs(InlineDFGError),
+    /// Error while inlining function calls.
+    InlineFuncs(InlineFuncsError),
     /// Error while removing redundant order edges.
     #[from(ignore)]
     RedundantOrderEdges(HugrError),
@@ -193,6 +234,7 @@ mod test {
 
         let mut hugr2 = hugr.clone();
         NormalizeGuppy::default()
+            .resolve_modifiers(false)
             .simplify_cfgs(false)
             .remove_tuple_untuple(false)
             .constant_folding(false)

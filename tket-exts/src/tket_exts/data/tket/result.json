@@ -22,6 +22,7 @@
             {
               "t": "Opaque",
               "extension": "collections.array",
+              "extension_version": "0.1.2",
               "id": "array",
               "args": [
                 {
@@ -68,6 +69,7 @@
             {
               "t": "Opaque",
               "extension": "collections.array",
+              "extension_version": "0.1.2",
               "id": "array",
               "args": [
                 {
@@ -83,6 +85,7 @@
                   "ty": {
                     "t": "Opaque",
                     "extension": "arithmetic.float.types",
+                    "extension_version": "0.1.0",
                     "id": "float64",
                     "args": [],
                     "bound": "C"
@@ -120,6 +123,7 @@
             {
               "t": "Opaque",
               "extension": "collections.array",
+              "extension_version": "0.1.2",
               "id": "array",
               "args": [
                 {
@@ -135,6 +139,7 @@
                   "ty": {
                     "t": "Opaque",
                     "extension": "arithmetic.int.types",
+                    "extension_version": "0.1.0",
                     "id": "int",
                     "args": [
                       {
@@ -181,6 +186,7 @@
             {
               "t": "Opaque",
               "extension": "collections.array",
+              "extension_version": "0.1.2",
               "id": "array",
               "args": [
                 {
@@ -196,6 +202,7 @@
                   "ty": {
                     "t": "Opaque",
                     "extension": "arithmetic.int.types",
+                    "extension_version": "0.1.0",
                     "id": "int",
                     "args": [
                       {
@@ -257,6 +264,7 @@
             {
               "t": "Opaque",
               "extension": "arithmetic.float.types",
+              "extension_version": "0.1.0",
               "id": "float64",
               "args": [],
               "bound": "C"
@@ -286,6 +294,7 @@
             {
               "t": "Opaque",
               "extension": "arithmetic.int.types",
+              "extension_version": "0.1.0",
               "id": "int",
               "args": [
                 {
@@ -324,6 +333,7 @@
             {
               "t": "Opaque",
               "extension": "arithmetic.int.types",
+              "extension_version": "0.1.0",
               "id": "int",
               "args": [
                 {
