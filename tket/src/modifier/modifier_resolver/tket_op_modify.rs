@@ -27,7 +27,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         if (control != 0 || dagger) && !tket_op.is_quantum() {
             return Err(ModifierResolverErrors::unresolvable(
                 op_node,
-                "Non-quantum operation cannot be modified".to_string(),
+                Some("non-quantum operation are not expected in a modified context".to_string()),
                 tket_op.into(),
             ));
         }
@@ -474,10 +474,8 @@ impl<N: HugrNode> ModifierResolver<N> {
                 }
             }
             Measure | MeasureFree | QAlloc | TryQAlloc | QFree | Reset => {
-                Err(ModifierResolverErrors::unresolvable(
-                    op_node,
-                    format!("of type {tket_op:?}"),
-                    tket_op.into(),
+                Err(ModifierResolverErrors::unreachable(
+                    "Non quantum operation should already be rejected",
                 ))
             }
         }

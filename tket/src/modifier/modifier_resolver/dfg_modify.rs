@@ -577,7 +577,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             let optype = h.get_optype(n);
             return Err(ModifierResolverErrors::unresolvable(
                 n,
-                "TailLoop cannot be daggered.".to_string(),
+                Some("TailLoop cannot be daggered.".to_string()),
                 optype.clone(),
             ));
         }

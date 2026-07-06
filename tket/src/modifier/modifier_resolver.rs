@@ -406,11 +406,11 @@ impl<N> ModifierError<N> {
 #[derive(Debug, derive_more::Display, derive_more::Error, derive_more::From)]
 #[non_exhaustive]
 pub enum ModifierResolverErrors<N = Node> {
-    /// Cannot modify the node.
+    /// Errors during tracing or validating a chain of modifiers and its target.
     #[display("{_0}")]
     #[from]
     ModifierError(ModifierError<N>),
-    /// Error during the DFG build process.
+    /// Error if the new hugr is not built properly.
     #[display("{_0}")]
     #[from]
     BuildError(BuildError),
@@ -421,14 +421,14 @@ pub enum ModifierResolverErrors<N = Node> {
         msg: String,
     },
     /// Modifier applied to a node that cannot be modified.
-    #[display("Modifier {node} applied to the node {msg} cannot be modified")]
+    #[display("The node {node} of type {optype} cannot be modified{msg}")]
     UnResolvable {
         /// The node that cannot be modified.
         node: N,
-        /// The message of the unresolvable error.
-        msg: String,
         /// The operation type that cannot be modified.
         optype: OpType,
+        /// The message of the unresolvable error.
+        msg: String,
     },
     /// The node cannot be modified.
     #[display("Modification by {_0:?} is not defined for the node {_1}")]
@@ -448,10 +448,10 @@ impl<N> ModifierResolverErrors<N> {
     }
 
     /// Create an unresolvable error.
-    fn unresolvable(node: N, msg: impl Into<String>, optype: OpType) -> Self {
+    fn unresolvable(node: N, msg: Option<impl Into<String>>, optype: OpType) -> Self {
         Self::UnResolvable {
             node,
-            msg: msg.into(),
+            msg: msg.map(|m| m.into()).unwrap_or_else(|| ".".to_string()),
             optype,
         }
     }
@@ -1126,7 +1126,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             | OpType::DataflowBlock(_) => {
                 return Err(ModifierResolverErrors::unresolvable(
                     target_node,
-                    "Unmodifiable node found".to_string(),
+                    Some("Unmodifiable node found".to_string()),
                     optype.clone(),
                 ));
             }
@@ -1134,7 +1134,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                 // Q. Maybe we should just ignore unknown operations?
                 return Err(ModifierResolverErrors::unresolvable(
                     target_node,
-                    "Unknown operation".to_string(),
+                    Some("Unknown operation".to_string()),
                     optype.clone(),
                 ));
             }
@@ -1404,7 +1404,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         if children.len() != 1 && self.modifiers().dagger {
             return Err(ModifierResolverErrors::unresolvable(
                 cfg_node,
-                "CFG with more than one node cannot be daggered.".to_string(),
+                Some("CFG with more than one node cannot be daggered."),
                 cfg.clone().into(),
             ));
         }
