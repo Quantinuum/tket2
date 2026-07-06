@@ -1118,23 +1118,23 @@ mod test {
 
     #[rstest]
     fn order_edges_loop_after() {
-        // BB -> loop_bb -> Exit
-        //        /   \
-        //        \-<-/
-        // ...where BB1 has a result op => moved before CFG
+        // entry_bb -> loop_bb -> Exit
+        //              /   \
+        //              \-<-/
+        // ...where entry_bb has a result op => moved before CFG
         let (_e, result_opdef) = result_ext_and_op();
 
         let mut h = CFGBuilder::new(inout_sig([usize_t(), bool_t()], [])).unwrap();
         let res_op: OpType = ExtensionOp::new(result_opdef.clone(), &[usize_t().into()])
             .unwrap()
             .into();
-        let mut bb = h.simple_entry_builder(type_row![], 1).unwrap();
-        let [i, b] = bb.input_wires_arr();
-        let res = bb.add_dataflow_op(res_op.clone(), [i]).unwrap().node();
-        let pred = bb.add_load_value(Value::unary_unit_sum());
-        bb.add_other_wire(bb.input().node(), res);
-        bb.add_other_wire(res, bb.output().node());
-        let bb = bb.finish_with_outputs(pred, []).unwrap();
+        let mut entry_bb = h.simple_entry_builder(type_row![], 1).unwrap();
+        let [i, b] = entry_bb.input_wires_arr();
+        let res = entry_bb.add_dataflow_op(res_op.clone(), [i]).unwrap().node();
+        let pred = entry_bb.add_load_value(Value::unary_unit_sum());
+        entry_bb.add_other_wire(entry_bb.input().node(), res);
+        entry_bb.add_other_wire(res, entry_bb.output().node());
+        let entry_bb = entry_bb.finish_with_outputs(pred, []).unwrap();
 
         let loop_bb = h
             .simple_block_builder(endo_sig([]), 2)
@@ -1142,7 +1142,7 @@ mod test {
             .finish_with_outputs(b, []) // `Dom` edge from entry block
             .unwrap();
 
-        h.branch(&bb, 0, &loop_bb).unwrap();
+        h.branch(&entry_bb, 0, &loop_bb).unwrap();
         h.branch(&loop_bb, 0, &h.exit_block()).unwrap();
         h.branch(&loop_bb, 1, &loop_bb).unwrap();
         let mut h = h.finish_hugr().unwrap();
@@ -1159,7 +1159,7 @@ mod test {
         h.validate().unwrap();
 
         assert_eq!(h.get_optype(res), &res_op);
-        assert!(h.entrypoint_optype().is_cfg()); // remains, but result nodes outside:
+        assert!(h.entrypoint_optype().is_cfg()); // remains, but result node lifted outside:
         assert_eq!(h.get_parent(res.node()), Some(fd));
 
         assert_eq!(
@@ -1226,6 +1226,8 @@ mod test {
         assert_order_single_chain(&h, [inp, res, outp]);
     }
 
+    /// Assert that the given nodes are linked in a single chain of order edges
+    /// (nodes[0] -> nodes[1] -> nodes[2], without e.g. nodes[0] -> nodes[2])
     fn assert_order_single_chain<H: HugrView>(h: &H, nodes: impl IntoIterator<Item = H::Node>) {
         for (prev, succ) in nodes.into_iter().tuple_windows() {
             let prev_out = h.get_optype(prev).other_output_port().unwrap();
