@@ -249,13 +249,15 @@ fn tableau_to_tk(tableau_data: &TableauData, n_qubits: usize) -> Value {
         &mut phases,
     );
     let tab_json = json!({
-        "qubits": qubits,
         "tab": {
-            "nqubits": n_qubits,
-            "nrows": n_qubits * 2,
-            "phases": phases,
-            "xmat": &[x_xbits, x_zbits].concat(),
-            "zmat": &[z_xbits, z_zbits].concat(),
+            "qubits": qubits,
+            "tab": {
+                "nqubits": n_qubits,
+                "nrows": n_qubits * 2,
+                "phase": phases,
+                "xmat": &[x_xbits, x_zbits].concat(),
+                "zmat": &[z_xbits, z_zbits].concat(),
+            }
         }
     });
     tk_cmd_json(
@@ -286,7 +288,7 @@ fn op_to_tk(op: &Op, n_qubits: usize) -> Result<Vec<Value>, TKConversionError> {
             })
             .collect(),
         Op::Tableau { data } => Ok(vec![tableau_to_tk(data, n_qubits)]),
-        Op::SetBoundary { .. } => Ok(vec![]), // SetBoundary are ignored in TKET conversion
+        Op::SetBoundary => Ok(vec![]), // SetBoundary are ignored in TKET conversion
         _ => Err(TKConversionError::UnsupportedPGOp(format!(
             "Op {:?} is not supported in TK conversion",
             op
@@ -655,11 +657,15 @@ pub fn pg_from_tk_json(tk_json: &Value) -> Result<PauliGraph, TKConversionError>
                 if !cond_bits.is_empty() {
                     return Err(TKConversionError::UnsupportedTKJson("Conditional UnitaryTableauBox is not supported in TKET to PauliGraph conversion".into()));
                 }
-                let tab = &op.get("box").and_then(|b| b.get("tab")).ok_or_else(|| {
-                    TKConversionError::InvalidTKJson(
-                        "Missing tab field in UnitaryTableauBox".into(),
-                    )
-                })?;
+                let tab = &op
+                    .get("box")
+                    .and_then(|b| b.get("tab"))
+                    .and_then(|b| b.get("tab"))
+                    .ok_or_else(|| {
+                        TKConversionError::InvalidTKJson(
+                            "Missing tab field in UnitaryTableauBox".into(),
+                        )
+                    })?;
                 let tab_width = tab.get("nqubits").and_then(Value::as_u64).ok_or_else(|| {
                     TKConversionError::InvalidTKJson(
                         "Missing or invalid nqubits field in UnitaryTableauBox".into(),
@@ -726,18 +732,18 @@ pub fn pg_from_tk_json(tk_json: &Value) -> Result<PauliGraph, TKConversionError>
                     })
                     .collect::<Result<Vec<Vec<bool>>, TKConversionError>>()?;
                 let phases = tab
-                    .get("phases")
+                    .get("phase")
                     .and_then(Value::as_array)
                     .ok_or_else(|| {
                         TKConversionError::InvalidTKJson(
-                            "Missing or invalid phases field in UnitaryTableauBox".into(),
+                            "Missing or invalid phase field in UnitaryTableauBox".into(),
                         )
                     })?
                     .iter()
                     .map(|row| {
                         row.as_array().ok_or_else(|| {
                             TKConversionError::InvalidTKJson(
-                                "Unexpected phases row format in TKET JSON".into(),
+                                "Unexpected phase row format in TKET JSON".into(),
                             )
                         })?[0]
                             .as_bool()
@@ -782,6 +788,9 @@ pub fn pg_from_tk_json(tk_json: &Value) -> Result<PauliGraph, TKConversionError>
     }
     Ok(pg)
 }
+
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1061,13 +1070,15 @@ mod tests {
                 {
                     "op": {
                         "box": {
-                            "qubits": [["q", [0]], ["q", [1]]],
                             "tab": {
-                                "nqubits": 2,
-                                "nrows": 4,
-                                "phases": [[true], [false], [false], [false]],
-                                "xmat": [[true, true], [false, true], [false, false], [false, false]],
-                                "zmat": [[false, false], [false, false], [true, false], [true, true]]
+                                "qubits": [["q", [0]], ["q", [1]]],
+                                "tab": {
+                                    "nqubits": 2,
+                                    "nrows": 4,
+                                    "phase": [[true], [false], [false], [false]],
+                                    "xmat": [[true, true], [false, true], [false, false], [false, false]],
+                                    "zmat": [[false, false], [false, false], [true, false], [true, true]]
+                                }
                             },
                             "type": "UnitaryTableauBox"
                         },
