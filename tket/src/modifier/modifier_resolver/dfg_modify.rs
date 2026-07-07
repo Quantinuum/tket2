@@ -22,7 +22,7 @@ use petgraph::visit::{Topo, Walker};
 
 use crate::{TketOp, extension::global_phase::GlobalPhase};
 
-use super::{DirWire, ModifierFlags, ModifierResolver, ModifierResolverErrors, PortExt};
+use super::{DirWire, ModifierResolver, ModifierResolverErrors, PortExt};
 
 impl<N: HugrNode> ModifierResolver<N> {
     /// Modifies the body of a dataflow graph.
@@ -408,18 +408,6 @@ impl<N: HugrNode> ModifierResolver<N> {
             self.function_input_modifiers
                 .insert(new_function_node, input_modifiers);
         }
-        // Set unitarity metadata
-        // TODO: ModifierFlags indicate whether a function satisfies the controllable or daggerable
-        // constraints after Guppy type checking.
-        //
-        // These flags previously determined whether modifier resolution should modify a function.
-        // This is no longer the case; see [`Self::modify_fn_if_needed`]. They may therefore be removed
-        // in the future.
-        //
-        // See: https://github.com/Quantinuum/tket2/issues/1790
-        ModifierFlags::from_combined(self.modifiers())
-            .or(&ModifierFlags::from_metadata(h, func))
-            .set_metadata(h, new_function_node);
         self.modified_functions.insert(func);
 
         Ok(new_function_node)
