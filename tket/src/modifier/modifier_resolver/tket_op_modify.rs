@@ -27,7 +27,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         if (control != 0 || dagger) && !tket_op.is_quantum() {
             return Err(ModifierResolverErrors::unresolvable(
                 op_node,
-                Some("non-quantum operation are not expected in a modified context".to_string()),
+                Some("non-quantum operation are not expected in a modified context.".to_string()),
                 tket_op.into(),
             ));
         }
@@ -642,12 +642,16 @@ mod test {
                 .unwrap();
             let op_node = func.add_child_node(op);
             let mut resolver = ModifierResolver::new();
+            resolver.modifiers.dagger = true;
 
             let result = resolver.modify_tket_op(op_node, op, &mut func, &mut vec![]);
             match result {
                 Err(ModifierResolverErrors::UnResolvable { node, msg, optype }) => {
                     assert_eq!(node, op_node);
-                    assert_eq!(msg, format!("of type {op:?}"));
+                    assert_eq!(
+                        msg,
+                        "non-quantum operation are not expected in a modified context."
+                    );
                     assert_eq!(optype, op.into());
                 }
                 Err(error) => panic!("expected {op:?} to be unresolvable, got {error:?}"),

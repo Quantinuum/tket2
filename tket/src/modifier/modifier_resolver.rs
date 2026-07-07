@@ -1126,7 +1126,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             | OpType::DataflowBlock(_) => {
                 return Err(ModifierResolverErrors::unresolvable(
                     target_node,
-                    Some("Unmodifiable node found".to_string()),
+                    Some("unmodifiable node found.".to_string()),
                     optype.clone(),
                 ));
             }
@@ -1134,7 +1134,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                 // Q. Maybe we should just ignore unknown operations?
                 return Err(ModifierResolverErrors::unresolvable(
                     target_node,
-                    Some("Unknown operation".to_string()),
+                    Some("unknown operation.".to_string()),
                     optype.clone(),
                 ));
             }
