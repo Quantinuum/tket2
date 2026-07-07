@@ -1102,17 +1102,14 @@ mod test {
 
         let res1_out = res1_op.other_output_port().unwrap();
         let res2_in = res2_op.other_input_port().unwrap();
-        let inp_out = h.get_optype(inp).other_output_port().unwrap();
-        let outp_in = h.get_optype(outp).other_input_port().unwrap();
-        // Extra order edges Input->res2 and res1->Output are harmless
-        // and would be removed by RedundantOrderEdgesPass, but we haven't run that
+
         assert_eq!(
             h.linked_inputs(res1, res1_out).collect_vec(),
-            vec![(res2, res2_in), (outp, outp_in)]
+            vec![(res2, res2_in)]
         );
         assert_eq!(
             h.linked_outputs(res2, res2_in).collect_vec(),
-            vec![(res1, res1_out), (inp, inp_out)]
+            vec![(res1, res1_out)]
         );
     }
 
@@ -1165,10 +1162,10 @@ mod test {
         assert!(h.entrypoint_optype().is_cfg()); // remains, but result node lifted outside:
         assert_eq!(h.get_parent(res.node()), Some(fd));
 
-        assert_eq!(
+        assert!(
             h.linked_outputs(res, res_op.other_input_port().unwrap())
-                .collect_vec(),
-            [(inp, h.get_optype(inp).other_output_port().unwrap())]
+                .next()
+                .is_none(),
         );
         assert_eq!(
             h.linked_inputs(res, res_op.other_output_port().unwrap())
