@@ -216,16 +216,6 @@ pub fn normalize_cfg<H: HugrMut>(
         }
         // 1b. Move entry block outside/before the CFG; its successor becomes the entry block.
         let new_cfg_inputs = entry_blk.successor_input(0).unwrap();
-        // Look for nonlocal `Dom` edges from the entry block. (Ignore `Ext` edges.)
-        let nonlocal_srcs = h
-            .children(entry)
-            .filter(|n| {
-                h.output_neighbours(*n).any(|succ| {
-                    ancestor_block(h, succ).expect("Dom edges within entry, Ext within CFG")
-                        != entry
-                })
-            })
-            .collect::<Vec<_>>();
         // Move entry block contents into DFG.
         let dfg = h.add_node_with_parent(
             cfg_parent,
@@ -261,10 +251,6 @@ pub fn normalize_cfg<H: HugrMut>(
             h.connect(dfg, src, cfg_node, src.index());
         }
         // Inline DFG to ensure that any nonlocal (`Dom`) edges from it, become valid `Ext` edges
-        for n in nonlocal_srcs {
-            // With required Order edge. (Do this before inlining, in case n is Input.)
-            h.add_other_edge(n, cfg_node);
-        }
         entry_nodes_moved.extend(h.children(dfg).skip(2)); // Skip Input/Output nodes
         h.apply_patch(InlineDFG(dfg.into())).unwrap();
     }
