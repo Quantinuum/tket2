@@ -29,7 +29,7 @@ def fuu(i: int) -> int:
 
 
 @guppy
-def inner(mk_struct: "Callable[[int], int]", x: int) -> int:
+def inner(mk_struct: Callable[[int], int], x: int) -> int:
     return mk_struct(x)
 
 
