@@ -21,8 +21,14 @@ import hypothesis.strategies as st
 from hypothesis.strategies._internal import SearchStrategy
 from hypothesis import given, settings
 
-from tket.passes import PytketHugrPass, _QSystemLLVMPass, QSystemRebasePass
+from tket.passes import (
+    PytketHugrPass,
+    _QSystemLLVMPass,
+    QSystemRebasePass,
+    PlatformTarget,
+)
 from hugr.build.base import Hugr
+from hugr.package import Package
 
 import numpy as np
 import pytest
@@ -45,9 +51,9 @@ normalize = NormalizeGuppy()
 
 def _hugr_from_path(str_path: str) -> Hugr:
     with open(Path(str_path), "rb") as f:
-        h = Hugr.from_bytes(f.read())
+        h = Package.from_bytes(f.read())
 
-    return h
+    return h.modules[0]
 
 
 def _count_ops(hugr: Hugr, op_string_name: str) -> int:
@@ -228,7 +234,7 @@ def test_squash_phasedx_rz():
         Circuit(1).Rz(0.25, 0).Rz(0.75, 0).Rz(0.25, 0).Rz(-1.25, 0)
     )
     hugr = Hugr.from_str(c.to_str(), tket_registry())
-    squash_pass = PytketHugrPass(SquashRzPhasedX())
+    squash_pass = PytketHugrPass(SquashRzPhasedX(), target=PlatformTarget.Tket)
     opt_hugr = squash_pass(hugr)
     opt_circ = CompilationState.from_bytes(opt_hugr.to_bytes())
     # TODO: We cannot use circuit_cost due to a panic on non-tket ops and there
@@ -247,6 +253,25 @@ def test_sequence_pass():
     opt_circ = CompilationState.from_bytes(res_hugr.to_bytes())
     assert opt_circ.num_operations() == 1
     assert opt_circ.circuit_cost(lambda op: int(op == TketOp.CX)) == 1
+
+
+@pytest.mark.parametrize(
+    ("target", "expected_rz"),
+    [
+        (PlatformTarget.Tket, "tket.quantum.Rz"),
+        (PlatformTarget.Sol, "tket.qsystem.sol.Rz"),
+        (PlatformTarget.Helios, "tket.qsystem.helios.Rz"),
+    ],
+)
+def test_platform_target_decoding(target: PlatformTarget, expected_rz: str):
+    """The platform target controls which extension the ambiguous `Rz`
+    operation is decoded into."""
+    c = CompilationState.from_tket1(Circuit(1).Rz(0.25, 0).Rz(0.25, 0))
+    hugr = Hugr.from_str(c.to_str(), tket_registry())
+
+    res = PytketHugrPass(RemoveRedundancies(), target=target).run(hugr)
+
+    assert _count_ops(res.hugr, expected_rz) == 1
 
 
 def test_normalize_guppy():
@@ -357,6 +382,7 @@ def test_normalize_guppy_on_modifier() -> None:
     for hugr_path in sorted(Path("test_files/modifier_examples").glob("*.hugr")):
         try:
             normalized = normalize(_hugr_from_path(str(hugr_path)))
+            CompilationState.from_python(normalized).validate()
         except Exception as exc:
             raise AssertionError(f"NormalizeGuppy failed for {hugr_path}") from exc
         assert not _contains_modifiers(normalized), (
@@ -419,6 +445,7 @@ def test_python_qsystem_pass_with_modifiers() -> None:
     for hugr_path in sorted(Path("test_files/modifier_examples").glob("*.hugr")):
         try:
             qsystem_hugr = qsystem_llvm(qsystem_rebase(_hugr_from_path(str(hugr_path))))
+            CompilationState.from_python(qsystem_hugr).validate()
         except Exception as exc:
             raise AssertionError(f"QSystem passes failed for {hugr_path}") from exc
         assert not _contains_modifiers(qsystem_hugr), (

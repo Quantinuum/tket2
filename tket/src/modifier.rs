@@ -86,10 +86,6 @@ impl ModifierFlags {
         h.set_metadata::<metadata::UnitaryFlags>(n, num);
     }
 
-    fn satisfies(&self, combined: &CombinedModifier) -> bool {
-        (combined.control == 0 || self.control) && (!combined.dagger || self.dagger)
-    }
-
     fn from_combined(combined: &CombinedModifier) -> Self {
         ModifierFlags {
             control: combined.control > 0,

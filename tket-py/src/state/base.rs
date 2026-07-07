@@ -1,6 +1,7 @@
 //! Rust-backed representation of circuits
 
 use std::num::NonZeroU8;
+use std::str::FromStr;
 
 use anyhow::Context;
 use hugr::envelope::{EnvelopeConfig, EnvelopeFormat, ZstdConfig};
@@ -15,9 +16,9 @@ use tket::serialize::TKETDecode;
 use tket::serialize::pytket::{DecodeOptions, EncodeOptions};
 use tket::{Circuit, TketOp};
 use tket_json_rs::circuit_json::SerialCircuit;
-use tket_qsystem::QSystemPlatform;
 use tket_qsystem::extension::REGISTRY;
-use tket_qsystem::pytket::{qsystem_decoder_config, qsystem_encoder_config};
+use tket_qsystem::pytket::qsystem_encoder_config;
+use tket_qsystem::{PlatformTarget, QSystemPlatform};
 
 use crate::ops::PyTketOp;
 use crate::rewrite::PyCircuitRewrite;
@@ -45,12 +46,21 @@ impl CompilationState {
     }
 
     /// Load a program from a legacy `pytket.Circuit`.
+    ///
+    /// The `target` string selects which decoder extension set is used when
+    /// translating pytket commands into HUGR operations. It defaults to the
+    /// platform-agnostic `"tket"` target. See [`PlatformTarget`] for the
+    /// available targets and their behaviour.
     #[staticmethod]
-    pub fn from_tket1(circ: &Bound<PyAny>) -> anyhow::Result<Self> {
+    #[pyo3(signature = (circ, *, target = None))]
+    pub fn from_tket1(circ: &Bound<PyAny>, target: Option<&str>) -> anyhow::Result<Self> {
+        let target = match target {
+            None => PlatformTarget::default(),
+            Some(s) => PlatformTarget::from_str(s)
+                .with_context(|| format!("Unknown platform target: {s:?}"))?,
+        };
         let hugr = SerialCircuit::from_tket1(circ)?
-            .decode(
-                DecodeOptions::new().with_config(qsystem_decoder_config(QSystemPlatform::Helios)),
-            )
+            .decode(DecodeOptions::new().with_config(target.decoder_config()))
             .context("Could not decode a CompilationState from a pytket circuit")?;
         Ok(CompilationState { hugr })
     }

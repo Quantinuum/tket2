@@ -14,6 +14,9 @@ rust:
   - "compile-rewriter/**"
   - "tket1-passes/**"
 
+pg-libs:
+  - "pg-libs/**"
+
 python:
   - *rust-core
   - "tket-py/**"

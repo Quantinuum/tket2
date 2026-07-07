@@ -1,4 +1,4 @@
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 
 from tket._tket.ops import TketOp
 from tket.util import PytketCircuitProto as Tk1Circuit
@@ -23,8 +23,18 @@ class CompilationState:
         """Create a new empty program."""
 
     @staticmethod
-    def from_tket1(circ: Tk1Circuit) -> CompilationState:
-        """Load a program from a legacy pytket Circuit."""
+    def from_tket1(
+        circ: Tk1Circuit, *, target: Literal["tket", "sol", "helios"] | None = None
+    ) -> CompilationState:
+        """Load a program from a legacy pytket Circuit.
+
+        Parameters:
+        - circ: The legacy pytket circuit to load.
+        - target: The platform target identifier selecting which decoder
+          extension set to use when translating pytket commands into HUGR
+          operations. One of ``"tket"``, ``"sol"``, or ``"helios"``. Defaults to
+          the platform-agnostic ``"tket"`` target.
+        """
 
     def apply_rewrite(self, rw) -> None:
         """Apply a rewrite on the circuit."""

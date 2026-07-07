@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#    "guppylang==1.0.0a7",
+#    "guppylang==1.0.0a8",
 # ]
 # ///
 """Test the use of a classical function inside modifiers"""

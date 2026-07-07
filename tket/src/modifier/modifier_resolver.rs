@@ -1758,7 +1758,7 @@ mod tests {
         },
         std_extensions::collections::array::ArrayOpBuilder,
         type_row,
-        types::Term,
+        types::{Term, TypeBound},
     };
 
     use hugr_core::Visibility;
@@ -1957,6 +1957,40 @@ mod tests {
         let h = module.finish_hugr().unwrap();
         assert_matches!(h.validate(), Ok(()));
         (h, foo_node)
+    }
+
+    #[test]
+    /// Test that the signature_has_quantum_data method correctly identifies signatures with quantum data.
+    /// Also test that signatures with quantum data in nested function types are not considered to have quantum data at the top level.
+    fn signature_has_quantum_data_checks_boundary_types_only() {
+        let resolver = ModifierResolver::<Node>::new();
+
+        assert!(resolver.signature_has_quantum_data(&Signature::new_endo([qb_t()])));
+        assert!(
+            resolver
+                .signature_has_quantum_data(&Signature::new([array_type(3, qb_t())], type_row![],))
+        );
+        assert!(
+            resolver
+                .signature_has_quantum_data(&Signature::new(type_row![], [array_type(3, qb_t())],))
+        );
+
+        let inner_quantum_function = Type::new_function(Signature::new_endo([qb_t()]));
+        let outer_signature = Signature::new([inner_quantum_function], type_row![]);
+
+        assert!(!resolver.signature_has_quantum_data(&outer_signature));
+        assert!(
+            !resolver
+                .function_type_has_quantum_data(&Type::new_function(outer_signature))
+                .unwrap()
+        );
+
+        let generic_ty = || Type::new_var_use(0, TypeBound::Linear);
+        let generic_quantum_signature = Signature::new([generic_ty(), qb_t()], [generic_ty()]);
+        assert!(resolver.signature_has_quantum_data(&generic_quantum_signature));
+
+        let generic_classical_signature = Signature::new_endo([generic_ty()]);
+        assert!(!resolver.signature_has_quantum_data(&generic_classical_signature));
     }
 
     #[test]
@@ -2414,6 +2448,7 @@ mod tests {
     #[case::double_modifier("../test_files/modifier_examples/double_modifier.hugr")]
     #[case::even_dagger("../test_files/modifier_examples/even_dagger.hugr")]
     #[case::higher_order_recursive("../test_files/modifier_examples/higher_order_recursive.hugr")]
+    #[case::loaded_pytket("../test_files/modifier_examples/loaded_pytket.hugr")]
     #[case::multiple_functions("../test_files/modifier_examples/multiple_functions.hugr")]
     #[case::nested_multiple("../test_files/modifier_examples/nested_multiple.hugr")]
     #[case::simple_higher_order("../test_files/modifier_examples/simple_higher_order.hugr")]

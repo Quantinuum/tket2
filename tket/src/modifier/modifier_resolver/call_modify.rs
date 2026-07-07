@@ -32,8 +32,9 @@ impl<N: HugrNode> ModifierResolver<N> {
             .single_linked_output(call_node, call.called_function_port())
             .unwrap();
 
-        // wire the callee
-        let Some(new_callee) = self.modify_fn_if_needed(h, callee.0)? else {
+        let Some(new_callee) =
+            self.modify_fn_if_needed(h, callee.0, Some(&old_signature), false)?
+        else {
             // If the function need not be modified, just copy the Call node as is.
             let new = self.add_node_no_modification(h, call_node, call.clone(), new_dfg)?;
             self.call_map_insert(callee.0, (new, call.called_function_port()));
@@ -318,20 +319,10 @@ impl<N: HugrNode> ModifierResolver<N> {
         let (func, load) =
             Self::get_loaded_function(h, n, targ, h.get_optype(targ)).map_err(wrap_modifier_err)?;
 
-        // Modify the function (if needed)
-        let Some(modified_fn) = self.modify_fn_if_needed(h, func)? else {
-            // The loaded function does not satisfy the active modifier, so keep
-            // it unchanged.
-            // If same modifier are present, we raise an error instead of silently skipping modification,
-            // since that likely indicates a mistake in the input graph
-            *self.modifiers_mut() = modifiers;
-            if trace.len() > 1 {
-                return Err(ModifierResolverErrors::unresolvable(
-                    trace[0],
-                    "Cannot modify indirect call.",
-                    indir_call.clone().into(),
-                ));
-            }
+        let Some(modified_fn) = self
+            .modify_fn_if_needed(h, func, Some(&indir_call.signature), trace.len() > 1)
+            .map_err(wrap_resolver_err)?
+        else {
             self.add_node_no_modification(h, n, indir_call.clone(), new_dfg)?;
             return Ok(());
         };
@@ -458,15 +449,19 @@ impl<N: HugrNode> ModifierResolver<N> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::tests::{SetUnitary, modifier_test_hugr, test_modifier_resolver};
+    use super::super::tests::{SetUnitary, test_modifier_resolver};
     use super::super::*;
     use crate::TketOp;
-    use crate::extension::modifier::{CONTROL_OP_ID, MODIFIER_EXTENSION, Modifier};
+    use crate::extension::modifier::{CONTROL_OP_ID, MODIFIER_EXTENSION};
     use hugr::{
         Hugr,
         builder::{Dataflow, DataflowSubContainer, ModuleBuilder},
         extension::prelude::qb_t,
-        ops::{CallIndirect, ExtensionOp, OpType, handle::FuncID},
+        ops::{CallIndirect, ExtensionOp, handle::FuncID},
+        std_extensions::arithmetic::{
+            int_ops::IntOpDef,
+            int_types::{ConstInt, INT_TYPES},
+        },
         std_extensions::collections::array::{ArrayOpBuilder, array_type},
         types::{Signature, Term},
     };
@@ -666,6 +661,66 @@ mod tests {
         *foo.handle()
     }
 
+    /// Test quantum and classical indirect calls in modifier context
+    fn foo_indirect_unmodified_callees(
+        module: &mut ModuleBuilder<Hugr>,
+        t_num: usize,
+    ) -> FuncID<true> {
+        let quantum_sig = Signature::new_endo(vec![qb_t()]);
+        let quantum = {
+            let mut quantum_builder = module
+                .define_function("indirect_quantum", quantum_sig.clone())
+                .unwrap();
+            quantum_builder.set_unitary();
+            let mut inputs: Vec<Wire> = quantum_builder.input_wires().collect();
+            inputs[0] = quantum_builder
+                .add_dataflow_op(TketOp::X, vec![inputs[0]])
+                .unwrap()
+                .out_wire(0);
+            quantum_builder.finish_with_outputs(inputs).unwrap()
+        };
+
+        let int_t = INT_TYPES[3].clone();
+        let add_sig = Signature::new(vec![int_t.clone(); 2], vec![int_t]);
+        let add = {
+            let mut add_builder = module
+                .define_function("indirect_classical_add", add_sig.clone())
+                .unwrap();
+            let [lhs, rhs] = add_builder.input_wires_arr();
+            let sum = add_builder
+                .add_dataflow_op(IntOpDef::iadd.with_log_width(3), [lhs, rhs])
+                .unwrap()
+                .out_wire(0);
+            add_builder.finish_with_outputs([sum]).unwrap()
+        };
+
+        let foo_sig = Signature::new_endo(iter::repeat_n(qb_t(), t_num).collect::<Vec<_>>());
+        let mut foo_builder = module.define_function("foo", foo_sig).unwrap();
+        foo_builder.set_unitary();
+        let mut inputs: Vec<Wire> = foo_builder.input_wires().collect();
+
+        let quantum_handle = foo_builder.load_func(quantum.handle(), &[]).unwrap();
+        inputs[0] = foo_builder
+            .add_dataflow_op(
+                CallIndirect {
+                    signature: quantum_sig,
+                },
+                [quantum_handle, inputs[0]],
+            )
+            .unwrap()
+            .out_wire(0);
+
+        let add_handle = foo_builder.load_func(add.handle(), &[]).unwrap();
+        let lhs = foo_builder.add_load_value(ConstInt::new_u(3, 2).unwrap());
+        let rhs = foo_builder.add_load_value(ConstInt::new_u(3, 3).unwrap());
+        let _sum = foo_builder
+            .add_dataflow_op(CallIndirect { signature: add_sig }, [add_handle, lhs, rhs])
+            .unwrap()
+            .out_wire(0);
+
+        *foo_builder.finish_with_outputs(inputs).unwrap().handle()
+    }
+
     #[rstest::rstest]
     #[case::call_twice(1, 1, foo_modifier_on_function, false)]
     #[case::call(1, 1, foo_call, false)]
@@ -675,6 +730,7 @@ mod tests {
     #[case::load_fn(1, 1, foo_load_fn, false)]
     #[case::nested_modifier(2, 2, foo_nested_modifier, false)]
     #[case::nested_modifier_unmodified_callee(2, 2, foo_nested_modifier_unmodified_callee, false)]
+    #[case::indirect_unmodified_callees(1, 1, foo_indirect_unmodified_callees, true)]
     fn test_call_modify(
         #[case] target_num: usize,
         #[case] ctrl_num: u64,
@@ -682,79 +738,5 @@ mod tests {
         #[case] dagger: bool,
     ) {
         test_modifier_resolver(target_num, ctrl_num, foo, dagger);
-    }
-
-    fn foo_indirect_modifier_unmodified_callee(
-        module: &mut ModuleBuilder<Hugr>,
-        t_num: usize,
-    ) -> FuncID<true> {
-        let bar_sig = Signature::new_endo(vec![qb_t()]);
-        let bar = {
-            let bar_builder = module.define_function("bar", bar_sig).unwrap();
-            let inputs: Vec<Wire> = bar_builder.input_wires().collect();
-            bar_builder.finish_with_outputs(inputs).unwrap()
-        };
-
-        let controlled_sig = Signature::new_endo(vec![array_type(1, qb_t()), qb_t()]);
-        let foo_sig = Signature::new_endo(iter::repeat_n(qb_t(), t_num).collect::<Vec<_>>());
-        let foo = {
-            let mut foo_builder = module.define_function("foo", foo_sig).unwrap();
-            foo_builder.set_unitary();
-            let mut inputs: Vec<Wire> = foo_builder.input_wires().collect();
-            let load = foo_builder.load_func(bar.handle(), &[]).unwrap();
-
-            let control_op: ExtensionOp = MODIFIER_EXTENSION
-                .instantiate_extension_op(
-                    &CONTROL_OP_ID,
-                    [Term::BoundedNat(1), [qb_t().into()].into(), [].into()],
-                )
-                .unwrap();
-            let controlled = foo_builder
-                .add_dataflow_op(control_op, vec![load])
-                .unwrap()
-                .out_wire(0);
-            let mut ctrl = foo_builder.add_new_array(qb_t(), [inputs[0]]).unwrap();
-            [ctrl, inputs[1]] = foo_builder
-                .add_dataflow_op(
-                    CallIndirect {
-                        signature: controlled_sig,
-                    },
-                    [controlled, ctrl, inputs[1]],
-                )
-                .unwrap()
-                .outputs_arr();
-            inputs[0] = foo_builder.add_array_unpack(qb_t(), 1, ctrl).unwrap()[0];
-            foo_builder.finish_with_outputs(inputs).unwrap()
-        };
-        *foo.handle()
-    }
-
-    #[test]
-    fn indirect_call_modifier_chain_rejects_unmodified_callee() {
-        let (mut h, foo_node) =
-            modifier_test_hugr(2, 2, foo_indirect_modifier_unmodified_callee, false);
-        let outer_modifier =
-            h.nodes()
-                .find_map(|node| {
-                    let OpType::LoadFunction(load) = h.get_optype(node) else {
-                        return None;
-                    };
-                    let (loaded_func, _) = h.single_linked_output(node, load.function_port())?;
-                    (loaded_func == foo_node)
-                        .then(|| {
-                            h.linked_inputs(node, 0).map(|(consumer, _)| consumer).find(
-                                |consumer| Modifier::from_optype(h.get_optype(*consumer)).is_some(),
-                            )
-                        })
-                        .flatten()
-                })
-                .unwrap();
-
-        match resolve_modifier_with_entrypoints(&mut h, [outer_modifier]) {
-            Err(ModifierResolverErrors::UnResolvable { msg, .. }) => {
-                assert_eq!(msg, "Cannot modify indirect call.");
-            }
-            result => panic!("expected indirect call modifier chain error, got {result:?}"),
-        }
     }
 }

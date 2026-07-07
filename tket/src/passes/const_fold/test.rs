@@ -1,3 +1,4 @@
+use hugr::extension::prelude::{ConstUsize, qb_t, usize_t};
 use hugr_core::builder::{
     Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
     HugrBuilder, ModuleBuilder, SubContainer, endo_sig, inout_sig,
@@ -2072,4 +2073,53 @@ fn test_propagate_parametrized_sum_type(
             .fold(0, |sum, _, (_, count)| sum + count),
     );
     Ok(())
+}
+
+#[test]
+fn linear_sum_type() {
+    use crate::passes::test_utils::test_quantum_extension::{q_alloc, q_discard};
+    let variants = [TypeRow::from([qb_t()]), [usize_t()].into()];
+    let st = SumType::new(variants.clone());
+    let mut bldr = FunctionBuilder::new("main", inout_sig([qb_t()], [st.clone().into()])).unwrap();
+
+    // Build sum value of linear type
+    let tag = bldr
+        .add_dataflow_op(Tag::new(0, variants.to_vec()), bldr.input_wires())
+        .unwrap();
+    let [sv] = tag.outputs_arr();
+
+    let mut cond = bldr
+        .conditional_builder((variants.clone(), sv), [], [st.clone().into()].into())
+        .unwrap();
+
+    // qubit case: explicit discard, return constant
+    let mut case_qb = cond.case_builder(0).unwrap();
+    let inps = case_qb.input_wires();
+    case_qb.add_dataflow_op(q_discard(), inps).unwrap();
+    let rv =
+        case_qb.add_load_value(Value::sum(1, [ConstUsize::new(3).into()], st.clone()).unwrap());
+    case_qb.finish_with_outputs([rv]).unwrap();
+
+    // Int case: implicit discard, qalloc
+    let mut case_usz = cond.case_builder(1).unwrap();
+    let qb = case_usz.add_dataflow_op(q_alloc(), []).unwrap();
+    let tag2 = case_usz
+        .add_dataflow_op(Tag::new(0, variants.to_vec()), qb.outputs())
+        .unwrap();
+    case_usz.finish_with_outputs(tag2.outputs()).unwrap();
+    let cond = cond.finish_sub_container().unwrap();
+    let mut h = bldr.finish_hugr_with_outputs(cond.outputs()).unwrap();
+
+    ConstantFoldPass::default().run(&mut h).unwrap();
+    h.validate().unwrap();
+
+    // Must not remove the conditional, as it consumes the qubit input.
+    // (Until we remove untaken branches, converting sum types to one variant,
+    // then we can remove the qalloc altogether.)
+    assert!(h.get_optype(cond.node()).is_conditional()); // Still there
+    let [_inp, outp] = h.get_io(h.entrypoint()).unwrap();
+    assert_eq!(h.input_neighbours(cond.node()).collect_vec(), [tag.node()]);
+    // Cannot disconnect the conditional (even tho we know the output is Right(3)),
+    // as the output is linear.
+    assert_eq!(h.input_neighbours(outp).collect_vec(), [cond.node()]);
 }
