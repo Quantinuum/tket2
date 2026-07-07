@@ -421,7 +421,7 @@ pub enum ModifierResolverErrors<N = Node> {
         msg: String,
     },
     /// Modifier applied to a node that cannot be modified.
-    #[display("The node {node} of type {optype} cannot be modified{msg}")]
+    #[display("The node {node} of type {optype} cannot be modified: {msg}")]
     UnResolvable {
         /// The node that cannot be modified.
         node: N,
@@ -452,7 +452,7 @@ impl<N> ModifierResolverErrors<N> {
         Self::UnResolvable {
             node,
             optype,
-            msg: format!(": {}", msg.into()),
+            msg: msg.into(),
         }
     }
 }
@@ -1812,7 +1812,7 @@ mod tests {
             error,
             ModifierResolverErrors::UnResolvable { node, msg, optype } => {
                 assert_eq!(node, block_node);
-                assert_eq!(msg, ": unmodifiable node found.");
+                assert_eq!(msg, "unmodifiable node found.");
                 assert_eq!(optype, block_optype);
             }
         );

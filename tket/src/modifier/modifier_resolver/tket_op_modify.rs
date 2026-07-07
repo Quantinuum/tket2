@@ -681,7 +681,7 @@ mod test {
                     assert_eq!(node, op_node);
                     assert_eq!(
                         msg,
-                        ": non-quantum operations are not expected in a modified context."
+                        "non-quantum operations are not expected in a modified context."
                     );
                     assert_eq!(optype, op.into());
                 }

@@ -1500,20 +1500,15 @@ mod test {
         1,
         1,
         foo_cfg_branching,
-        ": CFG with more than one node cannot be daggered."
+        "CFG with more than one node cannot be daggered."
     )]
-    #[case::cfg_loop(
-        1,
-        1,
-        foo_cfg_loop,
-        ": CFG with more than one node cannot be daggered."
-    )]
-    #[case::tail_loop(1, 1, foo_tail_loop, ": TailLoop cannot be daggered.")]
+    #[case::cfg_loop(1, 1, foo_cfg_loop, "CFG with more than one node cannot be daggered.")]
+    #[case::tail_loop(1, 1, foo_tail_loop, "TailLoop cannot be daggered.")]
     #[case::cfg_two_blocks_dagger(
         1,
         1,
         foo_cfg_two_blocks,
-        ": CFG with more than one node cannot be daggered."
+        "CFG with more than one node cannot be daggered."
     )]
 
     fn test_dagger_rejects_cfg_with_control_flow(
