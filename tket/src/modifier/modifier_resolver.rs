@@ -448,11 +448,11 @@ impl<N> ModifierResolverErrors<N> {
     }
 
     /// Create an unresolvable error.
-    fn unresolvable(node: N, msg: Option<impl Into<String>>, optype: OpType) -> Self {
+    fn unresolvable(node: N, msg: impl Into<String>, optype: OpType) -> Self {
         Self::UnResolvable {
             node,
-            msg: msg.map(|m| m.into()).unwrap_or_else(|| ".".to_string()),
             optype,
+            msg: format!(": {}", msg.into()),
         }
     }
 }
@@ -1126,7 +1126,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             | OpType::DataflowBlock(_) => {
                 return Err(ModifierResolverErrors::unresolvable(
                     target_node,
-                    Some("unmodifiable node found.".to_string()),
+                    "unmodifiable node found.".to_string(),
                     optype.clone(),
                 ));
             }
@@ -1134,7 +1134,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                 // Q. Maybe we should just ignore unknown operations?
                 return Err(ModifierResolverErrors::unresolvable(
                     target_node,
-                    Some("unknown operation.".to_string()),
+                    "unknown operation.".to_string(),
                     optype.clone(),
                 ));
             }
@@ -1404,7 +1404,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         if children.len() != 1 && self.modifiers().dagger {
             return Err(ModifierResolverErrors::unresolvable(
                 cfg_node,
-                Some("CFG with more than one node cannot be daggered."),
+                "CFG with more than one node cannot be daggered.".to_string(),
                 cfg.clone().into(),
             ));
         }
@@ -1781,6 +1781,41 @@ mod tests {
             self.hugr_mut()
                 .set_metadata::<metadata::UnitaryFlags>(node, 7);
         }
+    }
+
+    #[test]
+    fn modify_op_rejects_unmodifiable_dataflow_block() {
+        let mut cfg = CFGBuilder::new(Signature::new_endo([qb_t()])).unwrap();
+        let block = {
+            let mut block = cfg
+                .entry_builder(vec![type_row![]], [qb_t()].into())
+                .unwrap();
+            let qubit = block.input_wires().next().unwrap();
+            let branch = block.make_sum(0, [type_row![]], []).unwrap();
+            block.finish_with_outputs(branch, [qubit]).unwrap()
+        };
+        let block_node = block.node();
+        cfg.branch(&block, 0, &cfg.exit_block()).unwrap();
+
+        let mut h = cfg.finish_hugr().unwrap();
+        let block_optype = h.get_optype(block_node).clone();
+
+        let mut module = ModuleBuilder::new();
+        let mut new_fn = module
+            .define_function("new", Signature::new_endo([qb_t()]))
+            .unwrap();
+        let error = ModifierResolver::new()
+            .modify_op(&mut h, block_node, &mut new_fn)
+            .unwrap_err();
+
+        assert_matches!(
+            error,
+            ModifierResolverErrors::UnResolvable { node, msg, optype } => {
+                assert_eq!(node, block_node);
+                assert_eq!(msg, ": unmodifiable node found.");
+                assert_eq!(optype, block_optype);
+            }
+        );
     }
 
     /// Helper that builds a test hugr with a modifier chain and runs the resolver on it.

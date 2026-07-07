@@ -577,7 +577,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             let optype = h.get_optype(n);
             return Err(ModifierResolverErrors::unresolvable(
                 n,
-                Some("TailLoop cannot be daggered.".to_string()),
+                "TailLoop cannot be daggered.".to_string(),
                 optype.clone(),
             ));
         }
@@ -1500,15 +1500,20 @@ mod test {
         1,
         1,
         foo_cfg_branching,
-        "CFG with more than one node cannot be daggered."
+        ": CFG with more than one node cannot be daggered."
     )]
-    #[case::cfg_loop(1, 1, foo_cfg_loop, "CFG with more than one node cannot be daggered.")]
-    #[case::tail_loop(1, 1, foo_tail_loop, "TailLoop cannot be daggered.")]
+    #[case::cfg_loop(
+        1,
+        1,
+        foo_cfg_loop,
+        ": CFG with more than one node cannot be daggered."
+    )]
+    #[case::tail_loop(1, 1, foo_tail_loop, ": TailLoop cannot be daggered.")]
     #[case::cfg_two_blocks_dagger(
         1,
         1,
         foo_cfg_two_blocks,
-        "CFG with more than one node cannot be daggered."
+        ": CFG with more than one node cannot be daggered."
     )]
 
     fn test_dagger_rejects_cfg_with_control_flow(

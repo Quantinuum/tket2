@@ -139,9 +139,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                 _ => {
                     return Err(ModifierResolverErrors::unresolvable(
                         n,
-                        Some(format!(
-                            "modify array operation {op_def:?} cannot be daggered."
-                        )),
+                        format!("modify array operation {op_def:?} cannot be daggered."),
                         OpType::from(op.clone()),
                     ));
                 }
