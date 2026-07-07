@@ -1479,6 +1479,7 @@ mod test {
         *func.finish_with_outputs(inputs).unwrap().handle()
     }
 
+    /// Test pass on a DFG with no quantum signature that calls an external function
     fn foo_dfg_external_function_call(
         module: &mut ModuleBuilder<Hugr>,
         t_num: usize,
@@ -1486,31 +1487,28 @@ mod test {
         assert_eq!(t_num, 1);
 
         let external = {
-            let mut func = module
-                .define_function("external_quantum_x", Signature::new_endo([qb_t()]))
+            let func = module
+                .define_function(
+                    "external_classical_noop",
+                    Signature::new(type_row![], type_row![]),
+                )
                 .unwrap();
-            func.set_unitary();
-            let q = func.input_wires().next().unwrap();
-            let q = func.add_dataflow_op(TketOp::X, [q]).unwrap().out_wire(0);
-            let q = func.add_dataflow_op(TketOp::Z, [q]).unwrap().out_wire(0);
-            func.finish_with_outputs([q]).unwrap()
+            func.finish_with_outputs([]).unwrap()
         };
 
         let foo_sig = Signature::new_endo([qb_t()]);
         let mut func = module.define_function("foo", foo_sig).unwrap();
         func.set_unitary();
         let q = func.input_wires().next().unwrap();
-        let dfg = {
+        {
             let mut dfg = func
-                .dfg_builder(Signature::new_endo([qb_t()]), [q])
+                .dfg_builder(Signature::new(type_row![], type_row![]), [])
                 .unwrap();
-            let q = dfg.input_wires().next().unwrap();
-            let q = dfg.call(external.handle(), &[], [q]).unwrap().out_wire(0);
-            let q = dfg.add_dataflow_op(TketOp::X, [q]).unwrap().out_wire(0);
-            dfg.finish_with_outputs([q]).unwrap()
-        };
+            dfg.call(external.handle(), &[], []).unwrap();
+            dfg.finish_with_outputs([]).unwrap();
+        }
 
-        *func.finish_with_outputs(dfg.outputs()).unwrap().handle()
+        *func.finish_with_outputs([q]).unwrap().handle()
     }
 
     #[rstest::rstest]
