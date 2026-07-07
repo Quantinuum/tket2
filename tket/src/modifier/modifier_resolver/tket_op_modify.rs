@@ -474,11 +474,11 @@ impl<N: HugrNode> ModifierResolver<N> {
                 }
             }
             Measure | MeasureFree | QAlloc | TryQAlloc | QFree | Reset => {
-                return Err(ModifierResolverErrors::unresolvable(
+                Err(ModifierResolverErrors::unresolvable(
                     op_node,
                     "non-quantum operations are not expected in a modified context.".to_string(),
                     tket_op.into(),
-                ));
+                ))
             }
         }
     }
