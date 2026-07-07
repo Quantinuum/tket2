@@ -135,4 +135,5 @@ repos:
         entry: uv run -- sh -c "maturin develop && pytest --cov=./ --cov-report=html"
         language: system
         files: \.py$
+        exclude: ^pg-libs/
         pass_filenames: false
