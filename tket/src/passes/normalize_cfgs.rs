@@ -1148,10 +1148,10 @@ mod test {
         assert!(h.entrypoint_optype().is_cfg()); // remains, but result node lifted outside:
         assert_eq!(h.get_parent(res.node()), Some(fd));
 
-        assert!(
+        assert_eq!(
             h.linked_outputs(res, res_op.other_input_port().unwrap())
-                .next()
-                .is_none(),
+                .collect_vec(),
+            [(inp, h.get_optype(inp).other_output_port().unwrap())]
         );
         assert_eq!(
             h.linked_inputs(res, res_op.other_output_port().unwrap())
