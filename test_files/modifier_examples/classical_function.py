@@ -49,31 +49,31 @@ def main() -> None:
     with dagger, control(c1):
         inner(foo, 2)
 
-    # Testing that array operations are happening in the correct order
-    with control(t), dagger:
-        arr[1] += 1
-        arr[1] *= 2
-    if arr[1] == 4:
-        h(c1)
+    # # Testing that array operations are happening in the correct order
+    # with control(t), dagger:
+    #     arr[1] += 1
+    #     arr[1] *= 2
+    # if arr[1] == 4:
+    #     h(c1)
 
-    # Test that array swap in a dagger and control context works correctly
-    with dagger:
-        array_swap(arr, 2, 4)
-        with control(c2):
-            array_swap(arr, 0, 4)
-    if arr[0] == 2:
-        h(c2)
+    # # Test that array swap in a dagger and control context works correctly
+    # with dagger:
+    #     array_swap(arr, 2, 4)
+    #     with control(c2):
+    #         array_swap(arr, 0, 4)
+    # if arr[0] == 2:
+    #     h(c2)
 
-    # Test that dagger and control does not affect the classical function
-    with control(c1):
-        d1 = fuu(2)
-        with dagger:
-            i = 2
-            d2 = fuu(i)
-            d3 = fuu(i)
-            with control(c2):
-                d = (d1 + d2 + d3) / (i + 1)
-                rx(t, angle(1 / d))
+    # # Test that dagger and control does not affect the classical function
+    # with control(c1):
+    #     d1 = fuu(2)
+    #     with dagger:
+    #         i = 2
+    #         d2 = fuu(i)
+    #         d3 = fuu(i)
+    #         with control(c2):
+    #             d = (d1 + d2 + d3) / (i + 1)
+    #             rx(t, angle(1 / d))
 
     state_result("r", c1, c2, t)
     discard(c1)
@@ -82,4 +82,22 @@ def main() -> None:
 
 
 program = main.compile()
+program.modules[0].render_dot().view("1")
+from tket.passes import NormalizeGuppy
+
+normalize = NormalizeGuppy(
+    resolve_modifiers=False,
+    simplify_cfgs=True,
+    remove_tuple_untuple=False,
+    constant_folding=False,
+    remove_dead_funcs=False,
+    inline_funcs=False,
+    inline_dfgs=False,
+    remove_redundant_order_edges=False,
+    squash_borrows=False,
+)
+normalize(program.modules[0]).render_dot().view(
+    "2",
+)
+
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())

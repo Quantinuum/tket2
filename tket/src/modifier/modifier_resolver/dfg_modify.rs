@@ -543,8 +543,17 @@ impl<N: HugrNode> ModifierResolver<N> {
     ) -> Result<(), ModifierResolverErrors<N>> {
         // Check if the DFG input or output are carrying qubits: only DFGs with quantum effects need to be modified.
         let boundary_has_qubits = self.signature_has_quantum_data(&dfg.signature);
-        if !boundary_has_qubits {
+        let has_indirect_call = h
+            .descendants(n)
+            .any(|node| matches!(h.get_optype(node), OpType::CallIndirect(_)));
+        let has_active_higher_order_inputs = !self.active_function_input_modifiers().is_empty();
+        if !boundary_has_qubits
+            && !self.subtree_has_quantum_operation(h, n)
+            && !has_indirect_call
+            && !has_active_higher_order_inputs
+        {
             self.copy_sub_container_no_modification(h, n, parent_dfg)?;
+            // todo: if there are modifier inside the dfg we should solve them
             return Ok(());
         }
 

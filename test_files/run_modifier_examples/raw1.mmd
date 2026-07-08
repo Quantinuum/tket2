@@ -1,0 +1,174 @@
+---
+config:
+    layout: elk
+---
+graph LR
+    subgraph 0 ["(0) Module"]
+        direction LR
+        subgraph 1 ["(1) [**FuncDefn: #quot;__main__.bar#quot;**]"]
+            direction LR
+            style 1 stroke:#832561,stroke-width:3px
+            2["(2) Input"]
+            3["(3) Output"]
+            subgraph 4 ["(4) DFG"]
+                direction LR
+                5["(5) Input"]
+                6["(6) Output"]
+                69["(69) LoadFunction"]
+                9["(9) collections.borrow_arr.new_array"]
+                10["(10) collections.borrow_arr.to_array"]
+                11["(11) CallIndirect"]
+                12["(12) collections.borrow_arr.from_array"]
+                13["(13) collections.borrow_arr.unpack"]
+                14["(14) Tag"]
+                15["(15) prelude.UnpackTuple"]
+                5--"0:0<br>qubit"-->9
+                5-."1:2".->11
+                69--"0:0<br>[array(1, qubit)] -> [array(1, qubit)]"-->11
+                9--"0:0<br>borrow_array(1, qubit)"-->10
+                10--"0:1<br>array(1, qubit)"-->11
+                11--"0:0<br>array(1, qubit)"-->12
+                11-."1:1".->6
+                12--"0:0<br>borrow_array(1, qubit)"-->13
+                13--"0:0<br>qubit"-->6
+                14--"0:0<br>Unit"-->15
+            end
+            2--"0:0<br>qubit"-->4
+            2-."1:1".->4
+            4--"0:0<br>qubit"-->3
+            4-."1:1".->3
+        end
+        subgraph 16 ["(16) FuncDefn: #quot;__main__.bar.__WithBlock__0#quot;"]
+            direction LR
+            17["(17) Input"]
+            18["(18) Output"]
+            subgraph 19 ["(19) DFG"]
+                direction LR
+                20["(20) Input"]
+                21["(21) Output"]
+                22["(22) Call"]
+                23["(23) prelude.MakeTuple"]
+                24["(24) Tag"]
+                25["(25) prelude.UnpackTuple"]
+                20-."0:1".->22
+                22-."0:0".->21
+                24--"0:0<br>Unit"-->25
+            end
+            17-."0:0".->19
+            19-."0:0".->18
+        end
+        subgraph 26 ["(26) FuncDefn: #quot;__main__.foo#quot;"]
+            direction LR
+            27["(27) Input"]
+            28["(28) Output"]
+            subgraph 29 ["(29) DFG"]
+                direction LR
+                30["(30) Input"]
+                31["(31) Output"]
+                32["(32) tket.quantum.QAlloc"]
+                33["(33) tket.quantum.QAlloc"]
+                81["(81) LoadFunction"]
+                36["(36) collections.borrow_arr.new_array"]
+                37["(37) collections.borrow_arr.to_array"]
+                38["(38) CallIndirect"]
+                39["(39) collections.borrow_arr.from_array"]
+                40["(40) collections.borrow_arr.unpack"]
+                41["(41) tket.quantum.QFree"]
+                42["(42) prelude.MakeTuple"]
+                43["(43) tket.quantum.QFree"]
+                44["(44) prelude.MakeTuple"]
+                45["(45) Tag"]
+                46["(46) prelude.UnpackTuple"]
+                30-."0:0".->32
+                32--"0:2<br>qubit"-->38
+                32-."1:0".->33
+                33--"0:0<br>qubit"-->36
+                33-."1:3".->38
+                81--"0:0<br>[array(1, qubit), qubit] -> [array(1, qubit), qubit]"-->38
+                36--"0:0<br>borrow_array(1, qubit)"-->37
+                37--"0:1<br>array(1, qubit)"-->38
+                38--"0:0<br>array(1, qubit)"-->39
+                38--"1:0<br>qubit"-->41
+                38-."2:1".->41
+                39--"0:0<br>borrow_array(1, qubit)"-->40
+                40--"0:0<br>qubit"-->43
+                41-."0:1".->43
+                43-."0:0".->31
+                45--"0:0<br>Unit"-->46
+            end
+            27-."0:0".->29
+            29-."0:0".->28
+        end
+        subgraph 47 ["(47) FuncDefn: #quot;__main__.foo.__WithBlock__0#quot;"]
+            direction LR
+            48["(48) Input"]
+            49["(49) Output"]
+            subgraph 50 ["(50) DFG"]
+                direction LR
+                51["(51) Input"]
+                52["(52) Output"]
+                53["(53) tket.quantum.X"]
+                54["(54) prelude.MakeTuple"]
+                55["(55) Tag"]
+                56["(56) prelude.UnpackTuple"]
+                51--"0:0<br>qubit"-->53
+                53--"0:0<br>qubit"-->52
+                55--"0:0<br>Unit"-->56
+            end
+            48--"0:0<br>qubit"-->50
+            50--"0:0<br>qubit"-->49
+        end
+        subgraph 7 ["(7) FuncDefn: #quot;__modified____main__.bar.__WithBlock__0#quot;"]
+            direction LR
+            57["(57) Input"]
+            58["(58) Output"]
+            59["(59) collections.array.unpack"]
+            subgraph 60 ["(60) DFG"]
+                direction LR
+                62["(62) Input"]
+                63["(63) Output"]
+                64["(64) Call"]
+                65["(65) prelude.MakeTuple"]
+                66["(66) Tag"]
+                67["(67) prelude.UnpackTuple"]
+                62-."0:1".->64
+                64-."0:0".->63
+                66--"0:0<br>Unit"-->67
+            end
+            61["(61) collections.array.new_array"]
+            57--"0:0<br>array(1, qubit)"-->59
+            59--"0:0<br>qubit"-->61
+            61--"0:0<br>array(1, qubit)"-->58
+        end
+        subgraph 34 ["(34) FuncDefn: #quot;__modified____main__.foo.__WithBlock__0#quot;"]
+            direction LR
+            70["(70) Input"]
+            71["(71) Output"]
+            72["(72) collections.array.unpack"]
+            subgraph 73 ["(73) DFG"]
+                direction LR
+                75["(75) Input"]
+                76["(76) Output"]
+                77["(77) Tag"]
+                78["(78) prelude.UnpackTuple"]
+                79["(79) prelude.MakeTuple"]
+                80["(80) tket.quantum.CX"]
+                75--"0:0<br>qubit"-->80
+                75--"1:1<br>qubit"-->80
+                77--"0:0<br>Unit"-->78
+                80--"0:0<br>qubit"-->76
+                80--"1:1<br>qubit"-->76
+            end
+            74["(74) collections.array.new_array"]
+            70--"0:0<br>array(1, qubit)"-->72
+            70--"1:1<br>qubit"-->73
+            72--"0:0<br>qubit"-->73
+            73--"0:0<br>qubit"-->74
+            73--"1:1<br>qubit"-->71
+            74--"0:0<br>array(1, qubit)"-->71
+        end
+        26--"0:0<br>[] -> []"-->22
+        26--"0:0<br>[] -> []"-->64
+        7--"0:0<br>[array(1, qubit)] -> [array(1, qubit)]"-->69
+        34--"0:0<br>[array(1, qubit), qubit] -> [array(1, qubit), qubit]"-->81
+    end
