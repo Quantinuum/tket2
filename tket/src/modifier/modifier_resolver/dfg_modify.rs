@@ -459,18 +459,20 @@ impl<N: HugrNode> ModifierResolver<N> {
         let static_edges = nodes
             .iter()
             .flat_map(|node| {
-                h.node_inputs(*node)
-                    .filter(|port| {
-                        matches!(
-                            h.get_optype(*node).port_kind(*port),
-                            Some(EdgeKind::Function(_))
-                        )
-                    })
-                    .filter_map(|port| {
-                        h.single_linked_output(*node, port)
-                            .filter(|(source, _)| h.get_parent(*node) != h.get_parent(*source))
-                            .map(|(source, _)| (source, *node, port))
-                    })
+                h.node_inputs(*node).filter_map(|port| {
+                    h.single_linked_output(*node, port)
+                        .filter(|(src_n, _)| h.get_parent(*node) != h.get_parent(*src_n))
+                        .map(|(src_n, _)| {
+                            assert!(
+                                matches!(
+                                    h.get_optype(*node).port_kind(port),
+                                    Some(EdgeKind::Function(_))
+                                ),
+                                "Nonlocal Const/Value edges not supported"
+                            );
+                            (src_n, *node, port)
+                        })
+                })
             })
             .collect::<Vec<_>>();
 
