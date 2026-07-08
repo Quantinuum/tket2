@@ -571,17 +571,14 @@ mod test {
     };
     use strum::IntoEnumIterator;
 
+    use crate::extension::{
+        modifier::{CONTROL_OP_ID, DAGGER_OP_ID, MODIFIER_EXTENSION},
+        rotation::rotation_type,
+    };
     use crate::{
         extension::rotation::ConstRotation,
         modifier::modifier_resolver::tests::{SetUnitary, test_modifier_resolver},
         modifier::modifier_resolver::*,
-    };
-    use crate::{
-        extension::{
-            modifier::{CONTROL_OP_ID, DAGGER_OP_ID, MODIFIER_EXTENSION},
-            rotation::rotation_type,
-        },
-        modifier::*,
     };
 
     fn size(op: TketOp) -> Option<(usize, bool)> {
