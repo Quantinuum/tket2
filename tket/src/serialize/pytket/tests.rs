@@ -9,6 +9,7 @@ use hugr::builder::{
     ModuleBuilder, SubContainer,
 };
 use hugr::extension::prelude::{ConstExternalSymbol, UnwrapBuilder, bool_t, option_type, qb_t};
+use hugr::extension::simple_op::MakeExtensionOp;
 use hugr::std_extensions::arithmetic::float_types::{ConstF64, float64_type};
 use hugr::std_extensions::logic::LogicOp;
 use std::sync::Arc;
@@ -16,6 +17,7 @@ use std::sync::Arc;
 use super::TKETDecode;
 use crate::TketOp;
 use crate::extension::TKET1_EXTENSION_ID;
+use crate::extension::global_phase::GlobalPhase;
 use crate::extension::measurement::MeasurementOp;
 use crate::extension::rotation::{ConstRotation, RotationOp, rotation_type};
 use crate::extension::sympy::SympyOpDef;
@@ -202,9 +204,12 @@ fn validate_serial_circ(circ: &SerialCircuit) {
 )]
 fn compare_serial_circs(a: &SerialCircuit, b: &SerialCircuit) {
     assert_eq!(a.name, b.name);
-    assert_eq!(a.phase, b.phase);
     assert_eq!(&a.qubits, &b.qubits);
     assert_eq!(a.commands.len(), b.commands.len());
+
+    // pytket phase parameters do not roundtrip exactly.
+    // Phases are decoded as Hugr ops, but the encoder does not re-encoded them into the pytket circuit.
+    // TODO: Update this comment if a GlobalPhase encoder is added.
 
     // Allow additional bit ids after a roundtrip, as the encoder may freely
     // allocate new IDs instead of reusing old ones.
@@ -1086,6 +1091,38 @@ fn decode_tuple_output_from_permuted_barrier_args() {
         .unwrap();
 
     hugr.validate().unwrap();
+}
+
+#[test]
+fn decode_global_phase_attribute_and_command() {
+    // A circuit with both a phase parameter and a phase op.
+    // The decoded Hugr should contain two phase nodes.
+    let ser: circuit_json::SerialCircuit = serde_json::from_str(
+        r#"{
+        "phase": "1/2",
+        "bits": [],
+        "qubits": [],
+        "commands": [
+            {"args": [], "op": {"type": "Phase", "params": ["alpha"]}}
+        ],
+        "implicit_permutation": []
+    }"#,
+    )
+    .unwrap();
+
+    let hugr = ser.decode(DecodeOptions::new()).unwrap();
+    hugr.validate().unwrap();
+
+    let global_phase_nodes = hugr
+        .nodes()
+        .filter(|node| GlobalPhase::from_optype(hugr.get_optype(*node)).is_some())
+        .collect_vec();
+
+    assert_eq!(global_phase_nodes.len(), 2);
+    assert_eq!(
+        hugr.get_metadata::<metadata::PytketPhaseExpr>(hugr.entrypoint()),
+        None
+    );
 }
 
 /// Test parameter to select which decoders/encoders to enable.

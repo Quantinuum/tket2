@@ -18,8 +18,6 @@ use crate::serialize::pytket::decoder::ParameterType;
 ///
 /// The leafs of the AST are either a constant value, a variable name, or an
 /// unrecognized sympy expression.
-///
-/// Return type of [`parse_pytket_param`].
 #[derive(Debug, Display, Clone, PartialEq)]
 pub enum PytketParam<'a> {
     /// A constant value that can be loaded directly.
@@ -47,18 +45,25 @@ pub enum PytketParam<'a> {
     },
 }
 
-/// Parse a TKET1 operation parameter, and return an AST representing the expression.
-#[inline]
-pub fn parse_pytket_param(param: &str) -> PytketParam<'_> {
-    let Ok(mut parsed) = ParamParser::parse(Rule::parameter, param) else {
-        // The parameter could not be parsed, so we just return it as an opaque sympy expression.
-        return PytketParam::Sympy(param);
-    };
-    let parsed = parsed
-        .next()
-        .expect("The `parameter` rule can only be matched once.");
+impl<'a> PytketParam<'a> {
+    /// Parse a TKET1 operation parameter, and return an AST representing the expression.
+    #[inline]
+    pub fn parse(param: &'a str) -> Self {
+        let Ok(mut parsed) = ParamParser::parse(Rule::parameter, param) else {
+            // The parameter could not be parsed, so we just return it as an opaque sympy expression.
+            return PytketParam::Sympy(param);
+        };
+        let parsed = parsed
+            .next()
+            .expect("The `parameter` rule can only be matched once.");
 
-    parse_infix_ops(parsed.into_inner())
+        parse_infix_ops(parsed.into_inner())
+    }
+
+    /// Returns `true` if the parameter is zero.
+    pub fn is_zero(&self) -> bool {
+        matches!(self, PytketParam::Constant(value) if *value == 0.0)
+    }
 }
 
 #[derive(Parser)]
@@ -284,7 +289,7 @@ mod test {
         param_ty: ParameterType::Rotation,
     })]
     fn parse_param(#[case] param: &str, #[case] expected: PytketParam) {
-        let parsed = parse_pytket_param(param);
+        let parsed = PytketParam::parse(param);
         if parsed != expected {
             panic!(
                 "Incorrect parameter parsing\n\texpression: \"{param}\"\n\tparsed: {parsed}\n\texpected: {expected}"

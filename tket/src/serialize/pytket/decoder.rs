@@ -31,12 +31,14 @@ use tket_json_rs::circuit_json::SerialCircuit;
 
 use super::PytketDecodeError;
 use crate::TketOp;
+use crate::extension::global_phase::GlobalPhase;
 use crate::extension::rotation::rotation_type;
 use crate::metadata;
 use crate::serialize::pytket::circuit::{
     AdditionalNodesAndWires, EncodedCircuitInfo, StraightThroughWire,
 };
 use crate::serialize::pytket::config::PytketDecoderConfig;
+use crate::serialize::pytket::decoder::param::parser::PytketParam;
 use crate::serialize::pytket::decoder::wires::WireTracker;
 use crate::serialize::pytket::extension::{RegisterCount, build_opaque_tket_op};
 use crate::serialize::pytket::opaque::{EncodedEdgeID, OpaqueSubgraphs};
@@ -154,20 +156,20 @@ impl<'h> PytketDecoderContext<'h> {
             &config,
         )?;
 
-        if !serialcirc.phase.is_empty() {
-            // TODO - add a phase gate
-            // <https://github.com/quantinuum/tket2/issues/598>
-            // let phase = Param::new(serialcirc.phase);
-            // decoder.add_phase(phase);
-        }
-
-        Ok(PytketDecoderContext {
+        let mut decoder = PytketDecoderContext {
             builder: dfg,
             wire_tracker: Box::new(wire_tracker),
             config,
             extensions: options.extensions,
             opaque_subgraphs,
-        })
+        };
+
+        if !serialcirc.phase.is_empty() && !PytketParam::parse(&serialcirc.phase).is_zero() {
+            let phase = decoder.load_half_turns(&serialcirc.phase);
+            decoder.add_global_phase(phase)?;
+        }
+
+        Ok(decoder)
     }
 
     /// Store the serialised circuit information as HUGR metadata,
@@ -177,8 +179,6 @@ impl<'h> PytketDecoderContext<'h> {
         // should pass through the serialization roundtrip.
 
         let node = dfg.container_node();
-        dfg.hugr_mut()
-            .set_metadata::<metadata::PytketPhaseExpr>(node, &serialcirc.phase);
         dfg.hugr_mut()
             .set_metadata::<metadata::PytketQubitRegisterNames>(node, serialcirc.qubits.clone());
         dfg.hugr_mut()
@@ -976,6 +976,19 @@ impl<'h> PytketDecoderContext<'h> {
         self.wire_tracker
             .load_half_turns_parameter(&mut self.builder, param, Some(typ))
             .with_type(typ, &mut self.builder)
+    }
+
+    /// Add an explicit global phase operation for a pytket half-turns expression.
+    ///
+    /// Pytket may represent global phase either as the circuit-level `phase`
+    /// property or as a zero-qubit `Phase` command. Both forms are normalized
+    /// through this helper so later HUGR passes see the same explicit operation.
+    pub fn add_global_phase(
+        &mut self,
+        phase: LoadedParameter,
+    ) -> Result<BuildHandle<DataflowOpID>, PytketDecodeError> {
+        let phase = phase.as_rotation(&mut self.builder);
+        self.add_node_with_wires(GlobalPhase, &[], &[], &[], &[], &[phase])
     }
 
     /// Returns the configuration used by the decoder.
