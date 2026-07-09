@@ -18,7 +18,7 @@ use hugr_core::metadata::DEBUGINFO_META_KEY;
 use hugr_core::metadata::RawMetadataValue;
 use hugr_core::ops::OpType;
 
-/// The signature of a callback for updating child metadata.
+/// The signature of a callback for updating descendant metadata.
 /// See [MetadataPropagationRule] for a description of the arguments.
 pub type UpdateFn = dyn Fn(&OpType, &NodeMetadataMap, &OpType, &NodeMetadataMap) -> Vec<(String, RawMetadataValue)>
     + Send
@@ -44,7 +44,7 @@ pub type UpdateFn = dyn Fn(&OpType, &NodeMetadataMap, &OpType, &NodeMetadataMap)
 ///    `update_new` will be called for each descendant before the keys are removed.
 ///
 /// To use a custom rule, add it to a pass's [`MetadataPropagationPolicy`]:
-/// ```
+/// ```ignore
 /// pass.metadata_policy_mut().add_rule(my_custom_rule)
 /// ```
 #[derive(Clone)]
@@ -79,19 +79,20 @@ impl Debug for MetadataPropagationRule {
 /// A set of rules for propagating node metadata when a single node is replaced by a container.
 ///
 /// By default, a container which replaces a node retains the original node's metadata,
-/// and the children of the container receive no metadata. This policy allows passes to
-/// change that behavior in two ways:
+/// and the descendants of the new container receive no metadata. This policy allows passes to
+/// adjust that behavior in two ways:
 ///     1) Metadata may be added to child nodes based on the original node's metadata.
 ///     2) Metadata may be removed by key from the replacement container node.
 ///
-/// A policy consists of a series of composed [`MetadataPropagationRule`]s, see the
-/// documentation of that struct for the definition of a rule.
+/// Each pass has exactly one associated policy. A policy consists of zero or more
+/// composed [`MetadataPropagationRule`]s. See the documentation of that struct for the
+/// definition of a rule.
 ///
-/// # Notes on composition
+/// # Notes on composing rules
 ///
-/// 1. Rules are applied in order, and each rule receives root and child metadata that
+/// 1. Rules are applied in order, and each rule receives descendant metadata that
 ///    reflects updates from previous rules.
-/// 2. All child metadata updates are applied before any keys are removed from the
+/// 2. All descendant metadata updates are applied before any keys are removed from the
 ///    replacing container.
 /// 3. If replacement is applied recursively, metadata is propagated before any
 ///    descendants of the container are themselves replaced.
@@ -99,7 +100,7 @@ impl Debug for MetadataPropagationRule {
 /// # Default policy
 ///
 /// The default policy applies a single rule which propagates debug source location
-/// metadata from the replacing container, where it has no effect, to child nodes where
+/// metadata from the replacing container, where it has no effect, to descendants where
 /// a location is meaningful. This rule should be applied for all ReplaceTypes passes.
 #[derive(Clone, Debug)]
 pub struct MetadataPropagationPolicy {
@@ -163,12 +164,13 @@ impl MetadataPropagationPolicy {
 
         let descendants: Vec<Node> = hugr.descendants(container_node).skip(1).collect();
         for inner in descendants {
-            let inner_optype = hugr.get_optype(inner).clone();
-            let inner_meta = hugr.node_metadata_map(inner).clone();
             for entry in &self.rules {
-                for (key, value) in
-                    (entry.update_new)(old_optype, &old_meta, &inner_optype, &inner_meta)
-                {
+                for (key, value) in (entry.update_new)(
+                    old_optype,
+                    &old_meta,
+                    hugr.get_optype(inner),
+                    hugr.node_metadata_map(inner),
+                ) {
                     hugr.set_metadata_any(inner, &key, value);
                 }
             }
@@ -649,6 +651,53 @@ mod test {
         // ExtensionOps two levels deep should still carry the debug location.
         for op_node in ext_op_children(&h, inner_dfg) {
             assert_location(&h, op_node);
+        }
+    }
+
+    /// Rules should observe updates to `inner_meta` from earlier rules.
+    #[test]
+    fn later_rule_sees_inner_meta_updates_from_earlier_rule() {
+        use serde_json::Value;
+
+        let ext = ext();
+        let (mut h, read_node) = build_read_hugr_with_location(&ext);
+
+        let mut lw = lowerer(&ext);
+        // Start fresh so we only observe our custom rules.
+        lw.set_metadata_policy(MetadataPropagationPolicy::empty());
+        lw.metadata_policy_mut()
+            .add_rule(MetadataPropagationRule::new(
+                Arc::new(|_, _, _, _| vec![("meta.rule1".into(), Value::Bool(true))]),
+                vec![],
+            ));
+        lw.metadata_policy_mut()
+            .add_rule(MetadataPropagationRule::new(
+                Arc::new(|_, _, _, inner_meta| {
+                    let saw_rule1 = inner_meta.contains_key("meta.rule1");
+                    vec![(
+                        "meta.rule2".into(),
+                        Value::String(if saw_rule1 {
+                            "saw_rule1".into()
+                        } else {
+                            "missing_rule1".into()
+                        }),
+                    )]
+                }),
+                vec![],
+            ));
+        lw.run(&mut h).unwrap();
+        h.validate().unwrap();
+
+        let children: Vec<_> = h.children(read_node).collect();
+        assert!(!children.is_empty());
+        for child in children {
+            assert_eq!(
+                h.get_metadata_any(child, "meta.rule2"),
+                Some(&Value::String("saw_rule1".into())),
+                "Second rule did not see meta.rule1 set by the first rule on {child:?} ({:?}); \
+                 inner_meta passed to later rules should reflect updates from earlier rules",
+                h.get_optype(child)
+            );
         }
     }
 
