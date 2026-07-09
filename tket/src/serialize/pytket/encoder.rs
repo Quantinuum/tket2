@@ -171,7 +171,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
         .cloned();
 
         // Backwards compatibility only: The global phase parameter
-        // of pytket circuits is now encoded as  explicit `tket.global_phase` operations instead.
+        // of pytket circuits is now encoded as explicit `tket.global_phase` operations instead.
         #[expect(deprecated)]
         let phase = match hugr.get_metadata::<metadata::PytketPhaseExpr>(region) {
             Some(p) => p.to_string(),
