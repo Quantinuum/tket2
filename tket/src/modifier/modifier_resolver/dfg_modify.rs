@@ -577,7 +577,6 @@ impl<N: HugrNode> ModifierResolver<N> {
             ),
             (0, 0, offset),
         )?;
-        // self.modified_functions.insert(n);
 
         Ok(())
     }
