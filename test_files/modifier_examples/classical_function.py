@@ -22,6 +22,15 @@ enable_experimental_features()
 @guppy
 def fuu(i: int) -> int:
     q = qubit()
+    x(q)
+    if measure(q):
+        i = i + 1
+    return i
+
+
+@guppy
+def dummy_fuu(i: int) -> int:
+    q = qubit()
     c = qubit()
     h(c)
     with control(c), dagger:
@@ -59,7 +68,11 @@ def main() -> None:
     a = 3
     with control(c1):
         with dagger:
-            fuu(a)
+            pass
+    a = 3
+    with control(c1):
+        with dagger:
+            dummy_fuu(a)
 
     # Testing that array operations are happening in the correct order
     with control(t), dagger:
@@ -94,20 +107,4 @@ def main() -> None:
 
 
 program = main.compile()
-program.modules[0].render_dot()  # view("1")
-from tket.passes import NormalizeGuppy
-
-normalize = NormalizeGuppy(
-    resolve_modifiers=False,
-    simplify_cfgs=True,
-    remove_tuple_untuple=False,
-    constant_folding=False,
-    remove_dead_funcs=False,
-    inline_funcs=False,
-    inline_dfgs=False,
-    remove_redundant_order_edges=False,
-    squash_borrows=False,
-)
-normalize(program.modules[0]).render_dot()
-
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
