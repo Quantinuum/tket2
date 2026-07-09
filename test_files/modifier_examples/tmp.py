@@ -65,8 +65,8 @@ program = bar.with_minimal_opt().with_optimization(normalize).compile_function()
 from hugr.hugr.render import RenderConfig
 
 # normalize(program.modules[0]).render_dot(RenderConfig(max_node_label_length=None)).view(
-program.modules[0].render_dot(RenderConfig(max_node_label_length=None)).view(
-    "2", quiet=True
-)
+# program.modules[0].render_dot(RenderConfig(max_node_label_length=None)).view(
+#     "2", quiet=True
+# )
 
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
