@@ -449,43 +449,38 @@ impl<N: HugrNode> ModifierResolver<N> {
         &mut self,
         h: &impl HugrView<Node = N>,
         n: N,
-        dfg: &mut impl Container,
+        new_dfg: &mut impl Container,
     ) -> Result<Node, ModifierResolverErrors<N>> {
-        let nodes = h
-            .descendants(n)
-            .chain(iter::once(n))
-            .collect::<HashSet<_>>();
+        let nodes = h.descendants(n).collect::<HashSet<_>>();
 
         let static_edges = nodes
             .iter()
             .flat_map(|node| {
-                h.node_inputs(*node)
-                    .filter(|port| {
-                        matches!(
-                            h.get_optype(*node).port_kind(*port),
-                            Some(EdgeKind::Function(_))
-                        )
-                    })
-                    .filter_map(|port| {
-                        h.single_linked_output(*node, port)
-                            .filter(|(source, _)| h.get_parent(*node) != h.get_parent(*source))
-                            .map(|(source, _)| (source, *node, port))
-                    })
+                h.node_inputs(*node).filter_map(|port| {
+                    h.single_linked_output(*node, port)
+                        .filter(|(src_n, _)| h.get_parent(*node) != h.get_parent(*src_n))
+                        .map(|(src_n, _)| {
+                            assert!(
+                                matches!(
+                                    h.get_optype(*node).port_kind(port),
+                                    Some(EdgeKind::Function(_))
+                                ),
+                                "Nonlocal Const/Value edges not supported"
+                            );
+                            (src_n, *node, port)
+                        })
+                })
             })
             .collect::<Vec<_>>();
 
-        let insertion_result = dfg.add_hugr_view(&h.with_entrypoint(n));
+        let insertion_result = new_dfg.add_hugr_view(&h.with_entrypoint(n));
 
         let new_node = insertion_result.inserted_entrypoint;
         for port in h.all_node_ports(n) {
             self.map_insert(DirWire(n, port), DirWire(new_node, port))?;
         }
         for (source, old_target, target_port) in static_edges {
-            let Some(new_target) = insertion_result.node_map.get(&old_target).copied() else {
-                return Err(ModifierResolverErrors::unreachable(format!(
-                    "Copied subtree is missing static-edge target {old_target}."
-                )));
-            };
+            let new_target = insertion_result.node_map.get(&old_target).copied().unwrap();
             self.call_map_insert(source, (new_target, target_port));
         }
 
@@ -1483,24 +1478,18 @@ mod test {
     ) -> FuncID<true> {
         assert_eq!(t_num, 1);
 
-        let external = {
-            let func = module
-                .define_function(
-                    "external_classical_noop",
-                    Signature::new(type_row![], type_row![]),
-                )
-                .unwrap();
-            func.finish_with_outputs([]).unwrap()
-        };
+        let external = module
+            .define_function("external_classical_noop", Signature::new_endo([]))
+            .unwrap()
+            .finish_with_outputs([])
+            .unwrap();
 
         let foo_sig = Signature::new_endo([qb_t()]);
         let mut func = module.define_function("foo", foo_sig).unwrap();
         func.set_unitary();
         let q = func.input_wires().next().unwrap();
         {
-            let mut dfg = func
-                .dfg_builder(Signature::new(type_row![], type_row![]), [])
-                .unwrap();
+            let mut dfg = func.dfg_builder(Signature::new_endo([]), []).unwrap();
             dfg.call(external.handle(), &[], []).unwrap();
             dfg.finish_with_outputs([]).unwrap();
         }
