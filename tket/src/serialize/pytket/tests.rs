@@ -1186,12 +1186,12 @@ fn circuit_standalone_roundtrip(#[case] hugr: Hugr, #[case] config: CircuitRound
     assert_eq!(
         &circ_signature.input, &deser_sig.input,
         "Input signature mismatch\n  Expected: {}\n  Actual:   {}",
-        &circ_signature, &deser_sig
+        circ_signature, deser_sig
     );
     assert_eq!(
         &circ_signature.output, &deser_sig.output,
         "Output signature mismatch\n  Expected: {}\n  Actual:   {}",
-        &circ_signature, &deser_sig
+        circ_signature, deser_sig
     );
 
     let reser = SerialCircuit::encode(&deser, encode_options).unwrap();
@@ -1306,12 +1306,12 @@ fn encoded_circuit_roundtrip(
     assert_eq!(
         &circ_signature.input, &deser_sig.input,
         "Input signature mismatch\n  Expected: {}\n  Actual:   {}",
-        &circ_signature, &deser_sig
+        circ_signature, deser_sig
     );
     assert_eq!(
         &circ_signature.output, &deser_sig.output,
         "Output signature mismatch\n  Expected: {}\n  Actual:   {}",
-        &circ_signature, &deser_sig
+        circ_signature, deser_sig
     );
 }
 

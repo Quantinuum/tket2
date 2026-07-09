@@ -14,7 +14,7 @@ from guppylang import enable_experimental_features, guppy
 from guppylang.std.array import array_swap
 from guppylang.std.builtins import array, control, dagger
 from guppylang.std.debug import state_result
-from guppylang.std.quantum import angle, discard, h, measure, qubit, rx, x
+from guppylang.std.quantum import angle, discard, h, measure, qubit, rx, x, z
 
 enable_experimental_features()
 
@@ -25,6 +25,20 @@ def fuu(i: int) -> int:
     x(q)
     if measure(q):
         i = i + 1
+    return i
+
+
+@guppy
+def dummy_fuu(i: int) -> int:
+    q = qubit()
+    c = qubit()
+    h(c)
+    with control(c), dagger:
+        x(q)
+        z(q)
+    if measure(q):
+        i = i + 1
+    discard(c)
     return i
 
 
@@ -48,6 +62,17 @@ def main() -> None:
     # Testing that a classical higher order function can be called inside a modified context
     with dagger, control(c1):
         inner(foo, 2)
+
+    # Testing nested with_block with no quantum input
+    # (issue: https://github.com/Quantinuum/tket2/issues/1814)
+    a = 3
+    with control(c1):
+        with dagger:
+            pass
+    a = 3
+    with control(c1):
+        with dagger:
+            dummy_fuu(a)
 
     # Testing that array operations are happening in the correct order
     with control(t), dagger:
