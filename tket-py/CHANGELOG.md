@@ -2,6 +2,8 @@
 
 ## [0.15.2](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.1...tket-py-v0.15.2) (2026-07-09)
 
+This release includes multiple fixes to the passes included in `NormalizeGuppy`,
+as well as the improvements to pytket decoding.
 
 ### Features
 
