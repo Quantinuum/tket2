@@ -27,7 +27,7 @@ pub fn default_decoder_config() -> PytketDecoderConfig {
 /// Add the default HUGR decoders and type translators to an existing config.
 ///
 /// This registers the base `tket` decoders ([`CoreDecoder`], [`PreludeEmitter`],
-/// [`GlobalPhaseDecoder`], and [`TketOpEmitter`]) together with the default
+/// [`GlobalPhaseEmitter`], and [`TketOpEmitter`]) together with the default
 /// type translators.
 ///
 /// Decoders are tried in registration order, so this is useful when building
