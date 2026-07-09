@@ -9,8 +9,8 @@ pub use encoder_config::PytketEncoderConfig;
 pub use type_translators::TypeTranslatorSet;
 
 use crate::serialize::pytket::extension::{
-    CoreDecoder, FloatEmitter, MeasurementEmitter, PreludeEmitter, RotationEmitter, Tk1Emitter,
-    TketOpEmitter,
+    CoreDecoder, FloatEmitter, GlobalPhaseEmitter, MeasurementEmitter, PreludeEmitter,
+    RotationEmitter, Tk1Emitter, TketOpEmitter,
 };
 use hugr::HugrView;
 
@@ -27,7 +27,8 @@ pub fn default_decoder_config() -> PytketDecoderConfig {
 /// Add the default HUGR decoders and type translators to an existing config.
 ///
 /// This registers the base `tket` decoders ([`CoreDecoder`], [`PreludeEmitter`],
-/// and [`TketOpEmitter`]) together with the default type translators.
+/// [`GlobalPhaseEmitter`], and [`TketOpEmitter`]) together with the default
+/// type translators.
 ///
 /// Decoders are tried in registration order, so this is useful when building
 /// custom decoder configs that register additional decoders *before* the base
@@ -36,6 +37,7 @@ pub fn default_decoder_config() -> PytketDecoderConfig {
 pub fn add_default_decoders(config: &mut PytketDecoderConfig) {
     config.add_decoder(CoreDecoder);
     config.add_decoder(PreludeEmitter);
+    config.add_decoder(GlobalPhaseEmitter);
     config.add_decoder(TketOpEmitter);
 
     config.add_type_translator(PreludeEmitter);
@@ -52,6 +54,7 @@ pub fn default_encoder_config<H: HugrView>() -> PytketEncoderConfig<H> {
     config.add_emitter(FloatEmitter);
     config.add_emitter(MeasurementEmitter);
     config.add_emitter(RotationEmitter);
+    config.add_emitter(GlobalPhaseEmitter);
     config.add_emitter(Tk1Emitter);
     config.add_emitter(TketOpEmitter);
 

@@ -476,7 +476,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             Measure | MeasureFree | QAlloc | TryQAlloc | QFree | Reset => {
                 Err(ModifierResolverErrors::unresolvable(
                     op_node,
-                    "non-quantum operations are not expected in a modified context.".to_string(),
+                    "non-unitary operations are not expected in a modified context.".to_string(),
                     tket_op.into(),
                 ))
             }
@@ -678,7 +678,7 @@ mod test {
                     assert_eq!(node, op_node);
                     assert_eq!(
                         msg,
-                        "non-quantum operations are not expected in a modified context."
+                        "non-unitary operations are not expected in a modified context."
                     );
                     assert_eq!(optype, op.into());
                 }
@@ -689,7 +689,7 @@ mod test {
     }
 
     #[test]
-    /// Test that when no modifiers are applied (e.g. with an even number of daggers), non quantum operations are handled correctly.
+    /// Test that when no modifiers are applied non unitary operations are handled correctly.
     fn double_dagger_allows_measurement_function() {
         let mut module = ModuleBuilder::new();
         let measure_sig = Signature::new_endo([qb_t()]);
