@@ -18,7 +18,7 @@ use tket_json_rs::circuit_json::ImplicitPermutation;
 use tket_json_rs::register::ElementId as PytketRegister;
 
 use crate::extension::rotation::{ConstRotation, rotation_type};
-use crate::serialize::pytket::decoder::param::parser::{PytketParam, parse_pytket_param};
+use crate::serialize::pytket::decoder::param::parser::PytketParam;
 use crate::serialize::pytket::decoder::{
     LoadedParameter, ParameterType, PytketDecoderContext, TrackedBit, TrackedBitId, TrackedQubit,
     TrackedQubitId,
@@ -1083,7 +1083,7 @@ impl WireTracker {
             &mut self.parameters,
             &mut self.parameter_vars,
             &mut self.unused_parameter_inputs,
-            parse_pytket_param(param),
+            PytketParam::parse(param),
             param,
             type_hint,
         )

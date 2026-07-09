@@ -1,6 +1,7 @@
 //! General tests.
 
 use std::collections::{HashMap, HashSet};
+use std::hash::Hash;
 use std::io::BufReader;
 
 use cool_asserts::assert_matches;
@@ -9,6 +10,7 @@ use hugr::builder::{
     ModuleBuilder, SubContainer,
 };
 use hugr::extension::prelude::{ConstExternalSymbol, UnwrapBuilder, bool_t, option_type, qb_t};
+use hugr::extension::simple_op::MakeExtensionOp;
 use hugr::std_extensions::arithmetic::float_types::{ConstF64, float64_type};
 use hugr::std_extensions::logic::LogicOp;
 use std::sync::Arc;
@@ -16,11 +18,13 @@ use std::sync::Arc;
 use super::TKETDecode;
 use crate::TketOp;
 use crate::extension::TKET1_EXTENSION_ID;
+use crate::extension::global_phase::GlobalPhase;
 use crate::extension::measurement::MeasurementOp;
 use crate::extension::rotation::{ConstRotation, RotationOp, rotation_type};
 use crate::extension::sympy::SympyOpDef;
 use crate::metadata;
 use crate::serialize::pytket::PytketEncodeError;
+use crate::serialize::pytket::decoder::PytketParam;
 use crate::serialize::pytket::extension::{CoreDecoder, OpaqueTk1Op, PreludeEmitter};
 use crate::serialize::pytket::{
     DecodeInsertionTarget, DecodeOptions, EncodeOptions, EncodedCircuit, PytketDecodeError,
@@ -202,9 +206,7 @@ fn validate_serial_circ(circ: &SerialCircuit) {
 )]
 fn compare_serial_circs(a: &SerialCircuit, b: &SerialCircuit) {
     assert_eq!(a.name, b.name);
-    assert_eq!(a.phase, b.phase);
     assert_eq!(&a.qubits, &b.qubits);
-    assert_eq!(a.commands.len(), b.commands.len());
 
     // Allow additional bit ids after a roundtrip, as the encoder may freely
     // allocate new IDs instead of reusing old ones.
@@ -234,24 +236,34 @@ fn compare_serial_circs(a: &SerialCircuit, b: &SerialCircuit) {
     // TODO: Do a proper comparison independent of the toposort ordering, and
     // track register reordering.
     #[derive(PartialEq, Eq, Hash, Debug)]
-    struct CommandInfo {
+    struct CommandInfo<'p> {
         op_type: tket_json_rs::OpType,
-        params: Vec<String>,
+        params: Vec<PytketParam<'p>>,
         n_args: usize,
     }
 
-    impl From<&tket_json_rs::circuit_json::Command> for CommandInfo {
-        fn from(command: &tket_json_rs::circuit_json::Command) -> Self {
+    impl<'a> From<&'a tket_json_rs::circuit_json::Command> for CommandInfo<'a> {
+        fn from(command: &'a tket_json_rs::circuit_json::Command) -> Self {
+            let params = command
+                .op
+                .params
+                .iter()
+                .flatten()
+                .map(|p| PytketParam::parse(p))
+                .collect();
             CommandInfo {
                 op_type: command.op.op_type,
-                params: command.op.params.clone().unwrap_or_default(),
+                params,
                 n_args: command.args.len(),
             }
         }
     }
 
-    let a_command_count: HashMap<CommandInfo, usize> = a.commands.iter().map_into().counts();
-    let b_command_count: HashMap<CommandInfo, usize> = b.commands.iter().map_into().counts();
+    #[expect(clippy::mutable_key_type)]
+    let mut a_command_count: HashMap<CommandInfo<'_>, usize> =
+        a.commands.iter().map_into().counts();
+    #[expect(clippy::mutable_key_type)]
+    let b_command_count: HashMap<CommandInfo<'_>, usize> = b.commands.iter().map_into().counts();
     for (a, &count_a) in &a_command_count {
         let count_b = b_command_count.get(a).copied().unwrap_or_default();
         assert_eq!(
@@ -259,6 +271,19 @@ fn compare_serial_circs(a: &SerialCircuit, b: &SerialCircuit) {
             "command {a:?} appears {count_a} times in rhs and {count_b} times in lhs.\ncounts for a: {a_command_count:#?}\ncounts for b: {b_command_count:#?}"
         );
     }
+
+    // Phase parameters in the original circuit `a` get translated into a global phase operation after a roundtrip.
+    // So we add that virtual command to `a` here.
+    let a_phase = PytketParam::parse(&a.phase);
+    if !a_phase.is_zero() {
+        let global_phase_command = CommandInfo {
+            op_type: tket_json_rs::OpType::Phase,
+            params: vec![a_phase],
+            n_args: 0,
+        };
+        *a_command_count.entry(global_phase_command).or_default() += 1;
+    }
+
     assert_eq!(a_command_count.len(), b_command_count.len());
 }
 
@@ -1086,6 +1111,59 @@ fn decode_tuple_output_from_permuted_barrier_args() {
         .unwrap();
 
     hugr.validate().unwrap();
+}
+
+#[test]
+fn decode_global_phase_attribute_and_command() {
+    // A circuit with both a phase parameter and a phase op.
+    // The decoded Hugr should contain two phase nodes, and the re-encoded
+    // circuit should make both phases explicit as commands.
+    let ser: circuit_json::SerialCircuit = serde_json::from_str(
+        r#"{
+        "phase": "1/2",
+        "bits": [],
+        "qubits": [],
+        "commands": [
+            {"args": [], "op": {"type": "Phase", "params": ["alpha"]}}
+        ],
+        "implicit_permutation": []
+    }"#,
+    )
+    .unwrap();
+
+    let hugr = ser.decode(DecodeOptions::new()).unwrap();
+    hugr.validate().unwrap();
+
+    let global_phase_nodes = hugr
+        .nodes()
+        .filter(|node| GlobalPhase::from_optype(hugr.get_optype(*node)).is_some())
+        .collect_vec();
+
+    assert_eq!(global_phase_nodes.len(), 2);
+    #[expect(deprecated)]
+    let phase_metadata = hugr.get_metadata::<metadata::PytketPhaseExpr>(hugr.entrypoint());
+    assert_eq!(phase_metadata, None);
+
+    let reser: SerialCircuit = SerialCircuit::encode(&hugr, EncodeOptions::new()).unwrap();
+    assert_eq!(reser.phase, "0");
+
+    let phase_commands = reser
+        .commands
+        .iter()
+        .filter(|command| command.op.op_type == tket_json_rs::OpType::Phase)
+        .collect_vec();
+    assert_eq!(phase_commands.len(), 2);
+    assert!(phase_commands.iter().all(|command| command.args.is_empty()));
+
+    let phase_params = phase_commands
+        .iter()
+        .map(|command| command.op.params.clone().unwrap_or_default())
+        .collect_vec();
+    assert!(
+        phase_params
+            .iter()
+            .any(|params| params.len() == 1 && params[0] == "alpha")
+    );
 }
 
 /// Test parameter to select which decoders/encoders to enable.
