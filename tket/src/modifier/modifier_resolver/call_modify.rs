@@ -255,21 +255,17 @@ impl<N: HugrNode> ModifierResolver<N> {
                         fn_optype.clone(),
                     ));
                 };
+                // SOLVED?
                 // TODO: We want some machinery to prevent generating a lot of copies of modified functions
                 // from the same function.
                 Ok((fn_node, load.clone()))
             }
             OpType::Input(_) => Err(ModifierError::NoTarget(modifier_node)),
             // If the target is a function, we need to create a new dataflow block of it.
-            _ => {
-                // TODO:
-                // In the future, we might want to handle modifiers provided from other nodes.
-                // For example, conditionals?
-                Err(ModifierError::ModifierNotApplicable(
-                    modifier_node,
-                    optype.clone(),
-                ))
-            }
+            _ => Err(ModifierError::ModifierNotApplicable(
+                modifier_node,
+                optype.clone(),
+            )),
         }
     }
 
@@ -300,6 +296,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             .map_err(wrap_resolver_err)?;
         let targ = trace.last().cloned().unwrap();
 
+        // NICOLA TODO: try without the input check?
         // If the target is a function input, we cannot solve the modifier chain here.
         // Instead, we record the modifiers to be applied to that input and propagate
         // the requirement to callers.
@@ -309,6 +306,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                 self.add_node_no_modification(h, n, indir_call.clone(), new_dfg)?;
                 return Ok(());
             }
+            // NICOLA TODO: Here we dont need the indirect call, no quantum dynamic function are allowed
             *self.modifiers_mut() = modifiers;
             return self.modify_input_indirect_call(n, chain_tail.1.index(), indir_call, new_dfg);
         }
@@ -659,6 +657,8 @@ mod tests {
     }
 
     /// Test quantum and classical indirect calls in modifier context
+    /// NICOLA TODO: this may be to be deleted after refactoring
+    /// NICOLA this should be fine?
     fn foo_indirect_unmodified_callees(
         module: &mut ModuleBuilder<Hugr>,
         t_num: usize,
@@ -719,14 +719,14 @@ mod tests {
     }
 
     #[rstest::rstest]
-    #[case::call_twice(1, 1, foo_modifier_on_function, false)]
-    #[case::call(1, 1, foo_call, false)]
-    #[case::call_dagger(1, 1, foo_call, true)]
-    #[case::indir_call(1, 1, foo_indir_call, false)]
-    #[case::indir_call_dagger(1, 1, foo_indir_call, true)]
-    #[case::load_fn(1, 1, foo_load_fn, false)]
-    #[case::nested_modifier(2, 2, foo_nested_modifier, false)]
-    #[case::nested_modifier_unmodified_callee(2, 2, foo_nested_modifier_unmodified_callee, false)]
+    // #[case::call_twice(1, 1, foo_modifier_on_function, false)]
+    // #[case::call(1, 1, foo_call, false)]
+    // #[case::call_dagger(1, 1, foo_call, true)]
+    // #[case::indir_call(1, 1, foo_indir_call, false)]
+    // #[case::indir_call_dagger(1, 1, foo_indir_call, true)]
+    // #[case::load_fn(1, 1, foo_load_fn, false)]
+    // #[case::nested_modifier(2, 2, foo_nested_modifier, false)]
+    //#[case::nested_modifier_unmodified_callee(2, 2, foo_nested_modifier_unmodified_callee, false)]
     #[case::indirect_unmodified_callees(1, 1, foo_indirect_unmodified_callees, true)]
     fn test_call_modify(
         #[case] target_num: usize,

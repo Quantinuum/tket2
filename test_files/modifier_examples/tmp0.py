@@ -14,7 +14,7 @@ from guppylang import enable_experimental_features, guppy
 from guppylang.std.builtins import Controllable, Unitary, array, control, dagger
 from guppylang.std.debug import state_result
 from guppylang.std.lang import Function
-from guppylang.std.quantum import angle, discard_array, h, qubit, rx, rz
+from guppylang.std.quantum import angle, discard, h, qubit, rx, rz
 
 enable_experimental_features()
 
@@ -29,40 +29,34 @@ def get_get_angle() -> Function[[float], angle]:
     return get_angle
 
 
-@guppy(controllable=True)
+@guppy(unitary=True)
 def apply_c(
-    f: Controllable[[qubit], None],
     g: Unitary[[qubit, angle], None],
     classic_fun: Function[[], Function[[float], angle]],
     q: qubit,
-    b: bool,
 ) -> None:
-    n = 3
-    if b:
-        while n > 0:
-            f(q)
-            n -= 1
-    else:
-        get_a = classic_fun()
-        # BUG if using:
-        angle = get_a(0.25)
-        for _ in range(2):
-            # g(q, get_a(0.25))
-            g(q, angle)
+    get_a = classic_fun()
+    # BUG if using:
+    angle = get_a(0.25)
+    # for _ in range(2):
+    # g(q, get_a(0.25))
+    g(q, angle)
 
 
 @guppy
 def main() -> None:
-    qs: array[qubit, 2] = array(qubit(), qubit())
-    h(qs[0])
-    flag = 2 > 10
-    with control(qs[0]):
-        apply_c(h, rx, get_get_angle, qs[1], True)
-        apply_c(h, rx, get_get_angle, qs[1], flag)
+    qs1 = qubit()
+    with dagger:
+        apply_c(rx, get_get_angle, qs1)
 
-    state_result("r", qs[0], qs[1])
-    discard_array(qs)
+    # state_result("r", qs0, qs1)
+    discard(qs1)
 
 
 program = main.compile()
+from hugr.hugr.render import RenderConfig
+
+program.modules[0].render_dot(RenderConfig(max_node_label_length=None)).view(
+    "tmp0_base.pdf", quiet=True
+)
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())

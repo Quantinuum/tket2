@@ -323,13 +323,6 @@ pub struct ModifierResolver<N = Node> {
     /// Multiple calls can reference the same function node, so each source
     /// maps to every copied static input that must be reconnected.
     call_map: HashMap<N, Vec<(Node, IncomingPort)>>,
-    // TODO:
-    // Should keep track of the collection of modifiers that are applied to the same function.
-    // This will prevent the duplicated generation of Controlled-functions.
-    // Some HashMap should be held here so that we remember such information.
-    // ```
-    // _modified_functions: HashMap<N, (CombinedModifier, Node)>,
-    // ```
     /// Original functions for which the resolver generated modified replacements.
     modified_functions: HashSet<N>,
     /// Function input ports that must receive already-modified function values
@@ -1371,6 +1364,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             // We try to place the original operation.
             // TODO: Revisit whether unknown extension operations should return
             // an explicit error instead of falling back to the original operation.
+            // NICOLA TODO: consider adding the error
             self.modify_dataflow_op(h, op_node, optype, new_dfg)
         }
     }
@@ -1838,8 +1832,8 @@ mod tests {
         ctrl_num: u64,
         foo: impl FnOnce(&mut ModuleBuilder<Hugr>, usize) -> FuncID<true>,
         dagger: bool,
-    ) {
-        let _ = resolved_modifier_test_hugr(target_num, ctrl_num, foo, dagger);
+    ) -> Hugr {
+        resolved_modifier_test_hugr(target_num, ctrl_num, foo, dagger)
     }
 
     pub(crate) fn resolved_modifier_test_hugr(
@@ -1850,6 +1844,7 @@ mod tests {
     ) -> Hugr {
         let (mut h, foo_node) = modifier_test_hugr(target_num, ctrl_num, foo, dagger);
 
+        std::fs::write("path.mmd", h.mermaid_string()).unwrap();
         let entrypoint = h.entrypoint();
         resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
 
