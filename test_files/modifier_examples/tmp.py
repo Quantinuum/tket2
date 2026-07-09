@@ -21,9 +21,9 @@ from guppylang.std.quantum import angle, discard, h, measure, qubit, rx, x
 enable_experimental_features()
 
 
-@guppy.declare
+@guppy
 def foo() -> None:
-    ...
+    pass
     # q = qubit()
     # c = qubit()
     # with control(c):

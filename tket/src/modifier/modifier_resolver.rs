@@ -330,7 +330,10 @@ pub struct ModifierResolver<N = Node> {
     // ```
     // _modified_functions: HashMap<N, (CombinedModifier, Node)>,
     // ```
-    /// Original functions for which the resolver generated modified replacements.
+    /// Original containers for which the resolver generated modified replacements.
+    ///
+    /// Function entries are also used by `remove_unused_modified_functions`;
+    /// non-function entries are ignored there.
     modified_functions: HashSet<N>,
     /// Function input ports that must receive already-modified function values
     /// when calling the function currently being rewritten.
@@ -1518,6 +1521,24 @@ fn module_child_containing<N: HugrNode>(h: &impl HugrView<Node = N>, node: N) ->
     None
 }
 
+/// Returns whether any parent of `node` is in `modified_containers`.
+/// In case of nested DFG/FuncDefn we stop at the first DFG/FuncDefn parent,
+///  to ensure that all nested DFG are considered.
+#[allow(unused)]
+fn check_parent_already_modified<N: HugrNode>(
+    h: &impl HugrView<Node = N>,
+    node: N,
+    modified_containers: &HashSet<N>,
+) -> bool {
+    match h.get_optype(node) {
+        OpType::FuncDefn(_) => modified_containers.contains(&node),
+        _ => match h.get_parent(node) {
+            Some(parent) => check_parent_already_modified(h, parent, modified_containers),
+            None => false,
+        },
+    }
+}
+
 /// Returns whether `func` has any static target outside `candidates`.
 ///
 /// Functions without readable static targets are treated as used outside the
@@ -1633,6 +1654,7 @@ pub fn resolve_modifier_with_entrypoints_and_scope(
 ) -> Result<(), ModifierResolverErrors<Node>> {
     use ModifierResolverErrors::*;
 
+    std::fs::write("input.mmd", h.mermaid_string()).unwrap();
     // Collect entry points into a deque so they can be cloned for later cleanup passes.
     let entry_points: VecDeque<_> = entry_points.into_iter().collect();
 
@@ -1643,24 +1665,23 @@ pub fn resolve_modifier_with_entrypoints_and_scope(
     let mut visited = FxHashSet::default();
 
     while let Some(node) = worklist.pop_front() {
+        println!("V: {:?}", node);
         // Skip nodes that have been removed during previous rewrites or already visited.
         if !h.contains_node(node) || visited.contains(&node) {
-            continue;
-        }
-        // `modify_fn` leaves the original function in the module and records it in
-        // `modified_functions` after generating the replacement. From this point on,
-        // the original body is stale: walking into it again would resolve modifier
-        // chains that have already been accounted for in the replacement function.
-        if module_child_containing(h, node)
-            .is_some_and(|owner| resolver.modified_functions.contains(&owner))
-        {
-            visited.insert(node);
             continue;
         }
         // Expand the frontier: enqueue children and dataflow neighbours not yet visited.
         worklist.extend(h.children(node).filter(|n| !visited.contains(n)));
         worklist.extend(h.all_neighbours(node).filter(|n| !visited.contains(n)));
         visited.insert(node);
+        // `modify_fn`/`modify_dfg` leave the original container in the graph
+        // after generating a replacement. From this point on, the stale
+        // container should not be processed again, but copied nested DFGs
+        // should still be visited independently.
+        // if check_parent_already_modified(h, node, &resolver.modified_functions) {
+        //     println!("Skipped: {:?}", node);
+        //     continue;
+        // }
         if let Err(e) = resolver.try_rewrite(h, node) {
             // ModifierError means this node is not a modifier (or is not the first
             // in its chain) and can safely be skipped.
@@ -1688,10 +1709,10 @@ pub fn resolve_modifier_with_entrypoints_and_scope(
     let mut visited = FxHashSet::default();
 
     while let Some(node) = deletelist.pop_front() {
-        // Keep the cleanup pass out of stale original function bodies too. Their
-        // modifier nodes may still be present, but removing them after the
-        // replacement has been built can invalidate the untouched original HUGR
-        // structure and is unnecessary for the solved entrypoint.
+        // if !h.contains_node(node) || visited.contains(&node) {
+        //     continue;
+        // }
+
         if module_child_containing(h, node)
             .is_some_and(|owner| resolver.modified_functions.contains(&owner))
         {
@@ -1701,6 +1722,13 @@ pub fn resolve_modifier_with_entrypoints_and_scope(
         deletelist.extend(h.children(node).filter(|n| !visited.contains(n)));
         deletelist.extend(h.all_neighbours(node).filter(|n| !visited.contains(n)));
         visited.insert(node);
+        // Keep the cleanup pass out of stale original containers too. Their
+        // modifier nodes may still be present, but removing them after the
+        // replacement has been built can invalidate the untouched original HUGR
+        // structure and is unnecessary for the solved entrypoint.
+        // if check_parent_already_modified(h, node, &resolver.modified_functions) {
+        //     continue;
+        // }
         if h.contains_node(node) {
             let optype = h.get_optype(node);
             if Modifier::from_optype(optype).is_some() {
@@ -1708,6 +1736,9 @@ pub fn resolve_modifier_with_entrypoints_and_scope(
                 // output edges (i.e. nodes that would become disconnected).
                 let mut l = vec![node];
                 while let Some(n) = l.pop() {
+                    // if !h.contains_node(n) {
+                    //     continue;
+                    // }
                     l.extend(h.output_neighbours(n));
                     h.remove_node(n);
                 }
@@ -2438,7 +2469,7 @@ mod tests {
     fn test_resolve(h: &mut Hugr) {
         assert_matches!(h.validate(), Ok(()));
 
-        let entrypoint = h.entrypoint();
+        let entrypoint = PassScope::default().root(&h).unwrap_or(h.entrypoint());
         resolve_modifier_with_entrypoints(h, [entrypoint]).unwrap();
 
         assert!(

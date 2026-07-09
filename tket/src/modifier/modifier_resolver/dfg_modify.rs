@@ -534,13 +534,19 @@ impl<N: HugrNode> ModifierResolver<N> {
         h: &mut impl HugrMut<Node = N>,
         n: N,
         dfg: &DFG,
-        parent_dfg: &mut impl Container,
+        new_parent_dfg: &mut impl Container,
     ) -> Result<(), ModifierResolverErrors<N>> {
         // Check if the DFG input or output are carrying qubits: only DFGs with quantum effects need to be modified.
         let boundary_has_qubits = self.signature_has_quantum_data(&dfg.signature);
         if !boundary_has_qubits {
-            self.copy_sub_container_no_modification(h, n, parent_dfg)?;
-            // todo: if there are modifier inside the dfg we should solve them
+            let new_dfg = self.with_modifiers(Default::default(), |this| {
+                let mut builder = DFGBuilder::new(dfg.signature.clone()).unwrap();
+                this.modify_dfg_body(h, n, &mut builder)?;
+                this.insert_sub_dfg(new_parent_dfg, builder)
+            })?;
+            for port in h.all_node_ports(n) {
+                self.map_insert(DirWire(n, port), DirWire(new_dfg, port))?;
+            }
             return Ok(());
         }
 
@@ -552,11 +558,11 @@ impl<N: HugrNode> ModifierResolver<N> {
         self.modify_signature(&mut signature, true);
         let mut builder = DFGBuilder::new(signature.clone()).unwrap();
         self.modify_dfg_body(h, n, &mut builder)?;
-        let new_dfg = self.insert_sub_dfg(parent_dfg, builder)?;
+        let new_dfg = self.insert_sub_dfg(new_parent_dfg, builder)?;
 
         // connect the controls and register the IOs
         for (i, c) in self.controls().iter_mut().enumerate() {
-            parent_dfg
+            new_parent_dfg
                 .hugr_mut()
                 .connect(c.node(), c.source(), new_dfg, i);
             *c = Wire::new(new_dfg, i);
@@ -571,6 +577,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             ),
             (0, 0, offset),
         )?;
+        // self.modified_functions.insert(n);
 
         Ok(())
     }
