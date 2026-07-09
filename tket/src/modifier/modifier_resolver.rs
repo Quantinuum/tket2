@@ -1674,6 +1674,8 @@ pub fn resolve_modifier_with_entrypoints_and_scope(
         }
     }
 
+    std::fs::write("raw0.mmd", h.mermaid_string()).unwrap();
+
     // After all rewrites, some modifier nodes may still remain in the graph
     // (e.g. intermediate nodes in a chain whose last modifier was the one rewritten).
     // Walk the same reachable set again and delete any surviving modifier nodes,
@@ -1684,8 +1686,6 @@ pub fn resolve_modifier_with_entrypoints_and_scope(
     // If more thorough cleanup is needed, we should run dead code elimination.
     let mut deletelist = entry_points.clone();
     let mut visited = FxHashSet::default();
-
-    std::fs::write("raw0.mmd", h.mermaid_string()).unwrap();
 
     while let Some(node) = deletelist.pop_front() {
         // Keep the cleanup pass out of stale original function bodies too. Their

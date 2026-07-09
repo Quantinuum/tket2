@@ -3,6 +3,8 @@
 # dependencies = [
 #    "guppylang==1.0.0a8",
 # ]
+# [tool.uv.sources]
+# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", branch = "main"}
 # ///
 """Test the use of a classical function inside modifiers"""
 
@@ -19,24 +21,28 @@ from guppylang.std.quantum import angle, discard, h, measure, qubit, rx, x
 enable_experimental_features()
 
 
-@guppy
+@guppy.declare
 def foo() -> None:
-    q = qubit()
-    c = qubit()
-    with control(c):
-        x(q)
-    discard(q)
-    discard(c)
+    ...
+    # q = qubit()
+    # c = qubit()
+    # with control(c):
+    #     x(q)
+    # discard(q)
+    # discard(c)
 
 
 @guppy
 def bar(q: qubit) -> None:
+    # with control(q):
+    #     with dagger:
+    #         pass
+
     with control(q):
-        foo()
+        with dagger:
+            foo()
 
 
-program = bar.compile_function()
-program.modules[0].render_dot().view("1")
 from tket.passes import NormalizeGuppy
 
 normalize = NormalizeGuppy(
@@ -50,9 +56,16 @@ normalize = NormalizeGuppy(
     remove_redundant_order_edges=False,
     squash_borrows=False,
 )
+program = bar.with_minimal_opt().with_optimization(normalize).compile_function()
+# from hugr.hugr.render import RenderConfig
+
+# program.modules[0].render_dot(RenderConfig(max_node_label_length=None)).view(
+#     "1", quiet=True
+# )
 from hugr.hugr.render import RenderConfig
 
-normalize(program.modules[0]).render_dot(RenderConfig(max_node_label_length=None)).view(
+# normalize(program.modules[0]).render_dot(RenderConfig(max_node_label_length=None)).view(
+program.modules[0].render_dot(RenderConfig(max_node_label_length=None)).view(
     "2", quiet=True
 )
 
