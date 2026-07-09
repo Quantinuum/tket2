@@ -283,11 +283,8 @@ impl<N: HugrNode> ModifierResolver<N> {
         // Wrap ModifierError as UnResolvable, using the ModifierError node as the error
         // location and the IndirectCall OpType for context.
         let wrap_modifier_err = |e: ModifierError<N>| {
-            ModifierResolverErrors::unresolvable(
-                e.node(),
-                "Cannot modify indirect call.".to_string(),
-                indir_call.clone().into(),
-            )
+            let message = format!("{}", e);
+            ModifierResolverErrors::unresolvable(e.node(), message, indir_call.clone().into())
         };
         // Wrap ModifierResolverErrors::ModifierError as UnResolvable
         let wrap_resolver_err = |e: ModifierResolverErrors<N>| match e {

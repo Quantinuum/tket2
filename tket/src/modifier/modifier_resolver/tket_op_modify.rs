@@ -24,12 +24,12 @@ impl<N: HugrNode> ModifierResolver<N> {
         let control = self.control_num();
         let dagger = self.modifiers.dagger;
 
-        if (control != 0 || dagger) && !tket_op.is_quantum() {
-            return Err(ModifierResolverErrors::unresolvable(
-                op_node,
-                "Non-quantum operation cannot be modified".to_string(),
-                tket_op.into(),
-            ));
+        // No modification is needed
+        if control == 0 && !dagger {
+            let new = new_fn.add_child_node(tket_op);
+            let incoming = 0..new_fn.hugr().num_inputs(new);
+            let outgoing = 0..new_fn.hugr().num_outputs(new);
+            return Ok(PortVector::from_single_node(new, incoming, outgoing));
         }
         match tket_op {
             X | CX | Toffoli | Y | CY | Z | CZ | S | Sdg | T | Tdg | V | Vdg | H
@@ -476,7 +476,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             Measure | MeasureFree | QAlloc | TryQAlloc | QFree | Reset => {
                 Err(ModifierResolverErrors::unresolvable(
                     op_node,
-                    format!("of type {tket_op:?}"),
+                    "non-quantum operations are not expected in a modified context.".to_string(),
                     tket_op.into(),
                 ))
             }
@@ -562,7 +562,7 @@ impl CombinedModifier {
 mod test {
     use cool_asserts::assert_matches;
     use hugr::{
-        Hugr,
+        Hugr, IncomingPort, OutgoingPort,
         builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
         extension::prelude::qb_t,
         ops::CallIndirect,
@@ -592,6 +592,35 @@ mod test {
             Measure | MeasureFree | QAlloc | TryQAlloc | QFree | Reset => return None,
         };
         Some(p)
+    }
+
+    #[test]
+    fn unmodified_tket_op_is_copied_directly() {
+        let mut module = ModuleBuilder::new();
+        let mut func = module
+            .define_function("foo", Signature::new_endo([qb_t()]))
+            .unwrap();
+        let op_node = func.add_child_node(TketOp::X);
+        let mut resolver = ModifierResolver::new();
+
+        let port_vector = resolver
+            .modify_tket_op(op_node, TketOp::X, &mut func, &mut vec![])
+            .unwrap();
+
+        let (new_node, first_input): (_, IncomingPort) =
+            port_vector.incoming[0].try_into().unwrap();
+        assert_eq!(first_input, IncomingPort::from(0));
+
+        let expected_incoming = (0..func.hugr().num_inputs(new_node))
+            .map(|port| DirWire::from((new_node, IncomingPort::from(port))))
+            .collect::<Vec<_>>();
+        let expected_outgoing = (0..func.hugr().num_outputs(new_node))
+            .map(|port| DirWire::from((new_node, OutgoingPort::from(port))))
+            .collect::<Vec<_>>();
+
+        assert_eq!(port_vector.incoming, expected_incoming);
+        assert_eq!(port_vector.outgoing, expected_outgoing);
+        assert_eq!(func.hugr().get_optype(new_node), &TketOp::X.into());
     }
 
     #[rstest::rstest]
@@ -641,18 +670,88 @@ mod test {
                 .unwrap();
             let op_node = func.add_child_node(op);
             let mut resolver = ModifierResolver::new();
+            resolver.modifiers.dagger = true;
 
             let result = resolver.modify_tket_op(op_node, op, &mut func, &mut vec![]);
             match result {
                 Err(ModifierResolverErrors::UnResolvable { node, msg, optype }) => {
                     assert_eq!(node, op_node);
-                    assert_eq!(msg, format!("of type {op:?}"));
+                    assert_eq!(
+                        msg,
+                        "non-quantum operations are not expected in a modified context."
+                    );
                     assert_eq!(optype, op.into());
                 }
                 Err(error) => panic!("expected {op:?} to be unresolvable, got {error:?}"),
                 Ok(_) => panic!("expected {op:?} to be rejected"),
             }
         }
+    }
+
+    #[test]
+    /// Test that when no modifiers are applied (e.g. with an even number of daggers), non quantum operations are handled correctly.
+    fn double_dagger_allows_measurement_function() {
+        let mut module = ModuleBuilder::new();
+        let measure_sig = Signature::new_endo([qb_t()]);
+
+        let dagger_op = MODIFIER_EXTENSION
+            .instantiate_extension_op(&DAGGER_OP_ID, [Term::new_list([qb_t()]), vec![].into()])
+            .unwrap();
+
+        let measured = {
+            let mut func = module
+                .define_function("measured", measure_sig.clone())
+                .unwrap();
+            let q = func.input_wires().next().unwrap();
+            let [q, _result] = func
+                .add_dataflow_op(TketOp::Measure, [q])
+                .unwrap()
+                .outputs_arr();
+            *func.finish_with_outputs([q]).unwrap().handle()
+        };
+
+        {
+            let mut func = module
+                .define_function("main", Signature::new(vec![], [qb_t()]))
+                .unwrap();
+            let loaded = func.load_func(&measured, &[]).unwrap();
+            let daggered_once = func
+                .add_dataflow_op(dagger_op.clone(), [loaded])
+                .unwrap()
+                .out_wire(0);
+            let daggered_twice = func
+                .add_dataflow_op(dagger_op, [daggered_once])
+                .unwrap()
+                .out_wire(0);
+            let q = func
+                .add_dataflow_op(TketOp::QAlloc, [])
+                .unwrap()
+                .out_wire(0);
+            let outputs = func
+                .add_dataflow_op(
+                    CallIndirect {
+                        signature: measure_sig,
+                    },
+                    [daggered_twice, q],
+                )
+                .unwrap()
+                .outputs();
+            func.finish_with_outputs(outputs).unwrap();
+        }
+
+        let mut h = module.finish_hugr().unwrap();
+        assert_matches!(h.validate(), Ok(()));
+        let entrypoint = h.entrypoint();
+        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        assert_matches!(h.validate(), Ok(()));
+        assert!(
+            h.nodes()
+                .all(|node| Modifier::from_optype(h.get_optype(node)).is_none())
+        );
+        assert!(
+            h.nodes()
+                .any(|node| TketOp::from_optype(h.get_optype(node)) == Some(TketOp::Measure))
+        );
     }
 
     #[test]
