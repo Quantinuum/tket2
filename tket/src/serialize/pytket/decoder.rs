@@ -13,6 +13,7 @@ pub use param::{LoadedParameter, ParameterType};
 pub use tracked_elem::{TrackedBit, TrackedQubit};
 pub use wires::TrackedWires;
 
+pub(super) use param::parser::PytketParam;
 pub(super) use wires::FoundWire;
 
 use std::sync::Arc;
@@ -38,7 +39,6 @@ use crate::serialize::pytket::circuit::{
     AdditionalNodesAndWires, EncodedCircuitInfo, StraightThroughWire,
 };
 use crate::serialize::pytket::config::PytketDecoderConfig;
-use crate::serialize::pytket::decoder::param::parser::PytketParam;
 use crate::serialize::pytket::decoder::wires::WireTracker;
 use crate::serialize::pytket::extension::{RegisterCount, build_opaque_tket_op};
 use crate::serialize::pytket::opaque::{EncodedEdgeID, OpaqueSubgraphs};

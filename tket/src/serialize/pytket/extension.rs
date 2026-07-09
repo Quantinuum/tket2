@@ -24,7 +24,7 @@ mod tket;
 
 pub use core::CoreDecoder;
 pub use float::FloatEmitter;
-pub use global_phase::GlobalPhaseDecoder;
+pub use global_phase::GlobalPhaseEmitter;
 pub use measurement::MeasurementEmitter;
 pub use prelude::PreludeEmitter;
 pub use rotation::RotationEmitter;
