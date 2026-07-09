@@ -27,68 +27,68 @@ alloca_block:
   store i64 -1, ptr %3, align 1
   %qalloc.i.i = tail call i64 @___qalloc()
   %not_max.not.not.i.i = icmp eq i64 %qalloc.i.i, -1
-  br i1 %not_max.not.not.i.i, label %cond_1503_case_0.i.i, label %__hugr__.__tk2_sol_qalloc.1507.exit.i
+  br i1 %not_max.not.not.i.i, label %cond_1981_case_0.i.i, label %__hugr__.__tk2_sol_qalloc.1992.exit.i
 
-cond_1503_case_0.i.i:                             ; preds = %cond_exit_2178.2.i, %cond_exit_2178.1.i, %cond_exit_2178.i, %alloca_block
+cond_1981_case_0.i.i:                             ; preds = %cond_exit_2178.2.i, %cond_exit_2178.1.i, %cond_exit_2178.i, %alloca_block
   tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0")
   unreachable
 
-__hugr__.__tk2_sol_qalloc.1507.exit.i:            ; preds = %alloca_block
+__hugr__.__tk2_sol_qalloc.1992.exit.i:            ; preds = %alloca_block
   tail call void @___reset(i64 %qalloc.i.i)
   %4 = load i64, ptr %3, align 4
   %5 = trunc i64 %4 to i1
   br i1 %5, label %cond_exit_2178.i, label %panic.i.i
 
-panic.i.i:                                        ; preds = %__barray_check_bounds.exit.3.i, %__hugr__.__tk2_sol_qalloc.1507.exit.2.i, %__hugr__.__tk2_sol_qalloc.1507.exit.1.i, %__hugr__.__tk2_sol_qalloc.1507.exit.i
+panic.i.i:                                        ; preds = %__barray_check_bounds.exit.3.i, %__hugr__.__tk2_sol_qalloc.1992.exit.2.i, %__hugr__.__tk2_sol_qalloc.1992.exit.1.i, %__hugr__.__tk2_sol_qalloc.1992.exit.i
   tail call void @panic(i32 1002, ptr nonnull @"e_Array alre.5A300C2A.0")
   unreachable
 
-cond_exit_2178.i:                                 ; preds = %__hugr__.__tk2_sol_qalloc.1507.exit.i
+cond_exit_2178.i:                                 ; preds = %__hugr__.__tk2_sol_qalloc.1992.exit.i
   %6 = and i64 %4, -2
   store i64 %6, ptr %3, align 4
   store i64 %qalloc.i.i, ptr %2, align 4
   %qalloc.i.1.i = tail call i64 @___qalloc()
   %not_max.not.not.i.1.i = icmp eq i64 %qalloc.i.1.i, -1
-  br i1 %not_max.not.not.i.1.i, label %cond_1503_case_0.i.i, label %__hugr__.__tk2_sol_qalloc.1507.exit.1.i
+  br i1 %not_max.not.not.i.1.i, label %cond_1981_case_0.i.i, label %__hugr__.__tk2_sol_qalloc.1992.exit.1.i
 
-__hugr__.__tk2_sol_qalloc.1507.exit.1.i:          ; preds = %cond_exit_2178.i
+__hugr__.__tk2_sol_qalloc.1992.exit.1.i:          ; preds = %cond_exit_2178.i
   tail call void @___reset(i64 %qalloc.i.1.i)
   %7 = load i64, ptr %3, align 4
   %8 = and i64 %7, 2
   %.not.i = icmp eq i64 %8, 0
   br i1 %.not.i, label %panic.i.i, label %cond_exit_2178.1.i
 
-cond_exit_2178.1.i:                               ; preds = %__hugr__.__tk2_sol_qalloc.1507.exit.1.i
+cond_exit_2178.1.i:                               ; preds = %__hugr__.__tk2_sol_qalloc.1992.exit.1.i
   %9 = and i64 %7, -3
   store i64 %9, ptr %3, align 4
   %10 = getelementptr inbounds nuw i8, ptr %2, i64 8
   store i64 %qalloc.i.1.i, ptr %10, align 4
   %qalloc.i.2.i = tail call i64 @___qalloc()
   %not_max.not.not.i.2.i = icmp eq i64 %qalloc.i.2.i, -1
-  br i1 %not_max.not.not.i.2.i, label %cond_1503_case_0.i.i, label %__hugr__.__tk2_sol_qalloc.1507.exit.2.i
+  br i1 %not_max.not.not.i.2.i, label %cond_1981_case_0.i.i, label %__hugr__.__tk2_sol_qalloc.1992.exit.2.i
 
-__hugr__.__tk2_sol_qalloc.1507.exit.2.i:          ; preds = %cond_exit_2178.1.i
+__hugr__.__tk2_sol_qalloc.1992.exit.2.i:          ; preds = %cond_exit_2178.1.i
   tail call void @___reset(i64 %qalloc.i.2.i)
   %11 = load i64, ptr %3, align 4
   %12 = and i64 %11, 4
-  %.not304.i = icmp eq i64 %12, 0
-  br i1 %.not304.i, label %panic.i.i, label %cond_exit_2178.2.i
+  %.not308.i = icmp eq i64 %12, 0
+  br i1 %.not308.i, label %panic.i.i, label %cond_exit_2178.2.i
 
-cond_exit_2178.2.i:                               ; preds = %__hugr__.__tk2_sol_qalloc.1507.exit.2.i
+cond_exit_2178.2.i:                               ; preds = %__hugr__.__tk2_sol_qalloc.1992.exit.2.i
   %13 = and i64 %11, -5
   store i64 %13, ptr %3, align 4
   %14 = getelementptr inbounds nuw i8, ptr %2, i64 16
   store i64 %qalloc.i.2.i, ptr %14, align 4
   %qalloc.i.3.i = tail call i64 @___qalloc()
   %not_max.not.not.i.3.i = icmp eq i64 %qalloc.i.3.i, -1
-  br i1 %not_max.not.not.i.3.i, label %cond_1503_case_0.i.i, label %__barray_check_bounds.exit.3.i
+  br i1 %not_max.not.not.i.3.i, label %cond_1981_case_0.i.i, label %__barray_check_bounds.exit.3.i
 
 __barray_check_bounds.exit.3.i:                   ; preds = %cond_exit_2178.2.i
   tail call void @___reset(i64 %qalloc.i.3.i)
   %15 = load i64, ptr %3, align 4
   %16 = and i64 %15, 8
-  %.not305.i = icmp eq i64 %16, 0
-  br i1 %.not305.i, label %panic.i.i, label %cond_exit_2178.3.i
+  %.not309.i = icmp eq i64 %16, 0
+  br i1 %.not309.i, label %panic.i.i, label %cond_exit_2178.3.i
 
 cond_exit_2178.3.i:                               ; preds = %__barray_check_bounds.exit.3.i
   %17 = and i64 %15, -9
@@ -101,70 +101,70 @@ cond_exit_2178.3.i:                               ; preds = %__barray_check_boun
   %19 = tail call fastcc { ptr, ptr, i64 } @"__hugr__.$apply_bitstring$$n(4).2199"({ ptr, ptr, i64 } %"127.fca.2.insert.i", ptr nonnull @"sa.static_pyarray.%tmp159.7d66e70e.0")
   %qalloc.i284.i = tail call i64 @___qalloc()
   %not_max.not.not.i285.i = icmp eq i64 %qalloc.i284.i, -1
-  br i1 %not_max.not.not.i285.i, label %cond_1491_case_0.i.i, label %__hugr__.__tk2_sol_qalloc.1494.exit.i
+  br i1 %not_max.not.not.i285.i, label %cond_1981_case_0.i286.i, label %__hugr__.__tk2_sol_qalloc.1992.exit287.i
 
-cond_1491_case_0.i.i:                             ; preds = %cond_exit_2340.2.i, %cond_exit_2340.1.i, %cond_exit_2340.i, %cond_exit_2178.3.i
+cond_1981_case_0.i286.i:                          ; preds = %cond_exit_2340.2.i, %cond_exit_2340.1.i, %cond_exit_2340.i, %cond_exit_2178.3.i
   tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0")
   unreachable
 
-__hugr__.__tk2_sol_qalloc.1494.exit.i:            ; preds = %cond_exit_2178.3.i
+__hugr__.__tk2_sol_qalloc.1992.exit287.i:         ; preds = %cond_exit_2178.3.i
   tail call void @___reset(i64 %qalloc.i284.i)
   %20 = load i64, ptr %1, align 4
   %21 = trunc i64 %20 to i1
-  br i1 %21, label %cond_exit_2340.i, label %panic.i288.i
+  br i1 %21, label %cond_exit_2340.i, label %panic.i290.i
 
-panic.i288.i:                                     ; preds = %__barray_check_bounds.exit287.3.i, %__hugr__.__tk2_sol_qalloc.1494.exit.2.i, %__hugr__.__tk2_sol_qalloc.1494.exit.1.i, %__hugr__.__tk2_sol_qalloc.1494.exit.i
+panic.i290.i:                                     ; preds = %__barray_check_bounds.exit289.3.i, %__hugr__.__tk2_sol_qalloc.1992.exit287.2.i, %__hugr__.__tk2_sol_qalloc.1992.exit287.1.i, %__hugr__.__tk2_sol_qalloc.1992.exit287.i
   tail call void @panic(i32 1002, ptr nonnull @"e_Array alre.5A300C2A.0")
   unreachable
 
-cond_exit_2340.i:                                 ; preds = %__hugr__.__tk2_sol_qalloc.1494.exit.i
+cond_exit_2340.i:                                 ; preds = %__hugr__.__tk2_sol_qalloc.1992.exit287.i
   %22 = and i64 %20, -2
   store i64 %22, ptr %1, align 4
   store i64 %qalloc.i284.i, ptr %0, align 4
   %qalloc.i284.1.i = tail call i64 @___qalloc()
   %not_max.not.not.i285.1.i = icmp eq i64 %qalloc.i284.1.i, -1
-  br i1 %not_max.not.not.i285.1.i, label %cond_1491_case_0.i.i, label %__hugr__.__tk2_sol_qalloc.1494.exit.1.i
+  br i1 %not_max.not.not.i285.1.i, label %cond_1981_case_0.i286.i, label %__hugr__.__tk2_sol_qalloc.1992.exit287.1.i
 
-__hugr__.__tk2_sol_qalloc.1494.exit.1.i:          ; preds = %cond_exit_2340.i
+__hugr__.__tk2_sol_qalloc.1992.exit287.1.i:       ; preds = %cond_exit_2340.i
   tail call void @___reset(i64 %qalloc.i284.1.i)
   %23 = load i64, ptr %1, align 4
   %24 = and i64 %23, 2
-  %.not306.i = icmp eq i64 %24, 0
-  br i1 %.not306.i, label %panic.i288.i, label %cond_exit_2340.1.i
+  %.not310.i = icmp eq i64 %24, 0
+  br i1 %.not310.i, label %panic.i290.i, label %cond_exit_2340.1.i
 
-cond_exit_2340.1.i:                               ; preds = %__hugr__.__tk2_sol_qalloc.1494.exit.1.i
+cond_exit_2340.1.i:                               ; preds = %__hugr__.__tk2_sol_qalloc.1992.exit287.1.i
   %25 = and i64 %23, -3
   store i64 %25, ptr %1, align 4
   %26 = getelementptr inbounds nuw i8, ptr %0, i64 8
   store i64 %qalloc.i284.1.i, ptr %26, align 4
   %qalloc.i284.2.i = tail call i64 @___qalloc()
   %not_max.not.not.i285.2.i = icmp eq i64 %qalloc.i284.2.i, -1
-  br i1 %not_max.not.not.i285.2.i, label %cond_1491_case_0.i.i, label %__hugr__.__tk2_sol_qalloc.1494.exit.2.i
+  br i1 %not_max.not.not.i285.2.i, label %cond_1981_case_0.i286.i, label %__hugr__.__tk2_sol_qalloc.1992.exit287.2.i
 
-__hugr__.__tk2_sol_qalloc.1494.exit.2.i:          ; preds = %cond_exit_2340.1.i
+__hugr__.__tk2_sol_qalloc.1992.exit287.2.i:       ; preds = %cond_exit_2340.1.i
   tail call void @___reset(i64 %qalloc.i284.2.i)
   %27 = load i64, ptr %1, align 4
   %28 = and i64 %27, 4
-  %.not307.i = icmp eq i64 %28, 0
-  br i1 %.not307.i, label %panic.i288.i, label %cond_exit_2340.2.i
+  %.not311.i = icmp eq i64 %28, 0
+  br i1 %.not311.i, label %panic.i290.i, label %cond_exit_2340.2.i
 
-cond_exit_2340.2.i:                               ; preds = %__hugr__.__tk2_sol_qalloc.1494.exit.2.i
+cond_exit_2340.2.i:                               ; preds = %__hugr__.__tk2_sol_qalloc.1992.exit287.2.i
   %29 = and i64 %27, -5
   store i64 %29, ptr %1, align 4
   %30 = getelementptr inbounds nuw i8, ptr %0, i64 16
   store i64 %qalloc.i284.2.i, ptr %30, align 4
   %qalloc.i284.3.i = tail call i64 @___qalloc()
   %not_max.not.not.i285.3.i = icmp eq i64 %qalloc.i284.3.i, -1
-  br i1 %not_max.not.not.i285.3.i, label %cond_1491_case_0.i.i, label %__barray_check_bounds.exit287.3.i
+  br i1 %not_max.not.not.i285.3.i, label %cond_1981_case_0.i286.i, label %__barray_check_bounds.exit289.3.i
 
-__barray_check_bounds.exit287.3.i:                ; preds = %cond_exit_2340.2.i
+__barray_check_bounds.exit289.3.i:                ; preds = %cond_exit_2340.2.i
   tail call void @___reset(i64 %qalloc.i284.3.i)
   %31 = load i64, ptr %1, align 4
   %32 = and i64 %31, 8
-  %.not308.i = icmp eq i64 %32, 0
-  br i1 %.not308.i, label %panic.i288.i, label %cond_exit_2340.3.i
+  %.not312.i = icmp eq i64 %32, 0
+  br i1 %.not312.i, label %panic.i290.i, label %cond_exit_2340.3.i
 
-cond_exit_2340.3.i:                               ; preds = %__barray_check_bounds.exit287.3.i
+cond_exit_2340.3.i:                               ; preds = %__barray_check_bounds.exit289.3.i
   %33 = and i64 %31, -9
   store i64 %33, ptr %1, align 4
   %34 = getelementptr inbounds nuw i8, ptr %0, i64 24
@@ -173,25 +173,25 @@ cond_exit_2340.3.i:                               ; preds = %__barray_check_boun
   %"188.fca.1.insert.i" = insertvalue { ptr, ptr, i64 } %"188.fca.0.insert.i", ptr %1, 1
   %"188.fca.2.insert.i" = insertvalue { ptr, ptr, i64 } %"188.fca.1.insert.i", i64 0, 2
   %35 = tail call fastcc { ptr, ptr, i64 } @"__hugr__.$apply_bitstring$$n(4).2199"({ ptr, ptr, i64 } %"188.fca.2.insert.i", ptr nonnull @"sa.static_pyarray.%tmp160.8bfddccb.0")
-  %qalloc.i290.i = tail call i64 @___qalloc()
-  %not_max.not.not.i291.i = icmp eq i64 %qalloc.i290.i, -1
-  br i1 %not_max.not.not.i291.i, label %cond_1981_case_0.i.i, label %"__hugr__.$crc_prep_regs$$n(4).2143.exit"
+  %qalloc.i292.i = tail call i64 @___qalloc()
+  %not_max.not.not.i293.i = icmp eq i64 %qalloc.i292.i, -1
+  br i1 %not_max.not.not.i293.i, label %cond_1981_case_0.i294.i, label %"__hugr__.$crc_prep_regs$$n(4).2143.exit"
 
-cond_1981_case_0.i.i:                             ; preds = %cond_exit_2340.3.i
+cond_1981_case_0.i294.i:                          ; preds = %cond_exit_2340.3.i
   tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0")
   unreachable
 
 "__hugr__.$crc_prep_regs$$n(4).2143.exit":        ; preds = %cond_exit_2340.3.i
-  tail call void @___reset(i64 %qalloc.i290.i)
+  tail call void @___reset(i64 %qalloc.i292.i)
   %qalloc.i.i208 = tail call i64 @___qalloc()
   %not_max.not.not.i.i209 = icmp eq i64 %qalloc.i.i208, -1
-  br i1 %not_max.not.not.i.i209, label %cond_1949_case_0.i.i, label %__hugr__.__tk2_sol_qalloc.1963.exit.i
+  br i1 %not_max.not.not.i.i209, label %cond_1981_case_0.i.i212, label %__hugr__.__tk2_sol_qalloc.1992.exit.i210
 
-cond_1949_case_0.i.i:                             ; preds = %"__hugr__.$crc_prep_regs$$n(4).2143.exit"
+cond_1981_case_0.i.i212:                          ; preds = %"__hugr__.$crc_prep_regs$$n(4).2143.exit"
   tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0")
   unreachable
 
-__hugr__.__tk2_sol_qalloc.1963.exit.i:            ; preds = %"__hugr__.$crc_prep_regs$$n(4).2143.exit"
+__hugr__.__tk2_sol_qalloc.1992.exit.i210:         ; preds = %"__hugr__.$crc_prep_regs$$n(4).2143.exit"
   tail call void @___reset(i64 %qalloc.i.i208)
   %.fca.0.extract309.i.i = extractvalue { ptr, ptr, i64 } %19, 0
   %.fca.1.extract310.i.i = extractvalue { ptr, ptr, i64 } %19, 1
@@ -201,8 +201,8 @@ __hugr__.__tk2_sol_qalloc.1963.exit.i:            ; preds = %"__hugr__.$crc_prep
   %.fca.2.extract308.i.i = extractvalue { ptr, ptr, i64 } %35, 2
   br label %__barray_check_bounds.exit.i.i
 
-__barray_check_bounds.exit.i.i:                   ; preds = %__barray_mask_return.exit324.i.i, %__hugr__.__tk2_sol_qalloc.1963.exit.i
-  %.fca.0.extract192.i334.i.i = phi i64 [ 1, %__hugr__.__tk2_sol_qalloc.1963.exit.i ], [ %36, %__barray_mask_return.exit324.i.i ]
+__barray_check_bounds.exit.i.i:                   ; preds = %__barray_mask_return.exit324.i.i, %__hugr__.__tk2_sol_qalloc.1992.exit.i210
+  %.fca.0.extract192.i334.i.i = phi i64 [ 1, %__hugr__.__tk2_sol_qalloc.1992.exit.i210 ], [ %36, %__barray_mask_return.exit324.i.i ]
   %36 = add nuw nsw i64 %.fca.0.extract192.i334.i.i, 1
   %37 = add i64 %.fca.0.extract192.i334.i.i, %.fca.2.extract308.i.i
   %38 = lshr i64 %37, 6
@@ -284,9 +284,9 @@ __barray_mask_return.exit324.i.i:                 ; preds = %__barray_check_boun
   %71 = and i64 %67, 63
   %72 = lshr i64 %70, %71
   %73 = trunc i64 %72 to i1
-  br i1 %73, label %panic.i.i210, label %__barray_mask_borrow.exit.i
+  br i1 %73, label %panic.i.i211, label %__barray_mask_borrow.exit.i
 
-panic.i.i210:                                     ; preds = %"__hugr__.$traversal2_start_end$$n(4).2395.exit.i"
+panic.i.i211:                                     ; preds = %"__hugr__.$traversal2_start_end$$n(4).2395.exit.i"
   tail call void @panic(i32 1002, ptr nonnull @"e_Array elem.E746B1A3.0")
   unreachable
 
@@ -567,38 +567,38 @@ __barray_mask_return.exit651.i.i:                 ; preds = %__barray_mask_retur
   %188 = xor i64 %185, %166
   store i64 %188, ptr %161, align 4
   store i64 %169, ptr %168, align 4
-  %189 = load i64, ptr %69, align 4
-  %190 = lshr i64 %189, %71
-  %191 = trunc i64 %190 to i1
-  br i1 %191, label %panic.i695.i.i, label %__barray_mask_borrow.exit696.i.i
+  %189 = add i64 %.fca.2.extract308.i.i, 2
+  %190 = lshr i64 %189, 6
+  %191 = getelementptr inbounds nuw i64, ptr %.fca.1.extract307.i.i, i64 %190
+  %192 = load i64, ptr %191, align 4
+  %193 = and i64 %189, 63
+  %194 = lshr i64 %192, %193
+  %195 = trunc i64 %194 to i1
+  br i1 %195, label %panic.i695.i.i, label %__barray_mask_borrow.exit696.i.i
 
 panic.i695.i.i:                                   ; preds = %__barray_mask_return.exit651.i.i
   tail call void @panic(i32 1002, ptr nonnull @"e_Array elem.E746B1A3.0")
   unreachable
 
 __barray_mask_borrow.exit696.i.i:                 ; preds = %__barray_mask_return.exit651.i.i
-  %192 = xor i64 %189, %74
-  store i64 %192, ptr %69, align 4
-  %193 = load i64, ptr %76, align 4
-  %194 = add i64 %.fca.2.extract308.i.i, 2
-  %195 = lshr i64 %194, 6
-  %196 = getelementptr inbounds nuw i64, ptr %.fca.1.extract307.i.i, i64 %195
-  %197 = load i64, ptr %196, align 4
-  %198 = and i64 %194, 63
-  %199 = lshr i64 %197, %198
-  %200 = trunc i64 %199 to i1
-  br i1 %200, label %panic.i697.i.i, label %__barray_mask_borrow.exit698.i.i
+  %196 = shl nuw i64 1, %193
+  %197 = xor i64 %192, %196
+  store i64 %197, ptr %191, align 4
+  %198 = getelementptr inbounds i64, ptr %.fca.0.extract306.i.i, i64 %189
+  %199 = load i64, ptr %198, align 4
+  %200 = load i64, ptr %69, align 4
+  %201 = lshr i64 %200, %71
+  %202 = trunc i64 %201 to i1
+  br i1 %202, label %panic.i697.i.i, label %__barray_mask_borrow.exit698.i.i
 
 panic.i697.i.i:                                   ; preds = %__barray_mask_borrow.exit696.i.i
   tail call void @panic(i32 1002, ptr nonnull @"e_Array elem.E746B1A3.0")
   unreachable
 
 __barray_mask_borrow.exit698.i.i:                 ; preds = %__barray_mask_borrow.exit696.i.i
-  %201 = shl nuw i64 1, %198
-  %202 = xor i64 %197, %201
-  store i64 %202, ptr %196, align 4
-  %203 = getelementptr inbounds i64, ptr %.fca.0.extract306.i.i, i64 %194
-  %204 = load i64, ptr %203, align 4
+  %203 = xor i64 %200, %74
+  store i64 %203, ptr %69, align 4
+  %204 = load i64, ptr %76, align 4
   %205 = load i64, ptr %109, align 4
   %206 = lshr i64 %205, %111
   %207 = trunc i64 %206 to i1
@@ -626,15 +626,15 @@ __barray_mask_borrow.exit702.i.i:                 ; preds = %__barray_mask_borro
   store i64 %213, ptr %161, align 4
   %214 = load i64, ptr %168, align 4
   tail call void @___rp(i64 %214, double 0x3FF921FB54442D18, double 0x3FF921FB54442D18)
-  tail call void @___rpp(i64 %214, i64 %qalloc.i290.i, double 0x3FF921FB54442D18, double 0.000000e+00)
+  tail call void @___rpp(i64 %214, i64 %qalloc.i292.i, double 0x3FF921FB54442D18, double 0.000000e+00)
   tail call void @___rp(i64 %214, double 0xBFF921FB54442D18, double 0x3FF921FB54442D18)
   tail call void @___rz(i64 %214, double 0xBFF921FB54442D18)
-  tail call void @___rp(i64 %qalloc.i290.i, double 0xBFF921FB54442D18, double 0.000000e+00)
-  %215 = tail call fastcc { i64, i64, i64 } @__hugr__.ccx.1244(i64 %193, i64 %204, i64 %212)
-  %216 = extractvalue { i64, i64, i64 } %215, 1
+  tail call void @___rp(i64 %qalloc.i292.i, double 0xBFF921FB54442D18, double 0.000000e+00)
+  %215 = tail call fastcc { i64, i64, i64 } @__hugr__.ccx.1244(i64 %204, i64 %199, i64 %212)
+  %216 = extractvalue { i64, i64, i64 } %215, 0
   %217 = extractvalue { i64, i64, i64 } %215, 2
-  %218 = load i64, ptr %69, align 4
-  %219 = lshr i64 %218, %71
+  %218 = load i64, ptr %191, align 4
+  %219 = lshr i64 %218, %193
   %220 = trunc i64 %219 to i1
   br i1 %220, label %__barray_mask_return.exit709.i.i, label %panic.i708.i.i
 
@@ -643,12 +643,12 @@ panic.i708.i.i:                                   ; preds = %__barray_mask_borro
   unreachable
 
 __barray_mask_return.exit709.i.i:                 ; preds = %__barray_mask_borrow.exit702.i.i
-  %221 = extractvalue { i64, i64, i64 } %215, 0
-  %222 = xor i64 %218, %74
-  store i64 %222, ptr %69, align 4
-  store i64 %221, ptr %76, align 4
-  %223 = load i64, ptr %196, align 4
-  %224 = lshr i64 %223, %198
+  %221 = extractvalue { i64, i64, i64 } %215, 1
+  %222 = xor i64 %218, %196
+  store i64 %222, ptr %191, align 4
+  store i64 %221, ptr %198, align 4
+  %223 = load i64, ptr %69, align 4
+  %224 = lshr i64 %223, %71
   %225 = trunc i64 %224 to i1
   br i1 %225, label %__barray_mask_return.exit711.i.i, label %panic.i710.i.i
 
@@ -657,9 +657,9 @@ panic.i710.i.i:                                   ; preds = %__barray_mask_retur
   unreachable
 
 __barray_mask_return.exit711.i.i:                 ; preds = %__barray_mask_return.exit709.i.i
-  %226 = xor i64 %223, %201
-  store i64 %226, ptr %196, align 4
-  store i64 %216, ptr %203, align 4
+  %226 = xor i64 %223, %74
+  store i64 %226, ptr %69, align 4
+  store i64 %216, ptr %76, align 4
   %227 = load i64, ptr %109, align 4
   %228 = lshr i64 %227, %111
   %229 = trunc i64 %228 to i1
@@ -714,25 +714,25 @@ __barray_check_bounds.exit.1.i:                   ; preds = %__barray_check_boun
   %244 = xor i64 %241, %145
   store i64 %244, ptr %140, align 4
   store i64 %240, ptr %147, align 4
-  %245 = load i64, ptr %196, align 4
-  %246 = lshr i64 %245, %198
+  %245 = load i64, ptr %191, align 4
+  %246 = lshr i64 %245, %193
   %247 = trunc i64 %246 to i1
   br i1 %247, label %panic.i794.i, label %__barray_check_bounds.exit797.1.i
 
 __barray_check_bounds.exit797.1.i:                ; preds = %__barray_check_bounds.exit.1.i
-  %248 = xor i64 %245, %201
-  store i64 %248, ptr %196, align 4
-  %249 = load i64, ptr %203, align 4
+  %248 = xor i64 %245, %196
+  store i64 %248, ptr %191, align 4
+  %249 = load i64, ptr %198, align 4
   tail call void @___rp(i64 %249, double 0x400921FB54442D18, double 0.000000e+00)
-  %250 = load i64, ptr %196, align 4
-  %251 = lshr i64 %250, %198
+  %250 = load i64, ptr %191, align 4
+  %251 = lshr i64 %250, %193
   %252 = trunc i64 %251 to i1
   br i1 %252, label %__barray_mask_return.exit799.1.i, label %panic.i798.i
 
 __barray_mask_return.exit799.1.i:                 ; preds = %__barray_check_bounds.exit797.1.i
-  %253 = xor i64 %250, %201
-  store i64 %253, ptr %196, align 4
-  store i64 %249, ptr %203, align 4
+  %253 = xor i64 %250, %196
+  store i64 %253, ptr %191, align 4
+  store i64 %249, ptr %198, align 4
   %254 = load i64, ptr %109, align 4
   %255 = lshr i64 %254, %111
   %256 = trunc i64 %255 to i1
@@ -765,7 +765,7 @@ __barray_mask_borrow.exit803.i:                   ; preds = %__barray_mask_borro
   store i64 %267, ptr %260, align 4
   %268 = getelementptr inbounds i64, ptr %.fca.0.extract306.i.i, i64 %258
   %269 = load i64, ptr %268, align 4
-  %270 = tail call fastcc { i64, i64, i64 } @__hugr__.ccx.1244(i64 %265, i64 %269, i64 %qalloc.i290.i)
+  %270 = tail call fastcc { i64, i64, i64 } @__hugr__.ccx.1244(i64 %265, i64 %269, i64 %qalloc.i292.i)
   %271 = extractvalue { i64, i64, i64 } %270, 1
   %272 = load i64, ptr %109, align 4
   %273 = lshr i64 %272, %111
@@ -809,9 +809,9 @@ __barray_mask_borrow.exit809.i:                   ; preds = %__barray_mask_retur
   %285 = load i64, ptr %147, align 4
   tail call void @___rp(i64 %234, double 0x3FF921FB54442D18, double 0x3FF921FB54442D18)
   tail call void @___rpp(i64 %234, i64 %285, double 0x3FF921FB54442D18, double 0.000000e+00)
-  tail call void @___rp(i64 %285, double 0xBFF921FB54442D18, double 0.000000e+00)
   tail call void @___rp(i64 %234, double 0xBFF921FB54442D18, double 0x3FF921FB54442D18)
   tail call void @___rz(i64 %234, double 0xBFF921FB54442D18)
+  tail call void @___rp(i64 %285, double 0xBFF921FB54442D18, double 0.000000e+00)
   %286 = load i64, ptr %140, align 4
   %287 = lshr i64 %286, %142
   %288 = trunc i64 %287 to i1
@@ -825,8 +825,8 @@ __barray_mask_return.exit813.i:                   ; preds = %__barray_mask_borro
   %289 = xor i64 %286, %145
   store i64 %289, ptr %140, align 4
   store i64 %285, ptr %147, align 4
-  %290 = load i64, ptr %196, align 4
-  %291 = lshr i64 %290, %198
+  %290 = load i64, ptr %191, align 4
+  %291 = lshr i64 %290, %193
   %292 = trunc i64 %291 to i1
   br i1 %292, label %panic.i816.i, label %__barray_mask_borrow.exit817.i
 
@@ -835,9 +835,9 @@ panic.i816.i:                                     ; preds = %__barray_check_boun
   unreachable
 
 __barray_mask_borrow.exit817.i:                   ; preds = %__barray_mask_return.exit813.i
-  %293 = xor i64 %290, %201
-  store i64 %293, ptr %196, align 4
-  %294 = load i64, ptr %203, align 4
+  %293 = xor i64 %290, %196
+  store i64 %293, ptr %191, align 4
+  %294 = load i64, ptr %198, align 4
   %295 = load i64, ptr %69, align 4
   %296 = lshr i64 %295, %71
   %297 = trunc i64 %296 to i1
@@ -856,8 +856,8 @@ __barray_check_bounds.exit825.i:                  ; preds = %__barray_mask_borro
   tail call void @___rp(i64 %299, double 0xBFF921FB54442D18, double 0x3FF921FB54442D18)
   tail call void @___rz(i64 %299, double 0xBFF921FB54442D18)
   tail call void @___rp(i64 %294, double 0xBFF921FB54442D18, double 0.000000e+00)
-  %300 = load i64, ptr %196, align 4
-  %301 = lshr i64 %300, %198
+  %300 = load i64, ptr %191, align 4
+  %301 = lshr i64 %300, %193
   %302 = trunc i64 %301 to i1
   br i1 %302, label %__barray_check_bounds.exit829.i, label %panic.i826.i
 
@@ -866,9 +866,9 @@ panic.i826.i:                                     ; preds = %__barray_check_boun
   unreachable
 
 __barray_check_bounds.exit829.i:                  ; preds = %__barray_check_bounds.exit825.i
-  %303 = xor i64 %300, %201
-  store i64 %303, ptr %196, align 4
-  store i64 %294, ptr %203, align 4
+  %303 = xor i64 %300, %196
+  store i64 %303, ptr %191, align 4
+  store i64 %294, ptr %198, align 4
   %304 = load i64, ptr %69, align 4
   %305 = lshr i64 %304, %71
   %306 = trunc i64 %305 to i1
@@ -936,8 +936,8 @@ __barray_mask_borrow.exit.i832.i:                 ; preds = %__barray_mask_retur
   %329 = xor i64 %326, %74
   store i64 %329, ptr %69, align 4
   %330 = load i64, ptr %76, align 4
-  %331 = load i64, ptr %109, align 4
-  %332 = lshr i64 %331, %111
+  %331 = load i64, ptr %191, align 4
+  %332 = lshr i64 %331, %193
   %333 = trunc i64 %332 to i1
   br i1 %333, label %panic.i610.i.i, label %__barray_mask_borrow.exit611.i.i
 
@@ -946,10 +946,10 @@ panic.i610.i.i:                                   ; preds = %__barray_mask_borro
   unreachable
 
 __barray_mask_borrow.exit611.i.i:                 ; preds = %__barray_mask_borrow.exit.i832.i
-  %334 = xor i64 %331, %114
-  store i64 %334, ptr %109, align 4
-  %335 = load i64, ptr %196, align 4
-  %336 = lshr i64 %335, %198
+  %334 = xor i64 %331, %196
+  store i64 %334, ptr %191, align 4
+  %335 = load i64, ptr %109, align 4
+  %336 = lshr i64 %335, %111
   %337 = trunc i64 %336 to i1
   br i1 %337, label %panic.i612.i.i, label %__barray_mask_borrow.exit613.i.i
 
@@ -958,11 +958,11 @@ panic.i612.i.i:                                   ; preds = %__barray_mask_borro
   unreachable
 
 __barray_mask_borrow.exit613.i.i:                 ; preds = %__barray_mask_borrow.exit611.i.i
-  %338 = load i64, ptr %116, align 4
-  %339 = xor i64 %335, %201
-  store i64 %339, ptr %196, align 4
-  %340 = load i64, ptr %203, align 4
-  %341 = tail call fastcc { i64, i64, i64 } @__hugr__.ccx.1244(i64 %330, i64 %340, i64 %338)
+  %338 = load i64, ptr %198, align 4
+  %339 = xor i64 %335, %114
+  store i64 %339, ptr %109, align 4
+  %340 = load i64, ptr %116, align 4
+  %341 = tail call fastcc { i64, i64, i64 } @__hugr__.ccx.1244(i64 %330, i64 %338, i64 %340)
   %342 = extractvalue { i64, i64, i64 } %341, 1
   %343 = extractvalue { i64, i64, i64 } %341, 2
   %344 = load i64, ptr %69, align 4
@@ -979,8 +979,8 @@ __barray_mask_return.exit.i833.i:                 ; preds = %__barray_mask_borro
   %348 = xor i64 %344, %74
   store i64 %348, ptr %69, align 4
   store i64 %347, ptr %76, align 4
-  %349 = load i64, ptr %196, align 4
-  %350 = lshr i64 %349, %198
+  %349 = load i64, ptr %191, align 4
+  %350 = lshr i64 %349, %193
   %351 = trunc i64 %350 to i1
   br i1 %351, label %__barray_mask_return.exit616.i.i, label %panic.i615.i.i
 
@@ -989,9 +989,9 @@ panic.i615.i.i:                                   ; preds = %__barray_mask_retur
   unreachable
 
 __barray_mask_return.exit616.i.i:                 ; preds = %__barray_mask_return.exit.i833.i
-  %352 = xor i64 %349, %201
-  store i64 %352, ptr %196, align 4
-  store i64 %342, ptr %203, align 4
+  %352 = xor i64 %349, %196
+  store i64 %352, ptr %191, align 4
+  store i64 %342, ptr %198, align 4
   %353 = load i64, ptr %109, align 4
   %354 = lshr i64 %353, %111
   %355 = trunc i64 %354 to i1
@@ -1031,8 +1031,8 @@ __barray_mask_borrow.exit668.i.i:                 ; preds = %__barray_mask_borro
   %365 = xor i64 %362, %74
   store i64 %365, ptr %69, align 4
   %366 = load i64, ptr %76, align 4
-  %367 = load i64, ptr %196, align 4
-  %368 = lshr i64 %367, %198
+  %367 = load i64, ptr %191, align 4
+  %368 = lshr i64 %367, %193
   %369 = trunc i64 %368 to i1
   br i1 %369, label %panic.i669.i.i, label %__barray_mask_borrow.exit670.i.i
 
@@ -1041,9 +1041,9 @@ panic.i669.i.i:                                   ; preds = %__barray_mask_borro
   unreachable
 
 __barray_mask_borrow.exit670.i.i:                 ; preds = %__barray_mask_borrow.exit668.i.i
-  %370 = xor i64 %367, %201
-  store i64 %370, ptr %196, align 4
-  %371 = load i64, ptr %203, align 4
+  %370 = xor i64 %367, %196
+  store i64 %370, ptr %191, align 4
+  %371 = load i64, ptr %198, align 4
   %372 = load i64, ptr %109, align 4
   %373 = lshr i64 %372, %111
   %374 = trunc i64 %373 to i1
@@ -1106,8 +1106,8 @@ __barray_mask_return.exit684.i.i:                 ; preds = %__barray_mask_retur
   %393 = xor i64 %390, %74
   store i64 %393, ptr %69, align 4
   store i64 %384, ptr %76, align 4
-  %394 = load i64, ptr %196, align 4
-  %395 = lshr i64 %394, %198
+  %394 = load i64, ptr %191, align 4
+  %395 = lshr i64 %394, %193
   %396 = trunc i64 %395 to i1
   br i1 %396, label %__barray_mask_return.exit686.i.i, label %panic.i685.i.i
 
@@ -1116,9 +1116,9 @@ panic.i685.i.i:                                   ; preds = %__barray_mask_retur
   unreachable
 
 __barray_mask_return.exit686.i.i:                 ; preds = %__barray_mask_return.exit684.i.i
-  %397 = xor i64 %394, %201
-  store i64 %397, ptr %196, align 4
-  store i64 %371, ptr %203, align 4
+  %397 = xor i64 %394, %196
+  store i64 %397, ptr %191, align 4
+  store i64 %371, ptr %198, align 4
   %398 = load i64, ptr %109, align 4
   %399 = lshr i64 %398, %111
   %400 = trunc i64 %399 to i1
@@ -1158,8 +1158,8 @@ __barray_mask_borrow.exit692.i.i:                 ; preds = %__barray_mask_retur
   %409 = xor i64 %406, %88
   store i64 %409, ptr %83, align 4
   %410 = load i64, ptr %90, align 4
-  %411 = load i64, ptr %140, align 4
-  %412 = lshr i64 %411, %142
+  %411 = load i64, ptr %93, align 4
+  %412 = lshr i64 %411, %95
   %413 = trunc i64 %412 to i1
   br i1 %413, label %panic.i693.i.i, label %__barray_mask_borrow.exit694.i.i
 
@@ -1168,11 +1168,11 @@ panic.i693.i.i:                                   ; preds = %__barray_mask_borro
   unreachable
 
 __barray_mask_borrow.exit694.i.i:                 ; preds = %__barray_mask_borrow.exit692.i.i
-  %414 = xor i64 %411, %145
-  store i64 %414, ptr %140, align 4
-  %415 = load i64, ptr %147, align 4
-  %416 = load i64, ptr %93, align 4
-  %417 = lshr i64 %416, %95
+  %414 = xor i64 %411, %98
+  store i64 %414, ptr %93, align 4
+  %415 = load i64, ptr %100, align 4
+  %416 = load i64, ptr %140, align 4
+  %417 = lshr i64 %416, %142
   %418 = trunc i64 %417 to i1
   br i1 %418, label %panic.i695.i840.i, label %__barray_mask_borrow.exit696.i834.i
 
@@ -1181,9 +1181,9 @@ panic.i695.i840.i:                                ; preds = %__barray_mask_borro
   unreachable
 
 __barray_mask_borrow.exit696.i834.i:              ; preds = %__barray_mask_borrow.exit694.i.i
-  %419 = xor i64 %416, %98
-  store i64 %419, ptr %93, align 4
-  %420 = load i64, ptr %100, align 4
+  %419 = xor i64 %416, %145
+  store i64 %419, ptr %140, align 4
+  %420 = load i64, ptr %147, align 4
   %421 = load i64, ptr %69, align 4
   %422 = lshr i64 %421, %71
   %423 = trunc i64 %422 to i1
@@ -1215,8 +1215,8 @@ __barray_mask_borrow.exit700.i836.i:              ; preds = %__barray_mask_borro
   tail call void @___rp(i64 %430, double 0xBFF921FB54442D18, double 0x3FF921FB54442D18)
   tail call void @___rz(i64 %430, double 0xBFF921FB54442D18)
   tail call void @___rp(i64 %425, double 0xBFF921FB54442D18, double 0.000000e+00)
-  tail call void @___rp(i64 %415, double 0x400921FB54442D18, double 0.000000e+00)
-  %431 = tail call fastcc { i64, i64, i64 } @__hugr__.ccx.1244(i64 %410, i64 %420, i64 %383)
+  tail call void @___rp(i64 %420, double 0x400921FB54442D18, double 0.000000e+00)
+  %431 = tail call fastcc { i64, i64, i64 } @__hugr__.ccx.1244(i64 %410, i64 %415, i64 %383)
   %432 = extractvalue { i64, i64, i64 } %431, 1
   %433 = load i64, ptr %83, align 4
   %434 = lshr i64 %433, %85
@@ -1257,7 +1257,7 @@ panic.i711.i.i:                                   ; preds = %__barray_mask_retur
 __barray_mask_return.exit712.i.i:                 ; preds = %__barray_mask_return.exit710.i.i
   %445 = xor i64 %442, %145
   store i64 %445, ptr %140, align 4
-  store i64 %415, ptr %147, align 4
+  store i64 %420, ptr %147, align 4
   %446 = load i64, ptr %69, align 4
   %447 = lshr i64 %446, %71
   %448 = trunc i64 %447 to i1
@@ -1401,9 +1401,9 @@ __barray_mask_return.exit1273.i.i.i:              ; preds = %__barray_check_boun
   %497 = load i64, ptr %93, align 4
   %498 = lshr i64 %497, %95
   %499 = trunc i64 %498 to i1
-  br i1 %499, label %panic.i.i246, label %"__hugr__.$__next__$$t(qubit)$n(4).3884.exit"
+  br i1 %499, label %panic.i.i248, label %"__hugr__.$__next__$$t(qubit)$n(4).3884.exit"
 
-panic.i.i246:                                     ; preds = %"__hugr__.$ripple_carry_adder$$n(4).2370.exit"
+panic.i.i248:                                     ; preds = %"__hugr__.$ripple_carry_adder$$n(4).2370.exit"
   tail call void @panic(i32 1002, ptr nonnull @"e_Array elem.E746B1A3.0")
   unreachable
 
@@ -1443,13 +1443,13 @@ cond_3965_case_1.i:                               ; preds = %"__hugr__.$__next__
   %511 = load i64, ptr %83, align 4
   %512 = lshr i64 %511, %85
   %513 = trunc i64 %512 to i1
-  br i1 %513, label %panic.i.i261, label %"__hugr__.$__next__$$t(qubit)$n(4).3884.exit262"
+  br i1 %513, label %panic.i.i263, label %"__hugr__.$__next__$$t(qubit)$n(4).3884.exit264"
 
-panic.i.i261:                                     ; preds = %"__hugr__.$discard_array$$n(4).3852.exit"
+panic.i.i263:                                     ; preds = %"__hugr__.$discard_array$$n(4).3852.exit"
   tail call void @panic(i32 1002, ptr nonnull @"e_Array elem.E746B1A3.0")
   unreachable
 
-"__hugr__.$__next__$$t(qubit)$n(4).3884.exit262": ; preds = %"__hugr__.$discard_array$$n(4).3852.exit"
+"__hugr__.$__next__$$t(qubit)$n(4).3884.exit264": ; preds = %"__hugr__.$discard_array$$n(4).3852.exit"
   %514 = xor i64 %511, %88
   store i64 %514, ptr %83, align 4
   %515 = load i64, ptr %90, align 4
@@ -1457,7 +1457,7 @@ panic.i.i261:                                     ; preds = %"__hugr__.$discard_
   tail call void @___qfree(i64 %515)
   %516 = load i64, ptr %510, align 4
   %517 = trunc i64 %516 to i1
-  br i1 %517, label %loop_body.i, label %panic.i.i211
+  br i1 %517, label %loop_body.i, label %panic.i.i213
 
 out_of_bounds.i.i:                                ; preds = %loop_body.3.i
   %518 = extractvalue { i1, { { { ptr, ptr, i64 }, i64 }, i64 } } %545, 1
@@ -1467,11 +1467,11 @@ out_of_bounds.i.i:                                ; preds = %loop_body.3.i
   tail call void @panic(i32 1002, ptr nonnull @"e_Index out .DD115165.0")
   unreachable
 
-panic.i.i211:                                     ; preds = %cond_4002_case_1.3.i, %cond_4002_case_1.2.i, %cond_4002_case_1.1.i, %"__hugr__.$__next__$$t(qubit)$n(4).3884.exit262"
+panic.i.i213:                                     ; preds = %cond_4002_case_1.3.i, %cond_4002_case_1.2.i, %cond_4002_case_1.1.i, %"__hugr__.$__next__$$t(qubit)$n(4).3884.exit264"
   tail call void @panic(i32 1002, ptr nonnull @"e_Array alre.5A300C2A.0")
   unreachable
 
-loop_body.i:                                      ; preds = %"__hugr__.$__next__$$t(qubit)$n(4).3884.exit262"
+loop_body.i:                                      ; preds = %"__hugr__.$__next__$$t(qubit)$n(4).3884.exit264"
   %"4016_054.fca.1.insert.i" = insertvalue { i1, i64, i1 } { i1 true, i64 poison, i1 undef }, i64 %lazy_measure.i, 1
   %"4016_054.fca.2.insert.i" = insertvalue { i1, i64, i1 } %"4016_054.fca.1.insert.i", i1 undef, 2
   %519 = insertvalue { { ptr, ptr, i64 }, i64 } poison, ptr %.fca.0.extract306.i.i, 0, 0
@@ -1492,8 +1492,8 @@ cond_4002_case_1.1.i:                             ; preds = %loop_body.i
   tail call void @___qfree(i64 %.fca.1.extract93.1.i)
   %526 = load i64, ptr %510, align 4
   %527 = and i64 %526, 2
-  %.not.i212 = icmp eq i64 %527, 0
-  br i1 %.not.i212, label %panic.i.i211, label %loop_body.1.i
+  %.not.i214 = icmp eq i64 %527, 0
+  br i1 %.not.i214, label %panic.i.i213, label %loop_body.1.i
 
 loop_body.1.i:                                    ; preds = %cond_4002_case_1.1.i
   %"4016_054.fca.1.insert.1.i" = insertvalue { i1, i64, i1 } { i1 true, i64 poison, i1 undef }, i64 %lazy_measure.1.i, 1
@@ -1515,7 +1515,7 @@ cond_4002_case_1.2.i:                             ; preds = %loop_body.1.i
   %533 = load i64, ptr %510, align 4
   %534 = and i64 %533, 4
   %.not158.i = icmp eq i64 %534, 0
-  br i1 %.not158.i, label %panic.i.i211, label %loop_body.2.i
+  br i1 %.not158.i, label %panic.i.i213, label %loop_body.2.i
 
 loop_body.2.i:                                    ; preds = %cond_4002_case_1.2.i
   %"4016_054.fca.1.insert.2.i" = insertvalue { i1, i64, i1 } { i1 true, i64 poison, i1 undef }, i64 %lazy_measure.2.i, 1
@@ -1537,7 +1537,7 @@ cond_4002_case_1.3.i:                             ; preds = %loop_body.2.i
   %540 = load i64, ptr %510, align 4
   %541 = and i64 %540, 8
   %.not159.i = icmp eq i64 %541, 0
-  br i1 %.not159.i, label %panic.i.i211, label %loop_body.3.i
+  br i1 %.not159.i, label %panic.i.i213, label %loop_body.3.i
 
 loop_body.3.i:                                    ; preds = %cond_4002_case_1.3.i
   %"4016_054.fca.1.insert.3.i" = insertvalue { i1, i64, i1 } { i1 true, i64 poison, i1 undef }, i64 %lazy_measure.3.i, 1
@@ -1568,146 +1568,146 @@ __barray_check_none_borrowed.exit:                ; preds = %"__hugr__.$measure_
   store i64 0, ptr %552, align 1
   %553 = load { i1, i64, i1 }, ptr %509, align 4
   %.fca.0.extract118.i = extractvalue { i1, i64, i1 } %553, 0
-  br i1 %.fca.0.extract118.i, label %cond_1420_case_1.i, label %cond_1420_case_0.i
+  br i1 %.fca.0.extract118.i, label %cond_2006_case_1.i, label %cond_2006_case_0.i
 
 mask_block_err.i:                                 ; preds = %"__hugr__.$measure_array$$n(4).3981.exit"
   tail call void @panic(i32 1002, ptr nonnull @"e_Some array.A77EF32E.0")
   unreachable
 
-cond_1420_case_0.i:                               ; preds = %__barray_check_none_borrowed.exit
+cond_2006_case_0.i:                               ; preds = %__barray_check_none_borrowed.exit
   %.fca.2.extract120.i = extractvalue { i1, i64, i1 } %553, 2
-  br label %cond_exit_1420.i
+  br label %cond_exit_2006.i
 
-cond_1420_case_1.i:                               ; preds = %__barray_check_none_borrowed.exit
+cond_2006_case_1.i:                               ; preds = %__barray_check_none_borrowed.exit
   %.fca.1.extract119.i = extractvalue { i1, i64, i1 } %553, 1
   tail call void @___inc_future_refcount(i64 %.fca.1.extract119.i)
-  br label %cond_exit_1420.i
+  br label %cond_exit_2006.i
 
-cond_exit_1420.i:                                 ; preds = %cond_1420_case_1.i, %cond_1420_case_0.i
-  %"03.sroa.3.0.i" = phi i64 [ %.fca.1.extract119.i, %cond_1420_case_1.i ], [ undef, %cond_1420_case_0.i ]
-  %"03.sroa.6.0.i" = phi i1 [ undef, %cond_1420_case_1.i ], [ %.fca.2.extract120.i, %cond_1420_case_0.i ]
+cond_exit_2006.i:                                 ; preds = %cond_2006_case_1.i, %cond_2006_case_0.i
+  %"03.sroa.3.0.i" = phi i64 [ %.fca.1.extract119.i, %cond_2006_case_1.i ], [ undef, %cond_2006_case_0.i ]
+  %"03.sroa.6.0.i" = phi i1 [ undef, %cond_2006_case_1.i ], [ %.fca.2.extract120.i, %cond_2006_case_0.i ]
   %554 = load i64, ptr %547, align 4
   %555 = trunc i64 %554 to i1
-  br i1 %555, label %panic.i.i213, label %cond_1417_case_1.i
+  br i1 %555, label %panic.i.i215, label %cond_1954_case_1.i
 
-panic.i.i213:                                     ; preds = %cond_exit_1420.i.3, %cond_exit_1420.i.2, %cond_exit_1420.i.1, %cond_exit_1420.i
+panic.i.i215:                                     ; preds = %cond_exit_2006.i.3, %cond_exit_2006.i.2, %cond_exit_2006.i.1, %cond_exit_2006.i
   tail call void @panic(i32 1002, ptr nonnull @"e_Array elem.E746B1A3.0")
   unreachable
 
-cond_1417_case_1.i:                               ; preds = %cond_exit_1420.i
+cond_1954_case_1.i:                               ; preds = %cond_exit_2006.i
   %"16.fca.1.insert.i" = insertvalue { i1, i64, i1 } %553, i64 %"03.sroa.3.0.i", 1
   %"16.fca.2.insert.i" = insertvalue { i1, i64, i1 } %"16.fca.1.insert.i", i1 %"03.sroa.6.0.i", 2
   %556 = insertvalue { i1, { i1, i64, i1 } } { i1 true, { i1, i64, i1 } poison }, { i1, i64, i1 } %"16.fca.2.insert.i", 1
   %.fca.2.0.extract.i = load i1, ptr %546, align 1
   store { i1, { i1, i64, i1 } } %556, ptr %546, align 4
-  br i1 %.fca.2.0.extract.i, label %cond_1416_case_1.i, label %"__hugr__.$__copy_scan$$n(4)$t([Bool]+[Future(Bool)])$n(1).1434.exit"
+  br i1 %.fca.2.0.extract.i, label %cond_1950_case_1.i, label %"__hugr__.$__copy_scan$$n(4)$t([Bool]+[Future(Bool)])$n(1).1913.exit"
 
-cond_1416_case_1.i:                               ; preds = %cond_1417_case_1.i.3, %cond_1417_case_1.i.2, %cond_1417_case_1.i.1, %cond_1417_case_1.i
+cond_1950_case_1.i:                               ; preds = %cond_1954_case_1.i.3, %cond_1954_case_1.i.2, %cond_1954_case_1.i.1, %cond_1954_case_1.i
   tail call void @panic(i32 1001, ptr nonnull @"e_Expected v.2F17E0A9.0")
   unreachable
 
-"__hugr__.$__copy_scan$$n(4)$t([Bool]+[Future(Bool)])$n(1).1434.exit": ; preds = %cond_1417_case_1.i
+"__hugr__.$__copy_scan$$n(4)$t([Bool]+[Future(Bool)])$n(1).1913.exit": ; preds = %cond_1954_case_1.i
   store { i1, i64, i1 } %"16.fca.2.insert.i", ptr %551, align 4
   %557 = getelementptr inbounds nuw i8, ptr %509, i64 24
   %558 = load { i1, i64, i1 }, ptr %557, align 4
   %.fca.0.extract118.i.1 = extractvalue { i1, i64, i1 } %558, 0
-  br i1 %.fca.0.extract118.i.1, label %cond_1420_case_1.i.1, label %cond_1420_case_0.i.1
+  br i1 %.fca.0.extract118.i.1, label %cond_2006_case_1.i.1, label %cond_2006_case_0.i.1
 
-cond_1420_case_0.i.1:                             ; preds = %"__hugr__.$__copy_scan$$n(4)$t([Bool]+[Future(Bool)])$n(1).1434.exit"
+cond_2006_case_0.i.1:                             ; preds = %"__hugr__.$__copy_scan$$n(4)$t([Bool]+[Future(Bool)])$n(1).1913.exit"
   %.fca.2.extract120.i.1 = extractvalue { i1, i64, i1 } %558, 2
-  br label %cond_exit_1420.i.1
+  br label %cond_exit_2006.i.1
 
-cond_1420_case_1.i.1:                             ; preds = %"__hugr__.$__copy_scan$$n(4)$t([Bool]+[Future(Bool)])$n(1).1434.exit"
+cond_2006_case_1.i.1:                             ; preds = %"__hugr__.$__copy_scan$$n(4)$t([Bool]+[Future(Bool)])$n(1).1913.exit"
   %.fca.1.extract119.i.1 = extractvalue { i1, i64, i1 } %558, 1
   tail call void @___inc_future_refcount(i64 %.fca.1.extract119.i.1)
-  br label %cond_exit_1420.i.1
+  br label %cond_exit_2006.i.1
 
-cond_exit_1420.i.1:                               ; preds = %cond_1420_case_1.i.1, %cond_1420_case_0.i.1
-  %"03.sroa.3.0.i.1" = phi i64 [ %.fca.1.extract119.i.1, %cond_1420_case_1.i.1 ], [ undef, %cond_1420_case_0.i.1 ]
-  %"03.sroa.6.0.i.1" = phi i1 [ undef, %cond_1420_case_1.i.1 ], [ %.fca.2.extract120.i.1, %cond_1420_case_0.i.1 ]
+cond_exit_2006.i.1:                               ; preds = %cond_2006_case_1.i.1, %cond_2006_case_0.i.1
+  %"03.sroa.3.0.i.1" = phi i64 [ %.fca.1.extract119.i.1, %cond_2006_case_1.i.1 ], [ undef, %cond_2006_case_0.i.1 ]
+  %"03.sroa.6.0.i.1" = phi i1 [ undef, %cond_2006_case_1.i.1 ], [ %.fca.2.extract120.i.1, %cond_2006_case_0.i.1 ]
   %559 = load i64, ptr %547, align 4
   %560 = and i64 %559, 2
   %.not = icmp eq i64 %560, 0
-  br i1 %.not, label %cond_1417_case_1.i.1, label %panic.i.i213
+  br i1 %.not, label %cond_1954_case_1.i.1, label %panic.i.i215
 
-cond_1417_case_1.i.1:                             ; preds = %cond_exit_1420.i.1
+cond_1954_case_1.i.1:                             ; preds = %cond_exit_2006.i.1
   %"16.fca.1.insert.i.1" = insertvalue { i1, i64, i1 } %558, i64 %"03.sroa.3.0.i.1", 1
   %"16.fca.2.insert.i.1" = insertvalue { i1, i64, i1 } %"16.fca.1.insert.i.1", i1 %"03.sroa.6.0.i.1", 2
   %561 = insertvalue { i1, { i1, i64, i1 } } { i1 true, { i1, i64, i1 } poison }, { i1, i64, i1 } %"16.fca.2.insert.i.1", 1
   %562 = getelementptr i8, ptr %546, i64 32
   %.fca.2.0.extract.i.1 = load i1, ptr %562, align 1
   store { i1, { i1, i64, i1 } } %561, ptr %562, align 4
-  br i1 %.fca.2.0.extract.i.1, label %cond_1416_case_1.i, label %"__hugr__.$__copy_scan$$n(4)$t([Bool]+[Future(Bool)])$n(1).1434.exit.1"
+  br i1 %.fca.2.0.extract.i.1, label %cond_1950_case_1.i, label %"__hugr__.$__copy_scan$$n(4)$t([Bool]+[Future(Bool)])$n(1).1913.exit.1"
 
-"__hugr__.$__copy_scan$$n(4)$t([Bool]+[Future(Bool)])$n(1).1434.exit.1": ; preds = %cond_1417_case_1.i.1
+"__hugr__.$__copy_scan$$n(4)$t([Bool]+[Future(Bool)])$n(1).1913.exit.1": ; preds = %cond_1954_case_1.i.1
   %563 = getelementptr inbounds nuw i8, ptr %551, i64 24
   store { i1, i64, i1 } %"16.fca.2.insert.i.1", ptr %563, align 4
   %564 = getelementptr inbounds nuw i8, ptr %509, i64 48
   %565 = load { i1, i64, i1 }, ptr %564, align 4
   %.fca.0.extract118.i.2 = extractvalue { i1, i64, i1 } %565, 0
-  br i1 %.fca.0.extract118.i.2, label %cond_1420_case_1.i.2, label %cond_1420_case_0.i.2
+  br i1 %.fca.0.extract118.i.2, label %cond_2006_case_1.i.2, label %cond_2006_case_0.i.2
 
-cond_1420_case_0.i.2:                             ; preds = %"__hugr__.$__copy_scan$$n(4)$t([Bool]+[Future(Bool)])$n(1).1434.exit.1"
+cond_2006_case_0.i.2:                             ; preds = %"__hugr__.$__copy_scan$$n(4)$t([Bool]+[Future(Bool)])$n(1).1913.exit.1"
   %.fca.2.extract120.i.2 = extractvalue { i1, i64, i1 } %565, 2
-  br label %cond_exit_1420.i.2
+  br label %cond_exit_2006.i.2
 
-cond_1420_case_1.i.2:                             ; preds = %"__hugr__.$__copy_scan$$n(4)$t([Bool]+[Future(Bool)])$n(1).1434.exit.1"
+cond_2006_case_1.i.2:                             ; preds = %"__hugr__.$__copy_scan$$n(4)$t([Bool]+[Future(Bool)])$n(1).1913.exit.1"
   %.fca.1.extract119.i.2 = extractvalue { i1, i64, i1 } %565, 1
   tail call void @___inc_future_refcount(i64 %.fca.1.extract119.i.2)
-  br label %cond_exit_1420.i.2
+  br label %cond_exit_2006.i.2
 
-cond_exit_1420.i.2:                               ; preds = %cond_1420_case_1.i.2, %cond_1420_case_0.i.2
-  %"03.sroa.3.0.i.2" = phi i64 [ %.fca.1.extract119.i.2, %cond_1420_case_1.i.2 ], [ undef, %cond_1420_case_0.i.2 ]
-  %"03.sroa.6.0.i.2" = phi i1 [ undef, %cond_1420_case_1.i.2 ], [ %.fca.2.extract120.i.2, %cond_1420_case_0.i.2 ]
+cond_exit_2006.i.2:                               ; preds = %cond_2006_case_1.i.2, %cond_2006_case_0.i.2
+  %"03.sroa.3.0.i.2" = phi i64 [ %.fca.1.extract119.i.2, %cond_2006_case_1.i.2 ], [ undef, %cond_2006_case_0.i.2 ]
+  %"03.sroa.6.0.i.2" = phi i1 [ undef, %cond_2006_case_1.i.2 ], [ %.fca.2.extract120.i.2, %cond_2006_case_0.i.2 ]
   %566 = load i64, ptr %547, align 4
   %567 = and i64 %566, 4
-  %.not270 = icmp eq i64 %567, 0
-  br i1 %.not270, label %cond_1417_case_1.i.2, label %panic.i.i213
+  %.not272 = icmp eq i64 %567, 0
+  br i1 %.not272, label %cond_1954_case_1.i.2, label %panic.i.i215
 
-cond_1417_case_1.i.2:                             ; preds = %cond_exit_1420.i.2
+cond_1954_case_1.i.2:                             ; preds = %cond_exit_2006.i.2
   %"16.fca.1.insert.i.2" = insertvalue { i1, i64, i1 } %565, i64 %"03.sroa.3.0.i.2", 1
   %"16.fca.2.insert.i.2" = insertvalue { i1, i64, i1 } %"16.fca.1.insert.i.2", i1 %"03.sroa.6.0.i.2", 2
   %568 = insertvalue { i1, { i1, i64, i1 } } { i1 true, { i1, i64, i1 } poison }, { i1, i64, i1 } %"16.fca.2.insert.i.2", 1
   %569 = getelementptr i8, ptr %546, i64 64
   %.fca.2.0.extract.i.2 = load i1, ptr %569, align 1
   store { i1, { i1, i64, i1 } } %568, ptr %569, align 4
-  br i1 %.fca.2.0.extract.i.2, label %cond_1416_case_1.i, label %"__hugr__.$__copy_scan$$n(4)$t([Bool]+[Future(Bool)])$n(1).1434.exit.2"
+  br i1 %.fca.2.0.extract.i.2, label %cond_1950_case_1.i, label %"__hugr__.$__copy_scan$$n(4)$t([Bool]+[Future(Bool)])$n(1).1913.exit.2"
 
-"__hugr__.$__copy_scan$$n(4)$t([Bool]+[Future(Bool)])$n(1).1434.exit.2": ; preds = %cond_1417_case_1.i.2
+"__hugr__.$__copy_scan$$n(4)$t([Bool]+[Future(Bool)])$n(1).1913.exit.2": ; preds = %cond_1954_case_1.i.2
   %570 = getelementptr inbounds nuw i8, ptr %551, i64 48
   store { i1, i64, i1 } %"16.fca.2.insert.i.2", ptr %570, align 4
   %571 = getelementptr inbounds nuw i8, ptr %509, i64 72
   %572 = load { i1, i64, i1 }, ptr %571, align 4
   %.fca.0.extract118.i.3 = extractvalue { i1, i64, i1 } %572, 0
-  br i1 %.fca.0.extract118.i.3, label %cond_1420_case_1.i.3, label %cond_1420_case_0.i.3
+  br i1 %.fca.0.extract118.i.3, label %cond_2006_case_1.i.3, label %cond_2006_case_0.i.3
 
-cond_1420_case_0.i.3:                             ; preds = %"__hugr__.$__copy_scan$$n(4)$t([Bool]+[Future(Bool)])$n(1).1434.exit.2"
+cond_2006_case_0.i.3:                             ; preds = %"__hugr__.$__copy_scan$$n(4)$t([Bool]+[Future(Bool)])$n(1).1913.exit.2"
   %.fca.2.extract120.i.3 = extractvalue { i1, i64, i1 } %572, 2
-  br label %cond_exit_1420.i.3
+  br label %cond_exit_2006.i.3
 
-cond_1420_case_1.i.3:                             ; preds = %"__hugr__.$__copy_scan$$n(4)$t([Bool]+[Future(Bool)])$n(1).1434.exit.2"
+cond_2006_case_1.i.3:                             ; preds = %"__hugr__.$__copy_scan$$n(4)$t([Bool]+[Future(Bool)])$n(1).1913.exit.2"
   %.fca.1.extract119.i.3 = extractvalue { i1, i64, i1 } %572, 1
   tail call void @___inc_future_refcount(i64 %.fca.1.extract119.i.3)
-  br label %cond_exit_1420.i.3
+  br label %cond_exit_2006.i.3
 
-cond_exit_1420.i.3:                               ; preds = %cond_1420_case_0.i.3, %cond_1420_case_1.i.3
-  %"03.sroa.3.0.i.3" = phi i64 [ %.fca.1.extract119.i.3, %cond_1420_case_1.i.3 ], [ undef, %cond_1420_case_0.i.3 ]
-  %"03.sroa.6.0.i.3" = phi i1 [ undef, %cond_1420_case_1.i.3 ], [ %.fca.2.extract120.i.3, %cond_1420_case_0.i.3 ]
+cond_exit_2006.i.3:                               ; preds = %cond_2006_case_0.i.3, %cond_2006_case_1.i.3
+  %"03.sroa.3.0.i.3" = phi i64 [ %.fca.1.extract119.i.3, %cond_2006_case_1.i.3 ], [ undef, %cond_2006_case_0.i.3 ]
+  %"03.sroa.6.0.i.3" = phi i1 [ undef, %cond_2006_case_1.i.3 ], [ %.fca.2.extract120.i.3, %cond_2006_case_0.i.3 ]
   %573 = load i64, ptr %547, align 4
   %574 = and i64 %573, 8
-  %.not271 = icmp eq i64 %574, 0
-  br i1 %.not271, label %cond_1417_case_1.i.3, label %panic.i.i213
+  %.not273 = icmp eq i64 %574, 0
+  br i1 %.not273, label %cond_1954_case_1.i.3, label %panic.i.i215
 
-cond_1417_case_1.i.3:                             ; preds = %cond_exit_1420.i.3
+cond_1954_case_1.i.3:                             ; preds = %cond_exit_2006.i.3
   %"16.fca.1.insert.i.3" = insertvalue { i1, i64, i1 } %572, i64 %"03.sroa.3.0.i.3", 1
   %"16.fca.2.insert.i.3" = insertvalue { i1, i64, i1 } %"16.fca.1.insert.i.3", i1 %"03.sroa.6.0.i.3", 2
   %575 = insertvalue { i1, { i1, i64, i1 } } { i1 true, { i1, i64, i1 } poison }, { i1, i64, i1 } %"16.fca.2.insert.i.3", 1
   %576 = getelementptr i8, ptr %546, i64 96
   %.fca.2.0.extract.i.3 = load i1, ptr %576, align 1
   store { i1, { i1, i64, i1 } } %575, ptr %576, align 4
-  br i1 %.fca.2.0.extract.i.3, label %cond_1416_case_1.i, label %"__hugr__.$__copy_scan$$n(4)$t([Bool]+[Future(Bool)])$n(1).1434.exit.3"
+  br i1 %.fca.2.0.extract.i.3, label %cond_1950_case_1.i, label %"__hugr__.$__copy_scan$$n(4)$t([Bool]+[Future(Bool)])$n(1).1913.exit.3"
 
-"__hugr__.$__copy_scan$$n(4)$t([Bool]+[Future(Bool)])$n(1).1434.exit.3": ; preds = %cond_1417_case_1.i.3
+"__hugr__.$__copy_scan$$n(4)$t([Bool]+[Future(Bool)])$n(1).1913.exit.3": ; preds = %cond_1954_case_1.i.3
   %577 = getelementptr inbounds nuw i8, ptr %551, i64 72
   store { i1, i64, i1 } %"16.fca.2.insert.i.3", ptr %577, align 4
   tail call void @heap_free(ptr nonnull %509)
@@ -1716,28 +1716,28 @@ cond_1417_case_1.i.3:                             ; preds = %cond_exit_1420.i.3
   %579 = and i64 %578, 15
   store i64 %579, ptr %547, align 4
   %580 = icmp eq i64 %579, 0
-  br i1 %580, label %__barray_check_none_borrowed.exit220, label %mask_block_err.i218
+  br i1 %580, label %__barray_check_none_borrowed.exit222, label %mask_block_err.i220
 
-__barray_check_none_borrowed.exit220:             ; preds = %"__hugr__.$__copy_scan$$n(4)$t([Bool]+[Future(Bool)])$n(1).1434.exit.3"
+__barray_check_none_borrowed.exit222:             ; preds = %"__hugr__.$__copy_scan$$n(4)$t([Bool]+[Future(Bool)])$n(1).1913.exit.3"
   %581 = tail call ptr @heap_alloc(i64 96)
   %582 = tail call ptr @heap_alloc(i64 8)
   store i64 0, ptr %582, align 1
   %583 = load { i1, { i1, i64, i1 } }, ptr %546, align 4
-  %584 = tail call { { i1, i64, i1 } } @"__hugr__.$__unwrap$$t([Bool]+[Future(Bool)]).2059"({ i1, { i1, i64, i1 } } %583)
+  %584 = tail call { { i1, i64, i1 } } @"__hugr__.$__unwrap$$t([Bool]+[Future(Bool)]).1706"({ i1, { i1, i64, i1 } } %583)
   %585 = extractvalue { { i1, i64, i1 } } %584, 0
   store { i1, i64, i1 } %585, ptr %581, align 4
   %586 = load { i1, { i1, i64, i1 } }, ptr %562, align 4
-  %587 = tail call { { i1, i64, i1 } } @"__hugr__.$__unwrap$$t([Bool]+[Future(Bool)]).2059"({ i1, { i1, i64, i1 } } %586)
+  %587 = tail call { { i1, i64, i1 } } @"__hugr__.$__unwrap$$t([Bool]+[Future(Bool)]).1706"({ i1, { i1, i64, i1 } } %586)
   %588 = getelementptr inbounds nuw i8, ptr %581, i64 24
   %589 = extractvalue { { i1, i64, i1 } } %587, 0
   store { i1, i64, i1 } %589, ptr %588, align 4
   %590 = load { i1, { i1, i64, i1 } }, ptr %569, align 4
-  %591 = tail call { { i1, i64, i1 } } @"__hugr__.$__unwrap$$t([Bool]+[Future(Bool)]).2059"({ i1, { i1, i64, i1 } } %590)
+  %591 = tail call { { i1, i64, i1 } } @"__hugr__.$__unwrap$$t([Bool]+[Future(Bool)]).1706"({ i1, { i1, i64, i1 } } %590)
   %592 = getelementptr inbounds nuw i8, ptr %581, i64 48
   %593 = extractvalue { { i1, i64, i1 } } %591, 0
   store { i1, i64, i1 } %593, ptr %592, align 4
   %594 = load { i1, { i1, i64, i1 } }, ptr %576, align 4
-  %595 = tail call { { i1, i64, i1 } } @"__hugr__.$__unwrap$$t([Bool]+[Future(Bool)]).2059"({ i1, { i1, i64, i1 } } %594)
+  %595 = tail call { { i1, i64, i1 } } @"__hugr__.$__unwrap$$t([Bool]+[Future(Bool)]).1706"({ i1, { i1, i64, i1 } } %594)
   %596 = getelementptr inbounds nuw i8, ptr %581, i64 72
   %597 = extractvalue { { i1, i64, i1 } } %595, 0
   store { i1, i64, i1 } %597, ptr %596, align 4
@@ -1745,97 +1745,97 @@ __barray_check_none_borrowed.exit220:             ; preds = %"__hugr__.$__copy_s
   tail call void @heap_free(ptr nonnull %547)
   %598 = load i64, ptr %582, align 4
   %599 = trunc i64 %598 to i1
-  br i1 %599, label %cond_exit_1043, label %__barray_mask_borrow.exit
+  br i1 %599, label %cond_exit_1485, label %__barray_mask_borrow.exit
 
-mask_block_err.i218:                              ; preds = %"__hugr__.$__copy_scan$$n(4)$t([Bool]+[Future(Bool)])$n(1).1434.exit.3"
+mask_block_err.i220:                              ; preds = %"__hugr__.$__copy_scan$$n(4)$t([Bool]+[Future(Bool)])$n(1).1913.exit.3"
   tail call void @panic(i32 1002, ptr nonnull @"e_Some array.A77EF32E.0")
   unreachable
 
-mask_block_err.i224:                              ; preds = %cond_exit_1043.3
+mask_block_err.i226:                              ; preds = %cond_exit_1485.3
   tail call void @panic(i32 1002, ptr nonnull @"e_Array cont.EFA5AC45.0")
   unreachable
 
-__barray_mask_borrow.exit:                        ; preds = %__barray_check_none_borrowed.exit220
+__barray_mask_borrow.exit:                        ; preds = %__barray_check_none_borrowed.exit222
   %600 = or disjoint i64 %598, 1
   store i64 %600, ptr %582, align 4
   %601 = load { i1, i64, i1 }, ptr %581, align 4
   %.fca.0.extract127 = extractvalue { i1, i64, i1 } %601, 0
-  br i1 %.fca.0.extract127, label %cond_1020_case_1, label %cond_exit_1043
+  br i1 %.fca.0.extract127, label %cond_1464_case_1, label %cond_exit_1485
 
-cond_exit_1043:                                   ; preds = %__barray_check_none_borrowed.exit220, %__barray_mask_borrow.exit, %cond_1020_case_1
+cond_exit_1485:                                   ; preds = %__barray_check_none_borrowed.exit222, %__barray_mask_borrow.exit, %cond_1464_case_1
   %602 = load i64, ptr %582, align 4
   %603 = and i64 %602, 2
-  %.not274 = icmp eq i64 %603, 0
-  br i1 %.not274, label %__barray_mask_borrow.exit.1, label %cond_exit_1043.1
+  %.not276 = icmp eq i64 %603, 0
+  br i1 %.not276, label %__barray_mask_borrow.exit.1, label %cond_exit_1485.1
 
-__barray_mask_borrow.exit.1:                      ; preds = %cond_exit_1043
+__barray_mask_borrow.exit.1:                      ; preds = %cond_exit_1485
   %604 = or disjoint i64 %602, 2
   store i64 %604, ptr %582, align 4
   %605 = getelementptr inbounds nuw i8, ptr %581, i64 24
   %606 = load { i1, i64, i1 }, ptr %605, align 4
   %.fca.0.extract127.1 = extractvalue { i1, i64, i1 } %606, 0
-  br i1 %.fca.0.extract127.1, label %cond_1020_case_1.1, label %cond_exit_1043.1
+  br i1 %.fca.0.extract127.1, label %cond_1464_case_1.1, label %cond_exit_1485.1
 
-cond_1020_case_1.1:                               ; preds = %__barray_mask_borrow.exit.1
+cond_1464_case_1.1:                               ; preds = %__barray_mask_borrow.exit.1
   %.fca.1.extract128.1 = extractvalue { i1, i64, i1 } %606, 1
   tail call void @___dec_future_refcount(i64 %.fca.1.extract128.1)
-  br label %cond_exit_1043.1
+  br label %cond_exit_1485.1
 
-cond_exit_1043.1:                                 ; preds = %cond_1020_case_1.1, %__barray_mask_borrow.exit.1, %cond_exit_1043
+cond_exit_1485.1:                                 ; preds = %cond_1464_case_1.1, %__barray_mask_borrow.exit.1, %cond_exit_1485
   %607 = load i64, ptr %582, align 4
   %608 = and i64 %607, 4
-  %.not275 = icmp eq i64 %608, 0
-  br i1 %.not275, label %__barray_mask_borrow.exit.2, label %cond_exit_1043.2
+  %.not277 = icmp eq i64 %608, 0
+  br i1 %.not277, label %__barray_mask_borrow.exit.2, label %cond_exit_1485.2
 
-__barray_mask_borrow.exit.2:                      ; preds = %cond_exit_1043.1
+__barray_mask_borrow.exit.2:                      ; preds = %cond_exit_1485.1
   %609 = or disjoint i64 %607, 4
   store i64 %609, ptr %582, align 4
   %610 = getelementptr inbounds nuw i8, ptr %581, i64 48
   %611 = load { i1, i64, i1 }, ptr %610, align 4
   %.fca.0.extract127.2 = extractvalue { i1, i64, i1 } %611, 0
-  br i1 %.fca.0.extract127.2, label %cond_1020_case_1.2, label %cond_exit_1043.2
+  br i1 %.fca.0.extract127.2, label %cond_1464_case_1.2, label %cond_exit_1485.2
 
-cond_1020_case_1.2:                               ; preds = %__barray_mask_borrow.exit.2
+cond_1464_case_1.2:                               ; preds = %__barray_mask_borrow.exit.2
   %.fca.1.extract128.2 = extractvalue { i1, i64, i1 } %611, 1
   tail call void @___dec_future_refcount(i64 %.fca.1.extract128.2)
-  br label %cond_exit_1043.2
+  br label %cond_exit_1485.2
 
-cond_exit_1043.2:                                 ; preds = %cond_1020_case_1.2, %__barray_mask_borrow.exit.2, %cond_exit_1043.1
+cond_exit_1485.2:                                 ; preds = %cond_1464_case_1.2, %__barray_mask_borrow.exit.2, %cond_exit_1485.1
   %612 = load i64, ptr %582, align 4
   %613 = and i64 %612, 8
-  %.not276 = icmp eq i64 %613, 0
-  br i1 %.not276, label %__barray_mask_borrow.exit.3, label %cond_exit_1043.3
+  %.not278 = icmp eq i64 %613, 0
+  br i1 %.not278, label %__barray_mask_borrow.exit.3, label %cond_exit_1485.3
 
-__barray_mask_borrow.exit.3:                      ; preds = %cond_exit_1043.2
+__barray_mask_borrow.exit.3:                      ; preds = %cond_exit_1485.2
   %614 = or disjoint i64 %612, 8
   store i64 %614, ptr %582, align 4
   %615 = getelementptr inbounds nuw i8, ptr %581, i64 72
   %616 = load { i1, i64, i1 }, ptr %615, align 4
   %.fca.0.extract127.3 = extractvalue { i1, i64, i1 } %616, 0
-  br i1 %.fca.0.extract127.3, label %cond_1020_case_1.3, label %cond_exit_1043.3
+  br i1 %.fca.0.extract127.3, label %cond_1464_case_1.3, label %cond_exit_1485.3
 
-cond_1020_case_1.3:                               ; preds = %__barray_mask_borrow.exit.3
+cond_1464_case_1.3:                               ; preds = %__barray_mask_borrow.exit.3
   %.fca.1.extract128.3 = extractvalue { i1, i64, i1 } %616, 1
   tail call void @___dec_future_refcount(i64 %.fca.1.extract128.3)
-  br label %cond_exit_1043.3
+  br label %cond_exit_1485.3
 
-cond_exit_1043.3:                                 ; preds = %cond_1020_case_1.3, %__barray_mask_borrow.exit.3, %cond_exit_1043.2
+cond_exit_1485.3:                                 ; preds = %cond_1464_case_1.3, %__barray_mask_borrow.exit.3, %cond_exit_1485.2
   %617 = load i64, ptr %582, align 4
   %618 = or i64 %617, -16
   store i64 %618, ptr %582, align 4
   %619 = icmp eq i64 %618, -1
-  br i1 %619, label %loop_out, label %mask_block_err.i224
+  br i1 %619, label %loop_out, label %mask_block_err.i226
 
-loop_out:                                         ; preds = %cond_exit_1043.3
+loop_out:                                         ; preds = %cond_exit_1485.3
   tail call void @heap_free(ptr nonnull %581)
   tail call void @heap_free(ptr nonnull %582)
   %620 = load i64, ptr %552, align 4
   %621 = and i64 %620, 15
   store i64 %621, ptr %552, align 4
   %622 = icmp eq i64 %621, 0
-  br i1 %622, label %__barray_check_none_borrowed.exit233, label %mask_block_err.i231
+  br i1 %622, label %__barray_check_none_borrowed.exit235, label %mask_block_err.i233
 
-__barray_check_none_borrowed.exit233:             ; preds = %loop_out
+__barray_check_none_borrowed.exit235:             ; preds = %loop_out
   %623 = tail call ptr @heap_alloc(i64 4)
   %624 = tail call ptr @heap_alloc(i64 8)
   store i64 0, ptr %624, align 1
@@ -1864,18 +1864,18 @@ __barray_check_none_borrowed.exit233:             ; preds = %loop_out
   %641 = and i64 %640, 15
   store i64 %641, ptr %624, align 4
   %642 = icmp eq i64 %641, 0
-  br i1 %642, label %__barray_check_none_borrowed.exit239, label %mask_block_err.i237
+  br i1 %642, label %__barray_check_none_borrowed.exit241, label %mask_block_err.i239
 
-mask_block_err.i231:                              ; preds = %loop_out
+mask_block_err.i233:                              ; preds = %loop_out
   tail call void @panic(i32 1002, ptr nonnull @"e_Some array.A77EF32E.0")
   unreachable
 
-cond_1020_case_1:                                 ; preds = %__barray_mask_borrow.exit
+cond_1464_case_1:                                 ; preds = %__barray_mask_borrow.exit
   %.fca.1.extract128 = extractvalue { i1, i64, i1 } %601, 1
   tail call void @___dec_future_refcount(i64 %.fca.1.extract128)
-  br label %cond_exit_1043
+  br label %cond_exit_1485
 
-__barray_check_none_borrowed.exit239:             ; preds = %__barray_check_none_borrowed.exit233
+__barray_check_none_borrowed.exit241:             ; preds = %__barray_check_none_borrowed.exit235
   %643 = extractvalue { i64, i64, i64 } %270, 2
   %out_arr_alloca = alloca <{ i32, i32, ptr, ptr }>, align 8
   %y_ptr = getelementptr inbounds nuw i8, ptr %out_arr_alloca, i64 4
@@ -1895,7 +1895,7 @@ __barray_check_none_borrowed.exit239:             ; preds = %__barray_check_none
   call void @print_bool(ptr nonnull @res_carry_out.3DB2874F.0, i64 19, i1 %read_bool)
   ret void
 
-mask_block_err.i237:                              ; preds = %__barray_check_none_borrowed.exit233
+mask_block_err.i239:                              ; preds = %__barray_check_none_borrowed.exit235
   tail call void @panic(i32 1002, ptr nonnull @"e_Some array.A77EF32E.0")
   unreachable
 }
@@ -1903,20 +1903,20 @@ mask_block_err.i237:                              ; preds = %__barray_check_none
 define internal i1 @__hugr__.array.__read_bool.3.483({ i1, i64, i1 } %0) unnamed_addr {
 alloca_block:
   %.fca.0.extract = extractvalue { i1, i64, i1 } %0, 0
-  br i1 %.fca.0.extract, label %cond_1464_case_1, label %cond_1464_case_0
+  br i1 %.fca.0.extract, label %cond_2069_case_1, label %cond_2069_case_0
 
-cond_1464_case_0:                                 ; preds = %alloca_block
+cond_2069_case_0:                                 ; preds = %alloca_block
   %.fca.2.extract = extractvalue { i1, i64, i1 } %0, 2
-  br label %cond_exit_1464
+  br label %cond_exit_2069
 
-cond_1464_case_1:                                 ; preds = %alloca_block
+cond_2069_case_1:                                 ; preds = %alloca_block
   %.fca.1.extract = extractvalue { i1, i64, i1 } %0, 1
   %read_bool = tail call i1 @___read_future_bool(i64 %.fca.1.extract)
   tail call void @___dec_future_refcount(i64 %.fca.1.extract)
-  br label %cond_exit_1464
+  br label %cond_exit_2069
 
-cond_exit_1464:                                   ; preds = %cond_1464_case_1, %cond_1464_case_0
-  %"03.0" = phi i1 [ %read_bool, %cond_1464_case_1 ], [ %.fca.2.extract, %cond_1464_case_0 ]
+cond_exit_2069:                                   ; preds = %cond_2069_case_1, %cond_2069_case_0
+  %"03.0" = phi i1 [ %read_bool, %cond_2069_case_1 ], [ %.fca.2.extract, %cond_2069_case_0 ]
   ret i1 %"03.0"
 }
 
@@ -1930,16 +1930,16 @@ declare void @panic(i32, ptr) local_unnamed_addr #1
 
 declare void @heap_free(ptr) local_unnamed_addr
 
-define internal { i1, i64, i1 } @"__hugr__.$__unwrap$$t([Bool]+[Future(Bool)]).2059"({ i1, { i1, i64, i1 } } %0) unnamed_addr {
+define internal { i1, i64, i1 } @"__hugr__.$__unwrap$$t([Bool]+[Future(Bool)]).1706"({ i1, { i1, i64, i1 } } %0) unnamed_addr {
 alloca_block:
   %.fca.0.extract11 = extractvalue { i1, { i1, i64, i1 } } %0, 0
-  br i1 %.fca.0.extract11, label %cond_1380_case_1, label %cond_1380_case_0
+  br i1 %.fca.0.extract11, label %cond_1697_case_1, label %cond_1697_case_0
 
-cond_1380_case_1:                                 ; preds = %alloca_block
+cond_1697_case_1:                                 ; preds = %alloca_block
   %1 = extractvalue { i1, { i1, i64, i1 } } %0, 1
   ret { i1, i64, i1 } %1
 
-cond_1380_case_0:                                 ; preds = %alloca_block
+cond_1697_case_0:                                 ; preds = %alloca_block
   tail call void @panic(i32 1001, ptr nonnull @"e_Expected v.E6312129.0")
   unreachable
 }
@@ -1962,23 +1962,23 @@ alloca_block:
   %.fca.1.extract380 = extractvalue { ptr, ptr, i64 } %0, 1
   %2 = load i64, ptr %1, align 4
   %.not = icmp eq i64 %2, 0
-  br i1 %.not, label %cond_2283_case_0.i, label %cond_exit_1082
+  br i1 %.not, label %cond_2283_case_0.i, label %cond_exit_1518
 
 cond_2283_case_0.i:                               ; preds = %cond_2265_case_1.3, %cond_2265_case_1.2, %cond_2265_case_1.1, %alloca_block
   tail call void @panic(i32 1001, ptr nonnull @e_Frozenarra.36077F52.0)
   unreachable
 
-cond_2265_case_1.1:                               ; preds = %cond_exit_1082, %__barray_mask_return.exit
-  %3 = phi i64 [ %2, %cond_exit_1082 ], [ %.pre, %__barray_mask_return.exit ]
+cond_2265_case_1.1:                               ; preds = %cond_exit_1518, %__barray_mask_return.exit
+  %3 = phi i64 [ %2, %cond_exit_1518 ], [ %.pre, %__barray_mask_return.exit ]
   %4 = icmp ugt i64 %3, 1
-  br i1 %4, label %cond_exit_1082.1, label %cond_2283_case_0.i
+  br i1 %4, label %cond_exit_1518.1, label %cond_2283_case_0.i
 
-cond_exit_1082.1:                                 ; preds = %cond_2265_case_1.1
+cond_exit_1518.1:                                 ; preds = %cond_2265_case_1.1
   %5 = getelementptr inbounds nuw i8, ptr %1, i64 9
   %6 = load i1, ptr %5, align 1
   br i1 %6, label %__barray_check_bounds.exit.1, label %cond_2265_case_1.2
 
-__barray_check_bounds.exit.1:                     ; preds = %cond_exit_1082.1
+__barray_check_bounds.exit.1:                     ; preds = %cond_exit_1518.1
   %7 = load i64, ptr %.fca.1.extract380, align 4
   %8 = and i64 %7, 2
   %.not402 = icmp eq i64 %8, 0
@@ -2002,17 +2002,17 @@ __barray_mask_return.exit.1:                      ; preds = %__barray_check_boun
   %.pre398 = load i64, ptr %1, align 4
   br label %cond_2265_case_1.2
 
-cond_2265_case_1.2:                               ; preds = %__barray_mask_return.exit.1, %cond_exit_1082.1
-  %15 = phi i64 [ %.pre398, %__barray_mask_return.exit.1 ], [ %3, %cond_exit_1082.1 ]
+cond_2265_case_1.2:                               ; preds = %__barray_mask_return.exit.1, %cond_exit_1518.1
+  %15 = phi i64 [ %.pre398, %__barray_mask_return.exit.1 ], [ %3, %cond_exit_1518.1 ]
   %16 = icmp ugt i64 %15, 2
-  br i1 %16, label %cond_exit_1082.2, label %cond_2283_case_0.i
+  br i1 %16, label %cond_exit_1518.2, label %cond_2283_case_0.i
 
-cond_exit_1082.2:                                 ; preds = %cond_2265_case_1.2
+cond_exit_1518.2:                                 ; preds = %cond_2265_case_1.2
   %17 = getelementptr inbounds nuw i8, ptr %1, i64 10
   %18 = load i1, ptr %17, align 1
   br i1 %18, label %__barray_check_bounds.exit.2, label %cond_2265_case_1.3
 
-__barray_check_bounds.exit.2:                     ; preds = %cond_exit_1082.2
+__barray_check_bounds.exit.2:                     ; preds = %cond_exit_1518.2
   %19 = load i64, ptr %.fca.1.extract380, align 4
   %20 = and i64 %19, 4
   %.not404 = icmp eq i64 %20, 0
@@ -2036,17 +2036,17 @@ __barray_mask_return.exit.2:                      ; preds = %__barray_check_boun
   %.pre400 = load i64, ptr %1, align 4
   br label %cond_2265_case_1.3
 
-cond_2265_case_1.3:                               ; preds = %__barray_mask_return.exit.2, %cond_exit_1082.2
-  %27 = phi i64 [ %.pre400, %__barray_mask_return.exit.2 ], [ %15, %cond_exit_1082.2 ]
+cond_2265_case_1.3:                               ; preds = %__barray_mask_return.exit.2, %cond_exit_1518.2
+  %27 = phi i64 [ %.pre400, %__barray_mask_return.exit.2 ], [ %15, %cond_exit_1518.2 ]
   %28 = icmp ugt i64 %27, 3
-  br i1 %28, label %cond_exit_1082.3, label %cond_2283_case_0.i
+  br i1 %28, label %cond_exit_1518.3, label %cond_2283_case_0.i
 
-cond_exit_1082.3:                                 ; preds = %cond_2265_case_1.3
+cond_exit_1518.3:                                 ; preds = %cond_2265_case_1.3
   %29 = getelementptr inbounds nuw i8, ptr %1, i64 11
   %30 = load i1, ptr %29, align 1
   br i1 %30, label %__barray_check_bounds.exit.3, label %cond_exit_2250
 
-__barray_check_bounds.exit.3:                     ; preds = %cond_exit_1082.3
+__barray_check_bounds.exit.3:                     ; preds = %cond_exit_1518.3
   %31 = load i64, ptr %.fca.1.extract380, align 4
   %32 = and i64 %31, 8
   %.not406 = icmp eq i64 %32, 0
@@ -2069,16 +2069,16 @@ __barray_mask_return.exit.3:                      ; preds = %__barray_check_boun
   store i64 %35, ptr %34, align 4
   br label %cond_exit_2250
 
-cond_exit_2250:                                   ; preds = %__barray_mask_return.exit.3, %cond_exit_1082.3
+cond_exit_2250:                                   ; preds = %__barray_mask_return.exit.3, %cond_exit_1518.3
   %"2212_423.fca.2.insert" = insertvalue { ptr, ptr, i64 } %0, i64 0, 2
   ret { ptr, ptr, i64 } %"2212_423.fca.2.insert"
 
-cond_exit_1082:                                   ; preds = %alloca_block
+cond_exit_1518:                                   ; preds = %alloca_block
   %39 = getelementptr inbounds nuw i8, ptr %1, i64 8
   %40 = load i1, ptr %39, align 1
   br i1 %40, label %__barray_check_bounds.exit, label %cond_2265_case_1.1
 
-__barray_check_bounds.exit:                       ; preds = %cond_exit_1082
+__barray_check_bounds.exit:                       ; preds = %cond_exit_1518
   %41 = load i64, ptr %.fca.1.extract380, align 4
   %42 = trunc i64 %41 to i1
   br i1 %42, label %panic.i, label %__barray_check_bounds.exit383
@@ -2144,9 +2144,9 @@ alloca_block:
   tail call void @___rz(i64 %1, double 0x3FE921FB54442D18)
   tail call void @___rp(i64 %0, double 0x3FF921FB54442D18, double 0x3FF921FB54442D18)
   tail call void @___rpp(i64 %0, i64 %1, double 0x3FF921FB54442D18, double 0.000000e+00)
-  tail call void @___rp(i64 %1, double 0xBFF921FB54442D18, double 0.000000e+00)
   tail call void @___rp(i64 %0, double 0xBFF921FB54442D18, double 0x3FF921FB54442D18)
   tail call void @___rz(i64 %0, double 0xBFF921FB54442D18)
+  tail call void @___rp(i64 %1, double 0xBFF921FB54442D18, double 0.000000e+00)
   tail call void @___rz(i64 %1, double 0xBFE921FB54442D18)
   tail call void @___rz(i64 %0, double 0x3FE921FB54442D18)
   tail call void @___rp(i64 %0, double 0x3FF921FB54442D18, double 0x3FF921FB54442D18)
