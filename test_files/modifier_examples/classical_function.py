@@ -56,9 +56,10 @@ def main() -> None:
 
     # Testing nested wit_block with no quantum input
     # (issue: https://github.com/Quantinuum/tket2/issues/1814)
+    a = 3
     with control(c1):
         with dagger:
-            fuu()
+            fuu(a)
 
     # Testing that array operations are happening in the correct order
     with control(t), dagger:

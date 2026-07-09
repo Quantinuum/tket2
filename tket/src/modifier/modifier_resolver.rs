@@ -1700,8 +1700,6 @@ pub fn resolve_modifier_with_entrypoints_and_scope(
         }
     }
 
-    std::fs::write("raw0.mmd", h.mermaid_string()).unwrap();
-
     // After all rewrites, some modifier nodes may still remain in the graph
     // (e.g. intermediate nodes in a chain whose last modifier was the one rewritten).
     // Walk the same reachable set again and delete any surviving modifier nodes,

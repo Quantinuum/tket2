@@ -60,7 +60,7 @@ normalize = NormalizeGuppy(
 program = bar.with_minimal_opt().with_optimization(normalize).compile_function()
 from hugr.hugr.render import RenderConfig
 
-program.modules[0].render_dot(RenderConfig(max_node_label_length=None))
+# program.modules[0].render_dot(RenderConfig(max_node_label_length=None))
 # .view(
 #     "1", quiet=True
 # )
@@ -78,7 +78,7 @@ normalize = NormalizeGuppy(
 normalize(program.modules[0]).render_dot(
     RenderConfig(max_node_label_length=None)
 )  # ß.view(
-program.modules[0].render_dot(RenderConfig(max_node_label_length=None))
+# program.modules[0].render_dot(RenderConfig(max_node_label_length=None))
 # .view(
 #     "2", quiet=True
 # )
