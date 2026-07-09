@@ -8,6 +8,7 @@
 
 from pathlib import Path
 from sys import argv
+from collections.abc import Callable
 
 from guppylang import enable_experimental_features, guppy
 from guppylang.std.builtins import Controllable, Unitary, array, control, dagger
@@ -32,7 +33,7 @@ def get_get_angle() -> Function[[float], angle]:
 def apply_r(
     f: Unitary[[qubit, angle], None],
     q: array[qubit, 2],
-    fun_angle: Function[[float], angle],
+    fun_angle: Callable[[float], angle],
     radiant: float,
 ) -> None:
     f(q[1], fun_angle(radiant))

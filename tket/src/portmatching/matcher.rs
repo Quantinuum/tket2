@@ -466,7 +466,7 @@ pub(super) fn validate_circuit_edge(
 /// Returns a predicate checking that `node` satisfies `prop` in `circ`.
 pub(crate) fn validate_circuit_node(
     circ: &Circuit<impl HugrView<Node = Node>>,
-) -> impl for<'a> Fn(NodeID, &PNode) -> bool + '_ {
+) -> impl Fn(NodeID, &PNode) -> bool + '_ {
     move |node, prop| {
         let NodeID::HugrNode(node) = node else {
             return false;

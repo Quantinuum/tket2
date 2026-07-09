@@ -7,6 +7,7 @@ use std::fs;
 use std::io::BufReader;
 use std::path::Path;
 use tket::extension::{TKET_EXTENSION_ID, TKET1_EXTENSION_ID};
+use tket_qsystem::extension::result::EXTENSION_ID as RESULT_EXTENSION_ID;
 
 use hugr::{Hugr, HugrView};
 use rstest::rstest;
@@ -76,7 +77,8 @@ fn count_gates(h: &impl HugrView) -> HashMap<SmolStr, usize> {
     let mut counts = HashMap::new();
     for n in h.nodes() {
         if let Some(eop) = h.get_optype(n).as_extension_op()
-            && [TKET_EXTENSION_ID, TKET1_EXTENSION_ID].contains(eop.extension_id())
+            && [TKET_EXTENSION_ID, TKET1_EXTENSION_ID, RESULT_EXTENSION_ID]
+                .contains(eop.extension_id())
         {
             *counts.entry(eop.qualified_id()).or_default() += 1;
         }
@@ -93,15 +95,18 @@ fn count_gates(h: &impl HugrView) -> HashMap<SmolStr, usize> {
 #[case::nested_array("nested_array", None)]
 #[should_panic = "xfail"]
 #[case::angles("angles", Some(vec![
-    ("tket.quantum.MeasureFree", 1),("tket.quantum.QAlloc", 1),
+    ("tket.quantum.MeasureFree", 1), ("tket.quantum.QAlloc", 1), ("tket.result.result_bool", 1)
 ]))]
 #[should_panic = "xfail"]
 #[case::simple_cx("simple_cx", Some(vec![
-    ("tket.quantum.QAlloc", 2), ("tket.quantum.MeasureFree", 2),
+    ("tket.quantum.QAlloc", 2), ("tket.quantum.MeasureFree", 2), ("tket.result.result_bool", 2)
 ]))]
 #[case::nested("nested", None)]
 #[case::ranges("ranges", None)]
-#[case::false_branch("false_branch", None)]
+#[should_panic = "xfail"]
+#[case::false_branch("false_branch", Some(vec![
+    ("tket.quantum.QAlloc", 1), ("tket.quantum.MeasureFree", 1), ("tket.result.result_bool", 1)
+]))]
 #[should_panic = "xfail"]
 #[case::func_decls("func_decls", Some(vec![
     ("TKET1.tk1op", 2), ("tket.quantum.symbolic_angle", 1)
@@ -114,14 +119,17 @@ fn optimize_flattened_guppy(#[case] name: &str, #[case] xfail: Option<Vec<(&str,
     // to get rid of other guppy artifacts.
     NormalizeGuppy::default().run(&mut hugr).unwrap();
     run_pytket(&mut hugr, CLIFFORD_SIMP_STR);
-    let should_xfail = xfail.is_some();
-    let expected_counts = match xfail {
-        Some(counts) => counts.into_iter().map(|(k, v)| (k.into(), v)).collect(),
-        None => count_gates(&load_guppy_circuit(name, HugrFileType::Optimized).unwrap()),
-    };
-    assert_eq!(count_gates(&hugr), expected_counts);
-    if should_xfail {
-        panic!("xfail");
+
+    let actual_counts = count_gates(&hugr);
+    let optimized_counts = count_gates(&load_guppy_circuit(name, HugrFileType::Optimized).unwrap());
+
+    if let Some(expected) = xfail {
+        assert_ne!(actual_counts, optimized_counts);
+        let expected = expected.into_iter().map(|(k, v)| (k.into(), v)).collect();
+        assert_eq!(actual_counts, expected);
+        panic!("xfail")
+    } else {
+        assert_eq!(actual_counts, optimized_counts);
     }
 }
 
