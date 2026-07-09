@@ -536,9 +536,12 @@ impl<N: HugrNode> ModifierResolver<N> {
         dfg: &DFG,
         new_parent_dfg: &mut impl Container,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        // Check if the DFG input or output are carrying qubits: only DFGs with quantum effects need to be modified.
+        // Check if the DFG input or output are carrying qubits
         let boundary_has_qubits = self.signature_has_quantum_data(&dfg.signature);
         if !boundary_has_qubits {
+            // If the DFG does not carry qubits, we trigger the modification in the DFG in case the dfg contains modifier nodes.
+            // Since there are not input/out qubits, the modifier in the dfg does not effect the outside of the dfg, so we can
+            //safely modify them without worrying about the outside context.
             let new_dfg = self.with_modifiers(Default::default(), |this| {
                 let mut builder = DFGBuilder::new(dfg.signature.clone()).unwrap();
                 this.modify_dfg_body(h, n, &mut builder)?;
