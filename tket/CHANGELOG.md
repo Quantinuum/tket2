@@ -1,7 +1,7 @@
 # Changelog
 
 
-## [0.22.0](https://github.com/Quantinuum/tket2/compare/tket-v0.21.0...tket-v0.22.0) - 2026-07-09
+## [0.21.1](https://github.com/Quantinuum/tket2/compare/tket-v0.21.0...tket-v0.21.1) - 2026-07-09
 
 ### Bug Fixes
 

@@ -23,7 +23,7 @@ name = "tket-qsystem"
 required-features = ["cli"]
 
 [dependencies]
-tket = { path = "../tket", version = "0.22.0" }
+tket = { path = "../tket", version = "0.21.1" }
 
 hugr.workspace = true
 hugr-core.workspace = true
