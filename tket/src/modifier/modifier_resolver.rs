@@ -2463,7 +2463,9 @@ mod tests {
     fn test_resolve(h: &mut Hugr) {
         assert_matches!(h.validate(), Ok(()));
 
-        let entrypoint = PassScope::default().root(&h).unwrap_or(h.entrypoint());
+        let entrypoint = PassScope::default()
+            .root(&h)
+            .unwrap_or_else(|| h.entrypoint());
         resolve_modifier_with_entrypoints(h, [entrypoint]).unwrap();
 
         assert!(

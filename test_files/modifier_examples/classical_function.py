@@ -63,7 +63,7 @@ def main() -> None:
     with dagger, control(c1):
         inner(foo, 2)
 
-    # Testing nested wit_block with no quantum input
+    # Testing nested with_block with no quantum input
     # (issue: https://github.com/Quantinuum/tket2/issues/1814)
     a = 3
     with control(c1):
