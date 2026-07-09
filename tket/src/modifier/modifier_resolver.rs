@@ -1518,24 +1518,6 @@ fn module_child_containing<N: HugrNode>(h: &impl HugrView<Node = N>, node: N) ->
     None
 }
 
-/// Returns whether any parent of `node` is in `modified_containers`.
-/// In case of nested DFG/FuncDefn we stop at the first DFG/FuncDefn parent,
-///  to ensure that all nested DFG are considered.
-#[allow(unused)]
-fn check_parent_already_modified<N: HugrNode>(
-    h: &impl HugrView<Node = N>,
-    node: N,
-    modified_containers: &HashSet<N>,
-) -> bool {
-    match h.get_optype(node) {
-        OpType::FuncDefn(_) => modified_containers.contains(&node),
-        _ => match h.get_parent(node) {
-            Some(parent) => check_parent_already_modified(h, parent, modified_containers),
-            None => false,
-        },
-    }
-}
-
 /// Returns whether `func` has any static target outside `candidates`.
 ///
 /// Functions without readable static targets are treated as used outside the
@@ -1679,22 +1661,11 @@ pub fn resolve_modifier_with_entrypoints_and_scope(
         worklist.extend(h.children(node).filter(|n| !visited.contains(n)));
         worklist.extend(h.all_neighbours(node).filter(|n| !visited.contains(n)));
         visited.insert(node);
-        // `modify_fn`/`modify_dfg` leave the original container in the graph
-        // after generating a replacement. From this point on, the stale
-        // container should not be processed again, but copied nested DFGs
-        // should still be visited independently.
-        // if check_parent_already_modified(h, node, &resolver.modified_functions) {
-        //     println!("Skipped: {:?}", node);
-        //     continue;
-        // }
         if let Err(e) = resolver.try_rewrite(h, node) {
             // ModifierError means this node is not a modifier (or is not the first
             // in its chain) and can safely be skipped.
             // Any other error is a genuine failure and must be propagated.
             if !matches!(e, ModifierError(_)) {
-                // println!("§§§§§§§§§§\n{}", e);
-                // std::fs::write("error.mmd", h.mermaid_string()).unwrap();
-                // println!("§§§§§§§§§§§§§§§§§");
                 return Err(e);
             }
         }
@@ -1710,12 +1681,11 @@ pub fn resolve_modifier_with_entrypoints_and_scope(
     // If more thorough cleanup is needed, we should run dead code elimination.
     let mut deletelist = entry_points.clone();
     let mut visited = FxHashSet::default();
-
     while let Some(node) = deletelist.pop_front() {
-        // if !h.contains_node(node) || visited.contains(&node) {
-        //     continue;
-        // }
-
+        // Keep the cleanup pass out of stale original function bodies too. Their
+        // modifier nodes may still be present, but removing them after the
+        // replacement has been built can invalidate the untouched original HUGR
+        // structure and is unnecessary for the solved entrypoint.
         if module_child_containing(h, node)
             .is_some_and(|owner| resolver.modified_functions.contains(&owner))
         {
@@ -1725,13 +1695,6 @@ pub fn resolve_modifier_with_entrypoints_and_scope(
         deletelist.extend(h.children(node).filter(|n| !visited.contains(n)));
         deletelist.extend(h.all_neighbours(node).filter(|n| !visited.contains(n)));
         visited.insert(node);
-        // Keep the cleanup pass out of stale original containers too. Their
-        // modifier nodes may still be present, but removing them after the
-        // replacement has been built can invalidate the untouched original HUGR
-        // structure and is unnecessary for the solved entrypoint.
-        // if check_parent_already_modified(h, node, &resolver.modified_functions) {
-        //     continue;
-        // }
         if h.contains_node(node) {
             let optype = h.get_optype(node);
             if Modifier::from_optype(optype).is_some() {
@@ -1739,9 +1702,6 @@ pub fn resolve_modifier_with_entrypoints_and_scope(
                 // output edges (i.e. nodes that would become disconnected).
                 let mut l = vec![node];
                 while let Some(n) = l.pop() {
-                    // if !h.contains_node(n) {
-                    //     continue;
-                    // }
                     l.extend(h.output_neighbours(n));
                     h.remove_node(n);
                 }

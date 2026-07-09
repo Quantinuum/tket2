@@ -1495,10 +1495,62 @@ mod test {
         *func.finish_with_outputs([q]).unwrap().handle()
     }
 
+    /// Test pass on a DFG with no quantum signature that contains a modifier (dagger)
+    /// (https://github.com/Quantinuum/tket2/issues/1814)
+    fn foo_dfg_daggered_empty_indirect_call(
+        module: &mut ModuleBuilder<Hugr>,
+        t_num: usize,
+    ) -> FuncID<true> {
+        assert_eq!(t_num, 1);
+
+        let empty_sig = Signature::new_endo(type_row![]);
+        let empty = {
+            let mut func = module.define_function("empty", empty_sig.clone()).unwrap();
+            func.set_unitary();
+            func.finish_with_outputs([]).unwrap()
+        };
+
+        let dagger_op: ExtensionOp = MODIFIER_EXTENSION
+            .instantiate_extension_op(&DAGGER_OP_ID, [vec![].into(), vec![].into()])
+            .unwrap();
+
+        let foo_sig = Signature::new_endo([qb_t()]);
+        let mut func = module.define_function("foo", foo_sig).unwrap();
+        func.set_unitary();
+        let q = func.input_wires().next().unwrap();
+        {
+            let mut dfg = func
+                .dfg_builder(Signature::new_endo(type_row![]), [])
+                .unwrap();
+            let loaded = dfg.load_func(empty.handle(), &[]).unwrap();
+            let daggered = dfg
+                .add_dataflow_op(dagger_op, [loaded])
+                .unwrap()
+                .out_wire(0);
+            dfg.add_dataflow_op(
+                CallIndirect {
+                    signature: empty_sig,
+                },
+                [daggered],
+            )
+            .unwrap();
+            dfg.finish_with_outputs([]).unwrap();
+        }
+
+        *func.finish_with_outputs([q]).unwrap().handle()
+    }
+
     #[rstest::rstest]
     #[case::dfg(1, 2, foo_dfg, false)]
     #[case::dfg_dagger(1, 2, foo_dfg, true)]
     #[case::dfg_external_function_call(1, 1, foo_dfg_external_function_call, true)]
+    #[case::dfg_daggered_empty_indirect_call(1, 1, foo_dfg_daggered_empty_indirect_call, false)]
+    #[case::dfg_daggered_empty_indirect_call_daggered(
+        1,
+        1,
+        foo_dfg_daggered_empty_indirect_call,
+        true
+    )]
     #[case::tail_loop(1, 1, foo_tail_loop, false)]
     #[case::conditional(1, 1, foo_conditional, false)]
     #[case::conditional_dagger(1, 1, foo_conditional, true)]
