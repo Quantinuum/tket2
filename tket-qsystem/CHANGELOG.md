@@ -1,6 +1,16 @@
 # Changelog
 
 
+## [0.27.1](https://github.com/Quantinuum/tket2/compare/tket-qsystem-v0.27.0...tket-qsystem-v0.27.1) - 2026-07-09
+
+### Bug Fixes
+
+- merge_basic_blocks keeps Order edges ([#1782](https://github.com/Quantinuum/tket2/pull/1782))
+
+### New Features
+
+- Target platform option in PytketHugrPass ([#1787](https://github.com/Quantinuum/tket2/pull/1787))
+
 ## [0.27.0](https://github.com/Quantinuum/tket2/compare/tket-qsystem-v0.26.0...tket-qsystem-v0.27.0) - 2026-06-29
 
 ### Bug Fixes
