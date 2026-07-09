@@ -2,6 +2,7 @@
 //!
 //! This is based on the `pest` grammar defined in `param.pest`.
 
+use cgmath::RelativeEq;
 use derive_more::Display;
 use hugr::ops::OpType;
 use hugr::std_extensions::arithmetic::float_ops::FloatOps;
@@ -18,9 +19,7 @@ use crate::serialize::pytket::decoder::ParameterType;
 ///
 /// The leafs of the AST are either a constant value, a variable name, or an
 /// unrecognized sympy expression.
-///
-/// Return type of [`parse_pytket_param`].
-#[derive(Debug, Display, Clone, PartialEq)]
+#[derive(Debug, Display, Clone)]
 pub enum PytketParam<'a> {
     /// A constant value that can be loaded directly.
     #[display("{_0}")]
@@ -47,18 +46,64 @@ pub enum PytketParam<'a> {
     },
 }
 
-/// Parse a TKET1 operation parameter, and return an AST representing the expression.
-#[inline]
-pub fn parse_pytket_param(param: &str) -> PytketParam<'_> {
-    let Ok(mut parsed) = ParamParser::parse(Rule::parameter, param) else {
-        // The parameter could not be parsed, so we just return it as an opaque sympy expression.
-        return PytketParam::Sympy(param);
-    };
-    let parsed = parsed
-        .next()
-        .expect("The `parameter` rule can only be matched once.");
+impl<'a> PytketParam<'a> {
+    /// Parse a TKET1 operation parameter, and return an AST representing the expression.
+    #[inline]
+    pub fn parse(param: &'a str) -> Self {
+        let Ok(mut parsed) = ParamParser::parse(Rule::parameter, param) else {
+            // The parameter could not be parsed, so we just return it as an opaque sympy expression.
+            return PytketParam::Sympy(param);
+        };
+        let parsed = parsed
+            .next()
+            .expect("The `parameter` rule can only be matched once.");
 
-    parse_infix_ops(parsed.into_inner())
+        parse_infix_ops(parsed.into_inner())
+    }
+
+    /// Returns `true` if the parameter is zero.
+    pub fn is_zero(&self) -> bool {
+        matches!(self, PytketParam::Constant(value) if *value == 0.0)
+    }
+}
+
+impl<'a> PartialEq for PytketParam<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Constant(l0), Self::Constant(r0)) => {
+                l0.relative_eq(r0, f64::EPSILON, f64::EPSILON)
+            }
+            (Self::InputVariable { name: l_name }, Self::InputVariable { name: r_name }) => {
+                l_name == r_name
+            }
+            (Self::Sympy(l0), Self::Sympy(r0)) => l0 == r0,
+            (
+                Self::Operation {
+                    op: l_op,
+                    args: l_args,
+                    param_ty: l_param_ty,
+                },
+                Self::Operation {
+                    op: r_op,
+                    args: r_args,
+                    param_ty: r_param_ty,
+                },
+            ) => l_op == r_op && l_args == r_args && l_param_ty == r_param_ty,
+            _ => false,
+        }
+    }
+}
+
+impl<'a> Eq for PytketParam<'a> {}
+
+impl<'a> std::hash::Hash for PytketParam<'a> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            Self::InputVariable { name } => name.hash(state),
+            Self::Sympy(expr) => expr.hash(state),
+            _ => self.to_string().hash(state),
+        }
+    }
 }
 
 #[derive(Parser)]
@@ -284,7 +329,7 @@ mod test {
         param_ty: ParameterType::Rotation,
     })]
     fn parse_param(#[case] param: &str, #[case] expected: PytketParam) {
-        let parsed = parse_pytket_param(param);
+        let parsed = PytketParam::parse(param);
         if parsed != expected {
             panic!(
                 "Incorrect parameter parsing\n\texpression: \"{param}\"\n\tparsed: {parsed}\n\texpected: {expected}"

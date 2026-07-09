@@ -9,18 +9,13 @@
 //! Global phase is an operation that applies some global phase to a circuit.
 //! It is implemented as a side-effect that takes a rotation angle as an input.
 
-use hugr::{
-    HugrView, core::HugrNode, extension::simple_op::MakeExtensionOp, hugr::hugrmut::HugrMut,
-    ops::ExtensionOp,
-};
+use hugr::{extension::simple_op::MakeExtensionOp, ops::ExtensionOp};
 
 use crate::extension::modifier::Modifier;
 pub mod control;
 pub mod dagger;
 pub mod modifier_resolver;
 pub mod power;
-
-use crate::metadata;
 
 /// An accumulated modifier that combines control, dagger, and power modifiers.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
@@ -56,50 +51,5 @@ impl CombinedModifier {
             Err(_) => {}
         }
         Ok(())
-    }
-}
-
-/// Flags for each modifier.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-struct ModifierFlags {
-    control: bool,
-    dagger: bool,
-}
-
-impl ModifierFlags {
-    fn from_metadata<N: HugrNode>(h: &impl HugrView<Node = N>, n: N) -> Option<Self> {
-        h.get_metadata::<metadata::UnitaryFlags>(n)
-            .map(|num| ModifierFlags {
-                control: (num & 1) != 0,
-                dagger: (num & 2) != 0,
-            })
-    }
-
-    fn set_metadata<N: HugrNode>(&self, h: &mut impl HugrMut<Node = N>, n: N) {
-        let mut num = 0;
-        if self.dagger {
-            num |= 1;
-        }
-        if self.control {
-            num |= 2;
-        }
-        h.set_metadata::<metadata::UnitaryFlags>(n, num);
-    }
-
-    fn from_combined(combined: &CombinedModifier) -> Self {
-        ModifierFlags {
-            control: combined.control > 0,
-            dagger: combined.dagger,
-        }
-    }
-
-    fn or(self, other: &Option<Self>) -> Self {
-        match other {
-            None => self,
-            Some(other) => ModifierFlags {
-                control: self.control || other.control,
-                dagger: self.dagger || other.dagger,
-            },
-        }
     }
 }
