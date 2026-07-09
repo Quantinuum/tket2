@@ -124,8 +124,8 @@ impl MetadataPropagationPolicy {
         self
     }
 
-    /// Mutable access to the rule vector. Prefer using [`add_rule]` or [`with_rule`]
-    /// unless you need to reorder or remove entries.
+    /// Mutable access to the rule vector. Prefer using [`add_rule`](Self::add_rule) or
+    /// [`with_rule`](Self::with_rule) unless you need to reorder or remove entries.
     pub fn rules_mut(&mut self) -> &mut Vec<MetadataPropagationRule> {
         &mut self.rules
     }
