@@ -33,10 +33,11 @@ pub use dead_funcs::{RemoveDeadFuncsError, RemoveDeadFuncsPass};
 pub mod force_order;
 
 // Normalize the structure of programs.
+pub mod guppy;
 pub mod normalize;
 pub use normalize::Normalize;
 #[expect(deprecated)]
-pub use normalize::NormalizeGuppy;
+pub use guppy::NormalizeGuppy;
 
 // Inline DFG nodes.
 pub mod inline_dfgs;

@@ -214,14 +214,6 @@ pub enum NormalizeErrors {
     RedundantOrderEdges(HugrError),
 }
 
-/// Deprecated alias for [`Normalize`].
-#[deprecated(since = "0.21.2", note = "Use Normalize instead.")]
-pub type NormalizeGuppy = Normalize;
-
-/// Deprecated alias for [`NormalizeErrors`].
-#[deprecated(since = "0.21.2", note = "Use NormalizeErrors instead.")]
-pub type NormalizeGuppyErrors = NormalizeErrors;
-
 #[cfg(test)]
 mod test {
     use hugr::builder::{Dataflow, DataflowHugr, FunctionBuilder};
@@ -258,6 +250,6 @@ mod test {
     #[test]
     #[expect(deprecated)]
     fn normalize_guppy_alias() {
-        let _: NormalizeGuppy = Normalize::default();
+        let _: crate::passes::guppy::NormalizeGuppy = Normalize::default();
     }
 }
