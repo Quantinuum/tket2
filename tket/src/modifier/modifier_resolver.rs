@@ -1847,7 +1847,6 @@ mod tests {
     ) -> Hugr {
         let (mut h, foo_node) = modifier_test_hugr(target_num, ctrl_num, foo, dagger);
 
-        std::fs::write("path.mmd", h.mermaid_string()).unwrap();
         let entrypoint = h.entrypoint();
         resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
 
