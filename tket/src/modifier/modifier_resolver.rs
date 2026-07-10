@@ -1083,21 +1083,21 @@ impl<N: HugrNode> ModifierResolver<N> {
                 self.modify_constant(target_node, constant, new_dfg)?;
             }
             // Load constant
-            OpType::LoadConstant(_) | OpType::OpaqueOp(_) => {
+            OpType::LoadConstant(_) | OpType::OpaqueOp(_) | OpType::Tag(_) => {
                 self.add_node_no_modification(h, target_node, optype.clone(), new_dfg)?;
             }
-            OpType::Tag(tag) => {
-                let mut tag = tag.clone();
-                for variant in &mut tag.variants {
-                    // Tag stores the full sum variant rows in its own optype.
-                    // When a branch returns a function value that has been
-                    // resolved under a modifier, the Tag output sum must use
-                    // the same modified function type as the surrounding
-                    // Conditional/CFG edge.
-                    self.modify_carried_higher_order_types_if_present(variant)?;
-                }
-                self.add_node_no_modification(h, target_node, tag, new_dfg)?;
-            }
+            // OpType::Tag(tag) => {
+            //     let mut tag = tag.clone();
+            //     for variant in &mut tag.variants {
+            //         // Tag stores the full sum variant rows in its own optype.
+            //         // When a branch returns a function value that has been
+            //         // resolved under a modifier, the Tag output sum must use
+            //         // the same modified function type as the surrounding
+            //         // Conditional/CFG edge.
+            //         self.modify_carried_higher_order_types_if_present(variant)?;
+            //     }
+            //     self.add_node_no_modification(h, target_node, tag, new_dfg)?;
+            // }
 
             // Invalid nodes
             OpType::FuncDefn(_) | OpType::FuncDecl(_) | OpType::Module(_) => {
@@ -1191,14 +1191,12 @@ impl<N: HugrNode> ModifierResolver<N> {
             impl Iterator<Item = &'a Type>,
         ),
         (input_offset, output_offset, new_offset): (usize, usize, usize),
-        skip_inputs: &HashSet<usize>,
+        _skip_inputs: &HashSet<usize>,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        let mut old_in_wire: DirWire<N> = (old_in, IncomingPort::from(input_offset)).into();
-        let mut old_out_wire: DirWire<N> = (old_out, OutgoingPort::from(output_offset)).into();
-        let mut new_in_wire: DirWire =
-            (new_in, IncomingPort::from(input_offset + new_offset)).into();
-        let mut new_out_wire: DirWire =
-            (new_out, OutgoingPort::from(output_offset + new_offset)).into();
+        let mut old_in_wire = (old_in, IncomingPort::from(input_offset)).into();
+        let mut old_out_wire = (old_out, OutgoingPort::from(output_offset)).into();
+        let mut new_in_wire = (new_in, IncomingPort::from(input_offset + new_offset)).into();
+        let mut new_out_wire = (new_out, OutgoingPort::from(output_offset + new_offset)).into();
         let mut in_ty = inputs.next();
         let mut out_ty = outputs.next();
 
@@ -1208,11 +1206,12 @@ impl<N: HugrNode> ModifierResolver<N> {
                 if self.qubit_finder.contains_element_type(ty) {
                     break;
                 }
-                if skip_inputs.contains(&old_in_wire.1.index()) {
-                    self.map_insert_none(old_in_wire)?;
-                } else {
-                    self.map_insert(old_in_wire, new_in_wire)?;
-                }
+                self.map_insert(old_in_wire, new_in_wire)?;
+                // if skip_inputs.contains(&old_in_wire.1.index()) {
+                //     self.map_insert_none(old_in_wire)?;
+                // } else {
+                //     self.map_insert(old_in_wire, new_in_wire)?;
+                // }
                 old_in_wire = old_in_wire.shift(1);
                 new_in_wire = new_in_wire.shift(1);
                 in_ty = inputs.next();
@@ -1244,11 +1243,12 @@ impl<N: HugrNode> ModifierResolver<N> {
                     new_out_wire = new_out_wire.shift(1);
                     new_in
                 };
-                if skip_inputs.contains(&old_in_wire.1.index()) {
-                    self.map_insert_none(old_in_wire)?;
-                } else {
-                    self.map_insert(old_in_wire, new_in)?;
-                }
+                self.map_insert(old_in_wire, new_in)?;
+                // if skip_inputs.contains(&old_in_wire.1.index()) {
+                //     self.map_insert_none(old_in_wire)?;
+                // } else {
+                //     self.map_insert(old_in_wire, new_in)?;
+                // }
                 old_in_wire = old_in_wire.shift(1);
                 in_ty = inputs.next();
             }
@@ -1404,13 +1404,13 @@ impl<N: HugrNode> ModifierResolver<N> {
         }
 
         // CFGs always thread controls as carried values after block data.
-        let mut cfg_input = cfg.signature.input.clone();
-        self.modify_carried_higher_order_types_if_present(&mut cfg_input)?;
-        let mut cfg_output = cfg.signature.output.clone();
-        self.modify_carried_higher_order_types_if_present(&mut cfg_output)?;
+        // let mut cfg_input = cfg.signature.input.clone();
+        // self.modify_carried_higher_order_types_if_present(&mut cfg_input)?;
+        // let mut cfg_output = cfg.signature.output.clone();
+        // self.modify_carried_higher_order_types_if_present(&mut cfg_output)?;
         let signature = Signature::new(
-            self.cfg_control_types(cfg_input),
-            self.cfg_control_types(cfg_output),
+            self.cfg_control_types(cfg.signature.input.clone()),
+            self.cfg_control_types(cfg.signature.output.clone()),
         );
         let mut new_cfg = CFGBuilder::new(signature)?;
         let mut bb_map = HashMap::new();
@@ -1422,16 +1422,19 @@ impl<N: HugrNode> ModifierResolver<N> {
                     "Non-basic-block node found while modifying CFG.".to_string(),
                 ));
             };
-            let mut input = old_block.inputs.clone();
-            self.modify_carried_higher_order_types_if_present(&mut input)?;
-            let input = self.cfg_control_types(input);
-            let mut other_outputs = old_block.other_outputs.clone();
-            self.modify_carried_higher_order_types_if_present(&mut other_outputs)?;
-            let other_outputs = self.cfg_control_types(other_outputs);
-            let mut sum_rows = old_block.sum_rows.clone();
-            for row in sum_rows.iter_mut() {
-                self.modify_carried_higher_order_types_if_present(row)?;
-            }
+
+            // self.modify_carried_higher_order_types_if_present(&mut input)?;
+            // self.modify_carried_higher_order_types_if_present(&mut other_outputs)?;
+            // for row in sum_rows.iter_mut() {
+            //     self.modify_carried_higher_order_types_if_present(row)?;
+            // }
+            // let mut sum_rows = old_block.sum_rows.clone();
+            // let mut input = old_block.inputs.clone();
+            // let mut other_outputs = old_block.other_outputs.clone();
+
+            let input = self.cfg_control_types(old_block.inputs.clone());
+            let other_outputs = self.cfg_control_types(old_block.other_outputs.clone());
+            let sum_rows = old_block.sum_rows.clone();
             let mut new_bb = if i == 0 {
                 new_cfg.entry_builder(sum_rows, other_outputs)?
             } else {
