@@ -58,7 +58,7 @@ def main() -> None:
 program = main.compile()
 from hugr.hugr.render import RenderConfig
 
-program.modules[0].render_dot(RenderConfig(max_node_label_length=None)).view(
-    "tmp0_base", quiet=True
-)
+# program.modules[0].render_dot(RenderConfig(max_node_label_length=None)).view(
+#     "tmp0_base", quiet=True
+# )
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
