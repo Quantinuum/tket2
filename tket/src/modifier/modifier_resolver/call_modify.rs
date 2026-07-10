@@ -1,8 +1,7 @@
 //! Modify nodes related to function calls.
-use std::collections::HashSet;
 
 use hugr::{
-    IncomingPort, PortIndex, Wire,
+    IncomingPort, Wire,
     builder::{BuildError, Dataflow},
     core::HugrNode,
     extension::simple_op::MakeExtensionOp,
@@ -374,50 +373,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         for node in trace {
             self.forget_node(h, node)?
         }
-
-        Ok(())
-    }
-
-    fn modify_input_indirect_call(
-        &mut self,
-        n: N,
-        function_input: usize,
-        indir_call: &CallIndirect,
-        new_dfg: &mut impl Dataflow,
-    ) -> Result<(), ModifierResolverErrors<N>> {
-        let mut new_call = indir_call.clone();
-        self.modify_signature(&mut new_call.signature, false);
-        let new_call_node = new_dfg.add_child_node(new_call);
-
-        // The callee is a function input, so there is no LoadFunction to solve
-        // inside this body. Record that callers of the generated function must
-        // pass a statically modified value for this input, then call that input
-        // directly in the rewritten body.
-        let modifiers = self.modifiers().clone();
-        self.dynamic_input_modifiers()
-            .push((function_input, modifiers));
-        self.map_insert(
-            (n, IncomingPort::from(0)).into(),
-            (new_call_node, IncomingPort::from(0)).into(),
-        )?;
-
-        let mut controls = self.pack_controls(new_dfg)?;
-        let offset = self.modifiers().accum_ctrl.len();
-        for (i, ctrl) in controls.iter_mut().enumerate() {
-            new_dfg
-                .hugr_mut()
-                .connect(ctrl.node(), ctrl.source(), new_call_node, i + 1);
-            *ctrl = Wire::new(new_call_node, i);
-        }
-        *self.controls() = self.unpack_controls(new_dfg, controls)?;
-
-        let signature = indir_call.signature();
-        self.wire_node_inout(
-            n,
-            new_call_node,
-            (signature.input.iter().skip(1), signature.output.iter()),
-            (1, 0, offset),
-        )?;
 
         Ok(())
     }

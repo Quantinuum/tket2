@@ -17,7 +17,6 @@ use hugr::{
     std_extensions::collections::array::ArrayOpBuilder,
     types::{EdgeKind, FuncTypeBase, Signature, TypeRow},
 };
-use itertools::Itertools;
 use petgraph::visit::{Topo, Walker};
 
 use crate::{TketOp, extension::global_phase::GlobalPhase};
@@ -553,11 +552,9 @@ impl<N: HugrNode> ModifierResolver<N> {
             return Ok(());
         }
 
-        let mut boundary_signature = dfg.signature.clone();
-        // self.modify_carried_higher_order_types_if_present(&mut boundary_signature.input)?;
-        // self.modify_carried_higher_order_types_if_present(&mut boundary_signature.output)?;
-        let mut signature = boundary_signature.clone();
         // Build a new DFG with modified body.
+        let boundary_signature = dfg.signature.clone();
+        let mut signature = boundary_signature.clone();
         self.modify_signature(&mut signature, true);
         let mut builder = DFGBuilder::new(signature.clone()).unwrap();
         self.modify_dfg_body(h, n, &mut builder)?;
