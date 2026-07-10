@@ -35,7 +35,7 @@ pub mod force_order;
 // Normalize the structure of Guppy-generated programs.
 pub mod guppy;
 pub use guppy::Normalize;
-#[allow(deprecated)]
+#[expect(deprecated)]
 pub use guppy::NormalizeGuppy;
 
 // Inline DFG nodes.
