@@ -39,7 +39,7 @@ def apply_c(
 ) -> None:
     get_a = classic_fun()
     # BUG if using:
-    # angle = get_a(0.25)
+    angle = get_a(0.25)
     # # for _ in range(2):
     # # g(q, get_a(0.25))
     # # g(q, angle)
@@ -55,10 +55,10 @@ def main() -> None:
     discard(qs1)
 
 
-program = main.compile()
+program = main.with_minimal_opt().compile()
 from hugr.hugr.render import RenderConfig
 
-# program.modules[0].render_dot(RenderConfig(max_node_label_length=None)).view(
-#     "tmp0_base", quiet=True
-# )
+program.modules[0].render_dot(RenderConfig(max_node_label_length=None)).view(
+    "tmp0_base", quiet=True
+)
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
