@@ -806,18 +806,6 @@ impl<N: HugrNode> ModifierResolver<N> {
             OpType::LoadConstant(_) | OpType::OpaqueOp(_) | OpType::Tag(_) => {
                 self.add_node_no_modification(h, target_node, optype.clone(), new_dfg)?;
             }
-            // OpType::Tag(tag) => {
-            //     let mut tag = tag.clone();
-            //     for variant in &mut tag.variants {
-            //         // Tag stores the full sum variant rows in its own optype.
-            //         // When a branch returns a function value that has been
-            //         // resolved under a modifier, the Tag output sum must use
-            //         // the same modified function type as the surrounding
-            //         // Conditional/CFG edge.
-            //         self.modify_carried_higher_order_types_if_present(variant)?;
-            //     }
-            //     self.add_node_no_modification(h, target_node, tag, new_dfg)?;
-            // }
 
             // Invalid nodes
             OpType::FuncDefn(_) | OpType::FuncDecl(_) | OpType::Module(_) => {
@@ -927,11 +915,6 @@ impl<N: HugrNode> ModifierResolver<N> {
                     break;
                 }
                 self.map_insert(old_in_wire, new_in_wire)?;
-                // if skip_inputs.contains(&old_in_wire.1.index()) {
-                //     self.map_insert_none(old_in_wire)?;
-                // } else {
-                //     self.map_insert(old_in_wire, new_in_wire)?;
-                // }
                 old_in_wire = old_in_wire.shift(1);
                 new_in_wire = new_in_wire.shift(1);
                 in_ty = inputs.next();
@@ -964,11 +947,6 @@ impl<N: HugrNode> ModifierResolver<N> {
                     new_in
                 };
                 self.map_insert(old_in_wire, new_in)?;
-                // if skip_inputs.contains(&old_in_wire.1.index()) {
-                //     self.map_insert_none(old_in_wire)?;
-                // } else {
-                //     self.map_insert(old_in_wire, new_in)?;
-                // }
                 old_in_wire = old_in_wire.shift(1);
                 in_ty = inputs.next();
             }
@@ -1124,10 +1102,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         }
 
         // CFGs always thread controls as carried values after block data.
-        // let mut cfg_input = cfg.signature.input.clone();
-        // self.modify_carried_higher_order_types_if_present(&mut cfg_input)?;
-        // let mut cfg_output = cfg.signature.output.clone();
-        // self.modify_carried_higher_order_types_if_present(&mut cfg_output)?;
         let signature = Signature::new(
             self.cfg_control_types(cfg.signature.input.clone()),
             self.cfg_control_types(cfg.signature.output.clone()),
@@ -1142,15 +1116,6 @@ impl<N: HugrNode> ModifierResolver<N> {
                     "Non-basic-block node found while modifying CFG.".to_string(),
                 ));
             };
-
-            // self.modify_carried_higher_order_types_if_present(&mut input)?;
-            // self.modify_carried_higher_order_types_if_present(&mut other_outputs)?;
-            // for row in sum_rows.iter_mut() {
-            //     self.modify_carried_higher_order_types_if_present(row)?;
-            // }
-            // let mut sum_rows = old_block.sum_rows.clone();
-            // let mut input = old_block.inputs.clone();
-            // let mut other_outputs = old_block.other_outputs.clone();
 
             let input = self.cfg_control_types(old_block.inputs.clone());
             let other_outputs = self.cfg_control_types(old_block.other_outputs.clone());
@@ -1555,8 +1520,8 @@ mod tests {
         ctrl_num: u64,
         foo: impl FnOnce(&mut ModuleBuilder<Hugr>, usize) -> FuncID<true>,
         dagger: bool,
-    ) -> Hugr {
-        resolved_modifier_test_hugr(target_num, ctrl_num, foo, dagger)
+    ) {
+        let _ = resolved_modifier_test_hugr(target_num, ctrl_num, foo, dagger);
     }
 
     pub(crate) fn resolved_modifier_test_hugr(
