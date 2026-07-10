@@ -383,7 +383,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         // let dynamic_input_modifiers =
         //     mem::replace(self.dynamic_input_modifiers(), old_dynamic_input_modifiers);
         // *self.active_function_input_modifiers() = old_active_function_input_modifiers;
-        // modify_result?;
+        modify_result?;
 
         // Connect the global wires
         let call_map = mem::replace(self.call_map(), old_call_map);
