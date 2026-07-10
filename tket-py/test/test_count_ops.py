@@ -1,5 +1,5 @@
 from pathlib import Path
-from tket.passes import NormalizeGuppy
+from tket.passes import Normalize
 from tket._state import CompilationState
 import pytest
 
@@ -19,7 +19,7 @@ def load_example(example_name: str) -> CompilationState:
     circ = CompilationState.from_bytes(hugr_bytes)
 
     # Normalize the guppy circuit before returning
-    NormalizeGuppy()._run_tk(circ)
+    Normalize()._run_tk(circ)
     return circ
 
 

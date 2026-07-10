@@ -9,6 +9,7 @@ from tket.passes import (
     _greedy_depth_reduce,
     InlineFunctions,
     inline_funcs,
+    Normalize,
     NormalizeGuppy,
     ModifierResolverPass,
     GlobalScope,
@@ -46,7 +47,7 @@ from pytket.passes import (  # noqa: E402
 )
 
 
-normalize = NormalizeGuppy()
+normalize = Normalize()
 
 
 def _hugr_from_path(str_path: str) -> Hugr:
@@ -283,19 +284,26 @@ def test_normalize_guppy():
 
     pytket_circ = Circuit(4).CX(0, 2).CX(1, 2).CX(1, 2)
     # TODO: add a more thorough test which checks that the hugr is normalized as expected.
-    # test NormalizeGuppy as a ComposablePass
+    # test Normalize as a ComposablePass
     c1 = CompilationState.from_tket1(pytket_circ)
     hugr = Hugr.from_str(c1.to_str(), tket_registry())
 
-    normalize = NormalizeGuppy()
+    normalize = Normalize()
     clean_hugr = normalize(hugr)
     normal_circ1 = CompilationState.from_bytes(clean_hugr.to_bytes())
     assert normal_circ1.circuit_cost(lambda op: int(op == TketOp.CX)) == 3
 
 
+def test_normalize_guppy_deprecated_alias():
+    with pytest.deprecated_call(match="Use `Normalize` instead"):
+        normalize = NormalizeGuppy()
+
+    assert isinstance(normalize, Normalize)
+
+
 def test_modifier_resolver() -> None:
-    normalize = NormalizeGuppy(resolve_modifiers=False)
-    normalize_with_modifier_resolution = NormalizeGuppy()
+    normalize = Normalize(resolve_modifiers=False)
+    normalize_with_modifier_resolution = Normalize()
     mr_pass = ModifierResolverPass()
     # We consider a simple hugr for this test
     modifier_hugr: Hugr = _hugr_from_path(
@@ -378,15 +386,15 @@ def test_normalize_guppy_on_modifier() -> None:
 
     This won't actually do anything useful, we just want to check that the pass
     runs without errors."""
-    normalize = NormalizeGuppy()
+    normalize = Normalize()
     for hugr_path in sorted(Path("test_files/modifier_examples").glob("*.hugr")):
         try:
             normalized = normalize(_hugr_from_path(str(hugr_path)))
             CompilationState.from_python(normalized).validate()
         except Exception as exc:
-            raise AssertionError(f"NormalizeGuppy failed for {hugr_path}") from exc
+            raise AssertionError(f"Normalize failed for {hugr_path}") from exc
         assert not _contains_modifiers(normalized), (
-            f"NormalizeGuppy left modifiers in {hugr_path}"
+            f"Normalize left modifiers in {hugr_path}"
         )
 
 
@@ -425,7 +433,7 @@ def test_issue_1516() -> None:
 
 
 def test_python_qsystem_pass() -> None:
-    normalize = NormalizeGuppy()
+    normalize = Normalize()
     hugr = normalize(_hugr_from_path("test_files/guppy_examples/flat_quantum.hugr"))
     qsystem_rebase = QSystemRebasePass()
     qsystem_llvm = _QSystemLLVMPass()

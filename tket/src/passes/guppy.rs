@@ -20,7 +20,7 @@ use crate::passes::BorrowSquashPass;
 ///
 /// This is a mixture of global optimization passes, and operations that optimize the entrypoint.
 #[derive(Clone, Debug)]
-pub struct NormalizeGuppy {
+pub struct Normalize {
     /// Whether to resolve modifier operations.
     resolve_modifiers: bool,
     /// Whether to simplify CFG control flow.
@@ -46,7 +46,7 @@ pub struct NormalizeGuppy {
     scope: PassScope,
 }
 
-impl NormalizeGuppy {
+impl Normalize {
     /// Set whether to resolve modifier operations.
     pub fn resolve_modifiers(&mut self, resolve_modifiers: bool) -> &mut Self {
         self.resolve_modifiers = resolve_modifiers;
@@ -95,7 +95,7 @@ impl NormalizeGuppy {
     }
 }
 
-impl Default for NormalizeGuppy {
+impl Default for Normalize {
     fn default() -> Self {
         Self {
             resolve_modifiers: true,
@@ -112,15 +112,15 @@ impl Default for NormalizeGuppy {
     }
 }
 
-impl WithScope for NormalizeGuppy {
+impl WithScope for Normalize {
     fn with_scope(mut self, scope: impl Into<crate::passes::PassScope>) -> Self {
         self.scope = scope.into();
         self
     }
 }
 
-impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for NormalizeGuppy {
-    type Error = NormalizeGuppyErrors;
+impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for Normalize {
+    type Error = NormalizeErrors;
     type Result = ();
 
     fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
@@ -144,7 +144,7 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for NormalizeGuppy {
             InlineFunctionsPass::default_with_scope(self.scope.clone())
                 .with_heuristic(inline_funcs.clone())
                 .run(hugr)
-                .map_err(NormalizeGuppyErrors::InlineFuncs)?;
+                .map_err(NormalizeErrors::InlineFuncs)?;
         }
         // Clean up after inlining - only to improve compilation speed, not affected by
         // anything else until we start removing untaken branches.
@@ -184,7 +184,7 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for NormalizeGuppy {
             RedundantOrderEdgesPass::default()
                 .with_scope(self.scope.clone())
                 .run(hugr)
-                .map_err(NormalizeGuppyErrors::RedundantOrderEdges)?;
+                .map_err(NormalizeErrors::RedundantOrderEdges)?;
         }
 
         Ok(())
@@ -194,7 +194,7 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for NormalizeGuppy {
 /// Errors that can occur during the guppy-program normalization process.
 #[derive(derive_more::Error, Debug, derive_more::Display, derive_more::From)]
 #[non_exhaustive]
-pub enum NormalizeGuppyErrors {
+pub enum NormalizeErrors {
     /// Error while resolving modifier operations.
     ModifierResolver(ModifierResolverErrors),
     /// Error while simplifying CFG control flow.
@@ -213,6 +213,14 @@ pub enum NormalizeGuppyErrors {
     #[from(ignore)]
     RedundantOrderEdges(HugrError),
 }
+
+/// Deprecated alias for [`Normalize`].
+#[deprecated(since = "0.22.0", note = "Use Normalize instead.")]
+pub type NormalizeGuppy = Normalize;
+
+/// Deprecated alias for [`NormalizeErrors`].
+#[deprecated(since = "0.22.0", note = "Use NormalizeErrors instead.")]
+pub type NormalizeGuppyErrors = NormalizeErrors;
 
 #[cfg(test)]
 mod test {
@@ -233,7 +241,7 @@ mod test {
         let hugr = b.finish_hugr_with_outputs([q]).unwrap();
 
         let mut hugr2 = hugr.clone();
-        NormalizeGuppy::default()
+        Normalize::default()
             .resolve_modifiers(false)
             .simplify_cfgs(false)
             .remove_tuple_untuple(false)
@@ -245,5 +253,11 @@ mod test {
             .unwrap();
 
         assert_eq!(hugr2, hugr);
+    }
+
+    #[test]
+    #[expect(deprecated)]
+    fn normalize_guppy_alias() {
+        let _: NormalizeGuppy = Normalize::default();
     }
 }

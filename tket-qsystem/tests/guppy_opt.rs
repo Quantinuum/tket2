@@ -12,7 +12,7 @@ use tket_qsystem::extension::result::EXTENSION_ID as RESULT_EXTENSION_ID;
 use hugr::{Hugr, HugrView};
 use rstest::rstest;
 use tket::passes::ComposablePass;
-use tket::passes::NormalizeGuppy;
+use tket::passes::Normalize;
 use tket::serialize::pytket::{EncodeOptions, EncodedCircuit};
 
 use tket_qsystem::pytket::{qsystem_decoder_config, qsystem_encoder_config};
@@ -115,9 +115,9 @@ fn count_gates(h: &impl HugrView) -> HashMap<SmolStr, usize> {
 fn optimize_flattened_guppy(#[case] name: &str, #[case] xfail: Option<Vec<(&str, usize)>>) {
     let mut hugr = load_guppy_circuit(name, HugrFileType::Flat)
         .unwrap_or_else(|_| load_guppy_circuit(name, HugrFileType::Original).unwrap());
-    // We don't need NormalizeGuppy to "flatten" control flow here, but we still want
+    // We don't need Normalize to "flatten" control flow here, but we still want
     // to get rid of other guppy artifacts.
-    NormalizeGuppy::default().run(&mut hugr).unwrap();
+    Normalize::default().run(&mut hugr).unwrap();
     run_pytket(&mut hugr, CLIFFORD_SIMP_STR);
 
     let actual_counts = count_gates(&hugr);
@@ -140,7 +140,7 @@ fn optimize_guppy_ranges_array() {
     // (i.e. after control flow is flattened, but the array ops are not)
     let mut hugr = load_guppy_example("ranges/ranges.flat.array.hugr").unwrap();
 
-    NormalizeGuppy::default().run(&mut hugr).unwrap();
+    Normalize::default().run(&mut hugr).unwrap();
     run_pytket(&mut hugr, CLIFFORD_SIMP_STR);
 
     let expected_counts =
@@ -157,7 +157,7 @@ fn optimize_guppy_ranges_array() {
 #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
 fn flatten_guppy(#[case] name: &str) {
     let mut hugr = load_guppy_circuit(name, HugrFileType::Original).unwrap();
-    NormalizeGuppy::default().run(&mut hugr).unwrap();
+    Normalize::default().run(&mut hugr).unwrap();
     let target = load_guppy_circuit(name, HugrFileType::Flat).unwrap();
     assert_eq!(count_gates(&hugr), count_gates(&target));
 }
@@ -186,7 +186,7 @@ fn optimize_guppy(#[case] name: &str) {
     );
     let opt = count_gates(&load_guppy_circuit(name, HugrFileType::Optimized).unwrap());
 
-    NormalizeGuppy::default().run(&mut hugr).unwrap();
+    Normalize::default().run(&mut hugr).unwrap();
     assert_eq!(count_gates(&hugr), flat);
 
     run_pytket(&mut hugr, CLIFFORD_SIMP_STR);
