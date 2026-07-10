@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.4.1](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.4.0...qis-compiler-v0.4.1) (2026-07-10)
+
+This release includes fixes to the modifier resolution and constant-folding
+passes used by the QSystem lowering pipelines.
+
+
+### Bug Fixes
+
+* Fix ModifierResolverPass trying to connect outputs to outputs ([#1769](https://github.com/Quantinuum/tket2/issues/1769)) ([0ec4771](https://github.com/Quantinuum/tket2/commit/0ec477138aa13edf7f3420605966f446bc1ee1bb))
+* Fix ModifierResolverPass generating loops in DFGs ([#1777](https://github.com/Quantinuum/tket2/issues/1777)) ([51db9fa](https://github.com/Quantinuum/tket2/commit/51db9fac25b63c42cef4d2aa12091d28e9a5012f))
+* Solve IndirectCall nodes in ModifierResolverPass ([#1784](https://github.com/Quantinuum/tket2/issues/1784)) ([d43adf1](https://github.com/Quantinuum/tket2/commit/d43adf160380a74ad9f204ba91990916d625128e))
+* Prevent Constant Folding disconnecting linear outputs even if constant ([#1793](https://github.com/Quantinuum/tket2/issues/1793)) ([f494f3a](https://github.com/Quantinuum/tket2/commit/f494f3a56451c0794385d8a4f316182acb266dc4))
+* Improved `ModifierResolverErrors::UnResolvable` display error message ([#1808](https://github.com/Quantinuum/tket2/issues/1808)) ([19b2725](https://github.com/Quantinuum/tket2/commit/19b2725279e6431f2ef53149ae6551613839e38c))
+* Ensure ModifierResolverPass preserves function edges into classical DAG ([#1792](https://github.com/Quantinuum/tket2/issues/1792)) ([f5dfe78](https://github.com/Quantinuum/tket2/commit/f5dfe786e8c7a50f943b33814ae5efed6ca1a280))
+* Fix ModifierResolverPass producing invalid hugr with non quantum DAG ([#1817](https://github.com/Quantinuum/tket2/issues/1817)) ([cdb47dd](https://github.com/Quantinuum/tket2/commit/cdb47ddf413f1b6eeaecb3eb39417111fbdf42b5))
+
+
 ## [0.4.0](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.3.2...qis-compiler-v0.4.0) (2026-06-29)
 
 
