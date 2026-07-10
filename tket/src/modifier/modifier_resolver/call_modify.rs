@@ -184,6 +184,11 @@ impl<N: HugrNode> ModifierResolver<N> {
         indir_call: &CallIndirect,
         new_dfg: &mut impl Dataflow,
     ) -> Result<(), ModifierResolverErrors<N>> {
+        // If no quantum data is involved, we can skip modifying the call
+        if !self.signature_has_quantum_data(&indir_call.signature) {
+            self.add_node_no_modification(h, n, indir_call.clone(), new_dfg)?;
+            return Ok(());
+        }
         // Wrap ModifierError as UnResolvable, using the ModifierError node as the error
         // location and the IndirectCall OpType for context.
         let wrap_modifier_err = |e: ModifierError<N>| {
@@ -209,11 +214,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         // Instead, we record the modifiers to be applied to that input and propagate
         // the requirement to callers.
         if matches!(h.get_optype(targ), OpType::Input(_)) {
-            // If no quantum data is involved, we can skip modifying the call
-            if !self.signature_has_quantum_data(&indir_call.signature) {
-                self.add_node_no_modification(h, n, indir_call.clone(), new_dfg)?;
-                return Ok(());
-            }
             panic!("§§§§§§§§§§§§§§§§§§§§ SHOULD NOT BE HERE §§")
             // NICOLA TODO: Here we dont need the indirect call, no quantum dynamic function are allowed
             // *self.modifiers_mut() = modifiers;
@@ -223,6 +223,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         let (func, load) =
             Self::get_loaded_function(h, n, targ, h.get_optype(targ)).map_err(wrap_modifier_err)?;
 
+        // NICOLA TODO if needed may be useless? after the check at the top
         let Some(modified_fn) = self
             .modify_fn_if_needed(h, func, Some(&indir_call.signature), trace.len() > 1)
             .map_err(wrap_resolver_err)?
