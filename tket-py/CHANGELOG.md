@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.15.2](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.1...tket-py-v0.15.2) (2026-07-09)
+
+This release includes multiple fixes to the passes included in `NormalizeGuppy`,
+as well as the improvements to pytket decoding.
+
+### Features
+
+* Decode global phases from pytket circuits ([#1816](https://github.com/Quantinuum/tket2/issues/1816)) ([ec6d2e1](https://github.com/Quantinuum/tket2/commit/ec6d2e14f403bb429568b4a2cede42cb0c09474e))
+* Target platform option in PytketHugrPass ([#1787](https://github.com/Quantinuum/tket2/issues/1787)) ([f55550d](https://github.com/Quantinuum/tket2/commit/f55550db1a467672f18a41cc7c5c01cebd5f65c6))
+
+
+### Bug Fixes
+
+* merge_basic_blocks keeps Order edges ([#1782](https://github.com/Quantinuum/tket2/issues/1782)) ([d591a3d](https://github.com/Quantinuum/tket2/commit/d591a3d5a6302ed2b1ad057086b69e3ee78387da))
+
 ## [0.15.1](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.0...tket-py-v0.15.1) (2026-06-30)
 
 

@@ -53,9 +53,9 @@ create_py_exception!(
 );
 
 create_py_exception!(
-    tket::passes::guppy::NormalizeGuppyErrors,
-    PyNormalizeGuppyError,
-    "Errors from the Guppy normalization pass."
+    tket::passes::normalize::NormalizeErrors,
+    PyNormalizeError,
+    "Errors from the normalization pass."
 );
 
 create_py_exception!(
@@ -115,7 +115,7 @@ fn normalize_guppy(
     scope: Option<PyPassScope>,
 ) -> PyResult<()> {
     let py_scope = scope.unwrap_or_default();
-    let mut pass = tket::passes::NormalizeGuppy::default_with_scope(py_scope.scope);
+    let mut pass = tket::passes::Normalize::default_with_scope(py_scope.scope);
 
     pass.resolve_modifiers(resolve_modifiers)
         .simplify_cfgs(simplify_cfgs)
