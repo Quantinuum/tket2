@@ -185,10 +185,11 @@ impl<N: HugrNode> ModifierResolver<N> {
         new_dfg: &mut impl Dataflow,
     ) -> Result<(), ModifierResolverErrors<N>> {
         // If no quantum data is involved, we can skip modifying the call
-        if !self.signature_has_quantum_data(&indir_call.signature) {
-            self.add_node_no_modification(h, n, indir_call.clone(), new_dfg)?;
-            return Ok(());
-        }
+        // // NICOLA BUG HERE: TODO we are skipping function that are targeted by a modifier chain!
+        // if !self.signature_has_quantum_data(&indir_call.signature) {
+        //     self.add_node_no_modification(h, n, indir_call.clone(), new_dfg)?;
+        //     return Ok(());
+        // }
         // Wrap ModifierError as UnResolvable, using the ModifierError node as the error
         // location and the IndirectCall OpType for context.
         let wrap_modifier_err = |e: ModifierError<N>| {
@@ -209,6 +210,11 @@ impl<N: HugrNode> ModifierResolver<N> {
             .map_err(wrap_resolver_err)?;
         let targ = trace.last().cloned().unwrap();
 
+        // NICOLA BUG HERE: TODO we are skipping function that are targeted by a modifier chain!
+        if !self.signature_has_quantum_data(&indir_call.signature) && trace.len() == 1 {
+            self.add_node_no_modification(h, n, indir_call.clone(), new_dfg)?;
+            return Ok(());
+        }
         // NICOLA TODO: try without the input check?
         // If the target is a function input, we cannot solve the modifier chain here.
         // Instead, we record the modifiers to be applied to that input and propagate
@@ -219,7 +225,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             // *self.modifiers_mut() = modifiers;
             // return self.modify_input_indirect_call(n, chain_tail.1.index(), indir_call, new_dfg);
         }
-        // If the target is not a input, we expect it to be a LoadFunction node loading the function to call.
+        // NICOLA TODO update the comment: If the target is not a input, we expect it to be a LoadFunction node loading the function to call.
         let (func, load) =
             Self::get_loaded_function(h, n, targ, h.get_optype(targ)).map_err(wrap_modifier_err)?;
 
