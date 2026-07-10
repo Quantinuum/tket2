@@ -32,7 +32,7 @@ dependencies = ['hugr ~= 0.18.0', 'tket_eccs ~= 0.6.0', 'tket_exts ~= 0.14.0']
 
 [project.optional-dependencies]
 # The pytket python library is only used for type checking.
-pytket = ["pytket>=2.1.0,<3"]
+pytket = ["pytket>=2.18.1,<3"]
 
 [tool.uv.sources]
 tket_eccs = { workspace = true }
