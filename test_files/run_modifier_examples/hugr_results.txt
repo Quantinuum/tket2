@@ -61,7 +61,7 @@ subscript_in_dagger_ctrl_solved:
 	1111 -> 0.25+0j
 -----
 tmp0_solved:
-	0 -> 1+0j
+	000 -> 1+0j
 -----
 tmp1_solved:
 	00 -> 1+0j
