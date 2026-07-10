@@ -53,7 +53,7 @@ create_py_exception!(
 );
 
 create_py_exception!(
-    tket::passes::guppy::NormalizeErrors,
+    tket::passes::normalize::NormalizeErrors,
     PyNormalizeError,
     "Errors from the normalization pass."
 );
