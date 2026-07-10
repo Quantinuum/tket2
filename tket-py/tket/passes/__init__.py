@@ -160,7 +160,7 @@ class Normalize(ComposablePass):
     squash_borrows: bool = True
     _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
 
-    """Flatten the structure of a Guppy-generated program to enable additional optimisations.
+    """Flatten the structure of a program to enable additional optimisations.
 
     This should normally be called first before other optimisations.
 
