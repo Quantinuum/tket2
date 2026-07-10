@@ -1,8 +1,10 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#    "guppylang==1.0.0a8",
+#    "guppylang",
 # ]
+# [tool.uv.sources]
+# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", rev = "cc0977af918569ef9747bb07ca17fdfcbe8376e9"}
 # ///
 """Testing a dagger modifier on multiple functions, to ensure that the dagger is
 reversing the order of quantum operations"""

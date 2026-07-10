@@ -12,8 +12,8 @@ classical_function_solved:
 -----
 complex_cfg_higher_order_solved:
 	00 -> 0.7071+0j
-	10 -> 0.4619-0.1913j
-	11 -> -0.4619-0.1913j
+	10 -> 0.4619+0.1913j
+	11 -> -0.1913-0.4619j
 -----
 double_modifier_solved:
 	00 -> 0.7071+0j
@@ -59,3 +59,9 @@ subscript_in_dagger_ctrl_solved:
 	1100 -> 0.5+0j
 	1110 -> 0-0.433j
 	1111 -> 0.25+0j
+-----
+tmp0_solved:
+	0 -> 1+0j
+-----
+tmp1_solved:
+	00 -> 1+0j

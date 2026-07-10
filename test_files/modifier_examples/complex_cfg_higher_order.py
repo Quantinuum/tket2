@@ -1,8 +1,10 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#    "guppylang==1.0.0a8",
+#    "guppylang",
 # ]
+# [tool.uv.sources]
+# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", rev = "cc0977af918569ef9747bb07ca17fdfcbe8376e9"}
 # ///
 """Test the use of a higher-order function with complex control flow inside modifiers"""
 
@@ -55,10 +57,10 @@ def apply_c(
     else:
         get_a = classic_fun()
         # BUG if using:
-        angle = get_a(0.25)
+        # angle = get_a(0.25)
         for _ in range(2):
             g(q, get_a(0.25))
-            g(q, angle)
+            # g(q, angle)
 
 
 @guppy

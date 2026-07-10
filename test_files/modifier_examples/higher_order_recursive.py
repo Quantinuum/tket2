@@ -1,8 +1,10 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#    "guppylang==1.0.0a7",
+#    "guppylang",
 # ]
+# [tool.uv.sources]
+# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", rev = "cc0977af918569ef9747bb07ca17fdfcbe8376e9"}
 # ///
 """Some simple nested higher order functions inside modifiers"""
 
