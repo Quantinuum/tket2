@@ -22,6 +22,7 @@ circ = Circuit(2)
 circ.Rz(-0.5, 0)
 circ.Ry(-0.5, 1)
 circ.H(0)
+circ.Phase(0.5)
 
 guppy_circ = guppy.load_pytket("guppy_circ_2", circ, use_arrays=False)
 
