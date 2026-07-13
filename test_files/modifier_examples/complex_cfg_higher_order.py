@@ -57,10 +57,10 @@ def apply_c(
     else:
         get_a = classic_fun()
         # BUG if using:
-        # angle = get_a(0.25)
+        angle = get_a(0.25)
         for _ in range(2):
             g(q, get_a(0.25))
-            # g(q, angle)
+            g(q, angle)
 
 
 @guppy
