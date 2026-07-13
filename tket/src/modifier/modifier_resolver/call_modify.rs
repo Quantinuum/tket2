@@ -184,12 +184,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         indir_call: &CallIndirect,
         new_dfg: &mut impl Dataflow,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        // If no quantum data is involved, we can skip modifying the call
-        // // NICOLA BUG HERE: TODO we are skipping function that are targeted by a modifier chain!
-        // if !self.signature_has_quantum_data(&indir_call.signature) {
-        //     self.add_node_no_modification(h, n, indir_call.clone(), new_dfg)?;
-        //     return Ok(());
-        // }
         // Wrap ModifierError as UnResolvable, using the ModifierError node as the error
         // location and the IndirectCall OpType for context.
         let wrap_modifier_err = |e: ModifierError<N>| {
@@ -210,33 +204,41 @@ impl<N: HugrNode> ModifierResolver<N> {
             .map_err(wrap_resolver_err)?;
         let targ = trace.last().cloned().unwrap();
 
-        // NICOLA BUG HERE: TODO we are skipping function that are targeted by a modifier chain!
+        // If a function has no quantum effects and is not directly modified, we can skip modifying the call
         if !self.signature_has_quantum_data(&indir_call.signature) && trace.len() == 1 {
             self.add_node_no_modification(h, n, indir_call.clone(), new_dfg)?;
             return Ok(());
         }
-        // NICOLA TODO: try without the input check?
-        // If the target is a function input, we cannot solve the modifier chain here.
-        // Instead, we record the modifiers to be applied to that input and propagate
-        // the requirement to callers.
-        if matches!(h.get_optype(targ), OpType::Input(_)) {
-            panic!("§§§§§§§§§§§§§§§§§§§§ SHOULD NOT BE HERE §§")
-            // NICOLA TODO: Here we dont need the indirect call, no quantum dynamic function are allowed
-            // *self.modifiers_mut() = modifiers;
-            // return self.modify_input_indirect_call(n, chain_tail.1.index(), indir_call, new_dfg);
-        }
-        // NICOLA TODO update the comment: If the target is not a input, we expect it to be a LoadFunction node loading the function to call.
+
+        // // NICOLA TODO: try without the input check?
+        // // If the target is a function input, we cannot solve the modifier chain here.
+        // // Instead, we record the modifiers to be applied to that input and propagate
+        // // the requirement to callers.
+        // if matches!(h.get_optype(targ), OpType::Input(_)) {
+        //     panic!("§§§§§§§§§§§§§§§§§§§§ SHOULD NOT BE HERE §§")
+        //     // NICOLA TODO: Here we dont need the indirect call, no quantum dynamic function are allowed
+        //     // *self.modifiers_mut() = modifiers;
+        //     // return self.modify_input_indirect_call(n, chain_tail.1.index(), indir_call, new_dfg);
+        // }
+
+        // TODO add a test where we have quantum indirect call with a function input, to ensure that the proper error is raised.
+        // add also a test where we have 2 consecutive indirect calls, the second one must have quantum effects
+
+        // If the function has quantum effects, we expect it to be a LoadFunction node loading the function to call,
+        // otherwise the quantum function is not statically known and is modifiable.
         let (func, load) =
             Self::get_loaded_function(h, n, targ, h.get_optype(targ)).map_err(wrap_modifier_err)?;
 
+        // The function has quantum effects, thus we need to modify it.
+        let modified_fn = self.modify_fn(h, func).map_err(wrap_resolver_err)?;
         // NICOLA TODO if needed may be useless? after the check at the top
-        let Some(modified_fn) = self
-            .modify_fn_if_needed(h, func, Some(&indir_call.signature), trace.len() > 1)
-            .map_err(wrap_resolver_err)?
-        else {
-            self.add_node_no_modification(h, n, indir_call.clone(), new_dfg)?;
-            return Ok(());
-        };
+        // let Some(modified_fn) = self
+        //     .modify_fn_if_needed(h, func, Some(&indir_call.signature), trace.len() > 1)
+        //     .map_err(wrap_resolver_err)?
+        // else {
+        //     self.add_node_no_modification(h, n, indir_call.clone(), new_dfg)?;
+        //     return Ok(());
+        // };
 
         // Make new LoadFunction
         let mut modified_sig = load.func_sig.clone();
@@ -322,7 +324,7 @@ mod tests {
     use crate::extension::modifier::{CONTROL_OP_ID, MODIFIER_EXTENSION};
     use hugr::{
         Hugr,
-        builder::{Dataflow, DataflowSubContainer, ModuleBuilder},
+        builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
         extension::prelude::qb_t,
         ops::{CallIndirect, ExtensionOp, handle::FuncID},
         std_extensions::arithmetic::{
@@ -330,7 +332,7 @@ mod tests {
             int_types::{ConstInt, INT_TYPES},
         },
         std_extensions::collections::array::{ArrayOpBuilder, array_type},
-        types::{Signature, Term},
+        types::{Signature, Term, Type},
     };
 
     fn foo_call(module: &mut ModuleBuilder<Hugr>, t_num: usize) -> FuncID<true> {
@@ -605,5 +607,174 @@ mod tests {
         #[case] dagger: bool,
     ) {
         test_modifier_resolver(target_num, ctrl_num, foo, dagger);
+    }
+
+    #[test]
+    fn quantum_indirect_call_with_function_input_is_unresolvable() {
+        let callee_sig = Signature::new_endo([qb_t()]);
+        let callee_ty = Type::new_function(callee_sig.clone());
+        let foo_sig = Signature::new([qb_t(), callee_ty.clone()], [qb_t()]);
+
+        let mut module = ModuleBuilder::new();
+        let foo = {
+            let mut func = module.define_function("foo", foo_sig).unwrap();
+            func.set_unitary();
+            let [q, callee] = func.input_wires_arr();
+            let q = func
+                .add_dataflow_op(
+                    CallIndirect {
+                        signature: callee_sig.clone(),
+                    },
+                    [callee, q],
+                )
+                .unwrap()
+                .out_wire(0);
+            func.finish_with_outputs([q]).unwrap()
+        };
+
+        let control_op = MODIFIER_EXTENSION
+            .instantiate_extension_op(
+                &CONTROL_OP_ID,
+                [
+                    Term::BoundedNat(1),
+                    Term::new_list([qb_t()]),
+                    Term::new_list([callee_ty.clone()]),
+                ],
+            )
+            .unwrap();
+        let controlled_sig = Signature::new(
+            [array_type(1, qb_t()), qb_t(), callee_ty.clone()],
+            [array_type(1, qb_t()), qb_t()],
+        );
+        let main_sig = Signature::new([callee_ty], [array_type(1, qb_t()), qb_t()]);
+        let mut main = module.define_function("main", main_sig).unwrap();
+        let [callee] = main.input_wires_arr();
+        let foo = main.load_func(foo.handle(), &[]).unwrap();
+        let controlled = main.add_dataflow_op(control_op, [foo]).unwrap().out_wire(0);
+        let control = main
+            .add_dataflow_op(TketOp::QAlloc, [])
+            .unwrap()
+            .out_wire(0);
+        let q = main
+            .add_dataflow_op(TketOp::QAlloc, [])
+            .unwrap()
+            .out_wire(0);
+        let controls = main.add_new_array(qb_t(), [control]).unwrap();
+        let outputs = main
+            .add_dataflow_op(
+                CallIndirect {
+                    signature: controlled_sig,
+                },
+                [controlled, controls, q, callee],
+            )
+            .unwrap()
+            .outputs();
+        main.finish_with_outputs(outputs).unwrap();
+
+        let mut h = module.finish_hugr().unwrap();
+        let entrypoint = h.entrypoint();
+        std::fs::write("path1.mmd", h.mermaid_string()).unwrap();
+        match resolve_modifier_with_entrypoints(&mut h, [entrypoint]) {
+            Err(ModifierResolverErrors::UnResolvable { msg, .. }) => {
+                assert!(msg.contains("chain has no target"));
+            }
+            Err(err) => panic!("expected an unresolvable error, got {err:?}"),
+            Ok(()) => panic!("expected modifier resolution to fail"),
+        }
+    }
+
+    #[test]
+    fn quantum_double_indirect_call_is_unresolvable() {
+        let callee_sig = Signature::new_endo([qb_t()]);
+        let inner_foo_sig = Signature::new([], [Type::new_function(callee_sig.clone())]);
+        let foo_sig = Signature::new([qb_t()], [qb_t()]);
+
+        let mut module = ModuleBuilder::new();
+        let callee = {
+            let func = module
+                .define_function("callee", callee_sig.clone())
+                .unwrap();
+            let [q] = func.input_wires_arr();
+            func.finish_with_outputs([q]).unwrap()
+        };
+        let inner_foo = {
+            let mut func = module
+                .define_function("inner_foo", inner_foo_sig.clone())
+                .unwrap();
+            let callee = func.load_func(callee.handle(), &[]).unwrap();
+            func.finish_with_outputs([callee]).unwrap()
+        };
+        let foo = {
+            let mut func = module.define_function("foo", foo_sig).unwrap();
+            func.set_unitary();
+            let [q] = func.input_wires_arr();
+            let loaded_foo = func.load_func(inner_foo.clone().handle(), &[]).unwrap();
+            let callee = func
+                .add_dataflow_op(
+                    CallIndirect {
+                        signature: inner_foo_sig.clone(),
+                    },
+                    [loaded_foo],
+                )
+                .unwrap()
+                .out_wire(0);
+            let q = func
+                .add_dataflow_op(
+                    CallIndirect {
+                        signature: callee_sig.clone(),
+                    },
+                    [callee, q],
+                )
+                .unwrap()
+                .out_wire(0);
+            func.finish_with_outputs([q]).unwrap()
+        };
+
+        let control_op = MODIFIER_EXTENSION
+            .instantiate_extension_op(
+                &CONTROL_OP_ID,
+                [
+                    Term::BoundedNat(1),
+                    Term::new_list([qb_t()]),
+                    Term::new_list(Vec::<Type>::new()),
+                ],
+            )
+            .unwrap();
+        let controlled_sig =
+            Signature::new([array_type(1, qb_t()), qb_t()], [array_type(1, qb_t()), qb_t()]);
+        let main_sig = Signature::new([], [array_type(1, qb_t()), qb_t()]);
+        let mut main = module.define_function("main", main_sig).unwrap();
+        let foo = main.load_func(foo.handle(), &[]).unwrap();
+        let controlled = main.add_dataflow_op(control_op, [foo]).unwrap().out_wire(0);
+        let control = main
+            .add_dataflow_op(TketOp::QAlloc, [])
+            .unwrap()
+            .out_wire(0);
+        let q = main
+            .add_dataflow_op(TketOp::QAlloc, [])
+            .unwrap()
+            .out_wire(0);
+        let controls = main.add_new_array(qb_t(), [control]).unwrap();
+        let outputs = main
+            .add_dataflow_op(
+                CallIndirect {
+                    signature: controlled_sig,
+                },
+                [controlled, controls, q],
+            )
+            .unwrap()
+            .outputs();
+        main.finish_with_outputs(outputs).unwrap();
+
+        let mut h = module.finish_hugr().unwrap();
+        let entrypoint = h.entrypoint();
+        std::fs::write("path2.mmd", h.mermaid_string()).unwrap();
+        match resolve_modifier_with_entrypoints(&mut h, [entrypoint]) {
+            Err(ModifierResolverErrors::UnResolvable { msg, .. }) => {
+                assert!(msg.contains("Modifier cannot be applied to the node"));
+            }
+            Err(err) => panic!("expected an unresolvable error, got {err:?}"),
+            Ok(()) => panic!("expected modifier resolution to fail"),
+        }
     }
 }
