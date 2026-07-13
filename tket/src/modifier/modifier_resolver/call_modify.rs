@@ -61,10 +61,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         let controls = self.unpack_controls(new_dfg, controls)?;
         *self.controls() = controls;
 
-        // Wire the inputs/outputs using the original signature; controller
-        // information is already represented by `offset`. Inputs handled above
-        // are skipped so connect_all will not also wire the original function
-        // value into the call.
+        // Wire the inputs/outputs using the original signature; `offset` represent controller qubits
         self.wire_node_inout(
             call_node,
             new_call_node,

@@ -613,7 +613,7 @@ impl<N: HugrNode> ModifierResolver<N> {
     ) -> Result<(), ModifierResolverErrors<N>> {
         // If a conditional does not have quantum operations in its body, we can safely
         // copy the whole conditional without modification.
-        // NICOLA TODO: Do we need to check for CallIndirect? Maybe check the modifiers directly?
+        // TODO: Do we need to check for CallIndirect? Maybe just check if there are modifiers?
         let has_indirect_call = h
             .descendants(n)
             .any(|node| matches!(h.get_optype(node), OpType::CallIndirect(_)));
