@@ -2,6 +2,7 @@
 resolver = "3"
 members = [
     "pg-core",
+    "pg-converters/pg-tk",
     ]
 
 [workspace.package]
