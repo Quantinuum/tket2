@@ -1062,7 +1062,6 @@ impl<N: HugrNode> ModifierResolver<N> {
             // We try to place the original operation.
             // TODO: Revisit whether unknown extension operations should return
             // an explicit error instead of falling back to the original operation.
-            // NICOLA TODO: consider adding the error
             self.modify_dataflow_op(h, op_node, optype, new_dfg)
         }
     }
