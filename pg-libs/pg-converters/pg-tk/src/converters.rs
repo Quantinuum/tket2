@@ -788,9 +788,6 @@ pub fn pg_from_tk_json(tk_json: &Value) -> Result<PauliGraph, TKConversionError>
     }
     Ok(pg)
 }
-
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
