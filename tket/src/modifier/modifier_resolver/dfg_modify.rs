@@ -114,7 +114,6 @@ impl<N: HugrNode> ModifierResolver<N> {
                     (new_out, new_in),
                     (output.iter(), input.iter()),
                     (0, 0, offset),
-                    &HashSet::new(),
                 )?;
             }
             OpType::TailLoop(tail_loop) => {
@@ -154,7 +153,6 @@ impl<N: HugrNode> ModifierResolver<N> {
                     (new_out, new_in),
                     (other_outputs.iter(), inputs.iter()),
                     (1, 0, 0),
-                    &HashSet::new(),
                 )?;
             }
             OpType::Case(_) => {
@@ -619,8 +617,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         let has_indirect_call = h
             .descendants(n)
             .any(|node| matches!(h.get_optype(node), OpType::CallIndirect(_)));
-        if !self.subtree_has_quantum_operation(h, n) && !has_indirect_call
-        {
+        if !self.subtree_has_quantum_operation(h, n) && !has_indirect_call {
             self.copy_sub_container_no_modification(h, n, new_dfg)?;
             return Ok(());
         }
@@ -668,7 +665,6 @@ impl<N: HugrNode> ModifierResolver<N> {
                 (new_out, new_in),
                 (conditional.outputs.iter(), conditional.other_inputs.iter()),
                 (0, tag_wire_num, offset),
-                &HashSet::new(),
             )?;
 
             // Modify the children.

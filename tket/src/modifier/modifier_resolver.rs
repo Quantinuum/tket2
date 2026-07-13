@@ -886,7 +886,6 @@ impl<N: HugrNode> ModifierResolver<N> {
             (new_node, new_node),
             (inputs, outputs),
             (input_offset, output_offset, new_offset),
-            &HashSet::new(),
         )
     }
 
@@ -899,7 +898,6 @@ impl<N: HugrNode> ModifierResolver<N> {
             impl Iterator<Item = &'a Type>,
         ),
         (input_offset, output_offset, new_offset): (usize, usize, usize),
-        _skip_inputs: &HashSet<usize>,
     ) -> Result<(), ModifierResolverErrors<N>> {
         let mut old_in_wire = (old_in, IncomingPort::from(input_offset)).into();
         let mut old_out_wire = (old_out, OutgoingPort::from(output_offset)).into();
