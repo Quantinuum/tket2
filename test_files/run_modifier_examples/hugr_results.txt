@@ -59,9 +59,3 @@ subscript_in_dagger_ctrl_solved:
 	1100 -> 0.5+0j
 	1110 -> 0-0.433j
 	1111 -> 0.25+0j
------
-tmp0_solved:
-	000 -> 1+0j
------
-tmp1_solved:
-	00 -> 1+0j
