@@ -163,12 +163,8 @@ impl<N: HugrNode> ModifierResolver<N> {
                         fn_optype.clone(),
                     ));
                 };
-                // SOLVED?
-                // TODO: We want some machinery to prevent generating a lot of copies of modified functions
-                // from the same function.
                 Ok((fn_node, load.clone()))
             }
-            OpType::Input(_) => Err(ModifierError::NoTarget(modifier_node)),
             // If the target is a function, we need to create a new dataflow block of it.
             _ => Err(ModifierError::ModifierNotApplicable(
                 modifier_node,
@@ -653,7 +649,11 @@ mod tests {
         let entrypoint = h.entrypoint();
         match resolve_modifier_with_entrypoints(&mut h, [entrypoint]) {
             Err(ModifierResolverErrors::UnResolvable { msg, .. }) => {
-                assert!(msg.contains("chain has no target"));
+                assert!(
+                    msg.strip_prefix("Modifier cannot be applied to the node")
+                        .and_then(|node| node.strip_suffix("of type Input"))
+                        .is_some()
+                );
             }
             Err(err) => panic!("expected an unresolvable error, got {err:?}"),
             Ok(()) => panic!("expected modifier resolution to fail"),
@@ -749,7 +749,11 @@ mod tests {
         let entrypoint = h.entrypoint();
         match resolve_modifier_with_entrypoints(&mut h, [entrypoint]) {
             Err(ModifierResolverErrors::UnResolvable { msg, .. }) => {
-                assert!(msg.contains("Modifier cannot be applied to the node"));
+                assert!(
+                    msg.strip_prefix("Modifier cannot be applied to the node")
+                        .and_then(|node| node.strip_suffix("of type CallIndirect"))
+                        .is_some()
+                );
             }
             Err(err) => panic!("expected an unresolvable error, got {err:?}"),
             Ok(()) => panic!("expected modifier resolution to fail"),
