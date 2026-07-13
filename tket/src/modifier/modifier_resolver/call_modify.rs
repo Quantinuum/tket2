@@ -210,20 +210,6 @@ impl<N: HugrNode> ModifierResolver<N> {
             return Ok(());
         }
 
-        // // NICOLA TODO: try without the input check?
-        // // If the target is a function input, we cannot solve the modifier chain here.
-        // // Instead, we record the modifiers to be applied to that input and propagate
-        // // the requirement to callers.
-        // if matches!(h.get_optype(targ), OpType::Input(_)) {
-        //     panic!("§§§§§§§§§§§§§§§§§§§§ SHOULD NOT BE HERE §§")
-        //     // NICOLA TODO: Here we dont need the indirect call, no quantum dynamic function are allowed
-        //     // *self.modifiers_mut() = modifiers;
-        //     // return self.modify_input_indirect_call(n, chain_tail.1.index(), indir_call, new_dfg);
-        // }
-
-        // TODO add a test where we have quantum indirect call with a function input, to ensure that the proper error is raised.
-        // add also a test where we have 2 consecutive indirect calls, the second one must have quantum effects
-
         // If the function has quantum effects, we expect it to be a LoadFunction node loading the function to call,
         // otherwise the quantum function is not statically known and is modifiable.
         let (func, load) =
@@ -231,14 +217,6 @@ impl<N: HugrNode> ModifierResolver<N> {
 
         // The function has quantum effects, thus we need to modify it.
         let modified_fn = self.modify_fn(h, func).map_err(wrap_resolver_err)?;
-        // NICOLA TODO if needed may be useless? after the check at the top
-        // let Some(modified_fn) = self
-        //     .modify_fn_if_needed(h, func, Some(&indir_call.signature), trace.len() > 1)
-        //     .map_err(wrap_resolver_err)?
-        // else {
-        //     self.add_node_no_modification(h, n, indir_call.clone(), new_dfg)?;
-        //     return Ok(());
-        // };
 
         // Make new LoadFunction
         let mut modified_sig = load.func_sig.clone();
@@ -673,7 +651,6 @@ mod tests {
 
         let mut h = module.finish_hugr().unwrap();
         let entrypoint = h.entrypoint();
-        std::fs::write("path1.mmd", h.mermaid_string()).unwrap();
         match resolve_modifier_with_entrypoints(&mut h, [entrypoint]) {
             Err(ModifierResolverErrors::UnResolvable { msg, .. }) => {
                 assert!(msg.contains("chain has no target"));
@@ -740,8 +717,10 @@ mod tests {
                 ],
             )
             .unwrap();
-        let controlled_sig =
-            Signature::new([array_type(1, qb_t()), qb_t()], [array_type(1, qb_t()), qb_t()]);
+        let controlled_sig = Signature::new(
+            [array_type(1, qb_t()), qb_t()],
+            [array_type(1, qb_t()), qb_t()],
+        );
         let main_sig = Signature::new([], [array_type(1, qb_t()), qb_t()]);
         let mut main = module.define_function("main", main_sig).unwrap();
         let foo = main.load_func(foo.handle(), &[]).unwrap();
@@ -768,7 +747,6 @@ mod tests {
 
         let mut h = module.finish_hugr().unwrap();
         let entrypoint = h.entrypoint();
-        std::fs::write("path2.mmd", h.mermaid_string()).unwrap();
         match resolve_modifier_with_entrypoints(&mut h, [entrypoint]) {
             Err(ModifierResolverErrors::UnResolvable { msg, .. }) => {
                 assert!(msg.contains("Modifier cannot be applied to the node"));
