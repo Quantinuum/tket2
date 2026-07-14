@@ -1008,23 +1008,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         self.map_insert(Wire::new(n, 0).into(), Wire::new(output, 0).into())
     }
 
-    /// Copy the dataflow operation to the new function.
-    /// These are the operations that are not modified by the modifier.
-    fn modify_dataflow_op(
-        &mut self,
-        h: &impl HugrMut<Node = N>,
-        n: N,
-        optype: &OpType,
-        new_dfg: &mut impl Container,
-    ) -> Result<(), ModifierResolverErrors<N>> {
-        let node = new_dfg.add_child_node(optype.clone());
-        let signature = h.signature(n).unwrap();
-        let inputs = signature.input.iter();
-        let outputs = signature.output.iter();
-        self.wire_node_inout(n, node, (inputs, outputs), (0, 0, 0))?;
-        Ok(())
-    }
-
     fn modify_extension_op(
         &mut self,
         h: &impl HugrMut<Node = N>,
@@ -1058,9 +1041,11 @@ impl<N: HugrNode> ModifierResolver<N> {
         } else {
             // Some other Hugr extension operation.
             // Here, we do not know what is the modified version.
-            // We try to place the original operation.
-            // TODO: raise an error
-            self.modify_dataflow_op(h, op_node, optype, new_dfg)
+            Err(ModifierResolverErrors::unresolvable(
+                op_node,
+                "unknown extension operation.",
+                optype.clone(),
+            ))
         }
     }
 
@@ -2183,6 +2168,101 @@ mod tests {
         assert_matches!(
             result,
             Err(ModifierResolverErrors::PowerModifierNotSupported { node: _ })
+        );
+    }
+
+    #[test]
+    /// Test that a function containing an unknown extension op returns an
+    /// [`ModifierResolverErrors::UnResolvable`] error.
+    fn unknown_extension_op_in_modified_function_returns_error() {
+        use hugr::extension::{ExtensionId, Version};
+        use hugr_core::Extension;
+        use std::sync::Arc;
+
+        // Build a minimal custom extension.
+        let unknown_ext: Arc<Extension> = Extension::new_arc(
+            ExtensionId::new_unchecked("test.unknown_modifier_ext"),
+            Version::new(0, 0, 1),
+            |ext, ext_ref| {
+                ext.add_op(
+                    "UnknownQubitOp".into(),
+                    String::new(),
+                    Signature::new_endo(vec![qb_t()]),
+                    ext_ref,
+                )
+                .unwrap();
+            },
+        );
+        let unknown_op = unknown_ext
+            .instantiate_extension_op("UnknownQubitOp", [])
+            .unwrap();
+
+        let mut module = ModuleBuilder::new();
+
+        let foo = {
+            let mut func = module
+                .define_function("foo", Signature::new_endo(vec![qb_t()]))
+                .unwrap();
+            let inputs: Vec<Wire> = func.input_wires().collect();
+            let qubit = func
+                .add_dataflow_op(unknown_op, inputs)
+                .unwrap()
+                .out_wire(0);
+            func.finish_with_outputs([qubit]).unwrap()
+        };
+
+        let ctrl_num = 1u64;
+        let controlled_sig = Signature::new_endo(vec![array_type(ctrl_num, qb_t()), qb_t()]);
+        let main_sig = Signature::new(type_row![], vec![array_type(ctrl_num, qb_t()), qb_t()]);
+        let control_op: ExtensionOp = MODIFIER_EXTENSION
+            .instantiate_extension_op(
+                &CONTROL_OP_ID,
+                [
+                    Term::BoundedNat(ctrl_num),
+                    vec![qb_t().into()].into(),
+                    vec![].into(),
+                ],
+            )
+            .unwrap();
+
+        {
+            let mut func = module.define_function("main", main_sig).unwrap();
+            let loaded = func.load_func(foo.handle(), &[]).unwrap();
+            let modified_fn = func
+                .add_dataflow_op(control_op, vec![loaded])
+                .unwrap()
+                .out_wire(0);
+            let control = func
+                .add_dataflow_op(TketOp::QAlloc, vec![])
+                .unwrap()
+                .out_wire(0);
+            let target = func
+                .add_dataflow_op(TketOp::QAlloc, vec![])
+                .unwrap()
+                .out_wire(0);
+            let control_arr = func.add_new_array(qb_t(), [control]).unwrap();
+            let outputs = func
+                .add_dataflow_op(
+                    CallIndirect {
+                        signature: controlled_sig,
+                    },
+                    [modified_fn, control_arr, target],
+                )
+                .unwrap()
+                .outputs();
+            func.finish_with_outputs(outputs).unwrap();
+        }
+
+        let mut h = module.finish_hugr().unwrap();
+        assert_matches!(h.validate(), Ok(()));
+
+        let entrypoint = h.entrypoint();
+        let result = resolve_modifier_with_entrypoints(&mut h, [entrypoint]);
+        assert_matches!(
+            result,
+            Err(ModifierResolverErrors::UnResolvable { node: _, msg, optype: _ }) => {
+                assert_eq!(msg, "unknown extension operation.");
+            }
         );
     }
 }
