@@ -91,7 +91,7 @@
 //! We also should not forget to connect `fneg` to `Rx` in the new graph, whose edge/wires has
 //! no correspondence in the original graph.
 //!
-//! ## Not supported/TODO cases
+//! ## Not supported:
 //! - Power: Power modifier is not supported at this point.
 //! - Dagger of non-trivial CFGs: We cannot support dagger for complicated CFGs
 //!   since it is not clear at all whether we should reverse the control flow or not.
@@ -103,7 +103,7 @@
 //!   in any case.
 //!   This won't be manageable if dagger is applied, but if not, it should be handled in the future.
 //! - User defined extension ops: There is no way to infer modified unknown extension ops.
-//!   We currently raise an error if an unkown extension is found.
+//!   We currently raise an error if an unknown extension is found.
 use fxhash::FxHashSet;
 use itertools::{Either, Itertools};
 use std::{
@@ -1032,7 +1032,6 @@ impl<N: HugrNode> ModifierResolver<N> {
             );
             Ok(())
         } else if Modifier::from_optype(optype).is_some() {
-            // TODO: check if this is ok.
             self.forget_node(h, op_node)
         } else if self.modify_array_op(h, op_node, optype, new_dfg)?
             || self.try_array_convert(h, op_node, optype, new_dfg)?
@@ -1339,10 +1338,6 @@ pub fn resolve_modifier_with_entrypoints_and_scope(
     // (e.g. intermediate nodes in a chain whose last modifier was the one rewritten).
     // Walk the same reachable set again and delete any surviving modifier nodes,
     // together with every downstream node that consumes their output.
-    // TODO:
-    // This might be insufficient as a cleanup since the resolution procedure might
-    // generate nodes that are not reachable from the entry points.
-    // If more thorough cleanup is needed, we should run dead code elimination.
     let mut deletelist = entry_points.clone();
     let mut visited = FxHashSet::default();
     while let Some(node) = deletelist.pop_front() {
@@ -1372,26 +1367,7 @@ pub fn resolve_modifier_with_entrypoints_and_scope(
             }
         }
     }
-    // Alternatively, we can just remove all the modifiers in the graph.
-    // let entry_points = vec![h.module_root()];
-    // for entry_point in entry_points.clone() {
-    //     let descendants = h.descendants(entry_point).collect::<Vec<_>>();
-    //     for node in descendants {
-    //         if !h.contains_node(node) {
-    //             continue;
-    //         }
-    //         let optype = h.get_optype(node);
-    //         if Modifier::from_optype(optype).is_some() {
-    //             let mut l = vec![node];
-    //             while let Some(n) = l.pop() {
-    //                 l.extend(h.output_neighbours(n));
-    //                 h.remove_node(n);
-    //             }
-    //         }
-    //     }
-    // }
 
-    // TODO: This as well.
     // Ad hoc cleanup procedure: remove any dangling global-phase nodes that
     // were produced or left behind by the resolution passes above.
     delete_phase(h, entry_points)?;
