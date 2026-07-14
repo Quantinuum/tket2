@@ -255,8 +255,8 @@ fn tableau_to_tk(tableau_data: &TableauData, n_qubits: usize) -> Value {
                 "nqubits": n_qubits,
                 "nrows": n_qubits * 2,
                 "phase": phases,
-                "xmat": &[x_xbits, x_zbits].concat(),
-                "zmat": &[z_xbits, z_zbits].concat(),
+                "xmat": &[x_xbits, z_xbits].concat(),
+                "zmat": &[x_zbits, z_zbits].concat(),
             }
         }
     });
@@ -677,6 +677,7 @@ pub fn pg_from_tk_json(tk_json: &Value) -> Result<PauliGraph, TKConversionError>
                         tab_width, n_qubits
                     )));
                 }
+                // x bits. x outputs followed by z outputs.
                 let xmat = tab
                     .get("xmat")
                     .and_then(Value::as_array)
@@ -704,6 +705,7 @@ pub fn pg_from_tk_json(tk_json: &Value) -> Result<PauliGraph, TKConversionError>
                             .collect::<Result<Vec<bool>, TKConversionError>>()
                     })
                     .collect::<Result<Vec<Vec<bool>>, TKConversionError>>()?;
+                // z bits. x outputs followed by z outputs.
                 let zmat = tab
                     .get("zmat")
                     .and_then(Value::as_array)
@@ -758,8 +760,8 @@ pub fn pg_from_tk_json(tk_json: &Value) -> Result<PauliGraph, TKConversionError>
                 let mut z_outputs = Vec::with_capacity(n_qubits);
                 for i in 0..n_qubits {
                     let x_output_xbits = &xmat[i];
-                    let x_output_zbits = &xmat[i + n_qubits];
-                    let z_output_xbits = &zmat[i];
+                    let z_output_xbits = &xmat[i + n_qubits];
+                    let x_output_zbits = &zmat[i];
                     let z_output_zbits = &zmat[i + n_qubits];
                     // tket produces true for -1 phase
                     let x_output_phase = !phases[i];
@@ -788,6 +790,7 @@ pub fn pg_from_tk_json(tk_json: &Value) -> Result<PauliGraph, TKConversionError>
     }
     Ok(pg)
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
