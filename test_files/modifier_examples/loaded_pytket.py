@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#    "guppylang"
+#    "guppylang==1.0.0rc1",
 # ]
 # ///
 """Testing modifier on a loaded pytket circuit"""
@@ -41,5 +41,5 @@ def main() -> None:
     discard(c)
 
 
-program = main.compile()
+program = main.with_minimal_opt().compile()
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())

@@ -34,6 +34,9 @@ use crate::passes::{ComposablePass, PassScope};
 mod linearize;
 pub use linearize::{CallbackHandler, DelegatingLinearizer, LinearizeError, Linearizer};
 
+pub mod metadata;
+pub use metadata::MetadataPropagationPolicy;
+
 /// A recipe for creating a dataflow Node - as a new child of a [`DataflowParent`]
 /// or in order to replace an existing node.
 ///
@@ -160,6 +163,11 @@ impl NodeTemplate {
     ) -> Result<(), ReplaceTypesError> {
         let ef = |e| ReplaceTypesError::AddTemplateError(n, Box::new(e));
         assert_eq!(hugr.children(n).count(), 0);
+        // Snapshot the original optype for the metadata propagation policy.  Will be
+        // None for a SingleOp replacement, indicating that there is no container to
+        // propagate into.
+        let old_optype = (!matches!(self, NodeTemplate::SingleOp(_)) && !rt.meta_policy.is_empty())
+            .then(|| hugr.get_optype(n).clone());
         let (new_optype, static_source, static_inport) = match self {
             NodeTemplate::SingleOp(op_type) => {
                 if op_type.static_input_port().is_some() {
@@ -228,6 +236,15 @@ impl NodeTemplate {
             if let Some(static_source) = static_source {
                 hugr.connect(static_source, 0, n, static_inport);
             }
+        }
+        // Apply the metadata propagation policy *before* recursing into the
+        // replacement subtree. This way, if an inner op is itself replaced by a
+        // further container, the metadata propagated onto that inner op will be
+        // observed as the "old" metadata when the nested replacement runs its
+        // own policy — so the chain A -> C -> D propagates correctly all the
+        // way down to D's descendants.
+        if let Some(old_optype) = old_optype.as_ref() {
+            rt.meta_policy.apply(hugr, n, old_optype);
         }
         rt.process_subtree_opts(hugr, n, opts)?;
         Ok(())
@@ -336,12 +353,14 @@ pub struct ReplaceTypes {
         Arc<dyn Fn(&OpaqueValue, &ReplaceTypes) -> Result<Option<Value>, ReplaceTypesError>>,
     >,
     scope: Either<PassScope, Vec<Node>>,
+    meta_policy: MetadataPropagationPolicy,
 }
 
 impl Default for ReplaceTypes {
     fn default() -> Self {
         let mut res = Self::new_empty();
         res.linearize = DelegatingLinearizer::default();
+        res.meta_policy = MetadataPropagationPolicy::default();
         res.replace_consts_parametrized(array_type_def(), handlers::array_const);
         res.replace_consts_parametrized(list_type_def(), list_const);
         res
@@ -405,6 +424,7 @@ impl ReplaceTypes {
             // Not really clear what "preserve" means for a pass that changes signatures,
             // but default to running on whole hugr not just entrypoint.
             scope: Either::Left(PassScope::default()),
+            meta_policy: MetadataPropagationPolicy::empty(),
         }
     }
 
@@ -489,6 +509,18 @@ impl ReplaceTypes {
     /// [Self::set_replace_parametrized_op])
     pub fn get_linearizer(&self) -> &impl Linearizer {
         &self.linearize
+    }
+
+    /// Sets the metadata propagation policy used when an op is replaced by a
+    /// container. See [`MetadataPropagationPolicy`] for details.
+    pub fn set_metadata_policy(&mut self, policy: MetadataPropagationPolicy) {
+        self.meta_policy = policy;
+    }
+
+    /// Returns a mutable reference to the metadata propagation policy, for
+    /// incremental customisation (e.g. adding rules to the default policy).
+    pub fn metadata_policy_mut(&mut self) -> &mut MetadataPropagationPolicy {
+        &mut self.meta_policy
     }
 
     /// Configures this instance to change occurrences of `src` to `dest`.
@@ -837,7 +869,7 @@ impl From<&OpDef> for ParametricOp {
 }
 
 #[cfg(test)]
-mod test {
+pub(super) mod test {
     use std::sync::Arc;
 
     use crate::passes::replace_types::handlers::generic_array_const;
@@ -877,25 +909,25 @@ mod test {
 
     use super::{NodeTemplate, ReplaceTypes, handlers::list_const};
 
-    const PACKED_VEC: &str = "PackedVec";
-    const READ: &str = "read";
+    pub(super) const PACKED_VEC: &str = "PackedVec";
+    pub(super) const READ: &str = "read";
 
-    fn i64_t() -> Type {
+    pub(super) fn i64_t() -> Type {
         INT_TYPES[6].clone()
     }
 
-    fn read_op(ext: &Arc<Extension>, t: Type) -> ExtensionOp {
+    pub(super) fn read_op(ext: &Arc<Extension>, t: Type) -> ExtensionOp {
         ExtensionOp::new(ext.get_op(READ).unwrap().clone(), [t.into()]).unwrap()
     }
 
-    fn just_elem_type(args: &[TypeArg]) -> Type {
+    pub(super) fn just_elem_type(args: &[TypeArg]) -> Type {
         let [elem_term] = args else {
             panic!("Expected just elem type")
         };
         elem_term.clone().try_into().unwrap()
     }
 
-    fn ext() -> Arc<Extension> {
+    pub(super) fn ext() -> Arc<Extension> {
         Extension::new_arc(
             IdentList::new("TestExt").unwrap(),
             Version::new(0, 0, 1),
@@ -935,7 +967,7 @@ mod test {
         )
     }
 
-    fn lowered_read<T: Container + Dataflow>(
+    pub(super) fn lowered_read<T: Container + Dataflow>(
         elem_ty: Type,
         new: impl Fn(Signature) -> Result<T, BuildError>,
     ) -> T {
@@ -966,7 +998,7 @@ mod test {
         dfb
     }
 
-    fn lowerer(ext: &Arc<Extension>) -> ReplaceTypes {
+    pub(super) fn lowerer(ext: &Arc<Extension>) -> ReplaceTypes {
         let pv = ext.get_type(PACKED_VEC).unwrap();
         let mut lw = ReplaceTypes::default();
         lw.set_replace_type(pv.instantiate([bool_t().into()]).unwrap(), i64_t());

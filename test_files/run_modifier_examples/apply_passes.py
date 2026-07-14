@@ -1,4 +1,4 @@
-from tket.passes import ModifierResolverPass, NormalizeGuppy
+from tket.passes import ModifierResolverPass, Normalize
 from hugr.build.base import Hugr
 from pathlib import Path
 import sys
@@ -6,7 +6,7 @@ from tket._state import CompilationState
 
 
 mr_pass = ModifierResolverPass()
-normalize = NormalizeGuppy()
+normalize = Normalize()
 
 
 def _hugr_from_path(str_path: str) -> Hugr:

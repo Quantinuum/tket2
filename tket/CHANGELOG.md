@@ -1,6 +1,41 @@
 # Changelog
 
 
+## [0.21.1](https://github.com/Quantinuum/tket2/compare/tket-v0.21.0...tket-v0.21.1) - 2026-07-09
+
+### Bug Fixes
+
+- Modifier pass trying to connect outputs to outputs ([#1769](https://github.com/Quantinuum/tket2/pull/1769))
+- RedundantOrderEdges pass finding loops when there are none ([#1768](https://github.com/Quantinuum/tket2/pull/1768))
+- ModifierResolverPass generates loops in DFG ([#1777](https://github.com/Quantinuum/tket2/pull/1777))
+- merge_basic_blocks keeps Order edges ([#1782](https://github.com/Quantinuum/tket2/pull/1782))
+- IndirectCall nodes solving in ModifierResolverPass ([#1784](https://github.com/Quantinuum/tket2/pull/1784))
+- prevent Constant Folding disconnecting linear outputs even if constant ([#1793](https://github.com/Quantinuum/tket2/pull/1793))
+- NormalizeCFGs: no need to add Order edges for new Ext edges ([#1813](https://github.com/Quantinuum/tket2/pull/1813))
+- ModifierResolverPass preserve function edges into classical DAG ([#1792](https://github.com/Quantinuum/tket2/pull/1792))
+- `ModifierResolverErrors::UnResolvable` display error message ([#1808](https://github.com/Quantinuum/tket2/pull/1808))
+- ModifierPasses producing invalid hugr with non quantum DAG ([#1817](https://github.com/Quantinuum/tket2/pull/1817))
+
+### New Features
+
+- Improve InlineFuncs size heuristic ([#1771](https://github.com/Quantinuum/tket2/pull/1771))
+- Target platform option in PytketHugrPass ([#1787](https://github.com/Quantinuum/tket2/pull/1787))
+- Decode global phases from pytket circuits ([#1816](https://github.com/Quantinuum/tket2/pull/1816))
+
+### Performance
+
+- Improve rule evaluation order in dataflow analysis ([#1806](https://github.com/Quantinuum/tket2/pull/1806))
+- Pre-compute edge neighbours in dataflow analysis ([#1805](https://github.com/Quantinuum/tket2/pull/1805))
+
+### Refactor
+
+- Deleted redundant modifier guppy tests files ([#1737](https://github.com/Quantinuum/tket2/pull/1737))
+- [**breaking**] remove `ModifierFlags` logic from modifier and `dfg_modify` modules ([#1809](https://github.com/Quantinuum/tket2/pull/1809))
+
+### Testing
+
+- Added a test for PyTket loaded circuits ([#1738](https://github.com/Quantinuum/tket2/pull/1738))
+
 ## [0.21.0](https://github.com/Quantinuum/tket2/compare/tket-v0.20.0...tket-v0.21.0) - 2026-06-29
 
 ### Bug Fixes

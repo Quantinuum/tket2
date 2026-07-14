@@ -142,7 +142,16 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
         assert_eq!(root_descs.next(), Some(root), "Could not skip root");
         let wires_to_break = root_descs
             .filter(|n| !hugr.get_optype(*n).is_load_constant()) // no point in adding another Const!
-            .flat_map(|n| hugr.out_value_types(n).map(move |(outp, _ty)| (n, outp)))
+            .flat_map(|n| {
+                hugr.out_value_types(n)
+                    // Do not consider breaking wires from outports of linear type.
+                    // The `filter` here is overly conservative: see
+                    // https://github.com/Quantinuum/tket2/issues/1794,
+                    // https://github.com/Quantinuum/tket2/issues/1795,
+                    // https://github.com/Quantinuum/tket2/issues/1796
+                    .filter(|(_, ty)| ty.copyable())
+                    .map(move |(outp, _)| (n, outp))
+            })
             .filter_map(|(src, outp)| {
                 hugr.linked_inputs(src, outp).next()?; // Skip unconnected outputs
                 Some((

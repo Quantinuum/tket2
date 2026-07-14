@@ -5,7 +5,6 @@ Examples:
     >>> from tket.metadata import (
     ...     MaxQubitsHint,
     ...     PytketInputParameters,
-    ...     PytketPhaseExpr,
     ...     PytketQubitRegisterNames,
     ... )
     >>>
@@ -15,7 +14,6 @@ Examples:
     >>> node.metadata[MaxQubitsHint] = 3
     >>> node.metadata[PytketInputParameters] = ["theta", "phi"]
     >>> node.metadata[PytketQubitRegisterNames] = [("q", [0]), ("ancilla", [1])]
-    >>> node.metadata[PytketPhaseExpr] = "1/2"
     >>> node.metadata[MaxQubitsHint]
     3
     >>> node.metadata.get(PytketQubitRegisterNames)
@@ -26,6 +24,7 @@ Examples:
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal, TypeAlias, TypedDict
+from typing_extensions import deprecated
 
 from hugr.metadata import Metadata
 
@@ -158,8 +157,13 @@ class PytketQubitRegisterNames(Metadata[list[PytketQubit]]):
         return _read_pytket_register(cls.KEY, value)
 
 
+@deprecated("Call `used_extensions` on the hugr instead.")
 class PytketPhaseExpr(Metadata[str]):
-    """Metadata key for the serialized pytket global phase expression."""
+    """Metadata key for the serialized pytket global phase expression.
+
+    Deprecated:
+        Use explicit ``tket.global_phase`` operations instead.
+    """
 
     KEY = _metadata.PYTKET_PHASE_EXPR
 

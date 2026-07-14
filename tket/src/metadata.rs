@@ -116,9 +116,18 @@ impl Metadata for PytketQubitRegisterNames {
     type Type<'hugr> = Vec<Qubit>;
 }
 
-/// Metadata key for the global phase
+/// Metadata key for the serialized pytket global phase expression.
+///
+/// Deprecated: global phases are now represented as explicit
+/// `tket.global_phase` operations. This definition is left for
+/// compatibility with older Hugrs.
+#[deprecated(
+    since = "0.21.1",
+    note = "use explicit tket.global_phase operations instead"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PytketPhaseExpr;
+#[expect(deprecated, reason = "the impl is retained for legacy HUGR metadata")]
 impl Metadata for PytketPhaseExpr {
     const KEY: &'static str = "TKET1.phase";
     type Type<'hugr> = &'hugr str;
