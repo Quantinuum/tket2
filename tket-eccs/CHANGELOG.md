@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.7.0](https://github.com/Quantinuum/tket2/compare/tket-eccs-v0.6.0...tket-eccs-v0.7.0) (2026-07-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* Updated public dependency `hugr` to `0.28.0`
+
+### Features
+
+* Upgrade hugr dependency to 0.28.0 ([#1580](https://github.com/Quantinuum/tket2/issues/1580)) ([68e7fd7](https://github.com/Quantinuum/tket2/commit/68e7fd76705f3e221deaeea9b602c16ec9c6046b))
+
 ## [0.6.0](https://github.com/Quantinuum/tket2/compare/tket-eccs-v0.5.1...tket-eccs-v0.6.0) (2026-06-11)
 
 
