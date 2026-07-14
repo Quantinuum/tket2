@@ -637,7 +637,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         node
     }
 
-    /// connects all the wires in the builder.
+    /// Connects all the wires in the builder.
     fn connect_all(
         &mut self,
         h: &impl HugrView<Node = N>,
@@ -647,7 +647,8 @@ impl<N: HugrNode> ModifierResolver<N> {
         for out_node in h.children(parent) {
             for out_port in h.node_outputs(out_node) {
                 if let Some(EdgeKind::StateOrder) = h.get_optype(out_node).port_kind(out_port) {
-                    // TODO: Currently, we just ignore StateOrder edges.
+                    // NICOLA TODO: Open an issue, discuss with Alan
+                    // Currently, we just ignore StateOrder edges.
                     // This might be OK when the dagger is applied since StateOrder is not managable then.
                     // However, if not, we should preserve the StateOrder edges.
                     // This could be done in two ways:
@@ -670,11 +671,7 @@ impl<N: HugrNode> ModifierResolver<N> {
 }
 
 impl<N: HugrNode> ModifierResolver<N> {
-    // FIXME: Shouldn't we check that there is a caller of the modified function?
-    // We don't want to modify a function that is loaded and modified but never called.
-    // When more than one modifier is chained, after the last modifier is resolved,
-    // we delete the last modifier node, but the previous modifiers are not deleted.
-    // If the second last modifier was only called by the last modifier, that will not be called anymore.
+    // NICOLA: I would like not to do deadcode elimination here
     fn verify(&self, h: &impl HugrView<Node = N>, n: N) -> Result<(), ModifierError<N>> {
         // Check if the node is a modifier, modifying an operation.
         let optype = h.get_optype(n);
@@ -870,7 +867,7 @@ impl<N: HugrNode> ModifierResolver<N> {
     /// - input: [out0:qubit, in1:int, out1:array[qubit, _], in4:int]
     /// - output: [in0:qubit, in2:qubit, in3:qubit]
     ///
-    /// FIXME: This reverses everything that can contain qubits, which might not be intended in general.
+    /// This reverses everything that can contain qubits.
     /// TODO: Handle state order edges.
     fn wire_node_inout<'a>(
         &mut self,

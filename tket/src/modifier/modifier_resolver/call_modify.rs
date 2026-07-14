@@ -245,9 +245,9 @@ impl<N: HugrNode> ModifierResolver<N> {
         new_dfg.hugr_mut().connect(new_load, 0, new_call_node, 0);
         self.map_insert_none((n, IncomingPort::from(0)).into())?;
 
-        // FIXME: Forgetting all the nodes in the chain so that we don't have to worry about mapping the edges.
+        // Forgetting all the nodes in the chain so that we don't have to worry about mapping the edges.
         // Otherwise, there would be edges in the original graph that have no corresponding edges in the new graph.
-        // However, this could remove wires referenced by other nodes that are not in the chain.
+        // NOTE: this could remove wires referenced by other nodes that are not in the chain.
         for node in trace {
             self.forget_node(h, node)?
         }
