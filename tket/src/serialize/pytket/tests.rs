@@ -1166,6 +1166,39 @@ fn decode_global_phase_attribute_and_command() {
     );
 }
 
+#[test]
+fn decode_set_bits_as_bool_constants() {
+    let ser: SerialCircuit = serde_json::from_str(
+        r#"{
+        "phase": "0",
+        "bits": [["c", [0]], ["c", [1]]],
+        "qubits": [],
+        "commands": [
+            {
+                "args": [["c", [0]], ["c", [1]]],
+                "op": {
+                    "type": "SetBits",
+                    "classical": {"values": [true, false]}
+                }
+            }
+        ],
+        "implicit_permutation": []
+    }"#,
+    )
+    .unwrap();
+
+    let hugr = ser.decode(DecodeOptions::new()).unwrap();
+    hugr.validate().unwrap();
+    check_no_tk1_ops(&hugr);
+
+    let constants = hugr
+        .nodes()
+        .filter_map(|node| hugr.get_optype(node).as_const())
+        .map(|constant| constant.value().clone())
+        .collect_vec();
+    assert_eq!(constants, [Value::true_val(), Value::false_val()]);
+}
+
 /// Test parameter to select which decoders/encoders to enable.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CircuitRoundtripTestConfig {
