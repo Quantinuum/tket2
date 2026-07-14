@@ -1,7 +1,7 @@
 //! Try to delete modifier by applying the modifier to each component.
 //!
 //! The entry point of this module is [`resolve_modifier_with_entrypoints`]
-//! which takes a hugraph and a list of entry points.
+//! which takes a hugr and a list of entry points.
 //! Modifier resolver visits all the nodes reachable from the entry points.
 //!
 //! The main struct [`ModifierResolver`] holds the state during the process,
@@ -11,7 +11,7 @@
 //!
 //! A modifier is assumed to be applied to a loaded function
 //! and called directly exactly once by another modifier or
-//! an `IndirectedCall` node.
+//! an `IndirectCall` node.
 //! That is, the following structure is assumed:
 //! ```text
 //! LoadFunction -> Modifier* -> IndirectedCall
@@ -35,6 +35,8 @@
 //! and a builder `new_dfg` to construct the new graph.
 //! The correspondence map (`corresp_map`) keeps the correspondence
 //! from wires in `h` to wires in `new_dfg`.
+//! The `call_map` keeps track of the calls to the modified function, so that we can connect
+//! the modified function to its callers after the resolution.
 //! See `modify_op`, which is the main function that modifies each node.
 //!
 //! During the resolution, when a node with some data flow included (such as a function) is encountered,
@@ -91,18 +93,17 @@
 //!
 //! ## Not supported/TODO cases
 //! - Power: Power modifier is not supported at this point.
-//! - Non-trivial CFGs: We cannot support dagger for complicated CFGs
+//! - Dagger of non-trivial CFGs: We cannot support dagger for complicated CFGs
 //!   since it is not clear at all whether we should reverse the control flow or not.
 //!   Currently, when any non-trivial cfg with more than one block is encountered during
-//!   the resolution, an error is returned.
+//!   the resolution under a daggered context, an error is returned.
 //! - Branching in modifier chain: As noted above, we assume that a modifier is
 //!   chained linearly.
 //! - StateOrder edge: Currently, the modified function does not contain StateOrder edges
 //!   in any case.
 //!   This won't be manageable if dagger is applied, but if not, it should be handled in the future.
 //! - User defined extension ops: There is no way to infer modified unknown extension ops.
-//!   We currently try to insert the original optype without any modification,
-//!   but this could result in an unexpected error.
+//!   We currently raise an error if an unkown extension is found.
 use fxhash::FxHashSet;
 use itertools::{Either, Itertools};
 use std::{
@@ -133,7 +134,7 @@ use hugr::{
     types::{EdgeKind, FuncTypeBase, Signature, Type},
 };
 
-/// A wire of eigher direction.
+/// A wire of either direction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct DirWire<N = Node>(N, Port);
 
@@ -1058,8 +1059,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             // Some other Hugr extension operation.
             // Here, we do not know what is the modified version.
             // We try to place the original operation.
-            // TODO: Revisit whether unknown extension operations should return
-            // an explicit error instead of falling back to the original operation.
+            // TODO: raise an error
             self.modify_dataflow_op(h, op_node, optype, new_dfg)
         }
     }
