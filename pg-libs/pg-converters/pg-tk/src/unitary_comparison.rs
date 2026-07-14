@@ -183,7 +183,7 @@ pub fn compare_unitaries_via_tk(first: &PauliGraph, second: &PauliGraph) -> bool
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pg_core::{GateData, GateType, Op, Pauli, PauliGraph, RotationData};
+    use pg_core::{GateData, GateType, Op, Pauli, PauliGraph, RotationData, TableauData};
 
     #[test]
     fn test_compare_identities_via_tk() {
@@ -219,16 +219,22 @@ mod tests {
     }
 
     #[test]
-    fn test_compare_unitaries_via_tk_reuses_worker() {
-        let identity = PauliGraph::new(1);
-        let mut h = PauliGraph::new(1);
-        h.add_op(Op::Gate {
-            data: GateData::new(GateType::H, vec![0]),
-        });
-
-        for _ in 0..5 {
-            assert!(compare_unitaries_via_tk(&identity, &identity));
-            assert!(!compare_unitaries_via_tk(&h, &identity));
-        }
+    fn test_compare_tableaux() {
+        let pg0 = PauliGraph::new(2).with_ops(vec![Op::Tableau {
+            data: TableauData::new(
+                vec![
+                    (vec![Pauli::Z, Pauli::I], false),
+                    (vec![Pauli::I, Pauli::Z], true),
+                ],
+                vec![
+                    (vec![Pauli::X, Pauli::I], true),
+                    (vec![Pauli::I, Pauli::X], true),
+                ],
+            ),
+        }]);
+        let pg1 = PauliGraph::new(2).with_ops(vec![Op::Gate {
+            data: GateData::new(GateType::X, vec![0]),
+        }]);
+        assert!(compare_unitaries_via_tk(&pg0, &pg1));
     }
 }
