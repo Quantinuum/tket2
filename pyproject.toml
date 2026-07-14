@@ -1,5 +1,6 @@
 [tool.uv.workspace]
 members = ["tket-py", "tket-eccs", "tket-exts", "qis-compiler"]
+exclude = ["pg-libs"]
 
 [dependency-groups]
 dev = [

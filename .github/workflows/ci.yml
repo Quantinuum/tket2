@@ -111,6 +111,22 @@ jobs:
       - name: Check formatting
         working-directory: pg-libs
         run: cargo fmt -- --check
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - name: Install Python ${{ env.PYTHON_HIGHEST }}
+        run: uv python install ${{ env.PYTHON_HIGHEST }}
+      - name: Setup dependencies
+        working-directory: pg-libs
+        run: uv sync --python ${{ env.PYTHON_HIGHEST }}
+      - name: Check formatting with ruff
+        working-directory: pg-libs
+        run: uv run ruff format --check
+      - name: Lint with ruff
+        working-directory: pg-libs
+        run: uv run ruff check
 
   tests-pg-libs:
     name: pg-libs tests
@@ -122,6 +138,16 @@ jobs:
       - uses: mozilla-actions/sccache-action@v0.0.10
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - name: Install Python ${{ env.PYTHON_HIGHEST }}
+        run: uv python install ${{ env.PYTHON_HIGHEST }}
+      - name: Install pg-libs dev dependencies
+        working-directory: pg-libs
+        run: uv sync --python ${{ env.PYTHON_HIGHEST }}
       - name: Run stable tests
         working-directory: pg-libs
         run: cargo test --workspace
