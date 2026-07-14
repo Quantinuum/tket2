@@ -169,6 +169,19 @@ impl<N: HugrNode> ModifierResolver<N> {
             }
         }
 
+        self.wire_state_order(
+            old_in,
+            h.get_optype(old_in),
+            new_in,
+            new_dfg.hugr().get_optype(new_in),
+        )?;
+        self.wire_state_order(
+            old_out,
+            h.get_optype(old_out),
+            new_out,
+            new_dfg.hugr().get_optype(new_out),
+        )?;
+
         Ok(())
     }
 
@@ -538,6 +551,12 @@ impl<N: HugrNode> ModifierResolver<N> {
             ),
             (0, 0, offset),
         )?;
+        self.wire_state_order(
+            n,
+            h.get_optype(n),
+            new_dfg,
+            new_parent_dfg.hugr().get_optype(new_dfg),
+        )?;
 
         Ok(())
     }
@@ -701,6 +720,12 @@ impl<N: HugrNode> ModifierResolver<N> {
             new_conditional,
             (conditional.other_inputs.iter(), conditional.outputs.iter()),
             (1, 0, offset),
+        )?;
+        self.wire_state_order(
+            n,
+            h.get_optype(n),
+            new_conditional,
+            new_dfg.hugr().get_optype(new_conditional),
         )?;
 
         Ok(())
