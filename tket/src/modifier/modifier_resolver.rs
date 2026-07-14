@@ -647,7 +647,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         for out_node in h.children(parent) {
             for out_port in h.node_outputs(out_node) {
                 if let Some(EdgeKind::StateOrder) = h.get_optype(out_node).port_kind(out_port) {
-                    // NICOLA TODO: Open an issue, discuss with Alan
+                    // TODO: see https://github.com/Quantinuum/tket2/issues/1836
                     // Currently, we just ignore StateOrder edges.
                     // This might be OK when the dagger is applied since StateOrder is not managable then.
                     // However, if not, we should preserve the StateOrder edges.
@@ -666,6 +666,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             }
         }
         // FIXME: StateOrder is not preserved here.
+        // see: https://github.com/Quantinuum/tket2/issues/1836
         Ok(())
     }
 }
