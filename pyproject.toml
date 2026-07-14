@@ -9,7 +9,7 @@ dev = [
     "ruff>=0.15.21,<0.16",
     "mypy>=2.2.0,<3",
     "hypothesis>=6.156.4,<7",
-    "hugr~=0.18.0",
+    "hugr~=0.18.1",
     "graphviz ~=0.21.0",
     "pre-commit~=4.6",
     # Required to run `maturin develop`
