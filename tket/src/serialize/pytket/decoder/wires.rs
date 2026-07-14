@@ -5,7 +5,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use hugr::builder::{DFGBuilder, Dataflow as _};
-use hugr::extension::prelude::{bool_t, qb_t};
+use hugr::extension::prelude::{UnpackTuple, bool_t, qb_t};
 use hugr::hugr::hugrmut::HugrMut;
 use hugr::ops::Value;
 use hugr::std_extensions::arithmetic::float_types::{ConstF64, float64_type};
@@ -706,28 +706,50 @@ impl WireTracker {
         let wire_bits = bit_args.iter().take(reg_count.bits).cloned().collect_vec();
         let wire_bit_ids = wire_bits.iter().map(|bit| bit.id()).collect_vec();
 
-        // Find a wire that contains the correct type..
+        // Prefer an existing wire that exactly matches the requested registers
+        // and type.
         let check_wire = |w: &Wire| {
             let wire_data = &self.wires[w];
             wire_data.qubits == wire_qubit_ids
                 && wire_data.bits == wire_bit_ids
                 && config.types_are_isomorphic(wire_data.ty(), ty)
         };
-        let wire = match candidates.into_iter().find(check_wire) {
-            Some(wire) => wire,
+        let wire = if let Some(wire) = candidates.iter().copied().find(check_wire) {
+            wire
+        } else {
+            // The value may be part of a tuple wire, which needs to be unpacked
+            // before we can use the candidate.
+            //
+            // Find such a candidate and unpack it.
+            if self.try_unpack_tuple_candidate(
+                config,
+                builder,
+                &candidates,
+                &wire_qubit_ids,
+                &wire_bit_ids,
+            )? {
+                // Retry from the beginning, with the tuple values now unpacked.
+                return self.find_typed_wire(
+                    config,
+                    builder,
+                    ty,
+                    qubit_args,
+                    bit_args,
+                    params,
+                    unsupported_wire,
+                );
+            }
+
             // Handle lazy initialization of qubit and bit wires. These are
             // normally qubits/bits present in the pytket circuit definition,
             // but not in the region's input.
-            _ if ty == &qb_t() && !qubit_args.is_empty() => {
+            if ty == &qb_t() && !qubit_args.is_empty() {
                 self.initialize_qubit_wire(builder, qubit_args[0].clone())?
-            }
-            _ if ty == &bool_t() && !bit_args.is_empty() => {
+            } else if ty == &bool_t() && !bit_args.is_empty() {
                 self.initialize_bit_wire(builder, bit_args[0].clone())?
-            }
-            _ if matches!(ty.deref(), Term::SumType(sum) if sum.as_tuple().is_some()) => {
+            } else if matches!(ty.deref(), Term::SumType(sum) if sum.as_tuple().is_some()) {
                 return self.find_tuple_wire(config, builder, ty, qubit_args, bit_args, params);
-            }
-            _ => {
+            } else {
                 return Err(PytketDecodeErrorInner::NoMatchingWire {
                     ty: ty.to_string(),
                     qubit_args: qubit_args
@@ -780,6 +802,65 @@ impl WireTracker {
             self.mark_wire_outdated(wire);
             Ok(FoundWire::Register(self.wires[&new_wire].clone()))
         }
+    }
+
+    /// Decompose a tracked tuple when a command needs one of its elements.
+    ///
+    /// A required pytket qubit/bit value may be part of a tracked tuple wire,
+    /// which needs to be unpacked before we can use it.
+    ///
+    /// Here we check the candidate wires for any such case, and unpack the
+    /// first compatible tuple we find.
+    ///
+    /// Returns `true` when a candidate was unpacked, or `false` when none of
+    /// the candidates was a compatible tuple.
+    fn try_unpack_tuple_candidate(
+        &mut self,
+        config: &PytketDecoderConfig,
+        builder: &mut DFGBuilder<&mut Hugr>,
+        candidates: &[Wire],
+        required_qubits: &[TrackedQubitId],
+        required_bits: &[TrackedBitId],
+    ) -> Result<bool, PytketDecodeError> {
+        // Find a valid tuple wires between the candidates.
+        let check_candidate = |wire: &Wire| -> Option<(Wire, TypeRow)> {
+            let data: &WireData = &self.wires[wire];
+            // Find a tuple candidate with all the requested qubits and bits.
+            if !required_qubits.iter().all(|id| data.qubits.contains(id))
+                || !required_bits.iter().all(|id| data.bits.contains(id))
+            {
+                return None;
+            }
+            let Term::SumType(sum) = data.ty.as_ref().deref() else {
+                return None;
+            };
+
+            let tuple = TypeRow::try_from(sum.as_tuple()?.clone()).ok()?;
+            Some((*wire, tuple))
+        };
+        let Some((wire, tuple)) = candidates.iter().find_map(check_candidate) else {
+            return Ok(false);
+        };
+
+        // Insert the unpack operations and track the new wires.
+        let outputs = builder
+            .add_dataflow_op(UnpackTuple::new(tuple.clone()), [wire])
+            .map_err(PytketDecodeError::custom)?
+            .outputs()
+            .collect_vec();
+        let data = self.untrack_wire(wire);
+        let mut qubit_offset = 0;
+        let mut bit_offset = 0;
+        for (wire, ty) in outputs.into_iter().zip(tuple.iter()) {
+            let count = config.type_to_pytket(ty).unwrap_or_default();
+            let qubits = data.qubits[qubit_offset..qubit_offset + count.qubits].to_vec();
+            let bits = data.bits[bit_offset..bit_offset + count.bits].to_vec();
+            qubit_offset += count.qubits;
+            bit_offset += count.bits;
+            self.track_wire_ids(wire, Arc::new(ty.clone()), qubits, bits);
+        }
+
+        Ok(true)
     }
 
     /// Build a tuple wire from its tracked element wires when no matching
@@ -1112,6 +1193,23 @@ impl WireTracker {
             })
             .collect::<Result<_, _>>()?;
 
+        self.track_wire_ids(wire, ty, qubits, bits);
+
+        Ok(())
+    }
+
+    /// Track a wire using existing value IDs for each register.
+    ///
+    /// This is used for representation-only rewrites such as unpacking a tuple.
+    /// Unlike [`Self::track_wire`], it does not mark existing value IDs as
+    /// outdated.
+    fn track_wire_ids(
+        &mut self,
+        wire: Wire,
+        ty: Arc<Type>,
+        qubits: Vec<TrackedQubitId>,
+        bits: Vec<TrackedBitId>,
+    ) {
         for &q in &qubits {
             self.qubit_wires[&q].push(wire);
         }
@@ -1119,15 +1217,34 @@ impl WireTracker {
             self.bit_wires[&b].push(wire);
         }
 
-        let wire_data = WireData {
+        self.wires.insert(
             wire,
-            ty,
-            qubits,
-            bits,
-        };
-        self.wires.insert(wire, wire_data);
+            WireData {
+                wire,
+                ty,
+                qubits,
+                bits,
+            },
+        );
+    }
 
-        Ok(())
+    /// Stop tracking a wire without invalidating the value ID.
+    ///
+    /// This is used when the wire used for a type gets replaced, but the
+    /// corresponding pytket registers haven't been modified (e.g. when
+    /// unpacking a tuple).
+    fn untrack_wire(&mut self, wire: Wire) -> WireData {
+        let data = self
+            .wires
+            .swap_remove(&wire)
+            .expect("candidate wire must still be tracked");
+        for qubit in &data.qubits {
+            self.qubit_wires[qubit].retain(|candidate| *candidate != wire);
+        }
+        for bit in &data.bits {
+            self.bit_wires[bit].retain(|candidate| *candidate != wire);
+        }
+        data
     }
 
     /// Associate an input wire to the region with a parameter.

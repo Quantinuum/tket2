@@ -9,7 +9,9 @@ use hugr::builder::{
     Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder,
     ModuleBuilder, SubContainer,
 };
-use hugr::extension::prelude::{ConstExternalSymbol, UnwrapBuilder, bool_t, option_type, qb_t};
+use hugr::extension::prelude::{
+    ConstExternalSymbol, UnpackTuple, UnwrapBuilder, bool_t, option_type, qb_t,
+};
 use hugr::extension::simple_op::MakeExtensionOp;
 use hugr::std_extensions::arithmetic::float_types::{ConstF64, float64_type};
 use hugr::std_extensions::logic::LogicOp;
@@ -870,6 +872,41 @@ fn circ_complex_param_type() -> Hugr {
     h.finish_hugr_with_outputs([q, float_tuple]).unwrap()
 }
 
+/// A supported qubit tuple produced by an opaque subgraph and consumed by a
+/// pytket operation as separate qubit wires.
+#[fixture]
+fn circ_opaque_qubit_tuple_output() -> Hugr {
+    let pair_type = Type::from(SumType::new_tuple(vec![qb_t(), qb_t()]));
+    let optional_qubit_type = Type::from(option_type([qb_t()]));
+    let signature = Signature::new(
+        vec![qb_t(), qb_t(), optional_qubit_type.clone()],
+        vec![qb_t(), qb_t(), optional_qubit_type.clone()],
+    );
+    let mut h = FunctionBuilder::new("opaque_qubit_tuple_output", signature).unwrap();
+    let [q0, q1, optional_qubit] = h.input_wires_arr();
+
+    let pair = h.make_tuple([q0, q1]).unwrap();
+    let outer_tuple = h.make_tuple([pair, optional_qubit]).unwrap();
+    let [pair, optional_qubit] = h
+        .add_dataflow_op(
+            UnpackTuple::new(vec![pair_type, optional_qubit_type].into()),
+            [outer_tuple],
+        )
+        .unwrap()
+        .outputs_arr();
+    let [q0, q1] = h
+        .add_dataflow_op(UnpackTuple::new(vec![qb_t(), qb_t()].into()), [pair])
+        .unwrap()
+        .outputs_arr();
+    let [q0, q1] = h
+        .add_dataflow_op(TketOp::CX, [q0, q1])
+        .unwrap()
+        .outputs_arr();
+
+    h.finish_hugr_with_outputs([q0, q1, optional_qubit])
+        .unwrap()
+}
+
 /// A prelude barrier carrying one unsupported value next to a qubit.
 ///
 /// The barrier must be encoded as an opaque subgraph; trying to emit it as a
@@ -1361,6 +1398,11 @@ fn fail_on_modified_hugr(circ_tk1_ops: Hugr) {
 #[case::unsupported_io_wire(circ_unsupported_io_wire(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::order_edge(circ_order_edge(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::complex_param_type(circ_complex_param_type(), 1, CircuitRoundtripTestConfig::Default)]
+#[case::opaque_qubit_tuple_output(
+    circ_opaque_qubit_tuple_output(),
+    1,
+    CircuitRoundtripTestConfig::Default
+)]
 #[case::unsupported_subgraph_skipped_output_before_param(
     circ_unsupported_subgraph_skipped_output_before_param(),
     1,
