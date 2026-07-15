@@ -172,7 +172,7 @@ impl<H: HugrView> PytketEncoderConfig<H> {
     /// Translate a HUGR type into a count of qubits, bits, and parameters,
     /// using the registered custom translator.
     ///
-    /// Only tuple sums, bools, and custom types are supported.
+    /// Only bools, parameter types, and registered custom types are supported.
     /// Other types will return `None`.
     pub fn type_to_pytket(&self, typ: &Type) -> Option<RegisterCount> {
         self.type_translators.type_to_pytket(typ)

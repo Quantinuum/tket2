@@ -9,7 +9,9 @@ use hugr::builder::{
     Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder,
     ModuleBuilder, SubContainer,
 };
-use hugr::extension::prelude::{ConstExternalSymbol, UnwrapBuilder, bool_t, option_type, qb_t};
+use hugr::extension::prelude::{
+    ConstExternalSymbol, UnpackTuple, UnwrapBuilder, bool_t, option_type, qb_t,
+};
 use hugr::extension::simple_op::MakeExtensionOp;
 use hugr::std_extensions::arithmetic::float_types::{ConstF64, float64_type};
 use hugr::std_extensions::logic::LogicOp;
@@ -33,7 +35,7 @@ use crate::serialize::pytket::{
 };
 use hugr::hugr::hugrmut::HugrMut;
 use hugr::ops::handle::FuncID;
-use hugr::ops::{OpParent, OpType, Value};
+use hugr::ops::{OpParent, OpType, Tag, Value};
 use hugr::std_extensions::arithmetic::float_ops::FloatOps;
 use hugr::types::{Signature, SumType, Type};
 use hugr::{Hugr, HugrView};
@@ -870,6 +872,70 @@ fn circ_complex_param_type() -> Hugr {
     h.finish_hugr_with_outputs([q, float_tuple]).unwrap()
 }
 
+/// A supported qubit tuple produced by an opaque subgraph and consumed by a
+/// pytket operation as separate qubit wires.
+#[fixture]
+fn circ_opaque_qubit_tuple_output() -> Hugr {
+    let pair_type = Type::from(SumType::new_tuple(vec![qb_t(), qb_t()]));
+    let optional_qubit_type = Type::from(option_type([qb_t()]));
+    let signature = Signature::new(
+        vec![qb_t(), qb_t(), optional_qubit_type.clone()],
+        vec![qb_t(), qb_t(), optional_qubit_type.clone()],
+    );
+    let mut h = FunctionBuilder::new("opaque_qubit_tuple_output", signature).unwrap();
+    let [q0, q1, optional_qubit] = h.input_wires_arr();
+
+    let pair = h.make_tuple([q0, q1]).unwrap();
+    let outer_tuple = h.make_tuple([pair, optional_qubit]).unwrap();
+    let [pair, optional_qubit] = h
+        .add_dataflow_op(
+            UnpackTuple::new(vec![pair_type, optional_qubit_type].into()),
+            [outer_tuple],
+        )
+        .unwrap()
+        .outputs_arr();
+    let [q0, q1] = h
+        .add_dataflow_op(UnpackTuple::new(vec![qb_t(), qb_t()].into()), [pair])
+        .unwrap()
+        .outputs_arr();
+    let [q0, q1] = h
+        .add_dataflow_op(TketOp::CX, [q0, q1])
+        .unwrap()
+        .outputs_arr();
+
+    h.finish_hugr_with_outputs([q0, q1, optional_qubit])
+        .unwrap()
+}
+
+/// A qubit tuple consumed by an unsupported output after its elements have
+/// passed through a pytket operation.
+///
+/// The decoder must not try to unpack the tuple again while accounting for
+/// qubits that do not appear directly in the function output signature.
+#[fixture]
+fn circ_consumed_qubit_tuple() -> Hugr {
+    let pair_type = Type::from(SumType::new_tuple(vec![qb_t(), qb_t()]));
+    let optional_pair_type = Type::from(option_type([pair_type.clone()]));
+    let signature = Signature::new(vec![qb_t(), qb_t()], vec![optional_pair_type.clone()]);
+    let mut h = FunctionBuilder::new("consumed_qubit_tuple", signature).unwrap();
+    let [q0, q1] = h.input_wires_arr();
+
+    let [q0, q1] = h
+        .add_dataflow_op(TketOp::CX, [q0, q1])
+        .unwrap()
+        .outputs_arr();
+    let pair = h.make_tuple([q0, q1]).unwrap();
+    let optional_pair = h
+        .add_dataflow_op(
+            Tag::new(1, vec![vec![].into(), vec![pair_type].into()]),
+            [pair],
+        )
+        .unwrap()
+        .out_wire(0);
+
+    h.finish_hugr_with_outputs([optional_pair]).unwrap()
+}
+
 /// A prelude barrier carrying one unsupported value next to a qubit.
 ///
 /// The barrier must be encoded as an opaque subgraph; trying to emit it as a
@@ -1088,29 +1154,6 @@ fn json_file_roundtrip(#[case] circ: impl AsRef<std::path::Path>) {
     let reser: SerialCircuit = SerialCircuit::encode(&hugr, EncodeOptions::new()).unwrap();
     validate_serial_circ(&reser);
     compare_serial_circs(&ser, &reser);
-}
-
-#[test]
-fn decode_tuple_output_from_permuted_barrier_args() {
-    let ser: circuit_json::SerialCircuit = serde_json::from_str(
-        r#"{
-        "phase": "0",
-        "bits": [],
-        "qubits": [["q", [0]], ["q", [1]]],
-        "commands": [
-            {"args": [["q", [1]], ["q", [0]]], "op": {"type": "Barrier"}}
-        ],
-        "implicit_permutation": [[["q", [0]], ["q", [0]]], [["q", [1]], ["q", [1]]]]
-    }"#,
-    )
-    .unwrap();
-
-    let tuple_qubits = Type::from(SumType::new_tuple(vec![qb_t(), qb_t()]));
-    let hugr = ser
-        .decode(DecodeOptions::new().with_signature(Signature::new(vec![], vec![tuple_qubits])))
-        .unwrap();
-
-    hugr.validate().unwrap();
 }
 
 #[test]
@@ -1361,6 +1404,12 @@ fn fail_on_modified_hugr(circ_tk1_ops: Hugr) {
 #[case::unsupported_io_wire(circ_unsupported_io_wire(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::order_edge(circ_order_edge(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::complex_param_type(circ_complex_param_type(), 1, CircuitRoundtripTestConfig::Default)]
+#[case::opaque_qubit_tuple_output(
+    circ_opaque_qubit_tuple_output(),
+    1,
+    CircuitRoundtripTestConfig::Default
+)]
+#[case::consumed_qubit_tuple(circ_consumed_qubit_tuple(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::unsupported_subgraph_skipped_output_before_param(
     circ_unsupported_subgraph_skipped_output_before_param(),
     1,
