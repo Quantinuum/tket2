@@ -152,6 +152,22 @@ jobs:
         working-directory: pg-libs
         run: cargo test --workspace
 
+  tests-pg-libs-nightly:
+    name: pg-libs tests (nightly)
+    needs: [changes]
+    if: ${{ needs.changes.outputs.pg-libs == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: mozilla-actions/sccache-action@v0.0.10
+      - name: Install pinned nightly toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2025-09-14
+      - name: Run simd tests
+        working-directory: pg-libs
+        run: cargo test -p pg-bitpacked --features simd
+
   benches:
     name: Continuous benchmarking 🏋️
     needs: changes
@@ -481,6 +497,7 @@ jobs:
         check-rs,
         check-py,
         tests-pg-libs,
+        tests-pg-libs-nightly,
         tests-rs-stable-no-features,
         tests-rs-stable-all-features,
         tests-py,
