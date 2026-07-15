@@ -663,6 +663,11 @@ impl<N: HugrNode> ModifierResolver<N> {
 }
 
 impl<N: HugrNode> ModifierResolver<N> {
+    // FIXME: Shouldn't we check that there is a caller of the modified function?
+    // We don't want to modify a function that is loaded and modified but never called.
+    // When more than one modifier is chained, after the last modifier is resolved,
+    // we delete the last modifier node, but the previous modifiers are not deleted.
+    // If the second last modifier was only called by the last modifier, that will not be called anymore.
     fn verify(&self, h: &impl HugrView<Node = N>, n: N) -> Result<(), ModifierError<N>> {
         // Check if the node is a modifier, modifying an operation.
         let optype = h.get_optype(n);
