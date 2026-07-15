@@ -1055,6 +1055,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             // Some other Hugr extension operation.
             // Here, we do not know what is the modified version.
             // We try to place the original operation.
+            // TODO: Determine when we should raise an error
             // (see https://github.com/Quantinuum/tket2/issues/1828)
             self.modify_dataflow_op(h, op_node, optype, new_dfg)
         }
@@ -1350,6 +1351,11 @@ pub fn resolve_modifier_with_entrypoints_and_scope(
     // (e.g. intermediate nodes in a chain whose last modifier was the one rewritten).
     // Walk the same reachable set again and delete any surviving modifier nodes,
     // together with every downstream node that consumes their output.
+    //
+    // NOTE:
+    // This might be insufficient as a cleanup since the resolution procedure might
+    // generate nodes that are not reachable from the entry points.
+    // If more thorough cleanup is needed, we should run dead code elimination.
     let mut deletelist = entry_points.clone();
     let mut visited = FxHashSet::default();
     while let Some(node) = deletelist.pop_front() {
