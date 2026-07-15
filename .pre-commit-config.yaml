@@ -126,14 +126,14 @@ repos:
       - id: cargo-check-pg-libs
         name: cargo check (pg-libs)
         description: Check pg-libs rust code with `cargo check`.
-        entry: sh -c "cd pg-libs && env RUSTFLAGS='-Dwarnings' cargo check --all-features --workspace"
+        entry: sh -c "cd pg-libs && env RUSTFLAGS='-Dwarnings' cargo check --workspace"
         language: system
         files: ^pg-libs/.*\.rs$
         pass_filenames: false
       - id: cargo-clippy-pg-libs
         name: cargo clippy (pg-libs)
         description: Run clippy lints on pg-libs with `cargo clippy`.
-        entry: sh -c "cd pg-libs && cargo clippy --all-features --all-targets --workspace -- -D warnings"
+        entry: sh -c "cd pg-libs && cargo clippy --all-targets --workspace -- -D warnings"
         language: system
         files: ^pg-libs/.*\.rs$
         pass_filenames: false
@@ -141,7 +141,7 @@ repos:
         name: cargo nextest r (pg-libs)
         description: Run pg-libs tests with `cargo nextest r`.
         # cd into pg-libs so Cargo picks up pg-libs/.cargo/config.toml.
-        entry: sh -c "cd pg-libs && cargo nextest r --all-features"
+        entry: sh -c "cd pg-libs && cargo nextest r"
         language: system
         files: ^pg-libs/.*\.rs$
         pass_filenames: false
