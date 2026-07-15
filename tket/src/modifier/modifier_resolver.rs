@@ -1038,10 +1038,11 @@ impl<N: HugrNode> ModifierResolver<N> {
         } else {
             // Some other Hugr extension operation.
             // Here, we do not know what is the modified version.
-            // We try to place the original operation.
-            // TODO: Determine when we should raise an error
-            // (see https://github.com/Quantinuum/tket2/issues/1828)
-            self.modify_dataflow_op(h, op_node, optype, new_dfg)
+            Err(ModifierResolverErrors::unresolvable(
+                op_node,
+                "unknown extension operation.",
+                optype.clone(),
+            ))
         }
     }
 
