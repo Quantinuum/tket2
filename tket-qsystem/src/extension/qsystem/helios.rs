@@ -244,7 +244,7 @@ pub struct HeliosPlatformConfig {
 }
 
 impl hugr_core::metadata::Metadata for HeliosPlatformConfig {
-    const KEY: &'static str = "qsystem.helios.configuration";
+    const KEY: &'static str = "tket.qsystem.helios.configuration";
     type Type<'hugr> = HeliosPlatformConfig;
 }
 

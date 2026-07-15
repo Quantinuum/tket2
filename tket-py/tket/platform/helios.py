@@ -34,7 +34,7 @@ def set_platform_config(
     Args:
         hugr: A compiled HUGR package or module to configure.
         squash_rxys: Whether to combine single-qubit gates at runtime
-                        (independent of any compile-time squashing). Defaults to True.
+            (independent of any compile-time squashing). Defaults to True.
         enable_dd: Enable dynamical decoupling. Defaults to False.
     """
     config = {
