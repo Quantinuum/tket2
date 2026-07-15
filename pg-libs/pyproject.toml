@@ -1,0 +1,13 @@
+[project]
+name = "pg-libs-workspace"
+version = "0.0.0"
+requires-python = ">=3.10"
+
+[tool.uv.workspace]
+members = []
+
+[dependency-groups]
+dev = [
+  "ruff>=0.6",
+  "pytket>=2,<3",
+]

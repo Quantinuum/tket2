@@ -96,7 +96,7 @@
 //! - Dagger of non-trivial CFGs: We cannot support dagger for complicated CFGs
 //!   since it is not clear at all whether we should reverse the control flow or not.
 //!   Currently, when any non-trivial cfg with more than one block is encountered during
-//!   the resolution under a daggered context, an error is returned.
+//!   resolution in a daggered context, an error is returned.
 //! - Branching in modifier chain: As noted above, we assume that a modifier is
 //!   chained linearly.
 //! - StateOrder edge: Currently, the modified function does not contain StateOrder edges
@@ -672,7 +672,6 @@ impl<N: HugrNode> ModifierResolver<N> {
 }
 
 impl<N: HugrNode> ModifierResolver<N> {
-    // NICOLA: I would like not to do deadcode elimination here
     fn verify(&self, h: &impl HugrView<Node = N>, n: N) -> Result<(), ModifierError<N>> {
         // Check if the node is a modifier, modifying an operation.
         let optype = h.get_optype(n);
@@ -869,7 +868,8 @@ impl<N: HugrNode> ModifierResolver<N> {
     /// - output: [in0:qubit, in2:qubit, in3:qubit]
     ///
     /// This reverses everything that can contain qubits.
-    /// TODO: Handle state order edges.
+    // TODO: Handle state order edges.
+    // (see https://github.com/Quantinuum/tket2/issues/1836)
     fn wire_node_inout<'a>(
         &mut self,
         old_node: N,
@@ -1038,11 +1038,10 @@ impl<N: HugrNode> ModifierResolver<N> {
         } else {
             // Some other Hugr extension operation.
             // Here, we do not know what is the modified version.
-            Err(ModifierResolverErrors::unresolvable(
-                op_node,
-                "unknown extension operation.",
-                optype.clone(),
-            ))
+            // We try to place the original operation.
+            // TODO: Determine when we should raise an error
+            // (see https://github.com/Quantinuum/tket2/issues/1828)
+            self.modify_dataflow_op(h, op_node, optype, new_dfg)
         }
     }
 
@@ -1336,6 +1335,11 @@ pub fn resolve_modifier_with_entrypoints_and_scope(
     // (e.g. intermediate nodes in a chain whose last modifier was the one rewritten).
     // Walk the same reachable set again and delete any surviving modifier nodes,
     // together with every downstream node that consumes their output.
+    //
+    // NOTE:
+    // This might be insufficient as a cleanup since the resolution procedure might
+    // generate nodes that are not reachable from the entry points.
+    // If more thorough cleanup is needed, we should run dead code elimination.
     let mut deletelist = entry_points.clone();
     let mut visited = FxHashSet::default();
     while let Some(node) = deletelist.pop_front() {
