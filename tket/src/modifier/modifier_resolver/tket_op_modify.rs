@@ -92,6 +92,8 @@ impl<N: HugrNode> ModifierResolver<N> {
                             } else if i == qubits + control {
                                 Some((halfturn, IncomingPort::from(0)).into())
                             } else {
+                                // TODO: forget state order
+                                // see (https://github.com/Quantinuum/tket2/issues/1828)
                                 None
                             }
                         })
@@ -347,6 +349,8 @@ impl<N: HugrNode> ModifierResolver<N> {
                     mem::swap(&mut incoming, &mut outgoing)
                 }
                 incoming.push((halfturns, IncomingPort::from(0)).into());
+                // TODO: Ignoring StateOrder
+                // see https://github.com/Quantinuum/tket2/issues/1828
                 Ok(PortVector { incoming, outgoing })
             }
             Rz | Y | Z => {
@@ -461,6 +465,8 @@ impl<N: HugrNode> ModifierResolver<N> {
                 assert_eq!(control, self.control_num());
                 self.modifiers.dagger = dagger;
 
+                // TODO: This does not handle StateOrder wires
+                // (see https://github.com/Quantinuum/tket2/issues/1828)
                 if !dagger {
                     Ok(PortVector { incoming, outgoing })
                 } else {
