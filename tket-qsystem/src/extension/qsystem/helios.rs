@@ -233,9 +233,9 @@ impl MakeOpDef for RuntimeBarrierDef {
     }
 }
 
-/// Helios platform config options exposed by `tket.platform.helios.set_platform_config`.
+/// Platform config options exposed by `tket.platform.helios.set_platform_config`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct HeliosPublicConfig {
+pub struct HeliosPlatformConfig {
     /// Whether to combine single-qubit gates at runtime (independent of any
     /// compile-time squashing).
     pub squash_rxys: bool,
@@ -243,9 +243,9 @@ pub struct HeliosPublicConfig {
     pub enable_dd: bool,
 }
 
-impl hugr_core::metadata::Metadata for HeliosPublicConfig {
+impl hugr_core::metadata::Metadata for HeliosPlatformConfig {
     const KEY: &'static str = "qsystem.helios.configuration";
-    type Type<'hugr> = HeliosPublicConfig;
+    type Type<'hugr> = HeliosPlatformConfig;
 }
 
 #[derive(Debug)]
@@ -567,7 +567,7 @@ mod test {
     use hugr::std_extensions::collections::array::ArrayOpBuilder;
 
     use super::{
-        EXTENSION, EXTENSION_ID, HeliosOp, HeliosPublicConfig, HeliosSynthesizer,
+        EXTENSION, EXTENSION_ID, HeliosOp, HeliosPlatformConfig, HeliosSynthesizer,
         SynthesizeHeliosOp,
     };
     use hugr::extension::prelude::qb_t;
@@ -673,17 +673,17 @@ mod test {
     #[test]
     fn roundtrip_helios_public_config() {
         for config in [
-            HeliosPublicConfig {
+            HeliosPlatformConfig {
                 squash_rxys: false,
                 enable_dd: true,
             },
-            HeliosPublicConfig {
+            HeliosPlatformConfig {
                 squash_rxys: true,
                 enable_dd: false,
             },
         ] {
             let json = serde_json::to_string(&config).unwrap();
-            let decoded: HeliosPublicConfig = serde_json::from_str(&json).unwrap();
+            let decoded: HeliosPlatformConfig = serde_json::from_str(&json).unwrap();
             assert_eq!(config, decoded);
         }
     }
