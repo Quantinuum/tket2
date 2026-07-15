@@ -1,7 +1,7 @@
 //! Try to delete modifier by applying the modifier to each component.
 //!
 //! The entry point of this module is [`resolve_modifier_with_entrypoints`]
-//! which takes a hugr and a list of entry points.
+//! which takes a hugraph and a list of entry points.
 //! Modifier resolver visits all the nodes reachable from the entry points.
 //!
 //! The main struct [`ModifierResolver`] holds the state during the process,
@@ -11,7 +11,7 @@
 //!
 //! A modifier is assumed to be applied to a loaded function
 //! and called directly exactly once by another modifier or
-//! an `IndirectCall` node.
+//! an `IndirectedCall` node.
 //! That is, the following structure is assumed:
 //! ```text
 //! LoadFunction -> Modifier* -> IndirectedCall
@@ -35,8 +35,6 @@
 //! and a builder `new_dfg` to construct the new graph.
 //! The correspondence map (`corresp_map`) keeps the correspondence
 //! from wires in `h` to wires in `new_dfg`.
-//! The `call_map` keeps track of the calls to the modified function, so that we can connect
-//! the modified function to its callers after the resolution.
 //! See `modify_op`, which is the main function that modifies each node.
 //!
 //! During the resolution, when a node with some data flow included (such as a function) is encountered,
@@ -91,18 +89,19 @@
 //! We also should not forget to connect `fneg` to `Rx` in the new graph, whose edge/wires has
 //! no correspondence in the original graph.
 //!
-//! ## Not supported:
+//! ## Not supported/TODO cases
 //! - Power: Power modifier is not supported at this point.
-//! - Dagger of non-trivial CFGs: We cannot support dagger for complicated CFGs
+//! - Non-trivial CFGs: We cannot support dagger for complicated CFGs
 //!   since it is not clear at all whether we should reverse the control flow or not.
 //!   Currently, when any non-trivial cfg with more than one block is encountered during
-//!   the resolution under a daggered context, an error is returned.
+//!   the resolution, an error is returned.
 //! - Branching in modifier chain: As noted above, we assume that a modifier is
 //!   chained linearly.
 //! - StateOrder edge with dagger: StateOrder edges are preserved for ordinary and controlled
 //!   rewrites. Their reversal under dagger has not yet been implemented.
 //! - User defined extension ops: There is no way to infer modified unknown extension ops.
-//!   We currently raise an error if an unknown extension is found.
+//!   We currently try to insert the original optype without any modification,
+//!   but this could result in an unexpected error.
 use fxhash::FxHashSet;
 use itertools::{Either, Itertools};
 use std::{
@@ -664,7 +663,6 @@ impl<N: HugrNode> ModifierResolver<N> {
 }
 
 impl<N: HugrNode> ModifierResolver<N> {
-    // NICOLA: I would like not to do deadcode elimination here
     fn verify(&self, h: &impl HugrView<Node = N>, n: N) -> Result<(), ModifierError<N>> {
         // Check if the node is a modifier, modifying an operation.
         let optype = h.get_optype(n);
@@ -861,7 +859,8 @@ impl<N: HugrNode> ModifierResolver<N> {
     /// - output: [in0:qubit, in2:qubit, in3:qubit]
     ///
     /// This reverses everything that can contain qubits.
-    /// TODO: Handle state order edges.
+    // TODO: Handle state order edges.
+    // (see https://github.com/Quantinuum/tket2/issues/1836)
     fn wire_node_inout<'a>(
         &mut self,
         old_node: N,
@@ -1026,6 +1025,23 @@ impl<N: HugrNode> ModifierResolver<N> {
         self.map_insert(Wire::new(n, 0).into(), Wire::new(output, 0).into())
     }
 
+    /// Copy the dataflow operation to the new function.
+    /// These are the operations that are not modified by the modifier.
+    fn modify_dataflow_op(
+        &mut self,
+        h: &impl HugrMut<Node = N>,
+        n: N,
+        optype: &OpType,
+        new_dfg: &mut impl Container,
+    ) -> Result<(), ModifierResolverErrors<N>> {
+        let node = new_dfg.add_child_node(optype.clone());
+        let signature = h.signature(n).unwrap();
+        let inputs = signature.input.iter();
+        let outputs = signature.output.iter();
+        self.wire_node_inout(n, node, (inputs, outputs), (0, 0, 0))?;
+        Ok(())
+    }
+
     fn modify_extension_op(
         &mut self,
         h: &impl HugrMut<Node = N>,
@@ -1058,11 +1074,9 @@ impl<N: HugrNode> ModifierResolver<N> {
         } else {
             // Some other Hugr extension operation.
             // Here, we do not know what is the modified version.
-            Err(ModifierResolverErrors::unresolvable(
-                op_node,
-                "unknown extension operation.",
-                optype.clone(),
-            ))
+            // We try to place the original operation.
+            // (see https://github.com/Quantinuum/tket2/issues/1828)
+            self.modify_dataflow_op(h, op_node, optype, new_dfg)
         }
     }
 
@@ -2225,101 +2239,6 @@ mod tests {
         assert_matches!(
             result,
             Err(ModifierResolverErrors::PowerModifierNotSupported { node: _ })
-        );
-    }
-
-    #[test]
-    /// Test that a function containing an unknown extension op returns an
-    /// [`ModifierResolverErrors::UnResolvable`] error.
-    fn unknown_extension_op_in_modified_function_returns_error() {
-        use hugr::extension::{ExtensionId, Version};
-        use hugr_core::Extension;
-        use std::sync::Arc;
-
-        // Build a minimal custom extension.
-        let unknown_ext: Arc<Extension> = Extension::new_arc(
-            ExtensionId::new_unchecked("test.unknown_modifier_ext"),
-            Version::new(0, 0, 1),
-            |ext, ext_ref| {
-                ext.add_op(
-                    "UnknownQubitOp".into(),
-                    String::new(),
-                    Signature::new_endo(vec![qb_t()]),
-                    ext_ref,
-                )
-                .unwrap();
-            },
-        );
-        let unknown_op = unknown_ext
-            .instantiate_extension_op("UnknownQubitOp", [])
-            .unwrap();
-
-        let mut module = ModuleBuilder::new();
-
-        let foo = {
-            let mut func = module
-                .define_function("foo", Signature::new_endo(vec![qb_t()]))
-                .unwrap();
-            let inputs: Vec<Wire> = func.input_wires().collect();
-            let qubit = func
-                .add_dataflow_op(unknown_op, inputs)
-                .unwrap()
-                .out_wire(0);
-            func.finish_with_outputs([qubit]).unwrap()
-        };
-
-        let ctrl_num = 1u64;
-        let controlled_sig = Signature::new_endo(vec![array_type(ctrl_num, qb_t()), qb_t()]);
-        let main_sig = Signature::new(type_row![], vec![array_type(ctrl_num, qb_t()), qb_t()]);
-        let control_op: ExtensionOp = MODIFIER_EXTENSION
-            .instantiate_extension_op(
-                &CONTROL_OP_ID,
-                [
-                    Term::BoundedNat(ctrl_num),
-                    vec![qb_t().into()].into(),
-                    vec![].into(),
-                ],
-            )
-            .unwrap();
-
-        {
-            let mut func = module.define_function("main", main_sig).unwrap();
-            let loaded = func.load_func(foo.handle(), &[]).unwrap();
-            let modified_fn = func
-                .add_dataflow_op(control_op, vec![loaded])
-                .unwrap()
-                .out_wire(0);
-            let control = func
-                .add_dataflow_op(TketOp::QAlloc, vec![])
-                .unwrap()
-                .out_wire(0);
-            let target = func
-                .add_dataflow_op(TketOp::QAlloc, vec![])
-                .unwrap()
-                .out_wire(0);
-            let control_arr = func.add_new_array(qb_t(), [control]).unwrap();
-            let outputs = func
-                .add_dataflow_op(
-                    CallIndirect {
-                        signature: controlled_sig,
-                    },
-                    [modified_fn, control_arr, target],
-                )
-                .unwrap()
-                .outputs();
-            func.finish_with_outputs(outputs).unwrap();
-        }
-
-        let mut h = module.finish_hugr().unwrap();
-        assert_matches!(h.validate(), Ok(()));
-
-        let entrypoint = h.entrypoint();
-        let result = resolve_modifier_with_entrypoints(&mut h, [entrypoint]);
-        assert_matches!(
-            result,
-            Err(ModifierResolverErrors::UnResolvable { node: _, msg, optype: _ }) => {
-                assert_eq!(msg, "unknown extension operation.");
-            }
         );
     }
 }
