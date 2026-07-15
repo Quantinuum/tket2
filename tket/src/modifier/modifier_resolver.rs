@@ -96,7 +96,7 @@
 //! - Dagger of non-trivial CFGs: We cannot support dagger for complicated CFGs
 //!   since it is not clear at all whether we should reverse the control flow or not.
 //!   Currently, when any non-trivial cfg with more than one block is encountered during
-//!   the resolution under a daggered context, an error is returned.
+//!   resolution in a daggered context, an error is returned.
 //! - Branching in modifier chain: As noted above, we assume that a modifier is
 //!   chained linearly.
 //! - StateOrder edge: Currently, the modified function does not contain StateOrder edges
