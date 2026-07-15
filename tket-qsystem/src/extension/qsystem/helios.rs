@@ -233,6 +233,21 @@ impl MakeOpDef for RuntimeBarrierDef {
     }
 }
 
+/// Helios platform config options exposed by `tket.platform.helios.set_platform_config`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct HeliosPublicConfig {
+    /// Whether to combine single-qubit gates at runtime (independent of any
+    /// compile-time squashing).
+    pub squash_rxys: bool,
+    /// Whether to enable dynamical decoupling.
+    pub enable_dd: bool,
+}
+
+impl hugr_core::metadata::Metadata for HeliosPublicConfig {
+    const KEY: &'static str = "qsystem.helios.configuration";
+    type Type<'hugr> = HeliosPublicConfig;
+}
+
 #[derive(Debug)]
 /// Implmements traits for lowering operations in terms of Helios primitives.
 pub(super) struct HeliosSynthesizer<'a, D> {
@@ -551,7 +566,10 @@ mod test {
     use hugr::std_extensions::arithmetic::int_types::int_type;
     use hugr::std_extensions::collections::array::ArrayOpBuilder;
 
-    use super::{EXTENSION, EXTENSION_ID, HeliosOp, HeliosSynthesizer, SynthesizeHeliosOp};
+    use super::{
+        EXTENSION, EXTENSION_ID, HeliosOp, HeliosPublicConfig, HeliosSynthesizer,
+        SynthesizeHeliosOp,
+    };
     use hugr::extension::prelude::qb_t;
     use hugr::std_extensions::arithmetic::float_types::float64_type;
     use hugr::types::Signature;
@@ -650,5 +668,23 @@ mod test {
     #[test]
     fn test_cast() {
         crate::extension::qsystem::common::test_utils::assert_cast_roundtrip::<HeliosOp>();
+    }
+
+    #[test]
+    fn roundtrip_helios_public_config() {
+        for config in [
+            HeliosPublicConfig {
+                squash_rxys: false,
+                enable_dd: true,
+            },
+            HeliosPublicConfig {
+                squash_rxys: true,
+                enable_dd: false,
+            },
+        ] {
+            let json = serde_json::to_string(&config).unwrap();
+            let decoded: HeliosPublicConfig = serde_json::from_str(&json).unwrap();
+            assert_eq!(config, decoded);
+        }
     }
 }
