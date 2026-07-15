@@ -164,6 +164,16 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly-2025-09-14
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - name: Install Python ${{ env.PYTHON_HIGHEST }}
+        run: uv python install ${{ env.PYTHON_HIGHEST }}
+      - name: Install pg-libs dev dependencies
+        working-directory: pg-libs
+        run: uv sync --python ${{ env.PYTHON_HIGHEST }}
       - name: Run simd tests
         working-directory: pg-libs
         run: cargo test -p pg-bitpacked --features simd
