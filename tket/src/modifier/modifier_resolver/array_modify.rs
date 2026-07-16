@@ -166,24 +166,19 @@ impl<N: HugrNode> ModifierResolver<N> {
         optype: &OpType,
         new_dfg: &mut impl Dataflow,
     ) -> Result<bool, ModifierResolverErrors<N>> {
-        if !self.modifiers().dagger {
-            self.add_node_no_modification(h, n, optype.clone(), new_dfg)?;
-            return Ok(true);
-        }
-
         let Some(op) = optype.as_extension_op() else {
             return Ok(false);
         };
 
         // try some general array convert - no modification is needed if the array element type is not qubit
         let node = if let Ok(op) = BArrayToArray::from_extension_op(op) {
-            if !self.qubit_finder.contains_element_type(&op.elem_ty) {
+            if !self.modifiers().dagger || !self.qubit_finder.contains_element_type(&op.elem_ty) {
                 self.add_node_no_modification(h, n, optype.clone(), new_dfg)?;
                 return Ok(true);
             }
             new_dfg.add_child_node(BArrayFromArray::new(op.elem_ty, op.size))
         } else if let Ok(op) = BArrayFromArray::from_extension_op(op) {
-            if !self.qubit_finder.contains_element_type(&op.elem_ty) {
+            if !self.modifiers().dagger || !self.qubit_finder.contains_element_type(&op.elem_ty) {
                 self.add_node_no_modification(h, n, optype.clone(), new_dfg)?;
                 return Ok(true);
             }
