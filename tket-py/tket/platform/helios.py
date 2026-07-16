@@ -37,6 +37,7 @@ def _set_platform_config(
         squash_rxys: Whether to combine single-qubit gates at runtime
             (independent of any compile-time squashing). Defaults to True.
         enable_dd: Enable dynamical decoupling. Defaults to False.
+        leakage_repump: Enable leakage repump. Defaults to False.
     """
     config = {
         "squash_rxys": squash_rxys,
