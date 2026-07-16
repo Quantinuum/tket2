@@ -301,8 +301,6 @@ impl<N: HugrNode> ModifierResolver<N> {
     /// When the function definition or a concrete call instantiation contains qubits,
     /// the function needs to be modified. The concrete signature matters for polymorphic
     /// functions whose uninstantiated definition may not reveal quantum data.
-    /// force is used to indicate that the function is being called after a modifiers chain,
-    /// so it must be modified even if the concrete signature does not contain qubits.
     ///
     /// NOTE: When a polymorphic function has a polymorphic input, the function is considered
     /// to have classical data (there are no quantum generic types or generic quantum operations).
@@ -311,7 +309,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         h: &mut impl HugrMut<Node = N>,
         func: N,
         concrete_signature: Option<&Signature>,
-        force: bool,
     ) -> Result<Option<N>, ModifierResolverErrors<N>> {
         let OpType::FuncDefn(fn_defn) = h.get_optype(func) else {
             return Err(ModifierResolverErrors::unreachable(format!(
@@ -321,8 +318,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         };
         let concrete_signature_has_quantum_data =
             concrete_signature.is_some_and(|signature| self.signature_has_quantum_data(signature));
-        if !force
-            && !concrete_signature_has_quantum_data
+        if !concrete_signature_has_quantum_data
             && !self.signature_has_quantum_data(fn_defn.signature().body())
         {
             return Ok(None);
