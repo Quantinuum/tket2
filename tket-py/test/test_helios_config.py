@@ -17,19 +17,17 @@ def test__set_platform_config_defaults_hugr() -> None:
     assert config == {
         "squash_rxys": True,
         "enable_dd": False,
+        "leakage_repump": False,
     }
 
 
 def test__set_platform_config_custom_hugr() -> None:
     hugr = _make_hugr()
 
-    _set_platform_config(hugr, squash_rxys=False, enable_dd=True)
+    _set_platform_config(hugr, squash_rxys=False, enable_dd=True, leakage_repump=True)
 
     config = hugr[hugr.module_root].metadata[HELIOS_CONFIG_META_KEY]
-    assert config == {
-        "squash_rxys": False,
-        "enable_dd": True,
-    }
+    assert config == {"squash_rxys": False, "enable_dd": True, "leakage_repump": True}
 
 
 def test__set_platform_config_defaults_package() -> None:
@@ -42,19 +40,23 @@ def test__set_platform_config_defaults_package() -> None:
         assert config == {
             "squash_rxys": True,
             "enable_dd": False,
+            "leakage_repump": False,
         }
 
 
 def test__set_platform_config_custom_package() -> None:
     package = Package([_make_hugr(), _make_hugr()])
 
-    _set_platform_config(package, squash_rxys=False, enable_dd=True)
+    _set_platform_config(
+        package, squash_rxys=False, enable_dd=True, leakage_repump=True
+    )
 
     for module in package.modules:
         config = module[module.module_root].metadata[HELIOS_CONFIG_META_KEY]
         assert config == {
             "squash_rxys": False,
             "enable_dd": True,
+            "leakage_repump": True,
         }
 
 
@@ -70,4 +72,5 @@ def test__set_platform_config_independent_copies() -> None:
     assert second[second.module_root].metadata[HELIOS_CONFIG_META_KEY] == {
         "squash_rxys": True,
         "enable_dd": False,
+        "leakage_repump": False,
     }

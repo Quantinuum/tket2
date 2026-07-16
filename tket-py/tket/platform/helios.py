@@ -22,6 +22,7 @@ def _set_platform_config(
     hugr: Package | Hugr[Any],
     squash_rxys: bool = True,
     enable_dd: bool = False,
+    leakage_repump: bool = False,
 ) -> None:
     """EXPERIMENTAL: Set Helios-specific job configuration options on a compiled HUGR.
     This is currently provided for development purposes only - options may not work as
@@ -40,6 +41,7 @@ def _set_platform_config(
     config = {
         "squash_rxys": squash_rxys,
         "enable_dd": enable_dd,
+        "leakage_repump": leakage_repump,
     }
     modules = hugr.modules if isinstance(hugr, Package) else [hugr]
     for module in modules:

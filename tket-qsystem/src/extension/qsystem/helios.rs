@@ -241,6 +241,8 @@ pub struct HeliosPlatformConfig {
     pub squash_rxys: bool,
     /// Whether to enable dynamical decoupling.
     pub enable_dd: bool,
+    /// Whether to enable leakage repump.
+    pub leakage_repump: bool,
 }
 
 impl hugr_core::metadata::Metadata for HeliosPlatformConfig {
@@ -676,10 +678,12 @@ mod test {
             HeliosPlatformConfig {
                 squash_rxys: false,
                 enable_dd: true,
+                leakage_repump: true,
             },
             HeliosPlatformConfig {
                 squash_rxys: true,
                 enable_dd: false,
+                leakage_repump: false,
             },
         ] {
             let json = serde_json::to_string(&config).unwrap();
