@@ -1060,7 +1060,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             // Here, we do not know what is the modified version.
             Err(ModifierResolverErrors::unresolvable(
                 op_node,
-                "unknown extension operation.",
+                "unknown quantum operation.",
                 optype.clone(),
             ))
         }
@@ -2260,7 +2260,7 @@ mod tests {
         assert_matches!(
             result,
             Err(ModifierResolverErrors::UnResolvable { node: _, msg, optype: _ }) => {
-                assert_eq!(msg, "unknown extension operation.");
+                assert_eq!(msg, "unknown quantum operation.");
             }
         );
     }
