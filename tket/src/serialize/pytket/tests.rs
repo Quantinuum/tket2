@@ -1052,6 +1052,47 @@ fn circ_unsupported_subgraph_no_registers() -> Hugr {
     h.finish_hugr_with_outputs([q, rot2]).unwrap()
 }
 
+/// A parameter produced by an opaque barrier and consumed by a separate
+/// register-free opaque subgraph.
+#[fixture]
+fn circ_forward_opaque_parameter() -> Hugr {
+    let signature = Signature::new(vec![qb_t()], vec![qb_t(), rotation_type()]);
+    let mut h = FunctionBuilder::new("forward_opaque_parameter", signature).unwrap();
+    let [q] = h.input_wires_arr();
+
+    let consumer = h
+        .module_root_builder()
+        .declare(
+            "consumer",
+            Signature::new(vec![float64_type()], vec![rotation_type()]).into(),
+        )
+        .unwrap();
+
+    let [q, parameter] = {
+        let mut producer = h
+            .dfg_builder(
+                Signature::new(vec![qb_t()], vec![qb_t(), float64_type()]),
+                [q],
+            )
+            .unwrap();
+        let [q] = producer.input_wires_arr();
+        let parameter = producer.add_load_value(ConstF64::new(0.5));
+        producer
+            .finish_with_outputs([q, parameter])
+            .unwrap()
+            .outputs_arr()
+    };
+    let [q] = h.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
+    let two = h.add_load_value(ConstF64::new(2.0));
+    let [parameter] = h
+        .add_dataflow_op(FloatOps::fmul, [parameter, two])
+        .unwrap()
+        .outputs_arr();
+    let [rotation] = h.call(&consumer, &[], [parameter]).unwrap().outputs_arr();
+
+    h.finish_hugr_with_outputs([q, rotation]).unwrap()
+}
+
 // A circuit that discards the first qubit input and only outputs the second one.
 #[fixture]
 fn circ_discard_first_qubit() -> Hugr {
@@ -1425,6 +1466,11 @@ fn fail_on_modified_hugr(circ_tk1_ops: Hugr) {
 #[case::non_local(circ_non_local(), 2, CircuitRoundtripTestConfig::Default)]
 #[case::unsupported_subgraph_no_registers(
     circ_unsupported_subgraph_no_registers(),
+    1,
+    CircuitRoundtripTestConfig::Default
+)]
+#[case::forward_opaque_parameter(
+    circ_forward_opaque_parameter(),
     1,
     CircuitRoundtripTestConfig::Default
 )]
