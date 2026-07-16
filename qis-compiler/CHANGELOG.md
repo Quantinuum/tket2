@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.4.1...qis-compiler-v0.4.2) (2026-07-16)
+
+
+### Features
+
+* Metadata propagation policies for `ReplaceTypes` ([#1783](https://github.com/Quantinuum/tket2/issues/1783)) ([1a73cac](https://github.com/Quantinuum/tket2/commit/1a73cacd4bee04726ed702fd3f0da89a6ccf56f8))
+
 ## [0.4.1](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.4.0...qis-compiler-v0.4.1) (2026-07-10)
 
 This release includes fixes to the modifier resolution and constant-folding

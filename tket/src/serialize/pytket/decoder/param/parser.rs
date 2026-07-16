@@ -65,6 +65,22 @@ impl<'a> PytketParam<'a> {
     pub fn is_zero(&self) -> bool {
         matches!(self, PytketParam::Constant(value) if *value == 0.0)
     }
+
+    /// Visit the input variables referenced by this parsed expression.
+    ///
+    /// Variables inside unrecognized SymPy expressions cannot be routed by the
+    /// decoder, so [`Self::Sympy`] is treated as an opaque leaf.
+    pub fn visit_input_variables(&self, visitor: &mut impl FnMut(&'a str)) {
+        match self {
+            Self::InputVariable { name } => visitor(name),
+            Self::Operation { args, .. } => {
+                for arg in args {
+                    arg.visit_input_variables(visitor);
+                }
+            }
+            Self::Constant(_) | Self::Sympy(_) => {}
+        }
+    }
 }
 
 impl<'a> PartialEq for PytketParam<'a> {
@@ -335,5 +351,17 @@ mod test {
                 "Incorrect parameter parsing\n\texpression: \"{param}\"\n\tparsed: {parsed}\n\texpected: {expected}"
             );
         }
+    }
+
+    #[rstest]
+    #[case::constant("42", &[])]
+    #[case::variable("p0", &["p0"])]
+    #[case::nested("2 * (p0 + p1 + pi)", &["p0", "p1", "pi"])]
+    #[case::opaque_sympy("unknown_op(p0)", &[])]
+    fn visit_input_variables(#[case] param: &str, #[case] expected: &[&str]) {
+        let parsed = PytketParam::parse(param);
+        let mut variables = Vec::new();
+        parsed.visit_input_variables(&mut |name| variables.push(name));
+        assert_eq!(variables, expected);
     }
 }
