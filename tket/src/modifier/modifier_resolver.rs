@@ -102,8 +102,8 @@
 //! - StateOrder edge: Currently, the modified function does not contain StateOrder edges
 //!   in any case.
 //!   This won't be manageable if dagger is applied, but if not, it should be handled in the future.
-//! - User defined extension ops: There is no way to infer modified unknown extension ops.
-//!   We currently raise an error if an unknown extension is found.
+//! - User defined extension ops: There is no way to infer modified unknown extension ops
+//!   that operate on quantum data. We currently raise an error if one is found.
 use fxhash::FxHashSet;
 use itertools::{Either, Itertools};
 use std::{
@@ -1006,6 +1006,23 @@ impl<N: HugrNode> ModifierResolver<N> {
         self.map_insert(Wire::new(n, 0).into(), Wire::new(output, 0).into())
     }
 
+    /// Copy the dataflow operation to the new function.
+    /// These are the operations that are not modified by the modifier.
+    fn modify_dataflow_op(
+        &mut self,
+        h: &impl HugrMut<Node = N>,
+        n: N,
+        optype: &OpType,
+        new_dfg: &mut impl Container,
+    ) -> Result<(), ModifierResolverErrors<N>> {
+        let node = new_dfg.add_child_node(optype.clone());
+        let signature = h.signature(n).unwrap();
+        let inputs = signature.input.iter();
+        let outputs = signature.output.iter();
+        self.wire_node_inout(n, node, (inputs, outputs), (0, 0, 0))?;
+        Ok(())
+    }
+
     fn modify_extension_op(
         &mut self,
         h: &impl HugrMut<Node = N>,
@@ -1013,6 +1030,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         optype: &OpType,
         new_dfg: &mut impl Dataflow,
     ) -> Result<(), ModifierResolverErrors<N>> {
+        let signature = h.signature(op_node).unwrap();
         if self.controls().len() != self.control_num() {
             return Err(ModifierResolverErrors::unreachable(
                 "Control qubits are not set correctly.".to_string(),
@@ -1035,6 +1053,8 @@ impl<N: HugrNode> ModifierResolver<N> {
             || self.try_array_convert(h, op_node, optype, new_dfg)?
         {
             Ok(())
+        } else if !self.signature_has_quantum_data(&signature) {
+            self.modify_dataflow_op(h, op_node, optype, new_dfg)
         } else {
             // Some other Hugr extension operation.
             // Here, we do not know what is the modified version.
@@ -2160,7 +2180,7 @@ mod tests {
 
         // Build a minimal custom extension.
         let unknown_ext: Arc<Extension> = Extension::new_arc(
-            ExtensionId::new_unchecked("test.unknown_modifier_ext"),
+            ExtensionId::new_unchecked("test.unknown_ext"),
             Version::new(0, 0, 1),
             |ext, ext_ref| {
                 ext.add_op(
