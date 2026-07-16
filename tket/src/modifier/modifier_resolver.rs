@@ -1,7 +1,7 @@
 //! Try to delete modifier by applying the modifier to each component.
 //!
 //! The entry point of this module is [`resolve_modifier_with_entrypoints`]
-//! which takes a hugraph and a list of entry points.
+//! which takes a hugr and a list of entry points.
 //! Modifier resolver visits all the nodes reachable from the entry points.
 //!
 //! The main struct [`ModifierResolver`] holds the state during the process,
@@ -11,7 +11,7 @@
 //!
 //! A modifier is assumed to be applied to a loaded function
 //! and called directly exactly once by another modifier or
-//! an `IndirectedCall` node.
+//! an `IndirectCall` node.
 //! That is, the following structure is assumed:
 //! ```text
 //! LoadFunction -> Modifier* -> IndirectedCall
@@ -35,6 +35,8 @@
 //! and a builder `new_dfg` to construct the new graph.
 //! The correspondence map (`corresp_map`) keeps the correspondence
 //! from wires in `h` to wires in `new_dfg`.
+//! The `call_map` keeps track of the calls to the modified function, so that we can connect
+//! the modified function to its callers after the resolution.
 //! See `modify_op`, which is the main function that modifies each node.
 //!
 //! During the resolution, when a node with some data flow included (such as a function) is encountered,
@@ -89,12 +91,12 @@
 //! We also should not forget to connect `fneg` to `Rx` in the new graph, whose edge/wires has
 //! no correspondence in the original graph.
 //!
-//! ## Not supported/TODO cases
+//! ## Not supported:
 //! - Power: Power modifier is not supported at this point.
-//! - Non-trivial CFGs: We cannot support dagger for complicated CFGs
+//! - Dagger of non-trivial CFGs: We cannot support dagger for complicated CFGs
 //!   since it is not clear at all whether we should reverse the control flow or not.
 //!   Currently, when any non-trivial cfg with more than one block is encountered during
-//!   the resolution, an error is returned.
+//!   resolution in a daggered context, an error is returned.
 //! - Branching in modifier chain: As noted above, we assume that a modifier is
 //!   chained linearly.
 //! - StateOrder edge with dagger: StateOrder edges are preserved for ordinary and controlled
@@ -663,11 +665,6 @@ impl<N: HugrNode> ModifierResolver<N> {
 }
 
 impl<N: HugrNode> ModifierResolver<N> {
-    // FIXME: Shouldn't we check that there is a caller of the modified function?
-    // We don't want to modify a function that is loaded and modified but never called.
-    // When more than one modifier is chained, after the last modifier is resolved,
-    // we delete the last modifier node, but the previous modifiers are not deleted.
-    // If the second last modifier was only called by the last modifier, that will not be called anymore.
     fn verify(&self, h: &impl HugrView<Node = N>, n: N) -> Result<(), ModifierError<N>> {
         // Check if the node is a modifier, modifying an operation.
         let optype = h.get_optype(n);
@@ -1080,6 +1077,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             // Some other Hugr extension operation.
             // Here, we do not know what is the modified version.
             // We try to place the original operation.
+            // TODO: Determine when we should raise an error
             // (see https://github.com/Quantinuum/tket2/issues/1828)
             self.modify_dataflow_op(h, op_node, optype, new_dfg)
         }
@@ -1381,6 +1379,11 @@ pub fn resolve_modifier_with_entrypoints_and_scope(
     // (e.g. intermediate nodes in a chain whose last modifier was the one rewritten).
     // Walk the same reachable set again and delete any surviving modifier nodes,
     // together with every downstream node that consumes their output.
+    //
+    // NOTE:
+    // This might be insufficient as a cleanup since the resolution procedure might
+    // generate nodes that are not reachable from the entry points.
+    // If more thorough cleanup is needed, we should run dead code elimination.
     let mut deletelist = entry_points.clone();
     let mut visited = FxHashSet::default();
     while let Some(node) = deletelist.pop_front() {

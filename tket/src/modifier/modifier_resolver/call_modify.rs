@@ -31,9 +31,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             .single_linked_output(call_node, call.called_function_port())
             .unwrap();
 
-        let Some(new_callee) =
-            self.modify_fn_if_needed(h, callee.0, Some(&old_signature), false)?
-        else {
+        let Some(new_callee) = self.modify_fn_if_needed(h, callee.0, Some(&old_signature))? else {
             // If the function need not be modified, just copy the Call node as is.
             let new = self.add_node_no_modification(h, call_node, call.clone(), new_dfg)?;
             self.call_map_insert(callee.0, (new, call.called_function_port()));
@@ -257,9 +255,9 @@ impl<N: HugrNode> ModifierResolver<N> {
         new_dfg.hugr_mut().connect(new_load, 0, new_call_node, 0);
         self.map_insert_none((n, IncomingPort::from(0)).into())?;
 
-        // FIXME: Forgetting all the nodes in the chain so that we don't have to worry about mapping the edges.
+        // Forgetting all the nodes in the chain so that we don't have to worry about mapping the edges.
         // Otherwise, there would be edges in the original graph that have no corresponding edges in the new graph.
-        // However, this could remove wires referenced by other nodes that are not in the chain.
+        // NOTE: this could remove wires referenced by other nodes that are not in the chain.
         for node in trace {
             self.forget_node(h, node)?
         }
