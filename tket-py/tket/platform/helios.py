@@ -14,11 +14,11 @@ HELIOS_CONFIG_META_KEY = _metadata.HELIOS_CONFIG_KEY
 
 __all__ = [
     "HELIOS_CONFIG_META_KEY",
-    "set_platform_config",
+    "_set_platform_config",
 ]
 
 
-def set_platform_config(
+def _set_platform_config(
     hugr: Package | Hugr[Any],
     squash_rxys: bool = True,
     enable_dd: bool = False,
