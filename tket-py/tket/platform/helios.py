@@ -20,6 +20,7 @@ __all__ = [
 
 def _set_platform_config(
     hugr: Package | Hugr[Any],
+    *,
     squash_rxys: bool = True,
     enable_dd: bool = False,
     leakage_repump: bool = False,
