@@ -2746,7 +2746,7 @@ wheels = [
 
 [[package]]
 name = "selene-hugr-qis-compiler"
-version = "0.4.1"
+version = "0.4.2"
 source = { editable = "qis-compiler" }
 
 [package.dev-dependencies]
