@@ -6,7 +6,7 @@
 ### Features
 
 * Disable pytket encoding for tuple wires ([#1846](https://github.com/Quantinuum/tket2/issues/1846)) ([688e097](https://github.com/Quantinuum/tket2/commit/688e0973a1524bf366cbbb732682cb3ebe203fa0))
-* rename NormalizeGuppy to Normalize ([#1824](https://github.com/Quantinuum/tket2/issues/1824)) ([688e097](https://github.com/Quantinuum/tket2/commit/688e0973a1524bf366cbbb732682cb3ebe203fa0))
+* Rename NormalizeGuppy to Normalize ([#1824](https://github.com/Quantinuum/tket2/issues/1824)) ([688e097](https://github.com/Quantinuum/tket2/commit/688e0973a1524bf366cbbb732682cb3ebe203fa0))
 
 ## [0.15.2](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.1...tket-py-v0.15.2) (2026-07-09)
 
