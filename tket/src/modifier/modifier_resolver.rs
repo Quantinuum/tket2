@@ -101,12 +101,8 @@
 //!   chained linearly.
 //! - StateOrder edge with dagger: StateOrder edges are preserved for ordinary and controlled
 //!   rewrites. Their reversal under dagger has not yet been implemented, thus we simply ignore them.
-//! - User defined extension ops: There is no way to infer modified unknown extension ops.
-//!   We currently try to insert the original optype without any modification,
-//!   but this could result in an unexpected error.
 //! - User defined extension ops: There is no way to infer modified unknown extension ops
-//!   that operate on quantum data. We currently raise an error if we found an unknown quantum
-//! operation.
+//!   that operate on quantum data. We currently raise an error if one is found.
 use fxhash::FxHashSet;
 use itertools::{Either, Itertools};
 use std::{
