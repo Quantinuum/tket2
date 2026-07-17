@@ -548,32 +548,22 @@ impl<N: HugrNode> ModifierResolver<N> {
         old: DirWire<N>,
         new: DirWire,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        match self.corresp_map().entry(old) {
-            std::collections::hash_map::Entry::Vacant(entry) => {
-                entry.insert(vec![new]);
-                Ok(())
-            }
-            // Empty entry means that the old wire has no correspondence, so we can insert the new wire.
-            std::collections::hash_map::Entry::Occupied(mut entry) if entry.get().is_empty() => {
-                entry.insert(vec![new]);
+        let existing = self.corresp_map().entry(old).or_default();
+        match existing.as_slice() {
+            // No correspondence yet (vacant or previously emptied): register the new wire.
+            [] => {
+                existing.push(new);
                 Ok(())
             }
             // StateOrder correspondence may already have been registered while
             // wiring a container's I/O ports. Re-registering the same wire is
             // harmless; a different correspondence is still an error.
-            std::collections::hash_map::Entry::Occupied(entry)
-                if entry.get().len() == 1 && entry.get()[0] == new =>
-            {
-                Ok(())
-            }
+            [former] if *former == new => Ok(()),
             // If the old wire is already registered, raise an error.
-            std::collections::hash_map::Entry::Occupied(entry) => {
-                let former = entry.get();
-                Err(ModifierResolverErrors::unreachable(format!(
-                    "Wire already registered for node {}. Former [{},...], Latter {}.",
-                    old.0, former[0], new
-                )))
-            }
+            [former, ..] => Err(ModifierResolverErrors::unreachable(format!(
+                "Wire already registered for node {}. Former [{},...], Latter {}.",
+                old.0, former, new
+            ))),
         }
     }
 
