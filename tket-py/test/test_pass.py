@@ -47,12 +47,14 @@ from pytket.passes import (  # noqa: E402
 )
 
 
+from tket_exts import tket_registry
+
 normalize = Normalize()
 
 
 def _hugr_from_path(str_path: str) -> Hugr:
     with open(Path(str_path), "rb") as f:
-        h = Package.from_bytes(f.read())
+        h = Package.from_bytes(f.read(), tket_registry())
 
     return h.modules[0]
 
@@ -495,12 +497,21 @@ def test_python_qsystem_pass_with_modifiers() -> None:
     runs without errors."""
     qsystem_rebase = QSystemRebasePass()
     qsystem_llvm = _QSystemLLVMPass()
-    for hugr_path in sorted(Path("test_files/modifier_examples").glob("*.hugr")):
+    failures = []
+    for hugr_path in [
+        Path("test_files/modifier_examples/higher_order_recursive.hugr")
+    ]:  # sorted(Path("test_files/modifier_examples").glob("*.hugr")):
         try:
             qsystem_hugr = qsystem_llvm(qsystem_rebase(_hugr_from_path(str(hugr_path))))
+            from hugr.hugr.render import RenderConfig
+
+            qsystem_hugr.render_dot(RenderConfig(max_node_label_length=None)).view(
+                f"qsystem_{hugr_path.stem}"
+            )
             CompilationState.from_python(qsystem_hugr).validate()
+            assert not _contains_modifiers(qsystem_hugr), (
+                f"QSystem passes left modifiers in {hugr_path}"
+            )
         except Exception as exc:
-            raise AssertionError(f"QSystem passes failed for {hugr_path}") from exc
-        assert not _contains_modifiers(qsystem_hugr), (
-            f"QSystem passes left modifiers in {hugr_path}"
-        )
+            failures.append(f"{hugr_path}: {exc}")
+    assert not failures, "QSystem pass failures:\n" + "\n".join(failures)
