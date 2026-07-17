@@ -1,10 +1,14 @@
+from pathlib import Path
+
 from semver import Version
 
 from hugr import tys
 from hugr.ext import Extension, OpDef, OpDefSig
 from hugr.build.dfg import Function
 from hugr.hugr import Hugr
+from hugr.package import Package
 from hugr.std import _std_extensions
+from tket.passes import QSystemRebasePass, _QSystemLLVMPass
 from tket._state import (
     CompilationState,
     embedded_extensions,
@@ -37,6 +41,19 @@ def test_custom_ext_roundtrip() -> None:
 
     assert "test.custom" in binary_roundtrip.used_extensions().ids()
     assert "test.custom" in text_roundtrip.used_extensions().ids()
+
+
+def test_force_ordered_modifier_roundtrip_resolves_extension_ops() -> None:
+    """Resolve every extension op after loading an ordered modifier HUGR."""
+    path = Path("test_files/modifier_examples/higher_order_recursive.hugr")
+    hugr = Package.from_bytes(path.read_bytes(), tket_registry()).modules[0]
+    lowered = _QSystemLLVMPass()(QSystemRebasePass()(hugr))
+
+    binary_roundtrip = CompilationState.from_python(lowered)
+    binary_roundtrip.validate()
+
+    text_roundtrip = CompilationState.from_str(lowered.to_str())
+    text_roundtrip.validate()
 
 
 def test_tket_exts_registry_matches_embedded_tket_extensions() -> None:

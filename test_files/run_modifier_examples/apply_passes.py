@@ -34,9 +34,9 @@ def apply_passes(input_paths: list[Path], output_dir: Path) -> None:
         #     squash_borrows=False,
         # )
         # resolved: Hugr = normalize(hugr)
-        from hugr.hugr.render import RenderConfig
+        # from hugr.hugr.render import RenderConfig
 
-        resolved.render_dot(RenderConfig(max_node_label_length=None)).view("resolved")
+        # resolved.render_dot(RenderConfig(max_node_label_length=None)).view("resolved")
         CompilationState.from_python(resolved).validate()
         output_path = output_dir / f"{input_path.stem}_solved.hugr"
         output_path.write_bytes(resolved.to_bytes())

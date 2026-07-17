@@ -498,16 +498,10 @@ def test_python_qsystem_pass_with_modifiers() -> None:
     qsystem_rebase = QSystemRebasePass()
     qsystem_llvm = _QSystemLLVMPass()
     failures = []
-    for hugr_path in [
-        Path("test_files/modifier_examples/higher_order_recursive.hugr")
-    ]:  # sorted(Path("test_files/modifier_examples").glob("*.hugr")):
+    for hugr_path in sorted(Path("test_files/modifier_examples").glob("*.hugr")):
         try:
             qsystem_hugr = qsystem_llvm(qsystem_rebase(_hugr_from_path(str(hugr_path))))
-            from hugr.hugr.render import RenderConfig
 
-            qsystem_hugr.render_dot(RenderConfig(max_node_label_length=None)).view(
-                f"qsystem_{hugr_path.stem}"
-            )
             CompilationState.from_python(qsystem_hugr).validate()
             assert not _contains_modifiers(qsystem_hugr), (
                 f"QSystem passes left modifiers in {hugr_path}"

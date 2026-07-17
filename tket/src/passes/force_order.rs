@@ -24,6 +24,8 @@ use petgraph::{
 /// Dataflow regions are ordered by inserting order edges between their
 /// immediate children. A dataflow parent with `C` children will have at most
 /// `C-1` edges added. Any node that can be ordered will be.
+/// Existing StateOrder edges are used as precedence constraints and replaced
+/// by the resulting total order, so their ordering is preserved transitively.
 ///
 /// Nodes are ordered according to the `rank` function but respecting the order
 /// required for their dependencies (edges). The algorithm will put nodes of
@@ -81,6 +83,31 @@ pub fn force_order_by_key<H: HugrMut<Node = Node>, K: Ord>(
                 })
                 .collect_vec()
         };
+
+        // `ordered_nodes` was computed from the scheduling graph containing
+        // the existing StateOrder edges, so its order already respects every
+        // original ordering constraint. Remove those local edges before
+        // emitting the total order below. This avoids retaining branching
+        // StateOrder chains alongside the new total chain while preserving
+        // their precedence constraints transitively.
+        let mut old_order_targets = Vec::new();
+        for source in hugr.children(dp).collect_vec() {
+            let source_op = hugr.get_optype(source);
+            if source_op.other_output() != Some(EdgeKind::StateOrder) {
+                continue;
+            }
+            let source_port = source_op.other_output_port().unwrap();
+            old_order_targets.extend(hugr.linked_inputs(source, source_port).filter(
+                |(target, target_port)| {
+                    hugr.get_parent(*target) == Some(dp)
+                        && hugr.get_optype(*target).port_kind(*target_port)
+                            == Some(EdgeKind::StateOrder)
+                },
+            ));
+        }
+        for (target, target_port) in old_order_targets {
+            hugr.disconnect(target, target_port);
+        }
 
         // we iterate over the topologically sorted nodes, prepending the input
         // node and suffixing the output node.
@@ -321,6 +348,33 @@ mod test {
         let rank_map = [(v0, 0), (v1, 1), (v2, 2), (v3, 3)].into_iter().collect();
         let topo_sort = force_order_test_impl(&mut hugr, rank_map);
         assert_eq!(vec![v0, v1, v2, v3], topo_sort);
+    }
+
+    #[test]
+    fn test_force_order_normalizes_existing_order_edges() {
+        let (mut hugr, [v0, v1, v2, v3]) = test_hugr();
+
+        let v1_order_out = hugr.get_optype(v1).other_output_port().unwrap();
+        for target in [v0, v2] {
+            let target_order_in = hugr.get_optype(target).other_input_port().unwrap();
+            hugr.connect(v1, v1_order_out, target, target_order_in);
+        }
+
+        // The ranks prefer v1 last, but both existing constraints must keep it
+        // before v0 and v2 after the branching order edges are normalized.
+        let rank_map = [(v0, 0), (v1, 10), (v2, 1), (v3, 2)].into_iter().collect();
+        let topo_sort = force_order_test_impl(&mut hugr, rank_map);
+        let position = |node| topo_sort.iter().position(|n| *n == node).unwrap();
+        assert!(position(v1) < position(v0));
+        assert!(position(v1) < position(v2));
+
+        // The total order contains no branching StateOrder outputs.
+        for node in hugr.nodes() {
+            let optype = hugr.get_optype(node);
+            if let Some(port) = optype.other_output_port() {
+                assert!(hugr.linked_inputs(node, port).count() <= 1);
+            }
+        }
     }
 
     #[test]
