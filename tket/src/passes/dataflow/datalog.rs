@@ -218,7 +218,7 @@ fn run_datalog<V: AbstractValue, H: HugrView>(
 
         // Assemble node_in_value_row from in_wire_value's
         node_in_value_row(n, ValueRow::new(sig.input_count())) <-- node(n), if let Some(sig) = hugr.signature(*n);
-        node_in_value_row(n, ValueRow::new(hugr.signature(*n).unwrap().input_count()).set(p.index(), v.clone())) <-- in_wire_value(n, p, v);
+        node_in_value_row(n, ValueRow::sparse(hugr.signature(*n).unwrap().input_count(), p.index(), v.clone())) <-- in_wire_value(n, p, v);
 
         // Interpret leaf ops
         out_wire_value(n, p, v) <--
@@ -226,7 +226,7 @@ fn run_datalog<V: AbstractValue, H: HugrView>(
            let op_t = hugr.get_optype(*n),
            if !op_t.is_container(),
            if let Some(sig) = op_t.dataflow_signature(),
-           if let Some(outs) = propagate_leaf_op(&mut ctx, &hugr, *n, &vs[..], sig.output_count()),
+           if let Some(outs) = propagate_leaf_op(&mut ctx, &hugr, *n, vs.values(), sig.output_count()),
            for (p, v) in (0..).map(OutgoingPort::from).zip(outs);
 
         // DFG --------------------
