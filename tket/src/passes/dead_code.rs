@@ -6,6 +6,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 
+use crate::passes::composable::InScope;
 use crate::passes::composable::WithScope;
 use crate::passes::{ComposablePass, PassScope};
 
@@ -134,7 +135,15 @@ impl<H: HugrView> DeadCodeElimPass<H> {
             // being globally optimized. We could remove more from parent, but would require transforming
             // (e.g. removing individual Output ports) not just deleting, so don't.
             q.extend(h.get_parent(n));
-            for (i, ch) in h.children(n).enumerate() {
+            let inspect_children = self
+                .scope
+                .as_ref()
+                .is_none_or(|scope| scope.in_scope(h, n) != InScope::No);
+            for (i, ch) in h
+                .children(n)
+                .take(if inspect_children { usize::MAX } else { 0 })
+                .enumerate()
+            {
                 if self.must_preserve(h, &mut must_preserve, ch)
                     || match h.get_optype(ch) {
                         OpType::Case(_)  // Include all Cases in Conditionals
