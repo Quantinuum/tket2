@@ -235,7 +235,7 @@ impl<'h> PytketDecoderContext<'h> {
                     LoadedParameter::float_half_turns(wire)
                 };
                 self.wire_tracker
-                    .register_input_parameter(param, param_name)?;
+                    .bind_parameter(param, param_name, &mut self.builder)?;
             } else {
                 // This is an unsupported wire. If it was connected to the old
                 // region's output, rewire it to the new region's output.
