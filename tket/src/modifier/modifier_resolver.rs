@@ -1059,7 +1059,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         let outputs = signature.output.iter();
         self.wire_node_inout(n, new_node, (inputs, outputs), (0, 0, 0))?;
         self.wire_state_order(n, optype, new_node, optype)?;
-        // todo: should we wire the state order edges here?
         Ok(())
     }
 
