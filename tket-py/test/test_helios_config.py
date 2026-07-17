@@ -8,7 +8,7 @@ def _make_hugr() -> Hugr[ops.Module]:
     return Hugr[ops.Module]()
 
 
-def test__set_platform_config_defaults_hugr() -> None:
+def test_set_platform_config_defaults_hugr() -> None:
     hugr = _make_hugr()
 
     _set_platform_config(hugr)
@@ -21,7 +21,7 @@ def test__set_platform_config_defaults_hugr() -> None:
     }
 
 
-def test__set_platform_config_custom_hugr() -> None:
+def test_set_platform_config_custom_hugr() -> None:
     hugr = _make_hugr()
 
     _set_platform_config(hugr, squash_rxys=False, enable_dd=True, leakage_repump=True)
@@ -30,7 +30,7 @@ def test__set_platform_config_custom_hugr() -> None:
     assert config == {"squash_rxys": False, "enable_dd": True, "leakage_repump": True}
 
 
-def test__set_platform_config_defaults_package() -> None:
+def test_set_platform_config_defaults_package() -> None:
     package = Package([_make_hugr(), _make_hugr()])
 
     _set_platform_config(package)
@@ -44,7 +44,7 @@ def test__set_platform_config_defaults_package() -> None:
         }
 
 
-def test__set_platform_config_custom_package() -> None:
+def test_set_platform_config_custom_package() -> None:
     package = Package([_make_hugr(), _make_hugr()])
 
     _set_platform_config(
@@ -60,7 +60,7 @@ def test__set_platform_config_custom_package() -> None:
         }
 
 
-def test__set_platform_config_independent_copies() -> None:
+def test_set_platform_config_independent_copies() -> None:
     """Each module gets its own config dict, not a shared reference."""
     package = Package([_make_hugr(), _make_hugr()])
 
