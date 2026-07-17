@@ -487,11 +487,18 @@ fn test_region() {
     for (wire, val) in [
         (Wire::new(nested_input, 0), Some(pv_true())),
         (Wire::new(nested.node(), 0), Some(pv_true())),
-        (Wire::new(nested.node(), 1), Some(pv_false())),
     ] {
         assert_eq!(whole_hugr_results.read_out_wire(wire), val);
         assert_eq!(sub_hugr_results.read_out_wire(wire), val);
     }
+    assert_eq!(
+        whole_hugr_results.read_out_wire(Wire::new(nested.node(), 1)),
+        Some(pv_false())
+    );
+    assert_eq!(
+        sub_hugr_results.read_out_wire(Wire::new(nested.node(), 1)),
+        Some(PartialValue::Top)
+    );
 
     for (wire, val) in [
         (cst_w, pv_false()),
