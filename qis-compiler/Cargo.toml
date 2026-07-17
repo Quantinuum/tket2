@@ -20,8 +20,8 @@ serde_json.workspace = true
 tracing.workspace = true
 itertools.workspace = true
 strum.workspace = true
-tket = { path = "../tket", version = "0.19.1" }
-tket-qsystem = { path = "../tket-qsystem", version = "0.25.1", features = [
+tket = { path = "../tket", version = "0.19.2" }
+tket-qsystem = { path = "../tket-qsystem", version = "0.25.2", features = [
     "llvm",
 ] }
 

@@ -1,6 +1,16 @@
 # Changelog
 
 
+## [0.25.2](https://github.com/quantinuum/tket2/compare/tket-qsystem-v0.25.1...tket-qsystem-v0.25.2) - 2026-07-17
+
+### Bug Fixes
+
+- Deduplicate lowering replacement functions by using Visibility::Public ([#1706](https://github.com/quantinuum/tket2/pull/1706))
+
+### Performance
+
+- Cap SLP vectorizer recursion depth to fix compile-time blowup ([#1847](https://github.com/quantinuum/tket2/pull/1847))
+
 ## [0.25.1](https://github.com/quantinuum/tket2/compare/tket-qsystem-v0.25.0...tket-qsystem-v0.25.1) - 2026-07-06
 
 ### Performance
