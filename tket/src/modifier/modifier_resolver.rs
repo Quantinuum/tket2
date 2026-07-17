@@ -326,6 +326,9 @@ pub struct ModifierResolver<N = Node> {
     /// Original functions for which the resolver generated modified replacements.
     modified_functions: HashSet<N>,
     qubit_finder: TypeUnpacker,
+    /// Whether the operation currently being expanded has an incoming
+    /// StateOrder edge.
+    insert_state_order_edges: bool,
 }
 
 impl<N> ModifierResolver<N> {
@@ -339,6 +342,7 @@ impl<N> ModifierResolver<N> {
             call_map: HashMap::default(),
             modified_functions: HashSet::default(),
             qubit_finder: TypeUnpacker::for_qubits(),
+            insert_state_order_edges: false,
         }
     }
 }
@@ -470,6 +474,22 @@ impl<N: HugrNode> ModifierResolver<N> {
         self.call_map().entry(source).or_default().push(target);
     }
 
+    fn with_state_order_edges<T>(
+        &mut self,
+        insert_state_order_edges: bool,
+        f: impl FnOnce(&mut Self) -> T,
+    ) -> T {
+        let previous =
+            std::mem::replace(&mut self.insert_state_order_edges, insert_state_order_edges);
+        let result = f(self);
+        self.insert_state_order_edges = previous;
+        result
+    }
+
+    fn should_insert_state_order_edges(&self) -> bool {
+        self.insert_state_order_edges
+    }
+
     fn signature_has_quantum_data(&self, signature: &Signature) -> bool {
         signature
             .input
@@ -536,6 +556,14 @@ impl<N: HugrNode> ModifierResolver<N> {
             // Empty entry means that the old wire has no correspondence, so we can insert the new wire.
             std::collections::hash_map::Entry::Occupied(mut entry) if entry.get().is_empty() => {
                 entry.insert(vec![new]);
+                Ok(())
+            }
+            // StateOrder correspondence may already have been registered while
+            // wiring a container's I/O ports. Re-registering the same wire is
+            // harmless; a different correspondence is still an error.
+            std::collections::hash_map::Entry::Occupied(entry)
+                if entry.get().len() == 1 && entry.get()[0] == new =>
+            {
                 Ok(())
             }
             // If the old wire is already registered, raise an error.
@@ -1035,11 +1063,13 @@ impl<N: HugrNode> ModifierResolver<N> {
         optype: &OpType,
         new_dfg: &mut impl Container,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        let node = new_dfg.add_child_node(optype.clone());
+        let new_node = new_dfg.add_child_node(optype.clone());
         let signature = h.signature(n).unwrap();
         let inputs = signature.input.iter();
         let outputs = signature.output.iter();
-        self.wire_node_inout(n, node, (inputs, outputs), (0, 0, 0))?;
+        self.wire_node_inout(n, new_node, (inputs, outputs), (0, 0, 0))?;
+        self.wire_state_order(n, optype, new_node, optype)?;
+        // todo: should we wire the state order edges here?
         Ok(())
     }
 
@@ -1058,8 +1088,14 @@ impl<N: HugrNode> ModifierResolver<N> {
         }
 
         if let Some(tket_op) = TketOp::from_optype(optype) {
-            let pv = self.modify_tket_op(op_node, tket_op, new_dfg, &mut vec![])?;
-            self.add_edge_from_pv(h, op_node, pv)
+            let is_state_order_target = optype.other_input_port().is_some_and(|port| {
+                optype.port_kind(port) == Some(EdgeKind::StateOrder)
+                    && h.single_linked_output(op_node, port).is_some()
+            });
+            self.with_state_order_edges(is_state_order_target, |this| {
+                let pv = this.modify_tket_op(op_node, tket_op, new_dfg, &mut vec![])?;
+                this.add_edge_from_pv(h, op_node, pv)
+            })
         } else if GlobalPhase::from_optype(optype).is_some() {
             let inputs = self.modify_global_phase(op_node, new_dfg, &mut vec![])?;
             self.corresp_map().insert(
@@ -1445,6 +1481,7 @@ mod tests {
             CallIndirect, ExtensionOp,
             handle::{FuncID, NodeHandle},
         },
+        std_extensions::arithmetic::{float_ops::FloatOps, float_types::ConstF64},
         std_extensions::collections::array::ArrayOpBuilder,
         type_row,
         types::{Term, TypeBound},
@@ -1538,9 +1575,10 @@ mod tests {
         dagger: bool,
     ) -> Hugr {
         let (mut h, foo_node) = modifier_test_hugr(target_num, ctrl_num, foo, dagger);
-
+        std::fs::write("before.mmd", h.mermaid_string()).unwrap();
         let entrypoint = h.entrypoint();
         resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        std::fs::write("after.mmd", h.mermaid_string()).unwrap();
 
         // We check that the original function node has been removed in the resolved hugr
         assert!(!h.contains_node(foo_node));
@@ -1690,6 +1728,12 @@ mod tests {
                 .define_function("foo", Signature::new_endo([qb_t(), qb_t()]))
                 .unwrap();
             function.set_unitary();
+            // This non-quantum extension op is copied via `modify_dataflow_op`.
+            let angle = function.add_load_value(ConstF64::new(0.5));
+            let _negated_angle = function
+                .add_dataflow_op(FloatOps::fneg, [angle])
+                .unwrap()
+                .out_wire(0);
             let mut inputs = function.input_wires();
             let first = function
                 .add_dataflow_op(TketOp::X, [inputs.next().unwrap()])
@@ -1717,13 +1761,15 @@ mod tests {
                 .sum()
         }
 
-        let (mut h, foo_node) = modifier_test_hugr(2, 1, foo, false);
+        let (mut h, foo_node) = modifier_test_hugr(2, 3, foo, false);
         force_order(&mut h, foo_node, |_, _| 0).unwrap();
         let original_order_edges = state_order_edge_count(&h, foo_node);
         assert!(original_order_edges > 0);
 
         let entrypoint = h.entrypoint();
+        std::fs::write("before.mmd", h.mermaid_string()).unwrap();
         resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        std::fs::write("after.mmd", h.mermaid_string()).unwrap();
 
         let modified_function = h
             .nodes()
@@ -1733,10 +1779,7 @@ mod tests {
                     .is_some_and(|function| function.func_name().starts_with("__modified__"))
             })
             .unwrap();
-        assert_eq!(
-            state_order_edge_count(&h, modified_function),
-            original_order_edges
-        );
+        assert!(state_order_edge_count(&h, modified_function) > original_order_edges);
         assert_matches!(h.validate(), Ok(()));
     }
 

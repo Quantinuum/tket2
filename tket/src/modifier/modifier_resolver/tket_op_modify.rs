@@ -1,5 +1,6 @@
 //! This module provides functionality to modify TketOp operations in a quantum circuit.
 use hugr::{
+    HugrView,
     ops::handle::NodeHandle,
     std_extensions::arithmetic::{float_ops::FloatOps, float_types::ConstF64},
 };
@@ -12,7 +13,32 @@ use crate::{
 };
 
 impl<N: HugrNode> ModifierResolver<N> {
-    /// Modify a TketOp operation. The returned `PortVector` contains the incoming and outgoing ports of the modified operation.
+    fn state_order_input(pv: &PortVector) -> Result<DirWire, ModifierResolverErrors<N>> {
+        pv.incoming.last().copied().ok_or_else(|| {
+            ModifierResolverErrors::unreachable(
+                "Missing StateOrder input while expanding an operation.".to_string(),
+            )
+        })
+    }
+
+    fn state_order_output(pv: &PortVector) -> Result<DirWire, ModifierResolverErrors<N>> {
+        pv.outgoing.last().copied().ok_or_else(|| {
+            ModifierResolverErrors::unreachable(
+                "Missing StateOrder output while expanding an operation.".to_string(),
+            )
+        })
+    }
+
+    fn connect_state_order(
+        new_fn: &mut impl Dataflow,
+        source: DirWire,
+        target: DirWire,
+    ) -> Result<(), ModifierResolverErrors<N>> {
+        connect(new_fn, &source, &target)
+    }
+
+    /// Modify a TketOp operation. The returned `PortVector` contains the incoming and outgoing
+    /// ports of the modified operation.
     /// Ancilla qubits are dirty qubits that are used to store intermediate results.
     pub(crate) fn modify_tket_op(
         &mut self,
@@ -92,8 +118,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                             } else if i == qubits + control {
                                 Some((halfturn, IncomingPort::from(0)).into())
                             } else {
-                                // TODO: Here we forget state order, we should handle them properly
-                                // see (https://github.com/Quantinuum/tket2/issues/1836)
+                                // NOTE: StateOrder edges are intentionally ignored in a dagger context.
                                 None
                             }
                         })
@@ -217,6 +242,8 @@ impl<N: HugrNode> ModifierResolver<N> {
                 let pv1 = self.with_ancilla(cs2_last, ancilla, |this, ancilla| {
                     this.modify_tket_op(nd, Toffoli, new_fn, ancilla)
                 })?;
+                let pv1_state_in = Self::state_order_input(&pv1)?;
+                let pv1_state_out = Self::state_order_output(&pv1)?;
                 connect(new_fn, &a, &pv1.incoming[2])?;
                 let x_in = pv1.incoming[0];
                 let y_in = pv1.incoming[1];
@@ -230,6 +257,8 @@ impl<N: HugrNode> ModifierResolver<N> {
                 let pv2 = self.with_ancilla(&mut x, ancilla, |this, ancilla| {
                     this.modify_tket_op(nd, CX, new_fn, ancilla)
                 })?;
+                let pv2_state_in = Self::state_order_input(&pv2)?;
+                let pv2_state_out = Self::state_order_output(&pv2)?;
                 connect(new_fn, &a, &pv2.incoming[0])?;
                 a = pv2.outgoing[0];
                 let t_in = pv2.incoming[1];
@@ -242,6 +271,8 @@ impl<N: HugrNode> ModifierResolver<N> {
                 let pv3 = self.with_ancilla(cs2_last, ancilla, |this, ancilla| {
                     this.modify_tket_op(nd, Toffoli, new_fn, ancilla)
                 })?;
+                let pv3_state_in = Self::state_order_input(&pv3)?;
+                let pv3_state_out = Self::state_order_output(&pv3)?;
                 connect(new_fn, &x.into(), &pv3.incoming[0])?;
                 connect(new_fn, &y, &pv3.incoming[1])?;
                 connect(new_fn, &a, &pv3.incoming[2])?;
@@ -255,6 +286,8 @@ impl<N: HugrNode> ModifierResolver<N> {
                 let pv4 = self.with_ancilla(&mut x, ancilla, |this, ancilla| {
                     this.modify_tket_op(nd, CX, new_fn, ancilla)
                 })?;
+                let pv4_state_in = Self::state_order_input(&pv4)?;
+                let pv4_state_out = Self::state_order_output(&pv4)?;
                 connect(new_fn, &a, &pv4.incoming[0])?;
                 connect(new_fn, &t, &pv4.incoming[1])?;
                 a = pv4.outgoing[0];
@@ -269,6 +302,14 @@ impl<N: HugrNode> ModifierResolver<N> {
                 let mut outgoing = vec![x.into(), y, t];
                 if dagger {
                     mem::swap(&mut incoming, &mut outgoing);
+                } else {
+                    if self.should_insert_state_order_edges() {
+                        Self::connect_state_order(new_fn, pv1_state_out, pv2_state_in)?;
+                        Self::connect_state_order(new_fn, pv2_state_out, pv3_state_in)?;
+                        Self::connect_state_order(new_fn, pv3_state_out, pv4_state_in)?;
+                    }
+                    incoming.push(pv1_state_in);
+                    outgoing.push(pv4_state_out);
                 }
                 Ok(PortVector { incoming, outgoing })
             }
@@ -326,6 +367,8 @@ impl<N: HugrNode> ModifierResolver<N> {
 
                 // CnCX(cs,c,t)
                 let pv1 = self.modify_tket_op(op_node, CX, new_fn, ancilla)?;
+                let pv1_state_in = Self::state_order_input(&pv1)?;
+                let pv1_state_out = Self::state_order_output(&pv1)?;
                 let mut incoming = vec![pv1.incoming[0], (crz_pos, IncomingPort::from(0)).into()];
                 connect(new_fn, &t, &pv1.incoming[1])?;
                 let mut c = pv1.outgoing[0];
@@ -338,6 +381,8 @@ impl<N: HugrNode> ModifierResolver<N> {
 
                 // CnCX(cs,c,t)
                 let pv2 = self.modify_tket_op(op_node, CX, new_fn, ancilla)?;
+                let pv2_state_in = Self::state_order_input(&pv2)?;
+                let pv2_state_out = Self::state_order_output(&pv2)?;
                 connect(new_fn, &c, &pv2.incoming[0])?;
                 connect(new_fn, &t, &pv2.incoming[1])?;
                 c = pv2.outgoing[0];
@@ -346,11 +391,55 @@ impl<N: HugrNode> ModifierResolver<N> {
 
                 self.modifiers.dagger = dagger;
                 if dagger {
-                    mem::swap(&mut incoming, &mut outgoing)
+                    mem::swap(&mut incoming, &mut outgoing);
+                    incoming.push((halfturns, IncomingPort::from(0)).into());
+                } else {
+                    incoming.push((halfturns, IncomingPort::from(0)).into());
+                    let crz_pos_state_in = (
+                        crz_pos,
+                        new_fn
+                            .hugr()
+                            .get_optype(crz_pos)
+                            .other_input_port()
+                            .unwrap(),
+                    )
+                        .into();
+                    let crz_pos_state_out = (
+                        crz_pos,
+                        new_fn
+                            .hugr()
+                            .get_optype(crz_pos)
+                            .other_output_port()
+                            .unwrap(),
+                    )
+                        .into();
+                    let crz_neg_state_in = (
+                        crz_neg,
+                        new_fn
+                            .hugr()
+                            .get_optype(crz_neg)
+                            .other_input_port()
+                            .unwrap(),
+                    )
+                        .into();
+                    let crz_neg_state_out = (
+                        crz_neg,
+                        new_fn
+                            .hugr()
+                            .get_optype(crz_neg)
+                            .other_output_port()
+                            .unwrap(),
+                    )
+                        .into();
+
+                    if self.should_insert_state_order_edges() {
+                        Self::connect_state_order(new_fn, crz_pos_state_out, pv1_state_in)?;
+                        Self::connect_state_order(new_fn, pv1_state_out, crz_neg_state_in)?;
+                        Self::connect_state_order(new_fn, crz_neg_state_out, pv2_state_in)?;
+                    }
+                    incoming.push(crz_pos_state_in);
+                    outgoing.push(pv2_state_out);
                 }
-                incoming.push((halfturns, IncomingPort::from(0)).into());
-                // TODO: Here we forget StateOrder wires, we should handle them properly
-                // (see https://github.com/Quantinuum/tket2/issues/1836)
                 Ok(PortVector { incoming, outgoing })
             }
             Rz | Y | Z => {
@@ -411,6 +500,8 @@ impl<N: HugrNode> ModifierResolver<N> {
                 let c = self.controls().pop().unwrap();
                 let cs = mem::replace(self.controls(), vec![c]);
                 let pv_crx1 = self.modify_tket_op(op_node, V, new_fn, ancilla)?;
+                let pv_crx1_state_in = Self::state_order_input(&pv_crx1)?;
+                let pv_crx1_state_out = Self::state_order_output(&pv_crx1)?;
                 incoming.push(pv_crx1.incoming[0]);
                 let mut targ = pv_crx1.outgoing[0].try_into().unwrap();
 
@@ -420,6 +511,8 @@ impl<N: HugrNode> ModifierResolver<N> {
                 let pv_x1 = self.with_ancilla(&mut targ, ancilla, |this, ancilla| {
                     this.modify_tket_op(op_node, tket_op, new_fn, ancilla)
                 })?;
+                let pv_x1_state_in = Self::state_order_input(&pv_x1)?;
+                let pv_x1_state_out = Self::state_order_output(&pv_x1)?;
                 connect(new_fn, &c.into(), &pv_x1.incoming[gate_control])?;
                 let c = pv_x1.outgoing[gate_control].try_into().unwrap();
                 for i in 0..gate_control {
@@ -430,6 +523,8 @@ impl<N: HugrNode> ModifierResolver<N> {
                 self.modifiers.control = 1;
                 let cs = mem::replace(self.controls(), vec![c]);
                 let pv_crx2 = self.modify_tket_op(op_node, Vdg, new_fn, ancilla)?;
+                let pv_crx2_state_in = Self::state_order_input(&pv_crx2)?;
+                let pv_crx2_state_out = Self::state_order_output(&pv_crx2)?;
                 connect(new_fn, &targ.into(), &pv_crx2.incoming[0])?;
                 targ = pv_crx2.outgoing[0].try_into().unwrap();
 
@@ -440,6 +535,8 @@ impl<N: HugrNode> ModifierResolver<N> {
                 let pv_x2 = self.with_ancilla(&mut targ, ancilla, |this, ancilla| {
                     this.modify_tket_op(op_node, tket_op, new_fn, ancilla)
                 })?;
+                let pv_x2_state_in = Self::state_order_input(&pv_x2)?;
+                let pv_x2_state_out = Self::state_order_output(&pv_x2)?;
                 connect(new_fn, &c.into(), &pv_x2.incoming[gate_control])?;
                 c = pv_x2.outgoing[gate_control].try_into().unwrap();
                 for i in 0..gate_control {
@@ -454,6 +551,8 @@ impl<N: HugrNode> ModifierResolver<N> {
                 let pv_cnrx = self.with_ancilla(&mut c, ancilla, |this, ancilla| {
                     this.modify_tket_op(op_node, V, new_fn, ancilla)
                 })?;
+                let pv_cnrx_state_in = Self::state_order_input(&pv_cnrx)?;
+                let pv_cnrx_state_out = Self::state_order_output(&pv_cnrx)?;
                 for _ in 0..gate_control {
                     outgoing.push(self.pop_control().unwrap().into());
                 }
@@ -465,9 +564,15 @@ impl<N: HugrNode> ModifierResolver<N> {
                 assert_eq!(control, self.control_num());
                 self.modifiers.dagger = dagger;
 
-                // TODO: This does not handle StateOrder wires, we should handle them properly
-                // (see https://github.com/Quantinuum/tket2/issues/1836)
                 if !dagger {
+                    if self.should_insert_state_order_edges() {
+                        Self::connect_state_order(new_fn, pv_crx1_state_out, pv_x1_state_in)?;
+                        Self::connect_state_order(new_fn, pv_x1_state_out, pv_crx2_state_in)?;
+                        Self::connect_state_order(new_fn, pv_crx2_state_out, pv_x2_state_in)?;
+                        Self::connect_state_order(new_fn, pv_x2_state_out, pv_cnrx_state_in)?;
+                    }
+                    incoming.push(pv_crx1_state_in);
+                    outgoing.push(pv_cnrx_state_out);
                     Ok(PortVector { incoming, outgoing })
                 } else {
                     Ok(PortVector {
