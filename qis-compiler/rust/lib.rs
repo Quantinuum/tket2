@@ -53,7 +53,6 @@ use tracing::{Level, event, instrument};
 use utils::read_hugr_envelope;
 
 pub use tket::hugr::{self, llvm::inkwell};
-pub use tket_qsystem;
 pub use tket_qsystem::llvm::futures::FuturesCodegenExtension;
 pub use utils::validate;
 
@@ -64,7 +63,7 @@ mod utils;
 const LLVM_MAIN: &str = "qmain";
 const METADATA: &[(&str, &[&str])] = &[("name", &["mainlib"])];
 
-static REGISTRY: std::sync::LazyLock<ExtensionRegistry> = std::sync::LazyLock::new(|| {
+pub static REGISTRY: std::sync::LazyLock<ExtensionRegistry> = std::sync::LazyLock::new(|| {
     ExtensionRegistry::new([
         prelude::PRELUDE.to_owned(),
         int_types::EXTENSION.to_owned(),
