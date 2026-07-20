@@ -36,24 +36,24 @@ use std::{fs, str, vec};
 use tket::extension::rotation::ROTATION_EXTENSION;
 use tket::extension::{TKET_EXTENSION, TKET1_EXTENSION};
 use tket::hugr::extension::{ExtensionRegistry, prelude};
-pub use tket::hugr::llvm::inkwell;
 use tket::hugr::std_extensions::arithmetic::{
     conversions, float_ops, float_types, int_ops, int_types,
 };
 use tket::hugr::std_extensions::{collections, logic, ptr};
-use tket::hugr::{self};
 use tket::hugr::{Hugr, HugrView, Node};
 use tket::llvm::rotation::RotationCodegenExtension;
 use tket_qsystem::QSystemPass;
 use tket_qsystem::extension::{futures as qsystem_futures, qsystem, result as qsystem_result};
 use tket_qsystem::llvm::array_utils::ArrayLowering;
-pub use tket_qsystem::llvm::futures::FuturesCodegenExtension;
 use tket_qsystem::llvm::{
     debug::DebugCodegenExtension, prelude::QISPreludeCodegen, qsystem::QSystemCodegenExtension,
     random::RandomCodegenExtension, result::ResultsCodegenExtension, utils::UtilsCodegenExtension,
 };
 use tracing::{Level, event, instrument};
 use utils::read_hugr_envelope;
+
+pub use tket::hugr::{self, llvm::inkwell};
+pub use tket_qsystem::llvm::futures::FuturesCodegenExtension;
 
 mod gpu;
 mod selene_specific;
