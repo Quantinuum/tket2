@@ -9,11 +9,14 @@ working with quantum circuits. See also the Rust library with the same name on
 [crates.io](https://crates.io/crates/tket).
 """
 
-from . import passes, metadata
+from . import extensions, passes, metadata, platform, util
 
 __all__ = [
+    "extensions",
     "passes",
     "metadata",
+    "platform",
+    "util",
 ]
 
 
