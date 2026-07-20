@@ -32,13 +32,10 @@ use std::rc::Rc;
 use std::sync::Once;
 use std::vec::Vec;
 use std::{fs, str, vec};
-pub use tket::hugr::llvm::inkwell;
-use tket::hugr::{self};
 use tket::hugr::{Hugr, HugrView, Node};
 use tket::llvm::rotation::RotationCodegenExtension;
 use tket_qsystem::extension::{REGISTRY, qsystem};
 use tket_qsystem::llvm::array_utils::ArrayLowering;
-pub use tket_qsystem::llvm::futures::FuturesCodegenExtension;
 use tket_qsystem::llvm::globals::GlobalsCodegenExtension;
 use tket_qsystem::llvm::{
     argument::ArgumentCodegenExtension, debug::DebugCodegenExtension, prelude::QISPreludeCodegen,
@@ -47,6 +44,9 @@ use tket_qsystem::llvm::{
 };
 use tracing::{Level, event, instrument};
 use utils::read_hugr_envelope;
+
+pub use tket::hugr::{self, llvm::inkwell};
+pub use tket_qsystem::llvm::futures::FuturesCodegenExtension;
 
 mod gpu;
 mod selene_specific;
