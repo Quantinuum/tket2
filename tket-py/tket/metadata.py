@@ -202,3 +202,9 @@ def _read_pytket_register(key: str, value: JsonType) -> list[tuple[str, list[int
             register_indices.append(index)
         registers.append((name, register_indices))
     return registers
+
+
+class HeliosPlatformConfig(Metadata[dict[str, bool]]):
+    """Metadata key for Helios-specific configuration options."""
+
+    KEY = _metadata.HELIOS_PLATFORM_CONFIG

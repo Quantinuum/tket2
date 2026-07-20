@@ -1,7 +1,8 @@
 from hugr import Hugr, ops
 from hugr.package import Package
 
-from tket.platform.helios import HELIOS_CONFIG_META_KEY, _set_platform_config
+from tket.platform.helios import _set_platform_config
+from tket._tket.metadata import HELIOS_PLATFORM_CONFIG as HELIOS_CONFIG_META_KEY
 
 
 def _make_hugr() -> Hugr[ops.Module]:

@@ -7,13 +7,9 @@ from typing import Any
 from hugr.hugr.base import Hugr
 from hugr.package import Package
 
-from .._tket import metadata as _metadata
-
-#: Metadata key under which the Helios platform configuration is stored.
-HELIOS_CONFIG_META_KEY = _metadata.HELIOS_CONFIG_KEY
+from ..metadata import HeliosPlatformConfig
 
 __all__ = [
-    "HELIOS_CONFIG_META_KEY",
     "_set_platform_config",
 ]
 
@@ -47,4 +43,4 @@ def _set_platform_config(
     }
     modules = hugr.modules if isinstance(hugr, Package) else [hugr]
     for module in modules:
-        module[module.module_root].metadata[HELIOS_CONFIG_META_KEY] = config.copy()
+        module[module.module_root].metadata[HeliosPlatformConfig] = config.copy()

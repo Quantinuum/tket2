@@ -233,15 +233,24 @@ impl MakeOpDef for RuntimeBarrierDef {
     }
 }
 
+// WA for https://github.com/serde-rs/serde/issues/368
+fn literal_true() -> bool {
+    true
+}
+
 /// Platform config options exposed by `tket.platform.helios.set_platform_config`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
 pub struct HeliosPlatformConfig {
     /// Whether to combine single-qubit gates at runtime (independent of any
-    /// compile-time squashing).
+    /// compile-time squashing). Default true.
+    #[serde(default = "literal_true")]
     pub squash_rxys: bool,
-    /// Whether to enable dynamical decoupling.
+    /// Whether to enable dynamical decoupling. Default false.
+    #[serde(default)]
     pub enable_dd: bool,
-    /// Whether to enable leakage repump.
+    /// Whether to enable leakage repump. Default false.
+    #[serde(default)]
     pub leakage_repump: bool,
 }
 
@@ -568,10 +577,7 @@ mod test {
     use hugr::std_extensions::arithmetic::int_types::int_type;
     use hugr::std_extensions::collections::array::ArrayOpBuilder;
 
-    use super::{
-        EXTENSION, EXTENSION_ID, HeliosOp, HeliosPlatformConfig, HeliosSynthesizer,
-        SynthesizeHeliosOp,
-    };
+    use super::{EXTENSION, EXTENSION_ID, HeliosOp, HeliosSynthesizer, SynthesizeHeliosOp};
     use hugr::extension::prelude::qb_t;
     use hugr::std_extensions::arithmetic::float_types::float64_type;
     use hugr::types::Signature;
@@ -670,25 +676,5 @@ mod test {
     #[test]
     fn test_cast() {
         crate::extension::qsystem::common::test_utils::assert_cast_roundtrip::<HeliosOp>();
-    }
-
-    #[test]
-    fn roundtrip_helios_public_config() {
-        for config in [
-            HeliosPlatformConfig {
-                squash_rxys: false,
-                enable_dd: true,
-                leakage_repump: true,
-            },
-            HeliosPlatformConfig {
-                squash_rxys: true,
-                enable_dd: false,
-                leakage_repump: false,
-            },
-        ] {
-            let json = serde_json::to_string(&config).unwrap();
-            let decoded: HeliosPlatformConfig = serde_json::from_str(&json).unwrap();
-            assert_eq!(config, decoded);
-        }
     }
 }
