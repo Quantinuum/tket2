@@ -20,10 +20,6 @@ use inkwell::targets::{
 use itertools::Itertools;
 #[cfg(feature = "py")]
 use pyo3::prelude::*;
-use tket::hugr::ops::DataflowParent;
-use tket::passes::composable::ComposablePass;
-use tket_qsystem::{QSystemLLVMPass, QSystemRebasePass};
-
 use std::error::Error;
 use std::ffi::CString;
 use std::fmt::{self, Display, Formatter};
@@ -32,9 +28,12 @@ use std::rc::Rc;
 use std::sync::Once;
 use std::vec::Vec;
 use std::{fs, str, vec};
-use tket::hugr::{self, llvm::inkwell};
+pub use tket::hugr::llvm::inkwell;
+use tket::hugr::ops::DataflowParent;
+use tket::hugr::{self};
 use tket::hugr::{Hugr, HugrView, Node};
 use tket::llvm::rotation::RotationCodegenExtension;
+use tket::passes::composable::ComposablePass;
 use tket_qsystem::extension::{REGISTRY, qsystem};
 use tket_qsystem::llvm::array_utils::ArrayLowering;
 pub use tket_qsystem::llvm::futures::FuturesCodegenExtension;
@@ -44,6 +43,7 @@ use tket_qsystem::llvm::{
     qsystem::QSystemCodegenExtension, random::RandomCodegenExtension,
     result::ResultsCodegenExtension, utils::UtilsCodegenExtension,
 };
+use tket_qsystem::{QSystemLLVMPass, QSystemRebasePass};
 use tracing::{Level, event, instrument};
 use utils::read_hugr_envelope;
 
