@@ -53,6 +53,7 @@ use tracing::{Level, event, instrument};
 use utils::read_hugr_envelope;
 
 pub use tket::hugr::{self, llvm::inkwell};
+pub use tket_qsystem;
 pub use tket_qsystem::llvm::futures::FuturesCodegenExtension;
 pub use utils::validate;
 
