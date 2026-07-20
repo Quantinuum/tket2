@@ -23,6 +23,7 @@ use inkwell::targets::{
     CodeModel, InitializationConfig, RelocMode, Target, TargetMachine, TargetTriple,
 };
 use itertools::Itertools;
+#[cfg(feature = "py")]
 use pyo3::prelude::*;
 use tket::hugr::ops::DataflowParent;
 
@@ -414,12 +415,14 @@ pub fn get_opt_level(opt_level: u32) -> Result<OptimizationLevel> {
 }
 
 // -------------------- Python bindings -----------------------
+#[cfg(feature = "py")]
 #[allow(missing_docs)]
 mod exceptions {
     use pyo3::exceptions::PyException;
 
     pyo3::create_exception!(selene_hugr_qis_compiler, HugrReadError, PyException);
 }
+#[cfg(feature = "py")]
 #[pymodule]
 mod selene_hugr_qis_compiler {
     use super::{
