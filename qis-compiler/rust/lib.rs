@@ -36,11 +36,12 @@ use std::{fs, str, vec};
 use tket::extension::rotation::ROTATION_EXTENSION;
 use tket::extension::{TKET_EXTENSION, TKET1_EXTENSION};
 use tket::hugr::extension::{ExtensionRegistry, prelude};
+pub use tket::hugr::llvm::inkwell;
 use tket::hugr::std_extensions::arithmetic::{
     conversions, float_ops, float_types, int_ops, int_types,
 };
 use tket::hugr::std_extensions::{collections, logic, ptr};
-use tket::hugr::{self, llvm::inkwell};
+use tket::hugr::{self};
 use tket::hugr::{Hugr, HugrView, Node};
 use tket::llvm::rotation::RotationCodegenExtension;
 use tket_qsystem::QSystemPass;
