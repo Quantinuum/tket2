@@ -18,6 +18,7 @@ use inkwell::targets::{
     CodeModel, InitializationConfig, RelocMode, Target, TargetMachine, TargetTriple,
 };
 use itertools::Itertools;
+#[cfg(feature = "py")]
 use pyo3::prelude::*;
 use tket::hugr::ops::DataflowParent;
 use tket::passes::composable::ComposablePass;
@@ -511,11 +512,13 @@ pub fn get_platform(platform: &str) -> Result<qsystem::QSystemPlatform> {
 }
 
 // -------------------- Python bindings -----------------------
+#[cfg(feature = "py")]
 mod exceptions {
     use pyo3::exceptions::PyException;
 
     pyo3::create_exception!(selene_hugr_qis_compiler, HugrReadError, PyException);
 }
+#[cfg(feature = "py")]
 #[pymodule]
 mod selene_hugr_qis_compiler {
     use super::{
@@ -594,6 +597,7 @@ mod selene_hugr_qis_compiler {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "py")]
     use super::selene_hugr_qis_compiler::compile_to_bitcode;
     use std::{
         fs,
@@ -624,6 +628,7 @@ mod tests {
         result
     }
 
+    #[cfg(feature = "py")]
     #[test]
     fn test_compile_to_bitcode_returns_file_safe_public_bytes() {
         let hugr = include_bytes!("../python/tests/resources/check.hugr");
@@ -644,6 +649,7 @@ mod tests {
     /// A program with many `if <a or b or ...>:` branches over distinct booleans
     /// used to trigger a superlinear SLP-vectorizer blowup at the default opt
     /// level. It must still compile to valid, parseable bitcode with SLP off.
+    #[cfg(feature = "py")]
     #[test]
     fn test_compile_or_chain_program() {
         let hugr = include_bytes!("../python/tests/resources/slp_or_chain.hugr");
