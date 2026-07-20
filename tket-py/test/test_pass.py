@@ -35,8 +35,8 @@ from tket.passes import (
 # Import the pytket passes, if the `pytket` extra has been installed.
 # If not, skip all tests in this file.
 pytket = pytest.importorskip("pytket")
-from pytket import Circuit, OpType
-from pytket.passes import (
+from pytket import Circuit, OpType  # noqa: E402
+from pytket.passes import (  # noqa: E402
     CliffordSimp,
     RemoveRedundancies,
     SequencePass,
@@ -414,6 +414,8 @@ def test_panic_in_control() -> None:
                 "run",
                 "--no-project",
                 "--prerelease=allow",
+                "--python",
+                "3.13",
                 "run_panic_in_control.py",
                 str((generated_hugrs_dir / hugr_name).resolve()),
             ],

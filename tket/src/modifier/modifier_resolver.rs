@@ -1470,7 +1470,6 @@ mod tests {
             CallIndirect, ExtensionOp,
             handle::{FuncID, NodeHandle},
         },
-        std_extensions::arithmetic::{float_ops::FloatOps, float_types::ConstF64},
         std_extensions::collections::array::ArrayOpBuilder,
         type_row,
         types::{Term, TypeBound},
@@ -1564,10 +1563,9 @@ mod tests {
         dagger: bool,
     ) -> Hugr {
         let (mut h, foo_node) = modifier_test_hugr(target_num, ctrl_num, foo, dagger);
-        std::fs::write("before.mmd", h.mermaid_string()).unwrap();
+
         let entrypoint = h.entrypoint();
         resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
-        std::fs::write("after.mmd", h.mermaid_string()).unwrap();
 
         // We check that the original function node has been removed in the resolved hugr
         assert!(!h.contains_node(foo_node));
@@ -1711,33 +1709,8 @@ mod tests {
     }
 
     #[test]
+    /// Test that modifier passes under control preserve the order edges.
     fn control_modifier_preserves_state_order_edges() {
-        fn foo(module: &mut ModuleBuilder<Hugr>, _: usize) -> FuncID<true> {
-            let mut function = module
-                .define_function("foo", Signature::new_endo([qb_t(), qb_t()]))
-                .unwrap();
-            function.set_unitary();
-            // This non-quantum extension op is copied via `modify_dataflow_op`.
-            let angle = function.add_load_value(ConstF64::new(0.5));
-            let _negated_angle = function
-                .add_dataflow_op(FloatOps::fneg, [angle])
-                .unwrap()
-                .out_wire(0);
-            let mut inputs = function.input_wires();
-            let first = function
-                .add_dataflow_op(TketOp::X, [inputs.next().unwrap()])
-                .unwrap()
-                .out_wire(0);
-            let second = function
-                .add_dataflow_op(TketOp::X, [inputs.next().unwrap()])
-                .unwrap()
-                .out_wire(0);
-            *function
-                .finish_with_outputs([first, second])
-                .unwrap()
-                .handle()
-        }
-
         fn state_order_edge_count(h: &Hugr, root: Node) -> usize {
             h.descendants(root)
                 .flat_map(|node| {
@@ -1750,14 +1723,39 @@ mod tests {
                 .sum()
         }
 
-        let (mut h, foo_node) = modifier_test_hugr(2, 3, foo, false);
+        fn foo(module: &mut ModuleBuilder<Hugr>, _: usize) -> FuncID<true> {
+            let mut function = module
+                .define_function(
+                    "foo",
+                    Signature::new_endo([qb_t(), qb_t(), qb_t(), qb_t(), qb_t()]),
+                )
+                .unwrap();
+            function.set_unitary();
+            let [x, z, control_1, control_2, target] = function.input_wires_arr();
+            let x = function
+                .add_dataflow_op(TketOp::X, [x])
+                .unwrap()
+                .out_wire(0);
+            let z = function
+                .add_dataflow_op(TketOp::Z, [z])
+                .unwrap()
+                .out_wire(0);
+            let [control_1, control_2, target] = function
+                .add_dataflow_op(TketOp::Toffoli, [control_1, control_2, target])
+                .unwrap()
+                .outputs_arr();
+            *function
+                .finish_with_outputs([x, z, control_1, control_2, target])
+                .unwrap()
+                .handle()
+        }
+
+        let (mut h, foo_node) = modifier_test_hugr(5, 3, foo, false);
         force_order(&mut h, foo_node, |_, _| 0).unwrap();
-        let original_order_edges = state_order_edge_count(&h, foo_node);
-        assert!(original_order_edges > 0);
+        assert_eq!(state_order_edge_count(&h, foo_node), 2);
 
         let entrypoint = h.entrypoint();
         resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
-
         let modified_function = h
             .nodes()
             .find(|node| {
@@ -1766,7 +1764,7 @@ mod tests {
                     .is_some_and(|function| function.func_name().starts_with("__modified__"))
             })
             .unwrap();
-        assert!(state_order_edge_count(&h, modified_function) > original_order_edges);
+        assert_eq!(state_order_edge_count(&h, modified_function), 26);
         assert_matches!(h.validate(), Ok(()));
     }
 
