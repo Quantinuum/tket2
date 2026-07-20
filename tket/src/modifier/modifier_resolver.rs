@@ -1756,9 +1756,7 @@ mod tests {
         assert!(original_order_edges > 0);
 
         let entrypoint = h.entrypoint();
-        std::fs::write("before.mmd", h.mermaid_string()).unwrap();
         resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
-        std::fs::write("after.mmd", h.mermaid_string()).unwrap();
 
         let modified_function = h
             .nodes()
