@@ -1,6 +1,7 @@
 from hugr import Hugr, ops
 from hugr.package import Package
 
+from tket.metadata import HeliosPlatformConfig, HeliosPlatformConfigValue
 from tket.platform.helios import _set_platform_config
 from tket._tket.metadata import HELIOS_PLATFORM_CONFIG as HELIOS_CONFIG_META_KEY
 
@@ -27,8 +28,13 @@ def test_set_platform_config_custom_hugr() -> None:
 
     _set_platform_config(hugr, squash_rxys=False, enable_dd=True, leakage_repump=True)
 
-    config = hugr[hugr.module_root].metadata[HELIOS_CONFIG_META_KEY]
-    assert config == {"squash_rxys": False, "enable_dd": True, "leakage_repump": True}
+    assert hugr[hugr.module_root].metadata[HeliosPlatformConfig] == (
+        HeliosPlatformConfigValue(
+            squash_rxys=False,
+            enable_dd=True,
+            leakage_repump=True,
+        )
+    )
 
 
 def test_set_platform_config_defaults_package() -> None:

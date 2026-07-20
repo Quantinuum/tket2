@@ -7,7 +7,7 @@ from typing import Any
 from hugr.hugr.base import Hugr
 from hugr.package import Package
 
-from ..metadata import HeliosPlatformConfig
+from ..metadata import HeliosPlatformConfig, HeliosPlatformConfigValue
 
 __all__ = [
     "_set_platform_config",
@@ -36,11 +36,11 @@ def _set_platform_config(
         enable_dd: Enable dynamical decoupling. Defaults to False.
         leakage_repump: Enable leakage repump. Defaults to False.
     """
-    config = {
-        "squash_rxys": squash_rxys,
-        "enable_dd": enable_dd,
-        "leakage_repump": leakage_repump,
-    }
+    config = HeliosPlatformConfigValue(
+        squash_rxys=squash_rxys,
+        enable_dd=enable_dd,
+        leakage_repump=leakage_repump,
+    )
     modules = hugr.modules if isinstance(hugr, Package) else [hugr]
     for module in modules:
-        module[module.module_root].metadata[HeliosPlatformConfig] = config.copy()
+        module[module.module_root].metadata[HeliosPlatformConfig] = config
