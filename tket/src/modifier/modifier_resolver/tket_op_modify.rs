@@ -733,20 +733,45 @@ mod test {
 
     #[test]
     fn controlled_toffoli_expansion_preserves_state_order() {
+        let mut old_module = ModuleBuilder::new();
+        let mut old_func = old_module
+            .define_function("old", Signature::new_endo([qb_t(), qb_t(), qb_t(), qb_t()]))
+            .unwrap();
+        let previous = old_func.add_child_node(TketOp::X);
+        let op_node = old_func.add_child_node(TketOp::Toffoli);
+        let state_order_output = old_func
+            .hugr()
+            .get_optype(previous)
+            .other_output_port()
+            .unwrap();
+        let state_order_input = old_func
+            .hugr()
+            .get_optype(op_node)
+            .other_input_port()
+            .unwrap();
+        old_func
+            .hugr_mut()
+            .connect(previous, state_order_output, op_node, state_order_input);
+        let insert_state_order_edges = old_func
+            .hugr()
+            .single_linked_output(op_node, state_order_input)
+            .is_some();
+        assert!(insert_state_order_edges);
+
         let mut module = ModuleBuilder::new();
         let mut func = module
-            .define_function("foo", Signature::new_endo([qb_t(), qb_t(), qb_t(), qb_t()]))
+            .define_function("new", Signature::new_endo([qb_t(), qb_t(), qb_t(), qb_t()]))
             .unwrap();
         let inputs = func.input_wires().collect::<Vec<_>>();
-        let op_node = func.add_child_node(TketOp::Toffoli);
         let mut resolver = ModifierResolver::new();
         resolver.modifiers.control = 3;
         resolver.controls = inputs[..3].to_vec();
-        resolver.insert_state_order_edges = true;
 
-        let port_vector = resolver
-            .modify_tket_op(op_node, TketOp::Toffoli, &mut func, &mut vec![inputs[3]])
-            .unwrap();
+        let port_vector = resolver.with_state_order_edges(insert_state_order_edges, |resolver| {
+            resolver
+                .modify_tket_op(op_node, TketOp::Toffoli, &mut func, &mut vec![inputs[3]])
+                .unwrap()
+        });
 
         assert_eq!(port_vector.incoming.len(), 4);
         assert_eq!(port_vector.outgoing.len(), 4);
