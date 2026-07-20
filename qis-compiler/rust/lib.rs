@@ -285,7 +285,7 @@ fn wrap_main<'c>(
 }
 
 #[derive(Debug)]
-struct CompileArgs<'a> {
+pub struct CompileArgs<'a> {
     /// Entry point symbol
     entry: Option<String>,
     /// LLVM module name
@@ -299,7 +299,7 @@ struct CompileArgs<'a> {
 }
 
 impl<'a> CompileArgs<'a> {
-    fn new(
+    pub fn new(
         name: &impl ToString,
         target_machine: &'a TargetMachine,
         opt_level: OptimizationLevel,
@@ -317,7 +317,7 @@ impl<'a> CompileArgs<'a> {
 /// Compile the given HUGR to an LLVM module.
 /// This function is the primary entry point for the compiler.
 #[instrument(skip(ctx, hugr),parent = None)]
-fn compile<'c, 'hugr: 'c>(
+pub fn compile<'c, 'hugr: 'c>(
     args: &CompileArgs,
     ctx: &'c Context,
     hugr: &'hugr mut Hugr,
