@@ -675,7 +675,7 @@ mod test {
         extension::prelude::qb_t,
         ops::CallIndirect,
         std_extensions::collections::array::array_type,
-        types::{Signature, Term},
+        types::{EdgeKind, Signature, Term},
     };
     use strum::IntoEnumIterator;
 
@@ -729,6 +729,40 @@ mod test {
         assert_eq!(port_vector.incoming, expected_incoming);
         assert_eq!(port_vector.outgoing, expected_outgoing);
         assert_eq!(func.hugr().get_optype(new_node), &TketOp::X.into());
+    }
+
+    #[test]
+    fn controlled_toffoli_expansion_preserves_state_order() {
+        let mut module = ModuleBuilder::new();
+        let mut func = module
+            .define_function("foo", Signature::new_endo([qb_t(), qb_t(), qb_t(), qb_t()]))
+            .unwrap();
+        let inputs = func.input_wires().collect::<Vec<_>>();
+        let op_node = func.add_child_node(TketOp::Toffoli);
+        let mut resolver = ModifierResolver::new();
+        resolver.modifiers.control = 3;
+        resolver.controls = inputs[..3].to_vec();
+        resolver.insert_state_order_edges = true;
+
+        let port_vector = resolver
+            .modify_tket_op(op_node, TketOp::Toffoli, &mut func, &mut vec![inputs[3]])
+            .unwrap();
+
+        assert_eq!(port_vector.incoming.len(), 4);
+        assert_eq!(port_vector.outgoing.len(), 4);
+        let h = func.hugr();
+        let state_order_edges = h
+            .nodes()
+            .map(|node| {
+                h.node_outputs(node)
+                    .filter(|port| {
+                        h.get_optype(node).port_kind(*port) == Some(EdgeKind::StateOrder)
+                    })
+                    .map(|port| h.linked_inputs(node, port).count())
+                    .sum::<usize>()
+            })
+            .sum::<usize>();
+        assert_eq!(state_order_edges, 15);
     }
 
     #[rstest::rstest]
