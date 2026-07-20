@@ -1,53 +1,47 @@
 import importlib.util
-import tempfile
-
-from typing import Callable, Any
 import subprocess
-from tket._ops import TketOp
-from tket.passes import (
-    _badger_optimise,
-    _greedy_depth_reduce,
-    InlineFunctions,
-    inline_funcs,
-    Normalize,
-    NormalizeGuppy,
-    ModifierResolverPass,
-    GlobalScope,
-)
-from tket._state import CompilationState
-from tket_exts import modifier, tket_registry
+import tempfile
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any
 
-from tket._pattern import Rule, RuleMatcher
 import hypothesis.strategies as st
-from hypothesis.strategies._internal import SearchStrategy
-from hypothesis import given, settings
-
-from tket.passes import (
-    PytketHugrPass,
-    _QSystemLLVMPass,
-    QSystemRebasePass,
-    PlatformTarget,
-)
-from hugr.build.base import Hugr
-from hugr.package import Package
-
 import numpy as np
 import pytest
-from pathlib import Path
+from hugr.build.base import Hugr
+from hugr.package import Package
+from hypothesis import given, settings
+from hypothesis.strategies._internal import SearchStrategy
+from tket_exts import modifier, tket_registry
+
+from tket._ops import TketOp
+from tket._pattern import Rule, RuleMatcher
+from tket._state import CompilationState
+from tket.passes import (
+    GlobalScope,
+    InlineFunctions,
+    ModifierResolverPass,
+    Normalize,
+    NormalizeGuppy,
+    PlatformTarget,
+    PytketHugrPass,
+    QSystemRebasePass,
+    _badger_optimise,
+    _greedy_depth_reduce,
+    _QSystemLLVMPass,
+    inline_funcs,
+)
 
 # Import the pytket passes, if the `pytket` extra has been installed.
 # If not, skip all tests in this file.
 pytket = pytest.importorskip("pytket")
-from pytket import Circuit, OpType  # noqa: E402
-from pytket.passes import (  # noqa: E402
+from pytket import Circuit, OpType
+from pytket.passes import (
     CliffordSimp,
-    SquashRzPhasedX,
     RemoveRedundancies,
     SequencePass,
+    SquashRzPhasedX,
 )
-
-
-from tket_exts import tket_registry
 
 normalize = Normalize()
 
@@ -498,16 +492,9 @@ def test_python_qsystem_pass_with_modifiers() -> None:
     qsystem_rebase = QSystemRebasePass()
     qsystem_llvm = _QSystemLLVMPass()
     failures = []
-    for hugr_path in [
-        Path("test_files/modifier_examples/higher_order_recursive.hugr")
-    ]:  # sorted(Path("test_files/modifier_examples").glob("*.hugr")):
+    for hugr_path in sorted(Path("test_files/modifier_examples").glob("*.hugr")):
         try:
             qsystem_hugr = qsystem_llvm(qsystem_rebase(_hugr_from_path(str(hugr_path))))
-            from hugr.hugr.render import RenderConfig
-
-            qsystem_hugr.render_dot(RenderConfig(max_node_label_length=None)).view(
-                f"qsystem_{hugr_path.stem}"
-            )
             CompilationState.from_python(qsystem_hugr).validate()
             assert not _contains_modifiers(qsystem_hugr), (
                 f"QSystem passes left modifiers in {hugr_path}"
