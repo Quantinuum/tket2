@@ -8,6 +8,7 @@ use tket::metadata::{
     CircuitRewriteTraces, ExpectedQubitsHint, InlineAnnotation, PytketBitRegisterNames,
     PytketInputParameters, PytketOpGroup, PytketQubitRegisterNames, UnitaryFlags,
 };
+use tket_qsystem::extension::qsystem::helios::HeliosPlatformConfig;
 
 /// The module definition.
 pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
@@ -24,5 +25,6 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     m.add("PYTKET_QUBIT_REGISTER_NAMES", PytketQubitRegisterNames::KEY)?;
     #[expect(deprecated)]
     m.add("PYTKET_PHASE_EXPR", PytketPhaseExpr::KEY)?;
+    m.add("HELIOS_PLATFORM_CONFIG", HeliosPlatformConfig::KEY)?;
     Ok(m)
 }
