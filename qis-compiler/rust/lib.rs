@@ -359,7 +359,7 @@ pub struct CompileArgs<'a> {
 }
 
 impl<'a> CompileArgs<'a> {
-    fn new(
+    pub fn new(
         name: &impl ToString,
         target_machine: &'a TargetMachine,
         opt_level: OptimizationLevel,
