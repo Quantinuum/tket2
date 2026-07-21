@@ -497,14 +497,7 @@ def test_python_qsystem_pass_with_modifiers() -> None:
     for hugr_path in sorted(Path("test_files/modifier_examples").glob("*.hugr")):
         try:
             qsystem_hugr = qsystem_llvm(qsystem_rebase(_hugr_from_path(str(hugr_path))))
-            # TODO:
-            # We skip validation for the panic_in_control and higher_order_recursive examples,
-            # as they fail due to a bug in the hugr validation.
-            # See (https://github.com/Quantinuum/hugr/pull/3170)
-            # This skip is expected to be removed once the previous PR is merged and released.
-            # See (https://github.com/Quantinuum/tket2/issues/1865)
-            if hugr_path.stem not in ("panic_in_control", "higher_order_recursive"):
-                CompilationState.from_python(qsystem_hugr).validate()
+            CompilationState.from_python(qsystem_hugr).validate()
             assert not _contains_modifiers(qsystem_hugr), (
                 f"QSystem passes left modifiers in {hugr_path}"
             )
