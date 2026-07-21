@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#    "guppylang==1.0.0a8",
+#    "guppylang==1.0.0rc2",
 # ]
 # ///
 """Run on selene the passed hugrs"""
@@ -60,7 +60,7 @@ for hugr_path in hugr_paths:
 
     package = hugr.to_package()
 
-    builder = EmulatorBuilder()
+    builder = EmulatorBuilder().with_platform("helios")
     emulator = builder.build(package, n_qubits=9)
     state = emulator.statevector_sim().run()
     res = state.partial_state_dicts()[0]["r"].as_single_state()
