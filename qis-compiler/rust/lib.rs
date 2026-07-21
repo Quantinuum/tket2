@@ -34,7 +34,7 @@ use std::vec::Vec;
 use std::{fs, str, vec};
 use tket::hugr::{Hugr, HugrView, Node};
 use tket::llvm::rotation::RotationCodegenExtension;
-use tket_qsystem::extension::{REGISTRY, qsystem};
+use tket_qsystem::extension::qsystem;
 use tket_qsystem::llvm::array_utils::ArrayLowering;
 use tket_qsystem::llvm::globals::GlobalsCodegenExtension;
 use tket_qsystem::llvm::{
@@ -46,8 +46,7 @@ use tracing::{Level, event, instrument};
 use utils::read_hugr_envelope;
 
 pub use tket::hugr::{self, llvm::inkwell};
-pub use tket_qsystem;
-pub use tket_qsystem::llvm::futures::FuturesCodegenExtension;
+pub use tket_qsystem::{self, extension::REGISTRY, llvm::futures::FuturesCodegenExtension};
 pub use utils::validate;
 
 mod gpu;
