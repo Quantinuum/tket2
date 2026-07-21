@@ -36,12 +36,16 @@ pub fn cliff_angle(value: f64) -> Option<u8> {
 ///
 /// - `bool` - `true` if the value is approximately 0 modulo n, otherwise `false`.
 ///
+/// # Panics
+///
+/// Panics if `n` is zero or not finite.
+///
 pub fn equiv_0(value: f64, n: f64) -> bool {
-    if n == 0.0 {
-        return false;
+    if !n.is_finite() || n == 0.0 {
+        panic!("equiv_0 requires a finite, non-zero modulus");
     }
     let remainder = value.rem_euclid(n);
-    remainder <= EPS || n - remainder <= EPS
+    remainder <= EPS || n.abs() - remainder <= EPS
 }
 
 #[cfg(test)]
@@ -111,8 +115,32 @@ mod tests {
     }
 
     #[test]
-    fn test_equiv_0_invalid_inputs() {
-        assert!(!equiv_0(0.0, 0.0));
+    #[should_panic(expected = "equiv_0 requires a finite, non-zero modulus")]
+    fn test_equiv_0_zero_modulus() {
+        equiv_0(0.0, 0.0);
+    }
+
+    #[test]
+    fn test_equiv_0_negative_modulus() {
+        assert!(equiv_0(4.0, -2.0));
+        assert!(equiv_0(2.0 - 1e-9, -2.0));
+        assert!(!equiv_0(1.0, -2.0));
+    }
+
+    #[test]
+    #[should_panic(expected = "equiv_0 requires a finite, non-zero modulus")]
+    fn test_equiv_0_nan_modulus() {
+        equiv_0(0.0, f64::NAN);
+    }
+
+    #[test]
+    #[should_panic(expected = "equiv_0 requires a finite, non-zero modulus")]
+    fn test_equiv_0_infinite_modulus() {
+        equiv_0(0.0, f64::INFINITY);
+    }
+
+    #[test]
+    fn test_equiv_0_non_finite_values() {
         assert!(!equiv_0(f64::NAN, 2.0));
         assert!(!equiv_0(f64::INFINITY, 2.0));
         assert!(!equiv_0(f64::NEG_INFINITY, 2.0));
