@@ -4,16 +4,18 @@ use crate::u8_encodings::{XX_U8, XY_U8, XZ_U8, YX_U8, YY_U8, YZ_U8, ZX_U8, ZY_U8
 
 // ------------ 1Q Clifford gates that mutate the Pauli operators --------------
 
+// skip fmt due to a bug: https://github.com/rust-lang/rustfmt/issues/5489
+#[rustfmt::skip]
 macro_rules! make_slice_sq_gate {
     ($slice_fn:ident, $gate_fn:ident) => {
         #[doc = concat!(
-                                            "Scalar slice version of [`",
-                                            stringify!($gate_fn),
-                                            "`], applied in-place.\n\n",
-                                            "See [`",
-                                            stringify!($gate_fn),
-                                            "`] for the Pauli transformation and sign-flip logic."
-                                        )]
+            "Scalar slice version of [`",
+            stringify!($gate_fn),
+            "`], applied in-place.\n\n",
+            "See [`",
+            stringify!($gate_fn),
+            "`] for the Pauli transformation and sign-flip logic."
+        )]
         pub fn $slice_fn(zs: &mut [u64], xs: &mut [u64], signs: &mut [u64]) {
             for i in 0..zs.len() {
                 let (new_z, new_x, sign_flip) = $gate_fn(zs[i], xs[i]);
@@ -27,16 +29,17 @@ macro_rules! make_slice_sq_gate {
 
 // --- 1Q Clifford gates that only mutate the sign bits (i.e. Pauli gates) -----
 
+#[rustfmt::skip]
 macro_rules! make_slice_sq_gate_sign_only {
     ($slice_fn:ident, $gate_fn:ident) => {
         #[doc = concat!(
-                                                                    "Scalar slice version of [`",
-                                                                    stringify!($gate_fn),
-                                                                    "`], applied in-place.\n\n",
-                                                                    "See [`",
-                                                                    stringify!($gate_fn),
-                                                                    "`] for the sign-flip logic."
-                                                                )]
+            "Scalar slice version of [`",
+            stringify!($gate_fn),
+            "`], applied in-place.\n\n",
+            "See [`",
+            stringify!($gate_fn),
+            "`] for the sign-flip logic."
+        )]
         pub fn $slice_fn(zs: &[u64], xs: &[u64], signs: &mut [u64]) {
             for i in 0..zs.len() {
                 signs[i] ^= $gate_fn(zs[i], xs[i]);
@@ -47,16 +50,17 @@ macro_rules! make_slice_sq_gate_sign_only {
 
 // ---------------------------- 2Q Clifford gates ------------------------------
 
+#[rustfmt::skip]
 macro_rules! make_slice_tq_gate {
     ($slice_fn:ident, $gate_fn:ident) => {
         #[doc = concat!(
-                                            "Scalar slice version of [`",
-                                            stringify!($gate_fn),
-                                            "`], applied in-place.\n\n",
-                                            "See [`",
-                                            stringify!($gate_fn),
-                                            "`] for the Pauli transformation and sign-flip logic."
-                                        )]
+            "Scalar slice version of [`",
+            stringify!($gate_fn),
+            "`], applied in-place.\n\n",
+            "See [`",
+            stringify!($gate_fn),
+            "`] for the Pauli transformation and sign-flip logic."
+        )]
         pub fn $slice_fn(
             zs0: &mut [u64],
             xs0: &mut [u64],

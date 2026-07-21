@@ -29,6 +29,7 @@ macro_rules! simd_sq_remainder {
     };
 }
 
+#[rustfmt::skip]
 macro_rules! make_simd_sq_gate {
     ($simd_fn:ident, $gate_fn:ident) => {
         #[doc = concat!(
@@ -96,6 +97,8 @@ macro_rules! simd_sq_remainder_sign_only {
         }
     };
 }
+
+#[rustfmt::skip]
 macro_rules! make_simd_sq_gate_sign_only {
     ($simd_fn:ident, $gate_fn:ident) => {
         #[doc = concat!(
@@ -217,6 +220,7 @@ macro_rules! simd_tq_remainder {
     };
 }
 
+#[rustfmt::skip]
 macro_rules! make_simd_tq_gate {
     ($simd_fn:ident, $gate_fn:ident) => {
         #[doc = concat!(
