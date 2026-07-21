@@ -3,7 +3,7 @@ from ._tket.rewrite import ECCRewriter, CircuitRewrite, Subcircuit
 
 __all__ = [
     "default_ecc_rewriter",
-    # Bindings.
+    # Bindings
     # TODO: Wrap these in Python classes.
     "ECCRewriter",
     "CircuitRewrite",

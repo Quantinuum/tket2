@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#    "guppylang==1.0.0a7",
+#    "guppylang==1.0.0rc1",
 # ]
 # ///
 """Some simple nested higher order functions inside modifiers"""
@@ -62,5 +62,5 @@ def main() -> None:
     discard(c)
 
 
-program = main.compile()
+program = main.with_minimal_opt().compile()
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())

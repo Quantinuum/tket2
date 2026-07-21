@@ -11,10 +11,9 @@ use crate::serialize::pytket::opaque::OpaqueSubgraphPayload;
 use crate::serialize::pytket::{PytketDecodeError, PytketEncodeError};
 use hugr::HugrView;
 use hugr::extension::ExtensionId;
-use hugr::extension::prelude::{BarrierDef, Noop, PRELUDE_ID, TupleOpDef, bool_t, qb_t};
+use hugr::extension::prelude::{BarrierDef, Noop, PRELUDE_ID, bool_t, qb_t};
 use hugr::extension::simple_op::MakeExtensionOp;
 use hugr::ops::{ExtensionOp, OpType};
-use hugr::types::TypeArg;
 use tket_json_rs::optype::OpType as PytketOptype;
 
 /// Encoder for [prelude](hugr::extension::prelude) operations.
@@ -33,9 +32,6 @@ impl<H: HugrView> PytketEmitter<H> for PreludeEmitter {
         hugr: &H,
         encoder: &mut PytketEncoderContext<H>,
     ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
-        if let Ok(tuple_op) = TupleOpDef::from_extension_op(op) {
-            return self.tuple_op_to_pytket(node, op, &tuple_op, hugr, encoder);
-        };
         if let Ok(_barrier) = BarrierDef::from_extension_op(op) {
             // Check if the barrier has encodable types in its signature.
             // If not, fallback to marking it as unsupported.
@@ -76,56 +72,6 @@ impl PytketTypeTranslator for PreludeEmitter {
             // that use them are translated to pytket.
             _ => None,
         }
-    }
-}
-
-impl PreludeEmitter {
-    /// Encode a prelude tuple operation.
-    ///
-    /// These just bundle/unbundle the values of the inputs/outputs. Since
-    /// pytket types are already flattened, the translation of these is just a
-    /// no-op.
-    fn tuple_op_to_pytket<H: HugrView>(
-        &self,
-        node: H::Node,
-        op: &ExtensionOp,
-        tuple_op: &TupleOpDef,
-        hugr: &H,
-        encoder: &mut PytketEncoderContext<H>,
-    ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
-        if !matches!(tuple_op, TupleOpDef::MakeTuple | TupleOpDef::UnpackTuple) {
-            // Unknown operation
-            return Ok(EncodeStatus::Unsupported);
-        };
-
-        // First, check if we are working with supported types.
-        //
-        // If any of the types cannot be translated to a pytket type, we return
-        // false so the operation is marked as unsupported as a whole.
-        let args = op.args().first();
-        match args {
-            Some(TypeArg::Tuple(elems)) | Some(TypeArg::List(elems)) => {
-                if elems.is_empty() {
-                    return Ok(EncodeStatus::Unsupported);
-                }
-
-                for arg in elems {
-                    let Ok(ty) = arg.clone().try_into() else {
-                        return Ok(EncodeStatus::Unsupported);
-                    };
-                    let count = encoder.config().type_to_pytket(&ty);
-                    if count.is_none_or(|c| c.params > 0) {
-                        return Ok(EncodeStatus::Unsupported);
-                    }
-                }
-            }
-            _ => return Ok(EncodeStatus::Unsupported),
-        };
-
-        // Now we can gather all inputs and assign them to the node outputs transparently.
-        encoder.emit_transparent_node(node, hugr, |ps| ps.input_params.to_owned())?;
-
-        Ok(EncodeStatus::Success)
     }
 }
 

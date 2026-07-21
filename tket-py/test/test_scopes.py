@@ -2,10 +2,10 @@ import pytest
 
 from .test_pass import _hugr_from_path, _count_ops
 
-from tket.passes import NormalizeGuppy, PytketHugrPass
+from tket.passes import Normalize, PytketHugrPass
 from hugr.passes.scope import GlobalScope, LocalScope
 
-normalize = NormalizeGuppy(inline_funcs=False)
+normalize = Normalize(inline_funcs=False)
 
 
 def test_nested_function_opt_global() -> None:

@@ -14,7 +14,7 @@ from guppylang import guppy
 from guppylang.std.builtins import array, result
 from guppylang.std.qsystem import *  # noqa: F403
 from guppylang.std.quantum import measure, measure_array, qubit, collect_measurements
-from tket.passes import NormalizeGuppy
+from tket.passes import Normalize
 
 
 guppylang.enable_experimental_features()
@@ -28,5 +28,5 @@ def main_() -> None:
     result("qreg1", collect_measurements(measure_array(qreg1)))
 
 
-program = NormalizeGuppy()(main_.compile_function().modules[0])
+program = Normalize()(main_.compile_function().modules[0])
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())

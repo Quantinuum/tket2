@@ -17,7 +17,6 @@ use hugr::{
     std_extensions::collections::array::ArrayOpBuilder,
     types::{EdgeKind, FuncTypeBase, Signature, TypeRow},
 };
-use itertools::Itertools;
 use petgraph::visit::{Topo, Walker};
 
 use crate::{TketOp, extension::global_phase::GlobalPhase};
@@ -106,14 +105,6 @@ impl<N: HugrNode> ModifierResolver<N> {
                 } else {
                     self.control_num()
                 };
-                let mut input = input.clone();
-                if matches!(optype, OpType::FuncDefn(_)) {
-                    self.modify_higher_order_input_types(&mut input, 0)?;
-                } else {
-                    self.modify_carried_higher_order_types_if_present(&mut input)?;
-                }
-                let mut output = output.clone();
-                self.modify_carried_higher_order_types_if_present(&mut output)?;
 
                 // Wire the inputs and outputs
                 // Note that the local variable `old_in` is the input node of the old DFG,
@@ -123,7 +114,6 @@ impl<N: HugrNode> ModifierResolver<N> {
                     (new_out, new_in),
                     (output.iter(), input.iter()),
                     (0, 0, offset),
-                    &HashSet::new(),
                 )?;
             }
             OpType::TailLoop(tail_loop) => {
@@ -149,13 +139,9 @@ impl<N: HugrNode> ModifierResolver<N> {
             OpType::DataflowBlock(dfb) => {
                 let DataflowBlock {
                     inputs,
-                    other_outputs: output,
+                    other_outputs,
                     sum_rows: _sum_rows,
                 } = dfb;
-                let mut input = inputs.clone();
-                self.modify_carried_higher_order_types_if_present(&mut input)?;
-                let mut output = output.clone();
-                self.modify_carried_higher_order_types_if_present(&mut output)?;
 
                 // The branch sum is unchanged.
                 self.map_insert(
@@ -165,9 +151,8 @@ impl<N: HugrNode> ModifierResolver<N> {
                 self.wire_inout(
                     (old_out, old_in),
                     (new_out, new_in),
-                    (output.iter(), input.iter()),
+                    (other_outputs.iter(), inputs.iter()),
                     (1, 0, 0),
-                    &HashSet::new(),
                 )?;
             }
             OpType::Case(_) => {
@@ -316,8 +301,6 @@ impl<N: HugrNode> ModifierResolver<N> {
     /// When the function definition or a concrete call instantiation contains qubits,
     /// the function needs to be modified. The concrete signature matters for polymorphic
     /// functions whose uninstantiated definition may not reveal quantum data.
-    /// force is used to indicate that the function is being called after a modifiers chain,
-    /// so it must be modified even if the concrete signature does not contain qubits.
     ///
     /// NOTE: When a polymorphic function has a polymorphic input, the function is considered
     /// to have classical data (there are no quantum generic types or generic quantum operations).
@@ -326,7 +309,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         h: &mut impl HugrMut<Node = N>,
         func: N,
         concrete_signature: Option<&Signature>,
-        force: bool,
     ) -> Result<Option<N>, ModifierResolverErrors<N>> {
         let OpType::FuncDefn(fn_defn) = h.get_optype(func) else {
             return Err(ModifierResolverErrors::unreachable(format!(
@@ -336,8 +318,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         };
         let concrete_signature_has_quantum_data =
             concrete_signature.is_some_and(|signature| self.signature_has_quantum_data(signature));
-        if !force
-            && !concrete_signature_has_quantum_data
+        if !concrete_signature_has_quantum_data
             && !self.signature_has_quantum_data(fn_defn.signature().body())
         {
             return Ok(None);
@@ -352,7 +333,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         func: N,
     ) -> Result<N, ModifierResolverErrors<N>> {
         let old_call_map = mem::take(self.call_map());
-        let old_dynamic_input_modifiers = mem::take(self.dynamic_input_modifiers());
 
         // Old function definition
         let OpType::FuncDefn(old_fn_defn) = h.get_optype(func) else {
@@ -361,17 +341,8 @@ impl<N: HugrNode> ModifierResolver<N> {
                 h.get_optype(func)
             )));
         };
-        let higher_order_input_modifiers = self.higher_order_input_modifiers(h, func)?;
-        let old_active_function_input_modifiers = mem::replace(
-            self.active_function_input_modifiers(),
-            higher_order_input_modifiers.clone(),
-        );
         let mut poly_signature = old_fn_defn.signature().clone();
         self.modify_signature(poly_signature.body_mut(), false);
-        self.modify_higher_order_input_types(
-            &mut poly_signature.body_mut().input,
-            self.modifiers().accum_ctrl.len(),
-        )?;
 
         let mut new_fn = FunctionBuilder::new(
             format!("__modified__{}", old_fn_defn.func_name()),
@@ -380,9 +351,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         .unwrap();
 
         let modify_result = self.modify_dfg_body(h, func, &mut new_fn);
-        let dynamic_input_modifiers =
-            mem::replace(self.dynamic_input_modifiers(), old_dynamic_input_modifiers);
-        *self.active_function_input_modifiers() = old_active_function_input_modifiers;
         modify_result?;
 
         // Connect the global wires
@@ -396,18 +364,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         }
 
         let new_function_node = insertion_result.inserted_entrypoint;
-        let input_modifiers = if higher_order_input_modifiers.is_empty() {
-            dynamic_input_modifiers
-        } else {
-            higher_order_input_modifiers
-        }
-        .into_iter()
-        .unique()
-        .collect::<Vec<_>>();
-        if !input_modifiers.is_empty() {
-            self.function_input_modifiers
-                .insert(new_function_node, input_modifiers);
-        }
         self.modified_functions.insert(func);
 
         Ok(new_function_node)
@@ -553,11 +509,9 @@ impl<N: HugrNode> ModifierResolver<N> {
             return Ok(());
         }
 
-        let mut boundary_signature = dfg.signature.clone();
-        self.modify_carried_higher_order_types_if_present(&mut boundary_signature.input)?;
-        self.modify_carried_higher_order_types_if_present(&mut boundary_signature.output)?;
-        let mut signature = boundary_signature.clone();
         // Build a new DFG with modified body.
+        let boundary_signature = dfg.signature.clone();
+        let mut signature = boundary_signature.clone();
         self.modify_signature(&mut signature, true);
         let mut builder = DFGBuilder::new(signature.clone()).unwrap();
         self.modify_dfg_body(h, n, &mut builder)?;
@@ -607,14 +561,11 @@ impl<N: HugrNode> ModifierResolver<N> {
         let control_types: TypeRow = iter::repeat_n(qb_t(), self.control_num())
             .collect::<Vec<_>>()
             .into();
-        let mut just_inputs = tail_loop.just_inputs.clone();
-        self.modify_carried_higher_order_types_if_present(&mut just_inputs)?;
-        let mut rest = tail_loop.rest.clone();
-        self.modify_carried_higher_order_types_if_present(&mut rest)?;
-        let mut just_outputs = tail_loop.just_outputs.clone();
-        self.modify_carried_higher_order_types_if_present(&mut just_outputs)?;
-        let mut builder =
-            TailLoopBuilder::new(just_inputs, control_types.extend(rest.iter()), just_outputs)?;
+        let mut builder = TailLoopBuilder::new(
+            tail_loop.just_inputs.clone(),
+            control_types.extend(tail_loop.rest.iter()),
+            tail_loop.just_outputs.clone(),
+        )?;
         self.modify_dfg_body(h, n, &mut builder)?;
         let new_tail_loop = self.insert_sub_dfg(new_dfg, builder)?;
 
@@ -658,14 +609,11 @@ impl<N: HugrNode> ModifierResolver<N> {
     ) -> Result<(), ModifierResolverErrors<N>> {
         // If a conditional does not have quantum operations in its body, we can safely
         // copy the whole conditional without modification.
+        // TODO: Do we need to check for CallIndirect? Maybe just check if there are modifiers?
         let has_indirect_call = h
             .descendants(n)
             .any(|node| matches!(h.get_optype(node), OpType::CallIndirect(_)));
-        let has_active_higher_order_inputs = !self.active_function_input_modifiers().is_empty();
-        if !self.subtree_has_quantum_operation(h, n)
-            && !has_indirect_call
-            && !has_active_higher_order_inputs
-        {
+        if !self.subtree_has_quantum_operation(h, n) && !has_indirect_call {
             self.copy_sub_container_no_modification(h, n, new_dfg)?;
             return Ok(());
         }
@@ -674,21 +622,10 @@ impl<N: HugrNode> ModifierResolver<N> {
 
         // Build a new Conditional with modified body.
         let control_types: TypeRow = iter::repeat_n(qb_t(), offset).collect::<Vec<_>>().into();
-        let mut sum_rows = conditional.sum_rows.clone();
-        for row in &mut sum_rows {
-            // The selected branch payload may contain function values. If a
-            // function value is later called under the active modifier, the
-            // branch sum must carry the modified function type too.
-            self.modify_carried_higher_order_types_if_present(row)?;
-        }
-        let mut other_inputs = conditional.other_inputs.clone();
-        self.modify_carried_higher_order_types_if_present(&mut other_inputs)?;
-        let mut outputs = conditional.outputs.clone();
-        self.modify_carried_higher_order_types_if_present(&mut outputs)?;
         let mut builder = ConditionalBuilder::new(
-            sum_rows.clone(),
-            control_types.extend(other_inputs.iter()),
-            control_types.extend(outputs.iter()),
+            conditional.sum_rows.clone(),
+            control_types.extend(conditional.other_inputs.iter()),
+            control_types.extend(conditional.outputs.iter()),
         )?;
 
         // remember the current control qubits
@@ -696,7 +633,7 @@ impl<N: HugrNode> ModifierResolver<N> {
 
         let iter: Vec<_> = h.children(n).enumerate().collect();
         for (i, case_node) in iter {
-            let tag_wire_num = sum_rows[i].len();
+            let tag_wire_num = conditional.sum_rows[i].len();
             let mut case_builder = builder.case_builder(i).unwrap();
 
             // Set the controls and corresp_map
@@ -722,9 +659,8 @@ impl<N: HugrNode> ModifierResolver<N> {
             self.wire_inout(
                 (old_out, old_in),
                 (new_out, new_in),
-                (outputs.iter(), other_inputs.iter()),
+                (conditional.outputs.iter(), conditional.other_inputs.iter()),
                 (0, tag_wire_num, offset),
-                &HashSet::new(),
             )?;
 
             // Modify the children.
@@ -759,7 +695,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         self.wire_node_inout(
             n,
             new_conditional,
-            (other_inputs.iter(), outputs.iter()),
+            (conditional.other_inputs.iter(), conditional.outputs.iter()),
             (1, 0, offset),
         )?;
 

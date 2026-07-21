@@ -233,6 +233,32 @@ impl MakeOpDef for RuntimeBarrierDef {
     }
 }
 
+// WA for https://github.com/serde-rs/serde/issues/368
+fn literal_true() -> bool {
+    true
+}
+
+/// Platform config options exposed by `tket.platform.helios.set_platform_config`.
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
+pub struct HeliosPlatformConfig {
+    /// Whether to combine single-qubit gates at runtime (independent of any
+    /// compile-time squashing). Default true.
+    #[serde(default = "literal_true")]
+    pub squash_rxys: bool,
+    /// Whether to enable dynamical decoupling. Default false.
+    #[serde(default)]
+    pub enable_dd: bool,
+    /// Whether to enable leakage repump. Default false.
+    #[serde(default)]
+    pub leakage_repump: bool,
+}
+
+impl hugr_core::metadata::Metadata for HeliosPlatformConfig {
+    const KEY: &'static str = "tket.qsystem.helios.configuration";
+    type Type<'hugr> = HeliosPlatformConfig;
+}
+
 #[derive(Debug)]
 /// Implmements traits for lowering operations in terms of Helios primitives.
 pub(super) struct HeliosSynthesizer<'a, D> {

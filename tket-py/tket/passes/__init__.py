@@ -6,6 +6,7 @@ from functools import cache
 import json
 from pathlib import Path
 from typing import TYPE_CHECKING
+from typing_extensions import deprecated
 
 from hugr import Hugr
 
@@ -33,6 +34,7 @@ __all__ = [
     "PassResult",
     "InlineFuncsHeuristic",
     "InlineFunctions",
+    "Normalize",
     "NormalizeGuppy",
     "ModifierResolverPass",
     "QSystemRebasePass",
@@ -146,7 +148,7 @@ class PytketHugrPass(ComposablePass):
 
 
 @dataclass
-class NormalizeGuppy(ComposablePass):
+class Normalize(ComposablePass):
     resolve_modifiers: bool = True
     simplify_cfgs: bool = True
     remove_tuple_untuple: bool = True
@@ -158,7 +160,7 @@ class NormalizeGuppy(ComposablePass):
     squash_borrows: bool = True
     _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
 
-    """Flatten the structure of a Guppy-generated program to enable additional optimisations.
+    """Flatten the structure of a program to enable additional optimisations.
 
     This should normally be called first before other optimisations.
 
@@ -183,7 +185,7 @@ class NormalizeGuppy(ComposablePass):
             copy_call=lambda h: self._normalize(h, inplace),
         )
 
-    def with_scope(self, _scope: PassScope) -> NormalizeGuppy:
+    def with_scope(self, _scope: PassScope) -> Normalize:
         """Set the scope of this pass and return self."""
         self._scope = _scope
         return self
@@ -224,6 +226,11 @@ class NormalizeGuppy(ComposablePass):
             scope=self._scope,
         )
         return program
+
+
+@deprecated("Use `Normalize` instead.")
+class NormalizeGuppy(Normalize):
+    """Deprecated alias for :py:class:`Normalize`."""
 
 
 @cache

@@ -417,56 +417,56 @@ __barray_check_bounds.exit.i.i174:                ; preds = %loop_body.i177, %"_
   %124 = add nuw nsw i64 %"159_0.sroa.15.0168.i", 1, !dbg !68
   %.fca.2.extract208.i.i = extractvalue { ptr, ptr, i64 } %123, 2
   %.fca.1.extract207.i.i = extractvalue { ptr, ptr, i64 } %123, 1
-  %125 = add i64 %.fca.2.extract208.i.i, %"159_0.sroa.15.0168.i"
-  %126 = lshr i64 %125, 6, !dbg !71
-  %127 = getelementptr inbounds nuw i64, ptr %.fca.1.extract207.i.i, i64 %126, !dbg !71
-  %128 = load i64, ptr %127, align 4, !dbg !71
-  %129 = and i64 %125, 63, !dbg !71
-  %130 = lshr i64 %128, %129, !dbg !71
-  %131 = trunc i64 %130 to i1, !dbg !71
-  br i1 %131, label %panic.i.i.i189, label %__barray_check_bounds.exit221.i.i, !dbg !71
+  %125 = add i64 %.fca.2.extract208.i.i, %"159_0.sroa.15.0168.i", !dbg !71
+  %126 = lshr i64 %125, 6, !dbg !72
+  %127 = getelementptr inbounds nuw i64, ptr %.fca.1.extract207.i.i, i64 %126, !dbg !72
+  %128 = load i64, ptr %127, align 4, !dbg !72
+  %129 = and i64 %125, 63, !dbg !72
+  %130 = lshr i64 %128, %129, !dbg !72
+  %131 = trunc i64 %130 to i1, !dbg !72
+  br i1 %131, label %panic.i.i.i189, label %__barray_check_bounds.exit221.i.i, !dbg !72
 
 panic.i.i.i189:                                   ; preds = %__barray_check_bounds.exit.i.i174
-  tail call void @panic(i32 1002, ptr nonnull @"e_Array elem.E746B1A3.0"), !dbg !71
-  unreachable, !dbg !71
+  tail call void @panic(i32 1002, ptr nonnull @"e_Array elem.E746B1A3.0"), !dbg !72
+  unreachable, !dbg !72
 
 __barray_check_bounds.exit221.i.i:                ; preds = %__barray_check_bounds.exit.i.i174
   %.fca.0.extract206.i.i = extractvalue { ptr, ptr, i64 } %123, 0
-  %132 = shl nuw i64 1, %129, !dbg !71
-  %133 = xor i64 %132, %128, !dbg !71
-  store i64 %133, ptr %127, align 4, !dbg !71
-  %134 = getelementptr inbounds i64, ptr %.fca.0.extract206.i.i, i64 %125
-  %135 = load i64, ptr %134, align 4
-  tail call void @___inc_future_refcount(i64 %135)
-  %136 = load i64, ptr %127, align 4
-  %137 = lshr i64 %136, %129
-  %138 = trunc i64 %137 to i1
-  br i1 %138, label %__barray_check_bounds.exit.i175, label %panic.i222.i.i
+  %132 = shl nuw i64 1, %129, !dbg !72
+  %133 = xor i64 %132, %128, !dbg !72
+  store i64 %133, ptr %127, align 4, !dbg !72
+  %134 = getelementptr inbounds i64, ptr %.fca.0.extract206.i.i, i64 %125, !dbg !71
+  %135 = load i64, ptr %134, align 4, !dbg !71
+  tail call void @___inc_future_refcount(i64 %135), !dbg !71
+  %136 = load i64, ptr %127, align 4, !dbg !71
+  %137 = lshr i64 %136, %129, !dbg !71
+  %138 = trunc i64 %137 to i1, !dbg !71
+  br i1 %138, label %__barray_check_bounds.exit.i175, label %panic.i222.i.i, !dbg !71
 
 panic.i222.i.i:                                   ; preds = %__barray_check_bounds.exit221.i.i
-  tail call void @panic(i32 1002, ptr nonnull @"e_Array alre.5A300C2A.0")
-  unreachable
+  tail call void @panic(i32 1002, ptr nonnull @"e_Array alre.5A300C2A.0"), !dbg !71
+  unreachable, !dbg !71
 
 139:                                              ; preds = %mask_block_ok.i.i.i181
-  %140 = add nuw i64 %.02.i.i.i182, 1, !dbg !72
-  %exitcond.not.i.i.i185 = icmp eq i64 %.02.i.i.i182, %reass.sub.i.i.i179, !dbg !72
-  br i1 %exitcond.not.i.i.i185, label %"__hugr__.guppylang.std.quantum.collect_measurements$10.145.exit", label %mask_block_ok.i.i.i181, !dbg !72
+  %140 = add nuw i64 %.02.i.i.i182, 1, !dbg !74
+  %exitcond.not.i.i.i185 = icmp eq i64 %.02.i.i.i182, %reass.sub.i.i.i179, !dbg !74
+  br i1 %exitcond.not.i.i.i185, label %"__hugr__.guppylang.std.quantum.collect_measurements$10.145.exit", label %mask_block_ok.i.i.i181, !dbg !74
 
 mask_block_ok.i.i.i181:                           ; preds = %cond_exit_424.thread.9.i.i, %139
   %.02.i.i.i182 = phi i64 [ %140, %139 ], [ 0, %cond_exit_424.thread.9.i.i ]
-  %gep.i.i.i183 = getelementptr i64, ptr %118, i64 %.02.i.i.i182, !dbg !72
-  %141 = load i64, ptr %gep.i.i.i183, align 4, !dbg !72
-  %142 = icmp eq i64 %141, -1, !dbg !72
-  br i1 %142, label %139, label %mask_block_err.i.i.i184, !dbg !72
+  %gep.i.i.i183 = getelementptr i64, ptr %118, i64 %.02.i.i.i182, !dbg !74
+  %141 = load i64, ptr %gep.i.i.i183, align 4, !dbg !74
+  %142 = icmp eq i64 %141, -1, !dbg !74
+  br i1 %142, label %139, label %mask_block_err.i.i.i184, !dbg !74
 
 mask_block_err.i.i.i184:                          ; preds = %mask_block_ok.i.i.i181
-  tail call void @panic(i32 1002, ptr nonnull @"e_Array cont.EFA5AC45.0"), !dbg !72
-  unreachable, !dbg !72
+  tail call void @panic(i32 1002, ptr nonnull @"e_Array cont.EFA5AC45.0"), !dbg !74
+  unreachable, !dbg !74
 
 __barray_mask_borrow.exit228.i.i:                 ; preds = %loop_body.preheader.i.i
-  %143 = shl nuw i64 1, %120, !dbg !71
-  %144 = xor i64 %119, %143, !dbg !71
-  store i64 %144, ptr %118, align 4, !dbg !71
+  %143 = shl nuw i64 1, %120, !dbg !75
+  %144 = xor i64 %119, %143, !dbg !75
+  store i64 %144, ptr %118, align 4, !dbg !75
   %145 = getelementptr inbounds i64, ptr %"421_1.sroa.0.0.i.i", i64 %"421_1.sroa.10.0.i.i"
   %146 = load i64, ptr %145, align 4
   tail call void @___dec_future_refcount(i64 %146)
@@ -483,9 +483,9 @@ cond_exit_424.thread.i.i:                         ; preds = %__barray_mask_borro
   br i1 %153, label %cond_exit_424.thread.1.i.i, label %__barray_mask_borrow.exit228.1.i.i
 
 __barray_mask_borrow.exit228.1.i.i:               ; preds = %cond_exit_424.thread.i.i
-  %154 = shl nuw i64 1, %151, !dbg !71
-  %155 = xor i64 %150, %154, !dbg !71
-  store i64 %155, ptr %149, align 4, !dbg !71
+  %154 = shl nuw i64 1, %151, !dbg !75
+  %155 = xor i64 %150, %154, !dbg !75
+  store i64 %155, ptr %149, align 4, !dbg !75
   %156 = getelementptr inbounds i64, ptr %"421_1.sroa.0.0.i.i", i64 %147
   %157 = load i64, ptr %156, align 4
   tail call void @___dec_future_refcount(i64 %157)
@@ -502,9 +502,9 @@ cond_exit_424.thread.1.i.i:                       ; preds = %__barray_mask_borro
   br i1 %164, label %cond_exit_424.thread.2.i.i, label %__barray_mask_borrow.exit228.2.i.i
 
 __barray_mask_borrow.exit228.2.i.i:               ; preds = %cond_exit_424.thread.1.i.i
-  %165 = shl nuw i64 1, %162, !dbg !71
-  %166 = xor i64 %161, %165, !dbg !71
-  store i64 %166, ptr %160, align 4, !dbg !71
+  %165 = shl nuw i64 1, %162, !dbg !75
+  %166 = xor i64 %161, %165, !dbg !75
+  store i64 %166, ptr %160, align 4, !dbg !75
   %167 = getelementptr inbounds i64, ptr %"421_1.sroa.0.0.i.i", i64 %158
   %168 = load i64, ptr %167, align 4
   tail call void @___dec_future_refcount(i64 %168)
@@ -521,9 +521,9 @@ cond_exit_424.thread.2.i.i:                       ; preds = %__barray_mask_borro
   br i1 %175, label %cond_exit_424.thread.3.i.i, label %__barray_mask_borrow.exit228.3.i.i
 
 __barray_mask_borrow.exit228.3.i.i:               ; preds = %cond_exit_424.thread.2.i.i
-  %176 = shl nuw i64 1, %173, !dbg !71
-  %177 = xor i64 %172, %176, !dbg !71
-  store i64 %177, ptr %171, align 4, !dbg !71
+  %176 = shl nuw i64 1, %173, !dbg !75
+  %177 = xor i64 %172, %176, !dbg !75
+  store i64 %177, ptr %171, align 4, !dbg !75
   %178 = getelementptr inbounds i64, ptr %"421_1.sroa.0.0.i.i", i64 %169
   %179 = load i64, ptr %178, align 4
   tail call void @___dec_future_refcount(i64 %179)
@@ -540,9 +540,9 @@ cond_exit_424.thread.3.i.i:                       ; preds = %__barray_mask_borro
   br i1 %186, label %cond_exit_424.thread.4.i.i, label %__barray_mask_borrow.exit228.4.i.i
 
 __barray_mask_borrow.exit228.4.i.i:               ; preds = %cond_exit_424.thread.3.i.i
-  %187 = shl nuw i64 1, %184, !dbg !71
-  %188 = xor i64 %183, %187, !dbg !71
-  store i64 %188, ptr %182, align 4, !dbg !71
+  %187 = shl nuw i64 1, %184, !dbg !75
+  %188 = xor i64 %183, %187, !dbg !75
+  store i64 %188, ptr %182, align 4, !dbg !75
   %189 = getelementptr inbounds i64, ptr %"421_1.sroa.0.0.i.i", i64 %180
   %190 = load i64, ptr %189, align 4
   tail call void @___dec_future_refcount(i64 %190)
@@ -559,9 +559,9 @@ cond_exit_424.thread.4.i.i:                       ; preds = %__barray_mask_borro
   br i1 %197, label %cond_exit_424.thread.5.i.i, label %__barray_mask_borrow.exit228.5.i.i
 
 __barray_mask_borrow.exit228.5.i.i:               ; preds = %cond_exit_424.thread.4.i.i
-  %198 = shl nuw i64 1, %195, !dbg !71
-  %199 = xor i64 %194, %198, !dbg !71
-  store i64 %199, ptr %193, align 4, !dbg !71
+  %198 = shl nuw i64 1, %195, !dbg !75
+  %199 = xor i64 %194, %198, !dbg !75
+  store i64 %199, ptr %193, align 4, !dbg !75
   %200 = getelementptr inbounds i64, ptr %"421_1.sroa.0.0.i.i", i64 %191
   %201 = load i64, ptr %200, align 4
   tail call void @___dec_future_refcount(i64 %201)
@@ -578,9 +578,9 @@ cond_exit_424.thread.5.i.i:                       ; preds = %__barray_mask_borro
   br i1 %208, label %cond_exit_424.thread.6.i.i, label %__barray_mask_borrow.exit228.6.i.i
 
 __barray_mask_borrow.exit228.6.i.i:               ; preds = %cond_exit_424.thread.5.i.i
-  %209 = shl nuw i64 1, %206, !dbg !71
-  %210 = xor i64 %205, %209, !dbg !71
-  store i64 %210, ptr %204, align 4, !dbg !71
+  %209 = shl nuw i64 1, %206, !dbg !75
+  %210 = xor i64 %205, %209, !dbg !75
+  store i64 %210, ptr %204, align 4, !dbg !75
   %211 = getelementptr inbounds i64, ptr %"421_1.sroa.0.0.i.i", i64 %202
   %212 = load i64, ptr %211, align 4
   tail call void @___dec_future_refcount(i64 %212)
@@ -597,9 +597,9 @@ cond_exit_424.thread.6.i.i:                       ; preds = %__barray_mask_borro
   br i1 %219, label %cond_exit_424.thread.7.i.i, label %__barray_mask_borrow.exit228.7.i.i
 
 __barray_mask_borrow.exit228.7.i.i:               ; preds = %cond_exit_424.thread.6.i.i
-  %220 = shl nuw i64 1, %217, !dbg !71
-  %221 = xor i64 %216, %220, !dbg !71
-  store i64 %221, ptr %215, align 4, !dbg !71
+  %220 = shl nuw i64 1, %217, !dbg !75
+  %221 = xor i64 %216, %220, !dbg !75
+  store i64 %221, ptr %215, align 4, !dbg !75
   %222 = getelementptr inbounds i64, ptr %"421_1.sroa.0.0.i.i", i64 %213
   %223 = load i64, ptr %222, align 4
   tail call void @___dec_future_refcount(i64 %223)
@@ -616,9 +616,9 @@ cond_exit_424.thread.7.i.i:                       ; preds = %__barray_mask_borro
   br i1 %230, label %cond_exit_424.thread.8.i.i, label %__barray_mask_borrow.exit228.8.i.i
 
 __barray_mask_borrow.exit228.8.i.i:               ; preds = %cond_exit_424.thread.7.i.i
-  %231 = shl nuw i64 1, %228, !dbg !71
-  %232 = xor i64 %227, %231, !dbg !71
-  store i64 %232, ptr %226, align 4, !dbg !71
+  %231 = shl nuw i64 1, %228, !dbg !75
+  %232 = xor i64 %227, %231, !dbg !75
+  store i64 %232, ptr %226, align 4, !dbg !75
   %233 = getelementptr inbounds i64, ptr %"421_1.sroa.0.0.i.i", i64 %224
   %234 = load i64, ptr %233, align 4
   tail call void @___dec_future_refcount(i64 %234)
@@ -635,38 +635,38 @@ cond_exit_424.thread.8.i.i:                       ; preds = %__barray_mask_borro
   br i1 %241, label %cond_exit_424.thread.9.i.i, label %__barray_mask_borrow.exit228.9.i.i
 
 __barray_mask_borrow.exit228.9.i.i:               ; preds = %cond_exit_424.thread.8.i.i
-  %242 = shl nuw i64 1, %239, !dbg !71
-  %243 = xor i64 %238, %242, !dbg !71
-  store i64 %243, ptr %237, align 4, !dbg !71
+  %242 = shl nuw i64 1, %239, !dbg !75
+  %243 = xor i64 %238, %242, !dbg !75
+  store i64 %243, ptr %237, align 4, !dbg !75
   %244 = getelementptr inbounds i64, ptr %"421_1.sroa.0.0.i.i", i64 %235
   %245 = load i64, ptr %244, align 4
   tail call void @___dec_future_refcount(i64 %245)
   br label %cond_exit_424.thread.9.i.i
 
 cond_exit_424.thread.9.i.i:                       ; preds = %__barray_mask_borrow.exit228.9.i.i, %cond_exit_424.thread.8.i.i
-  %246 = load i64, ptr %118, align 4, !dbg !72
-  %247 = sub nuw nsw i64 64, %120, !dbg !72
-  %248 = lshr i64 -1, %247, !dbg !72
-  %249 = icmp eq i64 %120, 0, !dbg !72
-  %250 = select i1 %249, i64 0, i64 %248, !dbg !72
-  %251 = or i64 %246, %250, !dbg !72
-  store i64 %251, ptr %118, align 4, !dbg !72
-  %252 = load i64, ptr %237, align 4, !dbg !72
-  %253 = shl nsw i64 -2, %239, !dbg !72
-  %254 = icmp eq i64 %239, 63, !dbg !72
-  %255 = select i1 %254, i64 0, i64 %253, !dbg !72
-  %256 = or i64 %252, %255, !dbg !72
-  store i64 %256, ptr %237, align 4, !dbg !72
-  %reass.sub.i.i.i179 = sub nsw i64 %236, %117, !dbg !72
-  %.not.i.i.i180 = icmp eq i64 %reass.sub.i.i.i179, -1, !dbg !72
-  br i1 %.not.i.i.i180, label %"__hugr__.guppylang.std.quantum.collect_measurements$10.145.exit", label %mask_block_ok.i.i.i181, !dbg !72
+  %246 = load i64, ptr %118, align 4, !dbg !74
+  %247 = sub nuw nsw i64 64, %120, !dbg !74
+  %248 = lshr i64 -1, %247, !dbg !74
+  %249 = icmp eq i64 %120, 0, !dbg !74
+  %250 = select i1 %249, i64 0, i64 %248, !dbg !74
+  %251 = or i64 %246, %250, !dbg !74
+  store i64 %251, ptr %118, align 4, !dbg !74
+  %252 = load i64, ptr %237, align 4, !dbg !74
+  %253 = shl nsw i64 -2, %239, !dbg !74
+  %254 = icmp eq i64 %239, 63, !dbg !74
+  %255 = select i1 %254, i64 0, i64 %253, !dbg !74
+  %256 = or i64 %252, %255, !dbg !74
+  store i64 %256, ptr %237, align 4, !dbg !74
+  %reass.sub.i.i.i179 = sub nsw i64 %236, %117, !dbg !74
+  %.not.i.i.i180 = icmp eq i64 %reass.sub.i.i.i179, -1, !dbg !74
+  br i1 %.not.i.i.i180, label %"__hugr__.guppylang.std.quantum.collect_measurements$10.145.exit", label %mask_block_ok.i.i.i181, !dbg !74
 
 __barray_check_bounds.exit.i175:                  ; preds = %__barray_check_bounds.exit221.i.i
-  %257 = xor i64 %136, %132
-  store i64 %257, ptr %127, align 4
-  store i64 %135, ptr %134, align 4
-  %read_bool.i = tail call i1 @___read_future_bool(i64 %135), !dbg !73
-  tail call void @___dec_future_refcount(i64 %135), !dbg !73
+  %257 = xor i64 %136, %132, !dbg !71
+  store i64 %257, ptr %127, align 4, !dbg !71
+  store i64 %135, ptr %134, align 4, !dbg !71
+  %read_bool.i = tail call i1 @___read_future_bool(i64 %135), !dbg !76
+  tail call void @___dec_future_refcount(i64 %135), !dbg !76
   %258 = load i64, ptr %116, align 4
   %259 = lshr i64 %258, %"159_0.sroa.15.0168.i"
   %260 = trunc i64 %259 to i1
@@ -684,7 +684,7 @@ loop_body.i177:                                   ; preds = %__barray_check_boun
   %264 = getelementptr inbounds nuw i1, ptr %115, i64 %"159_0.sroa.15.0168.i"
   store i1 %read_bool.i, ptr %264, align 1
   %265 = extractvalue { { ptr, ptr, i64 }, i64 } %.pn159167.i, 0
-  %exitcond.not.i178 = icmp eq i64 %124, 10, !dbg !74
+  %exitcond.not.i178 = icmp eq i64 %124, 10, !dbg !77
   br i1 %exitcond.not.i178, label %loop_body.preheader.i.i, label %__barray_check_bounds.exit.i.i174
 
 "__hugr__.guppylang.std.quantum.collect_measurements$10.145.exit": ; preds = %139, %cond_exit_424.thread.9.i.i
@@ -717,12 +717,12 @@ declare i64 @___qalloc() local_unnamed_addr
 
 declare void @___reset(i64) local_unnamed_addr
 
-define i64 @qmain(i64 %0) local_unnamed_addr !dbg !75 {
+define i64 @qmain(i64 %0) local_unnamed_addr !dbg !78 {
 entry:
-  tail call void @setup(i64 %0), !dbg !79
-  tail call void @"__hugr__.__main__.measure_qb_array.<locals>.main.1"(), !dbg !79
-  %1 = tail call i64 @teardown(), !dbg !79
-  ret i64 %1, !dbg !79
+  tail call void @setup(i64 %0), !dbg !82
+  tail call void @"__hugr__.__main__.measure_qb_array.<locals>.main.1"(), !dbg !82
+  %1 = tail call i64 @teardown(), !dbg !82
+  ret i64 %1, !dbg !82
 }
 
 declare void @setup(i64) local_unnamed_addr
@@ -802,11 +802,14 @@ attributes #0 = { noreturn }
 !68 = !DILocation(line: 275, column: 12, scope: !69, inlinedAt: !70)
 !69 = distinct !DISubprogram(name: "std.array.ArrayIter.__next__$Measurement&10", linkageName: "__hugr__.guppylang.std.array.ArrayIter.__next__$Measurement&10.292", scope: null, file: !28, line: 270, type: !46, scopeLine: 273, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
 !70 = distinct !DILocation(line: 431, column: 35, scope: !65, inlinedAt: !66)
-!71 = !DILocation(line: 106, column: 10, scope: !4, inlinedAt: !70)
-!72 = !DILocation(line: 277, column: 8, scope: !45, inlinedAt: !70)
-!73 = !DILocation(line: 431, column: 17, scope: !65, inlinedAt: !66)
-!74 = !DILocation(line: 273, column: 11, scope: !69, inlinedAt: !70)
-!75 = distinct !DISubprogram(name: "qmain", linkageName: "qmain", scope: null, file: !76, type: !77, spFlags: DISPFlagDefinition, unit: !1)
-!77 = !DISubroutineType(types: !78)
-!78 = !{!36, !36}
-!79 = !DILocation(line: 0, scope: !75)
+!71 = !DILocation(line: 274, column: 19, scope: !69, inlinedAt: !70)
+!72 = !DILocation(line: 106, column: 10, scope: !4, inlinedAt: !73)
+!73 = distinct !DILocation(line: 274, column: 19, scope: !69, inlinedAt: !70)
+!74 = !DILocation(line: 277, column: 8, scope: !45, inlinedAt: !70)
+!75 = !DILocation(line: 106, column: 10, scope: !4, inlinedAt: !70)
+!76 = !DILocation(line: 431, column: 17, scope: !65, inlinedAt: !66)
+!77 = !DILocation(line: 273, column: 11, scope: !69, inlinedAt: !70)
+!78 = distinct !DISubprogram(name: "qmain", linkageName: "qmain", scope: null, file: !79, type: !80, spFlags: DISPFlagDefinition, unit: !1)
+!80 = !DISubroutineType(types: !81)
+!81 = !{!36, !36}
+!82 = !DILocation(line: 0, scope: !78)

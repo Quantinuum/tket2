@@ -1,10 +1,10 @@
-//! Benchmark the NormalizeGuppy pass on a small Guppy-generated HUGR.
+//! Benchmark the Normalize pass on a small Guppy-generated HUGR.
 
 use std::hint::black_box;
 
 use criterion::{AxisScale, BatchSize, Criterion, PlotConfiguration, criterion_group};
 use hugr::Hugr;
-use tket::passes::{ComposablePass, NormalizeGuppy};
+use tket::passes::{ComposablePass, Normalize};
 
 fn load_hugr(bytes: &[u8]) -> Hugr {
     Hugr::load(bytes, None).unwrap()
@@ -37,7 +37,7 @@ fn bench_normalize(c: &mut Criterion) {
             b.iter_batched(
                 || hugr.clone(),
                 |mut hugr| {
-                    NormalizeGuppy::default().run(&mut hugr).unwrap();
+                    Normalize::default().run(&mut hugr).unwrap();
                     black_box(hugr)
                 },
                 BatchSize::SmallInput,

@@ -1,8 +1,7 @@
 //! Modify nodes related to function calls.
-use std::collections::HashSet;
 
 use hugr::{
-    IncomingPort, PortIndex, Wire,
+    IncomingPort, Wire,
     builder::{BuildError, Dataflow},
     core::HugrNode,
     extension::simple_op::MakeExtensionOp,
@@ -32,114 +31,22 @@ impl<N: HugrNode> ModifierResolver<N> {
             .single_linked_output(call_node, call.called_function_port())
             .unwrap();
 
-        let Some(new_callee) =
-            self.modify_fn_if_needed(h, callee.0, Some(&old_signature), false)?
-        else {
+        let Some(new_callee) = self.modify_fn_if_needed(h, callee.0, Some(&old_signature))? else {
             // If the function need not be modified, just copy the Call node as is.
             let new = self.add_node_no_modification(h, call_node, call.clone(), new_dfg)?;
             self.call_map_insert(callee.0, (new, call.called_function_port()));
             return Ok(());
         };
 
-        // Modified higher-order functions may require some function-valued
-        // inputs to be supplied already modified. When the caller provides a
-        // static LoadFunction, solve that modifier here and wire the modified
-        // load directly into the new call.
-        let input_modifiers = self.function_input_modifiers(new_callee).to_vec();
-        let OpType::FuncDefn(new_callee_defn) = h.get_optype(new_callee) else {
-            return Err(ModifierResolverErrors::unreachable(format!(
-                "Modified callee is not a function definition: {}",
-                h.get_optype(new_callee)
-            )));
-        };
-        let poly_sig = new_callee_defn.signature().clone();
+        let mut poly_sig = call.func_sig.clone();
+
         let type_args = call.type_args.clone();
+        self.modify_signature(poly_sig.body_mut(), false);
         let new_call = Call::try_new(poly_sig, type_args).map_err(BuildError::from)?;
         let new_call_fn_port = new_call.called_function_port();
         let new_call_node = new_dfg.add_child_node(new_call);
 
         self.call_map_insert(new_callee, (new_call_node, new_call_fn_port));
-        let skip_inputs = input_modifiers
-            .iter()
-            .map(|(input, _)| *input)
-            .collect::<HashSet<_>>();
-
-        // Handle function arguments that must be modified before calling `new_call_node`.
-        // If the argument comes from another function input, we cannot solve it here,
-        // so we record that requirement for the caller.
-        // If the argument is a `LoadFunction`, we create the modified version of that
-        // loaded function and connect it directly to the new call.
-        for (input, modifiers) in input_modifiers {
-            // Resolve this argument in the modifier context required by the
-            // callee. The previous modifier state must be restored even if the
-            // argument cannot be resolved.
-            let saved_modifiers = std::mem::replace(self.modifiers_mut(), modifiers);
-            let result: Result<(), ModifierResolverErrors<N>> = (|| {
-                let source = h.single_linked_output(call_node, input).ok_or_else(|| {
-                    ModifierResolverErrors::unreachable(format!(
-                        "Call input {input} has no source while resolving higher-order modifier."
-                    ))
-                })?;
-                let trace = self.trace_modifiers_chain(h, source.0)?;
-                let targ = trace.last().cloned().ok_or_else(|| {
-                    ModifierResolverErrors::unreachable(
-                        "Higher-order modifier argument trace was empty.".to_string(),
-                    )
-                })?;
-                if matches!(h.get_optype(targ), OpType::Input(_)) {
-                    // The argument is another higher-order input of the function
-                    // currently being rewritten. This call cannot solve the
-                    // requirement yet, so record it for callers and wire the
-                    // function value through to the modified call input.
-                    let target_port = if trace.len() == 1 {
-                        source.1
-                    } else {
-                        h.single_linked_output(trace[trace.len() - 2], 0)
-                        .ok_or_else(|| {
-                            ModifierResolverErrors::unreachable(
-                                "Higher-order modifier argument trace ended at an input without an input port."
-                                    .to_string(),
-                            )
-                        })?
-                        .1
-                    };
-                    let modifiers = self.modifiers().clone();
-                    self.dynamic_input_modifiers()
-                        .push((target_port.index(), modifiers));
-                    self.map_insert(
-                        (call_node, IncomingPort::from(input)).into(),
-                        (new_call_node, IncomingPort::from(input + offset)).into(),
-                    )?;
-                    return Ok(());
-                }
-
-                // The caller supplied a concrete LoadFunction. Build/load the
-                // modified version now and connect that value directly into the
-                // rewritten call.
-                let (func, load) =
-                    Self::get_loaded_function(h, call_node, targ, h.get_optype(targ))
-                        .map_err(ModifierResolverErrors::ModifierError)?;
-                let modified_fn = self.modify_fn(h, func)?;
-
-                let mut modified_sig = load.func_sig.clone();
-                self.modify_signature(modified_sig.body_mut(), false);
-                let load = LoadFunction::try_new(modified_sig, load.type_args)
-                    .map_err(BuildError::from)?;
-                let new_load = new_dfg.add_child_node(load);
-                self.call_map_insert(modified_fn, (new_load, IncomingPort::from(0)));
-                new_dfg
-                    .hugr_mut()
-                    .connect(new_load, 0, new_call_node, input + offset);
-                self.map_insert_none((call_node, IncomingPort::from(input)).into())?;
-
-                for node in trace {
-                    self.forget_node(h, node)?;
-                }
-                Ok(())
-            })();
-            *self.modifiers_mut() = saved_modifiers;
-            result?;
-        }
 
         // wire the controls
         let mut controls = self.pack_controls(new_dfg)?;
@@ -152,16 +59,12 @@ impl<N: HugrNode> ModifierResolver<N> {
         let controls = self.unpack_controls(new_dfg, controls)?;
         *self.controls() = controls;
 
-        // Wire the inputs/outputs using the original signature; controller
-        // information is already represented by `offset`. Inputs handled above
-        // are skipped so connect_all will not also wire the original function
-        // value into the call.
-        self.wire_inout(
-            (call_node, call_node),
-            (new_call_node, new_call_node),
+        // Wire the inputs/outputs using the original signature; `offset` represent controller qubits
+        self.wire_node_inout(
+            call_node,
+            new_call_node,
             (old_signature.input.iter(), old_signature.output.iter()),
             (0, 0, offset),
-            &skip_inputs,
         )?;
 
         Ok(())
@@ -255,21 +158,13 @@ impl<N: HugrNode> ModifierResolver<N> {
                         fn_optype.clone(),
                     ));
                 };
-                // TODO: We want some machinery to prevent generating a lot of copies of modified functions
-                // from the same function.
                 Ok((fn_node, load.clone()))
             }
-            OpType::Input(_) => Err(ModifierError::NoTarget(modifier_node)),
             // If the target is a function, we need to create a new dataflow block of it.
-            _ => {
-                // TODO:
-                // In the future, we might want to handle modifiers provided from other nodes.
-                // For example, conditionals?
-                Err(ModifierError::ModifierNotApplicable(
-                    modifier_node,
-                    optype.clone(),
-                ))
-            }
+            _ => Err(ModifierError::ModifierNotApplicable(
+                modifier_node,
+                optype.clone(),
+            )),
         }
     }
 
@@ -300,29 +195,19 @@ impl<N: HugrNode> ModifierResolver<N> {
             .map_err(wrap_resolver_err)?;
         let targ = trace.last().cloned().unwrap();
 
-        // If the target is a function input, we cannot solve the modifier chain here.
-        // Instead, we record the modifiers to be applied to that input and propagate
-        // the requirement to callers.
-        if matches!(h.get_optype(targ), OpType::Input(_)) {
-            // If no quantum data is involved, we can skip modifying the call
-            if !self.signature_has_quantum_data(&indir_call.signature) {
-                self.add_node_no_modification(h, n, indir_call.clone(), new_dfg)?;
-                return Ok(());
-            }
-            *self.modifiers_mut() = modifiers;
-            return self.modify_input_indirect_call(n, chain_tail.1.index(), indir_call, new_dfg);
+        // If a function has no quantum effects and is not directly modified, we can skip modifying the call
+        if !self.signature_has_quantum_data(&indir_call.signature) && trace.len() == 1 {
+            self.add_node_no_modification(h, n, indir_call.clone(), new_dfg)?;
+            return Ok(());
         }
-        // If the target is not a input, we expect it to be a LoadFunction node loading the function to call.
+
+        // If the function has quantum effects, we expect it to be a LoadFunction node loading the function to call,
+        // otherwise the quantum function is not statically known and is modifiable.
         let (func, load) =
             Self::get_loaded_function(h, n, targ, h.get_optype(targ)).map_err(wrap_modifier_err)?;
 
-        let Some(modified_fn) = self
-            .modify_fn_if_needed(h, func, Some(&indir_call.signature), trace.len() > 1)
-            .map_err(wrap_resolver_err)?
-        else {
-            self.add_node_no_modification(h, n, indir_call.clone(), new_dfg)?;
-            return Ok(());
-        };
+        // The function has quantum effects, thus we need to modify it.
+        let modified_fn = self.modify_fn(h, func).map_err(wrap_resolver_err)?;
 
         // Make new LoadFunction
         let mut modified_sig = load.func_sig.clone();
@@ -358,56 +243,12 @@ impl<N: HugrNode> ModifierResolver<N> {
         new_dfg.hugr_mut().connect(new_load, 0, new_call_node, 0);
         self.map_insert_none((n, IncomingPort::from(0)).into())?;
 
-        // FIXME: Forgetting all the nodes in the chain so that we don't have to worry about mapping the edges.
+        // Forgetting all the nodes in the chain so that we don't have to worry about mapping the edges.
         // Otherwise, there would be edges in the original graph that have no corresponding edges in the new graph.
-        // However, this could remove wires referenced by other nodes that are not in the chain.
+        // NOTE: this could remove wires referenced by other nodes that are not in the chain.
         for node in trace {
             self.forget_node(h, node)?
         }
-
-        Ok(())
-    }
-
-    fn modify_input_indirect_call(
-        &mut self,
-        n: N,
-        function_input: usize,
-        indir_call: &CallIndirect,
-        new_dfg: &mut impl Dataflow,
-    ) -> Result<(), ModifierResolverErrors<N>> {
-        let mut new_call = indir_call.clone();
-        self.modify_signature(&mut new_call.signature, false);
-        let new_call_node = new_dfg.add_child_node(new_call);
-
-        // The callee is a function input, so there is no LoadFunction to solve
-        // inside this body. Record that callers of the generated function must
-        // pass a statically modified value for this input, then call that input
-        // directly in the rewritten body.
-        let modifiers = self.modifiers().clone();
-        self.dynamic_input_modifiers()
-            .push((function_input, modifiers));
-        self.map_insert(
-            (n, IncomingPort::from(0)).into(),
-            (new_call_node, IncomingPort::from(0)).into(),
-        )?;
-
-        let mut controls = self.pack_controls(new_dfg)?;
-        let offset = self.modifiers().accum_ctrl.len();
-        for (i, ctrl) in controls.iter_mut().enumerate() {
-            new_dfg
-                .hugr_mut()
-                .connect(ctrl.node(), ctrl.source(), new_call_node, i + 1);
-            *ctrl = Wire::new(new_call_node, i);
-        }
-        *self.controls() = self.unpack_controls(new_dfg, controls)?;
-
-        let signature = indir_call.signature();
-        self.wire_node_inout(
-            n,
-            new_call_node,
-            (signature.input.iter().skip(1), signature.output.iter()),
-            (1, 0, offset),
-        )?;
 
         Ok(())
     }
@@ -452,7 +293,7 @@ mod tests {
     use crate::extension::modifier::{CONTROL_OP_ID, MODIFIER_EXTENSION};
     use hugr::{
         Hugr,
-        builder::{Dataflow, DataflowSubContainer, ModuleBuilder},
+        builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
         extension::prelude::qb_t,
         ops::{CallIndirect, ExtensionOp, handle::FuncID},
         std_extensions::arithmetic::{
@@ -460,7 +301,7 @@ mod tests {
             int_types::{ConstInt, INT_TYPES},
         },
         std_extensions::collections::array::{ArrayOpBuilder, array_type},
-        types::{Signature, Term},
+        types::{Signature, Term, Type},
     };
 
     fn foo_call(module: &mut ModuleBuilder<Hugr>, t_num: usize) -> FuncID<true> {
@@ -735,5 +576,182 @@ mod tests {
         #[case] dagger: bool,
     ) {
         test_modifier_resolver(target_num, ctrl_num, foo, dagger);
+    }
+
+    #[test]
+    fn quantum_indirect_call_with_function_input_is_unresolvable() {
+        let callee_sig = Signature::new_endo([qb_t()]);
+        let callee_ty = Type::new_function(callee_sig.clone());
+        let foo_sig = Signature::new([qb_t(), callee_ty.clone()], [qb_t()]);
+
+        let mut module = ModuleBuilder::new();
+        let foo = {
+            let mut func = module.define_function("foo", foo_sig).unwrap();
+            func.set_unitary();
+            let [q, callee] = func.input_wires_arr();
+            let q = func
+                .add_dataflow_op(
+                    CallIndirect {
+                        signature: callee_sig.clone(),
+                    },
+                    [callee, q],
+                )
+                .unwrap()
+                .out_wire(0);
+            func.finish_with_outputs([q]).unwrap()
+        };
+
+        let control_op = MODIFIER_EXTENSION
+            .instantiate_extension_op(
+                &CONTROL_OP_ID,
+                [
+                    Term::BoundedNat(1),
+                    Term::new_list([qb_t()]),
+                    Term::new_list([callee_ty.clone()]),
+                ],
+            )
+            .unwrap();
+        let controlled_sig = Signature::new(
+            [array_type(1, qb_t()), qb_t(), callee_ty.clone()],
+            [array_type(1, qb_t()), qb_t()],
+        );
+        let main_sig = Signature::new([callee_ty], [array_type(1, qb_t()), qb_t()]);
+        let mut main = module.define_function("main", main_sig).unwrap();
+        let [callee] = main.input_wires_arr();
+        let foo = main.load_func(foo.handle(), &[]).unwrap();
+        let controlled = main.add_dataflow_op(control_op, [foo]).unwrap().out_wire(0);
+        let control = main
+            .add_dataflow_op(TketOp::QAlloc, [])
+            .unwrap()
+            .out_wire(0);
+        let q = main
+            .add_dataflow_op(TketOp::QAlloc, [])
+            .unwrap()
+            .out_wire(0);
+        let controls = main.add_new_array(qb_t(), [control]).unwrap();
+        let outputs = main
+            .add_dataflow_op(
+                CallIndirect {
+                    signature: controlled_sig,
+                },
+                [controlled, controls, q, callee],
+            )
+            .unwrap()
+            .outputs();
+        main.finish_with_outputs(outputs).unwrap();
+
+        let mut h = module.finish_hugr().unwrap();
+        let entrypoint = h.entrypoint();
+        match resolve_modifier_with_entrypoints(&mut h, [entrypoint]) {
+            Err(ModifierResolverErrors::UnResolvable { msg, .. }) => {
+                assert!(
+                    msg.strip_prefix("Modifier cannot be applied to the node")
+                        .and_then(|node| node.strip_suffix("of type Input"))
+                        .is_some()
+                );
+            }
+            Err(err) => panic!("expected an unresolvable error, got {err:?}"),
+            Ok(()) => panic!("expected modifier resolution to fail"),
+        }
+    }
+
+    #[test]
+    fn quantum_double_indirect_call_is_unresolvable() {
+        let callee_sig = Signature::new_endo([qb_t()]);
+        let inner_foo_sig = Signature::new([], [Type::new_function(callee_sig.clone())]);
+        let foo_sig = Signature::new([qb_t()], [qb_t()]);
+
+        let mut module = ModuleBuilder::new();
+        let callee = {
+            let func = module
+                .define_function("callee", callee_sig.clone())
+                .unwrap();
+            let [q] = func.input_wires_arr();
+            func.finish_with_outputs([q]).unwrap()
+        };
+        let inner_foo = {
+            let mut func = module
+                .define_function("inner_foo", inner_foo_sig.clone())
+                .unwrap();
+            let callee = func.load_func(callee.handle(), &[]).unwrap();
+            func.finish_with_outputs([callee]).unwrap()
+        };
+        let foo = {
+            let mut func = module.define_function("foo", foo_sig).unwrap();
+            func.set_unitary();
+            let [q] = func.input_wires_arr();
+            let loaded_foo = func.load_func(inner_foo.clone().handle(), &[]).unwrap();
+            let callee = func
+                .add_dataflow_op(
+                    CallIndirect {
+                        signature: inner_foo_sig.clone(),
+                    },
+                    [loaded_foo],
+                )
+                .unwrap()
+                .out_wire(0);
+            let q = func
+                .add_dataflow_op(
+                    CallIndirect {
+                        signature: callee_sig.clone(),
+                    },
+                    [callee, q],
+                )
+                .unwrap()
+                .out_wire(0);
+            func.finish_with_outputs([q]).unwrap()
+        };
+
+        let control_op = MODIFIER_EXTENSION
+            .instantiate_extension_op(
+                &CONTROL_OP_ID,
+                [
+                    Term::BoundedNat(1),
+                    Term::new_list([qb_t()]),
+                    Term::new_list(Vec::<Type>::new()),
+                ],
+            )
+            .unwrap();
+        let controlled_sig = Signature::new(
+            [array_type(1, qb_t()), qb_t()],
+            [array_type(1, qb_t()), qb_t()],
+        );
+        let main_sig = Signature::new([], [array_type(1, qb_t()), qb_t()]);
+        let mut main = module.define_function("main", main_sig).unwrap();
+        let foo = main.load_func(foo.handle(), &[]).unwrap();
+        let controlled = main.add_dataflow_op(control_op, [foo]).unwrap().out_wire(0);
+        let control = main
+            .add_dataflow_op(TketOp::QAlloc, [])
+            .unwrap()
+            .out_wire(0);
+        let q = main
+            .add_dataflow_op(TketOp::QAlloc, [])
+            .unwrap()
+            .out_wire(0);
+        let controls = main.add_new_array(qb_t(), [control]).unwrap();
+        let outputs = main
+            .add_dataflow_op(
+                CallIndirect {
+                    signature: controlled_sig,
+                },
+                [controlled, controls, q],
+            )
+            .unwrap()
+            .outputs();
+        main.finish_with_outputs(outputs).unwrap();
+
+        let mut h = module.finish_hugr().unwrap();
+        let entrypoint = h.entrypoint();
+        match resolve_modifier_with_entrypoints(&mut h, [entrypoint]) {
+            Err(ModifierResolverErrors::UnResolvable { msg, .. }) => {
+                assert!(
+                    msg.strip_prefix("Modifier cannot be applied to the node")
+                        .and_then(|node| node.strip_suffix("of type CallIndirect"))
+                        .is_some()
+                );
+            }
+            Err(err) => panic!("expected an unresolvable error, got {err:?}"),
+            Ok(()) => panic!("expected modifier resolution to fail"),
+        }
     }
 }

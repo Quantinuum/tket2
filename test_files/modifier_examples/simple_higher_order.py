@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#    "guppylang==1.0.0a8",
+#    "guppylang==1.0.0rc1",
 # ]
 # ///
 """Test the a simple use of a higher-order function with inside modifiers
@@ -44,5 +44,5 @@ def main() -> None:
     discard_array(q)
 
 
-program = main.compile()
+program = main.with_minimal_opt().compile()
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())

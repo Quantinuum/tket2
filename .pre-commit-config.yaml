@@ -44,6 +44,7 @@ repos:
         entry: uv run ruff format
         language: system
         files: \.py$
+        exclude: ^pg-libs/
         pass_filenames: false
       - id: ruff-check
         name: ruff
@@ -51,6 +52,7 @@ repos:
         entry: uv run ruff check --fix --exit-non-zero-on-fix
         language: system
         files: \.py$
+        exclude: ^pg-libs/
         pass_filenames: false
       - id: mypy-check
         name: mypy
@@ -99,32 +101,47 @@ repos:
         files: \.rs$
         exclude: ^pg-libs/
         pass_filenames: false
-      # pg-libs hooks (separate Cargo workspace)
+      # pg-libs hooks (separate Cargo/uv workspace)
+      - id: ruff-format-pg-libs
+        name: ruff format (pg-libs)
+        description: Format pg-libs python code with `ruff`.
+        entry: sh -c "cd pg-libs && uv run ruff format"
+        language: system
+        files: ^pg-libs/.*\.py$
+        pass_filenames: false
+      - id: ruff-check-pg-libs
+        name: ruff (pg-libs)
+        description: Check pg-libs python code with `ruff`.
+        entry: sh -c "cd pg-libs && uv run ruff check --fix --exit-non-zero-on-fix"
+        language: system
+        files: ^pg-libs/.*\.py$
+        pass_filenames: false
       - id: cargo-fmt-pg-libs
         name: cargo format (pg-libs)
         description: Format pg-libs rust code with `cargo fmt`.
-        entry: cargo fmt --all --manifest-path pg-libs/Cargo.toml -- --check
+        entry: sh -c "cd pg-libs && cargo fmt --all -- --check"
         language: system
         files: ^pg-libs/.*\.rs$
         pass_filenames: false
       - id: cargo-check-pg-libs
         name: cargo check (pg-libs)
         description: Check pg-libs rust code with `cargo check`.
-        entry: env RUSTFLAGS="-Dwarnings" cargo check --all-features --workspace --manifest-path pg-libs/Cargo.toml
+        entry: sh -c "cd pg-libs && env RUSTFLAGS='-Dwarnings' cargo check --all-features --workspace"
         language: system
         files: ^pg-libs/.*\.rs$
         pass_filenames: false
       - id: cargo-clippy-pg-libs
         name: cargo clippy (pg-libs)
         description: Run clippy lints on pg-libs with `cargo clippy`.
-        entry: cargo clippy --all-features --all-targets --workspace --manifest-path pg-libs/Cargo.toml -- -D warnings
+        entry: sh -c "cd pg-libs && cargo clippy --all-features --all-targets --workspace -- -D warnings"
         language: system
         files: ^pg-libs/.*\.rs$
         pass_filenames: false
       - id: cargo-test-pg-libs
         name: cargo nextest r (pg-libs)
         description: Run pg-libs tests with `cargo nextest r`.
-        entry: cargo nextest r --all-features --manifest-path pg-libs/Cargo.toml
+        # cd into pg-libs so Cargo picks up pg-libs/.cargo/config.toml.
+        entry: sh -c "cd pg-libs && cargo nextest r --all-features"
         language: system
         files: ^pg-libs/.*\.rs$
         pass_filenames: false
@@ -135,4 +152,5 @@ repos:
         entry: uv run -- sh -c "maturin develop && pytest --cov=./ --cov-report=html"
         language: system
         files: \.py$
+        exclude: ^pg-libs/
         pass_filenames: false

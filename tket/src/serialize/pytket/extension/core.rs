@@ -9,11 +9,12 @@ use crate::extension::rotation::rotation_type;
 use crate::serialize::pytket::decoder::{
     DecodeStatus, LoadedParameter, PytketDecoderContext, TrackedBit, TrackedQubit,
 };
-use crate::serialize::pytket::extension::PytketDecoder;
+use crate::serialize::pytket::extension::{PytketDecoder, RegisterCount};
 use crate::serialize::pytket::opaque::OpaqueSubgraphPayload;
 use crate::serialize::pytket::{DecodeInsertionTarget, DecodeOptions, PytketDecodeError};
-use hugr::builder::Container;
+use hugr::builder::{Container, Dataflow};
 use hugr::extension::prelude::{bool_t, qb_t};
+use hugr::ops::Value;
 use hugr::ops::handle::NodeHandle;
 use hugr::types::{Signature, Type};
 use itertools::Itertools;
@@ -27,7 +28,11 @@ pub struct CoreDecoder;
 
 impl PytketDecoder for CoreDecoder {
     fn op_types(&self) -> Vec<PytketOptype> {
-        vec![PytketOptype::Barrier, PytketOptype::CircBox]
+        vec![
+            PytketOptype::Barrier,
+            PytketOptype::CircBox,
+            PytketOptype::SetBits,
+        ]
     }
 
     fn op_to_hugr<'h>(
@@ -39,6 +44,11 @@ impl PytketDecoder for CoreDecoder {
         _opgroup: Option<&str>,
         decoder: &mut PytketDecoderContext<'h>,
     ) -> Result<DecodeStatus, PytketDecodeError> {
+        let count = RegisterCount {
+            qubits: qubits.len(),
+            bits: bits.len(),
+            params: params.len(),
+        };
         match &op {
             PytketOperation {
                 op_type: PytketOptype::Barrier,
@@ -98,6 +108,26 @@ impl PytketDecoder for CoreDecoder {
                 decoder
                     .wire_up_node(internal, qubits, qubits, bits, bits, params)
                     .map_err(|e| e.hugr_op("DFG"))?;
+
+                Ok(DecodeStatus::Success)
+            }
+            PytketOperation {
+                op_type: PytketOptype::SetBits,
+                classical: Some(classical),
+                ..
+            } => {
+                let tket_json_rs::circuit_json::Classical::SetBits { values } = classical.as_ref()
+                else {
+                    return Ok(DecodeStatus::Unsupported);
+                };
+                if count != RegisterCount::only_bits(values.len()) {
+                    return Ok(DecodeStatus::Unsupported);
+                }
+
+                for (bit, &value) in bits.iter().zip(values) {
+                    let wire = decoder.builder.add_load_const(Value::from_bool(value));
+                    decoder.register_node_outputs(wire.node(), [], [bit.clone()])?;
+                }
 
                 Ok(DecodeStatus::Success)
             }
