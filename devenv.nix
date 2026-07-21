@@ -59,6 +59,15 @@ in {
     components = [ "rustc" "cargo" "clippy" "rustfmt" "rust-analyzer" ];
   };
 
+  # Nightly toolchain required for pg-libs' `simd` feature
+  profiles.nightly.module = {
+    languages.rust = {
+      channel = "nightly";
+      version = "2025-09-14";
+      components = [ "rustc" "cargo" "clippy" "rustfmt" "rust-analyzer" ];
+    };
+  };
+
   languages.python = {
     enable = true;
     uv = {
