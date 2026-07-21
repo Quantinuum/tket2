@@ -13,7 +13,7 @@
 ///
 pub fn cliff_angle(value: f64) -> Option<u8> {
     const EPS: f64 = 2e-9;
-    let mut x = value.rem_euclid(2.0);
+    let x = value.rem_euclid(2.0);
     let qt = x * 2.0;
     let rounded = qt.round();
     if (qt - rounded).abs() <= EPS {

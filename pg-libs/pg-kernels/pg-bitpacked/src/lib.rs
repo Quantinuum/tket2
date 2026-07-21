@@ -156,8 +156,8 @@ pub fn u64s_to_paulis(packed_z_bits: &[u64], packed_x_bits: &[u64], n_paulis: us
             if decoded == n_paulis {
                 return paulis;
             }
-            let z_bit = ((z_pack >> i) & 0b1) as u8;
-            let x_bit = ((x_pack >> i) & 0b1) as u8;
+            let z_bit = (z_pack >> i) & 0b1;
+            let x_bit = (x_pack >> i) & 0b1;
             let pauli = match (z_bit, x_bit) {
                 (0, 0) => Pauli::I,
                 (0, 1) => Pauli::X,
@@ -246,7 +246,7 @@ pub fn u64s_to_sign_flips(packed_sign_flip_bits: &[u64], n_signs: usize) -> Vec<
             if decoded == n_signs {
                 return signs;
             }
-            let bits = ((encoding >> i) & 0b1) as u8;
+            let bits = (encoding >> i) & 0b1;
             signs.push(bits == 1);
             decoded += 1;
         }
