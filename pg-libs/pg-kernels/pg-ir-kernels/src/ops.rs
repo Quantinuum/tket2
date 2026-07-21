@@ -2,7 +2,7 @@ use std::vec;
 
 use crate::tableau_trait::PGTableau;
 use pg_core::{ConditionalBoxData, GateData, GateType, Op, Pauli, PauliGraph, RotationData};
-use pg_utils::cliff_angle;
+use pg_utils::{cliff_angle, equiv_0};
 
 // =============================================================================
 //                                 Op Queries
@@ -180,7 +180,13 @@ pub fn is_clifford(op: &Op) -> bool {
             data.get_conditional_bits().is_empty()
                 && (is_clifford_gate_type(data)
                     || (is_rotation_gate_type(data)
-                        && data.get_params().iter().all(|&p| cliff_angle(p).is_some())))
+                        && (data.get_params().iter().all(|&p| cliff_angle(p).is_some())
+                            || (data.get_gate_type() == &GateType::PHASEDX
+                                // PhasedX is identity if `a` is a multiple of 2 pi
+                                // PhasedX is Clifford if `a` is a multiple of pi and `b` is a multiple of pi/4
+                                && (equiv_0(data.get_params()[0], 2.0)
+                                    || (equiv_0(data.get_params()[0], 1.0)
+                                        && equiv_0(data.get_params()[1], 0.25)))))))
         }
         Op::Rotation { data } => cliff_angle(data.get_angle()).is_some(),
         Op::Tableau { .. } => true,
@@ -598,6 +604,18 @@ mod tests {
         // Rotation gate with Clifford angle
         assert!(is_clifford(&Op::Gate {
             data: GateData::new(GateType::RZ, vec![0]).with_params(vec![0.5])
+        }));
+        // PhasedX with Clifford angles
+        assert!(is_clifford(&Op::Gate {
+            data: GateData::new(GateType::PHASEDX, vec![0]).with_params(vec![0.5, 0.5])
+        }));
+        // PhasedX with the first angle being a multiple of 2pi
+        assert!(is_clifford(&Op::Gate {
+            data: GateData::new(GateType::PHASEDX, vec![0]).with_params(vec![2.0, 1.6])
+        }));
+        // PhasedX with the first angle being a multiple of pi, and the second angle being a multiple of pi/4
+        assert!(is_clifford(&Op::Gate {
+            data: GateData::new(GateType::PHASEDX, vec![0]).with_params(vec![3.0, 0.25])
         }));
         // Clifford rotation
         assert!(is_clifford(&Op::Rotation {

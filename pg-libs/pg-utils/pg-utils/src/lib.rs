@@ -1,6 +1,9 @@
 //! This crate provides utility functions for working with
 //! pg-libs
 
+/// Absolute tolerance used for approximate floating-point comparisons.
+const EPS: f64 = 2e-9;
+
 /// Compute the Clifford angle in quarter turns for a half-turn input value.
 ///
 /// # Arguments
@@ -12,7 +15,6 @@
 /// - `Option<u8>` - The Clifford angle is expressed as a number of quarter turns (0, 1, 2, 3) if the value is a valid Clifford angle, otherwise `None`.
 ///
 pub fn cliff_angle(value: f64) -> Option<u8> {
-    const EPS: f64 = 2e-9;
     let x = value.rem_euclid(2.0);
     let qt = x * 2.0;
     let rounded = qt.round();
@@ -21,6 +23,25 @@ pub fn cliff_angle(value: f64) -> Option<u8> {
     } else {
         None
     }
+}
+
+/// Test whether a value is approximately 0 modulo n
+///
+/// # Arguments
+///
+/// - `value` (`f64`) - The value to test.
+/// - `n` (`f64`) - The modulus value.
+///
+/// # Returns
+///
+/// - `bool` - `true` if the value is approximately 0 modulo n, otherwise `false`.
+///
+pub fn equiv_0(value: f64, n: f64) -> bool {
+    if n == 0.0 {
+        return false;
+    }
+    let remainder = value.rem_euclid(n);
+    remainder <= EPS || n - remainder <= EPS
 }
 
 #[cfg(test)]
@@ -55,6 +76,9 @@ mod tests {
         assert_eq!(cliff_angle(0.25), None);
         assert_eq!(cliff_angle(0.1), None);
         assert_eq!(cliff_angle(1.3), None);
+        assert_eq!(cliff_angle(f64::NAN), None);
+        assert_eq!(cliff_angle(f64::INFINITY), None);
+        assert_eq!(cliff_angle(f64::NEG_INFINITY), None);
     }
 
     #[test]
@@ -63,5 +87,34 @@ mod tests {
         assert_eq!(cliff_angle(0.5 + EPS * 0.9), Some(1));
         assert_eq!(cliff_angle(0.5 - EPS * 0.9), Some(1));
         assert_eq!(cliff_angle(0.5 + EPS * 1.1), None);
+    }
+
+    #[test]
+    fn test_equiv_0_multiples() {
+        assert!(equiv_0(0.0, 2.0));
+        assert!(equiv_0(4.0, 2.0));
+        assert!(equiv_0(-6.0, 3.0));
+        assert!(equiv_0(0.25, 0.25));
+        assert!(equiv_0(0.5, 0.25));
+        assert!(!equiv_0(1.0, 2.0));
+        assert!(!equiv_0(-1.0, 2.0));
+    }
+
+    #[test]
+    fn test_equiv_0_tolerance() {
+        assert!(equiv_0(1e-9, 2.0));
+        assert!(equiv_0(-1e-9, 2.0));
+        assert!(equiv_0(2.0 - 1e-9, 2.0));
+        assert!(equiv_0(2.0 + 1e-9, 2.0));
+        assert!(!equiv_0(3e-9, 2.0));
+        assert!(!equiv_0(-3e-9, 2.0));
+    }
+
+    #[test]
+    fn test_equiv_0_invalid_inputs() {
+        assert!(!equiv_0(0.0, 0.0));
+        assert!(!equiv_0(f64::NAN, 2.0));
+        assert!(!equiv_0(f64::INFINITY, 2.0));
+        assert!(!equiv_0(f64::NEG_INFINITY, 2.0));
     }
 }
