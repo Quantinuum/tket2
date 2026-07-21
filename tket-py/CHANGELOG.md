@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.4](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.3...tket-py-v0.15.4) (2026-07-16)
+
+
+### Bug Fixes
+
+* Parameters used before declaration in pytket decoder ([#1850](https://github.com/Quantinuum/tket2/issues/1850)) ([2f5cadd](https://github.com/Quantinuum/tket2/commit/2f5caddbd7fa4fa88bed74f97f61faf491273b10))
+
 ## [0.15.3](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.2...tket-py-v0.15.3) (2026-07-16)
 
 

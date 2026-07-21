@@ -24,6 +24,9 @@ Examples:
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal, TypeAlias, TypedDict
+
+from pydantic import StrictBool, TypeAdapter
+from pydantic.dataclasses import dataclass
 from typing_extensions import deprecated
 
 from hugr.metadata import Metadata
@@ -47,6 +50,8 @@ __all__ = [
     "PytketBitRegisterNames",
     "PytketQubitRegisterNames",
     "PytketPhaseExpr",
+    "HeliosPlatformConfigValue",
+    "HeliosPlatformConfig",
 ]
 
 
@@ -202,3 +207,29 @@ def _read_pytket_register(key: str, value: JsonType) -> list[tuple[str, list[int
             register_indices.append(index)
         registers.append((name, register_indices))
     return registers
+
+
+@dataclass(frozen=True)
+class HeliosPlatformConfigValue:
+    """Helios-specific configuration options."""
+
+    squash_rxys: StrictBool = True
+    enable_dd: StrictBool = False
+    leakage_repump: StrictBool = False
+
+
+_helios_platform_config_adapter = TypeAdapter(HeliosPlatformConfigValue)
+
+
+class HeliosPlatformConfig(Metadata[HeliosPlatformConfigValue]):
+    """Metadata key for Helios-specific configuration options."""
+
+    KEY = _metadata.HELIOS_PLATFORM_CONFIG
+
+    @classmethod
+    def to_json(cls, value: HeliosPlatformConfigValue) -> JsonType:
+        return _helios_platform_config_adapter.dump_python(value, mode="json")
+
+    @classmethod
+    def from_json(cls, value: JsonType) -> HeliosPlatformConfigValue:
+        return _helios_platform_config_adapter.validate_python(value)

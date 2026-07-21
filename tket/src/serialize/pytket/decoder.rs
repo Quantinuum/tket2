@@ -262,7 +262,7 @@ impl<'h> PytketDecoderContext<'h> {
                     LoadedParameter::float_half_turns(wire)
                 };
                 match input_params.next() {
-                    Some(param) => wire_tracker.register_input_parameter(loaded, param)?,
+                    Some(param) => wire_tracker.bind_parameter(loaded, param, dfg)?,
                     None => wire_tracker.register_unused_parameter_input(loaded),
                 };
             }
@@ -275,7 +275,7 @@ impl<'h> PytketDecoderContext<'h> {
             let wire = dfg
                 .add_input(rotation_type())
                 .expect("Must be building a FuncDefn or a DFG");
-            wire_tracker.register_input_parameter(LoadedParameter::rotation(wire), param)?;
+            wire_tracker.bind_parameter(LoadedParameter::rotation(wire), param, dfg)?;
         }
 
         // Any additional qubits or bits required by the circuit are registered
@@ -597,6 +597,8 @@ impl<'h> PytketDecoderContext<'h> {
         // Add additional subgraphs and wires not encoded in commands.
         let [input_node, output_node] = self.builder.io();
         if let Some(extras) = extra_nodes_and_wires {
+            self.reserve_additional_subgraph_parameters(extras);
+
             for extra_subgraph in &extras.additional_subgraphs {
                 let params = extra_subgraph
                     .params
@@ -632,6 +634,33 @@ impl<'h> PytketDecoderContext<'h> {
         }
 
         Ok(())
+    }
+
+    /// Reserve parameter variables used before pytket commands are decoded.
+    ///
+    /// Additional subgraphs are restored first, so their expressions may refer
+    /// to parameters produced by a later opaque barrier. Genuine region inputs
+    /// are already registered and are left unchanged by the wire tracker.
+    fn reserve_additional_subgraph_parameters(&mut self, extras: &AdditionalNodesAndWires) {
+        let mut params = IndexSet::new();
+        extras
+            .additional_subgraphs
+            .iter()
+            .flat_map(|subgraph| &subgraph.params)
+            .map(|param| PytketParam::parse(param))
+            .for_each(|param| {
+                param.visit_input_variables(&mut |name| {
+                    // `pi` is loaded as a constant rather than routed as a parameter.
+                    if name != "pi" {
+                        params.insert(name.to_owned());
+                    }
+                });
+            });
+
+        for param in params {
+            self.wire_tracker
+                .reserve_forward_parameter(param, &mut self.builder);
+        }
     }
 
     /// Add a tket1 [`circuit_json::Command`] from the serial circuit to the

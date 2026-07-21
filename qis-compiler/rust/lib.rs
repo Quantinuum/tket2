@@ -10,6 +10,7 @@ use hugr::llvm::extension::int::IntCodegenExtension;
 use hugr::llvm::utils::fat::FatExt as _;
 use inkwell::OptimizationLevel;
 use inkwell::context::Context;
+use inkwell::llvm_sys::support::LLVMParseCommandLineOptions;
 use inkwell::module::Module;
 use inkwell::passes::PassBuilderOptions;
 use inkwell::support::LLVMString;
@@ -23,9 +24,11 @@ use tket::passes::composable::ComposablePass;
 use tket_qsystem::{QSystemLLVMPass, QSystemRebasePass};
 
 use std::error::Error;
+use std::ffi::CString;
 use std::fmt::{self, Display, Formatter};
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::sync::Once;
 use std::vec::Vec;
 use std::{fs, str, vec};
 use tket::hugr::{self, llvm::inkwell};
@@ -172,8 +175,67 @@ fn get_module_with_std_exts<'c>(
     )
 }
 
-/// Optimize the module using LLVM passes
+/// Default cap for the LLVM SLP vectorizer's tree-building recursion depth.
+///
+/// LLVM's own default is 12. Programs with many `if <a or b or ...>:` branches
+/// over distinct runtime booleans lower to a wide/deep graph of `i1` phi/branch
+/// values, and `llvm::slpvectorizer::BoUpSLP::buildTreeRec` explores it with a
+/// cost that is superlinear in the width (empirically `~C * W^3.7` in the number
+/// of simultaneously-live booleans); a real [[19,1,5]] QEC program took ~95 min
+/// to compile. Capping the recursion depth collapses that blowup (an 11x12 grid
+/// of such branches: >45s -> ~4.4s at depth 4) while retaining the shallow,
+/// profitable vectorization the pass normally finds.
+const SLP_RECURSION_MAX_DEPTH: u32 = 4;
+
+/// Resolve the SLP recursion cap, honouring a `SELENE_SLP_RECURSION_MAX_DEPTH`
+/// override and falling back to [`SLP_RECURSION_MAX_DEPTH`] when it is absent or
+/// unparseable.
+fn resolve_slp_recursion_depth(override_value: Option<String>) -> u32 {
+    override_value
+        .and_then(|value| value.trim().parse::<u32>().ok())
+        .unwrap_or(SLP_RECURSION_MAX_DEPTH)
+}
+
+/// Cap the SLP vectorizer's recursion depth via LLVM's global `cl::opt`.
+///
+/// `-slp-recursion-max-depth` is a global `cl::opt<int>` with no C-API or
+/// [`PassBuilderOptions`] setter, so `LLVMParseCommandLineOptions` is the only
+/// lever. (The inkwell `set_loop_slp_vectorization` toggle maps to LLVM's
+/// `PipelineTuningOptions::SLPVectorization`, which the `default<O2>` textual
+/// pipeline does *not* honour — verified empirically that the SLP pass still
+/// runs and blows up.) This mutates process-global state, so we do it exactly
+/// once.
+fn configure_slp_recursion_depth() {
+    static INIT: Once = Once::new();
+    INIT.call_once(|| {
+        let depth =
+            resolve_slp_recursion_depth(std::env::var("SELENE_SLP_RECURSION_MAX_DEPTH").ok());
+        // These CStrings live for the duration of the parse call below.
+        let prog = CString::new("selene-hugr-qis-compiler").expect("static string is NUL-free");
+        let flag = CString::new(format!("-slp-recursion-max-depth={depth}"))
+            .expect("formatted flag is NUL-free");
+        let overview = CString::new("").expect("empty string is NUL-free");
+        let argv = [prog.as_ptr(), flag.as_ptr()];
+        // SAFETY: `argv` holds `argv.len()` valid, NUL-terminated pointers that
+        // outlive the call, and `overview` is a valid NUL-terminated string.
+        unsafe {
+            LLVMParseCommandLineOptions(
+                argv.len() as std::ffi::c_int,
+                argv.as_ptr(),
+                overview.as_ptr(),
+            );
+        }
+    });
+}
+
+/// Optimize the module using LLVM passes.
+///
+/// Before running the pipeline we cap the SLP vectorizer's recursion depth (see
+/// [`configure_slp_recursion_depth`]) to avoid a superlinear compile-time
+/// blowup on wide boolean short-circuit chains. LLVM only runs SLP at `O2`+, so
+/// that is where the blowup appears and where the cap matters.
 fn optimize_module(module: &Module, args: &CompileArgs) -> Result<()> {
+    configure_slp_recursion_depth();
     let opt_str = match args.opt_level {
         OptimizationLevel::Aggressive => "default<O3>",
         OptimizationLevel::Less => "default<O1>",
@@ -576,6 +638,34 @@ mod tests {
             bitcode,
             raw_buffer.as_slice()[..raw_buffer.as_slice().len() - 1],
             "Public bitcode should match LLVM's raw buffer without the implicit trailing NUL"
+        );
+    }
+
+    /// A program with many `if <a or b or ...>:` branches over distinct booleans
+    /// used to trigger a superlinear SLP-vectorizer blowup at the default opt
+    /// level. It must still compile to valid, parseable bitcode with SLP off.
+    #[test]
+    fn test_compile_or_chain_program() {
+        let hugr = include_bytes!("../python/tests/resources/slp_or_chain.hugr");
+        let bitcode = compile_to_bitcode(hugr, 2, "native", "helios", false)
+            .expect("compiling the or-chain fixture to bitcode should work");
+
+        parse_bitcode_as_file(&bitcode).expect("or-chain bitcode should parse from file");
+    }
+
+    #[test]
+    fn resolve_slp_recursion_depth_parses_override_or_falls_back() {
+        assert_eq!(
+            super::resolve_slp_recursion_depth(None),
+            super::SLP_RECURSION_MAX_DEPTH
+        );
+        assert_eq!(
+            super::resolve_slp_recursion_depth(Some(" 2 ".to_string())),
+            2
+        );
+        assert_eq!(
+            super::resolve_slp_recursion_depth(Some("garbage".to_string())),
+            super::SLP_RECURSION_MAX_DEPTH
         );
     }
 }
