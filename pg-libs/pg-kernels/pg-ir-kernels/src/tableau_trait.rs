@@ -293,7 +293,7 @@ pub trait PGTableau: From<TableauData> + Into<TableauData> + Eq {
                     ),
                 }]
             }
-            _ => panic!(
+            _ => unreachable!(
                 "Unsupported operation type in conjugate: {:?}. Should have been caught by can_be_conjugated()",
                 op
             ),

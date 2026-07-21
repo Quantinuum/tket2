@@ -476,7 +476,6 @@ impl PGRewrite for PauliGraph {
         }
         let op_i = &self.get_ops()[i];
         let op_j = &self.get_ops()[j];
-        // True if both clifford
         if self.is_clifford(i) && self.is_clifford(j) {
             let mut tab_i = T::eye(self.get_n_qubits());
             tab_i.postcompose_op(op_i);
