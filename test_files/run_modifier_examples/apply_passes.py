@@ -21,22 +21,6 @@ def apply_passes(input_paths: list[Path], output_dir: Path) -> None:
         print(f"Processing {input_path.name}")
         hugr = _hugr_from_path(str(input_path))
         resolved: Hugr = mr_pass(hugr)
-
-        # normalize = Normalize(
-        #     resolve_modifiers=True,
-        #     simplify_cfgs=True,
-        #     remove_tuple_untuple=False,
-        #     constant_folding=False,
-        #     remove_dead_funcs=False,
-        #     inline_funcs=False,
-        #     inline_dfgs=True,
-        #     remove_redundant_order_edges=False,
-        #     squash_borrows=False,
-        # )
-        # resolved: Hugr = normalize(hugr)
-        # from hugr.hugr.render import RenderConfig
-
-        # resolved.render_dot(RenderConfig(max_node_label_length=None)).view("resolved")
         CompilationState.from_python(resolved).validate()
         output_path = output_dir / f"{input_path.stem}_solved.hugr"
         output_path.write_bytes(resolved.to_bytes())
