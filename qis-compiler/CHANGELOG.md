@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.11](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.2.10...qis-compiler-v0.2.11) (2026-07-21)
+
+
+### Performance Improvements
+
+* cap SLP vectorizer recursion depth to fix compile-time blowup ([#1847](https://github.com/Quantinuum/tket2/issues/1847)) ([c7f6ed4](https://github.com/Quantinuum/tket2/commit/c7f6ed44ccefb0c0a7377fe8aa21c274b2b51075))
+
+
 ## [0.2.10](https://github.com/quantinuum/tket2/compare/qis-compiler-v0.2.9...qis-compiler-v0.2.10) (2025-11-10)
 
 
