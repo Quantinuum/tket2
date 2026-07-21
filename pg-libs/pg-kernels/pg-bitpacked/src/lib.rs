@@ -247,12 +247,7 @@ pub fn u64s_to_sign_flips(packed_sign_flip_bits: &[u64], n_signs: usize) -> Vec<
                 return signs;
             }
             let bits = ((encoding >> i) & 0b1) as u8;
-            let sign = match bits {
-                0 => false,
-                1 => true,
-                _ => unreachable!(),
-            };
-            signs.push(sign);
+            signs.push(bits == 1);
             decoded += 1;
         }
     }
