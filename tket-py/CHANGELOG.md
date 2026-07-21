@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.13.2](https://github.com/Quantinuum/tket2/compare/tket-py-v0.13.1...tket-py-v0.13.2) (2026-07-21)
+
+
+### Features
+
+* Frontend support for Helios platform configuration ([#1848](https://github.com/Quantinuum/tket2/issues/1848)) ([ce8df0b](https://github.com/Quantinuum/tket2/commit/ce8df0bf133e1c8234f70b44ee5c7286cde14945))
+
+
 ## [0.13.1](https://github.com/Quantinuum/tket2/compare/tket-py-v0.13.0...tket-py-v0.13.1) (2026-05-19)
 
 
