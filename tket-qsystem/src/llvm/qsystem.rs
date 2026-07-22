@@ -339,7 +339,6 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                 &[0, 1, 2],
                 &[0, 1],
             ),
-            // Measure qubit in Z basis, not forcing to a boolean.
             HeliosOp::LazyMeasure => {
                 let builder = context.builder();
                 let [qb] = args
@@ -359,7 +358,6 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                     .unwrap_basic();
                 self.finish_lazy_measure(context, args.outputs, qb, result)
             }
-            // Measure qubit in Z basis or detect leakage, not forcing to a boolean.
             HeliosOp::LazyMeasureLeaked => {
                 let builder = context.builder();
                 let [qb] = args
@@ -486,16 +484,9 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
 
     /// Lower a [`SharedOp`] that has identical LLVM behaviour on all platforms.
     ///
-    /// Note: [`SharedOp::PhasedX`] is excluded — it uses different runtime functions
-    /// per platform (`___rxy` on Helios, `___rp` on Sol) and must be handled by the
-    /// platform-specific method before calling this one.
-    ///
-    /// Note: [`SharedOp::LazyMeasure`], [`SharedOp::LazyMeasureLeaked`], and
-    /// [`SharedOp::LazyMeasureReset`] are also excluded — Sol uses a single
-    /// `___lazy_measure(q, flags)` runtime function for both `LazyMeasure` and
-    /// `LazyMeasureLeaked`, while Helios uses separate `___lazy_measure`/
-    /// `___lazy_measure_leaked` functions. They are handled by the platform-specific
-    /// method before calling this one.
+    /// Note: [`SharedOp::PhasedX`] and measurement `SharedOp`s are excluded — they
+    /// use different runtime functions per platform and must be handled by the
+    /// platform-specific methods rather than this one.
     fn emit_shared<'c, H: HugrView<Node = Node>>(
         &self,
         context: &mut EmitFuncContext<'c, '_, H>,
