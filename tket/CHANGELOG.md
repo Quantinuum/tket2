@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [0.19.3](https://github.com/quantinuum/tket2/compare/tket-v0.19.2...tket-v0.19.3) - 2026-07-22
+
+### Performance
+
+- Improve rule evaluation order in dataflow analysis ([#1806](https://github.com/quantinuum/tket2/pull/1806))
+- Pre-compute edge neighbours in dataflow analysis ([#1805](https://github.com/quantinuum/tket2/pull/1805))
+
 ## [0.19.1](https://github.com/quantinuum/tket2/compare/tket-v0.19.0...tket-v0.19.1) - 2026-07-06
 
 ### Performance
