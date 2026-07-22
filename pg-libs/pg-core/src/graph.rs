@@ -1,3 +1,5 @@
+use std::fmt;
+
 use serde::{Deserialize, Serialize};
 
 use crate::errors::PauliGraphError;
@@ -15,6 +17,18 @@ pub enum Pauli {
     Z = 2,
     /// The identity operator.
     I = 3,
+}
+
+impl fmt::Display for Pauli {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let s = match self {
+            Pauli::X => "X",
+            Pauli::Y => "Y",
+            Pauli::Z => "Z",
+            Pauli::I => "I",
+        };
+        write!(f, "{s}")
+    }
 }
 
 /// A pg-core program consisting of a qubit count and an ordered list of operations.
