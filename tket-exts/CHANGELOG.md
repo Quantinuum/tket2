@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.4](https://github.com/Quantinuum/tket2/compare/tket-exts-v0.12.3...tket-exts-v0.12.4) (2026-07-22)
+
+
+### Features
+
+* Add multiple platform-specific qsystem extensions ([#1567](https://github.com/Quantinuum/tket2/issues/1567)) ([b60553f](https://github.com/Quantinuum/tket2/commit/b60553fec5e81b698c75916658bae7d1c527907e))
+
 ## [0.12.3](https://github.com/Quantinuum/tket2/compare/tket-exts-v0.12.2...tket-exts-v0.12.3) (2026-04-07)
 
 
