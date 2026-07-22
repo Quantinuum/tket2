@@ -1,0 +1,22 @@
+[package]
+name = "pg-qm-tableau"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+pg-utils = { path = "../pg-utils/pg-utils" }
+pg-bitpacked = { path = "../pg-kernels/pg-bitpacked" }
+pg-ir-kernels = { path = "../pg-kernels/pg-ir-kernels" }
+pg-core = { path = "../pg-core" }
+rand = "0.9.1"
+rayon = "1.10"
+
+[dev-dependencies]
+pg-tk = { path = "../pg-converters/pg-tk" }
+rstest = { workspace = true}
+
+[features]
+simd = ["pg-bitpacked/simd"]
+
+[lints]
+workspace = true
