@@ -96,8 +96,6 @@ trait QSystemRuntimeFunction {
 enum GenericRuntimeFunction {
     QAlloc,
     QFree,
-    LazyMeasureLeaked,
-    LazyMeasure,
     Reset,
     Rz,
 }
@@ -107,8 +105,6 @@ impl QSystemRuntimeFunction for GenericRuntimeFunction {
         match self {
             GenericRuntimeFunction::QAlloc => "___qalloc",
             GenericRuntimeFunction::QFree => "___qfree",
-            GenericRuntimeFunction::LazyMeasureLeaked => "___lazy_measure_leaked",
-            GenericRuntimeFunction::LazyMeasure => "___lazy_measure",
             GenericRuntimeFunction::Reset => "___reset",
             GenericRuntimeFunction::Rz => "___rz",
         }
@@ -126,12 +122,6 @@ impl QSystemRuntimeFunction for GenericRuntimeFunction {
         match self {
             GenericRuntimeFunction::QAlloc => qb_type.fn_type(&[], false),
             GenericRuntimeFunction::QFree => iwc.void_type().fn_type(&[qb_type.into()], false),
-            GenericRuntimeFunction::LazyMeasureLeaked => {
-                future_type(iwc).fn_type(&[qb_type.into()], false)
-            }
-            GenericRuntimeFunction::LazyMeasure => {
-                future_type(iwc).fn_type(&[qb_type.into()], false)
-            }
             GenericRuntimeFunction::Reset => iwc.void_type().fn_type(&[qb_type.into()], false),
             GenericRuntimeFunction::Rz => iwc
                 .void_type()
@@ -141,15 +131,20 @@ impl QSystemRuntimeFunction for GenericRuntimeFunction {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum HeliosGateFunction {
+enum HeliosRuntimeFunction {
     Rzz,
     Rxy,
+    // Helios uses a separate function for leakage-heralding measurement
+    LazyMeasure,
+    LazyMeasureLeaked,
 }
-impl QSystemRuntimeFunction for HeliosGateFunction {
+impl QSystemRuntimeFunction for HeliosRuntimeFunction {
     fn name(&self) -> &str {
         match self {
-            HeliosGateFunction::Rzz => "___rzz",
-            HeliosGateFunction::Rxy => "___rxy",
+            HeliosRuntimeFunction::Rzz => "___rzz",
+            HeliosRuntimeFunction::Rxy => "___rxy",
+            HeliosRuntimeFunction::LazyMeasure => "___lazy_measure",
+            HeliosRuntimeFunction::LazyMeasureLeaked => "___lazy_measure_leaked",
         }
     }
 
@@ -163,29 +158,35 @@ impl QSystemRuntimeFunction for HeliosGateFunction {
             .as_basic_type_enum();
         let iwc = context.iw_context();
         match self {
-            HeliosGateFunction::Rzz => iwc.void_type().fn_type(
+            HeliosRuntimeFunction::Rzz => iwc.void_type().fn_type(
                 &[qb_type.into(), qb_type.into(), iwc.f64_type().into()],
                 false,
             ),
-            HeliosGateFunction::Rxy => iwc.void_type().fn_type(
+            HeliosRuntimeFunction::Rxy => iwc.void_type().fn_type(
                 &[qb_type.into(), iwc.f64_type().into(), iwc.f64_type().into()],
                 false,
             ),
+            HeliosRuntimeFunction::LazyMeasure | HeliosRuntimeFunction::LazyMeasureLeaked => {
+                future_type(iwc).fn_type(&[qb_type.into()], false)
+            }
         }
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum SolGateFunction {
+enum SolRuntimeFunction {
     Rp,
     Rpp,
+    // Sol uses one function for each type of measurement
+    LazyMeasure,
 }
 
-impl QSystemRuntimeFunction for SolGateFunction {
+impl QSystemRuntimeFunction for SolRuntimeFunction {
     fn name(&self) -> &str {
         match self {
-            SolGateFunction::Rp => "___rp",
-            SolGateFunction::Rpp => "___rpp",
+            SolRuntimeFunction::Rp => "___rp",
+            SolRuntimeFunction::Rpp => "___rpp",
+            SolRuntimeFunction::LazyMeasure => "___lazy_measure",
         }
     }
 
@@ -201,47 +202,22 @@ impl QSystemRuntimeFunction for SolGateFunction {
         let iwc = context.iw_context();
         let float = iwc.f64_type().into();
         match self {
-            SolGateFunction::Rp => iwc.void_type().fn_type(&[qubit, float, float], false),
-            SolGateFunction::Rpp => iwc
+            SolRuntimeFunction::Rp => iwc.void_type().fn_type(&[qubit, float, float], false),
+            SolRuntimeFunction::Rpp => iwc
                 .void_type()
                 .fn_type(&[qubit, qubit, float, float], false),
+            SolRuntimeFunction::LazyMeasure => {
+                future_type(iwc).fn_type(&[qubit, iwc.i64_type().into()], false)
+            }
         }
-    }
-}
-
-/// Sol's combined lazy-measure runtime function: `___lazy_measure(q: i64, flags: i64)`.
-///
-/// Unlike the generic `___lazy_measure`/`___lazy_measure_leaked` functions used on
-/// Helios, Sol uses a single function for both `LazyMeasure` and `LazyMeasureLeaked`,
-/// distinguished by a `flags` argument (`0` for `LazyMeasure`, `1` for
-/// `LazyMeasureLeaked`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct SolLazyMeasureFunction;
-
-impl QSystemRuntimeFunction for SolLazyMeasureFunction {
-    fn name(&self) -> &str {
-        "___lazy_measure"
-    }
-
-    fn func_type<'c>(
-        &self,
-        context: &EmitFuncContext<'c, '_, impl HugrView<Node = Node>>,
-        pcg: &impl PreludeCodegen,
-    ) -> FunctionType<'c> {
-        let qb_type = pcg
-            .qubit_type(&context.typing_session())
-            .as_basic_type_enum();
-        let iwc = context.iw_context();
-        future_type(iwc).fn_type(&[qb_type.into(), iwc.i64_type().into()], false)
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RuntimeFunction {
     Generic(GenericRuntimeFunction),
-    HeliosGate(HeliosGateFunction),
-    SolGate(SolGateFunction),
-    SolLazyMeasure,
+    Helios(HeliosRuntimeFunction),
+    Sol(SolRuntimeFunction),
 }
 
 impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
@@ -251,43 +227,29 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
         rf: RuntimeFunction,
     ) -> Result<FunctionValue<'c>> {
         match (self.platform, rf) {
-            (QSystemPlatform::Helios, RuntimeFunction::HeliosGate(gf)) => {
+            (QSystemPlatform::Helios, RuntimeFunction::Helios(gf)) => {
                 gf.get_func(context, &self.codegen)
             }
-            (QSystemPlatform::Sol, RuntimeFunction::SolGate(gf)) => {
-                gf.get_func(context, &self.codegen)
-            }
+            (QSystemPlatform::Sol, RuntimeFunction::Sol(gf)) => gf.get_func(context, &self.codegen),
             (_, RuntimeFunction::Generic(gf)) => gf.get_func(context, &self.codegen),
-            (QSystemPlatform::Sol, RuntimeFunction::SolLazyMeasure) => {
-                SolLazyMeasureFunction.get_func(context, &self.codegen)
-            }
-            (
-                QSystemPlatform::Helios,
-                RuntimeFunction::SolGate(_) | RuntimeFunction::SolLazyMeasure,
-            ) => {
+            (QSystemPlatform::Helios, RuntimeFunction::Sol(_)) => {
                 bail!("Sol runtime function called on Helios platform")
             }
-            (QSystemPlatform::Sol, RuntimeFunction::HeliosGate(_)) => {
-                bail!("Helios gate function called on Sol platform")
+            (QSystemPlatform::Sol, RuntimeFunction::Helios(_)) => {
+                bail!("Helios runtime function called on Sol platform")
             }
         }
     }
     fn runtime_func_name<'c>(&self, rf: &'c RuntimeFunction) -> Result<&'c str> {
         match (self.platform, rf) {
-            (QSystemPlatform::Helios, RuntimeFunction::HeliosGate(gf)) => Ok(gf.name()),
-            (QSystemPlatform::Sol, RuntimeFunction::SolGate(gf)) => Ok(gf.name()),
+            (QSystemPlatform::Helios, RuntimeFunction::Helios(gf)) => Ok(gf.name()),
+            (QSystemPlatform::Sol, RuntimeFunction::Sol(gf)) => Ok(gf.name()),
             (_, RuntimeFunction::Generic(gf)) => Ok(gf.name()),
-            (QSystemPlatform::Sol, RuntimeFunction::SolLazyMeasure) => {
-                Ok(SolLazyMeasureFunction.name())
-            }
-            (
-                QSystemPlatform::Helios,
-                RuntimeFunction::SolGate(_) | RuntimeFunction::SolLazyMeasure,
-            ) => {
+            (QSystemPlatform::Helios, RuntimeFunction::Sol(_)) => {
                 bail!("Sol runtime function called on Helios platform")
             }
-            (QSystemPlatform::Sol, RuntimeFunction::HeliosGate(_)) => {
-                bail!("Helios gate function called on Sol platform")
+            (QSystemPlatform::Sol, RuntimeFunction::Helios(_)) => {
+                bail!("Helios runtime function called on Sol platform")
             }
         }
     }
@@ -366,14 +328,14 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
             HeliosOp::PhasedX => self.emit_impl(
                 context,
                 args,
-                RuntimeFunction::HeliosGate(HeliosGateFunction::Rxy),
+                RuntimeFunction::Helios(HeliosRuntimeFunction::Rxy),
                 &[0, 1, 2],
                 &[0],
             ),
             HeliosOp::ZZPhase => self.emit_impl(
                 context,
                 args,
-                RuntimeFunction::HeliosGate(HeliosGateFunction::Rzz),
+                RuntimeFunction::Helios(HeliosRuntimeFunction::Rzz),
                 &[0, 1, 2],
                 &[0, 1],
             ),
@@ -388,7 +350,7 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                     .build_call(
                         self.runtime_func(
                             context,
-                            RuntimeFunction::Generic(GenericRuntimeFunction::LazyMeasure),
+                            RuntimeFunction::Helios(HeliosRuntimeFunction::LazyMeasure),
                         )?,
                         &[qb.into()],
                         "lazy_measure",
@@ -408,7 +370,7 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                     .build_call(
                         self.runtime_func(
                             context,
-                            RuntimeFunction::Generic(GenericRuntimeFunction::LazyMeasureLeaked),
+                            RuntimeFunction::Helios(HeliosRuntimeFunction::LazyMeasureLeaked),
                         )?,
                         &[qb.into()],
                         "lazy_measure_leaked",
@@ -427,7 +389,7 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                     .build_call(
                         self.runtime_func(
                             context,
-                            RuntimeFunction::Generic(GenericRuntimeFunction::LazyMeasure),
+                            RuntimeFunction::Helios(HeliosRuntimeFunction::LazyMeasure),
                         )?,
                         &[qb.into()],
                         "lazy_measure",
@@ -455,35 +417,32 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
             SolOp::PhasedX => self.emit_impl(
                 context,
                 args,
-                RuntimeFunction::SolGate(SolGateFunction::Rp),
+                RuntimeFunction::Sol(SolRuntimeFunction::Rp),
                 &[0, 1, 2],
                 &[0],
             ),
             SolOp::PhasedXX => self.emit_impl(
                 context,
                 args,
-                RuntimeFunction::SolGate(SolGateFunction::Rpp),
+                RuntimeFunction::Sol(SolRuntimeFunction::Rpp),
                 &[0, 1, 2, 3],
                 &[0, 1],
             ),
-            // Measure qubit in Z basis, not forcing to a boolean. On Sol both
-            // `LazyMeasure` and `LazyMeasureLeaked` share a single runtime function,
-            // distinguished by a `flags` argument (`0` here).
             SolOp::LazyMeasure => {
                 let [qb] = args
                     .inputs
                     .try_into()
                     .map_err(|_| anyhow!("LazyMeasure expects one input"))?;
+                // flags=0 -> no leakage-heralding
                 let result = self.emit_sol_lazy_measure_call(context, qb, 0)?;
                 self.finish_lazy_measure(context, args.outputs, qb, result)
             }
-            // Measure qubit in Z basis or detect leakage, not forcing to a boolean.
-            // See `SolOp::LazyMeasure` above regarding the `flags` argument (`1` here).
             SolOp::LazyMeasureLeaked => {
                 let [qb] = args
                     .inputs
                     .try_into()
                     .map_err(|_| anyhow!("LazyMeasureLeaked expects one input"))?;
+                // flags=1 -> leakage-heralding
                 let result = self.emit_sol_lazy_measure_call(context, qb, 1)?;
                 self.finish_lazy_measure(context, args.outputs, qb, result)
             }
@@ -514,7 +473,10 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
         Ok(context
             .builder()
             .build_call(
-                self.runtime_func(context, RuntimeFunction::SolLazyMeasure)?,
+                self.runtime_func(
+                    context,
+                    RuntimeFunction::Sol(SolRuntimeFunction::LazyMeasure),
+                )?,
                 &[qb.into(), flags_val.into()],
                 "lazy_measure",
             )?
