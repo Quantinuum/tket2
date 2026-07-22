@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.25.3](https://github.com/quantinuum/tket2/compare/tket-qsystem-v0.25.2...tket-qsystem-v0.25.3) - 2026-07-22
+
+### New Features
+
+- Frontend support for Helios platform configuration ([#1848](https://github.com/quantinuum/tket2/pull/1848))
+
 ## [0.25.2](https://github.com/quantinuum/tket2/compare/tket-qsystem-v0.25.1...tket-qsystem-v0.25.2) - 2026-07-17
 
 ### Bug Fixes

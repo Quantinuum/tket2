@@ -20,11 +20,11 @@ test = false
 bench = false
 
 [dependencies]
-tket = { path = "../tket", version = "0.19.2", features = [
+tket = { path = "../tket", version = "0.19.3", features = [
     "portmatching",
     "binary-eccs",
 ] }
-tket-qsystem = { path = "../tket-qsystem", version = "0.25.2" }
+tket-qsystem = { path = "../tket-qsystem", version = "0.25.3" }
 tket1-passes = { path = "../tket1-passes", version = "0.0.0" }
 
 derive_more = { workspace = true, features = ["into", "from"] }
