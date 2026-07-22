@@ -12,6 +12,7 @@ edition = "2024"
 name = "selene_hugr_qis_compiler"
 path = "rust/lib.rs"
 crate-type = ["cdylib", "rlib"]
+doctest = false
 
 [dependencies]
 anyhow.workspace = true
