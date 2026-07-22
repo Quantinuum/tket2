@@ -50,7 +50,7 @@ __hugr__.__tk2_sol_qalloc.94.exit94.i:            ; preds = %__hugr__.__tk2_sol_
   tail call void @___rp(i64 %qalloc.i91.i, double 0xBFF921FB54442D18, double 0x3FF921FB54442D18)
   tail call void @___rz(i64 %qalloc.i91.i, double 0xBFF921FB54442D18)
   tail call void @___rz(i64 %qalloc.i100.i, double 0x3FE921FB54442D18)
-  %lazy_measure.i = tail call i64 @___lazy_measure(i64 %qalloc.i100.i)
+  %lazy_measure.i = tail call i64 @___lazy_measure(i64 %qalloc.i100.i, i64 0)
   tail call void @___qfree(i64 %qalloc.i100.i)
   %read_bool.i.i = tail call i1 @___read_future_bool(i64 %lazy_measure.i)
   tail call void @___dec_future_refcount(i64 %lazy_measure.i)
@@ -74,7 +74,7 @@ __hugr__.__tk2_sol_qalloc.94.exit94.i:            ; preds = %__hugr__.__tk2_sol_
   tail call void @___rp(i64 %qalloc.i, double 0xBFF921FB54442D18, double 0x3FF921FB54442D18)
   tail call void @___rz(i64 %qalloc.i, double 0xBFF921FB54442D18)
   tail call void @___rz(i64 %qalloc.i91.i, double 0x3FE921FB54442D18)
-  %lazy_measure52.i = tail call i64 @___lazy_measure(i64 %qalloc.i91.i)
+  %lazy_measure52.i = tail call i64 @___lazy_measure(i64 %qalloc.i91.i, i64 0)
   tail call void @___qfree(i64 %qalloc.i91.i)
   %read_bool.i97.i = tail call i1 @___read_future_bool(i64 %lazy_measure52.i)
   tail call void @___dec_future_refcount(i64 %lazy_measure52.i)
@@ -85,7 +85,7 @@ __hugr__.__tk2_sol_qalloc.94.exit94.i:            ; preds = %__hugr__.__tk2_sol_
   br label %.backedge.i
 
 "__hugr__.__main__.rus.<locals>.rus.17.exit":     ; preds = %1
-  %lazy_measure = tail call i64 @___lazy_measure(i64 %qalloc.i)
+  %lazy_measure = tail call i64 @___lazy_measure(i64 %qalloc.i, i64 0)
   tail call void @___qfree(i64 %qalloc.i)
   %read_bool = tail call i1 @___read_future_bool(i64 %lazy_measure)
   tail call void @___dec_future_refcount(i64 %lazy_measure)
@@ -93,7 +93,7 @@ __hugr__.__tk2_sol_qalloc.94.exit94.i:            ; preds = %__hugr__.__tk2_sol_
   ret void
 }
 
-declare i64 @___lazy_measure(i64) local_unnamed_addr
+declare i64 @___lazy_measure(i64, i64) local_unnamed_addr
 
 declare void @___qfree(i64) local_unnamed_addr
 

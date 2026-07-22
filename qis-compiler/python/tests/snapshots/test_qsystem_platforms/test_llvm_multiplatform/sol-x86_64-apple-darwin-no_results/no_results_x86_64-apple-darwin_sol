@@ -19,14 +19,14 @@ __hugr__.__tk2_sol_qalloc.15.exit:                ; preds = %alloca_block
   tail call void @___reset(i64 %qalloc.i)
   tail call void @___rp(i64 %qalloc.i, double 0x3FF921FB54442D18, double 0xBFF921FB54442D18)
   tail call void @___rz(i64 %qalloc.i, double 0x400921FB54442D18)
-  %lazy_measure = tail call i64 @___lazy_measure(i64 %qalloc.i)
+  %lazy_measure = tail call i64 @___lazy_measure(i64 %qalloc.i, i64 0)
   tail call void @___qfree(i64 %qalloc.i)
   %read_bool = tail call i1 @___read_future_bool(i64 %lazy_measure)
   tail call void @___dec_future_refcount(i64 %lazy_measure)
   ret void
 }
 
-declare i64 @___lazy_measure(i64) local_unnamed_addr
+declare i64 @___lazy_measure(i64, i64) local_unnamed_addr
 
 declare void @___qfree(i64) local_unnamed_addr
 
