@@ -1,7 +1,8 @@
 [package]
 name = "pg-qm-tableau"
 version = "0.1.0"
-edition = "2024"
+edition = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
 pg-utils = { path = "../pg-utils/pg-utils" }

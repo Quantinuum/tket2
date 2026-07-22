@@ -176,7 +176,7 @@ jobs:
         run: uv sync --python ${{ env.PYTHON_HIGHEST }}
       - name: Run simd tests
         working-directory: pg-libs
-        run: cargo test -p pg-bitpacked --features simd
+        run: cargo test -p pg-bitpacked -p pg-qm-tableau --features simd
 
   benches:
     name: Continuous benchmarking 🏋️
