@@ -342,6 +342,7 @@ fn wrap_main<'c>(
     Ok(())
 }
 
+/// Options which control the behavior of the QIS compiler.
 #[derive(Debug)]
 pub struct CompileArgs<'a> {
     /// Entry point symbol
@@ -361,6 +362,7 @@ pub struct CompileArgs<'a> {
 }
 
 impl<'a> CompileArgs<'a> {
+    /// Create a CompileArgs using the given parameters
     pub fn new(
         name: &impl ToString,
         target_machine: &'a TargetMachine,

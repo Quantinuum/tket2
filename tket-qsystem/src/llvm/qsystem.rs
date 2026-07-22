@@ -209,11 +209,39 @@ impl QSystemRuntimeFunction for SolGateFunction {
     }
 }
 
+/// Sol's combined lazy-measure runtime function: `___lazy_measure(q: i64, flags: i64)`.
+///
+/// Unlike the generic `___lazy_measure`/`___lazy_measure_leaked` functions used on
+/// Helios, Sol uses a single function for both `LazyMeasure` and `LazyMeasureLeaked`,
+/// distinguished by a `flags` argument (`0` for `LazyMeasure`, `1` for
+/// `LazyMeasureLeaked`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SolLazyMeasureFunction;
+
+impl QSystemRuntimeFunction for SolLazyMeasureFunction {
+    fn name(&self) -> &str {
+        "___lazy_measure"
+    }
+
+    fn func_type<'c>(
+        &self,
+        context: &EmitFuncContext<'c, '_, impl HugrView<Node = Node>>,
+        pcg: &impl PreludeCodegen,
+    ) -> FunctionType<'c> {
+        let qb_type = pcg
+            .qubit_type(&context.typing_session())
+            .as_basic_type_enum();
+        let iwc = context.iw_context();
+        future_type(iwc).fn_type(&[qb_type.into(), iwc.i64_type().into()], false)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RuntimeFunction {
     Generic(GenericRuntimeFunction),
     HeliosGate(HeliosGateFunction),
     SolGate(SolGateFunction),
+    SolLazyMeasure,
 }
 
 impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
@@ -230,8 +258,14 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                 gf.get_func(context, &self.codegen)
             }
             (_, RuntimeFunction::Generic(gf)) => gf.get_func(context, &self.codegen),
-            (QSystemPlatform::Helios, RuntimeFunction::SolGate(_)) => {
-                bail!("Sol gate function called on Helios platform")
+            (QSystemPlatform::Sol, RuntimeFunction::SolLazyMeasure) => {
+                SolLazyMeasureFunction.get_func(context, &self.codegen)
+            }
+            (
+                QSystemPlatform::Helios,
+                RuntimeFunction::SolGate(_) | RuntimeFunction::SolLazyMeasure,
+            ) => {
+                bail!("Sol runtime function called on Helios platform")
             }
             (QSystemPlatform::Sol, RuntimeFunction::HeliosGate(_)) => {
                 bail!("Helios gate function called on Sol platform")
@@ -243,8 +277,14 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
             (QSystemPlatform::Helios, RuntimeFunction::HeliosGate(gf)) => Ok(gf.name()),
             (QSystemPlatform::Sol, RuntimeFunction::SolGate(gf)) => Ok(gf.name()),
             (_, RuntimeFunction::Generic(gf)) => Ok(gf.name()),
-            (QSystemPlatform::Helios, RuntimeFunction::SolGate(_)) => {
-                bail!("Sol gate function called on Helios platform")
+            (QSystemPlatform::Sol, RuntimeFunction::SolLazyMeasure) => {
+                Ok(SolLazyMeasureFunction.name())
+            }
+            (
+                QSystemPlatform::Helios,
+                RuntimeFunction::SolGate(_) | RuntimeFunction::SolLazyMeasure,
+            ) => {
+                bail!("Sol runtime function called on Helios platform")
             }
             (QSystemPlatform::Sol, RuntimeFunction::HeliosGate(_)) => {
                 bail!("Helios gate function called on Sol platform")
@@ -272,6 +312,48 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
         args.outputs.finish(context.builder(), outputs)
     }
 
+    /// Common tail logic after computing the "lazy measure" future `result` for
+    /// `LazyMeasure`/`LazyMeasureLeaked`: free the qubit and finish outputs with
+    /// just the future.
+    fn finish_lazy_measure<'c, H: HugrView<Node = Node>>(
+        &self,
+        context: &mut EmitFuncContext<'c, '_, H>,
+        outputs: hugr::llvm::emit::func::RowPromise<'c>,
+        qb: BasicValueEnum<'c>,
+        result: BasicValueEnum<'c>,
+    ) -> Result<()> {
+        context.builder().build_call(
+            self.runtime_func(
+                context,
+                RuntimeFunction::Generic(GenericRuntimeFunction::QFree),
+            )?,
+            &[qb.into()],
+            "qfree",
+        )?;
+        outputs.finish(context.builder(), [result])
+    }
+
+    /// Common tail logic after computing the "lazy measure" future `result` for
+    /// `LazyMeasureReset`: reset the qubit and finish outputs with the qubit and the
+    /// future.
+    fn finish_lazy_measure_reset<'c, H: HugrView<Node = Node>>(
+        &self,
+        context: &mut EmitFuncContext<'c, '_, H>,
+        outputs: hugr::llvm::emit::func::RowPromise<'c>,
+        qb: BasicValueEnum<'c>,
+        result: BasicValueEnum<'c>,
+    ) -> Result<()> {
+        context.builder().build_call(
+            self.runtime_func(
+                context,
+                RuntimeFunction::Generic(GenericRuntimeFunction::Reset),
+            )?,
+            &[qb.into()],
+            "reset",
+        )?;
+        outputs.finish(context.builder(), [qb, result])
+    }
+
     /// Function to help lower the `tket.qsystem.helios` extension.
     fn emit_helios<'c, H: HugrView<Node = Node>>(
         &self,
@@ -295,6 +377,65 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                 &[0, 1, 2],
                 &[0, 1],
             ),
+            // Measure qubit in Z basis, not forcing to a boolean.
+            HeliosOp::LazyMeasure => {
+                let builder = context.builder();
+                let [qb] = args
+                    .inputs
+                    .try_into()
+                    .map_err(|_| anyhow!("LazyMeasure expects one input"))?;
+                let result = builder
+                    .build_call(
+                        self.runtime_func(
+                            context,
+                            RuntimeFunction::Generic(GenericRuntimeFunction::LazyMeasure),
+                        )?,
+                        &[qb.into()],
+                        "lazy_measure",
+                    )?
+                    .try_as_basic_value()
+                    .unwrap_basic();
+                self.finish_lazy_measure(context, args.outputs, qb, result)
+            }
+            // Measure qubit in Z basis or detect leakage, not forcing to a boolean.
+            HeliosOp::LazyMeasureLeaked => {
+                let builder = context.builder();
+                let [qb] = args
+                    .inputs
+                    .try_into()
+                    .map_err(|_| anyhow!("LazyMeasureLeaked expects one input"))?;
+                let result = builder
+                    .build_call(
+                        self.runtime_func(
+                            context,
+                            RuntimeFunction::Generic(GenericRuntimeFunction::LazyMeasureLeaked),
+                        )?,
+                        &[qb.into()],
+                        "lazy_measure_leaked",
+                    )?
+                    .try_as_basic_value()
+                    .unwrap_basic();
+                self.finish_lazy_measure(context, args.outputs, qb, result)
+            }
+            HeliosOp::LazyMeasureReset => {
+                let builder = context.builder();
+                let [qb] = args
+                    .inputs
+                    .try_into()
+                    .map_err(|_| anyhow!("LazyMeasureReset expects one input"))?;
+                let result = builder
+                    .build_call(
+                        self.runtime_func(
+                            context,
+                            RuntimeFunction::Generic(GenericRuntimeFunction::LazyMeasure),
+                        )?,
+                        &[qb.into()],
+                        "lazy_measure",
+                    )?
+                    .try_as_basic_value()
+                    .unwrap_basic();
+                self.finish_lazy_measure_reset(context, args.outputs, qb, result)
+            }
             _ => {
                 let shared = SharedOp::try_from(op).map_err(|e| anyhow!(e))?;
                 self.emit_shared(context, args, shared)
@@ -325,6 +466,35 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                 &[0, 1, 2, 3],
                 &[0, 1],
             ),
+            // Measure qubit in Z basis, not forcing to a boolean. On Sol both
+            // `LazyMeasure` and `LazyMeasureLeaked` share a single runtime function,
+            // distinguished by a `flags` argument (`0` here).
+            SolOp::LazyMeasure => {
+                let [qb] = args
+                    .inputs
+                    .try_into()
+                    .map_err(|_| anyhow!("LazyMeasure expects one input"))?;
+                let result = self.emit_sol_lazy_measure_call(context, qb, 0)?;
+                self.finish_lazy_measure(context, args.outputs, qb, result)
+            }
+            // Measure qubit in Z basis or detect leakage, not forcing to a boolean.
+            // See `SolOp::LazyMeasure` above regarding the `flags` argument (`1` here).
+            SolOp::LazyMeasureLeaked => {
+                let [qb] = args
+                    .inputs
+                    .try_into()
+                    .map_err(|_| anyhow!("LazyMeasureLeaked expects one input"))?;
+                let result = self.emit_sol_lazy_measure_call(context, qb, 1)?;
+                self.finish_lazy_measure(context, args.outputs, qb, result)
+            }
+            SolOp::LazyMeasureReset => {
+                let [qb] = args
+                    .inputs
+                    .try_into()
+                    .map_err(|_| anyhow!("LazyMeasureReset expects one input"))?;
+                let result = self.emit_sol_lazy_measure_call(context, qb, 0)?;
+                self.finish_lazy_measure_reset(context, args.outputs, qb, result)
+            }
             _ => {
                 let shared = SharedOp::try_from(op).map_err(|e| anyhow!(e))?;
                 self.emit_shared(context, args, shared)
@@ -332,11 +502,38 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
         }
     }
 
+    /// Emit a call to Sol's combined `___lazy_measure(q, flags)` runtime function,
+    /// returning the resulting future.
+    fn emit_sol_lazy_measure_call<'c, H: HugrView<Node = Node>>(
+        &self,
+        context: &mut EmitFuncContext<'c, '_, H>,
+        qb: BasicValueEnum<'c>,
+        flags: u64,
+    ) -> Result<BasicValueEnum<'c>> {
+        let flags_val = context.iw_context().i64_type().const_int(flags, false);
+        Ok(context
+            .builder()
+            .build_call(
+                self.runtime_func(context, RuntimeFunction::SolLazyMeasure)?,
+                &[qb.into(), flags_val.into()],
+                "lazy_measure",
+            )?
+            .try_as_basic_value()
+            .unwrap_basic())
+    }
+
     /// Lower a [`SharedOp`] that has identical LLVM behaviour on all platforms.
     ///
     /// Note: [`SharedOp::PhasedX`] is excluded — it uses different runtime functions
     /// per platform (`___rxy` on Helios, `___rp` on Sol) and must be handled by the
     /// platform-specific method before calling this one.
+    ///
+    /// Note: [`SharedOp::LazyMeasure`], [`SharedOp::LazyMeasureLeaked`], and
+    /// [`SharedOp::LazyMeasureReset`] are also excluded — Sol uses a single
+    /// `___lazy_measure(q, flags)` runtime function for both `LazyMeasure` and
+    /// `LazyMeasureLeaked`, while Helios uses separate `___lazy_measure`/
+    /// `___lazy_measure_leaked` functions. They are handled by the platform-specific
+    /// method before calling this one.
     fn emit_shared<'c, H: HugrView<Node = Node>>(
         &self,
         context: &mut EmitFuncContext<'c, '_, H>,
@@ -352,88 +549,12 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                 &[0, 1],
                 &[0],
             ),
-            // Measure qubit in Z basis, not forcing to a boolean.
-            SharedOp::LazyMeasure => {
-                let builder = context.builder();
-                let [qb] = args
-                    .inputs
-                    .try_into()
-                    .map_err(|_| anyhow!("LazyMeasure expects one input"))?;
-                let result = builder
-                    .build_call(
-                        self.runtime_func(
-                            context,
-                            RuntimeFunction::Generic(GenericRuntimeFunction::LazyMeasure),
-                        )?,
-                        &[qb.into()],
-                        "lazy_measure",
-                    )?
-                    .try_as_basic_value()
-                    .unwrap_basic();
-                builder.build_call(
-                    self.runtime_func(
-                        context,
-                        RuntimeFunction::Generic(GenericRuntimeFunction::QFree),
-                    )?,
-                    &[qb.into()],
-                    "qfree",
-                )?;
-                args.outputs.finish(builder, [result])
-            }
-            // Measure qubit in Z basis or detect leakage, not forcing to a boolean.
-            SharedOp::LazyMeasureLeaked => {
-                let builder = context.builder();
-                let [qb] = args
-                    .inputs
-                    .try_into()
-                    .map_err(|_| anyhow!("LazyMeasureLeaked expects one input"))?;
-                let result = builder
-                    .build_call(
-                        self.runtime_func(
-                            context,
-                            RuntimeFunction::Generic(GenericRuntimeFunction::LazyMeasureLeaked),
-                        )?,
-                        &[qb.into()],
-                        "lazy_measure_leaked",
-                    )?
-                    .try_as_basic_value()
-                    .unwrap_basic();
-                builder.build_call(
-                    self.runtime_func(
-                        context,
-                        RuntimeFunction::Generic(GenericRuntimeFunction::QFree),
-                    )?,
-                    &[qb.into()],
-                    "qfree",
-                )?;
-                args.outputs.finish(builder, [result])
-            }
-            SharedOp::LazyMeasureReset => {
-                let builder = context.builder();
-                let [qb] = args
-                    .inputs
-                    .try_into()
-                    .map_err(|_| anyhow!("LazyMeasureReset expects one input"))?;
-                let result = builder
-                    .build_call(
-                        self.runtime_func(
-                            context,
-                            RuntimeFunction::Generic(GenericRuntimeFunction::LazyMeasure),
-                        )?,
-                        &[qb.into()],
-                        "lazy_measure",
-                    )?
-                    .try_as_basic_value()
-                    .unwrap_basic();
-                builder.build_call(
-                    self.runtime_func(
-                        context,
-                        RuntimeFunction::Generic(GenericRuntimeFunction::Reset),
-                    )?,
-                    &[qb.into()],
-                    "reset",
-                )?;
-                args.outputs.finish(builder, [qb, result])
+            SharedOp::LazyMeasure | SharedOp::LazyMeasureLeaked | SharedOp::LazyMeasureReset => {
+                unreachable!(
+                    "LazyMeasure/LazyMeasureLeaked/LazyMeasureReset use different LLVM \
+                     functions per platform and must be handled before dispatching to \
+                     emit_shared"
+                )
             }
             // Reset a qubit.
             SharedOp::Reset => self.emit_impl(
@@ -555,6 +676,7 @@ mod test {
     #[case::qfree(7, HeliosOp::QFree)]
     #[case::reset(8, HeliosOp::Reset)]
     #[case::lazy_measure_leaked(10, HeliosOp::LazyMeasureLeaked)]
+    #[case::lazy_measure_reset(11, HeliosOp::LazyMeasureReset)]
     fn emit_helios_codegen(
         #[case] _i: i32,
         #[with(_i)] mut llvm_ctx: TestContext,
@@ -634,6 +756,7 @@ mod test {
     #[case::qfree(7, SolOp::QFree)]
     #[case::reset(8, SolOp::Reset)]
     #[case::lazy_measure_leaked(10, SolOp::LazyMeasureLeaked)]
+    #[case::lazy_measure_reset(11, SolOp::LazyMeasureReset)]
     fn emit_sol_codegen(#[case] _i: i32, #[with(_i)] mut llvm_ctx: TestContext, #[case] op: SolOp) {
         use crate::llvm::{futures::FuturesCodegenExtension, prelude::QISPreludeCodegen};
 
