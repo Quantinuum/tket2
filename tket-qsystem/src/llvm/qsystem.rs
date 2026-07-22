@@ -177,7 +177,7 @@ impl QSystemRuntimeFunction for HeliosRuntimeFunction {
 enum SolRuntimeFunction {
     Rp,
     Rpp,
-    // Sol uses one function for each type of measurement
+    // Sol uses the same function for all measurement types
     LazyMeasure,
 }
 
