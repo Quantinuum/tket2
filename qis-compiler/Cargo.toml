@@ -27,7 +27,7 @@ tket-qsystem = { path = "../tket-qsystem", version = "0.22.0", features = [
 ] }
 
 [features]
-default = ["py"]
+default = []
 py = ["dep:pyo3"]
 extension-module = ["pyo3/extension-module"]
 
