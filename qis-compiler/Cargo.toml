@@ -28,8 +28,7 @@ tket-qsystem = { path = "../tket-qsystem", version = "0.22.0", features = [
 
 [features]
 default = []
-py = ["dep:pyo3"]
-extension-module = ["pyo3/extension-module"]
+py = ["dep:pyo3", "pyo3/extension-module"]
 
 [build-dependencies]
 cbindgen.workspace = true
