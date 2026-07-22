@@ -217,6 +217,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "pg-ir-kernels-tests"
+version = "0.1.0"
+dependencies = [
+ "pg-core",
+ "pg-ir-kernels",
+ "pg-qm-tableau",
+ "pg-tk",
+]
+
+[[package]]
 name = "pg-qm-tableau"
 version = "0.1.0"
 dependencies = [

@@ -1,0 +1,15 @@
+[package]
+name = "pg-ir-kernels-tests"
+version = "0.1.0"
+edition = { workspace = true }
+rust-version = { workspace = true }
+publish = false
+
+[dev-dependencies]
+pg-ir-kernels = { path = "../pg-ir-kernels" }
+pg-qm-tableau = { path = "../../pg-qm-tableau" }
+pg-core = { path = "../../pg-core" }
+pg-tk = { path = "../../pg-converters/pg-tk" }
+
+[lints]
+workspace = true

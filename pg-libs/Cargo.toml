@@ -5,6 +5,7 @@ members = [
     "pg-converters/pg-tk",
     "pg-kernels/pg-bitpacked",
     "pg-kernels/pg-ir-kernels",
+    "pg-kernels/pg-ir-kernels-tests",
     "pg-utils/pg-utils",
     "pg-qm-tableau",
     ]
