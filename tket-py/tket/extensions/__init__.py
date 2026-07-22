@@ -1,3 +1,5 @@
+"""HUGR extension definitions for tket circuits."""
+
 from tket_exts import (
     argument,
     debug,
