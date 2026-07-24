@@ -7,9 +7,9 @@ dev = [
     "maturin>=1.14.1,<2",
     "pytest>=9.1.1,<10",
     "pytest-cov ~=7.0",
-    "ruff>=0.15.22,<0.16",
+    "ruff>=0.16.0,<0.17",
     "mypy>=2.3.0,<3",
-    "hypothesis>=6.156.6,<7",
+    "hypothesis>=6.161.1,<7",
     "hugr~=0.18.2",
     "graphviz ~=0.21.0",
     "pre-commit~=4.6",
@@ -20,7 +20,7 @@ dev = [
     # used for tests in tket-py
     "numpy>=2.2.0",
 ]
-conan = ["conan>=2.30.0,<3"]
+conan = ["conan>=2.31.0,<3"]
 
 [tool.uv]
 prerelease = "explicit"
