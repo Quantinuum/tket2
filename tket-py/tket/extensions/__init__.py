@@ -21,6 +21,13 @@ Extensions may be imported directly as follows:
 >>> result_extension = ext.result()
 >>> rotation_extension = ext.rotation()
 >>> wasm_extension = ext.wasm()
+>>>
+>>> read_arg_op = argument_extension.get_op("read_arg")
+OpDef(name='read_arg', signature=OpDefSig(poly_func=PolyFuncType(params=[StringParam(), TypeTypeParam(bound=TypeBound.Linear)], body=FunctionType([], [$1])), binary=False), description='Read a runtime argument of the given type identified by a string tag', misc={})
+>>> read_arg_op.description
+'Read a runtime argument of the given type identified by a string tag'
+>>> read_arg_op.signature
+OpDefSig(poly_func=PolyFuncType(params=[StringParam(), TypeTypeParam(bound=TypeBound.Linear)], body=FunctionType([], [$1])), binary=False)
 """
 
 from tket_exts import (
