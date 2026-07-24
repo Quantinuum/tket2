@@ -286,6 +286,7 @@ fn wrap_main<'c>(
     Ok(())
 }
 
+/// Compilation arguments.
 #[derive(Debug)]
 pub struct CompileArgs<'a> {
     /// Entry point symbol
@@ -301,6 +302,7 @@ pub struct CompileArgs<'a> {
 }
 
 impl<'a> CompileArgs<'a> {
+    /// Create compiler arguments.
     pub fn new(
         name: &impl ToString,
         target_machine: &'a TargetMachine,
