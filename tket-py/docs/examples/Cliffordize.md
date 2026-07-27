@@ -33,7 +33,6 @@ By default, `Cliffordize` uses `GlobalScope.PRESERVE_PUBLIC`. Use
 ```python
 from hugr.passes.scope import LocalScope
 
-local_result = Cliffordize().with_scope(LocalScope.FLAT).run(
-    hugr, inplace=False
-)
+cliffordize = Cliffordize().with_scope(LocalScope.FLAT)
+local_result = cliffordize.run(hugr, inplace=False)
 ```
