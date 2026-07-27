@@ -6,9 +6,9 @@ use derive_more::Display;
 use hugr::ops::OpType;
 use hugr::std_extensions::arithmetic::float_ops::FloatOps;
 use itertools::Itertools;
+use pest::Parser;
 use pest::iterators::{Pair, Pairs};
 use pest::pratt_parser::PrattParser;
-use pest::Parser;
 use pest_derive::Parser;
 
 use crate::extension::rotation::RotationOp;
@@ -286,7 +286,9 @@ mod test {
     fn parse_param(#[case] param: &str, #[case] expected: PytketParam) {
         let parsed = parse_pytket_param(param);
         if parsed != expected {
-            panic!("Incorrect parameter parsing\n\texpression: \"{param}\"\n\tparsed: {parsed}\n\texpected: {expected}");
+            panic!(
+                "Incorrect parameter parsing\n\texpression: \"{param}\"\n\tparsed: {parsed}\n\texpected: {expected}"
+            );
         }
     }
 }

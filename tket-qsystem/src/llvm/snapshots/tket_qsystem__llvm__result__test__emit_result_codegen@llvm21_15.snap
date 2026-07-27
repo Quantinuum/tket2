@@ -1,0 +1,21 @@
+---
+source: tket-qsystem/src/llvm/result.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+@"res_   spaces .F46B5D1D.0" = private constant [41 x i8] c"(USER:BOOL:   spaces   tabs\09\09\09newlines\0A\0A\0A"
+
+define internal void @_hl.main.1(i1 %0) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %tag_len = load i8, ptr @"res_   spaces .F46B5D1D.0", align 1
+  %tag_len2 = zext i8 %tag_len to i64
+  call void @print_bool(ptr @"res_   spaces .F46B5D1D.0", i64 %tag_len2, i1 %0)
+  ret void
+}
+
+declare void @print_bool(ptr, i64, i1)

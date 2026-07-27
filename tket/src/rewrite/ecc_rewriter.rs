@@ -28,8 +28,8 @@ use std::{
 
 use crate::extension::REGISTRY;
 use crate::{
-    circuit::{remove_empty_wire, Circuit},
-    optimiser::badger::{load_eccs_json_file, EqCircClass},
+    circuit::{Circuit, remove_empty_wire},
+    optimiser::badger::{EqCircClass, load_eccs_json_file},
     portmatching::{CircuitPattern, PatternMatcher},
 };
 
@@ -298,7 +298,7 @@ fn empty_wires(circ: &Circuit<impl HugrView<Node = Node>>) -> Vec<usize> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{utils::build_simple_circuit, TketOp};
+    use crate::{TketOp, utils::build_simple_circuit};
 
     use super::*;
 
@@ -406,7 +406,7 @@ mod tests {
     /// obtain convex patterns
     #[test]
     fn ecc_rewriter_empty_params() {
-        let test_file = "../test_files/cx_cx_eccs.json";
+        let test_file = "../test_files/eccs/cx_cx_eccs.json";
         let rewriter = ECCRewriter::try_from_eccs_json_file(test_file).unwrap();
 
         let cx_cx = cx_cx();

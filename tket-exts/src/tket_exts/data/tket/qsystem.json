@@ -1,5 +1,5 @@
 {
-  "version": "0.5.0",
+  "version": "0.5.1",
   "name": "tket.qsystem",
   "types": {},
   "operations": {
@@ -308,7 +308,7 @@
     "Rz": {
       "extension": "tket.qsystem",
       "name": "Rz",
-      "description": "Rotate a qubit around the Z axis. Not physical.",
+      "description": "Rotate a qubit around the Z axis. Not physical on Helios or Sol platforms.",
       "signature": {
         "params": [],
         "body": {
@@ -362,7 +362,7 @@
     "ZZPhase": {
       "extension": "tket.qsystem",
       "name": "ZZPhase",
-      "description": "ZZ gate with an angle.",
+      "description": "ZZ gate with an angle, specific to the Helios platform.",
       "signature": {
         "params": [],
         "body": {

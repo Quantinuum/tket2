@@ -5,10 +5,10 @@
 //!
 //! [`Units`]: crate::circuit::units::Units
 
-use hugr::extension::prelude;
-use hugr::types::Type;
 use hugr::CircuitUnit;
 use hugr::Wire;
+use hugr::extension::prelude;
+use hugr::types::Type;
 
 use super::LinearUnit;
 

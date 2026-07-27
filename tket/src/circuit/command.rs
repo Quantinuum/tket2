@@ -3,20 +3,18 @@
 //! A [`Command`] is an operation applied to an specific wires, possibly identified by their index in the circuit's input vector.
 
 use std::collections::hash_map::Entry;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::iter::FusedIterator;
 
-use hugr::hugr::NodeMetadata;
+use hugr::metadata::Metadata;
 use hugr::ops::{OpTag, OpTrait};
 use hugr::{HugrView, IncomingPort, OutgoingPort};
-use hugr_core::hugr::internal::{HugrInternals, PortgraphNodeMap};
 use itertools::Either::{self, Left, Right};
 use itertools::{EitherOrBoth, Itertools};
-use petgraph::visit as pv;
-use portgraph::PortView;
+use petgraph::visit::{self as pv, NodeCount};
 
-use super::units::{filter, DefaultUnitLabeller, LinearUnit, UnitLabeller, Units};
 use super::Circuit;
+use super::units::{DefaultUnitLabeller, LinearUnit, UnitLabeller, Units, filter};
 
 pub use hugr::ops::OpType;
 pub use hugr::types::{EdgeKind, Type, TypeRow};
@@ -159,8 +157,8 @@ impl<'circ, T: HugrView<Node = Node>> Command<'circ, T> {
 
     /// Returns a metadata value associated with the command's node.
     #[inline]
-    pub fn metadata(&self, key: impl AsRef<str>) -> Option<&NodeMetadata> {
-        self.circ.hugr().get_metadata(self.node, key)
+    pub fn metadata<M: Metadata>(&self) -> Option<M::Type<'_>> {
+        self.circ.hugr().get_metadata::<M>(self.node)
     }
 }
 
@@ -231,25 +229,17 @@ impl<T: HugrView> std::hash::Hash for Command<'_, T> {
     }
 }
 
-/// A non-borrowing topological walker over the nodes of a circuit.
-type NodeWalker<'circ, T> = pv::Topo<
-    portgraph::NodeIndex,
-    <portgraph::view::FlatRegion<'circ, <T as HugrInternals>::RegionPortgraph<'circ>> as petgraph::visit::Visitable>::Map,
->;
-
 /// An iterator over the commands of a circuit.
-// TODO: this can only be made generic over node type once `SiblingGraph` is
-// generic over node type. See https://github.com/CQCL/hugr/issues/1926
 #[derive(Clone)]
+#[deprecated(
+    since = "0.19.0",
+    note = "This is a limited API that will be dropped soon. Use toposorting over `HugrView::scheduling_graph` instead.\n<https://docs.rs/hugr/latest/hugr/trait.HugrView.html#method.scheduling_graph>"
+)]
 pub struct CommandIterator<'circ, T: HugrView> {
     /// The circuit.
     circ: &'circ Circuit<T>,
-    /// A view of the top-level region of the circuit.
-    region: portgraph::view::FlatRegion<'circ, T::RegionPortgraph<'circ>>,
-    /// A map between portgraph nodes in [`CommandIterator::region`] and circuit nodes.
-    region_node_map: T::RegionPortgraphNodes,
     /// Toposorted nodes.
-    nodes: NodeWalker<'circ, T>,
+    nodes: VecDeque<T::Node>,
     /// Last wire for each [`LinearUnit`] in the circuit.
     wire_unit: HashMap<Wire, usize>,
     /// Maximum number of remaining commands, not counting I/O nodes nor root nodes.
@@ -274,29 +264,38 @@ pub struct CommandIterator<'circ, T: HugrView> {
     delayed_node: Option<Node>,
 }
 
+#[expect(deprecated)]
 impl<'circ, T: HugrView<Node = Node>> CommandIterator<'circ, T> {
     /// Create a new iterator over the commands of a circuit.
     pub(super) fn new(circ: &'circ Circuit<T>) -> Self {
         // Initialize the map assigning linear units to the input's linear
         // ports.
-        //
-        // TODO: `with_wires` combinator for `Units`?
         let wire_unit = circ
             .linear_units()
             .map(|(linear_unit, port, _)| (Wire::new(circ.input_node(), port), linear_unit.index()))
             .collect();
 
-        let (region, region_node_map) = circ.hugr().region_portgraph(circ.parent());
-        let node_count = region.node_count();
-        let nodes = pv::Topo::new(&region);
+        // Eagerly compute the topological order of the nodes, to avoid requiring keeping a `SchedulingGraph` alive during iteration.
+        let nodes = {
+            let scheduling_graph = circ.hugr().scheduling_graph(circ.parent());
+            let pg = scheduling_graph.petgraph();
+            let node_count = pg.node_count();
+
+            let mut nodes = VecDeque::with_capacity(node_count);
+            let mut topo = pv::Topo::new(&pg);
+            while let Some(node) = topo.next(&pg) {
+                nodes.push_back(scheduling_graph.pg_to_node(node));
+            }
+            nodes
+        };
+
+        let max_remaining = nodes.len() - 2; // I/O nodes are not yielded as commands.
         Self {
             circ,
-            region,
-            region_node_map,
             nodes,
             wire_unit,
             // Ignore the input and output nodes, and the root.
-            max_remaining: node_count - 2,
+            max_remaining,
             delayed_consts: HashSet::new(),
             delayed_consumers: HashMap::new(),
             delayed_node: None,
@@ -308,10 +307,10 @@ impl<'circ, T: HugrView<Node = Node>> CommandIterator<'circ, T> {
     /// If the next node in the topological order is a constant or load const node,
     /// delay it until its consumers are processed.
     fn next_node(&mut self) -> Option<Node> {
-        let node = self.delayed_node.take().or_else(|| {
-            let pg_node = self.nodes.next(&self.region)?;
-            Some(self.region_node_map.from_portgraph(pg_node))
-        })?;
+        let node = self
+            .delayed_node
+            .take()
+            .or_else(|| self.nodes.pop_front())?;
         if node == self.circ.parent() {
             // Ignore the root of the circuit.
             // This will only happen once.
@@ -335,7 +334,9 @@ impl<'circ, T: HugrView<Node = Node>> CommandIterator<'circ, T> {
                 self.delayed_consts.remove(&delayed);
                 for consumer in self.circ.hugr().output_neighbours(delayed) {
                     let Entry::Occupied(mut entry) = self.delayed_consumers.entry(consumer) else {
-                        panic!("Delayed node consumer was not in delayed_consumers. Delayed node: {delayed:?}, consumer: {consumer:?}.");
+                        panic!(
+                            "Delayed node consumer was not in delayed_consumers. Delayed node: {delayed:?}, consumer: {consumer:?}."
+                        );
                     };
                     *entry.get_mut() -= 1;
                     if *entry.get() == 0 {
@@ -443,6 +444,7 @@ impl<'circ, T: HugrView<Node = Node>> CommandIterator<'circ, T> {
     }
 }
 
+#[expect(deprecated)]
 impl<'circ, T: HugrView<Node = Node>> Iterator for CommandIterator<'circ, T> {
     type Item = Command<'circ, T>;
 
@@ -469,8 +471,10 @@ impl<'circ, T: HugrView<Node = Node>> Iterator for CommandIterator<'circ, T> {
     }
 }
 
+#[expect(deprecated)]
 impl<T: HugrView<Node = Node>> FusedIterator for CommandIterator<'_, T> {}
 
+#[expect(deprecated)]
 impl<T: HugrView<Node = Node>> std::fmt::Debug for CommandIterator<'_, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CommandIterator")
@@ -482,12 +486,13 @@ impl<T: HugrView<Node = Node>> std::fmt::Debug for CommandIterator<'_, T> {
 }
 
 #[cfg(test)]
+#[expect(deprecated)]
 mod test {
     use hugr::builder::{Container, DFGBuilder, Dataflow, DataflowHugr};
     use hugr::extension::prelude::qb_t;
     use hugr::hugr::hugrmut::HugrMut;
-    use hugr::ops::handle::NodeHandle;
     use hugr::ops::Value;
+    use hugr::ops::handle::NodeHandle;
     use hugr::types::Signature;
     use itertools::Itertools;
     use rstest::{fixture, rstest};
@@ -496,8 +501,8 @@ mod test {
 
     use crate::extension::rotation::ConstRotation;
 
-    use crate::utils::build_simple_circuit;
     use crate::TketOp;
+    use crate::utils::build_simple_circuit;
 
     use super::*;
 

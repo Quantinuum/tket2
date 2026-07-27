@@ -28,11 +28,11 @@ use hugr::ops::OpType;
 use hugr::{HugrView, Node};
 use itertools::Itertools;
 
-use crate::circuit::cost::{is_cx, is_quantum, CircuitCost, CostDelta, LexicographicCost};
-use crate::{op_matches, Circuit, TketOp};
+use crate::circuit::cost::{CircuitCost, CostDelta, LexicographicCost, is_cx, is_quantum};
+use crate::{Circuit, TketOp};
 
-use super::trace::RewriteTrace;
 use super::CircuitRewrite;
+use super::trace::RewriteTrace;
 
 /// Rewriting strategies for circuit optimisation.
 ///
@@ -66,9 +66,7 @@ pub trait RewriteStrategy {
     /// Returns the cost of a rewrite's matched subcircuit before replacing it.
     #[inline]
     fn pre_rewrite_cost(&self, rw: &CircuitRewrite, circ: &Circuit) -> Self::Cost {
-        circ.nodes_cost(rw.subcircuit().nodes().iter().copied(), |op| {
-            self.op_cost(op)
-        })
+        circ.nodes_cost(rw.subgraph().nodes().iter().copied(), |op| self.op_cost(op))
     }
 
     /// Returns the expected cost of a rewrite's matched subcircuit after replacing it.
@@ -129,14 +127,14 @@ impl RewriteStrategy for GreedyRewriteStrategy {
         let mut circ = circ.clone();
         for rewrite in rewrites {
             if rewrite
-                .subcircuit()
+                .subgraph()
                 .nodes()
                 .iter()
                 .any(|n| changed_nodes.contains(n))
             {
                 continue;
             }
-            changed_nodes.extend(rewrite.subcircuit().nodes().iter().copied());
+            changed_nodes.extend(rewrite.subgraph().nodes().iter().copied());
             cost_delta += rewrite.node_count_delta();
             rewrite
                 .apply(&mut circ)
@@ -371,7 +369,7 @@ impl LexicographicCostFunction<fn(&OpType) -> usize, 2> {
     pub fn rz_count() -> Self {
         Self {
             cost_fns: [
-                |op| op_matches(op, TketOp::Rz) as usize,
+                |op| (op.cast() == Some(TketOp::Rz)) as usize,
                 |op| is_quantum(op) as usize,
             ],
         }
@@ -475,14 +473,29 @@ impl GammaStrategyCost<fn(&OpType) -> usize> {
 mod tests {
     use super::*;
     use hugr::Node;
+    use hugr::hugr::views::SiblingSubgraph;
     use itertools::Itertools;
 
     use crate::rewrite::trace::REWRITE_TRACING_ENABLED;
-    use crate::{
-        circuit::Circuit,
-        rewrite::{CircuitRewrite, Subcircuit},
-        utils::build_simple_circuit,
-    };
+    use crate::{circuit::Circuit, rewrite::CircuitRewrite, utils::build_simple_circuit};
+
+    /// Create a rewrite rule to replace the subcircuit with a new circuit.
+    /// TODO: this should use the new Subcircuit; TEMP TEST WORKAROUND until that arrives.
+    ///
+    /// # Parameters
+    /// * `circuit` - The base circuit that contains the subcircuit.
+    /// * `replacement` - The new circuit to replace the subcircuit with.
+    fn create_rewrite(
+        ssg: &SiblingSubgraph<Node>,
+        circuit: &Circuit<impl HugrView<Node = Node>>,
+        replacement: Circuit<impl HugrView<Node = Node>>,
+    ) -> CircuitRewrite {
+        // The replacement must be a Dfg rooted hugr.
+        let replacement = replacement.extract_dfg().unwrap().into_hugr();
+        ssg.create_simple_replacement(circuit.hugr(), replacement)
+            .unwrap()
+            .into()
+    }
 
     fn n_cx(n_gates: usize) -> Circuit {
         let qbs = [0, 1];
@@ -497,24 +510,28 @@ mod tests {
 
     /// Rewrite cx_nodes -> empty
     fn rw_to_empty(circ: &Circuit, cx_nodes: impl Into<Vec<Node>>) -> CircuitRewrite {
-        let subcirc = Subcircuit::try_from_nodes(cx_nodes, circ).unwrap();
-        subcirc
-            .create_rewrite(circ, n_cx(0))
-            .unwrap_or_else(|e| panic!("{}", e))
+        let subcirc = SiblingSubgraph::try_from_nodes(cx_nodes, circ.hugr()).unwrap();
+        create_rewrite(&subcirc, circ, n_cx(0))
     }
 
     /// Rewrite cx_nodes -> 10x CX
     fn rw_to_full(circ: &Circuit, cx_nodes: impl Into<Vec<Node>>) -> CircuitRewrite {
-        let subcirc = Subcircuit::try_from_nodes(cx_nodes, circ).unwrap();
-        subcirc
-            .create_rewrite(circ, n_cx(10))
-            .unwrap_or_else(|e| panic!("{}", e))
+        let subcirc = SiblingSubgraph::try_from_nodes(cx_nodes, circ.hugr()).unwrap();
+        create_rewrite(&subcirc, circ, n_cx(10))
+    }
+
+    /// Returns a vector of `TketOp` nodes in the entrypoint region, in topological order.
+    fn entrypoint_tket_ops(circ: &Circuit) -> Vec<Node> {
+        circ.toposorted_children(circ.parent())
+            .expect("circuit entrypoint should be dataflow region")
+            .filter(|&n| circ.hugr().get_optype(n).cast::<TketOp>().is_some())
+            .collect_vec()
     }
 
     #[test]
     fn test_greedy_strategy() {
         let mut circ = n_cx(10);
-        let cx_gates = circ.commands().map(|cmd| cmd.node()).collect_vec();
+        let cx_gates = entrypoint_tket_ops(&circ);
 
         assert!(circ.rewrite_trace().is_none());
         circ.enable_rewrite_tracing();
@@ -543,7 +560,7 @@ mod tests {
     #[test]
     fn test_exhaustive_default_strategy() {
         let mut circ = n_cx(10);
-        let cx_gates = circ.commands().map(|cmd| cmd.node()).collect_vec();
+        let cx_gates = entrypoint_tket_ops(&circ);
         circ.enable_rewrite_tracing();
 
         let rws = [
@@ -580,7 +597,7 @@ mod tests {
     #[test]
     fn test_exhaustive_gamma_strategy() {
         let circ = n_cx(10);
-        let cx_gates = circ.commands().map(|cmd| cmd.node()).collect_vec();
+        let cx_gates = entrypoint_tket_ops(&circ);
 
         let rws = [
             rw_to_empty(&circ, cx_gates[0..2].to_vec()),

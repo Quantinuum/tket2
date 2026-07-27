@@ -1,23 +1,23 @@
 //! `hugr-llvm` codegen extension for `tket.bool`.
 
+use hugr::HugrView;
+use hugr::Node;
+use hugr::llvm::CodegenExtension;
+use hugr::llvm::emit::EmitOpArgs;
 use hugr::llvm::emit::emit_value;
 use hugr::llvm::emit::func::EmitFuncContext;
-use hugr::llvm::emit::EmitOpArgs;
 use hugr::llvm::inkwell;
 use hugr::llvm::sum::LLVMSumValue;
 use hugr::llvm::types::TypingSession;
-use hugr::llvm::CodegenExtension;
 use hugr::ops::ExtensionOp;
 use hugr::ops::Value;
 use hugr::types::SumType;
 use hugr::types::TypeName;
-use hugr::HugrView;
-use hugr::Node;
 
-use crate::extension::bool::{BoolOp, ConstBool, BOOL_EXTENSION_ID};
-use anyhow::{anyhow, Result};
-use inkwell::types::IntType;
+use crate::extension::bool::{BOOL_EXTENSION_ID, BoolOp, ConstBool};
+use anyhow::{Result, anyhow};
 use inkwell::IntPredicate;
+use inkwell::types::IntType;
 
 const BOOL_TYPE_ID: TypeName = TypeName::new_inline("bool");
 
@@ -123,7 +123,7 @@ mod test {
     use hugr::extension::simple_op::MakeRegisteredOp;
     use hugr::llvm::check_emission;
     use hugr::llvm::extension::DefaultPreludeCodegen;
-    use hugr::llvm::test::{llvm_ctx, single_op_hugr, TestContext};
+    use hugr::llvm::test::{TestContext, llvm_ctx, single_op_hugr};
 
     #[rstest]
     #[case::read(1, BoolOp::read)]

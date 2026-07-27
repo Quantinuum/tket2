@@ -1,0 +1,295 @@
+; ModuleID = 'hugr'
+source_filename = "hugr"
+target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
+target triple = "aarch64-unknown-linux-gnu"
+
+@"e_Array alre.5A300C2A.0" = private constant [57 x i8] c"8EXIT:INT:Array already contains an element at this index"
+@"e_Array elem.E746B1A3.0" = private constant [43 x i8] c"*EXIT:INT:Array element is already borrowed"
+@"e_Array cont.EFA5AC45.0" = private constant [70 x i8] c"EEXIT:INT:Array contains non-borrowed elements and cannot be discarded"
+@"e_No more qu.3B2EEBF0.0" = private constant [47 x i8] c".EXIT:INT:No more qubits available to allocate."
+
+declare ptr @heap_alloc(i64) local_unnamed_addr
+
+; Function Attrs: noreturn
+declare void @panic(i32, ptr) local_unnamed_addr #0
+
+declare void @___qfree(i64) local_unnamed_addr
+
+declare void @heap_free(ptr) local_unnamed_addr
+
+declare i64 @___qalloc() local_unnamed_addr
+
+declare void @___reset(i64) local_unnamed_addr
+
+define i64 @qmain(i64 %0) local_unnamed_addr {
+entry:
+  tail call void @setup(i64 %0)
+  %1 = tail call ptr @heap_alloc(i64 80)
+  %2 = tail call ptr @heap_alloc(i64 8)
+  store i64 -1, ptr %2, align 1
+  %qalloc.i.i = tail call i64 @___qalloc()
+  %not_max.not.not.i.i = icmp eq i64 %qalloc.i.i, -1
+  br i1 %not_max.not.not.i.i, label %cond_213_case_0.i.i, label %__hugr__.__tk2_helios_qalloc.218.exit.i
+
+cond_213_case_0.i.i:                              ; preds = %cond_exit_20.8.i, %cond_exit_20.7.i, %cond_exit_20.6.i, %cond_exit_20.5.i, %cond_exit_20.4.i, %cond_exit_20.3.i, %cond_exit_20.2.i, %cond_exit_20.1.i, %cond_exit_20.i, %entry
+  tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0")
+  unreachable
+
+__hugr__.__tk2_helios_qalloc.218.exit.i:          ; preds = %entry
+  tail call void @___reset(i64 %qalloc.i.i)
+  %3 = load i64, ptr %2, align 4
+  %4 = trunc i64 %3 to i1
+  br i1 %4, label %cond_exit_20.i, label %panic.i.i
+
+panic.i.i:                                        ; preds = %__barray_check_bounds.exit.9.i, %__hugr__.__tk2_helios_qalloc.218.exit.8.i, %__hugr__.__tk2_helios_qalloc.218.exit.7.i, %__hugr__.__tk2_helios_qalloc.218.exit.6.i, %__hugr__.__tk2_helios_qalloc.218.exit.5.i, %__hugr__.__tk2_helios_qalloc.218.exit.4.i, %__hugr__.__tk2_helios_qalloc.218.exit.3.i, %__hugr__.__tk2_helios_qalloc.218.exit.2.i, %__hugr__.__tk2_helios_qalloc.218.exit.1.i, %__hugr__.__tk2_helios_qalloc.218.exit.i
+  tail call void @panic(i32 1002, ptr nonnull @"e_Array alre.5A300C2A.0")
+  unreachable
+
+cond_exit_20.i:                                   ; preds = %__hugr__.__tk2_helios_qalloc.218.exit.i
+  %5 = and i64 %3, -2
+  store i64 %5, ptr %2, align 4
+  store i64 %qalloc.i.i, ptr %1, align 4
+  %qalloc.i.1.i = tail call i64 @___qalloc()
+  %not_max.not.not.i.1.i = icmp eq i64 %qalloc.i.1.i, -1
+  br i1 %not_max.not.not.i.1.i, label %cond_213_case_0.i.i, label %__hugr__.__tk2_helios_qalloc.218.exit.1.i
+
+__hugr__.__tk2_helios_qalloc.218.exit.1.i:        ; preds = %cond_exit_20.i
+  tail call void @___reset(i64 %qalloc.i.1.i)
+  %6 = load i64, ptr %2, align 4
+  %7 = and i64 %6, 2
+  %.not.i = icmp eq i64 %7, 0
+  br i1 %.not.i, label %panic.i.i, label %cond_exit_20.1.i
+
+cond_exit_20.1.i:                                 ; preds = %__hugr__.__tk2_helios_qalloc.218.exit.1.i
+  %8 = and i64 %6, -3
+  store i64 %8, ptr %2, align 4
+  %9 = getelementptr inbounds nuw i8, ptr %1, i64 8
+  store i64 %qalloc.i.1.i, ptr %9, align 4
+  %qalloc.i.2.i = tail call i64 @___qalloc()
+  %not_max.not.not.i.2.i = icmp eq i64 %qalloc.i.2.i, -1
+  br i1 %not_max.not.not.i.2.i, label %cond_213_case_0.i.i, label %__hugr__.__tk2_helios_qalloc.218.exit.2.i
+
+__hugr__.__tk2_helios_qalloc.218.exit.2.i:        ; preds = %cond_exit_20.1.i
+  tail call void @___reset(i64 %qalloc.i.2.i)
+  %10 = load i64, ptr %2, align 4
+  %11 = and i64 %10, 4
+  %.not106.i = icmp eq i64 %11, 0
+  br i1 %.not106.i, label %panic.i.i, label %cond_exit_20.2.i
+
+cond_exit_20.2.i:                                 ; preds = %__hugr__.__tk2_helios_qalloc.218.exit.2.i
+  %12 = and i64 %10, -5
+  store i64 %12, ptr %2, align 4
+  %13 = getelementptr inbounds nuw i8, ptr %1, i64 16
+  store i64 %qalloc.i.2.i, ptr %13, align 4
+  %qalloc.i.3.i = tail call i64 @___qalloc()
+  %not_max.not.not.i.3.i = icmp eq i64 %qalloc.i.3.i, -1
+  br i1 %not_max.not.not.i.3.i, label %cond_213_case_0.i.i, label %__hugr__.__tk2_helios_qalloc.218.exit.3.i
+
+__hugr__.__tk2_helios_qalloc.218.exit.3.i:        ; preds = %cond_exit_20.2.i
+  tail call void @___reset(i64 %qalloc.i.3.i)
+  %14 = load i64, ptr %2, align 4
+  %15 = and i64 %14, 8
+  %.not107.i = icmp eq i64 %15, 0
+  br i1 %.not107.i, label %panic.i.i, label %cond_exit_20.3.i
+
+cond_exit_20.3.i:                                 ; preds = %__hugr__.__tk2_helios_qalloc.218.exit.3.i
+  %16 = and i64 %14, -9
+  store i64 %16, ptr %2, align 4
+  %17 = getelementptr inbounds nuw i8, ptr %1, i64 24
+  store i64 %qalloc.i.3.i, ptr %17, align 4
+  %qalloc.i.4.i = tail call i64 @___qalloc()
+  %not_max.not.not.i.4.i = icmp eq i64 %qalloc.i.4.i, -1
+  br i1 %not_max.not.not.i.4.i, label %cond_213_case_0.i.i, label %__hugr__.__tk2_helios_qalloc.218.exit.4.i
+
+__hugr__.__tk2_helios_qalloc.218.exit.4.i:        ; preds = %cond_exit_20.3.i
+  tail call void @___reset(i64 %qalloc.i.4.i)
+  %18 = load i64, ptr %2, align 4
+  %19 = and i64 %18, 16
+  %.not108.i = icmp eq i64 %19, 0
+  br i1 %.not108.i, label %panic.i.i, label %cond_exit_20.4.i
+
+cond_exit_20.4.i:                                 ; preds = %__hugr__.__tk2_helios_qalloc.218.exit.4.i
+  %20 = and i64 %18, -17
+  store i64 %20, ptr %2, align 4
+  %21 = getelementptr inbounds nuw i8, ptr %1, i64 32
+  store i64 %qalloc.i.4.i, ptr %21, align 4
+  %qalloc.i.5.i = tail call i64 @___qalloc()
+  %not_max.not.not.i.5.i = icmp eq i64 %qalloc.i.5.i, -1
+  br i1 %not_max.not.not.i.5.i, label %cond_213_case_0.i.i, label %__hugr__.__tk2_helios_qalloc.218.exit.5.i
+
+__hugr__.__tk2_helios_qalloc.218.exit.5.i:        ; preds = %cond_exit_20.4.i
+  tail call void @___reset(i64 %qalloc.i.5.i)
+  %22 = load i64, ptr %2, align 4
+  %23 = and i64 %22, 32
+  %.not109.i = icmp eq i64 %23, 0
+  br i1 %.not109.i, label %panic.i.i, label %cond_exit_20.5.i
+
+cond_exit_20.5.i:                                 ; preds = %__hugr__.__tk2_helios_qalloc.218.exit.5.i
+  %24 = and i64 %22, -33
+  store i64 %24, ptr %2, align 4
+  %25 = getelementptr inbounds nuw i8, ptr %1, i64 40
+  store i64 %qalloc.i.5.i, ptr %25, align 4
+  %qalloc.i.6.i = tail call i64 @___qalloc()
+  %not_max.not.not.i.6.i = icmp eq i64 %qalloc.i.6.i, -1
+  br i1 %not_max.not.not.i.6.i, label %cond_213_case_0.i.i, label %__hugr__.__tk2_helios_qalloc.218.exit.6.i
+
+__hugr__.__tk2_helios_qalloc.218.exit.6.i:        ; preds = %cond_exit_20.5.i
+  tail call void @___reset(i64 %qalloc.i.6.i)
+  %26 = load i64, ptr %2, align 4
+  %27 = and i64 %26, 64
+  %.not110.i = icmp eq i64 %27, 0
+  br i1 %.not110.i, label %panic.i.i, label %cond_exit_20.6.i
+
+cond_exit_20.6.i:                                 ; preds = %__hugr__.__tk2_helios_qalloc.218.exit.6.i
+  %28 = and i64 %26, -65
+  store i64 %28, ptr %2, align 4
+  %29 = getelementptr inbounds nuw i8, ptr %1, i64 48
+  store i64 %qalloc.i.6.i, ptr %29, align 4
+  %qalloc.i.7.i = tail call i64 @___qalloc()
+  %not_max.not.not.i.7.i = icmp eq i64 %qalloc.i.7.i, -1
+  br i1 %not_max.not.not.i.7.i, label %cond_213_case_0.i.i, label %__hugr__.__tk2_helios_qalloc.218.exit.7.i
+
+__hugr__.__tk2_helios_qalloc.218.exit.7.i:        ; preds = %cond_exit_20.6.i
+  tail call void @___reset(i64 %qalloc.i.7.i)
+  %30 = load i64, ptr %2, align 4
+  %31 = and i64 %30, 128
+  %.not111.i = icmp eq i64 %31, 0
+  br i1 %.not111.i, label %panic.i.i, label %cond_exit_20.7.i
+
+cond_exit_20.7.i:                                 ; preds = %__hugr__.__tk2_helios_qalloc.218.exit.7.i
+  %32 = and i64 %30, -129
+  store i64 %32, ptr %2, align 4
+  %33 = getelementptr inbounds nuw i8, ptr %1, i64 56
+  store i64 %qalloc.i.7.i, ptr %33, align 4
+  %qalloc.i.8.i = tail call i64 @___qalloc()
+  %not_max.not.not.i.8.i = icmp eq i64 %qalloc.i.8.i, -1
+  br i1 %not_max.not.not.i.8.i, label %cond_213_case_0.i.i, label %__hugr__.__tk2_helios_qalloc.218.exit.8.i
+
+__hugr__.__tk2_helios_qalloc.218.exit.8.i:        ; preds = %cond_exit_20.7.i
+  tail call void @___reset(i64 %qalloc.i.8.i)
+  %34 = load i64, ptr %2, align 4
+  %35 = and i64 %34, 256
+  %.not112.i = icmp eq i64 %35, 0
+  br i1 %.not112.i, label %panic.i.i, label %cond_exit_20.8.i
+
+cond_exit_20.8.i:                                 ; preds = %__hugr__.__tk2_helios_qalloc.218.exit.8.i
+  %36 = and i64 %34, -257
+  store i64 %36, ptr %2, align 4
+  %37 = getelementptr inbounds nuw i8, ptr %1, i64 64
+  store i64 %qalloc.i.8.i, ptr %37, align 4
+  %qalloc.i.9.i = tail call i64 @___qalloc()
+  %not_max.not.not.i.9.i = icmp eq i64 %qalloc.i.9.i, -1
+  br i1 %not_max.not.not.i.9.i, label %cond_213_case_0.i.i, label %__barray_check_bounds.exit.9.i
+
+__barray_check_bounds.exit.9.i:                   ; preds = %cond_exit_20.8.i
+  tail call void @___reset(i64 %qalloc.i.9.i)
+  %38 = load i64, ptr %2, align 4
+  %39 = and i64 %38, 512
+  %.not113.i = icmp eq i64 %39, 0
+  br i1 %.not113.i, label %panic.i.i, label %cond_exit_20.9.i
+
+cond_exit_20.9.i:                                 ; preds = %__barray_check_bounds.exit.9.i
+  %40 = and i64 %38, -513
+  store i64 %40, ptr %2, align 4
+  %41 = getelementptr inbounds nuw i8, ptr %1, i64 72
+  store i64 %qalloc.i.9.i, ptr %41, align 4
+  %"116.fca.0.insert.i" = insertvalue { ptr, ptr, i64 } poison, ptr %1, 0
+  %"116.fca.1.insert.i" = insertvalue { ptr, ptr, i64 } %"116.fca.0.insert.i", ptr %2, 1
+  %"116.fca.2.insert.i" = insertvalue { ptr, ptr, i64 } %"116.fca.1.insert.i", i64 0, 2
+  %42 = insertvalue { { ptr, ptr, i64 }, i64 } poison, { ptr, ptr, i64 } %"116.fca.2.insert.i", 0
+  br label %__barray_check_bounds.exit.i.i.i
+
+43:                                               ; preds = %"__hugr__.$ArrayIter.__next__$$t(qubit)$n(10).302.exit.thread.i.i"
+  %44 = lshr i64 %.fca.1.0.0.2.extract.i.i.i, 6
+  %45 = getelementptr i64, ptr %.fca.1.0.0.1.extract.i.i.i, i64 %44
+  %46 = load i64, ptr %45, align 4
+  %47 = and i64 %.fca.1.0.0.2.extract.i.i.i, 63
+  %48 = sub nuw nsw i64 64, %47
+  %49 = lshr i64 -1, %48
+  %50 = icmp eq i64 %47, 0
+  %51 = select i1 %50, i64 0, i64 %49
+  %52 = or i64 %46, %51
+  store i64 %52, ptr %45, align 4
+  %last_valid.i.i.i.i = add i64 %.fca.1.0.0.2.extract.i.i.i, 9
+  %53 = lshr i64 %last_valid.i.i.i.i, 6
+  %54 = getelementptr inbounds nuw i64, ptr %.fca.1.0.0.1.extract.i.i.i, i64 %53
+  %55 = load i64, ptr %54, align 4
+  %56 = and i64 %last_valid.i.i.i.i, 63
+  %57 = shl nsw i64 -2, %56
+  %58 = icmp eq i64 %56, 63
+  %59 = select i1 %58, i64 0, i64 %57
+  %60 = or i64 %55, %59
+  store i64 %60, ptr %54, align 4
+  %reass.sub.i.i.i.i = sub nsw i64 %53, %44
+  %.not.i.i.i.i = icmp eq i64 %reass.sub.i.i.i.i, -1
+  br i1 %.not.i.i.i.i, label %__hugr__.main.1.exit, label %mask_block_ok.i.i.i.i
+
+61:                                               ; preds = %mask_block_ok.i.i.i.i
+  %62 = add nuw i64 %.02.i.i.i.i, 1
+  %exitcond.not.i.i.i.i = icmp eq i64 %.02.i.i.i.i, %reass.sub.i.i.i.i
+  br i1 %exitcond.not.i.i.i.i, label %__hugr__.main.1.exit, label %mask_block_ok.i.i.i.i
+
+mask_block_ok.i.i.i.i:                            ; preds = %43, %61
+  %.02.i.i.i.i = phi i64 [ %62, %61 ], [ 0, %43 ]
+  %gep.i.i.i.i = getelementptr i64, ptr %45, i64 %.02.i.i.i.i
+  %63 = load i64, ptr %gep.i.i.i.i, align 4
+  %64 = icmp eq i64 %63, -1
+  br i1 %64, label %61, label %mask_block_err.i.i.i.i
+
+mask_block_err.i.i.i.i:                           ; preds = %mask_block_ok.i.i.i.i
+  tail call void @panic(i32 1002, ptr nonnull @"e_Array cont.EFA5AC45.0")
+  unreachable
+
+__barray_check_bounds.exit.i.i.i:                 ; preds = %"__hugr__.$ArrayIter.__next__$$t(qubit)$n(10).302.exit.thread.i.i", %cond_exit_20.9.i
+  %.fca.2.extract82.i185.i.i = phi i64 [ 0, %cond_exit_20.9.i ], [ %.fca.1.0.0.2.extract.i.i.i, %"__hugr__.$ArrayIter.__next__$$t(qubit)$n(10).302.exit.thread.i.i" ]
+  %.fca.1.extract81.i184.i.i = phi ptr [ %2, %cond_exit_20.9.i ], [ %.fca.1.0.0.1.extract.i.i.i, %"__hugr__.$ArrayIter.__next__$$t(qubit)$n(10).302.exit.thread.i.i" ]
+  %.fca.0.extract80.i183.i.i = phi ptr [ %1, %cond_exit_20.9.i ], [ %.fca.1.0.0.0.extract.i.i.i, %"__hugr__.$ArrayIter.__next__$$t(qubit)$n(10).302.exit.thread.i.i" ]
+  %"294_0.0182.i.i" = phi i64 [ 0, %cond_exit_20.9.i ], [ %72, %"__hugr__.$ArrayIter.__next__$$t(qubit)$n(10).302.exit.thread.i.i" ]
+  %.pn181.i.i = phi { { ptr, ptr, i64 }, i64 } [ %42, %cond_exit_20.9.i ], [ %80, %"__hugr__.$ArrayIter.__next__$$t(qubit)$n(10).302.exit.thread.i.i" ]
+  %65 = add i64 %"294_0.0182.i.i", %.fca.2.extract82.i185.i.i
+  %66 = lshr i64 %65, 6
+  %67 = getelementptr inbounds nuw i64, ptr %.fca.1.extract81.i184.i.i, i64 %66
+  %68 = load i64, ptr %67, align 4
+  %69 = and i64 %65, 63
+  %70 = lshr i64 %68, %69
+  %71 = trunc i64 %70 to i1
+  br i1 %71, label %panic.i.i.i.i, label %"__hugr__.$ArrayIter.__next__$$t(qubit)$n(10).302.exit.thread.i.i"
+
+panic.i.i.i.i:                                    ; preds = %__barray_check_bounds.exit.i.i.i
+  tail call void @panic(i32 1002, ptr nonnull @"e_Array elem.E746B1A3.0")
+  unreachable
+
+"__hugr__.$ArrayIter.__next__$$t(qubit)$n(10).302.exit.thread.i.i": ; preds = %__barray_check_bounds.exit.i.i.i
+  %72 = add nuw nsw i64 %"294_0.0182.i.i", 1
+  %73 = shl nuw i64 1, %69
+  %74 = xor i64 %73, %68
+  store i64 %74, ptr %67, align 4
+  %75 = getelementptr inbounds i64, ptr %.fca.0.extract80.i183.i.i, i64 %65
+  %76 = load i64, ptr %75, align 4
+  %.fca.1.0.0.0.extract.i.i.i = extractvalue { { ptr, ptr, i64 }, i64 } %.pn181.i.i, 0, 0
+  %.fca.1.0.0.1.extract.i.i.i = extractvalue { { ptr, ptr, i64 }, i64 } %.pn181.i.i, 0, 1
+  %.fca.1.0.0.2.extract.i.i.i = extractvalue { { ptr, ptr, i64 }, i64 } %.pn181.i.i, 0, 2
+  %77 = insertvalue { { ptr, ptr, i64 }, i64 } %.pn181.i.i, i64 %72, 1
+  %78 = insertvalue { { ptr, ptr, i64 }, i64 } %77, ptr %.fca.1.0.0.0.extract.i.i.i, 0, 0
+  %79 = insertvalue { { ptr, ptr, i64 }, i64 } %78, ptr %.fca.1.0.0.1.extract.i.i.i, 0, 1
+  %80 = insertvalue { { ptr, ptr, i64 }, i64 } %79, i64 %.fca.1.0.0.2.extract.i.i.i, 0, 2
+  tail call void @___qfree(i64 %76)
+  %.not.i.i = icmp eq i64 %"294_0.0182.i.i", 9
+  br i1 %.not.i.i, label %43, label %__barray_check_bounds.exit.i.i.i
+
+__hugr__.main.1.exit:                             ; preds = %61, %43
+  tail call void @heap_free(ptr %.fca.1.0.0.0.extract.i.i.i)
+  tail call void @heap_free(ptr nonnull %.fca.1.0.0.1.extract.i.i.i)
+  %81 = tail call i64 @teardown()
+  ret i64 %81
+}
+
+declare void @setup(i64) local_unnamed_addr
+
+declare i64 @teardown() local_unnamed_addr
+
+attributes #0 = { noreturn }
+
+!name = !{!0}
+
+!0 = !{!"mainlib"}

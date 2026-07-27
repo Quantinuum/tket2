@@ -1,21 +1,16 @@
 # tket
 
 [![pypi][]](https://pypi.org/project/tket/)
-[![codecov][]](https://codecov.io/gh/CQCL/tket2)
+[![codecov][]](https://codecov.io/gh/quantinuum/tket2)
 [![py-version][]](https://pypi.org/project/tket/)
 
-  [codecov]: https://img.shields.io/codecov/c/gh/CQCL/tket2?logo=codecov
+  [codecov]: https://img.shields.io/codecov/c/gh/quantinuum/tket2?logo=codecov
   [py-version]: https://img.shields.io/pypi/pyversions/tket
   [pypi]: https://img.shields.io/pypi/v/tket
 
-TKET is an open source quantum compiler developed by Quantinuum. Central to
-TKET's design is its hardware agnosticism which allows researchers and quantum
-software developers to take advantage of its powerful compilation for many
-different quantum architectures.
-
-This is the Python front-end for TKET, providing a high-level interface for working with quantum circuits.
-See also the Rust library with the same name on [crates.io](https://crates.io/crates/tket).
-
+TKET is an open-source quantum compiler developed by Quantinuum. This project
+provides a set of tools for compiling quantum programs expressed in the
+[`hugr`][] format.
 
 ## Install
 
@@ -29,10 +24,10 @@ pip install tket
 
 See the [Getting Started][getting-started] guide and the other [examples].
 
-  [getting-started]: https://github.com/CQCL/tket2/blob/main/tket-py/examples/1-Getting-Started.ipynb
-  [examples]: https://github.com/CQCL/tket2/tree/main/tket-py/examples
+  [getting-started]: https://github.com/quantinuum/tket2/blob/main/tket-py/docs/examples/1-Getting-Started.ipynb
+  [examples]: https://github.com/quantinuum/tket2/tree/main/tket-py/docs/examples
 
-The API documentation for `tket-py` can be found at https://cqcl.github.io/tket2/.
+The API documentation for `tket` is [here](https://quantinuum.github.io/tket2/).
 
 ## Development
 
@@ -51,11 +46,11 @@ computational workloads.
 
 See [DEVELOPMENT.md] for more information.
 
-  [DEVELOPMENT.md]: https://github.com/CQCL/tket2/blob/main/DEVELOPMENT.md
+  [DEVELOPMENT.md]: https://github.com/quantinuum/tket2/blob/main/DEVELOPMENT.md
 
 
 ## License
 
 This project is licensed under Apache License, Version 2.0 ([LICENCE][] or http://www.apache.org/licenses/LICENSE-2.0).
 
-  [LICENCE]: https://github.com/CQCL/tket2/blob/main/LICENCE
+  [LICENCE]: https://github.com/quantinuum/tket2/blob/main/LICENCE

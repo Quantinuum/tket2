@@ -4,8 +4,9 @@
 
 use std::sync::Arc;
 
-use crate::serialize::pytket::extension::OpaqueTk1Op;
 use crate::TketOp;
+use crate::serialize::pytket::extension::OpaqueTk1Op;
+use hugr::Extension;
 use hugr::extension::simple_op::MakeOpDef;
 use hugr::extension::{
     CustomSignatureFunc, ExtensionId, ExtensionRegistry, SignatureError, Version,
@@ -14,7 +15,6 @@ use hugr::hugr::IdentList;
 use hugr::std_extensions::STD_REG;
 use hugr::types::type_param::{TypeArg, TypeParam};
 use hugr::types::{PolyFuncType, PolyFuncTypeRV};
-use hugr::Extension;
 use lazy_static::lazy_static;
 use smol_str::SmolStr;
 

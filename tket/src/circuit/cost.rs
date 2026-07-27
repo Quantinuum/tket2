@@ -7,7 +7,6 @@ use std::iter::Sum;
 use std::num::NonZeroUsize;
 use std::ops::{Add, AddAssign};
 
-use crate::ops::op_matches;
 use crate::TketOp;
 
 /// The cost for a group of operations in a circuit, each with cost `OpCost`.
@@ -110,11 +109,7 @@ impl<T: Add<Output = T> + Default + Copy, const N: usize> Sum for LexicographicC
 impl<const N: usize> CostDelta for LexicographicCost<isize, N> {
     #[inline]
     fn as_isize(&self) -> isize {
-        if N > 0 {
-            self.0[0]
-        } else {
-            0
-        }
+        if N > 0 { self.0[0] } else { 0 }
     }
 }
 
@@ -123,11 +118,7 @@ impl<const N: usize> CircuitCost for LexicographicCost<usize, N> {
 
     #[inline]
     fn as_usize(&self) -> usize {
-        if N > 0 {
-            self.0[0]
-        } else {
-            0
-        }
+        if N > 0 { self.0[0] } else { 0 }
     }
 
     #[inline]
@@ -191,15 +182,12 @@ impl CircuitCost for usize {
 
 /// Returns true if the operation is a controlled X operation.
 pub fn is_cx(op: &OpType) -> bool {
-    op_matches(op, TketOp::CX)
+    op.cast::<TketOp>() == Some(TketOp::CX)
 }
 
 /// Returns true if the operation is a quantum operation.
 pub fn is_quantum(op: &OpType) -> bool {
-    let Some(op): Option<TketOp> = op.cast() else {
-        return false;
-    };
-    op.is_quantum()
+    op.cast::<TketOp>().is_some_and(|op| op.is_quantum())
 }
 
 #[cfg(test)]

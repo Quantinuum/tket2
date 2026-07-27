@@ -7,10 +7,10 @@ use tket::optimiser::badger::log::{LOG_TARGET, METRICS_TARGET, PROGRESS_TARGET};
 
 use tracing::{Metadata, Subscriber};
 use tracing_appender::non_blocking;
+use tracing_subscriber::Layer;
 use tracing_subscriber::filter::filter_fn;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::Layer;
 
 fn log_filter(metadata: &Metadata<'_>) -> bool {
     metadata.target().starts_with(LOG_TARGET)
@@ -48,7 +48,7 @@ impl Tracer {
     }
 
     /// Clean log with the most important events.
-    fn stdout_layer<S>(&mut self, show_threads: bool) -> impl Layer<S>
+    fn stdout_layer<S>(&mut self, show_threads: bool) -> impl Layer<S> + use<S>
     where
         S: Subscriber + for<'span> tracing_subscriber::registry::LookupSpan<'span>,
     {
@@ -60,7 +60,7 @@ impl Tracer {
             .with_filter(filter_fn(log_filter))
     }
 
-    fn logfile_layer<S>(&mut self, logfile: PathBuf, show_threads: bool) -> impl Layer<S>
+    fn logfile_layer<S>(&mut self, logfile: PathBuf, show_threads: bool) -> impl Layer<S> + use<S>
     where
         S: Subscriber + for<'span> tracing_subscriber::registry::LookupSpan<'span>,
     {

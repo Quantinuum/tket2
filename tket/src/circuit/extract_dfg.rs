@@ -1,9 +1,9 @@
 //! Internal implementation of `Circuit::extract_dfg`.
 
-use hugr::hugr::hugrmut::HugrMut;
-use hugr::ops::{OpTrait, OpType, Output, DFG};
-use hugr::types::{Signature, SumType, TypeEnum};
 use hugr::HugrView;
+use hugr::hugr::hugrmut::HugrMut;
+use hugr::ops::{DFG, OpTrait, OpType, Output};
+use hugr::types::{Signature, SumType, TypeEnum};
 use hugr_core::hugr::internal::HugrMutInternals;
 use itertools::Itertools;
 

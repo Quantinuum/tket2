@@ -1,0 +1,63 @@
+---
+source: tket-qsystem/src/llvm/qsystem.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define internal i64 @_hl.main.1(i64 %0) {
+alloca_block:
+  %"0" = alloca i64, align 8
+  %"2_0" = alloca i64, align 8
+  %"4_0" = alloca i64, align 8
+  %"5_0" = alloca i64, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store i64 %0, ptr %"2_0", align 4
+  %"2_01" = load i64, ptr %"2_0", align 4
+  %1 = call i64 @_hl.__tk2_helios_h.6(i64 %"2_01")
+  store i64 %1, ptr %"4_0", align 4
+  %"4_02" = load i64, ptr %"4_0", align 4
+  %2 = call i64 @_hl.__tk2_helios_h.6(i64 %"4_02")
+  store i64 %2, ptr %"5_0", align 4
+  %"5_03" = load i64, ptr %"5_0", align 4
+  store i64 %"5_03", ptr %"0", align 4
+  %"04" = load i64, ptr %"0", align 4
+  ret i64 %"04"
+}
+
+define i64 @_hl.__tk2_helios_h.6(i64 %0) {
+alloca_block:
+  %"0" = alloca i64, align 8
+  %"14_0" = alloca double, align 8
+  %"12_0" = alloca double, align 8
+  %"10_0" = alloca double, align 8
+  %"7_0" = alloca i64, align 8
+  %"15_0" = alloca i64, align 8
+  %"16_0" = alloca i64, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store double 0xBFF921FB54442D18, ptr %"14_0", align 8
+  store double 0x3FF921FB54442D18, ptr %"12_0", align 8
+  store double 0x400921FB54442D18, ptr %"10_0", align 8
+  store i64 %0, ptr %"7_0", align 4
+  %"7_01" = load i64, ptr %"7_0", align 4
+  %"12_02" = load double, ptr %"12_0", align 8
+  %"14_03" = load double, ptr %"14_0", align 8
+  call void @___rxy(i64 %"7_01", double %"12_02", double %"14_03")
+  store i64 %"7_01", ptr %"15_0", align 4
+  %"15_04" = load i64, ptr %"15_0", align 4
+  %"10_05" = load double, ptr %"10_0", align 8
+  call void @___rz(i64 %"15_04", double %"10_05")
+  store i64 %"15_04", ptr %"16_0", align 4
+  %"16_06" = load i64, ptr %"16_0", align 4
+  store i64 %"16_06", ptr %"0", align 4
+  %"07" = load i64, ptr %"0", align 4
+  ret i64 %"07"
+}
+
+declare void @___rxy(i64, double, double)
+
+declare void @___rz(i64, double)

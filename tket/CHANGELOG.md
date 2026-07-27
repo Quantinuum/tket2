@@ -1,163 +1,288 @@
 # Changelog
 
 
-## [0.16.0](https://github.com/CQCL/tket2/compare/tket-v0.15.0...tket-v0.16.0) - 2025-10-20
+## [0.19.3](https://github.com/quantinuum/tket2/compare/tket-v0.19.2...tket-v0.19.3) - 2026-07-22
+
+### Performance
+
+- Improve rule evaluation order in dataflow analysis ([#1806](https://github.com/quantinuum/tket2/pull/1806))
+- Pre-compute edge neighbours in dataflow analysis ([#1805](https://github.com/quantinuum/tket2/pull/1805))
+
+## [0.19.1](https://github.com/quantinuum/tket2/compare/tket-v0.19.0...tket-v0.19.1) - 2026-07-06
+
+### Performance
+
+- Improve rule evaluation order in dataflow analysis ([#1806](https://github.com/quantinuum/tket2/pull/1806))
+- Pre-compute edge neighbours in dataflow analysis ([#1805](https://github.com/quantinuum/tket2/pull/1805))
+
+## [0.19.0](https://github.com/Quantinuum/tket2/compare/tket-v0.18.0...tket-v0.19.0) - 2026-05-28
 
 ### Bug Fixes
 
-- *(pytket-encoder)* Correctly encode I/O nodes in nested containers ([#1117](https://github.com/CQCL/tket2/pull/1117))
-- Ensure decoded circuits have the required signature ([#1123](https://github.com/CQCL/tket2/pull/1123))
-- Avoid loops when encoding recursive fns ([#1143](https://github.com/CQCL/tket2/pull/1143))
-- Badger performance improvements ([#1139](https://github.com/CQCL/tket2/pull/1139))
+- Apply modifiers through function calls ([#1531](https://github.com/Quantinuum/tket2/pull/1531))
+- Incorrect matching of pytket parameters to unsupported graph ports ([#1561](https://github.com/Quantinuum/tket2/pull/1561))
+- [**breaking**] Passes with Nested Modifier ([#1546](https://github.com/Quantinuum/tket2/pull/1546))
+- bug in hugr building when `control` modifiers are nested ([#1550](https://github.com/Quantinuum/tket2/pull/1550))
+- Multiple fixes to the pytket encoder ([#1566](https://github.com/Quantinuum/tket2/pull/1566))
+- [**breaking**] Replace non-deterministic iterations on hash maps ([#1582](https://github.com/Quantinuum/tket2/pull/1582))
+- Set inputs of functions loaded as values to top during dataflow analysis ([#1595](https://github.com/Quantinuum/tket2/pull/1595))
+- Using indexes inside dagger modifier ([#1588](https://github.com/Quantinuum/tket2/pull/1588))
+- address Miri unsoundness by installing nextest and skipping FFI/long running tests ([#1565](https://github.com/Quantinuum/tket2/pull/1565))
+- skip test_nested_array to resolve miri unsoundness ([#1623](https://github.com/Quantinuum/tket2/pull/1623))
 
 ### New Features
 
-- [**breaking**] SerialCircuit::decode_inplace and explicit option structs ([#1120](https://github.com/CQCL/tket2/pull/1120))
-- Decode pytket circs into DFGs ([#1121](https://github.com/CQCL/tket2/pull/1121))
-- Decode CircBoxes as DFG nodes ([#1122](https://github.com/CQCL/tket2/pull/1122))
-- *(pytket-decoder)* [**breaking**] Allow specifying qubit/bit reuse ([#1127](https://github.com/CQCL/tket2/pull/1127))
-- pull out unpack functionality from barrier handling ([#1144](https://github.com/CQCL/tket2/pull/1144))
-- Deal with non-local edges in pytket encoder ([#1145](https://github.com/CQCL/tket2/pull/1145))
-- Definition of extension ops for modifiers and global phases ([#1137](https://github.com/CQCL/tket2/pull/1137))
-- modifier resolver for various `OpTypes` ([#1162](https://github.com/CQCL/tket2/pull/1162))
-- Modifier for TketOps and global phases ([#1168](https://github.com/CQCL/tket2/pull/1168))
+- *(const-fold)* combine Consts for each out-port; write prepopulated inputs ([#1489](https://github.com/Quantinuum/tket2/pull/1489))
+- InlineFunctionsPass ([#1524](https://github.com/Quantinuum/tket2/pull/1524))
+- upgrade to hugr v0.27.1 ([#1568](https://github.com/Quantinuum/tket2/pull/1568))
+- [**breaking**] Ignore empty circuits when encoding Hugr regions into pytket ([#1562](https://github.com/Quantinuum/tket2/pull/1562))
+- Add python definitions for the TKET metadata keys ([#1535](https://github.com/Quantinuum/tket2/pull/1535))
+- Clean Up by Deleting Unconnected Nodes after Modifier Solve ([#1557](https://github.com/Quantinuum/tket2/pull/1557))
+- InlineHint metadata ([#1532](https://github.com/Quantinuum/tket2/pull/1532))
+- Allowing control flow in `control` ([#1603](https://github.com/Quantinuum/tket2/pull/1603))
+
+### Performance
+
+- Improve modifier resolver pass by visiting nodes in a set ([#1621](https://github.com/Quantinuum/tket2/pull/1621))
+- Avoid string formatting in Hugr op hashing ([#1624](https://github.com/Quantinuum/tket2/pull/1624))
 
 ### Refactor
 
-- Create backtracking optimiser, refactor badger to use it ([#977](https://github.com/CQCL/tket2/pull/977))
+- Replace portgraph toposort in CommandIterator with node vector ([#1608](https://github.com/Quantinuum/tket2/pull/1608))
+- [**breaking**] Deprecate commands iterator ([#1611](https://github.com/Quantinuum/tket2/pull/1611))
 
-## [0.15.0](https://github.com/CQCL/tket2/compare/tket-v0.14.0...tket-v0.15.0) - 2025-09-15
+### Testing
+
+- Pin guppy version in example files, fix test ([#1534](https://github.com/Quantinuum/tket2/pull/1534))
+- Skip slow modifier test ([#1587](https://github.com/Quantinuum/tket2/pull/1587))
+- Add modifier test for subscripted control qubits ([#1601](https://github.com/Quantinuum/tket2/pull/1601))
+
+## [0.18.0](https://github.com/Quantinuum/tket2/compare/tket-v0.17.0...tket-v0.18.0) - 2026-04-02
+
+This release bumps `hugr` to 0.27.0 and reworks the pytket encoding/decoding API to use raw `Hugr`s.
+The `tket::passes` module now contains the passes previously available in `hugr_passes`.
 
 ### Bug Fixes
 
-- [**breaking**] Fix rotation -> float param type conversion ([#1061](https://github.com/CQCL/tket2/pull/1061))
-- Pytket barrier operations not being decoded ([#1069](https://github.com/CQCL/tket2/pull/1069))
-- Always load parameter expressions as half turns in the decoder ([#1083](https://github.com/CQCL/tket2/pull/1083))
-
-### New Features
-
-- Capture pytket's output permutation explicitly in the hugr connectivity ([#1075](https://github.com/CQCL/tket2/pull/1075))
-- Add ResourceScope ([#1052](https://github.com/CQCL/tket2/pull/1052))
-- [**breaking**] Remove unnecessary Arc from PytketDecoder method ([#1114](https://github.com/CQCL/tket2/pull/1114))
-- [**breaking**] Remove deprecated definitions ([#1113](https://github.com/CQCL/tket2/pull/1113))
-
-## [0.14.0](https://github.com/CQCL/tket2/compare/tket-v0.13.2...tket-v0.14.0) - 2025-08-18
-
-### New Features
-
-- [**breaking**] Allow PytketTypeTranslators to translate nested types ([#1038](https://github.com/CQCL/tket2/pull/1038))
-- Define a wire tracker for the new pytket decoder ([#1036](https://github.com/CQCL/tket2/pull/1036))
-- [**breaking**] Reworked pytket decoder framework ([#1030](https://github.com/CQCL/tket2/pull/1030))
-- [**breaking**] Use qsystem encoder/decoders in tket-py ([#1041](https://github.com/CQCL/tket2/pull/1041))
-- [**breaking**] Avoid eagerly cloning SerialCircuits when decoding from pytket ([#1048](https://github.com/CQCL/tket2/pull/1048))
-
-### Refactor
-
-- [**breaking**] Rename tk2 encoder names to tket ([#1037](https://github.com/CQCL/tket2/pull/1037))
-
-## [0.13.2](https://github.com/CQCL/tket2/compare/tket-v0.13.1...tket-v0.13.2) - 2025-08-08
-
-### New Features
-
-- *(tket-py)* Create BadgerOptimiser from arbitrary Rewriters ([#1022](https://github.com/CQCL/tket2/pull/1022))
-
-## [0.13.1](https://github.com/CQCL/tket2/compare/tket-v0.13.0...tket-v0.13.1) - 2025-07-30
+- *(pytket decoder)* Panic on repeated bit registers in pytket decoded output ([#1445](https://github.com/Quantinuum/tket2/pull/1445))
+- pytket encoder drops order edges to the output node ([#1466](https://github.com/Quantinuum/tket2/pull/1466))
 
 ### Documentation
 
-- Update README badges ([#1004](https://github.com/CQCL/tket2/pull/1004))
-## [0.13.0](https://github.com/CQCL/tket2/compare/tket2-v0.12.3...tket-v0.13.0) - 2025-07-25
+- Fix tket README introductory example ([#1463](https://github.com/Quantinuum/tket2/pull/1463))
 
 ### New Features
 
-- [**breaking] Rename tket2.* HUGR extensions to tket.* ([#988](https://github.com/CQCL/tket2/pull/988))
-- [**breaking] Rename tket2* libs to tket* ([#987](https://github.com/CQCL/tket2/pull/987))
-- [**breaking**] Update to `hugr 0.21` ([#965](https://github.com/CQCL/tket2/pull/965))
-- Add guppy extension with drop operation ([#962](https://github.com/CQCL/tket2/pull/962))
-- [**breaking**] Split the pytket extension encoder trait ([#970](https://github.com/CQCL/tket2/pull/970))
-
-## [0.12.3](https://github.com/CQCL/tket2/compare/tket2-v0.12.2...tket2-v0.12.3) - 2025-07-08
-
-### New Features
-
-- Add llvm codegen for `tket2.bool` ([#950](https://github.com/CQCL/tket2/pull/950))
-
-## [0.12.2](https://github.com/CQCL/tket2/compare/tket2-v0.12.1...tket2-v0.12.2) - 2025-06-30
+- [**breaking**] Use raw Hugrs in pytket encoding/decoding API ([#1418](https://github.com/Quantinuum/tket2/pull/1418))
+- [**breaking**] Remove unused `lower_to_pytket` pass ([#1431](https://github.com/Quantinuum/tket2/pull/1431))
+- [**breaking**] Replace CircuitHash with hugr's implementation ([#1420](https://github.com/Quantinuum/tket2/pull/1420))
+- [**breaking**] Update MSRV to rust 1.91 ([#1446](https://github.com/Quantinuum/tket2/pull/1446))
+- [**breaking**] Update to hugr 0.26.0 ([#1448](https://github.com/Quantinuum/tket2/pull/1448))
+- [**breaking**] Follow pass scopes in composable passes ([#1429](https://github.com/Quantinuum/tket2/pull/1429))
+- Implemented `post_opdef` for `RotationOp` for constant folding ([#1468](https://github.com/Quantinuum/tket2/pull/1468))
+- [**breaking**] Reorganize `tket::passes` and add `hugr_passes` re-exports ([#1472](https://github.com/Quantinuum/tket2/pull/1472))
+- [**breaking**] Bump `hugr` dependency to 0.27.0 ([#1488](https://github.com/Quantinuum/tket2/pull/1488))
+- Move hugr-passes implementations to tket::passes ([#1487](https://github.com/Quantinuum/tket2/pull/1487))
+- Pass scopes in python API, update to hugr-py 0.16 ([#1464](https://github.com/Quantinuum/tket2/pull/1464))
 
 ### Refactor
 
-- *(hseries)* use array unpack operation ([#913](https://github.com/CQCL/tket2/pull/913))
+- *(llvm)* use llvm.is.fpclass for from_halfturns ([#1457](https://github.com/Quantinuum/tket2/pull/1457))
 
-## [0.12.1](https://github.com/CQCL/tket2/compare/tket2-v0.12.0...tket2-v0.12.1) - 2025-06-18
+### Testing
+
+- Fixed signatures when decoding pytket circuits ([#1405](https://github.com/Quantinuum/tket2/pull/1405))
+
+## [0.17.0](https://github.com/Quantinuum/tket2/compare/tket-v0.16.0...tket-v0.17.0) - 2026-02-02
+
+### Bug Fixes
+
+- *(encoded-circ)* Track unsupported wires between input and output ([#1224](https://github.com/Quantinuum/tket2/pull/1224))
+- Multiple fixes to the pytket encoder ([#1226](https://github.com/Quantinuum/tket2/pull/1226))
+- Don't use opgroup in pytket barrier encoding ([#1251](https://github.com/Quantinuum/tket2/pull/1251))
+- guppy_to_circuit always returns num_operations = 0 ([#1200](https://github.com/Quantinuum/tket2/pull/1200))
+- *(pytket-decoder)* Avoid QAllocating and immediately freeing qubits ([#1256](https://github.com/Quantinuum/tket2/pull/1256))
+- Encoding of opaque subgraphs with no associated qubit/bit ([#1295](https://github.com/Quantinuum/tket2/pull/1295))
+- [**breaking**] Don't rely on command params for pytket barriers ([#1298](https://github.com/Quantinuum/tket2/pull/1298))
+- Track output qubits in CircuitInfo ([#1304](https://github.com/Quantinuum/tket2/pull/1304))
+- Wrongly reused qubit IDs in pytket encoding ([#1358](https://github.com/Quantinuum/tket2/pull/1358))
 
 ### New Features
 
-- *(pytket encoding)* Support prelude barriers ([#919](https://github.com/CQCL/tket2/pull/919))
-
-## [0.12.0](https://github.com/CQCL/tket2/compare/tket2-v0.11.1...tket2-v0.12.0) - 2025-06-16
-
-### New Features
-
-- *(pytket-encoding)* Bit initialization and bool operations ([#907](https://github.com/CQCL/tket2/pull/907))
-- *(pytket-encoding)* Pytket encode dfgs and function calls ([#908](https://github.com/CQCL/tket2/pull/908))
-- Add llvm lowering for debug extension ([#900](https://github.com/CQCL/tket2/pull/900))
+- Deprecate local find_tuple_unpack rewrite ([#1188](https://github.com/Quantinuum/tket2/pull/1188))
+- Add CopyableExpressionAST ([#1209](https://github.com/Quantinuum/tket2/pull/1209))
+- `NormalizeGuppy` pass to simplify generated structure ([#1220](https://github.com/Quantinuum/tket2/pull/1220))
+- [**breaking**] pytket EncodedCircuit struct for in-place pytket optimisation ([#1211](https://github.com/Quantinuum/tket2/pull/1211))
+- [**breaking**] Interval is independent of resource IDs and scope position ([#1205](https://github.com/Quantinuum/tket2/pull/1205))
+- Don't translate usizes to pytket ([#1241](https://github.com/Quantinuum/tket2/pull/1241))
+- BorrowSquashPass to elide redundant borrow/return ops ([#1159](https://github.com/Quantinuum/tket2/pull/1159))
+- [**breaking**] Bump hugr to 0.25.0 ([#1325](https://github.com/Quantinuum/tket2/pull/1325))
+- Remove order edges in NormalizeGuppy pass ([#1326](https://github.com/Quantinuum/tket2/pull/1326))
+- [**breaking**] Remove deprecated unpack tuple pass ([#1387](https://github.com/Quantinuum/tket2/pull/1387))
 
 ### Refactor
 
-- [**breaking**] More flexible pytket encoding ([#849](https://github.com/CQCL/tket2/pull/849))
+- Remove contain_qubits, use TypeUnpacker ([#1283](https://github.com/Quantinuum/tket2/pull/1283))
+- [**breaking**] Replace Subcircuit with SiblingSubgraph ([#1288](https://github.com/Quantinuum/tket2/pull/1288))
+- *(metadata)* [**breaking**] Migrate all metadata keys onto the new metadata traits ([#1328](https://github.com/Quantinuum/tket2/pull/1328))
 
-## [0.11.1](https://github.com/CQCL/tket2/compare/tket2-v0.11.0...tket2-v0.11.1) - 2025-06-03
+## [0.16.0](https://github.com/quantinuum/tket2/compare/tket-v0.15.0...tket-v0.16.0) - 2025-10-20
+
+### Bug Fixes
+
+- *(pytket-encoder)* Correctly encode I/O nodes in nested containers ([#1117](https://github.com/quantinuum/tket2/pull/1117))
+- Ensure decoded circuits have the required signature ([#1123](https://github.com/quantinuum/tket2/pull/1123))
+- Avoid loops when encoding recursive fns ([#1143](https://github.com/quantinuum/tket2/pull/1143))
+- Badger performance improvements ([#1139](https://github.com/quantinuum/tket2/pull/1139))
 
 ### New Features
 
-- Add V and Vdg to quantum extension. ([#889](https://github.com/CQCL/tket2/pull/889))
-- *(tket2-hseries)* LLVM codegen for extensions ([#898](https://github.com/CQCL/tket2/pull/898))
+- [**breaking**] SerialCircuit::decode_inplace and explicit option structs ([#1120](https://github.com/quantinuum/tket2/pull/1120))
+- Decode pytket circs into DFGs ([#1121](https://github.com/quantinuum/tket2/pull/1121))
+- Decode CircBoxes as DFG nodes ([#1122](https://github.com/quantinuum/tket2/pull/1122))
+- *(pytket-decoder)* [**breaking**] Allow specifying qubit/bit reuse ([#1127](https://github.com/quantinuum/tket2/pull/1127))
+- pull out unpack functionality from barrier handling ([#1144](https://github.com/quantinuum/tket2/pull/1144))
+- Deal with non-local edges in pytket encoder ([#1145](https://github.com/quantinuum/tket2/pull/1145))
+- Definition of extension ops for modifiers and global phases ([#1137](https://github.com/quantinuum/tket2/pull/1137))
+- modifier resolver for various `OpTypes` ([#1162](https://github.com/quantinuum/tket2/pull/1162))
+- Modifier for TketOps and global phases ([#1168](https://github.com/quantinuum/tket2/pull/1168))
 
-## [0.11.0](https://github.com/CQCL/tket2/compare/tket2-v0.10.0...tket2-v0.11.0) - 2025-05-22
+### Refactor
+
+- Create backtracking optimiser, refactor badger to use it ([#977](https://github.com/quantinuum/tket2/pull/977))
+
+## [0.15.0](https://github.com/quantinuum/tket2/compare/tket-v0.14.0...tket-v0.15.0) - 2025-09-15
+
+### Bug Fixes
+
+- [**breaking**] Fix rotation -> float param type conversion ([#1061](https://github.com/quantinuum/tket2/pull/1061))
+- Pytket barrier operations not being decoded ([#1069](https://github.com/quantinuum/tket2/pull/1069))
+- Always load parameter expressions as half turns in the decoder ([#1083](https://github.com/quantinuum/tket2/pull/1083))
+
+### New Features
+
+- Capture pytket's output permutation explicitly in the hugr connectivity ([#1075](https://github.com/quantinuum/tket2/pull/1075))
+- Add ResourceScope ([#1052](https://github.com/quantinuum/tket2/pull/1052))
+- [**breaking**] Remove unnecessary Arc from PytketDecoder method ([#1114](https://github.com/quantinuum/tket2/pull/1114))
+- [**breaking**] Remove deprecated definitions ([#1113](https://github.com/quantinuum/tket2/pull/1113))
+
+## [0.14.0](https://github.com/quantinuum/tket2/compare/tket-v0.13.2...tket-v0.14.0) - 2025-08-18
+
+### New Features
+
+- [**breaking**] Allow PytketTypeTranslators to translate nested types ([#1038](https://github.com/quantinuum/tket2/pull/1038))
+- Define a wire tracker for the new pytket decoder ([#1036](https://github.com/quantinuum/tket2/pull/1036))
+- [**breaking**] Reworked pytket decoder framework ([#1030](https://github.com/quantinuum/tket2/pull/1030))
+- [**breaking**] Use qsystem encoder/decoders in tket-py ([#1041](https://github.com/quantinuum/tket2/pull/1041))
+- [**breaking**] Avoid eagerly cloning SerialCircuits when decoding from pytket ([#1048](https://github.com/quantinuum/tket2/pull/1048))
+
+### Refactor
+
+- [**breaking**] Rename tk2 encoder names to tket ([#1037](https://github.com/quantinuum/tket2/pull/1037))
+
+## [0.13.2](https://github.com/quantinuum/tket2/compare/tket-v0.13.1...tket-v0.13.2) - 2025-08-08
+
+### New Features
+
+- *(tket-py)* Create BadgerOptimiser from arbitrary Rewriters ([#1022](https://github.com/quantinuum/tket2/pull/1022))
+
+## [0.13.1](https://github.com/quantinuum/tket2/compare/tket-v0.13.0...tket-v0.13.1) - 2025-07-30
+
+### Documentation
+
+- Update README badges ([#1004](https://github.com/quantinuum/tket2/pull/1004))
+## [0.13.0](https://github.com/quantinuum/tket2/compare/tket2-v0.12.3...tket-v0.13.0) - 2025-07-25
+
+### New Features
+
+- [**breaking] Rename tket2.* HUGR extensions to tket.* ([#988](https://github.com/quantinuum/tket2/pull/988))
+- [**breaking] Rename tket2* libs to tket* ([#987](https://github.com/quantinuum/tket2/pull/987))
+- [**breaking**] Update to `hugr 0.21` ([#965](https://github.com/quantinuum/tket2/pull/965))
+- Add guppy extension with drop operation ([#962](https://github.com/quantinuum/tket2/pull/962))
+- [**breaking**] Split the pytket extension encoder trait ([#970](https://github.com/quantinuum/tket2/pull/970))
+
+## [0.12.3](https://github.com/quantinuum/tket2/compare/tket2-v0.12.2...tket2-v0.12.3) - 2025-07-08
+
+### New Features
+
+- Add llvm codegen for `tket2.bool` ([#950](https://github.com/quantinuum/tket2/pull/950))
+
+## [0.12.2](https://github.com/quantinuum/tket2/compare/tket2-v0.12.1...tket2-v0.12.2) - 2025-06-30
+
+### Refactor
+
+- *(hseries)* use array unpack operation ([#913](https://github.com/quantinuum/tket2/pull/913))
+
+## [0.12.1](https://github.com/quantinuum/tket2/compare/tket2-v0.12.0...tket2-v0.12.1) - 2025-06-18
+
+### New Features
+
+- *(pytket encoding)* Support prelude barriers ([#919](https://github.com/quantinuum/tket2/pull/919))
+
+## [0.12.0](https://github.com/quantinuum/tket2/compare/tket2-v0.11.1...tket2-v0.12.0) - 2025-06-16
+
+### New Features
+
+- *(pytket-encoding)* Bit initialization and bool operations ([#907](https://github.com/quantinuum/tket2/pull/907))
+- *(pytket-encoding)* Pytket encode dfgs and function calls ([#908](https://github.com/quantinuum/tket2/pull/908))
+- Add llvm lowering for debug extension ([#900](https://github.com/quantinuum/tket2/pull/900))
+
+### Refactor
+
+- [**breaking**] More flexible pytket encoding ([#849](https://github.com/quantinuum/tket2/pull/849))
+
+## [0.11.1](https://github.com/quantinuum/tket2/compare/tket2-v0.11.0...tket2-v0.11.1) - 2025-06-03
+
+### New Features
+
+- Add V and Vdg to quantum extension. ([#889](https://github.com/quantinuum/tket2/pull/889))
+- *(tket2-hseries)* LLVM codegen for extensions ([#898](https://github.com/quantinuum/tket2/pull/898))
+
+## [0.11.0](https://github.com/quantinuum/tket2/compare/tket2-v0.10.0...tket2-v0.11.0) - 2025-05-22
 
 ### ⚠ BREAKING CHANGES
 - Tk2Op::MeasureFree now returns a tket2.bool
 
 ### New Features
 
-- [**breaking**] Add `ReplaceBoolPass` ([#854](https://github.com/CQCL/tket2/pull/854))
+- [**breaking**] Add `ReplaceBoolPass` ([#854](https://github.com/quantinuum/tket2/pull/854))
 
 ### Refactor
 
-- Use black_box from standard library. ([#878](https://github.com/CQCL/tket2/pull/878))
+- Use black_box from standard library. ([#878](https://github.com/quantinuum/tket2/pull/878))
 
-## [0.10.0](https://github.com/CQCL/tket2/compare/tket2-v0.9.0...tket2-v0.10.0) - 2025-05-16
-
-### New Features
-
-- [**breaking**] bump msrv to 1.85 ([#868](https://github.com/CQCL/tket2/pull/868))
-
-## [0.9.0](https://github.com/CQCL/tket2/compare/tket2-v0.8.0...tket2-v0.9.0) - 2025-05-06
+## [0.10.0](https://github.com/quantinuum/tket2/compare/tket2-v0.9.0...tket2-v0.10.0) - 2025-05-16
 
 ### New Features
 
-- Add `tket2.bool` extension ([#823](https://github.com/CQCL/tket2/pull/823))
-- Add llvm codegen for `tket2.rotation` extension ([#851](https://github.com/CQCL/tket2/pull/851))
-- Add debug extension with state result op ([#843](https://github.com/CQCL/tket2/pull/843))
+- [**breaking**] bump msrv to 1.85 ([#868](https://github.com/quantinuum/tket2/pull/868))
+
+## [0.9.0](https://github.com/quantinuum/tket2/compare/tket2-v0.8.0...tket2-v0.9.0) - 2025-05-06
+
+### New Features
+
+- Add `tket2.bool` extension ([#823](https://github.com/quantinuum/tket2/pull/823))
+- Add llvm codegen for `tket2.rotation` extension ([#851](https://github.com/quantinuum/tket2/pull/851))
+- Add debug extension with state result op ([#843](https://github.com/quantinuum/tket2/pull/843))
 
 ### Refactor
 
-- Better error message on allocation failure. ([#827](https://github.com/CQCL/tket2/pull/827))
-- [**breaking**] Remove node parameter from Circuit ([#824](https://github.com/CQCL/tket2/pull/824))
+- Better error message on allocation failure. ([#827](https://github.com/quantinuum/tket2/pull/827))
+- [**breaking**] Remove node parameter from Circuit ([#824](https://github.com/quantinuum/tket2/pull/824))
 
-## [0.8.0](https://github.com/CQCL/tket2/compare/tket2-v0.7.3...tket2-v0.8.0) - 2025-03-17
+## [0.8.0](https://github.com/quantinuum/tket2/compare/tket2-v0.7.3...tket2-v0.8.0) - 2025-03-17
 
 ### New Features
 
-- [**breaking**] Use hugr envelopes to store/load circuits ([#813](https://github.com/CQCL/tket2/pull/813))
+- [**breaking**] Use hugr envelopes to store/load circuits ([#813](https://github.com/quantinuum/tket2/pull/813))
 
-## [0.7.1](https://github.com/CQCL/tket2/compare/tket2-v0.7.0...tket2-v0.7.1) - 2025-01-10
+## [0.7.1](https://github.com/quantinuum/tket2/compare/tket2-v0.7.0...tket2-v0.7.1) - 2025-01-10
 
 ### Bug Fixes
 
 - remove unicode pi symbols in rotation extension (#743)
 
-## [0.7.0](https://github.com/CQCL/tket2/compare/tket2-v0.6.0...tket2-v0.7.0) - 2024-12-16
+## [0.7.0](https://github.com/quantinuum/tket2/compare/tket2-v0.6.0...tket2-v0.7.0) - 2024-12-16
 
 ### ⚠ BREAKING CHANGES
 
@@ -173,125 +298,125 @@
 
 - [**breaking**] update to hugr 0.14 (#700)
 
-## [0.6.0](https://github.com/CQCL/tket2/compare/tket2-v0.5.0...tket2-v0.6.0) - 2024-10-15
+## [0.6.0](https://github.com/quantinuum/tket2/compare/tket2-v0.5.0...tket2-v0.6.0) - 2024-10-15
 
 ### New Features
 
-- *(badger)* `cx` and `rz` const functions and strategies for `LexicographicCostFunction` ([#625](https://github.com/CQCL/tket2/pull/625))
-- Add `tket2.rotation.from_halfturns_unchecked` op ([#640](https://github.com/CQCL/tket2/pull/640))
-- [**breaking**] update to hugr 0.13.0 ([#645](https://github.com/CQCL/tket2/pull/645))
-- Decode pytket op parameters ([#644](https://github.com/CQCL/tket2/pull/644))
-- re-export hugr crate ([#652](https://github.com/CQCL/tket2/pull/652))
-- Extract pytket parameters to input wires ([#661](https://github.com/CQCL/tket2/pull/661))
+- *(badger)* `cx` and `rz` const functions and strategies for `LexicographicCostFunction` ([#625](https://github.com/quantinuum/tket2/pull/625))
+- Add `tket2.rotation.from_halfturns_unchecked` op ([#640](https://github.com/quantinuum/tket2/pull/640))
+- [**breaking**] update to hugr 0.13.0 ([#645](https://github.com/quantinuum/tket2/pull/645))
+- Decode pytket op parameters ([#644](https://github.com/quantinuum/tket2/pull/644))
+- re-export hugr crate ([#652](https://github.com/quantinuum/tket2/pull/652))
+- Extract pytket parameters to input wires ([#661](https://github.com/quantinuum/tket2/pull/661))
 
 ### Refactor
 
-- [**breaking**] Remove deprecated exports ([#662](https://github.com/CQCL/tket2/pull/662))
+- [**breaking**] Remove deprecated exports ([#662](https://github.com/quantinuum/tket2/pull/662))
 
-## [0.5.0](https://github.com/CQCL/tket2/compare/tket2-v0.4.0...tket2-v0.5.0) - 2024-09-30
-
-### Bug Fixes
-
-- Support hugr packages, fix the notebooks ([#622](https://github.com/CQCL/tket2/pull/622))
-
-### New Features
-
-- Add an explicit struct for the tket2 sympy op ([#616](https://github.com/CQCL/tket2/pull/616))
-- Support encoding float and sympy ops ([#618](https://github.com/CQCL/tket2/pull/618))
-
-## [0.4.0](https://github.com/CQCL/tket2/compare/tket2-v0.3.0...tket2-v0.4.0) - 2024-09-16
+## [0.5.0](https://github.com/quantinuum/tket2/compare/tket2-v0.4.0...tket2-v0.5.0) - 2024-09-30
 
 ### Bug Fixes
 
-- angle type docstring to say 2pi ([#607](https://github.com/CQCL/tket2/pull/607))
-- Fix broken ConstAngle::TAU ([#609](https://github.com/CQCL/tket2/pull/609))
+- Support hugr packages, fix the notebooks ([#622](https://github.com/quantinuum/tket2/pull/622))
 
 ### New Features
 
-- [**breaking**] simplify angle extension in to a half turns rotation type ([#611](https://github.com/CQCL/tket2/pull/611))
+- Add an explicit struct for the tket2 sympy op ([#616](https://github.com/quantinuum/tket2/pull/616))
+- Support encoding float and sympy ops ([#618](https://github.com/quantinuum/tket2/pull/618))
 
-## [0.3.0](https://github.com/CQCL/tket2/compare/tket2-v0.2.0...tket2-v0.3.0) - 2024-09-09
+## [0.4.0](https://github.com/quantinuum/tket2/compare/tket2-v0.3.0...tket2-v0.4.0) - 2024-09-16
 
 ### Bug Fixes
 
-- extension ops checking against incorrect name ([#593](https://github.com/CQCL/tket2/pull/593))
-- [**breaking**] remove TryFrom for extension ops use `cast` ([#592](https://github.com/CQCL/tket2/pull/592))
-- don't load angle extensions on to quantum ([#597](https://github.com/CQCL/tket2/pull/597))
+- angle type docstring to say 2pi ([#607](https://github.com/quantinuum/tket2/pull/607))
+- Fix broken ConstAngle::TAU ([#609](https://github.com/quantinuum/tket2/pull/609))
 
 ### New Features
 
-- [**breaking**] move angle types + and ops to new "tket2.angle" extension ([#591](https://github.com/CQCL/tket2/pull/591))
-- dataflow builder methods for angle ops ([#596](https://github.com/CQCL/tket2/pull/596))
-- lowering tk2ops -> hseriesops ([#579](https://github.com/CQCL/tket2/pull/579))
+- [**breaking**] simplify angle extension in to a half turns rotation type ([#611](https://github.com/quantinuum/tket2/pull/611))
 
-## [0.2.0](https://github.com/CQCL/tket2/compare/tket2-v0.1.1...tket2-v0.2.0) - 2024-09-04
+## [0.3.0](https://github.com/quantinuum/tket2/compare/tket2-v0.2.0...tket2-v0.3.0) - 2024-09-09
 
 ### Bug Fixes
-- [**breaking**] quantum extension name wrong way round ([#582](https://github.com/CQCL/tket2/pull/582))
+
+- extension ops checking against incorrect name ([#593](https://github.com/quantinuum/tket2/pull/593))
+- [**breaking**] remove TryFrom for extension ops use `cast` ([#592](https://github.com/quantinuum/tket2/pull/592))
+- don't load angle extensions on to quantum ([#597](https://github.com/quantinuum/tket2/pull/597))
 
 ### New Features
-- Extend Command::optype lifetime ([#562](https://github.com/CQCL/tket2/pull/562))
-- [**breaking**] Update rust hugr dependency to `0.12.0`, and python hugr to `0.8.0` ([#568](https://github.com/CQCL/tket2/pull/568))
-- [**breaking**] remove Tk2Op::AngleAdd ([#567](https://github.com/CQCL/tket2/pull/567))
-- [**breaking**] angle type no longer parametric. ([#577](https://github.com/CQCL/tket2/pull/577))
-- [**breaking**] HSeries ops ([#573](https://github.com/CQCL/tket2/pull/573))
-- [**breaking**] replace f64 with angle type for tk2 ops ([#578](https://github.com/CQCL/tket2/pull/578))
-- more angle ops (construct, deconstruct, radians, equality) ([#581](https://github.com/CQCL/tket2/pull/581))
 
-## [0.1.1](https://github.com/CQCL/tket2/compare/tket2-v0.1.0...tket2-v0.1.1) - 2024-08-15
+- [**breaking**] move angle types + and ops to new "tket2.angle" extension ([#591](https://github.com/quantinuum/tket2/pull/591))
+- dataflow builder methods for angle ops ([#596](https://github.com/quantinuum/tket2/pull/596))
+- lowering tk2ops -> hseriesops ([#579](https://github.com/quantinuum/tket2/pull/579))
 
-### New Features
-- Move parallel evaluation code to CircuitChunks ([#528](https://github.com/CQCL/tket2/pull/528))
-
-
-## [0.1.0](https://github.com/CQCL/tket2/compare/tket2-v0.1.0-alpha.2...tket2-v0.1.0) - 2024-08-01
+## [0.2.0](https://github.com/quantinuum/tket2/compare/tket2-v0.1.1...tket2-v0.2.0) - 2024-09-04
 
 ### Bug Fixes
-- Single source of truth for circuit names, and better circuit errors ([#390](https://github.com/CQCL/tket2/pull/390))
-- Support non-DFG circuits ([#391](https://github.com/CQCL/tket2/pull/391))
-- Portmatching not matching const edges ([#444](https://github.com/CQCL/tket2/pull/444))
-- Pattern matcher discriminating on opaqueOp description ([#441](https://github.com/CQCL/tket2/pull/441))
-- `extract_dfg` inserting the output node with an invalid child order ([#442](https://github.com/CQCL/tket2/pull/442))
-- Recompile ecc sets after [#441](https://github.com/CQCL/tket2/pull/441) ([#484](https://github.com/CQCL/tket2/pull/484))
+- [**breaking**] quantum extension name wrong way round ([#582](https://github.com/quantinuum/tket2/pull/582))
+
+### New Features
+- Extend Command::optype lifetime ([#562](https://github.com/quantinuum/tket2/pull/562))
+- [**breaking**] Update rust hugr dependency to `0.12.0`, and python hugr to `0.8.0` ([#568](https://github.com/quantinuum/tket2/pull/568))
+- [**breaking**] remove Tk2Op::AngleAdd ([#567](https://github.com/quantinuum/tket2/pull/567))
+- [**breaking**] angle type no longer parametric. ([#577](https://github.com/quantinuum/tket2/pull/577))
+- [**breaking**] HSeries ops ([#573](https://github.com/quantinuum/tket2/pull/573))
+- [**breaking**] replace f64 with angle type for tk2 ops ([#578](https://github.com/quantinuum/tket2/pull/578))
+- more angle ops (construct, deconstruct, radians, equality) ([#581](https://github.com/quantinuum/tket2/pull/581))
+
+## [0.1.1](https://github.com/quantinuum/tket2/compare/tket2-v0.1.0...tket2-v0.1.1) - 2024-08-15
+
+### New Features
+- Move parallel evaluation code to CircuitChunks ([#528](https://github.com/quantinuum/tket2/pull/528))
+
+
+## [0.1.0](https://github.com/quantinuum/tket2/compare/tket2-v0.1.0-alpha.2...tket2-v0.1.0) - 2024-08-01
+
+### Bug Fixes
+- Single source of truth for circuit names, and better circuit errors ([#390](https://github.com/quantinuum/tket2/pull/390))
+- Support non-DFG circuits ([#391](https://github.com/quantinuum/tket2/pull/391))
+- Portmatching not matching const edges ([#444](https://github.com/quantinuum/tket2/pull/444))
+- Pattern matcher discriminating on opaqueOp description ([#441](https://github.com/quantinuum/tket2/pull/441))
+- `extract_dfg` inserting the output node with an invalid child order ([#442](https://github.com/quantinuum/tket2/pull/442))
+- Recompile ecc sets after [#441](https://github.com/quantinuum/tket2/pull/441) ([#484](https://github.com/quantinuum/tket2/pull/484))
 
 ### Documentation
-- Update tket2-py readme ([#431](https://github.com/CQCL/tket2/pull/431))
-- Better error reporting in portmatching ([#437](https://github.com/CQCL/tket2/pull/437))
-- Improved multi-threading docs for Badger ([#495](https://github.com/CQCL/tket2/pull/495))
+- Update tket2-py readme ([#431](https://github.com/quantinuum/tket2/pull/431))
+- Better error reporting in portmatching ([#437](https://github.com/quantinuum/tket2/pull/437))
+- Improved multi-threading docs for Badger ([#495](https://github.com/quantinuum/tket2/pull/495))
 
 ### New Features
-- `Circuit::operations` ([#395](https://github.com/CQCL/tket2/pull/395))
-- tuple unpack rewrite ([#406](https://github.com/CQCL/tket2/pull/406))
-- guppy → pytket conversion ([#407](https://github.com/CQCL/tket2/pull/407))
-- Drop linear bits, improve pytket encoding/decoding ([#420](https://github.com/CQCL/tket2/pull/420))
-- *(py)* Allow using `Tk2Op`s in the builder ([#436](https://github.com/CQCL/tket2/pull/436))
-- Initial support for `TailLoop` as circuit parent ([#417](https://github.com/CQCL/tket2/pull/417))
-- Support tuple unpacking with multiple unpacks ([#470](https://github.com/CQCL/tket2/pull/470))
-- Partial tuple unpack ([#475](https://github.com/CQCL/tket2/pull/475))
-- [**breaking**] Compress binary ECCs using zlib ([#498](https://github.com/CQCL/tket2/pull/498))
-- Add timeout options and stats to Badger ([#496](https://github.com/CQCL/tket2/pull/496))
-- Expose advanced Badger timeout options to tket2-py ([#506](https://github.com/CQCL/tket2/pull/506))
+- `Circuit::operations` ([#395](https://github.com/quantinuum/tket2/pull/395))
+- tuple unpack rewrite ([#406](https://github.com/quantinuum/tket2/pull/406))
+- guppy → pytket conversion ([#407](https://github.com/quantinuum/tket2/pull/407))
+- Drop linear bits, improve pytket encoding/decoding ([#420](https://github.com/quantinuum/tket2/pull/420))
+- *(py)* Allow using `Tk2Op`s in the builder ([#436](https://github.com/quantinuum/tket2/pull/436))
+- Initial support for `TailLoop` as circuit parent ([#417](https://github.com/quantinuum/tket2/pull/417))
+- Support tuple unpacking with multiple unpacks ([#470](https://github.com/quantinuum/tket2/pull/470))
+- Partial tuple unpack ([#475](https://github.com/quantinuum/tket2/pull/475))
+- [**breaking**] Compress binary ECCs using zlib ([#498](https://github.com/quantinuum/tket2/pull/498))
+- Add timeout options and stats to Badger ([#496](https://github.com/quantinuum/tket2/pull/496))
+- Expose advanced Badger timeout options to tket2-py ([#506](https://github.com/quantinuum/tket2/pull/506))
 
 ### Refactor
-- [**breaking**] Simplify tket1 conversion errors ([#408](https://github.com/CQCL/tket2/pull/408))
-- Cleanup tket1 serialized op structures ([#419](https://github.com/CQCL/tket2/pull/419))
+- [**breaking**] Simplify tket1 conversion errors ([#408](https://github.com/quantinuum/tket2/pull/408))
+- Cleanup tket1 serialized op structures ([#419](https://github.com/quantinuum/tket2/pull/419))
 
 ### Testing
-- Add coverage for Badger split circuit multi-threading ([#505](https://github.com/CQCL/tket2/pull/505))
+- Add coverage for Badger split circuit multi-threading ([#505](https://github.com/quantinuum/tket2/pull/505))
 
-## [0.1.0-alpha.2](https://github.com/CQCL/tket2/compare/tket2-v0.1.0-alpha.1...tket2-v0.1.0-alpha.2) - 2024-06-11
+## [0.1.0-alpha.2](https://github.com/quantinuum/tket2/compare/tket2-v0.1.0-alpha.1...tket2-v0.1.0-alpha.2) - 2024-06-11
 
 ### Bug Fixes
-- Commands iterator ignoring the hierarchy. ([#381](https://github.com/CQCL/tket2/pull/381))
+- Commands iterator ignoring the hierarchy. ([#381](https://github.com/quantinuum/tket2/pull/381))
 
 ### New Features
-- Replace `Circuit::num_gates` with `num_operations` ([#384](https://github.com/CQCL/tket2/pull/384))
-- Utilities for loading compiled guppy circuits ([#393](https://github.com/CQCL/tket2/pull/393))
+- Replace `Circuit::num_gates` with `num_operations` ([#384](https://github.com/quantinuum/tket2/pull/384))
+- Utilities for loading compiled guppy circuits ([#393](https://github.com/quantinuum/tket2/pull/393))
 
 ### Refactor
-- [**breaking**] Replace Circuit trait with a struct ([#370](https://github.com/CQCL/tket2/pull/370))
-- [**breaking**] Rename `tket2::json` into `tket2::serialize::pytket` ([#392](https://github.com/CQCL/tket2/pull/392))
+- [**breaking**] Replace Circuit trait with a struct ([#370](https://github.com/quantinuum/tket2/pull/370))
+- [**breaking**] Rename `tket2::json` into `tket2::serialize::pytket` ([#392](https://github.com/quantinuum/tket2/pull/392))
 
-## [0.1.0-alpha.1](https://github.com/CQCL/tket2/releases/tag/tket2-v0.1.0-alpha.1) - 2024-05-24
+## [0.1.0-alpha.1](https://github.com/quantinuum/tket2/releases/tag/tket2-v0.1.0-alpha.1) - 2024-05-24
 
 Initial alpha release of the library

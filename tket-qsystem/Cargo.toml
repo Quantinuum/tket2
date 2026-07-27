@@ -1,6 +1,6 @@
 [package]
 name = "tket-qsystem"
-version = "0.22.0"
+version = "0.25.3"
 edition.workspace = true
 rust-version.workspace = true
 
@@ -23,8 +23,10 @@ name = "tket-qsystem"
 required-features = ["cli"]
 
 [dependencies]
+tket = { path = "../tket", version = "0.19.3" }
+
 hugr.workspace = true
-tket = { path = "../tket", version = "0.16.0" }
+hugr-core.workspace = true
 tket-json-rs = { workspace = true }
 lazy_static.workspace = true
 serde = { workspace = true, features = ["derive"] }
@@ -45,10 +47,13 @@ indexmap.workspace = true
 anyhow = { workspace = true, optional = true }
 
 [dev-dependencies]
+tket1-passes = { path = "../tket1-passes" }
+
 cool_asserts.workspace = true
 petgraph.workspace = true
 rstest.workspace = true
 serde_json.workspace = true
+rayon.workspace = true
 
 [lints]
 workspace = true

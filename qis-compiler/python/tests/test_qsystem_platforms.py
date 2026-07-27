@@ -1,0 +1,72 @@
+from pathlib import Path
+from typing import Literal
+
+import pytest
+from pytest_snapshot.plugin import Snapshot
+from selene_hugr_qis_compiler import compile_to_llvm_ir  # , HugrReadError, check_hugr
+
+resources_dir = Path(__file__).parent / "resources"
+
+triples = [
+    "x86_64-unknown-linux-gnu",
+    "aarch64-unknown-linux-gnu",
+    "x86_64-apple-darwin",
+    # TODO: The test doesn't seem to like Apple Silicon, it throws a warning
+    # > 'aarch64' is not a recognized processor for this target (ignoring processor)
+    "aarch64-apple-darwin",
+    "x86_64-windows-msvc",
+]
+
+Platform = Literal["helios", "sol"]
+
+platforms: list[Platform] = ["helios", "sol"]
+
+
+def load(name: str) -> bytes:
+    hugr_file = resources_dir / f"{name}.hugr"
+    return hugr_file.read_bytes()
+
+
+@pytest.mark.parametrize(
+    "hugr_file",
+    [
+        "no_results",
+        "flip_some",
+        "discard_qb_array",
+        "measure_qb_array",
+        "postselect_exit",
+        "postselect_panic",
+        "print_current_shot",
+        "rng",
+        "rus",
+        "qft_32",
+        "addition_3_11",
+    ],
+)
+@pytest.mark.parametrize("target_triple", triples)
+@pytest.mark.parametrize("platform", platforms)
+def test_llvm_multiplatform(
+    snapshot: Snapshot, hugr_file: str, target_triple: str, platform: Platform
+) -> None:
+    hugr_envelope = load(hugr_file)
+    ir = compile_to_llvm_ir(
+        hugr_envelope, target_triple=target_triple, platform=platform
+    )
+    snapshot.assert_match(ir, f"{hugr_file}_{target_triple}_{platform}")
+
+
+@pytest.mark.xfail(
+    reason="Requires tket2 functionality that is not yet implemented for Sol"
+)
+@pytest.mark.parametrize(
+    "hugr_file",
+    [
+        # Look ma, no unimplemented gates!
+    ],
+)
+@pytest.mark.parametrize("target_triple", triples)
+def test_llvm_multiplatform_todos(
+    snapshot: Snapshot, hugr_file: str, target_triple: str
+) -> None:
+    hugr_envelope = load(hugr_file)
+    compile_to_llvm_ir(hugr_envelope, target_triple=target_triple, platform="sol")

@@ -6,3 +6,6 @@ compiler.cppstd=gnu17
 compiler.libcxx=libc++
 compiler.version=17
 os=Macos
+
+[buildenv]
+MACOSX_DEPLOYMENT_TARGET=15.0

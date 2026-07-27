@@ -9,7 +9,6 @@ use std::process::Command;
 const CONAN_REMOTE: &str = "https://quantinuumsw.jfrog.io/artifactory/api/conan/tket1-libs";
 
 fn main() {
-    // // Configure when to rerun the build script
     println!("cargo:rerun-if-env-changed=TKET_C_API_PATH");
     println!("cargo:rerun-if-changed=conanfile.txt");
     println!("cargo:rerun-if-changed=build.rs");
@@ -19,7 +18,7 @@ fn main() {
     let target = SupportedPlatform::from_target_str(&env::var("TARGET").unwrap());
 
     let header_path = if let Some(path) = custom_tket_path {
-        cargo_set_custom_lib_path(&path.join("lib"), target);
+        cargo_set_custom_lib_paths(&[path.join("lib"), path.join("lib64"), path.join("bin")]);
         let header_path = path.join("include").join("tket-c-api.h");
 
         assert!(
@@ -42,23 +41,32 @@ fn main() {
         add_conan_remote_if_missing(CONAN_REMOTE);
 
         // 2. Select one of the pre-built conan profiles if possible (fallback to default)
-        let profile_name = target
-            .map(|t| t.get_prebuilt_conan_profile())
+        let (profile_name, needs_build) = target
+            .map(|t| {
+                let profile = t.get_prebuilt_conan_profile();
+                let needs_build = t.needs_build_from_source();
+                (profile, needs_build)
+            })
             .unwrap_or_else(|| {
                 println!("cargo:warning=Unrecognized platform. Defaulting to default conan profile and building from source.");
-                "default"
+                ("default", true)
             });
         let profile_path = Path::new("./conan-profiles").join(profile_name);
         println!("Using conan profile: {}", profile_path.display());
 
         // 3. Prepare the conan install command
         let mut conan_install = conan2::ConanInstall::new();
-        conan_install
-            .build_type("Release")
-            .profile(profile_path.to_str().unwrap());
+        conan_install.build_type("Release");
 
         if profile_name == "default" {
+            // For default profile, let conan auto-detect
             conan_install.detect_profile().build("missing");
+        } else {
+            // Use the specified profile
+            conan_install.profile(profile_path.to_str().unwrap());
+            if needs_build {
+                conan_install.build("missing");
+            }
         }
 
         // 4. Run the conan install command and point cargo to the correct install paths
@@ -78,6 +86,9 @@ fn main() {
     // Link in standard C++ library.
     if target.is_some_and(|t| t.is_macos()) {
         println!("cargo:rustc-link-lib=c++");
+    } else if target.is_some_and(|t| t == SupportedPlatform::WindowsX86) {
+        // On Windows with MSVC, don't link stdc++ - MSVC runtime is used by default
+        // The tket-c-api library should already be linked against the correct runtime
     } else {
         println!("cargo:rustc-link-lib=stdc++");
     }
@@ -97,24 +108,42 @@ fn main() {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum SupportedPlatform {
+    // Platforms with pre-built binaries in tket-libs conan remote
     MacOsX86,
     MacOsArm,
+    LinuxX86,
+    // Manually added profiles for cross-compilation (no pre-built binaries)
     WindowsX86,
-    LinusX86,
+    LinuxArmv8,
+    LinuxAarch64Gnu,
+    LinuxAarch64Musl,
+    LinuxArmv7Gnu,
+    LinuxArmv7Musl,
+    LinuxI686Gnu,
+    LinuxI686Musl,
+    LinuxX86_64Musl,
 }
 
 impl SupportedPlatform {
     fn from_target_str(target: &str) -> Option<Self> {
-        if target.contains("apple") && target.contains("x86") {
-            Some(SupportedPlatform::MacOsX86)
-        } else if target.contains("apple") && target.contains("aarch64") {
-            Some(SupportedPlatform::MacOsArm)
-        } else if target.contains("windows") && target.contains("x86") {
-            Some(SupportedPlatform::WindowsX86)
-        } else if target.contains("linux") && target.contains("x86") {
-            Some(SupportedPlatform::LinusX86)
-        } else {
-            None
+        match target {
+            // Exact matches for manually added cross-compilation targets
+            "aarch64-unknown-linux-gnu" => Some(SupportedPlatform::LinuxAarch64Gnu),
+            "aarch64-unknown-linux-musl" => Some(SupportedPlatform::LinuxAarch64Musl),
+            "armv7-unknown-linux-gnueabihf" => Some(SupportedPlatform::LinuxArmv7Gnu),
+            "armv7-unknown-linux-musleabihf" => Some(SupportedPlatform::LinuxArmv7Musl),
+            "i686-unknown-linux-gnu" => Some(SupportedPlatform::LinuxI686Gnu),
+            "i686-unknown-linux-musl" => Some(SupportedPlatform::LinuxI686Musl),
+            "x86_64-unknown-linux-musl" => Some(SupportedPlatform::LinuxX86_64Musl),
+            // Fallback patterns for platforms with pre-built binaries
+            t if t.contains("apple") && t.contains("x86") => Some(SupportedPlatform::MacOsX86),
+            t if t.contains("apple") && t.contains("aarch64") => Some(SupportedPlatform::MacOsArm),
+            t if t.contains("windows") && t.contains("x86") => Some(SupportedPlatform::WindowsX86),
+            t if t.contains("linux") && t.contains("x86_64") && !t.contains("musl") => {
+                Some(SupportedPlatform::LinuxX86)
+            }
+            t if t.contains("linux") && t.contains("armv8") => Some(SupportedPlatform::LinuxArmv8),
+            _ => None,
         }
     }
 
@@ -126,14 +155,34 @@ impl SupportedPlatform {
     }
 
     fn get_prebuilt_conan_profile(&self) -> &'static str {
-        // Corresponds to profiles which have pre-built binaries in the tket-libs conan remote
-        // See ./conan-profiles/README.md for more details
         match self {
+            // Platforms with pre-built binaries in tket-libs conan remote
+            // See ./conan-profiles/README.md for more details
             SupportedPlatform::MacOsX86 => "macos-15-intel",
             SupportedPlatform::MacOsArm => "macos-15",
             SupportedPlatform::WindowsX86 => "windows-2025",
-            SupportedPlatform::LinusX86 => "linux-x86_64-gcc13",
+            SupportedPlatform::LinuxX86 => "linux-x86_64-gcc13",
+            SupportedPlatform::LinuxArmv8 => "linux-armv8-gcc14",
+            // Manually added profiles for cross-compilation (will build from source)
+            SupportedPlatform::LinuxAarch64Gnu => "linux-armv8-gcc14",
+            SupportedPlatform::LinuxAarch64Musl => "linux-armv8-gcc14",
+            SupportedPlatform::LinuxArmv7Gnu => "linux-armv7-gcc14",
+            SupportedPlatform::LinuxArmv7Musl => "linux-armv7-gcc14",
+            SupportedPlatform::LinuxI686Gnu => "linux-i686-gcc14",
+            SupportedPlatform::LinuxI686Musl => "linux-i686-gcc14",
+            SupportedPlatform::LinuxX86_64Musl => "linux-x86_64-gcc14",
         }
+    }
+
+    /// Some selected platforms publish pre-built binaries.
+    ///
+    /// For all others, we need to pass `--build=missing` to conan and build
+    /// from source.
+    fn needs_build_from_source(&self) -> bool {
+        !matches!(
+            self,
+            SupportedPlatform::MacOsX86 | SupportedPlatform::MacOsArm | SupportedPlatform::LinuxX86
+        )
     }
 }
 
@@ -154,13 +203,13 @@ fn add_conan_remote_if_missing(conan_remote: &str) {
     }
 }
 
-fn cargo_set_custom_lib_path(search_path: &Path, target: Option<SupportedPlatform>) {
-    println!("cargo:rustc-link-search={}", search_path.display());
+fn cargo_set_custom_lib_paths(search_path: &[PathBuf]) {
+    for path in search_path {
+        if path.exists() {
+            println!("cargo:rustc-link-search={}", path.display());
+        }
+    }
 
-    let lib_name = if target.is_some_and(|t| t == SupportedPlatform::WindowsX86) {
-        "libtket-c-api"
-    } else {
-        "tket-c-api"
-    };
+    let lib_name = "tket-c-api";
     println!("cargo:rustc-link-lib={lib_name}");
 }

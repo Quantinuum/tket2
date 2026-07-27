@@ -5,16 +5,16 @@ use std::sync::{Arc, Weak};
 
 use derive_more::derive::Display;
 use hugr::{
+    Extension, Wire,
     builder::{BuildError, Dataflow},
     extension::{
-        prelude::{option_type, UnwrapBuilder},
-        simple_op::{try_from_name, MakeOpDef, MakeRegisteredOp},
-        ExtensionBuildError, ExtensionId, ExtensionRegistry, OpDef, SignatureFunc, TypeDefBound,
-        Version, PRELUDE,
+        ExtensionBuildError, ExtensionId, ExtensionRegistry, OpDef, PRELUDE, SignatureFunc,
+        TypeDefBound, Version,
+        prelude::{UnwrapBuilder, option_type},
+        simple_op::{MakeOpDef, MakeRegisteredOp, try_from_name},
     },
     std_extensions::arithmetic::{float_types::float64_type, int_types::int_type},
     types::{CustomType, Signature, Type, TypeBound},
-    Extension, Wire,
 };
 use lazy_static::lazy_static;
 use smol_str::SmolStr;
@@ -141,7 +141,9 @@ impl MakeOpDef for RandomOp {
             ),
             RandomOp::NewRNGContext => Signature::new(
                 vec![int_type(6)],
-                Type::from(option_type(RandomType::RNGContext.get_type(extension_ref))),
+                vec![Type::from(option_type(vec![
+                    RandomType::RNGContext.get_type(extension_ref),
+                ]))],
             ),
             RandomOp::DeleteRNGContext => {
                 Signature::new(vec![RandomType::RNGContext.get_type(extension_ref)], vec![])
@@ -182,8 +184,8 @@ impl MakeRegisteredOp for RandomOp {
         EXTENSION_ID
     }
 
-    fn extension_ref(&self) -> Weak<Extension> {
-        Arc::downgrade(&EXTENSION)
+    fn extension_ref(&self) -> Arc<Extension> {
+        EXTENSION.clone()
     }
 }
 
@@ -240,8 +242,8 @@ mod test {
     use hugr::ops::Value;
     use hugr::std_extensions::arithmetic::int_types::ConstInt;
 
-    use hugr::builder::{DataflowHugr, FunctionBuilder};
     use hugr::HugrView;
+    use hugr::builder::{DataflowHugr, FunctionBuilder};
     use strum::IntoEnumIterator;
 
     use super::*;
@@ -273,7 +275,9 @@ mod test {
             let [ctx] = func_builder
                 .build_unwrap_sum(
                     1,
-                    option_type(RandomType::RNGContext.get_type(&Arc::downgrade(&EXTENSION))),
+                    option_type(vec![
+                        RandomType::RNGContext.get_type(&Arc::downgrade(&EXTENSION)),
+                    ]),
                     maybe_ctx,
                 )
                 .unwrap();

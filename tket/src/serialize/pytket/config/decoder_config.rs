@@ -1,5 +1,5 @@
 //! Configuration for converting [`tket_json_rs::circuit_json::SerialCircuit`]
-//! into [`Circuit`]s.
+//! into Hugrs.
 //!
 //! A configuration struct contains a list of custom decoders that define
 //! translations of legacy tket primitives into HUGR operations.
@@ -10,16 +10,16 @@ use hugr::{Hugr, Wire};
 use itertools::Itertools;
 use std::collections::HashMap;
 
+use crate::serialize::pytket::PytketDecodeError;
 use crate::serialize::pytket::decoder::{
     DecodeStatus, LoadedParameter, PytketDecoderContext, TrackedBit, TrackedQubit,
 };
 use crate::serialize::pytket::extension::{PytketDecoder, PytketTypeTranslator, RegisterCount};
-use crate::serialize::pytket::PytketDecodeError;
 
 use super::TypeTranslatorSet;
 
 /// Configuration for converting [`tket_json_rs::circuit_json::SerialCircuit`]
-/// into [`Circuit`][crate::Circuit].
+/// into Hugrs.
 ///
 /// Contains custom decoders that define translations for HUGR operations,
 /// types, and consts into pytket primitives.
@@ -93,7 +93,7 @@ impl PytketDecoderConfig {
     fn decoders_for_optype(
         &self,
         optype: &tket_json_rs::OpType,
-    ) -> impl Iterator<Item = &Box<dyn PytketDecoder + Send + Sync>> {
+    ) -> impl Iterator<Item = &Box<dyn PytketDecoder + Send + Sync>> + use<'_> {
         self.optype_decoders
             .get(optype)
             .into_iter()

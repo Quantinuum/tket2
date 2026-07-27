@@ -3,7 +3,7 @@
 //! details.
 use hugr::{
     extension::{Extension, ExtensionBuildError, ExtensionId, TypeDefBound},
-    types::{type_param::TypeParam, CustomType, Type, TypeBound, TypeRow, TypeRowRV},
+    types::{CustomType, Type, TypeBound, TypeRow, TypeRowRV, type_param::TypeParam},
 };
 use lazy_static::lazy_static;
 use smol_str::SmolStr;
@@ -94,7 +94,7 @@ pub enum ComputeType<T> {
         /// allowed.
         outputs: TypeRowRV,
     },
-    #[allow(missing_docs)]
+    /// Non-constructible variant.
     _Unreachable(std::convert::Infallible, PhantomData<T>),
 }
 
@@ -219,7 +219,7 @@ pub enum ComputeOp<T> {
         /// Note that row variables are not allowed here.
         outputs: TypeRow,
     },
-    #[allow(missing_docs)]
+    /// Non-constructible variant.
     _Unreachable(std::convert::Infallible, PhantomData<T>),
 }
 
@@ -243,15 +243,21 @@ macro_rules! compute_opdef {
             IntoStaticStr,
             EnumString,
         )]
-        #[allow(missing_docs, non_camel_case_types)]
+        #[expect(non_camel_case_types)]
         #[non_exhaustive]
         /// Simple enum of ops defined by the this extension.
         pub enum $opdef {
+            /// Retrieve the context for the given id.
             get_context,
+            /// Dispose of the context type.
             dispose_context,
+            /// Lookup a ComputeType::Func with the given signature.
             lookup_by_id,
+            /// Lookup a ComputeType::Func with the given name and signature.
             lookup_by_name,
+            /// Call a ComputeType::Func.
             call,
+            /// Read a future result type from a `call`.
             read_result,
         }
 
@@ -292,23 +298,23 @@ macro_rules! compute_opdef {
                 match self {
                     // [usize] -> [Context]
                     Self::get_context => Signature::new(
-                        usize_t(),
-                        Type::from(ComputeOp::<$ext>::get_context_return_type(
+                        vec![usize_t()],
+                        vec![Type::from(ComputeOp::<$ext>::get_context_return_type(
                             self.extension(),
                             extension_ref,
-                        )),
+                        ))],
                     )
                     .into(),
                     // [Context] -> []
-                    Self::dispose_context => Signature::new(context_type, type_row![]).into(),
+                    Self::dispose_context => Signature::new(vec![context_type], type_row![]).into(),
                     // <id: usize, inputs: TypeRow, outputs: TypeRow> [Module] -> [ComputeType::Func { inputs, outputs }]
                     Self::lookup_by_id => {
                         let inputs = TypeRV::new_row_var_use(1, TypeBound::Copyable);
                         let outputs = TypeRV::new_row_var_use(2, TypeBound::Copyable);
 
                         let func_type = ComputeType::<$ext>::func_custom_type(
-                            inputs,
-                            outputs,
+                            vec![inputs],
+                            vec![outputs],
                             self.extension(),
                             extension_ref,
                         )
@@ -329,8 +335,8 @@ macro_rules! compute_opdef {
                         let outputs = TypeRV::new_row_var_use(2, TypeBound::Copyable);
 
                         let func_type = ComputeType::<$ext>::func_custom_type(
-                            inputs,
-                            outputs,
+                            vec![inputs],
+                            vec![outputs],
                             self.extension(),
                             extension_ref,
                         )
@@ -351,14 +357,14 @@ macro_rules! compute_opdef {
                         let inputs = TypeRV::new_row_var_use(0, TypeBound::Copyable);
                         let outputs = TypeRV::new_row_var_use(1, TypeBound::Copyable);
                         let func_type = Type::new_extension(ComputeType::<$ext>::func_custom_type(
-                            inputs.clone(),
-                            outputs.clone(),
+                            vec![inputs.clone()],
+                            vec![outputs.clone()],
                             self.extension(),
                             extension_ref,
                         ));
                         let result_type =
                             TypeRV::new_extension(ComputeType::<$ext>::result_custom_type(
-                                outputs,
+                                vec![outputs],
                                 self.extension(),
                                 extension_ref,
                             ));
@@ -377,7 +383,7 @@ macro_rules! compute_opdef {
                         let outputs = TypeRV::new_row_var_use(0, TypeBound::Copyable);
                         let result_type =
                             TypeRV::new_extension(ComputeType::<$ext>::result_custom_type(
-                                outputs.clone(),
+                                vec![outputs.clone()],
                                 self.extension(),
                                 extension_ref,
                             ));
@@ -584,7 +590,9 @@ macro_rules! compute_opdef {
                 extension_id: ExtensionId,
                 extension_ref: &Weak<Extension>,
             ) -> SumType {
-                option_type(ComputeType::<$ext>::Context.get_type(extension_id, extension_ref))
+                option_type(vec![
+                    ComputeType::<$ext>::Context.get_type(extension_id, extension_ref),
+                ])
             }
         }
 

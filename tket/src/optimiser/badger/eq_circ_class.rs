@@ -1,8 +1,8 @@
 use std::io;
 use std::path::Path;
 
-use hugr::envelope::serde_with::AsStringEnvelope;
 use hugr::Hugr;
+use hugr::envelope::serde_with::AsStringEnvelope;
 use itertools::Itertools;
 use serde_with::serde_as;
 

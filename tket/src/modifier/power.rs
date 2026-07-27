@@ -4,16 +4,16 @@ use std::str::FromStr;
 use hugr::{
     extension::SignatureFunc,
     std_extensions::arithmetic::int_types::int_type,
-    types::{type_param::TypeParam, FuncValueType, PolyFuncTypeRV, TypeBound, TypeRV},
+    types::{FuncValueType, PolyFuncTypeRV, TypeBound, TypeRV, type_param::TypeParam},
 };
 
-#[allow(missing_docs)]
+/// Power modifier.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub struct ModifierPower;
 
 impl ModifierPower {
     /// Create a new ModifierPower.
-    pub fn new() -> Self {
+    fn new() -> Self {
         ModifierPower
     }
 }
@@ -36,7 +36,7 @@ impl FromStr for ModifierPower {
 impl ModifierPower {
     /// signature for the power modifier.
     /// The Copyable bound of the second parameter is needed while constructing `TailLoop`.
-    pub fn signature() -> SignatureFunc {
+    pub(crate) fn signature() -> SignatureFunc {
         PolyFuncTypeRV::new(
             [
                 TypeParam::new_list_type(TypeBound::Linear),
@@ -53,13 +53,13 @@ impl ModifierPower {
                     )),
                     int_type(6).into(),
                 ],
-                TypeRV::new_function(FuncValueType::new(
+                [TypeRV::new_function(FuncValueType::new(
                     vec![
                         TypeRV::new_row_var_use(0, TypeBound::Linear),
                         TypeRV::new_row_var_use(1, TypeBound::Copyable),
                     ],
-                    TypeRV::new_row_var_use(0, TypeBound::Linear),
-                )),
+                    [TypeRV::new_row_var_use(0, TypeBound::Linear)],
+                ))],
             ),
         )
         .into()

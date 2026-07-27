@@ -6,17 +6,17 @@
 use std::sync::{Arc, Weak};
 
 use hugr::{
+    Extension, Wire,
     builder::{BuildError, Dataflow},
     extension::{
-        simple_op::{
-            try_from_name, HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp,
-            OpLoadError,
-        },
         ExtensionBuildError, ExtensionId, OpDef, SignatureError, SignatureFunc, TypeDef, Version,
+        simple_op::{
+            HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
+            try_from_name,
+        },
     },
-    ops::{custom::ExtensionOp, OpType},
-    types::{type_param::TypeParam, CustomType, PolyFuncType, Signature, Type, TypeArg, TypeBound},
-    Extension, Wire,
+    ops::{OpType, custom::ExtensionOp},
+    types::{CustomType, PolyFuncType, Signature, Type, TypeArg, TypeBound, type_param::TypeParam},
 };
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -86,12 +86,14 @@ pub fn future_type(t: Type) -> Type {
     IntoStaticStr,
     EnumString,
 )]
-#[allow(missing_docs)]
 #[non_exhaustive]
 /// Simple enum of "tket.futures" operations.
 pub enum FutureOpDef {
+    /// Read a value from a Future, consuming it.
     Read,
+    /// Duplicate a Future. The original Future is consumed and two Futures are returned.
     Dup,
+    /// Consume a future without reading it.
     Free,
 }
 
@@ -106,15 +108,19 @@ impl MakeOpDef for FutureOpDef {
         let future_type = Type::new_extension(future_custom_type(t_type.clone(), extension_ref));
         match self {
             FutureOpDef::Read => {
-                PolyFuncType::new([t_param], Signature::new(future_type, t_type)).into()
+                PolyFuncType::new([t_param], Signature::new(vec![future_type], vec![t_type])).into()
             }
             FutureOpDef::Dup => PolyFuncType::new(
                 [t_param],
-                Signature::new(future_type.clone(), vec![future_type.clone(), future_type]),
+                Signature::new(
+                    vec![future_type.clone()],
+                    vec![future_type.clone(), future_type],
+                ),
             )
             .into(),
             FutureOpDef::Free => {
-                PolyFuncType::new([t_param], Signature::new(future_type.clone(), vec![])).into()
+                PolyFuncType::new([t_param], Signature::new(vec![future_type.clone()], vec![]))
+                    .into()
             }
         }
     }
@@ -194,8 +200,8 @@ impl MakeRegisteredOp for FutureOp {
         EXTENSION_ID
     }
 
-    fn extension_ref(&self) -> Weak<Extension> {
-        Arc::downgrade(&EXTENSION)
+    fn extension_ref(&self) -> Arc<Extension> {
+        EXTENSION.clone()
     }
 }
 
@@ -263,8 +269,8 @@ impl<D: Dataflow> FutureOpBuilder for D {}
 #[cfg(test)]
 pub(crate) mod test {
 
-    use hugr::builder::{Dataflow, DataflowHugr, FunctionBuilder};
     use hugr::HugrView;
+    use hugr::builder::{Dataflow, DataflowHugr, FunctionBuilder};
     use std::sync::Arc;
     use strum::IntoEnumIterator;
 
@@ -305,7 +311,10 @@ pub(crate) mod test {
         let hugr = {
             let mut func_builder = FunctionBuilder::new(
                 "circuit",
-                PolyFuncType::new(vec![t_param], Signature::new(future_type, t.clone())),
+                PolyFuncType::new(
+                    vec![t_param],
+                    Signature::new(vec![future_type], vec![t.clone()]),
+                ),
             )
             .unwrap();
             let [future_w] = func_builder.input_wires_arr();

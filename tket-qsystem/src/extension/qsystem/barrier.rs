@@ -6,22 +6,22 @@ pub use barrier_inserter::BarrierInserter;
 mod test {
     use super::*;
 
-    use crate::extension::qsystem::{self, lower_tk2_op};
+    use crate::extension::qsystem::{self, QSystemPlatform, lower_tk2_ops};
     use hugr::builder::{Dataflow, DataflowHugr};
     use hugr::extension::prelude::Barrier;
     use hugr::std_extensions::collections::borrow_array::borrow_array_type;
-    use hugr::std_extensions::collections::value_array::value_array_type;
+    use hugr::{HugrView, ops::handle::NodeHandle};
     use hugr::{
         builder::DFGBuilder,
         extension::prelude::{bool_t, option_type, qb_t},
         std_extensions::collections::array::array_type,
     };
-    use hugr::{ops::handle::NodeHandle, HugrView};
     use itertools::Itertools;
     use rstest::rstest;
+    use tket::passes::composable::Preserve;
 
     fn opt_q_arr(size: u64) -> hugr::types::Type {
-        array_type(size, option_type(qb_t()).into())
+        array_type(size, option_type(vec![qb_t()]).into())
     }
 
     #[rstest]
@@ -30,9 +30,8 @@ mod test {
     // special case, array of option qubit is unwrapped and unpacked
     #[case(vec![qb_t(), opt_q_arr(2)], 3, false)]
     // bare option of qubit is ignored
-    #[case(vec![qb_t(), option_type(qb_t()).into()], 1, false)]
+    #[case(vec![qb_t(), option_type(vec![qb_t()]).into()], 1, false)]
     #[case(vec![array_type(2, bool_t())], 0, false)]
-    #[case(vec![value_array_type(2, option_type(qb_t()).into())], 2, false)]
     #[case(vec![borrow_array_type(2, qb_t())], 2, false)]
     // special case, single array of qubits is passed directly to op without unpacking
     #[case(vec![array_type(3, qb_t())], 1, true)]
@@ -60,7 +59,8 @@ mod test {
         };
 
         // lower barrier to barrier + runtime barrier
-        let lowered = lower_tk2_op(&mut h).unwrap_or_else(|e| panic!("{}", e));
+        let lowered = lower_tk2_ops(&mut h, Preserve::Public, QSystemPlatform::Helios)
+            .unwrap_or_else(|e| panic!("{}", e));
         h.validate().unwrap_or_else(|e| panic!("{}", e));
         assert!(matches!(&lowered[..], [n] if barr_n == *n));
 
@@ -93,7 +93,7 @@ mod test {
                 // if the runtime barrier function is never called
                 // make sure it is because there are no qubits in the barrier
 
-                use tket::passes::unpack_container::type_unpack::TypeUnpacker;
+                use tket::passes::utils::unpack_container::type_unpack::TypeUnpacker;
 
                 let analyzer = TypeUnpacker::for_qubits();
                 let tuple_type = hugr::types::Type::new_tuple(type_row);
@@ -125,7 +125,7 @@ mod test {
         for n in h.nodes() {
             if let Some(op) = h.get_optype(n).as_extension_op() {
                 for factory_ext in [
-                    &tket::passes::unpack_container::TEMP_UNPACK_EXT_NAME,
+                    &tket::passes::utils::unpack_container::TEMP_UNPACK_EXT_NAME,
                     &wrapped_barrier::TEMP_BARRIER_EXT_NAME,
                 ] {
                     assert_ne!(

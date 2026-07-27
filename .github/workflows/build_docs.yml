@@ -15,14 +15,8 @@ permissions:
   id-token: write
 
 env:
-  UV_VERSION: "0.9.7"
+  UV_VERSION: "0.11.15"
   UV_FROZEN: 1
-  # Path to the cached tket-c-api library
-  # When this envvar is set, the `./.github/actions/tket-c-api` action **must** be run to fetch the artifacts
-  # This config is not required, but speeds up the build by caching the tket-c-api library
-  # The alternative is to install conan and remove the env var
-  TKET_C_API_PATH: "${{ github.workspace }}/tket-c-api"
-  LD_LIBRARY_PATH: ${{ github.workspace }}/tket-c-api/lib
 
 jobs:
   # Check if changes were made to the relevant files.
@@ -35,7 +29,7 @@ jobs:
     outputs:
       python: ${{ steps.filter.outputs.python || github.event_name != 'pull_request' }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/check-changes
         id: filter
   test:
@@ -44,17 +38,17 @@ jobs:
     if: ${{ needs.changes.outputs.python == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           submodules: true
 
-      - uses: extractions/setup-just@v3
+      - uses: extractions/setup-just@v4
         with:
           just-version: "1.40.0"
-      - name: Install tket-c-api library
-        uses: ./.github/actions/tket-c-api
+
+      - uses: quantinuum/hugrverse-env/install-hugrenv-action@main
         with:
-          install-path: ${{ env.TKET_C_API_PATH }}
+          packages: "tket"
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -67,7 +61,7 @@ jobs:
           just build-pydocs
 
       - name: Upload artifact.
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v5
         with:
           path: ./tket-py/docs/build
 
@@ -81,7 +75,7 @@ jobs:
     if: ${{ needs.changes.outputs.python == 'true' && github.event_name == 'push' }}
     steps:
       - name: Setup Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
       - name: Deploy to GitHub Pages.
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

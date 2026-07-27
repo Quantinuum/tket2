@@ -10,7 +10,7 @@ use hugr::{CircuitUnit, Hugr};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-use crate::extension::rotation::{rotation_type, RotationOp};
+use crate::extension::rotation::{RotationOp, rotation_type};
 use crate::{Circuit, TketOp};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -147,7 +147,7 @@ mod tests {
     #[test]
     #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     fn test_read_rep() {
-        let rep_map = load_representative_set("../test_files/h_rz_cxrepresentative_set.json");
+        let rep_map = load_representative_set("../test_files/eccs/h_rz_cxrepresentative_set.json");
 
         for c in rep_map.values().take(1) {
             println!("{}", c.dot_string());
@@ -157,7 +157,7 @@ mod tests {
     #[test]
     #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     fn test_read_complete() {
-        let _ecc = load_ecc_set("../test_files/h_rz_cxcomplete_ECC_set.json").unwrap();
+        let _ecc = load_ecc_set("../test_files/eccs/h_rz_cxcomplete_ECC_set.json").unwrap();
 
         // ecc.values()
         //     .flatten()

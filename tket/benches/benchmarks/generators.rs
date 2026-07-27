@@ -1,7 +1,7 @@
+use hugr::Hugr;
 use hugr::builder::{BuildError, CircuitBuilder, DFGBuilder, Dataflow, DataflowHugr};
 use hugr::extension::prelude::qb_t;
 use hugr::types::Signature;
-use hugr::Hugr;
 use tket::TketOp;
 
 /// Helper function for building circuits.

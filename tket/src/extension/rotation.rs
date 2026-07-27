@@ -1,12 +1,17 @@
-use hugr::builder::{BuildError, Dataflow};
-use hugr::extension::simple_op::{MakeOpDef, MakeRegisteredOp};
-use hugr::extension::{prelude::option_type, ExtensionId, Version};
-use hugr::ops::constant::{downcast_equal_consts, CustomConst, TryHash};
-use hugr::std_extensions::arithmetic::float_types::float64_type;
+use hugr::IncomingPort;
 use hugr::Wire;
+use hugr::builder::{BuildError, Dataflow};
+use hugr::extension::fold_out_row;
+use hugr::extension::prelude::const_some;
+use hugr::extension::simple_op::{MakeOpDef, MakeRegisteredOp};
+use hugr::extension::{ExtensionId, Version, prelude::option_type};
+use hugr::ops::Value;
+use hugr::ops::constant::{CustomConst, TryHash, downcast_equal_consts};
+use hugr::std_extensions::arithmetic::float_types::{ConstF64, float64_type};
+use hugr::utils::sorted_consts;
 use hugr::{
-    types::{ConstTypeError, CustomType, Signature, Type, TypeBound},
     Extension,
+    types::{ConstTypeError, CustomType, Signature, Type, TypeBound},
 };
 use smol_str::SmolStr;
 use std::f64::consts::PI;
@@ -113,7 +118,7 @@ impl CustomConst for ConstRotation {
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
-#[allow(missing_docs, non_camel_case_types)]
+#[expect(non_camel_case_types)]
 #[non_exhaustive]
 /// Rotation operations
 pub enum RotationOp {
@@ -148,16 +153,16 @@ impl MakeOpDef for RotationOp {
         let rotation_type = Type::new_extension(rotation_custom_type(extension_ref));
         match self {
             RotationOp::from_halfturns => Signature::new(
-                float64_type(),
-                Type::from(option_type(rotation_type.clone())),
+                [float64_type()],
+                [Type::from(option_type([rotation_type.clone()]))],
             ),
             RotationOp::from_halfturns_unchecked => {
-                Signature::new(float64_type(), rotation_type.clone())
+                Signature::new([float64_type()], [rotation_type.clone()])
             }
-            RotationOp::to_halfturns => Signature::new(rotation_type.clone(), float64_type()),
+            RotationOp::to_halfturns => Signature::new([rotation_type.clone()], [float64_type()]),
             RotationOp::radd => Signature::new(
                 vec![rotation_type.clone(), rotation_type.clone()],
-                rotation_type,
+                [rotation_type],
             ),
         }
         .into()
@@ -187,8 +192,49 @@ impl MakeOpDef for RotationOp {
         Arc::downgrade(&ROTATION_EXTENSION)
     }
 
-    // TODO constant folding
-    // https://github.com/CQCL/tket2/issues/405
+    // Constant folding for rotation ops
+    fn post_opdef(&self, def: &mut hugr::extension::OpDef) {
+        match self {
+            RotationOp::radd => {
+                def.set_constant_folder(|consts: &[(IncomingPort, Value)]| {
+                    let [a, b]: [&Value; 2] = sorted_consts(consts).try_into().ok()?;
+                    let a_rot = a.get_custom_value::<ConstRotation>()?;
+                    let b_rot = b.get_custom_value::<ConstRotation>()?;
+                    let sum = ConstRotation::new(a_rot.half_turns() + b_rot.half_turns()).ok()?;
+                    fold_out_row([Value::extension(sum)])
+                });
+            }
+
+            RotationOp::from_halfturns_unchecked => {
+                def.set_constant_folder(|consts: &[(IncomingPort, Value)]| {
+                    let (_, v) = consts.first()?;
+                    let f = v.get_custom_value::<ConstF64>()?;
+                    let rot = ConstRotation::new(f.value()).ok()?;
+                    fold_out_row([Value::extension(rot)])
+                });
+            }
+
+            // Since ConstF64 cannot be NaN or infinite,
+            // when folding a from_halfturns we always return `Some`.
+            RotationOp::from_halfturns => {
+                def.set_constant_folder(|consts: &[(IncomingPort, Value)]| {
+                    let (_, v) = consts.first()?;
+                    let f = v.get_custom_value::<ConstF64>()?;
+                    let rot = ConstRotation::new(f.value()).ok()?;
+                    let option_vale = const_some(Value::extension(rot));
+                    fold_out_row([option_vale])
+                });
+            }
+
+            RotationOp::to_halfturns => {
+                def.set_constant_folder(|consts: &[(IncomingPort, Value)]| {
+                    let (_, v) = consts.first()?;
+                    let rot = v.get_custom_value::<ConstRotation>()?;
+                    fold_out_row([Value::extension(ConstF64::new(rot.half_turns()))])
+                });
+            }
+        }
+    }
 }
 
 impl MakeRegisteredOp for RotationOp {
@@ -196,8 +242,8 @@ impl MakeRegisteredOp for RotationOp {
         ROTATION_EXTENSION_ID
     }
 
-    fn extension_ref(&self) -> Weak<Extension> {
-        Arc::downgrade(&ROTATION_EXTENSION)
+    fn extension_ref(&self) -> Arc<Extension> {
+        ROTATION_EXTENSION.clone()
     }
 }
 
@@ -291,8 +337,8 @@ mod test {
     #[test]
     fn test_builder() {
         let mut builder = DFGBuilder::new(Signature::new(
-            rotation_type(),
-            vec![Type::from(option_type(rotation_type())), rotation_type()],
+            [rotation_type()],
+            [Type::from(option_type([rotation_type()])), rotation_type()],
         ))
         .unwrap();
 
@@ -316,5 +362,109 @@ mod test {
         konst: ConstRotation,
     ) {
         assert_eq!(ConstRotation::new(konst.half_turns()), Ok(konst));
+    }
+
+    /// Helper: run constant folding for `op` given `consts`.
+    /// Returns `Some(values)` if the fold succeeded, `None` if the op declined to fold.
+    fn do_fold(op: RotationOp, consts: Vec<(IncomingPort, Value)>) -> Option<Vec<Value>> {
+        let ext_op = MakeRegisteredOp::to_extension_op(op).unwrap();
+        ext_op
+            .constant_fold(&consts)
+            .map(|r| r.into_iter().map(|(_, v)| v).collect())
+    }
+
+    #[rstest::rstest]
+    #[case(0.25, 0.5, 0.75)]
+    #[case(1.0, 0.0, 1.0)]
+    #[case(0.0, 0.0, 0.0)]
+    #[case(0.5, 0.5, 1.0)]
+    fn test_radd_fold(#[case] a: f64, #[case] b: f64, #[case] expected: f64) {
+        let consts = vec![
+            (
+                0usize.into(),
+                Value::extension(ConstRotation::new(a).unwrap()),
+            ),
+            (
+                1usize.into(),
+                Value::extension(ConstRotation::new(b).unwrap()),
+            ),
+        ];
+        let result = do_fold(RotationOp::radd, consts).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(
+            result[0]
+                .get_custom_value::<ConstRotation>()
+                .unwrap()
+                .half_turns(),
+            expected
+        );
+    }
+
+    #[test]
+    fn test_radd_no_fold() {
+        // Only one of two inputs is a constant: fold should be declined.
+        let consts = vec![(
+            0usize.into(),
+            Value::extension(ConstRotation::new(0.25).unwrap()),
+        )];
+        assert!(do_fold(RotationOp::radd, consts).is_none());
+    }
+
+    #[rstest::rstest]
+    #[case(0.25)]
+    #[case(1.0)]
+    #[case(0.0)]
+    fn test_to_halfturns_fold(#[case] val: f64) {
+        let consts = vec![(
+            0usize.into(),
+            Value::extension(ConstRotation::new(val).unwrap()),
+        )];
+        let result_checked = do_fold(RotationOp::to_halfturns, consts).unwrap();
+        assert_eq!(result_checked.len(), 1);
+        assert_eq!(
+            result_checked[0]
+                .get_custom_value::<ConstF64>()
+                .unwrap()
+                .value(),
+            val
+        );
+    }
+
+    #[test]
+    fn test_to_halfturns_no_fold() {
+        // Input is not a constant: fold should be declined.
+        let consts: Vec<(IncomingPort, Value)> = vec![];
+        assert!(do_fold(RotationOp::to_halfturns, consts).is_none());
+    }
+
+    #[rstest::rstest]
+    #[case(0.5)]
+    #[case(1.0)]
+    #[case(0.0)]
+    fn test_from_halfturns_fold(#[case] val: f64) {
+        let consts = vec![(0usize.into(), Value::extension(ConstF64::new(val)))];
+        let result_checked = do_fold(RotationOp::from_halfturns, consts.clone()).unwrap();
+        let result_unchecked = do_fold(RotationOp::from_halfturns_unchecked, consts).unwrap();
+        assert_eq!(result_checked.len(), 1);
+        assert_eq!(result_unchecked.len(), 1);
+        assert_eq!(
+            result_checked[0],
+            const_some(Value::extension(ConstRotation::new(val).unwrap()))
+        );
+        assert_eq!(
+            result_unchecked[0]
+                .get_custom_value::<ConstRotation>()
+                .unwrap()
+                .half_turns(),
+            val
+        );
+    }
+
+    #[test]
+    fn test_from_halfturns_no_fold() {
+        // Input is not a constant: fold should be declined.
+        let consts: Vec<(IncomingPort, Value)> = vec![];
+        assert!(do_fold(RotationOp::from_halfturns, consts.clone()).is_none());
+        assert!(do_fold(RotationOp::from_halfturns_unchecked, consts).is_none());
     }
 }

@@ -4,11 +4,10 @@ build-backend = "maturin"
 
 [dependency-groups]
 dev = [
-    "guppylang~=0.21.0",
     "pytest>=8.4.2",
     "pytest-snapshot~=0.9.0",
     "cibuildwheel>=2.23.2",
-    "tket-exts",              # remove after next guppy-internals release
+    "hugr~=0.16.0",
 ]
 
 [project]
@@ -39,13 +38,13 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
-version = "0.2.10" # updated by release-please
+version = "0.2.11" # updated by release-please
 
 [project.urls]
-repository = "https://github.com/CQCL/tket2/tree/main/qis-compiler"
+repository = "https://github.com/quantinuum/tket2/tree/main/qis-compiler"
 
 [tool.maturin]
-profile = "release"
+profile = "dev"
 features = ["py"]
 python-source = "python"
 manifest-path = "Cargo.toml"
@@ -81,72 +80,30 @@ cache-keys = [
     { file = "rust/**/*.rs" },
 ]
 
-[tool.uv.sources]
-guppylang = { git = "https://github.com/cqcl/guppylang.git", rev = "d5b4ca6", subdirectory = "guppylang" }
-tket-exts = { workspace = true }
-
 [tool.cibuildwheel]
 build = "cp310-*"
 build-frontend = "build[uv]; args: -C--profile=release"
 skip = "*-win32 *-manylinux_i686 *-musllinux*"
-manylinux-x86_64-image = "manylinux_2_28"
-manylinux-aarch64-image = "manylinux_2_28"
+manylinux-x86_64-image = "quay.io/pypa/manylinux_2_28_x86_64"
+manylinux-aarch64-image = "quay.io/pypa/manylinux_2_28_aarch64"
 
 before-test = "uv sync --only-dev --active"
 test-command = "pytest -vv {package}"
 
 [tool.cibuildwheel.linux.environment]
-PATH = '$HOME/.cargo/bin:/tmp/llvm/bin:$PATH'
-LLVM_SYS_140_PREFIX = '/tmp/llvm'
-environment-pass = ["CACHE_CARGO"]
+# we prepend /host to incoming paths because cibuildwheel mounts the host filesystem at /host.
+# this can ONLY be done if you know for sure that the libraries available at that directory on
+# the host are compatible with the build environment, e.g. manylinux compliant.
+PATH = '$HOME/.cargo/bin:/host${HUGRENV_PATH}/bin:$PATH'
+TKET_C_API_PATH = '/host${TKET_C_API_PATH}'
+LLVM_SYS_211_PREFIX = '/host${LLVM_SYS_211_PREFIX}'
 [tool.cibuildwheel.linux]
+environment-pass = ["HUGRENV_PATH", "TKET_C_API_PATH", "LLVM_SYS_211_PREFIX"]
 before-all = '''
     curl -sSf https://sh.rustup.rs | sh -s -- -y;
-    if ${CACHE_CARGO};
-    then
-        if [ -d /host/tmp/ci-cache/hugr-qis/.cargo ];
-        then
-            cp -r /host/tmp/ci-cache/hugr-qis/.cargo $HOME;
-        fi;
-        if [ -d /host/tmp/ci-cache/hugr-qis/target ];
-        then
-            cp -r /host/tmp/ci-cache/hugr-qis/target {package}
-        fi;
-    fi;
-    dnf install libffi-devel -y
-    mkdir -p /tmp/llvm;
-    if [ "$(uname -m)" = "x86_64" ];
-    then
-        curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-14.0.6/clang+llvm-14.0.6-x86_64-linux-gnu-rhel-8.4.tar.xz;
-        tar xf clang+llvm-14.0.6-x86_64-linux-gnu-rhel-8.4.tar.xz -C /tmp/llvm --strip-components=1;
-    else
-        dnf install ncurses-compat-libs ncurses-devel -y;
-        curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-14.0.6/clang+llvm-14.0.6-aarch64-linux-gnu.tar.xz
-        tar xf clang+llvm-14.0.6-aarch64-linux-gnu.tar.xz -C /tmp/llvm --strip-components=1;
-    fi;
+    dnf install -y --setopt=install_weak_deps=False libffi-devel gcc-toolset-13;
 '''
 before-test = '''
-    if ${CACHE_CARGO};
-    then
-        echo "Copying cache to the host"
-
-        mkdir -p /host/tmp/ci-cache/hugr-qis;
-
-        if [ -d $HOME/.cargo ];
-        then
-            rm -rf /host/tmp/ci-cache/hugr-qis/.cargo;
-            cp -r $HOME/.cargo /host/tmp/ci-cache/hugr-qis/;
-        fi;
-
-        if [ -d {package}/target ];
-        then
-            rm -rf /host/tmp/ci-cache/hugr-qis/target;
-            cp -r {package}/target /host/tmp/ci-cache/hugr-qis;
-        fi;
-
-        # make sure the cache is readable by the host
-        chmod -R a+rX /host/tmp/ci-cache/hugr-qis
-    fi
     uv sync --only-dev --active
 '''
 repair-wheel-command = [
@@ -155,31 +112,19 @@ repair-wheel-command = [
 ]
 
 [tool.cibuildwheel.macos.environment]
-PATH = '/tmp/llvm:$PATH'
-LLVM_SYS_140_PREFIX = '/tmp/llvm'
-MACOSX_DEPLOYMENT_TARGET = "13.2"
+PATH = '$HOME/.cargo/bin:${HUGRENV_PATH}/bin:$PATH'
+MACOSX_DEPLOYMENT_TARGET = "15.0"
 [tool.cibuildwheel.macos]
-before-all = [
-    'curl -sSf https://sh.rustup.rs | sh -s -- -y',
-    'if [ "$(uname -m)" = "arm64" ]; then ARCH_PREFIX=arm64-apple-darwin22.3.0; else ARCH_PREFIX=x86_64-apple-darwin; fi',
-    'curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-14.0.6/clang+llvm-14.0.6-$ARCH_PREFIX.tar.xz',
-    'mkdir -p /tmp/llvm',
-    'tar xf clang+llvm-14.0.6-$ARCH_PREFIX.tar.xz -C /tmp/llvm --strip-components=1',
-]
+before-all = ['curl -sSf https://sh.rustup.rs | sh -s -- -y']
 repair-wheel-command = [
-    'DYLD_LIBRARY_PATH=/tmp/llvm/lib delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel}',
+    'DYLD_FALLBACK_LIBRARY_PATH=${LLVM_SYS_211_PREFIX}/lib delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel}',
     'uvx abi3audit --strict --report {wheel}',
 ]
 
 [tool.cibuildwheel.windows.environment]
-PATH = 'C:\\LLVM\\bin;$PATH'
-LLVM_SYS_140_PREFIX = 'C:\\LLVM'
+PATH = '${HUGRENV_PATH}\\bin;$PATH'
 [tool.cibuildwheel.windows]
-before-all = [
-    'rustup update',
-    'curl -LO https://github.com/PLC-lang/llvm-package-windows/releases/download/v14.0.6/LLVM-14.0.6-win64.7z',
-    '7z x LLVM-14.0.6-win64.7z "-oC:\LLVM" -y',
-]
+before-all = ['rustup update']
 repair-wheel-command = [
     'uvx delvewheel repair -w {dest_dir} {wheel}',
     'uvx abi3audit --strict --report {wheel}',

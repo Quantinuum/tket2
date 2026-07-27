@@ -9,9 +9,9 @@ patterns in TK1 JSON format.
 
 ### Example use
 To generate the circuit matcher that corresponds to the ECC stored in
-`../test_files/T_Tdg_H_X_CX_complete_ECC_set.json`, run the following command
+`../test_files/eccs/T_Tdg_H_X_CX_complete_ECC_set.json`, run the following command
 from this folder:
 ```
-cargo run -- -i test_files/T_Tdg_H_X_CX_complete_ECC_set.json
+cargo run -- -i test_files/eccs/T_Tdg_H_X_CX_complete_ECC_set.json
 ```
 This will generate a file called `matcher.bin` in this folder. See `cargo run -- -h` for more information.

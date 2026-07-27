@@ -7,22 +7,20 @@
 use std::collections::{BTreeSet, VecDeque};
 use std::{cmp, iter};
 
+use crate::Circuit;
 use crate::resource::flow::{DefaultResourceFlow, ResourceFlow};
 use crate::resource::types::{CircuitUnit, PortMap};
 use crate::utils::type_is_linear;
-use crate::Circuit;
 use hugr::core::HugrNode;
-use hugr::hugr::views::sibling_subgraph::InvalidSubgraph;
 use hugr::hugr::views::SiblingSubgraph;
+use hugr::hugr::views::sibling_subgraph::InvalidSubgraph;
 use hugr::ops::OpTrait;
 use hugr::types::Signature;
 use hugr::{Direction, HugrView, IncomingPort, OutgoingPort, Port, PortIndex, Wire};
-use hugr_core::hugr::internal::PortgraphNodeMap;
-use indexmap::map::Entry;
 use indexmap::IndexMap;
+use indexmap::map::Entry;
 use itertools::Itertools;
-use portgraph::algorithms::{toposort, TopoSort};
-use portgraph::view::{FilteredGraph, NodeFilter, NodeFiltered};
+use petgraph::visit::{NodeFiltered, Topo, Walker};
 
 use super::{Position, ResourceAllocator, ResourceId};
 
@@ -592,26 +590,12 @@ fn toposort_subgraph<'h, H: HugrView>(
     subgraph: &'h SiblingSubgraph<H::Node>,
     sources: impl IntoIterator<Item = H::Node>,
 ) -> Vec<H::Node> {
-    fn contains_node(node: portgraph::NodeIndex, nodes: &&BTreeSet<portgraph::NodeIndex>) -> bool {
-        nodes.contains(&node)
-    }
+    let sg = hugr.scheduling_graph(subgraph.get_parent(hugr));
+    let subgraph_nodes: BTreeSet<_> = subgraph.nodes().iter().map(|&n| sg.node_to_pg(n)).collect();
 
-    let (pg, pg_map) = hugr.region_portgraph(subgraph.get_parent(hugr));
-    let subgraph_nodes: BTreeSet<_> = subgraph
-        .nodes()
-        .iter()
-        .map(|&n| pg_map.to_portgraph(n))
-        .collect();
-
-    let pg: NodeFiltered<_, NodeFilter<_>, _> =
-        FilteredGraph::new(&pg, contains_node, |_, _| true, &subgraph_nodes);
-    let topo: TopoSort<_> = toposort(
-        pg,
-        sources.into_iter().map(|n| pg_map.to_portgraph(n)),
-        Direction::Outgoing,
-    );
-
-    topo.map(|n| pg_map.from_portgraph(n)).collect()
+    let pg = NodeFiltered::from_fn(sg.petgraph(), |node| subgraph_nodes.contains(&node));
+    let t = Topo::with_initials(&pg, sources.into_iter().map(|n| sg.node_to_pg(n)));
+    t.iter(&pg).map(|n| sg.pg_to_node(n)).collect()
 }
 
 #[cfg(test)]
@@ -627,9 +611,9 @@ pub(crate) mod tests {
 
     use super::{CircuitUnit, ResourceScope};
     use crate::{
+        TketOp,
         resource::{Position, ResourceId},
         utils::build_simple_circuit,
-        TketOp,
     };
 
     pub type PathEl<N> = (Position, N, Port);
@@ -694,16 +678,16 @@ pub(crate) mod tests {
                 writeln!(f, "  - {res:?}:")?;
                 let mut path = path.iter().peekable();
                 while let Some(&(pos, node, port)) = path.next() {
-                    if let Some(&&(next_pos, next_node, next_port)) = path.peek() {
-                        if next_node == node {
-                            debug_assert_eq!(pos, next_pos);
-                            path.next();
-                            let in_port = port.as_incoming().unwrap();
-                            let out_port = next_port.as_outgoing().unwrap();
-                            let op_desc = self.hugr.get_optype(node).description();
-                            writeln!(f, "    * {op_desc}({node:?}) [{in_port} -> {out_port}]",)?;
-                            continue;
-                        }
+                    if let Some(&&(next_pos, next_node, next_port)) = path.peek()
+                        && next_node == node
+                    {
+                        debug_assert_eq!(pos, next_pos);
+                        path.next();
+                        let in_port = port.as_incoming().unwrap();
+                        let out_port = next_port.as_outgoing().unwrap();
+                        let op_desc = self.hugr.get_optype(node).description();
+                        writeln!(f, "    * {op_desc}({node:?}) [{in_port} -> {out_port}]",)?;
+                        continue;
                     }
                     writeln!(f, "    * {node:?}@{} [{port}]", pos.to_f64(2))?;
                 }

@@ -6,14 +6,14 @@
 use std::sync::{Arc, Weak};
 
 use hugr::{
+    Extension, Wire,
     builder::{BuildError, Dataflow},
     extension::{
-        simple_op::{try_from_name, MakeOpDef, MakeRegisteredOp},
         ExtensionBuildError, ExtensionId, SignatureFunc, TypeDef, Version,
+        simple_op::{MakeOpDef, MakeRegisteredOp, try_from_name},
     },
     ops::constant::{CustomConst, ValueName},
     types::{CustomType, Signature, Type, TypeBound},
-    Extension, Wire,
 };
 use lazy_static::lazy_static;
 use smol_str::SmolStr;
@@ -112,18 +112,23 @@ impl CustomConst for ConstBool {
     IntoStaticStr,
     EnumString,
 )]
-#[allow(missing_docs, non_camel_case_types)]
+#[expect(non_camel_case_types)]
 #[non_exhaustive]
 /// Simple enum of "tket.bool" operations.
 pub enum BoolOp {
-    // Gets a Hugr bool_t value from the opaque type.
+    /// Gets a Hugr bool_t value from the opaque type.
     read,
-    // Converts a Hugr bool_t value into the opaque type.
+    /// Converts a Hugr bool_t value into the opaque type.
     make_opaque,
+    /// Equality between two tket.bools.
     eq,
+    /// Negation of a tket.bool.
     not,
+    /// Logical AND between two tket.bools.
     and,
+    /// Logical OR between two tket.bools.
     or,
+    /// Logical XOR between two tket.bools.
     xor,
 }
 
@@ -136,14 +141,12 @@ impl MakeOpDef for BoolOp {
         let bool_type = Type::new_extension(bool_custom_type(extension_ref));
         let sum_type = Type::new_unit_sum(2);
         match self {
-            BoolOp::read => Signature::new(bool_type, sum_type).into(),
-            BoolOp::make_opaque => Signature::new(sum_type, bool_type).into(),
-            BoolOp::not => Signature::new(bool_type.clone(), bool_type.clone()).into(),
-            BoolOp::eq | BoolOp::and | BoolOp::or | BoolOp::xor => Signature::new(
-                vec![bool_type.clone(), bool_type.clone()],
-                bool_type.clone(),
-            )
-            .into(),
+            BoolOp::read => Signature::new([bool_type], [sum_type]).into(),
+            BoolOp::make_opaque => Signature::new([sum_type], [bool_type]).into(),
+            BoolOp::not => Signature::new([bool_type.clone()], [bool_type.clone()]).into(),
+            BoolOp::eq | BoolOp::and | BoolOp::or | BoolOp::xor => {
+                Signature::new([bool_type.clone(), bool_type.clone()], [bool_type.clone()]).into()
+            }
         }
     }
 
@@ -179,8 +182,8 @@ impl MakeRegisteredOp for BoolOp {
         BOOL_EXTENSION_ID
     }
 
-    fn extension_ref(&self) -> Weak<Extension> {
-        Arc::downgrade(&BOOL_EXTENSION)
+    fn extension_ref(&self) -> Arc<Extension> {
+        BOOL_EXTENSION.clone()
     }
 }
 /// An extension trait for [Dataflow] providing methods to add "tket.bool"
@@ -244,7 +247,7 @@ pub(crate) mod test {
     use hugr::HugrView;
     use hugr::{
         builder::{DFGBuilder, Dataflow, DataflowHugr},
-        extension::{simple_op::MakeExtensionOp, OpDef},
+        extension::{OpDef, simple_op::MakeExtensionOp},
     };
     use strum::IntoEnumIterator;
 
@@ -282,7 +285,7 @@ pub(crate) mod test {
         let sum_type = Type::new_unit_sum(2);
 
         let hugr = {
-            let mut builder = DFGBuilder::new(Signature::new(bool_type, sum_type)).unwrap();
+            let mut builder = DFGBuilder::new(Signature::new([bool_type], [sum_type])).unwrap();
             let [input] = builder.input_wires_arr();
             let output = builder.add_bool_read(input).unwrap();
             builder.finish_hugr_with_outputs(output).unwrap()
@@ -296,7 +299,7 @@ pub(crate) mod test {
         let sum_type = Type::new_unit_sum(2);
 
         let hugr = {
-            let mut builder = DFGBuilder::new(Signature::new(sum_type, bool_type)).unwrap();
+            let mut builder = DFGBuilder::new(Signature::new([sum_type], [bool_type])).unwrap();
             let [input] = builder.input_wires_arr();
             let output = builder.add_bool_make_opaque(input).unwrap();
             builder.finish_hugr_with_outputs(output).unwrap()

@@ -1,12 +1,12 @@
-//! Intermediate structure for encoding [`Circuit`]s into [`SerialCircuit`]s.
+//! Intermediate structure for encoding Hugrs into [`SerialCircuit`]s.
 
 mod unit_generator;
 mod unsupported_tracker;
 mod value_tracker;
 
 use hugr::core::HugrNode;
-use hugr_core::hugr::internal::PortgraphNodeMap;
 use tket_json_rs::clexpr::InputClRegister;
+use tket_json_rs::clexpr::operator::{ClArgument, ClOperator, ClTerminal, ClVariable};
 use tket_json_rs::opbox::BoxID;
 pub use value_tracker::{
     TrackedBit, TrackedParam, TrackedQubit, TrackedValue, TrackedValues, ValueTracker,
@@ -16,8 +16,7 @@ use hugr::ops::{OpTrait, OpType};
 use hugr::types::EdgeKind;
 
 use std::borrow::Cow;
-use std::collections::{BTreeSet, HashMap};
-use std::ops::RangeTo;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
 
 use hugr::{Direction, HugrView, OutgoingPort, Wire};
@@ -26,18 +25,16 @@ use tket_json_rs::circuit_json::{self, SerialCircuit};
 use unsupported_tracker::UnsupportedTracker;
 
 use super::opaque::OpaqueSubgraphs;
-use super::{
-    PytketEncodeError, PytketEncodeOpError, METADATA_OPGROUP, METADATA_PHASE, METADATA_Q_REGISTERS,
+use super::{PytketEncodeError, PytketEncodeOpError};
+use crate::metadata;
+use crate::serialize::pytket::circuit::{
+    AdditionalNodesAndWires, AdditionalSubgraph, EncodedCircuitInfo,
 };
-use crate::circuit::Circuit;
-use crate::serialize::pytket::circuit::{AdditionalNodesAndWires, EncodedCircuitInfo};
 use crate::serialize::pytket::config::PytketEncoderConfig;
 use crate::serialize::pytket::extension::RegisterCount;
-use crate::serialize::pytket::opaque::{
-    OpaqueSubgraph, OpaqueSubgraphPayload, OPGROUP_OPAQUE_HUGR,
-};
+use crate::serialize::pytket::opaque::{OpaqueSubgraph, OpaqueSubgraphPayload};
 
-/// The state of an in-progress [`SerialCircuit`] being built from a [`Circuit`].
+/// The state of an in-progress [`SerialCircuit`] being built from a Hugr.
 #[derive(derive_more::Debug)]
 #[debug(bounds(H: HugrView))]
 pub struct PytketEncoderContext<H: HugrView> {
@@ -58,6 +55,11 @@ pub struct PytketEncoderContext<H: HugrView> {
     unsupported: UnsupportedTracker<H::Node>,
     /// A registry of already-encoded opaque subgraphs.
     opaque_subgraphs: OpaqueSubgraphs<H::Node>,
+    /// Subgraphs in `opaque_subgraphs` that could not be emitted as opaque
+    /// barriers, and must be stored in the [`EncodedCircuitInfo`] instead when
+    /// finishing the encoding. Identified by their
+    /// [`super::opaque::SubgraphId`] in `opaque_subgraphs`.
+    non_emitted_subgraphs: Vec<AdditionalSubgraph>,
     /// Configuration for the encoding.
     ///
     /// Contains custom operation/type/const emitters.
@@ -70,7 +72,7 @@ pub struct PytketEncoderContext<H: HugrView> {
 ///
 /// Mostly related to qubit/bit/parameter reuse.
 #[derive(Default)]
-#[allow(clippy::type_complexity)]
+#[expect(clippy::type_complexity)]
 pub struct EmitCommandOptions<'a> {
     /// A function returning a list of input qubits to reuse in the output.
     /// Any additional required qubits IDs will be freshly generated.
@@ -143,41 +145,45 @@ impl<'a> EmitCommandOptions<'a> {
 }
 
 impl<H: HugrView> PytketEncoderContext<H> {
-    /// Create a new [`PytketEncoderContext`] from a [`Circuit`].
+    /// Create a new [`PytketEncoderContext`] from a Hugr.
     ///
     /// # Arguments
     ///
-    /// - `circ`: The circuit to encode.
+    /// - `hugr`: The Hugr to encode.
     /// - `region`: The region of the circuit to encode.
     /// - `opaque_subgraphs`: The opaque subgraphs registry to use.
     /// - `config`: The configuration for the encoder.
     pub(super) fn new(
-        circ: &Circuit<H>,
+        hugr: &H,
         region: H::Node,
         opaque_subgraphs: OpaqueSubgraphs<H::Node>,
         config: impl Into<Arc<PytketEncoderConfig<H>>>,
     ) -> Result<Self, PytketEncodeError<H::Node>> {
         let config: Arc<PytketEncoderConfig<H>> = config.into();
 
-        let hugr = circ.hugr();
-        let name = Circuit::new(hugr.with_entrypoint(region))
-            .name()
-            .map(str::to_string)
-            .filter(|s| !s.is_empty());
+        // If the function name is empty, do not set the pytket circuit name.
+        let fn_name = match hugr.get_optype(region) {
+            OpType::FuncDefn(f) => Some(f.func_name()),
+            OpType::FuncDecl(f) => Some(f.func_name()),
+            _ => None,
+        }
+        .filter(|name| !name.is_empty())
+        .cloned();
 
         // Recover other parameters stored in the metadata
-        let phase = match hugr.get_metadata(region, METADATA_PHASE) {
-            Some(p) => p.as_str().unwrap().to_string(),
+        let phase = match hugr.get_metadata::<metadata::PytketPhaseExpr>(region) {
+            Some(p) => p.to_string(),
             None => "0".to_string(),
         };
 
         Ok(Self {
-            name,
+            name: fn_name,
             phase,
             commands: vec![],
-            values: ValueTracker::new(circ, region, &config)?,
-            unsupported: UnsupportedTracker::new(circ),
+            values: ValueTracker::new(hugr, region, &config)?,
+            unsupported: UnsupportedTracker::new(hugr),
             opaque_subgraphs,
+            non_emitted_subgraphs: vec![],
             config,
             function_cache: Arc::new(RwLock::new(HashMap::new())),
         })
@@ -189,11 +195,11 @@ impl<H: HugrView> PytketEncoderContext<H> {
     /// Returns the final [`SerialCircuit`] if successful.
     pub(super) fn run_encoder(
         &mut self,
-        circ: &Circuit<H>,
+        hugr: &H,
         region: H::Node,
     ) -> Result<(), PytketEncodeError<H::Node>> {
         // When encoding a function, mark it as being encoded to detect recursive calls.
-        if circ.hugr().get_parent(region) == Some(circ.hugr().module_root()) {
+        if hugr.get_parent(region) == Some(hugr.module_root()) {
             let Ok(mut cache) = self.function_cache.write() else {
                 // If the cache is poisoned, some thread has panicked while holding the lock.
                 return Err(PytketEncodeError::custom("Detected encoder worker panic."));
@@ -201,14 +207,14 @@ impl<H: HugrView> PytketEncoderContext<H> {
             cache.insert(region, CachedEncodedFunction::InEncodingStack);
         }
 
-        let (region, node_map) = circ.hugr().region_portgraph(region);
+        let sg = hugr.scheduling_graph(region);
         // TODO: Use weighted topological sort to try and explore unsupported
         // ops first (that is, ops with no available emitter in `self.config`),
         // to ensure we group them as much as possible.
-        let mut topo = petgraph::visit::Topo::new(&region);
-        while let Some(pg_node) = topo.next(&region) {
-            let node = node_map.from_portgraph(pg_node);
-            self.try_encode_node(node, circ)?;
+        let mut topo = petgraph::visit::Topo::new(sg.petgraph());
+        while let Some(pg_node) = topo.next(sg.petgraph()) {
+            let node = sg.pg_to_node(pg_node);
+            self.try_encode_node(node, hugr)?;
         }
         Ok(())
     }
@@ -222,36 +228,17 @@ impl<H: HugrView> PytketEncoderContext<H> {
     #[expect(clippy::type_complexity)]
     pub(super) fn finish(
         mut self,
-        circ: &Circuit<H>,
+        hugr: &H,
         region: H::Node,
     ) -> Result<(EncodedCircuitInfo, OpaqueSubgraphs<H::Node>), PytketEncodeError<H::Node>> {
         // Add any remaining unsupported nodes
-        let mut extra_subgraph: Option<BTreeSet<H::Node>> = None;
-        let mut extra_subgraph_params = Vec::new();
         while !self.unsupported.is_empty() {
             let node = self.unsupported.iter().next().unwrap();
-            let opaque_subgraphs = self.unsupported.extract_component(node, circ.hugr())?;
-            match self.emit_unsupported(&opaque_subgraphs, circ) {
-                Ok(()) => (),
-                Err(PytketEncodeError::UnsupportedSubgraphHasNoRegisters { params }) => {
-                    // We'll store the nodes in the `extra_subgraph` field of the `EncodedCircuitInfo`.
-                    // So the decoder can reconstruct the original subgraph.
-                    extra_subgraph
-                        .get_or_insert_default()
-                        .extend(opaque_subgraphs.nodes().iter().cloned());
-                    extra_subgraph_params.extend(params);
-                }
-                Err(e) => return Err(e),
-            }
+            let opaque_subgraphs = self.unsupported.extract_component(node, hugr)?;
+            self.emit_unsupported(&opaque_subgraphs, hugr)?;
         }
-        let extra_subgraph = extra_subgraph
-            .map(|nodes| -> Result<_, PytketEncodeError<H::Node>> {
-                let subgraph = OpaqueSubgraph::try_from_nodes(nodes, circ.hugr())?;
-                Ok(self.opaque_subgraphs.register_opaque_subgraph(subgraph))
-            })
-            .transpose()?;
 
-        let tracker_result = self.values.finish(circ, region)?;
+        let tracker_result = self.values.finish(hugr, region)?;
 
         let mut ser = SerialCircuit::new(self.name, self.phase);
 
@@ -266,10 +253,11 @@ impl<H: HugrView> PytketEncoderContext<H> {
             input_params: tracker_result.input_params,
             output_params: tracker_result.params,
             additional_nodes_and_wires: AdditionalNodesAndWires {
-                extra_subgraph,
-                extra_subgraph_params,
+                additional_subgraphs: self.non_emitted_subgraphs,
                 straight_through_wires: tracker_result.straight_through_wires,
             },
+            output_qubits: tracker_result.qubit_outputs,
+            output_bits: tracker_result.bit_outputs,
         };
 
         Ok((info, self.opaque_subgraphs))
@@ -301,7 +289,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
     pub fn get_wire_values(
         &mut self,
         wire: Wire<H::Node>,
-        circ: &Circuit<H>,
+        hugr: &H,
     ) -> Result<Cow<'_, [TrackedValue]>, PytketEncodeError<H::Node>> {
         if self.values.peek_wire_values(wire).is_some() {
             return Ok(self.values.wire_values(wire).unwrap());
@@ -312,12 +300,10 @@ impl<H: HugrView> PytketEncoderContext<H> {
         //
         // We need to emit the unsupported node here before returning the values.
         if self.unsupported.is_unsupported(wire.node()) {
-            let unsupported_nodes = self
-                .unsupported
-                .extract_component(wire.node(), circ.hugr())?;
-            self.emit_unsupported(&unsupported_nodes, circ)?;
+            let unsupported_nodes = self.unsupported.extract_component(wire.node(), hugr)?;
+            self.emit_unsupported(&unsupported_nodes, hugr)?;
             debug_assert!(!self.unsupported.is_unsupported(wire.node()));
-            return self.get_wire_values(wire, circ);
+            return self.get_wire_values(wire, hugr);
         }
 
         Err(PytketEncodeOpError::WireHasNoValues { wire }.into())
@@ -346,9 +332,9 @@ impl<H: HugrView> PytketEncoderContext<H> {
     pub fn get_input_values(
         &mut self,
         node: H::Node,
-        circ: &Circuit<H>,
+        hugr: &H,
     ) -> Result<TrackedValues, PytketEncodeError<H::Node>> {
-        self.get_input_values_internal(node, circ, |_| true)?
+        self.get_input_values_internal(node, hugr, |_| true)?
             .try_into_tracked_values()
     }
 
@@ -360,22 +346,21 @@ impl<H: HugrView> PytketEncoderContext<H> {
     fn get_input_values_internal(
         &mut self,
         node: H::Node,
-        circ: &Circuit<H>,
+        hugr: &H,
         wire_filter: impl Fn(Wire<H::Node>) -> bool,
     ) -> Result<NodeInputValues<H::Node>, PytketEncodeError<H::Node>> {
         let mut tracked_values = TrackedValues::default();
         let mut unknown_values = Vec::new();
 
-        let optype = circ.hugr().get_optype(node);
+        let optype = hugr.get_optype(node);
         let other_input_port = optype.other_input_port();
-        for input in circ.hugr().node_inputs(node) {
+        for input in hugr.node_inputs(node) {
             // Ignore order edges.
             if Some(input) == other_input_port {
                 continue;
             }
             // Dataflow ports should have a single linked neighbour.
-            let (neigh, neigh_out) = circ
-                .hugr()
+            let (neigh, neigh_out) = hugr
                 .single_linked_output(node, input)
                 .expect("Dataflow input port should have a single neighbour");
             let wire = Wire::new(neigh, neigh_out);
@@ -383,7 +368,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
                 continue;
             }
 
-            match self.get_wire_values(wire, circ) {
+            match self.get_wire_values(wire, hugr) {
                 Ok(values) => tracked_values.extend(values.iter().copied()),
                 Err(PytketEncodeError::OpEncoding(PytketEncodeOpError::WireHasNoValues {
                     wire,
@@ -417,10 +402,10 @@ impl<H: HugrView> PytketEncoderContext<H> {
         &mut self,
         pytket_optype: tket_json_rs::OpType,
         node: H::Node,
-        circ: &Circuit<H>,
+        hugr: &H,
         options: EmitCommandOptions,
     ) -> Result<(), PytketEncodeError<H::Node>> {
-        self.emit_node_command(node, circ, options, move |inputs| {
+        self.emit_node_command(node, hugr, options, move |inputs| {
             make_tk1_operation(pytket_optype, inputs)
         })
     }
@@ -450,15 +435,15 @@ impl<H: HugrView> PytketEncoderContext<H> {
     pub fn emit_node_command(
         &mut self,
         node: H::Node,
-        circ: &Circuit<H>,
+        hugr: &H,
         options: EmitCommandOptions,
-        make_operation: impl FnOnce(MakeOperationArgs<'_>) -> tket_json_rs::circuit_json::Operation,
+        make_operation: impl FnOnce(MakeOperationArgs<'_>) -> circuit_json::Operation,
     ) -> Result<(), PytketEncodeError<H::Node>> {
         let TrackedValues {
             mut qubits,
             mut bits,
             params,
-        } = self.get_input_values(node, circ)?;
+        } = self.get_input_values(node, hugr)?;
         let params: Vec<String> = params
             .into_iter()
             .map(|p| self.values.param_expression(p).to_owned())
@@ -468,15 +453,13 @@ impl<H: HugrView> PytketEncoderContext<H> {
         //
         // We preserve the order of linear values in the input.
         let new_outputs =
-            self.register_node_outputs(node, circ, &qubits, &bits, &params, options, |_| true)?;
+            self.register_node_outputs(node, hugr, &qubits, &bits, &params, options, |_| true)?;
         qubits.extend(new_outputs.qubits);
         bits.extend(new_outputs.bits);
 
         // Preserve the pytket opgroup, if it got stored in the metadata.
-        let opgroup: Option<String> = circ
-            .hugr()
-            .get_metadata(node, METADATA_OPGROUP)
-            .and_then(serde_json::Value::as_str)
+        let opgroup: Option<String> = hugr
+            .get_metadata::<metadata::PytketOpGroup>(node)
             .map(ToString::to_string);
 
         let args = MakeOperationArgs {
@@ -515,11 +498,11 @@ impl<H: HugrView> PytketEncoderContext<H> {
     pub fn emit_transparent_node(
         &mut self,
         node: H::Node,
-        circ: &Circuit<H>,
+        hugr: &H,
         output_params: impl FnOnce(OutputParamArgs<'_>) -> Vec<String>,
     ) -> Result<(), PytketEncodeError<H::Node>> {
-        let input_values = self.get_input_values(node, circ)?;
-        let output_counts = self.node_output_values(node, circ)?;
+        let input_values = self.get_input_values(node, hugr)?;
+        let output_counts = self.node_output_values(node, hugr)?;
         let total_out_count: RegisterCount = output_counts.iter().map(|(_, c)| *c).sum();
 
         // Compute all the output parameters at once
@@ -537,7 +520,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
         if input_values.qubits.len() != total_out_count.qubits {
             return Err(PytketEncodeError::custom(format!(
                 "Mismatched number of input and output qubits while trying to emit a transparent operation for {}. We have {} inputs but {} outputs.",
-                circ.hugr().get_optype(node),
+                hugr.get_optype(node),
                 input_values.qubits.len(),
                 total_out_count.qubits,
             )));
@@ -545,7 +528,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
         if input_values.bits.len() != total_out_count.bits {
             return Err(PytketEncodeError::custom(format!(
                 "Mismatched number of input and output bits while trying to emit a transparent operation for {}. We have {} inputs but {} outputs.",
-                circ.hugr().get_optype(node),
+                hugr.get_optype(node),
                 input_values.bits.len(),
                 total_out_count.bits,
             )));
@@ -554,7 +537,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
             return Err(PytketEncodeError::custom(format!(
                 "Expected {} parameters in the input values for a {}, but got {}.",
                 total_out_count.params,
-                circ.hugr().get_optype(node),
+                hugr.get_optype(node),
                 out_params.len()
             )));
         }
@@ -570,7 +553,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
             for p in params.by_ref().take(count.params) {
                 values.push(self.values.new_param(p).into());
             }
-            self.values.register_wire(wire, values, circ)?;
+            self.values.register_wire(wire, values, hugr)?;
         }
 
         Ok(())
@@ -586,13 +569,12 @@ impl<H: HugrView> PytketEncoderContext<H> {
     fn emit_unsupported(
         &mut self,
         subgraph: &OpaqueSubgraph<H::Node>,
-        circ: &Circuit<H>,
+        hugr: &H,
     ) -> Result<(), PytketEncodeError<H::Node>> {
         // Encode a payload referencing the subgraph in the Hugr.
         let subgraph_id = self
             .opaque_subgraphs
             .register_opaque_subgraph(subgraph.clone());
-        let payload = OpaqueSubgraphPayload::new_external(subgraph_id);
 
         // Collects the input values for the subgraph.
         //
@@ -600,13 +582,12 @@ impl<H: HugrView> PytketEncoderContext<H> {
         // already-encoded nodes, and not from other unsupported nodes not in `unsupported_nodes`.
         let mut op_values = TrackedValues::default();
         for (node, port) in subgraph.incoming_ports().iter() {
-            let (neigh, neigh_out) = circ
-                .hugr()
+            let (neigh, neigh_out) = hugr
                 .single_linked_output(*node, *port)
                 .expect("Dataflow input port should have a single neighbour");
             let wire = Wire::new(neigh, neigh_out);
 
-            let Ok(tracked_values) = self.get_wire_values(wire, circ) else {
+            let Ok(tracked_values) = self.get_wire_values(wire, hugr) else {
                 // If the wire is not tracked, no need to consume it.
                 continue;
             };
@@ -617,6 +598,8 @@ impl<H: HugrView> PytketEncoderContext<H> {
             .into_iter()
             .map(|p| self.values.param_expression(p).to_owned())
             .collect();
+
+        let payload = OpaqueSubgraphPayload::new_external(subgraph_id, input_param_exprs.clone());
 
         // Update the values in the node's outputs, and extend `op_values` with
         // any new output values.
@@ -641,39 +624,47 @@ impl<H: HugrView> PytketEncoderContext<H> {
             let new_outputs = self.register_port_output(
                 *out_node,
                 *out_port,
-                circ,
+                hugr,
                 &mut out_qubits,
                 &mut out_bits,
                 &input_param_exprs,
                 |p| {
                     let range = out_param_count..out_param_count + p.expected_count;
                     out_param_count += p.expected_count;
-                    range.map(|i| format!("{subgraph_id}_out{i}")).collect_vec()
+                    range.map(|i| subgraph_id.output_parameter(i)).collect_vec()
                 },
             )?;
             op_values.append(new_outputs);
         }
 
         // Check that we have qubits or bits to attach the barrier command to.
-        //
-        // This should only fail when looking at the "leftover" unsupported nodes at the end of the decoding process.
         if op_values.qubits.is_empty() && op_values.bits.is_empty() {
-            return Err(PytketEncodeError::UnsupportedSubgraphHasNoRegisters {
+            // We cannot associate this subgraph to any qubit or bit register in
+            // the pytket circuit, so we'll store it in the
+            // [`AdditionalSubgraph`]s instead when finishing the encoding.
+            //
+            // That list contains a list of subgraphs so we don't need to do any
+            // additional handling, but if we preferred in the future we could
+            // instead merge a single list of nodes if we wanted.
+            self.non_emitted_subgraphs.push(AdditionalSubgraph {
+                id: subgraph_id,
                 params: input_param_exprs.clone(),
             });
+        } else {
+            // If there are registers to which to attach, emit it as a barrier command.
+
+            // Create the pytket operation, with an external reference to the subgraph.
+            let args = MakeOperationArgs {
+                num_qubits: op_values.qubits.len(),
+                num_bits: op_values.bits.len(),
+                params: Cow::Borrowed(&[]),
+            };
+            let mut pytket_op = make_tk1_operation(tket_json_rs::OpType::Barrier, args);
+            pytket_op.data = Some(serde_json::to_string(&payload).unwrap());
+
+            self.emit_command(pytket_op, &op_values.qubits, &op_values.bits, None);
         }
 
-        // Create pytket operation, and add the subcircuit as hugr
-        let args = MakeOperationArgs {
-            num_qubits: op_values.qubits.len(),
-            num_bits: op_values.bits.len(),
-            params: Cow::Borrowed(&input_param_exprs),
-        };
-        let mut pytket_op = make_tk1_operation(tket_json_rs::OpType::Barrier, args);
-        pytket_op.data = Some(serde_json::to_string(&payload).unwrap());
-
-        let opgroup = Some(OPGROUP_OPAQUE_HUGR.to_string());
-        self.emit_command(pytket_op, &op_values.qubits, &op_values.bits, opgroup);
         Ok(())
     }
 
@@ -703,7 +694,9 @@ impl<H: HugrView> PytketEncoderContext<H> {
     ///   Normally obtained from a HUGR node's inputs using
     ///   [`PytketEncoderContext::get_input_values`] or allocated via
     ///   [`ValueTracker::new_bit`].
-    /// - `opgroup`: A tket1 operation group identifier, if any.
+    /// - `opgroup`: A tket1 [operation group
+    ///   identifier](https://docs.quantinuum.com/tket/user-guide/manual/manual_circuit.html#modifying-operations-within-circuits),
+    ///   if any.
     pub fn emit_command(
         &mut self,
         pytket_op: circuit_json::Operation,
@@ -734,23 +727,23 @@ impl<H: HugrView> PytketEncoderContext<H> {
     fn emit_subcircuit(
         &mut self,
         node: H::Node,
-        circ: &Circuit<H>,
+        hugr: &H,
     ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
         let config = Arc::clone(&self.config);
 
         // Recursively encode the sub-graph.
         let opaque_subgraphs = std::mem::take(&mut self.opaque_subgraphs);
-        let mut subencoder = PytketEncoderContext::new(circ, node, opaque_subgraphs, config)?;
+        let mut subencoder = PytketEncoderContext::new(hugr, node, opaque_subgraphs, config)?;
         subencoder.function_cache = self.function_cache.clone();
-        subencoder.run_encoder(circ, node)?;
+        subencoder.run_encoder(hugr, node)?;
 
-        let (info, opaque_subgraphs) = subencoder.finish(circ, node)?;
+        let (info, opaque_subgraphs) = subencoder.finish(hugr, node)?;
         if !info.output_params.is_empty() {
             return Ok(EncodeStatus::Unsupported);
         }
         self.opaque_subgraphs = opaque_subgraphs;
 
-        self.emit_circ_box(node, info.serial_circuit, circ)?;
+        self.emit_circ_box(node, info.serial_circuit, hugr)?;
         Ok(EncodeStatus::Success)
     }
 
@@ -769,7 +762,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
         &mut self,
         node: H::Node,
         function: H::Node,
-        circ: &Circuit<H>,
+        hugr: &H,
     ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
         let cache = self.function_cache.read().ok();
         if let Some(encoded) = cache.as_ref().and_then(|c| c.get(&function)) {
@@ -777,7 +770,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
             drop(cache);
             match encoded {
                 CachedEncodedFunction::Encoded { serial_circuit } => {
-                    self.emit_circ_box(node, serial_circuit, circ)?;
+                    self.emit_circ_box(node, serial_circuit, hugr)?;
                     return Ok(EncodeStatus::Success);
                 }
                 CachedEncodedFunction::Unsupported | CachedEncodedFunction::InEncodingStack => {
@@ -791,10 +784,10 @@ impl<H: HugrView> PytketEncoderContext<H> {
         let config = Arc::clone(&self.config);
         let opaque_subgraphs = std::mem::take(&mut self.opaque_subgraphs);
         // Recursively encode the sub-graph.
-        let mut subencoder = PytketEncoderContext::new(circ, function, opaque_subgraphs, config)?;
+        let mut subencoder = PytketEncoderContext::new(hugr, function, opaque_subgraphs, config)?;
         subencoder.function_cache = self.function_cache.clone();
-        subencoder.run_encoder(circ, function)?;
-        let (info, opaque_subgraphs) = subencoder.finish(circ, function)?;
+        subencoder.run_encoder(hugr, function)?;
+        let (info, opaque_subgraphs) = subencoder.finish(hugr, function)?;
         self.opaque_subgraphs = opaque_subgraphs;
 
         let (result, cached_fn) = match info.output_params.is_empty() {
@@ -817,7 +810,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
         }
 
         if result == EncodeStatus::Success {
-            self.emit_circ_box(node, info.serial_circuit, circ)?;
+            self.emit_circ_box(node, info.serial_circuit, hugr)?;
         }
         Ok(result)
     }
@@ -827,11 +820,11 @@ impl<H: HugrView> PytketEncoderContext<H> {
         &mut self,
         node: H::Node,
         boxed_circuit: SerialCircuit,
-        circ: &Circuit<H>,
+        hugr: &H,
     ) -> Result<(), PytketEncodeError<H::Node>> {
         self.emit_node_command(
             node,
-            circ,
+            hugr,
             EmitCommandOptions::new().reuse_all_bits(),
             |args| {
                 let mut pytket_op = make_tk1_operation(tket_json_rs::OpType::CircBox, args);
@@ -857,16 +850,16 @@ impl<H: HugrView> PytketEncoderContext<H> {
     fn try_encode_node(
         &mut self,
         node: H::Node,
-        circ: &Circuit<H>,
+        hugr: &H,
     ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
-        let optype = circ.hugr().get_optype(node);
+        let optype = hugr.get_optype(node);
 
         // Try to register non-local inputs to nodes when possible (e.g.
         // constants, function definitions).
         //
         // Otherwise, mark the node as unsupported.
-        if self.encode_nonlocal_inputs(node, optype, circ)? == EncodeStatus::Unsupported {
-            self.unsupported.record_node(node, circ);
+        if self.encode_nonlocal_inputs(node, optype, hugr)? == EncodeStatus::Unsupported {
+            self.unsupported.record_node(node, hugr);
             return Ok(EncodeStatus::Unsupported);
         }
 
@@ -875,16 +868,15 @@ impl<H: HugrView> PytketEncoderContext<H> {
         // If none of the encoders can handle the operation, we just add it to
         // the unsupported tracker and move on.
         match optype {
-            OpType::ExtensionOp(op) => {
+            OpType::ExtensionOp(op)
                 // Ignore nodes with order edges, as they cannot be represented in the pytket circuit.
-                if !self.has_order_edges(node, optype, circ) {
+                if !self.has_order_edges(node, optype, hugr) => {
                     let config = Arc::clone(&self.config);
-                    if config.op_to_pytket(node, op, circ, self)? == EncodeStatus::Success {
+                    if config.op_to_pytket(node, op, hugr, self)? == EncodeStatus::Success {
                         return Ok(EncodeStatus::Success);
                     }
                 }
-            }
-            OpType::LoadConstant(constant) => {
+            OpType::LoadConstant(constant)
                 // If we are loading a supported type, emit a transparent node
                 // by reassigning the input values to the new outputs.
                 //
@@ -894,19 +886,28 @@ impl<H: HugrView> PytketEncoderContext<H> {
                     .config()
                     .type_to_pytket(constant.constant_type())
                     .is_some()
-                {
-                    self.emit_transparent_node(node, circ, |ps| ps.input_params.to_owned())?;
-                    return Ok(EncodeStatus::Success);
-                }
-            }
-            OpType::Const(op) => {
-                let config = Arc::clone(&self.config);
-                if self.config().type_to_pytket(&op.get_type()).is_some() {
-                    if let Some(values) = config.const_to_pytket(&op.value, self)? {
-                        let wire = Wire::new(node, 0);
-                        self.values.register_wire(wire, values.into_iter(), circ)?;
+                => {
+                    let (const_node, const_port) = hugr
+                        .single_linked_output(node, constant.constant_port())
+                        .expect("LoadConstant node must have a constant input");
+                    let const_wire = Wire::new(const_node, const_port);
+                    // Loading a constant is transparent only when the constant
+                    // value is supported an has already been registered.
+                    // Otherwise the load belongs to the same opaque subgraph as
+                    // its unsupported constant.
+                    if self.values.peek_wire_values(const_wire).is_some() {
+                        self.emit_transparent_node(node, hugr, |ps| ps.input_params.to_owned())?;
                         return Ok(EncodeStatus::Success);
                     }
+                }
+            OpType::Const(op) => {
+                let config = Arc::clone(&self.config);
+                if self.config().type_to_pytket(&op.get_type()).is_some()
+                    && let Some(values) = config.const_to_pytket(&op.value, self)?
+                {
+                    let wire = Wire::new(node, 0);
+                    self.values.register_wire(wire, values, hugr)?;
+                    return Ok(EncodeStatus::Success);
                 }
             }
             // TODO: DFG and function call emissions are temporarily disabled,
@@ -920,12 +921,11 @@ impl<H: HugrView> PytketEncoderContext<H> {
             /*
             OpType::DFG(_) => return self.emit_subcircuit(node, circ),
             OpType::Call(call) => {
-                let (fn_node, _) = circ
-                    .hugr()
+                let (fn_node, _) = hugr
                     .single_linked_output(node, call.called_function_port())
                     .expect("Function call must be linked to a function");
-                if circ.hugr().get_optype(fn_node).is_func_defn()
-                    && self.emit_function_call(node, fn_node, circ)? == EncodeStatus::Success
+                if hugr.get_optype(fn_node).is_func_defn()
+                    && self.emit_function_call(node, fn_node, hugr)? == EncodeStatus::Success
                 {
                     return Ok(EncodeStatus::Success);
                 }
@@ -938,7 +938,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
             _ => {}
         }
 
-        self.unsupported.record_node(node, circ);
+        self.unsupported.record_node(node, hugr);
         Ok(EncodeStatus::Unsupported)
     }
 
@@ -959,42 +959,40 @@ impl<H: HugrView> PytketEncoderContext<H> {
         &mut self,
         node: H::Node,
         optype: &OpType,
-        circ: &Circuit<H>,
+        hugr: &H,
     ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
-        let node_parent = circ.hugr().get_parent(node);
+        let node_parent = hugr.get_parent(node);
 
         // Explore the dataflow value and static inputs, but not the _other inputs_.
-        let input_ports = circ
-            .hugr()
+        let input_ports = hugr
             .node_inputs(node)
             .take(optype.value_input_count() + optype.static_input_port().is_some() as usize);
 
-        for (neigh, neigh_port) in input_ports.flat_map(|inp| circ.hugr().linked_outputs(node, inp))
-        {
+        for (neigh, neigh_port) in input_ports.flat_map(|inp| hugr.linked_outputs(node, inp)) {
             let wire = Wire::new(neigh, neigh_port);
             if self.values.peek_wire_values(wire).is_some() {
                 // Ignore inputs that already have registered values.
                 continue;
             }
 
-            let neigh_parent = circ.hugr().get_parent(neigh);
+            let neigh_parent = hugr.get_parent(neigh);
             if neigh_parent == node_parent {
                 continue;
             }
-            if neigh_parent != Some(circ.hugr().module_root()) {
+            if neigh_parent != Some(hugr.module_root()) {
                 // Non-global dataflow input, report as unsupported.
                 return Ok(EncodeStatus::Unsupported);
             }
-            let optype = circ.hugr().get_optype(neigh);
+            let optype = hugr.get_optype(neigh);
             match optype {
                 OpType::FuncDefn(_) | OpType::FuncDecl(_) => {
                     // Function definitions/declarations have special handling to be able to encode Call nodes.
                     // We register them here with an empty set of values (since function-typed wires do not carry pytket values).
                     self.values
-                        .register_wire::<TrackedValue>(wire, vec![], circ)?;
+                        .register_wire::<TrackedValue>(wire, vec![], hugr)?;
                 }
                 OpType::Const(_) => {
-                    if self.try_encode_node(neigh, circ)? == EncodeStatus::Unsupported {
+                    if self.try_encode_node(neigh, hugr)? == EncodeStatus::Unsupported {
                         return Ok(EncodeStatus::Unsupported);
                     }
                 }
@@ -1010,12 +1008,12 @@ impl<H: HugrView> PytketEncoderContext<H> {
     ///
     /// If that's the case, we don't try to encode the node and report it as
     /// unsupported instead.
-    fn has_order_edges(&mut self, node: H::Node, optype: &OpType, circ: &Circuit<H>) -> bool {
+    fn has_order_edges(&mut self, node: H::Node, optype: &OpType, hugr: &H) -> bool {
         optype
             .other_port(Direction::Incoming)
             .iter()
             .chain(optype.other_port(Direction::Outgoing).iter())
-            .any(|&p| circ.hugr().is_linked(node, p))
+            .any(|&p| hugr.is_linked(node, p))
     }
 
     /// Helper to register values for a node's output wires.
@@ -1033,18 +1031,18 @@ impl<H: HugrView> PytketEncoderContext<H> {
     ///   parameter expressions.
     /// - `wire_filter`: A function that takes a wire and returns true if the wire
     ///   at the output of the `node` should be registered.
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     fn register_node_outputs(
         &mut self,
         node: H::Node,
-        circ: &Circuit<H>,
+        hugr: &H,
         input_qubits: &[TrackedQubit],
         input_bits: &[TrackedBit],
         input_params: &[String],
         options: EmitCommandOptions,
         wire_filter: impl Fn(Wire<H::Node>) -> bool,
     ) -> Result<TrackedValues, PytketEncodeError<H::Node>> {
-        let output_counts = self.node_output_values(node, circ)?;
+        let output_counts = self.node_output_values(node, hugr)?;
         let total_out_count: RegisterCount = output_counts.iter().map(|(_, c)| *c).sum();
 
         let output_qubits = match options.reuse_qubits_fn {
@@ -1055,6 +1053,14 @@ impl<H: HugrView> PytketEncoderContext<H> {
             Some(f) => f(input_bits),
             None => input_bits.to_vec(),
         };
+
+        // Flag the input qubits that don't appear in the output as unused.
+        let used_qubits: HashSet<TrackedQubit> = output_qubits.iter().copied().collect();
+        for qb in input_qubits {
+            if !used_qubits.contains(qb) {
+                self.values.free_qubit(*qb);
+            }
+        }
 
         // Compute all the output parameters at once
         let out_params = match options.output_params_fn {
@@ -1070,7 +1076,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
             return Err(PytketEncodeError::custom(format!(
                 "Expected {} parameters in the input values for a {}, but got {}.",
                 total_out_count.params,
-                circ.hugr().get_optype(node),
+                hugr.get_optype(node),
                 out_params.len()
             )));
         }
@@ -1114,7 +1120,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
                 new_outputs.params.push(p);
                 out_wire_values.push(p.into());
             }
-            self.values.register_wire(wire, out_wire_values, circ)?;
+            self.values.register_wire(wire, out_wire_values, hugr)?;
         }
 
         Ok(new_outputs)
@@ -1141,12 +1147,12 @@ impl<H: HugrView> PytketEncoderContext<H> {
     /// - `input_params`: The list of input parameter expressions.
     /// - `options_params_fn`: A function that computes the output parameter
     ///   expressions given the inputs.
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     fn register_port_output(
         &mut self,
         node: H::Node,
         port: OutgoingPort,
-        circ: &Circuit<H>,
+        hugr: &H,
         qubits: &mut &[TrackedQubit],
         bits: &mut &[TrackedBit],
         input_params: &[String],
@@ -1154,8 +1160,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
     ) -> Result<TrackedValues, PytketEncodeError<H::Node>> {
         let wire = Wire::new(node, port);
 
-        let Some(ty) = circ
-            .hugr()
+        let Some(ty) = hugr
             .signature(node)
             .and_then(|s| s.out_port_type(port).cloned())
         else {
@@ -1179,7 +1184,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
             return Err(PytketEncodeError::custom(format!(
                 "Expected {} parameters in the input values for a {} at {port} of {node}, but got {}.",
                 count.params,
-                circ.hugr().get_optype(node),
+                hugr.get_optype(node),
                 out_params.len()
             )));
         }
@@ -1193,7 +1198,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
         // Qubits
         // Reuse the ones from `qubits`, dropping them from the slice,
         // and allocate new ones as needed.
-        let output_qubits = match split_off(qubits, ..count.qubits) {
+        let output_qubits = match qubits.split_off(..count.qubits) {
             Some(reused_qubits) => reused_qubits.to_vec(),
             None => {
                 // Not enough qubits, allocate some fresh ones.
@@ -1213,7 +1218,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
         // Bits
         // Reuse the ones from `bits`, dropping them from the slice,
         // and allocate new ones as needed.
-        let output_bits = match split_off(bits, ..count.bits) {
+        let output_bits = match bits.split_off(..count.bits) {
             Some(reused_bits) => reused_bits.to_vec(),
             None => {
                 // Not enough bits, allocate some fresh ones.
@@ -1236,24 +1241,24 @@ impl<H: HugrView> PytketEncoderContext<H> {
             new_outputs.params.push(p);
             out_wire_values.push(p.into());
         }
-        self.values.register_wire(wire, out_wire_values, circ)?;
+        self.values.register_wire(wire, out_wire_values, hugr)?;
 
         Ok(new_outputs)
     }
 
     /// Return the output wires of a node that have an associated pytket [`RegisterCount`].
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     fn node_output_values(
         &self,
         node: H::Node,
-        circ: &Circuit<H>,
+        hugr: &H,
     ) -> Result<Vec<(Wire<H::Node>, RegisterCount)>, PytketEncodeError<H::Node>> {
-        let op = circ.hugr().get_optype(node);
+        let op = hugr.get_optype(node);
         let signature = op.dataflow_signature();
         let static_output = op.static_output_port();
         let other_output = op.other_output_port();
-        let mut wire_counts = Vec::with_capacity(circ.hugr().num_outputs(node));
-        for out_port in circ.hugr().node_outputs(node) {
+        let mut wire_counts = Vec::with_capacity(hugr.num_outputs(node));
+        for out_port in hugr.node_outputs(node) {
             let ty = if Some(out_port) == other_output {
                 // Ignore order edges
                 continue;
@@ -1470,10 +1475,15 @@ pub fn make_tk1_classical_expression(
     bit_count: usize,
     output_bits: &[u32],
     registers: &[InputClRegister],
-    expression: tket_json_rs::clexpr::operator::ClOperator,
+    expression: ClOperator,
 ) -> tket_json_rs::circuit_json::Operation {
+    let mut bit_vars = Vec::new();
+    collect_clexpr_bit_vars(&expression, &mut bit_vars);
+    bit_vars.sort_unstable();
+    bit_vars.dedup();
+
     let mut clexpr = tket_json_rs::clexpr::ClExpr::default();
-    clexpr.bit_posn = (0..bit_count as u32).map(|i| (i, i)).collect();
+    clexpr.bit_posn = bit_vars.into_iter().map(|i| (i, i)).collect();
     clexpr.reg_posn = registers.to_vec();
     clexpr.output_posn = tket_json_rs::clexpr::ClRegisterBits(output_bits.to_vec());
     clexpr.expr = expression;
@@ -1488,13 +1498,21 @@ pub fn make_tk1_classical_expression(
     op
 }
 
-// TODO: Replace with array's `split_off` method once MSRV is ≥1.87
-fn split_off<'a, T>(slice: &mut &'a [T], range: RangeTo<usize>) -> Option<&'a [T]> {
-    let split_index = range.end;
-    if split_index > slice.len() {
-        return None;
+/// Collect the local bit variables referenced by a classical expression.
+///
+/// `ClExpr::bit_posn` describes variables used by the expression tree. Fresh
+/// output-only bits are listed in `output_posn`, but must not be declared as
+/// expression variables.
+fn collect_clexpr_bit_vars(expression: &ClOperator, bit_vars: &mut Vec<u32>) {
+    for arg in &expression.args {
+        match arg {
+            ClArgument::Terminal(ClTerminal::Variable(ClVariable::Bit { index })) => {
+                bit_vars.push(*index);
+            }
+            ClArgument::Expression(expression) => {
+                collect_clexpr_bit_vars(expression, bit_vars);
+            }
+            _ => {}
+        }
     }
-    let (front, back) = slice.split_at(split_index);
-    *slice = back;
-    Some(front)
 }

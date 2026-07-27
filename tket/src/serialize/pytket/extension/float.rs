@@ -1,18 +1,17 @@
 //! Encoder and decoder for floating point operations.
 
 use super::PytketEmitter;
+use crate::serialize::pytket::PytketEncodeError;
 use crate::serialize::pytket::config::TypeTranslatorSet;
 use crate::serialize::pytket::encoder::{EncodeStatus, PytketEncoderContext, TrackedValues};
 use crate::serialize::pytket::extension::{PytketTypeTranslator, RegisterCount};
-use crate::serialize::pytket::PytketEncodeError;
-use crate::Circuit;
-use hugr::extension::simple_op::MakeExtensionOp;
+use hugr::HugrView;
 use hugr::extension::ExtensionId;
-use hugr::ops::constant::OpaqueValue;
+use hugr::extension::simple_op::MakeExtensionOp;
 use hugr::ops::ExtensionOp;
+use hugr::ops::constant::OpaqueValue;
 use hugr::std_extensions::arithmetic::float_ops::FloatOps;
 use hugr::std_extensions::arithmetic::{float_ops, float_types};
-use hugr::HugrView;
 
 /// Encoder for [prelude](hugr::extension::prelude) operations.
 #[derive(Debug, Clone, Default)]
@@ -27,7 +26,7 @@ impl<H: HugrView> PytketEmitter<H> for FloatEmitter {
         &self,
         node: H::Node,
         op: &ExtensionOp,
-        circ: &Circuit<H>,
+        hugr: &H,
         encoder: &mut PytketEncoderContext<H>,
     ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
         let Ok(rot_op) = FloatOps::from_extension_op(op) else {
@@ -47,7 +46,7 @@ impl<H: HugrView> PytketEmitter<H> for FloatEmitter {
             | FloatOps::fmax
             | FloatOps::fmin
             | FloatOps::fabs => {
-                encoder.emit_transparent_node(node, circ, |ps| {
+                encoder.emit_transparent_node(node, hugr, |ps| {
                     match FloatEmitter::encode_rotation_op(&rot_op, ps.input_params) {
                         Some(s) => vec![s],
                         None => Vec::new(),

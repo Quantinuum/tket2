@@ -10,7 +10,9 @@ from tket_exts.tket.rotation import RotationExtension
 from tket_exts.tket.futures import FuturesExtension
 from tket_exts.tket.qsystem import (
     QSystemExtension,
+    QSystemHeliosExtension,
     QSystemRandomExtension,
+    QSystemSolExtension,
     QSystemUtilsExtension,
 )
 from tket_exts.tket.quantum import QuantumExtension
@@ -18,12 +20,12 @@ from tket_exts.tket.result import ResultExtension
 from tket_exts.tket.wasm import WasmExtension
 
 from typing_extensions import deprecated
-from hugr.ext import Extension
+from hugr.ext import Extension, ExtensionRegistry
 from tket_exts import tket
 
 # This is updated by our release-please workflow, triggered by this
 # annotation: x-release-please-version
-__version__ = "0.12.0"
+__version__ = "0.12.4"
 
 __all__ = [
     "bool",
@@ -33,6 +35,8 @@ __all__ = [
     "rotation",
     "futures",
     "qsystem",
+    "qsystem_helios",
+    "qsystem_sol",
     "qsystem_random",
     "qsystem_utils",
     "quantum",
@@ -48,6 +52,8 @@ gpu: GpuExtension = tket.gpu.GpuExtension()
 guppy: GuppyExtension = tket.guppy.GuppyExtension()
 rotation: RotationExtension = tket.rotation.RotationExtension()
 futures: FuturesExtension = tket.futures.FuturesExtension()
+qsystem_helios: QSystemHeliosExtension = tket.qsystem.QSystemHeliosExtension()
+qsystem_sol: QSystemSolExtension = tket.qsystem.QSystemSolExtension()
 qsystem: QSystemExtension = tket.qsystem.QSystemExtension()
 qsystem_random: QSystemRandomExtension = tket.qsystem.QSystemRandomExtension()
 qsystem_utils: QSystemUtilsExtension = tket.qsystem.QSystemUtilsExtension()
@@ -61,3 +67,36 @@ global_phase: GlobalPhaseExtension = tket.global_phase.GlobalPhaseExtension()
 @deprecated("Use tket_exts.bool() instead")
 def opaque_bool() -> Extension:
     return bool()
+
+
+def tket_registry() -> ExtensionRegistry:
+    """Returns an ExtensionRegistry containing all the tket extensions.
+
+    This can be used when loading a Hugr containing tket operations and types
+
+    Returns:
+        An ExtensionRegistry containing all the tket extensions.
+    """
+    tket_exts = [
+        tket.bool.BoolExtension(),
+        tket.debug.DebugExtension(),
+        tket.gpu.GpuExtension(),
+        tket.guppy.GuppyExtension(),
+        tket.rotation.RotationExtension(),
+        tket.futures.FuturesExtension(),
+        tket.qsystem.QSystemHeliosExtension(),
+        tket.qsystem.QSystemSolExtension(),
+        tket.qsystem.QSystemExtension(),
+        tket.qsystem.QSystemRandomExtension(),
+        tket.qsystem.QSystemUtilsExtension(),
+        tket.quantum.QuantumExtension(),
+        tket.result.ResultExtension(),
+        tket.wasm.WasmExtension(),
+        tket.modifier.ModifierExtension(),
+        tket.global_phase.GlobalPhaseExtension(),
+    ]
+
+    registry = ExtensionRegistry()
+    for ext in tket_exts:
+        registry.register(ext())
+    return registry

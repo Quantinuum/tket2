@@ -1,0 +1,36 @@
+---
+source: tket-qsystem/src/llvm/result.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+@res_test_arr_f.038B27BE.0 = private constant [27 x i8] c"\1AUSER:FLOATARR:test_arr_f64"
+
+define internal void @_hl.main.1({ ptr, i64 } %0) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %tag_len = load i8, ptr @res_test_arr_f.038B27BE.0, align 1
+  %tag_len2 = zext i8 %tag_len to i64
+  %array_ptr = extractvalue { ptr, i64 } %0, 0
+  %array_offset = extractvalue { ptr, i64 } %0, 1
+  %1 = getelementptr inbounds [10 x double], ptr %array_ptr, i64 %array_offset
+  %out_arr_alloca = alloca <{ i32, i32, ptr, ptr }>, align 8
+  %x_ptr = getelementptr inbounds nuw <{ i32, i32, ptr, ptr }>, ptr %out_arr_alloca, i32 0, i32 0
+  %y_ptr = getelementptr inbounds nuw <{ i32, i32, ptr, ptr }>, ptr %out_arr_alloca, i32 0, i32 1
+  %arr_ptr = getelementptr inbounds nuw <{ i32, i32, ptr, ptr }>, ptr %out_arr_alloca, i32 0, i32 2
+  %mask_ptr = getelementptr inbounds nuw <{ i32, i32, ptr, ptr }>, ptr %out_arr_alloca, i32 0, i32 3
+  %2 = alloca i1, i32 10, align 1
+  store [10 x i1] zeroinitializer, ptr %2, align 1
+  store i32 10, ptr %x_ptr, align 4
+  store i32 1, ptr %y_ptr, align 4
+  store ptr %1, ptr %arr_ptr, align 8
+  store ptr %2, ptr %mask_ptr, align 8
+  %3 = load <{ i32, i32, ptr, ptr }>, ptr %out_arr_alloca, align 1
+  call void @print_float_arr(ptr @res_test_arr_f.038B27BE.0, i64 %tag_len2, ptr %out_arr_alloca)
+  ret void
+}
+
+declare void @print_float_arr(ptr, i64, ptr)

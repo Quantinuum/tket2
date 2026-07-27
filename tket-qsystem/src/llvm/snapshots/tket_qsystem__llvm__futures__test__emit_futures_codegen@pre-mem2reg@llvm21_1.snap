@@ -1,0 +1,30 @@
+---
+source: tket-qsystem/src/llvm/futures.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define internal i1 @_hl.main.1(i64 %0) {
+alloca_block:
+  %"0" = alloca i1, align 1
+  %"2_0" = alloca i64, align 8
+  %"4_0" = alloca i1, align 1
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store i64 %0, ptr %"2_0", align 4
+  %"2_01" = load i64, ptr %"2_0", align 4
+  %read_bool = call i1 @___read_future_bool(i64 %"2_01")
+  call void @___dec_future_refcount(i64 %"2_01")
+  %measure = select i1 %read_bool, i1 true, i1 false
+  store i1 %measure, ptr %"4_0", align 1
+  %"4_02" = load i1, ptr %"4_0", align 1
+  store i1 %"4_02", ptr %"0", align 1
+  %"03" = load i1, ptr %"0", align 1
+  ret i1 %"03"
+}
+
+declare i1 @___read_future_bool(i64)
+
+declare void @___dec_future_refcount(i64)

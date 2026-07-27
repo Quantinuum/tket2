@@ -2,18 +2,17 @@
 
 use super::PytketEmitter;
 use crate::extension::rotation::{
-    ConstRotation, RotationOp, ROTATION_EXTENSION_ID, ROTATION_TYPE_ID,
+    ConstRotation, ROTATION_EXTENSION_ID, ROTATION_TYPE_ID, RotationOp,
 };
+use crate::serialize::pytket::PytketEncodeError;
 use crate::serialize::pytket::config::TypeTranslatorSet;
 use crate::serialize::pytket::encoder::{EncodeStatus, PytketEncoderContext, TrackedValues};
 use crate::serialize::pytket::extension::{PytketTypeTranslator, RegisterCount};
-use crate::serialize::pytket::PytketEncodeError;
-use crate::Circuit;
-use hugr::extension::simple_op::MakeExtensionOp;
-use hugr::extension::ExtensionId;
-use hugr::ops::constant::OpaqueValue;
-use hugr::ops::ExtensionOp;
 use hugr::HugrView;
+use hugr::extension::ExtensionId;
+use hugr::extension::simple_op::MakeExtensionOp;
+use hugr::ops::ExtensionOp;
+use hugr::ops::constant::OpaqueValue;
 use itertools::Itertools;
 
 /// Encoder for [prelude](hugr::extension::prelude) operations.
@@ -29,7 +28,7 @@ impl<H: HugrView> PytketEmitter<H> for RotationEmitter {
         &self,
         node: H::Node,
         op: &ExtensionOp,
-        circ: &Circuit<H>,
+        hugr: &H,
         encoder: &mut PytketEncoderContext<H>,
     ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
         let Ok(rot_op) = RotationOp::from_extension_op(op) else {
@@ -38,7 +37,7 @@ impl<H: HugrView> PytketEmitter<H> for RotationEmitter {
 
         match rot_op {
             RotationOp::from_halfturns_unchecked | RotationOp::to_halfturns => {
-                encoder.emit_transparent_node(node, circ, |ps| vec![ps.input_params[0].clone()])?;
+                encoder.emit_transparent_node(node, hugr, |ps| vec![ps.input_params[0].clone()])?;
                 Ok(EncodeStatus::Success)
             }
             RotationOp::from_halfturns => {
@@ -46,7 +45,7 @@ impl<H: HugrView> PytketEmitter<H> for RotationEmitter {
                 Ok(EncodeStatus::Unsupported)
             }
             _ => {
-                encoder.emit_transparent_node(node, circ, |ps| {
+                encoder.emit_transparent_node(node, hugr, |ps| {
                     RotationEmitter::encode_rotation_op(&rot_op, ps.input_params)
                         .into_iter()
                         .collect_vec()

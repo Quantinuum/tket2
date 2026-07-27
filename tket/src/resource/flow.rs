@@ -5,9 +5,9 @@
 
 use crate::resource::types::ResourceId;
 use derive_more::derive::{Display, Error};
+use hugr::HugrView;
 use hugr::ops::{OpTrait, OpType};
 use hugr::types::Type;
-use hugr::HugrView;
 use itertools::{EitherOrBoth, Itertools};
 
 /// Error type for unsupported operations in ResourceFlow implementations.

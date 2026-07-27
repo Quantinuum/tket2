@@ -8,9 +8,9 @@ use hugr::ops::custom::ExtensionOp;
 use hugr::types::Type;
 use hugr::{
     extension::{
-        prelude::{bool_t, option_type, qb_t},
-        simple_op::{try_from_name, MakeOpDef, MakeRegisteredOp},
         ExtensionId, OpDef, SignatureFunc,
+        prelude::{bool_t, option_type, qb_t},
+        simple_op::{MakeOpDef, MakeRegisteredOp, try_from_name},
     },
     ops::OpType,
     type_row,
@@ -22,6 +22,7 @@ use serde::{Deserialize, Serialize};
 use smol_str::ToSmolStr;
 use strum::{EnumIter, EnumString, IntoStaticStr};
 
+/// Standar TKET quantum operations.
 #[derive(
     Clone,
     Copy,
@@ -37,33 +38,191 @@ use strum::{EnumIter, EnumString, IntoStaticStr};
     IntoStaticStr,
     EnumString,
 )]
-#[allow(missing_docs)]
 #[non_exhaustive]
 /// Simple enum of tket quantum operations.
 pub enum TketOp {
+    /// Hadamard gate
+    ///
+    /// This is a single qubit gate.
     H,
+    /// Controlled-X (CNOT).
+    ///
+    /// Inputs:
+    /// - A control qubit
+    /// - The target qubit
+    ///
+    /// Outputs:
+    /// - The control qubit
+    /// - The target qubit
     CX,
+    /// Controlled-Y.
+    ///
+    /// Inputs:
+    /// - A control qubit
+    /// - The target qubit
+    ///
+    /// Outputs:
+    /// - The control qubit
+    /// - The target qubit
     CY,
+    /// Controlled-Z.
+    ///
+    /// Inputs:
+    /// - A control qubit
+    /// - The target qubit
+    ///
+    /// Outputs:
+    /// - The control qubit
+    /// - The target qubit
     CZ,
+    /// Controlled-Rz rotation.
+    ///
+    /// Inputs:
+    /// - A control qubit
+    /// - The target qubit
+    /// - A [`rotation`](rotation_type) angle expressed in half-turns.
+    ///
+    /// Outputs:
+    /// - The control qubit
+    /// - The target qubit
+    ///
+    /// See [`TketOp::Rz`].
     CRz,
+    /// T gate.
+    ///
+    /// Single qubit gate.
     T,
+    /// T dagger gate.
+    ///
+    /// Dagger of [`TketOp::T`].
+    ///
+    /// This is a single qubit gate.
     Tdg,
+    /// S gate.
+    ///
+    /// This is a single qubit gate.
     S,
+    /// S dagger gate.
+    ///
+    /// Dagger of [`TketOp::S`].
+    ///
+    /// This is a single qubit gate.
     Sdg,
+    /// Pauli X gate.
+    ///
+    /// This is a single qubit gate.
     X,
+    /// Pauli Y gate.
+    ///
+    /// This is a single qubit gate.
     Y,
+    /// Pauli Z gate.
+    ///
+    /// This is a single qubit gate.
     Z,
+    /// Pauli X rotation.
+    ///
+    /// Inputs:
+    /// - A qubit
+    /// - A [`rotation`](rotation_type) angle expressed in half-turns.
+    ///
+    /// Outputs:
+    /// - A qubit
+    ///
+    /// This is a single qubit gate.
     Rx,
+    /// Pauli Y rotation.
+    ///
+    /// Inputs:
+    /// - A qubit
+    /// - A [`rotation`](rotation_type) angle expressed in half-turns.
+    ///
+    /// Outputs:
+    /// - A qubit
+    ///
+    /// This is a single qubit gate.
     Ry,
+    /// Pauli Z rotation.
+    ///
+    /// Inputs:
+    /// - A qubit
+    /// - A [`rotation`](rotation_type) angle expressed in half-turns.
+    ///
+    /// Outputs:
+    /// - A qubit
+    ///
+    /// This is a single qubit gate.
     Rz,
+    /// Toffoli gate.
+    ///
+    /// Inputs:
+    /// - Control qubit 1
+    /// - Control qubit 2
+    /// - The target qubit
+    ///
+    /// Outputs:
+    /// - Control qubit 1
+    /// - Control qubit 2
+    /// - The target qubit
     Toffoli,
+    /// Measure a qubit and return it along with the measurement result.
+    ///
+    /// Inputs:
+    /// - A qubit
+    ///
+    /// Outputs:
+    /// - A qubit
+    /// - A boolean indicating whether the qubit was measured as 1
     Measure,
+    /// Measure a qubit and consume the qubit.
+    ///
+    /// Inputs:
+    /// - A qubit
+    ///
+    /// Outputs:
+    /// - A boolean indicating whether the qubit was measured as 1
     MeasureFree,
+    /// Allocate a qubit.
+    ///
+    /// Inputs:
+    /// - None
+    ///
+    /// Outputs:
+    /// - A qubit
     QAlloc,
+    /// Try to allocate a qubit, returning an option with the qubit or None on failure.
+    ///
+    /// Inputs:
+    /// - None
+    ///
+    /// Outputs:
+    /// - An [`option_type`] with a qubit or None on failure
     TryQAlloc,
+    /// Free a qubit.
+    ///
+    /// Inputs:
+    /// - A qubit
+    ///
+    /// Outputs:
+    /// - None
     QFree,
+    /// Reset a qubit to |0>.
+    ///
+    /// Inputs:
+    /// - A qubit
+    ///
+    /// Outputs:
+    /// - A qubit in the |0> state
     Reset,
+    /// V gate.
+    ///
+    /// This is a single qubit gate.
     V,
+    /// V dagger gate.
+    ///
+    /// Dagger of [`TketOp::V`].
+    ///
+    /// This is a single qubit gate.
     Vdg,
 }
 
@@ -81,19 +240,26 @@ impl TketOp {
 }
 
 /// Whether an op is a given TketOp.
+#[deprecated(
+    since = "0.19.0",
+    note = "Use `op.cast::<TketOp>() == Some(TketOp::...)` instead"
+)]
 pub fn op_matches(op: &OpType, tket_op: TketOp) -> bool {
     op.to_string() == tket_op.exposed_name()
 }
 
+/// Simple enum representation of Pauli matrices.
 #[derive(
     Clone, Copy, Debug, Serialize, Deserialize, EnumIter, Display, PartialEq, PartialOrd, EnumString,
 )]
-#[allow(missing_docs)]
-/// Simple enum representation of Pauli matrices.
 pub enum Pauli {
+    /// Pauli identity matrix.
     I,
+    /// Pauli X matrix.
     X,
+    /// Pauli Y matrix.
     Y,
+    /// Pauli Z matrix.
     Z,
 }
 
@@ -111,16 +277,16 @@ impl MakeOpDef for TketOp {
     fn init_signature(&self, _extension_ref: &std::sync::Weak<hugr::Extension>) -> SignatureFunc {
         use TketOp::*;
         match self {
-            H | T | S | V | X | Y | Z | Tdg | Sdg | Vdg | Reset => Signature::new_endo(qb_t()),
+            H | T | S | V | X | Y | Z | Tdg | Sdg | Vdg | Reset => Signature::new_endo([qb_t()]),
             CX | CZ | CY => Signature::new_endo(vec![qb_t(); 2]),
             Toffoli => Signature::new_endo(vec![qb_t(); 3]),
-            Measure => Signature::new(qb_t(), vec![qb_t(), bool_t()]),
-            MeasureFree => Signature::new(qb_t(), bool_type()),
-            Rz | Rx | Ry => Signature::new(vec![qb_t(), rotation_type()], qb_t()),
+            Measure => Signature::new([qb_t()], vec![qb_t(), bool_t()]),
+            MeasureFree => Signature::new([qb_t()], [bool_type()]),
+            Rz | Rx | Ry => Signature::new(vec![qb_t(), rotation_type()], [qb_t()]),
             CRz => Signature::new(vec![qb_t(), qb_t(), rotation_type()], vec![qb_t(); 2]),
-            QAlloc => Signature::new(type_row![], qb_t()),
-            TryQAlloc => Signature::new(type_row![], Type::from(option_type(qb_t()))),
-            QFree => Signature::new(qb_t(), type_row![]),
+            QAlloc => Signature::new(type_row![], [qb_t()]),
+            TryQAlloc => Signature::new(type_row![], [Type::from(option_type([qb_t()]))]),
+            QFree => Signature::new([qb_t()], type_row![]),
         }
         .into()
     }
@@ -150,8 +316,8 @@ impl MakeRegisteredOp for TketOp {
         EXTENSION_ID.to_owned()
     }
 
-    fn extension_ref(&self) -> Weak<hugr::Extension> {
-        Arc::<hugr::Extension>::downgrade(&TKET_EXTENSION)
+    fn extension_ref(&self) -> Arc<hugr::Extension> {
+        TKET_EXTENSION.clone()
     }
 }
 
@@ -187,7 +353,7 @@ pub fn symbolic_constant_op(arg: String) -> OpType {
 }
 
 #[cfg(test)]
-pub(crate) mod test {
+pub mod test {
 
     use std::str::FromStr;
     use std::sync::Arc;
@@ -195,19 +361,17 @@ pub(crate) mod test {
     use hugr::builder::{DFGBuilder, Dataflow, DataflowHugr};
     use hugr::extension::prelude::{option_type, qb_t};
     use hugr::extension::simple_op::{MakeExtensionOp, MakeOpDef};
-    use hugr::extension::{prelude::UnwrapBuilder as _, OpDef};
+    use hugr::extension::{OpDef, prelude::UnwrapBuilder as _};
     use hugr::types::Signature;
-    use hugr::{type_row, CircuitUnit, HugrView};
+    use hugr::{CircuitUnit, HugrView, type_row};
     use itertools::Itertools;
-    use rstest::{fixture, rstest};
     use strum::IntoEnumIterator;
 
     use super::TketOp;
-    use crate::circuit::Circuit;
+    use crate::Pauli;
     use crate::extension::bool::bool_type;
     use crate::extension::{TKET_EXTENSION as EXTENSION, TKET_EXTENSION_ID as EXTENSION_ID};
     use crate::utils::build_simple_circuit;
-    use crate::Pauli;
     fn get_opdef(op: TketOp) -> Option<&'static Arc<OpDef>> {
         EXTENSION.get_op(&op.op_id())
     }
@@ -218,22 +382,6 @@ pub(crate) mod test {
         for o in TketOp::iter() {
             assert_eq!(TketOp::from_def(get_opdef(o).unwrap()), Ok(o));
         }
-    }
-
-    #[fixture]
-    pub(crate) fn t2_bell_circuit() -> Circuit {
-        let h = build_simple_circuit(2, |circ| {
-            circ.append(TketOp::H, [0])?;
-            circ.append(TketOp::CX, [0, 1])?;
-            Ok(())
-        });
-
-        h.unwrap()
-    }
-
-    #[rstest]
-    fn check_t2_bell(t2_bell_circuit: Circuit) {
-        assert_eq!(t2_bell_circuit.commands().count(), 2);
     }
 
     #[test]
@@ -254,19 +402,18 @@ pub(crate) mod test {
         })
         .unwrap();
 
-        // 5 commands: alloc, reset, cx, measure, free
-        assert_eq!(h.commands().count(), 5);
+        assert_eq!(h.count_ops(|op| op.cast::<TketOp>().is_some()), 5);
     }
 
     #[test]
     fn try_qalloc_measure_free() {
-        let mut b = DFGBuilder::new(Signature::new(type_row![], bool_type())).unwrap();
+        let mut b = DFGBuilder::new(Signature::new(type_row![], [bool_type()])).unwrap();
 
         let try_q = b
             .add_dataflow_op(TketOp::TryQAlloc, [])
             .unwrap()
             .out_wire(0);
-        let [q] = b.build_unwrap_sum(1, option_type(qb_t()), try_q).unwrap();
+        let [q] = b.build_unwrap_sum(1, option_type([qb_t()]), try_q).unwrap();
         let measured = b
             .add_dataflow_op(TketOp::MeasureFree, [q])
             .unwrap()

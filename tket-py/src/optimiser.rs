@@ -6,12 +6,12 @@ use std::{fs, num::NonZeroUsize, path::PathBuf};
 use derive_more::derive::From;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use tket::Circuit;
 use tket::optimiser::badger::{BadgerOptions, DefaultBadgerStrategy};
 use tket::optimiser::{BadgerLogger, BadgerOptimiser};
-use tket::Circuit;
 
-use crate::circuit::update_circ;
 use crate::rewrite::{PyECCRewriter, PyRewriter};
+use crate::state::CompilationState;
 
 /// The module definition
 pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
@@ -24,7 +24,7 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
 ///
 /// Currently only exposes loading from an ECC file using the constructor
 /// and optimising using default logging settings.
-#[pyclass(name = "BadgerOptimiser")]
+#[pyclass(name = "BadgerOptimiser", skip_from_py_object)]
 #[derive(Clone, From)]
 pub struct PyBadgerOptimiser(BadgerOptimiser<PyRewriter, DefaultBadgerStrategy>);
 
@@ -47,8 +47,10 @@ impl BadgerCostFunction {
     }
 }
 
-impl<'py> FromPyObject<'py> for BadgerCostFunction {
-    fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
+impl<'py> FromPyObject<'_, 'py> for BadgerCostFunction {
+    type Error = PyErr;
+
+    fn extract(ob: Borrowed<'_, 'py, PyAny>) -> Result<Self, Self::Error> {
         let str = ob.extract::<&str>()?;
         match str {
             "cx" => Ok(BadgerCostFunction::CXCount),
@@ -137,11 +139,11 @@ impl PyBadgerOptimiser {
     /// * `log_progress`: The path to a CSV file to log progress to.
     ///
     #[pyo3(name = "optimise")]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     #[pyo3(signature = (circ, timeout=None, progress_timeout=None, max_circuit_count=None, n_threads=None, split_circ=None, queue_size=None, log_progress=None))]
-    pub fn py_optimise<'py>(
+    pub fn py_optimise(
         &self,
-        circ: &Bound<'py, PyAny>,
+        circ: &mut CompilationState,
         timeout: Option<u64>,
         progress_timeout: Option<u64>,
         max_circuit_count: Option<usize>,
@@ -149,7 +151,7 @@ impl PyBadgerOptimiser {
         split_circ: Option<bool>,
         queue_size: Option<usize>,
         log_progress: Option<PathBuf>,
-    ) -> PyResult<Bound<'py, PyAny>> {
+    ) -> PyResult<()> {
         let options = BadgerOptions {
             timeout,
             progress_timeout,
@@ -158,7 +160,10 @@ impl PyBadgerOptimiser {
             split_circuit: split_circ.unwrap_or(false),
             queue_size: queue_size.unwrap_or(100),
         };
-        update_circ(circ, |circ, _| self.optimise(circ, log_progress, options))
+        let c = Circuit::new(circ.hugr.clone());
+        let result = self.optimise(c, log_progress, options);
+        circ.hugr = result.into_hugr();
+        Ok(())
     }
 }
 

@@ -7,12 +7,11 @@ use crate::serialize::pytket::decoder::{
 };
 use crate::serialize::pytket::encoder::{EmitCommandOptions, EncodeStatus};
 use crate::serialize::pytket::{PytketDecodeError, PytketEncodeError, PytketEncoderContext};
-use crate::Circuit;
 
 use super::PytketEmitter;
 use hugr::builder::Dataflow;
-use hugr::extension::prelude::{bool_t, qb_t};
 use hugr::extension::ExtensionId;
+use hugr::extension::prelude::{bool_t, qb_t};
 use hugr::ops::{ExtensionOp, OpTrait, OpType};
 use hugr::types::{Signature, TypeArg};
 use hugr::{HugrView, IncomingPort};
@@ -36,7 +35,7 @@ impl<H: HugrView> PytketEmitter<H> for Tk1Emitter {
         &self,
         node: H::Node,
         op: &ExtensionOp,
-        circ: &Circuit<H>,
+        hugr: &H,
         encoder: &mut PytketEncoderContext<H>,
     ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
         if op.qualified_id() != format!("{TKET1_EXTENSION_ID}.{TKET1_OP_NAME}") {
@@ -52,7 +51,7 @@ impl<H: HugrView> PytketEmitter<H> for Tk1Emitter {
         // Most operations map directly to a pytket one.
         encoder.emit_node_command(
             node,
-            circ,
+            hugr,
             EmitCommandOptions::new(),
             // Emit the pre-defined pytket operation stored in the metadata.
             move |_| op.serialised_op,

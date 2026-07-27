@@ -5,6 +5,7 @@ rust-core: &rust-core
   - "tket/**"
   - "Cargo.toml"
   - "Cargo.lock"
+  - "hugrenv.lock"
 
 rust:
   - *rust-core
@@ -12,6 +13,7 @@ rust:
   - "badger-optimiser/**"
   - "compile-rewriter/**"
   - "tket1-passes/**"
+  - "tket-qec/**"
 
 python:
   - *rust-core

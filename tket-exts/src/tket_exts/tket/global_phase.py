@@ -9,7 +9,7 @@ from ._util import TketExtension, load_extension
 
 
 class GlobalPhaseExtension(TketExtension):
-    """TKET's standard quantum operations."""
+    """Operation to add global phase to unitary operations."""
 
     @functools.cache
     def __call__(self) -> Extension:

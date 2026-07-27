@@ -2,11 +2,11 @@
 
 use tket::hugr::{self, llvm::inkwell};
 
-use crate::extension::random::{self, RandomOp, CONTEXT_TYPE_NAME};
-use anyhow::{anyhow, Result};
+use crate::extension::random::{self, CONTEXT_TYPE_NAME, RandomOp};
+use anyhow::{Result, anyhow};
 use hugr::llvm::custom::CodegenExtension;
-use hugr::llvm::emit::func::EmitFuncContext;
 use hugr::llvm::emit::EmitOpArgs;
+use hugr::llvm::emit::func::EmitFuncContext;
 use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::types::{BasicTypeEnum, FloatType, IntType};
@@ -87,7 +87,7 @@ impl<'c, H: HugrView<Node = Node>> RandomEmitter<'c, '_, '_, H> {
                 name,
             )?
             .try_as_basic_value()
-            .unwrap_left();
+            .unwrap_basic();
         args.outputs
             .finish(self.builder(), [result, self.rng_context()])
     }
@@ -157,9 +157,9 @@ mod test {
     use crate::extension::random::RandomOp;
     use hugr::extension::simple_op::MakeRegisteredOp;
     use hugr::llvm::check_emission;
+    use hugr::llvm::test::TestContext;
     use hugr::llvm::test::llvm_ctx;
     use hugr::llvm::test::single_op_hugr;
-    use hugr::llvm::test::TestContext;
     use rstest::rstest;
 
     use super::*;

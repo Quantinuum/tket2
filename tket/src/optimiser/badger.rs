@@ -17,7 +17,7 @@ mod qtz_circuit;
 mod worker;
 
 use crossbeam_channel::select;
-pub use eq_circ_class::{load_eccs_json_file, EqCircClass};
+pub use eq_circ_class::{EqCircClass, load_eccs_json_file};
 use hugr::hugr::HugrError;
 use hugr::{HugrView, Node};
 pub use log::BadgerLogger;
@@ -27,14 +27,13 @@ use std::num::NonZeroUsize;
 use std::time::{Duration, Instant};
 use std::{mem, thread};
 
-use crate::circuit::cost::CircuitCost;
-use crate::circuit::CircuitHash;
-use crate::optimiser::badger::worker::BadgerWorker;
-use crate::optimiser::{pqueue_worker, BacktrackingOptimiser, Optimiser, State, StatePQWorker};
-use crate::passes::CircuitChunks;
-use crate::rewrite::strategy::{RewriteResult, RewriteStrategy};
-use crate::rewrite::Rewriter;
 use crate::Circuit;
+use crate::circuit::cost::CircuitCost;
+use crate::optimiser::badger::worker::BadgerWorker;
+use crate::optimiser::{BacktrackingOptimiser, Optimiser, State, StatePQWorker, pqueue_worker};
+use crate::passes::utils::CircuitChunks;
+use crate::rewrite::Rewriter;
+use crate::rewrite::strategy::{RewriteResult, RewriteStrategy};
 
 /// Configuration options for the Badger optimiser.
 #[derive(Copy, Clone, Debug)]
@@ -295,14 +294,13 @@ where
                         Ok(pqueue_worker::LogMessage::StateCount{processed_count: proc, seen_count: seen, queue_length}) => {
                             processed_count = proc;
                             seen_count = seen;
-                            if let Some(max_circuit_count) = opt.max_circuit_count {
-                                if seen_count > max_circuit_count {
+                            if let Some(max_circuit_count) = opt.max_circuit_count
+                                && seen_count > max_circuit_count {
                                     timeout_flag = true;
                                     // Signal the workers to stop.
                                     let _ = pq.close();
                                     break;
                                 }
-                            }
                             logger.log_progress(processed_count, Some(queue_length), seen_count);
                         }
                         Err(crossbeam_channel::RecvError) => {
@@ -449,9 +447,9 @@ mod badger_default {
 
     use hugr::ops::OpType;
 
+    use crate::rewrite::ECCRewriter;
     use crate::rewrite::ecc_rewriter::RewriterSerialisationError;
     use crate::rewrite::strategy::{ExhaustiveGreedyStrategy, LexicographicCostFunction};
-    use crate::rewrite::ECCRewriter;
 
     use super::*;
 
@@ -522,20 +520,35 @@ pub use badger_default::{DefaultBadgerStrategy, ECCBadgerOptimiser};
 #[cfg(test)]
 #[cfg(feature = "portmatching")]
 mod tests {
+    use hugr::Node;
     use hugr::{
+        HugrView,
         builder::{DFGBuilder, Dataflow, DataflowHugr},
         extension::prelude::qb_t,
         types::Signature,
-        HugrView,
     };
+    use itertools::Itertools;
     use rstest::{fixture, rstest};
 
+    use crate::extension::rotation::RotationOp;
     use crate::serialize::load_tk1_json_str;
     use crate::serialize::pytket::DecodeOptions;
-    use crate::{extension::rotation::rotation_type, optimiser::badger::BadgerOptions};
     use crate::{Circuit, TketOp};
+    use crate::{extension::rotation::rotation_type, optimiser::badger::BadgerOptions};
 
     use super::{BadgerOptimiser, ECCBadgerOptimiser};
+
+    /// Returns a vector of `TketOp` or `RotationOp` nodes in the entrypoint
+    /// region, in topological order.
+    fn entrypoint_tket_or_rotation_ops(circ: &Circuit) -> Vec<Node> {
+        circ.toposorted_children(circ.parent())
+            .expect("circuit entrypoint should be dataflow region")
+            .filter(|&n| {
+                let op = circ.hugr().get_optype(n);
+                op.cast::<TketOp>().is_some() || op.cast::<RotationOp>().is_some()
+            })
+            .collect_vec()
+    }
 
     #[fixture]
     fn rz_rz() -> Circuit {
@@ -577,7 +590,9 @@ mod tests {
     /// A circuit that would trigger non-composable rewrites, if we applied them blindly from nam_6_3 matches.
     #[fixture]
     fn non_composable_rw_hugr() -> Circuit {
-        load_tk1_json_str(NON_COMPOSABLE, DecodeOptions::new()).unwrap()
+        load_tk1_json_str(NON_COMPOSABLE, DecodeOptions::new())
+            .unwrap()
+            .into()
     }
 
     /// A badger optimiser using a reduced set of rewrite rules.
@@ -605,10 +620,6 @@ mod tests {
     #[case::compiled(badger_opt_compiled())]
     #[case::json(badger_opt_json())]
     fn rz_rz_cancellation(rz_rz: Circuit, #[case] badger_opt: ECCBadgerOptimiser) {
-        use hugr::ops::OpType;
-
-        use crate::{extension::rotation::RotationOp, op_matches};
-
         let opt_rz = badger_opt.optimise(
             &rz_rz,
             BadgerOptions {
@@ -616,16 +627,15 @@ mod tests {
                 ..Default::default()
             },
         );
-        let [op1, op2]: [&OpType; 2] = opt_rz
-            .commands()
-            .map(|cmd| cmd.optype())
-            .collect::<Vec<_>>()
-            .try_into()
+        let [op1, op2] = entrypoint_tket_or_rotation_ops(&opt_rz)
+            .into_iter()
+            .map(|node| opt_rz.hugr().get_optype(node))
+            .collect_array()
             .unwrap();
 
         // Rzs combined into a single one.
         assert_eq!(op1.cast(), Some(RotationOp::radd));
-        assert!(op_matches(op2, TketOp::Rz));
+        assert_eq!(op2.cast(), Some(TketOp::Rz));
     }
 
     #[rstest]
@@ -659,7 +669,7 @@ mod tests {
             },
         );
         opt_rz.hugr().validate().unwrap();
-        assert_eq!(opt_rz.commands().count(), 2);
+        assert_eq!(entrypoint_tket_or_rotation_ops(&opt_rz).len(), 2);
     }
 
     #[rstest]

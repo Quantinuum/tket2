@@ -1,39 +1,40 @@
-//! Provides a `ReplaceBoolPass` which replaces the tket.bool type and
-//! lazifies measure operations.
+//! Provides a [`ReplaceBoolPass`] which replaces the `tket.bool` type and
+//! lazifies measure operations for all supported platforms (Helios and Sol).
 mod static_array;
 
 use derive_more::{Display, Error, From};
-use hugr::algorithms::replace_types::{NodeTemplate, ReplaceTypesError, ReplacementOptions};
-use hugr::algorithms::{
-    ensure_no_nonlocal_edges, non_local::FindNonLocalEdgesError, ComposablePass, ReplaceTypes,
-};
 use hugr::builder::{
-    inout_sig, BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
-    SubContainer,
+    BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, SubContainer,
+    inout_sig,
 };
 use hugr::extension::prelude::{bool_t, option_type, qb_t, usize_t};
 use hugr::extension::simple_op::{MakeOpDef, MakeRegisteredOp};
-use hugr::ops::{handle::ConditionalID, ExtensionOp, Tag, Value};
+use hugr::ops::{ExtensionOp, Tag, Value, handle::ConditionalID};
 use hugr::std_extensions::arithmetic::{
     conversions::ConvertOpDef, int_ops::IntOpDef, int_types::ConstInt,
 };
 use hugr::std_extensions::collections::{
-    array::{self, array_type, GenericArrayOpDef, ARRAY_CLONE_OP_ID, ARRAY_DISCARD_OP_ID},
-    borrow_array::{self, borrow_array_type, BArrayUnsafeOpDef, BorrowArray},
+    array::{self, ARRAY_CLONE_OP_ID, ARRAY_DISCARD_OP_ID, GenericArrayOpDef, array_type},
+    borrow_array::{self, BArrayUnsafeOpDef, BorrowArray, borrow_array_type},
 };
 use hugr::std_extensions::logic::LogicOp;
 use hugr::types::{SumType, Term, Type};
-use hugr::{hugr::hugrmut::HugrMut, type_row, Hugr, HugrView, Node, Wire};
+use hugr::{Hugr, Node, Wire, hugr::hugrmut::HugrMut, type_row};
 use static_array::{ReplaceStaticArrayBoolPass, ReplaceStaticArrayBoolPassError};
+use tket::TketOp;
 use tket::extension::{
-    bool::{bool_type, BoolOp, ConstBool},
+    bool::{BoolOp, ConstBool, bool_type},
     guppy::{DROP_OP_NAME, GUPPY_EXTENSION},
 };
-use tket::TketOp;
+use tket::passes::PassScope;
+use tket::passes::composable::WithScope;
+use tket::passes::non_local::LocalizeEdges;
+use tket::passes::replace_types::{Linearizer, NodeTemplate, ReplaceTypesError};
+use tket::passes::{ComposablePass, ReplaceTypes, non_local::FindNonLocalEdgesError};
 
 use crate::extension::{
-    futures::{future_type, FutureOp, FutureOpBuilder, FutureOpDef},
-    qsystem::QSystemOp,
+    futures::{FutureOp, FutureOpBuilder, FutureOpDef, future_type},
+    qsystem::{helios::HeliosOp, sol::SolOp},
 };
 
 #[derive(Error, Debug, Display, From)]
@@ -49,47 +50,68 @@ pub enum ReplaceBoolPassError<N> {
     ReplaceStaticArrayBoolPassError(ReplaceStaticArrayBoolPassError),
 }
 
-/// A HUGR -> HUGR pass which replaces the `tket.bool`, enabling lazifying of measure
+/// A HUGR -> HUGR pass which replaces the `tket.bool` type, enabling lazifying of measure
 /// operations.
 ///
 /// The `tket.bool` type is replaced by a sum type of `bool_t` (the standard
 /// HUGR bool type represented by a unit sum) and `future(bool_t)`, with its operations
 /// being turned into conditionals that read the future if necessary.
 ///
-/// [TketOp::Measure], [QSystemOp::Measure], and [QSystemOp::MeasureReset] nodes
-/// are replaced by [QSystemOp::LazyMeasure] and [QSystemOp::LazyMeasureReset]
-/// nodes.
+/// Measure ops are replaced by their lazy equivalents on all supported platforms:
+/// - [`TketOp::MeasureFree`] → [`HeliosOp::LazyMeasure`]
+/// - [`HeliosOp::Measure`] → [`HeliosOp::LazyMeasure`]
+/// - [`HeliosOp::MeasureReset`] → [`HeliosOp::LazyMeasureReset`]
+/// - [`SolOp::Measure`] → [`SolOp::LazyMeasure`]
+/// - [`SolOp::MeasureReset`] → [`SolOp::LazyMeasureReset`]
 ///
-/// [TketOp::Measure]: tket::TketOp::Measure
-/// [QSystemOp::Measure]: crate::extension::qsystem::QSystemOp::Measure
-/// [QSystemOp::MeasureReset]: crate::extension::qsystem::QSystemOp::MeasureReset
-/// [QSystemOp::LazyMeasure]: crate::extension::qsystem::QSystemOp::LazyMeasure
-/// [QSystemOp::LazyMeasureReset]: crate::extension::qsystem::QSystemOp::LazyMeasureReset
+/// [`TketOp::MeasureFree`]: tket::TketOp::MeasureFree
+/// [`HeliosOp::Measure`]: crate::extension::qsystem::helios::HeliosOp::Measure
+/// [`HeliosOp::MeasureReset`]: crate::extension::qsystem::helios::HeliosOp::MeasureReset
+/// [`HeliosOp::LazyMeasure`]: crate::extension::qsystem::helios::HeliosOp::LazyMeasure
+/// [`HeliosOp::LazyMeasureReset`]: crate::extension::qsystem::helios::HeliosOp::LazyMeasureReset
+/// [`SolOp::Measure`]: crate::extension::qsystem::sol::SolOp::Measure
+/// [`SolOp::MeasureReset`]: crate::extension::qsystem::sol::SolOp::MeasureReset
+/// [`SolOp::LazyMeasure`]: crate::extension::qsystem::sol::SolOp::LazyMeasure
+/// [`SolOp::LazyMeasureReset`]: crate::extension::qsystem::sol::SolOp::LazyMeasureReset
 #[derive(Default, Debug, Clone)]
-pub struct ReplaceBoolPass;
+pub struct ReplaceBoolPass {
+    /// Where to apply the pass.
+    ///
+    /// Configurable via [`WithScope::with_scope`].
+    scope: PassScope,
+}
+
+impl WithScope for ReplaceBoolPass {
+    fn with_scope(mut self, scope: impl Into<PassScope>) -> Self {
+        self.scope = scope.into();
+        self
+    }
+}
 
 impl<H: HugrMut<Node = Node>> ComposablePass<H> for ReplaceBoolPass {
     type Error = ReplaceBoolPassError<H::Node>;
     type Result = ();
 
     fn run(&self, hugr: &mut H) -> Result<(), Self::Error> {
-        ensure_no_nonlocal_edges(hugr)?;
-        ReplaceStaticArrayBoolPass::default().run(hugr)?;
-        let lowerer = lowerer();
-        lowerer.run(hugr)?;
+        LocalizeEdges::default_with_scope(self.scope.clone()).check_no_nonlocal_edges(hugr)?;
+        ReplaceStaticArrayBoolPass::default_with_scope(self.scope.clone()).run(hugr)?;
+        lowerer().with_scope(self.scope.clone()).run(hugr)?;
         Ok(())
     }
 }
 
 /// The type each tket.bool is replaced with.
 fn bool_dest() -> Type {
-    SumType::new([bool_t(), future_type(bool_t())]).into()
+    SumType::new([vec![bool_t()], vec![future_type(bool_t())]]).into()
 }
 
 fn read_builder(dfb: &mut DFGBuilder<Hugr>, sum_wire: Wire) -> BuildHandle<ConditionalID> {
     let mut cb = dfb
         .conditional_builder(
-            ([bool_t().into(), future_type(bool_t()).into()], sum_wire),
+            (
+                [vec![bool_t()].into(), vec![future_type(bool_t())].into()],
+                sum_wire,
+            ),
             [],
             vec![bool_t()].into(),
         )
@@ -121,7 +143,10 @@ fn make_opaque_op_dest() -> NodeTemplate {
     let [inp] = dfb.input_wires_arr();
     let out = dfb
         .add_dataflow_op(
-            Tag::new(0, vec![bool_t().into(), future_type(bool_t()).into()]),
+            Tag::new(
+                0,
+                vec![vec![bool_t()].into(), vec![future_type(bool_t())].into()],
+            ),
             vec![inp],
         )
         .unwrap();
@@ -152,7 +177,10 @@ fn binary_logic_op_dest(op: &BoolOp) -> NodeTemplate {
     };
     let out = dfb
         .add_dataflow_op(
-            Tag::new(0, vec![bool_t().into(), future_type(bool_t()).into()]),
+            Tag::new(
+                0,
+                vec![vec![bool_t()].into(), vec![future_type(bool_t())].into()],
+            ),
             vec![result.out_wire(0)],
         )
         .unwrap();
@@ -170,7 +198,10 @@ fn not_op_dest() -> NodeTemplate {
         .unwrap();
     let out = dfb
         .add_dataflow_op(
-            Tag::new(0, vec![bool_t().into(), future_type(bool_t()).into()]),
+            Tag::new(
+                0,
+                vec![vec![bool_t()].into(), vec![future_type(bool_t())].into()],
+            ),
             vec![result.out_wire(0)],
         )
         .unwrap();
@@ -178,15 +209,16 @@ fn not_op_dest() -> NodeTemplate {
     NodeTemplate::CompoundOp(Box::new(h))
 }
 
-fn measure_dest() -> NodeTemplate {
-    let lazy_measure = QSystemOp::LazyMeasure.to_extension_op().unwrap();
-
+fn measure_dest(lazy_measure: hugr::ops::ExtensionOp) -> NodeTemplate {
     let mut dfb = DFGBuilder::new(inout_sig(vec![qb_t()], vec![bool_dest()])).unwrap();
     let [q] = dfb.input_wires_arr();
     let measure = dfb.add_dataflow_op(lazy_measure, vec![q]).unwrap();
     let tagged_output = dfb
         .add_dataflow_op(
-            Tag::new(1, vec![bool_t().into(), future_type(bool_t()).into()]),
+            Tag::new(
+                1,
+                vec![vec![bool_t()].into(), vec![future_type(bool_t())].into()],
+            ),
             vec![measure.out_wire(0)],
         )
         .unwrap();
@@ -196,15 +228,16 @@ fn measure_dest() -> NodeTemplate {
     NodeTemplate::CompoundOp(Box::new(h))
 }
 
-fn measure_reset_dest() -> NodeTemplate {
-    let lazy_measure_reset = QSystemOp::LazyMeasureReset.to_extension_op().unwrap();
-
+fn measure_reset_dest(lazy_measure_reset: hugr::ops::ExtensionOp) -> NodeTemplate {
     let mut dfb = DFGBuilder::new(inout_sig(vec![qb_t()], vec![qb_t(), bool_dest()])).unwrap();
     let [q] = dfb.input_wires_arr();
     let measure = dfb.add_dataflow_op(lazy_measure_reset, vec![q]).unwrap();
     let tagged_output = dfb
         .add_dataflow_op(
-            Tag::new(1, vec![bool_t().into(), future_type(bool_t()).into()]),
+            Tag::new(
+                1,
+                vec![vec![bool_t()].into(), vec![future_type(bool_t())].into()],
+            ),
             vec![measure.out_wire(1)],
         )
         .unwrap();
@@ -214,18 +247,9 @@ fn measure_reset_dest() -> NodeTemplate {
     NodeTemplate::CompoundOp(Box::new(h))
 }
 
-fn copy_dfg(ty: Type) -> Hugr {
-    let mut dfb = DFGBuilder::new(inout_sig(ty.clone(), vec![ty.clone(), ty])).unwrap();
-    let mut h = std::mem::take(dfb.hugr_mut());
-    let [inp, outp] = h.get_io(h.entrypoint()).unwrap();
-    h.connect(inp, 0, outp, 0);
-    h.connect(inp, 0, outp, 1);
-    h
-}
-
-fn barray_get_dest(size: u64, elem_ty: Type) -> NodeTemplate {
+fn barray_get_dest(rt: &ReplaceTypes, size: u64, elem_ty: Type) -> NodeTemplate {
     let array_ty = borrow_array_type(size, elem_ty.clone());
-    let opt_el = option_type(elem_ty.clone());
+    let opt_el = option_type(vec![elem_ty.clone()]);
     let mut dfb = DFGBuilder::new(inout_sig(
         vec![array_ty.clone(), usize_t()],
         vec![opt_el.clone().into(), array_ty.clone()],
@@ -252,7 +276,10 @@ fn barray_get_dest(size: u64, elem_ty: Type) -> NodeTemplate {
     let mut out_of_range = cb.case_builder(0).unwrap();
     let [arr_in, _] = out_of_range.input_wires_arr();
     let [none] = out_of_range
-        .add_dataflow_op(Tag::new(0, vec![type_row![], elem_ty.clone().into()]), [])
+        .add_dataflow_op(
+            Tag::new(0, vec![type_row![], vec![elem_ty.clone()].into()]),
+            [],
+        )
         .unwrap()
         .outputs_arr();
     out_of_range.finish_with_outputs([none, arr_in]).unwrap();
@@ -266,10 +293,15 @@ fn barray_get_dest(size: u64, elem_ty: Type) -> NodeTemplate {
         )
         .unwrap()
         .outputs_arr();
-    let [elem1, elem2] = in_range
-        .add_hugr_with_wires(copy_dfg(elem_ty.clone()), [elem])
+
+    let [elem1, elem2] = rt
+        .get_linearizer()
+        .copy_discard_op(&elem_ty, 2)
+        .unwrap()
+        .add(&mut in_range, [elem])
         .unwrap()
         .outputs_arr();
+
     let [arr] = in_range
         .add_dataflow_op(
             BArrayUnsafeOpDef::r#return.to_concrete(elem_ty.clone(), size),
@@ -278,7 +310,10 @@ fn barray_get_dest(size: u64, elem_ty: Type) -> NodeTemplate {
         .unwrap()
         .outputs_arr();
     let [some] = in_range
-        .add_dataflow_op(Tag::new(1, vec![type_row![], elem_ty.into()]), [elem2])
+        .add_dataflow_op(
+            Tag::new(1, vec![type_row![], vec![elem_ty].into()]),
+            [elem2],
+        )
         .unwrap()
         .outputs_arr();
     in_range.finish_with_outputs([some, arr]).unwrap();
@@ -295,7 +330,7 @@ fn lowerer() -> ReplaceTypes {
     let mut lw = ReplaceTypes::default();
 
     // Replace tket.bool type.
-    lw.replace_type(bool_type().as_extension().unwrap().clone(), bool_dest());
+    lw.set_replace_type(bool_type().as_extension().unwrap().clone(), bool_dest());
     let dup_op = FutureOp {
         op: FutureOpDef::Dup,
         typ: bool_t(),
@@ -308,7 +343,7 @@ fn lowerer() -> ReplaceTypes {
     }
     .to_extension_op()
     .unwrap();
-    lw.linearizer()
+    lw.linearizer_mut()
         .register_simple(
             future_type(bool_t()).as_extension().unwrap().clone(),
             NodeTemplate::SingleOp(dup_op.into()),
@@ -337,22 +372,41 @@ fn lowerer() -> ReplaceTypes {
 
     // Replace all tket.bool ops.
     let read_op = BoolOp::read.to_extension_op().unwrap();
-    lw.replace_op(&read_op, read_op_dest());
+    lw.set_replace_op(&read_op, read_op_dest());
     let make_opaque_op = BoolOp::make_opaque.to_extension_op().unwrap();
-    lw.replace_op(&make_opaque_op, make_opaque_op_dest());
+    lw.set_replace_op(&make_opaque_op, make_opaque_op_dest());
     for op in [BoolOp::eq, BoolOp::and, BoolOp::or, BoolOp::xor] {
-        lw.replace_op(&op.to_extension_op().unwrap(), binary_logic_op_dest(&op));
+        lw.set_replace_op(&op.to_extension_op().unwrap(), binary_logic_op_dest(&op));
     }
     let not_op = BoolOp::not.to_extension_op().unwrap();
-    lw.replace_op(&not_op, not_op_dest());
+    lw.set_replace_op(&not_op, not_op_dest());
 
     // Replace measure ops with lazy versions.
     let tket_measure_free = TketOp::MeasureFree.to_extension_op().unwrap();
-    let qsystem_measure = QSystemOp::Measure.to_extension_op().unwrap();
-    let qsystem_measure_reset = QSystemOp::MeasureReset.to_extension_op().unwrap();
-    lw.replace_op(&tket_measure_free, measure_dest());
-    lw.replace_op(&qsystem_measure, measure_dest());
-    lw.replace_op(&qsystem_measure_reset, measure_reset_dest());
+    let helios_measure = HeliosOp::Measure.to_extension_op().unwrap();
+    let helios_measure_reset = HeliosOp::MeasureReset.to_extension_op().unwrap();
+    let sol_measure = SolOp::Measure.to_extension_op().unwrap();
+    let sol_measure_reset = SolOp::MeasureReset.to_extension_op().unwrap();
+    lw.set_replace_op(
+        &tket_measure_free,
+        measure_dest(HeliosOp::LazyMeasure.to_extension_op().unwrap()),
+    );
+    lw.set_replace_op(
+        &helios_measure,
+        measure_dest(HeliosOp::LazyMeasure.to_extension_op().unwrap()),
+    );
+    lw.set_replace_op(
+        &helios_measure_reset,
+        measure_reset_dest(HeliosOp::LazyMeasureReset.to_extension_op().unwrap()),
+    );
+    lw.set_replace_op(
+        &sol_measure,
+        measure_dest(SolOp::LazyMeasure.to_extension_op().unwrap()),
+    );
+    lw.set_replace_op(
+        &sol_measure_reset,
+        measure_reset_dest(SolOp::LazyMeasureReset.to_extension_op().unwrap()),
+    );
 
     // Replace (borrow/)array ops that used to have with copyable bounds with DFGs that
     // the linearizer can act on now that the elements are no longer copyable.
@@ -366,57 +420,58 @@ fn lowerer() -> ReplaceTypes {
             borrow_array_type as fn(u64, Type) -> Type,
         ),
     ] {
-        lw.replace_parametrized_op_with(
+        lw.set_replace_parametrized_op(
             array_ext.get_op(ARRAY_CLONE_OP_ID.as_str()).unwrap(),
-            move |args| {
-                let [size, elem_ty] = args else {
-                    unreachable!()
-                };
-                let size = size.as_nat().unwrap();
-                let elem_ty = elem_ty.as_runtime().unwrap();
-                (!elem_ty.copyable()).then(|| {
-                    NodeTemplate::CompoundOp(Box::new(copy_dfg(type_fn(size, elem_ty.clone()))))
-                })
-            },
-            ReplacementOptions::default().with_linearization(true),
-        );
-        let drop_op_def = GUPPY_EXTENSION.get_op(DROP_OP_NAME.as_str()).unwrap();
-
-        lw.replace_parametrized_op(
-            array_ext.get_op(ARRAY_DISCARD_OP_ID.as_str()).unwrap(),
-            move |args| {
+            move |args, rt| {
                 let [size, elem_ty] = args else {
                     unreachable!()
                 };
                 let size = size.as_nat().unwrap();
                 let elem_ty = elem_ty.as_runtime().unwrap();
                 if elem_ty.copyable() {
-                    return None;
+                    return Ok(None);
+                }
+
+                let array_ty = type_fn(size, elem_ty);
+                Ok(Some(rt.get_linearizer().copy_discard_op(&array_ty, 2)?))
+            },
+        );
+        let drop_op_def = GUPPY_EXTENSION.get_op(DROP_OP_NAME.as_str()).unwrap();
+
+        lw.set_replace_parametrized_op(
+            array_ext.get_op(ARRAY_DISCARD_OP_ID.as_str()).unwrap(),
+            move |args, _| {
+                let [size, elem_ty] = args else {
+                    unreachable!()
+                };
+                let size = size.as_nat().unwrap();
+                let elem_ty = elem_ty.as_runtime().unwrap();
+                if elem_ty.copyable() {
+                    return Ok(None);
                 }
                 let drop_op = ExtensionOp::new(
                     drop_op_def.clone(),
                     vec![type_fn(size, elem_ty.clone()).into()],
                 )
                 .unwrap();
-                Some(NodeTemplate::SingleOp(drop_op.into()))
+                Ok(Some(NodeTemplate::SingleOp(drop_op.into())))
             },
         );
     }
 
-    lw.replace_parametrized_op_with(
+    lw.set_replace_parametrized_op(
         borrow_array::EXTENSION
             .get_op(GenericArrayOpDef::<BorrowArray>::get.opdef_id().as_str())
             .unwrap(),
-        |args| {
+        |args, rt| {
             let [Term::BoundedNat(size), Term::Runtime(elem_ty)] = args else {
                 unreachable!()
             };
             if elem_ty.copyable() {
-                return None;
+                return Ok(None);
             }
-            Some(barray_get_dest(*size, elem_ty.clone()))
+            Ok(Some(barray_get_dest(rt, *size, elem_ty.clone())))
         },
-        ReplacementOptions::default().with_linearization(true),
     );
 
     lw
@@ -424,28 +479,28 @@ fn lowerer() -> ReplaceTypes {
 
 #[cfg(test)]
 mod test {
-    use crate::extension::qsystem::{QSystemOp, QSystemOpBuilder};
+    use crate::extension::qsystem::{helios::HeliosOp, sol::SolOp};
 
     use super::*;
-    use hugr::extension::prelude::{option_type, usize_t, UnwrapBuilder};
+    use hugr::extension::prelude::{UnwrapBuilder, option_type, usize_t};
     use hugr::extension::simple_op::HasDef;
     use hugr::ops::OpType;
     use hugr::std_extensions::collections::array::op_builder::GenericArrayOpBuilder;
     use hugr::std_extensions::collections::array::{Array, ArrayKind};
     use hugr::std_extensions::collections::borrow_array::{
-        borrow_array_type, BArrayOpBuilder, BorrowArray,
+        BArrayOpBuilder, BorrowArray, borrow_array_type,
     };
     use hugr::type_row;
     use hugr::{
-        builder::{inout_sig, DFGBuilder, Dataflow, DataflowHugr},
+        HugrView,
+        builder::{DFGBuilder, Dataflow, DataflowHugr, inout_sig},
         extension::prelude::qb_t,
         types::TypeRow,
-        HugrView,
     };
     use rstest::rstest;
     use tket::{
-        extension::bool::{BoolOp, BoolOpBuilder},
         TketOp,
+        extension::bool::{BoolOp, BoolOpBuilder},
     };
 
     fn tket_bool_t() -> Type {
@@ -459,7 +514,7 @@ mod test {
         let mut h = dfb.finish_hugr_with_outputs([const_wire]).unwrap();
 
         h.validate().unwrap();
-        let pass = ReplaceBoolPass;
+        let pass = ReplaceBoolPass::default();
         pass.run(&mut h).unwrap();
         h.validate().unwrap();
         let sig = h.signature(h.entrypoint()).unwrap();
@@ -475,7 +530,7 @@ mod test {
 
         assert_eq!(h.num_nodes(), 8);
 
-        let pass = ReplaceBoolPass;
+        let pass = ReplaceBoolPass::default();
         pass.run(&mut h).unwrap();
         h.validate().unwrap();
 
@@ -495,7 +550,7 @@ mod test {
 
         assert_eq!(h.num_nodes(), 8);
 
-        let pass = ReplaceBoolPass;
+        let pass = ReplaceBoolPass::default();
         pass.run(&mut h).unwrap();
         h.validate().unwrap();
 
@@ -521,7 +576,7 @@ mod test {
         let result = dfb.add_dataflow_op(logic_op, [b1, b2]).unwrap();
         let mut h = dfb.finish_hugr_with_outputs(result.outputs()).unwrap();
 
-        let pass = ReplaceBoolPass;
+        let pass = ReplaceBoolPass::default();
         pass.run(&mut h).unwrap();
         h.validate().unwrap();
 
@@ -537,7 +592,7 @@ mod test {
         let result = dfb.add_dataflow_op(BoolOp::not, [b]).unwrap();
         let mut h = dfb.finish_hugr_with_outputs(result.outputs()).unwrap();
 
-        let pass = ReplaceBoolPass;
+        let pass = ReplaceBoolPass::default();
         pass.run(&mut h).unwrap();
         h.validate().unwrap();
 
@@ -548,14 +603,15 @@ mod test {
 
     #[rstest]
     #[case(TketOp::MeasureFree)]
-    #[case(QSystemOp::Measure)]
+    #[case(HeliosOp::Measure)]
+    #[case(SolOp::Measure)]
     fn test_measure<T: Into<OpType>>(#[case] measure_op: T) {
         let mut dfb = DFGBuilder::new(inout_sig(vec![qb_t()], vec![bool_type()])).unwrap();
         let [q] = dfb.input_wires_arr();
         let output = dfb.add_dataflow_op(measure_op, [q]).unwrap();
         let mut h = dfb.finish_hugr_with_outputs(output.outputs()).unwrap();
 
-        let pass = ReplaceBoolPass;
+        let pass = ReplaceBoolPass::default();
         pass.run(&mut h).unwrap();
         h.validate().unwrap();
 
@@ -573,14 +629,16 @@ mod test {
         //}));
     }
 
-    #[test]
-    fn test_measure_reset() {
+    #[rstest]
+    #[case(HeliosOp::MeasureReset)]
+    #[case(SolOp::MeasureReset)]
+    fn test_measure_reset<T: Into<OpType>>(#[case] measure_reset_op: T) {
         let mut dfb = DFGBuilder::new(inout_sig(vec![qb_t()], vec![qb_t(), bool_type()])).unwrap();
         let [q] = dfb.input_wires_arr();
-        let output = dfb.add_measure_reset(q).unwrap();
-        let mut h = dfb.finish_hugr_with_outputs(output).unwrap();
+        let output = dfb.add_dataflow_op(measure_reset_op, [q]).unwrap();
+        let mut h = dfb.finish_hugr_with_outputs(output.outputs()).unwrap();
 
-        let pass = ReplaceBoolPass;
+        let pass = ReplaceBoolPass::default();
         pass.run(&mut h).unwrap();
         h.validate().unwrap();
 
@@ -607,7 +665,7 @@ mod test {
         let mut h = dfb.finish_hugr_with_outputs([arr1, arr2]).unwrap();
 
         h.validate().unwrap();
-        let pass = ReplaceBoolPass;
+        let pass = ReplaceBoolPass::default();
         pass.run(&mut h).unwrap();
         h.validate().unwrap();
 
@@ -635,7 +693,7 @@ mod test {
         let mut h = dfb.finish_hugr_with_outputs([]).unwrap();
 
         h.validate().unwrap();
-        let pass = ReplaceBoolPass;
+        let pass = ReplaceBoolPass::default();
         pass.run(&mut h).unwrap();
         h.validate().unwrap();
     }
@@ -656,12 +714,12 @@ mod test {
             .add_borrow_array_get(src_ty.clone(), 4, arr_in, idx)
             .unwrap();
         let [elem] = dfb
-            .build_unwrap_sum(1, option_type(src_ty.clone()), opt_elem)
+            .build_unwrap_sum(1, option_type(vec![src_ty.clone()]), opt_elem)
             .unwrap();
         let mut h = dfb.finish_hugr_with_outputs([arr, elem]).unwrap();
 
         h.validate().unwrap();
-        let pass = ReplaceBoolPass;
+        let pass = ReplaceBoolPass::default();
         pass.run(&mut h).unwrap(); // Fails here with mismatch, option_type(bool_dest()) is not Copyable
         h.validate().unwrap();
 

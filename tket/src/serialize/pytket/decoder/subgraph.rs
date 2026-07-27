@@ -1,6 +1,5 @@
 //! Methods to decode opaque subgraphs from a pytket barrier operation.
 
-use std::ops::RangeTo;
 use std::sync::Arc;
 
 use hugr::builder::Container;
@@ -11,14 +10,18 @@ use hugr::{Hugr, HugrView, Node, OutgoingPort, PortIndex, Wire};
 use hugr_core::hugr::internal::HugrMutInternals;
 use itertools::Itertools;
 
+use crate::extension::rotation::rotation_type;
 use crate::serialize::pytket::decoder::{
     DecodeStatus, FoundWire, LoadedParameter, PytketDecoderContext, TrackedBit, TrackedQubit,
 };
+use crate::serialize::pytket::error::BarrierPayloadError;
 use crate::serialize::pytket::extension::RegisterCount;
 use crate::serialize::pytket::opaque::{
     EncodedEdgeID, OpaqueSubgraph, OpaqueSubgraphPayload, SubgraphId,
 };
-use crate::serialize::pytket::{PytketDecodeError, PytketDecodeErrorInner, PytketDecoderConfig};
+use crate::serialize::pytket::{
+    PARAMETER_TYPES, PytketDecodeError, PytketDecodeErrorInner, PytketDecoderConfig,
+};
 
 impl<'h> PytketDecoderContext<'h> {
     /// Insert a subgraph encoded in the payload of a pytket barrier operation into
@@ -27,26 +30,40 @@ impl<'h> PytketDecoderContext<'h> {
         &mut self,
         qubits: &[TrackedQubit],
         bits: &[TrackedBit],
-        params: &[LoadedParameter],
         payload: &OpaqueSubgraphPayload,
     ) -> Result<DecodeStatus, PytketDecodeError> {
+        let mut load_params = |input_params: &[String]| {
+            input_params
+                .iter()
+                .map(|p| self.load_half_turns(p))
+                .collect_vec()
+        };
         let status = match payload {
-            OpaqueSubgraphPayload::External { id } => {
-                self.insert_external_subgraph(*id, qubits, bits, params)
+            OpaqueSubgraphPayload::External { id, input_params } => {
+                let loaded_params = load_params(input_params);
+                self.insert_external_subgraph(*id, qubits, bits, &loaded_params)
             }
             OpaqueSubgraphPayload::Inline {
                 hugr_envelope,
                 inputs,
                 outputs,
-            } => self.insert_inline_subgraph(hugr_envelope, inputs, outputs, qubits, bits, params),
+                input_params,
+            } => {
+                let loaded_params = load_params(input_params);
+                self.insert_inline_subgraph(
+                    hugr_envelope,
+                    inputs,
+                    outputs,
+                    qubits,
+                    bits,
+                    &loaded_params,
+                )
+            }
         }?;
 
         // Mark the used qubits and bits as outdated.
         qubits.iter().for_each(|q| {
             self.wire_tracker.mark_qubit_outdated(q.clone());
-        });
-        bits.iter().for_each(|b| {
-            self.wire_tracker.mark_bit_outdated(b.clone());
         });
 
         Ok(status)
@@ -81,7 +98,9 @@ impl<'h> PytketDecoderContext<'h> {
             subgraph, qubits, bits, params, old_parent, new_parent,
         )?;
 
-        self.rewire_external_subgraph_outputs(subgraph, qubits, bits, old_parent, new_parent)?;
+        self.rewire_external_subgraph_outputs(id, subgraph, qubits, bits, old_parent, new_parent)?;
+
+        self.rewire_external_subgraph_io_order_edges(subgraph, old_parent, new_parent)?;
 
         Ok(DecodeStatus::Success)
     }
@@ -159,6 +178,7 @@ impl<'h> PytketDecoderContext<'h> {
     /// Helper for [`Self::insert_external_subgraph`].
     fn rewire_external_subgraph_outputs(
         &mut self,
+        id: SubgraphId,
         subgraph: &OpaqueSubgraph<Node>,
         qubits: &[TrackedQubit],
         bits: &[TrackedBit],
@@ -170,6 +190,7 @@ impl<'h> PytketDecoderContext<'h> {
 
         let mut output_qubits = qubits;
         let mut output_bits = bits;
+        let mut output_param_count = 0;
 
         for (ty, (src, src_port)) in subgraph
             .signature()
@@ -182,14 +203,13 @@ impl<'h> PytketDecoderContext<'h> {
             // leave it untouched.
             let wire = Wire::new(*src, *src_port);
             if let Some(counts) = self.config().type_to_pytket(ty).filter(|c| c.params == 0) {
-                // This port declares new outputs to be tracked by the decoder.
-                // Output parameters from a subgraph are always marked as not supported (they don't map to any pytket argument variable).
+                // This port declares new bit/qubit outputs to be tracked by the decoder.
 
                 // Make sure to disconnect the old wire.
                 self.builder.hugr_mut().disconnect(*src, *src_port);
 
-                let wire_qubits = split_off(&mut output_qubits, ..counts.qubits);
-                let wire_bits = split_off(&mut output_bits, ..counts.bits);
+                let wire_qubits = output_qubits.split_off(..counts.qubits);
+                let wire_bits = output_bits.split_off(..counts.bits);
                 if wire_qubits.is_none() || wire_bits.is_none() {
                     return Err(make_unexpected_node_out_error(
                         self.config(),
@@ -204,6 +224,18 @@ impl<'h> PytketDecoderContext<'h> {
                     wire_qubits.unwrap().iter().cloned(),
                     wire_bits.unwrap().iter().cloned(),
                 )?;
+            } else if PARAMETER_TYPES.contains(ty) {
+                // The encoder names opaque parameter outputs by the number of
+                // parameter values exposed to pytket.
+                let param_name = id.output_parameter(output_param_count);
+                output_param_count += 1;
+                let param = if ty == &rotation_type() {
+                    LoadedParameter::rotation(wire)
+                } else {
+                    LoadedParameter::float_half_turns(wire)
+                };
+                self.wire_tracker
+                    .register_input_parameter(param, param_name)?;
             } else {
                 // This is an unsupported wire. If it was connected to the old
                 // region's output, rewire it to the new region's output.
@@ -229,6 +261,74 @@ impl<'h> PytketDecoderContext<'h> {
         Ok(())
     }
 
+    /// Rewire any order edges betwen the input/output nodes of the old region and the external subgraph,
+    /// connecting them to the new input/output nodes instead.
+    fn rewire_external_subgraph_io_order_edges(
+        &mut self,
+        subgraph: &OpaqueSubgraph<Node>,
+        old_parent: Node,
+        new_parent: Node,
+    ) -> Result<(), PytketDecodeError> {
+        let [old_input, old_output] = self.builder.hugr().get_io(old_parent).expect("IO nodes");
+        let [new_input, new_output] = self.builder.hugr().get_io(new_parent).expect("IO nodes");
+
+        // Find the order edge ports.
+        // Since we are in a dataflow region, nodes are guaranteed to have an order-edge `other_port`s.
+        let order_out = |node: Node| {
+            self.builder
+                .hugr()
+                .get_optype(node)
+                .other_output_port()
+                .expect("Order edge")
+        };
+        let order_in = |node: Node| {
+            self.builder
+                .hugr()
+                .get_optype(node)
+                .other_input_port()
+                .expect("Order edge")
+        };
+        let old_input_order = order_out(old_input);
+        let new_input_order = order_out(new_input);
+        let old_output_order = order_in(old_output);
+        let new_output_order = order_in(new_output);
+
+        for (tgt_node, tgt_port) in self
+            .builder
+            .hugr()
+            .linked_inputs(old_input, old_input_order)
+            .filter(|(node, _)| subgraph.nodes().contains(node))
+            .collect_vec()
+        {
+            self.builder
+                .hugr_mut()
+                .connect(new_input, new_input_order, tgt_node, tgt_port);
+            self.builder
+                .hugr_mut()
+                .disconnect_edge(old_input, old_input_order, tgt_node, tgt_port);
+        }
+
+        for (src_node, src_port) in self
+            .builder
+            .hugr()
+            .linked_outputs(old_output, old_output_order)
+            .filter(|(node, _)| subgraph.nodes().contains(node))
+            .collect_vec()
+        {
+            self.builder
+                .hugr_mut()
+                .connect(src_node, src_port, new_output, new_output_order);
+            self.builder.hugr_mut().disconnect_edge(
+                src_node,
+                src_port,
+                old_output,
+                old_output_order,
+            );
+        }
+
+        Ok(())
+    }
+
     /// Insert an [`OpaqueSubgraphPayload::Inline`] into the Hugr being decoded.
     fn insert_inline_subgraph(
         &mut self,
@@ -240,7 +340,7 @@ impl<'h> PytketDecoderContext<'h> {
         params: &[LoadedParameter],
     ) -> Result<DecodeStatus, PytketDecodeError> {
         let to_insert_hugr = Hugr::load_str(hugr_envelope, Some(self.extension_registry()))
-            .map_err(|e| PytketDecodeErrorInner::UnsupportedSubgraphInlinePayload { source: e })?;
+            .map_err(|e| BarrierPayloadError::HugrRead(e).wrap())?;
         let to_insert_signature = to_insert_hugr.inner_function_type().unwrap();
 
         let module = self.builder.hugr().module_root();
@@ -293,11 +393,7 @@ impl<'h> PytketDecoderContext<'h> {
         let entrypoint_function =
             std::iter::successors(Some(to_insert_hugr.entrypoint()), |&node| {
                 let parent = to_insert_hugr.get_parent(node)?;
-                if parent == module {
-                    None
-                } else {
-                    Some(parent)
-                }
+                if parent == module { None } else { Some(parent) }
             })
             .last()
             .unwrap();
@@ -412,8 +508,8 @@ impl<'h> PytketDecoderContext<'h> {
                     // Track the registers in the subgraph output wires.
                     // Output parameters from a subgraph are always marked as not supported (they don't map to any pytket argument variable).
                     // We only track qubit/bit wires here.
-                    let wire_qubits = split_off(&mut output_qubits, ..counts.qubits);
-                    let wire_bits = split_off(&mut output_bits, ..counts.bits);
+                    let wire_qubits = output_qubits.split_off(..counts.qubits);
+                    let wire_bits = output_bits.split_off(..counts.bits);
                     if wire_qubits.is_none() || wire_bits.is_none() {
                         return Err(make_unexpected_node_out_error(
                             self.config(),
@@ -441,17 +537,6 @@ impl<'h> PytketDecoderContext<'h> {
         }
         Ok(())
     }
-}
-
-// TODO: Replace with array's `split_off` method once MSRV is ≥1.87
-fn split_off<'a, T>(slice: &mut &'a [T], range: RangeTo<usize>) -> Option<&'a [T]> {
-    let split_index = range.end;
-    if split_index > slice.len() {
-        return None;
-    }
-    let (front, back) = slice.split_at(split_index);
-    *slice = back;
-    Some(front)
 }
 
 /// Helper to compute the expected register counts before generating a

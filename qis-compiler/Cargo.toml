@@ -4,7 +4,7 @@ authors = ["Seyon Sivarajah <seyon.sivarajah@quantinuum.com>"]
 description = "Compiler for HUGR to LLVM targeting the Helios QIS"
 publish = false
 readme = "README.md"
-repository = "https://github.com/CQCL/tket2/tree/main/qis-compiler"
+repository = "https://github.com/quantinuum/tket2/tree/main/qis-compiler"
 license = "Apache-2.0"
 edition = "2024"
 
@@ -21,14 +21,17 @@ serde_json.workspace = true
 tracing.workspace = true
 itertools.workspace = true
 strum.workspace = true
-tket = { path = "../tket", version = "0.16.0" }
-tket-qsystem = { path = "../tket-qsystem", version = "0.22.0", features = [
+tket = { path = "../tket", version = "0.19.3" }
+tket-qsystem = { path = "../tket-qsystem", version = "0.25.3", features = [
     "llvm",
 ] }
 
+[lints]
+workspace = true
+
 [features]
 default = []
-py = ["dep:pyo3", "pyo3/extension-module"]
+py = ["dep:pyo3"]
 
 [build-dependencies]
 cbindgen.workspace = true
@@ -41,7 +44,7 @@ typetag.workspace = true
 
 # Defined here so it can be overridden by the codspeed CI job
 # using `cargo add`.
-insta = "1.43.2"
+insta = "1.47.2"
 
 [package.metadata.cargo-machete]
 ignored = ["cbindgen", "pyo3-build-config"]

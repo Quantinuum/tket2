@@ -3,16 +3,16 @@ use std::str::FromStr;
 
 use hugr::{
     extension::SignatureFunc,
-    types::{type_param::TypeParam, FuncValueType, PolyFuncTypeRV, TypeBound, TypeRV},
+    types::{FuncValueType, PolyFuncTypeRV, TypeBound, TypeRV, type_param::TypeParam},
 };
 
-#[allow(missing_docs)]
+/// Dagger modifier.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub struct ModifierDagger;
 
 impl ModifierDagger {
     /// Create a new ModifierDagger.
-    pub fn new() -> Self {
+    fn new() -> Self {
         ModifierDagger
     }
 }
@@ -34,27 +34,27 @@ impl FromStr for ModifierDagger {
 }
 impl ModifierDagger {
     /// Signature for the dagger modifier.
-    pub fn signature() -> SignatureFunc {
+    pub(crate) fn signature() -> SignatureFunc {
         PolyFuncTypeRV::new(
             [
                 TypeParam::new_list_type(TypeBound::Linear),
                 TypeParam::new_list_type(TypeBound::Linear),
             ],
             FuncValueType::new(
-                TypeRV::new_function(FuncValueType::new(
+                [TypeRV::new_function(FuncValueType::new(
                     vec![
                         TypeRV::new_row_var_use(0, TypeBound::Linear),
                         TypeRV::new_row_var_use(1, TypeBound::Linear),
                     ],
                     vec![TypeRV::new_row_var_use(0, TypeBound::Linear)],
-                )),
-                TypeRV::new_function(FuncValueType::new(
+                ))],
+                [TypeRV::new_function(FuncValueType::new(
                     vec![
                         TypeRV::new_row_var_use(0, TypeBound::Linear),
                         TypeRV::new_row_var_use(1, TypeBound::Linear),
                     ],
-                    TypeRV::new_row_var_use(0, TypeBound::Linear),
-                )),
+                    [TypeRV::new_row_var_use(0, TypeBound::Linear)],
+                ))],
             ),
         )
         .into()

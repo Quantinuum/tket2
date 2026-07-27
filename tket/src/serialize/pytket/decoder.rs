@@ -8,6 +8,7 @@ mod wires;
 use hugr::extension::ExtensionRegistry;
 use hugr::hugr::hugrmut::HugrMut;
 use hugr::std_extensions::arithmetic::float_types::float64_type;
+use indexmap::IndexSet;
 pub use param::{LoadedParameter, ParameterType};
 pub use tracked_elem::{TrackedBit, TrackedQubit};
 pub use wires::TrackedWires;
@@ -19,30 +20,29 @@ use std::sync::Arc;
 use hugr::builder::{BuildHandle, Container, DFGBuilder, Dataflow, FunctionBuilder, SubContainer};
 use hugr::extension::prelude::{bool_t, qb_t};
 use hugr::ops::handle::{DataflowOpID, NodeHandle};
-use hugr::ops::{OpParent, OpTrait, OpType, DFG};
+use hugr::ops::{DFG, OpParent, OpTrait, OpType};
 use hugr::types::{Signature, Type, TypeRow};
-use hugr::{Hugr, HugrView, Node, OutgoingPort, Wire};
+use hugr::{Hugr, HugrView, IncomingPort, Node, OutgoingPort, Wire};
 use tracked_elem::{TrackedBitId, TrackedQubitId};
 
 use itertools::Itertools;
-use serde_json::json;
 use tket_json_rs::circuit_json;
 use tket_json_rs::circuit_json::SerialCircuit;
 
-use super::{
-    PytketDecodeError, METADATA_B_REGISTERS, METADATA_INPUT_PARAMETERS, METADATA_PHASE,
-    METADATA_Q_REGISTERS,
-};
+use super::PytketDecodeError;
+use crate::TketOp;
 use crate::extension::rotation::rotation_type;
-use crate::serialize::pytket::circuit::{AdditionalNodesAndWires, StraightThroughWire};
+use crate::metadata;
+use crate::serialize::pytket::circuit::{
+    AdditionalNodesAndWires, EncodedCircuitInfo, StraightThroughWire,
+};
 use crate::serialize::pytket::config::PytketDecoderConfig;
 use crate::serialize::pytket::decoder::wires::WireTracker;
-use crate::serialize::pytket::extension::{build_opaque_tket_op, RegisterCount};
+use crate::serialize::pytket::extension::{RegisterCount, build_opaque_tket_op};
 use crate::serialize::pytket::opaque::{EncodedEdgeID, OpaqueSubgraphs};
 use crate::serialize::pytket::{
-    default_decoder_config, DecodeInsertionTarget, DecodeOptions, PytketDecodeErrorInner,
+    DecodeInsertionTarget, DecodeOptions, PytketDecodeErrorInner, default_decoder_config,
 };
-use crate::TketOp;
 
 /// State of the tket circuit being decoded.
 ///
@@ -156,7 +156,7 @@ impl<'h> PytketDecoderContext<'h> {
 
         if !serialcirc.phase.is_empty() {
             // TODO - add a phase gate
-            // <https://github.com/CQCL/tket2/issues/598>
+            // <https://github.com/quantinuum/tket2/issues/598>
             // let phase = Param::new(serialcirc.phase);
             // decoder.add_phase(phase);
         }
@@ -175,9 +175,14 @@ impl<'h> PytketDecoderContext<'h> {
     fn init_metadata(dfg: &mut DFGBuilder<&mut Hugr>, serialcirc: &SerialCircuit) {
         // Metadata. The circuit requires "name", and we store other things that
         // should pass through the serialization roundtrip.
-        dfg.set_metadata(METADATA_PHASE, json!(serialcirc.phase));
-        dfg.set_metadata(METADATA_Q_REGISTERS, json!(serialcirc.qubits));
-        dfg.set_metadata(METADATA_B_REGISTERS, json!(serialcirc.bits));
+
+        let node = dfg.container_node();
+        dfg.hugr_mut()
+            .set_metadata::<metadata::PytketPhaseExpr>(node, &serialcirc.phase);
+        dfg.hugr_mut()
+            .set_metadata::<metadata::PytketQubitRegisterNames>(node, serialcirc.qubits.clone());
+        dfg.hugr_mut()
+            .set_metadata::<metadata::PytketBitRegisterNames>(node, serialcirc.bits.clone());
     }
 
     /// Initialize the wire tracker with the input wires.
@@ -300,22 +305,49 @@ impl<'h> PytketDecoderContext<'h> {
     ///
     /// # Arguments
     ///
-    /// - `output_params`: A list of output parameter expressions to associate
-    ///   with the region's outputs.
-    pub(super) fn finish(mut self, output_params: &[String]) -> Result<Node, PytketDecodeError> {
-        // Order the final wires according to the serial circuit register order.
-        let known_qubits = self
-            .wire_tracker
-            .known_pytket_qubits()
-            .cloned()
-            .collect_vec();
-        let known_bits = self.wire_tracker.known_pytket_bits().cloned().collect_vec();
-        let mut qubits = known_qubits.as_slice();
-        let mut bits = known_bits.as_slice();
+    /// - `encoded_info`: Information stored while encoding the circuit, used to
+    ///   recover its original structure.
+    pub(super) fn finish(
+        mut self,
+        encoded_info: Option<&EncodedCircuitInfo>,
+    ) -> Result<Node, PytketDecodeError> {
+        // Qubits and bits appearing at the output.
+        let mut qubits: Vec<TrackedQubit> = Vec::new();
+        let mut bits: Vec<TrackedBit> = Vec::new();
+        if let Some(encoded_info) = encoded_info {
+            for qubit in encoded_info.output_qubits.iter() {
+                let id = self.wire_tracker.tracked_qubit_for_register(qubit)?;
+                qubits.push(id.clone());
+            }
+            for bit in encoded_info.output_bits.iter() {
+                let id = self.wire_tracker.tracked_bit_for_register(bit)?;
+                bits.push(id.clone());
+            }
+        }
+
+        // Add any other qubit and bit names used throughout the circuit, in the
+        // order they were registered.
+        let mut known_qubits: IndexSet<TrackedQubit> =
+            self.wire_tracker.known_pytket_qubits().cloned().collect();
+        let mut known_bits: IndexSet<TrackedBit> =
+            self.wire_tracker.known_pytket_bits().cloned().collect();
+        // Ignore qubits and bits that were already added to the list.
+        for q in &qubits {
+            known_qubits.shift_remove(q);
+        }
+        for b in &bits {
+            known_bits.shift_remove(b);
+        }
+        qubits.extend(known_qubits);
+        bits.extend(known_bits);
+
+        let mut qubits_slice: &[TrackedQubit] = &qubits;
+        let mut bits_slice: &[TrackedBit] = &bits;
 
         // Load the output parameter expressions.
-        let output_params = output_params
+        let output_params = encoded_info
             .iter()
+            .flat_map(|info| info.output_params.iter())
             .map(|p| self.load_half_turns(p))
             .collect_vec();
         let mut params: &[LoadedParameter] = &output_params;
@@ -337,6 +369,15 @@ impl<'h> PytketDecoderContext<'h> {
             // (It's a wire from an unsupported operation, or was a connected
             // straight through wire)
             if self.builder.hugr().is_linked(output_node, port) {
+                self.consume_registers_for_prelinked_output(
+                    output_node,
+                    port,
+                    ty,
+                    &expected_output_types,
+                    &mut qubits_slice,
+                    &mut bits_slice,
+                    &mut params,
+                )?;
                 continue;
             }
 
@@ -347,8 +388,8 @@ impl<'h> PytketDecoderContext<'h> {
                     &self.config,
                     &mut self.builder,
                     ty,
-                    &mut qubits,
-                    &mut bits,
+                    &mut qubits_slice,
+                    &mut bits_slice,
                     &mut params,
                     Some(EncodedEdgeID::default()),
                 )
@@ -385,12 +426,13 @@ impl<'h> PytketDecoderContext<'h> {
                     // Disconnected port with an unsupported type. We just skip
                     // it, since it must have been disconnected in the original
                     // hugr too.
-                    debug_assert!(self
-                        .builder
-                        .hugr()
-                        .get_optype(output_node)
-                        .port_kind(port)
-                        .is_none_or(|kind| !kind.is_value()));
+                    debug_assert!(
+                        self.builder
+                            .hugr()
+                            .get_optype(output_node)
+                            .port_kind(port)
+                            .is_none_or(|kind| !kind.is_value())
+                    );
                     continue;
                 }
             };
@@ -400,15 +442,18 @@ impl<'h> PytketDecoderContext<'h> {
         }
 
         // Qubits not in the output need to be freed.
-        self.add_implicit_qfree_operations(qubits);
+        self.add_implicit_qfree_operations(qubits_slice)?;
 
         // Store the name for the input parameter wires
         let input_params = self.wire_tracker.finish();
         if !input_params.is_empty() {
-            self.builder.set_metadata(
-                METADATA_INPUT_PARAMETERS,
-                json!(input_params.into_iter().collect_vec()),
-            );
+            let node = self.builder.container_node();
+            self.builder
+                .hugr_mut()
+                .set_metadata::<metadata::PytketInputParameters>(
+                    node,
+                    input_params.into_iter().collect_vec(),
+                );
         }
 
         Ok(self
@@ -418,14 +463,84 @@ impl<'h> PytketDecoderContext<'h> {
             .node())
     }
 
-    /// Add the implicit QFree operations for a list of qubits that are not in the hugr output.
+    /// Account for a HUGR output port that was connected before `finish` filled
+    /// in the remaining outputs.
     ///
-    /// We only do this if there's a wire with type `qb_t` containing the qubit.
-    fn add_implicit_qfree_operations(&mut self, qubits: &[TrackedQubit]) {
+    /// Pre-linked outputs come from unsupported subgraphs or straight-through
+    /// wires. They are already valid HUGR edges, so `finish` must not reconnect
+    /// them, but it must still advance the pytket register cursors. Otherwise a
+    /// qubit carried by such an output is later mistaken for a leftover qubit
+    /// and gets an invalid implicit [`TketOp::QFree`].
+    #[expect(clippy::too_many_arguments)]
+    fn consume_registers_for_prelinked_output(
+        &self,
+        output_node: Node,
+        port: IncomingPort,
+        ty: &Type,
+        expected_output_types: &[Type],
+        qubits: &mut &[TrackedQubit],
+        bits: &mut &[TrackedBit],
+        params: &mut &[LoadedParameter],
+    ) -> Result<(), PytketDecodeError> {
+        let linked_registers = self
+            .linked_wire_register_count(output_node, port)
+            .or_else(|| self.config.type_to_pytket(ty));
+        let Some(reg_count) = linked_registers else {
+            return Ok(());
+        };
+
+        if qubits.len() < reg_count.qubits
+            || bits.len() < reg_count.bits
+            || params.len() < reg_count.params
+        {
+            return Err(PytketDecodeErrorInner::InvalidOutputSignature {
+                expected_types: expected_output_types
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect(),
+            }
+            .wrap()
+            .hugr_op("Output"));
+        }
+
+        *qubits = &qubits[reg_count.qubits..];
+        *bits = &bits[reg_count.bits..];
+        *params = &params[reg_count.params..];
+        Ok(())
+    }
+
+    /// Return the pytket register count for the wire already linked to an
+    /// output port, if that wire is tracked by the decoder.
+    fn linked_wire_register_count(
+        &self,
+        output_node: Node,
+        port: IncomingPort,
+    ) -> Option<RegisterCount> {
+        self.builder
+            .hugr()
+            .single_linked_output(output_node, port)
+            .and_then(|(node, port)| {
+                self.wire_tracker
+                    .wire_data(Wire::new(node, port))
+                    .map(|wire| RegisterCount::new(wire.num_qubits(), wire.num_bits(), 0))
+            })
+    }
+
+    /// Add the implicit QFree operations for a list of qubits that are not in
+    /// the hugr output and still have a registered wire in the tracker.
+    fn add_implicit_qfree_operations(
+        &mut self,
+        qubits: &[TrackedQubit],
+    ) -> Result<(), PytketDecodeError> {
         let qb_type = qb_t();
         let mut bit_args: &[TrackedBit] = &[];
         let mut params: &[LoadedParameter] = &[];
         for q in qubits.iter() {
+            // Ignore qubits that didn't get initialized
+            if !self.wire_tracker.qubit_is_initialized(q) {
+                continue;
+            }
+
             let mut qubit_args: &[TrackedQubit] = std::slice::from_ref(q);
             let Ok(FoundWire::Register(wire)) = self.wire_tracker.find_typed_wire(
                 &self.config,
@@ -439,11 +554,28 @@ impl<'h> PytketDecoderContext<'h> {
                 continue;
             };
 
+            let wire = wire.wire();
+            // Check if the value wire is already consumed by another HUGR node.
+            //
+            // This may be the case if there's an unsupported subgraph at the
+            // end of the region.
+            if self
+                .builder
+                .hugr()
+                .linked_inputs(wire.node(), wire.source())
+                .next()
+                .is_some()
+            {
+                continue;
+            }
+
             self.builder
-                .add_dataflow_op(TketOp::QFree, [wire.wire()])
-                .unwrap()
+                .add_dataflow_op(TketOp::QFree, [wire])
+                .map_err(PytketDecodeError::custom)?
                 .out_wire(0);
         }
+
+        Ok(())
     }
 
     /// Decode a list of pytket commands.
@@ -462,24 +594,17 @@ impl<'h> PytketDecoderContext<'h> {
         commands: &[circuit_json::Command],
         extra_nodes_and_wires: Option<&AdditionalNodesAndWires>,
     ) -> Result<(), PytketDecodeError> {
-        let config = self.config().clone();
-        for com in commands {
-            let op_type = com.op.op_type;
-            self.process_command(com, config.as_ref())
-                .map_err(|e| e.pytket_op(&op_type))?;
-        }
-
         // Add additional subgraphs and wires not encoded in commands.
         let [input_node, output_node] = self.builder.io();
         if let Some(extras) = extra_nodes_and_wires {
-            if let Some(subgraph_id) = extras.extra_subgraph {
-                let params = extras
-                    .extra_subgraph_params
+            for extra_subgraph in &extras.additional_subgraphs {
+                let params = extra_subgraph
+                    .params
                     .iter()
                     .map(|p| self.load_half_turns(p))
                     .collect_vec();
 
-                self.insert_external_subgraph(subgraph_id, &[], &[], &params)
+                self.insert_external_subgraph(extra_subgraph.id, &[], &[], &params)
                     .map_err(|e| e.hugr_op("External subgraph"))?;
             }
 
@@ -497,6 +622,15 @@ impl<'h> PytketDecoderContext<'h> {
                 );
             }
         }
+
+        // Decode the pytket commands.
+        let config = self.config().clone();
+        for com in commands {
+            let op_type = com.op.op_type;
+            self.process_command(com, config.as_ref())
+                .map_err(|e| e.pytket_op(&op_type))?;
+        }
+
         Ok(())
     }
 
@@ -581,11 +715,6 @@ impl<'h> PytketDecoderContext<'h> {
     /// Connects the input ports of a node using a list of input qubits, bits,
     /// and pytket parameters. Registers the node's output wires in the wire
     /// tracker.
-    ///
-    /// The qubits registers in `wires` are reused between the operation inputs
-    /// and outputs. Bit registers, on the other hand, are not reused. We use
-    /// the first registers in `wires` for the bit inputs and the remaining
-    /// registers for the outputs.
     ///
     /// The input wire types must match the operation's input signature, no type
     /// conversion is performed.
@@ -700,9 +829,6 @@ impl<'h> PytketDecoderContext<'h> {
                 .hugr_mut()
                 .connect(wire.node(), wire.source(), node, input_idx);
         }
-        input_bits.iter().take(op_input_count.bits).for_each(|b| {
-            self.wire_tracker.mark_bit_outdated(b.clone());
-        });
 
         // Register the output wires.
         let output_qubits = output_qubits.iter().take(op_output_count.qubits).cloned();
@@ -773,9 +899,8 @@ impl<'h> PytketDecoderContext<'h> {
     /// Given a new node in the HUGR, register all of its output wires in the
     /// tracker.
     ///
-    /// Consumes the bits and qubits in order. Any unused bits and qubits are
-    /// marked as outdated, as they are assumed to have been consumed in the
-    /// inputs.
+    /// Consumes the bits and qubits in order. Any unused qubits are marked as
+    /// outdated, as they are assumed to have been consumed in the inputs.
     pub fn register_node_outputs(
         &mut self,
         node: Node,
@@ -820,12 +945,9 @@ impl<'h> PytketDecoderContext<'h> {
                 .track_wire(wire, Arc::new(ty.clone()), wire_qubits, wire_bits)?;
         }
 
-        // Mark any unused qubits and bits as outdated.
+        // Mark any unused qubits as outdated.
         qubits.for_each(|q| {
             self.wire_tracker.mark_qubit_outdated(q);
-        });
-        bits.for_each(|b| {
-            self.wire_tracker.mark_bit_outdated(b);
         });
 
         Ok(())

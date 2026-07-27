@@ -50,3 +50,21 @@ bitcode_apple_silicon = compile_to_bitcode(
     target_triple="x86_64-windows-msvc",
 )
 ```
+
+## Development
+
+### Snapshot testing
+This package uses snapshot testing for its compiler output.
+Sample programs are defined using guppy in the script `python/tests/generate_hugrs.py`.
+To add a new test case add a new function to generate the desired HUGR program and
+call it from the `if __name__ == "__main__":` block.
+
+The script has self contained dependencies with a pinned guppy version
+defined in comments at the top of the file. `uv` will create a virtual environment
+and install the dependencies when you run the script with `uv run python
+tests/generate_hugrs.py`. This can also be done using `just regenerate` in the
+`python/tests` directory.
+
+HUGR regeneration should not be done in conjunction with other changes to the compiler,
+to isolate possible changes to the snapshots. It should only be required if guppylang
+updates are required for testing the compiler.

@@ -10,7 +10,7 @@ use crate::serialize::pytket::decoder::{
     DecodeStatus, LoadedParameter, PytketDecoderContext, TrackedBit, TrackedQubit,
 };
 use crate::serialize::pytket::extension::PytketDecoder;
-use crate::serialize::pytket::opaque::{OpaqueSubgraphPayload, OPGROUP_OPAQUE_HUGR};
+use crate::serialize::pytket::opaque::OpaqueSubgraphPayload;
 use crate::serialize::pytket::{DecodeInsertionTarget, DecodeOptions, PytketDecodeError};
 use hugr::builder::Container;
 use hugr::extension::prelude::{bool_t, qb_t};
@@ -36,7 +36,7 @@ impl PytketDecoder for CoreDecoder {
         qubits: &[TrackedQubit],
         bits: &[TrackedBit],
         params: &[LoadedParameter],
-        opgroup: Option<&str>,
+        _opgroup: Option<&str>,
         decoder: &mut PytketDecoderContext<'h>,
     ) -> Result<DecodeStatus, PytketDecodeError> {
         match &op {
@@ -44,10 +44,16 @@ impl PytketDecoder for CoreDecoder {
                 op_type: PytketOptype::Barrier,
                 data: Some(payload),
                 ..
-            } if opgroup == Some(OPGROUP_OPAQUE_HUGR) => {
-                let payload =
-                    OpaqueSubgraphPayload::load_str(payload, decoder.extension_registry())?;
-                decoder.insert_subgraph_from_payload(qubits, bits, params, &payload)
+            } =>
+            // Load an opaque subgraph from a barrier.
+            //
+            // Note that pytket can delete parameters to a barrier operation, so
+            // we encode them in the payload instead of reading `params`.
+            {
+                match OpaqueSubgraphPayload::load_str(payload, decoder.extension_registry()) {
+                    Ok(payload) => decoder.insert_subgraph_from_payload(qubits, bits, &payload),
+                    _ => Ok(DecodeStatus::Unsupported),
+                }
             }
             PytketOperation {
                 op_type: PytketOptype::CircBox,
@@ -87,7 +93,7 @@ impl PytketDecoder for CoreDecoder {
                     decoder.opaque_subgraphs,
                 )?;
                 nested_decoder.run_decoder(&serial_circuit.commands, None)?;
-                let internal = nested_decoder.finish(&[])?.node();
+                let internal = nested_decoder.finish(None)?.node();
 
                 decoder
                     .wire_up_node(internal, qubits, qubits, bits, bits, params)

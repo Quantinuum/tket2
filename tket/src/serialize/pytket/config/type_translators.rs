@@ -7,8 +7,8 @@ use std::collections::HashMap;
 use std::sync::RwLock;
 
 use hugr::builder::{BuildError, DFGBuilder, Dataflow};
-use hugr::extension::prelude::bool_t;
 use hugr::extension::ExtensionId;
+use hugr::extension::prelude::bool_t;
 use hugr::std_extensions::arithmetic::float_types;
 use hugr::types::{Type, TypeEnum};
 use hugr::{Hugr, Wire};
@@ -141,7 +141,7 @@ impl TypeTranslatorSet {
     fn translators_for_extension(
         &self,
         ext: &ExtensionId,
-    ) -> impl Iterator<Item = &Box<dyn PytketTypeTranslator + Send + Sync>> {
+    ) -> impl Iterator<Item = &Box<dyn PytketTypeTranslator + Send + Sync>> + use<'_> {
         self.extension_translators
             .get(ext)
             .into_iter()
@@ -223,7 +223,7 @@ impl TypeTranslatorSet {
 
 #[cfg(test)]
 mod tests {
-    use hugr::extension::prelude::{qb_t, PRELUDE_ID};
+    use hugr::extension::prelude::{PRELUDE_ID, qb_t};
     use hugr::types::SumType;
 
     use crate::extension::bool::BOOL_EXTENSION_ID;

@@ -1,8 +1,15 @@
 name: Rust Semver Checks
 on:
-  pull_request_target:
+  pull_request:
     branches:
       - main
+
+env:
+  # different strings for install action and feature name
+  # adapted from https://github.com/TheDan64/inkwell/blob/master/.github/workflows/test.yml
+  LLVM_MAIN_VERSION: "21"
+  LLVM_VERSION: "21.1"
+  LLVM_FEATURE_NAME: "21-1"
 
 jobs:
   # Check if changes were made to the relevant files.
@@ -16,7 +23,7 @@ jobs:
       rust: ${{ steps.filter.outputs.rust }}
       python: ${{ steps.filter.outputs.python }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/check-changes
         id: filter
 
@@ -29,20 +36,17 @@ jobs:
       # When this envvar is set, the `./.github/actions/tket-c-api` action **must** be run to fetch the artifacts
       # This config is not required, but speeds up the build by caching the tket-c-api library
       # The alternative is to install conan and remove the env var
-      TKET_C_API_PATH: ${{ github.workspace }}/tket-c-api
-      LD_LIBRARY_PATH: ${{ github.workspace }}/tket-c-api/lib
+      HUGRENV_VERSION: "0.3.1"
+      HUGRENV_ROOT: "/tmp/hugrverse"
+      HUGRENV_PLATFORM: "manylinux_2_28_x86_64"
+      TKET_C_API_PATH: "/tmp/hugrverse"
+      LD_LIBRARY_PATH: "/tmp/hugrverse/lib:/tmp/hugrverse/lib64"
+      LLVM_SYS_211_PREFIX: "/tmp/hugrverse"
     steps:
       - name: Checkout tket
-        uses: actions/checkout@v5
-      - name: Install tket-c-api library
-        uses: ./.github/actions/tket-c-api
-        with:
-          install-path: ${{ env.TKET_C_API_PATH }}
-      - name: Install LLVM from apt
-        run: |
-          echo "Installing apt dependencies: llvm-14"
-          sudo apt-get install -y llvm-14
-      - uses: CQCL/hugrverse-actions/rs-semver-checks@main
+        uses: actions/checkout@v6
+      - uses: quantinuum/hugrverse-env/install-hugrenv-action@main
+      - uses: quantinuum/hugrverse-actions/rs-semver-checks@main
         env:
           TKET_C_API_PATH: ${{ env.TKET_C_API_PATH }}
         with:

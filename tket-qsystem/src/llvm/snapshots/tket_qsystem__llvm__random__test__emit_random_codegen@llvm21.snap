@@ -1,0 +1,17 @@
+---
+source: tket-qsystem/src/llvm/random.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define internal {} @_hl.main.1({} %0, i64 %1) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  call void @random_advance(i64 %1)
+  ret {} %0
+}
+
+declare void @random_advance(i64)

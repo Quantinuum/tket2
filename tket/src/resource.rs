@@ -56,22 +56,22 @@ mod types;
 #[cfg(test)]
 pub(crate) mod tests {
     use hugr::{
+        CircuitUnit, Hugr,
         builder::{DFGBuilder, Dataflow, DataflowHugr},
         extension::prelude::qb_t,
         hugr::views::SiblingSubgraph,
         ops::handle::DataflowParentID,
         types::Signature,
-        CircuitUnit, Hugr,
     };
 
     use itertools::Itertools;
     use rstest::rstest;
 
     use crate::{
-        extension::rotation::{rotation_type, ConstRotation},
+        TketOp,
+        extension::rotation::{ConstRotation, rotation_type},
         resource::scope::tests::ResourceScopeReport,
         utils::build_simple_circuit,
-        TketOp,
     };
 
     use super::ResourceScope;
@@ -154,9 +154,13 @@ pub(crate) mod tests {
         #[case] add_rz: bool,
         #[case] add_const_rz: bool,
     ) {
+        use hugr::hugr::views::RootChecked;
+
         let circ = circ(n_qubits, add_rz, add_const_rz);
-        let subgraph =
-            SiblingSubgraph::try_new_dataflow_subgraph::<_, DataflowParentID>(&circ).unwrap();
+        let subgraph = SiblingSubgraph::try_new_dataflow_subgraph::<_, DataflowParentID>(
+            RootChecked::try_new(&circ).expect("Entrypoint should be a dataflow parent."),
+        )
+        .unwrap();
         let scope = ResourceScope::new(&circ, subgraph);
         let info = ResourceScopeReport::from(&scope);
 

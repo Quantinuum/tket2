@@ -1,17 +1,19 @@
 //! Utilities for Control modifiers
 use hugr::{
-    extension::{prelude::qb_t, SignatureFunc},
+    extension::{SignatureFunc, prelude::qb_t},
     std_extensions::collections::array::array_type_parametric,
-    types::{type_param::TypeParam, FuncValueType, PolyFuncTypeRV, TypeArg, TypeBound, TypeRV},
+    types::{FuncValueType, PolyFuncTypeRV, TypeArg, TypeBound, TypeRV, type_param::TypeParam},
 };
 
-#[allow(missing_docs)]
+/// Control modifier.
+///
+/// Stores the number of controls qubits to apply.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub struct ModifierControl(usize);
 
 impl ModifierControl {
     /// Create a new ModifierControl with a specific number of controls.
-    pub fn new(num: usize) -> Self {
+    fn new(num: usize) -> Self {
         ModifierControl(num)
     }
 }
@@ -22,7 +24,7 @@ impl Default for ModifierControl {
 }
 impl ModifierControl {
     /// Signature for the control modifier.
-    pub fn signature() -> SignatureFunc {
+    pub(crate) fn signature() -> SignatureFunc {
         PolyFuncTypeRV::new(
             [
                 TypeParam::max_nat_type(),
@@ -30,14 +32,14 @@ impl ModifierControl {
                 TypeParam::new_list_type(TypeBound::Linear),
             ],
             FuncValueType::new(
-                TypeRV::new_function(FuncValueType::new(
+                [TypeRV::new_function(FuncValueType::new(
                     vec![
                         TypeRV::new_row_var_use(1, TypeBound::Linear),
                         TypeRV::new_row_var_use(2, TypeBound::Linear),
                     ],
                     vec![TypeRV::new_row_var_use(1, TypeBound::Linear)],
-                )),
-                TypeRV::new_function(FuncValueType::new(
+                ))],
+                [TypeRV::new_function(FuncValueType::new(
                     vec![
                         array_type_parametric(
                             TypeArg::new_var_use(0, TypeParam::max_nat_type()),
@@ -57,7 +59,7 @@ impl ModifierControl {
                         .into(),
                         TypeRV::new_row_var_use(1, TypeBound::Linear),
                     ],
-                )),
+                ))],
             ),
         )
         .into()

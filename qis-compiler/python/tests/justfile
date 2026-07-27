@@ -1,0 +1,7 @@
+# List the available commands
+help:
+    @just --list --justfile {{justfile()}}
+
+# Re-generate all hugr files.
+regenerate:
+    uv run --no-project generate_hugrs.py

@@ -1,18 +1,24 @@
 //! A pass that normalizes the structure of Guppy-generated circuits into something that can be optimized by tket.
 
-use hugr::algorithms::const_fold::{ConstFoldError, ConstantFoldPass};
-use hugr::algorithms::inline_dfgs::InlineDFGsPass;
-use hugr::algorithms::normalize_cfgs::{NormalizeCFGError, NormalizeCFGPass};
-use hugr::algorithms::untuple::{UntupleError, UntupleRecursive};
-use hugr::algorithms::{ComposablePass, RemoveDeadFuncsError, RemoveDeadFuncsPass, UntuplePass};
+use crate::passes::composable::WithScope;
+use crate::passes::const_fold::{ConstFoldError, ConstantFoldPass};
+use crate::passes::dead_funcs::RemoveDeadFuncsError;
+use crate::passes::inline_dfgs::InlineDFGsPass;
+use crate::passes::normalize_cfgs::{NormalizeCFGError, NormalizeCFGPass};
+use crate::passes::redundant_order_edges::RedundantOrderEdgesPass;
+use crate::passes::untuple::UntupleError;
+use crate::passes::{ComposablePass, PassScope, RemoveDeadFuncsPass, UntuplePass};
+use hugr::Node;
+use hugr::hugr::HugrError;
 use hugr::hugr::hugrmut::HugrMut;
 use hugr::hugr::patch::inline_dfg::InlineDFGError;
-use hugr::Node;
+
+use crate::passes::BorrowSquashPass;
 
 /// Normalize the structure of a Guppy-generated circuit into something that can be optimized by tket.
 ///
 /// This is a mixture of global optimization passes, and operations that optimize the entrypoint.
-#[derive(Clone, Copy)]
+#[derive(Clone, Debug)]
 pub struct NormalizeGuppy {
     /// Whether to simplify CFG control flow.
     simplify_cfgs: bool,
@@ -23,7 +29,16 @@ pub struct NormalizeGuppy {
     /// Whether to remove dead functions.
     dead_funcs: bool,
     /// Whether to inline DFG operations.
-    inline: bool,
+    inline_dfgs: bool,
+    /// Whether to squash BorrowArray borrow/return ops
+    squash_borrows: bool,
+    /// Whether to remove redundant order edges.
+    remove_redundant_order_edges: bool,
+
+    /// Where to apply the pass.
+    ///
+    /// Configurable via [`WithScope::with_scope`].
+    scope: PassScope,
 }
 
 impl NormalizeGuppy {
@@ -49,7 +64,17 @@ impl NormalizeGuppy {
     }
     /// Set whether to inline DFG operations.
     pub fn inline_dfgs(&mut self, inline: bool) -> &mut Self {
-        self.inline = inline;
+        self.inline_dfgs = inline;
+        self
+    }
+    /// Set whether to squash BorrowArray borrow/return ops
+    pub fn squash_borrows(&mut self, squash: bool) -> &mut Self {
+        self.squash_borrows = squash;
+        self
+    }
+    /// Set whether to remove redundant order edges.
+    pub fn remove_redundant_order_edges(&mut self, remove: bool) -> &mut Self {
+        self.remove_redundant_order_edges = remove;
         self
     }
 }
@@ -61,31 +86,69 @@ impl Default for NormalizeGuppy {
             constant_fold: true,
             untuple: true,
             dead_funcs: true,
-            inline: true,
+            inline_dfgs: true,
+            squash_borrows: true,
+            remove_redundant_order_edges: true,
+            scope: PassScope::default(),
         }
+    }
+}
+
+impl WithScope for NormalizeGuppy {
+    fn with_scope(mut self, scope: impl Into<crate::passes::PassScope>) -> Self {
+        self.scope = scope.into();
+        self
     }
 }
 
 impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for NormalizeGuppy {
     type Error = NormalizeGuppyErrors;
     type Result = ();
+
     fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
         if self.simplify_cfgs {
-            NormalizeCFGPass::default().run(hugr)?;
+            NormalizeCFGPass::default()
+                .with_scope(self.scope.clone())
+                .run(hugr)?;
         }
+        // When we do function inlining, do this after, to sort out argument marshalling
         if self.untuple {
-            UntuplePass::new(UntupleRecursive::Recursive)
-                .run(hugr)
-                .map_err(NormalizeGuppyErrors::Untuple)?;
+            UntuplePass::default_with_scope(self.scope.clone()).run(hugr)?;
         }
+        // Should propagate through untuple, so could do earlier, and must be before BorrowSquash
         if self.constant_fold {
-            ConstantFoldPass::default().run(hugr)?;
+            ConstantFoldPass::default()
+                .with_scope(self.scope.clone())
+                .run(hugr)?;
         }
+        // Only improves compilation speed, not affected by anything else
+        // until we start removing untaken branches
         if self.dead_funcs {
-            RemoveDeadFuncsPass::default().run(hugr)?;
+            RemoveDeadFuncsPass::default()
+                .with_scope(self.scope.clone())
+                .run(hugr)?;
         }
-        if self.inline {
-            InlineDFGsPass.run(hugr).unwrap_or_else(|e| match e {})
+        // Do earlier? Nothing creates DFGs
+        if self.inline_dfgs {
+            InlineDFGsPass::default()
+                .with_scope(self.scope.clone())
+                .run(hugr)
+                .unwrap_or_else(|e| match e {})
+        }
+        // Potentially, could (need to) do fixpoint here with untuple,
+        // as both create opportunities for the other
+        if self.squash_borrows {
+            BorrowSquashPass::default()
+                .with_scope(self.scope.clone())
+                .run(hugr)
+                .unwrap_or_else(|e| match e {});
+        }
+        // Remove redundant order edges once all other structural rewrites have been applied.
+        if self.remove_redundant_order_edges {
+            RedundantOrderEdgesPass::default()
+                .with_scope(self.scope.clone())
+                .run(hugr)
+                .map_err(NormalizeGuppyErrors::RedundantOrderEdges)?;
         }
 
         Ok(())
@@ -105,6 +168,9 @@ pub enum NormalizeGuppyErrors {
     DeadFuncs(RemoveDeadFuncsError),
     /// Error while inlining DFG operations.
     Inline(InlineDFGError),
+    /// Error while removing redundant order edges.
+    #[from(ignore)]
+    RedundantOrderEdges(HugrError),
 }
 
 #[cfg(test)]
@@ -132,6 +198,7 @@ mod test {
             .constant_folding(false)
             .remove_dead_funcs(false)
             .inline_dfgs(false)
+            .remove_redundant_order_edges(false)
             .run(&mut hugr2)
             .unwrap();
 

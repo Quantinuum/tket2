@@ -15,14 +15,11 @@ env:
   SCCACHE_GHA_ENABLED: "true"
   RUSTC_WRAPPER: "sccache"
   # Pinned version for the uv package manager
-  UV_VERSION: "0.9.7"
-  # The highest and lowest supported Python versions, used for testing
-  PYTHON_HIGHEST: "3.14"
-  PYTHON_LOWEST: "3.10"
+  UV_VERSION: "0.11.15"
 
 jobs:
   py-release:
-    name: Check `tket-py`compatibility with ${{ matrix.resolution }} dependencies
+    name: Check `tket-py`compatibility with ${{ matrix.target.resolution }} dependencies
     runs-on: ubuntu-latest
     # Check if we are running on a release PR.
     #
@@ -31,27 +28,32 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        resolution:
-          - "highest"
-          - "lowest-direct"
+        target:
+          - resolution: "highest"
+            python: "3.14"
+          - resolution: "lowest-direct"
+            python: "3.10"
     steps:
-      - uses: actions/checkout@v5
-      - uses: mozilla-actions/sccache-action@v0.0.9
+      - uses: actions/checkout@v6
+      - uses: mozilla-actions/sccache-action@v0.0.10
+      - uses: quantinuum/hugrverse-env/install-hugrenv-action@main
+        with:
+          packages: "tket"
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
-      - name: Install Python ${{ env.PYTHON_HIGHEST }}
+      - name: Install Python ${{ matrix.target.python }}
         run: |
-          uv python install ${{ env.PYTHON_HIGHEST }}
-          uv python pin ${{ env.PYTHON_HIGHEST }}
+          uv python install ${{ matrix.target.python }}
+          uv python pin ${{ matrix.target.python }}
       - name: Setup `tket-py` with only pypi deps
         env:
-          UV_RESOLUTION: ${{ matrix.resolution }}
+          RES: ${{ matrix.target.resolution }}
         run: |
-          uv lock --no-sources -U
-          uv sync --no-sources --no-install-workspace
+          UV_RESOLUTION="$RES" uv lock --no-sources -U
+          UV_RESOLUTION="$RES" uv sync --all-extras --no-sources --no-install-workspace
           uv pip install --no-sources tket-exts
           uv pip install --no-sources tket-eccs
           uv run --no-sync maturin develop

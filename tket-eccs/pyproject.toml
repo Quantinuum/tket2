@@ -29,8 +29,8 @@ classifiers = [
 dependencies = []
 
 [project.urls]
-homepage = "https://github.com/CQCL/tket2/tree/main/tket-eccs"
-repository = "https://github.com/CQCL/tket2/tree/main/tket-eccs"
+homepage = "https://github.com/quantinuum/tket2/tree/main/tket-eccs"
+repository = "https://github.com/quantinuum/tket2/tree/main/tket-eccs"
 
 [build-system]
 requires = ["hatchling"]
