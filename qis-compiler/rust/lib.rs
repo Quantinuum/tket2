@@ -588,6 +588,7 @@ mod selene_hugr_qis_compiler {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "py")]
     use super::selene_hugr_qis_compiler::compile_to_bitcode;
     use std::{
         fs,
@@ -618,6 +619,7 @@ mod tests {
         result
     }
 
+    #[cfg(feature = "py")]
     #[test]
     fn test_compile_to_bitcode_returns_file_safe_public_bytes() {
         let hugr = include_bytes!("../python/tests/resources/check.hugr");
@@ -638,6 +640,7 @@ mod tests {
     /// A program with many `if <a or b or ...>:` branches over distinct booleans
     /// used to trigger a superlinear SLP-vectorizer blowup at the default opt
     /// level. It must still compile to valid, parseable bitcode with SLP off.
+    #[cfg(feature = "py")]
     #[test]
     fn test_compile_or_chain_program() {
         let hugr = include_bytes!("../python/tests/resources/slp_or_chain.hugr");
