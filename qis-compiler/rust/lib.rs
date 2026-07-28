@@ -18,6 +18,7 @@ use inkwell::targets::{
     CodeModel, InitializationConfig, RelocMode, Target, TargetMachine, TargetTriple,
 };
 use itertools::Itertools;
+#[cfg(feature = "py")]
 use pyo3::prelude::*;
 use tket::hugr::ops::DataflowParent;
 use tket::passes::composable::ComposablePass;
@@ -37,19 +38,21 @@ use tket::hugr::std_extensions::arithmetic::{
     conversions, float_ops, float_types, int_ops, int_types,
 };
 use tket::hugr::std_extensions::{collections, logic, ptr};
-use tket::hugr::{self, llvm::inkwell};
 use tket::hugr::{Hugr, HugrView, Node};
 use tket::llvm::rotation::RotationCodegenExtension;
 use tket_qsystem::QSystemPass;
 use tket_qsystem::extension::{futures as qsystem_futures, qsystem, result as qsystem_result};
 use tket_qsystem::llvm::array_utils::ArrayLowering;
-pub use tket_qsystem::llvm::futures::FuturesCodegenExtension;
 use tket_qsystem::llvm::{
     debug::DebugCodegenExtension, prelude::QISPreludeCodegen, qsystem::QSystemCodegenExtension,
     random::RandomCodegenExtension, result::ResultsCodegenExtension, utils::UtilsCodegenExtension,
 };
 use tracing::{Level, event, instrument};
 use utils::read_hugr_envelope;
+
+pub use tket::hugr::{self, llvm::inkwell};
+pub use tket_qsystem::llvm::futures::FuturesCodegenExtension;
+pub use utils::validate;
 
 mod gpu;
 mod selene_specific;
@@ -58,7 +61,8 @@ mod utils;
 const LLVM_MAIN: &str = "qmain";
 const METADATA: &[(&str, &[&str])] = &[("name", &["mainlib"])];
 
-static REGISTRY: std::sync::LazyLock<ExtensionRegistry> = std::sync::LazyLock::new(|| {
+/// The extensions supported by the QIS compiler.
+pub static REGISTRY: std::sync::LazyLock<ExtensionRegistry> = std::sync::LazyLock::new(|| {
     ExtensionRegistry::new([
         prelude::PRELUDE.to_owned(),
         int_types::EXTENSION.to_owned(),
@@ -353,8 +357,9 @@ fn wrap_main<'c>(
     Ok(())
 }
 
+/// Compilation arguments.
 #[derive(Debug)]
-struct CompileArgs<'a> {
+pub struct CompileArgs<'a> {
     /// Entry point symbol
     entry: Option<String>,
     /// LLVM module name
@@ -370,7 +375,8 @@ struct CompileArgs<'a> {
 }
 
 impl<'a> CompileArgs<'a> {
-    fn new(
+    /// Create compiler arguments.
+    pub fn new(
         name: &impl ToString,
         target_machine: &'a TargetMachine,
         opt_level: OptimizationLevel,
@@ -390,7 +396,7 @@ impl<'a> CompileArgs<'a> {
 /// Compile the given HUGR to an LLVM module.
 /// This function is the primary entry point for the compiler.
 #[instrument(skip(ctx, hugr),parent = None)]
-fn compile<'c, 'hugr: 'c>(
+pub fn compile<'c, 'hugr: 'c>(
     args: &CompileArgs,
     ctx: &'c Context,
     hugr: &'hugr mut Hugr,
@@ -499,11 +505,13 @@ pub fn get_platform(platform: &str) -> Result<qsystem::QSystemPlatform> {
 }
 
 // -------------------- Python bindings -----------------------
+#[cfg(feature = "py")]
 mod exceptions {
     use pyo3::exceptions::PyException;
 
     pyo3::create_exception!(selene_hugr_qis_compiler, HugrReadError, PyException);
 }
+#[cfg(feature = "py")]
 #[pymodule]
 mod selene_hugr_qis_compiler {
     use super::{
@@ -580,6 +588,7 @@ mod selene_hugr_qis_compiler {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "py")]
     use super::selene_hugr_qis_compiler::compile_to_bitcode;
     use std::{
         fs,
@@ -610,6 +619,7 @@ mod tests {
         result
     }
 
+    #[cfg(feature = "py")]
     #[test]
     fn test_compile_to_bitcode_returns_file_safe_public_bytes() {
         let hugr = include_bytes!("../python/tests/resources/check.hugr");
@@ -630,6 +640,7 @@ mod tests {
     /// A program with many `if <a or b or ...>:` branches over distinct booleans
     /// used to trigger a superlinear SLP-vectorizer blowup at the default opt
     /// level. It must still compile to valid, parseable bitcode with SLP off.
+    #[cfg(feature = "py")]
     #[test]
     fn test_compile_or_chain_program() {
         let hugr = include_bytes!("../python/tests/resources/slp_or_chain.hugr");
