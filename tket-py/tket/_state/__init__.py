@@ -6,12 +6,12 @@ from typing import TYPE_CHECKING
 
 from hugr.envelope import EnvelopeConfig
 from hugr.ext import ExtensionRegistry
-from tket_exts import tket_registry
-from .._tket import state as _state
-from .build import CircBuild, Command
-
 from hugr.hugr.base import Hugr
 from hugr.package import Package
+from tket_exts import tket_registry
+
+from .._tket import state as _state
+from .build import CircBuild, Command
 
 # Re-export types from the Rust module
 Node = _state.Node
@@ -26,8 +26,8 @@ TK1EncodeError = _state.TK1EncodeError
 
 if TYPE_CHECKING:
     from tket._rewrite import CircuitRewrite
-    from tket.util import PytketCircuitProto
     from tket.passes import PlatformTarget
+    from tket.util import PytketCircuitProto
 
 
 __all__ = [

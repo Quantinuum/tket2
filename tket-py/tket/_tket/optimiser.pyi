@@ -1,4 +1,5 @@
-from typing import Literal, TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
+
 from .state import CompilationState
 
 if TYPE_CHECKING:
@@ -7,9 +8,7 @@ if TYPE_CHECKING:
 from pathlib import Path
 
 class BadgerOptimiser:
-    def __init__(
-        self, rewriter: "Rewriter", cost_fn: Literal["cx", "rz"] | None = None
-    ):
+    def __init__(self, rewriter: Rewriter, cost_fn: Literal["cx", "rz"] | None = None):
         """Create a new Badger optimiser.
 
         :param rewriter: The rewriter to use.

@@ -6,9 +6,9 @@
 # ///
 """Test the use of a higher-order function with complex control flow inside modifiers"""
 
+from collections.abc import Callable
 from pathlib import Path
 from sys import argv
-from collections.abc import Callable
 
 from guppylang import enable_experimental_features, guppy
 from guppylang.std.builtins import Controllable, Unitary, array, control, dagger

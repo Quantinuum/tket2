@@ -1,11 +1,11 @@
 """Quantum extension operations."""
 
 import functools
-from typing import List
 
 from hugr.ext import Extension, OpDef, TypeDef
 from hugr.ops import ExtOp
 from hugr.tys import StringArg
+
 from ._util import TketExtension, load_extension
 
 
@@ -17,11 +17,11 @@ class QuantumExtension(TketExtension):
         """Returns the quantum extension"""
         return load_extension("tket.quantum")
 
-    def TYPES(self) -> List[TypeDef]:
+    def TYPES(self) -> list[TypeDef]:
         """Return the types defined by this extension"""
         return []
 
-    def OPS(self) -> List[OpDef]:
+    def OPS(self) -> list[OpDef]:
         """Return the operations defined by this extension"""
         return [
             self.CRz.op_def(),

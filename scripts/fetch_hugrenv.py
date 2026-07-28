@@ -78,12 +78,12 @@ for package in ("llvm", "tket"):
             members.append(member)
         tar.extractall(path=install_path, members=members)
 
-print("")
+print()
 print(f"hugrenv {version} installed in {install_path}")
 print(
     "To use the hugrenv libraries, set the following environment variables in your shell."
 )
-print("")
+print()
 if os_name == "windows":
     p = str(install_path)
     print("PowerShell:")

@@ -1,7 +1,9 @@
 from pathlib import Path
-from tket.passes import Normalize
-from tket._state import CompilationState
+
 import pytest
+
+from tket._state import CompilationState
+from tket.passes import Normalize
 
 
 def load_example(example_name: str) -> CompilationState:

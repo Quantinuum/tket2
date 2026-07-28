@@ -1,11 +1,11 @@
+from pathlib import Path
 from typing import Literal
 
-from pathlib import Path
+from hugr.passes.scope import GlobalScope, PassScope
 
+from ..passes import inline_funcs
 from .optimiser import BadgerOptimiser
 from .state import CompilationState
-from ..passes import inline_funcs
-from hugr.passes.scope import PassScope, GlobalScope
 
 class CircuitChunks:
     def reassemble(self) -> CompilationState:

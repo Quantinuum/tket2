@@ -1,5 +1,5 @@
 # Re-export native bindings
-from ._tket.rewrite import ECCRewriter, CircuitRewrite, Subcircuit
+from ._tket.rewrite import CircuitRewrite, ECCRewriter, Subcircuit
 
 __all__ = [
     "default_ecc_rewriter",

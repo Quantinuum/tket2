@@ -9,15 +9,14 @@ from tket_exts import (
     modifier,
     qsystem,
     qsystem_helios,
-    qsystem_sol,
     qsystem_random,
+    qsystem_sol,
     qsystem_utils,
     quantum,
     result,
     rotation,
     wasm,
 )
-
 
 __all__ = [
     "argument",
@@ -30,8 +29,8 @@ __all__ = [
     "modifier",
     "qsystem",
     "qsystem_helios",
-    "qsystem_sol",
     "qsystem_random",
+    "qsystem_sol",
     "qsystem_utils",
     "quantum",
     "result",

@@ -12,10 +12,9 @@ from sys import argv
 import guppylang
 from guppylang import guppy
 from guppylang.std.builtins import array, result
-from guppylang.std.qsystem import *  # noqa: F403
-from guppylang.std.quantum import measure, measure_array, qubit, collect_measurements
+from guppylang.std.qsystem import *
+from guppylang.std.quantum import collect_measurements, measure, measure_array, qubit
 from tket.passes import Normalize
-
 
 guppylang.enable_experimental_features()
 

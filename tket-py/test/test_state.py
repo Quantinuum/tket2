@@ -1,15 +1,15 @@
-from semver import Version
-
 from hugr import tys
-from hugr.ext import Extension, OpDef, OpDefSig
 from hugr.build.dfg import Function
+from hugr.ext import Extension, OpDef, OpDefSig
 from hugr.hugr import Hugr
 from hugr.std import _std_extensions
+from semver import Version
+from tket_exts import tket_registry
+
 from tket._state import (
     CompilationState,
     embedded_extensions,
 )
-from tket_exts import tket_registry
 
 
 def _custom_extension_hugr() -> Hugr:
