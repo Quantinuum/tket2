@@ -14,6 +14,7 @@ from .._tket import state as _state
 from .build import CircBuild, Command
 
 # Re-export types from the Rust module
+# TODO: Wrap these in Python classes.
 Node = _state.Node
 Wire = _state.Wire
 CircuitCost = _state.CircuitCost
@@ -29,22 +30,19 @@ if TYPE_CHECKING:
     from tket.passes import PlatformTarget
     from tket.util import PytketCircuitProto
 
-
 __all__ = [
-    "CircBuild",
-    "Command",
-    # Bindings.
-    # TODO: Wrap these in Python classes.
-    "CompilationState",
-    "Node",
-    "Wire",
-    "CircuitCost",
-    "embedded_extensions",
-    "HugrError",
     "BuildError",
-    "ValidationError",
+    "CircBuild",
+    "CircuitCost",
+    "Command",
+    "CompilationState",
     "HUGRSerializationError",
+    "HugrError",
+    "Node",
     "TK1EncodeError",
+    "ValidationError",
+    "Wire",
+    "embedded_extensions",
 ]
 
 
@@ -79,7 +77,8 @@ class CompilationState:
         """
         target_str = target.value if target is not None else None
         return CompilationState(
-            _inner=_state.CompilationState.from_tket1(circ, target=target_str)  # type: ignore[arg-type]
+            _inner=_state.CompilationState.from_tket1(circ, target=target_str)
+            # type: ignore[arg-type]
         )
 
     @staticmethod
@@ -101,7 +100,7 @@ class CompilationState:
         elif isinstance(hugr, Package):
             package = hugr
         else:
-            raise ValueError(f"Expected a Hugr or Package, got {type(hugr)}")
+            raise TypeError(f"Expected a Hugr or Package, got {type(hugr)}")
 
         return CompilationState(
             _inner=_state.CompilationState.from_bytes(package.to_bytes()),

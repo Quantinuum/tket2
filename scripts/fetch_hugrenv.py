@@ -70,8 +70,7 @@ for package in ("llvm", "tket"):
             if (
                 not relative_name
                 or relative_name == "."
-                or relative_name.startswith("../")
-                or relative_name.startswith("/")
+                or relative_name.startswith(("../", "/"))
             ):
                 continue
             member.name = relative_name

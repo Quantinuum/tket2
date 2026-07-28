@@ -2,7 +2,6 @@
 
 import functools
 import warnings
-from typing import List
 
 from hugr.ext import Extension, OpDef, TypeDef
 from hugr.ops import ExtOp

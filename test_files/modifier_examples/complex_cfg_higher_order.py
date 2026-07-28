@@ -64,7 +64,7 @@ def apply_c(
 def main() -> None:
     qs: array[qubit, 2] = array(qubit(), qubit())
     h(qs[0])
-    flag = 2 > 10
+    flag = 2 > 10  # noqa: PLR0133
     with control(qs[0]):
         apply_c(h, rx, get_get_angle, qs[1], True)
         apply_c(h, rx, get_get_angle, qs[1], flag)

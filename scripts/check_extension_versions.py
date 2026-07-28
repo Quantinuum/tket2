@@ -39,7 +39,7 @@ def check_version_changes(changed_files: list[Path], target: str) -> list[str]:
         # Get the version in the target branch
         try:
             cmd = ["git", "show", f"{target}:{file_path}"]
-            result = subprocess.run(cmd, capture_output=True, text=True)
+            result = subprocess.run(cmd, capture_output=True, text=True, check=False)
 
             if result.returncode == 0:
                 # File exists in target
