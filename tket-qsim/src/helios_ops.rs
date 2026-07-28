@@ -66,7 +66,8 @@ fn gate_phased_x(theta: f64, phi: f64) -> UnitaryMatrix {
 fn gate_rz_radians(theta: f64) -> UnitaryMatrix {
     let e_neg = Complex64::from_polar(1.0, -theta / 2.0);
     let e_pos = Complex64::from_polar(1.0, theta / 2.0);
-    UnitaryMatrix::from_row_major(1, vec![e_neg, Complex64::ZERO, Complex64::ZERO, e_pos])
+    let zero = Complex64::new(0.0, 0.0);
+    UnitaryMatrix::from_row_major(1, vec![e_neg, zero, zero, e_pos])
 }
 
 /// ZZPhase(θ) gate where θ is in radians.
@@ -76,7 +77,7 @@ fn gate_rz_radians(theta: f64) -> UnitaryMatrix {
 fn gate_zz_phase(theta: f64) -> UnitaryMatrix {
     let e_neg = Complex64::from_polar(1.0, -theta / 2.0);
     let e_pos = Complex64::from_polar(1.0, theta / 2.0);
-    let o = Complex64::ZERO;
+    let o = Complex64::new(0.0, 0.0);
     #[rustfmt::skip]
     let data = vec![
         e_neg, o,     o,     o,

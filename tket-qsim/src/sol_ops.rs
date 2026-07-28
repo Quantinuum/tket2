@@ -54,7 +54,8 @@ fn gate_phased_x(theta: f64, phi: f64) -> UnitaryMatrix {
 fn gate_rz_radians(theta: f64) -> UnitaryMatrix {
     let e_neg = Complex64::from_polar(1.0, -theta / 2.0);
     let e_pos = Complex64::from_polar(1.0, theta / 2.0);
-    UnitaryMatrix::from_row_major(1, vec![e_neg, Complex64::ZERO, Complex64::ZERO, e_pos])
+    let zero = Complex64::new(0.0, 0.0);
+    UnitaryMatrix::from_row_major(1, vec![e_neg, zero, zero, e_pos])
 }
 
 /// PhasedXX(θ, φ) gate — the native 2-qubit gate for Sol.
@@ -71,7 +72,7 @@ fn gate_rz_radians(theta: f64) -> UnitaryMatrix {
 fn gate_phased_xx(theta: f64, phi: f64) -> UnitaryMatrix {
     let ct = Complex64::new((theta / 2.0).cos(), 0.0);
     let st = (theta / 2.0).sin();
-    let o = Complex64::ZERO;
+    let o = Complex64::new(0.0, 0.0);
     let mi = Complex64::new(0.0, -1.0);
     let e_neg2phi = Complex64::from_polar(1.0, -2.0 * phi);
     let e_pos2phi = Complex64::from_polar(1.0, 2.0 * phi);
@@ -121,7 +122,7 @@ mod tests {
         let u = SolOp::PhasedXX.unitary(&[1.5, 0.7]);
         let dim = u.dim();
         // Compute U†
-        let mut u_dag_data = vec![Complex64::ZERO; dim * dim];
+        let mut u_dag_data = vec![Complex64::new(0.0, 0.0); dim * dim];
         for i in 0..dim {
             for j in 0..dim {
                 u_dag_data[i * dim + j] = u.get(j, i).conj();

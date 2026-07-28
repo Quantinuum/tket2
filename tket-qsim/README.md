@@ -93,7 +93,7 @@ row-major order. For example, the X gate is:
 use num_complex::Complex64;
 use tket_qsim::UnitaryMatrix;
 
-let zero = Complex64::ZERO;
+let zero = Complex64::new(0.0, 0.0);
 let one = Complex64::new(1.0, 0.0);
 let x = UnitaryMatrix::from_row_major(1, vec![zero, one, one, zero]);
 ```

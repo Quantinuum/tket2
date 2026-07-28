@@ -16,7 +16,8 @@ impl UnitaryMatrix {
     /// Create an identity matrix for `n` qubits.
     pub fn identity(n: usize) -> Self {
         let dim = 1 << n;
-        let mut data = vec![Complex64::ZERO; dim * dim];
+        let zero = Complex64::new(0.0, 0.0);
+        let mut data = vec![zero; dim * dim];
         for i in 0..dim {
             data[i * dim + i] = Complex64::new(1.0, 0.0);
         }
@@ -72,11 +73,12 @@ impl UnitaryMatrix {
     pub fn matmul(&self, other: &Self) -> Self {
         assert_eq!(self.num_qubits, other.num_qubits);
         let dim = self.dim();
-        let mut result = vec![Complex64::ZERO; dim * dim];
+        let zero = Complex64::new(0.0, 0.0);
+        let mut result = vec![zero; dim * dim];
         for i in 0..dim {
             for k in 0..dim {
                 let a_ik = self.data[i * dim + k];
-                if a_ik == Complex64::ZERO {
+                if a_ik == zero {
                     continue;
                 }
                 for j in 0..dim {
@@ -96,11 +98,12 @@ impl UnitaryMatrix {
         let dim_a = self.dim();
         let dim_b = other.dim();
         let dim = dim_a * dim_b;
-        let mut data = vec![Complex64::ZERO; dim * dim];
+        let zero = Complex64::new(0.0, 0.0);
+        let mut data = vec![zero; dim * dim];
         for i_a in 0..dim_a {
             for j_a in 0..dim_a {
                 let a = self.data[i_a * dim_a + j_a];
-                if a == Complex64::ZERO {
+                if a == zero {
                     continue;
                 }
                 for i_b in 0..dim_b {
@@ -127,7 +130,8 @@ impl UnitaryMatrix {
         assert_eq!(target_qubits.len(), self.num_qubits);
         let full_dim = 1usize << total_qubits;
         let gate_dim = self.dim();
-        let mut result = vec![Complex64::ZERO; full_dim * full_dim];
+        let zero = Complex64::new(0.0, 0.0);
+        let mut result = vec![zero; full_dim * full_dim];
 
         for col in 0..full_dim {
             for gate_row in 0..gate_dim {
@@ -151,7 +155,7 @@ impl UnitaryMatrix {
                 }
 
                 let val = self.data[gate_row * gate_dim + gate_col];
-                if val != Complex64::ZERO {
+                if val != zero {
                     result[full_row * full_dim + col] += val;
                 }
             }
@@ -249,7 +253,7 @@ mod tests {
                 if i == j {
                     assert_eq!(id.get(i, j), Complex64::new(1.0, 0.0));
                 } else {
-                    assert_eq!(id.get(i, j), Complex64::ZERO);
+                    assert_eq!(id.get(i, j), Complex64::new(0.0, 0.0));
                 }
             }
         }
@@ -286,10 +290,10 @@ mod tests {
         let x = UnitaryMatrix::from_row_major(
             1,
             vec![
-                Complex64::ZERO,
+                Complex64::new(0.0, 0.0),
                 Complex64::new(1.0, 0.0),
                 Complex64::new(1.0, 0.0),
-                Complex64::ZERO,
+                Complex64::new(0.0, 0.0),
             ],
         );
         let expanded = x.expand_to_system(&[1], 2);
@@ -305,10 +309,10 @@ mod tests {
         let x = UnitaryMatrix::from_row_major(
             1,
             vec![
-                Complex64::ZERO,
+                Complex64::new(0.0, 0.0),
                 Complex64::new(1.0, 0.0),
                 Complex64::new(1.0, 0.0),
-                Complex64::ZERO,
+                Complex64::new(0.0, 0.0),
             ],
         );
 

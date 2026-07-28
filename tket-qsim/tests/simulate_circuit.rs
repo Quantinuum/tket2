@@ -48,7 +48,7 @@ fn composed_circuit_matches_pytket_reference() {
     let unitary = simulate_circuit(&hugr, &HashMap::new()).unwrap();
     let p = Complex64::new(0.5, 0.5);
     let m = Complex64::new(0.5, -0.5);
-    let z = Complex64::ZERO;
+    let z = Complex64::new(0.0, 0.0);
     let expected = [
         m, z, m, z, // row 0
         z, p, z, p, // row 1

@@ -2162,7 +2162,7 @@ dependencies = [
  "num-complex",
  "schemars 1.2.1",
  "serde",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
 ]
 
 [[package]]
@@ -2432,7 +2432,7 @@ dependencies = [
  "struqture 1.13.4",
  "struqture 2.6.0",
  "syn 2.0.117",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
 ]
 
 [[package]]
@@ -2849,7 +2849,7 @@ dependencies = [
  "schemars 1.2.1",
  "serde",
  "test-case",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
  "tinyvec",
 ]
 
@@ -2868,7 +2868,7 @@ dependencies = [
  "serde",
  "struqture 1.13.4",
  "test-case",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
  "tinyvec",
 ]
 

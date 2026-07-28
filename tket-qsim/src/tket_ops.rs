@@ -63,7 +63,7 @@ impl Simulatable for TketOp {
     }
 }
 
-// ─── Single-qubit gates ──────────────────────────────────────────────────────
+// Single-qubit gates
 
 fn gate_h() -> UnitaryMatrix {
     let s = FRAC_1_SQRT_2;
@@ -82,10 +82,10 @@ fn gate_x() -> UnitaryMatrix {
     UnitaryMatrix::from_row_major(
         1,
         vec![
-            Complex64::ZERO,
+            Complex64::new(0.0, 0.0),
             Complex64::new(1.0, 0.0),
             Complex64::new(1.0, 0.0),
-            Complex64::ZERO,
+            Complex64::new(0.0, 0.0),
         ],
     )
 }
@@ -94,10 +94,10 @@ fn gate_y() -> UnitaryMatrix {
     UnitaryMatrix::from_row_major(
         1,
         vec![
-            Complex64::ZERO,
+            Complex64::new(0.0, 0.0),
             Complex64::new(0.0, -1.0),
             Complex64::new(0.0, 1.0),
-            Complex64::ZERO,
+            Complex64::new(0.0, 0.0),
         ],
     )
 }
@@ -107,8 +107,8 @@ fn gate_z() -> UnitaryMatrix {
         1,
         vec![
             Complex64::new(1.0, 0.0),
-            Complex64::ZERO,
-            Complex64::ZERO,
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
             Complex64::new(-1.0, 0.0),
         ],
     )
@@ -119,8 +119,8 @@ fn gate_s() -> UnitaryMatrix {
         1,
         vec![
             Complex64::new(1.0, 0.0),
-            Complex64::ZERO,
-            Complex64::ZERO,
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
             Complex64::new(0.0, 1.0),
         ],
     )
@@ -131,8 +131,8 @@ fn gate_sdg() -> UnitaryMatrix {
         1,
         vec![
             Complex64::new(1.0, 0.0),
-            Complex64::ZERO,
-            Complex64::ZERO,
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
             Complex64::new(0.0, -1.0),
         ],
     )
@@ -144,8 +144,8 @@ fn gate_t() -> UnitaryMatrix {
         1,
         vec![
             Complex64::new(1.0, 0.0),
-            Complex64::ZERO,
-            Complex64::ZERO,
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
             phase,
         ],
     )
@@ -157,8 +157,8 @@ fn gate_tdg() -> UnitaryMatrix {
         1,
         vec![
             Complex64::new(1.0, 0.0),
-            Complex64::ZERO,
-            Complex64::ZERO,
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
             phase,
         ],
     )
@@ -221,13 +221,14 @@ fn gate_rz(half_turns: f64) -> UnitaryMatrix {
     let theta = half_turns * PI / 2.0;
     let e_neg = Complex64::from_polar(1.0, -theta);
     let e_pos = Complex64::from_polar(1.0, theta);
-    UnitaryMatrix::from_row_major(1, vec![e_neg, Complex64::ZERO, Complex64::ZERO, e_pos])
+    let zero = Complex64::new(0.0, 0.0);
+    UnitaryMatrix::from_row_major(1, vec![e_neg, zero, zero, e_pos])
 }
 
-// ─── Two-qubit gates ─────────────────────────────────────────────────────────
+// Two-qubit gates
 
 fn gate_cx() -> UnitaryMatrix {
-    let o = Complex64::ZERO;
+    let o = Complex64::new(0.0, 0.0);
     let i = Complex64::new(1.0, 0.0);
     // |00⟩→|00⟩, |01⟩→|01⟩, |10⟩→|11⟩, |11⟩→|10⟩
     #[rustfmt::skip]
@@ -241,7 +242,7 @@ fn gate_cx() -> UnitaryMatrix {
 }
 
 fn gate_cy() -> UnitaryMatrix {
-    let o = Complex64::ZERO;
+    let o = Complex64::new(0.0, 0.0);
     let i = Complex64::new(1.0, 0.0);
     let mi = Complex64::new(0.0, -1.0);
     let pi = Complex64::new(0.0, 1.0);
@@ -257,7 +258,7 @@ fn gate_cy() -> UnitaryMatrix {
 }
 
 fn gate_cz() -> UnitaryMatrix {
-    let o = Complex64::ZERO;
+    let o = Complex64::new(0.0, 0.0);
     let i = Complex64::new(1.0, 0.0);
     let m = Complex64::new(-1.0, 0.0);
     #[rustfmt::skip]
@@ -273,7 +274,7 @@ fn gate_cz() -> UnitaryMatrix {
 /// CRz(θ) where θ is in half-turns.
 /// CRz = |0⟩⟨0| ⊗ I + |1⟩⟨1| ⊗ Rz(θ)
 fn gate_crz(half_turns: f64) -> UnitaryMatrix {
-    let o = Complex64::ZERO;
+    let o = Complex64::new(0.0, 0.0);
     let i = Complex64::new(1.0, 0.0);
     let theta = half_turns * PI / 2.0;
     let e_neg = Complex64::from_polar(1.0, -theta);
@@ -288,11 +289,12 @@ fn gate_crz(half_turns: f64) -> UnitaryMatrix {
     UnitaryMatrix::from_row_major(2, data)
 }
 
-// ─── Three-qubit gates ───────────────────────────────────────────────────────
+// Three-qubit gates
 
 fn gate_toffoli() -> UnitaryMatrix {
     let dim = 8;
-    let mut data = vec![Complex64::ZERO; dim * dim];
+    let zero = Complex64::new(0.0, 0.0);
+    let mut data = vec![zero; dim * dim];
     // Identity on all states except |110⟩↔|111⟩
     for i in 0..dim {
         match i {
