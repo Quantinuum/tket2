@@ -10,8 +10,7 @@
 from pathlib import Path
 from sys import argv
 
-from guppylang import guppy
-from guppylang.experimental import enable_experimental_features
+from guppylang import guppy, enable_experimental_features
 from guppylang.std.builtins import control, power
 from guppylang.std.quantum import angle, discard, qubit
 from guppylang.std.quantum import h, rx

@@ -1,5 +1,43 @@
 # Changelog
 
+## [0.4.2](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.4.1...qis-compiler-v0.4.2) (2026-07-16)
+
+
+### Features
+
+* Metadata propagation policies for `ReplaceTypes` ([#1783](https://github.com/Quantinuum/tket2/issues/1783)) ([1a73cac](https://github.com/Quantinuum/tket2/commit/1a73cacd4bee04726ed702fd3f0da89a6ccf56f8))
+
+## [0.4.1](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.4.0...qis-compiler-v0.4.1) (2026-07-10)
+
+This release includes fixes to the modifier resolution and constant-folding
+passes used by the QSystem lowering pipelines.
+
+
+### Bug Fixes
+
+* Fix ModifierResolverPass trying to connect outputs to outputs ([#1769](https://github.com/Quantinuum/tket2/issues/1769)) ([0ec4771](https://github.com/Quantinuum/tket2/commit/0ec477138aa13edf7f3420605966f446bc1ee1bb))
+* Fix ModifierResolverPass generating loops in DFGs ([#1777](https://github.com/Quantinuum/tket2/issues/1777)) ([51db9fa](https://github.com/Quantinuum/tket2/commit/51db9fac25b63c42cef4d2aa12091d28e9a5012f))
+* Solve IndirectCall nodes in ModifierResolverPass ([#1784](https://github.com/Quantinuum/tket2/issues/1784)) ([d43adf1](https://github.com/Quantinuum/tket2/commit/d43adf160380a74ad9f204ba91990916d625128e))
+* Prevent Constant Folding disconnecting linear outputs even if constant ([#1793](https://github.com/Quantinuum/tket2/issues/1793)) ([f494f3a](https://github.com/Quantinuum/tket2/commit/f494f3a56451c0794385d8a4f316182acb266dc4))
+* Improved `ModifierResolverErrors::UnResolvable` display error message ([#1808](https://github.com/Quantinuum/tket2/issues/1808)) ([19b2725](https://github.com/Quantinuum/tket2/commit/19b2725279e6431f2ef53149ae6551613839e38c))
+* Ensure ModifierResolverPass preserves function edges into classical DAG ([#1792](https://github.com/Quantinuum/tket2/issues/1792)) ([f5dfe78](https://github.com/Quantinuum/tket2/commit/f5dfe786e8c7a50f943b33814ae5efed6ca1a280))
+* Fix ModifierResolverPass producing invalid hugr with non quantum DAG ([#1817](https://github.com/Quantinuum/tket2/issues/1817)) ([cdb47dd](https://github.com/Quantinuum/tket2/commit/cdb47ddf413f1b6eeaecb3eb39417111fbdf42b5))
+
+
+## [0.4.0](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.3.2...qis-compiler-v0.4.0) (2026-06-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* updates to public dependencies, specifically hugr 0.29.0 and hugr-py 0.18.0
+* ArrayLowering trait has new required method alloc_array for allocating a fresh array.
+
+### Features
+
+* Move modifier resolver pass from NormalizeGuppy to QSystemPass ([#1741](https://github.com/Quantinuum/tket2/issues/1741)) ([2be1be9](https://github.com/Quantinuum/tket2/commit/2be1be938638c5718690dfa2eaa0fbbcf034cd8f))
+* runtime entrypoint arguments via generic tket.argreader op ([#1731](https://github.com/Quantinuum/tket2/issues/1731)) ([3583b4e](https://github.com/Quantinuum/tket2/commit/3583b4ea93d732ffe927d74ee7d959d7f04f7b43))
+* update to hugr 0.29.0/hugr-py 0.18.0, tone down RedundantOrderEdgesPass ([#1742](https://github.com/Quantinuum/tket2/issues/1742)) ([1de66a2](https://github.com/Quantinuum/tket2/commit/1de66a29a10758fe3ddac564cfa51653c632fe3a))
+
 ## [0.3.2](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.3.1...qis-compiler-v0.3.2) (2026-06-19)
 
 

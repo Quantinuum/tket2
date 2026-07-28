@@ -6,6 +6,7 @@ from hugr.ops import CFG
 from hugr.package import Package
 from pytest_snapshot.plugin import Snapshot
 from selene_hugr_qis_compiler import HugrReadError, check_hugr, compile_to_llvm_ir
+from tket_exts import modifier
 
 resources_dir = Path(__file__).parent / "resources"
 
@@ -33,8 +34,8 @@ def contains_modifiers(hugr_envelope: bytes) -> bool:
     for module in package.modules:
         for _, node_data in module.nodes():
             if (
-                "tket.modifier.ControlModifier" in node_data.op.name()
-                or "tket.modifier.DaggerModifier" in node_data.op.name()
+                modifier.control.qualified_name() in node_data.op.name()
+                or modifier.dagger.qualified_name() in node_data.op.name()
             ):
                 return True
     return False

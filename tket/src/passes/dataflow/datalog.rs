@@ -147,6 +147,7 @@ fn run_datalog<V: AbstractValue, H: HugrView>(
         clippy::unused_enumerate_index,
         clippy::collapsible_if
     )]
+
     let all_results = ascent::ascent_run! {
         pub(super) struct AscentProgram<V: AbstractValue, H: HugrView>;
         relation node(H::Node); // <Node> exists in the hugr
@@ -155,6 +156,7 @@ fn run_datalog<V: AbstractValue, H: HugrView>(
         relation parent_of_node(H::Node, H::Node); // <Node> is parent of <Node>
         relation input_child(H::Node, H::Node); // <Node> has 1st child <Node> that is its `Input`
         relation output_child(H::Node, H::Node); // <Node> has 2nd child <Node> that is its `Output`
+        relation value_edge(H::Node, IncomingPort, H::Node, OutgoingPort); // <Target node/port> gets its value from <Source node/port>
         lattice out_wire_value(H::Node, OutgoingPort, PV<V, H::Node>); // <Node> produces, on <OutgoingPort>, the value <PV>
         lattice in_wire_value(H::Node, IncomingPort, PV<V, H::Node>); // <Node> receives, on <IncomingPort>, the value <PV>
         lattice node_in_value_row(H::Node, ValueRow<V, H::Node>); // <Node>'s inputs are <ValueRow>
@@ -174,15 +176,16 @@ fn run_datalog<V: AbstractValue, H: HugrView>(
 
         input_child(parent, input) <-- node(parent), if let Some([input, _output]) = hugr.get_io(*parent);
         output_child(parent, output) <-- node(parent), if let Some([_input, output]) = hugr.get_io(*parent);
+        value_edge(target, input, source, output) <--
+           in_wire(target, input),
+           if let Some((source, output)) = hugr.single_linked_output(*target, *input);
 
         // Initialize all wires to bottom
         out_wire_value(n, p, PV::bottom()) <-- out_wire(n, p);
         in_wire_value(n, p, PV::bottom()) <-- in_wire(n, p);
 
         // Outputs to inputs
-        in_wire_value(n, ip, v) <-- in_wire(n, ip),
-            if let Some((m, op)) = hugr.single_linked_output(*n, *ip),
-            out_wire_value(m, op, v);
+        in_wire_value(n, ip, v) <-- value_edge(n, ip, m, op), out_wire_value(m, op, v);
 
         // Prepopulate in_wire_value from in_wire_value_proto.
         in_wire_value(n, p, v) <-- for (n, p, v) in &in_wire_value_proto,
@@ -202,11 +205,10 @@ fn run_datalog<V: AbstractValue, H: HugrView>(
 
         // Interpret leaf ops
         out_wire_value(n, p, v) <--
-           node(n),
+           node_in_value_row(n, vs),
            let op_t = hugr.get_optype(*n),
            if !op_t.is_container(),
            if let Some(sig) = op_t.dataflow_signature(),
-           node_in_value_row(n, vs),
            if let Some(outs) = propagate_leaf_op(&mut ctx, &hugr, *n, &vs[..], sig.output_count()),
            for (p, v) in (0..).map(OutgoingPort::from).zip(outs);
 
@@ -222,26 +224,26 @@ fn run_datalog<V: AbstractValue, H: HugrView>(
 
         // TailLoop --------------------
         // inputs of tail loop propagate to Input node of child region
-        out_wire_value(i, OutgoingPort::from(p.index()), v) <-- node(tl),
+        out_wire_value(i, OutgoingPort::from(p.index()), v) <--
+            in_wire_value(tl, p, v),
             if hugr.get_optype(*tl).is_tail_loop(),
-            input_child(tl, i),
-            in_wire_value(tl, p, v);
+            input_child(tl, i);
 
         // Output node of child region propagate to Input node of child region
-        out_wire_value(in_n, OutgoingPort::from(out_p), v) <-- node(tl),
-            if let Some(tailloop) = hugr.get_optype(*tl).as_tail_loop(),
-            input_child(tl, in_n),
-            output_child(tl, out_n),
+        out_wire_value(in_n, OutgoingPort::from(out_p), v) <--
             node_in_value_row(out_n, out_in_row), // get the whole input row for the output node...
+            output_child(tl, out_n),
+            input_child(tl, in_n),
+            if let Some(tailloop) = hugr.get_optype(*tl).as_tail_loop(),
             // ...and select just what's possible for CONTINUE_TAG, if anything
             if let Some(fields) = out_in_row.unpack_first(TailLoop::CONTINUE_TAG, tailloop.just_inputs.len()),
             for (out_p, v) in fields.enumerate();
 
         // Output node of child region propagate to outputs of tail loop
-        out_wire_value(tl, OutgoingPort::from(out_p), v) <-- node(tl),
-            if let Some(tailloop) = hugr.get_optype(*tl).as_tail_loop(),
-            output_child(tl, out_n),
+        out_wire_value(tl, OutgoingPort::from(out_p), v) <--
             node_in_value_row(out_n, out_in_row), // get the whole input row for the output node...
+            output_child(tl, out_n),
+            if let Some(tailloop) = hugr.get_optype(*tl).as_tail_loop(),
             // ... and select just what's possible for BREAK_TAG, if anything
             if let Some(fields) = out_in_row.unpack_first(TailLoop::BREAK_TAG, tailloop.just_outputs.len()),
             for (out_p, v) in fields.enumerate();
@@ -325,9 +327,8 @@ fn run_datalog<V: AbstractValue, H: HugrView>(
         // mechanisms or pass the function to the open world (e.g. by returning it). See
         // https://github.com/Quantinuum/hugr/issues/3065 for possible precision increases.
         out_wire_value(inp, p, PV::top()) <--
-            node(n),
-            if hugr.get_optype(*n).is_load_function(),
             out_wire_value(n, OutgoingPort::from(0), v),
+            if hugr.get_optype(*n).is_load_function(),
             if {
                 assert!(matches!(v, PartialValue::LoadedFunction(_) | PartialValue::Bottom));
                 true
@@ -356,9 +357,8 @@ fn run_datalog<V: AbstractValue, H: HugrView>(
         // CallIndirect --------------------
         lattice indirect_call(H::Node, LatticeWrapper<H::Node>); // <Node> is an `IndirectCall` to `FuncDefn` <Node>
         indirect_call(call, tgt) <--
-            node(call),
-            if let OpType::CallIndirect(_) = hugr.get_optype(*call),
             in_wire_value(call, IncomingPort::from(0), v),
+            if let OpType::CallIndirect(_) = hugr.get_optype(*call),
             let tgt = load_func(v);
 
         out_wire_value(inp, OutgoingPort::from(p.index()-1), v) <--
@@ -377,9 +377,8 @@ fn run_datalog<V: AbstractValue, H: HugrView>(
         // Default out-value is Bottom, but if we can't determine the called function,
         // assign everything to Top
         out_wire_value(call, p, PV::Top) <--
-            node(call),
-            if let OpType::CallIndirect(ci) = hugr.get_optype(*call),
             in_wire_value(call, IncomingPort::from(0), v),
+            if let OpType::CallIndirect(ci) = hugr.get_optype(*call),
             // Second alternative below addresses function::Value's:
             if matches!(v, PartialValue::Top | PartialValue::Value(_)),
             for p in ci.signature().output_ports();

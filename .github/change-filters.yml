@@ -13,6 +13,11 @@ rust:
   - "badger-optimiser/**"
   - "compile-rewriter/**"
   - "tket1-passes/**"
+  - "qis-compiler/rust/**"
+  - "qis-compiler/Cargo.toml"
+
+pg-libs:
+  - "pg-libs/**"
 
 python:
   - *rust-core

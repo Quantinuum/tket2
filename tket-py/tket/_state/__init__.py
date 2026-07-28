@@ -27,6 +27,7 @@ TK1EncodeError = _state.TK1EncodeError
 if TYPE_CHECKING:
     from tket._rewrite import CircuitRewrite
     from tket.util import PytketCircuitProto
+    from tket.passes import PlatformTarget
 
 
 __all__ = [
@@ -65,9 +66,21 @@ class CompilationState:
     _py_extensions: ExtensionRegistry | None = None
 
     @staticmethod
-    def from_tket1(circ: PytketCircuitProto) -> CompilationState:
-        """Create a CompilationState from a legacy pytket Circuit."""
-        return CompilationState(_inner=_state.CompilationState.from_tket1(circ))
+    def from_tket1(
+        circ: PytketCircuitProto, *, target: PlatformTarget | None = None
+    ) -> CompilationState:
+        """Create a CompilationState from a legacy pytket Circuit.
+
+        Parameters:
+        - circ: The legacy pytket circuit to load.
+        - target: The platform target selecting which decoder extension set is
+          used when translating pytket commands into HUGR operations. Defaults
+          to the platform-agnostic ``PlatformTarget.Tket``.
+        """
+        target_str = target.value if target is not None else None
+        return CompilationState(
+            _inner=_state.CompilationState.from_tket1(circ, target=target_str)  # type: ignore[arg-type]
+        )
 
     @staticmethod
     def from_python(hugr: Hugr | Package) -> CompilationState:

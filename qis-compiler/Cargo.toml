@@ -11,25 +11,28 @@ edition = "2024"
 [lib]
 name = "selene_hugr_qis_compiler"
 path = "rust/lib.rs"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
+doctest = false
 
 [dependencies]
 anyhow.workspace = true
-pyo3 = { workspace = true, features = ["abi3-py310", "anyhow"] }
+pyo3 = { workspace = true, features = ["abi3-py310", "anyhow"], optional = true }
 serde_json.workspace = true
 tracing.workspace = true
 itertools.workspace = true
 strum.workspace = true
-tket = { path = "../tket", version = "0.20.0" }
-tket-qsystem = { path = "../tket-qsystem", version = "0.26.0", features = [
+tket = { path = "../tket", version = "0.21.1" }
+tket-qsystem = { path = "../tket-qsystem", version = "0.27.1", features = [
     "llvm",
 ] }
+
 
 [lints]
 workspace = true
 
 [features]
 default = []
+py = ["dep:pyo3"]
 
 [build-dependencies]
 cbindgen.workspace = true

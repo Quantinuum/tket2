@@ -33,6 +33,7 @@ jobs:
     permissions:
       pull-requests: read
     outputs:
+      pg-libs: ${{ steps.filter.outputs.pg-libs }}
       rust: ${{ steps.filter.outputs.rust }}
       python: ${{ steps.filter.outputs.python }}
       extensions: ${{ steps.filter.outputs.extensions }}
@@ -91,9 +92,91 @@ jobs:
       - name: Type check with mypy
         run: uv run mypy .
       - name: Check formatting with ruff
-        run: uv run --no-project ruff format --check
+        run: uv run ruff format --check
       - name: Lint with ruff
-        run: uv run --no-project ruff check
+        run: uv run ruff check
+
+  check-pg-libs:
+    name: Check pg-libs
+    needs: [changes]
+    if: ${{ needs.changes.outputs.pg-libs == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: mozilla-actions/sccache-action@v0.0.10
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Check formatting
+        working-directory: pg-libs
+        run: cargo fmt -- --check
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - name: Install Python ${{ env.PYTHON_HIGHEST }}
+        run: uv python install ${{ env.PYTHON_HIGHEST }}
+      - name: Setup dependencies
+        working-directory: pg-libs
+        run: uv sync --python ${{ env.PYTHON_HIGHEST }}
+      - name: Check formatting with ruff
+        working-directory: pg-libs
+        run: uv run ruff format --check
+      - name: Lint with ruff
+        working-directory: pg-libs
+        run: uv run ruff check
+
+  tests-pg-libs:
+    name: pg-libs tests
+    needs: [changes]
+    if: ${{ needs.changes.outputs.pg-libs == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: mozilla-actions/sccache-action@v0.0.10
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - name: Install Python ${{ env.PYTHON_HIGHEST }}
+        run: uv python install ${{ env.PYTHON_HIGHEST }}
+      - name: Install pg-libs dev dependencies
+        working-directory: pg-libs
+        run: uv sync --python ${{ env.PYTHON_HIGHEST }}
+      - name: Run stable tests
+        working-directory: pg-libs
+        run: cargo test --workspace
+
+  tests-pg-libs-nightly:
+    name: pg-libs tests (nightly)
+    needs: [changes]
+    if: ${{ needs.changes.outputs.pg-libs == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: mozilla-actions/sccache-action@v0.0.10
+      - name: Install pinned nightly toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2025-09-14
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - name: Install Python ${{ env.PYTHON_HIGHEST }}
+        run: uv python install ${{ env.PYTHON_HIGHEST }}
+      - name: Install pg-libs dev dependencies
+        working-directory: pg-libs
+        run: uv sync --python ${{ env.PYTHON_HIGHEST }}
+      - name: Run simd tests
+        working-directory: pg-libs
+        run: cargo test -p pg-bitpacked --features simd
 
   benches:
     name: Continuous benchmarking 🏋️
@@ -307,7 +390,7 @@ jobs:
         # avoid building qis-compiler
         run: uv sync --package=tket --exact --all-extras --python ${{ env.PYTHON_LOWEST }}
       - name: Run python tests with coverage instrumentation
-        run: uv run --no-project pytest --cov=./ --cov-report=xml ${{ env.PKGS }}
+        run: uv run pytest --cov=./ --cov-report=xml ${{ env.PKGS }}
       - name: Upload python coverage to codecov.io
         if: github.event_name != 'merge_group'
         uses: codecov/codecov-action@v7
@@ -394,7 +477,7 @@ jobs:
           fetch-depth: 0 # Need full history to compare with main
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: "3.10"
 
@@ -420,8 +503,11 @@ jobs:
     needs:
       [
         changes,
+        check-pg-libs,
         check-rs,
         check-py,
+        tests-pg-libs,
+        tests-pg-libs-nightly,
         tests-rs-stable-no-features,
         tests-rs-stable-all-features,
         tests-py,

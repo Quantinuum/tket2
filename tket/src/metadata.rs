@@ -34,9 +34,10 @@ use tket_json_rs::register::{Bit, Qubit};
 
 /// Metadata key for the number of qubits that a HUGR node expects to be required for execution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct MaxQubitsHint;
-impl Metadata for MaxQubitsHint {
-    const KEY: &'static str = "tket.hint.max_qubits";
+pub struct ExpectedQubitsHint;
+impl Metadata for ExpectedQubitsHint {
+    const KEY: &'static str = "tket.hint.expected_qubits";
+    const ALIASES: &'static [&'static str] = &["tket.hint.max_qubits"];
     type Type<'hugr> = u32;
 }
 
@@ -115,53 +116,26 @@ impl Metadata for PytketQubitRegisterNames {
     type Type<'hugr> = Vec<Qubit>;
 }
 
-/// Metadata key for the global phase
+/// Metadata key for the serialized pytket global phase expression.
+///
+/// Deprecated: global phases are now represented as explicit
+/// `tket.global_phase` operations. This definition is left for
+/// compatibility with older Hugrs.
+#[deprecated(
+    since = "0.21.1",
+    note = "use explicit tket.global_phase operations instead"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PytketPhaseExpr;
+#[expect(deprecated, reason = "the impl is retained for legacy HUGR metadata")]
 impl Metadata for PytketPhaseExpr {
     const KEY: &'static str = "TKET1.phase";
     type Type<'hugr> = &'hugr str;
 }
 
-/// Deprecated alias for [`MaxQubitsHint`].
+/// Deprecated alias for [`ExpectedQubitsHint`].
 #[deprecated(
-    since = "0.19.0",
-    note = "use MaxQubitsHint instead; this alias will be removed"
+    since = "0.21.0",
+    note = "use ExpectedQubitsHint instead; this alias will be removed"
 )]
-pub type MaxQubits = MaxQubitsHint;
-/// Deprecated alias for [`UnitaryFlags`].
-#[deprecated(
-    since = "0.19.0",
-    note = "use UnitaryFlags instead; this alias will be removed"
-)]
-pub type Unitary = UnitaryFlags;
-/// Deprecated alias for [`PytketInputParameters`].
-#[deprecated(
-    since = "0.19.0",
-    note = "use PytketInputParameters instead; this alias will be removed"
-)]
-pub type InputParameters = PytketInputParameters;
-/// Deprecated alias for [`PytketOpGroup`].
-#[deprecated(
-    since = "0.19.0",
-    note = "use PytketOpGroup instead; this alias will be removed"
-)]
-pub type OpGroup = PytketOpGroup;
-/// Deprecated alias for [`PytketBitRegisterNames`].
-#[deprecated(
-    since = "0.19.0",
-    note = "use PytketBitRegisterNames instead; this alias will be removed"
-)]
-pub type BitRegisters = PytketBitRegisterNames;
-/// Deprecated alias for [`PytketQubitRegisterNames`].
-#[deprecated(
-    since = "0.19.0",
-    note = "use PytketQubitRegisterNames instead; this alias will be removed"
-)]
-pub type QubitRegisters = PytketQubitRegisterNames;
-/// Deprecated alias for [`PytketPhaseExpr`].
-#[deprecated(
-    since = "0.19.0",
-    note = "use PytketPhaseExpr instead; this alias will be removed"
-)]
-pub type Phase = PytketPhaseExpr;
+pub type MaxQubitsHint = ExpectedQubitsHint;
