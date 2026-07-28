@@ -1,0 +1,22 @@
+[package]
+name = "tket-qsim"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+description = "Internal testing-only quantum circuit simulator for verifying compilation correctness"
+
+[lints]
+workspace = true
+
+[dependencies]
+tket = { path = "../tket" }
+tket-qsystem = { path = "../tket-qsystem" }
+hugr.workspace = true
+num-complex = { workspace = true }
+petgraph = { workspace = true }
+
+[dev-dependencies]
+ndarray = "0.17"
+roqoqo = "1.22"
+rstest.workspace = true
