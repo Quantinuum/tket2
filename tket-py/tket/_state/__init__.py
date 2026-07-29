@@ -77,8 +77,7 @@ class CompilationState:
         """
         target_str = target.value if target is not None else None
         return CompilationState(
-            _inner=_state.CompilationState.from_tket1(circ, target=target_str)
-            # type: ignore[arg-type]
+            _inner=_state.CompilationState.from_tket1(circ, target=target_str)  # type: ignore[arg-type]
         )
 
     @staticmethod

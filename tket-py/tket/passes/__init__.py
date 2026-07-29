@@ -28,7 +28,6 @@ from . import inline_funcs
 if TYPE_CHECKING:
     from tket.util import PytketPassProto as PytketPass
 
-
 __all__ = [
     "Cliffordize",
     "InlineFuncsHeuristic",
@@ -315,7 +314,7 @@ class InlineFunctions(ComposablePass):
       inline. Defaults to `MaxSize(128)`.
     """
 
-    heuristic: inline_funcs.InlineFuncsHeuristic = inline_funcs.MaxSize(128)
+    heuristic: inline_funcs.InlineFuncsHeuristic = inline_funcs.MaxSize(128)  # noqa: RUF009
     _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
 
     def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:

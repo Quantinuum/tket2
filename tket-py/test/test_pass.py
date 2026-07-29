@@ -76,9 +76,12 @@ def _contains_modifiers(module: Hugr) -> bool:
 @st.composite
 def circuits(
     draw: Callable[[SearchStrategy[Any]], Any],
-    n_qubits: SearchStrategy[int] = st.integers(min_value=0, max_value=8),
-    depth: SearchStrategy[int] = st.integers(min_value=5, max_value=50),
+    n_qubits: SearchStrategy[int] | None = None,
+    depth: SearchStrategy[int] | None = None,
 ) -> Circuit:
+    n_qubits = n_qubits or st.integers(min_value=0, max_value=8)
+    depth = depth or st.integers(min_value=5, max_value=50)
+
     total_qubits = draw(n_qubits)
     circuit = Circuit(total_qubits)
     if total_qubits == 0:
@@ -92,7 +95,7 @@ def circuits(
         if gate in (circuit.CX,):
             target = draw(
                 st.integers(min_value=0, max_value=total_qubits - 1).filter(
-                    lambda x: x != control
+                    lambda x: x != control  # noqa: B023
                 )
             )
             gate(control, target)

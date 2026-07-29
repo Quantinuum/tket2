@@ -20,6 +20,7 @@ class CircuitChunks:
 class PullForwardError(Exception):
     """Error from a `PullForward` operation."""
 
+# ruff: ignore[B008]
 def normalize_guppy(
     circ: CompilationState,
     *,
@@ -50,6 +51,7 @@ def normalize_guppy(
     - squash_borrows: Whether to squash return-borrow pairs on BorrowArrays.
     """
 
+# ruff: ignore[B008]
 def inline_functions(
     circ: CompilationState,
     *,
