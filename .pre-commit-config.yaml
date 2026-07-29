@@ -109,10 +109,10 @@ repos:
         language: system
         files: ^pg-libs/.*\.py$
         pass_filenames: false
-      - id: ruff-check-pg-libs
+      - id: ruff-fix-pg-libs
         name: ruff (pg-libs)
-        description: Check pg-libs python code with `ruff`.
-        entry: sh -c "cd pg-libs && just check-python"
+        description: Fix pg-libs python code with `ruff`.
+        entry: sh -c "cd pg-libs && just fix-python"
         language: system
         files: ^pg-libs/.*\.py$
         pass_filenames: false
