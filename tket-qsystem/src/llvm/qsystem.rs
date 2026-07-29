@@ -255,11 +255,7 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
     }
 
     /// Build a call to `runtime_func` with the given `inputs`, returning the
-    /// call's result value, if any (`None` for functions returning `void`).
-    ///
-    /// This is the shared call-building primitive used both by [`Self::emit_impl`]
-    /// (whose callers don't care about the return value) and by the "lazy
-    /// measure" helpers (whose callers need the returned future).
+    /// call's result value, if any.
     fn call_runtime_func<'c>(
         &self,
         context: &mut EmitFuncContext<'c, '_, impl HugrView<Node = Node>>,
@@ -276,9 +272,8 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
             .basic())
     }
 
-    /// Helper function to `emit` a qsystem operation whose outputs are simply
-    /// a subset of its inputs (i.e. the runtime function's return value, if
-    /// any, is discarded).
+    /// Helper function to `emit` a qsystem operation whose outputs are
+    /// a subset of its inputs.
     fn emit_impl<'c, H: HugrView<Node = Node>>(
         &self,
         context: &mut EmitFuncContext<'c, '_, impl HugrView<Node = Node>>,
@@ -293,7 +288,7 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
         args.outputs.finish(context.builder(), outputs)
     }
 
-    /// Emit a call to a "lazy measure" runtime function, passing `qb` followed
+    /// Emit a call to a lazy measure function, passing `qb` followed
     /// by any `extra_args` (e.g. Sol's leakage-heralding flags), and returning
     /// the resulting future.
     fn emit_lazy_measure_call<'c>(
@@ -310,11 +305,6 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
             .ok_or_else(|| anyhow!("lazy measure runtime function must return a value"))
     }
 
-    /// Shared top-level handler for `LazyMeasure`/`LazyMeasureLeaked`/
-    /// `LazyMeasureReset` on both platforms: destructures the single qubit
-    /// input, calls `runtime_func` (with any `extra_args` appended after the
-    /// qubit), and finishes outputs via [`Self::finish_lazy_measure`] or
-    /// [`Self::finish_lazy_measure_reset`] depending on `reset`.
     fn emit_lazy_measure_op<'c, H: HugrView<Node = Node>>(
         &self,
         context: &mut EmitFuncContext<'c, '_, H>,
