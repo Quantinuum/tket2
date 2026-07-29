@@ -53,6 +53,9 @@ ignore_missing_imports = true
 # TODO: Fix the lint errors and enable this
 #strict = true
 
+[tool.ruff.lint]
+ignore = ["EXE"]
+
 [tool.ruff.lint.per-file-ignores]
 "tket-exts/src/tket_exts/tket/**" = ["B019"] # @functools.cache is intentional, few instances exist
 
