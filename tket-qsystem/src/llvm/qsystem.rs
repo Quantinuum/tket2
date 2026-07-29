@@ -254,7 +254,31 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
         }
     }
 
-    /// Helper function to `emit` a qsystem operation.
+    /// Build a call to `runtime_func` with the given `inputs`, returning the
+    /// call's result value, if any (`None` for functions returning `void`).
+    ///
+    /// This is the shared call-building primitive used both by [`Self::emit_impl`]
+    /// (whose callers don't care about the return value) and by the "lazy
+    /// measure" helpers (whose callers need the returned future).
+    fn call_runtime_func<'c>(
+        &self,
+        context: &mut EmitFuncContext<'c, '_, impl HugrView<Node = Node>>,
+        inputs: &[BasicValueEnum<'c>],
+        runtime_func: RuntimeFunction,
+    ) -> Result<Option<BasicValueEnum<'c>>> {
+        let func = self.runtime_func(context, runtime_func)?;
+        let func_name = self.runtime_func_name(&runtime_func)?;
+        let call_inputs = inputs.iter().map(|&v| v.into()).collect_vec();
+        Ok(context
+            .builder()
+            .build_call(func, &call_inputs, func_name)?
+            .try_as_basic_value()
+            .basic())
+    }
+
+    /// Helper function to `emit` a qsystem operation whose outputs are simply
+    /// a subset of its inputs (i.e. the runtime function's return value, if
+    /// any, is discarded).
     fn emit_impl<'c, H: HugrView<Node = Node>>(
         &self,
         context: &mut EmitFuncContext<'c, '_, impl HugrView<Node = Node>>,
@@ -263,15 +287,52 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
         input_indices: &[usize],
         output_indices: &[usize],
     ) -> Result<()> {
-        let inputs = input_indices
-            .iter()
-            .map(|&i| args.inputs[i].into())
-            .collect_vec();
+        let inputs = input_indices.iter().map(|&i| args.inputs[i]).collect_vec();
+        self.call_runtime_func(context, &inputs, runtime_func)?;
         let outputs = output_indices.iter().map(|&i| args.inputs[i]).collect_vec();
-        let func = self.runtime_func(context, runtime_func)?;
-        let func_name = self.runtime_func_name(&runtime_func)?;
-        context.builder().build_call(func, &inputs, func_name)?;
         args.outputs.finish(context.builder(), outputs)
+    }
+
+    /// Emit a call to a "lazy measure" runtime function, passing `qb` followed
+    /// by any `extra_args` (e.g. Sol's leakage-heralding flags), and returning
+    /// the resulting future.
+    fn emit_lazy_measure_call<'c>(
+        &self,
+        context: &mut EmitFuncContext<'c, '_, impl HugrView<Node = Node>>,
+        runtime_func: RuntimeFunction,
+        qb: BasicValueEnum<'c>,
+        extra_args: &[BasicValueEnum<'c>],
+    ) -> Result<BasicValueEnum<'c>> {
+        let mut inputs = Vec::with_capacity(1 + extra_args.len());
+        inputs.push(qb);
+        inputs.extend_from_slice(extra_args);
+        self.call_runtime_func(context, &inputs, runtime_func)?
+            .ok_or_else(|| anyhow!("lazy measure runtime function must return a value"))
+    }
+
+    /// Shared top-level handler for `LazyMeasure`/`LazyMeasureLeaked`/
+    /// `LazyMeasureReset` on both platforms: destructures the single qubit
+    /// input, calls `runtime_func` (with any `extra_args` appended after the
+    /// qubit), and finishes outputs via [`Self::finish_lazy_measure`] or
+    /// [`Self::finish_lazy_measure_reset`] depending on `reset`.
+    fn emit_lazy_measure_op<'c, H: HugrView<Node = Node>>(
+        &self,
+        context: &mut EmitFuncContext<'c, '_, H>,
+        args: EmitOpArgs<'c, '_, ExtensionOp, H>,
+        runtime_func: RuntimeFunction,
+        extra_args: &[BasicValueEnum<'c>],
+        reset: bool,
+    ) -> Result<()> {
+        let [qb] = args
+            .inputs
+            .try_into()
+            .map_err(|_| anyhow!("lazy measure ops expect one input"))?;
+        let result = self.emit_lazy_measure_call(context, runtime_func, qb, extra_args)?;
+        if reset {
+            self.finish_lazy_measure_reset(context, args.outputs, qb, result)
+        } else {
+            self.finish_lazy_measure(context, args.outputs, qb, result)
+        }
     }
 
     /// Common tail logic after computing the "lazy measure" future `result` for
@@ -339,63 +400,28 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                 &[0, 1, 2],
                 &[0, 1],
             ),
-            HeliosOp::LazyMeasure => {
-                let builder = context.builder();
-                let [qb] = args
-                    .inputs
-                    .try_into()
-                    .map_err(|_| anyhow!("LazyMeasure expects one input"))?;
-                let result = builder
-                    .build_call(
-                        self.runtime_func(
-                            context,
-                            RuntimeFunction::Helios(HeliosRuntimeFunction::LazyMeasure),
-                        )?,
-                        &[qb.into()],
-                        "lazy_measure",
-                    )?
-                    .try_as_basic_value()
-                    .unwrap_basic();
-                self.finish_lazy_measure(context, args.outputs, qb, result)
-            }
-            HeliosOp::LazyMeasureLeaked => {
-                let builder = context.builder();
-                let [qb] = args
-                    .inputs
-                    .try_into()
-                    .map_err(|_| anyhow!("LazyMeasureLeaked expects one input"))?;
-                let result = builder
-                    .build_call(
-                        self.runtime_func(
-                            context,
-                            RuntimeFunction::Helios(HeliosRuntimeFunction::LazyMeasureLeaked),
-                        )?,
-                        &[qb.into()],
-                        "lazy_measure_leaked",
-                    )?
-                    .try_as_basic_value()
-                    .unwrap_basic();
-                self.finish_lazy_measure(context, args.outputs, qb, result)
-            }
-            HeliosOp::LazyMeasureReset => {
-                let builder = context.builder();
-                let [qb] = args
-                    .inputs
-                    .try_into()
-                    .map_err(|_| anyhow!("LazyMeasureReset expects one input"))?;
-                let result = builder
-                    .build_call(
-                        self.runtime_func(
-                            context,
-                            RuntimeFunction::Helios(HeliosRuntimeFunction::LazyMeasure),
-                        )?,
-                        &[qb.into()],
-                        "lazy_measure",
-                    )?
-                    .try_as_basic_value()
-                    .unwrap_basic();
-                self.finish_lazy_measure_reset(context, args.outputs, qb, result)
-            }
+            HeliosOp::LazyMeasure => self.emit_lazy_measure_op(
+                context,
+                args,
+                RuntimeFunction::Helios(HeliosRuntimeFunction::LazyMeasure),
+                &[],
+                false,
+            ),
+            // Helios uses a separate runtime function for leakage-heralding measurement.
+            HeliosOp::LazyMeasureLeaked => self.emit_lazy_measure_op(
+                context,
+                args,
+                RuntimeFunction::Helios(HeliosRuntimeFunction::LazyMeasureLeaked),
+                &[],
+                false,
+            ),
+            HeliosOp::LazyMeasureReset => self.emit_lazy_measure_op(
+                context,
+                args,
+                RuntimeFunction::Helios(HeliosRuntimeFunction::LazyMeasure),
+                &[],
+                true,
+            ),
             _ => {
                 let shared = SharedOp::try_from(op).map_err(|e| anyhow!(e))?;
                 self.emit_shared(context, args, shared)
@@ -427,59 +453,42 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                 &[0, 1],
             ),
             SolOp::LazyMeasure => {
-                let [qb] = args
-                    .inputs
-                    .try_into()
-                    .map_err(|_| anyhow!("LazyMeasure expects one input"))?;
                 // flags=0 -> no leakage-heralding
-                let result = self.emit_sol_lazy_measure_call(context, qb, 0)?;
-                self.finish_lazy_measure(context, args.outputs, qb, result)
+                let flags = context.iw_context().i64_type().const_int(0, false).into();
+                self.emit_lazy_measure_op(
+                    context,
+                    args,
+                    RuntimeFunction::Sol(SolRuntimeFunction::LazyMeasure),
+                    &[flags],
+                    false,
+                )
             }
             SolOp::LazyMeasureLeaked => {
-                let [qb] = args
-                    .inputs
-                    .try_into()
-                    .map_err(|_| anyhow!("LazyMeasureLeaked expects one input"))?;
                 // flags=1 -> leakage-heralding
-                let result = self.emit_sol_lazy_measure_call(context, qb, 1)?;
-                self.finish_lazy_measure(context, args.outputs, qb, result)
+                let flags = context.iw_context().i64_type().const_int(1, false).into();
+                self.emit_lazy_measure_op(
+                    context,
+                    args,
+                    RuntimeFunction::Sol(SolRuntimeFunction::LazyMeasure),
+                    &[flags],
+                    false,
+                )
             }
             SolOp::LazyMeasureReset => {
-                let [qb] = args
-                    .inputs
-                    .try_into()
-                    .map_err(|_| anyhow!("LazyMeasureReset expects one input"))?;
-                let result = self.emit_sol_lazy_measure_call(context, qb, 0)?;
-                self.finish_lazy_measure_reset(context, args.outputs, qb, result)
+                let flags = context.iw_context().i64_type().const_int(0, false).into();
+                self.emit_lazy_measure_op(
+                    context,
+                    args,
+                    RuntimeFunction::Sol(SolRuntimeFunction::LazyMeasure),
+                    &[flags],
+                    true,
+                )
             }
             _ => {
                 let shared = SharedOp::try_from(op).map_err(|e| anyhow!(e))?;
                 self.emit_shared(context, args, shared)
             }
         }
-    }
-
-    /// Emit a call to Sol's combined `___lazy_measure(q, flags)` runtime function,
-    /// returning the resulting future.
-    fn emit_sol_lazy_measure_call<'c, H: HugrView<Node = Node>>(
-        &self,
-        context: &mut EmitFuncContext<'c, '_, H>,
-        qb: BasicValueEnum<'c>,
-        flags: u64,
-    ) -> Result<BasicValueEnum<'c>> {
-        let flags_val = context.iw_context().i64_type().const_int(flags, false);
-        Ok(context
-            .builder()
-            .build_call(
-                self.runtime_func(
-                    context,
-                    RuntimeFunction::Sol(SolRuntimeFunction::LazyMeasure),
-                )?,
-                &[qb.into(), flags_val.into()],
-                "lazy_measure",
-            )?
-            .try_as_basic_value()
-            .unwrap_basic())
     }
 
     /// Lower a [`SharedOp`] that has identical LLVM behaviour on all platforms.

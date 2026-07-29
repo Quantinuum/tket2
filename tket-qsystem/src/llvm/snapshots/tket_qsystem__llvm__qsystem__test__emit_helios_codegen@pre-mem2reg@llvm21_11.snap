@@ -17,10 +17,10 @@ alloca_block:
 entry_block:                                      ; preds = %alloca_block
   store i64 %0, ptr %"2_0", align 4
   %"2_01" = load i64, ptr %"2_0", align 4
-  %lazy_measure = call i64 @___lazy_measure(i64 %"2_01"), !dbg !10
+  %___lazy_measure = call i64 @___lazy_measure(i64 %"2_01"), !dbg !10
   call void @___reset(i64 %"2_01"), !dbg !10
   store i64 %"2_01", ptr %"4_0", align 4, !dbg !10
-  store i64 %lazy_measure, ptr %"4_1", align 4, !dbg !10
+  store i64 %___lazy_measure, ptr %"4_1", align 4, !dbg !10
   %"4_02" = load i64, ptr %"4_0", align 4
   %"4_13" = load i64, ptr %"4_1", align 4
   store i64 %"4_02", ptr %"0", align 4

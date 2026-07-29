@@ -10,10 +10,10 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  %lazy_measure = call i64 @___lazy_measure(i64 %0, i64 0), !dbg !10
+  %___lazy_measure = call i64 @___lazy_measure(i64 %0, i64 0), !dbg !10
   call void @___reset(i64 %0), !dbg !10
   %mrv = insertvalue { i64, i64 } poison, i64 %0, 0
-  %mrv6 = insertvalue { i64, i64 } %mrv, i64 %lazy_measure, 1
+  %mrv6 = insertvalue { i64, i64 } %mrv, i64 %___lazy_measure, 1
   ret { i64, i64 } %mrv6
 }
 
