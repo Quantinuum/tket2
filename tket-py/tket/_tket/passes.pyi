@@ -89,14 +89,34 @@ def tket1_pass(
       nested inside other subregions of the circuit.
     """
 
-def global_t_resynthesis(
+def greedy_pauli_simp(
     circ: CompilationState,
-    ancilla_budget: int = 0,
+    scope: PassScope = GlobalScope.PRESERVE_PUBLIC,
+    window_size: int | None = None,
+    pool_size: int | None = None,
+    top_up_size: int | None = None,
+    seed: int | None = None,
+    parallel_mode: str = "auto",
+) -> None:
+    """Applies GreedyPauliSimp to optimize a hugr.
+
+    Parameters:
+    """
+    
+def t_optimization(
+    circ: CompilationState,
+    scope: PassScope = GlobalScope.PRESERVE_PUBLIC,
+    ancilla_budget: int | None = None,
+    window_size: int | None = None,
+    pool_size: int | None = None,
+    top_up_size: int | None = None,
+    seed: int | None = None,
+    parallel_mode: str = "auto",
 ) -> None:
     """Applies FastTODD and GreedyPauliSimp to a circuit.
 
     Parameters:
-    - ancilla_budget: number of ancillas available to increase size of phase_polynomial for FastTODD.
+    - ancilla_budget: number of ancillas available to increase size of phase_polynomial t optimization.
     """
 
 def resolve_modifiers(

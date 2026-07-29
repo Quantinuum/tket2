@@ -31,7 +31,8 @@ from ._tket.passes import (
     tket1_pass,
     normalize_guppy,
     PullForwardError,
-    global_t_resynthesis,
+    greedy_pauli_simp,
+    t_optimization,
     # inline_all,
 )
 
@@ -50,8 +51,7 @@ __all__ = [
     "PytketHugrPass",
     "PassResult",
     "NormalizeGuppy",
-    "GlobalTResynthesis",
-    # "InlineAll",
+    "GreedyPauliSimp",
 ]
 
 
@@ -195,10 +195,45 @@ class NormalizeGuppy(ComposablePass):
         return PassResult.for_pass(self, hugr=new_hugr, inplace=inplace, result=None)
 
 @dataclass
-class GlobalTResynthesis(ComposablePass):
-    ancilla_budget: int = 0
+class GreedyPauliSimp(ComposablePass):
+    """Resynthesise a circuit using GreedyPauliSimp.
 
-    """Resynthesise a circuit using the global-t optimisation.
+    Converts the circuit into a Pauli Graph, applies GreedyPauliSimp,
+    and resynthesises the circuit.
+
+    Parameters:
+    - window_size: The size of the sliding window for lookahead during synthesis.
+    - pool_size: The number of candidate gates to maintain in the pool.
+    - top_op_size: The number of candidates to add after each TQE gate.
+    - seed: The random seed for reproducible candidate sampling.
+    - parallel_mode: The configuration for parallel processing of candidates.
+    """
+
+    def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
+        return implement_pass_run(
+            self,
+            hugr=hugr,
+            inplace=inplace,
+            copy_call=lambda h: self._greedy_pauli_simp(h, inplace),
+        )
+
+    def _greedy_pauli_simp(self, hugr: Hugr, inplace: bool) -> PassResult:
+        compiler_state, registry = _hugr_to_tk2circuit(hugr)
+        opt_program = greedy_pauli_simp(
+            compiler_state,
+            window_size=self.window_size,
+            pool_size=self.pool_size,
+            top_up_size=self.top_up_size,
+            seed=self.seed,
+            parallel_mode=self.parallel_mode,
+        )
+        new_hugr = Hugr.from_str(opt_program.to_str())
+        new_hugr.resolve_extensions(registry)
+        return PassResult.for_pass(self, hugr=new_hugr, inplace=inplace, result=None)
+
+@dataclass
+class TOptimization(ComposablePass):
+    """Resynthesise a circuit using GreedyPauliSimp.
 
     Converts the circuit into a Pauli Graph, runs FastTODD with a given ancilla budget,
     and uses GreedyPauliSimp to synthesize the pauli graph.
@@ -212,41 +247,20 @@ class GlobalTResynthesis(ComposablePass):
             self,
             hugr=hugr,
             inplace=inplace,
-            copy_call=lambda h: self._global_t_resynthesis(h, inplace),
+            copy_call=lambda h: self._t_optimization(h, inplace),
         )
 
-    def _global_t_resynthesis(self, hugr: Hugr, inplace: bool) -> PassResult:
+    def _t_optimization(self, hugr: Hugr, inplace: bool) -> PassResult:
         compiler_state, registry = _hugr_to_tk2circuit(hugr)
-        opt_program = global_t_resynthesis(
+        opt_program = t_optimization(
             compiler_state,
+            window_size=self.window_size,
+            pool_size=self.pool_size,
+            top_up_size=self.top_up_size,
+            seed=self.seed,
+            parallel_mode=self.parallel_mode,
             ancilla_budget=self.ancilla_budget,
         )
         new_hugr = Hugr.from_str(opt_program.to_str())
         new_hugr.resolve_extensions(registry)
         return PassResult.for_pass(self, hugr=new_hugr, inplace=inplace, result=None)
-
-# @dataclass
-# class InlineAll(ComposablePass):
-#
-#     """Temporary inlining pass to debug global-t resynthesis.
-#
-#     Parameters:
-#     - None
-#     """
-#
-#     def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
-#         return implement_pass_run(
-#             self,
-#             hugr=hugr,
-#             inplace=inplace,
-#             copy_call=lambda h: self._inline_all(h, inplace),
-#         )
-#
-#     def _inline_all(self, hugr: Hugr, inplace: bool) -> PassResult:
-#         compiler_state, registry = _hugr_to_tk2circuit(hugr)
-#         opt_program = inline_all(
-#             compiler_state,
-#         )
-#         new_hugr = Hugr.from_str(opt_program.to_str())
-#         new_hugr.resolve_extensions(registry)
-#         return PassResult.for_pass(self, hugr=new_hugr, inplace=inplace, result=None)

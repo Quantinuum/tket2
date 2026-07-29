@@ -33,7 +33,7 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     m.add_class::<self::chunks::PyCircuitChunks>()?;
     m.add_function(wrap_pyfunction!(self::chunks::chunks, &m)?)?;
     m.add_function(wrap_pyfunction!(self::tket1::tket1_pass, &m)?)?;
-    m.add_function(wrap_pyfunction!(global_t_resynthesis, &m)?)?;
+    m.add_function(wrap_pyfunction!(greedy_pauli_simp, &m)?)?;
     m.add_function(wrap_pyfunction!(resolve_modifiers, &m)?)?;
     m.add_function(wrap_pyfunction!(qsystem_rebase_pass, &m)?)?;
     m.add("PullForwardError", py.get_type::<PyPullForwardError>())?;
@@ -58,9 +58,15 @@ create_py_exception!(
 );
 
 create_py_exception!(
-    tket::passes::global_t_resynthesis::GlobalTResynthesisErrors,
+    tket::passes::greedy_pauli_simp::GreedyPauliSimpErrors,
+    GreedyPauliSimpError,
+    "Errors from the greedy pauli simp pass."
+);
+
+create_py_exception!(
+    tket::passes::t_optimization::GlobalTResynthesisErrors,
     PyGlobalTResynthesisError,
-    "Errors from the global-t resynthesis pass."
+    "Errors from the global T resynthesis pass."
 );
 
 create_py_exception!(
@@ -245,29 +251,73 @@ fn qsystem_rebase_pass(
 }
 
 #[pyfunction]
-#[pyo3(signature = (circ, ancilla_budget=0, scope = None))]
-fn global_t_resynthesis(
+#[pyo3(signature = (circ, scope = None, window_size=None, pool_size=None, top_up_size=None, seed=None, parallel_mode=None))]
+fn greedy_pauli_simp(
     circ: &mut CompilationState,
-    ancilla_budget: usize,
     scope: Option<PyPassScope>,
+    window_size: Option<usize>,
+    pool_size: Option<usize>,
+    top_up_size: Option<usize>,
+    seed: Option<usize>,
+    parallel_mode: Option<String>,
 ) -> PyResult<()> {
     let py_scope = scope.unwrap_or_default();
-    let global_t_resynthesis_pass = tket::passes::GlobalTResynthesis::default_with_scope(py_scope.scope)
-        .with_ancilla_budget(ancilla_budget);
+    let mut pass = tket::passes::GreedyPauliSimpPass::default_with_scope(py_scope.scope);
+    if let Some(ws) = window_size {
+        pass = pass.with_window_size(ws);
+    }
+    if let Some(ps) = pool_size {
+        pass = pass.with_pool_size(ps);
+    }
+    if let Some(tus) = top_up_size {
+        pass = pass.with_top_up_size(tus);
+    }
+    if let Some(s) = seed {
+        pass = pass.with_seed(s as u64);
+    }
+    let parallel_mode = parallel_mode
+        .and_then(|s| greedy_synth::ParallelMode::from_str(&s).ok())
+        .unwrap_or(greedy_synth::ParallelMode::Auto);
+    pass = pass.with_parallel_mode(parallel_mode);
 
-    global_t_resynthesis_pass.run(&mut circ.hugr).convert_pyerrs()?;
+    pass.run(&mut circ.hugr).convert_pyerrs()?;
     Ok(())
 }
 
-fn global_t_resynthesis(
+#[pyfunction]
+#[pyo3(signature = (circ, scope = None, ancilla_budget=None, window_size=None, pool_size=None, top_up_size=None, seed=None, parallel_mode=None))]
+fn t_optimization(
     circ: &mut CompilationState,
-    ancilla_budget: usize,
     scope: Option<PyPassScope>,
+    ancilla_budget: Option<usize>,
+    window_size: Option<usize>,
+    pool_size: Option<usize>,
+    top_up_size: Option<usize>,
+    seed: Option<usize>,
+    parallel_mode: Option<String>,
 ) -> PyResult<()> {
-    let py_scope = scope. unwrap_or_default();
-    let globa_t_resynthesis_pass = tket::passes::GlobalTResynthesis::default_with_scope(py_scope.scope)
-        .with_ancilla_budget(ancilla_budget);
+    let py_scope = scope.unwrap_or_default();
+    let mut pass = tket::passes::TOptimizationPass::default_with_scope(py_scope.scope);
+    if let Some(ab) = ancilla_budget {
+        pass = pass.with_ancilla_budget(ab);
+    }
+    if let Some(ws) = window_size {
+        pass = pass.with_window_size(ws);
+    }
+    if let Some(ps) = pool_size {
+        pass = pass.with_pool_size(ps);
+    }
+    if let Some(tus) = top_up_size {
+        pass = pass.with_top_up_size(tus);
+    }
+    if let Some(s) = seed {
+        pass = pass.with_seed(s as u64);
+    }
+    let parallel_mode = parallel_mode
+        .and_then(|s| greedy_synth::ParallelMode::from_str(&s).ok())
+        .unwrap_or(greedy_synth::ParallelMode::Auto);
+    pass = pass.with_parallel_mode(parallel_mode);
 
-    global_t_resynthesis_pass.run(&mut circ.hugr).convert_pyerrs()?;
+    pass.run(&mut circ.hugr).convert_pyerrs()?;
     Ok(())
 }

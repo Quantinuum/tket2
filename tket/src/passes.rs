@@ -14,8 +14,13 @@ pub use borrow_squash::BorrowSquashPass;
 pub mod commutation;
 pub use commutation::apply_greedy_commutation;
 
-pub mod global_t_resynthesis;
-pub use global_t_resynthesis::GlobalTResynthesis;
+pub mod greedy_pauli_simp;
+pub use greedy_pauli_simp::GreedyPauliSimpPass;
+
+pub mod t_optimization;
+pub use t_optimization::TOptimizationPass;
+
+pub mod pg_convert;
 
 // Constant folding pass.
 pub mod const_fold;

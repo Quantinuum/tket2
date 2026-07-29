@@ -28,6 +28,7 @@ tket-qsystem = { path = "../tket-qsystem", version = "0.26.0" }
 tket1-passes = { path = "../tket1-passes", version = "0.0.0" }
 
 derive_more = { workspace = true, features = ["into", "from"] }
+greedy-synth = { workspace = true }
 hugr = { workspace = true }
 itertools = { workspace = true }
 num_cpus = { workspace = true }

@@ -108,7 +108,6 @@ pauli-graph = { git = "ssh://git@github.com/Quantinuum/pg-libs.git", package = "
 basic-passes = { git = "ssh://git@github.com/Quantinuum/pg-libs.git", package = "basic-passes" }
 greedy-synth = { git = "https://github.com/quantinuum-dev/greedy-pauli-rs", branch = "refactor-pauli-graph-into-separate-crate", package = "greedy-synth" }
 pg-optimise = { git = "https://github.com/quantinuum-dev/greedy-pauli-rs", branch = "refactor-pauli-graph-into-separate-crate", package = "pg-optimise" }
-# fast-todd = { git = "https://github.com/quantinuum-dev/fast-todd" }
 fast-todd = { path = "../fast-todd" }
 
 [profile.release.package.tket-py]

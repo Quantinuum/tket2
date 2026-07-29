@@ -31,6 +31,8 @@ __all__ = [
     "NormalizeGuppy",
     "ModifierResolverPass",
     "QSystemPass",
+    "GreedyPauliSimpPass",
+    "TOptimizationPass",
 ]
 
 
@@ -350,3 +352,98 @@ class QSystemPass(ComposablePass):
             scope=self._scope,
         )
         return program
+
+@dataclass
+class GreedyPauliSimpPass(ComposablePass):
+    """Resynthesise a circuit using greedy pauli simp.
+    Converts the circuit into a Pauli Graph and uses GreedyPauliSimp to synthesize the pauli graph.
+    Parameters:
+    - ancilla_budget: The number of ancilla qubits to use.
+    """
+
+    window_size: int | None = None
+    pool_size: int | None = None
+    top_up_size: int | None = None
+    seed: int | None = None
+    parallel_mode: str = "auto"
+    _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
+    
+    def with_scope(self, scope: PassScope) -> GreedyPauliSimpPass:
+        """Set the scope of this pass and return self."""
+        self._scope = scope
+        return self
+
+    def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
+        return implement_pass_run(
+            self,
+            hugr=hugr,
+            inplace=inplace,
+            copy_call=lambda h: self._greedy_pauli_simp(h, inplace),
+        )
+
+    def _greedy_pauli_simp(self, hugr: Hugr, inplace: bool) -> PassResult:
+        program = _state.CompilationState.from_python(hugr)
+        _passes.greedy_pauli_simp(
+            program._inner,
+            window_size=self.window_size,
+            pool_size=self.pool_size,
+            top_up_size=self.top_up_size,
+            seed=self.seed,
+            parallel_mode=self.parallel_mode
+        )
+        package = program.to_python()
+        return PassResult.for_pass(
+            self, hugr=package.modules[0], inplace=inplace, result=None
+        )
+@dataclass
+class TOptimizationPass(ComposablePass):
+    """Resynthesise a circuit using phase polynomial resynthesis and greedy pauli simp.
+    Converts the circuit into a Pauli Graph, resynthesises diagonal regions using the ancilla budget,
+    to increase their size, and uses GreedyPauliSimp to synthesize the pauli graph.
+    Parameters:
+    - ancilla_budget: The number of ancilla qubits to use.
+    - window_size: The size of the sliding window for lookahead during synthesis. Default to 1280.
+    - pool_size: The number of candidate gates to maintain in the pool. Default to max(1000, 0.2*N^2) where N is the number of qubits.
+    - top_op_size: The number of candidates to add after each TQE gate. Default to max(200, pool_size / N) where N is the number of qubits.
+    - seed: The random seed for reproducible candidate sampling. Default to `0`.
+    - parallel_mode: The configuration for parallel processing of candidates. Default to `ParallelMode.Auto`.
+    """
+
+    ancilla_budget: int | None = None
+    window_size: int | None = None
+    pool_size: int | None = None
+    top_up_size: int | None = None
+    seed: int | None = None
+    parallel_mode: str = "auto"
+    _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
+
+    def with_scope(self, scope: PassScope) -> TOptimizationPass:
+        """Set the scope of this pass and return self."""
+        self._scope = scope
+        return self
+
+    def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
+        return implement_pass_run(
+            self,
+            hugr=hugr,
+            inplace=inplace,
+            copy_call=lambda h: self._t_optimization(h, inplace),
+        )
+
+    def _t_optimization(self, hugr: Hugr, inplace: bool) -> PassResult:
+        program = _state.CompilationState.from_python(hugr)
+        _passes.t_optimization(
+            program._inner,
+            scope=self._scope,
+            ancilla_budget=self.ancilla_budget,
+            window_size=self.window_size,
+            pool_size=self.pool_size,
+            top_up_size=self.top_up_size,
+            seed=self.seed,
+            parallel_mode=self.parallel_mode
+        )
+        package = program.to_python()
+        return PassResult.for_pass(
+            self, hugr=package.modules[0], inplace=inplace, result=None
+        )
+
