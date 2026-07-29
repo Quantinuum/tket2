@@ -30,11 +30,10 @@ def main() -> None:
     array_qubits = array(qubit(), qubit())
     h(controller[0])
     x(controller[1])
-    with dagger:
-        with control(controller):
-            f(array_qubits[0], array_qubits[1])
-            s(array_qubits[0])
-            h(array_qubits[0])
+    with dagger, control(controller):
+        f(array_qubits[0], array_qubits[1])
+        s(array_qubits[0])
+        h(array_qubits[0])
 
     state_result("r", controller[0], controller[1], array_qubits[0], array_qubits[1])
     discard_array(array_qubits)

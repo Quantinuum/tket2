@@ -1,14 +1,13 @@
 # Re-export native bindings
-from ._tket.rewrite import ECCRewriter, CircuitRewrite, Subcircuit
+# TODO: Wrap these in Python classes.
+from ._tket.rewrite import CircuitRewrite, ECCRewriter, Subcircuit
 
 __all__ = [
-    "default_ecc_rewriter",
-    # Bindings
-    # TODO: Wrap these in Python classes.
-    "ECCRewriter",
     "CircuitRewrite",
-    "Subcircuit",
+    "ECCRewriter",
     "Rewriter",
+    "Subcircuit",
+    "default_ecc_rewriter",
 ]
 
 Rewriter = ECCRewriter | list["Rewriter"]

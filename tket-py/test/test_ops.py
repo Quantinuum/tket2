@@ -1,5 +1,5 @@
 import tket
-from tket._ops import TketOp, Pauli
+from tket._ops import Pauli, TketOp
 
 
 def test_ops_roundtrip():

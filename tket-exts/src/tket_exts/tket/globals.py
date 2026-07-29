@@ -1,11 +1,10 @@
 import functools
-from typing import List
 
+from hugr.ext import Extension, OpDef, TypeDef
 from hugr.ops import ExtOp
-from hugr.tys import StringArg, TypeTypeArg, Type, TypeArg, ListArg
+from hugr.tys import ListArg, StringArg, Type, TypeArg, TypeTypeArg
 
 from ._util import TketExtension, load_extension
-from hugr.ext import Extension, OpDef, TypeDef
 
 
 class GlobalsExtension(TketExtension):
@@ -16,11 +15,11 @@ class GlobalsExtension(TketExtension):
         """Returns the globals extension"""
         return load_extension("tket.globals")
 
-    def TYPES(self) -> List[TypeDef]:
+    def TYPES(self) -> list[TypeDef]:
         """Return the types defined by this extension"""
         return []
 
-    def OPS(self) -> List[OpDef]:
+    def OPS(self) -> list[OpDef]:
         """Return the operations defined by this extension"""
         return [
             self.with_def,
@@ -41,9 +40,9 @@ class GlobalsExtension(TketExtension):
         self,
         name: str,
         ty_arg: TypeArg,
-        inputs: List[Type],
-        outputs: List[Type],
-        impl_outputs: List[Type],
+        inputs: list[Type],
+        outputs: list[Type],
+        impl_outputs: list[Type],
     ) -> ExtOp:
         return (
             self()
@@ -63,9 +62,9 @@ class GlobalsExtension(TketExtension):
         self,
         name: str,
         ty_arg: TypeArg,
-        inputs: List[Type],
-        outputs: List[Type],
-        impl_outputs: List[Type],
+        inputs: list[Type],
+        outputs: list[Type],
+        impl_outputs: list[Type],
     ) -> ExtOp:
         return (
             self()

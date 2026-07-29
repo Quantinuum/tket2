@@ -2,17 +2,16 @@
 
 import functools
 import warnings
-from typing import List
-
-from .helios import QSystemHeliosExtension
-from .random import QSystemRandomExtension
-from .sol import QSystemSolExtension
-from .utils import QSystemUtilsExtension
 
 from hugr.ext import Extension, OpDef, TypeDef
 from hugr.ops import ExtOp
 from hugr.tys import BoundedNatArg
+
 from .._util import TketExtension, load_extension
+from .helios import QSystemHeliosExtension
+from .random import QSystemRandomExtension
+from .sol import QSystemSolExtension
+from .utils import QSystemUtilsExtension
 
 __all__ = [
     "QSystemHeliosExtension",
@@ -41,11 +40,11 @@ class QSystemExtension(TketExtension):
         )
         return load_extension("tket.qsystem")
 
-    def TYPES(self) -> List[TypeDef]:
+    def TYPES(self) -> list[TypeDef]:
         """Return the types defined by this extension"""
         return []
 
-    def OPS(self) -> List[OpDef]:
+    def OPS(self) -> list[OpDef]:
         """Return the operations defined by this extension"""
         return [
             self.lazy_measure.op_def(),

@@ -1,22 +1,22 @@
 # Re-export native bindings
 from ._tket.pattern import (
-    Rule,
-    RuleMatcher,
     CircuitPattern,
-    PatternMatcher,
-    PatternMatch,
-    PatternID,
     InvalidPatternError,
     InvalidReplacementError,
+    PatternID,
+    PatternMatch,
+    PatternMatcher,
+    Rule,
+    RuleMatcher,
 )
 
 __all__ = [
-    "Rule",
-    "RuleMatcher",
     "CircuitPattern",
-    "PatternMatcher",
-    "PatternMatch",
-    "PatternID",
     "InvalidPatternError",
     "InvalidReplacementError",
+    "PatternID",
+    "PatternMatch",
+    "PatternMatcher",
+    "Rule",
+    "RuleMatcher",
 ]

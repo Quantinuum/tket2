@@ -6,9 +6,9 @@
 # ///
 """Test the use of a classical function inside modifiers"""
 
+from collections.abc import Callable
 from pathlib import Path
 from sys import argv
-from collections.abc import Callable
 
 from guppylang import enable_experimental_features, guppy
 from guppylang.std.array import array_swap
@@ -66,13 +66,11 @@ def main() -> None:
     # Testing nested with_block with no quantum input
     # (issue: https://github.com/Quantinuum/tket2/issues/1814)
     a = 3
-    with control(c1):
-        with dagger:
-            pass
+    with control(c1), dagger:
+        pass
     a = 3
-    with control(c1):
-        with dagger:
-            dummy_fuu(a)
+    with control(c1), dagger:
+        dummy_fuu(a)
 
     # Testing that array operations are happening in the correct order
     with control(t), dagger:

@@ -33,7 +33,7 @@ def main() -> None:
             continue
         try:
             response = compare_request(json.loads(line))
-        except Exception:
+        except Exception:  # noqa: BLE001
             response = {"error": traceback.format_exc()}
         print(json.dumps(response), flush=True)
 
