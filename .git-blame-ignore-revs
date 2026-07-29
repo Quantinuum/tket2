@@ -8,3 +8,7 @@
 # Bump to rust edition 2024, MSRV 1.89, and a bunch of automated lint fixes
 # https://github.com/Quantinuum/tket2/pull/1314
 d8a169a23b2509c390730875d21869bf1e1a0fe3
+
+# Upgrade ruff to 0.16.0, enabling a bunch of rules by default, most of which have been applied
+# https://github.com/Quantinuum/tket2/pull/1885
+8ba7f8d2c8b73e5124270188b76c8afa723d4b24
