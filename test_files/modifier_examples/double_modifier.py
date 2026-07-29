@@ -25,9 +25,8 @@ def main() -> None:
     c1 = qubit()
     t = qubit()
     h(c1)
-    with control(c1):
-        with dagger:
-            ry(t, angle(1 / 3))
+    with control(c1), dagger:
+        ry(t, angle(1 / 3))
 
     state_result("r", c1, t)
     discard(c1)

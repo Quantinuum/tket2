@@ -1,12 +1,10 @@
-from hugr import Hugr
-from hugr import tys
+from hugr import Hugr, tys
 from hugr.build.function import Module
 from hugr.passes.scope import LocalScope
 from tket_exts import quantum
 
 from tket._state.build import H, OneQbGate, from_coms
 from tket.passes import Cliffordize
-
 
 S = OneQbGate("S")
 Sdg = OneQbGate("Sdg")

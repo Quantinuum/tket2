@@ -25,11 +25,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal, TypeAlias, TypedDict
 
+from hugr.metadata import Metadata
 from pydantic import StrictBool, TypeAdapter
 from pydantic.dataclasses import dataclass
 from typing_extensions import deprecated
-
-from hugr.metadata import Metadata
 
 from ._tket import metadata as _metadata
 
@@ -38,20 +37,20 @@ if TYPE_CHECKING:
 
 
 __all__ = [
-    "RewriteTraceValue",
-    "InlineAnnotationValue",
-    "InlineAnnotation",
     "CircuitRewriteTraces",
-    "UnitaryFlags",
+    "HeliosPlatformConfig",
+    "HeliosPlatformConfigValue",
+    "InlineAnnotation",
+    "InlineAnnotationValue",
+    "PytketBit",
+    "PytketBitRegisterNames",
     "PytketInputParameters",
     "PytketOpGroup",
-    "PytketBit",
-    "PytketQubit",
-    "PytketBitRegisterNames",
-    "PytketQubitRegisterNames",
     "PytketPhaseExpr",
-    "HeliosPlatformConfigValue",
-    "HeliosPlatformConfig",
+    "PytketQubit",
+    "PytketQubitRegisterNames",
+    "RewriteTraceValue",
+    "UnitaryFlags",
 ]
 
 
@@ -78,7 +77,7 @@ class ExpectedQubitsHint(Metadata[int]):
     ALIASES = _metadata.EXPECTED_QUBITS_HINT_ALIASES
 
 
-InlineAnnotationValue: TypeAlias = Literal["never"] | Literal["best_effort"]
+InlineAnnotationValue: TypeAlias = Literal["never", "best_effort"]
 
 
 class InlineAnnotation(Metadata[InlineAnnotationValue]):

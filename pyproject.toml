@@ -7,7 +7,7 @@ dev = [
     "maturin>=1.14.1,<2",
     "pytest>=9.1.1,<10",
     "pytest-cov ~=7.0",
-    "ruff>=0.15.22,<0.16",
+    "ruff>=0.16.0,<0.17",
     "mypy>=2.3.0,<3",
     "hypothesis>=6.161.6,<7",
     "hugr~=0.18.2",
@@ -52,6 +52,12 @@ ignore_missing_imports = true
 
 # TODO: Fix the lint errors and enable this
 #strict = true
+
+[tool.ruff.lint]
+ignore = ["EXE"]
+
+[tool.ruff.lint.per-file-ignores]
+"tket-exts/src/tket_exts/tket/**" = ["B019"] # @functools.cache is intentional, few instances exist
 
 [tool.coverage.report]
 exclude_also = [
