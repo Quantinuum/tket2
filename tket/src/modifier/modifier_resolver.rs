@@ -326,7 +326,7 @@ pub struct ModifierResolver<N = Node> {
     /// Original functions for which the resolver generated modified replacements.
     modified_functions: HashSet<N>,
     qubit_finder: TypeUnpacker,
-    /// Whether the operation currently being expanded has an incoming
+    /// Indicate whether the extension op being modified is targeted by some
     /// StateOrder edge.
     insert_state_order_edges: bool,
 }
@@ -666,6 +666,11 @@ impl<N: HugrNode> ModifierResolver<N> {
                 if self.modifiers.dagger
                     && h.get_optype(out_node).port_kind(out_port) == Some(EdgeKind::StateOrder)
                 {
+                    // TODO: see https://github.com/Quantinuum/tket2/issues/1893
+                    // Currently, we just ignore StateOrder edges under dagger to avoid introducing loops
+                    // between nodes.
+                    // To avoid loosing important order edges during the resolution guppy already discard some
+                    // operations (see https://github.com/Quantinuum/guppylang/commit/15215d1e13984573ca86db0fd07b51e90f0a6748)
                     continue;
                 }
                 for (in_node, in_port) in h.linked_inputs(out_node, out_port) {
