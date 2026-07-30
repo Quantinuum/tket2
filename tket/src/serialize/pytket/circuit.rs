@@ -38,12 +38,13 @@ use super::opaque::OpaqueSubgraphs;
 /// [`EncodedCircuit::ensure_standalone`].
 #[derive(Debug, Clone)]
 pub struct EncodedCircuit<Node: HugrNode> {
-    /// Circuits encoded from independent dataflow regions in the HUGR.
+    /// Circuit segments grouped by their originating dataflow region.
     ///
     /// These correspond to sections of the HUGR that can be optimized
     /// independently.
     ///
-    /// Ordered as a depth-first pre-order.
+    /// Regions are ordered as a depth-first pre-order; segments retain their
+    /// execution order within each region.
     circuits: IndexMap<Node, EncodedCircuitInfo>,
     /// Sets of subgraphs in the HUGR that have been encoded as opaque barriers
     /// in the pytket circuit.
@@ -53,13 +54,30 @@ pub struct EncodedCircuit<Node: HugrNode> {
     opaque_subgraphs: OpaqueSubgraphs<Node>,
 }
 
+/// Identifies one pytket circuit segment within an encoded HUGR region.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct EncodedCircuitId<Node> {
+    /// The HUGR dataflow region from which the segment was encoded.
+    pub region: Node,
+    /// The segment's zero-based position within the region.
+    pub segment: usize,
+}
+
 /// Information stored about a pytket circuit encoded from a HUGR region.
 #[derive(Debug, Default, Clone)]
 pub(super) struct EncodedCircuitInfo {
-    /// The serial circuit encoded from the region.
-    pub serial_circuit: SerialCircuit,
-    /// Information about any unsupported nodes in the region that could not be encoded as a pytket command.
-    pub additional_nodes_and_wires: AdditionalNodesAndWires,
+    /// Runs of pytket commands encoded from the region.
+    pub serial_circuits: Vec<SerialCircuit>,
+    /// Opaque subgraphs that must be restored before, between, or after the
+    /// serial circuits.
+    ///
+    /// This always contains one more entry than [`Self::serial_circuits`].
+    pub boundaries: Vec<EncodedCircuitBoundary>,
+    /// List of wires that directly connected the input node to the output node in the encoded region,
+    /// and were not encoded in [`serial_circuits`].
+    ///
+    /// We just store the input nodes's output port and output node's input port here.
+    pub straight_through_wires: Vec<StraightThroughWire>,
     /// List of parameters in the pytket circuit in the order they appear in the
     /// hugr input.
     ///
@@ -74,19 +92,51 @@ pub(super) struct EncodedCircuitInfo {
     pub output_bits: Vec<tket_json_rs::register::ElementId>,
 }
 
-/// Nodes and edges from the original region that could not be encoded into the
-/// pytket circuit, as they cannot be attached to a pytket command.
-#[derive(Debug, Default, Clone)]
-pub(super) struct AdditionalNodesAndWires {
-    /// Subgraphs of the region that could not be encoded as a pytket commands,
-    /// and have no qubit/bits in their boundary that could be used to emit an
-    /// opaque barrier command in the [`serial_circuit`].
-    pub additional_subgraphs: Vec<AdditionalSubgraph>,
-    /// List of wires that directly connected the input node to the output node in the encoded region,
-    /// and were not encoded in [`serial_circuit`].
+impl EncodedCircuitInfo {
+    /// Initialize a pytket circuit for a decoder
+    /// for every segment in this region.
     ///
-    /// We just store the input nodes's output port and output node's input port here.
-    pub straight_through_wires: Vec<StraightThroughWire>,
+    /// Callers may add registers to an individual segment, so the initialization
+    /// circuit contains the deterministic union of registers in first-use order.
+    fn decoder_initialization_circuit(&self) -> SerialCircuit {
+        let mut initialization_circuit = self
+            .serial_circuits
+            .first()
+            .cloned()
+            .expect("encoded regions always contain a circuit segment");
+        for circuit in self.serial_circuits.iter().skip(1) {
+            for qubit in &circuit.qubits {
+                if !initialization_circuit.qubits.contains(qubit) {
+                    initialization_circuit.qubits.push(qubit.clone());
+                }
+            }
+            for bit in &circuit.bits {
+                if !initialization_circuit.bits.contains(bit) {
+                    initialization_circuit.bits.push(bit.clone());
+                }
+            }
+        }
+        initialization_circuit.commands.clear();
+        initialization_circuit.phase = "0".to_owned();
+        initialization_circuit.implicit_permutation.clear();
+        initialization_circuit
+    }
+
+    /// Whether the region requires its original HUGR context for decoding.
+    fn has_external_boundaries(&self) -> bool {
+        self.boundaries
+            .iter()
+            .any(|boundary| !boundary.external_subgraphs.is_empty())
+    }
+}
+
+/// Unsupported subgraphs positioned at one boundary between serial circuits.
+#[derive(Debug, Default, Clone)]
+pub(super) struct EncodedCircuitBoundary {
+    /// Subgraphs of the region that could not be encoded as pytket commands,
+    /// and have no qubit/bits in their boundary that could be used to emit an
+    /// opaque barrier command in an adjacent serial circuit.
+    pub external_subgraphs: Vec<AdditionalSubgraph>,
 }
 
 /// A subgraph of the encoded circuit that could not be associated to any qubit or bit register in the pytket circuit.
@@ -94,7 +144,7 @@ pub(super) struct AdditionalNodesAndWires {
 pub(super) struct AdditionalSubgraph {
     /// The subgraph of the region that could not be encoded as a pytket command,
     /// and has no qubit/bits in its boundary that could be used to emit an opaque
-    /// barrier command in the [`serial_circuit`].
+    /// barrier command in an adjacent circuit segment.
     pub id: SubgraphId,
     /// Parameter expression inputs to the `subgraph`.
     pub params: Vec<String>,
@@ -218,16 +268,27 @@ impl EncodedCircuit<Node> {
             // Run the decoder, generating a new function with the extracted definition.
             //
             // Unsupported subgraphs of the original region will be transplanted here.
+            let initialization_circuit = encoded.decoder_initialization_circuit();
             let mut decoder = PytketDecoderContext::new(
-                &encoded.serial_circuit,
+                &initialization_circuit,
                 hugr,
                 DecodeInsertionTarget::Function { fn_name: None },
                 options,
                 Some(&self.opaque_subgraphs),
             )?;
-            decoder.run_decoder(
-                &encoded.serial_circuit.commands,
-                Some(&encoded.additional_nodes_and_wires),
+            decoder.reserve_boundary_parameters(&encoded.boundaries);
+            decoder.connect_straight_through_wires(&encoded.straight_through_wires);
+            for (segment, boundary) in encoded.serial_circuits.iter().zip(&encoded.boundaries) {
+                decoder.insert_boundary(boundary)?;
+                decoder.add_serial_circuit_phase(segment)?;
+                decoder.run_commands(&segment.commands)?;
+                decoder.apply_implicit_permutation(segment)?;
+            }
+            decoder.insert_boundary(
+                encoded
+                    .boundaries
+                    .last()
+                    .expect("encoded region has a trailing boundary"),
             )?;
             let decoded_node = decoder.finish(Some(encoded))?.node();
 
@@ -382,7 +443,8 @@ impl<Node: HugrNode> EncodedCircuit<Node> {
                     .iter()
                     .all(|cmd| cmd.op.op_type == tket_json_rs::OpType::Barrier)
             };
-            if !options.keep_empty_circuits && is_empty_circuit(&encoded.serial_circuit) {
+            if !options.keep_empty_circuits && encoded.serial_circuits.iter().all(is_empty_circuit)
+            {
                 continue;
             }
 
@@ -412,27 +474,35 @@ impl<Node: HugrNode> EncodedCircuit<Node> {
         fn_name: Option<String>,
         options: DecodeOptions,
     ) -> Result<Hugr, PytketDecodeError> {
-        if !self.contains_circuit(region) {
+        if !self.contains_region(region) {
             return Err(PytketDecodeErrorInner::NotAnEncodedRegion {
                 region: region.to_string(),
             }
             .wrap());
         }
         let encoded_info = &self.circuits[&region];
-        let serial_circuit = &encoded_info.serial_circuit;
+        let serial_circuit = encoded_info
+            .serial_circuits
+            .first()
+            .expect("encoded regions always contain a circuit segment");
 
-        if self.len() > 1 {
-            unimplemented!(
-                "Reassembling an `EncodedCircuit` with nested subcircuits is not yet implemented."
-            );
-        };
+        if self.circuits.len() > 1 {
+            return Err(PytketDecodeError::custom(
+                "Reassembling an `EncodedCircuit` with nested subcircuits is not yet implemented.",
+            ));
+        }
+        if encoded_info.serial_circuits.len() != 1 || encoded_info.has_external_boundaries() {
+            return Err(PytketDecodeError::custom(
+                "A segmented encoded region requires its original HUGR context; use `reassemble_inplace`.",
+            ));
+        }
 
         let mut hugr = Hugr::new();
         let target = DecodeInsertionTarget::Function { fn_name };
 
         let mut decoder =
             PytketDecoderContext::new(serial_circuit, &mut hugr, target, options, None)?;
-        decoder.run_decoder(&serial_circuit.commands, None)?;
+        decoder.run_decoder(&serial_circuit.commands)?;
         decoder.finish(Some(encoded_info))?;
         Ok(hugr)
     }
@@ -469,36 +539,117 @@ impl<Node: HugrNode> EncodedCircuit<Node> {
             Ok(())
         }
 
+        if self
+            .circuits
+            .values()
+            .any(EncodedCircuitInfo::has_external_boundaries)
+        {
+            return Err(PytketEncodeError::custom(
+                "A region split by register-free opaque subgraphs cannot be represented as a standalone `SerialCircuit`.",
+            ));
+        }
+
         for encoded in self.circuits.values_mut() {
-            make_commands_standalone(
-                &mut encoded.serial_circuit.commands,
-                &self.opaque_subgraphs,
-                hugr,
-            )?;
+            for circuit in &mut encoded.serial_circuits {
+                make_commands_standalone(&mut circuit.commands, &self.opaque_subgraphs, hugr)?;
+            }
         }
         Ok(())
     }
 
-    /// Returns `true` if there is an encoded pytket circuit for the given region.
-    pub fn contains_circuit(&self, region: Node) -> bool {
+    /// Returns `true` if the given region has any encoded circuit segments.
+    pub fn contains_region(&self, region: Node) -> bool {
         self.circuits.contains_key(&region)
     }
 
-    /// Returns the circuit encoded for the given region, or `None` if there is no circuit for that region.
+    /// Returns `true` if there is an encoded pytket circuit for the given region.
+    #[deprecated(
+        since = "0.21.2",
+        note = "use `contains_region`, since a region may contain multiple circuits"
+    )]
+    pub fn contains_circuit(&self, region: Node) -> bool {
+        self.contains_region(region)
+    }
+
+    /// Returns the first circuit segment encoded for the given region.
+    ///
+    /// This method predates segmented regions and silently ignores every
+    /// segment after the first.
+    #[deprecated(since = "0.21.2", note = "use `get_circuits` or `get_segment`")]
     pub fn get_circuit(&self, region: Node) -> Option<&SerialCircuit> {
-        let circ_info = self.circuits.get(&region)?;
-        Some(&circ_info.serial_circuit)
+        self.get_circuits(region).next().map(|(_, circuit)| circuit)
     }
 
-    /// Returns the circuit encoded for the given region, or `None` if there is no circuit for that region.
+    /// Returns the first mutable circuit segment encoded for the given region.
+    ///
+    /// This method predates segmented regions and silently ignores every
+    /// segment after the first.
+    #[deprecated(since = "0.21.2", note = "use `get_circuits_mut` or `get_segment_mut`")]
     pub fn get_circuit_mut(&mut self, region: Node) -> Option<&mut SerialCircuit> {
-        let circ_info = self.circuits.get_mut(&region)?;
-        Some(&mut circ_info.serial_circuit)
+        self.get_circuits_mut(region)
+            .next()
+            .map(|(_, circuit)| circuit)
     }
 
-    /// Returns the number of encoded pytket circuits.
+    /// Returns the circuit segments encoded for a region, in execution order.
+    ///
+    /// Returns an empty iterator when the region was not encoded.
+    pub fn get_circuits(
+        &self,
+        region: Node,
+    ) -> impl Iterator<Item = (EncodedCircuitId<Node>, &SerialCircuit)> {
+        self.circuits
+            .get(&region)
+            .into_iter()
+            .flat_map(move |info| {
+                info.serial_circuits
+                    .iter()
+                    .enumerate()
+                    .map(move |(segment, circuit)| (EncodedCircuitId { region, segment }, circuit))
+            })
+    }
+
+    /// Returns mutable circuit segments encoded for a region, in execution
+    /// order.
+    ///
+    /// Returns an empty iterator when the region was not encoded.
+    pub fn get_circuits_mut(
+        &mut self,
+        region: Node,
+    ) -> impl Iterator<Item = (EncodedCircuitId<Node>, &mut SerialCircuit)> {
+        self.circuits
+            .get_mut(&region)
+            .into_iter()
+            .flat_map(move |info| {
+                info.serial_circuits
+                    .iter_mut()
+                    .enumerate()
+                    .map(move |(segment, circuit)| (EncodedCircuitId { region, segment }, circuit))
+            })
+    }
+
+    /// Returns a circuit segment by its region and position.
+    pub fn get_segment(&self, id: EncodedCircuitId<Node>) -> Option<&SerialCircuit> {
+        self.circuits
+            .get(&id.region)?
+            .serial_circuits
+            .get(id.segment)
+    }
+
+    /// Returns a mutable circuit segment by its region and position.
+    pub fn get_segment_mut(&mut self, id: EncodedCircuitId<Node>) -> Option<&mut SerialCircuit> {
+        self.circuits
+            .get_mut(&id.region)?
+            .serial_circuits
+            .get_mut(id.segment)
+    }
+
+    /// Returns the total number of encoded pytket circuit segments.
     pub fn len(&self) -> usize {
-        self.circuits.len()
+        self.circuits
+            .values()
+            .map(|region| region.serial_circuits.len())
+            .sum()
     }
 
     /// Returns whether the encoded circuit is empty.
@@ -506,49 +657,113 @@ impl<Node: HugrNode> EncodedCircuit<Node> {
         self.circuits.is_empty()
     }
 
-    /// Returns an iterator over the encoded pytket circuits.
-    pub fn iter(&self) -> impl Iterator<Item = (Node, &SerialCircuit)> {
-        self.circuits
-            .iter()
-            .map(|(&n, circ)| (n, &circ.serial_circuit))
+    /// Returns an iterator over every encoded pytket circuit segment and its ID.
+    pub fn iter(&self) -> impl Iterator<Item = (EncodedCircuitId<Node>, &SerialCircuit)> {
+        self.circuits.iter().flat_map(|(&node, region)| {
+            region
+                .serial_circuits
+                .iter()
+                .enumerate()
+                .map(move |(segment, circuit)| {
+                    (
+                        EncodedCircuitId {
+                            region: node,
+                            segment,
+                        },
+                        circuit,
+                    )
+                })
+        })
     }
 
-    /// Returns a mutable iterator over the encoded pytket circuits.
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = (Node, &mut SerialCircuit)> {
-        self.circuits
-            .iter_mut()
-            .map(|(&n, circ)| (n, &mut circ.serial_circuit))
+    /// Returns a mutable iterator over every circuit segment and its ID.
+    pub fn iter_mut(
+        &mut self,
+    ) -> impl Iterator<Item = (EncodedCircuitId<Node>, &mut SerialCircuit)> {
+        self.circuits.iter_mut().flat_map(|(&node, region)| {
+            region
+                .serial_circuits
+                .iter_mut()
+                .enumerate()
+                .map(move |(segment, circuit)| {
+                    (
+                        EncodedCircuitId {
+                            region: node,
+                            segment,
+                        },
+                        circuit,
+                    )
+                })
+        })
     }
 }
 
 impl<Node: HugrNode + Send + Sync> EncodedCircuit<Node> {
-    /// Returns a parallel iterator over the encoded pytket circuits.
-    pub fn par_iter(&self) -> impl ParallelIterator<Item = (Node, &SerialCircuit)> {
-        self.circuits
-            .par_iter()
-            .map(|(&n, circ)| (n, &circ.serial_circuit))
+    /// Returns a parallel iterator over every circuit segment and its ID.
+    pub fn par_iter(
+        &self,
+    ) -> impl ParallelIterator<Item = (EncodedCircuitId<Node>, &SerialCircuit)> {
+        self.circuits.par_iter().flat_map_iter(|(&node, region)| {
+            region
+                .serial_circuits
+                .iter()
+                .enumerate()
+                .map(move |(segment, circuit)| {
+                    (
+                        EncodedCircuitId {
+                            region: node,
+                            segment,
+                        },
+                        circuit,
+                    )
+                })
+        })
     }
 
-    /// Returns a parallel mutable iterator over the encoded pytket circuits.
-    pub fn par_iter_mut(&mut self) -> impl ParallelIterator<Item = (Node, &mut SerialCircuit)> {
+    /// Returns a parallel mutable iterator over every circuit segment and its ID.
+    pub fn par_iter_mut(
+        &mut self,
+    ) -> impl ParallelIterator<Item = (EncodedCircuitId<Node>, &mut SerialCircuit)> {
         self.circuits
             .par_iter_mut()
-            .map(|(&n, circ)| (n, &mut circ.serial_circuit))
+            .flat_map_iter(|(&node, region)| {
+                region
+                    .serial_circuits
+                    .iter_mut()
+                    .enumerate()
+                    .map(move |(segment, circuit)| {
+                        (
+                            EncodedCircuitId {
+                                region: node,
+                                segment,
+                            },
+                            circuit,
+                        )
+                    })
+            })
     }
 }
 
-impl<Node: HugrNode> Index<Node> for EncodedCircuit<Node> {
+impl<Node: HugrNode> Index<EncodedCircuitId<Node>> for EncodedCircuit<Node> {
     type Output = SerialCircuit;
 
-    fn index(&self, index: Node) -> &Self::Output {
-        self.get_circuit(index)
-            .unwrap_or_else(|| panic!("Indexing into a circuit that was not encoded: {index}"))
+    fn index(&self, index: EncodedCircuitId<Node>) -> &Self::Output {
+        self.get_segment(index).unwrap_or_else(|| {
+            panic!(
+                "Indexing an encoded circuit segment that does not exist: {}:{}",
+                index.region, index.segment
+            )
+        })
     }
 }
 
-impl<Node: HugrNode> IndexMut<Node> for EncodedCircuit<Node> {
-    fn index_mut(&mut self, index: Node) -> &mut Self::Output {
-        self.get_circuit_mut(index)
-            .unwrap_or_else(|| panic!("Indexing into a circuit that was not encoded: {index}"))
+impl<Node: HugrNode> IndexMut<EncodedCircuitId<Node>> for EncodedCircuit<Node> {
+    fn index_mut(&mut self, index: EncodedCircuitId<Node>) -> &mut Self::Output {
+        self.get_segment_mut(index).unwrap_or_else(|| {
+            panic!(
+                "Indexing an encoded circuit segment that does not exist: {}:{}",
+                index.region, index.segment
+            )
+        })
     }
 }

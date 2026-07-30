@@ -28,7 +28,7 @@ use super::opaque::OpaqueSubgraphs;
 use super::{PytketEncodeError, PytketEncodeOpError};
 use crate::metadata;
 use crate::serialize::pytket::circuit::{
-    AdditionalNodesAndWires, AdditionalSubgraph, EncodedCircuitInfo,
+    AdditionalSubgraph, EncodedCircuitBoundary, EncodedCircuitInfo,
 };
 use crate::serialize::pytket::config::PytketEncoderConfig;
 use crate::serialize::pytket::extension::RegisterCount;
@@ -45,8 +45,8 @@ pub struct PytketEncoderContext<H: HugrView> {
     /// Defaults to "0" unless the circuit has a [METADATA_PHASE] metadata
     /// entry.
     phase: String,
-    /// The already-encoded serialised pytket commands.
-    commands: Vec<circuit_json::Command>,
+    /// Pytket command runs and the opaque boundaries separating them.
+    segments: CircuitSegments,
     /// A tracker for qubit/bit/parameter values associated with the circuit's wires.
     ///
     /// Contains methods to update the registers in the circuit being built.
@@ -55,17 +55,69 @@ pub struct PytketEncoderContext<H: HugrView> {
     unsupported: UnsupportedTracker<H::Node>,
     /// A registry of already-encoded opaque subgraphs.
     opaque_subgraphs: OpaqueSubgraphs<H::Node>,
-    /// Subgraphs in `opaque_subgraphs` that could not be emitted as opaque
-    /// barriers, and must be stored in the [`EncodedCircuitInfo`] instead when
-    /// finishing the encoding. Identified by their
-    /// [`super::opaque::SubgraphId`] in `opaque_subgraphs`.
-    non_emitted_subgraphs: Vec<AdditionalSubgraph>,
     /// Configuration for the encoding.
     ///
     /// Contains custom operation/type/const emitters.
     config: Arc<PytketEncoderConfig<H>>,
     /// A cache of translated hugr functions, to be encoded as op boxes.
     function_cache: Arc<RwLock<HashMap<H::Node, CachedEncodedFunction>>>,
+}
+
+/// Accumulates pytket command runs separated by external opaque subgraphs.
+///
+/// There is always one boundary before the current run. Flushing a non-empty
+/// run creates the following boundary, so the finished representation has one
+/// more boundary than command runs.
+#[derive(Debug, Default)]
+struct CircuitSegments {
+    /// Finished command runs, each separated by a boundary.
+    command_runs: Vec<Vec<circuit_json::Command>>,
+    /// Boundaries separating the command runs.
+    ///
+    /// There is always the same number of boundaries as `command_runs + 1`.
+    boundaries: Vec<EncodedCircuitBoundary>,
+    current_run: Vec<circuit_json::Command>,
+}
+
+impl CircuitSegments {
+    /// Create an accumulator with the leading region boundary.
+    fn new() -> Self {
+        Self {
+            boundaries: vec![EncodedCircuitBoundary::default()],
+            ..Self::default()
+        }
+    }
+
+    /// Append a pytket command to the current maximal run.
+    fn push_command(&mut self, command: circuit_json::Command) {
+        self.current_run.push(command);
+    }
+
+    /// Record an opaque subgraph at its current position in the traversal.
+    fn push_external_subgraph(&mut self, subgraph: AdditionalSubgraph) {
+        self.flush_run();
+        self.boundaries
+            .last_mut()
+            .expect("segment accumulator always has a boundary")
+            .external_subgraphs
+            .push(subgraph);
+    }
+
+    /// Finish the current command run and create its following boundary.
+    fn flush_run(&mut self) {
+        if self.current_run.is_empty() {
+            return;
+        }
+        self.command_runs
+            .push(std::mem::take(&mut self.current_run));
+        self.boundaries.push(EncodedCircuitBoundary::default());
+    }
+
+    /// Return all command runs and their interleaved boundaries.
+    fn finish(mut self) -> (Vec<Vec<circuit_json::Command>>, Vec<EncodedCircuitBoundary>) {
+        self.flush_run();
+        (self.command_runs, self.boundaries)
+    }
 }
 
 /// Options used when emitting a pytket command from HUGR operations.
@@ -181,11 +233,10 @@ impl<H: HugrView> PytketEncoderContext<H> {
         Ok(Self {
             name: fn_name,
             phase,
-            commands: vec![],
+            segments: CircuitSegments::new(),
             values: ValueTracker::new(hugr, region, &config)?,
             unsupported: UnsupportedTracker::new(hugr),
             opaque_subgraphs,
-            non_emitted_subgraphs: vec![],
             config,
             function_cache: Arc::new(RwLock::new(HashMap::new())),
         })
@@ -225,7 +276,8 @@ impl<H: HugrView> PytketEncoderContext<H> {
     ///
     /// # Returns
     ///
-    /// * An [`EncodedCircuitInfo`] containing the final [`SerialCircuit`] and some additional metadata.
+    /// * An [`EncodedCircuitInfo`] containing the final circuit segments and
+    ///   region metadata.
     /// * The set of opaque subgraphs that were referenced (from/inside) pytket barriers.
     #[expect(clippy::type_complexity)]
     pub(super) fn finish(
@@ -241,23 +293,50 @@ impl<H: HugrView> PytketEncoderContext<H> {
         }
 
         let tracker_result = self.values.finish(hugr, region)?;
+        let (mut command_runs, mut boundaries) = self.segments.finish();
+        if command_runs.is_empty() {
+            command_runs.push(Vec::new());
+            boundaries.push(EncodedCircuitBoundary::default());
+        }
 
-        let mut ser = SerialCircuit::new(self.name, self.phase);
-
-        ser.commands = self.commands;
-        ser.qubits = tracker_result.qubits.into_iter().map_into().collect();
-        ser.bits = tracker_result.bits.into_iter().map_into().collect();
-        ser.implicit_permutation = tracker_result.qubit_permutation;
-        ser.number_of_ws = None;
+        let qubits = tracker_result
+            .qubits
+            .into_iter()
+            .map_into()
+            .collect::<Vec<_>>();
+        let bits = tracker_result
+            .bits
+            .into_iter()
+            .map_into()
+            .collect::<Vec<_>>();
+        let final_segment = command_runs.len() - 1;
+        let serial_circuits = command_runs
+            .into_iter()
+            .enumerate()
+            .map(|(segment, commands)| {
+                let phase = if segment == 0 {
+                    self.phase.clone()
+                } else {
+                    "0".to_owned()
+                };
+                let mut circuit = SerialCircuit::new(self.name.clone(), phase);
+                circuit.commands = commands;
+                circuit.qubits = qubits.clone();
+                circuit.bits = bits.clone();
+                if segment == final_segment {
+                    circuit.implicit_permutation = tracker_result.qubit_permutation.clone();
+                }
+                circuit.number_of_ws = None;
+                circuit
+            })
+            .collect();
 
         let info = EncodedCircuitInfo {
-            serial_circuit: ser,
+            serial_circuits,
+            boundaries,
             input_params: tracker_result.input_params,
             output_params: tracker_result.params,
-            additional_nodes_and_wires: AdditionalNodesAndWires {
-                additional_subgraphs: self.non_emitted_subgraphs,
-                straight_through_wires: tracker_result.straight_through_wires,
-            },
+            straight_through_wires: tracker_result.straight_through_wires,
             output_qubits: tracker_result.qubit_outputs,
             output_bits: tracker_result.bit_outputs,
         };
@@ -653,7 +732,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
             // That list contains a list of subgraphs so we don't need to do any
             // additional handling, but if we preferred in the future we could
             // instead merge a single list of nodes if we wanted.
-            self.non_emitted_subgraphs.push(AdditionalSubgraph {
+            self.segments.push_external_subgraph(AdditionalSubgraph {
                 id: subgraph_id,
                 params: input_param_exprs.clone(),
             });
@@ -719,7 +798,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
             opgroup,
         };
 
-        self.commands.push(command);
+        self.segments.push_command(command);
     }
 
     /// Helper to emit a `CircBox` tket1 command corresponding to a region of the Hugr.
@@ -745,12 +824,25 @@ impl<H: HugrView> PytketEncoderContext<H> {
         subencoder.run_encoder(hugr, node)?;
 
         let (info, opaque_subgraphs) = subencoder.finish(hugr, node)?;
-        if !info.output_params.is_empty() {
+        self.opaque_subgraphs = opaque_subgraphs;
+        if !info.output_params.is_empty()
+            || info.serial_circuits.len() != 1
+            || info
+                .boundaries
+                .iter()
+                .any(|boundary| !boundary.external_subgraphs.is_empty())
+        {
             return Ok(EncodeStatus::Unsupported);
         }
-        self.opaque_subgraphs = opaque_subgraphs;
 
-        self.emit_circ_box(node, info.serial_circuit, hugr)?;
+        self.emit_circ_box(
+            node,
+            info.serial_circuits
+                .into_iter()
+                .next()
+                .expect("encoded region has one circuit"),
+            hugr,
+        )?;
         Ok(EncodeStatus::Success)
     }
 
@@ -797,14 +889,18 @@ impl<H: HugrView> PytketEncoderContext<H> {
         let (info, opaque_subgraphs) = subencoder.finish(hugr, function)?;
         self.opaque_subgraphs = opaque_subgraphs;
 
-        let (result, cached_fn) = match info.output_params.is_empty() {
-            true => (
+        let serial_circuit = (info.serial_circuits.len() == 1
+            && info
+                .boundaries
+                .iter()
+                .all(|boundary| boundary.external_subgraphs.is_empty()))
+        .then(|| info.serial_circuits[0].clone());
+        let (result, cached_fn) = match (info.output_params.is_empty(), serial_circuit) {
+            (true, Some(serial_circuit)) => (
                 EncodeStatus::Success,
-                CachedEncodedFunction::Encoded {
-                    serial_circuit: info.serial_circuit.clone(),
-                },
+                CachedEncodedFunction::Encoded { serial_circuit },
             ),
-            false => (
+            _ => (
                 EncodeStatus::Unsupported,
                 CachedEncodedFunction::Unsupported,
             ),
@@ -813,11 +909,14 @@ impl<H: HugrView> PytketEncoderContext<H> {
         // Cache the encoded subcircuit for future use.
         // If the cache is poisoned, ignore it.
         if let Ok(mut cache) = self.function_cache.write() {
-            cache.insert(function, cached_fn);
+            cache.insert(function, cached_fn.clone());
         }
 
         if result == EncodeStatus::Success {
-            self.emit_circ_box(node, info.serial_circuit, hugr)?;
+            let CachedEncodedFunction::Encoded { serial_circuit } = cached_fn else {
+                unreachable!("successful function encoding is cached as a circuit");
+            };
+            self.emit_circ_box(node, serial_circuit, hugr)?;
         }
         Ok(result)
     }

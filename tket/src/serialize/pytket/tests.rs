@@ -1093,6 +1093,44 @@ fn circ_forward_opaque_parameter() -> Hugr {
     h.finish_hugr_with_outputs([q, rotation]).unwrap()
 }
 
+/// A register-free opaque subgraph ordered between two supported command runs.
+///
+/// Regression test for <https://github.com/Quantinuum/tket2/issues/1856>.
+#[fixture]
+fn circ_mid_circuit_external_subgraph() -> Hugr {
+    let opaque_type = Type::from(option_type([bool_t()]));
+    let signature = Signature::new(vec![qb_t(), qb_t()], vec![qb_t(), qb_t()]);
+    let mut h = FunctionBuilder::new("mid_circuit_external_subgraph", signature).unwrap();
+    let [q0, q1] = h.input_wires_arr();
+
+    let producer = h
+        .module_root_builder()
+        .declare(
+            "opaque_producer",
+            Signature::new(vec![qb_t()], vec![opaque_type.clone(), qb_t()]).into(),
+        )
+        .unwrap();
+    let consumer = h
+        .module_root_builder()
+        .declare(
+            "opaque_consumer",
+            Signature::new(vec![opaque_type], vec![rotation_type()]).into(),
+        )
+        .unwrap();
+
+    let producer_call = h.call(&producer, &[], [q1]).unwrap();
+    let [opaque, q1] = producer_call.outputs_arr();
+    let [q1] = h.add_dataflow_op(TketOp::H, [q1]).unwrap().outputs_arr();
+    let consumer_call = h.call(&consumer, &[], [opaque]).unwrap();
+    let [rotation] = consumer_call.outputs_arr();
+    let [q1] = h
+        .add_dataflow_op(TketOp::Rz, [q1, rotation])
+        .unwrap()
+        .outputs_arr();
+
+    h.finish_hugr_with_outputs([q0, q1]).unwrap()
+}
+
 // A circuit that discards the first qubit input and only outputs the second one.
 #[fixture]
 fn circ_discard_first_qubit() -> Hugr {
@@ -1352,7 +1390,7 @@ fn circuit_standalone_roundtrip(#[case] hugr: Hugr, #[case] config: CircuitRound
     let encoded = EncodedCircuit::new_standalone(&hugr, encode_options.clone())
         .unwrap_or_else(|e| panic!("{e}"));
 
-    assert!(encoded.contains_circuit(hugr.entrypoint()));
+    assert!(encoded.contains_region(hugr.entrypoint()));
     assert_eq!(encoded.len(), 1);
 
     // Re-encode the EncodedCircuit
@@ -1368,7 +1406,11 @@ fn circuit_standalone_roundtrip(#[case] hugr: Hugr, #[case] config: CircuitRound
         .unwrap_or_else(|e| panic!("{e}"));
 
     // Extract the head pytket circuit, and re-encode it on its own.
-    let ser: &SerialCircuit = &encoded[hugr.entrypoint()];
+    let mut circuits = encoded.get_circuits(hugr.entrypoint());
+    let (_, ser) = circuits
+        .next()
+        .expect("standalone encoding has one circuit");
+    assert!(circuits.next().is_none());
     let deser: Hugr = ser.decode(decode_options).unwrap_or_else(|e| panic!("{e}"));
 
     deser.validate().unwrap_or_else(|e| panic!("{e}"));
@@ -1474,6 +1516,11 @@ fn fail_on_modified_hugr(circ_tk1_ops: Hugr) {
     1,
     CircuitRoundtripTestConfig::Default
 )]
+#[case::mid_circuit_external_subgraph(
+    circ_mid_circuit_external_subgraph(),
+    2,
+    CircuitRoundtripTestConfig::Default
+)]
 #[case::discard_first_qubit(circ_discard_first_qubit(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::measure_and_read(circ_measure_and_read(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::meas_ancilla(circ_measure_ancilla(), 1, CircuitRoundtripTestConfig::Default)]
@@ -1519,6 +1566,68 @@ fn encoded_circuit_roundtrip(
         "Output signature mismatch\n  Expected: {}\n  Actual:   {}",
         circ_signature, deser_sig
     );
+}
+
+/// Segment-local implicit permutations must be visible to subsequent
+/// segments, while the final permutation still determines region outputs.
+#[test]
+fn segmented_circuit_tracks_implicit_permutations() {
+    let hugr = circ_mid_circuit_external_subgraph();
+    let mut encoded =
+        EncodedCircuit::new(&hugr, EncodeOptions::new()).expect("fixture should encode");
+    let region = hugr.entrypoint();
+    assert!(encoded.contains_region(region));
+    assert!(encoded.get_circuits(hugr.module_root()).next().is_none());
+
+    let mut segments = encoded.get_circuits_mut(region);
+    let (first_id, first) = segments.next().expect("first segment");
+    let (second_id, second) = segments.next().expect("second segment");
+    assert_eq!(first_id.region, second_id.region);
+    assert_eq!((first_id.segment, second_id.segment), (0, 1));
+    assert!(segments.next().is_none());
+
+    let q0 = first.qubits[0].clone();
+    let q1 = first.qubits[1].clone();
+    let swap = vec![
+        circuit_json::ImplicitPermutation(q0.clone(), q1.clone()),
+        circuit_json::ImplicitPermutation(q1.clone(), q0.clone()),
+    ];
+    first.implicit_permutation = swap.clone();
+
+    let rz = second
+        .commands
+        .iter_mut()
+        .find(|command| command.op.op_type == tket_json_rs::OpType::Rz)
+        .expect("second segment contains Rz");
+    assert_eq!(rz.args, vec![q1.id.clone()]);
+    rz.args = vec![q0.id.clone()];
+    second.implicit_permutation = swap;
+    drop(segments);
+
+    let mut decoded = hugr.clone();
+    encoded
+        .reassemble_inplace(&mut decoded, None)
+        .expect("segmented circuit should decode");
+    decoded.validate().expect("decoded HUGR should be valid");
+
+    let region = decoded.entrypoint();
+    let output = decoded.get_io(region).expect("dataflow region IO")[1];
+    let (rz, _) = decoded
+        .single_linked_output(output, 1)
+        .expect("second qubit output");
+    assert_eq!(decoded.get_optype(rz), &OpType::from(TketOp::Rz));
+    let (h, _) = decoded.single_linked_output(rz, 0).expect("Rz qubit input");
+    assert_eq!(decoded.get_optype(h), &OpType::from(TketOp::H));
+}
+
+/// A split region depends on boundary metadata that cannot be represented in
+/// one standalone pytket circuit.
+#[test]
+fn segmented_circuit_rejects_standalone_encoding() {
+    let hugr = circ_mid_circuit_external_subgraph();
+    let error = EncodedCircuit::new_standalone(&hugr, EncodeOptions::new())
+        .expect_err("segmented encoding cannot be standalone");
+    assert!(error.to_string().contains("register-free opaque subgraphs"));
 }
 
 /// Test serialisation of circuits with a symbolic expression.
