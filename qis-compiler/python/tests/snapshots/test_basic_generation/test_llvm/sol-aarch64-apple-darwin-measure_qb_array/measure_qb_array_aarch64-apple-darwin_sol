@@ -361,7 +361,7 @@ __barray_check_bounds.exit.i:                     ; preds = %__barray_check_boun
   store i64 %103, ptr %97, align 4, !dbg !58
   %104 = getelementptr inbounds i64, ptr %.fca.0.extract62.i179.i, i64 %95, !dbg !57
   %105 = load i64, ptr %104, align 4, !dbg !57
-  %lazy_measure.i = tail call i64 @___lazy_measure(i64 %105), !dbg !60
+  %___lazy_measure.i = tail call i64 @___lazy_measure(i64 %105, i64 0), !dbg !60
   tail call void @___qfree(i64 %105), !dbg !60
   %106 = load i64, ptr %71, align 4
   %107 = lshr i64 %106, %"200_0.sroa.15.0178.i"
@@ -378,7 +378,7 @@ loop_body.i:                                      ; preds = %__barray_check_boun
   %111 = xor i64 %106, %110
   store i64 %111, ptr %71, align 4
   %112 = getelementptr inbounds nuw i64, ptr %70, i64 %"200_0.sroa.15.0178.i"
-  store i64 %lazy_measure.i, ptr %112, align 4
+  store i64 %___lazy_measure.i, ptr %112, align 4
   %113 = extractvalue { { ptr, ptr, i64 }, i64 } %.pn159177.i, 0
   %.fca.0.extract62.i.i = extractvalue { ptr, ptr, i64 } %113, 0
   %.fca.1.extract63.i.i = extractvalue { ptr, ptr, i64 } %113, 1
@@ -705,7 +705,7 @@ declare i1 @___read_future_bool(i64) local_unnamed_addr
 
 declare void @___dec_future_refcount(i64) local_unnamed_addr
 
-declare i64 @___lazy_measure(i64) local_unnamed_addr
+declare i64 @___lazy_measure(i64, i64) local_unnamed_addr
 
 declare void @___qfree(i64) local_unnamed_addr
 
