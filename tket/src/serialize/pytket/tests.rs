@@ -34,7 +34,7 @@ use crate::serialize::pytket::{
     PytketEncoderConfig, default_decoder_config, default_encoder_config,
 };
 use hugr::hugr::hugrmut::HugrMut;
-use hugr::ops::handle::FuncID;
+use hugr::ops::handle::{FuncID, NodeHandle};
 use hugr::ops::{OpParent, OpType, Tag, Value};
 use hugr::std_extensions::arithmetic::float_ops::FloatOps;
 use hugr::types::{Signature, SumType, Type};
@@ -1169,6 +1169,79 @@ fn circ_measure_and_read() -> Hugr {
     h.finish_hugr_with_outputs([bit]).unwrap()
 }
 
+/// A measured bit used as both a CFG predicate and an input to an unsupported
+/// operation.
+///
+/// This is the minimal HUGR structure produced by the Guppy Getting Started
+/// example that fails a pytket encoding roundtrip.
+#[fixture]
+fn circ_cfg_read_fanout() -> Hugr {
+    let mut function =
+        FunctionBuilder::new("cfg_read_fanout", Signature::new(vec![], vec![qb_t()])).unwrap();
+    let consume_bool = function
+        .module_root_builder()
+        .declare(
+            "consume_bool",
+            Signature::new(vec![bool_t()], vec![]).into(),
+        )
+        .unwrap();
+
+    let cfg = {
+        let mut cfg = function.cfg_builder([], vec![qb_t()].into()).unwrap();
+        let entry = {
+            let mut block = cfg
+                .entry_builder(vec![vec![].into(), vec![].into()], vec![qb_t()].into())
+                .unwrap();
+            let [q1] = block
+                .add_dataflow_op(TketOp::QAlloc, [])
+                .unwrap()
+                .outputs_arr();
+            let [q2] = block
+                .add_dataflow_op(TketOp::QAlloc, [])
+                .unwrap()
+                .outputs_arr();
+            let [q1] = block
+                .add_dataflow_op(TketOp::H, [q1])
+                .unwrap()
+                .outputs_arr();
+            let measure = block.add_dataflow_op(TketOp::MeasureFree, [q1]).unwrap();
+            let [measurement] = measure.outputs_arr();
+            let [bit] = block
+                .add_dataflow_op(MeasurementOp::Read, [measurement])
+                .unwrap()
+                .outputs_arr();
+            let result = block.call(&consume_bool, &[], [bit]).unwrap();
+            block.add_other_wire(measure.node(), result.node());
+            block.add_other_wire(result.node(), block.output().node());
+
+            block.finish_with_outputs(bit, [q2]).unwrap()
+        };
+
+        let branches = [false, true].map(|apply_x| {
+            let mut block = cfg
+                .simple_block_builder(Signature::new_endo([qb_t()]), 1)
+                .unwrap();
+            let [q] = block.input_wires_arr();
+            let q = if apply_x {
+                block.add_dataflow_op(TketOp::X, [q]).unwrap().out_wire(0)
+            } else {
+                q
+            };
+            let branch = block.add_load_value(Value::unary_unit_sum());
+            block.finish_with_outputs(branch, [q]).unwrap()
+        });
+
+        let exit = cfg.exit_block();
+        for (port, branch) in branches.iter().enumerate() {
+            cfg.branch(&entry, port, branch).unwrap();
+            cfg.branch(branch, 0, &exit).unwrap();
+        }
+        cfg.finish_sub_container().unwrap()
+    };
+
+    function.finish_hugr_with_outputs(cfg.outputs()).unwrap()
+}
+
 /// Check that all circuit ops have been translated to a native gate.
 ///
 /// Panics if there are tk1 ops in the circuit.
@@ -1525,6 +1598,7 @@ fn fail_on_modified_hugr(circ_tk1_ops: Hugr) {
 #[case::measure_and_read(circ_measure_and_read(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::meas_ancilla(circ_measure_ancilla(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::preset_bits(circ_preset_bits(), 1, CircuitRoundtripTestConfig::Default)]
+#[case::read_fanout(circ_cfg_read_fanout(), 2, CircuitRoundtripTestConfig::Default)]
 
 fn encoded_circuit_roundtrip(
     #[case] hugr: Hugr,
