@@ -29,9 +29,9 @@ use crate::serialize::pytket::PytketEncodeError;
 use crate::serialize::pytket::decoder::PytketParam;
 use crate::serialize::pytket::extension::{CoreDecoder, OpaqueTk1Op, PreludeEmitter};
 use crate::serialize::pytket::{
-    DecodeInsertionTarget, DecodeOptions, EncodeOptions, EncodedCircuit, PytketDecodeError,
-    PytketDecodeErrorInner, PytketDecoderConfig, PytketEncodeOpError, PytketEncoderConfig,
-    default_decoder_config, default_encoder_config,
+    DecodeInsertionTarget, DecodeOptions, EncodeOptions, EncodedCircuit, EncodedCircuitId,
+    PytketDecodeError, PytketDecodeErrorInner, PytketDecoderConfig, PytketEncodeOpError,
+    PytketEncoderConfig, default_decoder_config, default_encoder_config,
 };
 use hugr::hugr::hugrmut::HugrMut;
 use hugr::ops::handle::FuncID;
@@ -1570,7 +1570,7 @@ fn encoded_circuit_roundtrip(
 
 /// Segment-local implicit permutations must be visible to subsequent
 /// segments, while the final permutation still determines region outputs.
-#[test]
+#[rstest]
 fn segmented_circuit_tracks_implicit_permutations() {
     let hugr = circ_mid_circuit_external_subgraph();
     let mut encoded =
@@ -1618,6 +1618,55 @@ fn segmented_circuit_tracks_implicit_permutations() {
     assert_eq!(decoded.get_optype(rz), &OpType::from(TketOp::Rz));
     let (h, _) = decoded.single_linked_output(rz, 0).expect("Rz qubit input");
     assert_eq!(decoded.get_optype(h), &OpType::from(TketOp::H));
+}
+
+/// Segment accessors identify and mutate each circuit within a region.
+#[rstest]
+fn encoded_circuit_segment_accessors() {
+    let hugr = circ_mid_circuit_external_subgraph();
+    let region = hugr.entrypoint();
+    let mut encoded =
+        EncodedCircuit::new(&hugr, EncodeOptions::new()).expect("fixture should encode");
+
+    let segment_ids = encoded.get_circuits(region).map(|(id, _)| id).collect_vec();
+    assert_eq!(
+        segment_ids,
+        [
+            EncodedCircuitId { region, segment: 0 },
+            EncodedCircuitId { region, segment: 1 },
+        ]
+    );
+
+    for (id, circuit) in encoded.get_circuits_mut(region) {
+        circuit.phase = id.segment.to_string();
+    }
+
+    let [first, second] = segment_ids.as_slice() else {
+        panic!("fixture should encode as two segments");
+    };
+    assert_eq!(
+        encoded.get_segment(*first).expect("first segment").phase,
+        "0"
+    );
+    assert_eq!(encoded[*second].phase, "1");
+
+    encoded
+        .get_segment_mut(*first)
+        .expect("first segment")
+        .phase = "2".to_owned();
+    encoded[*second].phase = "3".to_owned();
+    assert_eq!(encoded[*first].phase, "2");
+    assert!(
+        encoded
+            .get_segment(EncodedCircuitId { region, segment: 2 })
+            .is_none()
+    );
+    let missing_region = EncodedCircuitId {
+        region: hugr.module_root(),
+        segment: 0,
+    };
+    assert!(encoded.get_segment(missing_region).is_none());
+    assert!(encoded.get_segment_mut(missing_region).is_none());
 }
 
 /// A split region depends on boundary metadata that cannot be represented in
