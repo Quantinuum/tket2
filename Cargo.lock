@@ -2842,7 +2842,7 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "tket"
-version = "0.21.1"
+version = "0.21.2"
 dependencies = [
  "anyhow",
  "ascent",
@@ -2927,7 +2927,7 @@ dependencies = [
 
 [[package]]
 name = "tket-qsystem"
-version = "0.27.1"
+version = "0.27.2"
 dependencies = [
  "anyhow",
  "clap",
