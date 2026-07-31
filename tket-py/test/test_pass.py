@@ -504,6 +504,6 @@ def test_python_qsystem_pass_with_modifiers() -> None:
             assert not _contains_modifiers(qsystem_hugr), (
                 f"QSystem passes left modifiers in {hugr_path}"
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             failures.append(f"{hugr_path}: {exc}")
     assert not failures, "QSystem pass failures:\n" + "\n".join(failures)
