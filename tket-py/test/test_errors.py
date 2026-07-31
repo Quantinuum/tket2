@@ -1,6 +1,7 @@
 import pytest
 from hugr import ops, tys
 from hugr.build.dfg import Function
+
 from tket._state import CompilationState
 
 

@@ -1,14 +1,16 @@
-from typing import Iterator
+from collections.abc import Iterator
+
 from hugr.passes.scope import PassScope
-from .state import Node, CompilationState
+
 from .rewrite import CircuitRewrite
+from .state import CompilationState, Node
 
 class Rule:
     """A rewrite rule defined by a left hand side and right hand side of an equation."""
 
     def __init__(
         self,
-        l: CompilationState,  # noqa: E741
+        l: CompilationState,
         r: CompilationState,
     ) -> None:
         """Create a new rewrite rule."""

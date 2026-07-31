@@ -19,7 +19,7 @@ use hugr::{
 };
 use petgraph::visit::{Topo, Walker};
 
-use crate::{TketOp, extension::global_phase::GlobalPhase};
+use crate::extension::modifier::Modifier;
 
 use super::{DirWire, ModifierResolver, ModifierResolverErrors, PortExt};
 
@@ -456,48 +456,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         Ok(new_node)
     }
 
-    fn subtree_has_quantum_operation(&self, h: &impl HugrView<Node = N>, n: N) -> bool {
-        // We need more than a type-level qubit check here: Guppy often emits
-        // bounds-check conditionals whose signature carries a qubit, but whose
-        // body only manipulates classical array indices and values.
-        h.descendants(n)
-            .chain(iter::once(n))
-            .any(|node| self.node_is_quantum_operation(h, node))
-    }
-
-    fn node_is_quantum_operation(&self, h: &impl HugrView<Node = N>, n: N) -> bool {
-        let optype = h.get_optype(n);
-        match optype {
-            OpType::Input(_)
-            | OpType::Output(_)
-            | OpType::CFG(_)
-            | OpType::DFG(_)
-            | OpType::TailLoop(_)
-            | OpType::Conditional(_)
-            | OpType::Case(_)
-            | OpType::DataflowBlock(_)
-            | OpType::FuncDefn(_)
-            | OpType::FuncDecl(_)
-            | OpType::Module(_) => false,
-            // tket quantum gates and global phases require the normal modifier
-            // logic. They are real operations, not just qubit-carrying IO.
-            _ if TketOp::from_optype(optype).is_some()
-                || GlobalPhase::from_optype(optype).is_some() =>
-            {
-                true
-            }
-            // Unknown operations are conservative: if their signature can carry
-            // qubits, treat them as quantum-sensitive so we do not silently copy
-            // an operation that may need dagger/control handling.
-            _ => h.signature(n).is_some_and(|sig| {
-                sig.input
-                    .iter()
-                    .chain(sig.output.iter())
-                    .any(|ty| self.qubit_finder.contains_element_type(ty))
-            }),
-        }
-    }
-
     pub(super) fn modify_dfg(
         &mut self,
         h: &mut impl HugrMut<Node = N>,
@@ -626,13 +584,14 @@ impl<N: HugrNode> ModifierResolver<N> {
         conditional: &Conditional,
         new_dfg: &mut impl Container,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        // If a conditional does not have quantum operations in its body, we can safely
-        // copy the whole conditional without modification.
-        // TODO: Do we need to check for CallIndirect? Maybe just check if there are modifiers?
-        let has_indirect_call = h
-            .descendants(n)
-            .any(|node| matches!(h.get_optype(node), OpType::CallIndirect(_)));
-        if !self.subtree_has_quantum_operation(h, n) && !has_indirect_call {
+        // A purely classical, modifier-free conditional is unchanged by the
+        // current modifier, so it can be copied without rebuilding its cases.
+        let needs_modification = iter::once(n).chain(h.descendants(n)).any(|node| {
+            h.signature(node)
+                .is_some_and(|signature| self.signature_has_quantum_data(&signature))
+                || Modifier::from_optype(h.get_optype(node)).is_some()
+        });
+        if !needs_modification {
             self.copy_sub_container_no_modification(h, n, new_dfg)?;
             return Ok(());
         }

@@ -11,7 +11,7 @@ from sys import argv
 
 from guppylang import guppy
 from guppylang.std.angles import angle
-from guppylang.std.quantum import rx, qubit
+from guppylang.std.quantum import qubit, rx
 
 
 @guppy.declare

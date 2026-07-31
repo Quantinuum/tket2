@@ -6,9 +6,9 @@
 # ///
 """Test the use of a higher-order function with complex control flow inside modifiers"""
 
+from collections.abc import Callable
 from pathlib import Path
 from sys import argv
-from collections.abc import Callable
 
 from guppylang import enable_experimental_features, guppy
 from guppylang.std.builtins import Controllable, Unitary, array, control, dagger
@@ -64,7 +64,7 @@ def apply_c(
 def main() -> None:
     qs: array[qubit, 2] = array(qubit(), qubit())
     h(qs[0])
-    flag = 2 > 10
+    flag = 2 > 10  # noqa: PLR0133
     with control(qs[0]):
         apply_c(h, rx, get_get_angle, qs[1], True)
         apply_c(h, rx, get_get_angle, qs[1], flag)

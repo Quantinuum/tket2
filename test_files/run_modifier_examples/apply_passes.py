@@ -1,9 +1,9 @@
-from tket.passes import ModifierResolverPass, Normalize
-from hugr.build.base import Hugr
-from pathlib import Path
 import sys
-from tket._state import CompilationState
+from pathlib import Path
 
+from hugr.build.base import Hugr
+from tket._state import CompilationState
+from tket.passes import ModifierResolverPass, Normalize
 
 mr_pass = ModifierResolverPass()
 normalize = Normalize()

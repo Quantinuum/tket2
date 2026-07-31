@@ -9,8 +9,8 @@ from pathlib import Path
 from sys import argv
 
 from guppylang import guppy
-from guppylang.std.quantum import qubit, h, cx, rz
 from guppylang.std.angles import pi
+from guppylang.std.quantum import cx, h, qubit, rz
 
 
 @guppy

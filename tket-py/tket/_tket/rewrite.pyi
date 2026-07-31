@@ -1,5 +1,6 @@
 from pathlib import Path
-from tket._tket.state import Node, CompilationState
+
+from tket._tket.state import CompilationState, Node
 
 class ECCRewriter:
     @staticmethod

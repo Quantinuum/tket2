@@ -39,11 +39,9 @@ def main() -> None:
             rx(c, angle(f))
 
     h(c)
-    with dagger:
-        with control(c):
-            with dagger:
-                # rotation is only `controllable`: fine since we have 2 daggers
-                rotation(q, 1 / 3)
+    with dagger, control(c), dagger:
+        # rotation is only `controllable`: fine since we have 2 daggers
+        rotation(q, 1 / 3)
 
     state_result("r", c, q)
 
