@@ -40,6 +40,7 @@ use hugr::std_extensions::arithmetic::float_ops::FloatOps;
 use hugr::types::{Signature, SumType, Type};
 use hugr::{Hugr, HugrView};
 use itertools::Itertools;
+use rayon::iter::ParallelIterator;
 use rstest::{fixture, rstest};
 use tket_json_rs::circuit_json::{self, SerialCircuit};
 use tket_json_rs::optype;
@@ -1741,6 +1742,53 @@ fn encoded_circuit_segment_accessors() {
     };
     assert!(encoded.get_segment(missing_region).is_none());
     assert!(encoded.get_segment_mut(missing_region).is_none());
+}
+
+/// Test the iterators over the segments of an encoded circuit,
+/// when a node has multiple segments.
+#[rstest]
+fn encoded_circuit_iterators() {
+    let hugr = circ_mid_circuit_external_subgraph();
+    let region = hugr.entrypoint();
+    let mut encoded =
+        EncodedCircuit::new(&hugr, EncodeOptions::new()).expect("fixture should encode");
+
+    assert_eq!(
+        encoded.iter().map(|(region, _)| region).collect_vec(),
+        [region, region]
+    );
+    assert_eq!(
+        encoded
+            .par_iter()
+            .map(|(region, _)| region)
+            .collect::<Vec<_>>(),
+        [region, region]
+    );
+
+    for (segment, (segment_region, circuit)) in encoded.iter_mut().enumerate() {
+        assert_eq!(segment_region, region);
+        circuit.phase = segment.to_string();
+    }
+    encoded
+        .par_iter_mut()
+        .for_each(|(segment_region, _)| assert_eq!(segment_region, region));
+
+    assert_eq!(encoded[region].phase, "0");
+    encoded[region].phase = "first".to_owned();
+    assert_eq!(
+        encoded
+            .get_segment(EncodedCircuitId { region, segment: 0 })
+            .expect("first segment")
+            .phase,
+        "first"
+    );
+    assert_eq!(
+        encoded
+            .get_segment(EncodedCircuitId { region, segment: 1 })
+            .expect("second segment")
+            .phase,
+        "1"
+    );
 }
 
 /// A split region depends on boundary metadata that cannot be represented in

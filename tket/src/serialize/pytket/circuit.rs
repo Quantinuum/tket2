@@ -657,90 +657,84 @@ impl<Node: HugrNode> EncodedCircuit<Node> {
         self.circuits.is_empty()
     }
 
-    /// Returns an iterator over every encoded pytket circuit segment and its ID.
-    pub fn iter(&self) -> impl Iterator<Item = (EncodedCircuitId<Node>, &SerialCircuit)> {
+    /// Returns an iterator over every encoded pytket circuit segment and its region.
+    ///
+    /// A region containing multiple segments appears once for each segment.
+    // TODO: Update signature to return `(EncodedCircuitId<Node>, &SerialCircuit)` in a breaking release.
+    pub fn iter(&self) -> impl Iterator<Item = (Node, &SerialCircuit)> {
         self.circuits.iter().flat_map(|(&node, region)| {
             region
                 .serial_circuits
                 .iter()
-                .enumerate()
-                .map(move |(segment, circuit)| {
-                    (
-                        EncodedCircuitId {
-                            region: node,
-                            segment,
-                        },
-                        circuit,
-                    )
-                })
+                .map(move |circuit| (node, circuit))
         })
     }
 
-    /// Returns a mutable iterator over every circuit segment and its ID.
-    pub fn iter_mut(
-        &mut self,
-    ) -> impl Iterator<Item = (EncodedCircuitId<Node>, &mut SerialCircuit)> {
+    /// Returns a mutable iterator over every circuit segment and its region.
+    ///
+    /// A region containing multiple segments appears once for each segment.
+    // TODO: Update signature to return `(EncodedCircuitId<Node>, &mut SerialCircuit)` in a breaking release.
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (Node, &mut SerialCircuit)> {
         self.circuits.iter_mut().flat_map(|(&node, region)| {
             region
                 .serial_circuits
                 .iter_mut()
-                .enumerate()
-                .map(move |(segment, circuit)| {
-                    (
-                        EncodedCircuitId {
-                            region: node,
-                            segment,
-                        },
-                        circuit,
-                    )
-                })
+                .map(move |circuit| (node, circuit))
         })
     }
 }
 
 impl<Node: HugrNode + Send + Sync> EncodedCircuit<Node> {
-    /// Returns a parallel iterator over every circuit segment and its ID.
-    pub fn par_iter(
-        &self,
-    ) -> impl ParallelIterator<Item = (EncodedCircuitId<Node>, &SerialCircuit)> {
+    /// Returns a parallel iterator over every circuit segment and its region.
+    ///
+    /// A region containing multiple segments appears once for each segment.
+    // TODO: Update signature to return `(EncodedCircuitId<Node>, &SerialCircuit)` in a breaking release.
+    pub fn par_iter(&self) -> impl ParallelIterator<Item = (Node, &SerialCircuit)> {
         self.circuits.par_iter().flat_map_iter(|(&node, region)| {
             region
                 .serial_circuits
                 .iter()
-                .enumerate()
-                .map(move |(segment, circuit)| {
-                    (
-                        EncodedCircuitId {
-                            region: node,
-                            segment,
-                        },
-                        circuit,
-                    )
-                })
+                .map(move |circuit| (node, circuit))
         })
     }
 
-    /// Returns a parallel mutable iterator over every circuit segment and its ID.
-    pub fn par_iter_mut(
-        &mut self,
-    ) -> impl ParallelIterator<Item = (EncodedCircuitId<Node>, &mut SerialCircuit)> {
+    /// Returns a parallel mutable iterator over every circuit segment and its region.
+    ///
+    /// A region containing multiple segments appears once for each segment.
+    // TODO: Update signature to return `(EncodedCircuitId<Node>, &mut SerialCircuit)` in a breaking release.
+    pub fn par_iter_mut(&mut self) -> impl ParallelIterator<Item = (Node, &mut SerialCircuit)> {
         self.circuits
             .par_iter_mut()
             .flat_map_iter(|(&node, region)| {
                 region
                     .serial_circuits
                     .iter_mut()
-                    .enumerate()
-                    .map(move |(segment, circuit)| {
-                        (
-                            EncodedCircuitId {
-                                region: node,
-                                segment,
-                            },
-                            circuit,
-                        )
-                    })
+                    .map(move |circuit| (node, circuit))
             })
+    }
+}
+
+/// Backwards-compatible region indexing that ignores all but the first segment.
+/// This implementation will be removed in a breaking release.
+impl<Node: HugrNode> Index<Node> for EncodedCircuit<Node> {
+    type Output = SerialCircuit;
+
+    fn index(&self, index: Node) -> &Self::Output {
+        self.circuits
+            .get(&index)
+            .and_then(|region| region.serial_circuits.first())
+            .unwrap_or_else(|| panic!("Indexing into a circuit that was not encoded: {index}"))
+    }
+}
+
+/// Backwards-compatible mutable region indexing that ignores all but the first segment.
+/// This implementation will be removed in a breaking release.
+impl<Node: HugrNode> IndexMut<Node> for EncodedCircuit<Node> {
+    fn index_mut(&mut self, index: Node) -> &mut Self::Output {
+        self.circuits
+            .get_mut(&index)
+            .and_then(|region| region.serial_circuits.first_mut())
+            .unwrap_or_else(|| panic!("Indexing into a circuit that was not encoded: {index}"))
     }
 }
 
