@@ -7,7 +7,6 @@ mod value_tracker;
 use hugr::core::HugrNode;
 use tket_json_rs::clexpr::InputClRegister;
 use tket_json_rs::clexpr::operator::{ClArgument, ClOperator, ClTerminal, ClVariable};
-use tket_json_rs::opbox::BoxID;
 pub use value_tracker::{
     TrackedBit, TrackedParam, TrackedQubit, TrackedValue, TrackedValues, ValueTracker,
 };
@@ -801,149 +800,6 @@ impl<H: HugrView> PytketEncoderContext<H> {
         self.segments.push_command(command);
     }
 
-    /// Helper to emit a `CircBox` tket1 command corresponding to a region of the Hugr.
-    ///
-    /// Returns a bool indicating whether the subcircuit was successfully emitted,
-    /// or should be encoded opaquely instead. This is the case when the subcircuit
-    /// contains output parameters.
-    ///
-    // TODO: Support output parameters in subcircuits. This may require
-    // substituting variables in the parameter expressions.
-    #[expect(unused)]
-    fn emit_subcircuit(
-        &mut self,
-        node: H::Node,
-        hugr: &H,
-    ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
-        let config = Arc::clone(&self.config);
-
-        // Recursively encode the sub-graph.
-        let opaque_subgraphs = std::mem::take(&mut self.opaque_subgraphs);
-        let mut subencoder = PytketEncoderContext::new(hugr, node, opaque_subgraphs, config)?;
-        subencoder.function_cache = self.function_cache.clone();
-        subencoder.run_encoder(hugr, node)?;
-
-        let (info, opaque_subgraphs) = subencoder.finish(hugr, node)?;
-        self.opaque_subgraphs = opaque_subgraphs;
-        if !info.output_params.is_empty()
-            || info.serial_circuits.len() != 1
-            || info
-                .boundaries
-                .iter()
-                .any(|boundary| !boundary.external_subgraphs.is_empty())
-        {
-            return Ok(EncodeStatus::Unsupported);
-        }
-
-        self.emit_circ_box(
-            node,
-            info.serial_circuits
-                .into_iter()
-                .next()
-                .expect("encoded region has one circuit"),
-            hugr,
-        )?;
-        Ok(EncodeStatus::Success)
-    }
-
-    /// Helper to emit a `CircBox` tket1 command corresponding to a function definition in the Hugr.
-    ///
-    /// The function encoding is cached and reused if possible.
-    ///
-    /// Returns a bool indicating whether the subcircuit was successfully emitted,
-    /// or should be encoded opaquely instead. This is the case when the subcircuit
-    /// contains output parameters.
-    ///
-    // TODO: Support output parameters in subcircuits. This may require
-    // substituting variables in the parameter expressions.
-    #[expect(unused)]
-    fn emit_function_call(
-        &mut self,
-        node: H::Node,
-        function: H::Node,
-        hugr: &H,
-    ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
-        let cache = self.function_cache.read().ok();
-        if let Some(encoded) = cache.as_ref().and_then(|c| c.get(&function)) {
-            let encoded = encoded.clone();
-            drop(cache);
-            match encoded {
-                CachedEncodedFunction::Encoded { serial_circuit } => {
-                    self.emit_circ_box(node, serial_circuit, hugr)?;
-                    return Ok(EncodeStatus::Success);
-                }
-                CachedEncodedFunction::Unsupported | CachedEncodedFunction::InEncodingStack => {
-                    return Ok(EncodeStatus::Unsupported);
-                }
-            };
-        }
-        drop(cache);
-
-        // If the function is not cached, we need to encode it.
-        let config = Arc::clone(&self.config);
-        let opaque_subgraphs = std::mem::take(&mut self.opaque_subgraphs);
-        // Recursively encode the sub-graph.
-        let mut subencoder = PytketEncoderContext::new(hugr, function, opaque_subgraphs, config)?;
-        subencoder.function_cache = self.function_cache.clone();
-        subencoder.run_encoder(hugr, function)?;
-        let (info, opaque_subgraphs) = subencoder.finish(hugr, function)?;
-        self.opaque_subgraphs = opaque_subgraphs;
-
-        let serial_circuit = (info.serial_circuits.len() == 1
-            && info
-                .boundaries
-                .iter()
-                .all(|boundary| boundary.external_subgraphs.is_empty()))
-        .then(|| info.serial_circuits[0].clone());
-        let (result, cached_fn) = match (info.output_params.is_empty(), serial_circuit) {
-            (true, Some(serial_circuit)) => (
-                EncodeStatus::Success,
-                CachedEncodedFunction::Encoded { serial_circuit },
-            ),
-            _ => (
-                EncodeStatus::Unsupported,
-                CachedEncodedFunction::Unsupported,
-            ),
-        };
-
-        // Cache the encoded subcircuit for future use.
-        // If the cache is poisoned, ignore it.
-        if let Ok(mut cache) = self.function_cache.write() {
-            cache.insert(function, cached_fn.clone());
-        }
-
-        if result == EncodeStatus::Success {
-            let CachedEncodedFunction::Encoded { serial_circuit } = cached_fn else {
-                unreachable!("successful function encoding is cached as a circuit");
-            };
-            self.emit_circ_box(node, serial_circuit, hugr)?;
-        }
-        Ok(result)
-    }
-
-    /// Helper to emit a `CircBox` tket1 command from a Serialised circuit.
-    fn emit_circ_box(
-        &mut self,
-        node: H::Node,
-        boxed_circuit: SerialCircuit,
-        hugr: &H,
-    ) -> Result<(), PytketEncodeError<H::Node>> {
-        self.emit_node_command(
-            node,
-            hugr,
-            EmitCommandOptions::new().reuse_all_bits(),
-            |args| {
-                let mut pytket_op = make_tk1_operation(tket_json_rs::OpType::CircBox, args);
-                pytket_op.op_box = Some(tket_json_rs::opbox::OpBox::CircBox {
-                    id: BoxID::new(),
-                    circuit: boxed_circuit,
-                });
-                pytket_op
-            },
-        )?;
-        Ok(())
-    }
-
     /// Encode a single circuit node into pytket commands and update the
     /// encoder.
     ///
@@ -1016,27 +872,6 @@ impl<H: HugrView> PytketEncoderContext<H> {
                     return Ok(EncodeStatus::Success);
                 }
             }
-            // TODO: DFG and function call emissions are temporarily disabled,
-            // since we cannot track additional metadata associated with the
-            // nested circuit in a `CircuitBox` as we'd do for the root one in
-            // [`EncodedCircuitInfo`].
-            //
-            // See the `unsupported_extras_in_circ_box` case in
-            // `tests::encoded_circuit_roundtrip` for a failing case when this
-            // is enabled.
-            /*
-            OpType::DFG(_) => return self.emit_subcircuit(node, circ),
-            OpType::Call(call) => {
-                let (fn_node, _) = hugr
-                    .single_linked_output(node, call.called_function_port())
-                    .expect("Function call must be linked to a function");
-                if hugr.get_optype(fn_node).is_func_defn()
-                    && self.emit_function_call(node, fn_node, hugr)? == EncodeStatus::Success
-                {
-                    return Ok(EncodeStatus::Success);
-                }
-            }
-            */
             OpType::Input(_) | OpType::Output(_) => {
                 // I/O nodes are handled by the container's encoder.
                 return Ok(EncodeStatus::Success);
@@ -1476,14 +1311,18 @@ impl<N: HugrNode> NodeInputValues<N> {
 ///
 /// If the function contains output parameters, it is unsupported
 /// and should be emitted as an unsupported op instead.
+//
+// TODO: Remove the leftover circbox encoding logic.
 #[derive(Clone, Debug)]
 enum CachedEncodedFunction {
     /// Successfully encoded function.
+    #[expect(unused)]
     Encoded {
         /// The serialised circuit for the function.
         serial_circuit: SerialCircuit,
     },
     /// Unsupported function
+    #[expect(unused)]
     Unsupported,
     /// A marker for functions currently being encoded.
     ///
