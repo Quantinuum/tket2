@@ -86,8 +86,8 @@
 //! can be completely mixed up.
 //! The logic of registering such correspondence is implemented in a function such as
 //! `wire_node_inout`.
-//! Also, the correspondence of I/O wires should be changed accordingly, depending on whether
-//! the wire correspond to a quantum or a classical type.
+//! Also, the correspondence of I/O wires should be changed accordingly, depending on whether a type
+//! has qubits or not (as defined by [TypeUnpacker])
 //! We also should not forget to connect `fneg` to `Rx` in the new graph, whose edge/wires has
 //! no correspondence in the original graph.
 //!
