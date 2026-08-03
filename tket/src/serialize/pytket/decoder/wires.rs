@@ -342,7 +342,7 @@ pub(crate) struct WireTracker {
     /// Not yet-produced parameters that have been referenced in the decoded hugr.
     ///
     /// These are introduced when decoding opaque hugr subgraphs outside the pytket commands.
-    /// See [`super::AdditionalNodesAndWires`].
+    /// See [`super::EncodedCircuitBoundary`].
     forward_parameter_placeholders: IndexSet<String>,
     /// A permutation of qubit registers in `latest_qubit_tracker` that we
     /// expect to see at the output.
@@ -435,6 +435,84 @@ impl WireTracker {
             reordered.insert(output_pos, input_pos);
         }
         self.output_qubit_permutation = reordered.values().copied().collect();
+    }
+
+    /// Relabel the current qubit values according to an intermediate circuit
+    /// permutation.
+    ///
+    /// Unlike the final output permutation, an intermediate permutation must
+    /// update register lookup before the next segment is decoded. The HUGR
+    /// wires themselves do not change; fresh tracked elements associate those
+    /// wires with their new pytket register names.
+    pub(super) fn apply_implicit_permutation(
+        &mut self,
+        permutation: &[ImplicitPermutation],
+    ) -> Result<(), PytketDecodeError> {
+        if permutation.is_empty() {
+            return Ok(());
+        }
+
+        let register_count = self.latest_qubit_tracker.len();
+        let mut source_for_output = (0..register_count).collect_vec();
+        for ImplicitPermutation(input, output) in permutation {
+            let input_hash = RegisterHash::from(input);
+            let output_hash = RegisterHash::from(output);
+            let Some(input_pos) = self.latest_qubit_tracker.get_index_of(&input_hash) else {
+                return Err(PytketDecodeError::custom(format!(
+                    "Unknown qubit register in implicit permutation: {input:?}"
+                )));
+            };
+            let Some(output_pos) = self.latest_qubit_tracker.get_index_of(&output_hash) else {
+                return Err(PytketDecodeError::custom(format!(
+                    "Unknown qubit register in implicit permutation: {output:?}"
+                )));
+            };
+            source_for_output[output_pos] = input_pos;
+        }
+
+        let current_ids = self.latest_qubit_tracker.values().copied().collect_vec();
+        let destination_registers = current_ids
+            .iter()
+            .map(|&id| self.get_qubit(id).pytket_register_arc())
+            .collect_vec();
+        let source_wires = source_for_output
+            .iter()
+            .map(|&source_pos| self.qubit_wires[&current_ids[source_pos]].clone())
+            .collect_vec();
+
+        for &id in &current_ids {
+            self.qubits[id.0].mark_outdated();
+        }
+
+        let mut replacements = BTreeMap::new();
+        for (output_pos, (register, wires)) in destination_registers
+            .into_iter()
+            .zip(source_wires)
+            .enumerate()
+        {
+            let hash = RegisterHash::from(register.as_ref());
+            let new_id = TrackedQubitId(self.qubits.len());
+            self.qubits
+                .push(TrackedQubit::new_with_hash(new_id, register, hash));
+            *self
+                .latest_qubit_tracker
+                .get_index_mut(output_pos)
+                .expect("tracked qubit position remains valid")
+                .1 = new_id;
+            self.qubit_wires.insert(new_id, wires);
+            replacements.insert(current_ids[source_for_output[output_pos]], new_id);
+        }
+
+        for wire_data in self.wires.values_mut() {
+            for qubit in &mut wire_data.qubits {
+                if let Some(replacement) = replacements.get(qubit) {
+                    *qubit = *replacement;
+                }
+            }
+        }
+
+        self.output_qubit_permutation.clear();
+        Ok(())
     }
 
     /// Returns a reference to the tracked qubit at the given index.
