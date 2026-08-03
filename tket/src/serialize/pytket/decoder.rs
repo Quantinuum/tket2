@@ -603,6 +603,8 @@ impl<'h> PytketDecoderContext<'h> {
             .map(|param| PytketParam::parse(param))
             .for_each(|param| {
                 param.visit_input_variables(&mut |name| {
+                    // TODO: Avoid hardcoding this here by treating `pi` as a constant name in the parser.
+                    // See https://github.com/Quantinuum/tket2/issues/1900
                     if name != "pi" {
                         params.insert(name.to_owned());
                     }
