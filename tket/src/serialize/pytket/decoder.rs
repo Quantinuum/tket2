@@ -590,6 +590,21 @@ impl<'h> PytketDecoderContext<'h> {
         self.run_commands(commands)
     }
 
+    /// Decode a contiguous list of pytket commands.
+    pub(super) fn run_commands(
+        &mut self,
+        commands: &[circuit_json::Command],
+    ) -> Result<(), PytketDecodeError> {
+        let config = self.config().clone();
+        for com in commands {
+            let op_type = com.op.op_type;
+            self.process_command(com, config.as_ref())
+                .map_err(|e| e.pytket_op(&op_type))?;
+        }
+
+        Ok(())
+    }
+
     /// Reserve every parameter referenced by an external region boundary.
     ///
     /// Boundaries may use parameters produced later in the region, so all
@@ -650,21 +665,6 @@ impl<'h> PytketDecoderContext<'h> {
                 .hugr_mut()
                 .connect(input_node, input_source, output_node, output_target);
         }
-    }
-
-    /// Decode a contiguous list of pytket commands.
-    pub(super) fn run_commands(
-        &mut self,
-        commands: &[circuit_json::Command],
-    ) -> Result<(), PytketDecodeError> {
-        let config = self.config().clone();
-        for com in commands {
-            let op_type = com.op.op_type;
-            self.process_command(com, config.as_ref())
-                .map_err(|e| e.pytket_op(&op_type))?;
-        }
-
-        Ok(())
     }
 
     /// Decode a segment's circuit-level global phase.
