@@ -661,6 +661,7 @@ impl<Node: HugrNode> EncodedCircuit<Node> {
     ///
     /// A region containing multiple segments appears once for each segment.
     // TODO: Update signature to return `(EncodedCircuitId<Node>, &SerialCircuit)` in a breaking release.
+    // See https://github.com/Quantinuum/tket2/issues/1901
     pub fn iter(&self) -> impl Iterator<Item = (Node, &SerialCircuit)> {
         self.circuits.iter().flat_map(|(&node, region)| {
             region
@@ -674,6 +675,7 @@ impl<Node: HugrNode> EncodedCircuit<Node> {
     ///
     /// A region containing multiple segments appears once for each segment.
     // TODO: Update signature to return `(EncodedCircuitId<Node>, &mut SerialCircuit)` in a breaking release.
+    // See https://github.com/Quantinuum/tket2/issues/1901
     pub fn iter_mut(&mut self) -> impl Iterator<Item = (Node, &mut SerialCircuit)> {
         self.circuits.iter_mut().flat_map(|(&node, region)| {
             region
@@ -689,6 +691,7 @@ impl<Node: HugrNode + Send + Sync> EncodedCircuit<Node> {
     ///
     /// A region containing multiple segments appears once for each segment.
     // TODO: Update signature to return `(EncodedCircuitId<Node>, &SerialCircuit)` in a breaking release.
+    // See https://github.com/Quantinuum/tket2/issues/1901
     pub fn par_iter(&self) -> impl ParallelIterator<Item = (Node, &SerialCircuit)> {
         self.circuits.par_iter().flat_map_iter(|(&node, region)| {
             region
@@ -702,6 +705,7 @@ impl<Node: HugrNode + Send + Sync> EncodedCircuit<Node> {
     ///
     /// A region containing multiple segments appears once for each segment.
     // TODO: Update signature to return `(EncodedCircuitId<Node>, &mut SerialCircuit)` in a breaking release.
+    // See https://github.com/Quantinuum/tket2/issues/1901
     pub fn par_iter_mut(&mut self) -> impl ParallelIterator<Item = (Node, &mut SerialCircuit)> {
         self.circuits
             .par_iter_mut()
