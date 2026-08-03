@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.6](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.5...tket-py-v0.15.6) (2026-08-03)
+
+
+### Bug Fixes
+
+* Panic when applying a `PytketHugrPass` on complex regions ([#1894](https://github.com/Quantinuum/tket2/issues/1894)) ([5661a98](https://github.com/Quantinuum/tket2/commit/5661a983989fbdc7a6dfb2a6f8632ba7da0b9c45))
+
 ## [0.15.5](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.4...tket-py-v0.15.5) (2026-07-31)
 
 

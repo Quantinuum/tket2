@@ -3149,7 +3149,7 @@ wheels = [
 
 [[package]]
 name = "tket"
-version = "0.15.5"
+version = "0.15.6"
 source = { editable = "tket-py" }
 dependencies = [
     { name = "hugr" },
