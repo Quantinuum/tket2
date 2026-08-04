@@ -4,9 +4,9 @@ A Clifford tableau implementation using a qubit-major memory layout.
 
 ## Memory layout
 
-In a conventional tableau layout, each output Pauli string, represented by a column, is stored contiguously in memory. This crate instead uses a row-oriented layout: for each output qubit, the (bitpacked) Pauli letters across all columns are stored contiguously.
+In a conventional tableau layout, each output Pauli string, often represented as a column, is stored contiguously in memory. This crate instead uses a row-oriented layout: for each output qubit, the corresponding Pauli letters from all output strings are stored contiguously in bit-packed form.
 
-This layout is efficient for operations that postcompose Clifford gates, as these operations update a small number of rows. The trade-off is that column-oriented operations, such as Pauli string multiplication and precomposition of Clifford gates, are less efficient.
+This layout is efficient for postcomposing Clifford gates because doing so updates only a small number of qubit sites. The trade-off is that image-oriented operations, such as conjugating Pauli strings and precomposing Clifford gates, are less efficient.
 
 `converter.rs` implements the `PGTableau` trait from `pg-ir-kernels`, allowing `Tableau` to be used as the tableau backend for operations on `PauliGraph`.
 

@@ -12,11 +12,11 @@ impl PGTableau for Tableau {
         self.get_n_qubits()
     }
     fn x(&self, qubit: usize) -> (Vec<Pauli>, bool) {
-        let (paulis, sign) = self.get_x_col_paulis(qubit);
+        let (paulis, sign) = self.x_image(qubit);
         (paulis, !sign)
     }
     fn z(&self, qubit: usize) -> (Vec<Pauli>, bool) {
-        let (paulis, sign) = self.get_z_col_paulis(qubit);
+        let (paulis, sign) = self.z_image(qubit);
         (paulis, !sign)
     }
     fn get_dagger(&self) -> Self {
@@ -284,10 +284,10 @@ impl PGTableau for Tableau {
                 }
             }
             Op::Rotation { data } => {
-                let (z_vec, x_vec) = paulis_to_u64s(data.get_string());
+                let (pauli_z_bits, pauli_x_bits) = paulis_to_u64s(data.get_string());
                 self.postcompose_pauli_gadget(
-                    &z_vec,
-                    &x_vec,
+                    &pauli_z_bits,
+                    &pauli_x_bits,
                     cliff_angle(data.get_angle()).expect("Pauli gadget has non clifford angle"),
                 );
             }
@@ -311,11 +311,12 @@ impl PGTableau for Tableau {
     }
 
     fn conjugate_string(&self, paulis: &[Pauli]) -> (Vec<Pauli>, bool) {
-        let (z_vec, x_vec) = paulis_to_u64s(paulis);
-        let (new_z_vec, new_x_vec, neg_sign) = self.apply_to_pauli(&z_vec, &x_vec);
+        let (input_z_bits, input_x_bits) = paulis_to_u64s(paulis);
+        let (result_z_bits, result_x_bits, result_sign) =
+            self.apply_to_pauli(&input_z_bits, &input_x_bits);
         (
-            u64s_to_paulis(&new_z_vec, &new_x_vec, self.get_n_qubits()),
-            !neg_sign,
+            u64s_to_paulis(&result_z_bits, &result_x_bits, self.get_n_qubits()),
+            !result_sign,
         )
     }
 }
@@ -323,24 +324,29 @@ impl PGTableau for Tableau {
 impl From<TableauData> for Tableau {
     fn from(data: TableauData) -> Self {
         let n_qubits = data.get_x_outputs().len();
-        let mut zb_rows = Vec::with_capacity(n_qubits);
-        let mut xb_rows = Vec::with_capacity(n_qubits);
-        for row_idx in 0..n_qubits {
-            let mut row = vec![Pauli::I; 2 * n_qubits];
-            for col_idx in 0..n_qubits {
-                row[2 * col_idx] = data.get_z_outputs()[col_idx].0[row_idx];
-                row[2 * col_idx + 1] = data.get_x_outputs()[col_idx].0[row_idx];
+        let mut qubit_slices_z_bits = Vec::with_capacity(n_qubits);
+        let mut qubit_slices_x_bits = Vec::with_capacity(n_qubits);
+        for output_q in 0..n_qubits {
+            let mut slice = vec![Pauli::I; 2 * n_qubits];
+            for input_q in 0..n_qubits {
+                slice[2 * input_q] = data.get_z_outputs()[input_q].0[output_q];
+                slice[2 * input_q + 1] = data.get_x_outputs()[input_q].0[output_q];
             }
-            let (zb_row, xb_row) = paulis_to_u64s(&row);
-            zb_rows.push(zb_row);
-            xb_rows.push(xb_row);
+            let (slice_z_bits, slice_x_bits) = paulis_to_u64s(&slice);
+            qubit_slices_z_bits.push(slice_z_bits);
+            qubit_slices_x_bits.push(slice_x_bits);
         }
         let mut neg_signs = vec![false; 2 * n_qubits];
-        for col_idx in 0..n_qubits {
-            neg_signs[2 * col_idx] = !data.get_z_outputs()[col_idx].1;
-            neg_signs[2 * col_idx + 1] = !data.get_x_outputs()[col_idx].1;
+        for input_q in 0..n_qubits {
+            neg_signs[2 * input_q] = !data.get_z_outputs()[input_q].1;
+            neg_signs[2 * input_q + 1] = !data.get_x_outputs()[input_q].1;
         }
-        Tableau::new(zb_rows, xb_rows, bools_to_u64_vec(&neg_signs), n_qubits)
+        Tableau::from_packed_qubit_slices(
+            qubit_slices_z_bits,
+            qubit_slices_x_bits,
+            bools_to_u64_vec(&neg_signs),
+            n_qubits,
+        )
     }
 }
 
@@ -349,9 +355,9 @@ impl From<Tableau> for TableauData {
         let n_qubits = tab.get_n_qubits();
         let mut z_outputs = Vec::with_capacity(n_qubits);
         let mut x_outputs = Vec::with_capacity(n_qubits);
-        for col_idx in 0..n_qubits {
-            z_outputs.push(tab.z(col_idx));
-            x_outputs.push(tab.x(col_idx));
+        for input_q in 0..n_qubits {
+            z_outputs.push(tab.z(input_q));
+            x_outputs.push(tab.x(input_q));
         }
         TableauData::new(z_outputs, x_outputs)
     }
@@ -390,8 +396,8 @@ mod tests {
             (vec![Pauli::I, Pauli::Z, Pauli::I], true),
         ];
         let tableau_data = TableauData::new(z_outputs.clone(), x_outputs.clone());
-        let row_major_tableau: Tableau = tableau_data.into();
-        let converted_back = TableauData::from(row_major_tableau);
+        let qm_tableau: Tableau = tableau_data.into();
+        let converted_back = TableauData::from(qm_tableau);
         assert_eq!(converted_back.get_z_outputs(), &z_outputs);
         assert_eq!(converted_back.get_x_outputs(), &x_outputs);
     }
@@ -422,8 +428,14 @@ mod tests {
             let random_tableau = Tableau::random(5, seed, 100, 100);
             let tableau_data = TableauData::from(random_tableau.clone());
             let converted_back: Tableau = tableau_data.into();
-            assert_eq!(random_tableau.get_zb_rows(), converted_back.get_zb_rows());
-            assert_eq!(random_tableau.get_xb_rows(), converted_back.get_xb_rows());
+            assert_eq!(
+                random_tableau.qubit_slices_z_bits(),
+                converted_back.qubit_slices_z_bits()
+            );
+            assert_eq!(
+                random_tableau.qubit_slices_x_bits(),
+                converted_back.qubit_slices_x_bits()
+            );
             assert_eq!(random_tableau.get_n_qubits(), converted_back.get_n_qubits());
             assert_eq!(random_tableau.get_signs(), converted_back.get_signs());
         }
