@@ -1652,7 +1652,7 @@ impl Tableau {
         self.postcompose_pauli_with(pauli, q, slice_x_gate, slice_y_gate, slice_z_gate);
     }
 
-    /// Return image of X on the ith qubit. Negative sign indicates a phase of +1.
+    /// Return image of X on the ith qubit. The boolean is true when the image has a -1 phase.
     pub fn x_image(&self, input_qubit: usize) -> (Vec<Pauli>, bool) {
         let (x_img_z_bits, x_img_x_bits, x_img_sign) = self.packed_image(2 * input_qubit + 1);
         (
@@ -1661,7 +1661,7 @@ impl Tableau {
         )
     }
 
-    /// Return image of Z on the ith qubit. Negative sign indicates a phase of +1.
+    /// Return image of Z on the ith qubit. The boolean is true when the image has a -1 phase.
     pub fn z_image(&self, input_qubit: usize) -> (Vec<Pauli>, bool) {
         let (z_img_z_bits, z_img_x_bits, z_img_sign) = self.packed_image(2 * input_qubit);
         (
