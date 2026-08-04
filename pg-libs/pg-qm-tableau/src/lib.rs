@@ -771,8 +771,7 @@ impl Tableau {
         &self,
         zb_pauli: &[u64],
         xb_pauli: &[u64],
-        string_mul_cols: StringMulFn,
-        string_mul_merge: StringMulFn,
+        string_mul: StringMulFn,
         count_y: CountYFn,
     ) -> (Vec<u64>, Vec<u64>, bool) {
         let mut phase0: u64 = 0;
@@ -797,8 +796,7 @@ impl Tableau {
                         let (zb_x_col, xb_x_col, s) = self.get_col(2 * q_index + 1);
                         sign_flip0 ^= s;
                         phase0 +=
-                            string_mul_cols(&mut base_zb0, &mut base_xb0, &zb_x_col, &xb_x_col)
-                                as u64;
+                            string_mul(&mut base_zb0, &mut base_xb0, &zb_x_col, &xb_x_col) as u64;
                         current_chunk &= current_chunk - 1; // Remove the lowest set bit
                     }
                 }
@@ -815,8 +813,7 @@ impl Tableau {
                         let (zb_z_col, xb_z_col, s) = self.get_col(2 * q_index);
                         sign_flip1 ^= s;
                         phase1 +=
-                            string_mul_cols(&mut base_zb1, &mut base_xb1, &zb_z_col, &xb_z_col)
-                                as u64;
+                            string_mul(&mut base_zb1, &mut base_xb1, &zb_z_col, &xb_z_col) as u64;
                         current_chunk &= current_chunk - 1; // Remove the lowest set bit
                     }
                 }
@@ -825,7 +822,7 @@ impl Tableau {
                 n_ys = count_y(zb_pauli, xb_pauli);
             });
         });
-        let phase = string_mul_merge(&mut base_zb0, &mut base_xb0, &base_zb1, &base_xb1) as u64;
+        let phase = string_mul(&mut base_zb0, &mut base_xb0, &base_zb1, &base_xb1) as u64;
         // count the number of ys, each y contributes a i phase, hence shift the total phase by 1
         (
             base_zb0,
@@ -1353,7 +1350,7 @@ impl Tableau {
         zb_pauli: &[u64],
         xb_pauli: &[u64],
     ) -> (Vec<u64>, Vec<u64>, bool) {
-        self.apply_to_pauli_mt_with(zb_pauli, xb_pauli, string_mul, string_mul, count_y)
+        self.apply_to_pauli_mt_with(zb_pauli, xb_pauli, string_mul, count_y)
     }
 
     /// Invert the tableau
@@ -1588,13 +1585,7 @@ impl SimdTableau for Tableau {
     where
         LaneCount<N>: SupportedLaneCount,
     {
-        self.apply_to_pauli_mt_with(
-            zb_pauli,
-            xb_pauli,
-            simd_string_mul::<N>,
-            simd_string_mul::<N>,
-            simd_count_y::<N>,
-        )
+        self.apply_to_pauli_mt_with(zb_pauli, xb_pauli, simd_string_mul::<N>, simd_count_y::<N>)
     }
 
     fn invert_simd<const N: usize>(&self) -> Tableau
