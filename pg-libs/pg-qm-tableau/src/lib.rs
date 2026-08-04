@@ -413,70 +413,56 @@ impl Tableau {
                 );
             }
             (Pauli::Y, Pauli::Y) => {
-                // z0 <- z0*y1 = iz0*x1*z1
-                let mut zb_z0_col_copy = zb_z0_col.clone();
-                let mut xb_z0_col_copy = xb_z0_col.clone();
-                let mut phase = string_mul(
-                    &mut zb_z0_col_copy,
-                    &mut xb_z0_col_copy,
-                    &zb_x1_col,
-                    &xb_x1_col,
-                );
-                phase += string_mul(
-                    &mut zb_z0_col_copy,
-                    &mut xb_z0_col_copy,
-                    &zb_z1_col,
-                    &xb_z1_col,
-                );
-                phase = (phase + 1) % 4;
-                self.set_col(
-                    z0_col_index,
-                    &zb_z0_col_copy,
-                    &xb_z0_col_copy,
-                    s_z0_col ^ s_z1_col ^ s_x1_col ^ (phase == 2),
-                );
-                // x0 <- x0*y1 = ix0*x1*z1
-                let mut zb_x0_col_copy = zb_x0_col.clone();
-                let mut xb_x0_col_copy = xb_x0_col.clone();
-                let mut phase = string_mul(
-                    &mut zb_x0_col_copy,
-                    &mut xb_x0_col_copy,
-                    &zb_x1_col,
-                    &xb_x1_col,
-                );
-                phase += string_mul(
-                    &mut zb_x0_col_copy,
-                    &mut xb_x0_col_copy,
-                    &zb_z1_col,
-                    &xb_z1_col,
-                );
-                phase = (phase + 1) % 4;
-                self.set_col(
-                    x0_col_index,
-                    &zb_x0_col_copy,
-                    &xb_x0_col_copy,
-                    s_x0_col ^ s_z1_col ^ s_x1_col ^ (phase == 2),
-                );
-                // z1 <- z1*y0 = iz1*x0*z0
-                let mut phase = string_mul(&mut zb_z1_col, &mut xb_z1_col, &zb_x0_col, &xb_x0_col);
-                phase += string_mul(&mut zb_z1_col, &mut xb_z1_col, &zb_z0_col, &xb_z0_col);
-                phase = (phase + 1) % 4;
-                self.set_col(
-                    z1_col_index,
-                    &zb_z1_col,
-                    &xb_z1_col,
-                    s_z1_col ^ s_z0_col ^ s_x0_col ^ (phase == 2),
-                );
-                // x1 <- x1*y0 = i x1*x0*z0
-                let mut phase = string_mul(&mut zb_x1_col, &mut xb_x1_col, &zb_x0_col, &xb_x0_col);
-                phase += string_mul(&mut zb_x1_col, &mut xb_x1_col, &zb_z0_col, &xb_z0_col);
-                phase = (phase + 1) % 4;
-                self.set_col(
-                    x1_col_index,
-                    &zb_x1_col,
-                    &xb_x1_col,
-                    s_x1_col ^ s_z0_col ^ s_x0_col ^ (phase == 2),
-                );
+                // convert sign to phase for readability
+                let z0_phase = (s_z0_col as u8) << 1;
+                let x0_phase = (s_x0_col as u8) << 1;
+                let z1_phase = (s_z1_col as u8) << 1;
+                let x1_phase = (s_x1_col as u8) << 1;
+                // y1 = ix1*z1
+                let mut zb_y1_col = zb_x1_col;
+                let mut xb_y1_col = xb_x1_col;
+                let y1_phase = string_mul(&mut zb_y1_col, &mut xb_y1_col, &zb_z1_col, &xb_z1_col)
+                    + 1
+                    + z1_phase
+                    + x1_phase;
+                // z0 <- z0*y1
+                let z0_phase_new =
+                    (string_mul(&mut zb_z0_col, &mut xb_z0_col, &zb_y1_col, &xb_y1_col)
+                        + z0_phase
+                        + y1_phase)
+                        % 4;
+                self.set_col(z0_col_index, &zb_z0_col, &xb_z0_col, z0_phase_new == 2);
+                // x0 <- x0*y1
+                let x0_phase_new =
+                    (string_mul(&mut zb_x0_col, &mut xb_x0_col, &zb_y1_col, &xb_y1_col)
+                        + x0_phase
+                        + y1_phase)
+                        % 4;
+                self.set_col(x0_col_index, &zb_x0_col, &xb_x0_col, x0_phase_new == 2);
+                // y0 = ix0*z0 = i * x0*y1 * z0*y1
+                let mut zb_y0_col = zb_x0_col;
+                let mut xb_y0_col = xb_x0_col;
+                let y0_phase = string_mul(&mut zb_y0_col, &mut xb_y0_col, &zb_z0_col, &xb_z0_col)
+                    + z0_phase_new
+                    + x0_phase_new
+                    + 1;
+                // z1 <- z1*y0
+                let z1_phase_new =
+                    (string_mul(&mut zb_z1_col, &mut xb_z1_col, &zb_y0_col, &xb_y0_col)
+                        + z1_phase
+                        + y0_phase)
+                        % 4;
+                self.set_col(z1_col_index, &zb_z1_col, &xb_z1_col, z1_phase_new == 2);
+                // x1 <- x1*y0 = (-iy1*z1)*y0 = -iy1* (z1*y0)
+                let mut zb_x1_col = zb_y1_col;
+                let mut xb_x1_col = xb_y1_col;
+                let x1_new_phase =
+                    (string_mul(&mut zb_x1_col, &mut xb_x1_col, &zb_z1_col, &xb_z1_col)
+                        + y1_phase
+                        + z1_phase_new
+                        + 3)
+                        % 4;
+                self.set_col(x1_col_index, &zb_x1_col, &xb_x1_col, x1_new_phase == 2);
             }
             (Pauli::Y, Pauli::Z) => {
                 // x1 <- x1*y0 = i x1*x0*z0

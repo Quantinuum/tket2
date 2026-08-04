@@ -541,6 +541,39 @@ mod tests {
     }
 
     #[rstest]
+    #[case(GateType::XX)]
+    #[case(GateType::XY)]
+    #[case(GateType::XZ)]
+    #[case(GateType::YX)]
+    #[case(GateType::YY)]
+    #[case(GateType::YZ)]
+    #[case(GateType::ZX)]
+    #[case(GateType::ZY)]
+    #[case(GateType::ZZ)]
+    fn test_tableau_tqe_precompose_correctness_on_random_tableau(#[case] gate_type: GateType) {
+        let op = Op::Gate {
+            data: GateData::new(gate_type.clone(), vec![0, 1]),
+        };
+        for seed in 0..10 {
+            let mut tab = Tableau::random(2, seed, 10, 10);
+            let random_tab_op = Op::Tableau {
+                data: tab.clone().into(),
+            };
+            let expected_pg = PauliGraph::new(2).with_ops(vec![op.clone(), random_tab_op]);
+
+            tab.precompose_op(&op);
+            let tab_pg = PauliGraph::new(2).with_ops(vec![Op::Tableau { data: tab.into() }]);
+
+            assert!(
+                compare_unitaries_via_tk(&expected_pg, &tab_pg),
+                "Precomposition onto a random tableau failed for gate type: {:?}, seed: {}",
+                gate_type,
+                seed
+            );
+        }
+    }
+
+    #[rstest]
     #[case(Op::Gate {
         data: GateData::new(GateType::RX, vec![0]).with_params(vec![0.5]),
     })]
