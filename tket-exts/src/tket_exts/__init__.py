@@ -1,6 +1,8 @@
 """HUGR extension definitions for tket circuits."""
 
-from hugr.ext import ExtensionRegistry
+from collections.abc import Callable
+
+from hugr.ext import Extension, ExtensionRegistry
 
 from tket_exts import tket
 from tket_exts.tket.argument import ArgumentExtension
@@ -56,7 +58,6 @@ rotation: RotationExtension = tket.rotation.RotationExtension()
 futures: FuturesExtension = tket.futures.FuturesExtension()
 qsystem_helios: QSystemHeliosExtension = tket.qsystem.QSystemHeliosExtension()
 qsystem_sol: QSystemSolExtension = tket.qsystem.QSystemSolExtension()
-qsystem: QSystemExtension = tket.qsystem.QSystemExtension()
 qsystem_random: QSystemRandomExtension = tket.qsystem.QSystemRandomExtension()
 qsystem_utils: QSystemUtilsExtension = tket.qsystem.QSystemUtilsExtension()
 quantum: QuantumExtension = tket.quantum.QuantumExtension()
@@ -68,6 +69,9 @@ globals: GlobalsExtension = tket.globals.GlobalsExtension()
 measurement: MeasurementExtension = tket.measurement.MeasurementExtension()
 argument: ArgumentExtension = tket.argument.ArgumentExtension()
 
+# TODO (deprecated): Remove the deprecated tket.qsystem extension in the next breaking release.
+qsystem: QSystemExtension = tket.qsystem.QSystemExtension()
+
 
 def tket_registry() -> ExtensionRegistry:
     """Returns an ExtensionRegistry containing all the tket extensions.
@@ -77,7 +81,7 @@ def tket_registry() -> ExtensionRegistry:
     Returns:
         An ExtensionRegistry containing all the tket extensions.
     """
-    tket_exts = [
+    tket_exts: list[Callable[[], Extension]] = [
         tket.debug.DebugExtension(),
         tket.gpu.GpuExtension(),
         tket.guppy.GuppyExtension(),
@@ -86,7 +90,7 @@ def tket_registry() -> ExtensionRegistry:
         tket.globals.GlobalsExtension(),
         tket.qsystem.QSystemHeliosExtension(),
         tket.qsystem.QSystemSolExtension(),
-        tket.qsystem.QSystemExtension(),
+        qsystem._extension,
         tket.qsystem.QSystemRandomExtension(),
         tket.qsystem.QSystemUtilsExtension(),
         tket.quantum.QuantumExtension(),
