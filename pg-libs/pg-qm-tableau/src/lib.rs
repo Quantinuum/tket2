@@ -1030,17 +1030,6 @@ impl Tableau {
                 _ => Pauli::Z,
             };
             tableau.postcompose_tqe(g0, g1, i, i + 1);
-            let g0 = match rng.random_range(0..3) {
-                0 => Pauli::X,
-                1 => Pauli::Y,
-                _ => Pauli::Z,
-            };
-            let g1 = match rng.random_range(0..3) {
-                0 => Pauli::X,
-                1 => Pauli::Y,
-                _ => Pauli::Z,
-            };
-            tableau.postcompose_tqe(g0, g1, i, i + 1);
         }
         for _ in 0..n_tqe {
             let q0 = rng.random_range(0..n_qubits);
