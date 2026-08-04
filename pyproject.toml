@@ -19,6 +19,7 @@ dev = [
     "pyyaml >=6.0.2",
     # used for tests in tket-py
     "numpy>=2.2.0",
+    "matplotlib>=3.10.9",
 ]
 conan = ["conan>=2.31.1,<3"]
 

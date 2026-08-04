@@ -184,6 +184,46 @@ impl RuleMatcher {
         target.hugr.set_entrypoint(original_entrypoint);
         result
     }
+
+    #[pyo3(signature = (target, scope = None))]
+    pub fn new_apply_exhaustive(
+        &self,
+        target: &mut CompilationState,
+        scope: Option<PyPassScope>,
+    ) -> anyhow::Result<usize> {
+        let scope = scope.unwrap_or_default().scope;
+        let original_entrypoint = target.hugr.entrypoint();
+        let regions: Vec<_> = scope.regions(&target.hugr).collect();
+
+        let result = (|| {
+            let mut rewrite_count = 0;
+            for region in regions {
+                target.hugr.set_entrypoint(region);
+                match Circuit::try_new(&target.hugr) {
+                    Ok(_) => {}
+                    Err(CircuitError::InvalidParentOp { .. }) => continue,
+                    Err(error) => return Err(anyhow::Error::msg(error.to_string())),
+                }
+
+                // We assume that applying a rewrite does not introduce new matches for the same rule
+                let rewrites = self.find_matches(target)?;
+                for rewrite in rewrites {
+                    target
+                        .apply_rewrite(rewrite)
+                        .context("Could not apply exhaustive rule rewrite")?;
+                    rewrite_count += 1;
+                }
+                assert!(
+                    self.find_match(target)?.is_none(),
+                    "Applying rewrites should not introduce new matches for the same rule"
+                );
+            }
+            Ok(rewrite_count)
+        })();
+
+        target.hugr.set_entrypoint(original_entrypoint);
+        result
+    }
 }
 
 impl RuleMatcher {
