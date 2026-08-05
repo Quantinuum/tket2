@@ -40,7 +40,7 @@ impl fmt::Display for Pauli {
 /// - Conditional bits/values lengths match.
 /// - `Op::BlackBox` operations have all argument qubits within the valid range.
 /// - `GateType::BlackBox` gates have no conditions, and they must have data.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(try_from = "PauliGraphRaw")]
 pub struct PauliGraph {
     n_qubits: usize,
