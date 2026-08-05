@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.1](https://github.com/Quantinuum/tket2/compare/tket-exts-v0.14.0...tket-exts-v0.14.1) (2026-08-04)
+
+
+### Features
+
+* Mute internal deprecation warning in tket-exts ([#1907](https://github.com/Quantinuum/tket2/issues/1907)) ([a60580a](https://github.com/Quantinuum/tket2/commit/a60580afb3b9e0ccd611c6fb87367836b7fb1509))
+
 ## [0.14.0](https://github.com/Quantinuum/tket2/compare/tket-exts-v0.13.1...tket-exts-v0.14.0) (2026-06-29)
 
 

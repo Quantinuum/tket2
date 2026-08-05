@@ -1,14 +1,16 @@
 from __future__ import annotations
-from typing import Iterable, TYPE_CHECKING
 
-from hugr import Hugr, tys, ops
-from hugr.package import Package
-from hugr.ext import Extension
-from hugr.ops import ComWire, Command
-from hugr.std.float import FLOAT_T
+from collections.abc import Iterable
+from typing import TYPE_CHECKING
+
+from hugr import Hugr, ops, tys
 from hugr.build.function import Module
 from hugr.build.tracked_dfg import TrackedDfg
 from hugr.envelope import EnvelopeConfig
+from hugr.ext import Extension
+from hugr.ops import Command, ComWire
+from hugr.package import Package
+from hugr.std.float import FLOAT_T
 
 if TYPE_CHECKING:
     from tket._state import CompilationState
@@ -108,8 +110,9 @@ def from_coms(*args: Command) -> CompilationState:
 
 
 def load_custom(serialized: bytes) -> ops.Custom:
-    import hugr._serialization.ops as sops
     import json
+
+    import hugr._serialization.ops as sops
 
     # TODO: We should return an "ExtOp" instead
     ext = json.loads(serialized)

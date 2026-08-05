@@ -1,6 +1,21 @@
 # Changelog
 
 
+## [0.27.2](https://github.com/Quantinuum/tket2/compare/tket-qsystem-v0.27.1...tket-qsystem-v0.27.2) - 2026-07-31
+
+### Bug Fixes
+
+- Swap angles in PhasedXX decomposition ([#1888](https://github.com/Quantinuum/tket2/pull/1888))
+
+### New Features
+
+- Frontend support for Helios platform configuration ([#1848](https://github.com/Quantinuum/tket2/pull/1848))
+- Adopt new measurement function for Sol ([#1875](https://github.com/Quantinuum/tket2/pull/1875))
+
+### Refactor
+
+- rename `NormalizeGuppy` to `Normalize` ([#1824](https://github.com/Quantinuum/tket2/pull/1824))
+
 ## [0.27.1](https://github.com/Quantinuum/tket2/compare/tket-qsystem-v0.27.0...tket-qsystem-v0.27.1) - 2026-07-09
 
 ### Bug Fixes

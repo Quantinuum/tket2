@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.15.6](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.5...tket-py-v0.15.6) (2026-08-03)
+
+
+### Bug Fixes
+
+* Panic when applying a `PytketHugrPass` on complex regions ([#1894](https://github.com/Quantinuum/tket2/issues/1894)) ([5661a98](https://github.com/Quantinuum/tket2/commit/5661a983989fbdc7a6dfb2a6f8632ba7da0b9c45))
+
+## [0.15.5](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.4...tket-py-v0.15.5) (2026-07-31)
+
+
+### Features
+
+* Frontend support for Helios platform configuration ([#1848](https://github.com/Quantinuum/tket2/issues/1848)) ([ce8df0b](https://github.com/Quantinuum/tket2/commit/ce8df0bf133e1c8234f70b44ee5c7286cde14945))
+
+
+### Documentation
+
+* Show documentation for `tket.extensions` module ([#1872](https://github.com/Quantinuum/tket2/issues/1872)) ([64d0c96](https://github.com/Quantinuum/tket2/commit/64d0c9634a108fdc2ee344ea2429e17f503c81f1))
+
 ## [0.15.4](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.3...tket-py-v0.15.4) (2026-07-16)
 
 

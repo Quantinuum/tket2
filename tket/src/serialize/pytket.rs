@@ -9,7 +9,7 @@ pub mod extension;
 pub mod opaque;
 mod options;
 
-pub use circuit::EncodedCircuit;
+pub use circuit::{EncodedCircuit, EncodedCircuitId};
 pub use config::{
     PytketDecoderConfig, PytketEncoderConfig, TypeTranslatorSet, add_default_decoders,
     default_decoder_config, default_encoder_config,
@@ -140,7 +140,7 @@ impl TKETDecode for SerialCircuit {
         options: DecodeOptions,
     ) -> Result<Node, Self::DecodeError> {
         let mut decoder = PytketDecoderContext::new(self, hugr, target, options, None)?;
-        decoder.run_decoder(&self.commands, None)?;
+        decoder.run_decoder(&self.commands)?;
         Ok(decoder.finish(None)?.node())
     }
 
@@ -160,9 +160,14 @@ impl TKETDecode for SerialCircuit {
 
         let mut encoded = EncodedCircuit::new_standalone(hugr, options)?;
 
-        let serial_circ = encoded
-            .get_circuit_mut(hugr.entrypoint())
+        let mut circuits = encoded.get_circuits_mut(hugr.entrypoint());
+        let (_, serial_circ) = circuits
+            .next()
             .expect("Hugr entrypoint must be a dataflow region");
+        debug_assert!(
+            circuits.next().is_none(),
+            "standalone encoding must produce one circuit"
+        );
         Ok(std::mem::take(serial_circ))
     }
 }

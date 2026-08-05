@@ -1,11 +1,11 @@
+from pathlib import Path
 from typing import Literal
 
-from pathlib import Path
+from hugr.passes.scope import GlobalScope, PassScope
 
+from ..passes import inline_funcs
 from .optimiser import BadgerOptimiser
 from .state import CompilationState
-from ..passes import inline_funcs
-from hugr.passes.scope import PassScope, GlobalScope
 
 class CircuitChunks:
     def reassemble(self) -> CompilationState:
@@ -20,6 +20,7 @@ class CircuitChunks:
 class PullForwardError(Exception):
     """Error from a `PullForward` operation."""
 
+# ruff: ignore[B008]
 def normalize_guppy(
     circ: CompilationState,
     *,
@@ -50,6 +51,7 @@ def normalize_guppy(
     - squash_borrows: Whether to squash return-borrow pairs on BorrowArrays.
     """
 
+# ruff: ignore[B008]
 def inline_functions(
     circ: CompilationState,
     *,

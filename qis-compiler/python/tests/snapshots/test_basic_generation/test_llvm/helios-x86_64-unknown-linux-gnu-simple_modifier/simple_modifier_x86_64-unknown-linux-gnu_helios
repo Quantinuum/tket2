@@ -56,15 +56,15 @@ __hugr__.__tk2_helios_qalloc.39.exit38:           ; preds = %__barray_check_none
   %7 = tail call ptr @heap_alloc(i64 8)
   store i64 0, ptr %7, align 1
   %8 = load i64, ptr %6, align 4
-  %lazy_measure = tail call i64 @___lazy_measure(i64 %8), !dbg !11
+  %___lazy_measure = tail call i64 @___lazy_measure(i64 %8), !dbg !11
   tail call void @___qfree(i64 %8), !dbg !11
-  %read_bool = tail call i1 @___read_future_bool(i64 %lazy_measure), !dbg !11
-  tail call void @___dec_future_refcount(i64 %lazy_measure), !dbg !11
+  %read_bool = tail call i1 @___read_future_bool(i64 %___lazy_measure), !dbg !11
+  tail call void @___dec_future_refcount(i64 %___lazy_measure), !dbg !11
   tail call void @print_bool(ptr nonnull @res_c0.7C14CD6E.0, i64 12, i1 %read_bool), !dbg !12
-  %lazy_measure19 = tail call i64 @___lazy_measure(i64 %qalloc.i35), !dbg !13
+  %___lazy_measure19 = tail call i64 @___lazy_measure(i64 %qalloc.i35), !dbg !13
   tail call void @___qfree(i64 %qalloc.i35), !dbg !13
-  %read_bool21 = tail call i1 @___read_future_bool(i64 %lazy_measure19), !dbg !13
-  tail call void @___dec_future_refcount(i64 %lazy_measure19), !dbg !13
+  %read_bool21 = tail call i1 @___read_future_bool(i64 %___lazy_measure19), !dbg !13
+  tail call void @___dec_future_refcount(i64 %___lazy_measure19), !dbg !13
   tail call void @print_bool(ptr nonnull @res_c1.1F7A6571.0, i64 12, i1 %read_bool21), !dbg !14
   ret void
 }

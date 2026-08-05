@@ -36,7 +36,7 @@ use crate::extension::global_phase::GlobalPhase;
 use crate::extension::rotation::rotation_type;
 use crate::metadata;
 use crate::serialize::pytket::circuit::{
-    AdditionalNodesAndWires, EncodedCircuitInfo, StraightThroughWire,
+    EncodedCircuitBoundary, EncodedCircuitInfo, StraightThroughWire,
 };
 use crate::serialize::pytket::config::PytketDecoderConfig;
 use crate::serialize::pytket::decoder::wires::WireTracker;
@@ -583,49 +583,18 @@ impl<'h> PytketDecoderContext<'h> {
     /// # Arguments
     ///
     /// - `commands`: The list of pytket commands to decode.
-    /// - `extra_subgraph`: An additional subgraph of the original Hugr that was
-    ///   not encoded as a pytket command, and must be decoded independently.
-    /// - `straight_through_wires`: A list of wires that directly connected the
-    ///   input node to the output node in the original region, and were not
-    ///   encoded in the pytket circuit or unsupported graphs.
-    ///   (They cannot be encoded in `extra_subgraph`).
     pub(super) fn run_decoder(
         &mut self,
         commands: &[circuit_json::Command],
-        extra_nodes_and_wires: Option<&AdditionalNodesAndWires>,
     ) -> Result<(), PytketDecodeError> {
-        // Add additional subgraphs and wires not encoded in commands.
-        let [input_node, output_node] = self.builder.io();
-        if let Some(extras) = extra_nodes_and_wires {
-            self.reserve_additional_subgraph_parameters(extras);
+        self.run_commands(commands)
+    }
 
-            for extra_subgraph in &extras.additional_subgraphs {
-                let params = extra_subgraph
-                    .params
-                    .iter()
-                    .map(|p| self.load_half_turns(p))
-                    .collect_vec();
-
-                self.insert_external_subgraph(extra_subgraph.id, &[], &[], &params)
-                    .map_err(|e| e.hugr_op("External subgraph"))?;
-            }
-
-            // Add wires from the input node to the output node that didn't get encoded in commands.
-            for StraightThroughWire {
-                input_source,
-                output_target,
-            } in &extras.straight_through_wires
-            {
-                self.builder.hugr_mut().connect(
-                    input_node,
-                    *input_source,
-                    output_node,
-                    *output_target,
-                );
-            }
-        }
-
-        // Decode the pytket commands.
+    /// Decode a contiguous list of pytket commands.
+    pub(super) fn run_commands(
+        &mut self,
+        commands: &[circuit_json::Command],
+    ) -> Result<(), PytketDecodeError> {
         let config = self.config().clone();
         for com in commands {
             let op_type = com.op.op_type;
@@ -636,21 +605,21 @@ impl<'h> PytketDecoderContext<'h> {
         Ok(())
     }
 
-    /// Reserve parameter variables used before pytket commands are decoded.
+    /// Reserve every parameter referenced by an external region boundary.
     ///
-    /// Additional subgraphs are restored first, so their expressions may refer
-    /// to parameters produced by a later opaque barrier. Genuine region inputs
-    /// are already registered and are left unchanged by the wire tracker.
-    fn reserve_additional_subgraph_parameters(&mut self, extras: &AdditionalNodesAndWires) {
+    /// Boundaries may use parameters produced later in the region, so all
+    /// names are reserved before any subgraph is transplanted.
+    pub(super) fn reserve_boundary_parameters(&mut self, boundaries: &[EncodedCircuitBoundary]) {
         let mut params = IndexSet::new();
-        extras
-            .additional_subgraphs
+        boundaries
             .iter()
+            .flat_map(|boundary| &boundary.external_subgraphs)
             .flat_map(|subgraph| &subgraph.params)
             .map(|param| PytketParam::parse(param))
             .for_each(|param| {
                 param.visit_input_variables(&mut |name| {
-                    // `pi` is loaded as a constant rather than routed as a parameter.
+                    // TODO: Avoid hardcoding this here by treating `pi` as a constant name in the parser.
+                    // See https://github.com/Quantinuum/tket2/issues/1900
                     if name != "pi" {
                         params.insert(name.to_owned());
                     }
@@ -661,6 +630,64 @@ impl<'h> PytketDecoderContext<'h> {
             self.wire_tracker
                 .reserve_forward_parameter(param, &mut self.builder);
         }
+    }
+
+    /// Restore the unsupported subgraphs assigned to one circuit boundary.
+    pub(super) fn insert_boundary(
+        &mut self,
+        boundary: &EncodedCircuitBoundary,
+    ) -> Result<(), PytketDecodeError> {
+        for extra_subgraph in &boundary.external_subgraphs {
+            let params = extra_subgraph
+                .params
+                .iter()
+                .map(|p| self.load_half_turns(p))
+                .collect_vec();
+
+            self.insert_external_subgraph(extra_subgraph.id, &[], &[], &params)
+                .map_err(|e| e.hugr_op("External subgraph"))?;
+        }
+        Ok(())
+    }
+
+    /// Restore wires that directly bypassed the encoded contents of a region.
+    pub(super) fn connect_straight_through_wires(
+        &mut self,
+        straight_through_wires: &[StraightThroughWire],
+    ) {
+        let [input_node, output_node] = self.builder.io();
+        for &StraightThroughWire {
+            input_source,
+            output_target,
+        } in straight_through_wires
+        {
+            self.builder
+                .hugr_mut()
+                .connect(input_node, input_source, output_node, output_target);
+        }
+    }
+
+    /// Decode a segment's circuit-level global phase.
+    pub(super) fn add_serial_circuit_phase(
+        &mut self,
+        serial_circuit: &SerialCircuit,
+    ) -> Result<(), PytketDecodeError> {
+        if !serial_circuit.phase.is_empty() && !PytketParam::parse(&serial_circuit.phase).is_zero()
+        {
+            let phase = self.load_half_turns(&serial_circuit.phase);
+            self.add_global_phase(phase)?;
+        }
+        Ok(())
+    }
+
+    /// Apply a segment's implicit qubit permutation before decoding the next
+    /// segment.
+    pub(super) fn apply_implicit_permutation(
+        &mut self,
+        serial_circuit: &SerialCircuit,
+    ) -> Result<(), PytketDecodeError> {
+        self.wire_tracker
+            .apply_implicit_permutation(&serial_circuit.implicit_permutation)
     }
 
     /// Add a tket1 [`circuit_json::Command`] from the serial circuit to the

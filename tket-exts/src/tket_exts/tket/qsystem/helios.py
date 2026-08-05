@@ -1,11 +1,11 @@
 """QSystem Helios platform extension operations."""
 
 import functools
-from typing import List
 
 from hugr.ext import Extension, OpDef, TypeDef
 from hugr.ops import ExtOp
 from hugr.tys import BoundedNatArg
+
 from .._util import TketExtension, load_extension
 
 __all__ = ["QSystemHeliosExtension"]
@@ -18,10 +18,10 @@ class QSystemHeliosExtension(TketExtension):
     def __call__(self) -> Extension:
         return load_extension("tket.qsystem.helios")
 
-    def TYPES(self) -> List[TypeDef]:
+    def TYPES(self) -> list[TypeDef]:
         return []
 
-    def OPS(self) -> List[OpDef]:
+    def OPS(self) -> list[OpDef]:
         return [
             self.lazy_measure.op_def(),
             self.lazy_measure_leaked.op_def(),

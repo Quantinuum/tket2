@@ -1,6 +1,6 @@
 //! Tracking of subgraphs of unsupported nodes in the hugr.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 
 use hugr::HugrView;
 use hugr::core::HugrNode;
@@ -22,7 +22,7 @@ pub struct UnsupportedTracker<N> {
     /// Stores the index of each node in [`Self::components`].
     ///
     /// Once a node has been extracted, it is removed from this map.
-    nodes: HashMap<N, UnsupportedNode>,
+    nodes: BTreeMap<N, UnsupportedNode>,
     /// A UnionFind structure for tracking connected components of `Self::nodes`.
     components: UnionFind<usize>,
 }
@@ -43,7 +43,7 @@ impl<N: HugrNode> UnsupportedTracker<N> {
     /// Create a new [`UnsupportedTracker`].
     pub fn new(_hugr: &impl HugrView<Node = N>) -> Self {
         Self {
-            nodes: HashMap::new(),
+            nodes: BTreeMap::new(),
             components: UnionFind::new_empty(),
         }
     }
@@ -94,7 +94,9 @@ impl<N: HugrNode> UnsupportedTracker<N> {
 
         nodes.extend(
             self.nodes
-                .extract_if(|_, data| self.components.find_mut(data.component) == representative)
+                .extract_if(.., |_, data| {
+                    self.components.find_mut(data.component) == representative
+                })
                 .map(|(n, _)| n),
         );
 
@@ -115,7 +117,7 @@ impl<N: HugrNode> UnsupportedTracker<N> {
 impl<N> Default for UnsupportedTracker<N> {
     fn default() -> Self {
         Self {
-            nodes: HashMap::new(),
+            nodes: BTreeMap::new(),
             components: UnionFind::new_empty(),
         }
     }

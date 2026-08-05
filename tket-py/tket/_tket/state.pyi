@@ -1,8 +1,10 @@
-from typing import Any, Callable, Literal
+from collections.abc import Callable
+from typing import Any, Literal
+
+from hugr.envelope import EnvelopeConfig
 
 from tket._tket.ops import TketOp
 from tket.util import PytketCircuitProto as Tk1Circuit
-from hugr.envelope import EnvelopeConfig
 
 try:
     from pytket.circuit import Circuit as Tk1Circuit

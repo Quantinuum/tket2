@@ -29,17 +29,18 @@ use crate::serialize::pytket::PytketEncodeError;
 use crate::serialize::pytket::decoder::PytketParam;
 use crate::serialize::pytket::extension::{CoreDecoder, OpaqueTk1Op, PreludeEmitter};
 use crate::serialize::pytket::{
-    DecodeInsertionTarget, DecodeOptions, EncodeOptions, EncodedCircuit, PytketDecodeError,
-    PytketDecodeErrorInner, PytketDecoderConfig, PytketEncodeOpError, PytketEncoderConfig,
-    default_decoder_config, default_encoder_config,
+    DecodeInsertionTarget, DecodeOptions, EncodeOptions, EncodedCircuit, EncodedCircuitId,
+    PytketDecodeError, PytketDecodeErrorInner, PytketDecoderConfig, PytketEncodeOpError,
+    PytketEncoderConfig, default_decoder_config, default_encoder_config,
 };
 use hugr::hugr::hugrmut::HugrMut;
-use hugr::ops::handle::FuncID;
+use hugr::ops::handle::{FuncID, NodeHandle};
 use hugr::ops::{OpParent, OpType, Tag, Value};
 use hugr::std_extensions::arithmetic::float_ops::FloatOps;
 use hugr::types::{Signature, SumType, Type};
 use hugr::{Hugr, HugrView};
 use itertools::Itertools;
+use rayon::iter::ParallelIterator;
 use rstest::{fixture, rstest};
 use tket_json_rs::circuit_json::{self, SerialCircuit};
 use tket_json_rs::optype;
@@ -1093,6 +1094,44 @@ fn circ_forward_opaque_parameter() -> Hugr {
     h.finish_hugr_with_outputs([q, rotation]).unwrap()
 }
 
+/// A register-free opaque subgraph ordered between two supported command runs.
+///
+/// Regression test for <https://github.com/Quantinuum/tket2/issues/1856>.
+#[fixture]
+fn circ_mid_circuit_external_subgraph() -> Hugr {
+    let opaque_type = Type::from(option_type([bool_t()]));
+    let signature = Signature::new(vec![qb_t(), qb_t()], vec![qb_t(), qb_t()]);
+    let mut h = FunctionBuilder::new("mid_circuit_external_subgraph", signature).unwrap();
+    let [q0, q1] = h.input_wires_arr();
+
+    let producer = h
+        .module_root_builder()
+        .declare(
+            "opaque_producer",
+            Signature::new(vec![qb_t()], vec![opaque_type.clone(), qb_t()]).into(),
+        )
+        .unwrap();
+    let consumer = h
+        .module_root_builder()
+        .declare(
+            "opaque_consumer",
+            Signature::new(vec![opaque_type], vec![rotation_type()]).into(),
+        )
+        .unwrap();
+
+    let producer_call = h.call(&producer, &[], [q1]).unwrap();
+    let [opaque, q1] = producer_call.outputs_arr();
+    let [q1] = h.add_dataflow_op(TketOp::H, [q1]).unwrap().outputs_arr();
+    let consumer_call = h.call(&consumer, &[], [opaque]).unwrap();
+    let [rotation] = consumer_call.outputs_arr();
+    let [q1] = h
+        .add_dataflow_op(TketOp::Rz, [q1, rotation])
+        .unwrap()
+        .outputs_arr();
+
+    h.finish_hugr_with_outputs([q0, q1]).unwrap()
+}
+
 // A circuit that discards the first qubit input and only outputs the second one.
 #[fixture]
 fn circ_discard_first_qubit() -> Hugr {
@@ -1129,6 +1168,79 @@ fn circ_measure_and_read() -> Hugr {
         .outputs_arr();
 
     h.finish_hugr_with_outputs([bit]).unwrap()
+}
+
+/// A measured bit used as both a CFG predicate and an input to an unsupported
+/// operation.
+///
+/// This is the minimal HUGR structure produced by the Guppy Getting Started
+/// example that fails a pytket encoding roundtrip.
+#[fixture]
+fn circ_cfg_read_fanout() -> Hugr {
+    let mut function =
+        FunctionBuilder::new("cfg_read_fanout", Signature::new(vec![], vec![qb_t()])).unwrap();
+    let consume_bool = function
+        .module_root_builder()
+        .declare(
+            "consume_bool",
+            Signature::new(vec![bool_t()], vec![]).into(),
+        )
+        .unwrap();
+
+    let cfg = {
+        let mut cfg = function.cfg_builder([], vec![qb_t()].into()).unwrap();
+        let entry = {
+            let mut block = cfg
+                .entry_builder(vec![vec![].into(), vec![].into()], vec![qb_t()].into())
+                .unwrap();
+            let [q1] = block
+                .add_dataflow_op(TketOp::QAlloc, [])
+                .unwrap()
+                .outputs_arr();
+            let [q2] = block
+                .add_dataflow_op(TketOp::QAlloc, [])
+                .unwrap()
+                .outputs_arr();
+            let [q1] = block
+                .add_dataflow_op(TketOp::H, [q1])
+                .unwrap()
+                .outputs_arr();
+            let measure = block.add_dataflow_op(TketOp::MeasureFree, [q1]).unwrap();
+            let [measurement] = measure.outputs_arr();
+            let [bit] = block
+                .add_dataflow_op(MeasurementOp::Read, [measurement])
+                .unwrap()
+                .outputs_arr();
+            let result = block.call(&consume_bool, &[], [bit]).unwrap();
+            block.add_other_wire(measure.node(), result.node());
+            block.add_other_wire(result.node(), block.output().node());
+
+            block.finish_with_outputs(bit, [q2]).unwrap()
+        };
+
+        let branches = [false, true].map(|apply_x| {
+            let mut block = cfg
+                .simple_block_builder(Signature::new_endo([qb_t()]), 1)
+                .unwrap();
+            let [q] = block.input_wires_arr();
+            let q = if apply_x {
+                block.add_dataflow_op(TketOp::X, [q]).unwrap().out_wire(0)
+            } else {
+                q
+            };
+            let branch = block.add_load_value(Value::unary_unit_sum());
+            block.finish_with_outputs(branch, [q]).unwrap()
+        });
+
+        let exit = cfg.exit_block();
+        for (port, branch) in branches.iter().enumerate() {
+            cfg.branch(&entry, port, branch).unwrap();
+            cfg.branch(branch, 0, &exit).unwrap();
+        }
+        cfg.finish_sub_container().unwrap()
+    };
+
+    function.finish_hugr_with_outputs(cfg.outputs()).unwrap()
 }
 
 /// Check that all circuit ops have been translated to a native gate.
@@ -1352,7 +1464,7 @@ fn circuit_standalone_roundtrip(#[case] hugr: Hugr, #[case] config: CircuitRound
     let encoded = EncodedCircuit::new_standalone(&hugr, encode_options.clone())
         .unwrap_or_else(|e| panic!("{e}"));
 
-    assert!(encoded.contains_circuit(hugr.entrypoint()));
+    assert!(encoded.contains_region(hugr.entrypoint()));
     assert_eq!(encoded.len(), 1);
 
     // Re-encode the EncodedCircuit
@@ -1368,7 +1480,11 @@ fn circuit_standalone_roundtrip(#[case] hugr: Hugr, #[case] config: CircuitRound
         .unwrap_or_else(|e| panic!("{e}"));
 
     // Extract the head pytket circuit, and re-encode it on its own.
-    let ser: &SerialCircuit = &encoded[hugr.entrypoint()];
+    let mut circuits = encoded.get_circuits(hugr.entrypoint());
+    let (_, ser) = circuits
+        .next()
+        .expect("standalone encoding has one circuit");
+    assert!(circuits.next().is_none());
     let deser: Hugr = ser.decode(decode_options).unwrap_or_else(|e| panic!("{e}"));
 
     deser.validate().unwrap_or_else(|e| panic!("{e}"));
@@ -1474,10 +1590,16 @@ fn fail_on_modified_hugr(circ_tk1_ops: Hugr) {
     1,
     CircuitRoundtripTestConfig::Default
 )]
+#[case::mid_circuit_external_subgraph(
+    circ_mid_circuit_external_subgraph(),
+    2,
+    CircuitRoundtripTestConfig::Default
+)]
 #[case::discard_first_qubit(circ_discard_first_qubit(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::measure_and_read(circ_measure_and_read(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::meas_ancilla(circ_measure_ancilla(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::preset_bits(circ_preset_bits(), 1, CircuitRoundtripTestConfig::Default)]
+#[case::read_fanout(circ_cfg_read_fanout(), 2, CircuitRoundtripTestConfig::Default)]
 
 fn encoded_circuit_roundtrip(
     #[case] hugr: Hugr,
@@ -1519,6 +1641,164 @@ fn encoded_circuit_roundtrip(
         "Output signature mismatch\n  Expected: {}\n  Actual:   {}",
         circ_signature, deser_sig
     );
+}
+
+/// Segment-local implicit permutations must be visible to subsequent
+/// segments, while the final permutation still determines region outputs.
+#[rstest]
+fn segmented_circuit_tracks_implicit_permutations() {
+    let hugr = circ_mid_circuit_external_subgraph();
+    let mut encoded =
+        EncodedCircuit::new(&hugr, EncodeOptions::new()).expect("fixture should encode");
+    let region = hugr.entrypoint();
+    assert!(encoded.contains_region(region));
+    assert!(encoded.get_circuits(hugr.module_root()).next().is_none());
+
+    let mut segments = encoded.get_circuits_mut(region);
+    let (first_id, first) = segments.next().expect("first segment");
+    let (second_id, second) = segments.next().expect("second segment");
+    assert_eq!(first_id.region, second_id.region);
+    assert_eq!((first_id.segment, second_id.segment), (0, 1));
+    assert!(segments.next().is_none());
+
+    let q0 = first.qubits[0].clone();
+    let q1 = first.qubits[1].clone();
+    let swap = vec![
+        circuit_json::ImplicitPermutation(q0.clone(), q1.clone()),
+        circuit_json::ImplicitPermutation(q1.clone(), q0.clone()),
+    ];
+    first.implicit_permutation = swap.clone();
+
+    let rz = second
+        .commands
+        .iter_mut()
+        .find(|command| command.op.op_type == tket_json_rs::OpType::Rz)
+        .expect("second segment contains Rz");
+    assert_eq!(rz.args, vec![q1.id.clone()]);
+    rz.args = vec![q0.id.clone()];
+    second.implicit_permutation = swap;
+    drop(segments);
+
+    let mut decoded = hugr.clone();
+    encoded
+        .reassemble_inplace(&mut decoded, None)
+        .expect("segmented circuit should decode");
+    decoded.validate().expect("decoded HUGR should be valid");
+
+    let region = decoded.entrypoint();
+    let output = decoded.get_io(region).expect("dataflow region IO")[1];
+    let (rz, _) = decoded
+        .single_linked_output(output, 1)
+        .expect("second qubit output");
+    assert_eq!(decoded.get_optype(rz), &OpType::from(TketOp::Rz));
+    let (h, _) = decoded.single_linked_output(rz, 0).expect("Rz qubit input");
+    assert_eq!(decoded.get_optype(h), &OpType::from(TketOp::H));
+}
+
+/// Segment accessors identify and mutate each circuit within a region.
+#[rstest]
+fn encoded_circuit_segment_accessors() {
+    let hugr = circ_mid_circuit_external_subgraph();
+    let region = hugr.entrypoint();
+    let mut encoded =
+        EncodedCircuit::new(&hugr, EncodeOptions::new()).expect("fixture should encode");
+
+    let segment_ids = encoded.get_circuits(region).map(|(id, _)| id).collect_vec();
+    assert_eq!(
+        segment_ids,
+        [
+            EncodedCircuitId { region, segment: 0 },
+            EncodedCircuitId { region, segment: 1 },
+        ]
+    );
+
+    for (id, circuit) in encoded.get_circuits_mut(region) {
+        circuit.phase = id.segment.to_string();
+    }
+
+    let [first, second] = segment_ids.as_slice() else {
+        panic!("fixture should encode as two segments");
+    };
+    assert_eq!(
+        encoded.get_segment(*first).expect("first segment").phase,
+        "0"
+    );
+    assert_eq!(encoded[*second].phase, "1");
+
+    encoded
+        .get_segment_mut(*first)
+        .expect("first segment")
+        .phase = "2".to_owned();
+    encoded[*second].phase = "3".to_owned();
+    assert_eq!(encoded[*first].phase, "2");
+    assert!(
+        encoded
+            .get_segment(EncodedCircuitId { region, segment: 2 })
+            .is_none()
+    );
+    let missing_region = EncodedCircuitId {
+        region: hugr.module_root(),
+        segment: 0,
+    };
+    assert!(encoded.get_segment(missing_region).is_none());
+    assert!(encoded.get_segment_mut(missing_region).is_none());
+}
+
+/// Test the iterators over the segments of an encoded circuit,
+/// when a node has multiple segments.
+#[rstest]
+fn encoded_circuit_iterators() {
+    let hugr = circ_mid_circuit_external_subgraph();
+    let region = hugr.entrypoint();
+    let mut encoded =
+        EncodedCircuit::new(&hugr, EncodeOptions::new()).expect("fixture should encode");
+
+    assert_eq!(
+        encoded.iter().map(|(region, _)| region).collect_vec(),
+        [region, region]
+    );
+    assert_eq!(
+        encoded
+            .par_iter()
+            .map(|(region, _)| region)
+            .collect::<Vec<_>>(),
+        [region, region]
+    );
+
+    for (segment, (segment_region, circuit)) in encoded.iter_mut().enumerate() {
+        assert_eq!(segment_region, region);
+        circuit.phase = segment.to_string();
+    }
+    encoded
+        .par_iter_mut()
+        .for_each(|(segment_region, _)| assert_eq!(segment_region, region));
+
+    assert_eq!(encoded[region].phase, "0");
+    encoded[region].phase = "first".to_owned();
+    assert_eq!(
+        encoded
+            .get_segment(EncodedCircuitId { region, segment: 0 })
+            .expect("first segment")
+            .phase,
+        "first"
+    );
+    assert_eq!(
+        encoded
+            .get_segment(EncodedCircuitId { region, segment: 1 })
+            .expect("second segment")
+            .phase,
+        "1"
+    );
+}
+
+/// A split region depends on boundary metadata that cannot be represented in
+/// one standalone pytket circuit.
+#[test]
+fn segmented_circuit_rejects_standalone_encoding() {
+    let hugr = circ_mid_circuit_external_subgraph();
+    let error = EncodedCircuit::new_standalone(&hugr, EncodeOptions::new())
+        .expect_err("segmented encoding cannot be standalone");
+    assert!(error.to_string().contains("register-free opaque subgraphs"));
 }
 
 /// Test serialisation of circuits with a symbolic expression.
