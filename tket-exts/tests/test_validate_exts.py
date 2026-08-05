@@ -1,3 +1,4 @@
+import warnings
 from collections.abc import Callable
 
 import pytest
@@ -271,3 +272,15 @@ def test_exported_extension(
     )
     for op in instantiated_ops:
         assert op.op_def().name in e.operations
+
+
+def check_warnings() -> None:
+    # QSystemExtension is deprecated, so we expect a warning when calling it.
+    with pytest.warns(DeprecationWarning, match="QSystemExtension"):
+        tket_exts.qsystem()
+
+    # Loading the full extension registry should not emit any warnings,
+    # even though it includes the deprecated QSystemExtension.
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        tket_exts.tket_registry()
