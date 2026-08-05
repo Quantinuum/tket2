@@ -31,21 +31,11 @@ impl PGTableau for Tableau {
                     panic!("Conditional gates cannot be precomposed.");
                 }
                 match data.get_gate_type() {
-                    GateType::H => {
-                        self.precompose_basis_change(Pauli::Y, data.get_args()[0], false)
-                    }
-                    GateType::S => {
-                        self.precompose_basis_change(Pauli::Z, data.get_args()[0], false)
-                    }
-                    GateType::V => {
-                        self.precompose_basis_change(Pauli::X, data.get_args()[0], false)
-                    }
-                    GateType::Sdg => {
-                        self.precompose_basis_change(Pauli::Z, data.get_args()[0], true)
-                    }
-                    GateType::Vdg => {
-                        self.precompose_basis_change(Pauli::X, data.get_args()[0], true)
-                    }
+                    GateType::H => self.precompose_h(data.get_args()[0]),
+                    GateType::S => self.precompose_half_pi(Pauli::Z, data.get_args()[0], false),
+                    GateType::V => self.precompose_half_pi(Pauli::X, data.get_args()[0], false),
+                    GateType::Sdg => self.precompose_half_pi(Pauli::Z, data.get_args()[0], true),
+                    GateType::Vdg => self.precompose_half_pi(Pauli::X, data.get_args()[0], true),
                     GateType::X => self.precompose_pauli(Pauli::X, data.get_args()[0]),
                     GateType::Y => self.precompose_pauli(Pauli::Y, data.get_args()[0]),
                     GateType::Z => self.precompose_pauli(Pauli::Z, data.get_args()[0]),
@@ -142,21 +132,11 @@ impl PGTableau for Tableau {
                     panic!("Conditional gates cannot be postcomposed.");
                 }
                 match data.get_gate_type() {
-                    GateType::H => {
-                        self.postcompose_basis_change(Pauli::Y, data.get_args()[0], false)
-                    }
-                    GateType::S => {
-                        self.postcompose_basis_change(Pauli::Z, data.get_args()[0], false)
-                    }
-                    GateType::V => {
-                        self.postcompose_basis_change(Pauli::X, data.get_args()[0], false)
-                    }
-                    GateType::Sdg => {
-                        self.postcompose_basis_change(Pauli::Z, data.get_args()[0], true)
-                    }
-                    GateType::Vdg => {
-                        self.postcompose_basis_change(Pauli::X, data.get_args()[0], true)
-                    }
+                    GateType::H => self.postcompose_h(data.get_args()[0]),
+                    GateType::S => self.postcompose_half_pi(Pauli::Z, data.get_args()[0], false),
+                    GateType::V => self.postcompose_half_pi(Pauli::X, data.get_args()[0], false),
+                    GateType::Sdg => self.postcompose_half_pi(Pauli::Z, data.get_args()[0], true),
+                    GateType::Vdg => self.postcompose_half_pi(Pauli::X, data.get_args()[0], true),
                     GateType::X => self.postcompose_pauli(Pauli::X, data.get_args()[0]),
                     GateType::Y => self.postcompose_pauli(Pauli::Y, data.get_args()[0]),
                     GateType::Z => self.postcompose_pauli(Pauli::Z, data.get_args()[0]),

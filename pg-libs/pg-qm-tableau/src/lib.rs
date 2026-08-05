@@ -2,15 +2,13 @@
 #![cfg_attr(feature = "simd", feature(portable_simd))]
 #[cfg(feature = "simd")]
 use pg_bitpacked::{
-    apply_enum_tqe_simd, apply_half_pi_gate_simd, simd_h_gate, simd_s_gate, simd_sdg_gate,
-    simd_v_gate, simd_vdg_gate, simd_x_gate, simd_xx_gate, simd_xy_gate, simd_xz_gate, simd_y_gate,
-    simd_yy_gate, simd_yz_gate, simd_z_gate, simd_zz_gate,
+    apply_enum_tqe_simd, apply_half_pi_gate_simd, simd_h_gate, simd_x_gate, simd_xx_gate,
+    simd_xy_gate, simd_xz_gate, simd_y_gate, simd_yy_gate, simd_yz_gate, simd_z_gate, simd_zz_gate,
 };
 use pg_bitpacked::{
-    apply_enum_tqe_slice, apply_half_pi_gate_slice, paulis_to_u64s, slice_h_gate, slice_s_gate,
-    slice_sdg_gate, slice_v_gate, slice_vdg_gate, slice_x_gate, slice_xx_gate, slice_xy_gate,
-    slice_xz_gate, slice_y_gate, slice_yy_gate, slice_yz_gate, slice_z_gate, slice_zz_gate,
-    u64s_to_paulis,
+    apply_enum_tqe_slice, apply_half_pi_gate_slice, paulis_to_u64s, slice_h_gate, slice_x_gate,
+    slice_xx_gate, slice_xy_gate, slice_xz_gate, slice_y_gate, slice_yy_gate, slice_yz_gate,
+    slice_z_gate, slice_zz_gate, u64s_to_paulis,
 };
 use pg_core::Pauli;
 use rand::rngs::StdRng;
@@ -30,7 +28,6 @@ const MT_THRESH: usize = 500;
 // Type aliases for function pointers to various gate application functions
 // These are used to allow for different implementations (e.g., SIMD vs. non-SIMD) to be used interchangeably.
 type TqeGateFn = fn(&mut [u64], &mut [u64], &mut [u64], &mut [u64], &mut [u64]);
-type SqGateFn = fn(&mut [u64], &mut [u64], &mut [u64]);
 type PauliGateFn = fn(&[u64], &[u64], &mut [u64]);
 type ApplyEnumTqeFn = fn(&mut [u64], &mut [u64], &mut [u64], &mut [u64], &mut [u64], Pauli, Pauli);
 type ApplyHalfPiFn = fn(&mut [u64], &mut [u64], &mut [u64], Pauli, bool);
@@ -696,37 +693,8 @@ impl Tableau {
         }
     }
 
-    /// Post compose a basis change gate.
-    fn postcompose_basis_change_with(
-        &mut self,
-        axis: Pauli,
-        q: usize,
-        v_gate: SqGateFn,
-        h_gate: SqGateFn,
-        s_gate: SqGateFn,
-    ) {
-        match axis {
-            Pauli::X => v_gate(
-                &mut self.qubit_slices_z_bits[q],
-                &mut self.qubit_slices_x_bits[q],
-                &mut self.sign_bits,
-            ),
-            Pauli::Y => h_gate(
-                &mut self.qubit_slices_z_bits[q],
-                &mut self.qubit_slices_x_bits[q],
-                &mut self.sign_bits,
-            ),
-            Pauli::Z => s_gate(
-                &mut self.qubit_slices_z_bits[q],
-                &mut self.qubit_slices_x_bits[q],
-                &mut self.sign_bits,
-            ),
-            _ => panic!("Unexpected basis change gate!"),
-        }
-    }
-
-    /// Pre compose a basis change gate.
-    fn precompose_basis_change_with(
+    /// Precompose a half-pi Pauli rotation gate.
+    fn precompose_half_pi_with(
         &mut self,
         axis: Pauli,
         q: usize,
@@ -739,7 +707,7 @@ impl Tableau {
         let (mut x_img_z_bits, mut x_img_x_bits, x_img_sign_bit) = self.packed_image(x_img_idx);
         match axis {
             Pauli::X => {
-                // v gate
+                // rx(pi/2) gate
                 // x <- x
                 // z <- -y = iz*x
                 let mut phase = string_mul(
@@ -758,12 +726,24 @@ impl Tableau {
                 );
             }
             Pauli::Y => {
-                // h gate
-                self.set_packed_image(z_img_idx, &x_img_z_bits, &x_img_x_bits, x_img_sign_bit);
-                self.set_packed_image(x_img_idx, &z_img_z_bits, &z_img_x_bits, z_img_sign_bit);
+                // ry(pi/2) gate
+                // x <- -z
+                // z <- x
+                self.set_packed_image(
+                    z_img_idx,
+                    &x_img_z_bits,
+                    &x_img_x_bits,
+                    x_img_sign_bit ^ dagger,
+                );
+                self.set_packed_image(
+                    x_img_idx,
+                    &z_img_z_bits,
+                    &z_img_x_bits,
+                    !z_img_sign_bit ^ dagger,
+                );
             }
             Pauli::Z => {
-                // s gate
+                // rz(pi/2) gate
                 // x <- y = ix*z
                 // z <- z
                 let mut phase = string_mul(
@@ -781,16 +761,16 @@ impl Tableau {
                     z_img_sign_bit ^ x_img_sign_bit ^ (phase == 2) ^ dagger,
                 );
             }
-            _ => panic!("Unexpected basis gate!"),
+            _ => panic!("Unexpected rotation axis!"),
         }
     }
 
-    /// Post compose a half pi Pauli rotation gate.
+    /// Postcompose a half-pi Pauli rotation gate.
     fn postcompose_half_pi_with(
         &mut self,
-        q: usize,
         axis: Pauli,
-        neg: bool,
+        q: usize,
+        dagger: bool,
         apply_half_pi: ApplyHalfPiFn,
     ) {
         apply_half_pi(
@@ -798,7 +778,7 @@ impl Tableau {
             &mut self.qubit_slices_x_bits[q],
             &mut self.sign_bits,
             axis,
-            neg,
+            dagger,
         );
     }
 
@@ -941,7 +921,7 @@ impl Tableau {
         }
 
         // apply the 1q clifford gate
-        self.postcompose_half_pi_with(a, pa, half_pis == 3, apply_half_pi);
+        self.postcompose_half_pi_with(pa, a, half_pis == 3, apply_half_pi);
         // Apply TQE gates in reverse order
         for (qa, qb, ga_rev, gb_rev) in tqe_gates.iter().rev() {
             let (qa_slice_z_bits, qb_slice_z_bits) =
@@ -1269,21 +1249,21 @@ impl Tableau {
         }
     }
 
-    /// Create a random Tableau by applying n_tqe TQE gates and n_basis_change basis change gates to a
-    /// identity tableau
-    pub fn random(n_qubits: usize, seed: u32, n_basis_change: u32, n_tqe: u32) -> Self {
+    /// Create a random tableau by applying `n_tqe` TQE gates and `n_half_pi` half-pi Pauli
+    /// rotations to an identity tableau.
+    pub fn random(n_qubits: usize, seed: u32, n_half_pi: u32, n_tqe: u32) -> Self {
         let mut tableau = Tableau::eye(n_qubits);
         let mut rng = StdRng::seed_from_u64(seed as u64);
 
-        // Apply random basis change gates
-        for _ in 0..n_basis_change {
+        // Apply random half-pi Pauli rotations
+        for _ in 0..n_half_pi {
             let axis = match rng.random_range(0..3) {
                 0 => Pauli::X,
                 1 => Pauli::Y,
                 _ => Pauli::Z,
             };
             let q = rng.random_range(0..n_qubits);
-            tableau.postcompose_basis_change(axis, q, false);
+            tableau.postcompose_half_pi(axis, q, false);
         }
         // Apply random TQE gates
         if n_qubits == 1 {
@@ -1455,46 +1435,19 @@ impl Tableau {
         self.precompose_tqe_with(g0, g1, q0, q1, string_mul);
     }
 
-    /// Postcompose a single-qubit basis change gate.
-    /// The basis change is specified by a Pauli operator.
+    /// Precompose a single-qubit half-pi Pauli rotation.
     ///
     /// # Arguments
     ///
-    /// * `axis` - The Pauli axis for the basis change (X, Y, or Z)
-    /// * `q` - Index of the qubit to apply the basis change to
+    /// * `axis` - The Pauli axis for the rotation (X, Y, or Z)
+    /// * `q` - Index of the qubit to apply the rotation to
     /// * `dagger` - Whether to apply the inverse (daggered) version of the gate
     ///
     /// # Panics
     ///
     /// Panics if `axis` is `Pauli::I`.
-    pub fn postcompose_basis_change(&mut self, axis: Pauli, q: usize, dagger: bool) {
-        if dagger {
-            self.postcompose_basis_change_with(
-                axis,
-                q,
-                slice_vdg_gate,
-                slice_h_gate,
-                slice_sdg_gate,
-            );
-        } else {
-            self.postcompose_basis_change_with(axis, q, slice_v_gate, slice_h_gate, slice_s_gate);
-        }
-    }
-
-    /// Precompose a single-qubit basis change gate.
-    /// The basis change is specified by a Pauli operator.
-    /// This is equivalent to absorbing H, S, or V gate on the input.
-    /// # Arguments
-    ///
-    /// * `axis` - The Pauli axis for the basis change (X, Y, or Z)
-    /// * `q` - Index of the qubit to apply the basis change to
-    /// * `dagger` - Whether to apply the inverse (daggered) version of the gate
-    ///
-    /// # Panics
-    ///
-    /// Panics if `axis` is `Pauli::I`.
-    pub fn precompose_basis_change(&mut self, axis: Pauli, q: usize, dagger: bool) {
-        self.precompose_basis_change_with(axis, q, dagger, string_mul);
+    pub fn precompose_half_pi(&mut self, axis: Pauli, q: usize, dagger: bool) {
+        self.precompose_half_pi_with(axis, q, dagger, string_mul);
     }
 
     /// Precompose a single-qubit Pauli gate.
@@ -1555,16 +1508,45 @@ impl Tableau {
         self.qubit_slices_x_bits.swap(q0, q1);
     }
 
-    /// Postcompose a half pi rotation gate.
+    /// Postcompose a half-pi Pauli rotation gate.
+    ///
+    /// # Arguments
+    ///
+    /// * `axis` - The Pauli axis for the rotation (X, Y, or Z)
+    /// * `q` - Index of the qubit
+    /// * `dagger` - Whether to apply the inverse (daggered) version of the gate
+    ///
+    pub fn postcompose_half_pi(&mut self, axis: Pauli, q: usize, dagger: bool) {
+        self.postcompose_half_pi_with(axis, q, dagger, apply_half_pi_gate_slice);
+    }
+
+    /// Precompose a Hadamard gate.
     ///
     /// # Arguments
     ///
     /// * `q` - Index of the qubit
-    /// * `axis` - The Pauli axis for the rotation (X, Y, or Z)
-    /// * `neg` - Whether the rotation is negative
     ///
-    pub fn postcompose_half_pi(&mut self, q: usize, axis: Pauli, neg: bool) {
-        self.postcompose_half_pi_with(q, axis, neg, apply_half_pi_gate_slice);
+    pub fn precompose_h(&mut self, q: usize) {
+        let z_img_idx = 2 * q;
+        let x_img_idx = 2 * q + 1;
+        let (z_img_z_bits, z_img_x_bits, z_img_sign_bit) = self.packed_image(z_img_idx);
+        let (x_img_z_bits, x_img_x_bits, x_img_sign_bit) = self.packed_image(x_img_idx);
+        self.set_packed_image(z_img_idx, &x_img_z_bits, &x_img_x_bits, x_img_sign_bit);
+        self.set_packed_image(x_img_idx, &z_img_z_bits, &z_img_x_bits, z_img_sign_bit);
+    }
+
+    /// Postcompose a Hadamard gate.
+    ///
+    /// # Arguments
+    ///
+    /// * `q` - Index of the qubit
+    ///
+    pub fn postcompose_h(&mut self, q: usize) {
+        slice_h_gate(
+            &mut self.qubit_slices_z_bits[q],
+            &mut self.qubit_slices_x_bits[q],
+            &mut self.sign_bits,
+        );
     }
 
     /// Postcompose a multi-qubit Clifford angle Pauli rotation.
@@ -1691,28 +1673,16 @@ pub trait SimdTableau {
     fn precompose_tqe_simd<const N: usize>(&mut self, g0: Pauli, g1: Pauli, q0: usize, q1: usize)
     where
         LaneCount<N>: SupportedLaneCount;
-    /// Postcompose a single-qubit basis change gate using SIMD operations.
+    /// Precompose a half-pi Pauli rotation using SIMD operations.
     ///
     /// # Panics
     ///
     /// Panics if `axis` is `Pauli::I`.
-    fn postcompose_basis_change_simd<const N: usize>(
-        &mut self,
-        axis: Pauli,
-        q: usize,
-        dagger: bool,
-    ) where
-        LaneCount<N>: SupportedLaneCount;
-    /// Precompose a single-qubit basis change gate using SIMD operations.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `axis` is `Pauli::I`.
-    fn precompose_basis_change_simd<const N: usize>(&mut self, axis: Pauli, q: usize, dagger: bool)
+    fn precompose_half_pi_simd<const N: usize>(&mut self, axis: Pauli, q: usize, dagger: bool)
     where
         LaneCount<N>: SupportedLaneCount;
-    /// Postcompose a half pi rotation gate using SIMD operations.
-    fn postcompose_half_pi_simd<const N: usize>(&mut self, q: usize, axis: Pauli, neg: bool)
+    /// Postcompose a half-pi Pauli rotation using SIMD operations.
+    fn postcompose_half_pi_simd<const N: usize>(&mut self, axis: Pauli, q: usize, dagger: bool)
     where
         LaneCount<N>: SupportedLaneCount;
     /// Postcompose a multi-qubit Clifford angle Pauli rotation using SIMD operations.
@@ -1762,6 +1732,11 @@ pub trait SimdTableau {
     fn postcompose_pauli_simd<const N: usize>(&mut self, pauli: Pauli, q: usize)
     where
         LaneCount<N>: SupportedLaneCount;
+
+    /// Postcompose a Hadamard gate using SIMD operations.
+    fn postcompose_h_simd<const N: usize>(&mut self, q: usize)
+    where
+        LaneCount<N>: SupportedLaneCount;
 }
 
 #[cfg(feature = "simd")]
@@ -1793,41 +1768,18 @@ impl SimdTableau for Tableau {
         self.precompose_tqe_with(g0, g1, q0, q1, simd_string_mul::<N>);
     }
 
-    fn postcompose_basis_change_simd<const N: usize>(&mut self, axis: Pauli, q: usize, dagger: bool)
+    fn precompose_half_pi_simd<const N: usize>(&mut self, axis: Pauli, q: usize, dagger: bool)
     where
         LaneCount<N>: SupportedLaneCount,
     {
-        if dagger {
-            self.postcompose_basis_change_with(
-                axis,
-                q,
-                simd_vdg_gate::<N>,
-                simd_h_gate::<N>,
-                simd_sdg_gate::<N>,
-            );
-        } else {
-            self.postcompose_basis_change_with(
-                axis,
-                q,
-                simd_v_gate::<N>,
-                simd_h_gate::<N>,
-                simd_s_gate::<N>,
-            );
-        }
+        self.precompose_half_pi_with(axis, q, dagger, simd_string_mul::<N>);
     }
 
-    fn precompose_basis_change_simd<const N: usize>(&mut self, axis: Pauli, q: usize, dagger: bool)
+    fn postcompose_half_pi_simd<const N: usize>(&mut self, axis: Pauli, q: usize, dagger: bool)
     where
         LaneCount<N>: SupportedLaneCount,
     {
-        self.precompose_basis_change_with(axis, q, dagger, simd_string_mul::<N>);
-    }
-
-    fn postcompose_half_pi_simd<const N: usize>(&mut self, q: usize, axis: Pauli, neg: bool)
-    where
-        LaneCount<N>: SupportedLaneCount,
-    {
-        self.postcompose_half_pi_with(q, axis, neg, apply_half_pi_gate_simd::<N>);
+        self.postcompose_half_pi_with(axis, q, dagger, apply_half_pi_gate_simd::<N>);
     }
 
     fn postcompose_pauli_gadget_simd<const N: usize>(
@@ -1915,6 +1867,17 @@ impl SimdTableau for Tableau {
             simd_z_gate::<N>,
         );
     }
+
+    fn postcompose_h_simd<const N: usize>(&mut self, q: usize)
+    where
+        LaneCount<N>: SupportedLaneCount,
+    {
+        simd_h_gate(
+            &mut self.qubit_slices_z_bits[q],
+            &mut self.qubit_slices_x_bits[q],
+            &mut self.sign_bits,
+        );
+    }
 }
 
 #[cfg(test)]
@@ -1953,7 +1916,11 @@ mod tests {
             })
             .collect()
     }
-    fn random_basis_changes(n_qubits: usize, k: usize, rng: &mut StdRng) -> Vec<(Pauli, usize)> {
+    fn random_half_pi_rotations(
+        n_qubits: usize,
+        k: usize,
+        rng: &mut StdRng,
+    ) -> Vec<(Pauli, usize)> {
         (0..k)
             .map(|_| {
                 let q = rng.random_range(0..n_qubits);
@@ -2036,55 +2003,57 @@ mod tests {
         );
     }
 
-    /// Shared body for `test_basis_change[_simd]_precompose_postcompose_matches`: precomposing
-    /// a sequence of basis change gates is equivalent to postcomposing the same sequence in
+    /// Shared body for `test_half_pi[_simd]_precompose_postcompose_matches`: precomposing
+    /// a sequence of half-pi rotations is equivalent to postcomposing the same sequence in
     /// reverse order.
-    fn basis_change_precompose_postcompose_body(
+    fn half_pi_precompose_postcompose_body(
         precompose: impl Fn(&mut Tableau, Pauli, usize, bool),
         postcompose: impl Fn(&mut Tableau, Pauli, usize, bool),
     ) {
         let mut rng = StdRng::seed_from_u64(0);
         for (n_qubits, n_gates) in [(5, 100), (100, 1000)] {
-            let mut tab = Tableau::eye(n_qubits);
-            let mut tab2 = Tableau::eye(n_qubits);
-            let gates = random_basis_changes(n_qubits, n_gates, &mut rng);
-            for &(axis, q) in gates.iter() {
-                precompose(&mut tab, axis, q, false);
+            let gates = random_half_pi_rotations(n_qubits, n_gates, &mut rng);
+            for dagger in [false, true] {
+                let mut tab = Tableau::eye(n_qubits);
+                let mut tab2 = Tableau::eye(n_qubits);
+                for &(axis, q) in gates.iter() {
+                    precompose(&mut tab, axis, q, dagger);
+                }
+                for &(axis, q) in gates.iter().rev() {
+                    postcompose(&mut tab2, axis, q, dagger);
+                }
+                assert_eq!(tab, tab2);
             }
-            for &(axis, q) in gates.iter().rev() {
-                postcompose(&mut tab2, axis, q, false);
-            }
-            assert_eq!(tab, tab2);
         }
     }
 
     #[test]
-    fn test_basis_change_precompose_postcompose_matches() {
-        basis_change_precompose_postcompose_body(
-            Tableau::precompose_basis_change,
-            Tableau::postcompose_basis_change,
+    fn test_half_pi_precompose_postcompose_matches() {
+        half_pi_precompose_postcompose_body(
+            Tableau::precompose_half_pi,
+            Tableau::postcompose_half_pi,
         );
     }
 
     #[cfg(feature = "simd")]
     #[test]
-    fn test_basis_change_simd_precompose_postcompose_matches() {
-        basis_change_precompose_postcompose_body(
-            Tableau::precompose_basis_change_simd::<64>,
-            Tableau::postcompose_basis_change_simd::<64>,
+    fn test_half_pi_simd_precompose_postcompose_matches() {
+        half_pi_precompose_postcompose_body(
+            Tableau::precompose_half_pi_simd::<64>,
+            Tableau::postcompose_half_pi_simd::<64>,
         );
     }
 
     /// Shared body for `test_compose[_simd]`.
     fn compose_body(
-        precompose_basis_change: impl Fn(&mut Tableau, Pauli, usize, bool),
+        precompose_half_pi: impl Fn(&mut Tableau, Pauli, usize, bool),
         precompose_tqe: impl Fn(&mut Tableau, Pauli, Pauli, usize, usize),
         compose: impl Fn(&mut Tableau, &Tableau),
     ) {
         let mut rng = StdRng::seed_from_u64(0);
 
-        for (n_qubits, n_tqes, n_basis_change) in [(5, 100, 100), (100, 1000, 1000)] {
-            let mut sqc_gates = random_basis_changes(n_qubits, n_basis_change, &mut rng);
+        for (n_qubits, n_tqes, n_half_pi) in [(5, 100, 100), (100, 1000, 1000)] {
+            let mut sqc_gates = random_half_pi_rotations(n_qubits, n_half_pi, &mut rng);
             let mut tqes = random_tqes(n_qubits, n_tqes, &mut rng);
             let sqc_gates2 = sqc_gates.split_off(50);
             let tqes2 = tqes.split_off(50);
@@ -2092,16 +2061,16 @@ mod tests {
             let mut tab2 = Tableau::eye(n_qubits);
             let mut tab3 = Tableau::eye(n_qubits);
             for &(axis, q) in sqc_gates.iter() {
-                precompose_basis_change(&mut tab1, axis, q, false);
-                precompose_basis_change(&mut tab3, axis, q, false);
+                precompose_half_pi(&mut tab1, axis, q, false);
+                precompose_half_pi(&mut tab3, axis, q, false);
             }
             for &(g0, g1, q0, q1) in tqes.iter() {
                 precompose_tqe(&mut tab1, g0, g1, q0, q1);
                 precompose_tqe(&mut tab3, g0, g1, q0, q1);
             }
             for &(axis, q) in sqc_gates2.iter() {
-                precompose_basis_change(&mut tab2, axis, q, false);
-                precompose_basis_change(&mut tab3, axis, q, false);
+                precompose_half_pi(&mut tab2, axis, q, false);
+                precompose_half_pi(&mut tab3, axis, q, false);
             }
             for &(g0, g1, q0, q1) in tqes2.iter() {
                 precompose_tqe(&mut tab2, g0, g1, q0, q1);
@@ -2115,7 +2084,7 @@ mod tests {
     #[test]
     fn test_compose() {
         compose_body(
-            Tableau::precompose_basis_change,
+            Tableau::precompose_half_pi,
             Tableau::precompose_tqe,
             Tableau::compose,
         );
@@ -2125,7 +2094,7 @@ mod tests {
     #[test]
     fn test_compose_simd() {
         compose_body(
-            Tableau::precompose_basis_change_simd::<64>,
+            Tableau::precompose_half_pi_simd::<64>,
             Tableau::precompose_tqe_simd::<64>,
             Tableau::compose_simd::<64>,
         );
@@ -2164,7 +2133,7 @@ mod tests {
         ),
         postcompose_pauli_gadget: impl Fn(&mut Tableau, &[u64], &[u64], u8),
         postcompose_tqe: impl Fn(&mut Tableau, Pauli, Pauli, usize, usize),
-        postcompose_half_pi: impl Fn(&mut Tableau, usize, Pauli, bool),
+        postcompose_half_pi: impl Fn(&mut Tableau, Pauli, usize, bool),
         postcompose_pauli: impl Fn(&mut Tableau, Pauli, usize),
     ) {
         const N_TRIALS: usize = 100;
@@ -2258,13 +2227,13 @@ mod tests {
                 match theta {
                     0 => {}
                     1 => {
-                        postcompose_half_pi(&mut tab2, support, p, false);
+                        postcompose_half_pi(&mut tab2, p, support, false);
                     }
                     2 => {
                         postcompose_pauli(&mut tab2, p, support);
                     }
                     3 => {
-                        postcompose_half_pi(&mut tab2, support, p, true);
+                        postcompose_half_pi(&mut tab2, p, support, true);
                     }
                     _ => panic!(),
                 }
