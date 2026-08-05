@@ -298,39 +298,36 @@ impl ConditionalBoxData {
     }
 }
 
-/// Tableau output data for a Clifford operation.
+/// Tableau image data for a Clifford operation.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct TableauData {
     #[serde(
         serialize_with = "serialize_pauli_string_bool_vec",
         deserialize_with = "deserialize_pauli_string_bool_vec"
     )]
-    pub(crate) z_outputs: Vec<(Vec<Pauli>, bool)>,
+    pub(crate) z_images: Vec<(Vec<Pauli>, bool)>,
     #[serde(
         serialize_with = "serialize_pauli_string_bool_vec",
         deserialize_with = "deserialize_pauli_string_bool_vec"
     )]
-    pub(crate) x_outputs: Vec<(Vec<Pauli>, bool)>,
+    pub(crate) x_images: Vec<(Vec<Pauli>, bool)>,
 }
 
 impl TableauData {
-    /// Creates tableau data from $Z$ and $X$ output images.
+    /// Creates tableau data from the images of the input $Z$ and $X$ operators.
     /// Each image Boolean is a sign bit (`false` = positive, `true` = negative).
-    pub fn new(z_outputs: Vec<(Vec<Pauli>, bool)>, x_outputs: Vec<(Vec<Pauli>, bool)>) -> Self {
-        Self {
-            z_outputs,
-            x_outputs,
-        }
+    pub fn new(z_images: Vec<(Vec<Pauli>, bool)>, x_images: Vec<(Vec<Pauli>, bool)>) -> Self {
+        Self { z_images, x_images }
     }
 
     /// Returns the images of the input $Z$ operators and their sign bits.
-    pub fn get_z_outputs(&self) -> &Vec<(Vec<Pauli>, bool)> {
-        &self.z_outputs
+    pub fn get_z_images(&self) -> &Vec<(Vec<Pauli>, bool)> {
+        &self.z_images
     }
 
     /// Returns the images of the input $X$ operators and their sign bits.
-    pub fn get_x_outputs(&self) -> &Vec<(Vec<Pauli>, bool)> {
-        &self.x_outputs
+    pub fn get_x_images(&self) -> &Vec<(Vec<Pauli>, bool)> {
+        &self.x_images
     }
 }
 

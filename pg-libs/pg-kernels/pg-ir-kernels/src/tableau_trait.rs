@@ -55,7 +55,7 @@ pub trait PGTableau: From<TableauData> + Into<TableauData> + Eq {
     ///
     /// - `(Vec<Pauli>, bool)` - A tuple where the first element is a vector of Pauli operators representing the image of the X operator,
     ///   and the second element is its sign bit.
-    fn x(&self, qubit: usize) -> (Vec<Pauli>, bool);
+    fn x_image(&self, qubit: usize) -> (Vec<Pauli>, bool);
 
     /// Get the image of a Z operator under the tableau. The returned Boolean is a sign bit (`false` = positive, `true` = negative).
     ///
@@ -67,7 +67,7 @@ pub trait PGTableau: From<TableauData> + Into<TableauData> + Eq {
     ///
     /// - `(Vec<Pauli>, bool)` - A tuple where the first element is a vector of Pauli operators representing the image of the Z operator,
     ///   and the second element is its sign bit.
-    fn z(&self, qubit: usize) -> (Vec<Pauli>, bool);
+    fn z_image(&self, qubit: usize) -> (Vec<Pauli>, bool);
 
     /// Pre-compose an operation to the tableau.
     ///
@@ -136,7 +136,7 @@ pub trait PGTableau: From<TableauData> + Into<TableauData> + Eq {
         match op {
             Op::Gate { data } => match data.get_gate_type() {
                 GateType::RX => {
-                    let (s, sign_bit) = self.x(data.get_args()[0]);
+                    let (s, sign_bit) = self.x_image(data.get_args()[0]);
                     let theta = if sign_bit {
                         -data.get_params()[0]
                     } else {
@@ -166,7 +166,7 @@ pub trait PGTableau: From<TableauData> + Into<TableauData> + Eq {
                     )]
                 }
                 GateType::RZ => {
-                    let (s, sign_bit) = self.z(data.get_args()[0]);
+                    let (s, sign_bit) = self.z_image(data.get_args()[0]);
                     let theta = if sign_bit {
                         -data.get_params()[0]
                     } else {
@@ -230,7 +230,7 @@ pub trait PGTableau: From<TableauData> + Into<TableauData> + Eq {
                     new_ops
                 }
                 GateType::Measure => {
-                    let (z_string, z_sign_bit) = self.z(data.get_args()[0]);
+                    let (z_string, z_sign_bit) = self.z_image(data.get_args()[0]);
                     vec![build_op_from_gate(
                         Op::Measure {
                             data: MeasureData::new(z_string, z_sign_bit, data.get_args()[1]),
@@ -239,8 +239,8 @@ pub trait PGTableau: From<TableauData> + Into<TableauData> + Eq {
                     )]
                 }
                 GateType::Reset => {
-                    let (z_string, z_sign_bit) = self.z(data.get_args()[0]);
-                    let (x_string, x_sign_bit) = self.x(data.get_args()[0]);
+                    let (z_string, z_sign_bit) = self.z_image(data.get_args()[0]);
+                    let (x_string, x_sign_bit) = self.x_image(data.get_args()[0]);
                     vec![build_op_from_gate(
                         Op::Reset {
                             data: ResetData::new(z_string, x_string, z_sign_bit, x_sign_bit),

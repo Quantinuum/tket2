@@ -11,15 +11,15 @@ use pg_tk::compare_unitaries_via_tk;
 #[test]
 fn tableau_sign_bit_contract_and_rotation_angle() {
     let identity = Tableau::eye(1);
-    assert_eq!(identity.x(0), (vec![Pauli::X], false));
-    assert_eq!(identity.z(0), (vec![Pauli::Z], false));
+    assert_eq!(identity.x_image(0), (vec![Pauli::X], false));
+    assert_eq!(identity.z_image(0), (vec![Pauli::Z], false));
 
     let mut z_tableau = Tableau::eye(1);
     z_tableau.postcompose_op(&Op::Gate {
         data: GateData::new(GateType::Z, vec![0]),
     });
-    assert_eq!(z_tableau.x(0), (vec![Pauli::X], true));
-    assert_eq!(z_tableau.z(0), (vec![Pauli::Z], false));
+    assert_eq!(z_tableau.x_image(0), (vec![Pauli::X], true));
+    assert_eq!(z_tableau.z_image(0), (vec![Pauli::Z], false));
 
     for (tableau, expected_angle) in [(&identity, 0.25), (&z_tableau, -0.25)] {
         let conjugated = tableau.conjugate(&Op::Rotation {

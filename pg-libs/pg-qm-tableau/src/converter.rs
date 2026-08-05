@@ -11,11 +11,11 @@ impl PGTableau for Tableau {
     fn get_n_qubits(&self) -> usize {
         self.get_n_qubits()
     }
-    fn x(&self, qubit: usize) -> (Vec<Pauli>, bool) {
-        self.x_image(qubit)
+    fn x_image(&self, qubit: usize) -> (Vec<Pauli>, bool) {
+        Tableau::x_image(self, qubit)
     }
-    fn z(&self, qubit: usize) -> (Vec<Pauli>, bool) {
-        self.z_image(qubit)
+    fn z_image(&self, qubit: usize) -> (Vec<Pauli>, bool) {
+        Tableau::z_image(self, qubit)
     }
     fn get_dagger(&self) -> Self {
         self.invert()
@@ -321,14 +321,14 @@ impl PGTableau for Tableau {
 
 impl From<TableauData> for Tableau {
     fn from(data: TableauData) -> Self {
-        let n_qubits = data.get_x_outputs().len();
+        let n_qubits = data.get_x_images().len();
         let mut qubit_slices_z_bits = Vec::with_capacity(n_qubits);
         let mut qubit_slices_x_bits = Vec::with_capacity(n_qubits);
         for output_q in 0..n_qubits {
             let mut slice = vec![Pauli::I; 2 * n_qubits];
             for input_q in 0..n_qubits {
-                slice[2 * input_q] = data.get_z_outputs()[input_q].0[output_q];
-                slice[2 * input_q + 1] = data.get_x_outputs()[input_q].0[output_q];
+                slice[2 * input_q] = data.get_z_images()[input_q].0[output_q];
+                slice[2 * input_q + 1] = data.get_x_images()[input_q].0[output_q];
             }
             let (slice_z_bits, slice_x_bits) = paulis_to_u64s(&slice);
             qubit_slices_z_bits.push(slice_z_bits);
@@ -336,8 +336,8 @@ impl From<TableauData> for Tableau {
         }
         let mut sign_bits = vec![false; 2 * n_qubits];
         for input_q in 0..n_qubits {
-            sign_bits[2 * input_q] = data.get_z_outputs()[input_q].1;
-            sign_bits[2 * input_q + 1] = data.get_x_outputs()[input_q].1;
+            sign_bits[2 * input_q] = data.get_z_images()[input_q].1;
+            sign_bits[2 * input_q + 1] = data.get_x_images()[input_q].1;
         }
         Tableau::from_packed_qubit_slices(
             qubit_slices_z_bits,
@@ -351,13 +351,13 @@ impl From<TableauData> for Tableau {
 impl From<Tableau> for TableauData {
     fn from(tab: Tableau) -> Self {
         let n_qubits = tab.get_n_qubits();
-        let mut z_outputs = Vec::with_capacity(n_qubits);
-        let mut x_outputs = Vec::with_capacity(n_qubits);
+        let mut z_images = Vec::with_capacity(n_qubits);
+        let mut x_images = Vec::with_capacity(n_qubits);
         for input_q in 0..n_qubits {
-            z_outputs.push(tab.z(input_q));
-            x_outputs.push(tab.x(input_q));
+            z_images.push(tab.z_image(input_q));
+            x_images.push(tab.x_image(input_q));
         }
-        TableauData::new(z_outputs, x_outputs)
+        TableauData::new(z_images, x_images)
     }
 }
 
@@ -383,21 +383,21 @@ mod tests {
 
     #[test]
     fn test_conversion() {
-        let z_outputs = vec![
+        let z_images = vec![
             (vec![Pauli::X, Pauli::I, Pauli::Z], false),
             (vec![Pauli::I, Pauli::Y, Pauli::I], true),
             (vec![Pauli::Z, Pauli::I, Pauli::X], false),
         ];
-        let x_outputs = vec![
+        let x_images = vec![
             (vec![Pauli::I, Pauli::X, Pauli::I], true),
             (vec![Pauli::Y, Pauli::I, Pauli::Z], false),
             (vec![Pauli::I, Pauli::Z, Pauli::I], true),
         ];
-        let tableau_data = TableauData::new(z_outputs.clone(), x_outputs.clone());
+        let tableau_data = TableauData::new(z_images.clone(), x_images.clone());
         let qm_tableau: Tableau = tableau_data.into();
         let converted_back = TableauData::from(qm_tableau);
-        assert_eq!(converted_back.get_z_outputs(), &z_outputs);
-        assert_eq!(converted_back.get_x_outputs(), &x_outputs);
+        assert_eq!(converted_back.get_z_images(), &z_images);
+        assert_eq!(converted_back.get_x_images(), &x_images);
     }
 
     #[test]
@@ -405,14 +405,14 @@ mod tests {
         let identity_tableau = Tableau::eye(2);
         let tableau_data: TableauData = identity_tableau.into();
         assert_eq!(
-            tableau_data.get_z_outputs(),
+            tableau_data.get_z_images(),
             &vec![
                 (vec![Pauli::Z, Pauli::I], false),
                 (vec![Pauli::I, Pauli::Z], false),
             ]
         );
         assert_eq!(
-            tableau_data.get_x_outputs(),
+            tableau_data.get_x_images(),
             &vec![
                 (vec![Pauli::X, Pauli::I], false),
                 (vec![Pauli::I, Pauli::X], false),
@@ -475,13 +475,13 @@ mod tests {
     #[test]
     fn test_identity_tableau() {
         let tableau = Tableau::eye(2);
-        let z0 = tableau.z(0);
+        let z0 = tableau.z_image(0);
         assert_eq!(z0, (vec![Pauli::Z, Pauli::I], false));
-        let x0 = tableau.x(0);
+        let x0 = tableau.x_image(0);
         assert_eq!(x0, (vec![Pauli::X, Pauli::I], false));
-        let z1 = tableau.z(1);
+        let z1 = tableau.z_image(1);
         assert_eq!(z1, (vec![Pauli::I, Pauli::Z], false));
-        let x1 = tableau.x(1);
+        let x1 = tableau.x_image(1);
         assert_eq!(x1, (vec![Pauli::I, Pauli::X], false));
     }
 
