@@ -1,5 +1,8 @@
-//! This module provides functions for finding non-local edges
-//! in a Hugr and converting them to local edges.
+//! Find and transform local and non-local value edges in a HUGR.
+//!
+//! [`LocalizeEdges`] makes storage explicit by threading non-local values through
+//! container inputs. [`NonLocalizeEdges`] performs the conservative inverse for
+//! copyable values whose forwarding provenance is unambiguous.
 use hugr_core::{
     HugrView, IncomingPort, Wire,
     hugr::hugrmut::HugrMut,
@@ -10,7 +13,10 @@ use crate::passes::composable::WithScope;
 use crate::passes::{ComposablePass, PassScope, composable::Preserve};
 
 mod localize;
+mod non_localize;
+
 use localize::ExtraSourceReqs;
+pub use non_localize::NonLocalizeEdges;
 
 /// Converts non-local edges in a Hugr into local ones, by inserting extra inputs to container
 /// nodes and extra outports to Input nodes (and conversely to outputs of [DataflowBlock]s).
@@ -460,23 +466,47 @@ mod test {
         remove_nonlocal_edges(&mut hugr).unwrap();
         hugr.validate().unwrap();
         assert!(pass.check_no_nonlocal_edges(&hugr).is_ok());
-        let dfb = |bb: BasicBlockID| hugr.get_optype(bb.node()).as_dataflow_block().unwrap();
-        // Entry node gets ext_edge_type added, only
+        {
+            let dfb = |bb: BasicBlockID| hugr.get_optype(bb.node()).as_dataflow_block().unwrap();
+            // Entry node gets ext_edge_type added, only
+            assert_eq!(
+                dfb(entry).inputs[..],
+                [ext_edge_type.clone(), Type::UNIT, branch_type.clone()]
+            );
+            // Left node gets both ext_edge_type and dom_edge_type
+            assert_eq!(
+                dfb(bb_left).inputs[..],
+                [
+                    ext_edge_type.clone(),
+                    dom_edge_type,
+                    Type::UNIT,
+                    other_output_type.clone()
+                ]
+            );
+            // Bottom node gets ext_edge_type added, only
+            assert_eq!(
+                dfb(bb_bottom).inputs[..],
+                [ext_edge_type, branch_type.clone()]
+            );
+        }
+
+        NonLocalizeEdges::default().run(&mut hugr).unwrap();
+        hugr.validate().unwrap();
+        assert!(pass.check_no_nonlocal_edges(&hugr).is_err());
         assert_eq!(
-            dfb(entry).inputs[..],
-            [ext_edge_type.clone(), Type::UNIT, branch_type.clone()]
+            hugr.single_linked_output(tgt_ext.node(), 0),
+            Some((src_ext.node(), src_ext.source()))
         );
-        // Left node gets both ext_edge_type and dom_edge_type
+        assert_eq!(
+            hugr.single_linked_output(tgt_dom.node(), 0),
+            Some((src_dom.node(), src_dom.source()))
+        );
+        let dfb = |bb: BasicBlockID| hugr.get_optype(bb.node()).as_dataflow_block().unwrap();
+        assert_eq!(dfb(entry).inputs[..], [Type::UNIT, branch_type.clone()]);
         assert_eq!(
             dfb(bb_left).inputs[..],
-            [
-                ext_edge_type.clone(),
-                dom_edge_type,
-                Type::UNIT,
-                other_output_type
-            ]
+            [Type::UNIT, other_output_type.clone()]
         );
-        // Bottom node gets ext_edge_type added, only
-        assert_eq!(dfb(bb_bottom).inputs[..], [ext_edge_type, branch_type]);
+        assert_eq!(dfb(bb_bottom).inputs[..], [branch_type]);
     }
 }

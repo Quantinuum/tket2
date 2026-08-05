@@ -59,7 +59,7 @@ pub use monomorphize::{MonomorphizePass, mangle_name};
 // Nest SESE regions in CFGs.
 pub mod nest_cfgs;
 
-// Find and localize non-local edges.
+// Find and transform local and non-local edges.
 pub mod non_local;
 
 // CFG normalization (merge blocks, simplify control flow).
