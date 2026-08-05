@@ -254,7 +254,8 @@ impl PGTableau for Tableau {
                             return;
                         }
                         // if alpha is a multiple of pi and beta is a multiple of pi/4, then this is a Clifford gate
-                        if equiv_0(alpha, 1.0) && equiv_0(beta, 0.25) {
+                        if equiv_0(alpha, 1.0) {
+                            assert!(equiv_0(beta, 0.25), "is_clifford should guarantee this");
                             self.postcompose_op(&Op::Gate {
                                 data: GateData::new(GateType::RX, data.get_args().clone())
                                     .with_params(vec![alpha]),
