@@ -29,6 +29,11 @@ class QSystemExtension(TketExtension):
     """
 
     @functools.cache
+    def _extension(self) -> Extension:
+        """Load the extension without emitting its public deprecation warning."""
+        return load_extension("tket.qsystem")
+
+    @functools.cache
     def __call__(self) -> Extension:
         """Returns the qsystem extension"""
         warnings.warn(
@@ -38,7 +43,7 @@ class QSystemExtension(TketExtension):
             DeprecationWarning,
             stacklevel=2,
         )
-        return load_extension("tket.qsystem")
+        return self._extension()
 
     def TYPES(self) -> list[TypeDef]:
         """Return the types defined by this extension"""
