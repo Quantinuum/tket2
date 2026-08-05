@@ -1,8 +1,26 @@
 use crate::Tableau;
 use ::pg_bitpacked::{bools_to_u64_vec, paulis_to_u64s, u64s_to_paulis};
-use ::pg_core::{GateData, GateType, Op, Pauli, RotationData, TableauData};
+use ::pg_core::{GateType, Op, Pauli, RotationData, TableauData};
 use ::pg_ir_kernels::{PGTableau, is_clifford};
 use ::pg_utils::{cliff_angle, equiv_0};
+
+/// postcompose a Clifford angle rotation
+fn postcompose_rotation(tableau: &mut Tableau, axis: Pauli, qubit: usize, angle: f64) {
+    if let Some(half_pis) = cliff_angle(angle) {
+        if half_pis == 1 {
+            tableau.postcompose_half_pi(axis, qubit, false);
+        } else if half_pis == 3 {
+            tableau.postcompose_half_pi(axis, qubit, true);
+        } else if half_pis == 2 {
+            tableau.postcompose_pauli(axis, qubit);
+        }
+    } else {
+        panic!(
+            "Cannot postcompose non-Clifford rotation: angle = {}",
+            angle
+        );
+    }
+}
 
 impl PGTableau for Tableau {
     fn eye(n_qubits: usize) -> Self {
@@ -195,28 +213,24 @@ impl PGTableau for Tableau {
                         data.get_args()[1],
                     ),
                     GateType::SWAP => self.postcompose_swap(data.get_args()[0], data.get_args()[1]),
-                    GateType::RX => {
-                        // TODO not efficient
-                        let mut string = vec![Pauli::I; self.get_n_qubits()];
-                        string[data.get_args()[0]] = Pauli::X;
-                        self.postcompose_op(&Op::Rotation {
-                            data: (RotationData::new(string, data.get_params()[0])),
-                        })
-                    }
-                    GateType::RY => {
-                        let mut string = vec![Pauli::I; self.get_n_qubits()];
-                        string[data.get_args()[0]] = Pauli::Y;
-                        self.postcompose_op(&Op::Rotation {
-                            data: (RotationData::new(string, data.get_params()[0])),
-                        })
-                    }
-                    GateType::RZ => {
-                        let mut string = vec![Pauli::I; self.get_n_qubits()];
-                        string[data.get_args()[0]] = Pauli::Z;
-                        self.postcompose_op(&Op::Rotation {
-                            data: (RotationData::new(string, data.get_params()[0])),
-                        })
-                    }
+                    GateType::RX => postcompose_rotation(
+                        self,
+                        Pauli::X,
+                        data.get_args()[0],
+                        data.get_params()[0],
+                    ),
+                    GateType::RY => postcompose_rotation(
+                        self,
+                        Pauli::Y,
+                        data.get_args()[0],
+                        data.get_params()[0],
+                    ),
+                    GateType::RZ => postcompose_rotation(
+                        self,
+                        Pauli::Z,
+                        data.get_args()[0],
+                        data.get_params()[0],
+                    ),
                     GateType::ZZPHASE => {
                         let mut string = vec![Pauli::I; self.get_n_qubits()];
                         string[data.get_args()[0]] = Pauli::Z;
@@ -236,28 +250,26 @@ impl PGTableau for Tableau {
                         // if alpha is a multiple of pi and beta is a multiple of pi/4, then this is a Clifford gate
                         if equiv_0(alpha, 1.0) {
                             assert!(equiv_0(beta, 0.25), "is_clifford should guarantee this");
-                            self.postcompose_op(&Op::Gate {
-                                data: GateData::new(GateType::RX, data.get_args().clone())
-                                    .with_params(vec![alpha]),
-                            });
-                            self.postcompose_op(&Op::Gate {
-                                data: GateData::new(GateType::RZ, data.get_args().clone())
-                                    .with_params(vec![2.0 * beta]),
-                            });
+                            postcompose_rotation(self, Pauli::X, data.get_args()[0], alpha);
+                            postcompose_rotation(self, Pauli::Z, data.get_args()[0], 2.0 * beta);
                             return;
                         }
-                        self.postcompose_op(&Op::Gate {
-                            data: GateData::new(GateType::RZ, data.get_args().clone())
-                                .with_params(vec![-beta]),
-                        });
-                        self.postcompose_op(&Op::Gate {
-                            data: GateData::new(GateType::RX, data.get_args().clone())
-                                .with_params(vec![alpha]),
-                        });
-                        self.postcompose_op(&Op::Gate {
-                            data: GateData::new(GateType::RZ, data.get_args().clone())
-                                .with_params(vec![beta]),
-                        });
+                        // alpha is an odd number of half-pis (i.e. 0.5, 1.5)
+                        // beta can be any clifford angle
+                        let beta_half_pis = cliff_angle(beta).unwrap();
+                        if beta_half_pis == 1 {
+                            // RZ(-0.5);RX(alpha);RZ(0.5) = RY(alpha)
+                            postcompose_rotation(self, Pauli::Y, data.get_args()[0], alpha)
+                        } else if beta_half_pis == 3 {
+                            //  RZ(0.5);RX(alpha);RZ(-0.5) = RY(-alpha)
+                            postcompose_rotation(self, Pauli::Y, data.get_args()[0], -alpha)
+                        } else if beta_half_pis == 0 {
+                            //  RZ(0.0);RX(alpha);RZ(-0.0) = RX(alpha)
+                            postcompose_rotation(self, Pauli::X, data.get_args()[0], alpha)
+                        } else {
+                            //  RZ(1.0);RX(alpha);RZ(-1.0) ~= RX(-alpha)
+                            postcompose_rotation(self, Pauli::X, data.get_args()[0], -alpha)
+                        }
                     }
                     _ => panic!("Unexpected gate type: {:?}", data.get_gate_type()),
                 }
@@ -345,7 +357,7 @@ impl From<Tableau> for TableauData {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pg_core::{PauliGraph, TableauData};
+    use pg_core::{GateData, PauliGraph, TableauData};
     use pg_tk::compare_unitaries_via_tk;
     use rand::{Rng, SeedableRng};
     use rstest::rstest;
@@ -475,6 +487,8 @@ mod tests {
     #[case(3.0, 0.25)]
     #[case(1.0, -0.25)]
     #[case(0.5, -0.5)]
+    #[case(0.5, 0.0)]
+    #[case(0.5, 1.0)]
     fn test_postcompose_phasedx(#[case] alpha: f64, #[case] beta: f64) {
         let op = Op::Gate {
             data: GateData::new(GateType::PHASEDX, vec![0]).with_params(vec![alpha, beta]),
