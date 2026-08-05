@@ -1,11 +1,11 @@
 """Result extension operations."""
 
 import functools
-from typing import List
 
 from hugr.ext import Extension, OpDef, TypeDef
 from hugr.ops import ExtOp
-from hugr.tys import StringArg, BoundedNatArg
+from hugr.tys import BoundedNatArg, StringArg
+
 from ._util import TketExtension, load_extension
 
 
@@ -17,11 +17,11 @@ class ResultExtension(TketExtension):
         """Returns the result extension"""
         return load_extension("tket.result")
 
-    def TYPES(self) -> List[TypeDef]:
+    def TYPES(self) -> list[TypeDef]:
         """Return the types defined by this extension"""
         return []
 
-    def OPS(self) -> List[OpDef]:
+    def OPS(self) -> list[OpDef]:
         """Return the operations defined by this extension"""
         return [
             self.result_array_bool_def,

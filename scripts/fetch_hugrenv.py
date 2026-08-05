@@ -70,20 +70,19 @@ for package in ("llvm", "tket"):
             if (
                 not relative_name
                 or relative_name == "."
-                or relative_name.startswith("../")
-                or relative_name.startswith("/")
+                or relative_name.startswith(("../", "/"))
             ):
                 continue
             member.name = relative_name
             members.append(member)
         tar.extractall(path=install_path, members=members)
 
-print("")
+print()
 print(f"hugrenv {version} installed in {install_path}")
 print(
     "To use the hugrenv libraries, set the following environment variables in your shell."
 )
-print("")
+print()
 if os_name == "windows":
     p = str(install_path)
     print("PowerShell:")

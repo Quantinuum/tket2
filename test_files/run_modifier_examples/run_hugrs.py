@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#    "guppylang==1.0.0rc2",
+#    "guppylang==1.0.0rc1",
 # ]
 # ///
 """Run on selene the passed hugrs"""
@@ -62,6 +62,18 @@ for hugr_path in hugr_paths:
 
     builder = EmulatorBuilder().with_platform("helios")
     emulator = builder.build(package, n_qubits=9)
+
+    # panic_in_control is expected to panic
+    if "panic_in_control_solved" == hugr_path.stem:
+        try:
+            emulator.statevector_sim().run()
+        except Exception as err:  # noqa: BLE001
+            print(
+                f"\t{hugr_path.stem} panicked as expected: {str(err).splitlines()[0]}"
+            )
+            continue
+        raise SystemExit(f"Expected {hugr_path.stem} to panic, but it completed.")
+
     state = emulator.statevector_sim().run()
     res = state.partial_state_dicts()[0]["r"].as_single_state()
     output_path = (

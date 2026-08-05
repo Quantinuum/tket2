@@ -1,58 +1,54 @@
 import importlib.util
-import tempfile
-
-from typing import Callable, Any
 import subprocess
-from tket._ops import TketOp
-from tket.passes import (
-    _badger_optimise,
-    _greedy_depth_reduce,
-    InlineFunctions,
-    inline_funcs,
-    Normalize,
-    NormalizeGuppy,
-    ModifierResolverPass,
-    GlobalScope,
-)
-from tket._state import CompilationState
-from tket_exts import modifier, tket_registry
+import tempfile
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any
 
-from tket._pattern import Rule, RuleMatcher
 import hypothesis.strategies as st
-from hypothesis.strategies._internal import SearchStrategy
-from hypothesis import given, settings
-
-from tket.passes import (
-    PytketHugrPass,
-    _QSystemLLVMPass,
-    QSystemRebasePass,
-    PlatformTarget,
-)
-from hugr.build.base import Hugr
-from hugr.package import Package
-
 import numpy as np
 import pytest
-from pathlib import Path
+from hugr.build.base import Hugr
+from hugr.package import Package
+from hypothesis import given, settings
+from hypothesis.strategies._internal import SearchStrategy
+from tket_exts import modifier, tket_registry
+
+from tket._ops import TketOp
+from tket._pattern import Rule, RuleMatcher
+from tket._state import CompilationState
+from tket.passes import (
+    GlobalScope,
+    InlineFunctions,
+    ModifierResolverPass,
+    Normalize,
+    NormalizeGuppy,
+    PlatformTarget,
+    PytketHugrPass,
+    QSystemRebasePass,
+    _badger_optimise,
+    _greedy_depth_reduce,
+    _QSystemLLVMPass,
+    inline_funcs,
+)
 
 # Import the pytket passes, if the `pytket` extra has been installed.
 # If not, skip all tests in this file.
 pytket = pytest.importorskip("pytket")
-from pytket import Circuit, OpType  # noqa: E402
-from pytket.passes import (  # noqa: E402
+from pytket import Circuit, OpType
+from pytket.passes import (
     CliffordSimp,
-    SquashRzPhasedX,
     RemoveRedundancies,
     SequencePass,
+    SquashRzPhasedX,
 )
-
 
 normalize = Normalize()
 
 
 def _hugr_from_path(str_path: str) -> Hugr:
     with open(Path(str_path), "rb") as f:
-        h = Package.from_bytes(f.read())
+        h = Package.from_bytes(f.read(), tket_registry())
 
     return h.modules[0]
 
@@ -80,9 +76,12 @@ def _contains_modifiers(module: Hugr) -> bool:
 @st.composite
 def circuits(
     draw: Callable[[SearchStrategy[Any]], Any],
-    n_qubits: SearchStrategy[int] = st.integers(min_value=0, max_value=8),
-    depth: SearchStrategy[int] = st.integers(min_value=5, max_value=50),
+    n_qubits: SearchStrategy[int] | None = None,
+    depth: SearchStrategy[int] | None = None,
 ) -> Circuit:
+    n_qubits = n_qubits or st.integers(min_value=0, max_value=8)
+    depth = depth or st.integers(min_value=5, max_value=50)
+
     total_qubits = draw(n_qubits)
     circuit = Circuit(total_qubits)
     if total_qubits == 0:
@@ -96,7 +95,7 @@ def circuits(
         if gate in (circuit.CX,):
             target = draw(
                 st.integers(min_value=0, max_value=total_qubits - 1).filter(
-                    lambda x: x != control
+                    lambda x: x != control  # noqa: B023
                 )
             )
             gate(control, target)
@@ -381,6 +380,53 @@ def test_modifier_execution() -> None:
             np.testing.assert_allclose(computed_statevector, expected_statevector)
 
 
+def test_panic_in_control() -> None:
+    """Run the solved `panic_in_control` hugr and ensure it aborts on the first panic.
+
+    The example is resolved with `apply_passes` and its solved hugr is executed
+    by `run_panic_in_control.py`, which loads the package, builds an emulator,
+    runs it, and asserts that execution aborts on the first panic and never
+    reaches the second. A non-zero exit status means one of those assertions
+    failed.
+    """
+    hugr_name = "panic_in_control"
+    modifier_examples_dir = Path("test_files/modifier_examples")
+    run_hugrs_dir = Path("test_files/run_modifier_examples")
+    apply_passes_path = run_hugrs_dir / "apply_passes.py"
+    spec = importlib.util.spec_from_file_location(
+        "run_modifier_examples_apply_passes", apply_passes_path
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    apply_passes_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(apply_passes_module)
+    apply_passes = apply_passes_module.apply_passes
+
+    hugr_path = modifier_examples_dir / f"{hugr_name}.hugr"
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        generated_hugrs_dir = Path(tmp_dir) / "modified_hugrs"
+        generated_hugrs_dir.mkdir()
+        apply_passes([hugr_path], generated_hugrs_dir)
+
+        # `run_panic_in_control.py` exits non-zero if the run does not panic as
+        # expected on the first panic.
+        subprocess.run(
+            [
+                "uv",
+                "run",
+                "--no-project",
+                "--prerelease=allow",
+                "--python",
+                "3.13",
+                "run_panic_in_control.py",
+                str((generated_hugrs_dir / hugr_name).resolve()),
+            ],
+            cwd=run_hugrs_dir,
+            check=True,
+        )
+
+
 def test_normalize_guppy_on_modifier() -> None:
     """Test the normalize_guppy pass on a hugr with modifiers.
 
@@ -450,12 +496,14 @@ def test_python_qsystem_pass_with_modifiers() -> None:
     runs without errors."""
     qsystem_rebase = QSystemRebasePass()
     qsystem_llvm = _QSystemLLVMPass()
+    failures = []
     for hugr_path in sorted(Path("test_files/modifier_examples").glob("*.hugr")):
         try:
             qsystem_hugr = qsystem_llvm(qsystem_rebase(_hugr_from_path(str(hugr_path))))
             CompilationState.from_python(qsystem_hugr).validate()
-        except Exception as exc:
-            raise AssertionError(f"QSystem passes failed for {hugr_path}") from exc
-        assert not _contains_modifiers(qsystem_hugr), (
-            f"QSystem passes left modifiers in {hugr_path}"
-        )
+            assert not _contains_modifiers(qsystem_hugr), (
+                f"QSystem passes left modifiers in {hugr_path}"
+            )
+        except Exception as exc:  # noqa: BLE001
+            failures.append(f"{hugr_path}: {exc}")
+    assert not failures, "QSystem pass failures:\n" + "\n".join(failures)

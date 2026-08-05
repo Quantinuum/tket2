@@ -86,8 +86,8 @@
 //! can be completely mixed up.
 //! The logic of registering such correspondence is implemented in a function such as
 //! `wire_node_inout`.
-//! Also, the correspondence of I/O wires should be changed accordingly, depending on whether
-//! it includes qubits or not.
+//! Also, the correspondence of I/O wires should be changed accordingly, depending on whether a type
+//! has qubits or not (as defined by [TypeUnpacker])
 //! We also should not forget to connect `fneg` to `Rx` in the new graph, whose edge/wires has
 //! no correspondence in the original graph.
 //!
@@ -99,9 +99,8 @@
 //!   resolution in a daggered context, an error is returned.
 //! - Branching in modifier chain: As noted above, we assume that a modifier is
 //!   chained linearly.
-//! - StateOrder edge: Currently, the modified function does not contain StateOrder edges
-//!   in any case.
-//!   This won't be manageable if dagger is applied, but if not, it should be handled in the future.
+//! - StateOrder edge with dagger: StateOrder edges are preserved for ordinary and controlled
+//!   rewrites. Their reversal under dagger has not yet been implemented, thus we simply ignore them.
 //! - User defined extension ops: There is no way to infer modified unknown extension ops
 //!   that operate on quantum data. We currently raise an error if one is found.
 use fxhash::FxHashSet;
@@ -129,7 +128,7 @@ use hugr::{
     core::HugrNode,
     extension::{prelude::qb_t, simple_op::MakeExtensionOp},
     hugr::hugrmut::HugrMut,
-    ops::{CFG, Const, OpType},
+    ops::{CFG, Const, OpTrait, OpType},
     std_extensions::collections::array::array_type,
     types::{EdgeKind, FuncTypeBase, Signature, Type},
 };
@@ -327,6 +326,9 @@ pub struct ModifierResolver<N = Node> {
     /// Original functions for which the resolver generated modified replacements.
     modified_functions: HashSet<N>,
     qubit_finder: TypeUnpacker,
+    /// Indicate whether the extension op being modified is targeted by some
+    /// StateOrder edge.
+    insert_state_order_edges: bool,
 }
 
 impl<N> ModifierResolver<N> {
@@ -340,6 +342,7 @@ impl<N> ModifierResolver<N> {
             call_map: HashMap::default(),
             modified_functions: HashSet::default(),
             qubit_finder: TypeUnpacker::for_qubits(),
+            insert_state_order_edges: false,
         }
     }
 }
@@ -471,6 +474,22 @@ impl<N: HugrNode> ModifierResolver<N> {
         self.call_map().entry(source).or_default().push(target);
     }
 
+    fn with_state_order_edges<T>(
+        &mut self,
+        insert_state_order_edges: bool,
+        f: impl FnOnce(&mut Self) -> T,
+    ) -> T {
+        let previous =
+            std::mem::replace(&mut self.insert_state_order_edges, insert_state_order_edges);
+        let result = f(self);
+        self.insert_state_order_edges = previous;
+        result
+    }
+
+    fn should_insert_state_order_edges(&self) -> bool {
+        self.insert_state_order_edges
+    }
+
     fn signature_has_quantum_data(&self, signature: &Signature) -> bool {
         signature
             .input
@@ -529,24 +548,22 @@ impl<N: HugrNode> ModifierResolver<N> {
         old: DirWire<N>,
         new: DirWire,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        match self.corresp_map().entry(old) {
-            std::collections::hash_map::Entry::Vacant(entry) => {
-                entry.insert(vec![new]);
+        let existing = self.corresp_map().entry(old).or_default();
+        match existing.as_slice() {
+            // No correspondence yet (vacant or previously emptied): register the new wire.
+            [] => {
+                existing.push(new);
                 Ok(())
             }
-            // Empty entry means that the old wire has no correspondence, so we can insert the new wire.
-            std::collections::hash_map::Entry::Occupied(mut entry) if entry.get().is_empty() => {
-                entry.insert(vec![new]);
-                Ok(())
-            }
+            // StateOrder correspondence may already have been registered while
+            // wiring a container's I/O ports. Re-registering the same wire is
+            // harmless; a different correspondence is still an error.
+            [former] if *former == new => Ok(()),
             // If the old wire is already registered, raise an error.
-            std::collections::hash_map::Entry::Occupied(entry) => {
-                let former = entry.get();
-                Err(ModifierResolverErrors::unreachable(format!(
-                    "Wire already registered for node {}. Former [{},...], Latter {}.",
-                    old.0, former[0], new
-                )))
-            }
+            [former, ..] => Err(ModifierResolverErrors::unreachable(format!(
+                "Wire already registered for node {}. Former [{},...], Latter {}.",
+                old.0, former, new
+            ))),
         }
     }
 
@@ -646,14 +663,14 @@ impl<N: HugrNode> ModifierResolver<N> {
     ) -> Result<(), ModifierResolverErrors<N>> {
         for out_node in h.children(parent) {
             for out_port in h.node_outputs(out_node) {
-                if let Some(EdgeKind::StateOrder) = h.get_optype(out_node).port_kind(out_port) {
-                    // TODO: see https://github.com/Quantinuum/tket2/issues/1836
-                    // Currently, we just ignore StateOrder edges.
-                    // This might be OK when the dagger is applied since StateOrder is not managable then.
-                    // However, if not, we should preserve the StateOrder edges.
-                    // This could be done in two ways:
-                    // 1. Register StateOrder edges to `corresp_map` as well as data edges.
-                    // 2. Use another `HashMap` to keep track of StateOrder edges.
+                if self.modifiers.dagger
+                    && h.get_optype(out_node).port_kind(out_port) == Some(EdgeKind::StateOrder)
+                {
+                    // TODO: see https://github.com/Quantinuum/tket2/issues/1893
+                    // Currently, we just ignore StateOrder edges under dagger to avoid introducing loops
+                    // between nodes.
+                    // To avoid loosing important order edges during the resolution guppy already discard some
+                    // operations (see https://github.com/Quantinuum/guppylang/commit/15215d1e13984573ca86db0fd07b51e90f0a6748)
                     continue;
                 }
                 for (in_node, in_port) in h.linked_inputs(out_node, out_port) {
@@ -665,8 +682,6 @@ impl<N: HugrNode> ModifierResolver<N> {
                 }
             }
         }
-        // FIXME: StateOrder is not preserved here.
-        // see: https://github.com/Quantinuum/tket2/issues/1836
         Ok(())
     }
 }
@@ -888,6 +903,34 @@ impl<N: HugrNode> ModifierResolver<N> {
         )
     }
 
+    /// Register StateOrder ports for a node that was rebuilt with a modified
+    /// dataflow signature.
+    fn wire_state_order(
+        &mut self,
+        old_node: N,
+        old_op: &OpType,
+        new_node: Node,
+        new_op: &OpType,
+    ) -> Result<(), ModifierResolverErrors<N>> {
+        if old_op.other_input() == Some(EdgeKind::StateOrder)
+            && new_op.other_input() == Some(EdgeKind::StateOrder)
+        {
+            self.map_insert(
+                (old_node, old_op.other_input_port().unwrap()).into(),
+                (new_node, new_op.other_input_port().unwrap()).into(),
+            )?;
+        }
+        if old_op.other_output() == Some(EdgeKind::StateOrder)
+            && new_op.other_output() == Some(EdgeKind::StateOrder)
+        {
+            self.map_insert(
+                (old_node, old_op.other_output_port().unwrap()).into(),
+                (new_node, new_op.other_output_port().unwrap()).into(),
+            )?;
+        }
+        Ok(())
+    }
+
     fn wire_inout<'a>(
         &mut self,
         (old_in, old_out): (N, N),
@@ -1015,11 +1058,12 @@ impl<N: HugrNode> ModifierResolver<N> {
         optype: &OpType,
         new_dfg: &mut impl Container,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        let node = new_dfg.add_child_node(optype.clone());
+        let new_node = new_dfg.add_child_node(optype.clone());
         let signature = h.signature(n).unwrap();
         let inputs = signature.input.iter();
         let outputs = signature.output.iter();
-        self.wire_node_inout(n, node, (inputs, outputs), (0, 0, 0))?;
+        self.wire_node_inout(n, new_node, (inputs, outputs), (0, 0, 0))?;
+        self.wire_state_order(n, optype, new_node, optype)?;
         Ok(())
     }
 
@@ -1038,8 +1082,14 @@ impl<N: HugrNode> ModifierResolver<N> {
         }
 
         if let Some(tket_op) = TketOp::from_optype(optype) {
-            let pv = self.modify_tket_op(op_node, tket_op, new_dfg, &mut vec![])?;
-            self.add_edge_from_pv(h, op_node, pv)
+            let is_state_order_target = optype.other_input_port().is_some_and(|port| {
+                optype.port_kind(port) == Some(EdgeKind::StateOrder)
+                    && h.single_linked_output(op_node, port).is_some()
+            });
+            self.with_state_order_edges(is_state_order_target, |this| {
+                let pv = this.modify_tket_op(op_node, tket_op, new_dfg, &mut vec![])?;
+                this.add_edge_from_pv(h, op_node, pv)
+            })
         } else if GlobalPhase::from_optype(optype).is_some() {
             let inputs = self.modify_global_phase(op_node, new_dfg, &mut vec![])?;
             self.corresp_map().insert(
@@ -1169,6 +1219,12 @@ impl<N: HugrNode> ModifierResolver<N> {
             new_node,
             (cfg.signature.input.iter(), cfg.signature.output.iter()),
             (0, 0, 0),
+        )?;
+        self.wire_state_order(
+            cfg_node,
+            h.get_optype(cfg_node),
+            new_node,
+            new_dfg.hugr().get_optype(new_node),
         )?;
 
         // Expose the controls after the CFG boundary data.
@@ -1430,7 +1486,7 @@ mod tests {
         TketOp,
         extension::modifier::{CONTROL_OP_ID, DAGGER_OP_ID, MODIFIER_EXTENSION},
         metadata,
-        passes::composable::Preserve,
+        passes::{composable::Preserve, force_order::force_order},
     };
 
     use super::*;
@@ -1655,6 +1711,66 @@ mod tests {
         let h = module.finish_hugr().unwrap();
         assert_matches!(h.validate(), Ok(()));
         (h, foo_node)
+    }
+
+    #[test]
+    /// Test that modifier passes under control preserve the order edges.
+    fn control_modifier_preserves_state_order_edges() {
+        fn state_order_edge_count(h: &Hugr, root: Node) -> usize {
+            h.descendants(root)
+                .flat_map(|node| {
+                    h.node_outputs(node)
+                        .filter(move |port| {
+                            h.get_optype(node).port_kind(*port) == Some(EdgeKind::StateOrder)
+                        })
+                        .map(move |port| h.linked_inputs(node, port).count())
+                })
+                .sum()
+        }
+
+        fn foo(module: &mut ModuleBuilder<Hugr>, _: usize) -> FuncID<true> {
+            let mut function = module
+                .define_function(
+                    "foo",
+                    Signature::new_endo([qb_t(), qb_t(), qb_t(), qb_t(), qb_t()]),
+                )
+                .unwrap();
+            function.set_unitary();
+            let [x, z, control_1, control_2, target] = function.input_wires_arr();
+            let x = function
+                .add_dataflow_op(TketOp::X, [x])
+                .unwrap()
+                .out_wire(0);
+            let z = function
+                .add_dataflow_op(TketOp::Z, [z])
+                .unwrap()
+                .out_wire(0);
+            let [control_1, control_2, target] = function
+                .add_dataflow_op(TketOp::Toffoli, [control_1, control_2, target])
+                .unwrap()
+                .outputs_arr();
+            *function
+                .finish_with_outputs([x, z, control_1, control_2, target])
+                .unwrap()
+                .handle()
+        }
+
+        let (mut h, foo_node) = modifier_test_hugr(5, 3, foo, false);
+        force_order(&mut h, foo_node, |_, _| 0).unwrap();
+        assert_eq!(state_order_edge_count(&h, foo_node), 2);
+
+        let entrypoint = h.entrypoint();
+        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        let modified_function = h
+            .nodes()
+            .find(|node| {
+                h.get_optype(*node)
+                    .as_func_defn()
+                    .is_some_and(|function| function.func_name().starts_with("__modified__"))
+            })
+            .unwrap();
+        assert_eq!(state_order_edge_count(&h, modified_function), 26);
+        assert_matches!(h.validate(), Ok(()));
     }
 
     #[test]

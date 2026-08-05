@@ -10,9 +10,9 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  %lazy_measure = call i64 @___lazy_measure(i64 %0), !dbg !8
+  %___lazy_measure = call i64 @___lazy_measure(i64 %0), !dbg !8
   call void @___qfree(i64 %0), !dbg !8
-  ret i64 %lazy_measure
+  ret i64 %___lazy_measure
 }
 
 declare i64 @___lazy_measure(i64)

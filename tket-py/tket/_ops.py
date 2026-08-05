@@ -4,11 +4,10 @@ from enum import Enum, auto
 from typing import Protocol
 
 import tket
-
 from tket._tket.ops import CustomOp
 from tket._types import QB_T
 
-__all__ = ["CustomOp", "ToCustomOp", "TketOp", "Pauli"]
+__all__ = ["CustomOp", "Pauli", "TketOp", "ToCustomOp"]
 
 
 class ToCustomOp(Protocol):
@@ -59,12 +58,12 @@ class TketOp(Enum):
         """Convert to a custom operation."""
         return self._to_rs().to_custom()
 
-    def _to_rs(self) -> "tket._tket.ops.TketOp":  # type: ignore[name-defined]
+    def _to_rs(self) -> tket._tket.ops.TketOp:  # type: ignore[name-defined]
         """Convert to the Rust-backed TketOp representation."""
         return tket._tket.ops.TketOp(self.name)  # type: ignore[attr-defined]
 
     @staticmethod
-    def _from_rs(op: tket._tket.ops.TketOp) -> "TketOp":  # type: ignore[name-defined]
+    def _from_rs(op: tket._tket.ops.TketOp) -> TketOp:  # type: ignore[name-defined]
         """Convert from the Rust-backed TketOp representation."""
         return TketOp[op.name]
 
@@ -85,7 +84,7 @@ class Pauli(Enum):
     Implements the `ToCustomOp` protocol.
     """
 
-    I = auto()  # noqa: E741
+    I = auto()
     X = auto()
     Y = auto()
     Z = auto()
@@ -95,12 +94,12 @@ class Pauli(Enum):
         gate_name = self.name
         return CustomOp(extension_name, gate_name, [QB_T], [QB_T])
 
-    def _to_rs(self) -> "tket._tket.ops.Pauli":  # type: ignore[name-defined]
+    def _to_rs(self) -> tket._tket.ops.Pauli:  # type: ignore[name-defined]
         """Convert to the Rust-backed Pauli representation."""
         return tket._tket.ops.Pauli(self.name)  # type: ignore[attr-defined]
 
     @staticmethod
-    def _from_rs(pauli: tket._tket.ops.Pauli) -> "Pauli":  # type: ignore[name-defined]
+    def _from_rs(pauli: tket._tket.ops.Pauli) -> Pauli:  # type: ignore[name-defined]
         """Convert from the Rust-backed Pauli representation."""
         return Pauli[pauli.name]
 

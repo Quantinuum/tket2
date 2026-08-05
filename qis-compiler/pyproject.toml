@@ -7,7 +7,7 @@ dev = [
     "pytest>=8.4.2",
     "pytest-snapshot~=0.9.0",
     "cibuildwheel>=2.23.2",
-    "hugr~=0.18.2",
+    "hugr~=0.18.3",
     "tket-exts>=0.13.1, <0.15.0",
 ]
 
@@ -48,6 +48,7 @@ repository = "https://github.com/quantinuum/tket2/tree/main/qis-compiler"
 profile = "dev"
 python-source = "python"
 manifest-path = "Cargo.toml"
+features = ["py"]
 include = ["python/selene_hugr_qis_compiler/py.typed"]
 
 [tool.ruff.lint]

@@ -152,6 +152,32 @@ jobs:
         working-directory: pg-libs
         run: cargo test --workspace
 
+  tests-pg-libs-nightly:
+    name: pg-libs tests (nightly)
+    needs: [changes]
+    if: ${{ needs.changes.outputs.pg-libs == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: mozilla-actions/sccache-action@v0.0.10
+      - name: Install pinned nightly toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2025-09-14
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - name: Install Python ${{ env.PYTHON_HIGHEST }}
+        run: uv python install ${{ env.PYTHON_HIGHEST }}
+      - name: Install pg-libs dev dependencies
+        working-directory: pg-libs
+        run: uv sync --python ${{ env.PYTHON_HIGHEST }}
+      - name: Run simd tests
+        working-directory: pg-libs
+        run: cargo test -p pg-bitpacked --features simd
+
   benches:
     name: Continuous benchmarking 🏋️
     needs: changes
@@ -174,7 +200,7 @@ jobs:
       - name: Build benchmarks
         run: cargo codspeed build --profile bench --features portmatching,binary-eccs,rewrite-tracing
       - name: Run benchmarks
-        uses: CodSpeedHQ/action@v4
+        uses: CodSpeedHQ/action@v4.19.1
         with:
           token: ${{ secrets.CODSPEED_TOKEN }}
           run: "cargo codspeed run"
@@ -451,7 +477,7 @@ jobs:
           fetch-depth: 0 # Need full history to compare with main
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: "3.10"
 
@@ -481,6 +507,7 @@ jobs:
         check-rs,
         check-py,
         tests-pg-libs,
+        tests-pg-libs-nightly,
         tests-rs-stable-no-features,
         tests-rs-stable-all-features,
         tests-py,

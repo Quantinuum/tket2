@@ -1,12 +1,10 @@
 import pytest
-
 from hugr import tys
 from hugr.build.function import Module
 
 from tket._pattern import InvalidReplacementError, Rule, RuleMatcher
 from tket._state import CompilationState
 from tket._state.build import CX, OneQbGate, from_coms
-
 
 S = OneQbGate("S")
 T = OneQbGate("T")
