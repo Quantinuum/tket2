@@ -494,6 +494,7 @@ mod tests {
     #[case(-1.0, 0.5)]
     #[case(3.0, 0.25)]
     #[case(1.0, -0.25)]
+    #[case(0.5, -0.5)]
     fn test_postcompose_phasedx(#[case] alpha: f64, #[case] beta: f64) {
         let op = Op::Gate {
             data: GateData::new(GateType::PHASEDX, vec![0]).with_params(vec![alpha, beta]),
