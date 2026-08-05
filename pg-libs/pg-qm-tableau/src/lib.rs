@@ -222,13 +222,13 @@ where
 /// \[0,1,1,0\],
 /// \[1,1,0,1\]
 /// \]
-/// signs = \[0, 0, 0, 1\]
+/// sign_bits = \[0, 0, 0, 1\]
 /// n_qubits = 2
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Tableau {
     qubit_slices_z_bits: Vec<Vec<u64>>,
     qubit_slices_x_bits: Vec<Vec<u64>>,
-    signs: Vec<u64>,
+    sign_bits: Vec<u64>,
     n_qubits: usize,
 }
 
@@ -247,7 +247,7 @@ impl fmt::Display for Tableau {
         }
         let total_sign_bits = 2 * self.n_qubits;
         let mut bits_printed = 0;
-        for s in &self.signs {
+        for s in &self.sign_bits {
             for i in 0..64 {
                 if bits_printed == total_sign_bits {
                     break;
@@ -278,8 +278,8 @@ impl Tableau {
         &self.qubit_slices_x_bits
     }
     /// Get the sign bits of the tableau rows. 1 represents a negative sign, and 0 represents a positive sign.
-    pub fn get_signs(&self) -> &Vec<u64> {
-        &self.signs
+    pub fn get_sign_bits(&self) -> &Vec<u64> {
+        &self.sign_bits
     }
 
     /// Split the tableau into mutable references for two qubits.
@@ -306,7 +306,7 @@ impl Tableau {
             q1_slice_z_bits,
             q0_slice_x_bits,
             q1_slice_x_bits,
-            &mut self.signs,
+            &mut self.sign_bits,
         )
     }
 
@@ -332,63 +332,63 @@ impl Tableau {
                 q0_slice_x_bits,
                 q1_slice_z_bits,
                 q1_slice_x_bits,
-                &mut self.signs,
+                &mut self.sign_bits,
             ),
             (Pauli::X, Pauli::Y) => xy_gate(
                 q0_slice_z_bits,
                 q0_slice_x_bits,
                 q1_slice_z_bits,
                 q1_slice_x_bits,
-                &mut self.signs,
+                &mut self.sign_bits,
             ),
             (Pauli::X, Pauli::Z) => xz_gate(
                 q0_slice_z_bits,
                 q0_slice_x_bits,
                 q1_slice_z_bits,
                 q1_slice_x_bits,
-                &mut self.signs,
+                &mut self.sign_bits,
             ),
             (Pauli::Y, Pauli::X) => xy_gate(
                 q1_slice_z_bits,
                 q1_slice_x_bits,
                 q0_slice_z_bits,
                 q0_slice_x_bits,
-                &mut self.signs,
+                &mut self.sign_bits,
             ),
             (Pauli::Y, Pauli::Y) => yy_gate(
                 q0_slice_z_bits,
                 q0_slice_x_bits,
                 q1_slice_z_bits,
                 q1_slice_x_bits,
-                &mut self.signs,
+                &mut self.sign_bits,
             ),
             (Pauli::Y, Pauli::Z) => yz_gate(
                 q0_slice_z_bits,
                 q0_slice_x_bits,
                 q1_slice_z_bits,
                 q1_slice_x_bits,
-                &mut self.signs,
+                &mut self.sign_bits,
             ),
             (Pauli::Z, Pauli::X) => xz_gate(
                 q1_slice_z_bits,
                 q1_slice_x_bits,
                 q0_slice_z_bits,
                 q0_slice_x_bits,
-                &mut self.signs,
+                &mut self.sign_bits,
             ),
             (Pauli::Z, Pauli::Y) => yz_gate(
                 q1_slice_z_bits,
                 q1_slice_x_bits,
                 q0_slice_z_bits,
                 q0_slice_x_bits,
-                &mut self.signs,
+                &mut self.sign_bits,
             ),
             (Pauli::Z, Pauli::Z) => zz_gate(
                 q0_slice_z_bits,
                 q0_slice_x_bits,
                 q1_slice_z_bits,
                 q1_slice_x_bits,
-                &mut self.signs,
+                &mut self.sign_bits,
             ),
             _ => panic!("Unexpected TQE gate!"),
         }
@@ -414,10 +414,10 @@ impl Tableau {
         let x0_img_idx = 2 * q0 + 1;
         let z1_img_idx = 2 * q1;
         let x1_img_idx = 2 * q1 + 1;
-        let (mut z0_img_z_bits, mut z0_img_x_bits, z0_img_sign) = self.packed_image(z0_img_idx);
-        let (mut x0_img_z_bits, mut x0_img_x_bits, x0_img_sign) = self.packed_image(x0_img_idx);
-        let (mut z1_img_z_bits, mut z1_img_x_bits, z1_img_sign) = self.packed_image(z1_img_idx);
-        let (mut x1_img_z_bits, mut x1_img_x_bits, x1_img_sign) = self.packed_image(x1_img_idx);
+        let (mut z0_img_z_bits, mut z0_img_x_bits, z0_img_sign_bit) = self.packed_image(z0_img_idx);
+        let (mut x0_img_z_bits, mut x0_img_x_bits, x0_img_sign_bit) = self.packed_image(x0_img_idx);
+        let (mut z1_img_z_bits, mut z1_img_x_bits, z1_img_sign_bit) = self.packed_image(z1_img_idx);
+        let (mut x1_img_z_bits, mut x1_img_x_bits, x1_img_sign_bit) = self.packed_image(x1_img_idx);
 
         match (g0, g1) {
             (Pauli::X, Pauli::X) => {
@@ -432,7 +432,7 @@ impl Tableau {
                     z0_img_idx,
                     &z0_img_z_bits,
                     &z0_img_x_bits,
-                    z0_img_sign ^ x1_img_sign ^ (phase == 2),
+                    z0_img_sign_bit ^ x1_img_sign_bit ^ (phase == 2),
                 );
                 // z1 <- z1 * x0
                 let phase = string_mul(
@@ -445,7 +445,7 @@ impl Tableau {
                     z1_img_idx,
                     &z1_img_z_bits,
                     &z1_img_x_bits,
-                    z1_img_sign ^ x0_img_sign ^ (phase == 2),
+                    z1_img_sign_bit ^ x0_img_sign_bit ^ (phase == 2),
                 );
             }
             (Pauli::X, Pauli::Y) => {
@@ -467,7 +467,7 @@ impl Tableau {
                     z0_img_idx,
                     &z0_img_z_bits,
                     &z0_img_x_bits,
-                    z0_img_sign ^ z1_img_sign ^ x1_img_sign ^ (phase == 2),
+                    z0_img_sign_bit ^ z1_img_sign_bit ^ x1_img_sign_bit ^ (phase == 2),
                 );
                 // z1 <- z1 * x0
                 let phase = string_mul(
@@ -480,7 +480,7 @@ impl Tableau {
                     z1_img_idx,
                     &z1_img_z_bits,
                     &z1_img_x_bits,
-                    z1_img_sign ^ x0_img_sign ^ (phase == 2),
+                    z1_img_sign_bit ^ x0_img_sign_bit ^ (phase == 2),
                 );
                 // x1 <- x1 * x0
                 let phase = string_mul(
@@ -493,7 +493,7 @@ impl Tableau {
                     x1_img_idx,
                     &x1_img_z_bits,
                     &x1_img_x_bits,
-                    x1_img_sign ^ x0_img_sign ^ (phase == 2),
+                    x1_img_sign_bit ^ x0_img_sign_bit ^ (phase == 2),
                 );
             }
             (Pauli::X, Pauli::Z) => {
@@ -508,7 +508,7 @@ impl Tableau {
                     z0_img_idx,
                     &z0_img_z_bits,
                     &z0_img_x_bits,
-                    z0_img_sign ^ z1_img_sign ^ (phase == 2),
+                    z0_img_sign_bit ^ z1_img_sign_bit ^ (phase == 2),
                 );
                 // x1 <- x1 * x0
                 let phase = string_mul(
@@ -521,15 +521,15 @@ impl Tableau {
                     x1_img_idx,
                     &x1_img_z_bits,
                     &x1_img_x_bits,
-                    x0_img_sign ^ x1_img_sign ^ (phase == 2),
+                    x0_img_sign_bit ^ x1_img_sign_bit ^ (phase == 2),
                 );
             }
             (Pauli::Y, Pauli::Y) => {
                 // convert sign to phase for readability
-                let z0_img_phase = (z0_img_sign as u8) << 1;
-                let x0_img_phase = (x0_img_sign as u8) << 1;
-                let z1_img_phase = (z1_img_sign as u8) << 1;
-                let x1_img_phase = (x1_img_sign as u8) << 1;
+                let z0_img_phase = (z0_img_sign_bit as u8) << 1;
+                let x0_img_phase = (x0_img_sign_bit as u8) << 1;
+                let z1_img_phase = (z1_img_sign_bit as u8) << 1;
+                let x1_img_phase = (x1_img_sign_bit as u8) << 1;
                 // y1 = i * x1 * z1
                 let mut y1_img_z_bits = x1_img_z_bits;
                 let mut y1_img_x_bits = x1_img_x_bits;
@@ -635,7 +635,7 @@ impl Tableau {
                     x1_img_idx,
                     &x1_img_z_bits,
                     &x1_img_x_bits,
-                    x1_img_sign ^ z0_img_sign ^ x0_img_sign ^ (phase == 2),
+                    x1_img_sign_bit ^ z0_img_sign_bit ^ x0_img_sign_bit ^ (phase == 2),
                 );
                 // z0 <- z0 * z1
                 let phase = string_mul(
@@ -648,7 +648,7 @@ impl Tableau {
                     z0_img_idx,
                     &z0_img_z_bits,
                     &z0_img_x_bits,
-                    z0_img_sign ^ z1_img_sign ^ (phase == 2),
+                    z0_img_sign_bit ^ z1_img_sign_bit ^ (phase == 2),
                 );
                 // x0 <- x0 * z1
                 let phase = string_mul(
@@ -661,7 +661,7 @@ impl Tableau {
                     x0_img_idx,
                     &x0_img_z_bits,
                     &x0_img_x_bits,
-                    x0_img_sign ^ z1_img_sign ^ (phase == 2),
+                    x0_img_sign_bit ^ z1_img_sign_bit ^ (phase == 2),
                 );
             }
             (Pauli::Z, Pauli::Z) => {
@@ -676,7 +676,7 @@ impl Tableau {
                     x0_img_idx,
                     &x0_img_z_bits,
                     &x0_img_x_bits,
-                    x0_img_sign ^ z1_img_sign ^ (phase == 2),
+                    x0_img_sign_bit ^ z1_img_sign_bit ^ (phase == 2),
                 );
                 // x1 <- x1 * z0
                 let phase = string_mul(
@@ -689,7 +689,7 @@ impl Tableau {
                     x1_img_idx,
                     &x1_img_z_bits,
                     &x1_img_x_bits,
-                    x1_img_sign ^ z0_img_sign ^ (phase == 2),
+                    x1_img_sign_bit ^ z0_img_sign_bit ^ (phase == 2),
                 );
             }
             _ => panic!("Unexpected TQE gate!"),
@@ -709,17 +709,17 @@ impl Tableau {
             Pauli::X => v_gate(
                 &mut self.qubit_slices_z_bits[q],
                 &mut self.qubit_slices_x_bits[q],
-                &mut self.signs,
+                &mut self.sign_bits,
             ),
             Pauli::Y => h_gate(
                 &mut self.qubit_slices_z_bits[q],
                 &mut self.qubit_slices_x_bits[q],
-                &mut self.signs,
+                &mut self.sign_bits,
             ),
             Pauli::Z => s_gate(
                 &mut self.qubit_slices_z_bits[q],
                 &mut self.qubit_slices_x_bits[q],
-                &mut self.signs,
+                &mut self.sign_bits,
             ),
             _ => panic!("Unexpected basis change gate!"),
         }
@@ -735,8 +735,8 @@ impl Tableau {
     ) {
         let z_img_idx = 2 * q;
         let x_img_idx = 2 * q + 1;
-        let (mut z_img_z_bits, mut z_img_x_bits, z_img_sign) = self.packed_image(z_img_idx);
-        let (mut x_img_z_bits, mut x_img_x_bits, x_img_sign) = self.packed_image(x_img_idx);
+        let (mut z_img_z_bits, mut z_img_x_bits, z_img_sign_bit) = self.packed_image(z_img_idx);
+        let (mut x_img_z_bits, mut x_img_x_bits, x_img_sign_bit) = self.packed_image(x_img_idx);
         match axis {
             Pauli::X => {
                 // v gate
@@ -754,13 +754,13 @@ impl Tableau {
                     z_img_idx,
                     &z_img_z_bits,
                     &z_img_x_bits,
-                    z_img_sign ^ x_img_sign ^ (phase == 2) ^ dagger,
+                    z_img_sign_bit ^ x_img_sign_bit ^ (phase == 2) ^ dagger,
                 );
             }
             Pauli::Y => {
                 // h gate
-                self.set_packed_image(z_img_idx, &x_img_z_bits, &x_img_x_bits, x_img_sign);
-                self.set_packed_image(x_img_idx, &z_img_z_bits, &z_img_x_bits, z_img_sign);
+                self.set_packed_image(z_img_idx, &x_img_z_bits, &x_img_x_bits, x_img_sign_bit);
+                self.set_packed_image(x_img_idx, &z_img_z_bits, &z_img_x_bits, z_img_sign_bit);
             }
             Pauli::Z => {
                 // s gate
@@ -778,7 +778,7 @@ impl Tableau {
                     x_img_idx,
                     &x_img_z_bits,
                     &x_img_x_bits,
-                    z_img_sign ^ x_img_sign ^ (phase == 2) ^ dagger,
+                    z_img_sign_bit ^ x_img_sign_bit ^ (phase == 2) ^ dagger,
                 );
             }
             _ => panic!("Unexpected basis gate!"),
@@ -796,7 +796,7 @@ impl Tableau {
         apply_half_pi(
             &mut self.qubit_slices_z_bits[q],
             &mut self.qubit_slices_x_bits[q],
-            &mut self.signs,
+            &mut self.sign_bits,
             axis,
             neg,
         );
@@ -815,17 +815,17 @@ impl Tableau {
             Pauli::X => x_gate(
                 &self.qubit_slices_z_bits[q],
                 &self.qubit_slices_x_bits[q],
-                &mut self.signs,
+                &mut self.sign_bits,
             ),
             Pauli::Y => y_gate(
                 &self.qubit_slices_z_bits[q],
                 &self.qubit_slices_x_bits[q],
-                &mut self.signs,
+                &mut self.sign_bits,
             ),
             Pauli::Z => z_gate(
                 &self.qubit_slices_z_bits[q],
                 &self.qubit_slices_x_bits[q],
-                &mut self.signs,
+                &mut self.sign_bits,
             ),
             _ => panic!("Unexpected basis gate!"),
         }
@@ -857,19 +857,19 @@ impl Tableau {
                     y_gate(
                         &self.qubit_slices_z_bits[q],
                         &self.qubit_slices_x_bits[q],
-                        &mut self.signs,
+                        &mut self.sign_bits,
                     );
                 } else if pauli_z_bit == 1 && pauli_x_bit == 0 {
                     z_gate(
                         &self.qubit_slices_z_bits[q],
                         &self.qubit_slices_x_bits[q],
-                        &mut self.signs,
+                        &mut self.sign_bits,
                     );
                 } else if pauli_z_bit == 0 && pauli_x_bit == 1 {
                     x_gate(
                         &self.qubit_slices_z_bits[q],
                         &self.qubit_slices_x_bits[q],
-                        &mut self.signs,
+                        &mut self.sign_bits,
                     );
                 }
             }
@@ -934,7 +934,7 @@ impl Tableau {
                 a_slice_x_bits,
                 b_slice_z_bits,
                 b_slice_x_bits,
-                &mut self.signs,
+                &mut self.sign_bits,
                 ga,
                 gb,
             );
@@ -953,7 +953,7 @@ impl Tableau {
                 qa_slice_x_bits,
                 qb_slice_z_bits,
                 qb_slice_x_bits,
-                &mut self.signs,
+                &mut self.sign_bits,
                 *ga_rev,
                 *gb_rev,
             );
@@ -980,8 +980,8 @@ impl Tableau {
                 if q == self.n_qubits {
                     break 'outer;
                 }
-                let (x_img_z_bits, x_img_x_bits, x_img_sign) = self.packed_image(2 * q + 1);
-                result_sign_flip ^= x_img_sign;
+                let (x_img_z_bits, x_img_x_bits, x_img_sign_bit) = self.packed_image(2 * q + 1);
+                result_sign_flip ^= x_img_sign_bit;
                 phase += string_mul(
                     &mut result_z_bits,
                     &mut result_x_bits,
@@ -999,8 +999,8 @@ impl Tableau {
                 if q == self.n_qubits {
                     break 'outer;
                 }
-                let (z_img_z_bits, z_img_x_bits, z_img_sign) = self.packed_image(2 * q);
-                result_sign_flip ^= z_img_sign;
+                let (z_img_z_bits, z_img_x_bits, z_img_sign_bit) = self.packed_image(2 * q);
+                result_sign_flip ^= z_img_sign_bit;
                 phase += string_mul(
                     &mut result_z_bits,
                     &mut result_x_bits,
@@ -1047,8 +1047,9 @@ impl Tableau {
                         if q == self.n_qubits {
                             break 'outer;
                         }
-                        let (x_img_z_bits, x_img_x_bits, x_img_sign) = self.packed_image(2 * q + 1);
-                        x_img_sign_flip ^= x_img_sign;
+                        let (x_img_z_bits, x_img_x_bits, x_img_sign_bit) =
+                            self.packed_image(2 * q + 1);
+                        x_img_sign_flip ^= x_img_sign_bit;
                         x_img_phase += string_mul(
                             &mut x_img_product_z_bits,
                             &mut x_img_product_x_bits,
@@ -1068,8 +1069,8 @@ impl Tableau {
                         if q == self.n_qubits {
                             break 'outer;
                         }
-                        let (z_img_z_bits, z_img_x_bits, z_img_sign) = self.packed_image(2 * q);
-                        z_img_sign_flip ^= z_img_sign;
+                        let (z_img_z_bits, z_img_x_bits, z_img_sign_bit) = self.packed_image(2 * q);
+                        z_img_sign_flip ^= z_img_sign_bit;
                         z_img_phase += string_mul(
                             &mut z_img_product_z_bits,
                             &mut z_img_product_x_bits,
@@ -1153,25 +1154,25 @@ impl Tableau {
         let mut tab_inv = Self {
             qubit_slices_z_bits: inv_slices_z_bits,
             qubit_slices_x_bits: inv_slices_x_bits,
-            signs: vec![0; self.signs.len()],
+            sign_bits: vec![0; self.sign_bits.len()],
             n_qubits: self.n_qubits,
         };
 
-        // set signs
+        // Set sign bits.
         for q in 0..self.n_qubits {
             let (z_img_z_bits, z_img_x_bits, _) = tab_inv.packed_image(2 * q);
             let (x_img_z_bits, x_img_x_bits, _) = tab_inv.packed_image(2 * q + 1);
-            let (z_img_sign, x_img_sign) = if self.n_qubits >= MT_THRESH {
-                let (_, _, z_img_sign) = apply_mt_fn(self, &z_img_z_bits, &z_img_x_bits);
-                let (_, _, x_img_sign) = apply_mt_fn(self, &x_img_z_bits, &x_img_x_bits);
-                (z_img_sign, x_img_sign)
+            let (z_img_sign_bit, x_img_sign_bit) = if self.n_qubits >= MT_THRESH {
+                let (_, _, z_img_sign_bit) = apply_mt_fn(self, &z_img_z_bits, &z_img_x_bits);
+                let (_, _, x_img_sign_bit) = apply_mt_fn(self, &x_img_z_bits, &x_img_x_bits);
+                (z_img_sign_bit, x_img_sign_bit)
             } else {
-                let (_, _, z_img_sign) = apply_fn(self, &z_img_z_bits, &z_img_x_bits);
-                let (_, _, x_img_sign) = apply_fn(self, &x_img_z_bits, &x_img_x_bits);
-                (z_img_sign, x_img_sign)
+                let (_, _, z_img_sign_bit) = apply_fn(self, &z_img_z_bits, &z_img_x_bits);
+                let (_, _, x_img_sign_bit) = apply_fn(self, &x_img_z_bits, &x_img_x_bits);
+                (z_img_sign_bit, x_img_sign_bit)
             };
-            tab_inv.set_sign(2 * q, z_img_sign);
-            tab_inv.set_sign(2 * q + 1, x_img_sign);
+            tab_inv.set_sign_bit(2 * q, z_img_sign_bit);
+            tab_inv.set_sign_bit(2 * q + 1, x_img_sign_bit);
         }
 
         tab_inv
@@ -1189,32 +1190,32 @@ impl Tableau {
         for q in 0..self.n_qubits {
             let z_img_idx = 2 * q;
             let x_img_idx = 2 * q + 1;
-            let (mut z_img_z_bits, mut z_img_x_bits, z_img_sign) = self.packed_image(z_img_idx);
-            let (mut x_img_z_bits, mut x_img_x_bits, x_img_sign) = self.packed_image(x_img_idx);
-            let (z_img_z_bits_new, z_img_x_bits_new, z_img_sign_new) = if self.n_qubits >= MT_THRESH
-            {
-                apply_mt_fn(other, &mut z_img_z_bits, &mut z_img_x_bits)
-            } else {
-                apply_fn(other, &mut z_img_z_bits, &mut z_img_x_bits)
-            };
-            let (x_img_z_bits_new, x_img_x_bits_new, x_img_sign_new) = if self.n_qubits >= MT_THRESH
-            {
-                apply_mt_fn(other, &mut x_img_z_bits, &mut x_img_x_bits)
-            } else {
-                apply_fn(other, &mut x_img_z_bits, &mut x_img_x_bits)
-            };
+            let (mut z_img_z_bits, mut z_img_x_bits, z_img_sign_bit) = self.packed_image(z_img_idx);
+            let (mut x_img_z_bits, mut x_img_x_bits, x_img_sign_bit) = self.packed_image(x_img_idx);
+            let (z_img_z_bits_new, z_img_x_bits_new, z_img_sign_bit_new) =
+                if self.n_qubits >= MT_THRESH {
+                    apply_mt_fn(other, &mut z_img_z_bits, &mut z_img_x_bits)
+                } else {
+                    apply_fn(other, &mut z_img_z_bits, &mut z_img_x_bits)
+                };
+            let (x_img_z_bits_new, x_img_x_bits_new, x_img_sign_bit_new) =
+                if self.n_qubits >= MT_THRESH {
+                    apply_mt_fn(other, &mut x_img_z_bits, &mut x_img_x_bits)
+                } else {
+                    apply_fn(other, &mut x_img_z_bits, &mut x_img_x_bits)
+                };
 
             self.set_packed_image(
                 z_img_idx,
                 &z_img_z_bits_new,
                 &z_img_x_bits_new,
-                z_img_sign_new ^ z_img_sign,
+                z_img_sign_bit_new ^ z_img_sign_bit,
             );
             self.set_packed_image(
                 x_img_idx,
                 &x_img_z_bits_new,
                 &x_img_x_bits_new,
-                x_img_sign_new ^ x_img_sign,
+                x_img_sign_bit_new ^ x_img_sign_bit,
             );
         }
     }
@@ -1225,7 +1226,7 @@ impl Tableau {
     ///
     /// * `qubit_slices_z_bits` - Packed Z bits for each qubit slice
     /// * `qubit_slices_x_bits` - Packed X bits for each qubit slice
-    /// * `signs` - Sign bits for each column, 0: + and 1: -
+    /// * `sign_bits` - Sign bits for each column, 0: + and 1: -
     /// * `n_qubits` - Number of qubits the tableau operates on
     ///
     /// # Returns
@@ -1235,13 +1236,13 @@ impl Tableau {
     pub fn from_packed_qubit_slices(
         qubit_slices_z_bits: Vec<Vec<u64>>,
         qubit_slices_x_bits: Vec<Vec<u64>>,
-        signs: Vec<u64>,
+        sign_bits: Vec<u64>,
         n_qubits: usize,
     ) -> Self {
         Self {
             qubit_slices_z_bits,
             qubit_slices_x_bits,
-            signs,
+            sign_bits,
             n_qubits,
         }
     }
@@ -1263,7 +1264,7 @@ impl Tableau {
         Self {
             qubit_slices_z_bits,
             qubit_slices_x_bits,
-            signs: vec![0; n_words],
+            sign_bits: vec![0; n_words],
             n_qubits,
         }
     }
@@ -1358,7 +1359,7 @@ impl Tableau {
         (
             img_z_bits,
             img_x_bits,
-            (self.signs[img_word_idx] >> img_bit_offset & 1 == 1),
+            (self.sign_bits[img_word_idx] >> img_bit_offset & 1 == 1),
         )
     }
 
@@ -1368,7 +1369,7 @@ impl Tableau {
         img_idx: usize,
         img_z_bits: &[u64],
         img_x_bits: &[u64],
-        img_sign: bool,
+        img_sign_bit: bool,
     ) {
         let img_word_idx = img_idx / 64;
         let img_bit_offset = img_idx % 64;
@@ -1382,26 +1383,26 @@ impl Tableau {
             self.qubit_slices_x_bits[output_q][img_word_idx] &= !(1 << img_bit_offset);
             self.qubit_slices_x_bits[output_q][img_word_idx] |= img_x_bit << img_bit_offset;
         }
-        if img_sign {
-            self.signs[img_word_idx] |= 1 << img_bit_offset;
+        if img_sign_bit {
+            self.sign_bits[img_word_idx] |= 1 << img_bit_offset;
         } else {
-            self.signs[img_word_idx] &= !(1 << img_bit_offset);
+            self.sign_bits[img_word_idx] &= !(1 << img_bit_offset);
         }
     }
     /// flip sign
     fn flip_sign(&mut self, img_idx: usize) {
         let img_word_idx = img_idx / 64;
         let img_bit_offset = img_idx % 64;
-        self.signs[img_word_idx] ^= 1 << img_bit_offset;
+        self.sign_bits[img_word_idx] ^= 1 << img_bit_offset;
     }
     /// set sign
-    fn set_sign(&mut self, img_idx: usize, img_sign: bool) {
+    fn set_sign_bit(&mut self, img_idx: usize, img_sign_bit: bool) {
         let img_word_idx = img_idx / 64;
         let img_bit_offset = img_idx % 64;
-        if img_sign {
-            self.signs[img_word_idx] |= 1 << img_bit_offset;
+        if img_sign_bit {
+            self.sign_bits[img_word_idx] |= 1 << img_bit_offset;
         } else {
-            self.signs[img_word_idx] &= !(1 << img_bit_offset);
+            self.sign_bits[img_word_idx] &= !(1 << img_bit_offset);
         }
     }
 
@@ -1532,14 +1533,14 @@ impl Tableau {
     /// * `q1` - Index of the second qubit
     ///
     pub fn precompose_swap(&mut self, q0: usize, q1: usize) {
-        let (z0_img_z_bits, z0_img_x_bits, z0_img_sign) = self.packed_image(2 * q0);
-        let (z1_img_z_bits, z1_img_x_bits, z1_img_sign) = self.packed_image(2 * q1);
-        let (x0_img_z_bits, x0_img_x_bits, x0_img_sign) = self.packed_image(2 * q0 + 1);
-        let (x1_img_z_bits, x1_img_x_bits, x1_img_sign) = self.packed_image(2 * q1 + 1);
-        self.set_packed_image(2 * q0, &z1_img_z_bits, &z1_img_x_bits, z1_img_sign);
-        self.set_packed_image(2 * q1, &z0_img_z_bits, &z0_img_x_bits, z0_img_sign);
-        self.set_packed_image(2 * q0 + 1, &x1_img_z_bits, &x1_img_x_bits, x1_img_sign);
-        self.set_packed_image(2 * q1 + 1, &x0_img_z_bits, &x0_img_x_bits, x0_img_sign);
+        let (z0_img_z_bits, z0_img_x_bits, z0_img_sign_bit) = self.packed_image(2 * q0);
+        let (z1_img_z_bits, z1_img_x_bits, z1_img_sign_bit) = self.packed_image(2 * q1);
+        let (x0_img_z_bits, x0_img_x_bits, x0_img_sign_bit) = self.packed_image(2 * q0 + 1);
+        let (x1_img_z_bits, x1_img_x_bits, x1_img_sign_bit) = self.packed_image(2 * q1 + 1);
+        self.set_packed_image(2 * q0, &z1_img_z_bits, &z1_img_x_bits, z1_img_sign_bit);
+        self.set_packed_image(2 * q1, &z0_img_z_bits, &z0_img_x_bits, z0_img_sign_bit);
+        self.set_packed_image(2 * q0 + 1, &x1_img_z_bits, &x1_img_x_bits, x1_img_sign_bit);
+        self.set_packed_image(2 * q1 + 1, &x0_img_z_bits, &x0_img_x_bits, x0_img_sign_bit);
     }
 
     /// Postcompose a SWAP gate.
@@ -1654,19 +1655,19 @@ impl Tableau {
 
     /// Return image of X on the ith qubit. The boolean is true when the image has a -1 phase.
     pub fn x_image(&self, input_qubit: usize) -> (Vec<Pauli>, bool) {
-        let (x_img_z_bits, x_img_x_bits, x_img_sign) = self.packed_image(2 * input_qubit + 1);
+        let (x_img_z_bits, x_img_x_bits, x_img_sign_bit) = self.packed_image(2 * input_qubit + 1);
         (
             u64s_to_paulis(&x_img_z_bits, &x_img_x_bits, self.n_qubits),
-            x_img_sign,
+            x_img_sign_bit,
         )
     }
 
     /// Return image of Z on the ith qubit. The boolean is true when the image has a -1 phase.
     pub fn z_image(&self, input_qubit: usize) -> (Vec<Pauli>, bool) {
-        let (z_img_z_bits, z_img_x_bits, z_img_sign) = self.packed_image(2 * input_qubit);
+        let (z_img_z_bits, z_img_x_bits, z_img_sign_bit) = self.packed_image(2 * input_qubit);
         (
             u64s_to_paulis(&z_img_z_bits, &z_img_x_bits, self.n_qubits),
-            z_img_sign,
+            z_img_sign_bit,
         )
     }
 }
@@ -2181,7 +2182,7 @@ mod tests {
                 // Each qubit slice has one u64, and only one is nonzero.
                 let mut qubit_slices_z_bits = vec![vec![0u64]; n_qubits];
                 let mut qubit_slices_x_bits = vec![vec![0u64]; n_qubits];
-                let mut signs = vec![0u64];
+                let mut sign_bits = vec![0u64];
                 match p {
                     Pauli::X => qubit_slices_x_bits[support][0] = 1,
                     Pauli::Y => {
@@ -2203,7 +2204,7 @@ mod tests {
                         q0_slice_x_bits,
                         q1_slice_z_bits,
                         q1_slice_x_bits,
-                        &mut signs,
+                        &mut sign_bits,
                         g0,
                         g1,
                     );
@@ -2239,7 +2240,7 @@ mod tests {
                 let mut tab2 = tab1.clone();
                 assert_eq!(tab1, tab2);
 
-                let half_pis = if signs[0] == 0 {
+                let half_pis = if sign_bits[0] == 0 {
                     theta
                 } else {
                     match theta {

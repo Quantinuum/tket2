@@ -233,7 +233,7 @@ fn tableau_to_tk(tableau_data: &TableauData, n_qubits: usize) -> Value {
             }
             xbits.push(s_xb);
             zbits.push(s_zb);
-            phases.push(vec![!phase]);
+            phases.push(vec![*phase]);
         }
     };
     process_outputs(
@@ -763,9 +763,9 @@ pub fn pg_from_tk_json(tk_json: &Value) -> Result<PauliGraph, TKConversionError>
                     let z_output_xbits = &xmat[i + n_qubits];
                     let x_output_zbits = &zmat[i];
                     let z_output_zbits = &zmat[i + n_qubits];
-                    // tket produces true for -1 phase
-                    let x_output_phase = !phases[i];
-                    let z_output_phase = !phases[i + n_qubits];
+                    // TKET and pg-core both use true for a -1 phase.
+                    let x_output_phase = phases[i];
+                    let z_output_phase = phases[i + n_qubits];
                     let x_output = (
                         bits_to_pauli_vec(x_output_zbits, x_output_xbits),
                         x_output_phase,
@@ -1053,12 +1053,12 @@ mod tests {
         // cx(0,1);z(0)
         let tableau_data = TableauData::new(
             vec![
-                (vec![Pauli::Z, Pauli::I], true),
-                (vec![Pauli::Z, Pauli::Z], true),
+                (vec![Pauli::Z, Pauli::I], false),
+                (vec![Pauli::Z, Pauli::Z], false),
             ],
             vec![
-                (vec![Pauli::X, Pauli::X], false),
-                (vec![Pauli::I, Pauli::X], true),
+                (vec![Pauli::X, Pauli::X], true),
+                (vec![Pauli::I, Pauli::X], false),
             ],
         );
         pg.add_op(Op::Tableau { data: tableau_data });

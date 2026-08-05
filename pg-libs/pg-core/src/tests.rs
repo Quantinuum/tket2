@@ -316,11 +316,11 @@ fn add_qubit_extends_tableau_and_appends_basis_outputs() {
             );
             assert_eq!(
                 data.get_z_outputs()[1],
-                (vec![Pauli::I, Pauli::I, Pauli::Z], true)
+                (vec![Pauli::I, Pauli::I, Pauli::Z], false)
             );
             assert_eq!(
                 data.get_x_outputs()[1],
-                (vec![Pauli::I, Pauli::I, Pauli::X], true)
+                (vec![Pauli::I, Pauli::I, Pauli::X], false)
             );
         }
         _ => panic!("expected Tableau"),
@@ -651,6 +651,12 @@ fn serde_roundtrip_pauli_graph() {
     );
 
     let json = serde_json::to_string(&pg).unwrap();
+    assert!(json.contains("\"sign_bit\":false"));
+    assert!(json.contains("\"first_sign_bit\":true"));
+    assert!(json.contains("\"second_sign_bit\":false"));
+    assert!(!json.contains("\"sign\":"));
+    assert!(!json.contains("\"first_sign\":"));
+    assert!(!json.contains("\"second_sign\":"));
     let restored: PauliGraph = serde_json::from_str(&json).unwrap();
 
     assert_eq!(restored.get_n_qubits(), pg.get_n_qubits());

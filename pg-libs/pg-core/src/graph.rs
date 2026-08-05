@@ -506,9 +506,9 @@ fn add_qubit_to_op(op: &mut Op, old_n_qubits: usize) {
                 append_identity(string);
             }
             data.z_outputs
-                .push((single_qubit_tableau_output(old_n_qubits, Pauli::Z), true));
+                .push((single_qubit_tableau_output(old_n_qubits, Pauli::Z), false));
             data.x_outputs
-                .push((single_qubit_tableau_output(old_n_qubits, Pauli::X), true));
+                .push((single_qubit_tableau_output(old_n_qubits, Pauli::X), false));
         }
         Op::ConditionalBox { data } => {
             for inner_op in &mut data.ops {

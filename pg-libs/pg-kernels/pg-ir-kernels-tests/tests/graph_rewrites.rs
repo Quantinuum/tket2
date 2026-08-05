@@ -1,11 +1,109 @@
 //! Test crate for `pg-ir-kernels`.
 
 use pg_core::{
-    BlackBoxData, ConditionalBoxData, GateData, GateType, Op, Pauli, PauliGraph, RotationData,
+    BlackBoxData, ConditionalBoxData, GateData, GateType, MeasureData, Op, Pauli, PauliGraph,
+    ResetData, RotationData,
 };
-use pg_ir_kernels::PGRewrite;
+use pg_ir_kernels::{PGRewrite, PGTableau};
 use pg_qm_tableau::Tableau;
 use pg_tk::compare_unitaries_via_tk;
+
+#[test]
+fn tableau_sign_bit_contract_and_rotation_angle() {
+    let identity = Tableau::eye(1);
+    assert_eq!(identity.x(0), (vec![Pauli::X], false));
+    assert_eq!(identity.z(0), (vec![Pauli::Z], false));
+
+    let mut z_tableau = Tableau::eye(1);
+    z_tableau.postcompose_op(&Op::Gate {
+        data: GateData::new(GateType::Z, vec![0]),
+    });
+    assert_eq!(z_tableau.x(0), (vec![Pauli::X], true));
+    assert_eq!(z_tableau.z(0), (vec![Pauli::Z], false));
+
+    for (tableau, expected_angle) in [(&identity, 0.25), (&z_tableau, -0.25)] {
+        let conjugated = tableau.conjugate(&Op::Rotation {
+            data: RotationData::new(vec![Pauli::X], 0.25),
+        });
+        let [Op::Rotation { data }] = conjugated.as_slice() else {
+            panic!("expected one rotation")
+        };
+        assert_eq!(data.get_angle(), expected_angle);
+    }
+}
+
+#[test]
+fn tableau_conjugation_composes_measure_and_reset_sign_bits_with_xor() {
+    let identity = Tableau::eye(1);
+    let mut negative = Tableau::eye(1);
+    negative.postcompose_op(&Op::Gate {
+        data: GateData::new(GateType::Z, vec![0]),
+    });
+
+    for (tableau, tableau_sign_bit) in [(&identity, false), (&negative, true)] {
+        for input_sign_bit in [false, true] {
+            let expected = tableau_sign_bit ^ input_sign_bit;
+            let measurement = Op::Measure {
+                data: MeasureData::new(vec![Pauli::X], input_sign_bit, 0),
+            };
+            let conjugated = tableau.conjugate(&measurement);
+            let [Op::Measure { data }] = conjugated.as_slice() else {
+                panic!("expected one measurement")
+            };
+            assert_eq!(data.get_sign_bit(), expected);
+
+            let conditional = Op::ConditionalBox {
+                data: ConditionalBoxData::new(vec![measurement], vec![0], vec![true]),
+            };
+            let conjugated = tableau.conjugate(&conditional);
+            let [Op::ConditionalBox { data }] = conjugated.as_slice() else {
+                panic!("expected one conditional box")
+            };
+            let [Op::Measure { data }] = data.get_ops().as_slice() else {
+                panic!("expected one conditional measurement")
+            };
+            assert_eq!(data.get_sign_bit(), expected);
+        }
+
+        for first_sign_bit in [false, true] {
+            for second_sign_bit in [false, true] {
+                let reset = Op::Reset {
+                    data: ResetData::new(
+                        vec![Pauli::X],
+                        vec![Pauli::Y],
+                        first_sign_bit,
+                        second_sign_bit,
+                    ),
+                };
+                let conjugated = tableau.conjugate(&reset);
+                let [Op::Reset { data }] = conjugated.as_slice() else {
+                    panic!("expected one reset")
+                };
+                assert_eq!(data.get_first_sign_bit(), tableau_sign_bit ^ first_sign_bit);
+                assert_eq!(
+                    data.get_second_sign_bit(),
+                    tableau_sign_bit ^ second_sign_bit
+                );
+
+                let conditional = Op::ConditionalBox {
+                    data: ConditionalBoxData::new(vec![reset], vec![0], vec![true]),
+                };
+                let conjugated = tableau.conjugate(&conditional);
+                let [Op::ConditionalBox { data }] = conjugated.as_slice() else {
+                    panic!("expected one conditional box")
+                };
+                let [Op::Reset { data }] = data.get_ops().as_slice() else {
+                    panic!("expected one conditional reset")
+                };
+                assert_eq!(data.get_first_sign_bit(), tableau_sign_bit ^ first_sign_bit);
+                assert_eq!(
+                    data.get_second_sign_bit(),
+                    tableau_sign_bit ^ second_sign_bit
+                );
+            }
+        }
+    }
+}
 
 #[test]
 fn test_non_identities() {

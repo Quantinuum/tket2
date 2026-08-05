@@ -43,8 +43,8 @@ where
 {
     use serde::ser::SerializeSeq;
     let mut seq = s.serialize_seq(Some(v.len()))?;
-    for (paulis, sign) in v {
-        seq.serialize_element(&(paulis_to_string(paulis), sign))?;
+    for (paulis, sign_bit) in v {
+        seq.serialize_element(&(paulis_to_string(paulis), sign_bit))?;
     }
     seq.end()
 }
@@ -66,10 +66,10 @@ where
     let items = Vec::<(String, bool)>::deserialize(deserializer)?;
     items
         .into_iter()
-        .map(|(s, sign)| {
+        .map(|(s, sign_bit)| {
             Ok((
                 string_to_paulis(&s).map_err(serde::de::Error::custom)?,
-                sign,
+                sign_bit,
             ))
         })
         .collect()
@@ -154,14 +154,19 @@ pub struct MeasureData {
         deserialize_with = "deserialize_pauli_string"
     )]
     pub(crate) string: Vec<Pauli>,
-    sign: bool,
+    sign_bit: bool,
     cbit: usize,
 }
 
 impl MeasureData {
-    /// Creates measurement data from a Pauli string, sign, and classical bit target.
-    pub fn new(string: Vec<Pauli>, sign: bool, cbit: usize) -> Self {
-        Self { string, sign, cbit }
+    /// Creates measurement data from a Pauli string, sign bit, and classical bit target.
+    /// `false` represents a positive sign and `true` represents a negative sign.
+    pub fn new(string: Vec<Pauli>, sign_bit: bool, cbit: usize) -> Self {
+        Self {
+            string,
+            sign_bit,
+            cbit,
+        }
     }
 
     /// Returns the measured Pauli string.
@@ -169,9 +174,9 @@ impl MeasureData {
         &self.string
     }
 
-    /// Returns the sign of the Pauli string.
-    pub fn get_sign(&self) -> bool {
-        self.sign
+    /// Returns the sign bit of the Pauli string (`false` = positive, `true` = negative).
+    pub fn get_sign_bit(&self) -> bool {
+        self.sign_bit
     }
 
     /// Returns the destination classical bit.
@@ -193,23 +198,24 @@ pub struct ResetData {
         deserialize_with = "deserialize_pauli_string"
     )]
     pub(crate) second_string: Vec<Pauli>,
-    first_sign: bool,
-    second_sign: bool,
+    first_sign_bit: bool,
+    second_sign_bit: bool,
 }
 
 impl ResetData {
-    /// Creates reset data from two anti-commuting Pauli strings and their corresponding signs.
+    /// Creates reset data from two anti-commuting Pauli strings and their sign bits.
+    /// `false` represents a positive sign and `true` represents a negative sign.
     pub fn new(
         first_string: Vec<Pauli>,
         second_string: Vec<Pauli>,
-        first_sign: bool,
-        second_sign: bool,
+        first_sign_bit: bool,
+        second_sign_bit: bool,
     ) -> Self {
         Self {
             first_string,
             second_string,
-            first_sign,
-            second_sign,
+            first_sign_bit,
+            second_sign_bit,
         }
     }
 
@@ -223,14 +229,14 @@ impl ResetData {
         &self.second_string
     }
 
-    /// Returns the sign associated with the first string.
-    pub fn get_first_sign(&self) -> bool {
-        self.first_sign
+    /// Returns the first string's sign bit (`false` = positive, `true` = negative).
+    pub fn get_first_sign_bit(&self) -> bool {
+        self.first_sign_bit
     }
 
-    /// Returns the sign associated with the second string.
-    pub fn get_second_sign(&self) -> bool {
-        self.second_sign
+    /// Returns the second string's sign bit (`false` = positive, `true` = negative).
+    pub fn get_second_sign_bit(&self) -> bool {
+        self.second_sign_bit
     }
 }
 
@@ -309,6 +315,7 @@ pub struct TableauData {
 
 impl TableauData {
     /// Creates tableau data from $Z$ and $X$ output images.
+    /// Each image Boolean is a sign bit (`false` = positive, `true` = negative).
     pub fn new(z_outputs: Vec<(Vec<Pauli>, bool)>, x_outputs: Vec<(Vec<Pauli>, bool)>) -> Self {
         Self {
             z_outputs,
@@ -316,12 +323,12 @@ impl TableauData {
         }
     }
 
-    /// Returns the images of the input $Z$ operators.
+    /// Returns the images of the input $Z$ operators and their sign bits.
     pub fn get_z_outputs(&self) -> &Vec<(Vec<Pauli>, bool)> {
         &self.z_outputs
     }
 
-    /// Returns the images of the input $X$ operators.
+    /// Returns the images of the input $X$ operators and their sign bits.
     pub fn get_x_outputs(&self) -> &Vec<(Vec<Pauli>, bool)> {
         &self.x_outputs
     }

@@ -12,12 +12,10 @@ impl PGTableau for Tableau {
         self.get_n_qubits()
     }
     fn x(&self, qubit: usize) -> (Vec<Pauli>, bool) {
-        let (paulis, sign) = self.x_image(qubit);
-        (paulis, !sign)
+        self.x_image(qubit)
     }
     fn z(&self, qubit: usize) -> (Vec<Pauli>, bool) {
-        let (paulis, sign) = self.z_image(qubit);
-        (paulis, !sign)
+        self.z_image(qubit)
     }
     fn get_dagger(&self) -> Self {
         self.invert()
@@ -312,11 +310,11 @@ impl PGTableau for Tableau {
 
     fn conjugate_string(&self, paulis: &[Pauli]) -> (Vec<Pauli>, bool) {
         let (input_z_bits, input_x_bits) = paulis_to_u64s(paulis);
-        let (result_z_bits, result_x_bits, result_sign) =
+        let (result_z_bits, result_x_bits, result_sign_bit) =
             self.apply_to_pauli(&input_z_bits, &input_x_bits);
         (
             u64s_to_paulis(&result_z_bits, &result_x_bits, self.get_n_qubits()),
-            !result_sign,
+            result_sign_bit,
         )
     }
 }
@@ -336,15 +334,15 @@ impl From<TableauData> for Tableau {
             qubit_slices_z_bits.push(slice_z_bits);
             qubit_slices_x_bits.push(slice_x_bits);
         }
-        let mut neg_signs = vec![false; 2 * n_qubits];
+        let mut sign_bits = vec![false; 2 * n_qubits];
         for input_q in 0..n_qubits {
-            neg_signs[2 * input_q] = !data.get_z_outputs()[input_q].1;
-            neg_signs[2 * input_q + 1] = !data.get_x_outputs()[input_q].1;
+            sign_bits[2 * input_q] = data.get_z_outputs()[input_q].1;
+            sign_bits[2 * input_q + 1] = data.get_x_outputs()[input_q].1;
         }
         Tableau::from_packed_qubit_slices(
             qubit_slices_z_bits,
             qubit_slices_x_bits,
-            bools_to_u64_vec(&neg_signs),
+            bools_to_u64_vec(&sign_bits),
             n_qubits,
         )
     }
@@ -409,23 +407,23 @@ mod tests {
         assert_eq!(
             tableau_data.get_z_outputs(),
             &vec![
-                (vec![Pauli::Z, Pauli::I], true),
-                (vec![Pauli::I, Pauli::Z], true),
+                (vec![Pauli::Z, Pauli::I], false),
+                (vec![Pauli::I, Pauli::Z], false),
             ]
         );
         assert_eq!(
             tableau_data.get_x_outputs(),
             &vec![
-                (vec![Pauli::X, Pauli::I], true),
-                (vec![Pauli::I, Pauli::X], true),
+                (vec![Pauli::X, Pauli::I], false),
+                (vec![Pauli::I, Pauli::X], false),
             ]
         );
     }
 
     #[test]
     fn test_random_pg_qm_tableau_round_trip() {
-        for seed in 0..10 {
-            let random_tableau = Tableau::random(5, seed, 100, 100);
+        for (n_qubits, seed) in [(5, 0), (63, 1), (64, 2), (65, 3)] {
+            let random_tableau = Tableau::random(n_qubits, seed, 20, 20);
             let tableau_data = TableauData::from(random_tableau.clone());
             let converted_back: Tableau = tableau_data.into();
             assert_eq!(
@@ -437,7 +435,10 @@ mod tests {
                 converted_back.qubit_slices_x_bits()
             );
             assert_eq!(random_tableau.get_n_qubits(), converted_back.get_n_qubits());
-            assert_eq!(random_tableau.get_signs(), converted_back.get_signs());
+            assert_eq!(
+                random_tableau.get_sign_bits(),
+                converted_back.get_sign_bits()
+            );
         }
     }
     #[test]
@@ -475,13 +476,13 @@ mod tests {
     fn test_identity_tableau() {
         let tableau = Tableau::eye(2);
         let z0 = tableau.z(0);
-        assert_eq!(z0, (vec![Pauli::Z, Pauli::I], true));
+        assert_eq!(z0, (vec![Pauli::Z, Pauli::I], false));
         let x0 = tableau.x(0);
-        assert_eq!(x0, (vec![Pauli::X, Pauli::I], true));
+        assert_eq!(x0, (vec![Pauli::X, Pauli::I], false));
         let z1 = tableau.z(1);
-        assert_eq!(z1, (vec![Pauli::I, Pauli::Z], true));
+        assert_eq!(z1, (vec![Pauli::I, Pauli::Z], false));
         let x1 = tableau.x(1);
-        assert_eq!(x1, (vec![Pauli::I, Pauli::X], true));
+        assert_eq!(x1, (vec![Pauli::I, Pauli::X], false));
     }
 
     #[rstest]
