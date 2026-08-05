@@ -210,6 +210,23 @@ def test_apply_exhaustive_reaches_fixed_point() -> None:
     assert matcher.apply_exhaustive(circ._inner) == 0
 
 
+def test_apply_all_matches_once() -> None:
+    circ = CompilationState.from_tket1(Circuit(3).H(0).H(0).H(1).H(1).H(2).H(2))
+
+    rule = Rule(
+        CompilationState.from_tket1(Circuit(1).H(0).H(0))._inner,
+        CompilationState.from_tket1(Circuit(1).X(0))._inner,
+    )
+    matcher = RuleMatcher([rule])
+
+    rewrite_count = matcher.apply_all_matches_once(circ._inner)
+
+    assert rewrite_count == 3
+    assert circ.to_tket1() == Circuit(3).X(0).X(1).X(2)
+
+    assert matcher.apply_all_matches_once(circ._inner) == 0
+
+
 def test_clifford_simp_no_swaps():
     c = CompilationState.from_tket1(Circuit(4).CX(0, 2).CX(1, 2).CX(1, 2))
     hugr = Hugr.from_str(c.to_str(), tket_registry())

@@ -145,7 +145,10 @@ impl RuleMatcher {
     }
 
     /// Apply the first matching rule repeatedly within each circuit-compatible
-    /// region in the selected scope.
+    /// When applying a rewrite, the rule matcher
+    /// searches for matches again from the beginning of the region after every rewrite.
+    /// This ensure that the rule is applied exhaustively, but may be not efficient for simple
+    /// rules that can be applied in a single pass.
     ///
     /// Non-circuit regions are skipped. Returns the number of rewrites applied
     /// and restores the original HUGR entrypoint before returning.
@@ -185,8 +188,37 @@ impl RuleMatcher {
         result
     }
 
+    /// Find all matching rules once within each circuit-compatible region and apply
+    /// the resulting rewrites.
+    ///
+    /// For each region, this method performs exactly one matching scan against a
+    /// single HUGR snapshot. It constructs all corresponding rewrites from that
+    /// snapshot and then applies them in matcher order.
+    ///
+    /// If some matches are found after applying a rewrite, the fuction panics.
+    ///
+    /// Non-circuit regions are skipped. The original HUGR entrypoint is restored
+    /// before returning, including when an error occurs.
+    ///
+    /// Returns the total number of successfully applied rewrites.
+    ///
+    /// ### Validity requirement
+    ///
+    /// To ensure that the rewrites works properly, the following condition must hold.
+    /// All matches returned by the matching scan must have pairwise disjoint
+    /// invalidation sets. In particular, no HUGR node may belong to more than one
+    /// matched subgraph in the same scan.
+    ///
+    /// This condition ensures that applying one rewrite cannot invalidate another
+    /// rewrite constructed from the HUGR state at the beginning of the scan. If the
+    /// condition does not hold, a later rewrite may refer to nodes invalidated by
+    /// an earlier rewrite and must not be applied using this method.
+    ///
+    /// For single-operation rules, such as `T -> S` and `Tdg -> Sdg`, this condition
+    /// is satisfied when each operation node is matched at most once.
+    ///
     #[pyo3(signature = (target, scope = None))]
-    pub fn new_apply_exhaustive(
+    pub fn apply_all_matches_once(
         &self,
         target: &mut CompilationState,
         scope: Option<PyPassScope>,
@@ -205,7 +237,6 @@ impl RuleMatcher {
                     Err(error) => return Err(anyhow::Error::msg(error.to_string())),
                 }
 
-                // We assume that applying a rewrite does not introduce new matches for the same rule
                 let rewrites = self.find_matches(target)?;
                 for rewrite in rewrites {
                     target
@@ -213,6 +244,7 @@ impl RuleMatcher {
                         .context("Could not apply exhaustive rule rewrite")?;
                     rewrite_count += 1;
                 }
+                // We assume that applying a rewrite does not introduce new matches for the same rule
                 assert!(
                     self.find_match(target)?.is_none(),
                     "Applying rewrites should not introduce new matches for the same rule"

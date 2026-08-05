@@ -1,13 +1,9 @@
+import statistics
 import time
+from pathlib import Path
 
-try:
-    import matplotlib.pyplot as plt
-except ModuleNotFoundError as exc:
-    if exc.name != "matplotlib":
-        raise
-    plt = None
-
-from tket._state.build import H, OneQbGate, from_coms
+import matplotlib.pyplot as plt
+from tket._state.build import OneQbGate, from_coms
 from tket.passes import Cliffordize
 
 T = OneQbGate("T")
@@ -86,21 +82,3 @@ if plt is not None:
 
 
 print()
-# print("One T in an otherwise-Clifford region")
-# print(f"{'N':>6} {'rewrites':>9} {'time(s)':>9} {'time/N':>10} {'ratio':>8}")
-# prev = None
-# for n in (200, 400, 800, 1600, 3200, 6400):
-#     hugr = from_coms(
-#         *([H(0) for _ in range(n - 1)] + [T(0)])
-#     ).to_python().modules[0]
-
-#     t0 = time.perf_counter()
-#     res = Cliffordize().run(hugr, inplace=False)
-#     dt = time.perf_counter() - t0
-
-#     ratio = f"x{dt / prev:.1f}" if prev else ""
-#     print(
-#         f"{n:>6} {res.results[-1][1]:>9} {dt:>9.4f} "
-#         f"{dt / n:>10.2e} {ratio:>8}"
-#     )
-#     prev = dt
