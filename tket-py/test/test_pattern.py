@@ -44,9 +44,9 @@ def test_rule_rejects_multiple_circuit_module() -> None:
 
 
 def test_find_methods_reject_non_circuit_entrypoint() -> None:
-    matcher = RuleMatcher([
-        Rule(_single_gate_module(T)._inner, _single_gate_module(S)._inner)
-    ])
+    matcher = RuleMatcher(
+        [Rule(_single_gate_module(T)._inner, _single_gate_module(S)._inner)]
+    )
     module = CompilationState.from_python(Module().hugr)
 
     with pytest.raises(ValueError, match="cannot be used as a circuit parent"):
@@ -65,9 +65,9 @@ def test_apply_exhaustive_restores_entrypoint_after_error() -> None:
 
     state = CompilationState.from_python(module.hugr)
     original_entrypoint = state.to_python().modules[0].entrypoint
-    invalid_matcher = RuleMatcher([
-        Rule(_single_gate_module(T)._inner, from_coms(CX(0, 1))._inner)
-    ])
+    invalid_matcher = RuleMatcher(
+        [Rule(_single_gate_module(T)._inner, from_coms(CX(0, 1))._inner)]
+    )
 
     with pytest.raises(
         InvalidReplacementError, match="Replacement graph type mismatch"

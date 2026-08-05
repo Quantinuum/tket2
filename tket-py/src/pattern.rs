@@ -144,10 +144,10 @@ impl RuleMatcher {
             .collect()
     }
 
-    /// Apply the first matching rule repeatedly within each circuit-compatible
+    /// Apply the first matching rule repeatedly within each circuit-compatible region.
     /// When applying a rewrite, the rule matcher
     /// searches for matches again from the beginning of the region after every rewrite.
-    /// This ensure that the rule is applied exhaustively, but may be not efficient for simple
+    /// This ensures that the rule is applied exhaustively, but may not be efficient for simple
     /// rules that can be applied in a single pass.
     ///
     /// Non-circuit regions are skipped. Returns the number of rewrites applied
@@ -195,7 +195,7 @@ impl RuleMatcher {
     /// single HUGR snapshot. It constructs all corresponding rewrites from that
     /// snapshot and then applies them in matcher order.
     ///
-    /// If some matches are found after applying a rewrite, the fuction panics.
+    /// If some matches are found after applying a rewrite, the function panics.
     ///
     /// Non-circuit regions are skipped. The original HUGR entrypoint is restored
     /// before returning, including when an error occurs.
@@ -204,7 +204,7 @@ impl RuleMatcher {
     ///
     /// ### Validity requirement
     ///
-    /// To ensure that the rewrites works properly, the following condition must hold.
+    /// To ensure that the rewrites work properly, the following condition must hold.
     /// All matches returned by the matching scan must have pairwise disjoint
     /// invalidation sets. In particular, no HUGR node may belong to more than one
     /// matched subgraph in the same scan.

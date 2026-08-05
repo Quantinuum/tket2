@@ -58,7 +58,8 @@ class RuleMatcher:
         a single HUGR snapshot. It constructs all corresponding rewrites from
         that snapshot and then applies them in matcher order.
 
-        If some matches are found after applying a rewrite, the function panics.
+        If some matches are found after applying a rewrite, the function raises
+        an assertion error.
 
 
         Non-circuit regions are skipped. The original HUGR entrypoint is
