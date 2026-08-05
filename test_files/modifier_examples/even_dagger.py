@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#    "guppylang==1.0.0rc1",
+#    "guppylang==1.0.1",
 # ]
 # ///
 """Test that an even number of daggers is equivalent to no dagger at all"""
