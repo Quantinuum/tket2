@@ -991,6 +991,130 @@ mod test {
         assert_matches!(h.validate(), Ok(()));
     }
 
+    /// Added after: <PR-link>
+    ///
+    /// Minimal reproducer for daggering an already-controlled CFG whose classical input is
+    /// interleaved with its quantum inputs.
+    /// The inner function has a packed control in its public signature, while its CFG threads
+    /// the unpacked control after the classical input:
+    ///
+    /// ```text
+    /// function: array<qubit; 1>, qubit, usize -> array<qubit; 1>, qubit
+    /// CFG:      qubit, usize, qubit           -> qubit, qubit
+    /// ```
+    ///
+    /// Applying a dagger must keep `usize` flowing forwards and reverse only the two quantum
+    /// wires.
+    #[test]
+    fn daggered_controlled_cfg_with_interleaved_classical_input() {
+        let mut module = ModuleBuilder::new();
+        let inner_control_array_ty = array_type(1, qb_t());
+        let already_controlled_sig = Signature::new(
+            [inner_control_array_ty.clone(), qb_t(), usize_t()],
+            [inner_control_array_ty.clone(), qb_t()],
+        );
+
+        let already_controlled = {
+            let mut func = module
+                .define_function("already_controlled", already_controlled_sig.clone())
+                .unwrap();
+            func.set_unitary();
+
+            let mut inputs = func.input_wires();
+            let inner_controls = inputs.next().unwrap();
+            let target = inputs.next().unwrap();
+            let classical = inputs.next().unwrap();
+            let inner_control = func.add_array_unpack(qb_t(), 1, inner_controls).unwrap()[0];
+
+            let cfg = {
+                let mut cfg = func
+                    .cfg_builder(
+                        vec![
+                            (qb_t(), target),
+                            (usize_t(), classical),
+                            (qb_t(), inner_control),
+                        ],
+                        [qb_t(), qb_t()].into(),
+                    )
+                    .unwrap();
+                let block = {
+                    let mut block = cfg
+                        .entry_builder(vec![type_row![]], [qb_t(), qb_t()].into())
+                        .unwrap();
+                    let mut inputs = block.input_wires();
+                    let target = inputs.next().unwrap();
+                    let _classical = inputs.next().unwrap();
+                    let inner_control = inputs.next().unwrap();
+                    let tag = block.make_sum(0, [type_row![]], []).unwrap();
+                    block
+                        .finish_with_outputs(tag, [target, inner_control])
+                        .unwrap()
+                };
+                let exit = cfg.exit_block();
+                cfg.branch(&block, 0, &exit).unwrap();
+                cfg.finish_sub_container().unwrap()
+            };
+
+            let mut cfg_outputs = cfg.outputs();
+            let target = cfg_outputs.next().unwrap();
+            let inner_control = cfg_outputs.next().unwrap();
+            let inner_controls = func.add_new_array(qb_t(), [inner_control]).unwrap();
+            func.finish_with_outputs([inner_controls, target]).unwrap()
+        };
+
+        let dagger_op = MODIFIER_EXTENSION
+            .instantiate_extension_op(
+                &DAGGER_OP_ID,
+                [
+                    vec![inner_control_array_ty.clone().into(), qb_t().into()].into(),
+                    vec![usize_t().into()].into(),
+                ],
+            )
+            .unwrap();
+
+        {
+            let mut main = module
+                .define_function(
+                    "main",
+                    Signature::new(type_row![], [inner_control_array_ty, qb_t()]),
+                )
+                .unwrap();
+            let loaded = main.load_func(already_controlled.handle(), &[]).unwrap();
+            let daggered = main
+                .add_dataflow_op(dagger_op, [loaded])
+                .unwrap()
+                .out_wire(0);
+
+            let inner_control = main
+                .add_dataflow_op(TketOp::QAlloc, [])
+                .unwrap()
+                .out_wire(0);
+            let target = main
+                .add_dataflow_op(TketOp::QAlloc, [])
+                .unwrap()
+                .out_wire(0);
+            let classical = main.add_load_value(ConstUsize::new(1));
+            let inner_controls = main.add_new_array(qb_t(), [inner_control]).unwrap();
+
+            let call = main
+                .add_dataflow_op(
+                    CallIndirect {
+                        signature: already_controlled_sig,
+                    },
+                    [daggered, inner_controls, target, classical],
+                )
+                .unwrap();
+            main.finish_with_outputs(call.outputs()).unwrap();
+        }
+
+        let mut h = module.finish_hugr().unwrap();
+        assert_matches!(h.validate(), Ok(()));
+
+        let entrypoint = h.entrypoint();
+        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        assert_matches!(h.validate(), Ok(()));
+    }
+
     #[test]
     /// Test that modifying a DFG representing a computation with no quantum effects (no input/output qubits)
     /// does not introduce invalid hugr.
