@@ -960,6 +960,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             ))
         };
 
+        // If dagger is not applied, the ports are mapped directly.
         if !self.modifiers.dagger {
             for index in 0..inputs.len() {
                 self.map_insert(old_input(index), new_input(index))?;
@@ -969,7 +970,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             }
             return Ok(());
         }
-
+        // Otherwise, we need to reverse only the quantum ports.
         // Classical ports remain forward-facing and retain their positions.
         for (index, ty) in inputs.iter().enumerate() {
             if !self.qubit_finder.contains_element_type(ty) {
