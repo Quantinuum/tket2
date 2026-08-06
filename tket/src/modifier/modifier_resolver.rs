@@ -931,18 +931,33 @@ impl<N: HugrNode> ModifierResolver<N> {
         Ok(())
     }
 
+    /// Registers how the old dataflow boundary ports correspond to ports on the rebuilt graph.
+    ///
+    /// `old_in` and `new_in` own the incoming ports described by `inputs`; `old_out` and
+    /// `new_out` own the outgoing ports described by `outputs`. For an ordinary operation each
+    /// pair contains the same node twice, while container boundaries may use separate input and
+    /// output nodes.
+    ///
+    /// `input_offset` and `output_offset` skip leading structural ports that are not represented
+    /// in the supplied type rows, such as the function operand of an indirect call. `new_offset`
+    /// skips additional ports inserted only into the rebuilt graph, such as control qubits.
+    ///
+    /// Without a dagger, each port is mapped to the same relative position. With a dagger,
+    /// non-quantum ports retain their direction and relative position, while quantum inputs and
+    /// outputs are paired in occurrence order and mapped across the boundary. The dagger mapping
+    /// requires the same number of quantum ports in `inputs` and `outputs`.
     fn wire_inout<'a>(
         &mut self,
         (old_in, old_out): (N, N),
         (new_in, new_out): (Node, Node),
         (inputs, outputs): (
-            impl Iterator<Item = &'a Type>,
-            impl Iterator<Item = &'a Type>,
+            impl IntoIterator<Item = &'a Type>,
+            impl IntoIterator<Item = &'a Type>,
         ),
         (input_offset, output_offset, new_offset): (usize, usize, usize),
     ) -> Result<(), ModifierResolverErrors<N>> {
-        let inputs = inputs.collect::<Vec<_>>();
-        let outputs = outputs.collect::<Vec<_>>();
+        let inputs = inputs.into_iter().collect::<Vec<_>>();
+        let outputs = outputs.into_iter().collect::<Vec<_>>();
 
         let old_input = |index| DirWire::from((old_in, IncomingPort::from(input_offset + index)));
         let old_output =
@@ -960,6 +975,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             ))
         };
 
+        // If dagger is not applied, the ports are mapped directly.
         if !self.modifiers.dagger {
             for index in 0..inputs.len() {
                 self.map_insert(old_input(index), new_input(index))?;
@@ -969,7 +985,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             }
             return Ok(());
         }
-
+        // Otherwise, we need to reverse only the quantum ports.
         // Classical ports remain forward-facing and retain their positions.
         for (index, ty) in inputs.iter().enumerate() {
             if !self.qubit_finder.contains_element_type(ty) {
