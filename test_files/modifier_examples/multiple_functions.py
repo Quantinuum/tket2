@@ -1,10 +1,8 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#    "guppylang==1.0.1",
+#    "guppylang==1.0.0rc1",
 # ]
-# [tool.uv.sources]
-# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", rev = "edd34171996d16f6aeafc77fbb463146b8a62a22"}
 # ///
 """Testing a dagger modifier on multiple functions, to ensure that the dagger is
 reversing the order of quantum operations"""
@@ -21,7 +19,7 @@ from guppylang.std.quantum import discard, qubit, rx, s
 enable_experimental_features()
 
 
-@guppy(daggerable=True)
+@guppy
 def get_f() -> float:
     return 1 / 3
 

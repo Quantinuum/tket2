@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#    "guppylang==1.0.1",
+#    "guppylang==1.0.0rc1",
 # ]
 # ///
 """Run on selene the passed hugrs"""
@@ -60,7 +60,7 @@ for hugr_path in hugr_paths:
 
     package = hugr.to_package()
 
-    builder = EmulatorBuilder().with_platform("helios")
+    builder = EmulatorBuilder()
     emulator = builder.build(package, n_qubits=9)
 
     # panic_in_control is expected to panic
