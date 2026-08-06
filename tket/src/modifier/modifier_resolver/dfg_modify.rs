@@ -1116,7 +1116,7 @@ mod test {
     }
 
     /// Added after: https://github.com/Quantinuum/tket2/pull/1911
-    /// Minimal reproducer for daggering an CFG whose classical output is
+    /// Minimal reproducer for daggering a CFG whose classical output is
     /// interleaved with its quantum outputs.
     ///
     /// The inner function has a packed control in its public signature, while its CFG moves the
