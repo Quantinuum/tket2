@@ -9,12 +9,12 @@ dev = [
     "pytest-cov ~=7.0",
     "ruff>=0.16.0,<0.17",
     "mypy>=2.3.0,<3",
-    "hypothesis>=6.161.8,<7",
+    "hypothesis>=6.165.0,<7",
     "hugr~=0.18.3",
     "graphviz ~=0.21.0",
     "pre-commit~=4.6",
     # Required to run `maturin develop`
-    "pip>=26.1.2",
+    "pip>=26.2",
     # Pyyaml 0.6.0 makes setuptools fail. This ensures we're using a newer version.
     "pyyaml >=6.0.2",
     # used for tests in tket-py
