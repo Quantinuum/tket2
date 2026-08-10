@@ -1747,6 +1747,10 @@ fn encoded_circuit_segment_accessors() {
 /// Test the iterators over the segments of an encoded circuit,
 /// when a node has multiple segments.
 #[rstest]
+// `crossbeam` causes issues in miri due to some experimental use of stacked-borrow rules.
+// See <https://github.com/Quantinuum/tket2/issues/1921#issuecomment-5238143899>
+// and <https://github.com/crossbeam-rs/crossbeam/issues/1181>
+#[cfg_attr(miri, ignore)]
 fn encoded_circuit_iterators() {
     let hugr = circ_mid_circuit_external_subgraph();
     let region = hugr.entrypoint();
