@@ -12,13 +12,11 @@ from collections.abc import Callable
 from pathlib import Path
 from sys import argv
 
-from guppylang import enable_experimental_features, guppy
+from guppylang import guppy
 from guppylang.std.array import array_swap
 from guppylang.std.builtins import array, control, dagger
 from guppylang.std.debug import state_result
 from guppylang.std.quantum import angle, discard, h, measure, qubit, rx, x, z
-
-enable_experimental_features()
 
 
 @guppy

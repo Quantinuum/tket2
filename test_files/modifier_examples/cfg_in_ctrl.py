@@ -9,13 +9,11 @@
 from pathlib import Path
 from sys import argv
 
-from guppylang import enable_experimental_features, guppy
+from guppylang import guppy
 from guppylang.std.angles import angle
 from guppylang.std.builtins import control
 from guppylang.std.debug import state_result
 from guppylang.std.quantum import discard, h, qubit, rx, rz, x
-
-enable_experimental_features()
 
 
 @guppy(controllable=True)

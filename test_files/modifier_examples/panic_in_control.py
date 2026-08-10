@@ -9,11 +9,9 @@
 from pathlib import Path
 from sys import argv
 
-from guppylang import enable_experimental_features, guppy
+from guppylang import guppy
 from guppylang.std.builtins import control, panic
 from guppylang.std.quantum import measure, qubit
-
-enable_experimental_features()
 
 
 @guppy
