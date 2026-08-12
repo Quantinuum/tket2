@@ -144,50 +144,6 @@ impl RuleMatcher {
             .collect()
     }
 
-    /// Apply the first matching rule repeatedly within each circuit-compatible region.
-    /// When applying a rewrite, the rule matcher
-    /// searches for matches again from the beginning of the region after every rewrite.
-    /// This ensures that the rule is applied exhaustively, but may not be efficient for simple
-    /// rules that can be applied in a single pass.
-    ///
-    /// Non-circuit regions are skipped. Returns the number of rewrites applied
-    /// and restores the original HUGR entrypoint before returning.
-    ///
-    /// Returns a count of applied rewrites.
-    #[pyo3(signature = (target, scope = None))]
-    pub fn apply_exhaustive(
-        &self,
-        target: &mut CompilationState,
-        scope: Option<PyPassScope>,
-    ) -> anyhow::Result<usize> {
-        let scope = scope.unwrap_or_default().scope;
-        let original_entrypoint = target.hugr.entrypoint();
-        let regions: Vec<_> = scope.regions(&target.hugr).collect();
-
-        let result = (|| {
-            let mut rewrite_count = 0;
-            for region in regions {
-                target.hugr.set_entrypoint(region);
-                match Circuit::try_new(&target.hugr) {
-                    Ok(_) => {}
-                    Err(CircuitError::InvalidParentOp { .. }) => continue,
-                    Err(error) => return Err(anyhow::Error::msg(error.to_string())),
-                }
-
-                while let Some(rewrite) = self.find_match(target)? {
-                    target
-                        .apply_rewrite(rewrite)
-                        .context("Could not apply exhaustive rule rewrite")?;
-                    rewrite_count += 1;
-                }
-            }
-            Ok(rewrite_count)
-        })();
-
-        target.hugr.set_entrypoint(original_entrypoint);
-        result
-    }
-
     /// Find all matching rules once within each circuit-compatible region and apply
     /// the resulting rewrites.
     ///

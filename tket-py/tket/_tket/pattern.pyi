@@ -39,16 +39,6 @@ class RuleMatcher:
     def find_matches(self, circ: CompilationState) -> list[CircuitRewrite]:
         """Find all matches of the rules in the circuit."""
 
-    def apply_exhaustive(
-        self, circ: CompilationState, scope: PassScope | None = None
-    ) -> int:
-        """Apply the first matching rule repeatedly within the selected scope.
-
-        Mutates the provided circuit and returns the number of rewrites applied.
-        Non-circuit scope regions are skipped, and the original HUGR entrypoint
-        is restored before returning, including when an error occurs.
-        """
-
     def apply_all_matches_once(
         self, circ: CompilationState, scope: PassScope | None = None
     ) -> int:
