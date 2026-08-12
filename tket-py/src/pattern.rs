@@ -150,8 +150,7 @@ impl RuleMatcher {
     /// For each region, this method performs exactly one matching scan against a
     /// single HUGR snapshot. It constructs all corresponding rewrites from that
     /// snapshot and then applies them in matcher order.
-    ///
-    /// If some matches are found after applying a rewrite, the function panics.
+    /// If the rewrite produces new matches, they are ignored.
     ///
     /// Non-circuit regions are skipped. The original HUGR entrypoint is restored
     /// before returning, including when an error occurs.
@@ -200,11 +199,6 @@ impl RuleMatcher {
                         .context("Could not apply exhaustive rule rewrite")?;
                     rewrite_count += 1;
                 }
-                // We assume that applying a rewrite does not introduce new matches for the same rule
-                assert!(
-                    self.find_match(target)?.is_none(),
-                    "Applying rewrites should not introduce new matches for the same rule"
-                );
             }
             Ok(rewrite_count)
         })();
