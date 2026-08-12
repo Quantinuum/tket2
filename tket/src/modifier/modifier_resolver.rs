@@ -931,87 +931,98 @@ impl<N: HugrNode> ModifierResolver<N> {
         Ok(())
     }
 
+    /// Registers how the old dataflow boundary ports correspond to ports on the rebuilt graph.
+    ///
+    /// `old_in` and `new_in` own the incoming ports described by `inputs`; `old_out` and
+    /// `new_out` own the outgoing ports described by `outputs`. For an ordinary operation each
+    /// pair contains the same node twice, while container boundaries may use separate input and
+    /// output nodes.
+    ///
+    /// `input_offset` and `output_offset` skip leading structural ports that are not represented
+    /// in the supplied type rows, such as the function operand of an indirect call. `new_offset`
+    /// skips additional ports inserted only into the rebuilt graph, such as control qubits.
+    ///
+    /// Without a dagger, each port is mapped to the same relative position. With a dagger,
+    /// non-quantum ports retain their direction and relative position, while quantum inputs and
+    /// outputs are paired in occurrence order and mapped across the boundary. The dagger mapping
+    /// requires the same number of quantum ports in `inputs` and `outputs`.
     fn wire_inout<'a>(
         &mut self,
         (old_in, old_out): (N, N),
         (new_in, new_out): (Node, Node),
-        (mut inputs, mut outputs): (
-            impl Iterator<Item = &'a Type>,
-            impl Iterator<Item = &'a Type>,
+        (inputs, outputs): (
+            impl IntoIterator<Item = &'a Type>,
+            impl IntoIterator<Item = &'a Type>,
         ),
         (input_offset, output_offset, new_offset): (usize, usize, usize),
     ) -> Result<(), ModifierResolverErrors<N>> {
-        let mut old_in_wire = (old_in, IncomingPort::from(input_offset)).into();
-        let mut old_out_wire = (old_out, OutgoingPort::from(output_offset)).into();
-        let mut new_in_wire = (new_in, IncomingPort::from(input_offset + new_offset)).into();
-        let mut new_out_wire = (new_out, OutgoingPort::from(output_offset + new_offset)).into();
-        let mut in_ty = inputs.next();
-        let mut out_ty = outputs.next();
+        let inputs = inputs.into_iter().collect::<Vec<_>>();
+        let outputs = outputs.into_iter().collect::<Vec<_>>();
 
-        loop {
-            // Wire inputs until the first quantum type
-            while let Some(ty) = in_ty {
-                if self.qubit_finder.contains_element_type(ty) {
-                    break;
-                }
-                self.map_insert(old_in_wire, new_in_wire)?;
-                old_in_wire = old_in_wire.shift(1);
-                new_in_wire = new_in_wire.shift(1);
-                in_ty = inputs.next();
-            }
+        let old_input = |index| DirWire::from((old_in, IncomingPort::from(input_offset + index)));
+        let old_output =
+            |index| DirWire::from((old_out, OutgoingPort::from(output_offset + index)));
+        let new_input = |index| {
+            DirWire::from((
+                new_in,
+                IncomingPort::from(input_offset + new_offset + index),
+            ))
+        };
+        let new_output = |index| {
+            DirWire::from((
+                new_out,
+                OutgoingPort::from(output_offset + new_offset + index),
+            ))
+        };
 
-            // Wire outputs until the first quantum type
-            while let Some(ty) = out_ty {
-                if self.qubit_finder.contains_element_type(ty) {
-                    break;
-                }
-                self.map_insert(old_out_wire, new_out_wire)?;
-                old_out_wire = old_out_wire.shift(1);
-                new_out_wire = new_out_wire.shift(1);
-                out_ty = outputs.next();
+        // If dagger is not applied, the ports are mapped directly.
+        if !self.modifiers.dagger {
+            for index in 0..inputs.len() {
+                self.map_insert(old_input(index), new_input(index))?;
             }
+            for index in 0..outputs.len() {
+                self.map_insert(old_output(index), new_output(index))?;
+            }
+            return Ok(());
+        }
+        // Otherwise, we need to reverse only the quantum ports.
+        // Classical ports remain forward-facing and retain their positions.
+        for (index, ty) in inputs.iter().enumerate() {
+            if !self.qubit_finder.contains_element_type(ty) {
+                self.map_insert(old_input(index), new_input(index))?;
+            }
+        }
+        for (index, ty) in outputs.iter().enumerate() {
+            if !self.qubit_finder.contains_element_type(ty) {
+                self.map_insert(old_output(index), new_output(index))?;
+            }
+        }
 
-            // If both are quantum types, wire them in the opposite direction (if dagger is applied)
-            // until the next non-quantum type
-            while let Some(ty) = in_ty {
-                if !self.qubit_finder.contains_element_type(ty) {
-                    break;
-                }
-                let new_in = if !self.modifiers.dagger {
-                    let new_in = new_in_wire;
-                    new_in_wire = new_in_wire.shift(1);
-                    new_in
-                } else {
-                    let new_in = new_out_wire;
-                    new_out_wire = new_out_wire.shift(1);
-                    new_in
-                };
-                self.map_insert(old_in_wire, new_in)?;
-                old_in_wire = old_in_wire.shift(1);
-                in_ty = inputs.next();
-            }
-            while let Some(ty) = out_ty {
-                if !self.qubit_finder.contains_element_type(ty) {
-                    break;
-                }
-                let new_out = if !self.modifiers.dagger {
-                    let new_out = new_out_wire;
-                    new_out_wire = new_out_wire.shift(1);
-                    new_out
-                } else {
-                    let new_out = new_in_wire;
-                    new_in_wire = new_in_wire.shift(1);
-                    new_out
-                };
-                self.map_insert(old_out_wire, new_out)?;
-                old_out_wire = old_out_wire.shift(1);
-                out_ty = outputs.next();
-            }
+        let quantum_inputs = inputs
+            .iter()
+            .enumerate()
+            .filter_map(|(index, ty)| self.qubit_finder.contains_element_type(ty).then_some(index))
+            .collect::<Vec<_>>();
 
-            // Break if ended
-            if in_ty.is_none() && out_ty.is_none() {
-                break;
-            }
+        let quantum_outputs = outputs
+            .iter()
+            .enumerate()
+            .filter_map(|(index, ty)| self.qubit_finder.contains_element_type(ty).then_some(index))
+            .collect::<Vec<_>>();
+
+        if quantum_inputs.len() != quantum_outputs.len() {
+            return Err(ModifierResolverErrors::unreachable(format!(
+                "Cannot dagger a signature with incompatible quantum port layouts: \
+                 {} quantum inputs and {} quantum outputs.",
+                quantum_inputs.len(),
+                quantum_outputs.len(),
+            )));
+        }
+
+        // Quantum flow reverses while skipping classical holes.
+        for (&input_index, &output_index) in quantum_inputs.iter().zip(&quantum_outputs) {
+            self.map_insert(old_input(input_index), new_output(output_index))?;
+            self.map_insert(old_output(output_index), new_input(input_index))?;
         }
 
         Ok(())
