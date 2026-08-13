@@ -223,12 +223,12 @@ mod tests {
         let pg0 = PauliGraph::new(2).with_ops(vec![Op::Tableau {
             data: TableauData::new(
                 vec![
-                    (vec![Pauli::Z, Pauli::I], false),
-                    (vec![Pauli::I, Pauli::Z], true),
+                    (vec![Pauli::Z, Pauli::I], true),
+                    (vec![Pauli::I, Pauli::Z], false),
                 ],
                 vec![
-                    (vec![Pauli::X, Pauli::I], true),
-                    (vec![Pauli::I, Pauli::X], true),
+                    (vec![Pauli::X, Pauli::I], false),
+                    (vec![Pauli::I, Pauli::X], false),
                 ],
             ),
         }]);
