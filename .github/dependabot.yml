@@ -52,6 +52,7 @@ updates:
       minor:
         update-types: ["minor"]
       # Major updates still generate individual PRs
+    versioning-strategy: "widen"
 
   - package-ecosystem: "github-actions"
     directory: "/"
