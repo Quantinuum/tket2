@@ -200,7 +200,7 @@ jobs:
       - name: Build benchmarks
         run: cargo codspeed build --profile bench --features portmatching,binary-eccs,rewrite-tracing
       - name: Run benchmarks
-        uses: CodSpeedHQ/action@v5.0.3
+        uses: CodSpeedHQ/action@v5
         with:
           token: ${{ secrets.CODSPEED_TOKEN }}
           run: "cargo codspeed run"
