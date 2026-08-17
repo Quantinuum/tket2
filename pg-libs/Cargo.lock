@@ -200,6 +200,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "pg-canonical-form"
+version = "0.1.0"
+dependencies = [
+ "pg-core",
+ "pg-ir-kernels",
+ "pg-qm-tableau",
+ "pg-tk",
+ "pg-utils",
+ "rstest",
+]
+
+[[package]]
 name = "pg-core"
 version = "0.1.0"
 dependencies = [
