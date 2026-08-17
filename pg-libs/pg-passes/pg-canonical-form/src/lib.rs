@@ -585,6 +585,11 @@ fn to_canonical_form(pg: &PauliGraph, forward: bool, cliff_eval: bool) -> PauliG
 /// resets, conditional operations) that are conjugated through and left in place.
 /// `cliff_eval` controls whether rotations with a Clifford angle are folded into the tableau
 /// (`true`) or kept as explicit rotations (`false`).
+///
+/// # Panics
+///
+/// Panics if a conditional box contains an operation other than [`Op::Rotation`],
+/// [`Op::Measure`], or [`Op::Reset`].
 pub struct CanonicalFormPass {
     forward: bool,
     cliff_eval: bool,
