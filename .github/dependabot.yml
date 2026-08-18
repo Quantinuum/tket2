@@ -52,7 +52,19 @@ updates:
       minor:
         update-types: ["minor"]
       # Major updates still generate individual PRs
-    versioning-strategy: "widen"
+
+    # Do not bump the minimal version of dependencies, only widen the upper bound.
+    #
+    # Bumping the minimum can be a breaking change for downstream python users,
+    # as they may break their dependency resolution and prevent them from updating.
+    #
+    # The dependabot documentation indicates this can be done by setting versioning-strategy to "widen",
+    # but this returned errors saying that the value is invalid.
+    # (https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference#versioning-strategy--)
+    #
+    # The uv versioning-strategy issue mentions "widen-ranges" instead
+    # see https://github.com/dependabot/dependabot-core/issues/12162#issuecomment-3898828918
+    versioning-strategy: "widen-ranges"
 
   - package-ecosystem: "github-actions"
     directory: "/"
