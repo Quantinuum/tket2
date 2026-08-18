@@ -196,6 +196,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
+name = "base64"
+version = "0.23.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ac07cdecf99051d9a5238b80f35af32cdeba5b336e55d957b318b50137e18da5"
+
+[[package]]
 name = "bimap"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -321,9 +327,9 @@ checksum = "1e748733b7cbc798e1434b6ac524f0c1ff2ab456fe201501e6497c8417a4fc33"
 
 [[package]]
 name = "capnp"
-version = "0.26.0"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71338171543626713e427635f7de390328d9e85828a816a0c88d959032b34a2f"
+checksum = "6ebfc0da565e747b1640e029bfbda72f61f39fcddfc8b465b4ae3f3e8b649f78"
 dependencies = [
  "embedded-io",
 ]
@@ -1111,8 +1117,7 @@ dependencies = [
 [[package]]
 name = "hugr"
 version = "0.29.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bdf82d7df5459b76cf6818f5b0df72f4ccfafc60678736301b35aa908da8b903"
+source = "git+https://github.com/quantinuum/hugr?rev=601ee49d41b0e388e6d0dd7a52ce99e1b144e5ef#601ee49d41b0e388e6d0dd7a52ce99e1b144e5ef"
 dependencies = [
  "hugr-core",
  "hugr-llvm",
@@ -1122,8 +1127,7 @@ dependencies = [
 [[package]]
 name = "hugr-cli"
 version = "0.29.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "389149b17f459d52540b9569c8d4721c44b350d0d73ef9eb08745a04e77f99a6"
+source = "git+https://github.com/quantinuum/hugr?rev=601ee49d41b0e388e6d0dd7a52ce99e1b144e5ef#601ee49d41b0e388e6d0dd7a52ce99e1b144e5ef"
 dependencies = [
  "anyhow",
  "clap",
@@ -1144,10 +1148,9 @@ dependencies = [
 [[package]]
 name = "hugr-core"
 version = "0.29.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e6c737d774c8d4847822a8c4543404c588fb0a3dd9f5418a15c4132c8000230"
+source = "git+https://github.com/quantinuum/hugr?rev=601ee49d41b0e388e6d0dd7a52ce99e1b144e5ef#601ee49d41b0e388e6d0dd7a52ce99e1b144e5ef"
 dependencies = [
- "base64",
+ "base64 0.23.1",
  "cgmath",
  "delegate 0.13.5",
  "derive_more 2.1.1",
@@ -1182,8 +1185,7 @@ dependencies = [
 [[package]]
 name = "hugr-llvm"
 version = "0.29.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e2728f7db705358c65f4f4efe98c1f86024227380eb53fa4c4b291731927916"
+source = "git+https://github.com/quantinuum/hugr?rev=601ee49d41b0e388e6d0dd7a52ce99e1b144e5ef#601ee49d41b0e388e6d0dd7a52ce99e1b144e5ef"
 dependencies = [
  "anyhow",
  "cc",
@@ -1203,10 +1205,9 @@ dependencies = [
 [[package]]
 name = "hugr-model"
 version = "0.29.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7108e9a20434b90d6f8770f078331233ad5fd5d3289a1d95dca2fd265d2c5d6"
+source = "git+https://github.com/quantinuum/hugr?rev=601ee49d41b0e388e6d0dd7a52ce99e1b144e5ef#601ee49d41b0e388e6d0dd7a52ce99e1b144e5ef"
 dependencies = [
- "base64",
+ "base64 0.23.1",
  "bumpalo",
  "capnp",
  "derive_more 2.1.1",
@@ -2224,7 +2225,7 @@ dependencies = [
  "derive_more 0.99.20",
  "fxhash",
  "itertools 0.13.0",
- "petgraph 0.8.3",
+ "petgraph 0.6.5",
  "serde",
  "slotmap_fork_lmondada",
  "thiserror 1.0.69",
@@ -2487,7 +2488,7 @@ version = "3.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "76a5c54c7310e7b8b9577c286d7e399ddd876c3e12b3ed917a8aabc4b96e9e8c"
 dependencies = [
- "base64",
+ "base64 0.22.1",
  "bs58",
  "chrono",
  "hex",
