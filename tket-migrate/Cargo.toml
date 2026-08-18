@@ -1,0 +1,17 @@
+[package]
+name = "hugr-extension-version"
+version = "0.1.0"
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+description = "Print extension versions saved on operations in a serialized HUGR"
+
+[lints]
+workspace = true
+
+[dependencies]
+hugr.workspace = true
+serde_json.workspace = true
+thiserror = { workspace = true }

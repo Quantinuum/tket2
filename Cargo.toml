@@ -8,6 +8,7 @@ members = [
     "compile-rewriter",
     "qis-compiler",
     "tket",
+    "tket-migrate",
     "tket1-passes",
     "tket-py",
     "tket-qsystem",
