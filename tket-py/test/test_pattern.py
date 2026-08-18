@@ -72,6 +72,6 @@ def test_apply_exhaustive_restores_entrypoint_after_error() -> None:
     with pytest.raises(
         InvalidReplacementError, match="Replacement graph type mismatch"
     ):
-        invalid_matcher.apply_exhaustive(state._inner)
+        invalid_matcher.apply_all_matches_once(state._inner)
 
     assert state.to_python().modules[0].entrypoint == original_entrypoint
