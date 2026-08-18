@@ -811,7 +811,7 @@ mod tests {
         } else {
             panic!("Expected a Measure op in the transformed graph");
         }
-        assert_eq!(transformed1.get_ops(), transformed2.get_ops());
+        assert_eq!(transformed1, transformed2);
     }
 
     #[test]
