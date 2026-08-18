@@ -40,6 +40,12 @@ large_enum_variant = "allow"
 
 [patch.crates-io]
 
+hugr = { git = "https://github.com/quantinuum/hugr", rev = "601ee49d41b0e388e6d0dd7a52ce99e1b144e5ef" }
+hugr-core = { git = "https://github.com/quantinuum/hugr", rev = "601ee49d41b0e388e6d0dd7a52ce99e1b144e5ef" }
+hugr-cli = { git = "https://github.com/quantinuum/hugr", rev = "601ee49d41b0e388e6d0dd7a52ce99e1b144e5ef" }
+hugr-llvm = { git = "https://github.com/quantinuum/hugr", rev = "601ee49d41b0e388e6d0dd7a52ce99e1b144e5ef" }
+hugr-model = { git = "https://github.com/quantinuum/hugr", rev = "601ee49d41b0e388e6d0dd7a52ce99e1b144e5ef" }
+
 # Uncomment to use unreleased versions of hugr
 #hugr = { git = "https://github.com/quantinuum/hugr", "rev" = "1787e12" }
 #hugr-core = { git = "https://github.com/quantinuum/hugr", "rev" = "1787e12" }
