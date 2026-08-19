@@ -82,6 +82,30 @@ impl Metadata for UnitaryFlags {
     type Type<'hugr> = u8;
 }
 
+/// Metadata key for the daggered variant of a function definition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct DaggeredImplementations;
+impl Metadata for DaggeredImplementations {
+    const KEY: &'static str = "tket.daggered";
+    type Type<'hugr> = String;
+}
+
+/// Metadata key for the controlled variants of a function definition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ControlledImplementations;
+impl Metadata for ControlledImplementations {
+    const KEY: &'static str = "tket.controlled";
+    type Type<'hugr> = Vec<String>;
+}
+
+/// Metadata key for the controlled-daggered variants of a function definition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct CtrlDaggeredImplementations;
+impl Metadata for CtrlDaggeredImplementations {
+    const KEY: &'static str = "tket.ctrl_daggered";
+    type Type<'hugr> = Vec<String>;
+}
+
 // Metadata keys used for pytket compatibility.
 
 /// Metadata key for explicit names for the input parameter wires.
