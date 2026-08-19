@@ -59,7 +59,7 @@ jobs:
         if: ${{ matrix.target.run == 'true' }}
       - name: Run sccache-cache
         if: ${{ matrix.target.run == 'true' }}
-        uses: mozilla-actions/sccache-action@v0.0.10
+        uses: mozilla-actions/sccache-action@v0.0.11
 
       - name: Set up uv
         if: ${{ matrix.target.run == 'true' }}
@@ -121,7 +121,7 @@ jobs:
           path: dist
           merge-multiple: true
       - name: Generate artifact attestation
-        uses: actions/attest@v4
+        uses: actions/attest@v4.2.2
         with:
           subject-path: "dist/*"
       - name: Report

@@ -19,7 +19,7 @@ use hugr::{
 };
 use petgraph::visit::{Topo, Walker};
 
-use crate::{TketOp, extension::global_phase::GlobalPhase};
+use crate::extension::modifier::Modifier;
 
 use super::{DirWire, ModifierResolver, ModifierResolverErrors, PortExt};
 
@@ -168,6 +168,19 @@ impl<N: HugrNode> ModifierResolver<N> {
                 )));
             }
         }
+
+        self.wire_state_order(
+            old_in,
+            h.get_optype(old_in),
+            new_in,
+            new_dfg.hugr().get_optype(new_in),
+        )?;
+        self.wire_state_order(
+            old_out,
+            h.get_optype(old_out),
+            new_out,
+            new_dfg.hugr().get_optype(new_out),
+        )?;
 
         Ok(())
     }
@@ -443,48 +456,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         Ok(new_node)
     }
 
-    fn subtree_has_quantum_operation(&self, h: &impl HugrView<Node = N>, n: N) -> bool {
-        // We need more than a type-level qubit check here: Guppy often emits
-        // bounds-check conditionals whose signature carries a qubit, but whose
-        // body only manipulates classical array indices and values.
-        h.descendants(n)
-            .chain(iter::once(n))
-            .any(|node| self.node_is_quantum_operation(h, node))
-    }
-
-    fn node_is_quantum_operation(&self, h: &impl HugrView<Node = N>, n: N) -> bool {
-        let optype = h.get_optype(n);
-        match optype {
-            OpType::Input(_)
-            | OpType::Output(_)
-            | OpType::CFG(_)
-            | OpType::DFG(_)
-            | OpType::TailLoop(_)
-            | OpType::Conditional(_)
-            | OpType::Case(_)
-            | OpType::DataflowBlock(_)
-            | OpType::FuncDefn(_)
-            | OpType::FuncDecl(_)
-            | OpType::Module(_) => false,
-            // tket quantum gates and global phases require the normal modifier
-            // logic. They are real operations, not just qubit-carrying IO.
-            _ if TketOp::from_optype(optype).is_some()
-                || GlobalPhase::from_optype(optype).is_some() =>
-            {
-                true
-            }
-            // Unknown operations are conservative: if their signature can carry
-            // qubits, treat them as quantum-sensitive so we do not silently copy
-            // an operation that may need dagger/control handling.
-            _ => h.signature(n).is_some_and(|sig| {
-                sig.input
-                    .iter()
-                    .chain(sig.output.iter())
-                    .any(|ty| self.qubit_finder.contains_element_type(ty))
-            }),
-        }
-    }
-
     pub(super) fn modify_dfg(
         &mut self,
         h: &mut impl HugrMut<Node = N>,
@@ -533,6 +504,12 @@ impl<N: HugrNode> ModifierResolver<N> {
                 boundary_signature.output.iter(),
             ),
             (0, 0, offset),
+        )?;
+        self.wire_state_order(
+            n,
+            h.get_optype(n),
+            new_dfg,
+            new_parent_dfg.hugr().get_optype(new_dfg),
         )?;
 
         Ok(())
@@ -607,13 +584,14 @@ impl<N: HugrNode> ModifierResolver<N> {
         conditional: &Conditional,
         new_dfg: &mut impl Container,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        // If a conditional does not have quantum operations in its body, we can safely
-        // copy the whole conditional without modification.
-        // TODO: Do we need to check for CallIndirect? Maybe just check if there are modifiers?
-        let has_indirect_call = h
-            .descendants(n)
-            .any(|node| matches!(h.get_optype(node), OpType::CallIndirect(_)));
-        if !self.subtree_has_quantum_operation(h, n) && !has_indirect_call {
+        // A purely classical, modifier-free conditional is unchanged by the
+        // current modifier, so it can be copied without rebuilding its cases.
+        let needs_modification = iter::once(n).chain(h.descendants(n)).any(|node| {
+            h.signature(node)
+                .is_some_and(|signature| self.signature_has_quantum_data(&signature))
+                || Modifier::from_optype(h.get_optype(node)).is_some()
+        });
+        if !needs_modification {
             self.copy_sub_container_no_modification(h, n, new_dfg)?;
             return Ok(());
         }
@@ -697,6 +675,12 @@ impl<N: HugrNode> ModifierResolver<N> {
             new_conditional,
             (conditional.other_inputs.iter(), conditional.outputs.iter()),
             (1, 0, offset),
+        )?;
+        self.wire_state_order(
+            n,
+            h.get_optype(n),
+            new_conditional,
+            new_dfg.hugr().get_optype(new_conditional),
         )?;
 
         Ok(())
@@ -1002,6 +986,255 @@ mod test {
         }
 
         let mut h = module.finish_hugr().unwrap();
+        let entrypoint = h.entrypoint();
+        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        assert_matches!(h.validate(), Ok(()));
+    }
+
+    /// Added after: https://github.com/Quantinuum/tket2/pull/1911
+    ///
+    /// Minimal reproducer for daggering a CFG whose classical input is
+    /// interleaved with its quantum inputs.
+    /// The inner function has a packed control in its public signature, while its CFG threads
+    /// the unpacked control after the classical input:
+    ///
+    /// ```text
+    /// function: array<qubit; 1>, qubit, usize -> array<qubit; 1>, qubit
+    /// CFG:      qubit, usize, qubit           -> qubit, qubit
+    /// ```
+    ///
+    /// Applying a dagger must keep `usize` flowing forwards and reverse only the two quantum
+    /// wires.
+    #[test]
+    fn daggered_controlled_cfg_with_interleaved_classical_input() {
+        let mut module = ModuleBuilder::new();
+        let inner_control_array_ty = array_type(1, qb_t());
+        let already_controlled_sig = Signature::new(
+            [inner_control_array_ty.clone(), qb_t(), usize_t()],
+            [inner_control_array_ty.clone(), qb_t()],
+        );
+
+        let already_controlled = {
+            let mut func = module
+                .define_function("already_controlled", already_controlled_sig.clone())
+                .unwrap();
+            func.set_unitary();
+
+            let mut inputs = func.input_wires();
+            let inner_controls = inputs.next().unwrap();
+            let target = inputs.next().unwrap();
+            let classical = inputs.next().unwrap();
+            let inner_control = func.add_array_unpack(qb_t(), 1, inner_controls).unwrap()[0];
+
+            let cfg = {
+                let mut cfg = func
+                    .cfg_builder(
+                        vec![
+                            (qb_t(), target),
+                            (usize_t(), classical),
+                            (qb_t(), inner_control),
+                        ],
+                        [qb_t(), qb_t()].into(),
+                    )
+                    .unwrap();
+                let block = {
+                    let mut block = cfg
+                        .entry_builder(vec![type_row![]], [qb_t(), qb_t()].into())
+                        .unwrap();
+                    let mut inputs = block.input_wires();
+                    let target = inputs.next().unwrap();
+                    let _classical = inputs.next().unwrap();
+                    let inner_control = inputs.next().unwrap();
+                    let tag = block.make_sum(0, [type_row![]], []).unwrap();
+                    block
+                        .finish_with_outputs(tag, [target, inner_control])
+                        .unwrap()
+                };
+                let exit = cfg.exit_block();
+                cfg.branch(&block, 0, &exit).unwrap();
+                cfg.finish_sub_container().unwrap()
+            };
+
+            let mut cfg_outputs = cfg.outputs();
+            let target = cfg_outputs.next().unwrap();
+            let inner_control = cfg_outputs.next().unwrap();
+            let inner_controls = func.add_new_array(qb_t(), [inner_control]).unwrap();
+            func.finish_with_outputs([inner_controls, target]).unwrap()
+        };
+
+        let dagger_op = MODIFIER_EXTENSION
+            .instantiate_extension_op(
+                &DAGGER_OP_ID,
+                [
+                    vec![inner_control_array_ty.clone().into(), qb_t().into()].into(),
+                    vec![usize_t().into()].into(),
+                ],
+            )
+            .unwrap();
+
+        {
+            let mut main = module
+                .define_function(
+                    "main",
+                    Signature::new(type_row![], [inner_control_array_ty, qb_t()]),
+                )
+                .unwrap();
+            let loaded = main.load_func(already_controlled.handle(), &[]).unwrap();
+            let daggered = main
+                .add_dataflow_op(dagger_op, [loaded])
+                .unwrap()
+                .out_wire(0);
+
+            let inner_control = main
+                .add_dataflow_op(TketOp::QAlloc, [])
+                .unwrap()
+                .out_wire(0);
+            let target = main
+                .add_dataflow_op(TketOp::QAlloc, [])
+                .unwrap()
+                .out_wire(0);
+            let classical = main.add_load_value(ConstUsize::new(1));
+            let inner_controls = main.add_new_array(qb_t(), [inner_control]).unwrap();
+
+            let call = main
+                .add_dataflow_op(
+                    CallIndirect {
+                        signature: already_controlled_sig,
+                    },
+                    [daggered, inner_controls, target, classical],
+                )
+                .unwrap();
+            main.finish_with_outputs(call.outputs()).unwrap();
+        }
+
+        let mut h = module.finish_hugr().unwrap();
+        assert_matches!(h.validate(), Ok(()));
+
+        let entrypoint = h.entrypoint();
+        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        assert_matches!(h.validate(), Ok(()));
+    }
+
+    /// Added after: https://github.com/Quantinuum/tket2/pull/1911
+    /// Minimal reproducer for daggering a CFG whose classical output is
+    /// interleaved with its quantum outputs.
+    ///
+    /// The inner function has a packed control in its public signature, while its CFG moves the
+    /// classical value from the last input port to the middle output port:
+    ///
+    /// ```text
+    /// function: array<qubit; 1>, qubit, usize -> array<qubit; 1>, qubit
+    /// CFG:      qubit, qubit, usize           -> qubit, usize, qubit
+    /// ```
+    ///
+    /// Applying a dagger must keep `usize` flowing forwards and reverse only the two quantum
+    /// wires, skipping the classical hole in the CFG outputs.
+    #[test]
+    fn daggered_controlled_cfg_with_interleaved_classical_output() {
+        let mut module = ModuleBuilder::new();
+        let inner_control_array_ty = array_type(1, qb_t());
+        let already_controlled_sig = Signature::new(
+            [inner_control_array_ty.clone(), qb_t(), usize_t()],
+            [inner_control_array_ty.clone(), qb_t()],
+        );
+
+        let already_controlled = {
+            let mut func = module
+                .define_function("already_controlled", already_controlled_sig.clone())
+                .unwrap();
+            func.set_unitary();
+
+            let mut inputs = func.input_wires();
+            let inner_controls = inputs.next().unwrap();
+            let target = inputs.next().unwrap();
+            let classical = inputs.next().unwrap();
+            let inner_control = func.add_array_unpack(qb_t(), 1, inner_controls).unwrap()[0];
+
+            let cfg = {
+                let mut cfg = func
+                    .cfg_builder(
+                        vec![
+                            (qb_t(), target),
+                            (qb_t(), inner_control),
+                            (usize_t(), classical),
+                        ],
+                        [qb_t(), usize_t(), qb_t()].into(),
+                    )
+                    .unwrap();
+                let block = {
+                    let mut block = cfg
+                        .entry_builder(vec![type_row![]], [qb_t(), usize_t(), qb_t()].into())
+                        .unwrap();
+                    let mut inputs = block.input_wires();
+                    let target = inputs.next().unwrap();
+                    let inner_control = inputs.next().unwrap();
+                    let classical = inputs.next().unwrap();
+                    let tag = block.make_sum(0, [type_row![]], []).unwrap();
+                    block
+                        .finish_with_outputs(tag, [target, classical, inner_control])
+                        .unwrap()
+                };
+                let exit = cfg.exit_block();
+                cfg.branch(&block, 0, &exit).unwrap();
+                cfg.finish_sub_container().unwrap()
+            };
+
+            let mut cfg_outputs = cfg.outputs();
+            let target = cfg_outputs.next().unwrap();
+            let _classical = cfg_outputs.next().unwrap();
+            let inner_control = cfg_outputs.next().unwrap();
+            let inner_controls = func.add_new_array(qb_t(), [inner_control]).unwrap();
+            func.finish_with_outputs([inner_controls, target]).unwrap()
+        };
+
+        let dagger_op = MODIFIER_EXTENSION
+            .instantiate_extension_op(
+                &DAGGER_OP_ID,
+                [
+                    vec![inner_control_array_ty.clone().into(), qb_t().into()].into(),
+                    vec![usize_t().into()].into(),
+                ],
+            )
+            .unwrap();
+
+        {
+            let mut main = module
+                .define_function(
+                    "main",
+                    Signature::new(type_row![], [inner_control_array_ty, qb_t()]),
+                )
+                .unwrap();
+            let loaded = main.load_func(already_controlled.handle(), &[]).unwrap();
+            let daggered = main
+                .add_dataflow_op(dagger_op, [loaded])
+                .unwrap()
+                .out_wire(0);
+
+            let inner_control = main
+                .add_dataflow_op(TketOp::QAlloc, [])
+                .unwrap()
+                .out_wire(0);
+            let target = main
+                .add_dataflow_op(TketOp::QAlloc, [])
+                .unwrap()
+                .out_wire(0);
+            let classical = main.add_load_value(ConstUsize::new(1));
+            let inner_controls = main.add_new_array(qb_t(), [inner_control]).unwrap();
+
+            let call = main
+                .add_dataflow_op(
+                    CallIndirect {
+                        signature: already_controlled_sig,
+                    },
+                    [daggered, inner_controls, target, classical],
+                )
+                .unwrap();
+            main.finish_with_outputs(call.outputs()).unwrap();
+        }
+
+        let mut h = module.finish_hugr().unwrap();
+        assert_matches!(h.validate(), Ok(()));
+
         let entrypoint = h.entrypoint();
         resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
         assert_matches!(h.validate(), Ok(()));

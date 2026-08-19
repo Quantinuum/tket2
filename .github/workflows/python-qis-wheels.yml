@@ -62,7 +62,7 @@ jobs:
       - uses: quantinuum/hugrverse-env/install-hugrenv-action@main
 
       - name: Build selene-hugr-qis-compiler wheel
-        uses: pypa/cibuildwheel@v4.1.0
+        uses: pypa/cibuildwheel@v4.2.0
         with:
           package-dir: qis-compiler
 
@@ -104,7 +104,7 @@ jobs:
           path: wheelhouse
           merge-multiple: true
       - name: Generate artifact attestation
-        uses: actions/attest@v4
+        uses: actions/attest@v4.2.2
         with:
           subject-path: "wheelhouse/*"
 

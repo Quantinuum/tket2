@@ -1,9 +1,9 @@
 import pytest
-
-from .test_pass import _hugr_from_path, _count_ops
+from hugr.passes.scope import GlobalScope, LocalScope
 
 from tket.passes import Normalize, PytketHugrPass
-from hugr.passes.scope import GlobalScope, LocalScope
+
+from .test_pass import _count_ops, _hugr_from_path
 
 normalize = Normalize(inline_funcs=False)
 

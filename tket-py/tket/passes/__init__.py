@@ -1,45 +1,45 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from enum import Enum
 from functools import cache
-import json
 from pathlib import Path
 from typing import TYPE_CHECKING
-from typing_extensions import deprecated
 
 from hugr import Hugr
-
-from tket import _state
-from . import inline_funcs
-from .._pattern import Rule, RuleMatcher
-from .._state.build import OneQbGate, from_coms
-from .._tket import passes as _passes, optimiser as _optimiser
-
 from hugr.passes.composable import (
     ComposablePass,
     ComposedPass,
-    implement_pass_run,
     PassResult,
+    implement_pass_run,
 )
-from hugr.passes.scope import PassScope, GlobalScope
+from hugr.passes.scope import GlobalScope, PassScope
+from typing_extensions import deprecated
+
+from tket import _state
+
+from .._pattern import Rule, RuleMatcher
+from .._state.build import OneQbGate, from_coms
+from .._tket import optimiser as _optimiser
+from .._tket import passes as _passes
+from . import inline_funcs
 
 if TYPE_CHECKING:
     from tket.util import PytketPassProto as PytketPass
 
-
 __all__ = [
-    "PytketHugrPass",
-    "PlatformTarget",
-    "PassResult",
+    "Cliffordize",
     "InlineFuncsHeuristic",
     "InlineFunctions",
+    "ModifierResolverPass",
     "Normalize",
     "NormalizeGuppy",
-    "ModifierResolverPass",
+    "PassResult",
+    "PlatformTarget",
+    "PytketHugrPass",
     "QSystemRebasePass",
     "_QSystemLLVMPass",
-    "Cliffordize",
 ]
 
 
@@ -299,7 +299,7 @@ class Cliffordize(ComposablePass):
 
     def _run_tk(self, program: _state.CompilationState) -> int:
         """Run the pass on a CompilationState and return the rewrite count."""
-        return _cliffordize_matcher().apply_exhaustive(
+        return _cliffordize_matcher().apply_all_matches_once(
             program._inner,
             scope=self._scope,
         )
@@ -314,7 +314,7 @@ class InlineFunctions(ComposablePass):
       inline. Defaults to `MaxSize(128)`.
     """
 
-    heuristic: inline_funcs.InlineFuncsHeuristic = inline_funcs.MaxSize(128)
+    heuristic: inline_funcs.InlineFuncsHeuristic = inline_funcs.MaxSize(128)  # noqa: RUF009
     _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
 
     def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:

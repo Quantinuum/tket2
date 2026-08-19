@@ -291,7 +291,7 @@ fn add_qubit_extends_rotation_measure_and_reset_strings() {
 }
 
 #[test]
-fn add_qubit_extends_tableau_and_appends_basis_outputs() {
+fn add_qubit_extends_tableau_and_appends_basis_images() {
     let mut pg = PauliGraph::new(2);
     pg.add_op(Op::Tableau {
         data: TableauData::new(
@@ -304,23 +304,23 @@ fn add_qubit_extends_tableau_and_appends_basis_outputs() {
 
     match &pg.get_ops()[0] {
         Op::Tableau { data } => {
-            assert_eq!(data.get_z_outputs().len(), 2);
-            assert_eq!(data.get_x_outputs().len(), 2);
+            assert_eq!(data.get_z_images().len(), 2);
+            assert_eq!(data.get_x_images().len(), 2);
             assert_eq!(
-                data.get_z_outputs()[0],
+                data.get_z_images()[0],
                 (vec![Pauli::Z, Pauli::I, Pauli::I], true)
             );
             assert_eq!(
-                data.get_x_outputs()[0],
+                data.get_x_images()[0],
                 (vec![Pauli::X, Pauli::Y, Pauli::I], false)
             );
             assert_eq!(
-                data.get_z_outputs()[1],
-                (vec![Pauli::I, Pauli::I, Pauli::Z], true)
+                data.get_z_images()[1],
+                (vec![Pauli::I, Pauli::I, Pauli::Z], false)
             );
             assert_eq!(
-                data.get_x_outputs()[1],
-                (vec![Pauli::I, Pauli::I, Pauli::X], true)
+                data.get_x_images()[1],
+                (vec![Pauli::I, Pauli::I, Pauli::X], false)
             );
         }
         _ => panic!("expected Tableau"),
@@ -388,11 +388,11 @@ fn data_getters_return_expected_values() {
     assert_eq!(rotation.get_string(), &vec![Pauli::X, Pauli::Z]);
     assert_eq!(rotation.get_angle(), 0.5);
 
-    let z_outputs = vec![(vec![Pauli::Z], true)];
-    let x_outputs = vec![(vec![Pauli::X], false)];
-    let tableau = TableauData::new(z_outputs.clone(), x_outputs.clone());
-    assert_eq!(tableau.get_z_outputs(), &z_outputs);
-    assert_eq!(tableau.get_x_outputs(), &x_outputs);
+    let z_images = vec![(vec![Pauli::Z], true)];
+    let x_images = vec![(vec![Pauli::X], false)];
+    let tableau = TableauData::new(z_images.clone(), x_images.clone());
+    assert_eq!(tableau.get_z_images(), &z_images);
+    assert_eq!(tableau.get_x_images(), &x_images);
 }
 
 #[test]
@@ -651,6 +651,14 @@ fn serde_roundtrip_pauli_graph() {
     );
 
     let json = serde_json::to_string(&pg).unwrap();
+    assert!(json.contains("\"sign_bit\":false"));
+    assert!(json.contains("\"first_sign_bit\":true"));
+    assert!(json.contains("\"second_sign_bit\":false"));
+    assert!(json.contains("\"z_images\":"));
+    assert!(json.contains("\"x_images\":"));
+    assert!(!json.contains("\"sign\":"));
+    assert!(!json.contains("\"first_sign\":"));
+    assert!(!json.contains("\"second_sign\":"));
     let restored: PauliGraph = serde_json::from_str(&json).unwrap();
 
     assert_eq!(restored.get_n_qubits(), pg.get_n_qubits());

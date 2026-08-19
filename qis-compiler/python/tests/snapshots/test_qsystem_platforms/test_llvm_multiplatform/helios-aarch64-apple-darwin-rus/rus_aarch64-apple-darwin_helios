@@ -50,10 +50,10 @@ __hugr__.__tk2_helios_qalloc.94.exit94.i:         ; preds = %__hugr__.__tk2_heli
   tail call void @___rxy(i64 %qalloc.i100.i, double 0x3FF921FB54442D18, double 0x400921FB54442D18)
   tail call void @___rz(i64 %qalloc.i100.i, double 0xBFF921FB54442D18)
   tail call void @___rz(i64 %qalloc.i100.i, double 0x3FE921FB54442D18)
-  %lazy_measure.i = tail call i64 @___lazy_measure(i64 %qalloc.i100.i)
+  %___lazy_measure.i = tail call i64 @___lazy_measure(i64 %qalloc.i100.i)
   tail call void @___qfree(i64 %qalloc.i100.i)
-  %read_bool.i.i = tail call i1 @___read_future_bool(i64 %lazy_measure.i)
-  tail call void @___dec_future_refcount(i64 %lazy_measure.i)
+  %read_bool.i.i = tail call i1 @___read_future_bool(i64 %___lazy_measure.i)
+  tail call void @___dec_future_refcount(i64 %___lazy_measure.i)
   br i1 %read_bool.i.i, label %1, label %0
 
 0:                                                ; preds = %__hugr__.__tk2_helios_qalloc.94.exit94.i
@@ -74,10 +74,10 @@ __hugr__.__tk2_helios_qalloc.94.exit94.i:         ; preds = %__hugr__.__tk2_heli
   tail call void @___rxy(i64 %qalloc.i91.i, double 0x3FF921FB54442D18, double 0x400921FB54442D18)
   tail call void @___rz(i64 %qalloc.i91.i, double 0xBFF921FB54442D18)
   tail call void @___rz(i64 %qalloc.i91.i, double 0x3FE921FB54442D18)
-  %lazy_measure52.i = tail call i64 @___lazy_measure(i64 %qalloc.i91.i)
+  %___lazy_measure52.i = tail call i64 @___lazy_measure(i64 %qalloc.i91.i)
   tail call void @___qfree(i64 %qalloc.i91.i)
-  %read_bool.i97.i = tail call i1 @___read_future_bool(i64 %lazy_measure52.i)
-  tail call void @___dec_future_refcount(i64 %lazy_measure52.i)
+  %read_bool.i97.i = tail call i1 @___read_future_bool(i64 %___lazy_measure52.i)
+  tail call void @___dec_future_refcount(i64 %___lazy_measure52.i)
   br i1 %read_bool.i97.i, label %"__hugr__.__main__.rus.<locals>.rus.17.exit", label %2
 
 2:                                                ; preds = %1
@@ -85,10 +85,10 @@ __hugr__.__tk2_helios_qalloc.94.exit94.i:         ; preds = %__hugr__.__tk2_heli
   br label %.backedge.i
 
 "__hugr__.__main__.rus.<locals>.rus.17.exit":     ; preds = %1
-  %lazy_measure = tail call i64 @___lazy_measure(i64 %qalloc.i)
+  %___lazy_measure = tail call i64 @___lazy_measure(i64 %qalloc.i)
   tail call void @___qfree(i64 %qalloc.i)
-  %read_bool = tail call i1 @___read_future_bool(i64 %lazy_measure)
-  tail call void @___dec_future_refcount(i64 %lazy_measure)
+  %read_bool = tail call i1 @___read_future_bool(i64 %___lazy_measure)
+  tail call void @___dec_future_refcount(i64 %___lazy_measure)
   tail call void @print_bool(ptr nonnull @res_result.457DE32D.0, i64 16, i1 %read_bool)
   ret void
 }

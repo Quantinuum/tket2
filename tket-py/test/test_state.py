@@ -1,15 +1,15 @@
-from semver import Version
-
 from hugr import tys
-from hugr.ext import Extension, OpDef, OpDefSig
 from hugr.build.dfg import Function
+from hugr.ext import Extension, OpDef, OpDefSig
 from hugr.hugr import Hugr
 from hugr.std import _std_extensions
+from semver import Version
+from tket_exts import tket_registry
+
 from tket._state import (
     CompilationState,
     embedded_extensions,
 )
-from tket_exts import tket_registry
 
 
 def _custom_extension_hugr() -> Hugr:
@@ -44,11 +44,11 @@ def test_tket_exts_registry_matches_embedded_tket_extensions() -> None:
     python_tket_ids = set(tket_registry().ids())
     prelude = set(_std_extensions().ids())
 
-    rust_tket_ids = set(
+    rust_tket_ids = {
         extension_id
         for extension_id in embedded_extensions()
         if extension_id not in prelude
-    )
+    }
 
     # Currently missing from tket_exts
     # TODO: Add to tket_exts

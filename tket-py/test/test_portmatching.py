@@ -1,10 +1,11 @@
 import pytest
+
 from tket._pattern import CircuitPattern, PatternMatcher
 from tket._state import CompilationState
 
 pytket = pytest.importorskip("pytket")
-from pytket import Circuit  # noqa: E402
-from pytket.qasm import circuit_from_qasm_str  # noqa: E402
+from pytket import Circuit
+from pytket.qasm import circuit_from_qasm_str
 
 
 def _tk(circ: Circuit):

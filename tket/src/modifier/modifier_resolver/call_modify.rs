@@ -1,7 +1,7 @@
 //! Modify nodes related to function calls.
 
 use hugr::{
-    IncomingPort, Wire,
+    HugrView, IncomingPort, Wire,
     builder::{BuildError, Dataflow},
     core::HugrNode,
     extension::simple_op::MakeExtensionOp,
@@ -65,6 +65,12 @@ impl<N: HugrNode> ModifierResolver<N> {
             new_call_node,
             (old_signature.input.iter(), old_signature.output.iter()),
             (0, 0, offset),
+        )?;
+        self.wire_state_order(
+            call_node,
+            h.get_optype(call_node),
+            new_call_node,
+            new_dfg.hugr().get_optype(new_call_node),
         )?;
 
         Ok(())
@@ -239,6 +245,12 @@ impl<N: HugrNode> ModifierResolver<N> {
             new_call_node,
             (signature.input.iter().skip(1), signature.output.iter()),
             (1, 0, offset),
+        )?;
+        self.wire_state_order(
+            n,
+            h.get_optype(n),
+            new_call_node,
+            new_dfg.hugr().get_optype(new_call_node),
         )?;
         new_dfg.hugr_mut().connect(new_load, 0, new_call_node, 0);
         self.map_insert_none((n, IncomingPort::from(0)).into())?;

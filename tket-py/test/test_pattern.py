@@ -1,12 +1,10 @@
 import pytest
-
 from hugr import tys
 from hugr.build.function import Module
 
 from tket._pattern import InvalidReplacementError, Rule, RuleMatcher
 from tket._state import CompilationState
 from tket._state.build import CX, OneQbGate, from_coms
-
 
 S = OneQbGate("S")
 T = OneQbGate("T")
@@ -74,6 +72,6 @@ def test_apply_exhaustive_restores_entrypoint_after_error() -> None:
     with pytest.raises(
         InvalidReplacementError, match="Replacement graph type mismatch"
     ):
-        invalid_matcher.apply_exhaustive(state._inner)
+        invalid_matcher.apply_all_matches_once(state._inner)
 
     assert state.to_python().modules[0].entrypoint == original_entrypoint

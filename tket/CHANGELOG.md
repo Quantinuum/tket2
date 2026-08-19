@@ -1,6 +1,31 @@
 # Changelog
 
 
+## [0.21.2](https://github.com/Quantinuum/tket2/compare/tket-v0.21.1...tket-v0.21.2) - 2026-07-31
+
+### Bug Fixes
+
+- Parameters used before declaration in pytket decoder ([#1850](https://github.com/Quantinuum/tket2/pull/1850))
+
+### Documentation
+
+- Update the `modifier_resolver` docs ([#1837](https://github.com/Quantinuum/tket2/pull/1837))
+
+### New Features
+
+- Metadata propagation policies for `ReplaceTypes` ([#1783](https://github.com/Quantinuum/tket2/pull/1783))
+- Decode pytket SetBit operations ([#1833](https://github.com/Quantinuum/tket2/pull/1833))
+- Disable pytket encoding for tuple wires ([#1846](https://github.com/Quantinuum/tket2/pull/1846))
+- Raise an error if an unknown extension is found ([#1839](https://github.com/Quantinuum/tket2/pull/1839))
+- improve conditional modification logic in `ModifierResolverPass` ([#1867](https://github.com/Quantinuum/tket2/pull/1867))
+
+### Refactor
+
+- rename `NormalizeGuppy` to `Normalize` ([#1824](https://github.com/Quantinuum/tket2/pull/1824))
+- Higher-order function handling in `ModifierResolverPass` ([#1827](https://github.com/Quantinuum/tket2/pull/1827))
+- Remove leftover todos in `ModifierResolverPass` ([#1838](https://github.com/Quantinuum/tket2/pull/1838))
+- Simplify function modification logic in `modify_fn_if_needed` ([#1842](https://github.com/Quantinuum/tket2/pull/1842))
+
 ## [0.21.1](https://github.com/Quantinuum/tket2/compare/tket-v0.21.0...tket-v0.21.1) - 2026-07-09
 
 ### Bug Fixes
