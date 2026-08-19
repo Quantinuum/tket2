@@ -4,7 +4,7 @@
 #    "guppylang==1.0.1",
 # ]
 # [tool.uv.sources]
-# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", rev = "dd3c1ed7c30a35771bef800d12e2b2444e379e08"}
+# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", rev = "51a990e6e26170f3d814391cc8a7dc9a2fc17eff"}
 # ///
 """Test the use of a higher-order function with complex control flow inside modifiers"""
 
@@ -13,7 +13,7 @@ from sys import argv
 
 from guppylang.std.builtins import array, control, dagger, nat, qubit
 from guppylang import guppy
-from guppylang.std.quantum import discard
+from guppylang.std.quantum import discard, x, discard_array
 from guppylang.std.debug import state_result
 
 from hugr.hugr.render import RenderConfig
@@ -25,28 +25,40 @@ enable_experimental_features()
 @guppy.unitary
 class foo:
     @guppy(unitary=True)
-    def __call__(x: int) -> None:
-        pass
+    def __call__(q: qubit) -> None:
+        _x = 1
+
+    # @guppy
+    # def daggered(x: int) -> None:
+    #     _x = 2
 
     @guppy
-    def daggered(x: int) -> None:
-        pass
+    def controlled[c: nat](q: qubit, _controls: array[qubit, c]) -> None:
+        with control(_controls):
+            x(q)
 
-    @guppy
-    def controlled[c: nat](x: int, _controls: array[qubit, c]) -> None:
-        _x = 4
+    # @guppy
+    # def ctrl_daggered[c: nat](x: int, _controls: array[qubit, c]) -> None:
+    #     _x = 4
 
 
 @guppy
 def main() -> None:
     q = qubit()
     c = qubit()
-    with control(q, c):
-        foo(2)
+    cs = array(qubit())
+    with control(cs):
+        with control(c):
+            foo(q)
+    # with dagger:
+    #     foo(3)
+    # with control(c), dagger:
+    #     foo(4)
 
     state_result("r", q, c)
     discard(q)
     discard(c)
+    discard_array(cs)
 
 
 main.with_minimal_opt().compile().modules[0].render_dot(
