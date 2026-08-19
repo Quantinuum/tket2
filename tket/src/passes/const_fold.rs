@@ -102,9 +102,14 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
         let Some(root) = self.scope.root(hugr) else {
             return Ok(()); // Scope says do nothing
         };
-        let fresh_node = Node::from(portgraph::NodeIndex::new(
-            hugr.nodes().max().map_or(0, |n| n.index() + 1),
-        ));
+        // A dummy location is only needed for explicitly supplied constants.
+        // Finding an unused node index scans the whole HUGR, so avoid doing it
+        // for the overwhelmingly common no-input case.
+        let fresh_node = (!self.inputs.is_empty()).then(|| {
+            Node::from(portgraph::NodeIndex::new(
+                hugr.nodes().max().map_or(0, |n| n.index() + 1),
+            ))
+        });
         let mut m = Machine::new(&hugr);
         for (&n, in_vals) in &self.inputs {
             if !hugr.contains_node(n) {
@@ -115,7 +120,12 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
                 in_vals.iter().map(|(p, v)| {
                     let const_with_dummy_loc = partial_from_const(
                         &ConstFoldContext,
-                        ConstLocation::Field(p.index(), &fresh_node.into()),
+                        ConstLocation::Field(
+                            p.index(),
+                            &fresh_node
+                                .expect("non-empty inputs require a dummy node")
+                                .into(),
+                        ),
                         v,
                     );
                     (*p, const_with_dummy_loc)

@@ -169,26 +169,31 @@ impl PassScope {
     ) -> impl Iterator<Item = H::Node> + 'a {
         self.root(hugr).into_iter().flat_map(move |r| {
             let ep = hugr.entrypoint();
-            [r, ep]
-                .into_iter()
-                .unique()
-                .chain(hugr.children(hugr.module_root()).filter(move |n| {
-                    if *n == ep {
-                        return false; // Entrypoint added above
-                    };
-                    match self {
-                        Self::Global(Preserve::All) => return true,
-                        Self::Global(Preserve::Public) => (), // fallthrough
-                        Self::Global(Preserve::Entrypoint) if ep == hugr.module_root() => (), // fallthough
-                        _ => return false,
-                    };
-                    let vis = match hugr.get_optype(*n) {
-                        OpType::FuncDecl(fd) => fd.visibility(),
-                        OpType::FuncDefn(fd) => fd.visibility(),
-                        _ => return false,
-                    };
-                    vis == &Visibility::Public
-                }))
+            let scan_module_children =
+                matches!(self, Self::Global(Preserve::All | Preserve::Public))
+                    || matches!(self, Self::Global(Preserve::Entrypoint))
+                        && ep == hugr.module_root();
+            [r, ep].into_iter().unique().chain(
+                hugr.children(hugr.module_root())
+                    .take(if scan_module_children { usize::MAX } else { 0 })
+                    .filter(move |n| {
+                        if *n == ep {
+                            return false; // Entrypoint added above
+                        };
+                        match self {
+                            Self::Global(Preserve::All) => return true,
+                            Self::Global(Preserve::Public) => (), // fallthrough
+                            Self::Global(Preserve::Entrypoint) if ep == hugr.module_root() => (), // fallthough
+                            _ => return false,
+                        };
+                        let vis = match hugr.get_optype(*n) {
+                            OpType::FuncDecl(fd) => fd.visibility(),
+                            OpType::FuncDefn(fd) => fd.visibility(),
+                            _ => return false,
+                        };
+                        vis == &Visibility::Public
+                    }),
+            )
         })
     }
 

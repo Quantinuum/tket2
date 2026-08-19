@@ -1,6 +1,6 @@
 //! [ascent] datalog implementation of analysis.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use ascent::Lattice;
 use ascent::lattice::BoundedLattice;
@@ -108,7 +108,8 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
 
     /// Run the analysis (iterate until a lattice fixpoint is reached).
     ///
-    /// Return results only for the given subtree.
+    /// Analyze the given subtree and statically referenced definitions, then
+    /// return results only for the subtree.
     pub fn run_subtree(
         self,
         context: impl DFContext<V, Node = H::Node>,
@@ -148,6 +149,20 @@ fn run_datalog<V: AbstractValue, H: HugrView>(
         clippy::collapsible_if
     )]
 
+    let (analysis_nodes, analysis_node_set) = analysis_nodes(&hugr, result_root);
+    let external_value_inputs = analysis_nodes
+        .iter()
+        .filter(|&&node| node != result_root)
+        .flat_map(|&node| {
+            hugr.in_value_types(node)
+                .filter_map(|(port, _)| {
+                    let (source, _) = hugr.single_linked_output(node, port)?;
+                    (!analysis_node_set.contains(&source)).then_some((node, port))
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+
     let all_results = ascent::ascent_run! {
         pub(super) struct AscentProgram<V: AbstractValue, H: HugrView>;
         relation node(H::Node); // <Node> exists in the hugr
@@ -161,12 +176,10 @@ fn run_datalog<V: AbstractValue, H: HugrView>(
         lattice in_wire_value(H::Node, IncomingPort, PV<V, H::Node>); // <Node> receives, on <IncomingPort>, the value <PV>
         lattice node_in_value_row(H::Node, ValueRow<V, H::Node>); // <Node>'s inputs are <ValueRow>
 
-        // Analyse all nodes as this will compute the most accurate results for the desired nodes.
-        // Moreover, this is the only sound policy until we correctly mark incoming edges at `Top`,
-        // see https://github.com/CQCL/hugr/issues/2254), so is a workaround for that.
-        // When that issue is solved, we can consider a flag to restrict analysis to the subregion
-        // (for efficiency - will still decrease accuracy of solutions, but will at least be safe).
-        node(n) <-- for n in hugr.nodes();
+        // Restrict analysis to the requested subtree and definitions reached by
+        // static edges. Value edges entering that closure are initialized to Top
+        // below, making the restricted analysis conservative.
+        node(n) <-- for n in analysis_nodes.iter().copied();
 
         in_wire(n, p) <-- node(n), for (p,_) in hugr.in_value_types(*n); // Note, gets connected inports only
         out_wire(n, p) <-- node(n), for (p,_) in hugr.out_value_types(*n); // (and likewise)
@@ -183,6 +196,10 @@ fn run_datalog<V: AbstractValue, H: HugrView>(
         // Initialize all wires to bottom
         out_wire_value(n, p, PV::bottom()) <-- out_wire(n, p);
         in_wire_value(n, p, PV::bottom()) <-- in_wire(n, p);
+
+        // A value entering the analysis closure is unknown. Without this rule it
+        // would remain Bottom, making a scoped analysis unsound.
+        in_wire_value(n, p, PV::top()) <-- for (n, p) in &external_value_inputs;
 
         // Outputs to inputs
         in_wire_value(n, ip, v) <-- value_edge(n, ip, m, op), out_wire_value(m, op, v);
@@ -410,6 +427,28 @@ fn run_datalog<V: AbstractValue, H: HugrView>(
             .filter(|(_, n)| filter_nodes.as_ref().is_none_or(|f| f.contains(n)))
             .collect(),
     }
+}
+
+/// Collect the requested subtree and the transitive closure of definitions it
+/// references through static edges.
+fn analysis_nodes<H: HugrView>(hugr: &H, root: H::Node) -> (Vec<H::Node>, HashSet<H::Node>) {
+    let mut nodes = Vec::new();
+    let mut node_set = HashSet::new();
+    let mut roots = VecDeque::from([root]);
+
+    while let Some(root) = roots.pop_front() {
+        for node in hugr.descendants(root) {
+            if !node_set.insert(node) {
+                continue;
+            }
+            nodes.push(node);
+            if let Some(static_source) = hugr.static_source(node) {
+                roots.push_back(static_source);
+            }
+        }
+    }
+
+    (nodes, node_set)
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, PartialOrd)]
