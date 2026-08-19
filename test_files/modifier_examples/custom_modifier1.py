@@ -4,7 +4,7 @@
 #    "guppylang==1.0.1",
 # ]
 # [tool.uv.sources]
-# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", rev = "e177e340b8680deee77a145bf416caf6a8da0f6c"}
+# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", rev = "dd3c1ed7c30a35771bef800d12e2b2444e379e08"}
 # ///
 """Test the use of a higher-order function with complex control flow inside modifiers"""
 
