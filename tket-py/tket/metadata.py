@@ -38,6 +38,9 @@ if TYPE_CHECKING:
 
 __all__ = [
     "CircuitRewriteTraces",
+    "ControlledImplementations",
+    "CtrlDaggeredImplementations",
+    "DaggeredImplementations",
     "HeliosPlatformConfig",
     "HeliosPlatformConfigValue",
     "InlineAnnotation",
@@ -62,6 +65,30 @@ PytketQubit: TypeAlias = tuple[str, list[int]]
 #
 # This can be passed to `pytket.unit_id.Bit.from_list`
 PytketBit: TypeAlias = tuple[str, list[int]]
+
+
+class ControlledImplementations(Metadata[list[str]]):
+    """Metadata key for the names of controlled implementations of a function."""
+
+    KEY = _metadata.CONTROLLED_IMPLEMENTATIONS
+
+
+class CtrlDaggeredImplementations(Metadata[list[str]]):
+    """Metadata key for the names of controlled-daggered implementations of a function."""
+
+    KEY = _metadata.CTRL_DAGGERED_IMPLEMENTATIONS
+
+
+class NumControlQubits(Metadata[int]):
+    """Metadata key for the number of control qubits used in a function's controlled implementation."""
+
+    KEY = _metadata.NUM_CONTROL_QUBITS
+
+
+class DaggeredImplementations(Metadata[str]):
+    """Metadata key for the name of the daggered implementation of a function."""
+
+    KEY = _metadata.DAGGERED_IMPLEMENTATIONS
 
 
 class RewriteTraceValue(TypedDict):

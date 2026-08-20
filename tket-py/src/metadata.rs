@@ -5,8 +5,10 @@ use pyo3::prelude::*;
 #[expect(deprecated)]
 use tket::metadata::PytketPhaseExpr;
 use tket::metadata::{
-    CircuitRewriteTraces, ExpectedQubitsHint, InlineAnnotation, PytketBitRegisterNames,
-    PytketInputParameters, PytketOpGroup, PytketQubitRegisterNames, UnitaryFlags,
+    CircuitRewriteTraces, ControlledImplementations, CtrlDaggeredImplementations,
+    DaggeredImplementations, ExpectedQubitsHint, InlineAnnotation, NumControlQubits,
+    PytketBitRegisterNames, PytketInputParameters, PytketOpGroup, PytketQubitRegisterNames,
+    UnitaryFlags,
 };
 use tket_qsystem::extension::qsystem::helios::HeliosPlatformConfig;
 
@@ -26,5 +28,12 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     #[expect(deprecated)]
     m.add("PYTKET_PHASE_EXPR", PytketPhaseExpr::KEY)?;
     m.add("HELIOS_PLATFORM_CONFIG", HeliosPlatformConfig::KEY)?;
+    m.add("CONTROLLED_IMPLEMENTATIONS", ControlledImplementations::KEY)?;
+    m.add(
+        "CTRL_DAGGERED_IMPLEMENTATIONS",
+        CtrlDaggeredImplementations::KEY,
+    )?;
+    m.add("DAGGERED_IMPLEMENTATIONS", DaggeredImplementations::KEY)?;
+    m.add("NUM_CONTROL_QUBITS", NumControlQubits::KEY)?;
     Ok(m)
 }
