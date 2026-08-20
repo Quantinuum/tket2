@@ -40,7 +40,7 @@ env:
   # hugrverse-env, and the pyodide ABI targeted above.
   EMSDK_VERSION: "4.0.9"
   # hugrverse-env target used to fetch the pre-built tket-c-api WebAssembly library.
-  HUGRVERSE_WASM_TARGET: "emscripten_4_0_9"
+  HUGRVERSE_WASM_TARGET: "emscripten_4_0_9_wasm32"
 
 jobs:
   # Check if the tag matches the package name,
