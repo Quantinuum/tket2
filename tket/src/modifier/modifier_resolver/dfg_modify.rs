@@ -1025,10 +1025,13 @@ mod test {
         builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder, SubContainer},
         extension::prelude::{ConstUsize, bool_t, qb_t, usize_t},
         extension::simple_op::MakeExtensionOp,
-        ops::{CallIndirect, ExtensionOp, handle::FuncID},
+        ops::{
+            CallIndirect, ExtensionOp,
+            handle::{FuncID, NodeHandle},
+        },
         std_extensions::collections::{
             array::{ArrayOp, ArrayOpBuilder, ArrayOpDef, array_type, array_type_parametric},
-            borrow_array::{BArrayOp, BArrayOpBuilder, BArrayOpDef},
+            borrow_array::{BArrayOp, BArrayOpBuilder, BArrayOpDef, borrow_array_type},
         },
         type_row,
         types::{PolyFuncType, Signature, Term, Type, TypeArg, TypeBound, type_param::TypeParam},
@@ -1051,6 +1054,55 @@ mod test {
         }
         .out_wire(0);
         *func.finish_with_outputs(inputs).unwrap().handle()
+    }
+
+    #[test]
+    fn custom_implementation_adapter_is_cached() {
+        let mut module = ModuleBuilder::new();
+        let original = {
+            let func = module
+                .define_function("original", Signature::new_endo([usize_t()]))
+                .unwrap();
+            let outputs = func.input_wires();
+            *func.finish_with_outputs(outputs).unwrap().handle()
+        };
+        let custom = {
+            let func = module
+                .define_function(
+                    "custom",
+                    Signature::new_endo([usize_t(), borrow_array_type(1, qb_t())]),
+                )
+                .unwrap();
+            let outputs = func.input_wires();
+            *func.finish_with_outputs(outputs).unwrap().handle()
+        };
+        let mut h = module.finish_hugr().unwrap();
+        let mut resolver = ModifierResolver::new();
+        resolver.modifiers = CombinedModifier {
+            control: 1,
+            accum_ctrl: vec![1],
+            dagger: false,
+        };
+
+        let first = resolver
+            .custom_implementation_adapter(&mut h, original.node(), custom.node())
+            .unwrap();
+        let second = resolver
+            .custom_implementation_adapter(&mut h, original.node(), custom.node())
+            .unwrap();
+
+        assert_eq!(first, second);
+        assert_eq!(resolver.custom_adapters.len(), 1);
+        assert_eq!(
+            h.children(h.module_root())
+                .filter(|&node| {
+                    h.get_optype(node)
+                        .as_func_defn()
+                        .is_some_and(|defn| defn.func_name().starts_with("__controller_adapter__"))
+                })
+                .count(),
+            1
+        );
     }
 
     fn foo_tail_loop(module: &mut ModuleBuilder<Hugr>, t_num: usize) -> FuncID<true> {
