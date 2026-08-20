@@ -7,8 +7,8 @@ use std::{
 use hugr::{
     HugrView, IncomingPort, Node, OutgoingPort, PortIndex, Wire,
     builder::{
-        ConditionalBuilder, Container, DFGBuilder, Dataflow, FunctionBuilder, SubContainer,
-        TailLoopBuilder,
+        BuildError, ConditionalBuilder, Container, DFGBuilder, Dataflow, FunctionBuilder,
+        SubContainer, TailLoopBuilder,
     },
     core::HugrNode,
     extension::{prelude::qb_t, simple_op::MakeExtensionOp},
@@ -21,7 +21,7 @@ use hugr::{
         array::ArrayOpBuilder,
         borrow_array::{BArrayOpBuilder, borrow_array_type},
     },
-    types::{EdgeKind, FuncTypeBase, Signature, TypeRow},
+    types::{EdgeKind, FuncTypeBase, PolyFuncType, Signature, TypeRow},
 };
 use petgraph::visit::{Topo, Walker};
 
@@ -232,17 +232,18 @@ impl<N: HugrNode> ModifierResolver<N> {
         Ok(controls)
     }
 
-    /// Unpacks the given control qubits from arrays according to the combined modifier.
+    /// Unpacks the control qubits (given by the combined modifier) from a list of arrays into a flat list of qubit wires.
     pub(super) fn unpack_controls(
         &self,
-        new_dfg: &mut impl Dataflow,
+        builder: &mut impl Dataflow,
         controls_arr: impl IntoIterator<Item = Wire>,
     ) -> Result<Vec<Wire>, ModifierResolverErrors<N>> {
-        let mut controls = Vec::new();
+        let control_layout = &self.modifiers().accum_ctrl;
+        let mut controls = Vec::with_capacity(control_layout.iter().sum());
         let mut controls_arr = controls_arr.into_iter();
-        for size in self.modifiers().accum_ctrl.iter() {
-            let ctrl_arr = controls_arr.next().unwrap();
-            controls.extend(new_dfg.add_array_unpack(qb_t(), *size as u64, ctrl_arr)?);
+        for size in control_layout {
+            let ctrl_arr = controls_arr.next().expect("missing control array");
+            controls.extend(builder.add_array_unpack(qb_t(), *size as u64, ctrl_arr)?);
         }
         Ok(controls)
     }
@@ -305,16 +306,11 @@ impl<N: HugrNode> ModifierResolver<N> {
         &self,
         new_dfg: &mut impl Dataflow,
     ) -> Result<Vec<Wire>, ModifierResolverErrors<N>> {
-        let controls = self.controls_ref();
-        let mut v = Vec::new();
-        let mut offset = 0;
-        for size in self.modifiers().accum_ctrl.iter() {
-            let wire =
-                new_dfg.add_new_array(qb_t(), controls[offset..offset + size].iter().cloned())?;
-            offset += size;
-            v.push(wire);
-        }
-        Ok(v)
+        Ok(pack_control_groups(
+            new_dfg,
+            self.controls_ref(),
+            &self.modifiers().accum_ctrl,
+        )?)
     }
 
     /// Modifies a function if necessary.
@@ -413,10 +409,11 @@ impl<N: HugrNode> ModifierResolver<N> {
 
     /// Return a cached adapter for a custom controlled implementation.
     ///
-    /// The resolver represents each accumulated control group as an owned array at the start of
-    /// the function signature. Guppy custom implementations instead receive one borrowed control
-    /// array after the ordinary inputs and return it after the ordinary outputs. The adapter keeps
-    /// that convention local to the custom implementation.
+    /// The resolver expects the modified function to receive groups of controls as
+    /// owned arrays prepended to its ordinary arguments. Guppy custom implementations
+    /// instead receive a single borrowed control array after the ordinary inputs and
+    /// return it after the ordinary outputs. The adapter combines the control groups
+    /// into one borrowed array and reorders the inputs and outputs accordingly.
     fn custom_implementation_adapter(
         &mut self,
         h: &mut impl HugrMut<Node = N>,
@@ -433,6 +430,26 @@ impl<N: HugrNode> ModifierResolver<N> {
             return Ok(*adapter);
         }
 
+        let spec = self.validate_custom_adapter(h, original_func, custom_func)?;
+        let mut adapter_signature = spec.original_signature.clone();
+        // The adapter signature is the original signature modified by the combined modifier, as
+        // the function was modified without using the custom implementation.
+        self.modify_signature(adapter_signature.body_mut(), false);
+        let adapter_func = self.build_custom_adapter(h, &spec, adapter_signature, custom_func)?;
+
+        // cache the adapter for future use
+        self.custom_adapters.insert(cache_key, adapter_func);
+        Ok(adapter_func)
+    }
+
+    /// Validate the controls-last ABI of a custom implementation and collect the information
+    /// required to build its controls-first adapter.
+    fn validate_custom_adapter(
+        &self,
+        h: &impl HugrView<Node = N>,
+        original_func: N,
+        custom_func: N,
+    ) -> Result<CustomAdapterSpec, ModifierResolverErrors<N>> {
         let OpType::FuncDefn(original_defn) = h.get_optype(original_func) else {
             return Err(ModifierResolverErrors::unreachable(format!(
                 "Cannot adapt a custom implementation for non-function node {original_func}."
@@ -447,6 +464,10 @@ impl<N: HugrNode> ModifierResolver<N> {
         let original_signature = original_defn.signature().clone();
         let custom_signature = custom_defn.signature().clone();
         let custom_name = custom_defn.func_name().clone();
+
+        // NICOLA: All these test are legit, not sure if we want to keep them or not
+        // If we remove them, given custom implementation that do not respect them will produce an invalid hugr
+        // (we will get an error anyway, but it will be less clear)
         let custom_optype = h.get_optype(custom_func).clone();
         if !original_signature.params().is_empty() || !custom_signature.params().is_empty() {
             return Err(ModifierResolverErrors::unresolvable(
@@ -495,75 +516,11 @@ impl<N: HugrNode> ModifierResolver<N> {
             ));
         }
 
-        let mut adapter_signature = original_signature;
-        self.modify_signature(adapter_signature.body_mut(), false);
-        let control_layout = self
-            .modifiers()
-            .accum_ctrl
-            .iter()
-            .map(usize::to_string)
-            .collect::<Vec<_>>()
-            .join("_");
-        let mut adapter = FunctionBuilder::new(
-            format!("__controller_adapter__{custom_name}__{control_layout}"),
-            adapter_signature,
-        )?;
-
-        let adapter_inputs = adapter.input_wires().collect::<Vec<_>>();
-        let control_group_count = self.modifiers().accum_ctrl.len();
-        let mut control_qubits = Vec::with_capacity(self.control_num());
-        for (&control_array, &size) in adapter_inputs
-            .iter()
-            .take(control_group_count)
-            .zip(self.modifiers().accum_ctrl.iter())
-        {
-            control_qubits.extend(adapter.add_array_unpack(qb_t(), size as u64, control_array)?);
-        }
-        let custom_control = adapter.add_new_borrow_array(qb_t(), control_qubits)?;
-        let custom_arguments = adapter_inputs
-            .into_iter()
-            .skip(control_group_count)
-            .chain([custom_control]);
-
-        // NICOLA: todo: why not adapter.call(function, type_args, input_wires) ?
-        let custom_call_op =
-            Call::try_new(custom_signature, []).map_err(hugr::builder::BuildError::from)?;
-        let custom_function_port = custom_call_op.called_function_port();
-        let custom_call = adapter.add_dataflow_op(custom_call_op, custom_arguments)?;
-        let custom_call_node = custom_call.node();
-
-        let mut ordinary_outputs = custom_call.outputs().collect::<Vec<_>>();
-        let returned_controls = ordinary_outputs.pop().ok_or_else(|| {
-            ModifierResolverErrors::unreachable(format!(
-                "Validated custom implementation `{custom_name}` has no control output."
-            ))
-        })?;
-        let returned_control_qubits = adapter.add_borrow_array_unpack(
-            qb_t(),
-            self.control_num() as u64,
-            returned_controls,
-        )?;
-        let mut control_outputs = Vec::with_capacity(control_group_count);
-        let mut offset = 0;
-        for &size in &self.modifiers().accum_ctrl {
-            control_outputs.push(
-                adapter.add_new_array(
-                    qb_t(),
-                    returned_control_qubits[offset..offset + size]
-                        .iter()
-                        .copied(),
-                )?,
-            );
-            offset += size;
-        }
-        adapter.set_outputs(control_outputs.into_iter().chain(ordinary_outputs))?;
-
-        let insertion = h.insert_from_view(h.module_root(), adapter.hugr());
-        let inserted_call = insertion.node_map[&custom_call_node];
-        h.connect(custom_func, 0, inserted_call, custom_function_port);
-        let adapter_func = insertion.inserted_entrypoint;
-        self.custom_adapters.insert(cache_key, adapter_func);
-        Ok(adapter_func)
+        Ok(CustomAdapterSpec {
+            original_signature,
+            custom_signature,
+            custom_name,
+        })
     }
 
     /// Generates a new function modified by the combined modifier.
@@ -912,6 +869,102 @@ impl<N: HugrNode> ModifierResolver<N> {
 
         Ok(())
     }
+
+    /// Build, insert, and link the adapter for a controlled custom implementation.
+    ///
+    /// The adapter is built as a standalone HUGR, so its call to `custom_func` is linked only after
+    /// insertion into `h`. The returned node is the inserted adapter function.
+    fn build_custom_adapter(
+        &self,
+        h: &mut impl HugrMut<Node = N>,
+        spec: &CustomAdapterSpec,
+        adapter_signature: PolyFuncType,
+        custom_func: N,
+    ) -> Result<N, ModifierResolverErrors<N>> {
+        let control_layout = &self.modifiers().accum_ctrl;
+        let layout_name = control_layout
+            .iter()
+            .map(usize::to_string)
+            .collect::<Vec<_>>()
+            .join("_");
+
+        // New adapter function
+        let mut adapter = FunctionBuilder::new(
+            format!("__controller_adapter[{}]__{layout_name}", spec.custom_name),
+            adapter_signature,
+        )?;
+
+        let adapter_inputs = adapter.input_wires().collect::<Vec<_>>();
+        let control_group_count = control_layout.len();
+        // We expect that the controllers inputting the adapter match exactly the control layout
+        assert_eq!(
+            adapter_inputs[..control_group_count].len(),
+            control_layout.len()
+        );
+        // Unpack the control groups and them pack them into a single borrowed array
+        let control_qubits = self.unpack_controls(
+            &mut adapter,
+            adapter_inputs[..control_group_count].iter().copied(),
+        )?;
+        let custom_control = adapter.add_new_borrow_array(qb_t(), control_qubits)?;
+        let custom_arguments = adapter_inputs
+            .into_iter()
+            .skip(control_group_count)
+            .chain([custom_control]);
+
+        // Call the custom implementation
+        let custom_call_op =
+            Call::try_new(spec.custom_signature.clone(), []).map_err(BuildError::from)?;
+        let function_port = custom_call_op.called_function_port();
+        let custom_call = adapter.add_dataflow_op(custom_call_op, custom_arguments)?;
+
+        let mut ordinary_outputs = custom_call.outputs().collect::<Vec<_>>();
+        let returned_controls = ordinary_outputs
+            .pop()
+            .expect("the validated custom signature has a control output");
+        let control_num = control_layout.iter().sum::<usize>();
+
+        // Unpack the returned control array and repack it into the resolver's control groups.
+        let returned_control_qubits =
+            adapter.add_borrow_array_unpack(qb_t(), control_num as u64, returned_controls)?;
+        // We expect that the returned control qubits match exactly the control layout
+        assert_eq!(returned_control_qubits.len(), control_num);
+        let control_outputs =
+            pack_control_groups(&mut adapter, &returned_control_qubits, control_layout)?;
+        adapter.set_outputs(control_outputs.into_iter().chain(ordinary_outputs))?;
+
+        // Link the inserted adapter to the custom implementation.
+        let insertion = h.insert_from_view(h.module_root(), adapter.hugr());
+        let inserted_call = insertion.node_map[&custom_call.node()];
+        h.connect(custom_func, 0, inserted_call, function_port);
+
+        Ok(insertion.inserted_entrypoint)
+    }
+}
+
+/// Signatures and naming information for a validated custom implementation adapter.
+struct CustomAdapterSpec {
+    original_signature: PolyFuncType,
+    custom_signature: PolyFuncType,
+    custom_name: String,
+}
+
+/// Pack a flat list of returned control qubits back into the resolver's control groups.
+fn pack_control_groups(
+    builder: &mut impl Dataflow,
+    controls: &[Wire],
+    control_layout: &[usize],
+) -> Result<Vec<Wire>, BuildError> {
+    let mut offset = 0;
+    control_layout
+        .iter()
+        .map(|&size| {
+            let group =
+                builder.add_new_array(qb_t(), controls[offset..offset + size].iter().copied())?;
+            offset += size;
+            Ok(group)
+        })
+        .collect()
 }
 
 /// Finds a function definition named `func_name` among the children of the module root.
@@ -1098,7 +1151,7 @@ mod test {
                 .filter(|&node| {
                     h.get_optype(node)
                         .as_func_defn()
-                        .is_some_and(|defn| defn.func_name().starts_with("__controller_adapter__"))
+                        .is_some_and(|defn| defn.func_name().starts_with("__controller_adapter"))
                 })
                 .count(),
             1
