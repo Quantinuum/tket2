@@ -2285,7 +2285,6 @@ mod tests {
     fn test_examples(#[case] example: &str) {
         let mut h = load_guppy_example(example).unwrap();
         test_resolve(&mut h);
-        std::fs::write("resolved.mmd", h.mermaid_string()).unwrap();
     }
 
     #[test]
