@@ -50,7 +50,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         let control = self.control_num();
         let dagger = self.modifiers.dagger;
 
-        // No modification is needed
+        // G(qs) is already unmodified: copy G directly.
         if control == 0 && !dagger {
             let new = new_fn.add_child_node(tket_op);
             let incoming = 0..new_fn.hugr().num_inputs(new);
@@ -63,6 +63,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                     || (control < 3 && tket_op == X)
                     || (control == 1 && matches!(tket_op, CX | Y | Z)) =>
             {
+                // The controlled or daggered G is itself a TketOp: emit it directly.
                 let gate = self
                     .modifiers
                     .modified(tket_op)
@@ -82,6 +83,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                 Ok(self.port_vector_dagger(new, incoming, outgoing, if_rev))
             }
             Rz | CRz | Rx | Ry if control == 0 || (control == 1 && tket_op == Rz) => {
+                // The modified rotation is itself a TketOp; for G†(θ), negate θ.
                 let qubits = if CRz == tket_op { 2 } else { 1 };
 
                 let new_op = self
@@ -137,7 +139,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                 }
             }
             H => {
-                // H = X * Ry(pi/2).
+                // CnH(cs,t) = CnRy(cs,t,π/2); CnX(cs,t). For H†, reverse and dagger.
                 let (mut pv_ry, pv_x) = if !dagger {
                     (
                         self.modify_tket_op(op_node, Ry, new_fn, ancilla)?,
@@ -165,6 +167,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                 })
             }
             Rx => {
+                // CnRx(cs,t,θ) = H(t); CnRz(cs,t,θ); H(t).
                 let h1 = new_fn.add_child_node(H);
                 let h2 = new_fn.add_child_node(H);
                 let mut pv = self.modify_tket_op(op_node, Rz, new_fn, ancilla)?;
@@ -173,6 +176,8 @@ impl<N: HugrNode> ModifierResolver<N> {
                 Ok(pv)
             }
             Ry | CY => {
+                // CnRy(cs,t,θ) = Sdg(t); CnRx(cs,t,θ); S(t).
+                // CnCY(cs,c,t) = Sdg(t); CnCX(cs,c,t); S(t).
                 let (gate, targ) = match tket_op {
                     Ry => (Rx, 0),
                     CY => (CX, 1),
@@ -191,7 +196,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                 Ok(pv)
             }
             T | Tdg | S | Sdg | V | Vdg => {
-                // op(t) = Phase(θ) * U(t, 2θ)
+                // CnOp(cs,t) = CnU(cs,t,2θ); CnPhase(cs,θ).
                 let Some((gate, angle)) = self.modifiers.rot_angle(tket_op) else {
                     unreachable!()
                 };
@@ -224,7 +229,6 @@ impl<N: HugrNode> ModifierResolver<N> {
 
                 Ok(pv_u)
             }
-            // If more control qubits
             Toffoli if !ancilla.is_empty() => {
                 // Cn+m+2X(cs1,cs2,x,y,t) = Cn+2X(cs1,x,y,a); Cm+1X(cs2,a,t); Cn+2X(cs1,x,y,a); Cm+1X(cs2,a,t);
                 let nd = op_node;
@@ -314,6 +318,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                 Ok(PortVector { incoming, outgoing })
             }
             CX | X if !ancilla.is_empty() => {
+                // Reinterpret modifier controls as native controls, reducing CnX or Cn+1X to Cn-2+2X or Cn-1+2X.
                 let c_num = if tket_op == X { 2 } else { 1 };
                 let mut ctrls = vec![];
                 for _ in 0..c_num {
@@ -443,7 +448,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                 Ok(PortVector { incoming, outgoing })
             }
             Rz | Y | Z => {
-                // reduce Rz, Y, Z to CRz, CY, CZ
+                // CnG(cs,c,t) = Cn-1(CG)(cs,c,t), for G = Rz, Y, or Z.
                 let c_op = if tket_op == Rz {
                     CRz
                 } else if tket_op == Y {
@@ -476,7 +481,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                 Ok(pv)
             }
             CZ => {
-                // reduce CZ to CRz(pi)
+                // Cn+1Z(cs,c,t) = CnCRz(cs,c,t,π).
                 let mut pv = self.modify_tket_op(op_node, CRz, new_fn, ancilla)?;
                 let halfturn = new_fn.add_load_value(ConstRotation::new(1.0).unwrap());
                 let dw = pv.incoming.remove(2);
@@ -582,6 +587,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                 }
             }
             Measure | MeasureFree | QAlloc | TryQAlloc | QFree | Reset => {
+                // Non-unitary operations have no controlled or daggered decomposition here.
                 Err(ModifierResolverErrors::unresolvable(
                     op_node,
                     "non-unitary operations are not expected in a modified context.".to_string(),
