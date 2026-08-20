@@ -1,0 +1,19 @@
+[package]
+name = "pg-optimise"
+version = "0.1.0"
+edition = { workspace = true }
+rust-version = { workspace = true }
+
+
+[dependencies]
+pg-core = { path = "../../pg-core"}
+pg-qm-tableau = { path = "../../pg-qm-tableau"}
+pg-ir-kernels = { path = "../../pg-kernels/pg-ir-kernels" }
+pg-utils = { path = "../../pg-utils/pg-utils" }
+
+[dev-dependencies]
+pg-tk = { path = "../../pg-converters/pg-tk" }
+rand = "0.10.0"
+
+[lints]
+workspace = true
