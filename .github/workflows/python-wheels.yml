@@ -27,11 +27,6 @@ env:
   # Python version used to build the wheels
   # We use abi3-compatible building, so this still supports newer Python versions
   PYTHON_VERSION: "3.10"
-  # Nightly Rust toolchain used for the WebAssembly wheels.
-  # Emscripten's ABI is unstable, so we rebuild the Rust std with `-Zbuild-std`
-  # against the specific emscripten version. See
-  # <https://doc.rust-lang.org/beta/rustc/platform-support/wasm32-unknown-emscripten.html>
-  RUST_NIGHTLY_VERSION: "nightly-2026-05-28"
   # sccache config
   SCCACHE_GHA_ENABLED: "true"
   RUSTC_WRAPPER: "sccache"
@@ -281,12 +276,12 @@ jobs:
       - name: Install nightly Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: ${{ env.RUST_NIGHTLY_VERSION }}
+          toolchain: "nightly"
       - name: Add required rust targets and components
         run: |
-          rustup override set ${{ env.RUST_NIGHTLY_VERSION }}
+          rustup override set nightly
           rustup target add wasm32-unknown-emscripten
-          rustup component add rust-src --toolchain ${{ env.RUST_NIGHTLY_VERSION }}-x86_64-unknown-linux-gnu
+          rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu
       - name: Install Node.js for emsdk
         uses: actions/setup-node@v6
         with:
