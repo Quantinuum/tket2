@@ -41,6 +41,8 @@ env:
   EMSDK_VERSION: "4.0.9"
   # hugrverse-env target used to fetch the pre-built tket-c-api WebAssembly library.
   HUGRVERSE_WASM_TARGET: "emscripten_4_0_9_wasm32"
+  # Rust nightly version used to build the WebAssembly wheels.
+  RUST_NIGHTLY_VERSION: "nightly-2026-08-20"
 
 jobs:
   # Check if the tag matches the package name,
@@ -276,12 +278,12 @@ jobs:
       - name: Install nightly Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "nightly"
+          toolchain: ${{ env.RUST_NIGHTLY_VERSION }}
       - name: Add required rust targets and components
         run: |
-          rustup override set nightly
+          rustup override set ${{ env.RUST_NIGHTLY_VERSION }}
           rustup target add wasm32-unknown-emscripten
-          rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu
+          rustup component add rust-src --toolchain ${{ env.RUST_NIGHTLY_VERSION }}
       - name: Install Node.js for emsdk
         uses: actions/setup-node@v6
         with:

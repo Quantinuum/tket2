@@ -96,9 +96,18 @@ fn main() {
         println!("cargo:rustc-link-lib=stdc++");
     }
 
-    // Generate bindings using bindgen
-    let bindings = bindgen::Builder::default()
-        .header(header_path.to_str().unwrap())
+    // Generate bindings using bindgen. The C API only contains opaque pointers
+    // and target-independent scalar types, so parsing it for the host produces
+    // bindings that are also valid for Emscripten. This avoids libclang
+    // dropping function declarations when using its Emscripten target.
+    let mut bindings_builder = bindgen::Builder::default().header(header_path.to_str().unwrap());
+    if target == Some(SupportedPlatform::Emscripten) {
+        println!("cargo:rerun-if-env-changed=HOST");
+        let host = env::var("HOST").expect("Cargo should set HOST for build scripts");
+        bindings_builder = bindings_builder.clang_arg(format!("--target={host}"));
+    }
+
+    let bindings = bindings_builder
         .generate()
         .expect("Unable to generate bindings");
 
