@@ -2,7 +2,6 @@
 
 use std::str::FromStr;
 
-use hugr::Node;
 use rayon::iter::ParallelIterator;
 use std::sync::Arc;
 use tket::passes::composable::PassScope;

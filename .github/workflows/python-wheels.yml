@@ -269,6 +269,9 @@ jobs:
     needs: check-tag
     if: ${{ needs.check-tag.outputs.run == 'true' }}
     runs-on: ubuntu-latest
+    env:
+      CARGO_PROFILE_RELEASE_STRIP: "false"
+      CARGO_PROFILE_RELEASE_DEBUG: "2"
     steps:
       - uses: actions/checkout@v7
       - uses: mozilla-actions/sccache-action@v0.0.10
