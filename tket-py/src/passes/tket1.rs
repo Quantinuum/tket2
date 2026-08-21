@@ -2,9 +2,11 @@
 
 use std::str::FromStr;
 
+use hugr::Node;
 use rayon::iter::ParallelIterator;
 use std::sync::Arc;
 use tket::passes::composable::PassScope;
+use tket_json_rs::SerialCircuit;
 use tket_qsystem::PlatformTarget;
 
 use crate::passes::PyPassScope;
@@ -70,20 +72,30 @@ pub(crate) fn tket1_pass(
     let mut encoded_circ = EncodedCircuit::new_with_entrypoint(&program.hugr, root, encode_options)
         .convert_pyerrs()?;
 
-    encoded_circ
-        .par_iter_mut()
-        .try_for_each(|(_, circ)| -> Result<(), tket1_passes::PassError> {
-            let mut tk1_circ = tket1_passes::Tket1Circuit::from_serial_circuit(circ)?;
-            tket1_passes::Tket1Pass::run_from_json(pass_json, &mut tk1_circ)?;
-            *circ = tk1_circ.to_serial_circuit()?;
-            Ok(())
-        })
-        .convert_pyerrs()?;
+    // Emscripten wheels are built with `rayon` disabled, so we need to run the
+    // pass sequentially in that case.
+    if cfg!(target_os = "emscripten") {
+        encoded_circ
+            .iter_mut()
+            .try_for_each(|(_, circ)| run_tket1_pass(circ, pass_json))?;
+    } else {
+        encoded_circ
+            .par_iter_mut()
+            .try_for_each(|(_, circ)| run_tket1_pass(circ, pass_json))?;
+    }
 
     encoded_circ
         .reassemble_inplace(&mut program.hugr, Some(Arc::new(target.decoder_config())))
         .convert_pyerrs()?;
 
+    Ok(())
+}
+
+/// Run a tket1 pass on a SerialCircuit.
+fn run_tket1_pass(circ: &mut SerialCircuit, pass_json: &str) -> PyResult<()> {
+    let mut tk1_circ = tket1_passes::Tket1Circuit::from_serial_circuit(circ).convert_pyerrs()?;
+    tket1_passes::Tket1Pass::run_from_json(pass_json, &mut tk1_circ).convert_pyerrs()?;
+    *circ = tk1_circ.to_serial_circuit().convert_pyerrs()?;
     Ok(())
 }
 
