@@ -50,7 +50,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         let control = self.control_num();
         let dagger = self.modifiers.dagger;
 
-        // No modification is needed
+        // No modification is needed.
         if control == 0 && !dagger {
             let new = new_fn.add_child_node(tket_op);
             let incoming = 0..new_fn.hugr().num_inputs(new);
@@ -59,8 +59,8 @@ impl<N: HugrNode> ModifierResolver<N> {
         }
         match tket_op {
             X | CX | Toffoli | Y | CY | Z | CZ | S | Sdg | T | Tdg | V | Vdg | H
-                if (control == 0)
-                    || (control < 3 && tket_op == X)
+                if (control == 0 && dagger)
+                    || ((1..3).contains(&control) && tket_op == X)
                     || (control == 1 && matches!(tket_op, CX | Y | Z)) =>
             {
                 // The controlled or daggered G is itself a TketOp: emit it directly.
@@ -82,7 +82,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                 let if_rev = control..(control + qubits);
                 Ok(self.port_vector_dagger(new, incoming, outgoing, if_rev))
             }
-            Rz | CRz | Rx | Ry if control == 0 || (control == 1 && tket_op == Rz) => {
+            Rz | CRz | Rx | Ry if (control == 0 && dagger) || (control == 1 && tket_op == Rz) => {
                 // The modified rotation is itself a TketOp; for G†(θ), negate θ.
                 let qubits = if CRz == tket_op { 2 } else { 1 };
 
@@ -602,55 +602,35 @@ impl<N: HugrNode> ModifierResolver<N> {
 impl CombinedModifier {
     /// If the modified operation can be represented as a TketOp,
     /// returns the modified operation, otherwise returns `None`.
+    ///
+    /// Not all the cases are handled here, since we assume that
+    /// unmodified operations are handled directly in `modify_tket_op`.
     fn modified(&self, op: TketOp) -> Option<TketOp> {
-        match op {
-            X if self.control == 0 => Some(X),
-            X if self.control == 1 => Some(CX),
-            X if self.control == 2 => Some(Toffoli),
-            Y if self.control == 0 => Some(Y),
-            Y if self.control == 1 => Some(CY),
-            Z if self.control == 0 => Some(Z),
-            Z if self.control == 1 => Some(CZ),
-            CX if self.control == 0 => Some(CX),
-            CX if self.control == 1 => Some(Toffoli),
-            CY if self.control == 0 => Some(CY),
-            CZ if self.control == 0 => Some(CZ),
-            Toffoli if self.control == 0 => Some(Toffoli),
-            H if self.control == 0 => Some(H),
-            Rz if self.control == 0 => Some(Rz),
-            Rz if self.control == 1 => Some(CRz),
-            CRz if self.control == 0 => Some(CRz),
-            Rx if self.control == 0 => Some(Rx),
-            Ry if self.control == 0 => Some(Ry),
-            T if self.control == 0 => match self.dagger {
-                false => Some(T),
-                true => Some(Tdg),
-            },
-            Tdg if self.control == 0 => match self.dagger {
-                false => Some(Tdg),
-                true => Some(T),
-            },
-            S if self.control == 0 => match self.dagger {
-                false => Some(S),
-                true => Some(Sdg),
-            },
-            Sdg if self.control == 0 => match self.dagger {
-                false => Some(Sdg),
-                true => Some(S),
-            },
-            V if self.control == 0 => match self.dagger {
-                false => Some(V),
-                true => Some(Vdg),
-            },
-            Vdg if self.control == 0 => match self.dagger {
-                false => Some(Vdg),
-                true => Some(V),
-            },
-            Measure | MeasureFree | QAlloc | TryQAlloc | QFree | Reset
-                if self.control == 0 && !self.dagger =>
-            {
-                Some(op)
-            }
+        match (op, self.control, self.dagger) {
+            (X, 0, _) => Some(X),
+            (X, 1, _) => Some(CX),
+            (X, 2, _) => Some(Toffoli),
+            (Y, 0, _) => Some(Y),
+            (Y, 1, _) => Some(CY),
+            (Z, 0, _) => Some(Z),
+            (Z, 1, _) => Some(CZ),
+            (CX, 0, _) => Some(CX),
+            (CX, 1, _) => Some(Toffoli),
+            (CY, 0, _) => Some(CY),
+            (CZ, 0, _) => Some(CZ),
+            (Toffoli, 0, _) => Some(Toffoli),
+            (H, 0, _) => Some(H),
+            (Rz, 0, _) => Some(Rz),
+            (Rz, 1, _) => Some(CRz),
+            (CRz, 0, _) => Some(CRz),
+            (Rx, 0, _) => Some(Rx),
+            (Ry, 0, _) => Some(Ry),
+            (T, 0, true) => Some(Tdg),
+            (Tdg, 0, true) => Some(T),
+            (S, 0, true) => Some(Sdg),
+            (Sdg, 0, true) => Some(S),
+            (V, 0, true) => Some(Vdg),
+            (Vdg, 0, true) => Some(V),
             _ => None,
         }
     }
