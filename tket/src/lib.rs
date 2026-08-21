@@ -57,6 +57,9 @@ pub mod rewrite;
 pub mod serialize;
 pub mod subcircuit;
 
+#[cfg(target_os = "emscripten")]
+mod emscripten_compat;
+
 #[cfg(feature = "portmatching")]
 pub mod portmatching;
 
