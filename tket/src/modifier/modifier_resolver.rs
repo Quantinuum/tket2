@@ -266,13 +266,6 @@ pub struct PortVector<N = Node> {
     outgoing: Vec<DirWire<N>>,
 }
 
-/// The exposed StateOrder boundary of an expanded operation.
-#[derive(Clone, Copy)]
-struct StateOrderPorts {
-    incoming: DirWire,
-    outgoing: DirWire,
-}
-
 impl<N: HugrNode> PortVector<N> {
     fn from_single_node(
         n: N,
