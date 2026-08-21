@@ -50,7 +50,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         let control = self.control_num();
         let dagger = self.modifiers.dagger;
 
-        // G(qs) is already unmodified: copy G directly.
+        // No modification is needed
         if control == 0 && !dagger {
             let new = new_fn.add_child_node(tket_op);
             let incoming = 0..new_fn.hugr().num_inputs(new);
@@ -229,6 +229,7 @@ impl<N: HugrNode> ModifierResolver<N> {
 
                 Ok(pv_u)
             }
+            // If more control qubits
             Toffoli if !ancilla.is_empty() => {
                 // Cn+m+2X(cs1,cs2,x,y,t) = Cn+2X(cs1,x,y,a); Cm+1X(cs2,a,t); Cn+2X(cs1,x,y,a); Cm+1X(cs2,a,t);
                 let nd = op_node;
@@ -481,11 +482,12 @@ impl<N: HugrNode> ModifierResolver<N> {
                 Ok(pv)
             }
             CZ => {
-                // Cn+1Z(cs,c,t) = CnCRz(cs,c,t,π).
-                let mut pv = self.modify_tket_op(op_node, CRz, new_fn, ancilla)?;
-                let halfturn = new_fn.add_load_value(ConstRotation::new(1.0).unwrap());
-                let dw = pv.incoming.remove(2);
-                connect(new_fn, &dw, &halfturn.into())?;
+                // Cn+1Z(cs,c,t) = H(t); Cn+1X(cs,c,t); H(t).
+                let h1 = new_fn.add_child_node(H);
+                let h2 = new_fn.add_child_node(H);
+                let mut pv = self.modify_tket_op(op_node, CX, new_fn, ancilla)?;
+                pv.incoming[1] = connect_by_num(new_fn, &pv.incoming[1], h1, 0);
+                pv.outgoing[1] = connect_by_num(new_fn, &pv.outgoing[1], h2, 0);
                 Ok(pv)
             }
             X | CX | Toffoli => {
@@ -587,7 +589,6 @@ impl<N: HugrNode> ModifierResolver<N> {
                 }
             }
             Measure | MeasureFree | QAlloc | TryQAlloc | QFree | Reset => {
-                // Non-unitary operations have no controlled or daggered decomposition here.
                 Err(ModifierResolverErrors::unresolvable(
                     op_node,
                     "non-unitary operations are not expected in a modified context.".to_string(),
