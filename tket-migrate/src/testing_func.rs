@@ -23,12 +23,16 @@ pub(crate) fn load_extension(path: &Path) -> Result<Extension, Box<dyn Error>> {
     Ok(serde_json::from_reader(BufReader::new(File::open(path)?))?)
 }
 
-pub(crate) fn load_registry(paths: &[PathBuf]) -> Result<ExtensionRegistry, Box<dyn Error>> {
-    let mut registry = STD_REG.to_owned();
-    let extensions = paths
+pub(crate) fn load_extensions(paths: &[PathBuf]) -> Result<Vec<Extension>, Box<dyn Error>> {
+    Ok(paths
         .iter()
         .map(|path| load_extension(path))
-        .collect::<Result<Vec<_>, _>>()?;
+        .collect::<Result<Vec<_>, _>>()?)
+}
+
+pub(crate) fn load_registry(paths: &[PathBuf]) -> Result<ExtensionRegistry, Box<dyn Error>> {
+    let mut registry = STD_REG.to_owned();
+    let extensions = load_extensions(paths)?;
     let custom_extensions = ExtensionRegistry::new_with_extension_resolution(
         extensions,
         &WeakExtensionRegistry::from(&registry),
@@ -83,10 +87,13 @@ pub(crate) fn generate(
     extension_paths: &[PathBuf],
     output_path: &Path,
     build_hugr: impl FnOnce(&ExtensionRegistry) -> Result<Hugr, Box<dyn Error>>,
+    save_file: bool,
 ) -> Result<Hugr, Box<dyn Error>> {
     let registry = load_registry(extension_paths)?;
     let hugr = build_hugr(&registry)?;
 
-    std::fs::write(output_path.with_extension("mmd"), hugr.mermaid_string())?;
+    if save_file {
+        std::fs::write(output_path.with_extension("mmd"), hugr.mermaid_string())?;
+    }
     Ok(hugr)
 }

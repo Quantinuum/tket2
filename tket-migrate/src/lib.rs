@@ -3,12 +3,198 @@
 use std::io::{self, BufRead, Write};
 
 use hugr::envelope::ReadError;
-use hugr::extension::ExtensionRegistry;
-use hugr::ops::OpType;
+use hugr::extension::resolution::WeakExtensionRegistry;
+use hugr::extension::{ExtensionRegistry, Version};
+use hugr::hugr::hugrmut::HugrMut;
+use hugr::ops::{ExtensionOp, OpType};
 use hugr::types::{CustomType, EdgeKind, PolyFuncType, Term};
-use hugr::{Hugr, HugrView, PortIndex};
+use hugr::{Extension, Hugr, HugrView, Node, PortIndex};
 use thiserror::Error;
 
+#[derive(Debug)]
+#[allow(unused, missing_docs)]
+
+pub struct OpUpdateMap {
+    old_op_name: String,
+    old_extension_name: String,
+    old_version: Version,
+    new_name: String,
+    new_extension_name: String,
+    new_version: Version,
+}
+
+#[allow(unused, missing_docs)]
+impl OpUpdateMap {
+    pub fn new(
+        old_op_name: String,
+        old_extension_name: String,
+        old_version: Version,
+        new_name: String,
+        new_extension_name: String,
+        new_version: Version,
+    ) -> Self {
+        Self {
+            old_op_name,
+            old_extension_name,
+            old_version,
+            new_name,
+            new_extension_name,
+            new_version,
+        }
+    }
+}
+
+#[derive(Debug)]
+#[allow(unused, missing_docs)]
+pub struct UndatingMap {
+    op_update_maps: Vec<OpUpdateMap>,
+}
+
+#[allow(unused, missing_docs)]
+impl UndatingMap {
+    pub fn new(op_update_maps: Vec<OpUpdateMap>) -> Self {
+        Self { op_update_maps }
+    }
+
+    fn filter_op(
+        &self,
+        op_qualified_id: &str,
+        extension_version: &Version,
+    ) -> Option<&OpUpdateMap> {
+        self.op_update_maps.iter().find(|op_update_map| {
+            op_update_map.old_version == *extension_version
+                && op_qualified_id
+                    .strip_prefix(&op_update_map.old_extension_name)
+                    .and_then(|name| name.strip_prefix('.'))
+                    == Some(op_update_map.old_op_name.as_str())
+        })
+    }
+}
+
+/// ?
+#[derive(Debug)]
+#[allow(unused)]
+pub struct ExtensionUpdater {
+    hugr: Hugr,
+    updating_map: UndatingMap,
+}
+
+#[allow(unused)]
+impl ExtensionUpdater {
+    // ...
+    #[allow(missing_docs)]
+    pub fn new(hugr: Hugr, updating_map: UndatingMap) -> Self {
+        Self { hugr, updating_map }
+    }
+
+    pub(crate) fn get_hugr(&self) -> &Hugr {
+        &self.hugr
+    }
+
+    fn get_new_op(&self, name: &str, extension_name: &str, version: &Version) -> ExtensionOp {
+        self.hugr
+            .extensions()
+            .get_exact(extension_name, version)
+            .expect(&format!(
+                "{} version {} is missing from the registry",
+                extension_name, version
+            ))
+            .instantiate_extension_op(name, [])
+            .expect(&format!(
+                "failed to instantiate {} {} version {}",
+                extension_name, name, version
+            ))
+    }
+
+    #[allow(dead_code, missing_docs)]
+    pub fn update_op(&mut self, new_extensions: Vec<Extension>) {
+        self.add_new_extension(new_extensions);
+        for node in self.hugr.nodes().collect::<Vec<_>>() {
+            self.update_node(node);
+        }
+    }
+
+    fn add_new_extension(&mut self, new_extensions: Vec<Extension>) {
+        let hugr_extensions = self.hugr.extensions();
+        let new_ext_registry = ExtensionRegistry::new_with_extension_resolution(
+            new_extensions,
+            &WeakExtensionRegistry::from(hugr_extensions),
+        )
+        .unwrap();
+        self.hugr.use_extensions(new_ext_registry);
+        std::fs::write(
+            "updated_extension_registry.json",
+            serde_json::to_string_pretty(&self.hugr.extensions()).unwrap(),
+        )
+        .unwrap();
+        println!("saved Hugr extensions");
+    }
+
+    #[allow(dead_code)]
+    fn update_node(&mut self, node: Node) {
+        match self.hugr.get_optype(node) {
+            OpType::ExtensionOp(operation) => {
+                if let Some(op_update_map) = self
+                    .updating_map
+                    .filter_op(&operation.qualified_id(), &operation.extension_version())
+                {
+                    let new_op = self.get_new_op(
+                        &op_update_map.new_name,
+                        &op_update_map.new_extension_name,
+                        &op_update_map.new_version,
+                    );
+                    println!(
+                        "Upgraded:\n{}\n{}\nwith:\n{}.{}\n{}",
+                        operation.qualified_id(),
+                        operation.extension_version(),
+                        op_update_map.new_name,
+                        op_update_map.new_extension_name,
+                        op_update_map.new_version,
+                    );
+                    self.replace_node_preserving_connections(node, new_op);
+                    println!("========")
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn replace_node_preserving_connections(&mut self, node: Node, new_op: ExtensionOp) {
+        let parent = self.hugr.get_parent(node).expect("operation has no parent");
+        let incoming = self
+            .hugr
+            .node_inputs(node)
+            .flat_map(|port| {
+                self.hugr
+                    .linked_outputs(node, port)
+                    .map(move |(source, source_port)| (source, source_port, port))
+            })
+            .collect::<Vec<_>>();
+        let outgoing = self
+            .hugr
+            .node_outputs(node)
+            .flat_map(|port| {
+                self.hugr
+                    .linked_inputs(node, port)
+                    .map(move |(target, target_port)| (port, target, target_port))
+            })
+            .collect::<Vec<_>>();
+
+        self.hugr.remove_node(node);
+        let new_node = self.hugr.add_node_with_parent(parent, new_op);
+        for (source, source_port, target_port) in incoming {
+            self.hugr
+                .connect(source, source_port, new_node, target_port);
+        }
+        for (source_port, target, target_port) in outgoing {
+            self.hugr
+                .connect(new_node, source_port, target, target_port);
+        }
+    }
+    // -----------------------------
+    // Old testing stuff
+    // -----------------------------
+}
 /// An error encountered while loading or printing a serialized HUGR.
 #[derive(Debug, Error)]
 #[non_exhaustive]
@@ -22,17 +208,7 @@ pub enum PrintExtensionVersionsError {
 }
 
 /// Load a serialized HUGR and print extension versions saved on operations and edges.
-///
-/// Operations are written in `qualified.operation: version` format. For every
-/// connected edge, each extension type contained in its type is written in
-/// `edge source:port -> target:port: qualified.type: version` format.
-/// `extensions` has the same semantics as the corresponding argument to
-/// [`Hugr::load`]: when it is `None`, the standard extension registry is used.
-///
-/// # Errors
-///
-/// Returns an error if the HUGR cannot be loaded or the output cannot be
-/// written.
+#[allow(dead_code, missing_docs)]
 pub fn print_extension_versions(
     serialized_hugr: impl BufRead,
     extensions: Option<&ExtensionRegistry>,
@@ -86,6 +262,7 @@ pub fn print_extension_versions(
     Ok(())
 }
 
+#[allow(dead_code, missing_docs)]
 fn visit_edge_custom_types(
     edge_kind: &EdgeKind,
     visit: &mut impl FnMut(&CustomType) -> io::Result<()>,
@@ -97,6 +274,7 @@ fn visit_edge_custom_types(
     }
 }
 
+#[allow(dead_code, missing_docs)]
 fn visit_poly_func_type(
     function: &PolyFuncType,
     visit: &mut impl FnMut(&CustomType) -> io::Result<()>,
@@ -115,6 +293,7 @@ fn visit_poly_func_type(
     Ok(())
 }
 
+#[allow(dead_code, missing_docs)]
 fn visit_term(
     term: &Term,
     visit: &mut impl FnMut(&CustomType) -> io::Result<()>,

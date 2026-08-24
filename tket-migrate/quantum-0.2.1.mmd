@@ -1,0 +1,28 @@
+---
+config:
+    layout: elk
+---
+graph LR
+    subgraph 0 ["(0) Module"]
+        direction LR
+        subgraph 1 ["(1) FuncDefn: #quot;main#quot;"]
+            direction LR
+            2["(2) Input"]
+            3["(3) Output"]
+            subgraph 4 ["(4) [**DFG**]"]
+                direction LR
+                style 4 stroke:#832561,stroke-width:3px
+                5["(5) Input"]
+                6["(6) Output"]
+                7["(7) tket.quantum.QAlloc"]
+                8["(8) tket.quantum.H"]
+                9["(9) tket.quantum.MeasureFree"]
+                10["(10) tket.bool.read"]
+                11["(11) logic.Not"]
+                7--"0:0<br>qubit"-->8
+                8--"0:0<br>qubit"-->9
+                9--"0:0<br>bool"-->10
+                10--"0:0<br>Bool"-->11
+            end
+        end
+    end

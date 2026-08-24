@@ -1,0 +1,2528 @@
+[
+  {
+    "version": "0.1.0",
+    "name": "arithmetic.float.types",
+    "types": {
+      "float64": {
+        "extension": "arithmetic.float.types",
+        "name": "float64",
+        "params": [],
+        "description": "64-bit IEEE 754-2019 floating-point value",
+        "bound": {
+          "b": "Explicit",
+          "bound": "C"
+        }
+      }
+    },
+    "operations": {}
+  },
+  {
+    "version": "0.1.0",
+    "name": "logic",
+    "types": {},
+    "operations": {
+      "And": {
+        "extension": "logic",
+        "name": "And",
+        "description": "logical 'and'",
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Sum",
+                "s": "Unit",
+                "size": 2
+              },
+              {
+                "t": "Sum",
+                "s": "Unit",
+                "size": 2
+              }
+            ],
+            "output": [
+              {
+                "t": "Sum",
+                "s": "Unit",
+                "size": 2
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "Eq": {
+        "extension": "logic",
+        "name": "Eq",
+        "description": "test if bools are equal",
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Sum",
+                "s": "Unit",
+                "size": 2
+              },
+              {
+                "t": "Sum",
+                "s": "Unit",
+                "size": 2
+              }
+            ],
+            "output": [
+              {
+                "t": "Sum",
+                "s": "Unit",
+                "size": 2
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "Not": {
+        "extension": "logic",
+        "name": "Not",
+        "description": "logical 'not'",
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Sum",
+                "s": "Unit",
+                "size": 2
+              }
+            ],
+            "output": [
+              {
+                "t": "Sum",
+                "s": "Unit",
+                "size": 2
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "Or": {
+        "extension": "logic",
+        "name": "Or",
+        "description": "logical 'or'",
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Sum",
+                "s": "Unit",
+                "size": 2
+              },
+              {
+                "t": "Sum",
+                "s": "Unit",
+                "size": 2
+              }
+            ],
+            "output": [
+              {
+                "t": "Sum",
+                "s": "Unit",
+                "size": 2
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "Xor": {
+        "extension": "logic",
+        "name": "Xor",
+        "description": "logical 'xor'",
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Sum",
+                "s": "Unit",
+                "size": 2
+              },
+              {
+                "t": "Sum",
+                "s": "Unit",
+                "size": 2
+              }
+            ],
+            "output": [
+              {
+                "t": "Sum",
+                "s": "Unit",
+                "size": 2
+              }
+            ]
+          }
+        },
+        "binary": false
+      }
+    }
+  },
+  {
+    "version": "0.2.2",
+    "name": "prelude",
+    "types": {
+      "error": {
+        "extension": "prelude",
+        "name": "error",
+        "params": [],
+        "description": "Simple opaque error type.",
+        "bound": {
+          "b": "Explicit",
+          "bound": "C"
+        }
+      },
+      "qubit": {
+        "extension": "prelude",
+        "name": "qubit",
+        "params": [],
+        "description": "qubit",
+        "bound": {
+          "b": "Explicit",
+          "bound": "A"
+        }
+      },
+      "string": {
+        "extension": "prelude",
+        "name": "string",
+        "params": [],
+        "description": "string",
+        "bound": {
+          "b": "Explicit",
+          "bound": "C"
+        }
+      },
+      "usize": {
+        "extension": "prelude",
+        "name": "usize",
+        "params": [],
+        "description": "usize",
+        "bound": {
+          "b": "Explicit",
+          "bound": "C"
+        }
+      }
+    },
+    "operations": {
+      "Barrier": {
+        "extension": "prelude",
+        "name": "Barrier",
+        "description": "Add a barrier to a row of values",
+        "signature": {
+          "params": [
+            {
+              "tp": "List",
+              "param": {
+                "tp": "Type",
+                "b": "A"
+              }
+            }
+          ],
+          "body": {
+            "input": [
+              {
+                "t": "R",
+                "i": 0,
+                "b": "A"
+              }
+            ],
+            "output": [
+              {
+                "t": "R",
+                "i": 0,
+                "b": "A"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "MakeError": {
+        "extension": "prelude",
+        "name": "MakeError",
+        "description": "Create an error value",
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "I"
+              },
+              {
+                "t": "Opaque",
+                "extension": "prelude",
+                "extension_version": "0.2.2",
+                "id": "string",
+                "args": [],
+                "bound": "C"
+              }
+            ],
+            "output": [
+              {
+                "t": "Opaque",
+                "extension": "prelude",
+                "extension_version": "0.2.2",
+                "id": "error",
+                "args": [],
+                "bound": "C"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "MakeTuple": {
+        "extension": "prelude",
+        "name": "MakeTuple",
+        "description": "MakeTuple operation",
+        "signature": {
+          "params": [
+            {
+              "tp": "List",
+              "param": {
+                "tp": "Type",
+                "b": "A"
+              }
+            }
+          ],
+          "body": {
+            "input": [
+              {
+                "t": "R",
+                "i": 0,
+                "b": "A"
+              }
+            ],
+            "output": [
+              {
+                "t": "Sum",
+                "s": "General",
+                "rows": [
+                  [
+                    {
+                      "t": "R",
+                      "i": 0,
+                      "b": "A"
+                    }
+                  ]
+                ]
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "Noop": {
+        "extension": "prelude",
+        "name": "Noop",
+        "description": "Noop gate",
+        "signature": {
+          "params": [
+            {
+              "tp": "Type",
+              "b": "A"
+            }
+          ],
+          "body": {
+            "input": [
+              {
+                "t": "V",
+                "i": 0,
+                "b": "A"
+              }
+            ],
+            "output": [
+              {
+                "t": "V",
+                "i": 0,
+                "b": "A"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "UnpackTuple": {
+        "extension": "prelude",
+        "name": "UnpackTuple",
+        "description": "UnpackTuple operation",
+        "signature": {
+          "params": [
+            {
+              "tp": "List",
+              "param": {
+                "tp": "Type",
+                "b": "A"
+              }
+            }
+          ],
+          "body": {
+            "input": [
+              {
+                "t": "Sum",
+                "s": "General",
+                "rows": [
+                  [
+                    {
+                      "t": "R",
+                      "i": 0,
+                      "b": "A"
+                    }
+                  ]
+                ]
+              }
+            ],
+            "output": [
+              {
+                "t": "R",
+                "i": 0,
+                "b": "A"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "exit": {
+        "extension": "prelude",
+        "name": "exit",
+        "description": "Exit with input error",
+        "signature": {
+          "params": [
+            {
+              "tp": "List",
+              "param": {
+                "tp": "Type",
+                "b": "A"
+              }
+            },
+            {
+              "tp": "List",
+              "param": {
+                "tp": "Type",
+                "b": "A"
+              }
+            }
+          ],
+          "body": {
+            "input": [
+              {
+                "t": "Opaque",
+                "extension": "prelude",
+                "extension_version": "0.2.2",
+                "id": "error",
+                "args": [],
+                "bound": "C"
+              },
+              {
+                "t": "R",
+                "i": 0,
+                "b": "A"
+              }
+            ],
+            "output": [
+              {
+                "t": "R",
+                "i": 1,
+                "b": "A"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "load_nat": {
+        "extension": "prelude",
+        "name": "load_nat",
+        "description": "Loads a generic bounded nat parameter into a usize runtime value.",
+        "signature": {
+          "params": [
+            {
+              "tp": "BoundedNat",
+              "bound": null
+            }
+          ],
+          "body": {
+            "input": [],
+            "output": [
+              {
+                "t": "I"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "panic": {
+        "extension": "prelude",
+        "name": "panic",
+        "description": "Panic with input error",
+        "signature": {
+          "params": [
+            {
+              "tp": "List",
+              "param": {
+                "tp": "Type",
+                "b": "A"
+              }
+            },
+            {
+              "tp": "List",
+              "param": {
+                "tp": "Type",
+                "b": "A"
+              }
+            }
+          ],
+          "body": {
+            "input": [
+              {
+                "t": "Opaque",
+                "extension": "prelude",
+                "extension_version": "0.2.2",
+                "id": "error",
+                "args": [],
+                "bound": "C"
+              },
+              {
+                "t": "R",
+                "i": 0,
+                "b": "A"
+              }
+            ],
+            "output": [
+              {
+                "t": "R",
+                "i": 1,
+                "b": "A"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "print": {
+        "extension": "prelude",
+        "name": "print",
+        "description": "Print the string to standard output",
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Opaque",
+                "extension": "prelude",
+                "extension_version": "0.2.2",
+                "id": "string",
+                "args": [],
+                "bound": "C"
+              }
+            ],
+            "output": []
+          }
+        },
+        "binary": false
+      }
+    }
+  },
+  {
+    "version": "0.2.0",
+    "name": "tket.bool",
+    "types": {
+      "bool": {
+        "extension": "tket.bool",
+        "name": "bool",
+        "params": [],
+        "description": "An opaque bool type",
+        "bound": {
+          "b": "Explicit",
+          "bound": "C"
+        }
+      }
+    },
+    "operations": {
+      "and": {
+        "extension": "tket.bool",
+        "name": "and",
+        "description": "Logical AND between two tket.bools.",
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Opaque",
+                "extension": "tket.bool",
+                "extension_version": "0.2.0",
+                "id": "bool",
+                "args": [],
+                "bound": "C"
+              },
+              {
+                "t": "Opaque",
+                "extension": "tket.bool",
+                "extension_version": "0.2.0",
+                "id": "bool",
+                "args": [],
+                "bound": "C"
+              }
+            ],
+            "output": [
+              {
+                "t": "Opaque",
+                "extension": "tket.bool",
+                "extension_version": "0.2.0",
+                "id": "bool",
+                "args": [],
+                "bound": "C"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "eq": {
+        "extension": "tket.bool",
+        "name": "eq",
+        "description": "Equality between two tket.bools.",
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Opaque",
+                "extension": "tket.bool",
+                "extension_version": "0.2.0",
+                "id": "bool",
+                "args": [],
+                "bound": "C"
+              },
+              {
+                "t": "Opaque",
+                "extension": "tket.bool",
+                "extension_version": "0.2.0",
+                "id": "bool",
+                "args": [],
+                "bound": "C"
+              }
+            ],
+            "output": [
+              {
+                "t": "Opaque",
+                "extension": "tket.bool",
+                "extension_version": "0.2.0",
+                "id": "bool",
+                "args": [],
+                "bound": "C"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "make_opaque": {
+        "extension": "tket.bool",
+        "name": "make_opaque",
+        "description": "Convert a Hugr bool_t (a unit sum) into an tket.bool.",
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Sum",
+                "s": "Unit",
+                "size": 2
+              }
+            ],
+            "output": [
+              {
+                "t": "Opaque",
+                "extension": "tket.bool",
+                "extension_version": "0.2.0",
+                "id": "bool",
+                "args": [],
+                "bound": "C"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "not": {
+        "extension": "tket.bool",
+        "name": "not",
+        "description": "Negation of a tket.bool.",
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Opaque",
+                "extension": "tket.bool",
+                "extension_version": "0.2.0",
+                "id": "bool",
+                "args": [],
+                "bound": "C"
+              }
+            ],
+            "output": [
+              {
+                "t": "Opaque",
+                "extension": "tket.bool",
+                "extension_version": "0.2.0",
+                "id": "bool",
+                "args": [],
+                "bound": "C"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "or": {
+        "extension": "tket.bool",
+        "name": "or",
+        "description": "Logical OR between two tket.bools.",
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Opaque",
+                "extension": "tket.bool",
+                "extension_version": "0.2.0",
+                "id": "bool",
+                "args": [],
+                "bound": "C"
+              },
+              {
+                "t": "Opaque",
+                "extension": "tket.bool",
+                "extension_version": "0.2.0",
+                "id": "bool",
+                "args": [],
+                "bound": "C"
+              }
+            ],
+            "output": [
+              {
+                "t": "Opaque",
+                "extension": "tket.bool",
+                "extension_version": "0.2.0",
+                "id": "bool",
+                "args": [],
+                "bound": "C"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "read": {
+        "extension": "tket.bool",
+        "name": "read",
+        "description": "Convert a tket.bool into a Hugr bool_t (a unit sum).",
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Opaque",
+                "extension": "tket.bool",
+                "extension_version": "0.2.0",
+                "id": "bool",
+                "args": [],
+                "bound": "C"
+              }
+            ],
+            "output": [
+              {
+                "t": "Sum",
+                "s": "Unit",
+                "size": 2
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "xor": {
+        "extension": "tket.bool",
+        "name": "xor",
+        "description": "Logical XOR between two tket.bools.",
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Opaque",
+                "extension": "tket.bool",
+                "extension_version": "0.2.0",
+                "id": "bool",
+                "args": [],
+                "bound": "C"
+              },
+              {
+                "t": "Opaque",
+                "extension": "tket.bool",
+                "extension_version": "0.2.0",
+                "id": "bool",
+                "args": [],
+                "bound": "C"
+              }
+            ],
+            "output": [
+              {
+                "t": "Opaque",
+                "extension": "tket.bool",
+                "extension_version": "0.2.0",
+                "id": "bool",
+                "args": [],
+                "bound": "C"
+              }
+            ]
+          }
+        },
+        "binary": false
+      }
+    }
+  },
+  {
+    "version": "0.1.0",
+    "name": "tket.measurement",
+    "types": {
+      "Measurement": {
+        "extension": "tket.measurement",
+        "name": "Measurement",
+        "params": [],
+        "description": "A copyable type representing the result of a measurement operation",
+        "bound": {
+          "b": "Explicit",
+          "bound": "C"
+        }
+      }
+    },
+    "operations": {
+      "Read": {
+        "extension": "tket.measurement",
+        "name": "Read",
+        "description": "Consumes a measurement, converting it into a bool.",
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Opaque",
+                "extension": "tket.measurement",
+                "extension_version": "0.1.0",
+                "id": "Measurement",
+                "args": [],
+                "bound": "C"
+              }
+            ],
+            "output": [
+              {
+                "t": "Sum",
+                "s": "Unit",
+                "size": 2
+              }
+            ]
+          }
+        },
+        "binary": false
+      }
+    }
+  },
+  {
+    "version": "0.2.1",
+    "name": "tket.quantum",
+    "types": {},
+    "operations": {
+      "CRz": {
+        "extension": "tket.quantum",
+        "name": "CRz",
+        "description": "CRz",
+        "misc": {
+          "commutation": []
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              },
+              {
+                "t": "Q"
+              },
+              {
+                "t": "Opaque",
+                "extension": "tket.rotation",
+                "extension_version": "0.2.0",
+                "id": "rotation",
+                "args": [],
+                "bound": "C"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              },
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "CX": {
+        "extension": "tket.quantum",
+        "name": "CX",
+        "description": "CX",
+        "misc": {
+          "commutation": [
+            [
+              0,
+              "Z"
+            ],
+            [
+              1,
+              "X"
+            ]
+          ]
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              },
+              {
+                "t": "Q"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              },
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "CY": {
+        "extension": "tket.quantum",
+        "name": "CY",
+        "description": "CY",
+        "misc": {
+          "commutation": []
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              },
+              {
+                "t": "Q"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              },
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "CZ": {
+        "extension": "tket.quantum",
+        "name": "CZ",
+        "description": "CZ",
+        "misc": {
+          "commutation": [
+            [
+              0,
+              "Z"
+            ],
+            [
+              1,
+              "Z"
+            ]
+          ]
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              },
+              {
+                "t": "Q"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              },
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "H": {
+        "extension": "tket.quantum",
+        "name": "H",
+        "description": "H",
+        "misc": {
+          "commutation": []
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "Measure": {
+        "extension": "tket.quantum",
+        "name": "Measure",
+        "description": "Measure",
+        "misc": {
+          "commutation": [
+            [
+              0,
+              "Z"
+            ]
+          ]
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              },
+              {
+                "t": "Sum",
+                "s": "Unit",
+                "size": 2
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "MeasureFree": {
+        "extension": "tket.quantum",
+        "name": "MeasureFree",
+        "description": "MeasureFree",
+        "misc": {
+          "commutation": []
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              }
+            ],
+            "output": [
+              {
+                "t": "Opaque",
+                "extension": "tket.bool",
+                "extension_version": "0.2.0",
+                "id": "bool",
+                "args": [],
+                "bound": "C"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "QAlloc": {
+        "extension": "tket.quantum",
+        "name": "QAlloc",
+        "description": "QAlloc",
+        "misc": {
+          "commutation": []
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [],
+            "output": [
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "QFree": {
+        "extension": "tket.quantum",
+        "name": "QFree",
+        "description": "QFree",
+        "misc": {
+          "commutation": []
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              }
+            ],
+            "output": []
+          }
+        },
+        "binary": false
+      },
+      "Reset": {
+        "extension": "tket.quantum",
+        "name": "Reset",
+        "description": "Reset",
+        "misc": {
+          "commutation": []
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "Rx": {
+        "extension": "tket.quantum",
+        "name": "Rx",
+        "description": "Rx",
+        "misc": {
+          "commutation": [
+            [
+              0,
+              "X"
+            ]
+          ]
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              },
+              {
+                "t": "Opaque",
+                "extension": "tket.rotation",
+                "extension_version": "0.2.0",
+                "id": "rotation",
+                "args": [],
+                "bound": "C"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "Ry": {
+        "extension": "tket.quantum",
+        "name": "Ry",
+        "description": "Ry",
+        "misc": {
+          "commutation": []
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              },
+              {
+                "t": "Opaque",
+                "extension": "tket.rotation",
+                "extension_version": "0.2.0",
+                "id": "rotation",
+                "args": [],
+                "bound": "C"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "Rz": {
+        "extension": "tket.quantum",
+        "name": "Rz",
+        "description": "Rz",
+        "misc": {
+          "commutation": [
+            [
+              0,
+              "Z"
+            ]
+          ]
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              },
+              {
+                "t": "Opaque",
+                "extension": "tket.rotation",
+                "extension_version": "0.2.0",
+                "id": "rotation",
+                "args": [],
+                "bound": "C"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "S": {
+        "extension": "tket.quantum",
+        "name": "S",
+        "description": "S",
+        "misc": {
+          "commutation": [
+            [
+              0,
+              "Z"
+            ]
+          ]
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "Sdg": {
+        "extension": "tket.quantum",
+        "name": "Sdg",
+        "description": "Sdg",
+        "misc": {
+          "commutation": [
+            [
+              0,
+              "Z"
+            ]
+          ]
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "T": {
+        "extension": "tket.quantum",
+        "name": "T",
+        "description": "T",
+        "misc": {
+          "commutation": [
+            [
+              0,
+              "Z"
+            ]
+          ]
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "Tdg": {
+        "extension": "tket.quantum",
+        "name": "Tdg",
+        "description": "Tdg",
+        "misc": {
+          "commutation": [
+            [
+              0,
+              "Z"
+            ]
+          ]
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "Toffoli": {
+        "extension": "tket.quantum",
+        "name": "Toffoli",
+        "description": "Toffoli",
+        "misc": {
+          "commutation": []
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              },
+              {
+                "t": "Q"
+              },
+              {
+                "t": "Q"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              },
+              {
+                "t": "Q"
+              },
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "TryQAlloc": {
+        "extension": "tket.quantum",
+        "name": "TryQAlloc",
+        "description": "TryQAlloc",
+        "misc": {
+          "commutation": []
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [],
+            "output": [
+              {
+                "t": "Sum",
+                "s": "General",
+                "rows": [
+                  [],
+                  [
+                    {
+                      "t": "Q"
+                    }
+                  ]
+                ]
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "V": {
+        "extension": "tket.quantum",
+        "name": "V",
+        "description": "V",
+        "misc": {
+          "commutation": [
+            [
+              0,
+              "X"
+            ]
+          ]
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "Vdg": {
+        "extension": "tket.quantum",
+        "name": "Vdg",
+        "description": "Vdg",
+        "misc": {
+          "commutation": [
+            [
+              0,
+              "X"
+            ]
+          ]
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "X": {
+        "extension": "tket.quantum",
+        "name": "X",
+        "description": "X",
+        "misc": {
+          "commutation": [
+            [
+              0,
+              "X"
+            ]
+          ]
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "Y": {
+        "extension": "tket.quantum",
+        "name": "Y",
+        "description": "Y",
+        "misc": {
+          "commutation": [
+            [
+              0,
+              "Y"
+            ]
+          ]
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "Z": {
+        "extension": "tket.quantum",
+        "name": "Z",
+        "description": "Z",
+        "misc": {
+          "commutation": [
+            [
+              0,
+              "Z"
+            ]
+          ]
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "symbolic_angle": {
+        "extension": "tket.quantum",
+        "name": "symbolic_angle",
+        "description": "Store a sympy expression that can be evaluated to an angle.",
+        "signature": {
+          "params": [
+            {
+              "tp": "String"
+            }
+          ],
+          "body": {
+            "input": [],
+            "output": [
+              {
+                "t": "Opaque",
+                "extension": "tket.rotation",
+                "extension_version": "0.2.0",
+                "id": "rotation",
+                "args": [],
+                "bound": "C"
+              }
+            ]
+          }
+        },
+        "binary": false
+      }
+    }
+  },
+  {
+    "version": "0.3.0",
+    "name": "tket.quantum",
+    "types": {},
+    "operations": {
+      "CRz": {
+        "extension": "tket.quantum",
+        "name": "CRz",
+        "description": "CRz",
+        "misc": {
+          "commutation": []
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              },
+              {
+                "t": "Q"
+              },
+              {
+                "t": "Opaque",
+                "extension": "tket.rotation",
+                "extension_version": "0.2.0",
+                "id": "rotation",
+                "args": [],
+                "bound": "C"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              },
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "CX": {
+        "extension": "tket.quantum",
+        "name": "CX",
+        "description": "CX",
+        "misc": {
+          "commutation": [
+            [
+              0,
+              "Z"
+            ],
+            [
+              1,
+              "X"
+            ]
+          ]
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              },
+              {
+                "t": "Q"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              },
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "CY": {
+        "extension": "tket.quantum",
+        "name": "CY",
+        "description": "CY",
+        "misc": {
+          "commutation": []
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              },
+              {
+                "t": "Q"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              },
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "CZ": {
+        "extension": "tket.quantum",
+        "name": "CZ",
+        "description": "CZ",
+        "misc": {
+          "commutation": [
+            [
+              0,
+              "Z"
+            ],
+            [
+              1,
+              "Z"
+            ]
+          ]
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              },
+              {
+                "t": "Q"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              },
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "H": {
+        "extension": "tket.quantum",
+        "name": "H",
+        "description": "H",
+        "misc": {
+          "commutation": []
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "Measure": {
+        "extension": "tket.quantum",
+        "name": "Measure",
+        "description": "Measure",
+        "misc": {
+          "commutation": [
+            [
+              0,
+              "Z"
+            ]
+          ]
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              },
+              {
+                "t": "Sum",
+                "s": "Unit",
+                "size": 2
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "MeasureFree": {
+        "extension": "tket.quantum",
+        "name": "MeasureFree",
+        "description": "MeasureFree",
+        "misc": {
+          "commutation": []
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              }
+            ],
+            "output": [
+              {
+                "t": "Opaque",
+                "extension": "tket.measurement",
+                "extension_version": "0.1.0",
+                "id": "Measurement",
+                "args": [],
+                "bound": "C"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "QAlloc": {
+        "extension": "tket.quantum",
+        "name": "QAlloc",
+        "description": "QAlloc",
+        "misc": {
+          "commutation": []
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [],
+            "output": [
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "QFree": {
+        "extension": "tket.quantum",
+        "name": "QFree",
+        "description": "QFree",
+        "misc": {
+          "commutation": []
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              }
+            ],
+            "output": []
+          }
+        },
+        "binary": false
+      },
+      "Reset": {
+        "extension": "tket.quantum",
+        "name": "Reset",
+        "description": "Reset",
+        "misc": {
+          "commutation": []
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "Rx": {
+        "extension": "tket.quantum",
+        "name": "Rx",
+        "description": "Rx",
+        "misc": {
+          "commutation": [
+            [
+              0,
+              "X"
+            ]
+          ]
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              },
+              {
+                "t": "Opaque",
+                "extension": "tket.rotation",
+                "extension_version": "0.2.0",
+                "id": "rotation",
+                "args": [],
+                "bound": "C"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "Ry": {
+        "extension": "tket.quantum",
+        "name": "Ry",
+        "description": "Ry",
+        "misc": {
+          "commutation": []
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              },
+              {
+                "t": "Opaque",
+                "extension": "tket.rotation",
+                "extension_version": "0.2.0",
+                "id": "rotation",
+                "args": [],
+                "bound": "C"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "Rz": {
+        "extension": "tket.quantum",
+        "name": "Rz",
+        "description": "Rz",
+        "misc": {
+          "commutation": [
+            [
+              0,
+              "Z"
+            ]
+          ]
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              },
+              {
+                "t": "Opaque",
+                "extension": "tket.rotation",
+                "extension_version": "0.2.0",
+                "id": "rotation",
+                "args": [],
+                "bound": "C"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "S": {
+        "extension": "tket.quantum",
+        "name": "S",
+        "description": "S",
+        "misc": {
+          "commutation": [
+            [
+              0,
+              "Z"
+            ]
+          ]
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "Sdg": {
+        "extension": "tket.quantum",
+        "name": "Sdg",
+        "description": "Sdg",
+        "misc": {
+          "commutation": [
+            [
+              0,
+              "Z"
+            ]
+          ]
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "T": {
+        "extension": "tket.quantum",
+        "name": "T",
+        "description": "T",
+        "misc": {
+          "commutation": [
+            [
+              0,
+              "Z"
+            ]
+          ]
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "Tdg": {
+        "extension": "tket.quantum",
+        "name": "Tdg",
+        "description": "Tdg",
+        "misc": {
+          "commutation": [
+            [
+              0,
+              "Z"
+            ]
+          ]
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "Toffoli": {
+        "extension": "tket.quantum",
+        "name": "Toffoli",
+        "description": "Toffoli",
+        "misc": {
+          "commutation": []
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              },
+              {
+                "t": "Q"
+              },
+              {
+                "t": "Q"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              },
+              {
+                "t": "Q"
+              },
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "TryQAlloc": {
+        "extension": "tket.quantum",
+        "name": "TryQAlloc",
+        "description": "TryQAlloc",
+        "misc": {
+          "commutation": []
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [],
+            "output": [
+              {
+                "t": "Sum",
+                "s": "General",
+                "rows": [
+                  [],
+                  [
+                    {
+                      "t": "Q"
+                    }
+                  ]
+                ]
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "V": {
+        "extension": "tket.quantum",
+        "name": "V",
+        "description": "V",
+        "misc": {
+          "commutation": [
+            [
+              0,
+              "X"
+            ]
+          ]
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "Vdg": {
+        "extension": "tket.quantum",
+        "name": "Vdg",
+        "description": "Vdg",
+        "misc": {
+          "commutation": [
+            [
+              0,
+              "X"
+            ]
+          ]
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "X": {
+        "extension": "tket.quantum",
+        "name": "X",
+        "description": "X",
+        "misc": {
+          "commutation": [
+            [
+              0,
+              "X"
+            ]
+          ]
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "Y": {
+        "extension": "tket.quantum",
+        "name": "Y",
+        "description": "Y",
+        "misc": {
+          "commutation": [
+            [
+              0,
+              "Y"
+            ]
+          ]
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "Z": {
+        "extension": "tket.quantum",
+        "name": "Z",
+        "description": "Z",
+        "misc": {
+          "commutation": [
+            [
+              0,
+              "Z"
+            ]
+          ]
+        },
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Q"
+              }
+            ],
+            "output": [
+              {
+                "t": "Q"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "symbolic_angle": {
+        "extension": "tket.quantum",
+        "name": "symbolic_angle",
+        "description": "Store a sympy expression that can be evaluated to an angle.",
+        "signature": {
+          "params": [
+            {
+              "tp": "String"
+            }
+          ],
+          "body": {
+            "input": [],
+            "output": [
+              {
+                "t": "Opaque",
+                "extension": "tket.rotation",
+                "extension_version": "0.2.0",
+                "id": "rotation",
+                "args": [],
+                "bound": "C"
+              }
+            ]
+          }
+        },
+        "binary": false
+      }
+    }
+  },
+  {
+    "version": "0.2.0",
+    "name": "tket.rotation",
+    "types": {
+      "rotation": {
+        "extension": "tket.rotation",
+        "name": "rotation",
+        "params": [],
+        "description": "rotation type expressed as number of half turns",
+        "bound": {
+          "b": "Explicit",
+          "bound": "C"
+        }
+      }
+    },
+    "operations": {
+      "from_halfturns": {
+        "extension": "tket.rotation",
+        "name": "from_halfturns",
+        "description": "Construct rotation from number of half-turns (would be multiples of PI in radians). Returns None if the float is non-finite.",
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Opaque",
+                "extension": "arithmetic.float.types",
+                "extension_version": "0.1.0",
+                "id": "float64",
+                "args": [],
+                "bound": "C"
+              }
+            ],
+            "output": [
+              {
+                "t": "Sum",
+                "s": "General",
+                "rows": [
+                  [],
+                  [
+                    {
+                      "t": "Opaque",
+                      "extension": "tket.rotation",
+                      "extension_version": "0.2.0",
+                      "id": "rotation",
+                      "args": [],
+                      "bound": "C"
+                    }
+                  ]
+                ]
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "from_halfturns_unchecked": {
+        "extension": "tket.rotation",
+        "name": "from_halfturns_unchecked",
+        "description": "Construct rotation from number of half-turns (would be multiples of PI in radians). Panics if the float is non-finite.",
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Opaque",
+                "extension": "arithmetic.float.types",
+                "extension_version": "0.1.0",
+                "id": "float64",
+                "args": [],
+                "bound": "C"
+              }
+            ],
+            "output": [
+              {
+                "t": "Opaque",
+                "extension": "tket.rotation",
+                "extension_version": "0.2.0",
+                "id": "rotation",
+                "args": [],
+                "bound": "C"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "radd": {
+        "extension": "tket.rotation",
+        "name": "radd",
+        "description": "Add two angles together (experimental).",
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Opaque",
+                "extension": "tket.rotation",
+                "extension_version": "0.2.0",
+                "id": "rotation",
+                "args": [],
+                "bound": "C"
+              },
+              {
+                "t": "Opaque",
+                "extension": "tket.rotation",
+                "extension_version": "0.2.0",
+                "id": "rotation",
+                "args": [],
+                "bound": "C"
+              }
+            ],
+            "output": [
+              {
+                "t": "Opaque",
+                "extension": "tket.rotation",
+                "extension_version": "0.2.0",
+                "id": "rotation",
+                "args": [],
+                "bound": "C"
+              }
+            ]
+          }
+        },
+        "binary": false
+      },
+      "to_halfturns": {
+        "extension": "tket.rotation",
+        "name": "to_halfturns",
+        "description": "Convert rotation to number of half-turns (would be multiples of PI in radians).",
+        "signature": {
+          "params": [],
+          "body": {
+            "input": [
+              {
+                "t": "Opaque",
+                "extension": "tket.rotation",
+                "extension_version": "0.2.0",
+                "id": "rotation",
+                "args": [],
+                "bound": "C"
+              }
+            ],
+            "output": [
+              {
+                "t": "Opaque",
+                "extension": "arithmetic.float.types",
+                "extension_version": "0.1.0",
+                "id": "float64",
+                "args": [],
+                "bound": "C"
+              }
+            ]
+          }
+        },
+        "binary": false
+      }
+    }
+  }
+]
