@@ -294,7 +294,7 @@ jobs:
         # See <https://doc.rust-lang.org/beta/rustc/platform-support/wasm32-unknown-emscripten.html>
         # and <https://github.com/pyodide/pyodide/blob/main/docs/development/abi.md>
         run: |
-          git clone --depth 1 https://github.com/emscripten-core/emsdk.git
+          git clone --depth 1 --revision=e5bd3d0874e302a18f13c5b41f5bacf9a40c8e59 https://github.com/emscripten-core/emsdk.git
           cd emsdk
           ./emsdk install ${{ env.EMSDK_VERSION }}
           ./emsdk activate ${{ env.EMSDK_VERSION }}
