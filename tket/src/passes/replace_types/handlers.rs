@@ -1,31 +1,33 @@
-//! Callbacks for use with [`ReplaceTypes::replace_consts_parametrized`]
+//! Callbacks for use with [`ReplaceTypes::replace_consts_parametrized`],
+//! [`ReplaceTypes::set_replace_parametrized_op`]
 //! and [`DelegatingLinearizer::register_callback`](super::DelegatingLinearizer::register_callback)
 
+use crate::extension::guppy::{DROP_OP_NAME, GUPPY_EXTENSION};
+use crate::passes::mangle_name;
 use hugr_core::builder::{
-    DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder, SubContainer, endo_sig,
-    inout_sig,
+    Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder, SubContainer,
+    endo_sig, inout_sig,
 };
-use hugr_core::extension::prelude::{UnwrapBuilder, option_type};
+use hugr_core::extension::prelude::{UnwrapBuilder, option_type, usize_t};
+use hugr_core::extension::simple_op::MakeOpDef;
 use hugr_core::hugr::linking::{NameLinkingPolicy, OnMultiDefn};
 use hugr_core::ops::constant::{CustomConst, OpaqueValue};
-use hugr_core::ops::{OpTrait, OpType, Tag, Value};
+use hugr_core::ops::{ExtensionOp, OpTrait, OpType, Tag, Value};
 use hugr_core::std_extensions::arithmetic::conversions::ConvertOpDef;
 use hugr_core::std_extensions::arithmetic::int_ops::IntOpDef;
 use hugr_core::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
 use hugr_core::std_extensions::collections::array::{
-    Array, ArrayClone, ArrayDiscard, ArrayKind, ArrayOpBuilder, GenericArrayOpDef,
-    GenericArrayRepeat, GenericArrayScan, GenericArrayValue, array_type,
+    ARRAY_CLONE_OP_ID, ARRAY_DISCARD_OP_ID, Array, ArrayClone, ArrayDiscard, ArrayKind,
+    ArrayOpBuilder, GenericArrayOpDef, GenericArrayRepeat, GenericArrayScan, GenericArrayValue,
+    array_type,
 };
 use hugr_core::std_extensions::collections::borrow_array::{
-    BArrayClone, BArrayDiscard, BArrayOpBuilder, BorrowArray, borrow_array_type,
+    BArrayClone, BArrayDiscard, BArrayOpBuilder, BArrayUnsafeOpDef, BorrowArray, borrow_array_type,
 };
 use hugr_core::std_extensions::collections::list::ListValue;
 use hugr_core::types::{SumType, Transformable, Type, TypeArg};
 use hugr_core::{Visibility, type_row};
-
 use itertools::Itertools;
-
-use crate::passes::mangle_name;
 
 use super::{
     CallbackHandler, LinearizeError, Linearizer, NodeTemplate, ReplaceTypes, ReplaceTypesError,
@@ -504,6 +506,196 @@ pub fn copy_discard_borrow_array(
         // For linear elements we have to fall back to the generic linearization implementation
         linearize_generic_array::<BorrowArray>(args, num_outports, lin)
     }
+}
+
+/// Decodes the [`TypeArg`]s of a generic array op into its size and element type.
+///
+/// Returns `None` if the element type is copyable, in which case the original
+/// op remains valid and needs no replacement.
+fn linear_array_args(args: &[TypeArg]) -> Option<(u64, Type)> {
+    let [size, elem_ty] = args else {
+        unreachable!("Illegal TypeArgs to array op: {args:?}")
+    };
+    let size = size.as_nat().expect("Illegal array size");
+    let elem_ty = Type::try_from(elem_ty.clone()).expect("Illegal array element type");
+    (!elem_ty.copyable()).then_some((size, elem_ty))
+}
+
+/// Handler for array `clone` ops whose element type has become linear.
+///
+/// The op is replaced with a copy produced by the [`Linearizer`], which must
+/// therefore be able to copy the array type. Ops on copyable element types are
+/// left unchanged.
+///
+/// Generic over the concrete array implementation. For use with
+/// [`ReplaceTypes::set_replace_parametrized_op`].
+pub fn linear_array_clone<AK: ArrayKind>(
+    args: &[TypeArg],
+    rt: &ReplaceTypes,
+) -> Result<Option<NodeTemplate>, ReplaceTypesError> {
+    let Some((size, elem_ty)) = linear_array_args(args) else {
+        return Ok(None);
+    };
+    let array_ty = AK::ty(size, elem_ty);
+    Ok(Some(rt.get_linearizer().copy_discard_op(&array_ty, 2)?))
+}
+
+/// Handler for array `discard` ops whose element type has become linear.
+///
+/// The op is replaced with a [`GUPPY_EXTENSION`] `drop` op, so a drop-lowering
+/// pass must run afterwards or the result will contain unresolved `drop`s. Ops
+/// on copyable element types are left unchanged.
+///
+/// Generic over the concrete array implementation. For use with
+/// [`ReplaceTypes::set_replace_parametrized_op`].
+pub fn linear_array_discard<AK: ArrayKind>(
+    args: &[TypeArg],
+    _rt: &ReplaceTypes,
+) -> Result<Option<NodeTemplate>, ReplaceTypesError> {
+    let Some((size, elem_ty)) = linear_array_args(args) else {
+        return Ok(None);
+    };
+    let drop_op_def = GUPPY_EXTENSION.get_op(DROP_OP_NAME.as_str()).unwrap();
+    let drop_op =
+        ExtensionOp::new(drop_op_def.clone(), vec![AK::ty(size, elem_ty).into()]).unwrap();
+    Ok(Some(NodeTemplate::SingleOp(drop_op.into())))
+}
+
+/// Handler for borrow-array `get` ops whose element type has become linear.
+///
+/// The op is replaced with a DFG that borrows the element, copies it via the
+/// [`Linearizer`] (which must therefore be able to copy the element type), and
+/// returns it to the array. Ops on copyable element types are left unchanged.
+///
+/// For use with [`ReplaceTypes::set_replace_parametrized_op`].
+pub fn linear_borrow_array_get(
+    args: &[TypeArg],
+    rt: &ReplaceTypes,
+) -> Result<Option<NodeTemplate>, ReplaceTypesError> {
+    let Some((size, elem_ty)) = linear_array_args(args) else {
+        return Ok(None);
+    };
+    Ok(Some(barray_get_replacement(rt, size, elem_ty)))
+}
+
+fn barray_get_replacement(rt: &ReplaceTypes, size: u64, elem_ty: Type) -> NodeTemplate {
+    let array_ty = borrow_array_type(size, elem_ty.clone());
+    let opt_el = option_type(vec![elem_ty.clone()]);
+    let mut dfb = DFGBuilder::new(inout_sig(
+        vec![array_ty.clone(), usize_t()],
+        vec![opt_el.clone().into(), array_ty.clone()],
+    ))
+    .unwrap();
+    let [arr_in, idx] = dfb.input_wires_arr();
+    let [idx_as_int] = dfb
+        .add_dataflow_op(ConvertOpDef::ifromusize.without_log_width(), [idx])
+        .unwrap()
+        .outputs_arr();
+    let bound = dfb.add_load_value(ConstInt::new_u(6, size).unwrap());
+    let [is_in_range] = dfb
+        .add_dataflow_op(IntOpDef::ilt_u.with_log_width(6), [idx_as_int, bound])
+        .unwrap()
+        .outputs_arr();
+    let mut cb = dfb
+        .conditional_builder(
+            (vec![type_row![]; 2], is_in_range),
+            [(array_ty.clone(), arr_in), (usize_t(), idx)],
+            vec![opt_el.clone().into(), array_ty.clone()].into(),
+        )
+        .unwrap();
+
+    let mut out_of_range = cb.case_builder(0).unwrap();
+    let [arr_in, _] = out_of_range.input_wires_arr();
+    let [none] = out_of_range
+        .add_dataflow_op(
+            Tag::new(0, vec![type_row![], vec![elem_ty.clone()].into()]),
+            [],
+        )
+        .unwrap()
+        .outputs_arr();
+    out_of_range.finish_with_outputs([none, arr_in]).unwrap();
+
+    let mut in_range = cb.case_builder(1).unwrap();
+    let [arr_in, idx] = in_range.input_wires_arr();
+    let [arr, elem] = in_range
+        .add_dataflow_op(
+            BArrayUnsafeOpDef::borrow.to_concrete(elem_ty.clone(), size),
+            [arr_in, idx],
+        )
+        .unwrap()
+        .outputs_arr();
+
+    let [elem1, elem2] = rt
+        .get_linearizer()
+        .copy_discard_op(&elem_ty, 2)
+        .unwrap()
+        .add(&mut in_range, [elem])
+        .unwrap()
+        .outputs_arr();
+
+    let [arr] = in_range
+        .add_dataflow_op(
+            BArrayUnsafeOpDef::r#return.to_concrete(elem_ty.clone(), size),
+            [arr, idx, elem1],
+        )
+        .unwrap()
+        .outputs_arr();
+    let [some] = in_range
+        .add_dataflow_op(
+            Tag::new(1, vec![type_row![], vec![elem_ty].into()]),
+            [elem2],
+        )
+        .unwrap()
+        .outputs_arr();
+    in_range.finish_with_outputs([some, arr]).unwrap();
+
+    let outs = cb.finish_sub_container().unwrap().outputs();
+    // Do not finish DFG: it contains "invalid" copy_dfg that needs linearizing
+    dfb.set_outputs(outs).unwrap();
+    let h = std::mem::take(dfb.hugr_mut());
+    NodeTemplate::CompoundOp(Box::new(h))
+}
+
+/// Registers replacements for array and borrow-array ops whose signatures
+/// require copyable elements, so that they keep working when the element type
+/// has become linear.
+///
+/// Covers `clone` and `discard` for both [`Array`] and [`BorrowArray`], plus
+/// borrow-array `get`. Ops on copyable element types are left unchanged.
+///
+/// # Prerequisites
+///
+/// * The `lowerer`'s [`Linearizer`] must handle the linear element types, as
+///   [`linear_array_clone`] and [`linear_borrow_array_get`] delegate to it.
+/// * [`linear_array_discard`] emits a [`GUPPY_EXTENSION`] `drop` op, so a
+///   drop-lowering pass must run afterwards or the result will contain
+///   unresolved `drop`s.
+pub fn register_linear_array_op_replacements(lowerer: &mut ReplaceTypes) {
+    register_linear_array_ops::<Array>(lowerer);
+    register_linear_array_ops::<BorrowArray>(lowerer);
+
+    // For borrow arrays, we also replace the `get` op (currently the Guppy compiler
+    // doesn't generate `get` ops for standard arrays.)
+    lowerer.set_replace_parametrized_op(
+        BorrowArray::extension()
+            .get_op(GenericArrayOpDef::<BorrowArray>::get.opdef_id().as_str())
+            .unwrap(),
+        linear_borrow_array_get,
+    );
+}
+
+/// Registers the [`linear_array_clone`] and [`linear_array_discard`] handlers
+/// for a single array implementation.
+fn register_linear_array_ops<AK: ArrayKind>(lowerer: &mut ReplaceTypes) {
+    let ext = AK::extension();
+    lowerer.set_replace_parametrized_op(
+        ext.get_op(ARRAY_CLONE_OP_ID.as_str()).unwrap(),
+        linear_array_clone::<AK>,
+    );
+    lowerer.set_replace_parametrized_op(
+        ext.get_op(ARRAY_DISCARD_OP_ID.as_str()).unwrap(),
+        linear_array_discard::<AK>,
+    );
 }
 
 #[cfg(test)]
