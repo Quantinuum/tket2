@@ -65,6 +65,8 @@ fn main1() -> Result<(), Box<dyn Error>> {
     std::fs::write("updated.mmd", updater.get_hugr().mermaid_string())?;
     println!("+++++++++++++++++");
 
+    // NICOLA todo: remove not used extensions
+
     updater.get_hugr().validate()?;
 
     // let new_output = crate_dir.join("quantum-0.3.0.hugr");
