@@ -8,6 +8,7 @@ use hugr_core::builder::{
     Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder, SubContainer,
     endo_sig, inout_sig,
 };
+use hugr_core::extension::SignatureError;
 use hugr_core::extension::prelude::{UnwrapBuilder, option_type, usize_t};
 use hugr_core::extension::simple_op::MakeOpDef;
 use hugr_core::hugr::linking::{NameLinkingPolicy, OnMultiDefn};
@@ -16,15 +17,17 @@ use hugr_core::ops::{ExtensionOp, OpTrait, OpType, Tag, Value};
 use hugr_core::std_extensions::arithmetic::conversions::ConvertOpDef;
 use hugr_core::std_extensions::arithmetic::int_ops::IntOpDef;
 use hugr_core::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
+use hugr_core::std_extensions::collections::array::op_builder::GenericArrayOpBuilder;
 use hugr_core::std_extensions::collections::array::{
-    ARRAY_CLONE_OP_ID, ARRAY_DISCARD_OP_ID, Array, ArrayClone, ArrayDiscard, ArrayKind,
-    ArrayOpBuilder, GenericArrayOpDef, GenericArrayRepeat, GenericArrayScan, GenericArrayValue,
-    array_type,
+    ARRAY_CLONE_OP_ID, ARRAY_DISCARD_OP_ID, Array, ArrayKind, GenericArrayClone,
+    GenericArrayDiscard, GenericArrayOpDef, GenericArrayRepeat, GenericArrayScan,
+    GenericArrayValue,
 };
 use hugr_core::std_extensions::collections::borrow_array::{
-    BArrayClone, BArrayDiscard, BArrayOpBuilder, BArrayUnsafeOpDef, BorrowArray, borrow_array_type,
+    BArrayOpBuilder, BArrayUnsafeOpDef, BorrowArray, borrow_array_type,
 };
 use hugr_core::std_extensions::collections::list::ListValue;
+use hugr_core::types::type_param::TermKindError;
 use hugr_core::types::{SumType, Transformable, Type, TypeArg};
 use hugr_core::{Visibility, type_row};
 use itertools::Itertools;
@@ -112,14 +115,11 @@ pub fn linearize_generic_array<AK: ArrayKind>(
 ) -> Result<NodeTemplate, LinearizeError> {
     // Require known length i.e. usable only after monomorphization, due to no-variables limitation
     // restriction on NodeTemplate::CompoundOp
-    let [TypeArg::BoundedNat(n), ty] = args else {
-        panic!("Illegal TypeArgs to array: {args:?}")
-    };
-    let ty = Type::try_from(ty.clone()).unwrap();
+    let (n, ty) = array_args(args)?;
     if num_outports == 0 {
         // "Simple" discard
-        let array_scan = GenericArrayScan::<AK>::new(ty.clone(), Type::UNIT, vec![], *n);
-        let in_type = AK::ty(*n, ty.clone());
+        let array_scan = GenericArrayScan::<AK>::new(ty.clone(), Type::UNIT, vec![], n);
+        let in_type = AK::ty(n, ty.clone());
         return Ok(NodeTemplate::LinkedHugr(
             Box::new({
                 let mut dfb = DFGBuilder::new(inout_sig([in_type], [])).unwrap();
@@ -148,7 +148,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
                     .add_dataflow_op(array_scan, [in_array, map_fn])
                     .unwrap()
                     .out_wire(0);
-                AK::build_discard(&mut dfb, Type::UNIT, *n, unit_arr).unwrap();
+                AK::build_discard(&mut dfb, Type::UNIT, n, unit_arr).unwrap();
                 dfb.finish_hugr_with_outputs([]).unwrap()
             }),
             NameLinkingPolicy::default().on_multiple_defn(OnMultiDefn::UseSource),
@@ -157,7 +157,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
     // The num_outports>1 case will simplify, and unify with the previous, when we have a
     // more general ArrayScan https://github.com/CQCL/hugr/issues/2041. In the meantime:
     let num_new = num_outports - 1;
-    let array_ty = AK::ty(*n, ty.clone());
+    let array_ty = AK::ty(n, ty.clone());
     let mut dfb = DFGBuilder::new(inout_sig(
         [array_ty.clone()],
         vec![array_ty.clone(); num_outports],
@@ -182,7 +182,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
                 .unwrap();
             fb.finish_with_outputs(none.outputs()).unwrap()
         };
-        let repeats = vec![GenericArrayRepeat::<AK>::new(option_ty.clone(), *n); num_new];
+        let repeats = vec![GenericArrayRepeat::<AK>::new(option_ty.clone(), n); num_new];
         let fn_none = dfb.load_func(fn_none.handle(), &[]).unwrap();
         repeats
             .into_iter()
@@ -196,7 +196,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
     // 2. use a scan through the input array, copying the element num_outputs times;
     // return the first copy, and put each of the other copies into one of the array<option>
     let i64_t = INT_TYPES[6].clone();
-    let option_array = AK::ty(*n, option_ty.clone());
+    let option_array = AK::ty(n, option_ty.clone());
     let copy_elem = {
         let mut io = vec![ty.clone(), i64_t.clone()];
         io.extend(vec![option_array.clone(); num_new]);
@@ -205,7 +205,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
             .define_function_vis(
                 mangle_name(
                     COPY_SCAN_PREFIX,
-                    &[(*n).into(), ty.clone().into(), (num_new as u64).into()],
+                    &[n.into(), ty.clone().into(), (num_new as u64).into()],
                 ),
                 endo_sig(io),
                 Visibility::Public,
@@ -227,7 +227,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
         let copy0 = copies.next().unwrap(); // We'll return this directly
 
         // Wrap each remaining copy into an option
-        let set_op = OpType::from(GenericArrayOpDef::<AK>::set.to_concrete(option_ty.clone(), *n));
+        let set_op = OpType::from(GenericArrayOpDef::<AK>::set.to_concrete(option_ty.clone(), n));
         let either_st = set_op.dataflow_signature().unwrap().output[0]
             .as_sum()
             .unwrap()
@@ -271,7 +271,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
         std::iter::once(i64_t)
             .chain(vec![option_array; num_new])
             .collect(),
-        *n,
+        n,
     );
 
     let copy_elem = dfb.load_func(copy_elem.handle(), &[]).unwrap();
@@ -305,7 +305,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
         fb.finish_with_outputs([val]).unwrap()
     };
 
-    let unwrap_scan = GenericArrayScan::<AK>::new(option_ty, ty.clone(), vec![], *n);
+    let unwrap_scan = GenericArrayScan::<AK>::new(option_ty, ty.clone(), vec![], n);
     let unwrap_elem = dfb.load_func(unwrap_elem.handle(), &[]).unwrap();
 
     let out_arrays = std::iter::once(out_array1)
@@ -335,40 +335,48 @@ pub fn copy_discard_array(
 ) -> Result<NodeTemplate, LinearizeError> {
     // Require known length i.e. usable only after monomorphization, due to no-variables limitation
     // restriction on NodeTemplate::CompoundOp
-    let [TypeArg::BoundedNat(n), ty] = args else {
-        panic!("Illegal TypeArgs to array: {args:?}")
-    };
-    let ty = Type::try_from(ty.clone()).expect("Illegal array element type");
+    let (n, ty) = array_args(args)?;
     if ty.copyable() {
         // For arrays with copyable elements, we can just use the clone/discard ops
-        if num_outports == 0 {
-            Ok(NodeTemplate::SingleOp(
-                ArrayDiscard::new(ty.clone(), *n).unwrap().into(),
-            ))
-        } else if num_outports == 2 {
-            Ok(NodeTemplate::SingleOp(
-                ArrayClone::new(ty.clone(), *n).unwrap().into(),
-            ))
-        } else {
-            let array_ty = array_type(*n, ty.clone());
-            Ok(NodeTemplate::CompoundOp(Box::new({
-                let mut dfb =
-                    DFGBuilder::new(inout_sig([array_ty.clone()], vec![array_ty; *n as usize]))
-                        .unwrap();
-                let [mut arr] = dfb.input_wires_arr();
-                let mut outs = vec![];
-                for _ in 0..(num_outports - 1) {
-                    let (arr1, arr2) = dfb.add_array_clone(ty.clone(), *n, arr).unwrap();
-                    arr = arr1;
-                    outs.push(arr2);
-                }
-                outs.push(arr);
-                dfb.finish_hugr_with_outputs(outs).unwrap()
-            })))
-        }
+        Ok(copyable_array_copy_discard::<Array>(n, ty, num_outports))
     } else {
         // For linear elements we have to fall back to the generic linearization implementation
         linearize_generic_array::<Array>(args, num_outports, lin)
+    }
+}
+
+/// Copies/discards an array whose elements are copyable, using the array
+/// `clone`/`discard` ops directly.
+///
+/// Generic over the concrete array implementation.
+fn copyable_array_copy_discard<AK: ArrayKind>(
+    n: u64,
+    ty: Type,
+    num_outports: usize,
+) -> NodeTemplate {
+    debug_assert!(ty.copyable());
+    if num_outports == 0 {
+        NodeTemplate::SingleOp(GenericArrayDiscard::<AK>::new(ty, n).unwrap().into())
+    } else if num_outports == 2 {
+        NodeTemplate::SingleOp(GenericArrayClone::<AK>::new(ty, n).unwrap().into())
+    } else {
+        let array_ty = AK::ty(n, ty.clone());
+        NodeTemplate::CompoundOp(Box::new({
+            let mut dfb =
+                DFGBuilder::new(inout_sig([array_ty.clone()], vec![array_ty; num_outports]))
+                    .unwrap();
+            let [mut arr] = dfb.input_wires_arr();
+            let mut outs = vec![];
+            for _ in 0..(num_outports - 1) {
+                let (arr1, arr2) = dfb
+                    .add_generic_array_clone::<AK>(ty.clone(), n, arr)
+                    .unwrap();
+                arr = arr1;
+                outs.push(arr2);
+            }
+            outs.push(arr);
+            dfb.finish_hugr_with_outputs(outs).unwrap()
+        }))
     }
 }
 
@@ -383,47 +391,24 @@ pub fn copy_discard_borrow_array(
 ) -> Result<NodeTemplate, LinearizeError> {
     // Require known length i.e. usable only after monomorphization, due to no-variables limitation
     // restriction on NodeTemplate::CompoundOp
-    let [TypeArg::BoundedNat(n), ty] = args else {
-        panic!("Illegal TypeArgs to borrow array: {args:?}")
-    };
-    let ty = Type::try_from(ty.clone()).expect("Illegal BorrowArray element type");
+    let (n, ty) = array_args(args)?;
     if ty.copyable() {
         // For arrays with copyable elements, we can just use the clone/discard ops
-        if num_outports == 0 {
-            Ok(NodeTemplate::SingleOp(
-                BArrayDiscard::new(ty.clone(), *n).unwrap().into(),
-            ))
-        } else if num_outports == 2 {
-            Ok(NodeTemplate::SingleOp(
-                BArrayClone::new(ty.clone(), *n).unwrap().into(),
-            ))
-        } else {
-            let array_ty = borrow_array_type(*n, ty.clone());
-            Ok(NodeTemplate::CompoundOp(Box::new({
-                let mut dfb =
-                    DFGBuilder::new(inout_sig([array_ty.clone()], vec![array_ty; *n as usize]))
-                        .unwrap();
-                let [mut arr] = dfb.input_wires_arr();
-                let mut outs = vec![];
-                for _ in 0..(num_outports - 1) {
-                    let (arr1, arr2) = dfb.add_borrow_array_clone(ty.clone(), *n, arr).unwrap();
-                    arr = arr1;
-                    outs.push(arr2);
-                }
-                outs.push(arr);
-                dfb.finish_hugr_with_outputs(outs).unwrap()
-            })))
-        }
+        Ok(copyable_array_copy_discard::<BorrowArray>(
+            n,
+            ty,
+            num_outports,
+        ))
     } else if num_outports == 0 {
         // Override "generic" array discard to only discard non-borrowed elements.
         let elem_discard = lin.copy_discard_op(&ty, 0)?;
-        let array_ty = || borrow_array_type(*n, ty.clone());
+        let array_ty = || borrow_array_type(n, ty.clone());
         let i64_t = || INT_TYPES[6].clone();
         let mut dfb = DFGBuilder::new(inout_sig([array_ty()], [])).unwrap();
         let [in_array] = dfb.input_wires_arr();
         let zero = dfb.add_load_value(ConstInt::new_u(6, 0).unwrap());
         let one = dfb.add_load_value(ConstInt::new_u(6, 1).unwrap());
-        let len = dfb.add_load_value(ConstInt::new_u(6, *n).unwrap());
+        let len = dfb.add_load_value(ConstInt::new_u(6, n).unwrap());
 
         // Loop through the elements, discarding as necessary
         let mut tl = dfb
@@ -447,7 +432,7 @@ pub fn copy_discard_borrow_array(
             let mut out_range = cond.case_builder(0).unwrap();
             let [arr] = out_range.input_wires_arr();
             let () = out_range
-                .add_discard_all_borrowed(ty.clone(), *n, arr)
+                .add_discard_all_borrowed(ty.clone(), n, arr)
                 .unwrap();
             let res = out_range
                 .add_dataflow_op(Tag::new(1, loop_variants.clone()), [])
@@ -462,9 +447,7 @@ pub fn copy_discard_borrow_array(
                 .add_dataflow_op(ConvertOpDef::itousize.without_log_width(), [idx])
                 .unwrap()
                 .outputs_arr();
-            let (arr, is_borrowed) = in_range
-                .add_is_borrowed(ty.clone(), *n, arr, idx_u)
-                .unwrap();
+            let (arr, is_borrowed) = in_range.add_is_borrowed(ty.clone(), n, arr, idx_u).unwrap();
             let mut cond2 = in_range
                 .conditional_builder(
                     (vec![type_row![]; 2], is_borrowed),
@@ -483,7 +466,7 @@ pub fn copy_discard_borrow_array(
                 let mut not_borrowed_case = cond2.case_builder(0).unwrap();
                 let [arr] = not_borrowed_case.input_wires_arr();
                 let (arr, elem) = not_borrowed_case
-                    .add_borrow_array_borrow(ty.clone(), *n, arr, idx_u)
+                    .add_borrow_array_borrow(ty.clone(), n, arr, idx_u)
                     .unwrap();
                 elem_discard.add(&mut not_borrowed_case, [elem]).unwrap();
                 not_borrowed_case.finish_with_outputs([arr]).unwrap();
@@ -510,15 +493,33 @@ pub fn copy_discard_borrow_array(
 
 /// Decodes the [`TypeArg`]s of a generic array op into its size and element type.
 ///
-/// Returns `None` if the element type is copyable, in which case the original
-/// op remains valid and needs no replacement.
-fn linear_array_args(args: &[TypeArg]) -> Option<(u64, Type)> {
+/// # Errors
+///
+/// [`SignatureError`] if `args` are not the `[size, element_type]` expected by
+/// an array op.
+fn array_args(args: &[TypeArg]) -> Result<(u64, Type), SignatureError> {
     let [size, elem_ty] = args else {
-        unreachable!("Illegal TypeArgs to array op: {args:?}")
+        return Err(TermKindError::WrongNumberArgs(args.len(), 2).into());
     };
-    let size = size.as_nat().expect("Illegal array size");
-    let elem_ty = Type::try_from(elem_ty.clone()).expect("Illegal array element type");
-    (!elem_ty.copyable()).then_some((size, elem_ty))
+    let size = size
+        .as_nat()
+        .ok_or_else(|| TermKindError::InvalidValue(Box::new(size.clone())))?;
+    let elem_ty = Type::try_from(elem_ty.clone())?;
+    Ok((size, elem_ty))
+}
+
+/// Decodes the [`TypeArg`]s of a generic array op into its size and element type.
+///
+/// Returns `Ok(None)` if the element type is copyable, in which case the
+/// original op remains valid and needs no replacement.
+///
+/// # Errors
+///
+/// [`SignatureError`] if `args` are not the `[size, element_type]` expected by
+/// an array op.
+fn linear_array_args(args: &[TypeArg]) -> Result<Option<(u64, Type)>, SignatureError> {
+    let (size, elem_ty) = array_args(args)?;
+    Ok((!elem_ty.copyable()).then_some((size, elem_ty)))
 }
 
 /// Handler for array `clone` ops whose element type has become linear.
@@ -533,7 +534,7 @@ pub fn linear_array_clone<AK: ArrayKind>(
     args: &[TypeArg],
     rt: &ReplaceTypes,
 ) -> Result<Option<NodeTemplate>, ReplaceTypesError> {
-    let Some((size, elem_ty)) = linear_array_args(args) else {
+    let Some((size, elem_ty)) = linear_array_args(args)? else {
         return Ok(None);
     };
     let array_ty = AK::ty(size, elem_ty);
@@ -552,7 +553,7 @@ pub fn linear_array_discard<AK: ArrayKind>(
     args: &[TypeArg],
     _rt: &ReplaceTypes,
 ) -> Result<Option<NodeTemplate>, ReplaceTypesError> {
-    let Some((size, elem_ty)) = linear_array_args(args) else {
+    let Some((size, elem_ty)) = linear_array_args(args)? else {
         return Ok(None);
     };
     let drop_op_def = GUPPY_EXTENSION.get_op(DROP_OP_NAME.as_str()).unwrap();
@@ -572,13 +573,17 @@ pub fn linear_borrow_array_get(
     args: &[TypeArg],
     rt: &ReplaceTypes,
 ) -> Result<Option<NodeTemplate>, ReplaceTypesError> {
-    let Some((size, elem_ty)) = linear_array_args(args) else {
+    let Some((size, elem_ty)) = linear_array_args(args)? else {
         return Ok(None);
     };
-    Ok(Some(barray_get_replacement(rt, size, elem_ty)))
+    Ok(Some(barray_get_replacement(rt, size, elem_ty)?))
 }
 
-fn barray_get_replacement(rt: &ReplaceTypes, size: u64, elem_ty: Type) -> NodeTemplate {
+fn barray_get_replacement(
+    rt: &ReplaceTypes,
+    size: u64,
+    elem_ty: Type,
+) -> Result<NodeTemplate, LinearizeError> {
     let array_ty = borrow_array_type(size, elem_ty.clone());
     let opt_el = option_type(vec![elem_ty.clone()]);
     let mut dfb = DFGBuilder::new(inout_sig(
@@ -627,8 +632,7 @@ fn barray_get_replacement(rt: &ReplaceTypes, size: u64, elem_ty: Type) -> NodeTe
 
     let [elem1, elem2] = rt
         .get_linearizer()
-        .copy_discard_op(&elem_ty, 2)
-        .unwrap()
+        .copy_discard_op(&elem_ty, 2)?
         .add(&mut in_range, [elem])
         .unwrap()
         .outputs_arr();
@@ -653,7 +657,7 @@ fn barray_get_replacement(rt: &ReplaceTypes, size: u64, elem_ty: Type) -> NodeTe
     // Do not finish DFG: it contains "invalid" copy_dfg that needs linearizing
     dfb.set_outputs(outs).unwrap();
     let h = std::mem::take(dfb.hugr_mut());
-    NodeTemplate::CompoundOp(Box::new(h))
+    Ok(NodeTemplate::CompoundOp(Box::new(h)))
 }
 
 /// Registers replacements for array and borrow-array ops whose signatures
