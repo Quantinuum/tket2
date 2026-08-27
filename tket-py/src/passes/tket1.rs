@@ -71,9 +71,18 @@ pub(crate) fn tket1_pass(
     let mut encoded_circ = EncodedCircuit::new_with_entrypoint(&program.hugr, root, encode_options)
         .convert_pyerrs()?;
 
-    encoded_circ
-        .par_iter_mut()
-        .try_for_each(|(_, circ)| run_tket1_pass(circ, pass_json))?;
+    // Emscripten wheels do not enable pthreads. Rayon's thread-pool initialization
+    // fails with `WouldBlock` instead of triggering its unsupported-platform
+    // fallback, so run this pass sequentially on Emscripten.
+    if cfg!(target_os = "emscripten") {
+        encoded_circ
+            .iter_mut()
+            .try_for_each(|(_, circ)| run_tket1_pass(circ, pass_json))?;
+    } else {
+        encoded_circ
+            .par_iter_mut()
+            .try_for_each(|(_, circ)| run_tket1_pass(circ, pass_json))?;
+    }
 
     encoded_circ
         .reassemble_inplace(&mut program.hugr, Some(Arc::new(target.decoder_config())))
