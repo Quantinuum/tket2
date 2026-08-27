@@ -11,35 +11,38 @@ use hugr::types::{CustomType, EdgeKind, PolyFuncType, Term};
 use hugr::{Extension, Hugr, HugrView, Node, PortIndex};
 use thiserror::Error;
 
+#[derive(Clone, Debug)]
+#[allow(unused, missing_docs)]
+pub struct VersionedOp {
+    name: String,
+    extension_name: String,
+    version: Version,
+}
+
+#[allow(unused, missing_docs)]
+impl VersionedOp {
+    pub fn new(name: String, extension_name: String, version: Version) -> Self {
+        Self {
+            name,
+            extension_name,
+            version,
+        }
+    }
+}
+
 #[derive(Debug)]
 #[allow(unused, missing_docs)]
-
 pub struct OpUpdateMap {
-    old_op_name: String,
-    old_extension_name: String,
-    old_version: Version,
-    new_name: String,
-    new_extension_name: String,
-    new_version: Version,
+    old_op: VersionedOp,
+    replacement: Vec<VersionedOp>,
 }
 
 #[allow(unused, missing_docs)]
 impl OpUpdateMap {
-    pub fn new(
-        old_op_name: String,
-        old_extension_name: String,
-        old_version: Version,
-        new_name: String,
-        new_extension_name: String,
-        new_version: Version,
-    ) -> Self {
+    pub fn new(old_op: VersionedOp, replacement: Vec<VersionedOp>) -> Self {
         Self {
-            old_op_name,
-            old_extension_name,
-            old_version,
-            new_name,
-            new_extension_name,
-            new_version,
+            old_op,
+            replacement,
         }
     }
 }
@@ -62,11 +65,11 @@ impl UndatingMap {
         extension_version: &Version,
     ) -> Option<&OpUpdateMap> {
         self.op_update_maps.iter().find(|op_update_map| {
-            op_update_map.old_version == *extension_version
+            op_update_map.old_op.version == *extension_version
                 && op_qualified_id
-                    .strip_prefix(&op_update_map.old_extension_name)
+                    .strip_prefix(&op_update_map.old_op.extension_name)
                     .and_then(|name| name.strip_prefix('.'))
-                    == Some(op_update_map.old_op_name.as_str())
+                    == Some(op_update_map.old_op.name.as_str())
         })
     }
 }
@@ -91,18 +94,18 @@ impl ExtensionUpdater {
         &self.hugr
     }
 
-    fn get_new_op(&self, name: &str, extension_name: &str, version: &Version) -> ExtensionOp {
+    fn get_op(&self, op: &VersionedOp) -> ExtensionOp {
         self.hugr
             .extensions()
-            .get_exact(extension_name, version)
+            .get_exact(&op.extension_name, &op.version)
             .expect(&format!(
                 "{} version {} is missing from the registry",
-                extension_name, version
+                op.extension_name, op.version
             ))
-            .instantiate_extension_op(name, [])
+            .instantiate_extension_op(&op.name, [])
             .expect(&format!(
                 "failed to instantiate {} {} version {}",
-                extension_name, name, version
+                op.extension_name, op.name, op.version
             ))
     }
 
@@ -130,36 +133,40 @@ impl ExtensionUpdater {
         println!("saved Hugr extensions");
     }
 
-    #[allow(dead_code)]
     fn update_node(&mut self, node: Node) {
-        match self.hugr.get_optype(node) {
-            OpType::ExtensionOp(operation) => {
-                if let Some(op_update_map) = self
-                    .updating_map
-                    .filter_op(&operation.qualified_id(), &operation.extension_version())
-                {
-                    let new_op = self.get_new_op(
-                        &op_update_map.new_name,
-                        &op_update_map.new_extension_name,
-                        &op_update_map.new_version,
-                    );
-                    println!(
-                        "Upgraded:\n{}\n{}\nwith:\n{}.{}\n{}",
-                        operation.qualified_id(),
-                        operation.extension_version(),
-                        op_update_map.new_name,
-                        op_update_map.new_extension_name,
-                        op_update_map.new_version,
-                    );
-                    self.replace_node_preserving_connections(node, new_op);
-                    println!("========")
-                }
-            }
-            _ => {}
-        }
+        let OpType::ExtensionOp(operation) = self.hugr.get_optype(node) else {
+            return;
+        };
+        let Some(op_update_map) = self
+            .updating_map
+            .filter_op(&operation.qualified_id(), &operation.extension_version())
+        else {
+            return;
+        };
+        let replacement = op_update_map.replacement.clone();
+        let replacement_ops = replacement
+            .iter()
+            .map(|op| self.get_op(op))
+            .collect::<Vec<_>>();
+        println!(
+            "Upgraded:\n{}@{}\nwith:\n{}",
+            operation.qualified_id(),
+            operation.extension_version(),
+            replacement
+                .iter()
+                .map(|op| format!("{}.{}@{}", op.extension_name, op.name, op.version))
+                .collect::<Vec<_>>()
+                .join(", "),
+        );
+        self.replace_node_preserving_connections(node, replacement_ops);
+        println!("========")
     }
 
-    fn replace_node_preserving_connections(&mut self, node: Node, new_op: ExtensionOp) {
+    fn replace_node_preserving_connections(
+        &mut self,
+        node: Node,
+        replacement_ops: Vec<ExtensionOp>,
+    ) {
         let parent = self.hugr.get_parent(node).expect("operation has no parent");
         let incoming = self
             .hugr
@@ -181,16 +188,54 @@ impl ExtensionUpdater {
             .collect::<Vec<_>>();
 
         self.hugr.remove_node(node);
-        let new_node = self.hugr.add_node_with_parent(parent, new_op);
+        let replacement_nodes = replacement_ops
+            .into_iter()
+            .map(|op| self.hugr.add_node_with_parent(parent, op))
+            .collect::<Vec<_>>();
+
+        let Some((&first, rest)) = replacement_nodes.split_first() else {
+            for (source, source_port, input_port) in incoming {
+                for (_, target, target_port) in outgoing
+                    .iter()
+                    .filter(|(output_port, _, _)| output_port.index() == input_port.index())
+                {
+                    self.hugr
+                        .connect(source, source_port, *target, *target_port);
+                }
+            }
+            return;
+        };
+
         for (source, source_port, target_port) in incoming {
-            self.hugr
-                .connect(source, source_port, new_node, target_port);
+            self.hugr.connect(source, source_port, first, target_port);
         }
+        for nodes in replacement_nodes.windows(2) {
+            for (output, input) in self
+                .hugr
+                .node_outputs(nodes[0])
+                .filter(|port| {
+                    matches!(
+                        self.hugr.get_optype(nodes[0]).port_kind(*port),
+                        Some(EdgeKind::Value(_))
+                    )
+                })
+                .zip(self.hugr.node_inputs(nodes[1]).filter(|port| {
+                    matches!(
+                        self.hugr.get_optype(nodes[1]).port_kind(*port),
+                        Some(EdgeKind::Value(_))
+                    )
+                }))
+                .collect::<Vec<_>>()
+            {
+                self.hugr.connect(nodes[0], output, nodes[1], input);
+            }
+        }
+        let last = rest.last().copied().unwrap_or(first);
         for (source_port, target, target_port) in outgoing {
-            self.hugr
-                .connect(new_node, source_port, target, target_port);
+            self.hugr.connect(last, source_port, target, target_port);
         }
     }
+
     // -----------------------------
     // Old testing stuff
     // -----------------------------

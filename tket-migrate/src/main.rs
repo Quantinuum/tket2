@@ -2,7 +2,12 @@
 
 mod lib;
 mod testing_func;
-use hugr::{HugrView, extension::Version};
+use hugr::{
+    HugrView,
+    builder::{DFGBuilder, Dataflow, DataflowHugr},
+    extension::{ExtensionRegistry, Version, prelude::bool_t},
+    types::Signature,
+};
 use std::{error::Error, io::BufReader, path::PathBuf};
 
 use lib::ExtensionUpdater;
@@ -31,7 +36,7 @@ fn main1() -> Result<(), Box<dyn Error>> {
         ],
         &old_output,
         build_old_hugr,
-        false,
+        true,
     )?;
 
     let new_extension_paths = vec![
@@ -41,20 +46,31 @@ fn main1() -> Result<(), Box<dyn Error>> {
 
     let updating_map = lib::UndatingMap::new(vec![
         lib::OpUpdateMap::new(
-            "MeasureFree".to_string(),
-            "tket.quantum".to_string(),
-            Version::new(0, 2, 1),
-            "MeasureFree".to_string(),
-            "tket.quantum".to_string(),
-            Version::new(0, 3, 0),
+            lib::VersionedOp::new(
+                "MeasureFree".to_string(),
+                "tket.quantum".to_string(),
+                Version::new(0, 2, 1),
+            ),
+            vec![
+                lib::VersionedOp::new(
+                    "MeasureFree".to_string(),
+                    "tket.quantum".to_string(),
+                    Version::new(0, 3, 0),
+                ),
+                lib::VersionedOp::new(
+                    "Read".to_string(),
+                    "tket.measurement".to_string(),
+                    Version::new(0, 1, 0),
+                ),
+            ],
         ),
         lib::OpUpdateMap::new(
-            "read".to_string(),
-            "tket.bool".to_string(),
-            Version::new(0, 2, 0),
-            "Read".to_string(),
-            "tket.measurement".to_string(),
-            Version::new(0, 1, 0),
+            lib::VersionedOp::new(
+                "read".to_string(),
+                "tket.bool".to_string(),
+                Version::new(0, 2, 0),
+            ),
+            vec![],
         ),
     ]);
 
@@ -77,7 +93,53 @@ fn main1() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn build_bool_hugr(registry: &ExtensionRegistry) -> Result<hugr::Hugr, Box<dyn Error>> {
+    let bool_extension = registry
+        .get("tket.bool")
+        .ok_or("tket.bool is missing from the registry")?;
+    let make_opaque = bool_extension.instantiate_extension_op("make_opaque", [])?;
+    let not = bool_extension.instantiate_extension_op("not", [])?;
+    let and = bool_extension.instantiate_extension_op("and", [])?;
+    let eq = bool_extension.instantiate_extension_op("eq", [])?;
+    let or = bool_extension.instantiate_extension_op("or", [])?;
+    let xor = bool_extension.instantiate_extension_op("xor", [])?;
+    let read = bool_extension.instantiate_extension_op("read", [])?;
+
+    let mut builder = DFGBuilder::new(Signature::new(vec![bool_t(); 5], [bool_t()]))?;
+    let inputs = builder.input_wires();
+    let mut values = Vec::with_capacity(inputs.len());
+    for input in inputs {
+        values.push(
+            builder
+                .add_dataflow_op(make_opaque.clone(), [input])?
+                .out_wire(0),
+        );
+    }
+
+    let value = builder.add_dataflow_op(not, [values[0]])?.out_wire(0);
+    let value = builder
+        .add_dataflow_op(and, [value, values[1]])?
+        .out_wire(0);
+    let value = builder.add_dataflow_op(eq, [value, values[2]])?.out_wire(0);
+    let value = builder.add_dataflow_op(or, [value, values[3]])?.out_wire(0);
+    let value = builder
+        .add_dataflow_op(xor, [value, values[4]])?
+        .out_wire(0);
+    let output = builder.add_dataflow_op(read, [value])?.out_wire(0);
+
+    Ok(builder.finish_hugr_with_outputs([output])?)
+}
+
+fn main2() -> Result<(), Box<dyn Error>> {
+    let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let bool_extension = crate_dir.join("data/bool-0.2.0.json");
+    let output = crate_dir.join("bool-0.2.0.hugr");
+    let hugr = generate(&[bool_extension], &output, build_bool_hugr, true)?;
+    hugr.validate()?;
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
-    main1()?;
+    main2()?;
     Ok(())
 }

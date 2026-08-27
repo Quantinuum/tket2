@@ -1,0 +1,52 @@
+---
+config:
+    layout: elk
+---
+graph LR
+    subgraph 0 ["(0) Module"]
+        direction LR
+        subgraph 1 ["(1) FuncDefn: #quot;main#quot;"]
+            direction LR
+            2["(2) Input"]
+            3["(3) Output"]
+            subgraph 4 ["(4) [**DFG**]"]
+                direction LR
+                style 4 stroke:#832561,stroke-width:3px
+                5["(5) Input"]
+                6["(6) Output"]
+                7["(7) tket.bool.make_opaque"]
+                8["(8) tket.bool.make_opaque"]
+                9["(9) tket.bool.make_opaque"]
+                10["(10) tket.bool.make_opaque"]
+                11["(11) tket.bool.make_opaque"]
+                12["(12) tket.bool.not"]
+                13["(13) tket.bool.and"]
+                14["(14) tket.bool.eq"]
+                15["(15) tket.bool.or"]
+                16["(16) tket.bool.xor"]
+                17["(17) tket.bool.read"]
+                5--"0:0<br>Bool"-->7
+                5--"1:0<br>Bool"-->8
+                5--"2:0<br>Bool"-->9
+                5--"3:0<br>Bool"-->10
+                5--"4:0<br>Bool"-->11
+                7--"0:0<br>bool"-->12
+                8--"0:1<br>bool"-->13
+                9--"0:1<br>bool"-->14
+                10--"0:1<br>bool"-->15
+                11--"0:1<br>bool"-->16
+                12--"0:0<br>bool"-->13
+                13--"0:0<br>bool"-->14
+                14--"0:0<br>bool"-->15
+                15--"0:0<br>bool"-->16
+                16--"0:0<br>bool"-->17
+                17--"0:0<br>Bool"-->6
+            end
+            2--"0:0<br>Bool"-->4
+            2--"1:1<br>Bool"-->4
+            2--"2:2<br>Bool"-->4
+            2--"3:3<br>Bool"-->4
+            2--"4:4<br>Bool"-->4
+            4--"0:0<br>Bool"-->3
+        end
+    end

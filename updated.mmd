@@ -18,11 +18,11 @@ graph LR
                 8["(8) tket.quantum.H"]
                 11["(11) logic.Not"]
                 9["(9) tket.quantum.MeasureFree"]
-                10["(10) tket.measurement.Read"]
+                12["(12) tket.measurement.Read"]
                 7--"0:0<br>qubit"-->8
                 8--"0:0<br>qubit"-->9
-                9--"0:0<br>Measurement"-->10
-                10--"0:0<br>Bool"-->11
+                9--"0:0<br>Measurement"-->12
+                12--"0:0<br>Bool"-->11
             end
         end
     end
