@@ -60,7 +60,8 @@ impl<N: HugrNode> ModifierResolver<N> {
         match tket_op {
             X | CX | Toffoli | Y | CY | Z | CZ | S | Sdg | T | Tdg | V | Vdg | H
                 if (control == 0 && dagger)
-                    || ((1..3).contains(&control) && tket_op == X)
+                    || (control == 1 && tket_op == X)
+                    || (control == 2 && tket_op == X)
                     || (control == 1 && matches!(tket_op, CX | Y | Z)) =>
             {
                 // The controlled or daggered G is itself a TketOp: emit it directly.
