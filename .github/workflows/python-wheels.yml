@@ -272,7 +272,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: mozilla-actions/sccache-action@v0.0.10
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.WASM_PYTHON_VERSION }}
       - name: Install nightly Rust toolchain
