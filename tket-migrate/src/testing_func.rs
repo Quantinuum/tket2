@@ -10,7 +10,7 @@ use std::{
 use hugr::{
     Extension, Hugr, HugrView,
     builder::{DFGBuilder, Dataflow, DataflowHugr},
-    extension::{ExtensionRegistry, resolution::WeakExtensionRegistry},
+    extension::{ExtensionRegistry, prelude::bool_t, resolution::WeakExtensionRegistry},
     std_extensions::{STD_REG, logic::LogicOp},
     types::Signature,
 };
@@ -81,6 +81,43 @@ pub(crate) fn build_new_hugr(registry: &ExtensionRegistry) -> Result<Hugr, Box<d
     let boolean = builder.add_dataflow_op(read, [measurement])?.out_wire(0);
     builder.add_dataflow_op(LogicOp::Not, [boolean])?;
     Ok(builder.finish_hugr_with_outputs([])?)
+}
+
+pub(crate) fn build_bool_hugr(registry: &ExtensionRegistry) -> Result<Hugr, Box<dyn Error>> {
+    let bool_extension = registry
+        .get(BOOL_EXTENSION)
+        .ok_or("tket.bool is missing from the registry")?;
+    let make_opaque = bool_extension.instantiate_extension_op("make_opaque", [])?;
+    let not = bool_extension.instantiate_extension_op("not", [])?;
+    let and = bool_extension.instantiate_extension_op("and", [])?;
+    let eq = bool_extension.instantiate_extension_op("eq", [])?;
+    let or = bool_extension.instantiate_extension_op("or", [])?;
+    let xor = bool_extension.instantiate_extension_op("xor", [])?;
+    let read = bool_extension.instantiate_extension_op("read", [])?;
+
+    let mut builder = DFGBuilder::new(Signature::new(vec![bool_t(); 5], [bool_t()]))?;
+    let inputs = builder.input_wires();
+    let mut values = Vec::with_capacity(inputs.len());
+    for input in inputs {
+        values.push(
+            builder
+                .add_dataflow_op(make_opaque.clone(), [input])?
+                .out_wire(0),
+        );
+    }
+
+    let value = builder.add_dataflow_op(not, [values[0]])?.out_wire(0);
+    let value = builder
+        .add_dataflow_op(and, [value, values[1]])?
+        .out_wire(0);
+    let value = builder.add_dataflow_op(eq, [value, values[2]])?.out_wire(0);
+    let value = builder.add_dataflow_op(or, [value, values[3]])?.out_wire(0);
+    let value = builder
+        .add_dataflow_op(xor, [value, values[4]])?
+        .out_wire(0);
+    let output = builder.add_dataflow_op(read, [value])?.out_wire(0);
+
+    Ok(builder.finish_hugr_with_outputs([output])?)
 }
 
 pub(crate) fn generate(

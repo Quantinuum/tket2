@@ -14,15 +14,27 @@ graph LR
                 style 4 stroke:#832561,stroke-width:3px
                 5["(5) Input"]
                 6["(6) Output"]
-                7["(7) tket.quantum.QAlloc"]
-                8["(8) tket.quantum.H"]
-                11["(11) logic.Not"]
-                9["(9) tket.quantum.MeasureFree"]
-                12["(12) tket.measurement.Read"]
-                7--"0:0<br>qubit"-->8
-                8--"0:0<br>qubit"-->9
-                9--"0:0<br>Measurement"-->12
-                12--"0:0<br>Bool"-->11
+                12["(12) logic.Not"]
+                13["(13) logic.And"]
+                14["(14) logic.Eq"]
+                15["(15) logic.Or"]
+                16["(16) logic.Xor"]
+                5--"0:0<br>Bool"-->12
+                5--"1:1<br>Bool"-->13
+                5--"2:1<br>Bool"-->14
+                5--"3:1<br>Bool"-->15
+                5--"4:1<br>Bool"-->16
+                12--"0:0<br>Bool"-->13
+                13--"0:0<br>Bool"-->14
+                14--"0:0<br>Bool"-->15
+                15--"0:0<br>Bool"-->16
+                16--"0:0<br>Bool"-->6
             end
+            2--"0:0<br>Bool"-->4
+            2--"1:1<br>Bool"-->4
+            2--"2:2<br>Bool"-->4
+            2--"3:3<br>Bool"-->4
+            2--"4:4<br>Bool"-->4
+            4--"0:0<br>Bool"-->3
         end
     end

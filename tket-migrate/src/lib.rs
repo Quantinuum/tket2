@@ -7,6 +7,7 @@ use hugr::extension::resolution::WeakExtensionRegistry;
 use hugr::extension::{ExtensionRegistry, Version};
 use hugr::hugr::hugrmut::HugrMut;
 use hugr::ops::{ExtensionOp, OpType};
+use hugr::std_extensions::STD_REG;
 use hugr::types::{CustomType, EdgeKind, PolyFuncType, Term};
 use hugr::{Extension, Hugr, HugrView, Node, PortIndex};
 use thiserror::Error;
@@ -118,13 +119,15 @@ impl ExtensionUpdater {
     }
 
     fn add_new_extension(&mut self, new_extensions: Vec<Extension>) {
-        let hugr_extensions = self.hugr.extensions();
+        let mut extensions = STD_REG.to_owned();
+        extensions.extend(self.hugr.extensions().clone());
         let new_ext_registry = ExtensionRegistry::new_with_extension_resolution(
             new_extensions,
-            &WeakExtensionRegistry::from(hugr_extensions),
+            &WeakExtensionRegistry::from(&extensions),
         )
         .unwrap();
-        self.hugr.use_extensions(new_ext_registry);
+        extensions.extend(new_ext_registry);
+        self.hugr.use_extensions(extensions);
         std::fs::write(
             "updated_extension_registry.json",
             serde_json::to_string_pretty(&self.hugr.extensions()).unwrap(),
