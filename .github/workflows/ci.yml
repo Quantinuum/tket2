@@ -176,7 +176,7 @@ jobs:
         run: uv sync --python ${{ env.PYTHON_HIGHEST }}
       - name: Run simd tests
         working-directory: pg-libs
-        run: cargo test -p pg-bitpacked --features simd
+        run: cargo test -p pg-bitpacked -p pg-qm-tableau --features simd
 
   benches:
     name: Continuous benchmarking 🏋️
@@ -200,7 +200,7 @@ jobs:
       - name: Build benchmarks
         run: cargo codspeed build --profile bench --features portmatching,binary-eccs,rewrite-tracing
       - name: Run benchmarks
-        uses: CodSpeedHQ/action@v5.0.2
+        uses: CodSpeedHQ/action@v5
         with:
           token: ${{ secrets.CODSPEED_TOKEN }}
           run: "cargo codspeed run"

@@ -31,6 +31,19 @@ env:
   SCCACHE_GHA_ENABLED: "true"
   RUSTC_WRAPPER: "sccache"
 
+  # Python version used to build the WebAssembly / Emscripten wheels.
+  # This must match the pyodide ABI targeted by the emscripten version below
+  # (`pyemscripten_2025_0` -> Python 3.13 / Emscripten 4.0.9).
+  WASM_PYTHON_VERSION: "3.13"
+  # Emscripten SDK version used for the WebAssembly wheels.
+  # Must match the version used to build the tket-c-api wasm target in
+  # hugrverse-env, and the pyodide ABI targeted above.
+  EMSDK_VERSION: "4.0.9"
+  # hugrverse-env target used to fetch the pre-built tket-c-api WebAssembly library.
+  HUGRVERSE_WASM_TARGET: "emscripten_4_0_9_wasm32"
+  # Rust nightly version used to build the WebAssembly wheels.
+  RUST_NIGHTLY_VERSION: "nightly-2026-08-20"
+
 jobs:
   # Check if the tag matches the package name,
   # or if the workflow is running on a non-tag event.
@@ -251,6 +264,79 @@ jobs:
           WORKSPACE: ${{ github.workspace }}
           TEST_INSTALL: ${{ matrix.platform.test-wheels }}
 
+  wasm:
+    name: wasm32-unknown-emscripten
+    needs: check-tag
+    if: ${{ needs.check-tag.outputs.run == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: mozilla-actions/sccache-action@v0.0.11
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.WASM_PYTHON_VERSION }}
+      - name: Install nightly Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_NIGHTLY_VERSION }}
+      - name: Add required rust targets and components
+        run: |
+          rustup override set ${{ env.RUST_NIGHTLY_VERSION }}
+          rustup target add wasm32-unknown-emscripten
+          rustup component add rust-src --toolchain ${{ env.RUST_NIGHTLY_VERSION }}
+      - name: Install Node.js for emsdk
+        uses: actions/setup-node@v7
+        with:
+          node-version: "18"
+      - name: Setup emsdk manually
+        # The emscripten version must match both the version used to build the
+        # tket-c-api wasm target in hugrverse-env and the pyodide ABI.
+        # See <https://doc.rust-lang.org/beta/rustc/platform-support/wasm32-unknown-emscripten.html>
+        # and <https://github.com/pyodide/pyodide/blob/main/docs/development/abi.md>
+        run: |
+          git clone --depth 1 --revision=e5bd3d0874e302a18f13c5b41f5bacf9a40c8e59 https://github.com/emscripten-core/emsdk.git
+          cd emsdk
+          ./emsdk install ${{ env.EMSDK_VERSION }}
+          ./emsdk activate ${{ env.EMSDK_VERSION }}
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      # Fetch the pre-built tket-c-api WebAssembly library from hugrverse-env.
+      # `llvm` has no wasm build, so we only request the `tket` package.
+      - uses: quantinuum/hugrverse-env/install-hugrenv-action@main
+        with:
+          packages: tket
+          target: ${{ env.HUGRVERSE_WASM_TARGET }}
+
+      # Emscripten's ABI is unstable, so we pass `-Zbuild-std` to rebuild Rust
+      # std with the specific emscripten version we are using, as indicated in
+      # <https://doc.rust-lang.org/beta/rustc/platform-support/wasm32-unknown-emscripten.html#emscripten-abi-compatibility>
+      - name: Build wasm wheels
+        run: |
+          source ../emsdk/emsdk_env.sh
+          uvx maturin build \
+            -Z build-std \
+            --release \
+            -i python${{ env.WASM_PYTHON_VERSION }} \
+            --target wasm32-unknown-emscripten \
+            -o ../dist \
+            -v
+        working-directory: ${{ env.MODULE_DIR }}
+        env:
+          CARGO_BUILD_TARGET: wasm32-unknown-emscripten
+          TARGET: wasm32-unknown-emscripten
+          CFLAGS: -fPIC
+          CXXFLAGS: -fPIC
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v7
+        with:
+          name: wheels-wasm32-unknown-emscripten
+          path: dist
+          if-no-files-found: error
+
   sdist:
     needs: check-tag
     if: ${{ needs.check-tag.outputs.run == 'true' }}
@@ -309,7 +395,7 @@ jobs:
       - name: Generate artifact attestation
         uses: actions/attest@v4.2.2
         with:
-          subject-path: 'dist/*'
+          subject-path: "dist/*"
       - name: Report
         run: |
           echo "Publishing to PyPI..."

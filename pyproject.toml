@@ -57,7 +57,9 @@ ignore_missing_imports = true
 ignore = ["EXE"]
 
 [tool.ruff.lint.per-file-ignores]
-"tket-exts/src/tket_exts/tket/**" = ["B019"] # @functools.cache is intentional, few instances exist
+"tket-exts/src/tket_exts/tket/**" = [
+    "B019",
+] # @functools.cache is intentional, few instances exist
 
 [tool.coverage.report]
 exclude_also = [

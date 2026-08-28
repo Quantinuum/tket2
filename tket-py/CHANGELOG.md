@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.15.7](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.6...tket-py-v0.15.7) (2026-08-28)
+
+
+### Features
+
+* Add re-exports for ComposablePass definitions ([#1941](https://github.com/Quantinuum/tket2/issues/1941)) ([4469024](https://github.com/Quantinuum/tket2/commit/4469024838fc61fce6135551a3fa0a0835c45bc5))
+* Preserving order edges during (non-dagger) modifier resolution ([#1840](https://github.com/Quantinuum/tket2/issues/1840)) ([cee5576](https://github.com/Quantinuum/tket2/commit/cee5576f5e475e54a30c7c9575e00adc2e925bf8))
+
+
+### Performance Improvements
+
+* improve Cliffordize performance ([#1909](https://github.com/Quantinuum/tket2/issues/1909)) ([b001ce1](https://github.com/Quantinuum/tket2/commit/b001ce1286d8f43966651a30f49e61c2c6591b1f))
+
 ## [0.15.6](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.5...tket-py-v0.15.6) (2026-08-03)
 
 
