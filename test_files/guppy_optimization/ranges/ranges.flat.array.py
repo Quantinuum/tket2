@@ -1,7 +1,9 @@
+# TODO: Change guppylang dependency after the branch is merged and released.
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang >=0.21.6",
+#     "guppylang==1.0.0a5",
+#     "guppylang-internals==1.0.0a5",
 # ]
 # ///
 
@@ -22,10 +24,10 @@ def main() -> None:
     b3 = measure(q3)
     b4 = measure(q4)
 
-    result("b1", b1)
-    result("b2", b2)
-    result("b3", b3)
-    result("b4", b4)
+    result("b1", b1.read())
+    result("b2", b2.read())
+    result("b3", b3.read())
+    result("b4", b4.read())
 
 
 # Version of f with flattened control flow but retaining array accesses

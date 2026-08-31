@@ -2,16 +2,11 @@
 //!
 //! This is only tracked if the `rewrite-tracing` feature is enabled.
 
+use crate::{Circuit, metadata};
 use hugr::hugr::hugrmut::HugrMut;
-use hugr::metadata::RawMetadataValue;
-use itertools::Itertools;
-
-use crate::Circuit;
+use serde::{Deserialize, Serialize};
 
 use super::CircuitRewrite;
-
-/// Metadata key for the circuit rewrite trace.
-pub const METADATA_REWRITES: &str = "TKET.rewrites";
 
 /// Global read-only flag for enabling rewrite tracing.
 /// Enable it by setting the `rewrite-tracing` feature.
@@ -24,7 +19,7 @@ pub const REWRITE_TRACING_ENABLED: bool = cfg!(feature = "rewrite-tracing");
 ///
 /// Traces are only enabled if the `rewrite-tracing` feature is enabled and
 /// [`Circuit::enable_rewrite_tracing`] is called on the circuit.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Deserialize, Serialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct RewriteTrace {
     /// A count of the number of individual patterns matched for this rewrite step.
@@ -51,22 +46,6 @@ impl RewriteTrace {
     }
 }
 
-impl From<&serde_json::Value> for RewriteTrace {
-    #[inline]
-    fn from(value: &serde_json::Value) -> Self {
-        Self {
-            individual_matches: value.as_u64().unwrap() as u16,
-        }
-    }
-}
-
-impl From<RewriteTrace> for serde_json::Value {
-    #[inline]
-    fn from(trace: RewriteTrace) -> Self {
-        serde_json::Value::from(trace.individual_matches)
-    }
-}
-
 /// Implementation for rewrite tracing in circuits.
 ///
 /// This is only tracked if the `rewrite-tracing` feature is enabled and
@@ -79,11 +58,12 @@ impl<T: HugrMut> Circuit<T> {
             return;
         }
         let root = self.parent();
-        let meta = self
-            .hugr_mut()
-            .get_metadata_any_mut(root, METADATA_REWRITES);
-        if *meta == RawMetadataValue::Null {
-            *meta = RawMetadataValue::Array(vec![]);
+        let hugr = self.hugr_mut();
+        if hugr
+            .get_metadata::<metadata::CircuitRewriteTraces>(root)
+            .is_none()
+        {
+            hugr.set_metadata::<metadata::CircuitRewriteTraces>(root, vec![]);
         }
     }
 
@@ -97,16 +77,16 @@ impl<T: HugrMut> Circuit<T> {
         }
         let root = self.parent();
         match self
-            .hugr_mut()
-            .get_metadata_any_mut(root, METADATA_REWRITES)
-            .as_array_mut()
+            .hugr()
+            .get_metadata::<metadata::CircuitRewriteTraces>(root)
         {
-            Some(meta) => {
-                let rewrite = rewrite.into();
+            Some(mut meta) => {
                 meta.push(rewrite.into());
+                self.hugr_mut()
+                    .set_metadata::<metadata::CircuitRewriteTraces>(root, meta);
                 true
             }
-            // Tracing was not enable for this circuit.
+            // Tracing was not enabled for this circuit.
             None => false,
         }
     }
@@ -119,10 +99,9 @@ impl<T: HugrMut> Circuit<T> {
         if !REWRITE_TRACING_ENABLED {
             return None;
         }
-        let meta = self
+        let ve = self
             .hugr()
-            .get_metadata_any(self.parent(), METADATA_REWRITES)?;
-        let rewrites = meta.as_array()?;
-        Some(rewrites.iter().map_into())
+            .get_metadata::<metadata::CircuitRewriteTraces>(self.parent());
+        ve.map(Vec::into_iter)
     }
 }

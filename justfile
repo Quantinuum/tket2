@@ -18,7 +18,7 @@ _check_default_conan_profile:
 # setting up the pre-commit hooks.
 setup: && _check_default_conan_profile _check_nextest_installed
     uv tool install conan
-    uv sync
+    uv sync --all-extras
     [[ -n "${TKET_JUST_INHIBIT_GIT_HOOKS:-}" ]] || uv run pre-commit install -t pre-commit
 
 # Run the pre-commit checks.
@@ -75,26 +75,58 @@ miri *TEST_ARGS:
 recompile-eccs:
     scripts/compile-test-eccs.sh
 
+# Update hugrenv version, including discovery of new hashes.
+# This change bumps the hugrenv version used in both devenv and CI.
+update-hugrenv version:
+    curl -L -o hugrenv.lock https://github.com/Quantinuum/hugrverse-env/releases/download/v{{version}}/hugrenv.lock
+
+# Fetch hugrverse environment packages for the current platform and extract them
+# to the provided directory.
+fetch-hugrenv install_path='./target/hugrenv/':
+    python scripts/fetch_hugrenv.py "{{install_path}}"
+
+
 # Regenerates all hugr definitions inside `test_files/`
 recompile-test-hugrs:
     @echo "---- Recompiling example guppy programs ----"
     just test_files/guppy_examples/recompile
     @echo "---- Recompiling optimization-target guppy programs ----"
     just test_files/guppy_optimization/recompile
+    just recompile-modifiers
+
+# Regenerates all hugrs inside `test_files/modifier_examples/` and run the passes on them
+recompile-modifiers:
+    @echo "---- Recompiling modifier examples ----"
+    uv run maturin develop --uv
+    just test_files/modifier_examples/recompile-hugrs
+    just test_files/run_modifier_examples/run-hugrs
+
+# Regenerates one the hugr corresponding to `test_files/modifier_examples/{{name}}` and run the passes on it
+recompile-modifier name:
+    @echo "---- Compiling hugr {{name}} ----"
+    uv run maturin develop --uv
+    just test_files/modifier_examples/rh "{{name}}.py"
+    just test_files/run_modifier_examples/rh "{{name}}"
+
 
 # Generate serialized declarations for the tket extensions
 gen-extensions:
-    cargo run -p tket-qsystem gen-extensions -o tket-exts/src/tket_exts/data
+    cargo run -p tket-qsystem gen-extensions -o tket-exts/src/tket_exts/data --unversioned
 
 # Update snapshot tests for both rust and python (requires `cargo-insta`)
 update-snapshots: update-snapshots-rs update-snapshots-py
 # Interactively update snapshot tests (requires `cargo-insta`)
 update-snapshots-rs:
+    cargo insta test
+    cargo insta test -p selene-hugr-qis-compiler
     cargo insta review
 # Update python snapshot tests.
 update-snapshots-py *TEST_ARGS:
     uv run maturin develop --uv
     uv run pytest --snapshot-update {{TEST_ARGS}}
+    uv run --package selene_hugr_qis_compiler pytest --snapshot-update {{TEST_ARGS}}
+
+
 
 # Build the sphinx API documentation
 build-pydocs:

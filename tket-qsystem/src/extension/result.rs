@@ -136,7 +136,7 @@ impl ResultOpDef {
             Self::Bool | Self::F64 => vec![],
             Self::Int | Self::UInt => vec![LOG_WIDTH_TYPE_PARAM],
             _ => [
-                vec![TypeParam::max_nat_type()],
+                vec![TypeParam::max_nat_kind()],
                 self.simple_type_op().type_params(),
             ]
             .concat(),
@@ -169,8 +169,8 @@ impl ResultOpDef {
 
     fn result_signature(&self) -> SignatureFunc {
         PolyFuncType::new(
-            [vec![TypeParam::StringType], self.type_params()].concat(),
-            Signature::new(self.arg_type(), type_row![]),
+            [vec![TypeParam::StringKind], self.type_params()].concat(),
+            Signature::new(vec![self.arg_type()], type_row![]),
         )
         .into()
     }
@@ -178,7 +178,7 @@ impl ResultOpDef {
 
 fn array_arg_type(inner_t: Type) -> Type {
     collections::array::array_type_parametric(
-        TypeArg::new_var_use(1, TypeParam::max_nat_type()),
+        TypeArg::new_var_use(1, TypeParam::max_nat_kind()),
         inner_t,
     )
     .unwrap()

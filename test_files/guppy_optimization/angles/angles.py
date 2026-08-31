@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang >=0.21.6",
+#     "guppylang ==0.21.13",
 # ]
 # ///
 
@@ -17,7 +17,7 @@ from sys import argv
 from guppylang import guppy
 from guppylang.std.angles import angle
 from guppylang.std.builtins import owned, result
-from guppylang.std.quantum import rz, h, measure, qubit
+from guppylang.std.quantum import h, measure, qubit, rz
 
 
 @guppy

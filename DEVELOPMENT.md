@@ -29,13 +29,13 @@ shell by setting up [direnv](https://devenv.sh/automatic-shell-activation/).
 To setup the environment manually you will need:
 
 - Just: <https://just.systems/>
-- Rust `>=1.89`: <https://www.rust-lang.org/tools/install>
+- Rust `>=1.91`: <https://www.rust-lang.org/tools/install>
 - cargo-nextest: <https://nexte.st/docs/installation/pre-built-binaries/>
-- uv `>=0.3`: docs.astral.sh/uv/getting-started/installation
+- uv `>=0.11`: docs.astral.sh/uv/getting-started/installation
 - conan `>=2.0.0,<3`: This gets installed by `just setup` / `uv tool install conan`
-- Optional: llvm `== 14.0`. The "llvm" feature (backed by the sub-crate `hugr-llvm`)
-  requires LLVM installed. We use the rust bindings
-  [llvm-sys](https://crates.io/crates/llvm-sys) to [llvm](https://llvm.org/).
+- Optional: [llvm](https://llvm.org/) `== 21.1`. The "llvm" feature (backed by the sub-crate `hugr-llvm`)
+  requires LLVM 21.1 installed. We use the rust bindings from
+  [llvm-sys](https://crates.io/crates/llvm-sys).
 
 Once you have these installed, install the required python dependencies and setup pre-commit hooks with:
 
@@ -45,11 +45,44 @@ just setup
 
 #### Note on LLVM
 
-You will need llvm 14.0 installed in order for `just check` to run all its
+You will need llvm 21.1 installed in order for `just check` to run all its
 checks successfully. On Debian-based systems you can install it as the
-`llvm-14` package; you will also need to install `libpolly14-dev`. You should
-set the environment variable `LLVM_SYS_140_PREFIX` to point to its location
-(e.g. `/usr/lib/llvm-14`) when running `just check`.
+`llvm-21` package; you may also need to install `libpolly-21-dev`. You should
+set the environment variable `LLVM_SYS_211_PREFIX` to point to its location
+(e.g. `/usr/lib/llvm-21`) when running `just check`.
+
+#### Using hugrenv without Nix
+
+If you are not using Nix, you can fetch the same prebuilt `llvm` + `tket`
+artifacts used by CI using
+
+```bash
+just fetch-hugrenv
+```
+
+with an optional installation path parameter.
+
+This command:
+
+- detects your OS/architecture;
+- downloads the matching `hugrverse-env` release tarballs;
+- uses the version and supported target matrix pinned in `hugrenv.lock`;
+- extracts them into the path you provide, or `./target/hugrenv/` by default;
+- prints the environment variables to export for your shell.
+
+Using the default installation path is convenient for single-repo local work,
+but if you want to manage multiple hugrenv versions (or share one install across
+multiple repositories), prefer an explicit central location and/or versioned
+install paths.
+
+For bash/zsh this includes:
+
+- `TKET_C_API_PATH=/path/to/hugrenv`
+- `LLVM_SYS_211_PREFIX=/path/to/hugrenv`
+- `LIBCLANG_PATH=/path/to/hugrenv/lib`
+- `PATH=/path/to/hugrenv/bin:$PATH`
+- `LD_LIBRARY_PATH` (Linux) or `DYLD_LIBRARY_PATH` (macOS) including
+  `/path/to/hugrenv/lib` and `/path/to/hugrenv/lib64`.
 
 ## 🚀 Local development using the tket python library
 
@@ -135,7 +168,7 @@ We welcome contributions to tket! Please open [an issue](https://github.com/quan
 PRs should be made against the `main` branch, and should pass all CI checks before being merged. This includes using the [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/) format for the PR title.
 
 Some tests may be skipped based on the changes made. To run all the tests in
-your PR mark it with a 'run-ci-checks' label and push new commits to it.
+your PR mark it with a 'X-run-thorough-ci-tests' label and push new commits to it.
 
 The general format of a contribution title should be:
 
@@ -157,6 +190,19 @@ We accept the following contribution types:
 - ci: CI related changes. These changes are not published in the changelog.
 - chore: Updating build tasks, package manager configs, etc. These changes are not published in the changelog.
 - revert: Reverting previous commits.
+
+## 🛠️ Common problems and solutions
+
+Here is a list of common problems found during development, and how to solve them.
+
+- `ImportError: cannot import name 'metadata' from 'tket._tket' (.../tket/_tket.abi3.so)` when running python tests.
+
+  The Rust bindings need to be recompiled. Run `uv run maturin develop` to recompile them manually or use `just test-python` instead of `pytest` to do it automatically.
+
+- `ValueError: Missing 'project' metadata table in configuration` when running `maturin develop`.
+
+  This is caused by an outdated version of `uv`. Run `uv self update` to update to the latest version.
+
 
 ## :shipit: Releasing new versions
 

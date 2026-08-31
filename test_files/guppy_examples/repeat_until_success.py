@@ -1,7 +1,8 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang >=0.21.6",
+#     "guppylang==1.0.0a5",
+#     "guppylang-internals==1.0.0a5",
 # ]
 # ///
 """An RUS program"""
@@ -11,7 +12,7 @@ from sys import argv
 
 from guppylang import guppy
 from guppylang.std.builtins import result
-from guppylang.std.quantum import qubit, cx, discard, h, measure, t, tdg, z
+from guppylang.std.quantum import cx, discard, h, measure, qubit, t, tdg, z
 
 
 @guppy

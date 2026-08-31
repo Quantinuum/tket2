@@ -15,20 +15,18 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use hugr::core::HugrNode;
 use hugr::ops::OpParent;
 use hugr::{HugrView, Wire};
+use hugr_core::metadata::Metadata;
 use itertools::Itertools;
 use tket_json_rs::circuit_json;
 use tket_json_rs::register::ElementId as RegisterUnit;
 
-use crate::circuit::Circuit;
+use crate::metadata;
 use crate::serialize::pytket::circuit::StraightThroughWire;
 use crate::serialize::pytket::extension::RegisterCount;
-use crate::serialize::pytket::{
-    METADATA_B_REGISTERS, METADATA_INPUT_PARAMETERS, PytketEncodeError, PytketEncodeOpError,
-    RegisterHash,
-};
+use crate::serialize::pytket::{PytketEncodeError, PytketEncodeOpError, RegisterHash};
 
+use super::PytketEncoderConfig;
 use super::unit_generator::RegisterUnitGenerator;
-use super::{METADATA_Q_REGISTERS, PytketEncoderConfig};
 
 /// A structure for tracking qubits used in the circuit being encoded.
 ///
@@ -201,7 +199,7 @@ pub struct ValueTrackerResult {
 }
 
 impl<N: HugrNode> ValueTracker<N> {
-    /// Create a new [`ValueTracker`] from the inputs of a [`Circuit`].
+    /// Create a new [`ValueTracker`] from the inputs of a Hugr.
     ///
     /// Reads a number of metadata values from the circuit root node, if present, to preserve information on circuits produced by
     /// decoding a pytket circuit:
@@ -213,15 +211,23 @@ impl<N: HugrNode> ValueTracker<N> {
     /// - `METADATA_INPUT_PARAMETERS`: The input parameter names.
     ///
     pub(super) fn new<H: HugrView<Node = N>>(
-        circ: &Circuit<H>,
+        hugr: &H,
         region: N,
         config: &PytketEncoderConfig<H>,
     ) -> Result<Self, PytketEncodeError<N>> {
         let param_variable_names: Vec<String> =
-            read_metadata_json_list(circ, region, METADATA_INPUT_PARAMETERS);
+            read_metadata_json_list::<_, _, metadata::PytketInputParameters>(hugr, region);
         let mut tracker = ValueTracker {
-            qubits: read_metadata_json_list(circ, region, METADATA_Q_REGISTERS),
-            bits: read_metadata_json_list(circ, region, METADATA_B_REGISTERS),
+            qubits: read_metadata_json_list::<_, _, metadata::PytketQubitRegisterNames>(
+                hugr, region,
+            )
+            .into_iter()
+            .map(|q| q.id)
+            .collect_vec(),
+            bits: read_metadata_json_list::<_, _, metadata::PytketBitRegisterNames>(hugr, region)
+                .into_iter()
+                .map(|b| b.id)
+                .collect_vec(),
             params: Vec::with_capacity(param_variable_names.len()),
             wires: BTreeMap::new(),
             unused_qubits: BTreeSet::new(),
@@ -245,17 +251,13 @@ impl<N: HugrNode> ValueTracker<N> {
         );
 
         // Register the circuit's inputs with the tracker.
-        let region_optype = circ.hugr().get_optype(region);
+        let region_optype = hugr.get_optype(region);
         let signature = region_optype.inner_function_type().ok_or_else(|| {
-            let optype = circ.hugr().get_optype(region).to_string();
+            let optype = hugr.get_optype(region).to_string();
             PytketEncodeError::NonDataflowRegion { region, optype }
         })?;
-        let inp_node = circ.hugr().get_io(region).unwrap()[0];
-        for (port, typ) in circ
-            .hugr()
-            .node_outputs(inp_node)
-            .zip(signature.input().iter())
-        {
+        let inp_node = hugr.get_io(region).unwrap()[0];
+        for (port, typ) in hugr.node_outputs(inp_node).zip(signature.input().iter()) {
             let wire = Wire::new(inp_node, port);
             let Some(count) = config.type_to_pytket(typ) else {
                 // If the input has a non-serializable type, it gets skipped.
@@ -282,7 +284,7 @@ impl<N: HugrNode> ValueTracker<N> {
                 wire_values.push(TrackedValue::Param(param));
             }
 
-            tracker.register_wire(wire, wire_values, circ)?;
+            tracker.register_wire(wire, wire_values, hugr)?;
         }
 
         Ok(tracker)
@@ -310,6 +312,16 @@ impl<N: HugrNode> ValueTracker<N> {
         })
     }
 
+    /// Frees a tracked qubit, and allow re-using it's ID when calling [`ValueTracker::new_qubit`].
+    pub fn free_qubit(&mut self, qb: TrackedQubit) {
+        self.unused_qubits.insert(qb);
+    }
+
+    /// Frees a tracked bit, and allow re-using it's ID when calling [`ValueTracker::new_bit`].
+    pub fn free_bit(&mut self, bit: TrackedBit) {
+        self.unused_bits.insert(bit);
+    }
+
     /// Register a new parameter string expression.
     ///
     /// Returns a unique identifier for the expression.
@@ -333,7 +345,7 @@ impl<N: HugrNode> ValueTracker<N> {
         &mut self,
         wire: Wire<N>,
         values: impl IntoIterator<Item = Val>,
-        circ: &Circuit<impl HugrView<Node = N>>,
+        hugr: &impl HugrView<Node = N>,
     ) -> Result<(), PytketEncodeOpError<N>> {
         let values = values.into_iter().map(|v| v.into()).collect_vec();
 
@@ -350,7 +362,7 @@ impl<N: HugrNode> ValueTracker<N> {
             }
         }
 
-        let unexplored_neighbours = circ.hugr().linked_ports(wire.node(), wire.source()).count();
+        let unexplored_neighbours = hugr.linked_ports(wire.node(), wire.source()).count();
         let tracked = TrackedWire {
             values: Some(values),
             unexplored_neighbours,
@@ -410,19 +422,6 @@ impl<N: HugrNode> ValueTracker<N> {
         let wire = self.wires.remove(&wire).unwrap();
         let values = wire.values?;
 
-        // Free up the qubit and bit registers associated with the wire.
-        for value in &values {
-            match value {
-                TrackedValue::Qubit(qb) => {
-                    self.unused_qubits.insert(*qb);
-                }
-                TrackedValue::Bit(bit) => {
-                    self.unused_bits.insert(*bit);
-                }
-                TrackedValue::Param(_) => {}
-            }
-        }
-
         Some(values)
     }
 
@@ -447,18 +446,18 @@ impl<N: HugrNode> ValueTracker<N> {
     /// output.
     pub(super) fn finish(
         self,
-        circ: &Circuit<impl HugrView<Node = N>>,
+        hugr: &impl HugrView<Node = N>,
         region: N,
     ) -> Result<ValueTrackerResult, PytketEncodeOpError<N>> {
-        let [input_node, output_node] = circ.hugr().get_io(region).unwrap();
+        let [input_node, output_node] = hugr.get_io(region).unwrap();
 
         // Ordered list of qubits and bits at the output of the circuit.
         let mut straight_through_wires = Vec::new();
         let mut qubit_outputs = Vec::with_capacity(self.qubits.len() - self.unused_qubits.len());
         let mut bit_outputs = Vec::with_capacity(self.bits.len() - self.unused_bits.len());
         let mut param_outputs = Vec::new();
-        for tgt_port in circ.hugr().node_inputs(output_node) {
-            for (src_node, src_port) in circ.hugr().linked_outputs(output_node, tgt_port) {
+        for tgt_port in hugr.node_inputs(output_node) {
+            for (src_node, src_port) in hugr.linked_outputs(output_node, tgt_port) {
                 let wire = Wire::new(src_node, src_port);
                 let Some(values) = self.peek_wire_values(wire) else {
                     // If the wire originates from the input node, track it as a straight through wire.
@@ -575,16 +574,16 @@ impl IntoIterator for TrackedValues {
 }
 
 /// Read a json-encoded vector of values from the circuit's root metadata.
-fn read_metadata_json_list<T: serde::de::DeserializeOwned, H: HugrView>(
-    circ: &Circuit<H>,
+fn read_metadata_json_list<T: serde::de::DeserializeOwned, H: HugrView, K: Metadata>(
+    hugr: &H,
     region: H::Node,
-    metadata_key: &str,
-) -> Vec<T> {
-    let Some(value) = circ.hugr().get_metadata_any(region, metadata_key) else {
-        return vec![];
-    };
-
-    serde_json::from_value::<Vec<T>>(value.clone()).unwrap_or_default()
+) -> Vec<T>
+where
+    for<'hugr> K::Type<'hugr>: Into<Vec<T>>,
+{
+    hugr.get_metadata::<K>(region)
+        .map(Into::into)
+        .unwrap_or_default()
 }
 
 /// Compute the final unit permutation for a circuit.

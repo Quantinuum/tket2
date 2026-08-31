@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang >=0.21.6",
+#     "guppylang ==0.21.13",
 # ]
 # ///
 
@@ -9,8 +9,8 @@ from pathlib import Path
 from sys import argv
 
 from guppylang import guppy
-from guppylang.std.quantum import qubit
 from guppylang.std.builtins import array
+from guppylang.std.quantum import qubit
 
 
 @guppy

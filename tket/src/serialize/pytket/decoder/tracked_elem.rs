@@ -211,7 +211,6 @@ impl std::hash::Hash for TrackedBit {
 mod tests {
     use super::*;
     use hugr::extension::prelude::{bool_t, qb_t};
-    use hugr::types::Type;
     use rstest::rstest;
     use std::sync::Arc;
     use tket_json_rs::register::ElementId;
@@ -224,7 +223,7 @@ mod tests {
         assert!(!tq.is_outdated());
         assert_eq!(tq.pytket_register(), &*reg);
         assert_eq!(tq.pytket_register_arc(), reg);
-        assert_eq!(&*tq.ty(), &Type::from(qb_t()));
+        assert_eq!(&*tq.ty(), &qb_t());
 
         tq.mark_outdated();
         assert!(tq.is_outdated());
@@ -238,7 +237,7 @@ mod tests {
         assert!(!tb.is_outdated());
         assert_eq!(tb.pytket_register(), &*reg);
         assert_eq!(tb.pytket_register_arc(), reg);
-        assert_eq!(&*tb.ty(), &Type::from(bool_t()));
+        assert_eq!(&*tb.ty(), &bool_t());
 
         tb.mark_outdated();
         assert!(tb.is_outdated());

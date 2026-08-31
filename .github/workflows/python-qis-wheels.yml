@@ -4,9 +4,8 @@ on:
   push:
     branches:
       - main
-  release:
-    types:
-      - published
+    tags:
+      - "qis-compiler-v*"
   pull_request:
     # check builds work if qis-compiler build config changes
     paths:
@@ -20,11 +19,10 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  CACHE_CARGO: true
-  UV_VERSION: "0.9.7"
+  UV_VERSION: "0.11.15"
 jobs:
   # Check if the tag matches the package name,
-  # or if the workflow is running on a non-release event.
+  # or if the workflow is running on a non-tag event.
   check-tag:
     name: Check tag
     runs-on: ubuntu-latest
@@ -36,7 +34,7 @@ jobs:
         run: |
           echo "run=$SHOULD_RUN" >> $GITHUB_OUTPUT
         env:
-          SHOULD_RUN: ${{ github.event_name != 'release' || ( github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/qis-compiler-v') ) }}
+          SHOULD_RUN: ${{ github.ref_type != 'tag' || startsWith(github.ref, 'refs/tags/qis-compiler-v') }}
 
   build_qis_compiler_wheels:
     needs: check-tag
@@ -53,13 +51,7 @@ jobs:
     name: "qis-compiler wheels (${{matrix.os}})"
     runs-on: ${{ matrix.os }}
     steps:
-      # ---------------------------------
-      # Bootstrap the build environment
-      # ---------------------------------
-
-      - uses: actions/checkout@v6
-        with:
-          submodules: recursive
+      - uses: actions/checkout@v7
 
       - name: Set up UV
         uses: astral-sh/setup-uv@v7
@@ -67,26 +59,10 @@ jobs:
           enable-cache: true
           version: ${{ env.UV_VERSION }}
 
-      # Note that we are using CIBuildWheel to build the wheels.
-      # This treats linux differently to macos and windows.
-      #
-      # On linux, building on the host platform adds an implicit
-      # requirement on the host platform's glibc version and other
-      # system libraries that happen to be available. To mitigate
-      # this, builds are performed within a docker container that
-      # is compatible with manylinux (in our case, manylinux_2_28).
-      #
-      # See https://github.com/pypa/manylinux for more information
-      # about the manylinux project.
-      #
-      # This is an important aspect of wheel building, as it means
-      # that wheels are built in an isolated environment. We use
-      # /tmp/ci-cache for caching, which is then accessed as
-      # /host/tmp/ci-cache within the container.
+      - uses: quantinuum/hugrverse-env/install-hugrenv-action@main
 
-      # if the hugr_qis compiler has changed, we build it.
       - name: Build selene-hugr-qis-compiler wheel
-        uses: pypa/cibuildwheel@v3.3.0
+        uses: pypa/cibuildwheel@v4.2.0
         with:
           package-dir: qis-compiler
 
@@ -94,7 +70,7 @@ jobs:
         run: uvx twine check --strict wheelhouse/*.whl
 
       - name: Upload wheels
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: qis-compiler-wheels-${{ matrix.os }}
           path: wheelhouse/*.whl
@@ -103,7 +79,7 @@ jobs:
   release:
     name: Release qis-compiler
     needs: [check-tag, build_qis_compiler_wheels]
-    if: ${{ needs.check-tag.outputs.run == 'true' && github.event_name == 'release' }}
+    if: ${{ needs.check-tag.outputs.run == 'true' && github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/qis-compiler-v') }}
     runs-on: ubuntu-latest
     # always do a full build and test before release of any package
     environment: release
@@ -111,11 +87,26 @@ jobs:
       contents: write
       # IMPORTANT: this permission is mandatory for trusted publishing
       id-token: write
+      # Used to generate artifact attestation
+      attestations: write
     steps:
-      - uses: actions/download-artifact@v6
+      - uses: actions/checkout@v7
+      - name: Check if the tag has an associated release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view ${{ github.ref_name }}; then
+            echo "No release found for tag ${{ github.ref_name }}"
+            exit 1
+          fi
+      - uses: actions/download-artifact@v8
         with:
           path: wheelhouse
           merge-multiple: true
+      - name: Generate artifact attestation
+        uses: actions/attest@v4.2.2
+        with:
+          subject-path: "wheelhouse/*"
 
       - name: Publish package distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
@@ -123,3 +114,12 @@ jobs:
           verbose: true
           skip-existing: true
           packages-dir: wheelhouse
+
+      - name: Upload wheels to the release and un-draft it
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Upload wheels to the release assets
+          gh release upload ${{ github.ref_name }} wheelhouse/*
+          # Un-draft the release on GitHub now that the package has been published to PyPI
+          gh release edit ${{ github.ref_name }} --draft=false

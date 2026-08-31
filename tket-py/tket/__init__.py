@@ -9,11 +9,17 @@ working with quantum circuits. See also the Rust library with the same name on
 [crates.io](https://crates.io/crates/tket).
 """
 
-from . import circuit, ops, optimiser, passes, pattern, rewrite
+from . import extensions, metadata, passes, platform, util
 
-__all__ = ["circuit", "ops", "optimiser", "passes", "pattern", "rewrite"]
+__all__ = [
+    "extensions",
+    "metadata",
+    "passes",
+    "platform",
+    "util",
+]
 
 
 # This is updated by our release-please workflow, triggered by this
 # annotation: x-release-please-version
-__version__ = "0.12.13"
+__version__ = "0.15.6"

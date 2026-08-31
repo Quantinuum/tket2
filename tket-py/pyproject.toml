@@ -1,10 +1,10 @@
 [project]
 name = "tket"
-version = "0.12.13"
-requires-python = ">=3.10"
+version = "0.15.6"
+requires-python = ">=3.12"
 description = "Quantinuum's TKET Quantum Compiler"
 license = { file = "LICENCE" }
-readme = "README.md"
+readme = "package.md"
 authors = [
     { name = "TKET development team", email = "tket-support@quantinuum.com" },
 ]
@@ -28,12 +28,11 @@ classifiers = [
 ]
 
 
-dependencies = [
-    'hugr >= 0.14.4',
-    "pytket>=1.34,<3",
-    'tket_eccs ~= 0.5.1',
-    'tket_exts >= 0.10.1, <0.13',
-]
+dependencies = ['hugr~=0.18.3', 'tket_eccs ~= 0.6.0', 'tket_exts ~= 0.14.0']
+
+[project.optional-dependencies]
+# The pytket python library is only used for type checking.
+pytket = ["pytket>=2.1.0,<3"]
 
 [tool.uv.sources]
 tket_eccs = { workspace = true }
@@ -61,8 +60,6 @@ docs = [
 # Make sure to copy any changes to the root `pyproject.toml` config too.
 module-name = "tket._tket"
 manifest-path = "Cargo.toml"
-# "extension-module" tells pyo3 we want to build an extension module (skips linking against libpython.so)
-features = ["pyo3/extension-module"]
 
 [tool.pytest.ini_options]
 # Lark throws deprecation warnings for `src_parse` and `src_constants`.

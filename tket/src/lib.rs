@@ -25,14 +25,14 @@
 //! use hugr::HugrView;
 //!
 //! // Load a tket1 circuit.
-//! let mut circ: Circuit = tket::serialize::load_tk1_json_file("../test_files/pytket/barenco_tof_5.json", DecodeOptions::new()).unwrap();
+//! let mut circ: Circuit = tket::serialize::load_tk1_json_file("../test_files/pytket/barenco_tof_5.json", DecodeOptions::new()).unwrap().into();
 //!
 //! assert_eq!(circ.qubit_count(), 9);
 //! assert_eq!(circ.num_operations(), 170);
 //!
-//! // Traverse the circuit and print the gates.
-//! for command in circ.commands() {
-//!     println!("{:?}", command.optype());
+//! // Traverse the circuit nodes and print the gates.
+//! for node in circ.toposorted_children(circ.parent()).unwrap() {
+//!     println!("{}", circ.hugr().get_optype(node));
 //! }
 //!
 //! // Render the circuit as a mermaid diagram.
@@ -47,6 +47,7 @@
 
 pub mod circuit;
 pub mod extension;
+pub mod metadata;
 pub mod modifier;
 pub(crate) mod ops;
 pub mod optimiser;
@@ -67,4 +68,10 @@ mod utils;
 pub use circuit::{Circuit, CircuitError, CircuitMutError};
 pub use hugr;
 pub use hugr::Hugr;
-pub use ops::{Pauli, TketOp, op_matches, symbolic_constant_op};
+#[expect(deprecated)]
+pub use ops::op_matches;
+pub use ops::{Pauli, TketOp, symbolic_constant_op};
+
+#[doc = include_str!("../README.md")]
+#[cfg(doctest)]
+pub struct ReadmeDoctests;

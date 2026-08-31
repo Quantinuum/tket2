@@ -1,17 +1,28 @@
 //! Contains a pass to lower "drop" ops from the Guppy extension
-use hugr::algorithms::replace_types::{Linearizer, NodeTemplate, ReplaceTypesError};
-use hugr::algorithms::{ComposablePass, ReplaceTypes};
-use hugr::extension::prelude::bool_t;
-use hugr::extension::simple_op::MakeRegisteredOp;
-use hugr::types::Term;
 use hugr::{Node, hugr::hugrmut::HugrMut};
+use hugr_core::types::Type;
 use tket::extension::guppy::{DROP_OP_NAME, GUPPY_EXTENSION};
+use tket::passes::composable::WithScope;
+use tket::passes::replace_types::{Linearizer, ReplaceTypesError};
+use tket::passes::{ComposablePass, PassScope};
 
-use crate::extension::futures::{FutureOp, FutureOpDef, future_type};
+use crate::helpers::lowerer_with_future_linearization;
 
 /// A pass that lowers "drop" ops from [GUPPY_EXTENSION]
 #[derive(Default, Debug, Clone)]
-pub struct LowerDropsPass;
+pub struct LowerDropsPass {
+    /// Where to apply the pass.
+    ///
+    /// Configurable via [`WithScope::with_scope`].
+    scope: PassScope,
+}
+
+impl WithScope for LowerDropsPass {
+    fn with_scope(mut self, scope: impl Into<PassScope>) -> Self {
+        self.scope = scope.into();
+        self
+    }
+}
 
 impl<H: HugrMut<Node = Node>> ComposablePass<H> for LowerDropsPass {
     type Error = ReplaceTypesError;
@@ -20,38 +31,16 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for LowerDropsPass {
     type Result = bool;
 
     fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
-        let mut rt = ReplaceTypes::default();
-
-        // future(bool) is not in the default linearizer handler so we add it here.
-        // TODO: Create ReplaceTypes with future(bool) linearized by default to avoid
-        // code duplication with ReplaceBools pass.
-        let dup_op = FutureOp {
-            op: FutureOpDef::Dup,
-            typ: bool_t(),
-        }
-        .to_extension_op()
-        .unwrap();
-        let free_op = FutureOp {
-            op: FutureOpDef::Free,
-            typ: bool_t(),
-        }
-        .to_extension_op()
-        .unwrap();
-        rt.linearizer_mut()
-            .register_simple(
-                future_type(bool_t()).as_extension().unwrap().clone(),
-                NodeTemplate::SingleOp(dup_op.into()),
-                NodeTemplate::SingleOp(free_op.into()),
-            )
-            .unwrap();
+        let mut rt = lowerer_with_future_linearization().with_scope(self.scope.clone());
 
         rt.set_replace_parametrized_op(
             GUPPY_EXTENSION.get_op(DROP_OP_NAME.as_str()).unwrap(),
             |args, rt| {
-                let [Term::Runtime(ty)] = args else {
+                let [ty] = args else {
                     panic!("Expected just one type")
                 };
-                Ok(Some(rt.get_linearizer().copy_discard_op(ty, 0)?))
+                let ty = Type::try_from(ty.clone()).unwrap();
+                Ok(Some(rt.get_linearizer().copy_discard_op(&ty, 0)?))
             },
         );
         rt.run(hugr)
@@ -74,7 +63,7 @@ mod test {
         let arr_type = array_type(2, usize_t());
         let drop_op = GUPPY_EXTENSION.get_op(DROP_OP_NAME.as_str()).unwrap();
         let drop_node = ExtensionOp::new(drop_op.clone(), [arr_type.clone().into()]).unwrap();
-        let mut b = DFGBuilder::new(inout_sig(arr_type, vec![])).unwrap();
+        let mut b = DFGBuilder::new(inout_sig(vec![arr_type], vec![])).unwrap();
         let inp = b.input_wires();
         b.add_dataflow_op(drop_node, inp).unwrap();
         let mut h = b.finish_hugr_with_outputs([]).unwrap();
@@ -88,7 +77,7 @@ mod test {
                 .count()
         };
         assert_eq!(count_drops(&h), 1);
-        LowerDropsPass.run(&mut h).unwrap();
+        LowerDropsPass::default().run(&mut h).unwrap();
         h.validate().unwrap();
         assert_eq!(count_drops(&h), 0);
     }

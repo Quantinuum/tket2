@@ -1,5 +1,79 @@
 # Changelog
 
+## [0.14.1](https://github.com/Quantinuum/tket2/compare/tket-exts-v0.14.0...tket-exts-v0.14.1) (2026-08-04)
+
+
+### Features
+
+* Mute internal deprecation warning in tket-exts ([#1907](https://github.com/Quantinuum/tket2/issues/1907)) ([a60580a](https://github.com/Quantinuum/tket2/commit/a60580afb3b9e0ccd611c6fb87367836b7fb1509))
+
+## [0.14.0](https://github.com/Quantinuum/tket2/compare/tket-exts-v0.13.1...tket-exts-v0.14.0) (2026-06-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* updates to public dependencies, specifically hugr 0.29.0 and hugr-py 0.18.0
+* ArrayLowering trait has new required method alloc_array for allocating a fresh array.
+
+### Features
+
+* runtime entrypoint arguments via generic tket.argreader op ([#1731](https://github.com/Quantinuum/tket2/issues/1731)) ([3583b4e](https://github.com/Quantinuum/tket2/commit/3583b4ea93d732ffe927d74ee7d959d7f04f7b43))
+* update to hugr 0.29.0/hugr-py 0.18.0, tone down RedundantOrderEdgesPass ([#1742](https://github.com/Quantinuum/tket2/issues/1742)) ([1de66a2](https://github.com/Quantinuum/tket2/commit/1de66a29a10758fe3ddac564cfa51653c632fe3a))
+
+## [0.13.1](https://github.com/Quantinuum/tket2/compare/tket-exts-v0.13.0...tket-exts-v0.13.1) (2026-06-19)
+
+
+### Features
+
+* HUGR extension for global variables ([#1530](https://github.com/Quantinuum/tket2/issues/1530)) ([4209df1](https://github.com/Quantinuum/tket2/commit/4209df1130f092d0936de71154bc98c78745a2ac))
+
+
+### Bug Fixes
+
+* add `--unversioned` flag to justfile, update extensions ([#1697](https://github.com/Quantinuum/tket2/issues/1697)) ([17a0f84](https://github.com/Quantinuum/tket2/commit/17a0f84ccb7f3c5a2ecb74b64436cdba4f339374))
+
+## [0.13.0](https://github.com/Quantinuum/tket2/compare/tket-exts-v0.12.3...tket-exts-v0.13.0) (2026-06-11)
+
+
+### ⚠ BREAKING CHANGES
+
+* Updated public dependency `hugr` to `0.28.0`.
+* Removed `tket.bool` extension.
+* Breaking version bump for extensions `tket.wasm`, `tket.gpu`, `tket.qsystem`, and `tket.quantum`.
+
+### Features
+
+* Add `measurement` extension and change `tket.quantum` / `tket.qsystem` extension measurement ops return type ([#1558](https://github.com/Quantinuum/tket2/issues/1558)) ([7e35ecf](https://github.com/Quantinuum/tket2/commit/7e35ecf592db05e51e9b4d4b577afc2c93bd291d))
+* `QSystemExtension` has been deprecated ([#1670](https://github.com/Quantinuum/tket2/issues/1670)) ([e25102e](https://github.com/Quantinuum/tket2/commit/e25102ea58df7531187f89c8c04104e3ec2bb71b))
+* Add multiple platform-specific qsystem extensions ([#1567](https://github.com/Quantinuum/tket2/issues/1567)) ([b60553f](https://github.com/Quantinuum/tket2/commit/b60553fec5e81b698c75916658bae7d1c527907e))
+* Add `RandomAdvance` platform call to `tket.qsystem.random` ([#1170](https://github.com/Quantinuum/tket2/issues/1170)) ([eed16e8](https://github.com/Quantinuum/tket2/commit/eed16e8c57541ea23af6241290aa47d37583cfc4))
+* Upgrade hugr dependency to 0.28.0 ([#1580](https://github.com/Quantinuum/tket2/issues/1580)) ([68e7fd7](https://github.com/Quantinuum/tket2/commit/68e7fd76705f3e221deaeea9b602c16ec9c6046b))
+
+
+## [0.12.3](https://github.com/Quantinuum/tket2/compare/tket-exts-v0.12.2...tket-exts-v0.12.3) (2026-04-07)
+
+
+### Features
+
+* Pass scopes in python API, update to hugr-py 0.16 ([#1464](https://github.com/Quantinuum/tket2/issues/1464)) ([369aba2](https://github.com/Quantinuum/tket2/commit/369aba22aa31f0e819074af8d96e8b38704c51ee))
+
+
+### Documentation
+
+* fix tket-exts pyproject description ([#1436](https://github.com/Quantinuum/tket2/issues/1436)) ([6f68fe0](https://github.com/Quantinuum/tket2/commit/6f68fe0cd869e5493afba8a85e3306bfa3bc486a))
+
+## [0.12.2](https://github.com/Quantinuum/tket2/compare/tket-exts-v0.12.1...tket-exts-v0.12.2) (2026-01-28)
+
+
+### Features
+
+* **tket-exts:** Export an ExtensionRegistry with all tket extensions ([#1371](https://github.com/Quantinuum/tket2/issues/1371)) ([c908427](https://github.com/Quantinuum/tket2/commit/c90842757dca3d4169be3c87fe4b1469b22fa194))
+
+
+### Documentation
+
+* Correct docstrings for two extensions ([#1378](https://github.com/Quantinuum/tket2/issues/1378)) ([a9c859a](https://github.com/Quantinuum/tket2/commit/a9c859a6b1c3ebd1f867b8da55d82b38f0ff9fee))
+
 ## [0.12.1](https://github.com/Quantinuum/tket2/compare/tket-exts-v0.12.0...tket-exts-v0.12.1) (2026-01-06)
 
 

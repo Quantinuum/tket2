@@ -1,6 +1,6 @@
 [package]
 name = "tket-qsystem"
-version = "0.22.0"
+version = "0.27.2"
 edition.workspace = true
 rust-version.workspace = true
 
@@ -11,7 +11,7 @@ homepage.workspace = true
 repository.workspace = true
 description = "TKET tool for preparing and validating `Hugr`s for compilation targeting Quantinuum H-series  quantum computers"
 keywords = ["Quantum", "Quantinuum"]
-categories = ["compilers"]
+categories = ["compilers", "science::quantum-computing"]
 
 [features]
 default = ["cli"]
@@ -23,9 +23,10 @@ name = "tket-qsystem"
 required-features = ["cli"]
 
 [dependencies]
+tket = { path = "../tket", version = "0.21.2" }
+
 hugr.workspace = true
 hugr-core.workspace = true
-tket = { path = "../tket", version = "0.16.0" }
 tket-json-rs = { workspace = true }
 lazy_static.workspace = true
 serde = { workspace = true, features = ["derive"] }
@@ -46,12 +47,21 @@ indexmap.workspace = true
 anyhow = { workspace = true, optional = true }
 
 [dev-dependencies]
+tket1-passes = { path = "../tket1-passes" }
+
 cool_asserts.workspace = true
 petgraph.workspace = true
 rstest.workspace = true
 serde_json.workspace = true
-tket1-passes = { path = "../tket1-passes" }
 rayon.workspace = true
+
+# Defined here so it can be overridden by the codspeed CI job
+# using `cargo add`.
+criterion = { version = "0.8.2", features = ["html_reports"] }
 
 [lints]
 workspace = true
+
+[[bench]]
+name = "bench_main"
+harness = false

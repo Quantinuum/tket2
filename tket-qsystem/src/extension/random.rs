@@ -72,6 +72,7 @@ impl RandomType {
                 CONTEXT_TYPE_NAME.to_owned(),
                 vec![],
                 EXTENSION_ID,
+                EXTENSION_VERSION,
                 TypeBound::Linear,
                 extension_ref,
             ),
@@ -141,7 +142,9 @@ impl MakeOpDef for RandomOp {
             ),
             RandomOp::NewRNGContext => Signature::new(
                 vec![int_type(6)],
-                Type::from(option_type(RandomType::RNGContext.get_type(extension_ref))),
+                vec![Type::from(option_type(vec![
+                    RandomType::RNGContext.get_type(extension_ref),
+                ]))],
             ),
             RandomOp::DeleteRNGContext => {
                 Signature::new(vec![RandomType::RNGContext.get_type(extension_ref)], vec![])
@@ -273,7 +276,9 @@ mod test {
             let [ctx] = func_builder
                 .build_unwrap_sum(
                     1,
-                    option_type(RandomType::RNGContext.get_type(&Arc::downgrade(&EXTENSION))),
+                    option_type(vec![
+                        RandomType::RNGContext.get_type(&Arc::downgrade(&EXTENSION)),
+                    ]),
                     maybe_ctx,
                 )
                 .unwrap();

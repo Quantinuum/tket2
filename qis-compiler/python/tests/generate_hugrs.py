@@ -1,18 +1,23 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#     "guppylang ==0.21.7",
+#     "guppylang==1.0.0a5",
+#     "guppylang-internals==1.0.0a5",
 #     "tket",
+#     "pytket >=2.1.0,<3",
 # ]
 # ///
 
 from pathlib import Path
 
-from guppylang import guppy
-from guppylang.std.builtins import array, exit, panic, result
+from guppylang import enable_experimental_features, guppy
+from guppylang.std.angles import pi
+from guppylang.std.builtins import array, control, dagger, exit, panic, result
 from guppylang.std.qsystem.random import RNG
 from guppylang.std.qsystem.utils import get_current_shot
 from guppylang.std.quantum import (
+    collect_measurements,
+    crz,
     cx,
     discard,
     discard_array,
@@ -25,6 +30,7 @@ from guppylang.std.quantum import (
     x,
     z,
 )
+from guppylang_internals.debug_mode import turn_off_debug_mode, turn_on_debug_mode
 
 resources_dir = Path(__file__).parent / "resources"
 
@@ -61,7 +67,7 @@ def no_results() -> bytes:
     def bar() -> None:
         q0: qubit = qubit()
         h(q0)
-        measure(q0)
+        measure(q0).read()
 
     return bar.compile().to_bytes()
 
@@ -76,10 +82,10 @@ def flip_some() -> bytes:
         x(q0)
         x(q2)
         x(q3)
-        result("c0", measure(q0))
-        result("c1", measure(q1))
-        result("c2", measure(q2))
-        result("c3", measure(q3))
+        result("c0", measure(q0).read())
+        result("c1", measure(q1).read())
+        result("c2", measure(q2).read())
+        result("c3", measure(q3).read())
 
     return main.compile().to_bytes()
 
@@ -101,7 +107,7 @@ def measure_qb_array() -> bytes:
         x(qs[2])
         x(qs[3])
         x(qs[9])
-        measure_array(qs)
+        collect_measurements(measure_array(qs))
 
     return main.compile().to_bytes()
 
@@ -115,7 +121,7 @@ def print_array() -> bytes:
         x(qs[2])
         x(qs[3])
         x(qs[9])
-        cs = measure_array(qs)
+        cs = collect_measurements(measure_array(qs))
         result("cs", cs)
         result("is", array(i for i in range(100)))
         result("fs", array(i * 0.0625 for i in range(100)))
@@ -128,7 +134,7 @@ def postselect_exit() -> bytes:
     def main() -> None:
         q = qubit()
         h(q)
-        outcome = measure(q)
+        outcome = measure(q).read()
         if outcome:
             exit("Postselection failed", 42)
         result("c", outcome)
@@ -141,7 +147,7 @@ def postselect_panic() -> bytes:
     def main() -> None:
         q = qubit()
         h(q)
-        outcome = measure(q)
+        outcome = measure(q).read()
         if outcome:
             panic("Postselection failed")
         result("c", outcome)
@@ -181,7 +187,7 @@ def rus() -> bytes:
     def main() -> None:
         q = qubit()
         rus(q)
-        result("result", measure(q))
+        result("result", measure(q).read())
 
     return main.compile().to_bytes()
 
@@ -219,12 +225,43 @@ def rng() -> bytes:
     return main.compile().to_bytes()
 
 
+def qft_32() -> bytes:
+    @guppy
+    def main() -> None:
+        qs = array(qubit() for _ in range(32))
+        for i in range(32):
+            h(qs[i])
+            angle = pi / 2
+            for j in range(31 - i):
+                crz(qs[i], qs[i + j + 1], angle)
+                angle /= 2
+        result("cs", collect_measurements(measure_array(qs)))
+
+    return main.compile().to_bytes()
+
+
 def entry_args() -> bytes:
     @guppy
     def foo(a: int) -> None:
         result("a", a)
 
     return foo.compile_function().to_bytes()
+
+
+def simple_modifier() -> bytes:
+    enable_experimental_features()
+
+    @guppy
+    def main() -> None:
+        q0 = qubit()
+        q1 = qubit()
+        h(q0)
+        with control(q0), dagger:
+            t(q1)
+        result("c0", measure(q0).read())
+        result("c1", measure(q1).read())
+
+    return main.compile().to_bytes()
 
 
 if __name__ == "__main__":
@@ -241,8 +278,12 @@ if __name__ == "__main__":
         postselect_panic,
         rus,
         print_current_shot,
+        qft_32,
         rng,
         entry_args,
+        simple_modifier,
     ]:
+        turn_on_debug_mode()
         envelope = func()
+        turn_off_debug_mode()
         (resources_dir / f"{func.__name__}.hugr").write_bytes(envelope)

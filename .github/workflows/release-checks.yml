@@ -15,14 +15,7 @@ env:
   SCCACHE_GHA_ENABLED: "true"
   RUSTC_WRAPPER: "sccache"
   # Pinned version for the uv package manager
-  UV_VERSION: "0.9.7"
-
-  # Path to the cached tket-c-api library
-  # When this envvar is set, the `./.github/actions/tket-c-api` action **must** be run to fetch the artifacts
-  # This config is not required, but speeds up the build by caching the tket-c-api library
-  # The alternative is to install conan and remove the env var
-  TKET_C_API_PATH: "${{ github.workspace }}/tket-c-api"
-  LD_LIBRARY_PATH: ${{ github.workspace }}/tket-c-api/lib
+  UV_VERSION: "0.11.15"
 
 jobs:
   py-release:
@@ -41,12 +34,11 @@ jobs:
           - resolution: "lowest-direct"
             python: "3.10"
     steps:
-      - uses: actions/checkout@v6
-      - uses: mozilla-actions/sccache-action@v0.0.9
-      - name: Install tket-c-api library
-        uses: ./.github/actions/tket-c-api
+      - uses: actions/checkout@v7
+      - uses: mozilla-actions/sccache-action@v0.0.11
+      - uses: quantinuum/hugrverse-env/install-hugrenv-action@main
         with:
-          install-path: ${{ env.TKET_C_API_PATH }}
+          packages: "tket"
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
         with:
@@ -61,7 +53,7 @@ jobs:
           RES: ${{ matrix.target.resolution }}
         run: |
           UV_RESOLUTION="$RES" uv lock --no-sources -U
-          UV_RESOLUTION="$RES" uv sync --no-sources --no-install-workspace
+          UV_RESOLUTION="$RES" uv sync --all-extras --no-sources --no-install-workspace
           uv pip install --no-sources tket-exts
           uv pip install --no-sources tket-eccs
           uv run --no-sync maturin develop

@@ -1,12 +1,11 @@
 //! Tracking of subgraphs of unsupported nodes in the hugr.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 
 use hugr::HugrView;
 use hugr::core::HugrNode;
 use petgraph::unionfind::UnionFind;
 
-use crate::Circuit;
 use crate::serialize::pytket::PytketEncodeError;
 use crate::serialize::pytket::opaque::OpaqueSubgraph;
 
@@ -23,7 +22,7 @@ pub struct UnsupportedTracker<N> {
     /// Stores the index of each node in [`Self::components`].
     ///
     /// Once a node has been extracted, it is removed from this map.
-    nodes: HashMap<N, UnsupportedNode>,
+    nodes: BTreeMap<N, UnsupportedNode>,
     /// A UnionFind structure for tracking connected components of `Self::nodes`.
     components: UnionFind<usize>,
 }
@@ -42,9 +41,9 @@ struct UnsupportedNode {
 
 impl<N: HugrNode> UnsupportedTracker<N> {
     /// Create a new [`UnsupportedTracker`].
-    pub fn new(_circ: &Circuit<impl HugrView>) -> Self {
+    pub fn new(_hugr: &impl HugrView<Node = N>) -> Self {
         Self {
-            nodes: HashMap::new(),
+            nodes: BTreeMap::new(),
             components: UnionFind::new_empty(),
         }
     }
@@ -55,7 +54,7 @@ impl<N: HugrNode> UnsupportedTracker<N> {
     }
 
     /// Record an unsupported node in the hugr.
-    pub fn record_node(&mut self, node: N, circ: &Circuit<impl HugrView<Node = N>>) {
+    pub fn record_node(&mut self, node: N, hugr: &impl HugrView<Node = N>) {
         let node_data = UnsupportedNode {
             component: self.components.new_set(),
         };
@@ -63,7 +62,7 @@ impl<N: HugrNode> UnsupportedTracker<N> {
 
         // Take the union of the component with any currently tracked incoming
         // neighbour.
-        for neighbour in circ.hugr().input_neighbours(node) {
+        for neighbour in hugr.input_neighbours(node) {
             if let Some(neigh_data) = self.nodes.get(&neighbour) {
                 self.components
                     .union(neigh_data.component, node_data.component);
@@ -92,14 +91,14 @@ impl<N: HugrNode> UnsupportedTracker<N> {
         // and use it here. For now we just traverse all unextracted nodes.
         let mut nodes = BTreeSet::new();
         nodes.insert(node);
-        for (&n, data) in &self.nodes {
-            if self.components.find_mut(data.component) == representative {
-                nodes.insert(n);
-            }
-        }
-        for n in &nodes {
-            self.nodes.remove(n);
-        }
+
+        nodes.extend(
+            self.nodes
+                .extract_if(.., |_, data| {
+                    self.components.find_mut(data.component) == representative
+                })
+                .map(|(n, _)| n),
+        );
 
         OpaqueSubgraph::try_from_nodes(nodes, hugr)
     }
@@ -118,7 +117,7 @@ impl<N: HugrNode> UnsupportedTracker<N> {
 impl<N> Default for UnsupportedTracker<N> {
     fn default() -> Self {
         Self {
-            nodes: HashMap::new(),
+            nodes: BTreeMap::new(),
             components: UnionFind::new_empty(),
         }
     }

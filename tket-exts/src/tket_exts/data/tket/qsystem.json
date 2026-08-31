@@ -1,8 +1,48 @@
 {
-  "version": "0.5.0",
+  "version": "0.6.0",
   "name": "tket.qsystem",
   "types": {},
   "operations": {
+    "FutureToMeasurement": {
+      "extension": "tket.qsystem",
+      "name": "FutureToMeasurement",
+      "description": "Convert a Future<bool> to a Measurement (for compatibility with the TKET quantum extension).",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "tket.futures",
+              "extension_version": "0.2.0",
+              "id": "Future",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "Sum",
+                    "s": "Unit",
+                    "size": 2
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "tket.measurement",
+              "extension_version": "0.1.0",
+              "id": "Measurement",
+              "args": [],
+              "bound": "C"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
     "LazyMeasure": {
       "extension": "tket.qsystem",
       "name": "LazyMeasure",
@@ -19,6 +59,7 @@
             {
               "t": "Opaque",
               "extension": "tket.futures",
+              "extension_version": "0.2.0",
               "id": "Future",
               "args": [
                 {
@@ -53,6 +94,7 @@
             {
               "t": "Opaque",
               "extension": "tket.futures",
+              "extension_version": "0.2.0",
               "id": "Future",
               "args": [
                 {
@@ -60,6 +102,7 @@
                   "ty": {
                     "t": "Opaque",
                     "extension": "arithmetic.int.types",
+                    "extension_version": "0.1.0",
                     "id": "int",
                     "args": [
                       {
@@ -97,6 +140,7 @@
             {
               "t": "Opaque",
               "extension": "tket.futures",
+              "extension_version": "0.2.0",
               "id": "Future",
               "args": [
                 {
@@ -109,59 +153,6 @@
                 }
               ],
               "bound": "A"
-            }
-          ]
-        }
-      },
-      "binary": false
-    },
-    "Measure": {
-      "extension": "tket.qsystem",
-      "name": "Measure",
-      "description": "Measure a qubit and lose it.",
-      "signature": {
-        "params": [],
-        "body": {
-          "input": [
-            {
-              "t": "Q"
-            }
-          ],
-          "output": [
-            {
-              "t": "Opaque",
-              "extension": "tket.bool",
-              "id": "bool",
-              "args": [],
-              "bound": "C"
-            }
-          ]
-        }
-      },
-      "binary": false
-    },
-    "MeasureReset": {
-      "extension": "tket.qsystem",
-      "name": "MeasureReset",
-      "description": "Measure a qubit and reset it to the Z |0> eigenstate.",
-      "signature": {
-        "params": [],
-        "body": {
-          "input": [
-            {
-              "t": "Q"
-            }
-          ],
-          "output": [
-            {
-              "t": "Q"
-            },
-            {
-              "t": "Opaque",
-              "extension": "tket.bool",
-              "id": "bool",
-              "args": [],
-              "bound": "C"
             }
           ]
         }
@@ -182,6 +173,7 @@
             {
               "t": "Opaque",
               "extension": "arithmetic.float.types",
+              "extension_version": "0.1.0",
               "id": "float64",
               "args": [],
               "bound": "C"
@@ -189,6 +181,7 @@
             {
               "t": "Opaque",
               "extension": "arithmetic.float.types",
+              "extension_version": "0.1.0",
               "id": "float64",
               "args": [],
               "bound": "C"
@@ -257,6 +250,7 @@
             {
               "t": "Opaque",
               "extension": "collections.array",
+              "extension_version": "0.1.2",
               "id": "array",
               "args": [
                 {
@@ -281,6 +275,7 @@
             {
               "t": "Opaque",
               "extension": "collections.array",
+              "extension_version": "0.1.2",
               "id": "array",
               "args": [
                 {
@@ -308,7 +303,7 @@
     "Rz": {
       "extension": "tket.qsystem",
       "name": "Rz",
-      "description": "Rotate a qubit around the Z axis. Not physical.",
+      "description": "Rotate a qubit around the Z axis. Not physical on Helios or Sol platforms.",
       "signature": {
         "params": [],
         "body": {
@@ -319,6 +314,7 @@
             {
               "t": "Opaque",
               "extension": "arithmetic.float.types",
+              "extension_version": "0.1.0",
               "id": "float64",
               "args": [],
               "bound": "C"
@@ -362,7 +358,7 @@
     "ZZPhase": {
       "extension": "tket.qsystem",
       "name": "ZZPhase",
-      "description": "ZZ gate with an angle.",
+      "description": "ZZ gate with an angle, specific to the Helios platform.",
       "signature": {
         "params": [],
         "body": {
@@ -376,6 +372,7 @@
             {
               "t": "Opaque",
               "extension": "arithmetic.float.types",
+              "extension_version": "0.1.0",
               "id": "float64",
               "args": [],
               "bound": "C"

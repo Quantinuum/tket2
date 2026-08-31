@@ -2,22 +2,26 @@
 
 pub mod chunks;
 pub mod gridsynth;
+mod inline_funcs;
+mod qsystem;
+mod scope;
 pub mod tket1;
+
+use hugr::HugrView;
+pub(crate) use scope::PyPassScope;
 
 use std::{cmp::min, convert::TryInto, fs, num::NonZeroUsize, path::PathBuf};
 
-use hugr::algorithms::ComposablePass;
-use pyo3::{prelude::*, types::IntoPyDict};
+use pyo3::prelude::*;
 use tket::optimiser::badger::BadgerOptions;
-use tket::passes;
-use tket::{TketOp, op_matches};
+use tket::passes::composable::{ComposablePass, WithScope};
+use tket::{Circuit, TketOp};
 
-use crate::circuit::CircuitType;
+use tket::passes;
+
+use crate::optimiser::PyBadgerOptimiser;
+use crate::state::CompilationState;
 use crate::utils::{ConvertPyErr, create_py_exception};
-use crate::{
-    circuit::{try_update_circ, try_with_circ},
-    optimiser::PyBadgerOptimiser,
-};
 
 /// The module definition
 ///
@@ -25,34 +29,66 @@ use crate::{
 pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     let m = PyModule::new(py, "passes")?;
     m.add_function(wrap_pyfunction!(greedy_depth_reduce, &m)?)?;
-    m.add_function(wrap_pyfunction!(lower_to_pytket, &m)?)?;
     m.add_function(wrap_pyfunction!(badger_optimise, &m)?)?;
     m.add_function(wrap_pyfunction!(normalize_guppy, &m)?)?;
+    m.add_function(wrap_pyfunction!(self::inline_funcs::inline_functions, &m)?)?;
     m.add_class::<self::chunks::PyCircuitChunks>()?;
     m.add_function(wrap_pyfunction!(self::chunks::chunks, &m)?)?;
     m.add_function(wrap_pyfunction!(self::gridsynth::gridsynth, &m)?)?;
     m.add_function(wrap_pyfunction!(self::tket1::tket1_pass, &m)?)?;
+    m.add_function(wrap_pyfunction!(resolve_modifiers, &m)?)?;
+    m.add_function(wrap_pyfunction!(qsystem::qsystem_rebase_pass, &m)?)?;
+    m.add_function(wrap_pyfunction!(qsystem::qsystem_llvm_pass, &m)?)?;
     m.add("PullForwardError", py.get_type::<PyPullForwardError>())?;
+    m.add(
+        "InlineFunctionsError",
+        py.get_type::<PyInlineFunctionsError>(),
+    )?;
     m.add("TK1PassError", py.get_type::<tket1::PytketPassError>())?;
+    m.add("GridsynthError", py.get_type::<PyGridsynthError>())?;
     Ok(m)
 }
 
 create_py_exception!(
-    tket::passes::PullForwardError,
+    tket::passes::gridsynth::GridSynthError,
+    PyGridsynthError,
+    "Errors from the gridsynth pass."
+);
+
+create_py_exception!(
+    tket::passes::commutation::PullForwardError,
     PyPullForwardError,
     "Error from a `PullForward` operation"
 );
 
 create_py_exception!(
-    tket::passes::pytket::PytketLoweringError,
-    PyPytketLoweringError,
-    "Errors that can occur while removing high-level operations from HUGR intended to be encoded as a pytket circuit."
+    tket::passes::normalize::NormalizeErrors,
+    PyNormalizeError,
+    "Errors from the normalization pass."
 );
 
 create_py_exception!(
-    tket::passes::guppy::NormalizeGuppyErrors,
-    PyNormalizeGuppyError,
-    "Errors from the Guppy normalization pass."
+    tket::passes::modifier_resolver::ModifierResolverErrors,
+    PyModifierResolverError,
+    "Errors from the modifer resolver pass."
+);
+
+create_py_exception!(
+    tket::passes::inline_funcs::InlineFuncsError,
+    PyInlineFunctionsError,
+    "Errors from the function inlining pass."
+);
+
+create_py_exception!(
+    tket_qsystem::QSystemRebasePassError,
+    PyQSystemRebasePassError,
+    "Errors from the QSystem rebase pass."
+);
+
+create_py_exception!(
+    tket_qsystem::QSystemLLVMPassError,
+    PyQSystemLLVMPassError,
+    "Errors from the QSystem pre-LLVM pass."
 );
 
 /// Flatten the structure of a Guppy-generated program to enable additional optimisations.
@@ -60,96 +96,63 @@ create_py_exception!(
 /// This should normally be called first before other optimisations.
 ///
 /// Parameters:
+/// - resolve_modifiers: Whether to resolve modifier operations.
 /// - simplify_cfgs: Whether to simplify CFG control flow.
 /// - remove_tuple_untuple: Whether to remove tuple/untuple operations.
 /// - constant_folding: Whether to constant fold the program.
 /// - remove_dead_funcs: Whether to remove dead functions.
 /// - inline_dfgs: Whether to inline DFG operations.
 /// - remove_redundant_order_edges: Whether to remove redundant order edges.
+/// - squash_borrows: Whether to squash return-borrow pairs on BorrowArrays.
 #[pyfunction]
-#[pyo3(signature = (circ, *, simplify_cfgs = true, remove_tuple_untuple = true, constant_folding = true, remove_dead_funcs = true, inline_dfgs = true, remove_redundant_order_edges = true))]
-fn normalize_guppy<'py>(
-    circ: &Bound<'py, PyAny>,
+#[pyo3(signature = (circ, *, resolve_modifiers = true, simplify_cfgs = true,
+    remove_tuple_untuple = true, constant_folding = true, remove_dead_funcs = true,
+    inline_dfgs = true, inline_funcs = Some(Default::default()),
+    remove_redundant_order_edges = true, squash_borrows = true, scope = None))]
+#[expect(clippy::too_many_arguments)]
+fn normalize_guppy(
+    circ: &mut CompilationState,
+    resolve_modifiers: bool,
     simplify_cfgs: bool,
     remove_tuple_untuple: bool,
     constant_folding: bool,
     remove_dead_funcs: bool,
     inline_dfgs: bool,
+    inline_funcs: Option<inline_funcs::PyInlineFuncsHeuristic>,
     remove_redundant_order_edges: bool,
-) -> PyResult<Bound<'py, PyAny>> {
-    let py = circ.py();
-    try_with_circ(circ, |mut circ, typ| {
-        let mut pass = tket::passes::NormalizeGuppy::default();
+    squash_borrows: bool,
+    scope: Option<PyPassScope>,
+) -> PyResult<()> {
+    let py_scope = scope.unwrap_or_default();
+    let mut pass = tket::passes::Normalize::default_with_scope(py_scope.scope);
 
-        pass.simplify_cfgs(simplify_cfgs)
-            .remove_tuple_untuple(remove_tuple_untuple)
-            .constant_folding(constant_folding)
-            .remove_dead_funcs(remove_dead_funcs)
-            .inline_dfgs(inline_dfgs)
-            .remove_redundant_order_edges(remove_redundant_order_edges);
+    pass.resolve_modifiers(resolve_modifiers)
+        .simplify_cfgs(simplify_cfgs)
+        .remove_tuple_untuple(remove_tuple_untuple)
+        .constant_folding(constant_folding)
+        .remove_dead_funcs(remove_dead_funcs)
+        .inline_dfgs(inline_dfgs)
+        .inline_funcs(inline_funcs.map(|h| h.0))
+        .remove_redundant_order_edges(remove_redundant_order_edges)
+        .squash_borrows(squash_borrows);
 
-        pass.run(circ.hugr_mut()).convert_pyerrs()?;
-
-        let circ = typ.convert(py, circ)?;
-        PyResult::Ok(circ)
-    })
+    pass.run(&mut circ.hugr).convert_pyerrs()?;
+    Ok(())
 }
 
 /// Pass which greedily commutes operations forwards in order to reduce depth.
 #[pyfunction]
-fn greedy_depth_reduce<'py>(circ: &Bound<'py, PyAny>) -> PyResult<(Bound<'py, PyAny>, u32)> {
-    let py = circ.py();
-    try_with_circ(circ, |mut circ, typ| {
-        let n_moves = passes::apply_greedy_commutation(&mut circ).convert_pyerrs()?;
-        let circ = typ.convert(py, circ)?;
-        PyResult::Ok((circ, n_moves))
-    })
-}
-
-/// Rebase a circuit to the Nam gate set (CX, Rz, H) using TKET1.
-///
-/// Equivalent to running the following code:
-/// ```python
-/// from pytket.passes import AutoRebase
-/// from pytket import OpType
-/// AutoRebase({OpType.CX, OpType.Rz, OpType.H}).apply(circ)"
-// ```
-fn rebase_nam(circ: &Bound<PyAny>) -> PyResult<()> {
-    let py = circ.py();
-    let auto_rebase = py.import("pytket.passes")?.getattr("AutoRebase")?;
-    let optype = py.import("pytket")?.getattr("OpType")?;
-    let locals = [("OpType", &optype)].into_py_dict(py)?;
-    let op_set = py.eval(c"{OpType.CX, OpType.Rz, OpType.H}", None, Some(&locals))?;
-    let rebase_pass = auto_rebase.call1((op_set,))?.getattr("apply")?;
-    rebase_pass.call1((circ,)).map(|_| ())
-}
-
-/// A pass that removes high-level control flow from a HUGR, so it can be used in pytket.
-#[pyfunction]
-fn lower_to_pytket<'py>(circ: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
-    let py = circ.py();
-    try_with_circ(circ, |circ, typ| match typ {
-        CircuitType::Tket1 => {
-            // If the circuit is already in tket1 format, just return it.
-            let circ = typ.convert(py, circ)?;
-            PyResult::Ok(circ)
-        }
-        CircuitType::Tket => {
-            let circ = passes::lower_to_pytket(&circ).convert_pyerrs()?;
-            let circ = typ.convert(py, circ)?;
-            PyResult::Ok(circ)
-        }
-    })
+fn greedy_depth_reduce(circ: &mut CompilationState) -> PyResult<u32> {
+    let mut c = Circuit::new(circ.hugr.clone());
+    let n_moves = passes::apply_greedy_commutation(&mut c).convert_pyerrs()?;
+    circ.hugr = c.into_hugr();
+    Ok(n_moves)
 }
 
 /// Badger optimisation pass.
 ///
 /// HyperTKET's best attempt at optimising a circuit using circuit rewriting
 /// and the given Badger optimiser.
-///
-/// By default, the input circuit will be rebased to Nam, i.e. CX + Rz + H before
-/// optimising. This can be deactivated by setting `rebase` to `false`, in which
-/// case the circuit is expected to be in the Nam gate set.
 ///
 /// Will use at most `max_threads` threads (plus a constant). Defaults to the
 /// number of CPUs available.
@@ -164,29 +167,22 @@ fn lower_to_pytket<'py>(circ: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>>
 ///
 /// Log files will be written to the directory `log_dir` if specified.
 #[pyfunction]
-#[expect(clippy::too_many_arguments)]
-#[pyo3(signature = (circ, optimiser, max_threads=None, timeout=None, progress_timeout=None, max_circuit_count=None, log_dir=None, rebase=None))]
-fn badger_optimise<'py>(
-    circ: &Bound<'py, PyAny>,
+#[pyo3(signature = (circ, optimiser, max_threads=None, timeout=None, progress_timeout=None, max_circuit_count=None, log_dir=None))]
+fn badger_optimise(
+    circ: &mut CompilationState,
     optimiser: &PyBadgerOptimiser,
     max_threads: Option<NonZeroUsize>,
     timeout: Option<u64>,
     progress_timeout: Option<u64>,
     max_circuit_count: Option<usize>,
     log_dir: Option<PathBuf>,
-    rebase: Option<bool>,
-) -> PyResult<Bound<'py, PyAny>> {
+) -> PyResult<()> {
     // Default parameter values
-    let rebase = rebase.unwrap_or(true);
     let max_threads = max_threads.unwrap_or(num_cpus::get().try_into().unwrap());
     let timeout = timeout.unwrap_or(30);
     // Create log directory if necessary
     if let Some(log_dir) = log_dir.as_ref() {
         fs::create_dir_all(log_dir)?;
-    }
-    // Rebase circuit
-    if rebase {
-        rebase_nam(circ)?;
     }
     // Logic to choose how to split the circuit
     let badger_splits = |n_threads: NonZeroUsize| match n_threads.get() {
@@ -203,32 +199,43 @@ fn badger_optimise<'py>(
         _ => unreachable!(),
     };
     // Optimise
-    try_update_circ(circ, |mut circ, _| {
-        let n_cx = circ
-            .commands()
-            .filter(|c| op_matches(c.optype(), TketOp::CX))
-            .count();
-        let n_threads = min(
-            (n_cx / 50).try_into().unwrap_or(1.try_into().unwrap()),
-            max_threads,
-        );
-        let (split_threads, split_timeouts) = badger_splits(n_threads);
-        for (i, (n_threads, timeout)) in split_threads.into_iter().zip(split_timeouts).enumerate() {
-            let log_file = log_dir.as_ref().map(|log_dir| {
-                let mut log_file = log_dir.clone();
-                log_file.push(format!("cycle-{i}.log"));
-                log_file
-            });
-            let options = BadgerOptions {
-                timeout: Some(timeout),
-                progress_timeout,
-                n_threads: n_threads.try_into().unwrap(),
-                split_circuit: true,
-                max_circuit_count,
-                ..Default::default()
-            };
-            circ = optimiser.optimise(circ, log_file, options);
-        }
-        PyResult::Ok(circ)
-    })
+    let c = Circuit::new(&circ.hugr);
+    let n_cx = c
+        .toposorted_children(c.parent())
+        .expect("circuit entrypoint should be dataflow region")
+        .filter(|&n| c.hugr().get_optype(n).cast::<TketOp>() == Some(TketOp::CX))
+        .count();
+    let n_threads = min(
+        (n_cx / 50).try_into().unwrap_or(1.try_into().unwrap()),
+        max_threads,
+    );
+    let (split_threads, split_timeouts) = badger_splits(n_threads);
+    let mut optimised = Circuit::new(circ.hugr.clone());
+    for (i, (n_threads, timeout)) in split_threads.into_iter().zip(split_timeouts).enumerate() {
+        let log_file = log_dir.as_ref().map(|log_dir| {
+            let mut log_file = log_dir.clone();
+            log_file.push(format!("cycle-{i}.log"));
+            log_file
+        });
+        let options = BadgerOptions {
+            timeout: Some(timeout),
+            progress_timeout,
+            n_threads: n_threads.try_into().unwrap(),
+            split_circuit: true,
+            max_circuit_count,
+            ..Default::default()
+        };
+        optimised = optimiser.optimise(optimised, log_file, options);
+    }
+    circ.hugr = optimised.into_hugr();
+    Ok(())
+}
+
+#[pyfunction]
+#[pyo3(signature = (circ, scope = None))]
+fn resolve_modifiers(circ: &mut CompilationState, scope: Option<PyPassScope>) -> PyResult<()> {
+    let py_scope = scope.unwrap_or_default();
+    let pass = tket::passes::ModifierResolverPass::default_with_scope(py_scope.scope);
+    pass.run(&mut circ.hugr).convert_pyerrs()?;
+    Ok(())
 }

@@ -1,5 +1,5 @@
 //! Configuration for converting [`tket_json_rs::circuit_json::SerialCircuit`]
-//! into [`Circuit`]s.
+//! into Hugrs.
 //!
 //! A configuration struct contains a list of custom decoders that define
 //! translations of legacy tket primitives into HUGR operations.
@@ -19,7 +19,7 @@ use crate::serialize::pytket::extension::{PytketDecoder, PytketTypeTranslator, R
 use super::TypeTranslatorSet;
 
 /// Configuration for converting [`tket_json_rs::circuit_json::SerialCircuit`]
-/// into [`Circuit`][crate::Circuit].
+/// into Hugrs.
 ///
 /// Contains custom decoders that define translations for HUGR operations,
 /// types, and consts into pytket primitives.
@@ -104,7 +104,7 @@ impl PytketDecoderConfig {
     /// Translate a HUGR type into a count of qubits, bits, and parameters,
     /// using the registered custom translator.
     ///
-    /// Only tuple sums, bools, and custom types are supported.
+    /// Only bools, parameter types, and registered custom types are supported.
     /// Other types will return `None`.
     pub fn type_to_pytket(&self, typ: &Type) -> Option<RegisterCount> {
         self.type_translators.type_to_pytket(typ)

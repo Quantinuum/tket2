@@ -1,4 +1,4 @@
-//! Configuration for converting [`Circuit`]s into
+//! Configuration for converting Hugrs into
 //! [`tket_json_rs::circuit_json::SerialCircuit`]
 //!
 //! A configuration struct contains a list of custom emitters that define
@@ -10,9 +10,8 @@ use hugr::extension::{ExtensionId, ExtensionSet};
 use hugr::ops::{ExtensionOp, Value};
 use hugr::types::{SumType, Type};
 
-use crate::Circuit;
-use crate::serialize::pytket::encoder::EncodeStatus;
-use crate::serialize::pytket::extension::{PytketTypeTranslator, RegisterCount, set_bits_op};
+use crate::serialize::pytket::encoder::{EncodeStatus, make_tk1_classical_operation};
+use crate::serialize::pytket::extension::{PytketTypeTranslator, RegisterCount};
 use crate::serialize::pytket::{PytketEmitter, PytketEncodeError};
 
 use super::super::encoder::{PytketEncoderContext, TrackedValues};
@@ -20,7 +19,7 @@ use super::TypeTranslatorSet;
 use hugr::HugrView;
 use itertools::Itertools;
 
-/// Configuration for converting [`Circuit`] into
+/// Configuration for converting Hugrs into
 /// [`tket_json_rs::circuit_json::SerialCircuit`].
 ///
 /// Contains custom emitters that define translations for HUGR operations,
@@ -39,6 +38,17 @@ pub struct PytketEncoderConfig<H: HugrView> {
     no_extension_emitters: Vec<usize>,
     /// Set of type translators used to translate HUGR types into pytket registers.
     type_translators: TypeTranslatorSet,
+}
+
+/// Return a pytket operation setting the values of a list of bits.
+pub(crate) fn set_bits_op(values: &[bool]) -> tket_json_rs::circuit_json::Operation {
+    make_tk1_classical_operation(
+        tket_json_rs::OpType::SetBits,
+        values.len(),
+        tket_json_rs::circuit_json::Classical::SetBits {
+            values: values.to_vec(),
+        },
+    )
 }
 
 impl<H: HugrView> PytketEncoderConfig<H> {
@@ -91,13 +101,13 @@ impl<H: HugrView> PytketEncoderConfig<H> {
         &self,
         node: H::Node,
         op: &ExtensionOp,
-        circ: &Circuit<H>,
+        hugr: &H,
         encoder: &mut PytketEncoderContext<H>,
     ) -> Result<EncodeStatus, PytketEncodeError<H::Node>> {
         let mut result = EncodeStatus::Unsupported;
         let extension = op.def().extension_id();
         for enc in self.emitters_for_extension(extension) {
-            if enc.op_to_pytket(node, op, circ, encoder)? == EncodeStatus::Success {
+            if enc.op_to_pytket(node, op, hugr, encoder)? == EncodeStatus::Success {
                 result = EncodeStatus::Success;
                 break;
             }
@@ -154,7 +164,6 @@ impl<H: HugrView> PytketEncoderConfig<H> {
                         return Ok(None);
                     }
                 }
-                _ => return Ok(None),
             }
         }
         Ok(Some(values))
@@ -163,7 +172,7 @@ impl<H: HugrView> PytketEncoderConfig<H> {
     /// Translate a HUGR type into a count of qubits, bits, and parameters,
     /// using the registered custom translator.
     ///
-    /// Only tuple sums, bools, and custom types are supported.
+    /// Only bools, parameter types, and registered custom types are supported.
     /// Other types will return `None`.
     pub fn type_to_pytket(&self, typ: &Type) -> Option<RegisterCount> {
         self.type_translators.type_to_pytket(typ)

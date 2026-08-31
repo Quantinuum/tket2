@@ -2,14 +2,18 @@
 
 pub mod portmatching;
 
-use crate::circuit::Tk2Circuit;
+use anyhow::Context;
+
+use crate::passes::PyPassScope;
 use crate::rewrite::PyCircuitRewrite;
+use crate::state::CompilationState;
 use crate::utils::{ConvertPyErr, create_py_exception};
 
-use hugr::{HugrView, Node};
+use hugr::{HugrView, Node, hugr::hugrmut::HugrMut};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use tket::Circuit;
 use tket::portmatching::{CircuitPattern, PatternMatch, PatternMatcher};
+use tket::{Circuit, CircuitError};
 
 /// The module definition
 pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
@@ -46,39 +50,64 @@ create_py_exception!(
 );
 
 #[derive(Clone)]
-#[pyclass]
+#[pyclass(from_py_object)]
 /// A rewrite rule defined by a left hand side and right hand side of an equation.
 pub struct Rule(pub [Circuit; 2]);
+
+fn rule_circuit(state: &CompilationState) -> PyResult<Circuit> {
+    let mut hugr = state.hugr.clone();
+
+    if hugr.get_optype(hugr.entrypoint()).is_module() {
+        let module = hugr.entrypoint();
+        let entrypoint = {
+            let mut children = hugr.children(module);
+            let entrypoint = children
+                .next()
+                .ok_or_else(|| PyValueError::new_err("Rule module contains no circuit"))?;
+
+            if children.next().is_some() {
+                return Err(PyValueError::new_err(
+                    "Rule module must contain exactly one circuit",
+                ));
+            }
+
+            entrypoint
+        };
+
+        hugr.set_entrypoint(entrypoint);
+    }
+
+    Circuit::try_new(hugr).map_err(|error| PyValueError::new_err(error.to_string()))
+}
 
 #[pymethods]
 impl Rule {
     #[new]
-    fn new_rule(l: &Bound<PyAny>, r: &Bound<PyAny>) -> PyResult<Rule> {
-        let l = Tk2Circuit::new(l)?;
-        let r = Tk2Circuit::new(r)?;
-
-        Ok(Rule([l.circ, r.circ]))
+    fn new_rule(l: &CompilationState, r: &CompilationState) -> PyResult<Rule> {
+        let l = rule_circuit(l)?;
+        let r = rule_circuit(r)?;
+        Ok(Rule([l, r]))
     }
 
     /// The left hand side of the rule.
     ///
     /// This is the pattern that will be matched against the target circuit.
-    fn lhs(&self) -> Tk2Circuit {
-        Tk2Circuit {
-            circ: self.0[0].clone(),
+    fn lhs(&self) -> CompilationState {
+        CompilationState {
+            hugr: self.0[0].clone().into_hugr(),
         }
     }
 
     /// The right hand side of the rule.
     ///
     /// This is the replacement that will be applied to the target circuit.
-    fn rhs(&self) -> Tk2Circuit {
-        Tk2Circuit {
-            circ: self.0[1].clone(),
+    fn rhs(&self) -> CompilationState {
+        CompilationState {
+            hugr: self.0[1].clone().into_hugr(),
         }
     }
 }
-#[pyclass]
+#[pyclass(skip_from_py_object)]
 struct RuleMatcher {
     matcher: PatternMatcher,
     rights: Vec<Circuit>,
@@ -97,20 +126,63 @@ impl RuleMatcher {
         Ok(Self { matcher, rights })
     }
 
-    pub fn find_match(&self, target: &Tk2Circuit) -> PyResult<Option<PyCircuitRewrite>> {
-        let circ = &target.circ;
-        let Some(pmatch) = self.matcher.find_matches_iter(circ).next() else {
+    pub fn find_match(&self, target: &CompilationState) -> PyResult<Option<PyCircuitRewrite>> {
+        let circ = Circuit::try_new(&target.hugr)
+            .map_err(|error| PyValueError::new_err(error.to_string()))?;
+        let Some(pmatch) = self.matcher.find_matches_iter(&circ).next() else {
             return Ok(None);
         };
-        Ok(Some(self.match_to_rewrite(pmatch, circ)?))
+        Ok(Some(self.match_to_rewrite(pmatch, &circ)?))
     }
 
-    pub fn find_matches(&self, target: &Tk2Circuit) -> PyResult<Vec<PyCircuitRewrite>> {
-        let circ = &target.circ;
+    pub fn find_matches(&self, target: &CompilationState) -> PyResult<Vec<PyCircuitRewrite>> {
+        let circ = Circuit::try_new(&target.hugr)
+            .map_err(|error| PyValueError::new_err(error.to_string()))?;
         self.matcher
-            .find_matches_iter(circ)
-            .map(|m| self.match_to_rewrite(m, circ))
+            .find_matches_iter(&circ)
+            .map(|m| self.match_to_rewrite(m, &circ))
             .collect()
+    }
+
+    /// Apply the first matching rule repeatedly within each circuit-compatible
+    /// region in the selected scope.
+    ///
+    /// Non-circuit regions are skipped. Returns the number of rewrites applied
+    /// and restores the original HUGR entrypoint before returning.
+    ///
+    /// Returns a count of applied rewrites.
+    #[pyo3(signature = (target, scope = None))]
+    pub fn apply_exhaustive(
+        &self,
+        target: &mut CompilationState,
+        scope: Option<PyPassScope>,
+    ) -> anyhow::Result<usize> {
+        let scope = scope.unwrap_or_default().scope;
+        let original_entrypoint = target.hugr.entrypoint();
+        let regions: Vec<_> = scope.regions(&target.hugr).collect();
+
+        let result = (|| {
+            let mut rewrite_count = 0;
+            for region in regions {
+                target.hugr.set_entrypoint(region);
+                match Circuit::try_new(&target.hugr) {
+                    Ok(_) => {}
+                    Err(CircuitError::InvalidParentOp { .. }) => continue,
+                    Err(error) => return Err(anyhow::Error::msg(error.to_string())),
+                }
+
+                while let Some(rewrite) = self.find_match(target)? {
+                    target
+                        .apply_rewrite(rewrite)
+                        .context("Could not apply exhaustive rule rewrite")?;
+                    rewrite_count += 1;
+                }
+            }
+            Ok(rewrite_count)
+        })();
+
+        target.hugr.set_entrypoint(original_entrypoint);
+        result
     }
 }
 

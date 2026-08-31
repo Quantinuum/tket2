@@ -1,7 +1,9 @@
 # Build artifacts
 /target
 tket-py/target/
+pg-libs/target/
 /dist
+/wheelhouse
 
 # Python caches
 __pycache__
@@ -38,6 +40,12 @@ jupyter_execute/
 
 # binaries
 *.so
+*.dylib
+*.dylib.yml
+*.plist
 
 # a reserved working dir for local experimentation
 /scratch
+
+# vscode settings
+.vscode

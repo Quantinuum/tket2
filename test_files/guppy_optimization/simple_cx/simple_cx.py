@@ -1,7 +1,8 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang >=0.21.6",
+#     "guppylang==1.0.0a5",
+#     "guppylang-internals==1.0.0a5",
 # ]
 # ///
 
@@ -9,8 +10,8 @@ from pathlib import Path
 from sys import argv
 
 from guppylang import guppy
-from guppylang.std.quantum import cx, measure, qubit
 from guppylang.std.builtins import result
+from guppylang.std.quantum import cx, measure, qubit
 
 
 @guppy
@@ -21,8 +22,8 @@ def main() -> None:
     b1 = measure(q1)
     b2 = measure(q2)
 
-    result("b1", b1)
-    result("b2", b2)
+    result("b1", b1.read())
+    result("b2", b2.read())
 
 
 program = main.compile()

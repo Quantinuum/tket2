@@ -4,8 +4,7 @@ name: Pure Python wheels 🐍
 # This does not include the main `tket-py` package, which is built using maturin.
 # See `python-wheels.yml` for that workflow.
 #
-# When running on a release event or as a workflow dispatch for a tag,
-# and if the tag matches `{package}-v*`,
+# When running on a tag push matching `{package}-v*`,
 # this workflow will publish the wheels to pypi.
 # If the version is already published, pypi just ignores it.
 
@@ -14,63 +13,73 @@ on:
   push:
     branches:
       - main
-  release:
-    types:
-      - published
+    tags:
+      - "tket-eccs-v*"
+      - "tket-exts-v*"
 
 env:
   # Pinned version for the uv package manager
-  UV_VERSION: "0.9.7"
+  UV_VERSION: "0.11.15"
 
 jobs:
-  build-publish:
-    name: Package and publish wheels
+  # Check if the tag matches the package name,
+  # or if the workflow is running on a non-tag event.
+  check-tag:
+    name: Check tag
     runs-on: ubuntu-latest
-    environment: release
-    permissions:
-      # IMPORTANT: this permission is mandatory for trusted publishing
-      id-token: write
-    strategy:
-      matrix:
-        target:
-          - { dir: tket-eccs, name: tket_eccs }
-          - { dir: tket-exts, name: tket_exts }
+    outputs:
+      run_exts: ${{ steps.check-tag.outputs.run_exts }}
+      run_eccs: ${{ steps.check-tag.outputs.run_eccs }}
     steps:
-      # Check the release tag against the package name
-      #
-      # Skip the workflow when triggered by a release event for any other package.
       - name: Check tag
         id: check-tag
         run: |
-          echo "run=$SHOULD_RUN" >> $GITHUB_OUTPUT
+          echo "run_exts=$RUN_EXTS" >> $GITHUB_OUTPUT
+          echo "run_eccs=$RUN_ECCS" >> $GITHUB_OUTPUT
         env:
-          SHOULD_RUN: ${{ github.event_name != 'release' || ( github.ref_type == 'tag' && startsWith(github.ref, format('refs/tags/{0}-v', matrix.target.dir)) ) }}
+          RUN_EXTS: ${{ github.ref_type != 'tag' || startsWith(github.ref, 'refs/tags/tket-exts-v') }}
+          RUN_ECCS: ${{ github.ref_type != 'tag' || startsWith(github.ref, 'refs/tags/tket-eccs-v') }}
 
-      - uses: actions/checkout@v6
-        if: ${{ steps.check-tag.outputs.run == 'true' }}
+  build:
+    name: Build and test wheels
+    needs: check-tag
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - dir: tket-eccs
+            name: tket_eccs
+            run: ${{ needs.check-tag.outputs.run_eccs }}
+          - dir: tket-exts
+            name: tket_exts
+            run: ${{ needs.check-tag.outputs.run_exts }}
+
+    steps:
+      - uses: actions/checkout@v7
+        if: ${{ matrix.target.run == 'true' }}
       - name: Run sccache-cache
-        if: ${{ steps.check-tag.outputs.run == 'true' }}
-        uses: mozilla-actions/sccache-action@v0.0.9
+        if: ${{ matrix.target.run == 'true' }}
+        uses: mozilla-actions/sccache-action@v0.0.11
 
       - name: Set up uv
-        if: ${{ steps.check-tag.outputs.run == 'true' }}
+        if: ${{ matrix.target.run == 'true' }}
         uses: astral-sh/setup-uv@v7
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
       - name: Install Python 3.13
         run: uv python install 3.13
-        if: ${{ steps.check-tag.outputs.run == 'true' }}
+        if: ${{ matrix.target.run == 'true' }}
 
       - name: Build sdist and wheels
-        if: ${{ steps.check-tag.outputs.run == 'true' }}
+        if: ${{ matrix.target.run == 'true' }}
         run: |
           cd ${{ matrix.target.dir }}
           uvx --from build pyproject-build --installer uv --outdir ../dist
 
       - name: Upload the built packages as artifacts
-        if: ${{ steps.check-tag.outputs.run == 'true' }}
-        uses: actions/upload-artifact@v6
+        if: ${{ matrix.target.run == 'true' }}
+        uses: actions/upload-artifact@v7
         with:
           name: build-${{ matrix.target.dir }}-sdist
           path: |
@@ -78,24 +87,61 @@ jobs:
             dist/*.whl
 
       - name: Test installing the built wheels
-        if: ${{ steps.check-tag.outputs.run == 'true' }}
+        if: ${{ matrix.target.run == 'true' }}
         run: |
           echo "Testing the newly built ${{ matrix.target.name }} wheels..."
           uv run -f dist --with ${{ matrix.target.name }} --refresh-package ${{ matrix.target.name }} --no-project -- python -c "import ${{ matrix.target.name }}"
           uvx twine check --strict dist/*
 
+  release:
+    name: Release
+    needs: [check-tag, build]
+    runs-on: ubuntu-latest
+    if: ${{ github.ref_type == 'tag' && (startsWith(github.ref, 'refs/tags/tket-eccs-v') || startsWith(github.ref, 'refs/tags/tket-exts-v')) }}
+    environment: release
+    permissions:
+      # IMPORTANT: this permission is mandatory for trusted publishing
+      id-token: write
+      # Used to upload release artifacts
+      contents: write
+      # Used to generate artifact attestation
+      attestations: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check if the tag has an associated release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view ${{ github.ref_name }}; then
+            echo "No release found for tag ${{ github.ref_name }}"
+            exit 1
+          fi
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Generate artifact attestation
+        uses: actions/attest@v4.2.2
+        with:
+          subject-path: "dist/*"
       - name: Report
-        if: ${{ (github.event_name == 'release' && github.ref_type == 'tag' && startsWith(github.ref, format('refs/tags/{0}-v', matrix.target.dir)) ) || (github.event_name == 'workflow_dispatch' && github.ref_type == 'tag' && startsWith(github.ref, format('refs/tags/{0}-v', matrix.target.dir)) ) }}
         run: |
           echo "Publishing to PyPI..."
           echo "Based on the following workflow variables, this is a new version tag push:"
           echo "  - event_name: ${{ github.event_name }}"
           echo "  - ref_type: ${{ github.ref_type }}"
           echo "  - ref: ${{ github.ref }}"
-
       - name: Publish package distributions to PyPI
-        if: ${{ (github.event_name == 'release' && github.ref_type == 'tag' && startsWith(github.ref, format('refs/tags/{0}-v', matrix.target.dir)) ) || (github.event_name == 'workflow_dispatch' && github.ref_type == 'tag' && startsWith(github.ref, format('refs/tags/{0}-v', matrix.target.dir)) ) }}
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           verbose: true
           skip-existing: true
+
+      - name: Upload wheels to the release and un-draft it
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Upload wheels to the release assets
+          gh release upload ${{ github.ref_name }} dist/*
+          # Un-draft the release on GitHub now that the package has been published to PyPI
+          gh release edit ${{ github.ref_name }} --draft=false

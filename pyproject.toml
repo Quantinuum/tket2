@@ -1,28 +1,34 @@
 [tool.uv.workspace]
-members = ["tket-py", "tket-eccs", "tket-exts", "qis-compiler"]
+members = ["tket-py", "tket-eccs", "tket-exts"]
+exclude = ["pg-libs", "qis-compiler"]
 
 [dependency-groups]
 dev = [
-    "maturin >=1.9.2,<2",
-    "pytest>=8.3.2,<10",
+    "maturin>=1.14.1,<2",
+    "pytest>=9.1.1,<10",
     "pytest-cov ~=7.0",
-    "ruff>=0.6.2,<0.15",
-    "mypy >=1.17.1,<2",
-    "hypothesis >=6.111.1,<7",
+    "ruff>=0.16.0,<0.17",
+    "mypy>=2.3.0,<3",
+    "hypothesis>=6.165.0,<7",
+    "hugr~=0.18.3",
     "graphviz ~=0.21.0",
-    "pre-commit ~=4.3",
-    "conan >= 2.23.0,<3",
+    "pre-commit~=4.6",
     # Required to run `maturin develop`
-    "pip >=25",
+    "pip>=26.2",
     # Pyyaml 0.6.0 makes setuptools fail. This ensures we're using a newer version.
     "pyyaml >=6.0.2",
+    # used for tests in tket-py
+    "numpy>=2.2.0",
+    # Guppy language compiler
+    "guppylang>=1.0.1",
 ]
+conan = ["conan>=2.31.1,<3"]
 
 [tool.uv]
 prerelease = "explicit"
 
 [tool.uv.sources]
-# hugr = { git = "https://github.com/quantinuum/hugr", subdirectory = "hugr-py", rev = "191c473" }
+#hugr = { git = "https://github.com/quantinuum/hugr", subdirectory = "hugr-py", rev = "1787e12" }
 
 
 [build-system]
@@ -36,8 +42,6 @@ build-backend = "hatchling.build"
 manifest-path = "tket-py/Cargo.toml"
 python-source = "tket-py"
 module-name = "tket._tket"
-# "extension-module" tells pyo3 we want to build an extension module (skips linking against libpython.so)
-features = ["pyo3/extension-module"]
 
 [tool.mypy]
 exclude = '''(?x)(
@@ -50,6 +54,12 @@ ignore_missing_imports = true
 
 # TODO: Fix the lint errors and enable this
 #strict = true
+
+[tool.ruff.lint]
+ignore = ["EXE"]
+
+[tool.ruff.lint.per-file-ignores]
+"tket-exts/src/tket_exts/tket/**" = ["B019"] # @functools.cache is intentional, few instances exist
 
 [tool.coverage.report]
 exclude_also = [

@@ -16,7 +16,7 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
 }
 
 /// Bounds on the valid operations on a type in a HUGR program.
-#[pyclass(eq, eq_int)]
+#[pyclass(eq, eq_int, skip_from_py_object)]
 #[pyo3(name = "TypeBound")]
 #[derive(PartialEq, Clone, Debug)]
 pub enum PyTypeBound {
@@ -49,7 +49,7 @@ impl From<TypeBound> for PyTypeBound {
 // TODO: These can no longer be constructed from Python. Since `hugr-rs 0.14`
 // we need an extension to defines these.
 // If fixing this, make sure to fix `PyExtensionOp` too.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[pyo3(name = "HugrType")]
 #[repr(transparent)]
 #[derive(From, Into, PartialEq, Clone)]

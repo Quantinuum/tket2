@@ -20,18 +20,19 @@ test = false
 bench = false
 
 [dependencies]
-tket = { path = "../tket", version = "0.16.0", features = [
+tket = { path = "../tket", version = "0.21.2", features = [
     "portmatching",
     "binary-eccs",
 ] }
-tket-qsystem = { path = "../tket-qsystem", version = "0.22.0" }
+tket-qsystem = { path = "../tket-qsystem", version = "0.27.2" }
 tket1-passes = { path = "../tket1-passes", version = "0.0.0" }
 derive_more = { workspace = true, features = ["into", "from"] }
 hugr = { workspace = true }
 itertools = { workspace = true }
 num_cpus = { workspace = true }
 portmatching = { workspace = true }
-pyo3 = { workspace = true, features = ["py-clone", "abi3-py310"] }
+pyo3 = { workspace = true, features = ["py-clone", "abi3-py310", "anyhow"] }
+anyhow = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }

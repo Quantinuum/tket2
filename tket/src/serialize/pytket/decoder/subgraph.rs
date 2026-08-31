@@ -65,9 +65,6 @@ impl<'h> PytketDecoderContext<'h> {
         qubits.iter().for_each(|q| {
             self.wire_tracker.mark_qubit_outdated(q.clone());
         });
-        bits.iter().for_each(|b| {
-            self.wire_tracker.mark_bit_outdated(b.clone());
-        });
 
         Ok(status)
     }
@@ -102,6 +99,8 @@ impl<'h> PytketDecoderContext<'h> {
         )?;
 
         self.rewire_external_subgraph_outputs(id, subgraph, qubits, bits, old_parent, new_parent)?;
+
+        self.rewire_external_subgraph_io_order_edges(subgraph, old_parent, new_parent)?;
 
         Ok(DecodeStatus::Success)
     }
@@ -191,12 +190,12 @@ impl<'h> PytketDecoderContext<'h> {
 
         let mut output_qubits = qubits;
         let mut output_bits = bits;
+        let mut output_param_count = 0;
 
-        for ((out_idx, ty), (src, src_port)) in subgraph
+        for (ty, (src, src_port)) in subgraph
             .signature()
             .output()
             .iter()
-            .enumerate()
             .zip_eq(subgraph.outgoing_ports())
         {
             // Output wire from the subgraph. Depending on the type, we may need
@@ -206,8 +205,20 @@ impl<'h> PytketDecoderContext<'h> {
             if let Some(counts) = self.config().type_to_pytket(ty).filter(|c| c.params == 0) {
                 // This port declares new bit/qubit outputs to be tracked by the decoder.
 
-                // Make sure to disconnect the old wire.
-                self.builder.hugr_mut().disconnect(*src, *src_port);
+                // Disconnect consumers outside the transplanted subgraph. The
+                // output port may also fan out to nodes inside the subgraph,
+                // and those original connections must remain intact.
+                for (target, target_port) in self
+                    .builder
+                    .hugr()
+                    .linked_inputs(*src, *src_port)
+                    .filter(|(target, _)| !subgraph.nodes().contains(target))
+                    .collect_vec()
+                {
+                    self.builder
+                        .hugr_mut()
+                        .disconnect_edge(*src, *src_port, target, target_port);
+                }
 
                 let wire_qubits = output_qubits.split_off(..counts.qubits);
                 let wire_bits = output_bits.split_off(..counts.bits);
@@ -226,14 +237,17 @@ impl<'h> PytketDecoderContext<'h> {
                     wire_bits.unwrap().iter().cloned(),
                 )?;
             } else if PARAMETER_TYPES.contains(ty) {
-                let param_name = id.output_parameter(out_idx);
+                // The encoder names opaque parameter outputs by the number of
+                // parameter values exposed to pytket.
+                let param_name = id.output_parameter(output_param_count);
+                output_param_count += 1;
                 let param = if ty == &rotation_type() {
                     LoadedParameter::rotation(wire)
                 } else {
                     LoadedParameter::float_half_turns(wire)
                 };
                 self.wire_tracker
-                    .register_input_parameter(param, param_name)?;
+                    .bind_parameter(param, param_name, &mut self.builder)?;
             } else {
                 // This is an unsupported wire. If it was connected to the old
                 // region's output, rewire it to the new region's output.
@@ -254,6 +268,74 @@ impl<'h> PytketDecoderContext<'h> {
                     }
                 }
             }
+        }
+
+        Ok(())
+    }
+
+    /// Rewire any order edges betwen the input/output nodes of the old region and the external subgraph,
+    /// connecting them to the new input/output nodes instead.
+    fn rewire_external_subgraph_io_order_edges(
+        &mut self,
+        subgraph: &OpaqueSubgraph<Node>,
+        old_parent: Node,
+        new_parent: Node,
+    ) -> Result<(), PytketDecodeError> {
+        let [old_input, old_output] = self.builder.hugr().get_io(old_parent).expect("IO nodes");
+        let [new_input, new_output] = self.builder.hugr().get_io(new_parent).expect("IO nodes");
+
+        // Find the order edge ports.
+        // Since we are in a dataflow region, nodes are guaranteed to have an order-edge `other_port`s.
+        let order_out = |node: Node| {
+            self.builder
+                .hugr()
+                .get_optype(node)
+                .other_output_port()
+                .expect("Order edge")
+        };
+        let order_in = |node: Node| {
+            self.builder
+                .hugr()
+                .get_optype(node)
+                .other_input_port()
+                .expect("Order edge")
+        };
+        let old_input_order = order_out(old_input);
+        let new_input_order = order_out(new_input);
+        let old_output_order = order_in(old_output);
+        let new_output_order = order_in(new_output);
+
+        for (tgt_node, tgt_port) in self
+            .builder
+            .hugr()
+            .linked_inputs(old_input, old_input_order)
+            .filter(|(node, _)| subgraph.nodes().contains(node))
+            .collect_vec()
+        {
+            self.builder
+                .hugr_mut()
+                .connect(new_input, new_input_order, tgt_node, tgt_port);
+            self.builder
+                .hugr_mut()
+                .disconnect_edge(old_input, old_input_order, tgt_node, tgt_port);
+        }
+
+        for (src_node, src_port) in self
+            .builder
+            .hugr()
+            .linked_outputs(old_output, old_output_order)
+            .filter(|(node, _)| subgraph.nodes().contains(node))
+            .collect_vec()
+        {
+            self.builder
+                .hugr_mut()
+                .connect(src_node, src_port, new_output, new_output_order);
+            self.builder.hugr_mut().disconnect_edge(
+                src_node,
+                src_port,
+                old_output,
+                old_output_order,
+            );
         }
 
         Ok(())

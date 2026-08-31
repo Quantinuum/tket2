@@ -1,6 +1,220 @@
 # Changelog
 
 
+## [0.21.2](https://github.com/Quantinuum/tket2/compare/tket-v0.21.1...tket-v0.21.2) - 2026-07-31
+
+### Bug Fixes
+
+- Parameters used before declaration in pytket decoder ([#1850](https://github.com/Quantinuum/tket2/pull/1850))
+
+### Documentation
+
+- Update the `modifier_resolver` docs ([#1837](https://github.com/Quantinuum/tket2/pull/1837))
+
+### New Features
+
+- Metadata propagation policies for `ReplaceTypes` ([#1783](https://github.com/Quantinuum/tket2/pull/1783))
+- Decode pytket SetBit operations ([#1833](https://github.com/Quantinuum/tket2/pull/1833))
+- Disable pytket encoding for tuple wires ([#1846](https://github.com/Quantinuum/tket2/pull/1846))
+- Raise an error if an unknown extension is found ([#1839](https://github.com/Quantinuum/tket2/pull/1839))
+- improve conditional modification logic in `ModifierResolverPass` ([#1867](https://github.com/Quantinuum/tket2/pull/1867))
+
+### Refactor
+
+- rename `NormalizeGuppy` to `Normalize` ([#1824](https://github.com/Quantinuum/tket2/pull/1824))
+- Higher-order function handling in `ModifierResolverPass` ([#1827](https://github.com/Quantinuum/tket2/pull/1827))
+- Remove leftover todos in `ModifierResolverPass` ([#1838](https://github.com/Quantinuum/tket2/pull/1838))
+- Simplify function modification logic in `modify_fn_if_needed` ([#1842](https://github.com/Quantinuum/tket2/pull/1842))
+
+## [0.21.1](https://github.com/Quantinuum/tket2/compare/tket-v0.21.0...tket-v0.21.1) - 2026-07-09
+
+### Bug Fixes
+
+- Modifier pass trying to connect outputs to outputs ([#1769](https://github.com/Quantinuum/tket2/pull/1769))
+- RedundantOrderEdges pass finding loops when there are none ([#1768](https://github.com/Quantinuum/tket2/pull/1768))
+- ModifierResolverPass generates loops in DFG ([#1777](https://github.com/Quantinuum/tket2/pull/1777))
+- merge_basic_blocks keeps Order edges ([#1782](https://github.com/Quantinuum/tket2/pull/1782))
+- IndirectCall nodes solving in ModifierResolverPass ([#1784](https://github.com/Quantinuum/tket2/pull/1784))
+- prevent Constant Folding disconnecting linear outputs even if constant ([#1793](https://github.com/Quantinuum/tket2/pull/1793))
+- NormalizeCFGs: no need to add Order edges for new Ext edges ([#1813](https://github.com/Quantinuum/tket2/pull/1813))
+- ModifierResolverPass preserve function edges into classical DAG ([#1792](https://github.com/Quantinuum/tket2/pull/1792))
+- `ModifierResolverErrors::UnResolvable` display error message ([#1808](https://github.com/Quantinuum/tket2/pull/1808))
+- ModifierPasses producing invalid hugr with non quantum DAG ([#1817](https://github.com/Quantinuum/tket2/pull/1817))
+
+### New Features
+
+- Improve InlineFuncs size heuristic ([#1771](https://github.com/Quantinuum/tket2/pull/1771))
+- Target platform option in PytketHugrPass ([#1787](https://github.com/Quantinuum/tket2/pull/1787))
+- Decode global phases from pytket circuits ([#1816](https://github.com/Quantinuum/tket2/pull/1816))
+
+### Performance
+
+- Improve rule evaluation order in dataflow analysis ([#1806](https://github.com/Quantinuum/tket2/pull/1806))
+- Pre-compute edge neighbours in dataflow analysis ([#1805](https://github.com/Quantinuum/tket2/pull/1805))
+
+### Refactor
+
+- Deleted redundant modifier guppy tests files ([#1737](https://github.com/Quantinuum/tket2/pull/1737))
+- [**breaking**] remove `ModifierFlags` logic from modifier and `dfg_modify` modules ([#1809](https://github.com/Quantinuum/tket2/pull/1809))
+
+### Testing
+
+- Added a test for PyTket loaded circuits ([#1738](https://github.com/Quantinuum/tket2/pull/1738))
+
+## [0.21.0](https://github.com/Quantinuum/tket2/compare/tket-v0.20.0...tket-v0.21.0) - 2026-06-29
+
+### Bug Fixes
+
+- Propagate metadata to monomorphized nodes ([#1683](https://github.com/Quantinuum/tket2/pull/1683))
+- Gracefully handle datatypes containing type arguments in constant folding ([#1609](https://github.com/Quantinuum/tket2/pull/1609))
+- RemoveDeadFuncsPass removed public function declarations ([#1759](https://github.com/Quantinuum/tket2/pull/1759))
+
+### New Features
+
+- Export extension registries from tket and tket-qsystem ([#1692](https://github.com/Quantinuum/tket2/pull/1692))
+- [**breaking**] Add modifier resolver to normalize guppy ([#1703](https://github.com/Quantinuum/tket2/pull/1703))
+- Add modifier passes to benchmarks ([#1708](https://github.com/Quantinuum/tket2/pull/1708))
+- Added an error if non quantum tket-op are modified ([#1739](https://github.com/Quantinuum/tket2/pull/1739))
+- [**breaking**] update to hugr 0.29.0/hugr-py 0.18.0, tone down RedundantOrderEdgesPass ([#1742](https://github.com/Quantinuum/tket2/pull/1742))
+- [**breaking**] include InlineFuncsPass in NormalizeGuppy and improve pass ordering ([#1754](https://github.com/Quantinuum/tket2/pull/1754))
+- [**breaking**] Rename `tket.hint.max_qubits` to `tket.hint.expected_qubits` ([#1765](https://github.com/Quantinuum/tket2/pull/1765))
+
+### Refactor
+
+- *(trivial)* RemoveDeadFuncs: add comment ([#1760](https://github.com/Quantinuum/tket2/pull/1760))
+
+## [0.20.0](https://github.com/Quantinuum/tket2/compare/tket-v0.19.0...tket-v0.20.0) - 2026-06-11
+
+### Bug Fixes
+
+- Modifier passes bugs with indirect call node ([#1634](https://github.com/Quantinuum/tket2/pull/1634))
+- Support type arguments in tuple/untuple pass ([#1583](https://github.com/Quantinuum/tket2/pull/1583))
+
+### New Features
+
+- [**breaking**] Raise an error when `power` modifier is present ([#1644](https://github.com/Quantinuum/tket2/pull/1644))
+- [**breaking**] Add `measurement` extension and change `tket.quantum` / `tket.qsystem` extension measurement ops return type ([#1558](https://github.com/Quantinuum/tket2/pull/1558))
+- Encode measurements followed by reads as pytket measurements ([#1658](https://github.com/Quantinuum/tket2/pull/1658))
+- [**breaking**] Upgrade hugr dependency to 0.28.0 ([#1580](https://github.com/Quantinuum/tket2/pull/1580))
+- Support debug info in qis-compiler ([#1521](https://github.com/Quantinuum/tket2/pull/1521))
+- Rename `unitary` metadata to `tket.unitary` ([#1669](https://github.com/Quantinuum/tket2/pull/1669))
+- [**breaking**] Remove deprecated definitions ([#1670](https://github.com/Quantinuum/tket2/pull/1670))
+
+### Refactor
+
+- Remove `power` from unitary metadata ([#1666](https://github.com/Quantinuum/tket2/pull/1666))
+
+## [0.19.0](https://github.com/Quantinuum/tket2/compare/tket-v0.18.0...tket-v0.19.0) - 2026-05-28
+
+### Bug Fixes
+
+- Apply modifiers through function calls ([#1531](https://github.com/Quantinuum/tket2/pull/1531))
+- Incorrect matching of pytket parameters to unsupported graph ports ([#1561](https://github.com/Quantinuum/tket2/pull/1561))
+- [**breaking**] Passes with Nested Modifier ([#1546](https://github.com/Quantinuum/tket2/pull/1546))
+- bug in hugr building when `control` modifiers are nested ([#1550](https://github.com/Quantinuum/tket2/pull/1550))
+- Multiple fixes to the pytket encoder ([#1566](https://github.com/Quantinuum/tket2/pull/1566))
+- [**breaking**] Replace non-deterministic iterations on hash maps ([#1582](https://github.com/Quantinuum/tket2/pull/1582))
+- Set inputs of functions loaded as values to top during dataflow analysis ([#1595](https://github.com/Quantinuum/tket2/pull/1595))
+- Using indexes inside dagger modifier ([#1588](https://github.com/Quantinuum/tket2/pull/1588))
+- address Miri unsoundness by installing nextest and skipping FFI/long running tests ([#1565](https://github.com/Quantinuum/tket2/pull/1565))
+- skip test_nested_array to resolve miri unsoundness ([#1623](https://github.com/Quantinuum/tket2/pull/1623))
+
+### New Features
+
+- *(const-fold)* combine Consts for each out-port; write prepopulated inputs ([#1489](https://github.com/Quantinuum/tket2/pull/1489))
+- InlineFunctionsPass ([#1524](https://github.com/Quantinuum/tket2/pull/1524))
+- upgrade to hugr v0.27.1 ([#1568](https://github.com/Quantinuum/tket2/pull/1568))
+- [**breaking**] Ignore empty circuits when encoding Hugr regions into pytket ([#1562](https://github.com/Quantinuum/tket2/pull/1562))
+- Add python definitions for the TKET metadata keys ([#1535](https://github.com/Quantinuum/tket2/pull/1535))
+- Clean Up by Deleting Unconnected Nodes after Modifier Solve ([#1557](https://github.com/Quantinuum/tket2/pull/1557))
+- InlineHint metadata ([#1532](https://github.com/Quantinuum/tket2/pull/1532))
+- Allowing control flow in `control` ([#1603](https://github.com/Quantinuum/tket2/pull/1603))
+
+### Performance
+
+- Improve modifier resolver pass by visiting nodes in a set ([#1621](https://github.com/Quantinuum/tket2/pull/1621))
+- Avoid string formatting in Hugr op hashing ([#1624](https://github.com/Quantinuum/tket2/pull/1624))
+
+### Refactor
+
+- Replace portgraph toposort in CommandIterator with node vector ([#1608](https://github.com/Quantinuum/tket2/pull/1608))
+- [**breaking**] Deprecate commands iterator ([#1611](https://github.com/Quantinuum/tket2/pull/1611))
+
+### Testing
+
+- Pin guppy version in example files, fix test ([#1534](https://github.com/Quantinuum/tket2/pull/1534))
+- Skip slow modifier test ([#1587](https://github.com/Quantinuum/tket2/pull/1587))
+- Add modifier test for subscripted control qubits ([#1601](https://github.com/Quantinuum/tket2/pull/1601))
+
+## [0.18.0](https://github.com/Quantinuum/tket2/compare/tket-v0.17.0...tket-v0.18.0) - 2026-04-02
+
+This release bumps `hugr` to 0.27.0 and reworks the pytket encoding/decoding API to use raw `Hugr`s.
+The `tket::passes` module now contains the passes previously available in `hugr_passes`.
+
+### Bug Fixes
+
+- *(pytket decoder)* Panic on repeated bit registers in pytket decoded output ([#1445](https://github.com/Quantinuum/tket2/pull/1445))
+- pytket encoder drops order edges to the output node ([#1466](https://github.com/Quantinuum/tket2/pull/1466))
+
+### Documentation
+
+- Fix tket README introductory example ([#1463](https://github.com/Quantinuum/tket2/pull/1463))
+
+### New Features
+
+- [**breaking**] Use raw Hugrs in pytket encoding/decoding API ([#1418](https://github.com/Quantinuum/tket2/pull/1418))
+- [**breaking**] Remove unused `lower_to_pytket` pass ([#1431](https://github.com/Quantinuum/tket2/pull/1431))
+- [**breaking**] Replace CircuitHash with hugr's implementation ([#1420](https://github.com/Quantinuum/tket2/pull/1420))
+- [**breaking**] Update MSRV to rust 1.91 ([#1446](https://github.com/Quantinuum/tket2/pull/1446))
+- [**breaking**] Update to hugr 0.26.0 ([#1448](https://github.com/Quantinuum/tket2/pull/1448))
+- [**breaking**] Follow pass scopes in composable passes ([#1429](https://github.com/Quantinuum/tket2/pull/1429))
+- Implemented `post_opdef` for `RotationOp` for constant folding ([#1468](https://github.com/Quantinuum/tket2/pull/1468))
+- [**breaking**] Reorganize `tket::passes` and add `hugr_passes` re-exports ([#1472](https://github.com/Quantinuum/tket2/pull/1472))
+- [**breaking**] Bump `hugr` dependency to 0.27.0 ([#1488](https://github.com/Quantinuum/tket2/pull/1488))
+- Move hugr-passes implementations to tket::passes ([#1487](https://github.com/Quantinuum/tket2/pull/1487))
+- Pass scopes in python API, update to hugr-py 0.16 ([#1464](https://github.com/Quantinuum/tket2/pull/1464))
+
+### Refactor
+
+- *(llvm)* use llvm.is.fpclass for from_halfturns ([#1457](https://github.com/Quantinuum/tket2/pull/1457))
+
+### Testing
+
+- Fixed signatures when decoding pytket circuits ([#1405](https://github.com/Quantinuum/tket2/pull/1405))
+
+## [0.17.0](https://github.com/Quantinuum/tket2/compare/tket-v0.16.0...tket-v0.17.0) - 2026-02-02
+
+### Bug Fixes
+
+- *(encoded-circ)* Track unsupported wires between input and output ([#1224](https://github.com/Quantinuum/tket2/pull/1224))
+- Multiple fixes to the pytket encoder ([#1226](https://github.com/Quantinuum/tket2/pull/1226))
+- Don't use opgroup in pytket barrier encoding ([#1251](https://github.com/Quantinuum/tket2/pull/1251))
+- guppy_to_circuit always returns num_operations = 0 ([#1200](https://github.com/Quantinuum/tket2/pull/1200))
+- *(pytket-decoder)* Avoid QAllocating and immediately freeing qubits ([#1256](https://github.com/Quantinuum/tket2/pull/1256))
+- Encoding of opaque subgraphs with no associated qubit/bit ([#1295](https://github.com/Quantinuum/tket2/pull/1295))
+- [**breaking**] Don't rely on command params for pytket barriers ([#1298](https://github.com/Quantinuum/tket2/pull/1298))
+- Track output qubits in CircuitInfo ([#1304](https://github.com/Quantinuum/tket2/pull/1304))
+- Wrongly reused qubit IDs in pytket encoding ([#1358](https://github.com/Quantinuum/tket2/pull/1358))
+
+### New Features
+
+- Deprecate local find_tuple_unpack rewrite ([#1188](https://github.com/Quantinuum/tket2/pull/1188))
+- Add CopyableExpressionAST ([#1209](https://github.com/Quantinuum/tket2/pull/1209))
+- `NormalizeGuppy` pass to simplify generated structure ([#1220](https://github.com/Quantinuum/tket2/pull/1220))
+- [**breaking**] pytket EncodedCircuit struct for in-place pytket optimisation ([#1211](https://github.com/Quantinuum/tket2/pull/1211))
+- [**breaking**] Interval is independent of resource IDs and scope position ([#1205](https://github.com/Quantinuum/tket2/pull/1205))
+- Don't translate usizes to pytket ([#1241](https://github.com/Quantinuum/tket2/pull/1241))
+- BorrowSquashPass to elide redundant borrow/return ops ([#1159](https://github.com/Quantinuum/tket2/pull/1159))
+- [**breaking**] Bump hugr to 0.25.0 ([#1325](https://github.com/Quantinuum/tket2/pull/1325))
+- Remove order edges in NormalizeGuppy pass ([#1326](https://github.com/Quantinuum/tket2/pull/1326))
+- [**breaking**] Remove deprecated unpack tuple pass ([#1387](https://github.com/Quantinuum/tket2/pull/1387))
+
+### Refactor
+
+- Remove contain_qubits, use TypeUnpacker ([#1283](https://github.com/Quantinuum/tket2/pull/1283))
+- [**breaking**] Replace Subcircuit with SiblingSubgraph ([#1288](https://github.com/Quantinuum/tket2/pull/1288))
+- *(metadata)* [**breaking**] Migrate all metadata keys onto the new metadata traits ([#1328](https://github.com/Quantinuum/tket2/pull/1328))
+
 ## [0.16.0](https://github.com/quantinuum/tket2/compare/tket-v0.15.0...tket-v0.16.0) - 2025-10-20
 
 ### Bug Fixes
