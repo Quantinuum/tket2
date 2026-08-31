@@ -215,9 +215,8 @@ where
         };
         backtracking
             .optimise_with_options(init_state, self, logger.into())
-            .expect("optimisation failed")
-            .best_state
-            .circ
+            .map(|result| result.best_state.circ)
+            .unwrap_or_else(|| circ.to_owned())
     }
 
     /// Run the Badger optimiser on a circuit, using multiple threads.

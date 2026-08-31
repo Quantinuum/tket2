@@ -81,8 +81,7 @@ impl CircuitPattern {
                     .expect("invalid circuit")
             })
             .collect_vec();
-        if let Some((to_node, to_port)) = inputs.iter().flatten().find(|&&(n, _)| n == out).copied()
-        {
+        if let Some(&(to_node, to_port)) = inputs.iter().flatten().find(|&&(n, _)| n == out) {
             // An input is connected to an output => empty qubit, not allowed.
             let (from_node, from_port): (Node, Port) =
                 hugr.linked_ports(to_node, to_port).next().unwrap();

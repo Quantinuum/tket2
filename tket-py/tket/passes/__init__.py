@@ -300,7 +300,7 @@ class Cliffordize(ComposablePass):
 
     def _run_tk(self, program: _state.CompilationState) -> int:
         """Run the pass on a CompilationState and return the rewrite count."""
-        return _cliffordize_matcher().apply_exhaustive(
+        return _cliffordize_matcher().apply_all_matches_once(
             program._inner,
             scope=self._scope,
         )

@@ -144,15 +144,36 @@ impl RuleMatcher {
             .collect()
     }
 
-    /// Apply the first matching rule repeatedly within each circuit-compatible
-    /// region in the selected scope.
+    /// Find all matching rules once within each circuit-compatible region and apply
+    /// the resulting rewrites.
     ///
-    /// Non-circuit regions are skipped. Returns the number of rewrites applied
-    /// and restores the original HUGR entrypoint before returning.
+    /// For each region, this method performs exactly one matching scan against a
+    /// single HUGR snapshot. It constructs all corresponding rewrites from that
+    /// snapshot and then applies them in matcher order.
+    /// If the rewrite produces new matches, they are ignored.
     ///
-    /// Returns a count of applied rewrites.
+    /// Non-circuit regions are skipped. The original HUGR entrypoint is restored
+    /// before returning, including when an error occurs.
+    ///
+    /// Returns the total number of successfully applied rewrites.
+    ///
+    /// ### Validity requirement
+    ///
+    /// To ensure that the rewrites work properly, the following condition must hold.
+    /// All matches returned by the matching scan must have pairwise disjoint
+    /// invalidation sets. In particular, no HUGR node may belong to more than one
+    /// matched subgraph in the same scan.
+    ///
+    /// This condition ensures that applying one rewrite cannot invalidate another
+    /// rewrite constructed from the HUGR state at the beginning of the scan. If the
+    /// condition does not hold, a later rewrite may refer to nodes invalidated by
+    /// an earlier rewrite and must not be applied using this method.
+    ///
+    /// For single-operation rules, such as `T -> S` and `Tdg -> Sdg`, this condition
+    /// is satisfied when each operation node is matched at most once.
+    ///
     #[pyo3(signature = (target, scope = None))]
-    pub fn apply_exhaustive(
+    pub fn apply_all_matches_once(
         &self,
         target: &mut CompilationState,
         scope: Option<PyPassScope>,
@@ -171,7 +192,8 @@ impl RuleMatcher {
                     Err(error) => return Err(anyhow::Error::msg(error.to_string())),
                 }
 
-                while let Some(rewrite) = self.find_match(target)? {
+                let rewrites = self.find_matches(target)?;
+                for rewrite in rewrites {
                     target
                         .apply_rewrite(rewrite)
                         .context("Could not apply exhaustive rule rewrite")?;
