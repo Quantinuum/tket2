@@ -263,12 +263,6 @@ mod tests {
         Hugr::load(BufReader::new(bytes.as_slice()), None).unwrap()
     }
     
-    fn count_rz(hugr: &Hugr) -> usize {
-        hugr.nodes()
-            .filter(|n| hugr.get_optype(*n).cast::<TketOp>() == Some(TketOp::Rz))
-            .count()
-    }
-
     fn count_gate(hugr: &Hugr, gate: TketOp) -> usize {
         hugr.nodes()
             .filter(|n| hugr.get_optype(*n).cast::<TketOp>() == Some(gate))
