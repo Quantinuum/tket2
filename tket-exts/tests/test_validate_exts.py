@@ -4,7 +4,7 @@ from collections.abc import Callable
 import pytest
 import tket_exts
 from hugr.ops import ExtOp
-from hugr.tys import Bool, ExtType
+from hugr.tys import Bool, ExtType, FunctionType, Qubit
 from tket_exts.tket._util import TketExtension
 
 
@@ -203,6 +203,15 @@ def ext_rotation() -> tuple[TketExtension, list[ExtType], list[ExtOp]]:
     )
 
 
+def ext_tket1() -> tuple[TketExtension, list[ExtType], list[ExtOp]]:
+    ext = tket_exts.tket1
+    return (
+        ext,
+        [],
+        [ext.tk1op("{}", FunctionType([Qubit], [Qubit]))],
+    )
+
+
 def ext_wasm() -> tuple[TketExtension, list[ExtType], list[ExtOp]]:
     ext = tket_exts.wasm
     return (
@@ -244,6 +253,7 @@ def ext_argument() -> tuple[TketExtension, list[ExtType], list[ExtOp]]:
         ext_quantum,
         ext_result,
         ext_rotation,
+        ext_tket1,
         ext_wasm,
         ext_argument,
     ],

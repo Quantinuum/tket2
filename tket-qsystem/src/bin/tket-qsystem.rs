@@ -8,7 +8,11 @@ use tket_qsystem::cli::CliArgs;
 fn main() -> Result<()> {
     match CliArgs::parse() {
         CliArgs::GenExtensions(args) => {
-            let registry = ExtensionRegistry::new(tket_qsystem::extension::qsystem_extensions());
+            let registry = ExtensionRegistry::new(
+                tket::extension::tket_extensions()
+                    .into_iter()
+                    .chain(tket_qsystem::extension::qsystem_extensions()),
+            );
             args.run_dump(&registry)?;
         }
         _ => {

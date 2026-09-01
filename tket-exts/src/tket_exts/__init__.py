@@ -24,6 +24,7 @@ from tket_exts.tket.qsystem import (
 from tket_exts.tket.quantum import QuantumExtension
 from tket_exts.tket.result import ResultExtension
 from tket_exts.tket.rotation import RotationExtension
+from tket_exts.tket.tket1 import Tket1Extension
 from tket_exts.tket.wasm import WasmExtension
 
 # This is updated by our release-please workflow, triggered by this
@@ -48,6 +49,7 @@ __all__ = [
     "quantum",
     "result",
     "rotation",
+    "tket1",
     "wasm",
 ]
 
@@ -68,6 +70,7 @@ global_phase: GlobalPhaseExtension = tket.global_phase.GlobalPhaseExtension()
 globals: GlobalsExtension = tket.globals.GlobalsExtension()
 measurement: MeasurementExtension = tket.measurement.MeasurementExtension()
 argument: ArgumentExtension = tket.argument.ArgumentExtension()
+tket1: Tket1Extension = tket.tket1.Tket1Extension()
 
 # TODO (deprecated): Remove the deprecated tket.qsystem extension in the next breaking release.
 qsystem: QSystemExtension = tket.qsystem.QSystemExtension()
@@ -100,6 +103,7 @@ def tket_registry() -> ExtensionRegistry:
         tket.global_phase.GlobalPhaseExtension(),
         tket.measurement.MeasurementExtension(),
         tket.argument.ArgumentExtension(),
+        tket.tket1.Tket1Extension(),
     ]
 
     registry = ExtensionRegistry()
