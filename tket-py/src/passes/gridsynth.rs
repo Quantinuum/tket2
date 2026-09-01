@@ -14,12 +14,7 @@ use super::super::utils::ConvertPyErr;
 pub(super) fn gridsynth(
     circ: &mut CompilationState,
     epsilon: f64,
-    simplify: bool,
 ) -> PyResult<()> {
-    // TODO: thread `simplify` through to the pass once the simplification
-    // is implemented (it is currently the identity function).
-    let _ = simplify;
-
     GridSynthPass::default()
         .with_epsilon(epsilon)
         .run(&mut circ.hugr)
