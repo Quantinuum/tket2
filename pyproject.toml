@@ -1,6 +1,6 @@
 [tool.uv.workspace]
-members = ["tket-py", "tket-eccs", "tket-exts"]
-exclude = ["pg-libs", "qis-compiler"]
+members = ["tket-py", "tket-eccs", "tket-exts", "qis-compiler"]
+exclude = ["pg-libs"]
 
 [dependency-groups]
 dev = [
@@ -19,8 +19,6 @@ dev = [
     "pyyaml >=6.0.2",
     # used for tests in tket-py
     "numpy>=2.2.0",
-    # Guppy language compiler
-    "guppylang>=1.0.1",
 ]
 conan = ["conan>=2.31.1,<3"]
 

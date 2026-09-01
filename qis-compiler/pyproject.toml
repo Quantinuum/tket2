@@ -15,7 +15,7 @@ dev = [
 name = "selene-hugr-qis-compiler"
 description = "A Python frontend for compiling HUGR to Quantinuum's QIS."
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 authors = [
     { name = "Seyon Sivarajah", email = "seyon.sivarajah@quantinuum.com" },
     { name = "TKET development team", email = "tket-support@quantinuum.com" },

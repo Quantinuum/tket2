@@ -589,7 +589,7 @@ class GridSynthPass(ComposablePass):
     def _gridsynth(self, hugr: Hugr, inplace: bool) -> PassResult:
         tk_program = _state.CompilationState.from_python(hugr)
 
-        _passes.gridsynth(tk_program._inner, self.epsilon, simplify=True)
+        _passes.gridsynth(tk_program._inner, self.epsilon)
 
         package = tk_program.to_python()
         return PassResult.for_pass(

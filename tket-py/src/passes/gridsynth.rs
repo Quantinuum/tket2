@@ -1,6 +1,4 @@
-//! Bindings to allow users to access the gridsynth pass from Python.
-//! The definitions here should be reflected in the
-//! `tket-py/tket/_tket/passes.pyi` type stubs file
+//! Pass to apply GridSynth
 use pyo3::prelude::*;
 use tket::passes::ComposablePass;
 use tket::passes::gridsynth::GridSynthPass;
@@ -8,8 +6,6 @@ use tket::passes::gridsynth::GridSynthPass;
 use super::super::state::CompilationState;
 use super::super::utils::ConvertPyErr;
 
-/// Binding to a python function called gridsynth that runs the gridsynth pass
-/// behind the scenes
 #[pyfunction]
 pub(super) fn gridsynth(
     circ: &mut CompilationState,
