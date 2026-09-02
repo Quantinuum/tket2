@@ -374,7 +374,11 @@ impl<N: HugrNode> ModifierResolver<N> {
                 // println!("Looking for daggered implementation of function `{func_name}`");
                 let Some(impl_name) = h
                     .try_get_metadata::<metadata::DaggeredImplementations>(func)
-                    .unwrap()
+                    .map_err(|e| {
+                        ModifierResolverErrors::unreachable(format!(
+                            "Failed to read daggered implementation metadata for `{func_name}`: {e}"
+                        ))
+                    })?
                 else {
                     return Ok(None);
                 };
@@ -391,7 +395,11 @@ impl<N: HugrNode> ModifierResolver<N> {
                 // );
                 let impl_names = h
                     .try_get_metadata::<metadata::ControlledImplementations>(func)
-                    .unwrap();
+                    .map_err(|e| {
+                         ModifierResolverErrors::unreachable(format!(
+                             "Failed to read controlled implementation metadata for `{func_name}`: {e}"
+                         ))
+                     })?;
                 find_controlled_implementation(h, impl_names, n, &func_name)
             }
             (n, true) if n > 0 => {
@@ -400,7 +408,11 @@ impl<N: HugrNode> ModifierResolver<N> {
                 // );
                 let impl_names = h
                     .try_get_metadata::<metadata::CtrlDaggeredImplementations>(func)
-                    .unwrap();
+                    .map_err(|e| {
+                         ModifierResolverErrors::unreachable(format!(
+                             "Failed to read controlled-daggered implementation metadata for `{func_name}`: {e}"
+                         ))
+                     })?;
                 find_controlled_implementation(h, impl_names, n, &func_name)
             }
             _ => Ok(None),
@@ -465,9 +477,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         let custom_signature = custom_defn.signature().clone();
         let custom_name = custom_defn.func_name().clone();
 
-        // NICOLA: All these test are legit, not sure if we want to keep them or not
-        // If we remove them, given custom implementation that do not respect them will produce an invalid hugr
-        // (we will get an error anyway, but it will be less clear)
         let custom_optype = h.get_optype(custom_func).clone();
         if !original_signature.params().is_empty() || !custom_signature.params().is_empty() {
             return Err(ModifierResolverErrors::unresolvable(
@@ -896,11 +905,6 @@ impl<N: HugrNode> ModifierResolver<N> {
 
         let adapter_inputs = adapter.input_wires().collect::<Vec<_>>();
         let control_group_count = control_layout.len();
-        // We expect that the controllers inputting the adapter match exactly the control layout
-        assert_eq!(
-            adapter_inputs[..control_group_count].len(),
-            control_layout.len()
-        );
         // Unpack the control groups and them pack them into a single borrowed array
         let control_qubits = self.unpack_controls(
             &mut adapter,

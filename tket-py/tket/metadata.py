@@ -45,6 +45,7 @@ __all__ = [
     "HeliosPlatformConfigValue",
     "InlineAnnotation",
     "InlineAnnotationValue",
+    "NumControlQubits",
     "PytketBit",
     "PytketBitRegisterNames",
     "PytketInputParameters",
