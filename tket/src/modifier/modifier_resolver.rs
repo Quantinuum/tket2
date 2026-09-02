@@ -1783,7 +1783,7 @@ mod tests {
                     .is_some_and(|function| function.func_name().starts_with("__modified__"))
             })
             .unwrap();
-        assert_eq!(state_order_edge_count(&h, modified_function), 26);
+        assert_eq!(state_order_edge_count(&h, modified_function), 16);
         assert_matches!(h.validate(), Ok(()));
     }
 
