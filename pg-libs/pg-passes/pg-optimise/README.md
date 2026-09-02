@@ -13,5 +13,6 @@ boxes; other operation types are treated as non-commuting.
 Greedily merges Pauli rotations with the same Pauli string when they commute
 with every operation between them. Clifford rotations are folded into
 tableaux.
+
 Consider running `CanonicalFormPass` before either optimisation pass so that
 the input operations are in the expected form.
