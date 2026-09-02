@@ -3,8 +3,6 @@
 # dependencies = [
 #    "guppylang==1.0.1",
 #    "matplotlib",
-#    "networkx>=3.4.2",
-#    "types-networkx>=3.6.1.20260612",
 # ]
 # [tool.uv.sources]
 # guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", rev = "952d728357b09741e5355a213f574a14967ffc12"}
