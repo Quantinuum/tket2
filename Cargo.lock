@@ -135,41 +135,40 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 
 [[package]]
 name = "ascent"
-version = "0.8.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1f021eb502b2d503783f992e99c7a099910c95c548008c51f6380259836260c"
+checksum = "4b69c5a0326edc45aea8469a51f84be0ff28ea1e3a4d087665468793be061682"
 dependencies = [
  "ascent_base",
  "ascent_macro",
  "boxcar",
  "cfg-if",
  "hashbrown 0.14.5",
- "instant",
- "paste",
- "rustc-hash 2.1.3",
+ "pastey",
+ "rustc-hash 2.1.2",
+ "web-time",
 ]
 
 [[package]]
 name = "ascent_base"
-version = "0.8.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df836580627d8774d2a573bbfb5612c013004afcde89675b6a054825618de8dc"
+checksum = "792af0babe403e49368d8717763605fe978b3a1eb7d51b52e3d0a5cb97e6eb74"
 dependencies = [
- "paste",
+ "pastey",
 ]
 
 [[package]]
 name = "ascent_macro"
-version = "0.8.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7d782b676e47b3657e5ae8ad3abe74b73a67a2cf73b3df85d1764e004724646"
+checksum = "1ac2662b20bf37fd66d21687c0ef91f1c64320a7ca985a34d1c3e60cc9ba940a"
 dependencies = [
  "ascent_base",
  "derive-syn-parse",
  "duplicate",
- "itertools 0.13.0",
- "lazy_static",
- "petgraph 0.6.5",
+ "itertools 0.15.0",
+ "petgraph 0.8.3",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -1572,15 +1571,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "instant"
-version = "0.1.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0242819d153cba4b4b05a5a8f2a7e9bbf97b6055b2a002b395c96b5ff3c0222"
-dependencies = [
- "cfg-if",
-]
-
-[[package]]
 name = "inventory"
 version = "0.3.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2008,12 +1998,6 @@ dependencies = [
  "fnv",
  "unicode-width",
 ]
-
-[[package]]
-name = "paste"
-version = "1.0.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
 name = "pastey"
@@ -3704,6 +3688,16 @@ checksum = "0ce5da8ecb62bcd8ec8b7ea19f69a51275e91299be594ea5cc6ef7819e16cd03"
 dependencies = [
  "bytemuck",
  "safe_arch",
+]
+
+[[package]]
+name = "web-time"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a6580f308b1fad9207618087a65c04e7a10bc77e02c8e84e9b00dd4b12fa0bb"
+dependencies = [
+ "js-sys",
+ "wasm-bindgen",
 ]
 
 [[package]]
