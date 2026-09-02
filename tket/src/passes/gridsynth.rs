@@ -14,6 +14,11 @@ use hugr::{
 };
 use rsgridsynth::config::config_from_theta_epsilon;
 use rsgridsynth::gridsynth::gridsynth_gates;
+use std::sync::{LazyLock, Mutex};
+
+/// rsgridsynth uses a global mutable precision counter PREC_BITS that isn't
+/// thread safe, so serialise gridsynth string synthesis.
+static GRIDSYNTH_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
 /// Error raised by [GridSynthPass]
 #[derive(derive_more::Error, Debug, derive_more::Display, derive_more::From)]
@@ -142,6 +147,7 @@ fn find_angle<H: HugrView<Node = Node>>(hugr: &H, const_node: Node) -> f64 {
 
 /// Runs the gridsynth algorithm on `theta` (radians), and returns the gate string.
 fn gridsynth(theta: f64, epsilon: f64) -> String {
+    let _guard = GRIDSYNTH_LOCK.lock().unwrap();
     let seed = 1234;
     let verbose = false;
     let up_to_phase = false;
