@@ -15,7 +15,7 @@ complex_cfg_higher_order_solved:
 	10 -> 0.4619-0.1913j
 	11 -> -0.4619-0.1913j
 -----
-custom_modifier1_solved:
+custom_modifier_solved:
 	101 -> 0.5+0j
 	110 -> -0.5-0j
 	111 -> 0-0.7071j
