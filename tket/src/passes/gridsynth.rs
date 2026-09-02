@@ -85,7 +85,7 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for GridSynthPass {
             };
 
             // The Normalize pass should result in all statically known angles appearing
-            // directly before the Rz gate. Therefore if the previous node is not 
+            // directly before the Rz gate. Therefore if the previous node is not
             // `LoadConstant`, the angle cannot be known statically.
             let const_node = if hugr.get_optype(source_node).is_load_constant() {
                 match hugr.static_source(source_node) {
@@ -136,9 +136,7 @@ fn find_angle<H: HugrView<Node = Node>>(hugr: &H, const_node: Node) -> f64 {
             })
             .to_radians()
     } else {
-        panic!(
-            "{const_node} has unexpected value type (expected ConstRotation or ConstF64)"
-        )
+        panic!("{const_node} has unexpected value type (expected ConstRotation or ConstF64)")
     }
 }
 
@@ -262,7 +260,7 @@ mod tests {
         });
         Hugr::load(BufReader::new(bytes.as_slice()), None).unwrap()
     }
-    
+
     fn count_gate(hugr: &Hugr, gate: TketOp) -> usize {
         hugr.nodes()
             .filter(|n| hugr.get_optype(*n).cast::<TketOp>() == Some(gate))
@@ -301,7 +299,6 @@ mod tests {
         assert_eq!(count_gate(&hugr, TketOp::Rz), 0);
         assert!(count_gate(&hugr, TketOp::H) > 1);
         assert!(count_gate(&hugr, TketOp::T) > 1);
-
     }
 
     #[test]
@@ -339,7 +336,7 @@ mod tests {
         assert_eq!(count_gate(&hugr, TketOp::Rz), 0);
         assert_eq!(count_gate(&hugr, TketOp::S), 1);
     }
-    
+
     #[test]
     #[cfg_attr(miri, ignore)]
     fn gridsynth_test_epsilon_precise() {
@@ -360,9 +357,10 @@ mod tests {
     fn gridsynth_undefined_angle_errors() {
         let mut hugr = load_guppy_hugr("undefined_angle");
         let result = GridSynthPass::default().run(&mut hugr);
-        assert!(
-            matches!(result.unwrap_err(), GridSynthError::UndefinedAngleError(_))
-        );
+        assert!(matches!(
+            result.unwrap_err(),
+            GridSynthError::UndefinedAngleError(_)
+        ));
     }
 
     #[test]

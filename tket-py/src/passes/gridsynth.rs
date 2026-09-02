@@ -7,10 +7,7 @@ use super::super::state::CompilationState;
 use super::super::utils::ConvertPyErr;
 
 #[pyfunction]
-pub(super) fn gridsynth(
-    circ: &mut CompilationState,
-    epsilon: f64,
-) -> PyResult<()> {
+pub(super) fn gridsynth(circ: &mut CompilationState, epsilon: f64) -> PyResult<()> {
     GridSynthPass::default()
         .with_epsilon(epsilon)
         .run(&mut circ.hugr)
