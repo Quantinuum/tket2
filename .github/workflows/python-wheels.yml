@@ -396,6 +396,14 @@ jobs:
         uses: actions/attest@v4.2.2
         with:
           subject-path: "dist/*"
+      - name: Prepare distributions for PyPI
+        run: |
+          # PyPI doesn't support wasm wheels, so pick all non-emscripten wheels
+          # and put them in a separate directory for publishing.
+          mkdir pypi-dist
+          find dist -maxdepth 1 -type f \
+            \( -name '*.tar.gz' -o \( -name '*.whl' ! -name '*emscripten*.whl' \) \) \
+            -exec cp -- {} pypi-dist/ \;
       - name: Report
         run: |
           echo "Publishing to PyPI..."
@@ -406,6 +414,7 @@ jobs:
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
+          packages-dir: pypi-dist
           verbose: true
           skip-existing: true
 
