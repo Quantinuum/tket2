@@ -14,6 +14,14 @@ use thiserror::Error;
 
 #[derive(Clone, Debug)]
 #[allow(unused, missing_docs)]
+/// Mapping used to update signature of input/output ports of dataflow and controlflow operations.
+pub struct TypeMapping {
+    old_type: VersionedOp,
+    new_type: VersionedOp,
+}
+
+#[derive(Clone, Debug)]
+#[allow(unused, missing_docs)]
 pub struct VersionedOp {
     name: String,
     extension_name: String,
