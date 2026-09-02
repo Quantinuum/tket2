@@ -15,7 +15,7 @@ use hugr::{
 use rsgridsynth::config::config_from_theta_epsilon;
 use rsgridsynth::gridsynth::gridsynth_gates;
 
-/// Error raised by [GridsynthPass]
+/// Error raised by [GridSynthPass]
 #[derive(derive_more::Error, Debug, derive_more::Display, derive_more::From)]
 #[non_exhaustive]
 pub enum GridSynthError {

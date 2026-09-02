@@ -11,8 +11,7 @@ from sys import argv
 
 from guppylang import guppy
 from guppylang.std.angles import angle
-from guppylang.std.quantum import qubit, rz, discard
-
+from guppylang.std.quantum import discard, qubit, rz
 
 @guppy
 def apply_rz(q: qubit, theta: float) -> None:
@@ -25,7 +24,6 @@ def main() -> None:
     q = qubit()
     apply_rz(q, theta)
     discard(q)
-
 
 program = main.compile()
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
