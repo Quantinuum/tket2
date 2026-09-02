@@ -2,9 +2,12 @@
 # requires-python = ">=3.13"
 # dependencies = [
 #    "guppylang==1.0.1",
+#    "matplotlib",
+#    "networkx>=3.4.2",
+#    "types-networkx>=3.6.1.20260612",
 # ]
 # [tool.uv.sources]
-# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", rev = "51a990e6e26170f3d814391cc8a7dc9a2fc17eff"}
+# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", rev = "952d728357b09741e5355a213f574a14967ffc12"}
 # ///
 """Test the use of a higher-order function with complex control flow inside modifiers"""
 
@@ -12,63 +15,79 @@ from pathlib import Path
 from sys import argv
 
 from guppylang import enable_experimental_features, guppy
-from guppylang.std.builtins import array, control, dagger, nat, qubit
+from guppylang.std.builtins import array, control, dagger, nat, panic, qubit
 from guppylang.std.debug import state_result
-from guppylang.std.quantum import discard, discard_array, h, x
+from guppylang.std.quantum import discard, discard_array, h, s, x, z
 
 enable_experimental_features()
 
-# NICOLA: TODO: Design a proper test
+
+@guppy.unitary
+class classic_custom:
+    @guppy
+    def __call__() -> int:
+        return 1
+
+    @guppy
+    def controlled[c: nat](_controls: array[qubit, c]) -> int:
+        return 99
 
 
 @guppy.unitary
 class foo:
     @guppy(unitary=True)
     def __call__(q: qubit) -> None:
-        h(q)
+        s(q)
 
-    # @guppy
-    # def daggered(x: int) -> None:
-    #     _x = 2
+    @guppy
+    def daggered(q: qubit) -> None:
+        x(q)
 
     @guppy
     def controlled[c: nat](q: qubit, _controls: array[qubit, c]) -> None:
-        # with control(_controls):
-        x(q)
+        with control(_controls):
+            h(q)
 
-    # @guppy
-    # def ctrl_daggered[c: nat](q: qubit, _controls: array[qubit, c]) -> None:
-    #     h(q)
+    @guppy
+    def ctrl_daggered[c: nat](q: qubit, _controls: array[qubit, c]) -> None:
+        with dagger:
+            foo(_controls[1])
+        with control(_controls):
+            x(q)
+
+
+@guppy(unitary=True)
+def helper(c0: qubit, c1: qubit, q: qubit) -> None:
+
+    with dagger, control(c0, c1):
+        foo(q)
 
 
 @guppy
 def main() -> None:
     q = qubit()
-    c = qubit()
-    cs = array(qubit())
-    # with control(cs):  # noqa: SIM117
-    #     with control(c):
-    #         foo(q)
-    # with dagger:
-    #     foo(3)
-    with control(cs):  # noqa: SIM117
-        with control(c):
-            foo(q)
-    # testing that cached adapter are used properly
-    with control(cs):  # noqa: SIM117
-        with control(c):
-            foo(q)
+    cs = array(qubit(), qubit())
 
-    state_result("r", q, c)
+    # we first test classical custom functions
+    with control(q):
+        y = classic_custom()
+        if y != 99:
+            panic("Unexpected value")
+
+    with dagger:
+        foo(cs[0])
+    with control(cs[0]):
+        foo(q)
+        with control(q):
+            foo(cs[1])
+            z(cs[1])
+
+    helper(cs[0], cs[1], q)
+
+    state_result("r", cs[0], cs[1], q)
     discard(q)
-    discard(c)
     discard_array(cs)
 
 
-# from hugr.hugr.render import RenderConfig
-
-# main.with_minimal_opt().compile().modules[0].render_dot(
-#     RenderConfig(max_node_label_length=None)
-# ).view("aaaa")
 program = main.with_minimal_opt().compile()
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
