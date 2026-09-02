@@ -13,6 +13,7 @@ from guppylang import guppy
 from guppylang.std.angles import angle
 from guppylang.std.quantum import discard, h, measure, qubit, rz
 
+
 @guppy
 def main() -> None:
     q1 = qubit()
@@ -24,6 +25,7 @@ def main() -> None:
     else:
         rz(q2, -theta)
     discard(q2)
+
 
 program = main.compile()
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())

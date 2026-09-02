@@ -13,11 +13,13 @@ from guppylang import guppy
 from guppylang.std.angles import pi
 from guppylang.std.quantum import discard, qubit, rz
 
+
 @guppy
 def main() -> None:
     q = qubit()
     rz(q, pi / 2)
     discard(q)
+
 
 program = main.compile()
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())

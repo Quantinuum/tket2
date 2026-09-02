@@ -13,6 +13,7 @@ from guppylang import guppy
 from guppylang.std.angles import angle
 from guppylang.std.quantum import discard, qubit, rz
 
+
 @guppy
 def main() -> None:
     theta = angle(0.5)
