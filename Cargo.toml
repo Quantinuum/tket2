@@ -10,6 +10,7 @@ members = [
     "tket",
     "tket1-passes",
     "tket-py",
+    "tket-qsim",
     "tket-qsystem",
 ]
 default-members = ["tket", "tket-qsystem"]
@@ -103,6 +104,7 @@ cool_asserts = "2.0.4"
 zstd = "0.13.3"
 anyhow = "1.0.102"
 num-rational = "0.4.2"
+num-complex = "0.4"
 
 [profile.release.package.tket-py]
 # Some configurations to reduce the size of tket wheels

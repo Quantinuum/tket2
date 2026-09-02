@@ -48,6 +48,7 @@ anyhow = { workspace = true, optional = true }
 
 [dev-dependencies]
 tket1-passes = { path = "../tket1-passes" }
+tket-qsim = { path = "../tket-qsim" }
 
 cool_asserts.workspace = true
 petgraph.workspace = true

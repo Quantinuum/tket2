@@ -1812,4 +1812,209 @@ mod test {
         h.validate().unwrap();
         assert_helios_to_sol_lowering(&h);
     }
+
+    /// Build a purely-unitary HUGR with concrete parameters (all constants
+    /// embedded) for simulation-based correctness testing.
+    ///
+    /// This fixture exercises:
+    /// - Single-qubit TketOps (H, X, Y, Z, S, Sdg, T, Tdg, V, Vdg)
+    /// - Parametric single-qubit TketOps (Rx, Ry, Rz)
+    /// - Two-qubit TketOps (CX, CY, CZ, CRz)
+    /// - Three-qubit TketOps (Toffoli)
+    /// - Shared platform ops (HeliosOp::PhasedX, SolOp::PhasedX, HeliosOp::Rz, SolOp::Rz)
+    /// - Platform-specific ops (HeliosOp::ZZPhase, SolOp::PhasedXX)
+    #[fixture]
+    fn unitary_ops_hugr() -> hugr::Hugr {
+        use hugr::std_extensions::arithmetic::float_types::ConstF64;
+        use tket::extension::rotation::ConstRotation;
+
+        // Pure qubit circuit: 3 qubits in, 3 qubits out
+        let mut b = FunctionBuilder::new(
+            "unitary_ops",
+            Signature::new(vec![qb_t(), qb_t(), qb_t()], vec![qb_t(), qb_t(), qb_t()]),
+        )
+        .unwrap();
+        let [q0, q1, q2] = b.input_wires_arr();
+
+        // Load constant parameters
+        let angle = b.add_load_value(ConstRotation::new(0.25).unwrap());
+        let float1 = b.add_load_value(ConstF64::new(1.2));
+        let float2 = b.add_load_value(ConstF64::new(0.7));
+
+        // Single-qubit gates
+        let [q0] = b.add_dataflow_op(TketOp::H, [q0]).unwrap().outputs_arr();
+        let [q1] = b.add_dataflow_op(TketOp::X, [q1]).unwrap().outputs_arr();
+        let [q2] = b.add_dataflow_op(TketOp::Y, [q2]).unwrap().outputs_arr();
+        let [q0] = b.add_dataflow_op(TketOp::Z, [q0]).unwrap().outputs_arr();
+        let [q1] = b.add_dataflow_op(TketOp::S, [q1]).unwrap().outputs_arr();
+        let [q2] = b.add_dataflow_op(TketOp::Sdg, [q2]).unwrap().outputs_arr();
+        let [q0] = b.add_dataflow_op(TketOp::T, [q0]).unwrap().outputs_arr();
+        let [q1] = b.add_dataflow_op(TketOp::Tdg, [q1]).unwrap().outputs_arr();
+        let [q2] = b.add_dataflow_op(TketOp::V, [q2]).unwrap().outputs_arr();
+        let [q0] = b.add_dataflow_op(TketOp::Vdg, [q0]).unwrap().outputs_arr();
+
+        // Parametric single-qubit gates
+        let [q0] = b
+            .add_dataflow_op(TketOp::Rx, [q0, angle])
+            .unwrap()
+            .outputs_arr();
+        let [q1] = b
+            .add_dataflow_op(TketOp::Ry, [q1, angle])
+            .unwrap()
+            .outputs_arr();
+        let [q2] = b
+            .add_dataflow_op(TketOp::Rz, [q2, angle])
+            .unwrap()
+            .outputs_arr();
+
+        // Two-qubit gates
+        let [q0, q1] = b
+            .add_dataflow_op(TketOp::CX, [q0, q1])
+            .unwrap()
+            .outputs_arr();
+        let [q0, q2] = b
+            .add_dataflow_op(TketOp::CY, [q0, q2])
+            .unwrap()
+            .outputs_arr();
+        let [q1, q2] = b
+            .add_dataflow_op(TketOp::CZ, [q1, q2])
+            .unwrap()
+            .outputs_arr();
+        let [q1, q2] = b
+            .add_dataflow_op(TketOp::CRz, [q1, q2, angle])
+            .unwrap()
+            .outputs_arr();
+
+        // Three-qubit gate
+        let [q0, q1, q2] = b
+            .add_dataflow_op(TketOp::Toffoli, [q0, q1, q2])
+            .unwrap()
+            .outputs_arr();
+
+        // Shared platform ops: PhasedX
+        let [q0] = b
+            .add_dataflow_op(HeliosOp::PhasedX, [q0, float1, float2])
+            .unwrap()
+            .outputs_arr();
+        let [q1] = b
+            .add_dataflow_op(SolOp::PhasedX, [q1, float1, float2])
+            .unwrap()
+            .outputs_arr();
+
+        // Shared platform ops: Rz
+        let [q1] = b
+            .add_dataflow_op(HeliosOp::Rz, [q1, float1])
+            .unwrap()
+            .outputs_arr();
+        let [q2] = b
+            .add_dataflow_op(SolOp::Rz, [q2, float2])
+            .unwrap()
+            .outputs_arr();
+
+        // Helios-specific: ZZPhase
+        let [q0, q1] = b
+            .add_dataflow_op(HeliosOp::ZZPhase, [q0, q1, float1])
+            .unwrap()
+            .outputs_arr();
+        let [q0, q2] = b
+            .add_dataflow_op(HeliosOp::ZZPhase, [q0, q2, float2])
+            .unwrap()
+            .outputs_arr();
+
+        // Sol-specific: PhasedXX
+        let [q2, q0] = b
+            .add_dataflow_op(SolOp::PhasedXX, [q2, q0, float1, float2])
+            .unwrap()
+            .outputs_arr();
+        let [q2, q1] = b
+            .add_dataflow_op(SolOp::PhasedXX, [q2, q1, float2, float1])
+            .unwrap()
+            .outputs_arr();
+
+        b.finish_hugr_with_outputs([q0, q1, q2]).unwrap()
+    }
+
+    /// Verify that lowering to Helios|Sol preserves the program semantics.
+    #[rstest]
+    #[case::helios(QSystemPlatform::Helios)]
+    #[case::sol(QSystemPlatform::Sol)]
+    fn test_lower_to_platform_preserves_semantics(
+        unitary_ops_hugr: hugr::Hugr,
+        #[case] platform: QSystemPlatform,
+    ) {
+        use std::collections::HashMap;
+        use tket::passes::{
+            InlineDFGsPass, InlineFunctionsPass, inline_funcs::InlineFuncsHeuristic,
+        };
+        use tket_qsim::simulate_circuit;
+
+        let params = HashMap::new();
+        let unitary_before = simulate_circuit(&unitary_ops_hugr, &params).unwrap();
+
+        let mut h = unitary_ops_hugr;
+        lower_tk2_ops(&mut h, Preserve::Public, platform).unwrap();
+        h.validate().unwrap();
+
+        // Need to inline so calls to the generated decomposition functions
+        // are also simulated
+        InlineFunctionsPass::default()
+            .with_heuristic(InlineFuncsHeuristic::All)
+            .run(&mut h)
+            .unwrap();
+        InlineDFGsPass::default().run(&mut h).unwrap();
+        h.validate().unwrap();
+
+        let unitary_after = simulate_circuit(&h, &params).unwrap();
+        assert!(
+            unitary_before.approx_eq_up_to_global_phase(&unitary_after, 1e-10),
+            "Lowering to {:?} changed the circuit semantics!\nBefore:\n{:?}\nAfter:\n{:?}",
+            platform,
+            unitary_before,
+            unitary_after
+        );
+    }
+
+    /// Verify that relowering preserves the program semantics.
+    #[rstest]
+    #[case::helios_then_sol(QSystemPlatform::Helios, QSystemPlatform::Sol)]
+    #[case::sol_then_helios(QSystemPlatform::Sol, QSystemPlatform::Helios)]
+    fn test_relowering_preserves_semantics(
+        unitary_ops_hugr: hugr::Hugr,
+        #[case] first: QSystemPlatform,
+        #[case] second: QSystemPlatform,
+    ) {
+        use std::collections::HashMap;
+        use tket::passes::{
+            InlineDFGsPass, InlineFunctionsPass, inline_funcs::InlineFuncsHeuristic,
+        };
+        use tket_qsim::simulate_circuit;
+
+        let params = HashMap::new();
+        let unitary_before = simulate_circuit(&unitary_ops_hugr, &params).unwrap();
+
+        let mut h = unitary_ops_hugr;
+        lower_tk2_ops(&mut h, Preserve::Public, first).unwrap();
+        h.validate().unwrap();
+        lower_tk2_ops(&mut h, Preserve::Public, second).unwrap();
+        h.validate().unwrap();
+
+        // Need to inline so calls to the generated decomposition functions
+        // are also simulated
+        InlineFunctionsPass::default()
+            .with_heuristic(InlineFuncsHeuristic::All)
+            .run(&mut h)
+            .unwrap();
+        InlineDFGsPass::default().run(&mut h).unwrap();
+        h.validate().unwrap();
+
+        let unitary_after = simulate_circuit(&h, &params).unwrap();
+        assert!(
+            unitary_before.approx_eq_up_to_global_phase(&unitary_after, 1e-10),
+            "Relowering from {:?} to {:?} changed the circuit semantics!\nBefore:\n{:?}\nAfter:\n{:?}",
+            first,
+            second,
+            unitary_before,
+            unitary_after
+        );
+    }
 }
