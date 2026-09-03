@@ -405,7 +405,6 @@ mod tests {
         let merged_pg = rotation_merging(&pg);
 
         assert_eq!(merged_pg, pg);
-        assert!(compare_unitaries_via_tk(&pg, &merged_pg));
     }
 
     #[test]
