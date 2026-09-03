@@ -1098,8 +1098,7 @@ dependencies = [
 [[package]]
 name = "hugr"
 version = "0.30.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80349c75261e201a6f0592e3ee5ba98379512826bc18642ee20c6be692c4da80"
+source = "git+https://github.com/quantinuum/hugr?rev=63972fb15aa553cc0db6761abb50a24b7f34f83e#63972fb15aa553cc0db6761abb50a24b7f34f83e"
 dependencies = [
  "hugr-core",
  "hugr-llvm",
@@ -1109,8 +1108,7 @@ dependencies = [
 [[package]]
 name = "hugr-cli"
 version = "0.30.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c6c180ab65267e65175bebe2546507fab8521f3665681a5c08484fc0e3bff357"
+source = "git+https://github.com/quantinuum/hugr?rev=63972fb15aa553cc0db6761abb50a24b7f34f83e#63972fb15aa553cc0db6761abb50a24b7f34f83e"
 dependencies = [
  "anyhow",
  "clap",
@@ -1131,8 +1129,7 @@ dependencies = [
 [[package]]
 name = "hugr-core"
 version = "0.30.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78147193f6a933130adcf5ca4e119228524d0a5393f27e2b0d6c0920de42024d"
+source = "git+https://github.com/quantinuum/hugr?rev=63972fb15aa553cc0db6761abb50a24b7f34f83e#63972fb15aa553cc0db6761abb50a24b7f34f83e"
 dependencies = [
  "base64 0.23.1",
  "cgmath",
@@ -1169,8 +1166,7 @@ dependencies = [
 [[package]]
 name = "hugr-llvm"
 version = "0.30.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "499baf84844496b536013e15f4e3cb59163cea4eb571136b8ae29ca5b0582638"
+source = "git+https://github.com/quantinuum/hugr?rev=63972fb15aa553cc0db6761abb50a24b7f34f83e#63972fb15aa553cc0db6761abb50a24b7f34f83e"
 dependencies = [
  "anyhow",
  "cc",
@@ -1190,8 +1186,7 @@ dependencies = [
 [[package]]
 name = "hugr-model"
 version = "0.30.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3fd86a36f80a200849cd5df1c02b54a947eaeb1e0663fab567e1a00aa450dfa"
+source = "git+https://github.com/quantinuum/hugr?rev=63972fb15aa553cc0db6761abb50a24b7f34f83e#63972fb15aa553cc0db6761abb50a24b7f34f83e"
 dependencies = [
  "base64 0.23.1",
  "bumpalo",
