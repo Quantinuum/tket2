@@ -8,9 +8,7 @@
 //! applied.
 //!
 //! The [`Units`] iterator defined in this module yields all the input or output
-//! units of a node. See [`Circuit::units`] and [`Command`] for more details.
-//!
-//! [`Command`]: super::command::Command
+//! units of a node. See [`Circuit::units`] for more details.
 
 pub mod filter;
 
