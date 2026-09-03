@@ -1,3 +1,6 @@
+use crate::extension::futures::{FutureOp, FutureOpDef, future_type};
+use crate::extension::qsystem::{self, QSystemPlatform};
+use crate::helpers::lowerer_with_future_linearization;
 use derive_more::{Display, Error, From};
 use hugr::extension::prelude::{Barrier, Noop, bool_t};
 use hugr::extension::simple_op::{MakeExtensionOp, MakeRegisteredOp};
@@ -14,15 +17,10 @@ use hugr::{
 use lazy_static::lazy_static;
 use tket::extension::measurement::{MeasurementOp, measurement_custom_type};
 use tket::passes::composable::WithScope;
+use tket::passes::replace_types::handlers::register_linear_array_op_replacements;
 use tket::passes::replace_types::{NodeTemplate, ReplaceTypesError};
 use tket::passes::{ComposablePass, PassScope, ReplaceTypes};
 use tket::{TketOp, extension::rotation::RotationOpBuilder};
-
-use crate::extension::futures::{FutureOp, FutureOpDef, future_type};
-use crate::extension::qsystem::{self, QSystemPlatform};
-use crate::helpers::{
-    lowerer_with_future_linearization, replace_array_ops_requiring_copyable_bounds,
-};
 
 use super::barrier::BarrierInserter;
 use super::common::SharedOp;
@@ -226,7 +224,7 @@ fn register_measurement_replacements(lowerer: &mut ReplaceTypes) {
     // This is required as copyable `Measurements` are replaced by linear
     // `Futures`. Note we don't need to deal with static arrays as you cannot
     // create static arrays of `Measurement`` values in Guppy.
-    replace_array_ops_requiring_copyable_bounds(lowerer);
+    register_linear_array_op_replacements(lowerer);
 }
 
 /// Lower [`TketOp`] operations to target QSystem operations.
