@@ -112,12 +112,11 @@ impl BarrierInserter {
         let tagged_wires: Vec<(bool, Wire)> = unpacked_wires
             .into_iter()
             .map(|wire| {
-                let node_sig = dfg_b
+                let ty = dfg_b
                     .hugr()
                     .get_optype(wire.node())
-                    .dataflow_signature()
-                    .unwrap();
-                (node_sig.port_type(wire.source()) == Some(&qb_t()), wire)
+                    .value_output_type(wire.source());
+                (ty == Some(qb_t()), wire)
             })
             .collect();
 

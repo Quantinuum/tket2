@@ -1097,9 +1097,9 @@ dependencies = [
 
 [[package]]
 name = "hugr"
-version = "0.29.4"
+version = "0.30.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f42b285fbe4cf19e924688c51cec8c9cbfe15040bf77e21eee2eb3e9c0fb54e"
+checksum = "3f1d08ddfb2a1a028735dbbcf22764acda84195b1c8dc636226c538d388ed4b6"
 dependencies = [
  "hugr-core",
  "hugr-llvm",
@@ -1108,9 +1108,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-cli"
-version = "0.29.4"
+version = "0.30.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0ee914f6f00bbe976d294ff4482280e7cef21a9ff2333004aa2a6d6986bd699"
+checksum = "8a051ffd593b85a97154e387910bea577295e8b302cfe47e53450d6fa75a5d49"
 dependencies = [
  "anyhow",
  "clap",
@@ -1130,9 +1130,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-core"
-version = "0.29.4"
+version = "0.30.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da81b093db6d92b8488dcbdfeb6ddf7fa595bb4eb85e6ec32805e4c36b400922"
+checksum = "a42d5a72a938fa4fcb420d134630324f8c8896c4978e4644a9605c9dbc702b3a"
 dependencies = [
  "base64 0.23.1",
  "cgmath",
@@ -1168,9 +1168,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-llvm"
-version = "0.29.4"
+version = "0.30.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6717bb93d0116cae410edf0c758b823bb87fa05126b8ceaad0328f3612dab015"
+checksum = "43c73f101b3010100c3c86c2ee018064d98d493539f720050b8622fb7a49d3e1"
 dependencies = [
  "anyhow",
  "cc",
@@ -1189,9 +1189,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-model"
-version = "0.29.4"
+version = "0.30.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1f556da3b88517153807ef076d32d3d38a80871feaf613140d26061198b4f76"
+checksum = "2d9e75da8e724d0c5c41d8938ce6bc6dce82987686b62609eb77f71915d119ac"
 dependencies = [
  "base64 0.23.1",
  "bumpalo",

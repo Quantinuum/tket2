@@ -9,11 +9,11 @@ use crate::serialize::pytket::encoder::{EmitCommandOptions, EncodeStatus, Pytket
 use crate::serialize::pytket::extension::{PytketDecoder, PytketTypeTranslator, RegisterCount};
 use crate::serialize::pytket::opaque::OpaqueSubgraphPayload;
 use crate::serialize::pytket::{PytketDecodeError, PytketEncodeError};
-use hugr::HugrView;
 use hugr::extension::ExtensionId;
 use hugr::extension::prelude::{BarrierDef, Noop, PRELUDE_ID, bool_t, qb_t};
 use hugr::extension::simple_op::MakeExtensionOp;
 use hugr::ops::{ExtensionOp, OpType};
+use hugr::{Direction, HugrView};
 use tket_json_rs::optype::OpType as PytketOptype;
 
 /// Encoder for [prelude](hugr::extension::prelude) operations.
@@ -35,12 +35,11 @@ impl<H: HugrView> PytketEmitter<H> for PreludeEmitter {
         if let Ok(_barrier) = BarrierDef::from_extension_op(op) {
             // Check if the barrier has encodable types in its signature.
             // If not, fallback to marking it as unsupported.
-            if hugr.signature(node).is_none_or(|sig| {
-                sig.input()
-                    .iter()
-                    .chain(sig.output().iter())
-                    .any(|ty| encoder.config().type_to_pytket(ty).is_none())
-            }) {
+            if hugr
+                .value_types(node, Direction::Incoming)
+                .chain(hugr.value_types(node, Direction::Outgoing))
+                .any(|(_, ty)| encoder.config().type_to_pytket(&ty).is_none())
+            {
                 return Ok(EncodeStatus::Unsupported);
             }
 
