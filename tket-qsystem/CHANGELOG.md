@@ -1,6 +1,19 @@
 # Changelog
 
 
+## [0.28.0](https://github.com/Quantinuum/tket2/compare/tket-qsystem-v0.27.2...tket-qsystem-v0.28.0) - 2026-09-03
+
+### New Features
+
+- Extract multiple pytket circuits from a hugr region ([#1894](https://github.com/Quantinuum/tket2/pull/1894))
+- Add missing tket1 extension to tket_exts ([#1961](https://github.com/Quantinuum/tket2/pull/1961))
+- *(rs)* [**breaking**] Update hugr to 0.30.1 ([#1965](https://github.com/Quantinuum/tket2/pull/1965))
+- [**breaking**] Remove deprecated definitions ([#1970](https://github.com/Quantinuum/tket2/pull/1970))
+
+### Refactor
+
+- Move borrow array linearizer helper functions to `tket` and make them public ([#1951](https://github.com/Quantinuum/tket2/pull/1951))
+
 ## [0.27.2](https://github.com/Quantinuum/tket2/compare/tket-qsystem-v0.27.1...tket-qsystem-v0.27.2) - 2026-07-31
 
 ### Bug Fixes
