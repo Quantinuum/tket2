@@ -104,21 +104,6 @@ where
     }
 }
 
-impl<N: HugrNode, UL> Units<IncomingPort, N, UL>
-where
-    UL: UnitLabeller<N>,
-{
-    /// Create a new iterator over the units terminating on the node.
-    #[inline]
-    pub(super) fn new_incoming<T: HugrView<Node = N>>(
-        circuit: &Circuit<T>,
-        node: N,
-        unit_labeller: UL,
-    ) -> Self {
-        Self::new_with_dir(circuit, node, Direction::Incoming, unit_labeller)
-    }
-}
-
 impl<P, N: HugrNode, UL> Units<P, N, UL>
 where
     P: Into<Port> + Copy,
