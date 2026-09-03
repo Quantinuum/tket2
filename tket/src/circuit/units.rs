@@ -158,11 +158,10 @@ where
     ) -> TypeRow {
         let hugr = circuit.hugr();
         let optype = hugr.get_optype(node);
-        let sig = hugr.signature(node).unwrap_or_default().into_owned();
-        let mut types = match direction {
-            Direction::Outgoing => sig.output,
-            Direction::Incoming => sig.input,
-        };
+        let mut types: TypeRow = hugr
+            .value_types(node, direction)
+            .map(|(_, ty)| ty)
+            .collect();
         if let Some(EdgeKind::Const(static_type)) = optype.static_port_kind(direction) {
             types.to_mut().push(static_type);
         };

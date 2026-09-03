@@ -4,10 +4,11 @@ use std::hint::black_box;
 
 use criterion::{AxisScale, BatchSize, Criterion, PlotConfiguration, criterion_group};
 use hugr::Hugr;
+use tket::extension::REGISTRY;
 use tket::passes::{ComposablePass, Normalize};
 
 fn load_hugr(bytes: &[u8]) -> Hugr {
-    Hugr::load(bytes, None).unwrap()
+    Hugr::load(bytes, Some(&REGISTRY)).unwrap()
 }
 
 fn bench_normalize(c: &mut Criterion) {

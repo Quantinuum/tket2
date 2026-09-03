@@ -7,7 +7,7 @@ use ascent::lattice::BoundedLattice;
 use itertools::Itertools;
 
 use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
-use hugr_core::ops::{DataflowOpTrait, OpTrait, OpType, TailLoop};
+use hugr_core::ops::{DataflowOpTrait, OpType, TailLoop};
 use hugr_core::{HugrView, IncomingPort, OutgoingPort, PortIndex as _, Wire};
 
 use super::value_row::ValueRow;
@@ -79,7 +79,7 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
                 // Put values onto out-wires of Input node
                 let [inp, _] = self.hugr.get_io(parent).unwrap();
                 let mut vals =
-                    vec![PartialValue::Top; self.hugr.signature(inp).unwrap().output_types().len()];
+                    vec![PartialValue::Top; self.hugr.get_optype(inp).value_output_count()];
                 for (ip, v) in in_values {
                     vals[ip.index()] = v;
                 }
@@ -89,10 +89,8 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
             }
             OpType::DFG(_) | OpType::TailLoop(_) | OpType::CFG(_) | OpType::Conditional(_) => {
                 // dataflow will handle this and propagate to the correct Input node(s)
-                let mut vals = vec![
-                    PartialValue::Top;
-                    self.hugr.signature(parent).unwrap().input_types().len()
-                ];
+                let mut vals =
+                    vec![PartialValue::Top; self.hugr.get_optype(parent).value_input_count()];
                 for (ip, v) in in_values {
                     vals[ip.index()] = v;
                 }
@@ -190,26 +188,27 @@ fn run_datalog<V: AbstractValue, H: HugrView>(
         // Prepopulate in_wire_value from in_wire_value_proto.
         in_wire_value(n, p, v) <-- for (n, p, v) in &in_wire_value_proto,
           node(n),
-          if let Some(sig) = hugr.signature(*n),
-          if sig.input_ports().contains(p);
+          let op = hugr.get_optype(*n),
+          if p.index() < op.value_input_count();
 
         // Prepopulate out_wire_value from out_wire_value_proto.
         out_wire_value(n, p, v) <-- for (n, p, v) in &out_wire_value_proto,
           node(n),
-          if let Some(sig) = hugr.signature(*n),
-          if sig.output_ports().contains(p);
+          let op = hugr.get_optype(*n),
+          if p.index() < op.value_output_count();
 
         // Assemble node_in_value_row from in_wire_value's
-        node_in_value_row(n, ValueRow::new(sig.input_count())) <-- node(n), if let Some(sig) = hugr.signature(*n);
-        node_in_value_row(n, ValueRow::new(hugr.signature(*n).unwrap().input_count()).set(p.index(), v.clone())) <-- in_wire_value(n, p, v);
+        node_in_value_row(n, ValueRow::new(op.value_input_count())) <-- node(n),
+          let op = hugr.get_optype(*n),
+          if op.value_input_count() > 0 || op.value_output_count() > 0;
+        node_in_value_row(n, ValueRow::new(hugr.get_optype(*n).value_input_count()).set(p.index(), v.clone())) <-- in_wire_value(n, p, v);
 
         // Interpret leaf ops
         out_wire_value(n, p, v) <--
            node_in_value_row(n, vs),
            let op_t = hugr.get_optype(*n),
            if !op_t.is_container(),
-           if let Some(sig) = op_t.dataflow_signature(),
-           if let Some(outs) = propagate_leaf_op(&mut ctx, &hugr, *n, &vs[..], sig.output_count()),
+           if let Some(outs) = propagate_leaf_op(&mut ctx, &hugr, *n, &vs[..], op_t.value_output_count()),
            for (p, v) in (0..).map(OutgoingPort::from).zip(outs);
 
         // DFG --------------------

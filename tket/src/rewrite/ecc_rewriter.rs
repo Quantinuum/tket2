@@ -277,10 +277,9 @@ fn get_patterns(rep_sets: &[EqCircClass]) -> Vec<Option<(CircuitPattern, Vec<usi
 fn empty_wires(circ: &Circuit<impl HugrView<Node = Node>>) -> Vec<usize> {
     let hugr = circ.hugr();
     let input = circ.input_node();
-    let input_sig = hugr.signature(input).unwrap();
-    hugr.node_outputs(input)
-        // Only consider dataflow edges
-        .filter(|&p| input_sig.out_port_type(p).is_some())
+    let input_op = hugr.get_optype(input);
+    input_op
+        .value_output_ports()
         // Only consider ports linked to at most one other port
         .filter_map(|p| Some((p, hugr.linked_ports(input, p).at_most_one().ok()?)))
         // Ports are either connected to output or nothing
