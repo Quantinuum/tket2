@@ -193,7 +193,7 @@ fn make_rewrite<'h, T: HugrView>(
     Some(remove_pack_unpack(
         hugr,
         convex_checker,
-        &tuple_types,
+        tuple_types,
         node,
         unpack_nodes,
         num_other_outputs,
@@ -205,7 +205,7 @@ fn make_rewrite<'h, T: HugrView>(
 fn remove_pack_unpack<'h, T: HugrView>(
     hugr: &'h T,
     convex_checker: &mut Option<SchedGraphChecker<'h, T>>,
-    tuple_types: &[Type],
+    tuple_types: Vec<Type>,
     pack_node: T::Node,
     unpack_nodes: Vec<T::Node>,
     num_other_outputs: usize,
@@ -238,7 +238,7 @@ fn remove_pack_unpack<'h, T: HugrView>(
 
     // If needed, re-add the tuple pack node and connect its output to the tuple outputs.
     if num_other_outputs > 0 {
-        let op = MakeTuple::new(tuple_types.to_vec().into());
+        let op = MakeTuple::new(tuple_types.into());
         let [tuple] = replacement
             .add_dataflow_op(op, replacement.input_wires())
             .unwrap()
