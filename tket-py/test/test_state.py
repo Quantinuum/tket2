@@ -50,9 +50,4 @@ def test_tket_exts_registry_matches_embedded_tket_extensions() -> None:
         if extension_id not in prelude
     }
 
-    # Currently missing from tket_exts
-    # TODO: Add to tket_exts
-    # <https://github.com/Quantinuum/tket2/issues/1693>
-    rust_tket_ids.discard("TKET1")
-
     assert python_tket_ids == rust_tket_ids
