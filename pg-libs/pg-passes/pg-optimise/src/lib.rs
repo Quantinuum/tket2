@@ -59,7 +59,7 @@ fn commute_bitpacked(p0: &[u64], p1: &[u64]) -> bool {
 /// Wraps an [`Op`] together with its bit-packed Pauli strings for commutation checks.
 ///
 /// The bits initially alternate between X and Z components. Calling
-/// `flip_to_zx` repacks them so that they alternate between Z and X components.
+/// `coerce_to_zx` repacks them so that they alternate between Z and X components.
 /// A commutation check requires the two wrapped operations to use opposite
 /// encodings.
 #[derive(Clone)]
@@ -119,7 +119,10 @@ impl BitPackedOp {
             z_first,
         }
     }
-    fn flip_to_zx(&mut self) {
+    fn coerce_to_zx(&mut self) {
+        if self.z_first {
+            return;
+        }
         self.strings = self
             .op
             .get_paulis()
@@ -202,7 +205,7 @@ mod tests {
     #[test]
     fn test_commute_bitpacked() {
         let p0 = vec![Pauli::X, Pauli::I, Pauli::Z];
-        let p1 = vec![Pauli::X, Pauli::I, Pauli::Z];
+        let p1 = vec![Pauli::Z, Pauli::Z, Pauli::Y];
         let p2 = vec![Pauli::X, Pauli::Z, Pauli::I];
         let p3 = vec![Pauli::Y, Pauli::I, Pauli::Z];
         let p4 = vec![Pauli::I, Pauli::I, Pauli::I];
@@ -222,7 +225,7 @@ mod tests {
             &bitpack_paulis(&p0, true),
             &bitpack_paulis(&p0, false)
         ));
-        assert!(!commute_bitpacked(
+        assert!(commute_bitpacked(
             &bitpack_paulis(&p1, true),
             &bitpack_paulis(&p3, false)
         ));
@@ -230,7 +233,7 @@ mod tests {
             &bitpack_paulis(&p2, true),
             &bitpack_paulis(&p3, false)
         ));
-        assert!(commute_bitpacked(
+        assert!(!commute_bitpacked(
             &bitpack_paulis(&p1, true),
             &bitpack_paulis(&p2, false)
         ));

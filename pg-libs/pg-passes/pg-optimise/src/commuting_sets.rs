@@ -19,14 +19,14 @@ fn group_ops(pg: &PauliGraph, max_set_size: usize) -> PauliGraph {
         if commuting_set.iter().all(|s| s.commute_with(&rich_op))
             && commuting_set.len() < max_set_size
         {
-            rich_op.flip_to_zx();
+            rich_op.coerce_to_zx();
             commuting_set.push(rich_op);
         } else if !commuting_set.is_empty() {
             commuting_set
                 .drain(..)
                 .for_each(|set_op| output_pg.add_op(set_op.into()));
             output_pg.add_op(Op::SetBoundary);
-            rich_op.flip_to_zx();
+            rich_op.coerce_to_zx();
             commuting_set.push(rich_op);
         }
     }
