@@ -20,6 +20,9 @@ class CircuitChunks:
 class PullForwardError(Exception):
     """Error from a `PullForward` operation."""
 
+class GridsynthError(Exception):
+    """Errors from the gridsynth pass."""
+
 # ruff: ignore[B008]
 def normalize_guppy(
     circ: CompilationState,
@@ -141,4 +144,13 @@ def qsystem_llvm_pass(
     :param monomorphize: Whether to monomorphize generic functions.
     :param force_order: Whether to enforce total ordering of all HUGR operations.
     :param scope: A scope to control how the pass is applied to HUGR regions.
+    """
+
+def gridsynth(circ: CompilationState, epsilon: float) -> None:
+    """Runs a pass applying the gridsynth algorithm to all Rz gates in a HUGR,
+    which decomposes them into the Clifford + T basis.
+
+    Parameters:
+    - circ: the circuit to run the pass on.
+    - epsilon: the precision of the gridsynth decomposition
     """
