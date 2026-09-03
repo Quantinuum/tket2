@@ -46,7 +46,7 @@ pub enum QSystemLLVMPassError {
 /// to run after this pass.
 ///
 /// The pass currently requires a global scope, matching the final preparation
-/// behavior of the old [`crate::QSystemPass`].
+/// behavior of the old `QSystemPass`.
 #[derive(Debug, Clone)]
 pub struct QSystemLLVMPass {
     constant_fold: bool,
