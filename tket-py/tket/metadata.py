@@ -206,7 +206,7 @@ class PytketPhaseExpr(Metadata[str]):
         Use explicit ``tket.global_phase`` operations instead.
     """
 
-    KEY = _metadata.PYTKET_PHASE_EXPR
+    KEY = "TKET1.phase"
 
 
 def _store_pytket_register(value: list[tuple[str, list[int]]]) -> JsonType:

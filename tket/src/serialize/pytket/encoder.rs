@@ -221,17 +221,9 @@ impl<H: HugrView> PytketEncoderContext<H> {
         .filter(|name| !name.is_empty())
         .cloned();
 
-        // Backwards compatibility only: The global phase parameter
-        // of pytket circuits is now encoded as explicit `tket.global_phase` operations instead.
-        #[expect(deprecated)]
-        let phase = match hugr.get_metadata::<metadata::PytketPhaseExpr>(region) {
-            Some(p) => p.to_string(),
-            None => "0".to_string(),
-        };
-
         Ok(Self {
             name: fn_name,
-            phase,
+            phase: "0".to_string(),
             segments: CircuitSegments::new(),
             values: ValueTracker::new(hugr, region, &config)?,
             unsupported: UnsupportedTracker::new(hugr),

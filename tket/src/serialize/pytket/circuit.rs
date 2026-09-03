@@ -562,35 +562,6 @@ impl<Node: HugrNode> EncodedCircuit<Node> {
         self.circuits.contains_key(&region)
     }
 
-    /// Returns `true` if there is an encoded pytket circuit for the given region.
-    #[deprecated(
-        since = "0.21.2",
-        note = "use `contains_region`, since a region may contain multiple circuits"
-    )]
-    pub fn contains_circuit(&self, region: Node) -> bool {
-        self.contains_region(region)
-    }
-
-    /// Returns the first circuit segment encoded for the given region.
-    ///
-    /// This method predates segmented regions and silently ignores every
-    /// segment after the first.
-    #[deprecated(since = "0.21.2", note = "use `get_circuits` or `get_segment`")]
-    pub fn get_circuit(&self, region: Node) -> Option<&SerialCircuit> {
-        self.get_circuits(region).next().map(|(_, circuit)| circuit)
-    }
-
-    /// Returns the first mutable circuit segment encoded for the given region.
-    ///
-    /// This method predates segmented regions and silently ignores every
-    /// segment after the first.
-    #[deprecated(since = "0.21.2", note = "use `get_circuits_mut` or `get_segment_mut`")]
-    pub fn get_circuit_mut(&mut self, region: Node) -> Option<&mut SerialCircuit> {
-        self.get_circuits_mut(region)
-            .next()
-            .map(|(_, circuit)| circuit)
-    }
-
     /// Returns the circuit segments encoded for a region, in execution order.
     ///
     /// Returns an empty iterator when the region was not encoded.

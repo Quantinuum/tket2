@@ -1336,9 +1336,6 @@ fn decode_global_phase_attribute_and_command() {
         .collect_vec();
 
     assert_eq!(global_phase_nodes.len(), 2);
-    #[expect(deprecated)]
-    let phase_metadata = hugr.get_metadata::<metadata::PytketPhaseExpr>(hugr.entrypoint());
-    assert_eq!(phase_metadata, None);
 
     let reser: SerialCircuit = SerialCircuit::encode(&hugr, EncodeOptions::new()).unwrap();
     assert_eq!(reser.phase, "0");

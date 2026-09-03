@@ -16,8 +16,6 @@ pub use extension::qsystem::QSystemPlatform;
 pub use passes::{
     QSystemLLVMPass, QSystemLLVMPassError, QSystemRebasePass, QSystemRebasePassError,
 };
-#[expect(deprecated)]
-pub use passes::{QSystemPass, QSystemPassError};
 pub use target::PlatformTarget;
 
 #[cfg(test)]
@@ -54,7 +52,8 @@ mod test {
 
     use crate::extension::{
         futures::{FutureOpBuilder, FutureOpDef, future_type},
-        qsystem::{QSystemOp, QSystemPlatform},
+        qsystem::QSystemPlatform,
+        qsystem::helios::HeliosOp,
     };
 
     #[rstest]
@@ -88,20 +87,20 @@ mod test {
 
             // with no dependencies, this Reset should be lifted to the start
             let [qb] = builder
-                .add_dataflow_op(QSystemOp::Reset, [qb])
+                .add_dataflow_op(HeliosOp::Reset, [qb])
                 .unwrap()
                 .outputs_arr();
             let h_node = qb.node();
 
             // depending on the angle means this op can't be lifted above the angle ops
             let [qb] = builder
-                .add_dataflow_op(QSystemOp::Rz, [qb, angle])
+                .add_dataflow_op(HeliosOp::Rz, [qb, angle])
                 .unwrap()
                 .outputs_arr();
             let rx_node = qb.node();
 
             let [measure_result] = builder
-                .add_dataflow_op(QSystemOp::LazyMeasure, [qb])
+                .add_dataflow_op(HeliosOp::LazyMeasure, [qb])
                 .unwrap()
                 .outputs_arr();
 
