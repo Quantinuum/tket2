@@ -560,6 +560,21 @@ impl<N: HugrNode> ModifierResolver<N> {
         h: &mut impl HugrMut<Node = N>,
         func: N,
     ) -> Result<N, ModifierResolverErrors<N>> {
+        // We first check for custom implementations.
+        if let Some(custom_func) = self.find_custom_implementation(h, func)? {
+            return Ok(self.custom_implementation_adapter(h, func, custom_func)?);
+        }
+
+        self.modify_fn_inner(h, func)
+    }
+
+    /// Generates a new function modified by the combined modifier without checking for a custom
+    /// implementation.
+    fn modify_fn_inner(
+        &mut self,
+        h: &mut impl HugrMut<Node = N>,
+        func: N,
+    ) -> Result<N, ModifierResolverErrors<N>> {
         let old_call_map = mem::take(self.call_map());
 
         // Old function definition
@@ -1022,10 +1037,21 @@ fn find_controlled_implementation<N: HugrNode>(
                 "Controlled implementation `{impl_name}` for function `{func_name}` not found."
             ))
         })?;
-        if requested_control_qubits
-            == h.get_metadata::<metadata::NumControlQubits>(impl_func)
-                .unwrap()
-        {
+        let control_qubits = h
+            .try_get_metadata::<metadata::NumControlQubits>(impl_func)
+            .map_err(|e| {
+                ModifierResolverErrors::unreachable(format!(
+                    "Failed to read control-qubit count metadata for controlled implementation \
+                     `{impl_name}`: {e}"
+                ))
+            })?
+            .ok_or_else(|| {
+                ModifierResolverErrors::unreachable(format!(
+                    "Controlled implementation `{impl_name}` is missing control-qubit count \
+                     metadata."
+                ))
+            })?;
+        if requested_control_qubits == control_qubits {
             return Ok(Some(impl_func));
         }
     }
@@ -1092,12 +1118,12 @@ mod test {
         SetUnitary, modifier_test_hugr, resolved_modifier_test_hugr, test_modifier_resolver,
     };
     use super::super::*;
-    use crate::TketOp;
     use crate::extension::{
         measurement::MeasurementOpBuilder,
         modifier::{CONTROL_OP_ID, DAGGER_OP_ID, MODIFIER_EXTENSION},
         rotation::{ConstRotation, rotation_type},
     };
+    use crate::{TketOp, metadata};
     use cool_asserts::assert_matches;
     use hugr::{
         Hugr,
@@ -1115,6 +1141,32 @@ mod test {
         type_row,
         types::{PolyFuncType, Signature, Term, Type, TypeArg, TypeBound, type_param::TypeParam},
     };
+
+    fn identity_function(
+        module: &mut ModuleBuilder<Hugr>,
+        name: &str,
+        signature: impl Into<PolyFuncType>,
+    ) -> FuncID<true> {
+        let func = module.define_function(name, signature).unwrap();
+        let outputs = func.input_wires();
+        *func.finish_with_outputs(outputs).unwrap().handle()
+    }
+
+    fn dagger_resolver() -> ModifierResolver {
+        let mut resolver = ModifierResolver::new();
+        resolver.modifiers.dagger = true;
+        resolver
+    }
+
+    fn controlled_resolver() -> ModifierResolver {
+        let mut resolver = ModifierResolver::new();
+        resolver.modifiers = CombinedModifier {
+            control: 1,
+            accum_ctrl: vec![1],
+            dagger: false,
+        };
+        resolver
+    }
 
     fn foo_dfg(module: &mut ModuleBuilder<Hugr>, t_num: usize) -> FuncID<true> {
         let foo_sig = Signature::new_endo(iter::repeat_n(qb_t(), t_num).collect::<Vec<_>>());
@@ -1182,6 +1234,167 @@ mod test {
                 .count(),
             1
         );
+    }
+
+    #[test]
+    fn modify_fn_uses_custom_implementation() {
+        let mut module = ModuleBuilder::new();
+        let original = identity_function(&mut module, "original", Signature::new_endo([usize_t()]));
+        let custom = identity_function(&mut module, "custom", Signature::new_endo([usize_t()]));
+        let mut h = module.finish_hugr().unwrap();
+        h.set_metadata::<metadata::DaggeredImplementation>(original.node(), "custom".to_string());
+        let mut resolver = dagger_resolver();
+
+        let modified = resolver.modify_fn(&mut h, original.node()).unwrap();
+
+        assert_eq!(modified, custom.node());
+    }
+
+    #[test]
+    fn malformed_custom_implementation_metadata_is_an_error() {
+        let mut module = ModuleBuilder::new();
+        let original = identity_function(&mut module, "original", Signature::new_endo([usize_t()]));
+        let mut h = module.finish_hugr().unwrap();
+        h.set_metadata_any(
+            original.node(),
+            "tket.daggered",
+            serde_json::json!(["custom"]),
+        );
+
+        let error = dagger_resolver()
+            .modify_fn(&mut h, original.node())
+            .unwrap_err();
+
+        assert_matches!(error, ModifierResolverErrors::Unreachable { msg } => {
+            assert!(msg.starts_with(
+                "Failed to read daggered implementation metadata for `original`:"
+            ));
+        });
+    }
+
+    #[test]
+    fn missing_custom_implementation_is_an_error() {
+        let mut module = ModuleBuilder::new();
+        let original = identity_function(&mut module, "original", Signature::new_endo([usize_t()]));
+        let mut h = module.finish_hugr().unwrap();
+        h.set_metadata::<metadata::DaggeredImplementation>(original.node(), "missing".to_string());
+
+        let error = dagger_resolver()
+            .modify_fn(&mut h, original.node())
+            .unwrap_err();
+
+        assert_matches!(error, ModifierResolverErrors::Unreachable { msg } => {
+            assert_eq!(
+                msg,
+                "Daggered implementation `missing` for function `original` not found."
+            );
+        });
+    }
+
+    #[test]
+    fn incompatible_daggered_implementation_signature_is_an_error() {
+        let mut module = ModuleBuilder::new();
+        let original = identity_function(&mut module, "original", Signature::new_endo([usize_t()]));
+        let custom = identity_function(&mut module, "custom", Signature::new_endo([bool_t()]));
+        let mut h = module.finish_hugr().unwrap();
+        let custom_optype = h.get_optype(custom.node()).clone();
+        h.set_metadata::<metadata::DaggeredImplementation>(original.node(), "custom".to_string());
+
+        let error = dagger_resolver()
+            .modify_fn(&mut h, original.node())
+            .unwrap_err();
+
+        assert_matches!(error, ModifierResolverErrors::UnResolvable { node, msg, optype } => {
+            assert_eq!(node, custom.node());
+            assert_eq!(optype, custom_optype);
+            assert!(msg.starts_with("Custom implementation `custom` has an incompatible signature;"));
+        });
+    }
+
+    #[test]
+    fn polymorphic_controlled_implementation_is_an_error() {
+        let mut module = ModuleBuilder::new();
+        let generic_type = Type::new_var_use(0, TypeBound::Linear);
+        let signature = PolyFuncType::new(
+            [TypeParam::TypeKind(TypeBound::Linear)],
+            Signature::new_endo([generic_type]),
+        );
+        let original = identity_function(&mut module, "original", signature.clone());
+        let custom = identity_function(&mut module, "custom", signature);
+        let mut h = module.finish_hugr().unwrap();
+        let custom_optype = h.get_optype(custom.node()).clone();
+        h.set_metadata::<metadata::ControlledImplementations>(
+            original.node(),
+            vec!["custom".to_string()],
+        );
+        h.set_metadata::<metadata::NumControlQubits>(custom.node(), 1);
+
+        let error = controlled_resolver()
+            .modify_fn(&mut h, original.node())
+            .unwrap_err();
+
+        assert_matches!(error, ModifierResolverErrors::UnResolvable { node, msg, optype } => {
+            assert_eq!(node, custom.node());
+            assert_eq!(optype, custom_optype);
+            assert_eq!(
+                msg,
+                "Polymorphic custom implementations are not supported (`original` and `custom`)."
+            );
+        });
+    }
+
+    #[test]
+    fn invalid_controlled_implementation_signature_is_an_error() {
+        let mut module = ModuleBuilder::new();
+        let original = identity_function(&mut module, "original", Signature::new_endo([usize_t()]));
+        let custom = identity_function(&mut module, "custom", Signature::new_endo([usize_t()]));
+        let mut h = module.finish_hugr().unwrap();
+        let custom_optype = h.get_optype(custom.node()).clone();
+        h.set_metadata::<metadata::ControlledImplementations>(
+            original.node(),
+            vec!["custom".to_string()],
+        );
+        h.set_metadata::<metadata::NumControlQubits>(custom.node(), 1);
+
+        let error = controlled_resolver()
+            .modify_fn(&mut h, original.node())
+            .unwrap_err();
+
+        assert_matches!(error, ModifierResolverErrors::UnResolvable { node, msg, optype } => {
+            assert_eq!(node, custom.node());
+            assert_eq!(optype, custom_optype);
+            assert!(msg.starts_with(
+                "Custom controlled implementation `custom` must place a trailing borrow_array of \
+                 1 control qubits"
+            ));
+        });
+    }
+
+    #[test]
+    fn missing_control_count_metadata_is_an_error() {
+        let mut module = ModuleBuilder::new();
+        let original = identity_function(&mut module, "original", Signature::new_endo([usize_t()]));
+        identity_function(
+            &mut module,
+            "custom",
+            Signature::new_endo([usize_t(), borrow_array_type(1, qb_t())]),
+        );
+        let mut h = module.finish_hugr().unwrap();
+        h.set_metadata::<metadata::ControlledImplementations>(
+            original.node(),
+            vec!["custom".to_string()],
+        );
+
+        let error = controlled_resolver()
+            .modify_fn(&mut h, original.node())
+            .unwrap_err();
+
+        assert_matches!(error, ModifierResolverErrors::Unreachable { msg } => {
+            assert_eq!(
+                msg,
+                "Controlled implementation `custom` is missing control-qubit count metadata."
+            );
+        });
     }
 
     fn foo_tail_loop(module: &mut ModuleBuilder<Hugr>, t_num: usize) -> FuncID<true> {
