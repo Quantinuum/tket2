@@ -8,9 +8,7 @@
 //! applied.
 //!
 //! The [`Units`] iterator defined in this module yields all the input or output
-//! units of a node. See [`Circuit::units`] and [`Command`] for more details.
-//!
-//! [`Command`]: super::command::Command
+//! units of a node. See [`Circuit::units`] for more details.
 
 pub mod filter;
 
@@ -101,21 +99,6 @@ where
         unit_labeller: UL,
     ) -> Self {
         Self::new_with_dir(circuit, node, Direction::Outgoing, unit_labeller)
-    }
-}
-
-impl<N: HugrNode, UL> Units<IncomingPort, N, UL>
-where
-    UL: UnitLabeller<N>,
-{
-    /// Create a new iterator over the units terminating on the node.
-    #[inline]
-    pub(super) fn new_incoming<T: HugrView<Node = N>>(
-        circuit: &Circuit<T>,
-        node: N,
-        unit_labeller: UL,
-    ) -> Self {
-        Self::new_with_dir(circuit, node, Direction::Incoming, unit_labeller)
     }
 }
 

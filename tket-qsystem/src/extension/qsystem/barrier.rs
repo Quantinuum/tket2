@@ -72,7 +72,7 @@ mod test {
                     h.get_optype(r_barr_n).as_extension_op().is_some_and(|op| {
                         op.def()
                             .name()
-                            .contains(qsystem::RUNTIME_BARRIER_NAME.as_str())
+                            .contains(qsystem::helios::RUNTIME_BARRIER_NAME.as_str())
                     })
                 })
                 .exactly_one()
@@ -108,7 +108,7 @@ mod test {
                     h.get_optype(n).as_extension_op().is_some_and(|op| {
                         op.def()
                             .name()
-                            .contains(qsystem::RUNTIME_BARRIER_NAME.as_str())
+                            .contains(qsystem::helios::RUNTIME_BARRIER_NAME.as_str())
                     })
                 })
                 .count();

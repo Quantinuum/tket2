@@ -2,8 +2,6 @@
 
 use hugr::metadata::Metadata;
 use pyo3::prelude::*;
-#[expect(deprecated)]
-use tket::metadata::PytketPhaseExpr;
 use tket::metadata::{
     CircuitRewriteTraces, ControlledImplementations, CtrlDaggeredImplementations,
     DaggeredImplementation, ExpectedQubitsHint, InlineAnnotation, NumControlQubits,
@@ -25,8 +23,6 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     m.add("PYTKET_OP_GROUP", PytketOpGroup::KEY)?;
     m.add("PYTKET_BIT_REGISTER_NAMES", PytketBitRegisterNames::KEY)?;
     m.add("PYTKET_QUBIT_REGISTER_NAMES", PytketQubitRegisterNames::KEY)?;
-    #[expect(deprecated)]
-    m.add("PYTKET_PHASE_EXPR", PytketPhaseExpr::KEY)?;
     m.add("HELIOS_PLATFORM_CONFIG", HeliosPlatformConfig::KEY)?;
     m.add("CONTROLLED_IMPLEMENTATIONS", ControlledImplementations::KEY)?;
     m.add(

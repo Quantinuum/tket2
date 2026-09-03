@@ -246,10 +246,4 @@ mod test {
 
         assert_eq!(hugr2, hugr);
     }
-
-    #[test]
-    #[expect(deprecated)]
-    fn normalize_guppy_alias() {
-        let _: crate::passes::guppy::NormalizeGuppy = Normalize::default();
-    }
 }
