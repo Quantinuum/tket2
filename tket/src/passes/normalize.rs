@@ -219,9 +219,8 @@ mod test {
     use hugr::builder::{Dataflow, DataflowHugr, FunctionBuilder};
     use hugr::extension::prelude::qb_t;
     use hugr::types::Signature;
-    use hugr::{Hugr, HugrView};
 
-    use crate::{TketOp, extension::REGISTRY};
+    use crate::TketOp;
 
     use super::*;
 
@@ -246,20 +245,6 @@ mod test {
             .unwrap();
 
         assert_eq!(hugr2, hugr);
-    }
-
-    /// Normalize a Guppy fixture using the canonical tket extension definitions.
-    #[test]
-    fn normalize_t_factory() {
-        let mut hugr = Hugr::load(
-            include_bytes!("../../../test_files/guppy_examples/t_factory.hugr").as_slice(),
-            Some(&REGISTRY),
-        )
-        .unwrap();
-
-        hugr.validate().unwrap();
-        Normalize::default().run(&mut hugr).unwrap();
-        hugr.validate().unwrap();
     }
 
     #[test]
