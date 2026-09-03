@@ -38,8 +38,7 @@ impl<H: HugrView> PytketEmitter<H> for PreludeEmitter {
             if hugr
                 .value_types(node, Direction::Incoming)
                 .chain(hugr.value_types(node, Direction::Outgoing))
-                .map(|(_, ty)| ty)
-                .any(|ty| encoder.config().type_to_pytket(&ty).is_none())
+                .any(|(_, ty)| encoder.config().type_to_pytket(&ty).is_none())
             {
                 return Ok(EncodeStatus::Unsupported);
             }
