@@ -1,6 +1,30 @@
 # Changelog
 
 
+## [0.22.0](https://github.com/Quantinuum/tket2/compare/tket-v0.21.2...tket-v0.22.0) - 2026-09-03
+
+### Bug Fixes
+
+- `wire_inout` port mapping with interleaved classical and quantum wires under `dagger` modifier ([#1911](https://github.com/Quantinuum/tket2/pull/1911))
+- Wrong decomposition of `CnZ` gate ([#1948](https://github.com/Quantinuum/tket2/pull/1948))
+
+### New Features
+
+- Extract multiple pytket circuits from a hugr region ([#1894](https://github.com/Quantinuum/tket2/pull/1894))
+- Preserving order edges during (non-dagger) modifier resolution ([#1840](https://github.com/Quantinuum/tket2/pull/1840))
+- Avoid panicking on badger optimization error ([#1940](https://github.com/Quantinuum/tket2/pull/1940))
+- Update Modifier pass to handle custom modifier and introduce new metadata for custom implementation ([#1962](https://github.com/Quantinuum/tket2/pull/1962))
+- *(rs)* [**breaking**] Update hugr to 0.30.1 ([#1965](https://github.com/Quantinuum/tket2/pull/1965))
+- [**breaking**] Remove deprecated definitions ([#1970](https://github.com/Quantinuum/tket2/pull/1970))
+
+### Refactor
+
+- Move borrow array linearizer helper functions to `tket` and make them public ([#1951](https://github.com/Quantinuum/tket2/pull/1951))
+
+### Testing
+
+- Disable failing miri check ([#1922](https://github.com/Quantinuum/tket2/pull/1922))
+
 ## [0.21.2](https://github.com/Quantinuum/tket2/compare/tket-v0.21.1...tket-v0.21.2) - 2026-07-31
 
 ### Bug Fixes
