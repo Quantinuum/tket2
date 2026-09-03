@@ -6,7 +6,7 @@ use pyo3::prelude::*;
 use tket::metadata::PytketPhaseExpr;
 use tket::metadata::{
     CircuitRewriteTraces, ControlledImplementations, CtrlDaggeredImplementations,
-    DaggeredImplementations, ExpectedQubitsHint, InlineAnnotation, NumControlQubits,
+    DaggeredImplementation, ExpectedQubitsHint, InlineAnnotation, NumControlQubits,
     PytketBitRegisterNames, PytketInputParameters, PytketOpGroup, PytketQubitRegisterNames,
     UnitaryFlags,
 };
@@ -33,7 +33,7 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
         "CTRL_DAGGERED_IMPLEMENTATIONS",
         CtrlDaggeredImplementations::KEY,
     )?;
-    m.add("DAGGERED_IMPLEMENTATIONS", DaggeredImplementations::KEY)?;
+    m.add("DAGGERED_IMPLEMENTATION", DaggeredImplementation::KEY)?;
     m.add("NUM_CONTROL_QUBITS", NumControlQubits::KEY)?;
     Ok(m)
 }

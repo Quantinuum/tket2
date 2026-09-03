@@ -373,7 +373,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             (0, true) => {
                 // println!("Looking for daggered implementation of function `{func_name}`");
                 let Some(impl_name) = h
-                    .try_get_metadata::<metadata::DaggeredImplementations>(func)
+                    .try_get_metadata::<metadata::DaggeredImplementation>(func)
                     .map_err(|e| {
                         ModifierResolverErrors::unreachable(format!(
                             "Failed to read daggered implementation metadata for `{func_name}`: {e}"
@@ -434,6 +434,29 @@ impl<N: HugrNode> ModifierResolver<N> {
     ) -> Result<N, ModifierResolverErrors<N>> {
         self.modified_functions.insert(original_func);
         if self.control_num() == 0 {
+            let original_defn = h.get_optype(original_func).as_func_defn().ok_or_else(|| {
+                ModifierResolverErrors::unreachable(format!(
+                    "Cannot use a custom implementation for non-function node {original_func}."
+                ))
+            })?;
+            let custom_defn = h.get_optype(custom_func).as_func_defn().ok_or_else(|| {
+                ModifierResolverErrors::unreachable(format!(
+                    "Custom implementation node {custom_func} is not a function."
+                ))
+            })?;
+            if original_defn.signature() != custom_defn.signature() {
+                return Err(ModifierResolverErrors::unresolvable(
+                    custom_func,
+                    format!(
+                        "Custom implementation `{}` has an incompatible signature; expected `{}`, \
+                         found `{}`.",
+                        custom_defn.func_name(),
+                        original_defn.signature(),
+                        custom_defn.signature(),
+                    ),
+                    h.get_optype(custom_func).clone(),
+                ));
+            }
             return Ok(custom_func);
         }
 
@@ -442,7 +465,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             return Ok(*adapter);
         }
 
-        let spec = self.validate_custom_adapter(h, original_func, custom_func)?;
+        let spec = self.get_custom_adapter_specs(h, original_func, custom_func)?;
         let mut adapter_signature = spec.original_signature.clone();
         // The adapter signature is the original signature modified by the combined modifier, as
         // the function was modified without using the custom implementation.
@@ -454,9 +477,8 @@ impl<N: HugrNode> ModifierResolver<N> {
         Ok(adapter_func)
     }
 
-    /// Validate the controls-last ABI of a custom implementation and collect the information
-    /// required to build its controls-first adapter.
-    fn validate_custom_adapter(
+    /// Get the specifications for a building the adapter and validates the signatures.
+    fn get_custom_adapter_specs(
         &self,
         h: &impl HugrView<Node = N>,
         original_func: N,

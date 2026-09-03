@@ -82,8 +82,8 @@ impl Metadata for UnitaryFlags {
 
 /// Metadata key for the daggered custom implementations of a function.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct DaggeredImplementations;
-impl Metadata for DaggeredImplementations {
+pub struct DaggeredImplementation;
+impl Metadata for DaggeredImplementation {
     const KEY: &'static str = "tket.daggered";
     type Type<'hugr> = String;
 }

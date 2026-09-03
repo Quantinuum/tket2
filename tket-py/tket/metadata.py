@@ -40,7 +40,7 @@ __all__ = [
     "CircuitRewriteTraces",
     "ControlledImplementations",
     "CtrlDaggeredImplementations",
-    "DaggeredImplementations",
+    "DaggeredImplementation",
     "HeliosPlatformConfig",
     "HeliosPlatformConfigValue",
     "InlineAnnotation",
@@ -86,10 +86,10 @@ class NumControlQubits(Metadata[int]):
     KEY = _metadata.NUM_CONTROL_QUBITS
 
 
-class DaggeredImplementations(Metadata[str]):
+class DaggeredImplementation(Metadata[str]):
     """Metadata key for the name of the daggered implementation of a function."""
 
-    KEY = _metadata.DAGGERED_IMPLEMENTATIONS
+    KEY = _metadata.DAGGERED_IMPLEMENTATION
 
 
 class RewriteTraceValue(TypedDict):
