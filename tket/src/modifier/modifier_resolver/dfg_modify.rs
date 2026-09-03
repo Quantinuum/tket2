@@ -562,7 +562,8 @@ impl<N: HugrNode> ModifierResolver<N> {
     ) -> Result<N, ModifierResolverErrors<N>> {
         // We first check for custom implementations.
         if let Some(custom_func) = self.find_custom_implementation(h, func)? {
-            return Ok(self.custom_implementation_adapter(h, func, custom_func)?);
+            let custom_fn = self.custom_implementation_adapter(h, func, custom_func)?;
+            return Ok(custom_fn);
         }
 
         self.modify_fn_inner(h, func)
