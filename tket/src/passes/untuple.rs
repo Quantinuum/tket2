@@ -8,7 +8,7 @@ use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
 use hugr_core::hugr::SimpleReplacementError;
 use hugr_core::hugr::hugrmut::HugrMut;
 use hugr_core::hugr::views::SiblingSubgraph;
-use hugr_core::ops::{OpTrait, OpType};
+use hugr_core::ops::OpType;
 use hugr_core::types::Type;
 use hugr_core::{HugrView, Node, PortIndex, SimpleReplacement};
 use itertools::Itertools;
@@ -166,7 +166,7 @@ fn make_rewrite<'h, T: HugrView>(
         return None;
     }
 
-    let tuple_types = op.dataflow_signature().unwrap().input_types().to_vec();
+    let tuple_types = hugr.in_value_types(node).map(|(_, ty)| ty).collect_vec();
     let node_parent = hugr.get_parent(node);
 
     // See if it is followed by a tuple unpack
