@@ -327,6 +327,7 @@ pub struct ModifierResolver<N = Node> {
     modified_functions: HashSet<N>,
     /// Cached adapters from the resolver's controls-first ABI to custom controls-last functions.
     custom_adapters: HashMap<(N, N, CombinedModifier), N>,
+    /// Analyzer used to find qubits in types. Used to check when a type carries quantum data.
     qubit_finder: TypeUnpacker,
     /// Indicate whether the extension op being modified is targeted by some
     /// StateOrder edge.
