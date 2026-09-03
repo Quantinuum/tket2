@@ -371,7 +371,6 @@ impl<N: HugrNode> ModifierResolver<N> {
 
         match (requested_control_qubits, self.modifiers().dagger) {
             (0, true) => {
-                // println!("Looking for daggered implementation of function `{func_name}`");
                 let Some(impl_name) = h
                     .try_get_metadata::<metadata::DaggeredImplementation>(func)
                     .map_err(|e| {
@@ -390,9 +389,6 @@ impl<N: HugrNode> ModifierResolver<N> {
                 Ok(Some(impl_func))
             }
             (n, false) if n > 0 => {
-                // println!(
-                //     "Looking for controlled implementation of function `{func_name}` with {n} control qubits"
-                // );
                 let impl_names = h
                     .try_get_metadata::<metadata::ControlledImplementations>(func)
                     .map_err(|e| {
@@ -403,9 +399,6 @@ impl<N: HugrNode> ModifierResolver<N> {
                 find_controlled_implementation(h, impl_names, n, &func_name)
             }
             (n, true) if n > 0 => {
-                // println!(
-                //     "Looking for controlled-daggered implementation of function `{func_name}` with {n} control qubits"
-                // );
                 let impl_names = h
                     .try_get_metadata::<metadata::CtrlDaggeredImplementations>(func)
                     .map_err(|e| {
