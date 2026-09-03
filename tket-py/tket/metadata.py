@@ -69,25 +69,34 @@ PytketBit: TypeAlias = tuple[str, list[int]]
 
 
 class ControlledImplementations(Metadata[list[str]]):
-    """Metadata key for the names of controlled implementations of a function."""
+    """Metadata key for the controlled custom implementations of a function.
+
+    This is used to store the names of the custom controlled implementations of a function, if present.
+    """
 
     KEY = _metadata.CONTROLLED_IMPLEMENTATIONS
 
 
 class CtrlDaggeredImplementations(Metadata[list[str]]):
-    """Metadata key for the names of controlled-daggered implementations of a function."""
+    """Metadata key for the controlled-daggered custom implementations of a function.
+
+    This is used to store the names of the custom controlled-daggered implementations of a function, if present.
+    """
 
     KEY = _metadata.CTRL_DAGGERED_IMPLEMENTATIONS
 
 
 class NumControlQubits(Metadata[int]):
-    """Metadata key for the number of control qubits used in a function's controlled implementation."""
+    """Metadata key for number of control qubits for the controlled implementations of a function."""
 
     KEY = _metadata.NUM_CONTROL_QUBITS
 
 
 class DaggeredImplementation(Metadata[str]):
-    """Metadata key for the name of the daggered implementation of a function."""
+    """Metadata key for the daggered custom implementations of a function.
+
+    This is used to store the name of the custom daggered implementation of a function, if present.
+    """
 
     KEY = _metadata.DAGGERED_IMPLEMENTATION
 
