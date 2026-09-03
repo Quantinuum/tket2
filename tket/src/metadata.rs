@@ -32,6 +32,9 @@ use crate::rewrite::trace::RewriteTrace;
 use hugr_core::metadata::Metadata;
 use tket_json_rs::register::{Bit, Qubit};
 
+/// The name of a function, used to reference custom implementations.
+pub type FunctionName = String;
+
 /// Metadata key for the number of qubits that a HUGR node expects to be required for execution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ExpectedQubitsHint;
@@ -81,27 +84,33 @@ impl Metadata for UnitaryFlags {
 }
 
 /// Metadata key for the daggered custom implementations of a function.
+///
+/// This is used to store the name of the custom daggered implementation of a function, if present.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct DaggeredImplementation;
 impl Metadata for DaggeredImplementation {
     const KEY: &'static str = "tket.daggered";
-    type Type<'hugr> = String;
+    type Type<'hugr> = FunctionName;
 }
 
 /// Metadata key for the controlled custom implementations of a function.
+///
+/// This is used to store the names of the custom controlled implementations of a function, if present.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ControlledImplementations;
 impl Metadata for ControlledImplementations {
     const KEY: &'static str = "tket.controlled";
-    type Type<'hugr> = Vec<String>;
+    type Type<'hugr> = Vec<FunctionName>;
 }
 
 /// Metadata key for the controlled-daggered custom implementations of a function.
+///
+/// This is used to store the names of the custom controlled-daggered implementations of a function, if present.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CtrlDaggeredImplementations;
 impl Metadata for CtrlDaggeredImplementations {
     const KEY: &'static str = "tket.ctrl_daggered";
-    type Type<'hugr> = Vec<String>;
+    type Type<'hugr> = Vec<FunctionName>;
 }
 
 /// Metadata key for number of control qubits for the controlled implementations of a function.
