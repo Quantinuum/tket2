@@ -107,8 +107,9 @@ class CompilationState:
 
     def to_python(self) -> Package:
         """Convert this CompilationState back to a python Hugr package."""
-        # Convert the inner hugr to bytes and load it in Python.
-        hugr_bytes = self._inner.to_bytes()
+        # Bundle all used definitions because the Python registry may have an
+        # older version from the same compatibility band as the Rust registry.
+        hugr_bytes = self._inner.to_bytes(omit_tket_exts=False)
         package = Package.from_bytes(hugr_bytes, tket_registry())
         if self._py_extensions is not None:
             # Resolve the extensions in the loaded package using the python registry, if needed.

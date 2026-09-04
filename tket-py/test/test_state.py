@@ -69,6 +69,12 @@ def test_newer_embedded_tket_extension_is_bundled() -> None:
     state = CompilationState.from_python(hugr)
 
     assert (str(embedded.name), newer_version) in _bundled_extensions(state)
+    resolved = (
+        state.to_python()
+        .used_extensions()
+        .used_extensions.get_extension(embedded.name, newer_version)
+    )
+    assert resolved.version == newer_version
 
 
 def test_newer_embedded_std_extension_is_bundled() -> None:
@@ -80,6 +86,12 @@ def test_newer_embedded_std_extension_is_bundled() -> None:
     state = CompilationState.from_python(hugr)
 
     assert (str(embedded.name), newer_version) in _bundled_extensions(state)
+    resolved = (
+        state.to_python()
+        .used_extensions()
+        .used_extensions.get_extension(embedded.name, newer_version)
+    )
+    assert resolved.version == newer_version
 
 
 def test_tket_exts_registry_matches_embedded_tket_extensions() -> None:
