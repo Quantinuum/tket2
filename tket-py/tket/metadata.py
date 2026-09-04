@@ -28,6 +28,7 @@ from typing import TYPE_CHECKING, Literal, TypeAlias, TypedDict
 from hugr.metadata import Metadata
 from pydantic import StrictBool, TypeAdapter
 from pydantic.dataclasses import dataclass
+from typing_extensions import deprecated
 
 from ._tket import metadata as _metadata
 
@@ -50,6 +51,7 @@ __all__ = [
     "PytketBitRegisterNames",
     "PytketInputParameters",
     "PytketOpGroup",
+    "PytketPhaseExpr",
     "PytketQubit",
     "PytketQubitRegisterNames",
     "RewriteTraceValue",
@@ -195,6 +197,17 @@ class PytketQubitRegisterNames(Metadata[list[PytketQubit]]):
     @classmethod
     def from_json(cls, value: JsonType) -> list[PytketQubit]:
         return _read_pytket_register(cls.KEY, value)
+
+
+@deprecated("Call `used_extensions` on the hugr instead.")
+class PytketPhaseExpr(Metadata[str]):
+    """Metadata key for the serialized pytket global phase expression.
+
+    Deprecated:
+        Use explicit ``tket.global_phase`` operations instead.
+    """
+
+    KEY = "TKET1.phase"
 
 
 def _store_pytket_register(value: list[tuple[str, list[int]]]) -> JsonType:
