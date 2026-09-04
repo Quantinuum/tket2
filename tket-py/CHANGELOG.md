@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.15.8](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.7...tket-py-v0.15.8) (2026-09-04)
+
+
+### Features
+
+* Add missing tket1 extension to tket_exts ([#1961](https://github.com/Quantinuum/tket2/issues/1961)) ([989e2a3](https://github.com/Quantinuum/tket2/commit/989e2a3b47ccdb3ac80c2dc2292393a2e154d8e5))
+* Update Modifier pass to handle custom modifier and introduce new metadata for custom implementation ([#1962](https://github.com/Quantinuum/tket2/issues/1962)) ([6ff9ad5](https://github.com/Quantinuum/tket2/commit/6ff9ad5ea9bfdd63dc3ac12adbe5cdc0252a43fb))
+
+### Bug Fixes
+
+* Include required newer extensions when loading a `CompilationState` from a Python hugr ([#1976](https://github.com/Quantinuum/tket2/issues/1976)) ([4bdffbf](https://github.com/Quantinuum/tket2/commit/4bdffbf6a286aecf7f9cc30bc9596057239e7189))
+
+
+
 ## [0.15.7](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.6...tket-py-v0.15.7) (2026-08-28)
 
 
