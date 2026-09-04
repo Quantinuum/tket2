@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.29.0](https://github.com/Quantinuum/tket2/compare/tket-qsystem-v0.28.0...tket-qsystem-v0.29.0) - 2026-09-04
+
+### New Features
+
+- [**breaking**] Rename Sol ___lazy_measure to ___future_measure ([#1938](https://github.com/Quantinuum/tket2/pull/1938))
+
 ## [0.28.0](https://github.com/Quantinuum/tket2/compare/tket-qsystem-v0.27.2...tket-qsystem-v0.28.0) - 2026-09-03
 
 ### New Features
