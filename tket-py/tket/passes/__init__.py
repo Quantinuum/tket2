@@ -15,7 +15,6 @@ from hugr.passes.composable import (
     implement_pass_run,
 )
 from hugr.passes.scope import GlobalScope, PassScope
-from typing_extensions import deprecated
 
 from tket import _state
 
@@ -34,7 +33,6 @@ __all__ = [
     "InlineFunctions",
     "ModifierResolverPass",
     "Normalize",
-    "NormalizeGuppy",
     "PassResult",
     "PlatformTarget",
     "PytketHugrPass",
@@ -226,11 +224,6 @@ class Normalize(ComposablePass):
             scope=self._scope,
         )
         return program
-
-
-@deprecated("Use `Normalize` instead.")
-class NormalizeGuppy(Normalize):
-    """Deprecated alias for :py:class:`Normalize`."""
 
 
 @cache

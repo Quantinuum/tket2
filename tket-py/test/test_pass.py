@@ -22,7 +22,6 @@ from tket.passes import (
     InlineFunctions,
     ModifierResolverPass,
     Normalize,
-    NormalizeGuppy,
     PlatformTarget,
     PytketHugrPass,
     QSystemRebasePass,
@@ -291,13 +290,6 @@ def test_normalize_guppy():
     clean_hugr = normalize(hugr)
     normal_circ1 = CompilationState.from_bytes(clean_hugr.to_bytes())
     assert normal_circ1.circuit_cost(lambda op: int(op == TketOp.CX)) == 3
-
-
-def test_normalize_guppy_deprecated_alias():
-    with pytest.deprecated_call(match="Use `Normalize` instead"):
-        normalize = NormalizeGuppy()
-
-    assert isinstance(normalize, Normalize)
 
 
 def test_modifier_resolver() -> None:
