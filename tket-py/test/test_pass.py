@@ -24,10 +24,10 @@ from tket.passes import (
     Normalize,
     PlatformTarget,
     PytketHugrPass,
-    QSystemLLVMPass,
     QSystemRebasePass,
     _badger_optimise,
     _greedy_depth_reduce,
+    _QSystemLLVMPass,
     inline_funcs,
 )
 
@@ -474,7 +474,7 @@ def test_python_qsystem_pass() -> None:
     normalize = Normalize()
     hugr = normalize(_hugr_from_path("test_files/guppy_examples/flat_quantum.hugr"))
     qsystem_rebase = QSystemRebasePass()
-    qsystem_llvm = QSystemLLVMPass()
+    qsystem_llvm = _QSystemLLVMPass()
     qsystem_hugr = qsystem_llvm(qsystem_rebase(hugr))
     assert _count_ops(qsystem_hugr, "ZZPhase") == 1
     assert _count_ops(qsystem_hugr, "Custom") == 0
@@ -487,7 +487,7 @@ def test_python_qsystem_pass_with_modifiers() -> None:
     This won't actually do anything useful, we just want to check that the pass
     runs without errors."""
     qsystem_rebase = QSystemRebasePass()
-    qsystem_llvm = QSystemLLVMPass()
+    qsystem_llvm = _QSystemLLVMPass()
     failures = []
     for hugr_path in sorted(Path("test_files/modifier_examples").glob("*.hugr")):
         try:

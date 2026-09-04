@@ -36,8 +36,8 @@ __all__ = [
     "PassResult",
     "PlatformTarget",
     "PytketHugrPass",
-    "QSystemLLVMPass",
     "QSystemRebasePass",
+    "_QSystemLLVMPass",
 ]
 
 
@@ -499,7 +499,7 @@ class QSystemRebasePass(ComposablePass):
 
 
 @dataclass(kw_only=True)
-class QSystemLLVMPass(ComposablePass):
+class _QSystemLLVMPass(ComposablePass):
     """Prepare a QSystem program for LLVM lowering.
 
     This is normally called automatically by the tools before LLVM lowering.
@@ -523,7 +523,7 @@ class QSystemLLVMPass(ComposablePass):
             copy_call=lambda h: self._qsystem_llvm(h, inplace),
         )
 
-    def with_scope(self, scope: PassScope) -> QSystemLLVMPass:
+    def with_scope(self, scope: PassScope) -> _QSystemLLVMPass:
         """Set the scope of this pass and return self."""
         self._scope = scope
         return self
