@@ -5,7 +5,7 @@ use std::str::FromStr;
 
 use anyhow::Context;
 use hugr::envelope::{EnvelopeConfig, EnvelopeFormat, ZstdConfig};
-use hugr::extension::ExtensionRegistry;
+use hugr::extension::{ExtensionRegistry, Version};
 use hugr::ops::OpType;
 use pyo3::types::PyAnyMethods;
 use pyo3::{Bound, PyAny, Python, pyclass, pyfunction, pymethods};
@@ -88,10 +88,10 @@ impl CompilationState {
     ///
     /// If no config is given, it defaults to the default binary envelope.
     ///
-    /// If `omit_tket_exts` is true, the extensions in [`embedded_extensions`]
-    /// will not be not be included in the envelope even when they are used in the
-    /// HUGR. This is useful when sending the HUGR to other components that
-    /// already have the tket extensions available.
+    /// If `omit_tket_exts` is true, extensions available at a compatible version
+    /// in the Rust registry will not be included in the envelope even when they
+    /// are used in the HUGR. This is useful when sending the HUGR to other
+    /// components that already have those extensions available.
     #[pyo3(signature = (config = None, *, omit_tket_exts = true))]
     pub fn to_bytes(
         &self,
@@ -114,10 +114,10 @@ impl CompilationState {
     ///
     /// If no config is given, it defaults to the default text envelope.
     ///
-    /// If `omit_tket_exts` is true, the extensions in [`embedded_extensions`]
-    /// will not be not be included in the envelope even when they are used in the
-    /// HUGR. This is useful when sending the HUGR to other components that
-    /// already have the tket extensions available.
+    /// If `omit_tket_exts` is true, extensions available at a compatible version
+    /// in the Rust registry will not be included in the envelope even when they
+    /// are used in the HUGR. This is useful when sending the HUGR to other
+    /// components that already have those extensions available.
     #[pyo3(signature = (config = None, *, omit_tket_exts = true))]
     pub fn to_str(
         &self,
@@ -268,9 +268,24 @@ fn extra_extensions(hugr: &Hugr, omit_tket_exts: bool) -> ExtensionRegistry {
 
 /// Returns a list of extension ids supported by the CompilationState loader.
 ///
-/// Extensions not in this list must be included in the package when
-/// loading a CompilationState.
+/// Extensions not in this list must be included in the package when loading a
+/// CompilationState.
+///
+/// Extensions with these ids may still need to be included if the registry
+/// cannot satisfy their requested version. Use [`has_compatible_extension`] to
+/// check if a specific version is compatible.
 #[pyfunction]
 pub fn embedded_extensions() -> Vec<String> {
     REGISTRY.ids().map(ToString::to_string).collect()
+}
+
+/// Returns whether the loader registry can satisfy an extension version.
+///
+/// Compatibility is checked by the Rust HUGR registry so callers use exactly
+/// the same version rules as [`CompilationState::from_bytes`].
+#[pyfunction]
+pub fn has_compatible_extension(name: &str, version: &str) -> anyhow::Result<bool> {
+    let version = Version::parse(version)
+        .with_context(|| format!("Invalid extension version: {version:?}"))?;
+    Ok(REGISTRY.get_compatible(name, &version).is_some())
 }

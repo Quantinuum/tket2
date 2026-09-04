@@ -51,10 +51,9 @@ class CompilationState:
         Args:
             config: The envelope configuration to use.
                 If not given, uses the default binary encoding.
-            omit_tket_exts: If true, the extensions in :meth:`embedded_extensions`
-                will not be not be included in the envelope even when they are used in the
-                HUGR. This is useful when sending the HUGR to other components that
-                already have the tket extensions available.
+            omit_tket_exts: If true, extensions available at a compatible version
+                in the Rust registry will not be included in the envelope even when
+                they are used in the HUGR.
         """
 
     def to_str(
@@ -68,10 +67,9 @@ class CompilationState:
         Args:
             config: The envelope configuration to use.
                 If not given, uses the default textual encoding.
-            omit_tket_exts: If true, the extensions in :meth:`embedded_extensions`
-                will not be not be included in the envelope even when they are used in the
-                HUGR. This is useful when sending the HUGR to other components that
-                already have the tket extensions available.
+            omit_tket_exts: If true, extensions available at a compatible version
+                in the Rust registry will not be included in the envelope even when
+                they are used in the HUGR.
         """
 
     @staticmethod
@@ -149,7 +147,10 @@ class CircuitCost:
     """A cost associated with a circuit."""
 
 def embedded_extensions() -> list[str]:
-    """Returns the list of extension ids supported by the CompilationState loader."""
+    """Return extension ids present in the CompilationState loader registry."""
+
+def has_compatible_extension(name: str, version: str) -> bool:
+    """Return whether the loader registry can satisfy an extension version."""
 
 class HugrError(Exception): ...
 class BuildError(Exception): ...

@@ -84,17 +84,18 @@ class CompilationState:
     def from_python(hugr: Hugr | Package) -> CompilationState:
         """Convert a python-backed Hugr to a CompilationState."""
         py_extensions = None
-        # Get extensions used by this hugr that are not already in the Rust registry.
+        # Get extensions used by this hugr that cannot be satisfied by the Rust
+        # registry at a compatible version.
         if isinstance(hugr, Hugr):
-            embedded = set(_state.embedded_extensions())
             res = hugr.used_extensions()
             py_extensions = res.used_extensions
             extensions = [
                 ext
                 for ext in res.used_extensions.extensions
-                if ext.name not in embedded
+                if not _state.has_compatible_extension(str(ext.name), str(ext.version))
             ]
-            # Wrap the hugr in a package with the non-standard extensions.
+            # Wrap the HUGR with every extension the Rust loader cannot provide,
+            # including newer versions of standard extensions.
             package = Package(modules=[hugr], extensions=extensions)
         elif isinstance(hugr, Package):
             package = hugr
@@ -169,10 +170,9 @@ class CompilationState:
         Args:
             config: The envelope configuration to use.
                 If not given, uses the default binary encoding.
-            omit_tket_exts: If true, the extensions in :meth:`embedded_extensions`
-                will not be not be included in the envelope even when they are used in the
-                HUGR. This is useful when sending the HUGR to other components that
-                already have the tket extensions available.
+            omit_tket_exts: If true, extensions available at a compatible version
+                in the Rust registry will not be included in the envelope even when
+                they are used in the HUGR.
         """
         return self._inner.to_bytes(config, omit_tket_exts=omit_tket_exts)
 
@@ -187,10 +187,9 @@ class CompilationState:
         Args:
             config: The envelope configuration to use.
                 If not given, uses the default textual encoding.
-            omit_tket_exts: If true, the extensions in :meth:`embedded_extensions`
-                will not be not be included in the envelope even when they are used in the
-                HUGR. This is useful when sending the HUGR to other components that
-                already have the tket extensions available.
+            omit_tket_exts: If true, extensions available at a compatible version
+                in the Rust registry will not be included in the envelope even when
+                they are used in the HUGR.
         """
         return self._inner.to_str(config, omit_tket_exts=omit_tket_exts)
 
