@@ -1,3 +1,5 @@
+import json
+
 from hugr import tys
 from hugr.build.dfg import Function
 from hugr.ext import Extension, OpDef, OpDefSig
@@ -6,15 +8,18 @@ from hugr.std import _std_extensions
 from semver import Version
 from tket_exts import tket_registry
 
-from tket._state import (
-    CompilationState,
-    embedded_extensions,
-)
+from tket._state import CompilationState
+from tket._tket import state as native_state
 
 
 def _custom_extension_hugr() -> Hugr:
     """Build a small HUGR using a Python-defined extension op."""
-    extension = Extension("test.custom", Version.parse("0.1.0"))
+    return _extension_hugr("test.custom", Version.parse("0.1.0"))
+
+
+def _extension_hugr(name: str, version: Version) -> Hugr:
+    """Build a small HUGR using the requested extension name and version."""
+    extension = Extension(name, version)
     op_def = extension.add_op_def(
         OpDef(
             "gate",
@@ -29,6 +34,22 @@ def _custom_extension_hugr() -> Hugr:
     return fn.hugr
 
 
+def _bundled_extensions(state: CompilationState) -> set[tuple[str, Version]]:
+    """Read extension identities from the default text envelope payload."""
+    payload = state.to_str()[10:]
+    extensions, _ = json.JSONDecoder().raw_decode(payload)
+    return {(ext["name"], Version.parse(ext["version"])) for ext in extensions}
+
+
+def _compatibility_band(version: Version) -> tuple[int, ...]:
+    """Return the caret-semver compatibility band for a stable version."""
+    if version.major != 0:
+        return (version.major,)
+    if version.minor != 0:
+        return (version.major, version.minor)
+    return (version.major, version.minor, version.patch)
+
+
 def test_custom_ext_roundtrip() -> None:
     state = CompilationState.from_python(_custom_extension_hugr())
 
@@ -39,15 +60,51 @@ def test_custom_ext_roundtrip() -> None:
     assert "test.custom" in text_roundtrip.used_extensions().ids()
 
 
-def test_tket_exts_registry_matches_embedded_tket_extensions() -> None:
-    """Keep tket-py's embedded extension registry in sync with tket_exts."""
-    python_tket_ids = set(tket_registry().ids())
-    prelude = set(_std_extensions().ids())
+def test_newer_embedded_tket_extension_is_bundled() -> None:
+    """A newer Python extension cannot be replaced by Rust's older definition."""
+    embedded = tket_registry().get_extension("tket.globals")
+    newer_version = embedded.version.bump_patch()
+    hugr = _extension_hugr(str(embedded.name), newer_version)
 
-    rust_tket_ids = {
-        extension_id
-        for extension_id in embedded_extensions()
-        if extension_id not in prelude
+    state = CompilationState.from_python(hugr)
+
+    assert (str(embedded.name), newer_version) in _bundled_extensions(state)
+    resolved = (
+        state.to_python()
+        .used_extensions()
+        .used_extensions.get_extension(embedded.name, newer_version)
+    )
+    assert resolved.version == newer_version
+
+
+def test_newer_embedded_std_extension_is_bundled() -> None:
+    """Newer standard extensions must also be present in the wire package."""
+    embedded = _std_extensions().get_extension("logic")
+    newer_version = embedded.version.bump_patch()
+    hugr = _extension_hugr(str(embedded.name), newer_version)
+
+    state = CompilationState.from_python(hugr)
+
+    assert (str(embedded.name), newer_version) in _bundled_extensions(state)
+    resolved = (
+        state.to_python()
+        .used_extensions()
+        .used_extensions.get_extension(embedded.name, newer_version)
+    )
+    assert resolved.version == newer_version
+
+
+def test_tket_exts_registry_matches_embedded_tket_extensions() -> None:
+    """Keep Python and Rust tket definitions in compatible version bands."""
+    std_ids = _std_extensions().ids()
+    python_extensions = {
+        (str(ext.name), _compatibility_band(ext.version))
+        for ext in tket_registry().all_extensions
+    }
+    rust_extensions = {
+        (name, _compatibility_band(Version.parse(version)))
+        for name, version in native_state.embedded_extensions()
+        if name not in std_ids
     }
 
-    assert python_tket_ids == rust_tket_ids
+    assert python_extensions == rust_extensions
