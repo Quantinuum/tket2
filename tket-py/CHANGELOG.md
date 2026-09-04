@@ -1,17 +1,11 @@
 # Changelog
 
-## [0.16.0](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.7...tket-py-v0.16.0) (2026-09-04)
+## [0.15.8](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.7...tket-py-v0.15.8) (2026-09-04)
 
-
-### ⚠ BREAKING CHANGES
-
-* Removed deprecated `tket.passes.NormalizeGuppy`. Use `Normalize` instead.
-* Removed deprecated `tket.metadata.PytketPhaseExpr`.
 
 ### Features
 
 * Add missing tket1 extension to tket_exts ([#1961](https://github.com/Quantinuum/tket2/issues/1961)) ([989e2a3](https://github.com/Quantinuum/tket2/commit/989e2a3b47ccdb3ac80c2dc2292393a2e154d8e5))
-* Remove deprecated definitions from tket-py ([#1975](https://github.com/Quantinuum/tket2/issues/1975)) ([3896c6c](https://github.com/Quantinuum/tket2/commit/3896c6c16c7dff27615865a4b1c17c34735ef091))
 * Update Modifier pass to handle custom modifier and introduce new metadata for custom implementation ([#1962](https://github.com/Quantinuum/tket2/issues/1962)) ([6ff9ad5](https://github.com/Quantinuum/tket2/commit/6ff9ad5ea9bfdd63dc3ac12adbe5cdc0252a43fb))
 
 ### Bug Fixes
