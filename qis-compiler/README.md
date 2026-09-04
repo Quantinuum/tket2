@@ -21,7 +21,7 @@ This can then be compiled to LLVM IR or bitcode
 using this package:
 
 ```python
-from qis_compiler import (
+from selene_hugr_qis_compiler import (
     compile_to_llvm_ir,
     compile_to_bitcode,
 )

@@ -15,7 +15,6 @@ from hugr.passes.composable import (
     implement_pass_run,
 )
 from hugr.passes.scope import GlobalScope, PassScope
-from typing_extensions import deprecated
 
 from tket import _state
 
@@ -34,12 +33,11 @@ __all__ = [
     "InlineFunctions",
     "ModifierResolverPass",
     "Normalize",
-    "NormalizeGuppy",
     "PassResult",
     "PlatformTarget",
     "PytketHugrPass",
+    "QSystemLLVMPass",
     "QSystemRebasePass",
-    "_QSystemLLVMPass",
 ]
 
 
@@ -226,11 +224,6 @@ class Normalize(ComposablePass):
             scope=self._scope,
         )
         return program
-
-
-@deprecated("Use `Normalize` instead.")
-class NormalizeGuppy(Normalize):
-    """Deprecated alias for :py:class:`Normalize`."""
 
 
 @cache
@@ -506,7 +499,7 @@ class QSystemRebasePass(ComposablePass):
 
 
 @dataclass(kw_only=True)
-class _QSystemLLVMPass(ComposablePass):
+class QSystemLLVMPass(ComposablePass):
     """Prepare a QSystem program for LLVM lowering.
 
     This is normally called automatically by the tools before LLVM lowering.
@@ -530,7 +523,7 @@ class _QSystemLLVMPass(ComposablePass):
             copy_call=lambda h: self._qsystem_llvm(h, inplace),
         )
 
-    def with_scope(self, scope: PassScope) -> _QSystemLLVMPass:
+    def with_scope(self, scope: PassScope) -> QSystemLLVMPass:
         """Set the scope of this pass and return self."""
         self._scope = scope
         return self
