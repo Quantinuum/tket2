@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#    "guppylang==1.0.0rc1",
+#    "guppylang==1.0.rc1",
 # ]
 # ///
 """Test the use of a higher-order function with complex control flow inside modifiers"""
@@ -10,13 +10,11 @@ from collections.abc import Callable
 from pathlib import Path
 from sys import argv
 
-from guppylang import enable_experimental_features, guppy
+from guppylang import guppy
 from guppylang.std.builtins import Controllable, Unitary, array, control, dagger
 from guppylang.std.debug import state_result
 from guppylang.std.lang import Function
 from guppylang.std.quantum import angle, discard_array, h, qubit, rx, rz
-
-enable_experimental_features()
 
 
 @guppy

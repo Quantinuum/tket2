@@ -9,13 +9,12 @@
 from pathlib import Path
 from sys import argv
 
-from guppylang import enable_experimental_features, guppy
+from guppylang import guppy
 from guppylang.std.builtins import control, dagger
 from guppylang.std.debug import state_result
 from guppylang.std.quantum import discard, h, qubit
 from pytket import Circuit
 
-enable_experimental_features()
 
 # PyTket circuit
 circ = Circuit(2)
