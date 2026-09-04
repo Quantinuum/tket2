@@ -45,7 +45,8 @@ version = "0.4.2" # updated by release-please
 repository = "https://github.com/quantinuum/tket2/tree/main/qis-compiler"
 
 [tool.maturin]
-profile = "dev"
+# Keep the profile unset: wheel builds default to release, while `maturin develop`
+# defaults to dev for fast local iteration.
 python-source = "python"
 manifest-path = "Cargo.toml"
 features = ["py"]

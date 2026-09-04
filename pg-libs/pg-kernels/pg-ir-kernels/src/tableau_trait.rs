@@ -45,7 +45,7 @@ pub trait PGTableau: From<TableauData> + Into<TableauData> + Eq {
     /// - `usize` - The number of qubits that the tableau acts on.
     fn get_n_qubits(&self) -> usize;
 
-    /// Get the image of an X operator under the tableau. The returned boolean indicates whether the image has a positive sign.
+    /// Get the image of an X operator under the tableau. The returned Boolean is a sign bit (`false` = positive, `true` = negative).
     ///
     /// # Arguments
     ///
@@ -54,10 +54,10 @@ pub trait PGTableau: From<TableauData> + Into<TableauData> + Eq {
     /// # Returns
     ///
     /// - `(Vec<Pauli>, bool)` - A tuple where the first element is a vector of Pauli operators representing the image of the X operator,
-    ///   and the second element is a boolean indicating whether the image has a positive sign.
-    fn x(&self, qubit: usize) -> (Vec<Pauli>, bool);
+    ///   and the second element is its sign bit.
+    fn x_image(&self, qubit: usize) -> (Vec<Pauli>, bool);
 
-    /// Get the image of a Z operator under the tableau. The returned boolean indicates whether the image has a positive sign.
+    /// Get the image of a Z operator under the tableau. The returned Boolean is a sign bit (`false` = positive, `true` = negative).
     ///
     /// # Arguments
     ///
@@ -66,8 +66,8 @@ pub trait PGTableau: From<TableauData> + Into<TableauData> + Eq {
     /// # Returns
     ///
     /// - `(Vec<Pauli>, bool)` - A tuple where the first element is a vector of Pauli operators representing the image of the Z operator,
-    ///   and the second element is a boolean indicating whether the image has a positive sign.
-    fn z(&self, qubit: usize) -> (Vec<Pauli>, bool);
+    ///   and the second element is its sign bit.
+    fn z_image(&self, qubit: usize) -> (Vec<Pauli>, bool);
 
     /// Pre-compose an operation to the tableau.
     ///
@@ -104,7 +104,7 @@ pub trait PGTableau: From<TableauData> + Into<TableauData> + Eq {
     /// - `Self` - The dagger (inverse) of the tableau.
     fn get_dagger(&self) -> Self;
 
-    /// Get the image of a Pauli string under the tableau. The returned boolean indicates whether the image has a positive sign.
+    /// Get the image of a Pauli string under the tableau. The returned Boolean is a sign bit (`false` = positive, `true` = negative).
     ///
     /// # Arguments
     ///
@@ -113,10 +113,10 @@ pub trait PGTableau: From<TableauData> + Into<TableauData> + Eq {
     /// # Returns
     ///
     /// - `(Vec<Pauli>, bool)` - A tuple where the first element is a vector of Pauli operators representing the image of the Pauli string,
-    ///   and the second element is a boolean indicating whether the image has a positive sign.
+    ///   and the second element is its sign bit.
     fn conjugate_string(&self, paulis: &[Pauli]) -> (Vec<Pauli>, bool);
 
-    /// Get the image of a PG Op under the tableau. The returned boolean indicates whether the image has a positive sign.
+    /// Get the image of a PG Op under the tableau.
     ///
     /// # Arguments
     ///
@@ -136,11 +136,11 @@ pub trait PGTableau: From<TableauData> + Into<TableauData> + Eq {
         match op {
             Op::Gate { data } => match data.get_gate_type() {
                 GateType::RX => {
-                    let (s, sign) = self.x(data.get_args()[0]);
-                    let theta = if sign {
-                        data.get_params()[0]
-                    } else {
+                    let (s, sign_bit) = self.x_image(data.get_args()[0]);
+                    let theta = if sign_bit {
                         -data.get_params()[0]
+                    } else {
+                        data.get_params()[0]
                     };
                     vec![build_op_from_gate(
                         Op::Rotation {
@@ -152,11 +152,11 @@ pub trait PGTableau: From<TableauData> + Into<TableauData> + Eq {
                 GateType::RY => {
                     let mut s = vec![Pauli::I; self.get_n_qubits()];
                     s[data.get_args()[0]] = Pauli::Y;
-                    let (s, sign) = self.conjugate_string(&s);
-                    let theta = if sign {
-                        data.get_params()[0]
-                    } else {
+                    let (s, sign_bit) = self.conjugate_string(&s);
+                    let theta = if sign_bit {
                         -data.get_params()[0]
+                    } else {
+                        data.get_params()[0]
                     };
                     vec![build_op_from_gate(
                         Op::Rotation {
@@ -166,11 +166,11 @@ pub trait PGTableau: From<TableauData> + Into<TableauData> + Eq {
                     )]
                 }
                 GateType::RZ => {
-                    let (s, sign) = self.z(data.get_args()[0]);
-                    let theta = if sign {
-                        data.get_params()[0]
-                    } else {
+                    let (s, sign_bit) = self.z_image(data.get_args()[0]);
+                    let theta = if sign_bit {
                         -data.get_params()[0]
+                    } else {
+                        data.get_params()[0]
                     };
                     vec![build_op_from_gate(
                         Op::Rotation {
@@ -183,11 +183,11 @@ pub trait PGTableau: From<TableauData> + Into<TableauData> + Eq {
                     let mut s = vec![Pauli::I; self.get_n_qubits()];
                     s[data.get_args()[0]] = Pauli::Z;
                     s[data.get_args()[1]] = Pauli::Z;
-                    let (s, sign) = self.conjugate_string(&s);
-                    let theta = if sign {
-                        data.get_params()[0]
-                    } else {
+                    let (s, sign_bit) = self.conjugate_string(&s);
+                    let theta = if sign_bit {
                         -data.get_params()[0]
+                    } else {
+                        data.get_params()[0]
                     };
                     vec![build_op_from_gate(
                         Op::Rotation {
@@ -230,20 +230,20 @@ pub trait PGTableau: From<TableauData> + Into<TableauData> + Eq {
                     new_ops
                 }
                 GateType::Measure => {
-                    let (z_string, z_sign) = self.z(data.get_args()[0]);
+                    let (z_string, z_sign_bit) = self.z_image(data.get_args()[0]);
                     vec![build_op_from_gate(
                         Op::Measure {
-                            data: MeasureData::new(z_string, z_sign, data.get_args()[1]),
+                            data: MeasureData::new(z_string, z_sign_bit, data.get_args()[1]),
                         },
                         data,
                     )]
                 }
                 GateType::Reset => {
-                    let (z_string, z_sign) = self.z(data.get_args()[0]);
-                    let (x_string, x_sign) = self.x(data.get_args()[0]);
+                    let (z_string, z_sign_bit) = self.z_image(data.get_args()[0]);
+                    let (x_string, x_sign_bit) = self.x_image(data.get_args()[0]);
                     vec![build_op_from_gate(
                         Op::Reset {
-                            data: ResetData::new(z_string, x_string, z_sign, x_sign),
+                            data: ResetData::new(z_string, x_string, z_sign_bit, x_sign_bit),
                         },
                         data,
                     )]
@@ -254,30 +254,30 @@ pub trait PGTableau: From<TableauData> + Into<TableauData> + Eq {
                 ),
             },
             Op::Rotation { data } => {
-                let (s, sign) = self.conjugate_string(data.get_string());
-                let theta = if sign {
-                    data.get_angle()
-                } else {
+                let (s, sign_bit) = self.conjugate_string(data.get_string());
+                let theta = if sign_bit {
                     -data.get_angle()
+                } else {
+                    data.get_angle()
                 };
                 vec![Op::Rotation {
                     data: RotationData::new(s, theta),
                 }]
             }
             Op::Measure { data } => {
-                let (s, mut sign) = self.conjugate_string(data.get_string());
-                sign = !sign ^ data.get_sign();
+                let (s, mut sign_bit) = self.conjugate_string(data.get_string());
+                sign_bit ^= data.get_sign_bit();
                 vec![Op::Measure {
-                    data: MeasureData::new(s, sign, data.get_cbit()),
+                    data: MeasureData::new(s, sign_bit, data.get_cbit()),
                 }]
             }
             Op::Reset { data } => {
-                let (z_string, mut z_sign) = self.conjugate_string(data.get_first_string());
-                let (x_string, mut x_sign) = self.conjugate_string(data.get_second_string());
-                z_sign = !z_sign ^ data.get_first_sign();
-                x_sign = !x_sign ^ data.get_second_sign();
+                let (z_string, mut z_sign_bit) = self.conjugate_string(data.get_first_string());
+                let (x_string, mut x_sign_bit) = self.conjugate_string(data.get_second_string());
+                z_sign_bit ^= data.get_first_sign_bit();
+                x_sign_bit ^= data.get_second_sign_bit();
                 vec![Op::Reset {
-                    data: ResetData::new(z_string, x_string, z_sign, x_sign),
+                    data: ResetData::new(z_string, x_string, z_sign_bit, x_sign_bit),
                 }]
             }
             Op::ConditionalBox { data } => {

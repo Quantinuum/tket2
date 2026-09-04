@@ -5,7 +5,9 @@ members = [
     "pg-converters/pg-tk",
     "pg-kernels/pg-bitpacked",
     "pg-kernels/pg-ir-kernels",
+    "pg-kernels/pg-ir-kernels-tests",
     "pg-utils/pg-utils",
+    "pg-qm-tableau",
     ]
 
 [workspace.package]
@@ -38,3 +40,5 @@ allow_attributes = "warn"
 iter_over_hash_type = "warn"
 result_large_err = "allow"
 large_enum_variant = "allow"
+type_complexity = "allow"
+too_many_arguments = "allow"

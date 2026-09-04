@@ -25,6 +25,7 @@
             {
               "t": "Opaque",
               "extension": "tket.measurement",
+              "extension_version": "0.1.0",
               "id": "Measurement",
               "args": [],
               "bound": "C"

@@ -1,3 +1,5 @@
+use std::fmt;
+
 use serde::{Deserialize, Serialize};
 
 use crate::errors::PauliGraphError;
@@ -17,6 +19,18 @@ pub enum Pauli {
     I = 3,
 }
 
+impl fmt::Display for Pauli {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let s = match self {
+            Pauli::X => "X",
+            Pauli::Y => "Y",
+            Pauli::Z => "Z",
+            Pauli::I => "I",
+        };
+        write!(f, "{s}")
+    }
+}
+
 /// A pg-core program consisting of a qubit count and an ordered list of operations.
 ///
 /// The following structural validity checks are performed at `Op` insertion time:
@@ -26,7 +40,7 @@ pub enum Pauli {
 /// - Conditional bits/values lengths match.
 /// - `Op::BlackBox` operations have all argument qubits within the valid range.
 /// - `GateType::BlackBox` gates have no conditions, and they must have data.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(try_from = "PauliGraphRaw")]
 pub struct PauliGraph {
     n_qubits: usize,
@@ -303,7 +317,7 @@ fn try_validate_op(op: &Op, pg_nqubits: usize) -> Result<(), PauliGraphError> {
             validate_pauli_string_len(data.get_second_string().len(), pg_nqubits, op)
         }
         Op::Tableau { data } => {
-            for (string, _) in data.get_z_outputs().iter().chain(data.get_x_outputs()) {
+            for (string, _) in data.get_z_images().iter().chain(data.get_x_images()) {
                 validate_pauli_string_len(string.len(), pg_nqubits, op)?;
             }
             Ok(())
@@ -466,10 +480,10 @@ fn append_identity(paulis: &mut Vec<Pauli>) {
     paulis.push(Pauli::I);
 }
 
-fn single_qubit_tableau_output(n_qubits: usize, pauli: Pauli) -> Vec<Pauli> {
-    let mut output = vec![Pauli::I; n_qubits];
-    output.push(pauli);
-    output
+fn single_qubit_tableau_image(n_qubits: usize, pauli: Pauli) -> Vec<Pauli> {
+    let mut image = vec![Pauli::I; n_qubits];
+    image.push(pauli);
+    image
 }
 
 fn add_qubit_to_op(op: &mut Op, old_n_qubits: usize) {
@@ -485,16 +499,16 @@ fn add_qubit_to_op(op: &mut Op, old_n_qubits: usize) {
             append_identity(&mut data.second_string);
         }
         Op::Tableau { data } => {
-            for (string, _) in &mut data.z_outputs {
+            for (string, _) in &mut data.z_images {
                 append_identity(string);
             }
-            for (string, _) in &mut data.x_outputs {
+            for (string, _) in &mut data.x_images {
                 append_identity(string);
             }
-            data.z_outputs
-                .push((single_qubit_tableau_output(old_n_qubits, Pauli::Z), true));
-            data.x_outputs
-                .push((single_qubit_tableau_output(old_n_qubits, Pauli::X), true));
+            data.z_images
+                .push((single_qubit_tableau_image(old_n_qubits, Pauli::Z), false));
+            data.x_images
+                .push((single_qubit_tableau_image(old_n_qubits, Pauli::X), false));
         }
         Op::ConditionalBox { data } => {
             for inner_op in &mut data.ops {

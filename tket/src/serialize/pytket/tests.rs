@@ -1336,9 +1336,6 @@ fn decode_global_phase_attribute_and_command() {
         .collect_vec();
 
     assert_eq!(global_phase_nodes.len(), 2);
-    #[expect(deprecated)]
-    let phase_metadata = hugr.get_metadata::<metadata::PytketPhaseExpr>(hugr.entrypoint());
-    assert_eq!(phase_metadata, None);
 
     let reser: SerialCircuit = SerialCircuit::encode(&hugr, EncodeOptions::new()).unwrap();
     assert_eq!(reser.phase, "0");
@@ -1747,6 +1744,10 @@ fn encoded_circuit_segment_accessors() {
 /// Test the iterators over the segments of an encoded circuit,
 /// when a node has multiple segments.
 #[rstest]
+// `crossbeam` causes issues in miri due to some experimental use of stacked-borrow rules.
+// See <https://github.com/Quantinuum/tket2/issues/1921#issuecomment-5238143899>
+// and <https://github.com/crossbeam-rs/crossbeam/issues/1181>
+#[cfg_attr(miri, ignore)]
 fn encoded_circuit_iterators() {
     let hugr = circ_mid_circuit_external_subgraph();
     let region = hugr.entrypoint();

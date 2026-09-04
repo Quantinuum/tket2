@@ -204,11 +204,11 @@ fn tableau_to_tk(tableau_data: &TableauData, n_qubits: usize) -> Value {
     let mut z_xbits = Vec::<Vec<bool>>::with_capacity(n_qubits);
     let mut z_zbits = Vec::<Vec<bool>>::with_capacity(n_qubits);
     let mut phases = Vec::<Vec<bool>>::with_capacity(n_qubits);
-    let process_outputs = |outputs: &Vec<(Vec<Pauli>, bool)>,
-                           xbits: &mut Vec<Vec<bool>>,
-                           zbits: &mut Vec<Vec<bool>>,
-                           phases: &mut Vec<Vec<bool>>| {
-        for (s, phase) in outputs {
+    let process_images = |images: &Vec<(Vec<Pauli>, bool)>,
+                          xbits: &mut Vec<Vec<bool>>,
+                          zbits: &mut Vec<Vec<bool>>,
+                          phases: &mut Vec<Vec<bool>>| {
+        for (s, phase) in images {
             let mut s_zb = Vec::<bool>::with_capacity(n_qubits);
             let mut s_xb = Vec::<bool>::with_capacity(n_qubits);
             for p in s {
@@ -233,17 +233,17 @@ fn tableau_to_tk(tableau_data: &TableauData, n_qubits: usize) -> Value {
             }
             xbits.push(s_xb);
             zbits.push(s_zb);
-            phases.push(vec![!phase]);
+            phases.push(vec![*phase]);
         }
     };
-    process_outputs(
-        tableau_data.get_x_outputs(),
+    process_images(
+        tableau_data.get_x_images(),
         &mut x_xbits,
         &mut x_zbits,
         &mut phases,
     );
-    process_outputs(
-        tableau_data.get_z_outputs(),
+    process_images(
+        tableau_data.get_z_images(),
         &mut z_xbits,
         &mut z_zbits,
         &mut phases,
@@ -677,7 +677,7 @@ pub fn pg_from_tk_json(tk_json: &Value) -> Result<PauliGraph, TKConversionError>
                         tab_width, n_qubits
                     )));
                 }
-                // x bits. x outputs followed by z outputs.
+                // X bits. X images followed by Z images.
                 let xmat = tab
                     .get("xmat")
                     .and_then(Value::as_array)
@@ -705,7 +705,7 @@ pub fn pg_from_tk_json(tk_json: &Value) -> Result<PauliGraph, TKConversionError>
                             .collect::<Result<Vec<bool>, TKConversionError>>()
                     })
                     .collect::<Result<Vec<Vec<bool>>, TKConversionError>>()?;
-                // z bits. x outputs followed by z outputs.
+                // Z bits. X images followed by Z images.
                 let zmat = tab
                     .get("zmat")
                     .and_then(Value::as_array)
@@ -756,28 +756,28 @@ pub fn pg_from_tk_json(tk_json: &Value) -> Result<PauliGraph, TKConversionError>
                             })
                     })
                     .collect::<Result<Vec<bool>, TKConversionError>>()?;
-                let mut x_outputs = Vec::with_capacity(n_qubits);
-                let mut z_outputs = Vec::with_capacity(n_qubits);
+                let mut x_images = Vec::with_capacity(n_qubits);
+                let mut z_images = Vec::with_capacity(n_qubits);
                 for i in 0..n_qubits {
-                    let x_output_xbits = &xmat[i];
-                    let z_output_xbits = &xmat[i + n_qubits];
-                    let x_output_zbits = &zmat[i];
-                    let z_output_zbits = &zmat[i + n_qubits];
-                    // tket produces true for -1 phase
-                    let x_output_phase = !phases[i];
-                    let z_output_phase = !phases[i + n_qubits];
-                    let x_output = (
-                        bits_to_pauli_vec(x_output_zbits, x_output_xbits),
-                        x_output_phase,
+                    let x_image_xbits = &xmat[i];
+                    let z_image_xbits = &xmat[i + n_qubits];
+                    let x_image_zbits = &zmat[i];
+                    let z_image_zbits = &zmat[i + n_qubits];
+                    // TKET and pg-core both use true for a -1 phase.
+                    let x_image_phase = phases[i];
+                    let z_image_phase = phases[i + n_qubits];
+                    let x_image = (
+                        bits_to_pauli_vec(x_image_zbits, x_image_xbits),
+                        x_image_phase,
                     );
-                    let z_output = (
-                        bits_to_pauli_vec(z_output_zbits, z_output_xbits),
-                        z_output_phase,
+                    let z_image = (
+                        bits_to_pauli_vec(z_image_zbits, z_image_xbits),
+                        z_image_phase,
                     );
-                    x_outputs.push(x_output);
-                    z_outputs.push(z_output);
+                    x_images.push(x_image);
+                    z_images.push(z_image);
                 }
-                let tableau_data = TableauData::new(z_outputs, x_outputs);
+                let tableau_data = TableauData::new(z_images, x_images);
                 pg.add_op(Op::Tableau { data: tableau_data });
             }
             _ => {
@@ -1053,12 +1053,12 @@ mod tests {
         // cx(0,1);z(0)
         let tableau_data = TableauData::new(
             vec![
-                (vec![Pauli::Z, Pauli::I], true),
-                (vec![Pauli::Z, Pauli::Z], true),
+                (vec![Pauli::Z, Pauli::I], false),
+                (vec![Pauli::Z, Pauli::Z], false),
             ],
             vec![
-                (vec![Pauli::X, Pauli::X], false),
-                (vec![Pauli::I, Pauli::X], true),
+                (vec![Pauli::X, Pauli::X], true),
+                (vec![Pauli::I, Pauli::X], false),
             ],
         );
         pg.add_op(Op::Tableau { data: tableau_data });

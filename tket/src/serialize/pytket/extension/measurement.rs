@@ -9,7 +9,6 @@ use hugr::extension::ExtensionId;
 use hugr::extension::prelude::bool_t;
 use hugr::extension::simple_op::MakeExtensionOp;
 use hugr::ops::ExtensionOp;
-use hugr::ops::OpTrait;
 use hugr::{HugrView, Wire};
 
 /// Emitter for `tket.measurement` operations.
@@ -59,15 +58,8 @@ impl MeasurementEmitter {
         };
 
         // Find the output wire that is of type `bool`.
-        let op = hugr.get_optype(node);
-        let Some(signature) = op.dataflow_signature() else {
-            return Ok(EncodeStatus::Unsupported);
-        };
-        let Some(output_port) = hugr.node_outputs(node).find(|&out_port| {
-            signature
-                .out_port_type(out_port)
-                .is_some_and(|ty| ty == &bool_t())
-        }) else {
+        let Some((output_port, _)) = hugr.out_value_types(node).find(|(_, ty)| ty == &bool_t())
+        else {
             return Ok(EncodeStatus::Unsupported);
         };
 

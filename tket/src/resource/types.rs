@@ -4,9 +4,7 @@
 //! copyable values throughout a HUGR circuit, including resource identifiers,
 //! positions, and the mapping structures that associate them with operations.
 
-use hugr::{
-    Direction, IncomingPort, OutgoingPort, Port, PortIndex, Wire, core::HugrNode, types::Signature,
-};
+use hugr::{Direction, IncomingPort, OutgoingPort, Port, PortIndex, Wire, core::HugrNode};
 use itertools::Itertools;
 use num_rational::Rational64;
 
@@ -126,22 +124,11 @@ pub(super) struct PortMap<T> {
 }
 
 impl<T> PortMap<T> {
-    pub(super) fn with_default(default: T, signature: &Signature) -> Self
+    /// Create a map sized for the value ports of an operation.
+    pub(super) fn with_default(default: T, num_inputs: usize, num_outputs: usize) -> Self
     where
         T: Clone,
     {
-        let num_inputs = signature.input_count();
-        let num_outputs = signature.output_count();
-
-        debug_assert!(
-            signature.input_ports().all(|p| p.index() < num_inputs),
-            "dataflow in ports are not in range 0..num_inputs"
-        );
-        debug_assert!(
-            signature.output_ports().all(|p| p.index() < num_outputs),
-            "dataflow out ports are not in range 0..num_outputs"
-        );
-
         Self {
             vec: vec![default; num_inputs + num_outputs],
             num_inputs,

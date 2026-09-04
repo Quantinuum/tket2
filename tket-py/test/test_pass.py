@@ -185,7 +185,7 @@ def test_multiple_rules():
     )
     matcher = RuleMatcher([rule1, rule2])
 
-    match_count = matcher.apply_exhaustive(circ._inner)
+    match_count = matcher.apply_all_matches_once(circ._inner)
 
     assert match_count == 3
 
@@ -193,7 +193,7 @@ def test_multiple_rules():
     assert out == Circuit(3).CX(0, 1).X(0)
 
 
-def test_apply_exhaustive_reaches_fixed_point() -> None:
+def test_apply_all_matches_once() -> None:
     circ = CompilationState.from_tket1(Circuit(3).H(0).H(0).H(1).H(1).H(2).H(2))
 
     rule = Rule(
@@ -202,12 +202,12 @@ def test_apply_exhaustive_reaches_fixed_point() -> None:
     )
     matcher = RuleMatcher([rule])
 
-    rewrite_count = matcher.apply_exhaustive(circ._inner)
+    rewrite_count = matcher.apply_all_matches_once(circ._inner)
 
     assert rewrite_count == 3
     assert circ.to_tket1() == Circuit(3).X(0).X(1).X(2)
 
-    assert matcher.apply_exhaustive(circ._inner) == 0
+    assert matcher.apply_all_matches_once(circ._inner) == 0
 
 
 def test_clifford_simp_no_swaps():

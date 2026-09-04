@@ -50,10 +50,10 @@ __hugr__.__tk2_sol_qalloc.94.exit94.i:            ; preds = %__hugr__.__tk2_sol_
   tail call void @___rp(i64 %qalloc.i91.i, double 0xBFF921FB54442D18, double 0x3FF921FB54442D18), !dbg !19
   tail call void @___rz(i64 %qalloc.i91.i, double 0xBFF921FB54442D18), !dbg !19
   tail call void @___rz(i64 %qalloc.i100.i, double 0x3FE921FB54442D18), !dbg !20
-  %___lazy_measure.i = tail call i64 @___lazy_measure(i64 %qalloc.i100.i, i64 0), !dbg !21
+  %___future_measure.i = tail call i64 @___future_measure(i64 %qalloc.i100.i, i64 0), !dbg !21
   tail call void @___qfree(i64 %qalloc.i100.i), !dbg !21
-  %read_bool.i.i = tail call i1 @___read_future_bool(i64 %___lazy_measure.i), !dbg !22
-  tail call void @___dec_future_refcount(i64 %___lazy_measure.i), !dbg !22
+  %read_bool.i.i = tail call i1 @___read_future_bool(i64 %___future_measure.i), !dbg !22
+  tail call void @___dec_future_refcount(i64 %___future_measure.i), !dbg !22
   br i1 %read_bool.i.i, label %1, label %0
 
 0:                                                ; preds = %__hugr__.__tk2_sol_qalloc.94.exit94.i
@@ -74,10 +74,10 @@ __hugr__.__tk2_sol_qalloc.94.exit94.i:            ; preds = %__hugr__.__tk2_sol_
   tail call void @___rp(i64 %qalloc.i, double 0xBFF921FB54442D18, double 0x3FF921FB54442D18), !dbg !32
   tail call void @___rz(i64 %qalloc.i, double 0xBFF921FB54442D18), !dbg !32
   tail call void @___rz(i64 %qalloc.i91.i, double 0x3FE921FB54442D18), !dbg !33
-  %___lazy_measure52.i = tail call i64 @___lazy_measure(i64 %qalloc.i91.i, i64 0), !dbg !34
+  %___future_measure52.i = tail call i64 @___future_measure(i64 %qalloc.i91.i, i64 0), !dbg !34
   tail call void @___qfree(i64 %qalloc.i91.i), !dbg !34
-  %read_bool.i97.i = tail call i1 @___read_future_bool(i64 %___lazy_measure52.i), !dbg !35
-  tail call void @___dec_future_refcount(i64 %___lazy_measure52.i), !dbg !35
+  %read_bool.i97.i = tail call i1 @___read_future_bool(i64 %___future_measure52.i), !dbg !35
+  tail call void @___dec_future_refcount(i64 %___future_measure52.i), !dbg !35
   br i1 %read_bool.i97.i, label %"__hugr__.__main__.rus.<locals>.rus.17.exit", label %2
 
 2:                                                ; preds = %1
@@ -85,15 +85,15 @@ __hugr__.__tk2_sol_qalloc.94.exit94.i:            ; preds = %__hugr__.__tk2_sol_
   br label %.backedge.i
 
 "__hugr__.__main__.rus.<locals>.rus.17.exit":     ; preds = %1
-  %___lazy_measure = tail call i64 @___lazy_measure(i64 %qalloc.i, i64 0), !dbg !38
+  %___future_measure = tail call i64 @___future_measure(i64 %qalloc.i, i64 0), !dbg !38
   tail call void @___qfree(i64 %qalloc.i), !dbg !38
-  %read_bool = tail call i1 @___read_future_bool(i64 %___lazy_measure), !dbg !38
-  tail call void @___dec_future_refcount(i64 %___lazy_measure), !dbg !38
+  %read_bool = tail call i1 @___read_future_bool(i64 %___future_measure), !dbg !38
+  tail call void @___dec_future_refcount(i64 %___future_measure), !dbg !38
   tail call void @print_bool(ptr nonnull @res_result.457DE32D.0, i64 16, i1 %read_bool), !dbg !39
   ret void
 }
 
-declare i64 @___lazy_measure(i64, i64) local_unnamed_addr
+declare i64 @___future_measure(i64, i64) local_unnamed_addr
 
 declare void @___qfree(i64) local_unnamed_addr
 

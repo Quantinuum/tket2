@@ -1,6 +1,5 @@
 //! Opaque subgraph definition.
 
-use hugr::ops::OpTrait;
 use itertools::{Either, Itertools};
 
 use std::collections::BTreeSet;
@@ -64,16 +63,12 @@ impl<N: HugrNode> OpaqueSubgraph<N> {
 
         for &node in &nodes {
             let op = hugr.get_optype(node);
-            let Some(signature) = op.dataflow_signature() else {
-                continue;
-            };
             // Check the value ports for boundary edges.
             let mut has_nonlocal_boundary = false;
-            for port in signature
-                .ports(Direction::Incoming)
-                .chain(signature.ports(Direction::Outgoing))
+            for (port, ty) in hugr
+                .value_types(node, Direction::Incoming)
+                .chain(hugr.value_types(node, Direction::Outgoing))
             {
-                let ty = signature.port_type(port).unwrap();
                 // If it's a value port to another node in the same region but outside the set, add it to the subgraph.
                 let mut is_local_boundary = false;
                 for (n, _) in hugr.linked_ports(node, port) {
@@ -92,11 +87,11 @@ impl<N: HugrNode> OpaqueSubgraph<N> {
                     match port.as_directed() {
                         Either::Left(inc) => {
                             incoming_ports.push((node, inc));
-                            input_types.push(ty.clone());
+                            input_types.push(ty);
                         }
                         Either::Right(out) => {
                             outgoing_ports.push((node, out));
-                            output_types.push(ty.clone());
+                            output_types.push(ty);
                         }
                     }
                 }

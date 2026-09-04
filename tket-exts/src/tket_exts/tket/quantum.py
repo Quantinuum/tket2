@@ -83,7 +83,7 @@ class QuantumExtension(TketExtension):
 
     @functools.cached_property
     def measure_free(self) -> ExtOp:
-        """Measure a qubit producing an opaque bool (qubit consumed)."""
+        """Measure a qubit producing a measurement (qubit consumed)."""
         return self().get_op("MeasureFree").instantiate()
 
     @functools.cached_property
