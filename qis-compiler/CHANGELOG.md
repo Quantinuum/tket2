@@ -5,14 +5,12 @@
 
 ### ⚠ BREAKING CHANGES
 
-* Removed deprecated `tket.passes.NormalizeGuppy`. Use `Normalize` instead. Removed deprecated `tket.metadata.PytketPhaseExpr`. Renamed `tket.passes._QSystemLLVMPass` to `tket.passes.QSystemLLVMPass`.
 * Renamed sol `___lazy_measure ` symbol to `___future_measure`
 
 ### Features
 
 * Adopt new measurement function for Sol ([#1875](https://github.com/Quantinuum/tket2/issues/1875)) ([7e64477](https://github.com/Quantinuum/tket2/commit/7e6447789ee7096e1262a64b6fa3526efde8e4b7))
 * Prepare use of QIS compiler as a Rust crate ([#1864](https://github.com/Quantinuum/tket2/issues/1864)) ([6a4708c](https://github.com/Quantinuum/tket2/commit/6a4708c6289fa5f6c68cfed64b5bdd9dbdef1ded))
-* Remove deprecated definitions from tket-py ([#1975](https://github.com/Quantinuum/tket2/issues/1975)) ([3896c6c](https://github.com/Quantinuum/tket2/commit/3896c6c16c7dff27615865a4b1c17c34735ef091))
 * Rename Sol ___lazy_measure to ___future_measure ([#1938](https://github.com/Quantinuum/tket2/issues/1938)) ([97b5ef3](https://github.com/Quantinuum/tket2/commit/97b5ef3aef58f6cf96d2b67a46a1db4aafc0881d))
 
 
