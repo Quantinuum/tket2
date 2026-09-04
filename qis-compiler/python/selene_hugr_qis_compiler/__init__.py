@@ -9,4 +9,4 @@ __all__ = ["compile_to_bitcode", "compile_to_llvm_ir", "check_hugr", "HugrReadEr
 
 # This is updated by our release-please workflow, triggered by this
 # annotation: x-release-please-version
-__version__ = "0.2.6"
+__version__ = "0.5.0"
