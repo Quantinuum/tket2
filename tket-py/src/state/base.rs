@@ -249,7 +249,8 @@ pub fn envelope_config_from_py(config: Bound<'_, PyAny>) -> anyhow::Result<Envel
 
 /// Returns an extension registry with the extensions required to load a Hugr.
 ///
-/// If `omit_tket_exts` is true, ignore the extensions in [`embedded_extensions`].
+/// If `omit_tket_exts` is true, omit extensions available at a compatible
+/// version in the Rust registry.
 fn extra_extensions(hugr: &Hugr, omit_tket_exts: bool) -> ExtensionRegistry {
     if !omit_tket_exts {
         return hugr.extensions().clone();
@@ -266,17 +267,16 @@ fn extra_extensions(hugr: &Hugr, omit_tket_exts: bool) -> ExtensionRegistry {
     registry
 }
 
-/// Returns a list of extension ids supported by the CompilationState loader.
+/// Returns the extension ids and versions in the CompilationState loader registry.
 ///
-/// Extensions not in this list must be included in the package when loading a
-/// CompilationState.
-///
-/// Extensions with these ids may still need to be included if the registry
-/// cannot satisfy their requested version. Use [`has_compatible_extension`] to
-/// check if a specific version is compatible.
+/// This inventory is exposed for checking that Python extension definitions stay
+/// in compatible version bands with the definitions embedded in Rust.
 #[pyfunction]
-pub fn embedded_extensions() -> Vec<String> {
-    REGISTRY.ids().map(ToString::to_string).collect()
+pub fn embedded_extensions() -> Vec<(String, String)> {
+    REGISTRY
+        .iter_all()
+        .map(|ext| (ext.name.to_string(), ext.version.to_string()))
+        .collect()
 }
 
 /// Returns whether the loader registry can satisfy an extension version.

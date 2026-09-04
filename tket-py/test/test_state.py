@@ -8,10 +8,8 @@ from hugr.std import _std_extensions
 from semver import Version
 from tket_exts import tket_registry
 
-from tket._state import (
-    CompilationState,
-    embedded_extensions,
-)
+from tket._state import CompilationState
+from tket._tket import state as native_state
 
 
 def _custom_extension_hugr() -> Hugr:
@@ -41,6 +39,15 @@ def _bundled_extensions(state: CompilationState) -> set[tuple[str, Version]]:
     payload = state.to_str()[10:]
     extensions, _ = json.JSONDecoder().raw_decode(payload)
     return {(ext["name"], Version.parse(ext["version"])) for ext in extensions}
+
+
+def _compatibility_band(version: Version) -> tuple[int, ...]:
+    """Return the caret-semver compatibility band for a stable version."""
+    if version.major != 0:
+        return (version.major,)
+    if version.minor != 0:
+        return (version.major, version.minor)
+    return (version.major, version.minor, version.patch)
 
 
 def test_custom_ext_roundtrip() -> None:
@@ -76,14 +83,16 @@ def test_newer_embedded_std_extension_is_bundled() -> None:
 
 
 def test_tket_exts_registry_matches_embedded_tket_extensions() -> None:
-    """Keep tket-py's embedded extension registry in sync with tket_exts."""
-    python_tket_ids = set(tket_registry().ids())
-    prelude = set(_std_extensions().ids())
-
-    rust_tket_ids = {
-        extension_id
-        for extension_id in embedded_extensions()
-        if extension_id not in prelude
+    """Keep Python and Rust tket definitions in compatible version bands."""
+    std_ids = _std_extensions().ids()
+    python_extensions = {
+        (str(ext.name), _compatibility_band(ext.version))
+        for ext in tket_registry().all_extensions
+    }
+    rust_extensions = {
+        (name, _compatibility_band(Version.parse(version)))
+        for name, version in native_state.embedded_extensions()
+        if name not in std_ids
     }
 
-    assert python_tket_ids == rust_tket_ids
+    assert python_extensions == rust_extensions

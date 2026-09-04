@@ -146,8 +146,8 @@ class Wire:
 class CircuitCost:
     """A cost associated with a circuit."""
 
-def embedded_extensions() -> list[str]:
-    """Return extension ids present in the CompilationState loader registry."""
+def embedded_extensions() -> list[tuple[str, str]]:
+    """Return extension IDs and versions present in the Rust loader registry."""
 
 def has_compatible_extension(name: str, version: str) -> bool:
     """Return whether the loader registry can satisfy an extension version."""

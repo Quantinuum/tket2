@@ -18,7 +18,6 @@ from .build import CircBuild, Command
 Node = _state.Node
 Wire = _state.Wire
 CircuitCost = _state.CircuitCost
-embedded_extensions = _state.embedded_extensions
 HugrError = _state.HugrError
 BuildError = _state.BuildError
 ValidationError = _state.ValidationError
@@ -42,7 +41,6 @@ __all__ = [
     "TK1EncodeError",
     "ValidationError",
     "Wire",
-    "embedded_extensions",
 ]
 
 
