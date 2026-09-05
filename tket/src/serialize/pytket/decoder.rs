@@ -51,10 +51,9 @@ use crate::serialize::pytket::{
 ///
 /// The state of a DFG being built from a [`SerialCircuit`] into a Hugr.
 ///
-/// The lifetime parameter `'h` is the lifetime of the target Hugr, as well
-/// as the lifetime of the external subgraphs referenced by
-/// [`OpaqueSubgraphPayload`][super::opaque::OpaqueSubgraphPayload]s in the
-/// pytket circuit.
+/// The lifetime parameter `'h` is the lifetime of the target Hugr, as well as
+/// the lifetime of the external subgraphs referenced by
+/// [`OpaqueSubgraphPayload`]s in the pytket circuit.
 #[derive(Debug)]
 pub struct PytketDecoderContext<'h> {
     /// The Hugr being built.
