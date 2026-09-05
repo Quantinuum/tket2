@@ -41,9 +41,10 @@ use crate::serialize::pytket::circuit::{
 use crate::serialize::pytket::config::PytketDecoderConfig;
 use crate::serialize::pytket::decoder::wires::WireTracker;
 use crate::serialize::pytket::extension::{RegisterCount, build_opaque_tket_op};
-use crate::serialize::pytket::opaque::{EncodedEdgeID, OpaqueSubgraphs};
+use crate::serialize::pytket::opaque::{EncodedEdgeID, OpaqueSubgraphPayload, OpaqueSubgraphs};
 use crate::serialize::pytket::{
-    DecodeInsertionTarget, DecodeOptions, PytketDecodeErrorInner, default_decoder_config,
+    DecodeInsertionTarget, DecodeOptions, PARAMETER_TYPES, PytketDecodeErrorInner,
+    default_decoder_config,
 };
 
 /// State of the tket circuit being decoded.
@@ -587,7 +588,51 @@ impl<'h> PytketDecoderContext<'h> {
         &mut self,
         commands: &[circuit_json::Command],
     ) -> Result<(), PytketDecodeError> {
+        self.reserve_command_parameters(commands);
         self.run_commands(commands)
+    }
+
+    /// Reserve parameters produced by opaque barriers in a command sequence.
+    ///
+    /// Pytket cannot see parameter dependencies carried by barrier payloads,
+    /// so it may move a consuming command before the barrier that produces its
+    /// parameter. Reserving all such outputs before decoding prevents an early
+    /// use from being mistaken for a new region input.
+    pub(super) fn reserve_command_parameters(&mut self, commands: &[circuit_json::Command]) {
+        let Some(subgraphs) = self.opaque_subgraphs else {
+            return;
+        };
+
+        let mut params = IndexSet::new();
+        for command in commands {
+            if command.op.op_type != tket_json_rs::OpType::Barrier {
+                continue;
+            }
+            let Some(payload) = command.op.data.as_deref() else {
+                continue;
+            };
+            let Some((id, _)) = OpaqueSubgraphPayload::parse_external_payload(payload) else {
+                continue;
+            };
+            let Some(subgraph) = subgraphs.get(id) else {
+                continue;
+            };
+
+            for i in 0..subgraph
+                .signature()
+                .output()
+                .iter()
+                .filter(|ty| PARAMETER_TYPES.contains(ty))
+                .count()
+            {
+                params.insert(id.output_parameter(i));
+            }
+        }
+
+        for param in params {
+            self.wire_tracker
+                .reserve_forward_parameter(param, &mut self.builder);
+        }
     }
 
     /// Decode a contiguous list of pytket commands.
