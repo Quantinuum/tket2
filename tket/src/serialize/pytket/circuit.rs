@@ -277,6 +277,9 @@ impl EncodedCircuit<Node> {
                 Some(&self.opaque_subgraphs),
             )?;
             decoder.reserve_boundary_parameters(&encoded.boundaries);
+            for segment in &encoded.serial_circuits {
+                decoder.reserve_command_parameters(&segment.commands);
+            }
             decoder.connect_straight_through_wires(&encoded.straight_through_wires);
             for (segment, boundary) in encoded.serial_circuits.iter().zip(&encoded.boundaries) {
                 decoder.insert_boundary(boundary)?;
