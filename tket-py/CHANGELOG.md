@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.9](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.8...tket-py-v0.15.9) (2026-09-07)
+
+
+### Bug Fixes
+
+* Decode pytket circuits that have reordered parameter-producing barriers ([#1980](https://github.com/Quantinuum/tket2/issues/1980)) ([d6c2b27](https://github.com/Quantinuum/tket2/commit/d6c2b274409b6bf7fc33c78980ec57d25bc0325f))
+
 ## [0.15.8](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.7...tket-py-v0.15.8) (2026-09-04)
 
 
