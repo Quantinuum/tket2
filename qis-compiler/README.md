@@ -13,40 +13,40 @@ from guppylang.decorator import guppy
 def main() -> None:
     # ...
 
-hugr = main.compile()
-hugr_envelope = hugr.package.to_bytes()
+package = main.compile()
 ```
 
-This can then be compiled to LLVM IR or bitcode
-using this package:
+This can then be compiled to LLVM IR or bitcode using this package:
 
 ```python
-from selene_hugr_qis_compiler import (
-    compile_to_llvm_ir,
-    compile_to_bitcode,
-)
+from selene_hugr_qis_compiler import EmulatorState
+
+state = EmulatorState.from_python(package)
 
 # Compile to LLVM IR for the host system
 # and receive it as a string
-ir = compile_to_llvm_ir(hugr_envelope)
+ir = state.compile_to_llvm_ir()
 
 # Compile to LLVM bitcode for the host system
 # and receive it as a bytes object
-bitcode = compile_to_bitcode(hugr_envelope)
+bitcode = state.compile_to_bitcode()
 ```
+
+Use `EmulatorState.from_bytes(hugr_envelope)` when loading a serialized HUGR
+package.
 
 If you wish to target a specific architecture or platform,
 you can pass the triple as an argument to the compilation functions:
 
 ```python
+state = EmulatorState.from_python(hugr.package, platform="helios")
+
 # Compile to LLVM IR for Apple Silicon
-ir_apple_silicon = compile_to_llvm_ir(
-    hugr_envelope,
+ir_apple_silicon = state.compile_to_llvm_ir(
     target_triple="aarch64-apple-darwin",
 )
 # Compile to LLVM bitcode for x86_64 MSVC
-bitcode_apple_silicon = compile_to_bitcode(
-    hugr_envelope,
+bitcode_x86_64_windows = state.compile_to_bitcode(
     target_triple="x86_64-windows-msvc",
 )
 ```

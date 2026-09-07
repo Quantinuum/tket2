@@ -2780,6 +2780,10 @@ wheels = [
 name = "selene-hugr-qis-compiler"
 version = "0.5.0"
 source = { editable = "qis-compiler" }
+dependencies = [
+    { name = "hugr" },
+    { name = "typing-extensions" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -2792,6 +2796,10 @@ dev = [
 ]
 
 [package.metadata]
+requires-dist = [
+    { name = "hugr", specifier = "~=0.18.3" },
+    { name = "typing-extensions", specifier = ">=4.5" },
+]
 
 [package.metadata.requires-dev]
 dev = [

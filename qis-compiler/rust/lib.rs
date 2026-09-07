@@ -1,8 +1,9 @@
 //! The compiler for HUGR to QIS
 pub mod array;
 
-use anyhow::{Result, anyhow};
+use anyhow::{Context as _, Result, anyhow};
 use hugr::envelope::EnvelopeConfig;
+use hugr::extension::Version;
 use hugr::llvm::CodegenExtsBuilder;
 use hugr::llvm::custom::CodegenExtsMap;
 use hugr::llvm::emit::{EmitDebugInfo, EmitHugr, Namer, debug_info::DebugInfoContext};
@@ -49,9 +50,12 @@ pub use tket::hugr::{self, llvm::inkwell};
 pub use tket_qsystem::{self, extension::REGISTRY, llvm::futures::FuturesCodegenExtension};
 pub use utils::validate;
 
+mod emulator;
 mod gpu;
 mod selene_specific;
 mod utils;
+
+pub use emulator::EmulatorState;
 
 const LLVM_MAIN: &str = "qmain";
 const METADATA: &[(&str, &[&str])] = &[("name", &["mainlib"])];
@@ -123,6 +127,29 @@ fn process_hugr(platform: qsystem::QSystemPlatform, hugr: &mut Hugr) -> Result<(
     Ok(())
 }
 
+/// Return the extension names and versions available to the envelope loader.
+///
+/// The result is sorted so callers can compare or serialize it deterministically.
+fn embedded_extensions() -> Vec<(String, String)> {
+    let mut extensions = REGISTRY
+        .iter_all()
+        .map(|ext| (ext.name.to_string(), ext.version.to_string()))
+        .collect::<Vec<_>>();
+    extensions.sort_unstable();
+    extensions
+}
+
+/// Return whether the envelope loader can provide a compatible extension.
+///
+/// # Errors
+///
+/// Returns an error if `version` is not a valid semantic version.
+fn has_compatible_extension(name: &str, version: &str) -> Result<bool> {
+    let version = Version::parse(version)
+        .with_context(|| format!("invalid extension version: {version:?}"))?;
+    Ok(REGISTRY.get_compatible(name, &version).is_some())
+}
+
 fn codegen_extensions(platform: qsystem::QSystemPlatform) -> CodegenExtsMap<'static, Hugr> {
     use array::SeleneHeapArrayCodegen;
     let pcg = QISPreludeCodegen;
@@ -157,13 +184,12 @@ fn codegen_extensions(platform: qsystem::QSystemPlatform) -> CodegenExtsMap<'sta
 
 /// given an LLVM context and hugr, compile to an LLVM module.
 /// Returns the LLVM Module and the [Node] of the entry point.
-fn get_module_with_std_exts<'c>(
+fn get_module_from_prepared_hugr<'c>(
     args: &CompileArgs,
     context: &'c Context,
     namer: Rc<Namer>,
-    hugr: &'c mut Hugr,
+    hugr: &Hugr,
 ) -> Result<(Module<'c>, Option<DebugInfoContext<'c>>)> {
-    process_hugr(args.platform, hugr)?;
     if let Some(filename) = &args.save_hugr {
         let file = fs::File::create(PathBuf::from(filename))?;
         hugr.store(file, EnvelopeConfig::text())?;
@@ -401,6 +427,12 @@ pub fn compile<'c, 'hugr: 'c>(
     ctx: &'c Context,
     hugr: &'hugr mut Hugr,
 ) -> Result<Module<'c>> {
+    process_hugr(args.platform, hugr)?;
+    compile_prepared(args, ctx, hugr)
+}
+
+/// Compile a HUGR after the platform-specific lowering passes have run.
+fn compile_prepared<'c>(args: &CompileArgs, ctx: &'c Context, hugr: &Hugr) -> Result<Module<'c>> {
     event!(Level::DEBUG, "starting primary compilation");
     let namer = Rc::new(Namer::new("__hugr__.", true));
 
@@ -413,7 +445,7 @@ pub fn compile<'c, 'hugr: 'c>(
     let module_entry = args.entry.as_ref().map_or(LLVM_MAIN, |x| x.as_ref());
 
     // Create a new LLVM module using hugr-llvm
-    let (module, mut maybe_di_ctx) = get_module_with_std_exts(args, ctx, namer, hugr)?;
+    let (module, mut maybe_di_ctx) = get_module_from_prepared_hugr(args, ctx, namer, hugr)?;
 
     wrap_main(
         ctx,
@@ -526,11 +558,15 @@ mod exceptions {
 #[pymodule]
 mod selene_hugr_qis_compiler {
     use super::{
-        CompileArgs, Context, Hugr, PyResult, compile, get_native_target_machine, get_opt_level,
-        get_platform, get_target_machine_from_triple, public_bitcode_bytes, pyfunction,
-        read_hugr_envelope,
+        CompileArgs, Context, Hugr, PyResult, embedded_extensions as rust_extensions,
+        get_native_target_machine, get_opt_level, get_platform, get_target_machine_from_triple,
+        has_compatible_extension as rust_has_compatible_extension, public_bitcode_bytes,
+        pyfunction, read_hugr_envelope,
     };
+    use pyo3::pymethods;
 
+    #[pymodule_export]
+    use super::EmulatorState;
     #[pymodule_export]
     use super::exceptions::HugrReadError;
 
@@ -538,71 +574,102 @@ mod selene_hugr_qis_compiler {
         read_hugr_envelope(pkg_bytes).map_err(|e| HugrReadError::new_err(format!("{e:?}")))
     }
 
+    pub(crate) fn py_emulator_state(pkg_bytes: &[u8], platform: &str) -> PyResult<EmulatorState> {
+        let platform = get_platform(platform)?;
+        let hugr = py_read_envelope(pkg_bytes)?;
+        Ok(EmulatorState::from_validated_hugr(hugr, platform)?)
+    }
+
+    #[pymethods]
+    impl EmulatorState {
+        #[new]
+        #[pyo3(signature = (pkg_bytes, *, platform="helios"))]
+        fn py_new(pkg_bytes: &[u8], platform: &str) -> PyResult<Self> {
+            py_emulator_state(pkg_bytes, platform)
+        }
+
+        /// Compile the prepared HUGR to an LLVM IR string.
+        #[pyo3(signature = (*, opt_level=2, target_triple="native", emit_debug=false))]
+        pub(crate) fn compile_to_llvm_ir(
+            &self,
+            opt_level: u32,
+            target_triple: &str,
+            emit_debug: bool,
+        ) -> PyResult<String> {
+            let opt = get_opt_level(opt_level)?;
+            let target_machine = if target_triple == "native" {
+                get_native_target_machine(opt)
+            } else {
+                get_target_machine_from_triple(target_triple, opt)
+            }?;
+            let ctx = Context::create();
+            let llvm_module = self.compile(
+                &CompileArgs::new(
+                    &"hugr",
+                    &target_machine,
+                    opt,
+                    self.platform(),
+                    &ctx,
+                    emit_debug,
+                ),
+                &ctx,
+            )?;
+            Ok(llvm_module.to_string())
+        }
+
+        /// Compile the prepared HUGR to LLVM bitcode.
+        #[pyo3(signature = (*, opt_level=2, target_triple="native", emit_debug=false))]
+        pub(crate) fn compile_to_bitcode(
+            &self,
+            opt_level: u32,
+            target_triple: &str,
+            emit_debug: bool,
+        ) -> PyResult<Vec<u8>> {
+            let opt = get_opt_level(opt_level)?;
+            let target_machine = if target_triple == "native" {
+                get_native_target_machine(opt)
+            } else {
+                get_target_machine_from_triple(target_triple, opt)
+            }?;
+            let ctx = Context::create();
+            let llvm_module = self.compile(
+                &CompileArgs::new(
+                    &"hugr",
+                    &target_machine,
+                    opt,
+                    self.platform(),
+                    &ctx,
+                    emit_debug,
+                ),
+                &ctx,
+            )?;
+            Ok(public_bitcode_bytes(&llvm_module.write_bitcode_to_memory()))
+        }
+    }
+
+    /// Return extension names and versions available to the native loader.
+    #[pyfunction]
+    fn embedded_extensions() -> Vec<(String, String)> {
+        rust_extensions()
+    }
+
+    /// Return whether the native loader can provide a compatible extension.
+    #[pyfunction]
+    fn has_compatible_extension(name: &str, version: &str) -> PyResult<bool> {
+        Ok(rust_has_compatible_extension(name, version)?)
+    }
+
     /// Load serialized HUGR and validate it
     #[pyfunction]
     pub fn check_hugr(pkg_bytes: &[u8]) -> PyResult<()> {
         py_read_envelope(pkg_bytes).map(|_| ())
-    }
-
-    /// Compile HUGR package to LLVM IR string
-    #[pyfunction]
-    #[pyo3(signature = (pkg_bytes, *, opt_level=2, target_triple="native", platform="helios", emit_debug=false))]
-    pub fn compile_to_llvm_ir(
-        pkg_bytes: &[u8],
-        opt_level: u32,
-        target_triple: &str,
-        platform: &str,
-        emit_debug: bool,
-    ) -> PyResult<String> {
-        let opt = get_opt_level(opt_level)?;
-        let target_machine = if target_triple == "native" {
-            get_native_target_machine(opt)
-        } else {
-            get_target_machine_from_triple(target_triple, opt)
-        }?;
-        let platform = get_platform(platform)?;
-        let mut hugr = py_read_envelope(pkg_bytes)?;
-        let ctx = Context::create();
-        let llvm_module = compile(
-            &CompileArgs::new(&"hugr", &target_machine, opt, platform, &ctx, emit_debug),
-            &ctx,
-            &mut hugr,
-        )?;
-        Ok(llvm_module.to_string())
-    }
-
-    /// Compile HUGR package to LLVM bitcode
-    #[pyfunction]
-    #[pyo3(signature = (pkg_bytes, *, opt_level=2, target_triple="native", platform="helios", emit_debug=false))]
-    pub fn compile_to_bitcode(
-        pkg_bytes: &[u8],
-        opt_level: u32,
-        target_triple: &str,
-        platform: &str,
-        emit_debug: bool,
-    ) -> PyResult<Vec<u8>> {
-        let opt = get_opt_level(opt_level)?;
-        let target_machine = if target_triple == "native" {
-            get_native_target_machine(opt)
-        } else {
-            get_target_machine_from_triple(target_triple, opt)
-        }?;
-        let platform = get_platform(platform)?;
-        let mut hugr = py_read_envelope(pkg_bytes)?;
-        let ctx = Context::create();
-        let llvm_module = compile(
-            &CompileArgs::new(&"hugr", &target_machine, opt, platform, &ctx, emit_debug),
-            &ctx,
-            &mut hugr,
-        )?;
-        Ok(public_bitcode_bytes(&llvm_module.write_bitcode_to_memory()))
     }
 }
 
 #[cfg(test)]
 mod tests {
     #[cfg(feature = "py")]
-    use super::selene_hugr_qis_compiler::compile_to_bitcode;
+    use super::selene_hugr_qis_compiler::py_emulator_state;
     use std::{
         fs,
         time::{SystemTime, UNIX_EPOCH},
@@ -636,7 +703,10 @@ mod tests {
     #[test]
     fn test_compile_to_bitcode_returns_file_safe_public_bytes() {
         let hugr = include_bytes!("../python/tests/resources/check.hugr");
-        let bitcode = compile_to_bitcode(hugr, 2, "native", "helios", false)
+        let state = py_emulator_state(hugr, "helios")
+            .expect("preparing fixture for the emulator should work");
+        let bitcode = state
+            .compile_to_bitcode(2, "native", false)
             .expect("compiling fixture to bitcode should work");
 
         let module =
@@ -657,7 +727,10 @@ mod tests {
     #[test]
     fn test_compile_or_chain_program() {
         let hugr = include_bytes!("../python/tests/resources/slp_or_chain.hugr");
-        let bitcode = compile_to_bitcode(hugr, 2, "native", "helios", false)
+        let state = py_emulator_state(hugr, "helios")
+            .expect("preparing fixture for the emulator should work");
+        let bitcode = state
+            .compile_to_bitcode(2, "native", false)
             .expect("compiling the or-chain fixture to bitcode should work");
 
         parse_bitcode_as_file(&bitcode).expect("or-chain bitcode should parse from file");
