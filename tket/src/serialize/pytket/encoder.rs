@@ -1101,10 +1101,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
     ) -> Result<TrackedValues, PytketEncodeError<H::Node>> {
         let wire = Wire::new(node, port);
 
-        let Some(ty) = hugr
-            .signature(node)
-            .and_then(|s| s.out_port_type(port).cloned())
-        else {
+        let Some(ty) = hugr.get_optype(node).value_output_type(port) else {
             return Ok(TrackedValues::default());
         };
 
@@ -1195,7 +1192,6 @@ impl<H: HugrView> PytketEncoderContext<H> {
         hugr: &H,
     ) -> Result<Vec<(Wire<H::Node>, RegisterCount)>, PytketEncodeError<H::Node>> {
         let op = hugr.get_optype(node);
-        let signature = op.dataflow_signature();
         let static_output = op.static_output_port();
         let other_output = op.other_output_port();
         let mut wire_counts = Vec::with_capacity(hugr.num_outputs(node));
@@ -1211,10 +1207,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
                 };
                 ty
             } else {
-                let Some(ty) = signature
-                    .as_ref()
-                    .and_then(|s| s.out_port_type(out_port).cloned())
-                else {
+                let Some(ty) = op.value_output_type(out_port) else {
                     return Err(PytketEncodeError::custom(
                         "Cannot emit a transparent node without a dataflow signature.",
                     ));

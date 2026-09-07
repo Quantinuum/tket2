@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.5.0](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.4.2...qis-compiler-v0.5.0) (2026-09-04)
+
+
+### ⚠ BREAKING CHANGES
+
+* Renamed sol `___lazy_measure ` symbol to `___future_measure`
+
+### Features
+
+* Adopt new measurement function for Sol ([#1875](https://github.com/Quantinuum/tket2/issues/1875)) ([7e64477](https://github.com/Quantinuum/tket2/commit/7e6447789ee7096e1262a64b6fa3526efde8e4b7))
+* Prepare use of QIS compiler as a Rust crate ([#1864](https://github.com/Quantinuum/tket2/issues/1864)) ([6a4708c](https://github.com/Quantinuum/tket2/commit/6a4708c6289fa5f6c68cfed64b5bdd9dbdef1ded))
+* Rename Sol ___lazy_measure to ___future_measure ([#1938](https://github.com/Quantinuum/tket2/issues/1938)) ([97b5ef3](https://github.com/Quantinuum/tket2/commit/97b5ef3aef58f6cf96d2b67a46a1db4aafc0881d))
+
+
+### Bug Fixes
+
+* **qis-compiler:** build source wheels in release mode ([#1930](https://github.com/Quantinuum/tket2/issues/1930)) ([6491a1f](https://github.com/Quantinuum/tket2/commit/6491a1f1cecc9ef727b7a1859178b004649370e7))
+
+
+### Performance Improvements
+
+* cap SLP vectorizer recursion depth to fix compile-time blowup ([#1847](https://github.com/Quantinuum/tket2/issues/1847)) ([c7f6ed4](https://github.com/Quantinuum/tket2/commit/c7f6ed44ccefb0c0a7377fe8aa21c274b2b51075))
+
+
+### Documentation
+
+* Add missing docstrings ([#1881](https://github.com/Quantinuum/tket2/issues/1881)) ([ad5905e](https://github.com/Quantinuum/tket2/commit/ad5905e9219313e8136aeb6eb2b9f7d1b816017d))
+
 ## [0.4.2](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.4.1...qis-compiler-v0.4.2) (2026-07-16)
 
 

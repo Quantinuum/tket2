@@ -218,7 +218,7 @@ version = "0.72.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "993776b509cfb49c750f11b8f07a46fa23e0a1386ffc01fb1e7d343efc387895"
 dependencies = [
- "bitflags 2.13.1",
+ "bitflags 2.12.1",
  "cexpr",
  "clang-sys",
  "itertools 0.13.0",
@@ -250,6 +250,12 @@ checksum = "5e764a1d40d510daf35e07be9eb06e75770908c27d411ee6c92109c9840eaaf7"
 [[package]]
 name = "bitflags"
 version = "1.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
+
+[[package]]
+name = "bitflags"
+version = "2.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
@@ -863,6 +869,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "defmt"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2953bfe4f93bbd20cc71198842756f77d161884c99ebbabc41d80231ded88d1"
+dependencies = [
+ "bitflags 1.3.2",
+ "defmt-macros",
+]
+
+[[package]]
+name = "defmt-macros"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bad9c72e7ca2137e0dc3813245a0d282fd6daad32fd800af018306a9169b5fe8"
+dependencies = [
+ "defmt-parser",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+]
+
+[[package]]
+name = "defmt-parser"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "10d60334b3b2e7c9d91ef8150abfb6fa4c1c39ebbcf4a81c2e346aad939fee3e"
+dependencies = [
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "delegate"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1348,9 +1385,9 @@ checksum = "c9356095b4b41197bba32173600e1582792cda618f65d12f68e2e77d273413c5"
 
 [[package]]
 name = "hugr"
-version = "0.29.4"
+version = "0.30.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f42b285fbe4cf19e924688c51cec8c9cbfe15040bf77e21eee2eb3e9c0fb54e"
+checksum = "12cda643566bf325b7ed21e9a762bc6cf80c03216de61060ec0514f61c254b34"
 dependencies = [
  "hugr-core",
  "hugr-llvm",
@@ -1359,9 +1396,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-cli"
-version = "0.29.4"
+version = "0.30.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0ee914f6f00bbe976d294ff4482280e7cef21a9ff2333004aa2a6d6986bd699"
+checksum = "7be085b0da949b6628a0607aa8f3699a2e9a8f03960c13d205778f91b828fc02"
 dependencies = [
  "anyhow",
  "clap",
@@ -1381,9 +1418,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-core"
-version = "0.29.4"
+version = "0.30.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da81b093db6d92b8488dcbdfeb6ddf7fa595bb4eb85e6ec32805e4c36b400922"
+checksum = "94d9b80e7f0b18e79188c4e4df2877386208f7abd006241ceebaffee7c2381d7"
 dependencies = [
  "base64 0.23.1",
  "cgmath",
@@ -1419,9 +1456,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-llvm"
-version = "0.29.4"
+version = "0.30.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6717bb93d0116cae410edf0c758b823bb87fa05126b8ceaad0328f3612dab015"
+checksum = "f9f8390c004d8c7e32cb2c143b34b269ca1bcdcde8c4da44b3a87e14adced4ef"
 dependencies = [
  "anyhow",
  "cc",
@@ -1440,9 +1477,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-model"
-version = "0.29.4"
+version = "0.30.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1f556da3b88517153807ef076d32d3d38a80871feaf613140d26061198b4f76"
+checksum = "18118590117721af0b21aa7edaf660ebb173b53f2df087dc7e191b9bb6039c5c"
 dependencies = [
  "base64 0.23.1",
  "bumpalo",
@@ -1540,7 +1577,7 @@ version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7decbc9dfa45a4a827a6ff7b822c113b1285678a937e84213417d4ca8a095782"
 dependencies = [
- "bitflags 2.13.1",
+ "bitflags 2.12.1",
  "inkwell_internals",
  "libc",
  "llvm-sys",
@@ -1673,7 +1710,7 @@ dependencies = [
  "jiff-core",
  "proc-macro2",
  "quote",
- "syn 2.0.119",
+ "syn 2.0.117",
 ]
 
 [[package]]
@@ -2131,6 +2168,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "portable-atomic-util"
+version = "0.2.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c2a106d1259c23fac8e543272398ae0e3c0b8d33c88ed73d0cc71b0f1d902618"
+dependencies = [
+ "portable-atomic",
+]
+
+[[package]]
 name = "portgraph"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2272,7 +2318,7 @@ checksum = "4b45fcc2344c680f5025fe57779faef368840d0bd1f42f216291f0dc4ace4744"
 dependencies = [
  "bit-set",
  "bit-vec",
- "bitflags 2.13.1",
+ "bitflags 2.12.1",
  "num-traits",
  "rand 0.9.5",
  "rand_chacha",
@@ -2674,7 +2720,7 @@ version = "1.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6fe4565b9518b83ef4f91bb47ce29620ca828bd32cb7e408f0062e9930ba190"
 dependencies = [
- "bitflags 2.13.1",
+ "bitflags 2.12.1",
  "errno",
  "libc",
  "linux-raw-sys",
@@ -3227,7 +3273,7 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "tket"
-version = "0.21.2"
+version = "0.22.0"
 dependencies = [
  "anyhow",
  "ascent",
@@ -3313,7 +3359,7 @@ dependencies = [
 
 [[package]]
 name = "tket-qsystem"
-version = "0.27.2"
+version = "0.29.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -3671,13 +3717,37 @@ dependencies = [
 ]
 
 [[package]]
-name = "web-sys"
-version = "0.3.104"
+name = "wasm-encoder"
+version = "0.244.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "990065f2fe63003fe337b932cfb5e3b80e0b4d0f5ff650e6985b1048f62c8319"
+dependencies = [
+ "leb128fmt",
+ "wasmparser",
+]
+
+[[package]]
+name = "wasm-metadata"
+version = "0.244.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb0e353e6a2fbdc176932bbaab493762eb1255a7900fe0fea1a2f96c296cc909"
+dependencies = [
+ "anyhow",
+ "indexmap 2.14.1",
+ "wasm-encoder",
+ "wasmparser",
+]
+
+[[package]]
+name = "wasmparser"
+version = "0.244.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c435338968042f4f59a557f690a253676d47ce13ceb55d70100e7facf6620a30"
 dependencies = [
- "js-sys",
- "wasm-bindgen",
+ "bitflags 2.12.1",
+ "hashbrown 0.15.5",
+ "indexmap 2.14.1",
+ "semver",
 ]
 
 [[package]]
@@ -3876,6 +3946,85 @@ name = "wit-bindgen"
 version = "0.57.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ebf944e87a7c253233ad6766e082e3cd714b5d03812acc24c318f549614536e"
+
+[[package]]
+name = "wit-bindgen-core"
+version = "0.51.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea61de684c3ea68cb082b7a88508a8b27fcc8b797d738bfc99a82facf1d752dc"
+dependencies = [
+ "anyhow",
+ "heck",
+ "wit-parser",
+]
+
+[[package]]
+name = "wit-bindgen-rust"
+version = "0.51.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b7c566e0f4b284dd6561c786d9cb0142da491f46a9fbed79ea69cdad5db17f21"
+dependencies = [
+ "anyhow",
+ "heck",
+ "indexmap 2.14.1",
+ "prettyplease",
+ "syn 2.0.117",
+ "wasm-metadata",
+ "wit-bindgen-core",
+ "wit-component",
+]
+
+[[package]]
+name = "wit-bindgen-rust-macro"
+version = "0.51.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c0f9bfd77e6a48eccf51359e3ae77140a7f50b1e2ebfe62422d8afdaffab17a"
+dependencies = [
+ "anyhow",
+ "prettyplease",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+ "wit-bindgen-core",
+ "wit-bindgen-rust",
+]
+
+[[package]]
+name = "wit-component"
+version = "0.244.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d66ea20e9553b30172b5e831994e35fbde2d165325bec84fc43dbf6f4eb9cb2"
+dependencies = [
+ "anyhow",
+ "bitflags 2.12.1",
+ "indexmap 2.14.1",
+ "log",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "wasm-encoder",
+ "wasm-metadata",
+ "wasmparser",
+ "wit-parser",
+]
+
+[[package]]
+name = "wit-parser"
+version = "0.244.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ecc8ac4bc1dc3381b7f59c34f00b67e18f910c2c0f50015669dde7def656a736"
+dependencies = [
+ "anyhow",
+ "id-arena",
+ "indexmap 2.14.1",
+ "log",
+ "semver",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "unicode-xid",
+ "wasmparser",
+]
 
 [[package]]
 name = "wyz"

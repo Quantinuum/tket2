@@ -21,10 +21,10 @@ __hugr__.__tk2_sol_qalloc.38.exit:                ; preds = %alloca_block
   tail call void @___reset(i64 %qalloc.i), !dbg !8
   tail call void @___rp(i64 %qalloc.i, double 0x3FF921FB54442D18, double 0xBFF921FB54442D18), !dbg !9
   tail call void @___rz(i64 %qalloc.i, double 0x400921FB54442D18), !dbg !9
-  %___lazy_measure = tail call i64 @___lazy_measure(i64 %qalloc.i, i64 0), !dbg !10
+  %___future_measure = tail call i64 @___future_measure(i64 %qalloc.i, i64 0), !dbg !10
   tail call void @___qfree(i64 %qalloc.i), !dbg !10
-  %read_bool = tail call i1 @___read_future_bool(i64 %___lazy_measure), !dbg !10
-  tail call void @___dec_future_refcount(i64 %___lazy_measure), !dbg !10
+  %read_bool = tail call i1 @___read_future_bool(i64 %___future_measure), !dbg !10
+  tail call void @___dec_future_refcount(i64 %___future_measure), !dbg !10
   br i1 %read_bool, label %1, label %0
 
 0:                                                ; preds = %__hugr__.__tk2_sol_qalloc.38.exit
@@ -36,7 +36,7 @@ __hugr__.__tk2_sol_qalloc.38.exit:                ; preds = %alloca_block
   unreachable
 }
 
-declare i64 @___lazy_measure(i64, i64) local_unnamed_addr
+declare i64 @___future_measure(i64, i64) local_unnamed_addr
 
 declare void @___qfree(i64) local_unnamed_addr
 

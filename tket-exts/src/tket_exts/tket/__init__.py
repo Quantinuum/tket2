@@ -13,6 +13,7 @@ from . import (
     quantum,
     result,
     rotation,
+    tket1,
     wasm,
 )
 
@@ -31,5 +32,6 @@ __all__ = [
     "quantum",
     "result",
     "rotation",
+    "tket1",
     "wasm",
 ]

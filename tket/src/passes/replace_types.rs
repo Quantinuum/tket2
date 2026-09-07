@@ -184,7 +184,7 @@ impl NodeTemplate {
                     root,
                     OpType::CFG(_) | OpType::DFG(_) | OpType::Conditional(_) | OpType::TailLoop(_)
                 )
-                //if !root.is_container() || !root.dataflow_signature().is_some() // Using explicit list as per docs
+                // Using explicit list as per docs
                 {
                     return Err(ef(BuildError::UnexpectedType {
                         node: n,

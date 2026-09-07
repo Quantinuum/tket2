@@ -68,8 +68,8 @@ impl CircuitPattern {
             return Err(InvalidPattern::NotConnected);
         }
         let [inp, out] = circuit.io_nodes();
-        let inp_ports = hugr.signature(inp).unwrap().output_ports();
-        let out_ports = hugr.signature(out).unwrap().input_ports();
+        let inp_ports = hugr.get_optype(inp).value_output_ports();
+        let out_ports = hugr.get_optype(out).value_input_ports();
         let inputs = inp_ports
             .map(|p| hugr.linked_ports(inp, p).collect())
             .collect_vec();

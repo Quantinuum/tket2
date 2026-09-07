@@ -325,6 +325,9 @@ pub struct ModifierResolver<N = Node> {
     call_map: HashMap<N, Vec<(Node, IncomingPort)>>,
     /// Original functions for which the resolver generated modified replacements.
     modified_functions: HashSet<N>,
+    /// Cached adapters from the resolver's controls-first ABI to custom controls-last functions.
+    custom_adapters: HashMap<(N, N, CombinedModifier), N>,
+    /// Analyzer used to find qubits in types. Used to check when a type carries quantum data.
     qubit_finder: TypeUnpacker,
     /// Indicate whether the extension op being modified is targeted by some
     /// StateOrder edge.
@@ -341,6 +344,7 @@ impl<N> ModifierResolver<N> {
             worklist: VecDeque::default(),
             call_map: HashMap::default(),
             modified_functions: HashSet::default(),
+            custom_adapters: HashMap::default(),
             qubit_finder: TypeUnpacker::for_qubits(),
             insert_state_order_edges: false,
         }
@@ -2277,6 +2281,7 @@ mod tests {
     #[case::subscript_in_dagger_ctrl(
         "../test_files/modifier_examples/subscript_in_dagger_ctrl.hugr"
     )]
+    #[case::custom_modifier1("../test_files/modifier_examples/custom_modifier.hugr")]
     #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     fn test_examples(#[case] example: &str) {
         let mut h = load_guppy_example(example).unwrap();

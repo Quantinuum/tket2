@@ -228,7 +228,9 @@ pub fn linearize_generic_array<AK: ArrayKind>(
 
         // Wrap each remaining copy into an option
         let set_op = OpType::from(GenericArrayOpDef::<AK>::set.to_concrete(option_ty.clone(), n));
-        let either_st = set_op.dataflow_signature().unwrap().output[0]
+        let either_st = set_op
+            .value_output_type(0.into())
+            .unwrap()
             .as_sum()
             .unwrap()
             .clone();

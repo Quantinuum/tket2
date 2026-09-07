@@ -15,7 +15,7 @@ use hugr::{Node, PortIndex};
 use crate::utils::create_py_exception;
 
 pub use self::cost::PyCircuitCost;
-pub use base::{CompilationState, embedded_extensions};
+pub use base::{CompilationState, embedded_extensions, has_compatible_extension};
 pub use tket::{Pauli, TketOp};
 
 /// The module definition
@@ -27,6 +27,7 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     m.add_class::<PyCircuitCost>()?;
 
     m.add_function(wrap_pyfunction!(embedded_extensions, &m)?)?;
+    m.add_function(wrap_pyfunction!(has_compatible_extension, &m)?)?;
 
     m.add("HugrError", py.get_type::<PyHugrError>())?;
     m.add("BuildError", py.get_type::<PyBuildError>())?;

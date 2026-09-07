@@ -39,7 +39,8 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
-version = "0.4.2" # updated by release-please
+version = "0.5.0" # updated by release-please
+dependencies = ["hugr~=0.18.3", "typing-extensions>=4.5"]
 
 [project.urls]
 repository = "https://github.com/quantinuum/tket2/tree/main/qis-compiler"
