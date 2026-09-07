@@ -1,24 +1,17 @@
-use crate::{BitPackedOp, bitpack_paulis};
+use crate::packed_op::{PackedOp, XZPackedPaulis};
 use pg_core::{
-    BlackBoxData, ConditionalBoxData, MeasureData, Op, PGPass, Pauli, PauliGraph, ResetData,
-    RotationData,
+    BlackBoxData, ConditionalBoxData, MeasureData, Op, PGPass, PauliGraph, ResetData, RotationData,
 };
 use pg_ir_kernels::PGTableau;
 use pg_qm_tableau::Tableau;
 use pg_utils::cliff_angle;
 use std::collections::HashMap;
 
-// Use bit-packed Pauli strings as lookup keys when finding rotations with the
-// same Pauli string.
-fn get_dense_key(paulis: &[Pauli]) -> Vec<u64> {
-    bitpack_paulis(paulis, false)
-}
-
 fn rotation_merging(pg: &PauliGraph) -> PauliGraph {
     let n_qubits = pg.get_n_qubits();
     let n_ops = pg.get_ops().len();
     let mut output_pg = PauliGraph::new(n_qubits);
-    let mut output_ops: Vec<BitPackedOp> = Vec::with_capacity(n_ops);
+    let mut output_ops: Vec<PackedOp> = Vec::with_capacity(n_ops);
     // Use `removed` to flag operations removed from `output_ops`.
     let mut removed: Vec<bool> = Vec::with_capacity(n_ops);
     let mut tab: Tableau = Tableau::eye(n_qubits);
@@ -31,7 +24,7 @@ fn rotation_merging(pg: &PauliGraph) -> PauliGraph {
     //
     // Lookup keys use XZ bit-packing, whereas output operations use ZX
     // bit-packing. Commutation checks require these opposite encodings.
-    let mut lookup: HashMap<Vec<u64>, Vec<usize>> = HashMap::new();
+    let mut lookup: HashMap<XZPackedPaulis, Vec<usize>> = HashMap::new();
     for op in pg.get_ops().iter() {
         match op {
             Op::Rotation { data } => {
@@ -41,7 +34,7 @@ fn rotation_merging(pg: &PauliGraph) -> PauliGraph {
                 } else {
                     data.get_angle()
                 };
-                let key = get_dense_key(&s);
+                let key = XZPackedPaulis::from(s.as_slice());
                 // Check whether a previous rotation with the same Pauli string
                 // can be merged with the current one.
                 if let Some(indices) = lookup.get_mut(&key)
@@ -82,24 +75,18 @@ fn rotation_merging(pg: &PauliGraph) -> PauliGraph {
                     });
                     tab_touched = true;
                 } else {
-                    output_ops.push(BitPackedOp::new(
-                        Op::Rotation {
-                            data: RotationData::new(s.clone(), angle),
-                        },
-                        true,
-                    ));
+                    output_ops.push(PackedOp::new(Op::Rotation {
+                        data: RotationData::new(s.clone(), angle),
+                    }));
                     removed.push(false);
                     lookup.entry(key).or_default().push(output_ops.len() - 1);
                 }
             }
             Op::Measure { data } => {
                 let (s, sign_bit) = tab.conjugate_string(data.get_string());
-                output_ops.push(BitPackedOp::new(
-                    Op::Measure {
-                        data: MeasureData::new(s, sign_bit ^ data.get_sign_bit(), data.get_cbit()),
-                    },
-                    true,
-                ));
+                output_ops.push(PackedOp::new(Op::Measure {
+                    data: MeasureData::new(s, sign_bit ^ data.get_sign_bit(), data.get_cbit()),
+                }));
                 removed.push(false);
             }
             Op::Reset { data } => {
@@ -107,12 +94,9 @@ fn rotation_merging(pg: &PauliGraph) -> PauliGraph {
                 let (x_string, mut x_sign_bit) = tab.conjugate_string(data.get_second_string());
                 z_sign_bit ^= data.get_first_sign_bit();
                 x_sign_bit ^= data.get_second_sign_bit();
-                output_ops.push(BitPackedOp::new(
-                    Op::Reset {
-                        data: ResetData::new(z_string, x_string, z_sign_bit, x_sign_bit),
-                    },
-                    true,
-                ));
+                output_ops.push(PackedOp::new(Op::Reset {
+                    data: ResetData::new(z_string, x_string, z_sign_bit, x_sign_bit),
+                }));
                 removed.push(false);
             }
             Op::ConditionalBox { data } => {
@@ -153,37 +137,25 @@ fn rotation_merging(pg: &PauliGraph) -> PauliGraph {
                         ),
                     }
                 }
-                output_ops.push(BitPackedOp::new(
-                    Op::ConditionalBox {
-                        data: ConditionalBoxData::new(
-                            new_cond_ops,
-                            data.get_conditional_bits().clone(),
-                            data.get_conditional_values().clone(),
-                        ),
-                    },
-                    true,
-                ));
+                output_ops.push(PackedOp::new(Op::ConditionalBox {
+                    data: ConditionalBoxData::new(
+                        new_cond_ops,
+                        data.get_conditional_bits().clone(),
+                        data.get_conditional_values().clone(),
+                    ),
+                }));
                 removed.push(false);
             }
             Op::BlackBox { data } => {
                 if tab_touched {
-                    output_ops.push(BitPackedOp::new(
-                        Op::Tableau {
-                            data: tab.invert().into(),
-                        },
-                        true,
-                    ));
+                    output_ops.push(PackedOp::new(Op::Tableau {
+                        data: tab.invert().into(),
+                    }));
                     removed.push(false);
                 }
-                output_ops.push(BitPackedOp::new(
-                    Op::BlackBox {
-                        data: BlackBoxData::new(
-                            data.get_qubits().clone(),
-                            data.get_content().clone(),
-                        ),
-                    },
-                    true,
-                ));
+                output_ops.push(PackedOp::new(Op::BlackBox {
+                    data: BlackBoxData::new(data.get_qubits().clone(), data.get_content().clone()),
+                }));
                 removed.push(false);
                 tab = Tableau::eye(n_qubits);
                 tab_touched = false;
@@ -255,7 +227,7 @@ impl PGPass for RotationMergingPass {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pg_core::{GateData, GateType, TableauData};
+    use pg_core::{GateData, GateType, Pauli, TableauData};
     use pg_tk::compare_unitaries_via_tk;
     use rand::{RngExt, SeedableRng, rngs::StdRng};
 

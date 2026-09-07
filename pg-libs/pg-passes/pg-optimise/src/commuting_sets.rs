@@ -1,9 +1,9 @@
-use crate::BitPackedOp;
+use crate::packed_op::{PackedOp, PendingPackedOp};
 use pg_core::{Op, PGPass, PauliGraph};
 
 fn group_ops(pg: &PauliGraph, max_set_size: usize) -> PauliGraph {
     let mut output_pg = PauliGraph::new(pg.get_n_qubits());
-    let mut commuting_set: Vec<BitPackedOp> = Vec::new();
+    let mut commuting_set: Vec<PackedOp> = Vec::new();
     if pg.get_ops().is_empty() {
         return output_pg;
     }
@@ -12,22 +12,17 @@ fn group_ops(pg: &PauliGraph, max_set_size: usize) -> PauliGraph {
         if matches!(op, Op::SetBoundary) {
             continue;
         }
-        // The new op uses XZ encoding (`z_first = false`), while the
-        // commuting set uses ZX encoding (`z_first = true`). The commutation
-        // check requires these opposite encodings.
-        let mut rich_op = BitPackedOp::new(op.clone(), false);
-        if commuting_set.iter().all(|s| s.commute_with(&rich_op))
+        let pending_op = PendingPackedOp::new(op.clone());
+        if commuting_set.iter().all(|s| s.commute_with(&pending_op))
             && commuting_set.len() < max_set_size
         {
-            rich_op.coerce_to_zx();
-            commuting_set.push(rich_op);
+            commuting_set.push(pending_op.into());
         } else if !commuting_set.is_empty() {
             commuting_set
                 .drain(..)
                 .for_each(|set_op| output_pg.add_op(set_op.into()));
             output_pg.add_op(Op::SetBoundary);
-            rich_op.coerce_to_zx();
-            commuting_set.push(rich_op);
+            commuting_set.push(pending_op.into());
         }
     }
     if !commuting_set.is_empty() {
