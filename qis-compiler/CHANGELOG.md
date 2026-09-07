@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.4.3](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.4.2...qis-compiler-v0.4.3) (2026-09-07)
+
+This release updates HUGR to 0.29.4, adding support for HUGRs using
+`std.arithmetic.float` 0.1.2.
+
+
+### Features
+
+* Add LLVM emission for froundeven ops ([#1957](https://github.com/Quantinuum/tket2/issues/1957)) ([fd76fb0](https://github.com/Quantinuum/tket2/commit/fd76fb0ffb16d86bf748553d7c7e1b9342748c30))
+
+
+### Bug Fixes
+
+* **qis-compiler:** build source wheels in release mode ([#1930](https://github.com/Quantinuum/tket2/issues/1930)) ([c63d012](https://github.com/Quantinuum/tket2/commit/c63d012987f9aa938b03c8bc9c56f0cd24a3d461))
+
 ## [0.4.2](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.4.1...qis-compiler-v0.4.2) (2026-07-16)
 
 
