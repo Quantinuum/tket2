@@ -1094,6 +1094,40 @@ fn circ_forward_opaque_parameter() -> Hugr {
     h.finish_hugr_with_outputs([q, rotation]).unwrap()
 }
 
+/// A parameter produced by an opaque barrier and consumed by a supported gate
+/// on a separate qubit.
+#[fixture]
+fn circ_reordered_opaque_parameter() -> Hugr {
+    let signature = Signature::new_endo(vec![qb_t(), qb_t()]);
+    let mut h = FunctionBuilder::new("reordered_opaque_parameter", signature).unwrap();
+    let [q0, q1] = h.input_wires_arr();
+
+    let [q0, parameter] = {
+        let mut producer = h
+            .dfg_builder(
+                Signature::new(vec![qb_t()], vec![qb_t(), float64_type()]),
+                [q0],
+            )
+            .unwrap();
+        let [q0] = producer.input_wires_arr();
+        let parameter = producer.add_load_value(ConstF64::new(0.5));
+        producer
+            .finish_with_outputs([q0, parameter])
+            .unwrap()
+            .outputs_arr()
+    };
+    let [parameter] = h
+        .add_dataflow_op(RotationOp::from_halfturns_unchecked, [parameter])
+        .unwrap()
+        .outputs_arr();
+    let [q1] = h
+        .add_dataflow_op(TketOp::Rz, [q1, parameter])
+        .unwrap()
+        .outputs_arr();
+
+    h.finish_hugr_with_outputs([q0, q1]).unwrap()
+}
+
 /// A register-free opaque subgraph ordered between two supported command runs.
 ///
 /// Regression test for <https://github.com/Quantinuum/tket2/issues/1856>.
@@ -1543,6 +1577,30 @@ fn fail_on_modified_hugr(circ_tk1_ops: Hugr) {
             ..
         })
     );
+}
+
+/// Parameters produced by opaque barriers remain data dependencies even though
+/// pytket only sees independent commands on separate qubit registers.
+#[rstest]
+fn decode_parameter_used_before_opaque_barrier(circ_reordered_opaque_parameter: Hugr) {
+    let mut encoded = EncodedCircuit::new(
+        &circ_reordered_opaque_parameter,
+        EncodeOptions::new().with_subcircuits(true),
+    )
+    .unwrap();
+
+    let (_, circuit) = encoded
+        .iter_mut()
+        .exactly_one()
+        .unwrap_or_else(|_| panic!("fixture should encode as one circuit"));
+    assert_eq!(circuit.commands.len(), 2);
+    assert_eq!(circuit.commands[0].op.op_type, optype::OpType::Barrier);
+    assert_eq!(circuit.commands[1].op.op_type, optype::OpType::Rz);
+    circuit.commands.swap(0, 1);
+
+    let mut decoded = circ_reordered_opaque_parameter;
+    encoded.reassemble_inplace(&mut decoded, None).unwrap();
+    decoded.validate().unwrap();
 }
 
 /// Test the serialisation roundtrip from a tket circuit into an EncodedCircuit and back.
