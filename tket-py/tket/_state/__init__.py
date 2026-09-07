@@ -133,8 +133,9 @@ class CompilationState:
         # (as json), passing them, and loading them in
         # `_program.CompilationState.from_bytes` before parsing the envelope.
         #
-        # Remember to filter out the embedded extensions from _program.embedded_extensions(),
-        # since we use those already when loading things in Rust.
+        # Remember to filter out the embedded extensions from
+        # _program.embedded_extensions(), since we use those already when
+        # loading things in Rust.
 
         return CompilationState(
             _inner=_state.CompilationState.from_bytes(envelope),
