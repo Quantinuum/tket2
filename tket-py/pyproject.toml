@@ -1,6 +1,6 @@
 [project]
 name = "tket"
-version = "0.15.8"
+version = "0.15.9"
 requires-python = ">=3.10"
 description = "Quantinuum's TKET Quantum Compiler"
 license = { file = "LICENCE" }
