@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#    "guppylang==1.0.0rc1",
+#    "guppylang==1.0.1",
 # ]
 # ///
 """Test modifiers with panics"""
@@ -9,11 +9,9 @@
 from pathlib import Path
 from sys import argv
 
-from guppylang import enable_experimental_features, guppy
+from guppylang import guppy
 from guppylang.std.builtins import control, panic
 from guppylang.std.quantum import measure, qubit
-
-enable_experimental_features()
 
 
 @guppy

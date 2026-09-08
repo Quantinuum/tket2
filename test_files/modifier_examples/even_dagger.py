@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#    "guppylang==1.0.0rc1",
+#    "guppylang==1.0.1",
 # ]
 # ///
 """Test that an even number of daggers is equivalent to no dagger at all"""
@@ -9,12 +9,10 @@
 from pathlib import Path
 from sys import argv
 
-from guppylang import enable_experimental_features, guppy
+from guppylang import guppy
 from guppylang.std.builtins import control, dagger
 from guppylang.std.debug import state_result
 from guppylang.std.quantum import angle, discard, h, qubit, rx
-
-enable_experimental_features()
 
 
 @guppy(controllable=True)
