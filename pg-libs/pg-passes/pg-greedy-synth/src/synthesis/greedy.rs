@@ -106,6 +106,12 @@ where
         config.top_up_size.is_none_or(|size| size > 0),
         "top-up size must be positive"
     );
+    if pg.get_n_qubits() == 0 {
+        if !pg.get_ops().is_empty() {
+            panic!("GreedySynthPass expects a graph with 0 qubits to have no operations.");
+        }
+        return PauliGraph::new(0);
+    }
     if pg.get_ops().is_empty() {
         return PauliGraph::new(pg.get_n_qubits());
     }
