@@ -1,23 +1,15 @@
 //! The compiler for HUGR to QIS
 pub mod array;
 
-use anyhow::{Context as _, Result, anyhow};
+use anyhow::{Result, anyhow};
 use hugr::envelope::EnvelopeConfig;
-use hugr::extension::Version;
-use hugr::llvm::CodegenExtsBuilder;
 use hugr::llvm::custom::CodegenExtsMap;
 use hugr::llvm::emit::{EmitDebugInfo, EmitHugr, Namer, debug_info::DebugInfoContext};
-use hugr::llvm::extension::int::IntCodegenExtension;
 use hugr::llvm::utils::fat::FatExt as _;
 use inkwell::OptimizationLevel;
 use inkwell::context::Context;
-use inkwell::llvm_sys::support::LLVMParseCommandLineOptions;
 use inkwell::module::Module;
-use inkwell::passes::PassBuilderOptions;
-use inkwell::support::LLVMString;
-use inkwell::targets::{
-    CodeModel, InitializationConfig, RelocMode, Target, TargetMachine, TargetTriple,
-};
+use inkwell::targets::TargetMachine;
 use itertools::Itertools;
 #[cfg(feature = "py")]
 use pyo3::prelude::*;
@@ -25,24 +17,14 @@ use tket::hugr::ops::DataflowParent;
 use tket::passes::composable::ComposablePass;
 use tket_qsystem::{QSystemLLVMPass, QSystemRebasePass};
 
-use std::error::Error;
-use std::ffi::CString;
-use std::fmt::{self, Display, Formatter};
+use extensions::codegen_extensions;
+use optimization::optimize_module;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::sync::Once;
 use std::vec::Vec;
-use std::{fs, str, vec};
+use std::{fs, str};
 use tket::hugr::{Hugr, HugrView, Node};
-use tket::llvm::rotation::RotationCodegenExtension;
 use tket_qsystem::extension::qsystem;
-use tket_qsystem::llvm::array_utils::ArrayLowering;
-use tket_qsystem::llvm::globals::GlobalsCodegenExtension;
-use tket_qsystem::llvm::{
-    argument::ArgumentCodegenExtension, debug::DebugCodegenExtension, prelude::QISPreludeCodegen,
-    qsystem::QSystemCodegenExtension, random::RandomCodegenExtension,
-    result::ResultsCodegenExtension, utils::UtilsCodegenExtension,
-};
 use tracing::{Level, event, instrument};
 use utils::read_hugr_envelope;
 
@@ -51,135 +33,42 @@ pub use tket_qsystem::{self, extension::REGISTRY, llvm::futures::FuturesCodegenE
 pub use utils::validate;
 
 mod emulator;
+mod extensions;
 mod gpu;
+mod optimization;
 mod selene_specific;
+mod target;
 mod utils;
 
 pub use emulator::EmulatorState;
+pub use target::{
+    get_native_target_machine, get_opt_level, get_platform, get_target_machine_from_triple,
+};
 
 const LLVM_MAIN: &str = "qmain";
 const METADATA: &[(&str, &[&str])] = &[("name", &["mainlib"])];
 
-#[derive(Debug)]
-/// Handles a series of errors
-struct ProcessErrs(Vec<String>);
-
-impl Display for ProcessErrs {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        for s in &self.0 {
-            f.write_str(&format!("{s}\n"))?;
-        }
-        Ok(())
-    }
-}
-
-impl From<String> for ProcessErrs {
-    fn from(value: String) -> Self {
-        Self(vec![value])
-    }
-}
-
-impl From<inkwell::Error> for ProcessErrs {
-    fn from(value: inkwell::Error) -> Self {
-        Self(vec![value.to_string()])
-    }
-}
-
-impl From<LLVMString> for ProcessErrs {
-    fn from(value: LLVMString) -> Self {
-        Self(vec![value.to_string()])
-    }
-}
-
-impl From<&str> for ProcessErrs {
-    fn from(value: &str) -> Self {
-        Self(vec![value.to_string()])
-    }
-}
-
-impl From<Vec<String>> for ProcessErrs {
-    fn from(value: Vec<String>) -> Self {
-        Self(value)
-    }
-}
-
-impl Error for ProcessErrs {}
-
 /// create an llvm module from hugr via hugr-llvm
-fn get_hugr_llvm_module<'c, 'hugr, 'a: 'c>(
+fn get_hugr_llvm_module<'c, 'a: 'c>(
     context: &'c Context,
     namer: Rc<Namer>,
-    hugr: &'hugr Hugr,
+    hugr: &Hugr,
     module_name: impl AsRef<str>,
     exts: Rc<CodegenExtsMap<'a, Hugr>>,
     emit_debug: EmitDebugInfo,
 ) -> Result<(Module<'c>, Option<DebugInfoContext<'c>>)> {
     let module = context.create_module(module_name.as_ref());
     let emit = EmitHugr::new(context, module, namer, exts);
-    Ok(emit
-        .emit_module(hugr.try_fat(hugr.module_root()).unwrap(), emit_debug)?
-        .finish())
+    let module_root = hugr
+        .try_fat(hugr.module_root())
+        .ok_or_else(|| anyhow!("module root has an unexpected HUGR operation type"))?;
+    Ok(emit.emit_module(module_root, emit_debug)?.finish())
 }
 
 fn process_hugr(platform: qsystem::QSystemPlatform, hugr: &mut Hugr) -> Result<()> {
     QSystemRebasePass::defaults(platform).run(hugr)?;
     QSystemLLVMPass::default().run(hugr)?;
     Ok(())
-}
-
-/// Return the extension names and versions available to the envelope loader.
-///
-/// The result is sorted so callers can compare or serialize it deterministically.
-fn embedded_extensions() -> Vec<(String, String)> {
-    let mut extensions = REGISTRY
-        .iter_all()
-        .map(|ext| (ext.name.to_string(), ext.version.to_string()))
-        .collect::<Vec<_>>();
-    extensions.sort_unstable();
-    extensions
-}
-
-/// Return whether the envelope loader can provide a compatible extension.
-///
-/// # Errors
-///
-/// Returns an error if `version` is not a valid semantic version.
-fn has_compatible_extension(name: &str, version: &str) -> Result<bool> {
-    let version = Version::parse(version)
-        .with_context(|| format!("invalid extension version: {version:?}"))?;
-    Ok(REGISTRY.get_compatible(name, &version).is_some())
-}
-
-fn codegen_extensions(platform: qsystem::QSystemPlatform) -> CodegenExtsMap<'static, Hugr> {
-    use array::SeleneHeapArrayCodegen;
-    let pcg = QISPreludeCodegen;
-    CodegenExtsBuilder::default()
-        .add_prelude_extensions(pcg.clone())
-        .add_extension(IntCodegenExtension::new(pcg.clone()))
-        .add_float_extensions()
-        .add_conversion_extensions()
-        .add_logic_extensions()
-        .add_extension(SeleneHeapArrayCodegen::LOWERING.codegen_extension())
-        .add_default_static_array_extensions()
-        .add_borrow_array_extensions(array::SeleneHeapBorrowArrayCodegen(pcg.clone()))
-        .add_extension(FuturesCodegenExtension)
-        .add_extension(GlobalsCodegenExtension::new(pcg.clone()))
-        .add_extension(QSystemCodegenExtension::new(platform, pcg.clone()))
-        .add_extension(RandomCodegenExtension)
-        // Results use standard arrays.
-        .add_extension(ResultsCodegenExtension::new(
-            SeleneHeapArrayCodegen::LOWERING,
-        ))
-        .add_extension(RotationCodegenExtension::new(pcg))
-        .add_extension(UtilsCodegenExtension)
-        // State results use standard arrays.
-        .add_extension(DebugCodegenExtension::new(SeleneHeapArrayCodegen::LOWERING))
-        .add_extension(gpu::GpuCodegen)
-        // Argument reading uses standard arrays.
-        .add_extension(ArgumentCodegenExtension::new(
-            SeleneHeapArrayCodegen::LOWERING,
-        ))
-        .finish()
 }
 
 /// given an LLVM context and hugr, compile to an LLVM module.
@@ -202,79 +91,6 @@ fn get_module_from_prepared_hugr<'c>(
         Rc::new(codegen_extensions(args.platform)),
         args.emit_debug,
     )
-}
-
-/// Default cap for the LLVM SLP vectorizer's tree-building recursion depth.
-///
-/// LLVM's own default is 12. Programs with many `if <a or b or ...>:` branches
-/// over distinct runtime booleans lower to a wide/deep graph of `i1` phi/branch
-/// values, and `llvm::slpvectorizer::BoUpSLP::buildTreeRec` explores it with a
-/// cost that is superlinear in the width (empirically `~C * W^3.7` in the number
-/// of simultaneously-live booleans); a real [[19,1,5]] QEC program took ~95 min
-/// to compile. Capping the recursion depth collapses that blowup (an 11x12 grid
-/// of such branches: >45s -> ~4.4s at depth 4) while retaining the shallow,
-/// profitable vectorization the pass normally finds.
-const SLP_RECURSION_MAX_DEPTH: u32 = 4;
-
-/// Resolve the SLP recursion cap, honouring a `SELENE_SLP_RECURSION_MAX_DEPTH`
-/// override and falling back to [`SLP_RECURSION_MAX_DEPTH`] when it is absent or
-/// unparseable.
-fn resolve_slp_recursion_depth(override_value: Option<String>) -> u32 {
-    override_value
-        .and_then(|value| value.trim().parse::<u32>().ok())
-        .unwrap_or(SLP_RECURSION_MAX_DEPTH)
-}
-
-/// Cap the SLP vectorizer's recursion depth via LLVM's global `cl::opt`.
-///
-/// `-slp-recursion-max-depth` is a global `cl::opt<int>` with no C-API or
-/// [`PassBuilderOptions`] setter, so `LLVMParseCommandLineOptions` is the only
-/// lever. (The inkwell `set_loop_slp_vectorization` toggle maps to LLVM's
-/// `PipelineTuningOptions::SLPVectorization`, which the `default<O2>` textual
-/// pipeline does *not* honour — verified empirically that the SLP pass still
-/// runs and blows up.) This mutates process-global state, so we do it exactly
-/// once.
-fn configure_slp_recursion_depth() {
-    static INIT: Once = Once::new();
-    INIT.call_once(|| {
-        let depth =
-            resolve_slp_recursion_depth(std::env::var("SELENE_SLP_RECURSION_MAX_DEPTH").ok());
-        // These CStrings live for the duration of the parse call below.
-        let prog = CString::new("selene-hugr-qis-compiler").expect("static string is NUL-free");
-        let flag = CString::new(format!("-slp-recursion-max-depth={depth}"))
-            .expect("formatted flag is NUL-free");
-        let overview = CString::new("").expect("empty string is NUL-free");
-        let argv = [prog.as_ptr(), flag.as_ptr()];
-        // SAFETY: `argv` holds `argv.len()` valid, NUL-terminated pointers that
-        // outlive the call, and `overview` is a valid NUL-terminated string.
-        unsafe {
-            LLVMParseCommandLineOptions(
-                argv.len() as std::ffi::c_int,
-                argv.as_ptr(),
-                overview.as_ptr(),
-            );
-        }
-    });
-}
-
-/// Optimize the module using LLVM passes.
-///
-/// Before running the pipeline we cap the SLP vectorizer's recursion depth (see
-/// [`configure_slp_recursion_depth`]) to avoid a superlinear compile-time
-/// blowup on wide boolean short-circuit chains. LLVM only runs SLP at `O2`+, so
-/// that is where the blowup appears and where the cap matters.
-fn optimize_module(module: &Module, args: &CompileArgs) -> Result<()> {
-    configure_slp_recursion_depth();
-    let opt_str = match args.opt_level {
-        OptimizationLevel::Aggressive => "default<O3>",
-        OptimizationLevel::Less => "default<O1>",
-        OptimizationLevel::None => "default<O0>",
-        OptimizationLevel::Default => "default<O2>",
-    };
-    module
-        .run_passes(opt_str, args.target_machine, PassBuilderOptions::create())
-        .map_err(Into::<ProcessErrs>::into)?;
-    Ok(())
 }
 
 /// Copy LLVM bitcode into a public byte buffer.
@@ -473,78 +289,19 @@ fn compile_prepared<'c>(args: &CompileArgs, ctx: &'c Context, hugr: &Hugr) -> Re
             .map(|v| ctx.metadata_string(v).into())
             .collect::<Vec<_>>();
         let node = ctx.metadata_node(md_vec.as_slice());
-        let _ = module
+        module
             .add_global_metadata(key, &node)
-            .map_err(ProcessErrs::from);
+            .map_err(|error| anyhow!(error.to_string()))?;
     }
 
     if let Some(di_ctx) = maybe_di_ctx.take() {
         di_ctx.finish();
     }
-    module.verify().map_err(Into::<ProcessErrs>::into)?;
+    module
+        .verify()
+        .map_err(|error| anyhow!(error.to_string()))?;
 
     Ok(module)
-}
-
-/// Get the Inkwell TargetMachine for the current platform, given
-/// the provided optimization level.
-pub fn get_native_target_machine(opt_level: OptimizationLevel) -> Result<TargetMachine> {
-    let reloc_mode = RelocMode::PIC;
-    let code_model = CodeModel::Default;
-    Target::initialize_native(&InitializationConfig::default()).unwrap();
-    let triple = TargetMachine::get_default_triple();
-    let target = Target::from_triple(&triple).map_err(|e| anyhow!("{e}"))?;
-    target
-        .create_target_machine(
-            &triple,
-            &TargetMachine::get_host_cpu_name().to_string_lossy(),
-            &TargetMachine::get_host_cpu_features().to_string_lossy(),
-            opt_level,
-            reloc_mode,
-            code_model,
-        )
-        .ok_or_else(|| anyhow!("Failed to create target machine"))
-}
-
-/// Get the Inkwell TargetMachine for the current platform, given
-/// the provided optimization level.
-pub fn get_target_machine_from_triple(
-    target_triple: &str,
-    opt_level: OptimizationLevel,
-) -> Result<TargetMachine> {
-    let reloc_mode = RelocMode::PIC;
-    let code_model = CodeModel::Default;
-    Target::initialize_all(&InitializationConfig::default());
-    let triple = TargetTriple::create(target_triple);
-    eprintln!("Using target triple: {triple}");
-    let target = Target::from_triple(&triple).map_err(|e| anyhow!("{e}"))?;
-    eprintln!("Using target: {:?}", target.get_name());
-    let cpu: String = target.get_name().to_string_lossy().to_string();
-    target
-        .create_target_machine(&triple, &cpu, "", opt_level, reloc_mode, code_model)
-        .ok_or_else(|| anyhow!("Failed to create target machine"))
-}
-
-/// Get the optimization level for the given integer value.
-pub fn get_opt_level(opt_level: u32) -> Result<OptimizationLevel> {
-    match opt_level {
-        0 => Ok(OptimizationLevel::None),
-        1 => Ok(OptimizationLevel::Less),
-        2 => Ok(OptimizationLevel::Default),
-        3 => Ok(OptimizationLevel::Aggressive),
-        _ => panic!("Invalid optimization level: {opt_level}"),
-    }
-}
-
-/// Get the QSystemPlatform from the given string. Can be "helios" or "sol".
-pub fn get_platform(platform: &str) -> Result<qsystem::QSystemPlatform> {
-    match platform.to_lowercase().as_str() {
-        "helios" => Ok(qsystem::QSystemPlatform::Helios),
-        "sol" => Ok(qsystem::QSystemPlatform::Sol),
-        _ => Err(anyhow!(
-            "Unknown platform: {platform} (expected 'helios' or 'sol')"
-        )),
-    }
 }
 
 // -------------------- Python bindings -----------------------
@@ -558,10 +315,13 @@ mod exceptions {
 #[pymodule]
 mod selene_hugr_qis_compiler {
     use super::{
-        CompileArgs, Context, Hugr, PyResult, embedded_extensions as rust_extensions,
-        get_native_target_machine, get_opt_level, get_platform, get_target_machine_from_triple,
-        has_compatible_extension as rust_has_compatible_extension, public_bitcode_bytes,
-        pyfunction, read_hugr_envelope,
+        CompileArgs, Context, Hugr, PyResult, get_native_target_machine, get_opt_level,
+        get_platform, get_target_machine_from_triple, public_bitcode_bytes, pyfunction,
+        read_hugr_envelope,
+    };
+    use crate::extensions::{
+        embedded_extensions as rust_extensions,
+        has_compatible_extension as rust_has_compatible_extension,
     };
     use pyo3::pymethods;
 
@@ -734,21 +494,5 @@ mod tests {
             .expect("compiling the or-chain fixture to bitcode should work");
 
         parse_bitcode_as_file(&bitcode).expect("or-chain bitcode should parse from file");
-    }
-
-    #[test]
-    fn resolve_slp_recursion_depth_parses_override_or_falls_back() {
-        assert_eq!(
-            super::resolve_slp_recursion_depth(None),
-            super::SLP_RECURSION_MAX_DEPTH
-        );
-        assert_eq!(
-            super::resolve_slp_recursion_depth(Some(" 2 ".to_string())),
-            2
-        );
-        assert_eq!(
-            super::resolve_slp_recursion_depth(Some("garbage".to_string())),
-            super::SLP_RECURSION_MAX_DEPTH
-        );
     }
 }
