@@ -13,7 +13,7 @@ use std::cmp::max;
 const DEFAULT_WINDOW_SIZE: usize = 1280;
 const MINIMUM_POOL_SIZE: usize = 1000;
 const MINIMUM_TOP_UP_SIZE: usize = 200;
-const GROUPED_WEIGHTED_SUM_MIN_ROTATIONS_PER_SET: usize = 64;
+const GROUPED_WEIGHTED_SUM_MIN_OPS_PER_SET: usize = 64;
 
 #[derive(Clone, Copy)]
 struct GreedySynthConfig {
@@ -38,32 +38,28 @@ impl Default for GreedySynthConfig {
     }
 }
 
-/// Returns the average size of nonempty rotation sets.
-fn average_rotations_per_set(pg: &PauliGraph) -> usize {
-    let mut rotations = 0;
-    let mut rotation_sets = 0;
-    let mut current_set_has_rotation = false;
+/// Returns the average size of nonempty Pauli-op sets.
+fn average_ops_per_set(pg: &PauliGraph) -> usize {
+    let mut ops: usize = 0;
+    let mut op_sets = 0;
+    let mut current_set_has_op = false;
 
     for op in pg.get_ops() {
         match op {
             Op::SetBoundary => {
-                rotation_sets += usize::from(current_set_has_rotation);
-                current_set_has_rotation = false;
+                op_sets += usize::from(current_set_has_op);
+                current_set_has_op = false;
             }
-            Op::Rotation { .. } => {
-                rotations += 1;
-                current_set_has_rotation = true;
+            Op::Rotation { .. } | Op::Reset { .. } | Op::Measure { .. } => {
+                ops += 1;
+                current_set_has_op = true;
             }
             _ => {}
         }
     }
-    rotation_sets += usize::from(current_set_has_rotation);
+    op_sets += usize::from(current_set_has_op);
 
-    if rotation_sets == 0 {
-        0
-    } else {
-        rotations / rotation_sets
-    }
+    ops.checked_div(op_sets).unwrap_or(0)
 }
 
 fn resolve_sizes(
@@ -120,7 +116,7 @@ where
         config.pool_size,
         config.top_up_size,
     );
-    if average_rotations_per_set(pg) >= GROUPED_WEIGHTED_SUM_MIN_ROTATIONS_PER_SET {
+    if average_ops_per_set(pg) >= GROUPED_WEIGHTED_SUM_MIN_OPS_PER_SET {
         Reducer::new(
             packed_backend,
             GreedyCostBackend::new(packed_backend, GroupedWeightedSum::default()),
