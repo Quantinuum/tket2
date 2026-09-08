@@ -84,7 +84,9 @@ impl FrontierSingleOp {
     /// Recomputes the cost of a single string as one less than its support size
     /// and updates the number of TQE candidates that reduce it.
     fn recompute(&mut self) {
-        assert!(!self.supports.is_empty());
+        if self.supports.is_empty() {
+            panic!("rotation or measurement cannot contain an identity Pauli string");
+        }
         self.tqe_cost = self.supports.len() - 1;
         self.support_pairs = self.supports.len() * self.tqe_cost / 2;
         self.reduction_gates = self.support_pairs * 4;
@@ -283,6 +285,9 @@ impl PairState {
     /// An anticommuting pair has an odd number of qubits where its local Paulis
     /// anticommute.
     fn recompute(&mut self) {
+        if self.anticommuting_supports.is_empty() {
+            panic!("tableau or reset contains an invalid pair of Pauli strings");
+        }
         let anticommuting_count = self.anticommuting_supports.len();
         let left_count = self.left_supports.len();
         let right_count = self.right_supports.len();
