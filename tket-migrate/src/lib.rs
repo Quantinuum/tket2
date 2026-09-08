@@ -2,23 +2,17 @@
 
 use std::io::{self, BufRead, Write};
 
+use hugr::builder::{DFGBuilder, Dataflow, DataflowHugr};
 use hugr::envelope::ReadError;
 use hugr::extension::resolution::WeakExtensionRegistry;
 use hugr::extension::{ExtensionRegistry, Version};
 use hugr::hugr::hugrmut::HugrMut;
-use hugr::ops::{ExtensionOp, OpType};
+use hugr::hugr::views::SiblingSubgraph;
+use hugr::ops::{DataflowOpTrait, ExtensionOp, OpType};
 use hugr::std_extensions::STD_REG;
-use hugr::types::{CustomType, EdgeKind, PolyFuncType, Term};
-use hugr::{Extension, Hugr, HugrView, Node, PortIndex};
+use hugr::types::{CustomType, EdgeKind, PolyFuncType, Signature, Term, Type};
+use hugr::{Extension, Hugr, HugrView, Node, PortIndex, SimpleReplacement};
 use thiserror::Error;
-
-#[derive(Clone, Debug)]
-#[allow(unused, missing_docs)]
-/// Mapping used to update signature of input/output ports of dataflow and controlflow operations.
-pub struct TypeMapping {
-    old_type: VersionedOp,
-    new_type: VersionedOp,
-}
 
 #[derive(Clone, Debug)]
 #[allow(unused, missing_docs)]
@@ -80,6 +74,20 @@ impl UndatingMap {
                     .and_then(|name| name.strip_prefix('.'))
                     == Some(op_update_map.old_op.name.as_str())
         })
+    }
+}
+
+#[derive(Clone, Debug)]
+#[allow(unused)]
+/// Mapping used to update signature of input/output ports of dataflow and controlflow operations.
+pub struct TypeMapping {
+    old_type: VersionedOp,
+    new_type: VersionedOp,
+}
+
+impl TypeMapping {
+    fn get_new_type(&self) -> &VersionedOp {
+        &self.new_type
     }
 }
 
@@ -178,79 +186,42 @@ impl ExtensionUpdater {
         node: Node,
         replacement_ops: Vec<ExtensionOp>,
     ) {
-        let parent = self.hugr.get_parent(node).expect("operation has no parent");
-        let incoming = self
-            .hugr
-            .node_inputs(node)
-            .flat_map(|port| {
-                self.hugr
-                    .linked_outputs(node, port)
-                    .map(move |(source, source_port)| (source, source_port, port))
-            })
-            .collect::<Vec<_>>();
-        let outgoing = self
-            .hugr
-            .node_outputs(node)
-            .flat_map(|port| {
-                self.hugr
-                    .linked_inputs(node, port)
-                    .map(move |(target, target_port)| (port, target, target_port))
-            })
-            .collect::<Vec<_>>();
-
-        self.hugr.remove_node(node);
-        let replacement_nodes = replacement_ops
-            .into_iter()
-            .map(|op| self.hugr.add_node_with_parent(parent, op))
-            .collect::<Vec<_>>();
-
-        let Some((&first, rest)) = replacement_nodes.split_first() else {
-            for (source, source_port, input_port) in incoming {
-                for (_, target, target_port) in outgoing
-                    .iter()
-                    .filter(|(output_port, _, _)| output_port.index() == input_port.index())
-                {
-                    self.hugr
-                        .connect(source, source_port, *target, *target_port);
-                }
-            }
-            return;
+        let subgraph = SiblingSubgraph::from_node(node, &self.hugr);
+        let old_signature = subgraph.signature(&self.hugr);
+        let signature = match (replacement_ops.first(), replacement_ops.last()) {
+            (Some(first), Some(last)) => Signature::new(
+                first.signature().input().clone(),
+                last.signature().output().clone(),
+            ),
+            _ => Signature::new_endo(old_signature.input().clone()),
         };
-
-        for (source, source_port, target_port) in incoming {
-            self.hugr.connect(source, source_port, first, target_port);
+        let mut builder = DFGBuilder::new(signature).expect("failed to create replacement builder");
+        let mut wires = builder.input_wires().collect::<Vec<_>>();
+        for op in replacement_ops {
+            wires = builder
+                .add_dataflow_op(op, wires)
+                .expect("replacement operations have incompatible signatures")
+                .outputs()
+                .collect();
         }
-        for nodes in replacement_nodes.windows(2) {
-            for (output, input) in self
-                .hugr
-                .node_outputs(nodes[0])
-                .filter(|port| {
-                    matches!(
-                        self.hugr.get_optype(nodes[0]).port_kind(*port),
-                        Some(EdgeKind::Value(_))
-                    )
-                })
-                .zip(self.hugr.node_inputs(nodes[1]).filter(|port| {
-                    matches!(
-                        self.hugr.get_optype(nodes[1]).port_kind(*port),
-                        Some(EdgeKind::Value(_))
-                    )
-                }))
-                .collect::<Vec<_>>()
-            {
-                self.hugr.connect(nodes[0], output, nodes[1], input);
-            }
-        }
-        let last = rest.last().copied().unwrap_or(first);
-        for (source_port, target, target_port) in outgoing {
-            self.hugr.connect(last, source_port, target, target_port);
-        }
+        // With no replacement operations, the inputs pass straight through.
+        let replacement = builder
+            .finish_hugr_with_outputs(wires)
+            .expect("replacement operations do not form a valid dataflow graph");
+        // Migration may change boundary types while preserving port positions.
+        // Neighbouring operations can still have old types until they are updated,
+        // so the host must be validated after the complete migration.
+        let replacement = SimpleReplacement::new_unchecked(subgraph, replacement);
+        self.hugr
+            .apply_patch(replacement)
+            .expect("failed to replace operation");
     }
 
     // -----------------------------
     // Old testing stuff
     // -----------------------------
 }
+
 /// An error encountered while loading or printing a serialized HUGR.
 #[derive(Debug, Error)]
 #[non_exhaustive]
@@ -389,16 +360,159 @@ fn visit_term(
 mod tests {
     use std::io::Cursor;
 
-    use hugr::HugrView;
     use hugr::builder::{DFGBuilder, Dataflow, DataflowHugr};
     use hugr::envelope::EnvelopeConfig;
     use hugr::extension::prelude::bool_t;
+    use hugr::ops::DataflowOpTrait;
+    use hugr::ops::handle::NodeHandle;
     use hugr::std_extensions::arithmetic::int_types::{VERSION as INT_VERSION, int_type};
     use hugr::std_extensions::collections::array::{VERSION as ARRAY_VERSION, array_type};
     use hugr::std_extensions::logic::{LogicOp, VERSION};
     use hugr::types::Signature;
+    use hugr::{HugrView, PortIndex};
 
-    use super::print_extension_versions;
+    use super::{
+        ExtensionRegistry, ExtensionUpdater, STD_REG, UndatingMap, WeakExtensionRegistry,
+        print_extension_versions,
+    };
+
+    #[test]
+    fn replacement_migrates_bool_types() {
+        let registry = ExtensionRegistry::new_with_extension_resolution(
+            [serde_json::from_str(include_str!("../data/bool-0.2.0.json")).unwrap()],
+            &WeakExtensionRegistry::from(&*STD_REG),
+        )
+        .unwrap();
+        let old_extension = registry.get("tket.bool").unwrap();
+        let old_op = |name: &str| old_extension.instantiate_extension_op(name, []).unwrap();
+        let new_not = STD_REG
+            .get("logic")
+            .unwrap()
+            .instantiate_extension_op("Not", [])
+            .unwrap();
+
+        for replacement_count in [1, 3] {
+            for reverse in [false, true] {
+                let mut builder =
+                    DFGBuilder::new(Signature::new([bool_t()], [bool_t(), bool_t()])).unwrap();
+                let [input] = builder.input_wires_arr();
+                let make = builder
+                    .add_dataflow_op(old_op("make_opaque"), [input])
+                    .unwrap();
+                let not = builder
+                    .add_dataflow_op(old_op("not"), make.outputs())
+                    .unwrap();
+                let read = builder
+                    .add_dataflow_op(old_op("read"), not.outputs())
+                    .unwrap();
+                let hugr = builder
+                    .finish_hugr_with_outputs([read.out_wire(0); 2])
+                    .unwrap();
+                let mut updater = ExtensionUpdater::new(hugr, UndatingMap::new(vec![]));
+                let mut replacements = vec![
+                    (make.node(), vec![]),
+                    (not.node(), vec![new_not.clone(); replacement_count]),
+                    (read.node(), vec![]),
+                ];
+                if reverse {
+                    replacements.reverse();
+                }
+                for (node, ops) in replacements {
+                    updater.replace_node_preserving_connections(node, ops);
+                }
+
+                let hugr = updater.get_hugr();
+                hugr.validate().unwrap();
+                let operations = hugr
+                    .nodes()
+                    .filter_map(|n| hugr.get_optype(n).as_extension_op());
+                assert_eq!(operations.clone().count(), replacement_count);
+                assert!(
+                    operations
+                        .into_iter()
+                        .all(|op| op.qualified_id() == "logic.Not")
+                );
+                let [_, output] = hugr.get_io(hugr.entrypoint()).unwrap();
+                assert_eq!(
+                    hugr.single_linked_output(output, 0),
+                    hugr.single_linked_output(output, 1)
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn replacement_rejects_arity_changes_before_mutating() {
+        for old_name in ["And", "Not"] {
+            let extension = STD_REG.get("logic").unwrap();
+            let old_op = extension.instantiate_extension_op(old_name, []).unwrap();
+            let mut builder = DFGBuilder::new(old_op.signature().into_owned()).unwrap();
+            let operation = builder
+                .add_dataflow_op(old_op, builder.input_wires())
+                .unwrap();
+            let hugr = builder
+                .finish_hugr_with_outputs(operation.outputs())
+                .unwrap();
+            let original = hugr.clone();
+            let mut updater = ExtensionUpdater::new(hugr, UndatingMap::new(vec![]));
+            let replacement = if old_name == "And" {
+                vec![] // Two inputs cannot pass through to one output.
+            } else {
+                vec![extension.instantiate_extension_op("And", []).unwrap()]
+            };
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                updater.replace_node_preserving_connections(operation.node(), replacement);
+            }));
+            assert!(result.is_err());
+            assert_eq!(updater.get_hugr(), &original);
+        }
+    }
+
+    #[test]
+    fn replacement_preserves_connections() {
+        for replacement_count in [0, 1, 3] {
+            // Cover both fan-out and a discarded (unconnected) output.
+            for output_count in [0, 2] {
+                let mut builder =
+                    DFGBuilder::new(Signature::new([bool_t()], vec![bool_t(); output_count]))
+                        .unwrap();
+                let [input] = builder.input_wires_arr();
+                let operation = builder.add_dataflow_op(LogicOp::Not, [input]).unwrap();
+                let node = operation.node();
+                let output = operation.out_wire(0);
+                let hugr = builder
+                    .finish_hugr_with_outputs(vec![output; output_count])
+                    .unwrap();
+                let [input_node, output_node] = hugr.get_io(hugr.entrypoint()).unwrap();
+                let op = hugr.get_optype(node).as_extension_op().unwrap().clone();
+                let mut updater = ExtensionUpdater::new(hugr, UndatingMap::new(vec![]));
+
+                updater.replace_node_preserving_connections(node, vec![op; replacement_count]);
+
+                let hugr = updater.get_hugr();
+                hugr.validate().unwrap();
+                assert_eq!(
+                    hugr.nodes()
+                        .filter(|&n| hugr.get_optype(n).is_extension_op())
+                        .count(),
+                    replacement_count
+                );
+                let mut source = input_node;
+                for _ in 0..replacement_count {
+                    let (next, port) = hugr.single_linked_input(source, 0).unwrap();
+                    assert_eq!(port.index(), 0);
+                    assert!(hugr.get_optype(next).is_extension_op());
+                    source = next;
+                }
+                for port in 0..output_count {
+                    assert_eq!(
+                        hugr.single_linked_output(output_node, port),
+                        Some((source, 0.into()))
+                    );
+                }
+            }
+        }
+    }
 
     #[test]
     fn prints_versions_from_serialized_operations() {
