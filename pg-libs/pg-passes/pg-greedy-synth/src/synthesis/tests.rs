@@ -12,6 +12,8 @@ use pg_ir_kernels::PGTableau;
 use pg_optimise::GroupCommutingOpsPass;
 use pg_qm_tableau::Tableau;
 use pg_tk::compare_unitaries_via_tk;
+use rand::seq::index::sample;
+use rand::{Rng, SeedableRng, rngs::StdRng};
 use rstest::rstest;
 
 fn graph(n_qubits: usize, ops: Vec<Op>) -> PauliGraph {
@@ -34,6 +36,27 @@ fn pauli_rotation(string: Vec<Pauli>, angle: f64) -> Op {
     Op::Rotation {
         data: RotationData::new(string, angle),
     }
+}
+
+fn random_pauli_graph(n_qubits: usize, n_ops: usize, seed: u64) -> PauliGraph {
+    let mut graph = PauliGraph::new(n_qubits);
+    let mut rng = StdRng::seed_from_u64(seed);
+    for _ in 0..n_ops {
+        let mut string = vec![Pauli::I; n_qubits];
+        let weight = rng.random_range(1..=n_qubits);
+        for qubit in sample(&mut rng, n_qubits, weight).iter() {
+            string[qubit] = match rng.random_range(0..3) {
+                0 => Pauli::X,
+                1 => Pauli::Y,
+                _ => Pauli::Z,
+            };
+        }
+        graph.add_op(pauli_rotation(
+            string,
+            rng.random_range(0.0..std::f64::consts::TAU),
+        ));
+    }
+    graph
 }
 
 fn prepare_for_synthesis(input: &PauliGraph) -> PauliGraph {
@@ -172,6 +195,38 @@ fn two_chunks_graph() -> PauliGraph {
 fn test_synthesis(#[case] input: PauliGraph) {
     let output = synthesise(&input);
     assert!(compare_unitaries_via_tk(&input, &output));
+}
+
+#[rstest]
+#[case::even_qubits(6)]
+#[case::odd_qubits(5)]
+fn test_random_pauli_graph_synthesis(#[case] qubits: usize) {
+    for seed in 0..20 {
+        let input = random_pauli_graph(qubits, 300, seed);
+        let output = synthesise(&input);
+        assert!(
+            compare_unitaries_via_tk(&input, &output),
+            "synthesis failed for random graph seed {seed}"
+        );
+    }
+}
+
+#[cfg(feature = "simd")]
+#[rstest]
+#[case::even_qubits(6)]
+#[case::odd_qubits(5)]
+fn test_random_pauli_graph_synthesis_simd(#[case] qubits: usize) {
+    for seed in 0..20 {
+        let input = random_pauli_graph(qubits, 300, seed);
+        let output = GreedySynthSimdPass::new()
+            .with_seed(17)
+            .with_parallel_mode(ParallelMode::Off)
+            .transform(&prepare_for_synthesis(&input));
+        assert!(
+            compare_unitaries_via_tk(&input, &output),
+            "SIMD synthesis failed for random graph seed {seed}"
+        );
+    }
 }
 
 #[test]
