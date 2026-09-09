@@ -15,12 +15,13 @@ fn add_rotation(
     s: Vec<Pauli>,
     theta: f64,
     tab: &mut QubitMajorTableau,
-    data: &GateData,
+    conditional_bits: &[usize],
+    conditional_values: &[bool],
     forward: bool,
     cliff_eval: bool,
 ) {
-    let cliff_theta = cliff_angle(theta);
-    if cliff_theta.is_some() && data.get_conditional_bits().is_empty() && cliff_eval {
+    let is_clifford = cliff_angle(theta).is_some();
+    if is_clifford && conditional_bits.is_empty() && cliff_eval {
         // Since the op is already conjugated, we need to post-compose the rotation.
         // If the pass is forward, the tableau is backward facing, so we need to post-compose
         // the tableau with the inverse of the rotation, and this means negating theta.
@@ -32,8 +33,8 @@ fn add_rotation(
             Op::Rotation {
                 data: RotationData::new(s, theta),
             },
-            data.get_conditional_bits().clone(),
-            data.get_conditional_values().clone(),
+            conditional_bits.to_vec(),
+            conditional_values.to_vec(),
         );
     }
 }
@@ -217,8 +218,8 @@ fn process_op(
                                 data.get_conditional_bits().clone(),
                                 data.get_conditional_values().clone(),
                             );
-                            // We set cliff_eval to false so the gates are not composed into the tableau.
-                            process_op(pg, &Op::Gate { data: sub_gate }, tab, forward, false);
+                            // These gates are conditional, so they are never composed into the tableau regardless of cliff_eval.
+                            process_op(pg, &Op::Gate { data: sub_gate }, tab, forward, cliff_eval);
                         }
                     }
                 }
@@ -229,7 +230,16 @@ fn process_op(
                     } else {
                         data.get_params()[0]
                     };
-                    add_rotation(pg, s, theta, tab, data, forward, cliff_eval);
+                    add_rotation(
+                        pg,
+                        s,
+                        theta,
+                        tab,
+                        data.get_conditional_bits(),
+                        data.get_conditional_values(),
+                        forward,
+                        cliff_eval,
+                    );
                 }
                 GateType::RY => {
                     let mut s = vec![Pauli::I; pg.get_n_qubits()];
@@ -240,7 +250,16 @@ fn process_op(
                     } else {
                         data.get_params()[0]
                     };
-                    add_rotation(pg, s, theta, tab, data, forward, cliff_eval);
+                    add_rotation(
+                        pg,
+                        s,
+                        theta,
+                        tab,
+                        data.get_conditional_bits(),
+                        data.get_conditional_values(),
+                        forward,
+                        cliff_eval,
+                    );
                 }
                 GateType::RZ => {
                     let (s, sign_bit) = tab.z_image(data.get_args()[0]);
@@ -249,7 +268,16 @@ fn process_op(
                     } else {
                         data.get_params()[0]
                     };
-                    add_rotation(pg, s, theta, tab, data, forward, cliff_eval);
+                    add_rotation(
+                        pg,
+                        s,
+                        theta,
+                        tab,
+                        data.get_conditional_bits(),
+                        data.get_conditional_values(),
+                        forward,
+                        cliff_eval,
+                    );
                 }
                 GateType::ZZPHASE => {
                     let mut s = vec![Pauli::I; pg.get_n_qubits()];
@@ -261,7 +289,16 @@ fn process_op(
                     } else {
                         data.get_params()[0]
                     };
-                    add_rotation(pg, s, theta, tab, data, forward, cliff_eval);
+                    add_rotation(
+                        pg,
+                        s,
+                        theta,
+                        tab,
+                        data.get_conditional_bits(),
+                        data.get_conditional_values(),
+                        forward,
+                        cliff_eval,
+                    );
                 }
                 GateType::PHASEDX => {
                     let alpha = data.get_params()[0];
@@ -427,19 +464,7 @@ fn process_op(
             } else {
                 data.get_angle()
             };
-            let cliff_theta = cliff_angle(theta);
-            if cliff_theta.is_some() && cliff_eval {
-                // Since the op is already conjugated, we need to post-compose the rotation
-                // If the pass is forward, the tableau is backward facing, so we need to post-compose
-                // the tableau with the inverse of the rotation, which means negating theta.
-                tab.postcompose_op(&Op::Rotation {
-                    data: RotationData::new(s, if forward { -theta } else { theta }),
-                });
-            } else {
-                pg.add_op(Op::Rotation {
-                    data: RotationData::new(s, theta),
-                });
-            }
+            add_rotation(pg, s, theta, tab, &[], &[], forward, cliff_eval);
         }
         Op::Measure { data } => {
             let (s, mut sign_bit) = tab.conjugate_string(data.get_string());
