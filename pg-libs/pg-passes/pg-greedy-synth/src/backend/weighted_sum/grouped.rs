@@ -23,10 +23,7 @@ impl WeightedSumStrategy for GroupedWeightedSum {
         self.weight_runs.clear();
         let mut current_weight = 1.0;
 
-        for (set_offset, set) in slice.op_sets().enumerate() {
-            if set_offset != 0 {
-                current_weight *= super::super::ALPHA;
-            }
+        for set in slice.op_sets() {
             for (_, view) in set {
                 let bit_range = match view.meta {
                     PackedOpMeta::Rotation(_) | PackedOpMeta::Measure(_) => view.bit_range,
@@ -45,6 +42,7 @@ impl WeightedSumStrategy for GroupedWeightedSum {
                     });
                 }
             }
+            current_weight *= super::super::ALPHA;
         }
     }
 

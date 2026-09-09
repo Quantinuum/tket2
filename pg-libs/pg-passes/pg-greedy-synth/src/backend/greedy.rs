@@ -27,9 +27,11 @@ impl GreedyCostMetadata {
     /// current slice.
     ///
     /// Each later commuting set is discounted by `ALPHA = 0.588`. This quality
-    /// tuning heuristic is inherited from the original implementation and
+    /// tuning heuristic is inherited from the [original implementation] and
     /// should only change with representative benchmarks and an output quality
     /// comparison.
+    ///
+    /// [original implementation]: https://docs.quantinuum.com/tket/api-docs/passes.html#pytket.passes.GreedyPauliSimp
     fn rebuild(&mut self, slice: &PackedPGSlice) {
         assert!(!slice.is_empty(), "cannot build weights for empty slice");
 
@@ -37,18 +39,8 @@ impl GreedyCostMetadata {
         self.has_pair_ops = false;
 
         let mut current_weight = 1.0;
-        let mut final_op_has_tableau_weight = false;
-
-        for (set_offset, set) in slice.op_sets().enumerate() {
-            if set_offset != 0 {
-                current_weight *= super::ALPHA;
-            }
-
+        for set in slice.op_sets() {
             for (index, view) in set {
-                final_op_has_tableau_weight = matches!(
-                    view.meta,
-                    PackedOpMeta::Rotation(_) | PackedOpMeta::Measure(_)
-                );
                 match view.meta {
                     PackedOpMeta::Rotation(_) | PackedOpMeta::Measure(_) => {}
                     PackedOpMeta::Reset(_) => self.has_pair_ops = true,
@@ -60,13 +52,10 @@ impl GreedyCostMetadata {
                     }
                 }
             }
+            current_weight *= super::ALPHA;
         }
 
-        self.tableau_weight = if final_op_has_tableau_weight {
-            current_weight * super::ALPHA
-        } else {
-            0.0
-        };
+        self.tableau_weight = current_weight;
     }
 }
 

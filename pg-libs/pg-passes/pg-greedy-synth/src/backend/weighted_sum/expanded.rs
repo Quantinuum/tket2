@@ -21,11 +21,7 @@ impl ExpandedWeights {
         self.values.clear();
         let mut current_weight = 1.0;
 
-        for (set_offset, set) in slice.op_sets().enumerate() {
-            if set_offset != 0 {
-                current_weight *= super::super::ALPHA;
-            }
-
+        for set in slice.op_sets() {
             for (_, view) in set {
                 let start = bit_index(view.bit_range.0);
                 let end = bit_index(view.bit_range.1);
@@ -37,6 +33,7 @@ impl ExpandedWeights {
                     PackedOpMeta::ConditionalBox(_) | PackedOpMeta::BlackBox(_) => {}
                 }
             }
+            current_weight *= super::super::ALPHA;
         }
     }
 }
