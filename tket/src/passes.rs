@@ -36,6 +36,10 @@ pub mod force_order;
 pub mod normalize;
 pub use normalize::Normalize;
 
+// Apply gridsynth to arbitrary rotations.
+pub mod gridsynth;
+pub use gridsynth::GridSynthPass;
+
 // Inline DFG nodes.
 pub mod inline_dfgs;
 pub use inline_dfgs::InlineDFGsPass;
