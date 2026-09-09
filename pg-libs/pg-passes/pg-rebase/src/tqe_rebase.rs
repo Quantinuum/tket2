@@ -131,7 +131,6 @@ impl RebaseTQEToZXPass {
 
 impl PGPass for RebaseTQEToZXPass {
     /// Rebases every disallowed TQE gate and leaves all other operations intact.
-    ///
     fn transform(&self, pg: &PauliGraph) -> PauliGraph {
         rebase_tqe_to_zx(pg, &self.allowed_tqes)
     }
