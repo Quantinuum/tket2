@@ -155,7 +155,7 @@ pub(crate) fn select_candidate(
         maximum_gate_cost = maximum_gate_cost.max(candidate.cost);
     }
     for (index, depth) in depths.iter().copied().enumerate() {
-        if depth <= minimum_depth {
+        if depth < minimum_depth {
             minimum_depth = depth;
             minimum_depth_index = index;
         }
