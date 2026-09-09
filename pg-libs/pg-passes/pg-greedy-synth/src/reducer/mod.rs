@@ -203,14 +203,13 @@ where
 
         match set_kind {
             FrontSetKind::BlackBox(data, tableau) => {
-                let mut nested_depth = vec![0; qubit_depth.len()];
                 output.extend(synthesise_tableau(
                     tableau,
                     &self.packed_backend,
                     &self.cost_backend,
                     self.pool_size,
                     self.top_up_size,
-                    &mut nested_depth,
+                    qubit_depth,
                     self.seed,
                     self.parallel_mode,
                     self.enable_progress,
@@ -267,7 +266,7 @@ where
 
         loop {
             let emissions = frontier.pop_ops();
-            let emitted_gate_count = emissions.iter().map(|item| item.ops.len()).sum::<usize>();
+            let emitted_any = !emissions.is_empty();
             for emission in emissions {
                 output.extend(PauliGraph::new(qubit_depth.len()).with_ops(emission.ops));
                 slice.clear_op_mask(emission.slice_index);
@@ -275,7 +274,7 @@ where
             if frontier.is_empty() {
                 break;
             }
-            let sample_count = if emitted_gate_count > 0 {
+            let sample_count = if emitted_any {
                 self.pool_size
             } else {
                 self.top_up_size
