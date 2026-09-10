@@ -81,7 +81,7 @@ fn main1() -> Result<(), Box<dyn Error>> {
     ]);
 
     let mut updater = ExtensionUpdater::new(_old_hugr, updating_map);
-    updater.update_op(load_new_extensions()?);
+    updater.migrate_hugr(load_new_extensions()?);
 
     std::fs::write("updated1.mmd", updater.get_hugr().mermaid_string())?;
     println!("+++++++++++++++++");
@@ -185,7 +185,7 @@ fn main2() -> Result<(), Box<dyn Error>> {
     ]);
 
     let mut updater = ExtensionUpdater::new(old_bool_hugr, updating_map);
-    updater.update_op(load_new_extensions()?);
+    updater.migrate_hugr(load_new_extensions()?);
 
     std::fs::write("updated2.mmd", updater.get_hugr().mermaid_string())?;
     println!("+++++++++++++++++");

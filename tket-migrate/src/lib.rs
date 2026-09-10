@@ -127,7 +127,7 @@ impl ExtensionUpdater {
     }
 
     #[allow(dead_code, missing_docs)]
-    pub fn update_op(&mut self, new_extensions: Vec<Extension>) {
+    pub fn migrate_hugr(&mut self, new_extensions: Vec<Extension>) {
         self.add_new_extension(new_extensions);
         for node in self.hugr.nodes().collect::<Vec<_>>() {
             self.update_node(node);
@@ -152,8 +152,8 @@ impl ExtensionUpdater {
         println!("saved Hugr extensions");
     }
 
-    fn update_node(&mut self, node: Node) {
-        let OpType::ExtensionOp(operation) = self.hugr.get_optype(node) else {
+    fn update_node(&mut self, old_node: Node) {
+        let OpType::ExtensionOp(operation) = self.hugr.get_optype(old_node) else {
             return;
         };
         let Some(op_update_map) = self
@@ -177,7 +177,7 @@ impl ExtensionUpdater {
                 .collect::<Vec<_>>()
                 .join(", "),
         );
-        self.replace_node_preserving_connections(node, replacement_ops);
+        self.replace_node_preserving_connections(old_node, replacement_ops);
         println!("========")
     }
 
@@ -216,11 +216,11 @@ impl ExtensionUpdater {
             .apply_patch(replacement)
             .expect("failed to replace operation");
     }
-
-    // -----------------------------
-    // Old testing stuff
-    // -----------------------------
 }
+
+// -----------------------------
+// Old testing stuff
+// -----------------------------
 
 /// An error encountered while loading or printing a serialized HUGR.
 #[derive(Debug, Error)]
