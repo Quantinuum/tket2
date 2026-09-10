@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.15.9](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.8...tket-py-v0.15.9) (2026-09-07)
+
+
+### Bug Fixes
+
+* Decode pytket circuits that have reordered parameter-producing barriers ([#1980](https://github.com/Quantinuum/tket2/issues/1980)) ([d6c2b27](https://github.com/Quantinuum/tket2/commit/d6c2b274409b6bf7fc33c78980ec57d25bc0325f))
+
+## [0.15.8](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.7...tket-py-v0.15.8) (2026-09-04)
+
+
+### Features
+
+* Add missing tket1 extension to tket_exts ([#1961](https://github.com/Quantinuum/tket2/issues/1961)) ([989e2a3](https://github.com/Quantinuum/tket2/commit/989e2a3b47ccdb3ac80c2dc2292393a2e154d8e5))
+* Update Modifier pass to handle custom modifier and introduce new metadata for custom implementation ([#1962](https://github.com/Quantinuum/tket2/issues/1962)) ([6ff9ad5](https://github.com/Quantinuum/tket2/commit/6ff9ad5ea9bfdd63dc3ac12adbe5cdc0252a43fb))
+
+### Bug Fixes
+
+* Include required newer extensions when loading a `CompilationState` from a Python hugr ([#1976](https://github.com/Quantinuum/tket2/issues/1976)) ([4bdffbf](https://github.com/Quantinuum/tket2/commit/4bdffbf6a286aecf7f9cc30bc9596057239e7189))
+
+
+
+## [0.15.7](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.6...tket-py-v0.15.7) (2026-08-28)
+
+
+### Features
+
+* Add re-exports for ComposablePass definitions ([#1941](https://github.com/Quantinuum/tket2/issues/1941)) ([4469024](https://github.com/Quantinuum/tket2/commit/4469024838fc61fce6135551a3fa0a0835c45bc5))
+* Preserving order edges during (non-dagger) modifier resolution ([#1840](https://github.com/Quantinuum/tket2/issues/1840)) ([cee5576](https://github.com/Quantinuum/tket2/commit/cee5576f5e475e54a30c7c9575e00adc2e925bf8))
+
+
+### Performance Improvements
+
+* improve Cliffordize performance ([#1909](https://github.com/Quantinuum/tket2/issues/1909)) ([b001ce1](https://github.com/Quantinuum/tket2/commit/b001ce1286d8f43966651a30f49e61c2c6591b1f))
+
 ## [0.15.6](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.5...tket-py-v0.15.6) (2026-08-03)
 
 

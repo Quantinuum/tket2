@@ -8,6 +8,7 @@ members = [
     "pg-kernels/pg-ir-kernels-tests",
     "pg-utils/pg-utils",
     "pg-passes/pg-canonical-form",
+    "pg-passes/pg-optimise",
     "pg-qm-tableau",
     ]
 

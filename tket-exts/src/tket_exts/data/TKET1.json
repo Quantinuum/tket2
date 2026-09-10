@@ -1,0 +1,14 @@
+{
+  "version": "0.2.0",
+  "name": "TKET1",
+  "types": {},
+  "operations": {
+    "tk1op": {
+      "extension": "TKET1",
+      "name": "tk1op",
+      "description": "An opaque TKET1 operation.",
+      "signature": null,
+      "binary": true
+    }
+  }
+}

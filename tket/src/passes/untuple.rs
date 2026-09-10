@@ -8,7 +8,7 @@ use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
 use hugr_core::hugr::SimpleReplacementError;
 use hugr_core::hugr::hugrmut::HugrMut;
 use hugr_core::hugr::views::SiblingSubgraph;
-use hugr_core::ops::{OpTrait, OpType};
+use hugr_core::ops::OpType;
 use hugr_core::types::Type;
 use hugr_core::{HugrView, Node, PortIndex, SimpleReplacement};
 use itertools::Itertools;
@@ -166,7 +166,7 @@ fn make_rewrite<'h, T: HugrView>(
         return None;
     }
 
-    let tuple_types = op.dataflow_signature().unwrap().input_types().to_vec();
+    let tuple_types = hugr.in_value_types(node).map(|(_, ty)| ty).collect_vec();
     let node_parent = hugr.get_parent(node);
 
     // See if it is followed by a tuple unpack
@@ -193,7 +193,7 @@ fn make_rewrite<'h, T: HugrView>(
     Some(remove_pack_unpack(
         hugr,
         convex_checker,
-        &tuple_types,
+        tuple_types,
         node,
         unpack_nodes,
         num_other_outputs,
@@ -205,7 +205,7 @@ fn make_rewrite<'h, T: HugrView>(
 fn remove_pack_unpack<'h, T: HugrView>(
     hugr: &'h T,
     convex_checker: &mut Option<SchedGraphChecker<'h, T>>,
-    tuple_types: &[Type],
+    tuple_types: Vec<Type>,
     pack_node: T::Node,
     unpack_nodes: Vec<T::Node>,
     num_other_outputs: usize,
@@ -238,7 +238,7 @@ fn remove_pack_unpack<'h, T: HugrView>(
 
     // If needed, re-add the tuple pack node and connect its output to the tuple outputs.
     if num_other_outputs > 0 {
-        let op = MakeTuple::new(tuple_types.to_vec().into());
+        let op = MakeTuple::new(tuple_types.into());
         let [tuple] = replacement
             .add_dataflow_op(op, replacement.input_wires())
             .unwrap()

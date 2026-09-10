@@ -39,13 +39,15 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
-version = "0.4.2" # updated by release-please
+version = "0.5.0" # updated by release-please
+dependencies = ["hugr~=0.18.3", "typing-extensions>=4.5"]
 
 [project.urls]
 repository = "https://github.com/quantinuum/tket2/tree/main/qis-compiler"
 
 [tool.maturin]
-profile = "dev"
+# Keep the profile unset: wheel builds default to release, while `maturin develop`
+# defaults to dev for fast local iteration.
 python-source = "python"
 manifest-path = "Cargo.toml"
 features = ["py"]

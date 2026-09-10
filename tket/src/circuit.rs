@@ -1,6 +1,5 @@
 //! Quantum circuit representation and operations.
 
-pub mod command;
 pub mod cost;
 mod extract_dfg;
 pub mod units;
@@ -10,8 +9,6 @@ use std::collections::HashSet;
 use std::iter::Sum;
 
 use crate::passes::utils::hash::{HashError, HugrHash};
-#[expect(deprecated)]
-pub use command::{Command, CommandIterator};
 use hugr::extension::prelude::{NoopDef, TupleOpDef};
 use hugr::extension::simple_op::MakeOpDef;
 use hugr::hugr::views::sibling_subgraph::InvalidSubgraph;
@@ -312,47 +309,6 @@ impl<T: HugrView> Circuit<T> {
 }
 
 impl<T: HugrView<Node = Node>> Circuit<T> {
-    /// Returns all the commands in the circuit, in some topological order.
-    ///
-    /// Ignores the Input and Output nodes.
-    #[inline]
-    #[deprecated(
-        since = "0.19.0",
-        note = "This is a limited API that will be dropped soon. Use toposorting over `HugrView::scheduling_graph` instead.\n<https://docs.rs/hugr/latest/hugr/trait.HugrView.html#method.scheduling_graph>"
-    )]
-    #[expect(deprecated)]
-    pub fn commands(&self) -> CommandIterator<'_, T>
-    where
-        Self: Sized,
-    {
-        // Traverse the circuit in topological order.
-        CommandIterator::new(self)
-    }
-
-    /// Returns the top-level operations in the circuit, in some topological
-    /// order.
-    ///
-    /// This is a subset of the commands returned by [`Circuit::commands`], only
-    /// including [`TketOp`]s, pytket ops, and any other custom operations.
-    ///
-    ///   [`TketOp`]: crate::TketOp
-    #[inline]
-    #[deprecated(
-        since = "0.19.0",
-        note = "This is a limited API that will be dropped soon. Use toposorting over `HugrView::scheduling_graph` instead.\n<https://docs.rs/hugr/latest/hugr/trait.HugrView.html#method.scheduling_graph>"
-    )]
-    #[expect(deprecated)]
-    pub fn operations(&self) -> impl Iterator<Item = Command<'_, T>> + '_
-    where
-        Self: Sized,
-    {
-        // Traverse the circuit in topological order.
-        self.commands().filter(|cmd| {
-            cmd.optype().is_extension_op()
-                && !IGNORED_EXTENSION_OPS.contains(&cmd.optype().to_smolstr())
-        })
-    }
-
     /// Extracts the circuit into a new owned HUGR containing the circuit at the root.
     /// Replaces the circuit container operation with an [`OpType::DFG`].
     ///

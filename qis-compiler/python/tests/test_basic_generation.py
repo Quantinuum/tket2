@@ -2,10 +2,19 @@ from pathlib import Path
 from typing import Literal
 
 import pytest
+from hugr import tys
+from hugr.build.dfg import Function
+from hugr.ext import Extension, OpDef, OpDefSig
+from hugr.hugr import Hugr
 from hugr.ops import CFG
 from hugr.package import Package
 from pytest_snapshot.plugin import Snapshot
-from selene_hugr_qis_compiler import HugrReadError, check_hugr, compile_to_llvm_ir
+from selene_hugr_qis_compiler import (
+    EmulatorState,
+    HugrReadError,
+)
+from selene_hugr_qis_compiler import selene_hugr_qis_compiler as _native
+from semver import Version
 from tket_exts import modifier
 
 resources_dir = Path(__file__).parent / "resources"
@@ -41,35 +50,69 @@ def contains_modifiers(hugr_envelope: bytes) -> bool:
     return False
 
 
+def extension_hugr(name: str, version: Version) -> Hugr:
+    """Build a HUGR using an operation from a specific extension version."""
+    extension = Extension(name, version)
+    op_def = extension.add_op_def(
+        OpDef("gate", OpDefSig(tys.FunctionType([tys.Qubit], [tys.Qubit])))
+    )
+
+    fn = Function("custom_op", [tys.Qubit])
+    [q] = fn.inputs()
+    [q] = fn.add_op(op_def.instantiate(), q).outputs()
+    fn.set_outputs(q)
+    return fn.hugr
+
+
 def test_check() -> None:
-    """Test the check_hugr function to ensure it can load a HUGR envelope."""
+    """Test that state construction loads and validates a HUGR envelope."""
     hugr_envelope = load("check")
-    check_hugr(hugr_envelope)  # guppy produces a valid HUGR envelope!
+    EmulatorState.from_bytes(hugr_envelope)
 
     bad_number = hugr_envelope[1:]
     with pytest.raises(HugrReadError, match="Bad magic number"):
-        check_hugr(bad_number)
+        EmulatorState.from_bytes(bad_number)
 
     bad_end = hugr_envelope[:-1]
     with pytest.raises(HugrReadError, match="Premature end of file"):
-        check_hugr(bad_end)
+        EmulatorState.from_bytes(bad_end)
 
     package = Package.from_bytes(hugr_envelope)
     hugr = package.modules[0]
     hugr.add_node(CFG([], []))
     with pytest.raises(ValueError, match="has no entry block"):
-        check_hugr(package.to_str().encode("utf-8"))
+        EmulatorState.from_bytes(package.to_str().encode("utf-8"))
 
 
-def test_unsupported_pytket_ops() -> None:
-    """Test the check_hugr function to ensure it flags unsupported pytket ops."""
-    hugr_envelope = load("unsupported_pytket_ops")
+def test_emulator_state_validates_on_construction() -> None:
     with pytest.raises(
         HugrReadError,
         match="Pytket op 'CSXdg' is not currently "
         "supported by the Selene HUGR-QIS compiler",
     ):
-        check_hugr(hugr_envelope)
+        EmulatorState.from_bytes(load("unsupported_pytket_ops"))
+
+
+def test_hugr_input_bundles_newer_extension() -> None:
+    name, version = next(
+        (name, Version.parse(version))
+        for name, version in _native.embedded_extensions()
+        if name == "logic"
+    )
+    newer_version = version.bump_patch()
+    assert not _native.has_compatible_extension(name, str(newer_version))
+
+    state = EmulatorState.from_python(extension_hugr(name, newer_version))
+
+    assert state is not None
+
+
+def test_emulator_state_accepts_package_input() -> None:
+    package = Package.from_bytes(load("check"))
+
+    ir = EmulatorState.from_python(package).compile_to_llvm_ir()
+
+    assert "define i64 @qmain" in ir
 
 
 def normalize_ir_snapshot(ir: str) -> str:
@@ -100,9 +143,8 @@ def test_llvm(
     snapshot: Snapshot, hugr_file: str, target_triple: str, platform: Platform
 ) -> None:
     hugr_envelope = load(hugr_file)
-    ir = compile_to_llvm_ir(
-        hugr_envelope, target_triple=target_triple, platform=platform, emit_debug=True
-    )
+    state = EmulatorState.from_bytes(hugr_envelope, platform=platform)
+    ir = state.compile_to_llvm_ir(target_triple=target_triple, emit_debug=True)
     ir = normalize_ir_snapshot(ir)
     snapshot.assert_match(ir, f"{hugr_file}_{target_triple}_{platform}")
 
@@ -112,7 +154,7 @@ def test_entry_args() -> None:
         RuntimeError,
         match="Entry point function must have no input parameters",
     ):
-        _ = compile_to_llvm_ir(load("entry_args"))
+        _ = EmulatorState.from_bytes(load("entry_args")).compile_to_llvm_ir()
 
 
 @pytest.mark.parametrize("platform", platforms)
@@ -120,10 +162,8 @@ def test_compile_modifiers(platform: Platform) -> None:
     hugr_envelope = load("simple_modifier")
     assert contains_modifiers(hugr_envelope)
 
-    ir = compile_to_llvm_ir(
-        hugr_envelope,
+    ir = EmulatorState.from_bytes(hugr_envelope, platform=platform).compile_to_llvm_ir(
         target_triple="x86_64-unknown-linux-gnu",
-        platform=platform,
     )
     assert "define i64 @qmain" in ir
     assert "ControlModifier" not in ir
@@ -163,5 +203,7 @@ def test_gpu(snapshot: Snapshot, target_triple: str) -> None:
     # above, using the tket_qsystem::extension::gpu entities.
     hugr_file = resources_dir / "example_gpu.hugr"
     hugr_envelope = hugr_file.read_bytes()
-    ir = compile_to_llvm_ir(hugr_envelope, target_triple=target_triple)
+    ir = EmulatorState.from_bytes(hugr_envelope).compile_to_llvm_ir(
+        target_triple=target_triple
+    )
     snapshot.assert_match(ir, f"gpu_{target_triple}")

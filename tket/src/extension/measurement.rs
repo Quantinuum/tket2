@@ -1,4 +1,4 @@
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, LazyLock, Weak};
 
 use hugr::{
     Extension, Wire,
@@ -57,9 +57,12 @@ pub fn measurement_custom_type() -> CustomType {
         .unwrap()
 }
 
+/// Shared storage for the concrete measurement type.
+static MEASUREMENT_TYPE: LazyLock<Type> = LazyLock::new(|| measurement_custom_type().into());
+
 /// Returns a `Measurement` [Type].
 pub fn measurement_type() -> Type {
-    measurement_custom_type().into()
+    MEASUREMENT_TYPE.clone()
 }
 
 #[derive(

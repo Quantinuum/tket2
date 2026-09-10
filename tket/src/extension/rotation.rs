@@ -15,7 +15,7 @@ use hugr::{
 };
 use smol_str::SmolStr;
 use std::f64::consts::PI;
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, LazyLock, Weak};
 use strum::{EnumIter, EnumString, IntoStaticStr};
 
 use lazy_static::lazy_static;
@@ -49,9 +49,13 @@ pub fn rotation_custom_type(extension_ref: &Weak<Extension>) -> CustomType {
     )
 }
 
+/// Shared storage for the commonly used concrete rotation type.
+static ROTATION_TYPE: LazyLock<Type> =
+    LazyLock::new(|| rotation_custom_type(&Arc::downgrade(&ROTATION_EXTENSION)).into());
+
 /// Type representing a rotation that is a number of half turns (as [Type])
 pub fn rotation_type() -> Type {
-    rotation_custom_type(&Arc::downgrade(&ROTATION_EXTENSION)).into()
+    ROTATION_TYPE.clone()
 }
 
 /// A rotation

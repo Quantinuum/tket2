@@ -53,31 +53,31 @@ cond_40_case_0.i44:                               ; preds = %__hugr__.__tk2_sol_
 
 __hugr__.__tk2_sol_qalloc.36.exit45:              ; preds = %__hugr__.__tk2_sol_qalloc.36.exit41
   tail call void @___reset(i64 %qalloc.i42), !dbg !13
-  %___lazy_measure = tail call i64 @___lazy_measure(i64 %qalloc.i, i64 0), !dbg !14
+  %___future_measure = tail call i64 @___future_measure(i64 %qalloc.i, i64 0), !dbg !14
   tail call void @___qfree(i64 %qalloc.i), !dbg !14
   tail call void @___rp(i64 %qalloc.i42, double 0x400921FB54442D18, double 0.000000e+00), !dbg !15
-  %read_bool = tail call i1 @___read_future_bool(i64 %___lazy_measure), !dbg !14
-  tail call void @___dec_future_refcount(i64 %___lazy_measure), !dbg !14
+  %read_bool = tail call i1 @___read_future_bool(i64 %___future_measure), !dbg !14
+  tail call void @___dec_future_refcount(i64 %___future_measure), !dbg !14
   tail call void @print_bool(ptr nonnull @res_c0.7C14CD6E.0, i64 12, i1 %read_bool), !dbg !16
-  %___lazy_measure9 = tail call i64 @___lazy_measure(i64 %qalloc.i34, i64 0), !dbg !17
+  %___future_measure9 = tail call i64 @___future_measure(i64 %qalloc.i34, i64 0), !dbg !17
   tail call void @___qfree(i64 %qalloc.i34), !dbg !17
-  %read_bool11 = tail call i1 @___read_future_bool(i64 %___lazy_measure9), !dbg !17
-  tail call void @___dec_future_refcount(i64 %___lazy_measure9), !dbg !17
+  %read_bool11 = tail call i1 @___read_future_bool(i64 %___future_measure9), !dbg !17
+  tail call void @___dec_future_refcount(i64 %___future_measure9), !dbg !17
   tail call void @print_bool(ptr nonnull @res_c1.1F7A6571.0, i64 12, i1 %read_bool11), !dbg !18
-  %___lazy_measure17 = tail call i64 @___lazy_measure(i64 %qalloc.i38, i64 0), !dbg !19
+  %___future_measure17 = tail call i64 @___future_measure(i64 %qalloc.i38, i64 0), !dbg !19
   tail call void @___qfree(i64 %qalloc.i38), !dbg !19
-  %read_bool19 = tail call i1 @___read_future_bool(i64 %___lazy_measure17), !dbg !19
-  tail call void @___dec_future_refcount(i64 %___lazy_measure17), !dbg !19
+  %read_bool19 = tail call i1 @___read_future_bool(i64 %___future_measure17), !dbg !19
+  tail call void @___dec_future_refcount(i64 %___future_measure17), !dbg !19
   tail call void @print_bool(ptr nonnull @res_c2.60825383.0, i64 12, i1 %read_bool19), !dbg !20
-  %___lazy_measure25 = tail call i64 @___lazy_measure(i64 %qalloc.i42, i64 0), !dbg !21
+  %___future_measure25 = tail call i64 @___future_measure(i64 %qalloc.i42, i64 0), !dbg !21
   tail call void @___qfree(i64 %qalloc.i42), !dbg !21
-  %read_bool27 = tail call i1 @___read_future_bool(i64 %___lazy_measure25), !dbg !21
-  tail call void @___dec_future_refcount(i64 %___lazy_measure25), !dbg !21
+  %read_bool27 = tail call i1 @___read_future_bool(i64 %___future_measure25), !dbg !21
+  tail call void @___dec_future_refcount(i64 %___future_measure25), !dbg !21
   tail call void @print_bool(ptr nonnull @res_c3.B223E16D.0, i64 12, i1 %read_bool27), !dbg !22
   ret void
 }
 
-declare i64 @___lazy_measure(i64, i64) local_unnamed_addr
+declare i64 @___future_measure(i64, i64) local_unnamed_addr
 
 declare void @___qfree(i64) local_unnamed_addr
 

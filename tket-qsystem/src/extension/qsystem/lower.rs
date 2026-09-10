@@ -1,3 +1,6 @@
+use crate::extension::futures::{FutureOp, FutureOpDef, future_type};
+use crate::extension::qsystem::{self, QSystemPlatform};
+use crate::helpers::lowerer_with_future_linearization;
 use derive_more::{Display, Error, From};
 use hugr::extension::prelude::{Barrier, Noop, bool_t};
 use hugr::extension::simple_op::{MakeExtensionOp, MakeRegisteredOp};
@@ -14,15 +17,10 @@ use hugr::{
 use lazy_static::lazy_static;
 use tket::extension::measurement::{MeasurementOp, measurement_custom_type};
 use tket::passes::composable::WithScope;
+use tket::passes::replace_types::handlers::register_linear_array_op_replacements;
 use tket::passes::replace_types::{NodeTemplate, ReplaceTypesError};
 use tket::passes::{ComposablePass, PassScope, ReplaceTypes};
 use tket::{TketOp, extension::rotation::RotationOpBuilder};
-
-use crate::extension::futures::{FutureOp, FutureOpDef, future_type};
-use crate::extension::qsystem::{self, QSystemPlatform};
-use crate::helpers::{
-    lowerer_with_future_linearization, replace_array_ops_requiring_copyable_bounds,
-};
 
 use super::barrier::BarrierInserter;
 use super::common::SharedOp;
@@ -81,23 +79,6 @@ pub enum LowerTk2Error {
     /// Error when inserting a runtime barrier.
     #[display("Error when inserting a runtime barrier: {_0}")]
     RuntimeBarrierError(#[from] InsertCutError),
-
-    /// Legacy `tket.qsystem` ops that are Helios-specific (i.e. have no shared
-    /// qsystem equivalent) could not previously be lowered to Sol via direct
-    /// remapping.
-    ///
-    /// Deprecated: Helios-specific ops are now handled via the cross-platform
-    /// lowering path; `lower_tk2_ops` will no longer return this error.
-    #[deprecated(
-        since = "0.26.0",
-        note = "Helios-specific ops are now handled by the cross-platform lowering path; \
-                    this error variant will no longer be returned by lower_tk2_ops."
-    )]
-    #[display(
-        "Helios-specific legacy tket.qsystem ops cannot be lowered to Sol via direct remapping; \
-         use cross-platform lowering instead."
-    )]
-    LegacyQSystemToSolUnsupported,
 }
 
 /// Ops detected for replacement, classified by type.
@@ -226,7 +207,7 @@ fn register_measurement_replacements(lowerer: &mut ReplaceTypes) {
     // This is required as copyable `Measurements` are replaced by linear
     // `Futures`. Note we don't need to deal with static arrays as you cannot
     // create static arrays of `Measurement`` values in Guppy.
-    replace_array_ops_requiring_copyable_bounds(lowerer);
+    register_linear_array_op_replacements(lowerer);
 }
 
 /// Lower [`TketOp`] operations to target QSystem operations.

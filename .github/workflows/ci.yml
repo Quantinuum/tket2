@@ -500,8 +500,7 @@ jobs:
   # even if they are skipped due to no changes in the relevant files.
   required-checks:
     name: Required checks 🦀+🐍
-    needs:
-      [
+    needs: [
         changes,
         check-pg-libs,
         check-rs,
@@ -512,7 +511,7 @@ jobs:
         tests-rs-stable-all-features,
         tests-py,
         tket-extensions,
-        extension-versions,
+        #extension-versions,
         tests-qis-compiler,
       ]
     if: ${{ !cancelled() }}

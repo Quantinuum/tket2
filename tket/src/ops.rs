@@ -240,15 +240,6 @@ impl TketOp {
     }
 }
 
-/// Whether an op is a given TketOp.
-#[deprecated(
-    since = "0.19.0",
-    note = "Use `op.cast::<TketOp>() == Some(TketOp::...)` instead"
-)]
-pub fn op_matches(op: &OpType, tket_op: TketOp) -> bool {
-    op.to_string() == tket_op.exposed_name()
-}
-
 /// Simple enum representation of Pauli matrices.
 #[derive(
     Clone, Copy, Debug, Serialize, Deserialize, EnumIter, Display, PartialEq, PartialOrd, EnumString,
