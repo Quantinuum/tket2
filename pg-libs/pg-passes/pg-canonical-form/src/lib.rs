@@ -1,43 +1,10 @@
 //! Pass to convert a Pauli graph into canonical form.
 use pg_core::{
-    BlackBoxData, ConditionalBoxData, GateData, GateType, MeasureData, Op, PGPass, Pauli,
-    PauliGraph, ResetData, RotationData, TableauData,
+    BlackBoxData, ConditionalBoxData, GateData, GateType, Op, PGPass, PauliGraph, TableauData,
 };
-use pg_ir_kernels::{PGTableau, get_dagger};
+use pg_ir_kernels::{PGTableau, get_dagger, is_clifford, is_clifford_gate_type};
 use pg_qm_tableau::Tableau as QubitMajorTableau;
-use pg_utils::{cliff_angle, equiv_0};
-
-/// Add a conjugated Pauli rotation to the Pauli graph.
-/// If `cliff_eval` is enabled, the rotation has a Clifford angle, and it is unconditional,
-/// we fold it into the current tableau; otherwise we emit it as a (possibly conditional) `Op::Rotation`.
-fn add_rotation(
-    pg: &mut PauliGraph,
-    s: Vec<Pauli>,
-    theta: f64,
-    tab: &mut QubitMajorTableau,
-    conditional_bits: &[usize],
-    conditional_values: &[bool],
-    forward: bool,
-    cliff_eval: bool,
-) {
-    let is_clifford = cliff_angle(theta).is_some();
-    if is_clifford && conditional_bits.is_empty() && cliff_eval {
-        // Since the op is already conjugated, we need to post-compose the rotation.
-        // If the pass is forward, the tableau is backward facing, so we need to post-compose
-        // the tableau with the inverse of the rotation, and this means negating theta.
-        tab.postcompose_op(&Op::Rotation {
-            data: RotationData::new(s, if forward { -theta } else { theta }),
-        });
-    } else {
-        pg.add_conditional_op(
-            Op::Rotation {
-                data: RotationData::new(s, theta),
-            },
-            conditional_bits.to_vec(),
-            conditional_values.to_vec(),
-        );
-    }
-}
+use pg_utils::cliff_angle;
 
 /// Decompose a Clifford gate into a sequence of rotations. We do this to process conditional Clifford gates.
 /// The current ConditionalBox only supports PauliRotation, Reset, and Measure, so we need to decompose Clifford gates into rotations to be able to process them.
@@ -153,16 +120,49 @@ fn decompose_clifford(gate_type: &GateType, args: &[usize]) -> Vec<GateData> {
             GateData::new(GateType::RZ, vec![args[1]]).with_params(vec![1.0]),
             GateData::new(GateType::RX, vec![args[0]]).with_params(vec![1.0]),
         ],
-        GateType::SWAP => vec![
-            GateData::new(GateType::ZX, vec![args[0], args[1]]),
-            GateData::new(GateType::ZX, vec![args[1], args[0]]),
-            GateData::new(GateType::ZX, vec![args[0], args[1]]),
-        ],
+        GateType::SWAP => [[args[0], args[1]], [args[1], args[0]], [args[0], args[1]]]
+            .into_iter()
+            .flat_map(|args| decompose_clifford(&GateType::ZX, &args))
+            .collect(),
         _ => panic!(
             "decompose_clifford called with non-Clifford gate type: {:?}",
             gate_type
         ),
     }
+}
+
+fn absorb_clifford(tab: &mut QubitMajorTableau, op: &Op, forward: bool) {
+    // if moving forward, we maintain the dagger of the tableau.
+    // so updating the dagger of the tableau with a gate on the right
+    // is equivalent to pre-composing
+    // the dagger tableau with the dagger of the gate.
+    // (C;G)^\dagger = G^\dagger;C^\dagger
+    if forward {
+        tab.precompose_op(&get_dagger::<QubitMajorTableau>(op));
+    } else {
+        tab.precompose_op(op);
+    }
+}
+
+/// Flush the accumulated tableau and emit either black box representation as an Op::BlackBox.
+fn flush_black_box(
+    pg: &mut PauliGraph,
+    tab: &mut QubitMajorTableau,
+    qubits: &[usize],
+    content: &str,
+    forward: bool,
+) {
+    let tab_moved = std::mem::replace(tab, QubitMajorTableau::eye(pg.get_n_qubits()));
+    pg.add_op(Op::Tableau {
+        data: TableauData::from(if forward {
+            tab_moved.invert()
+        } else {
+            tab_moved
+        }),
+    });
+    pg.add_op(Op::BlackBox {
+        data: BlackBoxData::new(qubits.to_vec(), content.to_owned()),
+    });
 }
 
 /// The main function for processing an Op in the input PauliGraph.
@@ -174,397 +174,124 @@ fn process_op(
     cliff_eval: bool,
 ) {
     match op {
-        Op::Gate { data } => {
-            match data.get_gate_type() {
-                GateType::H
-                | GateType::S
-                | GateType::V
-                | GateType::Sdg
-                | GateType::Vdg
-                | GateType::X
-                | GateType::Y
-                | GateType::Z
-                | GateType::XX
-                | GateType::XY
-                | GateType::XZ
-                | GateType::YX
-                | GateType::YY
-                | GateType::YZ
-                | GateType::ZX
-                | GateType::ZY
-                | GateType::ZZ => {
-                    if data.get_conditional_bits().is_empty() {
-                        if forward {
-                            // if moving forward, we maintain the dagger of the tableau.
-                            // so updating the dagger of the tableau with a gate on the right
-                            // is equivalent to pre-composing
-                            // the dagger tableau with the dagger of the gate.
-                            // (C;G)^\dagger = G^\dagger;C^\dagger
-                            tab.precompose_op(&get_dagger::<QubitMajorTableau>(op));
-                        } else {
-                            tab.precompose_op(op);
-                        }
-                    } else {
-                        // If the gate is conditional, we treat the gate as a sequence of rotations
-                        // and conjugate them.
-                        let mut decomposed_gates =
-                            decompose_clifford(data.get_gate_type(), data.get_args());
-                        // If the pass is moving backward, we need to add the gates in reverse order.
-                        if !forward {
-                            decomposed_gates.reverse();
-                        }
-                        for sub_gate in decomposed_gates {
-                            let sub_gate = sub_gate.with_conditional(
-                                data.get_conditional_bits().clone(),
-                                data.get_conditional_values().clone(),
-                            );
-                            // These gates are conditional, so they are never composed into the tableau regardless of cliff_eval.
-                            process_op(pg, &Op::Gate { data: sub_gate }, tab, forward, cliff_eval);
-                        }
-                    }
-                }
-                GateType::RX => {
-                    let (s, sign_bit) = tab.x_image(data.get_args()[0]);
-                    let theta = if sign_bit {
-                        -data.get_params()[0]
-                    } else {
-                        data.get_params()[0]
-                    };
-                    add_rotation(
-                        pg,
-                        s,
-                        theta,
-                        tab,
-                        data.get_conditional_bits(),
-                        data.get_conditional_values(),
-                        forward,
-                        cliff_eval,
-                    );
-                }
-                GateType::RY => {
-                    let mut s = vec![Pauli::I; pg.get_n_qubits()];
-                    s[data.get_args()[0]] = Pauli::Y;
-                    let (s, sign_bit) = tab.conjugate_string(&s);
-                    let theta = if sign_bit {
-                        -data.get_params()[0]
-                    } else {
-                        data.get_params()[0]
-                    };
-                    add_rotation(
-                        pg,
-                        s,
-                        theta,
-                        tab,
-                        data.get_conditional_bits(),
-                        data.get_conditional_values(),
-                        forward,
-                        cliff_eval,
-                    );
-                }
-                GateType::RZ => {
-                    let (s, sign_bit) = tab.z_image(data.get_args()[0]);
-                    let theta = if sign_bit {
-                        -data.get_params()[0]
-                    } else {
-                        data.get_params()[0]
-                    };
-                    add_rotation(
-                        pg,
-                        s,
-                        theta,
-                        tab,
-                        data.get_conditional_bits(),
-                        data.get_conditional_values(),
-                        forward,
-                        cliff_eval,
-                    );
-                }
-                GateType::ZZPHASE => {
-                    let mut s = vec![Pauli::I; pg.get_n_qubits()];
-                    s[data.get_args()[0]] = Pauli::Z;
-                    s[data.get_args()[1]] = Pauli::Z;
-                    let (s, sign_bit) = tab.conjugate_string(&s);
-                    let theta = if sign_bit {
-                        -data.get_params()[0]
-                    } else {
-                        data.get_params()[0]
-                    };
-                    add_rotation(
-                        pg,
-                        s,
-                        theta,
-                        tab,
-                        data.get_conditional_bits(),
-                        data.get_conditional_values(),
-                        forward,
-                        cliff_eval,
-                    );
-                }
-                GateType::PHASEDX => {
-                    let alpha = data.get_params()[0];
-                    let mut beta = data.get_params()[1];
-                    let args = data.get_args();
-                    // Special cases
-                    // If alpha is a multiple of 2 pi, the gate is identity and we can skip it.
-                    if equiv_0(alpha, 2.0) {
-                        return;
-                    }
-                    // If the pass is moving backward, we need to add the gates in reverse order.
-                    // This is equivalent to flipping the sign of beta.
-                    if !forward {
-                        beta = -beta;
-                    }
-                    // If alpha is a multiple of pi and beta is a multiple of pi/4
-                    if equiv_0(alpha, 1.0) && equiv_0(beta, 0.25) {
-                        process_op(
-                            pg,
-                            &Op::Gate {
-                                data: GateData::new(GateType::RX, args.clone())
-                                    .with_params(vec![alpha])
-                                    .with_conditional(
-                                        data.get_conditional_bits().clone(),
-                                        data.get_conditional_values().clone(),
-                                    ),
-                            },
-                            tab,
-                            forward,
-                            cliff_eval,
-                        );
-                        process_op(
-                            pg,
-                            &Op::Gate {
-                                data: GateData::new(GateType::RZ, args.clone())
-                                    .with_params(vec![2.0 * beta])
-                                    .with_conditional(
-                                        data.get_conditional_bits().clone(),
-                                        data.get_conditional_values().clone(),
-                                    ),
-                            },
-                            tab,
-                            forward,
-                            cliff_eval,
-                        );
-                        return;
-                    }
-                    process_op(
-                        pg,
-                        &Op::Gate {
-                            data: GateData::new(GateType::RZ, args.clone())
-                                .with_params(vec![-beta])
-                                .with_conditional(
-                                    data.get_conditional_bits().clone(),
-                                    data.get_conditional_values().clone(),
-                                ),
-                        },
-                        tab,
-                        forward,
-                        cliff_eval,
-                    );
-                    process_op(
-                        pg,
-                        &Op::Gate {
-                            data: GateData::new(GateType::RX, args.clone())
-                                .with_params(vec![alpha])
-                                .with_conditional(
-                                    data.get_conditional_bits().clone(),
-                                    data.get_conditional_values().clone(),
-                                ),
-                        },
-                        tab,
-                        forward,
-                        cliff_eval,
-                    );
-                    process_op(
-                        pg,
-                        &Op::Gate {
-                            data: GateData::new(GateType::RZ, args.clone())
-                                .with_params(vec![beta])
-                                .with_conditional(
-                                    data.get_conditional_bits().clone(),
-                                    data.get_conditional_values().clone(),
-                                ),
-                        },
-                        tab,
-                        forward,
-                        cliff_eval,
-                    );
-                }
-                GateType::Measure => {
-                    let (z_string, z_sign_bit) = tab.z_image(data.get_args()[0]);
-                    pg.add_conditional_op(
-                        Op::Measure {
-                            data: MeasureData::new(z_string, z_sign_bit, data.get_args()[1]),
-                        },
-                        data.get_conditional_bits().clone(),
-                        data.get_conditional_values().clone(),
-                    );
-                }
-                GateType::Reset => {
-                    let (z_string, z_sign_bit) = tab.z_image(data.get_args()[0]);
-                    let (x_string, x_sign_bit) = tab.x_image(data.get_args()[0]);
-                    pg.add_conditional_op(
-                        Op::Reset {
-                            data: ResetData::new(z_string, x_string, z_sign_bit, x_sign_bit),
-                        },
-                        data.get_conditional_bits().clone(),
-                        data.get_conditional_values().clone(),
-                    );
-                }
-                GateType::BlackBox => {
-                    assert!(
-                        data.get_conditional_bits().is_empty(),
-                        "Conditional black box gates are not supported at the moment"
-                    );
-                    // If the pass is forward, the tableau is backward facing, so we need to invert it to make sure the TableauDataOp
-                    // is forward facing.
-                    let tab_moved =
-                        std::mem::replace(tab, QubitMajorTableau::eye(pg.get_n_qubits()));
-                    if forward {
-                        pg.add_op(Op::Tableau {
-                            data: TableauData::from(tab_moved.invert()),
-                        });
-                    } else {
-                        pg.add_op(Op::Tableau {
-                            data: TableauData::from(tab_moved),
-                        });
-                    }
-                    pg.add_op(Op::BlackBox {
-                        data: BlackBoxData::new(
-                            data.get_args().clone(),
-                            data.get_data()
-                                .as_ref()
-                                .expect("BlackBox data is missing")
-                                .clone(),
-                        ),
-                    });
-                    // TODO: we can optimise this by pushing through part of the tableau.
-                }
-                GateType::SWAP => {
-                    if data.get_conditional_bits().is_empty() {
-                        let q0 = data.get_args()[0];
-                        let q1 = data.get_args()[1];
-                        tab.precompose_swap(q0, q1);
-                    } else {
-                        // No need to check forward or backward here since the decomposition is symmetric
-                        for sub_gate in decompose_clifford(&GateType::SWAP, data.get_args()) {
-                            let sub_gate = sub_gate.with_conditional(
-                                data.get_conditional_bits().clone(),
-                                data.get_conditional_values().clone(),
-                            );
-                            process_op(pg, &Op::Gate { data: sub_gate }, tab, forward, cliff_eval);
-                        }
-                    }
-                }
-            }
-        }
-        Op::Rotation { data } => {
-            let (s, sign_bit) = tab.conjugate_string(data.get_string());
-            let theta = if sign_bit {
-                -data.get_angle()
-            } else {
-                data.get_angle()
-            };
-            add_rotation(pg, s, theta, tab, &[], &[], forward, cliff_eval);
-        }
-        Op::Measure { data } => {
-            let (s, mut sign_bit) = tab.conjugate_string(data.get_string());
-            sign_bit ^= data.get_sign_bit();
-            pg.add_op(Op::Measure {
-                data: MeasureData::new(s, sign_bit, data.get_cbit()),
-            });
-        }
-        Op::Reset { data } => {
-            let (z_string, mut z_sign_bit) = tab.conjugate_string(data.get_first_string());
-            let (x_string, mut x_sign_bit) = tab.conjugate_string(data.get_second_string());
-            z_sign_bit ^= data.get_first_sign_bit();
-            x_sign_bit ^= data.get_second_sign_bit();
-            pg.add_op(Op::Reset {
-                data: ResetData::new(z_string, x_string, z_sign_bit, x_sign_bit),
-            });
-        }
-        Op::ConditionalBox { data } => {
-            let mut new_cond_ops = Vec::with_capacity(data.get_ops().len());
-            for cond_op in data.get_ops() {
-                match cond_op {
-                    Op::Rotation { data } => {
-                        let (s, sign_bit) = tab.conjugate_string(data.get_string());
-                        let theta = if sign_bit {
-                            -data.get_angle()
-                        } else {
-                            data.get_angle()
-                        };
-                        new_cond_ops.push(Op::Rotation {
-                            data: RotationData::new(s, theta),
-                        });
-                    }
-                    Op::Reset { data } => {
-                        let (z_string, mut z_sign_bit) =
-                            tab.conjugate_string(data.get_first_string());
-                        let (x_string, mut x_sign_bit) =
-                            tab.conjugate_string(data.get_second_string());
-                        z_sign_bit ^= data.get_first_sign_bit();
-                        x_sign_bit ^= data.get_second_sign_bit();
-                        new_cond_ops.push(Op::Reset {
-                            data: ResetData::new(z_string, x_string, z_sign_bit, x_sign_bit),
-                        });
-                    }
-                    Op::Measure { data } => {
-                        let (s, mut sign_bit) = tab.conjugate_string(data.get_string());
-                        sign_bit ^= data.get_sign_bit();
-                        new_cond_ops.push(Op::Measure {
-                            data: MeasureData::new(s, sign_bit, data.get_cbit()),
-                        });
-                    }
-                    _ => unimplemented!(
-                        "Only non-blocking Pauli ops (i.e. PauliRotation, Reset, Measure) are supported inside conditional boxes for now"
-                    ),
-                }
-            }
-            if !forward {
-                new_cond_ops.reverse();
-            }
-            pg.add_op(Op::ConditionalBox {
-                data: ConditionalBoxData::new(
-                    new_cond_ops,
-                    data.get_conditional_bits().clone(),
-                    data.get_conditional_values().clone(),
-                ),
-            });
-        }
-        Op::BlackBox { data } => {
-            let tab_moved = std::mem::replace(tab, QubitMajorTableau::eye(pg.get_n_qubits()));
-            if forward {
-                pg.add_op(Op::Tableau {
-                    data: TableauData::from(tab_moved.invert()),
-                });
-            } else {
-                pg.add_op(Op::Tableau {
-                    data: TableauData::from(tab_moved),
-                });
-            }
-            pg.add_op(Op::BlackBox {
-                data: BlackBoxData::new(data.get_qubits().clone(), data.get_content().clone()),
-            });
-        }
+        Op::SetBoundary => return,
         Op::Tableau { data } => {
-            let mut tableau_from_op: QubitMajorTableau = if forward {
+            let mut tableau_from_op = if forward {
                 QubitMajorTableau::from(data.clone()).get_dagger()
             } else {
                 QubitMajorTableau::from(data.clone())
             };
             tableau_from_op.compose(tab);
             *tab = tableau_from_op;
+            return;
         }
-        Op::SetBoundary => {
-            // We treat commuting boundaries as identities
+        Op::BlackBox { data } => {
+            flush_black_box(pg, tab, data.get_qubits(), data.get_content(), forward);
+            return;
         }
+        Op::Gate { data } => {
+            let gate_type = data.get_gate_type();
+            let conditional = !data.get_conditional_bits().is_empty();
+            if gate_type == &GateType::BlackBox {
+                assert!(
+                    !conditional,
+                    "Conditional black box gates are not supported at the moment"
+                );
+                flush_black_box(
+                    pg,
+                    tab,
+                    data.get_args(),
+                    data.get_data().as_ref().expect("BlackBox data is missing"),
+                    forward,
+                );
+                return;
+            }
+            if is_clifford_gate_type(data) {
+                if conditional {
+                    let new_cond_ops = decompose_clifford(gate_type, data.get_args())
+                        .into_iter()
+                        .flat_map(|data| tab.conjugate(&Op::Gate { data }))
+                        .collect();
+                    pg.add_op(Op::ConditionalBox {
+                        data: ConditionalBoxData::new(
+                            new_cond_ops,
+                            data.get_conditional_bits().clone(),
+                            data.get_conditional_values().clone(),
+                        ),
+                    });
+                } else {
+                    absorb_clifford(tab, op, forward);
+                }
+                return;
+            }
+            if !conditional {
+                if cliff_eval && is_clifford(op) {
+                    absorb_clifford(tab, op, forward);
+                    return;
+                }
+                if gate_type == &GateType::PHASEDX {
+                    let alpha = data.get_params()[0];
+                    let beta = data.get_params()[1];
+                    let args = data.get_args();
+                    let compose_alpha = cliff_eval && cliff_angle(alpha).is_some();
+                    let compose_beta = cliff_eval && cliff_angle(beta).is_some();
+                    // Forward traversal uses a backward facing tableau, so
+                    // composition requires the inverse of the gate.
+                    // Backward traversal doesn't require inverses, but we need to process
+                    // the gates in reverse order, which means flipping the sign of beta.
+                    let alpha = if forward && compose_alpha {
+                        -alpha
+                    } else {
+                        alpha
+                    };
+                    let beta = if !forward || compose_beta {
+                        -beta
+                    } else {
+                        beta
+                    };
+                    for (gate_type, angle, compose) in [
+                        (GateType::RZ, -beta, compose_beta),
+                        (GateType::RX, alpha, compose_alpha),
+                        (GateType::RZ, beta, compose_beta),
+                    ] {
+                        let op = Op::Gate {
+                            data: GateData::new(gate_type, args.clone()).with_params(vec![angle]),
+                        };
+                        if compose {
+                            tab.precompose_op(&op);
+                        } else {
+                            for conjugated_op in tab.conjugate(&op) {
+                                pg.add_op(conjugated_op);
+                            }
+                        }
+                    }
+                    return;
+                }
+            }
+        }
+        Op::Rotation { data } => {
+            if cliff_eval && cliff_angle(data.get_angle()).is_some() {
+                absorb_clifford(tab, op, forward);
+                return;
+            }
+        }
+        Op::Measure { .. } | Op::Reset { .. } | Op::ConditionalBox { .. } => {}
+    }
+
+    // All remaining operations share the same conjugation path.
+    let mut conjugated_ops = tab.conjugate(op);
+    if !forward {
+        conjugated_ops.reverse();
+    }
+    for conjugated_op in conjugated_ops {
+        pg.add_op(conjugated_op);
     }
 }
 
 fn to_canonical_form(pg: &PauliGraph, forward: bool, cliff_eval: bool) -> PauliGraph {
     let mut new_pg = PauliGraph::new(pg.get_n_qubits());
     // We maintain a tableau that represents the inverse of the Clifford unitary if we are moving forward. (i.e. backward facing tableau)
-    let mut current_tableau: QubitMajorTableau = QubitMajorTableau::eye(pg.get_n_qubits());
+    let mut current_tableau = QubitMajorTableau::eye(pg.get_n_qubits());
     let ops: Box<dyn Iterator<Item = &Op>> = if forward {
         Box::new(pg.get_ops().iter())
     } else {
@@ -585,21 +312,24 @@ fn to_canonical_form(pg: &PauliGraph, forward: bool, cliff_eval: bool) -> PauliG
         // reverse the ops
         let mut ops = new_pg.get_ops().clone();
         ops.reverse();
-        // also reverse the inner ops of conditional boxes
-        for op in ops.iter_mut() {
-            if let Op::ConditionalBox { data } = op {
-                let mut inner_ops = data.get_ops().clone();
-                inner_ops.reverse();
-                *data = ConditionalBoxData::new(
-                    inner_ops,
+        new_pg = PauliGraph::new(pg.get_n_qubits()).with_ops(ops);
+    }
+    // Merge adjacent conditional boxes once both outer and inner ops are in circuit order.
+    let mut merged_pg = PauliGraph::new(pg.get_n_qubits());
+    for op in new_pg.get_ops() {
+        if let Op::ConditionalBox { data } = op {
+            for inner_op in data.get_ops() {
+                merged_pg.add_conditional_op(
+                    inner_op.clone(),
                     data.get_conditional_bits().clone(),
                     data.get_conditional_values().clone(),
                 );
             }
+        } else {
+            merged_pg.add_conditional_op(op.clone(), vec![], vec![]);
         }
-        new_pg = PauliGraph::new(pg.get_n_qubits()).with_ops(ops);
     }
-    new_pg
+    merged_pg
 }
 
 /// Transform a Pauli graph into canonical form: non-Clifford gates are rewritten as Pauli
@@ -655,6 +385,9 @@ impl PGPass for CanonicalFormPass {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pg_core::{
+        GateData, GateType, MeasureData, Op, Pauli, PauliGraph, ResetData, RotationData,
+    };
     use pg_tk::compare_unitaries_via_tk;
     use rstest::rstest;
 

@@ -140,7 +140,7 @@ pub fn get_dagger<T: PGTableau>(op: &Op) -> Op {
 }
 
 /// Check if a gate is a Clifford gate type
-fn is_clifford_gate_type(gate: &GateData) -> bool {
+pub fn is_clifford_gate_type(gate: &GateData) -> bool {
     matches!(
         gate.get_gate_type(),
         GateType::H
