@@ -541,12 +541,14 @@ mod tests {
     use super::*;
     use hugr::{
         HugrView,
-        builder::{DFGBuilder, DataflowHugr as _},
+        builder::{DFGBuilder, DataflowHugr as _, FunctionBuilder},
         extension::prelude::{bool_t, option_type, qb_t, usize_t},
         std_extensions::collections::array::array_type,
         types::Signature,
     };
     use rstest::rstest;
+
+    use crate::passes::{ComposablePass, ReplaceTypes};
 
     #[test]
     fn test_container_factory_creation() {
@@ -568,6 +570,43 @@ mod tests {
 
         let hugr = builder.finish_hugr_with_outputs([wrapped])?;
         assert!(hugr.validate().is_ok());
+        Ok(())
+    }
+
+    #[test]
+    fn repeated_ops_share_lowering_functions() -> Result<(), BuildError> {
+        let factory = UnpackContainerBuilder::new(TypeUnpacker::for_qubits());
+        let option_qb_type = Type::from(option_type([qb_t()]));
+        let mut builder = FunctionBuilder::new("main", Signature::new_endo([option_qb_type]))?;
+
+        let input = builder.input().out_wire(0);
+        let unwrapped = factory.unpack_option(&mut builder, input, &qb_t())?;
+        let wrapped = factory.repack_option(&mut builder, unwrapped, &qb_t())?;
+        let unwrapped = factory.unpack_option(&mut builder, wrapped, &qb_t())?;
+        let wrapped = factory.repack_option(&mut builder, unwrapped, &qb_t())?;
+        let mut hugr = builder.finish_hugr_with_outputs([wrapped])?;
+
+        let mut lowerer = ReplaceTypes::new_empty();
+        factory
+            .into_function_map()
+            .register_operation_replacements(&mut hugr, &mut lowerer);
+        lowerer.run(&mut hugr).unwrap();
+        hugr.validate().unwrap();
+
+        let lowering_functions = hugr
+            .children(hugr.module_root())
+            .filter(|&node| {
+                hugr.get_optype(node)
+                    .as_func_defn()
+                    .is_some_and(|op| op.func_name() != "main")
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(lowering_functions.len(), 2);
+        assert!(
+            lowering_functions
+                .iter()
+                .all(|&function| hugr.output_neighbours(function).count() == 2)
+        );
         Ok(())
     }
 

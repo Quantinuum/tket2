@@ -3,9 +3,7 @@
 use crate::passes::monomorphize::mangle_name;
 use crate::passes::{ReplaceTypes, replace_types::NodeTemplate};
 use hugr::HugrView;
-use hugr::builder::{Container, Dataflow, HugrBuilder};
-use hugr::hugr::linking::OnMultiDefn;
-use hugr::ops::handle::{FuncID, NodeHandle};
+use hugr::ops::handle::FuncID;
 use hugr::{
     Hugr, Node, Wire,
     builder::{BuildError, DataflowHugr, FunctionBuilder},
@@ -13,8 +11,6 @@ use hugr::{
     ops::{DataflowOpTrait, ExtensionOp},
     types::TypeArg,
 };
-use hugr_core::Visibility;
-use hugr_core::hugr::linking::NameLinkingPolicy;
 use indexmap::IndexMap;
 use std::{cell::RefCell, ops::Deref};
 
@@ -119,12 +115,23 @@ impl OpFunctionMap {
     /// corresponding function definitions.
     pub fn register_operation_replacements(
         self,
-        _hugr: &mut impl HugrMut<Node = Node>,
+        hugr: &mut impl HugrMut<Node = Node>,
         lowerer: &mut ReplaceTypes,
     ) {
-        // Use the centralized cache for all operation replacements
         for (op, func_def) in self.into_function_iter() {
-            lowerer.set_replace_op(&op, func_as_node_template(func_def));
+            let func_sig = func_def
+                .entrypoint_optype()
+                .as_func_defn()
+                .expect("OpFunctionMap entries must be function definitions")
+                .signature()
+                .clone();
+            let function = FuncID::<true>::from(
+                hugr.insert_hugr(hugr.module_root(), func_def)
+                    .inserted_entrypoint,
+            );
+            let template = NodeTemplate::call_existing_function(function, func_sig, &[])
+                .expect("OpFunctionMap entries are monomorphic");
+            lowerer.set_replace_op(&op, template);
         }
     }
 }
@@ -133,31 +140,4 @@ impl Default for OpFunctionMap {
     fn default() -> Self {
         Self::new()
     }
-}
-
-/// Given a hugr with a function definition as entrypoint, constructs a
-/// [`NodeTemplate::LinkedHugr`] that produces a call to the function.
-//
-// TODO: Use [`NodeTemplate::call_to_function`] once it gets released in `hugr 0.25.6`.
-fn func_as_node_template(func_def: Hugr) -> NodeTemplate {
-    // Create a replacement hugr for the op nodes: Add a `call` node in the `func_def` hugr and set it as entrypoint.
-    let func_signature = func_def.inner_function_type().unwrap().into_owned();
-
-    // Build a new hugr and insert the function definition into it
-    let mut b = FunctionBuilder::new_vis("", func_signature, Visibility::Private).unwrap();
-    let func_id = FuncID::<true>::from(
-        b.module_root_builder()
-            .add_hugr(func_def)
-            .inserted_entrypoint,
-    );
-
-    // Build a call to the function in the new separate function.
-    let call = b.call(&func_id, &[], b.input_wires()).unwrap();
-    let mut call_hugr = b.finish_hugr_with_outputs(call.outputs()).unwrap();
-    call_hugr.set_entrypoint(call.node());
-
-    NodeTemplate::LinkedHugr(
-        Box::new(call_hugr),
-        NameLinkingPolicy::default().on_multiple_defn(OnMultiDefn::UseTarget),
-    )
 }

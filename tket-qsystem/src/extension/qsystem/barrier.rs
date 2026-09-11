@@ -139,4 +139,28 @@ mod test {
             }
         }
     }
+
+    #[test]
+    fn repeated_barriers_share_wrapped_function() {
+        let mut b =
+            DFGBuilder::new(hugr::types::Signature::new_endo(vec![qb_t(), qb_t()])).unwrap();
+        let first = b.add_barrier(b.input_wires()).unwrap();
+        let second = b.add_barrier(first.outputs()).unwrap();
+        let mut h = b.finish_hugr_with_outputs(second.outputs()).unwrap();
+
+        lower_tk2_ops(&mut h, Preserve::Public, QSystemPlatform::Helios).unwrap();
+        h.validate().unwrap();
+
+        let wrapped_function = h
+            .children(h.module_root())
+            .filter(|&node| {
+                h.get_optype(node).as_func_defn().is_some_and(|op| {
+                    op.func_name()
+                        .contains(wrapped_barrier::WRAPPED_BARRIER_NAME.as_str())
+                })
+            })
+            .exactly_one()
+            .expect("identical barriers should share one wrapped function");
+        assert_eq!(h.output_neighbours(wrapped_function).count(), 2);
+    }
 }
