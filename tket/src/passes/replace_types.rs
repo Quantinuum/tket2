@@ -24,8 +24,7 @@ use hugr_core::ops::{
     ExtensionOp, Input, LoadConstant, LoadFunction, OpTrait, OpType, Output, Tag, TailLoop, Value,
 };
 use hugr_core::types::{
-    ConstTypeError, CustomType, PolyFuncType, Signature, Transformable, Type, TypeArg, TypeRow,
-    TypeTransformer,
+    ConstTypeError, CustomType, Signature, Transformable, Type, TypeArg, TypeRow, TypeTransformer,
 };
 use hugr_core::{Direction, Hugr, HugrView, Node, PortIndex, Visibility, Wire};
 
@@ -66,11 +65,6 @@ pub enum NodeTemplate {
     /// Other children of the Hugr reachable from the entrypoint will also be inserted
     /// according to the specified linking policy.
     LinkedHugr(Box<Hugr>, NameLinkingPolicy),
-    /// Calls a function that is already defined in the HUGR being transformed.
-    ///
-    /// Unlike [`Self::call_to_function`], this does not link a fresh copy of the
-    /// function into the HUGR for each replacement.
-    CallFunction(FuncID<true>, Call),
 }
 
 impl NodeTemplate {
@@ -121,18 +115,6 @@ impl NodeTemplate {
         ))
     }
 
-    /// Creates a template that calls an existing function in the HUGR being transformed.
-    pub fn call_existing_function(
-        function: FuncID<true>,
-        func_sig: PolyFuncType,
-        type_args: &[TypeArg],
-    ) -> Result<Self, SignatureError> {
-        Ok(Self::CallFunction(
-            function,
-            Call::try_new(func_sig, type_args)?,
-        ))
-    }
-
     /// Adds this instance to the specified [`HugrMut`] as a new node or subtree under a
     /// given parent, returning the unique new child (of that parent) thus created
     ///
@@ -150,12 +132,6 @@ impl NodeTemplate {
     ) -> Result<Node, BuildError> {
         match self {
             NodeTemplate::SingleOp(op_type) => Ok(hugr.add_node_with_parent(parent, op_type)),
-            NodeTemplate::CallFunction(function, call) => {
-                let static_inport = call.called_function_port();
-                let call = hugr.add_node_with_parent(parent, call);
-                hugr.connect(function.node(), 0, call, static_inport);
-                Ok(call)
-            }
             NodeTemplate::CompoundOp(new_h) => {
                 Ok(hugr.insert_hugr(parent, *new_h).inserted_entrypoint)
             }
@@ -173,9 +149,6 @@ impl NodeTemplate {
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         match self {
             NodeTemplate::SingleOp(opty) => dfb.add_dataflow_op(opty, inputs),
-            NodeTemplate::CallFunction(function, call) => {
-                dfb.call(&function, &call.type_args, inputs)
-            }
             NodeTemplate::CompoundOp(h) => dfb.add_hugr_with_wires(*h, inputs),
             NodeTemplate::LinkedHugr(h, pol) => dfb.add_link_hugr_with_wires(*h, &pol, inputs),
         }
@@ -204,10 +177,6 @@ impl NodeTemplate {
                     }));
                 }
                 (op_type, None, None)
-            }
-            NodeTemplate::CallFunction(function, call) => {
-                let static_inport = call.called_function_port();
-                (call.into(), Some(function.node()), Some(static_inport))
             }
             NodeTemplate::CompoundOp(new_h) => {
                 let root = new_h.entrypoint_optype();
@@ -287,11 +256,11 @@ impl NodeTemplate {
         outputs: &TypeRow,
     ) -> Result<(), Option<Signature>> {
         let sig = match self {
-            NodeTemplate::CallFunction(_, call) => Some(Cow::Borrowed(&call.instantiation)),
-            NodeTemplate::SingleOp(op_type) => op_type.dataflow_signature(),
-            NodeTemplate::CompoundOp(hugr) => hugr.entrypoint_optype().dataflow_signature(),
-            NodeTemplate::LinkedHugr(hugr, _) => hugr.entrypoint_optype().dataflow_signature(),
-        };
+            NodeTemplate::SingleOp(op_type) => op_type,
+            NodeTemplate::CompoundOp(hugr) => hugr.entrypoint_optype(),
+            NodeTemplate::LinkedHugr(hugr, _) => hugr.entrypoint_optype(),
+        }
+        .dataflow_signature();
         if sig.as_deref().map(Signature::io) == Some((inputs, outputs)) {
             Ok(())
         } else {

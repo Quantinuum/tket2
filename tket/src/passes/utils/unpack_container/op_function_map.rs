@@ -3,14 +3,15 @@
 use crate::passes::monomorphize::mangle_name;
 use crate::passes::{ReplaceTypes, replace_types::NodeTemplate};
 use hugr::HugrView;
-use hugr::ops::handle::FuncID;
 use hugr::{
     Hugr, Node, Wire,
     builder::{BuildError, DataflowHugr, FunctionBuilder},
     hugr::hugrmut::HugrMut,
-    ops::{DataflowOpTrait, ExtensionOp},
+    ops::{DataflowOpTrait, ExtensionOp, OpType},
     types::TypeArg,
 };
+use hugr_core::Visibility;
+use hugr_core::hugr::internal::HugrMutInternals;
 use indexmap::IndexMap;
 use std::{cell::RefCell, ops::Deref};
 
@@ -115,25 +116,26 @@ impl OpFunctionMap {
     /// corresponding function definitions.
     pub fn register_operation_replacements(
         self,
-        hugr: &mut impl HugrMut<Node = Node>,
+        _hugr: &mut impl HugrMut<Node = Node>,
         lowerer: &mut ReplaceTypes,
     ) {
         for (op, func_def) in self.into_function_iter() {
-            let func_sig = func_def
-                .entrypoint_optype()
-                .as_func_defn()
-                .expect("OpFunctionMap entries must be function definitions")
-                .signature()
-                .clone();
-            let function = FuncID::<true>::from(
-                hugr.insert_hugr(hugr.module_root(), func_def)
-                    .inserted_entrypoint,
-            );
-            let template = NodeTemplate::call_existing_function(function, func_sig, &[])
-                .expect("OpFunctionMap entries are monomorphic");
-            lowerer.set_replace_op(&op, template);
+            lowerer.set_replace_op(&op, func_as_node_template(func_def));
         }
     }
+}
+
+/// Given a HUGR with a function definition as entrypoint, constructs a
+/// [`NodeTemplate::LinkedHugr`] that produces a call to the function.
+fn func_as_node_template(mut func_def: Hugr) -> NodeTemplate {
+    let entrypoint = func_def.entrypoint();
+    let OpType::FuncDefn(func) = func_def.optype_mut(entrypoint) else {
+        panic!("OpFunctionMap entries must be function definitions");
+    };
+    *func.visibility_mut() = Visibility::Public;
+
+    NodeTemplate::call_to_function(func_def, &[])
+        .expect("OpFunctionMap entries must be monomorphic function definitions")
 }
 
 impl Default for OpFunctionMap {
