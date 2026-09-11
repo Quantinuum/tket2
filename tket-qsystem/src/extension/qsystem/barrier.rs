@@ -160,6 +160,7 @@ mod test {
                 })
             })
             .exactly_one()
+            .ok()
             .expect("identical barriers should share one wrapped function");
         assert_eq!(h.output_neighbours(wrapped_function).count(), 2);
     }
