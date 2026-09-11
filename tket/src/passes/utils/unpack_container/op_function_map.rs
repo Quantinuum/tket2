@@ -76,7 +76,16 @@ impl OpFunctionMap {
         if self.map.borrow().contains_key(&key) {
             return Ok(());
         }
-        let name = mangle_name(op.def().name(), mangle_args);
+        // Definitions are made public while name linking deduplicates them, so
+        // the symbol must distinguish every cached operation instance. Keep
+        // caller-selected arguments for readability, and append the complete
+        // operation arguments to guarantee uniqueness.
+        let name_args = mangle_args
+            .iter()
+            .chain(op.args())
+            .cloned()
+            .collect::<Vec<_>>();
+        let name = mangle_name(op.def().name(), name_args);
         let sig = op.signature().deref().clone();
         let mut func_b = FunctionBuilder::new(name, sig)?;
         // insert None as a placeholder to avoid cyclic recursion in func_builder call

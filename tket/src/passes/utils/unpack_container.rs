@@ -577,14 +577,22 @@ mod tests {
     fn repeated_ops_share_lowering_functions() -> Result<(), BuildError> {
         let factory = UnpackContainerBuilder::new(TypeUnpacker::for_qubits());
         let option_qb_type = Type::from(option_type([qb_t()]));
-        let mut builder = FunctionBuilder::new("main", Signature::new_endo([option_qb_type]))?;
+        let option_usize_type = Type::from(option_type([usize_t()]));
+        let mut builder = FunctionBuilder::new(
+            "main",
+            Signature::new_endo([option_qb_type, option_usize_type]),
+        )?;
 
-        let input = builder.input().out_wire(0);
-        let unwrapped = factory.unpack_option(&mut builder, input, &qb_t())?;
+        let qb_input = builder.input().out_wire(0);
+        let unwrapped = factory.unpack_option(&mut builder, qb_input, &qb_t())?;
         let wrapped = factory.repack_option(&mut builder, unwrapped, &qb_t())?;
         let unwrapped = factory.unpack_option(&mut builder, wrapped, &qb_t())?;
-        let wrapped = factory.repack_option(&mut builder, unwrapped, &qb_t())?;
-        let mut hugr = builder.finish_hugr_with_outputs([wrapped])?;
+        let qb_output = factory.repack_option(&mut builder, unwrapped, &qb_t())?;
+
+        let usize_input = builder.input().out_wire(1);
+        let unwrapped = factory.unpack_option(&mut builder, usize_input, &usize_t())?;
+        let usize_output = factory.repack_option(&mut builder, unwrapped, &usize_t())?;
+        let mut hugr = builder.finish_hugr_with_outputs([qb_output, usize_output])?;
 
         let mut lowerer = ReplaceTypes::new_empty();
         factory
@@ -601,12 +609,13 @@ mod tests {
                     .is_some_and(|op| op.func_name() != "main")
             })
             .collect::<Vec<_>>();
-        assert_eq!(lowering_functions.len(), 2);
-        assert!(
-            lowering_functions
-                .iter()
-                .all(|&function| hugr.output_neighbours(function).count() == 2)
-        );
+        assert_eq!(lowering_functions.len(), 4);
+        let mut use_counts = lowering_functions
+            .iter()
+            .map(|&function| hugr.output_neighbours(function).count())
+            .collect::<Vec<_>>();
+        use_counts.sort_unstable();
+        assert_eq!(use_counts, [1, 1, 2, 2]);
         Ok(())
     }
 
