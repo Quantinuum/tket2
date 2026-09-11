@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.5.0...qis-compiler-v0.5.1) (2026-09-11)
+
+
+### Features
+
+* **qis-compiler:** Add a EmulationState to handle extension passing ([#1986](https://github.com/Quantinuum/tket2/issues/1986)) ([1efd990](https://github.com/Quantinuum/tket2/commit/1efd9908ca010e03e75261a873dadc229a340951))
+
 ## [0.5.0](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.4.2...qis-compiler-v0.5.0) (2026-09-04)
 
 
