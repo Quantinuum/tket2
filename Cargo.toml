@@ -58,7 +58,7 @@ portgraph = "0.16.1"
 pyo3 = ">= 0.28.2, < 0.30"
 pyo3-build-config = ">= 0.28.2, < 0.30"
 
-bindgen = "0.72"
+bindgen = "0.73"
 cbindgen = "0.29"
 cc = "1.2.63"
 conan2 = "0.1.9"
