@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#    "guppylang==1.0.0rc1",
+#    "guppylang==1.0.1",
 # ]
 # ///
 """Test the a simple use of a higher-order function with inside modifiers
@@ -12,12 +12,10 @@ The hugr generated from this script is also used to benchmark the performance of
 from pathlib import Path
 from sys import argv
 
-from guppylang import array, enable_experimental_features, guppy
+from guppylang import array, guppy
 from guppylang.std.builtins import Unitary, control, dagger
 from guppylang.std.debug import state_result
 from guppylang.std.quantum import cx, discard_array, h, qubit, s
-
-enable_experimental_features()
 
 
 @guppy(unitary=True)
