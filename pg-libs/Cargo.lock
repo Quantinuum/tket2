@@ -346,6 +346,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "pg-rebase"
+version = "0.1.0"
+dependencies = [
+ "pg-core",
+ "pg-tk",
+ "rstest",
+]
+
+[[package]]
 name = "pg-tk"
 version = "0.1.0"
 dependencies = [
