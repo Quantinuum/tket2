@@ -34,9 +34,14 @@ type is used to update packed data and to calculate raw cost changes.
 
 ### `Reducer<P, C>`
 
-`Reducer` runs the synthesis. `P` updates the packed data and `C` scores TQE
-candidates. The reducer creates a `PackedPGSlice`, a `Frontier` and a
-`GatePool`.
+`Reducer` runs the synthesis. `P` updates the packed data and `C` scores
+two qubit entangling (TQE) gate candidates.
+
+> [!NOTE]
+> TQE gates are XX, XY, XZ, YY, YZ and ZZ. Each can be obtained by
+> conjugating the CX gate with local Clifford gates.
+
+The reducer creates a `PackedPGSlice`, a `Frontier` and a `GatePool`.
 
 It loads commuting sets into the lookahead slice, reduces the first visible set
 and appends the resulting gates to the output graph. It also handles black boxes
