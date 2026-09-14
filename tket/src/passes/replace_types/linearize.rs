@@ -8,7 +8,11 @@ use hugr_core::extension::{SignatureError, TypeDef};
 use hugr_core::std_extensions::collections::array::array_type_def;
 use hugr_core::std_extensions::collections::borrow_array::borrow_array_type_def;
 use hugr_core::types::{CustomType, Signature, Term, Type, TypeArg, TypeRow};
-use hugr_core::{HugrView, IncomingPort, Node, Wire, hugr::hugrmut::HugrMut, ops::Tag};
+use hugr_core::{
+    HugrView, IncomingPort, Node, Wire,
+    hugr::hugrmut::HugrMut,
+    ops::{OpTrait, Tag},
+};
 use itertools::Itertools;
 
 use super::handlers::{copy_discard_array, copy_discard_borrow_array};
@@ -76,8 +80,10 @@ pub trait Linearizer {
                     tgt_parent,
                 });
             }
-            let sig = hugr.signature(src.node()).unwrap();
-            let typ = sig.port_type(src.source()).unwrap().clone();
+            let typ = hugr
+                .get_optype(src.node())
+                .value_output_type(src.source())
+                .unwrap();
             let copy_discard_op = self
                 .copy_discard_op(&typ, targets.len())?
                 .add_hugr(hugr, src_parent)

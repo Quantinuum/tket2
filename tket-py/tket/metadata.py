@@ -11,10 +11,10 @@ Examples:
     >>> hugr = Hugr()
     >>> node = hugr[hugr.module_root]
     >>>
-    >>> node.metadata[MaxQubitsHint] = 3
+    >>> node.metadata[ExpectedQubitsHint] = 3
     >>> node.metadata[PytketInputParameters] = ["theta", "phi"]
     >>> node.metadata[PytketQubitRegisterNames] = [("q", [0]), ("ancilla", [1])]
-    >>> node.metadata[MaxQubitsHint]
+    >>> node.metadata[ExpectedQubitsHint]
     3
     >>> node.metadata.get(PytketQubitRegisterNames)
     [('q', [0]), ('ancilla', [1])]
@@ -41,6 +41,7 @@ __all__ = [
     "ControlledImplementations",
     "CtrlDaggeredImplementations",
     "DaggeredImplementation",
+    "ExpectedQubitsHint",
     "HeliosPlatformConfig",
     "HeliosPlatformConfigValue",
     "InlineAnnotation",
@@ -206,7 +207,7 @@ class PytketPhaseExpr(Metadata[str]):
         Use explicit ``tket.global_phase`` operations instead.
     """
 
-    KEY = _metadata.PYTKET_PHASE_EXPR
+    KEY = "TKET1.phase"
 
 
 def _store_pytket_register(value: list[tuple[str, list[int]]]) -> JsonType:

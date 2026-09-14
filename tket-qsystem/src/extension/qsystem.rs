@@ -33,8 +33,8 @@ lazy_static! {
     /// The "tket.qsystem" extension.
     pub static ref EXTENSION: Arc<Extension> = {
          Extension::new_arc(EXTENSION_ID, EXTENSION_VERSION, |ext, ext_ref| {
-            QSystemOp::load_all_ops( ext, ext_ref).unwrap();
-            RuntimeBarrierDef.add_to_extension(ext, ext_ref).unwrap();
+            helios::HeliosOp::load_all_ops( ext, ext_ref).unwrap();
+            helios::RuntimeBarrierDef.add_to_extension(ext, ext_ref).unwrap();
         })
     };
 
@@ -71,16 +71,5 @@ impl QSystemPlatform {
         }
     }
 }
-#[deprecated(
-    since = "0.25.0",
-    note = "Use helios::HeliosOp instead of QSystemOp for Helios-specific operations"
-)]
-pub use helios::HeliosOp as QSystemOp;
-
-#[deprecated(since = "0.25.0", note = "Use helios::RUNTIME_BARRIER_NAME instead.")]
-pub use helios::RUNTIME_BARRIER_NAME;
-
-#[deprecated(since = "0.25.0", note = "Use helios::RuntimeBarrierDef instead.")]
-pub use helios::RuntimeBarrierDef;
 
 use crate::extension::futures;

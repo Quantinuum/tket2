@@ -14,8 +14,7 @@ use crate::utils::type_is_linear;
 use hugr::core::HugrNode;
 use hugr::hugr::views::SiblingSubgraph;
 use hugr::hugr::views::sibling_subgraph::InvalidSubgraph;
-use hugr::ops::OpTrait;
-use hugr::types::Signature;
+use hugr::ops::{OpTag, OpTrait};
 use hugr::{Direction, HugrView, IncomingPort, OutgoingPort, Port, PortIndex, Wire};
 use indexmap::IndexMap;
 use indexmap::map::Entry;
@@ -49,9 +48,10 @@ struct NodeCircuitUnits<N: HugrNode> {
 }
 
 impl<N: HugrNode> NodeCircuitUnits<N> {
-    fn with_default(default: CircuitUnit<N>, signature: &Signature) -> Self {
+    /// Create storage for an operation's value ports without materializing its signature.
+    fn with_default(default: CircuitUnit<N>, num_inputs: usize, num_outputs: usize) -> Self {
         Self {
-            port_map: PortMap::with_default(default, signature),
+            port_map: PortMap::with_default(default, num_inputs, num_outputs),
             position: Position::default(),
         }
     }
@@ -435,11 +435,8 @@ impl<H: HugrView> ResourceScope<H> {
         node: H::Node,
         allocator: &mut CircuitUnitAllocator,
     ) {
-        let Some(signature) = self.hugr.get_optype(node).dataflow_signature() else {
-            return;
-        };
-
-        let mut incoming_ports = signature.input_ports().collect_vec();
+        let op = self.hugr.get_optype(node);
+        let mut incoming_ports = op.value_input_ports().collect_vec();
         if let Some(node_units) = self.circuit_units.get(&node) {
             // Only assign circuit units to input ports without assigned units
             incoming_ports.retain(|&p| node_units.port_map.get(p).is_sentinel());
@@ -486,14 +483,10 @@ impl<H: HugrView> ResourceScope<H> {
             .find_map(|f| f.map_resources(node, &self.hugr, &inp_resources).ok())
             .expect("no flow found");
 
-        let signature = self
-            .hugr
-            .get_optype(node)
-            .dataflow_signature()
-            .expect("op has dataflow inputs");
+        let op = self.hugr.get_optype(node);
 
         // Set out resources to output, create new circuit units where required
-        for p in signature.output_ports() {
+        for p in op.value_output_ports() {
             let unit = match out_resources.get(p.index()).copied().flatten() {
                 Some(resource_id) => {
                     let index = inp_resources
@@ -511,12 +504,13 @@ impl<H: HugrView> ResourceScope<H> {
     /// Propagate circuit units at output ports across wires to connected
     /// inputs.
     fn propagate_to_next_inputs(&mut self, node: H::Node) {
-        let Some(signature) = self.hugr.get_optype(node).dataflow_signature() else {
+        let op = self.hugr.get_optype(node);
+        if !OpTag::DataflowChild.is_superset(op.tag()) || op.value_output_count() == 0 {
             return;
-        };
+        }
         let pos = self.get_position(node).expect("dataflow node has position");
 
-        for p in signature.output_ports() {
+        for p in op.value_output_ports() {
             let unit = self
                 .get_circuit_unit(node, p)
                 .expect("dataflow node has circuit unit");
@@ -539,7 +533,7 @@ impl<H: HugrView> ResourceScope<H> {
 
 /// Get the circuit units for the given node, creating them if they don't exist.
 ///
-/// Return `None` if the node is not a dataflow op.
+/// Return `None` if the node is not a dataflow child.
 fn node_circuit_units_mut<H: HugrView>(
     all_circuit_units: &mut IndexMap<H::Node, NodeCircuitUnits<H::Node>>,
     node: H::Node,
@@ -548,10 +542,14 @@ fn node_circuit_units_mut<H: HugrView>(
     match all_circuit_units.entry(node) {
         Entry::Occupied(occupied_entry) => Some(occupied_entry.into_mut()),
         Entry::Vacant(vacant_entry) => {
-            let signature = hugr.get_optype(node).dataflow_signature()?;
+            let op = hugr.get_optype(node);
+            if !OpTag::DataflowChild.is_superset(op.tag()) {
+                return None;
+            }
             Some(vacant_entry.insert(NodeCircuitUnits::with_default(
                 CircuitUnit::sentinel(),
-                &signature,
+                op.value_input_count(),
+                op.value_output_count(),
             )))
         }
     }
@@ -573,10 +571,9 @@ impl CircuitUnitAllocator {
         hugr: &H,
     ) -> CircuitUnit<H::Node> {
         let op = hugr.get_optype(node);
-        let signature = op.dataflow_signature().expect("dataflow op");
         let port = port.into();
-        let ty = signature.port_type(port).expect("valid dataflow port");
-        if type_is_linear(ty) {
+        let ty = op.value_port_type(port).expect("valid dataflow port");
+        if type_is_linear(&ty) {
             self.allocate_resource()
         } else {
             let w = Wire::from_connected_port(node, port, hugr);

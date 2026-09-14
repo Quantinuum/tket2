@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.14.2](https://github.com/Quantinuum/tket2/compare/tket-exts-v0.14.1...tket-exts-v0.14.2) (2026-09-04)
+
+
+### Features
+
+* Add missing tket1 extension to tket_exts ([#1961](https://github.com/Quantinuum/tket2/issues/1961)) ([989e2a3](https://github.com/Quantinuum/tket2/commit/989e2a3b47ccdb3ac80c2dc2292393a2e154d8e5))
+
+
+### Bug Fixes
+
+* Fix outdated comment mentioning opaque bool ([#1959](https://github.com/Quantinuum/tket2/issues/1959)) ([1fb0e4d](https://github.com/Quantinuum/tket2/commit/1fb0e4d4ec334a61fe10d251859e067efa99cd9d))
+
 ## [0.14.1](https://github.com/Quantinuum/tket2/compare/tket-exts-v0.14.0...tket-exts-v0.14.1) (2026-08-04)
 
 

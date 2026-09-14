@@ -178,7 +178,7 @@ enum SolRuntimeFunction {
     Rp,
     Rpp,
     // Sol uses the same function for all measurement types
-    LazyMeasure,
+    FutureMeasure,
 }
 
 impl QSystemRuntimeFunction for SolRuntimeFunction {
@@ -186,7 +186,7 @@ impl QSystemRuntimeFunction for SolRuntimeFunction {
         match self {
             SolRuntimeFunction::Rp => "___rp",
             SolRuntimeFunction::Rpp => "___rpp",
-            SolRuntimeFunction::LazyMeasure => "___lazy_measure",
+            SolRuntimeFunction::FutureMeasure => "___future_measure",
         }
     }
 
@@ -206,7 +206,7 @@ impl QSystemRuntimeFunction for SolRuntimeFunction {
             SolRuntimeFunction::Rpp => iwc
                 .void_type()
                 .fn_type(&[qubit, qubit, float, float], false),
-            SolRuntimeFunction::LazyMeasure => {
+            SolRuntimeFunction::FutureMeasure => {
                 future_type(iwc).fn_type(&[qubit, iwc.i64_type().into()], false)
             }
         }
@@ -448,7 +448,7 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                 self.emit_lazy_measure_op(
                     context,
                     args,
-                    RuntimeFunction::Sol(SolRuntimeFunction::LazyMeasure),
+                    RuntimeFunction::Sol(SolRuntimeFunction::FutureMeasure),
                     &[flags],
                     false,
                 )
@@ -459,7 +459,7 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                 self.emit_lazy_measure_op(
                     context,
                     args,
-                    RuntimeFunction::Sol(SolRuntimeFunction::LazyMeasure),
+                    RuntimeFunction::Sol(SolRuntimeFunction::FutureMeasure),
                     &[flags],
                     false,
                 )
@@ -469,7 +469,7 @@ impl<PCG: PreludeCodegen> QSystemCodegenExtension<PCG> {
                 self.emit_lazy_measure_op(
                     context,
                     args,
-                    RuntimeFunction::Sol(SolRuntimeFunction::LazyMeasure),
+                    RuntimeFunction::Sol(SolRuntimeFunction::FutureMeasure),
                     &[flags],
                     true,
                 )

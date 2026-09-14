@@ -29,7 +29,7 @@ pub enum QSystemRebasePassError {
 /// Lower a HUGR to operations supported by a concrete QSystem platform.
 ///
 /// This pass performs the target-aware lowering part of the old
-/// [`crate::QSystemPass`] pipeline. By default it resolves modifier operations,
+/// `QSystemPass` pipeline. By default it resolves modifier operations,
 /// lowers `tket.quantum` operations to platform-native QSystem operations, lowers
 /// Guppy `drop` operations, and marks helper functions introduced during
 /// lowering as private.

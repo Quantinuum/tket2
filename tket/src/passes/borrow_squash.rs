@@ -131,8 +131,7 @@ fn is_borrow_return<H: HugrView>(node: H::Node, hugr: &H) -> Option<BorrowReturn
 
     match BArrayUnsafeOpDef::from_extension_op(ext_op) {
         Ok(BArrayUnsafeOpDef::borrow) => {
-            let sig = op.dataflow_signature().unwrap();
-            let counts = (sig.input_count(), sig.output_count());
+            let counts = (op.value_input_count(), op.value_output_count());
             assert_eq!(counts, (2, 2), "Borrow node has incorrect signature");
             Some(BorrowReturnPorts {
                 action: BRAction::Borrow(OutgoingPort::from(1)),
@@ -144,8 +143,7 @@ fn is_borrow_return<H: HugrView>(node: H::Node, hugr: &H) -> Option<BorrowReturn
             })
         }
         Ok(BArrayUnsafeOpDef::r#return) => {
-            let sig = op.dataflow_signature().unwrap();
-            let counts = (sig.input_count(), sig.output_count());
+            let counts = (op.value_input_count(), op.value_output_count());
             assert_eq!(counts, (3, 1), "Return node has incorrect signature");
             Some(BorrowReturnPorts {
                 action: BRAction::Return(IncomingPort::from(2)),
@@ -524,13 +522,8 @@ mod test {
                     1 | 2 => &inner_array_type,
                     idx => panic!("Unexpected index {idx}"),
                 };
-                assert_eq!(
-                    h.get_optype(node)
-                        .dataflow_signature()
-                        .unwrap()
-                        .input_types()[0],
-                    *expected_array_type
-                );
+                let actual_array_type = h.get_optype(node).value_input_type(0.into()).unwrap();
+                assert_eq!(&actual_array_type, expected_array_type);
             }
             // For each CX, two borrows or two returns of the outer array before the op, and two after
             assert_eq!(outer_count, 8);

@@ -12,14 +12,12 @@
 //! let mut hugr = Hugr::new();
 //! let node = hugr.entrypoint();
 //!
-//! hugr.set_metadata::<metadata::MaxQubitsHint>(node, 3);
 //! hugr.set_metadata::<metadata::PytketInputParameters>(node, vec!["theta".to_string()]);
 //! hugr.set_metadata::<metadata::PytketQubitRegisterNames>(
 //!     node,
 //!     vec![Qubit::from(ElementId("q".to_string(), vec![0]))],
 //! );
 //!
-//! assert_eq!(hugr.get_metadata::<metadata::MaxQubitsHint>(node), Some(3));
 //! assert_eq!(
 //!     hugr.get_metadata::<metadata::PytketInputParameters>(node),
 //!     Some(vec!["theta".to_string()]),
@@ -171,10 +169,3 @@ impl Metadata for PytketPhaseExpr {
     const KEY: &'static str = "TKET1.phase";
     type Type<'hugr> = &'hugr str;
 }
-
-/// Deprecated alias for [`ExpectedQubitsHint`].
-#[deprecated(
-    since = "0.21.0",
-    note = "use ExpectedQubitsHint instead; this alias will be removed"
-)]
-pub type MaxQubitsHint = ExpectedQubitsHint;
