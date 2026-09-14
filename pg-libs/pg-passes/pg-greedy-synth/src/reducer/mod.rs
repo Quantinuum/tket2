@@ -63,6 +63,11 @@ where
     /// sets are retired, it synthesises the remaining Clifford tableau with the
     /// same frontier and candidate pool machinery.
     pub(crate) fn reduce(&mut self, input: &PauliGraph) -> PauliGraph {
+        let mut qubit_depth = vec![0; input.get_n_qubits()];
+        self.reduce_with_depth(input, &mut qubit_depth)
+    }
+
+    fn reduce_with_depth(&mut self, input: &PauliGraph, qubit_depth: &mut [u64]) -> PauliGraph {
         let n_qubits = input.get_n_qubits();
         let input_ops = input.get_ops();
         if input_ops.is_empty() {
@@ -77,7 +82,6 @@ where
         let mut frontier = Frontier::new(n_qubits);
         let mut pool = GatePool::new(n_qubits);
         let mut output = PauliGraph::new(n_qubits);
-        let mut qubit_depth = vec![0; n_qubits];
         let mut rng = StdRng::seed_from_u64(self.seed);
         let mut next_input = 0;
         let progress = progress_bar(
@@ -100,7 +104,7 @@ where
                     &mut frontier,
                     &mut pool,
                     &mut output,
-                    &mut qubit_depth,
+                    qubit_depth,
                     &mut rng,
                 );
                 if let Some(progress) = &progress {
@@ -122,7 +126,7 @@ where
             &self.cost_backend,
             self.pool_size,
             self.top_up_size,
-            &mut qubit_depth,
+            qubit_depth,
             self.seed,
             self.parallel_mode,
             self.enable_progress,
@@ -223,7 +227,7 @@ where
                 let inner = PauliGraph::new(qubit_depth.len()).with_ops(data.get_ops().clone());
                 let canonical = CanonicalFormPass::new().transform(&inner);
                 let grouped = GroupCommutingOpsPass::new().transform(&canonical);
-                let reduced = self.reduce(&grouped);
+                let reduced = self.reduce_with_depth(&grouped, qubit_depth);
                 for op in reduced.get_ops() {
                     let Op::Gate { data: gate } = op else {
                         panic!("conditional synthesis emitted an operation that is not a gate")
