@@ -12,6 +12,7 @@ use std::cmp::max;
 
 const DEFAULT_WINDOW_SIZE: usize = 1280;
 const MINIMUM_POOL_SIZE: usize = 1000;
+const TQE_SAMPLE_FRACTION: f64 = 0.1;
 const MINIMUM_TOP_UP_SIZE: usize = 200;
 const GROUPED_WEIGHTED_SUM_MIN_OPS_PER_SET: usize = 64;
 
@@ -71,7 +72,7 @@ fn resolve_sizes(
     let window_size = window_size.unwrap_or(DEFAULT_WINDOW_SIZE);
     let pool_size = pool_size.unwrap_or(max(
         MINIMUM_POOL_SIZE,
-        ((n_qubits * n_qubits) as f64 * 0.2) as usize,
+        ((n_qubits * n_qubits) as f64 * (2.0 * TQE_SAMPLE_FRACTION)) as usize,
     ));
     let top_up_size = top_up_size.unwrap_or(max(MINIMUM_TOP_UP_SIZE, pool_size / n_qubits));
     (window_size, pool_size, top_up_size)

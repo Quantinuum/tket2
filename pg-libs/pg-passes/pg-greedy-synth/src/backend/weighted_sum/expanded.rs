@@ -7,6 +7,9 @@ use std::simd::{LaneCount, Simd, SupportedLaneCount, num::SimdFloat, num::SimdUi
 #[cfg(feature = "simd")]
 const SIMD_LANES: usize = 64;
 
+#[cfg(feature = "simd")]
+const SPARSE_WEIGHTING_MAX_DENSITY: f64 = 0.25;
+
 #[derive(Default)]
 struct ExpandedWeights {
     values: Vec<f64>,
@@ -113,7 +116,7 @@ fn simd_weight_sum(masks: &[u64], weights: &[f64]) -> f64 {
     let density = (masks.iter().map(|word| word.count_ones()).sum::<u32>() as f64
         / masks.len() as f64)
         / 64.0;
-    if density < 0.25 {
+    if density < SPARSE_WEIGHTING_MAX_DENSITY {
         return sparse_weight_sum(masks, weights);
     }
 

@@ -16,3 +16,4 @@ The pass can output:
 7. Black boxes, which are preserved
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for an overview of the internal design.
+See [TUNING.md](TUNING.md) for internal tuning constants.

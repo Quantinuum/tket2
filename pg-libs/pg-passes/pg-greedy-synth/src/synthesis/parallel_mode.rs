@@ -1,3 +1,5 @@
+const PARALLEL_COSTING_THRESHOLD: usize = 150_000;
+
 /// Parallelisation mode for gate costing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ParallelMode {
@@ -19,7 +21,7 @@ impl ParallelMode {
         match self {
             Self::Off => false,
             Self::On => true,
-            Self::Auto => work_items.saturating_mul(candidates) >= 150_000,
+            Self::Auto => work_items.saturating_mul(candidates) >= PARALLEL_COSTING_THRESHOLD,
         }
     }
 }
