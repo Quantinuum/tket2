@@ -26,6 +26,7 @@ pub mod guppy;
 /// Definition for measurement types.
 pub mod measurement;
 pub mod modifier;
+pub mod pauli_exp;
 /// Definition for Angle ops and types.
 pub mod rotation;
 pub mod sympy;
@@ -66,7 +67,7 @@ pub static ref REGISTRY: ExtensionRegistry = ExtensionRegistry::new(
 /// The list is used to build [`REGISTRY`] and by downstream crates that need to
 /// extend the same base set without maintaining a second copy of the tket
 /// extension list.
-pub fn tket_extensions() -> [Arc<Extension>; 8] {
+pub fn tket_extensions() -> [Arc<Extension>; 9] {
     [
         TKET1_EXTENSION.to_owned(),
         TKET_EXTENSION.to_owned(),
@@ -74,6 +75,7 @@ pub fn tket_extensions() -> [Arc<Extension>; 8] {
         global_phase::GLOBAL_PHASE_EXTENSION.to_owned(),
         guppy::GUPPY_EXTENSION.to_owned(),
         modifier::MODIFIER_EXTENSION.to_owned(),
+        pauli_exp::PAULI_EXP_EXTENSION.to_owned(),
         measurement::MEASUREMENT_EXTENSION.to_owned(),
         rotation::ROTATION_EXTENSION.to_owned(),
     ]
