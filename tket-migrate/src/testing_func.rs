@@ -9,10 +9,12 @@ use std::{
 
 use hugr::{
     Extension, Hugr, HugrView,
-    builder::{DFGBuilder, Dataflow, DataflowHugr},
+    builder::{
+        DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, SubContainer,
+    },
     extension::{ExtensionRegistry, prelude::bool_t, resolution::WeakExtensionRegistry},
     std_extensions::{STD_REG, logic::LogicOp},
-    types::Signature,
+    types::{Signature, Type},
 };
 
 const QUANTUM_EXTENSION: &str = "tket.quantum";
@@ -118,6 +120,37 @@ pub(crate) fn build_bool_hugr(registry: &ExtensionRegistry) -> Result<Hugr, Box<
     let output = builder.add_dataflow_op(read, [value])?.out_wire(0);
 
     Ok(builder.finish_hugr_with_outputs([output])?)
+}
+
+pub(crate) fn build_bool_cfg_hugr(registry: &ExtensionRegistry) -> Result<Hugr, Box<dyn Error>> {
+    let bool_extension = registry
+        .get(BOOL_EXTENSION)
+        .ok_or("tket.bool is missing from the registry")?;
+    let boolean: Type = bool_extension
+        .get_type("bool")
+        .ok_or("tket.bool.bool is missing from the extension")?
+        .instantiate([])?
+        .into();
+    let not = bool_extension.instantiate_extension_op("not", [])?;
+    let signature = Signature::new([boolean.clone()], [boolean.clone()]);
+    let mut function = FunctionBuilder::new("bool_cfg", signature.clone())?;
+    let [mut value] = function.input_wires_arr();
+
+    for _ in 0..2 {
+        let mut cfg = function.cfg_builder([(boolean.clone(), value)], [boolean.clone()].into())?;
+        let mut block = cfg.entry_builder([vec![].into()], [boolean.clone()].into())?;
+        let [input] = block.input_wires_arr();
+        let mut dfg = block.dfg_builder(signature.clone(), [input])?;
+        let [input] = dfg.input_wires_arr();
+        let result = dfg.add_dataflow_op(not.clone(), [input])?.out_wire(0);
+        let dfg = dfg.finish_with_outputs([result])?;
+        let tag = block.make_sum(0, [vec![].into()], [])?;
+        let block = block.finish_with_outputs(tag, dfg.outputs())?;
+        cfg.branch(&block, 0, &cfg.exit_block())?;
+        value = cfg.finish_sub_container()?.out_wire(0);
+    }
+
+    Ok(function.finish_hugr_with_outputs([value])?)
 }
 
 pub(crate) fn generate(
