@@ -77,7 +77,7 @@ fn tk_conditional_json(op_json: Value, cond_bits: &[Value], cond_values: &[bool]
             "op": op_json,
             "width": cond_bits.len(),
             // little-endian encoding of the condition values
-            "values": cond_values.iter().enumerate().fold(0u64, |acc, (i, &b)| acc | ((b as u64) << i)),
+            "value": cond_values.iter().enumerate().fold(0u64, |acc, (i, &b)| acc | ((b as u64) << i)),
         },
         "type": "Conditional",
     })
@@ -535,11 +535,11 @@ pub fn pg_from_tk_json(tk_json: &Value) -> Result<PauliGraph, TKConversionError>
                 .collect::<Result<Vec<usize>, TKConversionError>>()?;
             // little-endian encoding of the condition values
             let cond_value_u64 = conditional_json
-                .get("values")
+                .get("value")
                 .and_then(Value::as_u64)
                 .ok_or_else(|| {
                     TKConversionError::InvalidTKJson(
-                        "Missing or invalid values field in TKET JSON conditional".into(),
+                        "Missing or invalid value field in TKET JSON conditional".into(),
                     )
                 })?;
             let cond_values = (0..width)
@@ -579,14 +579,16 @@ pub fn pg_from_tk_json(tk_json: &Value) -> Result<PauliGraph, TKConversionError>
                     "Reset" => GateType::Reset,
                     _ => unreachable!(),
                 };
-                let params = op
-                    .get("params")
-                    .and_then(Value::as_array)
-                    .ok_or_else(|| {
-                        TKConversionError::InvalidTKJson(
-                            "Missing or invalid params field in TKET JSON op".into(),
-                        )
-                    })?
+                let params: &[Value] = match op.get("params") {
+                    None => &[],
+                    Some(Value::Array(params)) => params,
+                    _ => {
+                        return Err(TKConversionError::InvalidTKJson(
+                            "Invalid params field in TKET JSON op".into(),
+                        ));
+                    }
+                };
+                let params = params
                     .iter()
                     .map(|p| {
                         p.as_str()
@@ -795,24 +797,108 @@ pub fn pg_from_tk_json(tk_json: &Value) -> Result<PauliGraph, TKConversionError>
 mod tests {
     use super::*;
     use pg_core::{BlackBoxData, ConditionalBoxData};
-    fn remove_box_id(value: &mut Value) {
-        value["commands"]
-            .as_array_mut()
-            .unwrap()
-            .iter_mut()
-            .for_each(|cmd| {
-                if let Some(op) = cmd.get_mut("op") {
-                    if let Some(box_json) = op.get_mut("box") {
-                        box_json.as_object_mut().unwrap().remove("id");
-                    }
-                    if let Some(condition_json) = op.get_mut("conditional")
-                        && let Some(box_json) = condition_json.get_mut("op")
-                        && let Some(box_json) = box_json.get_mut("box")
-                    {
-                        box_json.as_object_mut().unwrap().remove("id");
-                    }
-                }
-            });
+    use rstest::rstest;
+    use std::process::{Command, Stdio};
+
+    fn round_trip_via_pytket(pg: &PauliGraph) -> PauliGraph {
+        let tk_json = pg_to_tk_json(pg).expect("Failed to export graph to TKET JSON");
+        let python = std::env::var("PG_TK_PYTHON").unwrap_or_else(|_| "python3".into());
+        let mut child = Command::new(python)
+            .args([
+                "-c",
+                concat!(
+                    "import json, sys\n",
+                    "from pytket import Circuit\n",
+                    "json.dump(Circuit.from_dict(json.load(sys.stdin)).to_dict(), sys.stdout)\n",
+                ),
+            ])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("Failed to start Python for TKET round trip");
+        serde_json::to_writer(child.stdin.take().expect("Missing Python stdin"), &tk_json)
+            .expect("Failed to write TKET JSON to Python");
+        let output = child.wait_with_output().expect("Failed to wait for Python");
+        assert!(
+            output.status.success(),
+            "Python round trip failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let tk_json =
+            serde_json::from_slice(&output.stdout).expect("Invalid JSON returned by Python");
+        pg_from_tk_json(&tk_json).expect("Failed to import graph from TKET JSON")
+    }
+
+    fn circuit_with_op(op: Value, args: Value) -> Value {
+        json!({
+            "qubits": [["q", [0]], ["q", [1]]],
+            "bits": [["c", [0]], ["c", [1]], ["c", [2]]],
+            "commands": [{"op": op, "args": args}],
+            "created_qubits": [], "discarded_qubits": [],
+            "implicit_permutation": [], "phase": "0.0"
+        })
+    }
+
+    #[rstest]
+    #[case::missing_params(None)]
+    #[case::empty_params(Some(json!([])))]
+    fn non_parameterised_gate_accepts_missing_or_empty_params(#[case] params: Option<Value>) {
+        let mut op = json!({"type": "H"});
+        if let Some(params) = params {
+            op["params"] = params;
+        }
+        let graph = pg_from_tk_json(&circuit_with_op(op, json!([["q", [0]]]))).unwrap();
+
+        let Op::Gate { data } = &graph.get_ops()[0] else {
+            panic!("Expected gate")
+        };
+        assert!(data.get_params().is_empty());
+        assert!(data.get_conditional_values().is_empty());
+    }
+
+    fn assert_invalid_params(op: Value, args: Value) {
+        let panic = std::panic::catch_unwind(|| pg_from_tk_json(&circuit_with_op(op, args)))
+            .expect_err("Expected a panic for invalid parameter count");
+        let message = panic
+            .downcast_ref::<String>()
+            .map(String::as_str)
+            .or_else(|| panic.downcast_ref::<&str>().copied())
+            .expect("Expected a string panic message");
+        assert!(
+            message.contains("Gate has wrong number of parameters"),
+            "Unexpected panic message: {message}"
+        );
+    }
+
+    #[rstest]
+    #[case::rz_missing_param("Rz", json!([]), json!([["q", [0]]]))]
+    #[case::rz_extra_param("Rz", json!(["0.5", "0.5"]), json!([["q", [0]]]))]
+    #[case::phasedx_missing_param("PhasedX", json!(["0.5"]), json!([["q", [0]]]))]
+    fn gate_rejects_wrong_parameter_count(
+        #[case] name: &str,
+        #[case] params: Value,
+        #[case] args: Value,
+    ) {
+        assert_invalid_params(json!({"type": name, "params": params}), args);
+    }
+
+    #[rstest]
+    #[case::rx_invalid_string("Rx", json!(["invalid"]), json!([["q", [0]]]))]
+    #[case::rz_number_instead_of_string("Rz", json!([0.5]), json!([["q", [0]]]))]
+    fn gate_rejects_invalid_parameter_values(
+        #[case] name: &str,
+        #[case] params: Value,
+        #[case] args: Value,
+    ) {
+        let result = pg_from_tk_json(&circuit_with_op(
+            json!({"type": name, "params": params}),
+            args,
+        ));
+        assert!(
+            matches!(result, Err(TKConversionError::InvalidTKJson(_))),
+            "Expected a parameter conversion error, got {result:?}"
+        );
     }
 
     #[test]
@@ -825,80 +911,46 @@ mod tests {
             data: GateData::new(GateType::Measure, vec![0, 1]),
         });
         pg.add_op(Op::Gate {
+            data: GateData::new(GateType::ZX, vec![0, 1]),
+        });
+        pg.add_op(Op::Gate {
             data: GateData::new(GateType::Reset, vec![1]),
         });
         pg.add_op(Op::Gate {
             data: GateData::new(GateType::PHASEDX, vec![1]).with_params(vec![0.4, 0.4]),
         });
         pg.add_op(Op::Gate {
-            data: GateData::new(GateType::X, vec![0])
+            data: GateData::new(GateType::X, vec![1])
                 .with_conditional(vec![1, 0], vec![true, false]),
         });
-        let tk_json = pg_to_tk_json(&pg).unwrap();
-        let expected_json = json!({
-            "qubits": [["q", [0]], ["q", [1]]],
-            "bits": [["c", [0]], ["c", [1]]],
-            "commands": [
-                {
-                    "op": {
-                        "type": "H",
-                        "params": []
-                    },
-                    "args": [["q", [0]]]
-                },
-                {
-                    "op": {
-                        "type": "Measure",
-                        "params": []
-                    },
-                    "args": [["q", [0]], ["c", [1]]]
-                },
-                {
-                    "op": {
-                        "type": "Reset",
-                        "params": []
-                    },
-                    "args": [["q", [1]]]
-                },
-                {
-                    "op": {
-                        "type": "PhasedX",
-                        "params": ["0.4", "0.4"]
-                    },
-                    "args": [["q", [1]]]
-                },
-                {
-                    "op": {
-                        "conditional": {
-                            "op": {
-                                "type": "X",
-                                "params": []
-                            },
-                            "width": 2,
-                            "values": 1
-                        },
-                        "type": "Conditional"
-                    },
-                    "args": [
-                        ["c", [1]],
-                        ["c", [0]],
-                        ["q", [0]]
-                    ]
-                }
-            ],
-            "phase": "0.0",
-            "created_qubits": [],
-            "discarded_qubits": [],
-            "implicit_permutation": [
-                [["q", [0]], ["q", [0]]],
-                [["q", [1]], ["q", [1]]]
-            ]
+
+        let rotation_data = RotationData::new(vec![Pauli::X, Pauli::Y], 0.5);
+        pg.add_op(Op::Rotation {
+            data: rotation_data,
         });
-        assert_eq!(tk_json, expected_json);
-        // test round trip conversion
-        let pg2 = pg_from_tk_json(&tk_json).unwrap();
-        assert_eq!(pg.get_n_qubits(), pg2.get_n_qubits());
-        assert_eq!(pg.get_ops(), pg2.get_ops());
+        let rotation_data = RotationData::new(vec![Pauli::X, Pauli::Z], 0.5);
+        let conditional_box_data = ConditionalBoxData::new(
+            vec![Op::Rotation {
+                data: rotation_data,
+            }],
+            vec![0, 1, 2],
+            vec![true, false, true],
+        );
+        pg.add_op(Op::ConditionalBox {
+            data: conditional_box_data,
+        });
+        let tableau_data = TableauData::new(
+            vec![
+                (vec![Pauli::Z, Pauli::I], false),
+                (vec![Pauli::Z, Pauli::Z], false),
+            ],
+            vec![
+                (vec![Pauli::X, Pauli::X], true),
+                (vec![Pauli::I, Pauli::X], false),
+            ],
+        );
+        pg.add_op(Op::Tableau { data: tableau_data });
+        assert_eq!(round_trip_via_pytket(&pg), pg);
     }
 
     #[test]
@@ -943,164 +995,6 @@ mod tests {
             ]
         });
         assert_eq!(tk_json.unwrap(), expected_json);
-    }
-
-    #[test]
-    fn test_rotation_to_tk() {
-        let mut pg = PauliGraph::new(3);
-        let rotation_data = RotationData::new(vec![Pauli::X, Pauli::Y, Pauli::Z], 0.5);
-        pg.add_op(Op::Rotation {
-            data: rotation_data,
-        });
-        let mut tk_json = pg_to_tk_json(&pg).unwrap();
-        let expected_json = json!({
-            "qubits": [["q", [0]], ["q", [1]], ["q", [2]]],
-            "bits": [],
-            "commands": [
-                {
-                    "op": {
-                        "box": {
-                            "cx_config": "Tree",
-                            "paulis": ["X", "Y", "Z"],
-                            "phase": "0.5",
-                            "type": "PauliExpBox"
-                        },
-                        "type": "PauliExpBox"
-                    },
-                    "args": [["q", [0]], ["q", [1]], ["q", [2]]]
-                }
-            ],
-            "phase": "0.0",
-            "created_qubits": [],
-            "discarded_qubits": [],
-            "implicit_permutation": [
-                [["q", [0]], ["q", [0]]],
-                [["q", [1]], ["q", [1]]],
-                [["q", [2]], ["q", [2]]]
-            ]
-        });
-        remove_box_id(&mut tk_json);
-        assert_eq!(tk_json, expected_json);
-        // test round trip conversion
-        let pg2 = pg_from_tk_json(&tk_json).unwrap();
-        assert_eq!(pg.get_n_qubits(), pg2.get_n_qubits());
-        assert_eq!(pg.get_ops(), pg2.get_ops());
-    }
-
-    #[test]
-    fn test_conditional_box_pg_to_tk_json() {
-        let mut pg = PauliGraph::new(1);
-        let rotation_data = RotationData::new(vec![Pauli::X], 0.5);
-        let conditional_box_data = ConditionalBoxData::new(
-            vec![Op::Rotation {
-                data: rotation_data,
-            }],
-            vec![0, 1, 2],
-            vec![true, false, true],
-        );
-        pg.add_op(Op::ConditionalBox {
-            data: conditional_box_data,
-        });
-        let mut tk_json = pg_to_tk_json(&pg).unwrap();
-        let expected_json = json!({
-            "qubits": [["q", [0]]],
-            "bits": [["c", [0]], ["c", [1]], ["c", [2]]],
-            "commands": [
-                {
-                    "op": {
-                        "conditional": {
-                            "op": {
-                                "type": "PauliExpBox",
-                                "box": {
-                                    "cx_config": "Tree",
-                                    "paulis": ["X"],
-                                    "phase": "0.5",
-                                    "type": "PauliExpBox"
-                                }
-                            },
-                            "width": 3,
-                            "values": 5
-                        },
-                        "type": "Conditional"
-                    },
-                    "args": [
-                        ["c", [0]],
-                        ["c", [1]],
-                        ["c", [2]],
-                        ["q", [0]]
-                    ]
-                }
-            ],
-            "phase": "0.0",
-            "created_qubits": [],
-            "discarded_qubits": [],
-            "implicit_permutation": [
-                [["q", [0]], ["q", [0]]]
-            ]
-        });
-
-        remove_box_id(&mut tk_json);
-        assert_eq!(tk_json, expected_json);
-        // test round trip conversion
-        let pg2 = pg_from_tk_json(&tk_json).unwrap();
-        assert_eq!(pg.get_n_qubits(), pg2.get_n_qubits());
-        assert_eq!(pg.get_ops(), pg2.get_ops());
-    }
-
-    #[test]
-    fn test_tableau_to_tk() {
-        let mut pg = PauliGraph::new(2);
-        // cx(0,1);z(0)
-        let tableau_data = TableauData::new(
-            vec![
-                (vec![Pauli::Z, Pauli::I], false),
-                (vec![Pauli::Z, Pauli::Z], false),
-            ],
-            vec![
-                (vec![Pauli::X, Pauli::X], true),
-                (vec![Pauli::I, Pauli::X], false),
-            ],
-        );
-        pg.add_op(Op::Tableau { data: tableau_data });
-        let mut tk_json = pg_to_tk_json(&pg).unwrap();
-        let expected_json = json!({
-            "qubits": [["q", [0]], ["q", [1]]],
-            "bits": [],
-            "commands": [
-                {
-                    "op": {
-                        "box": {
-                            "tab": {
-                                "qubits": [["q", [0]], ["q", [1]]],
-                                "tab": {
-                                    "nqubits": 2,
-                                    "nrows": 4,
-                                    "phase": [[true], [false], [false], [false]],
-                                    "xmat": [[true, true], [false, true], [false, false], [false, false]],
-                                    "zmat": [[false, false], [false, false], [true, false], [true, true]]
-                                }
-                            },
-                            "type": "UnitaryTableauBox"
-                        },
-                        "type": "UnitaryTableauBox"
-                    },
-                    "args": [["q", [0]], ["q", [1]]]
-                }
-            ],
-            "phase": "0.0",
-            "created_qubits": [],
-            "discarded_qubits": [],
-            "implicit_permutation": [
-                [["q", [0]], ["q", [0]]],
-                [["q", [1]], ["q", [1]]]
-            ]
-        });
-        remove_box_id(&mut tk_json);
-        assert_eq!(tk_json, expected_json);
-        // test round trip conversion
-        let pg2 = pg_from_tk_json(&tk_json).unwrap();
-        assert_eq!(pg.get_n_qubits(), pg2.get_n_qubits());
-        assert_eq!(pg.get_ops(), pg2.get_ops());
     }
 
     #[test]
