@@ -3,7 +3,7 @@ from typing import Literal
 
 import pytest
 from pytest_snapshot.plugin import Snapshot
-from selene_hugr_qis_compiler import compile_to_llvm_ir  # , HugrReadError, check_hugr
+from selene_hugr_qis_compiler import EmulatorState
 
 resources_dir = Path(__file__).parent / "resources"
 
@@ -40,6 +40,7 @@ def load(name: str) -> bytes:
         "rng",
         "rus",
         "qft_32",
+        "simple_modifier",
     ],
 )
 @pytest.mark.parametrize("target_triple", triples)
@@ -48,8 +49,8 @@ def test_llvm_multiplatform(
     snapshot: Snapshot, hugr_file: str, target_triple: str, platform: Platform
 ) -> None:
     hugr_envelope = load(hugr_file)
-    ir = compile_to_llvm_ir(
-        hugr_envelope, target_triple=target_triple, platform=platform
+    ir = EmulatorState.from_bytes(hugr_envelope, platform=platform).compile_to_llvm_ir(
+        target_triple=target_triple
     )
     snapshot.assert_match(ir, f"{hugr_file}_{target_triple}_{platform}")
 
@@ -68,4 +69,6 @@ def test_llvm_multiplatform_todos(
     snapshot: Snapshot, hugr_file: str, target_triple: str
 ) -> None:
     hugr_envelope = load(hugr_file)
-    compile_to_llvm_ir(hugr_envelope, target_triple=target_triple, platform="sol")
+    EmulatorState.from_bytes(hugr_envelope, platform="sol").compile_to_llvm_ir(
+        target_triple=target_triple
+    )

@@ -1,24 +1,22 @@
 //! Structures to keep track of pytket [`ElementId`][tket_json_rs::register::ElementId]s and
 //! their correspondence to wires in the hugr being defined.
 use std::collections::{BTreeMap, VecDeque};
-use std::ops::Deref;
 use std::sync::Arc;
 
-use hugr::builder::{DFGBuilder, Dataflow as _};
+use hugr::builder::{Container as _, DFGBuilder, Dataflow as _};
 use hugr::extension::prelude::{bool_t, qb_t};
 use hugr::hugr::hugrmut::HugrMut;
 use hugr::ops::Value;
 use hugr::std_extensions::arithmetic::float_types::{ConstF64, float64_type};
 use hugr::types::Type;
-use hugr::{Hugr, IncomingPort, Node, Wire};
-use hugr_core::types::{Term, TypeRow};
+use hugr::{Hugr, HugrView as _, IncomingPort, Node, Wire};
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 use tket_json_rs::circuit_json::ImplicitPermutation;
 use tket_json_rs::register::ElementId as PytketRegister;
 
 use crate::extension::rotation::{ConstRotation, rotation_type};
-use crate::serialize::pytket::decoder::param::parser::{PytketParam, parse_pytket_param};
+use crate::serialize::pytket::decoder::param::parser::PytketParam;
 use crate::serialize::pytket::decoder::{
     LoadedParameter, ParameterType, PytketDecoderContext, TrackedBit, TrackedBitId, TrackedQubit,
     TrackedQubitId,
@@ -341,6 +339,11 @@ pub(crate) struct WireTracker {
     ///
     /// Ordered according to their order in the function input.
     parameter_vars: IndexSet<String>,
+    /// Not yet-produced parameters that have been referenced in the decoded hugr.
+    ///
+    /// These are introduced when decoding opaque hugr subgraphs outside the pytket commands.
+    /// See [`super::EncodedCircuitBoundary`].
+    forward_parameter_placeholders: IndexSet<String>,
     /// A permutation of qubit registers in `latest_qubit_tracker` that we
     /// expect to see at the output.
     ///
@@ -396,6 +399,7 @@ impl WireTracker {
             parameters: IndexMap::new(),
             unused_parameter_inputs: VecDeque::new(),
             parameter_vars: IndexSet::new(),
+            forward_parameter_placeholders: IndexSet::new(),
             output_qubit_permutation: Vec::with_capacity(qubit_count),
             unsupported_wires: IndexMap::new(),
         }
@@ -431,6 +435,84 @@ impl WireTracker {
             reordered.insert(output_pos, input_pos);
         }
         self.output_qubit_permutation = reordered.values().copied().collect();
+    }
+
+    /// Relabel the current qubit values according to an intermediate circuit
+    /// permutation.
+    ///
+    /// Unlike the final output permutation, an intermediate permutation must
+    /// update register lookup before the next segment is decoded. The HUGR
+    /// wires themselves do not change; fresh tracked elements associate those
+    /// wires with their new pytket register names.
+    pub(super) fn apply_implicit_permutation(
+        &mut self,
+        permutation: &[ImplicitPermutation],
+    ) -> Result<(), PytketDecodeError> {
+        if permutation.is_empty() {
+            return Ok(());
+        }
+
+        let register_count = self.latest_qubit_tracker.len();
+        let mut source_for_output = (0..register_count).collect_vec();
+        for ImplicitPermutation(input, output) in permutation {
+            let input_hash = RegisterHash::from(input);
+            let output_hash = RegisterHash::from(output);
+            let Some(input_pos) = self.latest_qubit_tracker.get_index_of(&input_hash) else {
+                return Err(PytketDecodeError::custom(format!(
+                    "Unknown qubit register in implicit permutation: {input:?}"
+                )));
+            };
+            let Some(output_pos) = self.latest_qubit_tracker.get_index_of(&output_hash) else {
+                return Err(PytketDecodeError::custom(format!(
+                    "Unknown qubit register in implicit permutation: {output:?}"
+                )));
+            };
+            source_for_output[output_pos] = input_pos;
+        }
+
+        let current_ids = self.latest_qubit_tracker.values().copied().collect_vec();
+        let destination_registers = current_ids
+            .iter()
+            .map(|&id| self.get_qubit(id).pytket_register_arc())
+            .collect_vec();
+        let source_wires = source_for_output
+            .iter()
+            .map(|&source_pos| self.qubit_wires[&current_ids[source_pos]].clone())
+            .collect_vec();
+
+        for &id in &current_ids {
+            self.qubits[id.0].mark_outdated();
+        }
+
+        let mut replacements = BTreeMap::new();
+        for (output_pos, (register, wires)) in destination_registers
+            .into_iter()
+            .zip(source_wires)
+            .enumerate()
+        {
+            let hash = RegisterHash::from(register.as_ref());
+            let new_id = TrackedQubitId(self.qubits.len());
+            self.qubits
+                .push(TrackedQubit::new_with_hash(new_id, register, hash));
+            *self
+                .latest_qubit_tracker
+                .get_index_mut(output_pos)
+                .expect("tracked qubit position remains valid")
+                .1 = new_id;
+            self.qubit_wires.insert(new_id, wires);
+            replacements.insert(current_ids[source_for_output[output_pos]], new_id);
+        }
+
+        for wire_data in self.wires.values_mut() {
+            for qubit in &mut wire_data.qubits {
+                if let Some(replacement) = replacements.get(qubit) {
+                    *qubit = *replacement;
+                }
+            }
+        }
+
+        self.output_qubit_permutation.clear();
+        Ok(())
     }
 
     /// Returns a reference to the tracked qubit at the given index.
@@ -724,9 +806,6 @@ impl WireTracker {
             _ if ty == &bool_t() && !bit_args.is_empty() => {
                 self.initialize_bit_wire(builder, bit_args[0].clone())?
             }
-            _ if matches!(ty.deref(), Term::SumType(sum) if sum.as_tuple().is_some()) => {
-                return self.find_tuple_wire(config, builder, ty, qubit_args, bit_args, params);
-            }
             _ => {
                 return Err(PytketDecodeErrorInner::NoMatchingWire {
                     ty: ty.to_string(),
@@ -780,95 +859,6 @@ impl WireTracker {
             self.mark_wire_outdated(wire);
             Ok(FoundWire::Register(self.wires[&new_wire].clone()))
         }
-    }
-
-    /// Build a tuple wire from its tracked element wires when no matching
-    /// aggregate wire exists.
-    ///
-    /// Pytket passes may preserve an opaque barrier while presenting its qubit
-    /// arguments in an order that does not match any aggregate tuple wire
-    /// already tracked from the original HUGR. In that case, we can rebuild the
-    /// tuple explicitly from the individual decoded wires.
-    fn find_tuple_wire(
-        &mut self,
-        config: &PytketDecoderConfig,
-        builder: &mut DFGBuilder<&mut Hugr>,
-        ty: &Type,
-        qubit_args: &mut &[TrackedQubit],
-        bit_args: &mut &[TrackedBit],
-        params: &mut &[LoadedParameter],
-    ) -> Result<FoundWire, PytketDecodeError> {
-        let Term::SumType(sum) = ty.deref() else {
-            unreachable!("find_tuple_wire called with non-sum type");
-        };
-        let Some(tuple) = sum.as_tuple() else {
-            unreachable!("find_tuple_wire called with non-tuple sum type");
-        };
-        let tuple = TypeRow::try_from(tuple.clone()).map_err(|_| {
-            PytketDecodeErrorInner::NoMatchingWire {
-                ty: ty.to_string(),
-                qubit_args: qubit_args
-                    .iter()
-                    .map(|q| q.pytket_register().to_string())
-                    .collect(),
-                bit_args: bit_args
-                    .iter()
-                    .map(|bit| bit.pytket_register().to_string())
-                    .collect(),
-            }
-            .wrap()
-        })?;
-
-        let mut tuple_qubits = *qubit_args;
-        let mut tuple_bits = *bit_args;
-        let mut tuple_params = *params;
-        let mut element_wires = Vec::with_capacity(tuple.len());
-        for elem_ty in tuple.iter() {
-            let FoundWire::Register(wire) = self.find_typed_wire(
-                config,
-                builder,
-                elem_ty,
-                &mut tuple_qubits,
-                &mut tuple_bits,
-                &mut tuple_params,
-                None,
-            )?
-            else {
-                return Err(PytketDecodeErrorInner::NoMatchingWire {
-                    ty: ty.to_string(),
-                    qubit_args: qubit_args
-                        .iter()
-                        .map(|q| q.pytket_register().to_string())
-                        .collect(),
-                    bit_args: bit_args
-                        .iter()
-                        .map(|bit| bit.pytket_register().to_string())
-                        .collect(),
-                }
-                .wrap());
-            };
-            element_wires.push(wire.wire());
-        }
-
-        let reg_count = config
-            .type_to_pytket(ty)
-            .expect("tuple fallback requires a pytket-representable type");
-        let wire_qubits = qubit_args
-            .iter()
-            .take(reg_count.qubits)
-            .cloned()
-            .collect_vec();
-        let wire_bits = bit_args.iter().take(reg_count.bits).cloned().collect_vec();
-        let tuple_wire = builder
-            .make_tuple(element_wires)
-            .map_err(PytketDecodeError::custom)?;
-        self.track_wire(tuple_wire, Arc::new(ty.clone()), wire_qubits, wire_bits)?;
-
-        *qubit_args = tuple_qubits;
-        *bit_args = tuple_bits;
-        *params = tuple_params;
-
-        Ok(FoundWire::Register(self.wires[&tuple_wire].clone()))
     }
 
     /// Returns a new [TrackedWires] set for a list of [`TrackedQubit`]s,
@@ -1083,7 +1073,7 @@ impl WireTracker {
             &mut self.parameters,
             &mut self.parameter_vars,
             &mut self.unused_parameter_inputs,
-            parse_pytket_param(param),
+            PytketParam::parse(param),
             param,
             type_hint,
         )
@@ -1130,22 +1120,91 @@ impl WireTracker {
         Ok(())
     }
 
-    /// Associate an input wire to the region with a parameter.
-    pub(super) fn register_input_parameter(
+    /// Bind a pytket variable name to its loaded parameter value.
+    ///
+    /// If [`Self::reserve_forward_parameter`] created a placeholder for the
+    /// parameter name, this replaces the placeholder binding, rewires all of
+    /// its consumers to the produced value, and removes the temporary node.
+    ///
+    /// Otherwise, this creates a new binding and records the name in the
+    /// context. In that case the `builder` is not modified.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PytketDecodeErrorInner::DuplicatedParameter`] if the name is
+    /// already bound and is not an unresolved forward reference.
+    pub(super) fn bind_parameter(
         &mut self,
         loaded: LoadedParameter,
         param: String,
+        builder: &mut DFGBuilder<&mut Hugr>,
     ) -> Result<(), PytketDecodeError> {
-        let entry = self.parameters.entry(param.clone());
-        if let indexmap::map::Entry::Occupied(_) = &entry {
-            return Err(PytketDecodeErrorInner::DuplicatedParameter {
-                param: entry.key().clone(),
+        let was_predeclared = self.forward_parameter_placeholders.contains(&param);
+
+        if !was_predeclared {
+            let entry = self.parameters.entry(param.clone());
+            if let indexmap::map::Entry::Occupied(_) = &entry {
+                return Err(PytketDecodeErrorInner::DuplicatedParameter {
+                    param: entry.key().clone(),
+                }
+                .into());
             }
-            .into());
+            self.parameter_vars.insert(param);
+            entry.insert_entry(loaded);
+        } else {
+            // Replace a pre-declared parameter placeholder with the actual value, and rewire all of its consumers.
+
+            let placeholder = self
+                .parameters
+                .insert(param, loaded)
+                .expect("reserved parameter must have a placeholder");
+            let targets = builder
+                .hugr()
+                .linked_inputs(placeholder.wire().node(), placeholder.wire().source())
+                .collect_vec();
+            if !targets.is_empty() {
+                let replacement = loaded.with_type(placeholder.typ(), builder).wire();
+                builder
+                    .hugr_mut()
+                    .disconnect(placeholder.wire().node(), placeholder.wire().source());
+                for (node, port) in targets {
+                    builder.hugr_mut().connect(
+                        replacement.node(),
+                        replacement.source(),
+                        node,
+                        port,
+                    );
+                }
+            }
+            builder.hugr_mut().remove_node(placeholder.wire().node());
         }
-        self.parameter_vars.insert(param);
-        entry.insert_entry(loaded);
+
         Ok(())
+    }
+
+    /// Reserve a parameter name referenced before its producer is decoded.
+    ///
+    /// Adds a placeholder constant definition to the Hugr, which will be
+    /// replaced by the actual parameter value when it is produced.
+    ///
+    /// If the name is already bound, no reservation is needed so this is a
+    /// no-op.
+    pub(super) fn reserve_forward_parameter(
+        &mut self,
+        param: String,
+        builder: &mut DFGBuilder<&mut Hugr>,
+    ) {
+        if self.parameters.contains_key(&param) {
+            return;
+        }
+
+        let wire = builder
+            .add_dataflow_op(symbolic_constant_op(param.clone()), [])
+            .expect("symbolic parameter placeholder must be valid")
+            .out_wire(0);
+        self.parameters
+            .insert(param.clone(), LoadedParameter::rotation(wire));
+        self.forward_parameter_placeholders.insert(param);
     }
 
     /// Track a parameter input to the region for which we don't have a variable name yet.

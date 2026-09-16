@@ -55,11 +55,11 @@ jobs:
             run: ${{ needs.check-tag.outputs.run_exts }}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         if: ${{ matrix.target.run == 'true' }}
       - name: Run sccache-cache
         if: ${{ matrix.target.run == 'true' }}
-        uses: mozilla-actions/sccache-action@v0.0.10
+        uses: mozilla-actions/sccache-action@v0.0.11
 
       - name: Set up uv
         if: ${{ matrix.target.run == 'true' }}
@@ -107,7 +107,7 @@ jobs:
       # Used to generate artifact attestation
       attestations: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Check if the tag has an associated release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -121,7 +121,7 @@ jobs:
           path: dist
           merge-multiple: true
       - name: Generate artifact attestation
-        uses: actions/attest@v4
+        uses: actions/attest@v4.2.2
         with:
           subject-path: "dist/*"
       - name: Report

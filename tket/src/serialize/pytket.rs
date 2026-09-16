@@ -9,10 +9,10 @@ pub mod extension;
 pub mod opaque;
 mod options;
 
-pub use circuit::EncodedCircuit;
+pub use circuit::{EncodedCircuit, EncodedCircuitId};
 pub use config::{
-    PytketDecoderConfig, PytketEncoderConfig, TypeTranslatorSet, default_decoder_config,
-    default_encoder_config,
+    PytketDecoderConfig, PytketEncoderConfig, TypeTranslatorSet, add_default_decoders,
+    default_decoder_config, default_encoder_config,
 };
 pub use encoder::PytketEncoderContext;
 pub use error::{
@@ -140,7 +140,7 @@ impl TKETDecode for SerialCircuit {
         options: DecodeOptions,
     ) -> Result<Node, Self::DecodeError> {
         let mut decoder = PytketDecoderContext::new(self, hugr, target, options, None)?;
-        decoder.run_decoder(&self.commands, None)?;
+        decoder.run_decoder(&self.commands)?;
         Ok(decoder.finish(None)?.node())
     }
 
@@ -160,9 +160,14 @@ impl TKETDecode for SerialCircuit {
 
         let mut encoded = EncodedCircuit::new_standalone(hugr, options)?;
 
-        let serial_circ = encoded
-            .get_circuit_mut(hugr.entrypoint())
+        let mut circuits = encoded.get_circuits_mut(hugr.entrypoint());
+        let (_, serial_circ) = circuits
+            .next()
             .expect("Hugr entrypoint must be a dataflow region");
+        debug_assert!(
+            circuits.next().is_none(),
+            "standalone encoding must produce one circuit"
+        );
         Ok(std::mem::take(serial_circ))
     }
 }
@@ -202,7 +207,7 @@ pub fn load_tk1_json_str(json: &str, options: DecodeOptions) -> Result<Hugr, Pyt
 /// Save a circuit to file in TK1 JSON format.
 ///
 /// You may need to normalize the circuit using
-/// [`NormalizeGuppy`][crate::passes::NormalizeGuppy] before saving.
+/// [`Normalize`][crate::passes::Normalize] before saving.
 ///
 /// See [EncodeOptions] for the options used by the encoder.
 ///
@@ -223,7 +228,7 @@ pub fn save_tk1_json_file<H: HugrView>(
 /// Save a circuit in TK1 JSON format to a writer.
 ///
 /// You may need to normalize the circuit using
-/// [`NormalizeGuppy`][crate::passes::NormalizeGuppy] before saving.
+/// [`Normalize`][crate::passes::Normalize] before saving.
 ///
 /// See [EncodeOptions] for the options used by the encoder.
 ///
@@ -244,7 +249,7 @@ pub fn save_tk1_json_writer<H: HugrView>(
 /// Save a circuit in TK1 JSON format to a String.
 ///
 /// You may need to normalize the circuit using
-/// [`NormalizeGuppy`][crate::passes::NormalizeGuppy] before saving.
+/// [`Normalize`][crate::passes::Normalize] before saving.
 ///
 /// See [EncodeOptions] for the options used by the encoder.
 ///

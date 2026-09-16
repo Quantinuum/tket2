@@ -7,22 +7,29 @@ use std::{
 use hugr::{
     HugrView, IncomingPort, Node, OutgoingPort, PortIndex, Wire,
     builder::{
-        ConditionalBuilder, Container, DFGBuilder, Dataflow, FunctionBuilder, SubContainer,
-        TailLoopBuilder,
+        BuildError, ConditionalBuilder, Container, DFGBuilder, Dataflow, FunctionBuilder,
+        SubContainer, TailLoopBuilder,
     },
     core::HugrNode,
     extension::{prelude::qb_t, simple_op::MakeExtensionOp},
     hugr::hugrmut::HugrMut,
-    ops::{Conditional, DFG, DataflowBlock, DataflowOpTrait, OpType, TailLoop},
-    std_extensions::collections::array::ArrayOpBuilder,
-    types::{EdgeKind, FuncTypeBase, TypeRow},
+    ops::{
+        Call, Conditional, DFG, DataflowBlock, DataflowOpTrait, OpType, TailLoop,
+        handle::NodeHandle,
+    },
+    std_extensions::collections::{
+        array::ArrayOpBuilder,
+        borrow_array::{BArrayOpBuilder, borrow_array_type},
+    },
+    types::{EdgeKind, FuncTypeBase, PolyFuncType, Signature, TypeRow},
 };
-use itertools::Itertools;
 use petgraph::visit::{Topo, Walker};
 
-use crate::{TketOp, extension::global_phase::GlobalPhase};
+use crate::extension::modifier::Modifier;
 
-use super::{DirWire, ModifierFlags, ModifierResolver, ModifierResolverErrors, PortExt};
+use super::{DirWire, ModifierResolver, ModifierResolverErrors, PortExt};
+
+use crate::metadata;
 
 impl<N: HugrNode> ModifierResolver<N> {
     /// Modifies the body of a dataflow graph.
@@ -106,14 +113,6 @@ impl<N: HugrNode> ModifierResolver<N> {
                 } else {
                     self.control_num()
                 };
-                let mut input = input.clone();
-                if matches!(optype, OpType::FuncDefn(_)) {
-                    self.modify_higher_order_input_types(&mut input, 0)?;
-                } else {
-                    self.modify_carried_higher_order_types_if_present(&mut input)?;
-                }
-                let mut output = output.clone();
-                self.modify_carried_higher_order_types_if_present(&mut output)?;
 
                 // Wire the inputs and outputs
                 // Note that the local variable `old_in` is the input node of the old DFG,
@@ -123,7 +122,6 @@ impl<N: HugrNode> ModifierResolver<N> {
                     (new_out, new_in),
                     (output.iter(), input.iter()),
                     (0, 0, offset),
-                    &HashSet::new(),
                 )?;
             }
             OpType::TailLoop(tail_loop) => {
@@ -149,13 +147,9 @@ impl<N: HugrNode> ModifierResolver<N> {
             OpType::DataflowBlock(dfb) => {
                 let DataflowBlock {
                     inputs,
-                    other_outputs: output,
+                    other_outputs,
                     sum_rows: _sum_rows,
                 } = dfb;
-                let mut input = inputs.clone();
-                self.modify_carried_higher_order_types_if_present(&mut input)?;
-                let mut output = output.clone();
-                self.modify_carried_higher_order_types_if_present(&mut output)?;
 
                 // The branch sum is unchanged.
                 self.map_insert(
@@ -165,9 +159,8 @@ impl<N: HugrNode> ModifierResolver<N> {
                 self.wire_inout(
                     (old_out, old_in),
                     (new_out, new_in),
-                    (output.iter(), input.iter()),
+                    (other_outputs.iter(), inputs.iter()),
                     (1, 0, 0),
-                    &HashSet::new(),
                 )?;
             }
             OpType::Case(_) => {
@@ -183,6 +176,19 @@ impl<N: HugrNode> ModifierResolver<N> {
                 )));
             }
         }
+
+        self.wire_state_order(
+            old_in,
+            h.get_optype(old_in),
+            new_in,
+            new_dfg.hugr().get_optype(new_in),
+        )?;
+        self.wire_state_order(
+            old_out,
+            h.get_optype(old_out),
+            new_out,
+            new_dfg.hugr().get_optype(new_out),
+        )?;
 
         Ok(())
     }
@@ -226,17 +232,18 @@ impl<N: HugrNode> ModifierResolver<N> {
         Ok(controls)
     }
 
-    /// Unpacks the given control qubits from arrays according to the combined modifier.
+    /// Unpacks the control qubits (given by the combined modifier) from a list of arrays into a flat list of qubit wires.
     pub(super) fn unpack_controls(
         &self,
-        new_dfg: &mut impl Dataflow,
+        builder: &mut impl Dataflow,
         controls_arr: impl IntoIterator<Item = Wire>,
     ) -> Result<Vec<Wire>, ModifierResolverErrors<N>> {
-        let mut controls = Vec::new();
+        let control_layout = &self.modifiers().accum_ctrl;
+        let mut controls = Vec::with_capacity(control_layout.iter().sum());
         let mut controls_arr = controls_arr.into_iter();
-        for size in self.modifiers().accum_ctrl.iter() {
-            let ctrl_arr = controls_arr.next().unwrap();
-            controls.extend(new_dfg.add_array_unpack(qb_t(), *size as u64, ctrl_arr)?);
+        for size in control_layout {
+            let ctrl_arr = controls_arr.next().expect("missing control array");
+            controls.extend(builder.add_array_unpack(qb_t(), *size as u64, ctrl_arr)?);
         }
         Ok(controls)
     }
@@ -299,46 +306,245 @@ impl<N: HugrNode> ModifierResolver<N> {
         &self,
         new_dfg: &mut impl Dataflow,
     ) -> Result<Vec<Wire>, ModifierResolverErrors<N>> {
-        let controls = self.controls_ref();
-        let mut v = Vec::new();
-        let mut offset = 0;
-        for size in self.modifiers().accum_ctrl.iter() {
-            let wire =
-                new_dfg.add_new_array(qb_t(), controls[offset..offset + size].iter().cloned())?;
-            offset += size;
-            v.push(wire);
-        }
-        Ok(v)
+        Ok(pack_control_groups(
+            new_dfg,
+            self.controls_ref(),
+            &self.modifiers().accum_ctrl,
+        )?)
     }
 
     /// Modifies a function if necessary.
-    /// When unitary flags satisfies the current modifier, the function needs to be modified.
-    /// If not, we don't know whether the function needs modification or not.
-    /// e.g. A polymorphic function that converts array kinds needs no modification if
-    /// it is instantiated with `array[int, n]`, but needs modification if instantiated with
-    /// `array[qubit, n]`.
     ///
-    /// Since we want to avoid unnecessary modification,
-    /// we implement some logic to find an evident reason that modification is not needed.
-    // TODO: Add more logic so that we can recognize more cases where no modification is needed.
-    // It's better to change the behavior depending on the modifier.
-    // e.g. if only power, do nothing
-    //      if only control, just wrap with controls (IO do not need to match)
-    //      if only dagger, just check signature
-    //
-    // Also, it may be better to check with the usage (how it is instantiated).
+    /// When the function definition or a concrete call instantiation contains qubits,
+    /// the function needs to be modified. The concrete signature matters for polymorphic
+    /// functions whose uninstantiated definition may not reveal quantum data.
+    ///
+    /// NOTE: When a polymorphic function has a polymorphic input, the function is considered
+    /// to have classical data (there are no quantum generic types or generic quantum operations).
     pub(crate) fn modify_fn_if_needed(
         &mut self,
         h: &mut impl HugrMut<Node = N>,
         func: N,
+        concrete_signature: Option<&Signature>,
     ) -> Result<Option<N>, ModifierResolverErrors<N>> {
-        let satisfies = ModifierFlags::from_metadata(h, func)
-            .is_some_and(|flags| flags.satisfies(&self.modifiers));
+        let OpType::FuncDefn(fn_defn) = h.get_optype(func) else {
+            return Err(ModifierResolverErrors::unreachable(format!(
+                "Cannot modify a non-function node. {}",
+                h.get_optype(func)
+            )));
+        };
 
-        if !satisfies {
+        // We first check for custom implementations.
+        if let Some(custom_func) = self.find_custom_implementation(h, func)? {
+            return Ok(Some(self.custom_implementation_adapter(
+                h,
+                func,
+                custom_func,
+            )?));
+        }
+
+        let concrete_signature_has_quantum_data =
+            concrete_signature.is_some_and(|signature| self.signature_has_quantum_data(signature));
+        if !concrete_signature_has_quantum_data
+            && !self.signature_has_quantum_data(fn_defn.signature().body())
+        {
             return Ok(None);
         }
         Ok(Some(self.modify_fn(h, func)?))
+    }
+
+    /// Looks up a user-provided custom implementation of `func` for the current modifier.
+    ///
+    /// Returns the matching function node if the function's metadata registers a custom
+    /// daggered, controlled, or controlled-daggered implementation for the requested modifier.
+    fn find_custom_implementation(
+        &self,
+        h: &impl HugrView<Node = N>,
+        func: N,
+    ) -> Result<Option<N>, ModifierResolverErrors<N>> {
+        let func_name = h
+            .get_optype(func)
+            .as_func_defn()
+            .map(|defn| defn.func_name().to_string())
+            .unwrap_or_default();
+        let requested_control_qubits = self.control_num();
+
+        match (requested_control_qubits, self.modifiers().dagger) {
+            (0, true) => {
+                let Some(impl_name) = h
+                    .try_get_metadata::<metadata::DaggeredImplementation>(func)
+                    .map_err(|e| {
+                        ModifierResolverErrors::unreachable(format!(
+                            "Failed to read daggered implementation metadata for `{func_name}`: {e}"
+                        ))
+                    })?
+                else {
+                    return Ok(None);
+                };
+                let impl_func = find_module_func_by_name(h, &impl_name).ok_or_else(|| {
+                    ModifierResolverErrors::unreachable(format!(
+                        "Daggered implementation `{impl_name}` for function `{func_name}` not found."
+                    ))
+                })?;
+                Ok(Some(impl_func))
+            }
+            (n, false) if n > 0 => {
+                let impl_names = h
+                    .try_get_metadata::<metadata::ControlledImplementations>(func)
+                    .map_err(|e| {
+                         ModifierResolverErrors::unreachable(format!(
+                             "Failed to read controlled implementation metadata for `{func_name}`: {e}"
+                         ))
+                     })?;
+                find_controlled_implementation(h, impl_names, n, &func_name)
+            }
+            (n, true) if n > 0 => {
+                let impl_names = h
+                    .try_get_metadata::<metadata::CtrlDaggeredImplementations>(func)
+                    .map_err(|e| {
+                         ModifierResolverErrors::unreachable(format!(
+                             "Failed to read controlled-daggered implementation metadata for `{func_name}`: {e}"
+                         ))
+                     })?;
+                find_controlled_implementation(h, impl_names, n, &func_name)
+            }
+            _ => Ok(None),
+        }
+    }
+
+    /// Return a cached adapter for a custom controlled implementation.
+    ///
+    /// The resolver expects the modified function to receive groups of controls as
+    /// owned arrays prepended to its ordinary arguments. Guppy custom implementations
+    /// instead receive a single borrowed control array after the ordinary inputs and
+    /// return it after the ordinary outputs. The adapter combines the control groups
+    /// into one borrowed array and reorders the inputs and outputs accordingly.
+    fn custom_implementation_adapter(
+        &mut self,
+        h: &mut impl HugrMut<Node = N>,
+        original_func: N,
+        custom_func: N,
+    ) -> Result<N, ModifierResolverErrors<N>> {
+        self.modified_functions.insert(original_func);
+        if self.control_num() == 0 {
+            let original_defn = h.get_optype(original_func).as_func_defn().ok_or_else(|| {
+                ModifierResolverErrors::unreachable(format!(
+                    "Cannot use a custom implementation for non-function node {original_func}."
+                ))
+            })?;
+            let custom_defn = h.get_optype(custom_func).as_func_defn().ok_or_else(|| {
+                ModifierResolverErrors::unreachable(format!(
+                    "Custom implementation node {custom_func} is not a function."
+                ))
+            })?;
+            if original_defn.signature() != custom_defn.signature() {
+                return Err(ModifierResolverErrors::unresolvable(
+                    custom_func,
+                    format!(
+                        "Custom implementation `{}` has an incompatible signature; expected `{}`, \
+                         found `{}`.",
+                        custom_defn.func_name(),
+                        original_defn.signature(),
+                        custom_defn.signature(),
+                    ),
+                    h.get_optype(custom_func).clone(),
+                ));
+            }
+            return Ok(custom_func);
+        }
+
+        let cache_key = (original_func, custom_func, self.modifiers().clone());
+        if let Some(adapter) = self.custom_adapters.get(&cache_key) {
+            return Ok(*adapter);
+        }
+
+        let spec = self.get_custom_adapter_specs(h, original_func, custom_func)?;
+        let mut adapter_signature = spec.original_signature.clone();
+        // The adapter signature is the original signature modified by the combined modifier, as
+        // the function was modified without using the custom implementation.
+        self.modify_signature(adapter_signature.body_mut(), false);
+        let adapter_func = self.build_custom_adapter(h, &spec, adapter_signature, custom_func)?;
+
+        // cache the adapter for future use
+        self.custom_adapters.insert(cache_key, adapter_func);
+        Ok(adapter_func)
+    }
+
+    /// Get the specifications for a building the adapter and validates the signatures.
+    fn get_custom_adapter_specs(
+        &self,
+        h: &impl HugrView<Node = N>,
+        original_func: N,
+        custom_func: N,
+    ) -> Result<CustomAdapterSpec, ModifierResolverErrors<N>> {
+        let OpType::FuncDefn(original_defn) = h.get_optype(original_func) else {
+            return Err(ModifierResolverErrors::unreachable(format!(
+                "Cannot adapt a custom implementation for non-function node {original_func}."
+            )));
+        };
+        let OpType::FuncDefn(custom_defn) = h.get_optype(custom_func) else {
+            return Err(ModifierResolverErrors::unreachable(format!(
+                "Custom implementation node {custom_func} is not a function."
+            )));
+        };
+
+        let original_signature = original_defn.signature().clone();
+        let custom_signature = custom_defn.signature().clone();
+        let custom_name = custom_defn.func_name().clone();
+
+        let custom_optype = h.get_optype(custom_func).clone();
+        if !original_signature.params().is_empty() || !custom_signature.params().is_empty() {
+            return Err(ModifierResolverErrors::unresolvable(
+                custom_func,
+                format!(
+                    "Polymorphic custom implementations are not supported (`{}` and \
+                     `{custom_name}`).",
+                    original_defn.func_name()
+                ),
+                custom_optype,
+            ));
+        }
+
+        let control_type = borrow_array_type(self.control_num() as u64, qb_t());
+        let original_body = original_signature.body();
+        let custom_body = custom_signature.body();
+        let expected_custom_input: TypeRow = original_body
+            .input
+            .iter()
+            .cloned()
+            .chain([control_type.clone()])
+            .collect::<Vec<_>>()
+            .into();
+        let expected_custom_output: TypeRow = original_body
+            .output
+            .iter()
+            .cloned()
+            .chain([control_type])
+            .collect::<Vec<_>>()
+            .into();
+        if custom_body.input != expected_custom_input
+            || custom_body.output != expected_custom_output
+        {
+            return Err(ModifierResolverErrors::unresolvable(
+                custom_func,
+                format!(
+                    "Custom controlled implementation `{custom_name}` must place a trailing \
+                     borrow_array of {} control qubits after the ordinary inputs and outputs; \
+                     expected `{expected_custom_input} -> {expected_custom_output}`, found \
+                     `{} -> {}`.",
+                    self.control_num(),
+                    custom_body.input,
+                    custom_body.output,
+                ),
+                custom_optype,
+            ));
+        }
+
+        Ok(CustomAdapterSpec {
+            original_signature,
+            custom_signature,
+            custom_name,
+        })
     }
 
     /// Generates a new function modified by the combined modifier.
@@ -347,8 +553,23 @@ impl<N: HugrNode> ModifierResolver<N> {
         h: &mut impl HugrMut<Node = N>,
         func: N,
     ) -> Result<N, ModifierResolverErrors<N>> {
+        // We first check for custom implementations.
+        if let Some(custom_func) = self.find_custom_implementation(h, func)? {
+            let custom_fn = self.custom_implementation_adapter(h, func, custom_func)?;
+            return Ok(custom_fn);
+        }
+
+        self.modify_fn_inner(h, func)
+    }
+
+    /// Generates a new function modified by the combined modifier without checking for a custom
+    /// implementation.
+    fn modify_fn_inner(
+        &mut self,
+        h: &mut impl HugrMut<Node = N>,
+        func: N,
+    ) -> Result<N, ModifierResolverErrors<N>> {
         let old_call_map = mem::take(self.call_map());
-        let old_dynamic_input_modifiers = mem::take(self.dynamic_input_modifiers());
 
         // Old function definition
         let OpType::FuncDefn(old_fn_defn) = h.get_optype(func) else {
@@ -357,17 +578,8 @@ impl<N: HugrNode> ModifierResolver<N> {
                 h.get_optype(func)
             )));
         };
-        let higher_order_input_modifiers = self.higher_order_input_modifiers(h, func)?;
-        let old_active_function_input_modifiers = mem::replace(
-            self.active_function_input_modifiers(),
-            higher_order_input_modifiers.clone(),
-        );
         let mut poly_signature = old_fn_defn.signature().clone();
         self.modify_signature(poly_signature.body_mut(), false);
-        self.modify_higher_order_input_types(
-            &mut poly_signature.body_mut().input,
-            self.modifiers().accum_ctrl.len(),
-        )?;
 
         let mut new_fn = FunctionBuilder::new(
             format!("__modified__{}", old_fn_defn.func_name()),
@@ -376,9 +588,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         .unwrap();
 
         let modify_result = self.modify_dfg_body(h, func, &mut new_fn);
-        let dynamic_input_modifiers =
-            mem::replace(self.dynamic_input_modifiers(), old_dynamic_input_modifiers);
-        *self.active_function_input_modifiers() = old_active_function_input_modifiers;
         modify_result?;
 
         // Connect the global wires
@@ -392,22 +601,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         }
 
         let new_function_node = insertion_result.inserted_entrypoint;
-        let input_modifiers = if higher_order_input_modifiers.is_empty() {
-            dynamic_input_modifiers
-        } else {
-            higher_order_input_modifiers
-        }
-        .into_iter()
-        .unique()
-        .collect::<Vec<_>>();
-        if !input_modifiers.is_empty() {
-            self.function_input_modifiers
-                .insert(new_function_node, input_modifiers);
-        }
-        // set unitarity metadata
-        ModifierFlags::from_combined(self.modifiers())
-            .or(&ModifierFlags::from_metadata(h, func))
-            .set_metadata(h, new_function_node);
         self.modified_functions.insert(func);
 
         Ok(new_function_node)
@@ -444,66 +637,47 @@ impl<N: HugrNode> ModifierResolver<N> {
         Ok(insertion_result.inserted_entrypoint)
     }
 
+    /// Copies a sub-container into the parent DFG without modification, preserving non-local function call edges.
     fn copy_sub_container_no_modification(
         &mut self,
         h: &impl HugrView<Node = N>,
         n: N,
         new_dfg: &mut impl Container,
     ) -> Result<Node, ModifierResolverErrors<N>> {
-        // Some containers have qubits in their signature but only pass them
-        // through while doing classical work. Copying the whole subtree keeps
-        // those classical dependencies intact instead of trying to dagger the
-        // boundary one port at a time.
+        let nodes = h.descendants(n).collect::<HashSet<_>>();
+
+        let static_edges = nodes
+            .iter()
+            .flat_map(|node| {
+                h.node_inputs(*node).filter_map(|port| {
+                    h.single_linked_output(*node, port)
+                        .filter(|(src_n, _)| h.get_parent(*node) != h.get_parent(*src_n))
+                        .map(|(src_n, _)| {
+                            assert!(
+                                matches!(
+                                    h.get_optype(*node).port_kind(port),
+                                    Some(EdgeKind::Function(_))
+                                ),
+                                "Nonlocal Const/Value edges not supported"
+                            );
+                            (src_n, *node, port)
+                        })
+                })
+            })
+            .collect::<Vec<_>>();
+
         let insertion_result = new_dfg.add_hugr_view(&h.with_entrypoint(n));
 
         let new_node = insertion_result.inserted_entrypoint;
         for port in h.all_node_ports(n) {
             self.map_insert(DirWire(n, port), DirWire(new_node, port))?;
         }
+        for (source, old_target, target_port) in static_edges {
+            let new_target = insertion_result.node_map.get(&old_target).copied().unwrap();
+            self.call_map_insert(source, (new_target, target_port));
+        }
 
         Ok(new_node)
-    }
-
-    fn subtree_has_quantum_operation(&self, h: &impl HugrView<Node = N>, n: N) -> bool {
-        // We need more than a type-level qubit check here: Guppy often emits
-        // bounds-check conditionals whose signature carries a qubit, but whose
-        // body only manipulates classical array indices and values.
-        h.descendants(n)
-            .chain(iter::once(n))
-            .any(|node| self.node_is_quantum_operation(h, node))
-    }
-
-    fn node_is_quantum_operation(&self, h: &impl HugrView<Node = N>, n: N) -> bool {
-        let optype = h.get_optype(n);
-        match optype {
-            OpType::Input(_)
-            | OpType::Output(_)
-            | OpType::CFG(_)
-            | OpType::DFG(_)
-            | OpType::TailLoop(_)
-            | OpType::Conditional(_)
-            | OpType::Case(_)
-            | OpType::DataflowBlock(_)
-            | OpType::FuncDefn(_)
-            | OpType::FuncDecl(_)
-            | OpType::Module(_) => false,
-            // tket quantum gates and global phases require the normal modifier
-            // logic. They are real operations, not just qubit-carrying IO.
-            _ if TketOp::from_optype(optype).is_some()
-                || GlobalPhase::from_optype(optype).is_some() =>
-            {
-                true
-            }
-            // Unknown operations are conservative: if their signature can carry
-            // qubits, treat them as quantum-sensitive so we do not silently copy
-            // an operation that may need dagger/control handling.
-            _ => h.signature(n).is_some_and(|sig| {
-                sig.input
-                    .iter()
-                    .chain(sig.output.iter())
-                    .any(|ty| self.qubit_finder.contains_element_type(ty))
-            }),
-        }
     }
 
     pub(super) fn modify_dfg(
@@ -511,20 +685,36 @@ impl<N: HugrNode> ModifierResolver<N> {
         h: &mut impl HugrMut<Node = N>,
         n: N,
         dfg: &DFG,
-        parent_dfg: &mut impl Container,
+        new_parent_dfg: &mut impl Container,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        let mut signature = dfg.signature.clone();
+        // Check if the DFG input or output are carrying qubits
+        let boundary_has_qubits = self.signature_has_quantum_data(&dfg.signature);
+        if !boundary_has_qubits {
+            // If the DFG does not carry qubits, we still modify its body in case it contains modifier nodes.
+            // Since there are no input/output qubits, modifiers inside the DFG cannot affect the outside of
+            // the DFG, so we can safely resolve them without worrying about the surrounding context.
+            let new_dfg = self.with_modifiers(Default::default(), |this| {
+                let mut builder = DFGBuilder::new(dfg.signature.clone()).unwrap();
+                this.modify_dfg_body(h, n, &mut builder)?;
+                this.insert_sub_dfg(new_parent_dfg, builder)
+            })?;
+            for port in h.all_node_ports(n) {
+                self.map_insert(DirWire(n, port), DirWire(new_dfg, port))?;
+            }
+            return Ok(());
+        }
+
         // Build a new DFG with modified body.
+        let boundary_signature = dfg.signature.clone();
+        let mut signature = boundary_signature.clone();
         self.modify_signature(&mut signature, true);
-        self.modify_carried_higher_order_types_if_present(&mut signature.input)?;
-        self.modify_carried_higher_order_types_if_present(&mut signature.output)?;
         let mut builder = DFGBuilder::new(signature.clone()).unwrap();
         self.modify_dfg_body(h, n, &mut builder)?;
-        let new_dfg = self.insert_sub_dfg(parent_dfg, builder)?;
+        let new_dfg = self.insert_sub_dfg(new_parent_dfg, builder)?;
 
         // connect the controls and register the IOs
         for (i, c) in self.controls().iter_mut().enumerate() {
-            parent_dfg
+            new_parent_dfg
                 .hugr_mut()
                 .connect(c.node(), c.source(), new_dfg, i);
             *c = Wire::new(new_dfg, i);
@@ -533,8 +723,17 @@ impl<N: HugrNode> ModifierResolver<N> {
         self.wire_node_inout(
             n,
             new_dfg,
-            (signature.input.iter(), signature.output.iter()),
+            (
+                boundary_signature.input.iter(),
+                boundary_signature.output.iter(),
+            ),
             (0, 0, offset),
+        )?;
+        self.wire_state_order(
+            n,
+            h.get_optype(n),
+            new_dfg,
+            new_parent_dfg.hugr().get_optype(new_dfg),
         )?;
 
         Ok(())
@@ -563,14 +762,11 @@ impl<N: HugrNode> ModifierResolver<N> {
         let control_types: TypeRow = iter::repeat_n(qb_t(), self.control_num())
             .collect::<Vec<_>>()
             .into();
-        let mut just_inputs = tail_loop.just_inputs.clone();
-        self.modify_carried_higher_order_types_if_present(&mut just_inputs)?;
-        let mut rest = tail_loop.rest.clone();
-        self.modify_carried_higher_order_types_if_present(&mut rest)?;
-        let mut just_outputs = tail_loop.just_outputs.clone();
-        self.modify_carried_higher_order_types_if_present(&mut just_outputs)?;
-        let mut builder =
-            TailLoopBuilder::new(just_inputs, control_types.extend(rest.iter()), just_outputs)?;
+        let mut builder = TailLoopBuilder::new(
+            tail_loop.just_inputs.clone(),
+            control_types.extend(tail_loop.rest.iter()),
+            tail_loop.just_outputs.clone(),
+        )?;
         self.modify_dfg_body(h, n, &mut builder)?;
         let new_tail_loop = self.insert_sub_dfg(new_dfg, builder)?;
 
@@ -612,16 +808,14 @@ impl<N: HugrNode> ModifierResolver<N> {
         conditional: &Conditional,
         new_dfg: &mut impl Container,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        // If a conditional does not have quantum operations in its body, we can safely
-        // copy the whole conditional without modification.
-        let has_indirect_call = h
-            .descendants(n)
-            .any(|node| matches!(h.get_optype(node), OpType::CallIndirect(_)));
-        let has_active_higher_order_inputs = !self.active_function_input_modifiers().is_empty();
-        if !self.subtree_has_quantum_operation(h, n)
-            && !has_indirect_call
-            && !has_active_higher_order_inputs
-        {
+        // A purely classical, modifier-free conditional is unchanged by the
+        // current modifier, so it can be copied without rebuilding its cases.
+        let needs_modification = iter::once(n).chain(h.descendants(n)).any(|node| {
+            h.signature(node)
+                .is_some_and(|signature| self.signature_has_quantum_data(&signature))
+                || Modifier::from_optype(h.get_optype(node)).is_some()
+        });
+        if !needs_modification {
             self.copy_sub_container_no_modification(h, n, new_dfg)?;
             return Ok(());
         }
@@ -630,21 +824,10 @@ impl<N: HugrNode> ModifierResolver<N> {
 
         // Build a new Conditional with modified body.
         let control_types: TypeRow = iter::repeat_n(qb_t(), offset).collect::<Vec<_>>().into();
-        let mut sum_rows = conditional.sum_rows.clone();
-        for row in &mut sum_rows {
-            // The selected branch payload may contain function values. If a
-            // function value is later called under the active modifier, the
-            // branch sum must carry the modified function type too.
-            self.modify_carried_higher_order_types_if_present(row)?;
-        }
-        let mut other_inputs = conditional.other_inputs.clone();
-        self.modify_carried_higher_order_types_if_present(&mut other_inputs)?;
-        let mut outputs = conditional.outputs.clone();
-        self.modify_carried_higher_order_types_if_present(&mut outputs)?;
         let mut builder = ConditionalBuilder::new(
-            sum_rows.clone(),
-            control_types.extend(other_inputs.iter()),
-            control_types.extend(outputs.iter()),
+            conditional.sum_rows.clone(),
+            control_types.extend(conditional.other_inputs.iter()),
+            control_types.extend(conditional.outputs.iter()),
         )?;
 
         // remember the current control qubits
@@ -652,7 +835,7 @@ impl<N: HugrNode> ModifierResolver<N> {
 
         let iter: Vec<_> = h.children(n).enumerate().collect();
         for (i, case_node) in iter {
-            let tag_wire_num = sum_rows[i].len();
+            let tag_wire_num = conditional.sum_rows[i].len();
             let mut case_builder = builder.case_builder(i).unwrap();
 
             // Set the controls and corresp_map
@@ -678,9 +861,8 @@ impl<N: HugrNode> ModifierResolver<N> {
             self.wire_inout(
                 (old_out, old_in),
                 (new_out, new_in),
-                (outputs.iter(), other_inputs.iter()),
+                (conditional.outputs.iter(), conditional.other_inputs.iter()),
                 (0, tag_wire_num, offset),
-                &HashSet::new(),
             )?;
 
             // Modify the children.
@@ -715,12 +897,159 @@ impl<N: HugrNode> ModifierResolver<N> {
         self.wire_node_inout(
             n,
             new_conditional,
-            (other_inputs.iter(), outputs.iter()),
+            (conditional.other_inputs.iter(), conditional.outputs.iter()),
             (1, 0, offset),
+        )?;
+        self.wire_state_order(
+            n,
+            h.get_optype(n),
+            new_conditional,
+            new_dfg.hugr().get_optype(new_conditional),
         )?;
 
         Ok(())
     }
+
+    /// Build, insert, and link the adapter for a controlled custom implementation.
+    ///
+    /// The adapter is built as a standalone HUGR, so its call to `custom_func` is linked only after
+    /// insertion into `h`. The returned node is the inserted adapter function.
+    fn build_custom_adapter(
+        &self,
+        h: &mut impl HugrMut<Node = N>,
+        spec: &CustomAdapterSpec,
+        adapter_signature: PolyFuncType,
+        custom_func: N,
+    ) -> Result<N, ModifierResolverErrors<N>> {
+        let control_layout = &self.modifiers().accum_ctrl;
+        let layout_name = control_layout
+            .iter()
+            .map(usize::to_string)
+            .collect::<Vec<_>>()
+            .join("_");
+
+        // New adapter function
+        let mut adapter = FunctionBuilder::new(
+            format!("__controller_adapter[{}]__{layout_name}", spec.custom_name),
+            adapter_signature,
+        )?;
+
+        let adapter_inputs = adapter.input_wires().collect::<Vec<_>>();
+        let control_group_count = control_layout.len();
+        // Unpack the control groups and them pack them into a single borrowed array
+        let control_qubits = self.unpack_controls(
+            &mut adapter,
+            adapter_inputs[..control_group_count].iter().copied(),
+        )?;
+        let custom_control = adapter.add_new_borrow_array(qb_t(), control_qubits)?;
+        let custom_arguments = adapter_inputs
+            .into_iter()
+            .skip(control_group_count)
+            .chain([custom_control]);
+
+        // Call the custom implementation
+        let custom_call_op =
+            Call::try_new(spec.custom_signature.clone(), []).map_err(BuildError::from)?;
+        let function_port = custom_call_op.called_function_port();
+        let custom_call = adapter.add_dataflow_op(custom_call_op, custom_arguments)?;
+
+        let mut ordinary_outputs = custom_call.outputs().collect::<Vec<_>>();
+        let returned_controls = ordinary_outputs
+            .pop()
+            .expect("the validated custom signature has a control output");
+        let control_num = control_layout.iter().sum::<usize>();
+
+        // Unpack the returned control array and repack it into the resolver's control groups.
+        let returned_control_qubits =
+            adapter.add_borrow_array_unpack(qb_t(), control_num as u64, returned_controls)?;
+        // We expect that the returned control qubits match exactly the control layout
+        assert_eq!(returned_control_qubits.len(), control_num);
+        let control_outputs =
+            pack_control_groups(&mut adapter, &returned_control_qubits, control_layout)?;
+        adapter.set_outputs(control_outputs.into_iter().chain(ordinary_outputs))?;
+
+        // Link the inserted adapter to the custom implementation.
+        let insertion = h.insert_from_view(h.module_root(), adapter.hugr());
+        let inserted_call = insertion.node_map[&custom_call.node()];
+        h.connect(custom_func, 0, inserted_call, function_port);
+
+        Ok(insertion.inserted_entrypoint)
+    }
+}
+
+/// Signatures and naming information for a validated custom implementation adapter.
+struct CustomAdapterSpec {
+    original_signature: PolyFuncType,
+    custom_signature: PolyFuncType,
+    custom_name: String,
+}
+
+/// Pack a flat list of returned control qubits back into the resolver's control groups.
+fn pack_control_groups(
+    builder: &mut impl Dataflow,
+    controls: &[Wire],
+    control_layout: &[usize],
+) -> Result<Vec<Wire>, BuildError> {
+    let mut offset = 0;
+    control_layout
+        .iter()
+        .map(|&size| {
+            let group =
+                builder.add_new_array(qb_t(), controls[offset..offset + size].iter().copied())?;
+            offset += size;
+            Ok(group)
+        })
+        .collect()
+}
+
+/// Finds a function definition named `func_name` among the children of the module root.
+fn find_module_func_by_name<N: HugrNode>(
+    h: &impl HugrView<Node = N>,
+    func_name: &str,
+) -> Option<N> {
+    h.children(h.module_root()).find(|&node| {
+        h.get_optype(node)
+            .as_func_defn()
+            .is_some_and(|defn| defn.func_name() == func_name)
+    })
+}
+
+/// Finds the controlled implementation among `impl_names` whose number of control qubits
+/// matches `requested_control_qubits`.
+fn find_controlled_implementation<N: HugrNode>(
+    h: &impl HugrView<Node = N>,
+    impl_names: Option<Vec<String>>,
+    requested_control_qubits: usize,
+    func_name: &str,
+) -> Result<Option<N>, ModifierResolverErrors<N>> {
+    let Some(impl_names) = impl_names else {
+        return Ok(None);
+    };
+    for impl_name in impl_names {
+        let impl_func = find_module_func_by_name(h, &impl_name).ok_or_else(|| {
+            ModifierResolverErrors::unreachable(format!(
+                "Controlled implementation `{impl_name}` for function `{func_name}` not found."
+            ))
+        })?;
+        let control_qubits = h
+            .try_get_metadata::<metadata::NumControlQubits>(impl_func)
+            .map_err(|e| {
+                ModifierResolverErrors::unreachable(format!(
+                    "Failed to read control-qubit count metadata for controlled implementation \
+                     `{impl_name}`: {e}"
+                ))
+            })?
+            .ok_or_else(|| {
+                ModifierResolverErrors::unreachable(format!(
+                    "Controlled implementation `{impl_name}` is missing control-qubit count \
+                     metadata."
+                ))
+            })?;
+        if requested_control_qubits == control_qubits {
+            return Ok(Some(impl_func));
+        }
+    }
+    Ok(None)
 }
 
 /// composition of two call maps
@@ -783,25 +1112,55 @@ mod test {
         SetUnitary, modifier_test_hugr, resolved_modifier_test_hugr, test_modifier_resolver,
     };
     use super::super::*;
-    use crate::TketOp;
     use crate::extension::{
+        measurement::MeasurementOpBuilder,
         modifier::{CONTROL_OP_ID, DAGGER_OP_ID, MODIFIER_EXTENSION},
         rotation::{ConstRotation, rotation_type},
     };
+    use crate::{TketOp, metadata};
     use cool_asserts::assert_matches;
     use hugr::{
         Hugr,
         builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder, SubContainer},
-        extension::prelude::{ConstUsize, qb_t, usize_t},
+        extension::prelude::{ConstUsize, bool_t, qb_t, usize_t},
         extension::simple_op::MakeExtensionOp,
-        ops::{CallIndirect, ExtensionOp, handle::FuncID},
+        ops::{
+            CallIndirect, ExtensionOp,
+            handle::{FuncID, NodeHandle},
+        },
         std_extensions::collections::{
-            array::{ArrayOp, ArrayOpBuilder, ArrayOpDef, array_type},
-            borrow_array::{BArrayOp, BArrayOpBuilder, BArrayOpDef},
+            array::{ArrayOp, ArrayOpBuilder, ArrayOpDef, array_type, array_type_parametric},
+            borrow_array::{BArrayOp, BArrayOpBuilder, BArrayOpDef, borrow_array_type},
         },
         type_row,
-        types::{Signature, Term},
+        types::{PolyFuncType, Signature, Term, Type, TypeArg, TypeBound, type_param::TypeParam},
     };
+
+    fn identity_function(
+        module: &mut ModuleBuilder<Hugr>,
+        name: &str,
+        signature: impl Into<PolyFuncType>,
+    ) -> FuncID<true> {
+        let func = module.define_function(name, signature).unwrap();
+        let outputs = func.input_wires();
+        *func.finish_with_outputs(outputs).unwrap().handle()
+    }
+
+    fn dagger_resolver() -> ModifierResolver {
+        let mut resolver = ModifierResolver::new();
+        resolver.modifiers.dagger = true;
+        resolver
+    }
+
+    fn controlled_resolver() -> ModifierResolver {
+        let mut resolver = ModifierResolver::new();
+        resolver.modifiers = CombinedModifier {
+            control: 1,
+            accum_ctrl: vec![1],
+            dagger: false,
+        };
+        resolver
+    }
 
     fn foo_dfg(module: &mut ModuleBuilder<Hugr>, t_num: usize) -> FuncID<true> {
         let foo_sig = Signature::new_endo(iter::repeat_n(qb_t(), t_num).collect::<Vec<_>>());
@@ -820,6 +1179,216 @@ mod test {
         }
         .out_wire(0);
         *func.finish_with_outputs(inputs).unwrap().handle()
+    }
+
+    #[test]
+    fn custom_implementation_adapter_is_cached() {
+        let mut module = ModuleBuilder::new();
+        let original = {
+            let func = module
+                .define_function("original", Signature::new_endo([usize_t()]))
+                .unwrap();
+            let outputs = func.input_wires();
+            *func.finish_with_outputs(outputs).unwrap().handle()
+        };
+        let custom = {
+            let func = module
+                .define_function(
+                    "custom",
+                    Signature::new_endo([usize_t(), borrow_array_type(1, qb_t())]),
+                )
+                .unwrap();
+            let outputs = func.input_wires();
+            *func.finish_with_outputs(outputs).unwrap().handle()
+        };
+        let mut h = module.finish_hugr().unwrap();
+        let mut resolver = ModifierResolver::new();
+        resolver.modifiers = CombinedModifier {
+            control: 1,
+            accum_ctrl: vec![1],
+            dagger: false,
+        };
+
+        let first = resolver
+            .custom_implementation_adapter(&mut h, original.node(), custom.node())
+            .unwrap();
+        let second = resolver
+            .custom_implementation_adapter(&mut h, original.node(), custom.node())
+            .unwrap();
+
+        assert_eq!(first, second);
+        assert_eq!(resolver.custom_adapters.len(), 1);
+        assert_eq!(
+            h.children(h.module_root())
+                .filter(|&node| {
+                    h.get_optype(node)
+                        .as_func_defn()
+                        .is_some_and(|defn| defn.func_name().starts_with("__controller_adapter"))
+                })
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn modify_fn_uses_custom_implementation() {
+        let mut module = ModuleBuilder::new();
+        let original = identity_function(&mut module, "original", Signature::new_endo([usize_t()]));
+        let custom = identity_function(&mut module, "custom", Signature::new_endo([usize_t()]));
+        let mut h = module.finish_hugr().unwrap();
+        h.set_metadata::<metadata::DaggeredImplementation>(original.node(), "custom".to_string());
+        let mut resolver = dagger_resolver();
+
+        let modified = resolver.modify_fn(&mut h, original.node()).unwrap();
+
+        assert_eq!(modified, custom.node());
+    }
+
+    #[test]
+    fn malformed_custom_implementation_metadata_is_an_error() {
+        let mut module = ModuleBuilder::new();
+        let original = identity_function(&mut module, "original", Signature::new_endo([usize_t()]));
+        let mut h = module.finish_hugr().unwrap();
+        h.set_metadata_any(
+            original.node(),
+            "tket.daggered",
+            serde_json::json!(["custom"]),
+        );
+
+        let error = dagger_resolver()
+            .modify_fn(&mut h, original.node())
+            .unwrap_err();
+
+        assert_matches!(error, ModifierResolverErrors::Unreachable { msg } => {
+            assert!(msg.starts_with(
+                "Failed to read daggered implementation metadata for `original`:"
+            ));
+        });
+    }
+
+    #[test]
+    fn missing_custom_implementation_is_an_error() {
+        let mut module = ModuleBuilder::new();
+        let original = identity_function(&mut module, "original", Signature::new_endo([usize_t()]));
+        let mut h = module.finish_hugr().unwrap();
+        h.set_metadata::<metadata::DaggeredImplementation>(original.node(), "missing".to_string());
+
+        let error = dagger_resolver()
+            .modify_fn(&mut h, original.node())
+            .unwrap_err();
+
+        assert_matches!(error, ModifierResolverErrors::Unreachable { msg } => {
+            assert_eq!(
+                msg,
+                "Daggered implementation `missing` for function `original` not found."
+            );
+        });
+    }
+
+    #[test]
+    fn incompatible_daggered_implementation_signature_is_an_error() {
+        let mut module = ModuleBuilder::new();
+        let original = identity_function(&mut module, "original", Signature::new_endo([usize_t()]));
+        let custom = identity_function(&mut module, "custom", Signature::new_endo([bool_t()]));
+        let mut h = module.finish_hugr().unwrap();
+        let custom_optype = h.get_optype(custom.node()).clone();
+        h.set_metadata::<metadata::DaggeredImplementation>(original.node(), "custom".to_string());
+
+        let error = dagger_resolver()
+            .modify_fn(&mut h, original.node())
+            .unwrap_err();
+
+        assert_matches!(error, ModifierResolverErrors::UnResolvable { node, msg, optype } => {
+            assert_eq!(node, custom.node());
+            assert_eq!(optype, custom_optype);
+            assert!(msg.starts_with("Custom implementation `custom` has an incompatible signature;"));
+        });
+    }
+
+    #[test]
+    fn polymorphic_controlled_implementation_is_an_error() {
+        let mut module = ModuleBuilder::new();
+        let generic_type = Type::new_var_use(0, TypeBound::Linear);
+        let signature = PolyFuncType::new(
+            [TypeParam::TypeKind(TypeBound::Linear)],
+            Signature::new_endo([generic_type]),
+        );
+        let original = identity_function(&mut module, "original", signature.clone());
+        let custom = identity_function(&mut module, "custom", signature);
+        let mut h = module.finish_hugr().unwrap();
+        let custom_optype = h.get_optype(custom.node()).clone();
+        h.set_metadata::<metadata::ControlledImplementations>(
+            original.node(),
+            vec!["custom".to_string()],
+        );
+        h.set_metadata::<metadata::NumControlQubits>(custom.node(), 1);
+
+        let error = controlled_resolver()
+            .modify_fn(&mut h, original.node())
+            .unwrap_err();
+
+        assert_matches!(error, ModifierResolverErrors::UnResolvable { node, msg, optype } => {
+            assert_eq!(node, custom.node());
+            assert_eq!(optype, custom_optype);
+            assert_eq!(
+                msg,
+                "Polymorphic custom implementations are not supported (`original` and `custom`)."
+            );
+        });
+    }
+
+    #[test]
+    fn invalid_controlled_implementation_signature_is_an_error() {
+        let mut module = ModuleBuilder::new();
+        let original = identity_function(&mut module, "original", Signature::new_endo([usize_t()]));
+        let custom = identity_function(&mut module, "custom", Signature::new_endo([usize_t()]));
+        let mut h = module.finish_hugr().unwrap();
+        let custom_optype = h.get_optype(custom.node()).clone();
+        h.set_metadata::<metadata::ControlledImplementations>(
+            original.node(),
+            vec!["custom".to_string()],
+        );
+        h.set_metadata::<metadata::NumControlQubits>(custom.node(), 1);
+
+        let error = controlled_resolver()
+            .modify_fn(&mut h, original.node())
+            .unwrap_err();
+
+        assert_matches!(error, ModifierResolverErrors::UnResolvable { node, msg, optype } => {
+            assert_eq!(node, custom.node());
+            assert_eq!(optype, custom_optype);
+            assert!(msg.starts_with(
+                "Custom controlled implementation `custom` must place a trailing borrow_array of \
+                 1 control qubits"
+            ));
+        });
+    }
+
+    #[test]
+    fn missing_control_count_metadata_is_an_error() {
+        let mut module = ModuleBuilder::new();
+        let original = identity_function(&mut module, "original", Signature::new_endo([usize_t()]));
+        identity_function(
+            &mut module,
+            "custom",
+            Signature::new_endo([usize_t(), borrow_array_type(1, qb_t())]),
+        );
+        let mut h = module.finish_hugr().unwrap();
+        h.set_metadata::<metadata::ControlledImplementations>(
+            original.node(),
+            vec!["custom".to_string()],
+        );
+
+        let error = controlled_resolver()
+            .modify_fn(&mut h, original.node())
+            .unwrap_err();
+
+        assert_matches!(error, ModifierResolverErrors::Unreachable { msg } => {
+            assert_eq!(
+                msg,
+                "Controlled implementation `custom` is missing control-qubit count metadata."
+            );
+        });
     }
 
     fn foo_tail_loop(module: &mut ModuleBuilder<Hugr>, t_num: usize) -> FuncID<true> {
@@ -938,6 +1507,465 @@ mod test {
         inputs[0] = cfg.outputs().next().unwrap();
 
         *func.finish_with_outputs(inputs).unwrap().handle()
+    }
+
+    #[test]
+    fn daggered_controlled_dfg_keeps_classical_boundary_input_forward() {
+        let mut module = ModuleBuilder::new();
+        let foo_sig = Signature::new([qb_t(), usize_t()], [qb_t()]);
+        let foo = {
+            let mut func = module.define_function("foo", foo_sig.clone()).unwrap();
+            func.set_unitary();
+            let mut inputs = func.input_wires();
+            let q = inputs.next().unwrap();
+            let index = inputs.next().unwrap();
+            let dfg = {
+                let mut dfg = func
+                    .dfg_builder(Signature::new([qb_t(), usize_t()], [qb_t()]), [q, index])
+                    .unwrap();
+                let mut inputs = dfg.input_wires();
+                let q = inputs.next().unwrap();
+                let _index = inputs.next().unwrap();
+                let q = dfg.add_dataflow_op(TketOp::X, [q]).unwrap().out_wire(0);
+                dfg.finish_with_outputs([q]).unwrap()
+            };
+            func.finish_with_outputs(dfg.outputs()).unwrap()
+        };
+
+        let dagger_op: ExtensionOp = MODIFIER_EXTENSION
+            .instantiate_extension_op(
+                &DAGGER_OP_ID,
+                [vec![qb_t().into()].into(), vec![usize_t().into()].into()],
+            )
+            .unwrap();
+        let control_op: ExtensionOp = MODIFIER_EXTENSION
+            .instantiate_extension_op(
+                &CONTROL_OP_ID,
+                [
+                    Term::BoundedNat(1),
+                    vec![qb_t().into()].into(),
+                    vec![usize_t().into()].into(),
+                ],
+            )
+            .unwrap();
+        let controlled_sig = Signature::new(
+            [array_type(1, qb_t()), qb_t(), usize_t()],
+            [array_type(1, qb_t()), qb_t()],
+        );
+        {
+            let mut func = module
+                .define_function(
+                    "main",
+                    Signature::new(type_row![], [array_type(1, qb_t()), qb_t()]),
+                )
+                .unwrap();
+            let loaded = func.load_func(foo.handle(), &[]).unwrap();
+            let daggered = func
+                .add_dataflow_op(dagger_op, [loaded])
+                .unwrap()
+                .out_wire(0);
+            let controlled = func
+                .add_dataflow_op(control_op, [daggered])
+                .unwrap()
+                .out_wire(0);
+            let control = func
+                .add_dataflow_op(TketOp::QAlloc, [])
+                .unwrap()
+                .out_wire(0);
+            let target = func
+                .add_dataflow_op(TketOp::QAlloc, [])
+                .unwrap()
+                .out_wire(0);
+            let index = func.add_load_value(ConstUsize::new(1));
+            let controls = func.add_new_array(qb_t(), [control]).unwrap();
+            let call = func
+                .add_dataflow_op(
+                    CallIndirect {
+                        signature: controlled_sig,
+                    },
+                    [controlled, controls, target, index],
+                )
+                .unwrap();
+            func.finish_with_outputs(call.outputs()).unwrap();
+        }
+
+        let mut h = module.finish_hugr().unwrap();
+        let entrypoint = h.entrypoint();
+        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        assert_matches!(h.validate(), Ok(()));
+    }
+
+    /// Added after: https://github.com/Quantinuum/tket2/pull/1911
+    ///
+    /// Minimal reproducer for daggering a CFG whose classical input is
+    /// interleaved with its quantum inputs.
+    /// The inner function has a packed control in its public signature, while its CFG threads
+    /// the unpacked control after the classical input:
+    ///
+    /// ```text
+    /// function: array<qubit; 1>, qubit, usize -> array<qubit; 1>, qubit
+    /// CFG:      qubit, usize, qubit           -> qubit, qubit
+    /// ```
+    ///
+    /// Applying a dagger must keep `usize` flowing forwards and reverse only the two quantum
+    /// wires.
+    #[test]
+    fn daggered_controlled_cfg_with_interleaved_classical_input() {
+        let mut module = ModuleBuilder::new();
+        let inner_control_array_ty = array_type(1, qb_t());
+        let already_controlled_sig = Signature::new(
+            [inner_control_array_ty.clone(), qb_t(), usize_t()],
+            [inner_control_array_ty.clone(), qb_t()],
+        );
+
+        let already_controlled = {
+            let mut func = module
+                .define_function("already_controlled", already_controlled_sig.clone())
+                .unwrap();
+            func.set_unitary();
+
+            let mut inputs = func.input_wires();
+            let inner_controls = inputs.next().unwrap();
+            let target = inputs.next().unwrap();
+            let classical = inputs.next().unwrap();
+            let inner_control = func.add_array_unpack(qb_t(), 1, inner_controls).unwrap()[0];
+
+            let cfg = {
+                let mut cfg = func
+                    .cfg_builder(
+                        vec![
+                            (qb_t(), target),
+                            (usize_t(), classical),
+                            (qb_t(), inner_control),
+                        ],
+                        [qb_t(), qb_t()].into(),
+                    )
+                    .unwrap();
+                let block = {
+                    let mut block = cfg
+                        .entry_builder(vec![type_row![]], [qb_t(), qb_t()].into())
+                        .unwrap();
+                    let mut inputs = block.input_wires();
+                    let target = inputs.next().unwrap();
+                    let _classical = inputs.next().unwrap();
+                    let inner_control = inputs.next().unwrap();
+                    let tag = block.make_sum(0, [type_row![]], []).unwrap();
+                    block
+                        .finish_with_outputs(tag, [target, inner_control])
+                        .unwrap()
+                };
+                let exit = cfg.exit_block();
+                cfg.branch(&block, 0, &exit).unwrap();
+                cfg.finish_sub_container().unwrap()
+            };
+
+            let mut cfg_outputs = cfg.outputs();
+            let target = cfg_outputs.next().unwrap();
+            let inner_control = cfg_outputs.next().unwrap();
+            let inner_controls = func.add_new_array(qb_t(), [inner_control]).unwrap();
+            func.finish_with_outputs([inner_controls, target]).unwrap()
+        };
+
+        let dagger_op = MODIFIER_EXTENSION
+            .instantiate_extension_op(
+                &DAGGER_OP_ID,
+                [
+                    vec![inner_control_array_ty.clone().into(), qb_t().into()].into(),
+                    vec![usize_t().into()].into(),
+                ],
+            )
+            .unwrap();
+
+        {
+            let mut main = module
+                .define_function(
+                    "main",
+                    Signature::new(type_row![], [inner_control_array_ty, qb_t()]),
+                )
+                .unwrap();
+            let loaded = main.load_func(already_controlled.handle(), &[]).unwrap();
+            let daggered = main
+                .add_dataflow_op(dagger_op, [loaded])
+                .unwrap()
+                .out_wire(0);
+
+            let inner_control = main
+                .add_dataflow_op(TketOp::QAlloc, [])
+                .unwrap()
+                .out_wire(0);
+            let target = main
+                .add_dataflow_op(TketOp::QAlloc, [])
+                .unwrap()
+                .out_wire(0);
+            let classical = main.add_load_value(ConstUsize::new(1));
+            let inner_controls = main.add_new_array(qb_t(), [inner_control]).unwrap();
+
+            let call = main
+                .add_dataflow_op(
+                    CallIndirect {
+                        signature: already_controlled_sig,
+                    },
+                    [daggered, inner_controls, target, classical],
+                )
+                .unwrap();
+            main.finish_with_outputs(call.outputs()).unwrap();
+        }
+
+        let mut h = module.finish_hugr().unwrap();
+        assert_matches!(h.validate(), Ok(()));
+
+        let entrypoint = h.entrypoint();
+        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        assert_matches!(h.validate(), Ok(()));
+    }
+
+    /// Added after: https://github.com/Quantinuum/tket2/pull/1911
+    /// Minimal reproducer for daggering a CFG whose classical output is
+    /// interleaved with its quantum outputs.
+    ///
+    /// The inner function has a packed control in its public signature, while its CFG moves the
+    /// classical value from the last input port to the middle output port:
+    ///
+    /// ```text
+    /// function: array<qubit; 1>, qubit, usize -> array<qubit; 1>, qubit
+    /// CFG:      qubit, qubit, usize           -> qubit, usize, qubit
+    /// ```
+    ///
+    /// Applying a dagger must keep `usize` flowing forwards and reverse only the two quantum
+    /// wires, skipping the classical hole in the CFG outputs.
+    #[test]
+    fn daggered_controlled_cfg_with_interleaved_classical_output() {
+        let mut module = ModuleBuilder::new();
+        let inner_control_array_ty = array_type(1, qb_t());
+        let already_controlled_sig = Signature::new(
+            [inner_control_array_ty.clone(), qb_t(), usize_t()],
+            [inner_control_array_ty.clone(), qb_t()],
+        );
+
+        let already_controlled = {
+            let mut func = module
+                .define_function("already_controlled", already_controlled_sig.clone())
+                .unwrap();
+            func.set_unitary();
+
+            let mut inputs = func.input_wires();
+            let inner_controls = inputs.next().unwrap();
+            let target = inputs.next().unwrap();
+            let classical = inputs.next().unwrap();
+            let inner_control = func.add_array_unpack(qb_t(), 1, inner_controls).unwrap()[0];
+
+            let cfg = {
+                let mut cfg = func
+                    .cfg_builder(
+                        vec![
+                            (qb_t(), target),
+                            (qb_t(), inner_control),
+                            (usize_t(), classical),
+                        ],
+                        [qb_t(), usize_t(), qb_t()].into(),
+                    )
+                    .unwrap();
+                let block = {
+                    let mut block = cfg
+                        .entry_builder(vec![type_row![]], [qb_t(), usize_t(), qb_t()].into())
+                        .unwrap();
+                    let mut inputs = block.input_wires();
+                    let target = inputs.next().unwrap();
+                    let inner_control = inputs.next().unwrap();
+                    let classical = inputs.next().unwrap();
+                    let tag = block.make_sum(0, [type_row![]], []).unwrap();
+                    block
+                        .finish_with_outputs(tag, [target, classical, inner_control])
+                        .unwrap()
+                };
+                let exit = cfg.exit_block();
+                cfg.branch(&block, 0, &exit).unwrap();
+                cfg.finish_sub_container().unwrap()
+            };
+
+            let mut cfg_outputs = cfg.outputs();
+            let target = cfg_outputs.next().unwrap();
+            let _classical = cfg_outputs.next().unwrap();
+            let inner_control = cfg_outputs.next().unwrap();
+            let inner_controls = func.add_new_array(qb_t(), [inner_control]).unwrap();
+            func.finish_with_outputs([inner_controls, target]).unwrap()
+        };
+
+        let dagger_op = MODIFIER_EXTENSION
+            .instantiate_extension_op(
+                &DAGGER_OP_ID,
+                [
+                    vec![inner_control_array_ty.clone().into(), qb_t().into()].into(),
+                    vec![usize_t().into()].into(),
+                ],
+            )
+            .unwrap();
+
+        {
+            let mut main = module
+                .define_function(
+                    "main",
+                    Signature::new(type_row![], [inner_control_array_ty, qb_t()]),
+                )
+                .unwrap();
+            let loaded = main.load_func(already_controlled.handle(), &[]).unwrap();
+            let daggered = main
+                .add_dataflow_op(dagger_op, [loaded])
+                .unwrap()
+                .out_wire(0);
+
+            let inner_control = main
+                .add_dataflow_op(TketOp::QAlloc, [])
+                .unwrap()
+                .out_wire(0);
+            let target = main
+                .add_dataflow_op(TketOp::QAlloc, [])
+                .unwrap()
+                .out_wire(0);
+            let classical = main.add_load_value(ConstUsize::new(1));
+            let inner_controls = main.add_new_array(qb_t(), [inner_control]).unwrap();
+
+            let call = main
+                .add_dataflow_op(
+                    CallIndirect {
+                        signature: already_controlled_sig,
+                    },
+                    [daggered, inner_controls, target, classical],
+                )
+                .unwrap();
+            main.finish_with_outputs(call.outputs()).unwrap();
+        }
+
+        let mut h = module.finish_hugr().unwrap();
+        assert_matches!(h.validate(), Ok(()));
+
+        let entrypoint = h.entrypoint();
+        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        assert_matches!(h.validate(), Ok(()));
+    }
+
+    #[test]
+    /// Test that modifying a DFG representing a computation with no quantum effects (no input/output qubits)
+    /// does not introduce invalid hugr.
+    fn daggered_controlled_rotation_is_acyclic() {
+        let mut module = ModuleBuilder::new();
+        let inner_sig = Signature::new_endo([qb_t()]);
+        let outer_sig = Signature::new_endo([qb_t(), qb_t()]);
+        let controlled_sig = Signature::new_endo([array_type(1, qb_t()), qb_t()]);
+        let main_sig = Signature::new(vec![], [qb_t(), qb_t()]);
+
+        let control_op = MODIFIER_EXTENSION
+            .instantiate_extension_op(
+                &CONTROL_OP_ID,
+                [Term::BoundedNat(1), Term::new_list([qb_t()]), vec![].into()],
+            )
+            .unwrap();
+        let dagger_op = MODIFIER_EXTENSION
+            .instantiate_extension_op(
+                &DAGGER_OP_ID,
+                [Term::new_list([qb_t(), qb_t()]), vec![].into()],
+            )
+            .unwrap();
+
+        let inner = {
+            let mut func = module.define_function("inner", inner_sig).unwrap();
+            func.set_unitary();
+            let q = func.input_wires().next().unwrap();
+            let measurement_dfg = {
+                let mut measurement_dfg = func
+                    .dfg_builder(Signature::new(type_row![], [bool_t()]), [])
+                    .unwrap();
+                let q = measurement_dfg
+                    .add_dataflow_op(TketOp::QAlloc, [])
+                    .unwrap()
+                    .out_wire(0);
+                let measured = measurement_dfg
+                    .add_dataflow_op(TketOp::MeasureFree, [q])
+                    .unwrap()
+                    .out_wire(0);
+                let [measured_result] = measurement_dfg.add_measurement_read(measured).unwrap();
+                measurement_dfg
+                    .finish_with_outputs([measured_result])
+                    .unwrap()
+            };
+            func.dfg_builder(
+                Signature::new([bool_t()], type_row![]),
+                [measurement_dfg.out_wire(0)],
+            )
+            .unwrap()
+            .finish_sub_container()
+            .unwrap();
+            let angle_dfg = {
+                let mut dfg = func
+                    .dfg_builder(
+                        Signature::new([bool_t()], [rotation_type()]),
+                        [measurement_dfg.out_wire(0)],
+                    )
+                    .unwrap();
+                let angle = dfg.add_load_value(ConstRotation::new(0.5).unwrap());
+                dfg.finish_with_outputs([angle]).unwrap()
+            };
+            let angle = angle_dfg.out_wire(0);
+            let q = func
+                .add_dataflow_op(TketOp::Rx, [q, angle])
+                .unwrap()
+                .out_wire(0);
+            func.finish_with_outputs([q]).unwrap()
+        };
+        let outer = {
+            let mut func = module.define_function("outer", outer_sig.clone()).unwrap();
+            func.set_unitary();
+            let [control, target] = func.input_wires_arr();
+            let inner = func.load_func(inner.handle(), &[]).unwrap();
+            let controlled = func
+                .add_dataflow_op(control_op, [inner])
+                .unwrap()
+                .out_wire(0);
+            let control_array = func.add_new_array(qb_t(), [control]).unwrap();
+            let [control_array, target] = func
+                .add_dataflow_op(
+                    CallIndirect {
+                        signature: controlled_sig.clone(),
+                    },
+                    [controlled, control_array, target],
+                )
+                .unwrap()
+                .outputs_arr();
+            let control = func.add_array_unpack(qb_t(), 1, control_array).unwrap()[0];
+            func.finish_with_outputs([control, target]).unwrap()
+        };
+
+        {
+            let mut func = module.define_function("main", main_sig).unwrap();
+            let loaded = func.load_func(outer.handle(), &[]).unwrap();
+            let daggered = func
+                .add_dataflow_op(dagger_op, [loaded])
+                .unwrap()
+                .out_wire(0);
+            let control = func
+                .add_dataflow_op(TketOp::QAlloc, [])
+                .unwrap()
+                .out_wire(0);
+            let target = func
+                .add_dataflow_op(TketOp::QAlloc, [])
+                .unwrap()
+                .out_wire(0);
+            let outputs = func
+                .add_dataflow_op(
+                    CallIndirect {
+                        signature: outer_sig,
+                    },
+                    [daggered, control, target],
+                )
+                .unwrap()
+                .outputs();
+            func.finish_with_outputs(outputs).unwrap();
+        }
+
+        let mut h = module.finish_hugr().unwrap();
+        let entrypoint = h.entrypoint();
+        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        assert_matches!(h.validate(), Ok(()));
     }
 
     // A CFG with two sequential blocks
@@ -1217,9 +2245,88 @@ mod test {
         *func.finish_with_outputs(inputs).unwrap().handle()
     }
 
+    /// Test pass on a DFG with no quantum signature that calls an external function
+    fn foo_dfg_external_function_call(
+        module: &mut ModuleBuilder<Hugr>,
+        t_num: usize,
+    ) -> FuncID<true> {
+        assert_eq!(t_num, 1);
+
+        let external = module
+            .define_function("external_classical_noop", Signature::new_endo([]))
+            .unwrap()
+            .finish_with_outputs([])
+            .unwrap();
+
+        let foo_sig = Signature::new_endo([qb_t()]);
+        let mut func = module.define_function("foo", foo_sig).unwrap();
+        func.set_unitary();
+        let q = func.input_wires().next().unwrap();
+        {
+            let mut dfg = func.dfg_builder(Signature::new_endo([]), []).unwrap();
+            dfg.call(external.handle(), &[], []).unwrap();
+            dfg.finish_with_outputs([]).unwrap();
+        }
+
+        *func.finish_with_outputs([q]).unwrap().handle()
+    }
+
+    /// Test pass on a DFG with no quantum signature that contains a modifier (dagger)
+    /// (https://github.com/Quantinuum/tket2/issues/1814)
+    fn foo_dfg_daggered_empty_indirect_call(
+        module: &mut ModuleBuilder<Hugr>,
+        t_num: usize,
+    ) -> FuncID<true> {
+        assert_eq!(t_num, 1);
+
+        let empty_sig = Signature::new_endo(type_row![]);
+        let empty = {
+            let mut func = module.define_function("empty", empty_sig.clone()).unwrap();
+            func.set_unitary();
+            func.finish_with_outputs([]).unwrap()
+        };
+
+        let dagger_op: ExtensionOp = MODIFIER_EXTENSION
+            .instantiate_extension_op(&DAGGER_OP_ID, [vec![].into(), vec![].into()])
+            .unwrap();
+
+        let foo_sig = Signature::new_endo([qb_t()]);
+        let mut func = module.define_function("foo", foo_sig).unwrap();
+        func.set_unitary();
+        let q = func.input_wires().next().unwrap();
+        {
+            let mut dfg = func
+                .dfg_builder(Signature::new_endo(type_row![]), [])
+                .unwrap();
+            let loaded = dfg.load_func(empty.handle(), &[]).unwrap();
+            let daggered = dfg
+                .add_dataflow_op(dagger_op, [loaded])
+                .unwrap()
+                .out_wire(0);
+            dfg.add_dataflow_op(
+                CallIndirect {
+                    signature: empty_sig,
+                },
+                [daggered],
+            )
+            .unwrap();
+            dfg.finish_with_outputs([]).unwrap();
+        }
+
+        *func.finish_with_outputs([q]).unwrap().handle()
+    }
+
     #[rstest::rstest]
     #[case::dfg(1, 2, foo_dfg, false)]
     #[case::dfg_dagger(1, 2, foo_dfg, true)]
+    #[case::dfg_external_function_call(1, 1, foo_dfg_external_function_call, true)]
+    #[case::dfg_daggered_empty_indirect_call(1, 1, foo_dfg_daggered_empty_indirect_call, false)]
+    #[case::dfg_daggered_empty_indirect_call_daggered(
+        1,
+        1,
+        foo_dfg_daggered_empty_indirect_call,
+        true
+    )]
     #[case::tail_loop(1, 1, foo_tail_loop, false)]
     #[case::conditional(1, 1, foo_conditional, false)]
     #[case::conditional_dagger(1, 1, foo_conditional, true)]
@@ -1228,12 +2335,13 @@ mod test {
     #[case::cfg_two_blocks(1, 1, foo_cfg_two_blocks, false)]
     #[case::cfg_branching(1, 1, foo_cfg_branching, false)]
     #[case::cfg_loop(1, 1, foo_cfg_loop, false)]
-    #[case::array_ops(4, 0, foo_array_ops, false)]
-    #[case::array_ops_dagger(4, 0, foo_array_ops, true)]
-    #[case::safe_array_ops(4, 0, foo_safe_array_ops, false)]
-    #[case::safe_array_ops_dagger(4, 0, foo_safe_array_ops, true)]
-    #[case::nested_safe_array_ops(5, 0, foo_nested_quantum_array_ops, false)]
-    #[case::nested_safe_array_ops_dagger(5, 0, foo_nested_quantum_array_ops, true)]
+    #[case::array_ops(4, 3, foo_array_ops, false)]
+    #[case::array_ops_dagger(4, 3, foo_array_ops, true)]
+    #[case::safe_array_ops(4, 3, foo_safe_array_ops, false)]
+    #[case::safe_array_ops_dagger(4, 3, foo_safe_array_ops, true)]
+    #[case::nested_safe_array_ops(5, 4, foo_nested_quantum_array_ops, false)]
+    #[case::nested_safe_array_ops_dagger(5, 4, foo_nested_quantum_array_ops, true)]
+
     fn test_dfg_modify(
         #[case] t_num: usize,
         #[case] c_num: u64,
@@ -1510,5 +2618,333 @@ mod test {
         resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
 
         assert_matches!(h.validate(), Ok(()));
+    }
+
+    #[derive(Clone, Copy)]
+    enum PolymorphicArrayElement {
+        Qubit,
+        Usize,
+    }
+
+    #[derive(Clone, Copy)]
+    enum NestedGenericCall {
+        Direct,
+        Indirect,
+    }
+
+    impl PolymorphicArrayElement {
+        fn ty(self) -> Type {
+            match self {
+                Self::Qubit => qb_t(),
+                Self::Usize => usize_t(),
+            }
+        }
+
+        fn type_arg(self) -> TypeArg {
+            self.ty().into()
+        }
+
+        fn array_ty(self) -> Type {
+            array_type(2, self.ty())
+        }
+    }
+
+    fn add_polymorphic_array_identity_named(
+        module: &mut ModuleBuilder<Hugr>,
+        name: &str,
+    ) -> FuncID<true> {
+        let type_param = TypeParam::TypeKind(TypeBound::Linear);
+        let generic_ty = Type::new_var_use(0, TypeBound::Linear);
+        let generic_array_ty = array_type_parametric(2, generic_ty).unwrap();
+        let foo_sig = PolyFuncType::new([type_param], Signature::new_endo([generic_array_ty]));
+        let mut func = module.define_function(name, foo_sig).unwrap();
+        func.set_unitary();
+        let [input] = func.input_wires_arr();
+        *func.finish_with_outputs([input]).unwrap().handle()
+    }
+
+    fn add_polymorphic_array_identity(module: &mut ModuleBuilder<Hugr>) -> FuncID<true> {
+        add_polymorphic_array_identity_named(module, "foo")
+    }
+
+    fn add_nested_polymorphic_array_identity(module: &mut ModuleBuilder<Hugr>) -> FuncID<true> {
+        let inner = add_polymorphic_array_identity_named(module, "inner_generic_array_identity");
+        let type_param = TypeParam::TypeKind(TypeBound::Linear);
+        let generic_ty = Type::new_var_use(0, TypeBound::Linear);
+        let generic_array_ty = array_type_parametric(2, generic_ty.clone()).unwrap();
+        let outer_sig = PolyFuncType::new([type_param], Signature::new_endo([generic_array_ty]));
+        let mut func = module
+            .define_function("outer_generic_array_identity", outer_sig)
+            .unwrap();
+        func.set_unitary();
+        let [input] = func.input_wires_arr();
+        let outputs = func
+            .call(&inner, &[generic_ty.into()], [input])
+            .unwrap()
+            .outputs();
+        *func.finish_with_outputs(outputs).unwrap().handle()
+    }
+
+    fn resolve_and_validate_polymorphic_array_input(module: ModuleBuilder<Hugr>) {
+        let mut h = module.finish_hugr().unwrap();
+        assert_matches!(h.validate(), Ok(()));
+        let entrypoint = h.entrypoint();
+        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        assert_matches!(h.validate(), Ok(()));
+    }
+
+    fn add_nested_polymorphic_array_call(
+        block: &mut impl Dataflow,
+        callee: &FuncID<true>,
+        input: Wire,
+        element: PolymorphicArrayElement,
+        call: NestedGenericCall,
+    ) -> Vec<Wire> {
+        let call_sig = Signature::new_endo([element.array_ty()]);
+        let generic_input = match element {
+            PolymorphicArrayElement::Qubit => input,
+            PolymorphicArrayElement::Usize => {
+                let one = block.add_load_value(ConstUsize::new(1));
+                let two = block.add_load_value(ConstUsize::new(2));
+                block.add_new_array(usize_t(), [one, two]).unwrap()
+            }
+        };
+        let generic_outputs = match call {
+            NestedGenericCall::Direct => block
+                .call(callee, &[element.type_arg()], [generic_input])
+                .unwrap()
+                .outputs()
+                .collect(),
+            NestedGenericCall::Indirect => {
+                let loaded = block.load_func(callee, &[element.type_arg()]).unwrap();
+                block
+                    .add_dataflow_op(
+                        CallIndirect {
+                            signature: call_sig,
+                        },
+                        [loaded, generic_input],
+                    )
+                    .unwrap()
+                    .outputs()
+                    .collect()
+            }
+        };
+
+        match element {
+            PolymorphicArrayElement::Qubit => generic_outputs,
+            PolymorphicArrayElement::Usize => {
+                for output in generic_outputs {
+                    let _ = block.add_array_unpack(usize_t(), 2, output).unwrap();
+                }
+                vec![input]
+            }
+        }
+    }
+
+    fn add_outer_with_nested_polymorphic_array_call(
+        module: &mut ModuleBuilder<Hugr>,
+        callee: &FuncID<true>,
+        element: PolymorphicArrayElement,
+        call: NestedGenericCall,
+    ) -> FuncID<true> {
+        let target_sig = Signature::new_endo([array_type(2, qb_t())]);
+        let mut func = module.define_function("outer", target_sig.clone()).unwrap();
+        func.set_unitary();
+        let [input] = func.input_wires_arr();
+        let block = {
+            let mut block = func.dfg_builder(target_sig.clone(), [input]).unwrap();
+            let [input] = block.input_wires_arr();
+            let outputs =
+                add_nested_polymorphic_array_call(&mut block, callee, input, element, call);
+            block.finish_with_outputs(outputs).unwrap()
+        };
+        *func.finish_with_outputs(block.outputs()).unwrap().handle()
+    }
+
+    fn add_dagger_controlled_main_for_array_outer(
+        module: &mut ModuleBuilder<Hugr>,
+        outer: &FuncID<true>,
+    ) {
+        let target_ty = array_type(2, qb_t());
+        let control_op: ExtensionOp = MODIFIER_EXTENSION
+            .instantiate_extension_op(
+                &CONTROL_OP_ID,
+                [
+                    Term::BoundedNat(1),
+                    vec![target_ty.clone().into()].into(),
+                    vec![].into(),
+                ],
+            )
+            .unwrap();
+        let controlled_sig = Signature::new_endo([array_type(1, qb_t()), target_ty.clone()]);
+        let dagger_op: ExtensionOp = MODIFIER_EXTENSION
+            .instantiate_extension_op(
+                &DAGGER_OP_ID,
+                [vec![target_ty.into()].into(), vec![].into()],
+            )
+            .unwrap();
+
+        let mut func = module
+            .define_function(
+                "main",
+                Signature::new(type_row![], controlled_sig.output.clone()),
+            )
+            .unwrap();
+        let loaded = func.load_func(outer, &[]).unwrap();
+        let daggered = func
+            .add_dataflow_op(dagger_op, [loaded])
+            .unwrap()
+            .out_wire(0);
+        let controlled = func
+            .add_dataflow_op(control_op, [daggered])
+            .unwrap()
+            .out_wire(0);
+        let control = func
+            .add_dataflow_op(TketOp::QAlloc, [])
+            .unwrap()
+            .out_wire(0);
+        let controls = func.add_new_array(qb_t(), [control]).unwrap();
+        let target_0 = func
+            .add_dataflow_op(TketOp::QAlloc, [])
+            .unwrap()
+            .out_wire(0);
+        let target_1 = func
+            .add_dataflow_op(TketOp::QAlloc, [])
+            .unwrap()
+            .out_wire(0);
+        let targets = func.add_new_array(qb_t(), [target_0, target_1]).unwrap();
+        let outputs = func
+            .add_dataflow_op(
+                CallIndirect {
+                    signature: controlled_sig,
+                },
+                [controlled, controls, targets],
+            )
+            .unwrap()
+            .outputs();
+        func.finish_with_outputs(outputs).unwrap();
+    }
+
+    fn build_nested_polymorphic_array_input_module(
+        element: PolymorphicArrayElement,
+        call: NestedGenericCall,
+    ) -> ModuleBuilder<Hugr> {
+        let mut module = ModuleBuilder::new();
+        let foo = add_polymorphic_array_identity(&mut module);
+        let outer = add_outer_with_nested_polymorphic_array_call(&mut module, &foo, element, call);
+        add_dagger_controlled_main_for_array_outer(&mut module, &outer);
+        module
+    }
+
+    #[test]
+    /// Test when a polymorphic function is targeted a modifier chain
+    fn test_control_polymorphic_array_input() {
+        let mut module = ModuleBuilder::new();
+
+        let foo = add_polymorphic_array_identity(&mut module);
+        let concrete_array_ty = array_type(2, qb_t());
+
+        let control_op: ExtensionOp = MODIFIER_EXTENSION
+            .instantiate_extension_op(
+                &CONTROL_OP_ID,
+                [
+                    Term::BoundedNat(1),
+                    vec![concrete_array_ty.clone().into()].into(),
+                    vec![].into(),
+                ],
+            )
+            .unwrap();
+        let dagger_op = MODIFIER_EXTENSION
+            .instantiate_extension_op(
+                &DAGGER_OP_ID,
+                [vec![concrete_array_ty.clone().into()].into(), vec![].into()],
+            )
+            .unwrap();
+        let controlled_sig = Signature::new_endo([array_type(1, qb_t()), concrete_array_ty]);
+
+        let mut func = module
+            .define_function(
+                "main",
+                Signature::new(type_row![], controlled_sig.output.clone()),
+            )
+            .unwrap();
+        let loaded = func.load_func(&foo, &[TypeArg::from(qb_t())]).unwrap();
+        let daggered = func
+            .add_dataflow_op(dagger_op, [loaded])
+            .unwrap()
+            .out_wire(0);
+        let controlled = func
+            .add_dataflow_op(control_op, [daggered])
+            .unwrap()
+            .out_wire(0);
+        let control = func
+            .add_dataflow_op(TketOp::QAlloc, [])
+            .unwrap()
+            .out_wire(0);
+        let controls = func.add_new_array(qb_t(), [control]).unwrap();
+        let target_0 = func
+            .add_dataflow_op(TketOp::QAlloc, [])
+            .unwrap()
+            .out_wire(0);
+        let target_1 = func
+            .add_dataflow_op(TketOp::QAlloc, [])
+            .unwrap()
+            .out_wire(0);
+        let targets = func.add_new_array(qb_t(), [target_0, target_1]).unwrap();
+        let outputs = func
+            .add_dataflow_op(
+                CallIndirect {
+                    signature: controlled_sig,
+                },
+                [controlled, controls, targets],
+            )
+            .unwrap()
+            .outputs();
+        func.finish_with_outputs(outputs).unwrap();
+
+        resolve_and_validate_polymorphic_array_input(module);
+    }
+
+    #[rstest::rstest]
+    #[case::qubit_array(PolymorphicArrayElement::Qubit)]
+    #[case::usize_array(PolymorphicArrayElement::Usize)]
+    /// Test that an indirect call to a polymorphic function is resolved correctly when the function is inside a modified block.
+    fn test_control_polymorphic_array_input_nested_dfg_call(
+        #[case] element: PolymorphicArrayElement,
+    ) {
+        let module =
+            build_nested_polymorphic_array_input_module(element, NestedGenericCall::Indirect);
+        resolve_and_validate_polymorphic_array_input(module);
+    }
+
+    #[rstest::rstest]
+    #[case::qubit_array(PolymorphicArrayElement::Qubit)]
+    #[case::usize_array(PolymorphicArrayElement::Usize)]
+    /// Test that a direct call to a polymorphic function is resolved correctly when the function is inside a modified block.
+    fn test_control_polymorphic_array_input_nested_dfg_direct_call(
+        #[case] element: PolymorphicArrayElement,
+    ) {
+        let module =
+            build_nested_polymorphic_array_input_module(element, NestedGenericCall::Direct);
+        resolve_and_validate_polymorphic_array_input(module);
+    }
+
+    #[rstest::rstest]
+    #[case::qubit_array(PolymorphicArrayElement::Qubit)]
+    #[case::usize_array(PolymorphicArrayElement::Usize)]
+    /// Test that two nested generic functions are resolved correctly when the functions are inside a modified block.
+    fn test_control_polymorphic_array_input_two_nested_generic_functions(
+        #[case] element: PolymorphicArrayElement,
+    ) {
+        let mut module = ModuleBuilder::new();
+        let nested_generic = add_nested_polymorphic_array_identity(&mut module);
+        let outer = add_outer_with_nested_polymorphic_array_call(
+            &mut module,
+            &nested_generic,
+            element,
+            NestedGenericCall::Direct,
+        );
+        add_dagger_controlled_main_for_array_outer(&mut module, &outer);
+        resolve_and_validate_polymorphic_array_input(module);
     }
 }

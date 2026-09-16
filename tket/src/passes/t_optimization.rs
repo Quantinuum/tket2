@@ -1,8 +1,7 @@
-use crate::metadata::QubitRegisters;
-use crate::passes::guppy::NormalizeGuppyErrors;
+use crate::passes::normalize::NormalizeErrors;
 use crate::passes::inline_funcs::InlineFuncsError;
 use crate::passes::pg_convert::{ConversionError, RegisterMap, pauli_graph_to_cmds, serial_circuit_to_pauli_graph };
-use crate::passes::{ComposablePass, InlineDFGsPass, InlineFunctionsPass, NormalizeGuppy, PassScope, WithScope };
+use crate::passes::{ComposablePass, InlineDFGsPass, InlineFunctionsPass, Normalize, PassScope, WithScope };
 use crate::serialize::pytket::{
     default_decoder_config,
     default_encoder_config,
@@ -186,7 +185,7 @@ impl ComposablePass<Hugr> for TOptimizationPass {
     fn run(&self, hugr: &mut Hugr) -> Result<Self::Result, Self::Error> {
         InlineFunctionsPass::default().run(hugr).unwrap();
 
-        NormalizeGuppy::default()
+        Normalize::default()
             .run(hugr)?;
 
         let mut circ = Circuit::try_new(hugr.clone())?;
@@ -263,7 +262,7 @@ pub enum GlobalTResynthesisErrors {
     InlineError(InlineFuncsError),
     /// Error normalizing the hugr
     #[from]
-    NormalizeError(NormalizeGuppyErrors),
+    NormalizeError(NormalizeErrors),
     /// Error loading the circuit.
     #[display("Error loading the circuit: {_0}")]
     #[from]

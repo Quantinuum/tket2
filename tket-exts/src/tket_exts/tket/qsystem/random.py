@@ -1,11 +1,11 @@
 """QSystem random extension operations."""
 
 import functools
-from typing import List
 
 from hugr.ext import Extension, OpDef, TypeDef
 from hugr.ops import ExtOp
 from hugr.tys import ExtType
+
 from .._util import TketExtension, load_extension
 
 
@@ -17,11 +17,11 @@ class QSystemRandomExtension(TketExtension):
         """Returns the qsystem random extension"""
         return load_extension("tket.qsystem.random")
 
-    def TYPES(self) -> List[TypeDef]:
+    def TYPES(self) -> list[TypeDef]:
         """Return the types defined by this extension"""
         return [self.context.type_def]
 
-    def OPS(self) -> List[OpDef]:
+    def OPS(self) -> list[OpDef]:
         """Return the operations defined by this extension"""
         return [
             self.delete_RNGContext.op_def(),

@@ -1,7 +1,6 @@
 """Measurement extension operations."""
 
 import functools
-from typing import List
 
 from hugr.ext import Extension, OpDef, TypeDef
 from hugr.ops import ExtOp
@@ -18,11 +17,11 @@ class MeasurementExtension(TketExtension):
         """Returns the measurement extension"""
         return load_extension("tket.measurement")
 
-    def TYPES(self) -> List[TypeDef]:
+    def TYPES(self) -> list[TypeDef]:
         """Return the types defined by this extension"""
         return [self.measurement_t.type_def]
 
-    def OPS(self) -> List[OpDef]:
+    def OPS(self) -> list[OpDef]:
         """Return the operations defined by this extension"""
         return [
             self.read.op_def(),

@@ -1,11 +1,12 @@
 import pytest
 from hugr import ops, tys
 from hugr.build.dfg import Function
+
 from tket._state import CompilationState
 
 
 def test_unresolved_op() -> None:
-    """Define a function with an unresolved op, and try to convert it to a CompilationState."""
+    """Define a function with an unresolved op, and try to convert it to a CompilationState"""
     fn = Function("unresolved_op", [tys.Qubit])
     [q] = fn.inputs()
     [q] = fn.add_op(
@@ -25,6 +26,6 @@ def test_unresolved_op() -> None:
     # The error contains the full traceback, rather than just the top-level error message.
     err = str(excinfo.value)
     assert "Could not read CompilationState from bytes" in err
-    assert "Error reading package payload in envelope." in err
+    assert "Error reading package payload in envelope:" in err
     assert "unknown.unresolved" in err
     assert "requires extension unknown" in err

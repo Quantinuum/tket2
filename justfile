@@ -101,6 +101,7 @@ recompile-modifiers:
     just test_files/modifier_examples/recompile-hugrs
     just test_files/run_modifier_examples/run-hugrs
 
+# Regenerates one the hugr corresponding to `test_files/modifier_examples/{{name}}` and run the passes on it
 recompile-modifier name:
     @echo "---- Compiling hugr {{name}} ----"
     uv run maturin develop --uv
@@ -110,7 +111,7 @@ recompile-modifier name:
 
 # Generate serialized declarations for the tket extensions
 gen-extensions:
-    cargo run -p tket-qsystem gen-extensions -o tket-exts/src/tket_exts/data
+    cargo run -p tket-qsystem gen-extensions -o tket-exts/src/tket_exts/data --unversioned
 
 # Update snapshot tests for both rust and python (requires `cargo-insta`)
 update-snapshots: update-snapshots-rs update-snapshots-py

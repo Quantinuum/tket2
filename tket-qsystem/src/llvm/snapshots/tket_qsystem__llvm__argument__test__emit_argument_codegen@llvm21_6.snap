@@ -1,0 +1,41 @@
+---
+source: tket-qsystem/src/llvm/argument.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+@argument_test_arr_f.A22F4976.0 = private constant [13 x i8] c"\0Ctest_arr_f64"
+
+define internal { ptr, i64 } @_hl.main.1() !dbg !3 {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %0 = mul i64 10, ptrtoint (ptr getelementptr (double, ptr null, i32 1) to i64), !dbg !11
+  %1 = call ptr @malloc(i64 %0), !dbg !11
+  %2 = insertvalue { ptr, i64 } poison, ptr %1, 0, !dbg !11
+  %3 = insertvalue { ptr, i64 } %2, i64 0, 1, !dbg !11
+  call void @argreader_get_f64_array(ptr @argument_test_arr_f.A22F4976.0, ptr %1, i64 10), !dbg !11
+  ret { ptr, i64 } %3
+}
+
+declare void @argreader_get_f64_array(ptr, ptr, i64)
+
+declare ptr @malloc(i64)
+
+!llvm.module.flags = !{!0}
+!llvm.dbg.cu = !{!1}
+
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "hugr_llvm_test", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "/lPNzlV/ClAphFG/yrhvZs/eDgUn/eIVwAutKJHaZEPSZwPXPeycUvnujGxZ")
+!3 = distinct !DISubprogram(name: "_hl.main.1", linkageName: "_hl.main.1", scope: null, file: !4, line: 25254, type: !5, scopeLine: 25255, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
+!4 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "")
+!5 = !DISubroutineType(types: !6)
+!6 = !{!7}
+!7 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ ptr, i64 }", file: !2, size: 128, align: 8, elements: !8)
+!8 = !{!9, !10}
+!9 = !DIBasicType(name: "ptr", size: 64, encoding: DW_ATE_address)
+!10 = !DIBasicType(name: "i64", size: 64, encoding: DW_ATE_unsigned)
+!11 = !DILocation(line: 27062, column: 402, scope: !3)

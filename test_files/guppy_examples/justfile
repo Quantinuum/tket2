@@ -10,5 +10,5 @@ recompile-hugrs:
     #!/usr/bin/env sh
     for example in $(find . -type f -name "*.py"); do
         echo "Re-generating $example"
-        uv run --no-project "$example"
+        uv run --prerelease=allow --no-project "$example"
     done

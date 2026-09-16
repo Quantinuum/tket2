@@ -54,19 +54,29 @@ pub static ref TKET1_EXTENSION: Arc<Extension>  = {
     })
 };
 
-/// Extension registry including the prelude, std, TKET1, and TketOps extensions.
-pub(crate) static ref REGISTRY: ExtensionRegistry = ExtensionRegistry::new(
-    STD_REG.iter_all().cloned().chain([
-    TKET1_EXTENSION.to_owned(),
-    TKET_EXTENSION.to_owned(),
-    debug::DEBUG_EXTENSION.to_owned(),
-    global_phase::GLOBAL_PHASE_EXTENSION.to_owned(),
-    guppy::GUPPY_EXTENSION.to_owned(),
-    modifier::MODIFIER_EXTENSION.to_owned(),
-    measurement::MEASUREMENT_EXTENSION.to_owned(),
-    rotation::ROTATION_EXTENSION.to_owned()
-]));
+/// Extension registry including the prelude, std, TKET1, and tket extensions.
+pub static ref REGISTRY: ExtensionRegistry = ExtensionRegistry::new(
+    STD_REG.iter_all().cloned().chain(tket_extensions())
+);
 
+}
+
+/// Returns the extension definitions owned by the `tket` crate.
+///
+/// The list is used to build [`REGISTRY`] and by downstream crates that need to
+/// extend the same base set without maintaining a second copy of the tket
+/// extension list.
+pub fn tket_extensions() -> [Arc<Extension>; 8] {
+    [
+        TKET1_EXTENSION.to_owned(),
+        TKET_EXTENSION.to_owned(),
+        debug::DEBUG_EXTENSION.to_owned(),
+        global_phase::GLOBAL_PHASE_EXTENSION.to_owned(),
+        guppy::GUPPY_EXTENSION.to_owned(),
+        modifier::MODIFIER_EXTENSION.to_owned(),
+        measurement::MEASUREMENT_EXTENSION.to_owned(),
+        rotation::ROTATION_EXTENSION.to_owned(),
+    ]
 }
 
 struct Tk1Signature([TypeParam; 1]);

@@ -1,30 +1,32 @@
 import itertools
 
 import pytest
-
-from hugr.ops import Custom
 from hugr.hugr import Wire
+from hugr.ops import Custom
+from hugr.std.logic import Not
+
+from tket._pattern import Rule, RuleMatcher  # type: ignore
+from tket._rewrite import CircuitRewrite, Subcircuit  # type: ignore
 from tket._state import (
     CompilationState,
+)
+from tket._state import (
     Node as Tk2Node,
 )
 from tket._state.build import (
+    CX,
     CircBuild,
     H,
-    from_coms,
-    CX,
+    Measure,
     PauliX,
     PauliY,
     PauliZ,
-    Measure,
     QAlloc,
     QFree,
-    load_custom,
+    from_coms,
     id_circ,
+    load_custom,
 )
-from hugr.std.logic import Not
-from tket._pattern import Rule, RuleMatcher  # type: ignore
-from tket._rewrite import CircuitRewrite, Subcircuit  # type: ignore
 
 
 @pytest.fixture

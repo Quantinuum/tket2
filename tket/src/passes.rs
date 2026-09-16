@@ -44,8 +44,8 @@ pub mod force_order;
 // pub use fast_todd::{apply_fast_todd, apply_fast_todd_to_pauli_graph, FastToddResult, FastToddError};
 
 // Normalize the structure of Guppy-generated programs.
-pub mod guppy;
-pub use guppy::NormalizeGuppy;
+pub mod normalize;
+pub use normalize::Normalize;
 
 // Inline DFG nodes.
 pub mod inline_dfgs;

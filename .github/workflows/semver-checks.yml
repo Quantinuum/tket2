@@ -23,7 +23,7 @@ jobs:
       rust: ${{ steps.filter.outputs.rust }}
       python: ${{ steps.filter.outputs.python }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/check-changes
         id: filter
 
@@ -44,7 +44,7 @@ jobs:
       LLVM_SYS_211_PREFIX: "/tmp/hugrverse"
     steps:
       - name: Checkout tket
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - uses: quantinuum/hugrverse-env/install-hugrenv-action@main
       - uses: quantinuum/hugrverse-actions/rs-semver-checks@main
         env:

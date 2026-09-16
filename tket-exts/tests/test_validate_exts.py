@@ -1,13 +1,14 @@
-from typing import Callable, List, Tuple
-from hugr.ops import ExtOp
-from hugr.tys import ExtType
-import tket_exts
+import warnings
+from collections.abc import Callable
 
 import pytest
+import tket_exts
+from hugr.ops import ExtOp
+from hugr.tys import Bool, ExtType, FunctionType, Qubit
 from tket_exts.tket._util import TketExtension
 
 
-def ext_debug() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
+def ext_debug() -> tuple[TketExtension, list[ExtType], list[ExtOp]]:
     ext = tket_exts.debug
     return (
         ext,
@@ -16,7 +17,7 @@ def ext_debug() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
     )
 
 
-def ext_gpu() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
+def ext_gpu() -> tuple[TketExtension, list[ExtType], list[ExtOp]]:
     ext = tket_exts.gpu
     return (
         ext,
@@ -32,7 +33,7 @@ def ext_gpu() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
     )
 
 
-def ext_guppy() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
+def ext_guppy() -> tuple[TketExtension, list[ExtType], list[ExtOp]]:
     ext = tket_exts.guppy
     rot_t = tket_exts.rotation.rotation  # Arbitrary non-linear type for testing.
     return (
@@ -42,7 +43,7 @@ def ext_guppy() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
     )
 
 
-def ext_futures() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
+def ext_futures() -> tuple[TketExtension, list[ExtType], list[ExtOp]]:
     ext = tket_exts.futures
     rot_t = tket_exts.rotation.rotation  # Arbitrary non-linear type for testing.
     return (
@@ -52,7 +53,7 @@ def ext_futures() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
     )
 
 
-def ext_measurement() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
+def ext_measurement() -> tuple[TketExtension, list[ExtType], list[ExtOp]]:
     ext = tket_exts.measurement
     return (
         ext,
@@ -61,7 +62,19 @@ def ext_measurement() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
     )
 
 
-def ext_qsystem_helios() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
+def ext_globals() -> tuple[TketExtension, list[ExtType], list[ExtOp]]:
+    ext = tket_exts.globals
+    return (
+        ext,
+        [],
+        [
+            ext.with_op("test-name", Bool.type_arg(), [], [Bool, Bool], []),
+            ext.map("test-name", Bool.type_arg(), [Bool, Bool], [Bool, Bool], []),
+        ],
+    )
+
+
+def ext_qsystem_helios() -> tuple[TketExtension, list[ExtType], list[ExtOp]]:
     ext = tket_exts.qsystem_helios
     return (
         ext,
@@ -82,7 +95,7 @@ def ext_qsystem_helios() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
     )
 
 
-def ext_qsystem_sol() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
+def ext_qsystem_sol() -> tuple[TketExtension, list[ExtType], list[ExtOp]]:
     ext = tket_exts.qsystem_sol
     return (
         ext,
@@ -103,7 +116,7 @@ def ext_qsystem_sol() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
     )
 
 
-def ext_qsystem_random() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
+def ext_qsystem_random() -> tuple[TketExtension, list[ExtType], list[ExtOp]]:
     ext = tket_exts.qsystem_random
     return (
         ext,
@@ -119,7 +132,7 @@ def ext_qsystem_random() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
     )
 
 
-def ext_qsystem_utils() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
+def ext_qsystem_utils() -> tuple[TketExtension, list[ExtType], list[ExtOp]]:
     ext = tket_exts.qsystem_utils
     return (
         ext,
@@ -128,7 +141,7 @@ def ext_qsystem_utils() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
     )
 
 
-def ext_quantum() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
+def ext_quantum() -> tuple[TketExtension, list[ExtType], list[ExtOp]]:
     ext = tket_exts.quantum
     return (
         ext,
@@ -163,7 +176,7 @@ def ext_quantum() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
     )
 
 
-def ext_result() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
+def ext_result() -> tuple[TketExtension, list[ExtType], list[ExtOp]]:
     ext = tket_exts.result
     return (
         ext,
@@ -181,7 +194,7 @@ def ext_result() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
     )
 
 
-def ext_rotation() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
+def ext_rotation() -> tuple[TketExtension, list[ExtType], list[ExtOp]]:
     ext = tket_exts.rotation
     return (
         ext,
@@ -190,7 +203,16 @@ def ext_rotation() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
     )
 
 
-def ext_wasm() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
+def ext_tket1() -> tuple[TketExtension, list[ExtType], list[ExtOp]]:
+    ext = tket_exts.tket1
+    return (
+        ext,
+        [],
+        [ext.tk1op("{}", FunctionType([Qubit], [Qubit]))],
+    )
+
+
+def ext_wasm() -> tuple[TketExtension, list[ExtType], list[ExtOp]]:
     ext = tket_exts.wasm
     return (
         ext,
@@ -206,6 +228,15 @@ def ext_wasm() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
     )
 
 
+def ext_argument() -> tuple[TketExtension, list[ExtType], list[ExtOp]]:
+    ext = tket_exts.argument
+    return (
+        ext,
+        [],
+        [ext.read_arg("test", Bool)],
+    )
+
+
 @pytest.mark.parametrize(
     "ext_vals",
     [
@@ -213,6 +244,7 @@ def ext_wasm() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
         ext_gpu,
         ext_guppy,
         ext_futures,
+        ext_globals,
         ext_measurement,
         ext_qsystem_helios,
         ext_qsystem_sol,
@@ -221,11 +253,13 @@ def ext_wasm() -> Tuple[TketExtension, List[ExtType], List[ExtOp]]:
         ext_quantum,
         ext_result,
         ext_rotation,
+        ext_tket1,
         ext_wasm,
+        ext_argument,
     ],
 )
 def test_exported_extension(
-    ext_vals: Callable[[], Tuple[TketExtension, List[ExtType], List[ExtOp]]],
+    ext_vals: Callable[[], tuple[TketExtension, list[ExtType], list[ExtOp]]],
 ):
     (ext, instantiated_types, instantiated_ops) = ext_vals()
 
@@ -249,4 +283,14 @@ def test_exported_extension(
     for op in instantiated_ops:
         assert op.op_def().name in e.operations
 
-    return
+
+def check_warnings() -> None:
+    # QSystemExtension is deprecated, so we expect a warning when calling it.
+    with pytest.warns(DeprecationWarning, match="QSystemExtension"):
+        tket_exts.qsystem()
+
+    # Loading the full extension registry should not emit any warnings,
+    # even though it includes the deprecated QSystemExtension.
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        tket_exts.tket_registry()

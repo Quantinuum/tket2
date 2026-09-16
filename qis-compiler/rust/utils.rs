@@ -1,5 +1,6 @@
 use crate::REGISTRY;
 use anyhow::{Error, Result, anyhow};
+use itertools::Itertools;
 use tket::hugr::envelope::read_envelope;
 use tket::hugr::ops::OpType;
 use tket::hugr::types::Term;
@@ -15,27 +16,31 @@ pub fn read_hugr_envelope(bytes: &[u8]) -> Result<Hugr> {
     let (desc, package) = read_envelope(bytes, &REGISTRY)
         .map_err(|e| Error::new(e).context("Error loading HUGR package."))?;
 
-    if package.modules.len() != 1 {
+    let num = package.modules.len();
+    let Ok(hugr) = package.modules.into_iter().exactly_one() else {
         return Err(anyhow!(
-            "Expected exactly one module in the package, found {}",
-            package.modules.len()
+            "Expected exactly one module in the package, found {num}"
         ));
-    }
+    };
 
-    package.validate().map_err(|e| {
-        let generator = desc.generator();
-        let any = Error::new(e);
-        if let Some(generator) = generator {
-            any.context(format!("in package with generator {generator}"))
+    validate(&hugr).map_err(|e| {
+        if let Some(generator) = desc.generator() {
+            e.context(format!("in package with generator {generator}"))
         } else {
-            any
+            e
         }
     })?;
 
+    Ok(hugr)
+}
+
+/// Checks whether the hugr is expected to be processable by the QIS compiler.
+pub fn validate(hugr: &Hugr) -> Result<(), Error> {
+    hugr.validate()?;
+
     // Check that no opaque tket1 operations are present.
-    for node in package.modules[0].nodes() {
-        let op = package.modules[0].get_optype(node);
-        if let Some(name) = is_opaque_tket1_op(op) {
+    for node in hugr.nodes() {
+        if let Some(name) = is_opaque_tket1_op(hugr.get_optype(node)) {
             return Err(anyhow!(
                 "Pytket op '{name}' is not currently supported by the Selene HUGR-QIS compiler"
             ));
@@ -43,7 +48,7 @@ pub fn read_hugr_envelope(bytes: &[u8]) -> Result<Hugr> {
     }
 
     // some more validation can be done here, e.g. extension version checking.
-    Ok(package.modules[0].clone())
+    Ok(())
 }
 
 /// Check if the optype is an opaque tket1 operation,

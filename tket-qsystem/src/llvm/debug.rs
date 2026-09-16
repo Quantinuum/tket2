@@ -80,7 +80,7 @@ impl<AL: ArrayLowering> DebugCodegenExtension<AL> {
         let [qubits] = args
             .inputs
             .try_into()
-            .map_err(|_| anyhow!(format!("StateResult expects a qubit array argument")))?;
+            .map_err(|_| anyhow!("StateResult expects a qubit array argument".to_string()))?;
         let qubits_array = self.array_lowering.array_to_ptr(
             builder,
             qubits,

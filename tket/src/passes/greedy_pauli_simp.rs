@@ -1,7 +1,7 @@
-use crate::passes::guppy::NormalizeGuppyErrors;
 use crate::passes::inline_funcs::InlineFuncsError;
+use crate::passes::normalize::NormalizeErrors;
 use crate::passes::pg_convert::{ConversionError, RegisterMap, pauli_graph_to_cmds, serial_circuit_to_pauli_graph};
-use crate::passes::{ComposablePass, InlineFunctionsPass, NormalizeGuppy, PassScope, WithScope};
+use crate::passes::{ComposablePass, InlineFunctionsPass, Normalize, PassScope, WithScope};
 use crate::CircuitError;
 use crate::Circuit;
 use crate::serialize::pytket::{
@@ -88,7 +88,7 @@ impl ComposablePass<Hugr> for GreedyPauliSimpPass {
     type Result = ();
     fn run(&self, hugr: &mut Hugr) -> Result<Self::Result, Self::Error> {
         InlineFunctionsPass::default().run(hugr).unwrap();
-        NormalizeGuppy::default().run(hugr)?;
+        Normalize::default().run(hugr)?;
         
         let encode_options = EncodeOptions::new()
             .with_subcircuits(true)
@@ -161,7 +161,7 @@ pub enum GreedyPauliSimpErrors {
     InlineError(InlineFuncsError),
     /// Error normalizing the hugr
     #[from]
-    NormalizeError(NormalizeGuppyErrors),
+    NormalizeError(NormalizeErrors),
     /// Error loading the circuit.
     #[display("Error loading the circuit: {_0}")]
     #[from]

@@ -6,18 +6,18 @@ from typing import TYPE_CHECKING
 
 from hugr.envelope import EnvelopeConfig
 from hugr.ext import ExtensionRegistry
+from hugr.hugr.base import Hugr
+from hugr.package import Package
 from tket_exts import tket_registry
+
 from .._tket import state as _state
 from .build import CircBuild, Command
 
-from hugr.hugr.base import Hugr
-from hugr.package import Package
-
 # Re-export types from the Rust module
+# TODO: Wrap these in Python classes.
 Node = _state.Node
 Wire = _state.Wire
 CircuitCost = _state.CircuitCost
-embedded_extensions = _state.embedded_extensions
 HugrError = _state.HugrError
 BuildError = _state.BuildError
 ValidationError = _state.ValidationError
@@ -26,24 +26,21 @@ TK1EncodeError = _state.TK1EncodeError
 
 if TYPE_CHECKING:
     from tket._rewrite import CircuitRewrite
+    from tket.passes import PlatformTarget
     from tket.util import PytketCircuitProto
 
-
 __all__ = [
-    "CircBuild",
-    "Command",
-    # Bindings.
-    # TODO: Wrap these in Python classes.
-    "CompilationState",
-    "Node",
-    "Wire",
-    "CircuitCost",
-    "embedded_extensions",
-    "HugrError",
     "BuildError",
-    "ValidationError",
+    "CircBuild",
+    "CircuitCost",
+    "Command",
+    "CompilationState",
     "HUGRSerializationError",
+    "HugrError",
+    "Node",
     "TK1EncodeError",
+    "ValidationError",
+    "Wire",
 ]
 
 
@@ -65,30 +62,43 @@ class CompilationState:
     _py_extensions: ExtensionRegistry | None = None
 
     @staticmethod
-    def from_tket1(circ: PytketCircuitProto) -> CompilationState:
-        """Create a CompilationState from a legacy pytket Circuit."""
-        return CompilationState(_inner=_state.CompilationState.from_tket1(circ))
+    def from_tket1(
+        circ: PytketCircuitProto, *, target: PlatformTarget | None = None
+    ) -> CompilationState:
+        """Create a CompilationState from a legacy pytket Circuit.
+
+        Parameters:
+        - circ: The legacy pytket circuit to load.
+        - target: The platform target selecting which decoder extension set is
+          used when translating pytket commands into HUGR operations. Defaults
+          to the platform-agnostic ``PlatformTarget.Tket``.
+        """
+        target_str = target.value if target is not None else None
+        return CompilationState(
+            _inner=_state.CompilationState.from_tket1(circ, target=target_str)  # type: ignore[arg-type]
+        )
 
     @staticmethod
     def from_python(hugr: Hugr | Package) -> CompilationState:
         """Convert a python-backed Hugr to a CompilationState."""
         py_extensions = None
-        # Get extensions used by this hugr that are not already in the Rust registry.
+        # Get extensions used by this hugr that cannot be satisfied by the Rust
+        # registry at a compatible version.
         if isinstance(hugr, Hugr):
-            embedded = set(_state.embedded_extensions())
             res = hugr.used_extensions()
             py_extensions = res.used_extensions
             extensions = [
                 ext
                 for ext in res.used_extensions.extensions
-                if ext.name not in embedded
+                if not _state.has_compatible_extension(str(ext.name), str(ext.version))
             ]
-            # Wrap the hugr in a package with the non-standard extensions.
+            # Wrap the HUGR with every extension the Rust loader cannot provide,
+            # including newer versions of standard extensions.
             package = Package(modules=[hugr], extensions=extensions)
         elif isinstance(hugr, Package):
             package = hugr
         else:
-            raise ValueError(f"Expected a Hugr or Package, got {type(hugr)}")
+            raise TypeError(f"Expected a Hugr or Package, got {type(hugr)}")
 
         return CompilationState(
             _inner=_state.CompilationState.from_bytes(package.to_bytes()),
@@ -97,8 +107,9 @@ class CompilationState:
 
     def to_python(self) -> Package:
         """Convert this CompilationState back to a python Hugr package."""
-        # Convert the inner hugr to bytes and load it in Python.
-        hugr_bytes = self._inner.to_bytes()
+        # Bundle all used definitions because the Python registry may have an
+        # older version from the same compatibility band as the Rust registry.
+        hugr_bytes = self._inner.to_bytes(omit_tket_exts=False)
         package = Package.from_bytes(hugr_bytes, tket_registry())
         if self._py_extensions is not None:
             # Resolve the extensions in the loaded package using the python registry, if needed.
@@ -122,8 +133,9 @@ class CompilationState:
         # (as json), passing them, and loading them in
         # `_program.CompilationState.from_bytes` before parsing the envelope.
         #
-        # Remember to filter out the embedded extensions from _program.embedded_extensions(),
-        # since we use those already when loading things in Rust.
+        # Remember to filter out the embedded extensions from
+        # _program.embedded_extensions(), since we use those already when
+        # loading things in Rust.
 
         return CompilationState(
             _inner=_state.CompilationState.from_bytes(envelope),
@@ -148,20 +160,38 @@ class CompilationState:
             _py_extensions=None,
         )
 
-    def to_bytes(self, config: EnvelopeConfig | None = None) -> bytes:
+    def to_bytes(
+        self, config: EnvelopeConfig | None = None, *, omit_tket_exts: bool = True
+    ) -> bytes:
         """Serialize the program to a HUGR envelope byte string.
 
         Some envelope formats can be encoded into a string. See :meth:`to_str`.
-        """
-        return self._inner.to_bytes(config)
 
-    def to_str(self, config: EnvelopeConfig | None = None) -> str:
+        Args:
+            config: The envelope configuration to use.
+                If not given, uses the default binary encoding.
+            omit_tket_exts: If true, extensions available at a compatible version
+                in the Rust registry will not be included in the envelope even when
+                they are used in the HUGR.
+        """
+        return self._inner.to_bytes(config, omit_tket_exts=omit_tket_exts)
+
+    def to_str(
+        self, config: EnvelopeConfig | None = None, *, omit_tket_exts: bool = True
+    ) -> str:
         """Serialize the program to a HUGR envelope string.
 
         Not all envelope formats can be encoded into a string.
         See :meth:`to_bytes` for a more general method.
+
+        Args:
+            config: The envelope configuration to use.
+                If not given, uses the default textual encoding.
+            omit_tket_exts: If true, extensions available at a compatible version
+                in the Rust registry will not be included in the envelope even when
+                they are used in the HUGR.
         """
-        return self._inner.to_str(config)
+        return self._inner.to_str(config, omit_tket_exts=omit_tket_exts)
 
     def apply_rewrite(self, rewrite: CircuitRewrite) -> None:
         """Apply a rewrite command to this program."""

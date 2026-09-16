@@ -1,0 +1,408 @@
+; ModuleID = 'hugr'
+source_filename = "hugr"
+target datalayout = "e-m:o-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-n32:64-S128-Fn32"
+target triple = "aarch64-apple-darwin"
+
+@"e_Some array.A77EF32E.0" = private constant [48 x i8] c"/EXIT:INT:Some array elements have been borrowed"
+@res_a.19FB4E83.0 = private constant [11 x i8] c"\0AUSER:INT:a"
+@res_b.0E048F9C.0 = private constant [13 x i8] c"\0CUSER:FLOAT:b"
+@res_c.1C9EF4D1.0 = private constant [12 x i8] c"\0BUSER:BOOL:c"
+@res_d.93EDD03A.0 = private constant [14 x i8] c"\0DUSER:INTARR:d"
+@res_e.DB2DB1D9.0 = private constant [16 x i8] c"\0FUSER:FLOATARR:e"
+@res_f.173699F1.0 = private constant [15 x i8] c"\0EUSER:BOOLARR:f"
+@argument_arg_5.E3E8C60E.0 = private constant [6 x i8] c"\05arg_5"
+@argument_arg_4.43DB6CC9.0 = private constant [6 x i8] c"\05arg_4"
+@argument_arg_3.E6500947.0 = private constant [6 x i8] c"\05arg_3"
+@argument_arg_2.32BF8FD7.0 = private constant [6 x i8] c"\05arg_2"
+@argument_arg_1.12764F87.0 = private constant [6 x i8] c"\05arg_1"
+@argument_arg_0.0A040DE9.0 = private constant [6 x i8] c"\05arg_0"
+
+define { { ptr, ptr, i64 }, { ptr, ptr, i64 }, { ptr, ptr, i64 } } @"__hugr__.__main__.entry_args.<locals>.foo.1"(i64 %0, double %1, i1 %2, { ptr, ptr, i64 } %3, { ptr, ptr, i64 } %4, { ptr, ptr, i64 } %5) local_unnamed_addr !dbg !4 {
+alloca_block:
+  %.fca.0.extract161 = extractvalue { ptr, ptr, i64 } %3, 0
+  %.fca.1.extract163 = extractvalue { ptr, ptr, i64 } %3, 1
+  %.fca.2.extract165 = extractvalue { ptr, ptr, i64 } %3, 2
+  %.fca.0.extract155 = extractvalue { ptr, ptr, i64 } %4, 0
+  %.fca.1.extract157 = extractvalue { ptr, ptr, i64 } %4, 1
+  %.fca.2.extract159 = extractvalue { ptr, ptr, i64 } %4, 2
+  %.fca.0.extract149 = extractvalue { ptr, ptr, i64 } %5, 0
+  %.fca.1.extract151 = extractvalue { ptr, ptr, i64 } %5, 1
+  %.fca.2.extract153 = extractvalue { ptr, ptr, i64 } %5, 2
+  %6 = lshr i64 %.fca.2.extract153, 6, !dbg !16
+  %7 = getelementptr i64, ptr %.fca.1.extract151, i64 %6, !dbg !16
+  %8 = load i64, ptr %7, align 4, !dbg !16
+  %9 = and i64 %.fca.2.extract153, 63, !dbg !16
+  %10 = shl nsw i64 -1, %9, !dbg !16
+  %11 = and i64 %8, %10, !dbg !16
+  store i64 %11, ptr %7, align 4, !dbg !16
+  %last_valid.i = add i64 %.fca.2.extract153, 7, !dbg !16
+  %12 = lshr i64 %last_valid.i, 6, !dbg !16
+  %13 = getelementptr inbounds nuw i64, ptr %.fca.1.extract151, i64 %12, !dbg !16
+  %14 = load i64, ptr %13, align 4, !dbg !16
+  %15 = and i64 %last_valid.i, 63, !dbg !16
+  %16 = xor i64 %15, 63, !dbg !16
+  %17 = lshr i64 -1, %16, !dbg !16
+  %18 = and i64 %14, %17, !dbg !16
+  store i64 %18, ptr %13, align 4, !dbg !16
+  %reass.sub.i = sub nsw i64 %12, %6, !dbg !16
+  %.not.i = icmp eq i64 %reass.sub.i, -1, !dbg !16
+  br i1 %.not.i, label %__barray_check_none_borrowed.exit, label %mask_block_ok.i, !dbg !16
+
+19:                                               ; preds = %mask_block_ok.i
+  %20 = add nuw i64 %.02.i, 1, !dbg !16
+  %exitcond.not.i = icmp eq i64 %.02.i, %reass.sub.i, !dbg !16
+  br i1 %exitcond.not.i, label %__barray_check_none_borrowed.exit, label %mask_block_ok.i, !dbg !16
+
+mask_block_ok.i:                                  ; preds = %alloca_block, %19
+  %.02.i = phi i64 [ %20, %19 ], [ 0, %alloca_block ], !dbg !18
+  %gep.i = getelementptr i64, ptr %7, i64 %.02.i, !dbg !16
+  %21 = load i64, ptr %gep.i, align 4, !dbg !16
+  %22 = icmp eq i64 %21, 0, !dbg !16
+  br i1 %22, label %19, label %mask_block_err.i, !dbg !16
+
+mask_block_err.i:                                 ; preds = %mask_block_ok.i
+  tail call void @panic(i32 1002, ptr nonnull @"e_Some array.A77EF32E.0"), !dbg !16
+  unreachable, !dbg !16
+
+__barray_check_none_borrowed.exit:                ; preds = %19, %alloca_block
+  %23 = tail call ptr @heap_alloc(i64 8), !dbg !18
+  %24 = tail call ptr @heap_alloc(i64 8), !dbg !18
+  store i64 0, ptr %24, align 1, !dbg !18
+  %25 = getelementptr inbounds i1, ptr %.fca.0.extract149, i64 %.fca.2.extract153, !dbg !18
+  %26 = load i64, ptr %25, align 1, !dbg !18
+  store i64 %26, ptr %23, align 1, !dbg !18
+  %27 = load i64, ptr %7, align 4, !dbg !19
+  %28 = and i64 %27, %10, !dbg !19
+  store i64 %28, ptr %7, align 4, !dbg !19
+  %29 = load i64, ptr %13, align 4, !dbg !19
+  %30 = and i64 %29, %17, !dbg !19
+  store i64 %30, ptr %13, align 4, !dbg !19
+  br i1 %.not.i, label %__barray_check_none_borrowed.exit188, label %mask_block_ok.i183, !dbg !19
+
+31:                                               ; preds = %mask_block_ok.i183
+  %32 = add nuw i64 %.02.i184, 1, !dbg !19
+  %exitcond.not.i187 = icmp eq i64 %.02.i184, %reass.sub.i, !dbg !19
+  br i1 %exitcond.not.i187, label %__barray_check_none_borrowed.exit188, label %mask_block_ok.i183, !dbg !19
+
+mask_block_ok.i183:                               ; preds = %__barray_check_none_borrowed.exit, %31
+  %.02.i184 = phi i64 [ %32, %31 ], [ 0, %__barray_check_none_borrowed.exit ], !dbg !18
+  %gep.i185 = getelementptr i64, ptr %7, i64 %.02.i184, !dbg !19
+  %33 = load i64, ptr %gep.i185, align 4, !dbg !19
+  %34 = icmp eq i64 %33, 0, !dbg !19
+  br i1 %34, label %31, label %mask_block_err.i186, !dbg !19
+
+mask_block_err.i186:                              ; preds = %mask_block_ok.i183
+  tail call void @panic(i32 1002, ptr nonnull @"e_Some array.A77EF32E.0"), !dbg !19
+  unreachable, !dbg !19
+
+__barray_check_none_borrowed.exit188:             ; preds = %31, %__barray_check_none_borrowed.exit
+  %35 = lshr i64 %.fca.2.extract159, 6, !dbg !21
+  %36 = getelementptr i64, ptr %.fca.1.extract157, i64 %35, !dbg !21
+  %37 = load i64, ptr %36, align 4, !dbg !21
+  %38 = and i64 %.fca.2.extract159, 63, !dbg !21
+  %39 = shl nsw i64 -1, %38, !dbg !21
+  %40 = and i64 %37, %39, !dbg !21
+  store i64 %40, ptr %36, align 4, !dbg !21
+  %last_valid.i189 = add i64 %.fca.2.extract159, 2, !dbg !21
+  %41 = lshr i64 %last_valid.i189, 6, !dbg !21
+  %42 = getelementptr inbounds nuw i64, ptr %.fca.1.extract157, i64 %41, !dbg !21
+  %43 = load i64, ptr %42, align 4, !dbg !21
+  %44 = and i64 %last_valid.i189, 63, !dbg !21
+  %45 = xor i64 %44, 63, !dbg !21
+  %46 = lshr i64 -1, %45, !dbg !21
+  %47 = and i64 %43, %46, !dbg !21
+  store i64 %47, ptr %42, align 4, !dbg !21
+  %reass.sub.i190 = sub nsw i64 %41, %35, !dbg !21
+  %.not.i191 = icmp eq i64 %reass.sub.i190, -1, !dbg !21
+  br i1 %.not.i191, label %__barray_check_none_borrowed.exit197, label %mask_block_ok.i192, !dbg !21
+
+48:                                               ; preds = %mask_block_ok.i192
+  %49 = add nuw i64 %.02.i193, 1, !dbg !21
+  %exitcond.not.i196 = icmp eq i64 %.02.i193, %reass.sub.i190, !dbg !21
+  br i1 %exitcond.not.i196, label %__barray_check_none_borrowed.exit197, label %mask_block_ok.i192, !dbg !21
+
+mask_block_ok.i192:                               ; preds = %__barray_check_none_borrowed.exit188, %48
+  %.02.i193 = phi i64 [ %49, %48 ], [ 0, %__barray_check_none_borrowed.exit188 ], !dbg !23
+  %gep.i194 = getelementptr i64, ptr %36, i64 %.02.i193, !dbg !21
+  %50 = load i64, ptr %gep.i194, align 4, !dbg !21
+  %51 = icmp eq i64 %50, 0, !dbg !21
+  br i1 %51, label %48, label %mask_block_err.i195, !dbg !21
+
+mask_block_err.i195:                              ; preds = %mask_block_ok.i192
+  tail call void @panic(i32 1002, ptr nonnull @"e_Some array.A77EF32E.0"), !dbg !21
+  unreachable, !dbg !21
+
+__barray_check_none_borrowed.exit197:             ; preds = %48, %__barray_check_none_borrowed.exit188
+  %52 = tail call ptr @heap_alloc(i64 24), !dbg !23
+  %53 = tail call ptr @heap_alloc(i64 8), !dbg !23
+  store i64 0, ptr %53, align 1, !dbg !23
+  %54 = getelementptr inbounds double, ptr %.fca.0.extract155, i64 %.fca.2.extract159, !dbg !23
+  tail call void @llvm.memcpy.p0.p0.i64(ptr noundef nonnull align 1 dereferenceable(24) %52, ptr noundef nonnull align 1 dereferenceable(24) %54, i64 24, i1 false), !dbg !23
+  %55 = load i64, ptr %36, align 4, !dbg !24
+  %56 = and i64 %55, %39, !dbg !24
+  store i64 %56, ptr %36, align 4, !dbg !24
+  %57 = load i64, ptr %42, align 4, !dbg !24
+  %58 = and i64 %57, %46, !dbg !24
+  store i64 %58, ptr %42, align 4, !dbg !24
+  br i1 %.not.i191, label %__barray_check_none_borrowed.exit206, label %mask_block_ok.i201, !dbg !24
+
+59:                                               ; preds = %mask_block_ok.i201
+  %60 = add nuw i64 %.02.i202, 1, !dbg !24
+  %exitcond.not.i205 = icmp eq i64 %.02.i202, %reass.sub.i190, !dbg !24
+  br i1 %exitcond.not.i205, label %__barray_check_none_borrowed.exit206, label %mask_block_ok.i201, !dbg !24
+
+mask_block_ok.i201:                               ; preds = %__barray_check_none_borrowed.exit197, %59
+  %.02.i202 = phi i64 [ %60, %59 ], [ 0, %__barray_check_none_borrowed.exit197 ], !dbg !23
+  %gep.i203 = getelementptr i64, ptr %36, i64 %.02.i202, !dbg !24
+  %61 = load i64, ptr %gep.i203, align 4, !dbg !24
+  %62 = icmp eq i64 %61, 0, !dbg !24
+  br i1 %62, label %59, label %mask_block_err.i204, !dbg !24
+
+mask_block_err.i204:                              ; preds = %mask_block_ok.i201
+  tail call void @panic(i32 1002, ptr nonnull @"e_Some array.A77EF32E.0"), !dbg !24
+  unreachable, !dbg !24
+
+__barray_check_none_borrowed.exit206:             ; preds = %59, %__barray_check_none_borrowed.exit197
+  %63 = lshr i64 %.fca.2.extract165, 6, !dbg !26
+  %64 = getelementptr i64, ptr %.fca.1.extract163, i64 %63, !dbg !26
+  %65 = load i64, ptr %64, align 4, !dbg !26
+  %66 = and i64 %.fca.2.extract165, 63, !dbg !26
+  %67 = shl nsw i64 -1, %66, !dbg !26
+  %68 = and i64 %65, %67, !dbg !26
+  store i64 %68, ptr %64, align 4, !dbg !26
+  %last_valid.i207 = add i64 %.fca.2.extract165, 4, !dbg !26
+  %69 = lshr i64 %last_valid.i207, 6, !dbg !26
+  %70 = getelementptr inbounds nuw i64, ptr %.fca.1.extract163, i64 %69, !dbg !26
+  %71 = load i64, ptr %70, align 4, !dbg !26
+  %72 = and i64 %last_valid.i207, 63, !dbg !26
+  %73 = xor i64 %72, 63, !dbg !26
+  %74 = lshr i64 -1, %73, !dbg !26
+  %75 = and i64 %71, %74, !dbg !26
+  store i64 %75, ptr %70, align 4, !dbg !26
+  %reass.sub.i208 = sub nsw i64 %69, %63, !dbg !26
+  %.not.i209 = icmp eq i64 %reass.sub.i208, -1, !dbg !26
+  br i1 %.not.i209, label %__barray_check_none_borrowed.exit215, label %mask_block_ok.i210, !dbg !26
+
+76:                                               ; preds = %mask_block_ok.i210
+  %77 = add nuw i64 %.02.i211, 1, !dbg !26
+  %exitcond.not.i214 = icmp eq i64 %.02.i211, %reass.sub.i208, !dbg !26
+  br i1 %exitcond.not.i214, label %__barray_check_none_borrowed.exit215, label %mask_block_ok.i210, !dbg !26
+
+mask_block_ok.i210:                               ; preds = %__barray_check_none_borrowed.exit206, %76
+  %.02.i211 = phi i64 [ %77, %76 ], [ 0, %__barray_check_none_borrowed.exit206 ], !dbg !28
+  %gep.i212 = getelementptr i64, ptr %64, i64 %.02.i211, !dbg !26
+  %78 = load i64, ptr %gep.i212, align 4, !dbg !26
+  %79 = icmp eq i64 %78, 0, !dbg !26
+  br i1 %79, label %76, label %mask_block_err.i213, !dbg !26
+
+mask_block_err.i213:                              ; preds = %mask_block_ok.i210
+  tail call void @panic(i32 1002, ptr nonnull @"e_Some array.A77EF32E.0"), !dbg !26
+  unreachable, !dbg !26
+
+__barray_check_none_borrowed.exit215:             ; preds = %76, %__barray_check_none_borrowed.exit206
+  %80 = tail call ptr @heap_alloc(i64 40), !dbg !28
+  %81 = tail call ptr @heap_alloc(i64 8), !dbg !28
+  store i64 0, ptr %81, align 1, !dbg !28
+  %82 = getelementptr inbounds i64, ptr %.fca.0.extract161, i64 %.fca.2.extract165, !dbg !28
+  tail call void @llvm.memcpy.p0.p0.i64(ptr noundef nonnull align 1 dereferenceable(40) %80, ptr noundef nonnull align 1 dereferenceable(40) %82, i64 40, i1 false), !dbg !28
+  %83 = load i64, ptr %64, align 4, !dbg !29
+  %84 = and i64 %83, %67, !dbg !29
+  store i64 %84, ptr %64, align 4, !dbg !29
+  %85 = load i64, ptr %70, align 4, !dbg !29
+  %86 = and i64 %85, %74, !dbg !29
+  store i64 %86, ptr %70, align 4, !dbg !29
+  br i1 %.not.i209, label %__barray_check_none_borrowed.exit224, label %mask_block_ok.i219, !dbg !29
+
+87:                                               ; preds = %mask_block_ok.i219
+  %88 = add nuw i64 %.02.i220, 1, !dbg !29
+  %exitcond.not.i223 = icmp eq i64 %.02.i220, %reass.sub.i208, !dbg !29
+  br i1 %exitcond.not.i223, label %__barray_check_none_borrowed.exit224, label %mask_block_ok.i219, !dbg !29
+
+mask_block_ok.i219:                               ; preds = %__barray_check_none_borrowed.exit215, %87
+  %.02.i220 = phi i64 [ %88, %87 ], [ 0, %__barray_check_none_borrowed.exit215 ], !dbg !28
+  %gep.i221 = getelementptr i64, ptr %64, i64 %.02.i220, !dbg !29
+  %89 = load i64, ptr %gep.i221, align 4, !dbg !29
+  %90 = icmp eq i64 %89, 0, !dbg !29
+  br i1 %90, label %87, label %mask_block_err.i222, !dbg !29
+
+mask_block_err.i222:                              ; preds = %mask_block_ok.i219
+  tail call void @panic(i32 1002, ptr nonnull @"e_Some array.A77EF32E.0"), !dbg !29
+  unreachable, !dbg !29
+
+__barray_check_none_borrowed.exit224:             ; preds = %87, %__barray_check_none_borrowed.exit215
+  %91 = insertvalue { ptr, ptr, i64 } poison, ptr %80, 0, !dbg !28
+  %92 = insertvalue { ptr, ptr, i64 } %91, ptr %81, 1, !dbg !28
+  %93 = insertvalue { ptr, ptr, i64 } %92, i64 0, 2, !dbg !28
+  %94 = insertvalue { ptr, ptr, i64 } poison, ptr %52, 0, !dbg !23
+  %95 = insertvalue { ptr, ptr, i64 } %94, ptr %53, 1, !dbg !23
+  %96 = insertvalue { ptr, ptr, i64 } %95, i64 0, 2, !dbg !23
+  %97 = insertvalue { ptr, ptr, i64 } poison, ptr %23, 0, !dbg !18
+  %98 = insertvalue { ptr, ptr, i64 } %97, ptr %24, 1, !dbg !18
+  %99 = insertvalue { ptr, ptr, i64 } %98, i64 0, 2, !dbg !18
+  tail call void @print_int(ptr nonnull @res_a.19FB4E83.0, i64 10, i64 %0), !dbg !31
+  tail call void @print_float(ptr nonnull @res_b.0E048F9C.0, i64 12, double %1), !dbg !32
+  tail call void @print_bool(ptr nonnull @res_c.1C9EF4D1.0, i64 11, i1 %2), !dbg !33
+  %100 = getelementptr inbounds [5 x i64], ptr %.fca.0.extract161, i64 %.fca.2.extract165, !dbg !28
+  %out_arr_alloca = alloca <{ i32, i32, ptr, ptr }>, align 8, !dbg !28
+  %y_ptr = getelementptr inbounds nuw i8, ptr %out_arr_alloca, i64 4, !dbg !28
+  %arr_ptr = getelementptr inbounds nuw i8, ptr %out_arr_alloca, i64 8, !dbg !28
+  %mask_ptr = getelementptr inbounds nuw i8, ptr %out_arr_alloca, i64 16, !dbg !28
+  %101 = alloca [5 x i1], align 1, !dbg !28
+  call void @llvm.memset.p0.i64(ptr noundef nonnull align 1 dereferenceable(5) %101, i8 0, i64 5, i1 false), !dbg !28
+  store i32 5, ptr %out_arr_alloca, align 8, !dbg !28
+  store i32 1, ptr %y_ptr, align 4, !dbg !28
+  store ptr %100, ptr %arr_ptr, align 8, !dbg !28
+  store ptr %101, ptr %mask_ptr, align 8, !dbg !28
+  call void @print_int_arr(ptr nonnull @res_d.93EDD03A.0, i64 13, ptr nonnull %out_arr_alloca), !dbg !28
+  %102 = getelementptr inbounds [3 x double], ptr %.fca.0.extract155, i64 %.fca.2.extract159, !dbg !23
+  %out_arr_alloca57 = alloca <{ i32, i32, ptr, ptr }>, align 8, !dbg !23
+  %y_ptr59 = getelementptr inbounds nuw i8, ptr %out_arr_alloca57, i64 4, !dbg !23
+  %arr_ptr60 = getelementptr inbounds nuw i8, ptr %out_arr_alloca57, i64 8, !dbg !23
+  %mask_ptr61 = getelementptr inbounds nuw i8, ptr %out_arr_alloca57, i64 16, !dbg !23
+  %103 = alloca [3 x i1], align 1, !dbg !23
+  store i1 false, ptr %103, align 1, !dbg !23
+  %.repack171 = getelementptr inbounds nuw i8, ptr %103, i64 1, !dbg !23
+  store i1 false, ptr %.repack171, align 1, !dbg !23
+  %.repack172 = getelementptr inbounds nuw i8, ptr %103, i64 2, !dbg !23
+  store i1 false, ptr %.repack172, align 1, !dbg !23
+  store i32 3, ptr %out_arr_alloca57, align 8, !dbg !23
+  store i32 1, ptr %y_ptr59, align 4, !dbg !23
+  store ptr %102, ptr %arr_ptr60, align 8, !dbg !23
+  store ptr %103, ptr %mask_ptr61, align 8, !dbg !23
+  call void @print_float_arr(ptr nonnull @res_e.DB2DB1D9.0, i64 15, ptr nonnull %out_arr_alloca57), !dbg !23
+  %104 = getelementptr inbounds [8 x i1], ptr %.fca.0.extract149, i64 %.fca.2.extract153, !dbg !18
+  %out_arr_alloca67 = alloca <{ i32, i32, ptr, ptr }>, align 8, !dbg !18
+  %y_ptr69 = getelementptr inbounds nuw i8, ptr %out_arr_alloca67, i64 4, !dbg !18
+  %arr_ptr70 = getelementptr inbounds nuw i8, ptr %out_arr_alloca67, i64 8, !dbg !18
+  %mask_ptr71 = getelementptr inbounds nuw i8, ptr %out_arr_alloca67, i64 16, !dbg !18
+  %105 = alloca [8 x i1], align 8, !dbg !18
+  store i64 0, ptr %105, align 8, !dbg !18
+  store i32 8, ptr %out_arr_alloca67, align 8, !dbg !18
+  store i32 1, ptr %y_ptr69, align 4, !dbg !18
+  store ptr %104, ptr %arr_ptr70, align 8, !dbg !18
+  store ptr %105, ptr %mask_ptr71, align 8, !dbg !18
+  call void @print_bool_arr(ptr nonnull @res_f.173699F1.0, i64 14, ptr nonnull %out_arr_alloca67), !dbg !18
+  %mrv = insertvalue { { ptr, ptr, i64 }, { ptr, ptr, i64 }, { ptr, ptr, i64 } } poison, { ptr, ptr, i64 } %93, 0
+  %mrv89 = insertvalue { { ptr, ptr, i64 }, { ptr, ptr, i64 }, { ptr, ptr, i64 } } %mrv, { ptr, ptr, i64 } %96, 1
+  %mrv90 = insertvalue { { ptr, ptr, i64 }, { ptr, ptr, i64 }, { ptr, ptr, i64 } } %mrv89, { ptr, ptr, i64 } %99, 2
+  ret { { ptr, ptr, i64 }, { ptr, ptr, i64 }, { ptr, ptr, i64 } } %mrv90
+}
+
+; Function Attrs: noreturn
+declare void @panic(i32, ptr) local_unnamed_addr #0
+
+declare ptr @heap_alloc(i64) local_unnamed_addr
+
+; Function Attrs: mustprogress nocallback nofree nounwind willreturn memory(argmem: write)
+declare void @llvm.memset.p0.i64(ptr writeonly captures(none), i8, i64, i1 immarg) #1
+
+; Function Attrs: mustprogress nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i64, i1 immarg) #2
+
+declare void @print_int(ptr, i64, i64) local_unnamed_addr
+
+declare void @print_float(ptr, i64, double) local_unnamed_addr
+
+declare void @print_bool(ptr, i64, i1) local_unnamed_addr
+
+declare void @print_int_arr(ptr, i64, ptr) local_unnamed_addr
+
+declare void @print_float_arr(ptr, i64, ptr) local_unnamed_addr
+
+declare void @print_bool_arr(ptr, i64, ptr) local_unnamed_addr
+
+declare void @argreader_get_bool_array(ptr, ptr, i64) local_unnamed_addr
+
+declare void @argreader_get_f64_array(ptr, ptr, i64) local_unnamed_addr
+
+declare void @argreader_get_i64_array(ptr, ptr, i64) local_unnamed_addr
+
+declare i1 @argreader_get_bool(ptr) local_unnamed_addr
+
+declare double @argreader_get_f64(ptr) local_unnamed_addr
+
+declare i64 @argreader_get_i64(ptr) local_unnamed_addr
+
+define i64 @qmain(i64 %0) local_unnamed_addr !dbg !34 {
+entry:
+  tail call void @setup(i64 %0), !dbg !38
+  %1 = tail call ptr @heap_alloc(i64 8), !dbg !38
+  %2 = tail call ptr @heap_alloc(i64 8), !dbg !38
+  store i64 0, ptr %2, align 1, !dbg !38
+  %3 = insertvalue { ptr, ptr, i64 } poison, ptr %1, 0, !dbg !38
+  %4 = insertvalue { ptr, ptr, i64 } %3, ptr %2, 1, !dbg !38
+  %5 = insertvalue { ptr, ptr, i64 } %4, i64 0, 2, !dbg !38
+  tail call void @argreader_get_bool_array(ptr nonnull @argument_arg_5.E3E8C60E.0, ptr %1, i64 8), !dbg !38
+  %6 = tail call ptr @heap_alloc(i64 24), !dbg !38
+  %7 = tail call ptr @heap_alloc(i64 8), !dbg !38
+  store i64 0, ptr %7, align 1, !dbg !38
+  %8 = insertvalue { ptr, ptr, i64 } poison, ptr %6, 0, !dbg !38
+  %9 = insertvalue { ptr, ptr, i64 } %8, ptr %7, 1, !dbg !38
+  %10 = insertvalue { ptr, ptr, i64 } %9, i64 0, 2, !dbg !38
+  tail call void @argreader_get_f64_array(ptr nonnull @argument_arg_4.43DB6CC9.0, ptr %6, i64 3), !dbg !38
+  %11 = tail call ptr @heap_alloc(i64 40), !dbg !38
+  %12 = tail call ptr @heap_alloc(i64 8), !dbg !38
+  store i64 0, ptr %12, align 1, !dbg !38
+  %13 = insertvalue { ptr, ptr, i64 } poison, ptr %11, 0, !dbg !38
+  %14 = insertvalue { ptr, ptr, i64 } %13, ptr %12, 1, !dbg !38
+  %15 = insertvalue { ptr, ptr, i64 } %14, i64 0, 2, !dbg !38
+  tail call void @argreader_get_i64_array(ptr nonnull @argument_arg_3.E6500947.0, ptr %11, i64 5), !dbg !38
+  %read_arg_bool.i = tail call i1 @argreader_get_bool(ptr nonnull @argument_arg_2.32BF8FD7.0), !dbg !38
+  %read_arg_f64.i = tail call double @argreader_get_f64(ptr nonnull @argument_arg_1.12764F87.0), !dbg !38
+  %read_arg_int.i = tail call i64 @argreader_get_i64(ptr nonnull @argument_arg_0.0A040DE9.0), !dbg !38
+  %16 = tail call { { ptr, ptr, i64 }, { ptr, ptr, i64 }, { ptr, ptr, i64 } } @"__hugr__.__main__.entry_args.<locals>.foo.1"(i64 %read_arg_int.i, double %read_arg_f64.i, i1 %read_arg_bool.i, { ptr, ptr, i64 } %15, { ptr, ptr, i64 } %10, { ptr, ptr, i64 } %5), !dbg !38
+  %17 = tail call i64 @teardown(), !dbg !38
+  ret i64 %17, !dbg !38
+}
+
+declare void @setup(i64) local_unnamed_addr
+
+declare i64 @teardown() local_unnamed_addr
+
+attributes #0 = { noreturn }
+attributes #1 = { mustprogress nocallback nofree nounwind willreturn memory(argmem: write) }
+attributes #2 = { mustprogress nocallback nofree nounwind willreturn memory(argmem: readwrite) }
+
+!llvm.module.flags = !{!0}
+!llvm.dbg.cu = !{!1}
+!name = !{!3}
+
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "guppylang (guppylang-internals-v1.0.0-a3)-v1.0.0-a3", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "/stripped/for/reproducibility", directory: "/stripped/for/reproducibility")
+!3 = !{!"mainlib"}
+!4 = distinct !DISubprogram(name: "entry_args.<locals>.foo", linkageName: "__hugr__.__main__.entry_args.<locals>.foo.1", scope: null, file: !5, line: 247, type: !6, scopeLine: 248, spFlags: DISPFlagDefinition, unit: !1)
+!5 = !DIFile(filename: "/stripped/for/reproducibility", directory: "/stripped/for/reproducibility")
+!6 = !DISubroutineType(types: !7)
+!7 = !{!8, !13, !14, !15, !10, !10, !10}
+!8 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ { ptr, ptr, i64 }, { ptr, ptr, i64 }, { ptr, ptr, i64 } }", file: !2, size: 576, align: 8, elements: !9)
+!9 = !{!10, !10, !10}
+!10 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ ptr, ptr, i64 }", file: !2, size: 192, align: 8, elements: !11)
+!11 = !{!12, !12, !13}
+!12 = !DIBasicType(name: "ptr", size: 64, encoding: DW_ATE_address)
+!13 = !DIBasicType(name: "i64", size: 64, encoding: DW_ATE_unsigned)
+!14 = !DIBasicType(name: "f64", size: 64, encoding: DW_ATE_float)
+!15 = !DIBasicType(name: "i1", size: 1, encoding: DW_ATE_unsigned)
+!16 = !DILocation(line: 253, column: 8, scope: !4, inlinedAt: !17)
+!17 = distinct !DILocation(line: 253, column: 8, scope: !4)
+!18 = !DILocation(line: 253, column: 8, scope: !4)
+!19 = !DILocation(line: 253, column: 8, scope: !4, inlinedAt: !20)
+!20 = distinct !DILocation(line: 253, column: 8, scope: !4)
+!21 = !DILocation(line: 253, column: 8, scope: !4, inlinedAt: !22)
+!22 = distinct !DILocation(line: 252, column: 8, scope: !4)
+!23 = !DILocation(line: 252, column: 8, scope: !4)
+!24 = !DILocation(line: 253, column: 8, scope: !4, inlinedAt: !25)
+!25 = distinct !DILocation(line: 252, column: 8, scope: !4)
+!26 = !DILocation(line: 253, column: 8, scope: !4, inlinedAt: !27)
+!27 = distinct !DILocation(line: 251, column: 8, scope: !4)
+!28 = !DILocation(line: 251, column: 8, scope: !4)
+!29 = !DILocation(line: 253, column: 8, scope: !4, inlinedAt: !30)
+!30 = distinct !DILocation(line: 251, column: 8, scope: !4)
+!31 = !DILocation(line: 248, column: 8, scope: !4)
+!32 = !DILocation(line: 249, column: 8, scope: !4)
+!33 = !DILocation(line: 250, column: 8, scope: !4)
+!34 = distinct !DISubprogram(name: "qmain", linkageName: "qmain", scope: null, file: !35, type: !36, spFlags: DISPFlagDefinition, unit: !1)
+!35 = !DIFile(filename: "COMPILER_GENERATED_CODE", directory: "")
+!36 = !DISubroutineType(types: !37)
+!37 = !{!13, !13}
+!38 = !DILocation(line: 0, scope: !34)

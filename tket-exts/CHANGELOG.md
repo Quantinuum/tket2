@@ -1,5 +1,49 @@
 # Changelog
 
+## [0.14.2](https://github.com/Quantinuum/tket2/compare/tket-exts-v0.14.1...tket-exts-v0.14.2) (2026-09-04)
+
+
+### Features
+
+* Add missing tket1 extension to tket_exts ([#1961](https://github.com/Quantinuum/tket2/issues/1961)) ([989e2a3](https://github.com/Quantinuum/tket2/commit/989e2a3b47ccdb3ac80c2dc2292393a2e154d8e5))
+
+
+### Bug Fixes
+
+* Fix outdated comment mentioning opaque bool ([#1959](https://github.com/Quantinuum/tket2/issues/1959)) ([1fb0e4d](https://github.com/Quantinuum/tket2/commit/1fb0e4d4ec334a61fe10d251859e067efa99cd9d))
+
+## [0.14.1](https://github.com/Quantinuum/tket2/compare/tket-exts-v0.14.0...tket-exts-v0.14.1) (2026-08-04)
+
+
+### Features
+
+* Mute internal deprecation warning in tket-exts ([#1907](https://github.com/Quantinuum/tket2/issues/1907)) ([a60580a](https://github.com/Quantinuum/tket2/commit/a60580afb3b9e0ccd611c6fb87367836b7fb1509))
+
+## [0.14.0](https://github.com/Quantinuum/tket2/compare/tket-exts-v0.13.1...tket-exts-v0.14.0) (2026-06-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* updates to public dependencies, specifically hugr 0.29.0 and hugr-py 0.18.0
+* ArrayLowering trait has new required method alloc_array for allocating a fresh array.
+
+### Features
+
+* runtime entrypoint arguments via generic tket.argreader op ([#1731](https://github.com/Quantinuum/tket2/issues/1731)) ([3583b4e](https://github.com/Quantinuum/tket2/commit/3583b4ea93d732ffe927d74ee7d959d7f04f7b43))
+* update to hugr 0.29.0/hugr-py 0.18.0, tone down RedundantOrderEdgesPass ([#1742](https://github.com/Quantinuum/tket2/issues/1742)) ([1de66a2](https://github.com/Quantinuum/tket2/commit/1de66a29a10758fe3ddac564cfa51653c632fe3a))
+
+## [0.13.1](https://github.com/Quantinuum/tket2/compare/tket-exts-v0.13.0...tket-exts-v0.13.1) (2026-06-19)
+
+
+### Features
+
+* HUGR extension for global variables ([#1530](https://github.com/Quantinuum/tket2/issues/1530)) ([4209df1](https://github.com/Quantinuum/tket2/commit/4209df1130f092d0936de71154bc98c78745a2ac))
+
+
+### Bug Fixes
+
+* add `--unversioned` flag to justfile, update extensions ([#1697](https://github.com/Quantinuum/tket2/issues/1697)) ([17a0f84](https://github.com/Quantinuum/tket2/commit/17a0f84ccb7f3c5a2ecb74b64436cdba4f339374))
+
 ## [0.13.0](https://github.com/Quantinuum/tket2/compare/tket-exts-v0.12.3...tket-exts-v0.13.0) (2026-06-11)
 
 

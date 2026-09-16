@@ -15,6 +15,7 @@
 
 mod core;
 mod float;
+mod global_phase;
 mod measurement;
 mod prelude;
 mod rotation;
@@ -23,6 +24,7 @@ mod tket;
 
 pub use core::CoreDecoder;
 pub use float::FloatEmitter;
+pub use global_phase::GlobalPhaseEmitter;
 pub use measurement::MeasurementEmitter;
 pub use prelude::PreludeEmitter;
 pub use rotation::RotationEmitter;

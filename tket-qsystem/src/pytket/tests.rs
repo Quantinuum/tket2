@@ -297,7 +297,7 @@ fn circuit_standalone_roundtrip(#[case] hugr: Hugr) {
     let encoded = EncodedCircuit::new_standalone(&hugr, encode_options.clone())
         .unwrap_or_else(|e| panic!("{e}"));
 
-    assert!(encoded.contains_circuit(hugr.entrypoint()));
+    assert!(encoded.contains_region(hugr.entrypoint()));
     assert_eq!(encoded.len(), 1);
 
     // Re-encode the EncodedCircuit
@@ -313,7 +313,11 @@ fn circuit_standalone_roundtrip(#[case] hugr: Hugr) {
         .unwrap_or_else(|e| panic!("{e}"));
 
     // Extract the head pytket circuit, and re-encode it on its own.
-    let ser: &SerialCircuit = &encoded[hugr.entrypoint()];
+    let mut circuits = encoded.get_circuits(hugr.entrypoint());
+    let (_, ser) = circuits
+        .next()
+        .expect("standalone encoding has one circuit");
+    assert!(circuits.next().is_none());
     let deser: Hugr = ser.decode(decode_options).unwrap_or_else(|e| panic!("{e}"));
 
     let deser_sig = deser
@@ -324,12 +328,12 @@ fn circuit_standalone_roundtrip(#[case] hugr: Hugr) {
     assert_eq!(
         &circ_signature.input, &deser_sig.input,
         "Input signature mismatch\n  Expected: {}\n  Actual:   {}",
-        &circ_signature, &deser_sig
+        circ_signature, deser_sig
     );
     assert_eq!(
         &circ_signature.output, &deser_sig.output,
         "Output signature mismatch\n  Expected: {}\n  Actual:   {}",
-        &circ_signature, &deser_sig
+        circ_signature, deser_sig
     );
 
     let reser = SerialCircuit::encode(
@@ -355,7 +359,7 @@ fn encoded_circuit_roundtrip(#[case] hugr: Hugr, #[case] num_circuits: usize) {
 
     let encoded = EncodedCircuit::new(&hugr, encode_options).unwrap_or_else(|e| panic!("{e}"));
 
-    assert!(encoded.contains_circuit(hugr.entrypoint()));
+    assert!(encoded.contains_region(hugr.entrypoint()));
     assert_eq!(encoded.len(), num_circuits);
 
     let mut deser = hugr.clone();
@@ -376,12 +380,12 @@ fn encoded_circuit_roundtrip(#[case] hugr: Hugr, #[case] num_circuits: usize) {
     assert_eq!(
         &circ_signature.input, &deser_sig.input,
         "Input signature mismatch\n  Expected: {}\n  Actual:   {}",
-        &circ_signature, &deser_sig
+        circ_signature, deser_sig
     );
     assert_eq!(
         &circ_signature.output, &deser_sig.output,
         "Output signature mismatch\n  Expected: {}\n  Actual:   {}",
-        &circ_signature, &deser_sig
+        circ_signature, deser_sig
     );
 }
 
@@ -397,7 +401,7 @@ fn regression_dropped_order_edge(circ_dropped_order_edge: Hugr) {
         .with_subcircuits(true)
         .with_config(qsystem_encoder_config(QSystemPlatform::Helios));
     let encoded = EncodedCircuit::new(&hugr, encode_options).unwrap_or_else(|e| panic!("{e}"));
-    assert!(encoded.contains_circuit(hugr.entrypoint()));
+    assert!(encoded.contains_region(hugr.entrypoint()));
 
     let mut deser = hugr.clone();
     encoded

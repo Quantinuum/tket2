@@ -1,0 +1,12 @@
+[package]
+name = "pg-ir-kernels"
+version = "0.1.0"
+edition = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+pg-core = { path = "../../pg-core" }
+pg-utils = { path = "../../pg-utils/pg-utils" }
+
+[lints]
+workspace = true

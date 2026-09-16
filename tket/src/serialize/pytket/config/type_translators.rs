@@ -12,7 +12,7 @@ use hugr::extension::prelude::bool_t;
 use hugr::std_extensions::arithmetic::float_types;
 use hugr::types::Type;
 use hugr::{Hugr, Wire};
-use hugr_core::types::{Term, TypeRow};
+use hugr_core::types::Term;
 use itertools::Itertools;
 
 use crate::extension::rotation;
@@ -64,15 +64,16 @@ impl TypeTranslatorSet {
     /// Translate a HUGR type into a count of qubits, bits, and parameters,
     /// using the registered custom translator.
     ///
-    /// Only tuple sums, bools, and custom types are supported.
+    /// Only bools, parameter types, and registered custom types are supported.
     /// Other types will return `None`.
     pub fn type_to_pytket(&self, typ: &Type) -> Option<RegisterCount> {
         self.type_to_pytket_internal(typ).filter(|c| !c.is_empty())
     }
 
-    /// Recursive call for [`Self::type_to_pytket`].
+    /// Cached implementation for [`Self::type_to_pytket`].
     ///
-    /// This allows returning empty register counts, for types that may be included inside other types.
+    /// This permits translators to return an empty register count, which the
+    /// public method treats as unsupported.
     fn type_to_pytket_internal(&self, typ: &Type) -> Option<RegisterCount> {
         let cache = self.type_cache.read().ok();
         if let Some(count) = cache.and_then(|c| c.get(typ).cloned()) {
@@ -88,24 +89,8 @@ impl TypeTranslatorSet {
         }
 
         let res = match &**typ {
-            Term::SumType(sum) => {
-                if sum.num_variants() == 0 {
-                    return Some(RegisterCount::default());
-                }
-                if typ == &bool_t() {
-                    return Some(RegisterCount::only_bits(1));
-                }
-                if let Some(tuple) = sum.as_tuple() {
-                    TypeRow::try_from(tuple.clone()).ok().and_then(|t| {
-                        let count: Option<RegisterCount> =
-                            t.iter().map(|ty| self.type_to_pytket_internal(ty)).sum();
-                        // Don't allow parameters nested inside other types
-                        count.filter(|c| c.params == 0)
-                    })
-                } else {
-                    None
-                }
-            }
+            Term::SumType(_) if typ == &bool_t() => Some(RegisterCount::only_bits(1)),
+            Term::SumType(_) => None,
             Term::ExtensionType(custom) => 'outer: {
                 let type_ext = custom.extension();
                 for encoder in self.translators_for_extension(type_ext) {
@@ -214,7 +199,7 @@ mod tests {
     #[case::empty(SumType::new_unary(0).into(), None)]
     #[case::native_bool(SumType::new_unary(2).into(), Some(RegisterCount::only_bits(1)))]
     #[case::simple(bool_t(), Some(RegisterCount::only_bits(1)))]
-    #[case::tuple(SumType::new_tuple(vec![bool_t(), qb_t(), bool_t(), SumType::new_unary(1).into()]).into(), Some(RegisterCount::new(1, 2, 0)))]
+    #[case::tuple(SumType::new_tuple(vec![bool_t(), qb_t()]).into(), None)]
     #[case::unsupported(SumType::new([vec![bool_t(), qb_t()], vec![bool_t()]]).into(), None)]
     fn test_translations(
         translator_set: TypeTranslatorSet,

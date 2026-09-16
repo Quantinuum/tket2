@@ -1,8 +1,8 @@
 import pytest
 
-from tket._state import CompilationState
-from tket._rewrite import ECCRewriter
 from tket._optimiser import BadgerOptimiser
+from tket._rewrite import ECCRewriter
+from tket._state import CompilationState
 
 
 def test_simple_optimiser():

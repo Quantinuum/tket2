@@ -5,18 +5,16 @@ Examples:
     >>> from tket.metadata import (
     ...     MaxQubitsHint,
     ...     PytketInputParameters,
-    ...     PytketPhaseExpr,
     ...     PytketQubitRegisterNames,
     ... )
     >>>
     >>> hugr = Hugr()
     >>> node = hugr[hugr.module_root]
     >>>
-    >>> node.metadata[MaxQubitsHint] = 3
+    >>> node.metadata[ExpectedQubitsHint] = 3
     >>> node.metadata[PytketInputParameters] = ["theta", "phi"]
     >>> node.metadata[PytketQubitRegisterNames] = [("q", [0]), ("ancilla", [1])]
-    >>> node.metadata[PytketPhaseExpr] = "1/2"
-    >>> node.metadata[MaxQubitsHint]
+    >>> node.metadata[ExpectedQubitsHint]
     3
     >>> node.metadata.get(PytketQubitRegisterNames)
     [('q', [0]), ('ancilla', [1])]
@@ -28,6 +26,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Literal, TypeAlias, TypedDict
 
 from hugr.metadata import Metadata
+from pydantic import StrictBool, TypeAdapter
+from pydantic.dataclasses import dataclass
+from typing_extensions import deprecated
 
 from ._tket import metadata as _metadata
 
@@ -36,19 +37,25 @@ if TYPE_CHECKING:
 
 
 __all__ = [
-    "RewriteTraceValue",
-    "MaxQubitsHint",
-    "InlineAnnotationValue",
-    "InlineAnnotation",
     "CircuitRewriteTraces",
-    "UnitaryFlags",
+    "ControlledImplementations",
+    "CtrlDaggeredImplementations",
+    "DaggeredImplementation",
+    "ExpectedQubitsHint",
+    "HeliosPlatformConfig",
+    "HeliosPlatformConfigValue",
+    "InlineAnnotation",
+    "InlineAnnotationValue",
+    "NumControlQubits",
+    "PytketBit",
+    "PytketBitRegisterNames",
     "PytketInputParameters",
     "PytketOpGroup",
-    "PytketBit",
-    "PytketQubit",
-    "PytketBitRegisterNames",
-    "PytketQubitRegisterNames",
     "PytketPhaseExpr",
+    "PytketQubit",
+    "PytketQubitRegisterNames",
+    "RewriteTraceValue",
+    "UnitaryFlags",
 ]
 
 
@@ -62,19 +69,53 @@ PytketQubit: TypeAlias = tuple[str, list[int]]
 PytketBit: TypeAlias = tuple[str, list[int]]
 
 
+class ControlledImplementations(Metadata[list[str]]):
+    """Metadata key for the controlled custom implementations of a function.
+
+    This is used to store the names of the custom controlled implementations of a function, if present.
+    """
+
+    KEY = _metadata.CONTROLLED_IMPLEMENTATIONS
+
+
+class CtrlDaggeredImplementations(Metadata[list[str]]):
+    """Metadata key for the controlled-daggered custom implementations of a function.
+
+    This is used to store the names of the custom controlled-daggered implementations of a function, if present.
+    """
+
+    KEY = _metadata.CTRL_DAGGERED_IMPLEMENTATIONS
+
+
+class NumControlQubits(Metadata[int]):
+    """Metadata key for number of control qubits for the controlled implementations of a function."""
+
+    KEY = _metadata.NUM_CONTROL_QUBITS
+
+
+class DaggeredImplementation(Metadata[str]):
+    """Metadata key for the daggered custom implementations of a function.
+
+    This is used to store the name of the custom daggered implementation of a function, if present.
+    """
+
+    KEY = _metadata.DAGGERED_IMPLEMENTATION
+
+
 class RewriteTraceValue(TypedDict):
     """Serialized rewrite trace metadata entry."""
 
     individual_matches: int
 
 
-class MaxQubitsHint(Metadata[int]):
+class ExpectedQubitsHint(Metadata[int]):
     """Metadata key for the number of qubits required to execute a HUGR node."""
 
-    KEY = _metadata.MAX_QUBITS_HINT
+    KEY = _metadata.EXPECTED_QUBITS_HINT
+    ALIASES = _metadata.EXPECTED_QUBITS_HINT_ALIASES
 
 
-InlineAnnotationValue: TypeAlias = Literal["never"] | Literal["best_effort"]
+InlineAnnotationValue: TypeAlias = Literal["never", "best_effort"]
 
 
 class InlineAnnotation(Metadata[InlineAnnotationValue]):
@@ -158,10 +199,15 @@ class PytketQubitRegisterNames(Metadata[list[PytketQubit]]):
         return _read_pytket_register(cls.KEY, value)
 
 
+@deprecated("Call `used_extensions` on the hugr instead.")
 class PytketPhaseExpr(Metadata[str]):
-    """Metadata key for the serialized pytket global phase expression."""
+    """Metadata key for the serialized pytket global phase expression.
 
-    KEY = _metadata.PYTKET_PHASE_EXPR
+    Deprecated:
+        Use explicit ``tket.global_phase`` operations instead.
+    """
+
+    KEY = "TKET1.phase"
 
 
 def _store_pytket_register(value: list[tuple[str, list[int]]]) -> JsonType:
@@ -198,3 +244,29 @@ def _read_pytket_register(key: str, value: JsonType) -> list[tuple[str, list[int
             register_indices.append(index)
         registers.append((name, register_indices))
     return registers
+
+
+@dataclass(frozen=True)
+class HeliosPlatformConfigValue:
+    """Helios-specific configuration options."""
+
+    squash_rxys: StrictBool = True
+    enable_dd: StrictBool = False
+    leakage_repump: StrictBool = False
+
+
+_helios_platform_config_adapter = TypeAdapter(HeliosPlatformConfigValue)
+
+
+class HeliosPlatformConfig(Metadata[HeliosPlatformConfigValue]):
+    """Metadata key for Helios-specific configuration options."""
+
+    KEY = _metadata.HELIOS_PLATFORM_CONFIG
+
+    @classmethod
+    def to_json(cls, value: HeliosPlatformConfigValue) -> JsonType:
+        return _helios_platform_config_adapter.dump_python(value, mode="json")
+
+    @classmethod
+    def from_json(cls, value: JsonType) -> HeliosPlatformConfigValue:
+        return _helios_platform_config_adapter.validate_python(value)

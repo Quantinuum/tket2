@@ -21,10 +21,10 @@ __hugr__.__tk2_sol_qalloc.38.exit:                ; preds = %alloca_block
   tail call void @___reset(i64 %qalloc.i), !dbg !8
   tail call void @___rp(i64 %qalloc.i, double 0x3FF921FB54442D18, double 0xBFF921FB54442D18), !dbg !9
   tail call void @___rz(i64 %qalloc.i, double 0x400921FB54442D18), !dbg !9
-  %lazy_measure = tail call i64 @___lazy_measure(i64 %qalloc.i), !dbg !10
+  %___future_measure = tail call i64 @___future_measure(i64 %qalloc.i, i64 0), !dbg !10
   tail call void @___qfree(i64 %qalloc.i), !dbg !10
-  %read_bool = tail call i1 @___read_future_bool(i64 %lazy_measure), !dbg !10
-  tail call void @___dec_future_refcount(i64 %lazy_measure), !dbg !10
+  %read_bool = tail call i1 @___read_future_bool(i64 %___future_measure), !dbg !10
+  tail call void @___dec_future_refcount(i64 %___future_measure), !dbg !10
   br i1 %read_bool, label %1, label %0
 
 0:                                                ; preds = %__hugr__.__tk2_sol_qalloc.38.exit
@@ -36,7 +36,7 @@ __hugr__.__tk2_sol_qalloc.38.exit:                ; preds = %alloca_block
   unreachable
 }
 
-declare i64 @___lazy_measure(i64) local_unnamed_addr
+declare i64 @___future_measure(i64, i64) local_unnamed_addr
 
 declare void @___qfree(i64) local_unnamed_addr
 
@@ -76,16 +76,16 @@ attributes #0 = { noreturn }
 !name = !{!3}
 
 !0 = !{i32 2, !"Debug Info Version", i32 3}
-!1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "guppylang (guppylang-internals-v1.0.0-a1)-v1.0.0-a1", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "guppylang (guppylang-internals-v1.0.0-a5)-v1.0.0-a5", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
 !3 = !{!"mainlib"}
-!4 = distinct !DISubprogram(name: "postselect_panic.<locals>.main", linkageName: "__hugr__.__main__.postselect_panic.<locals>.main.1", scope: null, file: !5, line: 149, type: !6, scopeLine: 150, spFlags: DISPFlagDefinition, unit: !1)
+!4 = distinct !DISubprogram(name: "postselect_panic.<locals>.main", linkageName: "__hugr__.__main__.postselect_panic.<locals>.main.1", scope: null, file: !5, line: 147, type: !6, scopeLine: 148, spFlags: DISPFlagDefinition, unit: !1)
 !6 = !DISubroutineType(types: !7)
 !7 = !{null}
-!8 = !DILocation(line: 150, column: 12, scope: !4)
-!9 = !DILocation(line: 151, column: 8, scope: !4)
-!10 = !DILocation(line: 152, column: 18, scope: !4)
-!11 = !DILocation(line: 155, column: 8, scope: !4)
-!12 = !DILocation(line: 154, column: 12, scope: !4)
+!8 = !DILocation(line: 148, column: 12, scope: !4)
+!9 = !DILocation(line: 149, column: 8, scope: !4)
+!10 = !DILocation(line: 150, column: 18, scope: !4)
+!11 = !DILocation(line: 153, column: 8, scope: !4)
+!12 = !DILocation(line: 152, column: 12, scope: !4)
 !13 = distinct !DISubprogram(name: "qmain", linkageName: "qmain", scope: null, file: !14, type: !15, spFlags: DISPFlagDefinition, unit: !1)
 !15 = !DISubroutineType(types: !16)
 !16 = !{!17, !17}

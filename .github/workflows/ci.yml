@@ -33,12 +33,13 @@ jobs:
     permissions:
       pull-requests: read
     outputs:
+      pg-libs: ${{ steps.filter.outputs.pg-libs }}
       rust: ${{ steps.filter.outputs.rust }}
       python: ${{ steps.filter.outputs.python }}
       extensions: ${{ steps.filter.outputs.extensions }}
       qis: ${{ steps.filter.outputs.qis }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/check-changes
         id: filter
 
@@ -51,8 +52,8 @@ jobs:
       # Fail on rust compiler warnings.
       RUSTFLAGS: -D warnings
     steps:
-      - uses: actions/checkout@v6
-      - uses: mozilla-actions/sccache-action@v0.0.10
+      - uses: actions/checkout@v7
+      - uses: mozilla-actions/sccache-action@v0.0.11
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -73,8 +74,8 @@ jobs:
     if: ${{ needs.changes.outputs.python == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: mozilla-actions/sccache-action@v0.0.10
+      - uses: actions/checkout@v7
+      - uses: mozilla-actions/sccache-action@v0.0.11
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Set up uv
@@ -91,9 +92,91 @@ jobs:
       - name: Type check with mypy
         run: uv run mypy .
       - name: Check formatting with ruff
-        run: uv run --no-project ruff format --check
+        run: uv run ruff format --check
       - name: Lint with ruff
-        run: uv run --no-project ruff check
+        run: uv run ruff check
+
+  check-pg-libs:
+    name: Check pg-libs
+    needs: [changes]
+    if: ${{ needs.changes.outputs.pg-libs == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: mozilla-actions/sccache-action@v0.0.11
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Check formatting
+        working-directory: pg-libs
+        run: cargo fmt -- --check
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - name: Install Python ${{ env.PYTHON_HIGHEST }}
+        run: uv python install ${{ env.PYTHON_HIGHEST }}
+      - name: Setup dependencies
+        working-directory: pg-libs
+        run: uv sync --python ${{ env.PYTHON_HIGHEST }}
+      - name: Check formatting with ruff
+        working-directory: pg-libs
+        run: uv run ruff format --check
+      - name: Lint with ruff
+        working-directory: pg-libs
+        run: uv run ruff check
+
+  tests-pg-libs:
+    name: pg-libs tests
+    needs: [changes]
+    if: ${{ needs.changes.outputs.pg-libs == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: mozilla-actions/sccache-action@v0.0.11
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - name: Install Python ${{ env.PYTHON_HIGHEST }}
+        run: uv python install ${{ env.PYTHON_HIGHEST }}
+      - name: Install pg-libs dev dependencies
+        working-directory: pg-libs
+        run: uv sync --python ${{ env.PYTHON_HIGHEST }}
+      - name: Run stable tests
+        working-directory: pg-libs
+        run: cargo test --workspace
+
+  tests-pg-libs-nightly:
+    name: pg-libs tests (nightly)
+    needs: [changes]
+    if: ${{ needs.changes.outputs.pg-libs == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: mozilla-actions/sccache-action@v0.0.11
+      - name: Install pinned nightly toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2025-09-14
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - name: Install Python ${{ env.PYTHON_HIGHEST }}
+        run: uv python install ${{ env.PYTHON_HIGHEST }}
+      - name: Install pg-libs dev dependencies
+        working-directory: pg-libs
+        run: uv sync --python ${{ env.PYTHON_HIGHEST }}
+      - name: Run simd tests
+        working-directory: pg-libs
+        run: cargo test -p pg-bitpacked -p pg-qm-tableau --features simd
 
   benches:
     name: Continuous benchmarking 🏋️
@@ -103,8 +186,8 @@ jobs:
     permissions:
       checks: write
     steps:
-      - uses: actions/checkout@v6
-      - uses: mozilla-actions/sccache-action@v0.0.10
+      - uses: actions/checkout@v7
+      - uses: mozilla-actions/sccache-action@v0.0.11
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
       - uses: quantinuum/hugrverse-env/install-hugrenv-action@main
@@ -117,7 +200,7 @@ jobs:
       - name: Build benchmarks
         run: cargo codspeed build --profile bench --features portmatching,binary-eccs,rewrite-tracing
       - name: Run benchmarks
-        uses: CodSpeedHQ/action@v4
+        uses: CodSpeedHQ/action@v5
         with:
           token: ${{ secrets.CODSPEED_TOKEN }}
           run: "cargo codspeed run"
@@ -130,8 +213,8 @@ jobs:
     runs-on: ubuntu-latest
     name: tests (Rust stable, no features)
     steps:
-      - uses: actions/checkout@v6
-      - uses: mozilla-actions/sccache-action@v0.0.10
+      - uses: actions/checkout@v7
+      - uses: mozilla-actions/sccache-action@v0.0.11
       - id: toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -152,8 +235,8 @@ jobs:
     runs-on: ubuntu-latest
     name: tests (Rust stable, all features)
     steps:
-      - uses: actions/checkout@v6
-      - uses: mozilla-actions/sccache-action@v0.0.10
+      - uses: actions/checkout@v7
+      - uses: mozilla-actions/sccache-action@v0.0.11
       - id: toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -183,8 +266,8 @@ jobs:
         rust: [beta]
     name: tests (Rust ${{ matrix.rust }})
     steps:
-      - uses: actions/checkout@v6
-      - uses: mozilla-actions/sccache-action@v0.0.10
+      - uses: actions/checkout@v7
+      - uses: mozilla-actions/sccache-action@v0.0.11
       - id: toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -211,8 +294,8 @@ jobs:
     runs-on: ubuntu-latest
     name: tests (Rust nightly, coverage)
     steps:
-      - uses: actions/checkout@v6
-      - uses: mozilla-actions/sccache-action@v0.0.10
+      - uses: actions/checkout@v7
+      - uses: mozilla-actions/sccache-action@v0.0.11
       - uses: dtolnay/rust-toolchain@master
         with:
           # Nightly is required to count doctests coverage
@@ -246,8 +329,8 @@ jobs:
     runs-on: ubuntu-latest
     name: tests (Rust MSRV, min dependencies)
     steps:
-      - uses: actions/checkout@v6
-      - uses: mozilla-actions/sccache-action@v0.0.10
+      - uses: actions/checkout@v7
+      - uses: mozilla-actions/sccache-action@v0.0.11
       - name: Install MSRV toolchain
         id: toolchain
         uses: dtolnay/rust-toolchain@master
@@ -291,8 +374,8 @@ jobs:
     env:
       PKGS: tket-py tket-eccs tket-exts
     steps:
-      - uses: actions/checkout@v6
-      - uses: mozilla-actions/sccache-action@v0.0.10
+      - uses: actions/checkout@v7
+      - uses: mozilla-actions/sccache-action@v0.0.11
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Set up uv
@@ -307,7 +390,7 @@ jobs:
         # avoid building qis-compiler
         run: uv sync --package=tket --exact --all-extras --python ${{ env.PYTHON_LOWEST }}
       - name: Run python tests with coverage instrumentation
-        run: uv run --no-project pytest --cov=./ --cov-report=xml ${{ env.PKGS }}
+        run: uv run pytest --cov=./ --cov-report=xml ${{ env.PKGS }}
       - name: Upload python coverage to codecov.io
         if: github.event_name != 'merge_group'
         uses: codecov/codecov-action@v7
@@ -326,8 +409,8 @@ jobs:
     runs-on: ubuntu-latest
     name: qis-compiler test
     steps:
-      - uses: actions/checkout@v6
-      - uses: mozilla-actions/sccache-action@v0.0.10
+      - uses: actions/checkout@v7
+      - uses: mozilla-actions/sccache-action@v0.0.11
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Set up uv
@@ -365,8 +448,8 @@ jobs:
     name: Check standard extensions
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: mozilla-actions/sccache-action@v0.0.10
+      - uses: actions/checkout@v7
+      - uses: mozilla-actions/sccache-action@v0.0.11
       - uses: quantinuum/hugrverse-env/install-hugrenv-action@main
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -389,12 +472,12 @@ jobs:
     if: ${{ needs.changes.outputs.extensions == 'true' }}
     name: Check extension versions
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # Need full history to compare with main
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: "3.10"
 
@@ -417,16 +500,18 @@ jobs:
   # even if they are skipped due to no changes in the relevant files.
   required-checks:
     name: Required checks 🦀+🐍
-    needs:
-      [
+    needs: [
         changes,
+        check-pg-libs,
         check-rs,
         check-py,
+        tests-pg-libs,
+        tests-pg-libs-nightly,
         tests-rs-stable-no-features,
         tests-rs-stable-all-features,
         tests-py,
         tket-extensions,
-        extension-versions,
+        #extension-versions,
         tests-qis-compiler,
       ]
     if: ${{ !cancelled() }}

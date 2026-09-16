@@ -1,0 +1,35 @@
+# Currently pg-libs and the rest of the repo are separated workspaces.
+# We need to unset UV_PROJECT_ENVIRONMENT and VIRTUAL_ENV to avoid uv using the root python environment.
+sync-uv:
+    env -u UV_PROJECT_ENVIRONMENT -u VIRTUAL_ENV uv sync
+
+test-rust:
+    cargo test --workspace
+
+# When using the devenv shell, start it with the nightly profile,
+# and the toolchain does not need to be specified explicitly.
+test-rust-all-features_nix:
+    cargo test --workspace --all-features
+
+test-rust-all-features:
+    cargo +nightly-2025-09-14 test --workspace --all-features
+
+fix:
+    just fix-rust
+    just fix-python
+
+fix-rust:
+    cargo clippy --all-targets --all-features --workspace --fix --allow-staged --allow-dirty
+
+fix-python:
+    env -u UV_PROJECT_ENVIRONMENT -u VIRTUAL_ENV uv run ruff check --fix
+
+format:
+    just format-rust
+    just format-python
+
+format-rust:
+    cargo fmt
+
+format-python:
+    env -u UV_PROJECT_ENVIRONMENT -u VIRTUAL_ENV uv run ruff format

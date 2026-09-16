@@ -1,11 +1,11 @@
-import pytest
-
 from dataclasses import dataclass
 
+import pytest
+
+from tket._ops import TketOp
 from tket._state import (
     CompilationState,
 )
-from tket._ops import TketOp
 
 
 @dataclass

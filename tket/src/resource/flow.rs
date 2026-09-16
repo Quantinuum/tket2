@@ -6,7 +6,7 @@
 use crate::resource::types::ResourceId;
 use derive_more::derive::{Display, Error};
 use hugr::HugrView;
-use hugr::ops::{OpTrait, OpType};
+use hugr::ops::OpType;
 use hugr::types::Type;
 use itertools::{EitherOrBoth, Itertools};
 
@@ -96,11 +96,14 @@ pub struct DefaultResourceFlow;
 impl DefaultResourceFlow {
     /// Determine if an operation is resource-preserving based on input/output
     /// types.
-    fn is_resource_preserving(input_types: &[Type], output_types: &[Type]) -> bool {
+    fn is_resource_preserving(
+        input_types: impl IntoIterator<Item = Type>,
+        output_types: impl IntoIterator<Item = Type>,
+    ) -> bool {
         // An operation is resource-preserving if for each i, if input[i] or
         // output[i] is linear, then type(input[i]) == type(output[i])
 
-        for io_ty in input_types.iter().zip_longest(output_types.iter()) {
+        for io_ty in input_types.into_iter().zip_longest(output_types) {
             let (input_ty, output_ty) = match io_ty {
                 EitherOrBoth::Both(input_ty, output_ty) => (input_ty, output_ty),
                 EitherOrBoth::Left(ty) | EitherOrBoth::Right(ty) => {
@@ -132,31 +135,36 @@ impl<H: HugrView> ResourceFlow<H> for DefaultResourceFlow {
         inputs: &[Option<ResourceId>],
     ) -> Result<Vec<Option<ResourceId>>, UnsupportedOp> {
         let op = hugr.get_optype(node);
-        let signature = op.dataflow_signature().expect("dataflow op");
-        let input_types = signature.input_types();
-        let output_types = signature.output_types();
 
         debug_assert_eq!(
             inputs.len(),
-            input_types.len(),
+            op.value_input_count(),
             "Input resource array length must match operation input count"
         );
 
-        if Self::is_resource_preserving(input_types, output_types) {
-            Ok(retain_linear_types(inputs.to_vec(), output_types))
+        if Self::is_resource_preserving(
+            hugr.in_value_types(node).map(|(_, ty)| ty),
+            hugr.out_value_types(node).map(|(_, ty)| ty),
+        ) {
+            Ok(retain_linear_types(
+                inputs.to_vec(),
+                hugr.out_value_types(node).map(|(_, ty)| ty),
+                op.value_output_count(),
+            ))
         } else {
             // Not resource-preserving: all linear outputs are new resources (None)
-            Ok(vec![None; output_types.len()])
+            Ok(vec![None; op.value_output_count()])
         }
     }
 }
 
 fn retain_linear_types(
     mut resources: Vec<Option<ResourceId>>,
-    types: &[Type],
+    types: impl IntoIterator<Item = Type>,
+    output_count: usize,
 ) -> Vec<Option<ResourceId>> {
-    resources.resize(types.len(), None);
-    for (ty, resource) in types.iter().zip(resources.iter_mut()) {
+    resources.resize(output_count, None);
+    for (ty, resource) in types.into_iter().zip(resources.iter_mut()) {
         if ty.copyable() {
             *resource = None;
         }

@@ -1,20 +1,18 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#     "guppylang ==0.21.14",
-#     "guppylang-internals",
+#     "guppylang==1.0.0a5",
+#     "guppylang-internals==1.0.0a5",
 #     "tket",
 #     "pytket >=2.1.0,<3",
 # ]
-# [tool.uv.sources]
-# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", branch = "ts/future-measure"}  # noqa: E501
 # ///
 
 from pathlib import Path
 
-from guppylang import guppy
+from guppylang import enable_experimental_features, guppy
 from guppylang.std.angles import pi
-from guppylang.std.builtins import array, exit, panic, result
+from guppylang.std.builtins import array, control, dagger, exit, panic, result
 from guppylang.std.qsystem.random import RNG
 from guppylang.std.qsystem.utils import get_current_shot
 from guppylang.std.quantum import (
@@ -250,6 +248,22 @@ def entry_args() -> bytes:
     return foo.compile_function().to_bytes()
 
 
+def simple_modifier() -> bytes:
+    enable_experimental_features()
+
+    @guppy
+    def main() -> None:
+        q0 = qubit()
+        q1 = qubit()
+        h(q0)
+        with control(q0), dagger:
+            t(q1)
+        result("c0", measure(q0).read())
+        result("c1", measure(q1).read())
+
+    return main.compile().to_bytes()
+
+
 if __name__ == "__main__":
     for func in [
         check,
@@ -267,6 +281,7 @@ if __name__ == "__main__":
         qft_32,
         rng,
         entry_args,
+        simple_modifier,
     ]:
         turn_on_debug_mode()
         envelope = func()

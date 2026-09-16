@@ -1,11 +1,11 @@
 """GPU extension operations."""
 
 import functools
-from typing import List
 
 from hugr.ext import Extension, OpDef, TypeDef
 from hugr.ops import ExtOp
-from hugr.tys import ExtType, Type, TypeTypeArg, BoundedNatArg, ListArg, StringArg
+from hugr.tys import BoundedNatArg, ExtType, ListArg, StringArg, Type, TypeTypeArg
+
 from ._util import TketExtension, load_extension
 
 
@@ -17,7 +17,7 @@ class GpuExtension(TketExtension):
         """Returns the gpu extension"""
         return load_extension("tket.gpu")
 
-    def TYPES(self) -> List[TypeDef]:
+    def TYPES(self) -> list[TypeDef]:
         """Return the types defined by this extension"""
         return [
             self.context.type_def,
@@ -26,7 +26,7 @@ class GpuExtension(TketExtension):
             self.result_def,
         ]
 
-    def OPS(self) -> List[OpDef]:
+    def OPS(self) -> list[OpDef]:
         """Return the operations defined by this extension"""
         return [
             self.call_def,
@@ -50,7 +50,7 @@ class GpuExtension(TketExtension):
         """
         return self().get_type("func")
 
-    def func(self, inputs: List[Type], outputs: List[Type]) -> ExtType:
+    def func(self, inputs: list[Type], outputs: list[Type]) -> ExtType:
         """GPU function type signature (instantiated).
 
         Args:
@@ -73,7 +73,7 @@ class GpuExtension(TketExtension):
         """GPU module."""
         return self().get_type("result")
 
-    def result(self, outputs: List[Type]) -> ExtType:
+    def result(self, outputs: list[Type]) -> ExtType:
         return self.result_def.instantiate([ListArg([TypeTypeArg(t) for t in outputs])])
 
     @functools.cached_property
@@ -90,7 +90,7 @@ class GpuExtension(TketExtension):
         """
         return self().get_op("call")
 
-    def call(self, inputs: List[Type], outputs: List[Type]) -> ExtOp:
+    def call(self, inputs: list[Type], outputs: list[Type]) -> ExtOp:
         """Call a function in a context, returning a `Result`.
 
         Args:
@@ -123,7 +123,7 @@ class GpuExtension(TketExtension):
         """
         return self().get_op("lookup_by_id")
 
-    def lookup_by_id(self, id: int, inputs: List[Type], outputs: List[Type]) -> ExtOp:
+    def lookup_by_id(self, id: int, inputs: list[Type], outputs: list[Type]) -> ExtOp:
         """Lookup a function in a module by name and signature.
 
         Args:
@@ -149,7 +149,7 @@ class GpuExtension(TketExtension):
         return self().get_op("lookup_by_name")
 
     def lookup_by_name(
-        self, name: str, inputs: List[Type], outputs: List[Type]
+        self, name: str, inputs: list[Type], outputs: list[Type]
     ) -> ExtOp:
         """Lookup a function in a module by name and signature.
 
@@ -175,7 +175,7 @@ class GpuExtension(TketExtension):
         """
         return self().get_op("read_result")
 
-    def read_result(self, outputs: List[Type]) -> ExtOp:
+    def read_result(self, outputs: list[Type]) -> ExtOp:
         """Read the result of a function call.
 
         Args:

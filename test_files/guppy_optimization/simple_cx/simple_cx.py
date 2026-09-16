@@ -1,18 +1,17 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang ==0.21.13",
+#     "guppylang==1.0.0a5",
+#     "guppylang-internals==1.0.0a5",
 # ]
-# [tool.uv.sources]
-# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", branch = "ts/future-measure"}
 # ///
 
 from pathlib import Path
 from sys import argv
 
 from guppylang import guppy
-from guppylang.std.quantum import cx, measure, qubit
 from guppylang.std.builtins import result
+from guppylang.std.quantum import cx, measure, qubit
 
 
 @guppy

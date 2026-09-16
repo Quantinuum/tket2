@@ -1,9 +1,9 @@
 """Modifier extension operations."""
 
 import functools
-from typing import List
 
 from hugr.ext import Extension, OpDef, TypeDef
+
 from ._util import TketExtension, load_extension
 
 
@@ -15,11 +15,11 @@ class ModifierExtension(TketExtension):
         """Returns the quantum extension"""
         return load_extension("tket.modifier")
 
-    def TYPES(self) -> List[TypeDef]:
+    def TYPES(self) -> list[TypeDef]:
         """Return the types defined by this extension"""
         return []
 
-    def OPS(self) -> List[OpDef]:
+    def OPS(self) -> list[OpDef]:
         """Return the operations defined by this extension"""
         return [
             self.control,

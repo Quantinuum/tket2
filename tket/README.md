@@ -37,11 +37,6 @@ let mut circ: Circuit = ser.decode(DecodeOptions::new()).unwrap().into();
 assert_eq!(circ.qubit_count(), 9);
 assert_eq!(circ.num_operations(), 170);
 
-// Traverse the circuit and print the gates.
-for command in circ.commands() {
-    println!("{:?}", command.optype());
-}
-
 // Render the circuit as a mermaid diagram.
 println!("{}", circ.mermaid_string());
 

@@ -6,6 +6,9 @@
 # Add specific rules below.
 # Lower the rule, higher the precedence
 
+# Codeowners for the pg-libs subproject
+pg-libs/** @quantinuum/pg-libs
+
 # The release PRs that trigger publication to PyPI always modify the changelog.
 # We require those PRs to be approved by someone with release permissions.
 **/CHANGELOG.md @aborgna-q @cqc-alec @ss2165 @doug-q

@@ -12,14 +12,12 @@
 //! let mut hugr = Hugr::new();
 //! let node = hugr.entrypoint();
 //!
-//! hugr.set_metadata::<metadata::MaxQubitsHint>(node, 3);
 //! hugr.set_metadata::<metadata::PytketInputParameters>(node, vec!["theta".to_string()]);
 //! hugr.set_metadata::<metadata::PytketQubitRegisterNames>(
 //!     node,
 //!     vec![Qubit::from(ElementId("q".to_string(), vec![0]))],
 //! );
 //!
-//! assert_eq!(hugr.get_metadata::<metadata::MaxQubitsHint>(node), Some(3));
 //! assert_eq!(
 //!     hugr.get_metadata::<metadata::PytketInputParameters>(node),
 //!     Some(vec!["theta".to_string()]),
@@ -32,11 +30,15 @@ use crate::rewrite::trace::RewriteTrace;
 use hugr_core::metadata::Metadata;
 use tket_json_rs::register::{Bit, Qubit};
 
+/// The name of a function, used to reference custom implementations.
+pub type FunctionName = String;
+
 /// Metadata key for the number of qubits that a HUGR node expects to be required for execution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct MaxQubitsHint;
-impl Metadata for MaxQubitsHint {
-    const KEY: &'static str = "tket.hint.max_qubits";
+pub struct ExpectedQubitsHint;
+impl Metadata for ExpectedQubitsHint {
+    const KEY: &'static str = "tket.hint.expected_qubits";
+    const ALIASES: &'static [&'static str] = &["tket.hint.max_qubits"];
     type Type<'hugr> = u32;
 }
 
@@ -71,14 +73,50 @@ impl Metadata for CircuitRewriteTraces {
 }
 
 /// Metadata key for flagging unitarity constraints / modifiers on a HUGR node
-///
-/// See crate::modifier::ModifierFlags
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UnitaryFlags;
 impl Metadata for UnitaryFlags {
     const KEY: &'static str = "tket.unitary";
     const ALIASES: &'static [&'static str] = &["unitary"];
     type Type<'hugr> = u8;
+}
+
+/// Metadata key for the daggered custom implementations of a function.
+///
+/// This is used to store the name of the custom daggered implementation of a function, if present.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct DaggeredImplementation;
+impl Metadata for DaggeredImplementation {
+    const KEY: &'static str = "tket.daggered";
+    type Type<'hugr> = FunctionName;
+}
+
+/// Metadata key for the controlled custom implementations of a function.
+///
+/// This is used to store the names of the custom controlled implementations of a function, if present.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ControlledImplementations;
+impl Metadata for ControlledImplementations {
+    const KEY: &'static str = "tket.controlled";
+    type Type<'hugr> = Vec<FunctionName>;
+}
+
+/// Metadata key for the controlled-daggered custom implementations of a function.
+///
+/// This is used to store the names of the custom controlled-daggered implementations of a function, if present.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct CtrlDaggeredImplementations;
+impl Metadata for CtrlDaggeredImplementations {
+    const KEY: &'static str = "tket.ctrl_daggered";
+    type Type<'hugr> = Vec<FunctionName>;
+}
+
+/// Metadata key for number of control qubits for the controlled implementations of a function.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct NumControlQubits;
+impl Metadata for NumControlQubits {
+    const KEY: &'static str = "tket.num_control_qubits";
+    type Type<'hugr> = usize;
 }
 
 // Metadata keys used for pytket compatibility.
@@ -115,53 +153,19 @@ impl Metadata for PytketQubitRegisterNames {
     type Type<'hugr> = Vec<Qubit>;
 }
 
-/// Metadata key for the global phase
+/// Metadata key for the serialized pytket global phase expression.
+///
+/// Deprecated: global phases are now represented as explicit
+/// `tket.global_phase` operations. This definition is left for
+/// compatibility with older Hugrs.
+#[deprecated(
+    since = "0.21.1",
+    note = "use explicit tket.global_phase operations instead"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PytketPhaseExpr;
+#[expect(deprecated, reason = "the impl is retained for legacy HUGR metadata")]
 impl Metadata for PytketPhaseExpr {
     const KEY: &'static str = "TKET1.phase";
     type Type<'hugr> = &'hugr str;
 }
-
-/// Deprecated alias for [`MaxQubitsHint`].
-#[deprecated(
-    since = "0.19.0",
-    note = "use MaxQubitsHint instead; this alias will be removed"
-)]
-pub type MaxQubits = MaxQubitsHint;
-/// Deprecated alias for [`UnitaryFlags`].
-#[deprecated(
-    since = "0.19.0",
-    note = "use UnitaryFlags instead; this alias will be removed"
-)]
-pub type Unitary = UnitaryFlags;
-/// Deprecated alias for [`PytketInputParameters`].
-#[deprecated(
-    since = "0.19.0",
-    note = "use PytketInputParameters instead; this alias will be removed"
-)]
-pub type InputParameters = PytketInputParameters;
-/// Deprecated alias for [`PytketOpGroup`].
-#[deprecated(
-    since = "0.19.0",
-    note = "use PytketOpGroup instead; this alias will be removed"
-)]
-pub type OpGroup = PytketOpGroup;
-/// Deprecated alias for [`PytketBitRegisterNames`].
-#[deprecated(
-    since = "0.19.0",
-    note = "use PytketBitRegisterNames instead; this alias will be removed"
-)]
-pub type BitRegisters = PytketBitRegisterNames;
-/// Deprecated alias for [`PytketQubitRegisterNames`].
-#[deprecated(
-    since = "0.19.0",
-    note = "use PytketQubitRegisterNames instead; this alias will be removed"
-)]
-pub type QubitRegisters = PytketQubitRegisterNames;
-/// Deprecated alias for [`PytketPhaseExpr`].
-#[deprecated(
-    since = "0.19.0",
-    note = "use PytketPhaseExpr instead; this alias will be removed"
-)]
-pub type Phase = PytketPhaseExpr;

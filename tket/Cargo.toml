@@ -1,6 +1,6 @@
 [package]
 name = "tket"
-version = "0.20.0"
+version = "0.22.0"
 edition = { workspace = true }
 rust-version = { workspace = true }
 
@@ -83,7 +83,7 @@ basic-passes = { workspace = true }
 greedy-synth = { workspace = true }
 pg-optimise = { workspace = true }
 fast-todd = { workspace = true }
-ascent = "0.8.0"
+ascent = { version = "0.8.1", default-features = false }
 pastey = { workspace = true }
 thiserror = { workspace = true }
 

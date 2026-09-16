@@ -15,6 +15,7 @@
             {
               "t": "Opaque",
               "extension": "arithmetic.int.types",
+              "extension_version": "0.1.0",
               "id": "int",
               "args": [
                 {

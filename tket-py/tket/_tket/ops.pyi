@@ -1,5 +1,5 @@
+from collections.abc import Iterable
 from enum import Enum
-from typing import Any, Iterable
 
 from tket._tket.types import HugrType
 
@@ -49,15 +49,12 @@ class TketOp(Enum):
     def qualified_name(self) -> str:
         """Return the fully qualified name of the operation, including the extension."""
 
-    def __str__(self) -> str:
-        """Get the string name of the operation."""
-
     def __eq__(self, value: object) -> bool: ...
 
 class Pauli(Enum):
     """Simple enum representation of Pauli matrices."""
 
-    I = "I"  # noqa: E741
+    I = "I"
     X = "X"
     Y = "Y"
     Z = "Z"
@@ -73,10 +70,7 @@ class Pauli(Enum):
     def values() -> Iterable[Pauli]:
         """Iterate over all Pauli matrix variants."""
 
-    def __str__(self) -> str:
-        """Get the string name of the Pauli."""
-
-    def __eq__(self, value: Any) -> bool: ...
+    def __eq__(self, value: object) -> bool: ...
 
 class CustomOp:
     """A HUGR custom operation."""

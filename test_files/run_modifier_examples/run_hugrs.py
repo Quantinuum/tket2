@@ -1,20 +1,19 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang ==0.21.15",
+#    "guppylang==1.0.0rc1",
 # ]
-# [tool.uv.sources]
-# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", branch = "na/temporary-cherrypicked"}
 # ///
 """Run on selene the passed hugrs"""
 
-from pathlib import Path
 import shutil
 import sys
+from pathlib import Path
+
 import numpy as np
 import numpy.typing as npt
-from hugr import Hugr
 from guppylang.emulator import EmulatorBuilder
+from hugr import Hugr
 
 
 def format_statevector(
@@ -63,6 +62,18 @@ for hugr_path in hugr_paths:
 
     builder = EmulatorBuilder()
     emulator = builder.build(package, n_qubits=9)
+
+    # panic_in_control is expected to panic
+    if "panic_in_control_solved" == hugr_path.stem:
+        try:
+            emulator.statevector_sim().run()
+        except Exception as err:  # noqa: BLE001
+            print(
+                f"\t{hugr_path.stem} panicked as expected: {str(err).splitlines()[0]}"
+            )
+            continue
+        raise SystemExit(f"Expected {hugr_path.stem} to panic, but it completed.")
+
     state = emulator.statevector_sim().run()
     res = state.partial_state_dicts()[0]["r"].as_single_state()
     output_path = (
