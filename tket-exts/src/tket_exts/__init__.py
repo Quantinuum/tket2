@@ -14,6 +14,7 @@ from tket_exts.tket.gpu import GpuExtension
 from tket_exts.tket.guppy import GuppyExtension
 from tket_exts.tket.measurement import MeasurementExtension
 from tket_exts.tket.modifier import ModifierExtension
+from tket_exts.tket.pauli_exp import PauliExpExtension
 from tket_exts.tket.qsystem import (
     QSystemExtension,
     QSystemHeliosExtension,
@@ -41,6 +42,7 @@ __all__ = [
     "guppy",
     "measurement",
     "modifier",
+    "pauli_exp",
     "qsystem",
     "qsystem_helios",
     "qsystem_random",
@@ -66,6 +68,7 @@ quantum: QuantumExtension = tket.quantum.QuantumExtension()
 result: ResultExtension = tket.result.ResultExtension()
 wasm: WasmExtension = tket.wasm.WasmExtension()
 modifier: ModifierExtension = tket.modifier.ModifierExtension()
+pauli_exp: PauliExpExtension = tket.pauli_exp.PauliExpExtension()
 global_phase: GlobalPhaseExtension = tket.global_phase.GlobalPhaseExtension()
 globals: GlobalsExtension = tket.globals.GlobalsExtension()
 measurement: MeasurementExtension = tket.measurement.MeasurementExtension()
@@ -100,6 +103,7 @@ def tket_registry() -> ExtensionRegistry:
         tket.result.ResultExtension(),
         tket.wasm.WasmExtension(),
         tket.modifier.ModifierExtension(),
+        tket.pauli_exp.PauliExpExtension(),
         tket.global_phase.GlobalPhaseExtension(),
         tket.measurement.MeasurementExtension(),
         tket.argument.ArgumentExtension(),
