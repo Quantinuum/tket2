@@ -130,24 +130,11 @@ impl ComposablePass<Hugr> for GreedyPauliSimpPass {
 
             serial_circ.commands = pauli_graph_to_cmds(pauli_graph, &register_map)?;
         }
-
-        // encoded_circs
-        //     .reassemble_inplace(
-        //         circ.hugr_mut(),
-        //         Some(Arc::new(default_decoder_config())),
-        //     )?;
-        
         encoded_circs
             .reassemble_inplace(
                 hugr,
                 Some(Arc::new(default_decoder_config())),
             )?;
-
-        // circ.hugr().validate()?;
-        //
-        // let mermaid_string = circ.mermaid_string();
-        //
-        // *hugr = circ.into_hugr();
 
         Ok(())
     }
