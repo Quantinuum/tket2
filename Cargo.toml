@@ -103,6 +103,11 @@ cool_asserts = "2.0.4"
 zstd = "0.14.0"
 anyhow = "1.0.102"
 num-rational = "0.4.2"
+pg-core = { path = "pg-libs/pg-core" }
+pg-canonical-form = { path = "pg-libs/pg-passes/pg-canonical-form" }
+pg-greedy-synth = { path = "pg-libs/pg-passes/pg-greedy-synth" }
+pg-optimise = { path = "pg-libs/pg-passes/pg-optimise" }
+pg-rebase = { path = "pg-libs/pg-passes/pg-rebase" }
 
 [profile.release.package.tket-py]
 # Some configurations to reduce the size of tket wheels

@@ -18,6 +18,15 @@ use tket::{Circuit, TketOp};
 
 use tket::passes;
 
+fn parse_parallel_mode(s: &str) -> Option<pg_greedy_synth::ParallelMode> {
+    match s.trim() {
+        "Auto" => Some(pg_greedy_synth::ParallelMode::Auto),
+        "On" => Some(pg_greedy_synth::ParallelMode::On),
+        "Off" => Some(pg_greedy_synth::ParallelMode::Off),
+        _ => None,
+    }
+}
+
 use crate::optimiser::PyBadgerOptimiser;
 use crate::state::CompilationState;
 use crate::utils::{ConvertPyErr, create_py_exception};
@@ -34,6 +43,7 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     m.add_class::<self::chunks::PyCircuitChunks>()?;
     m.add_function(wrap_pyfunction!(self::chunks::chunks, &m)?)?;
     m.add_function(wrap_pyfunction!(self::tket1::tket1_pass, &m)?)?;
+    m.add_function(wrap_pyfunction!(greedy_resynth, &m)?)?;
     m.add_function(wrap_pyfunction!(resolve_modifiers, &m)?)?;
     m.add_function(wrap_pyfunction!(qsystem::qsystem_rebase_pass, &m)?)?;
     m.add_function(wrap_pyfunction!(qsystem::qsystem_llvm_pass, &m)?)?;
@@ -62,6 +72,12 @@ create_py_exception!(
     tket::passes::modifier_resolver::ModifierResolverErrors,
     PyModifierResolverError,
     "Errors from the modifer resolver pass."
+);
+
+create_py_exception!(
+    tket::passes::greedy_resynth::GreedyResynthErrors,
+    GreedyResynthError,
+    "Errors from the greedy resynth pass."
 );
 
 create_py_exception!(
@@ -227,6 +243,40 @@ fn badger_optimise(
 fn resolve_modifiers(circ: &mut CompilationState, scope: Option<PyPassScope>) -> PyResult<()> {
     let py_scope = scope.unwrap_or_default();
     let pass = tket::passes::ModifierResolverPass::default_with_scope(py_scope.scope);
+    pass.run(&mut circ.hugr).convert_pyerrs()?;
+    Ok(())
+}
+
+#[pyfunction]
+#[pyo3(signature = (circ, scope = None, window_size=None, pool_size=None, top_up_size=None, seed=None, parallel_mode=None))]
+fn greedy_resynth(
+    circ: &mut CompilationState,
+    scope: Option<PyPassScope>,
+    window_size: Option<usize>,
+    pool_size: Option<usize>,
+    top_up_size: Option<usize>,
+    seed: Option<usize>,
+    parallel_mode: Option<String>,
+) -> PyResult<()> {
+    let py_scope = scope.unwrap_or_default();
+    let mut pass = tket::passes::GreedyResynthPass::default_with_scope(py_scope.scope);
+    if let Some(ws) = window_size {
+        pass = pass.with_window_size(ws);
+    }
+    if let Some(ps) = pool_size {
+        pass = pass.with_pool_size(ps);
+    }
+    if let Some(tus) = top_up_size {
+        pass = pass.with_top_up_size(tus);
+    }
+    if let Some(s) = seed {
+        pass = pass.with_seed(s as u64);
+    }
+    let parallel_mode = parallel_mode
+        .and_then(|s| parse_parallel_mode(&s))
+        .unwrap_or(pg_greedy_synth::ParallelMode::Auto);
+    pass = pass.with_parallel_mode(parallel_mode);
+
     pass.run(&mut circ.hugr).convert_pyerrs()?;
     Ok(())
 }

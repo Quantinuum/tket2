@@ -30,6 +30,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "Cliffordize",
+    "GreedyResynthPass",
     "InlineFuncsHeuristic",
     "InlineFunctions",
     "ModifierResolverPass",
@@ -503,6 +504,51 @@ class QSystemRebasePass(ComposablePass):
             scope=self._scope,
         )
         return program
+
+
+@dataclass
+class GreedyResynthPass(ComposablePass):
+    """Resynthesise a circuit using greedy resynth.
+    Converts the circuit into a Pauli Graph and uses GreedyResynth to synthesize the pauli graph.
+    Parameters:
+    - ancilla_budget: The number of ancilla qubits to use.
+    """
+
+    window_size: int | None = None
+    pool_size: int | None = None
+    top_up_size: int | None = None
+    seed: int | None = None
+    parallel_mode: str = "auto"
+    _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
+    
+    def with_scope(self, scope: PassScope) -> GreedyResynthPass:
+        """Set the scope of this pass and return self."""
+        self._scope = scope
+        return self
+
+    def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
+        return implement_pass_run(
+            self,
+            hugr=hugr,
+            inplace=inplace,
+            copy_call=lambda h: self._greedy_resynth(h, inplace),
+        )
+
+    def _greedy_resynth(self, hugr: Hugr, inplace: bool) -> PassResult:
+        program = _state.CompilationState.from_python(hugr)
+        _passes.greedy_resynth(
+            program._inner,
+            scope=self._scope,
+            window_size=self.window_size,
+            pool_size=self.pool_size,
+            top_up_size=self.top_up_size,
+            seed=self.seed,
+            parallel_mode=self.parallel_mode
+        )
+        package = program.to_python()
+        return PassResult.for_pass(
+            self, hugr=package.modules[0], inplace=inplace, result=None
+        )
 
 
 @dataclass(kw_only=True)

@@ -14,6 +14,11 @@ pub use borrow_squash::BorrowSquashPass;
 pub mod commutation;
 pub use commutation::apply_greedy_commutation;
 
+pub mod greedy_resynth;
+pub use greedy_resynth::GreedyResynthPass;
+
+pub mod pg_convert;
+
 // Constant folding pass.
 pub mod const_fold;
 pub use const_fold::ConstantFoldPass;

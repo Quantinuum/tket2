@@ -102,6 +102,20 @@ def tket1_pass(
       Defaults to the platform-agnostic ``"tket"`` target.
     """
 
+def greedy_resynth(
+    circ: CompilationState,
+    scope: PassScope = GlobalScope.PRESERVE_PUBLIC,
+    window_size: int | None = None,
+    pool_size: int | None = None,
+    top_up_size: int | None = None,
+    seed: int | None = None,
+    parallel_mode: str = "auto",
+) -> None:
+    """Applies GreedyResynth to optimize a hugr.
+
+    Parameters:
+    """
+
 def resolve_modifiers(
     circ: CompilationState, scope: PassScope = GlobalScope.PRESERVE_PUBLIC
 ) -> None:
