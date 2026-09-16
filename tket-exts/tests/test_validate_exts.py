@@ -176,6 +176,11 @@ def ext_quantum() -> tuple[TketExtension, list[ExtType], list[ExtOp]]:
     )
 
 
+def ext_pauli_exp() -> tuple[TketExtension, list[ExtType], list[ExtOp]]:
+    ext = tket_exts.pauli_exp
+    return ext, [], [ext.pauli_exp(4, [0, 1, 2, 3])]
+
+
 def ext_result() -> tuple[TketExtension, list[ExtType], list[ExtOp]]:
     ext = tket_exts.result
     return (
@@ -251,6 +256,7 @@ def ext_argument() -> tuple[TketExtension, list[ExtType], list[ExtOp]]:
         ext_qsystem_random,
         ext_qsystem_utils,
         ext_quantum,
+        ext_pauli_exp,
         ext_result,
         ext_rotation,
         ext_tket1,
