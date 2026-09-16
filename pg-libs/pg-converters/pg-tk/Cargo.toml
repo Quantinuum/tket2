@@ -10,5 +10,8 @@ serde_json = {workspace = true}
 uuid = {version = "1.23.3", features = ["v4"]}
 thiserror = {workspace = true}
 
+[dev-dependencies]
+rstest = { workspace = true }
+
 [lints]
 workspace = true
