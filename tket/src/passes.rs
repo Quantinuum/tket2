@@ -40,6 +40,9 @@ pub use dead_funcs::{RemoveDeadFuncsError, RemoveDeadFuncsPass};
 // Force a topological order on nodes.
 pub mod force_order;
 
+// pub mod fast_todd;
+// pub use fast_todd::{apply_fast_todd, apply_fast_todd_to_pauli_graph, FastToddResult, FastToddError};
+
 // Normalize the structure of Guppy-generated programs.
 pub mod guppy;
 pub use guppy::NormalizeGuppy;

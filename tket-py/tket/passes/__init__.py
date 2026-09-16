@@ -385,6 +385,7 @@ class GreedyPauliSimpPass(ComposablePass):
         program = _state.CompilationState.from_python(hugr)
         _passes.greedy_pauli_simp(
             program._inner,
+            scope=self._scope,
             window_size=self.window_size,
             pool_size=self.pool_size,
             top_up_size=self.top_up_size,

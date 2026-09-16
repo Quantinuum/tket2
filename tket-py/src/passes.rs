@@ -8,7 +8,7 @@ pub mod tket1;
 use hugr::HugrView;
 pub(crate) use scope::PyPassScope;
 
-use std::{cmp::min, convert::TryInto, fs, num::NonZeroUsize, path::PathBuf};
+use std::{cmp::min, convert::TryInto, fs, num::NonZeroUsize, path::PathBuf, str::FromStr};
 
 use pyo3::prelude::*;
 use tket::optimiser::badger::BadgerOptions;
@@ -36,6 +36,7 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     m.add_function(wrap_pyfunction!(greedy_pauli_simp, &m)?)?;
     m.add_function(wrap_pyfunction!(resolve_modifiers, &m)?)?;
     m.add_function(wrap_pyfunction!(qsystem_rebase_pass, &m)?)?;
+    m.add_function(wrap_pyfunction!(t_optimization, &m)?)?;
     m.add("PullForwardError", py.get_type::<PyPullForwardError>())?;
     m.add(
         "InlineFunctionsError",
@@ -65,8 +66,8 @@ create_py_exception!(
 
 create_py_exception!(
     tket::passes::t_optimization::GlobalTResynthesisErrors,
-    PyGlobalTResynthesisError,
-    "Errors from the global T resynthesis pass."
+    PyTOptimizationError,
+    "Errors from the TOptimization pass."
 );
 
 create_py_exception!(
