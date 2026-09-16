@@ -78,11 +78,11 @@ zstd = { workspace = true, optional = true }
 anyhow = { workspace = true, optional = true }
 num-rational = { workspace = true }
 regex = { workspace = true }
-pauli-graph = { workspace = true }
-basic-passes = { workspace = true }
-greedy-synth = { workspace = true }
+pg-core = { workspace = true }
+pg-canonical-form = { workspace = true }
+pg-greedy-synth = { workspace = true }
 pg-optimise = { workspace = true }
-fast-todd = { workspace = true }
+pg-rebase = { workspace = true }
 ascent = { version = "0.8.1", default-features = false }
 pastey = { workspace = true }
 thiserror = { workspace = true }

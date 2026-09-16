@@ -9,7 +9,7 @@ pub mod tket1;
 use hugr::HugrView;
 pub(crate) use scope::PyPassScope;
 
-use std::{cmp::min, convert::TryInto, fs, num::NonZeroUsize, path::PathBuf, str::FromStr};
+use std::{cmp::min, convert::TryInto, fs, num::NonZeroUsize, path::PathBuf};
 
 use pyo3::prelude::*;
 use tket::optimiser::badger::BadgerOptions;
@@ -17,6 +17,15 @@ use tket::passes::composable::{ComposablePass, WithScope};
 use tket::{Circuit, TketOp};
 
 use tket::passes;
+
+fn parse_parallel_mode(s: &str) -> Option<pg_greedy_synth::ParallelMode> {
+    match s.trim() {
+        "Auto" => Some(pg_greedy_synth::ParallelMode::Auto),
+        "On" => Some(pg_greedy_synth::ParallelMode::On),
+        "Off" => Some(pg_greedy_synth::ParallelMode::Off),
+        _ => None,
+    }
+}
 
 use crate::optimiser::PyBadgerOptimiser;
 use crate::state::CompilationState;
@@ -271,8 +280,8 @@ fn greedy_pauli_simp(
         pass = pass.with_seed(s as u64);
     }
     let parallel_mode = parallel_mode
-        .and_then(|s| greedy_synth::ParallelMode::from_str(&s).ok())
-        .unwrap_or(greedy_synth::ParallelMode::Auto);
+        .and_then(|s| parse_parallel_mode(&s))
+        .unwrap_or(pg_greedy_synth::ParallelMode::Auto);
     pass = pass.with_parallel_mode(parallel_mode);
 
     pass.run(&mut circ.hugr).convert_pyerrs()?;
@@ -309,8 +318,8 @@ fn t_optimization(
         pass = pass.with_seed(s as u64);
     }
     let parallel_mode = parallel_mode
-        .and_then(|s| greedy_synth::ParallelMode::from_str(&s).ok())
-        .unwrap_or(greedy_synth::ParallelMode::Auto);
+        .and_then(|s| parse_parallel_mode(&s))
+        .unwrap_or(pg_greedy_synth::ParallelMode::Auto);
     pass = pass.with_parallel_mode(parallel_mode);
 
     pass.run(&mut circ.hugr).convert_pyerrs()?;

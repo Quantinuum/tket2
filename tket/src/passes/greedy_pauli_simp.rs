@@ -13,9 +13,10 @@ use crate::serialize::pytket::{
 };
 
 use hugr::hugr::ValidationError;
-use pauli_graph::{GateType, PauliGraphPass};
-use basic_passes::CanonicalFormPass;
-use greedy_synth::{GreedySynthPass, ParallelMode, RebaseTQEToZXPass};
+use pg_core::{GateType, PGPass};
+use pg_canonical_form::CanonicalFormPass;
+use pg_greedy_synth::{GreedySynthPass, ParallelMode};
+use pg_rebase::RebaseTQEToZXPass;
 use pg_optimise::{GroupCommutingOpsPass, RotationMergingPass};
 use hugr::{Hugr, Node};
 use std::sync::Arc;

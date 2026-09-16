@@ -16,12 +16,12 @@ use hugr::hugr::hugrmut::HugrMut;
 use hugr::ops::{OpTag, OpTrait};
 use hugr::types::EdgeKind;
 use hugr_core::hugr::internal::{HugrInternals, PortgraphNodeMap};
-use pauli_graph::{BlackBoxData, GateData, GateType, Op, PauliGraph, PauliGraphPass};
-use basic_passes::CanonicalFormPass;
-use greedy_synth::{GreedySynthPass, ParallelMode, RebaseTQEToZXPass};
+use pg_core::{BlackBoxData, GateData, GateType, Op, PauliGraph, PGPass};
+use pg_canonical_form::CanonicalFormPass;
+use pg_greedy_synth::{GreedySynthPass, ParallelMode};
 use petgraph::visit as pv;
 use pg_optimise::{GroupCommutingOpsPass, RotationMergingPass};
-use fast_todd::FastTODDPass;
+use pg_rebase::RebaseTQEToZXPass;
 
 use hugr::{Hugr, Node};
 use hugr::HugrView;
@@ -205,8 +205,6 @@ impl ComposablePass<Hugr> for TOptimizationPass {
             let canonical_pass = CanonicalFormPass::new().with_forward(true);
             let grouping_pass = GroupCommutingOpsPass::new();
             let rotation_merging_pass = RotationMergingPass::new();
-            // let fast_todd_pass = FastTODDPass::new()
-            //    .with_ancilla_budget(self.ancilla_budget);
             let rebase_pass = RebaseTQEToZXPass::new()
                 .with_allowed_tqes(vec![GateType::ZX]);
             
@@ -228,7 +226,6 @@ impl ComposablePass<Hugr> for TOptimizationPass {
 
             let pauli_graph = canonical_pass.transform(&pauli_graph);
             let pauli_graph = rotation_merging_pass.transform(&pauli_graph);
-            // let pauli_graph = fast_todd_pass.transform(&pauli_graph);
             let pauli_graph = grouping_pass.transform(&pauli_graph);
             let pauli_graph = synth_pass.transform(&pauli_graph);
             let pauli_graph = rebase_pass.transform(&pauli_graph);

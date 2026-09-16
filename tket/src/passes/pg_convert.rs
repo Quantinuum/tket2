@@ -1,4 +1,4 @@
-use pauli_graph::{BlackBoxData, GateData, GateType, Op, PauliGraph};
+use pg_core::{BlackBoxData, GateData, GateType, Op, PauliGraph};
 use tket_json_rs::circuit_json::{Command, Operation};
 use tket_json_rs::register::{Bit, ElementId, Qubit};
 use tket_json_rs::{OpType, SerialCircuit};
