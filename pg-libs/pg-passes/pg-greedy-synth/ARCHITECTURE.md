@@ -38,7 +38,7 @@ type is used to update packed data and to calculate raw cost changes.
 two qubit entangling (TQE) gate candidates.
 
 > [!NOTE]
-> TQE gates are XX, XY, XZ, YY, YZ and ZZ. Each can be obtained by
+> The TQE gates are XX, XY, XZ, YY, YZ and ZZ. Each can be obtained by
 > conjugating the CX gate with local Clifford gates.
 
 The reducer creates a `PackedPGSlice`, a `Frontier` and a `GatePool`.
