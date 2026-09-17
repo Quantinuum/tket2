@@ -1557,7 +1557,7 @@ impl Tableau {
     ///
     /// * `pauli_z_bits` - Z bits of the Pauli string
     /// * `pauli_x_bits` - X bits of the Pauli string
-    /// * `half_pis` - number of half pi turns, [0,1,2,3]
+    /// * `half_pis` - number of half pi turns, \[0,1,2,3\]
     ///
     /// # Panics
     ///
@@ -1614,7 +1614,7 @@ impl Tableau {
     }
 
     /// Invert the tableau
-    /// https://algassert.com/post/2002
+    /// <https://algassert.com/post/2002>
     pub fn invert(&self) -> Tableau {
         self.invert_with(Tableau::apply_to_pauli, Tableau::apply_to_pauli_mt)
     }
