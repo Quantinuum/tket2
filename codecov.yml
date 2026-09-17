@@ -2,7 +2,7 @@
 
 # Ignore tests and binaries
 ignore:
-  - "tket-py/test"
+  - "tket/tket-py/test"
   - "scripts"
   - "test_files"
 

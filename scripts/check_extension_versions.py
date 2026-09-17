@@ -15,7 +15,7 @@ def get_changed_files(target: str) -> list[Path]:
         "--name-only",
         target,
         "--",
-        "tket-exts/src/tket_exts/data/tket/",
+        "tket/tket-exts/src/tket_exts/data/tket/",
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, check=True)
     changed_files = [Path(f) for f in result.stdout.splitlines() if f.endswith(".json")]
