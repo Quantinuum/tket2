@@ -12,8 +12,8 @@ different quantum architectures.
 a python package on [PyPI](https://pypi.org/project/tket/).
 
 See the respective
-[Rust](https://github.com/quantinuum/tket2/blob/main/tket) and
-[Python](https://github.com/quantinuum/tket2/blob/main/tket-py) READMEs for
+[Rust](https://github.com/quantinuum/tket2/blob/main/tket/tket-rs) and
+[Python](https://github.com/quantinuum/tket2/blob/main/tket/tket-py) READMEs for
 more information.
 
 ## Usage

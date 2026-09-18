@@ -1,0 +1,37 @@
+[project]
+name = "tket-exts"
+version = "0.14.2"
+requires-python = ">=3.10"
+description = "Python interface for hugr extensions offered by tket"
+license = { file = "LICENCE" }
+readme = "README.md"
+authors = [
+    { name = "TKET development team", email = "tket-support@quantinuum.com" },
+]
+maintainers = [
+    { name = "TKET development team", email = "tket-support@quantinuum.com" },
+]
+classifiers = [
+    "Environment :: Console",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
+]
+
+dependencies = ['hugr>=0.18.3,<0.19']
+
+[project.urls]
+homepage = "https://github.com/quantinuum/tket2/tree/main/tket/tket-exts"
+repository = "https://github.com/quantinuum/tket2/tree/main/tket/tket-exts"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
