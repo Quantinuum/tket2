@@ -1462,7 +1462,7 @@ impl CircuitRoundtripTestConfig {
     }
 }
 
-/// Test the standalone serialisation roundtrip from a tket circuit.
+/// Test the standalone serialization roundtrip from a tket circuit.
 ///
 /// This is not a pure roundtrip as the encoder may add internal qubits/bits to
 /// the circuit.
@@ -1603,7 +1603,7 @@ fn decode_parameter_used_before_opaque_barrier(circ_reordered_opaque_parameter: 
     decoded.validate().unwrap();
 }
 
-/// Test the serialisation roundtrip from a tket circuit into an EncodedCircuit and back.
+/// Test the serialization roundtrip from a tket circuit into an EncodedCircuit and back.
 #[rstest]
 #[case::preset_qubits(circ_preset_qubits(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::preset_parameterized(circ_parameterized(), 1, CircuitRoundtripTestConfig::Default)]
@@ -1860,7 +1860,7 @@ fn segmented_circuit_rejects_standalone_encoding() {
     assert!(error.to_string().contains("register-free opaque subgraphs"));
 }
 
-/// Test serialisation of circuits with a symbolic expression.
+/// Test serialization of circuits with a symbolic expression.
 ///
 /// Note: this is not a proper roundtrip as the symbols f0 and f1 are not
 /// converted back to circuit inputs. This would require parsing symbolic

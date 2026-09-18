@@ -28,4 +28,4 @@ This library is currently limited to legacy TKET passes (a small subset of them,
 Specifically, the following passes are supported:
 
 - **`two_qubit_squash`** - Squash sequences of two-qubit operations using KAK decomposition
-- **`clifford_resynthesis`** - Resynthesise Clifford subcircuits and simplify using Clifford rules
+- **`clifford_resynthesis`** - Resynthesize Clifford subcircuits and simplify using Clifford rules

@@ -34,7 +34,7 @@ pub fn array_args<AT: ArrayKind>(ext: &CustomType) -> Option<(u64, Type)> {
         })
 }
 
-/// Analyzes types to determine how they should be unpacked
+/// Analyses types to determine how they should be unpacked
 /// such that the `element_type` is extracted out into individual wires.
 /// Can recursively handle array and tuple composite types. Elements inside
 /// other composite types (e.g. from unknown extensions) are ignored.
@@ -44,7 +44,7 @@ pub fn array_args<AT: ArrayKind>(ext: &CustomType) -> Option<(u64, Type)> {
 /// (i.e. no `None` values). If this assumption is not true there will be a runtime error.
 #[derive(Clone)]
 pub struct TypeUnpacker {
-    /// The target element type to analyze for.
+    /// The target element type to analyse for.
     element_type: Type,
     /// Cache of unpacked types.
     cache: RefCell<HashMap<Type, Option<Vec<Type>>>>,
@@ -69,7 +69,7 @@ impl TypeUnpacker {
     /// The row contains one entry per element type extracted,
     /// other row elements are the other elements that were not unpacked.
     ///
-    /// For example a tuple of (array[bool; 2], array[qubit; 2]) when analyzing for qubits
+    /// For example a tuple of (array[bool; 2], array[qubit; 2]) when analysing for qubits
     /// would produce the row [array[bool; 2], qubit, qubit].
     ///
     /// Uses memoization to avoid recomputing the same type.
@@ -146,7 +146,7 @@ impl TypeUnpacker {
         self.unpack_type(ty).is_some()
     }
 
-    /// Get the element type this analyzer is configured for.
+    /// Get the element type this analyser is configured for.
     pub fn element_type(&self) -> &Type {
         &self.element_type
     }

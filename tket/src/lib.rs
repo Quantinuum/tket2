@@ -10,7 +10,7 @@
 //! interface for working with HUGRs representing quantum circuits, and defines
 //! a HUGR extension with quantum operations.
 //!
-//! This crate includes a number of optimisation passes and rewrite utilities
+//! This crate includes a number of optimization passes and rewrite utilities
 //! for circuits, as well as interoperability with `tket1` circuits via its
 //! serial encoding.
 //!
@@ -38,7 +38,7 @@
 //! // Render the circuit as a mermaid diagram.
 //! println!("{}", circ.mermaid_string());
 //!
-//! // Optimise the circuit.
+//! // Optimize the circuit.
 //! tket::passes::apply_greedy_commutation(&mut circ);
 //! ```
 //!

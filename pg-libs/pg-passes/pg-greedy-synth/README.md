@@ -1,7 +1,7 @@
 # pg-greedy-synth
 
 `pg-greedy-synth` provides `GreedySynthPass`, which uses a greedy heuristic to
-synthesise a canonical Pauli graph. It processes commuting operation sets in
+synthesize a canonical Pauli graph. It processes commuting operation sets in
 order and selects TQEs that reduce the current operations while taking nearby
 operations into account.
 

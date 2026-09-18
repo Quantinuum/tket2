@@ -251,7 +251,7 @@ You can use [`release-plz`](https://release-plz.ieni.dev/) to automatically gene
 # If you have cargo-semver-checks installed,
 # release-plz will ensure your changes don't break the semver rules.
 cargo install cargo-semver-checks --locked
-# Analyze the new comments to generate the changelogs / bump the versions
+# Analyse the new comments to generate the changelogs / bump the versions
 release-plz update
 ```
 
@@ -286,7 +286,7 @@ For historical reasons, the repository hosting this project is called `tket2`.
 
 `pytket` / `tket` (a.k.a. `tket1`) was the first version of the tket library, written in C++ and Python.
 `TKET2` was the grounds-up rewrite of the compiler, based on the HUGR IR and aimed at
-optimising quantum programs with complex classical control flow, type generics, etc.
+optimizing quantum programs with complex classical control flow, type generics, etc.
 
 For simplicity, the `tket2` libraries were renamed to `tket`. Throughout the
 project we refer to the new codebase as _tket_, while the old codebase is

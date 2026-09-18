@@ -284,7 +284,7 @@ make_simd_tq_gate!(simd_zz_gate, zz_gate);
 ///
 /// XY gate: `gz0=0u64, gx0=u64::MAX, gz1=u64::MAX, gx1=u64::MAX`
 ///
-/// Compared to the specialised functions (e.g., `simd_xx_gate`), this function
+/// Compared to the specialized functions (e.g., `simd_xx_gate`), this function
 /// avoids branching prediction penalties in some loop scenarios.
 pub fn apply_branchless_tqe_simd<const N: usize>(
     zs0: &mut [u64],
