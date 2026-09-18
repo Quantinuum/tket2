@@ -1,6 +1,6 @@
 # Build artifacts
 /target
-tket-py/target/
+tket/tket-py/target/
 pg-libs/target/
 /dist
 /wheelhouse
@@ -31,8 +31,8 @@ lcov.info
 .DS_Store
 
 # Python sphinx docs
-tket-py/docs/build
-tket-py/docs/generated
+tket/tket-py/docs/build
+tket/tket-py/docs/generated
 jupyter_execute/
 
 .github/copilot-instructions.md

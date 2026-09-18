@@ -2779,7 +2779,7 @@ wheels = [
 [[package]]
 name = "selene-hugr-qis-compiler"
 version = "0.5.0"
-source = { editable = "qis-compiler" }
+source = { editable = "tket/qis-compiler" }
 dependencies = [
     { name = "hugr" },
     { name = "typing-extensions" },
@@ -2807,7 +2807,7 @@ dev = [
     { name = "hugr", specifier = "~=0.18.3" },
     { name = "pytest", specifier = ">=8.4.2" },
     { name = "pytest-snapshot", specifier = "~=0.9.0" },
-    { name = "tket-exts", editable = "tket-exts" },
+    { name = "tket-exts", editable = "tket/tket-exts" },
 ]
 
 [[package]]
@@ -3184,7 +3184,7 @@ wheels = [
 [[package]]
 name = "tket"
 version = "0.15.9"
-source = { editable = "tket-py" }
+source = { editable = "tket/tket-py" }
 dependencies = [
     { name = "hugr" },
     { name = "tket-eccs" },
@@ -3211,8 +3211,8 @@ docs = [
 requires-dist = [
     { name = "hugr", specifier = "~=0.18.6" },
     { name = "pytket", marker = "extra == 'pytket'", specifier = ">=2.1.0,<3" },
-    { name = "tket-eccs", editable = "tket-eccs" },
-    { name = "tket-exts", editable = "tket-exts" },
+    { name = "tket-eccs", editable = "tket/tket-eccs" },
+    { name = "tket-exts", editable = "tket/tket-exts" },
 ]
 provides-extras = ["pytket"]
 
@@ -3228,12 +3228,12 @@ docs = [
 [[package]]
 name = "tket-eccs"
 version = "0.6.0"
-source = { editable = "tket-eccs" }
+source = { editable = "tket/tket-eccs" }
 
 [[package]]
 name = "tket-exts"
 version = "0.14.2"
-source = { editable = "tket-exts" }
+source = { editable = "tket/tket-exts" }
 dependencies = [
     { name = "hugr" },
 ]

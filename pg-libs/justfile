@@ -1,3 +1,7 @@
+# List local commands
+help:
+    @just --list --justfile "{{justfile()}}"
+
 # Currently pg-libs and the rest of the repo are separated workspaces.
 # We need to unset UV_PROJECT_ENVIRONMENT and VIRTUAL_ENV to avoid uv using the root python environment.
 sync-uv:

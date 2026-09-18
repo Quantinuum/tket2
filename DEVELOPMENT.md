@@ -113,7 +113,8 @@ just test-rust
 just test-python
 ```
 
-Run `just` to see all available commands.
+The `tket` and `pg-libs` directories have independent justfiles with their own sets of commands.
+Run `just tket/help` and `just pg-libs/help` to see all commands.
 
 ## 💅 Coding Style
 
@@ -155,7 +156,7 @@ cargo install cargo-llvm-cov
 Then run the tests:
 
 ```bash
-just coverage
+just tket/coverage
 ```
 
 This will generate a coverage file that can be opened with your favourite coverage viewer. In VSCode, you can use
