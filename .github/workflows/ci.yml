@@ -96,8 +96,8 @@ jobs:
       - name: Lint with ruff
         run: uv run ruff check
 
-  check-pg-libs:
-    name: Check pg-libs
+  check-pg-libs-rs:
+    name: Check pg-libs 🦀
     needs: [changes]
     if: ${{ needs.changes.outputs.pg-libs == 'true' }}
     runs-on: ubuntu-latest
@@ -107,10 +107,26 @@ jobs:
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt
+          components: rustfmt, clippy
       - name: Check formatting
         working-directory: pg-libs
         run: cargo fmt -- --check
+      - name: Run clippy
+        working-directory: pg-libs
+        run: cargo clippy --all-targets --workspace -- -D warnings
+      - name: Build docs
+        working-directory: pg-libs
+        run: cargo doc --no-deps --workspace
+        env:
+          RUSTDOCFLAGS: "-Dwarnings"
+
+  check-pg-libs-py:
+    name: Check pg-libs 🐍
+    needs: [changes]
+    if: ${{ needs.changes.outputs.pg-libs == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
         with:
@@ -121,6 +137,9 @@ jobs:
       - name: Setup dependencies
         working-directory: pg-libs
         run: uv sync --python ${{ env.PYTHON_HIGHEST }}
+      - name: Type check with mypy
+        working-directory: pg-libs
+        run: uv run mypy .
       - name: Check formatting with ruff
         working-directory: pg-libs
         run: uv run ruff format --check
@@ -502,7 +521,8 @@ jobs:
     name: Required checks 🦀+🐍
     needs: [
         changes,
-        check-pg-libs,
+        check-pg-libs-rs,
+        check-pg-libs-py,
         check-rs,
         check-py,
         tests-pg-libs,
