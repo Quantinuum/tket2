@@ -1,5 +1,5 @@
 # pg-core
-Core IR definitions for the `pg-libs` optimisation stack.
+Core IR definitions for the `pg-libs` optimization stack.
 This crate provides:
 
 - A `PauliGraph` IR that also serves as a quantum circuit representation, supporting common circuit operations.

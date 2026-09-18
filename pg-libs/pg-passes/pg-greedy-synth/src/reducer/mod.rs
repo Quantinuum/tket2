@@ -60,7 +60,7 @@ where
     /// This fills a [`PackedPGSlice`], rebuilds a [`Frontier`] for its
     /// first visible set, emits operations with zero cost and repeatedly
     /// applies a sampled TQE from the cheapest positive cost bucket. Once all
-    /// sets are retired, it synthesises the remaining Clifford tableau with the
+    /// sets are retired, it synthesizes the remaining Clifford tableau with the
     /// same frontier and candidate pool machinery.
     pub(crate) fn reduce(&mut self, input: &PauliGraph) -> PauliGraph {
         let mut qubit_depth = vec![0; input.get_n_qubits()];
@@ -162,11 +162,11 @@ where
         }
     }
 
-    /// Synthesises all operations in the current front set.
+    /// Synthesizes all operations in the current front set.
     ///
     /// Black boxes and conditional boxes are standalone sets. A black box first
     /// emits the Clifford tableau captured immediately before it. A conditional
-    /// box is decoded, canonicalised and reduced recursively, then its condition
+    /// box is decoded, canonicalized and reduced recursively, then its condition
     /// is copied to every emitted gate.
     fn reduce_front_set(
         &mut self,

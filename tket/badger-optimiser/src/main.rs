@@ -27,7 +27,7 @@ static PEAK_ALLOC: peak_alloc::PeakAlloc = peak_alloc::PeakAlloc;
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-/// Optimise circuits using Quartz-generated ECCs.
+/// Optimize circuits using Quartz-generated ECCs.
 ///
 /// Quartz: <https://github.com/quantum-compiler/quartz>
 #[derive(Parser, Debug)]

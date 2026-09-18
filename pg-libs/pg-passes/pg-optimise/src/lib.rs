@@ -1,4 +1,4 @@
-//! Optimisation passes for Pauli graphs.
+//! Optimization passes for Pauli graphs.
 
 mod commuting_sets;
 mod packed_op;

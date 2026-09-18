@@ -22,4 +22,4 @@ Defined in [synthesis/greedy.rs](src/synthesis/greedy.rs).
 | `SPARSE_WEIGHTING_MAX_DENSITY` | `0.25` | `ExpandedSimdWeightedSum` strategy uses sparse iteration below this mask density, avoiding work on zero bits. | [expanded.rs](src/backend/weighted_sum/expanded.rs) |
 | `ALPHA` | `0.588` | Factor by which to discount the weight of each successive set, favouring nearby operations. | [greedy.rs](src/backend/greedy.rs) |
 | `MAX_SELECTION_CANDIDATES` | `5` | Limits depth comparison to this many current candidates with the lowest costs. | [gate_pool.rs](src/reducer/gate_pool.rs) |
-| `DEPTH_WEIGHT` | `0.3` | Weights normalised depth relative to normalised gate cost. Larger values favour depth more strongly. | [gate_pool.rs](src/reducer/gate_pool.rs) |
+| `DEPTH_WEIGHT` | `0.3` | Weights normalized depth relative to normalized gate cost. Larger values favour depth more strongly. | [gate_pool.rs](src/reducer/gate_pool.rs) |

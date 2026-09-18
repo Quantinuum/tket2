@@ -13,8 +13,8 @@ Circuits are represented using the HUGR IR defined in the
 [hugr] crate. TKET augments Hugr with
 * The [`Circuit`] trait, providing a high-level interface for working with HUGRs representing quantum circuits
 * a HUGR extension with quantum operations
-* A composable pass system for optimising circuits
-* A number of built-in rewrite utilities and passes for common optimisations
+* A composable pass system for optimizing circuits
+* A number of built-in rewrite utilities and passes for common optimizations
 
 This crate is interoperable with legacy [`pytket`] circuits via its serial
 encoding.
@@ -40,7 +40,7 @@ assert_eq!(circ.num_operations(), 170);
 // Render the circuit as a mermaid diagram.
 println!("{}", circ.mermaid_string());
 
-// Optimise the circuit.
+// Optimize the circuit.
 tket::passes::apply_greedy_commutation(&mut circ).unwrap();
 ```
 
