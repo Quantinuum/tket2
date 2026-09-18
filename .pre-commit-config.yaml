@@ -54,12 +54,13 @@ repos:
         files: \.py$
         exclude: ^pg-libs/
         pass_filenames: false
-      - id: mypy-check
-        name: mypy
-        description: Check python code with `mypy`.
+      - id: mypy-check-tket
+        name: mypy (tket)
+        description: Check tket Python code with `mypy`.
         entry: uv run --all-extras mypy .
         language: system
         files: \.py$
+        exclude: ^pg-libs/
         pass_filenames: false
       - id: cargo-fmt
         name: cargo format
@@ -113,6 +114,13 @@ repos:
         name: ruff (pg-libs)
         description: Fix pg-libs python code with `ruff`.
         entry: sh -c "cd pg-libs && just fix-python"
+        language: system
+        files: ^pg-libs/.*\.py$
+        pass_filenames: false
+      - id: mypy-check-pg-libs
+        name: mypy (pg-libs)
+        description: Check pg-libs Python code with `mypy`.
+        entry: sh -c "cd pg-libs && env -u UV_PROJECT_ENVIRONMENT -u VIRTUAL_ENV uv run mypy ."
         language: system
         files: ^pg-libs/.*\.py$
         pass_filenames: false

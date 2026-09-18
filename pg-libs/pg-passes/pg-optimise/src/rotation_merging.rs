@@ -179,7 +179,7 @@ fn rotation_merging(pg: &PauliGraph) -> PauliGraph {
         }
     }
     assert_eq!(output_ops.len(), removed.len());
-    for (op, is_removed) in output_ops.into_iter().zip(removed.into_iter()) {
+    for (op, is_removed) in output_ops.into_iter().zip(removed) {
         if !is_removed {
             output_pg.add_op(op.op);
         }

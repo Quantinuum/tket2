@@ -215,11 +215,8 @@ impl PauliOp for Op {
             Op::ConditionalBox { data } => {
                 let mut paulis = Vec::new();
                 for op in data.get_ops() {
-                    if let Some(op_paulis) = op.get_paulis() {
-                        paulis.extend(op_paulis);
-                    } else {
-                        return None;
-                    }
+                    let op_paulis = op.get_paulis()?;
+                    paulis.extend(op_paulis);
                 }
                 Some(paulis)
             }
