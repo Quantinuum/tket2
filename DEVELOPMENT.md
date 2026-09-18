@@ -113,7 +113,7 @@ just test-rust
 just test-python
 ```
 
-The `tket` and `pg-libs` have independent justfiles with their own sets of commands.
+The `tket` and `pg-libs` directories have independent justfiles with their own sets of commands.
 Run `just tket/help` and `just pg-libs/help` to see all commands.
 
 ## 💅 Coding Style
