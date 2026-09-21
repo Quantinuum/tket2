@@ -13,6 +13,7 @@ members = [
     "tket/tket-qsystem",
 ]
 default-members = ["tket/tket-rs", "tket/tket-qsystem"]
+exclude = ["pg-libs"]
 
 [workspace.package]
 rust-version = "1.91"

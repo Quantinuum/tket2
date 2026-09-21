@@ -520,7 +520,7 @@ class GreedyResynthPass(ComposablePass):
     seed: int | None = None
     parallel_mode: str = "auto"
     _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
-    
+
     def with_scope(self, scope: PassScope) -> GreedyResynthPass:
         """Set the scope of this pass and return self."""
         self._scope = scope
@@ -543,7 +543,7 @@ class GreedyResynthPass(ComposablePass):
             pool_size=self.pool_size,
             top_up_size=self.top_up_size,
             seed=self.seed,
-            parallel_mode=self.parallel_mode
+            parallel_mode=self.parallel_mode,
         )
         package = program.to_python()
         return PassResult.for_pass(
