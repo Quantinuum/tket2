@@ -120,8 +120,6 @@ impl ComposablePass<Hugr> for GreedyResynthPass {
             .with_subcircuits(self.scope.recursive())
             .with_config(default_encoder_config());
 
-        // Global scopes start at the module; entrypoint scopes stay within its
-        // selected subtree. Reassembly preserves the encoded region interfaces.
         let mut encoded_circs = EncodedCircuit::new_with_entrypoint(hugr, root, encode_options)?;
 
         for (_, serial_circ) in encoded_circs.iter_mut() {
@@ -320,7 +318,7 @@ mod tests {
 
         resynthesise(&mut circuit);
 
-        // T and Tdg cancel, leaving a nontrivial Clifford circuit to synthesise.
+        // T and Tdg cancel, leaving a nontrivial Clifford circuit to synthesise
         assert_eq!(count_gate(&circuit, TketOp::T), 0);
         assert_eq!(count_gate(&circuit, TketOp::Tdg), 0);
         assert!(count_gate(&circuit, TketOp::CX) > 0);

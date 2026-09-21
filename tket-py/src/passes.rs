@@ -18,15 +18,6 @@ use tket::{Circuit, TketOp};
 
 use tket::passes;
 
-fn parse_parallel_mode(s: &str) -> Option<pg_greedy_synth::ParallelMode> {
-    match s.trim() {
-        "Auto" => Some(pg_greedy_synth::ParallelMode::Auto),
-        "On" => Some(pg_greedy_synth::ParallelMode::On),
-        "Off" => Some(pg_greedy_synth::ParallelMode::Off),
-        _ => None,
-    }
-}
-
 use crate::optimiser::PyBadgerOptimiser;
 use crate::state::CompilationState;
 use crate::utils::{ConvertPyErr, create_py_exception};
@@ -245,6 +236,15 @@ fn resolve_modifiers(circ: &mut CompilationState, scope: Option<PyPassScope>) ->
     let pass = tket::passes::ModifierResolverPass::default_with_scope(py_scope.scope);
     pass.run(&mut circ.hugr).convert_pyerrs()?;
     Ok(())
+}
+
+fn parse_parallel_mode(s: &str) -> Option<pg_greedy_synth::ParallelMode> {
+    match s.trim() {
+        "Auto" => Some(pg_greedy_synth::ParallelMode::Auto),
+        "On" => Some(pg_greedy_synth::ParallelMode::On),
+        "Off" => Some(pg_greedy_synth::ParallelMode::Off),
+        _ => None,
+    }
 }
 
 #[pyfunction]
