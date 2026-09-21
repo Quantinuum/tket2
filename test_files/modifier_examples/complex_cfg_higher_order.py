@@ -1,23 +1,29 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#    "guppylang==1.0.rc1",
+#    "guppylang==1.1.1",
 # ]
 # ///
 """Test the use of a higher-order function with complex control flow inside modifiers"""
 
-from collections.abc import Callable
 from pathlib import Path
 from sys import argv
 
 from guppylang import guppy
-from guppylang.std.builtins import Controllable, Unitary, array, control, dagger
+from guppylang.std.builtins import (
+    Controllable,
+    Daggerable,
+    Unitary,
+    array,
+    control,
+    dagger,
+)
 from guppylang.std.debug import state_result
 from guppylang.std.lang import Function
 from guppylang.std.quantum import angle, discard_array, h, qubit, rx, rz
 
 
-@guppy
+@guppy(daggerable=True)
 def get_angle(f: float) -> angle:
     return angle(f)
 
@@ -31,10 +37,11 @@ def get_get_angle() -> Function[[float], angle]:
 def apply_r(
     f: Unitary[[qubit, angle], None],
     q: array[qubit, 2],
-    fun_angle: Callable[[float], angle],
+    fun_angle: Daggerable[[float], angle],
     radiant: float,
 ) -> None:
-    f(q[1], fun_angle(radiant))
+    a = fun_angle(radiant)
+    f(q[1], a)
 
 
 @guppy(controllable=True)

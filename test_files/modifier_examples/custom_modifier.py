@@ -1,11 +1,9 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#    "guppylang==1.0.1",
+#    "guppylang==1.1.1",
 #    "matplotlib",
 # ]
-# [tool.uv.sources]
-# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", rev = "952d728357b09741e5355a213f574a14967ffc12"}
 # ///
 """Test the use of a higher-order function with complex control flow inside modifiers"""
 

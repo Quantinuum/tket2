@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#    "guppylang==1.0.1",
+#    "guppylang==1.1.1",
 # ]
 # ///
 """Testing modifier on a loaded pytket circuit"""
