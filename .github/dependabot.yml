@@ -30,9 +30,9 @@ updates:
   - package-ecosystem: "uv"
     directories: # Location of package manifests
       - "/"
-      - "/tket-py"
-      - "/tket-eccs"
-      - "/tket-exts"
+      - "/tket/tket-py"
+      - "/tket/tket-eccs"
+      - "/tket/tket-exts"
     schedule:
       interval: "weekly"
     commit-message:

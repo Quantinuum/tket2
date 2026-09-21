@@ -60,8 +60,8 @@ jobs:
           echo "\nDone! Installed dependencies:"
           uv pip list
       - name: Type check with mypy
-        run: uv run --no-sync mypy tket-py
+        run: uv run --no-sync mypy tket/tket-py
       - name: Lint with ruff
-        run: uv run --no-sync ruff check tket-py
+        run: uv run --no-sync ruff check tket/tket-py
       - name: Run python tests
-        run: uv run --no-sync pytest tket-py
+        run: uv run --no-sync pytest tket/tket-py

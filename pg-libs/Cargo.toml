@@ -7,6 +7,10 @@ members = [
     "pg-kernels/pg-ir-kernels",
     "pg-kernels/pg-ir-kernels-tests",
     "pg-utils/pg-utils",
+    "pg-passes/pg-canonical-form",
+    "pg-passes/pg-optimise",
+    "pg-passes/pg-greedy-synth",
+    "pg-passes/pg-rebase",
     "pg-qm-tableau",
     ]
 

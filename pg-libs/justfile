@@ -1,3 +1,7 @@
+# List local commands
+help:
+    @just --list --justfile "{{justfile()}}"
+
 # Currently pg-libs and the rest of the repo are separated workspaces.
 # We need to unset UV_PROJECT_ENVIRONMENT and VIRTUAL_ENV to avoid uv using the root python environment.
 sync-uv:
@@ -19,7 +23,7 @@ fix:
     just fix-python
 
 fix-rust:
-    cargo clippy --all-targets --all-features --workspace --fix --allow-staged --allow-dirty
+    cargo +nightly-2025-09-14 clippy --all-targets --all-features --workspace --fix --allow-staged --allow-dirty
 
 fix-python:
     env -u UV_PROJECT_ENVIRONMENT -u VIRTUAL_ENV uv run ruff check --fix
