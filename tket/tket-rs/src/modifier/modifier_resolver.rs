@@ -325,6 +325,9 @@ pub struct ModifierResolver<N = Node> {
     call_map: HashMap<N, Vec<(Node, IncomingPort)>>,
     /// Original functions for which the resolver generated modified replacements.
     modified_functions: HashSet<N>,
+    /// Generated implementations keyed by original function and the full modifier,
+    /// including the control-array layout that determines the function signature.
+    modified_impls: HashMap<(N, CombinedModifier), N>,
     /// Cached adapters from the resolver's controls-first ABI to custom controls-last functions.
     custom_adapters: HashMap<(N, N, CombinedModifier), N>,
     /// Analyzer used to find qubits in types. Used to check when a type carries quantum data.
@@ -344,6 +347,7 @@ impl<N> ModifierResolver<N> {
             worklist: VecDeque::default(),
             call_map: HashMap::default(),
             modified_functions: HashSet::default(),
+            modified_impls: HashMap::default(),
             custom_adapters: HashMap::default(),
             qubit_finder: TypeUnpacker::for_qubits(),
             insert_state_order_edges: false,
@@ -1583,6 +1587,7 @@ mod tests {
         dagger: bool,
     ) -> Hugr {
         let (mut h, foo_node) = modifier_test_hugr(target_num, ctrl_num, foo, dagger);
+        std::fs::write("before.mmd", h.mermaid_string()).unwrap();
 
         let entrypoint = h.entrypoint();
         resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();

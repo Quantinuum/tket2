@@ -562,13 +562,18 @@ impl<N: HugrNode> ModifierResolver<N> {
         self.modify_fn_inner(h, func)
     }
 
-    /// Generates a new function modified by the combined modifier without checking for a custom
-    /// implementation.
+    /// Reuses or generates a function modified by the combined modifier without checking for a
+    /// custom implementation.
     fn modify_fn_inner(
         &mut self,
         h: &mut impl HugrMut<Node = N>,
         func: N,
     ) -> Result<N, ModifierResolverErrors<N>> {
+        let cache_key = (func, self.modifiers().clone());
+        if let Some(&modified_func) = self.modified_impls.get(&cache_key) {
+            return Ok(modified_func);
+        }
+
         let old_call_map = mem::take(self.call_map());
 
         // Old function definition
@@ -601,6 +606,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         }
 
         let new_function_node = insertion_result.inserted_entrypoint;
+        self.modified_impls.insert(cache_key, new_function_node);
         self.modified_functions.insert(func);
 
         Ok(new_function_node)
@@ -1179,6 +1185,76 @@ mod test {
         }
         .out_wire(0);
         *func.finish_with_outputs(inputs).unwrap().handle()
+    }
+
+    #[test]
+    fn repeated_calls_share_modified_implementation() {
+        let h = resolved_modifier_test_hugr(
+            2,
+            1,
+            |module, _| {
+                let callee = foo_dfg(module, 1);
+                let mut func = module
+                    .define_function("twice", Signature::new_endo([qb_t(), qb_t()]))
+                    .unwrap();
+                let inputs = func.input_wires().collect::<Vec<_>>();
+                let first = func.call(&callee, &[], [inputs[0]]).unwrap().out_wire(0);
+                let second = func.call(&callee, &[], [inputs[1]]).unwrap().out_wire(0);
+                *func.finish_with_outputs([first, second]).unwrap().handle()
+            },
+            false,
+        );
+
+        // std::fs::write("after.mmd", h.mermaid_string()).unwrap();
+        let implementations = h
+            .children(h.module_root())
+            .filter(|&node| {
+                h.get_optype(node)
+                    .as_func_defn()
+                    .is_some_and(|defn| defn.func_name() == "__modified__foo")
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(implementations.len(), 1);
+
+        let callees = h
+            .nodes()
+            .filter_map(|node| {
+                let OpType::Call(call) = h.get_optype(node) else {
+                    return None;
+                };
+                Some(
+                    h.single_linked_output(node, call.called_function_port())
+                        .unwrap()
+                        .0,
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(callees, vec![implementations[0]; 2]);
+    }
+
+    #[test]
+    fn modified_implementation_cache_distinguishes_modifiers() {
+        let mut module = ModuleBuilder::new();
+        let original = foo_dfg(&mut module, 1);
+        let mut h = module.finish_hugr().unwrap();
+        let mut resolver = ModifierResolver::new();
+        let mut implementations = HashSet::new();
+
+        // Equal total control counts can have different control-array signatures.
+        for accum_ctrl in [vec![2], vec![1, 1]] {
+            for dagger in [false, true] {
+                resolver.modifiers = CombinedModifier {
+                    control: accum_ctrl.iter().sum(),
+                    accum_ctrl: accum_ctrl.clone(),
+                    dagger,
+                };
+                let first = resolver.modify_fn(&mut h, original.node()).unwrap();
+                let second = resolver.modify_fn(&mut h, original.node()).unwrap();
+                assert_eq!(first, second);
+                assert!(implementations.insert(first));
+            }
+        }
+        h.validate().unwrap();
     }
 
     #[test]
