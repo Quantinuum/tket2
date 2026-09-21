@@ -1,5 +1,5 @@
 [tool.uv.workspace]
-members = ["tket-py", "tket-eccs", "tket-exts", "qis-compiler"]
+members = ["tket/tket-py", "tket/tket-eccs", "tket/tket-exts", "tket/qis-compiler"]
 exclude = ["pg-libs"]
 
 [dependency-groups]
@@ -35,10 +35,10 @@ build-backend = "hatchling.build"
 
 [tool.maturin]
 # Maturin is not the build system for the workspace (it is only used for `tket-py`).
-# We mirror the `tket-py/pyproject.toml` config here so `maturin develop` still works
+# We mirror the `tket/tket-py/pyproject.toml` config here so `maturin develop` still works
 # from the root of the workspace.
-manifest-path = "tket-py/Cargo.toml"
-python-source = "tket-py"
+manifest-path = "tket/tket-py/Cargo.toml"
+python-source = "tket/tket-py"
 module-name = "tket._tket"
 
 [tool.mypy]
@@ -46,7 +46,7 @@ exclude = '''(?x)(
     ^target/        # Build artifacts
     | ^notebooks/   # Examples
     | ^test_files/  # Test files
-    | ^tket1-passes/tket-c-api/ # Do not check conan files
+    | ^tket/tket1-passes/tket-c-api/ # Do not check conan files
 )'''
 ignore_missing_imports = true
 
@@ -57,7 +57,7 @@ ignore_missing_imports = true
 ignore = ["EXE"]
 
 [tool.ruff.lint.per-file-ignores]
-"tket-exts/src/tket_exts/tket/**" = [
+"tket/tket-exts/src/tket_exts/tket/**" = [
     "B019",
 ] # @functools.cache is intentional, few instances exist
 

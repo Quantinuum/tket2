@@ -96,8 +96,8 @@ jobs:
       - name: Lint with ruff
         run: uv run ruff check
 
-  check-pg-libs:
-    name: Check pg-libs
+  check-pg-libs-rs:
+    name: Check pg-libs 🦀
     needs: [changes]
     if: ${{ needs.changes.outputs.pg-libs == 'true' }}
     runs-on: ubuntu-latest
@@ -107,10 +107,26 @@ jobs:
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt
+          components: rustfmt, clippy
       - name: Check formatting
         working-directory: pg-libs
         run: cargo fmt -- --check
+      - name: Run clippy
+        working-directory: pg-libs
+        run: cargo clippy --all-targets --workspace -- -D warnings
+      - name: Build docs
+        working-directory: pg-libs
+        run: cargo doc --no-deps --workspace
+        env:
+          RUSTDOCFLAGS: "-Dwarnings"
+
+  check-pg-libs-py:
+    name: Check pg-libs 🐍
+    needs: [changes]
+    if: ${{ needs.changes.outputs.pg-libs == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
         with:
@@ -121,6 +137,9 @@ jobs:
       - name: Setup dependencies
         working-directory: pg-libs
         run: uv sync --python ${{ env.PYTHON_HIGHEST }}
+      - name: Type check with mypy
+        working-directory: pg-libs
+        run: uv run mypy .
       - name: Check formatting with ruff
         working-directory: pg-libs
         run: uv run ruff format --check
@@ -372,7 +391,7 @@ jobs:
     runs-on: ubuntu-latest
     name: tket-py tests (Python, coverage)
     env:
-      PKGS: tket-py tket-eccs tket-exts
+      PKGS: tket/tket-py tket/tket-eccs tket/tket-exts
     steps:
       - uses: actions/checkout@v7
       - uses: mozilla-actions/sccache-action@v0.0.11
@@ -428,7 +447,7 @@ jobs:
       - name: Run Rust unit tests
         run: cargo test -p selene-hugr-qis-compiler
       - name: Run qis-compiler tests
-        run: uv run --python ${{ env.PYTHON_LOWEST }} --exact --package selene_hugr_qis_compiler pytest --cov=./ --cov-report=xml qis-compiler
+        run: uv run --python ${{ env.PYTHON_LOWEST }} --exact --package selene_hugr_qis_compiler pytest --cov=./ --cov-report=xml tket/qis-compiler
       - name: Upload python coverage to codecov.io
         if: github.event_name != 'merge_group'
         uses: codecov/codecov-action@v7
@@ -455,13 +474,13 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - uses: extractions/setup-just@v4
       - name: Generate the updated definitions
-        run: just gen-extensions
+        run: just tket/gen-extensions
       - name: Check if the declarations are up to date
         run: |
-          git diff --exit-code --name-only tket-exts/src/tket_exts/data
+          git diff --exit-code --name-only tket/tket-exts/src/tket_exts/data
           if [ $? -ne 0 ]; then
             echo "The serialized standard extensions are not up to date"
-            echo "Please run 'just gen-extensions' and commit the changes.
+            echo "Please run 'just tket/gen-extensions' and commit the changes.
             Bump the version of tket-exts according to semver.
             "
             exit 1
@@ -502,7 +521,8 @@ jobs:
     name: Required checks 🦀+🐍
     needs: [
         changes,
-        check-pg-libs,
+        check-pg-libs-rs,
+        check-pg-libs-py,
         check-rs,
         check-py,
         tests-pg-libs,

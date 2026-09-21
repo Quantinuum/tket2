@@ -63,7 +63,7 @@ jobs:
       - name: Upload artifact.
         uses: actions/upload-pages-artifact@v5
         with:
-          path: ./tket-py/docs/build
+          path: ./tket/tket-py/docs/build
 
   publish:
     name: Publish docs.

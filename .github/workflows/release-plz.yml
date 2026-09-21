@@ -10,6 +10,13 @@ jobs:
   release-plz-pr:
     name: Create release-plz PR
     runs-on: ubuntu-latest
+    env:
+      HUGRENV_VERSION: "0.3.1"
+      HUGRENV_ROOT: "/tmp/hugrverse"
+      HUGRENV_PLATFORM: "manylinux_2_28_x86_64"
+      TKET_C_API_PATH: "/tmp/hugrverse"
+      LD_LIBRARY_PATH: "/tmp/hugrverse/lib:/tmp/hugrverse/lib64"
+      LLVM_SYS_211_PREFIX: "/tmp/hugrverse"
 
     # Ensure only one release-plz tries to create a PR at a time.
     #
@@ -27,6 +34,8 @@ jobs:
           token: ${{ secrets.HUGRBOT_PAT }}
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+      - name: Install LLVM
+        uses: quantinuum/hugrverse-env/install-hugrenv-action@main
 
       - name: Create release PR
         uses: MarcoIeni/release-plz-action@v0.5
@@ -45,7 +54,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: crate-release
     permissions:
-      id-token: write     # Required for OIDC token exchange
+      id-token: write # Required for OIDC token exchange
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7

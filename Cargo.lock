@@ -1876,6 +1876,7 @@ name = "pg-tk"
 version = "0.1.0"
 dependencies = [
  "pg-core",
+ "rstest",
  "serde_json",
  "thiserror 2.0.20",
  "uuid",

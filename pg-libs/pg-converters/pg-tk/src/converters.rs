@@ -77,7 +77,7 @@ fn tk_conditional_json(op_json: Value, cond_bits: &[Value], cond_values: &[bool]
             "op": op_json,
             "width": cond_bits.len(),
             // little-endian encoding of the condition values
-            "values": cond_values.iter().enumerate().fold(0u64, |acc, (i, &b)| acc | ((b as u64) << i)),
+            "value": cond_values.iter().enumerate().fold(0u64, |acc, (i, &b)| acc | ((b as u64) << i)),
         },
         "type": "Conditional",
     })
@@ -535,11 +535,11 @@ pub fn pg_from_tk_json(tk_json: &Value) -> Result<PauliGraph, TKConversionError>
                 .collect::<Result<Vec<usize>, TKConversionError>>()?;
             // little-endian encoding of the condition values
             let cond_value_u64 = conditional_json
-                .get("values")
+                .get("value")
                 .and_then(Value::as_u64)
                 .ok_or_else(|| {
                     TKConversionError::InvalidTKJson(
-                        "Missing or invalid values field in TKET JSON conditional".into(),
+                        "Missing or invalid value field in TKET JSON conditional".into(),
                     )
                 })?;
             let cond_values = (0..width)
@@ -579,14 +579,16 @@ pub fn pg_from_tk_json(tk_json: &Value) -> Result<PauliGraph, TKConversionError>
                     "Reset" => GateType::Reset,
                     _ => unreachable!(),
                 };
-                let params = op
-                    .get("params")
-                    .and_then(Value::as_array)
-                    .ok_or_else(|| {
-                        TKConversionError::InvalidTKJson(
-                            "Missing or invalid params field in TKET JSON op".into(),
-                        )
-                    })?
+                let params: &[Value] = match op.get("params") {
+                    None => &[],
+                    Some(Value::Array(params)) => params,
+                    _ => {
+                        return Err(TKConversionError::InvalidTKJson(
+                            "Invalid params field in TKET JSON op".into(),
+                        ));
+                    }
+                };
+                let params = params
                     .iter()
                     .map(|p| {
                         p.as_str()
@@ -795,6 +797,7 @@ pub fn pg_from_tk_json(tk_json: &Value) -> Result<PauliGraph, TKConversionError>
 mod tests {
     use super::*;
     use pg_core::{BlackBoxData, ConditionalBoxData};
+    use rstest::rstest;
     fn remove_box_id(value: &mut Value) {
         value["commands"]
             .as_array_mut()
@@ -813,6 +816,77 @@ mod tests {
                     }
                 }
             });
+    }
+
+    fn circuit_with_op(op: Value, args: Value) -> Value {
+        json!({
+            "qubits": [["q", [0]], ["q", [1]]],
+            "bits": [["c", [0]], ["c", [1]], ["c", [2]]],
+            "commands": [{"op": op, "args": args}],
+            "created_qubits": [], "discarded_qubits": [],
+            "implicit_permutation": [], "phase": "0.0"
+        })
+    }
+
+    #[rstest]
+    #[case::missing_params(None)]
+    #[case::empty_params(Some(json!([])))]
+    fn non_parameterised_gate_accepts_missing_or_empty_params(#[case] params: Option<Value>) {
+        let mut op = json!({"type": "H"});
+        if let Some(params) = params {
+            op["params"] = params;
+        }
+        let graph = pg_from_tk_json(&circuit_with_op(op, json!([["q", [0]]]))).unwrap();
+
+        let Op::Gate { data } = &graph.get_ops()[0] else {
+            panic!("Expected gate")
+        };
+        assert!(data.get_params().is_empty());
+        assert!(data.get_conditional_values().is_empty());
+    }
+
+    fn assert_invalid_params(op: Value, args: Value) {
+        let panic = std::panic::catch_unwind(|| pg_from_tk_json(&circuit_with_op(op, args)))
+            .expect_err("Expected a panic for invalid parameter count");
+        let message = panic
+            .downcast_ref::<String>()
+            .map(String::as_str)
+            .or_else(|| panic.downcast_ref::<&str>().copied())
+            .expect("Expected a string panic message");
+        assert!(
+            message.contains("Gate has wrong number of parameters"),
+            "Unexpected panic message: {message}"
+        );
+    }
+
+    #[rstest]
+    #[case::rz_missing_param("Rz", json!([]), json!([["q", [0]]]))]
+    #[case::rz_extra_param("Rz", json!(["0.5", "0.5"]), json!([["q", [0]]]))]
+    #[case::phasedx_missing_param("PhasedX", json!(["0.5"]), json!([["q", [0]]]))]
+    fn gate_rejects_wrong_parameter_count(
+        #[case] name: &str,
+        #[case] params: Value,
+        #[case] args: Value,
+    ) {
+        assert_invalid_params(json!({"type": name, "params": params}), args);
+    }
+
+    #[rstest]
+    #[case::rx_invalid_string("Rx", json!(["invalid"]), json!([["q", [0]]]))]
+    #[case::rz_number_instead_of_string("Rz", json!([0.5]), json!([["q", [0]]]))]
+    fn gate_rejects_invalid_parameter_values(
+        #[case] name: &str,
+        #[case] params: Value,
+        #[case] args: Value,
+    ) {
+        let result = pg_from_tk_json(&circuit_with_op(
+            json!({"type": name, "params": params}),
+            args,
+        ));
+        assert!(
+            matches!(result, Err(TKConversionError::InvalidTKJson(_))),
+            "Expected a parameter conversion error, got {result:?}"
+        );
     }
 
     #[test]
@@ -875,7 +949,7 @@ mod tests {
                                 "params": []
                             },
                             "width": 2,
-                            "values": 1
+                            "value": 1
                         },
                         "type": "Conditional"
                     },
@@ -1019,7 +1093,7 @@ mod tests {
                                 }
                             },
                             "width": 3,
-                            "values": 5
+                            "value": 5
                         },
                         "type": "Conditional"
                     },
