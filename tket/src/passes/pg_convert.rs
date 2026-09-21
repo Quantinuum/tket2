@@ -1,3 +1,9 @@
+//! Conversion utilities between serial circuits and Pauli graphs.
+//!
+//! Provides [`RegisterMap`], [`serial_circuit_to_pauli_graph`] and
+//! [`pauli_graph_to_cmds`] utilities required for passes that resynthesise
+//! a circuit using a [`PauliGraph`]
+
 use pg_core::{BlackBoxData, GateData, GateType, Op, PauliGraph};
 use tket_json_rs::circuit_json::{Command, Operation};
 use tket_json_rs::register::{Bit, ElementId, Qubit};
@@ -19,7 +25,7 @@ impl RegisterMap {
     pub fn new(qubits: &[Qubit], bits: &[Bit]) -> Self {
         Self {
             qubit_map: qubits.iter().map(|q| q.id.clone()).collect(),
-            bit_map: bits.iter().map(|b| b.id.clone()).collect()
+            bit_map: bits.iter().map(|b| b.id.clone()).collect(),
         }
     }
 
@@ -29,7 +35,7 @@ impl RegisterMap {
 
         for arg in args {
             if let Some(i) = self.qubit_map.get_index_of(arg) {
-                qubits.push(i);       
+                qubits.push(i);
             } else if let Some(i) = self.bit_map.get_index_of(arg) {
                 bits.push(i);
             } else {
@@ -41,12 +47,16 @@ impl RegisterMap {
     }
 
     fn get_qubit_id(&self, index: usize) -> Result<ElementId, ConversionError> {
-        self.qubit_map.get_index(index).cloned()
+        self.qubit_map
+            .get_index(index)
+            .cloned()
             .ok_or_else(|| ConversionError::UnknownRegister(index.to_string()))
     }
 
     fn get_bit_id(&self, index: usize) -> Result<ElementId, ConversionError> {
-        self.bit_map.get_index(index).cloned()
+        self.bit_map
+            .get_index(index)
+            .cloned()
             .ok_or_else(|| ConversionError::UnknownRegister(index.to_string()))
     }
 }
@@ -194,7 +204,6 @@ fn cmd_to_op(
                 data: GateData::new(GateType::RZ, qubits).with_params(vec![angle]),
             }])
         }
-        // TODO: Use a native CCX or toffoli when available
         OpType::CCX => Ok(vec![
             Op::Gate {
                 data: GateData::new(GateType::H, vec![qubits[2]]),
@@ -203,28 +212,28 @@ fn cmd_to_op(
                 data: GateData::new(GateType::ZX, vec![qubits[1], qubits[2]]),
             },
             Op::Gate {
-                data: GateData::new(GateType::Z, vec![qubits[2]]).with_params(vec![-0.25]),
+                data: GateData::new(GateType::RZ, vec![qubits[2]]).with_params(vec![-0.25]),
             },
             Op::Gate {
                 data: GateData::new(GateType::ZX, vec![qubits[0], qubits[2]]),
             },
             Op::Gate {
-                data: GateData::new(GateType::Z, vec![qubits[2]]).with_params(vec![0.25]),
+                data: GateData::new(GateType::RZ, vec![qubits[2]]).with_params(vec![0.25]),
             },
             Op::Gate {
                 data: GateData::new(GateType::ZX, vec![qubits[1], qubits[2]]),
             },
             Op::Gate {
-                data: GateData::new(GateType::Z, vec![qubits[2]]).with_params(vec![-0.25]),
+                data: GateData::new(GateType::RZ, vec![qubits[2]]).with_params(vec![-0.25]),
             },
             Op::Gate {
                 data: GateData::new(GateType::ZX, vec![qubits[0], qubits[2]]),
             },
             Op::Gate {
-                data: GateData::new(GateType::Z, vec![qubits[1]]).with_params(vec![0.25]),
+                data: GateData::new(GateType::RZ, vec![qubits[1]]).with_params(vec![0.25]),
             },
             Op::Gate {
-                data: GateData::new(GateType::Z, vec![qubits[2]]).with_params(vec![0.25]),
+                data: GateData::new(GateType::RZ, vec![qubits[2]]).with_params(vec![0.25]),
             },
             Op::Gate {
                 data: GateData::new(GateType::H, vec![qubits[2]]),
@@ -233,10 +242,10 @@ fn cmd_to_op(
                 data: GateData::new(GateType::ZX, vec![qubits[0], qubits[1]]),
             },
             Op::Gate {
-                data: GateData::new(GateType::Z, vec![qubits[0]]).with_params(vec![0.25]),
+                data: GateData::new(GateType::RZ, vec![qubits[0]]).with_params(vec![0.25]),
             },
             Op::Gate {
-                data: GateData::new(GateType::Z, vec![qubits[1]]).with_params(vec![-0.25]),
+                data: GateData::new(GateType::RZ, vec![qubits[1]]).with_params(vec![-0.25]),
             },
             Op::Gate {
                 data: GateData::new(GateType::ZX, vec![qubits[0], qubits[1]]),
@@ -248,7 +257,7 @@ fn cmd_to_op(
         OpType::Measure => Ok(vec![Op::Gate {
             data: GateData::new(GateType::Measure, vec![qubits[0], bits[0]]),
         }]),
-        // Currently, pg-lib blackboxes support specifying the qubits they act on, but not the bits. 
+        // Currently, pg-lib blackboxes support specifying the qubits they act on, but not the bits.
         // To prevent a blackbox which acts on bits from being incorrectly reordered during optimisation,
         // we say it acts on all qubits, to prevent it from being reordered.
         OpType::Barrier => {
@@ -262,7 +271,9 @@ fn cmd_to_op(
                 op_data: cmd.op.data.clone(),
                 args: cmd.args.clone(),
             })
-            .map_err(|_| ConversionError::UnsupportedBlackBox("Failed barrier conversion".to_string()))?;
+            .map_err(|_| {
+                ConversionError::UnsupportedBlackBox("Failed barrier conversion".to_string())
+            })?;
 
             Ok(vec![Op::BlackBox {
                 data: BlackBoxData::new(blackbox_qubits, content),
@@ -278,272 +289,277 @@ fn op_to_cmd(op: &Op, register_map: &RegisterMap) -> Result<Vec<Command<String>>
         Op::Gate { data } => {
             let args = data.get_args();
             match data.get_gate_type() {
-            GateType::H => {
-                let qubit = register_map.get_qubit_id(args[0])?;
-                Ok(vec![Command {
-                    op: Operation::from_optype(OpType::H),
-                    args: vec![qubit],
-                    opgroup: None,
-                }])
-            }
-            GateType::S => {
-                let qubit = register_map.get_qubit_id(args[0])?;
-                Ok(vec![Command {
-                    op: Operation::from_optype(OpType::S),
-                    args: vec![qubit],
-                    opgroup: None,
-                }])
-            }
-            GateType::Sdg => {
-                let qubit = register_map.get_qubit_id(args[0])?;
-                Ok(vec![Command {
-                    op: Operation::from_optype(OpType::Sdg),
-                    args: vec![qubit],
-                    opgroup: None,
-                }])
-            }
-            GateType::Z => {
-                let qubit = register_map.get_qubit_id(args[0])?;
-                Ok(vec![Command {
-                    op: Operation::from_optype(OpType::Z),
-                    args: vec![qubit],
-                    opgroup: None,
-                }])
-            }
-            GateType::V => {
-                let qubit = register_map.get_qubit_id(args[0])?;
-                Ok(vec![Command {
-                    op: Operation::from_optype(OpType::V),
-                    args: vec![qubit],
-                    opgroup: None,
-                }])
-            }
-            GateType::Vdg => {
-                let qubit = register_map.get_qubit_id(args[0])?;
-                Ok(vec![Command {
-                    op: Operation::from_optype(OpType::Vdg),
-                    args: vec![qubit],
-                    opgroup: None,
-                }])
-            }
-            GateType::X => {
-                let qubit = register_map.get_qubit_id(args[0])?;
-                Ok(vec![Command {
-                    op: Operation::from_optype(OpType::X),
-                    args: vec![qubit],
-                    opgroup: None,
-                }])
-            }
-            GateType::Y => {
-                let qubit = register_map.get_qubit_id(args[0])?;
-                Ok(vec![Command {
-                    op: Operation::from_optype(OpType::Y),
-                    args: vec![qubit],
-                    opgroup: None,
-                }])
-            }
-            GateType::ZX => {
-                let control = register_map.get_qubit_id(args[0])?;
-                let target = register_map.get_qubit_id(args[1])?;
-                return Ok(vec![Command {
-                    op: Operation::from_optype(OpType::CX),
-                    args: vec![control, target],
-                    opgroup: None,
-                }])
-            }
-            GateType::XZ => {
-                let control = register_map.get_qubit_id(args[0])?;
-                let target = register_map.get_qubit_id(args[1])?;
-                Ok(vec![Command {
-                    op: Operation::from_optype(OpType::CX),
-                    args: vec![target, control],
-                    opgroup: None,
-                }])
-            }
-            GateType::RX => {
-                let qubit = register_map.get_qubit_id(args[0])?;
-                let params = data.get_params();
-
-                if params.len() != 1 {
-                    let msg = format!("RX must have 1 parameter, found {}", params.len());
-                    return Err(ConversionError::ImpossibleParams(msg));
-                }
-
-                match params[0] {
-                    0.25 => Ok(vec![
-                        Command {
-                            op: Operation::from_optype(OpType::H),
-                            args: vec![qubit.clone()],
-                            opgroup: None,
-                        },
-                        Command {
-                            op: Operation::from_optype(OpType::T),
-                            args: vec![qubit.clone()],
-                            opgroup: None,
-                        },
-                        Command {
-                            op: Operation::from_optype(OpType::H),
-                            args: vec![qubit],
-                            opgroup: None,
-                        },
-                    ]),
-                    -0.25 => Ok(vec![
-                        Command {
-                            op: Operation::from_optype(OpType::H),
-                            args: vec![qubit.clone()],
-                            opgroup: None,
-                        },
-                        Command {
-                            op: Operation::from_optype(OpType::Tdg),
-                            args: vec![qubit.clone()],
-                            opgroup: None,
-                        },
-                        Command {
-                            op: Operation::from_optype(OpType::H),
-                            args: vec![qubit],
-                            opgroup: None,
-                        },
-                    ]),
-                    0.5 => Ok(vec![Command {
-                        op: Operation::from_optype(OpType::V),
+                GateType::H => {
+                    let qubit = register_map.get_qubit_id(args[0])?;
+                    Ok(vec![Command {
+                        op: Operation::from_optype(OpType::H),
                         args: vec![qubit],
                         opgroup: None,
-                    }]),
-                    -0.5 => Ok(vec![Command {
-                        op: Operation::from_optype(OpType::Vdg),
-                        args: vec![qubit],
-                        opgroup: None,
-                    }]),
-                    _ => {
-                        panic!("RX {} not in Clifford + T", params[0]);
-                    }
+                    }])
                 }
-            }
-            GateType::RY => {
-                let qubit = register_map.get_qubit_id(args[0])?;
-                let params = data.get_params();
-
-                if params.len() != 1 {
-                    let msg = format!("RY must have 1 parameter, found {}", params.len());
-                    return Err(ConversionError::ImpossibleParams(msg));
-                }
-
-                match params[0] {
-                    0.25 => Ok(vec![
-                        Command {
-                            op: Operation::from_optype(OpType::Sdg),
-                            args: vec![qubit.clone()],
-                            opgroup: None,
-                        },
-                        Command {
-                            op: Operation::from_optype(OpType::H),
-                            args: vec![qubit.clone()],
-                            opgroup: None,
-                        },
-                        Command {
-                            op: Operation::from_optype(OpType::T),
-                            args: vec![qubit.clone()],
-                            opgroup: None,
-                        },
-                        Command {
-                            op: Operation::from_optype(OpType::H),
-                            args: vec![qubit.clone()],
-                            opgroup: None,
-                        },
-                        Command {
-                            op: Operation::from_optype(OpType::S),
-                            args: vec![qubit],
-                            opgroup: None,
-                        },
-                    ]),
-                    -0.25 => Ok(vec![
-                        Command {
-                            op: Operation::from_optype(OpType::Sdg),
-                            args: vec![qubit.clone()],
-                            opgroup: None,
-                        },
-                        Command {
-                            op: Operation::from_optype(OpType::H),
-                            args: vec![qubit.clone()],
-                            opgroup: None,
-                        },
-                        Command {
-                            op: Operation::from_optype(OpType::Tdg),
-                            args: vec![qubit.clone()],
-                            opgroup: None,
-                        },
-                        Command {
-                            op: Operation::from_optype(OpType::H),
-                            args: vec![qubit.clone()],
-                            opgroup: None,
-                        },
-                        Command {
-                            op: Operation::from_optype(OpType::S),
-                            args: vec![qubit],
-                            opgroup: None,
-                        },
-                    ]),
-                    _ => {
-                        panic!("RY {} not in Clifford + T", params[0]);
-                    }
-                }
-            }
-            GateType::RZ => {
-                let qubit = register_map.get_qubit_id(args[0])?;
-                let params = data.get_params();
-
-                if params.len() != 1 {
-                    let msg = format!("RZ must have 1 parameter, found {}", params.len());
-                    return Err(ConversionError::ImpossibleParams(msg));
-                }
-
-                match params[0] {
-                    0.25 => Ok(vec![Command {
-                        op: Operation::from_optype(OpType::T),
-                        args: vec![qubit],
-                        opgroup: None,
-                    }]),
-                    -0.25 => Ok(vec![Command {
-                        op: Operation::from_optype(OpType::Tdg),
-                        args: vec![qubit],
-                        opgroup: None,
-                    }]),
-                    0.5 => Ok(vec![Command {
+                GateType::S => {
+                    let qubit = register_map.get_qubit_id(args[0])?;
+                    Ok(vec![Command {
                         op: Operation::from_optype(OpType::S),
                         args: vec![qubit],
                         opgroup: None,
-                    }]),
-                    -0.5 => Ok(vec![Command {
+                    }])
+                }
+                GateType::Sdg => {
+                    let qubit = register_map.get_qubit_id(args[0])?;
+                    Ok(vec![Command {
                         op: Operation::from_optype(OpType::Sdg),
                         args: vec![qubit],
                         opgroup: None,
-                    }]),
-                    _ => panic!("arbitrary RZ gate not in Clifford + T"),
+                    }])
                 }
+                GateType::Z => {
+                    let qubit = register_map.get_qubit_id(args[0])?;
+                    Ok(vec![Command {
+                        op: Operation::from_optype(OpType::Z),
+                        args: vec![qubit],
+                        opgroup: None,
+                    }])
+                }
+                GateType::V => {
+                    let qubit = register_map.get_qubit_id(args[0])?;
+                    Ok(vec![Command {
+                        op: Operation::from_optype(OpType::V),
+                        args: vec![qubit],
+                        opgroup: None,
+                    }])
+                }
+                GateType::Vdg => {
+                    let qubit = register_map.get_qubit_id(args[0])?;
+                    Ok(vec![Command {
+                        op: Operation::from_optype(OpType::Vdg),
+                        args: vec![qubit],
+                        opgroup: None,
+                    }])
+                }
+                GateType::X => {
+                    let qubit = register_map.get_qubit_id(args[0])?;
+                    Ok(vec![Command {
+                        op: Operation::from_optype(OpType::X),
+                        args: vec![qubit],
+                        opgroup: None,
+                    }])
+                }
+                GateType::Y => {
+                    let qubit = register_map.get_qubit_id(args[0])?;
+                    Ok(vec![Command {
+                        op: Operation::from_optype(OpType::Y),
+                        args: vec![qubit],
+                        opgroup: None,
+                    }])
+                }
+                GateType::ZX => {
+                    let control = register_map.get_qubit_id(args[0])?;
+                    let target = register_map.get_qubit_id(args[1])?;
+                    Ok(vec![Command {
+                        op: Operation::from_optype(OpType::CX),
+                        args: vec![control, target],
+                        opgroup: None,
+                    }])
+                }
+                GateType::XZ => {
+                    let control = register_map.get_qubit_id(args[0])?;
+                    let target = register_map.get_qubit_id(args[1])?;
+                    Ok(vec![Command {
+                        op: Operation::from_optype(OpType::CX),
+                        args: vec![target, control],
+                        opgroup: None,
+                    }])
+                }
+                GateType::RX => {
+                    let qubit = register_map.get_qubit_id(args[0])?;
+                    let params = data.get_params();
+
+                    if params.len() != 1 {
+                        let msg = format!("RX must have 1 parameter, found {}", params.len());
+                        return Err(ConversionError::ImpossibleParams(msg));
+                    }
+
+                    match params[0] {
+                        0.25 => Ok(vec![
+                            Command {
+                                op: Operation::from_optype(OpType::H),
+                                args: vec![qubit.clone()],
+                                opgroup: None,
+                            },
+                            Command {
+                                op: Operation::from_optype(OpType::T),
+                                args: vec![qubit.clone()],
+                                opgroup: None,
+                            },
+                            Command {
+                                op: Operation::from_optype(OpType::H),
+                                args: vec![qubit],
+                                opgroup: None,
+                            },
+                        ]),
+                        -0.25 => Ok(vec![
+                            Command {
+                                op: Operation::from_optype(OpType::H),
+                                args: vec![qubit.clone()],
+                                opgroup: None,
+                            },
+                            Command {
+                                op: Operation::from_optype(OpType::Tdg),
+                                args: vec![qubit.clone()],
+                                opgroup: None,
+                            },
+                            Command {
+                                op: Operation::from_optype(OpType::H),
+                                args: vec![qubit],
+                                opgroup: None,
+                            },
+                        ]),
+                        0.5 => Ok(vec![Command {
+                            op: Operation::from_optype(OpType::V),
+                            args: vec![qubit],
+                            opgroup: None,
+                        }]),
+                        -0.5 => Ok(vec![Command {
+                            op: Operation::from_optype(OpType::Vdg),
+                            args: vec![qubit],
+                            opgroup: None,
+                        }]),
+                        angle => Err(ConversionError::UnsupportedRotation {
+                            gate_type: GateType::RX,
+                            angle,
+                        }),
+                    }
+                }
+                GateType::RY => {
+                    let qubit = register_map.get_qubit_id(args[0])?;
+                    let params = data.get_params();
+
+                    if params.len() != 1 {
+                        let msg = format!("RY must have 1 parameter, found {}", params.len());
+                        return Err(ConversionError::ImpossibleParams(msg));
+                    }
+
+                    match params[0] {
+                        0.25 => Ok(vec![
+                            Command {
+                                op: Operation::from_optype(OpType::Sdg),
+                                args: vec![qubit.clone()],
+                                opgroup: None,
+                            },
+                            Command {
+                                op: Operation::from_optype(OpType::H),
+                                args: vec![qubit.clone()],
+                                opgroup: None,
+                            },
+                            Command {
+                                op: Operation::from_optype(OpType::T),
+                                args: vec![qubit.clone()],
+                                opgroup: None,
+                            },
+                            Command {
+                                op: Operation::from_optype(OpType::H),
+                                args: vec![qubit.clone()],
+                                opgroup: None,
+                            },
+                            Command {
+                                op: Operation::from_optype(OpType::S),
+                                args: vec![qubit],
+                                opgroup: None,
+                            },
+                        ]),
+                        -0.25 => Ok(vec![
+                            Command {
+                                op: Operation::from_optype(OpType::Sdg),
+                                args: vec![qubit.clone()],
+                                opgroup: None,
+                            },
+                            Command {
+                                op: Operation::from_optype(OpType::H),
+                                args: vec![qubit.clone()],
+                                opgroup: None,
+                            },
+                            Command {
+                                op: Operation::from_optype(OpType::Tdg),
+                                args: vec![qubit.clone()],
+                                opgroup: None,
+                            },
+                            Command {
+                                op: Operation::from_optype(OpType::H),
+                                args: vec![qubit.clone()],
+                                opgroup: None,
+                            },
+                            Command {
+                                op: Operation::from_optype(OpType::S),
+                                args: vec![qubit],
+                                opgroup: None,
+                            },
+                        ]),
+                        angle => Err(ConversionError::UnsupportedRotation {
+                            gate_type: GateType::RY,
+                            angle,
+                        }),
+                    }
+                }
+                GateType::RZ => {
+                    let qubit = register_map.get_qubit_id(args[0])?;
+                    let params = data.get_params();
+
+                    if params.len() != 1 {
+                        let msg = format!("RZ must have 1 parameter, found {}", params.len());
+                        return Err(ConversionError::ImpossibleParams(msg));
+                    }
+
+                    match params[0] {
+                        0.25 => Ok(vec![Command {
+                            op: Operation::from_optype(OpType::T),
+                            args: vec![qubit],
+                            opgroup: None,
+                        }]),
+                        -0.25 => Ok(vec![Command {
+                            op: Operation::from_optype(OpType::Tdg),
+                            args: vec![qubit],
+                            opgroup: None,
+                        }]),
+                        0.5 => Ok(vec![Command {
+                            op: Operation::from_optype(OpType::S),
+                            args: vec![qubit],
+                            opgroup: None,
+                        }]),
+                        -0.5 => Ok(vec![Command {
+                            op: Operation::from_optype(OpType::Sdg),
+                            args: vec![qubit],
+                            opgroup: None,
+                        }]),
+                        angle => Err(ConversionError::UnsupportedRotation {
+                            gate_type: GateType::RZ,
+                            angle,
+                        }),
+                    }
+                }
+                GateType::SWAP => {
+                    let qubit_0 = register_map.get_qubit_id(args[0])?;
+                    let qubit_1 = register_map.get_qubit_id(args[1])?;
+                    Ok(vec![Command {
+                        op: Operation::from_optype(OpType::SWAP),
+                        args: vec![qubit_0, qubit_1],
+                        opgroup: None,
+                    }])
+                }
+                GateType::Measure => {
+                    let qubit = register_map.get_qubit_id(args[0])?;
+                    let bit = register_map.get_bit_id(args[1])?;
+                    Ok(vec![Command {
+                        op: Operation::from_optype(OpType::Measure),
+                        args: vec![qubit, bit],
+                        opgroup: None,
+                    }])
+                }
+                _ => Err(ConversionError::UnsupportedGate(
+                    data.get_gate_type().clone(),
+                )),
             }
-            GateType::SWAP => {
-                let qubit_0 = register_map.get_qubit_id(args[0])?;
-                let qubit_1 = register_map.get_qubit_id(args[1])?;
-                Ok(vec![Command {
-                    op: Operation::from_optype(OpType::SWAP),
-                    args: vec![qubit_0, qubit_1],
-                    opgroup: None,
-                }])
-            }
-            GateType::Measure => {
-                let qubit = register_map.get_qubit_id(args[0])?;
-                let bit = register_map.get_bit_id(args[1])?;
-                Ok(vec![Command {
-                    op: Operation::from_optype(OpType::Measure),
-                    args: vec![qubit, bit],
-                    opgroup: None,
-                }])
-            }
-            _ => Err(ConversionError::UnsupportedGate(
-                data.get_gate_type().clone(),
-            )),
-            }
-        },
+        }
         Op::BlackBox { data } => {
             let content = data.get_content();
             let barrier_content: BarrierContent = serde_json::from_str(content)
@@ -585,6 +601,17 @@ pub enum ConversionError {
     #[display("Error converting to serial circuit: Unsupported Gate: {:?}", _0)]
     #[error(ignore)]
     UnsupportedGate(GateType),
+    /// Rotation angle is not supported by the Clifford + T conversion.
+    #[display(
+        "Error converting to serial circuit: Unsupported {gate_type:?} rotation angle: {angle}"
+    )]
+    #[error(ignore)]
+    UnsupportedRotation {
+        /// The rotation gate being converted.
+        gate_type: GateType,
+        /// The unsupported angle, in half turns.
+        angle: f64,
+    },
     /// Impossible Params
     #[display("Error converting to serial circuit: {_0}")]
     #[error(ignore)]
@@ -593,7 +620,430 @@ pub enum ConversionError {
     #[display("Error converting to serial circuit: Unsupported BlackBox content: {_0}")]
     #[error(ignore)]
     UnsupportedBlackBox(String),
+    /// A qubit or bit is not present in the [`RegisterMap`].
     #[display("Error converting to pauli graph: Unknown register: {_0}")]
     #[error(ignore)]
     UnknownRegister(String),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rstest::{fixture, rstest};
+
+    fn element(register: &str, index: i64) -> ElementId {
+        ElementId(register.to_owned(), vec![index])
+    }
+
+    fn command(op_type: OpType, args: Vec<ElementId>) -> Command<String> {
+        Command {
+            op: Operation::from_optype(op_type),
+            args,
+            opgroup: None,
+        }
+    }
+
+    fn rotation(op_type: OpType, angle: &str, args: Vec<ElementId>) -> Command<String> {
+        let mut command = command(op_type, args);
+        command.op.params = Some(vec![angle.to_owned()]);
+        command
+    }
+
+    fn gate(gate_type: GateType, args: Vec<usize>) -> Op {
+        Op::Gate {
+            data: GateData::new(gate_type, args),
+        }
+    }
+
+    fn rotation_gate(gate_type: GateType, angle: f64, qubit: usize) -> Op {
+        Op::Gate {
+            data: GateData::new(gate_type, vec![qubit]).with_params(vec![angle]),
+        }
+    }
+
+    #[fixture]
+    fn circuit() -> SerialCircuit {
+        let mut circuit = SerialCircuit::new(None, "0".to_owned());
+        circuit.qubits = vec![
+            Qubit::from(element("left", 2)),
+            Qubit::from(element("right", 4)),
+            Qubit::from(element("ancilla", 0)),
+        ];
+        circuit.bits = vec![
+            Bit::from(element("result", 3)),
+            Bit::from(element("result", 8)),
+        ];
+        circuit
+    }
+
+    #[fixture]
+    fn registers(circuit: SerialCircuit) -> RegisterMap {
+        RegisterMap::new(&circuit.qubits, &circuit.bits)
+    }
+
+    #[rstest]
+    #[case::h(OpType::H, GateType::H)]
+    #[case::s(OpType::S, GateType::S)]
+    #[case::sdg(OpType::Sdg, GateType::Sdg)]
+    #[case::v(OpType::V, GateType::V)]
+    #[case::vdg(OpType::Vdg, GateType::Vdg)]
+    #[case::x(OpType::X, GateType::X)]
+    #[case::y(OpType::Y, GateType::Y)]
+    #[case::z(OpType::Z, GateType::Z)]
+    fn converts_single_qubit_gates(
+        registers: RegisterMap,
+        #[case] op_type: OpType,
+        #[case] gate_type: GateType,
+    ) {
+        let command = command(op_type, vec![element("right", 4)]);
+        let op = gate(gate_type, vec![1]);
+
+        assert_eq!(cmd_to_op(&command, &registers).unwrap(), vec![op.clone()]);
+        assert_eq!(op_to_cmd(&op, &registers).unwrap(), vec![command]);
+    }
+
+    #[rstest]
+    #[case::cx(OpType::CX, GateType::ZX)]
+    #[case::cy(OpType::CY, GateType::ZY)]
+    #[case::cz(OpType::CZ, GateType::ZZ)]
+    #[case::swap(OpType::SWAP, GateType::SWAP)]
+    fn converts_two_qubit_commands(
+        registers: RegisterMap,
+        #[case] op_type: OpType,
+        #[case] gate_type: GateType,
+    ) {
+        let command = command(op_type, vec![element("left", 2), element("right", 4)]);
+        let ops = cmd_to_op(&command, &registers).unwrap();
+
+        assert_eq!(ops, vec![gate(gate_type, vec![0, 1])]);
+    }
+
+    #[rstest]
+    #[case::cx(GateType::ZX, OpType::CX, vec![0, 1])]
+    #[case::reversed_cx(GateType::XZ, OpType::CX, vec![1, 0])]
+    #[case::swap(GateType::SWAP, OpType::SWAP, vec![0, 1])]
+    fn converts_two_qubit_pauli_ops(
+        registers: RegisterMap,
+        #[case] gate_type: GateType,
+        #[case] op_type: OpType,
+        #[case] args: Vec<usize>,
+    ) {
+        let op = gate(gate_type, args);
+        let commands = op_to_cmd(&op, &registers).unwrap();
+        let expected = command(op_type, vec![element("left", 2), element("right", 4)]);
+
+        assert_eq!(commands, vec![expected]);
+    }
+
+    #[rstest]
+    #[case::t(OpType::T, 0.25)]
+    #[case::tdg(OpType::Tdg, -0.25)]
+    fn converts_t_commands_to_z_rotations(
+        registers: RegisterMap,
+        #[case] op_type: OpType,
+        #[case] angle: f64,
+    ) {
+        let command = command(op_type, vec![element("left", 2)]);
+        let ops = cmd_to_op(&command, &registers).unwrap();
+
+        assert_eq!(ops, vec![rotation_gate(GateType::RZ, angle, 0)]);
+    }
+
+    #[rstest]
+    #[case::rx(OpType::Rx, GateType::RX, "0.1", 0.1)]
+    #[case::ry(OpType::Ry, GateType::RY, "0.2", 0.2)]
+    #[case::rz(OpType::Rz, GateType::RZ, "0.3", 0.3)]
+    fn converts_rotation_commands(
+        registers: RegisterMap,
+        #[case] op_type: OpType,
+        #[case] gate_type: GateType,
+        #[case] angle_string: &str,
+        #[case] angle: f64,
+    ) {
+        let command = rotation(op_type, angle_string, vec![element("ancilla", 0)]);
+        let ops = cmd_to_op(&command, &registers).unwrap();
+
+        assert_eq!(ops, vec![rotation_gate(gate_type, angle, 2)]);
+    }
+
+    #[rstest]
+    fn decomposes_controlled_rz(registers: RegisterMap) {
+        let command = rotation(
+            OpType::CRz,
+            "1.0",
+            vec![element("left", 2), element("right", 4)],
+        );
+        let ops = cmd_to_op(&command, &registers).unwrap();
+
+        let expected = vec![
+            rotation_gate(GateType::RZ, 0.5, 1),
+            gate(GateType::ZX, vec![0, 1]),
+            rotation_gate(GateType::RZ, -0.5, 1),
+            gate(GateType::ZX, vec![0, 1]),
+        ];
+        assert_eq!(ops, expected);
+    }
+
+    #[rstest]
+    fn decomposes_ccx(registers: RegisterMap) {
+        let command = command(
+            OpType::CCX,
+            vec![
+                element("left", 2),
+                element("right", 4),
+                element("ancilla", 0),
+            ],
+        );
+        let ops = cmd_to_op(&command, &registers).unwrap();
+
+        let expected = vec![
+            gate(GateType::H, vec![2]),
+            gate(GateType::ZX, vec![1, 2]),
+            rotation_gate(GateType::RZ, -0.25, 2),
+            gate(GateType::ZX, vec![0, 2]),
+            rotation_gate(GateType::RZ, 0.25, 2),
+            gate(GateType::ZX, vec![1, 2]),
+            rotation_gate(GateType::RZ, -0.25, 2),
+            gate(GateType::ZX, vec![0, 2]),
+            rotation_gate(GateType::RZ, 0.25, 1),
+            rotation_gate(GateType::RZ, 0.25, 2),
+            gate(GateType::H, vec![2]),
+            gate(GateType::ZX, vec![0, 1]),
+            rotation_gate(GateType::RZ, 0.25, 0),
+            rotation_gate(GateType::RZ, -0.25, 1),
+            gate(GateType::ZX, vec![0, 1]),
+        ];
+        assert_eq!(ops, expected);
+    }
+
+    #[rstest]
+    #[case::rx_t(GateType::RX, 0.25, vec![OpType::H, OpType::T, OpType::H])]
+    #[case::rx_tdg(GateType::RX, -0.25, vec![OpType::H, OpType::Tdg, OpType::H])]
+    #[case::rx_v(GateType::RX, 0.5, vec![OpType::V])]
+    #[case::rx_vdg(GateType::RX, -0.5, vec![OpType::Vdg])]
+    #[case::ry_t(GateType::RY, 0.25, vec![OpType::Sdg, OpType::H, OpType::T, OpType::H, OpType::S])]
+    #[case::ry_tdg(GateType::RY, -0.25, vec![OpType::Sdg, OpType::H, OpType::Tdg, OpType::H, OpType::S])]
+    #[case::rz_t(GateType::RZ, 0.25, vec![OpType::T])]
+    #[case::rz_tdg(GateType::RZ, -0.25, vec![OpType::Tdg])]
+    #[case::rz_s(GateType::RZ, 0.5, vec![OpType::S])]
+    #[case::rz_sdg(GateType::RZ, -0.5, vec![OpType::Sdg])]
+    fn decomposes_pauli_rotations(
+        registers: RegisterMap,
+        #[case] gate_type: GateType,
+        #[case] angle: f64,
+        #[case] expected_types: Vec<OpType>,
+    ) {
+        let op = rotation_gate(gate_type, angle, 2);
+        let commands = op_to_cmd(&op, &registers).unwrap();
+        let expected: Vec<_> = expected_types
+            .into_iter()
+            .map(|op_type| command(op_type, vec![element("ancilla", 0)]))
+            .collect();
+
+        assert_eq!(commands, expected);
+    }
+
+    #[rstest]
+    fn converts_measurement_registers(registers: RegisterMap) {
+        let command = command(
+            OpType::Measure,
+            vec![element("ancilla", 0), element("result", 8)],
+        );
+        let op = gate(GateType::Measure, vec![2, 1]);
+
+        assert_eq!(cmd_to_op(&command, &registers).unwrap(), vec![op.clone()]);
+        assert_eq!(op_to_cmd(&op, &registers).unwrap(), vec![command]);
+    }
+
+    #[rstest]
+    #[case::qubit_only(vec![element("right", 4)], vec![1], None)]
+    #[case::with_bit(
+        vec![element("left", 2), element("result", 3)],
+        vec![0, 1, 2],
+        Some("keep together"),
+    )]
+    fn preserves_barriers(
+        registers: RegisterMap,
+        #[case] args: Vec<ElementId>,
+        #[case] affected_qubits: Vec<usize>,
+        #[case] op_data: Option<&str>,
+    ) {
+        let mut command = command(OpType::Barrier, args.clone());
+        command.op.data = op_data.map(str::to_owned);
+        let content = serde_json::to_string(&BarrierContent {
+            op_data: command.op.data.clone(),
+            args,
+        })
+        .unwrap();
+        let op = Op::BlackBox {
+            data: BlackBoxData::new(affected_qubits, content),
+        };
+
+        assert_eq!(cmd_to_op(&command, &registers).unwrap(), vec![op.clone()]);
+        assert_eq!(op_to_cmd(&op, &registers).unwrap(), vec![command]);
+    }
+
+    #[rstest]
+    fn converts_complete_circuit(mut circuit: SerialCircuit, registers: RegisterMap) {
+        circuit.commands = vec![
+            command(OpType::H, vec![element("left", 2)]),
+            command(OpType::CX, vec![element("left", 2), element("right", 4)]),
+            command(
+                OpType::Measure,
+                vec![element("right", 4), element("result", 8)],
+            ),
+        ];
+
+        let graph = serial_circuit_to_pauli_graph(&mut circuit, &registers).unwrap();
+
+        assert_eq!(graph.get_n_qubits(), 3);
+        assert_eq!(
+            graph.get_ops(),
+            &vec![
+                gate(GateType::H, vec![0]),
+                gate(GateType::ZX, vec![0, 1]),
+                gate(GateType::Measure, vec![1, 1]),
+            ]
+        );
+        assert_eq!(
+            pauli_graph_to_cmds(graph, &registers).unwrap(),
+            circuit.commands
+        );
+    }
+
+    #[rstest]
+    fn error_on_unknown_register_name(registers: RegisterMap) {
+        let unknown = element("unknown", 0);
+        let result = registers.get_indices(std::slice::from_ref(&unknown));
+
+        assert!(matches!(
+            result,
+            Err(ConversionError::UnknownRegister(register)) if register == unknown.to_string()
+        ));
+    }
+
+    #[rstest]
+    fn error_on_unknown_qubit_index(registers: RegisterMap) {
+        assert!(matches!(
+            registers.get_qubit_id(3),
+            Err(ConversionError::UnknownRegister(register)) if register == "3"
+        ));
+    }
+
+    #[rstest]
+    fn error_on_unknown_bit_index(registers: RegisterMap) {
+        assert!(matches!(
+            registers.get_bit_id(2),
+            Err(ConversionError::UnknownRegister(register)) if register == "2"
+        ));
+    }
+
+    #[rstest]
+    fn error_on_commands_without_rotation_angles(
+        registers: RegisterMap,
+        #[values(OpType::Rx, OpType::Ry, OpType::Rz, OpType::CRz)] op_type: OpType,
+    ) {
+        let command = command(op_type, vec![element("left", 2)]);
+        let result = cmd_to_op(&command, &registers);
+
+        assert!(matches!(
+            result,
+            Err(ConversionError::RotationAngleRequired(error_type)) if error_type == op_type
+        ));
+    }
+
+    #[rstest]
+    fn error_on_symbolic_rotation_angles(
+        registers: RegisterMap,
+        #[values(OpType::Rx, OpType::Ry, OpType::Rz, OpType::CRz)] op_type: OpType,
+    ) {
+        let command = rotation(op_type, "theta", vec![element("left", 2)]);
+        let result = cmd_to_op(&command, &registers);
+
+        assert!(matches!(
+            result,
+            Err(ConversionError::SymbolicParameter(parameter)) if parameter == "theta"
+        ));
+    }
+
+    #[rstest]
+    fn error_on_unsupported_commands(registers: RegisterMap) {
+        let command = command(OpType::Create, vec![element("left", 2)]);
+        let result = cmd_to_op(&command, &registers);
+
+        assert!(matches!(
+            result,
+            Err(ConversionError::UnsupportedOpType(OpType::Create))
+        ));
+    }
+
+    #[rstest]
+    fn error_on_unsupported_pauli_ops(registers: RegisterMap) {
+        let result = op_to_cmd(&Op::SetBoundary, &registers);
+
+        assert!(matches!(
+            result,
+            Err(ConversionError::UnsupportedOp(Op::SetBoundary))
+        ));
+    }
+
+    #[rstest]
+    fn error_on_unsupported_pauli_gates(registers: RegisterMap) {
+        let result = op_to_cmd(&gate(GateType::ZZ, vec![0, 1]), &registers);
+
+        assert!(matches!(
+            result,
+            Err(ConversionError::UnsupportedGate(GateType::ZZ))
+        ));
+    }
+
+    #[rstest]
+    fn error_on_pauli_rotations_without_angles(
+        registers: RegisterMap,
+        #[values(GateType::RX, GateType::RY, GateType::RZ)] gate_type: GateType,
+    ) {
+        let op = gate(gate_type.clone(), vec![0]);
+        let result = op_to_cmd(&op, &registers);
+        let expected_message = format!("{gate_type:?} must have 1 parameter, found 0");
+
+        assert!(matches!(
+            result,
+            Err(ConversionError::ImpossibleParams(message)) if message == expected_message
+        ));
+    }
+
+    #[rstest]
+    fn error_on_invalid_black_box_content(registers: RegisterMap) {
+        let op = Op::BlackBox {
+            data: BlackBoxData::new(vec![], "not json".to_owned()),
+        };
+        let result = op_to_cmd(&op, &registers);
+
+        assert!(matches!(
+            result,
+            Err(ConversionError::UnsupportedBlackBox(content)) if content == "not json"
+        ));
+    }
+
+    #[rstest]
+    #[case::rx(GateType::RX, 0.1)]
+    #[case::ry(GateType::RY, 0.1)]
+    #[case::rz(GateType::RZ, 0.1)]
+    #[case::unsupported_clifford_angle(GateType::RY, 0.5)]
+    fn error_on_unsupported_rotation(
+        registers: RegisterMap,
+        #[case] gate_type: GateType,
+        #[case] angle: f64,
+    ) {
+        let graph = PauliGraph::new(3).with_ops(vec![rotation_gate(gate_type.clone(), angle, 0)]);
+        let result = pauli_graph_to_cmds(graph, &registers);
+
+        assert!(matches!(
+            result,
+            Err(ConversionError::UnsupportedRotation {
+                gate_type: error_gate,
+                angle: error_angle,
+            }) if error_gate == gate_type && error_angle == angle
+        ));
+    }
 }
