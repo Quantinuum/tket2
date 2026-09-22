@@ -45,6 +45,22 @@ def apply_r(
 
 
 @guppy(controllable=True)
+def recursive_apply(
+    f: Controllable[[qubit, angle], None],
+    classic_call: Function[[float], angle],
+    angle: angle,
+    q: qubit,
+    b: bool,
+) -> None:
+    """Testing that recursive call do not cause non termination during compilation"""
+    if b:
+        f(q, classic_call(0.25))
+        f(q, angle)
+    else:
+        recursive_apply(f, classic_call, angle, q, not b)
+
+
+@guppy(controllable=True)
 def apply_c(
     f: Controllable[[qubit], None],
     g: Unitary[[qubit, angle], None],
@@ -61,8 +77,7 @@ def apply_c(
         get_a = classic_fun()
         angle = get_a(0.25)
         for _ in range(2):
-            g(q, get_a(0.25))
-            g(q, angle)
+            recursive_apply(g, get_a, angle, q, b)
 
 
 @guppy

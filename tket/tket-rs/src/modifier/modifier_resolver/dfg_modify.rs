@@ -596,12 +596,32 @@ impl<N: HugrNode> ModifierResolver<N> {
         )
         .unwrap();
 
+        // We add the new function node before modifying the function body to be
+        // able to cache it and catch recursive calls.
+        let local_function_node = new_fn.container_node();
+        let new_function_node = h.add_node_with_parent(
+            h.module_root(),
+            new_fn.hugr().get_optype(local_function_node).clone(),
+        );
+        self.modified_impls.insert(cache_key, new_function_node);
+
         let modify_result = self.modify_dfg_body(h, func, &mut new_fn);
         modify_result?;
 
-        // Connect the global wires
         let call_map = mem::replace(self.call_map(), old_call_map);
-        let insertion_result = h.insert_from_view(h.module_root(), new_fn.hugr());
+
+        // We insert the modified function body into the new_function_node
+        let body = new_fn.hugr();
+        let insertion_result = h
+            .insert_view_forest(
+                body,
+                body.descendants(local_function_node)
+                    .filter(|&node| node != local_function_node),
+                body.children(local_function_node)
+                    .map(|child| (child, new_function_node)),
+            )
+            .expect("Function-body descendants contain no duplicate nodes");
+
         let new_call_map = update_call_map(&call_map, &insertion_result.node_map);
         for (old_in, targets) in new_call_map.into_iter() {
             for (new_n, new_port) in targets {
@@ -609,8 +629,6 @@ impl<N: HugrNode> ModifierResolver<N> {
             }
         }
 
-        let new_function_node = insertion_result.inserted_entrypoint;
-        self.modified_impls.insert(cache_key, new_function_node);
         self.modified_functions.insert(func);
 
         Ok(new_function_node)
@@ -1215,7 +1233,7 @@ mod test {
             .filter(|&node| {
                 h.get_optype(node)
                     .as_func_defn()
-                    .is_some_and(|defn| defn.func_name() == "__modified__foo")
+                    .is_some_and(|defn| defn.func_name().starts_with("__modified__foo"))
             })
             .collect::<Vec<_>>();
         assert_eq!(implementations.len(), 1);
@@ -1234,6 +1252,62 @@ mod test {
             })
             .collect::<Vec<_>>();
         assert_eq!(callees, vec![implementations[0]; 2]);
+    }
+
+    #[test]
+    fn control_recursive_call() {
+        let mut module = ModuleBuilder::new();
+        // recursive(q) = {X(q); recursive(q)}
+        let recursive = module
+            .declare("recursive", Signature::new_endo([qb_t()]).into())
+            .unwrap();
+        {
+            let mut func = module.define_declaration(&recursive).unwrap();
+            let [q] = func.input_wires_arr();
+            let q = func.add_dataflow_op(TketOp::X, [q]).unwrap().out_wire(0);
+            let call = func.call(&recursive, &[], [q]).unwrap();
+            func.finish_with_outputs(call.outputs()).unwrap();
+        }
+        let mut h = module.finish_hugr().unwrap();
+        let modified = controlled_resolver()
+            .modify_fn(&mut h, recursive.node())
+            .unwrap();
+        h.validate().unwrap();
+
+        assert_eq!(
+            h.get_optype(modified)
+                .as_func_defn()
+                .unwrap()
+                .signature()
+                .body(),
+            &Signature::new_endo([array_type(1, qb_t()), qb_t()]),
+        );
+        let callees = h
+            .children(modified)
+            .filter_map(|node| {
+                let OpType::Call(call) = h.get_optype(node) else {
+                    return None;
+                };
+                Some(
+                    h.single_linked_output(node, call.called_function_port())
+                        .unwrap()
+                        .0,
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(callees, vec![modified]);
+        // Only the original and its controlled implementation should exist.
+        assert_eq!(
+            h.children(h.module_root())
+                .filter(|&node| h.get_optype(node).is_func_defn())
+                .count(),
+            2,
+        );
+        // The X gate is a CX now.
+        assert!(
+            h.descendants(modified)
+                .any(|node| h.get_optype(node).cast::<TketOp>() == Some(TketOp::CX))
+        );
     }
 
     #[test]

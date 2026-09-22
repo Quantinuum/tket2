@@ -325,8 +325,10 @@ pub struct ModifierResolver<N = Node> {
     call_map: HashMap<N, Vec<(Node, IncomingPort)>>,
     /// Original functions for which the resolver generated modified replacements.
     modified_functions: HashSet<N>,
-    /// Generated implementations keyed by original function and the full modifier,
-    /// including the control-array layout that determines the function signature.
+    /// Reserved or completed implementations keyed by original function and the
+    /// full modifier, including the control-array layout.
+    /// Entries are inserted before transforming bodies so recursive calls can
+    /// reference the function currently being generated.
     modified_impls: HashMap<(N, CombinedModifier), N>,
     /// Cached adapters from the resolver's controls-first ABI to custom controls-last functions.
     custom_adapters: HashMap<(N, N, CombinedModifier), N>,
@@ -1587,7 +1589,6 @@ mod tests {
         dagger: bool,
     ) -> Hugr {
         let (mut h, foo_node) = modifier_test_hugr(target_num, ctrl_num, foo, dagger);
-        std::fs::write("before.mmd", h.mermaid_string()).unwrap();
 
         let entrypoint = h.entrypoint();
         resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
