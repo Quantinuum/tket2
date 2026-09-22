@@ -54,6 +54,11 @@ impl CombinedModifier {
         Ok(())
     }
 
+    /// Returns a compact string representation of the combined modifier environment.
+    ///
+    /// The string consists of `'C'` followed by the number of control arrays (`self.accum_ctrl`),
+    /// joined by dots, and `'D'` if the dagger modifier has been applied.
+    /// If no control qubits are present, `'C'` is omitted.
     fn compact_string(&self) -> String {
         let mut s = String::new();
         if self.control > 0 {
