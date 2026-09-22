@@ -1,4 +1,4 @@
-//! This crate implements some basic operations for PauliGraph Ops
+#![doc = include_str!("../README.md")]
 
 mod ops;
 pub use ops::*;

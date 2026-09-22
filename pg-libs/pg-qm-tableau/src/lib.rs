@@ -1,4 +1,4 @@
-//! Clifford tableau
+#![doc = include_str!("../README.md")]
 #![cfg_attr(feature = "simd", feature(portable_simd))]
 #[cfg(feature = "simd")]
 use pg_bitpacked::{

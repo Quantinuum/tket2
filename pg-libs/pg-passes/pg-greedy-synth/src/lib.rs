@@ -1,14 +1,4 @@
-//! Greedy synthesis pass for Pauli graphs.
-//!
-//! [`GreedySynthPass`] lowers a canonical Pauli graph whose operations are
-//! grouped into commuting sets. The output contains Clifford gates on
-//! individual qubits, Pauli rotations, measurements, resets and entangling
-//! gates between two qubits, known as TQEs. [`ParallelMode`] controls whether
-//! Rayon evaluates candidate costs in parallel.
-//!
-//! The pass expects input produced by `CanonicalFormPass` followed by
-//! `GroupCommutingOpsPass`.
-
+#![doc = include_str!("../README.md")]
 #![cfg_attr(feature = "simd", feature(portable_simd))]
 #![allow(clippy::upper_case_acronyms)]
 mod backend;

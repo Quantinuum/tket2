@@ -1,4 +1,4 @@
-//! Optimisation passes for Pauli graphs.
+#![doc = include_str!("../README.md")]
 
 mod commuting_sets;
 mod packed_op;

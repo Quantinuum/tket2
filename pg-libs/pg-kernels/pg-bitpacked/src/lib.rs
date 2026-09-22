@@ -1,6 +1,4 @@
-//! This crate implements Clifford conjugation on bit-packed representations of Pauli operators.
-//! The simd feature enables the use of the nightly portable_simd API.
-
+#![doc = include_str!("../README.md")]
 #![cfg_attr(feature = "simd", feature(portable_simd))]
 
 use pg_core::Pauli;
