@@ -301,9 +301,9 @@ impl ReplacementOptions {
 /// The struct configures what types, ops, and constants should be replaced with what,
 /// and may be applied to a Hugr via [`Self::run`].
 ///
-/// Parametrized types and ops will be reparameterized taking into account the
+/// Parameterized types and ops will be reparameterized taking into account the
 /// replacements, but any ops taking/returning the replaced types *not* as a result of
-/// parametrization, will also need to be replaced - see [`Self::set_replace_op`].
+/// parameterization, will also need to be replaced - see [`Self::set_replace_op`].
 /// Similarly [Const]s.
 ///
 /// Types that are [Copyable](hugr_core::types::TypeBound::Copyable) may also be replaced
@@ -435,7 +435,7 @@ impl ReplaceTypes {
     /// the first type, must be handled by two separate [ReplaceTypes]'s via a temporary
     /// type. )
     ///
-    /// Note that if `src` is an instance of a *parametrized* [`TypeDef`], this takes
+    /// Note that if `src` is an instance of a *parameterized* [`TypeDef`], this takes
     /// precedence over [`Self::set_replace_parametrized_type`] where the `src`s overlap. Thus, this
     /// should only be used on already-*[monomorphize](crate::passes::MonomorphizePass)d* Hugrs, as
     /// substitution (parametric polymorphism) happening later will not respect this replacement.
@@ -455,7 +455,7 @@ impl ReplaceTypes {
             .insert(src, (dest, ReplacementOptions::recursive()));
     }
 
-    /// Configures this instance to change occurrences of a parametrized type `src`
+    /// Configures this instance to change occurrences of a parameterized type `src`
     /// via a callback that builds the replacement type given the [`TypeArg`]s.
     ///
     /// Note that the `TypeArgs` will already have been updated (e.g. they may not
@@ -518,7 +518,7 @@ impl ReplaceTypes {
     }
 
     /// Returns a mutable reference to the metadata propagation policy, for
-    /// incremental customisation (e.g. adding rules to the default policy).
+    /// incremental customization (e.g. adding rules to the default policy).
     pub fn metadata_policy_mut(&mut self) -> &mut MetadataPropagationPolicy {
         &mut self.meta_policy
     }
@@ -530,7 +530,7 @@ impl ReplaceTypes {
     /// instance of the same op, must be handled by two separate [ReplaceTypes]'s
     /// via a temporary op.)
     ///
-    /// Note that if `src` is an instance of a *parametrized* [`OpDef`], this takes
+    /// Note that if `src` is an instance of a *parameterized* [`OpDef`], this takes
     /// precedence over [`Self::set_replace_parametrized_op`] where the `src`s overlap.
     /// Thus, this method should only be used for already-*[monomorphize](crate::passes::MonomorphizePass)d*
     /// Hugrs, as substitution (parametric polymorphism) happening later will not respect
@@ -542,7 +542,7 @@ impl ReplaceTypes {
         );
     }
 
-    /// Configures this instance to change occurrences of a parametrized op `src`
+    /// Configures this instance to change occurrences of a parameterized op `src`
     /// via a callback that builds the replacement type given the [`TypeArg`]s.
     /// Note that the `TypeArgs` will already have been updated (e.g. they may not
     /// fit the bounds of the original op); and the returned [NodeTemplate] will be
@@ -566,7 +566,7 @@ impl ReplaceTypes {
     /// Configures this instance to change [Const]s of type `src_ty`, using
     /// a callback that is passed the value of the constant (of that type).
     ///
-    /// Note that if `src_ty` is an instance of a *parametrized* [`TypeDef`],
+    /// Note that if `src_ty` is an instance of a *parameterized* [`TypeDef`],
     /// this takes precedence over [`Self::replace_consts_parametrized`] where
     /// the `src_ty`s overlap.
     pub fn replace_consts(
@@ -578,7 +578,7 @@ impl ReplaceTypes {
     }
 
     /// Configures this instance to change [Const]s of all types that are instances
-    /// of a parametrized typedef `src_ty`, using a callback that is passed the
+    /// of a parameterized typedef `src_ty`, using a callback that is passed the
     /// value of the constant (the [`OpaqueValue`] contains the [`TypeArg`]s). The
     /// callback may return `None` to indicate no change to the constant.
     pub fn replace_consts_parametrized(

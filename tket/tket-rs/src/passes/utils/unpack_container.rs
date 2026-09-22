@@ -155,12 +155,12 @@ static TEMP_UNPACK_EXT: LazyLock<Arc<Extension>> = LazyLock::new(|| {
 pub struct UnpackContainerBuilder {
     /// Function definitions for each instance of the operations.
     func_map: OpFunctionMap,
-    /// Type analyzer for determining which types to unpack
+    /// Type analyser for determining which types to unpack
     type_analyzer: TypeUnpacker,
 }
 
 impl UnpackContainerBuilder {
-    /// Create a new instance with a custom type analyzer.
+    /// Create a new instance with a custom type analyser.
     pub fn new(type_analyzer: TypeUnpacker) -> Self {
         Self {
             func_map: OpFunctionMap::new(),
@@ -173,7 +173,7 @@ impl UnpackContainerBuilder {
         self.func_map
     }
 
-    /// Gets a reference to the internal type analyzer
+    /// Gets a reference to the internal type analyser
     pub fn type_analyzer(&mut self) -> &mut TypeUnpacker {
         &mut self.type_analyzer
     }
@@ -336,7 +336,7 @@ impl UnpackContainerBuilder {
         Some(args)
     }
 
-    /// Unpack a row of types into a flat list of wires containing all elements matching the analyzer
+    /// Unpack a row of types into a flat list of wires containing all elements matching the analyser
     pub fn unpack_row(
         &self,
         builder: &mut impl Dataflow,
@@ -439,7 +439,7 @@ impl UnpackContainerBuilder {
             .expect("one output"))
     }
 
-    /// Unpack a container type to extract wires matching the analyzer criteria.
+    /// Unpack a container type to extract wires matching the analyser criteria.
     pub fn unpack_container(
         &self,
         builder: &mut impl Dataflow,
