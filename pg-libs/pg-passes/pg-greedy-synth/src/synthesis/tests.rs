@@ -13,7 +13,7 @@ use pg_optimise::GroupCommutingOpsPass;
 use pg_qm_tableau::Tableau;
 use pg_tk::compare_unitaries_via_tk;
 use rand::seq::index::sample;
-use rand::{Rng, SeedableRng, rngs::StdRng};
+use rand::{RngExt, SeedableRng, rngs::StdRng};
 use rstest::rstest;
 
 fn graph(n_qubits: usize, ops: Vec<Op>) -> PauliGraph {

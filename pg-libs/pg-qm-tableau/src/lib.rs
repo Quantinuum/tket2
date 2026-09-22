@@ -13,7 +13,7 @@ use pg_bitpacked::{
 };
 use pg_core::Pauli;
 use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 use std::fmt;
 #[cfg(feature = "simd")]
 use std::simd::Simd;
@@ -1830,7 +1830,7 @@ mod tests {
     #[cfg(feature = "simd")]
     use pg_bitpacked::apply_enum_tqe_simd;
     use pg_bitpacked::apply_enum_tqe_slice;
-    use rand::Rng;
+    use rand::RngExt;
 
     fn random_tqes(
         n_qubits: usize,

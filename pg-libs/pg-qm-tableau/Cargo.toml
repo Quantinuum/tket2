@@ -9,8 +9,8 @@ pg-utils = { path = "../pg-utils/pg-utils" }
 pg-bitpacked = { path = "../pg-kernels/pg-bitpacked" }
 pg-ir-kernels = { path = "../pg-kernels/pg-ir-kernels" }
 pg-core = { path = "../pg-core" }
-rand = "0.9.1"
-rayon = "1.10"
+rand = { workspace = true }
+rayon = { workspace = true }
 
 [dev-dependencies]
 pg-tk = { path = "../pg-converters/pg-tk" }
