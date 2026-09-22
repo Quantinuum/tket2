@@ -1,6 +1,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "pg-libs",
     "pg-core",
     "pg-converters/pg-tk",
     "pg-kernels/pg-bitpacked",

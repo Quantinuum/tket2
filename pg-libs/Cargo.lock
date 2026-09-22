@@ -320,6 +320,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "pg-libs"
+version = "0.1.0"
+dependencies = [
+ "pg-bitpacked",
+ "pg-canonical-form",
+ "pg-core",
+ "pg-greedy-synth",
+ "pg-ir-kernels",
+ "pg-optimise",
+ "pg-qm-tableau",
+ "pg-rebase",
+ "pg-tk",
+ "pg-utils",
+]
+
+[[package]]
 name = "pg-optimise"
 version = "0.1.0"
 dependencies = [

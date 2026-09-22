@@ -10,6 +10,10 @@ sync-uv:
 test-rust:
     cargo test --workspace
 
+# Build and open the facade and dependency API documentation.
+doc-rust:
+    cargo doc -p pg-libs --open
+
 # When using the devenv shell, start it with the nightly profile,
 # and the toolchain does not need to be specified explicitly.
 test-rust-all-features_nix:
