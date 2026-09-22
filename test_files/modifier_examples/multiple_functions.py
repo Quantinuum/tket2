@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#    "guppylang==1.0.0rc1",
+#    "guppylang==1.1.1",
 # ]
 # ///
 """Testing a dagger modifier on multiple functions, to ensure that the dagger is
@@ -10,16 +10,14 @@ reversing the order of quantum operations"""
 from pathlib import Path
 from sys import argv
 
-from guppylang import enable_experimental_features, guppy
+from guppylang import guppy
 from guppylang.std.angles import angle
 from guppylang.std.builtins import control, dagger
 from guppylang.std.debug import state_result
 from guppylang.std.quantum import discard, qubit, rx, s
 
-enable_experimental_features()
 
-
-@guppy
+@guppy(daggerable=True)
 def get_f() -> float:
     return 1 / 3
 
