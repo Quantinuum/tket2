@@ -562,8 +562,9 @@ impl<N: HugrNode> ModifierResolver<N> {
         self.modify_fn_inner(h, func)
     }
 
-    /// Reuses or generates a function modified by the combined modifier without checking for a
-    /// custom implementation.
+    /// Generates a new function modified by the combined modifier without checking for a custom
+    /// implementation. If the function has already been modified with the same set of modifiers,
+    /// it will reuse the cached modified function.
     fn modify_fn_inner(
         &mut self,
         h: &mut impl HugrMut<Node = N>,
