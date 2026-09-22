@@ -1,5 +1,6 @@
 //! Clifford tableau
 #![cfg_attr(feature = "simd", feature(portable_simd))]
+#![expect(clippy::too_many_arguments, clippy::type_complexity)]
 #[cfg(feature = "simd")]
 use pg_bitpacked::{
     apply_enum_tqe_simd, apply_half_pi_gate_simd, simd_h_gate, simd_x_gate, simd_xx_gate,
@@ -12,12 +13,12 @@ use pg_bitpacked::{
 };
 use pg_core::Pauli;
 use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 use std::fmt;
 #[cfg(feature = "simd")]
-use std::simd::num::SimdUint;
+use std::simd::Simd;
 #[cfg(feature = "simd")]
-use std::simd::{LaneCount, Simd, SupportedLaneCount};
+use std::simd::num::SimdUint;
 
 mod converter;
 
@@ -122,10 +123,7 @@ fn simd_string_mul<const N: usize>(
     lhs_x_bits: &mut [u64],
     rhs_z_bits: &[u64],
     rhs_x_bits: &[u64],
-) -> u8
-where
-    LaneCount<N>: SupportedLaneCount,
-{
+) -> u8 {
     let len = lhs_z_bits.len();
     let chunks = len / N;
     let mut n_anti_commute_sites: u64 = 0;
@@ -173,10 +171,7 @@ where
 
 /// Given a Pauli string, count the number of Ys using SIMD
 #[cfg(feature = "simd")]
-fn simd_count_y<const N: usize>(input_z_bits: &[u64], input_x_bits: &[u64]) -> u64
-where
-    LaneCount<N>: SupportedLaneCount,
-{
+fn simd_count_y<const N: usize>(input_z_bits: &[u64], input_x_bits: &[u64]) -> u64 {
     let len = input_z_bits.len();
     let chunks = len / N;
 
@@ -1662,29 +1657,21 @@ pub trait SimdTableau {
     /// # Panics
     ///
     /// Panics if `q0 == q1`, or if `g0` or `g1` is `Pauli::I`.
-    fn postcompose_tqe_simd<const N: usize>(&mut self, g0: Pauli, g1: Pauli, q0: usize, q1: usize)
-    where
-        LaneCount<N>: SupportedLaneCount;
+    fn postcompose_tqe_simd<const N: usize>(&mut self, g0: Pauli, g1: Pauli, q0: usize, q1: usize);
     /// Precompose a TQE gate using SIMD operations.
     ///
     /// # Panics
     ///
     /// Panics if `q0 == q1`, or if `g0` or `g1` is `Pauli::I`.
-    fn precompose_tqe_simd<const N: usize>(&mut self, g0: Pauli, g1: Pauli, q0: usize, q1: usize)
-    where
-        LaneCount<N>: SupportedLaneCount;
+    fn precompose_tqe_simd<const N: usize>(&mut self, g0: Pauli, g1: Pauli, q0: usize, q1: usize);
     /// Precompose a half-pi Pauli rotation using SIMD operations.
     ///
     /// # Panics
     ///
     /// Panics if `axis` is `Pauli::I`.
-    fn precompose_half_pi_simd<const N: usize>(&mut self, axis: Pauli, q: usize, dagger: bool)
-    where
-        LaneCount<N>: SupportedLaneCount;
+    fn precompose_half_pi_simd<const N: usize>(&mut self, axis: Pauli, q: usize, dagger: bool);
     /// Postcompose a half-pi Pauli rotation using SIMD operations.
-    fn postcompose_half_pi_simd<const N: usize>(&mut self, axis: Pauli, q: usize, dagger: bool)
-    where
-        LaneCount<N>: SupportedLaneCount;
+    fn postcompose_half_pi_simd<const N: usize>(&mut self, axis: Pauli, q: usize, dagger: bool);
     /// Postcompose a multi-qubit Clifford angle Pauli rotation using SIMD operations.
     ///
     /// # Panics
@@ -1695,16 +1682,13 @@ pub trait SimdTableau {
         pauli_z_bits: &[u64],
         pauli_x_bits: &[u64],
         half_pis: u8,
-    ) where
-        LaneCount<N>: SupportedLaneCount;
+    );
     /// Conjugate a Pauli string using SIMD operations.
     fn apply_to_pauli_simd<const N: usize>(
         &self,
         pauli_z_bits: &[u64],
         pauli_x_bits: &[u64],
-    ) -> (Vec<u64>, Vec<u64>, bool)
-    where
-        LaneCount<N>: SupportedLaneCount;
+    ) -> (Vec<u64>, Vec<u64>, bool);
     /// Multi-threaded version of apply_to_pauli_simd.
     ///
     /// Note: For small tableaus it's worth benchmarking against the non-MT
@@ -1713,38 +1697,25 @@ pub trait SimdTableau {
         &self,
         pauli_z_bits: &[u64],
         pauli_x_bits: &[u64],
-    ) -> (Vec<u64>, Vec<u64>, bool)
-    where
-        LaneCount<N>: SupportedLaneCount;
+    ) -> (Vec<u64>, Vec<u64>, bool);
     /// Invert the tableau using SIMD operations.
-    fn invert_simd<const N: usize>(&self) -> Tableau
-    where
-        LaneCount<N>: SupportedLaneCount;
+    fn invert_simd<const N: usize>(&self) -> Tableau;
     /// Postcompose another tableau using SIMD operations.
-    fn compose_simd<const N: usize>(&mut self, other: &Tableau)
-    where
-        LaneCount<N>: SupportedLaneCount;
+    fn compose_simd<const N: usize>(&mut self, other: &Tableau);
     /// Postcompose a single-qubit Pauli gate using SIMD operations.
     ///
     /// # Panics
     ///
     /// Panics if `pauli` is `Pauli::I`.
-    fn postcompose_pauli_simd<const N: usize>(&mut self, pauli: Pauli, q: usize)
-    where
-        LaneCount<N>: SupportedLaneCount;
+    fn postcompose_pauli_simd<const N: usize>(&mut self, pauli: Pauli, q: usize);
 
     /// Postcompose a Hadamard gate using SIMD operations.
-    fn postcompose_h_simd<const N: usize>(&mut self, q: usize)
-    where
-        LaneCount<N>: SupportedLaneCount;
+    fn postcompose_h_simd<const N: usize>(&mut self, q: usize);
 }
 
 #[cfg(feature = "simd")]
 impl SimdTableau for Tableau {
-    fn postcompose_tqe_simd<const N: usize>(&mut self, g0: Pauli, g1: Pauli, q0: usize, q1: usize)
-    where
-        LaneCount<N>: SupportedLaneCount,
-    {
+    fn postcompose_tqe_simd<const N: usize>(&mut self, g0: Pauli, g1: Pauli, q0: usize, q1: usize) {
         check_distinct_qubits(q0, q1);
         self.postcompose_tqe_with(
             g0,
@@ -1760,25 +1731,16 @@ impl SimdTableau for Tableau {
         );
     }
 
-    fn precompose_tqe_simd<const N: usize>(&mut self, g0: Pauli, g1: Pauli, q0: usize, q1: usize)
-    where
-        LaneCount<N>: SupportedLaneCount,
-    {
+    fn precompose_tqe_simd<const N: usize>(&mut self, g0: Pauli, g1: Pauli, q0: usize, q1: usize) {
         check_distinct_qubits(q0, q1);
         self.precompose_tqe_with(g0, g1, q0, q1, simd_string_mul::<N>);
     }
 
-    fn precompose_half_pi_simd<const N: usize>(&mut self, axis: Pauli, q: usize, dagger: bool)
-    where
-        LaneCount<N>: SupportedLaneCount,
-    {
+    fn precompose_half_pi_simd<const N: usize>(&mut self, axis: Pauli, q: usize, dagger: bool) {
         self.precompose_half_pi_with(axis, q, dagger, simd_string_mul::<N>);
     }
 
-    fn postcompose_half_pi_simd<const N: usize>(&mut self, axis: Pauli, q: usize, dagger: bool)
-    where
-        LaneCount<N>: SupportedLaneCount,
-    {
+    fn postcompose_half_pi_simd<const N: usize>(&mut self, axis: Pauli, q: usize, dagger: bool) {
         self.postcompose_half_pi_with(axis, q, dagger, apply_half_pi_gate_simd::<N>);
     }
 
@@ -1787,9 +1749,7 @@ impl SimdTableau for Tableau {
         pauli_z_bits: &[u64],
         pauli_x_bits: &[u64],
         half_pis: u8,
-    ) where
-        LaneCount<N>: SupportedLaneCount,
-    {
+    ) {
         self.postcompose_pauli_gadget_with(
             pauli_z_bits,
             pauli_x_bits,
@@ -1806,10 +1766,7 @@ impl SimdTableau for Tableau {
         &self,
         pauli_z_bits: &[u64],
         pauli_x_bits: &[u64],
-    ) -> (Vec<u64>, Vec<u64>, bool)
-    where
-        LaneCount<N>: SupportedLaneCount,
-    {
+    ) -> (Vec<u64>, Vec<u64>, bool) {
         self.apply_to_pauli_with(
             pauli_z_bits,
             pauli_x_bits,
@@ -1822,10 +1779,7 @@ impl SimdTableau for Tableau {
         &self,
         pauli_z_bits: &[u64],
         pauli_x_bits: &[u64],
-    ) -> (Vec<u64>, Vec<u64>, bool)
-    where
-        LaneCount<N>: SupportedLaneCount,
-    {
+    ) -> (Vec<u64>, Vec<u64>, bool) {
         self.apply_to_pauli_mt_with(
             pauli_z_bits,
             pauli_x_bits,
@@ -1834,20 +1788,14 @@ impl SimdTableau for Tableau {
         )
     }
 
-    fn invert_simd<const N: usize>(&self) -> Tableau
-    where
-        LaneCount<N>: SupportedLaneCount,
-    {
+    fn invert_simd<const N: usize>(&self) -> Tableau {
         self.invert_with(
             SimdTableau::apply_to_pauli_simd::<N>,
             SimdTableau::apply_to_pauli_mt_simd::<N>,
         )
     }
 
-    fn compose_simd<const N: usize>(&mut self, other: &Tableau)
-    where
-        LaneCount<N>: SupportedLaneCount,
-    {
+    fn compose_simd<const N: usize>(&mut self, other: &Tableau) {
         self.compose_with(
             other,
             SimdTableau::apply_to_pauli_simd::<N>,
@@ -1855,10 +1803,7 @@ impl SimdTableau for Tableau {
         );
     }
 
-    fn postcompose_pauli_simd<const N: usize>(&mut self, pauli: Pauli, q: usize)
-    where
-        LaneCount<N>: SupportedLaneCount,
-    {
+    fn postcompose_pauli_simd<const N: usize>(&mut self, pauli: Pauli, q: usize) {
         self.postcompose_pauli_with(
             pauli,
             q,
@@ -1868,11 +1813,8 @@ impl SimdTableau for Tableau {
         );
     }
 
-    fn postcompose_h_simd<const N: usize>(&mut self, q: usize)
-    where
-        LaneCount<N>: SupportedLaneCount,
-    {
-        simd_h_gate(
+    fn postcompose_h_simd<const N: usize>(&mut self, q: usize) {
+        simd_h_gate::<N>(
             &mut self.qubit_slices_z_bits[q],
             &mut self.qubit_slices_x_bits[q],
             &mut self.sign_bits,
@@ -1888,7 +1830,7 @@ mod tests {
     #[cfg(feature = "simd")]
     use pg_bitpacked::apply_enum_tqe_simd;
     use pg_bitpacked::apply_enum_tqe_slice;
-    use rand::Rng;
+    use rand::RngExt;
 
     fn random_tqes(
         n_qubits: usize,

@@ -11,7 +11,7 @@ simd = []
 [dependencies]
 pg-core = { path = "../../pg-core" }
 approx_eq = "0.1.8"
-rand = "0.9.1"
+rand = { workspace = true }
 
 
 [dev-dependencies]

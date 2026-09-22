@@ -5,6 +5,7 @@ rust-core: &rust-core
   - "tket/tket-rs/**"
   - "Cargo.toml"
   - "Cargo.lock"
+  - "rust-toolchain.toml"
   - "hugrenv.lock"
 
 rust:
@@ -18,6 +19,13 @@ rust:
 
 pg-libs:
   - "pg-libs/**"
+  - "justfile"
+  - "devenv.nix"
+  - "Cargo.toml"
+  - "Cargo.lock"
+  - "rust-toolchain.toml"
+  - "pyproject.toml"
+  - "uv.lock"
 
 python:
   - *rust-core

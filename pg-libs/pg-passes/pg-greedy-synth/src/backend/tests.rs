@@ -7,7 +7,7 @@ use pg_bitpacked::{
     paulis_to_u64s, u8_tqe_to_u64, u64s_to_paulis,
 };
 use pg_core::Pauli;
-use rand::{Rng, SeedableRng, rngs::StdRng};
+use rand::{RngExt, SeedableRng, rngs::StdRng};
 use rstest::rstest;
 
 const N_COLUMNS: usize = 65 * 64;

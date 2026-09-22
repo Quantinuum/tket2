@@ -35,6 +35,11 @@ dev = [
     { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "ruff", specifier = ">=0.16.0,<0.17" },
 ]
+pg-libs = [
+    { name = "mypy", specifier = ">=2.3,<3" },
+    { name = "pytket", specifier = ">=2,<3" },
+    { name = "ruff", specifier = ">=0.6" },
+]
 
 [[package]]
 name = "accessible-pygments"

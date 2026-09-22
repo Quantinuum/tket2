@@ -2,38 +2,57 @@
 help:
     @just --list --justfile "{{justfile()}}"
 
-# Currently pg-libs and the rest of the repo are separated workspaces.
-# We need to unset UV_PROJECT_ENVIRONMENT and VIRTUAL_ENV to avoid uv using the root python environment.
+# Rust nightly toolchain version used across the justfiles
+nightly_toolchain := `just --justfile ../justfile --evaluate nightly_toolchain`
+
+# Install only pg-libs' tools and test dependencies in the shared environment.
 sync-uv:
-    env -u UV_PROJECT_ENVIRONMENT -u VIRTUAL_ENV uv sync
+    uv sync --only-group pg-libs --inexact
 
-test-rust:
-    cargo test --workspace
+# Run pg-libs tests, including the Python worker integration tests.
+test: test-rust
 
-# When using the devenv shell, start it with the nightly profile,
-# and the toolchain does not need to be specified explicitly.
-test-rust-all-features_nix:
-    cargo test --workspace --all-features
+# Run pg-libs Rust tests with stable features.
+[positional-arguments]
+test-rust *TEST_ARGS:
+    uv run --only-group pg-libs cargo test -p 'pg-*' "$@"
 
-test-rust-all-features:
-    cargo +nightly-2025-09-14 test --workspace --all-features
+# Check pg-libs' Rust and Python code.
+check: check-rust check-python
+
+# Check formatting, compilation, lints, and docs with stable features.
+check-rust:
+    cargo fmt -p pg-core -p pg-tk -p pg-bitpacked -p pg-ir-kernels -p pg-ir-kernels-tests -p pg-utils -p pg-canonical-form -p pg-optimise -p pg-greedy-synth -p pg-rebase -p pg-qm-tableau -- --check
+    cargo check -p 'pg-*' --all-targets
+    cargo clippy -p 'pg-*' --all-targets -- -D warnings
+    RUSTDOCFLAGS=-Dwarnings cargo +stable doc -p 'pg-*' --no-deps
+
+# Check formatting, lints, and types for pg-libs' Python tooling.
+check-python:
+    uv run --only-group pg-libs ruff format --check .
+    uv run --only-group pg-libs ruff check .
+    uv run --only-group pg-libs mypy .
+
+# Run all Rust features, including SIMD, with the pinned nightly toolchain.
+test-rust-nightly:
+    uv run --only-group pg-libs cargo +{{nightly_toolchain}} test -p 'pg-*' --all-features
 
 fix:
     just fix-rust
     just fix-python
 
 fix-rust:
-    cargo +nightly-2025-09-14 clippy --all-targets --all-features --workspace --fix --allow-staged --allow-dirty
+    cargo +{{nightly_toolchain}} clippy --all-targets --all-features -p 'pg-*' --fix --allow-staged --allow-dirty
 
 fix-python:
-    env -u UV_PROJECT_ENVIRONMENT -u VIRTUAL_ENV uv run ruff check --fix
+    uv run --only-group pg-libs ruff check --fix .
 
 format:
     just format-rust
     just format-python
 
 format-rust:
-    cargo fmt
+    cargo fmt --all
 
 format-python:
-    env -u UV_PROJECT_ENVIRONMENT -u VIRTUAL_ENV uv run ruff format
+    uv run --only-group pg-libs ruff format .

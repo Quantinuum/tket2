@@ -1,7 +1,7 @@
 use super::Pauli;
 use crate::kernels::*;
 use crate::u8_encodings::{XX_U8, XY_U8, XZ_U8, YX_U8, YY_U8, YZ_U8, ZX_U8, ZY_U8, ZZ_U8};
-use std::simd::{LaneCount, Simd, SupportedLaneCount};
+use std::simd::Simd;
 
 // ------------ 1Q Clifford gates that mutate the Pauli operators --------------
 
@@ -43,8 +43,6 @@ macro_rules! make_simd_sq_gate {
         )]
 
         pub fn $simd_fn<const N: usize>(zs: &mut [u64], xs: &mut [u64], signs: &mut [u64])
-        where
-            LaneCount<N>: SupportedLaneCount,
         {
             let len = zs.len();
             let chunks = len / N;
@@ -112,8 +110,6 @@ macro_rules! make_simd_sq_gate_sign_only {
         )]
 
         pub fn $simd_fn<const N: usize>(zs: & [u64], xs: & [u64], signs: &mut [u64])
-        where
-            LaneCount<N>: SupportedLaneCount,
         {
             let len = zs.len();
             let chunks = len / N;
@@ -176,10 +172,7 @@ fn get_tq_simd_chunks<'a, const N: usize>(
     Simd<u64, N>,
     Simd<u64, N>,
     Simd<u64, N>,
-)
-where
-    LaneCount<N>: SupportedLaneCount,
-{
+) {
     let z0_chunk = &mut zs0[start..=end];
     let x0_chunk = &mut xs0[start..=end];
     let z1_chunk = &mut zs1[start..=end];
@@ -232,7 +225,7 @@ macro_rules! make_simd_tq_gate {
             zs0: &mut [u64], xs0: &mut [u64],
             zs1: &mut [u64], xs1: &mut [u64],
             signs: &mut [u64],
-        ) where LaneCount<N>: SupportedLaneCount {
+        ) {
             let len = zs0.len();
             let chunks = len / N;
             for i in 0..chunks {
@@ -296,9 +289,7 @@ pub fn apply_branchless_tqe_simd<const N: usize>(
     gx0: u64,
     gz1: u64,
     gx1: u64,
-) where
-    LaneCount<N>: SupportedLaneCount,
-{
+) {
     let len = zs0.len();
     let chunks = len / N;
     let gz0_simd = Simd::<u64, N>::splat(gz0);
@@ -394,9 +385,7 @@ pub fn apply_enum_tqe_simd<const N: usize>(
     signs: &mut [u64],
     g0: Pauli,
     g1: Pauli,
-) where
-    LaneCount<N>: SupportedLaneCount,
-{
+) {
     match (g0, g1) {
         (Pauli::X, Pauli::X) => {
             simd_xx_gate::<N>(zs0, xs0, zs1, xs1, signs);
@@ -459,9 +448,7 @@ pub fn apply_u8_tqe_simd<const N: usize>(
     xs1: &mut [u64],
     signs: &mut [u64],
     gate: u8,
-) where
-    LaneCount<N>: SupportedLaneCount,
-{
+) {
     match gate {
         XX_U8 => {
             simd_xx_gate::<N>(zs0, xs0, zs1, xs1, signs);
@@ -511,16 +498,14 @@ pub fn apply_half_pi_gate_simd<const N: usize>(
     signs: &mut [u64],
     axis: Pauli,
     neg: bool,
-) where
-    LaneCount<N>: SupportedLaneCount,
-{
+) {
     match (axis, neg) {
-        (Pauli::X, false) => simd_rx90_gate(zs, xs, signs),
-        (Pauli::X, true) => simd_rx270_gate(zs, xs, signs),
-        (Pauli::Y, false) => simd_ry90_gate(zs, xs, signs),
-        (Pauli::Y, true) => simd_ry270_gate(zs, xs, signs),
-        (Pauli::Z, false) => simd_rz90_gate(zs, xs, signs),
-        (Pauli::Z, true) => simd_rz270_gate(zs, xs, signs),
+        (Pauli::X, false) => simd_rx90_gate::<N>(zs, xs, signs),
+        (Pauli::X, true) => simd_rx270_gate::<N>(zs, xs, signs),
+        (Pauli::Y, false) => simd_ry90_gate::<N>(zs, xs, signs),
+        (Pauli::Y, true) => simd_ry270_gate::<N>(zs, xs, signs),
+        (Pauli::Z, false) => simd_rz90_gate::<N>(zs, xs, signs),
+        (Pauli::Z, true) => simd_rz270_gate::<N>(zs, xs, signs),
         _ => panic!("Invalid axis"),
     }
 }

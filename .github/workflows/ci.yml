@@ -62,9 +62,9 @@ jobs:
       - name: Check formatting
         run: cargo fmt -- --check
       - name: Run clippy
-        run: cargo clippy --all-targets --all-features --workspace -- -D warnings
+        run: cargo clippy --all-targets --all-features --workspace --exclude 'pg-*' -- -D warnings
       - name: Build docs
-        run: cargo doc --no-deps --all-features --workspace
+        run: cargo doc --no-deps --all-features --workspace --exclude 'pg-*'
         env:
           RUSTDOCFLAGS: "-Dwarnings"
 
@@ -90,11 +90,11 @@ jobs:
         # avoid building qis-compiler
         run: uv sync --package=tket --exact --all-extras --python ${{ env.PYTHON_LOWEST }}
       - name: Type check with mypy
-        run: uv run mypy .
+        run: uv run mypy tket scripts
       - name: Check formatting with ruff
-        run: uv run ruff format --check
+        run: uv run ruff format --check tket scripts test_files
       - name: Lint with ruff
-        run: uv run ruff check
+        run: uv run ruff check tket scripts test_files
 
   check-pg-libs-rs:
     name: Check pg-libs 🦀
@@ -110,13 +110,13 @@ jobs:
           components: rustfmt, clippy
       - name: Check formatting
         working-directory: pg-libs
-        run: cargo fmt -- --check
+        run: cargo fmt --all -- --check
       - name: Run clippy
         working-directory: pg-libs
-        run: cargo clippy --all-targets --workspace -- -D warnings
+        run: cargo clippy --all-targets -p 'pg-*' -- -D warnings
       - name: Build docs
         working-directory: pg-libs
-        run: cargo doc --no-deps --workspace
+        run: cargo doc --no-deps -p 'pg-*'
         env:
           RUSTDOCFLAGS: "-Dwarnings"
 
@@ -136,16 +136,16 @@ jobs:
         run: uv python install ${{ env.PYTHON_HIGHEST }}
       - name: Setup dependencies
         working-directory: pg-libs
-        run: uv sync --python ${{ env.PYTHON_HIGHEST }}
+        run: uv sync --only-group pg-libs --python ${{ env.PYTHON_HIGHEST }}
       - name: Type check with mypy
         working-directory: pg-libs
-        run: uv run mypy .
+        run: uv run --only-group pg-libs mypy .
       - name: Check formatting with ruff
         working-directory: pg-libs
-        run: uv run ruff format --check
+        run: uv run --only-group pg-libs ruff format --check
       - name: Lint with ruff
         working-directory: pg-libs
-        run: uv run ruff check
+        run: uv run --only-group pg-libs ruff check
 
   tests-pg-libs:
     name: pg-libs tests
@@ -166,10 +166,10 @@ jobs:
         run: uv python install ${{ env.PYTHON_HIGHEST }}
       - name: Install pg-libs dev dependencies
         working-directory: pg-libs
-        run: uv sync --python ${{ env.PYTHON_HIGHEST }}
+        run: uv sync --only-group pg-libs --python ${{ env.PYTHON_HIGHEST }}
       - name: Run stable tests
         working-directory: pg-libs
-        run: cargo test --workspace
+        run: uv run --only-group pg-libs cargo test -p 'pg-*'
 
   tests-pg-libs-nightly:
     name: pg-libs tests (nightly)
@@ -179,10 +179,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: mozilla-actions/sccache-action@v0.0.11
+      - uses: extractions/setup-just@v4
+      - name: Read nightly toolchain
+        id: nightly-toolchain
+        run: echo "channel=$(just --evaluate nightly_toolchain)" >> "$GITHUB_OUTPUT"
       - name: Install pinned nightly toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2025-09-14
+          toolchain: ${{ steps.nightly-toolchain.outputs.channel }}
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
         with:
@@ -192,10 +196,10 @@ jobs:
         run: uv python install ${{ env.PYTHON_HIGHEST }}
       - name: Install pg-libs dev dependencies
         working-directory: pg-libs
-        run: uv sync --python ${{ env.PYTHON_HIGHEST }}
+        run: uv sync --only-group pg-libs --python ${{ env.PYTHON_HIGHEST }}
       - name: Run simd tests
         working-directory: pg-libs
-        run: cargo test -p pg-bitpacked -p pg-qm-tableau -p pg-greedy-synth --features simd
+        run: uv run --only-group pg-libs cargo +${{ steps.nightly-toolchain.outputs.channel }} test -p pg-bitpacked -p pg-qm-tableau -p pg-greedy-synth --features simd
 
   benches:
     name: Continuous benchmarking 🏋️
@@ -223,7 +227,8 @@ jobs:
         with:
           token: ${{ secrets.CODSPEED_TOKEN }}
           run: "cargo codspeed run"
-          mode: "instrumentation"
+          mode: simulation
+          exclude-allocations: "true"
 
   # Run tests on Rust stable
   tests-rs-stable-no-features:
@@ -267,9 +272,9 @@ jobs:
       # Crates using pyo3 cdylib require libpython to link test binaries;
       # they are tested separately in their own jobs.
       - name: Build with all features
-        run: cargo nextest r --verbose --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --all-features --no-run
+        run: cargo nextest r --verbose --workspace --exclude 'pg-*' --exclude tket-py --exclude selene-hugr-qis-compiler --all-features --no-run
       - name: Tests with all features
-        run: cargo nextest r --verbose --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --all-features
+        run: cargo nextest r --verbose --workspace --exclude 'pg-*' --exclude tket-py --exclude selene-hugr-qis-compiler --all-features
 
   # Run tests on other toolchains
   tests-rs-other:
@@ -298,13 +303,13 @@ jobs:
       # Crates using pyo3 cdylib require libpython to link test binaries;
       # they are tested separately in their own jobs.
       - name: Build with no features
-        run: cargo nextest r --verbose --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --no-default-features --no-run
+        run: cargo nextest r --verbose --workspace --exclude 'pg-*' --exclude tket-py --exclude selene-hugr-qis-compiler --no-default-features --no-run
       - name: Tests with no features
-        run: cargo nextest r --verbose --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --no-default-features
+        run: cargo nextest r --verbose --workspace --exclude 'pg-*' --exclude tket-py --exclude selene-hugr-qis-compiler --no-default-features
       - name: Build with all features
-        run: cargo nextest r --verbose --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --all-features --no-run
+        run: cargo nextest r --verbose --workspace --exclude 'pg-*' --exclude tket-py --exclude selene-hugr-qis-compiler --all-features --no-run
       - name: Tests with all features
-        run: cargo nextest r --verbose --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --all-features
+        run: cargo nextest r --verbose --workspace --exclude 'pg-*' --exclude tket-py --exclude selene-hugr-qis-compiler --all-features
 
   tests-nightly-coverage:
     needs: [changes]
@@ -328,8 +333,8 @@ jobs:
       - name: Run tests with coverage instrumentation
         run: |
           cargo llvm-cov clean --workspace
-          cargo llvm-cov --no-report --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --no-default-features --doctests
-          cargo llvm-cov --no-report --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --all-features --doctests
+          cargo llvm-cov --no-report -p tket -p tket-qsystem -p tket1-passes -p badger-optimiser -p compile-rewriter --no-default-features --doctests
+          cargo llvm-cov --no-report -p tket -p tket-qsystem -p tket1-passes -p badger-optimiser -p compile-rewriter --all-features --doctests
       - name: Generate coverage report
         run: cargo llvm-cov report --codecov --output-path coverage.json
       - name: Upload coverage to codecov.io
@@ -377,13 +382,13 @@ jobs:
       # Crates using pyo3 cdylib require libpython to link test binaries;
       # they are tested separately in their own jobs.
       - name: Build with no features
-        run: cargo minimal-versions --direct test --verbose --exclude tket-py --exclude selene-hugr-qis-compiler --no-default-features --no-run
+        run: cargo minimal-versions --direct test --verbose -p tket -p tket-qsystem -p tket1-passes -p badger-optimiser -p compile-rewriter --no-default-features --no-run
       - name: Tests with no features
-        run: cargo minimal-versions --direct test --verbose --exclude tket-py --exclude selene-hugr-qis-compiler --no-default-features
+        run: cargo minimal-versions --direct test --verbose -p tket -p tket-qsystem -p tket1-passes -p badger-optimiser -p compile-rewriter --no-default-features
       - name: Build with all features
-        run: cargo minimal-versions --direct test --verbose --exclude tket-py --exclude selene-hugr-qis-compiler --all-features --no-run
+        run: cargo minimal-versions --direct test --verbose -p tket -p tket-qsystem -p tket1-passes -p badger-optimiser -p compile-rewriter --all-features --no-run
       - name: Tests with all features
-        run: cargo minimal-versions --direct test --verbose --exclude tket-py --exclude selene-hugr-qis-compiler --all-features
+        run: cargo minimal-versions --direct test --verbose -p tket -p tket-qsystem -p tket1-passes -p badger-optimiser -p compile-rewriter --all-features
 
   tests-py:
     needs: changes
