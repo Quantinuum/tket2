@@ -203,7 +203,7 @@ macro_rules! impl_pass_configuration {
                 self
             }
 
-            /// Selects the parallelisation policy for candidate costing.
+            /// Selects the parallelization policy for candidate costing.
             ///
             /// The default is [`ParallelMode::Auto`].
             pub fn with_parallel_mode(mut self, mode: ParallelMode) -> Self {
@@ -220,7 +220,7 @@ macro_rules! impl_pass_configuration {
     };
 }
 
-/// Greedily synthesises a canonical Pauli graph with scalar packed kernels.
+/// Greedily synthesizes a canonical Pauli graph with scalar packed kernels.
 ///
 /// The pass expects the output of `CanonicalFormPass` followed by
 /// `GroupCommutingOpsPass`. Output contains Clifford gates on individual
@@ -246,7 +246,7 @@ impl PGPass for GreedySynthPass {
     }
 }
 
-/// Greedily synthesises a canonical Pauli graph with portable SIMD kernels.
+/// Greedily synthesizes a canonical Pauli graph with portable SIMD kernels.
 #[cfg(feature = "simd")]
 pub struct GreedySynthSimdPass {
     config: GreedySynthConfig,

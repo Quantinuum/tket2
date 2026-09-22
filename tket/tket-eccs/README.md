@@ -8,7 +8,7 @@
   [py-version]: https://img.shields.io/pypi/pyversions/tket-eccs
   [pypi]: https://img.shields.io/pypi/v/tket-eccs
 
-This is an auxiliary Python package containing compiler rewrite sets used for `tket`'s optimisation passes.
+This is an auxiliary Python package containing compiler rewrite sets used for `tket`'s optimization passes.
 
 This package is intended to be used as an internal dependency for `tket`.
 See https://pypi.org/project/tket/ for the main package.

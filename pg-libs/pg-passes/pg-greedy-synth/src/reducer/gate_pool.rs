@@ -107,7 +107,7 @@ impl GatePool {
 /// Selects the best candidate using gate cost and projected TQE depth.
 ///
 /// Selection examines at most five current entries with the lowest costs. It
-/// normalises cost and depth, then gives depth a weight of 0.3. These values are
+/// normalizes cost and depth, then gives depth a weight of 0.3. These values are
 /// inherited tuning heuristics and should only change with representative
 /// benchmarks and an output quality comparison. Unselected candidates are
 /// returned to the pool only when they are disjoint from the chosen gate.

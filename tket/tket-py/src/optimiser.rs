@@ -1,4 +1,4 @@
-//! PyO3 wrapper for the Badger circuit optimiser.
+//! PyO3 wrapper for the Badger circuit optimizer.
 
 use std::io::BufWriter;
 use std::{fs, num::NonZeroUsize, path::PathBuf};
@@ -23,18 +23,18 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
 /// Wrapped [`DefaultBadgerOptimiser`].
 ///
 /// Currently only exposes loading from an ECC file using the constructor
-/// and optimising using default logging settings.
+/// and optimizing using default logging settings.
 #[pyclass(name = "BadgerOptimiser", skip_from_py_object)]
 #[derive(Clone, From)]
 pub struct PyBadgerOptimiser(BadgerOptimiser<PyRewriter, DefaultBadgerStrategy>);
 
-/// The cost function to use for the Badger optimiser.
+/// The cost function to use for the Badger optimizer.
 #[derive(Debug, Clone, Copy, Default)]
 pub enum BadgerCostFunction {
-    /// Minimise CX count.
+    /// Minimize CX count.
     #[default]
     CXCount,
-    /// Minimise Rz count.
+    /// Minimize Rz count.
     RzCount,
 }
 
@@ -91,35 +91,35 @@ impl PyBadgerOptimiser {
         BadgerOptimiser::new(PyRewriter::ECC(rewriter), strategy).into()
     }
 
-    /// Run the optimiser on a circuit.
+    /// Run the optimizer on a circuit.
     ///
-    /// Returns an optimised circuit and optionally log the progress to a CSV
+    /// Returns an optimized circuit and optionally log the progress to a CSV
     /// file.
     ///
     /// # Parameters
     ///
-    /// * `circ`: The circuit to optimise.
+    /// * `circ`: The circuit to optimize.
     ///
-    /// * `timeout`: The maximum time (in seconds) to run the optimiser.
+    /// * `timeout`: The maximum time (in seconds) to run the optimizer.
     ///
-    ///     If `None` the optimiser will run indefinitely, or until
+    ///     If `None` the optimizer will run indefinitely, or until
     ///     `progress_timeout` is reached.
     ///
     /// * `progress_timeout`: The maximum time (in seconds) to search for new
     ///     improvements to the circuit. If no progress is made in this time,
-    ///     the optimiser will stop.
+    ///     the optimizer will stop.
     ///
-    ///     If `None` the optimiser will run indefinitely, or until `timeout` is
+    ///     If `None` the optimizer will run indefinitely, or until `timeout` is
     ///     reached.
     ///
     /// * `max_circuit_count`: The maximum number of circuits to process before
-    ///     stopping the optimisation.
+    ///     stopping the optimization.
     ///
     ///
     ///     For data parallel multi-threading, (split_circuit=true), applies on
     ///     a per-thread basis, otherwise applies globally.
     ///
-    ///     If `None` the optimiser will run indefinitely, or until `timeout` is
+    ///     If `None` the optimizer will run indefinitely, or until `timeout` is
     ///     reached.
     ///
     /// * `n_threads`: The number of threads to use. Defaults to `1`.
@@ -127,10 +127,10 @@ impl PyBadgerOptimiser {
     /// * `split_circ`: Whether to split the circuit into chunks and process
     ///     each in a separate thread.
     ///
-    ///     If this option is set to `true`, the optimiser will split the
+    ///     If this option is set to `true`, the optimizer will split the
     ///     circuit into `n_threads` chunks.
     ///
-    ///     If this option is set to `false`, the optimiser will run `n_threads`
+    ///     If this option is set to `false`, the optimizer will run `n_threads`
     ///     parallel searches on the whole circuit (default).
     ///
     /// * `queue_size`: The maximum size of the circuit candidates priority
@@ -168,7 +168,7 @@ impl PyBadgerOptimiser {
 }
 
 impl PyBadgerOptimiser {
-    /// The Python optimise method, but on Hugrs.
+    /// The Python optimize method, but on Hugrs.
     pub(super) fn optimise(
         &self,
         circ: Circuit,
