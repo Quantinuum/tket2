@@ -582,7 +582,11 @@ impl<N: HugrNode> ModifierResolver<N> {
         self.modify_signature(poly_signature.body_mut(), false);
 
         let mut new_fn = FunctionBuilder::new(
-            format!("__modified__{}", old_fn_defn.func_name()),
+            format!(
+                "__modified__{}__{:?}",
+                old_fn_defn.func_name(),
+                self.modifiers()
+            ),
             poly_signature,
         )
         .unwrap();
