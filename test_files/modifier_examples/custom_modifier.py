@@ -10,12 +10,10 @@
 from pathlib import Path
 from sys import argv
 
-from guppylang import enable_experimental_features, guppy
+from guppylang import guppy
 from guppylang.std.builtins import array, control, dagger, nat, panic, qubit
 from guppylang.std.debug import state_result
 from guppylang.std.quantum import discard, discard_array, h, s, x, z
-
-enable_experimental_features()
 
 
 @guppy.unitary
