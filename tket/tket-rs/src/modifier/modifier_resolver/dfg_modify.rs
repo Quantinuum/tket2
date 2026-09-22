@@ -587,7 +587,11 @@ impl<N: HugrNode> ModifierResolver<N> {
         self.modify_signature(poly_signature.body_mut(), false);
 
         let mut new_fn = FunctionBuilder::new(
-            format!("__modified__{}", old_fn_defn.func_name()),
+            "__modified__".to_string()
+                + old_fn_defn.func_name()
+                + "["
+                + &self.modifiers().compact_string()
+                + "]",
             poly_signature,
         )
         .unwrap();
@@ -1304,6 +1308,35 @@ mod test {
                 .count(),
             1
         );
+    }
+
+    #[rstest::rstest]
+    #[case::dagger(vec![], true, "__modified__original[D]")]
+    #[case::control(vec![2], false, "__modified__original[C2]")]
+    #[case::control_and_dagger(vec![2], true, "__modified__original[C2D]")]
+    #[case::nested_controls(vec![1, 2], true, "__modified__original[C1.2D]")]
+    fn modified_function_name(
+        #[case] accum_ctrl: Vec<usize>,
+        #[case] dagger: bool,
+        #[case] expected: &str,
+    ) {
+        let mut module = ModuleBuilder::new();
+        let original = identity_function(&mut module, "original", Signature::new_endo([qb_t()]));
+        let mut h = module.finish_hugr().unwrap();
+        let mut resolver = ModifierResolver::new();
+        resolver.modifiers = CombinedModifier {
+            control: accum_ctrl.iter().sum(),
+            accum_ctrl,
+            dagger,
+        };
+
+        let modified = resolver.modify_fn(&mut h, original.node()).unwrap();
+
+        assert_eq!(
+            h.get_optype(modified).as_func_defn().unwrap().func_name(),
+            expected
+        );
+        h.validate().unwrap();
     }
 
     #[test]

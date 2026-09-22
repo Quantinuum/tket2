@@ -15,7 +15,6 @@ from guppylang.std.debug import state_result
 from guppylang.std.quantum import discard, h, qubit
 from pytket import Circuit
 
-
 # PyTket circuit
 circ = Circuit(2)
 circ.Rz(-0.5, 0)
