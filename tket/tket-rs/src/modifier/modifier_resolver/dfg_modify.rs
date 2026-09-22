@@ -583,9 +583,9 @@ impl<N: HugrNode> ModifierResolver<N> {
 
         let mut new_fn = FunctionBuilder::new(
             format!(
-                "__modified__{}__{:?}",
+                "__modified__{}[{:?}]",
                 old_fn_defn.func_name(),
-                self.modifiers()
+                self.modifiers().compact_string()
             ),
             poly_signature,
         )
