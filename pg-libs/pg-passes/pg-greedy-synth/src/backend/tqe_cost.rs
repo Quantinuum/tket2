@@ -6,7 +6,7 @@ use std::ops::{BitAnd, BitOr, BitXor, Not, Shr};
 use super::SimdBackend;
 use super::{CostKernel, ScalarBackend};
 #[cfg(feature = "simd")]
-use std::simd::{LaneCount, Simd, SupportedLaneCount, num::SimdUint};
+use std::simd::{Simd, num::SimdUint};
 
 // Each pair stores its left string first and its right string in the following
 // packed position.
@@ -285,9 +285,7 @@ fn single_cost_chunk<const N: usize>(
     mask: &[u64],
     increases: &mut [u64],
     decreases: &mut [u64],
-) where
-    LaneCount<N>: SupportedLaneCount,
-{
+) {
     let (increase, decrease) = single_cost_changes(
         Simd::<u64, N>::from_slice(zb_q0),
         Simd::<u64, N>::from_slice(xb_q0),
@@ -317,9 +315,7 @@ fn pair_cost_chunk<const N: usize>(
     mask: &[u64],
     increases: &mut [u64],
     decreases: &mut [u64],
-) where
-    LaneCount<N>: SupportedLaneCount,
-{
+) {
     let (increase, decrease) = pair_cost_changes(
         Simd::<u64, N>::from_slice(zb_q0),
         Simd::<u64, N>::from_slice(xb_q0),
@@ -348,10 +344,7 @@ fn unweighted_pair_cost_chunk<const N: usize>(
     gate_x_q0: u64,
     gate_z_q1: u64,
     gate_x_q1: u64,
-) -> i64
-where
-    LaneCount<N>: SupportedLaneCount,
-{
+) -> i64 {
     let (increase, decrease) = pair_cost_changes(
         Simd::<u64, N>::from_slice(zb_q0),
         Simd::<u64, N>::from_slice(xb_q0),

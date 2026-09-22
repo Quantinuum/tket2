@@ -63,7 +63,7 @@ in {
   profiles.nightly.module = {
     languages.rust = {
       channel = "nightly";
-      version = "2025-09-14";
+      version = "2026-09-22";
       components = [ "rustc" "cargo" "clippy" "rustfmt" "rust-analyzer" ];
     };
   };
