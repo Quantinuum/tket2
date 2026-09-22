@@ -1,9 +1,9 @@
-//! Logging utilities for the Badger optimiser.
+//! Logging utilities for the Badger optimizer.
 
 use std::time::{Duration, Instant};
 use std::{fmt::Debug, io};
 
-/// Logging configuration for the Badger optimiser.
+/// Logging configuration for the Badger optimizer.
 pub struct BadgerLogger<'w> {
     circ_candidates_csv: Option<csv::Writer<Box<dyn io::Write + Send + Sync + 'w>>>,
     last_circ_processed: usize,
@@ -69,7 +69,7 @@ impl<'w> BadgerLogger<'w> {
         };
     }
 
-    /// Log the final optimised circuit
+    /// Log the final optimized circuit
     #[inline]
     pub fn log_processing_end<C: Debug>(
         &self,
@@ -100,7 +100,7 @@ impl<'w> BadgerLogger<'w> {
         }
     }
 
-    /// Log the progress of the optimisation.
+    /// Log the progress of the optimization.
     #[inline(always)]
     pub fn log_progress(
         &mut self,

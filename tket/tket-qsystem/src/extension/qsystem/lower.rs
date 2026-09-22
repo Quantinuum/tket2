@@ -54,7 +54,7 @@ pub enum LowerTk2Error {
     /// An error raised when building the circuit.
     #[display("Error when building the circuit: {_0}")]
     BuildError(BuildError),
-    /// Found an unrecognised operation.
+    /// Found an unrecognized operation.
     #[display("Unrecognised operation: {} with {_1} inputs", _0.exposed_name())]
     UnknownOp(TketOp, usize),
     /// An error raised when replacing an operation.

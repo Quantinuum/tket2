@@ -1,6 +1,6 @@
 const PARALLEL_COSTING_THRESHOLD: usize = 150_000;
 
-/// Parallelisation mode for gate costing.
+/// Parallelization mode for gate costing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ParallelMode {
     /// Always use sequential execution.

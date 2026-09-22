@@ -45,8 +45,8 @@ The reducer creates a `PackedPGSlice`, a `Frontier` and a `GatePool`.
 
 It loads commuting sets into the lookahead slice, reduces the first visible set
 and appends the resulting gates to the output graph. It also handles black boxes
-and recursively synthesises conditional boxes. After reducing every operation
-set, it synthesises the remaining Clifford tableau.
+and recursively synthesizes conditional boxes. After reducing every operation
+set, it synthesizes the remaining Clifford tableau.
 
 ### `PackedPGSlice`
 

@@ -1227,7 +1227,7 @@ impl Tableau {
         }
     }
 
-    /// Initialise an identity Tableau
+    /// Initialize an identity Tableau
     pub fn eye(n_qubits: usize) -> Self {
         let n_images = n_qubits * 2;
         let mut qubit_slices_z_bits = Vec::with_capacity(n_qubits);
