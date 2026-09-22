@@ -21,6 +21,7 @@ pg-libs:
 
 python:
   - *rust-core
+  - "test_files/**"
   - "tket/tket-py/**"
   - "tket/tket-eccs/**"
   - "tket/tket-exts/**"
