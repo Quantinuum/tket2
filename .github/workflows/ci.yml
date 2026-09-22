@@ -182,7 +182,7 @@ jobs:
       - name: Install pinned nightly toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2025-09-14
+          toolchain: nightly-2026-09-22
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
         with:
