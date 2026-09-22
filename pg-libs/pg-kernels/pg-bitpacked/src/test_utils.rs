@@ -1,5 +1,5 @@
 use pg_core::Pauli;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 
 pub(crate) fn pauli_to_bits(pauli: &Pauli) -> (bool, bool) {
     match pauli {

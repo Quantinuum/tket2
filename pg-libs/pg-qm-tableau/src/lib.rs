@@ -1,5 +1,6 @@
 //! Clifford tableau
 #![cfg_attr(feature = "simd", feature(portable_simd))]
+#![expect(clippy::too_many_arguments, clippy::type_complexity)]
 #[cfg(feature = "simd")]
 use pg_bitpacked::{
     apply_enum_tqe_simd, apply_half_pi_gate_simd, simd_h_gate, simd_x_gate, simd_xx_gate,
@@ -12,7 +13,7 @@ use pg_bitpacked::{
 };
 use pg_core::Pauli;
 use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 use std::fmt;
 #[cfg(feature = "simd")]
 use std::simd::Simd;
@@ -1829,7 +1830,7 @@ mod tests {
     #[cfg(feature = "simd")]
     use pg_bitpacked::apply_enum_tqe_simd;
     use pg_bitpacked::apply_enum_tqe_slice;
-    use rand::Rng;
+    use rand::RngExt;
 
     fn random_tqes(
         n_qubits: usize,

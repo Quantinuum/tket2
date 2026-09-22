@@ -1,5 +1,12 @@
 { pkgs, lib, inputs, config, ... }:
-let hugrenv = config.hugrenv.package;
+let
+  hugrenv = config.hugrenv.package;
+  # Let just evaluate its toolchain pin rather than parsing the justfile.
+  nightlyToolchain = builtins.readFile (pkgs.runCommand "tket-nightly-toolchain" {
+    nativeBuildInputs = [ pkgs.just ];
+  } ''
+    just --justfile ${./justfile} --evaluate nightly_toolchain > "$out"
+  '');
 in {
 
   options.hugrenv.package = lib.mkOption {
@@ -63,7 +70,7 @@ in {
   profiles.nightly.module = {
     languages.rust = {
       channel = "nightly";
-      version = "2026-09-22";
+      version = lib.removePrefix "nightly-" nightlyToolchain;
       components = [ "rustc" "cargo" "clippy" "rustfmt" "rust-analyzer" ];
     };
   };

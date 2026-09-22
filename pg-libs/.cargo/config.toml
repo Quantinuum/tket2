@@ -1,2 +1,0 @@
-[env]
-PG_TK_PYTHON = { value = ".venv/bin/python", relative = true }
