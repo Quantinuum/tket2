@@ -160,9 +160,9 @@ class Normalize(ComposablePass):
     squash_borrows: bool = True
     _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
 
-    """Flatten the structure of a program to enable additional optimisations.
+    """Flatten the structure of a program to enable additional optimizations.
 
-    This should normally be called first before other optimisations.
+    This should normally be called first before other optimizations.
 
     Parameters:
     - resolve_modifiers: Whether to resolve modifier operations.
@@ -359,9 +359,9 @@ def _badger_optimise(
     max_circuit_count: int | None = None,
     log_dir: Path | None = None,
 ) -> None:
-    """Optimise a circuit using the Badger optimiser.
+    """Optimize a circuit using the Badger optimizer.
 
-    HyperTKET's best attempt at optimising a circuit using circuit rewriting.
+    HyperTKET's best attempt at optimizing a circuit using circuit rewriting.
 
 
     If `optimiser` is a path, it should point to a file containing a Badger ECC
@@ -375,10 +375,10 @@ def _badger_optimise(
     Will use at most `max_threads` threads (plus a constant). Defaults to the
     number of CPUs available.
 
-    The optimisation will terminate at the first of the following timeout
+    The optimization will terminate at the first of the following timeout
     criteria, if set: - `timeout` seconds (default: 15min) have elapsed since
     the start of the
-      optimisation
+      optimization
     - `progress_timeout` (default: None) seconds have elapsed since progress in
       the cost function was last made
     - `max_circuit_count` (default: None) circuits have been explored.

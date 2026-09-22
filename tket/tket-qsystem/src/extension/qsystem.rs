@@ -52,7 +52,7 @@ lazy_static! {
 }
 
 /// Target platform for QSystem operations. This can determine supported operations,
-/// the native gateset, and steer optimisation choices.
+/// the native gateset, and steer optimization choices.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum QSystemPlatform {

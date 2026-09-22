@@ -49,7 +49,7 @@ operations we can state the program only uses `N` qubits.
 ## Angles
 
 The "angle" extension defines a specialized `angle<N>` type which is used
-to express parameters of rotation gates. The type is parametrized by the
+to express parameters of rotation gates. The type is parameterized by the
 _log-denominator_, which is an integer $N \in [0, 53]$; angles with
 log-denominator $N$ are multiples of $2 \pi / 2^N$, where the multiplier is an
 unsigned `int<N>` in the range $[0, 2^N]$. The maximum log-denominator $53$

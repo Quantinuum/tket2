@@ -516,7 +516,7 @@ impl<Node: HugrNode> EncodedCircuit<Node> {
     /// [`OpaqueSubgraphPayload::External`][super::opaque::OpaqueSubgraphPayload::External]
     /// payloads in opaque barriers with inline payloads.
     ///
-    /// Barrier operation with unrecognised payloads will be ignored.
+    /// Barrier operation with unrecognized payloads will be ignored.
     pub fn ensure_standalone(
         &mut self,
         hugr: &impl HugrView<Node = Node>,

@@ -82,7 +82,7 @@ pub use super::{
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-/// The type used to parameterise Compute operations for the wasm extension.
+/// The type used to parameterize Compute operations for the wasm extension.
 pub struct WasmExtension;
 
 /// Concrete instantiation(i.e. with type args applied) of a "tket.wasm" operation.
