@@ -1,5 +1,6 @@
 //! Clifford tableau
 #![cfg_attr(feature = "simd", feature(portable_simd))]
+#![expect(clippy::too_many_arguments, clippy::type_complexity)]
 #[cfg(feature = "simd")]
 use pg_bitpacked::{
     apply_enum_tqe_simd, apply_half_pi_gate_simd, simd_h_gate, simd_x_gate, simd_xx_gate,

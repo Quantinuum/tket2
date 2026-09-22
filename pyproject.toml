@@ -1,6 +1,5 @@
 [tool.uv.workspace]
 members = ["tket/tket-py", "tket/tket-eccs", "tket/tket-exts", "tket/qis-compiler"]
-exclude = ["pg-libs"]
 
 [dependency-groups]
 dev = [
@@ -21,6 +20,9 @@ dev = [
     "numpy>=2.2.0",
 ]
 conan = ["conan>=2.31.1,<3"]
+# `--only-group pg-libs` installs tools and the Python test worker without
+# building any of the tket Python packages.
+pg-libs = ["mypy>=2.3,<3", "ruff>=0.6", "pytket>=2,<3"]
 
 [tool.uv]
 prerelease = "explicit"
@@ -43,7 +45,7 @@ module-name = "tket._tket"
 
 [tool.mypy]
 exclude = '''(?x)(
-    ^target/        # Build artifacts
+    (^|/)target/   # Build artifacts (including old nested target directories)
     | ^notebooks/   # Examples
     | ^test_files/  # Test files
     | ^tket/tket1-passes/tket-c-api/ # Do not check conan files
@@ -55,6 +57,10 @@ ignore_missing_imports = true
 
 [tool.ruff.lint]
 ignore = ["EXE"]
+
+[tool.pytest.ini_options]
+# Default test discovery stays within tket; explicit paths still select a subset.
+testpaths = ["tket"]
 
 [tool.ruff.lint.per-file-ignores]
 "tket/tket-exts/src/tket_exts/tket/**" = [

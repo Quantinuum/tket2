@@ -16,7 +16,7 @@ outputs:
     description: "The extension definitions have changed"
     value: ${{ steps.override.outputs.out == 'true' || steps.change-filters.outputs.extensions == 'true' }}
   pg-libs:
-    description: "The pg-libs workspace has changed"
+    description: "The pg-libs crates or shared workspace configuration have changed"
     value: ${{ steps.override.outputs.out == 'true' || steps.change-filters.outputs.pg-libs == 'true' }}
   rust:
     description: "Rust files have changed"
