@@ -227,7 +227,8 @@ jobs:
         with:
           token: ${{ secrets.CODSPEED_TOKEN }}
           run: "cargo codspeed run"
-          mode: "instrumentation"
+          mode: simulation
+          exclude-allocations: "true"
 
   # Run tests on Rust stable
   tests-rs-stable-no-features:
