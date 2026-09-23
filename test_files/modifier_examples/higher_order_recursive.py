@@ -35,9 +35,22 @@ def apply2(f: Unitary[[qubit], None], q: qubit) -> None:
 
 
 @guppy(controllable=True)
+def recursive_apply_1(f: Unitary[[qubit], None], q: qubit, n: int) -> None:
+    if n == 0:
+        apply(f, q)
+    else:
+        recursive_apply_2(f, q, n)
+
+
+@guppy(controllable=True)
+def recursive_apply_2(f: Unitary[[qubit], None], q: qubit, n: int) -> None:
+    recursive_apply_1(f, q, n - 1)
+
+
+@guppy(controllable=True)
 def apply_if(f: Unitary[[qubit], None], q: qubit, b: bool) -> None:
     if b:
-        apply(f, q)
+        recursive_apply_1(f, q, 3)
 
 
 @guppy
