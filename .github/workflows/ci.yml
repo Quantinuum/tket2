@@ -34,7 +34,7 @@ jobs:
       pull-requests: read
     outputs:
       pg-libs: ${{ steps.filter.outputs.pg-libs }}
-      rust: ${{ steps.filter.outputs.rust }}
+      tket: ${{ steps.filter.outputs.tket }}
       python: ${{ steps.filter.outputs.python }}
       extensions: ${{ steps.filter.outputs.extensions }}
       qis: ${{ steps.filter.outputs.qis }}
@@ -46,7 +46,7 @@ jobs:
   check-rs:
     name: Check Rust code 🦀
     needs: [changes]
-    if: ${{ needs.changes.outputs.rust == 'true' }}
+    if: ${{ needs.changes.outputs.tket == 'true' }}
     runs-on: ubuntu-latest
     env:
       # Fail on rust compiler warnings.
@@ -204,7 +204,7 @@ jobs:
   benches:
     name: Continuous benchmarking 🏋️
     needs: changes
-    if: ${{ needs.changes.outputs.rust == 'true' && github.event_name != 'merge_group' }}
+    if: ${{ needs.changes.outputs.tket == 'true' && github.event_name != 'merge_group' }}
     runs-on: ubuntu-latest
     permissions:
       checks: write
@@ -233,7 +233,7 @@ jobs:
   # Run tests on Rust stable
   tests-rs-stable-no-features:
     needs: changes
-    if: ${{ needs.changes.outputs.rust == 'true' }}
+    if: ${{ needs.changes.outputs.tket == 'true' }}
     runs-on: ubuntu-latest
     name: tests (Rust stable, no features)
     steps:
@@ -255,7 +255,7 @@ jobs:
   # Run tests on Rust stable
   tests-rs-stable-all-features:
     needs: [changes]
-    if: ${{ needs.changes.outputs.rust == 'true' }}
+    if: ${{ needs.changes.outputs.tket == 'true' }}
     runs-on: ubuntu-latest
     name: tests (Rust stable, all features)
     steps:
@@ -279,7 +279,7 @@ jobs:
   # Run tests on other toolchains
   tests-rs-other:
     needs: [changes]
-    if: ${{ needs.changes.outputs.rust == 'true' && github.event_name != 'merge_group' }}
+    if: ${{ needs.changes.outputs.tket == 'true' && github.event_name != 'merge_group' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
@@ -314,7 +314,7 @@ jobs:
   tests-nightly-coverage:
     needs: [changes]
     # Run only if there are changes in the relevant files
-    if: ${{ needs.changes.outputs.rust == 'true' && github.event_name != 'merge_group' }}
+    if: ${{ needs.changes.outputs.tket == 'true' && github.event_name != 'merge_group' }}
     runs-on: ubuntu-latest
     name: tests (Rust nightly, coverage)
     steps:
@@ -349,7 +349,7 @@ jobs:
   # Run tests on the minimum supported rust version, with minimal dependency versions
   tests-msrv:
     needs: changes
-    if: ${{ needs.changes.outputs.rust == 'true' && github.event_name != 'merge_group' }}
+    if: ${{ needs.changes.outputs.tket == 'true' && github.event_name != 'merge_group' }}
     runs-on: ubuntu-latest
     name: tests (Rust MSRV, min dependencies)
     steps:
@@ -468,7 +468,7 @@ jobs:
   # Ensure that serialized extensions match rust implementation
   tket-extensions:
     needs: [changes, tests-rs-stable-all-features]
-    if: ${{ needs.changes.outputs.rust == 'true' && github.event_name != 'merge_group' }}
+    if: ${{ needs.changes.outputs.tket == 'true' && github.event_name != 'merge_group' }}
     name: Check standard extensions
     runs-on: ubuntu-latest
     steps:
@@ -524,7 +524,8 @@ jobs:
   # even if they are skipped due to no changes in the relevant files.
   required-checks:
     name: Required checks 🦀+🐍
-    needs: [
+    needs:
+      [
         changes,
         check-pg-libs-rs,
         check-pg-libs-py,
@@ -536,7 +537,7 @@ jobs:
         tests-rs-stable-all-features,
         tests-py,
         tket-extensions,
-        #extension-versions,
+        extension-versions,
         tests-qis-compiler,
       ]
     if: ${{ !cancelled() }}
@@ -544,8 +545,11 @@ jobs:
     steps:
       - name: Debug changes step output
         run: |
-          echo "Rust: ${{ needs.changes.outputs.rust }}"
-          echo "Python: ${{ needs.changes.outputs.python }}"
+          echo "pg-libs: ${{ needs.changes.outputs.pg-libs }}"
+          echo "tket: ${{ needs.changes.outputs.tket }}"
+          echo "python: ${{ needs.changes.outputs.python }}"
+          echo "extensions: ${{ needs.changes.outputs.extensions }}"
+          echo "qis: ${{ needs.changes.outputs.qis }}"
       - name: Fail if required checks failed
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
         run: |
