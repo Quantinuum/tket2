@@ -10,15 +10,15 @@ simd = ["pg-qm-tableau/simd", "pg-bitpacked/simd"]
 
 [dependencies]
 crossbeam-skiplist = "0.1.3"
-indexmap = "2.11.0"
-indicatif = "0.18.0"
+indexmap = { workspace = true }
+indicatif = { workspace = true }
 pg-bitpacked = { path = "../../pg-kernels/pg-bitpacked" }
 pg-canonical-form = { path = "../pg-canonical-form" }
 pg-core = { path = "../../pg-core" }
 pg-optimise = { path = "../pg-optimise" }
 pg-qm-tableau = { path = "../../pg-qm-tableau" }
-rand = "0.9.1"
-rayon = "1.10"
+rand = { workspace = true }
+rayon = { workspace = true }
 
 [dev-dependencies]
 pg-ir-kernels = { path = "../../pg-kernels/pg-ir-kernels" }

@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 #![cfg_attr(feature = "simd", feature(portable_simd))]
-#![allow(clippy::upper_case_acronyms)]
+#![expect(clippy::upper_case_acronyms)]
+#![expect(clippy::too_many_arguments)]
 mod backend;
 mod frontier;
 mod packed_pg_slice;

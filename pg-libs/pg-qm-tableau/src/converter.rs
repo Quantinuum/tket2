@@ -359,7 +359,7 @@ mod tests {
     use super::*;
     use pg_core::{GateData, PauliGraph, TableauData};
     use pg_tk::compare_unitaries_via_tk;
-    use rand::{Rng, SeedableRng};
+    use rand::{RngExt, SeedableRng};
     use rstest::rstest;
 
     fn random_paulis(length: usize, seed: u64) -> Vec<Pauli> {

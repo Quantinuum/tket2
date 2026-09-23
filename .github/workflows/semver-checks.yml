@@ -51,3 +51,9 @@ jobs:
           TKET_C_API_PATH: ${{ env.TKET_C_API_PATH }}
         with:
           token: ${{ secrets.HUGRBOT_PAT }}
+          # Include only stable workspace features, excluding pg-libs' nightly-only simd.
+          # This also ignores any non-default stable features.
+          #
+          # TODO: Move the unstable features under a `nightly` feature flag,
+          # or rename `simd` to `unstable_simd`, and restore the default behaviour.
+          args: --default-features

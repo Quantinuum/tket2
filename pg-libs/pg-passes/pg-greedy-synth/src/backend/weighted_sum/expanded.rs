@@ -2,7 +2,7 @@ use super::WeightedSumStrategy;
 use crate::packed_pg_slice::{PackedOpMeta, PackedPGSlice, SliceBitPosition};
 
 #[cfg(feature = "simd")]
-use std::simd::{LaneCount, Simd, SupportedLaneCount, num::SimdFloat, num::SimdUint};
+use std::simd::{Simd, num::SimdFloat, num::SimdUint};
 
 #[cfg(feature = "simd")]
 const SIMD_LANES: usize = 64;
@@ -90,10 +90,7 @@ impl WeightedSumStrategy for ExpandedSparseWeightedSum {
 }
 
 #[cfg(feature = "simd")]
-fn simd_weight_tail<const N: usize>(mask: u64, weights: &[f64]) -> f64
-where
-    LaneCount<N>: SupportedLaneCount,
-{
+fn simd_weight_tail<const N: usize>(mask: u64, weights: &[f64]) -> f64 {
     let shifts = Simd::<u64, N>::from_array(std::array::from_fn(|i| i as u64));
     let bits = (Simd::splat(mask) >> shifts) & Simd::splat(1);
     (bits.cast::<f64>() * Simd::<f64, N>::from_slice(weights)).reduce_sum()

@@ -1,5 +1,9 @@
 #![doc = include_str!("../README.md")]
 #![cfg_attr(feature = "simd", feature(portable_simd))]
+#![cfg_attr(
+    feature = "simd",
+    expect(clippy::too_many_arguments, clippy::type_complexity)
+)]
 
 use pg_core::Pauli;
 

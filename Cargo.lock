@@ -119,6 +119,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "approx_eq"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b3f9eb837c6a783fbf002e3e5cc7925a3aa6893d6d42f9169517528983777590"
+
+[[package]]
 name = "arrayvec"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -558,6 +564,7 @@ checksum = "d64e8af5551369d19cf50138de61f1c42074ab970f74e99be916646777f8fc87"
 dependencies = [
  "encode_unicode",
  "libc",
+ "unicode-width",
  "windows-sys 0.61.2",
 ]
 
@@ -666,6 +673,16 @@ version = "0.9.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b82ac4a3c2ca9c3460964f020e1402edd5753411d7737aa39c3714ad1b5420e"
 dependencies = [
+ "crossbeam-utils",
+]
+
+[[package]]
+name = "crossbeam-skiplist"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df29de440c58ca2cc6e587ec3d22347551a32435fbde9d2bff64e78a9ffa151b"
+dependencies = [
+ "crossbeam-epoch",
  "crossbeam-utils",
 ]
 
@@ -1213,7 +1230,7 @@ dependencies = [
  "itertools 0.15.0",
  "petgraph 0.8.3",
  "portgraph 0.16.2",
- "rand 0.10.1",
+ "rand 0.10.3",
  "rstest",
  "strum",
 ]
@@ -1318,6 +1335,19 @@ dependencies = [
  "rayon",
  "serde",
  "serde_core",
+]
+
+[[package]]
+name = "indicatif"
+version = "0.18.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "993f007684f2e9727160da8b960ec161264703bfd1af084fd2e34d040c9a0dd4"
+dependencies = [
+ "console",
+ "portable-atomic",
+ "unicode-width",
+ "unit-prefix",
+ "web-time",
 ]
 
 [[package]]
@@ -1766,6 +1796,141 @@ dependencies = [
 ]
 
 [[package]]
+name = "pg-bitpacked"
+version = "0.1.0"
+dependencies = [
+ "approx_eq",
+ "pg-core",
+ "pg-tk",
+ "rand 0.10.3",
+ "rstest",
+]
+
+[[package]]
+name = "pg-canonical-form"
+version = "0.1.0"
+dependencies = [
+ "pg-core",
+ "pg-ir-kernels",
+ "pg-qm-tableau",
+ "pg-tk",
+ "pg-utils",
+ "rstest",
+]
+
+[[package]]
+name = "pg-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "pg-greedy-synth"
+version = "0.1.0"
+dependencies = [
+ "crossbeam-skiplist",
+ "indexmap 2.14.2",
+ "indicatif",
+ "pg-bitpacked",
+ "pg-canonical-form",
+ "pg-core",
+ "pg-ir-kernels",
+ "pg-optimise",
+ "pg-qm-tableau",
+ "pg-tk",
+ "rand 0.10.3",
+ "rayon",
+ "rstest",
+]
+
+[[package]]
+name = "pg-ir-kernels"
+version = "0.1.0"
+dependencies = [
+ "pg-core",
+ "pg-utils",
+]
+
+[[package]]
+name = "pg-ir-kernels-tests"
+version = "0.1.0"
+dependencies = [
+ "pg-core",
+ "pg-ir-kernels",
+ "pg-qm-tableau",
+ "pg-tk",
+]
+
+[[package]]
+name = "pg-libs"
+version = "0.1.0"
+dependencies = [
+ "pg-bitpacked",
+ "pg-canonical-form",
+ "pg-core",
+ "pg-greedy-synth",
+ "pg-ir-kernels",
+ "pg-optimise",
+ "pg-qm-tableau",
+ "pg-rebase",
+ "pg-tk",
+ "pg-utils",
+]
+
+[[package]]
+name = "pg-optimise"
+version = "0.1.0"
+dependencies = [
+ "pg-core",
+ "pg-ir-kernels",
+ "pg-qm-tableau",
+ "pg-tk",
+ "pg-utils",
+ "rand 0.10.3",
+]
+
+[[package]]
+name = "pg-qm-tableau"
+version = "0.1.0"
+dependencies = [
+ "pg-bitpacked",
+ "pg-core",
+ "pg-ir-kernels",
+ "pg-tk",
+ "pg-utils",
+ "rand 0.10.3",
+ "rayon",
+ "rstest",
+]
+
+[[package]]
+name = "pg-rebase"
+version = "0.1.0"
+dependencies = [
+ "pg-core",
+ "pg-tk",
+ "rstest",
+]
+
+[[package]]
+name = "pg-tk"
+version = "0.1.0"
+dependencies = [
+ "pg-core",
+ "rstest",
+ "serde_json",
+ "thiserror 2.0.20",
+ "uuid",
+]
+
+[[package]]
+name = "pg-utils"
+version = "0.1.0"
+
+[[package]]
 name = "pin-project-lite"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2106,9 +2271,9 @@ dependencies = [
 
 [[package]]
 name = "rand"
-version = "0.10.1"
+version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2e8e8bcc7961af1fdac401278c6a831614941f6164ee3bf4ce61b7edb162207"
+checksum = "65c9fb96cbc91e3478eaae79a69fcd3f1ae4ad052e471fe6732fff548984b4af"
 dependencies = [
  "chacha20",
  "getrandom 0.4.2",
@@ -2258,7 +2423,7 @@ dependencies = [
  "derive_more 0.99.20",
  "fxhash",
  "itertools 0.13.0",
- "petgraph 0.6.5",
+ "petgraph 0.8.3",
  "serde",
  "slotmap_fork_lmondada",
  "thiserror 1.0.69",
@@ -3211,6 +3376,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ebc1c04c71510c7f702b52b7c350734c9ff1295c464a03335b00bb84fc54f853"
 
 [[package]]
+name = "unit-prefix"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "81e544489bf3d8ef66c953931f56617f423cd4b5494be343d9b9d3dda037b9a3"
+
+[[package]]
 name = "utf8-width"
 version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3224,9 +3395,9 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "uuid"
-version = "1.23.2"
+version = "1.23.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d258b83ceec21034727ecee8c382cfa6c3e133699b0742c64571814fb420c9f7"
+checksum = "ea5fab0d6c3c01ae70085a09cb03d4c7a1d6314e2b3e075392783396d724ca0a"
 dependencies = [
  "getrandom 0.4.2",
  "js-sys",

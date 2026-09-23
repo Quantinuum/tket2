@@ -10,6 +10,7 @@
 //! It is implemented as a side-effect that takes a rotation angle as an input.
 
 use hugr::{extension::simple_op::MakeExtensionOp, ops::ExtensionOp};
+use itertools::Itertools;
 
 use crate::extension::modifier::Modifier;
 pub mod control;
@@ -51,5 +52,22 @@ impl CombinedModifier {
             Err(_) => {}
         }
         Ok(())
+    }
+
+    /// Returns a compact string representation of the combined modifier environment.
+    ///
+    /// The string consists of `'C'` followed by the number of control arrays (`self.accum_ctrl`),
+    /// joined by dots, and `'D'` if the dagger modifier has been applied.
+    /// If no control qubits are present, `'C'` is omitted.
+    fn compact_string(&self) -> String {
+        let mut s = String::new();
+        if self.control > 0 {
+            s.push('C');
+            s.push_str(&self.accum_ctrl.iter().map(|c| c.to_string()).join("."));
+        }
+        if self.dagger {
+            s.push('D');
+        }
+        s
     }
 }
