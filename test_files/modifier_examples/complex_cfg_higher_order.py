@@ -52,7 +52,7 @@ def recursive_apply(
     q: qubit,
     b: bool,
 ) -> None:
-    """Testing that recursive call do not cause non termination during compilation"""
+    """Testing that recursive calls do not cause non termination during compilation"""
     if b:
         f(q, classic_call(0.25))
         f(q, angle)
