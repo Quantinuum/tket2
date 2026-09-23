@@ -1,4 +1,4 @@
-#![doc = include_str!("../README.md")]
+//! This crate contains the core data structures and traits for the `pg-libs` library.
 
 mod errors;
 mod gates;

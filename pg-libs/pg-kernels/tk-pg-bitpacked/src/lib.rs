@@ -1,4 +1,6 @@
-#![doc = include_str!("../README.md")]
+//! This crate implements Clifford conjugation on bit-packed representations of Pauli operators.
+//! The unstable_simd feature enables the use of the nightly portable_simd API.
+
 #![cfg_attr(feature = "unstable_simd", feature(portable_simd))]
 #![cfg_attr(
     feature = "unstable_simd",

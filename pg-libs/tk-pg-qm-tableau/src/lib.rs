@@ -1,4 +1,4 @@
-#![doc = include_str!("../README.md")]
+//! Clifford tableau
 #![cfg_attr(feature = "unstable_simd", feature(portable_simd))]
 #![expect(clippy::too_many_arguments, clippy::type_complexity)]
 use rand::rngs::StdRng;

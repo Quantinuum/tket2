@@ -1,5 +1,4 @@
-#![doc = include_str!("../README.md")]
-
+//! Pass to convert a Pauli graph into canonical form.
 use tk_pg_core::{
     BlackBoxData, ConditionalBoxData, GateData, GateType, Op, PGPass, PauliGraph, TableauData,
 };
