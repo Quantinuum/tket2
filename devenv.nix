@@ -66,7 +66,7 @@ in {
     components = [ "rustc" "cargo" "clippy" "rustfmt" "rust-analyzer" ];
   };
 
-  # Nightly toolchain required for pg-libs' `simd` feature
+  # Nightly toolchain required for pg-libs' `unstable_simd` feature
   profiles.nightly.module = {
     languages.rust = {
       channel = "nightly";

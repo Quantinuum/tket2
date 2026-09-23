@@ -3,7 +3,7 @@ use crate::backend::{
     CostKernel, ExpandedSparseWeightedSum, GreedyCostBackend, GroupedWeightedSum, ScalarBackend,
     WeightedSumStrategy,
 };
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 use crate::backend::{ExpandedSimdWeightedSum, SimdBackend};
 use crate::packed_pg_slice::PackedBackend;
 use crate::reducer::Reducer;
@@ -247,18 +247,18 @@ impl PGPass for GreedySynthPass {
 }
 
 /// Greedily synthesizes a canonical Pauli graph with portable SIMD kernels.
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 pub struct GreedySynthSimdPass {
     config: GreedySynthConfig,
 }
 
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 impl_pass_configuration!(
     GreedySynthSimdPass,
     "Creates a SIMD synthesis pass with sizes chosen automatically."
 );
 
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 impl PGPass for GreedySynthSimdPass {
     fn transform(&self, pg: &PauliGraph) -> PauliGraph {
         transform_with_backend(

@@ -17,7 +17,7 @@ pg-tk = { path = "../pg-converters/pg-tk" }
 rstest = { workspace = true}
 
 [features]
-simd = ["pg-bitpacked/simd"]
+unstable_simd = ["pg-bitpacked/unstable_simd"]
 
 [lints]
 workspace = true
