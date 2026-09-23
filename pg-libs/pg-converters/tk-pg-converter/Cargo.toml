@@ -1,0 +1,17 @@
+[package]
+name = "tk-pg-converter"
+version = "0.1.0"
+edition = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+tk-pg-core = { path = "../../tk-pg-core" }
+serde_json = { workspace = true }
+uuid = {version = "1.23.3", features = ["v4"]}
+thiserror = {workspace = true}
+
+[dev-dependencies]
+rstest = { workspace = true }
+
+[lints]
+workspace = true

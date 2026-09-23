@@ -35,8 +35,8 @@ check-pre-commit: _check_nextest_installed
 fix: fix-rust fix-python
 # Auto-fix all rust clippy warnings.
 fix-rust:
-    uv run cargo clippy --all-targets --all-features --workspace --exclude 'pg-*' --fix --allow-staged --allow-dirty
-    cargo clippy --all-targets -p 'pg-*' --fix --allow-staged --allow-dirty
+    uv run cargo clippy --all-targets --all-features --workspace --exclude 'tk-pg-*' --fix --allow-staged --allow-dirty
+    cargo clippy --all-targets -p 'tk-pg-*' --fix --allow-staged --allow-dirty
 # Auto-fix all python clippy warnings.
 fix-python:
     uv run ruff check --fix
