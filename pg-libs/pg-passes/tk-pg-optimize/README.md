@@ -1,4 +1,4 @@
-# tk-pg-optimise
+# tk-pg-optimize
 
 This crate contains 2 optimization passes for `PauliGraph`s.
 

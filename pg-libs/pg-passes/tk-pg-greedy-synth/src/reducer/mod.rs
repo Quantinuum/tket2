@@ -13,7 +13,7 @@ use rand::{SeedableRng, rngs::StdRng};
 use rayon::prelude::*;
 use tk_pg_canonical_form::CanonicalFormPass;
 use tk_pg_core::{GateData, GateType, Op, PGPass, PauliGraph};
-use tk_pg_optimise::GroupCommutingOpsPass;
+use tk_pg_optimize::GroupCommutingOpsPass;
 use tk_pg_qm_tableau::Tableau;
 
 pub(crate) struct Reducer<P, C> {

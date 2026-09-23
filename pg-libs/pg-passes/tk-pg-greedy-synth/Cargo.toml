@@ -15,7 +15,7 @@ indicatif = { workspace = true }
 tk-pg-bitpacked = { path = "../../pg-kernels/tk-pg-bitpacked" }
 tk-pg-canonical-form = { path = "../tk-pg-canonical-form" }
 tk-pg-core = { path = "../../tk-pg-core" }
-tk-pg-optimise = { path = "../tk-pg-optimise" }
+tk-pg-optimize = { path = "../tk-pg-optimize" }
 tk-pg-qm-tableau = { path = "../../tk-pg-qm-tableau" }
 rand = { workspace = true }
 rayon = { workspace = true }

@@ -58,7 +58,7 @@ fn group_ops(pg: &PauliGraph, max_set_size: usize) -> PauliGraph {
 /// # Examples
 ///
 /// ```
-/// use tk_pg_optimise::GroupCommutingOpsPass;
+/// use tk_pg_optimize::GroupCommutingOpsPass;
 ///
 /// let s = GroupCommutingOpsPass::new().with_max_set_size(100);
 /// ```

@@ -22,7 +22,7 @@ check: check-rust check-python
 
 # Check formatting, compilation, lints, and docs with stable features.
 check-rust:
-    cargo fmt -p tk-pg-core -p tk-pg-converter -p tk-pg-bitpacked -p tk-pg-ir-kernels -p tk-pg-ir-kernels-tests -p tk-pg-utils -p tk-pg-canonical-form -p tk-pg-optimise -p tk-pg-greedy-synth -p tk-pg-rebase -p tk-pg-qm-tableau -- --check
+    cargo fmt -p tk-pg-core -p tk-pg-converter -p tk-pg-bitpacked -p tk-pg-ir-kernels -p tk-pg-ir-kernels-tests -p tk-pg-utils -p tk-pg-canonical-form -p tk-pg-optimize -p tk-pg-greedy-synth -p tk-pg-rebase -p tk-pg-qm-tableau -- --check
     cargo check -p 'tk-pg-*' --all-targets
     cargo clippy -p 'tk-pg-*' --all-targets -- -D warnings
     RUSTDOCFLAGS=-Dwarnings cargo +stable doc -p 'tk-pg-*' --no-deps

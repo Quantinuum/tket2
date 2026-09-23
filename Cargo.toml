@@ -18,7 +18,7 @@ members = [
     "pg-libs/pg-kernels/tk-pg-ir-kernels-tests",
     "pg-libs/pg-utils/tk-pg-utils",
     "pg-libs/pg-passes/tk-pg-canonical-form",
-    "pg-libs/pg-passes/tk-pg-optimise",
+    "pg-libs/pg-passes/tk-pg-optimize",
     "pg-libs/pg-passes/tk-pg-greedy-synth",
     "pg-libs/pg-passes/tk-pg-rebase",
     "pg-libs/tk-pg-qm-tableau",
@@ -139,7 +139,7 @@ opt-level = 1
 opt-level = 1
 [profile.test.package.tk-pg-canonical-form]
 opt-level = 1
-[profile.test.package.tk-pg-optimise]
+[profile.test.package.tk-pg-optimize]
 opt-level = 1
 [profile.test.package.tk-pg-greedy-synth]
 opt-level = 1

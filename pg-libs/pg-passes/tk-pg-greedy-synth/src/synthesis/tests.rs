@@ -13,7 +13,7 @@ use tk_pg_core::{
     PauliGraph, ResetData, RotationData, TableauData,
 };
 use tk_pg_ir_kernels::PGTableau;
-use tk_pg_optimise::GroupCommutingOpsPass;
+use tk_pg_optimize::GroupCommutingOpsPass;
 use tk_pg_qm_tableau::Tableau;
 
 fn graph(n_qubits: usize, ops: Vec<Op>) -> PauliGraph {

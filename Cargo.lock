@@ -2957,7 +2957,7 @@ dependencies = [
  "tk-pg-converter",
  "tk-pg-core",
  "tk-pg-ir-kernels",
- "tk-pg-optimise",
+ "tk-pg-optimize",
  "tk-pg-qm-tableau",
 ]
 
@@ -2980,7 +2980,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tk-pg-optimise"
+name = "tk-pg-optimize"
 version = "0.1.0"
 dependencies = [
  "rand 0.10.3",
