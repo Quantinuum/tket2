@@ -2,14 +2,17 @@
 # to detect changes in each subproject, and only run the corresponding jobs.
 
 rust-core: &rust-core
-  - "tket/tket-rs/**"
   - "Cargo.toml"
   - "Cargo.lock"
   - "rust-toolchain.toml"
   - "hugrenv.lock"
 
-rust:
+tket-core: &tket-core
   - *rust-core
+  - "tket/tket-rs/**"
+
+tket:
+  - *tket-core
   - "tket/tket-qsystem/**"
   - "tket/badger-optimiser/**"
   - "tket/compile-rewriter/**"
@@ -18,17 +21,15 @@ rust:
   - "tket/qis-compiler/Cargo.toml"
 
 pg-libs:
+  - *rust-core
   - "pg-libs/**"
   - "justfile"
   - "devenv.nix"
-  - "Cargo.toml"
-  - "Cargo.lock"
-  - "rust-toolchain.toml"
   - "pyproject.toml"
   - "uv.lock"
 
 python:
-  - *rust-core
+  - *tket-core
   - "test_files/**"
   - "tket/tket-py/**"
   - "tket/tket-eccs/**"
@@ -37,7 +38,7 @@ python:
   - "uv.lock"
 
 qis:
-  - *rust-core
+  - *tket-core
   - "tket/qis-compiler/**"
   - "pyproject.toml"
   - "uv.lock"

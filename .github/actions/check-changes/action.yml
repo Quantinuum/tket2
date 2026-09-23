@@ -18,12 +18,15 @@ outputs:
   pg-libs:
     description: "The pg-libs crates or shared workspace configuration have changed"
     value: ${{ steps.override.outputs.out == 'true' || steps.change-filters.outputs.pg-libs == 'true' }}
-  rust:
-    description: "Rust files have changed"
-    value: ${{ steps.override.outputs.out == 'true' || steps.change-filters.outputs.rust == 'true' }}
   rust-core:
-    description: "The main tket rust library has changed"
+    description: "The shared Rust workspace configuration has changed"
     value: ${{ steps.override.outputs.out == 'true' || steps.change-filters.outputs.rust-core == 'true' }}
+  tket:
+    description: "The tket Rust crates or shared workspace configuration have changed"
+    value: ${{ steps.override.outputs.out == 'true' || steps.change-filters.outputs.tket == 'true' }}
+  tket-core:
+    description: "The main tket Rust library or shared workspace configuration has changed"
+    value: ${{ steps.override.outputs.out == 'true' || steps.change-filters.outputs.tket-core == 'true' }}
   python:
     description: "Python files have changed"
     value: ${{ steps.override.outputs.out == 'true' || steps.change-filters.outputs.python == 'true' }}
