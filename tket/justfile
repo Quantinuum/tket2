@@ -18,12 +18,12 @@ test: test-rust test-docs test-python
 # Run tket Rust tests; QIS tests run without the Python extension feature.
 [positional-arguments]
 test-rust *TEST_ARGS: _check_nextest_installed
-    uv run cargo nextest r --workspace --exclude 'pg-*' --exclude tket-py --exclude selene-hugr-qis-compiler --all-features "$@"
+    uv run cargo nextest r --workspace --exclude 'tk-pg-*' --exclude tket-py --exclude selene-hugr-qis-compiler --all-features "$@"
     uv run cargo nextest r -p selene-hugr-qis-compiler "$@"
 
 # Run tket's Rust documentation examples.
 test-docs:
-    uv run cargo test --doc --workspace --exclude 'pg-*' --exclude tket-py --exclude selene-hugr-qis-compiler --all-features
+    uv run cargo test --doc --workspace --exclude 'tk-pg-*' --exclude tket-py --exclude selene-hugr-qis-compiler --all-features
 
 # Run all python tests.
 [positional-arguments]
@@ -38,9 +38,9 @@ check: check-rust check-python
 # Check formatting, compilation, lints, and documentation for tket crates.
 check-rust:
     cargo fmt -p tket -p tket-qsystem -p tket1-passes -p badger-optimiser -p compile-rewriter -p tket-py -p selene-hugr-qis-compiler -- --check
-    uv run cargo check --workspace --exclude 'pg-*' --all-targets --all-features
-    uv run cargo clippy --workspace --exclude 'pg-*' --all-targets --all-features -- -D warnings
-    RUSTDOCFLAGS=-Dwarnings uv run cargo doc --workspace --exclude 'pg-*' --all-features --no-deps
+    uv run cargo check --workspace --exclude 'tk-pg-*' --all-targets --all-features
+    uv run cargo clippy --workspace --exclude 'tk-pg-*' --all-targets --all-features -- -D warnings
+    RUSTDOCFLAGS=-Dwarnings uv run cargo doc --workspace --exclude 'tk-pg-*' --all-features --no-deps
 
 # Check formatting, lints, and types for tket and its supporting scripts.
 check-python:

@@ -1,0 +1,18 @@
+[package]
+name = "tk-pg-canonical-form"
+version = "0.1.0"
+edition = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+tk-pg-core = { path = "../../tk-pg-core" }
+tk-pg-utils = { path = "../../pg-utils/tk-pg-utils" }
+tk-pg-ir-kernels = { path = "../../pg-kernels/tk-pg-ir-kernels" }
+tk-pg-qm-tableau = { path = "../../tk-pg-qm-tableau" }
+
+[dev-dependencies]
+tk-pg-tk = { path = "../../pg-converters/tk-pg-tk" }
+rstest = { workspace = true}
+
+[lints]
+workspace = true

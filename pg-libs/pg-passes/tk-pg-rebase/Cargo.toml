@@ -1,0 +1,15 @@
+[package]
+name = "tk-pg-rebase"
+version = "0.1.0"
+edition = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+tk-pg-core = { path = "../../tk-pg-core" }
+
+[dev-dependencies]
+tk-pg-tk = { path = "../../pg-converters/tk-pg-tk" }
+rstest = { workspace = true}
+
+[lints]
+workspace = true

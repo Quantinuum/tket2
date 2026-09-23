@@ -62,9 +62,9 @@ jobs:
       - name: Check formatting
         run: cargo fmt -- --check
       - name: Run clippy
-        run: cargo clippy --all-targets --all-features --workspace --exclude 'pg-*' -- -D warnings
+        run: cargo clippy --all-targets --all-features --workspace --exclude 'tk-pg-*' -- -D warnings
       - name: Build docs
-        run: cargo doc --no-deps --all-features --workspace --exclude 'pg-*'
+        run: cargo doc --no-deps --all-features --workspace --exclude 'tk-pg-*'
         env:
           RUSTDOCFLAGS: "-Dwarnings"
 
@@ -113,10 +113,10 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Run clippy
         working-directory: pg-libs
-        run: cargo clippy --all-targets -p 'pg-*' -- -D warnings
+        run: cargo clippy --all-targets -p 'tk-pg-*' -- -D warnings
       - name: Build docs
         working-directory: pg-libs
-        run: cargo doc --no-deps -p 'pg-*'
+        run: cargo doc --no-deps -p 'tk-pg-*'
         env:
           RUSTDOCFLAGS: "-Dwarnings"
 
@@ -169,7 +169,7 @@ jobs:
         run: uv sync --only-group pg-libs --python ${{ env.PYTHON_HIGHEST }}
       - name: Run stable tests
         working-directory: pg-libs
-        run: uv run --only-group pg-libs cargo test -p 'pg-*'
+        run: uv run --only-group pg-libs cargo test -p 'tk-pg-*'
 
   tests-pg-libs-nightly:
     name: pg-libs tests (nightly)
@@ -199,7 +199,7 @@ jobs:
         run: uv sync --only-group pg-libs --python ${{ env.PYTHON_HIGHEST }}
       - name: Run simd tests
         working-directory: pg-libs
-        run: uv run --only-group pg-libs cargo +${{ steps.nightly-toolchain.outputs.channel }} test -p pg-bitpacked -p pg-qm-tableau -p pg-greedy-synth --features simd
+        run: uv run --only-group pg-libs cargo +${{ steps.nightly-toolchain.outputs.channel }} test -p tk-pg-bitpacked -p tk-pg-qm-tableau -p tk-pg-greedy-synth --features simd
 
   benches:
     name: Continuous benchmarking 🏋️
@@ -272,9 +272,9 @@ jobs:
       # Crates using pyo3 cdylib require libpython to link test binaries;
       # they are tested separately in their own jobs.
       - name: Build with all features
-        run: cargo nextest r --verbose --workspace --exclude 'pg-*' --exclude tket-py --exclude selene-hugr-qis-compiler --all-features --no-run
+        run: cargo nextest r --verbose --workspace --exclude 'tk-pg-*' --exclude tket-py --exclude selene-hugr-qis-compiler --all-features --no-run
       - name: Tests with all features
-        run: cargo nextest r --verbose --workspace --exclude 'pg-*' --exclude tket-py --exclude selene-hugr-qis-compiler --all-features
+        run: cargo nextest r --verbose --workspace --exclude 'tk-pg-*' --exclude tket-py --exclude selene-hugr-qis-compiler --all-features
 
   # Run tests on other toolchains
   tests-rs-other:
@@ -303,13 +303,13 @@ jobs:
       # Crates using pyo3 cdylib require libpython to link test binaries;
       # they are tested separately in their own jobs.
       - name: Build with no features
-        run: cargo nextest r --verbose --workspace --exclude 'pg-*' --exclude tket-py --exclude selene-hugr-qis-compiler --no-default-features --no-run
+        run: cargo nextest r --verbose --workspace --exclude 'tk-pg-*' --exclude tket-py --exclude selene-hugr-qis-compiler --no-default-features --no-run
       - name: Tests with no features
-        run: cargo nextest r --verbose --workspace --exclude 'pg-*' --exclude tket-py --exclude selene-hugr-qis-compiler --no-default-features
+        run: cargo nextest r --verbose --workspace --exclude 'tk-pg-*' --exclude tket-py --exclude selene-hugr-qis-compiler --no-default-features
       - name: Build with all features
-        run: cargo nextest r --verbose --workspace --exclude 'pg-*' --exclude tket-py --exclude selene-hugr-qis-compiler --all-features --no-run
+        run: cargo nextest r --verbose --workspace --exclude 'tk-pg-*' --exclude tket-py --exclude selene-hugr-qis-compiler --all-features --no-run
       - name: Tests with all features
-        run: cargo nextest r --verbose --workspace --exclude 'pg-*' --exclude tket-py --exclude selene-hugr-qis-compiler --all-features
+        run: cargo nextest r --verbose --workspace --exclude 'tk-pg-*' --exclude tket-py --exclude selene-hugr-qis-compiler --all-features
 
   tests-nightly-coverage:
     needs: [changes]
