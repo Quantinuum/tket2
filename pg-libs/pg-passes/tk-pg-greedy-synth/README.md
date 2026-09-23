@@ -28,3 +28,9 @@ The pass can output:
 
 See [ARCHITECTURE.md](https://github.com/Quantinuum/tket2/blob/main/pg-libs/pg-passes/tk-pg-greedy-synth/ARCHITECTURE.md) for an overview of the internal design.
 See [TUNING.md](https://github.com/Quantinuum/tket2/blob/main/pg-libs/pg-passes/tk-pg-greedy-synth/TUNING.md) for internal tuning constants.
+
+## License
+
+This project is licensed under Apache License, Version 2.0 ([LICENCE][] or http://www.apache.org/licenses/LICENSE-2.0).
+
+  [LICENCE]: https://github.com/quantinuum/tket2/blob/main/LICENCE

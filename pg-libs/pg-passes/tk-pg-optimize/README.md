@@ -18,3 +18,9 @@ This crate contains 2 optimization passes for `PauliGraph`s.
 
 Consider running `CanonicalFormPass` before either optimization pass so that
 the input operations are in the expected form.
+
+## License
+
+This project is licensed under Apache License, Version 2.0 ([LICENCE][] or http://www.apache.org/licenses/LICENSE-2.0).
+
+  [LICENCE]: https://github.com/quantinuum/tket2/blob/main/LICENCE

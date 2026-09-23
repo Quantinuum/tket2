@@ -11,10 +11,14 @@ Add `tk-pg-libs` to your `Cargo.toml`, using the path to your checkout:
 tk-pg-libs = { path = "/path/to/tket2/pg-libs/tk-pg-libs" }
 ```
 
-Construct a two qubit circuit and apply the optimization and synthesis passes.
-The two RZ rotations merge into a Clifford rotation and are folded into the tableau.
-`GreedySynthPass` expects operations grouped into commuting sets by
-`GroupCommutingOpsPass`.
+### Example
+
+Passes implement `PGPass` and return a new `PauliGraph`. The example below builds
+a two qubit circuit and converts it to canonical form before merging its rotations.
+It then groups commuting operations with `GroupCommutingOpsPass` and synthesizes
+the result with `GreedySynthPass`.
+
+The two RZ rotations merge into a Clifford rotation, which is folded into the tableau.
 
 ```rust
 use tk_pg_libs::{GateData, GateType, Op, PauliGraph};
@@ -63,3 +67,9 @@ tk-pg-libs = { path = "/path/to/tket2/pg-libs/tk-pg-libs", features = ["unstable
 
 SIMD is experimental and requires a nightly toolchain. Build with
 `cargo +nightly-2026-09-22 build`, or use `devenv shell --profile nightly` before building.
+
+## License
+
+This project is licensed under Apache License, Version 2.0 ([LICENCE][] or http://www.apache.org/licenses/LICENSE-2.0).
+
+  [LICENCE]: https://github.com/quantinuum/tket2/blob/main/LICENCE

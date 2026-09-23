@@ -7,9 +7,8 @@ This crate provides:
 
 `tk-pg-core` provides the core types and pass trait used throughout the stack.
 
-
 ## License
 
-This project is licensed under Apache License, Version 2.0 ([LICENSE][] or <http://www.apache.org/licenses/LICENSE-2.0>).
+This project is licensed under Apache License, Version 2.0 ([LICENCE][] or http://www.apache.org/licenses/LICENSE-2.0).
 
-  [LICENSE]: https://github.com/quantinuum/tket2/blob/main/LICENCE
+  [LICENCE]: https://github.com/quantinuum/tket2/blob/main/LICENCE
