@@ -8,5 +8,9 @@ rust-version = { workspace = true }
 tk-pg-core = { path = "../../tk-pg-core" }
 tk-pg-utils = { path = "../../pg-utils/tk-pg-utils" }
 
+[dev-dependencies]
+tk-pg-qm-tableau = { path = "../../tk-pg-qm-tableau" }
+tk-pg-converter = { path = "../../pg-converters/tk-pg-converter" }
+
 [lints]
 workspace = true

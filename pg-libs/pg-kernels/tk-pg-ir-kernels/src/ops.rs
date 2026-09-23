@@ -535,7 +535,8 @@ impl PGRewrite for PauliGraph {
     }
 }
 
-// Here we only test methods that do not require tableau. Remaining methods will be tested in a separate test crate.
+// These unit tests cover methods that do not require a tableau.
+// Tests using a tableau implementation live in tests/graph_rewrites.rs.
 #[cfg(test)]
 mod tests {
     use super::*;

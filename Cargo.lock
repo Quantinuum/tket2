@@ -2965,18 +2965,10 @@ dependencies = [
 name = "tk-pg-ir-kernels"
 version = "0.1.0"
 dependencies = [
- "tk-pg-core",
- "tk-pg-utils",
-]
-
-[[package]]
-name = "tk-pg-ir-kernels-tests"
-version = "0.1.0"
-dependencies = [
  "tk-pg-converter",
  "tk-pg-core",
- "tk-pg-ir-kernels",
  "tk-pg-qm-tableau",
+ "tk-pg-utils",
 ]
 
 [[package]]

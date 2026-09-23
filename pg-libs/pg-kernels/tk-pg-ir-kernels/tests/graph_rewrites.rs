@@ -1,4 +1,4 @@
-//! Test crate for `tk-pg-ir-kernels`.
+//! Integration tests for `tk-pg-ir-kernels`.
 
 use tk_pg_converter::compare_unitaries_via_tk;
 use tk_pg_core::{
