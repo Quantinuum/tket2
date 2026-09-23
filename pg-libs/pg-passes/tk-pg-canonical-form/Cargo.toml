@@ -11,7 +11,7 @@ tk-pg-ir-kernels = { path = "../../pg-kernels/tk-pg-ir-kernels" }
 tk-pg-qm-tableau = { path = "../../tk-pg-qm-tableau" }
 
 [dev-dependencies]
-tk-pg-tk = { path = "../../pg-converters/tk-pg-tk" }
+tk-pg-converter = { path = "../../pg-converters/tk-pg-converter" }
 rstest = { workspace = true}
 
 [lints]

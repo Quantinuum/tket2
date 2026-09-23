@@ -1,4 +1,4 @@
-# tk-pg-tk
+# tk-pg-converter
 
 Conversions between `PauliGraph` and serialized TKET circuit format (JSON).
 
@@ -9,6 +9,6 @@ This crate provides:
 
 The Python worker (`scripts/compare_unitaries_worker.py`) is embedded at compile time and spawned on demand. The interpreter is resolved from the `PG_TK_PYTHON` environment variable if set, falling back to `python` then `python3` on `PATH`.
 
-In this repository, run tests with `uv run --only-group pg-libs cargo test -p tk-pg-tk`
+In this repository, run tests with `uv run --only-group pg-libs cargo test -p tk-pg-converter`
 to use the shared workspace environment with `pytket` installed. Set
 `PG_TK_PYTHON` only when you want to use a different interpreter.

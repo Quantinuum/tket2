@@ -139,10 +139,10 @@ impl PGPass for RebaseTQEToZXPass {
 mod tests {
     use super::*;
     use rstest::rstest;
+    use tk_pg_converter::compare_unitaries_via_tk;
     use tk_pg_core::{
         BlackBoxData, GateData, GateType, Op, PGPass, Pauli, PauliGraph, RotationData,
     };
-    use tk_pg_tk::compare_unitaries_via_tk;
 
     fn graph(ops: Vec<Op>) -> PauliGraph {
         PauliGraph::new(2).with_ops(ops)

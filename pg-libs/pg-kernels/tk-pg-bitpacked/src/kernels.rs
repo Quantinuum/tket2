@@ -548,8 +548,8 @@ pub fn apply_u8_tqe<T: BitOps>(
 pub(crate) mod tests {
     use super::*;
     use crate::test_utils::*;
+    use tk_pg_converter::compare_unitaries_via_tk;
     use tk_pg_core::{GateData, GateType, Op, Pauli, PauliGraph, RotationData};
-    use tk_pg_tk::compare_unitaries_via_tk;
 
     type SqGateFn = fn(bool, bool) -> (bool, bool, bool);
     type PauliGateFn = fn(bool, bool) -> bool;

@@ -8,7 +8,7 @@ rust-version = { workspace = true }
 tk-pg-core = { path = "../../tk-pg-core" }
 
 [dev-dependencies]
-tk-pg-tk = { path = "../../pg-converters/tk-pg-tk" }
+tk-pg-converter = { path = "../../pg-converters/tk-pg-converter" }
 rstest = { workspace = true}
 
 [lints]

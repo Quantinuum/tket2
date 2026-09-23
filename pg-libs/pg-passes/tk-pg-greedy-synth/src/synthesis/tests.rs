@@ -7,6 +7,7 @@ use rand::seq::index::sample;
 use rand::{RngExt, SeedableRng, rngs::StdRng};
 use rstest::rstest;
 use tk_pg_canonical_form::CanonicalFormPass;
+use tk_pg_converter::compare_unitaries_via_tk;
 use tk_pg_core::{
     BlackBoxData, ConditionalBoxData, GateData, GateType, MeasureData, Op, PGPass, Pauli,
     PauliGraph, ResetData, RotationData, TableauData,
@@ -14,7 +15,6 @@ use tk_pg_core::{
 use tk_pg_ir_kernels::PGTableau;
 use tk_pg_optimise::GroupCommutingOpsPass;
 use tk_pg_qm_tableau::Tableau;
-use tk_pg_tk::compare_unitaries_via_tk;
 
 fn graph(n_qubits: usize, ops: Vec<Op>) -> PauliGraph {
     PauliGraph::new(n_qubits).with_ops(ops)

@@ -1,5 +1,5 @@
 [package]
-name = "tk-pg-tk"
+name = "tk-pg-converter"
 version = "0.1.0"
 edition = { workspace = true }
 rust-version = { workspace = true }

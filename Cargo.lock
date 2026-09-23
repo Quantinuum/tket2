@@ -2906,8 +2906,8 @@ dependencies = [
  "approx_eq",
  "rand 0.10.3",
  "rstest",
+ "tk-pg-converter",
  "tk-pg-core",
- "tk-pg-tk",
 ]
 
 [[package]]
@@ -2915,11 +2915,22 @@ name = "tk-pg-canonical-form"
 version = "0.1.0"
 dependencies = [
  "rstest",
+ "tk-pg-converter",
  "tk-pg-core",
  "tk-pg-ir-kernels",
  "tk-pg-qm-tableau",
- "tk-pg-tk",
  "tk-pg-utils",
+]
+
+[[package]]
+name = "tk-pg-converter"
+version = "0.1.0"
+dependencies = [
+ "rstest",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tk-pg-core",
+ "uuid",
 ]
 
 [[package]]
@@ -2943,11 +2954,11 @@ dependencies = [
  "rstest",
  "tk-pg-bitpacked",
  "tk-pg-canonical-form",
+ "tk-pg-converter",
  "tk-pg-core",
  "tk-pg-ir-kernels",
  "tk-pg-optimise",
  "tk-pg-qm-tableau",
- "tk-pg-tk",
 ]
 
 [[package]]
@@ -2962,10 +2973,10 @@ dependencies = [
 name = "tk-pg-ir-kernels-tests"
 version = "0.1.0"
 dependencies = [
+ "tk-pg-converter",
  "tk-pg-core",
  "tk-pg-ir-kernels",
  "tk-pg-qm-tableau",
- "tk-pg-tk",
 ]
 
 [[package]]
@@ -2973,10 +2984,10 @@ name = "tk-pg-optimise"
 version = "0.1.0"
 dependencies = [
  "rand 0.10.3",
+ "tk-pg-converter",
  "tk-pg-core",
  "tk-pg-ir-kernels",
  "tk-pg-qm-tableau",
- "tk-pg-tk",
  "tk-pg-utils",
 ]
 
@@ -2988,9 +2999,9 @@ dependencies = [
  "rayon",
  "rstest",
  "tk-pg-bitpacked",
+ "tk-pg-converter",
  "tk-pg-core",
  "tk-pg-ir-kernels",
- "tk-pg-tk",
  "tk-pg-utils",
 ]
 
@@ -2999,19 +3010,8 @@ name = "tk-pg-rebase"
 version = "0.1.0"
 dependencies = [
  "rstest",
+ "tk-pg-converter",
  "tk-pg-core",
- "tk-pg-tk",
-]
-
-[[package]]
-name = "tk-pg-tk"
-version = "0.1.0"
-dependencies = [
- "rstest",
- "serde_json",
- "thiserror 2.0.20",
- "tk-pg-core",
- "uuid",
 ]
 
 [[package]]

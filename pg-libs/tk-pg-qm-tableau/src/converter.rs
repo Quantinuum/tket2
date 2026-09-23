@@ -359,8 +359,8 @@ mod tests {
     use super::*;
     use rand::{RngExt, SeedableRng};
     use rstest::rstest;
+    use tk_pg_converter::compare_unitaries_via_tk;
     use tk_pg_core::{GateData, PauliGraph, TableauData};
-    use tk_pg_tk::compare_unitaries_via_tk;
 
     fn random_paulis(length: usize, seed: u64) -> Vec<Pauli> {
         let mut rng = rand::rngs::StdRng::seed_from_u64(seed);

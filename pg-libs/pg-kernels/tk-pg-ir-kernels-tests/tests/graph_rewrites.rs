@@ -1,12 +1,12 @@
 //! Test crate for `tk-pg-ir-kernels`.
 
+use tk_pg_converter::compare_unitaries_via_tk;
 use tk_pg_core::{
     BlackBoxData, ConditionalBoxData, GateData, GateType, MeasureData, Op, Pauli, PauliGraph,
     ResetData, RotationData,
 };
 use tk_pg_ir_kernels::{PGRewrite, PGTableau};
 use tk_pg_qm_tableau::Tableau;
-use tk_pg_tk::compare_unitaries_via_tk;
 
 #[test]
 fn tableau_sign_bit_contract_and_rotation_angle() {

@@ -9,7 +9,7 @@ publish = false
 tk-pg-ir-kernels = { path = "../tk-pg-ir-kernels" }
 tk-pg-qm-tableau = { path = "../../tk-pg-qm-tableau" }
 tk-pg-core = { path = "../../tk-pg-core" }
-tk-pg-tk = { path = "../../pg-converters/tk-pg-tk" }
+tk-pg-converter = { path = "../../pg-converters/tk-pg-converter" }
 
 [lints]
 workspace = true

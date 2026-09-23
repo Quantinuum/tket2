@@ -386,10 +386,10 @@ impl PGPass for CanonicalFormPass {
 mod tests {
     use super::*;
     use rstest::rstest;
+    use tk_pg_converter::compare_unitaries_via_tk;
     use tk_pg_core::{
         GateData, GateType, MeasureData, Op, Pauli, PauliGraph, ResetData, RotationData,
     };
-    use tk_pg_tk::compare_unitaries_via_tk;
 
     #[test]
     fn test_empty_circuit() {

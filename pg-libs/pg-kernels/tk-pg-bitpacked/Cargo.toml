@@ -15,7 +15,7 @@ rand = { workspace = true }
 
 
 [dev-dependencies]
-tk-pg-tk = { path = "../../pg-converters/tk-pg-tk"}
+tk-pg-converter = { path = "../../pg-converters/tk-pg-converter"}
 rstest = { workspace = true}
 
 [lints]
