@@ -22,7 +22,7 @@ scoring and the output graph.
 ## Entry points
 
 `GreedySynthPass` is the scalar entry point. `GreedySynthSimdPass` is available
-with the `simd` feature and uses portable SIMD operations. Both implement
+with the `unstable_simd` feature and uses portable SIMD operations. Both implement
 `PGPass`. They differ only in the backend used for packed operations and cost
 calculations.
 

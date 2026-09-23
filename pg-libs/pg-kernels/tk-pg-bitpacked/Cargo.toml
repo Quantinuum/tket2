@@ -6,7 +6,7 @@ rust-version = { workspace = true }
 
 [features]
 default = []
-simd = []
+unstable_simd = []
 
 [dependencies]
 tk-pg-core = { path = "../../tk-pg-core" }

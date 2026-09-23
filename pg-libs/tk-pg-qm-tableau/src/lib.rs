@@ -1,14 +1,14 @@
 //! Clifford tableau
-#![cfg_attr(feature = "simd", feature(portable_simd))]
+#![cfg_attr(feature = "unstable_simd", feature(portable_simd))]
 #![expect(clippy::too_many_arguments, clippy::type_complexity)]
 use rand::rngs::StdRng;
 use rand::{RngExt, SeedableRng};
 use std::fmt;
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 use std::simd::Simd;
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 use std::simd::num::SimdUint;
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 use tk_pg_bitpacked::{
     apply_enum_tqe_simd, apply_half_pi_gate_simd, simd_h_gate, simd_x_gate, simd_xx_gate,
     simd_xy_gate, simd_xz_gate, simd_y_gate, simd_yy_gate, simd_yz_gate, simd_z_gate, simd_zz_gate,
@@ -117,7 +117,7 @@ fn count_y(input_z_bits: &[u64], input_x_bits: &[u64]) -> u64 {
 }
 
 /// Multiplies two bit-packed Pauli strings using SIMD operations, computing the phase.
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 fn simd_string_mul<const N: usize>(
     lhs_z_bits: &mut [u64],
     lhs_x_bits: &mut [u64],
@@ -170,7 +170,7 @@ fn simd_string_mul<const N: usize>(
 }
 
 /// Given a Pauli string, count the number of Ys using SIMD
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 fn simd_count_y<const N: usize>(input_z_bits: &[u64], input_x_bits: &[u64]) -> u64 {
     let len = input_z_bits.len();
     let chunks = len / N;
@@ -1650,7 +1650,7 @@ impl Tableau {
 }
 
 /// Trait for SIMD operations on Tableau
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 pub trait SimdTableau {
     /// Postcompose a TQE gate using SIMD operations.
     ///
@@ -1713,7 +1713,7 @@ pub trait SimdTableau {
     fn postcompose_h_simd<const N: usize>(&mut self, q: usize);
 }
 
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 impl SimdTableau for Tableau {
     fn postcompose_tqe_simd<const N: usize>(&mut self, g0: Pauli, g1: Pauli, q0: usize, q1: usize) {
         check_distinct_qubits(q0, q1);
@@ -1825,10 +1825,10 @@ impl SimdTableau for Tableau {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(feature = "simd")]
+    #[cfg(feature = "unstable_simd")]
     use crate::SimdTableau;
     use rand::RngExt;
-    #[cfg(feature = "simd")]
+    #[cfg(feature = "unstable_simd")]
     use tk_pg_bitpacked::apply_enum_tqe_simd;
     use tk_pg_bitpacked::apply_enum_tqe_slice;
 
@@ -1904,7 +1904,7 @@ mod tests {
         tableau_invert_roundtrip_body(Tableau::invert, Tableau::compose);
     }
 
-    #[cfg(feature = "simd")]
+    #[cfg(feature = "unstable_simd")]
     #[test]
     fn test_tableau_invert_roundtrip_simd() {
         tableau_invert_roundtrip_body(Tableau::invert_simd::<64>, Tableau::compose_simd::<64>);
@@ -1936,7 +1936,7 @@ mod tests {
         tqe_precompose_postcompose_body(Tableau::precompose_tqe, Tableau::postcompose_tqe);
     }
 
-    #[cfg(feature = "simd")]
+    #[cfg(feature = "unstable_simd")]
     #[test]
     fn test_tqe_simd_precompose_postcompose_matches() {
         tqe_precompose_postcompose_body(
@@ -1977,7 +1977,7 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "simd")]
+    #[cfg(feature = "unstable_simd")]
     #[test]
     fn test_half_pi_simd_precompose_postcompose_matches() {
         half_pi_precompose_postcompose_body(
@@ -2032,7 +2032,7 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "simd")]
+    #[cfg(feature = "unstable_simd")]
     #[test]
     fn test_compose_simd() {
         compose_body(
@@ -2198,7 +2198,7 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "simd")]
+    #[cfg(feature = "unstable_simd")]
     #[test]
     fn test_gadget_simd() {
         gadget_body(

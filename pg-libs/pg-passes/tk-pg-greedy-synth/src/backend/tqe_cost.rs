@@ -2,10 +2,10 @@
 
 use std::ops::{BitAnd, BitOr, BitXor, Not, Shr};
 
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 use super::SimdBackend;
 use super::{CostKernel, ScalarBackend};
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 use std::simd::{Simd, num::SimdUint};
 
 // Each pair stores its left string first and its right string in the following
@@ -13,7 +13,7 @@ use std::simd::{Simd, num::SimdUint};
 const LEFT_STRING_MASK: u64 = 0x5555_5555_5555_5555;
 const RIGHT_STRING_MASK: u64 = 0xAAAA_AAAA_AAAA_AAAA;
 
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 const SIMD_LANES: usize = 64;
 
 /// Computes masks for single strings whose support cost increases or decreases
@@ -272,7 +272,7 @@ fn unweighted_pair_cost(
 }
 
 /// Computes single string cost masks for one SIMD chunk.
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 fn single_cost_chunk<const N: usize>(
     zb_q0: &[u64],
     xb_q0: &[u64],
@@ -302,7 +302,7 @@ fn single_cost_chunk<const N: usize>(
 }
 
 /// Computes paired string cost masks for one SIMD chunk.
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 fn pair_cost_chunk<const N: usize>(
     zb_q0: &[u64],
     xb_q0: &[u64],
@@ -334,7 +334,7 @@ fn pair_cost_chunk<const N: usize>(
 }
 
 /// Computes the unweighted cost change for paired strings in one SIMD chunk.
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 fn unweighted_pair_cost_chunk<const N: usize>(
     zb_q0: &[u64],
     xb_q0: &[u64],
@@ -361,7 +361,7 @@ fn unweighted_pair_cost_chunk<const N: usize>(
 }
 
 /// Computes single string cost masks across all SIMD chunks.
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 fn single_cost_masks_simd(
     zb_q0: &[u64],
     xb_q0: &[u64],
@@ -416,7 +416,7 @@ fn single_cost_masks_simd(
 }
 
 /// Computes paired string cost masks across all SIMD chunks.
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 fn pair_cost_masks_simd(
     zb_q0: &[u64],
     xb_q0: &[u64],
@@ -472,7 +472,7 @@ fn pair_cost_masks_simd(
 
 /// Computes the total unweighted cost change for paired strings across all
 /// SIMD chunks.
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 fn unweighted_pair_cost_simd(
     zb_q0: &[u64],
     xb_q0: &[u64],
@@ -577,7 +577,7 @@ impl CostKernel for ScalarBackend {
     }
 }
 
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 impl CostKernel for SimdBackend {
     fn single_cost_masks(
         &self,

@@ -8,4 +8,4 @@ This crate implements Clifford conjugation of Pauli operators using bit-packed r
 
 ## SIMD (nightly)
 
-The `simd` feature enables `std::simd` via the `portable_simd` nightly feature gate. This requires a nightly toolchain.
+The `unstable_simd` feature enables `std::simd` via the `portable_simd` nightly feature gate. This requires a nightly toolchain.

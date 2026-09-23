@@ -20,4 +20,4 @@ This directory contains Rust crates for working with Pauli graphs.
   and Python formatting, linting, and types. Use `check-rust` or `check-python`
   to select one language. Rust checks use stable features. The `format-rust`
   recipe formats the shared workspace.
-- **Nightly toolchain**: The `simd` feature requires the nightly toolchain selected by `nightly_toolchain` in the root [`justfile`](../justfile). Run `just test-rust-nightly`; in devenv, use `devenv shell --profile nightly`.
+- **Nightly toolchain**: The `unstable_simd` feature requires the nightly toolchain selected by `nightly_toolchain` in the root [`justfile`](../justfile). Run `just test-rust-nightly`; in devenv, use `devenv shell --profile nightly`.

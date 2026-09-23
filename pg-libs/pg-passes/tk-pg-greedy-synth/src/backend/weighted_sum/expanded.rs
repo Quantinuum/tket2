@@ -1,13 +1,13 @@
 use super::WeightedSumStrategy;
 use crate::packed_pg_slice::{PackedOpMeta, PackedPGSlice, SliceBitPosition};
 
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 use std::simd::{Simd, num::SimdFloat, num::SimdUint};
 
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 const SIMD_LANES: usize = 64;
 
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 const SPARSE_WEIGHTING_MAX_DENSITY: f64 = 0.25;
 
 #[derive(Default)]
@@ -89,7 +89,7 @@ impl WeightedSumStrategy for ExpandedSparseWeightedSum {
     }
 }
 
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 fn simd_weight_tail<const N: usize>(mask: u64, weights: &[f64]) -> f64 {
     let shifts = Simd::<u64, N>::from_array(std::array::from_fn(|i| i as u64));
     let bits = (Simd::splat(mask) >> shifts) & Simd::splat(1);
@@ -104,7 +104,7 @@ fn simd_weight_tail<const N: usize>(mask: u64, weights: &[f64]) -> f64 {
 ///
 /// The cutoff is an inherited performance heuristic and should only change
 /// after representative benchmarks.
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 fn simd_weight_sum(masks: &[u64], weights: &[f64]) -> f64 {
     if masks.is_empty() {
         return 0.0;
@@ -145,13 +145,13 @@ fn simd_weight_sum(masks: &[u64], weights: &[f64]) -> f64 {
 ///
 /// For dense masks, it expands each `u64` mask into 64 SIMD lanes, multiplies
 /// each lane by its corresponding weight, and sums the results.
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 #[derive(Default)]
 pub(crate) struct ExpandedSimdWeightedSum {
     weights: ExpandedWeights,
 }
 
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 impl WeightedSumStrategy for ExpandedSimdWeightedSum {
     fn prepare(&mut self, slice: &PackedPGSlice) {
         self.weights.prepare(slice);

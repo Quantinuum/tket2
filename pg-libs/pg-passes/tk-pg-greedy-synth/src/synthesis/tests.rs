@@ -1,6 +1,6 @@
 //! Public semantic coverage for greedy synthesis.
 
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 use crate::GreedySynthSimdPass;
 use crate::{GreedySynthPass, ParallelMode};
 use rand::seq::index::sample;
@@ -211,7 +211,7 @@ fn test_random_pauli_graph_synthesis(#[case] qubits: usize) {
     }
 }
 
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 #[rstest]
 #[case::even_qubits(6)]
 #[case::odd_qubits(5)]
@@ -331,7 +331,7 @@ fn test_parallel(#[case] mode: ParallelMode) {
     assert!(compare_unitaries_via_tk(&input, &output));
 }
 
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 #[rstest]
 #[case::two_chunks(two_chunks_graph())]
 #[case::dense(dense_graph())]

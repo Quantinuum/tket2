@@ -58,7 +58,7 @@ fn weighted_sum_strategies_agree(#[case] strategy: impl WeightedSumStrategy) {
     assert_weighted_sum_cases(strategy);
 }
 
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 #[test]
 fn simd_weighted_sum_strategy_agrees() {
     assert_weighted_sum_cases(ExpandedSimdWeightedSum::default());

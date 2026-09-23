@@ -1,9 +1,9 @@
 //! This crate implements Clifford conjugation on bit-packed representations of Pauli operators.
-//! The simd feature enables the use of the nightly portable_simd API.
+//! The unstable_simd feature enables the use of the nightly portable_simd API.
 
-#![cfg_attr(feature = "simd", feature(portable_simd))]
+#![cfg_attr(feature = "unstable_simd", feature(portable_simd))]
 #![cfg_attr(
-    feature = "simd",
+    feature = "unstable_simd",
     expect(clippy::too_many_arguments, clippy::type_complexity)
 )]
 
@@ -17,9 +17,9 @@ pub use kernels::*;
 pub use slice::*;
 pub use u8_encodings::*;
 
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 mod simd;
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 pub use simd::*;
 
 #[cfg(test)]
