@@ -114,7 +114,7 @@ maturin develop
 ```
 
 Plain Cargo commands like `cargo build` select some default `tket` libraries, as listed in
-`default-members`. Use `-p 'pg-*'` to target pg-libs, or `--workspace --exclude 'pg-*'`
+`default-members`. Use `-p 'tk-pg-*'` to target pg-libs, or `--workspace --exclude 'tk-pg-*'`
 for all tket crates.
 
 ## 🏃 Running the tests

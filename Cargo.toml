@@ -11,21 +11,20 @@ members = [
     "tket/tket1-passes",
     "tket/tket-py",
     "tket/tket-qsystem",
-    "pg-libs/pg-core",
-    "pg-libs/pg-converters/pg-tk",
-    "pg-libs/pg-kernels/pg-bitpacked",
-    "pg-libs/pg-kernels/pg-ir-kernels",
-    "pg-libs/pg-kernels/pg-ir-kernels-tests",
-    "pg-libs/pg-utils/pg-utils",
-    "pg-libs/pg-passes/pg-canonical-form",
-    "pg-libs/pg-passes/pg-optimise",
-    "pg-libs/pg-passes/pg-greedy-synth",
-    "pg-libs/pg-passes/pg-rebase",
-    "pg-libs/pg-qm-tableau",
+    "pg-libs/tk-pg-core",
+    "pg-libs/pg-converters/tk-pg-converter",
+    "pg-libs/pg-kernels/tk-pg-bitpacked",
+    "pg-libs/pg-kernels/tk-pg-ir-kernels",
+    "pg-libs/pg-utils/tk-pg-utils",
+    "pg-libs/pg-passes/tk-pg-canonical-form",
+    "pg-libs/pg-passes/tk-pg-optimize",
+    "pg-libs/pg-passes/tk-pg-greedy-synth",
+    "pg-libs/pg-passes/tk-pg-rebase",
+    "pg-libs/tk-pg-qm-tableau",
 ]
 
 # Cargo commands run on the tket crates by default.
-# Use `-p 'pg-*'` for pg-libs.
+# Use `-p 'tk-pg-*'` for pg-libs.
 default-members = ["tket/tket-rs", "tket/tket-qsystem"]
 
 [workspace.package]
@@ -125,25 +124,23 @@ num-rational = "0.4.2"
 strip = true
 
 # Keep pg-libs tests optimized without slowing down tket's development builds.
-[profile.test.package.pg-core]
+[profile.test.package.tk-pg-core]
 opt-level = 1
-[profile.test.package.pg-tk]
+[profile.test.package.tk-pg-converter]
 opt-level = 1
-[profile.test.package.pg-bitpacked]
+[profile.test.package.tk-pg-bitpacked]
 opt-level = 1
-[profile.test.package.pg-ir-kernels]
+[profile.test.package.tk-pg-ir-kernels]
 opt-level = 1
-[profile.test.package.pg-ir-kernels-tests]
+[profile.test.package.tk-pg-utils]
 opt-level = 1
-[profile.test.package.pg-utils]
+[profile.test.package.tk-pg-canonical-form]
 opt-level = 1
-[profile.test.package.pg-canonical-form]
+[profile.test.package.tk-pg-optimize]
 opt-level = 1
-[profile.test.package.pg-optimise]
+[profile.test.package.tk-pg-greedy-synth]
 opt-level = 1
-[profile.test.package.pg-greedy-synth]
+[profile.test.package.tk-pg-rebase]
 opt-level = 1
-[profile.test.package.pg-rebase]
-opt-level = 1
-[profile.test.package.pg-qm-tableau]
+[profile.test.package.tk-pg-qm-tableau]
 opt-level = 1

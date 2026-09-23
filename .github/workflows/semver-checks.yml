@@ -20,8 +20,8 @@ jobs:
     permissions:
       pull-requests: read
     outputs:
-      rust: ${{ steps.filter.outputs.rust }}
-      python: ${{ steps.filter.outputs.python }}
+      pg-libs: ${{ steps.filter.outputs.pg-libs }}
+      tket: ${{ steps.filter.outputs.tket }}
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/check-changes
@@ -29,7 +29,7 @@ jobs:
 
   rs-semver-checks:
     needs: [changes]
-    if: ${{ needs.changes.outputs.rust == 'true' }}
+    if: ${{ needs.changes.outputs.tket == 'true' || needs.changes.outputs.pg-libs == 'true' }}
     runs-on: ubuntu-latest
     env:
       # Path to the cached tket-c-api library
@@ -51,9 +51,3 @@ jobs:
           TKET_C_API_PATH: ${{ env.TKET_C_API_PATH }}
         with:
           token: ${{ secrets.HUGRBOT_PAT }}
-          # Include only stable workspace features, excluding pg-libs' nightly-only simd.
-          # This also ignores any non-default stable features.
-          #
-          # TODO: Move the unstable features under a `nightly` feature flag,
-          # or rename `simd` to `unstable_simd`, and restore the default behaviour.
-          args: --default-features
