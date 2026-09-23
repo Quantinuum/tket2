@@ -1,4 +1,4 @@
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 use super::SimdBackend;
 use super::{CostKernel, ScalarBackend};
 use crate::tqe::TQEType;
@@ -223,7 +223,7 @@ fn scalar_unweighted_pair_cost(
     assert_unweighted_pair_cost(&ScalarBackend, gate);
 }
 
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 #[rstest]
 fn simd_single_cost_masks(
     #[values(XX_U8, XY_U8, XZ_U8, YX_U8, YY_U8, YZ_U8, ZX_U8, ZY_U8, ZZ_U8)] gate: TQEType,
@@ -231,7 +231,7 @@ fn simd_single_cost_masks(
     assert_single_cost_masks(&SimdBackend, gate);
 }
 
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 #[rstest]
 fn simd_pair_cost_masks(
     #[values(XX_U8, XY_U8, XZ_U8, YX_U8, YY_U8, YZ_U8, ZX_U8, ZY_U8, ZZ_U8)] gate: TQEType,
@@ -239,7 +239,7 @@ fn simd_pair_cost_masks(
     assert_pair_cost_masks(&SimdBackend, gate);
 }
 
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 #[rstest]
 fn simd_unweighted_pair_cost(
     #[values(XX_U8, XY_U8, XZ_U8, YX_U8, YY_U8, YZ_U8, ZX_U8, ZY_U8, ZZ_U8)] gate: TQEType,

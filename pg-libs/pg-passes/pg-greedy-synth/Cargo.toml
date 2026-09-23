@@ -6,7 +6,7 @@ rust-version = { workspace = true }
 
 [features]
 default = []
-simd = ["pg-qm-tableau/simd", "pg-bitpacked/simd"]
+unstable_simd = ["pg-qm-tableau/unstable_simd", "pg-bitpacked/unstable_simd"]
 
 [dependencies]
 crossbeam-skiplist = "0.1.3"

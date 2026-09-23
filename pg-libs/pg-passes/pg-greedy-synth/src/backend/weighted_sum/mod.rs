@@ -3,7 +3,7 @@
 mod expanded;
 mod grouped;
 
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 pub(crate) use expanded::ExpandedSimdWeightedSum;
 pub(crate) use expanded::ExpandedSparseWeightedSum;
 pub(crate) use grouped::GroupedWeightedSum;

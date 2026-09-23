@@ -21,7 +21,7 @@
 //!             └── computes the final TQE cost
 //! ```
 
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 macro_rules! dispatch_simd_tail {
     ($lanes:expr, $function:ident($($argument:expr),* $(,)?)) => {
         match $lanes {
@@ -95,16 +95,16 @@ macro_rules! dispatch_simd_tail {
 
 mod greedy;
 mod scalar;
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 mod simd;
 mod tqe_cost;
 mod weighted_sum;
 
 pub(crate) use greedy::GreedyCostBackend;
 pub(crate) use scalar::ScalarBackend;
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 pub(crate) use simd::SimdBackend;
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 pub(crate) use weighted_sum::ExpandedSimdWeightedSum;
 pub(crate) use weighted_sum::GroupedWeightedSum;
 pub(crate) use weighted_sum::{ExpandedSparseWeightedSum, WeightedSumStrategy};

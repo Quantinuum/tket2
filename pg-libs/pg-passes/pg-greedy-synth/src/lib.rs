@@ -9,7 +9,7 @@
 //! The pass expects input produced by `CanonicalFormPass` followed by
 //! `GroupCommutingOpsPass`.
 
-#![cfg_attr(feature = "simd", feature(portable_simd))]
+#![cfg_attr(feature = "unstable_simd", feature(portable_simd))]
 #![expect(clippy::upper_case_acronyms)]
 #![expect(clippy::too_many_arguments)]
 mod backend;
@@ -20,6 +20,6 @@ mod synthesis;
 mod tqe;
 mod utils;
 
-#[cfg(feature = "simd")]
+#[cfg(feature = "unstable_simd")]
 pub use synthesis::GreedySynthSimdPass;
 pub use synthesis::{GreedySynthPass, ParallelMode};
