@@ -4,21 +4,7 @@ Rust libraries for Pauli graph optimization and synthesis.
 
 ## Usage
 
-Add `tk-pg-libs` to your `Cargo.toml`, using the path to your checkout:
-
-```toml
-[dependencies]
-tk-pg-libs = { path = "/path/to/tket2/pg-libs/tk-pg-libs" }
-```
-
-### Example
-
-Passes implement `PGPass` and return a new `PauliGraph`. The example below builds
-a two qubit circuit and converts it to canonical form before merging its rotations.
-It then groups commuting operations with `GroupCommutingOpsPass` and synthesizes
-the result with `GreedySynthPass`.
-
-The two RZ rotations merge into a Clifford rotation, which is folded into the tableau.
+This example uses Pauli graph passes to optimize and synthesize a two qubit circuit.
 
 ```rust
 use tk_pg_libs::{GateData, GateType, Op, PauliGraph};
@@ -57,19 +43,11 @@ let pg = GreedySynthPass::new().transform(&pg);
 
 ## SIMD
 
-The optional `unstable_simd` feature enables SIMD kernels and `passes::GreedySynthSimdPass`.
-Use this pass in place of `GreedySynthPass` in the example above.
-
-```toml
-[dependencies]
-tk-pg-libs = { path = "/path/to/tket2/pg-libs/tk-pg-libs", features = ["unstable_simd"] }
-```
-
-SIMD is experimental and requires a nightly toolchain. Build with
+Some experimental SIMD features can be enabled with `unstable_simd`. These require a nightly Rust toolchain. Build with
 `cargo +nightly-2026-09-22 build`, or use `devenv shell --profile nightly` before building.
 
 ## License
 
-This project is licensed under Apache License, Version 2.0 ([LICENCE][] or http://www.apache.org/licenses/LICENSE-2.0).
+This project is licensed under Apache License, Version 2.0 ([LICENCE][] or <http://www.apache.org/licenses/LICENSE-2.0>).
 
   [LICENCE]: https://github.com/quantinuum/tket2/blob/main/LICENCE
