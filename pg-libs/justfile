@@ -14,22 +14,22 @@ test: test-rust
 
 # Build and open the facade and dependency API documentation.
 doc-rust:
-    cargo doc -p pg-libs --open
+    cargo doc -p tk-pg-libs --open
 
 # Run pg-libs Rust tests with stable features.
 [positional-arguments]
 test-rust *TEST_ARGS:
-    uv run --only-group pg-libs cargo test -p 'pg-*' "$@"
+    uv run --only-group pg-libs cargo test -p 'tk-pg-*' "$@"
 
 # Check pg-libs' Rust and Python code.
 check: check-rust check-python
 
 # Check formatting, compilation, lints, and docs with stable features.
 check-rust:
-    cargo fmt -p pg-core -p pg-tk -p pg-bitpacked -p pg-ir-kernels -p pg-ir-kernels-tests -p pg-utils -p pg-canonical-form -p pg-optimise -p pg-greedy-synth -p pg-rebase -p pg-qm-tableau -- --check
-    cargo check -p 'pg-*' --all-targets
-    cargo clippy -p 'pg-*' --all-targets -- -D warnings
-    RUSTDOCFLAGS=-Dwarnings cargo +stable doc -p 'pg-*' --no-deps
+    cargo fmt -p tk-pg-libs -p tk-pg-core -p tk-pg-converter -p tk-pg-bitpacked -p tk-pg-ir-kernels -p tk-pg-utils -p tk-pg-canonical-form -p tk-pg-optimize -p tk-pg-greedy-synth -p tk-pg-rebase -p tk-pg-qm-tableau -- --check
+    cargo check -p 'tk-pg-*' --all-targets
+    cargo clippy -p 'tk-pg-*' --all-targets -- -D warnings
+    RUSTDOCFLAGS=-Dwarnings cargo +stable doc -p 'tk-pg-*' --no-deps
 
 # Check formatting, lints, and types for pg-libs' Python tooling.
 check-python:
@@ -39,14 +39,14 @@ check-python:
 
 # Run all Rust features, including SIMD, with the pinned nightly toolchain.
 test-rust-nightly:
-    uv run --only-group pg-libs cargo +{{nightly_toolchain}} test -p 'pg-*' --all-features
+    uv run --only-group pg-libs cargo +{{nightly_toolchain}} test -p 'tk-pg-*' --all-features
 
 fix:
     just fix-rust
     just fix-python
 
 fix-rust:
-    cargo +{{nightly_toolchain}} clippy --all-targets --all-features -p 'pg-*' --fix --allow-staged --allow-dirty
+    cargo +{{nightly_toolchain}} clippy --all-targets --all-features -p 'tk-pg-*' --fix --allow-staged --allow-dirty
 
 fix-python:
     uv run --only-group pg-libs ruff check --fix .

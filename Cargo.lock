@@ -1796,141 +1796,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pg-bitpacked"
-version = "0.1.0"
-dependencies = [
- "approx_eq",
- "pg-core",
- "pg-tk",
- "rand 0.10.3",
- "rstest",
-]
-
-[[package]]
-name = "pg-canonical-form"
-version = "0.1.0"
-dependencies = [
- "pg-core",
- "pg-ir-kernels",
- "pg-qm-tableau",
- "pg-tk",
- "pg-utils",
- "rstest",
-]
-
-[[package]]
-name = "pg-core"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "pg-greedy-synth"
-version = "0.1.0"
-dependencies = [
- "crossbeam-skiplist",
- "indexmap 2.14.2",
- "indicatif",
- "pg-bitpacked",
- "pg-canonical-form",
- "pg-core",
- "pg-ir-kernels",
- "pg-optimise",
- "pg-qm-tableau",
- "pg-tk",
- "rand 0.10.3",
- "rayon",
- "rstest",
-]
-
-[[package]]
-name = "pg-ir-kernels"
-version = "0.1.0"
-dependencies = [
- "pg-core",
- "pg-utils",
-]
-
-[[package]]
-name = "pg-ir-kernels-tests"
-version = "0.1.0"
-dependencies = [
- "pg-core",
- "pg-ir-kernels",
- "pg-qm-tableau",
- "pg-tk",
-]
-
-[[package]]
-name = "pg-libs"
-version = "0.1.0"
-dependencies = [
- "pg-bitpacked",
- "pg-canonical-form",
- "pg-core",
- "pg-greedy-synth",
- "pg-ir-kernels",
- "pg-optimise",
- "pg-qm-tableau",
- "pg-rebase",
- "pg-tk",
- "pg-utils",
-]
-
-[[package]]
-name = "pg-optimise"
-version = "0.1.0"
-dependencies = [
- "pg-core",
- "pg-ir-kernels",
- "pg-qm-tableau",
- "pg-tk",
- "pg-utils",
- "rand 0.10.3",
-]
-
-[[package]]
-name = "pg-qm-tableau"
-version = "0.1.0"
-dependencies = [
- "pg-bitpacked",
- "pg-core",
- "pg-ir-kernels",
- "pg-tk",
- "pg-utils",
- "rand 0.10.3",
- "rayon",
- "rstest",
-]
-
-[[package]]
-name = "pg-rebase"
-version = "0.1.0"
-dependencies = [
- "pg-core",
- "pg-tk",
- "rstest",
-]
-
-[[package]]
-name = "pg-tk"
-version = "0.1.0"
-dependencies = [
- "pg-core",
- "rstest",
- "serde_json",
- "thiserror 2.0.20",
- "uuid",
-]
-
-[[package]]
-name = "pg-utils"
-version = "0.1.0"
-
-[[package]]
 name = "pin-project-lite"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3033,6 +2898,133 @@ name = "tinyvec_macros"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
+
+[[package]]
+name = "tk-pg-bitpacked"
+version = "0.1.0"
+dependencies = [
+ "approx_eq",
+ "rand 0.10.3",
+ "rstest",
+ "tk-pg-converter",
+ "tk-pg-core",
+]
+
+[[package]]
+name = "tk-pg-canonical-form"
+version = "0.1.0"
+dependencies = [
+ "rstest",
+ "tk-pg-converter",
+ "tk-pg-core",
+ "tk-pg-ir-kernels",
+ "tk-pg-qm-tableau",
+ "tk-pg-utils",
+]
+
+[[package]]
+name = "tk-pg-converter"
+version = "0.1.0"
+dependencies = [
+ "rstest",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tk-pg-core",
+ "uuid",
+]
+
+[[package]]
+name = "tk-pg-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "tk-pg-greedy-synth"
+version = "0.1.0"
+dependencies = [
+ "crossbeam-skiplist",
+ "indexmap 2.14.2",
+ "indicatif",
+ "rand 0.10.3",
+ "rayon",
+ "rstest",
+ "tk-pg-bitpacked",
+ "tk-pg-canonical-form",
+ "tk-pg-converter",
+ "tk-pg-core",
+ "tk-pg-ir-kernels",
+ "tk-pg-optimize",
+ "tk-pg-qm-tableau",
+]
+
+[[package]]
+name = "tk-pg-ir-kernels"
+version = "0.1.0"
+dependencies = [
+ "tk-pg-converter",
+ "tk-pg-core",
+ "tk-pg-qm-tableau",
+ "tk-pg-utils",
+]
+
+[[package]]
+name = "tk-pg-libs"
+version = "0.1.0"
+dependencies = [
+ "tk-pg-bitpacked",
+ "tk-pg-canonical-form",
+ "tk-pg-converter",
+ "tk-pg-core",
+ "tk-pg-greedy-synth",
+ "tk-pg-ir-kernels",
+ "tk-pg-optimize",
+ "tk-pg-qm-tableau",
+ "tk-pg-rebase",
+ "tk-pg-utils",
+]
+
+[[package]]
+name = "tk-pg-optimize"
+version = "0.1.0"
+dependencies = [
+ "rand 0.10.3",
+ "tk-pg-converter",
+ "tk-pg-core",
+ "tk-pg-ir-kernels",
+ "tk-pg-qm-tableau",
+ "tk-pg-utils",
+]
+
+[[package]]
+name = "tk-pg-qm-tableau"
+version = "0.1.0"
+dependencies = [
+ "rand 0.10.3",
+ "rayon",
+ "rstest",
+ "tk-pg-bitpacked",
+ "tk-pg-converter",
+ "tk-pg-core",
+ "tk-pg-ir-kernels",
+ "tk-pg-utils",
+]
+
+[[package]]
+name = "tk-pg-rebase"
+version = "0.1.0"
+dependencies = [
+ "rstest",
+ "tk-pg-converter",
+ "tk-pg-core",
+]
+
+[[package]]
+name = "tk-pg-utils"
+version = "0.1.0"
 
 [[package]]
 name = "tket"

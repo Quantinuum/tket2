@@ -73,7 +73,7 @@ repos:
       - id: cargo-check
         name: cargo check (tket)
         description: Check rust code with `cargo check`.
-        entry: env RUSTFLAGS="-Dwarnings" uv run -- cargo check --all --all-features --workspace --exclude 'pg-*'
+        entry: env RUSTFLAGS="-Dwarnings" uv run -- cargo check --all --all-features --workspace --exclude 'tk-pg-*'
         language: system
         files: \.rs$
         exclude: ^pg-libs/
@@ -89,7 +89,7 @@ repos:
       - id: cargo-clippy
         name: cargo clippy (tket)
         description: Run clippy lints with `cargo clippy`.
-        entry: uv run -- cargo clippy --all-features --all-targets --workspace --exclude 'pg-*' -- -D warnings
+        entry: uv run -- cargo clippy --all-features --all-targets --workspace --exclude 'tk-pg-*' -- -D warnings
         language: system
         files: \.rs$
         exclude: ^pg-libs/
@@ -97,7 +97,7 @@ repos:
       - id: cargo-doc
         name: cargo doc (tket)
         description: Generate documentation with `cargo doc`.
-        entry: uv run -- cargo doc --no-deps --all-features --workspace --exclude 'pg-*'
+        entry: uv run -- cargo doc --no-deps --all-features --workspace --exclude 'tk-pg-*'
         language: system
         files: \.rs$
         exclude: ^pg-libs/
@@ -134,21 +134,21 @@ repos:
       - id: cargo-check-pg-libs
         name: cargo check (pg-libs)
         description: Check pg-libs rust code with `cargo check`.
-        entry: sh -c "cd pg-libs && env RUSTFLAGS='-Dwarnings' cargo check -p 'pg-*'"
+        entry: sh -c "cd pg-libs && env RUSTFLAGS='-Dwarnings' cargo check -p 'tk-pg-*'"
         language: system
         files: ^pg-libs/.*\.rs$
         pass_filenames: false
       - id: cargo-clippy-pg-libs
         name: cargo clippy (pg-libs)
         description: Run clippy lints on pg-libs with `cargo clippy`.
-        entry: sh -c "cd pg-libs && cargo clippy --all-targets -p 'pg-*' -- -D warnings"
+        entry: sh -c "cd pg-libs && cargo clippy --all-targets -p 'tk-pg-*' -- -D warnings"
         language: system
         files: ^pg-libs/.*\.rs$
         pass_filenames: false
       - id: cargo-test-pg-libs
         name: cargo nextest r (pg-libs)
         description: Run pg-libs tests with `cargo nextest r`.
-        entry: sh -c "cd pg-libs && uv run --only-group pg-libs cargo nextest r -p 'pg-*'"
+        entry: sh -c "cd pg-libs && uv run --only-group pg-libs cargo nextest r -p 'tk-pg-*'"
         language: system
         files: ^pg-libs/.*\.rs$
         pass_filenames: false

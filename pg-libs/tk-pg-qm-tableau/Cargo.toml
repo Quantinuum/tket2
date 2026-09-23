@@ -1,0 +1,23 @@
+[package]
+name = "tk-pg-qm-tableau"
+version = "0.1.0"
+edition = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+tk-pg-utils = { path = "../pg-utils/tk-pg-utils" }
+tk-pg-bitpacked = { path = "../pg-kernels/tk-pg-bitpacked" }
+tk-pg-ir-kernels = { path = "../pg-kernels/tk-pg-ir-kernels" }
+tk-pg-core = { path = "../tk-pg-core" }
+rand = { workspace = true }
+rayon = { workspace = true }
+
+[dev-dependencies]
+tk-pg-converter = { path = "../pg-converters/tk-pg-converter" }
+rstest = { workspace = true}
+
+[features]
+unstable_simd = ["tk-pg-bitpacked/unstable_simd"]
+
+[lints]
+workspace = true

@@ -1,0 +1,16 @@
+[package]
+name = "tk-pg-ir-kernels"
+version = "0.1.0"
+edition = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+tk-pg-core = { path = "../../tk-pg-core" }
+tk-pg-utils = { path = "../../pg-utils/tk-pg-utils" }
+
+[dev-dependencies]
+tk-pg-qm-tableau = { path = "../../tk-pg-qm-tableau" }
+tk-pg-converter = { path = "../../pg-converters/tk-pg-converter" }
+
+[lints]
+workspace = true
