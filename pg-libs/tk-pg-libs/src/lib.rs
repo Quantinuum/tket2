@@ -12,7 +12,7 @@ pub use tk_pg_core as core;
 #[doc(inline)]
 pub use tk_pg_bitpacked as bitpacked;
 #[doc(inline)]
-pub use tk_pg_converter as tk;
+pub use tk_pg_converter as tk_converter;
 #[doc(inline)]
 pub use tk_pg_ir_kernels as ir_kernels;
 #[doc(inline)]

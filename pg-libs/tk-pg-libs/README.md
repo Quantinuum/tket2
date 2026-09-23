@@ -45,7 +45,7 @@ let pg = GreedySynthPass::new().transform(&pg);
 | --- | --- |
 | `core` | `PauliGraph` IR and the `PGPass` trait |
 | `passes` | Canonical form, optimization, synthesis and rebasing passes |
-| `tk` | Conversions between `PauliGraph` and serialized TKET circuits |
+| `tk_converter` | Conversions between `PauliGraph` and serialized TKET circuits |
 | `qm_tableau` | Clifford tableaux using a qubit major memory layout |
 | `bitpacked` | Clifford conjugation of Pauli operators using packed representations |
 | `ir_kernels` | Basic rewrite operations and the `PGTableau` trait |
