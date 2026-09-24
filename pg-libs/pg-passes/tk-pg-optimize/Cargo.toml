@@ -4,16 +4,23 @@ version = "0.1.0"
 description = "Optimization passes for Pauli graphs"
 edition = { workspace = true }
 rust-version = { workspace = true }
+license = { workspace = true }
+readme = "README.md"
+documentation = "https://docs.rs/tk-pg-optimize"
+homepage = { workspace = true }
+repository = { workspace = true }
+keywords = { workspace = true }
+categories = { workspace = true }
 
 
 [dependencies]
-tk-pg-core = { path = "../../tk-pg-core"}
-tk-pg-qm-tableau = { path = "../../tk-pg-qm-tableau"}
-tk-pg-ir-kernels = { path = "../../pg-kernels/tk-pg-ir-kernels" }
-tk-pg-utils = { path = "../../pg-utils/tk-pg-utils" }
+tk-pg-core = { path = "../../tk-pg-core", version = "0.1.0" }
+tk-pg-qm-tableau = { path = "../../tk-pg-qm-tableau", version = "0.1.0" }
+tk-pg-ir-kernels = { path = "../../pg-kernels/tk-pg-ir-kernels", version = "0.1.0" }
+tk-pg-utils = { path = "../../pg-utils/tk-pg-utils", version = "0.1.0" }
 
 [dev-dependencies]
-tk-pg-converter = { path = "../../pg-converters/tk-pg-converter" }
+tk-pg-converter = { path = "../../pg-converters/tk-pg-converter", version = "0.1.0" }
 rand = { workspace = true }
 
 [lints]

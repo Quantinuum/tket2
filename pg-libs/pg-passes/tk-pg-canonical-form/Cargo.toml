@@ -4,16 +4,23 @@ version = "0.1.0"
 description = "Canonical form transformations for Pauli graphs"
 edition = { workspace = true }
 rust-version = { workspace = true }
+license = { workspace = true }
+readme = "README.md"
+documentation = "https://docs.rs/tk-pg-canonical-form"
+homepage = { workspace = true }
+repository = { workspace = true }
+keywords = { workspace = true }
+categories = { workspace = true }
 
 [dependencies]
-tk-pg-core = { path = "../../tk-pg-core" }
-tk-pg-utils = { path = "../../pg-utils/tk-pg-utils" }
-tk-pg-ir-kernels = { path = "../../pg-kernels/tk-pg-ir-kernels" }
-tk-pg-qm-tableau = { path = "../../tk-pg-qm-tableau" }
+tk-pg-core = { path = "../../tk-pg-core", version = "0.1.0" }
+tk-pg-utils = { path = "../../pg-utils/tk-pg-utils", version = "0.1.0" }
+tk-pg-ir-kernels = { path = "../../pg-kernels/tk-pg-ir-kernels", version = "0.1.0" }
+tk-pg-qm-tableau = { path = "../../tk-pg-qm-tableau", version = "0.1.0" }
 
 [dev-dependencies]
-tk-pg-converter = { path = "../../pg-converters/tk-pg-converter" }
-rstest = { workspace = true}
+tk-pg-converter = { path = "../../pg-converters/tk-pg-converter", version = "0.1.0" }
+rstest = { workspace = true }
 
 [lints]
 workspace = true

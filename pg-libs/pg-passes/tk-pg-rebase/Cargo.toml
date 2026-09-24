@@ -4,13 +4,20 @@ version = "0.1.0"
 description = "Rebasing passes for Pauli graphs"
 edition = { workspace = true }
 rust-version = { workspace = true }
+license = { workspace = true }
+readme = "README.md"
+documentation = "https://docs.rs/tk-pg-rebase"
+homepage = { workspace = true }
+repository = { workspace = true }
+keywords = { workspace = true }
+categories = { workspace = true }
 
 [dependencies]
-tk-pg-core = { path = "../../tk-pg-core" }
+tk-pg-core = { path = "../../tk-pg-core", version = "0.1.0" }
 
 [dev-dependencies]
-tk-pg-converter = { path = "../../pg-converters/tk-pg-converter" }
-rstest = { workspace = true}
+tk-pg-converter = { path = "../../pg-converters/tk-pg-converter", version = "0.1.0" }
+rstest = { workspace = true }
 
 [lints]
 workspace = true
