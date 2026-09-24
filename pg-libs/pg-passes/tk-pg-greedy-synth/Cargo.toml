@@ -1,7 +1,7 @@
 [package]
 name = "tk-pg-greedy-synth"
 version = "0.1.0"
-description = "Greedy synthesis passes Pauli graphs"
+description = "Greedy synthesis passes for Pauli graphs"
 edition = { workspace = true }
 rust-version = { workspace = true }
 

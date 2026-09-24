@@ -4,6 +4,13 @@ version = "0.1.0"
 description = "Clifford conjugation kernels for packed Pauli representations"
 edition = { workspace = true }
 rust-version = { workspace = true }
+license = { workspace = true }
+readme = "README.md"
+documentation = "https://docs.rs/tk-pg-bitpacked"
+homepage = { workspace = true }
+repository = { workspace = true }
+keywords = { workspace = true }
+categories = { workspace = true }
 
 [features]
 default = []

@@ -4,6 +4,13 @@ version = "0.1.0"
 description = "Conversions between Pauli graphs and serialized TKET circuits"
 edition = { workspace = true }
 rust-version = { workspace = true }
+license = { workspace = true }
+readme = "README.md"
+documentation = "https://docs.rs/tk-pg-converter"
+homepage = { workspace = true }
+repository = { workspace = true }
+keywords = { workspace = true }
+categories = { workspace = true }
 
 [dependencies]
 tk-pg-core = { path = "../../tk-pg-core" }

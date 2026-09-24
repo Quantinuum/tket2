@@ -4,6 +4,13 @@ version = "0.1.0"
 description = "Canonical form transformations for Pauli graphs"
 edition = { workspace = true }
 rust-version = { workspace = true }
+license = { workspace = true }
+readme = "README.md"
+documentation = "https://docs.rs/tk-pg-canonical-form"
+homepage = { workspace = true }
+repository = { workspace = true }
+keywords = { workspace = true }
+categories = { workspace = true }
 
 [dependencies]
 tk-pg-core = { path = "../../tk-pg-core" }
