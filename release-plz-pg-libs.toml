@@ -1,0 +1,103 @@
+# Release management for the pg-libs Rust crates.
+
+[workspace]
+# Open the release PR as a draft
+pr_draft = true
+pr_name = "chore(pg-libs): 🦀 release{% if package %} {{ package }}{% endif %}{% if version %} v{{ version }}{% endif %}"
+pr_branch_prefix = "release-plz-pg-libs-"
+
+# Default to not processing the packages
+release = false
+
+# Enforce adding the project name in the git tag, to avoid collisions with python.
+git_tag_name = "{{ package }}-v{{ version }}"
+git_release_name = "{{ package }}: v{{ version }}"
+pr_labels = ["X-release", "A-rust"]
+
+# Publish only after merging a PR whose branch starts with `release-plz-pg-libs-`.
+release_always = false
+
+# Include a list of contributors in the release body
+git_release_body = """
+{{ changelog }}
+{% if remote.contributors %}
+### Contributors
+{% for contributor in remote.contributors %}
+* @{{ contributor.username }}
+{% endfor %}
+{% endif %}
+"""
+
+[changelog]
+header = """# Changelog
+
+"""
+sort_commits = "oldest"
+
+commit_parsers = [
+    { message = "^feat", group = "New Features" },
+    { message = "^fix", group = "Bug Fixes" },
+    { message = "^docs", group = "Documentation" },
+    { message = "^style", group = "Styling" },
+    { message = "^refactor", group = "Refactor" },
+    { message = "^perf", group = "Performance" },
+    { message = "^test", group = "Testing" },
+    { message = "^chore", group = "Miscellaneous Tasks", skip = true },
+    { message = "^revert", group = "Reverted changes", skip = true },
+    { message = "^ci", group = "CI", skip = true },
+]
+
+[[package]]
+name = "tk-pg-libs"
+release = true
+version_group = "pg-libs"
+
+[[package]]
+name = "tk-pg-core"
+release = true
+version_group = "pg-libs"
+
+[[package]]
+name = "tk-pg-converter"
+release = true
+version_group = "pg-libs"
+
+[[package]]
+name = "tk-pg-bitpacked"
+release = true
+version_group = "pg-libs"
+
+[[package]]
+name = "tk-pg-ir-kernels"
+release = true
+version_group = "pg-libs"
+
+[[package]]
+name = "tk-pg-utils"
+release = true
+version_group = "pg-libs"
+
+[[package]]
+name = "tk-pg-canonical-form"
+release = true
+version_group = "pg-libs"
+
+[[package]]
+name = "tk-pg-optimize"
+release = true
+version_group = "pg-libs"
+
+[[package]]
+name = "tk-pg-greedy-synth"
+release = true
+version_group = "pg-libs"
+
+[[package]]
+name = "tk-pg-rebase"
+release = true
+version_group = "pg-libs"
+
+[[package]]
+name = "tk-pg-qm-tableau"
+release = true
+version_group = "pg-libs"
