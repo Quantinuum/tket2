@@ -21,3 +21,9 @@ This directory contains Rust crates for working with Pauli graphs.
   to select one language. Rust checks use stable features. The `format-rust`
   recipe formats the shared workspace.
 - **Nightly toolchain**: The `unstable_simd` feature requires the nightly toolchain selected by `nightly_toolchain` in the root [`justfile`](../justfile). Run `just test-rust-nightly`; in devenv, use `devenv shell --profile nightly`.
+
+## License
+
+The pg-libs crates are licensed under Apache License, Version 2.0 ([LICENCE][] or <https://www.apache.org/licenses/LICENSE-2.0>).
+
+  [LICENCE]: https://github.com/quantinuum/tket2/blob/main/LICENCE
