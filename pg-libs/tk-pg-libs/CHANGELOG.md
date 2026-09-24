@@ -3,6 +3,4 @@
 
 ## [0.1.0](https://github.com/Quantinuum/tket2/releases/tag/tk-pg-libs-v0.1.0) - 2026-09-24
 
-### New Features
-
-- add pg-libs facade crate ([#2023](https://github.com/Quantinuum/tket2/pull/2023))
+Initial release of tk-pg-libs.
