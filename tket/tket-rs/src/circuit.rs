@@ -279,6 +279,7 @@ impl<T: HugrView> Circuit<T> {
     /// Return the graphviz representation of the underlying graph and hierarchy side by side.
     ///
     /// For a simpler representation, use the [`Circuit::mermaid_string`] format instead.
+    #[expect(deprecated)]
     pub fn dot_string(&self) -> String {
         // TODO: This will print the whole HUGR without identifying the circuit container.
         // Should we add some extra formatting for that?
