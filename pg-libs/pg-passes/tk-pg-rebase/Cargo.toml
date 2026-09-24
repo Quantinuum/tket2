@@ -1,6 +1,7 @@
 [package]
 name = "tk-pg-rebase"
 version = "0.1.0"
+description = "Rebasing passes for Pauli graphs"
 edition = { workspace = true }
 rust-version = { workspace = true }
 

@@ -11,6 +11,7 @@ members = [
     "tket/tket1-passes",
     "tket/tket-py",
     "tket/tket-qsystem",
+    "pg-libs/tk-pg-libs",
     "pg-libs/tk-pg-core",
     "pg-libs/pg-converters/tk-pg-converter",
     "pg-libs/pg-kernels/tk-pg-bitpacked",

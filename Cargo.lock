@@ -2972,6 +2972,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "tk-pg-libs"
+version = "0.1.0"
+dependencies = [
+ "tk-pg-bitpacked",
+ "tk-pg-canonical-form",
+ "tk-pg-converter",
+ "tk-pg-core",
+ "tk-pg-greedy-synth",
+ "tk-pg-ir-kernels",
+ "tk-pg-optimize",
+ "tk-pg-qm-tableau",
+ "tk-pg-rebase",
+ "tk-pg-utils",
+]
+
+[[package]]
 name = "tk-pg-optimize"
 version = "0.1.0"
 dependencies = [

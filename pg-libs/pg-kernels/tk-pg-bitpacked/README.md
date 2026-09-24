@@ -9,3 +9,9 @@ This crate implements Clifford conjugation of Pauli operators using bit-packed r
 ## SIMD (nightly)
 
 The `unstable_simd` feature enables `std::simd` via the `portable_simd` nightly feature gate. This requires a nightly toolchain.
+
+## License
+
+This project is licensed under Apache License, Version 2.0 ([LICENCE][] or http://www.apache.org/licenses/LICENSE-2.0).
+
+  [LICENCE]: https://github.com/quantinuum/tket2/blob/main/LICENCE

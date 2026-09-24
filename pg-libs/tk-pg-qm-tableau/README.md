@@ -15,3 +15,9 @@ This layout is efficient for postcomposing Clifford gates because doing so updat
 The optional `unstable_simd` feature provides the `SimdTableau` trait, which exposes SIMD implementations of the tableau operations using `std::simd`.
 
 This feature requires the nightly Rust toolchain with the `portable_simd` feature enabled. Check the `README.md` in the `pg-libs/` directory for instructions on how to set up the nightly toolchain.
+
+## License
+
+This project is licensed under Apache License, Version 2.0 ([LICENCE][] or http://www.apache.org/licenses/LICENSE-2.0).
+
+  [LICENCE]: https://github.com/quantinuum/tket2/blob/main/LICENCE

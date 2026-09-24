@@ -1,6 +1,7 @@
 [package]
 name = "tk-pg-converter"
 version = "0.1.0"
+description = "Conversions between Pauli graphs and serialized TKET circuits"
 edition = { workspace = true }
 rust-version = { workspace = true }
 

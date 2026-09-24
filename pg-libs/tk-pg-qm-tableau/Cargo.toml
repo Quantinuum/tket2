@@ -1,6 +1,7 @@
 [package]
 name = "tk-pg-qm-tableau"
 version = "0.1.0"
+description = "Clifford tableaux with a qubit major memory layout"
 edition = { workspace = true }
 rust-version = { workspace = true }
 
