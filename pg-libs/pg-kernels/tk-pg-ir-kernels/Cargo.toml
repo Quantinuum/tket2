@@ -13,12 +13,12 @@ keywords = { workspace = true }
 categories = { workspace = true }
 
 [dependencies]
-tk-pg-core = { path = "../../tk-pg-core" }
-tk-pg-utils = { path = "../../pg-utils/tk-pg-utils" }
+tk-pg-core = { path = "../../tk-pg-core", version = "0.1.0" }
+tk-pg-utils = { path = "../../pg-utils/tk-pg-utils", version = "0.1.0" }
 
 [dev-dependencies]
-tk-pg-qm-tableau = { path = "../../tk-pg-qm-tableau" }
-tk-pg-converter = { path = "../../pg-converters/tk-pg-converter" }
+tk-pg-qm-tableau = { path = "../../tk-pg-qm-tableau", version = "0.1.0" }
+tk-pg-converter = { path = "../../pg-converters/tk-pg-converter", version = "0.1.0" }
 
 [lints]
 workspace = true
