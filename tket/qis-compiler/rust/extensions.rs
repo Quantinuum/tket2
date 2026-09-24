@@ -50,7 +50,7 @@ pub(crate) fn codegen_extensions(platform: QSystemPlatform) -> CodegenExtsMap<'s
     CodegenExtsBuilder::default()
         .add_prelude_extensions(prelude.clone())
         .add_extension(IntCodegenExtension::new(prelude.clone()))
-        .add_float_extensions()
+        .add_math_extensions() // This also adds the float extension
         .add_conversion_extensions()
         .add_logic_extensions()
         .add_extension(SeleneHeapArrayCodegen::LOWERING.codegen_extension())
