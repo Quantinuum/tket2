@@ -1146,8 +1146,7 @@ dependencies = [
 [[package]]
 name = "hugr"
 version = "0.30.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12cda643566bf325b7ed21e9a762bc6cf80c03216de61060ec0514f61c254b34"
+source = "git+https://github.com/quantinuum/hugr?branch=hs%2Ffeat%2Fmath-extension#5170454aa2794eaec6ed2a8840fc14cb7a5dd2b4"
 dependencies = [
  "hugr-core",
  "hugr-llvm",
@@ -1157,8 +1156,7 @@ dependencies = [
 [[package]]
 name = "hugr-cli"
 version = "0.30.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7be085b0da949b6628a0607aa8f3699a2e9a8f03960c13d205778f91b828fc02"
+source = "git+https://github.com/quantinuum/hugr?branch=hs%2Ffeat%2Fmath-extension#5170454aa2794eaec6ed2a8840fc14cb7a5dd2b4"
 dependencies = [
  "anyhow",
  "clap",
@@ -1179,8 +1177,7 @@ dependencies = [
 [[package]]
 name = "hugr-core"
 version = "0.30.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94d9b80e7f0b18e79188c4e4df2877386208f7abd006241ceebaffee7c2381d7"
+source = "git+https://github.com/quantinuum/hugr?branch=hs%2Ffeat%2Fmath-extension#5170454aa2794eaec6ed2a8840fc14cb7a5dd2b4"
 dependencies = [
  "base64",
  "cgmath",
@@ -1211,14 +1208,13 @@ dependencies = [
  "thiserror 2.0.20",
  "tracing",
  "typetag",
- "zstd 0.13.3",
+ "zstd",
 ]
 
 [[package]]
 name = "hugr-llvm"
 version = "0.30.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f9f8390c004d8c7e32cb2c143b34b269ca1bcdcde8c4da44b3a87e14adced4ef"
+source = "git+https://github.com/quantinuum/hugr?branch=hs%2Ffeat%2Fmath-extension#5170454aa2794eaec6ed2a8840fc14cb7a5dd2b4"
 dependencies = [
  "anyhow",
  "cc",
@@ -1231,15 +1227,14 @@ dependencies = [
  "petgraph 0.8.3",
  "portgraph 0.16.2",
  "rand 0.10.3",
- "rstest",
+ "rstest 0.27.0",
  "strum",
 ]
 
 [[package]]
 name = "hugr-model"
 version = "0.30.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18118590117721af0b21aa7edaf660ebb173b53f2df087dc7e191b9bb6039c5c"
+source = "git+https://github.com/quantinuum/hugr?branch=hs%2Ffeat%2Fmath-extension#5170454aa2794eaec6ed2a8840fc14cb7a5dd2b4"
 dependencies = [
  "base64",
  "bumpalo",
@@ -1954,28 +1949,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "proc-macro-error-attr2"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96de42df36bb9bba5542fe9f1a054b8cc87e172759a1868aa05c1f3acc89dfc5"
-dependencies = [
- "proc-macro2",
- "quote",
-]
-
-[[package]]
-name = "proc-macro-error2"
-version = "2.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11ec05c52be0a07b08061f7dd003e7d7092e0472bc731b4af7bb1ef876109802"
-dependencies = [
- "proc-macro-error-attr2",
- "proc-macro2",
- "quote",
- "syn 2.0.117",
-]
-
-[[package]]
 name = "proc-macro2"
 version = "1.0.106"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2321,7 +2294,18 @@ checksum = "f5a3193c063baaa2a95a33f03035c8a72b83d97a54916055ba22d35ed3839d49"
 dependencies = [
  "futures-timer",
  "futures-util",
- "rstest_macros",
+ "rstest_macros 0.26.1",
+]
+
+[[package]]
+name = "rstest"
+version = "0.27.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "948203e6d13b83e51a90d7cf236dd58a0065f23f4b902f00f306e7eb2bd09b9c"
+dependencies = [
+ "futures-timer",
+ "futures-util",
+ "rstest_macros 0.27.0",
 ]
 
 [[package]]
@@ -2329,6 +2313,24 @@ name = "rstest_macros"
 version = "0.26.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c845311f0ff7951c5506121a9ad75aec44d083c31583b2ea5a30bcb0b0abba0"
+dependencies = [
+ "cfg-if",
+ "glob",
+ "proc-macro-crate",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "relative-path",
+ "rustc_version",
+ "syn 2.0.117",
+ "unicode-ident",
+]
+
+[[package]]
+name = "rstest_macros"
+version = "0.27.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a8d92eaf7b6e51e12471d71ddc72608e7151573de44099aacfbb1128177c0da4"
 dependencies = [
  "cfg-if",
  "glob",
@@ -2456,7 +2458,7 @@ dependencies = [
  "itertools 0.15.0",
  "pyo3",
  "pyo3-build-config",
- "rstest",
+ "rstest 0.26.1",
  "serde",
  "serde_json",
  "strum",
@@ -2718,9 +2720,9 @@ dependencies = [
 
 [[package]]
 name = "tabled"
-version = "0.21.0"
+version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5dc662e6da844ad6e428ad16b57967c9d33c82e16bb1c258326c0c078605dff"
+checksum = "2d2596a104db1900b943f97d793a6c99addca918c4525c999f751a0f17d472eb"
 dependencies = [
  "papergrid",
  "tabled_derive",
@@ -2729,12 +2731,11 @@ dependencies = [
 
 [[package]]
 name = "tabled_derive"
-version = "0.11.0"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ea5d1b13ca6cff1f9231ffd62f15eefd72543dab5e468735f1a456728a02846"
+checksum = "7dca1937322a1e892b1a65f6a6736183bb0a29d3b4234d1d53bc436dff9beb76"
 dependencies = [
  "heck",
- "proc-macro-error2",
  "proc-macro2",
  "quote",
  "syn 2.0.117",
@@ -2905,7 +2906,7 @@ version = "0.1.0"
 dependencies = [
  "approx_eq",
  "rand 0.10.3",
- "rstest",
+ "rstest 0.26.1",
  "tk-pg-converter",
  "tk-pg-core",
 ]
@@ -2914,7 +2915,7 @@ dependencies = [
 name = "tk-pg-canonical-form"
 version = "0.1.0"
 dependencies = [
- "rstest",
+ "rstest 0.26.1",
  "tk-pg-converter",
  "tk-pg-core",
  "tk-pg-ir-kernels",
@@ -2926,7 +2927,7 @@ dependencies = [
 name = "tk-pg-converter"
 version = "0.1.0"
 dependencies = [
- "rstest",
+ "rstest 0.26.1",
  "serde_json",
  "thiserror 2.0.20",
  "tk-pg-core",
@@ -2951,7 +2952,7 @@ dependencies = [
  "indicatif",
  "rand 0.10.3",
  "rayon",
- "rstest",
+ "rstest 0.26.1",
  "tk-pg-bitpacked",
  "tk-pg-canonical-form",
  "tk-pg-converter",
@@ -2989,7 +2990,7 @@ version = "0.1.0"
 dependencies = [
  "rand 0.10.3",
  "rayon",
- "rstest",
+ "rstest 0.26.1",
  "tk-pg-bitpacked",
  "tk-pg-converter",
  "tk-pg-core",
@@ -3001,7 +3002,7 @@ dependencies = [
 name = "tk-pg-rebase"
 version = "0.1.0"
 dependencies = [
- "rstest",
+ "rstest 0.26.1",
  "tk-pg-converter",
  "tk-pg-core",
 ]
@@ -3044,7 +3045,7 @@ dependencies = [
  "proptest-recurse",
  "rayon",
  "rmp-serde",
- "rstest",
+ "rstest 0.26.1",
  "serde",
  "serde_json",
  "serde_with",
@@ -3054,7 +3055,7 @@ dependencies = [
  "tket-json-rs",
  "tracing",
  "typetag",
- "zstd 0.14.0",
+ "zstd",
 ]
 
 [[package]]
@@ -3085,7 +3086,7 @@ dependencies = [
  "portmatching",
  "pyo3",
  "rayon",
- "rstest",
+ "rstest 0.26.1",
  "serde",
  "serde_json",
  "strum",
@@ -3113,7 +3114,7 @@ dependencies = [
  "lazy_static",
  "petgraph 0.8.3",
  "rayon",
- "rstest",
+ "rstest 0.26.1",
  "serde",
  "serde_json",
  "smol_str",
@@ -3135,7 +3136,7 @@ dependencies = [
  "itertools 0.15.0",
  "libc",
  "rayon",
- "rstest",
+ "rstest 0.26.1",
  "serde",
  "serde_json",
  "thiserror 2.0.20",
@@ -3831,29 +3832,11 @@ checksum = "b8848ee67ecc8aedbaf3e4122217aff892639231befc6a1b58d29fff4c2cabaa"
 
 [[package]]
 name = "zstd"
-version = "0.13.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e91ee311a569c327171651566e07972200e76fcfe2242a4fa446149a3881c08a"
-dependencies = [
- "zstd-safe 7.2.4",
-]
-
-[[package]]
-name = "zstd"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bf06bd8162af0734b344780deb55b42a2429ae430870d13fcc12f238e880fe6e"
 dependencies = [
- "zstd-safe 8.0.0",
-]
-
-[[package]]
-name = "zstd-safe"
-version = "7.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f49c4d5f0abb602a93fb8736af2a4f4dd9512e36f7f570d66e65ff867ed3b9d"
-dependencies = [
- "zstd-sys",
+ "zstd-safe",
 ]
 
 [[package]]

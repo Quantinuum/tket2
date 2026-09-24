@@ -28,7 +28,7 @@ pg-libs = ["mypy>=2.3,<3", "ruff>=0.6", "pytket>=2,<3"]
 prerelease = "explicit"
 
 [tool.uv.sources]
-#hugr = { git = "https://github.com/quantinuum/hugr", subdirectory = "hugr-py", rev = "1787e12" }
+hugr = { git = "https://github.com/quantinuum/hugr", subdirectory = "hugr-py", branch = "hs/feat/math-extension" }
 
 
 [build-system]
