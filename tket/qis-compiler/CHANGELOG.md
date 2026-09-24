@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.5.0...qis-compiler-v0.5.1) (2026-09-24)
+
+
+### Documentation
+
+* Use Oxford spelling consistently in public documentation ([#2016](https://github.com/Quantinuum/tket2/issues/2016)) ([c46d68d](https://github.com/Quantinuum/tket2/commit/c46d68d7fee4bb8630f59dfd255458184e9d28ba))
+
 ## [0.5.0](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.4.2...qis-compiler-v0.5.0) (2026-09-04)
 
 
