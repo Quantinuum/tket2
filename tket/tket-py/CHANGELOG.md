@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.10](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.9...tket-py-v0.15.10) (2026-09-24)
+
+
+### Documentation
+
+* Use Oxford spelling consistently in public documentation ([#2016](https://github.com/Quantinuum/tket2/issues/2016)) ([c46d68d](https://github.com/Quantinuum/tket2/commit/c46d68d7fee4bb8630f59dfd255458184e9d28ba))
+
 ## [0.15.9](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.8...tket-py-v0.15.9) (2026-09-07)
 
 
