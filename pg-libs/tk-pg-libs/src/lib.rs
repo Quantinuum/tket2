@@ -1,4 +1,32 @@
-#![doc = include_str!("../README.md")]
+//! An umbrella crate for pg-libs, TKET's Pauli graph libraries. It re-exports
+//! core types, transformation and synthesis passes, and supporting utilities.
+//!
+//! # Quick start
+//!
+//! This example optimizes and synthesizes a two qubit circuit.
+//!
+//! ```
+//! use tk_pg_libs::{GateData, GateType, Op, PauliGraph};
+//! use tk_pg_libs::passes::{
+//!     CanonicalFormPass, GreedySynthPass, GroupCommutingOpsPass, PGPass,
+//!     RotationMergingPass,
+//! };
+//!
+//! let mut pg = PauliGraph::new(2);
+//! for data in [
+//!     GateData::new(GateType::RZ, vec![1]).with_params(vec![0.25]),
+//!     GateData::new(GateType::ZX, vec![0, 1]), // CX(0, 1)
+//!     GateData::new(GateType::ZX, vec![1, 0]), // CX(1, 0)
+//!     GateData::new(GateType::RZ, vec![0]).with_params(vec![0.25]),
+//! ] {
+//!     pg.add_op(Op::Gate { data });
+//! }
+//!
+//! let pg = CanonicalFormPass::new().transform(&pg);
+//! let pg = RotationMergingPass::new().transform(&pg);
+//! let pg = GroupCommutingOpsPass::new().transform(&pg);
+//! let pg = GreedySynthPass::new().transform(&pg);
+//! ```
 
 #[doc(inline)]
 pub use tk_pg_core::{

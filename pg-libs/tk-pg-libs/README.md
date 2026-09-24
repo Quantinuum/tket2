@@ -1,6 +1,7 @@
 # tk-pg-libs
 
-Rust libraries for Pauli graph optimization and synthesis.
+An umbrella crate for pg-libs, TKET's Pauli graph libraries. It re-exports core
+types, transformation and synthesis passes, and supporting utilities.
 
 ## Usage
 
