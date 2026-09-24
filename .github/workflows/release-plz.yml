@@ -15,7 +15,7 @@ jobs:
       matrix:
         include:
           - component: tket
-            config: release-plz.toml
+            config: release-plz-tket.toml
             hugrenv: true
           - component: pg-libs
             config: release-plz-pg-libs.toml
@@ -62,7 +62,7 @@ jobs:
       matrix:
         include:
           - component: tket
-            config: release-plz.toml
+            config: release-plz-tket.toml
           - component: pg-libs
             config: release-plz-pg-libs.toml
     environment: crate-release

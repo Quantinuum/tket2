@@ -256,15 +256,15 @@ and bump the version accordingly.
 
 Rust releases have two independent release PRs:
 
-- `release-plz.toml` manages `tket` and `tket-qsystem`, with titles beginning
+- `release-plz-tket.toml` manages `tket` and `tket-qsystem`, with titles beginning
   `chore(tket): release` and branches beginning `release-plz-tket-`.
 - `release-plz-pg-libs.toml` manages the publishable pg-libs crates, with titles
   beginning `chore(pg-libs): release` and branches beginning `release-plz-pg-libs-`.
   The `pg-ir-kernels-tests` harness is excluded.
 
 The release workflow uses the same group configuration for preparing the PR
-and publishing after it merges. For local commands, select the pg-libs group
-with `--config release-plz-pg-libs.toml`; the default config selects tket.
+and publishing after it merges. For local commands, select the appropriate release group
+with `--config release-plz-<group>.toml`.
 
 To modify the version being released, update the `Cargo.toml`,
 `CHANGELOG.md`, PR name, and PR description in the release PR with the desired version. You may also have to update the dates.
