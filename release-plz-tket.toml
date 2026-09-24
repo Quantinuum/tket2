@@ -1,23 +1,20 @@
-# Automatic changelog generation for rust projects
+# Release management for the tket Rust crates.
 
 [workspace]
 # Open the release PR as a draft
 pr_draft = true
+pr_name = "chore(tket): 🦀 release{% if package %} {{ package }}{% endif %}{% if version %} v{{ version }}{% endif %}"
+pr_branch_prefix = "release-plz-tket-"
 
 # Default to not processing the packages
 release = false
 
 # Enforce adding the project name in the git tag, to avoid collisions with python.
-# (This would normally only be enabled once there are multiple packages in the workspace)
 git_tag_name = "{{ package }}-v{{ version }}"
 git_release_name = "{{ package }}: v{{ version }}"
 pr_labels = ["X-release", "A-rust"]
 
-# Only create releases / push to crates.io after merging a release-please PR.
-# This lets merge new crates to `main` without worrying about accidentally creating
-# github releases.
-#
-# To trigger a release manually, merge a PR from a branch starting with `release-plz-`.
+# Publish only after merging a PR whose branch starts with `release-plz-tket-`.
 release_always = false
 
 # Include a list of contributors in the release body

@@ -12,3 +12,9 @@ The Python worker (`scripts/compare_unitaries_worker.py`) is embedded at compile
 In this repository, run tests with `uv run --only-group pg-libs cargo test -p tk-pg-converter`
 to use the shared workspace environment with `pytket` installed. Set
 `PG_TK_PYTHON` only when you want to use a different interpreter.
+
+## License
+
+This project is licensed under Apache License, Version 2.0 ([LICENCE][] or <https://www.apache.org/licenses/LICENSE-2.0>).
+
+  [LICENCE]: https://github.com/quantinuum/tket2/blob/main/LICENCE

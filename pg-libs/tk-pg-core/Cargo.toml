@@ -9,9 +9,9 @@ readme = "README.md"
 documentation = "https://docs.rs/tk-pg-core"
 homepage = { workspace = true }
 repository = { workspace = true }
-description = "..."
-keywords = ["Quantum", "Quantinuum"]
-categories = ["compilers", "science::quantum-computing"]
+description = "Core types and pass interfaces for Pauli graphs"
+keywords = { workspace = true }
+categories = { workspace = true }
 
 [dependencies]
 serde = { workspace = true, features = ["derive"] }

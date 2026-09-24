@@ -6,3 +6,9 @@ unchanged.
 
 By default, `ZX` is the only two qubit entangling gate kept unchanged. Other
 gate types can also be allowed when creating the pass.
+
+## License
+
+This project is licensed under Apache License, Version 2.0 ([LICENCE][] or <https://www.apache.org/licenses/LICENSE-2.0>).
+
+  [LICENCE]: https://github.com/quantinuum/tket2/blob/main/LICENCE

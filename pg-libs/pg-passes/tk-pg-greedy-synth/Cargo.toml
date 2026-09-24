@@ -1,8 +1,16 @@
 [package]
 name = "tk-pg-greedy-synth"
 version = "0.1.0"
+description = "Greedy synthesis passes for Pauli graphs"
 edition = { workspace = true }
 rust-version = { workspace = true }
+license = { workspace = true }
+readme = "README.md"
+documentation = "https://docs.rs/tk-pg-greedy-synth"
+homepage = { workspace = true }
+repository = { workspace = true }
+keywords = { workspace = true }
+categories = { workspace = true }
 
 [features]
 default = []
@@ -12,17 +20,17 @@ unstable_simd = ["tk-pg-qm-tableau/unstable_simd", "tk-pg-bitpacked/unstable_sim
 crossbeam-skiplist = "0.1.3"
 indexmap = { workspace = true }
 indicatif = { workspace = true }
-tk-pg-bitpacked = { path = "../../pg-kernels/tk-pg-bitpacked" }
-tk-pg-canonical-form = { path = "../tk-pg-canonical-form" }
-tk-pg-core = { path = "../../tk-pg-core" }
-tk-pg-optimize = { path = "../tk-pg-optimize" }
-tk-pg-qm-tableau = { path = "../../tk-pg-qm-tableau" }
+tk-pg-bitpacked = { path = "../../pg-kernels/tk-pg-bitpacked", version = "0.1.0" }
+tk-pg-canonical-form = { path = "../tk-pg-canonical-form", version = "0.1.0" }
+tk-pg-core = { path = "../../tk-pg-core", version = "0.1.0" }
+tk-pg-optimize = { path = "../tk-pg-optimize", version = "0.1.0" }
+tk-pg-qm-tableau = { path = "../../tk-pg-qm-tableau", version = "0.1.0" }
 rand = { workspace = true }
 rayon = { workspace = true }
 
 [dev-dependencies]
-tk-pg-ir-kernels = { path = "../../pg-kernels/tk-pg-ir-kernels" }
-tk-pg-converter = { path = "../../pg-converters/tk-pg-converter" }
+tk-pg-ir-kernels = { path = "../../pg-kernels/tk-pg-ir-kernels", version = "0.1.0" }
+tk-pg-converter = { path = "../../pg-converters/tk-pg-converter", version = "0.1.0" }
 rstest = { workspace = true }
 
 [lints]

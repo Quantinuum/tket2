@@ -1,0 +1,32 @@
+[package]
+name = "tk-pg-libs"
+version = "0.1.0"
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+description = "A toolkit for constructing, transforming, and synthesizing Pauli graphs"
+readme = "README.md"
+documentation = "https://docs.rs/tk-pg-libs"
+keywords = { workspace = true }
+categories = { workspace = true }
+
+[features]
+default = []
+unstable_simd = ["tk-pg-bitpacked/unstable_simd", "tk-pg-qm-tableau/unstable_simd", "tk-pg-greedy-synth/unstable_simd"]
+
+[dependencies]
+tk-pg-core = { path = "../tk-pg-core", version = "0.1.0" }
+tk-pg-canonical-form = { path = "../pg-passes/tk-pg-canonical-form", version = "0.1.0" }
+tk-pg-optimize = { path = "../pg-passes/tk-pg-optimize", version = "0.1.0" }
+tk-pg-greedy-synth = { path = "../pg-passes/tk-pg-greedy-synth", version = "0.1.0" }
+tk-pg-rebase = { path = "../pg-passes/tk-pg-rebase", version = "0.1.0" }
+tk-pg-converter = { path = "../pg-converters/tk-pg-converter", version = "0.1.0" }
+tk-pg-qm-tableau = { path = "../tk-pg-qm-tableau", version = "0.1.0" }
+tk-pg-bitpacked = { path = "../pg-kernels/tk-pg-bitpacked", version = "0.1.0" }
+tk-pg-ir-kernels = { path = "../pg-kernels/tk-pg-ir-kernels", version = "0.1.0" }
+tk-pg-utils = { path = "../pg-utils/tk-pg-utils", version = "0.1.0" }
+
+[lints]
+workspace = true

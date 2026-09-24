@@ -11,6 +11,7 @@ members = [
     "tket/tket1-passes",
     "tket/tket-py",
     "tket/tket-qsystem",
+    "pg-libs/tk-pg-libs",
     "pg-libs/tk-pg-core",
     "pg-libs/pg-converters/tk-pg-converter",
     "pg-libs/pg-kernels/tk-pg-bitpacked",
@@ -33,6 +34,8 @@ edition = "2024"
 homepage = "https://github.com/quantinuum/tket2"
 repository = "https://github.com/quantinuum/tket2"
 license = "Apache-2.0"
+keywords = ["quantum", "Quantinuum", "tket"]
+categories = ["compilers", "science::quantum-computing"]
 
 [workspace.lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [
