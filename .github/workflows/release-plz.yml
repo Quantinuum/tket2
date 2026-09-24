@@ -8,22 +8,24 @@ on:
 
 jobs:
   release-plz-pr:
-    name: Create release-plz PR
+    name: Create release PR (${{ matrix.component }})
     runs-on: ubuntu-latest
-    env:
-      HUGRENV_VERSION: "0.3.1"
-      HUGRENV_ROOT: "/tmp/hugrverse"
-      HUGRENV_PLATFORM: "manylinux_2_28_x86_64"
-      TKET_C_API_PATH: "/tmp/hugrverse"
-      LD_LIBRARY_PATH: "/tmp/hugrverse/lib:/tmp/hugrverse/lib64"
-      LLVM_SYS_211_PREFIX: "/tmp/hugrverse"
-
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - component: tket
+            config: release-plz.toml
+            hugrenv: true
+          - component: pg-libs
+            config: release-plz-pg-libs.toml
+            hugrenv: false
     # Ensure only one release-plz tries to create a PR at a time.
     #
     # If two instances update the PR simultaneously, one will see an outdated git ref
     # and end up recreating the PR unnecessarily.
     concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}-pr
+      group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.component }}-pr
       cancel-in-progress: true
 
     steps:
@@ -34,24 +36,35 @@ jobs:
           token: ${{ secrets.HUGRBOT_PAT }}
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-      - name: Install LLVM
+      - name: Install tket and LLVM from hugrenv.lock
+        if: matrix.hugrenv
         uses: quantinuum/hugrverse-env/install-hugrenv-action@main
+        with:
+          packages: "tket,llvm"
 
       - name: Create release PR
-        uses: MarcoIeni/release-plz-action@v0.5
+        uses: release-plz/action@v0.5
         env:
           GITHUB_TOKEN: ${{ secrets.HUGRBOT_PAT }}
         with:
           command: release-pr
+          config: ${{ matrix.config }}
 
   # This job triggers the release to crates.io if the current crate version is higher than the
   # ones in the registry.
   #
-  # Release-plz will only run on commits originating from a PR whose source branch started with
-  # `release-plz-` (see `release-always=false` in the config).
+  # Each config publishes only after merging its own release PR.
   release-plz:
-    name: Release the crates
+    name: Release crates (${{ matrix.component }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - component: tket
+            config: release-plz.toml
+          - component: pg-libs
+            config: release-plz-pg-libs.toml
     environment: crate-release
     permissions:
       id-token: write # Required for OIDC token exchange
@@ -64,13 +77,10 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - uses: rust-lang/crates-io-auth-action@v1
-        id: auth
-
       - name: Run release-plz
-        uses: MarcoIeni/release-plz-action@v0.5
+        uses: release-plz/action@v0.5
         env:
           GITHUB_TOKEN: ${{ secrets.HUGRBOT_PAT }}
-          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
         with:
           command: release
+          config: ${{ matrix.config }}

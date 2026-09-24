@@ -1,10 +1,10 @@
-# Release management for the tket Rust crates.
+# Release management for the pg-libs Rust crates.
 
 [workspace]
 # Open the release PR as a draft
 pr_draft = true
-pr_name = "chore(tket): 🦀 release{% if package %} {{ package }}{% endif %}{% if version %} v{{ version }}{% endif %}"
-pr_branch_prefix = "release-plz-tket-"
+pr_name = "chore(pg-libs): 🦀 release{% if package %} {{ package }}{% endif %}{% if version %} v{{ version }}{% endif %}"
+pr_branch_prefix = "release-plz-pg-libs-"
 
 # Default to not processing the packages
 release = false
@@ -14,7 +14,7 @@ git_tag_name = "{{ package }}-v{{ version }}"
 git_release_name = "{{ package }}: v{{ version }}"
 pr_labels = ["X-release", "A-rust"]
 
-# Publish only after merging a PR whose branch starts with `release-plz-tket-`.
+# Publish only after merging a PR whose branch starts with `release-plz-pg-libs-`.
 release_always = false
 
 # Include a list of contributors in the release body
@@ -48,9 +48,56 @@ commit_parsers = [
 ]
 
 [[package]]
-name = "tket"
+name = "tk-pg-libs"
 release = true
+version_group = "pg-libs"
 
 [[package]]
-name = "tket-qsystem"
+name = "tk-pg-core"
 release = true
+version_group = "pg-libs"
+
+[[package]]
+name = "tk-pg-converter"
+release = true
+version_group = "pg-libs"
+
+[[package]]
+name = "tk-pg-bitpacked"
+release = true
+version_group = "pg-libs"
+
+[[package]]
+name = "tk-pg-ir-kernels"
+release = true
+version_group = "pg-libs"
+
+[[package]]
+name = "tk-pg-utils"
+release = true
+version_group = "pg-libs"
+
+[[package]]
+name = "tk-pg-canonical-form"
+release = true
+version_group = "pg-libs"
+
+[[package]]
+name = "tk-pg-optimize"
+release = true
+version_group = "pg-libs"
+
+[[package]]
+name = "tk-pg-greedy-synth"
+release = true
+version_group = "pg-libs"
+
+[[package]]
+name = "tk-pg-rebase"
+release = true
+version_group = "pg-libs"
+
+[[package]]
+name = "tk-pg-qm-tableau"
+release = true
+version_group = "pg-libs"
