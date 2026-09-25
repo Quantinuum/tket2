@@ -1,6 +1,6 @@
 { pkgs, lib, inputs, config, ... }:
 let
-  hugrenv = config.hugrenv.package;
+  hugrenv = config.hugrenv.finalPackage;
   # Let just evaluate its toolchain pin rather than parsing the justfile.
   nightlyToolchain = builtins.readFile (pkgs.runCommand "tket-nightly-toolchain" {
     nativeBuildInputs = [ pkgs.just ];
@@ -9,80 +9,93 @@ let
   '');
 in {
 
-  options.hugrenv.package = lib.mkOption {
-    type = lib.types.package;
-    default =  pkgs.callPackage ./hugrenv.nix {
-        packages = ["tket" "llvm"];
+  options.hugrenv = {
+    # Disable to use Nix-provided LLVM 21 and libclang (for example on NixOS).
+    llvm.enable = lib.mkEnableOption "LLVM from hugrenv" // { default = true; };
+    package = lib.mkOption {
+      type = lib.types.package;
+      default = pkgs.callPackage ./hugrenv.nix {
+        packages = [ "tket" ];
+      };
+    };
+    finalPackage = lib.mkOption {
+      internal = true;
+      type = lib.types.package;
     };
   };
 
   config = {
-  # https://devenv.sh/packages/
-  # on macos frameworks have to be explicitly specified
-  # otherwise a linker error occurs on rust packages
-  packages = [
-    pkgs.just
-    pkgs.cargo-insta
-    pkgs.cargo-nextest
+    hugrenv.finalPackage = let
+      pkg = config.hugrenv.package;
+    in if config.hugrenv.llvm.enable
+      then pkg.override (old: { packages = old.packages ++ [ "llvm" ]; })
+      else pkg;
+    # https://devenv.sh/packages/
+    # on macos frameworks have to be explicitly specified
+    # otherwise a linker error occurs on rust packages
+    packages = [
+      hugrenv
+      pkgs.just
+      pkgs.cargo-insta
+      pkgs.cargo-nextest
 
-    # These are required to be able to link to llvm.
-    pkgs.libffi
-    # used to override jemalloc-sys to use nixpkgs' jemalloc
-    # instead of building with cmake (and requiring reduced hardening)
-    pkgs.jemalloc
-  ] ++ lib.optionals pkgs.stdenv.isDarwin [
-    pkgs.xz
-  ];
+      # These are required to be able to link to llvm.
+      pkgs.libffi
+      # used to override jemalloc-sys to use nixpkgs' jemalloc
+      # instead of building with cmake (and requiring reduced hardening)
+      pkgs.jemalloc
+    ] ++ lib.optionals pkgs.stdenv.isDarwin [
+      pkgs.xz
+    ] ++ lib.optionals (!config.hugrenv.llvm.enable) [
+      pkgs.zlib
+      pkgs.libxml2
+    ];
 
-  enterShell = ''
-    cargo --version
-    python --version
-    uv --version
-    # append hugrenv to bin and lib paths
-    export PATH="${hugrenv}/bin:$PATH"
-    # if macos use DYLD_LIBRARY_PATH instead of LD_LIBRARY_PATH
-    if [ "$(uname)" = "Darwin" ]; then
-      export DYLD_LIBRARY_PATH="${hugrenv}/lib:${hugrenv}/lib64:${pkgs.stdenv.cc.cc.lib}/lib:$DYLD_LIBRARY_PATH"
-    else
-      export LD_LIBRARY_PATH="${hugrenv}/lib:${hugrenv}/lib64:${pkgs.stdenv.cc.cc.lib}/lib:$LD_LIBRARY_PATH"
-    fi
-  '';
+    enterShell = ''
+      cargo --version
+      python --version
+      uv --version
+    '';
 
-  env = {
-    "LLVM_SYS_211_PREFIX" = "${hugrenv}";
-    "TKET_C_API_PATH" = "${hugrenv}";
-    "LIBCLANG_PATH" = "${hugrenv}/lib";
-    "JEMALLOC_OVERRIDE" =
-      if pkgs.stdenv.isDarwin
-      then "${pkgs.jemalloc}/lib/libjemalloc.dylib"
-      else "${pkgs.jemalloc}/lib/libjemalloc.so";
-  };
+    env = {
+      "LLVM_SYS_211_PREFIX" = if config.hugrenv.llvm.enable
+        then "${hugrenv}"
+        else "${pkgs.llvmPackages_21.llvm.dev}";
+      "JEMALLOC_OVERRIDE" =
+        if pkgs.stdenv.isDarwin
+        then "${pkgs.jemalloc}/lib/libjemalloc.dylib"
+        else "${pkgs.jemalloc}/lib/libjemalloc.so";
+      "TKET_C_API_PATH" = "${hugrenv}";
+      "LIBCLANG_PATH" = if config.hugrenv.llvm.enable
+        then "${hugrenv}/lib"
+        else "${pkgs.llvmPackages_21.libclang.lib}/lib";
+    };
 
-  # https://devenv.sh/languages/
+    # https://devenv.sh/languages/
 
-  languages.rust = {
-    enable = true;
-    channel = "stable";
-    components = [ "rustc" "cargo" "clippy" "rustfmt" "rust-analyzer" ];
-  };
-
-  # Nightly toolchain required for pg-libs' `unstable_simd` feature
-  profiles.nightly.module = {
     languages.rust = {
-      channel = "nightly";
-      version = lib.removePrefix "nightly-" nightlyToolchain;
+      enable = true;
+      channel = "stable";
       components = [ "rustc" "cargo" "clippy" "rustfmt" "rust-analyzer" ];
     };
-  };
 
-  languages.python = {
-    enable = true;
-    uv = {
-      enable = true;
-      sync.enable = true;
+    # Nightly toolchain required for pg-libs' `unstable_simd` feature
+    profiles.nightly.module = {
+      languages.rust = {
+        channel = "nightly";
+        version = lib.removePrefix "nightly-" nightlyToolchain;
+        components = [ "rustc" "cargo" "clippy" "rustfmt" "rust-analyzer" ];
+      };
     };
-    venv.enable = true;
-  };
+
+    languages.python = {
+      enable = true;
+      uv = {
+        enable = true;
+        sync.enable = true;
+      };
+      venv.enable = true;
+    };
 
   };
 
