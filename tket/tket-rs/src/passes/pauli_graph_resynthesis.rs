@@ -29,7 +29,7 @@ use std::sync::Arc;
 /// optimisation techniques such as:
 /// - phase folding
 /// - a synthesis algorithm from pauli graph to Clifford + T aimed at reducing the number of 2
-/// qubit gates
+///   qubit gates
 ///
 ///
 /// - `window_size` (`Option<usize>`) - Size of the sliding window for lookahead during synthesis. Default to 1280.

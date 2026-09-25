@@ -580,5 +580,3 @@ def test_binding_rejects_invalid_parallel_mode() -> None:
         rust_passes.pauli_graph_resynthesis(circuit._inner, parallel_mode="on")
 
     assert _count_hadamards(circuit.to_python().modules[0]) == 2
-
-
