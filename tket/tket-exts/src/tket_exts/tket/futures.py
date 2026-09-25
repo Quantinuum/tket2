@@ -58,7 +58,7 @@ class FuturesExtension(TketExtension):
         """Duplicate a Future. The original is consumed and two Futures are returned.
 
         Args:
-            ty: The element type of the Future being duplicated.
+            ty: The copyable element type of the Future being duplicated.
         """
         return self.dup_def.instantiate([TypeTypeArg(ty)])
 
@@ -75,7 +75,7 @@ class FuturesExtension(TketExtension):
         """Consume a Future without reading it.
 
         Args:
-            ty: The element type of the Future being consumed.
+            ty: The copyable element type of the Future being consumed.
         """
         return self.free_def.instantiate([TypeTypeArg(ty)])
 
