@@ -4,6 +4,7 @@ import tempfile
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+from unittest.mock import ANY, patch
 
 import hypothesis.strategies as st
 import numpy as np
@@ -17,12 +18,16 @@ from tket_exts import modifier, tket_registry
 from tket._ops import TketOp
 from tket._pattern import Rule, RuleMatcher
 from tket._state import CompilationState
+from tket._state.build import H, from_coms
+from tket._tket import passes as rust_passes
 from tket.passes import (
     GlobalScope,
     InlineFunctions,
     ModifierResolverPass,
     Normalize,
     NormalizeGuppy,
+    ParallelMode,
+    PauliGraphResynthesis,
     PlatformTarget,
     PytketHugrPass,
     QSystemRebasePass,
@@ -507,3 +512,71 @@ def test_python_qsystem_pass_with_modifiers() -> None:
         except Exception as exc:  # noqa: BLE001
             failures.append(f"{hugr_path}: {exc}")
     assert not failures, "QSystem pass failures:\n" + "\n".join(failures)
+
+
+def _count_hadamards(hugr: Hugr) -> int:
+    return sum(
+        data.op.name().rsplit(".", maxsplit=1)[-1] == "H" for _, data in hugr.nodes()
+    )
+
+
+def test_resynthesis_with_default_options() -> None:
+    hugr = from_coms(H(0), H(0)).to_python().modules[0]
+    optimisation = PauliGraphResynthesis()
+
+    result = optimisation.run(hugr, inplace=False)
+
+    assert optimisation.parallel_mode is ParallelMode.Auto
+    assert optimisation.window_size is None
+    assert optimisation.pool_size is None
+    assert optimisation.top_up_size is None
+    assert optimisation.seed is None
+    assert result.results == [("PauliGraphResynthesis", None)]
+    assert _count_hadamards(result.hugr) == 0
+    assert _count_hadamards(hugr) == 2
+    CompilationState.from_python(result.hugr).validate()
+
+
+def test_custom_options_and_scope() -> None:
+    hugr = from_coms(H(0), H(0)).to_python().modules[0]
+    optimisation = PauliGraphResynthesis(
+        window_size=16,
+        pool_size=32,
+        top_up_size=4,
+        seed=7,
+        parallel_mode=ParallelMode.On,
+    )
+    assert optimisation.with_scope(GlobalScope.PRESERVE_ALL) is optimisation
+
+    with patch.object(
+        rust_passes,
+        "pauli_graph_resynthesis",
+        wraps=rust_passes.pauli_graph_resynthesis,
+    ) as resynthesis:
+        result = optimisation.run(hugr, inplace=False)
+
+    resynthesis.assert_called_once_with(
+        ANY,
+        scope=GlobalScope.PRESERVE_ALL,
+        window_size=16,
+        pool_size=32,
+        top_up_size=4,
+        seed=7,
+        parallel_mode="On",
+    )
+    assert _count_hadamards(result.hugr) == 0
+
+
+def test_wrapper_requires_parallel_mode_enum() -> None:
+    invalid_mode: Any = "on"
+    with pytest.raises(TypeError, match="parallel_mode must be a ParallelMode"):
+        PauliGraphResynthesis(parallel_mode=invalid_mode)
+
+
+def test_binding_rejects_invalid_parallel_mode() -> None:
+    circuit = from_coms(H(0), H(0))
+
+    with pytest.raises(ValueError, match="expected 'Auto', 'On', or 'Off'"):
+        rust_passes.pauli_graph_resynthesis(circuit._inner, parallel_mode="on")
+
+    assert _count_hadamards(circuit.to_python().modules[0]) == 2
