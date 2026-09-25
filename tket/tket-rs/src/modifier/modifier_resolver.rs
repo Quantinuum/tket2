@@ -325,9 +325,14 @@ pub struct ModifierResolver<N = Node> {
     call_map: HashMap<N, Vec<(Node, IncomingPort)>>,
     /// Original functions for which the resolver generated modified replacements.
     modified_functions: HashSet<N>,
+    /// Reserved or completed implementations keyed by original function and the
+    /// full modifier, including the control-array layout.
+    /// Entries are inserted before transforming bodies so recursive calls can
+    /// reference the function currently being generated.
+    modified_impls: HashMap<(N, CombinedModifier), N>,
     /// Cached adapters from the resolver's controls-first ABI to custom controls-last functions.
     custom_adapters: HashMap<(N, N, CombinedModifier), N>,
-    /// Analyzer used to find qubits in types. Used to check when a type carries quantum data.
+    /// Analyser used to find qubits in types. Used to check when a type carries quantum data.
     qubit_finder: TypeUnpacker,
     /// Indicate whether the extension op being modified is targeted by some
     /// StateOrder edge.
@@ -344,6 +349,7 @@ impl<N> ModifierResolver<N> {
             worklist: VecDeque::default(),
             call_map: HashMap::default(),
             modified_functions: HashSet::default(),
+            modified_impls: HashMap::default(),
             custom_adapters: HashMap::default(),
             qubit_finder: TypeUnpacker::for_qubits(),
             insert_state_order_edges: false,

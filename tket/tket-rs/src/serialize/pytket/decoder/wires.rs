@@ -1005,36 +1005,19 @@ impl WireTracker {
                     LoadedParameter::rotation(wire)
                 }
                 PytketParam::InputVariable { name } => {
-                    // Special case for the name "pi": inserts a constant definition instead.
-                    match (name, type_hint) {
-                        ("pi", Some(ParameterType::FloatHalfTurns))
-                        | ("pi", Some(ParameterType::FloatRadians)) => {
-                            let value: Value = ConstF64::new(std::f64::consts::PI).into();
-                            let wire = hugr.add_load_const(value);
-                            LoadedParameter::float_half_turns(wire)
+                    // Look it up in the input parameters to the circuit, and add a new float input if needed.
+                    *input_params.entry(name.to_string()).or_insert_with(|| {
+                        param_vars.insert(name.to_string());
+                        match unused_param_inputs.pop_front() {
+                            Some(loaded) => loaded,
+                            None => {
+                                let wire = hugr
+                                    .add_input(rotation_type())
+                                    .expect("Must be building a FuncDefn or a DFG");
+                                LoadedParameter::rotation(wire)
+                            }
                         }
-                        ("pi", _) => {
-                            let value: Value =
-                                ConstRotation::new(std::f64::consts::PI).unwrap().into();
-                            let wire = hugr.add_load_const(value);
-                            LoadedParameter::rotation(wire)
-                        }
-                        _ => {
-                            // Look it up in the input parameters to the circuit, and add a new float input if needed.
-                            *input_params.entry(name.to_string()).or_insert_with(|| {
-                                param_vars.insert(name.to_string());
-                                match unused_param_inputs.pop_front() {
-                                    Some(loaded) => loaded,
-                                    None => {
-                                        let wire = hugr
-                                            .add_input(rotation_type())
-                                            .expect("Must be building a FuncDefn or a DFG");
-                                        LoadedParameter::rotation(wire)
-                                    }
-                                }
-                            })
-                        }
-                    }
+                    })
                 }
                 PytketParam::Operation { op, args, param_ty } => {
                     // We assume all operations take float inputs.

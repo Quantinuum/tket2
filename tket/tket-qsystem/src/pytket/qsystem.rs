@@ -22,7 +22,7 @@ use crate::extension::qsystem::{
     sol::{RuntimeBarrierDef as SolRuntimeBarrierDef, SolOp},
 };
 
-/// Encoder/decoder for the native qsystem operations, parametrised by platform.
+/// Encoder/decoder for the native qsystem operations, parameterized by platform.
 #[derive(Debug, Clone)]
 pub struct QSystemEmitter(pub QSystemPlatform);
 

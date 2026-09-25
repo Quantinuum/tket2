@@ -83,7 +83,7 @@ impl<'h> PytketDecoderContext<'h> {
     ///
     /// # Arguments
     ///
-    /// - `serialcirc`: The serialised circuit to decode.
+    /// - `serialcirc`: The serialized circuit to decode.
     /// - `hugr`: The [`Hugr`] to define the new function in.
     /// - `target`: The target to insert the decoded circuit into.
     /// - `options`: The options for the decoder.
@@ -172,7 +172,7 @@ impl<'h> PytketDecoderContext<'h> {
         Ok(decoder)
     }
 
-    /// Store the serialised circuit information as HUGR metadata,
+    /// Store the serialized circuit information as HUGR metadata,
     /// so it can be reused later when re-encoding the circuit.
     fn init_metadata(dfg: &mut DFGBuilder<&mut Hugr>, serialcirc: &SerialCircuit) {
         // Metadata. The circuit requires "name", and we store other things that
@@ -662,11 +662,7 @@ impl<'h> PytketDecoderContext<'h> {
             .map(|param| PytketParam::parse(param))
             .for_each(|param| {
                 param.visit_input_variables(&mut |name| {
-                    // TODO: Avoid hardcoding this here by treating `pi` as a constant name in the parser.
-                    // See https://github.com/Quantinuum/tket2/issues/1900
-                    if name != "pi" {
-                        params.insert(name.to_owned());
-                    }
+                    params.insert(name.to_owned());
                 });
             });
 

@@ -1,8 +1,19 @@
 # Welcome to the tket development guide <!-- omit in toc -->
 
-This guide is intended to help you get started with developing tket.
+This guide explains how to develop and test tket and pg-libs.
 
 If you find any errors or omissions in this document, please [open an issue](https://github.com/quantinuum/tket2/issues/new)!
+
+## 🗺️ Repository structure
+
+The projects in this repo are split in two main categories. The `tket/`
+directory contains the main tket compiler libraries, both python and rust, and
+related tools. In turn, the `pg-libs/` directory contains the Pauli-graph
+intermediate representation definition and subcrates. `pg-libs` is an
+independent optimization engine that can be called as a pass from `tket`.
+
+All rust and python libraries share global workspaces defined in `Cargo.toml` and
+`pyproject.toml` respectively.
 
 ## #️⃣ Setting up the development environment
 
@@ -89,7 +100,7 @@ For bash/zsh this includes:
 If you want to use the `tket` python library directly from the repository, you can build it with:
 
 ```bash
-just build
+just tket/build
 ```
 
 This will build the python wheels and make them available in the `target/wheels` folder.
@@ -102,19 +113,30 @@ For this you must have `maturin` installed (you can install it with `pip install
 maturin develop
 ```
 
+Plain Cargo commands like `cargo build` select some default `tket` libraries, as listed in
+`default-members`. Use `-p 'tk-pg-*'` to target pg-libs, or `--workspace --exclude 'tk-pg-*'`
+for all tket crates.
+
 ## 🏃 Running the tests
 
 To compile and test the code, run:
 
 ```bash
 just test
-# or, to test only the rust code or the python code
+# test only the rust code or the python code
 just test-rust
 just test-python
+# to test one project
+just tket/test
+just pg-libs/test
 ```
 
 The `tket` and `pg-libs` directories have independent justfiles with their own sets of commands.
 Run `just tket/help` and `just pg-libs/help` to see all commands.
+
+Pg-libs tests use stable features and include the Python worker integration
+tests. To test its nightly-only SIMD features, run
+`just pg-libs/test-rust-nightly`.
 
 ## 💅 Coding Style
 
@@ -130,7 +152,16 @@ We also use various linters to catch common mistakes and enforce best practices.
 
 ```bash
 just check
+# or, to check one project or language
+just tket/check
+just pg-libs/check
+just check-rust
+just check-python
 ```
+
+These commands check formatting, compilation, lints, types, and Rust documentation.
+Run `just check-pre-commit` for all pre-commit hooks, including tests and
+repository hygiene checks.
 
 To quickly fix common issues, run:
 
@@ -223,6 +254,18 @@ Rust releases are managed by `release-plz`. This tool will automatically detect
 breaking changes even when they are not marked as such in the commit message,
 and bump the version accordingly.
 
+Rust releases have two independent release PRs:
+
+- `release-plz-tket.toml` manages `tket` and `tket-qsystem`, with titles beginning
+  `chore(tket): release` and branches beginning `release-plz-tket-`.
+- `release-plz-pg-libs.toml` manages the publishable pg-libs crates, with titles
+  beginning `chore(pg-libs): release` and branches beginning `release-plz-pg-libs-`.
+  The `pg-ir-kernels-tests` harness is excluded.
+
+The release workflow uses the same group configuration for preparing the PR
+and publishing after it merges. For local commands, select the appropriate release group
+with `--config release-plz-<group>.toml`.
+
 To modify the version being released, update the `Cargo.toml`,
 `CHANGELOG.md`, PR name, and PR description in the release PR with the desired version. You may also have to update the dates.
 Rust pre-release versions should be formatted as `0.1.0-alpha.1` (or `-beta`, or `-rc`).
@@ -252,7 +295,7 @@ You can use [`release-plz`](https://release-plz.ieni.dev/) to automatically gene
 # If you have cargo-semver-checks installed,
 # release-plz will ensure your changes don't break the semver rules.
 cargo install cargo-semver-checks --locked
-# Analyze the new comments to generate the changelogs / bump the versions
+# Analyse the new comments to generate the changelogs / bump the versions
 release-plz update
 ```
 
@@ -287,7 +330,7 @@ For historical reasons, the repository hosting this project is called `tket2`.
 
 `pytket` / `tket` (a.k.a. `tket1`) was the first version of the tket library, written in C++ and Python.
 `TKET2` was the grounds-up rewrite of the compiler, based on the HUGR IR and aimed at
-optimising quantum programs with complex classical control flow, type generics, etc.
+optimizing quantum programs with complex classical control flow, type generics, etc.
 
 For simplicity, the `tket2` libraries were renamed to `tket`. Throughout the
 project we refer to the new codebase as _tket_, while the old codebase is

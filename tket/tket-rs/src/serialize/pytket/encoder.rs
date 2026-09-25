@@ -1311,7 +1311,7 @@ enum CachedEncodedFunction {
     /// Successfully encoded function.
     #[expect(unused)]
     Encoded {
-        /// The serialised circuit for the function.
+        /// The serialized circuit for the function.
         serial_circuit: SerialCircuit,
     },
     /// Unsupported function

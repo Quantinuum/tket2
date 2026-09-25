@@ -80,7 +80,7 @@ impl Debug for MetadataPropagationRule {
 ///
 /// By default, a container which replaces a node retains the original node's metadata,
 /// and the descendants of the new container receive no metadata. This policy allows passes to
-/// adjust that behavior in two ways:
+/// adjust that behaviour in two ways:
 ///     1) Metadata may be added to child nodes based on the original node's metadata.
 ///     2) Metadata may be removed by key from the replacement container node.
 ///
@@ -280,7 +280,7 @@ mod test {
     }
 
     /// Builds a `ReplaceTypes` configured to lower `PackedVec`/`read` using a
-    /// caller-supplied template factory for the parametrised `read` op. Used to
+    /// caller-supplied template factory for the parameterized `read` op. Used to
     /// share the boilerplate across the three propagation tests that need
     /// different `NodeTemplate` variants.
     fn build_lw_with_read_template<F>(ext: &Arc<Extension>, template_for_read: F) -> ReplaceTypes

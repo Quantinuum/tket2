@@ -1,0 +1,30 @@
+[package]
+name = "tk-pg-bitpacked"
+version = "0.1.0"
+description = "Clifford conjugation kernels for packed Pauli representations"
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
+readme = "README.md"
+documentation = "https://docs.rs/tk-pg-bitpacked"
+homepage = { workspace = true }
+repository = { workspace = true }
+keywords = { workspace = true }
+categories = { workspace = true }
+
+[features]
+default = []
+unstable_simd = []
+
+[dependencies]
+tk-pg-core = { path = "../../tk-pg-core", version = "0.1.0" }
+approx_eq = "0.1.8"
+rand = { workspace = true }
+
+
+[dev-dependencies]
+tk-pg-converter = { path = "../../pg-converters/tk-pg-converter", version = "0.1.0" }
+rstest = { workspace = true }
+
+[lints]
+workspace = true

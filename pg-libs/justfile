@@ -2,38 +2,61 @@
 help:
     @just --list --justfile "{{justfile()}}"
 
-# Currently pg-libs and the rest of the repo are separated workspaces.
-# We need to unset UV_PROJECT_ENVIRONMENT and VIRTUAL_ENV to avoid uv using the root python environment.
+# Rust nightly toolchain version used across the justfiles
+nightly_toolchain := `just --justfile ../justfile --evaluate nightly_toolchain`
+
+# Install only pg-libs' tools and test dependencies in the shared environment.
 sync-uv:
-    env -u UV_PROJECT_ENVIRONMENT -u VIRTUAL_ENV uv sync
+    uv sync --only-group pg-libs --inexact
 
-test-rust:
-    cargo test --workspace
+# Run pg-libs tests, including the Python worker integration tests.
+test: test-rust
 
-# When using the devenv shell, start it with the nightly profile,
-# and the toolchain does not need to be specified explicitly.
-test-rust-all-features_nix:
-    cargo test --workspace --all-features
+# Build and open the facade and dependency API documentation.
+doc-rust:
+    cargo doc -p tk-pg-libs --open
 
-test-rust-all-features:
-    cargo +nightly-2025-09-14 test --workspace --all-features
+# Run pg-libs Rust tests with stable features.
+[positional-arguments]
+test-rust *TEST_ARGS:
+    uv run --only-group pg-libs cargo test -p 'tk-pg-*' "$@"
+
+# Check pg-libs' Rust and Python code.
+check: check-rust check-python
+
+# Check formatting, compilation, lints, and docs with stable features.
+check-rust:
+    cargo fmt -p tk-pg-libs -p tk-pg-core -p tk-pg-converter -p tk-pg-bitpacked -p tk-pg-ir-kernels -p tk-pg-utils -p tk-pg-canonical-form -p tk-pg-optimize -p tk-pg-greedy-synth -p tk-pg-rebase -p tk-pg-qm-tableau -- --check
+    cargo check -p 'tk-pg-*' --all-targets
+    cargo clippy -p 'tk-pg-*' --all-targets -- -D warnings
+    RUSTDOCFLAGS=-Dwarnings cargo +stable doc -p 'tk-pg-*' --no-deps
+
+# Check formatting, lints, and types for pg-libs' Python tooling.
+check-python:
+    uv run --only-group pg-libs ruff format --check .
+    uv run --only-group pg-libs ruff check .
+    uv run --only-group pg-libs mypy .
+
+# Run all Rust features, including SIMD, with the pinned nightly toolchain.
+test-rust-nightly:
+    uv run --only-group pg-libs cargo +{{nightly_toolchain}} test -p 'tk-pg-*' --all-features
 
 fix:
     just fix-rust
     just fix-python
 
 fix-rust:
-    cargo +nightly-2025-09-14 clippy --all-targets --all-features --workspace --fix --allow-staged --allow-dirty
+    cargo +{{nightly_toolchain}} clippy --all-targets --all-features -p 'tk-pg-*' --fix --allow-staged --allow-dirty
 
 fix-python:
-    env -u UV_PROJECT_ENVIRONMENT -u VIRTUAL_ENV uv run ruff check --fix
+    uv run --only-group pg-libs ruff check --fix .
 
 format:
     just format-rust
     just format-python
 
 format-rust:
-    cargo fmt
+    cargo fmt --all
 
 format-python:
-    env -u UV_PROJECT_ENVIRONMENT -u VIRTUAL_ENV uv run ruff format
+    uv run --only-group pg-libs ruff format .

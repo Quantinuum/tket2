@@ -1,4 +1,4 @@
-//! Passes for optimising circuits.
+//! Passes for optimizing circuits.
 
 pub mod chunks;
 mod inline_funcs;
@@ -93,9 +93,9 @@ create_py_exception!(
     "Errors from the QSystem pre-LLVM pass."
 );
 
-/// Flatten the structure of a Guppy-generated program to enable additional optimisations.
+/// Flatten the structure of a Guppy-generated program to enable additional optimizations.
 ///
-/// This should normally be called first before other optimisations.
+/// This should normally be called first before other optimizations.
 ///
 /// Parameters:
 /// - resolve_modifiers: Whether to resolve modifier operations.
@@ -151,18 +151,18 @@ fn greedy_depth_reduce(circ: &mut CompilationState) -> PyResult<u32> {
     Ok(n_moves)
 }
 
-/// Badger optimisation pass.
+/// Badger optimization pass.
 ///
-/// HyperTKET's best attempt at optimising a circuit using circuit rewriting
-/// and the given Badger optimiser.
+/// HyperTKET's best attempt at optimizing a circuit using circuit rewriting
+/// and the given Badger optimizer.
 ///
 /// Will use at most `max_threads` threads (plus a constant). Defaults to the
 /// number of CPUs available.
 ///
-/// The optimisation will terminate at the first of the following timeout
+/// The optimization will terminate at the first of the following timeout
 /// criteria, if set:
 /// - `timeout` seconds (default: 15min) have elapsed since the start of the
-///    optimisation
+///    optimization
 /// - `progress_timeout` (default: None) seconds have elapsed since progress
 ///    in the cost function was last made
 /// - `max_circuit_count` (default: None) circuits have been explored.

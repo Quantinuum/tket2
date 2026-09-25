@@ -1995,7 +1995,7 @@ fn test_propagate_not_parametrized() -> Result<(), Box<dyn std::error::Error>> {
 #[case::variant_without_parameter_use_no_children(0)]
 #[case::variant_without_parameter_use_with_children(1)]
 #[case::variant_with_parameter_use(2)]
-/// Test that values with datatypes that are parametrized sumtypes, where the used variants don't/do
+/// Test that values with datatypes that are parameterized sumtypes, where the used variants don't/do
 /// use parameters or have child values, are/aren't propagated by constant folding
 fn test_propagate_parametrized_sum_type(
     #[case] variant: usize,

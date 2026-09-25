@@ -1,0 +1,18 @@
+[package]
+name = "tk-pg-utils"
+version = "0.1.0"
+description = "Shared utilities for the pg-libs crates"
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
+readme = "README.md"
+documentation = "https://docs.rs/tk-pg-utils"
+homepage = { workspace = true }
+repository = { workspace = true }
+keywords = { workspace = true }
+categories = { workspace = true }
+
+[dependencies]
+
+[lints]
+workspace = true

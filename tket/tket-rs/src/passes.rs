@@ -1,4 +1,4 @@
-//! Optimisation passes and related utilities for HUGR programs.
+//! Optimization passes and related utilities for HUGR programs.
 
 /// Compiler passes and utilities for composing them.
 pub mod composable;
