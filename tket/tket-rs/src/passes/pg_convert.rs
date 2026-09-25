@@ -566,6 +566,25 @@ fn op_to_cmd(op: &Op, register_map: &RegisterMap) -> Result<Vec<Command<String>>
                         opgroup: None,
                     }])
                 }
+                GateType::BlackBox => {
+                    let content = data.get_data().as_deref().ok_or_else(|| {
+                        ConversionError::UnsupportedBlackBox(
+                            "Missing black-box payload".to_owned(),
+                        )
+                    })?;
+
+                    let barrier_content: BarrierContent = serde_json::from_str(content)
+                        .map_err(|_| ConversionError::UnsupportedBlackBox(content.to_owned()))?;
+
+                    let mut op = Operation::from_optype(OpType::Barrier);
+                    op.data = barrier_content.op_data;
+
+                    Ok(vec![Command {
+                        op,
+                        args: barrier_content.args,
+                        opgroup: None,
+                    }])
+                }
                 _ => Err(ConversionError::UnsupportedGate(
                     data.get_gate_type().clone(),
                 )),
