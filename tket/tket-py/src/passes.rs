@@ -34,7 +34,7 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     m.add_class::<self::chunks::PyCircuitChunks>()?;
     m.add_function(wrap_pyfunction!(self::chunks::chunks, &m)?)?;
     m.add_function(wrap_pyfunction!(self::tket1::tket1_pass, &m)?)?;
-    m.add_function(wrap_pyfunction!(greedy_resynth, &m)?)?;
+    m.add_function(wrap_pyfunction!(pauli_graph_resynthesis, &m)?)?;
     m.add_function(wrap_pyfunction!(resolve_modifiers, &m)?)?;
     m.add_function(wrap_pyfunction!(qsystem::qsystem_rebase_pass, &m)?)?;
     m.add_function(wrap_pyfunction!(qsystem::qsystem_llvm_pass, &m)?)?;
@@ -44,6 +44,10 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
         py.get_type::<PyInlineFunctionsError>(),
     )?;
     m.add("TK1PassError", py.get_type::<tket1::PytketPassError>())?;
+    m.add(
+        "PauliGraphResynthesisError",
+        py.get_type::<PauliGraphResynthesisError>(),
+    )?;
     Ok(m)
 }
 
@@ -66,9 +70,9 @@ create_py_exception!(
 );
 
 create_py_exception!(
-    tket::passes::greedy_resynth::GreedyResynthErrors,
-    GreedyResynthError,
-    "Errors from the greedy resynth pass."
+    tket::passes::pauli_graph_resynthesis::PauliGraphResynthesisErrors,
+    PauliGraphResynthesisError,
+    "Errors from the Pauli graph resynthesis pass."
 );
 
 create_py_exception!(
@@ -238,18 +242,20 @@ fn resolve_modifiers(circ: &mut CompilationState, scope: Option<PyPassScope>) ->
     Ok(())
 }
 
-fn parse_parallel_mode(s: &str) -> Option<pg_greedy_synth::ParallelMode> {
+fn parse_parallel_mode(s: &str) -> PyResult<pg_greedy_synth::ParallelMode> {
     match s.trim() {
-        "Auto" => Some(pg_greedy_synth::ParallelMode::Auto),
-        "On" => Some(pg_greedy_synth::ParallelMode::On),
-        "Off" => Some(pg_greedy_synth::ParallelMode::Off),
-        _ => None,
+        "Auto" => Ok(pg_greedy_synth::ParallelMode::Auto),
+        "On" => Ok(pg_greedy_synth::ParallelMode::On),
+        "Off" => Ok(pg_greedy_synth::ParallelMode::Off),
+        _ => Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "Invalid parallel_mode {s:?}; expected 'Auto', 'On', or 'Off'"
+        ))),
     }
 }
 
 #[pyfunction]
 #[pyo3(signature = (circ, scope = None, window_size=None, pool_size=None, top_up_size=None, seed=None, parallel_mode=None))]
-fn greedy_resynth(
+fn pauli_graph_resynthesis(
     circ: &mut CompilationState,
     scope: Option<PyPassScope>,
     window_size: Option<usize>,
@@ -259,7 +265,7 @@ fn greedy_resynth(
     parallel_mode: Option<String>,
 ) -> PyResult<()> {
     let py_scope = scope.unwrap_or_default();
-    let mut pass = tket::passes::GreedyResynthPass::default_with_scope(py_scope.scope);
+    let mut pass = tket::passes::PauliGraphResynthesis::default_with_scope(py_scope.scope);
     if let Some(ws) = window_size {
         pass = pass.with_window_size(ws);
     }
@@ -273,7 +279,9 @@ fn greedy_resynth(
         pass = pass.with_seed(s as u64);
     }
     let parallel_mode = parallel_mode
-        .and_then(|s| parse_parallel_mode(&s))
+        .as_deref()
+        .map(parse_parallel_mode)
+        .transpose()?
         .unwrap_or(pg_greedy_synth::ParallelMode::Auto);
     pass = pass.with_parallel_mode(parallel_mode);
 

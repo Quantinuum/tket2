@@ -20,6 +20,9 @@ class CircuitChunks:
 class PullForwardError(Exception):
     """Error from a `PullForward` operation."""
 
+class PauliGraphResynthesisError(Exception):
+    """Error from the Pauli graph resynthesis pass."""
+
 # ruff: ignore[B008]
 def normalize_guppy(
     circ: CompilationState,
@@ -102,18 +105,31 @@ def tket1_pass(
       Defaults to the platform-agnostic ``"tket"`` target.
     """
 
-def greedy_resynth(
+def pauli_graph_resynthesis(
     circ: CompilationState,
     scope: PassScope = GlobalScope.PRESERVE_PUBLIC,
     window_size: int | None = None,
     pool_size: int | None = None,
     top_up_size: int | None = None,
     seed: int | None = None,
-    parallel_mode: str = "auto",
+    parallel_mode: str | None = None,
 ) -> None:
-    """Applies GreedyResynth to optimize a hugr.
-
+    """
+    Resynthesizes a Clifford + T circuit by converting it to a Pauli graph and applying various
+    optimisation techniques such as:
+    - phase folding
+    - a synthesis algorithm from pauli graph to Clifford + T aimed at reducing the number of 2
+    qubit gates
     Parameters:
+    - window_size: Sets the size of the sliding window used for lookahead during synthesis.
+    - pool_size: Sets the number of candidate gates to maintain in the pool.
+    - top_up_size: Sets the number of candidate gates to add after each TQE gate.
+    - seed: Sets the random seed used to sample candidate gates.
+    - parallel_mode: One of "Auto", "On", or "Off" (case-sensitive).
+      Omitted or None selects "Auto". Invalid strings raise ValueError.
+
+    Raises:
+        PauliGraphResynthesisError: If the resynthesis pass fails.
     """
 
 def resolve_modifiers(

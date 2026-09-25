@@ -14,8 +14,8 @@ pub use borrow_squash::BorrowSquashPass;
 pub mod commutation;
 pub use commutation::apply_greedy_commutation;
 
-pub mod greedy_resynth;
-pub use greedy_resynth::GreedyResynthPass;
+pub mod pauli_graph_resynthesis;
+pub use pauli_graph_resynthesis::PauliGraphResynthesis;
 
 pub mod pg_convert;
 

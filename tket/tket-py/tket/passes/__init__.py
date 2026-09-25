@@ -30,18 +30,27 @@ if TYPE_CHECKING:
 
 __all__ = [
     "Cliffordize",
-    "GreedyResynthPass",
     "InlineFuncsHeuristic",
     "InlineFunctions",
     "ModifierResolverPass",
     "Normalize",
     "NormalizeGuppy",
+    "ParallelMode",
     "PassResult",
+    "PauliGraphResynthesis",
     "PlatformTarget",
     "PytketHugrPass",
     "QSystemRebasePass",
     "_QSystemLLVMPass",
 ]
+
+
+class ParallelMode(Enum):
+    """Parallel processing mode for Pauli graph resynthesis."""
+
+    Auto = "Auto"  # Let synthesis choose when to use parallel processing.
+    On = "On"  # Enable parallel processing.
+    Off = "Off"  # Disable parallel processing.
 
 
 class PlatformTarget(Enum):
@@ -507,21 +516,40 @@ class QSystemRebasePass(ComposablePass):
 
 
 @dataclass
-class GreedyResynthPass(ComposablePass):
-    """Resynthesise a circuit using greedy resynth.
-    Converts the circuit into a Pauli Graph and uses GreedyResynth to synthesize the pauli graph.
+class PauliGraphResynthesis(ComposablePass):
+    """
+    An optimisation pass that resynthesizes a Clifford + T circuit by converting it to a Pauli Graph
+    and applying various optimisation techniques such as:
+    - phase folding
+    - a synthesis algorithm from Pauli Graph to Clifford + T aimed at reducing the number of 2
+    qubit gates
     Parameters:
-    - ancilla_budget: The number of ancilla qubits to use.
+    - window_size: Sets the size of the sliding window used for lookahead during synthesis.
+    - pool_size: Sets the number of candidate gates to maintain in the pool.
+    - top_up_size: Sets the number of candidate gates to add after each TQE gate.
+    - seed: Sets the random seed used to sample candidate gates.
+    - parallel_mode: A :class:`ParallelMode` for candidate synthesis.
+      Defaults to :attr:`ParallelMode.Auto`.
     """
 
     window_size: int | None = None
     pool_size: int | None = None
     top_up_size: int | None = None
     seed: int | None = None
-    parallel_mode: str = "auto"
+    parallel_mode: ParallelMode = ParallelMode.Auto
     _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
 
-    def with_scope(self, scope: PassScope) -> GreedyResynthPass:
+    def __post_init__(self) -> None:
+        self._validate_parallel_mode()
+
+    def _validate_parallel_mode(self) -> None:
+        if not isinstance(self.parallel_mode, ParallelMode):
+            raise TypeError(
+                "parallel_mode must be a ParallelMode: "
+                "ParallelMode.Auto, ParallelMode.On, or ParallelMode.Off"
+            )
+
+    def with_scope(self, scope: PassScope) -> PauliGraphResynthesis:
         """Set the scope of this pass and return self."""
         self._scope = scope
         return self
@@ -531,19 +559,20 @@ class GreedyResynthPass(ComposablePass):
             self,
             hugr=hugr,
             inplace=inplace,
-            copy_call=lambda h: self._greedy_resynth(h, inplace),
+            copy_call=lambda h: self._pauli_graph_resynthesis(h, inplace),
         )
 
-    def _greedy_resynth(self, hugr: Hugr, inplace: bool) -> PassResult:
+    def _pauli_graph_resynthesis(self, hugr: Hugr, inplace: bool) -> PassResult:
+        self._validate_parallel_mode()
         program = _state.CompilationState.from_python(hugr)
-        _passes.greedy_resynth(
+        _passes.pauli_graph_resynthesis(
             program._inner,
             scope=self._scope,
             window_size=self.window_size,
             pool_size=self.pool_size,
             top_up_size=self.top_up_size,
             seed=self.seed,
-            parallel_mode=self.parallel_mode,
+            parallel_mode=self.parallel_mode.value,
         )
         package = program.to_python()
         return PassResult.for_pass(

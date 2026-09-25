@@ -1,7 +1,7 @@
 //! Conversion utilities between serial circuits and Pauli graphs.
 //!
 //! Provides [`RegisterMap`], [`serial_circuit_to_pauli_graph`] and
-//! [`pauli_graph_to_cmds`] utilities required for passes that resynthesise
+//! [`pauli_graph_to_cmds`] utilities required for passes that resynthesize
 //! a circuit using a [`PauliGraph`]
 
 use pg_core::{BlackBoxData, GateData, GateType, Op, PauliGraph};
@@ -256,6 +256,9 @@ fn cmd_to_op(
         }]),
         OpType::Measure => Ok(vec![Op::Gate {
             data: GateData::new(GateType::Measure, vec![qubits[0], bits[0]]),
+        }]),
+        OpType::Reset => Ok(vec![Op::Gate {
+            data: GateData::new(GateType::Reset, qubits),
         }]),
         // Currently, pg-lib blackboxes support specifying the qubits they act on, but not the bits.
         // To prevent a blackbox which acts on bits from being incorrectly reordered during optimisation,
@@ -552,6 +555,14 @@ fn op_to_cmd(op: &Op, register_map: &RegisterMap) -> Result<Vec<Command<String>>
                     Ok(vec![Command {
                         op: Operation::from_optype(OpType::Measure),
                         args: vec![qubit, bit],
+                        opgroup: None,
+                    }])
+                }
+                GateType::Reset => {
+                    let qubit = register_map.get_qubit_id(args[0])?;
+                    Ok(vec![Command {
+                        op: Operation::from_optype(OpType::Reset),
+                        args: vec![qubit],
                         opgroup: None,
                     }])
                 }
