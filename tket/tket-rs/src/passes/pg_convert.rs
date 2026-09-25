@@ -568,9 +568,7 @@ fn op_to_cmd(op: &Op, register_map: &RegisterMap) -> Result<Vec<Command<String>>
                 }
                 GateType::BlackBox => {
                     let content = data.get_data().as_deref().ok_or_else(|| {
-                        ConversionError::UnsupportedBlackBox(
-                            "Missing black-box payload".to_owned(),
-                        )
+                        ConversionError::UnsupportedBlackBox("Missing black-box payload".to_owned())
                     })?;
 
                     let barrier_content: BarrierContent = serde_json::from_str(content)
