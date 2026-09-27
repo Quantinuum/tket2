@@ -32,6 +32,8 @@ pub use dead_funcs::{RemoveDeadFuncsError, RemoveDeadFuncsPass};
 // Force a topological order on nodes.
 pub mod force_order;
 
+pub mod gating_path;
+
 // Normalize the structure of programs.
 pub mod normalize;
 pub use normalize::Normalize;
