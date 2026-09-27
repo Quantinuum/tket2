@@ -1,6 +1,6 @@
 //! Analysis of Control-Flow Graphs using dominator-strong components decomposition
 use itertools::Itertools;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::iter;
 
 use hugr::core::HugrNode;
@@ -36,6 +36,21 @@ pub struct DomTreeNode<N, LOOP> {
 
 /// A [DomTreeNode] representing a loop as the [GatingPath] back to the loop header.
 type DomTreeWithBackedges<N> = DomTreeNode<N, GatingPath<N>>;
+
+impl<N: HugrNode, LOOP> DomTreeNode<N, LOOP> {
+    fn disconnect(&mut self, doms: &[N]) -> (GatingPath<N>, Self) {
+        for (child_idx, (child_path, child)) in self.children.iter_mut().enumerate() {
+            if child.node == doms[0] {
+                if doms.len() == 1 {
+                    return self.children.remove(child_idx);
+                }
+                let (ep, dtn) = child.disconnect(&doms[1..]);
+                return (child_path.concat(&ep), dtn);
+            }
+        }
+        panic!("Node not found in children");
+    }
+}
 
 impl <N: HugrNode> DomTreeWithBackedges<N> {
     /// Builds a dominator tree for the given control flow graph (CFG).
@@ -161,6 +176,22 @@ impl <N: HugrNode> DomTreeWithBackedges<N> {
         assert_eq!(doms.root(), node_map.to_portgraph(entry));
         build(&hugr, &doms, entry, &node_map)
     }
+}
+
+fn loop_blocks<H: HugrView>(
+    hugr: &H,
+    loop_header: H::Node,
+    backedges: &GatingPath<H::Node>,
+) -> HashSet<H::Node> {
+    let mut blocks = HashSet::new();
+    let mut queue = VecDeque::from_iter(backedges.leaves(hugr).into_iter().map(|lp| lp.src.0));
+    while let Some(n) = queue.pop_front() {
+        if n == loop_header || !blocks.insert(n) {
+            continue;
+        }
+        queue.extend(hugr.input_neighbours(n));
+    }
+    blocks
 }
 
 fn compute_dominators<H: HugrView>(
