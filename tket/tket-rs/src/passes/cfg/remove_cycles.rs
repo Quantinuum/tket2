@@ -93,8 +93,8 @@ pub fn nest_loop<H: HugrMut>(
             .into_iter()
             .map(|ch| nest_loop(ch, hugr))
             .collect(),
-        |_, _, (src, outport)| {
-            assert!(hugr.single_linked_input(src, outport).unwrap().0 != loop_node);
+        |_, lp| {
+            assert_ne!(lp.tgt, loop_node);
             false
         },
         hugr,
