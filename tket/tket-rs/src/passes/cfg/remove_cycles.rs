@@ -4,7 +4,7 @@ use hugr::HugrView;
 use hugr::hugr::hugrmut::HugrMut;
 use hugr::ops::{CFG, DataflowBlock, ExitBlock, TailLoop};
 use hugr::types::{Signature, Type, TypeRow};
-use std::collections::{HashSet, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
 use super::gating_path::{DomTreeNode, DomTreeWithBackedges, GatingPath};
 
@@ -18,7 +18,7 @@ pub fn nest_loop<H: HugrMut>(
     dtn: DomTreeWithBackedges<H::Node>,
     hugr: &mut H,
 ) -> DomTreeNode<H::Node, InnerTailLoop<H::Node>> {
-    let Some(backedges) = dtn.loop_ else {
+    let Some(backedges) = dtn.loop_.as_ref() else {
         return DomTreeNode {
             node: dtn.node,
             children: dtn
@@ -31,48 +31,55 @@ pub fn nest_loop<H: HugrMut>(
         };
     };
     let loop_blocks = loop_blocks(hugr, dtn.node, &backedges);
-    let mut in_loop_children = Vec::new();
-    let mut out_of_loop_children = Vec::new();
-    for (cp, cn) in dtn.children {
-        let (in_loop, out_of_loop) = cn.detach(hugr, &loop_blocks);
-        if let Some(in_loop) = in_loop {
-            in_loop_children.push((cp, in_loop));
-        }
-        out_of_loop_children.extend(out_of_loop);
-    }
+    let (loop_dtn, out_of_loop, exit_targets) = dtn.detach(hugr, &loop_blocks);
+    let loop_dtn = loop_dtn.unwrap(); // header is in loop!!
+    let exit_targets = BTreeMap::from_iter(exit_targets);
 
-    let exit_type_rows = out_of_loop_children
-        .iter()
+    let exit_type_rows = exit_targets
+        .keys()
         .map(|n| {
-            hugr.get_optype(n.node)
+            hugr.get_optype(*n)
                 .as_dataflow_block()
                 .unwrap()
                 .inputs
                 .clone()
         })
         .collect::<Vec<_>>();
+    let exit_tags: HashMap<H::Node, usize> = exit_targets
+        .keys()
+        .enumerate()
+        .map(|(i, k)| (*k, i))
+        .collect();
+
+    // TODO add BBs doing Tags for each exit_target, positioned according to LCA (as vec)
+    // Any "exit edges" representing jumps to said tags also need recomputing.
+    // And we need to position tag_exit (could do according to loop_dtn.exit_edges, if properly computed)
+    // and tag_continue (could do according to loop_dtn.loop_ backedges) in loop_dtn's Dom Tree,
+    // along with the ExitBlock.
 
     let [inner_cfg, loop_node, tag_continue, tag_exit] =
-        make_inner_cfg(hugr, dtn.node, exit_type_rows);
+        make_inner_cfg(hugr, loop_dtn.node, exit_type_rows);
     for &n in &loop_blocks {
         hugr.set_parent(n, inner_cfg);
         for succ_port in hugr.node_outputs(n).collect::<Vec<_>>() {
             let (succ, _) = hugr.single_linked_input(n, succ_port).unwrap();
-            if succ == dtn.node {
+            if succ == loop_dtn.node {
                 //loop backedge
                 hugr.disconnect(n, succ_port);
                 hugr.connect(n, succ_port, tag_continue, 0);
             } else if !loop_blocks.contains(&succ) {
                 hugr.disconnect(n, succ_port);
+                let tag = *exit_tags.get(&succ).unwrap();
+                // TODO insert tag? Or tag block? exit_targets.values() does give LCA of tag block
                 hugr.connect(n, succ_port, tag_exit, 0);
             }
         }
     }
 
-    for (pred_n, outport) in hugr.all_linked_outputs(dtn.node).collect::<Vec<_>>() {
+    for (pred_n, outport) in hugr.all_linked_outputs(loop_dtn.node).collect::<Vec<_>>() {
         assert_eq!(
             hugr.single_linked_input(pred_n, outport),
-            Some((dtn.node, 0.into()))
+            Some((loop_dtn.node, 0.into()))
         );
         hugr.disconnect(pred_n, outport);
         assert!(!loop_blocks.contains(&pred_n)); // loop predecessors disconnected above
@@ -81,24 +88,24 @@ pub fn nest_loop<H: HugrMut>(
 
     DomTreeNode {
         node: loop_node,
-        // TODO we need also to include edges that exitted both the loop and the header's dom tree.
-        // these do not produce "children" here but instead add to exit_edges.
-        children: out_of_loop_children
+        children: out_of_loop
             .into_iter()
-            .enumerate()
-            .map(|(exit_num, n)| {
+            .map(|ch| {
+                let exit_num = *exit_tags.get(&ch.node).unwrap();
                 (
                     GatingPath::Always(loop_node, exit_num.into()),
-                    nest_loop(n, hugr),
+                    nest_loop(ch, hugr),
                 )
             })
             .collect(),
-        // TODO no recompute here. Old exit edges could include edges directly from the loop,
-        // these are now edges from the new header (loop_node)
+        // TODO no recompute here, from child exit_edges and own outgoing edges.
+        // (Any edges exitting the inner loop have been turned into outports of the containing
+        // block regardless of target)
         exit_edges: dtn.exit_edges,
         loop_: Some(InnerTailLoop(Box::new(DomTreeNode {
-            node: dtn.node,
-            children: in_loop_children
+            node: loop_dtn.node,
+            children: loop_dtn
+                .children
                 .into_iter()
                 .map(|(cp, cn)| (cp, nest_loop(cn, hugr)))
                 .collect(),

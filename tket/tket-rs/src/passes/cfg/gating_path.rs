@@ -37,21 +37,6 @@ pub struct DomTreeNode<N, LOOP> {
 /// A [DomTreeNode] representing a loop as the [GatingPath] back to the loop header.
 pub type DomTreeWithBackedges<N> = DomTreeNode<N, GatingPath<N>>;
 
-impl<N: HugrNode, LOOP> DomTreeNode<N, LOOP> {
-    fn disconnect(&mut self, doms: &[N]) -> (GatingPath<N>, Self) {
-        for (child_idx, (child_path, child)) in self.children.iter_mut().enumerate() {
-            if child.node == doms[0] {
-                if doms.len() == 1 {
-                    return self.children.remove(child_idx);
-                }
-                let (ep, dtn) = child.disconnect(&doms[1..]);
-                return (child_path.concat(&ep), dtn);
-            }
-        }
-        panic!("Node not found in children");
-    }
-}
-
 impl<N: HugrNode> DomTreeWithBackedges<N> {
     /// Builds a dominator tree for the given control flow graph (CFG).
     pub fn new_for_cfg(hugr: &impl HugrView<Node = N>, cfg: N) -> Self {
@@ -177,13 +162,22 @@ impl<N: HugrNode> DomTreeWithBackedges<N> {
         build(&hugr, &doms, entry, &node_map)
     }
 
+    /// Return values are:
+    /// * `Option<Self>`: The remaining part of the current node after detaching the
+    ///   non-loop blocks.
+    /// * `Vec<Self>`: The subtrees that were detached as being outside the loop
+    /// * `HashMap<N, Vec<N>>`: A mapping, from each node that is destination of a loop-exit
+    ///   edge, to a representation of the LCA in the dominator tree of all such edges,
+    ///   given as a list of dominators starting from `self` and moving down the dominator
+    ///   tree one node at a time until the LCA is reached.
     pub(super) fn detach<H: HugrView<Node = N>>(
         self,
         hugr: &H,
         loop_blocks: &HashSet<N>,
-    ) -> (Option<Self>, Vec<Self>) {
+    ) -> (Option<Self>, Vec<Self>, HashMap<N, Vec<N>>) {
         if !loop_blocks.contains(&self.node) {
-            return (None, vec![self]);
+            let n = self.node;
+            return (None, vec![self], HashMap::from([(n, vec![])]));
         }
         // TODO need to consider exit_edges here as well as children. If these exit the loop,
         // - in the inner loop, they'll go to tag_exit and then the inner ExitBlock;
@@ -192,12 +186,26 @@ impl<N: HugrNode> DomTreeWithBackedges<N> {
         //   to add to the *outer* block's DomTreeNode (as exit edges directly from the outer block i.e. the header).
         let mut remaining_children = Vec::new();
         let mut detached = Vec::new();
+        let mut exit_targets = HashMap::new();
         for (gp, ch) in self.children {
-            let (ch, ch_detached) = ch.detach(hugr, loop_blocks);
+            let (ch, ch_detached, ch_exit_targets) = ch.detach(hugr, loop_blocks);
             if let Some(ch) = ch {
                 remaining_children.push((gp, ch));
             }
             detached.extend(ch_detached);
+            for (k, mut v) in ch_exit_targets {
+                match exit_targets.entry(k) {
+                    Entry::Occupied(occupied_entry) => *occupied_entry.into_mut() = vec![self.node],
+                    Entry::Vacant(vacant_entry) => {
+                        v.insert(0, self.node);
+                        vacant_entry.insert(v);
+                    }
+                }
+            }
+        }
+        for lp in leaves(&self.exit_edges, hugr) {
+            // Override any existing entry as self.node is LCA.
+            exit_targets.insert(lp.tgt, vec![self.node]);
         }
         (
             Some(DomTreeNode {
@@ -207,6 +215,7 @@ impl<N: HugrNode> DomTreeWithBackedges<N> {
                 loop_: self.loop_,           // we have not detached the backedges
             }),
             detached,
+            exit_targets,
         )
     }
 }
