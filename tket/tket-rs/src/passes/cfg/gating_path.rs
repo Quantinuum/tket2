@@ -34,10 +34,106 @@ pub struct DomTreeNode<N, LOOP> {
     pub loop_: Option<LOOP>,
 }
 
+impl<N: HugrNode, LOOP> DomTreeNode<N, LOOP> {
+    /// Make a new instance by combining the children (provided in topsort order)
+    /// `loop_fn` updates the [DomTreeNode::loop_] with an exit path, returning `true`
+    /// if it did so, or `false` if the exit path was not part of the loop and should be
+    ///  recorded as an exit edge of the parent instance being created.
+    pub(super) fn new(
+        node: N,
+        children: Vec<Self>,
+        loop_fn: impl Fn(&mut Option<LOOP>, &GatingPath<N>, (N, OutgoingPort)) -> bool,
+        hugr: &impl HugrView<Node = N>,
+    ) -> Self {
+        let child_blocks: HashSet<N> = children.iter().map(|c| c.node).collect();
+        let mut child_paths = HashMap::<N, GatingPath<N>>::new();
+        let mut loop_: Option<LOOP> = None;
+        let mut exit_edges: Option<GatingPath<N>> = None;
+        // Process edges from this node (perhaps a loop header)
+        let path = hugr
+            .node_outputs(node)
+            .exactly_one()
+            .ok()
+            .map(|p| GatingPath::Always(node, p));
+        let outports = hugr.node_outputs(node).collect::<Vec<_>>();
+        for outport in &outports {
+            let path = path
+                .clone()
+                .unwrap_or(GatingPath::branch(node, *outport, outports.len()));
+            // Control Flow outports should have exactly one outgoing edge
+            let (tgt, _) = hugr.single_linked_input(node.into(), *outport).unwrap();
+            if child_blocks.contains(&tgt) {
+                child_paths
+                    .entry(tgt)
+                    .and_modify(|p| p.union(&path))
+                    .or_insert_with(|| path.clone());
+            } else if !loop_fn(&mut loop_, &path, (node, *outport)) {
+                union_opt(&mut exit_edges, &path)
+            }
+        }
+
+        // Now process children in the determined order
+        let children = children
+            .into_iter()
+            .map(|child_dtn| {
+                let path_to_child = child_paths.remove(&child_dtn.node).unwrap();
+                let child_exit_leaves = leaves(&child_dtn.exit_edges, hugr);
+                for lp in child_exit_leaves {
+                    let path_from_child_to_exit: GatingPath<N> = lp.clone().into();
+                    let path_to_exit = path_to_child.concat(&path_from_child_to_exit);
+                    /*assert!(
+                        // if dst has no dominator, dst is the entry node
+                        doms.immediate_dominator(node_map.to_portgraph(lp.tgt))
+                            .is_none_or(|tgt_dom|
+                        //otherwise, tgt_dom must be ni or some dominator thereof
+                        // (i.e. tgt is a sibling of an nonstrict-ancestor of ni).
+                    doms.dominators(ni).unwrap().contains(&tgt_dom))
+                    );*/
+                    if child_blocks.contains(&lp.tgt) {
+                        child_paths
+                            .entry(lp.tgt)
+                            .and_modify(|p| p.union(&path_to_exit))
+                            .or_insert_with(|| path_to_exit.clone());
+                    } else if !loop_fn(&mut loop_, &path_to_exit, lp.src) {
+                        union_opt(&mut exit_edges, &path_to_exit);
+                    }
+                }
+                (path_to_child, child_dtn)
+            })
+            .collect();
+
+        DomTreeNode {
+            node,
+            children,
+            exit_edges,
+            loop_,
+        }
+    }
+}
+
 /// A [DomTreeNode] representing a loop as the [GatingPath] back to the loop header.
 pub type DomTreeWithBackedges<N> = DomTreeNode<N, GatingPath<N>>;
 
 impl<N: HugrNode> DomTreeWithBackedges<N> {
+    /// Creates a new instance as per [DomTreeNode::new], updating the [DomTreeNode::loop_]
+    /// with gating paths that target the loop header.
+    fn new_with_children(node: N, children: Vec<Self>, hugr: &impl HugrView<Node = N>) -> Self {
+        Self::new(
+            node,
+            children,
+            |loop_, child_exit_path, (src_node, outport)| {
+                let (tgt, _) = hugr.single_linked_input(src_node, outport).unwrap();
+                if tgt == node {
+                    union_opt(loop_, &child_exit_path);
+                    true
+                } else {
+                    false
+                }
+            },
+            hugr,
+        )
+    }
+
     /// Builds a dominator tree for the given control flow graph (CFG).
     pub fn new_for_cfg(hugr: &impl HugrView<Node = N>, cfg: N) -> Self {
         fn rev_sort<N: HugrNode>(
@@ -62,43 +158,12 @@ impl<N: HugrNode> DomTreeWithBackedges<N> {
             node_map: &H::RegionPortgraphNodes,
         ) -> DomTreeWithBackedges<H::Node> {
             let ni = node_map.to_portgraph(n);
-            let children_by_bb = doms
+            let mut children_by_bb = doms
                 .immediately_dominated_by(ni)
                 .map(|c| build(hugr, doms, node_map.from_portgraph(c), node_map))
                 .map(|c| (c.node, c))
                 .collect::<HashMap<_, _>>();
-            let mut exit_edges: Option<GatingPath<H::Node>> = None;
-            let mut loop_backedges: Option<GatingPath<H::Node>> = None;
 
-            let mut child_paths = HashMap::<H::Node, GatingPath<H::Node>>::new();
-            // Process edges from this node (perhaps a loop header)
-            let path = hugr
-                .node_outputs(n.into())
-                .exactly_one()
-                .ok()
-                .map(|p| GatingPath::Always(n, p));
-            let outports = hugr.node_outputs(n.into()).collect::<Vec<_>>();
-            for outport in &outports {
-                let path = path
-                    .clone()
-                    .unwrap_or(GatingPath::branch(n, *outport, outports.len()));
-                // Control Flow outports should have exactly one outgoing edge
-                let (tgt, _) = hugr
-                    .linked_inputs(n.into(), *outport)
-                    .exactly_one()
-                    .ok()
-                    .unwrap();
-                if children_by_bb.contains_key(&tgt) {
-                    child_paths
-                        .entry(tgt)
-                        .and_modify(|p| p.union(&path))
-                        .or_insert_with(|| path.clone());
-                } else if tgt == n {
-                    union_opt(&mut loop_backedges, &path);
-                } else {
-                    union_opt(&mut exit_edges, &path)
-                }
-            }
             // We want to process children in reverse topsort order: any child C1 with an exit edge to C2, must be processed *before* C2.
             let mut ordered_children = Vec::new();
 
@@ -114,46 +179,14 @@ impl<N: HugrNode> DomTreeWithBackedges<N> {
             // This means targets of exit edges will be processed *after* all the sources of said exit edges:
             ordered_children.reverse();
 
-            // Now process children in the determined order
-            let mut children_by_bb = children_by_bb;
-            let children = ordered_children
-                .into_iter()
-                .map(|child| {
-                    let path_to_child = child_paths.remove(&child).unwrap();
-                    let child_dtn = children_by_bb.remove(&child).unwrap();
-                    let child_exit_leaves = leaves(&child_dtn.exit_edges, hugr);
-                    for lp in child_exit_leaves {
-                        let path_from_child_to_exit: GatingPath<H::Node> = lp.clone().into();
-                        let path_to_exit = path_to_child.concat(&path_from_child_to_exit);
-                        assert!(
-                            // if dst has no dominator, dst is the entry node
-                            doms.immediate_dominator(node_map.to_portgraph(lp.tgt))
-                                .is_none_or(|tgt_dom|
-                            //otherwise, tgt_dom must be ni or some dominator thereof
-                            // (i.e. tgt is a sibling of an nonstrict-ancestor of ni).
-                        doms.dominators(ni).unwrap().contains(&tgt_dom))
-                        );
-                        if children_by_bb.contains_key(&lp.tgt) {
-                            child_paths
-                                .entry(lp.tgt)
-                                .and_modify(|p| p.union(&path_to_exit))
-                                .or_insert_with(|| path_to_exit.clone());
-                        } else if lp.tgt == n {
-                            union_opt(&mut loop_backedges, &path_to_exit);
-                        } else {
-                            union_opt(&mut exit_edges, &path_to_exit);
-                        }
-                    }
-                    (path_to_child, child_dtn)
-                })
-                .collect();
-
-            DomTreeNode {
-                node: n,
-                children,
-                exit_edges,
-                loop_: loop_backedges,
-            }
+            DomTreeWithBackedges::<H::Node>::new_with_children(
+                n,
+                ordered_children
+                    .into_iter()
+                    .map(|n| children_by_bb.remove(&n).unwrap())
+                    .collect(),
+                hugr,
+            )
         }
 
         let (doms, node_map) = compute_dominators(hugr, cfg);

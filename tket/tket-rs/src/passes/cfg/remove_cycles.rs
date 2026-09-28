@@ -87,33 +87,30 @@ pub fn nest_loop<H: HugrMut>(
         hugr.connect(pred_n, outport, loop_node, 0);
     }
 
-    DomTreeNode {
-        node: loop_node,
-        children: out_of_loop
+    let mut dtn = DomTreeNode::<H::Node, InnerTailLoop<H::Node>>::new(
+        loop_node,
+        out_of_loop
             .into_iter()
-            .map(|ch| {
-                let exit_num = *exit_tags.get(&ch.node).unwrap();
-                (
-                    GatingPath::Always(loop_node, exit_num.into()),
-                    nest_loop(ch, hugr),
-                )
-            })
+            .map(|ch| nest_loop(ch, hugr))
             .collect(),
-        // TODO no recompute here, from child exit_edges and own outgoing edges.
-        // (Any edges exitting the inner loop have been turned into outports of the containing
-        // block regardless of target)
-        exit_edges: dtn.exit_edges,
-        loop_: Some(InnerTailLoop(Box::new(DomTreeNode {
-            node: loop_dtn.node,
-            children: loop_dtn
-                .children
-                .into_iter()
-                .map(|(cp, cn)| (cp, nest_loop(cn, hugr)))
-                .collect(),
-            exit_edges: None, // every node in inner CFG is dominated by the header, including the ExitBlock
-            loop_: None,
-        }))),
-    }
+        |_, _, (src, outport)| {
+            assert!(hugr.single_linked_input(src, outport).unwrap().0 != loop_node);
+            false
+        },
+        hugr,
+    );
+
+    dtn.loop_ = Some(InnerTailLoop(Box::new(DomTreeNode {
+        node: loop_dtn.node,
+        children: loop_dtn
+            .children
+            .into_iter()
+            .map(|(cp, cn)| (cp, nest_loop(cn, hugr)))
+            .collect(),
+        exit_edges: None, // every node in inner CFG is dominated by the header, including the ExitBlock
+        loop_: None,
+    })));
+    dtn
 }
 
 fn loop_blocks<H: HugrView>(
