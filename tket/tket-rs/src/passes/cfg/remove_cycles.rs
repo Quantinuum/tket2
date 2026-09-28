@@ -2,8 +2,9 @@
 
 use hugr::HugrView;
 use hugr::hugr::hugrmut::HugrMut;
-use hugr::ops::{CFG, DataflowBlock, ExitBlock, TailLoop};
+use hugr::ops::{CFG, DataflowBlock, ExitBlock, Input, OpTrait, OpType, Output, Tag, TailLoop};
 use hugr::types::{Signature, Type, TypeRow};
+use itertools::Itertools;
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
 use super::gating_path::{DomTreeNode, DomTreeWithBackedges, GatingPath};
@@ -154,7 +155,8 @@ fn make_inner_cfg<H: HugrMut>(
     let exit_sum_row = TypeRow::from([Type::new_sum(exit_type_rows.clone())]);
 
     let outer_cfg = hugr.get_parent(old_loop_node).unwrap();
-    let loop_node = hugr.add_node_with_parent(
+    let [loop_node, l_in, l_out] = create_with_io(
+        hugr,
         outer_cfg,
         DataflowBlock {
             inputs: header_inputs.clone(),
@@ -162,22 +164,33 @@ fn make_inner_cfg<H: HugrMut>(
             sum_rows: exit_type_rows.clone(),
         },
     );
-    let tail_loop = hugr.add_node_with_parent(
+    let [tail_loop, t_in, t_out] = create_with_io(
+        hugr,
         loop_node,
         TailLoop {
             just_inputs: header_inputs.clone(),
             just_outputs: exit_sum_row.clone(),
             rest: TypeRow::new(),
         },
-    ); // TODO and wire up (loop_node needs input/output first)
-    let exit_or_continue_row =
-        TypeRow::from([Type::new_sum([header_inputs.clone(), exit_sum_row.clone()])]);
+    );
+    wire_all(hugr, l_in, tail_loop);
+    wire_all(hugr, tail_loop, l_out);
+    let exit_or_continue_rows = BTreeMap::from([
+        (TailLoop::CONTINUE_TAG, header_inputs.clone()),
+        (TailLoop::BREAK_TAG, exit_sum_row.clone()),
+    ])
+    .into_values()
+    .collect_array::<2>()
+    .unwrap();
+    let exit_or_continue_row = TypeRow::from([Type::new_sum(exit_or_continue_rows.clone())]);
     let inner_cfg = hugr.add_node_with_parent(
         tail_loop,
         CFG {
             signature: Signature::new(header_inputs.clone(), exit_or_continue_row.clone()),
         },
-    ); // TODO and wire up (tail_loop needs input/output first)
+    );
+    wire_all(hugr, t_in, inner_cfg);
+    wire_all(hugr, inner_cfg, t_out);
     hugr.set_parent(old_loop_node, inner_cfg);
     let exit_block = hugr.add_node_with_parent(
         inner_cfg,
@@ -186,7 +199,8 @@ fn make_inner_cfg<H: HugrMut>(
         },
     );
 
-    let tag_continue = hugr.add_node_with_parent(
+    let [continue_block, c_i, c_o] = create_with_io(
+        hugr,
         inner_cfg,
         DataflowBlock {
             inputs: header_inputs.clone(),
@@ -194,8 +208,14 @@ fn make_inner_cfg<H: HugrMut>(
             sum_rows: vec![exit_or_continue_row.clone()],
         },
     );
-    // TODO add and wire up tag_continue's children
-    let tag_exit = hugr.add_node_with_parent(
+    let tag_continue = hugr.add_node_with_parent(
+        continue_block,
+        Tag::new(TailLoop::CONTINUE_TAG, exit_or_continue_rows.to_vec()),
+    );
+    wire_all(hugr, c_i, tag_continue);
+    wire_all(hugr, tag_continue, c_o);
+    let [break_block, b_i, b_o] = create_with_io(
+        hugr,
         inner_cfg,
         DataflowBlock {
             inputs: exit_sum_row,
@@ -203,9 +223,37 @@ fn make_inner_cfg<H: HugrMut>(
             sum_rows: vec![exit_or_continue_row.clone()],
         },
     );
-    // TODO add and wire up tag_exit's children
-    hugr.connect(tag_continue, 0, exit_block, 0);
-    hugr.connect(tag_exit, 0, exit_block, 0);
+    let tag_exit = hugr.add_node_with_parent(
+        exit_block,
+        Tag::new(TailLoop::BREAK_TAG, exit_or_continue_rows.to_vec()),
+    );
+    wire_all(hugr, b_i, tag_exit);
+    wire_all(hugr, tag_exit, b_o);
 
-    [loop_node, inner_cfg, tag_continue, tag_exit]
+    hugr.connect(continue_block, 0, exit_block, 0);
+    hugr.connect(break_block, 0, exit_block, 0);
+
+    [loop_node, inner_cfg, continue_block, break_block]
+}
+
+fn create_with_io<H: HugrMut>(
+    h: &mut H,
+    parent: H::Node,
+    op: impl OpTrait + Into<OpType>,
+) -> [H::Node; 3] {
+    let Signature { input, output } = op.dataflow_signature().unwrap().into_owned();
+    let op = op.into();
+
+    let n = h.add_node_with_parent(parent, op);
+    let i = h.add_node_with_parent(n, Input { types: input });
+    let o = h.add_node_with_parent(n, Output { types: output });
+    return [n, i, o];
+}
+
+fn wire_all<H: HugrMut>(h: &mut H, src_node: H::Node, tgt_node: H::Node) {
+    let outports = h.node_outputs(src_node).collect::<Vec<_>>();
+    let inports = h.node_inputs(tgt_node).collect::<Vec<_>>();
+    for (outport, inport) in outports.iter().zip_eq(inports.iter()) {
+        h.connect(src_node, *outport, tgt_node, *inport);
+    }
 }
