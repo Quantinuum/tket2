@@ -217,39 +217,37 @@ impl<N: HugrNode> DomTreeWithBackedges<N> {
         self,
         hugr: &H,
         loop_blocks: &HashSet<N>,
-    ) -> (Option<Self>, Vec<Self>, HashMap<N, Vec<N>>) {
+        post_loop_blocks: &HashMap<N, N>,
+    ) -> (Option<Self>, Vec<Self>) {
         if !loop_blocks.contains(&self.node) {
-            let n = self.node;
-            return (None, vec![self], HashMap::from([(n, vec![])]));
+            let new_subtree = post_loop_blocks.get(&self.node).map(|&node|
+                // Direct edge(s) to dominator subtree outside loop. `node` will
+                // * tag the appropriate destination to which to jump after exitting the loop
+                // * exit the loop
+                Self {
+                    node,
+                    children: Vec::new(),
+                    exit_edges: Some(GatingPath::Always(node, 0.into())),
+                    loop_: None
+                });
+            return (new_subtree, vec![self]);
         }
         let mut remaining_children = Vec::new();
         let mut detached = Vec::new();
-        let mut exit_targets = HashMap::new();
         for (_, ch) in self.children {
-            let (ch, ch_detached, ch_exit_targets) = ch.detach(hugr, loop_blocks);
+            let (ch, ch_detached) = ch.detach(hugr, loop_blocks, post_loop_blocks);
             remaining_children.extend(ch);
             detached.extend(ch_detached);
-            for (k, mut v) in ch_exit_targets {
-                match exit_targets.entry(k) {
-                    Entry::Occupied(occupied_entry) => *occupied_entry.into_mut() = vec![self.node],
-                    Entry::Vacant(vacant_entry) => {
-                        v.insert(0, self.node);
-                        vacant_entry.insert(v);
-                    }
-                }
-            }
         }
-        for lp in leaves(&self.exit_edges, hugr) {
-            // Override any existing entry as self.node is LCA.
-            exit_targets.insert(lp.tgt, vec![self.node]);
-        }
+        // Recompute exit_edges: we must remove any exits from inside a detached dominator tree;
+        // but add any edge to a detached tree itself.
         let in_loop_dtn = Self::new_with_children(self.node, remaining_children, hugr);
         // We have not detached the backedges, so should be the same. (No PartialEq...)
         assert_eq!(
             format!("{:?}", in_loop_dtn.loop_),
             format!("{:?}", self.loop_)
         ); // We have not detached the backedges
-        (Some(in_loop_dtn), detached, exit_targets)
+        (Some(in_loop_dtn), detached)
     }
 }
 
@@ -394,7 +392,10 @@ impl<N: HugrNode> GatingPath<N> {
     }
 }
 
-fn leaves<H: HugrView>(gp: &Option<GatingPath<H::Node>>, hugr: &H) -> Vec<LeafPath<H::Node>> {
+pub(super) fn leaves<H: HugrView>(
+    gp: &Option<GatingPath<H::Node>>,
+    hugr: &H,
+) -> Vec<LeafPath<H::Node>> {
     match gp {
         Some(gp) => gp.leaves(hugr),
         None => Vec::new(),
