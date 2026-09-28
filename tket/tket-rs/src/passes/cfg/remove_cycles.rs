@@ -57,7 +57,7 @@ pub fn nest_loop<H: HugrMut>(
     // and tag_continue (could do according to loop_dtn.loop_ backedges) in loop_dtn's Dom Tree,
     // along with the ExitBlock.
 
-    let [inner_cfg, loop_node, tag_continue, tag_exit] =
+    let [loop_node, inner_cfg, tag_continue, tag_exit] =
         make_inner_cfg(hugr, loop_dtn.node, exit_type_rows);
     for &n in &loop_blocks {
         hugr.set_parent(n, inner_cfg);
@@ -131,6 +131,14 @@ fn loop_blocks<H: HugrView>(
     blocks
 }
 
+/// Makes, inside the parent of `old_loop_node` (parent should be a CFG),
+/// a new basic block, containing a TailLoop, containing a CFG,
+/// into two `old_loop_node` is moved (becoming the entry block).
+///
+/// Return an array, in outside-to-in order, of:
+/// * the new basic block
+/// * the new CFG,
+/// * the `continue` and `exit` tagging nodes (which jump to the CFG's ExitBlock)
 fn make_inner_cfg<H: HugrMut>(
     hugr: &mut H,
     old_loop_node: H::Node,
@@ -199,5 +207,5 @@ fn make_inner_cfg<H: HugrMut>(
     hugr.connect(tag_continue, 0, exit_block, 0);
     hugr.connect(tag_exit, 0, exit_block, 0);
 
-    [inner_cfg, loop_node, tag_continue, tag_exit]
+    [loop_node, inner_cfg, tag_continue, tag_exit]
 }
