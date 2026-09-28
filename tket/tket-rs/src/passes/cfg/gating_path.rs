@@ -1,9 +1,7 @@
 //! Analysis of Control-Flow Graphs using dominator-strong components decomposition
-use hugr::hugr::hugrmut::HugrMut;
-use hugr::ops::{CFG, DataflowBlock, ExitBlock, TailLoop};
-use hugr::types::{Signature, Type, TypeRow};
 use itertools::Itertools;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::hash_map::Entry;
+use std::collections::{HashMap, HashSet};
 use std::iter;
 
 use hugr::core::HugrNode;
@@ -22,26 +20,22 @@ use portgraph::NodeIndex;
 /// * Extra information about loops (according to `LOOP`) - see e.g. [DomTreeWithBackedges]
 pub struct DomTreeNode<N, LOOP> {
     /// The CFG node at the root of this dominator subtree
-    node: N,
+    pub node: N,
     /// In topsort order (each child before any sibling to which the child has an exit edge);
     /// loop back edges from a child subtree back to [Self::node] do not affect topsort order.
-    children: Vec<(GatingPath<N>, DomTreeNode<N, LOOP>)>,
+    pub children: Vec<(GatingPath<N>, DomTreeNode<N, LOOP>)>,
     /// The control flow edges leaving this dominator subtree (i.e. whose
     /// source is within this subtree but whose target is not)
-    exit_edges: Option<GatingPath<N>>,
+    pub exit_edges: Option<GatingPath<N>>,
     /// Information describing any loop for which this is the header.
     /// (In a reducible CFG, loops can only be formed by back edges to the header,
     ///  which dominates all nodes in the loop body; the body being those nodes
     ///  which have a forwards path to the header)
-    loop_: Option<LOOP>,
+    pub loop_: Option<LOOP>,
 }
 
 /// A [DomTreeNode] representing a loop as the [GatingPath] back to the loop header.
-type DomTreeWithBackedges<N> = DomTreeNode<N, GatingPath<N>>;
-
-/// Used as [DomTreeNode::loop_], records information about a CFG within a TailLoop within
-/// the [DomTreeNode::node]
-struct InnerTailLoop<N>(Box<DomTreeNode<N, InnerTailLoop<N>>>);
+pub type DomTreeWithBackedges<N> = DomTreeNode<N, GatingPath<N>>;
 
 impl<N: HugrNode, LOOP> DomTreeNode<N, LOOP> {
     fn disconnect(&mut self, doms: &[N]) -> (GatingPath<N>, Self) {
@@ -57,8 +51,6 @@ impl<N: HugrNode, LOOP> DomTreeNode<N, LOOP> {
         panic!("Node not found in children");
     }
 }
-
-enum Void {}
 
 impl<N: HugrNode> DomTreeWithBackedges<N> {
     /// Builds a dominator tree for the given control flow graph (CFG).
@@ -185,155 +177,7 @@ impl<N: HugrNode> DomTreeWithBackedges<N> {
         build(&hugr, &doms, entry, &node_map)
     }
 
-    fn nest_loop(self, hugr: &mut impl HugrMut<Node = N>) -> DomTreeNode<N, InnerTailLoop<N>> {
-        let Some(backedges) = self.loop_ else {
-            return DomTreeNode {
-                node: self.node,
-                children: self
-                    .children
-                    .into_iter()
-                    .map(|(cp, cn)| (cp, cn.nest_loop(hugr)))
-                    .collect(),
-                exit_edges: self.exit_edges,
-                loop_: None,
-            };
-        };
-        let loop_blocks = loop_blocks(hugr, self.node, &backedges);
-        let mut in_loop_children = Vec::new();
-        let mut out_of_loop_children = Vec::new();
-        for (cp, cn) in self.children {
-            let (in_loop, out_of_loop) = cn.detach(hugr, &loop_blocks);
-            if let Some(in_loop) = in_loop {
-                in_loop_children.push((cp, in_loop));
-            }
-            out_of_loop_children.extend(out_of_loop);
-        }
-        let header_inputs = hugr
-            .get_optype(self.node)
-            .as_dataflow_block()
-            .unwrap()
-            .inputs
-            .clone();
-        let exit_type_rows = out_of_loop_children
-            .iter()
-            .map(|n| {
-                hugr.get_optype(n.node)
-                    .as_dataflow_block()
-                    .unwrap()
-                    .inputs
-                    .clone()
-            })
-            .collect::<Vec<_>>();
-        let outer_cfg = hugr.get_parent(self.node).unwrap();
-        let loop_node = hugr.add_node_with_parent(
-            outer_cfg,
-            DataflowBlock {
-                inputs: header_inputs.clone(),
-                other_outputs: TypeRow::new(),
-                sum_rows: exit_type_rows.clone(),
-            },
-        );
-        // TODO(?) If exit_type_rows of length one, then no need for this, hmmm.
-        let exit_sum_row = TypeRow::from([Type::new_sum(exit_type_rows)]);
-        let tail_loop = hugr.add_node_with_parent(
-            loop_node,
-            TailLoop {
-                just_inputs: header_inputs.clone(),
-                just_outputs: exit_sum_row.clone(),
-                rest: TypeRow::new(),
-            },
-        ); // TODO and wire up (loop_node needs input/output first)
-        let exit_or_continue_row =
-            TypeRow::from([Type::new_sum([header_inputs.clone(), exit_sum_row.clone()])]);
-        let inner_cfg = hugr.add_node_with_parent(
-            tail_loop,
-            CFG {
-                signature: Signature::new(header_inputs.clone(), exit_or_continue_row.clone()),
-            },
-        ); // TODO and wire up (tail_loop needs input/output first)
-        hugr.set_parent(self.node, inner_cfg);
-        let exit_block = hugr.add_node_with_parent(
-            inner_cfg,
-            ExitBlock {
-                cfg_outputs: exit_or_continue_row.clone(),
-            },
-        );
-
-        let tag_continue = hugr.add_node_with_parent(
-            inner_cfg,
-            DataflowBlock {
-                inputs: header_inputs.clone(),
-                other_outputs: TypeRow::new(),
-                sum_rows: vec![exit_or_continue_row.clone()],
-            },
-        );
-        // TODO add and wire up tag_continue's children
-        let tag_exit = hugr.add_node_with_parent(
-            inner_cfg,
-            DataflowBlock {
-                inputs: exit_sum_row,
-                other_outputs: TypeRow::new(),
-                sum_rows: vec![exit_or_continue_row.clone()],
-            },
-        );
-        // TODO add and wire up tag_exit's children
-        hugr.connect(tag_continue, 0, exit_block, 0);
-        hugr.connect(tag_exit, 0, exit_block, 0);
-        for &n in &loop_blocks {
-            hugr.set_parent(n, inner_cfg);
-            for succ_port in hugr.node_outputs(n).collect::<Vec<_>>() {
-                let (succ, _) = hugr.single_linked_input(n, succ_port).unwrap();
-                if succ == self.node {
-                    //loop backedge
-                    hugr.disconnect(n, succ_port);
-                    hugr.connect(n, succ_port, tag_continue, 0);
-                } else if !loop_blocks.contains(&succ) {
-                    hugr.disconnect(n, succ_port);
-                    hugr.connect(n, succ_port, tag_exit, 0);
-                }
-            }
-        }
-
-        for (pred_n, outport) in hugr.all_linked_outputs(self.node).collect::<Vec<_>>() {
-            assert_eq!(
-                hugr.single_linked_input(pred_n, outport),
-                Some((self.node, 0.into()))
-            );
-            hugr.disconnect(pred_n, outport);
-            assert!(!loop_blocks.contains(&pred_n)); // loop predecessors disconnected above
-            hugr.connect(pred_n, outport, loop_node, 0);
-        }
-
-        DomTreeNode {
-            node: loop_node,
-            // TODO we need also to include edges that exitted both the loop and the header's dom tree.
-            // these do not produce "children" here but instead add to exit_edges.
-            children: out_of_loop_children
-                .into_iter()
-                .enumerate()
-                .map(|(exit_num, n)| {
-                    (
-                        GatingPath::Always(loop_node, exit_num.into()),
-                        n.nest_loop(hugr),
-                    )
-                })
-                .collect(),
-            // TODO no recompute here. Old exit edges could include edges directly from the loop,
-            // these are now edges from the new header (loop_node)
-            exit_edges: self.exit_edges,
-            loop_: Some(InnerTailLoop(Box::new(DomTreeNode {
-                node: self.node,
-                children: in_loop_children
-                    .into_iter()
-                    .map(|(cp, cn)| (cp, cn.nest_loop(hugr)))
-                    .collect(),
-                exit_edges: None, // every node in inner CFG is dominated by the header, including the ExitBlock
-                loop_: None,
-            }))),
-        }
-    }
-
-    fn detach<H: HugrView<Node = N>>(
+    pub(super) fn detach<H: HugrView<Node = N>>(
         self,
         hugr: &H,
         loop_blocks: &HashSet<N>,
@@ -367,22 +211,6 @@ impl<N: HugrNode> DomTreeWithBackedges<N> {
     }
 }
 
-fn loop_blocks<H: HugrView>(
-    hugr: &H,
-    loop_header: H::Node,
-    backedges: &GatingPath<H::Node>,
-) -> HashSet<H::Node> {
-    let mut blocks = HashSet::new();
-    let mut queue = VecDeque::from_iter(backedges.leaves(hugr).into_iter().map(|lp| lp.src.0));
-    while let Some(n) = queue.pop_front() {
-        if n == loop_header || !blocks.insert(n) {
-            continue;
-        }
-        queue.extend(hugr.input_neighbours(n));
-    }
-    blocks
-}
-
 fn compute_dominators<H: HugrView>(
     hugr: &H,
     parent: H::Node,
@@ -396,21 +224,23 @@ fn compute_dominators<H: HugrView>(
 /// A collection (0 or more) paths from some given CFG node, within that node's dominator tree.
 /// `None` (rather than a `GatingPath`) represents the empty collection (no paths).
 #[derive(Clone, Debug)]
-enum GatingPath<N> {
-    // Source of an edge leaving the dom tree
+pub enum GatingPath<N> {
+    /// Source of an edge leaving the dominator tree
     Always(N, OutgoingPort),
-    // One element (None if no path via that port) for each outgoing port of the branch node
+    /// One element (None if no path via that port) for each outgoing port of the branch node
     Branch(N, Vec<Option<GatingPath<N>>>),
 }
 
 /// A single path from some given CFG node, stopping at the boundary of its dominator tree.
+///
+/// TODO this may not be required.
 #[derive(Clone, Debug, Default)]
-struct LeafPath<N> {
+pub(super) struct LeafPath<N> {
     /// Previous branches passed through on the way to [Self::src]. The `usize` caches the number of outgoing ports.
     branches: Vec<(N, OutgoingPort, usize)>,
     /// The source node (last node dominated by the start), and the outgoing port
     /// whose edge leaves the dominator tree
-    src: (N, OutgoingPort),
+    pub(super) src: (N, OutgoingPort),
     /// Target of that edge (outside the dominator tree)
     tgt: N,
 }
@@ -467,7 +297,8 @@ impl<N: HugrNode> GatingPath<N> {
         }
     }
 
-    fn leaves(&self, hugr: &impl HugrView<Node = N>) -> Vec<LeafPath<N>> {
+    /// TODO client (remove_cycles) only needs the [LeafPath::src] of each here
+    pub(super) fn leaves(&self, hugr: &impl HugrView<Node = N>) -> Vec<LeafPath<N>> {
         fn traverse<H: HugrView>(
             hugr: &H,
             gp: &GatingPath<H::Node>,
