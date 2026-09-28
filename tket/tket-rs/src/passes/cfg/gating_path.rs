@@ -195,6 +195,10 @@ impl<N: HugrNode> DomTreeWithBackedges<N> {
         build(&hugr, &doms, entry, &node_map)
     }
 
+    /// Detaches any parts of the subtree not containing within `loop_blocks`. (Makes sense
+    /// only if `loop_blocks` is closed under control-flow predecessor relation as far back
+    /// as [Self::node], but should not include non-loop predecessors thereof)
+    ///
     /// Return values are:
     /// * `Option<Self>`: The remaining part of the current node after detaching the
     ///   non-loop blocks.
@@ -212,19 +216,12 @@ impl<N: HugrNode> DomTreeWithBackedges<N> {
             let n = self.node;
             return (None, vec![self], HashMap::from([(n, vec![])]));
         }
-        // TODO need to consider exit_edges here as well as children. If these exit the loop,
-        // - in the inner loop, they'll go to tag_exit and then the inner ExitBlock;
-        //   it's not clear where those will be attached into the dominator tree.
-        // - for the outer (loop-containing node), we need to return the edge source (rather than a child),
-        //   to add to the *outer* block's DomTreeNode (as exit edges directly from the outer block i.e. the header).
         let mut remaining_children = Vec::new();
         let mut detached = Vec::new();
         let mut exit_targets = HashMap::new();
-        for (gp, ch) in self.children {
+        for (_, ch) in self.children {
             let (ch, ch_detached, ch_exit_targets) = ch.detach(hugr, loop_blocks);
-            if let Some(ch) = ch {
-                remaining_children.push((gp, ch));
-            }
+            remaining_children.extend(ch);
             detached.extend(ch_detached);
             for (k, mut v) in ch_exit_targets {
                 match exit_targets.entry(k) {
@@ -240,16 +237,13 @@ impl<N: HugrNode> DomTreeWithBackedges<N> {
             // Override any existing entry as self.node is LCA.
             exit_targets.insert(lp.tgt, vec![self.node]);
         }
-        (
-            Some(DomTreeNode {
-                node: self.node,
-                children: remaining_children,
-                exit_edges: self.exit_edges, // No recompute (?)
-                loop_: self.loop_,           // we have not detached the backedges
-            }),
-            detached,
-            exit_targets,
-        )
+        let in_loop_dtn = Self::new_with_children(self.node, remaining_children, hugr);
+        // We have not detached the backedges, so should be the same. (No PartialEq...)
+        assert_eq!(
+            format!("{:?}", in_loop_dtn.loop_),
+            format!("{:?}", self.loop_)
+        ); // We have not detached the backedges
+        (Some(in_loop_dtn), detached, exit_targets)
     }
 }
 
