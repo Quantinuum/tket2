@@ -124,7 +124,11 @@ pub type DomTreeWithBackedges<N> = DomTreeNode<N, GatingPath<N>>;
 impl<N: HugrNode> DomTreeWithBackedges<N> {
     /// Creates a new instance as per [DomTreeNode::new], updating the [DomTreeNode::loop_]
     /// with gating paths that target the loop header.
-    fn new_with_children(node: N, children: Vec<Self>, hugr: &impl HugrView<Node = N>) -> Self {
+    pub(super) fn new_with_children(
+        node: N,
+        children: Vec<Self>,
+        hugr: &impl HugrView<Node = N>,
+    ) -> Self {
         Self::new(
             node,
             children,
