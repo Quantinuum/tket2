@@ -49,22 +49,31 @@ pub fn synthesize(rotations: &[RotationData], n: usize) -> Synthesis {
         for gate in diagonalize(&mut frame, rotation.get_string()) {
             body.push(Op::Gate { data: gate });
         }
-        let (string, sign_bit) = frame.conjugate_string(rotation.get_string());
-
-        body.push(Op::Rotation {
-            data: RotationData::new(
-                string,
-                if sign_bit {
-                    -rotation.get_angle()
-                } else {
-                    rotation.get_angle()
-                },
-            ),
-        });
+        body.extend(frame.conjugate(&Op::Rotation {
+            data: rotation.clone(),
+        }));
     }
     Synthesis {
         prefix,
         body,
         correction: frame.invert(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_synthesize_rotation_sign() {
+        for (pauli, angle) in [(Pauli::X, 0.25), (Pauli::Y, -0.25), (Pauli::Z, 0.25)] {
+            let synthesis = synthesize(&[RotationData::new(vec![pauli], 0.25)], 1);
+            assert_eq!(
+                synthesis.body,
+                vec![Op::Rotation {
+                    data: RotationData::new(vec![Pauli::Z], angle),
+                }]
+            );
+        }
     }
 }

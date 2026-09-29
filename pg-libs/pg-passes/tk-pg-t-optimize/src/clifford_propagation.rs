@@ -3,7 +3,7 @@ use tk_pg_core::{
     ConditionalBoxData, GateData, GateType, Op, PGPass, Pauli, PauliGraph, RotationData,
     TableauData,
 };
-use tk_pg_ir_kernels::PGTableau;
+use tk_pg_ir_kernels::{PGTableau, get_dagger};
 use tk_pg_qm_tableau::Tableau;
 
 pub fn append_gate(frame: &mut Tableau, gate: &GateData) {
@@ -84,13 +84,9 @@ pub fn push_conditional_x(graph: PauliGraph) -> (PauliGraph, PauliGraph) {
 
 fn push_through(correction: &mut Tableau, op: &Op) {
     match op {
-        Op::Gate { data } => {
-            let mut gate = Tableau::eye(correction.get_n_qubits());
-            append_gate(&mut gate, data);
-            let mut conjugated = gate.invert();
-            conjugated.compose(correction);
-            conjugated.compose(&gate);
-            *correction = conjugated;
+        Op::Gate { .. } => {
+            correction.precompose_op(&get_dagger::<Tableau>(op));
+            correction.postcompose_op(op);
         }
         Op::Rotation { data } => {
             let (p, sign_bit) = correction.conjugate_string(data.get_string());
@@ -143,4 +139,34 @@ pub fn normalize(pg: &PauliGraph) -> (PauliGraph, Tableau) {
         PauliGraph::new(pg.get_n_qubits()).with_ops(ops),
         Tableau::from(data),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_push_through_gate() {
+        for (gate_type, args) in [
+            (GateType::S, vec![0]),
+            (GateType::Sdg, vec![0]),
+            (GateType::ZX, vec![0, 1]),
+            (GateType::ZZ, vec![0, 1]),
+            (GateType::SWAP, vec![0, 1]),
+        ] {
+            let op = Op::Gate {
+                data: GateData::new(gate_type, args),
+            };
+            let mut correction = Tableau::eye(2);
+            append_gate(&mut correction, &GateData::new(GateType::V, vec![0]));
+            let mut expected = correction.clone();
+            expected.postcompose_op(&op);
+
+            push_through(&mut correction, &op);
+            let mut actual = Tableau::eye(2);
+            actual.postcompose_op(&op);
+            actual.compose(&correction);
+            assert_eq!(actual, expected);
+        }
+    }
 }
