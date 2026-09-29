@@ -2,7 +2,7 @@
 
 use hugr::HugrView;
 use hugr::hugr::hugrmut::HugrMut;
-use hugr::ops::{CFG, DataflowBlock, ExitBlock, Input, OpTrait, OpType, Output, Tag, TailLoop};
+use hugr::ops::{CFG, DataflowBlock, ExitBlock, Input, OpParent, OpType, Output, Tag, TailLoop};
 use hugr::types::{Signature, Type, TypeRow};
 use itertools::Itertools;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
@@ -53,11 +53,11 @@ pub fn nest_loop<H: HugrMut>(
     let break_rows = post_loop_blocks
         .keys()
         .map(|n| {
-            hugr.get_optype(*n)
-                .as_dataflow_block()
-                .unwrap()
-                .inputs
-                .clone()
+            TypeRow::from_iter(
+                hugr.get_optype(*n)
+                    .value_input_types()
+                    .map(|(_, t)| t.clone()),
+            )
         })
         .collect::<Vec<_>>();
 
@@ -73,12 +73,11 @@ pub fn nest_loop<H: HugrMut>(
     let break_blocks = post_loop_blocks
         .iter()
         .map(|(&n, &tag)| {
-            let inp_row = hugr
-                .get_optype(n)
-                .as_dataflow_block()
-                .unwrap()
-                .inputs
-                .clone();
+            let inp_row = TypeRow::from_iter(
+                hugr.get_optype(n)
+                    .value_input_types()
+                    .map(|(_, t)| t.clone()),
+            );
             let break_row = TypeRow::from([break_type.clone()]);
             let [bb, i, o] = create_with_io(
                 hugr,
@@ -165,7 +164,7 @@ fn loop_blocks<H: HugrView>(
     let mut blocks = HashSet::new();
     let mut queue = VecDeque::from_iter(backedges.leaves(hugr).into_iter().map(|lp| lp.src.0));
     while let Some(n) = queue.pop_front() {
-        if n == loop_header || !blocks.insert(n) {
+        if !blocks.insert(n) || n == loop_header {
             continue;
         }
         queue.extend(hugr.input_neighbours(n));
@@ -284,13 +283,9 @@ fn make_inner_cfg<H: HugrMut>(
     ]
 }
 
-fn create_with_io<H: HugrMut>(
-    h: &mut H,
-    parent: H::Node,
-    op: impl OpTrait + Into<OpType>,
-) -> [H::Node; 3] {
-    let Signature { input, output } = op.dataflow_signature().unwrap().into_owned();
+fn create_with_io<H: HugrMut>(h: &mut H, parent: H::Node, op: impl Into<OpType>) -> [H::Node; 3] {
     let op = op.into();
+    let Signature { input, output } = op.inner_function_type().unwrap().into_owned();
 
     let n = h.add_node_with_parent(parent, op);
     let i = h.add_node_with_parent(n, Input { types: input });
