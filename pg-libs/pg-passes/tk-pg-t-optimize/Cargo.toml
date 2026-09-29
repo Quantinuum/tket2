@@ -11,6 +11,10 @@ repository = { workspace = true }
 keywords = { workspace = true }
 categories = { workspace = true }
 
+[features]
+default = []
+unstable_simd = []
+
 [dependencies]
 bitvec = "1.0.1"
 tk-pg-core = { path = "../../tk-pg-core", version = "0.1.0" }

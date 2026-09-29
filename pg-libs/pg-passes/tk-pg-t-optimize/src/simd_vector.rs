@@ -1,114 +1,48 @@
-/// A wrapper type to enforce 32-byte alignment for SIMD loads
-#[repr(align(32))]
-struct Lanes([i32; 8]);
+#[cfg(feature = "unstable_simd")]
+use std::simd::Simd;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Block {
-    #[cfg(target_feature = "avx2")]
-    inner: std::arch::x86_64::__m256i,
+    #[cfg(feature = "unstable_simd")]
+    inner: Simd<i32, 8>,
 
-    #[cfg(target_feature = "neon")]
-    inner: [std::arch::aarch64::int32x4_t; 2],
-
-    #[cfg(not(any(target_feature = "avx2", target_feature = "neon")))]
+    #[cfg(not(feature = "unstable_simd"))]
     inner: [i32; 8],
 }
 
 impl Block {
-    #[cfg(target_feature = "neon")]
-    fn constant(a: i32) -> Self {
+    fn load(arr: &[i32; 8]) -> Self {
         Block {
-            inner: unsafe { [std::arch::aarch64::vdupq_n_s32(a); 2] },
+            #[cfg(feature = "unstable_simd")]
+            inner: Simd::from_array(*arr),
+            #[cfg(not(feature = "unstable_simd"))]
+            inner: *arr,
         }
     }
 
-    #[cfg(not(any(target_feature = "avx2", target_feature = "neon")))]
-    fn constant(a: i32) -> Self {
-        Block { inner: [a; 8] }
-    }
-
-    #[cfg(target_feature = "avx2")]
-    fn load(arr: &Lanes) -> Self {
-        Block {
-            inner: unsafe { std::arch::x86_64::_mm256_load_si256(arr.0.as_ptr() as *const _) },
-        }
-    }
-
-    #[cfg(target_feature = "neon")]
-    fn load(arr: &Lanes) -> Self {
-        Block {
-            inner: unsafe {
-                [
-                    std::arch::aarch64::vld1q_s32(&arr.0[0]),
-                    std::arch::aarch64::vld1q_s32(&arr.0[4]),
-                ]
-            },
-        }
-    }
-
-    #[cfg(not(any(target_feature = "avx2", target_feature = "neon")))]
-    fn load(arr: &Lanes) -> Self {
-        Block {
-            inner: arr.0.clone(),
-        }
-    }
-
-    #[cfg(target_feature = "avx2")]
     fn zero() -> Self {
-        Block {
-            inner: unsafe { std::arch::x86_64::_mm256_setzero_si256() },
-        }
+        Self::load(&[0; 8])
     }
 
-    #[cfg(target_feature = "neon")]
-    fn zero() -> Self {
-        Block::constant(0)
-    }
-
-    #[cfg(not(any(target_feature = "avx2", target_feature = "neon")))]
-    fn zero() -> Self {
-        Self::constant(0)
-    }
-
-    #[cfg(target_feature = "avx2")]
     fn extract(&self) -> [i32; 8] {
-        let mut arr = Lanes([0; 8]);
-        unsafe {
-            std::arch::x86_64::_mm256_store_si256(arr.0.as_mut_ptr() as *mut _, self.inner);
+        #[cfg(feature = "unstable_simd")]
+        {
+            self.inner.to_array()
         }
-        arr.0
-    }
-
-    #[cfg(target_feature = "neon")]
-    fn extract(&self) -> [i32; 8] {
-        let mut arr = Lanes([0; 8]);
-        unsafe {
-            std::arch::aarch64::vst1q_s32(arr.0.as_mut_ptr(), self.inner[0]);
-            std::arch::aarch64::vst1q_s32(arr.0.as_mut_ptr().add(4), self.inner[1]);
+        #[cfg(not(feature = "unstable_simd"))]
+        {
+            self.inner
         }
-        arr.0
-    }
-
-    #[cfg(not(any(target_feature = "avx2", target_feature = "neon")))]
-    fn extract(&self) -> [i32; 8] {
-        self.inner
     }
 }
 
 impl std::ops::BitXorAssign for Block {
-    #[cfg(target_feature = "avx2")]
     fn bitxor_assign(&mut self, rhs: Self) {
-        self.inner = unsafe { std::arch::x86_64::_mm256_xor_si256(self.inner, rhs.inner) };
-    }
-
-    #[cfg(target_feature = "neon")]
-    fn bitxor_assign(&mut self, rhs: Self) {
-        self.inner[0] = unsafe { std::arch::aarch64::veorq_s32(self.inner[0], rhs.inner[0]) };
-        self.inner[1] = unsafe { std::arch::aarch64::veorq_s32(self.inner[1], rhs.inner[1]) };
-    }
-
-    #[cfg(not(any(target_feature = "avx2", target_feature = "neon")))]
-    fn bitxor_assign(&mut self, rhs: Self) {
+        #[cfg(feature = "unstable_simd")]
+        {
+            self.inner ^= rhs.inner;
+        }
+        #[cfg(not(feature = "unstable_simd"))]
         for i in 0..8 {
             self.inner[i] ^= rhs.inner[i];
         }
@@ -117,16 +51,11 @@ impl std::ops::BitXorAssign for Block {
 
 impl std::ops::BitAndAssign for Block {
     fn bitand_assign(&mut self, rhs: Self) {
-        #[cfg(target_feature = "avx2")]
+        #[cfg(feature = "unstable_simd")]
         {
-            self.inner = unsafe { std::arch::x86_64::_mm256_and_si256(self.inner, rhs.inner) };
+            self.inner &= rhs.inner;
         }
-        #[cfg(target_feature = "neon")]
-        {
-            self.inner[0] = unsafe { std::arch::aarch64::vandq_s32(self.inner[0], rhs.inner[0]) };
-            self.inner[1] = unsafe { std::arch::aarch64::vandq_s32(self.inner[1], rhs.inner[1]) };
-        }
-        #[cfg(not(any(target_feature = "avx2", target_feature = "neon")))]
+        #[cfg(not(feature = "unstable_simd"))]
         for i in 0..8 {
             self.inner[i] &= rhs.inner[i];
         }
@@ -163,8 +92,8 @@ impl SIMDVector {
         bit = bit % SIMDVector::BLOCK_SIZE;
         let lane_index = bit / SIMDVector::LANE_SIZE;
         bit = bit % SIMDVector::LANE_SIZE;
-        let mut arr = Lanes([0; SIMDVector::LANES]);
-        arr.0[lane_index] ^= 1 << bit;
+        let mut arr = [0; SIMDVector::LANES];
+        arr[lane_index] ^= 1 << bit;
         self.blocks[block_index] ^= Block::load(&arr);
     }
 
@@ -294,8 +223,11 @@ mod tests {
         }
         let mut intersection = a.clone();
         intersection.and(&b);
+        let mut difference = a.clone();
+        difference.xor(&b);
         for q in 0..width {
             assert_eq!(intersection.get(q), q % 21 == 0);
+            assert_eq!(difference.get(q), (q % 3 == 0) ^ (q % 7 == 0));
             let words = a.packed_words();
             assert_eq!(words[q / 32] as u32 & (1 << (q % 32)) != 0, a.get(q));
         }
