@@ -141,20 +141,20 @@ fn separating_kernel(basis: &[Option<SIMDVector>], i: usize, j: usize) -> Option
     difference.flip_bit(i);
     difference.flip_bit(j);
     for (pivot, row) in basis.iter().enumerate() {
-        if difference.get(pivot) {
-            if let Some(row) = row {
-                difference.xor(row);
-            }
+        if difference.get(pivot)
+            && let Some(row) = row
+        {
+            difference.xor(row);
         }
     }
     let free = difference.first_one()?;
     let mut y = SIMDVector::new(basis.len());
     y.flip_bit(free);
     for (pivot, row) in basis.iter().enumerate().rev() {
-        if let Some(row) = row {
-            if row.dot_parity(&y) {
-                y.flip_bit(pivot);
-            }
+        if let Some(row) = row
+            && row.dot_parity(&y)
+        {
+            y.flip_bit(pivot);
         }
     }
     Some(y)
