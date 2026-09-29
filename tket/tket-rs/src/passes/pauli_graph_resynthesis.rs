@@ -1,8 +1,9 @@
 //! Resynthesis of a Clifford + T circuit through a Pauli graph.
 //!
-//! The [`PauliGraphResynthesis`] pass resynthesizes a circuit by converting it to a
-//! Pauli graph, applying the [`GreedySynthPass`], and converting the result
-//! back into a circuit.
+//! The [`PauliGraphResynthesis`] pass optimises a circuit by converting it to a Pauli graph, and applying:
+//! - Phase folding through the [`RotationMergingPass`]
+//! - Optional phase polyomial resynthesis for further T gate reduction through the [`TOptimizationPass`]
+//! - Synthesis the pauli graph as a circuit, aiming to minimize 2 qubit gates through the [`GreedySynthPass`]
 
 use crate::CircuitError;
 use crate::passes::inline_funcs::InlineFuncsError;
@@ -25,20 +26,19 @@ use pg_optimise::{GroupCommutingOpsPass, RotationMergingPass};
 use pg_rebase::RebaseTQEToZXPass;
 use std::sync::Arc;
 
-/// Resynthesize a Clifford + T circuit by converting it to a Pauli graph and applying various
+/// Resynthesize a Clifford + Rz circuit by converting it to a Pauli graph and applying various
 /// optimisation techniques such as:
 /// - phase folding
+/// - optional phase polynomial resynthesis for T gate reduction
 /// - a synthesis algorithm from pauli graph to Clifford + T aimed at reducing the number of 2
 ///   qubit gates
-///
+/// Note: Circuits must be Clifford + T when `t_optimization` is enabled.
 ///
 /// - `window_size` (`Option<usize>`) - Size of the sliding window for lookahead during synthesis. Default to 1280.
 /// - `pool_size` (`Option<usize>`) - Number of candidate gates to maintain in the pool. Default to max(1000, 0.2*N^2) where N is the number of qubits.
 /// - `top_up_size` (`Option<usize>`) - Number of candidates to add after each TQE gate. Default to max(200, pool_size / N) where N is the number of qubits.
 /// - `seed` (`u64`) - Random seed for reproducible candidate sampling. Default to `0`.
 /// - `parallel_mode` (`ParallelMode`) - Configuration for parallel processing of candidates. Default to `ParallelMode::Auto`.
-///
-/// Explicit sizes must be greater than zero. Invalid sizes cause `run` to return
 /// [`PauliGraphResynthesisErrors::InvalidParameters`] before modifying the circuit.
 #[derive(Clone, Debug)]
 pub struct PauliGraphResynthesis {

@@ -428,10 +428,15 @@ fn op_to_cmd(op: &Op, register_map: &RegisterMap) -> Result<Vec<Command<String>>
                             args: vec![qubit],
                             opgroup: None,
                         }]),
-                        angle => Err(ConversionError::UnsupportedRotation {
-                            gate_type: GateType::RX,
-                            angle,
-                        }),
+                        angle => {
+                            let mut op = Operation::from_optype(OpType::Rx);
+                            op.params = Some(vec![angle.to_string()]);
+                            Ok(vec![Command {
+                                op,
+                                args: vec![qubit],
+                                opgroup: None,
+                            }])
+                        }
                     }
                 }
                 GateType::RY => {
@@ -498,10 +503,15 @@ fn op_to_cmd(op: &Op, register_map: &RegisterMap) -> Result<Vec<Command<String>>
                                 opgroup: None,
                             },
                         ]),
-                        angle => Err(ConversionError::UnsupportedRotation {
-                            gate_type: GateType::RY,
-                            angle,
-                        }),
+                        angle => {
+                            let mut op = Operation::from_optype(OpType::Ry);
+                            op.params = Some(vec![angle.to_string()]);
+                            Ok(vec![Command {
+                                op,
+                                args: vec![qubit],
+                                opgroup: None,
+                            }])
+                        }
                     }
                 }
                 GateType::RZ => {
@@ -534,10 +544,15 @@ fn op_to_cmd(op: &Op, register_map: &RegisterMap) -> Result<Vec<Command<String>>
                             args: vec![qubit],
                             opgroup: None,
                         }]),
-                        angle => Err(ConversionError::UnsupportedRotation {
-                            gate_type: GateType::RZ,
-                            angle,
-                        }),
+                        angle => {
+                            let mut op = Operation::from_optype(OpType::Rz);
+                            op.params = Some(vec![angle.to_string()]);
+                            Ok(vec![Command {
+                                op,
+                                args: vec![qubit],
+                                opgroup: None,
+                            }])
+                        }
                     }
                 }
                 GateType::SWAP => {
@@ -1054,24 +1069,26 @@ mod tests {
     }
 
     #[rstest]
-    #[case::rx(GateType::RX, 0.1)]
-    #[case::ry(GateType::RY, 0.1)]
-    #[case::rz(GateType::RZ, 0.1)]
-    #[case::unsupported_clifford_angle(GateType::RY, 0.5)]
-    fn error_on_unsupported_rotation(
+    #[case::rx(GateType::RX, OpType::Rx, 0.1)]
+    #[case::ry(GateType::RY, OpType::Ry, 0.1)]
+    #[case::rz(GateType::RZ, OpType::Rz, 0.1)]
+    #[case::clifford_angle(GateType::RY, OpType::Ry, 0.5)]
+    fn preserves_rotation_angles(
         registers: RegisterMap,
         #[case] gate_type: GateType,
+        #[case] op_type: OpType,
         #[case] angle: f64,
     ) {
-        let graph = PauliGraph::new(3).with_ops(vec![rotation_gate(gate_type.clone(), angle, 0)]);
-        let result = pauli_graph_to_cmds(graph, &registers);
+        let graph = PauliGraph::new(3).with_ops(vec![rotation_gate(gate_type, angle, 0)]);
+        let result = pauli_graph_to_cmds(graph, &registers).unwrap();
 
-        assert!(matches!(
+        assert_eq!(
             result,
-            Err(ConversionError::UnsupportedRotation {
-                gate_type: error_gate,
-                angle: error_angle,
-            }) if error_gate == gate_type && error_angle == angle
-        ));
+            vec![rotation(
+                op_type,
+                &angle.to_string(),
+                vec![registers.get_qubit_id(0).unwrap()]
+            )]
+        );
     }
 }
