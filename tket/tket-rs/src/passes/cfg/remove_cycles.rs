@@ -305,3 +305,55 @@ fn wire_all<H: HugrMut>(h: &mut H, src_node: H::Node, tgt_node: H::Node) {
         h.connect(src_node, *outport, tgt_node, *inport);
     }
 }
+
+#[cfg(test)]
+mod test {
+    use hugr::{Hugr, HugrView, envelope::EnvelopeConfig};
+    use itertools::Itertools;
+    use rstest::rstest;
+    use std::{fs::File, io::BufReader, path::Path};
+
+    use super::nest_loop;
+    use crate::passes::cfg::gating_path::DomTreeWithBackedges;
+
+    #[rstest]
+    #[case("/Users/alanlawrence/repos/tierkreis/doubler.hugr")]
+    #[case("/Users/alanlawrence/repos/tierkreis/doubler_indirect_minopt.hugr")]
+    #[case("/Users/alanlawrence/repos/tierkreis/shortcircuit_if.hugr")]
+    fn non_loop(#[case] fname: impl AsRef<Path>) {
+        let reader = BufReader::new(File::open(fname).unwrap());
+        let backup = Hugr::load(reader, None).unwrap();
+        let mut h = backup.clone();
+        let cfgs = h
+            .nodes()
+            .filter(|n| h.get_optype(*n).is_cfg())
+            .collect_vec();
+        for n in cfgs {
+            let dtn = DomTreeWithBackedges::new_for_cfg(&h, n);
+            nest_loop(dtn, &mut h);
+        }
+        assert_eq!(h, backup); // Did nothing
+    }
+
+    #[rstest]
+    #[case("/Users/alanlawrence/repos/tierkreis/tierkreis_loop.hugr")]
+    fn tierkreis_loop(#[case] fname: impl AsRef<Path>) {
+        let outfile = fname.as_ref().with_added_extension("nested");
+        let reader = BufReader::new(File::open(fname).unwrap());
+        let backup = Hugr::load(reader, None).unwrap();
+        eprintln!("{}", backup.mermaid_string());
+        let mut h = backup.clone();
+        let cfgs = h
+            .nodes()
+            .filter(|n| h.get_optype(*n).is_cfg())
+            .collect_vec();
+        eprintln!("Found {} cfgs", cfgs.len());
+        for n in cfgs {
+            eprintln!("Processing cfg node {}", n);
+            let dtn = DomTreeWithBackedges::new_for_cfg(&h, n);
+            nest_loop(dtn, &mut h);
+        }
+        let f = File::create(outfile).unwrap();
+        h.store(f, EnvelopeConfig::default()).unwrap();
+    }
+}
