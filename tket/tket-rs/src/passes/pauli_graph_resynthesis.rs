@@ -32,6 +32,7 @@ use std::sync::Arc;
 /// - optional phase polynomial resynthesis for T gate reduction
 /// - a synthesis algorithm from pauli graph to Clifford + T aimed at reducing the number of 2
 ///   qubit gates
+///
 /// Note: Circuits must be Clifford + T when `t_optimization` is enabled.
 ///
 /// - `window_size` (`Option<usize>`) - Size of the sliding window for lookahead during synthesis. Default to 1280.
@@ -39,7 +40,6 @@ use std::sync::Arc;
 /// - `top_up_size` (`Option<usize>`) - Number of candidates to add after each TQE gate. Default to max(200, pool_size / N) where N is the number of qubits.
 /// - `seed` (`u64`) - Random seed for reproducible candidate sampling. Default to `0`.
 /// - `parallel_mode` (`ParallelMode`) - Configuration for parallel processing of candidates. Default to `ParallelMode::Auto`.
-/// [`PauliGraphResynthesisErrors::InvalidParameters`] before modifying the circuit.
 #[derive(Clone, Debug)]
 pub struct PauliGraphResynthesis {
     scope: PassScope,
