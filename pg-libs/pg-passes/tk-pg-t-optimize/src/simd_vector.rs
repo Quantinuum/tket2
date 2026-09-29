@@ -225,10 +225,10 @@ mod tests {
         intersection.and(&b);
         let mut difference = a.clone();
         difference.xor(&b);
+        let words = a.packed_words();
         for q in 0..width {
             assert_eq!(intersection.get(q), q % 21 == 0);
             assert_eq!(difference.get(q), (q % 3 == 0) ^ (q % 7 == 0));
-            let words = a.packed_words();
             assert_eq!(words[q / 32] as u32 & (1 << (q % 32)) != 0, a.get(q));
         }
         assert_eq!(
