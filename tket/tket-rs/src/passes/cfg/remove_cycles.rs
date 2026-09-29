@@ -324,7 +324,10 @@ mod test {
     #[rstest]
     #[case("/Users/alanlawrence/repos/tierkreis/tierkreis_loop.hugr")]
     fn tierkreis_loop(#[case] fname: impl AsRef<Path>) {
-        let outfile = fname.as_ref().with_added_extension("nested");
+        use crate::passes::{ComposablePass, Normalize};
+
+        let outfile = fname.as_ref().with_extension("nested.hugr");
+        let outfile_m = fname.as_ref().with_extension("nested.merged.hugr");
         let reader = BufReader::new(File::open(fname).unwrap());
         let backup = Hugr::load(reader, None).unwrap();
         eprintln!("{}", backup.mermaid_string());
@@ -339,7 +342,11 @@ mod test {
             let dtn = DomTreeWithBackedges::new_for_cfg(&h, n);
             nest_loop(dtn, &mut h);
         }
+        h.validate().unwrap();
         let f = File::create(outfile).unwrap();
         h.store(f, EnvelopeConfig::default()).unwrap();
+        Normalize::default().run(&mut h).unwrap();
+        let f_m = File::create(outfile_m).unwrap();
+        h.store(f_m, EnvelopeConfig::default()).unwrap();
     }
 }
