@@ -89,9 +89,9 @@ impl SIMDVector {
 
     pub fn flip_bit(&mut self, mut bit: usize) {
         let block_index = bit / SIMDVector::BLOCK_SIZE;
-        bit = bit % SIMDVector::BLOCK_SIZE;
+        bit %= SIMDVector::BLOCK_SIZE;
         let lane_index = bit / SIMDVector::LANE_SIZE;
-        bit = bit % SIMDVector::LANE_SIZE;
+        bit %= SIMDVector::LANE_SIZE;
         let mut arr = [0; SIMDVector::LANES];
         arr[lane_index] ^= 1 << bit;
         self.blocks[block_index] ^= Block::load(&arr);
@@ -99,9 +99,9 @@ impl SIMDVector {
 
     pub fn get(&self, mut bit: usize) -> bool {
         let block_index = bit / SIMDVector::BLOCK_SIZE;
-        bit = bit % SIMDVector::BLOCK_SIZE;
+        bit %= SIMDVector::BLOCK_SIZE;
         let lane_index = bit / SIMDVector::LANE_SIZE;
-        bit = bit % SIMDVector::LANE_SIZE;
+        bit %= SIMDVector::LANE_SIZE;
         self.extract_block(block_index)[lane_index] & (1 << bit) != 0
     }
 
@@ -150,8 +150,8 @@ impl SIMDVector {
         let mut sum: i32 = 0;
         for block_index in 0..self.blocks.len() {
             let arr = self.extract_block(block_index);
-            for j in 0..8 {
-                sum += arr[j].count_ones() as i32;
+            for word in arr {
+                sum += word.count_ones() as i32;
             }
         }
         sum
