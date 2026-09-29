@@ -12,6 +12,7 @@ release = false
 # Enforce adding the project name in the git tag, to avoid collisions with python.
 git_tag_name = "{{ package }}-v{{ version }}"
 git_release_name = "{{ package }}: v{{ version }}"
+git_release_latest = false
 pr_labels = ["X-release", "A-rust"]
 
 # Publish only after merging a PR whose branch starts with `release-plz-pg-libs-`.
