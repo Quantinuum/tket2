@@ -2,7 +2,9 @@
 
 use hugr::HugrView;
 use hugr::hugr::hugrmut::HugrMut;
-use hugr::ops::{CFG, DataflowBlock, ExitBlock, Input, OpParent, OpType, Output, Tag, TailLoop};
+use hugr::ops::{
+    BasicBlock, CFG, DataflowBlock, ExitBlock, Input, OpParent, OpType, Output, Tag, TailLoop,
+};
 use hugr::types::{Signature, Type, TypeRow};
 use itertools::Itertools;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
@@ -52,46 +54,25 @@ pub fn nest_loop<H: HugrMut>(
 
     let break_rows = post_loop_blocks
         .keys()
-        .map(|n| {
-            TypeRow::from_iter(
-                hugr.get_optype(*n)
-                    .value_input_types()
-                    .map(|(_, t)| t.clone()),
-            )
-        })
+        .map(|n| block_inputs(hugr, *n))
         .collect::<Vec<_>>();
 
-    let [loop_node, inner_cfg, continue_bb, break_bb, exit_block] =
+    let [loop_block, inner_cfg, continue_bb, break_bb, exit_block] =
         make_inner_cfg(hugr, dtn.node, break_rows.clone());
     for block in &loop_blocks {
-        hugr.set_parent(*block, inner_cfg);
+        if block == &dtn.node {
+            assert_eq!(hugr.get_parent(*block), Some(inner_cfg));
+        } else {
+            hugr.set_parent(*block, inner_cfg);
+        }
     }
 
     // For each control-flow edge that exits the loop, make a new BB that exits the loop with a value
     // tagged to indicate which post-loop block to go to, and retarget the edge.
-    let break_row = TypeRow::from([Type::new_sum(break_rows.clone())]);
     let break_blocks = post_loop_blocks
         .iter()
         .map(|(&n, &tag)| {
-            let inp_row = TypeRow::from_iter(
-                hugr.get_optype(n)
-                    .value_input_types()
-                    .map(|(_, t)| t.clone()),
-            );
-            let [bb, i, o] = create_with_io(
-                hugr,
-                inner_cfg,
-                DataflowBlock {
-                    inputs: inp_row,
-                    other_outputs: TypeRow::new(),
-                    sum_rows: vec![break_row.clone()],
-                },
-            );
-            let which_break = hugr.add_node_with_parent(bb, Tag::new(tag, break_rows.clone()));
-            wire_all(hugr, i, which_break);
-            let bb_predicate = hugr.add_node_with_parent(bb, Tag::new(0, vec![break_row.clone()]));
-            hugr.connect(which_break, 0, bb_predicate, 0);
-            hugr.connect(bb_predicate, 0, o, 0);
+            let bb = tag_block(hugr, exit_block, tag, break_rows.clone());
             hugr.connect(bb, 0, break_bb, 0);
             // Disconnect the original control-flow edge from the loop to the post-loop block.
             for (n, p) in hugr.linked_outputs(n, 0).collect::<Vec<_>>() {
@@ -101,6 +82,14 @@ pub fn nest_loop<H: HugrMut>(
             (n, bb)
         })
         .collect::<HashMap<_, _>>();
+    for (outport, tgt) in hugr
+        .node_outputs(loop_block)
+        .zip_eq(post_loop_blocks.keys())
+        .collect::<Vec<_>>()
+    {
+        // tgt is *outside* the loop so in the outer CFG (as is loop_block which contains the inner CFG)
+        hugr.connect(loop_block, outport, *tgt, 0);
+    }
 
     // Any edges that exit the original subtree necessarily exit the loop (as entirely
     // contained within subtree), so the corresponding break-blocks will not be added by detach
@@ -118,18 +107,21 @@ pub fn nest_loop<H: HugrMut>(
 
     // disconnect backedges, reconnect to continue_bb
     for (n, p) in hugr.linked_outputs(loop_dtn.node, 0).collect::<Vec<_>>() {
-        hugr.disconnect(n, p);
-        hugr.connect(n, p, continue_bb, 0);
+        if loop_blocks.contains(&n) {
+            hugr.disconnect(n, p);
+            hugr.connect(n, p, continue_bb, 0);
+        }
     }
 
+    // Build DomTree to return
     let mut dtn = DomTreeNode::<H::Node, InnerTailLoop<H::Node>>::new(
-        loop_node,
+        loop_block,
         out_loop_children
             .into_iter()
             .map(|ch| nest_loop(ch, hugr))
             .collect(),
         |_, lp| {
-            assert_ne!(lp.tgt, loop_node);
+            assert_ne!(lp.tgt, loop_block);
             false
         },
         hugr,
@@ -152,6 +144,16 @@ pub fn nest_loop<H: HugrMut>(
             .collect(),
     });
     dtn
+}
+
+/// Inputs for a control flow [BasicBlock] (DataflowBlock or ExitBlock)
+fn block_inputs<H: HugrView>(hugr: &H, n: H::Node) -> TypeRow {
+    match hugr.get_optype(n) {
+        OpType::DataflowBlock(db) => db.dataflow_input(),
+        OpType::ExitBlock(eb) => eb.dataflow_input(),
+        op => panic!("Expected DataflowBlock/ExitBlock for {n:?}, got: {op:?}"),
+    }
+    .clone()
 }
 
 fn loop_blocks<H: HugrView>(
@@ -193,10 +195,9 @@ fn make_inner_cfg<H: HugrMut>(
     // TODO(?) If exit_type_rows of length one, then no need for this, hmmm.
     let exit_sum_row = TypeRow::from([Type::new_sum(exit_type_rows.clone())]);
 
-    let outer_cfg = hugr.get_parent(old_loop_node).unwrap();
-    let [loop_node, l_in, l_out] = create_with_io(
+    let [loop_block, l_in, l_out] = create_with_io(
         hugr,
-        outer_cfg,
+        old_loop_node,
         DataflowBlock {
             inputs: header_inputs.clone(),
             other_outputs: TypeRow::new(),
@@ -205,7 +206,7 @@ fn make_inner_cfg<H: HugrMut>(
     );
     let [tail_loop, t_in, t_out] = create_with_io(
         hugr,
-        loop_node,
+        l_out,
         TailLoop {
             just_inputs: header_inputs.clone(),
             just_outputs: exit_sum_row.clone(),
@@ -219,8 +220,7 @@ fn make_inner_cfg<H: HugrMut>(
         (TailLoop::BREAK_TAG, exit_sum_row.clone()),
     ])
     .into_values()
-    .collect_array::<2>()
-    .unwrap();
+    .collect::<Vec<_>>();
     let exit_or_continue_row = TypeRow::from([Type::new_sum(exit_or_continue_rows.clone())]);
     let inner_cfg = hugr.add_node_with_parent(
         tail_loop,
@@ -237,43 +237,19 @@ fn make_inner_cfg<H: HugrMut>(
             cfg_outputs: exit_or_continue_row.clone(),
         },
     );
-
-    let [continue_block, c_i, c_o] = create_with_io(
+    let continue_block = tag_block(
         hugr,
-        inner_cfg,
-        DataflowBlock {
-            inputs: header_inputs.clone(),
-            other_outputs: TypeRow::new(),
-            sum_rows: vec![exit_or_continue_row.clone()],
-        },
-    );
-    let tag_continue = hugr.add_node_with_parent(
-        continue_block,
-        Tag::new(TailLoop::CONTINUE_TAG, exit_or_continue_rows.to_vec()),
-    );
-    wire_all(hugr, c_i, tag_continue);
-    wire_all(hugr, tag_continue, c_o);
-    let [break_block, b_i, b_o] = create_with_io(
-        hugr,
-        inner_cfg,
-        DataflowBlock {
-            inputs: exit_sum_row,
-            other_outputs: TypeRow::new(),
-            sum_rows: vec![exit_or_continue_row.clone()],
-        },
-    );
-    let tag_exit = hugr.add_node_with_parent(
         exit_block,
-        Tag::new(TailLoop::BREAK_TAG, exit_or_continue_rows.to_vec()),
+        TailLoop::CONTINUE_TAG,
+        exit_or_continue_rows.clone(),
     );
-    wire_all(hugr, b_i, tag_exit);
-    wire_all(hugr, tag_exit, b_o);
+    let break_block = tag_block(hugr, exit_block, TailLoop::BREAK_TAG, exit_or_continue_rows);
 
     hugr.connect(continue_block, 0, exit_block, 0);
     hugr.connect(break_block, 0, exit_block, 0);
 
     [
-        loop_node,
+        loop_block,
         inner_cfg,
         continue_block,
         break_block,
@@ -281,11 +257,10 @@ fn make_inner_cfg<H: HugrMut>(
     ]
 }
 
-fn create_with_io<H: HugrMut>(h: &mut H, parent: H::Node, op: impl Into<OpType>) -> [H::Node; 3] {
+fn create_with_io<H: HugrMut>(h: &mut H, after: H::Node, op: impl Into<OpType>) -> [H::Node; 3] {
     let op = op.into();
     let Signature { input, output } = op.inner_function_type().unwrap().into_owned();
-
-    let n = h.add_node_with_parent(parent, op);
+    let n = h.add_node_after(after, op);
     let i = h.add_node_with_parent(n, Input { types: input });
     let o = h.add_node_with_parent(n, Output { types: output });
     return [n, i, o];
@@ -297,6 +272,24 @@ fn wire_all<H: HugrMut>(h: &mut H, src_node: H::Node, tgt_node: H::Node) {
     for (outport, inport) in outports.iter().zip_eq(inports.iter()) {
         h.connect(src_node, *outport, tgt_node, *inport);
     }
+}
+
+fn tag_block<H: HugrMut>(hugr: &mut H, after: H::Node, tag: usize, rows: Vec<TypeRow>) -> H::Node {
+    let [bb, i, o] = create_with_io(
+        hugr,
+        after,
+        DataflowBlock {
+            inputs: rows[tag].clone(),
+            other_outputs: TypeRow::from([Type::new_sum(rows.clone())]),
+            sum_rows: vec![TypeRow::new()],
+        },
+    );
+    let pred = hugr.add_node_with_parent(bb, Tag::new(0, vec![TypeRow::new()]));
+    hugr.connect(pred, 0, o, 0);
+    let tag = hugr.add_node_with_parent(bb, Tag::new(tag, rows.clone()));
+    wire_all(hugr, i, tag);
+    hugr.connect(tag, 0, o, 1);
+    bb
 }
 
 #[cfg(test)]
