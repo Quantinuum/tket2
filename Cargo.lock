@@ -1146,7 +1146,7 @@ dependencies = [
 [[package]]
 name = "hugr"
 version = "0.30.2"
-source = "git+https://github.com/quantinuum/hugr?branch=hs%2Ffeat%2Fmath-extension#5170454aa2794eaec6ed2a8840fc14cb7a5dd2b4"
+source = "git+https://github.com/quantinuum/hugr?rev=ae203a3a542a1a794be3c6f8b3558e2fa859c28b#ae203a3a542a1a794be3c6f8b3558e2fa859c28b"
 dependencies = [
  "hugr-core",
  "hugr-llvm",
@@ -1156,7 +1156,7 @@ dependencies = [
 [[package]]
 name = "hugr-cli"
 version = "0.30.2"
-source = "git+https://github.com/quantinuum/hugr?branch=hs%2Ffeat%2Fmath-extension#5170454aa2794eaec6ed2a8840fc14cb7a5dd2b4"
+source = "git+https://github.com/quantinuum/hugr?rev=ae203a3a542a1a794be3c6f8b3558e2fa859c28b#ae203a3a542a1a794be3c6f8b3558e2fa859c28b"
 dependencies = [
  "anyhow",
  "clap",
@@ -1177,7 +1177,7 @@ dependencies = [
 [[package]]
 name = "hugr-core"
 version = "0.30.2"
-source = "git+https://github.com/quantinuum/hugr?branch=hs%2Ffeat%2Fmath-extension#5170454aa2794eaec6ed2a8840fc14cb7a5dd2b4"
+source = "git+https://github.com/quantinuum/hugr?rev=ae203a3a542a1a794be3c6f8b3558e2fa859c28b#ae203a3a542a1a794be3c6f8b3558e2fa859c28b"
 dependencies = [
  "base64",
  "cgmath",
@@ -1214,7 +1214,7 @@ dependencies = [
 [[package]]
 name = "hugr-llvm"
 version = "0.30.2"
-source = "git+https://github.com/quantinuum/hugr?branch=hs%2Ffeat%2Fmath-extension#5170454aa2794eaec6ed2a8840fc14cb7a5dd2b4"
+source = "git+https://github.com/quantinuum/hugr?rev=ae203a3a542a1a794be3c6f8b3558e2fa859c28b#ae203a3a542a1a794be3c6f8b3558e2fa859c28b"
 dependencies = [
  "anyhow",
  "cc",
@@ -1234,7 +1234,7 @@ dependencies = [
 [[package]]
 name = "hugr-model"
 version = "0.30.2"
-source = "git+https://github.com/quantinuum/hugr?branch=hs%2Ffeat%2Fmath-extension#5170454aa2794eaec6ed2a8840fc14cb7a5dd2b4"
+source = "git+https://github.com/quantinuum/hugr?rev=ae203a3a542a1a794be3c6f8b3558e2fa859c28b#ae203a3a542a1a794be3c6f8b3558e2fa859c28b"
 dependencies = [
  "base64",
  "bumpalo",
