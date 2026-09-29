@@ -55,12 +55,17 @@ pub fn push_conditional_x(graph: PauliGraph) -> (PauliGraph, PauliGraph) {
 
                 let mut correction = Tableau::eye(width);
                 append_gate(&mut correction, x);
+                let mut string = vec![Pauli::I; width];
+                string[x.get_args()[0]] = Pauli::X;
+                let mut rotations = vec![Op::Rotation {
+                    data: RotationData::new(string, 1.0),
+                }];
                 for later in core.iter().rev() {
-                    push_through(&mut correction, later);
+                    push_through(&mut correction, &mut rotations, later);
                 }
                 suffix.push(Op::ConditionalBox {
                     data: ConditionalBoxData::new(
-                        vec![tableau_op(correction)],
+                        rotations,
                         data.get_conditional_bits().clone(),
                         data.get_conditional_values().clone(),
                     ),
@@ -85,19 +90,26 @@ pub fn push_conditional_x(graph: PauliGraph) -> (PauliGraph, PauliGraph) {
     )
 }
 
-fn push_through(correction: &mut Tableau, op: &Op) {
+// Keep an explicit rotation decomposition for greedy synthesis, alongside the
+// tableau used to calculate the corrections when crossing T rotations.
+fn push_through(correction: &mut Tableau, rotations: &mut Vec<Op>, op: &Op) {
     match op {
         Op::Gate { .. } => {
             correction.precompose_op(&get_dagger::<Tableau>(op));
             correction.postcompose_op(op);
+            let mut gate = Tableau::eye(correction.get_n_qubits());
+            gate.postcompose_op(op);
+            *rotations = rotations.iter().flat_map(|r| gate.conjugate(r)).collect();
         }
         Op::Rotation { data } => {
             let (p, sign_bit) = correction.conjugate_string(data.get_string());
             if sign_bit {
                 let half_pis = (4.0 * data.get_angle()).round().rem_euclid(4.0) as u8;
-                correction.postcompose_op(&Op::Rotation {
+                let rotation = Op::Rotation {
                     data: RotationData::new(p, f64::from(half_pis) / 2.0),
-                });
+                };
+                correction.postcompose_op(&rotation);
+                rotations.push(rotation);
             }
         }
         _ => panic!("expected an H-free Clifford+T region"),
@@ -147,6 +159,46 @@ mod tests {
     use super::*;
 
     #[test]
+    fn correction_rotations_match_tableau() {
+        for angle in [0.25, -0.25] {
+            let mut correction = Tableau::eye(2);
+            append_gate(&mut correction, &GateData::new(GateType::X, vec![0]));
+            let mut rotations = vec![Op::Rotation {
+                data: RotationData::new(vec![Pauli::X, Pauli::I], 1.0),
+            }];
+            let ops = [
+                Op::Rotation {
+                    data: RotationData::new(vec![Pauli::Z, Pauli::I], angle),
+                },
+                Op::Gate {
+                    data: GateData::new(GateType::S, vec![0]),
+                },
+                Op::Gate {
+                    data: GateData::new(GateType::ZZ, vec![0, 1]),
+                },
+                Op::Gate {
+                    data: GateData::new(GateType::SWAP, vec![0, 1]),
+                },
+                Op::Rotation {
+                    data: RotationData::new(vec![Pauli::I, Pauli::Z], -angle),
+                },
+            ];
+            for op in ops {
+                push_through(&mut correction, &mut rotations, &op);
+                let mut decomposed = Tableau::eye(2);
+                for rotation in &rotations {
+                    let Op::Rotation { data } = rotation else {
+                        unreachable!()
+                    };
+                    assert_eq!((data.get_angle() * 2.0).fract(), 0.0);
+                    decomposed.postcompose_op(rotation);
+                }
+                assert_eq!(decomposed, correction);
+            }
+        }
+    }
+
+    #[test]
     fn test_push_through_gate() {
         for (gate_type, args) in [
             (GateType::S, vec![0]),
@@ -163,7 +215,15 @@ mod tests {
             let mut expected = correction.clone();
             expected.postcompose_op(&op);
 
-            push_through(&mut correction, &op);
+            let mut rotations = vec![Op::Rotation {
+                data: RotationData::new(vec![Pauli::X, Pauli::I], 0.5),
+            }];
+            push_through(&mut correction, &mut rotations, &op);
+            let mut decomposed = Tableau::eye(2);
+            for rotation in &rotations {
+                decomposed.postcompose_op(rotation);
+            }
+            assert_eq!(decomposed, correction);
             let mut actual = Tableau::eye(2);
             actual.postcompose_op(&op);
             actual.compose(&correction);

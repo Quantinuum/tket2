@@ -124,6 +124,45 @@ mod tests {
     use super::*;
 
     #[test]
+    fn corrections_stay_outside_todd_input() {
+        let rotations = vec![
+            RotationData::new(vec![Pauli::Z, Pauli::I], 0.25),
+            RotationData::new(vec![Pauli::X, Pauli::I], -0.25),
+        ];
+        let mut next_bit = 3;
+        let (_, diagonal, suffix) = gadgetize(synthesize(&rotations, 2), 1, &mut next_bit);
+        assert_eq!(next_bit, 4);
+        for op in diagonal.get_ops() {
+            let Op::Rotation { data } = op else {
+                panic!("non-rotation in TODD input")
+            };
+            assert_eq!(data.get_angle().abs(), 0.25);
+            assert!(
+                data.get_string()
+                    .iter()
+                    .all(|p| matches!(p, Pauli::I | Pauli::Z))
+            );
+        }
+        let conditions: Vec<_> = suffix
+            .get_ops()
+            .iter()
+            .filter_map(|op| match op {
+                Op::ConditionalBox { data } => Some(data),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(conditions.len(), 1);
+        assert_eq!(conditions[0].get_conditional_bits(), &vec![3]);
+        assert_eq!(conditions[0].get_conditional_values(), &vec![true]);
+        for op in conditions[0].get_ops() {
+            let Op::Rotation { data } = op else {
+                panic!("correction was not lowered")
+            };
+            assert_eq!((data.get_angle() * 2.0).fract(), 0.0);
+        }
+    }
+
+    #[test]
     fn test_synthesize_rotation_sign() {
         for (pauli, angle) in [(Pauli::X, 0.25), (Pauli::Y, -0.25), (Pauli::Z, 0.25)] {
             let synthesis = synthesize(&[RotationData::new(vec![pauli], 0.25)], 1);

@@ -19,6 +19,7 @@ use crate::optimizer::optimize;
 #[derive(Default)]
 pub struct TOptimizationPass {
     ancilla_budget: usize,
+    first_bit: usize,
 }
 
 impl TOptimizationPass {
@@ -35,13 +36,20 @@ impl TOptimizationPass {
         self
     }
 
+    /// Start numbering new measurement results at `first_bit` (default: zero).
+    /// Set this to the number of existing classical bits to avoid overwriting them.
+    pub fn with_first_bit(mut self, first_bit: usize) -> Self {
+        self.first_bit = first_bit;
+        self
+    }
+
     /// Optimize a graph whose rotation angles are multiples of 0.25 half turns.
     ///
     /// # Panics
     ///
     /// Panics if the input contains unsupported operations or non-idle reserved ancillas.
     pub fn optimize(&self, graph: &PauliGraph) -> PauliGraph {
-        optimize(graph, self.ancilla_budget)
+        optimize(graph, self.ancilla_budget, self.first_bit)
     }
 }
 

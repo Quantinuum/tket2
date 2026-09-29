@@ -8,7 +8,7 @@ use tk_pg_ir_kernels::{PGRewrite, PGTableau};
 use tk_pg_qm_tableau::Tableau;
 
 /// Optimize T count using the last `budget` qubits as reserved idle ancillas.
-pub fn optimize(pauli_graph: &PauliGraph, budget: usize) -> PauliGraph {
+pub fn optimize(pauli_graph: &PauliGraph, budget: usize, first_bit: usize) -> PauliGraph {
     validate_ancillas(pauli_graph, budget);
 
     let n_qubits = pauli_graph.get_n_qubits();
@@ -22,7 +22,7 @@ pub fn optimize(pauli_graph: &PauliGraph, budget: usize) -> PauliGraph {
         output.add_op(Op::Gate { data: h });
     }
 
-    let mut next_bit = 0;
+    let mut next_bit = first_bit;
     for sub_graph in batch_rotations(&rotations, budget) {
         let rotations: Vec<_> = sub_graph
             .get_ops()

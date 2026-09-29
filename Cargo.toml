@@ -126,6 +126,7 @@ pg-core = { package = "tk-pg-core", path = "pg-libs/tk-pg-core", version = "0.1.
 pg-canonical-form = { package = "tk-pg-canonical-form", path = "pg-libs/pg-passes/tk-pg-canonical-form", version = "0.1.0" }
 pg-greedy-synth = { package = "tk-pg-greedy-synth", path = "pg-libs/pg-passes/tk-pg-greedy-synth", version = "0.1.0" }
 pg-optimise = { package = "tk-pg-optimize", path = "pg-libs/pg-passes/tk-pg-optimize", version = "0.1.0" }
+pg-t-optimize = { package = "tk-pg-t-optimize", path = "pg-libs/pg-passes/tk-pg-t-optimize", version = "0.1.0" }
 pg-rebase = { package = "tk-pg-rebase", path = "pg-libs/pg-passes/tk-pg-rebase", version = "0.1.0" }
 
 [profile.release.package.tket-py]

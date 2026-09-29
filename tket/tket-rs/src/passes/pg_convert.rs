@@ -5,7 +5,7 @@
 //! a circuit using a [`PauliGraph`]
 
 use pg_core::{BlackBoxData, GateData, GateType, Op, PauliGraph};
-use tket_json_rs::circuit_json::{Command, Operation};
+use tket_json_rs::circuit_json::{Command, Conditional, Operation};
 use tket_json_rs::register::{Bit, ElementId, Qubit};
 use tket_json_rs::{OpType, SerialCircuit};
 
@@ -289,6 +289,37 @@ fn cmd_to_op(
 /// Converts a pauli graph op to an equivalent vector of hugr commands
 fn op_to_cmd(op: &Op, register_map: &RegisterMap) -> Result<Vec<Command<String>>, ConversionError> {
     match op {
+        Op::Gate { data }
+            if !data.get_conditional_bits().is_empty()
+                || !data.get_conditional_values().is_empty() =>
+        {
+            let ([bit], [value]) = (
+                data.get_conditional_bits().as_slice(),
+                data.get_conditional_values().as_slice(),
+            ) else {
+                return Err(ConversionError::UnsupportedOp(op.clone()));
+            };
+
+            let bit = register_map.get_bit_id(*bit)?;
+            let unconditional = Op::Gate {
+                data: data.clone().with_conditional(vec![], vec![]),
+            };
+            let mut commands = op_to_cmd(&unconditional, register_map)?;
+
+            for command in &mut commands {
+                let inner_op =
+                    std::mem::replace(&mut command.op, Operation::from_optype(OpType::Conditional));
+                command.op.conditional = Some(Conditional {
+                    op: Box::new(inner_op),
+                    width: 1,
+                    value: u32::from(*value),
+                });
+                // Serial condition bits precede the underlying gate's arguments.
+                command.args.insert(0, bit.clone());
+            }
+
+            Ok(commands)
+        }
         Op::Gate { data } => {
             let args = data.get_args();
             match data.get_gate_type() {
@@ -881,6 +912,71 @@ mod tests {
 
         assert_eq!(cmd_to_op(&command, &registers).unwrap(), vec![op.clone()]);
         assert_eq!(op_to_cmd(&op, &registers).unwrap(), vec![command]);
+    }
+
+    #[rstest]
+    #[case::x(GateType::X, vec![], vec![OpType::X])]
+    #[case::rx(GateType::RX, vec![0.25], vec![OpType::H, OpType::T, OpType::H])]
+    fn converts_single_bit_conditions(
+        registers: RegisterMap,
+        #[case] gate_type: GateType,
+        #[case] params: Vec<f64>,
+        #[case] expected_types: Vec<OpType>,
+        #[values(false, true)] value: bool,
+    ) {
+        let op = Op::Gate {
+            data: GateData::new(gate_type, vec![2])
+                .with_params(params)
+                .with_conditional(vec![1], vec![value]),
+        };
+        let commands = op_to_cmd(&op, &registers).unwrap();
+
+        assert_eq!(commands.len(), expected_types.len());
+        for (command, expected_type) in commands.iter().zip(expected_types) {
+            assert_eq!(command.op.op_type, OpType::Conditional);
+            assert_eq!(
+                command.args,
+                vec![element("result", 8), element("ancilla", 0)]
+            );
+            assert_eq!(
+                command.op.conditional,
+                Some(Conditional {
+                    op: Box::new(Operation::from_optype(expected_type)),
+                    width: 1,
+                    value: u32::from(value),
+                })
+            );
+        }
+    }
+
+    #[rstest]
+    #[case::multiple_bits(vec![0, 1], vec![true, false])]
+    #[case::missing_value(vec![0], vec![])]
+    #[case::missing_bit(vec![], vec![true])]
+    #[case::extra_value(vec![0], vec![true, false])]
+    fn rejects_unsupported_conditions(
+        registers: RegisterMap,
+        #[case] bits: Vec<usize>,
+        #[case] values: Vec<bool>,
+    ) {
+        let op = Op::Gate {
+            data: GateData::new(GateType::X, vec![0]).with_conditional(bits, values),
+        };
+        assert!(matches!(
+            op_to_cmd(&op, &registers),
+            Err(ConversionError::UnsupportedOp(unsupported)) if unsupported == op
+        ));
+    }
+
+    #[rstest]
+    fn rejects_unknown_condition_bit(registers: RegisterMap) {
+        let op = Op::Gate {
+            data: GateData::new(GateType::X, vec![0]).with_conditional(vec![2], vec![true]),
+        };
+        assert!(matches!(
+            op_to_cmd(&op, &registers),
+            Err(ConversionError::UnknownRegister(register)) if register == "2"
+        ));
     }
 
     #[rstest]

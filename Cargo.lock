@@ -3055,6 +3055,7 @@ dependencies = [
  "tk-pg-greedy-synth",
  "tk-pg-optimize",
  "tk-pg-rebase",
+ "tk-pg-t-optimize",
  "tket-json-rs",
  "tracing",
  "typetag",
