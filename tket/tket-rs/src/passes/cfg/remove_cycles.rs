@@ -69,7 +69,7 @@ pub fn nest_loop<H: HugrMut>(
 
     // For each control-flow edge that exits the loop, make a new BB that exits the loop with a value
     // tagged to indicate which post-loop block to go to, and retarget the edge.
-    let break_type = Type::new_sum(break_rows.clone());
+    let break_row = TypeRow::from([Type::new_sum(break_rows.clone())]);
     let break_blocks = post_loop_blocks
         .iter()
         .map(|(&n, &tag)| {
@@ -78,7 +78,6 @@ pub fn nest_loop<H: HugrMut>(
                     .value_input_types()
                     .map(|(_, t)| t.clone()),
             );
-            let break_row = TypeRow::from([break_type.clone()]);
             let [bb, i, o] = create_with_io(
                 hugr,
                 inner_cfg,
@@ -110,7 +109,7 @@ pub fn nest_loop<H: HugrMut>(
     }
 
     // Any edges that exit the original subtree necessarily exit the loop (as entirely
-    // contained within subtree), so the corresponding break-blocks
+    // contained within subtree), so the corresponding break-blocks will not be added by detach
     let break_blocks_exitting_subtree = leaves(&dtn.exit_edges, hugr)
         .into_iter()
         .map(|lp| break_blocks[&lp.tgt])
