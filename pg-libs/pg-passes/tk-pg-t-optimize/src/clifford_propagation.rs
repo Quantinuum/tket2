@@ -120,7 +120,6 @@ pub fn normalize(pg: &PauliGraph) -> (PauliGraph, Tableau) {
                 if *data.get_gate_type() == GateType::H
                     && data.get_conditional_bits().is_empty() =>
             {
-                ()
             }
             // Use CanonicalFormPass to convert other raw gates into Pauli rotations
             // and tableaux before calling this pass. It also reduces rotation angles

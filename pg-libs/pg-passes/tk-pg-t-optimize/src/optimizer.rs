@@ -1,6 +1,5 @@
 use crate::clifford_propagation::{collect_cliffords, normalize, tableau_op};
-use crate::gadgetization::gadgetize;
-use crate::hadamard_optimizer::synthesize;
+use crate::hadamard_optimizer::{gadgetize, synthesize};
 use crate::t_optimizer::t_optimization;
 
 use bitvec::prelude::*;
@@ -183,8 +182,8 @@ fn pivot(matrix: &mut [BitVec<usize>], node: usize) {
 
     let v = predecessors[0];
     let mut successor_mask = BitVec::<usize>::repeat(false, n);
-    for j in (v + 1)..n {
-        if matrix[v][j] {
+    for (j, successor) in matrix[v].iter().enumerate().skip(v + 1) {
+        if *successor {
             successor_mask.set(j, true);
         }
     }
