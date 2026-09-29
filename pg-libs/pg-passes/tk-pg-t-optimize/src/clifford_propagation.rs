@@ -126,6 +126,9 @@ pub fn normalize(pg: &PauliGraph) -> (PauliGraph, Tableau) {
             {
                 ()
             }
+            // Use CanonicalFormPass to convert other raw gates into Pauli rotations
+            // and tableaux before calling this pass. It also reduces rotation angles
+            // to (-0.5, 0.5) by absorbing Clifford corrections into the tableau.
             _ => panic!("input must contain rotations, tableaux, or H preparations"),
         }
         input.add_op(op.clone());
