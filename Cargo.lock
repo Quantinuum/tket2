@@ -2995,6 +2995,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "tk-pg-t-optimize"
+version = "0.1.0"
+dependencies = [
+ "bitvec",
+ "tk-pg-canonical-form",
+ "tk-pg-core",
+ "tk-pg-ir-kernels",
+ "tk-pg-qm-tableau",
+]
+
+[[package]]
 name = "tk-pg-utils"
 version = "0.1.0"
 
