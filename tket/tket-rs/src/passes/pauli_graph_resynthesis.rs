@@ -2,7 +2,6 @@
 //!
 //! The [`PauliGraphResynthesis`] pass optimises a circuit by converting it to a Pauli graph, and applying:
 //! - Phase folding through the [`RotationMergingPass`]
-//! - Optional phase polyomial resynthesis for further T gate reduction through the [`TOptimizationPass`]
 //! - Synthesis the pauli graph as a circuit, aiming to minimize 2 qubit gates through the [`GreedySynthPass`]
 
 use crate::CircuitError;
