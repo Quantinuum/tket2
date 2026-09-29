@@ -2,8 +2,10 @@ use crate::simd_vector::SIMDVector;
 use std::collections::{HashMap, hash_map::Entry};
 use tk_pg_core::{Op, Pauli, PauliGraph, RotationData};
 
+/// Parity strings with coefficients in units of 0.25 half turns, modulo eight.
 type PhasePolynomial = Vec<(SIMDVector, i32)>;
 
+/// Reduce the T count of I/Z rotations whose angles are multiples of 0.25 half turns.
 pub fn t_optimization(graph: &mut PauliGraph) {
     let polynomial = rotations_to_simd(graph);
     let reduced = apply_todd(polynomial, graph.get_n_qubits());
@@ -60,6 +62,8 @@ fn apply_todd(mut weighted: PhasePolynomial, n: usize) -> PhasePolynomial {
     let mut result: Vec<_> = todd(table, n).into_iter().map(|p| (p, 1)).collect();
     weighted.extend(result.iter().map(|(p, c)| (p.clone(), -c)));
 
+    // TODD leaves a Clifford difference from the original polynomial. Recover it
+    // using single-qubit and two-qubit parities; higher-degree terms vanish modulo eight.
     let mut linear: Vec<i32> = (0..n)
         .map(|q| {
             weighted
@@ -87,6 +91,7 @@ fn apply_todd(mut weighted: PhasePolynomial, n: usize) -> PhasePolynomial {
             parity.flip_bit(q);
             parity.flip_bit(r);
             result.push((parity, quadratic));
+            // A two-qubit parity also contributes to both linear terms.
             linear[q] -= quadratic;
             linear[r] -= quadratic;
         }
@@ -136,6 +141,7 @@ fn insert_row(basis: &mut [Option<SIMDVector>], mut row: SIMDVector) -> bool {
     false
 }
 
+/// Find a vector orthogonal to the basis with different bits at `i` and `j`.
 fn separating_kernel(basis: &[Option<SIMDVector>], i: usize, j: usize) -> Option<SIMDVector> {
     let mut difference = SIMDVector::new(basis.len());
     difference.flip_bit(i);
@@ -165,6 +171,8 @@ fn product(products: &[Vec<SIMDVector>], a: usize, b: usize) -> &SIMDVector {
     &products[a][b - a - 1]
 }
 
+/// Reduce the number of parity columns using TODD, preserving the phase polynomial
+/// up to a Clifford correction.
 pub fn todd(table: Vec<SIMDVector>, nb_qubits: usize) -> Vec<SIMDVector> {
     let mut table = proper(table);
     loop {
@@ -212,6 +220,8 @@ pub fn todd(table: Vec<SIMDVector>, nb_qubits: usize) -> Vec<SIMDVector> {
                     .expect("proper columns are distinct");
                 let mut basis = base.clone();
                 let mut rank = base_rank;
+                // We will add z to each column selected by y. These constraints on y
+                // ensure that the change to the phase polynomial is Clifford.
                 'constraints: for a in 0..rows.len() {
                     if a == pivot {
                         continue;
@@ -237,6 +247,8 @@ pub fn todd(table: Vec<SIMDVector>, nb_qubits: usize) -> Vec<SIMDVector> {
                     continue;
                 }
                 if let Some(y) = separating_kernel(&basis, i, j) {
+                    // y selects exactly one of i and j, making the two columns equal.
+                    // proper() then removes the pair.
                     let mut z = table[i].clone();
                     z.xor(&table[j]);
                     let mut candidate = table.clone();
@@ -246,6 +258,7 @@ pub fn todd(table: Vec<SIMDVector>, nb_qubits: usize) -> Vec<SIMDVector> {
                         }
                     }
                     if y.popcount() % 2 == 1 {
+                        // Add an extra z column when y selects an odd number of columns.
                         candidate.push(z);
                     }
                     candidate = proper(candidate);

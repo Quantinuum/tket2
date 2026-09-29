@@ -1,6 +1,7 @@
 #[cfg(feature = "unstable_simd")]
 use std::simd::Simd;
 
+/// A 256-bit block with scalar or portable SIMD storage.
 #[derive(Debug, Clone, Copy)]
 pub struct Block {
     #[cfg(feature = "unstable_simd")]
@@ -62,8 +63,13 @@ impl std::ops::BitAndAssign for Block {
     }
 }
 
+/// Packed bits for parity columns and GF(2) rows.
+///
+/// The caller must track the length and leave unused bits at zero.
+/// Operations on two vectors assume they have the same number of blocks.
 #[derive(Debug, Clone)]
 pub struct SIMDVector {
+    /// Blocks ordered from lowest to highest bit index.
     pub blocks: Vec<Block>,
 }
 
@@ -72,6 +78,7 @@ impl SIMDVector {
     const LANE_SIZE: usize = 32;
     const BLOCK_SIZE: usize = 256;
 
+    /// Allocate at least `nb_bits` bits, all initially zero.
     pub fn new(nb_bits: usize) -> Self {
         SIMDVector {
             blocks: SIMDVector::init_blocks(nb_bits),
@@ -87,6 +94,7 @@ impl SIMDVector {
         vec
     }
 
+    /// Toggle the bit at the given index.
     pub fn flip_bit(&mut self, mut bit: usize) {
         let block_index = bit / SIMDVector::BLOCK_SIZE;
         bit %= SIMDVector::BLOCK_SIZE;
@@ -97,6 +105,7 @@ impl SIMDVector {
         self.blocks[block_index] ^= Block::load(&arr);
     }
 
+    /// Read the bit at the given index.
     pub fn get(&self, mut bit: usize) -> bool {
         let block_index = bit / SIMDVector::BLOCK_SIZE;
         bit %= SIMDVector::BLOCK_SIZE;
@@ -105,6 +114,7 @@ impl SIMDVector {
         self.extract_block(block_index)[lane_index] & (1 << bit) != 0
     }
 
+    /// Return the lowest set-bit index, or `None` if all bits are zero.
     pub fn first_one(&self) -> Option<usize> {
         for (block_index, block) in self.blocks.iter().enumerate() {
             for (lane, word) in block.extract().iter().enumerate() {
@@ -120,10 +130,12 @@ impl SIMDVector {
         None
     }
 
+    /// Return the packed words, including padding, so the vector can be used as a hash key.
     pub fn packed_words(&self) -> Vec<i32> {
         self.blocks.iter().flat_map(|b| b.extract()).collect()
     }
 
+    /// Return the GF(2) dot product with `other`.
     pub fn dot_parity(&self, other: &Self) -> bool {
         let mut parity = 0;
         for (a, b) in self.blocks.iter().zip(&other.blocks) {
@@ -134,18 +146,21 @@ impl SIMDVector {
         parity != 0
     }
 
+    /// Intersect the set bits with those in `other`.
     pub fn and(&mut self, other: &Self) {
         for (a, b) in self.blocks.iter_mut().zip(&other.blocks) {
             *a &= *b;
         }
     }
 
+    /// XOR the bits with those in `bv`.
     pub fn xor(&mut self, bv: &SIMDVector) {
         for i in 0..self.blocks.len() {
             self.blocks[i] ^= bv.blocks[i];
         }
     }
 
+    /// Count the set bits.
     pub fn popcount(&self) -> i32 {
         let mut sum: i32 = 0;
         for block_index in 0..self.blocks.len() {

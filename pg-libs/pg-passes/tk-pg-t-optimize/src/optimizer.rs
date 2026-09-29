@@ -7,6 +7,7 @@ use tk_pg_core::{GateData, GateType, Op, Pauli, PauliGraph, TableauData};
 use tk_pg_ir_kernels::{PGRewrite, PGTableau};
 use tk_pg_qm_tableau::Tableau;
 
+/// Optimize T count using the last `budget` qubits as reserved idle ancillas.
 pub fn optimize(pauli_graph: &PauliGraph, budget: usize) -> PauliGraph {
     validate_ancillas(pauli_graph, budget);
 
@@ -82,6 +83,7 @@ fn batch_rotations(pauli_graph: &PauliGraph, budget: usize) -> Vec<PauliGraph> {
         .collect()
 }
 
+/// Group rotation indices into batches requiring at most `budget` Hadamard gadgets.
 pub fn batch_indices(pauli_graph: &PauliGraph, budget: usize) -> Vec<Vec<usize>> {
     let mut matrix = get_commutation_matrix(pauli_graph);
     let mut index_map: Vec<usize> = (0..matrix.len()).collect();

@@ -3,9 +3,13 @@ use tk_pg_core::{GateData, GateType, Op, Pauli, PauliGraph, RotationData};
 use tk_pg_ir_kernels::PGTableau;
 use tk_pg_qm_tableau::Tableau;
 
+/// The circuit produced by Hadamard synthesis.
 pub struct Synthesis {
+    /// Initial Clifford basis change.
     pub prefix: Vec<GateData>,
+    /// I/Z rotations interleaved with Clifford gates.
     pub body: Vec<Op>,
+    /// Clifford correction to apply after the body.
     pub correction: Tableau,
 }
 
@@ -33,6 +37,7 @@ fn diagonalize(frame: &mut Tableau, string: &[Pauli]) -> Vec<GateData> {
     gates
 }
 
+/// Synthesize rotations on `n` qubits while reducing Hadamards in the body.
 pub fn synthesize(rotations: &[RotationData], n: usize) -> Synthesis {
     let mut reverse = Tableau::eye(n);
     for rotation in rotations.iter().rev() {
@@ -60,6 +65,8 @@ pub fn synthesize(rotations: &[RotationData], n: usize) -> Synthesis {
     }
 }
 
+/// Replace Hadamards in the body with ancilla gadgets.
+/// Returns the prefix, I/Z rotations, and a suffix with measurements and corrections.
 pub fn gadgetize(
     synthesis: Synthesis,
     budget: usize,

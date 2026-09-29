@@ -6,10 +6,12 @@ use tk_pg_core::{
 use tk_pg_ir_kernels::{PGTableau, get_dagger};
 use tk_pg_qm_tableau::Tableau;
 
+/// Append a Clifford gate to the tableau.
 pub fn append_gate(frame: &mut Tableau, gate: &GateData) {
     frame.postcompose_op(&Op::Gate { data: gate.clone() });
 }
 
+/// Collect Cliffords without moving them past conditional boxes, measurements, or resets.
 pub fn collect_cliffords(graph: PauliGraph) -> PauliGraph {
     let width = graph.get_n_qubits();
     let mut out = PauliGraph::new(width);
@@ -30,6 +32,7 @@ pub fn collect_cliffords(graph: PauliGraph) -> PauliGraph {
     out
 }
 
+/// Wrap a tableau as a graph operation.
 pub fn tableau_op(tableau: Tableau) -> Op {
     Op::Tableau {
         data: TableauData::from(tableau),
@@ -101,6 +104,7 @@ fn push_through(correction: &mut Tableau, op: &Op) {
     }
 }
 
+/// Check the input and return its rotations and final Clifford tableau.
 pub fn normalize(pg: &PauliGraph) -> (PauliGraph, Tableau) {
     let mut input = PauliGraph::new(pg.get_n_qubits());
     for op in pg.get_ops() {
