@@ -102,12 +102,6 @@ pub fn nest_loop<H: HugrMut>(
         })
         .collect::<HashMap<_, _>>();
 
-    // disconnect backedges.
-    for (n, p) in hugr.linked_outputs(dtn.node, 0).collect::<Vec<_>>() {
-        hugr.disconnect(n, p);
-        hugr.connect(n, p, continue_bb, 0);
-    }
-
     // Any edges that exit the original subtree necessarily exit the loop (as entirely
     // contained within subtree), so the corresponding break-blocks will not be added by detach
     let break_blocks_exitting_subtree = leaves(&dtn.exit_edges, hugr)
@@ -116,12 +110,17 @@ pub fn nest_loop<H: HugrMut>(
         .collect::<Vec<_>>();
 
     // now build the dominator tree for inside the loop. Its exit-edges will include all control-flow edges to:
-    //   continue_bb (i.e. all previous backedges)
     //   break_bb (i.e. all edges from detached subtree's individual break_block's)
     //   any break_blocks for nodes outside the subtree
     let (loop_dtn, out_loop_children) = dtn.detach(hugr, &loop_blocks, &break_blocks);
     let loop_dtn = loop_dtn.unwrap(); // header is in loop!!
-    assert!(loop_dtn.loop_.is_none()); // backedges disconnected
+    assert!(loop_dtn.loop_.is_some()); // detach has detailed assertion
+
+    // disconnect backedges, reconnect to continue_bb
+    for (n, p) in hugr.linked_outputs(loop_dtn.node, 0).collect::<Vec<_>>() {
+        hugr.disconnect(n, p);
+        hugr.connect(n, p, continue_bb, 0);
+    }
 
     let mut dtn = DomTreeNode::<H::Node, InnerTailLoop<H::Node>>::new(
         loop_node,
