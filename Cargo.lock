@@ -2956,6 +2956,7 @@ dependencies = [
  "tk-pg-optimize",
  "tk-pg-qm-tableau",
  "tk-pg-rebase",
+ "tk-pg-t-optimize",
  "tk-pg-utils",
 ]
 
