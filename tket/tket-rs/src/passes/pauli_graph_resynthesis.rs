@@ -1,6 +1,6 @@
 //! Resynthesis of a Clifford + Rz circuit through a Pauli graph.
 //!
-//! The [`PauliGraphResynthesis`] pass optimises a circuit by converting it to a Pauli graph, and applying:
+//! The [`PauliGraphResynthesis`] pass optimizes a circuit by converting it to a Pauli graph, and applying:
 //! - Phase folding through the [`RotationMergingPass`]
 //! - Optional phase polynomial resynthesis for further T count reduction through the [`TOptimizationPass`]
 //! - Synthesis of the pauli graph as a circuit, aiming to minimize 2 qubit gates, through the [`GreedySynthPass`]
