@@ -355,6 +355,31 @@ fn circ_preset_bits() -> Hugr {
     hugr
 }
 
+/// A classical opaque subgraph with shared inputs and two distinct outputs.
+#[fixture]
+fn circ_opaque_repeated_bit_inputs() -> Hugr {
+    let mut h = FunctionBuilder::new(
+        "opaque_repeated_bit_inputs",
+        Signature::new(vec![qb_t()], vec![qb_t(), bool_t(), bool_t()]),
+    )
+    .unwrap();
+
+    // Extra quantum op to ensure this circuit gets encoded.
+    let [q] = h.input_wires_arr();
+    let [q] = h.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
+
+    let input = h.add_load_value(Value::true_val());
+    let [same] = h
+        .add_dataflow_op(LogicOp::And, [input, input])
+        .unwrap()
+        .outputs_arr();
+    let [opposite] = h
+        .add_dataflow_op(LogicOp::Not, [same])
+        .unwrap()
+        .outputs_arr();
+    h.finish_hugr_with_outputs([q, same, opposite]).unwrap()
+}
+
 /// A simple circuit with some input parameters
 #[fixture]
 fn circ_parameterized() -> Hugr {
@@ -1655,6 +1680,11 @@ fn decode_parameter_used_before_opaque_barrier(circ_reordered_opaque_parameter: 
 #[case::meas_ancilla(circ_measure_ancilla(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::preset_bits(circ_preset_bits(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::read_fanout(circ_cfg_read_fanout(), 2, CircuitRoundtripTestConfig::Default)]
+#[case::repeated_bit_inputs(
+    circ_opaque_repeated_bit_inputs(),
+    1,
+    CircuitRoundtripTestConfig::Default
+)]
 
 fn encoded_circuit_roundtrip(
     #[case] hugr: Hugr,
@@ -2060,4 +2090,30 @@ fn standalone_reassemble_preserves_repeated_bit_outputs(circ_preset_bits: Hugr) 
         .expect("Function definition")
         .into_owned();
     assert_eq!(&circ_signature.output, &reassembled_signature.output);
+}
+
+/// Reassembling an opaque subgraph must keep its distinct classical results
+/// even when it receives the same bit on multiple input ports.
+///
+/// Regression test for <https://github.com/Quantinuum/guppylang/issues/2383>
+#[rstest]
+fn opaque_repeated_bit_inputs_preserve_outputs(circ_opaque_repeated_bit_inputs: Hugr) {
+    let mut decoded = circ_opaque_repeated_bit_inputs;
+    let options = EncodeOptions::new().with_subcircuits(true);
+    let encoded = EncodedCircuit::new(&decoded, options).unwrap();
+    let barrier = encoded
+        .iter()
+        .flat_map(|(_, circuit)| &circuit.commands)
+        .find(|command| command.op.op_type == optype::OpType::Barrier)
+        .unwrap();
+    assert_eq!(barrier.args.len(), 4);
+    assert_ne!(barrier.args[2], barrier.args[3]);
+    encoded.reassemble_inplace(&mut decoded, None).unwrap();
+    decoded.validate().unwrap();
+
+    let output = decoded.get_io(decoded.entrypoint()).unwrap()[1];
+    let first = decoded.single_linked_output(output, 1).unwrap().0;
+    let second = decoded.single_linked_output(output, 2).unwrap().0;
+    assert_eq!(decoded.get_optype(first), &OpType::from(LogicOp::And));
+    assert_eq!(decoded.get_optype(second), &OpType::from(LogicOp::Not));
 }
