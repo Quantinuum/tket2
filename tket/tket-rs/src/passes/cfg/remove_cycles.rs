@@ -87,10 +87,12 @@ pub fn nest_loop<H: HugrMut>(
         hugr.connect(loop_block, outport, tgt, 0);
     }
 
-    // Any edges that exit the original subtree necessarily exit the loop (which is entirely
-    // contained within the subtree), so the corresponding break-blocks will not be added by detach
+    // Any loop-exitting edges that also exit the original subtree will not have had their break-blocks
+    // inserted into the dom-tree (insertion happens only when the header dominates the out-of-loop subtree).
+    // Look for such among the subtree's exit edges as we will later need to add the break blocks (they *are*
+    // dominated by the loop header, unlike the original targets).
     let break_blocks_for_subtree_exits = leaf_targets(&dtn.exit_edges, hugr)
-        .map(|tgt| break_blocks[&tgt])
+        .filter_map(|tgt| break_blocks.get(&tgt).copied()) //.expect(format!("No break block for {tgt}").as_str()))
         .collect::<Vec<_>>();
 
     // now build the dominator tree for inside the loop. Its exit-edges will include all control-flow edges to:
