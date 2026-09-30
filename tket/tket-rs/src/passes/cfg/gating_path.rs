@@ -1,6 +1,5 @@
 //! Analysis of Control-Flow Graphs using dominator-strong components decomposition
 use itertools::Itertools;
-use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::iter;
 
@@ -204,55 +203,6 @@ impl<N: HugrNode> DomTreeWithBackedges<N> {
         assert_eq!(doms.root(), node_map.to_portgraph(entry));
         build(&hugr, &doms, entry, &node_map)
     }
-
-    /// Detaches any parts of the subtree not containing within `loop_blocks`. (Makes sense
-    /// only if `loop_blocks` is closed under control-flow predecessor relation as far back
-    /// as [Self::node], but should not include non-loop predecessors thereof)
-    ///
-    /// Return values are:
-    /// * `Option<Self>`: The remaining part of the current node after detaching the
-    ///   non-loop blocks.
-    /// * `Vec<Self>`: The subtrees that were detached as being outside the loop
-    /// * `HashMap<N, Vec<N>>`: A mapping, from each node that is destination of a loop-exit
-    ///   edge, to a representation of the LCA in the dominator tree of all such edges,
-    ///   given as a list of dominators starting from `self` and moving down the dominator
-    ///   tree one node at a time until the LCA is reached.
-    pub(super) fn detach<H: HugrView<Node = N>>(
-        self,
-        hugr: &H,
-        loop_blocks: &HashSet<N>,
-        post_loop_blocks: &HashMap<N, N>,
-    ) -> (Option<Self>, Vec<Self>) {
-        if !loop_blocks.contains(&self.node) {
-            let new_subtree = post_loop_blocks.get(&self.node).map(|&node|
-                // Direct edge(s) to dominator subtree outside loop. `node` will
-                // * tag the appropriate destination to which to jump after exitting the loop
-                // * exit the loop
-                Self {
-                    node,
-                    children: Vec::new(),
-                    exit_edges: Some(GatingPath::Always(node, 0.into())),
-                    loop_: None
-                });
-            return (new_subtree, vec![self]);
-        }
-        let mut remaining_children = Vec::new();
-        let mut detached = Vec::new();
-        for (_, ch) in self.children {
-            let (ch, ch_detached) = ch.detach(hugr, loop_blocks, post_loop_blocks);
-            remaining_children.extend(ch);
-            detached.extend(ch_detached);
-        }
-        // Recompute exit_edges: we must remove any exits from inside a detached dominator tree;
-        // but add any edge to a detached tree itself.
-        let in_loop_dtn = Self::new_with_children(self.node, remaining_children, hugr);
-        // We have not detached the backedges, so should be the same. (No PartialEq...)
-        assert_eq!(
-            format!("{:?}", in_loop_dtn.loop_),
-            format!("{:?}", self.loop_)
-        ); // We have not detached the backedges
-        (Some(in_loop_dtn), detached)
-    }
 }
 
 fn compute_dominators<H: HugrView>(
@@ -308,12 +258,6 @@ fn union_opt<N: HugrNode>(acc: &mut Option<GatingPath<N>>, other: &GatingPath<N>
 }
 
 impl<N: HugrNode> GatingPath<N> {
-    fn branch(node: N, port: OutgoingPort, num_ports: usize) -> Self {
-        let mut branches = vec![None; num_ports];
-        branches[port.index()] = Some(GatingPath::Always(node, port));
-        GatingPath::Branch(node, branches)
-    }
-
     fn concat(&self, other: &GatingPath<N>) -> Self {
         fn has_none<N>(gp: &Option<GatingPath<N>>) -> bool {
             match gp {
