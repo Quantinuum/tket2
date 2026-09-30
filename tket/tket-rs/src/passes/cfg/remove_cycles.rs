@@ -40,10 +40,6 @@ pub fn nest_loop<H: HugrMut>(
         };
     };
     let loop_blocks = loop_blocks(hugr, dtn.node, &backedges);
-    eprintln!(
-        "ALAN: loop_blocks = {:?}",
-        BTreeSet::from_iter(loop_blocks.iter().cloned())
-    );
     // While we could (more efficiently) extract the list of post-loop blocks during the detach operation,
     // it's more helpful to have the complete list available now so we can put Tags into place during detach.
     let post_loop_blocks = loop_blocks
@@ -55,7 +51,6 @@ pub fn nest_loop<H: HugrMut>(
         .enumerate()
         .map(|(i, n)| (n, i))
         .collect::<HashMap<_, _>>();
-    eprintln!("ALAN: post_loop_blocks = {:?}", post_loop_blocks);
 
     let break_rows = post_loop_blocks
         .keys()
@@ -64,9 +59,6 @@ pub fn nest_loop<H: HugrMut>(
 
     let [loop_block, inner_cfg, continue_bb, break_bb, exit_block] =
         make_inner_cfg(hugr, dtn.node, break_rows.clone());
-    eprintln!(
-        "Made: loop_node {loop_block:?}, inner_cfg {inner_cfg:?}, continue_bb {continue_bb:?}, break_bb {break_bb:?}, exit_block {exit_block:?}"
-    );
     for block in &loop_blocks {
         if block == &dtn.node {
             assert_eq!(hugr.get_parent(*block), Some(inner_cfg));
@@ -90,8 +82,6 @@ pub fn nest_loop<H: HugrMut>(
             (n, bb)
         })
         .collect::<HashMap<_, _>>();
-    eprintln!("Break blocks: {:?}", BTreeMap::from_iter(&break_blocks));
-
     for (outport, tgt) in hugr
         .node_outputs(loop_block)
         .zip_eq(post_loop_blocks.keys())
@@ -332,10 +322,10 @@ mod test {
     }
 
     #[rstest]
-    //#[case("/Users/alanlawrence/repos/tierkreis/tierkreis_loop.hugr")]
+    #[case("/Users/alanlawrence/repos/tierkreis/tierkreis_loop.hugr")]
     #[case("/Users/alanlawrence/repos/guppylang/multi_exit_loop.hugr")]
     //#[case("/Users/alanlawrence/repos/guppylang/nested_loop.hugr")]
-    //#[case("/Users/alanlawrence/repos/guppylang/early_return.hugr")]
+    #[case("/Users/alanlawrence/repos/guppylang/early_return.hugr")]
     fn tierkreis_loop(#[case] fname: impl AsRef<Path>) {
         use crate::passes::{ComposablePass, Normalize};
 
