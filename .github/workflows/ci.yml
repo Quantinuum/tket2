@@ -314,7 +314,10 @@ jobs:
   tests-nightly-coverage:
     needs: [changes]
     # Run only if there are changes in the relevant files
-    if: ${{ needs.changes.outputs.tket == 'true' && github.event_name != 'merge_group' }}
+    if: >-
+      ${{ (needs.changes.outputs.tket == 'true' ||
+           needs.changes.outputs.pg-libs == 'true') &&
+          github.event_name != 'merge_group' }}
     runs-on: ubuntu-latest
     name: tests (Rust nightly, coverage)
     steps:
@@ -335,6 +338,8 @@ jobs:
           cargo llvm-cov clean --workspace
           cargo llvm-cov --no-report -p tket -p tket-qsystem -p tket1-passes -p badger-optimiser -p compile-rewriter --no-default-features --doctests
           cargo llvm-cov --no-report -p tket -p tket-qsystem -p tket1-passes -p badger-optimiser -p compile-rewriter --all-features --doctests
+      - name: Run T optimizer tests with coverage instrumentation
+        run: cargo llvm-cov --no-report -p tk-pg-t-optimize --doctests
       - name: Generate coverage report
         run: cargo llvm-cov report --codecov --output-path coverage.json
       - name: Upload coverage to codecov.io

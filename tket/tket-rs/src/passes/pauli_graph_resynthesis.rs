@@ -671,6 +671,36 @@ mod tests {
         assert_s_on_qubit(&circuit, 0);
     }
 
+    #[test]
+    fn resynthesizes_with_t_optimization() {
+        let mut circuit = build_simple_circuit(1, |circ| {
+            for gate in [TketOp::T, TketOp::H, TketOp::T, TketOp::H, TketOp::T] {
+                circ.append(gate, [0])?;
+            }
+            Ok(())
+        })
+        .unwrap();
+        let signature = circuit.circuit_signature().into_owned();
+
+        PauliGraphResynthesis::default()
+            .with_t_optimization(true)
+            .with_ancilla_budget(1)
+            .with_parallel_mode(ParallelMode::Off)
+            .run(circuit.hugr_mut())
+            .unwrap();
+
+        circuit.hugr().validate().unwrap();
+        assert_eq!(circuit.circuit_signature().as_ref(), &signature);
+        assert!(count_gate(&circuit, TketOp::T) + count_gate(&circuit, TketOp::Tdg) <= 3);
+        assert!(count_gate(&circuit, TketOp::Measure) > 0);
+        assert!(
+            circuit
+                .hugr()
+                .nodes()
+                .any(|node| circuit.hugr().get_optype(node).is_conditional())
+        );
+    }
+
     #[rstest]
     #[case::different_angles([0.1, 0.2], 0.3)]
     #[case::opposite_angles([0.1, -0.1], 0.0)]
