@@ -1,4 +1,4 @@
-//! Applies algorithm 2 from https://arxiv.org/pdf/2302.07040 to reduce
+//! Applies algorithm 2 from <https://arxiv.org/pdf/2302.07040> to reduce
 //! the number of internal Hadamard gates, then gadgetizes them to produce
 //! a diagonal region of rotations in the circuit.
 use crate::clifford_propagation::{append_gate, collect_cliffords, push_conditional_x, tableau_op};

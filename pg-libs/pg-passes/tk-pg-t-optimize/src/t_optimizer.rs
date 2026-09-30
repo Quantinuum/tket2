@@ -284,6 +284,7 @@ pub fn todd(table: Vec<SIMDVector>, nb_qubits: usize) -> Vec<SIMDVector> {
 mod tests {
     use super::*;
 
+    #[expect(clippy::needless_range_loop)] // Compute each symmetric entry once, then fill its permutations.
     fn signature_tensor(table: &[SIMDVector], nb_qubits: usize) -> Vec<Vec<Vec<bool>>> {
         let mut tensor = vec![vec![vec![false; nb_qubits]; nb_qubits]; nb_qubits];
 
