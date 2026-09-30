@@ -135,10 +135,7 @@ pub fn normalize(pg: &PauliGraph) -> (PauliGraph, Tableau) {
             Op::Gate { data }
                 if *data.get_gate_type() == GateType::H
                     && data.get_conditional_bits().is_empty() => {}
-            // Use CanonicalFormPass to convert other raw gates into Pauli rotations
-            // and tableaux before calling this pass. It also reduces rotation angles
-            // to (-0.5, 0.5) by absorbing Clifford corrections into the tableau.
-            _ => panic!("input must contain rotations, tableaux, or H preparations"),
+            _ => panic!("input must contain rotations, tableaux, or H gates"),
         }
         input.add_op(op.clone());
     }
@@ -158,15 +155,27 @@ pub fn normalize(pg: &PauliGraph) -> (PauliGraph, Tableau) {
 mod tests {
     use super::*;
 
+    fn clifford_tableau(rotations: &[Op], nb_qubits: usize) -> Tableau {
+        let mut tableau = Tableau::eye(nb_qubits);
+        for rotation in rotations {
+            let Op::Rotation { data } = rotation else {
+                panic!("The correction should contain only rotations");
+            };
+            assert_eq!(data.get_angle() % 0.5, 0.0);
+            tableau.postcompose_op(rotation);
+        }
+        tableau
+    }
+
     #[test]
-    fn correction_rotations_match_tableau() {
+    fn test_correction_rotations_match_tableau() {
         for angle in [0.25, -0.25] {
             let mut correction = Tableau::eye(2);
             append_gate(&mut correction, &GateData::new(GateType::X, vec![0]));
             let mut rotations = vec![Op::Rotation {
                 data: RotationData::new(vec![Pauli::X, Pauli::I], 1.0),
             }];
-            let ops = [
+            let operations = [
                 Op::Rotation {
                     data: RotationData::new(vec![Pauli::Z, Pauli::I], angle),
                 },
@@ -183,51 +192,45 @@ mod tests {
                     data: RotationData::new(vec![Pauli::I, Pauli::Z], -angle),
                 },
             ];
-            for op in ops {
+            for op in operations {
                 push_through(&mut correction, &mut rotations, &op);
-                let mut decomposed = Tableau::eye(2);
-                for rotation in &rotations {
-                    let Op::Rotation { data } = rotation else {
-                        unreachable!()
-                    };
-                    assert_eq!((data.get_angle() * 2.0).fract(), 0.0);
-                    decomposed.postcompose_op(rotation);
-                }
-                assert_eq!(decomposed, correction);
+
+                assert_eq!(clifford_tableau(&rotations, 2), correction);
             }
         }
     }
 
     #[test]
     fn test_push_through_gate() {
-        for (gate_type, args) in [
+        let gates = [
             (GateType::S, vec![0]),
             (GateType::Sdg, vec![0]),
             (GateType::ZX, vec![0, 1]),
             (GateType::ZZ, vec![0, 1]),
             (GateType::SWAP, vec![0, 1]),
-        ] {
+        ];
+
+        for (gate_type, args) in gates {
             let op = Op::Gate {
                 data: GateData::new(gate_type, args),
             };
             let mut correction = Tableau::eye(2);
             append_gate(&mut correction, &GateData::new(GateType::V, vec![0]));
-            let mut expected = correction.clone();
-            expected.postcompose_op(&op);
-
             let mut rotations = vec![Op::Rotation {
                 data: RotationData::new(vec![Pauli::X, Pauli::I], 0.5),
             }];
+
+            let mut before = correction.clone();
+            before.postcompose_op(&op);
+
             push_through(&mut correction, &mut rotations, &op);
-            let mut decomposed = Tableau::eye(2);
-            for rotation in &rotations {
-                decomposed.postcompose_op(rotation);
-            }
-            assert_eq!(decomposed, correction);
-            let mut actual = Tableau::eye(2);
-            actual.postcompose_op(&op);
-            actual.compose(&correction);
-            assert_eq!(actual, expected);
+
+            let mut after = Tableau::eye(2);
+            after.postcompose_op(&op);
+            after.compose(&correction);
+
+            assert_eq!(clifford_tableau(&rotations, 2), correction);
+            assert_eq!(after, before);
         }
     }
 }

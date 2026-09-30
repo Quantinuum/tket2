@@ -133,55 +133,72 @@ fn gate_op(kind: GateType, args: Vec<usize>) -> Op {
 mod tests {
     use super::*;
 
-    #[test]
-    fn corrections_stay_outside_todd_input() {
+    fn gadgetize_two_rotations(next_bit: &mut usize) -> (PauliGraph, PauliGraph, PauliGraph) {
         let rotations = vec![
             RotationData::new(vec![Pauli::Z, Pauli::I], 0.25),
             RotationData::new(vec![Pauli::X, Pauli::I], -0.25),
         ];
-        let mut next_bit = 3;
-        let (_, diagonal, suffix) = gadgetize(synthesize(&rotations, 2), 1, &mut next_bit);
-        assert_eq!(next_bit, 4);
+        let synthesis = synthesize(&rotations, 2);
+        gadgetize(synthesis, 1, next_bit)
+    }
+
+    #[test]
+    fn test_gadgetize_produces_diagonal_t_rotations() {
+        let mut next_bit = 0;
+        let (_, diagonal, _) = gadgetize_two_rotations(&mut next_bit);
+
+        assert!(!diagonal.get_ops().is_empty());
         for op in diagonal.get_ops() {
             let Op::Rotation { data } = op else {
-                panic!("non-rotation in TODD input")
+                panic!("TODD input should contain only rotations");
             };
+
             assert_eq!(data.get_angle().abs(), 0.25);
-            assert!(
-                data.get_string()
-                    .iter()
-                    .all(|p| matches!(p, Pauli::I | Pauli::Z))
-            );
+            for pauli in data.get_string() {
+                assert!(matches!(pauli, Pauli::I | Pauli::Z));
+            }
         }
-        let conditions: Vec<_> = suffix
-            .get_ops()
-            .iter()
-            .filter_map(|op| match op {
-                Op::ConditionalBox { data } => Some(data),
-                _ => None,
-            })
-            .collect();
-        assert_eq!(conditions.len(), 1);
-        assert_eq!(conditions[0].get_conditional_bits(), &vec![3]);
-        assert_eq!(conditions[0].get_conditional_values(), &vec![true]);
-        for op in conditions[0].get_ops() {
+    }
+
+    #[test]
+    fn test_gadgetize_adds_conditional_clifford_correction() {
+        let mut next_bit = 3;
+        let (_, _, suffix) = gadgetize_two_rotations(&mut next_bit);
+
+        let mut corrections = Vec::new();
+        for op in suffix.get_ops() {
+            if let Op::ConditionalBox { data } = op {
+                corrections.push(data);
+            }
+        }
+
+        assert_eq!(next_bit, 4);
+        assert_eq!(corrections.len(), 1);
+        let correction = corrections[0];
+        assert_eq!(correction.get_conditional_bits(), &vec![3]);
+        assert_eq!(correction.get_conditional_values(), &vec![true]);
+        assert!(!correction.get_ops().is_empty());
+
+        for op in correction.get_ops() {
             let Op::Rotation { data } = op else {
-                panic!("correction was not lowered")
+                panic!("The correction should contain only rotations");
             };
-            assert_eq!((data.get_angle() * 2.0).fract(), 0.0);
+            assert_eq!(data.get_angle() % 0.5, 0.0);
         }
     }
 
     #[test]
     fn test_synthesize_rotation_sign() {
-        for (pauli, angle) in [(Pauli::X, 0.25), (Pauli::Y, -0.25), (Pauli::Z, 0.25)] {
-            let synthesis = synthesize(&[RotationData::new(vec![pauli], 0.25)], 1);
-            assert_eq!(
-                synthesis.rotations,
-                vec![Op::Rotation {
-                    data: RotationData::new(vec![Pauli::Z], angle),
-                }]
-            );
+        let cases = [(Pauli::X, 0.25), (Pauli::Y, -0.25), (Pauli::Z, 0.25)];
+
+        for (pauli, expected_angle) in cases {
+            let rotations = vec![RotationData::new(vec![pauli], 0.25)];
+            let synthesis = synthesize(&rotations, 1);
+
+            let expected = vec![Op::Rotation {
+                data: RotationData::new(vec![Pauli::Z], expected_angle),
+            }];
+            assert_eq!(synthesis.rotations, expected, "input Pauli: {pauli:?}");
         }
     }
 }

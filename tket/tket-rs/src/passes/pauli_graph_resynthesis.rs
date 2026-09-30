@@ -257,6 +257,19 @@ impl ComposablePass<Hugr> for PauliGraphResynthesis {
             pauli_graph = rotation_merging_pass.transform(&pauli_graph);
 
             if self.t_optimization {
+                let unsupported = pauli_graph.get_ops().iter().find_map(|op| match op {
+                    Op::Measure { .. } => Some("measurements"),
+                    Op::Reset { .. } => Some("resets"),
+                    Op::BlackBox { .. } => Some("black boxes"),
+                    Op::ConditionalBox { .. } => Some("conditional operations"),
+                    _ => None,
+                });
+                if let Some(operation) = unsupported {
+                    return Err(PauliGraphResynthesisErrors::UnsupportedTOptimizationInput {
+                        operation,
+                    });
+                }
+
                 let budget = serial_circ
                     .qubits
                     .iter()
@@ -503,6 +516,15 @@ pub enum PauliGraphResynthesisErrors {
     InvalidParameters {
         /// Name of the invalid size parameter.
         parameter: &'static str,
+    },
+    /// The input contains operations unsupported by T optimization.
+    #[display(
+        "T optimization does not support {operation} in the input circuit. \
+         Disable t_optimization or apply it to a unitary Clifford + T region."
+    )]
+    UnsupportedTOptimizationInput {
+        /// Kind of unsupported operation.
+        operation: &'static str,
     },
     /// Error inlining functions
     #[from]
