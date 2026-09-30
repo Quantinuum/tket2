@@ -40,7 +40,7 @@ use tket_json_rs::register::{Bit, ElementId};
 use tket_json_rs::{OpType as SerialOpType, SerialCircuit};
 
 /// Resynthesize a Clifford + Rz circuit by converting it to a Pauli graph and applying various
-/// optimisation techniques such as:
+/// optimization techniques such as:
 /// - phase folding
 /// - optional phase polynomial resynthesis for T gate reduction
 /// - a synthesis algorithm from pauli graph to Clifford + Rz aimed at reducing the number of 2
