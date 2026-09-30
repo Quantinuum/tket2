@@ -219,9 +219,10 @@ pub enum PauliGraphResynthesisErrors {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hugr::HugrView;
+    use hugr::{CircuitUnit, HugrView};
     use rstest::rstest;
 
+    use crate::extension::rotation::ConstRotation;
     use crate::utils::build_simple_circuit;
     use crate::{Circuit, TketOp};
 
@@ -332,6 +333,43 @@ mod tests {
         assert_eq!(count_gate(&circuit, TketOp::T), 0);
         assert_eq!(count_gate(&circuit, TketOp::Tdg), 0);
         assert_s_on_qubit(&circuit, 0);
+    }
+
+    #[rstest]
+    #[case::different_angles([0.1, 0.2], 0.3)]
+    #[case::opposite_angles([0.1, -0.1], 0.0)]
+    fn merges_arbitrary_rz_angles(#[case] angles: [f64; 2], #[case] expected: f64) {
+        let mut circuit = build_simple_circuit(1, |circ| {
+            for angle in angles {
+                let angle = circ.add_constant(ConstRotation::new(angle).unwrap());
+                circ.append_and_consume(
+                    TketOp::Rz,
+                    [CircuitUnit::Linear(0), CircuitUnit::Wire(angle)],
+                )?;
+            }
+            Ok(())
+        })
+        .unwrap();
+        resynthesize(&mut circuit);
+
+        if expected == 0.0 {
+            let identity = build_simple_circuit(1, |_| Ok(())).unwrap();
+            assert_eq!(circuit.num_operations(), 0);
+            assert_eq!(circuit, identity);
+            return;
+        }
+
+        assert_eq!(circuit.num_operations(), 1);
+        assert_eq!(count_gate(&circuit, TketOp::Rz), 1);
+        let hugr = circuit.hugr();
+        let angles: Vec<_> = hugr
+            .nodes()
+            .filter_map(|node| hugr.get_optype(node).as_const())
+            .filter_map(|constant| constant.value().get_custom_value::<ConstRotation>())
+            .map(ConstRotation::half_turns)
+            .collect();
+        assert_eq!(angles.len(), 1);
+        assert!((angles[0] - expected).abs() < 1e-10);
     }
 
     #[test]
