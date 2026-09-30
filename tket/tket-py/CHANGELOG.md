@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.15.10](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.9...tket-py-v0.15.10) (2026-09-30)
+
+
+### Features
+
+* Pauli Graph Resynthesis ([#2020](https://github.com/Quantinuum/tket2/issues/2020)) ([2737ab7](https://github.com/Quantinuum/tket2/commit/2737ab72d25d7374bf75406369382a3f44c9c700))
+
+
+### Bug Fixes
+
+* Incorrect Bit register name reuse in pytket encoder ([#2051](https://github.com/Quantinuum/tket2/issues/2051)) ([46493f5](https://github.com/Quantinuum/tket2/commit/46493f555809d282e25eb6089a07935c5e10ed11))
+
+
+### Documentation
+
+* Use Oxford spelling consistently in public documentation ([#2016](https://github.com/Quantinuum/tket2/issues/2016)) ([c46d68d](https://github.com/Quantinuum/tket2/commit/c46d68d7fee4bb8630f59dfd255458184e9d28ba))
+
 ## [0.15.9](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.8...tket-py-v0.15.9) (2026-09-07)
 
 
