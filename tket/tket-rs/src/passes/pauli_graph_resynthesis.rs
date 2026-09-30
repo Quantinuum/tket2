@@ -1,4 +1,4 @@
-//! Resynthesis of a Clifford + T circuit through a Pauli graph.
+//! Resynthesis of a Clifford + Rz circuit through a Pauli graph.
 //!
 //! The [`PauliGraphResynthesis`] pass optimises a circuit by converting it to a Pauli graph, and applying:
 //! - Phase folding through the [`RotationMergingPass`]
@@ -43,10 +43,11 @@ use tket_json_rs::{OpType as SerialOpType, SerialCircuit};
 /// optimisation techniques such as:
 /// - phase folding
 /// - optional phase polynomial resynthesis for T gate reduction
-/// - a synthesis algorithm from pauli graph to Clifford + T aimed at reducing the number of 2
+/// - a synthesis algorithm from pauli graph to Clifford + Rz aimed at reducing the number of 2
 ///   qubit gates
 ///
-/// Note: Circuits must be Clifford + T when `t_optimization` is enabled.
+/// Rotation angles must be numeric as symbolic angles are not supported currently.
+/// Circuits must be Clifford + T when `t_optimization` is enabled.
 ///
 /// - `window_size` (`Option<usize>`) - Size of the sliding window for lookahead during synthesis. Default to 1280.
 /// - `pool_size` (`Option<usize>`) - Number of candidate gates to maintain in the pool. Default to max(1000, 0.2*N^2) where N is the number of qubits.
@@ -532,10 +533,10 @@ pub enum PauliGraphResynthesisErrors {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hugr::HugrView;
-
+    use hugr::{CircuitUnit, HugrView};
     use rstest::rstest;
 
+    use crate::extension::rotation::ConstRotation;
     use crate::utils::build_simple_circuit;
     use crate::{Circuit, TketOp};
 
@@ -646,6 +647,43 @@ mod tests {
         assert_eq!(count_gate(&circuit, TketOp::T), 0);
         assert_eq!(count_gate(&circuit, TketOp::Tdg), 0);
         assert_s_on_qubit(&circuit, 0);
+    }
+
+    #[rstest]
+    #[case::different_angles([0.1, 0.2], 0.3)]
+    #[case::opposite_angles([0.1, -0.1], 0.0)]
+    fn merges_arbitrary_rz_angles(#[case] angles: [f64; 2], #[case] expected: f64) {
+        let mut circuit = build_simple_circuit(1, |circ| {
+            for angle in angles {
+                let angle = circ.add_constant(ConstRotation::new(angle).unwrap());
+                circ.append_and_consume(
+                    TketOp::Rz,
+                    [CircuitUnit::Linear(0), CircuitUnit::Wire(angle)],
+                )?;
+            }
+            Ok(())
+        })
+        .unwrap();
+        resynthesize(&mut circuit);
+
+        if expected == 0.0 {
+            let identity = build_simple_circuit(1, |_| Ok(())).unwrap();
+            assert_eq!(circuit.num_operations(), 0);
+            assert_eq!(circuit, identity);
+            return;
+        }
+
+        assert_eq!(circuit.num_operations(), 1);
+        assert_eq!(count_gate(&circuit, TketOp::Rz), 1);
+        let hugr = circuit.hugr();
+        let angles: Vec<_> = hugr
+            .nodes()
+            .filter_map(|node| hugr.get_optype(node).as_const())
+            .filter_map(|constant| constant.value().get_custom_value::<ConstRotation>())
+            .map(ConstRotation::half_turns)
+            .collect();
+        assert_eq!(angles.len(), 1);
+        assert!((angles[0] - expected).abs() < 1e-10);
     }
 
     #[test]

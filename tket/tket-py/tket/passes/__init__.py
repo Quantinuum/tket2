@@ -518,11 +518,14 @@ class QSystemRebasePass(ComposablePass):
 @dataclass
 class PauliGraphResynthesis(ComposablePass):
     """
-    An optimisation pass that resynthesizes a Clifford + T circuit by converting it to a Pauli Graph
+    An optimisation pass that resynthesizes a Clifford + Rz circuit by converting it to a Pauli Graph
     and applying various optimisation techniques such as:
     - phase folding
-    - a synthesis algorithm from Pauli Graph to Clifford + T aimed at reducing the number of 2
+    - a synthesis algorithm from Pauli Graph to Clifford + Rz aimed at reducing the number of 2
     qubit gates
+
+    Rotation angles must be numeric as symbolic angles are not supported currently.
+
     Parameters:
     - window_size: Sets the size of the sliding window used for lookahead during synthesis. Must be positive.
     - pool_size: Sets the number of candidate gates to maintain in the pool. Must be positive.
