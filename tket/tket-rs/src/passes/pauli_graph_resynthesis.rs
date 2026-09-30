@@ -1,4 +1,4 @@
-//! Resynthesis of a Clifford + T circuit through a Pauli graph.
+//! Resynthesis of a Clifford + Rz circuit through a Pauli graph.
 //!
 //! The [`PauliGraphResynthesis`] pass optimises a circuit by converting it to a Pauli graph, and applying:
 //! - Phase folding through the [`RotationMergingPass`]
@@ -28,11 +28,10 @@ use std::sync::Arc;
 /// Resynthesize a Clifford + Rz circuit by converting it to a Pauli graph and applying various
 /// optimisation techniques such as:
 /// - phase folding
-/// - optional phase polynomial resynthesis for T gate reduction
-/// - a synthesis algorithm from pauli graph to Clifford + T aimed at reducing the number of 2
+/// - a synthesis algorithm from pauli graph to Clifford + Rz aimed at reducing the number of 2
 ///   qubit gates
 ///
-/// Note: Circuits must be Clifford + T when `t_optimization` is enabled.
+/// Rotation angles must be numeric as symbolic angles are not supported currently.
 ///
 /// - `window_size` (`Option<usize>`) - Size of the sliding window for lookahead during synthesis. Default to 1280.
 /// - `pool_size` (`Option<usize>`) - Number of candidate gates to maintain in the pool. Default to max(1000, 0.2*N^2) where N is the number of qubits.
