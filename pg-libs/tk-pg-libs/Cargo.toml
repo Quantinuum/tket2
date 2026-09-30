@@ -14,12 +14,13 @@ categories = { workspace = true }
 
 [features]
 default = []
-unstable_simd = ["tk-pg-bitpacked/unstable_simd", "tk-pg-qm-tableau/unstable_simd", "tk-pg-greedy-synth/unstable_simd"]
+unstable_simd = ["tk-pg-bitpacked/unstable_simd", "tk-pg-qm-tableau/unstable_simd", "tk-pg-greedy-synth/unstable_simd", "tk-pg-t-optimize/unstable_simd"]
 
 [dependencies]
 tk-pg-core = { path = "../tk-pg-core", version = "0.1.0" }
 tk-pg-canonical-form = { path = "../pg-passes/tk-pg-canonical-form", version = "0.1.0" }
 tk-pg-optimize = { path = "../pg-passes/tk-pg-optimize", version = "0.1.0" }
+tk-pg-t-optimize = { path = "../pg-passes/tk-pg-t-optimize", version = "0.1.0" }
 tk-pg-greedy-synth = { path = "../pg-passes/tk-pg-greedy-synth", version = "0.1.0" }
 tk-pg-rebase = { path = "../pg-passes/tk-pg-rebase", version = "0.1.0" }
 tk-pg-converter = { path = "../pg-converters/tk-pg-converter", version = "0.1.0" }
