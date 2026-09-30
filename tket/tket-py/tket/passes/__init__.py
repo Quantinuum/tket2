@@ -524,10 +524,10 @@ class PauliGraphResynthesis(ComposablePass):
     - a synthesis algorithm from Pauli Graph to Clifford + T aimed at reducing the number of 2
     qubit gates
     Parameters:
-    - window_size: Sets the size of the sliding window used for lookahead during synthesis.
-    - pool_size: Sets the number of candidate gates to maintain in the pool.
-    - top_up_size: Sets the number of candidate gates to add after each TQE gate.
-    - seed: Sets the random seed used to sample candidate gates.
+    - window_size: Sets the size of the sliding window used for lookahead during synthesis. Must be positive.
+    - pool_size: Sets the number of candidate gates to maintain in the pool. Must be positive.
+    - top_up_size: Sets the number of candidate gates to add after each TQE gate. Must be positive.
+    - seed: Sets the random seed used to sample candidate gates. Must be non-negative.
     - parallel_mode: A :class:`ParallelMode` for candidate synthesis.
       Defaults to :attr:`ParallelMode.Auto`.
     """
@@ -540,13 +540,18 @@ class PauliGraphResynthesis(ComposablePass):
     _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
 
     def __post_init__(self) -> None:
-        self._validate_parallel_mode()
+        self._validate_parameters()
 
-    def _validate_parallel_mode(self) -> None:
+    def _validate_parameters(self) -> None:
+        for parameter in ("window_size", "pool_size", "top_up_size"):
+            value = getattr(self, parameter)
+            if value is not None and value <= 0:
+                raise ValueError(f"{parameter} must be positive")
+        if self.seed is not None and self.seed < 0:
+            raise ValueError("seed must be non-negative")
         if not isinstance(self.parallel_mode, ParallelMode):
             raise TypeError(
-                "parallel_mode must be a ParallelMode: "
-                "ParallelMode.Auto, ParallelMode.On, or ParallelMode.Off"
+                "parallel_mode must be an instance of the ParallelMode enum"
             )
 
     def with_scope(self, scope: PassScope) -> PauliGraphResynthesis:
@@ -563,7 +568,7 @@ class PauliGraphResynthesis(ComposablePass):
         )
 
     def _pauli_graph_resynthesis(self, hugr: Hugr, inplace: bool) -> PassResult:
-        self._validate_parallel_mode()
+        self._validate_parameters()
         program = _state.CompilationState.from_python(hugr)
         _passes.pauli_graph_resynthesis(
             program._inner,
@@ -572,7 +577,7 @@ class PauliGraphResynthesis(ComposablePass):
             pool_size=self.pool_size,
             top_up_size=self.top_up_size,
             seed=self.seed,
-            parallel_mode=self.parallel_mode.value,
+            parallel_mode=self.parallel_mode,
         )
         package = program.to_python()
         return PassResult.for_pass(

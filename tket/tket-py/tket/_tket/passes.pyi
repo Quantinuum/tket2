@@ -3,7 +3,7 @@ from typing import Literal
 
 from hugr.passes.scope import GlobalScope, PassScope
 
-from ..passes import inline_funcs
+from ..passes import ParallelMode, inline_funcs
 from .optimiser import BadgerOptimiser
 from .state import CompilationState
 
@@ -112,7 +112,7 @@ def pauli_graph_resynthesis(
     pool_size: int | None = None,
     top_up_size: int | None = None,
     seed: int | None = None,
-    parallel_mode: str | None = None,
+    parallel_mode: ParallelMode | None = None,
 ) -> None:
     """
     Resynthesizes a Clifford + T circuit by converting it to a Pauli graph and applying various
@@ -125,8 +125,8 @@ def pauli_graph_resynthesis(
     - pool_size: Sets the number of candidate gates to maintain in the pool.
     - top_up_size: Sets the number of candidate gates to add after each TQE gate.
     - seed: Sets the random seed used to sample candidate gates.
-    - parallel_mode: One of "Auto", "On", or "Off" (case-sensitive).
-      Omitted or None selects "Auto". Invalid strings raise ValueError.
+    - parallel_mode: ParallelMode.Auto, ParallelMode.On, or ParallelMode.Off.
+      Omitted or None selects ParallelMode.Auto.
 
     Raises:
         PauliGraphResynthesisError: If the resynthesis pass fails.

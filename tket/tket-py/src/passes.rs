@@ -242,14 +242,29 @@ fn resolve_modifiers(circ: &mut CompilationState, scope: Option<PyPassScope>) ->
     Ok(())
 }
 
-fn parse_parallel_mode(s: &str) -> PyResult<pg_greedy_synth::ParallelMode> {
-    match s.trim() {
-        "Auto" => Ok(pg_greedy_synth::ParallelMode::Auto),
-        "On" => Ok(pg_greedy_synth::ParallelMode::On),
-        "Off" => Ok(pg_greedy_synth::ParallelMode::Off),
-        _ => Err(pyo3::exceptions::PyValueError::new_err(format!(
-            "Invalid parallel_mode {s:?}; expected 'Auto', 'On', or 'Off'"
-        ))),
+struct PyParallelMode(pg_greedy_synth::ParallelMode);
+
+impl<'a, 'py> FromPyObject<'a, 'py> for PyParallelMode {
+    type Error = PyErr;
+
+    fn extract(ob: Borrowed<'a, 'py, PyAny>) -> PyResult<Self> {
+        use pg_greedy_synth::ParallelMode;
+
+        let enum_type = ob.py().import("tket.passes")?.getattr("ParallelMode")?;
+
+        for (name, mode) in [
+            ("Auto", ParallelMode::Auto),
+            ("On", ParallelMode::On),
+            ("Off", ParallelMode::Off),
+        ] {
+            if ob.is(&enum_type.getattr(name)?) {
+                return Ok(Self(mode));
+            }
+        }
+
+        Err(pyo3::exceptions::PyTypeError::new_err(
+            "parallel_mode must be an instance of the ParallelMode enum",
+        ))
     }
 }
 
@@ -262,7 +277,7 @@ fn pauli_graph_resynthesis(
     pool_size: Option<usize>,
     top_up_size: Option<usize>,
     seed: Option<usize>,
-    parallel_mode: Option<String>,
+    parallel_mode: Option<PyParallelMode>,
 ) -> PyResult<()> {
     let py_scope = scope.unwrap_or_default();
     let mut pass = tket::passes::PauliGraphResynthesis::default_with_scope(py_scope.scope);
@@ -278,11 +293,7 @@ fn pauli_graph_resynthesis(
     if let Some(s) = seed {
         pass = pass.with_seed(s as u64);
     }
-    let parallel_mode = parallel_mode
-        .as_deref()
-        .map(parse_parallel_mode)
-        .transpose()?
-        .unwrap_or(pg_greedy_synth::ParallelMode::Auto);
+    let parallel_mode = parallel_mode.map_or(pg_greedy_synth::ParallelMode::Auto, |mode| mode.0);
     pass = pass.with_parallel_mode(parallel_mode);
 
     pass.run(&mut circ.hugr).convert_pyerrs()?;

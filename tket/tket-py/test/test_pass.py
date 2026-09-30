@@ -562,21 +562,44 @@ def test_custom_options_and_scope() -> None:
         pool_size=32,
         top_up_size=4,
         seed=7,
-        parallel_mode="On",
+        parallel_mode=ParallelMode.On,
     )
     assert _count_hadamards(result.hugr) == 0
 
 
-def test_wrapper_requires_parallel_mode_enum() -> None:
+@pytest.mark.parametrize(
+    ("parameter", "value", "message"),
+    [
+        ("window_size", -1, "window_size must be positive"),
+        ("window_size", 0, "window_size must be positive"),
+        ("pool_size", -1, "pool_size must be positive"),
+        ("pool_size", 0, "pool_size must be positive"),
+        ("top_up_size", -1, "top_up_size must be positive"),
+        ("top_up_size", 0, "top_up_size must be positive"),
+        ("seed", -1, "seed must be non-negative"),
+    ],
+)
+def test_resynthesis_rejects_invalid_parameters(
+    parameter: str, value: int, message: str
+) -> None:
+    hugr = from_coms(H(0), H(0)).to_python().modules[0]
+    options: dict[str, Any] = {parameter: value}
+
+    with pytest.raises(ValueError, match=f"^{message}$"):
+        PauliGraphResynthesis(**options)
+
+    optimisation = PauliGraphResynthesis()
+    setattr(optimisation, parameter, value)
+
+    with pytest.raises(ValueError, match=f"^{message}$"):
+        optimisation.run(hugr, inplace=True)
+
+    assert _count_hadamards(hugr) == 2
+
+
+def test_wrapper_requires_enum() -> None:
     invalid_mode: Any = "on"
-    with pytest.raises(TypeError, match="parallel_mode must be a ParallelMode"):
+    with pytest.raises(
+        TypeError, match="parallel_mode must be an instance of the ParallelMode enum"
+    ):
         PauliGraphResynthesis(parallel_mode=invalid_mode)
-
-
-def test_binding_rejects_invalid_parallel_mode() -> None:
-    circuit = from_coms(H(0), H(0))
-
-    with pytest.raises(ValueError, match="expected 'Auto', 'On', or 'Off'"):
-        rust_passes.pauli_graph_resynthesis(circuit._inner, parallel_mode="on")
-
-    assert _count_hadamards(circuit.to_python().modules[0]) == 2
