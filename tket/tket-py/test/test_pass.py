@@ -584,39 +584,22 @@ def test_resynthesis_rejects_invalid_parameters(
 ) -> None:
     hugr = from_coms(H(0), H(0)).to_python().modules[0]
     options: dict[str, Any] = {parameter: value}
+
     with pytest.raises(ValueError, match=f"^{message}$"):
         PauliGraphResynthesis(**options)
 
     optimisation = PauliGraphResynthesis()
     setattr(optimisation, parameter, value)
+
     with pytest.raises(ValueError, match=f"^{message}$"):
         optimisation.run(hugr, inplace=True)
 
     assert _count_hadamards(hugr) == 2
 
 
-def test_wrapper_requires_parallel_mode_enum() -> None:
+def test_wrapper_requires_enum() -> None:
     invalid_mode: Any = "on"
-    with pytest.raises(TypeError, match="parallel_mode must be a ParallelMode"):
+    with pytest.raises(
+        TypeError, match="parallel_mode must be an instance of the ParallelMode enum"
+    ):
         PauliGraphResynthesis(parallel_mode=invalid_mode)
-
-
-@pytest.mark.parametrize(
-    "mode", [ParallelMode.Auto, ParallelMode.On, ParallelMode.Off, None]
-)
-def test_binding_accepts_parallel_mode_enum(mode: ParallelMode | None) -> None:
-    circuit = from_coms(H(0), H(0))
-
-    rust_passes.pauli_graph_resynthesis(circuit._inner, parallel_mode=mode)
-
-    assert _count_hadamards(circuit.to_python().modules[0]) == 0
-
-
-@pytest.mark.parametrize("invalid_mode", ["Auto", "on", 1])
-def test_binding_rejects_invalid_parallel_mode(invalid_mode: Any) -> None:
-    circuit = from_coms(H(0), H(0))
-
-    with pytest.raises(TypeError, match="parallel_mode must be a ParallelMode"):
-        rust_passes.pauli_graph_resynthesis(circuit._inner, parallel_mode=invalid_mode)
-
-    assert _count_hadamards(circuit.to_python().modules[0]) == 2

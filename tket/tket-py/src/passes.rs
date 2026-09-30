@@ -248,24 +248,23 @@ impl<'a, 'py> FromPyObject<'a, 'py> for PyParallelMode {
     type Error = PyErr;
 
     fn extract(ob: Borrowed<'a, 'py, PyAny>) -> PyResult<Self> {
+        use pg_greedy_synth::ParallelMode;
+
         let enum_type = ob.py().import("tket.passes")?.getattr("ParallelMode")?;
-        if !ob.is_instance(&enum_type)? {
-            return Err(pyo3::exceptions::PyTypeError::new_err(
-                "parallel_mode must be a ParallelMode: ParallelMode.Auto, ParallelMode.On, or ParallelMode.Off",
-            ));
-        }
-        let value: String = ob.getattr("value")?.extract()?;
-        let mode = match value.as_str() {
-            "Auto" => pg_greedy_synth::ParallelMode::Auto,
-            "On" => pg_greedy_synth::ParallelMode::On,
-            "Off" => pg_greedy_synth::ParallelMode::Off,
-            _ => {
-                return Err(pyo3::exceptions::PyValueError::new_err(format!(
-                    "Unknown ParallelMode value: {value:?}"
-                )));
+
+        for (name, mode) in [
+            ("Auto", ParallelMode::Auto),
+            ("On", ParallelMode::On),
+            ("Off", ParallelMode::Off),
+        ] {
+            if ob.is(&enum_type.getattr(name)?) {
+                return Ok(Self(mode));
             }
-        };
-        Ok(Self(mode))
+        }
+
+        Err(pyo3::exceptions::PyTypeError::new_err(
+            "parallel_mode must be an instance of the ParallelMode enum",
+        ))
     }
 }
 

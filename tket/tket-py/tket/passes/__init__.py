@@ -551,8 +551,7 @@ class PauliGraphResynthesis(ComposablePass):
             raise ValueError("seed must be non-negative")
         if not isinstance(self.parallel_mode, ParallelMode):
             raise TypeError(
-                "parallel_mode must be a ParallelMode: "
-                "ParallelMode.Auto, ParallelMode.On, or ParallelMode.Off"
+                "parallel_mode must be an instance of the ParallelMode enum"
             )
 
     def with_scope(self, scope: PassScope) -> PauliGraphResynthesis:
