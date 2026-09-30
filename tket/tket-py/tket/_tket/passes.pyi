@@ -118,6 +118,7 @@ def pauli_graph_resynthesis(
     Resynthesizes a Clifford + T circuit by converting it to a Pauli graph and applying various
     optimisation techniques such as:
     - phase folding
+    - phase polynomial resyntheis for further T count reduction
     - a synthesis algorithm from pauli graph to Clifford + T aimed at reducing the number of 2
     qubit gates
     Parameters:
