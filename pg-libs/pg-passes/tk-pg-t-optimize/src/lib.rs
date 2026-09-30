@@ -45,8 +45,6 @@ impl TOptimizationPass {
 
     /// Optimize a graph whose rotation angles are multiples of 0.25 half turns.
     ///
-    /// # Panics
-    ///
     /// Panics if the input contains unsupported operations or non-idle reserved ancillas.
     pub fn optimize(&self, graph: &PauliGraph) -> PauliGraph {
         optimize(graph, self.ancilla_budget, self.first_bit)

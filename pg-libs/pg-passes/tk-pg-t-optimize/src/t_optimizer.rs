@@ -2,16 +2,21 @@ use crate::simd_vector::SIMDVector;
 use std::collections::{HashMap, hash_map::Entry};
 use tk_pg_core::{Op, Pauli, PauliGraph, RotationData};
 
-/// Parity strings with coefficients in units of 0.25 half turns, modulo eight.
+/// Parity table representation of a phase polynomial.
 type PhasePolynomial = Vec<(SIMDVector, i32)>;
 
-/// Reduce the T count of I/Z rotations whose angles are multiples of 0.25 half turns.
+// Applies the todd algorithm to resynthesize the phase polynomial
+// within the given pauli graph.
+//
+// graph must only be comprised of rotations with I/Z letters and
+// the angles must be 0.25
 pub fn t_optimization(graph: &mut PauliGraph) {
-    let polynomial = rotations_to_simd(graph);
-    let reduced = apply_todd(polynomial, graph.get_n_qubits());
+    let phase_polynomial = rotations_to_simd(graph);
+    let reduced = apply_todd(phase_polynomial, graph.get_n_qubits());
     *graph = simd_to_rotations(reduced, graph.get_n_qubits());
 }
 
+/// Converts pauli graph rotations into SIMD vectors.
 fn rotations_to_simd(graph: &PauliGraph) -> PhasePolynomial {
     let n = graph.get_n_qubits();
     let mut phase_polynomial = Vec::new();
@@ -36,6 +41,8 @@ fn rotations_to_simd(graph: &PauliGraph) -> PhasePolynomial {
     phase_polynomial
 }
 
+// Converts a simd vector representation of a phase polynomial
+// into its equivalent pauli graph representation.
 fn simd_to_rotations(result: PhasePolynomial, n: usize) -> PauliGraph {
     let ops = result
         .into_iter()
@@ -52,21 +59,20 @@ fn simd_to_rotations(result: PhasePolynomial, n: usize) -> PauliGraph {
     PauliGraph::new(n).with_ops(ops)
 }
 
-fn apply_todd(mut weighted: PhasePolynomial, n: usize) -> PhasePolynomial {
-    let table = weighted
+// Applies the todd algorithm to resynthesize the phase polynomial
+fn apply_todd(mut phase_polynomial: PhasePolynomial, n: usize) -> PhasePolynomial {
+    let table = phase_polynomial
         .iter()
         .filter(|(_, c)| c.rem_euclid(2) != 0)
         .map(|(p, _)| p.clone())
         .collect();
 
     let mut result: Vec<_> = todd(table, n).into_iter().map(|p| (p, 1)).collect();
-    weighted.extend(result.iter().map(|(p, c)| (p.clone(), -c)));
+    phase_polynomial.extend(result.iter().map(|(p, c)| (p.clone(), -c)));
 
-    // TODD leaves a Clifford difference from the original polynomial. Recover it
-    // using single-qubit and two-qubit parities; higher-degree terms vanish modulo eight.
     let mut linear: Vec<i32> = (0..n)
         .map(|q| {
-            weighted
+            phase_polynomial
                 .iter()
                 .filter(|(p, _)| p.get(q))
                 .map(|(_, c)| c)
@@ -76,7 +82,7 @@ fn apply_todd(mut weighted: PhasePolynomial, n: usize) -> PhasePolynomial {
 
     for q in 0..n {
         for r in q + 1..n {
-            let quadratic = weighted
+            let quadratic = phase_polynomial
                 .iter()
                 .filter(|(p, _)| p.get(q) && p.get(r))
                 .map(|(_, c)| c)
@@ -91,7 +97,6 @@ fn apply_todd(mut weighted: PhasePolynomial, n: usize) -> PhasePolynomial {
             parity.flip_bit(q);
             parity.flip_bit(r);
             result.push((parity, quadratic));
-            // A two-qubit parity also contributes to both linear terms.
             linear[q] -= quadratic;
             linear[r] -= quadratic;
         }
@@ -104,6 +109,7 @@ fn apply_todd(mut weighted: PhasePolynomial, n: usize) -> PhasePolynomial {
     result
 }
 
+/// Removes zero columns and cancels duplicate parity columns in pairs.
 fn proper(mut table: Vec<SIMDVector>) -> Vec<SIMDVector> {
     let mut map = HashMap::with_capacity(table.len());
     let mut to_remove = Vec::new();
@@ -129,6 +135,8 @@ fn proper(mut table: Vec<SIMDVector>) -> Vec<SIMDVector> {
     table
 }
 
+/// Reduces a row against the binary basis using XOR, inserting it if independent.
+/// Returns whether the insertion increased the rank of the basis.
 fn insert_row(basis: &mut [Option<SIMDVector>], mut row: SIMDVector) -> bool {
     while let Some(pivot) = row.first_one() {
         if let Some(existing) = &basis[pivot] {
@@ -166,6 +174,7 @@ fn separating_kernel(basis: &[Option<SIMDVector>], i: usize, j: usize) -> Option
     Some(y)
 }
 
+/// Looks up the cached bitwise AND of two distinct rows, regardless of index order.
 fn product(products: &[Vec<SIMDVector>], a: usize, b: usize) -> &SIMDVector {
     let (a, b) = (a.min(b), a.max(b));
     &products[a][b - a - 1]
@@ -220,8 +229,6 @@ pub fn todd(table: Vec<SIMDVector>, nb_qubits: usize) -> Vec<SIMDVector> {
                     .expect("proper columns are distinct");
                 let mut basis = base.clone();
                 let mut rank = base_rank;
-                // We will add z to each column selected by y. These constraints on y
-                // ensure that the change to the phase polynomial is Clifford.
                 'constraints: for a in 0..rows.len() {
                     if a == pivot {
                         continue;
@@ -247,8 +254,6 @@ pub fn todd(table: Vec<SIMDVector>, nb_qubits: usize) -> Vec<SIMDVector> {
                     continue;
                 }
                 if let Some(y) = separating_kernel(&basis, i, j) {
-                    // y selects exactly one of i and j, making the two columns equal.
-                    // proper() then removes the pair.
                     let mut z = table[i].clone();
                     z.xor(&table[j]);
                     let mut candidate = table.clone();
@@ -258,7 +263,6 @@ pub fn todd(table: Vec<SIMDVector>, nb_qubits: usize) -> Vec<SIMDVector> {
                         }
                     }
                     if y.popcount() % 2 == 1 {
-                        // Add an extra z column when y selects an odd number of columns.
                         candidate.push(z);
                     }
                     candidate = proper(candidate);
@@ -272,6 +276,152 @@ pub fn todd(table: Vec<SIMDVector>, nb_qubits: usize) -> Vec<SIMDVector> {
         match replacement {
             Some(next) => table = next,
             None => return table,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn signature_tensor(table: &[SIMDVector], nb_qubits: usize) -> Vec<Vec<Vec<bool>>> {
+        let mut tensor = vec![vec![vec![false; nb_qubits]; nb_qubits]; nb_qubits];
+
+        for alpha in 0..nb_qubits {
+            for beta in alpha..nb_qubits {
+                for gamma in beta..nb_qubits {
+                    let mut count = 0u32;
+                    for col in table {
+                        if col.get(alpha) && col.get(beta) && col.get(gamma) {
+                            count += 1;
+                        }
+                    }
+                    let val = count % 2 == 1;
+                    tensor[alpha][beta][gamma] = val;
+                    tensor[alpha][gamma][beta] = val;
+                    tensor[beta][alpha][gamma] = val;
+                    tensor[beta][gamma][alpha] = val;
+                    tensor[gamma][alpha][beta] = val;
+                    tensor[gamma][beta][alpha] = val;
+                }
+            }
+        }
+
+        tensor
+    }
+
+
+    struct Lcg {
+        state: u64,
+    }
+
+    impl Lcg {
+        fn new(seed: u64) -> Self {
+            Lcg { state: seed }
+        }
+
+        fn next_u64(&mut self) -> u64 {
+            self.state = self.state.wrapping_mul(6364136223846793005).wrapping_add(1);
+            self.state
+        }
+
+        fn next_bool(&mut self) -> bool {
+            self.next_u64() >> 63 != 0
+        }
+    }
+
+    fn random_parity_table(nb_qubits: usize, nb_columns: usize, seed: u64) -> Vec<SIMDVector> {
+        let mut rng = Lcg::new(seed);
+        (0..nb_columns)
+            .map(|_| {
+                let mut col = SIMDVector::new(nb_qubits);
+                for q in 0..nb_qubits {
+                    if rng.next_bool() {
+                        col.flip_bit(q);
+                    }
+                }
+                col
+            })
+            .collect()
+    }
+
+
+    #[test]
+    fn signature_tensor_two_duplicate_columns() {
+        let nb_qubits = 2;
+        let mut col = SIMDVector::new(nb_qubits);
+        col.flip_bit(0);
+        col.flip_bit(1);
+
+        let table = vec![col.clone(), col];
+        let s = signature_tensor(&table, nb_qubits);
+
+        assert!(!s[0][0][0]);
+        assert!(!s[0][0][1]);
+        assert!(!s[0][1][1]);
+        assert!(!s[1][1][1]);
+    }
+
+    #[test]
+    fn todd_preserves_signature_tensor() {
+        let nb_qubits = 4;
+        let nb_columns = 12;
+
+        for seed in 0..20 {
+            let table = random_parity_table(nb_qubits, nb_columns, seed);
+            let original = signature_tensor(&table, nb_qubits);
+
+            let reduced = todd(table, nb_qubits);
+            let after = signature_tensor(&reduced, nb_qubits);
+
+            assert_eq!(original, after, "signature tensor changed for seed {seed}");
+        }
+    }
+
+    #[test]
+    fn todd_preserves_signature_tensor_larger() {
+        let nb_qubits = 6;
+        let nb_columns = 30;
+
+        let table = random_parity_table(nb_qubits, nb_columns, 99);
+        let original = signature_tensor(&table, nb_qubits);
+
+        let reduced = todd(table, nb_qubits);
+        let after = signature_tensor(&reduced, nb_qubits);
+
+        assert_eq!(original, after);
+    }
+
+    #[test]
+    fn todd_reduces_column_count() {
+        let nb_qubits = 5;
+        let nb_columns = 20;
+
+        let table = random_parity_table(nb_qubits, nb_columns, 7);
+        let original_len = table.len();
+
+        let reduced = todd(table, nb_qubits);
+
+        assert!(reduced.len() <= original_len);
+    }
+
+    #[test]
+    fn todd_no_duplicates_in_output() {
+        let nb_qubits = 5;
+        let nb_columns = 20;
+
+        let table = random_parity_table(nb_qubits, nb_columns, 13);
+        let reduced = todd(table, nb_qubits);
+
+        for i in 0..reduced.len() {
+            for j in (i + 1)..reduced.len() {
+                let mut diff = reduced[i].clone();
+                diff.xor(&reduced[j]);
+                assert!(
+                    diff.first_one().is_some(),
+                    "duplicate columns {i} and {j} in output"
+                );
+            }
         }
     }
 }
