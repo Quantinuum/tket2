@@ -87,11 +87,11 @@ pub fn nest_loop<H: HugrMut>(
         hugr.connect(loop_block, outport, tgt, 0);
     }
 
-    // Any edges that exit the original subtree necessarily exit the loop (as entirely
-    // contained within subtree), so the corresponding break-blocks will not be added by detach
-    let break_blocks_exitting_subtree = leaf_targets(&dtn.exit_edges, hugr)
+    // Any edges that exit the original subtree necessarily exit the loop (which is entirely
+    // contained within the subtree), so the corresponding break-blocks will not be added by detach
+    let break_blocks_for_subtree_exits = leaf_targets(&dtn.exit_edges, hugr)
         .map(|tgt| break_blocks[&tgt])
-        .collect::<Vec<_>>();
+        .collect();
 
     // now build the dominator tree for inside the loop. Its exit-edges will include all control-flow edges to:
     //   break_bb (i.e. all edges from detached subtree's individual break_block's)
@@ -112,7 +112,7 @@ pub fn nest_loop<H: HugrMut>(
     let loop_dtn = insert_nodes(
         loop_dtn,
         hugr,
-        break_blocks_exitting_subtree,
+        break_blocks_for_subtree_exits,
         Some(break_bb),
         Some(continue_bb),
         Some(exit_block),
@@ -287,30 +287,27 @@ fn tag_block<H: HugrMut>(hugr: &mut H, after: H::Node, tag: usize, rows: Vec<Typ
 fn insert_nodes<N: HugrNode>(
     dtn: DomTreeWithBackedges<N>,
     hugr: &impl HugrView<Node = N>,
-    break_blocks: Vec<N>, // all individually insertable at LCA of all exit edges
-    tag_break: Option<N>, // insert at LCA of break_blocks and its own uses
-    tag_continue: Option<N>, // individually insertable at LCA of all exit edges
-    exit_block: Option<N>, // insert at LCA of tag_break + tag_continue
+    break_blocks: HashSet<N>, // all individually insertable at LCA of all exit edges
+    tag_break: Option<N>,     // insert at LCA of break_blocks and its own uses
+    tag_continue: Option<N>,  // individually insertable at LCA of all exit edges
+    exit_block: Option<N>,    // insert at LCA of tag_break + tag_continue
 ) -> DomTreeWithBackedges<N> {
-    let nodes = HashSet::from_iter(
+    let nodes = Vec::from_iter(
         break_blocks
             .iter()
             .copied()
             .chain(tag_continue)
             .chain(tag_break),
-    );
-    assert!(nodes.is_superset(&leaf_targets(&dtn.exit_edges, hugr).collect::<HashSet<_>>()));
-    // At least some blocks must be provided
-    assert!(!break_blocks.is_empty() || tag_break.is_some() || tag_continue.is_some());
+    ); // preserves control-flow order as above
 
-    let direct_children = dtn
-        .children
-        .iter()
-        .map(|(_gp, c)| c.node)
-        .collect::<HashSet<_>>();
+    if nodes.is_empty() {
+        assert_eq!(exit_block, None);
+        return dtn;
+    }
+
     let user_and_tgts = hugr
         .output_neighbours(dtn.node)
-        .filter_map(|tgt| (!direct_children.contains(&tgt)).then_some((dtn.node, tgt)))
+        .map(|tgt| (dtn.node, tgt))
         .chain(dtn.children.iter().flat_map(|(_gp, child)| {
             leaf_targets(&child.exit_edges, hugr).map(|tgt| (child.node, tgt))
         }))
@@ -323,82 +320,60 @@ fn insert_nodes<N: HugrNode>(
         .collect();
 
     for (src, tgt) in user_and_tgts {
-        tgt_users
-            .get_mut(&tgt)
-            .expect(format!("No users for {tgt} from {src}").as_str())
-            .push(src);
-        if (Some(tgt) == tag_break || Some(tgt) == tag_continue) {
-            // will also use exit block
-            if let Some(exit_block) = exit_block {
-                tgt_users.get_mut(&exit_block).unwrap().push(src);
-            }
-        } else if exit_block.is_none_or(|eb| tgt != eb) {
-            debug_assert!(break_blocks.contains(&tgt)); // EXPENSIVE
-            if let Some(tag_break) = tag_break {
-                tgt_users.get_mut(&tag_break).unwrap().push(src);
-            }
-            if let Some(exit_block) = exit_block {
-                tgt_users.get_mut(&exit_block).unwrap().push(src);
+        if let Some(v) = tgt_users.get_mut(&tgt) {
+            v.push(src);
+            if Some(tgt) == tag_break || Some(tgt) == tag_continue {
+                // will also use exit block
+                if let Some(exit_block) = exit_block {
+                    tgt_users.get_mut(&exit_block).unwrap().push(src);
+                }
+            } else if exit_block.is_none_or(|eb| tgt != eb) {
+                debug_assert!(break_blocks.contains(&tgt)); // EXPENSIVE
+                if let Some(tag_break) = tag_break {
+                    tgt_users.get_mut(&tag_break).unwrap().push(src);
+                }
+                if let Some(exit_block) = exit_block {
+                    tgt_users.get_mut(&exit_block).unwrap().push(src);
+                }
             }
         }
     }
     // Anything in `nodes` where which_children has exactly one entry, should be passed to recursive call to that child
-    let mut break_blocks_per_child = HashMap::<N, Vec<N>>::new();
-    let mut tag_continue_child = None;
-    let mut tag_break_child = None;
-    let mut exit_block_child = None;
-    let new_children_here = tgt_users
+    let mut blocks_for_child = HashMap::<N, HashSet<N>>::new();
+    for (block, children_using) in tgt_users {
+        let ancestor = children_using
+            .into_iter()
+            .exactly_one()
+            .ok()
+            .unwrap_or(dtn.node);
+        blocks_for_child.entry(ancestor).or_default().insert(block);
+    }
+
+    let new_children = blocks_for_child
+        .remove(&dtn.node)
+        .unwrap_or_default()
         .into_iter()
-        .flat_map(|(node, children_using)| {
-            let only_child_using = children_using
-                .into_iter()
-                .exactly_one()
-                .ok()
-                .filter(|n| *n != dtn.node);
-            if Some(node) == tag_break {
-                tag_break_child = only_child_using;
-                // Include `node` in `new_children_here` if we are *not* assiging it to a child
-                return tag_break_child.is_none().then_some(node);
-            } else if Some(node) == tag_continue {
-                tag_continue_child = only_child_using;
-                return tag_continue_child.is_none().then_some(node);
-            } else if Some(node) == exit_block {
-                exit_block_child = only_child_using;
-                return exit_block_child.is_none().then_some(node);
-            } else if let Some(child) = only_child_using {
-                break_blocks_per_child.entry(child).or_default().push(node);
-                return None;
-            }
-            Some(node)
-        })
-        .collect::<Vec<_>>();
+        .map(|node| DomTreeNode {
+            node,
+            children: Vec::new(),
+            exit_edges: hugr
+                .get_optype(node)
+                .is_dataflow_block()
+                .then_some(GatingPath::Always(node, 0.into())),
+            loop_: None,
+        });
     let children = dtn
         .children
         .into_iter()
         .map(|(_gp, child)| {
-            let child_node = child.node;
-            insert_nodes(
-                child,
-                hugr,
-                break_blocks_per_child
-                    .remove(&child_node)
-                    .unwrap_or_default(),
-                tag_break.filter(|_| tag_break_child == Some(child_node)),
-                tag_continue.filter(|_| tag_continue_child == Some(child_node)),
-                exit_block.filter(|_| exit_block == Some(child_node)),
-            )
+            let mut blocks = blocks_for_child.remove(&child.node).unwrap_or_default();
+            let tag_break = tag_break.filter(|b| blocks.remove(b)); // keep Some only if removed
+            let tag_continue = tag_continue.filter(|c| blocks.remove(c));
+            let exit_block = exit_block.filter(|e| blocks.remove(e));
+            insert_nodes(child, hugr, blocks, tag_break, tag_continue, exit_block)
         })
-        .chain(new_children_here.into_iter().map(|node| {
-            DomTreeNode {
-                node,
-                children: Vec::new(),
-                exit_edges: hugr
-                    .get_optype(node)
-                    .is_dataflow_block()
-                    .then_some(GatingPath::Always(node, 0.into())),
-                loop_: None,
-            }
-        }));
+        .chain(new_children)
+        .collect::<Vec<_>>();
     DomTreeWithBackedges::new_with_children(dtn.node, children.collect(), hugr)
 }
 
