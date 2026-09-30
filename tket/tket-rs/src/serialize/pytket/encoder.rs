@@ -693,9 +693,10 @@ impl<H: HugrView> PytketEncoderContext<H> {
         // back to the encoded subcircuit's function name.
         let mut out_param_count = 0;
         let input_qubits = op_values.qubits.clone();
-        let input_bits = op_values.bits.clone();
         let mut out_qubits = input_qubits.as_slice();
-        let mut out_bits = input_bits.as_slice();
+        // Separate output bits from input bits: opaque operations may return
+        // different values even when several inputs share one bit register.
+        let mut out_bits: &[TrackedBit] = &[];
 
         for ((out_node, out_port), ty) in subgraph
             .outgoing_ports()
