@@ -310,7 +310,6 @@ mod tests {
         tensor
     }
 
-
     struct Lcg {
         state: u64,
     }
@@ -344,7 +343,6 @@ mod tests {
             })
             .collect()
     }
-
 
     #[test]
     fn signature_tensor_two_duplicate_columns() {

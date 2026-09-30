@@ -30,7 +30,7 @@
 //! ```
 //!
 //! [`passes::TOptimizationPass`] uses no ancillas by default and requires rotation
-//! angles that are multiples of 0.25 half turns. 
+//! angles that are multiples of 0.25 half turns.
 //! Measurements, resets, and black boxes are not supported as input to this pass.
 
 #[doc(inline)]
