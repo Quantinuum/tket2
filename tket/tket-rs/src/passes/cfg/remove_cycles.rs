@@ -71,15 +71,17 @@ pub fn nest_loop<H: HugrMut>(
     // tagged to indicate which post-loop block to go to, and retarget the edge.
     let break_blocks = post_loop_blocks
         .iter()
-        .map(|(&n, &tag)| {
+        .map(|(&post_loop, &tag)| {
             let bb = tag_block(hugr, exit_block, tag, break_rows.clone());
             hugr.connect(bb, 0, break_bb, 0);
             // Disconnect the original control-flow edge from the loop to the post-loop block.
-            for (n, p) in hugr.linked_outputs(n, 0).collect::<Vec<_>>() {
-                hugr.disconnect(n, p);
-                hugr.connect(n, p, bb, 0);
+            for (pred, p) in hugr.linked_outputs(post_loop, 0).collect::<Vec<_>>() {
+                if loop_blocks.contains(&pred) {
+                    hugr.disconnect(pred, p);
+                    hugr.connect(pred, p, bb, 0);
+                }
             }
-            (n, bb)
+            (post_loop, bb)
         })
         .collect::<HashMap<_, _>>();
     for (outport, tgt) in hugr
