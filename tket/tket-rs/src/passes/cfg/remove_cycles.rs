@@ -46,14 +46,10 @@ pub fn nest_loop<H: HugrMut>(
         .iter()
         .flat_map(|n| hugr.output_neighbours(*n))
         .filter(|n| !loop_blocks.contains(n))
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .enumerate()
-        .map(|(i, n)| (n, i))
-        .collect::<HashMap<_, _>>();
+        .collect::<BTreeSet<_>>();
 
     let break_rows = post_loop_blocks
-        .keys()
+        .iter()
         .map(|n| block_inputs(hugr, *n))
         .collect::<Vec<_>>();
 
@@ -71,7 +67,8 @@ pub fn nest_loop<H: HugrMut>(
     // tagged to indicate which post-loop block to go to, and retarget the edge.
     let break_blocks = post_loop_blocks
         .iter()
-        .map(|(&post_loop, &tag)| {
+        .enumerate()
+        .map(|(tag, &post_loop)| {
             let bb = tag_block(hugr, exit_block, tag, break_rows.clone());
             hugr.connect(bb, 0, break_bb, 0);
             // Disconnect the original control-flow edge from the loop to the post-loop block.
@@ -86,11 +83,11 @@ pub fn nest_loop<H: HugrMut>(
         .collect::<HashMap<_, _>>();
     for (outport, tgt) in hugr
         .node_outputs(loop_block)
-        .zip_eq(post_loop_blocks.keys())
+        .zip_eq(post_loop_blocks)
         .collect::<Vec<_>>()
     {
         // tgt is *outside* the loop so in the outer CFG (as is loop_block which contains the inner CFG)
-        hugr.connect(loop_block, outport, *tgt, 0);
+        hugr.connect(loop_block, outport, tgt, 0);
     }
 
     // Any edges that exit the original subtree necessarily exit the loop (as entirely
