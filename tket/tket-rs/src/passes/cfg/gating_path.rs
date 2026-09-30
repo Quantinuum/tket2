@@ -152,8 +152,8 @@ impl<N: HugrNode> DomTreeWithBackedges<N> {
                 return;
             };
             // Targets of exit edges pushed onto <ordered> first
-            for lp in leaves(&dtn.exit_edges, hugr) {
-                rev_sort(hugr, ordered, lp.tgt, remaining_children);
+            for tgt in leaf_targets(&dtn.exit_edges, hugr) {
+                rev_sort(hugr, ordered, tgt, remaining_children);
             }
             ordered.push(child);
         }
@@ -392,12 +392,10 @@ impl<N: HugrNode> GatingPath<N> {
     }
 }
 
-pub(super) fn leaves<H: HugrView>(
+pub(super) fn leaf_targets<H: HugrView>(
     gp: &Option<GatingPath<H::Node>>,
     hugr: &H,
-) -> Vec<LeafPath<H::Node>> {
-    match gp {
-        Some(gp) => gp.leaves(hugr),
-        None => Vec::new(),
-    }
+) -> impl Iterator<Item = H::Node> {
+    gp.into_iter()
+        .flat_map(move |gp| gp.leaves(hugr).into_iter().map(|lp| lp.tgt))
 }

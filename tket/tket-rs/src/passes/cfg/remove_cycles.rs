@@ -9,7 +9,7 @@ use hugr::types::{Signature, Type, TypeRow};
 use itertools::Itertools;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 
-use crate::passes::cfg::gating_path::leaves;
+use crate::passes::cfg::gating_path::leaf_targets;
 
 use super::gating_path::{DomTreeNode, DomTreeWithBackedges, GatingPath};
 
@@ -92,9 +92,8 @@ pub fn nest_loop<H: HugrMut>(
 
     // Any edges that exit the original subtree necessarily exit the loop (as entirely
     // contained within subtree), so the corresponding break-blocks will not be added by detach
-    let break_blocks_exitting_subtree = leaves(&dtn.exit_edges, hugr)
-        .into_iter()
-        .map(|lp| break_blocks[&lp.tgt])
+    let break_blocks_exitting_subtree = leaf_targets(&dtn.exit_edges, hugr)
+        .map(|tgt| break_blocks[&tgt])
         .collect::<Vec<_>>();
 
     // now build the dominator tree for inside the loop. Its exit-edges will include all control-flow edges to:
