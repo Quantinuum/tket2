@@ -1,4 +1,4 @@
-//! Applies algorithm 2 from https://arxiv.org/pdf/2302.07040 to reduce
+//! Applies algorithm 2 from <https://arxiv.org/pdf/2302.07040> to reduce
 //! the number of internal Hadamard gates, then gadgetizes them to produce
 //! a diagonal region of rotations in the circuit.
 use crate::clifford_propagation::{append_gate, collect_cliffords, push_conditional_x, tableau_op};
@@ -6,7 +6,7 @@ use tk_pg_core::{GateData, GateType, Op, Pauli, PauliGraph, RotationData};
 use tk_pg_ir_kernels::PGTableau;
 use tk_pg_qm_tableau::Tableau;
 
-/// The circuit produced after Hadamard optimization and 
+/// The circuit produced after Hadamard optimization and
 /// rotation diagonalization.
 pub struct DiagonalizedCircuit {
     /// Initial Clifford basis change.
@@ -50,7 +50,7 @@ pub fn synthesize(rotations: &[RotationData], n: usize) -> DiagonalizedCircuit {
     for rotation in rotations.iter().rev() {
         diagonalize(&mut reverse, rotation.get_string());
     }
-    
+
     let inverse = reverse.invert();
     let mut tableau = Tableau::eye(n);
     let mut prefix = Vec::new();
