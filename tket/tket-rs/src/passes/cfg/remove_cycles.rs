@@ -102,12 +102,11 @@ pub fn nest_loop<H: HugrMut>(
     let loop_dtn = loop_dtn.unwrap(); // header is in loop!!
     assert!(loop_dtn.loop_.is_some()); // detach has detailed assertion
 
-    // disconnect backedges, reconnect to continue_bb
+    // disconnect inputs to old header - it is now the entry node of the inner CFG. backedges reconnect to continue_bb
     for (n, p) in hugr.linked_outputs(loop_dtn.node, 0).collect::<Vec<_>>() {
-        if loop_blocks.contains(&n) {
-            hugr.disconnect(n, p);
-            hugr.connect(n, p, continue_bb, 0);
-        }
+        hugr.disconnect(n, p);
+        let tgt = if loop_blocks.contains(&n) {continue_bb} else {loop_block};
+        hugr.connect(n, p, tgt, 0);
     }
 
     // Build DomTree to return. Inner loop first
@@ -387,7 +386,7 @@ mod test {
     #[rstest]
     #[case("/Users/alanlawrence/repos/tierkreis/tierkreis_loop.hugr")]
     #[case("/Users/alanlawrence/repos/guppylang/multi_exit_loop.hugr")]
-    //#[case("/Users/alanlawrence/repos/guppylang/nested_loop.hugr")]
+    #[case("/Users/alanlawrence/repos/guppylang/nested_loop.hugr")]
     #[case("/Users/alanlawrence/repos/guppylang/early_return.hugr")]
     fn tierkreis_loop(#[case] fname: impl AsRef<Path>) {
         use crate::passes::{ComposablePass, Normalize};
