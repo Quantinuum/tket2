@@ -53,9 +53,12 @@ jobs:
         with:
           ref: ${{ github.sha }}
           path: SEMVER_HEAD
+          fetch-depth: 2
       - name: Read baseline from the tested merge
         id: semver-base
-        run: echo "sha=$(git -C SEMVER_HEAD rev-parse HEAD^1)" >> "$GITHUB_OUTPUT"
+        run: |
+          baseline_sha=$(git -C SEMVER_HEAD rev-parse --verify HEAD^1)
+          echo "sha=$baseline_sha" >> "$GITHUB_OUTPUT"
       - uses: quantinuum/hugrverse-actions/rs-semver-checks@main
         env:
           TKET_C_API_PATH: ${{ env.TKET_C_API_PATH }}
