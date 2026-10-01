@@ -128,6 +128,18 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for Normalize {
         // nothing else affects CFG structure or creates new opportunities for this.
         // (Possibly also this may assist modifier resolution??)
         if self.simplify_cfgs {
+            use super::cfg::{gating_path::DomTreeWithBackedges, remove_cycles::nest_loop};
+            let cfgs = self
+                .scope
+                .regions(hugr)
+                .filter(|n| hugr.get_optype(*n).is_cfg())
+                .collect::<Vec<_>>();
+            eprintln!("ALAN Found {} cfgs", cfgs.len());
+            for n in cfgs {
+                eprintln!("ALAN Processing cfg node {}", n);
+                let dtn = DomTreeWithBackedges::new_for_cfg(&hugr, n);
+                nest_loop(dtn, &mut *hugr);
+            }
             NormalizeCFGPass::default()
                 .with_scope(self.scope.clone())
                 .run(hugr)?;
