@@ -2956,6 +2956,7 @@ dependencies = [
  "tk-pg-optimize",
  "tk-pg-qm-tableau",
  "tk-pg-rebase",
+ "tk-pg-t-optimize",
  "tk-pg-utils",
 ]
 
@@ -2992,6 +2993,18 @@ dependencies = [
  "rstest",
  "tk-pg-converter",
  "tk-pg-core",
+]
+
+[[package]]
+name = "tk-pg-t-optimize"
+version = "0.1.0"
+dependencies = [
+ "bitvec",
+ "tk-pg-canonical-form",
+ "tk-pg-converter",
+ "tk-pg-core",
+ "tk-pg-ir-kernels",
+ "tk-pg-qm-tableau",
 ]
 
 [[package]]
@@ -3044,6 +3057,7 @@ dependencies = [
  "tk-pg-greedy-synth",
  "tk-pg-optimize",
  "tk-pg-rebase",
+ "tk-pg-t-optimize",
  "tket-json-rs",
  "tracing",
  "typetag",

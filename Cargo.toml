@@ -19,6 +19,7 @@ members = [
     "pg-libs/pg-utils/tk-pg-utils",
     "pg-libs/pg-passes/tk-pg-canonical-form",
     "pg-libs/pg-passes/tk-pg-optimize",
+    "pg-libs/pg-passes/tk-pg-t-optimize",
     "pg-libs/pg-passes/tk-pg-greedy-synth",
     "pg-libs/pg-passes/tk-pg-rebase",
     "pg-libs/tk-pg-qm-tableau",
@@ -125,6 +126,7 @@ pg-core = { package = "tk-pg-core", path = "pg-libs/tk-pg-core", version = "0.1.
 pg-canonical-form = { package = "tk-pg-canonical-form", path = "pg-libs/pg-passes/tk-pg-canonical-form", version = "0.1.0" }
 pg-greedy-synth = { package = "tk-pg-greedy-synth", path = "pg-libs/pg-passes/tk-pg-greedy-synth", version = "0.1.0" }
 pg-optimise = { package = "tk-pg-optimize", path = "pg-libs/pg-passes/tk-pg-optimize", version = "0.1.0" }
+pg-t-optimize = { package = "tk-pg-t-optimize", path = "pg-libs/pg-passes/tk-pg-t-optimize", version = "0.1.0" }
 pg-rebase = { package = "tk-pg-rebase", path = "pg-libs/pg-passes/tk-pg-rebase", version = "0.1.0" }
 
 [profile.release.package.tket-py]
@@ -145,6 +147,8 @@ opt-level = 1
 [profile.test.package.tk-pg-canonical-form]
 opt-level = 1
 [profile.test.package.tk-pg-optimize]
+opt-level = 1
+[profile.test.package.tk-pg-t-optimize]
 opt-level = 1
 [profile.test.package.tk-pg-greedy-synth]
 opt-level = 1
