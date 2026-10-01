@@ -5,7 +5,7 @@
 
 ### Refactor
 
-- move pg rewrite tests to a non-published crate ([#2055](https://github.com/Quantinuum/tket2/pull/2055))
+- Move Pauli-graph rewrite tests to a non-published crate ([#2055](https://github.com/Quantinuum/tket2/pull/2055))
 
 ## [0.1.0](https://github.com/Quantinuum/tket2/releases/tag/tk-pg-ir-kernels-v0.1.0) - 2026-09-24
 
