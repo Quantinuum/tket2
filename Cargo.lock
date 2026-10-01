@@ -2867,7 +2867,7 @@ checksum = "fd3ca314f692efd6c868f8408f53fe444634a845f96c028b97d35f6a1f79f0ee"
 
 [[package]]
 name = "tk-pg-bitpacked"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "rand 0.10.3",
  "rstest",
@@ -2877,7 +2877,7 @@ dependencies = [
 
 [[package]]
 name = "tk-pg-canonical-form"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "rstest",
  "tk-pg-converter",
@@ -2889,7 +2889,7 @@ dependencies = [
 
 [[package]]
 name = "tk-pg-converter"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "rstest",
  "serde_json",
@@ -2900,7 +2900,7 @@ dependencies = [
 
 [[package]]
 name = "tk-pg-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -2909,7 +2909,7 @@ dependencies = [
 
 [[package]]
 name = "tk-pg-greedy-synth"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "crossbeam-skiplist",
  "indexmap 2.14.2",
@@ -2928,7 +2928,7 @@ dependencies = [
 
 [[package]]
 name = "tk-pg-ir-kernels"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "tk-pg-core",
  "tk-pg-utils",
@@ -2946,7 +2946,7 @@ dependencies = [
 
 [[package]]
 name = "tk-pg-libs"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "tk-pg-bitpacked",
  "tk-pg-canonical-form",
@@ -2963,7 +2963,7 @@ dependencies = [
 
 [[package]]
 name = "tk-pg-optimize"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "rand 0.10.3",
  "tk-pg-converter",
@@ -2975,7 +2975,7 @@ dependencies = [
 
 [[package]]
 name = "tk-pg-qm-tableau"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "rand 0.10.3",
  "rayon",
@@ -2989,7 +2989,7 @@ dependencies = [
 
 [[package]]
 name = "tk-pg-rebase"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "rstest",
  "tk-pg-converter",
@@ -2998,7 +2998,7 @@ dependencies = [
 
 [[package]]
 name = "tk-pg-t-optimize"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bitvec",
  "tk-pg-canonical-form",
@@ -3010,7 +3010,7 @@ dependencies = [
 
 [[package]]
 name = "tk-pg-utils"
-version = "0.1.0"
+version = "0.1.1"
 
 [[package]]
 name = "tket"
