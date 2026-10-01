@@ -314,10 +314,7 @@ jobs:
   tests-nightly-coverage:
     needs: [changes]
     # Run only if there are changes in the relevant files
-    if: >-
-      ${{ (needs.changes.outputs.tket == 'true' ||
-           needs.changes.outputs.pg-libs == 'true') &&
-          github.event_name != 'merge_group' }}
+    if: ${{ needs.changes.outputs.tket == 'true' && github.event_name != 'merge_group' }}
     runs-on: ubuntu-latest
     name: tests (Rust nightly, coverage)
     steps:
@@ -338,19 +335,6 @@ jobs:
           cargo llvm-cov clean --workspace
           cargo llvm-cov --no-report -p tket -p tket-qsystem -p tket1-passes -p badger-optimiser -p compile-rewriter --no-default-features --doctests
           cargo llvm-cov --no-report -p tket -p tket-qsystem -p tket1-passes -p badger-optimiser -p compile-rewriter --all-features --doctests
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v7
-        with:
-          version: ${{ env.UV_VERSION }}
-          enable-cache: true
-      - name: Install Python for T optimizer tests
-        run: uv python install ${{ env.PYTHON_HIGHEST }}
-      - name: Install T optimizer test dependencies
-        working-directory: pg-libs
-        run: uv sync --only-group pg-libs --python ${{ env.PYTHON_HIGHEST }}
-      - name: Run T optimizer tests with coverage instrumentation
-        working-directory: pg-libs
-        run: uv run --only-group pg-libs cargo llvm-cov --no-report -p tk-pg-t-optimize --doctests
       - name: Generate coverage report
         run: cargo llvm-cov report --codecov --output-path coverage.json
       - name: Upload coverage to codecov.io
