@@ -352,42 +352,45 @@ fn insert_nodes<N: HugrNode>(
         return dtn;
     }
 
-    let user_and_tgts = hugr
-        .output_neighbours(dtn.node)
-        .map(|tgt| (dtn.node, tgt))
-        .chain(dtn.children.iter().flat_map(|(_gp, child)| {
-            leaf_targets(&child.exit_edges, hugr).map(|tgt| (child.node, tgt))
-        }))
-        .collect_vec();
+    let mut insertee_to_users: HashMap<_, _> =
+        to_insert.into_iter().map(|n| (n, Vec::new())).collect();
 
-    let mut tgt_users: HashMap<_, _> = to_insert.into_iter().map(|n| (n, Vec::new())).collect();
+    {
+        let users_insertees = hugr
+            .output_neighbours(dtn.node)
+            .map(|tgt| (dtn.node, tgt))
+            .chain(dtn.children.iter().flat_map(|(_gp, child)| {
+                leaf_targets(&child.exit_edges, hugr).map(|tgt| (child.node, tgt))
+            }))
+            .collect_vec();
 
-    for (src, mut tgt) in user_and_tgts {
-        while let Some(v) = tgt_users.get_mut(&tgt) {
-            v.push(src);
-            let outs = hugr
-                .node_outputs(tgt)
-                .at_most_one()
-                .ok()
-                .expect("Only for tag blocks (1 successor) or ExitBlock (0)");
-            let Some((succ, _)) = outs.map(|p| hugr.single_linked_input(tgt, p).unwrap()) else {
-                break;
-            };
-            tgt = succ; // successor also required
+        for (user, mut insertee) in users_insertees {
+            while let Some(v) = insertee_to_users.get_mut(&insertee) {
+                v.push(user);
+                let outs = hugr
+                    .node_outputs(insertee)
+                    .at_most_one()
+                    .ok()
+                    .expect("Only for tag blocks (1 successor) or ExitBlock (0)");
+                let Some((succ, _)) = outs.map(|p| hugr.single_linked_input(insertee, p).unwrap())
+                else {
+                    break;
+                };
+                insertee = succ; // successor also required
+            }
         }
     }
     // Anything in `nodes` where which_children has exactly one entry, should be passed to recursive call to that child
-    let mut blocks_for_child = HashMap::<N, HashSet<N>>::new();
-    for (block, children_using) in tgt_users {
-        let ancestor = children_using
-            .into_iter()
-            .exactly_one()
-            .ok()
-            .unwrap_or(dtn.node);
-        blocks_for_child.entry(ancestor).or_default().insert(block);
+    let mut owned_insertees = HashMap::<N, HashSet<N>>::new();
+    for (insertee, users) in insertee_to_users {
+        let ancestor = users.into_iter().exactly_one().ok().unwrap_or(dtn.node);
+        owned_insertees
+            .entry(ancestor)
+            .or_default()
+            .insert(insertee);
     }
 
-    let new_children = blocks_for_child
+    let new_children = owned_insertees
         .remove(&dtn.node)
         .unwrap_or_default()
         .into_iter()
@@ -404,7 +407,7 @@ fn insert_nodes<N: HugrNode>(
         .children
         .into_iter()
         .map(|(_gp, child)| {
-            let blocks = blocks_for_child.remove(&child.node).unwrap_or_default();
+            let blocks = owned_insertees.remove(&child.node).unwrap_or_default();
             insert_nodes(child, hugr, blocks)
         })
         .chain(new_children)
