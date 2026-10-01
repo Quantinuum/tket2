@@ -352,6 +352,15 @@ fn insert_nodes<N: HugrNode>(
         return dtn;
     }
 
+    fn single_successor_max2<H: HugrView>(hugr: &H, node: H::Node) -> Option<H::Node> {
+        let outs = hugr
+            .node_outputs(node)
+            .at_most_one()
+            .ok()
+            .expect("Only for tag blocks (1 successor) or ExitBlock (0)");
+        outs.map(|p| hugr.single_linked_input(node, p).unwrap().0)
+    }
+
     let mut insertee_to_users: HashMap<_, _> =
         to_insert.into_iter().map(|n| (n, Vec::new())).collect();
 
@@ -367,20 +376,15 @@ fn insert_nodes<N: HugrNode>(
         for (user, mut insertee) in users_insertees {
             while let Some(v) = insertee_to_users.get_mut(&insertee) {
                 v.push(user);
-                let outs = hugr
-                    .node_outputs(insertee)
-                    .at_most_one()
-                    .ok()
-                    .expect("Only for tag blocks (1 successor) or ExitBlock (0)");
-                let Some((succ, _)) = outs.map(|p| hugr.single_linked_input(insertee, p).unwrap())
-                else {
+                let Some(succ) = single_successor_max2(hugr, insertee) else {
                     break;
                 };
                 insertee = succ; // successor also required
             }
         }
     }
-    // Anything in `nodes` where which_children has exactly one entry, should be passed to recursive call to that child
+    // Anything insertee with exactly one user, should be added to the user's DomTree (either here,
+    // when the user is `dtn.node`, or somewhere beneath, if a child).
     let mut owned_insertees = HashMap::<N, HashSet<N>>::new();
     for (insertee, users) in insertee_to_users {
         let ancestor = users.into_iter().exactly_one().ok().unwrap_or(dtn.node);
@@ -389,12 +393,24 @@ fn insert_nodes<N: HugrNode>(
             .or_default()
             .insert(insertee);
     }
-
-    let new_children = owned_insertees
-        .remove(&dtn.node)
-        .unwrap_or_default()
-        .into_iter()
-        .map(|node| DomTreeNode {
+    let new_root_children = {
+        let mut cands = owned_insertees.remove(&dtn.node).unwrap_or_default();
+        // Put in order: any new child that is a successor of another, must come after it.
+        let mut reverse_ordered = Vec::new();
+        while let Some(&n) = cands.iter().next() {
+            cands.remove(&n);
+            // we need to push successors onto reverse-ordered first (when we reverse, will be after).
+            // The double-reverse is essential so that multiple nodes with the same successor don't end up
+            // with the successor inbetween them.
+            let mut succs = std::iter::successors(Some(n), |n| {
+                single_successor_max2(hugr, *n).filter(|node| cands.remove(node))
+            })
+            .collect::<Vec<_>>();
+            succs.reverse();
+            reverse_ordered.extend(succs)
+        }
+        reverse_ordered.reverse(); // now misnamed ;)
+        reverse_ordered.into_iter().map(|node| DomTreeNode {
             node,
             children: Vec::new(),
             exit_edges: hugr
@@ -402,7 +418,8 @@ fn insert_nodes<N: HugrNode>(
                 .is_dataflow_block()
                 .then_some(GatingPath::Always(node, 0.into())),
             loop_: None,
-        });
+        })
+    };
     let children = dtn
         .children
         .into_iter()
@@ -410,7 +427,7 @@ fn insert_nodes<N: HugrNode>(
             let blocks = owned_insertees.remove(&child.node).unwrap_or_default();
             insert_nodes(child, hugr, blocks)
         })
-        .chain(new_children)
+        .chain(new_root_children)
         .collect::<Vec<_>>();
     DomTreeWithBackedges::new_with_children(dtn.node, children, hugr)
 }
