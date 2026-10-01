@@ -51,3 +51,7 @@ jobs:
           TKET_C_API_PATH: ${{ env.TKET_C_API_PATH }}
         with:
           token: ${{ secrets.HUGRBOT_PAT }}
+          # The event payload's merge_commit_sha can lag behind the triggering SHA.
+          # Compare the initial checkout, which actions/checkout pins to github.sha.
+          args: --manifest-path "${{ github.workspace }}/Cargo.toml"
+          baseline-rev: ${{ github.event.pull_request.base.sha }}
