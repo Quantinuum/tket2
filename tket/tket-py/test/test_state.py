@@ -5,6 +5,7 @@ from hugr.build.dfg import Function
 from hugr.ext import Extension, OpDef, OpDefSig
 from hugr.hugr import Hugr
 from hugr.std import _std_extensions
+from hugr.std._util import _load_extension
 from semver import Version
 from tket_exts import tket_registry
 
@@ -96,7 +97,9 @@ def test_newer_embedded_std_extension_is_bundled() -> None:
 
 def test_tket_exts_registry_matches_embedded_tket_extensions() -> None:
     """Keep Python and Rust tket definitions in compatible version bands."""
-    std_ids = _std_extensions().ids()
+    # The pinned HUGR includes math in Rust STD_REG and its Python JSON
+    # definitions, but not yet in the Python standard registry.
+    std_ids = {*_std_extensions().ids(), str(_load_extension("arithmetic.math").name)}
     python_extensions = {
         (str(ext.name), _compatibility_band(ext.version))
         for ext in tket_registry().all_extensions
