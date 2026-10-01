@@ -61,31 +61,66 @@ impl PGPass for TOptimizationPass {
 mod tests {
     use super::*;
     use tk_pg_converter::compare_unitaries_via_tk;
-    use tk_pg_core::{Op, Pauli, RotationData};
+    use tk_pg_core::{GateData, GateType, Op, Pauli, RotationData};
+    use tk_pg_ir_kernels::PGTableau;
+    use tk_pg_qm_tableau::Tableau;
 
     #[test]
     fn reduces_t_count_without_ancillas() {
+        let mut clifford = Tableau::eye(4);
+        clifford.postcompose_op(&Op::Gate {
+            data: GateData::new(GateType::H, vec![0]),
+        });
+        clifford.postcompose_op(&Op::Gate {
+            data: GateData::new(GateType::S, vec![0]),
+        });
+        clifford.postcompose_op(&Op::Gate {
+            data: GateData::new(GateType::ZX, vec![0, 1]),
+        });
+        clifford.postcompose_op(&Op::Gate {
+            data: GateData::new(GateType::H, vec![2]),
+        });
+        clifford.postcompose_op(&Op::Gate {
+            data: GateData::new(GateType::ZX, vec![2, 3]),
+        });
+        clifford.postcompose_op(&Op::Gate {
+            data: GateData::new(GateType::S, vec![3]),
+        });
+        clifford.postcompose_op(&Op::Gate {
+            data: GateData::new(GateType::ZX, vec![1, 2]),
+        });
+        clifford.postcompose_op(&Op::Gate {
+            data: GateData::new(GateType::H, vec![1]),
+        });
+
         for (input_t_count, max_t_count) in [(14, 1), (15, 0)] {
             // T rotations on all 15 nonzero four-qubit parities give identity up to phase.
             // Omitting one parity leaves a single inverse T rotation.
+            // The Clifford conjugation preserves commutation and introduces X/Y terms.
             let pg = PauliGraph::new(4).with_ops(
                 (1..=input_t_count)
-                    .map(|parity| Op::Rotation {
-                        data: RotationData::new(
-                            (0..4)
-                                .map(|q| {
-                                    if parity & (1 << q) == 0 {
-                                        Pauli::I
-                                    } else {
-                                        Pauli::Z
-                                    }
-                                })
-                                .collect(),
-                            0.25,
-                        ),
+                    .flat_map(|parity| {
+                        let string = (0..4)
+                            .map(|q| {
+                                if parity & (1 << q) == 0 {
+                                    Pauli::I
+                                } else {
+                                    Pauli::Z
+                                }
+                            })
+                            .collect();
+                        clifford.conjugate(&Op::Rotation {
+                            data: RotationData::new(string, 0.25),
+                        })
                     })
                     .collect(),
             );
+
+            for pauli in [Pauli::X, Pauli::Y] {
+                assert!(pg.get_ops().iter().any(|op| {
+                    matches!(op, Op::Rotation { data } if data.get_string().contains(&pauli))
+                }));
+            }
 
             let optimized = TOptimizationPass::new().transform(&pg);
             optimized.try_validate().unwrap();
