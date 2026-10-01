@@ -66,9 +66,10 @@ hugr-llvm = { git = "https://github.com/quantinuum/hugr", rev = "7561d6936596998
 
 [workspace.dependencies]
 # Make sure to run `just tket/recompile-eccs` if the hugr serialisation format changes.
-hugr = "0.30.2"
-hugr-core = "0.30.2"
-hugr-cli = "0.30.2"
+# Direct sources retain the pointer revision in external consumers and semver checks.
+hugr = { git = "https://github.com/quantinuum/hugr", rev = "7561d6936596998b9bf99f719ba88630cf25b290" }
+hugr-core = { git = "https://github.com/quantinuum/hugr", rev = "7561d6936596998b9bf99f719ba88630cf25b290" }
+hugr-cli = { git = "https://github.com/quantinuum/hugr", rev = "7561d6936596998b9bf99f719ba88630cf25b290" }
 portgraph = "0.16.1"
 # There can only be one `pyo3` version in the whole workspace, so we use a
 # loose version constraint to prevent breaking changes in dependent crates where possible.

@@ -28,7 +28,8 @@ pg-libs = ["mypy>=2.3,<3", "ruff>=0.6", "pytket>=2,<3"]
 prerelease = "explicit"
 
 [tool.uv.sources]
-#hugr = { git = "https://github.com/quantinuum/hugr", subdirectory = "hugr-py", rev = "1787e12" }
+# Keep the Python standard extensions aligned with the Rust pointer contract.
+hugr = { git = "https://github.com/quantinuum/hugr", subdirectory = "hugr-py", rev = "7561d6936596998b9bf99f719ba88630cf25b290" }
 
 
 [build-system]
