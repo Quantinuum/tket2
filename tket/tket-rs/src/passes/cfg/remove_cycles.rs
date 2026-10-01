@@ -9,6 +9,7 @@ use hugr::ops::{
 use hugr::types::{Signature, Type, TypeRow};
 use itertools::Itertools;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
+use std::iter::successors;
 
 use crate::passes::cfg::gating_path::leaf_targets;
 
@@ -361,30 +362,25 @@ fn insert_nodes<N: HugrNode>(
         outs.map(|p| hugr.single_linked_input(node, p).unwrap().0)
     }
 
-    let mut insertee_to_users: HashMap<_, _> =
-        to_insert.into_iter().map(|n| (n, Vec::new())).collect();
+    // Let a `user` be either dtn.node (this node directly) or a child.node (meaning
+    // *somewhere* beneath that child). Each insertee should be positioned at the LCA
+    // of its users.
+    let insertee_to_users = hugr
+        .output_neighbours(dtn.node)
+        .map(|tgt| (dtn.node, tgt))
+        .chain(dtn.children.iter().flat_map(|(_gp, child)| {
+            leaf_targets(&child.exit_edges, hugr).map(|tgt| (child.node, tgt))
+        }))
+        .flat_map(|(user, insertee)| {
+            // if this DTN, or a child, uses the insertee, it also needs any successor thereof
+            // (thus, successor insertees will be inserted in the LCA of their predecessors)
+            successors(to_insert.contains(&insertee).then_some(insertee), |n| {
+                single_successor_max2(hugr, *n).filter(|n| to_insert.contains(n))
+            })
+            .map(move |n| (n, user))
+        })
+        .into_group_map();
 
-    {
-        let users_insertees = hugr
-            .output_neighbours(dtn.node)
-            .map(|tgt| (dtn.node, tgt))
-            .chain(dtn.children.iter().flat_map(|(_gp, child)| {
-                leaf_targets(&child.exit_edges, hugr).map(|tgt| (child.node, tgt))
-            }))
-            .collect_vec();
-
-        for (user, mut insertee) in users_insertees {
-            while let Some(v) = insertee_to_users.get_mut(&insertee) {
-                v.push(user);
-                let Some(succ) = single_successor_max2(hugr, insertee) else {
-                    break;
-                };
-                insertee = succ; // successor also required
-            }
-        }
-    }
-    // Anything insertee with exactly one user, should be added to the user's DomTree (either here,
-    // when the user is `dtn.node`, or somewhere beneath, if a child).
     let mut owned_insertees = HashMap::<N, HashSet<N>>::new();
     for (insertee, users) in insertee_to_users {
         let ancestor = users.into_iter().exactly_one().ok().unwrap_or(dtn.node);
@@ -402,7 +398,7 @@ fn insert_nodes<N: HugrNode>(
             // we need to push successors onto reverse-ordered first (when we reverse, will be after).
             // The double-reverse is essential so that multiple nodes with the same successor don't end up
             // with the successor inbetween them.
-            let mut succs = std::iter::successors(Some(n), |n| {
+            let mut succs = successors(Some(n), |n| {
                 single_successor_max2(hugr, *n).filter(|node| cands.remove(node))
             })
             .collect::<Vec<_>>();
