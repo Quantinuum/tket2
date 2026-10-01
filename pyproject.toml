@@ -29,7 +29,7 @@ prerelease = "explicit"
 
 [tool.uv.sources]
 # Keep the Python standard extensions aligned with the Rust pointer contract.
-hugr = { git = "https://github.com/quantinuum/hugr", subdirectory = "hugr-py", rev = "7561d6936596998b9bf99f719ba88630cf25b290" }
+hugr = { git = "https://github.com/quantinuum/hugr", subdirectory = "hugr-py", rev = "a956e639f0d36d3eae64e1f1090304e94a44eaa9" }
 
 
 [build-system]

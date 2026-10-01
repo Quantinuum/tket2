@@ -159,9 +159,56 @@ fn nested_linear_payload() -> Hugr {
         })
 }
 
+fn equality(aliases: bool, rhs_value: u64) -> Hugr {
+    let ty = int_type(6);
+    SimpleHugrConfig::new()
+        .with_extensions(STD_REG.to_owned())
+        .with_outs([bool_t()])
+        .finish(|mut b| {
+            let seven = b.add_load_value(ConstInt::new_u(6, 7).unwrap());
+            let rhs_value = b.add_load_value(ConstInt::new_u(6, rhs_value).unwrap());
+            let lhs = b.add_new_ptr(seven).unwrap();
+            let (lhs, rhs) = if aliases {
+                b.add_dup_ptr(lhs, ty.clone()).unwrap()
+            } else {
+                (lhs, b.add_new_ptr(rhs_value).unwrap())
+            };
+            let (lhs, rhs, equal) = b.add_eq_ptr(lhs, rhs, ty.clone()).unwrap();
+            let identity_ok = if aliases {
+                equal
+            } else {
+                b.add_not(equal).unwrap()
+            };
+            // Read both returned handles: different values expose swapped outputs.
+            let (lhs, left_value) = b.add_read_ptr(lhs, ty.clone()).unwrap();
+            let (rhs, right_value) = b.add_read_ptr(rhs, ty.clone()).unwrap();
+            let left_ok = b.add_ieq(6, left_value, seven).unwrap();
+            let right_ok = b.add_ieq(6, right_value, rhs_value).unwrap();
+            let first = b.add_free_ptr(lhs, ty.clone()).unwrap();
+            let last = b.add_free_ptr(rhs, ty.clone()).unwrap();
+            b.set_order(&first.node(), &last.node());
+            // Eq must not change the reference count or release either handle.
+            if aliases {
+                b.build_unwrap_sum::<0>(0, option_type([ty.clone()]), first)
+                    .unwrap();
+            } else {
+                let [_] = b
+                    .build_unwrap_sum(1, option_type([ty.clone()]), first)
+                    .unwrap();
+            }
+            let [_] = b.build_unwrap_sum(1, option_type([ty]), last).unwrap();
+            let ok = b.add_and(identity_ok, left_ok).unwrap();
+            let ok = b.add_and(ok, right_ok).unwrap();
+            b.finish_hugr_with_outputs([ok]).unwrap()
+        })
+}
+
 #[rstest]
 #[case(lifecycle(), 1, 7)]
 #[case(nested_linear_payload(), 2, 2)]
+#[case::eq_aliases(equality(true, 7), 1, 5)]
+#[case::eq_distinct_same_payload(equality(false, 7), 2, 4)]
+#[case::eq_distinct_different_payload(equality(false, 19), 2, 4)]
 fn custom_hooks_manage_cell_once(
     mut exec_ctx: TestContext,
     #[case] hugr: Hugr,

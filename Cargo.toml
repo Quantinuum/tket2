@@ -57,19 +57,19 @@ large_enum_variant = "allow"
 [patch.crates-io]
 
 # Pointer extension and LLVM lowering: Quantinuum/hugr#3282 and #3285.
-hugr = { git = "https://github.com/quantinuum/hugr", rev = "7561d6936596998b9bf99f719ba88630cf25b290" }
-hugr-core = { git = "https://github.com/quantinuum/hugr", rev = "7561d6936596998b9bf99f719ba88630cf25b290" }
-hugr-model = { git = "https://github.com/quantinuum/hugr", rev = "7561d6936596998b9bf99f719ba88630cf25b290" }
-hugr-cli = { git = "https://github.com/quantinuum/hugr", rev = "7561d6936596998b9bf99f719ba88630cf25b290" }
-hugr-llvm = { git = "https://github.com/quantinuum/hugr", rev = "7561d6936596998b9bf99f719ba88630cf25b290" }
+hugr = { git = "https://github.com/quantinuum/hugr", rev = "a956e639f0d36d3eae64e1f1090304e94a44eaa9" }
+hugr-core = { git = "https://github.com/quantinuum/hugr", rev = "a956e639f0d36d3eae64e1f1090304e94a44eaa9" }
+hugr-model = { git = "https://github.com/quantinuum/hugr", rev = "a956e639f0d36d3eae64e1f1090304e94a44eaa9" }
+hugr-cli = { git = "https://github.com/quantinuum/hugr", rev = "a956e639f0d36d3eae64e1f1090304e94a44eaa9" }
+hugr-llvm = { git = "https://github.com/quantinuum/hugr", rev = "a956e639f0d36d3eae64e1f1090304e94a44eaa9" }
 # portgraph = { git = "https://github.com/quantinuum/portgraph", rev = "68b96ac737e0c285d8c543b2d74a7aa80a18202c" }
 
 [workspace.dependencies]
 # Make sure to run `just tket/recompile-eccs` if the hugr serialisation format changes.
 # Direct sources retain the pointer revision in external consumers and semver checks.
-hugr = { git = "https://github.com/quantinuum/hugr", rev = "7561d6936596998b9bf99f719ba88630cf25b290" }
-hugr-core = { git = "https://github.com/quantinuum/hugr", rev = "7561d6936596998b9bf99f719ba88630cf25b290" }
-hugr-cli = { git = "https://github.com/quantinuum/hugr", rev = "7561d6936596998b9bf99f719ba88630cf25b290" }
+hugr = { git = "https://github.com/quantinuum/hugr", rev = "a956e639f0d36d3eae64e1f1090304e94a44eaa9" }
+hugr-core = { git = "https://github.com/quantinuum/hugr", rev = "a956e639f0d36d3eae64e1f1090304e94a44eaa9" }
+hugr-cli = { git = "https://github.com/quantinuum/hugr", rev = "a956e639f0d36d3eae64e1f1090304e94a44eaa9" }
 portgraph = "0.16.1"
 # There can only be one `pyo3` version in the whole workspace, so we use a
 # loose version constraint to prevent breaking changes in dependent crates where possible.

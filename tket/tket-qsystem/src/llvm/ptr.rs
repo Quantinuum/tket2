@@ -7,6 +7,8 @@
 //! Free tears down the mutex and allocation after the last handle is released.
 //! Lock/unlock provide exclusive access and acquire/release synchronization.
 //!
+//! Eq compares opaque cell identity and returns both handles in input order.
+//! It emits no runtime hooks and does not access the payload or reference count.
 //! HUGR owns the payload layout and reference counting. Map holds the lock
 //! throughout its callback; re-entering the same cell is unsupported. Thread
 //! returned handles or add order edges when operations require a relative order.

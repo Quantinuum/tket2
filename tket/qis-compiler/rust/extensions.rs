@@ -82,7 +82,7 @@ mod tests {
     use super::*;
     use crate::hugr;
     use hugr::builder::{Dataflow, DataflowHugr};
-    use hugr::extension::prelude::{UnwrapBuilder, option_type};
+    use hugr::extension::prelude::{UnwrapBuilder, bool_t, option_type};
     use hugr::llvm::emit::{EmitDebugInfo, Namer, test::SimpleHugrConfig};
     use hugr::std_extensions::{
         arithmetic::int_types::{ConstInt, int_type},
@@ -126,6 +126,41 @@ mod tests {
             ] {
                 assert!(module.get_function(symbol).is_some(), "missing {symbol}");
             }
+        }
+    }
+
+    #[test]
+    fn pointer_equality_uses_identity_without_runtime_hooks() {
+        for platform in [QSystemPlatform::Sol, QSystemPlatform::Helios] {
+            // A linear payload needs no read or payload-specific codegen for Eq.
+            let ty = ptr::ptr_type(int_type(6));
+            let pointer = ptr::ptr_type(ty.clone());
+            let mut hugr = SimpleHugrConfig::new()
+                .with_extensions(REGISTRY.to_owned())
+                .with_ins([pointer.clone(), pointer.clone()])
+                .with_outs([pointer.clone(), pointer, bool_t()])
+                .finish(|mut b| {
+                    let [lhs, rhs] = b.input_wires_arr();
+                    let (lhs, rhs, equal) = b.add_eq_ptr(lhs, rhs, ty).unwrap();
+                    b.finish_hugr_with_outputs([lhs, rhs, equal]).unwrap()
+                });
+            crate::process_hugr(platform, &mut hugr).unwrap();
+            let ctx = hugr::llvm::inkwell::context::Context::create();
+            let (module, _) = crate::get_hugr_llvm_module(
+                &ctx,
+                Rc::new(Namer::new("", false)),
+                &hugr,
+                "pointer_equality",
+                Rc::new(codegen_extensions(platform)),
+                EmitDebugInfo::Exclude,
+            )
+            .unwrap();
+            module.verify().unwrap();
+            let ir = module.print_to_string().to_string();
+            assert!(ir.contains("icmp eq ptr"));
+            assert!(!ir.contains("___ptr_"), "Eq must not emit runtime hooks");
+            assert!(!ir.contains("getelementptr"));
+            assert!(!ir.contains("atomic"));
         }
     }
 }
