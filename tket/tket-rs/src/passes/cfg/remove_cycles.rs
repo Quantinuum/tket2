@@ -446,6 +446,8 @@ mod test {
     #[case("/Users/alanlawrence/repos/guppylang/multi_exit_loop.hugr")]
     #[case("/Users/alanlawrence/repos/guppylang/nested_loop.hugr")]
     #[case("/Users/alanlawrence/repos/guppylang/early_return.hugr")]
+    #[case("/Users/alanlawrence/repos/guppylang/test_exec_array_loop.hugr")]
+    #[case("/Users/alanlawrence/repos/guppylang/test_control_flow.hugr")]
     fn tierkreis_loop(#[case] fname: impl AsRef<Path>) {
         use crate::passes::{ComposablePass, Normalize};
 
@@ -453,7 +455,6 @@ mod test {
         let outfile_m = fname.as_ref().with_extension("nested.merged.hugr");
         let reader = BufReader::new(File::open(fname).unwrap());
         let backup = Hugr::load(reader, None).unwrap();
-        eprintln!("{}", backup.mermaid_string());
         let mut h = backup.clone();
         let cfgs = h
             .nodes()
