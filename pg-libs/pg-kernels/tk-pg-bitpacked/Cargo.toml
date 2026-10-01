@@ -18,7 +18,6 @@ unstable_simd = []
 
 [dependencies]
 tk-pg-core = { path = "../../tk-pg-core", version = "0.1.0" }
-approx_eq = "0.1.8"
 rand = { workspace = true }
 
 

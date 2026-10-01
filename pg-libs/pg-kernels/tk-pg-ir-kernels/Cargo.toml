@@ -16,9 +16,5 @@ categories = { workspace = true }
 tk-pg-core = { path = "../../tk-pg-core", version = "0.1.0" }
 tk-pg-utils = { path = "../../pg-utils/tk-pg-utils", version = "0.1.0" }
 
-[dev-dependencies]
-tk-pg-qm-tableau = { path = "../../tk-pg-qm-tableau", version = "0.1.0" }
-tk-pg-converter = { path = "../../pg-converters/tk-pg-converter", version = "0.1.0" }
-
 [lints]
 workspace = true

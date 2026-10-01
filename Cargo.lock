@@ -119,12 +119,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "approx_eq"
-version = "0.1.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3f9eb837c6a783fbf002e3e5cc7925a3aa6893d6d42f9169517528983777590"
-
-[[package]]
 name = "arrayvec"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2875,7 +2869,6 @@ checksum = "fd3ca314f692efd6c868f8408f53fe444634a845f96c028b97d35f6a1f79f0ee"
 name = "tk-pg-bitpacked"
 version = "0.1.0"
 dependencies = [
- "approx_eq",
  "rand 0.10.3",
  "rstest",
  "tk-pg-converter",
@@ -2937,10 +2930,18 @@ dependencies = [
 name = "tk-pg-ir-kernels"
 version = "0.1.0"
 dependencies = [
+ "tk-pg-core",
+ "tk-pg-utils",
+]
+
+[[package]]
+name = "tk-pg-ir-kernels-tests"
+version = "0.0.0"
+dependencies = [
  "tk-pg-converter",
  "tk-pg-core",
+ "tk-pg-ir-kernels",
  "tk-pg-qm-tableau",
- "tk-pg-utils",
 ]
 
 [[package]]
