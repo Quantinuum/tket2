@@ -22,5 +22,8 @@ tk-pg-canonical-form = { path = "../tk-pg-canonical-form", version = "0.1.0" }
 tk-pg-ir-kernels = { path = "../../pg-kernels/tk-pg-ir-kernels", version = "0.1.0" }
 tk-pg-qm-tableau = { path = "../../tk-pg-qm-tableau", version = "0.1.0" }
 
+[dev-dependencies]
+tk-pg-converter = { path = "../../pg-converters/tk-pg-converter", version = "0.1.0" }
+
 [lints]
 workspace = true

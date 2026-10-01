@@ -56,3 +56,54 @@ impl PGPass for TOptimizationPass {
         self.optimize(pauli_graph)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tk_pg_converter::compare_unitaries_via_tk;
+    use tk_pg_core::{Op, Pauli, RotationData};
+
+    #[test]
+    fn reduces_t_count_without_ancillas() {
+        for (input_t_count, max_t_count) in [(14, 1), (15, 0)] {
+            // T rotations on all 15 nonzero four-qubit parities give identity up to phase.
+            // Omitting one parity leaves a single inverse T rotation.
+            let pg = PauliGraph::new(4).with_ops(
+                (1..=input_t_count)
+                    .map(|parity| Op::Rotation {
+                        data: RotationData::new(
+                            (0..4)
+                                .map(|q| {
+                                    if parity & (1 << q) == 0 {
+                                        Pauli::I
+                                    } else {
+                                        Pauli::Z
+                                    }
+                                })
+                                .collect(),
+                            0.25,
+                        ),
+                    })
+                    .collect(),
+            );
+
+            let optimized = TOptimizationPass::new().transform(&pg);
+            optimized.try_validate().unwrap();
+            assert_eq!(optimized.get_n_qubits(), pg.get_n_qubits());
+            let rotations: Vec<_> = optimized
+                .get_ops()
+                .iter()
+                .filter_map(|op| match op {
+                    Op::Rotation { data } => Some(data),
+                    _ => None,
+                })
+                .collect();
+            assert!(rotations.iter().all(|data| data.get_angle().abs() == 0.25));
+            assert!(
+                rotations.len() <= max_t_count,
+                "input T count: {input_t_count}"
+            );
+            assert!(compare_unitaries_via_tk(&pg, &optimized));
+        }
+    }
+}

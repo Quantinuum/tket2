@@ -3001,6 +3001,7 @@ version = "0.1.0"
 dependencies = [
  "bitvec",
  "tk-pg-canonical-form",
+ "tk-pg-converter",
  "tk-pg-core",
  "tk-pg-ir-kernels",
  "tk-pg-qm-tableau",
