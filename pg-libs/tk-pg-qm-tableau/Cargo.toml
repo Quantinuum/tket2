@@ -21,7 +21,7 @@ rand = { workspace = true }
 rayon = { workspace = true }
 
 [dev-dependencies]
-tk-pg-converter = { path = "../pg-converters/tk-pg-converter", version = "0.1.1" }
+tk-pg-converter = { path = "../pg-converters/tk-pg-converter" }
 rstest = { workspace = true }
 
 [features]
