@@ -133,7 +133,7 @@ pub fn nest_loop<H: HugrMut>(
             .map(|ch| nest_loop(ch, hugr))
             .collect(),
         |_, lp| {
-            assert_ne!(lp.tgt, loop_block);
+            assert_ne!(lp.tgt(hugr), loop_block);
             false
         },
         hugr,
@@ -214,7 +214,7 @@ fn loop_blocks<H: HugrView>(
     backedges: &GatingPath<H::Node>,
 ) -> HashSet<H::Node> {
     let mut blocks = HashSet::new();
-    let mut queue = VecDeque::from_iter(backedges.leaves(hugr).into_iter().map(|lp| lp.src.0));
+    let mut queue = VecDeque::from_iter(backedges.leaves().into_iter().map(|lp| lp.src.0));
     while let Some(n) = queue.pop_front() {
         if !blocks.insert(n) || n == loop_header {
             continue;

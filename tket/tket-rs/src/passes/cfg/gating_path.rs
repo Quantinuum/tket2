@@ -56,14 +56,12 @@ impl<N: HugrNode, LOOP> DomTreeNode<N, LOOP> {
             .map(|p| LeafPath {
                 src: (node, p),
                 branches: vec![],
-                tgt: hugr.single_linked_input(node, p).unwrap().0,
             });
         let outports = hugr.node_outputs(node).collect::<Vec<_>>();
         for outport in &outports {
             let path = path.clone().unwrap_or(LeafPath {
                 src: (node, *outport),
                 branches: vec![(node, *outport, outports.len())],
-                tgt: hugr.single_linked_input(node, *outport).unwrap().0,
             });
             // Control Flow outports should have exactly one outgoing edge
             let (tgt, _) = hugr.single_linked_input(node.into(), *outport).unwrap();
@@ -85,7 +83,7 @@ impl<N: HugrNode, LOOP> DomTreeNode<N, LOOP> {
                 let path_to_child = child_paths.remove(&child_dtn.node).unwrap();
                 if let Some(child_exit_edges) = child_dtn.exit_edges.as_ref() {
                     let path_to_child_exit = path_to_child.concat(child_exit_edges);
-                    for lp in path_to_child_exit.leaves(hugr) {
+                    for lp in path_to_child_exit.leaves() {
                         /*assert!(
                             // if dst has no dominator, dst is the entry node
                             doms.immediate_dominator(node_map.to_portgraph(lp.tgt))
@@ -94,8 +92,8 @@ impl<N: HugrNode, LOOP> DomTreeNode<N, LOOP> {
                             // (i.e. tgt is a sibling of an nonstrict-ancestor of ni).
                         doms.dominators(ni).unwrap().contains(&tgt_dom))
                         );*/
-                        if child_blocks.contains(&lp.tgt) {
-                            let e = child_paths.entry(lp.tgt);
+                        if child_blocks.contains(&lp.tgt(hugr)) {
+                            let e = child_paths.entry(lp.tgt(hugr));
                             let path_to_exit = lp.into();
                             e.and_modify(|p| p.union(&path_to_exit))
                                 .or_insert_with(|| path_to_exit);
@@ -132,7 +130,7 @@ impl<N: HugrNode> DomTreeWithBackedges<N> {
             node,
             children,
             |loop_, child_exit_path| {
-                if child_exit_path.tgt == node {
+                if child_exit_path.tgt(hugr) == node {
                     union_opt(loop_, &child_exit_path.clone().into());
                     true
                 } else {
@@ -233,8 +231,13 @@ pub(super) struct LeafPath<N> {
     /// The source node (last node dominated by the start), and the outgoing port
     /// whose edge leaves the dominator tree
     pub(super) src: (N, OutgoingPort),
-    /// Target of that edge (outside the dominator tree)
-    pub(super) tgt: N,
+}
+
+impl<N: Copy> LeafPath<N> {
+    /// Returns the target node (outside the dominator tree) of this leaf path.
+    pub(super) fn tgt(&self, hugr: &impl HugrView<Node = N>) -> N {
+        hugr.single_linked_input(self.src.0, self.src.1).unwrap().0
+    }
 }
 
 impl<N> From<LeafPath<N>> for GatingPath<N> {
@@ -283,19 +286,16 @@ impl<N: HugrNode> GatingPath<N> {
         }
     }
 
-    pub(super) fn leaves(&self, hugr: &impl HugrView<Node = N>) -> Vec<LeafPath<N>> {
-        fn traverse<H: HugrView>(
-            hugr: &H,
-            gp: &GatingPath<H::Node>,
-            path_to_here: &mut Vec<(H::Node, OutgoingPort, usize)>,
-        ) -> Vec<LeafPath<H::Node>> {
+    pub(super) fn leaves(&self) -> Vec<LeafPath<N>> {
+        fn traverse<N: Copy>(
+            gp: &GatingPath<N>,
+            path_to_here: &mut Vec<(N, OutgoingPort, usize)>,
+        ) -> Vec<LeafPath<N>> {
             match gp {
                 GatingPath::Always(node, port) => {
-                    let (tgt, _) = hugr.single_linked_input(*node, *port).unwrap();
                     vec![LeafPath {
                         branches: path_to_here.clone(),
                         src: (*node, *port),
-                        tgt,
                     }]
                 }
                 GatingPath::Branch(br, opts) => opts
@@ -305,7 +305,7 @@ impl<N: HugrNode> GatingPath<N> {
                         path_to_here.push((*br, i.into(), opts.len()));
                         let leaves = gp
                             .as_ref()
-                            .map(|gp| traverse(hugr, gp, path_to_here))
+                            .map(|gp| traverse(gp, path_to_here))
                             .unwrap_or_default();
                         path_to_here.pop();
                         leaves
@@ -313,7 +313,7 @@ impl<N: HugrNode> GatingPath<N> {
                     .collect(),
             }
         }
-        traverse(hugr, self, &mut Vec::new())
+        traverse(self, &mut Vec::new())
     }
 
     fn union(&mut self, other: &GatingPath<N>) {
@@ -345,5 +345,5 @@ pub(super) fn leaf_targets<H: HugrView>(
     hugr: &H,
 ) -> impl Iterator<Item = H::Node> {
     gp.into_iter()
-        .flat_map(move |gp| gp.leaves(hugr).into_iter().map(|lp| lp.tgt))
+        .flat_map(move |gp| gp.leaves().into_iter().map(move |lp| lp.tgt(hugr)))
 }
