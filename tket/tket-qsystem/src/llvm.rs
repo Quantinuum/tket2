@@ -5,6 +5,7 @@ pub mod debug;
 pub mod futures;
 pub mod globals;
 pub mod prelude;
+pub mod ptr;
 pub mod qsystem;
 pub mod random;
 pub mod result;
