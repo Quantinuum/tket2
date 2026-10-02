@@ -107,13 +107,18 @@ pub(super) unsafe extern "C" fn adjust(
     HELD.with_borrow(|held| assert!(!held.contains(&(handle as usize))));
     assert!(matches!(delta, -1 | 1));
     let cell = unsafe { &*handle };
-    let previous = cell
-        .owners
-        .fetch_update(Ordering::AcqRel, Ordering::Acquire, |owners| {
-            assert!(owners > 0);
-            owners.checked_add_signed(delta)
-        })
-        .unwrap();
+    let mut previous = cell.owners.load(Ordering::Acquire);
+    loop {
+        assert!(previous > 0);
+        let next = previous.checked_add_signed(delta).unwrap();
+        match cell
+            .owners
+            .compare_exchange_weak(previous, next, Ordering::AcqRel, Ordering::Acquire)
+        {
+            Ok(_) => break,
+            Err(observed) => previous = observed,
+        }
+    }
     let final_owner = delta == -1 && previous == 1;
     event(Event::Adjust { delta, final_owner });
     if !final_owner {
