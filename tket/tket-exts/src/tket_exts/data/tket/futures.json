@@ -1,5 +1,5 @@
 {
-  "version": "0.2.0",
+  "version": "0.3.0",
   "name": "tket.futures",
   "types": {
     "Future": {
@@ -22,12 +22,12 @@
     "Dup": {
       "extension": "tket.futures",
       "name": "Dup",
-      "description": "Duplicate a Future. The original Future is consumed and two Futures are returned",
+      "description": "Duplicate a Future of a copyable type, consuming it and returning two Futures",
       "signature": {
         "params": [
           {
             "tp": "Type",
-            "b": "A"
+            "b": "C"
           }
         ],
         "body": {
@@ -35,7 +35,7 @@
             {
               "t": "Opaque",
               "extension": "tket.futures",
-              "extension_version": "0.2.0",
+              "extension_version": "0.3.0",
               "id": "Future",
               "args": [
                 {
@@ -43,7 +43,7 @@
                   "ty": {
                     "t": "V",
                     "i": 0,
-                    "b": "A"
+                    "b": "C"
                   }
                 }
               ],
@@ -54,7 +54,7 @@
             {
               "t": "Opaque",
               "extension": "tket.futures",
-              "extension_version": "0.2.0",
+              "extension_version": "0.3.0",
               "id": "Future",
               "args": [
                 {
@@ -62,7 +62,7 @@
                   "ty": {
                     "t": "V",
                     "i": 0,
-                    "b": "A"
+                    "b": "C"
                   }
                 }
               ],
@@ -71,7 +71,7 @@
             {
               "t": "Opaque",
               "extension": "tket.futures",
-              "extension_version": "0.2.0",
+              "extension_version": "0.3.0",
               "id": "Future",
               "args": [
                 {
@@ -79,7 +79,7 @@
                   "ty": {
                     "t": "V",
                     "i": 0,
-                    "b": "A"
+                    "b": "C"
                   }
                 }
               ],
@@ -93,12 +93,12 @@
     "Free": {
       "extension": "tket.futures",
       "name": "Free",
-      "description": "Consume a future without reading it.",
+      "description": "Consume a future of a copyable type without reading it.",
       "signature": {
         "params": [
           {
             "tp": "Type",
-            "b": "A"
+            "b": "C"
           }
         ],
         "body": {
@@ -106,7 +106,7 @@
             {
               "t": "Opaque",
               "extension": "tket.futures",
-              "extension_version": "0.2.0",
+              "extension_version": "0.3.0",
               "id": "Future",
               "args": [
                 {
@@ -114,7 +114,7 @@
                   "ty": {
                     "t": "V",
                     "i": 0,
-                    "b": "A"
+                    "b": "C"
                   }
                 }
               ],
@@ -142,7 +142,7 @@
             {
               "t": "Opaque",
               "extension": "tket.futures",
-              "extension_version": "0.2.0",
+              "extension_version": "0.3.0",
               "id": "Future",
               "args": [
                 {
