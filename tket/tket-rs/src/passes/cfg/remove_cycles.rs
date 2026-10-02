@@ -353,7 +353,7 @@ fn insert_nodes<N: HugrNode>(
         return dtn;
     }
 
-    fn single_successor_max2<H: HugrView>(hugr: &H, node: H::Node) -> Option<H::Node> {
+    fn single_successor_max1<H: HugrView>(hugr: &H, node: H::Node) -> Option<H::Node> {
         let outs = hugr
             .node_outputs(node)
             .at_most_one()
@@ -375,7 +375,7 @@ fn insert_nodes<N: HugrNode>(
             // if this DTN, or a child, uses the insertee, it also needs any successor thereof
             // (thus, successor insertees will be inserted in the LCA of their predecessors)
             successors(to_insert.contains(&insertee).then_some(insertee), |n| {
-                single_successor_max2(hugr, *n).filter(|n| to_insert.contains(n))
+                single_successor_max1(hugr, *n).filter(|n| to_insert.contains(n))
             })
             .map(move |n| (n, user))
         })
@@ -399,7 +399,7 @@ fn insert_nodes<N: HugrNode>(
             // The double-reverse is essential so that multiple nodes with the same successor don't end up
             // with the successor inbetween them.
             let mut succs = successors(Some(n), |n| {
-                single_successor_max2(hugr, *n).filter(|node| cands.remove(node))
+                single_successor_max1(hugr, *n).filter(|node| cands.remove(node))
             })
             .collect::<Vec<_>>();
             succs.reverse();
