@@ -269,7 +269,8 @@ impl<'a, 'py> FromPyObject<'a, 'py> for PyParallelMode {
 }
 
 #[pyfunction]
-#[pyo3(signature = (circ, scope = None, window_size=None, pool_size=None, top_up_size=None, seed=None, parallel_mode=None))]
+#[pyo3(signature = (circ, scope = None, window_size=None, pool_size=None, top_up_size=None, seed=None, parallel_mode=None, t_optimization=false, ancilla_budget=None))]
+#[expect(clippy::too_many_arguments)]
 fn pauli_graph_resynthesis(
     circ: &mut CompilationState,
     scope: Option<PyPassScope>,
@@ -278,9 +279,15 @@ fn pauli_graph_resynthesis(
     top_up_size: Option<usize>,
     seed: Option<usize>,
     parallel_mode: Option<PyParallelMode>,
+    t_optimization: bool,
+    ancilla_budget: Option<usize>,
 ) -> PyResult<()> {
     let py_scope = scope.unwrap_or_default();
-    let mut pass = tket::passes::PauliGraphResynthesis::default_with_scope(py_scope.scope);
+    let mut pass = tket::passes::PauliGraphResynthesis::default_with_scope(py_scope.scope)
+        .with_t_optimization(t_optimization);
+    if let Some(budget) = ancilla_budget {
+        pass = pass.with_ancilla_budget(budget);
+    }
     if let Some(ws) = window_size {
         pass = pass.with_window_size(ws);
     }

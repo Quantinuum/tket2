@@ -1,23 +1,29 @@
 [package]
-name = "tk-pg-rebase"
+name = "tk-pg-t-optimize"
 version = "0.1.1"
-description = "Rebasing passes for Pauli graphs"
+description = "T-count optimization passes for Pauli graphs"
 edition = { workspace = true }
 rust-version = { workspace = true }
 license = { workspace = true }
-readme = "README.md"
-documentation = "https://docs.rs/tk-pg-rebase"
+documentation = "https://docs.rs/tk-pg-t-optimize"
 homepage = { workspace = true }
 repository = { workspace = true }
 keywords = { workspace = true }
 categories = { workspace = true }
 
+[features]
+default = []
+unstable_simd = []
+
 [dependencies]
+bitvec = "1.0.1"
 tk-pg-core = { path = "../../tk-pg-core", version = "0.1.1" }
+tk-pg-canonical-form = { path = "../tk-pg-canonical-form", version = "0.1.1" }
+tk-pg-ir-kernels = { path = "../../pg-kernels/tk-pg-ir-kernels", version = "0.1.1" }
+tk-pg-qm-tableau = { path = "../../tk-pg-qm-tableau", version = "0.1.1" }
 
 [dev-dependencies]
 tk-pg-converter = { path = "../../pg-converters/tk-pg-converter", version = "0.1.1" }
-rstest = { workspace = true }
 
 [lints]
 workspace = true

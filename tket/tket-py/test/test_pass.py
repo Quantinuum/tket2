@@ -563,6 +563,8 @@ def test_custom_options_and_scope() -> None:
         top_up_size=4,
         seed=7,
         parallel_mode=ParallelMode.On,
+        t_optimization=False,
+        ancilla_budget=None,
     )
     assert _count_hadamards(result.hugr) == 0
 
