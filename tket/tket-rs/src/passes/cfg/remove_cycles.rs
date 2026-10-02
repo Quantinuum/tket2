@@ -115,7 +115,7 @@ pub fn nest_loop<H: HugrMut>(
     }
 
     // Build DomTree to return. Inner loop first
-    let loop_dtn = insert_nodes(
+    let loop_dtn = insert_at_lca(
         loop_dtn,
         hugr,
         break_blocks_for_subtree_exits
@@ -344,12 +344,19 @@ fn tag_block<H: HugrMut>(hugr: &mut H, after: H::Node, tag: usize, rows: Vec<Typ
     bb
 }
 
-fn insert_nodes<N: HugrNode>(
+/// Inserts nodes into the dominator tree at the lowest common ancestor of their predecessors.
+///
+/// Takes account of the predecessors potentially including other nodes amongst those to be inserted.
+///
+/// TODO however if one node to be inserted *dominates* another, this will insert the two
+/// alongside each other, rather than as children. This could occur in a single-exit loop
+/// where the block tagging "which exit" dominates the block tagging "exit not continue".
+fn insert_at_lca<N: HugrNode>(
     dtn: DomTreeWithBackedges<N>,
     hugr: &impl HugrView<Node = N>,
-    to_insert: HashSet<N>, // insert at LCA of predecessors, which may include other elements
+    insertees: HashSet<N>,
 ) -> DomTreeWithBackedges<N> {
-    if to_insert.is_empty() {
+    if insertees.is_empty() {
         return dtn;
     }
 
@@ -374,8 +381,8 @@ fn insert_nodes<N: HugrNode>(
         .flat_map(|(user, insertee)| {
             // if this DTN, or a child, uses the insertee, it also needs any successor thereof
             // (thus, successor insertees will be inserted in the LCA of their predecessors)
-            successors(to_insert.contains(&insertee).then_some(insertee), |n| {
-                single_successor_max1(hugr, *n).filter(|n| to_insert.contains(n))
+            successors(insertees.contains(&insertee).then_some(insertee), |n| {
+                single_successor_max1(hugr, *n).filter(|n| insertees.contains(n))
             })
             .map(move |n| (n, user))
         })
@@ -421,7 +428,7 @@ fn insert_nodes<N: HugrNode>(
         .into_iter()
         .map(|(_gp, child)| {
             let blocks = owned_insertees.remove(&child.node).unwrap_or_default();
-            insert_nodes(child, hugr, blocks)
+            insert_at_lca(child, hugr, blocks)
         })
         .chain(new_root_children)
         .collect::<Vec<_>>();
