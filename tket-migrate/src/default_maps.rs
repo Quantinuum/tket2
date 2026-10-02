@@ -2,11 +2,11 @@ use hugr::extension::{Version, simple_op::MakeRegisteredOp};
 use hugr::std_extensions::logic::LogicOp;
 
 use crate::update_maps::{
-    OpReplacementTemplate, OpUpdateMap, TypeMapping, TypeReplacementTemplate, VersionedElement,
+    OpReplacementTemplate, OpMapping, TypeMapping, TypeReplacementTemplate, VersionedElement,
 };
 use tket::{hugr::extension::prelude::bool_t, passes::replace_types::NodeTemplate};
 
-pub fn get_measurement_migratation_op_map() -> OpUpdateMap {
+pub fn get_measurement_migratation_op_map() -> OpMapping {
     vec![
         (
             VersionedElement::new(

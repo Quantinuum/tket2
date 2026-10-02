@@ -1,5 +1,10 @@
 use hugr::HugrView;
-use hugr::{Hugr, extension::Version, ops::ExtensionOp, types::Type};
+use hugr::{
+    builder::{DFGBuilder, Dataflow, DataflowHugr},
+    extension::Version,
+    ops::{DataflowOpTrait, ExtensionOp},
+    types::{Signature, Type},
+};
 use std::collections::HashMap;
 use tket::passes::replace_types::NodeTemplate;
 
@@ -21,13 +26,24 @@ impl VersionedElement {
     }
 
     /// Instantiates the extension operation from the given Hugr view.
-    pub fn get_instantiated<T: HugrView>(&self, hugr: &T) -> ExtensionOp {
+    pub fn get_instantiated_op<T: HugrView>(&self, hugr: &T) -> ExtensionOp {
         // NICOLA: TODO: we should have a proper error here
         hugr.extensions()
             .get_exact(&self.extension_id, &self.version)
             .expect("Extension version is missing from the registry")
             .instantiate_extension_op(&self.id, [])
             .expect("Failed to instantiate extension operation")
+    }
+
+    pub fn get_type<T: HugrView>(&self, hugr: &T) -> CustomType {
+        // NICOLA: TODO: we should have a proper error here
+        hugr.extensions()
+            .get_exact(&self.extension_id, &self.version)
+            .expect("Extension version is missing from the registry")
+            .get_type(self.id.as_str())
+            .expect("Type is missing from the extension")
+            .instantiate([])
+            .expect("Failed to instantiate type")
     }
 }
 
@@ -44,13 +60,54 @@ pub enum OpReplacementTemplate {
     TemplateInstance(NodeTemplate),
 }
 
+impl OpReplacementTemplate {
+    pub fn get_op_replace<T: HugrView>(&self, old_op: &ExtensionOp, hugr: &T) -> NodeTemplate {
+        match self {
+            OpReplacementTemplate::TemplateInstance(template) => template.clone(),
+            OpReplacementTemplate::Empty => Self::get_node_template(old_op, &[], hugr),
+            OpReplacementTemplate::VersionedElements(v) => Self::get_node_template(old_op, v, hugr),
+        }
+    }
+
+    fn get_node_template<T: HugrView>(
+        old_op: &ExtensionOp,
+        versioned_elements: &[VersionedElement],
+        hugr: &T,
+    ) -> NodeTemplate {
+        let operations = versioned_elements
+            .iter()
+            .map(|element| element.get_instantiated(hugr))
+            .collect::<Vec<_>>();
+
+        let signature = match (operations.first(), operations.last()) {
+            (Some(first), Some(last)) => Signature::new(
+                first.signature().input().clone(),
+                last.signature().output().clone(),
+            ),
+            _ => old_op.signature().into_owned(),
+        };
+        let mut builder = DFGBuilder::new(signature).expect("Failed to build replacement");
+        let mut wires = builder.input_wires().collect::<Vec<_>>();
+        for operation in operations {
+            // NICOLA: TODO: we should have a proper error here
+            wires = builder
+                .add_dataflow_op(operation, wires)
+                .expect("Replacement operations have incompatible signatures")
+                .outputs()
+                .collect();
+        }
+        // NICOLA: TODO: we should have a proper error here
+        NodeTemplate::linked_hugr(builder.finish_hugr_with_outputs(wires).unwrap())
+    }
+}
+
 #[derive(Debug, Default)]
 /// Represents a mapping from an old operation to its replacement(s).
-pub struct OpUpdateMap {
+pub struct OpMapping {
     map: HashMap<VersionedElement, OpReplacementTemplate>,
 }
 
-impl OpUpdateMap {
+impl OpMapping {
     pub fn new(map: HashMap<VersionedElement, OpReplacementTemplate>) -> Self {
         Self { map }
     }
@@ -72,9 +129,13 @@ impl OpUpdateMap {
 
         Some(replacement)
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&VersionedElement, &OpReplacementTemplate)> {
+        self.map.iter()
+    }
 }
 
-impl From<Vec<(VersionedElement, OpReplacementTemplate)>> for OpUpdateMap {
+impl From<Vec<(VersionedElement, OpReplacementTemplate)>> for OpMapping {
     fn from(entries: Vec<(VersionedElement, OpReplacementTemplate)>) -> Self {
         Self {
             map: entries.into_iter().collect(),
@@ -113,6 +174,14 @@ impl TypeMapping {
     fn get_new_type(&self, old_type: &VersionedElement) -> Option<&TypeReplacementTemplate> {
         self.map.get(old_type)
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&VersionedElement, &TypeReplacementTemplate)> {
+        self.map.iter()
+    }
+
+    // pub fn get_replacement(&self, old_type: &VersionedElement) -> Option<&TypeReplacementTemplate> {
+    //     self.get_new_type(old_type)
+    // }
 }
 
 impl From<Vec<(VersionedElement, TypeReplacementTemplate)>> for TypeMapping {

@@ -1,21 +1,17 @@
 //! Generate semantically equivalent HUGRs with two quantum extension versions.
 
 mod default_maps;
+mod default_maps;
 mod hugr_migration;
-mod lib;
-mod old_lib;
 mod testing_func;
 mod update_maps;
+use default_maps::{get_measurement_migratation_op_map, get_measurement_migratation_type_map};
 use hugr::{Extension, HugrView, extension::Version};
 use std::{error::Error, fs, path::PathBuf};
 
-use lib::ExtensionUpdater;
 use testing_func::{build_bool_cfg_hugr, build_bool_hugr, build_old_hugr, generate};
 
-use crate::{
-    lib::{OpUpdateMap, TypeMapping, UndatingMap, VersionedElement},
-    testing_func::load_extensions,
-};
+use crate::testing_func::load_extensions;
 
 #[allow(dead_code)]
 fn update_measure_op() -> Result<(), Box<dyn Error>> {
@@ -57,47 +53,6 @@ fn main1() -> Result<(), Box<dyn Error>> {
         true,
     )?;
 
-    let updating_map = UndatingMap::new(
-        vec![
-            OpUpdateMap::new(
-                VersionedElement::new(
-                    "MeasureFree".to_string(),
-                    "tket.quantum".to_string(),
-                    Version::new(0, 2, 1),
-                ),
-                vec![
-                    VersionedElement::new(
-                        "MeasureFree".to_string(),
-                        "tket.quantum".to_string(),
-                        Version::new(0, 3, 0),
-                    ),
-                    VersionedElement::new(
-                        "Read".to_string(),
-                        "tket.measurement".to_string(),
-                        Version::new(0, 1, 0),
-                    ),
-                ],
-            ),
-            OpUpdateMap::new(
-                VersionedElement::new(
-                    "read".to_string(),
-                    "tket.bool".to_string(),
-                    Version::new(0, 2, 0),
-                ),
-                vec![],
-            ),
-        ],
-        vec![TypeMapping::new(
-            VersionedElement::new(
-                "bool".to_string(),
-                "tket.bool".to_string(),
-                Version::new(0, 2, 0),
-            ),
-            // We should have a instance here already
-            VersionedElement::new(name, extension_name, version),
-        )],
-    );
-
     let mut updater = ExtensionUpdater::new(_old_hugr, updating_map);
     updater.migrate_hugr(load_new_extensions()?);
 
@@ -114,98 +69,6 @@ fn main1() -> Result<(), Box<dyn Error>> {
     // println!("wrote {}", old_output.display());
     // // println!("wrote {}", new_output.display());
     Ok(())
-}
-
-fn update_bool_map() -> UndatingMap {
-    UndatingMap::new(
-        vec![
-            OpUpdateMap::new(
-                VersionedElement::new(
-                    "and".to_string(),
-                    "tket.bool".to_string(),
-                    Version::new(0, 2, 0),
-                ),
-                vec![VersionedElement::new(
-                    "And".to_string(),
-                    "logic".to_string(),
-                    Version::new(0, 1, 0),
-                )],
-            ),
-            OpUpdateMap::new(
-                VersionedElement::new(
-                    "eq".to_string(),
-                    "tket.bool".to_string(),
-                    Version::new(0, 2, 0),
-                ),
-                vec![VersionedElement::new(
-                    "Eq".to_string(),
-                    "logic".to_string(),
-                    Version::new(0, 1, 0),
-                )],
-            ),
-            OpUpdateMap::new(
-                VersionedElement::new(
-                    "not".to_string(),
-                    "tket.bool".to_string(),
-                    Version::new(0, 2, 0),
-                ),
-                vec![VersionedElement::new(
-                    "Not".to_string(),
-                    "logic".to_string(),
-                    Version::new(0, 1, 0),
-                )],
-            ),
-            OpUpdateMap::new(
-                VersionedElement::new(
-                    "or".to_string(),
-                    "tket.bool".to_string(),
-                    Version::new(0, 2, 0),
-                ),
-                vec![VersionedElement::new(
-                    "Or".to_string(),
-                    "logic".to_string(),
-                    Version::new(0, 1, 0),
-                )],
-            ),
-            OpUpdateMap::new(
-                VersionedElement::new(
-                    "xor".to_string(),
-                    "tket.bool".to_string(),
-                    Version::new(0, 2, 0),
-                ),
-                vec![VersionedElement::new(
-                    "Xor".to_string(),
-                    "logic".to_string(),
-                    Version::new(0, 1, 0),
-                )],
-            ),
-            OpUpdateMap::new(
-                VersionedElement::new(
-                    "read".to_string(),
-                    "tket.bool".to_string(),
-                    Version::new(0, 2, 0),
-                ),
-                vec![],
-            ),
-            OpUpdateMap::new(
-                VersionedElement::new(
-                    "make_opaque".to_string(),
-                    "tket.bool".to_string(),
-                    Version::new(0, 2, 0),
-                ),
-                vec![],
-            ),
-        ],
-        vec![TypeMapping::new(
-            VersionedElement::new(
-                "bool".to_string(),
-                "tket.bool".to_string(),
-                Version::new(0, 2, 0),
-            ),
-            // here we should have an already instantiated type e.g. bool_t
-            VersionedElement::new(name, extension_name, version),
-        )],
-    )
 }
 
 fn main2() -> Result<(), Box<dyn Error>> {
