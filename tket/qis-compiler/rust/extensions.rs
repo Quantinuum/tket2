@@ -101,9 +101,10 @@ mod tests {
                 .finish(|mut b| {
                     let value = b.add_load_value(ConstInt::new_u(6, 42).unwrap());
                     let p = b.add_new_ptr(value).unwrap();
+                    let (p, read) = b.add_read_ptr(p, ty.clone()).unwrap();
                     let result = b.add_free_ptr(p, ty.clone()).unwrap();
-                    let [value] = b.build_unwrap_sum(1, option_type([ty]), result).unwrap();
-                    b.finish_hugr_with_outputs([value]).unwrap()
+                    let [_] = b.build_unwrap_sum(1, option_type([ty]), result).unwrap();
+                    b.finish_hugr_with_outputs([read]).unwrap()
                 });
             crate::process_hugr(platform, &mut hugr).unwrap();
             let ctx = hugr::llvm::inkwell::context::Context::create();
@@ -118,11 +119,11 @@ mod tests {
             .unwrap();
             module.verify().unwrap();
             for symbol in [
-                "___ptr_alloc",
+                "___ptr_create",
                 "___ptr_get_ptr",
                 "___ptr_lock",
                 "___ptr_unlock",
-                "___ptr_free",
+                "___ptr_inc_refcount",
             ] {
                 assert!(module.get_function(symbol).is_some(), "missing {symbol}");
             }

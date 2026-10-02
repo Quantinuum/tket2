@@ -82,61 +82,8 @@ fn emit<'c>(ctx: &'c TestContext, hugr: &'c Hugr) -> Emission<'c> {
     emission
 }
 
-thread_local! {
-    static EVENTS: std::cell::RefCell<Vec<&'static str>> = const { std::cell::RefCell::new(Vec::new()) };
-    static ALLOCATIONS: std::cell::RefCell<std::collections::BTreeMap<usize, (std::alloc::Layout, usize)>> = const { std::cell::RefCell::new(std::collections::BTreeMap::new()) };
-}
-fn event(name: &'static str) {
-    EVENTS.with_borrow_mut(|events| events.push(name));
-}
-extern "C" fn hook_alloc(size: u64, align: u64) -> *mut u8 {
-    let payload = std::alloc::Layout::from_size_align(size as usize, align as usize).unwrap();
-    let (layout, offset) = std::alloc::Layout::new::<u64>().extend(payload).unwrap();
-    // LLVM supplies a nonzero sized cell and its power-of-two ABI alignment.
-    let ptr = unsafe { std::alloc::alloc(layout) };
-    assert!(!ptr.is_null());
-    ALLOCATIONS.with_borrow_mut(|allocs| allocs.insert(ptr as usize, (layout, offset)));
-    event("alloc");
-    hook_init(ptr.cast());
-    ptr
-}
-extern "C" fn hook_free(ptr: *mut u8) {
-    hook_destroy(ptr.cast());
-    let (layout, _) = ALLOCATIONS
-        .with_borrow_mut(|allocs| allocs.remove(&(ptr as usize)))
-        .unwrap();
-    // The last Free returns the value and destroys the mutex before freeing.
-    unsafe {
-        std::alloc::dealloc(ptr, layout);
-    }
-    event("free");
-}
-extern "C" fn hook_get_ptr(ptr: *mut u8) -> *mut u8 {
-    let offset = ALLOCATIONS.with_borrow(|allocs| allocs[&(ptr as usize)].1);
-    // Payload storage is a separate, aligned region after the runtime mutex.
-    assert!(offset > 0);
-    EVENTS.with_borrow(|events| assert!(matches!(events.last(), Some(&"lock" | &"init"))));
-    event("get_ptr");
-    unsafe { ptr.add(offset) }
-}
-extern "C" fn hook_init(ptr: *mut u64) {
-    unsafe {
-        ptr.write(0);
-    }
-    event("init");
-}
-extern "C" fn hook_lock(ptr: *mut u64) {
-    assert_eq!(unsafe { ptr.replace(1) }, 0);
-    event("lock");
-}
-extern "C" fn hook_unlock(ptr: *mut u64) {
-    assert_eq!(unsafe { ptr.replace(0) }, 1);
-    event("unlock");
-}
-extern "C" fn hook_destroy(ptr: *mut u64) {
-    assert_eq!(unsafe { ptr.read() }, 0);
-    event("destroy");
-}
+mod runtime;
+use runtime::{EVENTS, Event};
 
 fn nested_linear_payload() -> Hugr {
     let ty = int_type(6);
@@ -204,11 +151,11 @@ fn equality(aliases: bool, rhs_value: u64) -> Hugr {
 }
 
 #[rstest]
-#[case(lifecycle(), 1, 7)]
-#[case(nested_linear_payload(), 2, 2)]
-#[case::eq_aliases(equality(true, 7), 1, 5)]
-#[case::eq_distinct_same_payload(equality(false, 7), 2, 4)]
-#[case::eq_distinct_different_payload(equality(false, 19), 2, 4)]
+#[case(lifecycle(), 1, 4)]
+#[case(nested_linear_payload(), 2, 0)]
+#[case::eq_aliases(equality(true, 7), 1, 2)]
+#[case::eq_distinct_same_payload(equality(false, 7), 2, 2)]
+#[case::eq_distinct_different_payload(equality(false, 19), 2, 2)]
 fn custom_hooks_manage_cell_once(
     mut exec_ctx: TestContext,
     #[case] hugr: Hugr,
@@ -227,13 +174,15 @@ fn custom_hooks_manage_cell_once(
         .create_jit_execution_engine(inkwell::OptimizationLevel::None)
         .unwrap();
     for (name, address) in [
-        ("___ptr_alloc", hook_alloc as *const () as usize),
-        ("___ptr_free", hook_free as *const () as usize),
-        ("___ptr_get_ptr", hook_get_ptr as *const () as usize),
-        ("___ptr_lock", hook_lock as *const () as usize),
-        ("___ptr_unlock", hook_unlock as *const () as usize),
+        ("___ptr_create", runtime::create as *const () as usize),
+        ("___ptr_inc_refcount", runtime::adjust as *const () as usize),
+        ("___ptr_get_ptr", runtime::data as *const () as usize),
+        ("___ptr_lock", runtime::lock as *const () as usize),
+        ("___ptr_unlock", runtime::unlock as *const () as usize),
     ] {
-        engine.add_global_mapping(&emission.module().get_function(name).unwrap(), address);
+        if let Some(function) = emission.module().get_function(name) {
+            engine.add_global_mapping(&function, address);
+        }
     }
     EVENTS.with_borrow_mut(Vec::clear);
     // This test's entry has no arguments and returns the LLVM boolean type.
@@ -244,48 +193,48 @@ fn custom_hooks_manage_cell_once(
     };
     assert!(unsafe { main.call() });
     EVENTS.with_borrow(|events| {
+        let creates: Vec<_> = events
+            .iter()
+            .filter_map(|event| match event {
+                Event::Create { size, alignment } => Some((*size, *alignment)),
+                _ => None,
+            })
+            .collect();
+        // All these payloads are i64 or a pointer, never a {count, value} pair.
+        assert_eq!(creates, vec![(8, 8); allocations]);
         assert_eq!(
-            events.iter().filter(|e| **e == "alloc").count(),
+            events.iter().filter(|e| **e == Event::Destroy).count(),
             allocations
         );
-        assert_eq!(events.iter().filter(|e| **e == "free").count(), allocations);
-        assert_eq!(&events[..3], &["alloc", "init", "get_ptr"]);
-        assert_eq!(&events[events.len() - 2..], &["destroy", "free"]);
-        assert_eq!(events.iter().filter(|e| **e == "lock").count(), locks);
-        assert_eq!(events.iter().filter(|e| **e == "unlock").count(), locks);
+        assert!(matches!(events.first(), Some(Event::Create { .. })));
+        assert_eq!(events.last(), Some(&Event::Destroy));
+        assert_eq!(events.iter().filter(|e| **e == Event::Lock).count(), locks);
+        assert_eq!(
+            events.iter().filter(|e| **e == Event::Unlock).count(),
+            locks
+        );
+        assert_eq!(
+            events.iter().filter(|e| **e == Event::Project).count(),
+            locks
+        );
+        let adjustments: Vec<_> = events
+            .iter()
+            .filter_map(|event| match event {
+                Event::Adjust { delta, final_owner } => Some((*delta, *final_owner)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            adjustments.iter().map(|(delta, _)| delta).sum::<i64>(),
+            -(allocations as i64)
+        );
+        assert_eq!(
+            adjustments.iter().filter(|(_, last)| *last).count(),
+            allocations
+        );
     });
-    ALLOCATIONS.with_borrow(|allocs| assert!(allocs.is_empty()));
 }
 
-use std::{
-    cell::UnsafeCell,
-    sync::atomic::{AtomicU8, Ordering},
-};
-
-// A test runtime whose opaque handle and payload have different addresses.
-#[repr(C)]
-struct Cell {
-    mutex: AtomicU8,
-    count: u64,
-    value: UnsafeCell<u64>,
-}
-extern "C" fn concurrent_lock(ptr: *const Cell) {
-    // The test retains storage until all JIT calls join.
-    let lock = unsafe { &(*ptr).mutex };
-    while lock
-        .compare_exchange_weak(0, 1, Ordering::Acquire, Ordering::Relaxed)
-        .is_err()
-    {
-        std::hint::spin_loop();
-    }
-}
-extern "C" fn concurrent_unlock(ptr: *const Cell) {
-    unsafe { &(*ptr).mutex }.store(0, Ordering::Release);
-}
-extern "C" fn concurrent_get_ptr(ptr: *const Cell) -> *const u64 {
-    // Payload access occurs only while the caller holds the mutex.
-    unsafe { std::ptr::addr_of!((*ptr).count) }
-}
 #[rstest]
 fn custom_mutex_makes_concurrent_map_exclusive(mut exec_ctx: TestContext) {
     configure(&mut exec_ctx);
@@ -317,21 +266,21 @@ fn custom_mutex_makes_concurrent_map_exclusive(mut exec_ctx: TestContext) {
         .create_jit_execution_engine(inkwell::OptimizationLevel::Aggressive)
         .unwrap();
     for (name, address) in [
-        ("___ptr_get_ptr", concurrent_get_ptr as *const () as usize),
-        ("___ptr_lock", concurrent_lock as *const () as usize),
-        ("___ptr_unlock", concurrent_unlock as *const () as usize),
+        ("___ptr_get_ptr", runtime::data as *const () as usize),
+        ("___ptr_lock", runtime::lock as *const () as usize),
+        ("___ptr_unlock", runtime::unlock as *const () as usize),
     ] {
-        engine.add_global_mapping(&emission.module().get_function(name).unwrap(), address);
+        if let Some(function) = emission.module().get_function(name) {
+            engine.add_global_mapping(&function, address);
+        }
     }
     let address = engine.get_function_address("main").unwrap();
-    // Mirror the test spin-mutex cell layout. Each worker owns one of four handles;
-    // storage is owned by this test and stays alive until every worker joins.
-    let cell = Cell {
-        count: 4,
-        mutex: AtomicU8::new(0),
-        value: UnsafeCell::new(0),
-    };
-    let ptr = (&cell as *const Cell) as usize;
+    let initial = 0u64;
+    let cell = unsafe { runtime::create(8, 8, std::ptr::from_ref(&initial).cast()) };
+    for _ in 0..3 {
+        assert!(!unsafe { runtime::adjust(cell, 1, std::ptr::null_mut()) });
+    }
+    let ptr = cell as usize;
     let start = std::sync::Barrier::new(4);
     std::thread::scope(|scope| {
         for _ in 0..4 {
@@ -348,7 +297,13 @@ fn custom_mutex_makes_concurrent_map_exclusive(mut exec_ctx: TestContext) {
             });
         }
     });
-    // All workers have joined, so no concurrent access to the value remains.
-    assert_eq!(unsafe { *cell.value.get() }, 8000);
-    assert_eq!(cell.count, 4);
+    // The final extraction returns the value once, without an extra lock or
+    // caller-visible payload counter. Nonfinal releases leave output untouched.
+    let mut output = u64::MAX;
+    for _ in 0..3 {
+        assert!(!unsafe { runtime::adjust(cell, -1, std::ptr::from_mut(&mut output).cast()) });
+        assert_eq!(output, u64::MAX);
+    }
+    assert!(unsafe { runtime::adjust(cell, -1, std::ptr::from_mut(&mut output).cast()) });
+    assert_eq!(output, 8000);
 }

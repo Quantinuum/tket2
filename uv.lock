@@ -23,7 +23,7 @@ members = [
 conan = [{ name = "conan", specifier = ">=2.31.1,<3" }]
 dev = [
     { name = "graphviz", specifier = "~=0.21.0" },
-    { name = "hugr", git = "https://github.com/quantinuum/hugr?subdirectory=hugr-py&rev=a956e639f0d36d3eae64e1f1090304e94a44eaa9" },
+    { name = "hugr", git = "https://github.com/quantinuum/hugr?subdirectory=hugr-py&rev=fc654a9ad354f7235ad2469b6b3d10a43baf94d1" },
     { name = "hypothesis", specifier = ">=6.165.0,<7" },
     { name = "maturin", specifier = ">=1.14.1,<2" },
     { name = "mypy", specifier = ">=2.3.0,<3" },
@@ -844,7 +844,7 @@ wheels = [
 [[package]]
 name = "hugr"
 version = "0.18.6"
-source = { git = "https://github.com/quantinuum/hugr?subdirectory=hugr-py&rev=a956e639f0d36d3eae64e1f1090304e94a44eaa9#a956e639f0d36d3eae64e1f1090304e94a44eaa9" }
+source = { git = "https://github.com/quantinuum/hugr?subdirectory=hugr-py&rev=fc654a9ad354f7235ad2469b6b3d10a43baf94d1#fc654a9ad354f7235ad2469b6b3d10a43baf94d1" }
 dependencies = [
     { name = "graphviz" },
     { name = "pydantic" },
@@ -2773,14 +2773,14 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "hugr", git = "https://github.com/quantinuum/hugr?subdirectory=hugr-py&rev=a956e639f0d36d3eae64e1f1090304e94a44eaa9" },
+    { name = "hugr", git = "https://github.com/quantinuum/hugr?subdirectory=hugr-py&rev=fc654a9ad354f7235ad2469b6b3d10a43baf94d1" },
     { name = "typing-extensions", specifier = ">=4.5" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "cibuildwheel", specifier = ">=2.23.2" },
-    { name = "hugr", git = "https://github.com/quantinuum/hugr?subdirectory=hugr-py&rev=a956e639f0d36d3eae64e1f1090304e94a44eaa9" },
+    { name = "hugr", git = "https://github.com/quantinuum/hugr?subdirectory=hugr-py&rev=fc654a9ad354f7235ad2469b6b3d10a43baf94d1" },
     { name = "pytest", specifier = ">=8.4.2" },
     { name = "pytest-snapshot", specifier = "~=0.9.0" },
     { name = "tket-exts", editable = "tket/tket-exts" },
@@ -3185,7 +3185,7 @@ docs = [
 
 [package.metadata]
 requires-dist = [
-    { name = "hugr", git = "https://github.com/quantinuum/hugr?subdirectory=hugr-py&rev=a956e639f0d36d3eae64e1f1090304e94a44eaa9" },
+    { name = "hugr", git = "https://github.com/quantinuum/hugr?subdirectory=hugr-py&rev=fc654a9ad354f7235ad2469b6b3d10a43baf94d1" },
     { name = "pytket", marker = "extra == 'pytket'", specifier = ">=2.1.0,<3" },
     { name = "tket-eccs", editable = "tket/tket-eccs" },
     { name = "tket-exts", editable = "tket/tket-exts" },
@@ -3215,7 +3215,7 @@ dependencies = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "hugr", git = "https://github.com/quantinuum/hugr?subdirectory=hugr-py&rev=a956e639f0d36d3eae64e1f1090304e94a44eaa9" }]
+requires-dist = [{ name = "hugr", git = "https://github.com/quantinuum/hugr?subdirectory=hugr-py&rev=fc654a9ad354f7235ad2469b6b3d10a43baf94d1" }]
 
 [[package]]
 name = "tomli"
