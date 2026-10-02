@@ -23,6 +23,8 @@ use crate::passes::BorrowSquashPass;
 pub struct Normalize {
     /// Whether to resolve modifier operations.
     resolve_modifiers: bool,
+    /// Whether to turn cycles in the CFG into [TailLoop](hugr::ops::TailLoop)s.
+    remove_cfg_cycles: bool,
     /// Whether to simplify CFG control flow.
     simplify_cfgs: bool,
     /// Whether to remove tuple/untuple operations.
@@ -50,6 +52,11 @@ impl Normalize {
     /// Set whether to resolve modifier operations.
     pub fn resolve_modifiers(&mut self, resolve_modifiers: bool) -> &mut Self {
         self.resolve_modifiers = resolve_modifiers;
+        self
+    }
+    /// Set whether to turn cycles in the CFG into [TailLoop](hugr::ops::TailLoop)s.
+    pub fn remove_cfg_cycles(&mut self, remove_cfg_cycles: bool) -> &mut Self {
+        self.remove_cfg_cycles = remove_cfg_cycles;
         self
     }
     /// Set whether to simplify CFG control flow.
@@ -100,6 +107,7 @@ impl Default for Normalize {
         Self {
             resolve_modifiers: true,
             inline_funcs: Some(InlineFuncsHeuristic::default()),
+            remove_cfg_cycles: true,
             simplify_cfgs: true,
             constant_fold: true,
             untuple: true,
@@ -127,19 +135,20 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for Normalize {
         // Simplify CFGs first, as (until we start removing statically-impossible branches)
         // nothing else affects CFG structure or creates new opportunities for this.
         // (Possibly also this may assist modifier resolution??)
-        if self.simplify_cfgs {
+        if self.remove_cfg_cycles {
+            // TODO ALAN make this into a separate ComposablePass
             use super::cfg::{gating_path::DomTreeWithBackedges, remove_cycles::nest_loop};
             let cfgs = self
                 .scope
                 .regions(hugr)
                 .filter(|n| hugr.get_optype(*n).is_cfg())
                 .collect::<Vec<_>>();
-            eprintln!("ALAN Found {} cfgs", cfgs.len());
             for n in cfgs {
-                eprintln!("ALAN Processing cfg node {}", n);
                 let dtn = DomTreeWithBackedges::new_for_cfg(&hugr, n);
                 nest_loop(dtn, &mut *hugr);
             }
+        }
+        if self.simplify_cfgs {
             NormalizeCFGPass::default()
                 .with_scope(self.scope.clone())
                 .run(hugr)?;

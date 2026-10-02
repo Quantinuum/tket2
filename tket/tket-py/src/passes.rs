@@ -96,14 +96,15 @@ create_py_exception!(
 /// - remove_redundant_order_edges: Whether to remove redundant order edges.
 /// - squash_borrows: Whether to squash return-borrow pairs on BorrowArrays.
 #[pyfunction]
-#[pyo3(signature = (circ, *, resolve_modifiers = true, simplify_cfgs = true,
-    remove_tuple_untuple = true, constant_folding = true, remove_dead_funcs = true,
-    inline_dfgs = true, inline_funcs = Some(Default::default()),
+#[pyo3(signature = (circ, *, resolve_modifiers = true, remove_cfg_cycles = true,
+    simplify_cfgs = true, remove_tuple_untuple = true, constant_folding = true,
+    remove_dead_funcs = true, inline_dfgs = true, inline_funcs = Some(Default::default()),
     remove_redundant_order_edges = true, squash_borrows = true, scope = None))]
 #[expect(clippy::too_many_arguments)]
 fn normalize_guppy(
     circ: &mut CompilationState,
     resolve_modifiers: bool,
+    remove_cfg_cycles: bool,
     simplify_cfgs: bool,
     remove_tuple_untuple: bool,
     constant_folding: bool,
@@ -118,6 +119,7 @@ fn normalize_guppy(
     let mut pass = tket::passes::Normalize::default_with_scope(py_scope.scope);
 
     pass.resolve_modifiers(resolve_modifiers)
+        .remove_cfg_cycles(remove_cfg_cycles)
         .simplify_cfgs(simplify_cfgs)
         .remove_tuple_untuple(remove_tuple_untuple)
         .constant_folding(constant_folding)
