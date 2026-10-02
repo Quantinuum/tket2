@@ -1,6 +1,6 @@
 [package]
 name = "tk-pg-qm-tableau"
-version = "0.1.1"
+version = "0.1.2"
 description = "Clifford tableaux with a qubit major memory layout"
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -13,10 +13,10 @@ keywords = { workspace = true }
 categories = { workspace = true }
 
 [dependencies]
-tk-pg-utils = { path = "../pg-utils/tk-pg-utils", version = "0.1.1" }
-tk-pg-bitpacked = { path = "../pg-kernels/tk-pg-bitpacked", version = "0.1.1" }
-tk-pg-ir-kernels = { path = "../pg-kernels/tk-pg-ir-kernels", version = "0.1.1" }
-tk-pg-core = { path = "../tk-pg-core", version = "0.1.1" }
+tk-pg-utils = { path = "../pg-utils/tk-pg-utils", version = "0.1.2" }
+tk-pg-bitpacked = { path = "../pg-kernels/tk-pg-bitpacked", version = "0.1.2" }
+tk-pg-ir-kernels = { path = "../pg-kernels/tk-pg-ir-kernels", version = "0.1.2" }
+tk-pg-core = { path = "../tk-pg-core", version = "0.1.2" }
 rand = { workspace = true }
 rayon = { workspace = true }
 
