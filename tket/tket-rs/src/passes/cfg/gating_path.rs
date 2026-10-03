@@ -50,12 +50,9 @@ impl<N: HugrNode, LOOP> DomTreeNode<N, LOOP> {
         // Process edges from this node (perhaps a loop header)
         let outports = hugr.node_outputs(node).collect::<Vec<_>>();
         for outport in &outports {
-            let path = if let [only] = outports[..] {
-                GatingPath::Always(node, only)
-            } else {
-                let mut branches = vec![None; outports.len()];
-                branches[outport.index()] = Some(GatingPath::Always(node, *outport));
-                GatingPath::Branch(node, branches)
+            let mut path = GatingPath::Always(node, *outport);
+            if outports.len() > 1 {
+                path = GatingPath::branch(node, outports.len(), outport.index(), path);
             };
             // Control Flow outports should have exactly one outgoing edge
             let (tgt, _) = hugr.single_linked_input(node.into(), *outport).unwrap();
@@ -225,6 +222,12 @@ fn union_opt<N: HugrNode>(acc: &mut Option<GatingPath<N>>, other: &GatingPath<N>
 }
 
 impl<N: HugrNode> GatingPath<N> {
+    fn branch(node: N, num_ports: usize, i: usize, ch: GatingPath<N>) -> Self {
+        let mut branches = vec![None; num_ports];
+        branches[i] = Some(ch);
+        GatingPath::Branch(node, branches)
+    }
+
     fn concat(&self, other: &GatingPath<N>) -> Self {
         fn has_none<N>(gp: &Option<GatingPath<N>>) -> bool {
             match gp {
@@ -271,22 +274,22 @@ impl<N: HugrNode> GatingPath<N> {
                 let (tgt, _) = hugr.single_linked_input(*node, *port).unwrap();
                 HashMap::from([(tgt, self.clone())])
             }
-            GatingPath::Branch(node, opts) => {
-                let mut by_tgt = HashMap::<N, Vec<Option<GatingPath<N>>>>::new();
-                for (i, gp) in opts
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(i, o)| Some((i, o.as_ref()?)))
-                {
-                    for (tgt, sub) in gp.split_by_target(hugr) {
-                        by_tgt.entry(tgt).or_insert_with(|| vec![None; opts.len()])[i] = Some(sub);
-                    }
-                }
-                by_tgt
-                    .into_iter()
-                    .map(|(tgt, branches)| (tgt, GatingPath::Branch(*node, branches)))
-                    .collect()
-            }
+            GatingPath::Branch(node, opts) => opts
+                .iter()
+                .enumerate()
+                .filter_map(|(i, o)| Some((i, o.as_ref()?)))
+                .flat_map(|(i, ch)| {
+                    ch.split_by_target(hugr)
+                        .into_iter()
+                        .map(move |(tgt, sub_path)| {
+                            (tgt, GatingPath::branch(*node, opts.len(), i, sub_path))
+                        })
+                })
+                .into_grouping_map()
+                .reduce(|mut p, _tgt, p2| {
+                    p.union(&p2);
+                    p
+                }),
         }
     }
 
