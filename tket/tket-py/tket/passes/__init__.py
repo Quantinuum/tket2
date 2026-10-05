@@ -35,12 +35,22 @@ __all__ = [
     "ModifierResolverPass",
     "Normalize",
     "NormalizeGuppy",
+    "ParallelMode",
     "PassResult",
+    "PauliGraphResynthesis",
     "PlatformTarget",
     "PytketHugrPass",
     "QSystemRebasePass",
     "_QSystemLLVMPass",
 ]
+
+
+class ParallelMode(Enum):
+    """Parallel processing mode for Pauli graph resynthesis."""
+
+    Auto = "Auto"  # Let synthesis choose when to use parallel processing.
+    On = "On"  # Enable parallel processing.
+    Off = "Off"  # Disable parallel processing.
 
 
 class PlatformTarget(Enum):
@@ -503,6 +513,91 @@ class QSystemRebasePass(ComposablePass):
             scope=self._scope,
         )
         return program
+
+
+@dataclass
+class PauliGraphResynthesis(ComposablePass):
+    """
+    An optimisation pass that resynthesizes a Clifford + Rz circuit by converting it to a Pauli Graph
+    and applying various optimisation techniques such as:
+    - phase folding
+    - optional phase polynomial resynthesis for T count reduction
+    - a synthesis algorithm from Pauli Graph to Clifford + Rz aimed at reducing the number of 2
+    qubit gates
+
+    Rotation angles must be numeric as symbolic angles are not supported currently.
+
+    Parameters:
+    - window_size: Sets the size of the sliding window used for lookahead during synthesis. Must be positive.
+    - pool_size: Sets the number of candidate gates to maintain in the pool. Must be positive.
+    - top_up_size: Sets the number of candidate gates to add after each TQE gate. Must be positive.
+    - seed: Sets the random seed used to sample candidate gates. Must be non-negative.
+    - parallel_mode: A :class:`ParallelMode` for candidate synthesis.
+      Defaults to :attr:`ParallelMode.Auto`.
+    - t_optimization: Enable T count optimization. Defaults to False and requires
+      a Clifford + T circuit when enabled.
+    - ancilla_budget: Number of ancillas to allocate per outer circuit for T optimization.
+      Must be non-negative. None uses the largest Hadamard count among the selected
+      dataflow regions. Ignored when t_optimization is False.
+    """
+
+    window_size: int | None = None
+    pool_size: int | None = None
+    top_up_size: int | None = None
+    seed: int | None = None
+    parallel_mode: ParallelMode = ParallelMode.Auto
+    _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
+    t_optimization: bool = False
+    ancilla_budget: int | None = None
+
+    def __post_init__(self) -> None:
+        self._validate_parameters()
+
+    def _validate_parameters(self) -> None:
+        for parameter in ("window_size", "pool_size", "top_up_size"):
+            value = getattr(self, parameter)
+            if value is not None and value <= 0:
+                raise ValueError(f"{parameter} must be positive")
+        if self.seed is not None and self.seed < 0:
+            raise ValueError("seed must be non-negative")
+        if self.ancilla_budget is not None and self.ancilla_budget < 0:
+            raise ValueError("ancilla_budget must be non-negative")
+        if not isinstance(self.parallel_mode, ParallelMode):
+            raise TypeError(
+                "parallel_mode must be an instance of the ParallelMode enum"
+            )
+
+    def with_scope(self, scope: PassScope) -> PauliGraphResynthesis:
+        """Set the scope of this pass and return self."""
+        self._scope = scope
+        return self
+
+    def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
+        return implement_pass_run(
+            self,
+            hugr=hugr,
+            inplace=inplace,
+            copy_call=lambda h: self._pauli_graph_resynthesis(h, inplace),
+        )
+
+    def _pauli_graph_resynthesis(self, hugr: Hugr, inplace: bool) -> PassResult:
+        self._validate_parameters()
+        program = _state.CompilationState.from_python(hugr)
+        _passes.pauli_graph_resynthesis(
+            program._inner,
+            scope=self._scope,
+            window_size=self.window_size,
+            pool_size=self.pool_size,
+            top_up_size=self.top_up_size,
+            seed=self.seed,
+            parallel_mode=self.parallel_mode,
+            t_optimization=self.t_optimization,
+            ancilla_budget=self.ancilla_budget,
+        )
+        package = program.to_python()
+        return PassResult.for_pass(
+            self, hugr=package.modules[0], inplace=inplace, result=None
+        )
 
 
 @dataclass(kw_only=True)

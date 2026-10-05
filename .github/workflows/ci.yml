@@ -199,7 +199,7 @@ jobs:
         run: uv sync --only-group pg-libs --python ${{ env.PYTHON_HIGHEST }}
       - name: Run unstable_simd tests
         working-directory: pg-libs
-        run: uv run --only-group pg-libs cargo +${{ steps.nightly-toolchain.outputs.channel }} test -p tk-pg-bitpacked -p tk-pg-qm-tableau -p tk-pg-greedy-synth --features unstable_simd
+        run: uv run --only-group pg-libs cargo +${{ steps.nightly-toolchain.outputs.channel }} test -p tk-pg-bitpacked -p tk-pg-qm-tableau -p tk-pg-greedy-synth -p tk-pg-t-optimize --features unstable_simd
 
   benches:
     name: Continuous benchmarking 🏋️

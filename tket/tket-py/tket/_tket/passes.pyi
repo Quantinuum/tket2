@@ -3,7 +3,7 @@ from typing import Literal
 
 from hugr.passes.scope import GlobalScope, PassScope
 
-from ..passes import inline_funcs
+from ..passes import ParallelMode, inline_funcs
 from .optimiser import BadgerOptimiser
 from .state import CompilationState
 
@@ -19,6 +19,9 @@ class CircuitChunks:
 
 class PullForwardError(Exception):
     """Error from a `PullForward` operation."""
+
+class PauliGraphResynthesisError(Exception):
+    """Error from the Pauli graph resynthesis pass."""
 
 # ruff: ignore[B008]
 def normalize_guppy(
@@ -100,6 +103,44 @@ def tket1_pass(
     - target: The platform target identifier selecting which encoder/decoder
       extension set to use. One of ``"tket"``, ``"sol"``, or ``"helios"``.
       Defaults to the platform-agnostic ``"tket"`` target.
+    """
+
+def pauli_graph_resynthesis(
+    circ: CompilationState,
+    scope: PassScope = GlobalScope.PRESERVE_PUBLIC,
+    window_size: int | None = None,
+    pool_size: int | None = None,
+    top_up_size: int | None = None,
+    seed: int | None = None,
+    parallel_mode: ParallelMode | None = None,
+    t_optimization: bool = False,
+    ancilla_budget: int | None = None,
+) -> None:
+    """
+    Resynthesizes a Clifford + Rz circuit by converting it to a Pauli graph and applying various
+    optimisation techniques such as:
+    - phase folding
+    - optional phase polynomial resynthesis for T count reduction
+    - a synthesis algorithm from pauli graph to Clifford + Rz aimed at reducing the number of 2
+    qubit gates
+
+    Rotation angles must be numeric as symbolic angles are not supported currently.
+
+    Parameters:
+    - window_size: Sets the size of the sliding window used for lookahead during synthesis.
+    - pool_size: Sets the number of candidate gates to maintain in the pool.
+    - top_up_size: Sets the number of candidate gates to add after each TQE gate.
+    - seed: Sets the random seed used to sample candidate gates.
+    - parallel_mode: ParallelMode.Auto, ParallelMode.On, or ParallelMode.Off.
+      Omitted or None selects ParallelMode.Auto.
+    - t_optimization: Enable T count optimization. Defaults to False and requires
+      a Clifford + T circuit when enabled.
+    - ancilla_budget: Number of ancillas to allocate per outer circuit for T optimization.
+      Must be non-negative. None uses the largest Hadamard count among the selected
+      dataflow regions. Ignored when t_optimization is False.
+
+    Raises:
+        PauliGraphResynthesisError: If the resynthesis pass fails.
     """
 
 def resolve_modifiers(
