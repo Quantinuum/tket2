@@ -33,37 +33,44 @@ impl ExtensionUpdater {
         }
     }
 
-    pub fn migrate(&mut self) {
-        self.add_new_extension();
-        let mut replacer = ReplaceTypes::default();
-        // NICOLA: TODO: we should not iterate over the nodes, but simply for each element in the update map add the entry in the replacer.
-        // Now we need the node to get the signature when the replacement is to empty, we should be able to avid this (maybe by instantiating the versioned element that we need to replace).
-
-        self.op_mapping
-            .iter()
-            .for_each(|(old_element, replacement)| {
-                let old_op = old_element.get_instantiated_op(&self.hugr);
-                replacer.set_replace_op(&old_op, replacement.get_op_replace(&old_op, &self.hugr));
-            });
-
-        self.type_mapping
-            .iter()
-            .for_each(|(old_type, replacement)| {
-                let old_type = old_type.get_type(&self.hugr);
-                replacer.set_replace_type(old_type, replacement);
-            });
-
-        replacer.run(&mut self.hugr);
+    pub fn get_hugr(&self) -> &Hugr {
+        &self.hugr
     }
 
-    fn add_new_extension(&mut self) {
+    pub fn migrate(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        self.add_new_extension()?;
+        let mut replacer = ReplaceTypes::default();
+
+        for (old_type, replacement) in self.type_mapping.iter() {
+            let Some(old_type) = old_type.get_type(&self.hugr)? else {
+                continue;
+            };
+            replacer.set_replace_type(old_type, replacement.get_type(&self.hugr)?);
+        }
+
+        for (old_element, replacement) in self.op_mapping.iter() {
+            let Some(old_op) = old_element.get_instantiated_op(&self.hugr)? else {
+                continue;
+            };
+            let template = replacement.get_op_replace(&old_op, &self.hugr, &replacer)?;
+            replacer.set_replace_op(&old_op, template);
+        }
+
+        replacer.run(&mut self.hugr)?;
+
+        // remove unused extensions
+        // let registry = self.hugr.extensions().clone();
+        // self.hugr.resolve_extension_defs(&registry)?;
+        Ok(())
+    }
+
+    fn add_new_extension(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let mut extensions = STD_REG.to_owned();
         extensions.extend(self.hugr.extensions().clone());
         let new_ext_registry = ExtensionRegistry::new_with_extension_resolution(
-            self.new_extensions.clone(),
+            std::mem::take(&mut self.new_extensions),
             &WeakExtensionRegistry::from(&extensions),
-        )
-        .unwrap();
+        )?;
         extensions.extend(new_ext_registry);
         self.hugr.use_extensions(extensions);
         if DEBUG {
@@ -74,5 +81,6 @@ impl ExtensionUpdater {
             .unwrap();
             println!("saved Hugr extensions");
         }
+        Ok(())
     }
 }

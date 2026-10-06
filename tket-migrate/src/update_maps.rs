@@ -1,15 +1,16 @@
 use hugr::HugrView;
+use hugr::types::CustomType;
 use hugr::{
     builder::{DFGBuilder, Dataflow, DataflowHugr},
     extension::Version,
     ops::{DataflowOpTrait, ExtensionOp},
-    types::{Signature, Type},
+    types::{Signature, Transformable, Type},
 };
-use std::collections::HashMap;
-use tket::passes::replace_types::NodeTemplate;
+use std::{collections::HashMap, error::Error};
+use tket::passes::{ReplaceTypes, replace_types::NodeTemplate};
 
 /// Represents an Extension Op by its name, the extension it belongs to, and its version.
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct VersionedElement {
     pub(crate) id: String,
     pub(crate) extension_id: String,
@@ -26,29 +27,40 @@ impl VersionedElement {
     }
 
     /// Instantiates the extension operation from the given Hugr view.
-    pub fn get_instantiated_op<T: HugrView>(&self, hugr: &T) -> ExtensionOp {
-        // NICOLA: TODO: we should have a proper error here
-        hugr.extensions()
+    /// Returns `None` when the source extension version is absent.
+    pub fn get_instantiated_op<T: HugrView>(
+        &self,
+        hugr: &T,
+    ) -> Result<Option<ExtensionOp>, Box<dyn Error>> {
+        let Some(extension) = hugr
+            .extensions()
             .get_exact(&self.extension_id, &self.version)
-            .expect("Extension version is missing from the registry")
-            .instantiate_extension_op(&self.id, [])
-            .expect("Failed to instantiate extension operation")
+        else {
+            return Ok(None);
+        };
+        Ok(Some(extension.instantiate_extension_op(&self.id, [])?))
     }
 
-    pub fn get_type<T: HugrView>(&self, hugr: &T) -> CustomType {
-        // NICOLA: TODO: we should have a proper error here
-        hugr.extensions()
+    /// Returns `None` when the source extension version is absent.
+    pub fn get_type<T: HugrView>(&self, hugr: &T) -> Result<Option<CustomType>, Box<dyn Error>> {
+        let Some(extension) = hugr
+            .extensions()
             .get_exact(&self.extension_id, &self.version)
-            .expect("Extension version is missing from the registry")
-            .get_type(self.id.as_str())
-            .expect("Type is missing from the extension")
-            .instantiate([])
-            .expect("Failed to instantiate type")
+        else {
+            return Ok(None);
+        };
+        let definition = extension.get_type(self.id.as_str()).ok_or_else(|| {
+            format!(
+                "Type {} is missing from {}@{}",
+                self.id, self.extension_id, self.version
+            )
+        })?;
+        Ok(Some(definition.instantiate([])?))
     }
 }
 
 /// A recipe for creating the replacement
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum OpReplacementTemplate {
     /// An empty replacement template. States that the target should be removed.
     Empty,
@@ -61,11 +73,18 @@ pub enum OpReplacementTemplate {
 }
 
 impl OpReplacementTemplate {
-    pub fn get_op_replace<T: HugrView>(&self, old_op: &ExtensionOp, hugr: &T) -> NodeTemplate {
+    pub fn get_op_replace<T: HugrView>(
+        &self,
+        old_op: &ExtensionOp,
+        hugr: &T,
+        replacer: &ReplaceTypes,
+    ) -> Result<NodeTemplate, Box<dyn std::error::Error>> {
         match self {
-            OpReplacementTemplate::TemplateInstance(template) => template.clone(),
-            OpReplacementTemplate::Empty => Self::get_node_template(old_op, &[], hugr),
-            OpReplacementTemplate::VersionedElements(v) => Self::get_node_template(old_op, v, hugr),
+            OpReplacementTemplate::TemplateInstance(template) => Ok(template.clone()),
+            OpReplacementTemplate::Empty => Self::get_node_template(old_op, &[], hugr, replacer),
+            OpReplacementTemplate::VersionedElements(v) => {
+                Self::get_node_template(old_op, v, hugr, replacer)
+            }
         }
     }
 
@@ -73,31 +92,44 @@ impl OpReplacementTemplate {
         old_op: &ExtensionOp,
         versioned_elements: &[VersionedElement],
         hugr: &T,
-    ) -> NodeTemplate {
+        replacer: &ReplaceTypes,
+    ) -> Result<NodeTemplate, Box<dyn std::error::Error>> {
         let operations = versioned_elements
             .iter()
-            .map(|element| element.get_instantiated(hugr))
-            .collect::<Vec<_>>();
+            .map(|element| -> Result<_, Box<dyn Error>> {
+                element.get_instantiated_op(hugr)?.ok_or_else(|| {
+                    format!(
+                        "Replacement operation {} requires missing extension {}@{}",
+                        element.id, element.extension_id, element.version
+                    )
+                    .into()
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
 
         let signature = match (operations.first(), operations.last()) {
             (Some(first), Some(last)) => Signature::new(
                 first.signature().input().clone(),
                 last.signature().output().clone(),
             ),
-            _ => old_op.signature().into_owned(),
+            _ => {
+                // A passthrough must use the migrated types on both sides.
+                let mut signature = old_op.signature().into_owned();
+                signature.transform(replacer)?;
+                signature
+            }
         };
-        let mut builder = DFGBuilder::new(signature).expect("Failed to build replacement");
+        let mut builder = DFGBuilder::new(signature)?;
         let mut wires = builder.input_wires().collect::<Vec<_>>();
         for operation in operations {
-            // NICOLA: TODO: we should have a proper error here
             wires = builder
-                .add_dataflow_op(operation, wires)
-                .expect("Replacement operations have incompatible signatures")
+                .add_dataflow_op(operation, wires)?
                 .outputs()
                 .collect();
         }
-        // NICOLA: TODO: we should have a proper error here
-        NodeTemplate::linked_hugr(builder.finish_hugr_with_outputs(wires).unwrap())
+        Ok(NodeTemplate::linked_hugr(
+            builder.finish_hugr_with_outputs(wires)?,
+        ))
     }
 }
 
@@ -154,6 +186,24 @@ pub enum TypeReplacementTemplate {
     Type(Type),
 }
 
+impl TypeReplacementTemplate {
+    /// Retrieves the type represented by this replacement template.
+    pub fn get_type<T: HugrView>(&self, hugr: &T) -> Result<Type, Box<dyn Error>> {
+        match self {
+            TypeReplacementTemplate::VersionedElement(element) => {
+                let replacement = element.get_type(hugr)?.ok_or_else(|| {
+                    format!(
+                        "Replacement type {} requires missing extension {}@{}",
+                        element.id, element.extension_id, element.version
+                    )
+                })?;
+                Ok(replacement.into())
+            }
+            TypeReplacementTemplate::Type(t) => Ok(t.clone()),
+        }
+    }
+}
+
 #[derive(Debug)]
 /// Mapping used to update signature of input/output ports of dataflow and controlflow operations.
 ///
@@ -169,10 +219,6 @@ impl TypeMapping {
 
     pub fn insert(&mut self, old_type: VersionedElement, new_type: TypeReplacementTemplate) {
         self.map.insert(old_type, new_type);
-    }
-
-    fn get_new_type(&self, old_type: &VersionedElement) -> Option<&TypeReplacementTemplate> {
-        self.map.get(old_type)
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&VersionedElement, &TypeReplacementTemplate)> {

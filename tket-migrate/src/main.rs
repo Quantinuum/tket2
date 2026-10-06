@@ -1,17 +1,29 @@
 //! Generate semantically equivalent HUGRs with two quantum extension versions.
 
 mod default_maps;
-mod default_maps;
 mod hugr_migration;
 mod testing_func;
 mod update_maps;
 use default_maps::{get_measurement_migratation_op_map, get_measurement_migratation_type_map};
-use hugr::{Extension, HugrView, extension::Version};
+use hugr::{Extension, Hugr, HugrView};
+use hugr_migration::ExtensionUpdater;
 use std::{error::Error, fs, path::PathBuf};
 
 use testing_func::{build_bool_cfg_hugr, build_bool_hugr, build_old_hugr, generate};
 
 use crate::testing_func::load_extensions;
+
+fn migrate_hugr(hugr: Hugr) -> Result<ExtensionUpdater, Box<dyn Error>> {
+    let op_mapping = get_measurement_migratation_op_map();
+    let mut updater = ExtensionUpdater::new(
+        hugr,
+        op_mapping,
+        get_measurement_migratation_type_map(),
+        load_new_extensions()?,
+    );
+    updater.migrate()?;
+    Ok(updater)
+}
 
 #[allow(dead_code)]
 fn update_measure_op() -> Result<(), Box<dyn Error>> {
@@ -53,21 +65,12 @@ fn main1() -> Result<(), Box<dyn Error>> {
         true,
     )?;
 
-    let mut updater = ExtensionUpdater::new(_old_hugr, updating_map);
-    updater.migrate_hugr(load_new_extensions()?);
+    let updater = migrate_hugr(_old_hugr)?;
 
     std::fs::write("updated1.mmd", updater.get_hugr().mermaid_string())?;
     println!("+++++++++++++++++");
 
-    // NICOLA todo: remove not used extensions
-
     updater.get_hugr().validate()?;
-
-    // let new_output = crate_dir.join("quantum-0.3.0.hugr");
-    // let _new_hugr = generate(&new_extension_paths, &new_output, build_new_hugr, false)?;
-
-    // println!("wrote {}", old_output.display());
-    // // println!("wrote {}", new_output.display());
     Ok(())
 }
 
@@ -78,10 +81,7 @@ fn main2() -> Result<(), Box<dyn Error>> {
     let old_bool_hugr = generate(&[bool_extension], &output, build_bool_hugr, true)?;
     old_bool_hugr.validate()?;
 
-    let updating_map = update_bool_map();
-
-    let mut updater = ExtensionUpdater::new(old_bool_hugr, updating_map);
-    updater.migrate_hugr(load_new_extensions()?);
+    let updater = migrate_hugr(old_bool_hugr)?;
 
     std::fs::write("updated2.mmd", updater.get_hugr().mermaid_string())?;
     println!("+++++++++++++++++");
@@ -100,10 +100,7 @@ fn main3() -> Result<(), Box<dyn Error>> {
     let old_bool_hugr = generate(&[bool_extension], &output, build_bool_cfg_hugr, true)?;
     old_bool_hugr.validate()?;
 
-    let updating_map = update_bool_map();
-
-    let mut updater = ExtensionUpdater::new(old_bool_hugr, updating_map);
-    updater.migrate_hugr(load_new_extensions()?);
+    let updater = migrate_hugr(old_bool_hugr)?;
 
     fs::write("updated3.mmd", updater.get_hugr().mermaid_string())?;
     println!("+++++++++++++++++");
@@ -112,8 +109,8 @@ fn main3() -> Result<(), Box<dyn Error>> {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    // main1()?;
-    // main2()?;
+    main1()?;
+    main2()?;
     main3()?;
     Ok(())
 }
