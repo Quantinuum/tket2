@@ -450,7 +450,7 @@ jobs:
           echo "PYO3_PYTHON=$PYTHON" >> "$GITHUB_ENV"
           echo "LD_LIBRARY_PATH=$($PYTHON -c 'import sysconfig; print(sysconfig.get_config_var("LIBDIR"))')" >> "$GITHUB_ENV"
       - name: Run Rust unit tests
-        run: cargo test -p selene-hugr-qis-compiler
+        run: cargo test -p selene-hugr-qis-compiler --features py
       - name: Run qis-compiler tests
         run: uv run --python ${{ env.PYTHON_LOWEST }} --exact --package selene_hugr_qis_compiler pytest --cov=./ --cov-report=xml tket/qis-compiler
       - name: Upload python coverage to codecov.io
