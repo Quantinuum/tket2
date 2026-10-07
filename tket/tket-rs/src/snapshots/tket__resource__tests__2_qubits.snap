@@ -1,0 +1,13 @@
+---
+source: tket/tket-rs/src/resource.rs
+expression: info
+---
+Found 0 copyable wires
+Found 2 resource paths:
+  - ResourceId(0):
+    * H(Node(7)) [IncomingPort(0) -> OutgoingPort(0)]
+    * CX(Node(9)) [IncomingPort(0) -> OutgoingPort(0)]
+
+  - ResourceId(1):
+    * H(Node(8)) [IncomingPort(0) -> OutgoingPort(0)]
+    * CX(Node(9)) [IncomingPort(1) -> OutgoingPort(1)]

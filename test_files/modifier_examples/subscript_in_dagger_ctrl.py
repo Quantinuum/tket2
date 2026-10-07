@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#    "guppylang==1.0.0rc1",
+#    "guppylang==1.1.1",
 # ]
 # ///
 """Subscript indexing in dagger and control context"""
@@ -9,12 +9,10 @@
 from pathlib import Path
 from sys import argv
 
-from guppylang import array, enable_experimental_features, guppy
+from guppylang import array, guppy
 from guppylang.std.builtins import control, dagger
 from guppylang.std.debug import state_result
 from guppylang.std.quantum import angle, discard_array, h, qubit, rx, s, x
-
-enable_experimental_features()
 
 
 @guppy(unitary=True)

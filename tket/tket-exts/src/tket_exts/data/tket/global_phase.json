@@ -1,0 +1,29 @@
+{
+  "version": "0.1.0",
+  "name": "tket.global_phase",
+  "types": {},
+  "operations": {
+    "global_phase": {
+      "extension": "tket.global_phase",
+      "name": "global_phase",
+      "description": "Global phase of a circuit",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "tket.rotation",
+              "extension_version": "0.2.0",
+              "id": "rotation",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": []
+        }
+      },
+      "binary": false
+    }
+  }
+}

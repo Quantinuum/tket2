@@ -20,7 +20,7 @@ permissions:
   contents: read
 
 env:
-  MODULE_DIR: tket-py
+  MODULE_DIR: tket/tket-py
   # Pinned version for the uv package manager
   UV_VERSION: "0.11.15"
   UV_FROZEN: 1
@@ -164,7 +164,7 @@ jobs:
             ${{ steps.compatibility-flag.outputs.WITH_ZIG_FLAG }} \
             maturin build ${{ steps.compatibility-flag.outputs.COMPATIBILITY_FLAG }} \
             --release \
-            --out ../dist \
+            --out ../../dist \
             --target ${{ matrix.platform.target }} \
             --strip
 
@@ -180,7 +180,7 @@ jobs:
             maturin build \
             ${{ steps.compatibility-flag.outputs.COMPATIBILITY_FLAG }} \
             --release \
-            --out ../dist \
+            --out ../../dist \
             --target ${{ matrix.platform.target }} \
             --strip
 
@@ -244,8 +244,8 @@ jobs:
 
             # First install the pure python packages from this commit; this avoids fetching them
             # from pypi and providing false positives or false negatives in the presence of a conflict.
-            ${venv_pip} install ${GITHUB_WORKSPACE}/tket-eccs
-            ${venv_pip} install ${GITHUB_WORKSPACE}/tket-exts
+            ${venv_pip} install ${GITHUB_WORKSPACE}/tket/tket-eccs
+            ${venv_pip} install ${GITHUB_WORKSPACE}/tket/tket-exts
 
             # Install the built wheel
             wheel_path=$(ls "$GITHUB_WORKSPACE/dist/"*.whl | head -n 1)
@@ -315,13 +315,13 @@ jobs:
       # <https://doc.rust-lang.org/beta/rustc/platform-support/wasm32-unknown-emscripten.html#emscripten-abi-compatibility>
       - name: Build wasm wheels
         run: |
-          source ../emsdk/emsdk_env.sh
+          source ../../emsdk/emsdk_env.sh
           uvx maturin build \
             -Z build-std \
             --release \
             -i python${{ env.WASM_PYTHON_VERSION }} \
             --target wasm32-unknown-emscripten \
-            -o ../dist \
+            -o ../../dist \
             -v
         working-directory: ${{ env.MODULE_DIR }}
         env:
@@ -356,7 +356,7 @@ jobs:
             --python ${{ env.PYTHON_VERSION }} \
             --with maturin \
             maturin sdist \
-            --out ../dist \
+            --out ../../dist \
             --manifest-path Cargo.toml
       - name: Upload sdist
         uses: actions/upload-artifact@v7

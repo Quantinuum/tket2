@@ -1,0 +1,308 @@
+//! Passes for optimizing circuits.
+
+pub mod chunks;
+mod inline_funcs;
+mod qsystem;
+mod scope;
+pub mod tket1;
+
+use hugr::HugrView;
+pub(crate) use scope::PyPassScope;
+
+use std::{cmp::min, convert::TryInto, fs, num::NonZeroUsize, path::PathBuf};
+
+use pyo3::prelude::*;
+use tket::optimiser::badger::BadgerOptions;
+use tket::passes::composable::{ComposablePass, WithScope};
+use tket::{Circuit, TketOp};
+
+use tket::passes;
+
+use crate::optimiser::PyBadgerOptimiser;
+use crate::state::CompilationState;
+use crate::utils::{ConvertPyErr, create_py_exception};
+
+/// The module definition
+///
+/// This module is re-exported from the python module with the same name.
+pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
+    let m = PyModule::new(py, "passes")?;
+    m.add_function(wrap_pyfunction!(greedy_depth_reduce, &m)?)?;
+    m.add_function(wrap_pyfunction!(badger_optimise, &m)?)?;
+    m.add_function(wrap_pyfunction!(normalize_guppy, &m)?)?;
+    m.add_function(wrap_pyfunction!(self::inline_funcs::inline_functions, &m)?)?;
+    m.add_class::<self::chunks::PyCircuitChunks>()?;
+    m.add_function(wrap_pyfunction!(self::chunks::chunks, &m)?)?;
+    m.add_function(wrap_pyfunction!(self::tket1::tket1_pass, &m)?)?;
+    m.add_function(wrap_pyfunction!(pauli_graph_resynthesis, &m)?)?;
+    m.add_function(wrap_pyfunction!(resolve_modifiers, &m)?)?;
+    m.add_function(wrap_pyfunction!(qsystem::qsystem_rebase_pass, &m)?)?;
+    m.add_function(wrap_pyfunction!(qsystem::qsystem_llvm_pass, &m)?)?;
+    m.add("PullForwardError", py.get_type::<PyPullForwardError>())?;
+    m.add(
+        "InlineFunctionsError",
+        py.get_type::<PyInlineFunctionsError>(),
+    )?;
+    m.add("TK1PassError", py.get_type::<tket1::PytketPassError>())?;
+    m.add(
+        "PauliGraphResynthesisError",
+        py.get_type::<PauliGraphResynthesisError>(),
+    )?;
+    Ok(m)
+}
+
+create_py_exception!(
+    tket::passes::commutation::PullForwardError,
+    PyPullForwardError,
+    "Error from a `PullForward` operation"
+);
+
+create_py_exception!(
+    tket::passes::normalize::NormalizeErrors,
+    PyNormalizeError,
+    "Errors from the normalization pass."
+);
+
+create_py_exception!(
+    tket::passes::modifier_resolver::ModifierResolverErrors,
+    PyModifierResolverError,
+    "Errors from the modifer resolver pass."
+);
+
+create_py_exception!(
+    tket::passes::pauli_graph_resynthesis::PauliGraphResynthesisErrors,
+    PauliGraphResynthesisError,
+    "Errors from the Pauli graph resynthesis pass."
+);
+
+create_py_exception!(
+    tket::passes::inline_funcs::InlineFuncsError,
+    PyInlineFunctionsError,
+    "Errors from the function inlining pass."
+);
+
+create_py_exception!(
+    tket_qsystem::QSystemRebasePassError,
+    PyQSystemRebasePassError,
+    "Errors from the QSystem rebase pass."
+);
+
+create_py_exception!(
+    tket_qsystem::QSystemLLVMPassError,
+    PyQSystemLLVMPassError,
+    "Errors from the QSystem pre-LLVM pass."
+);
+
+/// Flatten the structure of a Guppy-generated program to enable additional optimizations.
+///
+/// This should normally be called first before other optimizations.
+///
+/// Parameters:
+/// - resolve_modifiers: Whether to resolve modifier operations.
+/// - simplify_cfgs: Whether to simplify CFG control flow.
+/// - remove_tuple_untuple: Whether to remove tuple/untuple operations.
+/// - constant_folding: Whether to constant fold the program.
+/// - remove_dead_funcs: Whether to remove dead functions.
+/// - inline_dfgs: Whether to inline DFG operations.
+/// - remove_redundant_order_edges: Whether to remove redundant order edges.
+/// - squash_borrows: Whether to squash return-borrow pairs on BorrowArrays.
+#[pyfunction]
+#[pyo3(signature = (circ, *, resolve_modifiers = true, simplify_cfgs = true,
+    remove_tuple_untuple = true, constant_folding = true, remove_dead_funcs = true,
+    inline_dfgs = true, inline_funcs = Some(Default::default()),
+    remove_redundant_order_edges = true, squash_borrows = true, scope = None))]
+#[expect(clippy::too_many_arguments)]
+fn normalize_guppy(
+    circ: &mut CompilationState,
+    resolve_modifiers: bool,
+    simplify_cfgs: bool,
+    remove_tuple_untuple: bool,
+    constant_folding: bool,
+    remove_dead_funcs: bool,
+    inline_dfgs: bool,
+    inline_funcs: Option<inline_funcs::PyInlineFuncsHeuristic>,
+    remove_redundant_order_edges: bool,
+    squash_borrows: bool,
+    scope: Option<PyPassScope>,
+) -> PyResult<()> {
+    let py_scope = scope.unwrap_or_default();
+    let mut pass = tket::passes::Normalize::default_with_scope(py_scope.scope);
+
+    pass.resolve_modifiers(resolve_modifiers)
+        .simplify_cfgs(simplify_cfgs)
+        .remove_tuple_untuple(remove_tuple_untuple)
+        .constant_folding(constant_folding)
+        .remove_dead_funcs(remove_dead_funcs)
+        .inline_dfgs(inline_dfgs)
+        .inline_funcs(inline_funcs.map(|h| h.0))
+        .remove_redundant_order_edges(remove_redundant_order_edges)
+        .squash_borrows(squash_borrows);
+
+    pass.run(&mut circ.hugr).convert_pyerrs()?;
+    Ok(())
+}
+
+/// Pass which greedily commutes operations forwards in order to reduce depth.
+#[pyfunction]
+fn greedy_depth_reduce(circ: &mut CompilationState) -> PyResult<u32> {
+    let mut c = Circuit::new(circ.hugr.clone());
+    let n_moves = passes::apply_greedy_commutation(&mut c).convert_pyerrs()?;
+    circ.hugr = c.into_hugr();
+    Ok(n_moves)
+}
+
+/// Badger optimization pass.
+///
+/// HyperTKET's best attempt at optimizing a circuit using circuit rewriting
+/// and the given Badger optimizer.
+///
+/// Will use at most `max_threads` threads (plus a constant). Defaults to the
+/// number of CPUs available.
+///
+/// The optimization will terminate at the first of the following timeout
+/// criteria, if set:
+/// - `timeout` seconds (default: 15min) have elapsed since the start of the
+///    optimization
+/// - `progress_timeout` (default: None) seconds have elapsed since progress
+///    in the cost function was last made
+/// - `max_circuit_count` (default: None) circuits have been explored.
+///
+/// Log files will be written to the directory `log_dir` if specified.
+#[pyfunction]
+#[pyo3(signature = (circ, optimiser, max_threads=None, timeout=None, progress_timeout=None, max_circuit_count=None, log_dir=None))]
+fn badger_optimise(
+    circ: &mut CompilationState,
+    optimiser: &PyBadgerOptimiser,
+    max_threads: Option<NonZeroUsize>,
+    timeout: Option<u64>,
+    progress_timeout: Option<u64>,
+    max_circuit_count: Option<usize>,
+    log_dir: Option<PathBuf>,
+) -> PyResult<()> {
+    // Default parameter values
+    let max_threads = max_threads.unwrap_or(num_cpus::get().try_into().unwrap());
+    let timeout = timeout.unwrap_or(30);
+    // Create log directory if necessary
+    if let Some(log_dir) = log_dir.as_ref() {
+        fs::create_dir_all(log_dir)?;
+    }
+    // Logic to choose how to split the circuit
+    let badger_splits = |n_threads: NonZeroUsize| match n_threads.get() {
+        n if n >= 7 => (
+            vec![n, 3, 1],
+            vec![timeout / 2, timeout / 10 * 3, timeout / 10 * 2],
+        ),
+        n if n >= 4 => (
+            vec![n, 2, 1],
+            vec![timeout / 2, timeout / 10 * 3, timeout / 10 * 2],
+        ),
+        n if n > 1 => (vec![n, 1], vec![timeout / 2, timeout / 2]),
+        1 => (vec![1], vec![timeout]),
+        _ => unreachable!(),
+    };
+    // Optimise
+    let c = Circuit::new(&circ.hugr);
+    let n_cx = c
+        .toposorted_children(c.parent())
+        .expect("circuit entrypoint should be dataflow region")
+        .filter(|&n| c.hugr().get_optype(n).cast::<TketOp>() == Some(TketOp::CX))
+        .count();
+    let n_threads = min(
+        (n_cx / 50).try_into().unwrap_or(1.try_into().unwrap()),
+        max_threads,
+    );
+    let (split_threads, split_timeouts) = badger_splits(n_threads);
+    let mut optimised = Circuit::new(circ.hugr.clone());
+    for (i, (n_threads, timeout)) in split_threads.into_iter().zip(split_timeouts).enumerate() {
+        let log_file = log_dir.as_ref().map(|log_dir| {
+            let mut log_file = log_dir.clone();
+            log_file.push(format!("cycle-{i}.log"));
+            log_file
+        });
+        let options = BadgerOptions {
+            timeout: Some(timeout),
+            progress_timeout,
+            n_threads: n_threads.try_into().unwrap(),
+            split_circuit: true,
+            max_circuit_count,
+            ..Default::default()
+        };
+        optimised = optimiser.optimise(optimised, log_file, options);
+    }
+    circ.hugr = optimised.into_hugr();
+    Ok(())
+}
+
+#[pyfunction]
+#[pyo3(signature = (circ, scope = None))]
+fn resolve_modifiers(circ: &mut CompilationState, scope: Option<PyPassScope>) -> PyResult<()> {
+    let py_scope = scope.unwrap_or_default();
+    let pass = tket::passes::ModifierResolverPass::default_with_scope(py_scope.scope);
+    pass.run(&mut circ.hugr).convert_pyerrs()?;
+    Ok(())
+}
+
+struct PyParallelMode(pg_greedy_synth::ParallelMode);
+
+impl<'a, 'py> FromPyObject<'a, 'py> for PyParallelMode {
+    type Error = PyErr;
+
+    fn extract(ob: Borrowed<'a, 'py, PyAny>) -> PyResult<Self> {
+        use pg_greedy_synth::ParallelMode;
+
+        let enum_type = ob.py().import("tket.passes")?.getattr("ParallelMode")?;
+
+        for (name, mode) in [
+            ("Auto", ParallelMode::Auto),
+            ("On", ParallelMode::On),
+            ("Off", ParallelMode::Off),
+        ] {
+            if ob.is(&enum_type.getattr(name)?) {
+                return Ok(Self(mode));
+            }
+        }
+
+        Err(pyo3::exceptions::PyTypeError::new_err(
+            "parallel_mode must be an instance of the ParallelMode enum",
+        ))
+    }
+}
+
+#[pyfunction]
+#[pyo3(signature = (circ, scope = None, window_size=None, pool_size=None, top_up_size=None, seed=None, parallel_mode=None, t_optimization=false, ancilla_budget=None))]
+#[expect(clippy::too_many_arguments)]
+fn pauli_graph_resynthesis(
+    circ: &mut CompilationState,
+    scope: Option<PyPassScope>,
+    window_size: Option<usize>,
+    pool_size: Option<usize>,
+    top_up_size: Option<usize>,
+    seed: Option<usize>,
+    parallel_mode: Option<PyParallelMode>,
+    t_optimization: bool,
+    ancilla_budget: Option<usize>,
+) -> PyResult<()> {
+    let py_scope = scope.unwrap_or_default();
+    let mut pass = tket::passes::PauliGraphResynthesis::default_with_scope(py_scope.scope)
+        .with_t_optimization(t_optimization);
+    if let Some(budget) = ancilla_budget {
+        pass = pass.with_ancilla_budget(budget);
+    }
+    if let Some(ws) = window_size {
+        pass = pass.with_window_size(ws);
+    }
+    if let Some(ps) = pool_size {
+        pass = pass.with_pool_size(ps);
+    }
+    if let Some(tus) = top_up_size {
+        pass = pass.with_top_up_size(tus);
+    }
+    if let Some(s) = seed {
+        pass = pass.with_seed(s as u64);
+    }
+    let parallel_mode = parallel_mode.map_or(pg_greedy_synth::ParallelMode::Auto, |mode| mode.0);
+    pass = pass.with_parallel_mode(parallel_mode);
+
+    pass.run(&mut circ.hugr).convert_pyerrs()?;
+    Ok(())
+}

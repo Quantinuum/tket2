@@ -1,0 +1,20 @@
+[package]
+name = "tk-pg-ir-kernels"
+version = "0.1.1"
+description = "Rewrite operations and tableau interfaces for Pauli graphs"
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
+readme = "README.md"
+documentation = "https://docs.rs/tk-pg-ir-kernels"
+homepage = { workspace = true }
+repository = { workspace = true }
+keywords = { workspace = true }
+categories = { workspace = true }
+
+[dependencies]
+tk-pg-core = { path = "../../tk-pg-core", version = "0.1.1" }
+tk-pg-utils = { path = "../../pg-utils/tk-pg-utils", version = "0.1.1" }
+
+[lints]
+workspace = true

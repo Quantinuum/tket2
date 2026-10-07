@@ -12,7 +12,7 @@ Each example is in its own directory, containing:
 
 - The `.hugr` files generated for each of the previous scripts.
 
-Run `just recompile` in this directory (or `just recompile-test-hugrs` on
+Run `just recompile` in this directory (or `just tket/recompile-test-hugrs` on
 the root) to recompile the `.hugr` files.
 The guppylang version used is defined by each script.
 

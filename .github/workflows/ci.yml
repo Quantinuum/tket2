@@ -34,7 +34,7 @@ jobs:
       pull-requests: read
     outputs:
       pg-libs: ${{ steps.filter.outputs.pg-libs }}
-      rust: ${{ steps.filter.outputs.rust }}
+      tket: ${{ steps.filter.outputs.tket }}
       python: ${{ steps.filter.outputs.python }}
       extensions: ${{ steps.filter.outputs.extensions }}
       qis: ${{ steps.filter.outputs.qis }}
@@ -46,7 +46,7 @@ jobs:
   check-rs:
     name: Check Rust code 🦀
     needs: [changes]
-    if: ${{ needs.changes.outputs.rust == 'true' }}
+    if: ${{ needs.changes.outputs.tket == 'true' }}
     runs-on: ubuntu-latest
     env:
       # Fail on rust compiler warnings.
@@ -62,9 +62,9 @@ jobs:
       - name: Check formatting
         run: cargo fmt -- --check
       - name: Run clippy
-        run: cargo clippy --all-targets --all-features --workspace -- -D warnings
+        run: cargo clippy --all-targets --all-features --workspace --exclude 'tk-pg-*' -- -D warnings
       - name: Build docs
-        run: cargo doc --no-deps --all-features --workspace
+        run: cargo doc --no-deps --all-features --workspace --exclude 'tk-pg-*'
         env:
           RUSTDOCFLAGS: "-Dwarnings"
 
@@ -90,14 +90,14 @@ jobs:
         # avoid building qis-compiler
         run: uv sync --package=tket --exact --all-extras --python ${{ env.PYTHON_LOWEST }}
       - name: Type check with mypy
-        run: uv run mypy .
+        run: uv run mypy tket scripts
       - name: Check formatting with ruff
-        run: uv run ruff format --check
+        run: uv run ruff format --check tket scripts test_files
       - name: Lint with ruff
-        run: uv run ruff check
+        run: uv run ruff check tket scripts test_files
 
-  check-pg-libs:
-    name: Check pg-libs
+  check-pg-libs-rs:
+    name: Check pg-libs 🦀
     needs: [changes]
     if: ${{ needs.changes.outputs.pg-libs == 'true' }}
     runs-on: ubuntu-latest
@@ -107,10 +107,26 @@ jobs:
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt
+          components: rustfmt, clippy
       - name: Check formatting
         working-directory: pg-libs
-        run: cargo fmt -- --check
+        run: cargo fmt --all -- --check
+      - name: Run clippy
+        working-directory: pg-libs
+        run: cargo clippy --all-targets -p 'tk-pg-*' -- -D warnings
+      - name: Build docs
+        working-directory: pg-libs
+        run: cargo doc --no-deps -p 'tk-pg-*'
+        env:
+          RUSTDOCFLAGS: "-Dwarnings"
+
+  check-pg-libs-py:
+    name: Check pg-libs 🐍
+    needs: [changes]
+    if: ${{ needs.changes.outputs.pg-libs == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
         with:
@@ -120,13 +136,16 @@ jobs:
         run: uv python install ${{ env.PYTHON_HIGHEST }}
       - name: Setup dependencies
         working-directory: pg-libs
-        run: uv sync --python ${{ env.PYTHON_HIGHEST }}
+        run: uv sync --only-group pg-libs --python ${{ env.PYTHON_HIGHEST }}
+      - name: Type check with mypy
+        working-directory: pg-libs
+        run: uv run --only-group pg-libs mypy .
       - name: Check formatting with ruff
         working-directory: pg-libs
-        run: uv run ruff format --check
+        run: uv run --only-group pg-libs ruff format --check
       - name: Lint with ruff
         working-directory: pg-libs
-        run: uv run ruff check
+        run: uv run --only-group pg-libs ruff check
 
   tests-pg-libs:
     name: pg-libs tests
@@ -147,10 +166,10 @@ jobs:
         run: uv python install ${{ env.PYTHON_HIGHEST }}
       - name: Install pg-libs dev dependencies
         working-directory: pg-libs
-        run: uv sync --python ${{ env.PYTHON_HIGHEST }}
+        run: uv sync --only-group pg-libs --python ${{ env.PYTHON_HIGHEST }}
       - name: Run stable tests
         working-directory: pg-libs
-        run: cargo test --workspace
+        run: uv run --only-group pg-libs cargo test -p 'tk-pg-*'
 
   tests-pg-libs-nightly:
     name: pg-libs tests (nightly)
@@ -160,10 +179,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: mozilla-actions/sccache-action@v0.0.11
+      - uses: extractions/setup-just@v4
+      - name: Read nightly toolchain
+        id: nightly-toolchain
+        run: echo "channel=$(just --evaluate nightly_toolchain)" >> "$GITHUB_OUTPUT"
       - name: Install pinned nightly toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2025-09-14
+          toolchain: ${{ steps.nightly-toolchain.outputs.channel }}
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
         with:
@@ -173,15 +196,15 @@ jobs:
         run: uv python install ${{ env.PYTHON_HIGHEST }}
       - name: Install pg-libs dev dependencies
         working-directory: pg-libs
-        run: uv sync --python ${{ env.PYTHON_HIGHEST }}
-      - name: Run simd tests
+        run: uv sync --only-group pg-libs --python ${{ env.PYTHON_HIGHEST }}
+      - name: Run unstable_simd tests
         working-directory: pg-libs
-        run: cargo test -p pg-bitpacked -p pg-qm-tableau --features simd
+        run: uv run --only-group pg-libs cargo +${{ steps.nightly-toolchain.outputs.channel }} test -p tk-pg-bitpacked -p tk-pg-qm-tableau -p tk-pg-greedy-synth -p tk-pg-t-optimize --features unstable_simd
 
   benches:
     name: Continuous benchmarking 🏋️
     needs: changes
-    if: ${{ needs.changes.outputs.rust == 'true' && github.event_name != 'merge_group' }}
+    if: ${{ needs.changes.outputs.tket == 'true' && github.event_name != 'merge_group' }}
     runs-on: ubuntu-latest
     permissions:
       checks: write
@@ -204,12 +227,13 @@ jobs:
         with:
           token: ${{ secrets.CODSPEED_TOKEN }}
           run: "cargo codspeed run"
-          mode: "instrumentation"
+          mode: simulation
+          exclude-allocations: "true"
 
   # Run tests on Rust stable
   tests-rs-stable-no-features:
     needs: changes
-    if: ${{ needs.changes.outputs.rust == 'true' }}
+    if: ${{ needs.changes.outputs.tket == 'true' }}
     runs-on: ubuntu-latest
     name: tests (Rust stable, no features)
     steps:
@@ -231,7 +255,7 @@ jobs:
   # Run tests on Rust stable
   tests-rs-stable-all-features:
     needs: [changes]
-    if: ${{ needs.changes.outputs.rust == 'true' }}
+    if: ${{ needs.changes.outputs.tket == 'true' }}
     runs-on: ubuntu-latest
     name: tests (Rust stable, all features)
     steps:
@@ -248,14 +272,14 @@ jobs:
       # Crates using pyo3 cdylib require libpython to link test binaries;
       # they are tested separately in their own jobs.
       - name: Build with all features
-        run: cargo nextest r --verbose --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --all-features --no-run
+        run: cargo nextest r --verbose --workspace --exclude 'tk-pg-*' --exclude tket-py --exclude selene-hugr-qis-compiler --all-features --no-run
       - name: Tests with all features
-        run: cargo nextest r --verbose --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --all-features
+        run: cargo nextest r --verbose --workspace --exclude 'tk-pg-*' --exclude tket-py --exclude selene-hugr-qis-compiler --all-features
 
   # Run tests on other toolchains
   tests-rs-other:
     needs: [changes]
-    if: ${{ needs.changes.outputs.rust == 'true' && github.event_name != 'merge_group' }}
+    if: ${{ needs.changes.outputs.tket == 'true' && github.event_name != 'merge_group' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
@@ -279,18 +303,18 @@ jobs:
       # Crates using pyo3 cdylib require libpython to link test binaries;
       # they are tested separately in their own jobs.
       - name: Build with no features
-        run: cargo nextest r --verbose --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --no-default-features --no-run
+        run: cargo nextest r --verbose --workspace --exclude 'tk-pg-*' --exclude tket-py --exclude selene-hugr-qis-compiler --no-default-features --no-run
       - name: Tests with no features
-        run: cargo nextest r --verbose --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --no-default-features
+        run: cargo nextest r --verbose --workspace --exclude 'tk-pg-*' --exclude tket-py --exclude selene-hugr-qis-compiler --no-default-features
       - name: Build with all features
-        run: cargo nextest r --verbose --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --all-features --no-run
+        run: cargo nextest r --verbose --workspace --exclude 'tk-pg-*' --exclude tket-py --exclude selene-hugr-qis-compiler --all-features --no-run
       - name: Tests with all features
-        run: cargo nextest r --verbose --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --all-features
+        run: cargo nextest r --verbose --workspace --exclude 'tk-pg-*' --exclude tket-py --exclude selene-hugr-qis-compiler --all-features
 
   tests-nightly-coverage:
     needs: [changes]
     # Run only if there are changes in the relevant files
-    if: ${{ needs.changes.outputs.rust == 'true' && github.event_name != 'merge_group' }}
+    if: ${{ needs.changes.outputs.tket == 'true' && github.event_name != 'merge_group' }}
     runs-on: ubuntu-latest
     name: tests (Rust nightly, coverage)
     steps:
@@ -309,8 +333,8 @@ jobs:
       - name: Run tests with coverage instrumentation
         run: |
           cargo llvm-cov clean --workspace
-          cargo llvm-cov --no-report --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --no-default-features --doctests
-          cargo llvm-cov --no-report --workspace --exclude tket-py --exclude selene-hugr-qis-compiler --all-features --doctests
+          cargo llvm-cov --no-report -p tket -p tket-qsystem -p tket1-passes -p badger-optimiser -p compile-rewriter --no-default-features --doctests
+          cargo llvm-cov --no-report -p tket -p tket-qsystem -p tket1-passes -p badger-optimiser -p compile-rewriter --all-features --doctests
       - name: Generate coverage report
         run: cargo llvm-cov report --codecov --output-path coverage.json
       - name: Upload coverage to codecov.io
@@ -325,7 +349,7 @@ jobs:
   # Run tests on the minimum supported rust version, with minimal dependency versions
   tests-msrv:
     needs: changes
-    if: ${{ needs.changes.outputs.rust == 'true' && github.event_name != 'merge_group' }}
+    if: ${{ needs.changes.outputs.tket == 'true' && github.event_name != 'merge_group' }}
     runs-on: ubuntu-latest
     name: tests (Rust MSRV, min dependencies)
     steps:
@@ -358,13 +382,13 @@ jobs:
       # Crates using pyo3 cdylib require libpython to link test binaries;
       # they are tested separately in their own jobs.
       - name: Build with no features
-        run: cargo minimal-versions --direct test --verbose --exclude tket-py --exclude selene-hugr-qis-compiler --no-default-features --no-run
+        run: cargo minimal-versions --direct test --verbose -p tket -p tket-qsystem -p tket1-passes -p badger-optimiser -p compile-rewriter --no-default-features --no-run
       - name: Tests with no features
-        run: cargo minimal-versions --direct test --verbose --exclude tket-py --exclude selene-hugr-qis-compiler --no-default-features
+        run: cargo minimal-versions --direct test --verbose -p tket -p tket-qsystem -p tket1-passes -p badger-optimiser -p compile-rewriter --no-default-features
       - name: Build with all features
-        run: cargo minimal-versions --direct test --verbose --exclude tket-py --exclude selene-hugr-qis-compiler --all-features --no-run
+        run: cargo minimal-versions --direct test --verbose -p tket -p tket-qsystem -p tket1-passes -p badger-optimiser -p compile-rewriter --all-features --no-run
       - name: Tests with all features
-        run: cargo minimal-versions --direct test --verbose --exclude tket-py --exclude selene-hugr-qis-compiler --all-features
+        run: cargo minimal-versions --direct test --verbose -p tket -p tket-qsystem -p tket1-passes -p badger-optimiser -p compile-rewriter --all-features
 
   tests-py:
     needs: changes
@@ -372,7 +396,7 @@ jobs:
     runs-on: ubuntu-latest
     name: tket-py tests (Python, coverage)
     env:
-      PKGS: tket-py tket-eccs tket-exts
+      PKGS: tket/tket-py tket/tket-eccs tket/tket-exts
     steps:
       - uses: actions/checkout@v7
       - uses: mozilla-actions/sccache-action@v0.0.11
@@ -426,9 +450,9 @@ jobs:
           echo "PYO3_PYTHON=$PYTHON" >> "$GITHUB_ENV"
           echo "LD_LIBRARY_PATH=$($PYTHON -c 'import sysconfig; print(sysconfig.get_config_var("LIBDIR"))')" >> "$GITHUB_ENV"
       - name: Run Rust unit tests
-        run: cargo test -p selene-hugr-qis-compiler
+        run: cargo test -p selene-hugr-qis-compiler --features py
       - name: Run qis-compiler tests
-        run: uv run --python ${{ env.PYTHON_LOWEST }} --exact --package selene_hugr_qis_compiler pytest --cov=./ --cov-report=xml qis-compiler
+        run: uv run --python ${{ env.PYTHON_LOWEST }} --exact --package selene_hugr_qis_compiler pytest --cov=./ --cov-report=xml tket/qis-compiler
       - name: Upload python coverage to codecov.io
         if: github.event_name != 'merge_group'
         uses: codecov/codecov-action@v7
@@ -444,7 +468,7 @@ jobs:
   # Ensure that serialized extensions match rust implementation
   tket-extensions:
     needs: [changes, tests-rs-stable-all-features]
-    if: ${{ needs.changes.outputs.rust == 'true' && github.event_name != 'merge_group' }}
+    if: ${{ needs.changes.outputs.tket == 'true' && github.event_name != 'merge_group' }}
     name: Check standard extensions
     runs-on: ubuntu-latest
     steps:
@@ -455,13 +479,13 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - uses: extractions/setup-just@v4
       - name: Generate the updated definitions
-        run: just gen-extensions
+        run: just tket/gen-extensions
       - name: Check if the declarations are up to date
         run: |
-          git diff --exit-code --name-only tket-exts/src/tket_exts/data
+          git diff --exit-code --name-only tket/tket-exts/src/tket_exts/data
           if [ $? -ne 0 ]; then
             echo "The serialized standard extensions are not up to date"
-            echo "Please run 'just gen-extensions' and commit the changes.
+            echo "Please run 'just tket/gen-extensions' and commit the changes.
             Bump the version of tket-exts according to semver.
             "
             exit 1
@@ -503,7 +527,8 @@ jobs:
     needs:
       [
         changes,
-        check-pg-libs,
+        check-pg-libs-rs,
+        check-pg-libs-py,
         check-rs,
         check-py,
         tests-pg-libs,
@@ -520,8 +545,11 @@ jobs:
     steps:
       - name: Debug changes step output
         run: |
-          echo "Rust: ${{ needs.changes.outputs.rust }}"
-          echo "Python: ${{ needs.changes.outputs.python }}"
+          echo "pg-libs: ${{ needs.changes.outputs.pg-libs }}"
+          echo "tket: ${{ needs.changes.outputs.tket }}"
+          echo "python: ${{ needs.changes.outputs.python }}"
+          echo "extensions: ${{ needs.changes.outputs.extensions }}"
+          echo "qis: ${{ needs.changes.outputs.qis }}"
       - name: Fail if required checks failed
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
         run: |
