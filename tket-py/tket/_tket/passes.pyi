@@ -146,11 +146,16 @@ def qsystem_llvm_pass(
     :param scope: A scope to control how the pass is applied to HUGR regions.
     """
 
-def gridsynth(circ: CompilationState, epsilon: float) -> None:
+def gridsynth(
+    circ: CompilationState,
+    epsilon: float,
+    seed: int,
+    scope: PassScope | None = None,
+) -> None:
     """Runs a pass applying the gridsynth algorithm to all Rz gates in a HUGR,
     which decomposes them into the Clifford + T basis.
 
-    Parameters:
-    - circ: the circuit to run the pass on.
-    - epsilon: the precision of the gridsynth decomposition
+    :param epsilon: the precision of the gridsynth decomposition.
+    :param seed: the seed for the gridsynth algorithm.
+    :param scope: A scope to control how the pass is applied to HUGR regions.
     """

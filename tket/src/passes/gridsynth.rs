@@ -3,17 +3,17 @@
 use crate::TketOp;
 use crate::extension::rotation::ConstRotation;
 use crate::passes::{
-    ComposablePass, InlineFunctionsPass, Normalize, PassScope, WithScope,
+    ComposablePass, InScope, InlineFunctionsPass, Normalize, PassScope, WithScope,
     inline_funcs::InlineFuncsError, normalize::NormalizeErrors,
 };
 
 use hugr::{
     HugrView, Node,
     hugr::{ValidationError, hugrmut::HugrMut},
-    std_extensions::arithmetic::float_types::ConstF64,
 };
 use rsgridsynth::config::config_from_theta_epsilon;
 use rsgridsynth::gridsynth::gridsynth_gates;
+use std::collections::HashSet;
 use std::sync::{LazyLock, Mutex};
 
 /// rsgridsynth uses a global mutable precision counter PREC_BITS that isn't
@@ -24,6 +24,10 @@ static GRIDSYNTH_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 #[derive(derive_more::Error, Debug, derive_more::Display, derive_more::From)]
 #[non_exhaustive]
 pub enum GridSynthError {
+    /// The approximation tolerance is outside the supported range.
+    #[error(ignore)]
+    #[display("Invalid gridsynth epsilon {_0}: expected a finite value strictly between 0 and 1")]
+    InvalidEpsilon(f64),
     /// The resulting HUGR is invalid.
     InvalidHUGR(#[from] ValidationError<Node>),
     /// Error inlining functions.
@@ -46,6 +50,8 @@ pub struct GridSynthPass {
     scope: PassScope,
     /// Precision of the gridsynth approximation.
     epsilon: f64,
+    /// Seed for the gridsynth algorithm.
+    seed: u64,
 }
 
 impl Default for GridSynthPass {
@@ -53,14 +59,24 @@ impl Default for GridSynthPass {
         Self {
             scope: PassScope::default(),
             epsilon: 1e-3,
+            seed: 1234,
         }
     }
 }
 
 impl GridSynthPass {
     /// Sets the precision of the gridsynth approximation.
+    ///
+    /// Must be finite and strictly between 0 and 1. Invalid values are rejected
+    /// when the pass runs, before modifying the HUGR.
     pub fn with_epsilon(mut self, epsilon: f64) -> Self {
         self.epsilon = epsilon;
+        self
+    }
+
+    /// Sets the seed for the gridsynth algorithm.
+    pub fn with_seed(mut self, seed: u64) -> Self {
+        self.seed = seed;
         self
     }
 }
@@ -70,58 +86,72 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for GridSynthPass {
     type Result = ();
 
     fn run(&self, hugr: &mut H) -> Result<(), Self::Error> {
-        InlineFunctionsPass::default().run(hugr)?;
-        Normalize::default().run(hugr)?;
+        if !self.epsilon.is_finite() || self.epsilon <= 0.0 || self.epsilon >= 1.0 {
+            return Err(GridSynthError::InvalidEpsilon(self.epsilon));
+        }
 
-        let rz_nodes: Vec<Node> = hugr
-            .nodes()
+        InlineFunctionsPass::default()
+            .with_scope(self.scope.clone())
+            .run(hugr)?;
+        Normalize::default()
+            .with_scope(self.scope.clone())
+            .run(hugr)?;
+
+        let rotations: Vec<_> = self
+            .scope
+            .regions(hugr)
+            .flat_map(|parent| hugr.children(parent))
             .filter(|n| hugr.get_optype(*n).cast::<TketOp>() == Some(TketOp::Rz))
+            .map(|rz_node| {
+                let angle_port = hugr
+                    .node_inputs(rz_node)
+                    .nth(1)
+                    .expect("Rz should have an angle input");
+
+                let (source_node, _) = hugr
+                    .single_linked_output(rz_node, angle_port)
+                    .ok_or(GridSynthError::UndefinedAngleError(rz_node))?;
+
+                if !hugr.get_optype(source_node).is_load_constant() {
+                    return Err(GridSynthError::UndefinedAngleError(rz_node));
+                }
+
+                let const_node = hugr
+                    .static_source(source_node)
+                    .filter(|&n| hugr.get_optype(n).is_const())
+                    .ok_or(GridSynthError::UndefinedAngleError(rz_node))?;
+
+                let theta = find_angle(hugr, const_node);
+                Ok((rz_node, theta, source_node, const_node))
+            })
+            .collect::<Result<_, GridSynthError>>()?;
+
+        for &(rz_node, theta, _, _) in &rotations {
+            let gates = gridsynth(theta, self.epsilon, self.seed);
+            replace_rz_with_gates(hugr, rz_node, gates)?;
+        }
+
+        let loads: HashSet<Node> = rotations.iter().map(|&(_, _, load, _)| load).collect();
+        let constants: HashSet<Node> = rotations
+            .iter()
+            .map(|&(_, _, _, constant)| constant)
             .collect();
 
-        for rz_node in rz_nodes {
-            let angle_port = hugr
-                .node_inputs(rz_node)
-                .nth(1)
-                .expect("Rz should have an angle input");
+        for node in loads.into_iter().chain(constants) {
+            let unused = hugr
+                .node_outputs(node)
+                .all(|port| !hugr.is_linked(node, port));
 
-            let (source_node, _) = match hugr.single_linked_output(rz_node, angle_port) {
-                Some(link) => link,
-                _ => return Err(GridSynthError::UndefinedAngleError(rz_node)),
-            };
-
-            // The Normalize pass should result in all statically known angles appearing
-            // directly before the Rz gate. Therefore if the previous node is not
-            // `LoadConstant`, the angle cannot be known statically.
-            let const_node = if hugr.get_optype(source_node).is_load_constant() {
-                match hugr.static_source(source_node) {
-                    Some(c) if hugr.get_optype(c).is_const() => c,
-                    _ => return Err(GridSynthError::UndefinedAngleError(rz_node)),
-                }
-            } else {
-                return Err(GridSynthError::UndefinedAngleError(rz_node));
-            };
-
-            let theta = find_angle(hugr, const_node);
-            hugr.remove_node(source_node);
-
-            let const_out = hugr
-                .node_outputs(const_node)
-                .next()
-                .expect("Const has a static output");
-
-            if !hugr.is_linked(const_node, const_out) {
-                hugr.remove_node(const_node);
+            if unused && self.scope.in_scope(hugr, node) == InScope::Yes {
+                hugr.remove_node(node);
             }
-
-            let gates = gridsynth(theta, self.epsilon);
-            replace_rz_with_gates(hugr, rz_node, &gates)?;
         }
 
         Ok(())
     }
 }
 
-/// Extracts the angle (in radians) held by a `Const` node.
+/// Extracts the angle (in radians) from a rotation constant loaded directly into `Rz`.
 fn find_angle<H: HugrView<Node = Node>>(hugr: &H, const_node: Node) -> f64 {
     let value = hugr
         .get_optype(const_node)
@@ -129,26 +159,17 @@ fn find_angle<H: HugrView<Node = Node>>(hugr: &H, const_node: Node) -> f64 {
         .expect("node is a Const")
         .value();
 
-    if let Some(rot) = value.get_custom_value::<ConstRotation>() {
-        rot.to_radians()
-    } else if let Some(fl) = value.get_custom_value::<ConstF64>() {
-        ConstRotation::new(fl.value())
-            .unwrap_or_else(|_| {
-                panic!(
-                    "ConstF64 value {:?} for node {const_node} is not a valid rotation",
-                    fl.value()
-                )
-            })
-            .to_radians()
-    } else {
-        panic!("{const_node} has unexpected value type (expected ConstRotation or ConstF64)")
-    }
+    value
+        .get_custom_value::<ConstRotation>()
+        .expect("constant loaded directly into Rz must be a ConstRotation")
+        .to_radians()
 }
 
 /// Runs the gridsynth algorithm on `theta` (radians), and returns the gate string.
-fn gridsynth(theta: f64, epsilon: f64) -> String {
-    let _guard = GRIDSYNTH_LOCK.lock().unwrap();
-    let seed = 1234;
+fn gridsynth(theta: f64, epsilon: f64, seed: u64) -> String {
+    let _guard = GRIDSYNTH_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let verbose = false;
     let up_to_phase = false;
     let mut config = config_from_theta_epsilon(theta, epsilon, seed, verbose, up_to_phase);
@@ -157,62 +178,64 @@ fn gridsynth(theta: f64, epsilon: f64) -> String {
 
 /// Compresses a gridsynth gate sequence into a shorter normal form.
 fn simplify(gates: String) -> String {
-    let mut gates = gates;
-    let n = gates.len();
-    let mut normal_form_reached = false;
-    while !normal_form_reached {
-        let new_gates = gates
+    let mut pending = gates.into_bytes();
+    pending.reverse();
+    let mut simplified = Vec::with_capacity(pending.len());
+
+    while let Some(gate) = pending.pop() {
+        simplified.push(gate);
+        let (consumed, replacement): (usize, &[u8]) = match simplified.as_slice() {
             // Cancellation rules
-            .replacen("ZZ", "", n)
-            .replacen("XX", "", n)
-            .replacen("HH", "", n)
-            .replacen("SS", "Z", n)
-            .replacen("TT", "S", n)
-            .replacen("DD", "SZ", n)
-            .replacen("TD", "", n)
-            .replacen("DT", "", n)
+            [.., b'Z', b'Z']
+            | [.., b'X', b'X']
+            | [.., b'H', b'H']
+            | [.., b'T', b'D']
+            | [.., b'D', b'T'] => (2, b""),
+            [.., b'S', b'S'] => (2, b"Z"),
+            [.., b'T', b'T'] => (2, b"S"),
+            [.., b'D', b'D'] => (2, b"SZ"),
             // Rules to push Paulis to the right
-            .replacen("ZS", "SZ", n)
-            .replacen("ZT", "TZ", n)
-            .replacen("ZD", "DZ", n)
-            .replacen("XS", "SZX", n)
-            .replacen("XT", "DX", n)
-            .replacen("XD", "TX", n)
-            .replacen("ZH", "HX", n)
-            .replacen("XH", "HZ", n)
-            .replacen("XZ", "ZX", n)
+            [.., b'Z', b'S'] => (2, b"SZ"),
+            [.., b'Z', b'T'] => (2, b"TZ"),
+            [.., b'Z', b'D'] => (2, b"DZ"),
+            [.., b'X', b'S'] => (2, b"SZX"),
+            [.., b'X', b'T'] => (2, b"DX"),
+            [.., b'X', b'D'] => (2, b"TX"),
+            [.., b'Z', b'H'] => (2, b"HX"),
+            [.., b'X', b'H'] => (2, b"HZ"),
+            [.., b'X', b'Z'] => (2, b"ZX"),
             // Interaction of H and S (reduces number of H)
-            .replacen("HSH", "SHSX", n)
+            [.., b'H', b'S', b'H'] => (3, b"SHSX"),
             // Interaction of S and T (reduces number of S)
-            .replacen("DS", "T", n)
-            .replacen("SD", "T", n)
-            .replacen("TS", "DZ", n)
-            .replacen("ST", "DZ", n);
-        // Stop when no more changes are possible
-        normal_form_reached = new_gates == gates;
-        gates = new_gates;
+            [.., b'D', b'S'] | [.., b'S', b'D'] => (2, b"T"),
+            [.., b'T', b'S'] | [.., b'S', b'T'] => (2, b"DZ"),
+            _ => continue,
+        };
+        simplified.truncate(simplified.len() - consumed);
+        pending.extend(replacement.iter().rev().copied());
     }
-    gates
+    String::from_utf8(simplified).expect("gate rewrites preserve UTF-8")
 }
 
 /// Replace an `Rz` node with the Clifford+T gates in `gates`.
 fn replace_rz_with_gates<H: HugrMut<Node = Node>>(
     hugr: &mut H,
     rz_node: Node,
-    gates: &str,
+    mut gates: String,
 ) -> Result<(), GridSynthError> {
     // W is a global phase factor so we can ignore it
-    let gates = gates.replacen('W', "", gates.len());
+    gates.retain(|c| c != 'W');
 
     let new_nodes: Vec<Node> = gates
         .chars()
-        .map(|gate| match gate {
-            'H' => TketOp::H,
-            'S' => TketOp::S,
-            'T' => TketOp::T,
-            'D' => TketOp::Tdg,
-            'X' => TketOp::X,
-            'Z' => TketOp::Z,
+        .filter_map(|gate| match gate {
+            'H' => Some(TketOp::H),
+            'S' => Some(TketOp::S),
+            'T' => Some(TketOp::T),
+            'D' => Some(TketOp::Tdg),
+            'X' => Some(TketOp::X),
+            'Z' => Some(TketOp::Z),
+            'I' => None,
             _ => panic!("The gate {gate} is not supported"),
         })
         .map(|op| hugr.add_node_after(rz_node, op))

@@ -566,7 +566,9 @@ class GridSynthPass(ComposablePass):
     gridsynth algorithm.
 
     Parameters:
-    - epsilon: Precision of the gridsynth approximation. Default is 1e-3.
+    - epsilon: Precision of the gridsynth approximation. Must be finite and
+      strictly between 0 and 1. Invalid values are rejected when the pass runs.
+      Default is 1e-3.
     """
 
     epsilon: float = 1e-3
@@ -586,10 +588,15 @@ class GridSynthPass(ComposablePass):
         self._scope = scope
         return self
 
+    def with_seed(self, seed: int) -> GridSynthPass:
+        """Set the seed for the gridsynth algorithm and return self."""
+        self._seed = seed
+        return self
+
     def _gridsynth(self, hugr: Hugr, inplace: bool) -> PassResult:
         tk_program = _state.CompilationState.from_python(hugr)
 
-        _passes.gridsynth(tk_program._inner, self.epsilon)
+        _passes.gridsynth(tk_program._inner, self.epsilon, self._seed, self._scope)
 
         package = tk_program.to_python()
         return PassResult.for_pass(
