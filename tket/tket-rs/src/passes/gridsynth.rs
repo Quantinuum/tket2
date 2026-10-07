@@ -167,9 +167,7 @@ fn find_angle<H: HugrView<Node = Node>>(hugr: &H, const_node: Node) -> f64 {
 
 /// Runs the gridsynth algorithm on `theta` (radians), and returns the gate string.
 fn gridsynth(theta: f64, epsilon: f64, seed: u64) -> String {
-    let _guard = GRIDSYNTH_LOCK
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let _guard = GRIDSYNTH_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let verbose = false;
     let up_to_phase = false;
     let mut config = config_from_theta_epsilon(theta, epsilon, seed, verbose, up_to_phase);
