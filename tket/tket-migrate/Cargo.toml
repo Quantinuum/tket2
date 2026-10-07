@@ -15,4 +15,4 @@ workspace = true
 hugr.workspace = true
 serde_json.workspace = true
 thiserror = { workspace = true }
-tket = { path = "../tket" }
+tket = { path = "../tket-rs" }
