@@ -1,4 +1,4 @@
-//! A pass that applies the gridsynth algorithm to synthesise arbitrary ratations to Clifford+T.
+//! A pass that applies the gridsynth algorithm to synthesise arbitrary rotations to Clifford+T.
 
 use crate::TketOp;
 use crate::extension::rotation::ConstRotation;
