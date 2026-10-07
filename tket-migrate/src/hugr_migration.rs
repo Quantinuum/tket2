@@ -59,8 +59,8 @@ impl ExtensionUpdater {
         replacer.run(&mut self.hugr)?;
 
         // remove unused extensions
-        // let registry = self.hugr.extensions().clone();
-        // self.hugr.resolve_extension_defs(&registry)?;
+        let registry = self.hugr.extensions().clone();
+        self.hugr.resolve_extension_defs(&registry)?;
         Ok(())
     }
 

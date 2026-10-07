@@ -38,7 +38,13 @@ impl VersionedElement {
         else {
             return Ok(None);
         };
-        Ok(Some(extension.instantiate_extension_op(&self.id, [])?))
+        let definition = extension.get_op(self.id.as_str()).ok_or_else(|| {
+            format!(
+                "Operation {} is missing from {}@{}",
+                self.id, self.extension_id, self.version
+            )
+        })?;
+        Ok(Some(ExtensionOp::new(definition.clone(), [])?))
     }
 
     /// Returns `None` when the source extension version is absent.
