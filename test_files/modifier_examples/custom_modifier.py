@@ -1,23 +1,19 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#    "guppylang==1.0.1",
+#    "guppylang==1.1.1",
 #    "matplotlib",
 # ]
-# [tool.uv.sources]
-# guppylang = {git = "https://github.com/quantinuum/guppylang", subdirectory = "guppylang", rev = "952d728357b09741e5355a213f574a14967ffc12"}
 # ///
 """Test the use of a higher-order function with complex control flow inside modifiers"""
 
 from pathlib import Path
 from sys import argv
 
-from guppylang import enable_experimental_features, guppy
+from guppylang import guppy
 from guppylang.std.builtins import array, control, dagger, nat, panic, qubit
 from guppylang.std.debug import state_result
 from guppylang.std.quantum import discard, discard_array, h, s, x, z
-
-enable_experimental_features()
 
 
 @guppy.unitary

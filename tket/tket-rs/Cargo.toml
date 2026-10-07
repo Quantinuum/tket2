@@ -1,0 +1,106 @@
+[package]
+name = "tket"
+version = "0.22.0"
+edition = { workspace = true }
+rust-version = { workspace = true }
+
+license = { workspace = true }
+readme = "README.md"
+documentation = "https://docs.rs/tket"
+homepage = { workspace = true }
+repository = { workspace = true }
+description = "Quantinuum's TKET Quantum Compiler"
+keywords = ["Quantum", "Quantinuum"]
+categories = ["compilers", "science::quantum-computing"]
+
+[lints]
+workspace = true
+
+[lib]
+bench = false
+name = "tket"
+path = "src/lib.rs"
+
+[features]
+# Enables search and replace optimisation passes using the `portmatching` crate.
+portmatching = ["dep:portmatching", "dep:rmp-serde"]
+
+# Stores a trace of the applied rewrites
+rewrite-tracing = []
+
+# Support compressed binary encoded ECC files
+binary-eccs = ["dep:zstd"]
+
+llvm = ["hugr/llvm", "hugr/llvm-test", "dep:anyhow"]
+
+default = ["binary-eccs"]
+
+[dependencies]
+lazy_static = { workspace = true }
+cgmath = { workspace = true }
+tket-json-rs = { workspace = true }
+rayon = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+serde_with = { workspace = true }
+priority-queue = { workspace = true }
+smol_str = { workspace = true }
+typetag = { workspace = true }
+itertools = { workspace = true }
+petgraph = { workspace = true }
+portmatching = { workspace = true, optional = true, features = ["serde"] }
+derive_more = { workspace = true, features = [
+    "debug",
+    "display",
+    "error",
+    "from",
+    "into",
+    "sum",
+    "add",
+    "add_assign",
+] }
+hugr = { workspace = true }
+hugr-core = { workspace = true }
+portgraph = { workspace = true, features = ["serde", "petgraph"] }
+strum = { workspace = true, features = ["derive"] }
+fxhash = { workspace = true }
+indexmap = { workspace = true, features = ["rayon"] }
+rmp-serde = { workspace = true, optional = true }
+delegate = { workspace = true }
+csv = { workspace = true }
+chrono = { workspace = true }
+bytemuck = { workspace = true }
+crossbeam-channel = { workspace = true }
+tracing = { workspace = true }
+pest = { workspace = true }
+pest_derive = { workspace = true }
+zstd = { workspace = true, optional = true }
+anyhow = { workspace = true, optional = true }
+num-rational = { workspace = true }
+rsgridsynth = { workspace = true }
+pg-core = { workspace = true }
+pg-canonical-form = { workspace = true }
+pg-greedy-synth = { workspace = true }
+pg-optimise = { workspace = true }
+pg-t-optimize = { workspace = true }
+pg-rebase = { workspace = true }
+ascent = { version = "0.8.1", default-features = false }
+pastey = { workspace = true }
+thiserror = { workspace = true }
+
+
+[dev-dependencies]
+rstest = { workspace = true }
+cool_asserts = { workspace = true }
+proptest = { workspace = true }
+proptest-recurse = { workspace = true }
+
+
+# Defined here so it can be overridden by the codspeed CI job
+# using `cargo add`.
+criterion = { version = "0.8.2", features = ["html_reports"] }
+insta = "1.47.2"
+
+[[bench]]
+name = "bench_main"
+harness = false

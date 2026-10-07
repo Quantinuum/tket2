@@ -9,7 +9,7 @@ on:
   pull_request:
     # check builds work if qis-compiler build config changes
     paths:
-      - "qis-compiler/pyproject.toml"
+      - "tket/qis-compiler/pyproject.toml"
       - ".github/workflows/python-qis-wheels.yml"
   workflow_dispatch:
 
@@ -65,9 +65,9 @@ jobs:
       - uses: quantinuum/hugrverse-env/install-hugrenv-action@main
 
       - name: Build selene-hugr-qis-compiler wheel
-        uses: pypa/cibuildwheel@v4.2.0
+        uses: pypa/cibuildwheel@v4.2.1
         with:
-          package-dir: qis-compiler
+          package-dir: tket/qis-compiler
 
       - name: Check built wheels
         run: uvx twine check --strict wheelhouse/*.whl

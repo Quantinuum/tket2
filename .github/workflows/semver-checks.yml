@@ -20,8 +20,8 @@ jobs:
     permissions:
       pull-requests: read
     outputs:
-      rust: ${{ steps.filter.outputs.rust }}
-      python: ${{ steps.filter.outputs.python }}
+      pg-libs: ${{ steps.filter.outputs.pg-libs }}
+      tket: ${{ steps.filter.outputs.tket }}
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/check-changes
@@ -29,7 +29,7 @@ jobs:
 
   rs-semver-checks:
     needs: [changes]
-    if: ${{ needs.changes.outputs.rust == 'true' }}
+    if: ${{ needs.changes.outputs.tket == 'true' || needs.changes.outputs.pg-libs == 'true' }}
     runs-on: ubuntu-latest
     env:
       # Path to the cached tket-c-api library

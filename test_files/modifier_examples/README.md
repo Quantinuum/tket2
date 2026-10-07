@@ -13,13 +13,16 @@ The compiled HUGR is stored alongside it with a `.hugr` extension.
 | Command | Where | Effect |
 |---------|-------|--------|
 | `just recompile-hugrs` | this directory | Recompile all `.hugr` files |
-| `just recompile-modifiers` | repo root | Recompile all `.hugr` files |
-| `just recompile-test-hugrs` | repo root | Same as above, plus all other test HUGRs in `test_files/` |
+| `just tket/recompile-modifiers` | repo root | Recompile all `.hugr` files |
+| `just tket/recompile-test-hugrs` | repo root | Same as above, plus all other test HUGRs in `test_files/` |
 
 All the previous commands also update
 the `test_files/run_modifier_examples/hugr_results/` directory with `.npy` files
 containing simulation results, and regenerate the human-readable summary in
 `test_files/run_modifier_examples/hugr_results.txt`.
 
-To recompile and run a single example, use from the repo root `just recompile-modifier <example_name>` or `just example <example_name>.py` in this directory. This will recompile the `.hugr` file and update the results only for that example., 
+To recompile and run a single example, run
+`just tket/recompile-modifier <example_name>` from the repository root, or
+`just example <example_name>.py` in this directory. This recompiles the `.hugr`
+file and updates the results only for that example.
 

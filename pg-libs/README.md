@@ -1,11 +1,29 @@
 # pg-libs
 
-This workspace contains Rust crates for working with Pauli graphs.
+This directory contains Rust crates for working with Pauli graphs.
 
 
 ## Development notes
 
-- `pg-libs` has its own Rust and Python (`uv`) workspaces, separate from the repository root.
-- Some Rust tests depend on `pytket` — see [`pg-tk`'s README](pg-converters/pg-tk/README.md) for details.
-- **Python / uv**: To set up the Python environment, run `uv sync` from inside `pg-libs`. If you are using the devenv shell, prefer the `justfile` tasks (e.g. `just sync-uv`, `just fix-python`, `just format-python`) over invoking `uv` directly, since they unset the root environment variables before running so they don't pick up the repository root's Python environment.
-- **Nightly toolchain**: The `simd` feature available to some crates requires a nightly Rust toolchain. If using the devenv shell, switch to the nightly profile (`devenv shell nightly`) so the toolchain is picked up automatically; otherwise use `cargo +nightly-2025-09-14 ...` as pinned in the `justfile`.
+- `pg-libs` and tket share the repository-root Cargo and uv workspaces, lockfiles,
+  `target/` directory, and Python environment.
+- Select the pg-libs crates with `cargo check -p 'tk-pg-*'`. Plain Cargo commands at
+  the repository root select the tket default packages; `--workspace` selects
+  both projects. The local just recipes select pg-libs explicitly.
+- Some Rust tests depend on `pytket` — see [`tk-pg-converter`'s README](pg-converters/tk-pg-converter/README.md) for details.
+- **Python / uv**: Run `just sync-uv` from this directory to install the
+  `pg-libs` dependency group in the shared environment. This does not build
+  tket's Python extensions or remove existing packages. `just test` (or
+  `just pg-libs/test` from the root) runs the pg-libs suite. These commands also work in the devenv shell.
+- **Checks**: Run `just check` from this directory (or `just pg-libs/check`
+  from the root) to check Rust formatting, compilation, Clippy, documentation,
+  and Python formatting, linting, and types. Use `check-rust` or `check-python`
+  to select one language. Rust checks use stable features. The `format-rust`
+  recipe formats the shared workspace.
+- **Nightly toolchain**: The `unstable_simd` feature requires the nightly toolchain selected by `nightly_toolchain` in the root [`justfile`](../justfile). Run `just test-rust-nightly`; in devenv, use `devenv shell --profile nightly`.
+
+## License
+
+The pg-libs crates are licensed under Apache License, Version 2.0 ([LICENCE][] or <https://www.apache.org/licenses/LICENSE-2.0>).
+
+  [LICENCE]: https://github.com/quantinuum/tket2/blob/main/LICENCE

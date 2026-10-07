@@ -12,3 +12,7 @@ d8a169a23b2509c390730875d21869bf1e1a0fe3
 # Upgrade ruff to 0.16.0, enabling a bunch of rules by default, most of which have been applied
 # https://github.com/Quantinuum/tket2/pull/1885
 8ba7f8d2c8b73e5124270188b76c8afa723d4b24
+
+# Directory restructuring, with tket libraries moved under `tket/`.
+# https://github.com/Quantinuum/tket2/pull/2012
+e3d1730e679a315868cd027049f1fc4371049a42

@@ -1,0 +1,202 @@
+from pathlib import Path
+from typing import Literal
+
+from hugr.passes.scope import GlobalScope, PassScope
+
+from ..passes import ParallelMode, inline_funcs
+from .optimiser import BadgerOptimiser
+from .state import CompilationState
+
+class CircuitChunks:
+    def reassemble(self) -> CompilationState:
+        """Reassemble the circuit from its chunks."""
+
+    def circuits(self) -> list[CompilationState]:
+        """Returns clones of the split circuits."""
+
+    def update_circuit(self, index: int, circ: CompilationState) -> None:
+        """Replace a circuit chunk with a new version."""
+
+class PullForwardError(Exception):
+    """Error from a `PullForward` operation."""
+
+class GridsynthError(Exception):
+    """Errors from the gridsynth pass."""
+
+class PauliGraphResynthesisError(Exception):
+    """Error from the Pauli graph resynthesis pass."""
+
+# ruff: ignore[B008]
+def normalize_guppy(
+    circ: CompilationState,
+    *,
+    resolve_modifiers: bool = True,
+    simplify_cfgs: bool = True,
+    remove_tuple_untuple: bool = True,
+    constant_folding: bool = True,
+    remove_dead_funcs: bool = True,
+    inline_dfgs: bool = True,
+    inline_funcs: inline_funcs.InlineFuncsHeuristic | None = inline_funcs.MaxSize(128),
+    remove_redundant_order_edges: bool = True,
+    squash_borrows: bool = True,
+    scope: PassScope = GlobalScope.PRESERVE_PUBLIC,
+) -> None:
+    """Flatten the structure of a Guppy-generated program to enable additional optimisations.
+
+    This should normally be called first before other optimisations.
+
+    Parameters:
+    - resolve_modifiers: Whether to resolve modifier operations.
+    - simplify_cfgs: Whether to simplify CFG control flow.
+    - remove_tuple_untuple: Whether to remove tuple/untuple operations.
+    - constant_folding: Whether to constant fold the program.
+    - remove_dead_funcs: Whether to remove dead functions.
+    - inline_dfgs: Whether to inline DFG operations.
+    - inline_funcs: a heuristic for inlining functions. If None, no inlining is performed.
+    - remove_redundant_order_edges: Whether to remove redundant order edges.
+    - squash_borrows: Whether to squash return-borrow pairs on BorrowArrays.
+    """
+
+# ruff: ignore[B008]
+def inline_functions(
+    circ: CompilationState,
+    *,
+    heuristic: inline_funcs.InlineFuncsHeuristic = inline_funcs.MaxSize(128),
+    scope: PassScope = GlobalScope.PRESERVE_PUBLIC,
+) -> None:
+    """Inline acyclic function calls below the selected scope."""
+
+def greedy_depth_reduce(circ: CompilationState) -> int:
+    """Greedy depth reduction of a circuit.
+
+    Mutates the circuit in place and returns the number of moves made.
+    """
+
+def badger_optimise(
+    circ: CompilationState,
+    optimiser: BadgerOptimiser,
+    max_threads: int | None = None,
+    timeout: int | None = None,
+    progress_timeout: int | None = None,
+    max_circuit_count: int | None = None,
+    log_dir: Path | None = None,
+) -> None:
+    """Optimise a circuit using the Badger optimiser."""
+
+def chunks(c: CompilationState, max_chunk_size: int) -> CircuitChunks:
+    """Split a circuit into chunks of at most `max_chunk_size` gates."""
+
+def tket1_pass(
+    circ: CompilationState,
+    pass_json: str,
+    *,
+    scope: PassScope | None = None,
+    target: Literal["tket", "sol", "helios"] | None = None,
+) -> None:
+    """Runs a pytket pass on all circuit-like regions under the entrypoint of the
+    HUGR.
+
+    Parameters:
+    - pass_json: The JSON string of the pytket pass to run. See [pytket
+      documentation](https://docs.quantinuum.com/tket/api-docs/passes.html#pytket.passes.BasePass.to_dict)
+      for more details.
+    - traverse_subcircuits: Whether to recurse into the children of the
+      circuit-like regions, and optimise them too.
+      nested inside other subregions of the circuit.
+    - target: The platform target identifier selecting which encoder/decoder
+      extension set to use. One of ``"tket"``, ``"sol"``, or ``"helios"``.
+      Defaults to the platform-agnostic ``"tket"`` target.
+    """
+
+def pauli_graph_resynthesis(
+    circ: CompilationState,
+    scope: PassScope = GlobalScope.PRESERVE_PUBLIC,
+    window_size: int | None = None,
+    pool_size: int | None = None,
+    top_up_size: int | None = None,
+    seed: int | None = None,
+    parallel_mode: ParallelMode | None = None,
+    t_optimization: bool = False,
+    ancilla_budget: int | None = None,
+) -> None:
+    """
+    Resynthesizes a Clifford + Rz circuit by converting it to a Pauli graph and applying various
+    optimisation techniques such as:
+    - phase folding
+    - optional phase polynomial resynthesis for T count reduction
+    - a synthesis algorithm from pauli graph to Clifford + Rz aimed at reducing the number of 2
+    qubit gates
+
+    Rotation angles must be numeric as symbolic angles are not supported currently.
+
+    Parameters:
+    - window_size: Sets the size of the sliding window used for lookahead during synthesis.
+    - pool_size: Sets the number of candidate gates to maintain in the pool.
+    - top_up_size: Sets the number of candidate gates to add after each TQE gate.
+    - seed: Sets the random seed used to sample candidate gates.
+    - parallel_mode: ParallelMode.Auto, ParallelMode.On, or ParallelMode.Off.
+      Omitted or None selects ParallelMode.Auto.
+    - t_optimization: Enable T count optimization. Defaults to False and requires
+      a Clifford + T circuit when enabled.
+    - ancilla_budget: Number of ancillas to allocate per outer circuit for T optimization.
+      Must be non-negative. None uses the largest Hadamard count among the selected
+      dataflow regions. Ignored when t_optimization is False.
+
+    Raises:
+        PauliGraphResynthesisError: If the resynthesis pass fails.
+    """
+
+def resolve_modifiers(
+    circ: CompilationState, scope: PassScope = GlobalScope.PRESERVE_PUBLIC
+) -> None:
+    """
+    Runs a Rust backed pass to resolve quantum modifiers (control, dagger, power).
+
+    :param circ: The input program as a CompilationState.
+    :param scope: A scope to control how the pass is applied to HUGR regions.
+    """
+
+def qsystem_rebase_pass(
+    circ: CompilationState,
+    *,
+    resolve_modifiers: bool = True,
+    lower_drops: bool = True,
+    hide_funcs: bool = True,
+    scope: PassScope | None = None,
+) -> None:
+    """Runs a rust backed pass to convert quantum ops to qsystem ops.
+
+    :param resolve_modifiers: Whether to resolve modifier operations.
+    :param lower_drops: Whether to lower drop operations.
+    :param hide_funcs: Make all HUGR functions private.
+    """
+
+def qsystem_llvm_pass(
+    circ: CompilationState,
+    *,
+    constant_fold: bool = True,
+    monomorphize: bool = True,
+    force_order: bool = True,
+    scope: PassScope | None = None,
+) -> None:
+    """Runs a rust backed pass to prepare the HUGR for LLVM code generation.
+
+    :param constant_fold: Whether to perform constant folding.
+    :param monomorphize: Whether to monomorphize generic functions.
+    :param force_order: Whether to enforce total ordering of all HUGR operations.
+    :param scope: A scope to control how the pass is applied to HUGR regions.
+    """
+
+def gridsynth(
+    circ: CompilationState,
+    epsilon: float,
+    seed: int,
+    scope: PassScope | None = None,
+) -> None:
+    """Runs a pass applying the gridsynth algorithm to all Rz gates in a HUGR,
+    which decomposes them into the Clifford + T basis.
+
+    :param epsilon: the precision of the gridsynth decomposition.
+    :param seed: the seed for the gridsynth algorithm.
+    :param scope: A scope to control how the pass is applied to HUGR regions.
+    """

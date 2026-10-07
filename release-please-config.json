@@ -8,7 +8,7 @@
     "separate-pull-requests": true,
     "pull-request-title-pattern": "chore(py): release${component} ${version}",
     "packages": {
-        "tket-py": {
+        "tket/tket-py": {
             "release-type": "python",
             "component": "tket-py",
             "package-name": "tket",
@@ -25,7 +25,7 @@
                 }
             ]
         },
-        "tket-eccs": {
+        "tket/tket-eccs": {
             "release-type": "python",
             "component": "tket-eccs",
             "package-name": "tket_eccs",
@@ -42,7 +42,7 @@
                 }
             ]
         },
-        "tket-exts": {
+        "tket/tket-exts": {
             "release-type": "python",
             "component": "tket-exts",
             "package-name": "tket_exts",
@@ -59,7 +59,7 @@
                 }
             ]
         },
-        "qis-compiler": {
+        "tket/qis-compiler": {
             "release-type": "python",
             "component": "qis-compiler",
             "package-name": "selene_hugr_qis_compiler",
@@ -69,7 +69,7 @@
             "prerelease": false,
             "draft-pull-request": true,
             "extra-files": [
-                "qis-compiler/python/selene_hugr_qis_compiler/__init__.py",
+                "tket/qis-compiler/python/selene_hugr_qis_compiler/__init__.py",
                 {
                     "type": "toml",
                     "path": "uv.lock",
