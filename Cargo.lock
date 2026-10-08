@@ -1121,9 +1121,8 @@ checksum = "c9356095b4b41197bba32173600e1582792cda618f65d12f68e2e77d273413c5"
 
 [[package]]
 name = "hugr"
-version = "0.30.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34b9fab5c01c0b2b8c1456514745d9e85032ab736ff8cf809c66701db826c41b"
+version = "0.30.2"
+source = "git+https://github.com/quantinuum/hugr?rev=83309ebe8b9460b01062d45e679de009ba7828d5#83309ebe8b9460b01062d45e679de009ba7828d5"
 dependencies = [
  "hugr-core",
  "hugr-llvm",
@@ -1132,9 +1131,8 @@ dependencies = [
 
 [[package]]
 name = "hugr-cli"
-version = "0.30.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb516a25b83f986bf8480708eedf7d8b7cdec8932069962dd1308a762d01c63e"
+version = "0.30.2"
+source = "git+https://github.com/quantinuum/hugr?rev=83309ebe8b9460b01062d45e679de009ba7828d5#83309ebe8b9460b01062d45e679de009ba7828d5"
 dependencies = [
  "anyhow",
  "clap",
@@ -1154,9 +1152,8 @@ dependencies = [
 
 [[package]]
 name = "hugr-core"
-version = "0.30.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "833274717d3e87cf48759a115d6e0a9d4a2f419e9790a8e1e092451c9efec1fa"
+version = "0.30.2"
+source = "git+https://github.com/quantinuum/hugr?rev=83309ebe8b9460b01062d45e679de009ba7828d5#83309ebe8b9460b01062d45e679de009ba7828d5"
 dependencies = [
  "base64",
  "cgmath",
@@ -1192,9 +1189,8 @@ dependencies = [
 
 [[package]]
 name = "hugr-llvm"
-version = "0.30.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07049e2bc59cae8cd7a6319e31c708b9f1c7c8d5faf63152aeb5c3ad94c0efe5"
+version = "0.30.2"
+source = "git+https://github.com/quantinuum/hugr?rev=83309ebe8b9460b01062d45e679de009ba7828d5#83309ebe8b9460b01062d45e679de009ba7828d5"
 dependencies = [
  "anyhow",
  "cc",
@@ -1213,9 +1209,8 @@ dependencies = [
 
 [[package]]
 name = "hugr-model"
-version = "0.30.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b60176a5fc54c266a752df5a800c06788b562634a6bc57406f5df372aea45a6"
+version = "0.30.2"
+source = "git+https://github.com/quantinuum/hugr?rev=83309ebe8b9460b01062d45e679de009ba7828d5#83309ebe8b9460b01062d45e679de009ba7828d5"
 dependencies = [
  "base64",
  "bumpalo",
