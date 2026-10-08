@@ -30,6 +30,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "Cliffordize",
+    "GridSynthPass",
     "InlineFuncsHeuristic",
     "InlineFunctions",
     "ModifierResolverPass",
@@ -650,3 +651,49 @@ class _QSystemLLVMPass(ComposablePass):
             scope=self._scope,
         )
         return program
+
+
+@dataclass
+class GridSynthPass(ComposablePass):
+    """Apply the gridsynth algorithm to synthesise arbitrary rotations to Clifford+T.
+
+    This pass replaces Rz gates with sequences of Clifford+T gates using the
+    gridsynth algorithm.
+
+    Parameters:
+    - epsilon: Precision of the gridsynth approximation. Must be finite and
+      strictly between 0 and 1. Invalid values are rejected when the pass runs.
+      Default is 1e-3.
+    """
+
+    epsilon: float = 1e-3
+    _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
+
+    def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
+        """Run the gridsynth pass and return the transformed HUGR."""
+        return implement_pass_run(
+            self,
+            hugr=hugr,
+            inplace=inplace,
+            copy_call=lambda h: self._gridsynth(h, inplace),
+        )
+
+    def with_scope(self, scope: PassScope) -> GridSynthPass:
+        """Set the scope of this pass and return self."""
+        self._scope = scope
+        return self
+
+    def with_seed(self, seed: int) -> GridSynthPass:
+        """Set the seed for the gridsynth algorithm and return self."""
+        self._seed = seed
+        return self
+
+    def _gridsynth(self, hugr: Hugr, inplace: bool) -> PassResult:
+        tk_program = _state.CompilationState.from_python(hugr)
+
+        _passes.gridsynth(tk_program._inner, self.epsilon, self._seed, self._scope)
+
+        package = tk_program.to_python()
+        return PassResult.for_pass(
+            self, hugr=package.modules[0], inplace=inplace, result=None
+        )

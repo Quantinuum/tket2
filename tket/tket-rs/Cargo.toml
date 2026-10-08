@@ -77,6 +77,7 @@ pest_derive = { workspace = true }
 zstd = { workspace = true, optional = true }
 anyhow = { workspace = true, optional = true }
 num-rational = { workspace = true }
+rsgridsynth = { workspace = true }
 pg-core = { workspace = true }
 pg-canonical-form = { workspace = true }
 pg-greedy-synth = { workspace = true }

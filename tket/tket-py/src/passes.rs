@@ -1,6 +1,7 @@
 //! Passes for optimizing circuits.
 
 pub mod chunks;
+pub mod gridsynth;
 mod inline_funcs;
 mod qsystem;
 mod scope;
@@ -33,6 +34,7 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     m.add_function(wrap_pyfunction!(self::inline_funcs::inline_functions, &m)?)?;
     m.add_class::<self::chunks::PyCircuitChunks>()?;
     m.add_function(wrap_pyfunction!(self::chunks::chunks, &m)?)?;
+    m.add_function(wrap_pyfunction!(self::gridsynth::gridsynth, &m)?)?;
     m.add_function(wrap_pyfunction!(self::tket1::tket1_pass, &m)?)?;
     m.add_function(wrap_pyfunction!(pauli_graph_resynthesis, &m)?)?;
     m.add_function(wrap_pyfunction!(resolve_modifiers, &m)?)?;
@@ -44,12 +46,19 @@ pub fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
         py.get_type::<PyInlineFunctionsError>(),
     )?;
     m.add("TK1PassError", py.get_type::<tket1::PytketPassError>())?;
+    m.add("GridsynthError", py.get_type::<PyGridsynthError>())?;
     m.add(
         "PauliGraphResynthesisError",
         py.get_type::<PauliGraphResynthesisError>(),
     )?;
     Ok(m)
 }
+
+create_py_exception!(
+    tket::passes::gridsynth::GridSynthError,
+    PyGridsynthError,
+    "Errors from the gridsynth pass."
+);
 
 create_py_exception!(
     tket::passes::commutation::PullForwardError,

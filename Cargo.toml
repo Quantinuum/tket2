@@ -123,6 +123,7 @@ cool_asserts = "2.0.4"
 zstd = "0.14.0"
 anyhow = "1.0.102"
 num-rational = "0.4.2"
+rsgridsynth = "0.2.0"
 pg-core = { package = "tk-pg-core", path = "pg-libs/tk-pg-core", version = "0.1.1" }
 pg-canonical-form = { package = "tk-pg-canonical-form", path = "pg-libs/pg-passes/tk-pg-canonical-form", version = "0.1.1" }
 pg-greedy-synth = { package = "tk-pg-greedy-synth", path = "pg-libs/pg-passes/tk-pg-greedy-synth", version = "0.1.1" }
