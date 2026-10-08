@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.15.11](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.10...tket-py-v0.15.11) (2026-10-07)
+
+
+### Features
+
+* Add T-count optimization pass ([#2049](https://github.com/Quantinuum/tket2/issues/2049)) ([b23898f](https://github.com/Quantinuum/tket2/commit/b23898f0a808f715d33b24352e4d62653b0c94c2))
+* Bump to latest `hugr` and register `math` extension with QIS compiler ([#2037](https://github.com/Quantinuum/tket2/issues/2037)) ([93ea902](https://github.com/Quantinuum/tket2/commit/93ea902721daf8dd49fd5a6d517c13c3358818d9))
+
 ## [0.15.10](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.9...tket-py-v0.15.10) (2026-09-30)
 
 
