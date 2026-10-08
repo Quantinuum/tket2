@@ -6,8 +6,10 @@ use hugr::{
     ops::{DataflowOpTrait, ExtensionOp},
     types::{Signature, Transformable, Type},
 };
-use std::{collections::HashMap, error::Error};
+use std::{collections::HashMap, fmt};
 use tket::passes::{ReplaceTypes, replace_types::NodeTemplate};
+
+use crate::error::{ReplacementError, VersionedElementError};
 
 /// Represents an Extension Op by its name, the extension it belongs to, and its version.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -29,40 +31,58 @@ impl VersionedElement {
 
     /// Instantiates the extension operation from the given Hugr view.
     /// Returns `None` when the source extension version is absent.
+    ///
+    /// Returns an error when the definition is missing or cannot be instantiated.
     pub fn get_instantiated_op<T: HugrView>(
         &self,
         hugr: &T,
-    ) -> Result<Option<ExtensionOp>, Box<dyn Error>> {
+    ) -> Result<Option<ExtensionOp>, VersionedElementError> {
         let Some(extension) = hugr
             .extensions()
             .get_exact(&self.extension_id, &self.version)
         else {
             return Ok(None);
         };
-        let definition = extension.get_op(self.id.as_str()).ok_or_else(|| {
-            format!(
-                "Operation {} is missing from {}@{}",
-                self.id, self.extension_id, self.version
-            )
+        let definition = extension
+            .get_op(self.id.as_str())
+            .ok_or_else(|| VersionedElementError::MissingOperation(self.clone()))?;
+        let operation = ExtensionOp::new(definition.clone(), []).map_err(|source| {
+            VersionedElementError::InstantiateOperation {
+                element: self.clone(),
+                source,
+            }
         })?;
-        Ok(Some(ExtensionOp::new(definition.clone(), [])?))
+        Ok(Some(operation))
     }
 
     /// Returns `None` when the source extension version is absent.
-    pub fn get_type<T: HugrView>(&self, hugr: &T) -> Result<Option<CustomType>, Box<dyn Error>> {
+    /// Returns an error when the type definition is missing or cannot be instantiated.
+    pub fn get_type<T: HugrView>(
+        &self,
+        hugr: &T,
+    ) -> Result<Option<CustomType>, VersionedElementError> {
         let Some(extension) = hugr
             .extensions()
             .get_exact(&self.extension_id, &self.version)
         else {
             return Ok(None);
         };
-        let definition = extension.get_type(self.id.as_str()).ok_or_else(|| {
-            format!(
-                "Type {} is missing from {}@{}",
-                self.id, self.extension_id, self.version
-            )
+        let definition = extension
+            .get_type(self.id.as_str())
+            .ok_or_else(|| VersionedElementError::MissingType(self.clone()))?;
+        let ty = definition.instantiate([]).map_err(|source| {
+            VersionedElementError::InstantiateType {
+                element: self.clone(),
+                source,
+            }
         })?;
-        Ok(Some(definition.instantiate([])?))
+        Ok(Some(ty))
+    }
+}
+
+impl fmt::Display for VersionedElement {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} in {}@{}", self.id, self.extension_id, self.version)
     }
 }
 
@@ -80,13 +100,13 @@ pub enum OpReplacementTemplate {
 }
 
 impl OpReplacementTemplate {
-    /// Builds a replacement template, applying type changes to empty replacements.
+    /// Builds a replacement template
     pub fn get_op_replace<T: HugrView>(
         &self,
         old_op: &ExtensionOp,
         hugr: &T,
         replacer: &ReplaceTypes,
-    ) -> Result<NodeTemplate, Box<dyn std::error::Error>> {
+    ) -> Result<NodeTemplate, ReplacementError> {
         match self {
             OpReplacementTemplate::TemplateInstance(template) => Ok(template.clone()),
             OpReplacementTemplate::Empty => Self::get_node_template(old_op, &[], hugr, replacer),
@@ -101,17 +121,13 @@ impl OpReplacementTemplate {
         versioned_elements: &[VersionedElement],
         hugr: &T,
         replacer: &ReplaceTypes,
-    ) -> Result<NodeTemplate, Box<dyn std::error::Error>> {
+    ) -> Result<NodeTemplate, ReplacementError> {
         let operations = versioned_elements
             .iter()
-            .map(|element| -> Result<_, Box<dyn Error>> {
-                element.get_instantiated_op(hugr)?.ok_or_else(|| {
-                    format!(
-                        "Replacement operation {} requires missing extension {}@{}",
-                        element.id, element.extension_id, element.version
-                    )
-                    .into()
-                })
+            .map(|element| {
+                element
+                    .get_instantiated_op(hugr)?
+                    .ok_or_else(|| ReplacementError::MissingOperationExtension(element.clone()))
             })
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -166,11 +182,7 @@ impl OpMapping {
             operation.extension_version().clone(),
         );
 
-        let Some(replacement) = self.map.get(&versioned_element) else {
-            return None;
-        };
-
-        Some(replacement)
+        self.map.get(&versioned_element)
     }
 
     /// Iterates over source operations and their replacements.
@@ -200,15 +212,13 @@ pub enum TypeReplacementTemplate {
 
 impl TypeReplacementTemplate {
     /// Retrieves the type represented by this replacement template.
-    pub fn get_type<T: HugrView>(&self, hugr: &T) -> Result<Type, Box<dyn Error>> {
+    /// Returns an error when a versioned replacement cannot be resolved or instantiated.
+    pub fn get_type<T: HugrView>(&self, hugr: &T) -> Result<Type, ReplacementError> {
         match self {
             TypeReplacementTemplate::VersionedElement(element) => {
-                let replacement = element.get_type(hugr)?.ok_or_else(|| {
-                    format!(
-                        "Replacement type {} requires missing extension {}@{}",
-                        element.id, element.extension_id, element.version
-                    )
-                })?;
+                let replacement = element
+                    .get_type(hugr)?
+                    .ok_or_else(|| ReplacementError::MissingTypeExtension(element.clone()))?;
                 Ok(replacement.into())
             }
             TypeReplacementTemplate::Type(t) => Ok(t.clone()),
@@ -258,11 +268,12 @@ mod tests {
     use super::*;
     use crate::hugr_migration::{ExtensionUpdater, test_helpers::*};
     use hugr::{
-        HugrView,
-        extension::{Version, prelude::bool_t, simple_op::MakeRegisteredOp},
+        Extension, HugrView,
+        extension::{TypeDefBound, Version, prelude::bool_t, simple_op::MakeRegisteredOp},
+        hugr::hugrmut::HugrMut,
         ops::OpTrait,
         std_extensions::logic::LogicOp,
-        types::Signature,
+        types::{PolyFuncType, Signature, TypeBound},
     };
     use std::{collections::HashMap, error::Error};
     use tket::passes::{ReplaceTypes, replace_types::NodeTemplate};
@@ -376,7 +387,7 @@ mod tests {
                     .get_hugr()
                     .get_optype(node)
                     .as_extension_op()
-                    .is_some_and(|op| op.qualified_id().to_string() == "logic.Not")
+                    .is_some_and(|op| op.qualified_id() == "logic.Not")
             }));
         }
         Ok(())
@@ -412,8 +423,85 @@ mod tests {
     #[test]
     fn missing_definition_in_existing_extension_is_an_error() -> Result<(), Box<dyn Error>> {
         let hugr = bool_graph()?;
-        assert!(old_bool("nonexistent").get_instantiated_op(&hugr).is_err());
-        assert!(old_bool("nonexistent").get_type(&hugr).is_err());
+        let requested = old_bool("nonexistent");
+        assert!(matches!(
+            requested.get_instantiated_op(&hugr),
+            Err(VersionedElementError::MissingOperation(element)) if element == requested
+        ));
+        assert!(matches!(
+            requested.get_type(&hugr),
+            Err(VersionedElementError::MissingType(element)) if element == requested
+        ));
+        assert!(matches!(
+            TypeReplacementTemplate::VersionedElement(requested.clone()).get_type(&hugr),
+            Err(ReplacementError::Element(VersionedElementError::MissingType(element)))
+                if element == requested
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn instantiation_errors_preserve_element_and_source() -> Result<(), Box<dyn Error>> {
+        let extension = Extension::try_new_arc(
+            "test.parameterized".try_into()?,
+            Version::new(1, 0, 0),
+            |extension, extension_ref| {
+                extension.add_type(
+                    "param_type".into(),
+                    vec![TypeBound::Copyable.into()],
+                    String::new(),
+                    TypeDefBound::copyable(),
+                    extension_ref,
+                )?;
+                extension.add_op(
+                    "param_op".into(),
+                    String::new(),
+                    PolyFuncType::new(vec![TypeBound::Copyable.into()], Signature::new_endo([])),
+                    extension_ref,
+                )?;
+                Ok::<_, Box<dyn Error>>(())
+            },
+        )?;
+        let mut hugr = identity_graph()?;
+        hugr.use_extensions([extension]);
+        let operation = VersionedElement::new(
+            "param_op".into(),
+            "test.parameterized".into(),
+            Version::new(1, 0, 0),
+        );
+        let ty = VersionedElement::new(
+            "param_type".into(),
+            "test.parameterized".into(),
+            Version::new(1, 0, 0),
+        );
+        let error = operation.get_instantiated_op(&hugr).unwrap_err();
+        assert!(
+            error
+                .source()
+                .unwrap()
+                .is::<hugr::extension::SignatureError>()
+        );
+        assert!(matches!(
+            error,
+            VersionedElementError::InstantiateOperation {
+                element,
+                source: hugr::extension::SignatureError::TypeArgMismatch(_),
+            } if element == operation
+        ));
+        let error = ty.get_type(&hugr).unwrap_err();
+        assert!(
+            error
+                .source()
+                .unwrap()
+                .is::<hugr::extension::SignatureError>()
+        );
+        assert!(matches!(
+            error,
+            VersionedElementError::InstantiateType {
+                element,
+                source: hugr::extension::SignatureError::TypeArgMismatch(_),
+            } if element == ty
+        ));
         Ok(())
     }
 
@@ -447,11 +535,11 @@ mod tests {
     fn empty_replacement_cannot_connect_unmigrated_types() -> Result<(), Box<dyn Error>> {
         let hugr = bool_graph()?;
         let operation = old_bool("make_opaque").get_instantiated_op(&hugr)?.unwrap();
-        assert!(
-            OpReplacementTemplate::Empty
-                .get_op_replace(&operation, &hugr, &ReplaceTypes::default())
-                .is_err()
-        );
+        let error = OpReplacementTemplate::Empty
+            .get_op_replace(&operation, &hugr, &ReplaceTypes::default())
+            .unwrap_err();
+        assert!(error.source().unwrap().is::<hugr::builder::BuildError>());
+        assert!(matches!(error, ReplacementError::Build(_)));
         Ok(())
     }
 }

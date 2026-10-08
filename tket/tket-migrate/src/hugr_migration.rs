@@ -1,4 +1,7 @@
-use crate::update_maps::{OpMapping, TypeMapping};
+use crate::{
+    error::MigrationError,
+    update_maps::{OpMapping, TypeMapping},
+};
 use hugr::HugrView;
 use hugr::hugr::hugrmut::HugrMut;
 use hugr::{
@@ -40,8 +43,10 @@ impl ExtensionUpdater {
     /// Registers new extensions and applies the configured replacements.
     ///
     /// Mappings whose source extension version is absent are skipped.
-    /// Missing required replacements return an error.
-    pub fn migrate(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    /// Errors identify failed source lookups, replacement construction, pass
+    /// execution, and extension registration.
+    /// Panics if we fail to resolve extension definitions after the migration.
+    pub fn migrate(&mut self) -> Result<(), MigrationError> {
         self.add_new_extension()?;
         let mut replacer = ReplaceTypes::default();
 
@@ -64,17 +69,18 @@ impl ExtensionUpdater {
 
         // remove unused extensions
         let registry = self.hugr.extensions().clone();
-        self.hugr.resolve_extension_defs(&registry)?;
+        self.hugr.resolve_extension_defs(&registry).unwrap();
         Ok(())
     }
 
-    fn add_new_extension(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn add_new_extension(&mut self) -> Result<(), MigrationError> {
         let mut extensions = STD_REG.to_owned();
         extensions.extend(self.hugr.extensions().clone());
         let new_ext_registry = ExtensionRegistry::new_with_extension_resolution(
             std::mem::take(&mut self.new_extensions),
             &WeakExtensionRegistry::from(&extensions),
-        )?;
+        )
+        .map_err(MigrationError::RegisterExtensions)?;
         extensions.extend(new_ext_registry);
         self.hugr.use_extensions(extensions);
         Ok(())
@@ -114,10 +120,10 @@ pub(crate) mod test_helpers {
     }
 
     pub(crate) fn load_extensions(paths: &[PathBuf]) -> Result<Vec<Extension>, Box<dyn Error>> {
-        Ok(paths
+        paths
             .iter()
             .map(|path| load_extension(path))
-            .collect::<Result<Vec<_>, _>>()?)
+            .collect::<Result<Vec<_>, _>>()
     }
 
     pub(crate) fn load_registry(paths: &[PathBuf]) -> Result<ExtensionRegistry, Box<dyn Error>> {
@@ -304,6 +310,7 @@ pub(crate) mod test_helpers {
 #[cfg(test)]
 mod tests {
     use super::{ExtensionUpdater, test_helpers::*};
+    use crate::error::{MigrationError, ReplacementError, VersionedElementError};
     use crate::update_maps::{
         OpMapping, OpReplacementTemplate, TypeMapping, TypeReplacementTemplate, VersionedElement,
     };
@@ -318,7 +325,7 @@ mod tests {
     use tket::passes::replace_types::NodeTemplate;
 
     fn new_boolean_extension() -> Result<Arc<Extension>, Box<dyn Error>> {
-        Ok(Extension::try_new_arc(
+        Extension::try_new_arc(
             "tket.bool".try_into()?,
             Version::new(0, 3, 0),
             |extension, extension_ref| {
@@ -331,7 +338,7 @@ mod tests {
                 )?;
                 Ok::<_, Box<dyn Error>>(())
             },
-        )?)
+        )
     }
 
     #[test]
@@ -488,9 +495,12 @@ mod tests {
             vec![].into(),
             vec![],
         );
-        let error = updater.migrate().unwrap_err().to_string();
-        assert!(error.contains("Replacement operation target_op"), "{error}");
-        assert!(error.contains("test.missing@1.0.0"), "{error}");
+        let error = updater.migrate().unwrap_err();
+        assert!(matches!(
+            error,
+            MigrationError::Replacement(ReplacementError::MissingOperationExtension(element))
+                if element == missing("target_op")
+        ));
         Ok(())
     }
 
@@ -506,9 +516,59 @@ mod tests {
             .into(),
             vec![],
         );
-        let error = updater.migrate().unwrap_err().to_string();
-        assert!(error.contains("Replacement type target_type"), "{error}");
-        assert!(error.contains("test.missing@1.0.0"), "{error}");
+        let error = updater.migrate().unwrap_err();
+        assert!(matches!(
+            error,
+            MigrationError::Replacement(ReplacementError::MissingTypeExtension(element))
+                if element == missing("target_type")
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn missing_source_definition_is_identified() -> Result<(), Box<dyn Error>> {
+        let mut updater = ExtensionUpdater::new(
+            bool_graph()?,
+            vec![(old_bool("nonexistent"), OpReplacementTemplate::Empty)].into(),
+            vec![].into(),
+            vec![],
+        );
+        assert!(matches!(
+            updater.migrate(),
+            Err(MigrationError::SourceElement(VersionedElementError::MissingOperation(element)))
+                if element == old_bool("nonexistent")
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn unsupported_replacement_container_preserves_pass_error() -> Result<(), Box<dyn Error>> {
+        let mut updater = ExtensionUpdater::new(
+            old_boolean_graph(true)?,
+            vec![(
+                old_bool("not"),
+                // A function is not a valid CompoundOp replacement container.
+                OpReplacementTemplate::TemplateInstance(NodeTemplate::CompoundOp(Box::new(
+                    build_bool_cfg_hugr(&boolean_registry()?)?,
+                ))),
+            )]
+            .into(),
+            vec![(old_bool("bool"), TypeReplacementTemplate::Type(bool_t()))].into(),
+            vec![],
+        );
+        let error = updater.migrate().unwrap_err();
+        assert!(
+            error
+                .source()
+                .unwrap()
+                .is::<tket::passes::replace_types::ReplaceTypesError>()
+        );
+        assert!(matches!(
+            error,
+            MigrationError::ReplaceTypes(
+                tket::passes::replace_types::ReplaceTypesError::AddTemplateError(..)
+            )
+        ));
         Ok(())
     }
 
