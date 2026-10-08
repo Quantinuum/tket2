@@ -1191,16 +1191,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hugr-extension-version"
-version = "0.1.0"
-dependencies = [
- "hugr",
- "serde_json",
- "thiserror 2.0.21",
- "tket",
-]
-
-[[package]]
 name = "hugr-llvm"
 version = "0.30.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3053,6 +3043,16 @@ dependencies = [
  "serde_json",
  "strum",
  "uuid",
+]
+
+[[package]]
+name = "tket-migrate"
+version = "0.1.0"
+dependencies = [
+ "hugr",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tket",
 ]
 
 [[package]]
