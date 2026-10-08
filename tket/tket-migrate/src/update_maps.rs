@@ -405,6 +405,91 @@ mod tests {
     }
 
     #[test]
+    fn versioned_elements_build_expected_replacement_graph() -> Result<(), Box<dyn Error>> {
+        let hugr = bool_graph()?;
+        let old_op = old_bool("not").get_instantiated_op(&hugr)?.unwrap();
+        let old_type = old_bool("bool").get_type(&hugr)?.unwrap();
+        let mut replacer = ReplaceTypes::default();
+        replacer.set_replace_type(old_type.clone(), bool_t());
+
+        let cases = [
+            (vec![], Signature::new_endo([bool_t()])),
+            (vec!["not"], Signature::new_endo([old_type.into()])),
+            (
+                vec!["make_opaque", "not", "read"],
+                Signature::new_endo([bool_t()]),
+            ),
+        ];
+        for (names, expected_signature) in cases {
+            let template = OpReplacementTemplate::VersionedElements(
+                names.iter().map(|name| old_bool(name)).collect(),
+            );
+            let NodeTemplate::LinkedHugr(replacement, _) =
+                template.get_op_replace(&old_op, &hugr, &replacer)?
+            else {
+                panic!("Expected a graph replacement for {names:?}");
+            };
+            replacement.validate()?;
+            assert_eq!(
+                replacement
+                    .entrypoint_optype()
+                    .dataflow_signature()
+                    .unwrap()
+                    .as_ref(),
+                &expected_signature,
+                "{names:?}"
+            );
+            assert_eq!(
+                replacement
+                    .nodes()
+                    .filter(|&node| replacement.get_optype(node).as_extension_op().is_some())
+                    .count(),
+                names.len(),
+                "{names:?}"
+            );
+
+            // Follow the actual wires to check operation order and the final output.
+            let [input, output] = replacement.get_io(replacement.entrypoint()).unwrap();
+            let mut previous = input;
+            for name in &names {
+                let (node, port) = replacement.single_linked_input(previous, 0).unwrap();
+                assert_eq!(port, hugr::IncomingPort::from(0));
+                let operation = replacement.get_optype(node).as_extension_op().unwrap();
+                assert_eq!(operation.unqualified_id(), *name);
+                assert_eq!(operation.extension_id().to_string(), "tket.bool");
+                assert_eq!(operation.extension_version(), Version::new(0, 2, 0));
+                previous = node;
+            }
+            assert_eq!(
+                replacement.single_linked_input(previous, 0),
+                Some((output, hugr::IncomingPort::from(0))),
+                "{names:?}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn versioned_elements_reject_incompatible_chains() -> Result<(), Box<dyn Error>> {
+        let hugr = bool_graph()?;
+        let old_op = old_bool("not").get_instantiated_op(&hugr)?.unwrap();
+        // The second operation requires either two inputs or a different input type.
+        for names in [["not", "and"], ["not", "make_opaque"]] {
+            let template = OpReplacementTemplate::VersionedElements(
+                names.iter().map(|name| old_bool(name)).collect(),
+            );
+            let error = template
+                .get_op_replace(&old_op, &hugr, &ReplaceTypes::default())
+                .unwrap_err();
+            assert!(
+                matches!(error, ReplacementError::Build(_)),
+                "{names:?}: {error}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
     fn missing_extension_or_version_returns_none() -> Result<(), Box<dyn Error>> {
         let hugr = bool_graph()?;
         assert!(missing("not").get_instantiated_op(&hugr)?.is_none());
