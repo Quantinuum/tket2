@@ -35,18 +35,13 @@ impl ExtensionUpdater {
         }
     }
 
-    /// Returns the HUGR, including any changes made by migration.
-    pub fn get_hugr(&self) -> &Hugr {
-        &self.hugr
-    }
-
     /// Registers new extensions and applies the configured replacements.
     ///
     /// Mappings whose source extension version is absent are skipped.
     /// Errors identify failed source lookups, replacement construction, pass
     /// execution, and extension registration.
     /// Panics if we fail to resolve extension definitions after the migration.
-    pub fn migrate(&mut self) -> Result<(), MigrationError> {
+    pub fn migrate(&mut self) -> Result<Hugr, MigrationError> {
         self.add_new_extension()?;
         let mut replacer = ReplaceTypes::default();
 
@@ -70,7 +65,7 @@ impl ExtensionUpdater {
         // remove unused extensions
         let registry = self.hugr.extensions().clone();
         self.hugr.resolve_extension_defs(&registry).unwrap();
-        Ok(())
+        Ok(self.hugr.clone())
     }
 
     fn add_new_extension(&mut self) -> Result<(), MigrationError> {
@@ -150,7 +145,7 @@ pub(crate) mod test_helpers {
         load_extensions(&new_extension_paths)
     }
 
-    pub(crate) fn migrate_hugr(hugr: Hugr) -> Result<ExtensionUpdater, Box<dyn Error>> {
+    pub(crate) fn migrate_hugr(hugr: Hugr) -> Result<Hugr, Box<dyn Error>> {
         let op_mapping = get_measurement_migratation_op_map();
         let mut updater = ExtensionUpdater::new(
             hugr,
@@ -158,8 +153,7 @@ pub(crate) mod test_helpers {
             get_measurement_migratation_type_map(),
             load_new_extensions()?,
         );
-        updater.migrate()?;
-        Ok(updater)
+        Ok(updater.migrate()?)
     }
 
     pub(crate) fn build_old_hugr(registry: &ExtensionRegistry) -> Result<Hugr, Box<dyn Error>> {
@@ -352,9 +346,9 @@ mod tests {
             TypeMapping::new(HashMap::new()),
             vec![],
         );
-        updater.migrate()?;
-        updater.get_hugr().validate()?;
-        assert_eq!(updater.get_hugr().mermaid_string(), before);
+        let new_hugr = updater.migrate()?;
+        new_hugr.validate()?;
+        assert_eq!(new_hugr.mermaid_string(), before);
         Ok(())
     }
 
@@ -372,8 +366,7 @@ mod tests {
             TypeMapping::new(HashMap::new()),
             vec![],
         );
-        updater.migrate()?;
-        let migrated = updater.get_hugr();
+        let migrated = updater.migrate()?;
         migrated.validate()?;
         assert!(
             migrated
@@ -418,8 +411,7 @@ mod tests {
                 .into(),
                 new_extensions,
             );
-            updater.migrate()?;
-            let migrated = updater.get_hugr();
+            let migrated = updater.migrate()?;
             migrated.validate()?;
             assert_eq!(
                 migrated
@@ -430,7 +422,7 @@ mod tests {
                 &Signature::new_endo([expected]),
                 "register_via_updater={register_via_updater}"
             );
-            assert!(target.get_type(migrated)?.is_some());
+            assert!(target.get_type(&migrated)?.is_some());
         }
         Ok(())
     }
@@ -451,9 +443,9 @@ mod tests {
             TypeMapping::new(HashMap::new()),
             vec![],
         );
-        updater.migrate()?;
-        updater.get_hugr().validate()?;
-        assert_eq!(updater.get_hugr().mermaid_string(), before);
+        let new_hugr = updater.migrate()?;
+        new_hugr.validate()?;
+        assert_eq!(new_hugr.mermaid_string(), before);
         Ok(())
     }
 
@@ -465,7 +457,10 @@ mod tests {
             hugr,
             vec![(
                 missing("source_op"),
-                OpReplacementTemplate::VersionedElements(vec![missing("target_op")]),
+                OpReplacementTemplate::VersionedElements {
+                    first: missing("target_op"),
+                    rest: vec![],
+                },
             )]
             .into(),
             vec![(
@@ -477,9 +472,9 @@ mod tests {
         );
         // Neither source extension exists, so both mappings should be ignored.
         // The replacements are also missing: looking them up would fail the migration.
-        updater.migrate()?;
-        updater.get_hugr().validate()?;
-        assert_eq!(updater.get_hugr().mermaid_string(), before);
+        let new_hugr = updater.migrate()?;
+        new_hugr.validate()?;
+        assert_eq!(new_hugr.mermaid_string(), before);
         Ok(())
     }
 
@@ -489,7 +484,10 @@ mod tests {
             bool_graph()?,
             vec![(
                 old_bool("not"),
-                OpReplacementTemplate::VersionedElements(vec![missing("target_op")]),
+                OpReplacementTemplate::VersionedElements {
+                    first: missing("target_op"),
+                    rest: vec![],
+                },
             )]
             .into(),
             vec![].into(),
@@ -579,8 +577,7 @@ mod tests {
         let registry = load_registry(&[fixture])?;
         for hugr in [build_bool_hugr(&registry)?, build_bool_cfg_hugr(&registry)?] {
             hugr.validate()?;
-            let updater = migrate_hugr(hugr)?;
-            let migrated = updater.get_hugr();
+            let migrated = migrate_hugr(hugr)?;
             migrated.validate()?;
             assert!(migrated.nodes().all(|node| {
                 migrated
@@ -602,8 +599,7 @@ mod tests {
         ])?;
         let hugr = build_old_hugr(&registry)?;
         hugr.validate()?;
-        let updater = migrate_hugr(hugr)?;
-        let migrated = updater.get_hugr();
+        let migrated = migrate_hugr(hugr)?;
         migrated.validate()?;
         let operations = migrated
             .nodes()

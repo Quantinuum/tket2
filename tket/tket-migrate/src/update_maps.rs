@@ -14,9 +14,9 @@ use crate::error::{ReplacementError, VersionedElementError};
 /// Represents an Extension Op by its name, the extension it belongs to, and its version.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct VersionedElement {
-    pub(crate) id: String,
-    pub(crate) extension_id: String,
-    pub(crate) version: Version,
+    id: String,
+    extension_id: String,
+    version: Version,
 }
 
 impl VersionedElement {
@@ -33,7 +33,7 @@ impl VersionedElement {
     /// Returns `None` when the source extension version is absent.
     ///
     /// Returns an error when the definition is missing or cannot be instantiated.
-    pub fn get_instantiated_op<T: HugrView>(
+    pub(crate) fn get_instantiated_op<T: HugrView>(
         &self,
         hugr: &T,
     ) -> Result<Option<ExtensionOp>, VersionedElementError> {
@@ -57,7 +57,7 @@ impl VersionedElement {
 
     /// Returns `None` when the source extension version is absent.
     /// Returns an error when the type definition is missing or cannot be instantiated.
-    pub fn get_type<T: HugrView>(
+    pub(crate) fn get_type<T: HugrView>(
         &self,
         hugr: &T,
     ) -> Result<Option<CustomType>, VersionedElementError> {
@@ -93,15 +93,26 @@ pub enum OpReplacementTemplate {
     Empty,
     /// A list of versioned elements declared as name, extension, and version.
     ///
-    /// The vector contains at least one element. If more elements are present, they are connected in sequence.
-    VersionedElements(Vec<VersionedElement>),
+    /// The first operation is required. Further operations are connected in sequence.
+    ///
+    /// An empty sequence cannot be constructed:
+    /// ```compile_fail,E0063
+    /// use tket_migrate::OpReplacementTemplate;
+    /// let replacement = OpReplacementTemplate::VersionedElements { rest: vec![] };
+    /// ```
+    VersionedElements {
+        /// The first operation in the replacement sequence.
+        first: VersionedElement,
+        /// Further operations to connect after the first operation, in order.
+        rest: Vec<VersionedElement>,
+    },
     /// The recipe for creating the replacement.
     TemplateInstance(NodeTemplate),
 }
 
 impl OpReplacementTemplate {
     /// Builds a replacement template
-    pub fn get_op_replace<T: HugrView>(
+    pub(crate) fn get_op_replace<T: HugrView>(
         &self,
         old_op: &ExtensionOp,
         hugr: &T,
@@ -109,21 +120,26 @@ impl OpReplacementTemplate {
     ) -> Result<NodeTemplate, ReplacementError> {
         match self {
             OpReplacementTemplate::TemplateInstance(template) => Ok(template.clone()),
-            OpReplacementTemplate::Empty => Self::get_node_template(old_op, &[], hugr, replacer),
-            OpReplacementTemplate::VersionedElements(v) => {
-                Self::get_node_template(old_op, v, hugr, replacer)
+            OpReplacementTemplate::Empty => {
+                Self::get_node_template(old_op, std::iter::empty(), hugr, replacer)
             }
+            OpReplacementTemplate::VersionedElements { first, rest } => Self::get_node_template(
+                old_op,
+                std::iter::once(first).chain(rest.iter()),
+                hugr,
+                replacer,
+            ),
         }
     }
 
-    fn get_node_template<T: HugrView>(
+    fn get_node_template<'a, T: HugrView>(
         old_op: &ExtensionOp,
-        versioned_elements: &[VersionedElement],
+        versioned_elements: impl IntoIterator<Item = &'a VersionedElement>,
         hugr: &T,
         replacer: &ReplaceTypes,
     ) -> Result<NodeTemplate, ReplacementError> {
         let operations = versioned_elements
-            .iter()
+            .into_iter()
             .map(|element| {
                 element
                     .get_instantiated_op(hugr)?
@@ -174,19 +190,8 @@ impl OpMapping {
         self.map.insert(old_op, replacement);
     }
 
-    /// Looks up the replacement for an instantiated operation and its version.
-    pub fn get_replacement(&self, operation: &ExtensionOp) -> Option<&OpReplacementTemplate> {
-        let versioned_element = VersionedElement::new(
-            operation.unqualified_id().to_string(),
-            operation.extension_id().to_string(),
-            operation.extension_version().clone(),
-        );
-
-        self.map.get(&versioned_element)
-    }
-
     /// Iterates over source operations and their replacements.
-    pub fn iter(&self) -> impl Iterator<Item = (&VersionedElement, &OpReplacementTemplate)> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (&VersionedElement, &OpReplacementTemplate)> {
         self.map.iter()
     }
 }
@@ -213,7 +218,7 @@ pub enum TypeReplacementTemplate {
 impl TypeReplacementTemplate {
     /// Retrieves the type represented by this replacement template.
     /// Returns an error when a versioned replacement cannot be resolved or instantiated.
-    pub fn get_type<T: HugrView>(&self, hugr: &T) -> Result<Type, ReplacementError> {
+    pub(crate) fn get_type<T: HugrView>(&self, hugr: &T) -> Result<Type, ReplacementError> {
         match self {
             TypeReplacementTemplate::VersionedElement(element) => {
                 let replacement = element
@@ -246,13 +251,11 @@ impl TypeMapping {
     }
 
     /// Iterates over source types and their replacements.
-    pub fn iter(&self) -> impl Iterator<Item = (&VersionedElement, &TypeReplacementTemplate)> {
+    pub(crate) fn iter(
+        &self,
+    ) -> impl Iterator<Item = (&VersionedElement, &TypeReplacementTemplate)> {
         self.map.iter()
     }
-
-    // pub fn get_replacement(&self, old_type: &VersionedElement) -> Option<&TypeReplacementTemplate> {
-    //     self.get_new_type(old_type)
-    // }
 }
 
 impl From<Vec<(VersionedElement, TypeReplacementTemplate)>> for TypeMapping {
@@ -327,8 +330,7 @@ mod tests {
                 let (ops_map, types_map) = negation_maps(construction, template);
                 let mut updater =
                     ExtensionUpdater::new(old_boolean_graph(true)?, ops_map, types_map, vec![]);
-                updater.migrate()?;
-                let migrated = updater.get_hugr();
+                let migrated = updater.migrate()?;
                 migrated.validate()?;
                 assert_eq!(
                     migrated
@@ -357,7 +359,10 @@ mod tests {
     #[test]
     fn insert_and_vector_construction_replace_duplicate_entries() -> Result<(), Box<dyn Error>> {
         for construction in [MapConstruction::Vector, MapConstruction::Insert] {
-            let bad_op = OpReplacementTemplate::VersionedElements(vec![missing("target_op")]);
+            let bad_op = OpReplacementTemplate::VersionedElements {
+                first: missing("target_op"),
+                rest: vec![],
+            };
             let good_op = OpReplacementTemplate::TemplateInstance(NodeTemplate::SingleOp(
                 LogicOp::Not.to_extension_op()?.into(),
             ));
@@ -380,11 +385,10 @@ mod tests {
             assert_eq!(ops.iter().count(), 1);
             assert_eq!(types.iter().count(), 1);
             let mut updater = ExtensionUpdater::new(old_boolean_graph(true)?, ops, types, vec![]);
-            updater.migrate()?;
-            updater.get_hugr().validate()?;
-            assert!(updater.get_hugr().nodes().any(|node| {
-                updater
-                    .get_hugr()
+            let migrated = updater.migrate()?;
+            migrated.validate()?;
+            assert!(migrated.nodes().any(|node| {
+                migrated
                     .get_optype(node)
                     .as_extension_op()
                     .is_some_and(|op| op.qualified_id() == "logic.Not")
@@ -413,17 +417,21 @@ mod tests {
         replacer.set_replace_type(old_type.clone(), bool_t());
 
         let cases = [
-            (vec![], Signature::new_endo([bool_t()])),
-            (vec!["not"], Signature::new_endo([old_type.into()])),
+            ("not", vec![], Signature::new_endo([old_type.into()])),
             (
-                vec!["make_opaque", "not", "read"],
+                "make_opaque",
+                vec!["not", "read"],
                 Signature::new_endo([bool_t()]),
             ),
         ];
-        for (names, expected_signature) in cases {
-            let template = OpReplacementTemplate::VersionedElements(
-                names.iter().map(|name| old_bool(name)).collect(),
-            );
+        for (first, rest, expected_signature) in cases {
+            let template = OpReplacementTemplate::VersionedElements {
+                first: old_bool(first),
+                rest: rest.iter().map(|name| old_bool(name)).collect(),
+            };
+            let names = std::iter::once(first)
+                .chain(rest.iter().copied())
+                .collect::<Vec<_>>();
             let NodeTemplate::LinkedHugr(replacement, _) =
                 template.get_op_replace(&old_op, &hugr, &replacer)?
             else {
@@ -474,10 +482,11 @@ mod tests {
         let hugr = bool_graph()?;
         let old_op = old_bool("not").get_instantiated_op(&hugr)?.unwrap();
         // The second operation requires either two inputs or a different input type.
-        for names in [["not", "and"], ["not", "make_opaque"]] {
-            let template = OpReplacementTemplate::VersionedElements(
-                names.iter().map(|name| old_bool(name)).collect(),
-            );
+        for names @ [first, second] in [["not", "and"], ["not", "make_opaque"]] {
+            let template = OpReplacementTemplate::VersionedElements {
+                first: old_bool(first),
+                rest: vec![old_bool(second)],
+            };
             let error = template
                 .get_op_replace(&old_op, &hugr, &ReplaceTypes::default())
                 .unwrap_err();

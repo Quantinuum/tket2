@@ -15,18 +15,18 @@ pub fn get_measurement_migratation_op_map() -> OpMapping {
                 "tket.quantum".to_string(),
                 Version::new(0, 2, 1),
             ),
-            OpReplacementTemplate::VersionedElements(vec![
-                VersionedElement::new(
+            OpReplacementTemplate::VersionedElements {
+                first: VersionedElement::new(
                     "MeasureFree".to_string(),
                     "tket.quantum".to_string(),
                     Version::new(0, 3, 0),
                 ),
-                VersionedElement::new(
+                rest: vec![VersionedElement::new(
                     "Read".to_string(),
                     "tket.measurement".to_string(),
                     Version::new(0, 1, 0),
-                ),
-            ]),
+                )],
+            },
         ),
         (
             VersionedElement::new(
