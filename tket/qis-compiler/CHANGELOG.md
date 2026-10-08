@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.5.1](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.5.0...qis-compiler-v0.5.1) (2026-10-07)
+
+
+### Features
+
+* Bump to latest `hugr` and register `math` extension with QIS compiler ([#2037](https://github.com/Quantinuum/tket2/issues/2037)) ([93ea902](https://github.com/Quantinuum/tket2/commit/93ea902721daf8dd49fd5a6d517c13c3358818d9))
+
+
+### Bug Fixes
+
+* **qis-compiler:** Remove trim for trailing NUL byte from public bitcode ([#2064](https://github.com/Quantinuum/tket2/issues/2064)) ([c4093a3](https://github.com/Quantinuum/tket2/commit/c4093a3481e8c3575ff60eef6286088f90000a72))
+
+
+### Documentation
+
+* Use Oxford spelling consistently in public documentation ([#2016](https://github.com/Quantinuum/tket2/issues/2016)) ([c46d68d](https://github.com/Quantinuum/tket2/commit/c46d68d7fee4bb8630f59dfd255458184e9d28ba))
+
 ## [0.5.0](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.4.2...qis-compiler-v0.5.0) (2026-09-04)
 
 
