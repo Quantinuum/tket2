@@ -72,12 +72,9 @@ pub fn get_measurement_migratation_op_map() -> OpMapping {
                 "tket.bool".to_string(),
                 Version::new(0, 2, 0),
             ),
-            // NICOLA: TODO: Using VersionedElements for testing reason
-            OpReplacementTemplate::VersionedElements(vec![VersionedElement::new(
-                "Or".to_string(),
-                "logic".to_string(),
-                Version::new(0, 1, 0),
-            )]),
+            OpReplacementTemplate::TemplateInstance(NodeTemplate::SingleOp(
+                LogicOp::Or.to_extension_op().unwrap().into(),
+            )),
         ),
         (
             VersionedElement::new(
@@ -85,11 +82,9 @@ pub fn get_measurement_migratation_op_map() -> OpMapping {
                 "tket.bool".to_string(),
                 Version::new(0, 2, 0),
             ),
-            OpReplacementTemplate::VersionedElements(vec![VersionedElement::new(
-                "Xor".to_string(),
-                "logic".to_string(),
-                Version::new(0, 1, 0),
-            )]),
+            OpReplacementTemplate::TemplateInstance(NodeTemplate::SingleOp(
+                LogicOp::Xor.to_extension_op().unwrap().into(),
+            )),
         ),
         (
             VersionedElement::new(
