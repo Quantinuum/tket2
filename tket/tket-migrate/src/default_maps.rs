@@ -2,10 +2,11 @@ use hugr::extension::{Version, simple_op::MakeRegisteredOp};
 use hugr::std_extensions::logic::LogicOp;
 
 use crate::update_maps::{
-    OpReplacementTemplate, OpMapping, TypeMapping, TypeReplacementTemplate, VersionedElement,
+    OpMapping, OpReplacementTemplate, TypeMapping, TypeReplacementTemplate, VersionedElement,
 };
 use tket::{hugr::extension::prelude::bool_t, passes::replace_types::NodeTemplate};
 
+/// Replaces legacy measurement and boolean operations with their newer equivalents.
 pub fn get_measurement_migratation_op_map() -> OpMapping {
     vec![
         (
@@ -110,6 +111,7 @@ pub fn get_measurement_migratation_op_map() -> OpMapping {
     .into()
 }
 
+/// Replaces the legacy TKET boolean type with the built-in HUGR boolean type.
 pub fn get_measurement_migratation_type_map() -> TypeMapping {
     vec![(
         VersionedElement::new(

@@ -6,7 +6,7 @@ rust-version = { workspace = true }
 license = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
-description = "Print extension versions saved on operations in a serialized HUGR"
+description = "Migrate HUGR extension operations and types between versions"
 
 [lints]
 workspace = true
