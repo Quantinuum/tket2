@@ -257,7 +257,8 @@ pub(crate) mod test_helpers {
     }
 
     pub(crate) fn bool_graph() -> Result<Hugr, Box<dyn Error>> {
-        let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data/bool-0.2.0.json");
+        let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test_files/old_extensions/bool-0.2.0.json");
         let registry = load_registry(&[fixture])?;
         build_bool_hugr(&registry)
     }
@@ -269,7 +270,8 @@ pub(crate) mod test_helpers {
     }
 
     pub(crate) fn boolean_registry() -> Result<hugr::extension::ExtensionRegistry, Box<dyn Error>> {
-        let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data/bool-0.2.0.json");
+        let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test_files/old_extensions/bool-0.2.0.json");
         load_registry(&[fixture])
     }
 
@@ -512,7 +514,8 @@ mod tests {
 
     #[test]
     fn migrate_boolean_dataflow_and_control_flow() -> Result<(), Box<dyn Error>> {
-        let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data/bool-0.2.0.json");
+        let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test_files/old_extensions/bool-0.2.0.json");
         let registry = load_registry(&[fixture])?;
         for hugr in [build_bool_hugr(&registry)?, build_bool_cfg_hugr(&registry)?] {
             hugr.validate()?;
@@ -534,8 +537,8 @@ mod tests {
         let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let registry = load_registry(&[
             crate_dir.join("../tket-exts/src/tket_exts/data/tket/rotation.json"),
-            crate_dir.join("data/bool-0.2.0.json"),
-            crate_dir.join("data/quantum-0.2.1.json"),
+            crate_dir.join("../../test_files/old_extensions/bool-0.2.0.json"),
+            crate_dir.join("../../test_files/old_extensions/quantum-0.2.1.json"),
         ])?;
         let hugr = build_old_hugr(&registry)?;
         hugr.validate()?;
