@@ -281,6 +281,16 @@ mod tests {
     use std::{collections::HashMap, error::Error};
     use tket::passes::{ReplaceTypes, replace_types::NodeTemplate};
 
+    #[test]
+    fn versioned_element_display_format() {
+        let element = VersionedElement::new(
+            "MeasureFree".into(),
+            "tket.quantum".into(),
+            Version::new(1, 2, 3),
+        );
+        assert_eq!(format!("{element}"), "MeasureFree in tket.quantum@1.2.3");
+    }
+
     #[derive(Clone, Copy, Debug)]
     enum MapConstruction {
         Vector,
