@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.10"
 resolution-markers = [
     "python_full_version >= '3.15'",
@@ -2787,7 +2787,7 @@ wheels = [
 
 [[package]]
 name = "selene-hugr-qis-compiler"
-version = "0.5.0"
+version = "0.5.1"
 source = { editable = "tket/qis-compiler" }
 dependencies = [
     { name = "hugr" },
