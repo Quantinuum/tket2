@@ -27,7 +27,6 @@ use hugr_core::std_extensions::collections::borrow_array::{
     BArrayOpBuilder, BArrayUnsafeOpDef, BorrowArray, borrow_array_type,
 };
 use hugr_core::std_extensions::collections::list::ListValue;
-use hugr_core::std_extensions::ptr::{PtrOpBuilder, ptr_type};
 use hugr_core::types::type_param::TermKindError;
 use hugr_core::types::{SumType, Transformable, Type, TypeArg};
 use hugr_core::{Visibility, type_row};
@@ -35,7 +34,6 @@ use itertools::Itertools;
 
 use super::{
     CallbackHandler, LinearizeError, Linearizer, NodeTemplate, ReplaceTypes, ReplaceTypesError,
-    ReplacementOptions,
 };
 
 /// Handler for [`ListValue`] constants that updates the element type and
@@ -97,40 +95,6 @@ pub fn array_const(
     repl: &ReplaceTypes,
 ) -> Result<Option<Value>, ReplaceTypesError> {
     generic_array_const::<Array>(val, repl)
-}
-
-/// Copy pointer handles with `ptr.Dup`, leaving their payload untouched.
-///
-/// Included in [`super::DelegatingLinearizer::default`]. Discard returns
-/// [`LinearizeError::NeedCopyDiscard`]: the pointer's type does not specify how to
-/// dispose of its final linear payload. Applications can register a typed copy and
-/// disposal recipe with [`super::DelegatingLinearizer::register_simple`], which takes
-/// precedence over this callback. No payload disposal policy is inferred.
-pub fn copy_discard_ptr(
-    args: &[TypeArg],
-    num_outports: usize,
-    _lin: &CallbackHandler,
-) -> Result<NodeTemplate, LinearizeError> {
-    let [payload] = args else {
-        return Err(SignatureError::InvalidTypeArgs.into());
-    };
-    let payload = Type::try_from(payload.clone()).map_err(SignatureError::from)?;
-    let ty = ptr_type(payload.clone());
-    if num_outports == 0 {
-        return Err(LinearizeError::NeedCopyDiscard(Box::new(ty)));
-    }
-    let mut builder = DFGBuilder::new(inout_sig([ty.clone()], vec![ty; num_outports])).unwrap();
-    let [mut handle] = builder.input_wires_arr();
-    let mut outputs = Vec::with_capacity(num_outports);
-    for _ in 1..num_outports {
-        let (copy, remaining) = builder.add_dup_ptr(handle, payload.clone()).unwrap();
-        outputs.push(copy);
-        handle = remaining;
-    }
-    outputs.push(handle);
-    Ok(NodeTemplate::CompoundOp(Box::new(
-        builder.finish_hugr_with_outputs(outputs).unwrap(),
-    )))
 }
 
 pub(super) const DISCARD_TO_UNIT_PREFIX: &str = "__discard_unit";
@@ -704,8 +668,6 @@ fn barray_get_replacement(
 ///
 /// Covers `clone` and `discard` for both [`Array`] and [`BorrowArray`], plus
 /// borrow-array `get`. Ops on copyable element types are left unchanged.
-/// Generated replacements use the already-transformed element type and are not
-/// transformed again, so physical types inside final pointer payloads stay intact.
 ///
 /// # Prerequisites
 ///
@@ -713,20 +675,18 @@ fn barray_get_replacement(
 ///   [`linear_array_clone`] and [`linear_borrow_array_get`] delegate to it.
 /// * [`linear_array_discard`] emits a [`GUPPY_EXTENSION`] `drop` op, so a
 ///   drop-lowering pass must run afterwards or the result will contain
-///   unresolved `drop`s. The default pointer recipe can copy handles but requires
-///   a registered typed disposal recipe for discard; see [`copy_discard_ptr`].
+///   unresolved `drop`s.
 pub fn register_linear_array_op_replacements(lowerer: &mut ReplaceTypes) {
     register_linear_array_ops::<Array>(lowerer);
     register_linear_array_ops::<BorrowArray>(lowerer);
 
     // For borrow arrays, we also replace the `get` op (currently the Guppy compiler
     // doesn't generate `get` ops for standard arrays.)
-    lowerer.set_replace_parametrized_op_with_options(
+    lowerer.set_replace_parametrized_op(
         BorrowArray::extension()
             .get_op(GenericArrayOpDef::<BorrowArray>::get.opdef_id().as_str())
             .unwrap(),
         linear_borrow_array_get,
-        ReplacementOptions::default(),
     );
 }
 
@@ -734,15 +694,13 @@ pub fn register_linear_array_op_replacements(lowerer: &mut ReplaceTypes) {
 /// for a single array implementation.
 fn register_linear_array_ops<AK: ArrayKind>(lowerer: &mut ReplaceTypes) {
     let ext = AK::extension();
-    lowerer.set_replace_parametrized_op_with_options(
+    lowerer.set_replace_parametrized_op(
         ext.get_op(ARRAY_CLONE_OP_ID.as_str()).unwrap(),
         linear_array_clone::<AK>,
-        ReplacementOptions::default(),
     );
-    lowerer.set_replace_parametrized_op_with_options(
+    lowerer.set_replace_parametrized_op(
         ext.get_op(ARRAY_DISCARD_OP_ID.as_str()).unwrap(),
         linear_array_discard::<AK>,
-        ReplacementOptions::default(),
     );
 }
 
