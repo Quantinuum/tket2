@@ -1,6 +1,25 @@
 # Changelog
 
 
+## [0.22.1](https://github.com/Quantinuum/tket2/compare/tket-v0.22.0...tket-v0.22.1) - 2026-10-09
+
+### Bug Fixes
+
+- Avoid naming different modified functions the same ([#2025](https://github.com/Quantinuum/tket2/pull/2025))
+- Cache modified functions and support recursive calls ([#2031](https://github.com/Quantinuum/tket2/pull/2031))
+- Incorrect Bit register name reuse in pytket encoder ([#2051](https://github.com/Quantinuum/tket2/pull/2051))
+
+### Documentation
+
+- Use Oxford spelling consistently in public documentation ([#2016](https://github.com/Quantinuum/tket2/pull/2016))
+
+### New Features
+
+- *(pytket)* parse pi as a constant ([#2021](https://github.com/Quantinuum/tket2/pull/2021))
+- Pauli Graph Resynthesis ([#2020](https://github.com/Quantinuum/tket2/pull/2020))
+- Add T-count optimization pass ([#2049](https://github.com/Quantinuum/tket2/pull/2049))
+- Bump to latest `hugr` and register `math` extension with QIS compiler ([#2037](https://github.com/Quantinuum/tket2/pull/2037))
+
 ## [0.22.0](https://github.com/Quantinuum/tket2/compare/tket-v0.21.2...tket-v0.22.0) - 2026-09-03
 
 ### Bug Fixes
