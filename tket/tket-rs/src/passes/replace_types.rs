@@ -32,6 +32,8 @@ use crate::passes::composable::WithScope;
 use crate::passes::{ComposablePass, PassScope};
 
 mod linearize;
+#[cfg(test)]
+mod ptr_tests;
 pub use linearize::{CallbackHandler, DelegatingLinearizer, LinearizeError, Linearizer};
 
 pub mod metadata;
@@ -271,8 +273,9 @@ impl NodeTemplate {
 
 /// Options for how a replacement (op or type) is processed.
 ///
-/// May be specified by [ReplaceTypes::set_replace_op] or [ReplaceTypes::set_replace_type].
-/// Otherwise (the default), replacements are inserted as given (without further processing).
+/// Use with [`ReplaceTypes::set_replace_type_with_options`] to control processing
+/// of the supplied replacement. The default inserts it without transforming it again.
+/// [`ReplaceTypes::set_replace_type`] instead processes replacements recursively.
 #[derive(Clone, Default, PartialEq, Eq)] // More derives might inhibit future extension
 pub struct ReplacementOptions {
     process_recursive: bool,
@@ -431,9 +434,9 @@ impl ReplaceTypes {
     /// Configures this instance to replace occurrences of type `src` with `dest`.
     ///
     /// `dest` will be recursively transformed by this [ReplaceTypes] before replacement.
-    /// (Cases where a type should be replaced by a type containing an instance of
-    /// the first type, must be handled by two separate [ReplaceTypes]'s via a temporary
-    /// type. )
+    /// To insert a complete target that contains the source type, use
+    /// [`Self::set_replace_type_with_options`] with [`ReplacementOptions::default`]
+    /// instead of recursively transforming the replacement.
     ///
     /// Note that if `src` is an instance of a *parameterized* [`TypeDef`], this takes
     /// precedence over [`Self::set_replace_parametrized_type`] where the `src`s overlap. Thus, this
@@ -451,8 +454,26 @@ impl ReplaceTypes {
         // We could check that 'dest' is copyable, 'src' is linear, or relevant copy and
         // discard functions are registered with the linearizer; but since we can't check
         // that for parametrized types, we'll be consistent and not check here either.
-        self.type_map
-            .insert(src, (dest, ReplacementOptions::recursive()));
+        self.set_replace_type_with_options(src, dest, ReplacementOptions::recursive());
+    }
+
+    /// Replace `src` with `dest`, controlling processing of the supplied target type.
+    ///
+    /// With [`ReplacementOptions::default`], `dest` is inserted as given. This allows
+    /// a replacement such as `Ptr<qubit>` to retain its physical payload when replacing
+    /// computational qubits. Original nested type arguments are still transformed;
+    /// only the newly supplied replacement is left unchanged.
+    ///
+    /// The remaining precedence, constant and linearity requirements of
+    /// [`Self::set_replace_type`] still apply. This does not protect graph regions:
+    /// implementations that must retain their types should be linked after this pass.
+    pub fn set_replace_type_with_options(
+        &mut self,
+        src: CustomType,
+        dest: Type,
+        options: ReplacementOptions,
+    ) {
+        self.type_map.insert(src, (dest, options));
     }
 
     /// Configures this instance to change occurrences of a parameterized type `src`
@@ -557,10 +578,22 @@ impl ReplaceTypes {
         dest_fn: impl Fn(&[TypeArg], &ReplaceTypes) -> Result<Option<NodeTemplate>, ReplaceTypesError>
         + 'static,
     ) {
-        self.param_ops.insert(
-            src.into(),
-            (Arc::new(dest_fn), ReplacementOptions::recursive()),
+        self.set_replace_parametrized_op_with_options(
+            src,
+            dest_fn,
+            ReplacementOptions::recursive(),
         );
+    }
+
+    fn set_replace_parametrized_op_with_options(
+        &mut self,
+        src: &OpDef,
+        dest_fn: impl Fn(&[TypeArg], &ReplaceTypes) -> Result<Option<NodeTemplate>, ReplaceTypesError>
+        + 'static,
+        options: ReplacementOptions,
+    ) {
+        self.param_ops
+            .insert(src.into(), (Arc::new(dest_fn), options));
     }
 
     /// Configures this instance to change [Const]s of type `src_ty`, using

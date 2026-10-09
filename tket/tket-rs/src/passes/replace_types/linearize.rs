@@ -15,7 +15,7 @@ use hugr_core::{
 };
 use itertools::Itertools;
 
-use super::handlers::{copy_discard_array, copy_discard_borrow_array};
+use super::handlers::{copy_discard_array, copy_discard_borrow_array, copy_discard_ptr};
 use super::{NodeTemplate, ParametricType};
 
 /// Trait for things that know how to wire up linear outports to other than one
@@ -135,6 +135,12 @@ impl Default for DelegatingLinearizer {
         let mut res = Self::new_empty();
         res.register_callback(array_type_def(), copy_discard_array);
         res.register_callback(borrow_array_type_def(), copy_discard_borrow_array);
+        res.register_callback(
+            hugr_core::std_extensions::ptr::EXTENSION
+                .get_type(&hugr_core::std_extensions::ptr::PTR_TYPE_ID)
+                .unwrap(),
+            copy_discard_ptr,
+        );
         res
     }
 }
