@@ -307,7 +307,9 @@ impl ReplacementOptions {
 /// Similarly [Const]s.
 ///
 /// Types that are [Copyable](hugr_core::types::TypeBound::Copyable) may also be replaced
-/// with types that are not, see [Linearizer].
+/// with types that are not, see [Linearizer]. Pointer `Read` is replaced with
+/// `Map` using the registered copy recipe if its payload becomes linear. Other
+/// operations must still support their transformed types; no repair is inferred.
 ///
 /// Note that although this pass may be used before [monomorphization], there are some
 /// limitations (that do not apply if done after [monomorphization]):
@@ -363,6 +365,12 @@ impl Default for ReplaceTypes {
         res.meta_policy = MetadataPropagationPolicy::default();
         res.replace_consts_parametrized(array_type_def(), handlers::array_const);
         res.replace_consts_parametrized(list_type_def(), list_const);
+        res.set_replace_parametrized_op(
+            hugr_core::std_extensions::ptr::EXTENSION
+                .get_op("Read")
+                .unwrap(),
+            handlers::linear_ptr_read,
+        );
         res
     }
 }
@@ -908,6 +916,155 @@ pub(super) mod test {
     use crate::passes::{ComposablePass, mangle_name};
 
     use super::{NodeTemplate, ReplaceTypes, handlers::list_const};
+
+    fn ptr_rewrite_extension() -> Arc<Extension> {
+        Extension::new_arc(
+            IdentList::new("PtrRewriteTest").unwrap(),
+            Version::new(0, 0, 1),
+            |e, w| {
+                let token: Type = e
+                    .add_type(
+                        "Token".into(),
+                        vec![],
+                        String::new(),
+                        TypeDefBound::Explicit {
+                            bound: TypeBound::Linear,
+                        },
+                        w,
+                    )
+                    .unwrap()
+                    .instantiate([])
+                    .unwrap()
+                    .into();
+                e.add_op(
+                    "copy".into(),
+                    String::new(),
+                    Signature::new([token.clone()], [token.clone(), token]),
+                    w,
+                )
+                .unwrap();
+            },
+        )
+    }
+
+    #[test]
+    fn existing_ptr_payload_and_dup_follow_composed_linear_replacements() {
+        use hugr_core::std_extensions::ptr::{PtrOpBuilder, ptr_type};
+        let ext = ptr_rewrite_extension();
+        let temp: Type = ext
+            .get_type("Token")
+            .unwrap()
+            .instantiate([])
+            .unwrap()
+            .into();
+        let mut b = DFGBuilder::new(inout_sig(
+            [ptr_type(qb_t())],
+            [ptr_type(qb_t()), ptr_type(qb_t())],
+        ))
+        .unwrap();
+        let [p] = b.input_wires_arr();
+        let (a, b_out) = b.add_dup_ptr(p, qb_t()).unwrap();
+        let mut graph = b.finish_hugr_with_outputs([a, b_out]).unwrap();
+        let mut first = ReplaceTypes::default();
+        first.set_replace_type(qb_t().as_extension().unwrap().clone(), temp.clone());
+        first.run(&mut graph).unwrap();
+        graph.validate().unwrap();
+        let target = array_type(2, qb_t());
+        let mut second = ReplaceTypes::default();
+        second.set_replace_type(temp.as_extension().unwrap().clone(), target.clone());
+        second.run(&mut graph).unwrap();
+        graph.validate().unwrap();
+        assert_eq!(
+            graph.signature(graph.entrypoint()).unwrap().into_owned(),
+            Signature::new(
+                [ptr_type(target.clone())],
+                [ptr_type(target.clone()), ptr_type(target.clone())]
+            )
+        );
+        let dup = graph
+            .nodes()
+            .find_map(|n| {
+                graph
+                    .get_optype(n)
+                    .as_extension_op()
+                    .filter(|op| op.qualified_id() == "ptr.Dup")
+            })
+            .unwrap();
+        assert_eq!(dup.args(), [target.into()]);
+    }
+
+    #[rstest]
+    #[case(false)]
+    #[case(true)]
+    fn ptr_read_uses_registered_semantic_copy(#[case] supplied: bool) {
+        use hugr_core::std_extensions::ptr::{PtrOpBuilder, ptr_type};
+        let ext = ptr_rewrite_extension();
+        let token = ext.get_type("Token").unwrap();
+        let target: Type = token.instantiate([]).unwrap().into();
+        let mut b = DFGBuilder::new(inout_sig(
+            [ptr_type(usize_t())],
+            [ptr_type(usize_t()), usize_t()],
+        ))
+        .unwrap();
+        let [p] = b.input_wires_arr();
+        let (p, value) = b.add_read_ptr(p, usize_t()).unwrap();
+        let mut graph = b.finish_hugr_with_outputs([p, value]).unwrap();
+        let mut pass = ReplaceTypes::default();
+        pass.set_replace_type(usize_t().as_extension().unwrap().clone(), target.clone());
+        if supplied {
+            let copy = ExtensionOp::new(ext.get_op("copy").unwrap().clone(), []).unwrap();
+            pass.linearizer_mut()
+                .register_callback(token, move |_, n, _| {
+                    assert_eq!(n, 2);
+                    Ok(NodeTemplate::SingleOp(copy.clone().into()))
+                });
+        }
+        let result = pass.run(&mut graph);
+        if !supplied {
+            assert_eq!(
+                result,
+                Err(super::ReplaceTypesError::LinearizeError(
+                    super::LinearizeError::NeedCopyDiscard(Box::new(target))
+                ))
+            );
+            return;
+        }
+        result.unwrap();
+        graph.validate().unwrap();
+        assert_eq!(
+            graph.signature(graph.entrypoint()).unwrap().into_owned(),
+            Signature::new(
+                [ptr_type(target.clone())],
+                [ptr_type(target.clone()), target.clone()]
+            )
+        );
+        let ops = graph
+            .nodes()
+            .filter_map(|n| graph.get_optype(n).as_extension_op())
+            .collect::<Vec<_>>();
+        let map = ops
+            .iter()
+            .find(|op| op.qualified_id() == "ptr.Map")
+            .unwrap();
+        assert_eq!(
+            map.args(),
+            [
+                target.clone().into(),
+                TypeRow::from([]).into(),
+                TypeRow::from([target]).into()
+            ]
+        );
+        assert_eq!(
+            ops.iter()
+                .filter(|op| op.qualified_id() == "PtrRewriteTest.copy")
+                .count(),
+            1
+        );
+        assert!(
+            !ops.iter()
+                .any(|op| matches!(op.qualified_id().as_str(), "ptr.New" | "ptr.Read"))
+        );
+    }
 
     pub(super) const PACKED_VEC: &str = "PackedVec";
     pub(super) const READ: &str = "read";
