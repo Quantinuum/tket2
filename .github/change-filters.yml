@@ -20,6 +20,8 @@ tket:
   - "tket/qis-compiler/rust/**"
   - "tket/qis-compiler/Cargo.toml"
   - "tket/tket-migrate/**"
+  - "test_files/old_extensions/**"
+  - "tket/tket-exts/src/tket_exts/data/tket/**"
 
 pg-libs:
   - *rust-core

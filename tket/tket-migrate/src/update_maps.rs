@@ -147,16 +147,29 @@ impl OpReplacementTemplate {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
+        // Transform the old signature according to the type replacements.
+        let mut old_signature = old_op.signature().into_owned();
+        old_signature.transform(replacer)?;
+
         let signature = match (operations.first(), operations.last()) {
-            (Some(first), Some(last)) => Signature::new(
-                first.signature().input().clone(),
-                last.signature().output().clone(),
-            ),
+            (Some(first), Some(last)) => {
+                let new_signature = Signature::new(
+                    first.signature().input().clone(),
+                    last.signature().output().clone(),
+                );
+
+                if new_signature != old_signature {
+                    return Err(ReplacementError::SignatureMismatch {
+                        expected: old_signature,
+                        actual: new_signature,
+                    });
+                }
+
+                new_signature
+            }
             _ => {
                 // A passthrough must use the migrated types on both sides.
-                let mut signature = old_op.signature().into_owned();
-                signature.transform(replacer)?;
-                signature
+                old_signature
             }
         };
         let mut builder = DFGBuilder::new(signature)?;
@@ -425,16 +438,23 @@ mod tests {
         let old_type = old_bool("bool").get_type(&hugr)?.unwrap();
         let mut replacer = ReplaceTypes::default();
         replacer.set_replace_type(old_type.clone(), bool_t());
+        let unchanged_types = ReplaceTypes::default();
 
         let cases = [
-            ("not", vec![], Signature::new_endo([old_type.into()])),
+            (
+                "not",
+                vec![],
+                Signature::new_endo([old_type.into()]),
+                &unchanged_types,
+            ),
             (
                 "make_opaque",
                 vec!["not", "read"],
                 Signature::new_endo([bool_t()]),
+                &replacer,
             ),
         ];
-        for (first, rest, expected_signature) in cases {
+        for (first, rest, expected_signature, replacer) in cases {
             let template = OpReplacementTemplate::VersionedElements {
                 first: old_bool(first),
                 rest: rest.iter().map(|name| old_bool(name)).collect(),
@@ -443,7 +463,7 @@ mod tests {
                 .chain(rest.iter().copied())
                 .collect::<Vec<_>>();
             let NodeTemplate::LinkedHugr(replacement, _) =
-                template.get_op_replace(&old_op, &hugr, &replacer)?
+                template.get_op_replace(&old_op, &hugr, replacer)?
             else {
                 panic!("Expected a graph replacement for {names:?}");
             };
@@ -482,6 +502,49 @@ mod tests {
                 replacement.single_linked_input(previous, 0),
                 Some((output, hugr::IncomingPort::from(0))),
                 "{names:?}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn versioned_elements_reject_signature_mismatches() -> Result<(), Box<dyn Error>> {
+        let hugr = bool_graph()?;
+        let old_op = old_bool("not").get_instantiated_op(&hugr)?.unwrap();
+        let old_type = old_bool("bool").get_type(&hugr)?.unwrap();
+
+        // Check input type, output type, input arity, and migrated types.
+        for (name, migrate_types) in [
+            ("make_opaque", false),
+            ("read", false),
+            ("and", false),
+            ("not", true),
+        ] {
+            let mut replacer = ReplaceTypes::default();
+            let expected = if migrate_types {
+                replacer.set_replace_type(old_type.clone(), bool_t());
+                Signature::new_endo([bool_t()])
+            } else {
+                old_op.signature().into_owned()
+            };
+            let actual = old_bool(name)
+                .get_instantiated_op(&hugr)?
+                .unwrap()
+                .signature()
+                .into_owned();
+            let template = OpReplacementTemplate::VersionedElements {
+                first: old_bool(name),
+                rest: vec![],
+            };
+            let error = template
+                .get_op_replace(&old_op, &hugr, &replacer)
+                .unwrap_err();
+            assert!(
+                matches!(&error, ReplacementError::SignatureMismatch {
+                    expected: expected_signature,
+                    actual: actual_signature,
+                } if expected_signature == &expected && actual_signature == &actual),
+                "{name}, migrate_types={migrate_types}: {error}"
             );
         }
         Ok(())

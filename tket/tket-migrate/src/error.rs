@@ -1,8 +1,11 @@
 //! Errors produced when resolving mappings and migrating a HUGR.
 
 use hugr::{
+    Node,
     builder::BuildError,
     extension::{SignatureError, resolution::ExtensionResolutionError},
+    hugr::ValidationError,
+    types::Signature,
 };
 use thiserror::Error;
 use tket::passes::replace_types::ReplaceTypesError;
@@ -52,9 +55,17 @@ pub enum ReplacementError {
     /// A replacement definition cannot be resolved or instantiated.
     #[error(transparent)]
     Element(#[from] VersionedElementError),
-    /// Migrating the signature of an empty replacement failed.
+    /// Migrating the old operation's signature failed.
     #[error("Could not migrate replacement signature: {0}")]
     Signature(#[from] ReplaceTypesError),
+    /// The replacement does not match the old operation's migrated signature.
+    #[error("Replacement signature {actual} does not match migrated signature {expected}")]
+    SignatureMismatch {
+        /// The old operation's signature after applying type replacements.
+        expected: Signature,
+        /// The replacement sequence's input and output signature.
+        actual: Signature,
+    },
     /// The replacement operations cannot be connected into a valid HUGR.
     #[error("Could not build replacement HUGR: {0}")]
     Build(#[from] BuildError),
@@ -76,4 +87,7 @@ pub enum MigrationError {
     /// Resolving dependencies of the new extensions failed.
     #[error("Could not register new extensions: {0}")]
     RegisterExtensions(#[source] ExtensionResolutionError),
+    /// Validating the migrated HUGR failed.
+    #[error("Could not validate migrated HUGR: {0}")]
+    Validate(#[from] ValidationError<Node>),
 }
