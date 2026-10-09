@@ -4,7 +4,7 @@ use hugr::builder::{Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder};
 use hugr::extension::prelude::bool_t;
 use hugr::llvm::emit::{EmitDebugInfo, EmitFuncContext, Namer, test::SimpleHugrConfig};
 use hugr::llvm::extension::PreludeCodegen;
-use hugr::llvm::inkwell::{self, context::Context, module::Module};
+use hugr::llvm::inkwell::{self, context::Context, module::Module, values::PointerValue};
 use hugr::llvm::utils::IntOpBuilder;
 use hugr::ops::handle::NodeHandle;
 use hugr::std_extensions::arithmetic::int_types::{ConstInt, int_type};
@@ -130,9 +130,9 @@ fn emit<'c>(
     module
 }
 
-thread_local! { static EVENTS: RefCell<Vec<(bool, u64)>> = const { RefCell::new(Vec::new()) }; }
-extern "C" fn event(locked: bool, value: u64) {
-    EVENTS.with_borrow_mut(|events| events.push((locked, value)));
+thread_local! { static EVENTS: RefCell<Vec<(usize, bool, u64)>> = const { RefCell::new(Vec::new()) }; }
+extern "C" fn event(global: *const u8, locked: bool, value: u64) {
+    EVENTS.with_borrow_mut(|events| events.push((global as usize, locked, value)));
 }
 unsafe extern "C" fn runtime_panic(code: u32, message: *const u8) {
     // QIS strings contain a length byte followed by tagged bytes, without NUL.
@@ -166,18 +166,24 @@ struct TracingLocks {
 impl TracingLocks {
     fn record<'c, H: HugrView<Node = Node>>(
         context: &mut EmitFuncContext<'c, '_, H>,
+        global: PointerValue<'c>,
         locked: bool,
     ) -> Result<()> {
         let ty = context.iw_context().bool_type();
         let value_ty =
             context.llvm_sum_type(hugr::extension::prelude::option_type([int_type(6)]))?;
         let module = context.get_current_module();
-        let global = module.get_global("__globals__.state").unwrap();
-        let value = context.builder().build_load(
-            value_ty.clone(),
-            global.as_pointer_value(),
-            "observed_global",
-        )?;
+        assert_eq!(
+            global,
+            module
+                .get_global("__globals__.state")
+                .unwrap()
+                .as_pointer_value(),
+            "hooks must receive the global slot, not its payload or a fabricated identifier"
+        );
+        let value = context
+            .builder()
+            .build_load(value_ty.clone(), global, "observed_global")?;
         let value = value_ty.value(value)?;
         let tag = value.build_get_tag(context.builder())?;
         let present = context.builder().build_int_compare(
@@ -197,16 +203,17 @@ impl TracingLocks {
         let f = module.get_function("global_lock_event").unwrap_or_else(|| {
             module.add_function(
                 "global_lock_event",
-                context
-                    .iw_context()
-                    .void_type()
-                    .fn_type(&[ty.into(), payload_ty.into()], false),
+                context.iw_context().void_type().fn_type(
+                    &[global.get_type().into(), ty.into(), payload_ty.into()],
+                    false,
+                ),
                 None,
             )
         });
         context.builder().build_call(
             f,
             &[
+                global.into(),
                 ty.const_int(u64::from(locked), false).into(),
                 observed.into(),
             ],
@@ -219,23 +226,23 @@ impl GlobalsLockCodegen for TracingLocks {
     fn emit_lock<'c, H: HugrView<Node = Node>, PCG: PreludeCodegen>(
         &self,
         context: &mut EmitFuncContext<'c, '_, H>,
-        name: &str,
+        global: PointerValue<'c>,
         prelude: &PCG,
     ) -> Result<()> {
-        DefaultGlobalsLockCodegen::default().emit_lock(context, name, prelude)?;
-        Self::record(context, true)
+        DefaultGlobalsLockCodegen::default().emit_lock(context, global, prelude)?;
+        Self::record(context, global, true)
     }
     fn emit_unlock<'c, H: HugrView<Node = Node>, PCG: PreludeCodegen>(
         &self,
         context: &mut EmitFuncContext<'c, '_, H>,
-        name: &str,
+        global: PointerValue<'c>,
         prelude: &PCG,
     ) -> Result<()> {
-        DefaultGlobalsLockCodegen::default().emit_unlock(context, name, prelude)?;
+        DefaultGlobalsLockCodegen::default().emit_unlock(context, global, prelude)?;
         if self.double_unlock {
-            DefaultGlobalsLockCodegen::default().emit_unlock(context, name, prelude)?;
+            DefaultGlobalsLockCodegen::default().emit_unlock(context, global, prelude)?;
         }
-        Self::record(context, false)
+        Self::record(context, global, false)
     }
 }
 
@@ -271,8 +278,18 @@ fn globals_custom_hooks_cover_scoped_install_map_and_restore() {
     );
     assert!(execute(&module, 1));
     EVENTS.with_borrow(|events| {
+        let address = events[0].0;
+        assert_ne!(address, 0);
+        assert!(
+            events.iter().all(|event| event.0 == address),
+            "With and Map lock/unlock must use one stable slot address"
+        );
+        let transitions = events
+            .iter()
+            .map(|&(_, locked, value)| (locked, value))
+            .collect::<Vec<_>>();
         assert_eq!(
-            events,
+            transitions,
             &[
                 (true, 0),
                 (false, 41),

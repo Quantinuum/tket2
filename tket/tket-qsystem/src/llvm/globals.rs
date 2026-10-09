@@ -29,21 +29,22 @@ use hugr::{
 use hugr_core::types::{FuncValueType, Signature, Type, TypeRowRV};
 use itertools::Itertools;
 
-/// Backend hooks protecting access to a named global slot.
+/// Backend hooks protecting access to a global slot.
 ///
-/// A backend must use the same lock for every operation with the same global name
-/// in a module. Both methods must leave the builder in a continuation block.
+/// `global` is the stable address of the LLVM global variable storing the slot,
+/// not the value stored in that slot. A backend must use the same lock for every
+/// access to that address. Both methods must leave the builder in a continuation block.
 /// Lock must reject reentrant access and unlock must reject an unmatched release.
 /// `Map` holds the lock throughout its callback and restores the value before
 /// unlocking. `With` locks only while installing/restoring its scoped value;
 /// its callback runs unlocked so it can use `Map`. These hooks do not make
 /// overlapping `With` scopes across threads safe.
 pub trait GlobalsLockCodegen {
-    /// Acquire exclusive access to the global identified by `name`.
+    /// Acquire exclusive access to the slot at `global`.
     fn emit_lock<'c, H: HugrView<Node = Node>, PCG: PreludeCodegen>(
         &self,
         context: &mut EmitFuncContext<'c, '_, H>,
-        name: &str,
+        global: PointerValue<'c>,
         prelude: &PCG,
     ) -> Result<()>;
 
@@ -51,12 +52,12 @@ pub trait GlobalsLockCodegen {
     fn emit_unlock<'c, H: HugrView<Node = Node>, PCG: PreludeCodegen>(
         &self,
         context: &mut EmitFuncContext<'c, '_, H>,
-        name: &str,
+        global: PointerValue<'c>,
         prelude: &PCG,
     ) -> Result<()>;
 }
 
-/// Checked sequential locking, using a non-atomic flag per named global.
+/// Checked sequential locking, using a non-atomic flag per global slot.
 ///
 /// This detects reentry and unmatched unlocks, but provides no cross-thread
 /// synchronization. Errors use the extension's configured prelude panic lowering.
@@ -90,13 +91,22 @@ impl DefaultGlobalsLockCodegen {
     fn emit_transition<'c, H: HugrView<Node = Node>, PCG: PreludeCodegen>(
         &self,
         context: &mut EmitFuncContext<'c, '_, H>,
-        name: &str,
+        global: PointerValue<'c>,
         prelude: &PCG,
         acquire: bool,
     ) -> Result<()> {
         let flag_ty = context.iw_context().bool_type();
         let module = context.get_current_module();
-        let symbol = format!("__globals_lock__.{name}");
+        // The lowering supplies the global slot itself. Its LLVM symbol only
+        // names the associated flag; the hook identity remains the slot address.
+        let slot_name = global.get_name().to_str()?;
+        ensure!(
+            module
+                .get_global(slot_name)
+                .is_some_and(|slot| slot.as_pointer_value() == global),
+            "Expected the address of a global slot in the current module"
+        );
+        let symbol = format!("__globals_lock__.{slot_name}");
         let flag = module.get_global(&symbol).unwrap_or_else(|| {
             let flag = module.add_global(flag_ty, Some(AddressSpace::default()), &symbol);
             flag.set_initializer(&flag_ty.const_zero());
@@ -144,19 +154,19 @@ impl GlobalsLockCodegen for DefaultGlobalsLockCodegen {
     fn emit_lock<'c, H: HugrView<Node = Node>, PCG: PreludeCodegen>(
         &self,
         context: &mut EmitFuncContext<'c, '_, H>,
-        name: &str,
+        global: PointerValue<'c>,
         prelude: &PCG,
     ) -> Result<()> {
-        self.emit_transition(context, name, prelude, true)
+        self.emit_transition(context, global, prelude, true)
     }
 
     fn emit_unlock<'c, H: HugrView<Node = Node>, PCG: PreludeCodegen>(
         &self,
         context: &mut EmitFuncContext<'c, '_, H>,
-        name: &str,
+        global: PointerValue<'c>,
         prelude: &PCG,
     ) -> Result<()> {
-        self.emit_transition(context, name, prelude, false)
+        self.emit_transition(context, global, prelude, false)
     }
 }
 
@@ -253,7 +263,8 @@ impl<PCG: PreludeCodegen, LCG: GlobalsLockCodegen> GlobalsCodegenExtension<PCG, 
                     global_ty == sym_ty.as_basic_type_enum(),
                     "Input type does not match global variable type. Found {global_ty}, Expected {sym_ty}"
                 );
-                self.locks.emit_lock(context, &name, &self.pcg)?;
+                self.locks
+                    .emit_lock(context, global.as_pointer_value(), &self.pcg)?;
                 let builder = context.builder();
                 let start_value =
                     builder.build_load(sym_ty.clone(), global.as_pointer_value(), "start_value")?;
@@ -262,7 +273,8 @@ impl<PCG: PreludeCodegen, LCG: GlobalsLockCodegen> GlobalsCodegenExtension<PCG, 
 
                 let _ = builder.build_store(global.as_pointer_value(), new_value)?;
 
-                self.locks.emit_unlock(context, &name, &self.pcg)?;
+                self.locks
+                    .emit_unlock(context, global.as_pointer_value(), &self.pcg)?;
                 let builder = context.builder();
 
                 let real_args = func_args.iter().copied().map_into().collect_vec();
@@ -277,7 +289,8 @@ impl<PCG: PreludeCodegen, LCG: GlobalsLockCodegen> GlobalsCodegenExtension<PCG, 
                 let func_call =
                     builder.build_indirect_call(func_ty, func_ptr, &real_args, "call_func")?;
 
-                self.locks.emit_lock(context, &name, &self.pcg)?;
+                self.locks
+                    .emit_lock(context, global.as_pointer_value(), &self.pcg)?;
                 let builder = context.builder();
                 let end_value =
                     builder.build_load(sym_ty.clone(), global.as_pointer_value(), "end_value")?;
@@ -287,7 +300,8 @@ impl<PCG: PreludeCodegen, LCG: GlobalsLockCodegen> GlobalsCodegenExtension<PCG, 
 
                 let _ = builder.build_store(global.as_pointer_value(), start_value)?;
 
-                self.locks.emit_unlock(context, &name, &self.pcg)?;
+                self.locks
+                    .emit_unlock(context, global.as_pointer_value(), &self.pcg)?;
                 let builder = context.builder();
 
                 let mut call_results =
@@ -345,7 +359,8 @@ impl<PCG: PreludeCodegen, LCG: GlobalsLockCodegen> GlobalsCodegenExtension<PCG, 
                     "Input type does not match global variable type. Found {global_ty}, Expected {sym_ty}"
                 );
 
-                self.locks.emit_lock(context, &name, &self.pcg)?;
+                self.locks
+                    .emit_lock(context, global.as_pointer_value(), &self.pcg)?;
                 let start_value = {
                     let v = context.builder().build_load(
                         sym_ty.clone(),
@@ -412,7 +427,8 @@ impl<PCG: PreludeCodegen, LCG: GlobalsLockCodegen> GlobalsCodegenExtension<PCG, 
                 let end_value = sym_ty.build_tag(builder, 1, vec![*end_value])?;
                 builder.build_store(global.as_pointer_value(), end_value)?;
 
-                self.locks.emit_unlock(context, &name, &self.pcg)?;
+                self.locks
+                    .emit_unlock(context, global.as_pointer_value(), &self.pcg)?;
                 let builder = context.builder();
                 args.outputs
                     .finish(builder, results.iter().copied().map_into().collect_vec())?;
