@@ -271,8 +271,8 @@ impl NodeTemplate {
 
 /// Options for how a replacement (op or type) is processed.
 ///
-/// May be specified by [ReplaceTypes::set_replace_op] or [ReplaceTypes::set_replace_type].
-/// Otherwise (the default), replacements are inserted as given (without further processing).
+/// With [`ReplaceTypes::set_replace_type_with_options`], the default inserts the
+/// target unchanged. [`ReplaceTypes::set_replace_type`] processes it recursively.
 #[derive(Clone, Default, PartialEq, Eq)] // More derives might inhibit future extension
 pub struct ReplacementOptions {
     process_recursive: bool,
@@ -451,8 +451,22 @@ impl ReplaceTypes {
         // We could check that 'dest' is copyable, 'src' is linear, or relevant copy and
         // discard functions are registered with the linearizer; but since we can't check
         // that for parametrized types, we'll be consistent and not check here either.
-        self.type_map
-            .insert(src, (dest, ReplacementOptions::recursive()));
+        self.set_replace_type_with_options(src, dest, ReplacementOptions::recursive());
+    }
+
+    /// Replace `src` with `dest`, controlling processing of the supplied target.
+    ///
+    /// With [`ReplacementOptions::default`], `dest` is inserted unchanged, even if
+    /// it contains `src`. Original nested types and operation arguments are still
+    /// transformed. The precedence, constant and linearity requirements of
+    /// [`Self::set_replace_type`] also apply.
+    pub fn set_replace_type_with_options(
+        &mut self,
+        src: CustomType,
+        dest: Type,
+        options: ReplacementOptions,
+    ) {
+        self.type_map.insert(src, (dest, options));
     }
 
     /// Configures this instance to change occurrences of a parameterized type `src`
@@ -899,7 +913,8 @@ pub(super) mod test {
         ListOp, ListOpInst, ListValue, list_type, list_type_def,
     };
     use hugr_core::types::{
-        EdgeKind, PolyFuncType, Signature, SumType, Term, Type, TypeArg, TypeBound, TypeRow,
+        EdgeKind, PolyFuncType, Signature, SumType, Term, Transformable, Type, TypeArg, TypeBound,
+        TypeRow,
     };
     use hugr_core::{Direction, Extension, HugrView, Port, Visibility, type_row};
     use itertools::Itertools;
@@ -908,6 +923,41 @@ pub(super) mod test {
     use crate::passes::{ComposablePass, mangle_name};
 
     use super::{NodeTemplate, ReplaceTypes, handlers::list_const};
+
+    #[test]
+    fn complete_target_preserves_payload_and_traverses_original_types() {
+        let nested = |ty: Type| {
+            Type::new_tuple([
+                ty.clone(),
+                array_type(2, ty.clone()),
+                borrow_array_type(3, ty.clone()),
+                Type::new_function(Signature::new_endo([ty])),
+            ])
+        };
+        let target = list_type(usize_t());
+        let mut ty = nested(usize_t());
+        let mut pass = ReplaceTypes::default();
+        pass.set_replace_type_with_options(
+            usize_t().as_extension().unwrap().clone(),
+            target.clone(),
+            super::ReplacementOptions::default(),
+        );
+        assert!(ty.transform(&pass).unwrap());
+        assert_eq!(ty, nested(target));
+    }
+
+    #[test]
+    fn recursive_setter_keeps_transitive_behavior() {
+        let mut pass = ReplaceTypes::default();
+        pass.set_replace_type(
+            usize_t().as_extension().unwrap().clone(),
+            list_type(i64_t()),
+        );
+        pass.set_replace_type(i64_t().as_extension().unwrap().clone(), bool_t());
+        let mut ty = usize_t();
+        assert!(ty.transform(&pass).unwrap());
+        assert_eq!(ty, list_type(bool_t()));
+    }
 
     pub(super) const PACKED_VEC: &str = "PackedVec";
     pub(super) const READ: &str = "read";
