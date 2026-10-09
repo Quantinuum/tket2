@@ -1,6 +1,6 @@
 [package]
 name = "tk-pg-t-optimize"
-version = "0.1.1"
+version = "0.1.2"
 description = "T-count optimization passes for Pauli graphs"
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -17,13 +17,13 @@ unstable_simd = []
 
 [dependencies]
 bitvec = "1.0.1"
-tk-pg-core = { path = "../../tk-pg-core", version = "0.1.1" }
-tk-pg-canonical-form = { path = "../tk-pg-canonical-form", version = "0.1.1" }
-tk-pg-ir-kernels = { path = "../../pg-kernels/tk-pg-ir-kernels", version = "0.1.1" }
-tk-pg-qm-tableau = { path = "../../tk-pg-qm-tableau", version = "0.1.1" }
+tk-pg-core = { path = "../../tk-pg-core", version = "0.1.2" }
+tk-pg-canonical-form = { path = "../tk-pg-canonical-form", version = "0.1.2" }
+tk-pg-ir-kernels = { path = "../../pg-kernels/tk-pg-ir-kernels", version = "0.1.2" }
+tk-pg-qm-tableau = { path = "../../tk-pg-qm-tableau", version = "0.1.2" }
 
 [dev-dependencies]
-tk-pg-converter = { path = "../../pg-converters/tk-pg-converter", version = "0.1.1" }
+tk-pg-converter = { path = "../../pg-converters/tk-pg-converter", version = "0.1.2" }
 
 [lints]
 workspace = true
