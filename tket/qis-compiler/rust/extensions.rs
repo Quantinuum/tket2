@@ -50,6 +50,7 @@ pub(crate) fn codegen_extensions(platform: QSystemPlatform) -> CodegenExtsMap<'s
     CodegenExtsBuilder::default()
         .add_prelude_extensions(prelude.clone())
         .add_extension(IntCodegenExtension::new(prelude.clone()))
+        .add_default_ptr_extensions(prelude.clone(), SeleneHeapArrayCodegen)
         .add_math_extensions() // This also adds the float extension
         .add_conversion_extensions()
         .add_logic_extensions()
@@ -75,3 +76,6 @@ pub(crate) fn codegen_extensions(platform: QSystemPlatform) -> CodegenExtsMap<'s
         ))
         .finish()
 }
+
+#[cfg(test)]
+mod ptr_tests;
