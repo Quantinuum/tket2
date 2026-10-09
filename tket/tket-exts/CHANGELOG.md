@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.0 (2026-10-09)
+
+
+### Features
+
+* Bump to latest `hugr` and register `math` extension with QIS compiler ([#2037](https://github.com/Quantinuum/tket2/issues/2037)) ([93ea902](https://github.com/Quantinuum/tket2/commit/93ea902721daf8dd49fd5a6d517c13c3358818d9))
+
 ## [0.14.3](https://github.com/Quantinuum/tket2/compare/tket-exts-v0.14.2...tket-exts-v0.14.3) (2026-09-17)
 
 
