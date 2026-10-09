@@ -1,7 +1,9 @@
 //! LLVM lowering implementations for "tket.globals" operations.
 //!
 //! Construct the extension with [`GlobalsCodegenExtension::new`].
-//! Provides custom panic error [`GlobalsCodegenExtension::with_no_global_error`] to override the default.
+//! The default backend checks sequential access with a non-atomic flag and uses
+//! the configured prelude for panic. Use [`GlobalsCodegenExtension::with_lock_codegen`]
+//! to supply a backend that synchronizes access.
 
 use crate::extension::globals::{GlobalsOp, GlobalsOpDef};
 use anyhow::{Result, bail, ensure};
@@ -27,13 +29,147 @@ use hugr::{
 use hugr_core::types::{FuncValueType, Signature, Type, TypeRowRV};
 use itertools::Itertools;
 
+/// Backend hooks protecting access to a named global slot.
+///
+/// A backend must use the same lock for every operation with the same global name
+/// in a module. Both methods must leave the builder in a continuation block.
+/// Lock must reject reentrant access and unlock must reject an unmatched release.
+/// `Map` holds the lock throughout its callback and restores the value before
+/// unlocking. `With` locks only while installing/restoring its scoped value;
+/// its callback runs unlocked so it can use `Map`. These hooks do not make
+/// overlapping `With` scopes across threads safe.
+pub trait GlobalsLockCodegen {
+    /// Acquire exclusive access to the global identified by `name`.
+    fn emit_lock<'c, H: HugrView<Node = Node>, PCG: PreludeCodegen>(
+        &self,
+        context: &mut EmitFuncContext<'c, '_, H>,
+        name: &str,
+        prelude: &PCG,
+    ) -> Result<()>;
+
+    /// Release access after the global value has been restored.
+    fn emit_unlock<'c, H: HugrView<Node = Node>, PCG: PreludeCodegen>(
+        &self,
+        context: &mut EmitFuncContext<'c, '_, H>,
+        name: &str,
+        prelude: &PCG,
+    ) -> Result<()>;
+}
+
+/// Checked sequential locking, using a non-atomic flag per named global.
+///
+/// This detects reentry and unmatched unlocks, but provides no cross-thread
+/// synchronization. Errors use the extension's configured prelude panic lowering.
+pub struct DefaultGlobalsLockCodegen {
+    already_locked_error: ConstError,
+    not_locked_error: ConstError,
+}
+
+impl Default for DefaultGlobalsLockCodegen {
+    fn default() -> Self {
+        Self {
+            already_locked_error: ConstError::new_default_signal("Global already locked"),
+            not_locked_error: ConstError::new_default_signal("Global not locked"),
+        }
+    }
+}
+
+impl DefaultGlobalsLockCodegen {
+    /// Configure the error for reentrant access.
+    pub fn with_already_locked_error(mut self, error: ConstError) -> Self {
+        self.already_locked_error = error;
+        self
+    }
+
+    /// Configure the error for an unmatched unlock.
+    pub fn with_not_locked_error(mut self, error: ConstError) -> Self {
+        self.not_locked_error = error;
+        self
+    }
+
+    fn emit_transition<'c, H: HugrView<Node = Node>, PCG: PreludeCodegen>(
+        &self,
+        context: &mut EmitFuncContext<'c, '_, H>,
+        name: &str,
+        prelude: &PCG,
+        acquire: bool,
+    ) -> Result<()> {
+        let flag_ty = context.iw_context().bool_type();
+        let module = context.get_current_module();
+        let symbol = format!("__globals_lock__.{name}");
+        let flag = module.get_global(&symbol).unwrap_or_else(|| {
+            let flag = module.add_global(flag_ty, Some(AddressSpace::default()), &symbol);
+            flag.set_initializer(&flag_ty.const_zero());
+            flag
+        });
+        ensure!(
+            flag.get_value_type() == flag_ty.into(),
+            "Invalid global lock flag type"
+        );
+        let error = if acquire {
+            &self.already_locked_error
+        } else {
+            &self.not_locked_error
+        };
+        let failed =
+            context.build_positioned_new_block("global_lock_error", None, |context, bb| {
+                let error = emit_value(context, &Value::from(error.clone()))?;
+                prelude.emit_panic(context, error)?;
+                context.builder().build_unreachable()?;
+                anyhow::Ok(bb)
+            })?;
+        let success =
+            context
+                .build_positioned_new_block("global_lock_continue", None, |_, bb| anyhow::Ok(bb))?;
+        let builder = context.builder();
+        let locked = builder
+            .build_load(flag_ty, flag.as_pointer_value(), "global_locked")?
+            .into_int_value();
+        let invalid = if acquire {
+            locked
+        } else {
+            builder.build_not(locked, "global_unlocked")?
+        };
+        builder.build_conditional_branch(invalid, failed, success)?;
+        builder.position_at_end(success);
+        builder.build_store(
+            flag.as_pointer_value(),
+            flag_ty.const_int(u64::from(acquire), false),
+        )?;
+        Ok(())
+    }
+}
+
+impl GlobalsLockCodegen for DefaultGlobalsLockCodegen {
+    fn emit_lock<'c, H: HugrView<Node = Node>, PCG: PreludeCodegen>(
+        &self,
+        context: &mut EmitFuncContext<'c, '_, H>,
+        name: &str,
+        prelude: &PCG,
+    ) -> Result<()> {
+        self.emit_transition(context, name, prelude, true)
+    }
+
+    fn emit_unlock<'c, H: HugrView<Node = Node>, PCG: PreludeCodegen>(
+        &self,
+        context: &mut EmitFuncContext<'c, '_, H>,
+        name: &str,
+        prelude: &PCG,
+    ) -> Result<()> {
+        self.emit_transition(context, name, prelude, false)
+    }
+}
+
 /// Codegen extension for globals.
-pub struct GlobalsCodegenExtension<PCG> {
+pub struct GlobalsCodegenExtension<PCG, LCG = DefaultGlobalsLockCodegen> {
     pcg: PCG,
+    locks: LCG,
     no_global_error: ConstError,
 }
 
-impl<PCG: PreludeCodegen> CodegenExtension for GlobalsCodegenExtension<PCG> {
+impl<PCG: PreludeCodegen, LCG: GlobalsLockCodegen> CodegenExtension
+    for GlobalsCodegenExtension<PCG, LCG>
+{
     fn add_extension<'a, H: HugrView<Node = Node> + 'a>(
         self,
         builder: CodegenExtsBuilder<'a, H>,
@@ -47,13 +183,28 @@ impl<PCG: PreludeCodegen> CodegenExtension for GlobalsCodegenExtension<PCG> {
 }
 
 impl<PCG: PreludeCodegen> GlobalsCodegenExtension<PCG> {
-    /// Create a new `GlobalsCodegenExtension` with the given [PreludeCodegen].
+    /// Create an extension using checked sequential locks and the given prelude.
     pub fn new(pcg: PCG) -> Self {
         Self {
             pcg,
+            locks: DefaultGlobalsLockCodegen::default(),
             no_global_error: ConstError::new_default_signal(
                 "No global provided for GlobalsOp::With",
             ),
+        }
+    }
+}
+
+impl<PCG: PreludeCodegen, LCG: GlobalsLockCodegen> GlobalsCodegenExtension<PCG, LCG> {
+    /// Replace the locking backend without changing global operations or storage.
+    pub fn with_lock_codegen<L: GlobalsLockCodegen>(
+        self,
+        locks: L,
+    ) -> GlobalsCodegenExtension<PCG, L> {
+        GlobalsCodegenExtension {
+            pcg: self.pcg,
+            locks,
+            no_global_error: self.no_global_error,
         }
     }
 
@@ -102,12 +253,17 @@ impl<PCG: PreludeCodegen> GlobalsCodegenExtension<PCG> {
                     global_ty == sym_ty.as_basic_type_enum(),
                     "Input type does not match global variable type. Found {global_ty}, Expected {sym_ty}"
                 );
+                self.locks.emit_lock(context, &name, &self.pcg)?;
+                let builder = context.builder();
                 let start_value =
                     builder.build_load(sym_ty.clone(), global.as_pointer_value(), "start_value")?;
 
                 let new_value = sym_ty.build_tag(builder, 1, vec![*init_global_value])?;
 
                 let _ = builder.build_store(global.as_pointer_value(), new_value)?;
+
+                self.locks.emit_unlock(context, &name, &self.pcg)?;
+                let builder = context.builder();
 
                 let real_args = func_args.iter().copied().map_into().collect_vec();
                 let func_ptr = PointerValue::try_from(*func).map_err(|e| {
@@ -121,6 +277,8 @@ impl<PCG: PreludeCodegen> GlobalsCodegenExtension<PCG> {
                 let func_call =
                     builder.build_indirect_call(func_ty, func_ptr, &real_args, "call_func")?;
 
+                self.locks.emit_lock(context, &name, &self.pcg)?;
+                let builder = context.builder();
                 let end_value =
                     builder.build_load(sym_ty.clone(), global.as_pointer_value(), "end_value")?;
 
@@ -128,6 +286,9 @@ impl<PCG: PreludeCodegen> GlobalsCodegenExtension<PCG> {
                 let end_value = end_value.build_untag(builder, 1)?[0];
 
                 let _ = builder.build_store(global.as_pointer_value(), start_value)?;
+
+                self.locks.emit_unlock(context, &name, &self.pcg)?;
+                let builder = context.builder();
 
                 let mut call_results =
                     deaggregate_call_result(builder, func_call, hugr_func_ty.output.len())?;
@@ -184,6 +345,7 @@ impl<PCG: PreludeCodegen> GlobalsCodegenExtension<PCG> {
                     "Input type does not match global variable type. Found {global_ty}, Expected {sym_ty}"
                 );
 
+                self.locks.emit_lock(context, &name, &self.pcg)?;
                 let start_value = {
                     let v = context.builder().build_load(
                         sym_ty.clone(),
@@ -250,6 +412,8 @@ impl<PCG: PreludeCodegen> GlobalsCodegenExtension<PCG> {
                 let end_value = sym_ty.build_tag(builder, 1, vec![*end_value])?;
                 builder.build_store(global.as_pointer_value(), end_value)?;
 
+                self.locks.emit_unlock(context, &name, &self.pcg)?;
+                let builder = context.builder();
                 args.outputs
                     .finish(builder, results.iter().copied().map_into().collect_vec())?;
             }
