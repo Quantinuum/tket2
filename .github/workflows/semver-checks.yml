@@ -46,8 +46,25 @@ jobs:
       - name: Checkout tket
         uses: actions/checkout@v7
       - uses: quantinuum/hugrverse-env/install-hugrenv-action@main
+      # Keep the candidate separate from the shared action's nested checkouts:
+      # cargo-semver-checks scans the manifest's directory recursively.
+      - name: Checkout exact candidate for semver
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          path: SEMVER_HEAD
+          fetch-depth: 2
+      - name: Read baseline from the tested merge
+        id: semver-base
+        run: |
+          baseline_sha=$(git -C SEMVER_HEAD rev-parse --verify HEAD^1)
+          echo "sha=$baseline_sha" >> "$GITHUB_OUTPUT"
       - uses: quantinuum/hugrverse-actions/rs-semver-checks@main
         env:
           TKET_C_API_PATH: ${{ env.TKET_C_API_PATH }}
         with:
           token: ${{ secrets.HUGRBOT_PAT }}
+          # The event payload's merge_commit_sha can lag behind the triggering SHA.
+          # Compare the explicitly pinned candidate instead.
+          args: --manifest-path "${{ github.workspace }}/SEMVER_HEAD/Cargo.toml"
+          baseline-rev: ${{ steps.semver-base.outputs.sha }}
