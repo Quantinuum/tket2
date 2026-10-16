@@ -229,7 +229,7 @@ mod test {
 
     use hugr_core::builder::{DFGBuilder, Dataflow, DataflowHugr, FunctionBuilder, HugrBuilder};
     use hugr_core::extension::prelude::{bool_t, usize_t};
-    use hugr_core::std_extensions::collections::list::list_type;
+    use hugr_core::std_extensions::collections::static_array::static_array_type;
     use hugr_core::types::{Signature, Type, TypeArg};
     use hugr_core::{Extension, HugrView, Visibility};
 
@@ -292,7 +292,7 @@ mod test {
         lw.set_replace_type(pv.instantiate([bool_t().into()]).unwrap(), i64_t());
         lw.set_replace_parametrized_type(
             pv,
-            Box::new(|args: &[TypeArg]| Some(list_type(just_elem_type(args).clone()))),
+            Box::new(|args: &[TypeArg]| Some(static_array_type(just_elem_type(args).clone()))),
         );
         lw.set_replace_parametrized_op(ext.get_op(READ).unwrap().as_ref(), move |args, _| {
             Ok(Some(template_for_read(args)))
@@ -630,7 +630,7 @@ mod test {
                 .finish_hugr()
                 .unwrap();
             let mut outer = DFGBuilder::new(Signature::new(
-                [list_type(ty.clone()), i64_t()],
+                [static_array_type(ty.clone()), i64_t()],
                 [ty.clone()],
             ))
             .unwrap();

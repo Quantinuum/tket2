@@ -18,7 +18,7 @@ use tket_qsystem::llvm::{
     result::ResultsCodegenExtension, utils::UtilsCodegenExtension,
 };
 
-use crate::array::SeleneHeapArrayCodegen;
+use crate::array::{SeleneHeapArrayCodegen, SeleneHeapListCodegen};
 use crate::gpu::GpuCodegen;
 
 /// Return the extension names and versions available to the envelope loader.
@@ -54,6 +54,7 @@ pub(crate) fn codegen_extensions(platform: QSystemPlatform) -> CodegenExtsMap<'s
         .add_conversion_extensions()
         .add_logic_extensions()
         .add_extension(SeleneHeapArrayCodegen::LOWERING.codegen_extension())
+        .add_list_extensions(SeleneHeapListCodegen(prelude.clone()))
         .add_default_static_array_extensions()
         .add_borrow_array_extensions(crate::array::SeleneHeapBorrowArrayCodegen(prelude.clone()))
         .add_extension(FuturesCodegenExtension)

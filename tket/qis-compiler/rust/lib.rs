@@ -35,6 +35,8 @@ pub use utils::validate;
 mod emulator;
 mod extensions;
 mod gpu;
+#[cfg(test)]
+mod list_tests;
 mod optimization;
 mod selene_specific;
 mod target;

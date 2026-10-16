@@ -1,8 +1,9 @@
-//! Implementation for heap allocation of arrays using the selene heap.
+//! Implementation for heap allocation of arrays and lists using the Selene heap.
 use anyhow::Result;
 use hugr::llvm::emit::EmitFuncContext;
 use hugr::llvm::extension::collections::array::ArrayCodegen;
 use hugr::llvm::extension::collections::borrow_array::BorrowArrayCodegen;
+use hugr::llvm::extension::collections::list::ListCodegen;
 use hugr::llvm::inkwell;
 use hugr::{HugrView, Node};
 use inkwell::AddressSpace;
@@ -15,6 +16,32 @@ use tket_qsystem::llvm::array_utils::HeapArrayLowering;
 #[derive(Clone, Debug, Default)]
 /// Codegen extension for array operations using the selene heap.
 pub struct SeleneHeapArrayCodegen;
+
+/// List lowering with the selected Selene array allocator and prelude.
+#[derive(Clone)]
+pub struct SeleneHeapListCodegen<PCG>(pub PCG);
+
+impl<PCG: PreludeCodegen> ListCodegen for SeleneHeapListCodegen<PCG> {
+    fn emit_allocate_list<'c, H: HugrView<Node = Node>>(
+        &self,
+        ctx: &mut EmitFuncContext<'c, '_, H>,
+        size: IntValue<'c>,
+    ) -> Result<PointerValue<'c>> {
+        SeleneHeapArrayCodegen.emit_allocate_array(ctx, size)
+    }
+
+    fn emit_free_list<'c, H: HugrView<Node = Node>>(
+        &self,
+        ctx: &mut EmitFuncContext<'c, '_, H>,
+        ptr: PointerValue<'c>,
+    ) -> Result<()> {
+        SeleneHeapArrayCodegen.emit_free_array(ctx, ptr)
+    }
+
+    fn prelude_codegen(&self) -> impl PreludeCodegen {
+        self.0.clone()
+    }
+}
 
 impl ArrayCodegen for SeleneHeapArrayCodegen {
     fn emit_allocate_array<'c, H: HugrView<Node = Node>>(

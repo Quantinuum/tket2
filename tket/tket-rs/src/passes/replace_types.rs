@@ -971,7 +971,10 @@ pub(super) mod test {
         BArrayValue, BorrowArray, borrow_array_type,
     };
     use hugr_core::std_extensions::collections::list::{
-        ListOp, ListOpInst, ListValue, list_type, list_type_def,
+        ListOp, ListValue, list_type, list_type_def,
+    };
+    use hugr_core::std_extensions::collections::static_array::{
+        StaticArrayOp, StaticArrayOpDef, static_array_type,
     };
     use hugr_core::types::{
         EdgeKind, PolyFuncType, Signature, SumType, Term, Type, TypeArg, TypeBound, TypeRow,
@@ -1042,12 +1045,14 @@ pub(super) mod test {
         )
     }
 
+    // PackedVec is copyable for copyable elements, and read does not return it.
+    // Its replacement must preserve that contract; linear lists cannot do so.
     pub(super) fn lowered_read<T: Container + Dataflow>(
         elem_ty: Type,
         new: impl Fn(Signature) -> Result<T, BuildError>,
     ) -> T {
         let mut dfb = new(Signature::new(
-            [list_type(elem_ty.clone()), i64_t()],
+            [static_array_type(elem_ty.clone()), i64_t()],
             [elem_ty.clone()],
         ))
         .unwrap();
@@ -1058,10 +1063,12 @@ pub(super) mod test {
             .outputs_arr();
         let [opt] = dfb
             .add_dataflow_op(
-                ListOp::get
-                    .with_type(elem_ty.clone())
-                    .to_extension_op()
-                    .unwrap(),
+                StaticArrayOp {
+                    def: StaticArrayOpDef::get,
+                    elem_ty: elem_ty.clone(),
+                }
+                .to_extension_op()
+                .unwrap(),
                 [val, idx],
             )
             .unwrap()
@@ -1079,7 +1086,7 @@ pub(super) mod test {
         lw.set_replace_type(pv.instantiate([bool_t().into()]).unwrap(), i64_t());
         lw.set_replace_parametrized_type(
             pv,
-            Box::new(|args: &[TypeArg]| Some(list_type(just_elem_type(args).clone()))),
+            Box::new(|args: &[TypeArg]| Some(static_array_type(just_elem_type(args).clone()))),
         );
         lw.set_replace_op(
             &read_op(ext, bool_t()),
@@ -1213,28 +1220,30 @@ pub(super) mod test {
                 .collect_vec(),
             ["get", "itousize", "panic"]
         );
-        // The PackedVec<PackedVec<bool>> becomes a list<i64>
+        // The PackedVec<PackedVec<bool>> becomes a static_array<i64>
         let array_gets = ext_ops
             .into_iter()
-            .filter_map(|e| ListOpInst::from_extension_op(e).ok())
+            .filter_map(|e| StaticArrayOp::from_extension_op(e).ok())
             .collect_vec();
-        assert_eq!(array_gets, [ListOp::get.with_type(i64_t())]);
+        assert_eq!(
+            array_gets,
+            [StaticArrayOp {
+                def: StaticArrayOpDef::get,
+                elem_ty: i64_t()
+            }]
+        );
     }
 
     #[test]
     fn loop_const() {
         let cu = |u| ConstUsize::new(u).into();
-        let mut tl = TailLoopBuilder::new(
-            [list_type(usize_t())],
-            [list_type(bool_t())],
-            [list_type(usize_t())],
-        )
-        .unwrap();
-        let [_, bools] = tl.input_wires_arr();
-        let st = SumType::new(vec![[list_type(usize_t())]; 2]);
+        let mut tl =
+            TailLoopBuilder::new([], [list_type(bool_t())], [list_type(usize_t())]).unwrap();
+        let [bools] = tl.input_wires_arr();
+        let st = SumType::new(vec![type_row![], [list_type(usize_t())].into()]);
         let pred = tl.add_load_value(
             Value::sum(
-                0,
+                1,
                 [ListValue::new(usize_t(), [cu(1), cu(3), cu(3), cu(7)]).into()],
                 st,
             )
@@ -1242,6 +1251,7 @@ pub(super) mod test {
         );
         tl.set_outputs(pred, [bools]).unwrap();
         let backup = tl.finish_hugr().unwrap();
+        backup.validate().unwrap();
 
         let mut lowerer = ReplaceTypes::default();
 
@@ -1253,12 +1263,16 @@ pub(super) mod test {
         {
             let mut h = backup.clone();
             assert_eq!(lowerer.run(&mut h), Ok(true));
+            h.validate().unwrap();
             let sig = h.signature(h.entrypoint()).unwrap();
             assert_eq!(
                 sig.input(),
+                &TypeRow::from(vec![borrow_array_type(10, bool_t())])
+            );
+            assert_eq!(
+                sig.output(),
                 &TypeRow::from(vec![list_type(usize_t()), borrow_array_type(10, bool_t())])
             );
-            assert_eq!(sig.input(), sig.output());
         }
 
         // 2. Now we'll also change usize's to i64_t's
@@ -1275,12 +1289,16 @@ pub(super) mod test {
         {
             let mut h = backup.clone();
             assert_eq!(lowerer.run(&mut h), Ok(true));
+            h.validate().unwrap();
             let sig = h.signature(h.entrypoint()).unwrap();
             assert_eq!(
                 sig.input(),
+                &TypeRow::from(vec![borrow_array_type(10, bool_t())])
+            );
+            assert_eq!(
+                sig.output(),
                 &TypeRow::from(vec![list_type(i64_t()), borrow_array_type(10, bool_t())])
             );
-            assert_eq!(sig.input(), sig.output());
             // This will have to update inside the Const
             let cst = h
                 .entry_descendants()
@@ -1288,7 +1306,10 @@ pub(super) mod test {
                 .exactly_one()
                 .ok()
                 .unwrap();
-            assert_eq!(cst.get_type(), Type::new_sum(vec![[list_type(i64_t())]; 2]));
+            assert_eq!(
+                cst.get_type(),
+                Type::new_sum(vec![type_row![], [list_type(i64_t())].into()])
+            );
         }
 
         // 3. Lower all List<T> to BArray<4,T>
@@ -1309,12 +1330,16 @@ pub(super) mod test {
             ))
         });
         lowerer.run(&mut h).unwrap();
+        h.validate().unwrap();
 
         assert_eq!(
             h.get_optype(pred.node())
                 .as_load_constant()
                 .map(hugr_core::ops::LoadConstant::constant_type),
-            Some(&Type::new_sum(vec![[borrow_array_type(4, i64_t())]; 2]))
+            Some(&Type::new_sum(vec![
+                type_row![],
+                [borrow_array_type(4, i64_t())].into()
+            ]))
         );
     }
 
@@ -1329,8 +1354,11 @@ pub(super) mod test {
                 let list_of_var = list_type(tv.clone());
                 e.add_op(
                     READ.into(),
-                    "Like List::get but without the option".to_string(),
-                    PolyFuncType::new(params, Signature::new([list_of_var, usize_t()], [tv])),
+                    "Like List::pop but without the option".to_string(),
+                    PolyFuncType::new(
+                        params,
+                        Signature::new([list_of_var.clone()], [list_of_var, tv]),
+                    ),
                     w,
                 )
                 .unwrap();
@@ -1351,20 +1379,24 @@ pub(super) mod test {
         let i32_custom_t = i32_t().as_extension().unwrap().clone();
         let mut dfb = DFGBuilder::new(inout_sig(
             vec![list_type(i32_t()), list_type(opt_i32.clone())],
-            vec![i32_t(), opt_i32.clone()],
+            vec![
+                list_type(i32_t()),
+                i32_t(),
+                list_type(opt_i32.clone()),
+                opt_i32.clone(),
+            ],
         ))
         .unwrap();
         let [l_i, l_oi] = dfb.input_wires_arr();
-        let idx = dfb.add_load_value(ConstUsize::new(2));
-        let [i] = dfb
-            .add_dataflow_op(read_op(&e, i32_t()), [l_i, idx])
+        let [l_i, i] = dfb
+            .add_dataflow_op(read_op(&e, i32_t()), [l_i])
             .unwrap()
             .outputs_arr();
-        let [oi] = dfb
-            .add_dataflow_op(read_op(&e, opt_i32.clone()), [l_oi, idx])
+        let [l_oi, oi] = dfb
+            .add_dataflow_op(read_op(&e, opt_i32.clone()), [l_oi])
             .unwrap()
             .outputs_arr();
-        let mut h = dfb.finish_hugr_with_outputs([i, oi]).unwrap();
+        let mut h = dfb.finish_hugr_with_outputs([l_i, i, l_oi, oi]).unwrap();
 
         let mut lowerer = ReplaceTypes::default();
         lowerer.set_replace_type(i32_custom_t, qb_t());
@@ -1372,11 +1404,12 @@ pub(super) mod test {
         lowerer.set_replace_parametrized_type(list_type_def(), |args| {
             option_contents(args).map(list_type)
         });
-        // and read<option<x>> to get<x> - the latter has the expected option<x> return type
+        // Pop returns the list and an option, and supports arbitrary elements
+        // after the recursive i32-to-qubit replacement.
         lowerer.set_replace_parametrized_op(e.get_op(READ).unwrap().as_ref(), |args, _| {
             Ok(option_contents(args).map(|elem| {
                 NodeTemplate::SingleOp(
-                    ListOp::get
+                    ListOp::pop
                         .with_type(elem)
                         .to_extension_op()
                         .unwrap()
@@ -1385,13 +1418,20 @@ pub(super) mod test {
             }))
         });
         assert!(lowerer.run(&mut h).unwrap());
-        // list<usz>      -> read<usz>      -> usz just becomes list<qb> -> read<qb> -> qb
-        // list<opt<usz>> -> read<opt<usz>> -> opt<usz> becomes list<qb> -> get<qb>  -> opt<qb>
+        h.validate().unwrap();
+        // Both reads retain ownership of the list alongside their result.
+        // The option read becomes pop<qb>; the other remains read<qb>.
         assert_eq!(
             h.entrypoint_optype().dataflow_signature().unwrap().io(),
             (
                 &vec![list_type(qb_t()); 2].into(),
-                &vec![qb_t(), option_type([qb_t()]).into()].into()
+                &vec![
+                    list_type(qb_t()),
+                    qb_t(),
+                    list_type(qb_t()),
+                    option_type([qb_t()]).into()
+                ]
+                .into()
             )
         );
         assert_eq!(
@@ -1400,7 +1440,7 @@ pub(super) mod test {
                 .map(hugr_core::ops::ExtensionOp::qualified_id)
                 .sorted()
                 .collect_vec(),
-            ["NoBoundsCheck.read", "collections.list.get"]
+            ["NoBoundsCheck.read", "collections.list.pop"]
         );
     }
 
@@ -1615,7 +1655,7 @@ pub(super) mod test {
         let ep = h.entrypoint();
         lowerer.set_regions(vec![h.entrypoint()]);
         assert!(lowerer.run(&mut h).unwrap());
-        let v_u = list_type(usize_t());
+        let v_u = static_array_type(usize_t());
         assert_eq!(h.signature(ep).unwrap().as_ref(), &endo_sig([v_u.clone()]));
         assert_eq!(h.num_nodes(), h.num_nodes());
         let [f_in, _] = h.get_io(h.get_parent(ep).unwrap()).unwrap();
@@ -1698,7 +1738,7 @@ pub(super) mod test {
         );
 
         // Arrays of 64 bools should thus be transformed into PackedVec<bool> and then to int64s
-        // Arrays of 64 non-bools should thus become PackedVec<T> and thus List<T>
+        // Arrays of 64 non-bools become PackedVec<T> and then static_array<T>.
         let a64 = |t| array_type(64, t);
         let opt = |t| Type::from(option_type([t]));
         let mut dfb = DFGBuilder::new(Signature::new(
