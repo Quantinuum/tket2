@@ -33,7 +33,7 @@ use strum::{EnumIter, EnumString, IntoStaticStr};
 /// The "tket.qsystem.sol" extension id.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("tket.qsystem.sol");
 /// The "tket.qsystem.sol" extension version.
-pub const EXTENSION_VERSION: Version = Version::new(0, 6, 0);
+pub const EXTENSION_VERSION: Version = Version::new(0, 6, 1);
 
 lazy_static! {
     /// The "tket.qsystem.sol" extension.
