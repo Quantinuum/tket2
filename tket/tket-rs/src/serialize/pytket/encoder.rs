@@ -692,6 +692,8 @@ impl<H: HugrView> PytketEncoderContext<H> {
         // Output parameters are mapped to a fresh variable, that can be tracked
         // back to the encoded subcircuit's function name.
         let mut out_param_count = 0;
+        // Save the input count before the loop appends fresh output bits.
+        let input_bit_count = op_values.bits.len();
         let input_qubits = op_values.qubits.clone();
         let mut out_qubits = input_qubits.as_slice();
         // Separate output bits from input bits: opaque operations may return
@@ -746,6 +748,20 @@ impl<H: HugrView> PytketEncoderContext<H> {
                 params: Cow::Borrowed(&[]),
             };
             let mut pytket_op = make_tk1_operation(tket_json_rs::OpType::Barrier, args);
+            // Output bits are writes, not Boolean reads. Without classical edges,
+            // pytket can move a consumer before this barrier and the decoder will
+            // read an uninitialized bit instead of the subgraph's result.
+            // See https://github.com/Quantinuum/guppylang/issues/2423.
+            // Keep inputs as Boolean reads: multiple inputs may share a register.
+            for edge in pytket_op
+                .signature
+                .as_mut()
+                .unwrap()
+                .iter_mut()
+                .skip(op_values.qubits.len() + input_bit_count)
+            {
+                *edge = "C".into();
+            }
             pytket_op.data = Some(serde_json::to_string(&payload).unwrap());
 
             self.emit_command(pytket_op, &op_values.qubits, &op_values.bits, None);

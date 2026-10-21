@@ -2107,6 +2107,13 @@ fn opaque_repeated_bit_inputs_preserve_outputs(circ_opaque_repeated_bit_inputs: 
         .find(|command| command.op.op_type == optype::OpType::Barrier)
         .unwrap();
     assert_eq!(barrier.args.len(), 4);
+    // Shared inputs are reads, but fresh outputs must be writes so pytket
+    // preserves their dependencies on later consumers.
+    // Regression: https://github.com/Quantinuum/guppylang/issues/2423.
+    assert_eq!(
+        barrier.op.signature.as_ref().unwrap(),
+        &["B", "B", "C", "C"]
+    );
     assert_ne!(barrier.args[2], barrier.args[3]);
     encoded.reassemble_inplace(&mut decoded, None).unwrap();
     decoded.validate().unwrap();

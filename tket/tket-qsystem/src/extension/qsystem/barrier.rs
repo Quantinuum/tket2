@@ -164,4 +164,156 @@ mod test {
             .expect("identical barriers should share one wrapped function");
         assert_eq!(h.output_neighbours(wrapped_function).count(), 2);
     }
+
+    #[rstest]
+    #[case(QSystemPlatform::Helios)]
+    #[case(QSystemPlatform::Sol)]
+    fn wrapped_barrier_does_not_reuse_user_function(#[case] platform: QSystemPlatform) {
+        use hugr::builder::{DataflowSubContainer, HugrBuilder, ModuleBuilder};
+        use hugr::core::Visibility;
+        use hugr::types::Signature;
+        use tket::passes::ComposablePass;
+
+        let mut b = ModuleBuilder::new();
+        let identity = b
+            .define_function_vis(
+                "$wrapped_barrier$$n(2)$list($e(qubit)$e(qubit))",
+                Signature::new_endo([qb_t(), qb_t()]),
+                Visibility::Public,
+            )
+            .unwrap();
+        let inputs = identity.input_wires().collect_vec();
+        let identity_id = identity.finish_with_outputs(inputs).unwrap();
+
+        let mut main = b
+            .define_function_vis("main", Signature::new_endo([]), Visibility::Public)
+            .unwrap();
+        let q0 = main.add_dataflow_op(tket::TketOp::QAlloc, []).unwrap();
+        let q1 = main.add_dataflow_op(tket::TketOp::QAlloc, []).unwrap();
+        let identity_call = main
+            .call(identity_id.handle(), &[], [q0.out_wire(0), q1.out_wire(0)])
+            .unwrap();
+        let barrier = main.add_barrier(identity_call.outputs()).unwrap();
+        for q in barrier.outputs() {
+            main.add_dataflow_op(tket::TketOp::QFree, [q]).unwrap();
+        }
+        let main_id = main.finish_with_outputs([]).unwrap();
+        let mut h = b.finish_hugr().unwrap();
+        h.validate().unwrap();
+
+        crate::QSystemRebasePass::defaults(platform)
+            .run(&mut h)
+            .unwrap();
+        h.validate().unwrap();
+
+        assert_eq!(
+            h.static_source(identity_call.node()),
+            Some(identity_id.node())
+        );
+        assert_eq!(h.children(identity_id.node()).count(), 2);
+        let [input, output] = h.get_io(identity_id.node()).unwrap();
+        for port in 0..2 {
+            assert_eq!(
+                h.single_linked_output(output, port),
+                Some((input, port.into()))
+            );
+        }
+        assert_eq!(
+            h.get_optype(identity_id.node())
+                .as_func_defn()
+                .unwrap()
+                .visibility(),
+            &Visibility::Public
+        );
+        let runtime_barriers = h
+            .nodes()
+            .filter(|&n| {
+                h.get_optype(n)
+                    .as_extension_op()
+                    .is_some_and(|op| op.unqualified_id() == "RuntimeBarrier")
+            })
+            .collect_vec();
+        assert_eq!(
+            runtime_barriers.len(),
+            1,
+            "the runtime barrier must survive linking"
+        );
+        let runtime_op = h.get_optype(runtime_barriers[0]).as_extension_op().unwrap();
+        assert_eq!(runtime_op.args(), &[hugr::types::TypeArg::BoundedNat(2)]);
+        assert_eq!(
+            runtime_op.extension_id(),
+            &match platform {
+                QSystemPlatform::Helios => qsystem::helios::EXTENSION_ID,
+                QSystemPlatform::Sol => qsystem::sol::EXTENSION_ID,
+            }
+        );
+        let wrapper = h.get_parent(runtime_barriers[0]).unwrap();
+        assert_ne!(wrapper, identity_id.node());
+        assert_eq!(
+            h.get_optype(wrapper).as_func_defn().unwrap().visibility(),
+            &Visibility::Private
+        );
+        let call = h
+            .output_neighbours(wrapper)
+            .exactly_one()
+            .unwrap_or_else(|error| panic!("{error}"));
+        assert!(h.descendants(main_id.node()).contains(&call));
+    }
+
+    #[rstest]
+    #[case(QSystemPlatform::Helios)]
+    #[case(QSystemPlatform::Sol)]
+    fn repeated_container_barriers_share_helpers(
+        #[case] platform: QSystemPlatform,
+        #[values(false, true)] hide_funcs: bool,
+    ) {
+        use hugr::builder::FunctionBuilder;
+        use hugr::core::Visibility;
+        use hugr::types::Signature;
+        use tket::passes::ComposablePass;
+
+        let mut b =
+            FunctionBuilder::new("main", Signature::new_endo([borrow_array_type(2, qb_t())]))
+                .unwrap();
+        let mut wires = b.input_wires().collect_vec();
+        for _ in 0..64 {
+            wires = b.add_barrier(wires).unwrap().outputs().collect_vec();
+        }
+        let mut h = b.finish_hugr_with_outputs(wires).unwrap();
+        crate::QSystemRebasePass::defaults(platform)
+            .with_hide_funcs(hide_funcs)
+            .run(&mut h)
+            .unwrap();
+        h.validate().unwrap();
+
+        let helpers = h
+            .children(h.module_root())
+            .filter(|&n| {
+                h.get_optype(n)
+                    .as_func_defn()
+                    .is_some_and(|f| f.func_name() != "main")
+            })
+            .collect_vec();
+        assert_eq!(helpers.len(), 3, "unpack, wrapped barrier, repack");
+        for helper in helpers {
+            assert_eq!(h.output_neighbours(helper).count(), 64);
+            assert_eq!(
+                h.get_optype(helper).as_func_defn().unwrap().visibility(),
+                &if hide_funcs {
+                    Visibility::Private
+                } else {
+                    Visibility::Public
+                }
+            );
+        }
+        assert_eq!(
+            h.nodes()
+                .filter(|&n| h
+                    .get_optype(n)
+                    .as_extension_op()
+                    .is_some_and(|op| op.unqualified_id() == "RuntimeBarrier"))
+                .count(),
+            1
+        );
+    }
 }
