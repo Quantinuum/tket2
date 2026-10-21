@@ -162,10 +162,23 @@ impl<N: HugrNode> ModifierResolver<N> {
                         optype.to_owned(),
                     ));
                 }
+
                 chain.push(current);
                 break;
             }
 
+            // Check that the modfier node has not order edges
+            if optype
+                .other_input_port()
+                .is_some_and(|p| h.is_linked(current, p))
+                || optype
+                    .other_output_port()
+                    .is_some_and(|p| h.is_linked(current, p))
+            {
+                return Err(ModifierResolverErrors::unreachable(
+                    "Modifier node has order edges. The chain is malformed.",
+                ));
+            }
             chain.push(current);
             modifiers.push(optype.as_extension_op().unwrap(), current, h)?;
             let (new, _) = h
@@ -193,17 +206,25 @@ impl<N: HugrNode> ModifierResolver<N> {
         }
 
         // Modify the function loaded by the indirect call preserving the modifier state.
-        let (modified_fn, new_load_op) = self.with_modifiers(self.modifiers().clone(), |this| {
-            // Follow the function operand through its modifiers to the loader.
-            let trace = this.trace_indirect_call_to_load(h, ind_call_node)?;
-            let load_node = *trace.last().unwrap();
-            // Apply the combined modifiers and build the replacement loader.
-            this.modify_load(h, load_node)
-        })?;
+        let (load_node, modified_fn, new_load_op) =
+            self.with_modifiers(self.modifiers().clone(), |this| {
+                // Follow the function operand through its modifiers to the loader.
+                let trace = this.trace_indirect_call_to_load(h, ind_call_node)?;
+                let load_node = *trace.last().unwrap();
+                // Apply the combined modifiers and build the replacement loader.
+                let (modified_fn, new_load_op) = this.modify_load(h, load_node)?;
+                Ok::<_, ModifierResolverErrors<N>>((load_node, modified_fn, new_load_op))
+            })?;
 
         // Insert the modified loader into the new graph.
         let new_load_node = new_dfg.add_child_node(new_load_op);
         self.call_map_insert(modified_fn, (new_load_node, IncomingPort::from(0)));
+        self.wire_state_order(
+            load_node,
+            h.get_optype(load_node),
+            new_load_node,
+            new_dfg.hugr().get_optype(new_load_node),
+        )?;
 
         // Construct the replacement IndirectCall with additional control-array inputs and outputs.
         let mut new_ind_call = indir_call.clone();
@@ -288,7 +309,10 @@ mod tests {
         Hugr,
         builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
         extension::prelude::qb_t,
-        ops::{CallIndirect, ExtensionOp, handle::FuncID},
+        ops::{
+            CallIndirect, ExtensionOp,
+            handle::{FuncID, NodeHandle},
+        },
         std_extensions::arithmetic::{
             int_ops::IntOpDef,
             int_types::{ConstInt, INT_TYPES},
@@ -296,6 +320,169 @@ mod tests {
         std_extensions::collections::array::{ArrayOpBuilder, array_type},
         types::{Signature, Term, Type},
     };
+
+    /// Load an identity function through one or two controlled calls, optionally
+    /// sharing the loader with a plain call. Independent tags order the loader.
+    fn ordered_loader_function(
+        module: &mut ModuleBuilder<Hugr>,
+        sharing: usize,
+        modifier_order: Option<bool>,
+    ) -> FuncID<true> {
+        let signature = Signature::new_endo([qb_t()]);
+        let callee = {
+            let mut f = module
+                .define_function("identity", signature.clone())
+                .unwrap();
+            f.set_unitary();
+            let outputs = f.input_wires();
+            f.finish_with_outputs(outputs).unwrap()
+        };
+        let mut f = module
+            .define_function("ordered_loader", Signature::new_endo([qb_t(), qb_t()]))
+            .unwrap();
+        f.set_unitary();
+        let [mut control, mut target] = f.input_wires_arr();
+        let markers = std::array::from_fn::<_, 4, _>(|tag| {
+            f.add_child_node(hugr::ops::Tag::new(tag, vec![Default::default(); 37]))
+        });
+        let loaded = f.load_func(callee.handle(), &[]).unwrap();
+        // Two independent predecessors and successors exercise order fan-in/fan-out.
+        for &before in &markers[..2] {
+            connect_order(f.hugr_mut(), before, loaded.node());
+        }
+        for &after in &markers[2..] {
+            connect_order(f.hugr_mut(), loaded.node(), after);
+        }
+        // sharing: 0 = exclusive, 1 = also a plain call, 2 = two modified calls.
+        if sharing == 1 {
+            target = f
+                .add_dataflow_op(CallIndirect { signature }, [loaded, target])
+                .unwrap()
+                .out_wire(0);
+        }
+        for _ in 0..if sharing == 2 { 2 } else { 1 } {
+            let modifier = MODIFIER_EXTENSION
+                .instantiate_extension_op(
+                    &CONTROL_OP_ID,
+                    [Term::BoundedNat(1), [qb_t().into()].into(), [].into()],
+                )
+                .unwrap();
+            let controlled = f.add_dataflow_op(modifier, [loaded]).unwrap();
+            if let Some(incoming) = modifier_order {
+                let (source, target) = if incoming {
+                    (markers[0], controlled.node())
+                } else {
+                    (controlled.node(), markers[3])
+                };
+                connect_order(f.hugr_mut(), source, target);
+            }
+            let controls = f.add_new_array(qb_t(), [control]).unwrap();
+            let [controls, result] = f
+                .add_dataflow_op(
+                    CallIndirect {
+                        signature: Signature::new_endo([array_type(1, qb_t()), qb_t()]),
+                    },
+                    [controlled.out_wire(0), controls, target],
+                )
+                .unwrap()
+                .outputs_arr();
+            control = f.add_array_unpack(qb_t(), 1, controls).unwrap()[0];
+            target = result;
+        }
+        *f.finish_with_outputs([control, target]).unwrap().handle()
+    }
+
+    fn connect_order(h: &mut Hugr, source: Node, target: Node) {
+        let output = h.get_optype(source).other_output_port().unwrap();
+        let input = h.get_optype(target).other_input_port().unwrap();
+        h.connect(source, output, target, input);
+    }
+
+    #[rstest::rstest]
+    #[case::exclusive_in_place(false, 0)]
+    #[case::shared_plain_in_place(false, 1)]
+    #[case::shared_modifiers_in_place(false, 2)]
+    #[case::exclusive_rebuilt(true, 0)]
+    #[case::shared_plain_rebuilt(true, 1)]
+    #[case::shared_modifiers_rebuilt(true, 2)]
+    fn loader_order_edges_survive_modifier_resolution(
+        // rebuilt: false = apply_modification in place, true = modify_indirect_call in a rebuilt body.
+        #[case] rebuilt: bool,
+        // sharing: 0 = one modified call, 1 = modified + plain call, 2 = two modified calls.
+        #[case] sharing: usize,
+    ) {
+        let mut h = if rebuilt {
+            // An outer modifier exercises modify_indirect_call while rebuilding the body.
+            let (mut h, _) = modifier_test_hugr(
+                2,
+                1,
+                |module, _| ordered_loader_function(module, sharing, None),
+                false,
+            );
+            let main = dfg_modify::find_module_func_by_name(&h, "main").unwrap();
+            h.set_entrypoint(main);
+            h
+        } else {
+            let mut module = ModuleBuilder::new();
+            let f = ordered_loader_function(&mut module, sharing, None);
+            let mut h = module.finish_hugr().unwrap();
+            h.set_entrypoint(f.node());
+            h
+        };
+        h.validate().unwrap();
+        let entrypoint = h.entrypoint();
+        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        let name = if rebuilt {
+            "__modified__ordered_loader[C1]"
+        } else {
+            "ordered_loader"
+        };
+        let owner = dfg_modify::find_module_func_by_name(&h, name).unwrap();
+        let markers: [Node; 4] = std::array::from_fn(|tag| {
+            h.children(owner)
+                .find(|&n| matches!(h.get_optype(n), OpType::Tag(t) if t.variants.len() == 37 && t.tag == tag))
+                .unwrap()
+        });
+        let calls = h
+            .children(owner)
+            .filter(|&n| matches!(h.get_optype(n), OpType::CallIndirect(_)))
+            .collect_vec();
+        assert_eq!(calls.len(), if sharing == 0 { 1 } else { 2 });
+        for call in calls {
+            // Check the loader actually used by each call, rather than an unused
+            // copy that happens to retain the original edges.
+            let loader = h.single_linked_output(call, 0).unwrap().0;
+            assert!(matches!(h.get_optype(loader), OpType::LoadFunction(_)));
+            let op = h.get_optype(loader);
+            let predecessors = h
+                .linked_outputs(loader, op.other_input_port().unwrap())
+                .map(|(n, _)| n)
+                .collect::<HashSet<_>>();
+            let successors = h
+                .linked_inputs(loader, op.other_output_port().unwrap())
+                .map(|(n, _)| n)
+                .collect::<HashSet<_>>();
+            assert_eq!(predecessors, HashSet::from([markers[0], markers[1]]));
+            assert_eq!(successors, HashSet::from([markers[2], markers[3]]));
+        }
+        h.validate().unwrap();
+    }
+
+    #[rstest::rstest]
+    #[case::incoming(true)]
+    #[case::outgoing(false)]
+    fn modifier_nodes_with_order_edges_are_rejected(#[case] incoming: bool) {
+        let mut module = ModuleBuilder::new();
+        let f = ordered_loader_function(&mut module, 0, Some(incoming));
+        let mut h = module.finish_hugr().unwrap();
+        h.set_entrypoint(f.node());
+        let error = resolve_modifier_with_entrypoints(&mut h, [f.node()]).unwrap_err();
+        assert!(matches!(
+            error,
+            ModifierResolverErrors::Unreachable { msg }
+                if msg == "Modifier node has order edges. The chain is malformed."
+        ));
+    }
 
     #[test]
     fn modify_load_rejects_function_declaration() {

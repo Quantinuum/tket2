@@ -565,29 +565,20 @@ impl<N: HugrNode> ModifierResolver<N> {
         self.modifiers.control += 1;
     }
 
-    /// Register a correspondence from old to new wire.
+    /// Register a correspondence from old to new wire, retaining distinct targets.
     fn map_insert(
         &mut self,
         old: DirWire<N>,
         new: DirWire,
     ) -> Result<(), ModifierResolverErrors<N>> {
         let existing = self.corresp_map().entry(old).or_default();
-        match existing.as_slice() {
-            // No correspondence yet (vacant or previously emptied): register the new wire.
-            [] => {
-                existing.push(new);
-                Ok(())
-            }
-            // StateOrder correspondence may already have been registered while
-            // wiring a container's I/O ports. Re-registering the same wire is
-            // harmless; a different correspondence is still an error.
-            [former] if *former == new => Ok(()),
-            // If the old wire is already registered, raise an error.
-            [former, ..] => Err(ModifierResolverErrors::unreachable(format!(
-                "Wire already registered for node {}. Former [{},...], Latter {}.",
-                old.0, former, new
-            ))),
+        // Rewriting can split one node into several replacements. For example,
+        // two modified calls sharing a LoadFunction get separate loaders; both
+        // must inherit the original loader's order dependencies.
+        if !existing.contains(&new) {
+            existing.push(new);
         }
+        Ok(())
     }
 
     /// Remember that old wire has no correspondence.
@@ -755,14 +746,29 @@ impl<N: HugrNode> ModifierResolver<N> {
                 Ok((trace, load_node, modified_fn, new_load_op))
             },
         )?;
-        // Remove the old loader only if it has no other consumers.
+        // Insert the new loader and connect it to the modified function.
+        let new_load_node = hugr.add_node_before(indirect_call_node, new_load_op);
+        hugr.connect(modified_fn, 0, new_load_node, 0);
+        // Transfer order dependencies before removing the original loader.
+        let old_op = hugr.get_optype(load_node);
+        let old_input = old_op.other_input_port().unwrap();
+        let old_output = old_op.other_output_port().unwrap();
+        let predecessors = hugr.linked_outputs(load_node, old_input).collect_vec();
+        let successors = hugr.linked_inputs(load_node, old_output).collect_vec();
+        let new_op = hugr.get_optype(new_load_node);
+        let new_input = new_op.other_input_port().unwrap();
+        let new_output = new_op.other_output_port().unwrap();
+        for (source, port) in predecessors {
+            hugr.connect(source, port, new_load_node, new_input);
+        }
+        for (target, port) in successors {
+            hugr.connect(new_load_node, new_output, target, port);
+        }
+        // Remove the old loader only if it has no other value consumers.
         if hugr.linked_inputs(load_node, 0).count() == 1 {
             hugr.remove_node(load_node);
         }
 
-        // Insert the new loader and connect it to the modified function.
-        let new_load_node = hugr.add_node_before(indirect_call_node, new_load_op);
-        hugr.connect(modified_fn, 0, new_load_node, 0);
         // Disconnect the indirect caller from the modifier chain and connect it to the new loader.
         hugr.disconnect(indirect_call_node, IncomingPort::from(0));
         hugr.connect(new_load_node, 0, indirect_call_node, 0);
@@ -1449,15 +1455,8 @@ pub fn resolve_modifier_with_entrypoints_and_scope(
         }
     }
 
-    // After all rewrites, some modifier nodes may still remain in the graph
-    // (e.g. intermediate nodes in a chain whose last modifier was the one rewritten).
-    // Walk the same reachable set again and delete any surviving modifier nodes,
-    // together with every downstream node that consumes their output.
-    //
-    // NOTE:
-    // This might be insufficient as a cleanup since the resolution procedure might
-    // generate nodes that are not reachable from the entry points.
-    // If more thorough cleanup is needed, we should run dead code elimination.
+    // We do not expect any modifier nodes to remain after the main resolution pass.
+    // The following loop revisits all reachable nodes to ensure that no modifier nodes remain.
     let mut deletelist = entry_points.clone();
     let mut visited = FxHashSet::default();
     while let Some(node) = deletelist.pop_front() {
@@ -1476,15 +1475,10 @@ pub fn resolve_modifier_with_entrypoints_and_scope(
         visited.insert(node);
         if h.contains_node(node) {
             let optype = h.get_optype(node);
-            // NICOLA TODO this may be useless
             if Modifier::from_optype(optype).is_some() {
-                // Remove the modifier node and all nodes reachable through its
-                // output edges (i.e. nodes that would become disconnected).
-                let mut l = vec![node];
-                while let Some(n) = l.pop() {
-                    l.extend(h.output_neighbours(n));
-                    h.remove_node(n);
-                }
+                return Err(ModifierResolverErrors::unreachable(format!(
+                    "Modifier at node {node} remains unresolved; all modifiers should be resolved."
+                )));
             }
         }
     }
