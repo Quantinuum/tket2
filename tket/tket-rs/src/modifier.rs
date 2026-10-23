@@ -9,10 +9,7 @@
 //! Global phase is an operation that applies some global phase to a circuit.
 //! It is implemented as a side-effect that takes a rotation angle as an input.
 
-use hugr::{
-    HugrView, IncomingPort, Wire, core::HugrNode, extension::simple_op::MakeExtensionOp,
-    ops::ExtensionOp,
-};
+use hugr::{extension::simple_op::MakeExtensionOp, ops::ExtensionOp};
 use itertools::Itertools;
 
 use crate::extension::modifier::Modifier;
@@ -21,9 +18,9 @@ pub mod dagger;
 pub mod modifier_resolver;
 pub mod power;
 
-/// An accumulated modifier that combines control, dagger, and power modifiers.
+/// An accumulated modifier that combines control and dagger modifiers.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-struct CombinedModifier<N: HugrNode> {
+struct CombinedModifier {
     // Number of all control qubits
     control: usize,
     // Control arrays applied so far
@@ -31,18 +28,11 @@ struct CombinedModifier<N: HugrNode> {
     accum_ctrl: Vec<usize>,
     /// Whether the dagger modifier has been applied.
     dagger: bool,
-    /// The wires containing the exponent of the power modifier.
-    exponents: Vec<Wire<N>>,
 }
 
-impl<N: HugrNode> CombinedModifier<N> {
+impl CombinedModifier {
     /// Add a modifier
-    fn push(
-        &mut self,
-        ext_op: &ExtensionOp,
-        node: N,
-        hugr: &impl HugrView<Node = N>,
-    ) -> Result<(), modifier_resolver::ModifierResolverErrors<N>> {
+    fn push(&mut self, ext_op: &ExtensionOp) {
         match Modifier::from_extension_op(ext_op) {
             Ok(Modifier::ControlModifier) => {
                 let ctrl = ext_op.args()[0].as_nat().unwrap() as usize;
@@ -50,13 +40,9 @@ impl<N: HugrNode> CombinedModifier<N> {
                 self.accum_ctrl.push(ctrl);
             }
             Ok(Modifier::DaggerModifier) => self.dagger = !self.dagger,
-            Ok(Modifier::PowerModifier) => {
-                let exponent = Wire::from_connected_port(node, IncomingPort::from(1), hugr);
-                self.exponents.push(exponent);
-            }
+            Ok(Modifier::PowerModifier) => {}
             Err(_) => {}
         }
-        Ok(())
     }
 
     /// Returns a compact string representation of the combined modifier environment.
@@ -77,13 +63,12 @@ impl<N: HugrNode> CombinedModifier<N> {
     }
 }
 
-impl<N: HugrNode> Default for CombinedModifier<N> {
+impl Default for CombinedModifier {
     fn default() -> Self {
         Self {
             control: 0,
             accum_ctrl: Vec::new(),
             dagger: false,
-            exponents: Vec::new(),
         }
     }
 }

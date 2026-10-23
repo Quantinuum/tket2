@@ -121,12 +121,23 @@ use crate::passes::utils::unpack_container::TypeUnpacker;
 use crate::passes::{InScope, PassScope};
 use crate::{TketOp, extension::global_phase::GlobalPhase, modifier::Modifier};
 use global_phase_modify::delete_phase;
+use hugr::{
+    ops::{Case, Conditional, Input, LoadConstant, Output, TailLoop, Value},
+    std_extensions::arithmetic::{
+        int_ops::{self, IntOpDef},
+        int_types::{self, ConstInt, int_type},
+    },
+    type_row,
+};
 
 use hugr::{
     HugrView, IncomingPort, Node, OutgoingPort, Port, PortIndex, Wire,
     builder::{BuildError, CFGBuilder, Container, Dataflow, SubContainer},
     core::HugrNode,
-    extension::{prelude::qb_t, simple_op::MakeExtensionOp},
+    extension::{
+        prelude::{bool_t, qb_t},
+        simple_op::MakeExtensionOp,
+    },
     hugr::hugrmut::HugrMut,
     ops::{CFG, Const, OpTrait, OpType},
     std_extensions::collections::array::array_type,
@@ -308,7 +319,7 @@ impl<N: HugrNode> PortVector<N> {
 /// This struct holds the state during the modifier resolution process.
 pub struct ModifierResolver<N: HugrNode = Node> {
     /// Current accumulated modifiers.
-    modifiers: CombinedModifier<N>,
+    modifiers: CombinedModifier,
     /// A map from old wire to new wires.
     /// The keys are old wires, and the values are new wires.
     /// As noted at the head of this module, especially when dagger is applied,
@@ -329,9 +340,9 @@ pub struct ModifierResolver<N: HugrNode = Node> {
     /// full modifier, including the control-array layout.
     /// Entries are inserted before transforming bodies so recursive calls can
     /// reference the function currently being generated.
-    modified_impls: HashMap<(N, CombinedModifier<N>), N>,
+    modified_impls: HashMap<(N, CombinedModifier), N>,
     /// Cached adapters from the resolver's controls-first ABI to custom controls-last functions.
-    custom_adapters: HashMap<(N, N, CombinedModifier<N>), N>,
+    custom_adapters: HashMap<(N, N, CombinedModifier), N>,
     /// Analyser used to find qubits in types. Used to check when a type carries quantum data.
     qubit_finder: TypeUnpacker,
     /// Indicate whether the extension op being modified is targeted by some
@@ -439,6 +450,7 @@ mod modifier_error {
         #[display("Modification by {_0:?} is not defined for the node {_1}")]
         Unimplemented(Modifier, OpType),
         /// The power modifier is not supported.
+        #[deprecated(since = "0.23.0", note = "Power is supported now!")]
         #[display("Found power modifier in node: {node}. Power modifier is not supported yet.")]
         PowerModifierNotSupported {
             /// The `power` node
@@ -468,10 +480,10 @@ impl<N> ModifierResolverErrors<N> {
 
 // Utility functions for ModifierResolver
 impl<N: HugrNode> ModifierResolver<N> {
-    fn modifiers_mut(&mut self) -> &mut CombinedModifier<N> {
+    fn modifiers_mut(&mut self) -> &mut CombinedModifier {
         &mut self.modifiers
     }
-    fn modifiers(&self) -> &CombinedModifier<N> {
+    fn modifiers(&self) -> &CombinedModifier {
         &self.modifiers
     }
     fn control_num(&self) -> usize {
@@ -530,7 +542,7 @@ impl<N: HugrNode> ModifierResolver<N> {
 
     fn with_modifiers<T>(
         &mut self,
-        modifiers: CombinedModifier<N>,
+        modifiers: CombinedModifier,
         f: impl FnOnce(&mut Self) -> T,
     ) -> T {
         let modifiers = mem::replace(self.modifiers_mut(), modifiers);
@@ -734,48 +746,248 @@ impl<N: HugrNode> ModifierResolver<N> {
     ) -> Result<(), ModifierResolverErrors<N>> {
         // Make sure that the modifiers are initially empty.
         assert_eq!(self.modifiers(), &CombinedModifier::default());
+
         // Modify the function loaded by the indirect call preserving the modifier state.
-        let (trace, load_node, modified_fn, new_load_op) = self.with_modifiers(
+        let (trace, load_node, modified_fn, new_load_op, exponent_wires) = self.with_modifiers(
             self.modifiers().clone(),
             |this| -> Result<_, ModifierResolverErrors<N>> {
                 // Collect the chain for cleanup while accumulating its modifiers.
-                let trace = this.trace_indirect_call_to_load(hugr, indirect_call_node)?;
+                let (trace, exponents_wires) =
+                    this.trace_indirect_call_to_load(hugr, indirect_call_node)?;
                 let load_node = *trace.last().unwrap();
                 // Modify the loaded function and prepare its replacement loader.
                 let (modified_fn, new_load_op) = this.modify_load(hugr, load_node)?;
-                Ok((trace, load_node, modified_fn, new_load_op))
+                Ok((trace, load_node, modified_fn, new_load_op, exponents_wires))
             },
         )?;
-        // Insert the new loader and connect it to the modified function.
-        let new_load_node = hugr.add_node_before(indirect_call_node, new_load_op);
-        hugr.connect(modified_fn, 0, new_load_node, 0);
-        // Transfer order dependencies before removing the original loader.
-        let old_op = hugr.get_optype(load_node);
-        let old_input = old_op.other_input_port().unwrap();
-        let old_output = old_op.other_output_port().unwrap();
-        let predecessors = hugr.linked_outputs(load_node, old_input).collect_vec();
-        let successors = hugr.linked_inputs(load_node, old_output).collect_vec();
-        let new_op = hugr.get_optype(new_load_node);
-        let new_input = new_op.other_input_port().unwrap();
-        let new_output = new_op.other_output_port().unwrap();
-        for (source, port) in predecessors {
-            hugr.connect(source, port, new_load_node, new_input);
-        }
-        for (target, port) in successors {
-            hugr.connect(new_load_node, new_output, target, port);
-        }
-        // Remove the old loader only if it has no other value consumers.
-        if hugr.linked_inputs(load_node, 0).count() == 1 {
-            hugr.remove_node(load_node);
-        }
 
-        // Disconnect the indirect caller from the modifier chain and connect it to the new loader.
-        hugr.disconnect(indirect_call_node, IncomingPort::from(0));
-        hugr.connect(new_load_node, 0, indirect_call_node, 0);
+        if !exponent_wires.is_empty() {
+            let mut exponent_wire = exponent_wires[0];
+            for wire in &exponent_wires[1..] {
+                let multiply =
+                    hugr.add_node_before(indirect_call_node, IntOpDef::imul.with_log_width(6));
+                hugr.connect(exponent_wire.node(), exponent_wire.source(), multiply, 0);
+                hugr.connect(wire.node(), wire.source(), multiply, 1);
+                exponent_wire = Wire::new(multiply, 0);
+            }
+
+            // NICOLA: COMMENT PR: A.i. suggestion
+            // Ensure that the integer extensions are available
+            hugr.use_extension(int_types::EXTENSION.clone());
+            hugr.use_extension(int_ops::EXTENSION.clone());
+
+            let OpType::CallIndirect(indirect_call_op) =
+                hugr.get_optype(indirect_call_node).clone()
+            else {
+                unreachable!("expected CallIndirect");
+            };
+
+            // NICOLA: todo: move these variables as below as you can, to leave them closer their first use
+            let fun_signature = indirect_call_op.signature.clone();
+            // we add the exponent input as last input
+            let exponent_port = fun_signature.input_count();
+            // in the tail loop we pass the function inputs + exponent as inout args
+            let loop_inout = fun_signature.input.extend([&int_type(6)]);
+            // the output of the loop is the selector plus inout
+            let loop_selector = hugr::types::TypeRow::from(vec![bool_t()]);
+            let loop_body_output = loop_selector.extend(loop_inout.iter());
+            let parent = hugr.get_parent(indirect_call_node).unwrap();
+
+            // Load 0 constant
+            let zero_node = hugr.add_node_with_parent(
+                parent,
+                Const::new(Value::extension(ConstInt::new_s(6, 0).unwrap())),
+            );
+            let load_zero_op = LoadConstant {
+                datatype: int_type(6),
+            };
+            let constant_port = load_zero_op.constant_port();
+            let load_zero_node = hugr.add_node_after(zero_node, load_zero_op);
+            hugr.connect(zero_node, 0, load_zero_node, constant_port);
+
+            // Compare the exponent with zero
+            let compare = hugr.add_node_after(load_zero_node, IntOpDef::igt_s.with_log_width(6));
+            hugr.connect(exponent_wire.node(), exponent_wire.source(), compare, 0);
+            hugr.connect(load_zero_node, 0, compare, 1);
+
+            // Build the external conditional:
+            // - if the exponent is > 0 then we run the tail loop representing the powered function
+            // - else we skip it
+            let conditional = hugr.add_node_after(
+                compare,
+                Conditional {
+                    sum_rows: vec![type_row![], type_row![]],
+                    other_inputs: loop_inout.clone(),
+                    outputs: fun_signature.output.clone(),
+                },
+            );
+            // wire the function inputs to the conditional
+            hugr.connect(compare, 0, conditional, 0);
+            for i in 0..exponent_port {
+                let wire =
+                    Wire::from_connected_port(indirect_call_node, IncomingPort::from(i + 1), hugr);
+                hugr.connect(wire.node(), wire.source(), conditional, i + 1);
+            }
+            // wire the exponent
+            hugr.connect(
+                exponent_wire.node(),
+                exponent_wire.source(),
+                conditional,
+                exponent_port + 1,
+            );
+
+            for branch in 0..2 {
+                let case = hugr.add_node_with_parent(
+                    conditional,
+                    Case {
+                        signature: Signature::new(loop_inout.clone(), fun_signature.output.clone()),
+                    },
+                );
+                let cond_input = hugr.add_node_with_parent(
+                    case,
+                    Input {
+                        types: loop_inout.clone(),
+                    },
+                );
+                let cond_output = hugr.add_node_with_parent(
+                    case,
+                    Output {
+                        types: fun_signature.output.clone(),
+                    },
+                );
+                let result = if branch == 0 {
+                    // branch 0 is the skip case, simply pass inputs to outputs
+                    cond_input
+                } else {
+                    // branch 1 is the loop case
+                    let loop_node = hugr.add_node_with_parent(
+                        case,
+                        TailLoop {
+                            just_inputs: type_row![],
+                            just_outputs: type_row![],
+                            rest: loop_inout.clone(),
+                        },
+                    );
+                    for i in 0..=exponent_port {
+                        hugr.connect(cond_input, i, loop_node, i);
+                    }
+                    let loop_input = hugr.add_node_with_parent(
+                        loop_node,
+                        Input {
+                            types: loop_inout.clone(),
+                        },
+                    );
+                    let loop_output = hugr.add_node_with_parent(
+                        loop_node,
+                        Output {
+                            types: loop_body_output.clone(),
+                        },
+                    );
+
+                    // load and indirectly call the modified function
+                    let new_load_node = hugr.add_node_with_parent(loop_node, new_load_op.clone());
+                    hugr.connect(modified_fn, 0, new_load_node, 0);
+                    let call = hugr.add_node_after(new_load_node, indirect_call_op.clone());
+                    hugr.connect(new_load_node, 0, call, 0);
+                    // all inputs apart from exponent go to call
+                    for i in 0..exponent_port {
+                        hugr.connect(loop_input, i, call, i + 1);
+                    }
+
+                    // insert the exponent decrement
+                    let one = hugr.add_node_with_parent(
+                        loop_node,
+                        Const::new(Value::extension(ConstInt::new_s(6, 1).unwrap())),
+                    );
+                    let load_one_op = LoadConstant {
+                        datatype: int_type(6),
+                    };
+                    let constant_port = load_one_op.constant_port();
+                    let load_one = hugr.add_node_after(one, load_one_op);
+                    hugr.connect(one, 0, load_one, constant_port);
+                    let decrement = hugr.add_node_after(load_one, IntOpDef::isub.with_log_width(6));
+                    hugr.connect(loop_input, exponent_port, decrement, 0);
+                    hugr.connect(load_one, 0, decrement, 1);
+
+                    // compare the exponent with zero
+                    let compare = hugr.add_node_after(decrement, IntOpDef::igt_s.with_log_width(6));
+                    hugr.connect(decrement, 0, compare, 0);
+                    let inner_zero_node = hugr.add_node_with_parent(
+                        loop_node,
+                        Const::new(Value::extension(ConstInt::new_s(6, 0).unwrap())),
+                    );
+                    let load_zero_op = LoadConstant {
+                        datatype: int_type(6),
+                    };
+                    let constant_port = load_zero_op.constant_port();
+                    let load_zero_node = hugr.add_node_after(inner_zero_node, load_zero_op);
+
+                    hugr.connect(inner_zero_node, 0, load_zero_node, constant_port);
+                    hugr.connect(load_zero_node, 0, compare, 1);
+
+                    // the tail loop output takes the compare result followed by the call output + exponent
+                    hugr.connect(compare, 0, loop_output, 0);
+                    for i in 0..exponent_port {
+                        hugr.connect(call, i, loop_output, i + 1);
+                    }
+                    hugr.connect(decrement, 0, loop_output, exponent_port + 1);
+
+                    loop_node
+                };
+                // connect loop outputs or skip outputs
+                for i in 0..fun_signature.output_count() {
+                    hugr.connect(result, i, cond_output, i);
+                }
+            }
+
+            // disconect the indirect call outputs and reconnect to conditional
+            for out_port in hugr.node_outputs(indirect_call_node).collect_vec() {
+                for (target, target_port) in hugr
+                    .linked_inputs(indirect_call_node, out_port)
+                    .collect_vec()
+                {
+                    hugr.disconnect(target, target_port);
+                    hugr.connect(conditional, out_port, target, target_port);
+                }
+            }
+
+            hugr.remove_node(indirect_call_node);
+
+            std::fs::write("power_res.mmd", hugr.mermaid_string()).unwrap();
+            println!("±±±±±±±±±±±±±±±§§§§§§§§§§§§§§§§§§§±±±±±±±±±±±±±±");
+        } else {
+            // Insert the new loader and connect it to the modified function.
+            let new_load_node = hugr.add_node_before(indirect_call_node, new_load_op);
+            hugr.connect(modified_fn, 0, new_load_node, 0);
+            // Transfer order dependencies before removing the original loader.
+            let old_op = hugr.get_optype(load_node);
+            let old_input = old_op.other_input_port().unwrap();
+            let old_output = old_op.other_output_port().unwrap();
+            let predecessors = hugr.linked_outputs(load_node, old_input).collect_vec();
+            let successors = hugr.linked_inputs(load_node, old_output).collect_vec();
+            let new_op = hugr.get_optype(new_load_node);
+            let new_input = new_op.other_input_port().unwrap();
+            let new_output = new_op.other_output_port().unwrap();
+            for (source, port) in predecessors {
+                hugr.connect(source, port, new_load_node, new_input);
+            }
+            for (target, port) in successors {
+                hugr.connect(new_load_node, new_output, target, port);
+            }
+
+            // Disconnect the indirect caller from the modifier chain and connect it to the new loader.
+            hugr.disconnect(indirect_call_node, IncomingPort::from(0));
+            hugr.connect(new_load_node, 0, indirect_call_node, 0);
+        }
 
         // Then remove the chain, skipping the last node (the original `load_node`).
         for node in &trace[..trace.len().saturating_sub(1)] {
             hugr.remove_node(*node);
+        }
+
+        // Remove the old loader only if it has no remaining value consumers.
+        if hugr.linked_inputs(load_node, 0).next().is_none() {
+            hugr.remove_node(load_node);
         }
 
         Ok(())
@@ -1475,6 +1687,7 @@ pub fn resolve_modifier_with_entrypoints_and_scope(
         visited.insert(node);
         if h.contains_node(node) {
             let optype = h.get_optype(node);
+            // NICOLA: TODO: a dedicated error for this case
             if Modifier::from_optype(optype).is_some() {
                 return Err(ModifierResolverErrors::unreachable(format!(
                     "Modifier at node {node} remains unresolved; all modifiers should be resolved."
@@ -2309,6 +2522,15 @@ mod tests {
     fn test_examples(#[case] example: &str) {
         let mut h = load_guppy_example(example).unwrap();
         test_resolve(&mut h);
+    }
+
+    #[test]
+    fn test_power_example() {
+        let mut h =
+            load_guppy_example("../../test_files/modifier_examples/triple_modifier.hugr").unwrap();
+        std::fs::write("power.mmd", h.mermaid_string()).unwrap();
+        let entrypoint = h.entrypoint();
+        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
     }
 
     #[test]

@@ -1187,7 +1187,6 @@ mod test {
             control: 1,
             accum_ctrl: vec![1],
             dagger: false,
-            exponents: vec![],
         };
         resolver
     }
@@ -1327,7 +1326,6 @@ mod test {
                     control: accum_ctrl.iter().sum(),
                     accum_ctrl: accum_ctrl.clone(),
                     dagger,
-                    exponents: vec![],
                 };
                 let first = resolver.modify_fn(&mut h, original.node()).unwrap();
                 let second = resolver.modify_fn(&mut h, original.node()).unwrap();
@@ -1364,7 +1362,6 @@ mod test {
             control: 1,
             accum_ctrl: vec![1],
             dagger: false,
-            exponents: vec![],
         };
 
         let first = resolver
@@ -1406,7 +1403,6 @@ mod test {
             control: accum_ctrl.iter().sum(),
             accum_ctrl,
             dagger,
-            exponents: vec![],
         };
 
         let modified = resolver.modify_fn(&mut h, original.node()).unwrap();

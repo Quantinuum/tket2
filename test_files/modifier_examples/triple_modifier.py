@@ -25,7 +25,7 @@ def main(c1: qubit) -> None:  # , c2: qubit, t: qubit) -> None:
     # c1 = qubit()
     # t = qubit()
     # h(c1)
-    with power(2):
+    with power(2), power(4):
         h(c1)
 
     # with control(c1):
