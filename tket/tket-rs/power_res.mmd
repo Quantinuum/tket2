@@ -49,20 +49,20 @@ graph LR
                                 60["(60) const:custom:u64(1)"]
                                 61["(61) LoadConstant"]
                                 62["(62) arithmetic.int.isub"]
-                                63["(63) arithmetic.int.igt_s"]
-                                64["(64) const:custom:u64(0)"]
-                                65["(65) LoadConstant"]
+                                63["(63) const:custom:u64(0)"]
+                                64["(64) LoadConstant"]
+                                65["(65) arithmetic.int.igt_s"]
                                 56--"0:1<br>prelude.qubit"-->59
                                 56--"1:0<br>arithmetic.int.types.int"-->62
                                 58--"0:0<br>[prelude.qubit] -> [prelude.qubit]"-->59
                                 59--"0:1<br>prelude.qubit"-->57
                                 60--"0:0<br>arithmetic.int.types.int"-->61
                                 61--"0:1<br>arithmetic.int.types.int"-->62
-                                62--"0:0<br>arithmetic.int.types.int"-->63
+                                62--"0:0<br>arithmetic.int.types.int"-->65
                                 62--"0:2<br>arithmetic.int.types.int"-->57
-                                63--"0:0<br>Bool"-->57
-                                64--"0:0<br>arithmetic.int.types.int"-->65
-                                65--"0:1<br>arithmetic.int.types.int"-->63
+                                63--"0:0<br>arithmetic.int.types.int"-->64
+                                64--"0:1<br>arithmetic.int.types.int"-->65
+                                65--"0:0<br>Bool"-->57
                             end
                             53--"0:0<br>prelude.qubit"-->55
                             53--"1:1<br>arithmetic.int.types.int"-->55
