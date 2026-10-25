@@ -475,9 +475,9 @@ mod test {
     use crate::passes::cfg::gating_path::DomTreeWithBackedges;
 
     #[rstest]
-    #[case("/Users/alanlawrence/repos/tierkreis/doubler.hugr")]
-    #[case("/Users/alanlawrence/repos/tierkreis/doubler_indirect_minopt.hugr")]
-    #[case("/Users/alanlawrence/repos/tierkreis/shortcircuit_if.hugr")]
+    #[case("../../test_files/cfgs/doubler.hugr")]
+    #[case("../../test_files/cfgs/doubler_indirect_minopt.hugr")]
+    #[case("../../test_files/cfgs/shortcircuit_if.hugr")]
     fn non_loop(#[case] fname: impl AsRef<Path>) {
         let reader = BufReader::new(File::open(fname).unwrap());
         let backup = Hugr::load(reader, None).unwrap();
@@ -494,12 +494,12 @@ mod test {
     }
 
     #[rstest]
-    #[case("/Users/alanlawrence/repos/tierkreis/tierkreis_loop.hugr")]
-    #[case("/Users/alanlawrence/repos/guppylang/multi_exit_loop.hugr")]
-    #[case("/Users/alanlawrence/repos/guppylang/nested_loop.hugr")]
-    #[case("/Users/alanlawrence/repos/guppylang/early_return.hugr")]
-    #[case("/Users/alanlawrence/repos/guppylang/test_exec_array_loop.hugr")]
-    #[case("/Users/alanlawrence/repos/guppylang/test_control_flow.hugr")]
+    #[case("../../test_files/cfgs/tierkreis_loop.hugr")]
+    #[case("../../test_files/cfgs/multi_exit_loop.hugr")]
+    #[case("../../test_files/cfgs/nested_loop.hugr")]
+    #[case("../../test_files/cfgs/early_return.hugr")]
+    #[case("../../test_files/cfgs/test_exec_array_loop.hugr")]
+    #[case("../../test_files/cfgs/test_control_flow.hugr")]
     fn tierkreis_loop(#[case] fname: impl AsRef<Path>) {
         use crate::passes::{ComposablePass, Normalize};
 
