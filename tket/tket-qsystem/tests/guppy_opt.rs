@@ -32,12 +32,19 @@ enum HugrFileType {
     Optimized,
 }
 
+impl HugrFileType {
+    fn suffix(&self) -> &str {
+        match self {
+            HugrFileType::Original => "",
+            HugrFileType::Flat => ".flat",
+            HugrFileType::Optimized => ".opt",
+        }
+    }
+}
+
+
 fn load_guppy_circuit(name: &str, file_type: HugrFileType) -> std::io::Result<Hugr> {
-    let suffix = match file_type {
-        HugrFileType::Original => "",
-        HugrFileType::Flat => ".flat",
-        HugrFileType::Optimized => ".opt",
-    };
+    let suffix = file_type.suffix();
     load_guppy_example(&format!("{name}/{name}{suffix}.hugr"))
 }
 
@@ -93,22 +100,41 @@ fn count_gates(h: &impl HugrView) -> HashMap<SmolStr, usize> {
 
 #[rstest]
 #[case::nested_array("nested_array", None)]
+#[case::nested_array_v1_1("nested_array_v1.1", None)]
 #[should_panic = "xfail"]
 #[case::angles("angles", Some(vec![
+    ("tket.quantum.MeasureFree", 1), ("tket.quantum.QAlloc", 1), ("tket.result.result_bool", 1)
+]))]
+#[should_panic = "xfail"]
+#[case::angles_v1_1("angles_v1.1", Some(vec![
     ("tket.quantum.MeasureFree", 1), ("tket.quantum.QAlloc", 1), ("tket.result.result_bool", 1)
 ]))]
 #[should_panic = "xfail"]
 #[case::simple_cx("simple_cx", Some(vec![
     ("tket.quantum.QAlloc", 2), ("tket.quantum.MeasureFree", 2), ("tket.result.result_bool", 2)
 ]))]
+#[should_panic = "xfail"]
+#[case::simple_cx_v1_1("simple_cx_v1.1", Some(vec![
+    ("tket.quantum.QAlloc", 2), ("tket.quantum.MeasureFree", 2), ("tket.result.result_bool", 2)
+]))]
 #[case::nested("nested", None)]
+#[case::nested_v1_1("nested_v1.1", None)]
 #[case::ranges("ranges", None)]
+#[case::ranges_v1_1("ranges_v1.1", None)]
 #[should_panic = "xfail"]
 #[case::false_branch("false_branch", Some(vec![
     ("tket.quantum.QAlloc", 1), ("tket.quantum.MeasureFree", 1), ("tket.result.result_bool", 1)
 ]))]
 #[should_panic = "xfail"]
+#[case::false_branch_v1_1("false_branch_v1.1", Some(vec![
+    ("tket.quantum.QAlloc", 1), ("tket.quantum.MeasureFree", 1), ("tket.result.result_bool", 1)
+]))]
+#[should_panic = "xfail"]
 #[case::func_decls("func_decls", Some(vec![
+    ("TKET1.tk1op", 2), ("tket.quantum.symbolic_angle", 1)
+]))]
+#[should_panic = "xfail"]
+#[case::func_decls_v1_1("func_decls_v1.1", Some(vec![
     ("TKET1.tk1op", 2), ("tket.quantum.symbolic_angle", 1)
 ]))]
 #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
@@ -135,10 +161,10 @@ fn optimize_flattened_guppy(#[case] name: &str, #[case] xfail: Option<Vec<(&str,
 
 #[rstest]
 #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
-fn optimize_guppy_ranges_array() {
+fn optimize_guppy_ranges_array(#[values("ranges", "ranges_v1.1")]dir: &str) {
     // Demonstrates we can fully optimize the array operations in ranges
     // (i.e. after control flow is flattened, but the array ops are not)
-    let mut hugr = load_guppy_example("ranges/ranges.flat.array.hugr").unwrap();
+    let mut hugr = load_guppy_example(&format!("{dir}/ranges.flat.array.hugr")).unwrap();
 
     Normalize::default().run(&mut hugr).unwrap();
     run_pytket(&mut hugr, CLIFFORD_SIMP_STR);
