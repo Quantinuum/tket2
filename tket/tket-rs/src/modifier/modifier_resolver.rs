@@ -138,7 +138,7 @@ use hugr::{
 
 /// A modified callee and the original chain to clean up after replacing its call.
 struct ResolvedModification<N> {
-    modifier_nodes: Vec<N>,
+    modifier_chain: Vec<N>,
     load_node: N,
     modified_fn: N,
     load_op: LoadFunction,
@@ -759,7 +759,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                 // Modify the loaded function and prepare its replacement loader.
                 let (modified_fn, load_op) = this.modify_load(hugr, load_node)?;
                 Ok(ResolvedModification {
-                    modifier_nodes: trace,
+                    modifier_chain: trace,
                     load_node,
                     modified_fn,
                     load_op,
@@ -775,7 +775,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         }
 
         // Then remove the chain, skipping the last node (the original `load_node`).
-        for node in resolved.modifier_nodes {
+        for node in resolved.modifier_chain {
             hugr.remove_node(node);
         }
 
