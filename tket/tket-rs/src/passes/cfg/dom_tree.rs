@@ -1,5 +1,5 @@
 //! Analysis of Control-Flow Graphs using dominator-strong components decomposition
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, BTreeSet};
 use std::fmt::Debug;
 
 use hugr::core::HugrNode;
@@ -239,4 +239,40 @@ pub(super) fn leaf_targets<'a, H: HugrView, P: Path<H::Node> + 'a>(
         gp.leaves()
             .map(|((node, port), _)| hugr.single_linked_input(node, port).unwrap().0)
     })
+}
+
+pub type EdgeSources<N> = BTreeSet<(N, OutgoingPort)>;
+
+impl<N: HugrNode> Path<N> for EdgeSources<N> {
+    type OptPath = Self;
+
+    fn new_edge(node: N, outport: OutgoingPort) -> Self {
+        Self::from([(node, outport)])
+    }
+
+    fn new_branch(_node: N, _num_outports: usize, _outport: OutgoingPort, ch: Self) -> Self {
+        ch
+    }
+
+    fn union(&mut self, other: &Self) {
+        self.extend(other);
+    }
+
+    fn concat(&self, other: &Self) -> Self {
+        assert!(!self.is_empty());
+        other.clone()
+    }
+
+    fn leaves(&self) -> impl Iterator<Item = ((N, OutgoingPort), Self)> {
+        self.iter()
+            .map(|&(node, outport)| ((node, outport), Self::from([(node, outport)])))
+    }
+
+    fn opt_as_ref(opt: &Self::OptPath) -> Option<&Self> {
+        (!opt.is_empty()).then_some(opt)
+    }
+
+    fn union_opt(opt: &mut Self::OptPath, other: &Self) {
+        opt.extend(other);
+    }
 }

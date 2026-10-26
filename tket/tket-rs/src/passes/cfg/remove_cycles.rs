@@ -479,7 +479,8 @@ mod test {
     use std::{fs::File, io::BufReader};
 
     use super::nest_loop;
-    use crate::passes::cfg::{dom_tree::DomTreeWithBackedges, gating_path::GatingPath};
+    use crate::passes::cfg::dom_tree::{DomTreeWithBackedges, EdgeSources};
+    use crate::passes::cfg::gating_path::GatingPath;
 
     fn gating_path() -> GatingPath<Node> {
         GatingPath::Always(Node::from(portgraph::NodeIndex::new(0)), 0.into())
@@ -490,7 +491,7 @@ mod test {
     #[case("../../test_files/cfgs/doubler_indirect_minopt.hugr")]
     #[case("../../test_files/cfgs/shortcircuit_if.hugr")]
     fn non_loop<P: super::Path<Node>>(
-        #[values(gating_path())] _unused: P,
+        #[values(gating_path(), EdgeSources::new())] _unused: P,
         #[case] fname: impl AsRef<std::path::Path>,
     ) {
         let reader = BufReader::new(File::open(fname).unwrap());
@@ -515,7 +516,7 @@ mod test {
     #[case("../../test_files/cfgs/test_exec_array_loop.hugr")]
     #[case("../../test_files/cfgs/test_control_flow.hugr")]
     fn tierkreis_loop<P: super::Path<Node>>(
-        #[values(gating_path())] _unused: P,
+        #[values(gating_path(), EdgeSources::new())] _unused: P,
         #[case] fname: impl AsRef<std::path::Path>,
     ) {
         use crate::passes::{ComposablePass, Normalize};

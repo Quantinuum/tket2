@@ -137,14 +137,15 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for Normalize {
         // (Possibly also this may assist modifier resolution??)
         if self.remove_cfg_cycles {
             // TODO ALAN make this into a separate ComposablePass
-            use super::cfg::{gating_path::DomTreeWithBackedges, remove_cycles::nest_loop};
+            use super::cfg::dom_tree::{DomTreeWithBackedges, EdgeSources};
+            use super::cfg::remove_cycles::nest_loop;
             let cfgs = self
                 .scope
                 .regions(hugr)
                 .filter(|n| hugr.get_optype(*n).is_cfg())
                 .collect::<Vec<_>>();
             for n in cfgs {
-                let dtn = DomTreeWithBackedges::new_for_cfg(&hugr, n);
+                let dtn = DomTreeWithBackedges::<Node, EdgeSources<Node>>::new_for_cfg(&hugr, n);
                 nest_loop(dtn, &mut *hugr);
             }
         }
