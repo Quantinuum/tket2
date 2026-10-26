@@ -183,9 +183,11 @@ impl<N: HugrNode> ModifierResolver<N> {
                 ));
             }
             chain.push(current);
-            // Power expoent wire are tracked separately, since they are not comuleted during the resolution
+            // Power exponent wires are stored for runtime resolution.
             if matches!(Modifier::from_optype(optype), Some(Modifier::PowerModifier)) {
-                exponent_wires.push(Wire::from_connected_port(current, IncomingPort::from(1), h));
+                let wire = Wire::from_connected_port(current, IncomingPort::from(1), h);
+                modifiers.exponent_wires.push(wire);
+                exponent_wires.push(wire);
             } else {
                 modifiers.push(optype.as_extension_op().unwrap());
             }

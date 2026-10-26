@@ -20,13 +20,18 @@ from guppylang.std.quantum import angle, discard, h, qubit, ry
 enable_experimental_features()
 
 
+@guppy.declare
+def fun(q: qubit, i: int): ...
+
+
 @guppy
-def main(c1: qubit) -> None:  # , c2: qubit, t: qubit) -> None:
+def main(c1: qubit, i: int) -> None:  # , c2: qubit, t: qubit) -> None:
     # c1 = qubit()
     # t = qubit()
     # h(c1)
     with power(2), power(4):
-        h(c1)
+        i += 1
+        fun(c1, i)
 
     # with control(c1):
     #     # with control(c2):  # , dagger:

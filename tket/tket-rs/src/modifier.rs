@@ -9,7 +9,7 @@
 //! Global phase is an operation that applies some global phase to a circuit.
 //! It is implemented as a side-effect that takes a rotation angle as an input.
 
-use hugr::{extension::simple_op::MakeExtensionOp, ops::ExtensionOp};
+use hugr::{Node, Wire, core::HugrNode, extension::simple_op::MakeExtensionOp, ops::ExtensionOp};
 use itertools::Itertools;
 
 use crate::extension::modifier::Modifier;
@@ -18,9 +18,9 @@ pub mod dagger;
 pub mod modifier_resolver;
 pub mod power;
 
-/// An accumulated modifier that combines control and dagger modifiers.
+/// An accumulated modifier that combines control, dagger, and power modifiers.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-struct CombinedModifier {
+struct CombinedModifier<N: HugrNode = Node> {
     // Number of all control qubits
     control: usize,
     // Control arrays applied so far
@@ -28,9 +28,11 @@ struct CombinedModifier {
     accum_ctrl: Vec<usize>,
     /// Whether the dagger modifier has been applied.
     dagger: bool,
+    /// Runtime exponent wires collected from power modifiers.
+    exponent_wires: Vec<Wire<N>>,
 }
 
-impl CombinedModifier {
+impl<N: HugrNode> CombinedModifier<N> {
     /// Add a modifier
     fn push(&mut self, ext_op: &ExtensionOp) {
         match Modifier::from_extension_op(ext_op) {
@@ -63,12 +65,13 @@ impl CombinedModifier {
     }
 }
 
-impl Default for CombinedModifier {
+impl<N: HugrNode> Default for CombinedModifier<N> {
     fn default() -> Self {
         Self {
             control: 0,
             accum_ctrl: Vec::new(),
             dagger: false,
+            exponent_wires: Vec::new(),
         }
     }
 }

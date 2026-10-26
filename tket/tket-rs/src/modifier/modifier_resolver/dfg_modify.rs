@@ -1187,6 +1187,7 @@ mod test {
             control: 1,
             accum_ctrl: vec![1],
             dagger: false,
+            exponent_wires: Vec::new(),
         };
         resolver
     }
@@ -1326,6 +1327,7 @@ mod test {
                     control: accum_ctrl.iter().sum(),
                     accum_ctrl: accum_ctrl.clone(),
                     dagger,
+                    exponent_wires: Vec::new(),
                 };
                 let first = resolver.modify_fn(&mut h, original.node()).unwrap();
                 let second = resolver.modify_fn(&mut h, original.node()).unwrap();
@@ -1362,6 +1364,7 @@ mod test {
             control: 1,
             accum_ctrl: vec![1],
             dagger: false,
+            exponent_wires: Vec::new(),
         };
 
         let first = resolver
@@ -1403,6 +1406,7 @@ mod test {
             control: accum_ctrl.iter().sum(),
             accum_ctrl,
             dagger,
+            exponent_wires: Vec::new(),
         };
 
         let modified = resolver.modify_fn(&mut h, original.node()).unwrap();

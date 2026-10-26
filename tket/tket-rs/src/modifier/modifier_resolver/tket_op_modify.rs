@@ -600,7 +600,7 @@ impl<N: HugrNode> ModifierResolver<N> {
     }
 }
 
-impl CombinedModifier {
+impl<N: HugrNode> CombinedModifier<N> {
     /// If the modified operation can be represented as a TketOp,
     /// returns the modified operation, otherwise returns `None`.
     ///
