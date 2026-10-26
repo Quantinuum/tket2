@@ -337,7 +337,7 @@ fn create_with_io<H: HugrMut>(h: &mut H, after: H::Node, op: impl Into<OpType>) 
     let n = h.add_node_after(after, op);
     let i = h.add_node_with_parent(n, Input { types: input });
     let o = h.add_node_with_parent(n, Output { types: output });
-    return [n, i, o];
+    [n, i, o]
 }
 
 fn wire_all<H: HugrMut>(h: &mut H, src_node: H::Node, tgt_node: H::Node) {
