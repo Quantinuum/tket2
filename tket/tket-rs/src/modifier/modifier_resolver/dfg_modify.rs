@@ -586,6 +586,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         };
         let mut poly_signature = old_fn_defn.signature().clone();
         self.modify_signature(poly_signature.body_mut(), false);
+        self.append_power_inputs(poly_signature.body_mut());
 
         let mut new_fn = FunctionBuilder::new(
             "__modified__".to_string()

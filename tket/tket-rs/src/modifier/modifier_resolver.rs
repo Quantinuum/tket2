@@ -132,7 +132,7 @@ use hugr::{
     extension::{prelude::qb_t, simple_op::MakeExtensionOp},
     hugr::hugrmut::HugrMut,
     ops::{CFG, Const, LoadFunction, OpTrait, OpType},
-    std_extensions::collections::array::array_type,
+    std_extensions::{arithmetic::int_types::int_type, collections::array::array_type},
     types::{EdgeKind, FuncTypeBase, Signature, Type},
 };
 
@@ -819,6 +819,14 @@ impl<N: HugrNode> ModifierResolver<N> {
             // Insert the same control array types at the beginning of the output signature
             output.to_mut().splice(0..0, control_types);
         }
+    }
+
+    /// Appends one runtime exponent input for each registered power modifier.
+    fn append_power_inputs(&self, signature: &mut Signature) {
+        signature.input.to_mut().extend(iter::repeat_n(
+            int_type(6),
+            self.modifiers.exponent_wires.len(),
+        ));
     }
 
     // We take an arbitrary topological order of the circuit so that we can plug the control qubits
