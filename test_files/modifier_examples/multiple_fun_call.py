@@ -4,9 +4,9 @@
 #    "guppylang==1.2",
 # ]
 # ///
-"""Testing nested modifiers
-
-The hugr generated from this script is also used to benchmark the performance of modifier passes resolver
+"""
+Test multiple function calls with modifiers.
+Issue: https://github.com/Quantinuum/guppylang/issues/2461
 """
 
 from pathlib import Path

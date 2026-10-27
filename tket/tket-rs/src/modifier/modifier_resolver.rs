@@ -118,7 +118,6 @@ use super::CombinedModifier;
 use crate::passes::utils::unpack_container::TypeUnpacker;
 use crate::passes::{InScope, PassScope};
 use crate::{TketOp, extension::global_phase::GlobalPhase, modifier::Modifier};
-use global_phase_modify::delete_phase;
 
 use hugr::{
     HugrView, IncomingPort, Node, OutgoingPort, Port, PortIndex, Wire,
@@ -1416,8 +1415,7 @@ pub fn resolve_modifier_with_entrypoints(
 
 /// Resolve modifiers reachable from the root selected by `scope`.
 ///
-/// Does nothing when the scope has no root. Cleanup of solved original
-/// functions respects the scope's interface preservation policy.
+/// Does nothing when the scope has no root.
 pub fn resolve_modifier(
     h: &mut impl HugrMut<Node = Node>,
     scope: &PassScope,
@@ -1427,6 +1425,7 @@ pub fn resolve_modifier(
     };
 
     if h.get_optype(root).is_module() {
+        // Get all the functions in the module
         let entry_points = h
             .children(root)
             .filter(|&node| h.get_optype(node).is_func_defn())
@@ -1470,8 +1469,6 @@ fn resolve_modifier_from_entrypoints(
     let mut visited_function = FxHashSet::default();
     let mut child_worklist = VecDeque::new();
     let mut nodes_to_modify = Vec::new();
-
-    std::fs::write("unsolved.mmd", h.mermaid_string()).unwrap();
 
     while let Some(function) = function_worklist.pop_front() {
         if !visited_function.insert(function) {
@@ -2330,7 +2327,7 @@ mod tests {
         "../../test_files/modifier_examples/subscript_in_dagger_ctrl.hugr"
     )]
     #[case::custom_modifier1("../../test_files/modifier_examples/custom_modifier.hugr")]
-    #[case::tmp("../../test_files/modifier_examples/tmp.hugr")]
+    #[case::multiple_fun_call("../../test_files/modifier_examples/multiple_fun_call.hugr")]
     #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     fn test_examples(#[case] example: &str) {
         let mut h = load_guppy_example(example).unwrap();

@@ -3,9 +3,9 @@ from pathlib import Path
 
 from hugr.build.base import Hugr
 from hugr.ops import Custom, ExtOp
-from tket_exts import modifier
 from tket._state import CompilationState
 from tket.passes import ModifierResolverPass, Normalize
+from tket_exts import modifier
 
 mr_pass = ModifierResolverPass()
 normalize = Normalize()
@@ -35,7 +35,6 @@ def apply_passes(input_paths: list[Path], output_dir: Path) -> None:
             )
             for _, data in resolved.nodes()
         ), f"Unresolved modifier nodes remain in {input_path.name}"
-        # resolved.render_dot().view("aaaa")
         CompilationState.from_python(resolved).validate()
         output_path = output_dir / f"{input_path.stem}_solved.hugr"
         output_path.write_bytes(resolved.to_bytes())

@@ -889,6 +889,103 @@ mod tests {
         test_modifier_resolver(target_num, ctrl_num, foo, dagger);
     }
 
+    /// A plain call keeps f live while a daggered call rebuilds its controlled H.
+    #[test]
+    fn plain_and_daggered_calls_to_function_with_controlled_h() {
+        let mut module = ModuleBuilder::new();
+        let h_sig = Signature::new_endo([qb_t()]);
+        let hadamard = {
+            let mut h = module.define_function("h", h_sig.clone()).unwrap();
+            h.set_unitary();
+            let [q] = h.input_wires_arr();
+            let q = h.add_dataflow_op(TketOp::H, [q]).unwrap().out_wire(0);
+            h.finish_with_outputs([q]).unwrap()
+        };
+
+        // f(c, q): with control(c): h(q)
+        let f_sig = Signature::new_endo([qb_t(), qb_t()]);
+        let f = {
+            let mut f = module.define_function("f", f_sig.clone()).unwrap();
+            f.set_unitary();
+            let [c, q] = f.input_wires_arr();
+            let loaded_h = f.load_func(hadamard.handle(), &[]).unwrap();
+            let control = MODIFIER_EXTENSION
+                .instantiate_extension_op(
+                    &CONTROL_OP_ID,
+                    [
+                        Term::BoundedNat(1),
+                        Term::new_list([qb_t()]),
+                        Term::new_list(Vec::<Type>::new()),
+                    ],
+                )
+                .unwrap();
+            let controlled_h = f.add_dataflow_op(control, [loaded_h]).unwrap().out_wire(0);
+            let controls = f.add_new_array(qb_t(), [c]).unwrap();
+            let [controls, q] = f
+                .add_dataflow_op(
+                    CallIndirect {
+                        signature: Signature::new_endo([array_type(1, qb_t()), qb_t()]),
+                    },
+                    [controlled_h, controls, q],
+                )
+                .unwrap()
+                .outputs_arr();
+            let [c] = f
+                .add_array_unpack(qb_t(), 1, controls)
+                .unwrap()
+                .try_into()
+                .unwrap();
+            f.finish_with_outputs([c, q]).unwrap()
+        };
+
+        // main(): allocate c and q; f(c, q); dagger(f)(c, q); discard both.
+        let mut main = module
+            .define_function("main", Signature::new_endo([]))
+            .unwrap();
+        let c = main
+            .add_dataflow_op(TketOp::QAlloc, [])
+            .unwrap()
+            .out_wire(0);
+        let q = main
+            .add_dataflow_op(TketOp::QAlloc, [])
+            .unwrap()
+            .out_wire(0);
+        let plain_call = main.call(f.handle(), &[], [c, q]).unwrap();
+        let [c, q] = plain_call.outputs_arr();
+        let loaded_f = main.load_func(f.handle(), &[]).unwrap();
+        let dagger = MODIFIER_EXTENSION
+            .instantiate_extension_op(
+                &DAGGER_OP_ID,
+                [
+                    Term::new_list([qb_t(), qb_t()]),
+                    Term::new_list(Vec::<Type>::new()),
+                ],
+            )
+            .unwrap();
+        let daggered_f = main
+            .add_dataflow_op(dagger, [loaded_f])
+            .unwrap()
+            .out_wire(0);
+        let daggered_call = main
+            .add_dataflow_op(CallIndirect { signature: f_sig }, [daggered_f, c, q])
+            .unwrap();
+        for q in daggered_call.outputs() {
+            main.add_dataflow_op(TketOp::QFree, [q]).unwrap();
+        }
+        let main_node = main.finish_with_outputs([]).unwrap().node();
+        let mut h = module.finish_hugr().unwrap();
+        h.set_entrypoint(main_node);
+
+        test_resolve(&mut h);
+
+        // The plain call still uses f; the daggered call uses a resolved copy.
+        assert_eq!(h.static_source(plain_call.node()), Some(f.node()));
+        let daggered_f = dfg_modify::find_module_func_by_name(&h, "__modified__f[D]").unwrap();
+        let loader = h.single_linked_output(daggered_call.node(), 0).unwrap().0;
+        assert_eq!(h.static_source(loader), Some(daggered_f));
+        assert_ne!(daggered_f, f.node());
+    }
+
     /// Resolve this HUGR, where both indirect calls in f share one LoadFunction:
     ///
     /// ```text
