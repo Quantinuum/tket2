@@ -1139,6 +1139,7 @@ where
 mod test {
     use super::super::tests::{
         SetUnitary, modifier_test_hugr, resolved_modifier_test_hugr, test_modifier_resolver,
+        test_resolve,
     };
     use super::super::*;
     use crate::extension::{
@@ -1774,8 +1775,7 @@ mod test {
         }
 
         let mut h = module.finish_hugr().unwrap();
-        let entrypoint = h.entrypoint();
-        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        test_resolve(&mut h);
         assert_matches!(h.validate(), Ok(()));
     }
 
@@ -1898,8 +1898,7 @@ mod test {
         let mut h = module.finish_hugr().unwrap();
         assert_matches!(h.validate(), Ok(()));
 
-        let entrypoint = h.entrypoint();
-        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        test_resolve(&mut h);
         assert_matches!(h.validate(), Ok(()));
     }
 
@@ -2023,8 +2022,7 @@ mod test {
         let mut h = module.finish_hugr().unwrap();
         assert_matches!(h.validate(), Ok(()));
 
-        let entrypoint = h.entrypoint();
-        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        test_resolve(&mut h);
         assert_matches!(h.validate(), Ok(()));
     }
 
@@ -2147,8 +2145,7 @@ mod test {
         }
 
         let mut h = module.finish_hugr().unwrap();
-        let entrypoint = h.entrypoint();
-        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        test_resolve(&mut h);
         assert_matches!(h.validate(), Ok(()));
     }
 
@@ -2539,8 +2536,7 @@ mod test {
         h: &mut Hugr,
         expected: &str,
     ) -> Result<(), ModifierResolverErrors> {
-        let entrypoint = h.entrypoint();
-        match resolve_modifier_with_entrypoints(h, [entrypoint]) {
+        match resolve_modifier(h, &PassScope::default()) {
             Err(ModifierResolverErrors::UnResolvable { msg, .. }) => {
                 assert_eq!(msg, expected);
                 Ok(())
@@ -2798,8 +2794,7 @@ mod test {
         let mut h = module.finish_hugr().unwrap();
         assert_matches!(h.validate(), Ok(()));
 
-        let entrypoint = h.entrypoint();
-        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        test_resolve(&mut h);
 
         assert_matches!(h.validate(), Ok(()));
     }
@@ -2872,8 +2867,7 @@ mod test {
     fn resolve_and_validate_polymorphic_array_input(module: ModuleBuilder<Hugr>) {
         let mut h = module.finish_hugr().unwrap();
         assert_matches!(h.validate(), Ok(()));
-        let entrypoint = h.entrypoint();
-        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        test_resolve(&mut h);
         assert_matches!(h.validate(), Ok(()));
     }
 

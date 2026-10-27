@@ -1,8 +1,7 @@
 //! Try to delete modifier by applying the modifier to each component.
 //!
-//! The entry point of this module is [`resolve_modifier_with_entrypoints`]
-//! which takes a hugr and a list of entry points.
-//! Modifier resolver visits all the nodes reachable from the entry points.
+//! The entry point of this module is [`resolve_modifier`], which takes a hugr
+//! and a pass scope. The resolver visits all nodes reachable from the scope's root.
 //!
 //! The main struct [`ModifierResolver`] holds the state during the process,
 //! and implements the core logic. `corresp_map` holds
@@ -1396,18 +1395,46 @@ fn remove_unused_modified_functions<N: HugrNode>(
 /// from the entrypoint, from nodes whose interface is preserved by the default
 /// pass scope, or from other preserved modified functions.
 ///
-/// Use [`resolve_modifier_with_entrypoints_and_scope`] to make cleanup follow a
-/// specific [`PassScope`].
+/// Use [`resolve_modifier`] to select the entrypoint and cleanup policy through
+/// a [`PassScope`].
 //
 // Shouldn't we use a worklist of nodes?
 // As we may want to change the order of resolving modifiers
 // but might want to rollback if the second last one is called in a different path,
 // this may be needed.
+
+#[deprecated(
+    since = "0.23.0",
+    note = "Use resolve_modifier with a PassScope instead"
+)]
 pub fn resolve_modifier_with_entrypoints(
     h: &mut impl HugrMut<Node = Node>,
     entry_points: impl IntoIterator<Item = Node>,
 ) -> Result<(), ModifierResolverErrors<Node>> {
-    resolve_modifier_with_entrypoints_and_scope(h, entry_points, &PassScope::default())
+    resolve_modifier_from_entrypoints(h, entry_points, &PassScope::default())
+}
+
+/// Resolve modifiers reachable from the root selected by `scope`.
+///
+/// Does nothing when the scope has no root. Cleanup of solved original
+/// functions respects the scope's interface preservation policy.
+pub fn resolve_modifier(
+    h: &mut impl HugrMut<Node = Node>,
+    scope: &PassScope,
+) -> Result<(), ModifierResolverErrors<Node>> {
+    let Some(root) = scope.root(h) else {
+        return Ok(());
+    };
+
+    if h.get_optype(root).is_module() {
+        let entry_points = h
+            .children(root)
+            .filter(|&node| h.get_optype(node).is_func_defn())
+            .collect_vec();
+        resolve_modifier_from_entrypoints(h, entry_points, scope)
+    } else {
+        resolve_modifier_from_entrypoints(h, [root], scope)
+    }
 }
 
 /// Resolve modifiers in a circuit by applying them to each entry point.
@@ -1415,7 +1442,21 @@ pub fn resolve_modifier_with_entrypoints(
 /// Cleanup of solved original function nodes respects `scope`: a function is
 /// only removed when it is no longer needed and [`PassScope::in_scope`] says the
 /// function may be modified freely.
+///
+/// Use [`resolve_modifier`] to select the entrypoint through a [`PassScope`].
+#[deprecated(
+    since = "0.23.0",
+    note = "Use resolve_modifier with a PassScope instead"
+)]
 pub fn resolve_modifier_with_entrypoints_and_scope(
+    h: &mut impl HugrMut<Node = Node>,
+    entry_points: impl IntoIterator<Item = Node>,
+    scope: &PassScope,
+) -> Result<(), ModifierResolverErrors<Node>> {
+    resolve_modifier_from_entrypoints(h, entry_points, scope)
+}
+
+fn resolve_modifier_from_entrypoints(
     h: &mut impl HugrMut<Node = Node>,
     entry_points: impl IntoIterator<Item = Node>,
     scope: &PassScope,
@@ -1423,68 +1464,50 @@ pub fn resolve_modifier_with_entrypoints_and_scope(
     // Collect entry points into a deque so they can be cloned for later cleanup passes.
     let entry_points: VecDeque<_> = entry_points.into_iter().collect();
 
-    // Walk all nodes reachable from the entry points (children and neighbours)
-    // and attempt to rewrite each modifier node it encounters.
+    // Traverse function bodies and unmodified callees, collecting calls to rewrite.
     let mut resolver = ModifierResolver::new();
-    let mut worklist = entry_points.clone();
-    let mut visited = FxHashSet::default();
+    let mut function_worklist = entry_points.clone();
+    let mut visited_function = FxHashSet::default();
+    let mut child_worklist = VecDeque::new();
+    let mut nodes_to_modify = Vec::new();
 
-    while let Some(node) = worklist.pop_front() {
-        // Skip nodes that have been removed during previous rewrites or already visited.
-        if !h.contains_node(node) || visited.contains(&node) {
+    std::fs::write("unsolved.mmd", h.mermaid_string()).unwrap();
+
+    while let Some(function) = function_worklist.pop_front() {
+        if !visited_function.insert(function) {
             continue;
         }
-        // `modify_fn` leaves the original function in the module and records it in
-        // `modified_functions` after generating the replacement. From this point on,
-        // the original body is stale: walking into it again would resolve modifier
-        // chains that have already been accounted for in the replacement function.
-        if module_child_containing(h, node)
-            .is_some_and(|owner| resolver.modified_functions.contains(&owner))
-        {
-            visited.insert(node);
-            continue;
-        }
-        // Expand the frontier: enqueue children and dataflow neighbours not yet visited.
-        worklist.extend(h.children(node).filter(|n| !visited.contains(n)));
-        worklist.extend(h.all_neighbours(node).filter(|n| !visited.contains(n)));
-        visited.insert(node);
+        child_worklist.push_back(function);
+        while let Some(node) = child_worklist.pop_front() {
+            child_worklist.extend(h.children(node));
 
-        if resolver.should_modify(h, node)? {
-            resolver.apply_modification(h, node)?;
-        }
-    }
+            if resolver.should_modify(h, node)? {
+                nodes_to_modify.push(node);
+            }
 
-    // We do not expect any modifier nodes to remain after the main resolution pass.
-    // The following loop revisits all reachable nodes to ensure that no modifier nodes remain.
-    let mut deletelist = entry_points.clone();
-    let mut visited = FxHashSet::default();
-    while let Some(node) = deletelist.pop_front() {
-        // Keep the cleanup pass out of stale original function bodies too. Their
-        // modifier nodes may still be present, but removing them after the
-        // replacement has been built can invalidate the untouched original HUGR
-        // structure and is unnecessary for the solved entrypoint.
-        if module_child_containing(h, node)
-            .is_some_and(|owner| resolver.modified_functions.contains(&owner))
-        {
-            visited.insert(node);
-            continue;
-        }
-        deletelist.extend(h.children(node).filter(|n| !visited.contains(n)));
-        deletelist.extend(h.all_neighbours(node).filter(|n| !visited.contains(n)));
-        visited.insert(node);
-        if h.contains_node(node) {
-            let optype = h.get_optype(node);
-            if Modifier::from_optype(optype).is_some() {
-                return Err(ModifierResolverErrors::unreachable(format!(
-                    "Modifier at node {node} remains unresolved; all modifiers should be resolved."
-                )));
+            // If we have an unmodified call we need to explore it
+            let function = match h.get_optype(node) {
+                OpType::Call(_) => h.static_source(node),
+                OpType::LoadFunction(_) => {
+                    if h.linked_inputs(node, 0).all(|(consumer, _)| {
+                        Modifier::from_optype(h.get_optype(consumer)).is_some()
+                    }) {
+                        continue;
+                    }
+                    h.static_source(node)
+                }
+                _ => None,
+            };
+
+            if let Some(function) = function {
+                function_worklist.push_back(function);
             }
         }
     }
 
-    // Ad hoc cleanup procedure: remove any dangling global-phase nodes that
-    // were produced or left behind by the resolution passes above.
-    delete_phase(h, entry_points)?;
+    for node in nodes_to_modify {
+        resolver.apply_modification(h, node)?;
+    }
 
     // Remove only original functions for which this resolver generated modified
     // replacements, and only when no remaining non-obsolete function uses them.
@@ -1521,7 +1544,10 @@ mod tests {
         TketOp,
         extension::modifier::{CONTROL_OP_ID, DAGGER_OP_ID, MODIFIER_EXTENSION},
         metadata,
-        passes::{composable::Preserve, force_order::force_order},
+        passes::{
+            ComposablePass, ModifierResolverPass, WithScope, composable::Preserve,
+            force_order::force_order,
+        },
     };
 
     use super::*;
@@ -1604,17 +1630,10 @@ mod tests {
     ) -> Hugr {
         let (mut h, foo_node) = modifier_test_hugr(target_num, ctrl_num, foo, dagger);
 
-        let entrypoint = h.entrypoint();
-        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        test_resolve(&mut h);
 
         // We check that the original function node has been removed in the resolved hugr
         assert!(!h.contains_node(foo_node));
-
-        // We also check that there is no modifier node in the resolved hugr.
-        assert!(
-            h.nodes()
-                .all(|node| Modifier::from_optype(h.get_optype(node)).is_none())
-        );
 
         // The resolved hugr must still be structurally valid.
         assert_matches!(h.validate(), Ok(()));
@@ -1794,8 +1813,7 @@ mod tests {
         force_order(&mut h, foo_node, |_, _| 0).unwrap();
         assert_eq!(state_order_edge_count(&h, foo_node), 2);
 
-        let entrypoint = h.entrypoint();
-        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        test_resolve(&mut h);
         let modified_function = h
             .nodes()
             .find(|node| {
@@ -1919,8 +1937,7 @@ mod tests {
         let mut h = module.finish_hugr().unwrap();
         assert_matches!(h.validate(), Ok(()));
 
-        let entrypoint = h.entrypoint();
-        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        test_resolve(&mut h);
 
         // Check that the shared load and original function are still present after resolution.
         assert!(h.contains_node(shared_load_node));
@@ -2005,8 +2022,7 @@ mod tests {
         let mut h = module.finish_hugr().unwrap();
         assert_matches!(h.validate(), Ok(()));
 
-        let entrypoint = h.entrypoint();
-        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        test_resolve(&mut h);
 
         // Only the original function that was actually replaced is removed.
         assert!(!h.contains_node(foo_node));
@@ -2080,8 +2096,7 @@ mod tests {
         let mut h = module.finish_hugr().unwrap();
         assert_matches!(h.validate(), Ok(()));
 
-        let entrypoint = h.entrypoint();
-        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        test_resolve(&mut h);
 
         assert!(h.contains_node(foo_node));
         assert_matches!(h.validate(), Ok(()));
@@ -2154,8 +2169,7 @@ mod tests {
         assert_matches!(h.validate(), Ok(()));
 
         let scope = PassScope::Global(Preserve::Entrypoint);
-        let root = scope.root(&h).unwrap();
-        resolve_modifier_with_entrypoints_and_scope(&mut h, [root], &scope).unwrap();
+        test_resolve_with_scope(&mut h, scope);
 
         assert!(!h.contains_node(foo_node));
         assert_matches!(h.validate(), Ok(()));
@@ -2253,8 +2267,7 @@ mod tests {
         let mut h = module.finish_hugr().unwrap();
         assert_matches!(h.validate(), Ok(()));
 
-        let entrypoint = h.entrypoint();
-        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        test_resolve(&mut h);
 
         // Keeping original `bar` also requires keeping its original dependency `foo`.
         assert!(h.contains_node(bar_node));
@@ -2268,19 +2281,32 @@ mod tests {
         Ok(Hugr::load(reader, None).unwrap())
     }
 
-    /// Resolve modifiers in `h`
-    fn test_resolve(h: &mut Hugr) {
-        assert_matches!(h.validate(), Ok(()));
-
-        let entrypoint = PassScope::default()
-            .root(&h)
-            .unwrap_or_else(|| h.entrypoint());
-        resolve_modifier_with_entrypoints(h, [entrypoint]).unwrap();
-
+    /// Assert that every modifier has been resolved, including in retained functions.
+    pub(crate) fn assert_modifiers_resolved(h: &impl HugrView<Node = Node>) {
+        let unresolved = h
+            .nodes()
+            .filter_map(|node| {
+                Modifier::from_optype(h.get_optype(node)).map(|modifier| (node, modifier))
+            })
+            .collect_vec();
         assert!(
-            h.nodes()
-                .all(|node| Modifier::from_optype(h.get_optype(node)).is_none())
+            unresolved.is_empty(),
+            "Unresolved modifier nodes: {unresolved:?}"
         );
+    }
+
+    /// Run the modifier pass using its default scope and check its postconditions.
+    pub(crate) fn test_resolve(h: &mut Hugr) {
+        test_resolve_with_scope(h, PassScope::default());
+    }
+
+    fn test_resolve_with_scope(h: &mut Hugr, scope: PassScope) {
+        assert_matches!(h.validate(), Ok(()));
+        ModifierResolverPass::default()
+            .with_scope(scope)
+            .run(h)
+            .unwrap();
+        assert_modifiers_resolved(h);
         assert_matches!(h.validate(), Ok(()));
     }
 
@@ -2304,6 +2330,7 @@ mod tests {
         "../../test_files/modifier_examples/subscript_in_dagger_ctrl.hugr"
     )]
     #[case::custom_modifier1("../../test_files/modifier_examples/custom_modifier.hugr")]
+    #[case::tmp("../../test_files/modifier_examples/tmp.hugr")]
     #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     fn test_examples(#[case] example: &str) {
         let mut h = load_guppy_example(example).unwrap();
@@ -2317,8 +2344,7 @@ mod tests {
             load_guppy_example("../../test_files/guppy_examples/use_of_power.hugr").unwrap();
         assert_matches!(h.validate(), Ok(()));
 
-        let entrypoint = h.entrypoint();
-        let result = resolve_modifier_with_entrypoints(&mut h, [entrypoint]);
+        let result = resolve_modifier(&mut h, &PassScope::default());
         assert_matches!(
             result,
             Err(ModifierResolverErrors::PowerModifierNotSupported { node: _ })
@@ -2410,8 +2436,7 @@ mod tests {
         let mut h = module.finish_hugr().unwrap();
         assert_matches!(h.validate(), Ok(()));
 
-        let entrypoint = h.entrypoint();
-        let result = resolve_modifier_with_entrypoints(&mut h, [entrypoint]);
+        let result = resolve_modifier(&mut h, &PassScope::default());
         assert_matches!(
             result,
             Err(ModifierResolverErrors::UnResolvable { node: _, msg, optype: _ }) => {

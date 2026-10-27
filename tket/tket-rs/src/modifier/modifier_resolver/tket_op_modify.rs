@@ -673,7 +673,7 @@ mod test {
     };
     use crate::{
         extension::rotation::ConstRotation,
-        modifier::modifier_resolver::tests::{SetUnitary, test_modifier_resolver},
+        modifier::modifier_resolver::tests::{SetUnitary, test_modifier_resolver, test_resolve},
         modifier::modifier_resolver::*,
     };
 
@@ -896,13 +896,8 @@ mod test {
 
         let mut h = module.finish_hugr().unwrap();
         assert_matches!(h.validate(), Ok(()));
-        let entrypoint = h.entrypoint();
-        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        test_resolve(&mut h);
         assert_matches!(h.validate(), Ok(()));
-        assert!(
-            h.nodes()
-                .all(|node| Modifier::from_optype(h.get_optype(node)).is_none())
-        );
         assert!(
             h.nodes()
                 .any(|node| TketOp::from_optype(h.get_optype(node)) == Some(TketOp::Measure))
@@ -1012,8 +1007,7 @@ mod test {
 
         let mut h = module.finish_hugr().unwrap();
 
-        let entrypoint = h.entrypoint();
-        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        test_resolve(&mut h);
         assert_matches!(h.validate(), Ok(()));
     }
 }

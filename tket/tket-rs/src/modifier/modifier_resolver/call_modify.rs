@@ -309,7 +309,9 @@ impl<N: HugrNode> ModifierResolver<N> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::tests::{SetUnitary, modifier_test_hugr, test_modifier_resolver};
+    use super::super::tests::{
+        SetUnitary, modifier_test_hugr, test_modifier_resolver, test_resolve,
+    };
     use super::super::*;
     use crate::TketOp;
     use crate::extension::modifier::{CONTROL_OP_ID, DAGGER_OP_ID, MODIFIER_EXTENSION};
@@ -438,8 +440,7 @@ mod tests {
             h
         };
         h.validate().unwrap();
-        let entrypoint = h.entrypoint();
-        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        test_resolve(&mut h);
         let name = if rebuilt {
             "__modified__ordered_loader[C1]"
         } else {
@@ -484,7 +485,7 @@ mod tests {
         let f = ordered_loader_function(&mut module, 0, Some(incoming));
         let mut h = module.finish_hugr().unwrap();
         h.set_entrypoint(f.node());
-        let error = resolve_modifier_with_entrypoints(&mut h, [f.node()]).unwrap_err();
+        let error = resolve_modifier(&mut h, &PassScope::default()).unwrap_err();
         assert!(matches!(
             error,
             ModifierResolverErrors::Unreachable { msg }
@@ -976,7 +977,7 @@ mod tests {
             })
             .unwrap();
         h.set_entrypoint(main);
-        resolve_modifier_with_entrypoints(&mut h, [main]).unwrap();
+        test_resolve(&mut h);
 
         // Find the rebuilt f and collect its indirect-call loaders and callee names.
         let suffix = if dagger { "D" } else { "" };
@@ -999,11 +1000,12 @@ mod tests {
             .unzip();
         callee_names.sort_unstable();
 
-        // Both branches inherit the outer control; only the second adds two local controls.
+        // Global resolution resolves the local controls first. The rebuilt function
+        // then applies the outer control to each already-resolved branch.
         assert_eq!(
             callee_names,
             [
-                format!("__modified__g[C1.2{suffix}]"),
+                format!("__modified____modified__g[C2][C1{suffix}]"),
                 format!("__modified__g[C1{suffix}]"),
             ]
         );
@@ -1074,8 +1076,7 @@ mod tests {
         main.finish_with_outputs(outputs).unwrap();
 
         let mut h = module.finish_hugr().unwrap();
-        let entrypoint = h.entrypoint();
-        match resolve_modifier_with_entrypoints(&mut h, [entrypoint]) {
+        match resolve_modifier(&mut h, &PassScope::default()) {
             Err(ModifierResolverErrors::UnResolvable { msg, .. }) => {
                 assert!(
                     msg.strip_prefix("Modifier cannot be applied to the node")
@@ -1174,8 +1175,7 @@ mod tests {
         main.finish_with_outputs(outputs).unwrap();
 
         let mut h = module.finish_hugr().unwrap();
-        let entrypoint = h.entrypoint();
-        match resolve_modifier_with_entrypoints(&mut h, [entrypoint]) {
+        match resolve_modifier(&mut h, &PassScope::default()) {
             Err(ModifierResolverErrors::UnResolvable { msg, .. }) => {
                 assert!(
                     msg.strip_prefix("Modifier cannot be applied to the node")
