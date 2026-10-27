@@ -31,6 +31,10 @@ def main() -> None:
     f(c, q)
     with dagger:
         f(c, q)
+    for _ in range(3):
+        f(c, q)
+        with dagger:
+            f(c, q)
     state_result("r", q)
     discard(c)
     discard(q)
