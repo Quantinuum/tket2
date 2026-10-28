@@ -105,7 +105,7 @@
 use fxhash::FxHashSet;
 use itertools::{Either, Itertools};
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{BTreeSet, HashMap, HashSet, VecDeque},
     iter, mem,
 };
 
@@ -1473,6 +1473,15 @@ pub fn resolve_modifier_with_entrypoints_and_scope(
     resolve_modifier_from_entrypoints(h, entry_points, scope)
 }
 
+/// Resolve modifiers reachable from the supplied entry points.
+///
+/// Traverses entrypoint subtrees, direct callees, and loaded functions with
+/// non-modifier consumers. Rewrites are applied after each discovery round,
+/// then selected custom implementations and retained callees are explored.
+///
+/// Removes dangling global phase operations within the entrypoint subtrees and
+/// unused original functions replaced during resolution, respecting `scope`
+/// when removing functions. Validates the resulting HUGR before returning.
 fn resolve_modifier_from_entrypoints(
     h: &mut impl HugrMut<Node = Node>,
     entry_points: impl IntoIterator<Item = Node>,
@@ -1490,7 +1499,7 @@ fn resolve_modifier_from_entrypoints(
 
     while !worklist.is_empty() {
         // Collect calls before rewriting any bodies.
-        let mut nodes_to_modify = Vec::new();
+        let mut nodes_to_modify = BTreeSet::new();
 
         while let Some(node) = worklist.pop_front() {
             for child in h.children(node) {
@@ -1503,7 +1512,7 @@ fn resolve_modifier_from_entrypoints(
             }
 
             if resolver.should_modify(h, node)? {
-                nodes_to_modify.push(node);
+                nodes_to_modify.insert(node);
             }
 
             // Follow direct callees and loaded functions with a non-modifier consumer.

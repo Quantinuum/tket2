@@ -1,6 +1,6 @@
 //! Modifier for dataflow blocks.
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{BTreeSet, HashMap, HashSet, VecDeque},
     iter, mem,
 };
 
@@ -677,7 +677,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         n: N,
         new_dfg: &mut impl Container,
     ) -> Result<Node, ModifierResolverErrors<N>> {
-        let nodes = h.descendants(n).collect::<HashSet<_>>();
+        let nodes = h.descendants(n).collect::<BTreeSet<_>>();
 
         let static_edges = nodes
             .iter()
