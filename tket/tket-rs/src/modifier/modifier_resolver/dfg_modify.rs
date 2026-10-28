@@ -348,6 +348,8 @@ impl<N: HugrNode> ModifierResolver<N> {
         if !concrete_signature_has_quantum_data
             && !self.signature_has_quantum_data(fn_defn.signature().body())
         {
+            // A classical signature can hide modifiers inside the unchanged body.
+            self.new_callees.push(func);
             return Ok(None);
         }
         Ok(Some(self.modify_fn(h, func)?))

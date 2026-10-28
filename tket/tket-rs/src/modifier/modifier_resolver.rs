@@ -330,7 +330,7 @@ pub struct ModifierResolver<N = Node> {
     modified_impls: HashMap<(N, CombinedModifier), N>,
     /// Cached adapters from the resolver's controls-first ABI to custom controls-last functions.
     custom_adapters: HashMap<(N, N, CombinedModifier), N>,
-    /// Selected custom implementations whose bodies may still need modifier discovery.
+    /// Custom implementations and skipped classical functions needing body discovery.
     new_callees: Vec<N>,
     /// Analyser used to find qubits in types. Used to check when a type carries quantum data.
     qubit_finder: TypeUnpacker,
@@ -1413,7 +1413,7 @@ pub fn resolve_modifier_with_entrypoints(
 
 /// Resolve modifiers reachable from the root selected by `scope`.
 ///
-/// Rewrites record selected custom implementations, so
+/// Rewrites record selected custom implementations and skipped classical functions, so
 /// discovery can expand to their bodies without revisiting previously explored functions.
 /// Cleanup removes unused originals only when `scope` permits their removal.
 /// Global phase operations are retained.
@@ -1523,7 +1523,7 @@ fn resolve_modifier_from_entrypoints(
             resolver.apply_modification(h, node)?;
         }
 
-        // Expand discovery only to custom implementations selected during rewriting.
+        // Explore selected custom implementations and skipped classical functions.
         for function in resolver.new_callees.drain(..) {
             if added_functions.insert(function) {
                 worklist.push_back(function);
