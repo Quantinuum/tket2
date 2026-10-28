@@ -1418,15 +1418,21 @@ pub fn resolve_modifier(
         return Ok(());
     };
 
-    if h.get_optype(root).is_module() {
-        // Get all the functions in the module
-        let entry_points = h
-            .children(root)
-            .filter(|&node| h.get_optype(node).is_func_defn())
-            .collect_vec();
-        resolve_modifier_from_entrypoints(h, entry_points, scope)
-    } else {
-        resolve_modifier_from_entrypoints(h, [root], scope)
+    match scope {
+        PassScope::Global(_) => {
+            // The root must be a module in global scope
+            assert!(h.get_optype(root).is_module());
+            let entry_points = h
+                .children(root)
+                .filter(|&node| h.get_optype(node).is_func_defn())
+                .filter(|&f| scope.in_scope(h, f) == InScope::PreserveInterface)
+                .collect_vec();
+            resolve_modifier_from_entrypoints(h, entry_points, scope)
+        }
+        PassScope::EntrypointFlat | PassScope::EntrypointRecursive => {
+            // If the scope is not global, just use the root as entry point
+            resolve_modifier_from_entrypoints(h, [root], scope)
+        }
     }
 }
 
@@ -1454,45 +1460,45 @@ fn resolve_modifier_from_entrypoints(
     entry_points: impl IntoIterator<Item = Node>,
     scope: &PassScope,
 ) -> Result<(), ModifierResolverErrors<Node>> {
-    // Collect entry points into a deque so they can be cloned for later cleanup passes.
-    let entry_points: VecDeque<_> = entry_points.into_iter().collect();
-
-    // Traverse function bodies and unmodified callees, collecting calls to rewrite.
+    // Traverse function bodies from entry points and unmodified callees, collecting calls to rewrite.
     let mut resolver = ModifierResolver::new();
-    let mut function_worklist = entry_points.clone();
-    let mut visited_functions = FxHashSet::default();
-    let mut children_worklist = VecDeque::new();
+    let mut worklist: VecDeque<_> = entry_points.into_iter().collect();
+    let mut added_functions = FxHashSet::default();
     let mut nodes_to_modify = Vec::new();
 
-    while let Some(function) = function_worklist.pop_front() {
-        if !visited_functions.insert(function) {
-            continue;
+    while let Some(node) = worklist.pop_front() {
+        for child in h.children(node) {
+            if (h.get_optype(child).is_func_decl() || h.get_optype(child).is_func_defn())
+                && !added_functions.insert(child)
+            {
+                continue;
+            }
+            worklist.push_back(child);
         }
-        children_worklist.push_back(function);
-        while let Some(node) = children_worklist.pop_front() {
-            children_worklist.extend(h.children(node));
 
-            if resolver.should_modify(h, node)? {
-                nodes_to_modify.push(node);
-            }
+        if resolver.should_modify(h, node)? {
+            nodes_to_modify.push(node);
+        }
 
-            // If we have an unmodified call we need to explore it
-            let function = match h.get_optype(node) {
-                OpType::Call(_) => h.static_source(node),
-                OpType::LoadFunction(_) => {
-                    if h.linked_inputs(node, 0).all(|(consumer, _)| {
-                        Modifier::from_optype(h.get_optype(consumer)).is_some()
-                    }) {
-                        continue;
-                    }
-                    h.static_source(node)
+        // If we have an unmodified call we need to explore it
+        let maybe_function = match h.get_optype(node) {
+            OpType::Call(_) => h.static_source(node),
+            OpType::LoadFunction(_) => {
+                if h.linked_inputs(node, 0)
+                    .all(|(consumer, _)| Modifier::from_optype(h.get_optype(consumer)).is_some())
+                {
+                    continue;
                 }
-                _ => None,
-            };
-
-            if let Some(function) = function {
-                function_worklist.push_back(function);
+                h.static_source(node)
             }
+            _ => None,
+        };
+
+        // If we have a function, we store it as visited, to avoid duplicating modification
+        if let Some(function) = maybe_function
+            && added_functions.insert(function)
+        {
+            worklist.push_back(function);
         }
     }
 
