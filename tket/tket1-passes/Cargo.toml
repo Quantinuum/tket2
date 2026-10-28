@@ -21,7 +21,10 @@ tket-json-rs.workspace = true
 
 [build-dependencies]
 cc.workspace = true
-bindgen.workspace = true
+bindgen = { workspace = true, default-features = false, features = [
+    "logging",
+    "runtime",
+] }
 conan2.workspace = true
 
 [dev-dependencies]
