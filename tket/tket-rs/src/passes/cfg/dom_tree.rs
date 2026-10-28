@@ -1,5 +1,5 @@
 //! Analysis of Control-Flow Graphs using dominator-strong components decomposition
-use std::collections::{HashMap, HashSet, BTreeSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt::Debug;
 
 use hugr::core::HugrNode;
@@ -46,14 +46,13 @@ pub struct DomTreeNode<N, P: Path<N>, LOOP> {
 }
 
 impl<N: HugrNode, P: Path<N>, LOOP: Default> DomTreeNode<N, P, LOOP> {
-    /// Make a new instance by combining the children (provided in topsort order)
-    /// `loop_fn` updates the [DomTreeNode::loop_] with an exit path, returning `true`
-    /// if it did so, or `false` if the exit path was not part of the loop and should be
-    ///  recorded as an exit edge of the parent instance being created.
-    pub(super) fn new(
+    /// Make a new instance by combining the children (provided in topsort order).
+    /// `loop_fn` is called to update the [DomTreeNode::loop_] with each child exit edge
+    /// targetting the main node (i.e. the loop header).
+    pub fn new_with_loop_callback(
         node: N,
         children: Vec<Self>,
-        loop_fn: impl Fn(&mut LOOP, N, &P) -> bool,
+        loop_fn: impl Fn(&mut LOOP, &P),
         hugr: &impl HugrView<Node = N>,
     ) -> Self {
         let child_blocks: HashSet<N> = children.iter().map(|c| c.node).collect();
@@ -74,7 +73,9 @@ impl<N: HugrNode, P: Path<N>, LOOP: Default> DomTreeNode<N, P, LOOP> {
                     .entry(tgt)
                     .and_modify(|p| p.union(&path))
                     .or_insert(path);
-            } else if !loop_fn(&mut loop_, tgt, &path) {
+            } else if tgt == node {
+                loop_fn(&mut loop_, &path)
+            } else {
                 P::union_opt(&mut exit_edges, &path)
             }
         }
@@ -101,7 +102,9 @@ impl<N: HugrNode, P: Path<N>, LOOP: Default> DomTreeNode<N, P, LOOP> {
                                 .entry(tgt)
                                 .and_modify(|p| p.union(&path_to_exit))
                                 .or_insert(path_to_exit);
-                        } else if !loop_fn(&mut loop_, tgt, &path_to_exit) {
+                        } else if tgt == node {
+                            loop_fn(&mut loop_, &path_to_exit)
+                        } else {
                             P::union_opt(&mut exit_edges, &path_to_exit);
                         }
                     }
@@ -130,19 +133,7 @@ impl<N: HugrNode, P: Path<N>> DomTreeWithBackedges<N, P> {
         children: Vec<Self>,
         hugr: &impl HugrView<Node = N>,
     ) -> Self {
-        Self::new(
-            node,
-            children,
-            |loop_, tgt, child_exit_path| {
-                if tgt == node {
-                    P::union_opt(loop_, child_exit_path);
-                    true
-                } else {
-                    false
-                }
-            },
-            hugr,
-        )
+        Self::new_with_loop_callback(node, children, P::union_opt, hugr)
     }
 
     /// Builds a dominator tree for the given control flow graph (CFG).

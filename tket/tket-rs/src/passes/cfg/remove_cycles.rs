@@ -137,15 +137,17 @@ pub fn nest_loop<H: HugrMut, P: Path<H::Node>>(
     assert!(P::opt_as_ref(&loop_dtn.exit_edges).is_none()); // every node in inner CFG is dominated by the header, including the ExitBlock
     assert!(P::opt_as_ref(&loop_dtn.loop_).is_none()); // no backedges!
 
-    let mut dtn = DomTreeNode::<H::Node, P, InnerTailLoop<H::Node, P>>::new(
+    let mut dtn = DomTreeNode::<H::Node, P, InnerTailLoop<H::Node, P>>::new_with_loop_callback(
         loop_block,
         out_loop_children
             .into_iter()
             .map(|ch| nest_loop(ch, hugr))
             .collect(),
-        |_, tgt, _lp| {
-            assert_ne!(tgt, loop_block);
-            false
+        |_, lp| {
+            panic!(
+                "Should not be any paths back to loop header, but received {:?}",
+                lp
+            );
         },
         hugr,
     );
