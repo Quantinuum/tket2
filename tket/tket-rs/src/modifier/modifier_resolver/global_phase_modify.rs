@@ -1,7 +1,4 @@
 //! Modifier resolution for global phase operations.
-//!
-//! Dagger negates the phase angle. Controls turn the phase into rotations on
-//! control qubits and a residual global phase.
 //! After resolving modifiers, all global phase operations are removed.
 //!
 use hugr::{

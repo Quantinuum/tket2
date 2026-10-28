@@ -1400,6 +1400,8 @@ fn remove_unused_modified_functions<N: HugrNode>(
 /// original function nodes may be removed if they are no longer reachable
 /// from the entrypoint, from nodes whose interface is preserved by the default
 /// pass scope, or from other preserved modified functions.
+/// Global phase operations are removed within the supplied entrypoint subtrees.
+/// Phase cleanup does not follow calls to other functions.
 ///
 /// Use [`resolve_modifier`] to select the entrypoint and cleanup policy through
 /// a [`PassScope`].
@@ -1452,6 +1454,7 @@ pub fn resolve_modifier(
 /// Cleanup of original function nodes respects `scope`: a function is
 /// only removed when it is no longer needed and [`PassScope::in_scope`] says the
 /// function may be modified freely.
+/// Global phase operations are removed within the supplied entrypoint subtrees.
 ///
 /// Use [`resolve_modifier`] to select the entrypoint through a [`PassScope`].
 #[deprecated(
