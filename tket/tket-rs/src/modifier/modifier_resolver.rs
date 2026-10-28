@@ -330,6 +330,8 @@ pub struct ModifierResolver<N = Node> {
     modified_impls: HashMap<(N, CombinedModifier), N>,
     /// Cached adapters from the resolver's controls-first ABI to custom controls-last functions.
     custom_adapters: HashMap<(N, N, CombinedModifier), N>,
+    /// Selected custom implementations whose bodies may still need modifier discovery.
+    new_callees: Vec<N>,
     /// Analyser used to find qubits in types. Used to check when a type carries quantum data.
     qubit_finder: TypeUnpacker,
     /// Indicate whether the extension op being modified is targeted by some
@@ -349,6 +351,7 @@ impl<N> ModifierResolver<N> {
             modified_functions: HashSet::default(),
             modified_impls: HashMap::default(),
             custom_adapters: HashMap::default(),
+            new_callees: Vec::new(),
             qubit_finder: TypeUnpacker::for_qubits(),
             insert_state_order_edges: false,
         }
@@ -1410,6 +1413,8 @@ pub fn resolve_modifier_with_entrypoints(
 
 /// Resolve modifiers reachable from the root selected by `scope`.
 ///
+/// Rewrites record selected custom implementations, so
+/// discovery can expand to their bodies without revisiting previously explored functions.
 /// Cleanup removes unused originals only when `scope` permits their removal.
 /// Global phase operations are retained.
 /// Does nothing when the scope has no root.
@@ -1463,51 +1468,67 @@ fn resolve_modifier_from_entrypoints(
     entry_points: impl IntoIterator<Item = Node>,
     scope: &PassScope,
 ) -> Result<(), ModifierResolverErrors<Node>> {
-    // Collect calls before rewriting any bodies. Follow descendants and unmodified callees.
+    let entry_points = entry_points.into_iter().collect_vec();
     let mut resolver = ModifierResolver::new();
-    let mut worklist: VecDeque<_> = entry_points.into_iter().collect();
-    let mut added_functions = FxHashSet::default();
-    let mut nodes_to_modify = Vec::new();
 
-    while let Some(node) = worklist.pop_front() {
-        for child in h.children(node) {
-            if (h.get_optype(child).is_func_decl() || h.get_optype(child).is_func_defn())
-                && !added_functions.insert(child)
-            {
-                continue;
-            }
-            worklist.push_back(child);
-        }
+    let mut worklist: VecDeque<_> = entry_points.iter().copied().collect();
+    let mut added_functions = entry_points
+        .iter()
+        .copied()
+        .filter(|&node| h.get_optype(node).is_func_defn() || h.get_optype(node).is_func_decl())
+        .collect::<FxHashSet<_>>();
 
-        if resolver.should_modify(h, node)? {
-            nodes_to_modify.push(node);
-        }
+    while !worklist.is_empty() {
+        // Collect calls before rewriting any bodies.
+        let mut nodes_to_modify = Vec::new();
 
-        // Follow direct callees and loaded functions with a non-modifier consumer.
-        let maybe_function = match h.get_optype(node) {
-            OpType::Call(_) => h.static_source(node),
-            OpType::LoadFunction(_) => {
-                // A load used only by modifiers is handled when building replacements.
-                if h.linked_inputs(node, 0)
-                    .all(|(consumer, _)| Modifier::from_optype(h.get_optype(consumer)).is_some())
+        while let Some(node) = worklist.pop_front() {
+            for child in h.children(node) {
+                if (h.get_optype(child).is_func_decl() || h.get_optype(child).is_func_defn())
+                    && !added_functions.insert(child)
                 {
                     continue;
                 }
-                h.static_source(node)
+                worklist.push_back(child);
             }
-            _ => None,
-        };
 
-        // Track queued callees to stop recursive calls from repeatedly expanding them.
-        if let Some(function) = maybe_function
-            && added_functions.insert(function)
-        {
-            worklist.push_back(function);
+            if resolver.should_modify(h, node)? {
+                nodes_to_modify.push(node);
+            }
+
+            // Follow direct callees and loaded functions with a non-modifier consumer.
+            let maybe_function = match h.get_optype(node) {
+                OpType::Call(_) => h.static_source(node),
+                OpType::LoadFunction(_) => {
+                    // A load used only by modifiers is handled when building replacements.
+                    if h.linked_inputs(node, 0).all(|(consumer, _)| {
+                        Modifier::from_optype(h.get_optype(consumer)).is_some()
+                    }) {
+                        continue;
+                    }
+                    h.static_source(node)
+                }
+                _ => None,
+            };
+
+            // Track queued callees to stop recursive calls from repeatedly expanding them.
+            if let Some(function) = maybe_function
+                && added_functions.insert(function)
+            {
+                worklist.push_back(function);
+            }
         }
-    }
 
-    for node in nodes_to_modify {
-        resolver.apply_modification(h, node)?;
+        for node in nodes_to_modify {
+            resolver.apply_modification(h, node)?;
+        }
+
+        // Expand discovery only to custom implementations selected during rewriting.
+        for function in resolver.new_callees.drain(..) {
+            if added_functions.insert(function) {
+                worklist.push_back(function);
+            }
+        }
     }
 
     // Remove only original functions for which this resolver generated modified

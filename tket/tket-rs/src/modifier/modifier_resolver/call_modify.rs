@@ -1097,12 +1097,11 @@ mod tests {
             .unzip();
         callee_names.sort_unstable();
 
-        // Global resolution resolves the local controls first. The rebuilt function
-        // then applies the outer control to each already-resolved branch.
+        // Both branches inherit the outer control; only the second adds two local controls.
         assert_eq!(
             callee_names,
             [
-                format!("__modified____modified__g[C2][C1{suffix}]"),
+                format!("__modified__g[C1.2{suffix}]"),
                 format!("__modified__g[C1{suffix}]"),
             ]
         );

@@ -426,6 +426,8 @@ impl<N: HugrNode> ModifierResolver<N> {
         custom_func: N,
     ) -> Result<N, ModifierResolverErrors<N>> {
         self.modified_functions.insert(original_func);
+        // The selected body is reused, not rebuilt, so its modifiers still need discovery.
+        self.new_callees.push(custom_func);
         if self.control_num() == 0 {
             let original_defn = h.get_optype(original_func).as_func_defn().ok_or_else(|| {
                 ModifierResolverErrors::unreachable(format!(
@@ -1427,6 +1429,72 @@ mod test {
         let modified = resolver.modify_fn(&mut h, original.node()).unwrap();
 
         assert_eq!(modified, custom.node());
+    }
+
+    /// Resolve a chain of private custom dagger implementations with nested modified calls.
+    /// Test that modifier resolution finds the dagger inside the custom implementation
+    #[test]
+    fn pass_resolves_custom_dagger_implementation() {
+        let mut module = ModuleBuilder::new();
+        let signature = Signature::new_endo([qb_t()]);
+        let original = identity_function(&mut module, "original", signature.clone());
+        let leaf = identity_function(&mut module, "leaf", signature.clone());
+        let terminal = identity_function(&mut module, "terminal", signature.clone());
+        let dagger = MODIFIER_EXTENSION
+            .instantiate_extension_op(
+                &DAGGER_OP_ID,
+                [Term::new_list([qb_t()]), Term::new_list(Vec::<Type>::new())],
+            )
+            .unwrap();
+        // main -> dagger(original) selects custom; custom -> dagger(leaf)
+        // selects inner_custom, whose own daggered call must also be resolved.
+        let [
+            (inner_custom, inner_call),
+            (custom, custom_call),
+            (main, main_call),
+        ] = [
+            ("inner_custom", terminal),
+            ("custom", leaf),
+            ("main", original),
+        ]
+        .map(|(name, callee)| {
+            let mut function = module
+                .define_function_vis(name, signature.clone(), hugr_core::Visibility::Private)
+                .unwrap();
+            let [q] = function.input_wires_arr();
+            let loaded = function.load_func(&callee, &[]).unwrap();
+            let modified = function
+                .add_dataflow_op(dagger.clone(), [loaded])
+                .unwrap()
+                .out_wire(0);
+            let call = function
+                .add_dataflow_op(
+                    CallIndirect {
+                        signature: signature.clone(),
+                    },
+                    [modified, q],
+                )
+                .unwrap();
+            (
+                function.finish_with_outputs(call.outputs()).unwrap().node(),
+                call.node(),
+            )
+        });
+        let mut h = module.finish_hugr().unwrap();
+        h.set_entrypoint(main);
+        h.set_metadata::<metadata::DaggeredImplementation>(original.node(), "custom".to_string());
+        h.set_metadata::<metadata::DaggeredImplementation>(leaf.node(), "inner_custom".to_string());
+        test_resolve(&mut h);
+
+        // The outer call uses the custom implementation, whose nested call is also resolved.
+        let loader = h.single_linked_output(main_call, 0).unwrap().0;
+        assert_eq!(h.static_source(loader), Some(custom));
+        let loader = h.single_linked_output(custom_call, 0).unwrap().0;
+        assert_eq!(h.static_source(loader), Some(inner_custom));
+        let loader = h.single_linked_output(inner_call, 0).unwrap().0;
+        let modified_terminal =
+            super::find_module_func_by_name(&h, "__modified__terminal[D]").unwrap();
+        assert_eq!(h.static_source(loader), Some(modified_terminal));
     }
 
     #[test]
