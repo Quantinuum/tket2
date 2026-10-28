@@ -1,4 +1,4 @@
-//! Try to delete modifier by applying the modifier to each component.
+//! Resolve modifier chains by applying their combined modifiers to function bodies.
 //!
 //! The entry point of this module is [`resolve_modifier`], which takes a hugr
 //! and a pass scope. The resolver visits all nodes reachable from the scope's root.
@@ -21,9 +21,10 @@
 //!                 |
 //!                 +-> Modifier -> IndirectedCall.
 //! ```
-//! The resolver finds the last modifier in a chain of modifiers,
-//! and starts resolving the function loaded by the `LoadFunction` node,
-//! in `apply_modification` or, if nested modifier blocks are present, in `modify_indirect_call`.
+//! The resolver starts at a `CallIndirect` fed by a modifier chain and traces
+//! backwards to its `LoadFunction`, accumulating the modifiers. It rebuilds
+//! the loaded function in `apply_modification` or, for calls within a modified
+//! body, in `modify_indirect_call`.
 //! After resolution, original function nodes that have been replaced by solved
 //! modified versions may be removed if they are no longer needed and the pass
 //! scope allows removing them. Nodes whose interface must be preserved by the
@@ -49,8 +50,8 @@
 //! ModifierResolver::connect_all to connect all wires that are registered
 //! in the correspondence map.
 //!
-//! Importantly, when dagger is applied, not only the order of nodes is reversed,
-//! the direction of wires that includes any qubits is also reversed.
+//! Applying dagger reverses both the order of operations and the direction of
+//! wires carrying quantum data.
 //! Let us explain this with an example.
 //! Suppose we have a graph like below:
 //! ```text
@@ -66,7 +67,7 @@
 //!                                |
 //! angle(π) ------- [fneg] ------+
 //! ```
-//! Looking at on the edge between `Rx` and `S` in `h`,
+//! Looking at the edge between `Rx` and `S` in `h`,
 //! one can see that the direction of the edge is reversed in the new graph.
 //! In other words, the incoming port of `S` is mapped to the outgoing port of `Sdg`,
 //! and the outgoing port of `Rx` is mapped to the incoming port of `Rx`.
@@ -77,8 +78,8 @@
 //! ```text
 //! (S, In(0))          -> (Sdg, Out(0))
 //! (Rx, Out(0))        -> (Rx, In(0))
-//! (angle(π), Out(0)) -> (angle(π), Out(0))
-//! (Rx, In(1))         -> (fneg, In(1))
+//! (angle(π), Out(0))  -> (angle(π), Out(0))
+//! (Rx, In(1))         -> (fneg, In(0))
 //! ```
 //! From this correspondence map, we can see that the direction of wires in the new graph
 //! can be completely mixed up.
@@ -1390,7 +1391,7 @@ fn remove_unused_modified_functions<N: HugrNode>(
 /// Resolve modifiers in a circuit by applying them to each entry point.
 ///
 /// When resolution creates modified replacements for loaded functions, the
-/// original solved function nodes are removed if they are no longer reachable
+/// original function nodes may be removed if they are no longer reachable
 /// from the entrypoint, from nodes whose interface is preserved by the default
 /// pass scope, or from other preserved modified functions.
 ///
@@ -1409,6 +1410,8 @@ pub fn resolve_modifier_with_entrypoints(
 
 /// Resolve modifiers reachable from the root selected by `scope`.
 ///
+/// Cleanup removes unused originals only when `scope` permits their removal.
+/// Global phase operations are retained.
 /// Does nothing when the scope has no root.
 pub fn resolve_modifier(
     h: &mut impl HugrMut<Node = Node>,
@@ -1420,7 +1423,7 @@ pub fn resolve_modifier(
 
     match scope {
         PassScope::Global(_) => {
-            // The root must be a module in global scope
+            // Global scopes always select the module root.
             assert!(h.get_optype(root).is_module());
             let entry_points = h
                 .children(root)
@@ -1438,7 +1441,7 @@ pub fn resolve_modifier(
 
 /// Resolve modifiers in a circuit by applying them to each entry point.
 ///
-/// Cleanup of solved original function nodes respects `scope`: a function is
+/// Cleanup of original function nodes respects `scope`: a function is
 /// only removed when it is no longer needed and [`PassScope::in_scope`] says the
 /// function may be modified freely.
 ///
@@ -1460,7 +1463,7 @@ fn resolve_modifier_from_entrypoints(
     entry_points: impl IntoIterator<Item = Node>,
     scope: &PassScope,
 ) -> Result<(), ModifierResolverErrors<Node>> {
-    // Traverse function bodies from entry points and unmodified callees, collecting calls to rewrite.
+    // Collect calls before rewriting any bodies. Follow descendants and unmodified callees.
     let mut resolver = ModifierResolver::new();
     let mut worklist: VecDeque<_> = entry_points.into_iter().collect();
     let mut added_functions = FxHashSet::default();
@@ -1480,10 +1483,11 @@ fn resolve_modifier_from_entrypoints(
             nodes_to_modify.push(node);
         }
 
-        // If we have an unmodified call we need to explore it
+        // Follow direct callees and loaded functions with a non-modifier consumer.
         let maybe_function = match h.get_optype(node) {
             OpType::Call(_) => h.static_source(node),
             OpType::LoadFunction(_) => {
+                // A load used only by modifiers is handled when building replacements.
                 if h.linked_inputs(node, 0)
                     .all(|(consumer, _)| Modifier::from_optype(h.get_optype(consumer)).is_some())
                 {
@@ -1494,7 +1498,7 @@ fn resolve_modifier_from_entrypoints(
             _ => None,
         };
 
-        // If we have a function, we store it as visited, to avoid duplicating modification
+        // Track queued callees to stop recursive calls from repeatedly expanding them.
         if let Some(function) = maybe_function
             && added_functions.insert(function)
         {
@@ -2292,7 +2296,7 @@ mod tests {
         );
     }
 
-    /// Run the modifier pass using its default scope and check its postconditions.
+    /// Run the modifier pass with its default scope, then validate and check every node.
     pub(crate) fn test_resolve(h: &mut Hugr) {
         test_resolve_with_scope(h, PassScope::default());
     }

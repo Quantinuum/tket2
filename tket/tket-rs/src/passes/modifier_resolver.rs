@@ -11,6 +11,8 @@ pub use crate::modifier::modifier_resolver::ModifierResolverErrors;
 
 /// A pass to resolve modifiers (control/dagger/power) in a Hugr.
 ///
+/// Uses [`resolve_modifier`] to select traversal roots from the configured scope.
+///
 /// Solved original function nodes may be removed after resolution when they
 /// are no longer needed and [`PassScope::in_scope`] allows them to be modified
 /// freely. Nodes whose interface is preserved by the scope are kept.
