@@ -128,11 +128,7 @@ pub type DomTreeWithBackedges<N, P> = DomTreeNode<N, P, <P as Path<N>>::OptPath>
 impl<N: HugrNode, P: Path<N>> DomTreeWithBackedges<N, P> {
     /// Creates a new instance as per [DomTreeNode::new], updating the [DomTreeNode::loop_]
     /// with gating paths that target the loop header.
-    pub(super) fn new_with_children(
-        node: N,
-        children: Vec<Self>,
-        hugr: &impl HugrView<Node = N>,
-    ) -> Self {
+    pub fn new(node: N, children: Vec<Self>, hugr: &impl HugrView<Node = N>) -> Self {
         Self::new_with_loop_callback(node, children, P::union_opt, hugr)
     }
 
@@ -181,7 +177,7 @@ impl<N: HugrNode, P: Path<N>> DomTreeWithBackedges<N, P> {
             // This means targets of exit edges will be processed *after* all the sources of said exit edges:
             ordered_children.reverse();
 
-            DomTreeWithBackedges::<H::Node, P>::new_with_children(
+            DomTreeWithBackedges::<H::Node, P>::new(
                 n,
                 ordered_children
                     .into_iter()

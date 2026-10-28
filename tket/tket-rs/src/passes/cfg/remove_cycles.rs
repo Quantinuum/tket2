@@ -191,7 +191,7 @@ fn detach<H: HugrView, P: Path<H::Node>>(
     }
     // Recompute exit_edges: we must remove any exits from inside a detached dominator tree;
     // but add any edge to a detached tree itself.
-    let in_loop_dtn = DomTreeWithBackedges::new_with_children(dtn.node, remaining_children, hugr);
+    let in_loop_dtn = DomTreeWithBackedges::new(dtn.node, remaining_children, hugr);
     // We have not detached the backedges, so should be the same. (No PartialEq...)
     assert_eq!(
         format!("{:?}", in_loop_dtn.loop_),
@@ -470,7 +470,7 @@ fn insert_at_lca<N: HugrNode, P: Path<N>>(
         })
         .chain(new_root_children)
         .collect::<Vec<_>>();
-    DomTreeWithBackedges::new_with_children(dtn.node, children, hugr)
+    DomTreeWithBackedges::new(dtn.node, children, hugr)
 }
 
 #[cfg(test)]
