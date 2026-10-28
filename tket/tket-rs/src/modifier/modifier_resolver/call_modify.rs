@@ -303,6 +303,8 @@ impl<N: HugrNode> ModifierResolver<N> {
                     )
                 })?;
         self.call_map_insert(loaded_func, (new, load.function_port()));
+        // The retained callee can contain modifiers even when its call is unchanged.
+        self.new_callees.push(loaded_func);
         Ok(())
     }
 }

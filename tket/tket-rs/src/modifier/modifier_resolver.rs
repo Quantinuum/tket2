@@ -333,7 +333,7 @@ pub struct ModifierResolver<N = Node> {
     modified_impls: HashMap<(N, CombinedModifier), N>,
     /// Cached adapters from the resolver's controls-first ABI to custom controls-last functions.
     custom_adapters: HashMap<(N, N, CombinedModifier), N>,
-    /// Custom implementations and skipped classical functions needing body discovery.
+    /// Custom implementations and retained callees needing body discovery.
     new_callees: Vec<N>,
     /// Analyser used to find qubits in types. Used to check when a type carries quantum data.
     qubit_finder: TypeUnpacker,
@@ -1418,7 +1418,7 @@ pub fn resolve_modifier_with_entrypoints(
 
 /// Resolve modifiers reachable from the root selected by `scope`.
 ///
-/// Rewrites record selected custom implementations and skipped classical functions, so
+/// Rewrites record selected custom implementations and retained callees, so
 /// discovery can expand to their bodies without revisiting previously explored functions.
 /// Cleanup removes unused originals only when `scope` permits their removal and any
 /// dangling global phase operations.
@@ -1435,10 +1435,14 @@ pub fn resolve_modifier(
         PassScope::Global(_) => {
             // Global scopes always select the module root.
             assert!(h.get_optype(root).is_module());
+            let mut preserved = scope.preserve_interface(h).collect::<FxHashSet<_>>();
+            // A nested entrypoint is preserved without preserving its containing function.
+            // Include that function so discovery reaches the entrypoint's modifiers.
+            preserved.extend(module_child_containing(h, h.entrypoint()));
             let entry_points = h
                 .children(root)
                 .filter(|&node| h.get_optype(node).is_func_defn())
-                .filter(|&f| scope.in_scope(h, f) == InScope::PreserveInterface)
+                .filter(|f| preserved.contains(f))
                 .collect_vec();
             resolve_modifier_from_entrypoints(h, entry_points, scope)
         }
@@ -1529,7 +1533,7 @@ fn resolve_modifier_from_entrypoints(
             resolver.apply_modification(h, node)?;
         }
 
-        // Explore selected custom implementations and skipped classical functions.
+        // Explore selected custom implementations and retained callees.
         for function in resolver.new_callees.drain(..) {
             if added_functions.insert(function) {
                 worklist.push_back(function);
@@ -2137,6 +2141,47 @@ mod tests {
 
         assert!(h.contains_node(foo_node));
         assert_matches!(h.validate(), Ok(()));
+    }
+
+    #[rstest::rstest]
+    #[case::entrypoint(Preserve::Entrypoint)]
+    #[case::public(Preserve::Public)]
+    fn global_scope_resolves_nested_entrypoint(#[case] preserve: Preserve) {
+        let mut module = ModuleBuilder::new();
+        let signature = Signature::new_endo([qb_t()]);
+        let leaf = {
+            let function = module.define_function("leaf", signature.clone()).unwrap();
+            let inputs = function.input_wires();
+            function.finish_with_outputs(inputs).unwrap()
+        };
+        let mut main = module.define_function("main", signature.clone()).unwrap();
+        let mut nested = main
+            .dfg_builder(signature.clone(), main.input_wires())
+            .unwrap();
+        let [q] = nested.input_wires_arr();
+        let loaded = nested.load_func(leaf.handle(), &[]).unwrap();
+        let dagger = MODIFIER_EXTENSION
+            .instantiate_extension_op(
+                &DAGGER_OP_ID,
+                [Term::new_list([qb_t()]), Term::new_list(Vec::<Type>::new())],
+            )
+            .unwrap();
+        let modified = nested
+            .add_dataflow_op(dagger, [loaded])
+            .unwrap()
+            .out_wire(0);
+        let call = nested
+            .add_dataflow_op(CallIndirect { signature }, [modified, q])
+            .unwrap();
+        let nested = nested.finish_with_outputs(call.outputs()).unwrap();
+        let entrypoint = nested.node();
+        let main = main.finish_with_outputs(nested.outputs()).unwrap();
+        let mut h = module.finish_hugr().unwrap();
+        h.set_entrypoint(entrypoint);
+
+        test_resolve_with_scope(&mut h, PassScope::Global(preserve));
+        assert_eq!(h.entrypoint(), entrypoint);
+        assert!(h.contains_node(main.node()));
     }
 
     #[test]

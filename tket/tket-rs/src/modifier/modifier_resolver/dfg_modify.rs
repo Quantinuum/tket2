@@ -708,6 +708,8 @@ impl<N: HugrNode> ModifierResolver<N> {
         for (source, old_target, target_port) in static_edges {
             let new_target = insertion_result.node_map.get(&old_target).copied().unwrap();
             self.call_map_insert(source, (new_target, target_port));
+            // Copying the container does not resolve modifiers inside its callees.
+            self.new_callees.push(source);
         }
 
         Ok(new_node)
@@ -1497,6 +1499,83 @@ mod test {
         let modified_terminal =
             super::find_module_func_by_name(&h, "__modified__terminal[D]").unwrap();
         assert_eq!(h.static_source(loader), Some(modified_terminal));
+    }
+
+    /// Retained private callees must be explored even when their calls are copied unchanged.
+    #[rstest::rstest]
+    #[case::classical_indirect_call(false)]
+    #[case::copied_conditional(true)]
+    fn pass_resolves_modifiers_in_retained_callees(#[case] in_conditional: bool) {
+        let (mut h, _) = modifier_test_hugr(
+            1,
+            0,
+            |module, _| {
+                let leaf = identity_function(module, "leaf", Signature::new_endo([qb_t()]));
+                let mut callee = module
+                    .define_function("classical", Signature::new_endo([]))
+                    .unwrap();
+                let loaded = callee.load_func(&leaf, &[]).unwrap();
+                let dagger = MODIFIER_EXTENSION
+                    .instantiate_extension_op(
+                        &DAGGER_OP_ID,
+                        [Term::new_list([qb_t()]), Term::new_list(Vec::<Type>::new())],
+                    )
+                    .unwrap();
+                let modified = callee
+                    .add_dataflow_op(dagger, [loaded])
+                    .unwrap()
+                    .out_wire(0);
+                let q = callee
+                    .add_dataflow_op(TketOp::QAlloc, [])
+                    .unwrap()
+                    .out_wire(0);
+                let q = callee
+                    .add_dataflow_op(
+                        CallIndirect {
+                            signature: Signature::new_endo([qb_t()]),
+                        },
+                        [modified, q],
+                    )
+                    .unwrap()
+                    .out_wire(0);
+                callee.add_dataflow_op(TketOp::QFree, [q]).unwrap();
+                let callee = callee.finish_with_outputs([]).unwrap();
+
+                let mut outer = module
+                    .define_function("outer", Signature::new_endo([qb_t()]))
+                    .unwrap();
+                outer.set_unitary();
+                if in_conditional {
+                    // The conditional has no quantum boundary or local modifier nodes,
+                    // so it is copied wholesale, including its call to `classical`.
+                    let rows = [type_row![], type_row![]];
+                    let condition = outer.make_sum(0, rows.clone(), []).unwrap();
+                    let mut conditional = outer
+                        .conditional_builder((rows, condition), [], type_row![])
+                        .unwrap();
+                    for index in 0..2 {
+                        let mut case = conditional.case_builder(index).unwrap();
+                        case.call(callee.handle(), &[], []).unwrap();
+                        case.finish_with_outputs([]).unwrap();
+                    }
+                    conditional.finish_sub_container().unwrap();
+                } else {
+                    let loaded = outer.load_func(callee.handle(), &[]).unwrap();
+                    outer
+                        .add_dataflow_op(
+                            CallIndirect {
+                                signature: Signature::new_endo([]),
+                            },
+                            [loaded],
+                        )
+                        .unwrap();
+                }
+                let inputs = outer.input_wires();
+                *outer.finish_with_outputs(inputs).unwrap().handle()
+            },
+            true,
+        );
+        test_resolve(&mut h);
     }
 
     #[test]
