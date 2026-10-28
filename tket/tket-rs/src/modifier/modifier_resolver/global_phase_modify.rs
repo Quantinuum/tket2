@@ -1,11 +1,14 @@
 //! Modifier resolution for global phase operations.
 //!
 //! Dagger negates the phase angle. Controls turn the phase into rotations on
-//! control qubits and a residual global phase. Residual phases are retained.
+//! control qubits and a residual global phase.
+//! After resolving modifiers, all global phase operations are removed.
+//!
 use hugr::{
     IncomingPort, Node, Wire,
     builder::Dataflow,
     core::HugrNode,
+    extension::simple_op::MakeExtensionOp,
     hugr::hugrmut::HugrMut,
     std_extensions::arithmetic::{float_ops::FloatOps, float_types::ConstF64},
 };
@@ -100,6 +103,22 @@ impl<N: HugrNode> ModifierResolver<N> {
             }
         }
     }
+}
+
+/// Delete all global phase operations in the subgraph reachable from the given entry points.
+pub(crate) fn delete_phase<N: HugrNode>(
+    h: &mut impl HugrMut<Node = N>,
+    entry_points: impl IntoIterator<Item = N>,
+) -> Result<(), ModifierResolverErrors<N>> {
+    for entry_point in entry_points {
+        let descendants = h.descendants(entry_point).collect::<Vec<_>>();
+        for node in descendants {
+            if GlobalPhase::from_optype(h.get_optype(node)).is_some() {
+                h.remove_subtree(node);
+            }
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

@@ -116,9 +116,12 @@ pub mod global_phase_modify;
 pub mod tket_op_modify;
 
 use super::CombinedModifier;
-use crate::passes::utils::unpack_container::TypeUnpacker;
 use crate::passes::{InScope, PassScope};
 use crate::{TketOp, extension::global_phase::GlobalPhase, modifier::Modifier};
+use crate::{
+    modifier::modifier_resolver::global_phase_modify::delete_phase,
+    passes::utils::unpack_container::TypeUnpacker,
+};
 
 use hugr::{
     HugrView, IncomingPort, Node, OutgoingPort, Port, PortIndex, Wire,
@@ -1415,8 +1418,8 @@ pub fn resolve_modifier_with_entrypoints(
 ///
 /// Rewrites record selected custom implementations and skipped classical functions, so
 /// discovery can expand to their bodies without revisiting previously explored functions.
-/// Cleanup removes unused originals only when `scope` permits their removal.
-/// Global phase operations are retained.
+/// Cleanup removes unused originals only when `scope` permits their removal and any
+/// dangling global phase operations.
 /// Does nothing when the scope has no root.
 pub fn resolve_modifier(
     h: &mut impl HugrMut<Node = Node>,
@@ -1530,6 +1533,10 @@ fn resolve_modifier_from_entrypoints(
             }
         }
     }
+
+    // Ad hoc cleanup procedure: remove any dangling global-phase nodes that
+    // were produced or left behind by the resolution passes above.
+    delete_phase(h, entry_points)?;
 
     // Remove only original functions for which this resolver generated modified
     // replacements, and only when no remaining non-obsolete function uses them.
