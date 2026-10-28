@@ -661,7 +661,7 @@ mod test {
         Hugr, IncomingPort, OutgoingPort,
         builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
         extension::prelude::qb_t,
-        ops::CallIndirect,
+        ops::{CallIndirect, handle::NodeHandle},
         std_extensions::collections::array::array_type,
         types::{EdgeKind, Signature, Term},
     };
@@ -865,7 +865,7 @@ mod test {
             *func.finish_with_outputs([q]).unwrap().handle()
         };
 
-        {
+        let main = {
             let mut func = module
                 .define_function("main", Signature::new(vec![], [qb_t()]))
                 .unwrap();
@@ -891,10 +891,11 @@ mod test {
                 )
                 .unwrap()
                 .outputs();
-            func.finish_with_outputs(outputs).unwrap();
-        }
+            func.finish_with_outputs(outputs).unwrap()
+        };
 
         let mut h = module.finish_hugr().unwrap();
+        h.set_entrypoint(main.node());
         assert_matches!(h.validate(), Ok(()));
         test_resolve(&mut h);
         assert_matches!(h.validate(), Ok(()));
@@ -978,7 +979,7 @@ mod test {
             func.finish_with_outputs(vec![in1, in2, in3]).unwrap()
         };
 
-        let _main = {
+        let main = {
             let mut func = module.define_function("main", main_sig.clone()).unwrap();
             let loaded = func.load_func(foo.handle(), &[]).unwrap();
             let controlled = func
@@ -1006,6 +1007,7 @@ mod test {
         };
 
         let mut h = module.finish_hugr().unwrap();
+        h.set_entrypoint(main.node());
 
         test_resolve(&mut h);
         assert_matches!(h.validate(), Ok(()));

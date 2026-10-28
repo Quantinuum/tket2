@@ -1807,7 +1807,7 @@ mod test {
             [array_type(1, qb_t()), qb_t(), usize_t()],
             [array_type(1, qb_t()), qb_t()],
         );
-        {
+        let main = {
             let mut func = module
                 .define_function(
                     "main",
@@ -1841,10 +1841,11 @@ mod test {
                     [controlled, controls, target, index],
                 )
                 .unwrap();
-            func.finish_with_outputs(call.outputs()).unwrap();
-        }
+            func.finish_with_outputs(call.outputs()).unwrap()
+        };
 
         let mut h = module.finish_hugr().unwrap();
+        h.set_entrypoint(main.node());
         test_resolve(&mut h);
         assert_matches!(h.validate(), Ok(()));
     }
@@ -1930,7 +1931,7 @@ mod test {
             )
             .unwrap();
 
-        {
+        let main = {
             let mut main = module
                 .define_function(
                     "main",
@@ -1962,10 +1963,11 @@ mod test {
                     [daggered, inner_controls, target, classical],
                 )
                 .unwrap();
-            main.finish_with_outputs(call.outputs()).unwrap();
-        }
+            main.finish_with_outputs(call.outputs()).unwrap()
+        };
 
         let mut h = module.finish_hugr().unwrap();
+        h.set_entrypoint(main.node());
         assert_matches!(h.validate(), Ok(()));
 
         test_resolve(&mut h);
@@ -2054,7 +2056,7 @@ mod test {
             )
             .unwrap();
 
-        {
+        let main = {
             let mut main = module
                 .define_function(
                     "main",
@@ -2086,10 +2088,11 @@ mod test {
                     [daggered, inner_controls, target, classical],
                 )
                 .unwrap();
-            main.finish_with_outputs(call.outputs()).unwrap();
-        }
+            main.finish_with_outputs(call.outputs()).unwrap()
+        };
 
         let mut h = module.finish_hugr().unwrap();
+        h.set_entrypoint(main.node());
         assert_matches!(h.validate(), Ok(()));
 
         test_resolve(&mut h);
@@ -2187,7 +2190,7 @@ mod test {
             func.finish_with_outputs([control, target]).unwrap()
         };
 
-        {
+        let main = {
             let mut func = module.define_function("main", main_sig).unwrap();
             let loaded = func.load_func(outer.handle(), &[]).unwrap();
             let daggered = func
@@ -2211,10 +2214,11 @@ mod test {
                 )
                 .unwrap()
                 .outputs();
-            func.finish_with_outputs(outputs).unwrap();
-        }
+            func.finish_with_outputs(outputs).unwrap()
+        };
 
         let mut h = module.finish_hugr().unwrap();
+        h.set_entrypoint(main.node());
         test_resolve(&mut h);
         assert_matches!(h.validate(), Ok(()));
     }
@@ -2808,7 +2812,7 @@ mod test {
 
         let foo = foo(&mut module, t_num);
 
-        let _main = {
+        let main = {
             let mut func = module.define_function("main", main_sig).unwrap();
             let loaded = func.load_func(&foo, &[]).unwrap();
             let call1 = func
@@ -2862,6 +2866,7 @@ mod test {
         };
 
         let mut h = module.finish_hugr().unwrap();
+        h.set_entrypoint(main.node());
         assert_matches!(h.validate(), Ok(()));
 
         test_resolve(&mut h);
@@ -2936,6 +2941,8 @@ mod test {
 
     fn resolve_and_validate_polymorphic_array_input(module: ModuleBuilder<Hugr>) {
         let mut h = module.finish_hugr().unwrap();
+        let main = super::super::dfg_modify::find_module_func_by_name(&h, "main").unwrap();
+        h.set_entrypoint(main);
         assert_matches!(h.validate(), Ok(()));
         test_resolve(&mut h);
         assert_matches!(h.validate(), Ok(()));

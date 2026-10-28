@@ -1727,7 +1727,7 @@ mod tests {
         let foo_node = foo.node();
 
         // Build the "main" function body ---
-        let _main = {
+        let main = {
             let mut func = module.define_function("main", main_sig).unwrap();
 
             // Load the function value; this is the wire that will be passed through modifiers.
@@ -1783,8 +1783,9 @@ mod tests {
             func.finish_with_outputs(fn_outs).unwrap()
         };
 
-        // Run the resolver and validate
-        let h = module.finish_hugr().unwrap();
+        // Set the function entrypoint and validate the fixture.
+        let mut h = module.finish_hugr().unwrap();
+        h.set_entrypoint(main.node());
         assert_matches!(h.validate(), Ok(()));
         (h, foo_node)
     }
@@ -1912,7 +1913,7 @@ mod tests {
             )
             .unwrap();
 
-        let shared_load_node = {
+        let (main, shared_load_node) = {
             let mut func = module.define_function("main", main_sig).unwrap();
             let loaded = func.load_func(foo.handle(), &[]).unwrap();
             let shared_load_node = loaded.node();
@@ -1951,12 +1952,14 @@ mod tests {
                 .unwrap()
                 .out_wire(0);
 
-            func.finish_with_outputs([control_arr, controlled_target, direct_target])
+            let main = func
+                .finish_with_outputs([control_arr, controlled_target, direct_target])
                 .unwrap();
-            shared_load_node
+            (main, shared_load_node)
         };
 
         let mut h = module.finish_hugr().unwrap();
+        h.set_entrypoint(main.node());
         assert_matches!(h.validate(), Ok(()));
 
         test_resolve(&mut h);
@@ -2012,7 +2015,7 @@ mod tests {
             )
             .unwrap();
 
-        {
+        let main = {
             let mut func = module.define_function("main", main_sig).unwrap();
             // Build `LoadFunction(foo) -> Control -> CallIndirect`.
             let loaded = func.load_func(foo.handle(), &[]).unwrap();
@@ -2038,10 +2041,11 @@ mod tests {
                 )
                 .unwrap()
                 .outputs();
-            func.finish_with_outputs(outputs).unwrap();
-        }
+            func.finish_with_outputs(outputs).unwrap()
+        };
 
         let mut h = module.finish_hugr().unwrap();
+        h.set_entrypoint(main.node());
         assert_matches!(h.validate(), Ok(()));
 
         test_resolve(&mut h);
@@ -2087,7 +2091,7 @@ mod tests {
             )
             .unwrap();
 
-        {
+        let main = {
             let mut func = module.define_function("main", main_sig).unwrap();
             let loaded = func.load_func(foo.handle(), &[]).unwrap();
             let modified_fn = func
@@ -2112,10 +2116,11 @@ mod tests {
                 )
                 .unwrap()
                 .outputs();
-            func.finish_with_outputs(outputs).unwrap();
-        }
+            func.finish_with_outputs(outputs).unwrap()
+        };
 
         let mut h = module.finish_hugr().unwrap();
+        h.set_entrypoint(main.node());
         assert_matches!(h.validate(), Ok(()));
 
         test_resolve(&mut h);
@@ -2244,7 +2249,7 @@ mod tests {
             )
             .unwrap();
 
-        {
+        let main = {
             let mut func = module.define_function("main", main_sig).unwrap();
             // One branch uses a controlled indirect call to `bar`; the other
             // branch calls the original `bar` directly.
@@ -2283,10 +2288,11 @@ mod tests {
                 .out_wire(0);
 
             func.finish_with_outputs([control_arr, controlled_target, direct_target])
-                .unwrap();
-        }
+                .unwrap()
+        };
 
         let mut h = module.finish_hugr().unwrap();
+        h.set_entrypoint(main.node());
         assert_matches!(h.validate(), Ok(()));
 
         test_resolve(&mut h);
@@ -2427,7 +2433,7 @@ mod tests {
             )
             .unwrap();
 
-        {
+        let main = {
             let mut func = module.define_function("main", main_sig).unwrap();
             let loaded = func.load_func(foo.handle(), &[]).unwrap();
             let modified_fn = func
@@ -2452,10 +2458,11 @@ mod tests {
                 )
                 .unwrap()
                 .outputs();
-            func.finish_with_outputs(outputs).unwrap();
-        }
+            func.finish_with_outputs(outputs).unwrap()
+        };
 
         let mut h = module.finish_hugr().unwrap();
+        h.set_entrypoint(main.node());
         assert_matches!(h.validate(), Ok(()));
 
         let result = resolve_modifier(&mut h, &PassScope::default());

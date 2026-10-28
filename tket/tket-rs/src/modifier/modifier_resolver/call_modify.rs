@@ -1169,9 +1169,10 @@ mod tests {
             )
             .unwrap()
             .outputs();
-        main.finish_with_outputs(outputs).unwrap();
+        let main = main.finish_with_outputs(outputs).unwrap();
 
         let mut h = module.finish_hugr().unwrap();
+        h.set_entrypoint(main.node());
         match resolve_modifier(&mut h, &PassScope::default()) {
             Err(ModifierResolverErrors::UnResolvable { msg, .. }) => {
                 assert!(
@@ -1268,9 +1269,10 @@ mod tests {
             )
             .unwrap()
             .outputs();
-        main.finish_with_outputs(outputs).unwrap();
+        let main = main.finish_with_outputs(outputs).unwrap();
 
         let mut h = module.finish_hugr().unwrap();
+        h.set_entrypoint(main.node());
         match resolve_modifier(&mut h, &PassScope::default()) {
             Err(ModifierResolverErrors::UnResolvable { msg, .. }) => {
                 assert!(
