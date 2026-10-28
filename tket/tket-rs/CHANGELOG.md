@@ -5,12 +5,14 @@
 
 ### Bug Fixes
 
+- Decode pytket circuits with reordered parameter-producing barriers ([#1980](https://github.com/Quantinuum/tket2/pull/1980))
+- Reuse generated operation functions ([#1995](https://github.com/Quantinuum/tket2/pull/1995))
 - Avoid naming different modified functions the same ([#2025](https://github.com/Quantinuum/tket2/pull/2025))
 - Cache modified functions and support recursive calls ([#2031](https://github.com/Quantinuum/tket2/pull/2031))
-- Incorrect Bit register name reuse in pytket encoder ([#2051](https://github.com/Quantinuum/tket2/pull/2051))
+- Fix incorrect bit register name reuse in the pytket encoder ([#2051](https://github.com/Quantinuum/tket2/pull/2051))
 - Avoid generated helper symbol collisions ([#2081](https://github.com/Quantinuum/tket2/pull/2081))
-- *(pytket)* preserve opaque bit output dependencies ([#2085](https://github.com/Quantinuum/tket2/pull/2085))
-- Update modifier resolution functions to explore all function calls avoiding repetitions ([#2098](https://github.com/Quantinuum/tket2/pull/2098))
+- Preserve opaque bit output dependencies in pytket circuits ([#2085](https://github.com/Quantinuum/tket2/pull/2085))
+- Fix modifier resolution missing functions reachable through calls ([#2098](https://github.com/Quantinuum/tket2/pull/2098))
 
 ### Documentation
 
@@ -18,14 +20,15 @@
 
 ### New Features
 
-- *(pytket)* parse pi as a constant ([#2021](https://github.com/Quantinuum/tket2/pull/2021))
-- Pauli Graph Resynthesis ([#2020](https://github.com/Quantinuum/tket2/pull/2020))
-- Add T-count optimization pass ([#2049](https://github.com/Quantinuum/tket2/pull/2049))
-- Bump to latest `hugr` and register `math` extension with QIS compiler ([#2037](https://github.com/Quantinuum/tket2/pull/2037))
+- Add the `pauli_exp` extension ([#1996](https://github.com/Quantinuum/tket2/pull/1996))
+- Parse pi as a constant in pytket circuits ([#2021](https://github.com/Quantinuum/tket2/pull/2021))
+- Add Pauli graph resynthesis ([#2020](https://github.com/Quantinuum/tket2/pull/2020))
+- Add a T-count optimization pass ([#2049](https://github.com/Quantinuum/tket2/pull/2049))
+- Update `hugr` and register the `math` extension with the QIS compiler ([#2037](https://github.com/Quantinuum/tket2/pull/2037))
 
 ### Refactor
 
-- Extract modifier chain helper and improve function modification scan ([#2079](https://github.com/Quantinuum/tket2/pull/2079))
+- Extract a modifier chain helper and improve the function modification scan ([#2079](https://github.com/Quantinuum/tket2/pull/2079))
 
 ## [0.22.0](https://github.com/Quantinuum/tket2/compare/tket-v0.21.2...tket-v0.22.0) - 2026-09-03
 

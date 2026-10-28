@@ -5,6 +5,7 @@
 
 ### Bug Fixes
 
+- Add regression coverage for sharing helpers between repeated barriers ([#1995](https://github.com/Quantinuum/tket2/pull/1995))
 - Avoid generated helper symbol collisions ([#2081](https://github.com/Quantinuum/tket2/pull/2081))
 
 ### Documentation
