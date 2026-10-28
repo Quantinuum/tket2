@@ -3,13 +3,13 @@
 //!
 //! # Quick start
 //!
-//! This example optimizes and synthesizes a two qubit circuit.
+//! This example optimizes the T count and synthesizes a two qubit Clifford+T circuit.
 //!
 //! ```
 //! use tk_pg_libs::{GateData, GateType, Op, PauliGraph};
 //! use tk_pg_libs::passes::{
 //!     CanonicalFormPass, GreedySynthPass, GroupCommutingOpsPass, PGPass,
-//!     RotationMergingPass,
+//!     RotationMergingPass, TOptimizationPass,
 //! };
 //!
 //! let mut pg = PauliGraph::new(2);
@@ -24,9 +24,14 @@
 //!
 //! let pg = CanonicalFormPass::new().transform(&pg);
 //! let pg = RotationMergingPass::new().transform(&pg);
+//! let pg = TOptimizationPass::new().transform(&pg);
 //! let pg = GroupCommutingOpsPass::new().transform(&pg);
 //! let pg = GreedySynthPass::new().transform(&pg);
 //! ```
+//!
+//! [`passes::TOptimizationPass`] uses no ancillas by default and requires rotation
+//! angles that are multiples of 0.25 half turns.
+//! Measurements, resets, and black boxes are not supported as input to this pass.
 
 #[doc(inline)]
 pub use tk_pg_core::{
@@ -60,6 +65,8 @@ pub mod passes {
     pub use tk_pg_optimize::{GroupCommutingOpsPass, RotationMergingPass};
     #[doc(inline)]
     pub use tk_pg_rebase::RebaseTQEToZXPass;
+    #[doc(inline)]
+    pub use tk_pg_t_optimize::TOptimizationPass;
 
     #[cfg(feature = "unstable_simd")]
     #[doc(inline)]
@@ -73,4 +80,6 @@ pub mod passes {
     pub use tk_pg_optimize as optimise;
     #[doc(inline)]
     pub use tk_pg_rebase as rebase;
+    #[doc(inline)]
+    pub use tk_pg_t_optimize as t_optimize;
 }

@@ -24,8 +24,7 @@
 //! ```
 //! The resolver finds the last modifier in a chain of modifiers,
 //! and starts resolving the function loaded by the `LoadFunction` node,
-//! which is done in
-//! `apply_modifier_chain_to_loaded_fn`.
+//! in `apply_modification` or, if nested modifier blocks are present, in `modify_indirect_call`.
 //! After resolution, original function nodes that have been replaced by solved
 //! modified versions may be removed if they are no longer needed and the pass
 //! scope allows removing them. Nodes whose interface must be preserved by the
@@ -363,79 +362,92 @@ impl<N> Default for ModifierResolver<N> {
     }
 }
 
-/// Errors that can occur when tracing and validating a chain of modifiers and its target.
-#[derive(Debug, derive_more::Error, derive_more::Display)]
-#[non_exhaustive]
-pub enum ModifierError<N = Node> {
-    /// The node is not a modifier
-    #[display("Node to modify {_0} expected to be a modifier but actually {_1}")]
-    NotModifier(N, OpType),
-    /// No caller of this modified function exists.
-    #[display("No caller of the modified function exists for node {_0}")]
-    #[error(ignore)]
-    NoCaller(N),
-    /// No target of this modifier exists.
-    #[display("The modifier node {_0} chain has no target")]
-    #[error(ignore)]
-    NoTarget(N),
-    /// Not the first modifier in a chain.
-    #[display("Node {_0} of type {_1} is not the first modifier in a chain.")]
-    NotInitialModifier(N, OpType),
-    /// The modifier cannot be applied to the node.
-    #[display("Modifier cannot be applied to the node {_0} of type {_1}")]
-    ModifierNotApplicable(N, OpType),
-}
+// There are some issue in rust when we try to deprecate a enum with `derive_more` macros
+// (https://github.com/JelteF/derive_more/issues/570) or deprecate a enum variant
+// (https://github.com/rust-lang/rust/issues/92313). As a workaround, we use `#[expect(deprecated)]`
+// on the module containing the deprecated enum.
+#[expect(deprecated)]
+mod modifier_error {
+    use super::*;
 
-impl<N> ModifierError<N> {
-    fn node(self) -> N {
-        match self {
-            ModifierError::NotModifier(n, _)
-            | ModifierError::NoCaller(n)
-            | ModifierError::NoTarget(n)
-            | ModifierError::NotInitialModifier(n, _)
-            | ModifierError::ModifierNotApplicable(n, _) => n,
-        }
+    /// Errors that can occur when tracing and validating a chain of modifiers and its target.
+    #[derive(Debug, derive_more::Error, derive_more::Display)]
+    #[non_exhaustive]
+    #[deprecated(since = "0.23.0", note = "Use ModifierResolverErrors instead")]
+    pub enum ModifierError<N = Node> {
+        /// The node is not a modifier
+        #[display("Node to modify {_0} expected to be a modifier but actually {_1}")]
+        NotModifier(N, OpType),
+        /// No caller of this modified function exists.
+        #[display("No caller of the modified function exists for node {_0}")]
+        #[error(ignore)]
+        NoCaller(N),
+        /// No target of this modifier exists.
+        #[display("The modifier node {_0} chain has no target")]
+        #[error(ignore)]
+        NoTarget(N),
+        /// Not the first modifier in a chain.
+        #[display("Node {_0} of type {_1} is not the first modifier in a chain.")]
+        NotInitialModifier(N, OpType),
+        /// The modifier cannot be applied to the node.
+        #[display("Modifier cannot be applied to the node {_0} of type {_1}")]
+        ModifierNotApplicable(N, OpType),
+    }
+
+    /// Possible errors that can occur during the modifier resolution process.
+    #[derive(Debug, derive_more::Display, derive_more::Error, derive_more::From)]
+    #[non_exhaustive]
+    pub enum ModifierResolverErrors<N = Node> {
+        /// Errors during tracing or validating a chain of modifiers and its target.
+        #[deprecated(
+            since = "0.23.0",
+            note = "Use the specific ModifierResolverErrors variants instead"
+        )]
+        #[display("{_0}")]
+        #[from]
+        ModifierError(ModifierError<N>),
+        /// The head of a modifier chain is not a loaded function.
+        #[display(
+            "Malformed modifier chain: head node {_0} must be a LoadFunction. Found {_1} instead."
+        )]
+        MalformedChainHead(N, OpType),
+        /// The modifier cannot be applied to the node.
+        #[display("Modifier cannot be applied to the node {_0} of type {_1}")]
+        ModifierNotApplicable(N, OpType),
+        /// Error if the new hugr is not built properly.
+        #[display("{_0}")]
+        #[from]
+        BuildError(BuildError),
+        /// Error that is caused by a bug in this resolver which should be unreachable.
+        #[display("Unreachable error: {msg}")]
+        Unreachable {
+            /// The message of the unreachable error.
+            msg: String,
+        },
+        /// Modifier applied to a node that cannot be modified.
+        #[display("The node {node} of type {optype} cannot be modified: {msg}")]
+        UnResolvable {
+            /// The node that cannot be modified.
+            node: N,
+            /// The operation type that cannot be modified.
+            optype: OpType,
+            /// The message of the unresolvable error.
+            msg: String,
+        },
+        /// The node cannot be modified.
+        #[display("Modification by {_0:?} is not defined for the node {_1}")]
+        Unimplemented(Modifier, OpType),
+        /// The power modifier is not supported.
+        #[display("Found power modifier in node: {node}. Power modifier is not supported yet.")]
+        PowerModifierNotSupported {
+            /// The `power` node
+            node: N,
+        },
     }
 }
 
-/// Possible errors that can occur during the modifier resolution process.
-#[derive(Debug, derive_more::Display, derive_more::Error, derive_more::From)]
-#[non_exhaustive]
-pub enum ModifierResolverErrors<N = Node> {
-    /// Errors during tracing or validating a chain of modifiers and its target.
-    #[display("{_0}")]
-    #[from]
-    ModifierError(ModifierError<N>),
-    /// Error if the new hugr is not built properly.
-    #[display("{_0}")]
-    #[from]
-    BuildError(BuildError),
-    /// Error that is caused by a bug in this resolver which should be unreachable.
-    #[display("Unreachable error: {msg}")]
-    Unreachable {
-        /// The message of the unreachable error.
-        msg: String,
-    },
-    /// Modifier applied to a node that cannot be modified.
-    #[display("The node {node} of type {optype} cannot be modified: {msg}")]
-    UnResolvable {
-        /// The node that cannot be modified.
-        node: N,
-        /// The operation type that cannot be modified.
-        optype: OpType,
-        /// The message of the unresolvable error.
-        msg: String,
-    },
-    /// The node cannot be modified.
-    #[display("Modification by {_0:?} is not defined for the node {_1}")]
-    Unimplemented(Modifier, OpType),
-    /// The power modifier is not supported.
-    #[display("Found power modifier in node: {node}. Power modifier is not supported yet.")]
-    PowerModifierNotSupported {
-        /// The `power` node
-        node: N,
-    },
-}
+#[expect(deprecated)]
+pub use modifier_error::{ModifierError, ModifierResolverErrors};
 
 impl<N> ModifierResolverErrors<N> {
     /// Create an unreachable error.
@@ -552,29 +564,20 @@ impl<N: HugrNode> ModifierResolver<N> {
         self.modifiers.control += 1;
     }
 
-    /// Register a correspondence from old to new wire.
+    /// Register a correspondence from old to new wire, retaining distinct targets.
     fn map_insert(
         &mut self,
         old: DirWire<N>,
         new: DirWire,
     ) -> Result<(), ModifierResolverErrors<N>> {
         let existing = self.corresp_map().entry(old).or_default();
-        match existing.as_slice() {
-            // No correspondence yet (vacant or previously emptied): register the new wire.
-            [] => {
-                existing.push(new);
-                Ok(())
-            }
-            // StateOrder correspondence may already have been registered while
-            // wiring a container's I/O ports. Re-registering the same wire is
-            // harmless; a different correspondence is still an error.
-            [former] if *former == new => Ok(()),
-            // If the old wire is already registered, raise an error.
-            [former, ..] => Err(ModifierResolverErrors::unreachable(format!(
-                "Wire already registered for node {}. Former [{},...], Latter {}.",
-                old.0, former, new
-            ))),
+        // Rewriting can split one node into several replacements. For example,
+        // two modified calls sharing a LoadFunction get separate loaders; both
+        // must inherit the original loader's order dependencies.
+        if !existing.contains(&new) {
+            existing.push(new);
         }
+        Ok(())
     }
 
     /// Remember that old wire has no correspondence.
@@ -697,55 +700,83 @@ impl<N: HugrNode> ModifierResolver<N> {
 }
 
 impl<N: HugrNode> ModifierResolver<N> {
-    fn verify(&self, h: &impl HugrView<Node = N>, n: N) -> Result<(), ModifierError<N>> {
-        // Check if the node is a modifier, modifying an operation.
-        let optype = h.get_optype(n);
-        if Modifier::from_optype(optype).is_none() {
-            return Err(ModifierError::NotModifier(n, optype.clone()));
+    /// Check whether the node is an indirect call whose function input (port 0)
+    /// is supplied by a modifier operation.
+    /// Return an error if an indirect call's function input has no unique source.
+    fn should_modify(
+        &self,
+        h: &impl HugrView<Node = N>,
+        node: N,
+    ) -> Result<bool, ModifierResolverErrors<N>> {
+        // Check if the node is an indirect call.
+        if !matches!(h.get_optype(node), OpType::CallIndirect(_)) {
+            return Ok(false);
         }
-        // Check if this is the first modifier in a chain.
-        let Ok((caller, _)) = h.linked_inputs(n, 0).exactly_one() else {
-            return Err(ModifierError::NoCaller(n));
-        };
-        let optype = h.get_optype(caller);
-        if Modifier::from_optype(optype).is_some() {
-            return Err(ModifierError::NotInitialModifier(caller, optype.clone()));
+        // Check if this indirect call is targeted by a modifier chain.
+        let (maybe_a_modifier, _) = h
+            .single_linked_output(node, 0)
+            .expect("CallIndirect must have exactly one function input");
+        if Modifier::from_optype(h.get_optype(maybe_a_modifier)).is_none() {
+            return Ok(false);
         }
-        Ok(())
+
+        Ok(true)
     }
 
-    /// Apply the resolver to the current node `n`.
-    /// It first checks if the node is a modifier and can be applied.
-    /// If not, it returns a [`ModifierError`].
-    /// If yes, it applies the modifier to the loaded function,
-    fn try_rewrite(
+    /// Resolve a modifier chain in place, starting with no enclosing modifiers.
+    ///
+    /// `indirect_call_node` is expected to be a `CallIndirect` node, as checked by `should_modify`.
+    fn apply_modification(
         &mut self,
         hugr: &mut impl HugrMut<Node = N>,
-        modifier_node: N,
+        indirect_call_node: N,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        // Verify that the rewrite can be applied.
-        self.verify(hugr, modifier_node)?;
-
-        // The ports that takes inputs from the modified function to the IndirectCall node.
-        let modified_fn_loader: Vec<(_, Vec<_>)> = hugr
-            .node_outputs(modifier_node)
-            .map(|p| (p, hugr.linked_inputs(modifier_node, p).collect()))
-            .collect();
-
-        // Modify the chain of modifiers.
         // Make sure that the modifiers are initially empty.
-        let modifiers = CombinedModifier::default();
-        let new_load = self.with_modifiers(modifiers, |this| {
-            this.apply_modifier_chain_to_loaded_fn(hugr, modifier_node)
-        })?;
-
-        // Connect the modified function to the inputs
-        for (out_port, inputs) in modified_fn_loader {
-            for (recv, recv_port) in inputs {
-                hugr.disconnect(recv, recv_port);
-                hugr.connect(new_load, out_port, recv, recv_port);
-            }
+        assert_eq!(self.modifiers(), &CombinedModifier::default());
+        // Modify the function loaded by the indirect call preserving the modifier state.
+        let (trace, load_node, modified_fn, new_load_op) = self.with_modifiers(
+            self.modifiers().clone(),
+            |this| -> Result<_, ModifierResolverErrors<N>> {
+                // Collect the chain for cleanup while accumulating its modifiers.
+                let trace = this.trace_indirect_call_to_load(hugr, indirect_call_node)?;
+                let load_node = *trace.last().unwrap();
+                // Modify the loaded function and prepare its replacement loader.
+                let (modified_fn, new_load_op) = this.modify_load(hugr, load_node)?;
+                Ok((trace, load_node, modified_fn, new_load_op))
+            },
+        )?;
+        // Insert the new loader and connect it to the modified function.
+        let new_load_node = hugr.add_node_before(indirect_call_node, new_load_op);
+        hugr.connect(modified_fn, 0, new_load_node, 0);
+        // Transfer order dependencies before removing the original loader.
+        let old_op = hugr.get_optype(load_node);
+        let old_input = old_op.other_input_port().unwrap();
+        let old_output = old_op.other_output_port().unwrap();
+        let predecessors = hugr.linked_outputs(load_node, old_input).collect_vec();
+        let successors = hugr.linked_inputs(load_node, old_output).collect_vec();
+        let new_op = hugr.get_optype(new_load_node);
+        let new_input = new_op.other_input_port().unwrap();
+        let new_output = new_op.other_output_port().unwrap();
+        for (source, port) in predecessors {
+            hugr.connect(source, port, new_load_node, new_input);
         }
+        for (target, port) in successors {
+            hugr.connect(new_load_node, new_output, target, port);
+        }
+        // Remove the old loader only if it has no other value consumers.
+        if hugr.linked_inputs(load_node, 0).count() == 1 {
+            hugr.remove_node(load_node);
+        }
+
+        // Disconnect the indirect caller from the modifier chain and connect it to the new loader.
+        hugr.disconnect(indirect_call_node, IncomingPort::from(0));
+        hugr.connect(new_load_node, 0, indirect_call_node, 0);
+
+        // Then remove the chain, skipping the last node (the original `load_node`).
+        for node in &trace[..trace.len().saturating_sub(1)] {
+            hugr.remove_node(*node);
+        }
+
         Ok(())
     }
 
@@ -1389,8 +1420,6 @@ pub fn resolve_modifier_with_entrypoints_and_scope(
     entry_points: impl IntoIterator<Item = Node>,
     scope: &PassScope,
 ) -> Result<(), ModifierResolverErrors<Node>> {
-    use ModifierResolverErrors::*;
-
     // Collect entry points into a deque so they can be cloned for later cleanup passes.
     let entry_points: VecDeque<_> = entry_points.into_iter().collect();
 
@@ -1419,25 +1448,14 @@ pub fn resolve_modifier_with_entrypoints_and_scope(
         worklist.extend(h.children(node).filter(|n| !visited.contains(n)));
         worklist.extend(h.all_neighbours(node).filter(|n| !visited.contains(n)));
         visited.insert(node);
-        if let Err(e) = resolver.try_rewrite(h, node) {
-            // ModifierError means this node is not a modifier (or is not the first
-            // in its chain) and can safely be skipped.
-            // Any other error is a genuine failure and must be propagated.
-            if !matches!(e, ModifierError(_)) {
-                return Err(e);
-            }
+
+        if resolver.should_modify(h, node)? {
+            resolver.apply_modification(h, node)?;
         }
     }
 
-    // After all rewrites, some modifier nodes may still remain in the graph
-    // (e.g. intermediate nodes in a chain whose last modifier was the one rewritten).
-    // Walk the same reachable set again and delete any surviving modifier nodes,
-    // together with every downstream node that consumes their output.
-    //
-    // NOTE:
-    // This might be insufficient as a cleanup since the resolution procedure might
-    // generate nodes that are not reachable from the entry points.
-    // If more thorough cleanup is needed, we should run dead code elimination.
+    // We do not expect any modifier nodes to remain after the main resolution pass.
+    // The following loop revisits all reachable nodes to ensure that no modifier nodes remain.
     let mut deletelist = entry_points.clone();
     let mut visited = FxHashSet::default();
     while let Some(node) = deletelist.pop_front() {
@@ -1457,13 +1475,9 @@ pub fn resolve_modifier_with_entrypoints_and_scope(
         if h.contains_node(node) {
             let optype = h.get_optype(node);
             if Modifier::from_optype(optype).is_some() {
-                // Remove the modifier node and all nodes reachable through its
-                // output edges (i.e. nodes that would become disconnected).
-                let mut l = vec![node];
-                while let Some(n) = l.pop() {
-                    l.extend(h.output_neighbours(n));
-                    h.remove_node(n);
-                }
+                return Err(ModifierResolverErrors::unreachable(format!(
+                    "Modifier at node {node} remains unresolved; all modifiers should be resolved."
+                )));
             }
         }
     }

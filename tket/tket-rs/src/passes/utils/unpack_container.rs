@@ -597,7 +597,7 @@ mod tests {
         let mut lowerer = ReplaceTypes::new_empty();
         factory
             .into_function_map()
-            .register_operation_replacements(&mut hugr, &mut lowerer);
+            .register_operation_replacements(&hugr, &mut lowerer);
         lowerer.run(&mut hugr).unwrap();
         hugr.validate().unwrap();
 

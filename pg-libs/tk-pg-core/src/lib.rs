@@ -1,4 +1,7 @@
 //! This crate contains the core data structures and traits for the `pg-libs` library.
+//!
+//! See [tk-pg-libs](https://docs.rs/tk-pg-libs) for the available passes and usage examples,
+//! including [T-count optimization](https://docs.rs/tk-pg-t-optimize).
 
 mod errors;
 mod gates;

@@ -98,7 +98,20 @@ impl<'h> PytketDecoderContext<'h> {
             subgraph, qubits, bits, params, old_parent, new_parent,
         )?;
 
-        self.rewire_external_subgraph_outputs(id, subgraph, qubits, bits, old_parent, new_parent)?;
+        let output_bits = opaque_output_bits(
+            self.config(),
+            bits,
+            subgraph.signature().input().iter(),
+            subgraph.signature().output().iter(),
+        );
+        self.rewire_external_subgraph_outputs(
+            id,
+            subgraph,
+            qubits,
+            output_bits,
+            old_parent,
+            new_parent,
+        )?;
 
         self.rewire_external_subgraph_io_order_edges(subgraph, old_parent, new_parent)?;
 
@@ -432,9 +445,15 @@ impl<'h> PytketDecoderContext<'h> {
             &insertion_result,
         )?;
 
+        let output_bits = opaque_output_bits(
+            self.config(),
+            bits,
+            payload_inputs.iter().map(|(ty, _)| ty),
+            payload_outputs.iter().map(|(ty, _)| ty),
+        );
         self.wire_inline_subgraph_outputs(
             qubits,
-            bits,
+            output_bits,
             payload_outputs,
             to_insert_outputs,
             &insertion_result,
@@ -548,6 +567,32 @@ impl<'h> PytketDecoderContext<'h> {
             }
         }
         Ok(())
+    }
+}
+
+/// Select the separate registers assigned to an opaque subgraph's classical
+/// outputs.
+///
+/// Older barrier payloads reused input registers, so retain that layout when
+/// the command has no complete output suffix for backwards compatibility.
+fn opaque_output_bits<'a, 't>(
+    config: &PytketDecoderConfig,
+    bits: &'a [TrackedBit],
+    input_types: impl Iterator<Item = &'t Type>,
+    output_types: impl Iterator<Item = &'t Type>,
+) -> &'a [TrackedBit] {
+    let input_bits = input_types
+        .filter_map(|ty| config.type_to_pytket(ty))
+        .map(|count| count.bits)
+        .sum::<usize>();
+    let output_bits = output_types
+        .filter_map(|ty| config.type_to_pytket(ty))
+        .map(|count| count.bits)
+        .sum::<usize>();
+    if bits.len() >= input_bits.saturating_add(output_bits) {
+        &bits[input_bits..]
+    } else {
+        bits
     }
 }
 

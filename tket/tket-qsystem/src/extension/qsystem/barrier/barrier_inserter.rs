@@ -190,7 +190,7 @@ impl BarrierInserter {
     /// Register function replacements for all temporary operations
     pub fn register_operation_replacements(
         self,
-        hugr: &mut impl HugrMut<Node = Node>,
+        hugr: &impl HugrView<Node = Node>,
         lowerer: &mut ReplaceTypes,
     ) {
         self.barrier_builder

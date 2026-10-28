@@ -1,5 +1,38 @@
 # Changelog
 
+## [0.15.12](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.11...tket-py-v0.15.12) (2026-10-20)
+
+
+### Bug Fixes
+
+* Avoid generated helper symbol collisions ([#2081](https://github.com/Quantinuum/tket2/pull/2081))
+* Preserve opaque bit output dependencies ([#2085](https://github.com/Quantinuum/tket2/pull/2085))
+
+## [0.15.11](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.10...tket-py-v0.15.11) (2026-10-07)
+
+
+### Features
+
+* Add T-count optimization pass ([#2049](https://github.com/Quantinuum/tket2/issues/2049)) ([b23898f](https://github.com/Quantinuum/tket2/commit/b23898f0a808f715d33b24352e4d62653b0c94c2))
+* Bump to latest `hugr` and register `math` extension with QIS compiler ([#2037](https://github.com/Quantinuum/tket2/issues/2037)) ([93ea902](https://github.com/Quantinuum/tket2/commit/93ea902721daf8dd49fd5a6d517c13c3358818d9))
+
+## [0.15.10](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.9...tket-py-v0.15.10) (2026-09-30)
+
+
+### Features
+
+* Pauli Graph Resynthesis ([#2020](https://github.com/Quantinuum/tket2/issues/2020)) ([2737ab7](https://github.com/Quantinuum/tket2/commit/2737ab72d25d7374bf75406369382a3f44c9c700))
+
+
+### Bug Fixes
+
+* Incorrect Bit register name reuse in pytket encoder ([#2051](https://github.com/Quantinuum/tket2/issues/2051)) ([46493f5](https://github.com/Quantinuum/tket2/commit/46493f555809d282e25eb6089a07935c5e10ed11))
+
+
+### Documentation
+
+* Use Oxford spelling consistently in public documentation ([#2016](https://github.com/Quantinuum/tket2/issues/2016)) ([c46d68d](https://github.com/Quantinuum/tket2/commit/c46d68d7fee4bb8630f59dfd255458184e9d28ba))
+
 ## [0.15.9](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.8...tket-py-v0.15.9) (2026-09-07)
 
 

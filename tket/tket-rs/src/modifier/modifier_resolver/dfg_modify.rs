@@ -1032,7 +1032,7 @@ fn pack_control_groups(
 }
 
 /// Finds a function definition named `func_name` among the children of the module root.
-fn find_module_func_by_name<N: HugrNode>(
+pub(super) fn find_module_func_by_name<N: HugrNode>(
     h: &impl HugrView<Node = N>,
     func_name: &str,
 ) -> Option<N> {

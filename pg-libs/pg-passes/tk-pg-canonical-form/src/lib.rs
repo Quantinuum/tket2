@@ -1,6 +1,7 @@
 //! Pass to convert a Pauli graph into canonical form.
 use tk_pg_core::{
-    BlackBoxData, ConditionalBoxData, GateData, GateType, Op, PGPass, PauliGraph, TableauData,
+    BlackBoxData, ConditionalBoxData, GateData, GateType, Op, PGPass, Pauli, PauliGraph,
+    RotationData, TableauData,
 };
 use tk_pg_ir_kernels::{PGTableau, get_dagger, is_clifford, is_clifford_gate_type};
 use tk_pg_qm_tableau::Tableau as QubitMajorTableau;
@@ -260,9 +261,7 @@ fn process_op(
                         if compose {
                             tab.precompose_op(&op);
                         } else {
-                            for conjugated_op in tab.conjugate(&op) {
-                                pg.add_op(conjugated_op);
-                            }
+                            process_op(pg, &op, tab, forward, cliff_eval);
                         }
                     }
                     return;
@@ -283,7 +282,25 @@ fn process_op(
     if !forward {
         conjugated_ops.reverse();
     }
-    for conjugated_op in conjugated_ops {
+    for mut conjugated_op in conjugated_ops {
+        if cliff_eval && let Op::Rotation { data } = &mut conjugated_op {
+            let angle = data.get_angle();
+            if angle.is_finite() && angle.abs() >= 0.5 {
+                let remainder = angle % 0.5;
+                let correction = angle - remainder;
+                // The string is already conjugated, so append the correction to the tableau.
+                // Forward traversal maintains the inverse tableau.
+                if data.get_string().iter().any(|p| *p != Pauli::I) {
+                    tab.postcompose_op(&Op::Rotation {
+                        data: RotationData::new(
+                            data.get_string().clone(),
+                            if forward { -correction } else { correction },
+                        ),
+                    });
+                }
+                *data = RotationData::new(data.get_string().clone(), remainder);
+            }
+        }
         pg.add_op(conjugated_op);
     }
 }
@@ -339,7 +356,9 @@ fn to_canonical_form(pg: &PauliGraph, forward: bool, cliff_eval: bool) -> PauliG
 /// tableaux, interleaved with any obstructions and the non-Clifford ops (rotations, measures,
 /// resets, conditional operations) that are conjugated through and left in place.
 /// `cliff_eval` controls whether rotations with a Clifford angle are folded into the tableau
-/// (`true`) or kept as explicit rotations (`false`).
+/// (`true`) or kept as explicit rotations (`false`). When enabled, it also extracts
+/// Clifford corrections from unconditional rotations, leaving their angles strictly
+/// between -0.5 and 0.5 half turns.
 ///
 /// # Panics
 ///
@@ -369,7 +388,9 @@ impl CanonicalFormPass {
         self.forward = forward;
         self
     }
-    /// Set whether to evaluate Clifford angle rotations as Clifford gates or keep them as rotations.
+    /// Set whether to absorb Clifford rotations and the Clifford part of larger angles
+    /// into the tableau. Enabled by default; remaining unconditional rotation angles
+    /// lie strictly between -0.5 and 0.5 half turns.
     pub fn with_cliff_eval(mut self, cliff_eval: bool) -> Self {
         self.cliff_eval = cliff_eval;
         self
@@ -452,6 +473,87 @@ mod tests {
         let pass = CanonicalFormPass::new().with_forward(forward);
         let transformed = pass.transform(&pg);
         assert_eq!(transformed.get_ops().len(), 1);
+        assert!(compare_unitaries_via_tk(&pg, &transformed));
+    }
+
+    #[rstest]
+    #[case(true, true, 0.75, 0.25)]
+    #[case(false, true, 0.75, 0.25)]
+    #[case(true, true, -0.75, -0.25)]
+    #[case(false, true, -0.75, -0.25)]
+    #[case(true, true, 2.1, 0.1)]
+    #[case(false, true, 2.1, 0.1)]
+    #[case(true, true, -2.1, -0.1)]
+    #[case(false, true, -2.1, -0.1)]
+    #[case(true, false, 0.75, 0.75)]
+    #[case(false, false, 0.75, 0.75)]
+    #[case(true, false, -0.75, -0.75)]
+    #[case(false, false, -0.75, -0.75)]
+    #[case(true, false, 2.1, 2.1)]
+    #[case(false, false, 2.1, 2.1)]
+    #[case(true, false, -2.1, -2.1)]
+    #[case(false, false, -2.1, -2.1)]
+    fn test_extract_clifford_corrections(
+        #[case] forward: bool,
+        #[case] cliff_eval: bool,
+        #[case] angle: f64,
+        #[case] expected_angle: f64,
+    ) {
+        let mut pg = PauliGraph::new(2);
+        pg.add_op(Op::Gate {
+            data: GateData::new(GateType::RZ, vec![0]).with_params(vec![angle]),
+        });
+        pg.add_op(Op::Rotation {
+            data: RotationData::new(vec![Pauli::I, Pauli::Z], angle),
+        });
+        let pass = CanonicalFormPass::new()
+            .with_forward(forward)
+            .with_cliff_eval(cliff_eval);
+        let transformed = pass.transform(&pg);
+
+        assert_eq!(transformed.get_ops().len(), 3);
+        for op in transformed.get_ops() {
+            if let Op::Rotation { data } = op {
+                assert!((data.get_angle() - expected_angle).abs() < 1e-10);
+            }
+        }
+        assert!(compare_unitaries_via_tk(&pg, &transformed));
+    }
+
+    #[rstest]
+    #[case(true)]
+    #[case(false)]
+    fn test_clifford_corrections_propagate(#[case] forward: bool) {
+        let mut pg = PauliGraph::new(2);
+        pg.add_op(Op::Gate {
+            data: GateData::new(GateType::H, vec![0]),
+        });
+        pg.add_op(Op::Gate {
+            data: GateData::new(GateType::RX, vec![0]).with_params(vec![0.75]),
+        });
+        pg.add_op(Op::Gate {
+            data: GateData::new(GateType::RY, vec![0]).with_params(vec![-0.75]),
+        });
+        pg.add_op(Op::Rotation {
+            data: RotationData::new(vec![Pauli::X, Pauli::Y], 1.25),
+        });
+        pg.add_op(Op::Gate {
+            data: GateData::new(GateType::PHASEDX, vec![0]).with_params(vec![0.75, 1.25]),
+        });
+        pg.add_op(Op::Gate {
+            data: GateData::new(GateType::ZZPHASE, vec![0, 1]).with_params(vec![-1.25]),
+        });
+        pg.add_op(Op::Gate {
+            data: GateData::new(GateType::H, vec![1]),
+        });
+        let pass = CanonicalFormPass::new().with_forward(forward);
+        let transformed = pass.transform(&pg);
+
+        for op in transformed.get_ops() {
+            if let Op::Rotation { data } = op {
+                assert!(data.get_angle().abs() < 0.5);
+            }
+        }
         assert!(compare_unitaries_via_tk(&pg, &transformed));
     }
 

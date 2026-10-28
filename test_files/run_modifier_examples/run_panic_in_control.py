@@ -2,6 +2,7 @@
 # requires-python = ">=3.13"
 # dependencies = [
 #    "guppylang==1.1.1",
+#    "ziglang==0.16.0",
 # ]
 # ///
 """Run a solved `panic_in_control` hugr and assert it aborts on the first panic.

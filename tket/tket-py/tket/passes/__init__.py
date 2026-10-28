@@ -521,6 +521,7 @@ class PauliGraphResynthesis(ComposablePass):
     An optimisation pass that resynthesizes a Clifford + Rz circuit by converting it to a Pauli Graph
     and applying various optimisation techniques such as:
     - phase folding
+    - optional phase polynomial resynthesis for T count reduction
     - a synthesis algorithm from Pauli Graph to Clifford + Rz aimed at reducing the number of 2
     qubit gates
 
@@ -533,6 +534,11 @@ class PauliGraphResynthesis(ComposablePass):
     - seed: Sets the random seed used to sample candidate gates. Must be non-negative.
     - parallel_mode: A :class:`ParallelMode` for candidate synthesis.
       Defaults to :attr:`ParallelMode.Auto`.
+    - t_optimization: Enable T count optimization. Defaults to False and requires
+      a Clifford + T circuit when enabled.
+    - ancilla_budget: Number of ancillas to allocate per outer circuit for T optimization.
+      Must be non-negative. None uses the largest Hadamard count among the selected
+      dataflow regions. Ignored when t_optimization is False.
     """
 
     window_size: int | None = None
@@ -541,6 +547,8 @@ class PauliGraphResynthesis(ComposablePass):
     seed: int | None = None
     parallel_mode: ParallelMode = ParallelMode.Auto
     _scope: PassScope = GlobalScope.PRESERVE_PUBLIC
+    t_optimization: bool = False
+    ancilla_budget: int | None = None
 
     def __post_init__(self) -> None:
         self._validate_parameters()
@@ -552,6 +560,8 @@ class PauliGraphResynthesis(ComposablePass):
                 raise ValueError(f"{parameter} must be positive")
         if self.seed is not None and self.seed < 0:
             raise ValueError("seed must be non-negative")
+        if self.ancilla_budget is not None and self.ancilla_budget < 0:
+            raise ValueError("ancilla_budget must be non-negative")
         if not isinstance(self.parallel_mode, ParallelMode):
             raise TypeError(
                 "parallel_mode must be an instance of the ParallelMode enum"
@@ -581,6 +591,8 @@ class PauliGraphResynthesis(ComposablePass):
             top_up_size=self.top_up_size,
             seed=self.seed,
             parallel_mode=self.parallel_mode,
+            t_optimization=self.t_optimization,
+            ancilla_budget=self.ancilla_budget,
         )
         package = program.to_python()
         return PassResult.for_pass(
