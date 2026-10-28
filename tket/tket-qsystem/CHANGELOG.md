@@ -1,6 +1,16 @@
 # Changelog
 
 
+## [0.29.1](https://github.com/Quantinuum/tket2/compare/tket-qsystem-v0.29.0...tket-qsystem-v0.29.1) - 2026-10-28
+
+### Bug Fixes
+
+- Avoid generated helper symbol collisions ([#2081](https://github.com/Quantinuum/tket2/pull/2081))
+
+### Documentation
+
+- Use Oxford spelling consistently in public documentation ([#2016](https://github.com/Quantinuum/tket2/pull/2016))
+
 ## [0.29.0](https://github.com/Quantinuum/tket2/compare/tket-qsystem-v0.28.0...tket-qsystem-v0.29.0) - 2026-09-04
 
 ### New Features
