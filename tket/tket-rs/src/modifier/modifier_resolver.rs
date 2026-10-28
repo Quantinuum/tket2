@@ -1396,12 +1396,6 @@ fn remove_unused_modified_functions<N: HugrNode>(
 ///
 /// Use [`resolve_modifier`] to select the entrypoint and cleanup policy through
 /// a [`PassScope`].
-//
-// Shouldn't we use a worklist of nodes?
-// As we may want to change the order of resolving modifiers
-// but might want to rollback if the second last one is called in a different path,
-// this may be needed.
-
 #[deprecated(
     since = "0.23.0",
     note = "Use resolve_modifier with a PassScope instead"
@@ -1466,17 +1460,17 @@ fn resolve_modifier_from_entrypoints(
     // Traverse function bodies and unmodified callees, collecting calls to rewrite.
     let mut resolver = ModifierResolver::new();
     let mut function_worklist = entry_points.clone();
-    let mut visited_function = FxHashSet::default();
-    let mut child_worklist = VecDeque::new();
+    let mut visited_functions = FxHashSet::default();
+    let mut children_worklist = VecDeque::new();
     let mut nodes_to_modify = Vec::new();
 
     while let Some(function) = function_worklist.pop_front() {
-        if !visited_function.insert(function) {
+        if !visited_functions.insert(function) {
             continue;
         }
-        child_worklist.push_back(function);
-        while let Some(node) = child_worklist.pop_front() {
-            child_worklist.extend(h.children(node));
+        children_worklist.push_back(function);
+        while let Some(node) = children_worklist.pop_front() {
+            children_worklist.extend(h.children(node));
 
             if resolver.should_modify(h, node)? {
                 nodes_to_modify.push(node);

@@ -5,7 +5,6 @@ use hugr::{
     IncomingPort, Node, Wire,
     builder::Dataflow,
     core::HugrNode,
-    extension::simple_op::MakeExtensionOp,
     hugr::hugrmut::HugrMut,
     std_extensions::arithmetic::{float_ops::FloatOps, float_types::ConstF64},
 };
