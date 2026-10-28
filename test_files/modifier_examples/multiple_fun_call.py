@@ -15,7 +15,7 @@ from sys import argv
 from guppylang import guppy
 from guppylang.std.builtins import control, dagger
 from guppylang.std.debug import state_result
-from guppylang.std.quantum import discard, h, measure, qubit
+from guppylang.std.quantum import discard, h, qubit
 
 
 @guppy(unitary=True)
