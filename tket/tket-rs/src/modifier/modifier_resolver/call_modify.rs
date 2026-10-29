@@ -110,6 +110,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         // Give the replacement loader the modified function's signature
         let mut modified_sig = load_op.func_sig;
         self.modify_signature(modified_sig.body_mut(), false);
+        self.append_power_inputs(modified_sig.body_mut());
         let new_load =
             LoadFunction::try_new(modified_sig, load_op.type_args).map_err(BuildError::from)?;
 
