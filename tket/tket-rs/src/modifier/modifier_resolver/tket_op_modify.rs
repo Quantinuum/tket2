@@ -661,7 +661,7 @@ mod test {
         Hugr, IncomingPort, OutgoingPort,
         builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
         extension::prelude::qb_t,
-        ops::CallIndirect,
+        ops::{CallIndirect, handle::NodeHandle},
         std_extensions::collections::array::array_type,
         types::{EdgeKind, Signature, Term},
     };
@@ -673,7 +673,7 @@ mod test {
     };
     use crate::{
         extension::rotation::ConstRotation,
-        modifier::modifier_resolver::tests::{SetUnitary, test_modifier_resolver},
+        modifier::modifier_resolver::tests::{SetUnitary, test_modifier_resolver, test_resolve},
         modifier::modifier_resolver::*,
     };
 
@@ -865,7 +865,7 @@ mod test {
             *func.finish_with_outputs([q]).unwrap().handle()
         };
 
-        {
+        let main = {
             let mut func = module
                 .define_function("main", Signature::new(vec![], [qb_t()]))
                 .unwrap();
@@ -891,18 +891,14 @@ mod test {
                 )
                 .unwrap()
                 .outputs();
-            func.finish_with_outputs(outputs).unwrap();
-        }
+            func.finish_with_outputs(outputs).unwrap()
+        };
 
         let mut h = module.finish_hugr().unwrap();
+        h.set_entrypoint(main.node());
         assert_matches!(h.validate(), Ok(()));
-        let entrypoint = h.entrypoint();
-        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        test_resolve(&mut h);
         assert_matches!(h.validate(), Ok(()));
-        assert!(
-            h.nodes()
-                .all(|node| Modifier::from_optype(h.get_optype(node)).is_none())
-        );
         assert!(
             h.nodes()
                 .any(|node| TketOp::from_optype(h.get_optype(node)) == Some(TketOp::Measure))
@@ -983,7 +979,7 @@ mod test {
             func.finish_with_outputs(vec![in1, in2, in3]).unwrap()
         };
 
-        let _main = {
+        let main = {
             let mut func = module.define_function("main", main_sig.clone()).unwrap();
             let loaded = func.load_func(foo.handle(), &[]).unwrap();
             let controlled = func
@@ -1011,9 +1007,9 @@ mod test {
         };
 
         let mut h = module.finish_hugr().unwrap();
+        h.set_entrypoint(main.node());
 
-        let entrypoint = h.entrypoint();
-        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        test_resolve(&mut h);
         assert_matches!(h.validate(), Ok(()));
     }
 }
