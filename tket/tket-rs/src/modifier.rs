@@ -52,6 +52,7 @@ impl<N: HugrNode> CombinedModifier<N> {
     /// The string consists of `'C'` followed by the number of control arrays (`self.accum_ctrl`),
     /// joined by dots, and `'D'` if the dagger modifier has been applied.
     /// If no control qubits are present, `'C'` is omitted.
+    /// Power modifiers are represented by `'P'` followed by the number of exponent wires.
     fn compact_string(&self) -> String {
         let mut s = String::new();
         if self.control > 0 {
@@ -60,6 +61,10 @@ impl<N: HugrNode> CombinedModifier<N> {
         }
         if self.dagger {
             s.push('D');
+        }
+        if !self.exponent_wires.is_empty() {
+            s.push('P');
+            s.push_str(&self.exponent_wires.len().to_string());
         }
         s
     }

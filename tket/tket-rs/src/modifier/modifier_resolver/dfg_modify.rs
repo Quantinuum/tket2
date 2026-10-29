@@ -1397,13 +1397,17 @@ mod test {
     }
 
     #[rstest::rstest]
-    #[case::dagger(vec![], true, "__modified__original[D]")]
-    #[case::control(vec![2], false, "__modified__original[C2]")]
-    #[case::control_and_dagger(vec![2], true, "__modified__original[C2D]")]
-    #[case::nested_controls(vec![1, 2], true, "__modified__original[C1.2D]")]
+    #[case::dagger(vec![], true, 0, "__modified__original[D]")]
+    #[case::control(vec![2], false, 0, "__modified__original[C2]")]
+    #[case::control_and_dagger(vec![2], true, 0, "__modified__original[C2D]")]
+    #[case::nested_controls(vec![1, 2], true, 0, "__modified__original[C1.2D]")]
+    #[case::power(vec![], false, 1, "__modified__original[P1]")]
+    #[case::nested_powers(vec![], false, 2, "__modified__original[P2]")]
+    #[case::all_modifiers(vec![1, 2], true, 2, "__modified__original[C1.2DP2]")]
     fn modified_function_name(
         #[case] accum_ctrl: Vec<usize>,
         #[case] dagger: bool,
+        #[case] power_count: usize,
         #[case] expected: &str,
     ) {
         let mut module = ModuleBuilder::new();
@@ -1414,7 +1418,8 @@ mod test {
             control: accum_ctrl.iter().sum(),
             accum_ctrl,
             dagger,
-            exponent_wires: Vec::new(),
+            // Only the number of exponent wires is used when modifying the definition.
+            exponent_wires: vec![Wire::new(original.node(), 0); power_count],
         };
 
         let modified = resolver.modify_fn(&mut h, original.node()).unwrap();
