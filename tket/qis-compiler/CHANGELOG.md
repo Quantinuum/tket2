@@ -5,6 +5,7 @@
 
 ### Features
 
+* **qis-compiler:** Add `EmulationState` to manage extension passing ([#1986](https://github.com/Quantinuum/tket2/issues/1986)) ([1efd990](https://github.com/Quantinuum/tket2/commit/1efd9908ca010e03e75261a873dadc229a340951))
 * Bump to latest `hugr` and register `math` extension with QIS compiler ([#2037](https://github.com/Quantinuum/tket2/issues/2037)) ([93ea902](https://github.com/Quantinuum/tket2/commit/93ea902721daf8dd49fd5a6d517c13c3358818d9))
 
 
