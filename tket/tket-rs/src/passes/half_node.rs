@@ -105,6 +105,7 @@ mod test {
     use itertools::Itertools;
     use std::collections::HashSet;
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_cond_in_loop_combined_headers() -> Result<(), BuildError> {
         let (h, main, tail) = build_conditional_in_loop_cfg(false)?;
         //               /-> left --\

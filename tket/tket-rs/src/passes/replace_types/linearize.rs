@@ -488,6 +488,7 @@ mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn single_values() {
         let (_e, lowerer) = ext_lowerer();
         // Build Hugr - uses first input three times, discards second input (both usize)
@@ -535,6 +536,7 @@ mod test {
     }
 
     #[rstest]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn sums_2way_copy(#[values(2, 3, 4)] num_copies: usize) {
         let (mut h, inner) = copy_n_discard_one(option_type([usize_t()]).into(), num_copies);
 
@@ -648,6 +650,7 @@ mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn bad_sig() {
         // Change usize to QB_T
         let (ext, _) = ext_lowerer();

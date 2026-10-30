@@ -421,6 +421,7 @@ mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn remove_unreachable_bb() {
         let mut cb = CFGBuilder::new(Signature::new_endo(type_row![])).unwrap();
 

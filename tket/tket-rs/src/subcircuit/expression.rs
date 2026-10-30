@@ -363,6 +363,7 @@ mod tests {
             Wire::new(Node::from(portgraph::NodeIndex::new(4)), OutgoingPort::from(1)),
         )
     )]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case::midcircuit_meas(
         // Circuit where a measurement output is converted to float then to
         // rotation, multiplied by two and passed to a Rx rotation
@@ -407,6 +408,7 @@ mod tests {
     }
 
     #[rstest]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_copyable_expression_ast_new_bounded_inputs() {
         let hugr = hugr_with_midcircuit_meas();
 
@@ -454,6 +456,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_copyable_expression_ast_new_non_convex() {
         let hugr = hugr_with_midcircuit_meas();
 

@@ -233,6 +233,7 @@ mod tests {
     #[case::same_map_declaration(EarlierHelper::SameMap, true)]
     #[case::separate_maps_declaration(EarlierHelper::SeparateMap, true)]
     #[case::replaced_declaration(EarlierHelper::Replaced, true)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn helper_symbol_avoids_its_incoming_dependency(
         #[case] earlier: EarlierHelper,
         #[case] declaration: bool,
@@ -393,6 +394,7 @@ mod tests {
     }
 
     #[rstest]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn helper_symbols_handle_nested_dependencies_and_repeated_lowering(
         #[values(false, true)] separate_maps: bool,
     ) {

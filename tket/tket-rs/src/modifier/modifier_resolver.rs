@@ -1815,6 +1815,7 @@ mod tests {
 
     #[test]
     /// Test that modifier passes under control preserve the order edges.
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn control_modifier_preserves_state_order_edges() {
         fn state_order_edge_count(h: &Hugr, root: Node) -> usize {
             h.descendants(root)
@@ -1903,6 +1904,7 @@ mod tests {
 
     #[test]
     /// Test that a LoadFunction node that is shared between a modifier and a direct call is not removed during resolution.
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn shared_loaded_function_is_not_removed() {
         let mut module = ModuleBuilder::new();
 
@@ -2268,6 +2270,7 @@ mod tests {
 
     #[test]
     /// Test that a still used function is not removed
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn modified_dependency_is_preserved_when_original_caller_is_live() {
         let mut module = ModuleBuilder::new();
 
