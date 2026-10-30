@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.22.2](https://github.com/Quantinuum/tket2/compare/tket-v0.22.1...tket-v0.22.2) - 2026-10-30
+
+### Refactor
+
+- Rename modify_fn to modify_fn_inner to avoid redundant check ([#2114](https://github.com/Quantinuum/tket2/pull/2114))
+
 ## [0.22.1](https://github.com/Quantinuum/tket2/compare/tket-v0.22.0...tket-v0.22.1) - 2026-10-28
 
 ### Bug Fixes
