@@ -590,6 +590,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         };
         let mut poly_signature = old_fn_defn.signature().clone();
         self.modify_signature(poly_signature.body_mut(), false);
+        // NICOLA: TODO: here we add power inputs for the function signature and plan to "consum the modification?"
         self.append_power_inputs(poly_signature.body_mut());
 
         let mut new_fn = FunctionBuilder::new(
@@ -611,8 +612,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         );
         self.modified_impls.insert(cache_key, new_function_node);
 
-        let modify_result = self.modify_dfg_body(h, func, &mut new_fn);
-        modify_result?;
+        self.modify_dfg_body(h, func, &mut new_fn)?;
 
         let call_map = mem::replace(self.call_map(), old_call_map);
 

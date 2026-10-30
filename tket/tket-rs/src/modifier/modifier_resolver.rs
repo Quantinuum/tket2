@@ -118,12 +118,8 @@ mod power_modify;
 pub mod tket_op_modify;
 
 use super::CombinedModifier;
-use crate::passes::{InScope, PassScope};
+use crate::passes::{InScope, PassScope, utils::unpack_container::TypeUnpacker};
 use crate::{TketOp, extension::global_phase::GlobalPhase, modifier::Modifier};
-use crate::{
-    modifier::modifier_resolver::power_modify::replace_with_power_loop,
-    passes::utils::unpack_container::TypeUnpacker,
-};
 use global_phase_modify::delete_phase;
 use hugr::{
     HugrView, IncomingPort, Node, OutgoingPort, Port, PortIndex, Wire,
@@ -131,7 +127,7 @@ use hugr::{
     core::HugrNode,
     extension::{prelude::qb_t, simple_op::MakeExtensionOp},
     hugr::hugrmut::HugrMut,
-    ops::{CFG, Const, LoadFunction, OpTrait, OpType},
+    ops::{CFG, CallIndirect, Const, LoadFunction, OpTrait, OpType},
     std_extensions::{arithmetic::int_types::int_type, collections::array::array_type},
     types::{EdgeKind, FuncTypeBase, Signature, Type},
 };
@@ -752,42 +748,46 @@ impl<N: HugrNode> ModifierResolver<N> {
         assert_eq!(self.modifiers(), &CombinedModifier::default());
 
         // Modify the function loaded by the indirect call preserving the modifier state.
-        let resolved = self.with_modifiers(
+        self.with_modifiers(
             self.modifiers().clone(),
-            |this| -> Result<_, ModifierResolverErrors<N>> {
+            |this| -> Result<(), ModifierResolverErrors<N>> {
                 // Collect the chain for cleanup while accumulating its modifiers.
-                let (mut trace, exponent_wires) =
-                    this.trace_indirect_call_to_load(hugr, indirect_call_node)?;
+                // Here we push power wires
+                let mut trace = this.trace_indirect_call_to_load(hugr, indirect_call_node)?;
                 let load_node = trace.pop().expect("modifier chain must end with a loader");
                 // Modify the loaded function and prepare its replacement loader.
                 let (modified_fn, load_op) = this.modify_load(hugr, load_node)?;
-                Ok(ResolvedModification {
-                    modifier_chain: trace,
+
+                let OpType::CallIndirect(mut new_call_op) =
+                    hugr.get_optype(indirect_call_node).clone()
+                else {
+                    unreachable!("Expected CallIndirect");
+                };
+                this.append_power_inputs(&mut new_call_op.signature);
+                let exponent_wires = &this.modifiers().exponent_wires;
+                replace_function_loader(
+                    hugr,
+                    indirect_call_node,
                     load_node,
                     modified_fn,
                     load_op,
+                    new_call_op,
                     exponent_wires,
-                })
+                );
+
+                // Remove the modifier chain after replacing the call's loader.
+                for node in trace {
+                    hugr.remove_node(node);
+                }
+
+                // Remove the old loader only if it has no remaining value consumers.
+                if hugr.linked_inputs(load_node, 0).next().is_none() {
+                    hugr.remove_node(load_node);
+                }
+
+                Ok(())
             },
-        )?;
-
-        if resolved.exponent_wires.is_empty() {
-            replace_function_loader(hugr, indirect_call_node, &resolved);
-        } else {
-            replace_with_power_loop(hugr, indirect_call_node, &resolved);
-        }
-
-        // Then remove the chain, skipping the last node (the original `load_node`).
-        for node in resolved.modifier_chain {
-            hugr.remove_node(node);
-        }
-
-        // Remove the old loader only if it has no remaining value consumers.
-        if hugr.linked_inputs(resolved.load_node, 0).next().is_none() {
-            hugr.remove_node(resolved.load_node);
-        }
-
-        Ok(())
+        )
     }
 
     /// Modifies a function signature to account for control qubits added by modifiers.
@@ -1407,18 +1407,53 @@ fn remove_unused_modified_functions<N: HugrNode>(
     }
 }
 
-/// Retarget the call and preserve the original loader's order dependencies.
+/// Replace the call, pass its exponents, and preserve the loader's order dependencies.
 fn replace_function_loader<N: HugrNode>(
     hugr: &mut impl HugrMut<Node = N>,
     indirect_call_node: N,
-    resolved: &ResolvedModification<N>,
+    load_node: N,
+    modified_fn: N,
+    new_load_op: LoadFunction,
+    new_call_op: CallIndirect,
+    exponent_wires: &[Wire<N>],
 ) {
-    let load_node = resolved.load_node;
-    let modified_fn = resolved.modified_fn;
-    let new_load_op = resolved.load_op.clone();
-    // Insert the new loader and connect it to the modified function.
+    let power_input_offset = new_call_op.signature.input_count() + 1 - exponent_wires.len();
+    // Insert the replacement loader and call even when there are no exponents.
     let new_load_node = hugr.add_node_before(indirect_call_node, new_load_op);
+    let new_call_node = hugr.add_node_before(indirect_call_node, new_call_op);
     hugr.connect(modified_fn, 0, new_load_node, 0);
+    hugr.connect(new_load_node, 0, new_call_node, 0);
+
+    // Transfer arguments and move StateOrder past the appended exponent inputs.
+    for port in hugr.node_inputs(indirect_call_node).skip(1).collect_vec() {
+        let new_port = if port.index() < power_input_offset {
+            port
+        } else {
+            port.shift(exponent_wires.len())
+        };
+        // Connect old inputs to new call node
+        for (source, source_port) in hugr.linked_outputs(indirect_call_node, port).collect_vec() {
+            hugr.connect(source, source_port, new_call_node, new_port);
+        }
+    }
+    // Connect exponent wires to new call node
+    for (i, wire) in exponent_wires.iter().enumerate() {
+        hugr.connect(
+            wire.node(),
+            wire.source(),
+            new_call_node,
+            power_input_offset + i,
+        );
+    }
+
+    // Transfer results and outgoing order edges before removing the original call.
+    for port in hugr.node_outputs(indirect_call_node).collect_vec() {
+        for (target, target_port) in hugr.linked_inputs(indirect_call_node, port).collect_vec() {
+            hugr.connect(new_call_node, port, target, target_port);
+        }
+    }
+    hugr.remove_node(indirect_call_node);
+
     // Transfer order dependencies before removing the original loader.
     let old_op = hugr.get_optype(load_node);
     let old_input = old_op.other_input_port().unwrap();
@@ -1434,10 +1469,6 @@ fn replace_function_loader<N: HugrNode>(
     for (target, port) in successors {
         hugr.connect(new_load_node, new_output, target, port);
     }
-
-    // Disconnect the indirect caller from the modifier chain and connect it to the new loader.
-    hugr.disconnect(indirect_call_node, IncomingPort::from(0));
-    hugr.connect(new_load_node, 0, indirect_call_node, 0);
 }
 
 /// Resolve modifiers in a circuit by applying them to each entry point.
@@ -1603,6 +1634,8 @@ fn resolve_modifier_from_entrypoints(
     // Remove only original functions for which this resolver generated modified
     // replacements, and only when no remaining non-obsolete function uses them.
     remove_unused_modified_functions(h, &resolver.modified_functions, scope);
+
+    std::fs::write("power_solved.mmd", h.mermaid_string()).unwrap();
 
     h.validate()
         .map_err(|e| ModifierResolverErrors::BuildError(e.into()))?;

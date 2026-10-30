@@ -118,7 +118,7 @@ impl<N: HugrNode> ModifierResolver<N> {
     }
 
     /// Trace a `CallIndirect`'s function input back to a `LoadFunction`, accumulating modifiers.
-    /// Return nodes from nearest modifier to load, excluding the call, and power exponent wires;
+    /// Return nodes from nearest modifier to load, excluding the call;
     /// error on invalid chains.
     ///
     /// For `load -> modifier_a -> modifier_b -> call_indirect`, tracing from `call_indirect`
@@ -127,7 +127,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         &mut self,
         h: &impl HugrMut<Node = N>,
         ind_call_node: N,
-    ) -> Result<(Vec<N>, Vec<Wire<N>>), ModifierResolverErrors<N>> {
+    ) -> Result<Vec<N>, ModifierResolverErrors<N>> {
         // NICOLA: TODO: consider putting this outside since it may be already used
         let optype = h.get_optype(ind_call_node);
         // First node must be a CallIndirect node
@@ -140,7 +140,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         let modifiers = self.modifiers_mut();
         let (mut current, _) = h.single_linked_output(ind_call_node, 0).unwrap();
         let mut chain: Vec<N> = Vec::new();
-        let mut exponent_wires = Vec::new();
 
         loop {
             let optype = h.get_optype(current);
@@ -196,7 +195,6 @@ impl<N: HugrNode> ModifierResolver<N> {
             if matches!(Modifier::from_optype(optype), Some(Modifier::PowerModifier)) {
                 let wire = Wire::from_connected_port(current, IncomingPort::from(1), h);
                 modifiers.exponent_wires.push(wire);
-                exponent_wires.push(wire);
             } else {
                 modifiers.push(optype.as_extension_op().unwrap());
             }
@@ -205,7 +203,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                 .expect("Expected exactly one output connected to input port 0 of a modifier node");
             current = new;
         }
-        Ok((chain, exponent_wires))
+        Ok(chain)
     }
 
     pub(super) fn modify_indirect_call(
@@ -228,7 +226,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         let (load_node, modified_fn, new_load_op) =
             self.with_modifiers(self.modifiers().clone(), |this| {
                 // Follow the function operand through its modifiers to the loader.
-                let (trace, _) = this.trace_indirect_call_to_load(h, ind_call_node)?;
+                let trace = this.trace_indirect_call_to_load(h, ind_call_node)?;
                 let load_node = *trace.last().unwrap();
                 // Apply the combined modifiers and build the replacement loader.
                 let (modified_fn, new_load_op) = this.modify_load(h, load_node)?;
