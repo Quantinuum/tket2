@@ -141,6 +141,7 @@ mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn repeated_barriers_share_wrapped_function() {
         let mut b =
             DFGBuilder::new(hugr::types::Signature::new_endo(vec![qb_t(), qb_t()])).unwrap();
@@ -168,6 +169,7 @@ mod test {
     #[rstest]
     #[case(QSystemPlatform::Helios)]
     #[case(QSystemPlatform::Sol)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn wrapped_barrier_does_not_reuse_user_function(#[case] platform: QSystemPlatform) {
         use hugr::builder::{DataflowSubContainer, HugrBuilder, ModuleBuilder};
         use hugr::core::Visibility;
@@ -263,6 +265,7 @@ mod test {
     #[rstest]
     #[case(QSystemPlatform::Helios)]
     #[case(QSystemPlatform::Sol)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn repeated_container_barriers_share_helpers(
         #[case] platform: QSystemPlatform,
         #[values(false, true)] hide_funcs: bool,

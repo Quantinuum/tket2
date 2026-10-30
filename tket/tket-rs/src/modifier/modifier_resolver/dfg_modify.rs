@@ -1218,6 +1218,7 @@ mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn repeated_calls_share_modified_implementation() {
         let h = resolved_modifier_test_hugr(
             2,
@@ -2181,6 +2182,7 @@ mod test {
     #[test]
     /// Test that modifying a DFG representing a computation with no quantum effects (no input/output qubits)
     /// does not introduce invalid hugr.
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn daggered_controlled_rotation_is_acyclic() {
         let mut module = ModuleBuilder::new();
         let inner_sig = Signature::new_endo([qb_t()]);
@@ -2702,13 +2704,16 @@ mod test {
     }
 
     #[rstest::rstest]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case::cfg_branching(
         1,
         1,
         foo_cfg_branching,
         "CFG with more than one node cannot be daggered."
     )]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case::cfg_loop(1, 1, foo_cfg_loop, "CFG with more than one node cannot be daggered.")]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case::tail_loop(1, 1, foo_tail_loop, "TailLoop cannot be daggered.")]
     #[case::cfg_two_blocks_dagger(
         1,
@@ -3243,6 +3248,7 @@ mod test {
     #[case::qubit_array(PolymorphicArrayElement::Qubit)]
     #[case::usize_array(PolymorphicArrayElement::Usize)]
     /// Test that an indirect call to a polymorphic function is resolved correctly when the function is inside a modified block.
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_control_polymorphic_array_input_nested_dfg_call(
         #[case] element: PolymorphicArrayElement,
     ) {
@@ -3253,6 +3259,7 @@ mod test {
 
     #[rstest::rstest]
     #[case::qubit_array(PolymorphicArrayElement::Qubit)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case::usize_array(PolymorphicArrayElement::Usize)]
     /// Test that a direct call to a polymorphic function is resolved correctly when the function is inside a modified block.
     fn test_control_polymorphic_array_input_nested_dfg_direct_call(
@@ -3267,6 +3274,7 @@ mod test {
     #[case::qubit_array(PolymorphicArrayElement::Qubit)]
     #[case::usize_array(PolymorphicArrayElement::Usize)]
     /// Test that two nested generic functions are resolved correctly when the functions are inside a modified block.
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_control_polymorphic_array_input_two_nested_generic_functions(
         #[case] element: PolymorphicArrayElement,
     ) {

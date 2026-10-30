@@ -289,6 +289,7 @@ mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_force_order_1() {
         let (mut hugr, [v0, v1, v2, v3]) = test_hugr();
 
@@ -303,6 +304,7 @@ mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_force_order_2() {
         let (mut hugr, [v0, v1, v2, v3]) = test_hugr();
 
@@ -316,6 +318,7 @@ mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_force_order_3() {
         let (mut hugr, [v0, v1, v2, v3]) = test_hugr();
         let rank_map = [(v0, 0), (v1, 1), (v2, 2), (v3, 3)].into_iter().collect();

@@ -384,6 +384,7 @@ mod test {
     use rstest::{fixture, rstest};
 
     #[rstest]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn simple() {
         let mut dfb = DFGBuilder::new(endo_sig([BorrowArray::ty(3, qb_t())])).unwrap();
         let [arr] = dfb.input_wires_arr();
@@ -585,6 +586,7 @@ mod test {
     /// Captures (somewhere) dynamic borrow, return or both together
     ///   coming at any position before/during/after borrow-return-reborrow
     #[rstest]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_dynamic(#[values(0, 1, 2)] dyn_pos: usize) {
         // element 1:               Borrow Return Reborrow
         // dyn_pos==0:  dyn Borrow                          dyn Return

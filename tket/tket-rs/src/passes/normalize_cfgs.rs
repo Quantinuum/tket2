@@ -556,6 +556,7 @@ mod test {
     #[rstest]
     #[case(true)]
     #[case(false)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn merge_bbs_in_loop(#[case] self_loop: bool) -> Result<(), Box<dyn std::error::Error>> {
         /* self_loop==False:
            -> Noop1 -----> Test -> Exit       -> Noop1AndTest --> Exit
@@ -655,6 +656,7 @@ mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn elide_triple_with_permute() -> Result<(), Box<dyn std::error::Error>> {
         // Blocks are just BB1 -> BB2 -> BB3 --> Exit.
         // Should be merged into one BB (we don't check that specifically)
@@ -738,6 +740,7 @@ mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn entry_before_loop() -> Result<(), Box<dyn std::error::Error>> {
         /* -> Noop --> Test -> Exit      -> Test --> Exit
                        |  |          =>     |  |
@@ -873,6 +876,7 @@ mod test {
     }
 
     #[rstest]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn nested_cfgs_pass(#[values(true, false)] nonlocal: bool) {
         //  --> Entry --> Loop --> Tail --> EXIT
         //        |       /  \
@@ -1031,6 +1035,7 @@ mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn order_edges() {
         // BB1 -> BB2 -> Exit    =>   DFG
         // ...where each BB has an Input->result->Output chain of order edges
@@ -1100,6 +1105,7 @@ mod test {
     }
 
     #[rstest]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn order_edges_loop_after() {
         // entry_bb -> loop_bb -> Exit
         //              /   \
@@ -1161,6 +1167,7 @@ mod test {
     }
 
     #[rstest]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn order_edges_loop_before() {
         // loop_bb -> BB1 -> Exit
         //  /   \
