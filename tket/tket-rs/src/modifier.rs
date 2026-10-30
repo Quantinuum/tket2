@@ -9,7 +9,7 @@
 //! Global phase is an operation that applies some global phase to a circuit.
 //! It is implemented as a side-effect that takes a rotation angle as an input.
 
-use hugr::{extension::simple_op::MakeExtensionOp, ops::ExtensionOp};
+use hugr::{Node, Wire, core::HugrNode, extension::simple_op::MakeExtensionOp, ops::ExtensionOp};
 use itertools::Itertools;
 
 use crate::extension::modifier::Modifier;
@@ -19,8 +19,8 @@ pub mod modifier_resolver;
 pub mod power;
 
 /// An accumulated modifier that combines control, dagger, and power modifiers.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
-struct CombinedModifier {
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct CombinedModifier<N: HugrNode = Node> {
     // Number of all control qubits
     control: usize,
     // Control arrays applied so far
@@ -28,15 +28,13 @@ struct CombinedModifier {
     accum_ctrl: Vec<usize>,
     /// Whether the dagger modifier has been applied.
     dagger: bool,
+    /// Runtime exponent wires collected from power modifiers.
+    exponent_wires: Vec<Wire<N>>,
 }
 
-impl CombinedModifier {
+impl<N: HugrNode> CombinedModifier<N> {
     /// Add a modifier
-    fn push<N>(
-        &mut self,
-        ext_op: &ExtensionOp,
-        node: N,
-    ) -> Result<(), modifier_resolver::ModifierResolverErrors<N>> {
+    fn push(&mut self, ext_op: &ExtensionOp) {
         match Modifier::from_extension_op(ext_op) {
             Ok(Modifier::ControlModifier) => {
                 let ctrl = ext_op.args()[0].as_nat().unwrap() as usize;
@@ -44,14 +42,9 @@ impl CombinedModifier {
                 self.accum_ctrl.push(ctrl);
             }
             Ok(Modifier::DaggerModifier) => self.dagger = !self.dagger,
-            Ok(Modifier::PowerModifier) => {
-                return Err(
-                    modifier_resolver::ModifierResolverErrors::PowerModifierNotSupported { node },
-                );
-            }
+            Ok(Modifier::PowerModifier) => {}
             Err(_) => {}
         }
-        Ok(())
     }
 
     /// Returns a compact string representation of the combined modifier environment.
@@ -59,6 +52,7 @@ impl CombinedModifier {
     /// The string consists of `'C'` followed by the number of control arrays (`self.accum_ctrl`),
     /// joined by dots, and `'D'` if the dagger modifier has been applied.
     /// If no control qubits are present, `'C'` is omitted.
+    /// Power modifiers are represented by `'P'` followed by the number of exponent wires.
     fn compact_string(&self) -> String {
         let mut s = String::new();
         if self.control > 0 {
@@ -68,6 +62,21 @@ impl CombinedModifier {
         if self.dagger {
             s.push('D');
         }
+        if !self.exponent_wires.is_empty() {
+            s.push('P');
+            s.push_str(&self.exponent_wires.len().to_string());
+        }
         s
+    }
+}
+
+impl<N: HugrNode> Default for CombinedModifier<N> {
+    fn default() -> Self {
+        Self {
+            control: 0,
+            accum_ctrl: Vec::new(),
+            dagger: false,
+            exponent_wires: Vec::new(),
+        }
     }
 }

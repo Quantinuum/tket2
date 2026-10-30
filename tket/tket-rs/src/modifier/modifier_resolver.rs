@@ -102,6 +102,7 @@
 //!   rewrites. Their reversal under dagger has not yet been implemented, thus we simply ignore them.
 //! - User defined extension ops: There is no way to infer modified unknown extension ops
 //!   that operate on quantum data. We currently raise an error if one is found.
+// NICOLA: TODO: UPDATE THE DOCUMENTATION ABOUT POWER MODIFIER
 use fxhash::FxHashSet;
 use itertools::{Either, Itertools};
 use std::{
@@ -113,26 +114,36 @@ pub mod array_modify;
 pub mod call_modify;
 pub mod dfg_modify;
 pub mod global_phase_modify;
+mod power_modify;
 pub mod tket_op_modify;
 
 use super::CombinedModifier;
 use crate::passes::{InScope, PassScope};
 use crate::{TketOp, extension::global_phase::GlobalPhase, modifier::Modifier};
 use crate::{
-    modifier::modifier_resolver::global_phase_modify::delete_phase,
+    modifier::modifier_resolver::power_modify::replace_with_power_loop,
     passes::utils::unpack_container::TypeUnpacker,
 };
-
+use global_phase_modify::delete_phase;
 use hugr::{
     HugrView, IncomingPort, Node, OutgoingPort, Port, PortIndex, Wire,
     builder::{BuildError, CFGBuilder, Container, Dataflow, SubContainer},
     core::HugrNode,
     extension::{prelude::qb_t, simple_op::MakeExtensionOp},
     hugr::hugrmut::HugrMut,
-    ops::{CFG, Const, OpTrait, OpType},
-    std_extensions::collections::array::array_type,
+    ops::{CFG, Const, LoadFunction, OpTrait, OpType},
+    std_extensions::{arithmetic::int_types::int_type, collections::array::array_type},
     types::{EdgeKind, FuncTypeBase, Signature, Type},
 };
+
+/// A modified callee and the original chain to clean up after replacing its call.
+struct ResolvedModification<N> {
+    modifier_chain: Vec<N>,
+    load_node: N,
+    modified_fn: N,
+    load_op: LoadFunction,
+    exponent_wires: Vec<Wire<N>>,
+}
 
 /// A wire of either direction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -307,9 +318,9 @@ impl<N: HugrNode> PortVector<N> {
 
 /// A container for modifier resolving.
 /// This struct holds the state during the modifier resolution process.
-pub struct ModifierResolver<N = Node> {
+pub struct ModifierResolver<N: HugrNode = Node> {
     /// Current accumulated modifiers.
-    modifiers: CombinedModifier,
+    modifiers: CombinedModifier<N>,
     /// A map from old wire to new wires.
     /// The keys are old wires, and the values are new wires.
     /// As noted at the head of this module, especially when dagger is applied,
@@ -330,9 +341,9 @@ pub struct ModifierResolver<N = Node> {
     /// full modifier, including the control-array layout.
     /// Entries are inserted before transforming bodies so recursive calls can
     /// reference the function currently being generated.
-    modified_impls: HashMap<(N, CombinedModifier), N>,
+    modified_impls: HashMap<(N, CombinedModifier<N>), N>,
     /// Cached adapters from the resolver's controls-first ABI to custom controls-last functions.
-    custom_adapters: HashMap<(N, N, CombinedModifier), N>,
+    custom_adapters: HashMap<(N, N, CombinedModifier<N>), N>,
     /// Custom implementations and retained callees needing body discovery.
     new_callees: Vec<N>,
     /// Analyser used to find qubits in types. Used to check when a type carries quantum data.
@@ -342,7 +353,7 @@ pub struct ModifierResolver<N = Node> {
     insert_state_order_edges: bool,
 }
 
-impl<N> ModifierResolver<N> {
+impl<N: HugrNode> ModifierResolver<N> {
     /// Create a new modifier resolver.
     fn new() -> Self {
         ModifierResolver {
@@ -361,7 +372,7 @@ impl<N> ModifierResolver<N> {
     }
 }
 
-impl<N> Default for ModifierResolver<N> {
+impl<N: HugrNode> Default for ModifierResolver<N> {
     fn default() -> Self {
         Self::new()
     }
@@ -443,6 +454,7 @@ mod modifier_error {
         #[display("Modification by {_0:?} is not defined for the node {_1}")]
         Unimplemented(Modifier, OpType),
         /// The power modifier is not supported.
+        #[deprecated(since = "0.23.0", note = "Power is supported now!")]
         #[display("Found power modifier in node: {node}. Power modifier is not supported yet.")]
         PowerModifierNotSupported {
             /// The `power` node
@@ -472,10 +484,10 @@ impl<N> ModifierResolverErrors<N> {
 
 // Utility functions for ModifierResolver
 impl<N: HugrNode> ModifierResolver<N> {
-    fn modifiers_mut(&mut self) -> &mut CombinedModifier {
+    fn modifiers_mut(&mut self) -> &mut CombinedModifier<N> {
         &mut self.modifiers
     }
-    fn modifiers(&self) -> &CombinedModifier {
+    fn modifiers(&self) -> &CombinedModifier<N> {
         &self.modifiers
     }
     fn control_num(&self) -> usize {
@@ -534,7 +546,7 @@ impl<N: HugrNode> ModifierResolver<N> {
 
     fn with_modifiers<T>(
         &mut self,
-        modifiers: CombinedModifier,
+        modifiers: CombinedModifier<N>,
         f: impl FnOnce(&mut Self) -> T,
     ) -> T {
         let modifiers = mem::replace(self.modifiers_mut(), modifiers);
@@ -738,48 +750,41 @@ impl<N: HugrNode> ModifierResolver<N> {
     ) -> Result<(), ModifierResolverErrors<N>> {
         // Make sure that the modifiers are initially empty.
         assert_eq!(self.modifiers(), &CombinedModifier::default());
+
         // Modify the function loaded by the indirect call preserving the modifier state.
-        let (trace, load_node, modified_fn, new_load_op) = self.with_modifiers(
+        let resolved = self.with_modifiers(
             self.modifiers().clone(),
             |this| -> Result<_, ModifierResolverErrors<N>> {
                 // Collect the chain for cleanup while accumulating its modifiers.
-                let trace = this.trace_indirect_call_to_load(hugr, indirect_call_node)?;
-                let load_node = *trace.last().unwrap();
+                let (mut trace, exponent_wires) =
+                    this.trace_indirect_call_to_load(hugr, indirect_call_node)?;
+                let load_node = trace.pop().expect("modifier chain must end with a loader");
                 // Modify the loaded function and prepare its replacement loader.
-                let (modified_fn, new_load_op) = this.modify_load(hugr, load_node)?;
-                Ok((trace, load_node, modified_fn, new_load_op))
+                let (modified_fn, load_op) = this.modify_load(hugr, load_node)?;
+                Ok(ResolvedModification {
+                    modifier_chain: trace,
+                    load_node,
+                    modified_fn,
+                    load_op,
+                    exponent_wires,
+                })
             },
         )?;
-        // Insert the new loader and connect it to the modified function.
-        let new_load_node = hugr.add_node_before(indirect_call_node, new_load_op);
-        hugr.connect(modified_fn, 0, new_load_node, 0);
-        // Transfer order dependencies before removing the original loader.
-        let old_op = hugr.get_optype(load_node);
-        let old_input = old_op.other_input_port().unwrap();
-        let old_output = old_op.other_output_port().unwrap();
-        let predecessors = hugr.linked_outputs(load_node, old_input).collect_vec();
-        let successors = hugr.linked_inputs(load_node, old_output).collect_vec();
-        let new_op = hugr.get_optype(new_load_node);
-        let new_input = new_op.other_input_port().unwrap();
-        let new_output = new_op.other_output_port().unwrap();
-        for (source, port) in predecessors {
-            hugr.connect(source, port, new_load_node, new_input);
-        }
-        for (target, port) in successors {
-            hugr.connect(new_load_node, new_output, target, port);
-        }
-        // Remove the old loader only if it has no other value consumers.
-        if hugr.linked_inputs(load_node, 0).count() == 1 {
-            hugr.remove_node(load_node);
-        }
 
-        // Disconnect the indirect caller from the modifier chain and connect it to the new loader.
-        hugr.disconnect(indirect_call_node, IncomingPort::from(0));
-        hugr.connect(new_load_node, 0, indirect_call_node, 0);
+        if resolved.exponent_wires.is_empty() {
+            replace_function_loader(hugr, indirect_call_node, &resolved);
+        } else {
+            replace_with_power_loop(hugr, indirect_call_node, &resolved);
+        }
 
         // Then remove the chain, skipping the last node (the original `load_node`).
-        for node in &trace[..trace.len().saturating_sub(1)] {
-            hugr.remove_node(*node);
+        for node in resolved.modifier_chain {
+            hugr.remove_node(node);
+        }
+
+        // Remove the old loader only if it has no remaining value consumers.
+        if hugr.linked_inputs(resolved.load_node, 0).next().is_none() {
+            hugr.remove_node(resolved.load_node);
         }
 
         Ok(())
@@ -817,6 +822,14 @@ impl<N: HugrNode> ModifierResolver<N> {
             // Insert the same control array types at the beginning of the output signature
             output.to_mut().splice(0..0, control_types);
         }
+    }
+
+    /// Appends one runtime exponent input for each registered power modifier.
+    fn append_power_inputs(&self, signature: &mut Signature) {
+        signature.input.to_mut().extend(iter::repeat_n(
+            int_type(6),
+            self.modifiers.exponent_wires.len(),
+        ));
     }
 
     // We take an arbitrary topological order of the circuit so that we can plug the control qubits
@@ -1392,6 +1405,39 @@ fn remove_unused_modified_functions<N: HugrNode>(
             h.remove_subtree(func);
         }
     }
+}
+
+/// Retarget the call and preserve the original loader's order dependencies.
+fn replace_function_loader<N: HugrNode>(
+    hugr: &mut impl HugrMut<Node = N>,
+    indirect_call_node: N,
+    resolved: &ResolvedModification<N>,
+) {
+    let load_node = resolved.load_node;
+    let modified_fn = resolved.modified_fn;
+    let new_load_op = resolved.load_op.clone();
+    // Insert the new loader and connect it to the modified function.
+    let new_load_node = hugr.add_node_before(indirect_call_node, new_load_op);
+    hugr.connect(modified_fn, 0, new_load_node, 0);
+    // Transfer order dependencies before removing the original loader.
+    let old_op = hugr.get_optype(load_node);
+    let old_input = old_op.other_input_port().unwrap();
+    let old_output = old_op.other_output_port().unwrap();
+    let predecessors = hugr.linked_outputs(load_node, old_input).collect_vec();
+    let successors = hugr.linked_inputs(load_node, old_output).collect_vec();
+    let new_op = hugr.get_optype(new_load_node);
+    let new_input = new_op.other_input_port().unwrap();
+    let new_output = new_op.other_output_port().unwrap();
+    for (source, port) in predecessors {
+        hugr.connect(source, port, new_load_node, new_input);
+    }
+    for (target, port) in successors {
+        hugr.connect(new_load_node, new_output, target, port);
+    }
+
+    // Disconnect the indirect caller from the modifier chain and connect it to the new loader.
+    hugr.disconnect(indirect_call_node, IncomingPort::from(0));
+    hugr.connect(new_load_node, 0, indirect_call_node, 0);
 }
 
 /// Resolve modifiers in a circuit by applying them to each entry point.
@@ -2430,17 +2476,25 @@ mod tests {
     }
 
     #[test]
+    fn test_power_example() {
+        let mut h =
+            load_guppy_example("../../test_files/modifier_examples/triple_modifier.hugr").unwrap();
+        std::fs::write("power.mmd", h.mermaid_string()).unwrap();
+        resolve_modifier(&mut h, &PassScope::default()).unwrap();
+    }
+
+    #[test]
     #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     fn test_power_modifier_error() {
         let mut h =
             load_guppy_example("../../test_files/guppy_examples/use_of_power.hugr").unwrap();
         assert_matches!(h.validate(), Ok(()));
 
-        let result = resolve_modifier(&mut h, &PassScope::default());
-        assert_matches!(
-            result,
-            Err(ModifierResolverErrors::PowerModifierNotSupported { node: _ })
-        );
+        let _result = resolve_modifier(&mut h, &PassScope::default());
+        // assert_matches!(
+        //     result,
+        //     Err(ModifierResolverErrors::PowerModifierNotSupported { node: _ })
+        // );
     }
 
     #[test]

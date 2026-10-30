@@ -1,4 +1,5 @@
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 
 from hugr.build.base import Hugr
@@ -18,12 +19,19 @@ def _hugr_from_path(str_path: str) -> Hugr:
     return h
 
 
-def apply_passes(input_paths: list[Path], output_dir: Path) -> None:
+def apply_passes(input_paths: list[Path] | Iterator[Path], output_dir: Path) -> None:
     modifier_extension_name = modifier().name
     for input_path in input_paths:
         print(f"Processing {input_path.name}")
         hugr = _hugr_from_path(str(input_path))
         resolved: Hugr = mr_pass(hugr)
+
+        from hugr.hugr.render import RenderConfig
+
+        resolved.render_dot(RenderConfig(max_node_label_length=None)).view(
+            f"{input_path.stem}_resolved"
+        )
+
         assert not any(
             (
                 isinstance(data.op, Custom)
