@@ -11,12 +11,55 @@ use itertools::Itertools;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use std::iter::successors;
 
-use crate::passes::cfg::dom_tree::leaf_targets;
+use crate::passes::{ComposablePass, PassScope, WithScope};
 
-use super::dom_tree::{DomTreeNode, DomTreeWithBackedges, Path};
+use super::dom_tree::{DomTreeNode, DomTreeWithBackedges, EdgeSources, Path, leaf_targets};
 
-/// Used as [DomTreeNode::loop_], records information about a CFG within a TailLoop within
-/// the [DomTreeNode::node]
+/// A [ComposablePass] that removes cycles from all control-flow graphs (CFG) within its scope,
+/// transforming any such loops into nested [TailLoop] structures. (See [nest_loop].)
+#[derive(Debug, Default)]
+pub struct RemoveCFGCyclesPass(PassScope);
+
+impl WithScope for RemoveCFGCyclesPass {
+    fn with_scope(mut self, scope: impl Into<PassScope>) -> Self {
+        self.0 = scope.into();
+        self
+    }
+}
+
+/// An error resulting from [RemoveCFGCyclesPass] failing to remove cycles from a CFG.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum RemoveCyclesError {}
+
+impl<H: HugrMut> ComposablePass<H> for RemoveCFGCyclesPass {
+    type Error = RemoveCyclesError;
+
+    /// The result of running the pass is a mapping from each CFG node in (scope in) the original Hugr
+    /// to the [DomTreeNode] describing that CFG after loop removal.
+    type Result = BTreeMap<
+        H::Node,
+        DomTreeNode<H::Node, EdgeSources<H::Node>, InnerTailLoop<H::Node, EdgeSources<H::Node>>>,
+    >;
+
+    fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
+        let cfgs = self
+            .0
+            .regions(hugr)
+            .filter(|n| hugr.get_optype(*n).is_cfg())
+            .collect::<Vec<_>>();
+        Ok(cfgs
+            .into_iter()
+            .map(|n| {
+                let dtn = DomTreeWithBackedges::<_, EdgeSources<_>>::new_for_cfg(&hugr, n);
+                (n, nest_loop(dtn, &mut *hugr))
+            })
+            .collect())
+    }
+}
+
+/// Following removing cycles, used for the returned [DomTreeNode::loop_] to record information
+/// about the CFG nested within any generated TailLoop within the [DomTreeNode::node].
 pub struct InnerTailLoop<N, P: Path<N>>(pub Option<Box<DomTreeNode<N, P, InnerTailLoop<N, P>>>>);
 
 impl<N, P: Path<N>> Default for InnerTailLoop<N, P> {
@@ -25,8 +68,10 @@ impl<N, P: Path<N>> Default for InnerTailLoop<N, P> {
     }
 }
 
-/// Turn any loops in the input into loops inside [TailLoop] nodes (containing an inner
-/// CFG with the loop blocks) inside the original header block.
+/// Turn each loop in the input CFG (indicated by `dtn.node`) into a single basic block
+/// which takes the place of all the original blocks in the loop.
+/// The new block (in fact the original header block) contains a [TailLoop] node which
+/// contains the rest of the blocks forming the original loop.
 pub fn nest_loop<H: HugrMut, P: Path<H::Node>>(
     dtn: DomTreeWithBackedges<H::Node, P>,
     hugr: &mut H,

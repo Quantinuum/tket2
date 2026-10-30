@@ -1,5 +1,6 @@
 //! A pass that normalizes the structure of Guppy-generated circuits into something that can be optimized by tket.
 
+use crate::passes::cfg::remove_cycles::RemoveCFGCyclesPass;
 use crate::passes::composable::WithScope;
 use crate::passes::const_fold::{ConstFoldError, ConstantFoldPass};
 use crate::passes::dead_funcs::RemoveDeadFuncsError;
@@ -136,18 +137,9 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for Normalize {
         // nothing else affects CFG structure or creates new opportunities for this.
         // (Possibly also this may assist modifier resolution??)
         if self.remove_cfg_cycles {
-            // TODO ALAN make this into a separate ComposablePass
-            use super::cfg::dom_tree::{DomTreeWithBackedges, EdgeSources};
-            use super::cfg::remove_cycles::nest_loop;
-            let cfgs = self
-                .scope
-                .regions(hugr)
-                .filter(|n| hugr.get_optype(*n).is_cfg())
-                .collect::<Vec<_>>();
-            for n in cfgs {
-                let dtn = DomTreeWithBackedges::<Node, EdgeSources<Node>>::new_for_cfg(&hugr, n);
-                nest_loop(dtn, &mut *hugr);
-            }
+            RemoveCFGCyclesPass::default()
+                .with_scope(self.scope.clone())
+                .run(hugr).unwrap_or_else(|e| match e {});
         }
         if self.simplify_cfgs {
             NormalizeCFGPass::default()
