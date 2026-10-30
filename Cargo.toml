@@ -70,11 +70,11 @@ large_enum_variant = "allow"
 hugr = "0.30.3"
 hugr-core = "0.30.3"
 hugr-cli = "0.30.3"
-portgraph = "0.16.1"
+portgraph = "0.16.2"
 # There can only be one `pyo3` version in the whole workspace, so we use a
 # loose version constraint to prevent breaking changes in dependent crates where possible.
-pyo3 = ">= 0.28.2, < 0.30"
-pyo3-build-config = ">= 0.28.2, < 0.30"
+pyo3 = ">= 0.28.2, < 0.31"
+pyo3-build-config = ">= 0.28.2, < 0.31"
 
 bindgen = { version = "0.73", default-features = false, features = [
     "logging",
