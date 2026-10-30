@@ -56,6 +56,8 @@ impl Normalize {
         self
     }
     /// Set whether to turn cycles in the CFG into [TailLoop](hugr::ops::TailLoop)s.
+    ///
+    /// Note this is off by default.
     pub fn remove_cfg_cycles(&mut self, remove_cfg_cycles: bool) -> &mut Self {
         self.remove_cfg_cycles = remove_cfg_cycles;
         self
@@ -108,7 +110,7 @@ impl Default for Normalize {
         Self {
             resolve_modifiers: true,
             inline_funcs: Some(InlineFuncsHeuristic::default()),
-            remove_cfg_cycles: true,
+            remove_cfg_cycles: false,
             simplify_cfgs: true,
             constant_fold: true,
             untuple: true,
