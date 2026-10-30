@@ -352,7 +352,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             self.new_callees.push(func);
             return Ok(None);
         }
-        Ok(Some(self.modify_fn(h, func)?))
+        Ok(Some(self.modify_fn_inner(h, func)?))
     }
 
     /// Looks up a user-provided custom implementation of `func` for the current modifier.
