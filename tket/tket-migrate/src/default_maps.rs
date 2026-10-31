@@ -1,0 +1,120 @@
+use hugr::extension::{Version, simple_op::MakeRegisteredOp};
+use hugr::std_extensions::logic::LogicOp;
+
+use crate::update_maps::{
+    OpMapping, OpReplacementTemplate, TypeMapping, TypeReplacementTemplate, VersionedElement,
+};
+use tket::{hugr::extension::prelude::bool_t, passes::replace_types::NodeTemplate};
+
+/// Replaces legacy measurement and boolean operations with their newer equivalents.
+pub fn get_measurement_migratation_op_map() -> OpMapping {
+    vec![
+        (
+            VersionedElement::new(
+                "MeasureFree".to_string(),
+                "tket.quantum".to_string(),
+                Version::new(0, 2, 1),
+            ),
+            OpReplacementTemplate::VersionedElements {
+                first: VersionedElement::new(
+                    "MeasureFree".to_string(),
+                    "tket.quantum".to_string(),
+                    Version::new(0, 3, 0),
+                ),
+                rest: vec![VersionedElement::new(
+                    "Read".to_string(),
+                    "tket.measurement".to_string(),
+                    Version::new(0, 1, 0),
+                )],
+            },
+        ),
+        (
+            VersionedElement::new(
+                "read".to_string(),
+                "tket.bool".to_string(),
+                Version::new(0, 2, 0),
+            ),
+            OpReplacementTemplate::Empty,
+        ),
+        (
+            VersionedElement::new(
+                "and".to_string(),
+                "tket.bool".to_string(),
+                Version::new(0, 2, 0),
+            ),
+            OpReplacementTemplate::TemplateInstance(NodeTemplate::SingleOp(
+                LogicOp::And.to_extension_op().unwrap().into(),
+            )),
+        ),
+        (
+            VersionedElement::new(
+                "eq".to_string(),
+                "tket.bool".to_string(),
+                Version::new(0, 2, 0),
+            ),
+            OpReplacementTemplate::TemplateInstance(NodeTemplate::SingleOp(
+                LogicOp::Eq.to_extension_op().unwrap().into(),
+            )),
+        ),
+        (
+            VersionedElement::new(
+                "not".to_string(),
+                "tket.bool".to_string(),
+                Version::new(0, 2, 0),
+            ),
+            OpReplacementTemplate::TemplateInstance(NodeTemplate::SingleOp(
+                LogicOp::Not.to_extension_op().unwrap().into(),
+            )),
+        ),
+        (
+            VersionedElement::new(
+                "or".to_string(),
+                "tket.bool".to_string(),
+                Version::new(0, 2, 0),
+            ),
+            OpReplacementTemplate::TemplateInstance(NodeTemplate::SingleOp(
+                LogicOp::Or.to_extension_op().unwrap().into(),
+            )),
+        ),
+        (
+            VersionedElement::new(
+                "xor".to_string(),
+                "tket.bool".to_string(),
+                Version::new(0, 2, 0),
+            ),
+            OpReplacementTemplate::TemplateInstance(NodeTemplate::SingleOp(
+                LogicOp::Xor.to_extension_op().unwrap().into(),
+            )),
+        ),
+        (
+            VersionedElement::new(
+                "read".to_string(),
+                "tket.bool".to_string(),
+                Version::new(0, 2, 0),
+            ),
+            OpReplacementTemplate::Empty,
+        ),
+        (
+            VersionedElement::new(
+                "make_opaque".to_string(),
+                "tket.bool".to_string(),
+                Version::new(0, 2, 0),
+            ),
+            OpReplacementTemplate::Empty,
+        ),
+    ]
+    .into()
+}
+
+/// Replaces the legacy TKET boolean type with the built-in HUGR boolean type.
+pub fn get_measurement_migratation_type_map() -> TypeMapping {
+    vec![(
+        VersionedElement::new(
+            "bool".to_string(),
+            "tket.bool".to_string(),
+            Version::new(0, 2, 0),
+        ),
+        TypeReplacementTemplate::Type(bool_t()),
+    )]
+    .into()
+}
