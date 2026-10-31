@@ -1,6 +1,6 @@
 [package]
 name = "tk-pg-utils"
-version = "0.1.1"
+version = "0.1.2"
 description = "Shared utilities for the pg-libs crates"
 edition = { workspace = true }
 rust-version = { workspace = true }
