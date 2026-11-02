@@ -636,7 +636,7 @@ mod tests {
     #[case::hadamards(TketOp::H, TketOp::H, vec![0])]
     #[case::inverse_t_gates(TketOp::T, TketOp::Tdg, vec![0])]
     #[case::controlled_nots(TketOp::CX, TketOp::CX, vec![0, 1])]
-    // Re-enable after upgrading crossbeam-epoch (currently 0.9.21) and crossbeam-skiplist
+    // todo: Re-enable after upgrading crossbeam-epoch (currently 0.9.21) and crossbeam-skiplist
     // (currently 0.1.3) to releases containing crossbeam-rs/crossbeam#871's Stacked Borrows fixes.
     #[cfg_attr(miri, ignore)]
     fn cancels_inverse_gates(
@@ -660,7 +660,7 @@ mod tests {
     }
 
     #[test]
-    // Re-enable after upgrading crossbeam-epoch (currently 0.9.21) and crossbeam-skiplist
+    // todo: Re-enable after upgrading crossbeam-epoch (currently 0.9.21) and crossbeam-skiplist
     // (currently 0.1.3) to releases containing crossbeam-rs/crossbeam#871's Stacked Borrows fixes.
     #[cfg_attr(miri, ignore)]
     fn merges_two_t_gates_into_s() {
@@ -678,7 +678,7 @@ mod tests {
     }
 
     #[test]
-    // Re-enable after upgrading crossbeam-epoch (currently 0.9.21) and crossbeam-skiplist
+    // todo: Re-enable after upgrading crossbeam-epoch (currently 0.9.21) and crossbeam-skiplist
     // (currently 0.1.3) to releases containing crossbeam-rs/crossbeam#871's Stacked Borrows fixes.
     #[cfg_attr(miri, ignore)]
     fn resynthesizes_with_t_optimization() {
@@ -713,7 +713,7 @@ mod tests {
     #[rstest]
     #[case::different_angles([0.1, 0.2], 0.3)]
     #[case::opposite_angles([0.1, -0.1], 0.0)]
-    // Re-enable after upgrading crossbeam-epoch (currently 0.9.21) and crossbeam-skiplist
+    // todo: Re-enable after upgrading crossbeam-epoch (currently 0.9.21) and crossbeam-skiplist
     // (currently 0.1.3) to releases containing crossbeam-rs/crossbeam#871's Stacked Borrows fixes.
     #[cfg_attr(miri, ignore)]
     fn merges_arbitrary_rz_angles(#[case] angles: [f64; 2], #[case] expected: f64) {
@@ -751,7 +751,7 @@ mod tests {
     }
 
     #[test]
-    // Re-enable after upgrading crossbeam-epoch (currently 0.9.21) and crossbeam-skiplist
+    // todo: Re-enable after upgrading crossbeam-epoch (currently 0.9.21) and crossbeam-skiplist
     // (currently 0.1.3) to releases containing crossbeam-rs/crossbeam#871's Stacked Borrows fixes.
     #[cfg_attr(miri, ignore)]
     fn merges_t_gates_across_cx() {
@@ -772,7 +772,7 @@ mod tests {
     }
 
     #[test]
-    // Re-enable after upgrading crossbeam-epoch (currently 0.9.21) and crossbeam-skiplist
+    // todo: Re-enable after upgrading crossbeam-epoch (currently 0.9.21) and crossbeam-skiplist
     // (currently 0.1.3) to releases containing crossbeam-rs/crossbeam#871's Stacked Borrows fixes.
     #[cfg_attr(miri, ignore)]
     fn cancels_phases_across_cz_layer() {
