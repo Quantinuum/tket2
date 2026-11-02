@@ -417,6 +417,7 @@ mod tests {
     #[case::exclusive_rebuilt(true, 0)]
     #[case::shared_plain_rebuilt(true, 1)]
     #[case::shared_modifiers_rebuilt(true, 2)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn loader_order_edges_survive_modifier_resolution(
         // rebuilt: false = apply_modification in place, true = modify_indirect_call in a rebuilt body.
         #[case] rebuilt: bool,
@@ -482,6 +483,7 @@ mod tests {
     #[rstest::rstest]
     #[case::incoming(true)]
     #[case::outgoing(false)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn modifier_nodes_with_order_edges_are_rejected(#[case] incoming: bool) {
         let mut module = ModuleBuilder::new();
         let f = ordered_loader_function(&mut module, 0, Some(incoming));
@@ -496,6 +498,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn branching_modifier_chain_is_rejected() {
         let signature = Signature::new_endo([qb_t()]);
         let dagger = MODIFIER_EXTENSION
@@ -1003,6 +1006,7 @@ mod tests {
     #[rstest::rstest]
     #[case::controlled(false)]
     #[case::controlled_daggered(true)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn shared_loader_with_local_modifier_in_modified_function(#[case] dagger: bool) {
         let (mut h, _) = modifier_test_hugr(
             4,
