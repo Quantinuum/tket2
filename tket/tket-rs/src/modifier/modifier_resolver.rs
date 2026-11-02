@@ -551,6 +551,13 @@ impl<N: HugrNode> ModifierResolver<N> {
         r
     }
 
+    fn with_no_power_inputs<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+        let exponent_inputs = mem::take(&mut self.modifiers_mut().exponent_inputs);
+        let r = f(self);
+        self.modifiers_mut().exponent_inputs = exponent_inputs;
+        r
+    }
+
     fn with_ancilla<T>(
         &mut self,
         wire: &mut Wire<Node>,
@@ -752,7 +759,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             self.modifiers().clone(),
             |this| -> Result<(), ModifierResolverErrors<N>> {
                 // Collect the chain for cleanup while accumulating its modifiers.
-                // Here we push power wires
+                // NICOLA: Here we record power exponent inputs.
                 let mut trace = this.trace_indirect_call_to_load(hugr, indirect_call_node)?;
                 let load_node = trace.pop().expect("modifier chain must end with a loader");
                 // Modify the loaded function and prepare its replacement loader.
@@ -763,8 +770,11 @@ impl<N: HugrNode> ModifierResolver<N> {
                 else {
                     unreachable!("Expected CallIndirect");
                 };
-                this.append_power_inputs(&mut new_call_op.signature);
-                let exponent_wires = &this.modifiers().exponent_wires;
+                let exponent_wires = this.modifiers().exponent_wires(hugr);
+                Self::append_power_inputs(
+                    &mut new_call_op.signature,
+                    this.modifiers().num_exponents(),
+                );
                 replace_function_loader(
                     hugr,
                     indirect_call_node,
@@ -772,7 +782,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                     modified_fn,
                     load_op,
                     new_call_op,
-                    exponent_wires,
+                    &exponent_wires,
                 );
 
                 // Remove the modifier chain after replacing the call's loader.
@@ -824,12 +834,12 @@ impl<N: HugrNode> ModifierResolver<N> {
         }
     }
 
-    /// Appends one runtime exponent input for each registered power modifier.
-    fn append_power_inputs(&self, signature: &mut Signature) {
-        signature.input.to_mut().extend(iter::repeat_n(
-            int_type(6),
-            self.modifiers.exponent_wires.len(),
-        ));
+    /// Appends the specified number of runtime exponent inputs.
+    fn append_power_inputs(signature: &mut Signature, num_exponents: usize) {
+        signature
+            .input
+            .to_mut()
+            .extend(iter::repeat_n(int_type(6), num_exponents));
     }
 
     // We take an arbitrary topological order of the circuit so that we can plug the control qubits

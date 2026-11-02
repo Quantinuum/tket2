@@ -26,11 +26,11 @@ def apply_passes(input_paths: list[Path] | Iterator[Path], output_dir: Path) -> 
         hugr = _hugr_from_path(str(input_path))
         resolved: Hugr = mr_pass(hugr)
 
-        from hugr.hugr.render import RenderConfig
+        # from hugr.hugr.render import RenderConfig
 
-        resolved.render_dot(RenderConfig(max_node_label_length=None)).view(
-            f"{input_path.stem}_resolved"
-        )
+        # resolved.render_dot(RenderConfig(max_node_label_length=None)).view(
+        #     f"{input_path.stem}_resolved"
+        # )
 
         assert not any(
             (

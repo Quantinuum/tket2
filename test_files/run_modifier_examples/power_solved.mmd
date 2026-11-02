@@ -1,0 +1,122 @@
+---
+config:
+    layout: elk
+---
+graph LR
+    subgraph 0 ["(0) Module"]
+        direction LR
+        subgraph 1 ["(1) [**FuncDefn: #quot;__main__.main#quot;**]"]
+            direction LR
+            style 1 stroke:#832561,stroke-width:3px
+            2["(2) Input"]
+            3["(3) Output"]
+            subgraph 4 ["(4) CFG"]
+                direction LR
+                subgraph 5 ["(5) DataflowBlock"]
+                    direction LR
+                    6["(6) Input"]
+                    7["(7) Output"]
+                    89["(89) LoadFunction"]
+                    90["(90) CallIndirect"]
+                    11["(11) Tag(Unit)"]
+                    6--"0:1<br>prelude.qubit"-->90
+                    6--"1:2<br>arithmetic.int.types.int"-->90
+                    6--"1:3<br>arithmetic.int.types.int"-->90
+                    89--"0:0<br>[prelude.qubit, arithmetic.int.types.int, arithmetic.int.types.int] -> [prelude.qubit]"-->90
+                    90--"0:1<br>prelude.qubit"-->7
+                    11--"0:0<br>Unit"-->7
+                end
+                12["(12) ExitBlock"]
+                5-."0:0".->12
+            end
+            2--"0:0<br>prelude.qubit"-->4
+            2--"1:1<br>arithmetic.int.types.int"-->4
+            4--"0:0<br>prelude.qubit"-->3
+        end
+        subgraph 52 ["(52) FuncDefn: #quot;__modified____main__.main.__WithBlock__0[P1]#quot;"]
+            direction LR
+            73["(73) Input"]
+            74["(74) Output"]
+            subgraph 75 ["(75) CFG"]
+                direction LR
+                subgraph 76 ["(76) DataflowBlock"]
+                    direction LR
+                    78["(78) Input"]
+                    79["(79) Output"]
+                    80["(80) Tag(Unit)"]
+                    81["(81) const:custom:u64(1)"]
+                    82["(82) LoadConstant"]
+                    83["(83) arithmetic.int.iu_to_s"]
+                    84["(84) arithmetic.int.iadd"]
+                    85["(85) arithmetic.int.is_to_u"]
+                    86["(86) LoadFunction"]
+                    87["(87) CallIndirect"]
+                    78--"0:1<br>prelude.qubit"-->87
+                    78--"1:0<br>arithmetic.int.types.int"-->83
+                    78--"1:2<br>arithmetic.int.types.int"-->87
+                    80--"0:0<br>Unit"-->79
+                    81--"0:0<br>arithmetic.int.types.int"-->82
+                    82--"0:1<br>arithmetic.int.types.int"-->84
+                    83--"0:0<br>arithmetic.int.types.int"-->84
+                    84--"0:0<br>arithmetic.int.types.int"-->85
+                    85--"0:3<br>arithmetic.int.types.int"-->87
+                    86--"0:0<br>[prelude.qubit, arithmetic.int.types.int, arithmetic.int.types.int] -> [prelude.qubit]"-->87
+                    87--"0:1<br>prelude.qubit"-->79
+                end
+                77["(77) ExitBlock"]
+                76-."0:0".->77
+            end
+            73--"0:0<br>prelude.qubit"-->75
+            73--"1:1<br>arithmetic.int.types.int"-->75
+            75--"0:0<br>prelude.qubit"-->74
+        end
+        subgraph 53 ["(53) FuncDefn: #quot;__modified____main__.main.__WithBlock__1[P1]#quot;"]
+            direction LR
+            63["(63) Input"]
+            64["(64) Output"]
+            subgraph 65 ["(65) CFG"]
+                direction LR
+                subgraph 66 ["(66) DataflowBlock"]
+                    direction LR
+                    68["(68) Input"]
+                    69["(69) Output"]
+                    70["(70) Tag(Unit)"]
+                    71["(71) prelude.MakeTuple"]
+                    72["(72) Call"]
+                    68--"0:0<br>prelude.qubit"-->72
+                    68--"1:1<br>arithmetic.int.types.int"-->72
+                    70--"0:0<br>Unit"-->69
+                    72--"0:1<br>prelude.qubit"-->69
+                end
+                67["(67) ExitBlock"]
+                66-."0:0".->67
+            end
+            63--"0:0<br>prelude.qubit"-->65
+            63--"1:1<br>arithmetic.int.types.int"-->65
+            65--"0:0<br>prelude.qubit"-->64
+        end
+        subgraph 54 ["(54) FuncDefn: #quot;__modified____main__.fun[]#quot;"]
+            direction LR
+            55["(55) Input"]
+            56["(56) Output"]
+            subgraph 57 ["(57) CFG"]
+                direction LR
+                subgraph 58 ["(58) DataflowBlock"]
+                    direction LR
+                    60["(60) Input"]
+                    61["(61) Output"]
+                    62["(62) Tag(Unit)"]
+                    60--"0:1<br>prelude.qubit"-->61
+                    62--"0:0<br>Unit"-->61
+                end
+                59["(59) ExitBlock"]
+                58-."0:0".->59
+            end
+            55--"0:0<br>prelude.qubit"-->57
+            55--"1:1<br>arithmetic.int.types.int"-->57
+            57--"0:0<br>prelude.qubit"-->56
+        end
+        52--"0:0<br>[prelude.qubit, arithmetic.int.types.int, arithmetic.int.types.int] -> [prelude.qubit]"-->89
+        53--"0:0<br>[prelude.qubit, arithmetic.int.types.int, arithmetic.int.types.int] -> [prelude.qubit]"-->86
+        54--"0:2<br>[prelude.qubit, arithmetic.int.types.int] -> [prelude.qubit]"-->72
+    end

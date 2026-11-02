@@ -590,8 +590,8 @@ impl<N: HugrNode> ModifierResolver<N> {
         };
         let mut poly_signature = old_fn_defn.signature().clone();
         self.modify_signature(poly_signature.body_mut(), false);
-        // NICOLA: TODO: here we add power inputs for the function signature and plan to "consum the modification?"
-        self.append_power_inputs(poly_signature.body_mut());
+        // NICOLA: here we add power inputs for the function signature and plan to "consum the modification?"
+        Self::append_power_inputs(poly_signature.body_mut(), self.modifiers().num_exponents());
 
         let mut new_fn = FunctionBuilder::new(
             "__modified__".to_string()
@@ -612,7 +612,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         );
         self.modified_impls.insert(cache_key, new_function_node);
 
-        self.modify_dfg_body(h, func, &mut new_fn)?;
+        self.with_no_power_inputs(|this| this.modify_dfg_body(h, func, &mut new_fn))?;
 
         let call_map = mem::replace(self.call_map(), old_call_map);
 
@@ -1195,7 +1195,7 @@ mod test {
             control: 1,
             accum_ctrl: vec![1],
             dagger: false,
-            exponent_wires: Vec::new(),
+            exponent_inputs: Vec::new(),
         };
         resolver
     }
@@ -1335,7 +1335,7 @@ mod test {
                     control: accum_ctrl.iter().sum(),
                     accum_ctrl: accum_ctrl.clone(),
                     dagger,
-                    exponent_wires: Vec::new(),
+                    exponent_inputs: Vec::new(),
                 };
                 let first = resolver.modify_fn(&mut h, original.node()).unwrap();
                 let second = resolver.modify_fn(&mut h, original.node()).unwrap();
@@ -1372,7 +1372,7 @@ mod test {
             control: 1,
             accum_ctrl: vec![1],
             dagger: false,
-            exponent_wires: Vec::new(),
+            exponent_inputs: Vec::new(),
         };
 
         let first = resolver
@@ -1418,8 +1418,8 @@ mod test {
             control: accum_ctrl.iter().sum(),
             accum_ctrl,
             dagger,
-            // Only the number of exponent wires is used when modifying the definition.
-            exponent_wires: vec![Wire::new(original.node(), 0); power_count],
+            // Only the number of exponent inputs is used when modifying the definition.
+            exponent_inputs: vec![(original.node(), IncomingPort::from(1)); power_count],
         };
 
         let modified = resolver.modify_fn(&mut h, original.node()).unwrap();

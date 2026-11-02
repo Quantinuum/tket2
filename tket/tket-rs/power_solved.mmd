@@ -1,0 +1,65 @@
+---
+config:
+    layout: elk
+---
+graph LR
+    subgraph 0 ["(0) Module"]
+        direction LR
+        subgraph 1 ["(1) [**FuncDefn: #quot;__main__.main#quot;**]"]
+            direction LR
+            style 1 stroke:#832561,stroke-width:3px
+            2["(2) Input"]
+            3["(3) Output"]
+            subgraph 4 ["(4) CFG"]
+                direction LR
+                subgraph 5 ["(5) DataflowBlock"]
+                    direction LR
+                    6["(6) Input"]
+                    7["(7) Output"]
+                    9["(9) LoadConstant"]
+                    10["(10) const:custom:u64(2)"]
+                    12["(12) LoadConstant"]
+                    13["(13) const:custom:u64(4)"]
+                    42["(42) LoadFunction"]
+                    15["(15) CallIndirect"]
+                    16["(16) Tag(Unit)"]
+                    6--"0:1<br>prelude.qubit"-->15
+                    9--"0:3<br>arithmetic.int.types.int"-->15
+                    10--"0:0<br>arithmetic.int.types.int"-->9
+                    12--"0:2<br>arithmetic.int.types.int"-->15
+                    13--"0:0<br>arithmetic.int.types.int"-->12
+                    42--"0:0<br>[prelude.qubit, arithmetic.int.types.int, arithmetic.int.types.int] -> [prelude.qubit]"-->15
+                    15--"0:1<br>prelude.qubit"-->7
+                    16--"0:0<br>Unit"-->7
+                end
+                17["(17) ExitBlock"]
+                5-."0:0".->17
+            end
+            2--"0:0<br>prelude.qubit"-->4
+            4--"0:0<br>prelude.qubit"-->3
+        end
+        subgraph 29 ["(29) FuncDefn: #quot;__modified____main__.main.__WithBlock__0[P2]#quot;"]
+            direction LR
+            30["(30) Input"]
+            31["(31) Output"]
+            subgraph 32 ["(32) CFG"]
+                direction LR
+                subgraph 33 ["(33) DataflowBlock"]
+                    direction LR
+                    35["(35) Input"]
+                    36["(36) Output"]
+                    37["(37) Tag(Unit)"]
+                    38["(38) prelude.MakeTuple"]
+                    39["(39) tket.quantum.H"]
+                    35--"0:0<br>prelude.qubit"-->39
+                    37--"0:0<br>Unit"-->36
+                    39--"0:1<br>prelude.qubit"-->36
+                end
+                34["(34) ExitBlock"]
+                33-."0:0".->34
+            end
+            30--"0:0<br>prelude.qubit"-->32
+            32--"0:0<br>prelude.qubit"-->31
+        end
+        29--"0:0<br>[prelude.qubit, arithmetic.int.types.int, arithmetic.int.types.int] -> [prelude.qubit]"-->42
+    end
