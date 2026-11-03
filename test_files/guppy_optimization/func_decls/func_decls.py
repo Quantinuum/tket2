@@ -35,5 +35,5 @@ def unknown_rotations(q: qubit) -> None:
     rx(q, angle(other_rotation))
 
 
-program = unknown_rotations.compile_function()
+program = unknown_rotations.with_minimal_opt().compile_function()
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
