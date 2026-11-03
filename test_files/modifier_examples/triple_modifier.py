@@ -31,10 +31,10 @@ def main(c1: qubit, i: nat) -> None:  # , c2: qubit, t: qubit) -> None:
     # c1 = qubit()
     # t = qubit()
     # h(c1)
-    with power(i):  # , power(4):
+    with power(i), power(4):
         j = nat(i + 1)
-        with power(j):
-            fun(c1, j)
+        # with power(j):
+        # fun(c1, j)
 
     # with control(c1):
     #     # with control(c2):  # , dagger:
