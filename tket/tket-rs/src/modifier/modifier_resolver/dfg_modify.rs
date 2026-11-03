@@ -17,9 +17,12 @@ use hugr::{
         Call, Conditional, DFG, DataflowBlock, DataflowOpTrait, OpType, TailLoop,
         handle::NodeHandle,
     },
-    std_extensions::collections::{
-        array::ArrayOpBuilder,
-        borrow_array::{BArrayOpBuilder, borrow_array_type},
+    std_extensions::{
+        arithmetic::int_ops::IntOpDef,
+        collections::{
+            array::ArrayOpBuilder,
+            borrow_array::{BArrayOpBuilder, borrow_array_type},
+        },
     },
     types::{EdgeKind, FuncTypeBase, PolyFuncType, Signature, TypeRow},
 };
@@ -612,6 +615,9 @@ impl<N: HugrNode> ModifierResolver<N> {
         );
         self.modified_impls.insert(cache_key, new_function_node);
 
+        // todo if we have exponent,
+        self.multiply_exponent_inputs(&mut new_fn)?;
+
         // Power modifier is consumed here. Nested calls need a fresh power environment.
         self.with_no_power_inputs(|this| this.modify_dfg_body(h, func, &mut new_fn))?;
 
@@ -639,6 +645,26 @@ impl<N: HugrNode> ModifierResolver<N> {
         self.modified_functions.insert(func);
 
         Ok(new_function_node)
+    }
+
+    /// Multiplies the trailing exponent inputs into a single wire, if present.
+    fn multiply_exponent_inputs(
+        &self,
+        builder: &mut impl Dataflow,
+    ) -> Result<Option<Wire>, BuildError> {
+        let num_exponents = self.modifiers().num_exponents();
+        let mut exponent_inputs = builder
+            .input_wires()
+            .skip(builder.input_wires().count() - num_exponents);
+        let Some(mut exponent_wire) = exponent_inputs.next() else {
+            return Ok(None);
+        };
+        for input in exponent_inputs {
+            exponent_wire = builder
+                .add_dataflow_op(IntOpDef::imul.with_log_width(6), [exponent_wire, input])?
+                .out_wire(0);
+        }
+        Ok(Some(exponent_wire))
     }
 
     /// Inserts a sub DFG into the given parent DFG, updating the call map accordingly.
