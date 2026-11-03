@@ -612,6 +612,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         );
         self.modified_impls.insert(cache_key, new_function_node);
 
+        // Power modifier is consumed here. Nested calls need a fresh power environment.
         self.with_no_power_inputs(|this| this.modify_dfg_body(h, func, &mut new_fn))?;
 
         let call_map = mem::replace(self.call_map(), old_call_map);
