@@ -222,7 +222,7 @@ impl ComposablePass<Hugr> for PauliGraphResynthesis {
         }
 
         for (region, serial_circ) in encoded_circs.iter_mut() {
-            if serial_circ.commands.is_empty() {
+            if serial_circ.commands.is_empty() || serial_circ.qubits.is_empty() {
                 continue;
             }
             let registers = &ancillas[&region];

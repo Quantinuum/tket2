@@ -61,13 +61,11 @@ impl RegisterMap {
     }
 }
 
-/// Holds the data and registers of an [`OpType::Barrier`]
+/// Holds a command that cannot be converted for it to be encoded as
+/// serialized black-box content.
 #[derive(Serialize, Deserialize)]
-struct BarrierContent {
-    #[serde(default)]
-    op_data: Option<String>,
-    #[serde(default)]
-    args: Vec<ElementId>,
+struct BlackBoxContent {
+    command: Command<String>,
 }
 
 /// Converts a serial circuit to an equivalent pauli graph
@@ -263,19 +261,24 @@ fn cmd_to_op(
         // Currently, pg-lib blackboxes support specifying the qubits they act on, but not the bits.
         // To prevent a blackbox which acts on bits from being incorrectly reordered during optimisation,
         // we say it acts on all qubits, to prevent it from being reordered.
-        OpType::Barrier => {
-            let blackbox_qubits = if !bits.is_empty() {
+        OpType::Barrier | OpType::SetBits => {
+            if cmd.op.op_type == OpType::SetBits
+                && (!qubits.is_empty() || register_map.qubit_map.is_empty())
+            {
+                return Err(ConversionError::UnsupportedOpType(OpType::SetBits));
+            }
+
+            let blackbox_qubits = if cmd.op.op_type == OpType::SetBits || !bits.is_empty() {
                 (0..register_map.qubit_map.len()).collect()
             } else {
                 qubits.clone()
             };
 
-            let content = serde_json::to_string(&BarrierContent {
-                op_data: cmd.op.data.clone(),
-                args: cmd.args.clone(),
+            let content = serde_json::to_string(&BlackBoxContent {
+                command: cmd.clone(),
             })
             .map_err(|_| {
-                ConversionError::UnsupportedBlackBox("Failed barrier conversion".to_string())
+                ConversionError::UnsupportedBlackBox("Failed black-box conversion".to_string())
             })?;
 
             Ok(vec![Op::BlackBox {
@@ -617,17 +620,9 @@ fn op_to_cmd(op: &Op, register_map: &RegisterMap) -> Result<Vec<Command<String>>
                         ConversionError::UnsupportedBlackBox("Missing black-box payload".to_owned())
                     })?;
 
-                    let barrier_content: BarrierContent = serde_json::from_str(content)
+                    let payload: BlackBoxContent = serde_json::from_str(content)
                         .map_err(|_| ConversionError::UnsupportedBlackBox(content.to_owned()))?;
-
-                    let mut op = Operation::from_optype(OpType::Barrier);
-                    op.data = barrier_content.op_data;
-
-                    Ok(vec![Command {
-                        op,
-                        args: barrier_content.args,
-                        opgroup: None,
-                    }])
+                    Ok(vec![payload.command])
                 }
                 _ => Err(ConversionError::UnsupportedGate(
                     data.get_gate_type().clone(),
@@ -636,17 +631,9 @@ fn op_to_cmd(op: &Op, register_map: &RegisterMap) -> Result<Vec<Command<String>>
         }
         Op::BlackBox { data } => {
             let content = data.get_content();
-            let barrier_content: BarrierContent = serde_json::from_str(content)
-                .map_err(|_| ConversionError::UnsupportedBlackBox(content.to_string()))?;
-
-            let mut op = Operation::from_optype(OpType::Barrier);
-            op.data = barrier_content.op_data;
-
-            Ok(vec![Command {
-                op,
-                args: barrier_content.args,
-                opgroup: None,
-            }])
+            let payload: BlackBoxContent = serde_json::from_str(content)
+                .map_err(|_| ConversionError::UnsupportedBlackBox(content.to_owned()))?;
+            Ok(vec![payload.command])
         }
         _ => Err(ConversionError::UnsupportedOp(op.clone())),
     }
@@ -1009,9 +996,8 @@ mod tests {
     ) {
         let mut command = command(OpType::Barrier, args.clone());
         command.op.data = op_data.map(str::to_owned);
-        let content = serde_json::to_string(&BarrierContent {
-            op_data: command.op.data.clone(),
-            args,
+        let content = serde_json::to_string(&BlackBoxContent {
+            command: command.clone(),
         })
         .unwrap();
         let op = Op::BlackBox {
