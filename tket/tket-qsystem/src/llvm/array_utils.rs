@@ -37,6 +37,9 @@ pub trait ArrayLowering {
     ) -> Result<PointerValue<'c>>;
 
     /// Releases the backing allocation of a consumed array value.
+    ///
+    /// Implementations must free the original allocation, even if the value
+    /// represents a slice with a nonzero offset.
     fn free_array<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
