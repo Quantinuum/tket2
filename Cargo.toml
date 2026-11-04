@@ -58,11 +58,12 @@ large_enum_variant = "allow"
 
 [patch.crates-io]
 
-# Uncomment to use unreleased versions of hugr
-#hugr = { git = "https://github.com/quantinuum/hugr", "rev" = "1787e12" }
-#hugr-core = { git = "https://github.com/quantinuum/hugr", "rev" = "1787e12" }
-#hugr-cli = { git = "https://github.com/quantinuum/hugr", "rev" = "1787e12" }
-#hugr-llvm = { git = "https://github.com/quantinuum/hugr", "rev" = "1787e12" }
+# Pointer lowering and CFG serialization use the same HUGR source as Python.
+hugr = { git = "https://github.com/quantinuum/hugr", rev = "793b1014f490eca899cae0f49d46b3187bfc8da6" }
+hugr-core = { git = "https://github.com/quantinuum/hugr", rev = "793b1014f490eca899cae0f49d46b3187bfc8da6" }
+hugr-model = { git = "https://github.com/quantinuum/hugr", rev = "793b1014f490eca899cae0f49d46b3187bfc8da6" }
+hugr-cli = { git = "https://github.com/quantinuum/hugr", rev = "793b1014f490eca899cae0f49d46b3187bfc8da6" }
+hugr-llvm = { git = "https://github.com/quantinuum/hugr", rev = "793b1014f490eca899cae0f49d46b3187bfc8da6" }
 # portgraph = { git = "https://github.com/quantinuum/portgraph", rev = "68b96ac737e0c285d8c543b2d74a7aa80a18202c" }
 
 [workspace.dependencies]
