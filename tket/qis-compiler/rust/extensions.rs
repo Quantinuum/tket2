@@ -75,3 +75,6 @@ pub(crate) fn codegen_extensions(platform: QSystemPlatform) -> CodegenExtsMap<'s
         ))
         .finish()
 }
+
+#[cfg(test)]
+mod globals_tests;
