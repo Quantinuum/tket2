@@ -39,6 +39,7 @@ python:
 
 qis:
   - *tket-core
+  - "tket/tket-qsystem/**"
   - "tket/qis-compiler/**"
   - "pyproject.toml"
   - "uv.lock"
