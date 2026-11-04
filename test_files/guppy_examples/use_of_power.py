@@ -1,6 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
+# # use prerelease as `power` was removed in actual release
 #     "guppylang==1.0.0a5",
 #     "guppylang-internals==1.0.0a5",
 # ]
