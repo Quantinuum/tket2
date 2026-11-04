@@ -11,6 +11,38 @@ use tk_pg_qm_tableau::Tableau;
 pub fn optimize(pauli_graph: &PauliGraph, budget: usize, first_bit: usize) -> PauliGraph {
     validate_ancillas(pauli_graph, budget);
 
+    let width = pauli_graph.get_n_qubits();
+    let mut output = PauliGraph::new(width);
+    let mut region = PauliGraph::new(width);
+    let mut next_bit = first_bit;
+    
+    for op in pauli_graph.get_ops() {
+        let boundary = match op {
+            Op::Rotation { .. } | Op::Tableau { .. } => false,
+            Op::Gate { data } => {
+                *data.get_gate_type() != GateType::H
+                    || !data.get_conditional_bits().is_empty()
+                    || !data.get_conditional_values().is_empty()
+            }
+            _ => true,
+        };
+        if boundary {
+            if !region.get_ops().is_empty() {
+                output.extend(optimize_region(&region, budget, &mut next_bit));
+                region = PauliGraph::new(width);
+            }
+            output.add_op(op.clone());
+        } else {
+            region.add_op(op.clone());
+        }
+    }
+    if !region.get_ops().is_empty() {
+        output.extend(optimize_region(&region, budget, &mut next_bit));
+    }
+    output
+}
+
+fn optimize_region(pauli_graph: &PauliGraph, budget: usize, next_bit: &mut usize) -> PauliGraph {
     let n_qubits = pauli_graph.get_n_qubits();
     let ancillas = n_qubits - budget..n_qubits;
     let (rotations, mut final_clifford) = normalize(pauli_graph);
@@ -22,7 +54,6 @@ pub fn optimize(pauli_graph: &PauliGraph, budget: usize, first_bit: usize) -> Pa
         output.add_op(Op::Gate { data: h });
     }
 
-    let mut next_bit = first_bit;
     for sub_graph in batch_rotations(&rotations, budget) {
         let rotations: Vec<_> = sub_graph
             .get_ops()
@@ -33,7 +64,7 @@ pub fn optimize(pauli_graph: &PauliGraph, budget: usize, first_bit: usize) -> Pa
             })
             .collect();
         let region = synthesize(&rotations, n_qubits);
-        let (prefix, mut diagonal, suffix) = gadgetize(region, budget, &mut next_bit);
+        let (prefix, mut diagonal, suffix) = gadgetize(region, budget, next_bit);
 
         t_optimization(&mut diagonal);
 
