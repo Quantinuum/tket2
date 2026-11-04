@@ -1009,6 +1009,23 @@ mod tests {
     }
 
     #[rstest]
+    fn preserves_set_bits(registers: RegisterMap) {
+        let command: Command<String> = serde_json::from_value(serde_json::json!({
+            "op": {"type": "SetBits", "classical": {"values": [true, false]}},
+            "args": [["result", [8]], ["result", [3]]],
+        }))
+        .unwrap();
+
+        let ops = cmd_to_op(&command, &registers).unwrap();
+        let [Op::BlackBox { data }] = ops.as_slice() else {
+            panic!("SetBits must be encoded as a black box");
+        };
+
+        assert_eq!(data.get_qubits(), &vec![0, 1, 2]);
+        assert_eq!(op_to_cmd(&ops[0], &registers).unwrap(), vec![command]);
+    }
+
+    #[rstest]
     fn converts_complete_circuit(mut circuit: SerialCircuit, registers: RegisterMap) {
         circuit.commands = vec![
             command(OpType::H, vec![element("left", 2)]),
