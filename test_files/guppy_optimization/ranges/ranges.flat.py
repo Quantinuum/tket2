@@ -1,8 +1,8 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang==1.0.0a5",
-#     "guppylang-internals==1.0.0a5",
+#     "guppylang==1.1.4",
+#     "guppylang-internals==1.1.4",
 # ]
 # ///
 
@@ -42,5 +42,6 @@ def f(qs: array[qubit, 4] @ owned) -> array[qubit, 4]:
     return qs
 
 
-program = main.compile()
+# This is a program to optimize, not a goal for optimization to reach.
+program = main.with_minimal_opt().compile()
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
