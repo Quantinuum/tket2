@@ -1,8 +1,8 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang==1.0.5",
-#     "guppylang-internals==1.0.5",
+#     "guppylang==1.1.3",
+#     "guppylang-internals==1.1.3",
 # ]
 # ///
 """A loop inside a conditional branch"""
