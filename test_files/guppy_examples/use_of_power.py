@@ -1,8 +1,8 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang==1.1.3",
-#     "guppylang-internals==1.1.3",
+#     "guppylang==1.1.4",
+#     "guppylang-internals==1.1.4",
 # ]
 # ///
 """Example program that uses the `power` modifier (expected to be rejected by tket)."""

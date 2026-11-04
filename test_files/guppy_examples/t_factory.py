@@ -1,8 +1,8 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang==1.1.3",
-#     "guppylang-internals==1.1.3",
+#     "guppylang==1.1.4",
+#     "guppylang-internals==1.1.4",
 # ]
 # ///
 """A small T-state factory using magic-state distillation."""
