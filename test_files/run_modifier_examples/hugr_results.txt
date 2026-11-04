@@ -42,6 +42,9 @@ loaded_pytket_solved:
 	110 -> 0.25-0.25j
 	111 -> 0.25-0.25j
 -----
+multiple_fun_call_solved:
+	0 -> 1+0j
+-----
 multiple_functions_solved:
 	00 -> 0.7071+0j
 	10 -> 0+0.6124j

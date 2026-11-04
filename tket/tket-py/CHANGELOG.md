@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.13](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.12...tket-py-v0.15.13) (2026-10-29)
+
+
+### Bug Fixes
+
+* Update modifier resolution functions to explore all function calls avoiding repetitions ([#2098](https://github.com/Quantinuum/tket2/issues/2098)) ([d3ab2c7](https://github.com/Quantinuum/tket2/commit/d3ab2c7fffe26bd219793029d5063e1c61656267))
+
 ## [0.15.12](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.11...tket-py-v0.15.12) (2026-10-20)
 
 

@@ -529,6 +529,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_greedy_strategy() {
         let mut circ = n_cx(10);
         let cx_gates = entrypoint_tket_ops(&circ);
@@ -558,6 +559,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_exhaustive_default_strategy() {
         let mut circ = n_cx(10);
         let cx_gates = entrypoint_tket_ops(&circ);
@@ -595,6 +597,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_exhaustive_gamma_strategy() {
         let circ = n_cx(10);
         let cx_gates = entrypoint_tket_ops(&circ);

@@ -128,6 +128,7 @@ fn test_tail_loop_never_iterates() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 fn test_tail_loop_always_iterates() {
     let mut builder = DFGBuilder::new(Signature::new_endo([])).unwrap();
     let r_w = builder.add_load_value(
@@ -166,6 +167,7 @@ fn test_tail_loop_always_iterates() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 fn test_tail_loop_two_iters() {
     let mut builder = DFGBuilder::new(Signature::new_endo([])).unwrap();
 
@@ -262,6 +264,7 @@ fn test_tail_loop_containing_conditional() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 fn test_conditional() {
     let variants = vec![type_row![], type_row![], [bool_t()].into()];
     let cond_t = Type::new_sum(variants.clone());
@@ -392,6 +395,7 @@ fn xor_and_cfg() -> Hugr {
 #[case(pv_true_or_false(), pv_false(), pv_true_or_false(), pv_true_or_false())]
 #[case(PartialValue::Top, pv_true(), pv_true_or_false(), PartialValue::Top)]
 #[case(PartialValue::Top, pv_false(), PartialValue::Top, PartialValue::Top)]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 fn test_cfg(
     #[case] inp0: PartialValue<Void>,
     #[case] inp1: PartialValue<Void>,
@@ -416,6 +420,7 @@ fn test_cfg(
 #[case(pv_true(), pv_true(), pv_true())]
 #[case(pv_false(), pv_false(), pv_false())]
 #[case(pv_true(), pv_false(), pv_true_or_false())] // Two calls alias
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 fn test_call(
     #[case] inp0: PartialValue<Void>,
     #[case] inp1: PartialValue<Void>,
@@ -504,6 +509,7 @@ fn test_region() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 fn test_module() {
     let mut modb = ModuleBuilder::new();
     let leaf_fn = modb
@@ -581,6 +587,7 @@ fn test_module() {
 #[case(pv_true(), pv_true())]
 // Expected to fail due low precision, see https://github.com/Quantinuum/hugr/issues/3065.
 #[should_panic]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 fn call_indirect(#[case] inp1: PartialValue<Void>, #[case] inp2: PartialValue<Void>) {
     let b2b = || Signature::new_endo([bool_t()]);
     let mut dfb = DFGBuilder::new(inout_sig(vec![bool_t(); 3], vec![bool_t(); 2])).unwrap();

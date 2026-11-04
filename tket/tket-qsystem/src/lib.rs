@@ -59,6 +59,7 @@ mod test {
     #[rstest]
     #[case(QSystemPlatform::Helios)]
     #[case(QSystemPlatform::Sol)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn qsystem_passes(#[case] platform: QSystemPlatform) {
         let mut mb = hugr::builder::ModuleBuilder::new();
         let func = mb
@@ -146,6 +147,7 @@ mod test {
     #[rstest]
     #[case(QSystemPlatform::Helios)]
     #[case(QSystemPlatform::Sol)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn qsystem_split_passes(#[case] platform: QSystemPlatform) {
         let mut builder =
             FunctionBuilder::new("main", Signature::new(vec![qb_t()], vec![qb_t()])).unwrap();
@@ -220,6 +222,7 @@ mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn measurement_drop_lowering() {
         // Additional test outside of the `LowerTketToQSystemPass` to check the
         // interaction with `LowerDropsPass`.
@@ -251,6 +254,7 @@ mod test {
     #[rstest]
     #[case(QSystemPlatform::Helios)]
     #[case(QSystemPlatform::Sol)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn qsystem_native_pass_resolves_modifiers(#[case] platform: QSystemPlatform) {
         let mut module = hugr::builder::ModuleBuilder::new();
 

@@ -295,7 +295,9 @@ mod test {
     }
 
     #[rstest]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case(["a", "b", "c"], ["a", "b", "c"], [vec!["g", "x"], vec!["f"], vec!["x"], vec![], vec![]])]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case(["a", "b"], ["a", "b"], [vec!["g", "x"], vec!["f", "c"], vec!["x"], vec!["c"], vec![]])]
     #[case(["c"], ["c"], [vec!["g", "a"], vec!("f", "b"), vec!["x"], vec![], vec![]])]
     fn test_inline(
@@ -348,6 +350,7 @@ mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_filter_caller() {
         let mut h = make_test_hugr();
         let [g, b, c] = ["g", "b", "c"].map(|n| find_func(&h, n));
@@ -392,7 +395,9 @@ mod test {
 
     #[rstest]
     #[case::size_zero(InlineFuncsHeuristic::MaxSize(0), vec!["f", "b"])]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case::size_unlimited(InlineFuncsHeuristic::MaxSize(usize::MAX), vec!["f"])]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case::all(InlineFuncsHeuristic::All, vec!["f"])]
     fn inline_functions_pass_heuristic(
         #[case] heuristic: InlineFuncsHeuristic,
@@ -432,6 +437,7 @@ mod test {
     }
 
     #[rstest]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn inline_functions_pass_hints() {
         let g_targets = vec!["f", "c"];
 
