@@ -1,0 +1,593 @@
+//! Remove cycles from a [DomTreeWithBackedges]
+
+use hugr::core::HugrNode;
+use hugr::hugr::hugrmut::HugrMut;
+use hugr::ops::{
+    BasicBlock, CFG, DataflowBlock, ExitBlock, Input, OpParent, OpType, Output, Tag, TailLoop,
+};
+use hugr::types::{Signature, Type, TypeRow};
+use hugr::{HugrView, OutgoingPort};
+use itertools::Itertools;
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
+use std::iter::successors;
+
+use crate::passes::{ComposablePass, PassScope, WithScope};
+
+use super::dom_tree::{DomTreeNode, DomTreeWithBackedges, EdgeSources, Path, leaf_targets};
+
+/// A [ComposablePass] that removes cycles from all control-flow graphs (CFG) within its scope,
+/// transforming any such loops into nested [TailLoop] structures. (See [nest_loop].)
+#[derive(Debug, Default)]
+pub struct RemoveCFGCyclesPass(PassScope);
+
+impl WithScope for RemoveCFGCyclesPass {
+    fn with_scope(mut self, scope: impl Into<PassScope>) -> Self {
+        self.0 = scope.into();
+        self
+    }
+}
+
+/// An error resulting from [RemoveCFGCyclesPass] failing to remove cycles from a CFG.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum RemoveCyclesError {}
+
+impl<H: HugrMut> ComposablePass<H> for RemoveCFGCyclesPass {
+    type Error = RemoveCyclesError;
+
+    /// The result of running the pass is a mapping from each CFG node in (scope in) the original Hugr
+    /// to the [DomTreeNode] describing that CFG after loop removal.
+    type Result = BTreeMap<
+        H::Node,
+        DomTreeNode<H::Node, EdgeSources<H::Node>, InnerTailLoop<H::Node, EdgeSources<H::Node>>>,
+    >;
+
+    fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
+        let cfgs = self
+            .0
+            .regions(hugr)
+            .filter(|n| hugr.get_optype(*n).is_cfg())
+            .collect::<Vec<_>>();
+        Ok(cfgs
+            .into_iter()
+            .map(|n| {
+                let dtn = DomTreeWithBackedges::<_, EdgeSources<_>>::new_for_cfg(&hugr, n);
+                (n, nest_loop(dtn, &mut *hugr))
+            })
+            .collect())
+    }
+}
+
+/// Following removing cycles, used for the returned [DomTreeNode::loop_] to record information
+/// about the CFG nested within any generated TailLoop within the [DomTreeNode::node].
+pub struct InnerTailLoop<N, P: Path<N>>(pub Option<Box<DomTreeNode<N, P, InnerTailLoop<N, P>>>>);
+
+impl<N, P: Path<N>> Default for InnerTailLoop<N, P> {
+    fn default() -> Self {
+        InnerTailLoop(None)
+    }
+}
+
+/// Turn each loop in the input CFG (indicated by `dtn.node`) into a single basic block
+/// which takes the place of all the original blocks in the loop.
+/// The new block (in fact the original header block) contains a [TailLoop] node which
+/// contains the rest of the blocks forming the original loop.
+pub fn nest_loop<H: HugrMut, P: Path<H::Node>>(
+    dtn: DomTreeWithBackedges<H::Node, P>,
+    hugr: &mut H,
+) -> DomTreeNode<H::Node, P, InnerTailLoop<H::Node, P>> {
+    let Some(backedges) = P::opt_as_ref(&dtn.loop_) else {
+        return DomTreeNode {
+            node: dtn.node,
+            children: dtn
+                .children
+                .into_iter()
+                .map(|(cp, cn)| (cp, nest_loop(cn, hugr)))
+                .collect(),
+            exit_edges: dtn.exit_edges,
+            loop_: InnerTailLoop(None),
+        };
+    };
+    let loop_blocks = loop_blocks(hugr, dtn.node, backedges);
+    // While we could (more efficiently) extract the list of post-loop blocks during the detach operation,
+    // it's more helpful to have the complete list available now so we can put Tags into place during detach.
+    let post_loop_blocks = loop_blocks
+        .iter()
+        .flat_map(|n| hugr.output_neighbours(*n))
+        .filter(|n| !loop_blocks.contains(n))
+        .collect::<BTreeSet<_>>();
+
+    let break_rows = post_loop_blocks
+        .iter()
+        .map(|n| block_inputs(hugr, *n))
+        .collect::<Vec<_>>();
+
+    let [loop_block, inner_cfg, continue_bb, break_bb, exit_block] =
+        make_inner_cfg(hugr, dtn.node, break_rows.clone());
+    for block in &loop_blocks {
+        if block == &dtn.node {
+            assert_eq!(hugr.get_parent(*block), Some(inner_cfg));
+        } else {
+            hugr.set_parent(*block, inner_cfg);
+        }
+    }
+
+    // For each control-flow edge that exits the loop, make a new BB that exits the loop with a value
+    // tagged to indicate which post-loop block to go to, and retarget the edge.
+    fn retarget_loop_preds<H: HugrMut>(
+        hugr: &mut H,
+        post_loop: H::Node,
+        loop_blocks: &HashSet<H::Node>,
+        new_tgt: H::Node,
+    ) {
+        // For each predecessor of `post_loop` in `loop_blocks`, change edge to target `new_tgt` instead
+        for (pred, p) in hugr.linked_outputs(post_loop, 0).collect::<Vec<_>>() {
+            if loop_blocks.contains(&pred) {
+                hugr.disconnect(pred, p);
+                hugr.connect(pred, p, new_tgt, 0);
+            }
+        }
+    }
+    let break_blocks = match post_loop_blocks.iter().exactly_one() {
+        Ok(&post_loop) => {
+            retarget_loop_preds(hugr, post_loop, &loop_blocks, break_bb);
+            vec![]
+        }
+        Err(e) => e
+            .enumerate()
+            .map(|(tag, &post_loop)| {
+                let bb = tag_block(hugr, exit_block, tag, break_rows.clone());
+                hugr.connect(bb, 0, break_bb, 0);
+                retarget_loop_preds(hugr, post_loop, &loop_blocks, bb);
+                bb
+            })
+            .collect(),
+    };
+
+    for (outport, tgt) in hugr
+        .node_outputs(loop_block)
+        .zip_eq(post_loop_blocks)
+        .collect::<Vec<_>>()
+    {
+        // tgt is *outside* the loop so in the outer CFG (as is loop_block which contains the inner CFG)
+        hugr.connect(loop_block, outport, tgt, 0);
+    }
+
+    // now build the dominator tree for inside the loop.
+    // Its exit-edges will include all control-flow edges to any break_blocks.
+    let (loop_dtn, out_loop_children) = detach(dtn, hugr, &loop_blocks);
+    let loop_dtn = loop_dtn.unwrap(); // header is in loop!!
+    assert!(P::opt_as_ref(&loop_dtn.loop_).is_some()); // detach has detailed assertion
+
+    // disconnect inputs to old header - it is now the entry node of the inner CFG. backedges reconnect to continue_bb
+    for (n, p) in hugr.linked_outputs(loop_dtn.node, 0).collect::<Vec<_>>() {
+        hugr.disconnect(n, p);
+        let tgt = if loop_blocks.contains(&n) {
+            continue_bb
+        } else {
+            loop_block
+        };
+        hugr.connect(n, p, tgt, 0);
+    }
+
+    // Build DomTree to return. Inner loop first
+    let loop_dtn = insert_at_lca(
+        loop_dtn,
+        hugr,
+        break_blocks
+            .into_iter()
+            .chain([break_bb, continue_bb, exit_block])
+            .collect(),
+    );
+    assert!(P::opt_as_ref(&loop_dtn.exit_edges).is_none()); // every node in inner CFG is dominated by the header, including the ExitBlock
+    assert!(P::opt_as_ref(&loop_dtn.loop_).is_none()); // no backedges!
+
+    let mut dtn = DomTreeNode::<H::Node, P, InnerTailLoop<H::Node, P>>::new_with_loop_callback(
+        loop_block,
+        out_loop_children
+            .into_iter()
+            .map(|ch| nest_loop(ch, hugr))
+            .collect(),
+        |_, lp| {
+            panic!(
+                "Should not be any paths back to loop header, but received {:?}",
+                lp
+            );
+        },
+        hugr,
+    );
+
+    // We could avoid calling nest_loop on the parent here (we know it has no backedges) but we need to on the children.
+    dtn.loop_ = InnerTailLoop(Some(Box::new(nest_loop(loop_dtn, hugr))));
+    dtn
+}
+
+/// Detaches any parts of the subtree not containing within `loop_blocks`. (Makes sense
+/// only if `loop_blocks` is closed under control-flow predecessor relation as far back
+/// as [Self::node], but should not include non-loop predecessors thereof)
+///
+/// Return values are:
+/// * `Option<Self>`: The remaining part of the current node after detaching the
+///   non-loop blocks.
+/// * `Vec<Self>`: The subtrees that were detached as being outside the loop
+/// * `HashMap<N, Vec<N>>`: A mapping, from each node that is destination of a loop-exit
+///   edge, to a representation of the LCA in the dominator tree of all such edges,
+///   given as a list of dominators starting from `self` and moving down the dominator
+///   tree one node at a time until the LCA is reached.
+fn detach<H: HugrView, P: Path<H::Node>>(
+    dtn: DomTreeWithBackedges<H::Node, P>,
+    hugr: &H,
+    loop_blocks: &HashSet<H::Node>,
+) -> (
+    Option<DomTreeWithBackedges<H::Node, P>>,
+    Vec<DomTreeWithBackedges<H::Node, P>>,
+) {
+    if !loop_blocks.contains(&dtn.node) {
+        // TODO maybe it is easier not to add even dominated break-blocks here,
+        // and to add them alongside the non-dominated break-blocks later?
+        return (None, vec![dtn]);
+    }
+    let mut remaining_children = Vec::new();
+    let mut detached = Vec::new();
+    for (_, ch) in dtn.children {
+        let (ch, ch_detached) = detach(ch, hugr, loop_blocks);
+        remaining_children.extend(ch);
+        detached.extend(ch_detached);
+    }
+    // Recompute exit_edges: we must remove any exits from inside a detached dominator tree;
+    // but add any edge to a detached tree itself.
+    let in_loop_dtn = DomTreeWithBackedges::new(dtn.node, remaining_children, hugr);
+    // We have not detached the backedges, so should be the same. (No PartialEq...)
+    assert_eq!(
+        format!("{:?}", in_loop_dtn.loop_),
+        format!("{:?}", dtn.loop_)
+    ); // We have not detached the backedges
+    (Some(in_loop_dtn), detached)
+}
+
+/// Inputs for a control flow [BasicBlock] (DataflowBlock or ExitBlock)
+fn block_inputs<H: HugrView>(hugr: &H, n: H::Node) -> TypeRow {
+    match hugr.get_optype(n) {
+        OpType::DataflowBlock(db) => db.dataflow_input(),
+        OpType::ExitBlock(eb) => eb.dataflow_input(),
+        op => panic!("Expected DataflowBlock/ExitBlock for {n:?}, got: {op:?}"),
+    }
+    .clone()
+}
+
+fn loop_blocks<H: HugrView>(
+    hugr: &H,
+    loop_header: H::Node,
+    backedges: &impl Path<H::Node>,
+) -> HashSet<H::Node> {
+    let mut blocks = HashSet::new();
+    let mut queue = VecDeque::from_iter(backedges.leaves().map(|((node, _), _)| node));
+    while let Some(n) = queue.pop_front() {
+        if !blocks.insert(n) || n == loop_header {
+            continue;
+        }
+        queue.extend(hugr.input_neighbours(n));
+    }
+    blocks
+}
+
+/// Makes, inside the parent of `old_loop_node` (parent should be a CFG),
+/// a new basic block, containing a TailLoop, containing a CFG,
+/// into two `old_loop_node` is moved (becoming the entry block).
+///
+/// Return an array, in outside-to-in order, of:
+/// * the new (containing) [DataflowBlock]
+/// * the new [CFG],
+/// * the `continue` and `exit` tagging nodes - both of which jump to:
+/// * the new CFG's [ExitBlock]
+fn make_inner_cfg<H: HugrMut>(
+    hugr: &mut H,
+    old_loop_node: H::Node,
+    exit_type_rows: Vec<TypeRow>,
+) -> [H::Node; 5] {
+    let header_inputs = hugr
+        .get_optype(old_loop_node)
+        .as_dataflow_block()
+        .unwrap()
+        .inputs
+        .clone();
+    let ([loop_block, l_in, l_out], exit_sum_row, loop_pred) =
+        match exit_type_rows.into_iter().exactly_one() {
+            Ok(r) => {
+                let l @ [loop_block, _, _] = create_with_io(
+                    hugr,
+                    old_loop_node,
+                    DataflowBlock {
+                        inputs: header_inputs.clone(),
+                        other_outputs: r.clone(),
+                        sum_rows: vec![TypeRow::new()],
+                    },
+                );
+                let loop_pred =
+                    hugr.add_node_with_parent(loop_block, Tag::new(0, vec![TypeRow::new()]));
+                (l, r, Some((loop_pred, 0.into())))
+            }
+            Err(e) => {
+                let exit_type_rows = e.collect_vec();
+                (
+                    create_with_io(
+                        hugr,
+                        old_loop_node,
+                        DataflowBlock {
+                            inputs: header_inputs.clone(),
+                            other_outputs: TypeRow::new(),
+                            sum_rows: exit_type_rows.clone(),
+                        },
+                    ),
+                    TypeRow::from([Type::new_sum(exit_type_rows.clone())]),
+                    None,
+                )
+            }
+        };
+    let [tail_loop, t_in, t_out] = create_with_io(
+        hugr,
+        l_out,
+        TailLoop {
+            just_inputs: header_inputs.clone(),
+            just_outputs: exit_sum_row.clone(),
+            rest: TypeRow::new(),
+        },
+    );
+    wire_all(hugr, l_in, tail_loop);
+    wire_all_to(
+        hugr,
+        loop_pred
+            .into_iter()
+            .chain(hugr.node_outputs(tail_loop).map(|p| (tail_loop, p)))
+            .collect(),
+        l_out,
+    );
+    let exit_or_continue_rows = BTreeMap::from([
+        (TailLoop::CONTINUE_TAG, header_inputs.clone()),
+        (TailLoop::BREAK_TAG, exit_sum_row.clone()),
+    ])
+    .into_values()
+    .collect::<Vec<_>>();
+    let exit_or_continue_row = TypeRow::from([Type::new_sum(exit_or_continue_rows.clone())]);
+    let inner_cfg = hugr.add_node_with_parent(
+        tail_loop,
+        CFG {
+            signature: Signature::new(header_inputs.clone(), exit_or_continue_row.clone()),
+        },
+    );
+    wire_all(hugr, t_in, inner_cfg);
+    wire_all(hugr, inner_cfg, t_out);
+    hugr.set_parent(old_loop_node, inner_cfg);
+    let exit_block = hugr.add_node_with_parent(
+        inner_cfg,
+        ExitBlock {
+            cfg_outputs: exit_or_continue_row.clone(),
+        },
+    );
+    let continue_block = tag_block(
+        hugr,
+        exit_block,
+        TailLoop::CONTINUE_TAG,
+        exit_or_continue_rows.clone(),
+    );
+    let break_block = tag_block(hugr, exit_block, TailLoop::BREAK_TAG, exit_or_continue_rows);
+
+    hugr.connect(continue_block, 0, exit_block, 0);
+    hugr.connect(break_block, 0, exit_block, 0);
+
+    [
+        loop_block,
+        inner_cfg,
+        continue_block,
+        break_block,
+        exit_block,
+    ]
+}
+
+fn create_with_io<H: HugrMut>(h: &mut H, after: H::Node, op: impl Into<OpType>) -> [H::Node; 3] {
+    let op = op.into();
+    let Signature { input, output } = op.inner_function_type().unwrap().into_owned();
+    let n = h.add_node_after(after, op);
+    let i = h.add_node_with_parent(n, Input { types: input });
+    let o = h.add_node_with_parent(n, Output { types: output });
+    [n, i, o]
+}
+
+fn wire_all<H: HugrMut>(h: &mut H, src_node: H::Node, tgt_node: H::Node) {
+    wire_all_to(
+        h,
+        h.node_outputs(src_node).map(|p| (src_node, p)).collect(),
+        tgt_node,
+    );
+}
+
+fn wire_all_to<H: HugrMut>(h: &mut H, outports: Vec<(H::Node, OutgoingPort)>, tgt_node: H::Node) {
+    let inports = h.node_inputs(tgt_node).collect::<Vec<_>>();
+    for ((src_node, src_p), inport) in outports.into_iter().zip_eq(inports.iter()) {
+        h.connect(src_node, src_p, tgt_node, *inport);
+    }
+}
+
+fn tag_block<H: HugrMut>(hugr: &mut H, after: H::Node, tag: usize, rows: Vec<TypeRow>) -> H::Node {
+    let [bb, i, o] = create_with_io(
+        hugr,
+        after,
+        DataflowBlock {
+            inputs: rows[tag].clone(),
+            other_outputs: TypeRow::from([Type::new_sum(rows.clone())]),
+            sum_rows: vec![TypeRow::new()],
+        },
+    );
+    let pred = hugr.add_node_with_parent(bb, Tag::new(0, vec![TypeRow::new()]));
+    hugr.connect(pred, 0, o, 0);
+    let tag = hugr.add_node_with_parent(bb, Tag::new(tag, rows.clone()));
+    wire_all(hugr, i, tag);
+    hugr.connect(tag, 0, o, 1);
+    bb
+}
+
+/// Inserts nodes into the dominator tree at the lowest common ancestor of their predecessors.
+///
+/// Takes account of the predecessors potentially including other nodes amongst those to be inserted.
+///
+/// TODO however if one node to be inserted *dominates* another, this will insert the two
+/// alongside each other, rather than as children. This could occur in a single-exit loop
+/// where the block tagging "which exit" dominates the block tagging "exit not continue".
+fn insert_at_lca<N: HugrNode, P: Path<N>>(
+    dtn: DomTreeWithBackedges<N, P>,
+    hugr: &impl HugrView<Node = N>,
+    insertees: HashSet<N>,
+) -> DomTreeWithBackedges<N, P> {
+    if insertees.is_empty() {
+        return dtn;
+    }
+
+    fn single_successor_max1<H: HugrView>(hugr: &H, node: H::Node) -> Option<H::Node> {
+        let outs = hugr
+            .node_outputs(node)
+            .at_most_one()
+            .ok()
+            .expect("Only for tag blocks (1 successor) or ExitBlock (0)");
+        outs.map(|p| hugr.single_linked_input(node, p).unwrap().0)
+    }
+
+    // Let a `user` be either dtn.node (this node directly) or a child.node (meaning
+    // *somewhere* beneath that child). Each insertee should be positioned at the LCA
+    // of its users.
+    let insertee_to_users = hugr
+        .output_neighbours(dtn.node)
+        .map(|tgt| (dtn.node, tgt))
+        .chain(dtn.children.iter().flat_map(|(_gp, child)| {
+            leaf_targets::<_, P>(&child.exit_edges, hugr).map(|tgt| (child.node, tgt))
+        }))
+        .flat_map(|(user, insertee)| {
+            // if this DTN, or a child, uses the insertee, it also needs any successor thereof
+            // (thus, successor insertees will be inserted in the LCA of their predecessors)
+            successors(insertees.contains(&insertee).then_some(insertee), |n| {
+                single_successor_max1(hugr, *n).filter(|n| insertees.contains(n))
+            })
+            .map(move |n| (n, user))
+        })
+        .into_group_map();
+
+    let mut owned_insertees = HashMap::<N, HashSet<N>>::new();
+    for (insertee, users) in insertee_to_users {
+        let ancestor = users.into_iter().exactly_one().ok().unwrap_or(dtn.node);
+        owned_insertees
+            .entry(ancestor)
+            .or_default()
+            .insert(insertee);
+    }
+    let new_root_children = {
+        let mut cands = owned_insertees.remove(&dtn.node).unwrap_or_default();
+        // Put in order: any new child that is a successor of another, must come after it.
+        let mut reverse_ordered = Vec::new();
+        while let Some(&n) = cands.iter().next() {
+            cands.remove(&n);
+            // we need to push successors onto reverse-ordered first (when we reverse, will be after).
+            // The double-reverse is essential so that multiple nodes with the same successor don't end up
+            // with the successor inbetween them.
+            let mut succs = successors(Some(n), |n| {
+                single_successor_max1(hugr, *n).filter(|node| cands.remove(node))
+            })
+            .collect::<Vec<_>>();
+            succs.reverse();
+            reverse_ordered.extend(succs)
+        }
+        reverse_ordered.reverse(); // now misnamed ;)
+        reverse_ordered.into_iter().map(|node| DomTreeNode {
+            node,
+            children: Vec::new(),
+            exit_edges: if hugr.get_optype(node).is_dataflow_block() {
+                P::new_edge(node, 0.into()).into()
+            } else {
+                P::OptPath::default()
+            },
+            loop_: P::OptPath::default(),
+        })
+    };
+    let children = dtn
+        .children
+        .into_iter()
+        .map(|(_gp, child)| {
+            let blocks = owned_insertees.remove(&child.node).unwrap_or_default();
+            insert_at_lca(child, hugr, blocks)
+        })
+        .chain(new_root_children)
+        .collect::<Vec<_>>();
+    DomTreeWithBackedges::new(dtn.node, children, hugr)
+}
+
+#[cfg(test)]
+mod test {
+    use hugr::{Hugr, HugrView, Node, envelope::EnvelopeConfig};
+    use itertools::Itertools;
+    use rstest::rstest;
+    use std::{fs::File, io::BufReader};
+
+    use super::nest_loop;
+    use crate::passes::cfg::dom_tree::{DomTreeWithBackedges, EdgeSources};
+    use crate::passes::cfg::gating_path::GatingPath;
+
+    fn gating_path() -> GatingPath<Node> {
+        GatingPath::Always(Node::from(portgraph::NodeIndex::new(0)), 0.into())
+    }
+
+    #[rstest]
+    #[case("../../test_files/cfgs/doubler.hugr")]
+    #[case("../../test_files/cfgs/doubler_indirect_minopt.hugr")]
+    #[case("../../test_files/cfgs/shortcircuit_if.hugr")]
+    fn non_loop<P: super::Path<Node>>(
+        #[values(gating_path(), EdgeSources::new())] _unused: P,
+        #[case] fname: impl AsRef<std::path::Path>,
+    ) {
+        let reader = BufReader::new(File::open(fname).unwrap());
+        let backup = Hugr::load(reader, None).unwrap();
+        let mut h = backup.clone();
+        let cfgs = h
+            .nodes()
+            .filter(|n| h.get_optype(*n).is_cfg())
+            .collect_vec();
+        for n in cfgs {
+            let dtn = DomTreeWithBackedges::<Node, P>::new_for_cfg(&h, n);
+            nest_loop(dtn, &mut h);
+        }
+        assert_eq!(h, backup); // Did nothing
+    }
+
+    #[rstest]
+    #[case("../../test_files/cfgs/tierkreis_loop.hugr")]
+    #[case("../../test_files/cfgs/multi_exit_loop.hugr")]
+    #[case("../../test_files/cfgs/nested_loop.hugr")]
+    #[case("../../test_files/cfgs/early_return.hugr")]
+    #[case("../../test_files/cfgs/test_exec_array_loop.hugr")]
+    #[case("../../test_files/cfgs/test_control_flow.hugr")]
+    fn tierkreis_loop<P: super::Path<Node>>(
+        #[values(gating_path(), EdgeSources::new())] _unused: P,
+        #[case] fname: impl AsRef<std::path::Path>,
+    ) {
+        use crate::passes::{ComposablePass, Normalize};
+
+        let outfile = fname.as_ref().with_extension("nested.hugr");
+        let outfile_m = fname.as_ref().with_extension("nested.merged.hugr");
+        let reader = BufReader::new(File::open(fname).unwrap());
+        let backup = Hugr::load(reader, None).unwrap();
+        let mut h = backup.clone();
+        let cfgs = h
+            .nodes()
+            .filter(|n| h.get_optype(*n).is_cfg())
+            .collect_vec();
+        eprintln!("Found {} cfgs", cfgs.len());
+        for n in cfgs {
+            eprintln!("Processing cfg node {}", n);
+            let dtn = DomTreeWithBackedges::<Node, P>::new_for_cfg(&h, n);
+            nest_loop(dtn, &mut h);
+        }
+        h.validate().unwrap();
+        let f = File::create(outfile).unwrap();
+        h.store(f, EnvelopeConfig::default()).unwrap();
+        Normalize::default().run(&mut h).unwrap();
+        let f_m = File::create(outfile_m).unwrap();
+        h.store(f_m, EnvelopeConfig::default()).unwrap();
+    }
+}

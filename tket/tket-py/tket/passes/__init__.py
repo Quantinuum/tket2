@@ -160,6 +160,7 @@ class PytketHugrPass(ComposablePass):
 @dataclass
 class Normalize(ComposablePass):
     resolve_modifiers: bool = True
+    remove_cfg_cycles: bool = True
     simplify_cfgs: bool = True
     remove_tuple_untuple: bool = True
     constant_folding: bool = True
@@ -176,6 +177,7 @@ class Normalize(ComposablePass):
 
     Parameters:
     - resolve_modifiers: Whether to resolve modifier operations.
+    - remove_cfg_cycles: Whether to turn cycles in the CFG into `TailLoop`s.
     - simplify_cfgs: Whether to simplify CFG control flow.
     - remove_tuple_untuple: Whether to remove tuple/untuple operations.
     - constant_folding: Whether to constant fold the program.
@@ -225,6 +227,7 @@ class Normalize(ComposablePass):
         _passes.normalize_guppy(
             program._inner,
             resolve_modifiers=self.resolve_modifiers,
+            remove_cfg_cycles=self.remove_cfg_cycles,
             simplify_cfgs=self.simplify_cfgs,
             remove_tuple_untuple=self.remove_tuple_untuple,
             constant_folding=self.constant_folding,
