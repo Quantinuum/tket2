@@ -35,5 +35,6 @@ def unknown_rotations(q: qubit) -> None:
     rx(q, angle(other_rotation))
 
 
+# Output unoptimized Hugr so we can see the effect of optimization during test.
 program = unknown_rotations.with_minimal_opt().compile_function()
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())

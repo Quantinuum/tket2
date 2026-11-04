@@ -42,5 +42,6 @@ def f(qs: array[qubit, 4] @ owned) -> array[qubit, 4]:
     return qs
 
 
+# Output unoptimized Hugr so we can see the effect of optimization during test.
 program = main.with_minimal_opt().compile()
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
