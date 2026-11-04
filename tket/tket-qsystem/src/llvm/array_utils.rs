@@ -36,6 +36,13 @@ pub trait ArrayLowering {
         length: u32,
     ) -> Result<PointerValue<'c>>;
 
+    /// Releases the backing allocation of a consumed array value.
+    fn free_array<'c, H: HugrView<Node = Node>>(
+        &self,
+        ctx: &mut EmitFuncContext<'c, '_, H>,
+        val: BasicValueEnum<'c>,
+    ) -> Result<()>;
+
     /// Turns a pointer to the first array element into an array value in the given lowering.
     fn array_from_ptr<'c, H: HugrView<Node = Node>>(
         &self,
@@ -76,6 +83,15 @@ impl<ACG: array::ArrayCodegen> HeapArrayLowering<ACG> {
 impl<ACG: array::ArrayCodegen + Clone> ArrayLowering for HeapArrayLowering<ACG> {
     fn codegen_extension(&self) -> impl CodegenExtension {
         array::ArrayCodegenExtension::new(self.0.clone())
+    }
+
+    fn free_array<'c, H: HugrView<Node = Node>>(
+        &self,
+        ctx: &mut EmitFuncContext<'c, '_, H>,
+        val: BasicValueEnum<'c>,
+    ) -> Result<()> {
+        let (base, _) = decompose_array_fat_pointer(ctx.builder(), val)?;
+        self.0.emit_free_array(ctx, base)
     }
 
     fn array_to_ptr<'c>(

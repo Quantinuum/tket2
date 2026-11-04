@@ -134,7 +134,7 @@ impl<'c, H: HugrView<Node = Node>, AL: ArrayLowering + Clone> ResultEmitter<'c, 
         &self,
         args: &EmitOpArgs<'c, '_, ExtensionOp, H>,
         type_tag: impl AsRef<str>,
-    ) -> Result<(BasicValueEnum<'_>, IntValue<'_>)> {
+    ) -> Result<(BasicValueEnum<'c>, IntValue<'c>)> {
         let type_tag = type_tag.as_ref();
         let result_op = ResultOp::from_extension_op(args.node().as_ref())?;
 
@@ -158,8 +158,8 @@ impl<'c, H: HugrView<Node = Node>, AL: ArrayLowering + Clone> ResultEmitter<'c, 
     }
 
     fn build_print_array_call(
-        &self,
-        val: BasicValueEnum,
+        &mut self,
+        val: BasicValueEnum<'c>,
         op: &ResultOp,
         data_type: &ElemType,
         tag_ptr: BasicValueEnum,
@@ -184,11 +184,12 @@ impl<'c, H: HugrView<Node = Node>, AL: ArrayLowering + Clone> ResultEmitter<'c, 
             &[tag_ptr.into(), tag_len.into(), array_ptr.into()],
             "",
         )?;
+        self.1.free_array(self.0, val)?;
         Result::Ok(())
     }
 
     /// Function to help lower the tket result extension.
-    fn emit(&self, args: EmitOpArgs<'c, '_, ExtensionOp, H>, op: &ResultOp) -> Result<()> {
+    fn emit(&mut self, args: EmitOpArgs<'c, '_, ExtensionOp, H>, op: &ResultOp) -> Result<()> {
         let print_fn = self.get_func_print(op)?;
         match op.result_op {
             ResultOpDef::Bool => {
@@ -284,18 +285,172 @@ impl<'c, H: HugrView<Node = Node>, AL: ArrayLowering + Clone> ResultEmitter<'c, 
 
 #[cfg(test)]
 mod test {
+    use std::ffi::c_void;
+    use std::sync::Mutex;
+
     use crate::extension::result::ResultOp;
     use crate::llvm::array_utils::DEFAULT_HEAP_ARRAY_LOWERING;
 
     use hugr::extension::simple_op::MakeRegisteredOp;
     use hugr::llvm::check_emission;
     use hugr::llvm::test::TestContext;
+    use hugr::llvm::test::exec_ctx;
     use hugr::llvm::test::llvm_ctx;
     use hugr::llvm::test::single_op_hugr;
 
     use crate::llvm::prelude::QISPreludeCodegen;
 
     use rstest::rstest;
+
+    #[derive(Default)]
+    struct AllocationAccounting {
+        outstanding: Vec<usize>,
+        allocations: usize,
+        invalid_frees: usize,
+        prints: usize,
+        invalid_prints: usize,
+    }
+
+    static ACCOUNTING: Mutex<AllocationAccounting> = Mutex::new(AllocationAccounting {
+        outstanding: Vec::new(),
+        allocations: 0,
+        invalid_frees: 0,
+        prints: 0,
+        invalid_prints: 0,
+    });
+
+    unsafe extern "C" {
+        fn malloc(size: usize) -> *mut c_void;
+        fn free(ptr: *mut c_void);
+    }
+
+    unsafe extern "C" fn counted_alloc(size: usize) -> *mut c_void {
+        let ptr = unsafe { malloc(size) };
+        let mut accounting = ACCOUNTING.lock().unwrap();
+        accounting.allocations += 1;
+        accounting.outstanding.push(ptr as usize);
+        ptr
+    }
+
+    unsafe extern "C" fn counted_free(ptr: *mut c_void) {
+        let mut accounting = ACCOUNTING.lock().unwrap();
+        if let Some(i) = accounting
+            .outstanding
+            .iter()
+            .position(|&p| p == ptr as usize)
+        {
+            accounting.outstanding.swap_remove(i);
+            unsafe { free(ptr) };
+        } else {
+            accounting.invalid_frees += 1;
+        }
+    }
+
+    #[repr(C, packed)]
+    struct TestResultArray {
+        rows: u32,
+        columns: u32,
+        values: *const i64,
+        mask: *const u8,
+    }
+
+    unsafe extern "C" fn counted_print(_tag: *const u8, _len: u64, array: *const TestResultArray) {
+        let values = unsafe { (*array).values };
+        let mut accounting = ACCOUNTING.lock().unwrap();
+        let is_owned = accounting
+            .outstanding
+            .iter()
+            .any(|&base| values as usize == base || values as usize == base + size_of::<i64>());
+        if !is_owned || unsafe { *values } != 7 {
+            accounting.invalid_prints += 1;
+        }
+        accounting.prints += 1;
+    }
+
+    #[rstest]
+    fn exec_result_array_releases_allocation(mut exec_ctx: TestContext) {
+        use hugr::builder::{Dataflow, DataflowHugr};
+        use hugr::extension::ExtensionRegistry;
+        use hugr::extension::prelude::{UnwrapBuilder as _, option_type};
+        use hugr::llvm::emit::test::{Emission, SimpleHugrConfig, TEST_EMIT_DEBUG};
+        use hugr::llvm::utils::fat::FatExt as _;
+        use hugr::std_extensions::arithmetic::int_types::{self, ConstInt, int_type};
+        use hugr::std_extensions::collections::array::{self, ArrayOpBuilder};
+
+        let registry = ExtensionRegistry::new([
+            hugr::extension::prelude::PRELUDE.to_owned(),
+            int_types::EXTENSION.to_owned(),
+            array::EXTENSION.to_owned(),
+            crate::extension::result::EXTENSION.to_owned(),
+        ]);
+        let hugr = SimpleHugrConfig::new()
+            .with_extensions(registry)
+            .finish(|mut b| {
+                let value = b.add_load_value(ConstInt::new_s(6, 7).unwrap());
+                let array = b.add_new_array(int_type(6), [value]).unwrap();
+                b.add_dataflow_op(ResultOp::new_int("result", 6).array_op(1), [array])
+                    .unwrap();
+                let first = b.add_load_value(ConstInt::new_s(6, 3).unwrap());
+                let array = b.add_new_array(int_type(6), [first, value]).unwrap();
+                let popped = b.add_array_pop_left(int_type(6), 2, array).unwrap();
+                let [_, tail] = b
+                    .build_unwrap_sum(
+                        1,
+                        option_type([int_type(6), array::array_type(1, int_type(6))]),
+                        popped,
+                    )
+                    .unwrap();
+                b.add_dataflow_op(ResultOp::new_int("tail", 6).array_op(1), [tail])
+                    .unwrap();
+                b.finish_hugr_with_outputs([]).unwrap()
+            });
+        exec_ctx.add_extensions(|cge| {
+            cge.add_default_prelude_extensions()
+                .add_default_int_extensions()
+                .add_extension(DEFAULT_HEAP_ARRAY_LOWERING.codegen_extension())
+                .add_extension(ResultsCodegenExtension::new(DEFAULT_HEAP_ARRAY_LOWERING))
+        });
+        let emission = Emission::emit_hugr(
+            hugr.fat_root().unwrap(),
+            exec_ctx.get_emit_hugr(),
+            TEST_EMIT_DEBUG,
+        )
+        .unwrap();
+        emission.verify().unwrap();
+        let module = emission.module();
+        module
+            .get_function("main")
+            .unwrap()
+            .set_linkage(inkwell::module::Linkage::External);
+        let engine = module
+            .create_jit_execution_engine(inkwell::OptimizationLevel::None)
+            .unwrap();
+        engine.add_global_mapping(
+            &module.get_function("malloc").unwrap(),
+            counted_alloc as *const () as usize,
+        );
+        if let Some(free_fn) = module.get_function("free") {
+            engine.add_global_mapping(&free_fn, counted_free as *const () as usize);
+        }
+        engine.add_global_mapping(
+            &module.get_function("print_int_arr").unwrap(),
+            counted_print as *const () as usize,
+        );
+        let run: unsafe extern "C" fn() =
+            unsafe { engine.get_function("main").unwrap().into_raw() };
+        for _ in 0..100 {
+            unsafe { run() };
+        }
+        let accounting = ACCOUNTING.lock().unwrap();
+        assert_eq!(accounting.allocations, 200);
+        assert_eq!(accounting.prints, 200);
+        assert_eq!(accounting.invalid_prints, 0);
+        assert_eq!(accounting.invalid_frees, 0);
+        assert!(
+            accounting.outstanding.is_empty(),
+            "result array allocations leaked"
+        );
+    }
 
     use super::*;
 
