@@ -1,6 +1,6 @@
 [package]
 name = "tk-pg-bitpacked"
-version = "0.1.1"
+version = "0.1.2"
 description = "Clifford conjugation kernels for packed Pauli representations"
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -17,7 +17,7 @@ default = []
 unstable_simd = []
 
 [dependencies]
-tk-pg-core = { path = "../../tk-pg-core", version = "0.1.1" }
+tk-pg-core = { path = "../../tk-pg-core", version = "0.1.2" }
 rand = { workspace = true }
 
 
