@@ -8,7 +8,7 @@ use hugr::core::{HugrNode, IncomingPort, OutgoingPort};
 use hugr::hugr::hugrmut::HugrMut;
 use hugr::ops::handle::NodeHandle;
 use hugr::ops::{OpParent, OpTag, OpTrait};
-use hugr::types::EdgeKind;
+use hugr::types::{EdgeKind, Type};
 use hugr::{Hugr, HugrView, Node};
 use hugr_core::hugr::internal::HugrMutInternals;
 use indexmap::IndexMap;
@@ -45,7 +45,7 @@ pub struct EncodedCircuit<Node: HugrNode> {
     ///
     /// Regions are ordered as a depth-first pre-order; segments retain their
     /// execution order within each region.
-    circuits: IndexMap<Node, EncodedCircuitInfo>,
+    circuits: IndexMap<Node, EncodedCircuitInfo<Node>>,
     /// Sets of subgraphs in the HUGR that have been encoded as opaque barriers
     /// in the pytket circuit.
     ///
@@ -65,7 +65,7 @@ pub struct EncodedCircuitId<Node> {
 
 /// Information stored about a pytket circuit encoded from a HUGR region.
 #[derive(Debug, Default, Clone)]
-pub(super) struct EncodedCircuitInfo {
+pub(super) struct EncodedCircuitInfo<N> {
     /// Runs of pytket commands encoded from the region.
     pub serial_circuits: Vec<SerialCircuit>,
     /// Opaque subgraphs that must be restored before, between, or after the
@@ -90,9 +90,24 @@ pub(super) struct EncodedCircuitInfo {
     pub output_qubits: Vec<tket_json_rs::register::ElementId>,
     /// List of bit registers seen at the output of the encoded region.
     pub output_bits: Vec<tket_json_rs::register::ElementId>,
+    /// Encoded values with consumers in nested dataflow regions.
+    pub nonlocal_outputs: Vec<NonlocalOutput<N>>,
 }
 
-impl EncodedCircuitInfo {
+/// An encoded value used in nested dataflow regions.
+///
+/// The target ports must be reconnected to the decoded value before replacing
+/// the original region's contents.
+#[derive(Debug, Clone)]
+pub(super) struct NonlocalOutput<N> {
+    pub targets: Vec<(N, IncomingPort)>,
+    pub ty: Type,
+    pub qubits: Vec<tket_json_rs::register::ElementId>,
+    pub bits: Vec<tket_json_rs::register::ElementId>,
+    pub params: Vec<String>,
+}
+
+impl<N> EncodedCircuitInfo<N> {
     /// Initialize a pytket circuit for a decoder
     /// for every segment in this region.
     ///
@@ -293,6 +308,7 @@ impl EncodedCircuit<Node> {
                     .last()
                     .expect("encoded region has a trailing boundary"),
             )?;
+            decoder.reconnect_nonlocal_outputs(&encoded.nonlocal_outputs)?;
             let decoded_node = decoder.finish(Some(encoded))?.node();
 
             // Move any non-local edges from originating from the old input node.
