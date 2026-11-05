@@ -36,10 +36,12 @@ pub trait ArrayLowering {
         length: u32,
     ) -> Result<PointerValue<'c>>;
 
-    /// Releases the backing allocation of a consumed array value.
+    /// Releases the backing allocation owned by a consumed array value.
     ///
-    /// Implementations must free the original allocation, even if the value
-    /// represents a slice with a nonzero offset.
+    /// This releases the allocation made by [`ArrayLowering::alloc_array`]
+    /// or another producer of an owned array. Implementations must free its
+    /// base pointer, which may differ from the first-element pointer returned
+    /// by [`ArrayLowering::array_to_ptr`] when the array has a nonzero offset.
     fn free_array<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
@@ -93,7 +95,10 @@ impl<ACG: array::ArrayCodegen + Clone> ArrayLowering for HeapArrayLowering<ACG> 
         ctx: &mut EmitFuncContext<'c, '_, H>,
         val: BasicValueEnum<'c>,
     ) -> Result<()> {
-        let (base, _) = decompose_array_fat_pointer(ctx.builder(), val)?;
+        let base = ctx
+            .builder()
+            .build_extract_value(val.into_struct_value(), 0, "array_ptr")?
+            .into_pointer_value();
         self.0.emit_free_array(ctx, base)
     }
 

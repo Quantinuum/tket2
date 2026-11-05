@@ -324,7 +324,7 @@ mod test {
         fn free(ptr: *mut c_void);
     }
 
-    unsafe extern "C" fn counted_alloc(size: usize) -> *mut c_void {
+    unsafe extern "C" fn counted_malloc(size: usize) -> *mut c_void {
         let ptr = unsafe { malloc(size) };
         let mut accounting = ACCOUNTING.lock().unwrap();
         accounting.allocations += 1;
@@ -427,7 +427,7 @@ mod test {
             .unwrap();
         engine.add_global_mapping(
             &module.get_function("malloc").unwrap(),
-            counted_alloc as *const () as usize,
+            counted_malloc as *const () as usize,
         );
         if let Some(free_fn) = module.get_function("free") {
             engine.add_global_mapping(&free_fn, counted_free as *const () as usize);
