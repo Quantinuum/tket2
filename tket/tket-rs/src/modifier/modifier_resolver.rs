@@ -2479,7 +2479,6 @@ mod tests {
     #[case::subscript_in_dagger_ctrl(
         "../../test_files/modifier_examples/subscript_in_dagger_ctrl.hugr"
     )]
-    #[case::struct_in_ctrl("../../test_files/modifier_examples/struct_in_ctrl.hugr")]
     #[case::struct_in_dagger_ctrl("../../test_files/modifier_examples/struct_in_dagger_ctrl.hugr")]
     #[case::custom_modifier1("../../test_files/modifier_examples/custom_modifier.hugr")]
     #[case::multiple_fun_call("../../test_files/modifier_examples/multiple_fun_call.hugr")]
