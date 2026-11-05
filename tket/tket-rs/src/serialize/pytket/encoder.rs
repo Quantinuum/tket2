@@ -1,5 +1,6 @@
 //! Intermediate structure for encoding Hugrs into [`SerialCircuit`]s.
 
+mod nonlocal;
 mod unit_generator;
 mod unsupported_tracker;
 mod value_tracker;
@@ -283,7 +284,8 @@ impl<H: HugrView> PytketEncoderContext<H> {
         mut self,
         hugr: &H,
         region: H::Node,
-    ) -> Result<(EncodedCircuitInfo, OpaqueSubgraphs<H::Node>), PytketEncodeError<H::Node>> {
+    ) -> Result<(EncodedCircuitInfo<H::Node>, OpaqueSubgraphs<H::Node>), PytketEncodeError<H::Node>>
+    {
         // Add any remaining unsupported nodes
         while !self.unsupported.is_empty() {
             let node = self.unsupported.iter().next().unwrap();
@@ -291,6 +293,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
             self.emit_unsupported(&opaque_subgraphs, hugr)?;
         }
 
+        let nonlocal_outputs = self.collect_nonlocal_outputs(hugr, region);
         let tracker_result = self.values.finish(hugr, region)?;
         let (mut command_runs, mut boundaries) = self.segments.finish();
         if command_runs.is_empty() {
@@ -338,6 +341,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
             straight_through_wires: tracker_result.straight_through_wires,
             output_qubits: tracker_result.qubit_outputs,
             output_bits: tracker_result.bit_outputs,
+            nonlocal_outputs,
         };
 
         Ok((info, self.opaque_subgraphs))

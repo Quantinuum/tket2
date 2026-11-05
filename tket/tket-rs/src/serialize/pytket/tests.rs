@@ -1,5 +1,7 @@
 //! General tests.
 
+mod nonlocal;
+
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::io::BufReader;
