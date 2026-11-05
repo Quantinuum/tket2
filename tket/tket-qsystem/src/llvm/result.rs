@@ -165,7 +165,6 @@ impl<'c, H: HugrView<Node = Node>, AL: ArrayLowering + Clone> ResultEmitter<'c, 
         tag_ptr: BasicValueEnum,
         tag_len: IntValue,
     ) -> Result<()> {
-        // TODO update to return array after https://github.com/quantinuum/tket2/issues/922
         let ResultArgs::Array(_, length) = op.args else {
             bail!("Expected array argument")
         };
@@ -184,6 +183,8 @@ impl<'c, H: HugrView<Node = Node>, AL: ArrayLowering + Clone> ResultEmitter<'c, 
             &[tag_ptr.into(), tag_len.into(), array_ptr.into()],
             "",
         )?;
+        // TODO(https://github.com/Quantinuum/tket2/issues/922): Return ownership
+        // instead of freeing when result operations return the input array.
         self.1.free_array(self.0, val)?;
         Result::Ok(())
     }
@@ -285,6 +286,7 @@ impl<'c, H: HugrView<Node = Node>, AL: ArrayLowering + Clone> ResultEmitter<'c, 
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use std::ffi::c_void;
     use std::sync::Mutex;
 
@@ -451,8 +453,6 @@ mod test {
             "result array allocations leaked"
         );
     }
-
-    use super::*;
 
     #[rstest]
     #[case::bool(1, ResultOp::new_bool("test_bool"), &DEFAULT_HEAP_ARRAY_LOWERING)]
