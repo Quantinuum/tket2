@@ -36,6 +36,18 @@ pub trait ArrayLowering {
         length: u32,
     ) -> Result<PointerValue<'c>>;
 
+    /// Releases the backing allocation owned by a consumed array value.
+    ///
+    /// This releases the allocation made by [`ArrayLowering::alloc_array`]
+    /// or another producer of an owned array. Implementations must free its
+    /// base pointer, which may differ from the first-element pointer returned
+    /// by [`ArrayLowering::array_to_ptr`] when the array has a nonzero offset.
+    fn free_array<'c, H: HugrView<Node = Node>>(
+        &self,
+        ctx: &mut EmitFuncContext<'c, '_, H>,
+        val: BasicValueEnum<'c>,
+    ) -> Result<()>;
+
     /// Turns a pointer to the first array element into an array value in the given lowering.
     fn array_from_ptr<'c, H: HugrView<Node = Node>>(
         &self,
@@ -76,6 +88,19 @@ impl<ACG: array::ArrayCodegen> HeapArrayLowering<ACG> {
 impl<ACG: array::ArrayCodegen + Clone> ArrayLowering for HeapArrayLowering<ACG> {
     fn codegen_extension(&self) -> impl CodegenExtension {
         array::ArrayCodegenExtension::new(self.0.clone())
+    }
+
+    fn free_array<'c, H: HugrView<Node = Node>>(
+        &self,
+        ctx: &mut EmitFuncContext<'c, '_, H>,
+        val: BasicValueEnum<'c>,
+    ) -> Result<()> {
+        let array = StructValue::try_from(val)
+            .map_err(|_| anyhow::anyhow!("Expected an array fat pointer"))?;
+        let base =
+            PointerValue::try_from(ctx.builder().build_extract_value(array, 0, "array_ptr")?)
+                .map_err(|_| anyhow::anyhow!("Expected an array base pointer"))?;
+        self.0.emit_free_array(ctx, base)
     }
 
     fn array_to_ptr<'c>(
@@ -375,5 +400,23 @@ mod tests {
             .array_from_ptr(&mut emit_ctx, new_array_ptr, elem_ty, size)
             .unwrap();
         assert_eq!(array.get_type(), new_array.get_type());
+    }
+
+    #[test]
+    fn test_free_array_rejects_non_struct() {
+        let llvm_ctx = llvm_ctx(-1);
+        let mod_ctx = llvm_ctx.get_emit_module_context();
+        let function_type = mod_ctx.iw_context().void_type().fn_type(&[], false);
+        let function = mod_ctx
+            .module()
+            .add_function("test_function", function_type, None);
+        let mut emit_ctx = EmitFuncContext::new(mod_ctx, function).unwrap();
+        let invalid = emit_ctx.iw_context().i32_type().const_zero().into();
+
+        assert!(
+            DEFAULT_HEAP_ARRAY_LOWERING
+                .free_array(&mut emit_ctx, invalid)
+                .is_err()
+        );
     }
 }
