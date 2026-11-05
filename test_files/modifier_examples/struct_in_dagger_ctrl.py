@@ -31,7 +31,9 @@ def main() -> None:
     c = qubit()
     st = S(qubit())
     h(c)
-    with dagger, control(c):
+    with dagger:
+        use(st)
+    with control(c):
         use(st)
 
     state_result("r", c, st.q)

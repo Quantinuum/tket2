@@ -62,15 +62,10 @@ simple_higher_order_solved:
 	100 -> 0.5+0j
 	111 -> 0-0.5j
 -----
-struct_in_ctrl_solved:
-	00 -> 0.7071+0j
-	10 -> 0.6124+0j
-	11 -> 0-0.3536j
------
 struct_in_dagger_ctrl_solved:
-	00 -> 0.7071+0j
-	10 -> 0.6124+0j
-	11 -> 0.3536+0j
+	00 -> 0.6124+0j
+	01 -> 0.3536+0j
+	10 -> 0.7071+0j
 -----
 subscript_in_dagger_ctrl_solved:
 	0100 -> 0.7071+0j
