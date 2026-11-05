@@ -16,7 +16,7 @@ use thiserror::Error;
 use hugr_core::builder::{
     BuildError, BuildHandle, Container, Dataflow, DataflowHugr, FunctionBuilder,
 };
-use hugr_core::extension::{ExtensionId, OpDef, SignatureError, TypeDef};
+use hugr_core::extension::{ExtensionId, OpDef, SignatureError, TypeDef, Version};
 use hugr_core::hugr::hugrmut::HugrMut;
 use hugr_core::hugr::internal::HugrMutInternals;
 use hugr_core::ops::constant::{OpaqueValue, Sum};
@@ -906,6 +906,8 @@ pub mod handlers;
 #[derive(Clone, Hash, PartialEq, Eq)]
 struct OpHashWrapper {
     op_name: String, // Only because SmolStr not in hugr-passes yet
+    // the replacement pass ignored extension versions and kept replacing the new MeasureFree with itself.
+    extension_version: Version,
     args: Vec<TypeArg>,
 }
 
@@ -913,6 +915,7 @@ impl From<&ExtensionOp> for OpHashWrapper {
     fn from(op: &ExtensionOp) -> Self {
         Self {
             op_name: op.qualified_id().to_string(),
+            extension_version: op.extension_version(),
             args: op.args().to_vec(),
         }
     }
