@@ -127,7 +127,10 @@ use hugr::{
     HugrView, IncomingPort, Node, OutgoingPort, Port, PortIndex, Wire,
     builder::{BuildError, CFGBuilder, Container, Dataflow, SubContainer},
     core::HugrNode,
-    extension::{prelude::qb_t, simple_op::MakeExtensionOp},
+    extension::{
+        prelude::{MakeTuple, UnpackTuple, qb_t},
+        simple_op::MakeExtensionOp,
+    },
     hugr::hugrmut::HugrMut,
     ops::{CFG, Const, OpTrait, OpType},
     std_extensions::collections::array::array_type,
@@ -1158,6 +1161,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             self.forget_node(h, op_node)
         } else if self.modify_array_op(h, op_node, optype, new_dfg)?
             || self.try_array_convert(h, op_node, optype, new_dfg)?
+            || self.modify_tuple_op(h, op_node, optype, new_dfg)?
         {
             Ok(())
         } else if !self.signature_has_quantum_data(&signature) {
@@ -1171,6 +1175,57 @@ impl<N: HugrNode> ModifierResolver<N> {
                 optype.clone(),
             ))
         }
+    }
+
+    /// Try to modify `MakeTuple` / `UnpackTuple` operations carrying qubits.
+    fn modify_tuple_op(
+        &mut self,
+        h: &impl HugrMut<Node = N>,
+        n: N,
+        optype: &OpType,
+        new_dfg: &mut impl Dataflow,
+    ) -> Result<bool, ModifierResolverErrors<N>> {
+        let (row, reversed): (_, OpType) = if let Some(op) = optype.cast::<MakeTuple>() {
+            (op.0.clone(), UnpackTuple::new(op.0).into())
+        } else if let Some(op) = optype.cast::<UnpackTuple>() {
+            (op.0.clone(), MakeTuple::new(op.0).into())
+        } else {
+            // Not a tuple operation, skip.
+            return Ok(false);
+        };
+
+        let num_quantum = row
+            .iter()
+            .filter(|ty| self.qubit_finder.contains_element_type(ty))
+            .count();
+        if num_quantum == 0 {
+            // Take existing classical path instead (`modify_dataflow_op`).
+            return Ok(false);
+        }
+
+        if !self.modifiers.dagger {
+            // Without dagger, just add the node without modification.
+            self.add_node_no_modification(h, n, optype.clone(), new_dfg)?;
+            return Ok(true);
+        }
+
+        if num_quantum != row.len() {
+            // Mixing quantum and classical elements in a tuple under a dagger is not
+            // resolvable, because it isn't clear how you would reserve the order for
+            // quantum elements while keeping it unchanged for classical elements.
+            return Err(ModifierResolverErrors::unresolvable(
+                n,
+                "tuple mixing quantum and classical elements cannot be daggered.",
+                optype.clone(),
+            ));
+        }
+
+        // Under dagger, reverse the tuple operation and all its ports.
+        let node = new_dfg.add_child_node(reversed);
+        for port in h.all_node_ports(n) {
+            self.map_insert(DirWire(n, port), DirWire::new(node, port).reverse())?;
+        }
+        Ok(true)
     }
 
     /// Returns a row with modifier controls in the layout expected by a CFG edge.
@@ -2424,6 +2479,7 @@ mod tests {
     #[case::subscript_in_dagger_ctrl(
         "../../test_files/modifier_examples/subscript_in_dagger_ctrl.hugr"
     )]
+    #[case::struct_in_dagger_ctrl("../../test_files/modifier_examples/struct_in_dagger_ctrl.hugr")]
     #[case::custom_modifier1("../../test_files/modifier_examples/custom_modifier.hugr")]
     #[case::multiple_fun_call("../../test_files/modifier_examples/multiple_fun_call.hugr")]
     #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
