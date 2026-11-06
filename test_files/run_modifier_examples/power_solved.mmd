@@ -16,56 +16,104 @@ graph LR
                     direction LR
                     6["(6) Input"]
                     7["(7) Output"]
-                    10["(10) LoadConstant"]
-                    11["(11) const:custom:u64(4)"]
-                    46["(46) LoadFunction"]
-                    47["(47) CallIndirect"]
-                    14["(14) Tag(Unit)"]
-                    6--"0:1<br>prelude.qubit"-->7
-                    6--"1:1<br>arithmetic.int.types.int"-->47
-                    6--"1:3<br>arithmetic.int.types.int"-->47
-                    10--"0:2<br>arithmetic.int.types.int"-->47
-                    11--"0:0<br>arithmetic.int.types.int"-->10
-                    46--"0:0<br>[arithmetic.int.types.int, arithmetic.int.types.int, arithmetic.int.types.int] -> []"-->47
-                    14--"0:0<br>Unit"-->7
+                    68["(68) LoadFunction"]
+                    69["(69) CallIndirect"]
+                    11["(11) Tag(Unit)"]
+                    6--"0:1<br>prelude.qubit"-->69
+                    6--"1:3<br>arithmetic.int.types.int"-->69
+                    6--"1:4<br>arithmetic.int.types.int"-->69
+                    6--"2:2<br>prelude.qubit"-->69
+                    68--"0:0<br>[prelude.qubit, prelude.qubit, arithmetic.int.types.int, arithmetic.int.types.int] -> [prelude.qubit, prelude.qubit]"-->69
+                    69--"0:1<br>prelude.qubit"-->7
+                    69--"1:2<br>prelude.qubit"-->7
+                    11--"0:0<br>Unit"-->7
                 end
-                15["(15) ExitBlock"]
-                5-."0:0".->15
+                12["(12) ExitBlock"]
+                5-."0:0".->12
             end
             2--"0:0<br>prelude.qubit"-->4
             2--"1:1<br>arithmetic.int.types.int"-->4
+            2--"2:2<br>prelude.qubit"-->4
             4--"0:0<br>prelude.qubit"-->3
+            4--"1:1<br>prelude.qubit"-->3
         end
-        subgraph 31 ["(31) FuncDefn: #quot;__modified____main__.main.__WithBlock__0[P2]#quot;"]
+        subgraph 34 ["(34) FuncDefn: #quot;__modified____main__.main.__WithBlock__0[P1]#quot;"]
             direction LR
-            32["(32) Input"]
-            33["(33) Output"]
-            34["(34) arithmetic.int.imul"]
-            subgraph 35 ["(35) CFG"]
+            44["(44) Input"]
+            45["(45) Output"]
+            46["(46) const:custom:u64(0)"]
+            47["(47) LoadConstant"]
+            48["(48) arithmetic.int.igt_s"]
+            subgraph 49 ["(49) Conditional"]
                 direction LR
-                subgraph 36 ["(36) DataflowBlock"]
+                subgraph 55 ["(55) Case"]
                     direction LR
-                    38["(38) Input"]
-                    39["(39) Output"]
-                    40["(40) Tag(Unit)"]
-                    41["(41) const:custom:u64(1)"]
-                    42["(42) LoadConstant"]
-                    43["(43) arithmetic.int.iu_to_s"]
-                    44["(44) arithmetic.int.iadd"]
-                    45["(45) arithmetic.int.is_to_u"]
-                    38--"0:0<br>arithmetic.int.types.int"-->43
-                    40--"0:0<br>Unit"-->39
-                    41--"0:0<br>arithmetic.int.types.int"-->42
-                    42--"0:1<br>arithmetic.int.types.int"-->44
-                    43--"0:0<br>arithmetic.int.types.int"-->44
-                    44--"0:0<br>arithmetic.int.types.int"-->45
+                    59["(59) Input"]
+                    60["(60) Output"]
                 end
-                37["(37) ExitBlock"]
-                36-."0:0".->37
+                subgraph 56 ["(56) Case"]
+                    direction LR
+                    61["(61) Input"]
+                    62["(62) Output"]
+                end
             end
-            32--"0:0<br>arithmetic.int.types.int"-->35
-            32--"1:0<br>arithmetic.int.types.int"-->34
-            32--"2:1<br>arithmetic.int.types.int"-->34
+            subgraph 51 ["(51) CFG"]
+                direction LR
+                subgraph 57 ["(57) DataflowBlock"]
+                    direction LR
+                    63["(63) Input"]
+                    64["(64) Output"]
+                    65["(65) Tag(Unit)"]
+                    66["(66) prelude.MakeTuple"]
+                    67["(67) Call"]
+                    63--"0:0<br>prelude.qubit"-->67
+                    63--"1:2<br>prelude.qubit"-->67
+                    63--"2:1<br>arithmetic.int.types.int"-->67
+                    65--"0:0<br>Unit"-->64
+                    67--"0:1<br>prelude.qubit"-->64
+                    67--"1:2<br>prelude.qubit"-->64
+                end
+                58["(58) ExitBlock"]
+                57-."0:0".->58
+            end
+            44--"0:1<br>prelude.qubit"-->49
+            44--"0:0<br>prelude.qubit"-->51
+            44--"1:2<br>prelude.qubit"-->49
+            44--"1:1<br>prelude.qubit"-->51
+            44--"2:3<br>arithmetic.int.types.int"-->49
+            44--"2:2<br>arithmetic.int.types.int"-->51
+            44--"3:1<br>arithmetic.int.types.int"-->48
+            44--"3:4<br>arithmetic.int.types.int"-->49
+            46--"0:0<br>arithmetic.int.types.int"-->47
+            47--"0:0<br>arithmetic.int.types.int"-->48
+            48--"0:0<br>Bool"-->49
+            51--"0:0<br>prelude.qubit"-->45
+            51--"1:1<br>prelude.qubit"-->45
         end
-        31--"0:0<br>[arithmetic.int.types.int, arithmetic.int.types.int, arithmetic.int.types.int] -> []"-->46
+        subgraph 35 ["(35) FuncDefn: #quot;__modified____main__.fun[]#quot;"]
+            direction LR
+            36["(36) Input"]
+            37["(37) Output"]
+            subgraph 38 ["(38) CFG"]
+                direction LR
+                subgraph 39 ["(39) DataflowBlock"]
+                    direction LR
+                    41["(41) Input"]
+                    42["(42) Output"]
+                    43["(43) Tag(Unit)"]
+                    41--"0:1<br>prelude.qubit"-->42
+                    41--"2:2<br>prelude.qubit"-->42
+                    43--"0:0<br>Unit"-->42
+                end
+                40["(40) ExitBlock"]
+                39-."0:0".->40
+            end
+            36--"0:0<br>prelude.qubit"-->38
+            36--"1:1<br>arithmetic.int.types.int"-->38
+            36--"2:2<br>prelude.qubit"-->38
+            38--"0:0<br>prelude.qubit"-->37
+            38--"1:1<br>prelude.qubit"-->37
+        end
+        34--"0:0<br>[prelude.qubit, prelude.qubit, arithmetic.int.types.int, arithmetic.int.types.int] -> [prelude.qubit, prelude.qubit]"-->68
+        35--"0:3<br>[prelude.qubit, arithmetic.int.types.int, prelude.qubit] -> [prelude.qubit, prelude.qubit]"-->67
     end

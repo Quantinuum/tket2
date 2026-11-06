@@ -7,8 +7,8 @@ use std::{
 use hugr::{
     HugrView, IncomingPort, Node, OutgoingPort, PortIndex, Wire,
     builder::{
-        BuildError, ConditionalBuilder, Container, DFGBuilder, Dataflow, FunctionBuilder,
-        SubContainer, TailLoopBuilder,
+        BuildError, ConditionalBuilder, Container, DFGBuilder, Dataflow, DataflowSubContainer,
+        FunctionBuilder, SubContainer, TailLoopBuilder,
     },
     core::HugrNode,
     extension::{prelude::qb_t, simple_op::MakeExtensionOp},
@@ -18,12 +18,13 @@ use hugr::{
         handle::NodeHandle,
     },
     std_extensions::{
-        arithmetic::int_ops::IntOpDef,
+        arithmetic::{int_ops::IntOpDef, int_types::ConstInt},
         collections::{
             array::ArrayOpBuilder,
             borrow_array::{BArrayOpBuilder, borrow_array_type},
         },
     },
+    type_row,
     types::{EdgeKind, FuncTypeBase, PolyFuncType, Signature, TypeRow},
 };
 use petgraph::visit::{Topo, Walker};
@@ -593,7 +594,24 @@ impl<N: HugrNode> ModifierResolver<N> {
         };
         let mut poly_signature = old_fn_defn.signature().clone();
         self.modify_signature(poly_signature.body_mut(), false);
-        // NICOLA: here we add power inputs for the function signature and plan to "consum the modification?"
+
+        // Modifier block do not have classical outputs, since the power is supposed to applied directly to the modifier block,
+        // during its resolution we do nothandle classical outputs. To avoid invalid hugr later we raise an error here.
+        if self.modifiers().num_exponents() > 0
+            && poly_signature
+                .body()
+                .input
+                .iter()
+                .filter(|ty| !ty.copyable())
+                .ne(poly_signature.body().output.iter())
+        {
+            return Err(ModifierResolverErrors::unresolvable(
+                func,
+                "Power modifiers require outputs to match linear inputs in order.",
+                h.get_optype(func).clone(),
+            ));
+        }
+        // NICOLA: here we add power inputs for the function signature and plan to "consume the modification?"
         Self::append_power_inputs(poly_signature.body_mut(), self.modifiers().num_exponents());
 
         let mut new_fn = FunctionBuilder::new(
@@ -615,12 +633,69 @@ impl<N: HugrNode> ModifierResolver<N> {
         );
         self.modified_impls.insert(cache_key, new_function_node);
 
-        // todo if we have exponent,
-        self.multiply_exponent_inputs(&mut new_fn)?;
+        // NICOLA from here: if we have exponent...
+        let maybe_exponent_wire = self.multiply_exponent_inputs(&mut new_fn)?;
+        match maybe_exponent_wire {
+            Some(exponent_wire) => {
+                let is_negative = Self::check_positive(&mut new_fn, exponent_wire)?;
+                let OpType::FuncDefn(new_fn_defn) = h.get_optype(new_function_node) else {
+                    unreachable!("The modified function node is a function definition");
+                };
+                let signature = new_fn_defn.signature().body();
+                let cond_inputs = signature.input.iter().cloned().zip(new_fn.input_wires());
+                let cond_output_types = signature.output.clone();
+                let mut cond_builder = new_fn
+                    .conditional_builder(
+                        ([TypeRow::default(), TypeRow::default()], is_negative),
+                        cond_inputs,
+                        cond_output_types,
+                    )
+                    .unwrap();
+                // case 0: negative exponent -> do nothing
+                let case0_b = cond_builder.case_builder(0).unwrap();
+                let linear_outputs = signature
+                    .input
+                    .iter()
+                    .zip(case0_b.input_wires())
+                    .filter_map(|(ty, wire)| (!ty.copyable()).then_some(wire))
+                    .collect::<Vec<_>>();
+                case0_b.finish_with_outputs(linear_outputs)?;
+                // case 1: positive exponent -> build the loop
+                let mut case1_b = cond_builder.case_builder(1).unwrap();
+                let loop_inputs = signature
+                    .input
+                    .iter()
+                    .cloned()
+                    .zip(case1_b.input_wires())
+                    .collect::<Vec<_>>();
+                // Insert tail loop
+                let mut tl_b = case1_b
+                    .tail_loop_builder([], loop_inputs, type_row![])
+                    .unwrap();
+                // Decrement the exponent
+                let one_wire = tl_b.add_load_value(ConstInt::new_s(6, 1).unwrap());
+                let exponent_input = tl_b
+                    .input_wires()
+                    .last()
+                    .expect("Tail loop must have an exponent as its last input");
 
-        // Power modifier is consumed here. Nested calls need a fresh power environment.
-        self.with_no_power_inputs(|this| this.modify_dfg_body(h, func, &mut new_fn))?;
+                let exponent_count = tl_b
+                    .add_dataflow_op(IntOpDef::isub.with_log_width(6), [exponent_input, one_wire])
+                    .unwrap()
+                    .out_wire(0);
 
+                let is_finished = Self::check_positive(&mut tl_b, exponent_count)?;
+                self.with_no_power_inputs(|this| this.modify_dfg_body(h, func, &mut tl_b))?;
+
+                // connect the loop outputs
+                let conditional = cond_builder.finish_sub_container()?;
+                new_fn.set_outputs(conditional.outputs())?;
+            }
+            None => {
+                // Power modifier is consumed here. Nested calls need a fresh power environment.
+                self.with_no_power_inputs(|this| this.modify_dfg_body(h, func, &mut new_fn))?;
+            }
+        };
         let call_map = mem::replace(self.call_map(), old_call_map);
 
         // We insert the modified function body into the new_function_node
@@ -645,6 +720,15 @@ impl<N: HugrNode> ModifierResolver<N> {
         self.modified_functions.insert(func);
 
         Ok(new_function_node)
+    }
+
+    /// Checks whether a signed 64-bit exponent is less than zero.
+    //NICOLA: TODO: move out impl
+    fn check_positive(builder: &mut impl Dataflow, exponent: Wire) -> Result<Wire, BuildError> {
+        let zero = builder.add_load_value(ConstInt::new_s(6, 0).unwrap());
+        Ok(builder
+            .add_dataflow_op(IntOpDef::igt_s.with_log_width(6), [exponent, zero])?
+            .out_wire(0))
     }
 
     /// Multiplies the trailing exponent inputs into a single wire, if present.
