@@ -1,6 +1,19 @@
 # Changelog
 
 
+## [0.22.2](https://github.com/Quantinuum/tket2/compare/tket-v0.22.1...tket-v0.22.2) - 2026-11-06
+
+### Bug Fixes
+
+- address Miri failures in bitvec and Crossbeam resynthesis ([#2116](https://github.com/Quantinuum/tket2/pull/2116))
+- Preserve qubit order when expanding controlled Toffoli ([#2123](https://github.com/Quantinuum/tket2/pull/2123))
+- Handle `UnpackTuple` / `MakeTuple` in modifier resolver ([#2127](https://github.com/Quantinuum/tket2/pull/2127))
+- Unconnected ports when running pytket passes on hugrs with non-local edges ([#2131](https://github.com/Quantinuum/tket2/pull/2131))
+
+### Refactor
+
+- Rename modify_fn to modify_fn_inner to avoid redundant check ([#2114](https://github.com/Quantinuum/tket2/pull/2114))
+
 ## [0.22.1](https://github.com/Quantinuum/tket2/compare/tket-v0.22.0...tket-v0.22.1) - 2026-10-28
 
 ### Bug Fixes
