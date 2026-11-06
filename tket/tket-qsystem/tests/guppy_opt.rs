@@ -2,6 +2,7 @@
 
 use rayon::iter::ParallelIterator;
 use smol_str::SmolStr;
+use tket_qsystem::extension::REGISTRY;
 use std::collections::HashMap;
 use std::fs;
 use std::io::BufReader;
@@ -45,7 +46,7 @@ fn load_guppy_example(path: &str) -> std::io::Result<Hugr> {
     let file = Path::new(GUPPY_EXAMPLES_DIR).join(path);
     let reader = fs::File::open(file)?;
     let reader = BufReader::new(reader);
-    Ok(Hugr::load(reader, None).unwrap())
+    Ok(Hugr::load(reader, Some(&REGISTRY)).unwrap())
 }
 
 /// Run a json-encoded pytket pass on the given HUGR.
