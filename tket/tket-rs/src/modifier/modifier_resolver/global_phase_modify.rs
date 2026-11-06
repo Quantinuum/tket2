@@ -133,6 +133,7 @@ mod tests {
         *func.finish_with_outputs(inputs).unwrap().handle()
     }
 
+    /// Verify that global phases survive modifier resolution when no modifiers are applied.
     #[test]
     fn global_phase_without_modifiers_is_preserved() {
         let mut function = FunctionBuilder::new("main", Signature::new_endo(type_row![])).unwrap();
