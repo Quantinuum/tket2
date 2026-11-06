@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.16.0](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.14...tket-py-v0.16.0) (2026-11-06)
+
+
+### ⚠ BREAKING CHANGES
+
+* **tket-qsystem:** Custom `ArrayLowering` implementations must implement `free_array` to release the original backing allocation of a consumed array, including when the array has a nonzero offset.
+
+### Bug Fixes
+
+* [#2121](https://github.com/Quantinuum/tket2/issues/2121) ([1e4b2a7](https://github.com/Quantinuum/tket2/commit/1e4b2a7f18193c62e32430727d0d76f00f47a2f9))
+* Handle `UnpackTuple` / `MakeTuple` in modifier resolver ([#2127](https://github.com/Quantinuum/tket2/issues/2127)) ([1e4b2a7](https://github.com/Quantinuum/tket2/commit/1e4b2a7f18193c62e32430727d0d76f00f47a2f9))
+* **tket-qsystem:** release arrays after recording results ([#2128](https://github.com/Quantinuum/tket2/issues/2128)) ([006dde2](https://github.com/Quantinuum/tket2/commit/006dde218e9a45649080ac5370f3169ea59c9c6c))
+* Unconnected ports when running pytket passes on hugrs with non-local edges ([#2131](https://github.com/Quantinuum/tket2/issues/2131)) ([8547351](https://github.com/Quantinuum/tket2/commit/8547351b692f93dcfe0649fd7bb11260f453d2d9))
+
 ## [0.15.14](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.13...tket-py-v0.15.14) (2026-11-04)
 
 
