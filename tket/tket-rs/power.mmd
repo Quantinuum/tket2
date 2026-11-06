@@ -1,0 +1,126 @@
+---
+config:
+    layout: elk
+---
+graph LR
+    subgraph 0 ["(0) Module"]
+        direction LR
+        subgraph 1 ["(1) [**FuncDefn: #quot;__main__.main#quot;**]"]
+            direction LR
+            style 1 stroke:#832561,stroke-width:3px
+            2["(2) Input"]
+            3["(3) Output"]
+            subgraph 4 ["(4) CFG"]
+                direction LR
+                subgraph 5 ["(5) DataflowBlock"]
+                    direction LR
+                    6["(6) Input"]
+                    7["(7) Output"]
+                    8["(8) LoadFunction"]
+                    9["(9) tket.modifier.PowerModifier"]
+                    10["(10) CallIndirect"]
+                    11["(11) Tag(Unit)"]
+                    6--"0:1<br>prelude.qubit"-->10
+                    6--"1:1<br>arithmetic.int.types.int"-->9
+                    6--"1:2<br>arithmetic.int.types.int"-->10
+                    8--"0:0<br>[prelude.qubit, arithmetic.int.types.int] -> [prelude.qubit]"-->9
+                    9--"0:0<br>[prelude.qubit, arithmetic.int.types.int] -> [prelude.qubit]"-->10
+                    10--"0:1<br>prelude.qubit"-->7
+                    11--"0:0<br>Unit"-->7
+                end
+                12["(12) ExitBlock"]
+                5-."0:0".->12
+            end
+            2--"0:0<br>prelude.qubit"-->4
+            2--"1:1<br>arithmetic.int.types.int"-->4
+            4--"0:0<br>prelude.qubit"-->3
+        end
+        subgraph 13 ["(13) FuncDefn: #quot;__main__.main.__WithBlock__0#quot;"]
+            direction LR
+            14["(14) Input"]
+            15["(15) Output"]
+            subgraph 16 ["(16) CFG"]
+                direction LR
+                subgraph 17 ["(17) DataflowBlock"]
+                    direction LR
+                    18["(18) Input"]
+                    19["(19) Output"]
+                    20["(20) arithmetic.int.iu_to_s"]
+                    21["(21) LoadConstant"]
+                    22["(22) const:custom:u64(1)"]
+                    23["(23) arithmetic.int.iadd"]
+                    24["(24) arithmetic.int.is_to_u"]
+                    25["(25) LoadFunction"]
+                    26["(26) tket.modifier.PowerModifier"]
+                    27["(27) CallIndirect"]
+                    28["(28) Tag(Unit)"]
+                    18--"0:1<br>prelude.qubit"-->27
+                    18--"1:0<br>arithmetic.int.types.int"-->20
+                    18--"1:2<br>arithmetic.int.types.int"-->27
+                    20--"0:0<br>arithmetic.int.types.int"-->23
+                    21--"0:1<br>arithmetic.int.types.int"-->23
+                    22--"0:0<br>arithmetic.int.types.int"-->21
+                    23--"0:0<br>arithmetic.int.types.int"-->24
+                    24--"0:1<br>arithmetic.int.types.int"-->26
+                    25--"0:0<br>[prelude.qubit, arithmetic.int.types.int] -> [prelude.qubit]"-->26
+                    26--"0:0<br>[prelude.qubit, arithmetic.int.types.int] -> [prelude.qubit]"-->27
+                    27--"0:1<br>prelude.qubit"-->19
+                    28--"0:0<br>Unit"-->19
+                end
+                29["(29) ExitBlock"]
+                17-."0:0".->29
+            end
+            14--"0:0<br>prelude.qubit"-->16
+            14--"1:1<br>arithmetic.int.types.int"-->16
+            16--"0:0<br>prelude.qubit"-->15
+        end
+        subgraph 30 ["(30) FuncDefn: #quot;__main__.main.__WithBlock__1#quot;"]
+            direction LR
+            31["(31) Input"]
+            32["(32) Output"]
+            subgraph 33 ["(33) CFG"]
+                direction LR
+                subgraph 34 ["(34) DataflowBlock"]
+                    direction LR
+                    35["(35) Input"]
+                    36["(36) Output"]
+                    37["(37) Call"]
+                    38["(38) prelude.MakeTuple"]
+                    39["(39) Tag(Unit)"]
+                    35--"0:0<br>prelude.qubit"-->37
+                    35--"1:1<br>arithmetic.int.types.int"-->37
+                    37--"0:1<br>prelude.qubit"-->36
+                    39--"0:0<br>Unit"-->36
+                end
+                40["(40) ExitBlock"]
+                34-."0:0".->40
+            end
+            31--"0:0<br>prelude.qubit"-->33
+            31--"1:1<br>arithmetic.int.types.int"-->33
+            33--"0:0<br>prelude.qubit"-->32
+        end
+        subgraph 41 ["(41) FuncDefn: #quot;__main__.fun#quot;"]
+            direction LR
+            42["(42) Input"]
+            43["(43) Output"]
+            subgraph 44 ["(44) CFG"]
+                direction LR
+                subgraph 45 ["(45) DataflowBlock"]
+                    direction LR
+                    46["(46) Input"]
+                    47["(47) Output"]
+                    48["(48) Tag(Unit)"]
+                    46--"0:1<br>prelude.qubit"-->47
+                    48--"0:0<br>Unit"-->47
+                end
+                49["(49) ExitBlock"]
+                45-."0:0".->49
+            end
+            42--"0:0<br>prelude.qubit"-->44
+            42--"1:1<br>arithmetic.int.types.int"-->44
+            44--"0:0<br>prelude.qubit"-->43
+        end
+        13--"0:0<br>[prelude.qubit, arithmetic.int.types.int] -> [prelude.qubit]"-->8
+        30--"0:0<br>[prelude.qubit, arithmetic.int.types.int] -> [prelude.qubit]"-->25
+        41--"0:2<br>[prelude.qubit, arithmetic.int.types.int] -> [prelude.qubit]"-->37
+    end

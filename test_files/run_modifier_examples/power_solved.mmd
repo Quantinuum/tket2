@@ -1,0 +1,71 @@
+---
+config:
+    layout: elk
+---
+graph LR
+    subgraph 0 ["(0) Module"]
+        direction LR
+        subgraph 1 ["(1) [**FuncDefn: #quot;__main__.main#quot;**]"]
+            direction LR
+            style 1 stroke:#832561,stroke-width:3px
+            2["(2) Input"]
+            3["(3) Output"]
+            subgraph 4 ["(4) CFG"]
+                direction LR
+                subgraph 5 ["(5) DataflowBlock"]
+                    direction LR
+                    6["(6) Input"]
+                    7["(7) Output"]
+                    10["(10) LoadConstant"]
+                    11["(11) const:custom:u64(4)"]
+                    46["(46) LoadFunction"]
+                    47["(47) CallIndirect"]
+                    14["(14) Tag(Unit)"]
+                    6--"0:1<br>prelude.qubit"-->7
+                    6--"1:1<br>arithmetic.int.types.int"-->47
+                    6--"1:3<br>arithmetic.int.types.int"-->47
+                    10--"0:2<br>arithmetic.int.types.int"-->47
+                    11--"0:0<br>arithmetic.int.types.int"-->10
+                    46--"0:0<br>[arithmetic.int.types.int, arithmetic.int.types.int, arithmetic.int.types.int] -> []"-->47
+                    14--"0:0<br>Unit"-->7
+                end
+                15["(15) ExitBlock"]
+                5-."0:0".->15
+            end
+            2--"0:0<br>prelude.qubit"-->4
+            2--"1:1<br>arithmetic.int.types.int"-->4
+            4--"0:0<br>prelude.qubit"-->3
+        end
+        subgraph 31 ["(31) FuncDefn: #quot;__modified____main__.main.__WithBlock__0[P2]#quot;"]
+            direction LR
+            32["(32) Input"]
+            33["(33) Output"]
+            34["(34) arithmetic.int.imul"]
+            subgraph 35 ["(35) CFG"]
+                direction LR
+                subgraph 36 ["(36) DataflowBlock"]
+                    direction LR
+                    38["(38) Input"]
+                    39["(39) Output"]
+                    40["(40) Tag(Unit)"]
+                    41["(41) const:custom:u64(1)"]
+                    42["(42) LoadConstant"]
+                    43["(43) arithmetic.int.iu_to_s"]
+                    44["(44) arithmetic.int.iadd"]
+                    45["(45) arithmetic.int.is_to_u"]
+                    38--"0:0<br>arithmetic.int.types.int"-->43
+                    40--"0:0<br>Unit"-->39
+                    41--"0:0<br>arithmetic.int.types.int"-->42
+                    42--"0:1<br>arithmetic.int.types.int"-->44
+                    43--"0:0<br>arithmetic.int.types.int"-->44
+                    44--"0:0<br>arithmetic.int.types.int"-->45
+                end
+                37["(37) ExitBlock"]
+                36-."0:0".->37
+            end
+            32--"0:0<br>arithmetic.int.types.int"-->35
+            32--"1:0<br>arithmetic.int.types.int"-->34
+            32--"2:1<br>arithmetic.int.types.int"-->34
+        end
+        31--"0:0<br>[arithmetic.int.types.int, arithmetic.int.types.int, arithmetic.int.types.int] -> []"-->46
+    end

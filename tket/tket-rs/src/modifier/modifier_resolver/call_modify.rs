@@ -1,7 +1,7 @@
 //! Modify nodes related to function calls.
 
 use hugr::{
-    HugrView, IncomingPort, Wire,
+    HugrView, IncomingPort, Node, Wire,
     builder::{BuildError, Dataflow},
     core::HugrNode,
     extension::simple_op::MakeExtensionOp,
@@ -110,6 +110,10 @@ impl<N: HugrNode> ModifierResolver<N> {
         // Give the replacement loader the modified function's signature
         let mut modified_sig = load_op.func_sig;
         self.modify_signature(modified_sig.body_mut(), false);
+        Self::append_power_inputs(
+            modified_sig.body_mut(),
+            self.modifiers().num_exponents(),
+        );
         let new_load =
             LoadFunction::try_new(modified_sig, load_op.type_args).map_err(BuildError::from)?;
 
@@ -117,7 +121,8 @@ impl<N: HugrNode> ModifierResolver<N> {
     }
 
     /// Trace a `CallIndirect`'s function input back to a `LoadFunction`, accumulating modifiers.
-    /// Return nodes from nearest modifier to load, excluding the call; error on invalid chains.
+    /// Return nodes from nearest modifier to load, excluding the call;
+    /// error on invalid chains.
     ///
     /// For `load -> modifier_a -> modifier_b -> call_indirect`, tracing from `call_indirect`
     /// returns `[modifier_b, modifier_a, load]`.
@@ -126,6 +131,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         h: &impl HugrMut<Node = N>,
         ind_call_node: N,
     ) -> Result<Vec<N>, ModifierResolverErrors<N>> {
+        // NICOLA: TODO: consider putting this outside since it may be already used
         let optype = h.get_optype(ind_call_node);
         // First node must be a CallIndirect node
         assert!(
@@ -135,6 +141,10 @@ impl<N: HugrNode> ModifierResolver<N> {
 
         // Collection of modifiers to apply.
         let modifiers = self.modifiers_mut();
+        assert!(
+            modifiers.exponent_inputs.is_empty(),
+            "Nested functions do not inherit exponents."
+        );
         let (mut current, _) = h.single_linked_output(ind_call_node, 0).unwrap();
         let mut chain: Vec<N> = Vec::new();
 
@@ -188,13 +198,29 @@ impl<N: HugrNode> ModifierResolver<N> {
             }
 
             chain.push(current);
-            modifiers.push(optype.as_extension_op().unwrap(), current)?;
+            modifiers.push(optype.as_extension_op().unwrap(), current);
             let (new, _) = h
                 .single_linked_output(current, 0)
                 .expect("Expected exactly one output connected to input port 0 of a modifier node");
             current = new;
         }
         Ok(chain)
+    }
+
+    /// Map power modifiers' exponent inputs to the replacement call's runtime inputs.
+    fn wire_exponents(
+        &mut self,
+        exponent_inputs: &[(N, IncomingPort)],
+        new_call_node: Node,
+        exponent_port: usize,
+    ) -> Result<(), ModifierResolverErrors<N>> {
+        for (i, &input) in exponent_inputs.iter().enumerate() {
+            self.map_insert(
+                input.into(),
+                (new_call_node, IncomingPort::from(exponent_port + i)).into(),
+            )?;
+        }
+        Ok(())
     }
 
     pub(super) fn modify_indirect_call(
@@ -214,14 +240,20 @@ impl<N: HugrNode> ModifierResolver<N> {
         }
 
         // Modify the function loaded by the indirect call preserving the modifier state.
-        let (load_node, modified_fn, new_load_op) =
+        let (load_node, modified_fn, new_load_op, exponent_inputs) =
             self.with_modifiers(self.modifiers().clone(), |this| {
                 // Follow the function operand through its modifiers to the loader.
                 let trace = this.trace_indirect_call_to_load(h, ind_call_node)?;
                 let load_node = *trace.last().unwrap();
                 // Apply the combined modifiers and build the replacement loader.
                 let (modified_fn, new_load_op) = this.modify_load(h, load_node)?;
-                Ok::<_, ModifierResolverErrors<N>>((load_node, modified_fn, new_load_op))
+                let exponent_inputs = this.modifiers().exponent_inputs.clone();
+                Ok::<_, ModifierResolverErrors<N>>((
+                    load_node,
+                    modified_fn,
+                    new_load_op,
+                    exponent_inputs,
+                ))
             })?;
 
         // Insert the modified loader into the new graph.
@@ -234,9 +266,12 @@ impl<N: HugrNode> ModifierResolver<N> {
             new_dfg.hugr().get_optype(new_load_node),
         )?;
 
-        // Construct the replacement IndirectCall with additional control-array inputs and outputs.
+        // Construct the replacement IndirectCall with control arrays and runtime exponent inputs.
         let mut new_ind_call = indir_call.clone();
         self.modify_signature(&mut new_ind_call.signature, false);
+        let exponent_count = exponent_inputs.len();
+        Self::append_power_inputs(&mut new_ind_call.signature, exponent_count);
+        let exponent_port = new_ind_call.signature.input_count() + 1 - exponent_count;
         let new_call_node = new_dfg.add_child_node(new_ind_call);
 
         // Pack the current control qubits into the arrays expected by the call.
@@ -250,6 +285,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         }
         *self.controls() = self.unpack_controls(new_dfg, controls)?;
 
+        self.wire_exponents(&exponent_inputs, new_call_node, exponent_port)?;
         // Map the original arguments and results
         let signature = indir_call.signature();
         self.wire_node_inout(

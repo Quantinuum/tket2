@@ -1,0 +1,143 @@
+---
+config:
+    layout: elk
+---
+graph LR
+    subgraph 0 ["(0) Module"]
+        direction LR
+        subgraph 1 ["(1) [**FuncDefn: #quot;__main__.main#quot;**]"]
+            direction LR
+            style 1 stroke:#832561,stroke-width:3px
+            2["(2) Input"]
+            3["(3) Output"]
+            subgraph 4 ["(4) CFG"]
+                direction LR
+                subgraph 5 ["(5) DataflowBlock"]
+                    direction LR
+                    6["(6) Input"]
+                    7["(7) Output"]
+                    8["(8) LoadFunction"]
+                    9["(9) LoadConstant"]
+                    10["(10) const:custom:u64(2)"]
+                    11["(11) tket.modifier.PowerModifier"]
+                    12["(12) LoadConstant"]
+                    13["(13) const:custom:u64(4)"]
+                    14["(14) tket.modifier.PowerModifier"]
+                    40["(40) arithmetic.int.imul"]
+                    16["(16) Tag(Unit)"]
+                    43["(43) const:custom:u64(0)"]
+                    44["(44) LoadConstant"]
+                    45["(45) arithmetic.int.igt_s"]
+                    subgraph 46 ["(46) Conditional"]
+                        direction LR
+                        subgraph 49 ["(49) Case"]
+                            direction LR
+                            50["(50) Input"]
+                            51["(51) Output"]
+                            50--"0:0<br>prelude.qubit"-->51
+                        end
+                        subgraph 52 ["(52) Case"]
+                            direction LR
+                            53["(53) Input"]
+                            54["(54) Output"]
+                            subgraph 55 ["(55) TailLoop"]
+                                direction LR
+                                56["(56) Input"]
+                                57["(57) Output"]
+                                58["(58) LoadFunction"]
+                                59["(59) CallIndirect"]
+                                60["(60) const:custom:u64(1)"]
+                                61["(61) LoadConstant"]
+                                62["(62) arithmetic.int.isub"]
+                                63["(63) const:custom:u64(0)"]
+                                64["(64) LoadConstant"]
+                                65["(65) arithmetic.int.igt_s"]
+                                56--"0:1<br>prelude.qubit"-->59
+                                56--"1:0<br>arithmetic.int.types.int"-->62
+                                58--"0:0<br>[prelude.qubit] -> [prelude.qubit]"-->59
+                                59--"0:1<br>prelude.qubit"-->57
+                                60--"0:0<br>arithmetic.int.types.int"-->61
+                                61--"0:1<br>arithmetic.int.types.int"-->62
+                                62--"0:0<br>arithmetic.int.types.int"-->65
+                                62--"0:2<br>arithmetic.int.types.int"-->57
+                                63--"0:0<br>arithmetic.int.types.int"-->64
+                                64--"0:1<br>arithmetic.int.types.int"-->65
+                                65--"0:0<br>Bool"-->57
+                            end
+                            53--"0:0<br>prelude.qubit"-->55
+                            53--"1:1<br>arithmetic.int.types.int"-->55
+                            55--"0:0<br>prelude.qubit"-->54
+                        end
+                    end
+                    6--"0:1<br>prelude.qubit"-->46
+                    8--"0:0<br>[prelude.qubit] -> [prelude.qubit]"-->11
+                    9--"0:1<br>arithmetic.int.types.int"-->11
+                    9--"0:1<br>arithmetic.int.types.int"-->40
+                    10--"0:0<br>arithmetic.int.types.int"-->9
+                    11--"0:0<br>[prelude.qubit] -> [prelude.qubit]"-->14
+                    12--"0:1<br>arithmetic.int.types.int"-->14
+                    12--"0:0<br>arithmetic.int.types.int"-->40
+                    13--"0:0<br>arithmetic.int.types.int"-->12
+                    40--"0:0<br>arithmetic.int.types.int"-->45
+                    40--"0:2<br>arithmetic.int.types.int"-->46
+                    16--"0:0<br>Unit"-->7
+                    43--"0:0<br>arithmetic.int.types.int"-->44
+                    44--"0:1<br>arithmetic.int.types.int"-->45
+                    45--"0:0<br>Bool"-->46
+                    46--"0:1<br>prelude.qubit"-->7
+                end
+                17["(17) ExitBlock"]
+                5-."0:0".->17
+            end
+            2--"0:0<br>prelude.qubit"-->4
+            4--"0:0<br>prelude.qubit"-->3
+        end
+        subgraph 18 ["(18) FuncDefn: #quot;__main__.main.__WithBlock__0#quot;"]
+            direction LR
+            19["(19) Input"]
+            20["(20) Output"]
+            subgraph 21 ["(21) CFG"]
+                direction LR
+                subgraph 22 ["(22) DataflowBlock"]
+                    direction LR
+                    23["(23) Input"]
+                    24["(24) Output"]
+                    25["(25) tket.quantum.H"]
+                    26["(26) prelude.MakeTuple"]
+                    27["(27) Tag(Unit)"]
+                    23--"0:0<br>prelude.qubit"-->25
+                    25--"0:1<br>prelude.qubit"-->24
+                    27--"0:0<br>Unit"-->24
+                end
+                28["(28) ExitBlock"]
+                22-."0:0".->28
+            end
+            19--"0:0<br>prelude.qubit"-->21
+            21--"0:0<br>prelude.qubit"-->20
+        end
+        subgraph 29 ["(29) FuncDefn: #quot;__modified____main__.main.__WithBlock__0[]#quot;"]
+            direction LR
+            30["(30) Input"]
+            31["(31) Output"]
+            subgraph 32 ["(32) CFG"]
+                direction LR
+                subgraph 33 ["(33) DataflowBlock"]
+                    direction LR
+                    35["(35) Input"]
+                    36["(36) Output"]
+                    37["(37) Tag(Unit)"]
+                    38["(38) prelude.MakeTuple"]
+                    39["(39) tket.quantum.H"]
+                    35--"0:0<br>prelude.qubit"-->39
+                    37--"0:0<br>Unit"-->36
+                    39--"0:1<br>prelude.qubit"-->36
+                end
+                34["(34) ExitBlock"]
+                33-."0:0".->34
+            end
+            30--"0:0<br>prelude.qubit"-->32
+            32--"0:0<br>prelude.qubit"-->31
+        end
+        18--"0:0<br>[prelude.qubit] -> [prelude.qubit]"-->8
+        29--"0:0<br>[prelude.qubit] -> [prelude.qubit]"-->58
+    end

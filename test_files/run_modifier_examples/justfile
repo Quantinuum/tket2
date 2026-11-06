@@ -17,5 +17,5 @@ apply-passes:
 rh example:
     @echo "---- Applying passes ----"
     uv run apply_passes.py "{{example}}"
-    @echo "---- Running hugrs ----"
-    uv run --prerelease=allow --no-project "run_hugrs.py" "{{example}}"
+    # @echo "---- Running hugrs ----"
+    # uv run --prerelease=allow --no-project "run_hugrs.py" "{{example}}"

@@ -17,9 +17,12 @@ use hugr::{
         Call, Conditional, DFG, DataflowBlock, DataflowOpTrait, OpType, TailLoop,
         handle::NodeHandle,
     },
-    std_extensions::collections::{
-        array::ArrayOpBuilder,
-        borrow_array::{BArrayOpBuilder, borrow_array_type},
+    std_extensions::{
+        arithmetic::int_ops::IntOpDef,
+        collections::{
+            array::ArrayOpBuilder,
+            borrow_array::{BArrayOpBuilder, borrow_array_type},
+        },
     },
     types::{EdgeKind, FuncTypeBase, PolyFuncType, Signature, TypeRow},
 };
@@ -590,6 +593,8 @@ impl<N: HugrNode> ModifierResolver<N> {
         };
         let mut poly_signature = old_fn_defn.signature().clone();
         self.modify_signature(poly_signature.body_mut(), false);
+        // NICOLA: here we add power inputs for the function signature and plan to "consum the modification?"
+        Self::append_power_inputs(poly_signature.body_mut(), self.modifiers().num_exponents());
 
         let mut new_fn = FunctionBuilder::new(
             "__modified__".to_string()
@@ -610,8 +615,11 @@ impl<N: HugrNode> ModifierResolver<N> {
         );
         self.modified_impls.insert(cache_key, new_function_node);
 
-        let modify_result = self.modify_dfg_body(h, func, &mut new_fn);
-        modify_result?;
+        // todo if we have exponent,
+        self.multiply_exponent_inputs(&mut new_fn)?;
+
+        // Power modifier is consumed here. Nested calls need a fresh power environment.
+        self.with_no_power_inputs(|this| this.modify_dfg_body(h, func, &mut new_fn))?;
 
         let call_map = mem::replace(self.call_map(), old_call_map);
 
@@ -637,6 +645,26 @@ impl<N: HugrNode> ModifierResolver<N> {
         self.modified_functions.insert(func);
 
         Ok(new_function_node)
+    }
+
+    /// Multiplies the trailing exponent inputs into a single wire, if present.
+    fn multiply_exponent_inputs(
+        &self,
+        builder: &mut impl Dataflow,
+    ) -> Result<Option<Wire>, BuildError> {
+        let num_exponents = self.modifiers().num_exponents();
+        let mut exponent_inputs = builder
+            .input_wires()
+            .skip(builder.input_wires().count() - num_exponents);
+        let Some(mut exponent_wire) = exponent_inputs.next() else {
+            return Ok(None);
+        };
+        for input in exponent_inputs {
+            exponent_wire = builder
+                .add_dataflow_op(IntOpDef::imul.with_log_width(6), [exponent_wire, input])?
+                .out_wire(0);
+        }
+        Ok(Some(exponent_wire))
     }
 
     /// Inserts a sub DFG into the given parent DFG, updating the call map accordingly.
@@ -1194,6 +1222,7 @@ mod test {
             control: 1,
             accum_ctrl: vec![1],
             dagger: false,
+            exponent_inputs: Vec::new(),
         };
         resolver
     }
@@ -1334,6 +1363,7 @@ mod test {
                     control: accum_ctrl.iter().sum(),
                     accum_ctrl: accum_ctrl.clone(),
                     dagger,
+                    exponent_inputs: Vec::new(),
                 };
                 let first = resolver.modify_fn(&mut h, original.node()).unwrap();
                 let second = resolver.modify_fn(&mut h, original.node()).unwrap();
@@ -1370,6 +1400,7 @@ mod test {
             control: 1,
             accum_ctrl: vec![1],
             dagger: false,
+            exponent_inputs: Vec::new(),
         };
 
         let first = resolver
@@ -1394,13 +1425,17 @@ mod test {
     }
 
     #[rstest::rstest]
-    #[case::dagger(vec![], true, "__modified__original[D]")]
-    #[case::control(vec![2], false, "__modified__original[C2]")]
-    #[case::control_and_dagger(vec![2], true, "__modified__original[C2D]")]
-    #[case::nested_controls(vec![1, 2], true, "__modified__original[C1.2D]")]
+    #[case::dagger(vec![], true, 0, "__modified__original[D]")]
+    #[case::control(vec![2], false, 0, "__modified__original[C2]")]
+    #[case::control_and_dagger(vec![2], true, 0, "__modified__original[C2D]")]
+    #[case::nested_controls(vec![1, 2], true, 0, "__modified__original[C1.2D]")]
+    #[case::power(vec![], false, 1, "__modified__original[P1]")]
+    #[case::nested_powers(vec![], false, 2, "__modified__original[P2]")]
+    #[case::all_modifiers(vec![1, 2], true, 2, "__modified__original[C1.2DP2]")]
     fn modified_function_name(
         #[case] accum_ctrl: Vec<usize>,
         #[case] dagger: bool,
+        #[case] power_count: usize,
         #[case] expected: &str,
     ) {
         let mut module = ModuleBuilder::new();
@@ -1411,6 +1446,8 @@ mod test {
             control: accum_ctrl.iter().sum(),
             accum_ctrl,
             dagger,
+            // Only the number of exponent inputs is used when modifying the definition.
+            exponent_inputs: vec![(original.node(), IncomingPort::from(1)); power_count],
         };
 
         let modified = resolver.modify_fn(&mut h, original.node()).unwrap();
