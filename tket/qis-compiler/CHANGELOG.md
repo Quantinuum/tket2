@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.6.0](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.5.1...qis-compiler-v0.6.0) (2026-11-06)
+
+
+### ⚠ BREAKING CHANGES
+
+* **tket-qsystem:** Custom `ArrayLowering` implementations must implement `free_array` to release the original backing allocation of a consumed array, including when the array has a nonzero offset.
+
+### Bug Fixes
+
+* **tket-qsystem:** release arrays after recording results ([#2128](https://github.com/Quantinuum/tket2/issues/2128)) ([006dde2](https://github.com/Quantinuum/tket2/commit/006dde218e9a45649080ac5370f3169ea59c9c6c))
+
 ## [0.5.1](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.5.0...qis-compiler-v0.5.1) (2026-10-07)
 
 
