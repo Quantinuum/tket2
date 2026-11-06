@@ -1,11 +1,8 @@
 //! Modifier resolution for global phase operations.
-//! After resolving modifiers, all global phase operations are removed.
-//!
 use hugr::{
     IncomingPort, Node, Wire,
     builder::Dataflow,
     core::HugrNode,
-    extension::simple_op::MakeExtensionOp,
     hugr::hugrmut::HugrMut,
     std_extensions::arithmetic::{float_ops::FloatOps, float_types::ConstF64},
 };
@@ -102,37 +99,27 @@ impl<N: HugrNode> ModifierResolver<N> {
     }
 }
 
-/// Delete all global phase operations in the subgraph reachable from the given entry points.
-pub(crate) fn delete_phase<N: HugrNode>(
-    h: &mut impl HugrMut<Node = N>,
-    entry_points: impl IntoIterator<Item = N>,
-) -> Result<(), ModifierResolverErrors<N>> {
-    for entry_point in entry_points {
-        let descendants = h.descendants(entry_point).collect::<Vec<_>>();
-        for node in descendants {
-            if GlobalPhase::from_optype(h.get_optype(node)).is_some() {
-                h.remove_subtree(node);
-            }
-        }
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use std::iter;
 
-    use hugr::Hugr;
-    use hugr::ops::handle::FuncID;
     use hugr::{
-        builder::{DataflowSubContainer, ModuleBuilder},
-        extension::prelude::qb_t,
+        Hugr, HugrView,
+        builder::{DataflowHugr, DataflowSubContainer, FunctionBuilder, ModuleBuilder},
+        extension::{prelude::qb_t, simple_op::MakeExtensionOp},
+        ops::handle::{FuncID, NodeHandle},
+        type_row,
         types::Signature,
     };
 
-    use crate::extension::rotation::ConstRotation;
-    use crate::modifier::modifier_resolver::tests::SetUnitary;
-    use crate::modifier::modifier_resolver::tests::test_modifier_resolver;
+    use crate::{
+        extension::rotation::ConstRotation,
+        modifier::modifier_resolver::{
+            resolve_modifier,
+            tests::{SetUnitary, resolved_modifier_test_hugr},
+        },
+        passes::PassScope,
+    };
 
     use super::*;
 
@@ -146,7 +133,28 @@ mod tests {
         *func.finish_with_outputs(inputs).unwrap().handle()
     }
 
+    /// Verify that global phases survive modifier resolution when no modifiers are applied.
+    #[test]
+    fn global_phase_without_modifiers_is_preserved() {
+        let mut function = FunctionBuilder::new("main", Signature::new_endo(type_row![])).unwrap();
+        let angle = function.add_load_value(ConstRotation::new(0.5).unwrap());
+        let phase = function
+            .add_dataflow_op(GlobalPhase, [angle])
+            .unwrap()
+            .node();
+        let mut h = function.finish_hugr_with_outputs([]).unwrap();
+
+        resolve_modifier(&mut h, &PassScope::default()).unwrap();
+
+        assert!(h.contains_node(phase));
+        assert_eq!(
+            h.single_linked_output(phase, IncomingPort::from(0)),
+            Some((angle.node(), angle.source())),
+        );
+    }
+
     #[rstest::rstest]
+    #[case(0, foo, true)]
     #[case(1, foo, false)]
     #[case(1, foo, true)]
     #[case(5, foo, false)]
@@ -156,6 +164,11 @@ mod tests {
         #[case] foo: fn(&mut ModuleBuilder<Hugr>, usize) -> FuncID<true>,
         #[case] dagger: bool,
     ) {
-        test_modifier_resolver(0, c_num, foo, dagger);
+        let h = resolved_modifier_test_hugr(0, c_num, foo, dagger);
+        assert!(
+            h.nodes()
+                .any(|node| GlobalPhase::from_optype(h.get_optype(node)).is_some()),
+            "modifier resolution discarded the global phase",
+        );
     }
 }
