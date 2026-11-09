@@ -10,37 +10,37 @@ define void @"__hugr__.__main__.rus.<locals>.main.1"() local_unnamed_addr !dbg !
 alloca_block:
   %qalloc.i = tail call i64 @___qalloc(), !dbg !8
   %not_max.not.not.i = icmp eq i64 %qalloc.i, -1, !dbg !8
-  br i1 %not_max.not.not.i, label %cond_48_case_0.i, label %__hugr__.__tk2_sol_qalloc.44.exit, !dbg !8
+  br i1 %not_max.not.not.i, label %cond_50_case_0.i, label %__hugr__.__tk2_sol_qalloc.46.exit, !dbg !8
 
-cond_48_case_0.i:                                 ; preds = %alloca_block
+cond_50_case_0.i:                                 ; preds = %alloca_block
   tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0"), !dbg !8
   unreachable, !dbg !8
 
-__hugr__.__tk2_sol_qalloc.44.exit:                ; preds = %alloca_block
+__hugr__.__tk2_sol_qalloc.46.exit:                ; preds = %alloca_block
   tail call void @___reset(i64 %qalloc.i), !dbg !8
   %qalloc.i6676 = tail call i64 @___qalloc(), !dbg !9
   %not_max.not.not.i6777 = icmp eq i64 %qalloc.i6676, -1, !dbg !9
-  br i1 %not_max.not.not.i6777, label %cond_48_case_0.i68, label %__hugr__.__tk2_sol_qalloc.44.exit69, !dbg !9
+  br i1 %not_max.not.not.i6777, label %cond_50_case_0.i68, label %__hugr__.__tk2_sol_qalloc.46.exit69, !dbg !9
 
-cond_48_case_0.i68:                               ; preds = %.backedge, %__hugr__.__tk2_sol_qalloc.44.exit
+cond_50_case_0.i68:                               ; preds = %.backedge, %__hugr__.__tk2_sol_qalloc.46.exit
   tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0"), !dbg !9
   unreachable, !dbg !9
 
-__hugr__.__tk2_sol_qalloc.44.exit69:              ; preds = %__hugr__.__tk2_sol_qalloc.44.exit, %.backedge
-  %qalloc.i6678 = phi i64 [ %qalloc.i66, %.backedge ], [ %qalloc.i6676, %__hugr__.__tk2_sol_qalloc.44.exit ]
+__hugr__.__tk2_sol_qalloc.46.exit69:              ; preds = %__hugr__.__tk2_sol_qalloc.46.exit, %.backedge
+  %qalloc.i6678 = phi i64 [ %qalloc.i66, %.backedge ], [ %qalloc.i6676, %__hugr__.__tk2_sol_qalloc.46.exit ]
   tail call void @___reset(i64 %qalloc.i6678), !dbg !9
   tail call void @___rp(i64 %qalloc.i6678, double 0x3FF921FB54442D18, double 0xBFF921FB54442D18), !dbg !10
   tail call void @___rz(i64 %qalloc.i6678, double 0x400921FB54442D18), !dbg !10
   tail call void @___rz(i64 %qalloc.i6678, double 0xBFE921FB54442D18)
   %qalloc.i70 = tail call i64 @___qalloc(), !dbg !11
   %not_max.not.not.i71 = icmp eq i64 %qalloc.i70, -1, !dbg !11
-  br i1 %not_max.not.not.i71, label %cond_48_case_0.i72, label %__hugr__.__tk2_sol_qalloc.44.exit73, !dbg !11
+  br i1 %not_max.not.not.i71, label %cond_50_case_0.i72, label %__hugr__.__tk2_sol_qalloc.46.exit73, !dbg !11
 
-cond_48_case_0.i72:                               ; preds = %__hugr__.__tk2_sol_qalloc.44.exit69
+cond_50_case_0.i72:                               ; preds = %__hugr__.__tk2_sol_qalloc.46.exit69
   tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0"), !dbg !11
   unreachable, !dbg !11
 
-__hugr__.__tk2_sol_qalloc.44.exit73:              ; preds = %__hugr__.__tk2_sol_qalloc.44.exit69
+__hugr__.__tk2_sol_qalloc.46.exit73:              ; preds = %__hugr__.__tk2_sol_qalloc.46.exit69
   tail call void @___reset(i64 %qalloc.i70), !dbg !11
   tail call void @___rp(i64 %qalloc.i70, double 0x3FF921FB54442D18, double 0xBFF921FB54442D18)
   tail call void @___rz(i64 %qalloc.i70, double 0x400921FB54442D18)
@@ -56,16 +56,16 @@ __hugr__.__tk2_sol_qalloc.44.exit73:              ; preds = %__hugr__.__tk2_sol_
   tail call void @___dec_future_refcount(i64 %___future_measure), !dbg !13
   br i1 %read_bool, label %1, label %0
 
-0:                                                ; preds = %__hugr__.__tk2_sol_qalloc.44.exit73
+0:                                                ; preds = %__hugr__.__tk2_sol_qalloc.46.exit73
   tail call void @___qfree(i64 %qalloc.i70), !dbg !14
   br label %.backedge
 
 .backedge:                                        ; preds = %0, %2
   %qalloc.i66 = tail call i64 @___qalloc(), !dbg !9
   %not_max.not.not.i67 = icmp eq i64 %qalloc.i66, -1, !dbg !9
-  br i1 %not_max.not.not.i67, label %cond_48_case_0.i68, label %__hugr__.__tk2_sol_qalloc.44.exit69, !dbg !9
+  br i1 %not_max.not.not.i67, label %cond_50_case_0.i68, label %__hugr__.__tk2_sol_qalloc.46.exit69, !dbg !9
 
-1:                                                ; preds = %__hugr__.__tk2_sol_qalloc.44.exit73
+1:                                                ; preds = %__hugr__.__tk2_sol_qalloc.46.exit73
   tail call void @___rz(i64 %qalloc.i, double 0x3FE921FB54442D18)
   tail call void @___rz(i64 %qalloc.i, double 0x400921FB54442D18)
   tail call void @___rp(i64 %qalloc.i, double 0x3FF921FB54442D18, double 0x3FF921FB54442D18)
@@ -135,7 +135,7 @@ attributes #0 = { noreturn }
 !name = !{!3}
 
 !0 = !{i32 2, !"Debug Info Version", i32 3}
-!1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "guppylang (guppylang-internals-v1.1.4)-v1.1.4", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "guppylang (guppylang-internals-v1.2.0)-v1.2.0", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
 !3 = !{!"mainlib"}
 !4 = distinct !DISubprogram(name: "rus.<locals>.main", linkageName: "__hugr__.__main__.rus.<locals>.main.1", scope: null, file: !5, line: 187, type: !6, scopeLine: 188, spFlags: DISPFlagDefinition, unit: !1)
 !6 = !DISubroutineType(types: !7)
