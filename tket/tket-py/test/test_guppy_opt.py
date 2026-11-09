@@ -79,21 +79,11 @@ def _run_clifford_simp(hugr: Hugr) -> Hugr:
     return result.hugr
 
 
-class FailedAsExpected(Exception):
-    pass
-
-
-def _xfail_param(name, version_suffix, expected):
-    return pytest.param(
-        name, version_suffix, expected, marks=pytest.mark.xfail(raises=FailedAsExpected)
-    )
-
-
 @pytest.mark.parametrize(
     "name,version_suffix,expected",
     [
         ("nested_array", "", None),
-        _xfail_param(
+        (
             "angles",
             "1.1",
             {
@@ -102,7 +92,7 @@ def _xfail_param(name, version_suffix, expected):
                 "tket.result.result_bool": 1,
             },
         ),
-        _xfail_param(
+        (
             "angles",
             "",
             {
@@ -111,7 +101,7 @@ def _xfail_param(name, version_suffix, expected):
                 "tket.result.result_bool": 1,
             },
         ),
-        _xfail_param(
+        (
             "simple_cx",
             "",
             {
@@ -122,7 +112,7 @@ def _xfail_param(name, version_suffix, expected):
         ),
         ("nested", "", None),
         ("ranges", "", None),
-        _xfail_param(
+        (
             "false_branch",
             "",
             {
@@ -131,7 +121,7 @@ def _xfail_param(name, version_suffix, expected):
                 "tket.result.result_bool": 1,
             },
         ),
-        _xfail_param(
+        (
             "func_decls",
             "",
             {
@@ -163,7 +153,7 @@ def test_optimize_flattened_guppy(name, version_suffix, expected):
     if expected is not None:
         assert actual_counts != optimized_counts
         assert actual_counts == expected
-        raise FailedAsExpected()
+        pytest.xfail()
     else:
         assert actual_counts == optimized_counts
 
