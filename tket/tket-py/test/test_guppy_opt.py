@@ -76,11 +76,17 @@ def _run_clifford_simp(hugr: Hugr) -> Hugr:
     return result.hugr
 
 
+def _xfail_param(name, version_suffix, expected):
+    return pytest.param(
+        name, version_suffix, expected, marks=pytest.mark.xfail(match="xfail")
+    )
+
+
 @pytest.mark.parametrize(
     "name,version_suffix,expected",
     [
         ("nested_array", "", None),
-        pytest.param(
+        _xfail_param(
             "angles",
             "1.1",
             {
@@ -88,9 +94,8 @@ def _run_clifford_simp(hugr: Hugr) -> Hugr:
                 "tket.quantum.QAlloc": 1,
                 "tket.result.result_bool": 1,
             },
-            marks=pytest.mark.xfail(reason="xfail"),
         ),
-        pytest.param(
+        _xfail_param(
             "angles",
             "",
             {
@@ -98,9 +103,8 @@ def _run_clifford_simp(hugr: Hugr) -> Hugr:
                 "tket.quantum.QAlloc": 1,
                 "tket.result.result_bool": 1,
             },
-            marks=pytest.mark.xfail(reason="xfail"),
         ),
-        pytest.param(
+        _xfail_param(
             "simple_cx",
             "",
             {
@@ -108,11 +112,10 @@ def _run_clifford_simp(hugr: Hugr) -> Hugr:
                 "tket.quantum.MeasureFree": 2,
                 "tket.result.result_bool": 2,
             },
-            marks=pytest.mark.xfail(reason="xfail"),
         ),
         ("nested", "", None),
         ("ranges", "", None),
-        pytest.param(
+        _xfail_param(
             "false_branch",
             "",
             {
@@ -120,16 +123,14 @@ def _run_clifford_simp(hugr: Hugr) -> Hugr:
                 "tket.quantum.MeasureFree": 1,
                 "tket.result.result_bool": 1,
             },
-            marks=pytest.mark.xfail(reason="xfail"),
         ),
-        pytest.param(
+        _xfail_param(
             "func_decls",
             "",
             {
                 "TKET1.tk1op": 2,
                 "tket.quantum.symbolic_angle": 1,
             },
-            marks=pytest.mark.xfail(reason="xfail"),
         ),
     ],
 )
