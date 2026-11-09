@@ -15,13 +15,12 @@ from tket.passes import Normalize, PytketHugrPass, QSystemRebasePass, _QSystemLL
 pytket = pytest.importorskip("pytket")
 from pytket.passes import CliffordSimp, RemoveBarriers
 
-test_files_path = Path(__file__).parents[3] / "test_files"
-base_path = test_files_path / "guppy_optimization"
+guppy_opt_path = Path("guppy_optimization")
 
 
 def _hugr_from_path(path: Path) -> Hugr:
     """Load a HUGR from a file."""
-    with open(path, "rb") as f:
+    with open(Path(__file__).parents[3] / "test_files" / path, "rb") as f:
         h = Package.from_bytes(f.read(), tket_registry())
     return h.modules[0]
 
@@ -50,7 +49,9 @@ def _load_guppy_circuit(
 
     dir_suffix = f"-v{version_suffix}" if version_suffix else ""
 
-    return _hugr_from_path(base_path / f"{name}{dir_suffix}" / f"{name}{suffix}.hugr")
+    return _hugr_from_path(
+        guppy_opt_path / f"{name}{dir_suffix}" / f"{name}{suffix}.hugr"
+    )
 
 
 def _count_gates(hugr: Hugr) -> dict[str, int]:
@@ -140,9 +141,8 @@ def test_optimize_flattened_guppy(
     hugr = _run_clifford_simp(hugr)
 
     actual_counts = _count_gates(hugr)
-    optimized_counts = _count_gates(
-        _load_guppy_circuit(name, version_suffix, "optimized")
-    )
+    optimized_hugr = _load_guppy_circuit(name, version_suffix, "optimized")
+    optimized_counts = _count_gates(optimized_hugr)
 
     if expected is not None:
         assert actual_counts != optimized_counts
@@ -185,7 +185,7 @@ def test_optimize_guppy_ranges_array() -> None:
     This is a test that after control flow is flattened, but the array ops are not,
     we can still optimize them completely.
     """
-    hugr = _hugr_from_path(base_path / "ranges" / "ranges.flat.array.hugr")
+    hugr = _hugr_from_path(guppy_opt_path / "ranges" / "ranges.flat.array.hugr")
 
     hugr = Normalize()(hugr)
     hugr = _run_clifford_simp(hugr)
@@ -238,7 +238,7 @@ def test_issue_1577_remove_barriers_reassembles_nested_circuits() -> None:
 
     RemoveBarriers should properly reassemble nested circuits.
     """
-    hugr = _hugr_from_path(test_files_path / "guppy_examples" / "issue_1577.hugr")
+    hugr = _hugr_from_path(Path("guppy_examples") / "issue_1577.hugr")
 
     result = PytketHugrPass(RemoveBarriers()).run(hugr)
 
