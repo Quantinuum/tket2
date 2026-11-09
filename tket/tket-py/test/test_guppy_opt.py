@@ -5,6 +5,7 @@ from typing import Literal
 
 import pytest
 from hugr.build.base import Hugr
+from hugr.ops import AsExtOp
 from hugr.package import Package
 from tket_exts import tket_registry
 
@@ -60,12 +61,14 @@ def _count_gates(hugr: Hugr) -> dict[str, int]:
     """
     counts = {}
     for _, data in hugr.nodes():
-        op_name = data.op.name()
-        # Count operations from the relevant extensions
-        if any(
-            op_name.startswith(prefix) for prefix in ["tket.", "TKET1.", "tket.result."]
-        ):
-            counts[op_name] = counts.get(op_name, 0) + 1
+        if isinstance(data.op, AsExtOp):
+            op_name = data.op.op_def().qualified_name()
+            # Count operations from the relevant extensions
+            if any(
+                op_name.startswith(prefix)
+                for prefix in ["tket.quantum.", "TKET1.", "tket.result."]
+            ):
+                counts[op_name] = counts.get(op_name, 0) + 1
     return counts
 
 
