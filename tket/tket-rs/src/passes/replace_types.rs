@@ -1319,6 +1319,7 @@ pub(super) mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn partial_replace() {
         let e = Extension::new_arc(
             IdentList::new_unchecked("NoBoundsCheck"),

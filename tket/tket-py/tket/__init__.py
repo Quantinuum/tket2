@@ -20,6 +20,5 @@ __all__ = [
 ]
 
 
-# This is updated by our release-please workflow, triggered by this
-# annotation: x-release-please-version
-__version__ = "0.15.11"
+# Updated by the release-please workflow.
+__version__ = "0.15.14"  # x-release-please-version

@@ -607,6 +607,7 @@ pub(crate) mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_cond_then_loop_separate() -> Result<(), BuildError> {
         //               /-> left --\
         // entry -> split            > merge -> head -> tail -> exit
@@ -686,6 +687,7 @@ pub(crate) mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_cond_then_loop_combined() -> Result<(), BuildError> {
         // Here we would like two consecutive regions, but there is no *edge* between
         // the conditional and the loop to indicate the boundary, so we cannot separate them.
@@ -724,6 +726,7 @@ pub(crate) mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_cond_in_loop_separate_headers() -> Result<(), BuildError> {
         let (mut h, head, tail) = build_conditional_in_loop_cfg(true)?;
         let head = head.node();
@@ -777,6 +780,7 @@ pub(crate) mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_cond_in_loop_combined_headers() -> Result<(), BuildError> {
         let (h, head, tail) = build_conditional_in_loop_cfg(false)?;
         let head = head.node();
@@ -821,6 +825,7 @@ pub(crate) mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn incorrect_insertion() {
         let (mut h, _, tail) = build_conditional_in_loop_cfg(false).unwrap();
 

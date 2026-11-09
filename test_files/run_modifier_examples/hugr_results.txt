@@ -42,6 +42,9 @@ loaded_pytket_solved:
 	110 -> 0.25-0.25j
 	111 -> 0.25-0.25j
 -----
+multiple_fun_call_solved:
+	0 -> 1+0j
+-----
 multiple_functions_solved:
 	00 -> 0.7071+0j
 	10 -> 0+0.6124j
@@ -58,6 +61,11 @@ simple_higher_order_solved:
 	000 -> 0.7071+0j
 	100 -> 0.5+0j
 	111 -> 0-0.5j
+-----
+struct_in_dagger_ctrl_solved:
+	00 -> 0.6124+0j
+	01 -> 0.3536+0j
+	10 -> 0.7071+0j
 -----
 subscript_in_dagger_ctrl_solved:
 	0100 -> 0.7071+0j
