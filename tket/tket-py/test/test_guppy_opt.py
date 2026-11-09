@@ -54,16 +54,11 @@ def _load_guppy_circuit(
 
 
 def _count_gates(hugr: Hugr) -> dict[str, int]:
-    """Count gates by their operation names (which include qualified IDs).
-
-    Only counts operations from tket, tket1, and result extensions.
-    Returns a mapping from operation name to count.
-    """
+    """Returns mapping from qualified ID to count for gates and result ops only"""
     counts: dict[str, int] = {}
     for _, data in hugr.nodes():
         if isinstance(data.op, AsExtOp):
             op_name = data.op.op_def().qualified_name()
-            # Count operations from the relevant extensions
             if any(
                 op_name.startswith(prefix)
                 for prefix in ["tket.quantum.", "TKET1.", "tket.result."]
@@ -83,6 +78,9 @@ def _run_clifford_simp(hugr: Hugr) -> Hugr:
     "name,version_suffix,expected",
     [
         ("nested_array", "", None),
+        # There was a significant change to angles between guppylang v1.1.x and v1.2,
+        # hence the second testcase, but this only shows up when looking at rotation ops
+        # - see test_angles_rotations.
         (
             "angles",
             "1.1",
@@ -131,16 +129,13 @@ def _run_clifford_simp(hugr: Hugr) -> Hugr:
 def test_optimize_flattened_guppy(
     name: str, version_suffix: str, expected: dict[str, int] | None
 ) -> None:
-    """Test optimizing flattened Guppy circuits.
-
-    Run Normalize and CliffordSimp on flattened Guppy circuits and check
-    that they match the expected optimized counts.
-    """
     try:
         hugr = _load_guppy_circuit(name, version_suffix, "flat")
     except FileNotFoundError:
         hugr = _load_guppy_circuit(name, version_suffix, "original")
 
+    # We don't need Normalize to "flatten" control flow here, but we still want
+    # to get rid of other guppy artifacts.
     hugr = Normalize()(hugr)
     hugr = _run_clifford_simp(hugr)
 
@@ -160,16 +155,11 @@ def test_optimize_flattened_guppy(
 @pytest.mark.parametrize(
     "version_suffix,expected",
     [
-        ("1.1", 0),
-        ("", 10),
+        ("1.1", 0),  # previously working as desired
+        ("", 10),  # now: https://github.com/Quantinuum/tket2/issues/2130
     ],
 )
 def test_angles_rotations(version_suffix, expected) -> None:
-    """Test counting from_halfturns operations in angles circuits.
-
-    Regression test for issue https://github.com/Quantinuum/tket2/issues/2130
-    """
-
     def count_from_halfturns(hugr: Hugr) -> int:
         return sum(
             int(data.op.name().startswith("tket.rotation.from_halfturns"))
@@ -179,6 +169,8 @@ def test_angles_rotations(version_suffix, expected) -> None:
     hugr = _load_guppy_circuit("angles", version_suffix, "flat")
     assert count_from_halfturns(hugr) == 2
 
+    # We don't need Normalize to "flatten" control flow here, but we still want
+    # to get rid of other guppy artifacts.
     hugr = Normalize()(hugr)
     hugr = _run_clifford_simp(hugr)
 
