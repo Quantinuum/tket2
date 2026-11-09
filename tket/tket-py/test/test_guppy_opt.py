@@ -129,6 +129,8 @@ def _run_clifford_simp(hugr: Hugr) -> Hugr:
 def test_optimize_flattened_guppy(
     name: str, version_suffix: str, expected: dict[str, int] | None
 ) -> None:
+    """Test that given Guppy whose control-flow has been flattened by hand,
+    the optimizer can do the rest."""
     try:
         hugr = _load_guppy_circuit(name, version_suffix, "flat")
     except FileNotFoundError:
@@ -181,9 +183,7 @@ def test_angles_rotations(version_suffix, expected) -> None:
 def test_optimize_guppy_ranges_array() -> None:
     """Demonstrates we can fully optimize the array operations in ranges.
 
-    This is a test that after control flow is flattened, but the array ops are not,
-    we can still optimize them completely.
-    """
+    (i.e. after control flow is flattened, but the array ops are not)"""
     hugr = _test_files_hugr(guppy_opt_path / "ranges" / "ranges.flat.array.hugr")
 
     hugr = Normalize()(hugr)
