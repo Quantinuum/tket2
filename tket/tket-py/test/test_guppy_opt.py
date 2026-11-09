@@ -76,9 +76,13 @@ def _run_clifford_simp(hugr: Hugr) -> Hugr:
     return result.hugr
 
 
+class FailedAsExpected(Exception):
+    pass
+
+
 def _xfail_param(name, version_suffix, expected):
     return pytest.param(
-        name, version_suffix, expected, marks=pytest.mark.xfail(match="xfail")
+        name, version_suffix, expected, marks=pytest.mark.xfail(raises=FailedAsExpected)
     )
 
 
@@ -156,7 +160,7 @@ def test_optimize_flattened_guppy(name, version_suffix, expected):
     if expected is not None:
         assert actual_counts != optimized_counts
         assert actual_counts == expected
-        pytest.xfail()
+        raise FailedAsExpected()
     else:
         assert actual_counts == optimized_counts
 
