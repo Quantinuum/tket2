@@ -178,7 +178,7 @@ fn test_angles_rotations(#[case] version_suffix: &str, #[case] expected: usize) 
     Normalize::default().run(&mut hugr).unwrap();
     run_pytket(&mut hugr, CLIFFORD_SIMP_STR);
 
-    let optimized = &load_guppy_circuit("angles", version_suffix, HugrFileType::Optimized).unwrap();
+    let optimized = load_guppy_circuit("angles", version_suffix, HugrFileType::Optimized).unwrap();
     assert_eq!(count_from_halfturns(&optimized), 0);
     assert_eq!(count_from_halfturns(&hugr), expected);
 }
