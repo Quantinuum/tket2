@@ -2,12 +2,12 @@
 
 use rayon::iter::ParallelIterator;
 use smol_str::SmolStr;
-use tket_qsystem::extension::REGISTRY;
 use std::collections::HashMap;
 use std::fs;
 use std::io::BufReader;
 use std::path::Path;
 use tket::extension::{TKET_EXTENSION_ID, TKET1_EXTENSION_ID};
+use tket_qsystem::extension::REGISTRY;
 use tket_qsystem::extension::result::EXTENSION_ID as RESULT_EXTENSION_ID;
 
 use hugr::{Hugr, HugrView};
@@ -33,13 +33,21 @@ enum HugrFileType {
     Optimized,
 }
 
-fn load_guppy_circuit(name: &str, file_type: HugrFileType) -> std::io::Result<Hugr> {
+fn load_guppy_circuit(
+    name: &str,
+    version_suffix: Option<&str>,
+    file_type: HugrFileType,
+) -> std::io::Result<Hugr> {
     let suffix = match file_type {
         HugrFileType::Original => "",
         HugrFileType::Flat => ".flat",
         HugrFileType::Optimized => ".opt",
     };
-    load_guppy_example(&format!("{name}/{name}{suffix}.hugr"))
+    let dir_suffix = match version_suffix {
+        Some(v) => format!("-{v}"),
+        None => String::new(),
+    };
+    load_guppy_example(&format!("{name}{dir_suffix}/{name}{suffix}.hugr"))
 }
 
 fn load_guppy_example(path: &str) -> std::io::Result<Hugr> {
@@ -93,36 +101,50 @@ fn count_gates(h: &impl HugrView) -> HashMap<SmolStr, usize> {
 ///
 
 #[rstest]
-#[case::nested_array("nested_array", None)]
+#[case::nested_array("nested_array", None, None)]
+// There was a significant change to angles between guppylang v1.1.x and v1.2,
+// hence the second testcase, but this only shows up when looking at rotation ops
+// - see test_angles_rotations.
 #[should_panic = "xfail"]
-#[case::angles("angles", Some(vec![
+#[case::angles_v1_1("angles", Some("v1.1"), Some(vec![
     ("tket.quantum.MeasureFree", 1), ("tket.quantum.QAlloc", 1), ("tket.result.result_bool", 1)
 ]))]
 #[should_panic = "xfail"]
-#[case::simple_cx("simple_cx", Some(vec![
+#[case::angles("angles", None, Some(vec![
+    ("tket.quantum.MeasureFree", 1), ("tket.quantum.QAlloc", 1), ("tket.result.result_bool", 1)
+]))]
+#[should_panic = "xfail"]
+#[case::simple_cx("simple_cx", None, Some(vec![
     ("tket.quantum.QAlloc", 2), ("tket.quantum.MeasureFree", 2), ("tket.result.result_bool", 2)
 ]))]
-#[case::nested("nested", None)]
-#[case::ranges("ranges", None)]
+#[case::nested("nested", None, None)]
+#[case::ranges("ranges", None, None)]
 #[should_panic = "xfail"]
-#[case::false_branch("false_branch", Some(vec![
+#[case::false_branch("false_branch", None, Some(vec![
     ("tket.quantum.QAlloc", 1), ("tket.quantum.MeasureFree", 1), ("tket.result.result_bool", 1)
 ]))]
 #[should_panic = "xfail"]
-#[case::func_decls("func_decls", Some(vec![
+#[case::func_decls("func_decls", None, Some(vec![
     ("TKET1.tk1op", 2), ("tket.quantum.symbolic_angle", 1)
 ]))]
 #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
-fn optimize_flattened_guppy(#[case] name: &str, #[case] xfail: Option<Vec<(&str, usize)>>) {
-    let mut hugr = load_guppy_circuit(name, HugrFileType::Flat)
-        .unwrap_or_else(|_| load_guppy_circuit(name, HugrFileType::Original).unwrap());
+fn optimize_flattened_guppy(
+    #[case] name: &str,
+    #[case] version_suffix: Option<&str>,
+    #[case] xfail: Option<Vec<(&str, usize)>>,
+) {
+    let mut hugr =
+        load_guppy_circuit(name, version_suffix, HugrFileType::Flat).unwrap_or_else(|_| {
+            load_guppy_circuit(name, version_suffix, HugrFileType::Original).unwrap()
+        });
     // We don't need Normalize to "flatten" control flow here, but we still want
     // to get rid of other guppy artifacts.
     Normalize::default().run(&mut hugr).unwrap();
     run_pytket(&mut hugr, CLIFFORD_SIMP_STR);
 
     let actual_counts = count_gates(&hugr);
-    let optimized_counts = count_gates(&load_guppy_circuit(name, HugrFileType::Optimized).unwrap());
+    let optimized_counts =
+        count_gates(&load_guppy_circuit(name, version_suffix, HugrFileType::Optimized).unwrap());
 
     if let Some(expected) = xfail {
         assert_ne!(actual_counts, optimized_counts);
@@ -145,47 +167,51 @@ fn optimize_guppy_ranges_array() {
     run_pytket(&mut hugr, CLIFFORD_SIMP_STR);
 
     let expected_counts =
-        count_gates(&load_guppy_circuit("ranges", HugrFileType::Optimized).unwrap());
+        count_gates(&load_guppy_circuit("ranges", None, HugrFileType::Optimized).unwrap());
     assert_eq!(count_gates(&hugr), expected_counts);
 }
 
 #[rstest]
-#[case::angles("angles")]
+#[case::angles_v1_1("angles", Some("v1.1"))]
+#[case::angles("angles", None)]
 #[should_panic]
-#[case::nested("nested")]
+#[case::nested("nested", None)]
 #[should_panic]
-#[case::ranges("ranges")]
+#[case::ranges("ranges", None)]
 #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
-fn flatten_guppy(#[case] name: &str) {
-    let mut hugr = load_guppy_circuit(name, HugrFileType::Original).unwrap();
+fn flatten_guppy(#[case] name: &str, #[case] version_suffix: Option<&str>) {
+    let mut hugr = load_guppy_circuit(name, version_suffix, HugrFileType::Original).unwrap();
     Normalize::default().run(&mut hugr).unwrap();
-    let target = load_guppy_circuit(name, HugrFileType::Flat).unwrap();
+    let target = load_guppy_circuit(name, version_suffix, HugrFileType::Flat).unwrap();
     assert_eq!(count_gates(&hugr), count_gates(&target));
 }
 
 /// Check that each example optimizes to the full extent given by the .opt .hugr files.
 #[rstest]
-#[case::nested_array("nested_array")]
+#[case::nested_array("nested_array", None)]
 #[should_panic]
-#[case::angles("angles")]
+#[case::angles_v1_1("angles", Some("v1.1"))]
 #[should_panic]
-#[case::false_branch("false_branch")]
+#[case::angles("angles", None)]
 #[should_panic]
-#[case::simple_cx("simple_cx")]
+#[case::false_branch("false_branch", None)]
 #[should_panic]
-#[case::nested("nested")]
+#[case::simple_cx("simple_cx", None)]
 #[should_panic]
-#[case::ranges("ranges")]
+#[case::nested("nested", None)]
+#[should_panic]
+#[case::ranges("ranges", None)]
 #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
-fn optimize_guppy(#[case] name: &str) {
-    let mut hugr = load_guppy_circuit(name, HugrFileType::Original).unwrap();
+fn optimize_guppy(#[case] name: &str, #[case] version_suffix: Option<&str>) {
+    let mut hugr = load_guppy_circuit(name, version_suffix, HugrFileType::Original).unwrap();
     let flat = count_gates(
-        load_guppy_circuit(name, HugrFileType::Flat)
+        load_guppy_circuit(name, version_suffix, HugrFileType::Flat)
             .ok()
             .as_ref()
             .unwrap_or(&hugr),
     );
-    let opt = count_gates(&load_guppy_circuit(name, HugrFileType::Optimized).unwrap());
+    let opt =
+        count_gates(&load_guppy_circuit(name, version_suffix, HugrFileType::Optimized).unwrap());
 
     Normalize::default().run(&mut hugr).unwrap();
     assert_eq!(count_gates(&hugr), flat);
