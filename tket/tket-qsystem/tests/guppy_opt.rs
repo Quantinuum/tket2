@@ -160,6 +160,7 @@ fn optimize_flattened_guppy(
 #[rstest]
 #[case::angles_v1_1("1.1", 0)] // was working as desired
 #[case::angles("", 10)] // now: https://github.com/Quantinuum/tket2/issues/2130
+#[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
 fn test_angles_rotations(#[case] version_suffix: &str, #[case] expected: usize) {
     fn count_from_halfturns(hugr: &Hugr) -> usize {
         hugr.nodes()
