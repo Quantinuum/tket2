@@ -18,8 +18,7 @@ from pytket.passes import CliffordSimp, RemoveBarriers
 guppy_opt_path = Path("guppy_optimization")
 
 
-def _hugr_from_path(path: Path) -> Hugr:
-    """Load a HUGR from a file."""
+def _test_files_hugr(path: Path) -> Hugr:
     with open(Path(__file__).parents[3] / "test_files" / path, "rb") as f:
         h = Package.from_bytes(f.read(), tket_registry())
     return h.modules[0]
@@ -30,7 +29,7 @@ def _load_guppy_circuit(
     version_suffix: str = "",
     file_type: Literal["original", "flat", "optimized"] = "original",
 ) -> Hugr:
-    """Load a Guppy-generated circuit from test files.
+    """Load a Hugr from test_files / guppy_optimization.
 
     Args:
         name: Base name of the circuit (e.g., "angles", "nested_array")
@@ -49,7 +48,7 @@ def _load_guppy_circuit(
 
     dir_suffix = f"-v{version_suffix}" if version_suffix else ""
 
-    return _hugr_from_path(
+    return _test_files_hugr(
         guppy_opt_path / f"{name}{dir_suffix}" / f"{name}{suffix}.hugr"
     )
 
@@ -185,7 +184,7 @@ def test_optimize_guppy_ranges_array() -> None:
     This is a test that after control flow is flattened, but the array ops are not,
     we can still optimize them completely.
     """
-    hugr = _hugr_from_path(guppy_opt_path / "ranges" / "ranges.flat.array.hugr")
+    hugr = _test_files_hugr(guppy_opt_path / "ranges" / "ranges.flat.array.hugr")
 
     hugr = Normalize()(hugr)
     hugr = _run_clifford_simp(hugr)
@@ -238,7 +237,7 @@ def test_issue_1577_remove_barriers_reassembles_nested_circuits() -> None:
 
     RemoveBarriers should properly reassemble nested circuits.
     """
-    hugr = _hugr_from_path(Path("guppy_examples") / "issue_1577.hugr")
+    hugr = _test_files_hugr(Path("guppy_examples") / "issue_1577.hugr")
 
     result = PytketHugrPass(RemoveBarriers()).run(hugr)
 
