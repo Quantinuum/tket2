@@ -214,18 +214,12 @@ def test_optimize_guppy_ranges_array():
     "name,version_suffix",
     [
         ("nested_array", ""),
-        pytest.param(
-            "angles", "1.1", marks=pytest.mark.xfail(reason="expected to fail")
-        ),
-        pytest.param("angles", "", marks=pytest.mark.xfail(reason="expected to fail")),
-        pytest.param(
-            "false_branch", "", marks=pytest.mark.xfail(reason="expected to fail")
-        ),
-        pytest.param(
-            "simple_cx", "", marks=pytest.mark.xfail(reason="expected to fail")
-        ),
-        pytest.param("nested", "", marks=pytest.mark.xfail(reason="expected to fail")),
-        pytest.param("ranges", "", marks=pytest.mark.xfail(reason="expected to fail")),
+        pytest.param("angles", "1.1", marks=pytest.mark.xfail()),
+        pytest.param("angles", "", marks=pytest.mark.xfail()),
+        pytest.param("false_branch", "", marks=pytest.mark.xfail()),
+        pytest.param("simple_cx", "", marks=pytest.mark.xfail()),
+        pytest.param("nested", "", marks=pytest.mark.xfail()),
+        pytest.param("ranges", "", marks=pytest.mark.xfail()),
     ],
 )
 def test_optimize_guppy(name, version_suffix):
