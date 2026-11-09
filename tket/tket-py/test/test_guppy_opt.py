@@ -50,9 +50,7 @@ def _load_guppy_circuit(
 
     dir_suffix = f"-v{version_suffix}" if version_suffix else ""
 
-    circuit_path = base_path / f"{name}{dir_suffix}" / f"{name}{suffix}.hugr"
-
-    return _hugr_from_path(circuit_path)
+    return _hugr_from_path(base_path / f"{name}{dir_suffix}" / f"{name}{suffix}.hugr")
 
 
 def _count_gates(hugr: Hugr) -> dict[str, int]:
@@ -126,10 +124,7 @@ def _run_clifford_simp(hugr: Hugr) -> Hugr:
         (
             "func_decls",
             "",
-            {
-                "TKET1.tk1op": 2,
-                "tket.quantum.symbolic_angle": 1,
-            },
+            {"TKET1.tk1op": 2, "tket.quantum.symbolic_angle": 1},
         ),
     ],
 )
@@ -176,12 +171,10 @@ def test_angles_rotations(version_suffix, expected) -> None:
     """
 
     def count_from_halfturns(hugr: Hugr) -> int:
-        count = 0
-        for _, data in hugr.nodes():
-            op_name = data.op.name()
-            if "tket.rotation.from_halfturns" in op_name:
-                count += 1
-        return count
+        return sum(
+            int(data.op.name().startswith("tket.rotation.from_halfturns"))
+            for _, data in hugr.nodes()
+        )
 
     hugr = _load_guppy_circuit("angles", version_suffix, "flat")
     assert count_from_halfturns(hugr) == 2
@@ -200,9 +193,7 @@ def test_optimize_guppy_ranges_array() -> None:
     This is a test that after control flow is flattened, but the array ops are not,
     we can still optimize them completely.
     """
-    hugr_path = base_path / "ranges" / "ranges.flat.array.hugr"
-
-    hugr = _hugr_from_path(hugr_path)
+    hugr = _hugr_from_path(base_path / "ranges" / "ranges.flat.array.hugr")
 
     hugr = Normalize()(hugr)
     hugr = _run_clifford_simp(hugr)
@@ -255,11 +246,8 @@ def test_issue_1577_remove_barriers_reassembles_nested_circuits() -> None:
 
     RemoveBarriers should properly reassemble nested circuits.
     """
-    hugr_path = test_files_path / "guppy_examples" / "issue_1577.hugr"
+    hugr = _hugr_from_path(test_files_path / "guppy_examples" / "issue_1577.hugr")
 
-    hugr = _hugr_from_path(hugr_path)
-
-    remove_barriers_pass = PytketHugrPass(RemoveBarriers())
-    result = remove_barriers_pass.run(hugr)
+    result = PytketHugrPass(RemoveBarriers()).run(hugr)
 
     CompilationState.from_python(result.hugr).validate()
