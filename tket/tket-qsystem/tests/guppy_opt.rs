@@ -35,7 +35,7 @@ enum HugrFileType {
 
 fn load_guppy_circuit(
     name: &str,
-    version_suffix: Option<&str>,
+    version_suffix: &str,
     file_type: HugrFileType,
 ) -> std::io::Result<Hugr> {
     let suffix = match file_type {
@@ -43,9 +43,10 @@ fn load_guppy_circuit(
         HugrFileType::Flat => ".flat",
         HugrFileType::Optimized => ".opt",
     };
-    let dir_suffix = match version_suffix {
-        Some(v) => format!("-{v}"),
-        None => String::new(),
+    let dir_suffix = if version_suffix.is_empty() {
+        String::new()
+    } else {
+        format!("-v{version_suffix}")
     };
     load_guppy_example(&format!("{name}{dir_suffix}/{name}{suffix}.hugr"))
 }
@@ -101,33 +102,33 @@ fn count_gates(h: &impl HugrView) -> HashMap<SmolStr, usize> {
 ///
 
 #[rstest]
-#[case::nested_array("nested_array", None, None)]
+#[case::nested_array("nested_array", "", None)]
 #[should_panic = "xfail"]
-#[case::angles_v1_1("angles", Some("v1.1"), Some(vec![
+#[case::angles_v1_1("angles", "1.1", Some(vec![
     ("tket.quantum.MeasureFree", 1), ("tket.quantum.QAlloc", 1), ("tket.result.result_bool", 1)
 ]))]
 #[should_panic = "xfail"]
-#[case::angles("angles", None, Some(vec![
+#[case::angles("angles", "", Some(vec![
     ("tket.quantum.MeasureFree", 1), ("tket.quantum.QAlloc", 1), ("tket.result.result_bool", 1)
 ]))]
 #[should_panic = "xfail"]
-#[case::simple_cx("simple_cx", None, Some(vec![
+#[case::simple_cx("simple_cx", "", Some(vec![
     ("tket.quantum.QAlloc", 2), ("tket.quantum.MeasureFree", 2), ("tket.result.result_bool", 2)
 ]))]
-#[case::nested("nested", None, None)]
-#[case::ranges("ranges", None, None)]
+#[case::nested("nested", "", None)]
+#[case::ranges("ranges", "", None)]
 #[should_panic = "xfail"]
-#[case::false_branch("false_branch", None, Some(vec![
+#[case::false_branch("false_branch", "", Some(vec![
     ("tket.quantum.QAlloc", 1), ("tket.quantum.MeasureFree", 1), ("tket.result.result_bool", 1)
 ]))]
 #[should_panic = "xfail"]
-#[case::func_decls("func_decls", None, Some(vec![
+#[case::func_decls("func_decls", "", Some(vec![
     ("TKET1.tk1op", 2), ("tket.quantum.symbolic_angle", 1)
 ]))]
 #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
 fn optimize_flattened_guppy(
     #[case] name: &str,
-    #[case] version_suffix: Option<&str>,
+    #[case] version_suffix: &str,
     #[case] xfail: Option<Vec<(&str, usize)>>,
 ) {
     let mut hugr =
@@ -164,19 +165,19 @@ fn optimize_guppy_ranges_array() {
     run_pytket(&mut hugr, CLIFFORD_SIMP_STR);
 
     let expected_counts =
-        count_gates(&load_guppy_circuit("ranges", None, HugrFileType::Optimized).unwrap());
+        count_gates(&load_guppy_circuit("ranges", "", HugrFileType::Optimized).unwrap());
     assert_eq!(count_gates(&hugr), expected_counts);
 }
 
 #[rstest]
-#[case::angles_v1_1("angles", Some("v1.1"))]
-#[case::angles("angles", None)]
+#[case::angles_v1_1("angles", "1.1")]
+#[case::angles("angles", "")]
 #[should_panic]
-#[case::nested("nested", None)]
+#[case::nested("nested", "")]
 #[should_panic]
-#[case::ranges("ranges", None)]
+#[case::ranges("ranges", "")]
 #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
-fn flatten_guppy(#[case] name: &str, #[case] version_suffix: Option<&str>) {
+fn flatten_guppy(#[case] name: &str, #[case] version_suffix: &str) {
     let mut hugr = load_guppy_circuit(name, version_suffix, HugrFileType::Original).unwrap();
     Normalize::default().run(&mut hugr).unwrap();
     let target = load_guppy_circuit(name, version_suffix, HugrFileType::Flat).unwrap();
@@ -185,21 +186,21 @@ fn flatten_guppy(#[case] name: &str, #[case] version_suffix: Option<&str>) {
 
 /// Check that each example optimizes to the full extent given by the .opt .hugr files.
 #[rstest]
-#[case::nested_array("nested_array", None)]
+#[case::nested_array("nested_array", "")]
 #[should_panic]
-#[case::angles_v1_1("angles", Some("v1.1"))]
+#[case::angles_v1_1("angles", "1.1")]
 #[should_panic]
-#[case::angles("angles", None)]
+#[case::angles("angles", "")]
 #[should_panic]
-#[case::false_branch("false_branch", None)]
+#[case::false_branch("false_branch", "")]
 #[should_panic]
-#[case::simple_cx("simple_cx", None)]
+#[case::simple_cx("simple_cx", "")]
 #[should_panic]
-#[case::nested("nested", None)]
+#[case::nested("nested", "")]
 #[should_panic]
-#[case::ranges("ranges", None)]
+#[case::ranges("ranges", "")]
 #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
-fn optimize_guppy(#[case] name: &str, #[case] version_suffix: Option<&str>) {
+fn optimize_guppy(#[case] name: &str, #[case] version_suffix: &str) {
     let mut hugr = load_guppy_circuit(name, version_suffix, HugrFileType::Original).unwrap();
     let flat = count_gates(
         load_guppy_circuit(name, version_suffix, HugrFileType::Flat)
