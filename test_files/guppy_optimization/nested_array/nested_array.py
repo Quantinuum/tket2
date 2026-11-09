@@ -1,7 +1,8 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang ==0.21.13",
+#     "guppylang==1.1.4",
+#     "guppylang-internals==1.1.4",
 # ]
 # ///
 
@@ -19,5 +20,6 @@ def main(arr: array[array[qubit, 5], 3]) -> None:
     cx(arr[0][1], arr[0][2])
 
 
-program = main.compile_function()
+# Output unoptimized Hugr so we can see the effect of optimization during test.
+program = main.with_minimal_opt().compile_function()
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
