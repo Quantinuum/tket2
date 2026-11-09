@@ -102,9 +102,6 @@ fn count_gates(h: &impl HugrView) -> HashMap<SmolStr, usize> {
 
 #[rstest]
 #[case::nested_array("nested_array", None, None)]
-// There was a significant change to angles between guppylang v1.1.x and v1.2,
-// hence the second testcase, but this only shows up when looking at rotation ops
-// - see test_angles_rotations.
 #[should_panic = "xfail"]
 #[case::angles_v1_1("angles", Some("v1.1"), Some(vec![
     ("tket.quantum.MeasureFree", 1), ("tket.quantum.QAlloc", 1), ("tket.result.result_bool", 1)
