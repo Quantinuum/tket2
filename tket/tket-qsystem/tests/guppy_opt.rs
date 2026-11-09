@@ -103,6 +103,9 @@ fn count_gates(h: &impl HugrView) -> HashMap<SmolStr, usize> {
 
 #[rstest]
 #[case::nested_array("nested_array", "", None)]
+// There was a significant change to angles between guppylang v1.1.x and v1.2,
+// hence the second testcase, but this only shows up when looking at rotation ops
+// - see test_angles_rotations.
 #[should_panic = "xfail"]
 #[case::angles_v1_1("angles", "1.1", Some(vec![
     ("tket.quantum.MeasureFree", 1), ("tket.quantum.QAlloc", 1), ("tket.result.result_bool", 1)
@@ -152,6 +155,32 @@ fn optimize_flattened_guppy(
     } else {
         assert_eq!(actual_counts, optimized_counts);
     }
+}
+
+#[rstest]
+#[case::angles_v1_1("1.1", 0)] // was working as desired
+#[case::angles("", 10)] // now: https://github.com/Quantinuum/tket2/issues/2130
+fn test_angles_rotations(#[case] version_suffix: &str, #[case] expected: usize) {
+    fn count_from_halfturns(hugr: &Hugr) -> usize {
+        hugr.nodes()
+            .filter(|n| {
+                hugr.get_optype(*n).as_extension_op().is_some_and(|eop| {
+                    eop.qualified_id()
+                        .starts_with("tket.rotation.from_halfturns")
+                })
+            })
+            .count()
+    }
+    let mut hugr = load_guppy_circuit("angles", version_suffix, HugrFileType::Flat).unwrap();
+    assert_eq!(count_from_halfturns(&hugr), 2);
+    // We don't need Normalize to "flatten" control flow here, but we still want
+    // to get rid of other guppy artifacts.
+    Normalize::default().run(&mut hugr).unwrap();
+    run_pytket(&mut hugr, CLIFFORD_SIMP_STR);
+
+    let optimized = &load_guppy_circuit("angles", version_suffix, HugrFileType::Optimized).unwrap();
+    assert_eq!(count_from_halfturns(&optimized), 0);
+    assert_eq!(count_from_halfturns(&hugr), expected);
 }
 
 #[rstest]
