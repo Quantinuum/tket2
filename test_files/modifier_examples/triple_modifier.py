@@ -16,7 +16,7 @@ from guppylang import enable_experimental_features, guppy
 from guppylang.std.builtins import control, dagger, power
 from guppylang.std.debug import state_result
 from guppylang.std.num import nat
-from guppylang.std.quantum import angle, discard, h, qubit, ry
+from guppylang.std.quantum import angle, discard, h, qubit, x
 
 enable_experimental_features()
 
@@ -27,7 +27,7 @@ def fun(q: qubit, i: nat, p: qubit) -> None:
 
 
 @guppy
-def main(
+def inner(
     c1: qubit, c2: qubit, i: nat, q: qubit
 ) -> None:  # , c2: qubit, t: qubit) -> None:
     # c1 = qubit()
@@ -40,15 +40,27 @@ def main(
         fun(c1, i, q)
 
     with control(c1):
+        x(q)
         with power(i):
+            x(c2)
             with control(c2):  # , dagger:
-                h(q)
+                x(q)
 
     # with dagger:
     #     h(t)
 
-    # state_result("r", c1, t)
-    # discard(c1)
+
+@guppy
+def main() -> None:
+    q1 = qubit()
+    q2 = qubit()
+    q3 = qubit()
+    inner(q1, q2, 3, q3)
+
+    state_result("r", q1)
+    discard(q1)
+    discard(q2)
+    discard(q3)
     # discard(t)
 
 
