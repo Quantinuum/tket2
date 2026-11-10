@@ -3,7 +3,7 @@ source_filename = "hugr"
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
 
-@s_Postselect.13DF1CD0.0 = private constant [21 x i8] c"\14Postselection failed"
+@e_Postselect.558881BF.0 = private constant [30 x i8] c"\1DEXIT:INT:Postselection failed"
 @res_c.1C9EF4D1.0 = private constant [12 x i8] c"\0BUSER:BOOL:c"
 @"e_No more qu.3B2EEBF0.0" = private constant [47 x i8] c".EXIT:INT:No more qubits available to allocate."
 
@@ -32,7 +32,7 @@ __hugr__.__tk2_sol_qalloc.32.exit:                ; preds = %alloca_block
   ret void
 
 1:                                                ; preds = %__hugr__.__tk2_sol_qalloc.32.exit
-  tail call void @panic(i32 1001, ptr nonnull @s_Postselect.13DF1CD0.0)
+  tail call void @panic(i32 1001, ptr nonnull @e_Postselect.558881BF.0)
   unreachable
 }
 

@@ -5,7 +5,7 @@ use tket::hugr::{self, llvm::inkwell};
 
 use anyhow::{Result, anyhow, ensure};
 use hugr::llvm::emit::func::EmitFuncContext;
-use hugr::llvm::extension::prelude::PreludeCodegen;
+use hugr::llvm::extension::prelude::{DefaultPreludeCodegen, PreludeCodegen};
 use hugr::llvm::types::TypingSession;
 use inkwell::AddressSpace;
 use inkwell::attributes::{Attribute, AttributeLoc};
@@ -16,6 +16,9 @@ use tket::hugr::{HugrView, Node};
 
 #[derive(Clone)]
 /// Codegen extension for the QIS prelude.
+///
+/// `MakeError` requires a message loaded from a HUGR string constant;
+/// its signal may be computed at runtime.
 pub struct QISPreludeCodegen;
 
 impl PreludeCodegen for QISPreludeCodegen {
@@ -94,7 +97,7 @@ impl PreludeCodegen for QISPreludeCodegen {
             .into_int_type()
             .const_int(u64::from(err.signal), false);
 
-        let message = emit_global_string(ctx, &err.message, "e_", "EXIT:INT:")?;
+        let message = Self::emit_error_message(ctx, &err.message)?;
         let err = err_ty.const_named_struct(&[signal.into(), message]);
         Ok(err.into())
     }
@@ -106,9 +109,29 @@ impl PreludeCodegen for QISPreludeCodegen {
     ) -> Result<BasicValueEnum<'c>> {
         emit_global_string(ctx, str.value(), "s_", "")
     }
+
+    fn emit_make_error<'c, H: HugrView<Node = Node>>(
+        &self,
+        ctx: &mut EmitFuncContext<'c, '_, H>,
+        signal: BasicValueEnum<'c>,
+        _message: BasicValueEnum<'c>,
+        const_message: Option<&hugr::extension::prelude::ConstString>,
+    ) -> Result<BasicValueEnum<'c>> {
+        let message = const_message
+            .ok_or_else(|| anyhow!("QIS MakeError requires a statically known string message"))?;
+        let message = Self::emit_error_message(ctx, message.value())?;
+        DefaultPreludeCodegen.emit_make_error(ctx, signal, message, None)
+    }
 }
 
 impl QISPreludeCodegen {
+    fn emit_error_message<'c, H: HugrView<Node = Node>>(
+        ctx: &EmitFuncContext<'c, '_, H>,
+        message: &str,
+    ) -> Result<BasicValueEnum<'c>> {
+        emit_global_string(ctx, message, "e_", "EXIT:INT:")
+    }
+
     fn get_panic<'c, H: HugrView<Node = Node>>(
         ctx: &EmitFuncContext<'c, '_, H>,
     ) -> Result<FunctionValue<'c>> {
@@ -203,9 +226,12 @@ pub fn emit_global_string<'c, H: HugrView<Node = Node>>(
 mod test {
     use hugr::builder::{Dataflow, DataflowHugr};
     use hugr::extension::PRELUDE;
-    use hugr::extension::prelude::{self, ConstError, EXIT_OP_ID, PANIC_OP_ID, qb_t};
+    use hugr::extension::prelude::{
+        self, ConstError, ConstString, ConstUsize, EXIT_OP_ID, MAKE_ERROR_OP_ID, PANIC_OP_ID, qb_t,
+    };
     use hugr::llvm::check_emission;
-    use hugr::llvm::emit::test::SimpleHugrConfig;
+    use hugr::llvm::emit::test::{Emission, SimpleHugrConfig, TEST_EMIT_DEBUG};
+    use hugr::llvm::utils::fat::FatExt as _;
 
     use hugr::llvm::test::llvm_ctx;
     use hugr::types::TypeArg;
@@ -272,5 +298,181 @@ mod test {
             });
 
         check_emission!(hugr, llvm_ctx);
+    }
+
+    #[rstest]
+    #[case::exit(EXIT_OP_ID)]
+    #[case::panic(PANIC_OP_ID)]
+    fn test_make_error_emit(#[case] op_id: hugr::ops::OpName) {
+        let mut llvm_ctx = llvm_ctx(0);
+        llvm_ctx.add_extensions(|ceb| ceb.add_prelude_extensions(QISPreludeCodegen));
+
+        let make_error_op = PRELUDE
+            .instantiate_extension_op(&MAKE_ERROR_OP_ID, [])
+            .unwrap();
+        let terminate_op = PRELUDE
+            .instantiate_extension_op(&op_id, [TypeArg::List(vec![]), TypeArg::List(vec![])])
+            .unwrap();
+        let hugr = SimpleHugrConfig::new()
+            .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
+            .finish(|mut builder| {
+                let signal = builder.add_load_value(ConstUsize::new(42));
+                let message =
+                    builder.add_load_value(ConstString::new("Postselection failed".into()));
+                let [err] = builder
+                    .add_dataflow_op(make_error_op, [signal, message])
+                    .unwrap()
+                    .outputs_arr();
+                builder.add_dataflow_op(terminate_op, [err]).unwrap();
+                builder.finish_hugr_with_outputs([]).unwrap()
+            });
+
+        // Match Guppy's make_error path, rather than loading a ConstError.
+        let emission = Emission::emit_hugr(
+            hugr.fat_root().unwrap(),
+            llvm_ctx.get_emit_hugr(),
+            TEST_EMIT_DEBUG,
+        )
+        .unwrap();
+        emission.verify().unwrap();
+        let ir = emission.module().to_string();
+        assert!(
+            ir.contains(r#"[30 x i8] c"\1DEXIT:INT:Postselection failed""#),
+            "{ir}"
+        );
+    }
+
+    #[rstest]
+    #[case::empty("")]
+    #[case::unicode_and_nul("é\0oops")]
+    #[case::maximum_error(&"x".repeat(246))]
+    fn test_make_error_dynamic_signal(#[case] message: &str) {
+        let mut llvm_ctx = llvm_ctx(0);
+        llvm_ctx.add_extensions(|ceb| ceb.add_prelude_extensions(QISPreludeCodegen));
+        let make_error = PRELUDE
+            .instantiate_extension_op(&MAKE_ERROR_OP_ID, [])
+            .unwrap();
+        let hugr = SimpleHugrConfig::new()
+            .with_ins([prelude::usize_t()])
+            .with_outs([prelude::error_type(), prelude::string_type()])
+            .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
+            .finish(|mut builder| {
+                let [signal] = builder.input_wires_arr();
+                let text = builder.add_load_value(ConstString::new(message.into()));
+                let [err] = builder
+                    .add_dataflow_op(make_error, [signal, text])
+                    .unwrap()
+                    .outputs_arr();
+                builder.finish_hugr_with_outputs([err, text]).unwrap()
+            });
+        let emission = Emission::emit_hugr(
+            hugr.fat_root().unwrap(),
+            llvm_ctx.get_emit_hugr(),
+            TEST_EMIT_DEBUG,
+        )
+        .unwrap();
+        emission.verify().unwrap();
+        // The same source string is used as ordinary text and as an error.
+        // Only the error global receives the tag; a computed signal is allowed.
+        for (prefix, expected) in [
+            ("s_", message.to_owned()),
+            ("e_", format!("EXIT:INT:{message}")),
+        ] {
+            let global = emission
+                .module()
+                .get_globals()
+                .find(|global| global.get_name().to_bytes().starts_with(prefix.as_bytes()))
+                .unwrap();
+            let initializer = global.get_initializer().unwrap();
+            assert_eq!(
+                initializer,
+                llvm_ctx
+                    .iw_context()
+                    .const_string(
+                        &[
+                            &[u8::try_from(expected.len()).unwrap()],
+                            expected.as_bytes()
+                        ]
+                        .concat(),
+                        false
+                    )
+                    .as_basic_value_enum()
+            );
+        }
+    }
+
+    #[rstest]
+    #[case::ordinary_long_string(false, "x".repeat(255))]
+    #[case::oversize_error(true, "x".repeat(247))]
+    fn test_string_length_limits(#[case] as_error: bool, #[case] message: String) {
+        let mut llvm_ctx = llvm_ctx(0);
+        llvm_ctx.add_extensions(|ceb| ceb.add_prelude_extensions(QISPreludeCodegen));
+        let hugr = SimpleHugrConfig::new()
+            .with_outs([if as_error {
+                prelude::error_type()
+            } else {
+                prelude::string_type()
+            }])
+            .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
+            .finish(|mut builder| {
+                let text = builder.add_load_value(ConstString::new(message));
+                let output = if as_error {
+                    let signal = builder.add_load_value(ConstUsize::new(42));
+                    let op = PRELUDE
+                        .instantiate_extension_op(&MAKE_ERROR_OP_ID, [])
+                        .unwrap();
+                    builder
+                        .add_dataflow_op(op, [signal, text])
+                        .unwrap()
+                        .out_wire(0)
+                } else {
+                    text
+                };
+                builder.finish_hugr_with_outputs([output]).unwrap()
+            });
+        let result = Emission::emit_hugr(
+            hugr.fat_root().unwrap(),
+            llvm_ctx.get_emit_hugr(),
+            TEST_EMIT_DEBUG,
+        );
+        if as_error {
+            let err = result
+                .err()
+                .expect("An error message plus its tag must fit in 255 bytes");
+            assert!(format!("{err:#}").contains("Constant string too long: 256 >= 256"));
+        } else {
+            result.unwrap().verify().unwrap();
+        }
+    }
+
+    #[rstest]
+    fn test_make_error_unknown_message() {
+        let mut llvm_ctx = llvm_ctx(0);
+        llvm_ctx.add_extensions(|ceb| ceb.add_prelude_extensions(QISPreludeCodegen));
+        let hugr = SimpleHugrConfig::new()
+            .with_ins([prelude::usize_t(), prelude::string_type()])
+            .with_outs([prelude::error_type()])
+            .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
+            .finish(|mut builder| {
+                let [signal, message] = builder.input_wires_arr();
+                let op = PRELUDE
+                    .instantiate_extension_op(&MAKE_ERROR_OP_ID, [])
+                    .unwrap();
+                let [err] = builder
+                    .add_dataflow_op(op, [signal, message])
+                    .unwrap()
+                    .outputs_arr();
+                builder.finish_hugr_with_outputs([err]).unwrap()
+            });
+        let err = Emission::emit_hugr(
+            hugr.fat_root().unwrap(),
+            llvm_ctx.get_emit_hugr(),
+            TEST_EMIT_DEBUG,
+        )
+        .err()
+        .expect("Unknown messages must not silently bypass the error tag");
+        assert!(
+            format!("{err:#}").contains("QIS MakeError requires a statically known string message")
+        );
     }
 }
