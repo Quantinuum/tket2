@@ -13,10 +13,10 @@ from pathlib import Path
 from sys import argv
 
 from guppylang import enable_experimental_features, guppy
-from guppylang.std.builtins import control, dagger, power
+from guppylang.std.builtins import control, power
 from guppylang.std.debug import state_result
 from guppylang.std.num import nat
-from guppylang.std.quantum import angle, discard, h, qubit, x
+from guppylang.std.quantum import discard, qubit, x
 
 enable_experimental_features()
 
