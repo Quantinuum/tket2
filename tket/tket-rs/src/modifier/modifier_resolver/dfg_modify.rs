@@ -8,7 +8,7 @@ use hugr::{
     HugrView, IncomingPort, Node, OutgoingPort, PortIndex, Wire,
     builder::{
         BuildError, ConditionalBuilder, Container, DFGBuilder, Dataflow, DataflowSubContainer,
-        FunctionBuilder, SubContainer, TailLoopBuilder,
+        FunctionBuilder, SubContainer, TailLoopBuilder, handle::Outputs,
     },
     core::HugrNode,
     extension::{prelude::qb_t, simple_op::MakeExtensionOp},
@@ -23,9 +23,10 @@ use hugr::{
             array::ArrayOpBuilder,
             borrow_array::{BArrayOpBuilder, borrow_array_type},
         },
+        logic::LogicOp,
     },
     type_row,
-    types::{EdgeKind, FuncTypeBase, PolyFuncType, Signature, TypeRow},
+    types::{EdgeKind, FuncTypeBase, PolyFuncType, Signature, Type, TypeRow},
 };
 use petgraph::visit::{Topo, Walker};
 
@@ -595,6 +596,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         let mut poly_signature = old_fn_defn.signature().clone();
         self.modify_signature(poly_signature.body_mut(), false);
 
+        // NICOLA: TODO: check the matching between copiable inout if not in order
         // Modifier block do not have classical outputs, since the power is supposed to applied directly to the modifier block,
         // during its resolution we do nothandle classical outputs. To avoid invalid hugr later we raise an error here.
         if self.modifiers().num_exponents() > 0
@@ -611,6 +613,8 @@ impl<N: HugrNode> ModifierResolver<N> {
                 h.get_optype(func).clone(),
             ));
         }
+        // Save the signature without power inputs: we need it to compute conditional and tail loop signtures
+        let signature_without_power = poly_signature.body().clone();
         // NICOLA: here we add power inputs for the function signature and plan to "consume the modification?"
         Self::append_power_inputs(poly_signature.body_mut(), self.modifiers().num_exponents());
 
@@ -637,55 +641,53 @@ impl<N: HugrNode> ModifierResolver<N> {
         let maybe_exponent_wire = self.multiply_exponent_inputs(&mut new_fn)?;
         match maybe_exponent_wire {
             Some(exponent_wire) => {
-                let is_negative = Self::check_positive(&mut new_fn, exponent_wire)?;
-                let OpType::FuncDefn(new_fn_defn) = h.get_optype(new_function_node) else {
-                    unreachable!("The modified function node is a function definition");
-                };
-                let signature = new_fn_defn.signature().body();
-                let cond_inputs = signature.input.iter().cloned().zip(new_fn.input_wires());
-                let cond_output_types = signature.output.clone();
+                let is_positive = Self::check_positive(&mut new_fn, exponent_wire)?;
+                let mut cond_signature = signature_without_power;
+                // Conditional inputs are the function ones (without exponents) plus one int for the multiplied exponents
+                let function_input_count = cond_signature.input.len();
+                Self::append_power_inputs(&mut cond_signature, 1);
+                let cond_inputs = cond_signature.input.iter().cloned().zip(
+                    new_fn
+                        .input_wires()
+                        .take(function_input_count)
+                        .chain(iter::once(exponent_wire)),
+                );
+                let cond_output_types = cond_signature.output.clone();
                 let mut cond_builder = new_fn
                     .conditional_builder(
-                        ([TypeRow::default(), TypeRow::default()], is_negative),
+                        ([TypeRow::default(), TypeRow::default()], is_positive),
                         cond_inputs,
                         cond_output_types,
                     )
                     .unwrap();
-                // case 0: negative exponent -> do nothing
+
+                // case 0: non-positive exponent -> simply filert the inputs, only return copiable inputs
                 let case0_b = cond_builder.case_builder(0).unwrap();
-                let linear_outputs = signature
+                let case0_linear_outputs = cond_signature
                     .input
                     .iter()
                     .zip(case0_b.input_wires())
                     .filter_map(|(ty, wire)| (!ty.copyable()).then_some(wire))
                     .collect::<Vec<_>>();
-                case0_b.finish_with_outputs(linear_outputs)?;
-                // case 1: positive exponent -> build the loop
+                case0_b.finish_with_outputs(case0_linear_outputs)?;
+
+                // case 1: positive exponent -> build the loop then output only non copiable outputs
                 let mut case1_b = cond_builder.case_builder(1).unwrap();
-                let loop_inputs = signature
+                let loop_inputs = cond_signature
                     .input
                     .iter()
                     .cloned()
                     .zip(case1_b.input_wires())
                     .collect::<Vec<_>>();
-                // Insert tail loop
-                let mut tl_b = case1_b
-                    .tail_loop_builder([], loop_inputs, type_row![])
-                    .unwrap();
-                // Decrement the exponent
-                let one_wire = tl_b.add_load_value(ConstInt::new_s(6, 1).unwrap());
-                let exponent_input = tl_b
-                    .input_wires()
-                    .last()
-                    .expect("Tail loop must have an exponent as its last input");
+                let tl_outputs = self.build_power_tail_loop(h, func, &mut case1_b, loop_inputs)?;
 
-                let exponent_count = tl_b
-                    .add_dataflow_op(IntOpDef::isub.with_log_width(6), [exponent_input, one_wire])
-                    .unwrap()
-                    .out_wire(0);
-
-                let is_finished = Self::check_positive(&mut tl_b, exponent_count)?;
-                self.with_no_power_inputs(|this| this.modify_dfg_body(h, func, &mut tl_b))?;
+                let case1_linear_outputs = cond_signature
+                    .input
+                    .iter()
+                    .zip(tl_outputs)
+                    .filter_map(|(ty, wire)| (!ty.copyable()).then_some(wire))
+                    .collect::<Vec<_>>();
+                case1_b.finish_with_outputs(case1_linear_outputs)?;
 
                 // connect the loop outputs
                 let conditional = cond_builder.finish_sub_container()?;
@@ -722,12 +724,92 @@ impl<N: HugrNode> ModifierResolver<N> {
         Ok(new_function_node)
     }
 
-    /// Checks whether a signed 64-bit exponent is less than zero.
+    /// Builds the tail loop for the positive-exponent case.
+    fn build_power_tail_loop(
+        &mut self,
+        h: &mut impl HugrMut<Node = N>,
+        func: N,
+        case1_b: &mut impl Dataflow,
+        loop_inputs: Vec<(Type, Wire)>,
+    ) -> Result<Outputs, ModifierResolverErrors<N>> {
+        // todo: move input_types, tl_b and inputs_wires in the caller
+        let input_types = loop_inputs
+            .iter()
+            .map(|(ty, _)| ty.clone())
+            .collect::<Vec<_>>();
+
+        let mut tl_b = case1_b
+            .tail_loop_builder([], loop_inputs, type_row![])
+            .unwrap();
+        let input_wires = tl_b.input_wires().collect::<Vec<_>>();
+
+        // Decrement the exponent and check if positive
+        let one_wire = tl_b.add_load_value(ConstInt::new_s(6, 1).unwrap());
+        let exponent_input = *input_wires
+            .last()
+            .expect("Tail loop must have an exponent as its last input");
+        let exponent_count = tl_b
+            .add_dataflow_op(IntOpDef::isub.with_log_width(6), [exponent_input, one_wire])
+            .unwrap()
+            .out_wire(0);
+        let should_stop = Self::check_negative(&mut tl_b, exponent_count)?;
+
+        // Insert the loop body (i.e. the modifier block)
+        // The loop body does not include the exponent and only return linear values
+        let body_input_count = input_types.len() - 1;
+        let body_signature = Signature::new(
+            input_types[..body_input_count].to_vec(),
+            input_types
+                .iter()
+                .filter(|ty| !ty.copyable())
+                .cloned()
+                .collect::<Vec<_>>(),
+        );
+        let mut body_b = tl_b.dfg_builder(
+            body_signature,
+            input_wires.iter().copied().take(body_input_count),
+        )?;
+        self.with_no_power_inputs(|this| this.modify_dfg_body(h, func, &mut body_b))?;
+        let body = body_b.finish_sub_container()?;
+        let mut body_outputs = body.outputs();
+
+        // Connect body outputs to loop affine outputs.
+        // Copyable values are carried unchanged, except for the decremented exponent.
+        let loop_outputs = input_types
+            .iter()
+            .zip(input_wires)
+            .take(body_input_count)
+            .map(|(ty, wire)| {
+                if ty.copyable() {
+                    wire
+                } else {
+                    body_outputs
+                        .next()
+                        .expect("Body must preserve linear inputs")
+                }
+            })
+            .chain(iter::once(exponent_count))
+            .collect::<Vec<_>>();
+        let tail_loop = tl_b.finish_with_outputs(should_stop, loop_outputs)?;
+
+        Ok(tail_loop.outputs())
+    }
+
+    /// Checks whether a signed 64-bit exponent is greater than zero.
     //NICOLA: TODO: move out impl
     fn check_positive(builder: &mut impl Dataflow, exponent: Wire) -> Result<Wire, BuildError> {
         let zero = builder.add_load_value(ConstInt::new_s(6, 0).unwrap());
         Ok(builder
             .add_dataflow_op(IntOpDef::igt_s.with_log_width(6), [exponent, zero])?
+            .out_wire(0))
+    }
+
+    /// Checks whether a signed 64-bit exponent is less than zero.
+    //NICOLA: TODO: move out impl
+    fn check_negative(builder: &mut impl Dataflow, exponent: Wire) -> Result<Wire, BuildError> {
+        let zero = builder.add_load_value(ConstInt::new_s(6, 0).unwrap());
+        Ok(builder
+            .add_dataflow_op(IntOpDef::ile_s.with_log_width(6), [exponent, zero])?
             .out_wire(0))
     }
 

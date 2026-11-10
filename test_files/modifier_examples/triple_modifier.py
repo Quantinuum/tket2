@@ -27,18 +27,22 @@ def fun(q: qubit, i: nat, p: qubit) -> None:
 
 
 @guppy
-def main(c1: qubit, i: nat, q: qubit) -> None:  # , c2: qubit, t: qubit) -> None:
+def main(
+    c1: qubit, c2: qubit, i: nat, q: qubit
+) -> None:  # , c2: qubit, t: qubit) -> None:
     # c1 = qubit()
     # t = qubit()
     # h(c1)
-    with power(i):  # dagger, power(i):
+    with power(i), power(2):  # dagger, power(i):
         # j = nat(i + 1)
         # with power(j):
+        # i = nat(i + 1)
         fun(c1, i, q)
 
-    # with control(c1):
-    #     # with control(c2):  # , dagger:
-    #     h(t)
+    with control(c1):
+        with power(i):
+            with control(c2):  # , dagger:
+                h(q)
 
     # with dagger:
     #     h(t)
