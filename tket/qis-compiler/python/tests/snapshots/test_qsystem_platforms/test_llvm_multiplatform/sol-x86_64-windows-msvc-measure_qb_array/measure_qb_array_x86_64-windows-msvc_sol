@@ -22,9 +22,9 @@ alloca_block:
   store i64 -1, ptr %5, align 1
   %qalloc.i = tail call i64 @___qalloc()
   %not_max.not.not.i = icmp eq i64 %qalloc.i, -1
-  br i1 %not_max.not.not.i, label %cond_314_case_0.i, label %__barray_check_bounds.exit
+  br i1 %not_max.not.not.i, label %cond_318_case_0.i, label %__barray_check_bounds.exit
 
-cond_314_case_0.i:                                ; preds = %cond_exit_12.8, %cond_exit_12.7, %cond_exit_12.6, %cond_exit_12.5, %cond_exit_12.4, %cond_exit_12.3, %cond_exit_12.2, %cond_exit_12.1, %cond_exit_12, %alloca_block
+cond_318_case_0.i:                                ; preds = %cond_exit_12.8, %cond_exit_12.7, %cond_exit_12.6, %cond_exit_12.5, %cond_exit_12.4, %cond_exit_12.3, %cond_exit_12.2, %cond_exit_12.1, %cond_exit_12, %alloca_block
   tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0")
   unreachable
 
@@ -44,7 +44,7 @@ cond_exit_12:                                     ; preds = %__barray_check_boun
   store i64 %qalloc.i, ptr %4, align 4
   %qalloc.i.1 = tail call i64 @___qalloc()
   %not_max.not.not.i.1 = icmp eq i64 %qalloc.i.1, -1
-  br i1 %not_max.not.not.i.1, label %cond_314_case_0.i, label %__barray_check_bounds.exit.1
+  br i1 %not_max.not.not.i.1, label %cond_318_case_0.i, label %__barray_check_bounds.exit.1
 
 __barray_check_bounds.exit.1:                     ; preds = %cond_exit_12
   tail call void @___reset(i64 %qalloc.i.1)
@@ -60,7 +60,7 @@ cond_exit_12.1:                                   ; preds = %__barray_check_boun
   store i64 %qalloc.i.1, ptr %12, align 4
   %qalloc.i.2 = tail call i64 @___qalloc()
   %not_max.not.not.i.2 = icmp eq i64 %qalloc.i.2, -1
-  br i1 %not_max.not.not.i.2, label %cond_314_case_0.i, label %__barray_check_bounds.exit.2
+  br i1 %not_max.not.not.i.2, label %cond_318_case_0.i, label %__barray_check_bounds.exit.2
 
 __barray_check_bounds.exit.2:                     ; preds = %cond_exit_12.1
   tail call void @___reset(i64 %qalloc.i.2)
@@ -76,7 +76,7 @@ cond_exit_12.2:                                   ; preds = %__barray_check_boun
   store i64 %qalloc.i.2, ptr %16, align 4
   %qalloc.i.3 = tail call i64 @___qalloc()
   %not_max.not.not.i.3 = icmp eq i64 %qalloc.i.3, -1
-  br i1 %not_max.not.not.i.3, label %cond_314_case_0.i, label %__barray_check_bounds.exit.3
+  br i1 %not_max.not.not.i.3, label %cond_318_case_0.i, label %__barray_check_bounds.exit.3
 
 __barray_check_bounds.exit.3:                     ; preds = %cond_exit_12.2
   tail call void @___reset(i64 %qalloc.i.3)
@@ -92,7 +92,7 @@ cond_exit_12.3:                                   ; preds = %__barray_check_boun
   store i64 %qalloc.i.3, ptr %20, align 4
   %qalloc.i.4 = tail call i64 @___qalloc()
   %not_max.not.not.i.4 = icmp eq i64 %qalloc.i.4, -1
-  br i1 %not_max.not.not.i.4, label %cond_314_case_0.i, label %__barray_check_bounds.exit.4
+  br i1 %not_max.not.not.i.4, label %cond_318_case_0.i, label %__barray_check_bounds.exit.4
 
 __barray_check_bounds.exit.4:                     ; preds = %cond_exit_12.3
   tail call void @___reset(i64 %qalloc.i.4)
@@ -108,7 +108,7 @@ cond_exit_12.4:                                   ; preds = %__barray_check_boun
   store i64 %qalloc.i.4, ptr %24, align 4
   %qalloc.i.5 = tail call i64 @___qalloc()
   %not_max.not.not.i.5 = icmp eq i64 %qalloc.i.5, -1
-  br i1 %not_max.not.not.i.5, label %cond_314_case_0.i, label %__barray_check_bounds.exit.5
+  br i1 %not_max.not.not.i.5, label %cond_318_case_0.i, label %__barray_check_bounds.exit.5
 
 __barray_check_bounds.exit.5:                     ; preds = %cond_exit_12.4
   tail call void @___reset(i64 %qalloc.i.5)
@@ -124,7 +124,7 @@ cond_exit_12.5:                                   ; preds = %__barray_check_boun
   store i64 %qalloc.i.5, ptr %28, align 4
   %qalloc.i.6 = tail call i64 @___qalloc()
   %not_max.not.not.i.6 = icmp eq i64 %qalloc.i.6, -1
-  br i1 %not_max.not.not.i.6, label %cond_314_case_0.i, label %__barray_check_bounds.exit.6
+  br i1 %not_max.not.not.i.6, label %cond_318_case_0.i, label %__barray_check_bounds.exit.6
 
 __barray_check_bounds.exit.6:                     ; preds = %cond_exit_12.5
   tail call void @___reset(i64 %qalloc.i.6)
@@ -140,7 +140,7 @@ cond_exit_12.6:                                   ; preds = %__barray_check_boun
   store i64 %qalloc.i.6, ptr %32, align 4
   %qalloc.i.7 = tail call i64 @___qalloc()
   %not_max.not.not.i.7 = icmp eq i64 %qalloc.i.7, -1
-  br i1 %not_max.not.not.i.7, label %cond_314_case_0.i, label %__barray_check_bounds.exit.7
+  br i1 %not_max.not.not.i.7, label %cond_318_case_0.i, label %__barray_check_bounds.exit.7
 
 __barray_check_bounds.exit.7:                     ; preds = %cond_exit_12.6
   tail call void @___reset(i64 %qalloc.i.7)
@@ -156,7 +156,7 @@ cond_exit_12.7:                                   ; preds = %__barray_check_boun
   store i64 %qalloc.i.7, ptr %36, align 4
   %qalloc.i.8 = tail call i64 @___qalloc()
   %not_max.not.not.i.8 = icmp eq i64 %qalloc.i.8, -1
-  br i1 %not_max.not.not.i.8, label %cond_314_case_0.i, label %__barray_check_bounds.exit.8
+  br i1 %not_max.not.not.i.8, label %cond_318_case_0.i, label %__barray_check_bounds.exit.8
 
 __barray_check_bounds.exit.8:                     ; preds = %cond_exit_12.7
   tail call void @___reset(i64 %qalloc.i.8)
@@ -172,7 +172,7 @@ cond_exit_12.8:                                   ; preds = %__barray_check_boun
   store i64 %qalloc.i.8, ptr %40, align 4
   %qalloc.i.9 = tail call i64 @___qalloc()
   %not_max.not.not.i.9 = icmp eq i64 %qalloc.i.9, -1
-  br i1 %not_max.not.not.i.9, label %cond_314_case_0.i, label %__barray_check_bounds.exit.9
+  br i1 %not_max.not.not.i.9, label %cond_318_case_0.i, label %__barray_check_bounds.exit.9
 
 __barray_check_bounds.exit.9:                     ; preds = %cond_exit_12.8
   tail call void @___reset(i64 %qalloc.i.9)
@@ -361,11 +361,11 @@ loop_body307.preheader.preheader:                 ; preds = %mask_block_ok.i
   tail call void @heap_free(ptr nonnull %5)
   br label %__barray_check_bounds.exit848
 
-__barray_check_bounds.exit848:                    ; preds = %cond_exit_212, %loop_body307.preheader.preheader
-  %"208_0.sroa.15.0893" = phi i64 [ %96, %cond_exit_212 ], [ 0, %loop_body307.preheader.preheader ]
-  %96 = add nuw nsw i64 %"208_0.sroa.15.0893", 1
+__barray_check_bounds.exit848:                    ; preds = %cond_exit_214, %loop_body307.preheader.preheader
+  %"210_0.sroa.15.0893" = phi i64 [ %96, %cond_exit_214 ], [ 0, %loop_body307.preheader.preheader ]
+  %96 = add nuw nsw i64 %"210_0.sroa.15.0893", 1
   %97 = load i64, ptr %3, align 4
-  %98 = lshr i64 %97, %"208_0.sroa.15.0893"
+  %98 = lshr i64 %97, %"210_0.sroa.15.0893"
   %99 = trunc i64 %98 to i1
   br i1 %99, label %panic.i849, label %__barray_check_bounds.exit852
 
@@ -374,14 +374,14 @@ panic.i849:                                       ; preds = %__barray_check_boun
   unreachable
 
 __barray_check_bounds.exit852:                    ; preds = %__barray_check_bounds.exit848
-  %100 = shl nuw nsw i64 1, %"208_0.sroa.15.0893"
+  %100 = shl nuw nsw i64 1, %"210_0.sroa.15.0893"
   %101 = xor i64 %97, %100
   store i64 %101, ptr %3, align 4
-  %102 = getelementptr inbounds nuw i64, ptr %2, i64 %"208_0.sroa.15.0893"
+  %102 = getelementptr inbounds nuw i64, ptr %2, i64 %"210_0.sroa.15.0893"
   %103 = load i64, ptr %102, align 4
   tail call void @___inc_future_refcount(i64 %103)
   %104 = load i64, ptr %3, align 4
-  %105 = lshr i64 %104, %"208_0.sroa.15.0893"
+  %105 = lshr i64 %104, %"210_0.sroa.15.0893"
   %106 = trunc i64 %105 to i1
   br i1 %106, label %__barray_check_bounds.exit856, label %panic.i853
 
@@ -396,15 +396,15 @@ __barray_check_bounds.exit856:                    ; preds = %__barray_check_boun
   %read_bool = tail call i1 @___read_future_bool(i64 %103)
   tail call void @___dec_future_refcount(i64 %103)
   %108 = load i64, ptr %1, align 4
-  %109 = lshr i64 %108, %"208_0.sroa.15.0893"
+  %109 = lshr i64 %108, %"210_0.sroa.15.0893"
   %110 = trunc i64 %109 to i1
-  br i1 %110, label %cond_exit_212, label %panic.i857
+  br i1 %110, label %cond_exit_214, label %panic.i857
 
 panic.i857:                                       ; preds = %__barray_check_bounds.exit856
   tail call void @panic(i32 1002, ptr nonnull @"e_Array alre.5A300C2A.0")
   unreachable
 
-mask_block_err.i862:                              ; preds = %cond_exit_360.9
+mask_block_err.i862:                              ; preds = %cond_exit_364.9
   tail call void @panic(i32 1002, ptr nonnull @"e_Array cont.EFA5AC45.0")
   unreachable
 
@@ -413,155 +413,155 @@ __barray_mask_borrow.exit870:                     ; preds = %__barray_check_boun
   store i64 %111, ptr %3, align 4
   %112 = load i64, ptr %2, align 4
   tail call void @___dec_future_refcount(i64 %112)
-  br label %cond_exit_360
+  br label %cond_exit_364
 
-cond_exit_360:                                    ; preds = %__barray_mask_borrow.exit870, %__barray_check_bounds.exit866.preheader
+cond_exit_364:                                    ; preds = %__barray_mask_borrow.exit870, %__barray_check_bounds.exit866.preheader
   %113 = load i64, ptr %3, align 4
   %114 = and i64 %113, 2
   %.not909 = icmp eq i64 %114, 0
-  br i1 %.not909, label %__barray_mask_borrow.exit870.1, label %cond_exit_360.1
+  br i1 %.not909, label %__barray_mask_borrow.exit870.1, label %cond_exit_364.1
 
-__barray_mask_borrow.exit870.1:                   ; preds = %cond_exit_360
+__barray_mask_borrow.exit870.1:                   ; preds = %cond_exit_364
   %115 = or disjoint i64 %113, 2
   store i64 %115, ptr %3, align 4
   %116 = getelementptr inbounds nuw i8, ptr %2, i64 8
   %117 = load i64, ptr %116, align 4
   tail call void @___dec_future_refcount(i64 %117)
-  br label %cond_exit_360.1
+  br label %cond_exit_364.1
 
-cond_exit_360.1:                                  ; preds = %__barray_mask_borrow.exit870.1, %cond_exit_360
+cond_exit_364.1:                                  ; preds = %__barray_mask_borrow.exit870.1, %cond_exit_364
   %118 = load i64, ptr %3, align 4
   %119 = and i64 %118, 4
   %.not910 = icmp eq i64 %119, 0
-  br i1 %.not910, label %__barray_mask_borrow.exit870.2, label %cond_exit_360.2
+  br i1 %.not910, label %__barray_mask_borrow.exit870.2, label %cond_exit_364.2
 
-__barray_mask_borrow.exit870.2:                   ; preds = %cond_exit_360.1
+__barray_mask_borrow.exit870.2:                   ; preds = %cond_exit_364.1
   %120 = or disjoint i64 %118, 4
   store i64 %120, ptr %3, align 4
   %121 = getelementptr inbounds nuw i8, ptr %2, i64 16
   %122 = load i64, ptr %121, align 4
   tail call void @___dec_future_refcount(i64 %122)
-  br label %cond_exit_360.2
+  br label %cond_exit_364.2
 
-cond_exit_360.2:                                  ; preds = %__barray_mask_borrow.exit870.2, %cond_exit_360.1
+cond_exit_364.2:                                  ; preds = %__barray_mask_borrow.exit870.2, %cond_exit_364.1
   %123 = load i64, ptr %3, align 4
   %124 = and i64 %123, 8
   %.not911 = icmp eq i64 %124, 0
-  br i1 %.not911, label %__barray_mask_borrow.exit870.3, label %cond_exit_360.3
+  br i1 %.not911, label %__barray_mask_borrow.exit870.3, label %cond_exit_364.3
 
-__barray_mask_borrow.exit870.3:                   ; preds = %cond_exit_360.2
+__barray_mask_borrow.exit870.3:                   ; preds = %cond_exit_364.2
   %125 = or disjoint i64 %123, 8
   store i64 %125, ptr %3, align 4
   %126 = getelementptr inbounds nuw i8, ptr %2, i64 24
   %127 = load i64, ptr %126, align 4
   tail call void @___dec_future_refcount(i64 %127)
-  br label %cond_exit_360.3
+  br label %cond_exit_364.3
 
-cond_exit_360.3:                                  ; preds = %__barray_mask_borrow.exit870.3, %cond_exit_360.2
+cond_exit_364.3:                                  ; preds = %__barray_mask_borrow.exit870.3, %cond_exit_364.2
   %128 = load i64, ptr %3, align 4
   %129 = and i64 %128, 16
   %.not912 = icmp eq i64 %129, 0
-  br i1 %.not912, label %__barray_mask_borrow.exit870.4, label %cond_exit_360.4
+  br i1 %.not912, label %__barray_mask_borrow.exit870.4, label %cond_exit_364.4
 
-__barray_mask_borrow.exit870.4:                   ; preds = %cond_exit_360.3
+__barray_mask_borrow.exit870.4:                   ; preds = %cond_exit_364.3
   %130 = or disjoint i64 %128, 16
   store i64 %130, ptr %3, align 4
   %131 = getelementptr inbounds nuw i8, ptr %2, i64 32
   %132 = load i64, ptr %131, align 4
   tail call void @___dec_future_refcount(i64 %132)
-  br label %cond_exit_360.4
+  br label %cond_exit_364.4
 
-cond_exit_360.4:                                  ; preds = %__barray_mask_borrow.exit870.4, %cond_exit_360.3
+cond_exit_364.4:                                  ; preds = %__barray_mask_borrow.exit870.4, %cond_exit_364.3
   %133 = load i64, ptr %3, align 4
   %134 = and i64 %133, 32
   %.not913 = icmp eq i64 %134, 0
-  br i1 %.not913, label %__barray_mask_borrow.exit870.5, label %cond_exit_360.5
+  br i1 %.not913, label %__barray_mask_borrow.exit870.5, label %cond_exit_364.5
 
-__barray_mask_borrow.exit870.5:                   ; preds = %cond_exit_360.4
+__barray_mask_borrow.exit870.5:                   ; preds = %cond_exit_364.4
   %135 = or disjoint i64 %133, 32
   store i64 %135, ptr %3, align 4
   %136 = getelementptr inbounds nuw i8, ptr %2, i64 40
   %137 = load i64, ptr %136, align 4
   tail call void @___dec_future_refcount(i64 %137)
-  br label %cond_exit_360.5
+  br label %cond_exit_364.5
 
-cond_exit_360.5:                                  ; preds = %__barray_mask_borrow.exit870.5, %cond_exit_360.4
+cond_exit_364.5:                                  ; preds = %__barray_mask_borrow.exit870.5, %cond_exit_364.4
   %138 = load i64, ptr %3, align 4
   %139 = and i64 %138, 64
   %.not914 = icmp eq i64 %139, 0
-  br i1 %.not914, label %__barray_mask_borrow.exit870.6, label %cond_exit_360.6
+  br i1 %.not914, label %__barray_mask_borrow.exit870.6, label %cond_exit_364.6
 
-__barray_mask_borrow.exit870.6:                   ; preds = %cond_exit_360.5
+__barray_mask_borrow.exit870.6:                   ; preds = %cond_exit_364.5
   %140 = or disjoint i64 %138, 64
   store i64 %140, ptr %3, align 4
   %141 = getelementptr inbounds nuw i8, ptr %2, i64 48
   %142 = load i64, ptr %141, align 4
   tail call void @___dec_future_refcount(i64 %142)
-  br label %cond_exit_360.6
+  br label %cond_exit_364.6
 
-cond_exit_360.6:                                  ; preds = %__barray_mask_borrow.exit870.6, %cond_exit_360.5
+cond_exit_364.6:                                  ; preds = %__barray_mask_borrow.exit870.6, %cond_exit_364.5
   %143 = load i64, ptr %3, align 4
   %144 = and i64 %143, 128
   %.not915 = icmp eq i64 %144, 0
-  br i1 %.not915, label %__barray_mask_borrow.exit870.7, label %cond_exit_360.7
+  br i1 %.not915, label %__barray_mask_borrow.exit870.7, label %cond_exit_364.7
 
-__barray_mask_borrow.exit870.7:                   ; preds = %cond_exit_360.6
+__barray_mask_borrow.exit870.7:                   ; preds = %cond_exit_364.6
   %145 = or disjoint i64 %143, 128
   store i64 %145, ptr %3, align 4
   %146 = getelementptr inbounds nuw i8, ptr %2, i64 56
   %147 = load i64, ptr %146, align 4
   tail call void @___dec_future_refcount(i64 %147)
-  br label %cond_exit_360.7
+  br label %cond_exit_364.7
 
-cond_exit_360.7:                                  ; preds = %__barray_mask_borrow.exit870.7, %cond_exit_360.6
+cond_exit_364.7:                                  ; preds = %__barray_mask_borrow.exit870.7, %cond_exit_364.6
   %148 = load i64, ptr %3, align 4
   %149 = and i64 %148, 256
   %.not916 = icmp eq i64 %149, 0
-  br i1 %.not916, label %__barray_mask_borrow.exit870.8, label %cond_exit_360.8
+  br i1 %.not916, label %__barray_mask_borrow.exit870.8, label %cond_exit_364.8
 
-__barray_mask_borrow.exit870.8:                   ; preds = %cond_exit_360.7
+__barray_mask_borrow.exit870.8:                   ; preds = %cond_exit_364.7
   %150 = or disjoint i64 %148, 256
   store i64 %150, ptr %3, align 4
   %151 = getelementptr inbounds nuw i8, ptr %2, i64 64
   %152 = load i64, ptr %151, align 4
   tail call void @___dec_future_refcount(i64 %152)
-  br label %cond_exit_360.8
+  br label %cond_exit_364.8
 
-cond_exit_360.8:                                  ; preds = %__barray_mask_borrow.exit870.8, %cond_exit_360.7
+cond_exit_364.8:                                  ; preds = %__barray_mask_borrow.exit870.8, %cond_exit_364.7
   %153 = load i64, ptr %3, align 4
   %154 = and i64 %153, 512
   %.not917 = icmp eq i64 %154, 0
-  br i1 %.not917, label %__barray_mask_borrow.exit870.9, label %cond_exit_360.9
+  br i1 %.not917, label %__barray_mask_borrow.exit870.9, label %cond_exit_364.9
 
-__barray_mask_borrow.exit870.9:                   ; preds = %cond_exit_360.8
+__barray_mask_borrow.exit870.9:                   ; preds = %cond_exit_364.8
   %155 = or disjoint i64 %153, 512
   store i64 %155, ptr %3, align 4
   %156 = getelementptr inbounds nuw i8, ptr %2, i64 72
   %157 = load i64, ptr %156, align 4
   tail call void @___dec_future_refcount(i64 %157)
-  br label %cond_exit_360.9
+  br label %cond_exit_364.9
 
-cond_exit_360.9:                                  ; preds = %__barray_mask_borrow.exit870.9, %cond_exit_360.8
+cond_exit_364.9:                                  ; preds = %__barray_mask_borrow.exit870.9, %cond_exit_364.8
   %158 = load i64, ptr %3, align 4
   %159 = or i64 %158, -1024
   store i64 %159, ptr %3, align 4
   %160 = icmp eq i64 %159, -1
   br i1 %160, label %loop_out306, label %mask_block_err.i862
 
-cond_exit_212:                                    ; preds = %__barray_check_bounds.exit856
+cond_exit_214:                                    ; preds = %__barray_check_bounds.exit856
   %161 = xor i64 %108, %100
   store i64 %161, ptr %1, align 4
-  %162 = getelementptr inbounds nuw i1, ptr %0, i64 %"208_0.sroa.15.0893"
+  %162 = getelementptr inbounds nuw i1, ptr %0, i64 %"210_0.sroa.15.0893"
   store i1 %read_bool, ptr %162, align 1
-  %163 = icmp eq i64 %"208_0.sroa.15.0893", 9
+  %163 = icmp eq i64 %"210_0.sroa.15.0893", 9
   br i1 %163, label %__barray_check_bounds.exit866.preheader, label %__barray_check_bounds.exit848
 
-__barray_check_bounds.exit866.preheader:          ; preds = %cond_exit_212
+__barray_check_bounds.exit866.preheader:          ; preds = %cond_exit_214
   %164 = load i64, ptr %3, align 4
   %165 = trunc i64 %164 to i1
-  br i1 %165, label %cond_exit_360, label %__barray_mask_borrow.exit870
+  br i1 %165, label %cond_exit_364, label %__barray_mask_borrow.exit870
 
-loop_out306:                                      ; preds = %cond_exit_360.9
+loop_out306:                                      ; preds = %cond_exit_364.9
   tail call void @heap_free(ptr %2)
   tail call void @heap_free(ptr nonnull %3)
   tail call void @heap_free(ptr %0)

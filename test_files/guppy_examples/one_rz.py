@@ -1,8 +1,8 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang==1.1.4",
-#     "guppylang-internals==1.1.4",
+#     "guppylang==1.2.0",
+#     "guppylang-internals==1.2.0",
 # ]
 # ///
 """An function with a Rz operation"""

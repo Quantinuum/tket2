@@ -10,37 +10,37 @@ define void @"__hugr__.__main__.rus.<locals>.main.1"() local_unnamed_addr {
 alloca_block:
   %qalloc.i = tail call i64 @___qalloc()
   %not_max.not.not.i = icmp eq i64 %qalloc.i, -1
-  br i1 %not_max.not.not.i, label %cond_48_case_0.i, label %__hugr__.__tk2_sol_qalloc.44.exit
+  br i1 %not_max.not.not.i, label %cond_50_case_0.i, label %__hugr__.__tk2_sol_qalloc.46.exit
 
-cond_48_case_0.i:                                 ; preds = %alloca_block
+cond_50_case_0.i:                                 ; preds = %alloca_block
   tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0")
   unreachable
 
-__hugr__.__tk2_sol_qalloc.44.exit:                ; preds = %alloca_block
+__hugr__.__tk2_sol_qalloc.46.exit:                ; preds = %alloca_block
   tail call void @___reset(i64 %qalloc.i)
   %qalloc.i6676 = tail call i64 @___qalloc()
   %not_max.not.not.i6777 = icmp eq i64 %qalloc.i6676, -1
-  br i1 %not_max.not.not.i6777, label %cond_48_case_0.i68, label %__hugr__.__tk2_sol_qalloc.44.exit69
+  br i1 %not_max.not.not.i6777, label %cond_50_case_0.i68, label %__hugr__.__tk2_sol_qalloc.46.exit69
 
-cond_48_case_0.i68:                               ; preds = %.backedge, %__hugr__.__tk2_sol_qalloc.44.exit
+cond_50_case_0.i68:                               ; preds = %.backedge, %__hugr__.__tk2_sol_qalloc.46.exit
   tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0")
   unreachable
 
-__hugr__.__tk2_sol_qalloc.44.exit69:              ; preds = %__hugr__.__tk2_sol_qalloc.44.exit, %.backedge
-  %qalloc.i6678 = phi i64 [ %qalloc.i66, %.backedge ], [ %qalloc.i6676, %__hugr__.__tk2_sol_qalloc.44.exit ]
+__hugr__.__tk2_sol_qalloc.46.exit69:              ; preds = %__hugr__.__tk2_sol_qalloc.46.exit, %.backedge
+  %qalloc.i6678 = phi i64 [ %qalloc.i66, %.backedge ], [ %qalloc.i6676, %__hugr__.__tk2_sol_qalloc.46.exit ]
   tail call void @___reset(i64 %qalloc.i6678)
   tail call void @___rp(i64 %qalloc.i6678, double 0x3FF921FB54442D18, double 0xBFF921FB54442D18)
   tail call void @___rz(i64 %qalloc.i6678, double 0x400921FB54442D18)
   tail call void @___rz(i64 %qalloc.i6678, double 0xBFE921FB54442D18)
   %qalloc.i70 = tail call i64 @___qalloc()
   %not_max.not.not.i71 = icmp eq i64 %qalloc.i70, -1
-  br i1 %not_max.not.not.i71, label %cond_48_case_0.i72, label %__hugr__.__tk2_sol_qalloc.44.exit73
+  br i1 %not_max.not.not.i71, label %cond_50_case_0.i72, label %__hugr__.__tk2_sol_qalloc.46.exit73
 
-cond_48_case_0.i72:                               ; preds = %__hugr__.__tk2_sol_qalloc.44.exit69
+cond_50_case_0.i72:                               ; preds = %__hugr__.__tk2_sol_qalloc.46.exit69
   tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0")
   unreachable
 
-__hugr__.__tk2_sol_qalloc.44.exit73:              ; preds = %__hugr__.__tk2_sol_qalloc.44.exit69
+__hugr__.__tk2_sol_qalloc.46.exit73:              ; preds = %__hugr__.__tk2_sol_qalloc.46.exit69
   tail call void @___reset(i64 %qalloc.i70)
   tail call void @___rp(i64 %qalloc.i70, double 0x3FF921FB54442D18, double 0xBFF921FB54442D18)
   tail call void @___rz(i64 %qalloc.i70, double 0x400921FB54442D18)
@@ -56,16 +56,16 @@ __hugr__.__tk2_sol_qalloc.44.exit73:              ; preds = %__hugr__.__tk2_sol_
   tail call void @___dec_future_refcount(i64 %___future_measure)
   br i1 %read_bool, label %1, label %0
 
-0:                                                ; preds = %__hugr__.__tk2_sol_qalloc.44.exit73
+0:                                                ; preds = %__hugr__.__tk2_sol_qalloc.46.exit73
   tail call void @___qfree(i64 %qalloc.i70)
   br label %.backedge
 
 .backedge:                                        ; preds = %0, %2
   %qalloc.i66 = tail call i64 @___qalloc()
   %not_max.not.not.i67 = icmp eq i64 %qalloc.i66, -1
-  br i1 %not_max.not.not.i67, label %cond_48_case_0.i68, label %__hugr__.__tk2_sol_qalloc.44.exit69
+  br i1 %not_max.not.not.i67, label %cond_50_case_0.i68, label %__hugr__.__tk2_sol_qalloc.46.exit69
 
-1:                                                ; preds = %__hugr__.__tk2_sol_qalloc.44.exit73
+1:                                                ; preds = %__hugr__.__tk2_sol_qalloc.46.exit73
   tail call void @___rz(i64 %qalloc.i, double 0x3FE921FB54442D18)
   tail call void @___rz(i64 %qalloc.i, double 0x400921FB54442D18)
   tail call void @___rp(i64 %qalloc.i, double 0x3FF921FB54442D18, double 0x3FF921FB54442D18)
