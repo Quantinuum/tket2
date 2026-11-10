@@ -22,7 +22,7 @@ env:
   UV_FROZEN: 1
   # The highest and lowest supported Python versions, used for testing
   PYTHON_HIGHEST: "3.14"
-  PYTHON_LOWEST: "3.10"
+  PYTHON_LOWEST: "3.12"
 
 jobs:
   # Check if changes were made to the relevant files.
