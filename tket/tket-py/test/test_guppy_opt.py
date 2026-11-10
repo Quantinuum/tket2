@@ -15,7 +15,7 @@ from tket.passes import Normalize, PytketHugrPass, QSystemRebasePass, _QSystemLL
 # Import the pytket passes, if the `pytket` extra has been installed.
 # If not, skip all tests in this file.
 pytket = pytest.importorskip("pytket")
-from pytket.passes import CliffordSimp, RemoveBarriers
+from pytket.passes import CliffordSimp, RemoveBarriers, RemoveRedundancies
 
 guppy_opt_path = Path("guppy_optimization")
 
@@ -121,11 +121,7 @@ def _run_clifford_simp(hugr: Hugr) -> Hugr:
                 "tket.result.result_bool": 1,
             },
         ),
-        (
-            "func_decls",
-            "",
-            {"TKET1.tk1op": 2, "tket.quantum.symbolic_angle": 1},
-        ),
+        ("func_decls", "", None),
     ],
 )
 def test_optimize_flattened_guppy(
@@ -141,7 +137,10 @@ def test_optimize_flattened_guppy(
     # We don't need Normalize to "flatten" control flow here, but we still want
     # to get rid of other guppy artifacts.
     hugr = Normalize()(hugr)
-    hugr = _run_clifford_simp(hugr)
+    if name == "func_decls":
+        hugr = PytketHugrPass(RemoveRedundancies())(hugr)
+    else:
+        hugr = _run_clifford_simp(hugr)
 
     actual_counts = _count_gates(hugr)
     optimized_hugr = _load_guppy_circuit(name, version_suffix, "optimized")
