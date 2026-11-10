@@ -1652,11 +1652,7 @@ mod test {
             .unwrap();
         // main -> dagger(original) selects custom; custom -> dagger(leaf)
         // selects inner_custom, whose own daggered call must also be resolved.
-        let [
-            (inner_custom, inner_call),
-            (custom, custom_call),
-            (main, main_call),
-        ] = [
+        let [inner_custom, custom, main] = [
             ("inner_custom", terminal),
             ("custom", leaf),
             ("main", original),
@@ -1679,10 +1675,7 @@ mod test {
                     [modified, q],
                 )
                 .unwrap();
-            (
-                function.finish_with_outputs(call.outputs()).unwrap().node(),
-                call.node(),
-            )
+            function.finish_with_outputs(call.outputs()).unwrap().node()
         });
         let mut h = module.finish_hugr().unwrap();
         h.set_entrypoint(main);
@@ -1690,15 +1683,23 @@ mod test {
         h.set_metadata::<metadata::DaggeredImplementation>(leaf.node(), "inner_custom".to_string());
         test_resolve(&mut h);
 
-        // The outer call uses the custom implementation, whose nested call is also resolved.
-        let loader = h.single_linked_output(main_call, 0).unwrap().0;
-        assert_eq!(h.static_source(loader), Some(custom));
-        let loader = h.single_linked_output(custom_call, 0).unwrap().0;
-        assert_eq!(h.static_source(loader), Some(inner_custom));
-        let loader = h.single_linked_output(inner_call, 0).unwrap().0;
         let modified_terminal =
             super::find_module_func_by_name(&h, "__modified__terminal[D]").unwrap();
-        assert_eq!(h.static_source(loader), Some(modified_terminal));
+        // Resolution replaces each indirect call. Check the new calls throughout
+        // the custom implementation chain rather than retaining the original nodes.
+        for (caller, callee) in [
+            (main, custom),
+            (custom, inner_custom),
+            (inner_custom, modified_terminal),
+        ] {
+            let call = h
+                .children(caller)
+                .filter(|&node| matches!(h.get_optype(node), OpType::CallIndirect(_)))
+                .exactly_one()
+                .unwrap_or_else(|_| panic!("Expected one resolved indirect call in {caller}"));
+            let loader = h.single_linked_output(call, 0).unwrap().0;
+            assert_eq!(h.static_source(loader), Some(callee));
+        }
     }
 
     /// Retained private callees must be explored even when their calls are copied unchanged.

@@ -1018,7 +1018,13 @@ mod tests {
         // The plain call still uses f; the daggered call uses a resolved copy.
         assert_eq!(h.static_source(plain_call.node()), Some(f.node()));
         let daggered_f = dfg_modify::find_module_func_by_name(&h, "__modified__f[D]").unwrap();
-        let loader = h.single_linked_output(daggered_call.node(), 0).unwrap().0;
+        // Resolution replaces the indirect call, so find its replacement in main.
+        let daggered_call = h
+            .children(main_node)
+            .filter(|&node| matches!(h.get_optype(node), OpType::CallIndirect(_)))
+            .exactly_one()
+            .unwrap_or_else(|_| panic!("Expected one resolved indirect call in main"));
+        let loader = h.single_linked_output(daggered_call, 0).unwrap().0;
         assert_eq!(h.static_source(loader), Some(daggered_f));
         assert_ne!(daggered_f, f.node());
     }
