@@ -96,20 +96,19 @@ fn find_rewrites<H: HugrView>(
         let mut rewritten_nodes: FxHashSet<H::Node> = FxHashSet::default();
 
         for node in hugr.children(parent) {
+            // Avoid constructing a rewrite for a node already scheduled for removal.
+            if rewritten_nodes.contains(&node) {
+                continue;
+            }
             let op = hugr.get_optype(node);
             let rewrite = if is_make_tuple(op) {
-                make_pack_unpack_rewrite(hugr, &mut convex_checker, node)
+                make_pack_unpack_rewrite(hugr, &mut convex_checker, node, &rewritten_nodes)
             } else if is_unpack_tuple(op) {
-                make_unpack_pack_rewrite(hugr, &mut convex_checker, node)
+                make_unpack_pack_rewrite(hugr, &mut convex_checker, node, &rewritten_nodes)
             } else {
                 None
             };
-            if let Some(rw) = rewrite.filter(|rw| {
-                rw.subgraph()
-                    .nodes()
-                    .iter()
-                    .all(|n| !rewritten_nodes.contains(n))
-            }) {
+            if let Some(rw) = rewrite {
                 rewritten_nodes.extend(rw.subgraph().nodes().iter().copied());
                 res.push(rw);
             }
@@ -187,6 +186,7 @@ fn make_pack_unpack_rewrite<'h, T: HugrView>(
     hugr: &'h T,
     convex_checker: &mut Option<SchedGraphChecker<'h, T>>,
     node: T::Node,
+    rewritten_nodes: &FxHashSet<T::Node>,
 ) -> Option<SimpleReplacement<T::Node>> {
     // If the node has order edges, ignore it.
     if has_order_edges(hugr, node) {
@@ -214,6 +214,10 @@ fn make_pack_unpack_rewrite<'h, T: HugrView>(
     if unpack_nodes.is_empty() && !links.is_empty() {
         return None;
     }
+    // Reject overlaps before constructing the subgraph and replacement HUGR.
+    if unpack_nodes.iter().any(|n| rewritten_nodes.contains(n)) {
+        return None;
+    }
 
     // Remove all unpack operations, and remove the pack operation if all neighbours are unpacks.
     let num_other_outputs = links.len() - unpack_nodes.len();
@@ -232,6 +236,7 @@ fn make_unpack_pack_rewrite<'h, T: HugrView>(
     hugr: &'h T,
     convex_checker: &mut Option<SchedGraphChecker<'h, T>>,
     unpack_node: T::Node,
+    rewritten_nodes: &FxHashSet<T::Node>,
 ) -> Option<SimpleReplacement<T::Node>> {
     if has_order_edges(hugr, unpack_node) {
         return None;
@@ -261,6 +266,10 @@ fn make_unpack_pack_rewrite<'h, T: HugrView>(
         })
         .collect_vec();
     if pack_nodes.is_empty() {
+        return None;
+    }
+    // The anchor may be free even when one of its repacks is already selected.
+    if pack_nodes.iter().any(|n| rewritten_nodes.contains(n)) {
         return None;
     }
 
@@ -371,6 +380,7 @@ mod test {
     use hugr_core::Hugr;
     use hugr_core::builder::{DFGBuilder, DataflowSubContainer, FunctionBuilder};
     use hugr_core::extension::prelude::{UnpackTuple, bool_t, qb_t};
+    use hugr_core::hugr::internal::HugrMutInternals;
     use hugr_core::ops::handle::NodeHandle;
     use hugr_core::std_extensions::arithmetic::float_types::float64_type;
     use hugr_core::std_extensions::collections::array::array_type_parametric;
@@ -762,25 +772,46 @@ mod test {
         assert_eq!(hugr.children(hugr.entrypoint()).count(), 2);
     }
 
-    #[test]
-    fn test_overlapping_pack_unpack_repack() {
-        let mut h = DFGBuilder::new(Signature::new(
-            vec![qb_t(), bool_t()],
-            vec![Type::new_tuple(vec![qb_t(), bool_t()])],
-        ))
-        .unwrap();
-        let tuple = h.make_tuple(h.input_wires()).unwrap();
-        let fields = h
-            .add_dataflow_op(UnpackTuple::new(vec![qb_t(), bool_t()].into()), [tuple])
-            .unwrap()
-            .outputs()
-            .collect_vec();
-        let tuple = h.make_tuple(fields).unwrap();
-        let mut hugr = h.finish_hugr_with_outputs([tuple]).unwrap();
+    #[rstest]
+    #[case::pack_unpack_repack(false, false)]
+    #[case::pack_unpack_repack_middle_first(false, true)]
+    #[case::unpack_pack_unpack(true, false)]
+    #[case::unpack_pack_unpack_middle_first(true, true)]
+    fn test_overlapping_rewrites(#[case] unpack_first: bool, #[case] middle_first: bool) {
+        let fields = vec![qb_t(), bool_t()];
+        let tuple = vec![Type::new_tuple(fields.clone())];
+        let signature = if unpack_first {
+            Signature::new(tuple, fields.clone())
+        } else {
+            Signature::new(fields.clone(), tuple)
+        };
+        let mut h = DFGBuilder::new(signature).unwrap();
+        let mut wires = h.input_wires().collect_vec();
+        let mut nodes = Vec::new();
+        for unpack in [unpack_first, !unpack_first, unpack_first] {
+            wires = if unpack {
+                h.add_dataflow_op(UnpackTuple::new(fields.clone().into()), wires)
+                    .unwrap()
+                    .outputs()
+                    .collect_vec()
+            } else {
+                vec![h.make_tuple(wires).unwrap()]
+            };
+            nodes.push(wires[0].node());
+        }
+        let mut hugr = h.finish_hugr_with_outputs(wires).unwrap();
+        if middle_first {
+            // Visit the middle node first so a later candidate has a free
+            // anchor but overlaps a previously selected neighbouring node.
+            hugr.move_before_sibling(nodes[1], nodes[0]);
+        }
         let pass = UntuplePass::default();
         let rewrites = pass.all_rewrites(&hugr);
         // The two possible rewrites overlap, so only one may be returned.
         assert_eq!(rewrites.len(), 1);
+        let selected = rewrites[0].subgraph().nodes();
+        assert!(selected.contains(&nodes[1]));
+        assert!(selected.contains(&nodes[if middle_first { 2 } else { 0 }]));
         for rewrite in rewrites {
             hugr.apply_patch(rewrite).unwrap();
         }
