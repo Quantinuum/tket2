@@ -8,7 +8,7 @@ use hugr::{
     HugrView, IncomingPort, Node, OutgoingPort, PortIndex, Wire,
     builder::{
         BuildError, ConditionalBuilder, Container, DFGBuilder, Dataflow, DataflowSubContainer,
-        FunctionBuilder, SubContainer, TailLoopBuilder, handle::Outputs,
+        FunctionBuilder, SubContainer, TailLoopBuilder,
     },
     core::HugrNode,
     extension::{prelude::qb_t, simple_op::MakeExtensionOp},
@@ -23,7 +23,6 @@ use hugr::{
             array::ArrayOpBuilder,
             borrow_array::{BArrayOpBuilder, borrow_array_type},
         },
-        logic::LogicOp,
     },
     type_row,
     types::{EdgeKind, FuncTypeBase, PolyFuncType, Signature, Type, TypeRow},
@@ -596,10 +595,9 @@ impl<N: HugrNode> ModifierResolver<N> {
         let mut poly_signature = old_fn_defn.signature().clone();
         self.modify_signature(poly_signature.body_mut(), false);
 
-        // NICOLA: TODO: check the matching between copiable inout if not in order
-        // Modifier block do not have classical outputs, since the power is supposed to applied directly to the modifier block,
-        // during its resolution we do nothandle classical outputs. To avoid invalid hugr later we raise an error here.
         if self.modifiers().num_exponents() > 0
+            // Power is  supposed to applied directly to the modifier block. A modifier block do not have copiable outputs, 
+            // and the output must match affine inputs. To avoid invalid hugr later we raise an error here if this is not the case.
             && poly_signature
                 .body()
                 .input
@@ -615,7 +613,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         }
         // Save the signature without power inputs: we need it to compute conditional and tail loop signtures
         let signature_without_power = poly_signature.body().clone();
-        // NICOLA: here we add power inputs for the function signature and plan to "consume the modification?"
         Self::append_power_inputs(poly_signature.body_mut(), self.modifiers().num_exponents());
 
         let mut new_fn = FunctionBuilder::new(
@@ -637,7 +634,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         );
         self.modified_impls.insert(cache_key, new_function_node);
 
-        // NICOLA from here: if we have exponent...
         let maybe_exponent_wire = self.multiply_exponent_inputs(&mut new_fn)?;
         match maybe_exponent_wire {
             Some(exponent_wire) => {
@@ -679,7 +675,19 @@ impl<N: HugrNode> ModifierResolver<N> {
                     .cloned()
                     .zip(case1_b.input_wires())
                     .collect::<Vec<_>>();
-                let tl_outputs = self.build_power_tail_loop(h, func, &mut case1_b, loop_inputs)?;
+                let mut tl_b = case1_b
+                    .tail_loop_builder([], loop_inputs, type_row![])
+                    .unwrap();
+                let input_wires = tl_b.input_wires().collect::<Vec<_>>();
+                let (should_stop, loop_outputs) = self.build_power_tail_loop(
+                    h,
+                    func,
+                    &mut tl_b,
+                    &cond_signature.input,
+                    input_wires,
+                )?;
+                let tail_loop = tl_b.finish_with_outputs(should_stop, loop_outputs)?;
+                let tl_outputs = tail_loop.outputs();
 
                 let case1_linear_outputs = cond_signature
                     .input
@@ -729,20 +737,10 @@ impl<N: HugrNode> ModifierResolver<N> {
         &mut self,
         h: &mut impl HugrMut<Node = N>,
         func: N,
-        case1_b: &mut impl Dataflow,
-        loop_inputs: Vec<(Type, Wire)>,
-    ) -> Result<Outputs, ModifierResolverErrors<N>> {
-        // todo: move input_types, tl_b and inputs_wires in the caller
-        let input_types = loop_inputs
-            .iter()
-            .map(|(ty, _)| ty.clone())
-            .collect::<Vec<_>>();
-
-        let mut tl_b = case1_b
-            .tail_loop_builder([], loop_inputs, type_row![])
-            .unwrap();
-        let input_wires = tl_b.input_wires().collect::<Vec<_>>();
-
+        tl_b: &mut impl Dataflow,
+        input_types: &[Type],
+        input_wires: Vec<Wire>,
+    ) -> Result<(Wire, Vec<Wire>), ModifierResolverErrors<N>> {
         // Decrement the exponent and check if positive
         let one_wire = tl_b.add_load_value(ConstInt::new_s(6, 1).unwrap());
         let exponent_input = *input_wires
@@ -752,7 +750,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             .add_dataflow_op(IntOpDef::isub.with_log_width(6), [exponent_input, one_wire])
             .unwrap()
             .out_wire(0);
-        let should_stop = Self::check_negative(&mut tl_b, exponent_count)?;
+        let should_stop = Self::check_negative(tl_b, exponent_count)?;
 
         // Insert the loop body (i.e. the modifier block)
         // The loop body does not include the exponent and only return linear values
@@ -790,9 +788,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             })
             .chain(iter::once(exponent_count))
             .collect::<Vec<_>>();
-        let tail_loop = tl_b.finish_with_outputs(should_stop, loop_outputs)?;
-
-        Ok(tail_loop.outputs())
+        Ok((should_stop, loop_outputs))
     }
 
     /// Checks whether a signed 64-bit exponent is greater than zero.

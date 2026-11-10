@@ -118,8 +118,7 @@ impl<N: HugrNode> ModifierResolver<N> {
     }
 
     /// Trace a `CallIndirect`'s function input back to a `LoadFunction`, accumulating modifiers.
-    /// Return nodes from nearest modifier to load, excluding the call;
-    /// error on invalid chains.
+    /// Return nodes from nearest modifier to load, excluding the call; error on invalid chains.
     ///
     /// For `load -> modifier_a -> modifier_b -> call_indirect`, tracing from `call_indirect`
     /// returns `[modifier_b, modifier_a, load]`.
@@ -236,6 +235,11 @@ impl<N: HugrNode> ModifierResolver<N> {
             return Ok(());
         }
 
+        // The indirect call already have the control arrays required by its direct modifiers.
+        // Thus, we add controls from external modifiers before tracing the loader.
+        let mut new_ind_call = indir_call.clone();
+        self.modify_signature(&mut new_ind_call.signature, false);
+
         // Modify the function loaded by the indirect call preserving the modifier state.
         let (load_node, modified_fn, new_load_op, exponent_inputs) =
             self.with_modifiers(self.modifiers().clone(), |this| {
@@ -245,6 +249,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                 // Apply the combined modifiers and build the replacement loader.
                 let (modified_fn, new_load_op) = this.modify_load(h, load_node)?;
                 let exponent_inputs = this.modifiers().exponent_inputs.clone();
+                Self::append_power_inputs(&mut new_ind_call.signature, exponent_inputs.len());
                 Ok::<_, ModifierResolverErrors<N>>((
                     load_node,
                     modified_fn,
@@ -263,11 +268,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             new_dfg.hugr().get_optype(new_load_node),
         )?;
 
-        // Construct the replacement IndirectCall with control arrays and runtime exponent inputs.
-        let mut new_ind_call = indir_call.clone();
-        self.modify_signature(&mut new_ind_call.signature, false);
         let exponent_count = exponent_inputs.len();
-        Self::append_power_inputs(&mut new_ind_call.signature, exponent_count);
         let exponent_port = new_ind_call.signature.input_count() + 1 - exponent_count;
         let new_call_node = new_dfg.add_child_node(new_ind_call);
 

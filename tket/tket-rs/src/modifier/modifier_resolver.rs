@@ -114,7 +114,6 @@ pub mod array_modify;
 pub mod call_modify;
 pub mod dfg_modify;
 pub mod global_phase_modify;
-mod power_modify;
 pub mod tket_op_modify;
 
 use super::CombinedModifier;
@@ -127,19 +126,10 @@ use hugr::{
     core::HugrNode,
     extension::{prelude::qb_t, simple_op::MakeExtensionOp},
     hugr::hugrmut::HugrMut,
-    ops::{CFG, Const, LoadFunction, OpTrait, OpType},
+    ops::{CFG, Const, OpTrait, OpType},
     std_extensions::{arithmetic::int_types::int_type, collections::array::array_type},
     types::{EdgeKind, FuncTypeBase, Signature, Type},
 };
-
-/// A modified callee and the original chain to clean up after replacing its call.
-struct ResolvedModification<N> {
-    modifier_chain: Vec<N>,
-    load_node: N,
-    modified_fn: N,
-    load_op: LoadFunction,
-    exponent_wires: Vec<Wire<N>>,
-}
 
 /// A wire of either direction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -766,6 +756,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                     // Modify the loaded function and prepare its replacement loader.
                     let (modified_fn, load_op) = this.modify_load(hugr, load_node)?;
 
+                    // NICOLA: TODO: we may want to move this above and avoid a similar instruction in trace_indirect_call_to_load
                     let OpType::CallIndirect(mut new_call_op) =
                         hugr.get_optype(indirect_call_node).clone()
                     else {
@@ -788,7 +779,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             )?;
 
         let power_input_offset = new_call_op.signature.input_count() + 1 - exponent_wires.len();
-        // Insert the replacement loader and call even when there are no exponents.
+        // Insert the new loader and call nodes. With no exponents, the new call is equal to the original one.
         let new_load_node = hugr.add_node_before(indirect_call_node, load_op);
         let new_call_node = hugr.add_node_before(indirect_call_node, new_call_op);
         hugr.connect(modified_fn, 0, new_load_node, 0);
@@ -890,6 +881,7 @@ impl<N: HugrNode> ModifierResolver<N> {
     }
 
     /// Appends the specified number of runtime exponent inputs.
+    // NICOLA: TODO: I want a function that adds power inputs from self.modifiers().num_exponents() and a helper (maybe external to do add an arbitrary number of int inputs)
     fn append_power_inputs(signature: &mut Signature, num_exponents: usize) {
         signature
             .input
@@ -1635,8 +1627,6 @@ fn resolve_modifier_from_entrypoints(
     // Remove only original functions for which this resolver generated modified
     // replacements, and only when no remaining non-obsolete function uses them.
     remove_unused_modified_functions(h, &resolver.modified_functions, scope);
-
-    std::fs::write("power_solved.mmd", h.mermaid_string()).unwrap();
 
     h.validate()
         .map_err(|e| ModifierResolverErrors::BuildError(e.into()))?;
@@ -2503,32 +2493,11 @@ mod tests {
     )]
     #[case::custom_modifier1("../../test_files/modifier_examples/custom_modifier.hugr")]
     #[case::multiple_fun_call("../../test_files/modifier_examples/multiple_fun_call.hugr")]
+    #[case::power_modifier("../../test_files/modifier_examples/power_modifier.hugr")]
     #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     fn test_examples(#[case] example: &str) {
         let mut h = load_guppy_example(example).unwrap();
         test_resolve(&mut h);
-    }
-
-    #[test]
-    fn test_power_example() {
-        let mut h =
-            load_guppy_example("../../test_files/modifier_examples/triple_modifier.hugr").unwrap();
-        std::fs::write("power.mmd", h.mermaid_string()).unwrap();
-        resolve_modifier(&mut h, &PassScope::default()).unwrap();
-    }
-
-    // #[test]
-    #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
-    fn test_power_modifier_error() {
-        let mut h =
-            load_guppy_example("../../test_files/guppy_examples/use_of_power.hugr").unwrap();
-        assert_matches!(h.validate(), Ok(()));
-
-        let result = resolve_modifier(&mut h, &PassScope::default());
-        assert_matches!(
-            result,
-            Err(ModifierResolverErrors::PowerModifierNotSupported { node: _ })
-        );
     }
 
     #[test]
