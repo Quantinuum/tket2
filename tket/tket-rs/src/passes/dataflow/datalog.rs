@@ -255,20 +255,26 @@ fn run_datalog<V: AbstractValue, H: HugrView>(
           for (i, case) in hugr.children(*cond).enumerate(),
           if hugr.get_optype(case).is_case();
 
-        // inputs of conditional propagate into case nodes
+        // A changed conditional input can find its cases directly, avoiding a
+        // scan of all case relations on each dataflow iteration.
         out_wire_value(i_node, OutgoingPort::from(out_p), v) <--
-          case_node(cond, case_index, case),
-          input_child(case, i_node),
           node_in_value_row(cond, in_row),
-          let conditional = hugr.get_optype(*cond).as_conditional().unwrap(),
-          if let Some(fields) = in_row.unpack_first(*case_index, conditional.sum_rows[*case_index].len()),
+          if let Some(conditional) = hugr.get_optype(*cond).as_conditional(),
+          for (case_index, case) in hugr.children(*cond).enumerate(),
+          if hugr.get_optype(case).is_case(),
+          if let Some([i_node, _]) = hugr.get_io(case),
+          if let Some(fields) = in_row.unpack_first(case_index, conditional.sum_rows[case_index].len()),
           for (out_p, v) in fields.enumerate();
+
+        relation reachable_case_output(H::Node, H::Node);
+        reachable_case_output(cond, o) <--
+          case_node(cond, _i, case),
+          case_reachable(cond, case),
+          output_child(case, o);
 
         // outputs of case nodes propagate to outputs of conditional *if* case reachable
         out_wire_value(cond, OutgoingPort::from(o_p.index()), v) <--
-          case_node(cond, _i, case),
-          case_reachable(cond, case),
-          output_child(case, o),
+          reachable_case_output(cond, o),
           in_wire_value(o, o_p, v);
 
         // In `Conditional` <Node>, child `Case` <Node> is reachable given our knowledge of predicate:
@@ -307,15 +313,28 @@ fn run_datalog<V: AbstractValue, H: HugrView>(
             if hugr.get_optype(blk).is_dataflow_block(),
             input_child(blk, inp);
 
+        // Compute the static control-flow edges once, before joining them with
+        // the changing reachability and input-value lattices.
+        relation cfg_edge(H::Node, H::Node, H::Node, H::Node, usize, usize);
+        cfg_edge(cfg, pred, out_n, dest, succ_n, arity) <--
+            cfg_node(cfg),
+            for pred in hugr.children(*cfg),
+            if let Some(df_block) = hugr.get_optype(pred).as_dataflow_block(),
+            output_child(pred, out_n),
+            for (succ_n, succ) in hugr.output_neighbours(pred).enumerate(),
+            _cfg_succ_dest(cfg, succ, dest),
+            let arity = df_block.sum_rows.get(succ_n).unwrap().len();
+
+        relation reachable_cfg_edge(H::Node, H::Node, usize, usize);
+        reachable_cfg_edge(out_n, dest, succ_n, arity) <--
+            bb_reachable(cfg, pred),
+            cfg_edge(cfg, pred, out_n, dest, succ_n, arity);
+
         // Outputs of each reachable block propagated to successor block or CFG itself
         out_wire_value(dest, OutgoingPort::from(out_p), v) <--
-            bb_reachable(cfg, pred),
-            if let Some(df_block) = hugr.get_optype(*pred).as_dataflow_block(),
-            for (succ_n, succ) in hugr.output_neighbours(*pred).enumerate(),
-            output_child(pred, out_n),
-            _cfg_succ_dest(cfg, succ, dest),
+            reachable_cfg_edge(out_n, dest, succ_n, arity),
             node_in_value_row(out_n, out_in_row),
-            if let Some(fields) = out_in_row.unpack_first(succ_n, df_block.sum_rows.get(succ_n).unwrap().len()),
+            if let Some(fields) = out_in_row.unpack_first(*succ_n, *arity),
             for (out_p, v) in fields.enumerate();
 
         // Functions ---------------
@@ -343,14 +362,20 @@ fn run_datalog<V: AbstractValue, H: HugrView>(
             if hugr.get_optype(*call).is_call(),
             if let Some(func_defn) = hugr.static_source(*call);
 
+        // Follow the static function edge from each changed call input.
         out_wire_value(inp, OutgoingPort::from(p.index()), v) <--
+            in_wire_value(call, p, v),
+            if hugr.get_optype(*call).is_call(),
+            if let Some(func) = hugr.static_source(*call),
+            if let Some([inp, _]) = hugr.get_io(func);
+
+        relation function_return(H::Node, H::Node);
+        function_return(outp, call) <--
             func_call(call, func),
-            input_child(func, inp),
-            in_wire_value(call, p, v);
+            output_child(func, outp);
 
         out_wire_value(call, OutgoingPort::from(p.index()), v) <--
-            func_call(call, func),
-            output_child(func, outp),
+            function_return(outp, call),
             in_wire_value(outp, p, v);
 
         // CallIndirect --------------------
