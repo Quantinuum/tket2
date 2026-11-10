@@ -5,11 +5,10 @@
 
 ### Bug Fixes
 
-* Handle UnpackTuple / MakeTuple in modifier resolver ([#2127](https://github.com/Quantinuum/tket2/issues/2127)) ([1e4b2a7](https://github.com/Quantinuum/tket2/commit/1e4b2a7f18193c62e32430727d0d76f00f47a2f9))
-* Preload pytket as a workaround for segfaulting import order ([#2148](https://github.com/Quantinuum/tket2/issues/2148)) ([9dc850a](https://github.com/Quantinuum/tket2/commit/9dc850aa6ab88419be08b111792410bf3d0843b3))
-* **tket-qsystem:** release arrays after recording results ([006dde2](https://github.com/Quantinuum/tket2/commit/006dde218e9a45649080ac5370f3169ea59c9c6c))
-* **tket:** Preserve global phases during modifier resolution ([#2138](https://github.com/Quantinuum/tket2/issues/2138)) ([0b56730](https://github.com/Quantinuum/tket2/commit/0b5673046fe2db08183f97c72584b9ddf18ff77e))
-* Unconnected ports when running pytket passes on hugrs with non-local edges ([#2131](https://github.com/Quantinuum/tket2/issues/2131)) ([8547351](https://github.com/Quantinuum/tket2/commit/8547351b692f93dcfe0649fd7bb11260f453d2d9))
+* Prevent macOS crashes when importing `tket` before `pytket` ([#2148](https://github.com/Quantinuum/tket2/pull/2148))
+* Don't delete non-local edges when applying `PytketHugrPass` to HUGRs with nested regions ([#2131](https://github.com/Quantinuum/tket2/pull/2131))
+* Preserve global phase operations during modifier resolution ([#2138](https://github.com/Quantinuum/tket2/pull/2138))
+* Handle `MakeTuple` and `UnpackTuple` carrying quantum data during modifier resolution ([#2127](https://github.com/Quantinuum/tket2/pull/2127))
 
 ## [0.15.14](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.13...tket-py-v0.15.14) (2026-11-04)
 
