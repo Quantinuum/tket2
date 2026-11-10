@@ -18,7 +18,10 @@ use hugr::{
         handle::NodeHandle,
     },
     std_extensions::{
-        arithmetic::{int_ops::IntOpDef, int_types::ConstInt},
+        arithmetic::{
+            int_ops::IntOpDef,
+            int_types::{ConstInt, int_type},
+        },
         collections::{
             array::ArrayOpBuilder,
             borrow_array::{BArrayOpBuilder, borrow_array_type},
@@ -613,7 +616,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         }
         // Save the signature without power inputs: we need it to compute conditional and tail loop signtures
         let signature_without_power = poly_signature.body().clone();
-        Self::append_power_inputs(poly_signature.body_mut(), self.modifiers().num_exponents());
+        self.append_power_inputs(poly_signature.body_mut());
 
         let mut new_fn = FunctionBuilder::new(
             "__modified__".to_string()
@@ -637,11 +640,11 @@ impl<N: HugrNode> ModifierResolver<N> {
         let maybe_exponent_wire = self.multiply_exponent_inputs(&mut new_fn)?;
         match maybe_exponent_wire {
             Some(exponent_wire) => {
-                let is_positive = Self::check_positive(&mut new_fn, exponent_wire)?;
+                let is_positive = check_positive(&mut new_fn, exponent_wire)?;
                 let mut cond_signature = signature_without_power;
                 // Conditional inputs are the function ones (without exponents) plus one int for the multiplied exponents
                 let function_input_count = cond_signature.input.len();
-                Self::append_power_inputs(&mut cond_signature, 1);
+                cond_signature.input.to_mut().push(int_type(6));
                 let cond_inputs = cond_signature.input.iter().cloned().zip(
                     new_fn
                         .input_wires()
@@ -750,7 +753,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             .add_dataflow_op(IntOpDef::isub.with_log_width(6), [exponent_input, one_wire])
             .unwrap()
             .out_wire(0);
-        let should_stop = Self::check_negative(tl_b, exponent_count)?;
+        let should_stop = check_negative(tl_b, exponent_count)?;
 
         // Insert the loop body (i.e. the modifier block)
         // The loop body does not include the exponent and only return linear values
@@ -789,24 +792,6 @@ impl<N: HugrNode> ModifierResolver<N> {
             .chain(iter::once(exponent_count))
             .collect::<Vec<_>>();
         Ok((should_stop, loop_outputs))
-    }
-
-    /// Checks whether a signed 64-bit exponent is greater than zero.
-    //NICOLA: TODO: move out impl
-    fn check_positive(builder: &mut impl Dataflow, exponent: Wire) -> Result<Wire, BuildError> {
-        let zero = builder.add_load_value(ConstInt::new_s(6, 0).unwrap());
-        Ok(builder
-            .add_dataflow_op(IntOpDef::igt_s.with_log_width(6), [exponent, zero])?
-            .out_wire(0))
-    }
-
-    /// Checks whether a signed 64-bit exponent is less than zero.
-    //NICOLA: TODO: move out impl
-    fn check_negative(builder: &mut impl Dataflow, exponent: Wire) -> Result<Wire, BuildError> {
-        let zero = builder.add_load_value(ConstInt::new_s(6, 0).unwrap());
-        Ok(builder
-            .add_dataflow_op(IntOpDef::ile_s.with_log_width(6), [exponent, zero])?
-            .out_wire(0))
     }
 
     /// Multiplies the trailing exponent inputs into a single wire, if present.
@@ -1200,6 +1185,22 @@ impl<N: HugrNode> ModifierResolver<N> {
 
         Ok(insertion.inserted_entrypoint)
     }
+}
+
+/// Checks whether a signed 64-bit exponent is greater than zero.
+fn check_positive(builder: &mut impl Dataflow, exponent: Wire) -> Result<Wire, BuildError> {
+    let zero = builder.add_load_value(ConstInt::new_s(6, 0).unwrap());
+    Ok(builder
+        .add_dataflow_op(IntOpDef::igt_s.with_log_width(6), [exponent, zero])?
+        .out_wire(0))
+}
+
+/// Checks whether a signed 64-bit exponent is less than zero.
+fn check_negative(builder: &mut impl Dataflow, exponent: Wire) -> Result<Wire, BuildError> {
+    let zero = builder.add_load_value(ConstInt::new_s(6, 0).unwrap());
+    Ok(builder
+        .add_dataflow_op(IntOpDef::ile_s.with_log_width(6), [exponent, zero])?
+        .out_wire(0))
 }
 
 /// Signatures and naming information for a validated custom implementation adapter.

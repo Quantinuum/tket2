@@ -763,10 +763,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                         unreachable!("Expected CallIndirect");
                     };
                     let exponent_wires = this.modifiers().exponent_wires(hugr);
-                    Self::append_power_inputs(
-                        &mut new_call_op.signature,
-                        this.modifiers().num_exponents(),
-                    );
+                    this.append_power_inputs(&mut new_call_op.signature);
                     Ok((
                         trace,
                         load_node,
@@ -880,13 +877,12 @@ impl<N: HugrNode> ModifierResolver<N> {
         }
     }
 
-    /// Appends the specified number of runtime exponent inputs.
-    // NICOLA: TODO: I want a function that adds power inputs from self.modifiers().num_exponents() and a helper (maybe external to do add an arbitrary number of int inputs)
-    fn append_power_inputs(signature: &mut Signature, num_exponents: usize) {
-        signature
-            .input
-            .to_mut()
-            .extend(iter::repeat_n(int_type(6), num_exponents));
+    /// Appends runtime exponent inputs required by the current modifiers.
+    fn append_power_inputs(&self, signature: &mut Signature) {
+        signature.input.to_mut().extend(iter::repeat_n(
+            int_type(6),
+            self.modifiers().num_exponents(),
+        ));
     }
 
     // We take an arbitrary topological order of the circuit so that we can plug the control qubits
