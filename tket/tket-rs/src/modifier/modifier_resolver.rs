@@ -116,12 +116,8 @@ pub mod global_phase_modify;
 pub mod tket_op_modify;
 
 use super::CombinedModifier;
-use crate::passes::{InScope, PassScope};
+use crate::passes::{InScope, PassScope, utils::unpack_container::TypeUnpacker};
 use crate::{TketOp, extension::global_phase::GlobalPhase, modifier::Modifier};
-use crate::{
-    modifier::modifier_resolver::global_phase_modify::delete_phase,
-    passes::utils::unpack_container::TypeUnpacker,
-};
 
 use hugr::{
     HugrView, IncomingPort, Node, OutgoingPort, Port, PortIndex, Wire,
@@ -1455,8 +1451,6 @@ fn remove_unused_modified_functions<N: HugrNode>(
 /// original function nodes may be removed if they are no longer reachable
 /// from the entrypoint, from nodes whose interface is preserved by the default
 /// pass scope, or from other preserved modified functions.
-/// Global phase operations are removed within the supplied entrypoint subtrees.
-/// Phase cleanup does not follow calls to other functions.
 ///
 /// Use [`resolve_modifier`] to select the entrypoint and cleanup policy through
 /// a [`PassScope`].
@@ -1475,8 +1469,7 @@ pub fn resolve_modifier_with_entrypoints(
 ///
 /// Rewrites record selected custom implementations and retained callees, so
 /// discovery can expand to their bodies without revisiting previously explored functions.
-/// Cleanup removes unused originals only when `scope` permits their removal and any
-/// dangling global phase operations.
+/// Cleanup removes unused originals only when `scope` permits their removal.
 /// Does nothing when the scope has no root.
 pub fn resolve_modifier(
     h: &mut impl HugrMut<Node = Node>,
@@ -1513,7 +1506,6 @@ pub fn resolve_modifier(
 /// Cleanup of original function nodes respects `scope`: a function is
 /// only removed when it is no longer needed and [`PassScope::in_scope`] says the
 /// function may be modified freely.
-/// Global phase operations are removed within the supplied entrypoint subtrees.
 ///
 /// Use [`resolve_modifier`] to select the entrypoint through a [`PassScope`].
 #[deprecated(
@@ -1534,9 +1526,8 @@ pub fn resolve_modifier_with_entrypoints_and_scope(
 /// non-modifier consumers. Rewrites are applied after each discovery round,
 /// then selected custom implementations and retained callees are explored.
 ///
-/// Removes dangling global phase operations within the entrypoint subtrees and
-/// unused original functions replaced during resolution, respecting `scope`
-/// when removing functions. Validates the resulting HUGR before returning.
+/// Removes unused original functions replaced during resolution, respecting
+/// `scope` when removing functions. Validates the resulting HUGR before returning.
 fn resolve_modifier_from_entrypoints(
     h: &mut impl HugrMut<Node = Node>,
     entry_points: impl IntoIterator<Item = Node>,
@@ -1604,10 +1595,6 @@ fn resolve_modifier_from_entrypoints(
             }
         }
     }
-
-    // Ad hoc cleanup procedure: remove any dangling global-phase nodes that
-    // were produced or left behind by the resolution passes above.
-    delete_phase(h, entry_points)?;
 
     // Remove only original functions for which this resolver generated modified
     // replacements, and only when no remaining non-obsolete function uses them.
