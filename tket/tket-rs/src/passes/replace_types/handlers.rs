@@ -5,8 +5,8 @@
 use crate::extension::guppy::{DROP_OP_NAME, GUPPY_EXTENSION};
 use crate::passes::mangle_name;
 use hugr_core::builder::{
-    Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder, SubContainer,
-    endo_sig, inout_sig,
+    BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
+    SubContainer, endo_sig, inout_sig,
 };
 use hugr_core::extension::SignatureError;
 use hugr_core::extension::prelude::{UnwrapBuilder, option_type, usize_t};
@@ -27,6 +27,7 @@ use hugr_core::std_extensions::collections::borrow_array::{
     BArrayOpBuilder, BArrayUnsafeOpDef, BorrowArray, borrow_array_type,
 };
 use hugr_core::std_extensions::collections::list::ListValue;
+use hugr_core::std_extensions::ptr::{PtrOpBuilder, ptr_type};
 use hugr_core::types::type_param::TermKindError;
 use hugr_core::types::{SumType, Transformable, Type, TypeArg};
 use hugr_core::{Visibility, type_row};
@@ -95,6 +96,48 @@ pub fn array_const(
     repl: &ReplaceTypes,
 ) -> Result<Option<Value>, ReplaceTypesError> {
     generic_array_const::<Array>(val, repl)
+}
+
+/// Replace pointer Read with Map when its transformed payload is linear.
+/// The registered copy recipe supplies `T -> (T, T)`: Map restores the first
+/// result and returns the second alongside the original pointer. No allocation
+/// or payload-copy policy is inferred; missing recipes use the existing error.
+pub(super) fn linear_ptr_read(
+    args: &[TypeArg],
+    rt: &ReplaceTypes,
+) -> Result<Option<NodeTemplate>, ReplaceTypesError> {
+    let [ty] = args else {
+        return Err(SignatureError::InvalidTypeArgs.into());
+    };
+    let ty = Type::try_from(ty.clone()).map_err(SignatureError::from)?;
+    if ty.copyable() {
+        return Ok(None);
+    }
+    let copy = rt.get_linearizer().copy_discard_op(&ty, 2)?;
+    let build = || -> Result<_, BuildError> {
+        let mut b = DFGBuilder::new(inout_sig(
+            [ptr_type(ty.clone())],
+            [ptr_type(ty.clone()), ty.clone()],
+        ))?;
+        let callback = {
+            let mut module = b.module_root_builder();
+            let mut f = module.define_function_vis(
+                mangle_name("__ptr_read_copy", &[ty.clone().into()]),
+                inout_sig([ty.clone()], [ty.clone(), ty.clone()]),
+                Visibility::Private,
+            )?;
+            let inputs = f.input_wires().collect::<Vec<_>>();
+            let outputs = copy.add(&mut f, inputs)?.outputs().collect::<Vec<_>>();
+            f.finish_with_outputs(outputs)?
+        };
+        let [pointer] = b.input_wires_arr();
+        let callback = b.load_func(callback.handle(), &[])?;
+        let (pointer, copied) = b.add_map_ptr(pointer, callback, ty.clone(), [], [ty.clone()])?;
+        b.finish_hugr_with_outputs([pointer, copied[0]])
+    };
+    let graph =
+        build().map_err(|e| LinearizeError::NestedTemplateError(Box::new(ty), Box::new(e)))?;
+    Ok(Some(NodeTemplate::linked_hugr(graph)))
 }
 
 pub(super) const DISCARD_TO_UNIT_PREFIX: &str = "__discard_unit";

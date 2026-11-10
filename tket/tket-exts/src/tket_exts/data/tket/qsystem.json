@@ -1,5 +1,5 @@
 {
-  "version": "0.6.0",
+  "version": "0.6.1",
   "name": "tket.qsystem",
   "types": {},
   "operations": {
@@ -14,7 +14,7 @@
             {
               "t": "Opaque",
               "extension": "tket.futures",
-              "extension_version": "0.2.0",
+              "extension_version": "0.3.0",
               "id": "Future",
               "args": [
                 {
@@ -59,7 +59,7 @@
             {
               "t": "Opaque",
               "extension": "tket.futures",
-              "extension_version": "0.2.0",
+              "extension_version": "0.3.0",
               "id": "Future",
               "args": [
                 {
@@ -94,7 +94,7 @@
             {
               "t": "Opaque",
               "extension": "tket.futures",
-              "extension_version": "0.2.0",
+              "extension_version": "0.3.0",
               "id": "Future",
               "args": [
                 {
@@ -140,7 +140,7 @@
             {
               "t": "Opaque",
               "extension": "tket.futures",
-              "extension_version": "0.2.0",
+              "extension_version": "0.3.0",
               "id": "Future",
               "args": [
                 {
