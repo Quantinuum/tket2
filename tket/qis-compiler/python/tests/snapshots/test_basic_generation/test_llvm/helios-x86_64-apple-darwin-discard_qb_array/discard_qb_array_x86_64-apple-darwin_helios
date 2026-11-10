@@ -14,9 +14,9 @@ alloca_block:
   store i64 -1, ptr %1, align 1, !dbg !8
   %qalloc.i = tail call i64 @___qalloc(), !dbg !9
   %not_max.not.not.i = icmp eq i64 %qalloc.i, -1, !dbg !9
-  br i1 %not_max.not.not.i, label %cond_269_case_0.i, label %__barray_check_bounds.exit, !dbg !9
+  br i1 %not_max.not.not.i, label %cond_271_case_0.i, label %__barray_check_bounds.exit, !dbg !9
 
-cond_269_case_0.i:                                ; preds = %cond_exit_12.8, %cond_exit_12.7, %cond_exit_12.6, %cond_exit_12.5, %cond_exit_12.4, %cond_exit_12.3, %cond_exit_12.2, %cond_exit_12.1, %cond_exit_12, %alloca_block
+cond_271_case_0.i:                                ; preds = %cond_exit_12.8, %cond_exit_12.7, %cond_exit_12.6, %cond_exit_12.5, %cond_exit_12.4, %cond_exit_12.3, %cond_exit_12.2, %cond_exit_12.1, %cond_exit_12, %alloca_block
   tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0"), !dbg !9
   unreachable, !dbg !9
 
@@ -36,7 +36,7 @@ cond_exit_12:                                     ; preds = %__barray_check_boun
   store i64 %qalloc.i, ptr %0, align 4
   %qalloc.i.1 = tail call i64 @___qalloc(), !dbg !9
   %not_max.not.not.i.1 = icmp eq i64 %qalloc.i.1, -1, !dbg !9
-  br i1 %not_max.not.not.i.1, label %cond_269_case_0.i, label %__barray_check_bounds.exit.1, !dbg !9
+  br i1 %not_max.not.not.i.1, label %cond_271_case_0.i, label %__barray_check_bounds.exit.1, !dbg !9
 
 __barray_check_bounds.exit.1:                     ; preds = %cond_exit_12
   tail call void @___reset(i64 %qalloc.i.1), !dbg !9
@@ -52,7 +52,7 @@ cond_exit_12.1:                                   ; preds = %__barray_check_boun
   store i64 %qalloc.i.1, ptr %8, align 4
   %qalloc.i.2 = tail call i64 @___qalloc(), !dbg !9
   %not_max.not.not.i.2 = icmp eq i64 %qalloc.i.2, -1, !dbg !9
-  br i1 %not_max.not.not.i.2, label %cond_269_case_0.i, label %__barray_check_bounds.exit.2, !dbg !9
+  br i1 %not_max.not.not.i.2, label %cond_271_case_0.i, label %__barray_check_bounds.exit.2, !dbg !9
 
 __barray_check_bounds.exit.2:                     ; preds = %cond_exit_12.1
   tail call void @___reset(i64 %qalloc.i.2), !dbg !9
@@ -68,7 +68,7 @@ cond_exit_12.2:                                   ; preds = %__barray_check_boun
   store i64 %qalloc.i.2, ptr %12, align 4
   %qalloc.i.3 = tail call i64 @___qalloc(), !dbg !9
   %not_max.not.not.i.3 = icmp eq i64 %qalloc.i.3, -1, !dbg !9
-  br i1 %not_max.not.not.i.3, label %cond_269_case_0.i, label %__barray_check_bounds.exit.3, !dbg !9
+  br i1 %not_max.not.not.i.3, label %cond_271_case_0.i, label %__barray_check_bounds.exit.3, !dbg !9
 
 __barray_check_bounds.exit.3:                     ; preds = %cond_exit_12.2
   tail call void @___reset(i64 %qalloc.i.3), !dbg !9
@@ -84,7 +84,7 @@ cond_exit_12.3:                                   ; preds = %__barray_check_boun
   store i64 %qalloc.i.3, ptr %16, align 4
   %qalloc.i.4 = tail call i64 @___qalloc(), !dbg !9
   %not_max.not.not.i.4 = icmp eq i64 %qalloc.i.4, -1, !dbg !9
-  br i1 %not_max.not.not.i.4, label %cond_269_case_0.i, label %__barray_check_bounds.exit.4, !dbg !9
+  br i1 %not_max.not.not.i.4, label %cond_271_case_0.i, label %__barray_check_bounds.exit.4, !dbg !9
 
 __barray_check_bounds.exit.4:                     ; preds = %cond_exit_12.3
   tail call void @___reset(i64 %qalloc.i.4), !dbg !9
@@ -100,7 +100,7 @@ cond_exit_12.4:                                   ; preds = %__barray_check_boun
   store i64 %qalloc.i.4, ptr %20, align 4
   %qalloc.i.5 = tail call i64 @___qalloc(), !dbg !9
   %not_max.not.not.i.5 = icmp eq i64 %qalloc.i.5, -1, !dbg !9
-  br i1 %not_max.not.not.i.5, label %cond_269_case_0.i, label %__barray_check_bounds.exit.5, !dbg !9
+  br i1 %not_max.not.not.i.5, label %cond_271_case_0.i, label %__barray_check_bounds.exit.5, !dbg !9
 
 __barray_check_bounds.exit.5:                     ; preds = %cond_exit_12.4
   tail call void @___reset(i64 %qalloc.i.5), !dbg !9
@@ -116,7 +116,7 @@ cond_exit_12.5:                                   ; preds = %__barray_check_boun
   store i64 %qalloc.i.5, ptr %24, align 4
   %qalloc.i.6 = tail call i64 @___qalloc(), !dbg !9
   %not_max.not.not.i.6 = icmp eq i64 %qalloc.i.6, -1, !dbg !9
-  br i1 %not_max.not.not.i.6, label %cond_269_case_0.i, label %__barray_check_bounds.exit.6, !dbg !9
+  br i1 %not_max.not.not.i.6, label %cond_271_case_0.i, label %__barray_check_bounds.exit.6, !dbg !9
 
 __barray_check_bounds.exit.6:                     ; preds = %cond_exit_12.5
   tail call void @___reset(i64 %qalloc.i.6), !dbg !9
@@ -132,7 +132,7 @@ cond_exit_12.6:                                   ; preds = %__barray_check_boun
   store i64 %qalloc.i.6, ptr %28, align 4
   %qalloc.i.7 = tail call i64 @___qalloc(), !dbg !9
   %not_max.not.not.i.7 = icmp eq i64 %qalloc.i.7, -1, !dbg !9
-  br i1 %not_max.not.not.i.7, label %cond_269_case_0.i, label %__barray_check_bounds.exit.7, !dbg !9
+  br i1 %not_max.not.not.i.7, label %cond_271_case_0.i, label %__barray_check_bounds.exit.7, !dbg !9
 
 __barray_check_bounds.exit.7:                     ; preds = %cond_exit_12.6
   tail call void @___reset(i64 %qalloc.i.7), !dbg !9
@@ -148,7 +148,7 @@ cond_exit_12.7:                                   ; preds = %__barray_check_boun
   store i64 %qalloc.i.7, ptr %32, align 4
   %qalloc.i.8 = tail call i64 @___qalloc(), !dbg !9
   %not_max.not.not.i.8 = icmp eq i64 %qalloc.i.8, -1, !dbg !9
-  br i1 %not_max.not.not.i.8, label %cond_269_case_0.i, label %__barray_check_bounds.exit.8, !dbg !9
+  br i1 %not_max.not.not.i.8, label %cond_271_case_0.i, label %__barray_check_bounds.exit.8, !dbg !9
 
 __barray_check_bounds.exit.8:                     ; preds = %cond_exit_12.7
   tail call void @___reset(i64 %qalloc.i.8), !dbg !9
@@ -164,7 +164,7 @@ cond_exit_12.8:                                   ; preds = %__barray_check_boun
   store i64 %qalloc.i.8, ptr %36, align 4
   %qalloc.i.9 = tail call i64 @___qalloc(), !dbg !9
   %not_max.not.not.i.9 = icmp eq i64 %qalloc.i.9, -1, !dbg !9
-  br i1 %not_max.not.not.i.9, label %cond_269_case_0.i, label %__barray_check_bounds.exit.9, !dbg !9
+  br i1 %not_max.not.not.i.9, label %cond_271_case_0.i, label %__barray_check_bounds.exit.9, !dbg !9
 
 __barray_check_bounds.exit.9:                     ; preds = %cond_exit_12.8
   tail call void @___reset(i64 %qalloc.i.9), !dbg !9
@@ -324,10 +324,6 @@ cond_exit_157.9.i:                                ; preds = %__barray_mask_borro
   %90 = icmp eq i64 %89, -1, !dbg !25
   br i1 %90, label %"__hugr__.guppylang.std.quantum.discard_array$10.111.exit", label %mask_block_err.i.i, !dbg !25
 
-mask_block_err.i.i:                               ; preds = %cond_exit_157.9.i
-  tail call void @panic(i32 1002, ptr nonnull @"e_Array cont.EFA5AC45.0"), !dbg !25
-  unreachable, !dbg !25
-
 __barray_mask_borrow.exit.i:                      ; preds = %cond_exit_12.9
   %91 = or disjoint i64 %41, 1, !dbg !21
   store i64 %91, ptr %1, align 4, !dbg !21
@@ -335,6 +331,10 @@ __barray_mask_borrow.exit.i:                      ; preds = %cond_exit_12.9
   tail call void @___qfree(i64 %92), !dbg !24
   %.pre.i = load i64, ptr %1, align 4, !dbg !10
   br label %cond_exit_157.i
+
+mask_block_err.i.i:                               ; preds = %cond_exit_157.9.i
+  tail call void @panic(i32 1002, ptr nonnull @"e_Array cont.EFA5AC45.0"), !dbg !25
+  unreachable, !dbg !25
 
 "__hugr__.guppylang.std.quantum.discard_array$10.111.exit": ; preds = %cond_exit_157.9.i
   tail call void @heap_free(ptr nonnull %0), !dbg !27
@@ -374,30 +374,30 @@ attributes #0 = { noreturn }
 !name = !{!3}
 
 !0 = !{i32 2, !"Debug Info Version", i32 3}
-!1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "guppylang (guppylang-internals-v1.1.4)-v1.1.4", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "guppylang (guppylang-internals-v1.2.0)-v1.2.0", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
 !3 = !{!"mainlib"}
 !4 = distinct !DISubprogram(name: "discard_qb_array.<locals>.main", linkageName: "__hugr__.__main__.discard_qb_array.<locals>.main.1", scope: null, file: !5, line: 95, type: !6, scopeLine: 96, spFlags: DISPFlagDefinition, unit: !1)
 !6 = !DISubroutineType(types: !7)
 !7 = !{null}
 !8 = !DILocation(line: 96, column: 13, scope: !4)
 !9 = !DILocation(line: 96, column: 19, scope: !4)
-!10 = !DILocation(line: 429, column: 15, scope: !11, inlinedAt: !19)
-!11 = distinct !DISubprogram(name: "std.quantum.discard_array$10", linkageName: "__hugr__.guppylang.std.quantum.discard_array$10.111", scope: null, file: !12, line: 426, type: !13, scopeLine: 428, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
+!10 = !DILocation(line: 437, column: 15, scope: !11, inlinedAt: !19)
+!11 = distinct !DISubprogram(name: "std.quantum.discard_array$10", linkageName: "__hugr__.guppylang.std.quantum.discard_array$10.111", scope: null, file: !12, line: 434, type: !13, scopeLine: 436, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
 !13 = !DISubroutineType(types: !14)
 !14 = !{null, !15}
 !15 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ ptr, ptr, i64 }", file: !2, size: 192, align: 8, elements: !16)
 !16 = !{!17, !17, !18}
 !17 = !DIBasicType(name: "ptr", size: 64, encoding: DW_ATE_address)
 !18 = !DIBasicType(name: "i64", size: 64, encoding: DW_ATE_unsigned)
-!19 = distinct !DILocation(line: 429, column: 15, scope: !11, inlinedAt: !20)
+!19 = distinct !DILocation(line: 437, column: 15, scope: !11, inlinedAt: !20)
 !20 = distinct !DILocation(line: 97, column: 8, scope: !4)
-!21 = !DILocation(line: 430, column: 20, scope: !11, inlinedAt: !22)
-!22 = distinct !DILocation(line: 430, column: 20, scope: !11, inlinedAt: !20)
-!23 = !DILocation(line: 430, column: 20, scope: !11, inlinedAt: !20)
-!24 = !DILocation(line: 430, column: 12, scope: !11, inlinedAt: !20)
-!25 = !DILocation(line: 431, column: 4, scope: !11, inlinedAt: !26)
-!26 = distinct !DILocation(line: 431, column: 4, scope: !11, inlinedAt: !20)
-!27 = !DILocation(line: 431, column: 4, scope: !11, inlinedAt: !20)
+!21 = !DILocation(line: 438, column: 20, scope: !11, inlinedAt: !22)
+!22 = distinct !DILocation(line: 438, column: 20, scope: !11, inlinedAt: !20)
+!23 = !DILocation(line: 438, column: 20, scope: !11, inlinedAt: !20)
+!24 = !DILocation(line: 438, column: 12, scope: !11, inlinedAt: !20)
+!25 = !DILocation(line: 439, column: 4, scope: !11, inlinedAt: !26)
+!26 = distinct !DILocation(line: 439, column: 4, scope: !11, inlinedAt: !20)
+!27 = !DILocation(line: 439, column: 4, scope: !11, inlinedAt: !20)
 !28 = distinct !DISubprogram(name: "qmain", linkageName: "qmain", scope: null, file: !29, type: !30, spFlags: DISPFlagDefinition, unit: !1)
 !30 = !DISubroutineType(types: !31)
 !31 = !{!18, !18}

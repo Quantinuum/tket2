@@ -13,67 +13,67 @@ define void @"__hugr__.__main__.flip_some.<locals>.main.1"() local_unnamed_addr 
 alloca_block:
   %qalloc.i = tail call i64 @___qalloc(), !dbg !8
   %not_max.not.not.i = icmp eq i64 %qalloc.i, -1, !dbg !8
-  br i1 %not_max.not.not.i, label %cond_27_case_0.i, label %__hugr__.__tk2_helios_qalloc.23.exit, !dbg !8
+  br i1 %not_max.not.not.i, label %cond_29_case_0.i, label %__hugr__.__tk2_helios_qalloc.25.exit, !dbg !8
 
-cond_27_case_0.i:                                 ; preds = %alloca_block
+cond_29_case_0.i:                                 ; preds = %alloca_block
   tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0"), !dbg !8
   unreachable, !dbg !8
 
-__hugr__.__tk2_helios_qalloc.23.exit:             ; preds = %alloca_block
+__hugr__.__tk2_helios_qalloc.25.exit:             ; preds = %alloca_block
   tail call void @___reset(i64 %qalloc.i), !dbg !8
   tail call void @___rxy(i64 %qalloc.i, double 0x400921FB54442D18, double 0.000000e+00)
   %qalloc.i32 = tail call i64 @___qalloc(), !dbg !9
   %not_max.not.not.i33 = icmp eq i64 %qalloc.i32, -1, !dbg !9
-  br i1 %not_max.not.not.i33, label %cond_27_case_0.i34, label %__hugr__.__tk2_helios_qalloc.23.exit35, !dbg !9
+  br i1 %not_max.not.not.i33, label %cond_29_case_0.i34, label %__hugr__.__tk2_helios_qalloc.25.exit35, !dbg !9
 
-cond_27_case_0.i34:                               ; preds = %__hugr__.__tk2_helios_qalloc.23.exit
+cond_29_case_0.i34:                               ; preds = %__hugr__.__tk2_helios_qalloc.25.exit
   tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0"), !dbg !9
   unreachable, !dbg !9
 
-__hugr__.__tk2_helios_qalloc.23.exit35:           ; preds = %__hugr__.__tk2_helios_qalloc.23.exit
+__hugr__.__tk2_helios_qalloc.25.exit35:           ; preds = %__hugr__.__tk2_helios_qalloc.25.exit
   tail call void @___reset(i64 %qalloc.i32), !dbg !9
   %qalloc.i36 = tail call i64 @___qalloc(), !dbg !10
   %not_max.not.not.i37 = icmp eq i64 %qalloc.i36, -1, !dbg !10
-  br i1 %not_max.not.not.i37, label %cond_27_case_0.i38, label %__hugr__.__tk2_helios_qalloc.23.exit39, !dbg !10
+  br i1 %not_max.not.not.i37, label %cond_29_case_0.i38, label %__hugr__.__tk2_helios_qalloc.25.exit39, !dbg !10
 
-cond_27_case_0.i38:                               ; preds = %__hugr__.__tk2_helios_qalloc.23.exit35
+cond_29_case_0.i38:                               ; preds = %__hugr__.__tk2_helios_qalloc.25.exit35
   tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0"), !dbg !10
   unreachable, !dbg !10
 
-__hugr__.__tk2_helios_qalloc.23.exit39:           ; preds = %__hugr__.__tk2_helios_qalloc.23.exit35
+__hugr__.__tk2_helios_qalloc.25.exit39:           ; preds = %__hugr__.__tk2_helios_qalloc.25.exit35
   tail call void @___reset(i64 %qalloc.i36), !dbg !10
   tail call void @___rxy(i64 %qalloc.i36, double 0x400921FB54442D18, double 0.000000e+00)
   %qalloc.i40 = tail call i64 @___qalloc(), !dbg !11
   %not_max.not.not.i41 = icmp eq i64 %qalloc.i40, -1, !dbg !11
-  br i1 %not_max.not.not.i41, label %cond_27_case_0.i42, label %__hugr__.__tk2_helios_qalloc.23.exit43, !dbg !11
+  br i1 %not_max.not.not.i41, label %cond_29_case_0.i42, label %__hugr__.__tk2_helios_qalloc.25.exit43, !dbg !11
 
-cond_27_case_0.i42:                               ; preds = %__hugr__.__tk2_helios_qalloc.23.exit39
+cond_29_case_0.i42:                               ; preds = %__hugr__.__tk2_helios_qalloc.25.exit39
   tail call void @panic(i32 1001, ptr nonnull @"e_No more qu.3B2EEBF0.0"), !dbg !11
   unreachable, !dbg !11
 
-__hugr__.__tk2_helios_qalloc.23.exit43:           ; preds = %__hugr__.__tk2_helios_qalloc.23.exit39
+__hugr__.__tk2_helios_qalloc.25.exit43:           ; preds = %__hugr__.__tk2_helios_qalloc.25.exit39
   tail call void @___reset(i64 %qalloc.i40), !dbg !11
-  %___lazy_measure = tail call i64 @___lazy_measure(i64 %qalloc.i), !dbg !12
-  tail call void @___qfree(i64 %qalloc.i), !dbg !12
-  tail call void @___rxy(i64 %qalloc.i40, double 0x400921FB54442D18, double 0.000000e+00)
-  %read_bool = tail call i1 @___read_future_bool(i64 %___lazy_measure), !dbg !12
-  tail call void @___dec_future_refcount(i64 %___lazy_measure), !dbg !12
-  tail call void @print_bool(ptr nonnull @res_c0.7C14CD6E.0, i64 12, i1 %read_bool), !dbg !13
-  %___lazy_measure9 = tail call i64 @___lazy_measure(i64 %qalloc.i32), !dbg !14
+  %___lazy_measure = tail call i64 @___lazy_measure(i64 %qalloc.i36), !dbg !12
+  tail call void @___qfree(i64 %qalloc.i36), !dbg !12
+  %___lazy_measure5 = tail call i64 @___lazy_measure(i64 %qalloc.i), !dbg !13
+  tail call void @___qfree(i64 %qalloc.i), !dbg !13
+  %___lazy_measure7 = tail call i64 @___lazy_measure(i64 %qalloc.i32), !dbg !14
   tail call void @___qfree(i64 %qalloc.i32), !dbg !14
-  %read_bool11 = tail call i1 @___read_future_bool(i64 %___lazy_measure9), !dbg !14
-  tail call void @___dec_future_refcount(i64 %___lazy_measure9), !dbg !14
-  tail call void @print_bool(ptr nonnull @res_c1.1F7A6571.0, i64 12, i1 %read_bool11), !dbg !15
-  %___lazy_measure17 = tail call i64 @___lazy_measure(i64 %qalloc.i36), !dbg !16
-  tail call void @___qfree(i64 %qalloc.i36), !dbg !16
-  %read_bool19 = tail call i1 @___read_future_bool(i64 %___lazy_measure17), !dbg !16
-  tail call void @___dec_future_refcount(i64 %___lazy_measure17), !dbg !16
-  tail call void @print_bool(ptr nonnull @res_c2.60825383.0, i64 12, i1 %read_bool19), !dbg !17
-  %___lazy_measure25 = tail call i64 @___lazy_measure(i64 %qalloc.i40), !dbg !18
-  tail call void @___qfree(i64 %qalloc.i40), !dbg !18
-  %read_bool27 = tail call i1 @___read_future_bool(i64 %___lazy_measure25), !dbg !18
-  tail call void @___dec_future_refcount(i64 %___lazy_measure25), !dbg !18
-  tail call void @print_bool(ptr nonnull @res_c3.B223E16D.0, i64 12, i1 %read_bool27), !dbg !19
+  tail call void @___rxy(i64 %qalloc.i40, double 0x400921FB54442D18, double 0.000000e+00)
+  %___lazy_measure10 = tail call i64 @___lazy_measure(i64 %qalloc.i40), !dbg !15
+  tail call void @___qfree(i64 %qalloc.i40), !dbg !15
+  %read_bool = tail call i1 @___read_future_bool(i64 %___lazy_measure10), !dbg !15
+  tail call void @___dec_future_refcount(i64 %___lazy_measure10), !dbg !15
+  %read_bool13 = tail call i1 @___read_future_bool(i64 %___lazy_measure), !dbg !12
+  tail call void @___dec_future_refcount(i64 %___lazy_measure), !dbg !12
+  %read_bool16 = tail call i1 @___read_future_bool(i64 %___lazy_measure5), !dbg !13
+  tail call void @___dec_future_refcount(i64 %___lazy_measure5), !dbg !13
+  tail call void @print_bool(ptr nonnull @res_c0.7C14CD6E.0, i64 12, i1 %read_bool16), !dbg !16
+  %read_bool21 = tail call i1 @___read_future_bool(i64 %___lazy_measure7), !dbg !14
+  tail call void @___dec_future_refcount(i64 %___lazy_measure7), !dbg !14
+  tail call void @print_bool(ptr nonnull @res_c1.1F7A6571.0, i64 12, i1 %read_bool21), !dbg !17
+  tail call void @print_bool(ptr nonnull @res_c2.60825383.0, i64 12, i1 %read_bool13), !dbg !18
+  tail call void @print_bool(ptr nonnull @res_c3.B223E16D.0, i64 12, i1 %read_bool), !dbg !19
   ret void
 }
 
@@ -115,7 +115,7 @@ attributes #0 = { noreturn }
 !name = !{!3}
 
 !0 = !{i32 2, !"Debug Info Version", i32 3}
-!1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "guppylang (guppylang-internals-v1.1.4)-v1.1.4", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "guppylang (guppylang-internals-v1.2.0)-v1.2.0", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
 !3 = !{!"mainlib"}
 !4 = distinct !DISubprogram(name: "flip_some.<locals>.main", linkageName: "__hugr__.__main__.flip_some.<locals>.main.1", scope: null, file: !5, line: 77, type: !6, scopeLine: 78, spFlags: DISPFlagDefinition, unit: !1)
 !6 = !DISubroutineType(types: !7)
@@ -124,13 +124,13 @@ attributes #0 = { noreturn }
 !9 = !DILocation(line: 79, column: 20, scope: !4)
 !10 = !DILocation(line: 80, column: 20, scope: !4)
 !11 = !DILocation(line: 81, column: 20, scope: !4)
-!12 = !DILocation(line: 85, column: 21, scope: !4)
-!13 = !DILocation(line: 85, column: 8, scope: !4)
+!12 = !DILocation(line: 87, column: 21, scope: !4)
+!13 = !DILocation(line: 85, column: 21, scope: !4)
 !14 = !DILocation(line: 86, column: 21, scope: !4)
-!15 = !DILocation(line: 86, column: 8, scope: !4)
-!16 = !DILocation(line: 87, column: 21, scope: !4)
-!17 = !DILocation(line: 87, column: 8, scope: !4)
-!18 = !DILocation(line: 88, column: 21, scope: !4)
+!15 = !DILocation(line: 88, column: 21, scope: !4)
+!16 = !DILocation(line: 85, column: 8, scope: !4)
+!17 = !DILocation(line: 86, column: 8, scope: !4)
+!18 = !DILocation(line: 87, column: 8, scope: !4)
 !19 = !DILocation(line: 88, column: 8, scope: !4)
 !20 = distinct !DISubprogram(name: "qmain", linkageName: "qmain", scope: null, file: !21, type: !22, spFlags: DISPFlagDefinition, unit: !1)
 !22 = !DISubroutineType(types: !23)
