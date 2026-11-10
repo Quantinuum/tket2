@@ -100,7 +100,8 @@ create_py_exception!(
 /// Parameters:
 /// - resolve_modifiers: Whether to resolve modifier operations.
 /// - simplify_cfgs: Whether to simplify CFG control flow.
-/// - remove_tuple_untuple: Whether to remove tuple/untuple operations.
+/// - remove_tuple_untuple: Whether to remove redundant tuple pack/unpack operations
+///   in either order.
 /// - constant_folding: Whether to constant fold the program.
 /// - remove_dead_funcs: Whether to remove dead functions.
 /// - inline_dfgs: Whether to inline DFG operations.
