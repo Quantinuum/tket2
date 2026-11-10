@@ -12,6 +12,8 @@ from tket_exts import tket_registry
 from tket._state import CompilationState
 from tket.passes import Normalize, PytketHugrPass, QSystemRebasePass, _QSystemLLVMPass
 
+# Import the pytket passes, if the `pytket` extra has been installed.
+# If not, skip all tests in this file.
 pytket = pytest.importorskip("pytket")
 from pytket.passes import CliffordSimp, RemoveBarriers
 
