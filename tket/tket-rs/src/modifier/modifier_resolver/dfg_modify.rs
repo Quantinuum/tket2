@@ -962,7 +962,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         let just_input_num = tail_loop.just_inputs.len();
         let just_output_num = tail_loop.just_outputs.len();
 
-        h.get_metadata::<IsPowerLoop>(tl_node);
+        if h.get_metadata::<IsPowerLoop>(tl_node) == Some(true) {}
 
         if self.modifiers.dagger {
             let optype = h.get_optype(tl_node);
