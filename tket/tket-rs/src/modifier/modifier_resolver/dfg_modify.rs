@@ -597,24 +597,9 @@ impl<N: HugrNode> ModifierResolver<N> {
         };
         let mut poly_signature = old_fn_defn.signature().clone();
         self.modify_signature(poly_signature.body_mut(), false);
+        self.validate_power_signature(h, func, poly_signature.body())?;
 
-        if self.modifiers().num_exponents() > 0
-            // Power is  supposed to applied directly to the modifier block. A modifier block do not have copiable outputs, 
-            // and the output must match affine inputs. To avoid invalid hugr later we raise an error here if this is not the case.
-            && poly_signature
-                .body()
-                .input
-                .iter()
-                .filter(|ty| !ty.copyable())
-                .ne(poly_signature.body().output.iter())
-        {
-            return Err(ModifierResolverErrors::unresolvable(
-                func,
-                "Power modifiers require outputs to match linear inputs in order.",
-                h.get_optype(func).clone(),
-            ));
-        }
-        // Save the signature without power inputs: we need it to compute conditional and tail loop signtures
+        // Keep the signature without exponent inputs for the conditional and tail loop.
         let signature_without_power = poly_signature.body().clone();
         self.append_power_inputs(poly_signature.body_mut());
 
@@ -640,72 +625,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         let maybe_exponent_wire = self.multiply_exponent_inputs(&mut new_fn)?;
         match maybe_exponent_wire {
             Some(exponent_wire) => {
-                let is_positive = check_positive(&mut new_fn, exponent_wire)?;
-                let mut cond_signature = signature_without_power;
-                // Conditional inputs are the function ones (without exponents) plus one int for the multiplied exponents
-                let function_input_count = cond_signature.input.len();
-                cond_signature.input.to_mut().push(int_type(6));
-                let cond_inputs = cond_signature.input.iter().cloned().zip(
-                    new_fn
-                        .input_wires()
-                        .take(function_input_count)
-                        .chain(iter::once(exponent_wire)),
-                );
-                let cond_output_types = cond_signature.output.clone();
-                let mut cond_builder = new_fn
-                    .conditional_builder(
-                        ([TypeRow::default(), TypeRow::default()], is_positive),
-                        cond_inputs,
-                        cond_output_types,
-                    )
-                    .unwrap();
-
-                // case 0: non-positive exponent -> simply filert the inputs, only return copiable inputs
-                let case0_b = cond_builder.case_builder(0).unwrap();
-                let case0_linear_outputs = cond_signature
-                    .input
-                    .iter()
-                    .zip(case0_b.input_wires())
-                    .filter_map(|(ty, wire)| (!ty.copyable()).then_some(wire))
-                    .collect::<Vec<_>>();
-                case0_b.finish_with_outputs(case0_linear_outputs)?;
-
-                // case 1: positive exponent -> build the loop then output only non copiable outputs
-                let mut case1_b = cond_builder.case_builder(1).unwrap();
-                let loop_inputs = cond_signature
-                    .input
-                    .iter()
-                    .cloned()
-                    .zip(case1_b.input_wires())
-                    .collect::<Vec<_>>();
-                let mut tl_b = case1_b
-                    .tail_loop_builder([], loop_inputs, type_row![])
-                    .unwrap();
-                let input_wires = tl_b.input_wires().collect::<Vec<_>>();
-                let (should_stop, loop_outputs) = self.build_power_tail_loop(
-                    h,
-                    func,
-                    &mut tl_b,
-                    &cond_signature.input,
-                    input_wires,
-                )?;
-                let tail_loop = tl_b.finish_with_outputs(should_stop, loop_outputs)?;
-                case1_b
-                    .hugr_mut()
-                    .set_metadata::<IsPowerLoop>(tail_loop.node(), true);
-                let tl_outputs = tail_loop.outputs();
-
-                let case1_linear_outputs = cond_signature
-                    .input
-                    .iter()
-                    .zip(tl_outputs)
-                    .filter_map(|(ty, wire)| (!ty.copyable()).then_some(wire))
-                    .collect::<Vec<_>>();
-                case1_b.finish_with_outputs(case1_linear_outputs)?;
-
-                // connect the loop outputs
-                let conditional = cond_builder.finish_sub_container()?;
-                new_fn.set_outputs(conditional.outputs())?;
+                self.build_power_body(h, func, &mut new_fn, signature_without_power, exponent_wire)?
             }
             None => {
                 // Power modifier is consumed here. Nested calls need a fresh power environment.
@@ -736,6 +656,100 @@ impl<N: HugrNode> ModifierResolver<N> {
         self.modified_functions.insert(func);
 
         Ok(new_function_node)
+    }
+
+    /// Checks that powered functions return their linear inputs in the same order.
+    fn validate_power_signature(
+        &self,
+        h: &impl HugrView<Node = N>,
+        func: N,
+        signature: &Signature,
+    ) -> Result<(), ModifierResolverErrors<N>> {
+        if self.modifiers().num_exponents() > 0
+            && signature
+                .input
+                .iter()
+                .filter(|ty| !ty.copyable())
+                .ne(signature.output.iter())
+        {
+            return Err(ModifierResolverErrors::unresolvable(
+                func,
+                "Power modifiers require outputs to match linear inputs in order.",
+                h.get_optype(func).clone(),
+            ));
+        }
+        Ok(())
+    }
+
+    /// Builds the power conditional and tail loop, and sets the function outputs.
+    fn build_power_body(
+        &mut self,
+        h: &mut impl HugrMut<Node = N>,
+        func: N,
+        new_fn: &mut impl Dataflow,
+        mut cond_signature: Signature,
+        exponent_wire: Wire,
+    ) -> Result<(), ModifierResolverErrors<N>> {
+        let is_positive = check_positive(new_fn, exponent_wire)?;
+        // Pass the function inputs and one combined exponent into the conditional.
+        let function_input_count = cond_signature.input.len();
+        cond_signature.input.to_mut().push(int_type(6));
+        let cond_inputs = cond_signature.input.iter().cloned().zip(
+            new_fn
+                .input_wires()
+                .take(function_input_count)
+                .chain(iter::once(exponent_wire)),
+        );
+        let cond_output_types = cond_signature.output.clone();
+        let mut cond_builder = new_fn
+            .conditional_builder(
+                ([TypeRow::default(), TypeRow::default()], is_positive),
+                cond_inputs,
+                cond_output_types,
+            )
+            .unwrap();
+
+        // case 0: non-positive exponent -> simply filert the inputs, only return copiable inputs
+        let case0_b = cond_builder.case_builder(0).unwrap();
+        let case0_linear_outputs = cond_signature
+            .input
+            .iter()
+            .zip(case0_b.input_wires())
+            .filter_map(|(ty, wire)| (!ty.copyable()).then_some(wire))
+            .collect::<Vec<_>>();
+        case0_b.finish_with_outputs(case0_linear_outputs)?;
+
+        // case 1: positive exponent -> build the loop then output only non copiable outputs
+        let mut case1_b = cond_builder.case_builder(1).unwrap();
+        let loop_inputs = cond_signature
+            .input
+            .iter()
+            .cloned()
+            .zip(case1_b.input_wires())
+            .collect::<Vec<_>>();
+        let mut tl_b = case1_b
+            .tail_loop_builder([], loop_inputs, type_row![])
+            .unwrap();
+        let input_wires = tl_b.input_wires().collect::<Vec<_>>();
+        let (should_stop, loop_outputs) =
+            self.build_power_tail_loop(h, func, &mut tl_b, &cond_signature.input, input_wires)?;
+        let tail_loop = tl_b.finish_with_outputs(should_stop, loop_outputs)?;
+        case1_b
+            .hugr_mut()
+            .set_metadata::<IsPowerLoop>(tail_loop.node(), true);
+        let tl_outputs = tail_loop.outputs();
+
+        let case1_linear_outputs = cond_signature
+            .input
+            .iter()
+            .zip(tl_outputs)
+            .filter_map(|(ty, wire)| (!ty.copyable()).then_some(wire))
+            .collect::<Vec<_>>();
+        case1_b.finish_with_outputs(case1_linear_outputs)?;
+
+        let conditional = cond_builder.finish_sub_container()?;
+        new_fn.set_outputs(conditional.outputs())?;
+        Ok(())
     }
 
     /// Builds the tail loop for the positive-exponent case.
