@@ -34,7 +34,7 @@ use petgraph::visit::{Topo, Walker};
 
 use crate::extension::modifier::Modifier;
 
-use super::{DirWire, ModifierResolver, ModifierResolverErrors, PortExt};
+use super::{DirWire, IsPowerLoop, ModifierResolver, ModifierResolverErrors, PortExt};
 
 use crate::metadata;
 
@@ -690,6 +690,9 @@ impl<N: HugrNode> ModifierResolver<N> {
                     input_wires,
                 )?;
                 let tail_loop = tl_b.finish_with_outputs(should_stop, loop_outputs)?;
+                case1_b
+                    .hugr_mut()
+                    .set_metadata::<IsPowerLoop>(tail_loop.node(), true);
                 let tl_outputs = tail_loop.outputs();
 
                 let case1_linear_outputs = cond_signature
@@ -952,17 +955,19 @@ impl<N: HugrNode> ModifierResolver<N> {
     pub(super) fn modify_tail_loop(
         &mut self,
         h: &mut impl HugrMut<Node = N>,
-        n: N,
+        tl_node: N,
         tail_loop: &TailLoop,
         new_dfg: &mut impl Container,
     ) -> Result<(), ModifierResolverErrors<N>> {
         let just_input_num = tail_loop.just_inputs.len();
         let just_output_num = tail_loop.just_outputs.len();
 
+        h.get_metadata::<IsPowerLoop>(tl_node);
+
         if self.modifiers.dagger {
-            let optype = h.get_optype(n);
+            let optype = h.get_optype(tl_node);
             return Err(ModifierResolverErrors::unresolvable(
-                n,
+                tl_node,
                 "TailLoop cannot be daggered.".to_string(),
                 optype.clone(),
             ));
@@ -977,7 +982,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             control_types.extend(tail_loop.rest.iter()),
             tail_loop.just_outputs.clone(),
         )?;
-        self.modify_dfg_body(h, n, &mut builder)?;
+        self.modify_dfg_body(h, tl_node, &mut builder)?;
         let new_tail_loop = self.insert_sub_dfg(new_dfg, builder)?;
 
         // connect the controls and register IOs
@@ -991,21 +996,21 @@ impl<N: HugrNode> ModifierResolver<N> {
             );
             *ctrl = Wire::new(new_tail_loop, i + just_output_num);
         }
-        for port in h.node_inputs(n) {
+        for port in h.node_inputs(tl_node) {
             let new_port = if port.index() < just_input_num {
                 port
             } else {
                 port.shift(offset)
             };
-            self.map_insert((n, port).into(), (new_tail_loop, new_port).into())?;
+            self.map_insert((tl_node, port).into(), (new_tail_loop, new_port).into())?;
         }
-        for port in h.node_outputs(n) {
+        for port in h.node_outputs(tl_node) {
             let new_port = if port.index() < just_output_num {
                 port
             } else {
                 port.shift(offset)
             };
-            self.map_insert((n, port).into(), (new_tail_loop, new_port).into())?
+            self.map_insert((tl_node, port).into(), (new_tail_loop, new_port).into())?
         }
 
         Ok(())

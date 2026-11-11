@@ -126,10 +126,19 @@ use hugr::{
     core::HugrNode,
     extension::{prelude::qb_t, simple_op::MakeExtensionOp},
     hugr::hugrmut::HugrMut,
+    metadata::Metadata,
     ops::{CFG, Const, OpTrait, OpType},
     std_extensions::{arithmetic::int_types::int_type, collections::array::array_type},
     types::{EdgeKind, FuncTypeBase, Signature, Type},
 };
+
+/// Metadata key marking tail loops generated during power modifier resolution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+struct IsPowerLoop;
+impl Metadata for IsPowerLoop {
+    const KEY: &'static str = "tket.power_loop";
+    type Type<'hugr> = bool;
+}
 
 /// A wire of either direction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -2494,6 +2503,23 @@ mod tests {
     fn test_examples(#[case] example: &str) {
         let mut h = load_guppy_example(example).unwrap();
         test_resolve(&mut h);
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
+    fn power_resolution_marks_generated_tail_loops() {
+        let mut h =
+            load_guppy_example("../../test_files/modifier_examples/power_modifier.hugr").unwrap();
+        test_resolve(&mut h);
+
+        let tail_loops = h
+            .descendants(h.module_root())
+            .filter(|&node| matches!(h.get_optype(node), OpType::TailLoop(_)))
+            .collect_vec();
+        assert!(!tail_loops.is_empty());
+        for node in tail_loops {
+            assert_eq!(h.get_metadata::<IsPowerLoop>(node), Some(true));
+        }
     }
 
     #[test]
