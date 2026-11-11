@@ -77,84 +77,6 @@ def _run_clifford_simp(hugr: Hugr) -> Hugr:
 
 
 @pytest.mark.parametrize(
-    "name,version_suffix,expected",
-    [
-        ("nested_array", "", None),
-        # There was a significant change to angles between guppylang v1.1.x and v1.2,
-        # hence the second testcase, but this only shows up when looking at rotation ops
-        # - see test_angles_rotations.
-        (
-            "angles",
-            "1.1",
-            {
-                "tket.quantum.MeasureFree": 1,
-                "tket.quantum.QAlloc": 1,
-                "tket.result.result_bool": 1,
-            },
-        ),
-        (
-            "angles",
-            "",
-            {
-                "tket.quantum.MeasureFree": 1,
-                "tket.quantum.QAlloc": 1,
-                "tket.result.result_bool": 1,
-            },
-        ),
-        (
-            "simple_cx",
-            "",
-            {
-                "tket.quantum.QAlloc": 2,
-                "tket.quantum.MeasureFree": 2,
-                "tket.result.result_bool": 2,
-            },
-        ),
-        ("nested", "", None),
-        ("ranges", "", None),
-        (
-            "false_branch",
-            "",
-            {
-                "tket.quantum.QAlloc": 1,
-                "tket.quantum.MeasureFree": 1,
-                "tket.result.result_bool": 1,
-            },
-        ),
-        ("func_decls", "", None),
-    ],
-)
-def test_optimize_flattened_guppy(
-    name: str, version_suffix: str, expected: dict[str, int] | None
-) -> None:
-    """Test that given Guppy whose control-flow has been flattened by hand,
-    the optimizer can do the rest."""
-    try:
-        hugr = _load_guppy_circuit(name, version_suffix, "flat")
-    except FileNotFoundError:
-        hugr = _load_guppy_circuit(name, version_suffix, "original")
-
-    # We don't need Normalize to "flatten" control flow here, but we still want
-    # to get rid of other guppy artifacts.
-    hugr = Normalize()(hugr)
-    if name == "func_decls":
-        hugr = PytketHugrPass(RemoveRedundancies())(hugr)
-    else:
-        hugr = _run_clifford_simp(hugr)
-
-    actual_counts = _count_gates(hugr)
-    optimized_hugr = _load_guppy_circuit(name, version_suffix, "optimized")
-    optimized_counts = _count_gates(optimized_hugr)
-
-    if expected is not None:
-        assert actual_counts != optimized_counts
-        assert actual_counts == expected
-        pytest.xfail()
-    else:
-        assert actual_counts == optimized_counts
-
-
-@pytest.mark.parametrize(
     "version_suffix,expected",
     [
         ("1.1", 0),  # previously working as desired
@@ -195,42 +117,131 @@ def test_optimize_guppy_ranges_array() -> None:
 
 
 @pytest.mark.parametrize(
-    "name,version_suffix",
+    ("name", "version_suffix", "start", "expected"),
     [
-        ("nested_array", ""),
-        pytest.param("angles", "1.1", marks=pytest.mark.xfail()),
-        pytest.param("angles", "", marks=pytest.mark.xfail()),
-        pytest.param("false_branch", "", marks=pytest.mark.xfail()),
-        pytest.param("simple_cx", "", marks=pytest.mark.xfail()),
-        pytest.param("nested", "", marks=pytest.mark.xfail()),
-        pytest.param("ranges", "", marks=pytest.mark.xfail()),
+        ("nested_array", "", "original", None),  # There is no nested_array.flat
+        # There was a significant change to angles between guppylang v1.1.x and v1.2,
+        # hence the second testcase, but this only shows up when looking at rotation ops
+        # - see test_angles_rotations.
+        (
+            "angles",
+            "1.1",
+            "flat",
+            {
+                "tket.quantum.MeasureFree": 1,
+                "tket.quantum.QAlloc": 1,
+                "tket.result.result_bool": 1,
+            },
+        ),  # Since "flat" fails, do not bother testing "original"
+        (
+            "angles",
+            "",
+            "flat",
+            {
+                "tket.quantum.MeasureFree": 1,
+                "tket.quantum.QAlloc": 1,
+                "tket.result.result_bool": 1,
+            },
+        ),  # Since "flat" fails, do not bother testing "original"
+        (
+            "simple_cx",
+            "",
+            "original",  # There is no "flat"
+            {
+                "tket.quantum.QAlloc": 2,
+                "tket.quantum.MeasureFree": 2,
+                "tket.result.result_bool": 2,
+            },
+        ),
+        ("nested", "", "flat", None),
+        (
+            "nested",
+            "",
+            "original",
+            {
+                "tket.quantum.QAlloc": 3,
+                "tket.quantum.MeasureFree": 3,
+                "tket.result.result_bool": 3,
+                "TKET1.tk1op": 4,
+                "tket.quantum.CX": 1,
+            },
+        ),
+        ("ranges", "", "flat", None),
+        (
+            "ranges",
+            "",
+            "original",
+            {
+                "tket.quantum.QAlloc": 4,
+                "tket.quantum.MeasureFree": 4,
+                "tket.result.result_bool": 4,
+                "TKET1.tk1op": 2,
+                "tket.quantum.CX": 2,
+            },
+        ),
+        (
+            "false_branch",
+            "",
+            "original",
+            {
+                "tket.quantum.QAlloc": 1,
+                "tket.quantum.MeasureFree": 1,
+                "tket.result.result_bool": 1,
+            },
+        ),
+        # ALAN maybe just delete func_decls.flat altogether, given "original" passes?
+        ("func_decls", "", "flat", None),
+        ("func_decls", "", "original", None),  # Note special-case optimizations below.
     ],
 )
-def test_optimize_guppy(name: str, version_suffix: str) -> None:
-    """Test full optimization pipeline on Guppy circuits.
+def test_optimize_guppy(
+    name: str,
+    version_suffix: str,
+    start: Literal["flat", "original"],
+    expected: dict[str, int] | None,
+) -> None:
+    """Test optimization pipeline on Guppy circuits.
 
-    Check that each example optimizes to the full extent given by the .opt .hugr files,
-    including lowering to QSystem.
+    Check that each example (perhaps starting from manually-flattened) optimizes
+     to the full extent given by the .opt .hugr files, and can be lowered to QSystem.
     """
-    hugr = _load_guppy_circuit(name, version_suffix, "original")
 
-    try:
-        flat_counts = _count_gates(_load_guppy_circuit(name, version_suffix, "flat"))
-    except FileNotFoundError:
-        flat_counts = _count_gates(hugr)
-
-    opt_counts = _count_gates(_load_guppy_circuit(name, version_suffix, "optimized"))
-
+    hugr = _load_guppy_circuit(name, version_suffix, start)
     hugr = Normalize()(hugr)
-    assert _count_gates(hugr) == flat_counts
+    if start == "original" and expected is None:
+        # Check that we are at least flattening correctly.
+        # If the manually-flattened version doesn't optimize, we don't expect
+        #    the original to, so we don't test it.
+        # If flattening fails (but the manually-flattened version optimizes),
+        #   then overall will fail.
+        try:
+            flat_counts = _count_gates(
+                _load_guppy_circuit(name, version_suffix, "flat")
+            )
+            assert _count_gates(hugr) == flat_counts
+        except FileNotFoundError:
+            pass
 
-    hugr = _run_clifford_simp(hugr)
-    assert _count_gates(hugr) == opt_counts
+    if name == "func_decls":
+        hugr = PytketHugrPass(RemoveRedundancies())(hugr)
+    else:
+        hugr = _run_clifford_simp(hugr)
+
+    actual_counts = _count_gates(hugr)
+    optimized_hugr = _load_guppy_circuit(name, version_suffix, "optimized")
+    optimized_counts = _count_gates(optimized_hugr)
 
     QSystemRebasePass().run(hugr)
     _QSystemLLVMPass().run(hugr)
 
     CompilationState.from_python(hugr).validate()
+
+    if expected is not None:
+        assert actual_counts != optimized_counts
+        assert actual_counts == expected
+        pytest.xfail()
+    else:
+        assert actual_counts == optimized_counts
 
 
 def test_issue_1577_remove_barriers_reassembles_nested_circuits() -> None:
