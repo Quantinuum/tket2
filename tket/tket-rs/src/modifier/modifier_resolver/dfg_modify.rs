@@ -28,7 +28,7 @@ use hugr::{
         },
     },
     type_row,
-    types::{EdgeKind, FuncTypeBase, PolyFuncType, Signature, Type, TypeRow},
+    types::{EdgeKind, FuncTypeBase, PolyFuncType, Signature, TypeRow},
 };
 use petgraph::visit::{Topo, Walker};
 
@@ -597,7 +597,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         };
         let mut poly_signature = old_fn_defn.signature().clone();
         self.modify_signature(poly_signature.body_mut(), false);
-        self.validate_power_signature(h, func, poly_signature.body())?;
 
         // Keep the signature without exponent inputs for the conditional and tail loop.
         let signature_without_power = poly_signature.body().clone();
@@ -658,29 +657,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         Ok(new_function_node)
     }
 
-    /// Checks that powered functions return their linear inputs in the same order.
-    fn validate_power_signature(
-        &self,
-        h: &impl HugrView<Node = N>,
-        func: N,
-        signature: &Signature,
-    ) -> Result<(), ModifierResolverErrors<N>> {
-        if self.modifiers().num_exponents() > 0
-            && signature
-                .input
-                .iter()
-                .filter(|ty| !ty.copyable())
-                .ne(signature.output.iter())
-        {
-            return Err(ModifierResolverErrors::unresolvable(
-                func,
-                "Power modifiers require outputs to match linear inputs in order.",
-                h.get_optype(func).clone(),
-            ));
-        }
-        Ok(())
-    }
-
     /// Builds the power conditional and tail loop, and sets the function outputs.
     fn build_power_body(
         &mut self,
@@ -691,6 +667,9 @@ impl<N: HugrNode> ModifierResolver<N> {
         exponent_wire: Wire,
     ) -> Result<(), ModifierResolverErrors<N>> {
         let is_positive = check_positive(new_fn, exponent_wire)?;
+        // PowerModifier's signature places all INOUT values before input-only
+        // parameters. HUGR copyability does not distinguish these groups.
+        let inout_count = cond_signature.output.len();
         // Pass the function inputs and one combined exponent into the conditional.
         let function_input_count = cond_signature.input.len();
         cond_signature.input.to_mut().push(int_type(6));
@@ -709,17 +688,12 @@ impl<N: HugrNode> ModifierResolver<N> {
             )
             .unwrap();
 
-        // case 0: non-positive exponent -> simply filert the inputs, only return copiable inputs
+        // Non-positive exponents return the leading INOUT inputs unchanged.
         let case0_b = cond_builder.case_builder(0).unwrap();
-        let case0_linear_outputs = cond_signature
-            .input
-            .iter()
-            .zip(case0_b.input_wires())
-            .filter_map(|(ty, wire)| (!ty.copyable()).then_some(wire))
-            .collect::<Vec<_>>();
-        case0_b.finish_with_outputs(case0_linear_outputs)?;
+        let case0_outputs = case0_b.input_wires().take(inout_count);
+        case0_b.finish_with_outputs(case0_outputs)?;
 
-        // case 1: positive exponent -> build the loop then output only non copiable outputs
+        // Positive exponents run the loop and return its leading INOUT outputs.
         let mut case1_b = cond_builder.case_builder(1).unwrap();
         let loop_inputs = cond_signature
             .input
@@ -732,20 +706,12 @@ impl<N: HugrNode> ModifierResolver<N> {
             .unwrap();
         let input_wires = tl_b.input_wires().collect::<Vec<_>>();
         let (should_stop, loop_outputs) =
-            self.build_power_tail_loop(h, func, &mut tl_b, &cond_signature.input, input_wires)?;
+            self.build_power_tail_loop(h, func, &mut tl_b, &cond_signature, input_wires)?;
         let tail_loop = tl_b.finish_with_outputs(should_stop, loop_outputs)?;
         case1_b
             .hugr_mut()
             .set_metadata::<IsPowerLoop>(tail_loop.node(), true);
-        let tl_outputs = tail_loop.outputs();
-
-        let case1_linear_outputs = cond_signature
-            .input
-            .iter()
-            .zip(tl_outputs)
-            .filter_map(|(ty, wire)| (!ty.copyable()).then_some(wire))
-            .collect::<Vec<_>>();
-        case1_b.finish_with_outputs(case1_linear_outputs)?;
+        case1_b.finish_with_outputs(tail_loop.outputs().take(inout_count))?;
 
         let conditional = cond_builder.finish_sub_container()?;
         new_fn.set_outputs(conditional.outputs())?;
@@ -758,7 +724,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         h: &mut impl HugrMut<Node = N>,
         func: N,
         tl_b: &mut impl Dataflow,
-        input_types: &[Type],
+        loop_signature: &Signature,
         input_wires: Vec<Wire>,
     ) -> Result<(Wire, Vec<Wire>), ModifierResolverErrors<N>> {
         // Decrement the exponent and check if positive
@@ -773,15 +739,12 @@ impl<N: HugrNode> ModifierResolver<N> {
         let should_stop = check_negative(tl_b, exponent_count)?;
 
         // Insert the loop body (i.e. the modifier block)
-        // The loop body does not include the exponent and only return linear values
-        let body_input_count = input_types.len() - 1;
+        // The loop body excludes the exponent and returns the INOUT values,
+        // including any whose HUGR types are copyable.
+        let body_input_count = loop_signature.input.len() - 1;
         let body_signature = Signature::new(
-            input_types[..body_input_count].to_vec(),
-            input_types
-                .iter()
-                .filter(|ty| !ty.copyable())
-                .cloned()
-                .collect::<Vec<_>>(),
+            loop_signature.input[..body_input_count].to_vec(),
+            loop_signature.output.clone(),
         );
         let mut body_b = tl_b.dfg_builder(
             body_signature,
@@ -789,23 +752,17 @@ impl<N: HugrNode> ModifierResolver<N> {
         )?;
         self.with_no_power_inputs(|this| this.modify_dfg_body(h, func, &mut body_b))?;
         let body = body_b.finish_sub_container()?;
-        let mut body_outputs = body.outputs();
 
-        // Connect body outputs to loop affine outputs.
-        // Copyable values are carried unchanged, except for the decremented exponent.
-        let loop_outputs = input_types
-            .iter()
-            .zip(input_wires)
-            .take(body_input_count)
-            .map(|(ty, wire)| {
-                if ty.copyable() {
-                    wire
-                } else {
-                    body_outputs
-                        .next()
-                        .expect("Body must preserve linear inputs")
-                }
-            })
+        // Feed updated INOUT values into the next iteration. The trailing
+        // input-only parameters are reused unchanged, followed by the counter.
+        let loop_outputs = body
+            .outputs()
+            .chain(
+                input_wires
+                    .into_iter()
+                    .take(body_input_count)
+                    .skip(loop_signature.output.len()),
+            )
             .chain(iter::once(exponent_count))
             .collect::<Vec<_>>();
         Ok((should_stop, loop_outputs))
@@ -1386,9 +1343,12 @@ mod test {
             CallIndirect, ExtensionOp,
             handle::{FuncID, NodeHandle},
         },
-        std_extensions::collections::{
-            array::{ArrayOp, ArrayOpBuilder, ArrayOpDef, array_type, array_type_parametric},
-            borrow_array::{BArrayOp, BArrayOpBuilder, BArrayOpDef, borrow_array_type},
+        std_extensions::{
+            arithmetic::int_ops::IntOpDef,
+            collections::{
+                array::{ArrayOp, ArrayOpBuilder, ArrayOpDef, array_type, array_type_parametric},
+                borrow_array::{BArrayOp, BArrayOpBuilder, BArrayOpDef, borrow_array_type},
+            },
         },
         type_row,
         types::{PolyFuncType, Signature, Term, Type, TypeArg, TypeBound, type_param::TypeParam},
@@ -1996,11 +1956,13 @@ mod test {
     }
 
     #[rstest::rstest]
-    #[case::dagger(0, true)]
-    #[case::control(1, false)]
-    #[case::controlled_dagger(1, true)]
-    #[case::multiple_controls(2, true)]
-    fn modify_resolved_power_loop(#[case] control_num: usize, #[case] dagger: bool) {
+    #[case::dagger(vec![], true)]
+    #[case::control(vec![1], false)]
+    #[case::controlled_dagger(vec![1], true)]
+    #[case::multiple_controls(vec![2], true)]
+    #[case::separate_control_groups(vec![1, 1], true)]
+    fn modify_resolved_power_loop(#[case] accum_ctrl: Vec<usize>, #[case] dagger: bool) {
+        let control_num = accum_ctrl.iter().sum();
         let mut module = ModuleBuilder::new();
         let mut func = module
             .define_function("original", Signature::new([qb_t(), usize_t()], [qb_t()]))
@@ -2021,11 +1983,7 @@ mod test {
         let mut resolver = ModifierResolver::new();
         resolver.modifiers = CombinedModifier {
             control: control_num,
-            accum_ctrl: if control_num == 0 {
-                vec![]
-            } else {
-                vec![control_num]
-            },
+            accum_ctrl,
             dagger,
             exponent_inputs: vec![],
         };

@@ -91,9 +91,9 @@
 //!
 //! Power modifiers add runtime 64-bit exponent inputs to the replacement call.
 //! Exponents in the same chain are multiplied to obtain a signed repetition count.
-//! Non-positive counts return the linear inputs unchanged; positive counts run a
-//! `TailLoop`, feeding linear outputs into each iteration and reusing copyable
-//! inputs. Outputs must match the linear input types in order.
+//! Non-positive counts return the leading INOUT inputs unchanged; positive counts
+//! run a `TailLoop`, feeding INOUT outputs into each iteration and reusing trailing
+//! input-only parameters.
 //!
 //! Control and dagger modify the repeated body; nested modifier chains resolve
 //! their powers independently. Generated loops carry `tket.power_loop` metadata
@@ -2509,13 +2509,30 @@ mod tests {
             load_guppy_example("../../test_files/modifier_examples/power_modifier.hugr").unwrap();
         test_resolve(&mut h);
 
-        let tail_loops = h
-            .descendants(h.module_root())
-            .filter(|&node| matches!(h.get_optype(node), OpType::TailLoop(_)))
+        // The example also contains ordinary Guppy loops (e.g. array
+        // construction). Check the outer loops of powered wrappers only.
+        let powered_functions = h
+            .children(h.module_root())
+            .filter(|&node| {
+                h.get_optype(node).as_func_defn().is_some_and(|defn| {
+                    defn.func_name()
+                        .rsplit_once('[')
+                        .is_some_and(|(_, modifiers)| modifiers.contains('P'))
+                })
+            })
             .collect_vec();
-        assert!(!tail_loops.is_empty());
-        for node in tail_loops {
-            assert_eq!(h.get_metadata::<IsPowerLoop>(node), Some(true));
+        assert!(!powered_functions.is_empty());
+        for function in powered_functions {
+            let conditional = h
+                .children(function)
+                .find(|&node| matches!(h.get_optype(node), OpType::Conditional(_)))
+                .unwrap();
+            let positive_case = h.children(conditional).nth(1).unwrap();
+            let tail_loop = h
+                .children(positive_case)
+                .find(|&node| matches!(h.get_optype(node), OpType::TailLoop(_)))
+                .unwrap();
+            assert_eq!(h.get_metadata::<IsPowerLoop>(tail_loop), Some(true));
         }
     }
 
