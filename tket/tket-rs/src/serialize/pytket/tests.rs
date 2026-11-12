@@ -1865,29 +1865,34 @@ fn encoded_circuit_iterators() {
     let region = hugr.entrypoint();
     let mut encoded =
         EncodedCircuit::new(&hugr, EncodeOptions::new()).expect("fixture should encode");
+    let expected = [
+        EncodedCircuitId { region, segment: 0 },
+        EncodedCircuitId { region, segment: 1 },
+    ];
 
-    assert_eq!(
-        encoded.iter().map(|(region, _)| region).collect_vec(),
-        [region, region]
-    );
-    assert_eq!(
-        encoded
-            .par_iter()
-            .map(|(region, _)| region)
-            .collect::<Vec<_>>(),
-        [region, region]
-    );
+    assert_eq!(encoded.iter().map(|(id, _)| id).collect_vec(), expected);
+    let mut parallel_ids = encoded.par_iter().map(|(id, _)| id).collect::<Vec<_>>();
+    parallel_ids.sort();
+    assert_eq!(parallel_ids, expected);
 
-    for (segment, (segment_region, circuit)) in encoded.iter_mut().enumerate() {
-        assert_eq!(segment_region, region);
-        circuit.phase = segment.to_string();
+    for (id, circuit) in encoded.iter_mut() {
+        assert_eq!(id.region, region);
+        circuit.phase = id.segment.to_string();
     }
-    encoded
-        .par_iter_mut()
-        .for_each(|(segment_region, _)| assert_eq!(segment_region, region));
+    encoded.par_iter_mut().for_each(|(id, circuit)| {
+        assert_eq!(id.region, region);
+        circuit.name = Some(format!("segment {}", id.segment));
+    });
 
-    assert_eq!(encoded[region].phase, "0");
-    encoded[region].phase = "first".to_owned();
+    for id in expected {
+        let circuit = encoded.get_segment(id).expect("segment should exist");
+        assert_eq!(circuit.phase, id.segment.to_string());
+        assert_eq!(circuit.name, Some(format!("segment {}", id.segment)));
+    }
+
+    let first = EncodedCircuitId { region, segment: 0 };
+    assert_eq!(encoded[first].phase, "0");
+    encoded[first].phase = "first".to_owned();
     assert_eq!(
         encoded
             .get_segment(EncodedCircuitId { region, segment: 0 })

@@ -209,8 +209,8 @@ impl ComposablePass<Hugr> for PauliGraphResynthesis {
         }
 
         let mut ancillas: HashMap<Node, HashSet<ElementId>> = HashMap::new();
-        for (region, serial_circ) in encoded_circs.iter_mut() {
-            let registers = ancillas.entry(region).or_default();
+        for (id, serial_circ) in encoded_circs.iter_mut() {
+            let registers = ancillas.entry(id.region).or_default();
             serial_circ.commands.retain(|cmd| {
                 if cmd.opgroup.as_deref() == Some(marker.as_str()) {
                     registers.extend(cmd.args.iter().cloned());
@@ -221,11 +221,11 @@ impl ComposablePass<Hugr> for PauliGraphResynthesis {
             });
         }
 
-        for (region, serial_circ) in encoded_circs.iter_mut() {
+        for (id, serial_circ) in encoded_circs.iter_mut() {
             if serial_circ.commands.is_empty() {
                 continue;
             }
-            let registers = &ancillas[&region];
+            let registers = &ancillas[&id.region];
             let mut qubits = serial_circ.qubits.clone();
             qubits.sort_by_key(|q| registers.contains(&q.id));
 
