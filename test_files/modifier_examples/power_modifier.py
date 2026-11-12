@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#    "guppylang==1.1.1",
+#    "guppylang==1.2.1",
 # ]
 # ///
 """Exercise power modifiers with a small, predictable final state."""
@@ -11,7 +11,7 @@ from sys import argv
 
 from guppylang import enable_experimental_features, guppy
 from guppylang.std.angles import pi
-from guppylang.std.builtins import array, control, dagger, frozenarray, power
+from guppylang.std.builtins import array, control, dagger, frozenarray, panic, power
 from guppylang.std.debug import state_result
 from guppylang.std.num import nat
 from guppylang.std.quantum import discard_array, h, qubit, ry, s, x
@@ -47,17 +47,25 @@ def main() -> None:
     settings = Settings(nat(3), nat(0))
     flips = FLIPS
 
-    # Zero repetitions: qs[1] stays |0>, index stays at 0.
+    # Zero repetitions: qs[1] stays |0>, caller's index stays at 0.
     with power(0):
         fun(qs[1], settings, flips)
+    # if settings.index != nat(0):
+    #     panic("settings.index changed after power(0)")
 
-    # Indices 1, 0: X, I; qs[1] goes |0> -> |1>, index ends at 0.
-    with power(2):
+    # Each call flips its local index 0 -> 1 and applies X.
+    # X**3 = X: qs[1] goes |0> -> |1>, caller's index stays at 0.
+    with power(3):
         fun(qs[1], settings, flips)
+    # if settings.index != nat(1):
+    #     panic("settings.index changed after power(3)")
 
-    # Indices (1, 0)**6: (X, I)**6 = I; qs[1] stays |1>, index ends at 0.
+    # Each of the 4 * 3 calls flips its local index 0 -> 1 and applies X.
+    # X**12 = I: qs[1] stays |1>, caller's index stays at 0.
     with power(4), power(settings.exponent):
         fun(qs[1], settings, flips)
+    # if settings.index != nat(0):
+    #     panic("settings.index changed after chained powers")
 
     # State (qs[0], qs[1], qs[2]): |010>.
 
@@ -92,4 +100,9 @@ def main() -> None:
 
 
 program = main.with_minimal_opt().compile_function()
+# from hugr.hugr.render import RenderConfig
+
+# program.modules[0].render_dot(RenderConfig(max_node_label_length=None)).view(
+#     "triple_modifier"
+# )
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())

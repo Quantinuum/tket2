@@ -58,7 +58,8 @@ nested_multiple_solved:
 	1111 -> 0.3062-0.1768j
 -----
 power_modifier_solved:
-	0 -> 1+0j
+	000 -> 0.7071+0j
+	100 -> 0+0.7071j
 -----
 simple_higher_order_solved:
 	000 -> 0.7071+0j
