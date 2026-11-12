@@ -3,31 +3,36 @@
 
 ## [0.23.0](https://github.com/Quantinuum/tket2/compare/tket-v0.22.1...tket-v0.23.0) - 2026-11-12
 
+This release improves tuple normalization, modifier resolution, and constant-folding
+performance. It updates to HUGR 0.31.0 and removes deprecated circuit and modifier
+APIs. Encoded circuit iterators and indexing now use segment identifiers, and
+legacy pytket phase metadata is no longer read.
+
 ### Bug Fixes
 
-- address Miri failures in bitvec and Crossbeam resynthesis ([#2116](https://github.com/Quantinuum/tket2/pull/2116))
 - Preserve qubit order when expanding controlled Toffoli ([#2123](https://github.com/Quantinuum/tket2/pull/2123))
-- Handle `UnpackTuple` / `MakeTuple` in modifier resolver ([#2127](https://github.com/Quantinuum/tket2/pull/2127))
-- Unconnected ports when running pytket passes on hugrs with non-local edges ([#2131](https://github.com/Quantinuum/tket2/pull/2131))
-- *(tket)* Preserve global phases during modifier resolution ([#2138](https://github.com/Quantinuum/tket2/pull/2138))
-- remove merged CFG blocks from the worklist ([#2151](https://github.com/Quantinuum/tket2/pull/2151))
+- Handle `UnpackTuple` and `MakeTuple` during modifier resolution ([#2127](https://github.com/Quantinuum/tket2/pull/2127))
+- Reconnect non-local edges when applying pytket passes to HUGRs ([#2131](https://github.com/Quantinuum/tket2/pull/2131))
+- Preserve global phases during modifier resolution ([#2138](https://github.com/Quantinuum/tket2/pull/2138))
+- Avoid panics from deleted blocks in `NormalizeCFGPass` after merging basic blocks ([#2151](https://github.com/Quantinuum/tket2/pull/2151))
 
 ### New Features
 
-- Remove redundant `UnpackTuple`/`MakeTuple` pairs ([#2147](https://github.com/Quantinuum/tket2/pull/2147))
-- [**breaking**] Remove deprecated Node indexing of EncodedCircuit ([#2157](https://github.com/Quantinuum/tket2/pull/2157))
-- allow inserting replacement types unchanged ([#2074](https://github.com/Quantinuum/tket2/pull/2074))
+- Remove redundant `UnpackTuple`/`MakeTuple` pairs in `UntuplePass` and `Normalize` ([#2147](https://github.com/Quantinuum/tket2/pull/2147))
+- Add `ReplaceTypes::set_replace_type_with_options` to insert replacement types without recursively transforming them ([#2074](https://github.com/Quantinuum/tket2/pull/2074))
+- [**breaking**] Update `hugr` dependency to 0.31.0 ([#2156](https://github.com/Quantinuum/tket2/pull/2156))
+- [**breaking**] Return `EncodedCircuitId`s from `EncodedCircuit` iterators and remove indexing by `Node` ([#2157](https://github.com/Quantinuum/tket2/pull/2157))
 
 ### Performance
 
-- reduce repeated dataflow relation scans ([#2150](https://github.com/Quantinuum/tket2/pull/2150))
+- Reduce repeated dataflow analysis scans during constant folding ([#2150](https://github.com/Quantinuum/tket2/pull/2150))
 
 ### Refactor
 
-- Rename modify_fn to modify_fn_inner to avoid redundant check ([#2114](https://github.com/Quantinuum/tket2/pull/2114))
-- [**breaking**] Remove deprecated definitions in modifier module ([#2159](https://github.com/Quantinuum/tket2/pull/2159))
-- [**breaking**] remove obsolete circuit DFG extraction API ([#2160](https://github.com/Quantinuum/tket2/pull/2160))
-- [**breaking**] Remove unused pytket phase metadata key ([#2158](https://github.com/Quantinuum/tket2/pull/2158))
+- [**breaking**] Remove `resolve_modifier_with_entrypoints` and `resolve_modifier_with_entrypoints_and_scope`. Use `resolve_modifier` with a `PassScope` instead ([#2159](https://github.com/Quantinuum/tket2/pull/2159))
+- [**breaking**] Remove deprecated `ModifierError` and `ModifierResolverErrors::ModifierError`. ([#2159](https://github.com/Quantinuum/tket2/pull/2159))
+- [**breaking**] Remove `Circuit::extract_dfg`. Use `Circuit::to_owned` instead ([#2160](https://github.com/Quantinuum/tket2/pull/2160))
+- [**breaking**] Remove `PytketPhaseExpr` and support for the legacy `TKET1.phase` metadata ([#2158](https://github.com/Quantinuum/tket2/pull/2158))
 
 ## [0.22.1](https://github.com/Quantinuum/tket2/compare/tket-v0.22.0...tket-v0.22.1) - 2026-10-28
 

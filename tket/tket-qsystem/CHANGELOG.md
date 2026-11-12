@@ -3,14 +3,17 @@
 
 ## [0.30.0](https://github.com/Quantinuum/tket2/compare/tket-qsystem-v0.29.1...tket-qsystem-v0.30.0) - 2026-11-12
 
+This release fixes a memory leak when recording array results and updates to HUGR
+0.31.0. Custom `ArrayLowering` implementations must now release the original backing
+allocation through `free_array`, including for arrays with a nonzero offset.
+
 ### Bug Fixes
 
-- address Miri failures in bitvec and Crossbeam resynthesis ([#2116](https://github.com/Quantinuum/tket2/pull/2116))
-- *(tket-qsystem)* [**breaking**] release arrays after recording results ([#2128](https://github.com/Quantinuum/tket2/pull/2128))
+- [**breaking**] Release backing allocations after recording array results ([#2128](https://github.com/Quantinuum/tket2/pull/2128))
 
-### Testing
+### New Features
 
-- update examples to guppylang 1.2.0 ([#2142](https://github.com/Quantinuum/tket2/pull/2142))
+- [**breaking**] Update `hugr` dependency to 0.31.0 ([#2156](https://github.com/Quantinuum/tket2/pull/2156))
 
 ## [0.29.1](https://github.com/Quantinuum/tket2/compare/tket-qsystem-v0.29.0...tket-qsystem-v0.29.1) - 2026-10-28
 
