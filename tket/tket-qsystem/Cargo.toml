@@ -7,7 +7,6 @@ rust-version.workspace = true
 license.workspace = true
 readme = "README.md"
 documentation = "https://docs.rs/tket-qsystem"
-homepage.workspace = true
 repository.workspace = true
 description = "TKET tool for preparing and validating `Hugr`s for compilation targeting Quantinuum H-series  quantum computers"
 keywords = ["Quantum", "Quantinuum"]

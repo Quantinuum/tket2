@@ -10,3 +10,6 @@ publish = false
 [dependencies]
 clap = { workspace = true, features = ["derive"] }
 tket = { path = "../tket-rs", features = ["portmatching", "binary-eccs"] }
+
+[lints]
+workspace = true

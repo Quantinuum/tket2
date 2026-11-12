@@ -74,7 +74,6 @@ portgraph = "0.16.3"
 # There can only be one `pyo3` version in the whole workspace, so we use a
 # loose version constraint to prevent breaking changes in dependent crates where possible.
 pyo3 = ">= 0.28.2, < 0.31"
-pyo3-build-config = ">= 0.28.2, < 0.31"
 # This version of pest is pinned in hugr due to severe slow downs in `2.9.x`.
 pest = "2.8.8"
 pest_derive = "2.8.8"
@@ -83,13 +82,10 @@ bindgen = { version = "0.73", default-features = false, features = [
     "logging",
     "runtime",
 ] }
-cbindgen = "0.29"
-cc = "1.11.1"
 conan2 = "0.1.9"
 itertools = "0.15.0"
 tket-json-rs = "0.8.4"
 portmatching = "0.3.3"
-bytemuck = "1.25.0"
 cgmath = "0.18.0"
 chrono = "0.4.45"
 clap = "4.6.1"
