@@ -4,70 +4,92 @@
 #    "guppylang==1.1.1",
 # ]
 # ///
-"""Testing nested modifiers
-
-The hugr generated from this script is also used to benchmark the performance of modifier passes resolver
-"""
+"""Exercise power modifiers with a small, predictable final state."""
 
 from pathlib import Path
 from sys import argv
 
 from guppylang import enable_experimental_features, guppy
-from guppylang.std.builtins import control, power
+from guppylang.std.angles import pi
+from guppylang.std.builtins import array, control, dagger, frozenarray, power
 from guppylang.std.debug import state_result
 from guppylang.std.num import nat
-from guppylang.std.quantum import discard, qubit, x
+from guppylang.std.quantum import discard_array, h, qubit, ry, s, x
 
 enable_experimental_features()
 
+FLIPS = [0, 1]
 
-@guppy(daggerable=True)
-def fun(q: qubit, i: nat, p: qubit) -> None:
-    pass
+
+@guppy.struct
+class Settings:
+    exponent: nat
+    index: nat
 
 
 @guppy
-def inner(
-    c1: qubit, c2: qubit, i: nat, q: qubit
-) -> None:  # , c2: qubit, t: qubit) -> None:
-    # c1 = qubit()
-    # t = qubit()
-    # h(c1)
-    with power(i), power(2):  # dagger, power(i):
-        # j = nat(i + 1)
-        # with power(j):
-        # i = nat(i + 1)
-        fun(c1, i, q)
-
-    with control(c1):
+def fun(q: qubit, settings: Settings, flips: frozenarray[int, 2]) -> None:
+    settings.index = nat(1 - int(settings.index))
+    if flips[settings.index] == 1:
         x(q)
-        with power(i):
-            x(c2)
-            with control(c2):  # , dagger:
-                x(q)
 
-    # with dagger:
-    #     h(t)
+
+@guppy(unitary=True)
+def phases(q: qubit, exponent: nat) -> None:
+    # S**exponent: |0> -> |0>, |1> -> i**exponent |1>.
+    with power(exponent):
+        s(q)
 
 
 @guppy
 def main() -> None:
-    q1 = qubit()
-    q2 = qubit()
-    q3 = qubit()
-    inner(q1, q2, 3, q3)
+    qs = array(qubit() for _ in range(3))
+    settings = Settings(nat(3), nat(0))
+    flips = FLIPS
 
-    state_result("r", q1)
-    discard(q1)
-    discard(q2)
-    discard(q3)
-    # discard(t)
+    # Zero repetitions: qs[1] stays |0>, index stays at 0.
+    with power(0):
+        fun(qs[1], settings, flips)
+
+    # Indices 1, 0: X, I; qs[1] goes |0> -> |1>, index ends at 0.
+    with power(2):
+        fun(qs[1], settings, flips)
+
+    # Indices (1, 0)**6: (X, I)**6 = I; qs[1] stays |1>, index ends at 0.
+    with power(4), power(settings.exponent):
+        fun(qs[1], settings, flips)
+
+    # State (qs[0], qs[1], qs[2]): |010>.
+
+    # (H**9)† = H: prepare a superposition on qs[0].
+    with power(3):  # noqa: SIM117
+        with dagger:
+            with power(settings.exponent):
+                h(qs[0])
+
+    # (S**3)† = S: multiply the qs[0] = |1> component by i.
+    with dagger:
+        phases(qs[0], settings.exponent)
+
+    # State: (|010> + i|110>) / sqrt(2).
+
+    # Controlled Ry(pi/6)**3 = controlled Ry(pi/2): qs[2] goes |0> -> |+>.
+    with power(settings.exponent):  # noqa: SIM117
+        with control(qs[1]):
+            ry(qs[2], pi / 6)
+
+    # State: (|010> + |011> + i|110> + i|111>) / 2.
+
+    # Controlled S†: multiply the qs[2] = |1> components by -i.
+    with control(qs[1]), dagger:
+        phases(qs[2], nat(1))
+
+    # State: (|010> - i|011> + i|110> + |111>) / 2.
+
+    # Expected amplitudes: 010 -> 0.5, 011 -> -0.5j, 110 -> 0.5j, 111 -> 0.5.
+    state_result("r", qs[0], qs[1], qs[2])
+    discard_array(qs)
 
 
 program = main.with_minimal_opt().compile_function()
-# from hugr.hugr.render import RenderConfig
-
-# program.modules[0].render_dot(RenderConfig(max_node_label_length=None)).view(
-#     "triple_modifier"
-# )
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
