@@ -1,3 +1,5 @@
+//! Optimise circuits using Quartz-generated equivalence classes.
+
 mod tracing;
 
 use crate::tracing::Tracer;

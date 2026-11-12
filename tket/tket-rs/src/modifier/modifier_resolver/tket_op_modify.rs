@@ -523,8 +523,8 @@ impl<N: HugrNode> ModifierResolver<N> {
                 let pv_x1_state_out = Self::state_order_output(&pv_x1)?;
                 connect(new_fn, &c.into(), &pv_x1.incoming[gate_control])?;
                 let c = pv_x1.outgoing[gate_control].try_into().unwrap();
-                for i in 0..gate_control {
-                    incoming.insert(i, pv_x1.incoming[i]);
+                for (i, &port) in pv_x1.incoming[..gate_control].iter().enumerate() {
+                    incoming.insert(i, port);
                 }
 
                 // CVdg(c,t)
@@ -553,8 +553,8 @@ impl<N: HugrNode> ModifierResolver<N> {
 
                 // CnV(cs,t)
                 // self.control_num() = control + gate_control - 1;
-                for i in 0..gate_control {
-                    self.push_control(pv_x2.outgoing[i].try_into().unwrap());
+                for &port in &pv_x2.outgoing[..gate_control] {
+                    self.push_control(port.try_into().unwrap());
                 }
                 let pv_cnrx = self.with_ancilla(&mut c, ancilla, |this, ancilla| {
                     this.modify_tket_op(op_node, V, new_fn, ancilla)

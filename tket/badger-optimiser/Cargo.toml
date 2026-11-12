@@ -28,3 +28,6 @@ tikv-jemallocator = "0.7"
 [features]
 default = []
 peak_alloc = ["dep:peak_alloc"]
+
+[lints]
+workspace = true

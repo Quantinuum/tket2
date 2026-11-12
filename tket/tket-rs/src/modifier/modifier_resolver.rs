@@ -677,11 +677,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         let (maybe_a_modifier, _) = h
             .single_linked_output(node, 0)
             .expect("CallIndirect must have exactly one function input");
-        if Modifier::from_optype(h.get_optype(maybe_a_modifier)).is_none() {
-            return Ok(false);
-        }
-
-        Ok(true)
+        Ok(Modifier::from_optype(h.get_optype(maybe_a_modifier)).is_some())
     }
 
     /// Resolve a modifier chain in place, starting with no enclosing modifiers.
