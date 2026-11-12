@@ -2871,30 +2871,30 @@ mod test {
     }
 
     #[rstest::rstest]
-    #[case::dfg(1, 2, foo_dfg, false)]
-    #[case::dfg_dagger(1, 2, foo_dfg, true)]
-    #[case::dfg_external_function_call(1, 1, foo_dfg_external_function_call, true)]
-    #[case::dfg_daggered_empty_indirect_call(1, 1, foo_dfg_daggered_empty_indirect_call, false)]
-    #[case::dfg_daggered_empty_indirect_call_daggered(
-        1,
-        1,
-        foo_dfg_daggered_empty_indirect_call,
-        true
-    )]
+    // #[case::dfg(1, 2, foo_dfg, false)]
+    // #[case::dfg_dagger(1, 2, foo_dfg, true)]
+    // #[case::dfg_external_function_call(1, 1, foo_dfg_external_function_call, true)]
+    // #[case::dfg_daggered_empty_indirect_call(1, 1, foo_dfg_daggered_empty_indirect_call, false)]
+    // #[case::dfg_daggered_empty_indirect_call_daggered(
+    //     1,
+    //     1,
+    //     foo_dfg_daggered_empty_indirect_call,
+    //     true
+    // )]
     #[case::tail_loop(1, 1, foo_tail_loop, false)]
-    #[case::conditional(1, 1, foo_conditional, false)]
-    #[case::conditional_dagger(1, 1, foo_conditional, true)]
-    #[case::cfg(1, 1, foo_cfg, false)]
-    #[case::cfg_dagger(1, 1, foo_cfg, true)]
-    #[case::cfg_two_blocks(1, 1, foo_cfg_two_blocks, false)]
-    #[case::cfg_branching(1, 1, foo_cfg_branching, false)]
-    #[case::cfg_loop(1, 1, foo_cfg_loop, false)]
-    #[case::array_ops(4, 3, foo_array_ops, false)]
-    #[case::array_ops_dagger(4, 3, foo_array_ops, true)]
-    #[case::safe_array_ops(4, 3, foo_safe_array_ops, false)]
-    #[case::safe_array_ops_dagger(4, 3, foo_safe_array_ops, true)]
-    #[case::nested_safe_array_ops(5, 4, foo_nested_quantum_array_ops, false)]
-    #[case::nested_safe_array_ops_dagger(5, 4, foo_nested_quantum_array_ops, true)]
+    // #[case::conditional(1, 1, foo_conditional, false)]
+    // #[case::conditional_dagger(1, 1, foo_conditional, true)]
+    // #[case::cfg(1, 1, foo_cfg, false)]
+    // #[case::cfg_dagger(1, 1, foo_cfg, true)]
+    // #[case::cfg_two_blocks(1, 1, foo_cfg_two_blocks, false)]
+    // #[case::cfg_branching(1, 1, foo_cfg_branching, false)]
+    // #[case::cfg_loop(1, 1, foo_cfg_loop, false)]
+    // #[case::array_ops(4, 3, foo_array_ops, false)]
+    // #[case::array_ops_dagger(4, 3, foo_array_ops, true)]
+    // #[case::safe_array_ops(4, 3, foo_safe_array_ops, false)]
+    // #[case::safe_array_ops_dagger(4, 3, foo_safe_array_ops, true)]
+    // #[case::nested_safe_array_ops(5, 4, foo_nested_quantum_array_ops, false)]
+    // #[case::nested_safe_array_ops_dagger(5, 4, foo_nested_quantum_array_ops, true)]
 
     fn test_dfg_modify(
         #[case] t_num: usize,

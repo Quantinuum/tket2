@@ -1750,6 +1750,8 @@ mod tests {
     ) -> Hugr {
         let (mut h, foo_node) = modifier_test_hugr(target_num, ctrl_num, foo, dagger);
 
+        std::fs::write("unsolved.mmd", h.mermaid_string()).unwrap();
+
         test_resolve(&mut h);
 
         // We check that the original function node has been removed in the resolved hugr
@@ -1758,6 +1760,7 @@ mod tests {
         // The resolved hugr must still be structurally valid.
         assert_matches!(h.validate(), Ok(()));
 
+        std::fs::write("solved.mmd", h.mermaid_string()).unwrap();
         h
     }
 
