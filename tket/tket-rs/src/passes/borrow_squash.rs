@@ -255,6 +255,18 @@ fn borrow_squash_traversal<H: HugrMut<Node = Node>>(
             .single_linked_input(n, ports.out)
             .expect("array is linear");
         hugr.connect(in_array.0, in_array.1, out_array.0, out_array.1);
+        // Now elide the order edges by connecting every predecessor to every successor
+        // (expensive if there are many, but for typical borrow/return we usually expect only one).
+        let opty = hugr.get_optype(n);
+        let inport = opty.other_input_port().unwrap();
+        let outport = opty.other_output_port().unwrap();
+        let order_succs = hugr.linked_inputs(n, outport).collect::<Vec<_>>();
+        let order_preds = hugr.linked_outputs(n, inport).collect::<Vec<_>>();
+        for (pred, _) in order_preds {
+            for (succ, _) in &order_succs {
+                hugr.add_other_edge(pred, *succ);
+            }
+        }
         hugr.remove_node(n);
     }
     let mut elided: Vec<_> = rb_elisions
@@ -484,7 +496,7 @@ mod test {
         }
         // and now check the order chain is intact (regression test for
         // https://github.com/Quantinuum/tket2/issues/2154).
-        assert!(order_path_from(&h, inp, out)); // FAILS
+        assert!(order_path_from(&h, inp, out));
         assert!(order_path_from(&h, call1, call2));
     }
 
