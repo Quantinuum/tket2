@@ -753,36 +753,26 @@ impl<N: HugrNode> ModifierResolver<N> {
         // Make sure that the modifiers are initially empty.
         assert_eq!(self.modifiers(), &CombinedModifier::default());
 
-        // Modify the function loaded by the indirect call preserving the modifier state.
-        let (trace, load_node, modified_fn, load_op, new_call_op, exponent_wires) = self
-            .with_modifiers(
-                self.modifiers().clone(),
-                |this| -> Result<_, ModifierResolverErrors<N>> {
-                    // Collect the chain for cleanup while accumulating its modifiers.
-                    // NICOLA: Here we record power exponent inputs.
-                    let mut trace = this.trace_indirect_call_to_load(hugr, indirect_call_node)?;
-                    let load_node = trace.pop().expect("modifier chain must end with a loader");
-                    // Modify the loaded function and prepare its replacement loader.
-                    let (modified_fn, load_op) = this.modify_load(hugr, load_node)?;
+        let OpType::CallIndirect(mut new_call_op) = hugr.get_optype(indirect_call_node).clone()
+        else {
+            unreachable!("Expected CallIndirect");
+        };
 
-                    // NICOLA: TODO: we may want to move this above and avoid a similar instruction in trace_indirect_call_to_load
-                    let OpType::CallIndirect(mut new_call_op) =
-                        hugr.get_optype(indirect_call_node).clone()
-                    else {
-                        unreachable!("Expected CallIndirect");
-                    };
-                    let exponent_wires = this.modifiers().exponent_wires(hugr);
-                    this.append_power_inputs(&mut new_call_op.signature);
-                    Ok((
-                        trace,
-                        load_node,
-                        modified_fn,
-                        load_op,
-                        new_call_op,
-                        exponent_wires,
-                    ))
-                },
-            )?;
+        // Modify the function loaded by the indirect call preserving the modifier state.
+        let (trace, load_node, modified_fn, load_op, exponent_wires) = self.with_modifiers(
+            self.modifiers().clone(),
+            |this| -> Result<_, ModifierResolverErrors<N>> {
+                // Collect the chain for cleanup while accumulating its modifiers.
+                let mut trace = this.trace_indirect_call_to_load(hugr, indirect_call_node)?;
+                let load_node = trace.pop().expect("modifier chain must end with a loader");
+                // Modify the loaded function and prepare its replacement loader.
+                let (modified_fn, load_op) = this.modify_load(hugr, load_node)?;
+
+                let exponent_wires = this.modifiers().exponent_wires(hugr);
+                this.append_power_inputs(&mut new_call_op.signature);
+                Ok((trace, load_node, modified_fn, load_op, exponent_wires))
+            },
+        )?;
 
         let power_input_offset = new_call_op.signature.input_count() + 1 - exponent_wires.len();
         // Insert the new loader and call nodes. With no exponents, the new call is equal to the original one.

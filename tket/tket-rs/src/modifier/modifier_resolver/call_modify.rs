@@ -127,14 +127,6 @@ impl<N: HugrNode> ModifierResolver<N> {
         h: &impl HugrMut<Node = N>,
         ind_call_node: N,
     ) -> Result<Vec<N>, ModifierResolverErrors<N>> {
-        // NICOLA: TODO: consider putting this outside since it may be already used
-        let optype = h.get_optype(ind_call_node);
-        // First node must be a CallIndirect node
-        assert!(
-            matches!(optype, OpType::CallIndirect(_)),
-            "Expected CallIndirect, found {optype:?}"
-        );
-
         // Collection of modifiers to apply.
         let modifiers = self.modifiers_mut();
         assert!(
