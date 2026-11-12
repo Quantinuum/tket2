@@ -647,63 +647,56 @@ impl<Node: HugrNode> EncodedCircuit<Node> {
         self.circuits.is_empty()
     }
 
-    /// Returns an iterator over every encoded pytket circuit segment and its region.
+    /// Returns every encoded pytket circuit segment and its identifier.
     ///
-    /// A region containing multiple segments appears once for each segment.
-    // TODO: Update signature to return `(EncodedCircuitId<Node>, &SerialCircuit)` in a breaking release.
-    // See https://github.com/Quantinuum/tket2/issues/1901
-    pub fn iter(&self) -> impl Iterator<Item = (Node, &SerialCircuit)> {
-        self.circuits.iter().flat_map(|(&node, region)| {
-            region
-                .serial_circuits
+    /// Regions retain their encoding order; segments within each region are
+    /// yielded in execution order.
+    pub fn iter(&self) -> impl Iterator<Item = (EncodedCircuitId<Node>, &SerialCircuit)> {
+        self.circuits.iter().flat_map(|(&region, info)| {
+            info.serial_circuits
                 .iter()
-                .map(move |circuit| (node, circuit))
+                .enumerate()
+                .map(move |(segment, circuit)| (EncodedCircuitId { region, segment }, circuit))
         })
     }
 
-    /// Returns a mutable iterator over every circuit segment and its region.
-    ///
-    /// A region containing multiple segments appears once for each segment.
-    // TODO: Update signature to return `(EncodedCircuitId<Node>, &mut SerialCircuit)` in a breaking release.
-    // See https://github.com/Quantinuum/tket2/issues/1901
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = (Node, &mut SerialCircuit)> {
-        self.circuits.iter_mut().flat_map(|(&node, region)| {
-            region
-                .serial_circuits
+    /// Returns mutable circuit segments and their identifiers in encoding order.
+    pub fn iter_mut(
+        &mut self,
+    ) -> impl Iterator<Item = (EncodedCircuitId<Node>, &mut SerialCircuit)> {
+        self.circuits.iter_mut().flat_map(|(&region, info)| {
+            info.serial_circuits
                 .iter_mut()
-                .map(move |circuit| (node, circuit))
+                .enumerate()
+                .map(move |(segment, circuit)| (EncodedCircuitId { region, segment }, circuit))
         })
     }
 }
 
 impl<Node: HugrNode + Send + Sync> EncodedCircuit<Node> {
-    /// Returns a parallel iterator over every circuit segment and its region.
-    ///
-    /// A region containing multiple segments appears once for each segment.
-    // TODO: Update signature to return `(EncodedCircuitId<Node>, &SerialCircuit)` in a breaking release.
-    // See https://github.com/Quantinuum/tket2/issues/1901
-    pub fn par_iter(&self) -> impl ParallelIterator<Item = (Node, &SerialCircuit)> {
-        self.circuits.par_iter().flat_map_iter(|(&node, region)| {
-            region
-                .serial_circuits
+    /// Returns a parallel iterator over circuit segments and their identifiers.
+    pub fn par_iter(
+        &self,
+    ) -> impl ParallelIterator<Item = (EncodedCircuitId<Node>, &SerialCircuit)> {
+        self.circuits.par_iter().flat_map_iter(|(&region, info)| {
+            info.serial_circuits
                 .iter()
-                .map(move |circuit| (node, circuit))
+                .enumerate()
+                .map(move |(segment, circuit)| (EncodedCircuitId { region, segment }, circuit))
         })
     }
 
-    /// Returns a parallel mutable iterator over every circuit segment and its region.
-    ///
-    /// A region containing multiple segments appears once for each segment.
-    // TODO: Update signature to return `(EncodedCircuitId<Node>, &mut SerialCircuit)` in a breaking release.
-    // See https://github.com/Quantinuum/tket2/issues/1901
-    pub fn par_iter_mut(&mut self) -> impl ParallelIterator<Item = (Node, &mut SerialCircuit)> {
+    /// Returns a parallel mutable iterator over circuit segments and their identifiers.
+    pub fn par_iter_mut(
+        &mut self,
+    ) -> impl ParallelIterator<Item = (EncodedCircuitId<Node>, &mut SerialCircuit)> {
         self.circuits
             .par_iter_mut()
-            .flat_map_iter(|(&node, region)| {
-                region
-                    .serial_circuits
+            .flat_map_iter(|(&region, info)| {
+                info.serial_circuits
                     .iter_mut()
-                    .map(move |circuit| (node, circuit))
+                    .enumerate()
+                    .map(move |(segment, circuit)| (EncodedCircuitId { region, segment }, circuit))
             })
     }
 }
