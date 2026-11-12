@@ -40,11 +40,6 @@ use crate::serialize::pytket::opaque::{OpaqueSubgraph, OpaqueSubgraphPayload};
 pub struct PytketEncoderContext<H: HugrView> {
     /// The name of the circuit being encoded.
     name: Option<String>,
-    /// Global phase value.
-    ///
-    /// Defaults to "0" unless the circuit has a [METADATA_PHASE] metadata
-    /// entry.
-    phase: String,
     /// Pytket command runs and the opaque boundaries separating them.
     segments: CircuitSegments,
     /// A tracker for qubit/bit/parameter values associated with the circuit's wires.
@@ -222,17 +217,8 @@ impl<H: HugrView> PytketEncoderContext<H> {
         .filter(|name| !name.is_empty())
         .cloned();
 
-        // Backwards compatibility only: The global phase parameter
-        // of pytket circuits is now encoded as explicit `tket.global_phase` operations instead.
-        #[expect(deprecated)]
-        let phase = match hugr.get_metadata::<metadata::PytketPhaseExpr>(region) {
-            Some(p) => p.to_string(),
-            None => "0".to_string(),
-        };
-
         Ok(Self {
             name: fn_name,
-            phase,
             segments: CircuitSegments::new(),
             values: ValueTracker::new(hugr, region, &config)?,
             unsupported: UnsupportedTracker::new(hugr),
@@ -316,11 +302,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
             .into_iter()
             .enumerate()
             .map(|(segment, commands)| {
-                let phase = if segment == 0 {
-                    self.phase.clone()
-                } else {
-                    "0".to_owned()
-                };
+                let phase = "0".to_owned();
                 let mut circuit = SerialCircuit::new(self.name.clone(), phase);
                 circuit.commands = commands;
                 circuit.qubits = qubits.clone();
