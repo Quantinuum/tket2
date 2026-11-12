@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.2](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.5.1...qis-compiler-v0.5.2) (2026-11-12)
+
+
+### Features
+
+* Update hugr dependency to 0.31.0 ([#2156](https://github.com/Quantinuum/tket2/issues/2156)) ([5cbba24](https://github.com/Quantinuum/tket2/commit/5cbba242b80655819d2f4c92f787e9a9509ec53a))
+
+
+### Bug Fixes
+
+* **tket-qsystem:** release arrays after recording results ([006dde2](https://github.com/Quantinuum/tket2/commit/006dde218e9a45649080ac5370f3169ea59c9c6c))
+
 ## [0.5.1](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.5.0...qis-compiler-v0.5.1) (2026-10-07)
 
 
