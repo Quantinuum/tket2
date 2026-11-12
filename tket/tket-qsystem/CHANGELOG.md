@@ -1,6 +1,17 @@
 # Changelog
 
 
+## [0.30.0](https://github.com/Quantinuum/tket2/compare/tket-qsystem-v0.29.1...tket-qsystem-v0.30.0) - 2026-11-12
+
+### Bug Fixes
+
+- address Miri failures in bitvec and Crossbeam resynthesis ([#2116](https://github.com/Quantinuum/tket2/pull/2116))
+- *(tket-qsystem)* [**breaking**] release arrays after recording results ([#2128](https://github.com/Quantinuum/tket2/pull/2128))
+
+### Testing
+
+- update examples to guppylang 1.2.0 ([#2142](https://github.com/Quantinuum/tket2/pull/2142))
+
 ## [0.29.1](https://github.com/Quantinuum/tket2/compare/tket-qsystem-v0.29.0...tket-qsystem-v0.29.1) - 2026-10-28
 
 ### Bug Fixes

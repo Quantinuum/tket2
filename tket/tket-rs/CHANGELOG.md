@@ -1,6 +1,34 @@
 # Changelog
 
 
+## [0.23.0](https://github.com/Quantinuum/tket2/compare/tket-v0.22.1...tket-v0.23.0) - 2026-11-12
+
+### Bug Fixes
+
+- address Miri failures in bitvec and Crossbeam resynthesis ([#2116](https://github.com/Quantinuum/tket2/pull/2116))
+- Preserve qubit order when expanding controlled Toffoli ([#2123](https://github.com/Quantinuum/tket2/pull/2123))
+- Handle `UnpackTuple` / `MakeTuple` in modifier resolver ([#2127](https://github.com/Quantinuum/tket2/pull/2127))
+- Unconnected ports when running pytket passes on hugrs with non-local edges ([#2131](https://github.com/Quantinuum/tket2/pull/2131))
+- *(tket)* Preserve global phases during modifier resolution ([#2138](https://github.com/Quantinuum/tket2/pull/2138))
+- remove merged CFG blocks from the worklist ([#2151](https://github.com/Quantinuum/tket2/pull/2151))
+
+### New Features
+
+- Remove redundant `UnpackTuple`/`MakeTuple` pairs ([#2147](https://github.com/Quantinuum/tket2/pull/2147))
+- [**breaking**] Remove deprecated Node indexing of EncodedCircuit ([#2157](https://github.com/Quantinuum/tket2/pull/2157))
+- allow inserting replacement types unchanged ([#2074](https://github.com/Quantinuum/tket2/pull/2074))
+
+### Performance
+
+- reduce repeated dataflow relation scans ([#2150](https://github.com/Quantinuum/tket2/pull/2150))
+
+### Refactor
+
+- Rename modify_fn to modify_fn_inner to avoid redundant check ([#2114](https://github.com/Quantinuum/tket2/pull/2114))
+- [**breaking**] Remove deprecated definitions in modifier module ([#2159](https://github.com/Quantinuum/tket2/pull/2159))
+- [**breaking**] remove obsolete circuit DFG extraction API ([#2160](https://github.com/Quantinuum/tket2/pull/2160))
+- [**breaking**] Remove unused pytket phase metadata key ([#2158](https://github.com/Quantinuum/tket2/pull/2158))
+
 ## [0.22.1](https://github.com/Quantinuum/tket2/compare/tket-v0.22.0...tket-v0.22.1) - 2026-10-28
 
 ### Bug Fixes
