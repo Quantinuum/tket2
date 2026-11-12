@@ -36,6 +36,8 @@ use super::opaque::OpaqueSubgraphs;
 /// circuit that can be used independently, and stored permanently, use
 /// [`EncodedCircuit::new_standalone`] or call
 /// [`EncodedCircuit::ensure_standalone`].
+///
+/// Circuit segments are indexed by [`EncodedCircuitId`].
 #[derive(Debug, Clone)]
 pub struct EncodedCircuit<Node: HugrNode> {
     /// Circuit segments grouped by their originating dataflow region.
@@ -698,30 +700,6 @@ impl<Node: HugrNode + Send + Sync> EncodedCircuit<Node> {
                     .enumerate()
                     .map(move |(segment, circuit)| (EncodedCircuitId { region, segment }, circuit))
             })
-    }
-}
-
-/// Backwards-compatible region indexing that ignores all but the first segment.
-/// This implementation will be removed in a breaking release.
-impl<Node: HugrNode> Index<Node> for EncodedCircuit<Node> {
-    type Output = SerialCircuit;
-
-    fn index(&self, index: Node) -> &Self::Output {
-        self.circuits
-            .get(&index)
-            .and_then(|region| region.serial_circuits.first())
-            .unwrap_or_else(|| panic!("Indexing into a circuit that was not encoded: {index}"))
-    }
-}
-
-/// Backwards-compatible mutable region indexing that ignores all but the first segment.
-/// This implementation will be removed in a breaking release.
-impl<Node: HugrNode> IndexMut<Node> for EncodedCircuit<Node> {
-    fn index_mut(&mut self, index: Node) -> &mut Self::Output {
-        self.circuits
-            .get_mut(&index)
-            .and_then(|region| region.serial_circuits.first_mut())
-            .unwrap_or_else(|| panic!("Indexing into a circuit that was not encoded: {index}"))
     }
 }
 
