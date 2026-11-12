@@ -39,8 +39,7 @@
 //! See `modify_op`, which is the main function that modifies each node.
 //!
 //! During the resolution, when a node with some data flow included (such as a function) is encountered,
-//! the function `modify_dfg_body`
-//! is called.
+//! the function `modify_dfg_body`is called.
 //! This function modifies the I/O nodes and then calls
 //! `modify_dfg_children`
 //! to visit all other children nodes.
@@ -90,8 +89,17 @@
 //! We also should not forget to connect `fneg` to `Rx` in the new graph, whose edge/wires has
 //! no correspondence in the original graph.
 //!
+//! Power modifiers add runtime 64-bit exponent inputs to the replacement call.
+//! Exponents in the same chain are multiplied to obtain a signed repetition count.
+//! Non-positive counts return the linear inputs unchanged; positive counts run a
+//! `TailLoop`, feeding linear outputs into each iteration and reusing copyable
+//! inputs. Outputs must match the linear input types in order.
+//!
+//! Control and dagger modify the repeated body; nested modifier chains resolve
+//! their powers independently. Generated loops carry `tket.power_loop` metadata
+//! so later rewrites preserve the forward counter and classical loop-carried values.
+//!
 //! ## Not supported:
-//! - Power: Power modifier is not supported at this point.
 //! - Dagger of non-trivial CFGs: We cannot support dagger for complicated CFGs
 //!   since it is not clear at all whether we should reverse the control flow or not.
 //!   Currently, when any non-trivial cfg with more than one block is encountered during
@@ -102,7 +110,6 @@
 //!   rewrites. Their reversal under dagger has not yet been implemented, thus we simply ignore them.
 //! - User defined extension ops: There is no way to infer modified unknown extension ops
 //!   that operate on quantum data. We currently raise an error if one is found.
-// NICOLA: TODO: UPDATE THE DOCUMENTATION ABOUT POWER MODIFIER
 use fxhash::FxHashSet;
 use itertools::{Either, Itertools};
 use std::{
@@ -448,7 +455,7 @@ mod modifier_error {
         /// The node cannot be modified.
         #[display("Modification by {_0:?} is not defined for the node {_1}")]
         Unimplemented(Modifier, OpType),
-        /// The power modifier is not supported.
+        /// Legacy error retained for compatibility; power modifiers are now supported.
         #[deprecated(since = "0.23.0", note = "Power is supported now!")]
         #[display("Found power modifier in node: {node}. Power modifier is not supported yet.")]
         PowerModifierNotSupported {
