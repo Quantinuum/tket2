@@ -37,6 +37,7 @@ mask_block_err.i:                                 ; preds = %__hugr__.__tk2_sol_
   unreachable
 
 __barray_check_none_borrowed.exit:                ; preds = %__hugr__.__tk2_sol_qalloc.45.exit
+  tail call void @heap_free(ptr nonnull %1)
   %qalloc.i35 = tail call i64 @___qalloc(), !dbg !10
   %not_max.not.not.i36 = icmp eq i64 %qalloc.i35, -1, !dbg !10
   br i1 %not_max.not.not.i36, label %cond_41_case_0.i37, label %__hugr__.__tk2_sol_qalloc.45.exit38, !dbg !10
@@ -48,6 +49,7 @@ cond_41_case_0.i37:                               ; preds = %__barray_check_none
 __hugr__.__tk2_sol_qalloc.45.exit38:              ; preds = %__barray_check_none_borrowed.exit
   tail call void @___reset(i64 %qalloc.i35), !dbg !10
   %5 = load i64, ptr %0, align 4
+  tail call void @heap_free(ptr nonnull %0)
   tail call void @___rp(i64 %qalloc.i35, double 0x3FF921FB54442D18, double 0xBFF921FB54442D18)
   tail call void @___rp(i64 %5, double 0x3FF921FB54442D18, double 0xBFF921FB54442D18)
   tail call void @___rpp(i64 %5, i64 %qalloc.i35, double 0x3FD921FB54442D18, double 0xC00921FB54442D18)
@@ -62,6 +64,8 @@ __hugr__.__tk2_sol_qalloc.45.exit38:              ; preds = %__barray_check_none
   %7 = tail call ptr @heap_alloc(i64 8)
   store i64 0, ptr %7, align 1
   %8 = load i64, ptr %6, align 4
+  tail call void @heap_free(ptr nonnull %6)
+  tail call void @heap_free(ptr nonnull %7)
   %___future_measure16 = tail call i64 @___future_measure(i64 %8, i64 0), !dbg !12
   tail call void @___qfree(i64 %8), !dbg !12
   %read_bool = tail call i1 @___read_future_bool(i64 %___future_measure), !dbg !11
@@ -77,6 +81,8 @@ declare ptr @heap_alloc(i64) local_unnamed_addr
 
 ; Function Attrs: noreturn
 declare void @panic(i32, ptr) local_unnamed_addr #0
+
+declare void @heap_free(ptr) local_unnamed_addr
 
 declare i64 @___future_measure(i64, i64) local_unnamed_addr
 
