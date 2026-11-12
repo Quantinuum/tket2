@@ -2,15 +2,26 @@
 
 ## [0.5.2](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.5.1...qis-compiler-v0.5.2) (2026-11-12)
 
-
-### Features
-
-* Update hugr dependency to 0.31.0 ([#2156](https://github.com/Quantinuum/tket2/issues/2156)) ([5cbba24](https://github.com/Quantinuum/tket2/commit/5cbba242b80655819d2f4c92f787e9a9509ec53a))
-
+This release fixes modifier resolution and a memory leak when recording array
+results. It also reduces the cost of constant folding during compilation and
+updates to HUGR 0.31.0.
 
 ### Bug Fixes
 
-* **tket-qsystem:** release arrays after recording results ([006dde2](https://github.com/Quantinuum/tket2/commit/006dde218e9a45649080ac5370f3169ea59c9c6c))
+- Avoid generated helper symbol collisions during lowering ([#2081](https://github.com/Quantinuum/tket2/pull/2081))
+- Resolve modifiers in functions reachable through calls ([#2098](https://github.com/Quantinuum/tket2/pull/2098))
+- Preserve qubit order when expanding controlled Toffoli ([#2123](https://github.com/Quantinuum/tket2/pull/2123))
+- Handle `UnpackTuple` and `MakeTuple` during modifier resolution ([#2127](https://github.com/Quantinuum/tket2/pull/2127))
+- Release backing allocations after recording array results ([#2128](https://github.com/Quantinuum/tket2/pull/2128))
+- Preserve global phases during modifier resolution ([#2138](https://github.com/Quantinuum/tket2/pull/2138))
+
+### Features
+
+- Update `hugr` dependency to 0.31.0 ([#2156](https://github.com/Quantinuum/tket2/pull/2156))
+
+### Performance Improvements
+
+- Reduce repeated dataflow analysis scans during constant folding ([#2150](https://github.com/Quantinuum/tket2/pull/2150))
 
 ## [0.5.1](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.5.0...qis-compiler-v0.5.1) (2026-10-07)
 
