@@ -34,7 +34,7 @@ use petgraph::visit::{Topo, Walker};
 
 use crate::extension::modifier::Modifier;
 
-use super::{DirWire, IsPowerLoop, ModifierResolver, ModifierResolverErrors, PortExt};
+use super::{DirWire, IsPowerLoop, ModifierResolver, ModifierResolverErrors};
 
 use crate::metadata;
 
@@ -134,22 +134,22 @@ impl<N: HugrNode> ModifierResolver<N> {
             OpType::TailLoop(tail_loop) => {
                 let just_input_num = tail_loop.just_inputs.len();
                 let offset = self.control_num();
-                for port in h.node_outputs(old_in) {
-                    let new_port = if port.index() < just_input_num {
-                        port
-                    } else {
-                        port.shift(offset)
-                    };
-                    self.map_insert((old_in, port).into(), DirWire::from((new_in, new_port)))?;
+                // Keep the loop-specific input prefix and branch sum unchanged.
+                for index in 0..just_input_num {
+                    let port = OutgoingPort::from(index);
+                    self.map_insert((old_in, port).into(), (new_in, port).into())?;
                 }
-                for port in h.node_inputs(old_out) {
-                    let new_port = if port.index() == 0 {
-                        port
-                    } else {
-                        port.shift(offset)
-                    };
-                    self.map_insert((old_out, port).into(), DirWire::from((new_out, new_port)))?
-                }
+                self.map_insert(
+                    (old_out, IncomingPort::from(0)).into(),
+                    (new_out, IncomingPort::from(0)).into(),
+                )?;
+                // Only the carried quantum data reverses under dagger.
+                self.wire_inout(
+                    (old_out, old_in),
+                    (new_out, new_in),
+                    (tail_loop.rest.iter(), tail_loop.rest.iter()),
+                    (1, just_input_num, offset),
+                )?;
             }
             OpType::DataflowBlock(dfb) => {
                 let DataflowBlock {
@@ -975,10 +975,9 @@ impl<N: HugrNode> ModifierResolver<N> {
     ) -> Result<(), ModifierResolverErrors<N>> {
         let just_input_num = tail_loop.just_inputs.len();
         let just_output_num = tail_loop.just_outputs.len();
+        let is_power_loop = h.get_metadata::<IsPowerLoop>(tl_node) == Some(true);
 
-        if h.get_metadata::<IsPowerLoop>(tl_node) == Some(true) {}
-
-        if self.modifiers.dagger {
+        if self.modifiers.dagger && !is_power_loop {
             let optype = h.get_optype(tl_node);
             return Err(ModifierResolverErrors::unresolvable(
                 tl_node,
@@ -987,20 +986,27 @@ impl<N: HugrNode> ModifierResolver<N> {
             ));
         }
 
+        let control_num = self.control_num();
         // Build a new TailLoop with modified body.
-        let control_types: TypeRow = iter::repeat_n(qb_t(), self.control_num())
+        let control_types: TypeRow = iter::repeat_n(qb_t(), control_num)
             .collect::<Vec<_>>()
             .into();
+        let inout_signature = control_types.extend(tail_loop.rest.iter());
+
         let mut builder = TailLoopBuilder::new(
             tail_loop.just_inputs.clone(),
-            control_types.extend(tail_loop.rest.iter()),
+            inout_signature,
             tail_loop.just_outputs.clone(),
         )?;
         self.modify_dfg_body(h, tl_node, &mut builder)?;
         let new_tail_loop = self.insert_sub_dfg(new_dfg, builder)?;
+        if is_power_loop {
+            new_dfg
+                .hugr_mut()
+                .set_metadata::<IsPowerLoop>(new_tail_loop, true);
+        }
 
         // connect the controls and register IOs
-        let offset = self.control_num();
         for (i, ctrl) in self.controls().iter_mut().enumerate() {
             new_dfg.hugr_mut().connect(
                 ctrl.node(),
@@ -1010,22 +1016,28 @@ impl<N: HugrNode> ModifierResolver<N> {
             );
             *ctrl = Wire::new(new_tail_loop, i + just_output_num);
         }
-        for port in h.node_inputs(tl_node) {
-            let new_port = if port.index() < just_input_num {
-                port
-            } else {
-                port.shift(offset)
-            };
-            self.map_insert((tl_node, port).into(), (new_tail_loop, new_port).into())?;
+        // The just_inputs/just_outputs prefixes keep their original port indices.
+        // Controls are inserted after them; wire_node_inout below maps only rest.
+        for index in 0..just_input_num {
+            let port = IncomingPort::from(index);
+            self.map_insert((tl_node, port).into(), (new_tail_loop, port).into())?;
         }
-        for port in h.node_outputs(tl_node) {
-            let new_port = if port.index() < just_output_num {
-                port
-            } else {
-                port.shift(offset)
-            };
-            self.map_insert((tl_node, port).into(), (new_tail_loop, new_port).into())?
+        for index in 0..just_output_num {
+            let port = OutgoingPort::from(index);
+            self.map_insert((tl_node, port).into(), (new_tail_loop, port).into())?;
         }
+        self.wire_node_inout(
+            tl_node,
+            new_tail_loop,
+            (tail_loop.rest.iter(), tail_loop.rest.iter()),
+            (just_input_num, just_output_num, control_num),
+        )?;
+        self.wire_state_order(
+            tl_node,
+            h.get_optype(tl_node),
+            new_tail_loop,
+            new_dfg.hugr().get_optype(new_tail_loop),
+        )?;
 
         Ok(())
     }
@@ -1381,6 +1393,7 @@ mod test {
         type_row,
         types::{PolyFuncType, Signature, Term, Type, TypeArg, TypeBound, type_param::TypeParam},
     };
+    use petgraph::visit::{Topo, Walker};
 
     fn identity_function(
         module: &mut ModuleBuilder<Hugr>,
@@ -1980,6 +1993,95 @@ mod test {
         };
         let outputs = tail_loop.outputs();
         *func.finish_with_outputs(outputs).unwrap().handle()
+    }
+
+    #[rstest::rstest]
+    #[case::dagger(0, true)]
+    #[case::control(1, false)]
+    #[case::controlled_dagger(1, true)]
+    #[case::multiple_controls(2, true)]
+    fn modify_resolved_power_loop(#[case] control_num: usize, #[case] dagger: bool) {
+        let mut module = ModuleBuilder::new();
+        let mut func = module
+            .define_function("original", Signature::new([qb_t(), usize_t()], [qb_t()]))
+            .unwrap();
+        let [q, _classical] = func.input_wires_arr();
+        let q = func.add_dataflow_op(TketOp::X, [q]).unwrap().out_wire(0);
+        let q = func.add_dataflow_op(TketOp::S, [q]).unwrap().out_wire(0);
+        let original = func.finish_with_outputs([q]).unwrap();
+        let mut h = module.finish_hugr().unwrap();
+
+        let mut power_resolver = ModifierResolver::new();
+
+        // Test power resolution
+        power_resolver.modifiers.exponent_inputs = vec![(original.node(), IncomingPort::from(0))];
+        let powered = power_resolver.modify_fn(&mut h, original.node()).unwrap();
+        h.validate().unwrap();
+
+        let mut resolver = ModifierResolver::new();
+        resolver.modifiers = CombinedModifier {
+            control: control_num,
+            accum_ctrl: if control_num == 0 {
+                vec![]
+            } else {
+                vec![control_num]
+            },
+            dagger,
+            exponent_inputs: vec![],
+        };
+        // Test power + optional control/dagger
+        let modified = resolver.modify_fn(&mut h, powered).unwrap();
+        h.validate().unwrap();
+
+        let tail_loop = h
+            .descendants(modified)
+            .find(|&node| matches!(h.get_optype(node), OpType::TailLoop(_)))
+            .unwrap();
+
+        let [loop_in, loop_out] = h.get_io(tail_loop).unwrap();
+        // The classical parameter is carried unchanged, after the controls and target.
+        assert_eq!(
+            h.single_linked_output(loop_out, control_num + 2),
+            Some((loop_in, OutgoingPort::from(control_num + 1))),
+        );
+        let (decrement, _) = h.single_linked_output(loop_out, control_num + 3).unwrap();
+        // The subtraction must consume the current exponent counter, not the input.
+        assert_eq!(
+            h.single_linked_output(decrement, 0),
+            Some((loop_in, OutgoingPort::from(control_num + 2))),
+        );
+
+        // Read gates in execution order; child insertion order can differ after daggering.
+        let body = h
+            .children(tail_loop)
+            .find(|&node| matches!(h.get_optype(node), OpType::DFG(_)))
+            .unwrap();
+        let graph = h.scheduling_graph(body);
+        // Compare quantum gates, skipping I/O nodes and classical angle calculations.
+        let gates = Topo::new(graph.petgraph())
+            .iter(graph.petgraph())
+            .filter_map(|node| TketOp::from_optype(h.get_optype(graph.pg_to_node(node))))
+            .collect::<Vec<_>>();
+        use TketOp::{CRz, CX, Rz, Sdg, Toffoli, X};
+        let expected = match (control_num, dagger) {
+            // Dagger reverses X; S into Sdg; X.
+            (0, true) => vec![Sdg, X],
+            // Controlled S expands into CRz on the target and Rz on the control.
+            (1, false) => vec![CX, CRz, Rz],
+            // Sdg uses the same decomposition with negated angles, followed by CX.
+            (1, true) => vec![CRz, Rz, CX],
+            // With two controls, Sdg expands into Rz; Toffoli; Rz; Toffoli; Rz,
+            // plus a CRz phase correction. The final Toffoli is the controlled X.
+            (2, true) => vec![Rz, Toffoli, Rz, Toffoli, Rz, CRz, Toffoli],
+            _ => unreachable!(),
+        };
+        assert_eq!(gates, expected);
+
+        // The rebuilt loop must retain its power-loop marker.
+        assert_eq!(h.get_metadata::<IsPowerLoop>(tail_loop), Some(true));
+        // The preserved marker must allow another dagger of the rebuilt loop.
+        dagger_resolver().modify_fn(&mut h, modified).unwrap();
+        h.validate().unwrap();
     }
 
     fn foo_conditional(module: &mut ModuleBuilder<Hugr>, t_num: usize) -> FuncID<true> {
@@ -2871,30 +2973,30 @@ mod test {
     }
 
     #[rstest::rstest]
-    // #[case::dfg(1, 2, foo_dfg, false)]
-    // #[case::dfg_dagger(1, 2, foo_dfg, true)]
-    // #[case::dfg_external_function_call(1, 1, foo_dfg_external_function_call, true)]
-    // #[case::dfg_daggered_empty_indirect_call(1, 1, foo_dfg_daggered_empty_indirect_call, false)]
-    // #[case::dfg_daggered_empty_indirect_call_daggered(
-    //     1,
-    //     1,
-    //     foo_dfg_daggered_empty_indirect_call,
-    //     true
-    // )]
+    #[case::dfg(1, 2, foo_dfg, false)]
+    #[case::dfg_dagger(1, 2, foo_dfg, true)]
+    #[case::dfg_external_function_call(1, 1, foo_dfg_external_function_call, true)]
+    #[case::dfg_daggered_empty_indirect_call(1, 1, foo_dfg_daggered_empty_indirect_call, false)]
+    #[case::dfg_daggered_empty_indirect_call_daggered(
+        1,
+        1,
+        foo_dfg_daggered_empty_indirect_call,
+        true
+    )]
     #[case::tail_loop(1, 1, foo_tail_loop, false)]
-    // #[case::conditional(1, 1, foo_conditional, false)]
-    // #[case::conditional_dagger(1, 1, foo_conditional, true)]
-    // #[case::cfg(1, 1, foo_cfg, false)]
-    // #[case::cfg_dagger(1, 1, foo_cfg, true)]
-    // #[case::cfg_two_blocks(1, 1, foo_cfg_two_blocks, false)]
-    // #[case::cfg_branching(1, 1, foo_cfg_branching, false)]
-    // #[case::cfg_loop(1, 1, foo_cfg_loop, false)]
-    // #[case::array_ops(4, 3, foo_array_ops, false)]
-    // #[case::array_ops_dagger(4, 3, foo_array_ops, true)]
-    // #[case::safe_array_ops(4, 3, foo_safe_array_ops, false)]
-    // #[case::safe_array_ops_dagger(4, 3, foo_safe_array_ops, true)]
-    // #[case::nested_safe_array_ops(5, 4, foo_nested_quantum_array_ops, false)]
-    // #[case::nested_safe_array_ops_dagger(5, 4, foo_nested_quantum_array_ops, true)]
+    #[case::conditional(1, 1, foo_conditional, false)]
+    #[case::conditional_dagger(1, 1, foo_conditional, true)]
+    #[case::cfg(1, 1, foo_cfg, false)]
+    #[case::cfg_dagger(1, 1, foo_cfg, true)]
+    #[case::cfg_two_blocks(1, 1, foo_cfg_two_blocks, false)]
+    #[case::cfg_branching(1, 1, foo_cfg_branching, false)]
+    #[case::cfg_loop(1, 1, foo_cfg_loop, false)]
+    #[case::array_ops(4, 3, foo_array_ops, false)]
+    #[case::array_ops_dagger(4, 3, foo_array_ops, true)]
+    #[case::safe_array_ops(4, 3, foo_safe_array_ops, false)]
+    #[case::safe_array_ops_dagger(4, 3, foo_safe_array_ops, true)]
+    #[case::nested_safe_array_ops(5, 4, foo_nested_quantum_array_ops, false)]
+    #[case::nested_safe_array_ops_dagger(5, 4, foo_nested_quantum_array_ops, true)]
 
     fn test_dfg_modify(
         #[case] t_num: usize,
