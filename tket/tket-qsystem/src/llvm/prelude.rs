@@ -110,7 +110,7 @@ impl PreludeCodegen for QISPreludeCodegen {
         emit_global_string(ctx, str.value(), "s_", "")
     }
 
-    fn emit_make_error<'c, H: HugrView<Node = Node>>(
+    fn emit_make_error_with_const_message<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
         signal: BasicValueEnum<'c>,
@@ -120,7 +120,7 @@ impl PreludeCodegen for QISPreludeCodegen {
         let message = const_message
             .ok_or_else(|| anyhow!("QIS MakeError requires a statically known string message"))?;
         let message = Self::emit_error_message(ctx, message.value())?;
-        DefaultPreludeCodegen.emit_make_error(ctx, signal, message, None)
+        DefaultPreludeCodegen.emit_make_error(ctx, signal, message)
     }
 }
 
