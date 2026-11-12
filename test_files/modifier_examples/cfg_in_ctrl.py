@@ -34,7 +34,7 @@ def main() -> None:
     c = qubit()
     t = qubit()
     flag = True
-    h(c)
+    branchy(c, not flag)
     with control(c):
         inner_flag = False
         branchy(t, flag)

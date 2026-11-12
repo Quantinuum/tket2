@@ -6,13 +6,13 @@ In contrast to `../guppy_examples`, these definitions include optimized variant
 to compare after running the passes.
 
 Each example is in its own directory, containing:
-- A `.py` [uv script](https://docs.astral.sh/uv/guides/scripts/) that defines the guppy program for a pinned version of guppylang.
-- A `.flat.py` script that defines the same program using `comptime` or manual loop peeling, if applicable.
+- A `.py` [uv script](https://docs.astral.sh/uv/guides/scripts/) that defines the guppy program for a pinned version of guppylang, and outputs an unoptimized Hugr to serve as test input.
+- A `.flat.py` script, and/or perhaps other variants, that defines the same program using `comptime` or manual loop peeling, if applicable.
 - A `.opt.py` script that defines a hand-optimized version of the program, indicative of the greatest optimization we believe can be achieved by the compiler.
 
 - The `.hugr` files generated for each of the previous scripts.
 
-Run `just recompile` in this directory (or `just tket/recompile-test-hugrs` on
+Run `just recompile-hugrs` in this directory (or `just tket/recompile-test-hugrs` on
 the root) to recompile the `.hugr` files.
 The guppylang version used is defined by each script.
 

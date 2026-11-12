@@ -130,6 +130,7 @@ mod test {
     }
 
     #[rstest]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_lower(noop_hugr: Hugr, identity_hugr: Hugr) {
         let mut h = noop_hugr;
 

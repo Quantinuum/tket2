@@ -1,8 +1,8 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang==1.0.0a5",
-#     "guppylang-internals==1.0.0a5",
+#     "guppylang==1.2.0",
+#     "guppylang-internals==1.2.0",
 # ]
 # ///
 """Nested function calls"""
@@ -34,5 +34,6 @@ def outer(q0: qubit @ owned) -> qubit:
     return mid(q0)
 
 
-program = outer.compile_function()
+# Tests explicitly look for Call ops so minimal optimization prevents inlining
+program = outer.with_minimal_opt().compile_function()
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())

@@ -1,5 +1,6 @@
 //! Intermediate structure for encoding Hugrs into [`SerialCircuit`]s.
 
+mod nonlocal;
 mod unit_generator;
 mod unsupported_tracker;
 mod value_tracker;
@@ -283,7 +284,8 @@ impl<H: HugrView> PytketEncoderContext<H> {
         mut self,
         hugr: &H,
         region: H::Node,
-    ) -> Result<(EncodedCircuitInfo, OpaqueSubgraphs<H::Node>), PytketEncodeError<H::Node>> {
+    ) -> Result<(EncodedCircuitInfo<H::Node>, OpaqueSubgraphs<H::Node>), PytketEncodeError<H::Node>>
+    {
         // Add any remaining unsupported nodes
         while !self.unsupported.is_empty() {
             let node = self.unsupported.iter().next().unwrap();
@@ -291,6 +293,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
             self.emit_unsupported(&opaque_subgraphs, hugr)?;
         }
 
+        let nonlocal_outputs = self.collect_nonlocal_outputs(hugr, region);
         let tracker_result = self.values.finish(hugr, region)?;
         let (mut command_runs, mut boundaries) = self.segments.finish();
         if command_runs.is_empty() {
@@ -338,6 +341,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
             straight_through_wires: tracker_result.straight_through_wires,
             output_qubits: tracker_result.qubit_outputs,
             output_bits: tracker_result.bit_outputs,
+            nonlocal_outputs,
         };
 
         Ok((info, self.opaque_subgraphs))
@@ -692,6 +696,8 @@ impl<H: HugrView> PytketEncoderContext<H> {
         // Output parameters are mapped to a fresh variable, that can be tracked
         // back to the encoded subcircuit's function name.
         let mut out_param_count = 0;
+        // Save the input count before the loop appends fresh output bits.
+        let input_bit_count = op_values.bits.len();
         let input_qubits = op_values.qubits.clone();
         let mut out_qubits = input_qubits.as_slice();
         // Separate output bits from input bits: opaque operations may return
@@ -746,6 +752,20 @@ impl<H: HugrView> PytketEncoderContext<H> {
                 params: Cow::Borrowed(&[]),
             };
             let mut pytket_op = make_tk1_operation(tket_json_rs::OpType::Barrier, args);
+            // Output bits are writes, not Boolean reads. Without classical edges,
+            // pytket can move a consumer before this barrier and the decoder will
+            // read an uninitialized bit instead of the subgraph's result.
+            // See https://github.com/Quantinuum/guppylang/issues/2423.
+            // Keep inputs as Boolean reads: multiple inputs may share a register.
+            for edge in pytket_op
+                .signature
+                .as_mut()
+                .unwrap()
+                .iter_mut()
+                .skip(op_values.qubits.len() + input_bit_count)
+            {
+                *edge = "C".into();
+            }
             pytket_op.data = Some(serde_json::to_string(&payload).unwrap());
 
             self.emit_command(pytket_op, &op_values.qubits, &op_values.bits, None);

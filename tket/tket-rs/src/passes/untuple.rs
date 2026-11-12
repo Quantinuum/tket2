@@ -475,14 +475,19 @@ mod test {
 
     #[rstest]
     #[case::unused(unused_pack(), 1, 2)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case::simple(simple_pack_unpack(), 1, 2)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case::multi(multi_unpack(), 1, 2)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case::partial(partial_unpack(), 1, 3)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case::unpack_discard_first(unpack_discard_first(), 1, 2)]
     // Nodes with order edges are ignored.
     #[case::ordered(ordered_pack_unpack(), 0, 4)]
     #[case::outgoing_ordered(outgoing_ordered_pack_unpack(), 0, 4)]
     #[case::incoming_ordered(incoming_ordered_pack_unpack(), 0, 4)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case::type_parameters(unpack_type_parameters(), 1, 2)]
     fn test_pack_unpack(
         #[case] mut hugr: Hugr,

@@ -574,6 +574,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn repeated_ops_share_lowering_functions() -> Result<(), BuildError> {
         let factory = UnpackContainerBuilder::new(TypeUnpacker::for_qubits());
         let option_qb_type = Type::from(option_type([qb_t()]));
@@ -597,7 +598,7 @@ mod tests {
         let mut lowerer = ReplaceTypes::new_empty();
         factory
             .into_function_map()
-            .register_operation_replacements(&mut hugr, &mut lowerer);
+            .register_operation_replacements(&hugr, &mut lowerer);
         lowerer.run(&mut hugr).unwrap();
         hugr.validate().unwrap();
 
