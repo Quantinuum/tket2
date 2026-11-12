@@ -284,26 +284,20 @@ pub fn todd(table: Vec<SIMDVector>, nb_qubits: usize) -> Vec<SIMDVector> {
 mod tests {
     use super::*;
 
+    /// Returns the parity of column products for each triple of qubit indices.
     fn signature_tensor(table: &[SIMDVector], nb_qubits: usize) -> Vec<Vec<Vec<bool>>> {
         let mut tensor = vec![vec![vec![false; nb_qubits]; nb_qubits]; nb_qubits];
 
-        // Compute each symmetric entry once, then fill its permutations.
-        for alpha in 0..nb_qubits {
-            for beta in alpha..nb_qubits {
-                for gamma in beta..nb_qubits {
+        for (alpha, plane) in tensor.iter_mut().enumerate() {
+            for (beta, row) in plane.iter_mut().enumerate() {
+                for (gamma, entry) in row.iter_mut().enumerate() {
                     let mut count = 0u32;
                     for col in table {
                         if col.get(alpha) && col.get(beta) && col.get(gamma) {
                             count += 1;
                         }
                     }
-                    let val = count % 2 == 1;
-                    tensor[alpha][beta][gamma] = val;
-                    tensor[alpha][gamma][beta] = val;
-                    tensor[beta][alpha][gamma] = val;
-                    tensor[beta][gamma][alpha] = val;
-                    tensor[gamma][alpha][beta] = val;
-                    tensor[gamma][beta][alpha] = val;
+                    *entry = count % 2 == 1;
                 }
             }
         }
