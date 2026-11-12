@@ -491,7 +491,7 @@ mod tests {
         replacement: Circuit<impl HugrView<Node = Node>>,
     ) -> CircuitRewrite {
         // The replacement must be a Dfg rooted hugr.
-        let replacement = replacement.extract_dfg().unwrap().into_hugr();
+        let replacement = replacement.to_owned().into_hugr();
         ssg.create_simple_replacement(circuit.hugr(), replacement)
             .unwrap()
             .into()
