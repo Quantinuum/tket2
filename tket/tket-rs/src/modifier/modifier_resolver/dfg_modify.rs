@@ -1343,12 +1343,9 @@ mod test {
             CallIndirect, ExtensionOp,
             handle::{FuncID, NodeHandle},
         },
-        std_extensions::{
-            arithmetic::int_ops::IntOpDef,
-            collections::{
-                array::{ArrayOp, ArrayOpBuilder, ArrayOpDef, array_type, array_type_parametric},
-                borrow_array::{BArrayOp, BArrayOpBuilder, BArrayOpDef, borrow_array_type},
-            },
+        std_extensions::collections::{
+            array::{ArrayOp, ArrayOpBuilder, ArrayOpDef, array_type, array_type_parametric},
+            borrow_array::{BArrayOp, BArrayOpBuilder, BArrayOpDef, borrow_array_type},
         },
         type_row,
         types::{PolyFuncType, Signature, Term, Type, TypeArg, TypeBound, type_param::TypeParam},
