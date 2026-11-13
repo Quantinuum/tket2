@@ -1,0 +1,61 @@
+# Exercise the Conan build path without the libraries supplied by hugrenv.
+name: Conan smoke test
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/conan-smoke-test.yml"
+      - "tket/tket1-passes/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "pyproject.toml"
+      - "uv.lock"
+  push:
+    branches:
+      - main
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  conan-smoke-test:
+    name: Conan build and tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      # These native targets use prebuilt binaries in tket1-passes/build.rs.
+      matrix:
+        os: [ubuntu-latest, macos-15, macos-15-intel]
+    env:
+      CARGO_TERM_COLOR: always
+      CARGO_INCREMENTAL: 0
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.11.15"
+      - name: Install libclang
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libclang-dev
+      - name: Build and run C API tests through Conan
+        shell: bash
+        env:
+          # Keep both caches fresh so a previous build cannot hide missing binaries.
+          CONAN_HOME: ${{ runner.temp }}/conan
+          CARGO_TARGET_DIR: ${{ runner.temp }}/conan-smoke-target
+        run: |
+          unset TKET_C_API_PATH
+          uv run --frozen --only-group conan conan profile detect
+          uv run --frozen --only-group conan cargo test --locked -p tket1-passes --lib
