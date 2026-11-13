@@ -611,9 +611,7 @@ mod tests {
             h
         };
         let case_name = format!("control_{control}_power_{power}_rebuilt_{rebuilt}");
-        std::fs::write(format!("before_{case_name}.mmd"), h.mermaid_string()).unwrap();
         test_resolve(&mut h);
-        std::fs::write(format!("after_{case_name}.mmd"), h.mermaid_string()).unwrap();
 
         let owner_name = if rebuilt {
             "__modified__ordered_call[C1]"
