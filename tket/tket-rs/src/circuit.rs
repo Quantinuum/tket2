@@ -1,7 +1,6 @@
 //! Quantum circuit representation and operations.
 
 pub mod cost;
-mod extract_dfg;
 pub mod units;
 
 use std::borrow::Cow;
@@ -310,19 +309,6 @@ impl<T: HugrView> Circuit<T> {
 }
 
 impl<T: HugrView<Node = Node>> Circuit<T> {
-    /// Extracts the circuit into a new owned HUGR containing the circuit at the root.
-    /// Replaces the circuit container operation with an [`OpType::DFG`].
-    ///
-    /// Regions that are not descendants of the parent node are not included in the new HUGR.
-    /// This may invalidate calls to functions defined elsewhere. Make sure to inline any
-    /// external functions before calling this method.
-    pub fn extract_dfg(&self) -> Result<Circuit<Hugr>, CircuitMutError> {
-        let circ = self.to_owned();
-        // TODO: Can we just ignore this now?
-        //extract_dfg::rewrite_into_dfg(&mut circ)?;
-        Ok(circ)
-    }
-
     /// Construct the subgraph containing the entire circuit.
     pub fn subgraph(&self) -> Result<SiblingSubgraph, InvalidSubgraph>
     where

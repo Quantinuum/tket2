@@ -11,6 +11,7 @@ const CONAN_REMOTE: &str = "https://quantinuumsw.jfrog.io/artifactory/api/conan/
 fn main() {
     println!("cargo:rerun-if-env-changed=TKET_C_API_PATH");
     println!("cargo:rerun-if-changed=conanfile.txt");
+    println!("cargo:rerun-if-changed=conan-profiles");
     println!("cargo:rerun-if-changed=build.rs");
 
     let custom_tket_path = env::var("TKET_C_API_PATH").ok().map(PathBuf::from);
@@ -176,9 +177,9 @@ impl SupportedPlatform {
             // Platforms with pre-built binaries in tket-libs conan remote
             // See ./conan-profiles/README.md for more details
             SupportedPlatform::MacOsX86 => "macos-15-intel",
-            SupportedPlatform::MacOsArm => "macos-15",
-            SupportedPlatform::WindowsX86 => "windows-2025",
-            SupportedPlatform::LinuxX86 => "linux-x86_64-gcc13",
+            SupportedPlatform::MacOsArm => "macos-26",
+            SupportedPlatform::WindowsX86 => "windows-2025-vs2026",
+            SupportedPlatform::LinuxX86 => "linux-x86_64-gcc14",
             SupportedPlatform::LinuxArmv8 => "linux-armv8-gcc14",
             // Manually added profiles for cross-compilation (will build from source)
             SupportedPlatform::LinuxAarch64Gnu => "linux-armv8-gcc14",

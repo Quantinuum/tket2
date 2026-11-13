@@ -7,7 +7,6 @@ rust-version = { workspace = true }
 license = { workspace = true }
 readme = "README.md"
 documentation = "https://docs.rs/tk-pg-bitpacked"
-homepage = { workspace = true }
 repository = { workspace = true }
 keywords = { workspace = true }
 categories = { workspace = true }

@@ -32,10 +32,7 @@ impl CircuitRewrite {
         hugr: &impl HugrView<Node = Node>,
         replacement: Circuit<impl HugrView<Node = Node>>,
     ) -> Result<Self, InvalidReplacement> {
-        let replacement = replacement
-            .extract_dfg()
-            .unwrap_or_else(|e| panic!("{}", e))
-            .into_hugr();
+        let replacement = replacement.to_owned().into_hugr();
         Ok(Self(subgraph.create_simple_replacement(hugr, replacement)?))
     }
 

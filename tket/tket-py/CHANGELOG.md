@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.15.15](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.14...tket-py-v0.15.15) (2026-11-10)
+
+
+### Bug Fixes
+
+* Prevent macOS crashes when importing `tket` before `pytket` ([#2148](https://github.com/Quantinuum/tket2/pull/2148))
+* Don't delete non-local edges when applying `PytketHugrPass` to HUGRs with nested regions ([#2131](https://github.com/Quantinuum/tket2/pull/2131))
+* Preserve global phase operations during modifier resolution ([#2138](https://github.com/Quantinuum/tket2/pull/2138))
+* Handle `MakeTuple` and `UnpackTuple` carrying quantum data during modifier resolution ([#2127](https://github.com/Quantinuum/tket2/pull/2127))
+
+## [0.15.14](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.13...tket-py-v0.15.14) (2026-11-04)
+
+
+### Bug Fixes
+
+* Address Miri failures in bitvec and Crossbeam resynthesis ([#2116](https://github.com/Quantinuum/tket2/issues/2116)) ([1e37f79](https://github.com/Quantinuum/tket2/commit/1e37f7964bd72837f4456b2ee4b2fa69362c710f))
+* Preserve qubit order when expanding controlled Toffoli ([#2123](https://github.com/Quantinuum/tket2/issues/2123)) ([049245f](https://github.com/Quantinuum/tket2/commit/049245f17b53719ac7400c1c2ac032fd44caa0e1)), closes [#2122](https://github.com/Quantinuum/tket2/issues/2122)
+
 ## [0.15.13](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.12...tket-py-v0.15.13) (2026-10-29)
 
 

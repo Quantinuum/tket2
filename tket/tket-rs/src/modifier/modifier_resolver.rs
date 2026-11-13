@@ -111,6 +111,7 @@
 //! - User defined extension ops: There is no way to infer modified unknown extension ops
 //!   that operate on quantum data. We currently raise an error if one is found.
 use fxhash::FxHashSet;
+use hugr::builder::BuildError;
 use itertools::{Either, Itertools};
 use std::{
     collections::{BTreeSet, HashMap, HashSet, VecDeque},
@@ -126,12 +127,14 @@ pub mod tket_op_modify;
 use super::CombinedModifier;
 use crate::passes::{InScope, PassScope, utils::unpack_container::TypeUnpacker};
 use crate::{TketOp, extension::global_phase::GlobalPhase, modifier::Modifier};
-use global_phase_modify::delete_phase;
 use hugr::{
     HugrView, IncomingPort, Node, OutgoingPort, Port, PortIndex, Wire,
-    builder::{BuildError, CFGBuilder, Container, Dataflow, SubContainer},
+    builder::{CFGBuilder, Container, Dataflow, SubContainer},
     core::HugrNode,
-    extension::{prelude::qb_t, simple_op::MakeExtensionOp},
+    extension::{
+        prelude::{MakeTuple, UnpackTuple, qb_t},
+        simple_op::MakeExtensionOp,
+    },
     hugr::hugrmut::HugrMut,
     metadata::Metadata,
     ops::{CFG, Const, OpTrait, OpType},
@@ -380,93 +383,48 @@ impl<N: HugrNode> Default for ModifierResolver<N> {
     }
 }
 
-// There are some issue in rust when we try to deprecate a enum with `derive_more` macros
-// (https://github.com/JelteF/derive_more/issues/570) or deprecate a enum variant
-// (https://github.com/rust-lang/rust/issues/92313). As a workaround, we use `#[expect(deprecated)]`
-// on the module containing the deprecated enum.
-#[expect(deprecated)]
-mod modifier_error {
-    use super::*;
-
-    /// Errors that can occur when tracing and validating a chain of modifiers and its target.
-    #[derive(Debug, derive_more::Error, derive_more::Display)]
-    #[non_exhaustive]
-    #[deprecated(since = "0.23.0", note = "Use ModifierResolverErrors instead")]
-    pub enum ModifierError<N = Node> {
-        /// The node is not a modifier
-        #[display("Node to modify {_0} expected to be a modifier but actually {_1}")]
-        NotModifier(N, OpType),
-        /// No caller of this modified function exists.
-        #[display("No caller of the modified function exists for node {_0}")]
-        #[error(ignore)]
-        NoCaller(N),
-        /// No target of this modifier exists.
-        #[display("The modifier node {_0} chain has no target")]
-        #[error(ignore)]
-        NoTarget(N),
-        /// Not the first modifier in a chain.
-        #[display("Node {_0} of type {_1} is not the first modifier in a chain.")]
-        NotInitialModifier(N, OpType),
-        /// The modifier cannot be applied to the node.
-        #[display("Modifier cannot be applied to the node {_0} of type {_1}")]
-        ModifierNotApplicable(N, OpType),
-    }
-
-    /// Possible errors that can occur during the modifier resolution process.
-    #[derive(Debug, derive_more::Display, derive_more::Error, derive_more::From)]
-    #[non_exhaustive]
-    pub enum ModifierResolverErrors<N = Node> {
-        /// Errors during tracing or validating a chain of modifiers and its target.
-        #[deprecated(
-            since = "0.23.0",
-            note = "Use the specific ModifierResolverErrors variants instead"
-        )]
-        #[display("{_0}")]
-        #[from]
-        ModifierError(ModifierError<N>),
-        /// The head of a modifier chain is not a loaded function.
-        #[display(
-            "Malformed modifier chain: head node {_0} must be a LoadFunction. Found {_1} instead."
-        )]
-        MalformedChainHead(N, OpType),
-        /// The modifier cannot be applied to the node.
-        #[display("Modifier cannot be applied to the node {_0} of type {_1}")]
-        ModifierNotApplicable(N, OpType),
-        /// Error if the new hugr is not built properly.
-        #[display("{_0}")]
-        #[from]
-        BuildError(BuildError),
-        /// Error that is caused by a bug in this resolver which should be unreachable.
-        #[display("Unreachable error: {msg}")]
-        Unreachable {
-            /// The message of the unreachable error.
-            msg: String,
-        },
-        /// Modifier applied to a node that cannot be modified.
-        #[display("The node {node} of type {optype} cannot be modified: {msg}")]
-        UnResolvable {
-            /// The node that cannot be modified.
-            node: N,
-            /// The operation type that cannot be modified.
-            optype: OpType,
-            /// The message of the unresolvable error.
-            msg: String,
-        },
-        /// The node cannot be modified.
-        #[display("Modification by {_0:?} is not defined for the node {_1}")]
-        Unimplemented(Modifier, OpType),
-        /// Legacy error retained for compatibility; power modifiers are now supported.
-        #[deprecated(since = "0.23.0", note = "Power is supported now!")]
-        #[display("Found power modifier in node: {node}. Power modifier is not supported yet.")]
-        PowerModifierNotSupported {
-            /// The `power` node
-            node: N,
-        },
-    }
+/// Possible errors that can occur during the modifier resolution process.
+#[derive(Debug, derive_more::Display, derive_more::Error, derive_more::From)]
+#[non_exhaustive]
+pub enum ModifierResolverErrors<N = Node> {
+    /// The head of a modifier chain is not a loaded function.
+    #[display(
+        "Malformed modifier chain: head node {_0} must be a LoadFunction. Found {_1} instead."
+    )]
+    MalformedChainHead(N, OpType),
+    /// The modifier cannot be applied to the node.
+    #[display("Modifier cannot be applied to the node {_0} of type {_1}")]
+    ModifierNotApplicable(N, OpType),
+    /// Error if the new hugr is not built properly.
+    #[display("{_0}")]
+    #[from]
+    BuildError(BuildError),
+    /// Error that is caused by a bug in this resolver which should be unreachable.
+    #[display("Unreachable error: {msg}")]
+    Unreachable {
+        /// The message of the unreachable error.
+        msg: String,
+    },
+    /// Modifier applied to a node that cannot be modified.
+    #[display("The node {node} of type {optype} cannot be modified: {msg}")]
+    UnResolvable {
+        /// The node that cannot be modified.
+        node: N,
+        /// The operation type that cannot be modified.
+        optype: OpType,
+        /// The message of the unresolvable error.
+        msg: String,
+    },
+    /// The node cannot be modified.
+    #[display("Modification by {_0:?} is not defined for the node {_1}")]
+    Unimplemented(Modifier, OpType),
+    /// The power modifier is not supported.
+    #[display("Found power modifier in node: {node}. Power modifier is not supported yet.")]
+    PowerModifierNotSupported {
+        /// The `power` node
+        node: N,
+    },
 }
-
-#[expect(deprecated)]
-pub use modifier_error::{ModifierError, ModifierResolverErrors};
 
 impl<N> ModifierResolverErrors<N> {
     /// Create an unreachable error.
@@ -742,11 +700,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         let (maybe_a_modifier, _) = h
             .single_linked_output(node, 0)
             .expect("CallIndirect must have exactly one function input");
-        if Modifier::from_optype(h.get_optype(maybe_a_modifier)).is_none() {
-            return Ok(false);
-        }
-
-        Ok(true)
+        Ok(Modifier::from_optype(h.get_optype(maybe_a_modifier)).is_some())
     }
 
     /// Resolve a modifier chain in place, starting with no enclosing modifiers.
@@ -1230,6 +1184,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             self.forget_node(h, op_node)
         } else if self.modify_array_op(h, op_node, optype, new_dfg)?
             || self.try_array_convert(h, op_node, optype, new_dfg)?
+            || self.modify_tuple_op(h, op_node, optype, new_dfg)?
         {
             Ok(())
         } else if !self.signature_has_quantum_data(&signature) {
@@ -1243,6 +1198,57 @@ impl<N: HugrNode> ModifierResolver<N> {
                 optype.clone(),
             ))
         }
+    }
+
+    /// Try to modify `MakeTuple` / `UnpackTuple` operations carrying qubits.
+    fn modify_tuple_op(
+        &mut self,
+        h: &impl HugrMut<Node = N>,
+        n: N,
+        optype: &OpType,
+        new_dfg: &mut impl Dataflow,
+    ) -> Result<bool, ModifierResolverErrors<N>> {
+        let (row, reversed): (_, OpType) = if let Some(op) = optype.cast::<MakeTuple>() {
+            (op.0.clone(), UnpackTuple::new(op.0).into())
+        } else if let Some(op) = optype.cast::<UnpackTuple>() {
+            (op.0.clone(), MakeTuple::new(op.0).into())
+        } else {
+            // Not a tuple operation, skip.
+            return Ok(false);
+        };
+
+        let num_quantum = row
+            .iter()
+            .filter(|ty| self.qubit_finder.contains_element_type(ty))
+            .count();
+        if num_quantum == 0 {
+            // Take existing classical path instead (`modify_dataflow_op`).
+            return Ok(false);
+        }
+
+        if !self.modifiers.dagger {
+            // Without dagger, just add the node without modification.
+            self.add_node_no_modification(h, n, optype.clone(), new_dfg)?;
+            return Ok(true);
+        }
+
+        if num_quantum != row.len() {
+            // Mixing quantum and classical elements in a tuple under a dagger is not
+            // resolvable, because it isn't clear how you would reserve the order for
+            // quantum elements while keeping it unchanged for classical elements.
+            return Err(ModifierResolverErrors::unresolvable(
+                n,
+                "tuple mixing quantum and classical elements cannot be daggered.",
+                optype.clone(),
+            ));
+        }
+
+        // Under dagger, reverse the tuple operation and all its ports.
+        let node = new_dfg.add_child_node(reversed);
+        for port in h.all_node_ports(n) {
+            self.map_insert(DirWire(n, port), DirWire::new(node, port).reverse())?;
+        }
+        Ok(true)
     }
 
     /// Returns a row with modifier controls in the layout expected by a CFG edge.
@@ -1466,34 +1472,11 @@ fn remove_unused_modified_functions<N: HugrNode>(
     }
 }
 
-/// Resolve modifiers in a circuit by applying them to each entry point.
-///
-/// When resolution creates modified replacements for loaded functions, the
-/// original function nodes may be removed if they are no longer reachable
-/// from the entrypoint, from nodes whose interface is preserved by the default
-/// pass scope, or from other preserved modified functions.
-/// Global phase operations are removed within the supplied entrypoint subtrees.
-/// Phase cleanup does not follow calls to other functions.
-///
-/// Use [`resolve_modifier`] to select the entrypoint and cleanup policy through
-/// a [`PassScope`].
-#[deprecated(
-    since = "0.23.0",
-    note = "Use resolve_modifier with a PassScope instead"
-)]
-pub fn resolve_modifier_with_entrypoints(
-    h: &mut impl HugrMut<Node = Node>,
-    entry_points: impl IntoIterator<Item = Node>,
-) -> Result<(), ModifierResolverErrors<Node>> {
-    resolve_modifier_from_entrypoints(h, entry_points, &PassScope::default())
-}
-
 /// Resolve modifiers reachable from the root selected by `scope`.
 ///
 /// Rewrites record selected custom implementations and retained callees, so
 /// discovery can expand to their bodies without revisiting previously explored functions.
-/// Cleanup removes unused originals only when `scope` permits their removal and any
-/// dangling global phase operations.
+/// Cleanup removes unused originals only when `scope` permits their removal.
 /// Does nothing when the scope has no root.
 pub fn resolve_modifier(
     h: &mut impl HugrMut<Node = Node>,
@@ -1525,35 +1508,14 @@ pub fn resolve_modifier(
     }
 }
 
-/// Resolve modifiers in a circuit by applying them to each entry point.
-///
-/// Cleanup of original function nodes respects `scope`: a function is
-/// only removed when it is no longer needed and [`PassScope::in_scope`] says the
-/// function may be modified freely.
-/// Global phase operations are removed within the supplied entrypoint subtrees.
-///
-/// Use [`resolve_modifier`] to select the entrypoint through a [`PassScope`].
-#[deprecated(
-    since = "0.23.0",
-    note = "Use resolve_modifier with a PassScope instead"
-)]
-pub fn resolve_modifier_with_entrypoints_and_scope(
-    h: &mut impl HugrMut<Node = Node>,
-    entry_points: impl IntoIterator<Item = Node>,
-    scope: &PassScope,
-) -> Result<(), ModifierResolverErrors<Node>> {
-    resolve_modifier_from_entrypoints(h, entry_points, scope)
-}
-
 /// Resolve modifiers reachable from the supplied entry points.
 ///
 /// Traverses entrypoint subtrees, direct callees, and loaded functions with
 /// non-modifier consumers. Rewrites are applied after each discovery round,
 /// then selected custom implementations and retained callees are explored.
 ///
-/// Removes dangling global phase operations within the entrypoint subtrees and
-/// unused original functions replaced during resolution, respecting `scope`
-/// when removing functions. Validates the resulting HUGR before returning.
+/// Removes unused original functions replaced during resolution, respecting
+/// `scope` when removing functions. Validates the resulting HUGR before returning.
 fn resolve_modifier_from_entrypoints(
     h: &mut impl HugrMut<Node = Node>,
     entry_points: impl IntoIterator<Item = Node>,
@@ -1621,10 +1583,6 @@ fn resolve_modifier_from_entrypoints(
             }
         }
     }
-
-    // Ad hoc cleanup procedure: remove any dangling global-phase nodes that
-    // were produced or left behind by the resolution passes above.
-    delete_phase(h, entry_points)?;
 
     // Remove only original functions for which this resolver generated modified
     // replacements, and only when no remaining non-obsolete function uses them.
@@ -1887,6 +1845,7 @@ mod tests {
 
     #[test]
     /// Test that modifier passes under control preserve the order edges.
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn control_modifier_preserves_state_order_edges() {
         fn state_order_edge_count(h: &Hugr, root: Node) -> usize {
             h.descendants(root)
@@ -1975,6 +1934,7 @@ mod tests {
 
     #[test]
     /// Test that a LoadFunction node that is shared between a modifier and a direct call is not removed during resolution.
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn shared_loaded_function_is_not_removed() {
         let mut module = ModuleBuilder::new();
 
@@ -2340,6 +2300,7 @@ mod tests {
 
     #[test]
     /// Test that a still used function is not removed
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn modified_dependency_is_preserved_when_original_caller_is_live() {
         let mut module = ModuleBuilder::new();
 
@@ -2493,6 +2454,7 @@ mod tests {
     #[case::subscript_in_dagger_ctrl(
         "../../test_files/modifier_examples/subscript_in_dagger_ctrl.hugr"
     )]
+    #[case::struct_in_dagger_ctrl("../../test_files/modifier_examples/struct_in_dagger_ctrl.hugr")]
     #[case::custom_modifier1("../../test_files/modifier_examples/custom_modifier.hugr")]
     #[case::multiple_fun_call("../../test_files/modifier_examples/multiple_fun_call.hugr")]
     #[case::power_modifier("../../test_files/modifier_examples/power_modifier.hugr")]

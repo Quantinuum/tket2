@@ -4,7 +4,6 @@ version = "0.0.0"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-homepage.workspace = true
 description = "Rust interface for tket1-passes library"
 publish = false
 
@@ -20,7 +19,6 @@ serde_json.workspace = true
 tket-json-rs.workspace = true
 
 [build-dependencies]
-cc.workspace = true
 bindgen.workspace = true
 conan2.workspace = true
 
@@ -31,7 +29,7 @@ rayon.workspace = true
 
 # Used for integration tests
 hugr = { workspace = true }
-tket = { path = "../tket-rs", version = "0.22.1" }
+tket = { path = "../tket-rs", version = "0.23.0" }
 
 [lints]
 workspace = true

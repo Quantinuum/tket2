@@ -209,8 +209,8 @@ impl ComposablePass<Hugr> for PauliGraphResynthesis {
         }
 
         let mut ancillas: HashMap<Node, HashSet<ElementId>> = HashMap::new();
-        for (region, serial_circ) in encoded_circs.iter_mut() {
-            let registers = ancillas.entry(region).or_default();
+        for (id, serial_circ) in encoded_circs.iter_mut() {
+            let registers = ancillas.entry(id.region).or_default();
             serial_circ.commands.retain(|cmd| {
                 if cmd.opgroup.as_deref() == Some(marker.as_str()) {
                     registers.extend(cmd.args.iter().cloned());
@@ -221,11 +221,11 @@ impl ComposablePass<Hugr> for PauliGraphResynthesis {
             });
         }
 
-        for (region, serial_circ) in encoded_circs.iter_mut() {
+        for (id, serial_circ) in encoded_circs.iter_mut() {
             if serial_circ.commands.is_empty() {
                 continue;
             }
-            let registers = &ancillas[&region];
+            let registers = &ancillas[&id.region];
             let mut qubits = serial_circ.qubits.clone();
             qubits.sort_by_key(|q| registers.contains(&q.id));
 
@@ -636,6 +636,9 @@ mod tests {
     #[case::hadamards(TketOp::H, TketOp::H, vec![0])]
     #[case::inverse_t_gates(TketOp::T, TketOp::Tdg, vec![0])]
     #[case::controlled_nots(TketOp::CX, TketOp::CX, vec![0, 1])]
+    // todo: Re-enable after upgrading crossbeam-epoch (currently 0.9.21) and crossbeam-skiplist
+    // (currently 0.1.3) to releases containing crossbeam-rs/crossbeam#871's Stacked Borrows fixes.
+    #[cfg_attr(miri, ignore)]
     fn cancels_inverse_gates(
         #[case] gate: TketOp,
         #[case] inverse: TketOp,
@@ -657,6 +660,9 @@ mod tests {
     }
 
     #[test]
+    // todo: Re-enable after upgrading crossbeam-epoch (currently 0.9.21) and crossbeam-skiplist
+    // (currently 0.1.3) to releases containing crossbeam-rs/crossbeam#871's Stacked Borrows fixes.
+    #[cfg_attr(miri, ignore)]
     fn merges_two_t_gates_into_s() {
         let mut circuit = build_simple_circuit(1, |circ| {
             circ.append(TketOp::T, [0])?;
@@ -672,6 +678,9 @@ mod tests {
     }
 
     #[test]
+    // todo: Re-enable after upgrading crossbeam-epoch (currently 0.9.21) and crossbeam-skiplist
+    // (currently 0.1.3) to releases containing crossbeam-rs/crossbeam#871's Stacked Borrows fixes.
+    #[cfg_attr(miri, ignore)]
     fn resynthesizes_with_t_optimization() {
         let mut circuit = build_simple_circuit(1, |circ| {
             for gate in [TketOp::T, TketOp::H, TketOp::T, TketOp::H, TketOp::T] {
@@ -704,6 +713,9 @@ mod tests {
     #[rstest]
     #[case::different_angles([0.1, 0.2], 0.3)]
     #[case::opposite_angles([0.1, -0.1], 0.0)]
+    // todo: Re-enable after upgrading crossbeam-epoch (currently 0.9.21) and crossbeam-skiplist
+    // (currently 0.1.3) to releases containing crossbeam-rs/crossbeam#871's Stacked Borrows fixes.
+    #[cfg_attr(miri, ignore)]
     fn merges_arbitrary_rz_angles(#[case] angles: [f64; 2], #[case] expected: f64) {
         let mut circuit = build_simple_circuit(1, |circ| {
             for angle in angles {
@@ -739,6 +751,9 @@ mod tests {
     }
 
     #[test]
+    // todo: Re-enable after upgrading crossbeam-epoch (currently 0.9.21) and crossbeam-skiplist
+    // (currently 0.1.3) to releases containing crossbeam-rs/crossbeam#871's Stacked Borrows fixes.
+    #[cfg_attr(miri, ignore)]
     fn merges_t_gates_across_cx() {
         let mut circuit = build_simple_circuit(2, |circ| {
             circ.append(TketOp::T, [0])?;
@@ -757,6 +772,9 @@ mod tests {
     }
 
     #[test]
+    // todo: Re-enable after upgrading crossbeam-epoch (currently 0.9.21) and crossbeam-skiplist
+    // (currently 0.1.3) to releases containing crossbeam-rs/crossbeam#871's Stacked Borrows fixes.
+    #[cfg_attr(miri, ignore)]
     fn cancels_phases_across_cz_layer() {
         let mut circuit = build_simple_circuit(6, |circ| {
             for qubit in 0..6 {

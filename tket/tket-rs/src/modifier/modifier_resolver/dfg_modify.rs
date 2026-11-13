@@ -1337,7 +1337,7 @@ mod test {
     use hugr::{
         Hugr,
         builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder, SubContainer},
-        extension::prelude::{ConstUsize, bool_t, qb_t, usize_t},
+        extension::prelude::{ConstUsize, MakeTuple, UnpackTuple, bool_t, qb_t, usize_t},
         extension::simple_op::MakeExtensionOp,
         ops::{
             CallIndirect, ExtensionOp,
@@ -1402,6 +1402,7 @@ mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn repeated_calls_share_modified_implementation() {
         let h = resolved_modifier_test_hugr(
             2,
@@ -2461,6 +2462,7 @@ mod test {
     #[test]
     /// Test that modifying a DFG representing a computation with no quantum effects (no input/output qubits)
     /// does not introduce invalid hugr.
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn daggered_controlled_rotation_is_acyclic() {
         let mut module = ModuleBuilder::new();
         let inner_sig = Signature::new_endo([qb_t()]);
@@ -2773,6 +2775,50 @@ mod test {
         *func.finish_with_outputs(inputs).unwrap().handle()
     }
 
+    fn foo_tuple_ops(module: &mut ModuleBuilder<Hugr>, t_num: usize) -> FuncID<true> {
+        assert_eq!(t_num, 2);
+
+        let tuple_types = vec![qb_t(); t_num];
+        let mut func = module
+            .define_function("foo", Signature::new_endo(tuple_types.clone()))
+            .unwrap();
+        func.set_unitary();
+        let inputs: Vec<_> = func.input_wires().collect();
+
+        let tuple = func
+            .add_dataflow_op(MakeTuple::new(tuple_types.clone().into()), inputs)
+            .unwrap()
+            .out_wire(0);
+        let outputs = func
+            .add_dataflow_op(UnpackTuple::new(tuple_types.into()), [tuple])
+            .unwrap()
+            .outputs();
+
+        *func.finish_with_outputs(outputs).unwrap().handle()
+    }
+
+    fn foo_mixed_tuple_ops(module: &mut ModuleBuilder<Hugr>, t_num: usize) -> FuncID<true> {
+        assert_eq!(t_num, 1);
+
+        let tuple_types = vec![qb_t(), usize_t()];
+        let mut func = module
+            .define_function("foo", Signature::new_endo(vec![qb_t()]))
+            .unwrap();
+        func.set_unitary();
+        let qubit = func.input_wires().next().unwrap();
+        let one = func.add_load_value(ConstUsize::new(1));
+
+        let tuple = func
+            .add_dataflow_op(MakeTuple::new(tuple_types.clone().into()), [qubit, one])
+            .unwrap()
+            .out_wire(0);
+        let qubit = func
+            .add_dataflow_op(UnpackTuple::new(tuple_types.into()), [tuple])
+            .unwrap()
+            .out_wire(0);
+
+        *func.finish_with_outputs([qubit]).unwrap().handle()
+    }
     fn foo_non_quantum_array_ops(module: &mut ModuleBuilder<Hugr>, t_num: usize) -> FuncID<true> {
         assert_eq!(t_num, 1);
 
@@ -2955,6 +3001,9 @@ mod test {
     #[case::safe_array_ops_dagger(4, 3, foo_safe_array_ops, true)]
     #[case::nested_safe_array_ops(5, 4, foo_nested_quantum_array_ops, false)]
     #[case::nested_safe_array_ops_dagger(5, 4, foo_nested_quantum_array_ops, true)]
+    #[case::tuple_ops(2, 1, foo_tuple_ops, false)]
+    #[case::tuple_ops_dagger(2, 1, foo_tuple_ops, true)]
+    #[case::mixed_tuple_ops(1, 1, foo_mixed_tuple_ops, false)]
 
     fn test_dfg_modify(
         #[case] t_num: usize,
@@ -2982,13 +3031,16 @@ mod test {
     }
 
     #[rstest::rstest]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case::cfg_branching(
         1,
         1,
         foo_cfg_branching,
         "CFG with more than one node cannot be daggered."
     )]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case::cfg_loop(1, 1, foo_cfg_loop, "CFG with more than one node cannot be daggered.")]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case::tail_loop(1, 1, foo_tail_loop, "TailLoop cannot be daggered.")]
     #[case::cfg_two_blocks_dagger(
         1,
@@ -3005,6 +3057,18 @@ mod test {
     ) {
         let (mut h, _) = modifier_test_hugr(t_num, c_num, foo, true);
         assert_matches!(assert_unresolvable_message(&mut h, expected), Ok(()));
+    }
+
+    #[test]
+    fn test_dagger_rejects_mixed_quantum_classical_tuple() {
+        let (mut h, _) = modifier_test_hugr(1, 1, foo_mixed_tuple_ops, true);
+        assert_matches!(
+            assert_unresolvable_message(
+                &mut h,
+                "tuple mixing quantum and classical elements cannot be daggered."
+            ),
+            Ok(())
+        );
     }
 
     #[test]
@@ -3523,6 +3587,7 @@ mod test {
     #[case::qubit_array(PolymorphicArrayElement::Qubit)]
     #[case::usize_array(PolymorphicArrayElement::Usize)]
     /// Test that an indirect call to a polymorphic function is resolved correctly when the function is inside a modified block.
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_control_polymorphic_array_input_nested_dfg_call(
         #[case] element: PolymorphicArrayElement,
     ) {
@@ -3533,6 +3598,7 @@ mod test {
 
     #[rstest::rstest]
     #[case::qubit_array(PolymorphicArrayElement::Qubit)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case::usize_array(PolymorphicArrayElement::Usize)]
     /// Test that a direct call to a polymorphic function is resolved correctly when the function is inside a modified block.
     fn test_control_polymorphic_array_input_nested_dfg_direct_call(
@@ -3547,6 +3613,7 @@ mod test {
     #[case::qubit_array(PolymorphicArrayElement::Qubit)]
     #[case::usize_array(PolymorphicArrayElement::Usize)]
     /// Test that two nested generic functions are resolved correctly when the functions are inside a modified block.
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_control_polymorphic_array_input_two_nested_generic_functions(
         #[case] element: PolymorphicArrayElement,
     ) {

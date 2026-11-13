@@ -25,7 +25,7 @@ pub struct Normalize {
     resolve_modifiers: bool,
     /// Whether to simplify CFG control flow.
     simplify_cfgs: bool,
-    /// Whether to remove tuple/untuple operations.
+    /// Whether to remove redundant tuple pack/unpack operations in either order.
     untuple: bool,
     /// Whether to constant fold the program.
     constant_fold: bool,
@@ -57,7 +57,7 @@ impl Normalize {
         self.simplify_cfgs = simplify_cfgs;
         self
     }
-    /// Set whether to remove tuple/untuple operations.
+    /// Set whether to remove redundant tuple pack/unpack operations in either order.
     pub fn remove_tuple_untuple(&mut self, untuple: bool) -> &mut Self {
         self.untuple = untuple;
         self

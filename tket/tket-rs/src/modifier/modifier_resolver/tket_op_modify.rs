@@ -523,8 +523,8 @@ impl<N: HugrNode> ModifierResolver<N> {
                 let pv_x1_state_out = Self::state_order_output(&pv_x1)?;
                 connect(new_fn, &c.into(), &pv_x1.incoming[gate_control])?;
                 let c = pv_x1.outgoing[gate_control].try_into().unwrap();
-                for i in 0..gate_control {
-                    incoming.insert(i, pv_x1.incoming[i]);
+                for (i, &port) in pv_x1.incoming[..gate_control].iter().enumerate() {
+                    incoming.insert(i, port);
                 }
 
                 // CVdg(c,t)
@@ -553,16 +553,17 @@ impl<N: HugrNode> ModifierResolver<N> {
 
                 // CnV(cs,t)
                 // self.control_num() = control + gate_control - 1;
-                for i in 0..gate_control {
-                    self.push_control(pv_x2.outgoing[i].try_into().unwrap());
+                for &port in &pv_x2.outgoing[..gate_control] {
+                    self.push_control(port.try_into().unwrap());
                 }
                 let pv_cnrx = self.with_ancilla(&mut c, ancilla, |this, ancilla| {
                     this.modify_tket_op(op_node, V, new_fn, ancilla)
                 })?;
                 let pv_cnrx_state_in = Self::state_order_input(&pv_cnrx)?;
                 let pv_cnrx_state_out = Self::state_order_output(&pv_cnrx)?;
+                // Restore native controls in their original argument order.
                 for _ in 0..gate_control {
-                    outgoing.push(self.pop_control().unwrap().into());
+                    outgoing.insert(0, self.pop_control().unwrap().into());
                 }
                 connect(new_fn, &targ.into(), &pv_cnrx.incoming[0])?;
                 // connect(new_fn, &half_pos.into(), &pv_cnrx.incoming[1])?;
@@ -779,6 +780,57 @@ mod test {
     }
 
     #[rstest::rstest]
+    #[case(0, false, false)]
+    #[case(2, false, false)]
+    #[case(2, true, false)]
+    #[case(2, false, true)]
+    fn controlled_toffoli_preserves_qubit_identity(
+        #[case] controls: usize,
+        #[case] dagger: bool,
+        #[case] use_ancilla: bool,
+    ) {
+        let mut module = ModuleBuilder::new();
+        let mut func = module
+            .define_function("test", Signature::new_endo(vec![qb_t(); controls + 1]))
+            .unwrap();
+        let inputs = func.input_wires().collect::<Vec<_>>();
+        let op_node = func.add_child_node(TketOp::Toffoli);
+        let mut resolver = ModifierResolver::new();
+        resolver.modifiers.control = controls;
+        resolver.modifiers.dagger = dagger;
+        resolver.controls = inputs[..controls].to_vec();
+        let mut ancilla = if use_ancilla {
+            vec![inputs[controls]]
+        } else {
+            vec![]
+        };
+        let pv = resolver
+            .modify_tket_op(op_node, TketOp::Toffoli, &mut func, &mut ancilla)
+            .unwrap();
+
+        // Every emitted gate preserves the identity of its qubit ports. Follow
+        // each output through gates and wires back to the corresponding input.
+        // This catches a permutation even when HUGR validation succeeds.
+        let h = func.hugr();
+        let mut input_indices = Vec::new();
+        for output in &pv.outgoing[..3] {
+            let mut port = output.reverse();
+            for _ in 0..h.num_nodes() {
+                if let Some(index) = pv.incoming[..3].iter().position(|p| *p == port) {
+                    input_indices.push(index);
+                    break;
+                }
+                let (node, linked) = h
+                    .linked_ports(port.0, port.1)
+                    .exactly_one()
+                    .unwrap_or_else(|_| panic!("qubit path should have exactly one connection"));
+                port = DirWire::new(node, linked).reverse();
+            }
+        }
+        assert_eq!(input_indices, vec![0, 1, 2]);
+    }
+
+    #[rstest::rstest]
     #[case(0, true)]
     #[case(1, false)]
     #[case(3, false)]
@@ -906,6 +958,7 @@ mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_modify_complex() {
         let mut module = ModuleBuilder::new();
         let foo_sig = Signature::new(

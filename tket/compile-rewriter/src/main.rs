@@ -1,3 +1,5 @@
+//! Precompile equivalence classes into a binary rewriter.
+
 use std::fs;
 use std::path::Path;
 use std::process::exit;

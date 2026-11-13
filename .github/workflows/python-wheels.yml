@@ -95,7 +95,7 @@ jobs:
             manylinux: manylinux_2_28
             test-wheels: true
           # ---------------- Mac
-          - runner: macos-14
+          - runner: macos-15
             target: aarch64-apple-darwin
             macos-compatibility: "11.0"
             test-wheels: true
