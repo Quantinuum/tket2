@@ -1,6 +1,39 @@
 # Changelog
 
 
+## [0.23.0](https://github.com/Quantinuum/tket2/compare/tket-v0.22.1...tket-v0.23.0) - 2026-11-12
+
+This release improves tuple normalization, modifier resolution, and constant-folding
+performance. It updates to HUGR 0.31.0 and removes deprecated circuit and modifier
+APIs. Encoded circuit iterators and indexing now use segment identifiers, and
+legacy pytket phase metadata is no longer read.
+
+### Bug Fixes
+
+- Preserve qubit order when expanding controlled Toffoli ([#2123](https://github.com/Quantinuum/tket2/pull/2123))
+- Handle `UnpackTuple` and `MakeTuple` during modifier resolution ([#2127](https://github.com/Quantinuum/tket2/pull/2127))
+- Reconnect non-local edges when applying pytket passes to HUGRs ([#2131](https://github.com/Quantinuum/tket2/pull/2131))
+- Preserve global phases during modifier resolution ([#2138](https://github.com/Quantinuum/tket2/pull/2138))
+- Avoid panics from deleted blocks in `NormalizeCFGPass` after merging basic blocks ([#2151](https://github.com/Quantinuum/tket2/pull/2151))
+
+### New Features
+
+- Remove redundant `UnpackTuple`/`MakeTuple` pairs in `UntuplePass` and `Normalize` ([#2147](https://github.com/Quantinuum/tket2/pull/2147))
+- Add `ReplaceTypes::set_replace_type_with_options` to insert replacement types without recursively transforming them ([#2074](https://github.com/Quantinuum/tket2/pull/2074))
+- [**breaking**] Update `hugr` dependency to 0.31.0 ([#2156](https://github.com/Quantinuum/tket2/pull/2156))
+- [**breaking**] Return `EncodedCircuitId`s from `EncodedCircuit` iterators and remove indexing by `Node` ([#2157](https://github.com/Quantinuum/tket2/pull/2157))
+
+### Performance
+
+- Reduce repeated dataflow analysis scans during constant folding ([#2150](https://github.com/Quantinuum/tket2/pull/2150))
+
+### Refactor
+
+- [**breaking**] Remove `resolve_modifier_with_entrypoints` and `resolve_modifier_with_entrypoints_and_scope`. Use `resolve_modifier` with a `PassScope` instead ([#2159](https://github.com/Quantinuum/tket2/pull/2159))
+- [**breaking**] Remove deprecated `ModifierError` and `ModifierResolverErrors::ModifierError`. ([#2159](https://github.com/Quantinuum/tket2/pull/2159))
+- [**breaking**] Remove `Circuit::extract_dfg`. Use `Circuit::to_owned` instead ([#2160](https://github.com/Quantinuum/tket2/pull/2160))
+- [**breaking**] Remove `PytketPhaseExpr` and support for the legacy `TKET1.phase` metadata ([#2158](https://github.com/Quantinuum/tket2/pull/2158))
+
 ## [0.22.1](https://github.com/Quantinuum/tket2/compare/tket-v0.22.0...tket-v0.22.1) - 2026-10-28
 
 ### Bug Fixes

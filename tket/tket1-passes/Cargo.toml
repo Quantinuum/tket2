@@ -29,7 +29,7 @@ rayon.workspace = true
 
 # Used for integration tests
 hugr = { workspace = true }
-tket = { path = "../tket-rs", version = "0.22.1" }
+tket = { path = "../tket-rs", version = "0.23.0" }
 
 [lints]
 workspace = true
