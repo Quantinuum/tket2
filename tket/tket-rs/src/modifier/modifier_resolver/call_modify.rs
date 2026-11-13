@@ -680,6 +680,112 @@ mod tests {
     }
 
     #[rstest::rstest]
+    #[case::apply_modification(false)]
+    #[case::modify_indirect_call(true)]
+    /// Test that powering twice a function shares the modified implementation
+    /// NOTE: The test hugr is impossible to be obtained from Guppy
+    fn power_call_sites_share_modified_implementation(#[case] rebuilt: bool) {
+        let build_function = |module: &mut ModuleBuilder<Hugr>, _| {
+            let signature = Signature::new_endo([qb_t()]);
+            let target = {
+                let mut f = module
+                    .define_function("power_target", signature.clone())
+                    .unwrap();
+                f.set_unitary();
+                let [q] = f.input_wires_arr();
+                let q = f.add_dataflow_op(TketOp::X, [q]).unwrap().out_wire(0);
+                f.finish_with_outputs([q]).unwrap()
+            };
+            let mut f = module
+                .define_function("two_power_calls", Signature::new_endo([qb_t(), qb_t()]))
+                .unwrap();
+            f.set_unitary();
+            let inputs = f.input_wires().collect_vec();
+            let power = MODIFIER_EXTENSION
+                .instantiate_extension_op(
+                    &POWER_OP_ID,
+                    [Term::new_list([qb_t()]), Term::new_list(Vec::<Type>::new())],
+                )
+                .unwrap();
+            let mut outputs = Vec::new();
+            for (q, exponent) in inputs.into_iter().zip([2, 3]) {
+                let loaded = f.load_func(target.handle(), &[]).unwrap();
+                let exponent = f.add_load_value(ConstInt::new_s(6, exponent).unwrap());
+                let powered = f
+                    .add_dataflow_op(power.clone(), [loaded, exponent])
+                    .unwrap();
+                let call = f
+                    .add_dataflow_op(
+                        CallIndirect {
+                            signature: signature.clone(),
+                        },
+                        [powered.out_wire(0), q],
+                    )
+                    .unwrap();
+                outputs.push(call.out_wire(0));
+            }
+            *f.finish_with_outputs(outputs).unwrap().handle()
+        };
+        let mut h = if rebuilt {
+            let (mut h, _) = modifier_test_hugr(2, 1, build_function, false);
+            let main = dfg_modify::find_module_func_by_name(&h, "main").unwrap();
+            h.set_entrypoint(main);
+            h
+        } else {
+            let mut module = ModuleBuilder::new();
+            let f = build_function(&mut module, 2);
+            let mut h = module.finish_hugr().unwrap();
+            h.set_entrypoint(f.node());
+            h
+        };
+
+        test_resolve(&mut h);
+
+        let (owner_name, implementation_name) = if rebuilt {
+            (
+                "__modified__two_power_calls[C1]",
+                "__modified__power_target[C1P1]",
+            )
+        } else {
+            ("two_power_calls", "__modified__power_target[P1]")
+        };
+        let owner = dfg_modify::find_module_func_by_name(&h, owner_name).unwrap();
+        let implementation = dfg_modify::find_module_func_by_name(&h, implementation_name).unwrap();
+        let calls = h
+            .children(owner)
+            .filter(|&node| matches!(h.get_optype(node), OpType::CallIndirect(_)))
+            .collect_vec();
+        assert_eq!(calls.len(), 2);
+        let [input, _] = h.get_io(owner).unwrap();
+        let control_offset = usize::from(rebuilt);
+        for call in calls {
+            let loader = h.single_linked_output(call, 0).unwrap().0;
+            // Separate power nodes must reuse the same lowered function definition.
+            assert_eq!(h.static_source(loader), Some(implementation));
+
+            let (source, target_port) = h.single_linked_output(call, 1 + control_offset).unwrap();
+            assert_eq!(source, input);
+            let target_index = target_port.index() - control_offset;
+            let exponent_port = h
+                .get_optype(call)
+                .as_call_indirect()
+                .unwrap()
+                .signature
+                .input_count();
+            let (exponent_load, _) = h.single_linked_output(call, exponent_port).unwrap();
+            let constant = h.static_source(exponent_load).unwrap();
+            let exponent = h
+                .get_optype(constant)
+                .as_const()
+                .unwrap()
+                .get_custom_value::<ConstInt>()
+                .unwrap();
+            // Sharing the wrapper must preserve each call's own runtime exponent argument.
+            assert_eq!(exponent.value_s(), target_index as i64 + 2);
+        }
+    }
+
+    #[rstest::rstest]
     #[case::incoming(true)]
     #[case::outgoing(false)]
     #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]

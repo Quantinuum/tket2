@@ -124,7 +124,7 @@ pub mod dfg_modify;
 pub mod global_phase_modify;
 pub mod tket_op_modify;
 
-use super::CombinedModifier;
+use super::{CombinedModifier, ModifierCacheKey};
 use crate::passes::{InScope, PassScope, utils::unpack_container::TypeUnpacker};
 use crate::{TketOp, extension::global_phase::GlobalPhase, modifier::Modifier};
 use hugr::{
@@ -343,12 +343,12 @@ pub struct ModifierResolver<N: HugrNode = Node> {
     /// Original functions for which the resolver generated modified replacements.
     modified_functions: HashSet<N>,
     /// Reserved or completed implementations keyed by original function and the
-    /// full modifier, including the control-array layout.
+    /// control-array layout, dagger flag, and exponent count.
     /// Entries are inserted before transforming bodies so recursive calls can
     /// reference the function currently being generated.
-    modified_impls: HashMap<(N, CombinedModifier<N>), N>,
+    modified_impls: HashMap<(N, ModifierCacheKey), N>,
     /// Cached adapters from the resolver's controls-first ABI to custom controls-last functions.
-    custom_adapters: HashMap<(N, N, CombinedModifier<N>), N>,
+    custom_adapters: HashMap<(N, N, ModifierCacheKey), N>,
     /// Custom implementations and retained callees needing body discovery.
     new_callees: Vec<N>,
     /// Analyser used to find qubits in types. Used to check when a type carries quantum data.

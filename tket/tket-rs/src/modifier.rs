@@ -22,7 +22,7 @@ pub mod modifier_resolver;
 pub mod power;
 
 /// An accumulated modifier that combines control, dagger, and power modifiers.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct CombinedModifier<N: HugrNode = Node> {
     // Number of all control qubits
     control: usize,
@@ -35,7 +35,25 @@ struct CombinedModifier<N: HugrNode = Node> {
     exponent_inputs: Vec<(N, IncomingPort)>,
 }
 
+/// Modifier properties that determine a generated implementation's body and signature.
+/// Runtime exponent sources are call-site wiring and do not affect implementation reuse.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct ModifierCacheKey {
+    accum_ctrl: Vec<usize>,
+    dagger: bool,
+    num_exponents: usize,
+}
+
 impl<N: HugrNode> CombinedModifier<N> {
+    /// Return the implementation cache key without call-site exponent sources.
+    fn cache_key(&self) -> ModifierCacheKey {
+        ModifierCacheKey {
+            accum_ctrl: self.accum_ctrl.clone(),
+            dagger: self.dagger,
+            num_exponents: self.num_exponents(),
+        }
+    }
+
     /// Return the number of registered power exponents.
     fn num_exponents(&self) -> usize {
         self.exponent_inputs.len()

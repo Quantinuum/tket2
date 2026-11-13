@@ -474,7 +474,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             return Ok(custom_func);
         }
 
-        let cache_key = (original_func, custom_func, self.modifiers().clone());
+        let cache_key = (original_func, custom_func, self.modifiers().cache_key());
         if let Some(adapter) = self.custom_adapters.get(&cache_key) {
             return Ok(*adapter);
         }
@@ -587,7 +587,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         h: &mut impl HugrMut<Node = N>,
         func: N,
     ) -> Result<N, ModifierResolverErrors<N>> {
-        let cache_key = (func, self.modifiers().clone());
+        let cache_key = (func, self.modifiers().cache_key());
         if let Some(&modified_func) = self.modified_impls.get(&cache_key) {
             return Ok(modified_func);
         }
@@ -1517,20 +1517,26 @@ mod test {
         // Equal total control counts can have different control-array signatures.
         for accum_ctrl in [vec![2], vec![1, 1]] {
             for dagger in [false, true] {
-                resolver.modifiers = CombinedModifier {
-                    control: accum_ctrl.iter().sum(),
-                    accum_ctrl: accum_ctrl.clone(),
-                    dagger,
-                    exponent_inputs: Vec::new(),
-                };
-                let first = resolver
-                    .modify_modifier_block(&mut h, original.node())
-                    .unwrap();
-                let second = resolver
-                    .modify_modifier_block(&mut h, original.node())
-                    .unwrap();
-                assert_eq!(first, second);
-                assert!(implementations.insert(first));
+                for power_count in 0..=2 {
+                    resolver.modifiers = CombinedModifier {
+                        control: accum_ctrl.iter().sum(),
+                        accum_ctrl: accum_ctrl.clone(),
+                        dagger,
+                        // Definition generation uses the number of exponents, not their sources.
+                        exponent_inputs: vec![
+                            (original.node(), IncomingPort::from(1));
+                            power_count
+                        ],
+                    };
+                    let first = resolver
+                        .modify_modifier_block(&mut h, original.node())
+                        .unwrap();
+                    let second = resolver
+                        .modify_modifier_block(&mut h, original.node())
+                        .unwrap();
+                    assert_eq!(first, second);
+                    assert!(implementations.insert(first));
+                }
             }
         }
         h.validate().unwrap();
