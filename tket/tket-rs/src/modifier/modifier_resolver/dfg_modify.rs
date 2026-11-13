@@ -74,6 +74,12 @@ impl<N: HugrNode> ModifierResolver<N> {
         n: N,
         new_dfg: &mut impl Dataflow,
     ) -> Result<(), ModifierResolverErrors<N>> {
+        // Power modifier is consumed "on the spot".
+        // Thus combined modifer should carry exponent in the DFG body.
+        assert!(
+            self.modifiers().exponent_inputs.is_empty(),
+            "Dataflow bodies must not inherit exponents."
+        );
         let mut worklist = VecDeque::new();
         // This block is needed to appease the borrow checker.
         {
