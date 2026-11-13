@@ -610,7 +610,6 @@ mod tests {
             h.set_entrypoint(f.node());
             h
         };
-        let case_name = format!("control_{control}_power_{power}_rebuilt_{rebuilt}");
         test_resolve(&mut h);
 
         let owner_name = if rebuilt {
