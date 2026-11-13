@@ -7,8 +7,8 @@ use std::{
 use hugr::{
     HugrView, IncomingPort, Node, OutgoingPort, PortIndex, Wire,
     builder::{
-        BuildError, ConditionalBuilder, Container, DFGBuilder, Dataflow, FunctionBuilder,
-        SubContainer, TailLoopBuilder,
+        BuildError, ConditionalBuilder, Container, DFGBuilder, Dataflow, DataflowSubContainer,
+        FunctionBuilder, SubContainer, TailLoopBuilder,
     },
     core::HugrNode,
     extension::{prelude::qb_t, simple_op::MakeExtensionOp},
@@ -17,17 +17,24 @@ use hugr::{
         Call, Conditional, DFG, DataflowBlock, DataflowOpTrait, OpType, TailLoop,
         handle::NodeHandle,
     },
-    std_extensions::collections::{
-        array::ArrayOpBuilder,
-        borrow_array::{BArrayOpBuilder, borrow_array_type},
+    std_extensions::{
+        arithmetic::{
+            int_ops::IntOpDef,
+            int_types::{ConstInt, int_type},
+        },
+        collections::{
+            array::ArrayOpBuilder,
+            borrow_array::{BArrayOpBuilder, borrow_array_type},
+        },
     },
+    type_row,
     types::{EdgeKind, FuncTypeBase, PolyFuncType, Signature, TypeRow},
 };
 use petgraph::visit::{Topo, Walker};
 
 use crate::extension::modifier::Modifier;
 
-use super::{DirWire, ModifierResolver, ModifierResolverErrors, PortExt};
+use super::{DirWire, IsPowerLoop, ModifierResolver, ModifierResolverErrors};
 
 use crate::metadata;
 
@@ -67,6 +74,12 @@ impl<N: HugrNode> ModifierResolver<N> {
         n: N,
         new_dfg: &mut impl Dataflow,
     ) -> Result<(), ModifierResolverErrors<N>> {
+        // Power modifier is consumed "on the spot".
+        // Thus combined modifer should carry exponent in the DFG body.
+        assert!(
+            self.modifiers().exponent_inputs.is_empty(),
+            "Dataflow bodies must not inherit exponents."
+        );
         let mut worklist = VecDeque::new();
         // This block is needed to appease the borrow checker.
         {
@@ -127,22 +140,22 @@ impl<N: HugrNode> ModifierResolver<N> {
             OpType::TailLoop(tail_loop) => {
                 let just_input_num = tail_loop.just_inputs.len();
                 let offset = self.control_num();
-                for port in h.node_outputs(old_in) {
-                    let new_port = if port.index() < just_input_num {
-                        port
-                    } else {
-                        port.shift(offset)
-                    };
-                    self.map_insert((old_in, port).into(), DirWire::from((new_in, new_port)))?;
+                // Keep the loop-specific input prefix and branch sum unchanged.
+                for index in 0..just_input_num {
+                    let port = OutgoingPort::from(index);
+                    self.map_insert((old_in, port).into(), (new_in, port).into())?;
                 }
-                for port in h.node_inputs(old_out) {
-                    let new_port = if port.index() == 0 {
-                        port
-                    } else {
-                        port.shift(offset)
-                    };
-                    self.map_insert((old_out, port).into(), DirWire::from((new_out, new_port)))?
-                }
+                self.map_insert(
+                    (old_out, IncomingPort::from(0)).into(),
+                    (new_out, IncomingPort::from(0)).into(),
+                )?;
+                // Only the carried quantum data reverses under dagger.
+                self.wire_inout(
+                    (old_out, old_in),
+                    (new_out, new_in),
+                    (tail_loop.rest.iter(), tail_loop.rest.iter()),
+                    (1, just_input_num, offset),
+                )?;
             }
             OpType::DataflowBlock(dfb) => {
                 let DataflowBlock {
@@ -371,6 +384,10 @@ impl<N: HugrNode> ModifierResolver<N> {
             .unwrap_or_default();
         let requested_control_qubits = self.control_num();
 
+        assert!(
+            self.modifiers().exponent_inputs.is_empty(),
+            "Custom implementations must not inherit power exponents."
+        );
         match (requested_control_qubits, self.modifiers().dagger) {
             (0, true) => {
                 let Some(impl_name) = h
@@ -457,7 +474,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             return Ok(custom_func);
         }
 
-        let cache_key = (original_func, custom_func, self.modifiers().clone());
+        let cache_key = (original_func, custom_func, self.modifiers().cache_key());
         if let Some(adapter) = self.custom_adapters.get(&cache_key) {
             return Ok(*adapter);
         }
@@ -551,18 +568,14 @@ impl<N: HugrNode> ModifierResolver<N> {
         })
     }
 
-    /// Generates a new function modified by the combined modifier.
-    pub(crate) fn modify_fn(
+    /// Rebuilds a modifier block's function with the combined modifiers.
+    /// A Modifier block is a wrapper that contains the computation to be modified,
+    ///  thus it cannot have custom implementations.
+    pub(crate) fn modify_modifier_block(
         &mut self,
         h: &mut impl HugrMut<Node = N>,
         func: N,
     ) -> Result<N, ModifierResolverErrors<N>> {
-        // We first check for custom implementations.
-        if let Some(custom_func) = self.find_custom_implementation(h, func)? {
-            let custom_fn = self.custom_implementation_adapter(h, func, custom_func)?;
-            return Ok(custom_fn);
-        }
-
         self.modify_fn_inner(h, func)
     }
 
@@ -574,7 +587,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         h: &mut impl HugrMut<Node = N>,
         func: N,
     ) -> Result<N, ModifierResolverErrors<N>> {
-        let cache_key = (func, self.modifiers().clone());
+        let cache_key = (func, self.modifiers().cache_key());
         if let Some(&modified_func) = self.modified_impls.get(&cache_key) {
             return Ok(modified_func);
         }
@@ -590,6 +603,10 @@ impl<N: HugrNode> ModifierResolver<N> {
         };
         let mut poly_signature = old_fn_defn.signature().clone();
         self.modify_signature(poly_signature.body_mut(), false);
+
+        // Keep the signature without exponent inputs for the conditional and tail loop.
+        let signature_without_power = poly_signature.body().clone();
+        self.append_power_inputs(poly_signature.body_mut());
 
         let mut new_fn = FunctionBuilder::new(
             "__modified__".to_string()
@@ -610,9 +627,16 @@ impl<N: HugrNode> ModifierResolver<N> {
         );
         self.modified_impls.insert(cache_key, new_function_node);
 
-        let modify_result = self.modify_dfg_body(h, func, &mut new_fn);
-        modify_result?;
-
+        let maybe_exponent_wire = self.multiply_exponent_inputs(&mut new_fn)?;
+        match maybe_exponent_wire {
+            Some(exponent_wire) => {
+                self.build_power_body(h, func, &mut new_fn, signature_without_power, exponent_wire)?
+            }
+            None => {
+                // Power modifier is consumed here. Nested calls need a fresh power environment.
+                self.with_no_power_inputs(|this| this.modify_dfg_body(h, func, &mut new_fn))?;
+            }
+        };
         let call_map = mem::replace(self.call_map(), old_call_map);
 
         // We insert the modified function body into the new_function_node
@@ -637,6 +661,137 @@ impl<N: HugrNode> ModifierResolver<N> {
         self.modified_functions.insert(func);
 
         Ok(new_function_node)
+    }
+
+    /// Builds the power conditional and tail loop, and sets the function outputs.
+    fn build_power_body(
+        &mut self,
+        h: &mut impl HugrMut<Node = N>,
+        func: N,
+        new_fn: &mut impl Dataflow,
+        mut cond_signature: Signature,
+        exponent_wire: Wire,
+    ) -> Result<(), ModifierResolverErrors<N>> {
+        let is_positive = check_positive(new_fn, exponent_wire)?;
+        // PowerModifier's signature places all INOUT values before input-only
+        // parameters. HUGR copyability does not distinguish these groups.
+        let inout_count = cond_signature.output.len();
+        // Pass the function inputs and one combined exponent into the conditional.
+        let function_input_count = cond_signature.input.len();
+        cond_signature.input.to_mut().push(int_type(6));
+        let cond_inputs = cond_signature.input.iter().cloned().zip(
+            new_fn
+                .input_wires()
+                .take(function_input_count)
+                .chain(iter::once(exponent_wire)),
+        );
+        let cond_output_types = cond_signature.output.clone();
+        let mut cond_builder = new_fn
+            .conditional_builder(
+                ([TypeRow::default(), TypeRow::default()], is_positive),
+                cond_inputs,
+                cond_output_types,
+            )
+            .unwrap();
+
+        // Non-positive exponents return the leading INOUT inputs unchanged.
+        let case0_b = cond_builder.case_builder(0).unwrap();
+        let case0_outputs = case0_b.input_wires().take(inout_count);
+        case0_b.finish_with_outputs(case0_outputs)?;
+
+        // Positive exponents run the loop and return its leading INOUT outputs.
+        let mut case1_b = cond_builder.case_builder(1).unwrap();
+        let loop_inputs = cond_signature
+            .input
+            .iter()
+            .cloned()
+            .zip(case1_b.input_wires())
+            .collect::<Vec<_>>();
+        let mut tl_b = case1_b
+            .tail_loop_builder([], loop_inputs, type_row![])
+            .unwrap();
+        let input_wires = tl_b.input_wires().collect::<Vec<_>>();
+        let (should_stop, loop_outputs) =
+            self.build_power_tail_loop(h, func, &mut tl_b, &cond_signature, input_wires)?;
+        let tail_loop = tl_b.finish_with_outputs(should_stop, loop_outputs)?;
+        case1_b
+            .hugr_mut()
+            .set_metadata::<IsPowerLoop>(tail_loop.node(), true);
+        case1_b.finish_with_outputs(tail_loop.outputs().take(inout_count))?;
+
+        let conditional = cond_builder.finish_sub_container()?;
+        new_fn.set_outputs(conditional.outputs())?;
+        Ok(())
+    }
+
+    /// Builds the tail loop for the positive-exponent case.
+    fn build_power_tail_loop(
+        &mut self,
+        h: &mut impl HugrMut<Node = N>,
+        func: N,
+        tl_b: &mut impl Dataflow,
+        loop_signature: &Signature,
+        input_wires: Vec<Wire>,
+    ) -> Result<(Wire, Vec<Wire>), ModifierResolverErrors<N>> {
+        // Decrement the exponent and check if positive
+        let one_wire = tl_b.add_load_value(ConstInt::new_s(6, 1).unwrap());
+        let exponent_input = *input_wires
+            .last()
+            .expect("Tail loop must have an exponent as its last input");
+        let exponent_count = tl_b
+            .add_dataflow_op(IntOpDef::isub.with_log_width(6), [exponent_input, one_wire])
+            .unwrap()
+            .out_wire(0);
+        let should_stop = check_negative(tl_b, exponent_count)?;
+
+        // Insert the loop body (i.e. the modifier block)
+        // The loop body excludes the exponent and returns the INOUT values,
+        // including any whose HUGR types are copyable.
+        let body_input_count = loop_signature.input.len() - 1;
+        let body_signature = Signature::new(
+            loop_signature.input[..body_input_count].to_vec(),
+            loop_signature.output.clone(),
+        );
+        let mut body_b = tl_b.dfg_builder(
+            body_signature,
+            input_wires.iter().copied().take(body_input_count),
+        )?;
+        self.with_no_power_inputs(|this| this.modify_dfg_body(h, func, &mut body_b))?;
+        let body = body_b.finish_sub_container()?;
+
+        // Feed updated INOUT values into the next iteration. The trailing
+        // input-only parameters are reused unchanged, followed by the counter.
+        let loop_outputs = body
+            .outputs()
+            .chain(
+                input_wires
+                    .into_iter()
+                    .take(body_input_count)
+                    .skip(loop_signature.output.len()),
+            )
+            .chain(iter::once(exponent_count))
+            .collect::<Vec<_>>();
+        Ok((should_stop, loop_outputs))
+    }
+
+    /// Multiplies the trailing exponent inputs into a single wire, if present.
+    fn multiply_exponent_inputs(
+        &self,
+        builder: &mut impl Dataflow,
+    ) -> Result<Option<Wire>, BuildError> {
+        let num_exponents = self.modifiers().num_exponents();
+        let mut exponent_inputs = builder
+            .input_wires()
+            .skip(builder.input_wires().count() - num_exponents);
+        let Some(mut exponent_wire) = exponent_inputs.next() else {
+            return Ok(None);
+        };
+        for input in exponent_inputs {
+            exponent_wire = builder
+                .add_dataflow_op(IntOpDef::imul.with_log_width(6), [exponent_wire, input])?
+                .out_wire(0);
+        }
+        Ok(Some(exponent_wire))
     }
 
     /// Inserts a sub DFG into the given parent DFG, updating the call map accordingly.
@@ -777,36 +932,44 @@ impl<N: HugrNode> ModifierResolver<N> {
     pub(super) fn modify_tail_loop(
         &mut self,
         h: &mut impl HugrMut<Node = N>,
-        n: N,
+        tl_node: N,
         tail_loop: &TailLoop,
         new_dfg: &mut impl Container,
     ) -> Result<(), ModifierResolverErrors<N>> {
         let just_input_num = tail_loop.just_inputs.len();
         let just_output_num = tail_loop.just_outputs.len();
+        let is_power_loop = h.get_metadata::<IsPowerLoop>(tl_node) == Some(true);
 
-        if self.modifiers.dagger {
-            let optype = h.get_optype(n);
+        if self.modifiers.dagger && !is_power_loop {
+            let optype = h.get_optype(tl_node);
             return Err(ModifierResolverErrors::unresolvable(
-                n,
+                tl_node,
                 "TailLoop cannot be daggered.".to_string(),
                 optype.clone(),
             ));
         }
 
+        let control_num = self.control_num();
         // Build a new TailLoop with modified body.
-        let control_types: TypeRow = iter::repeat_n(qb_t(), self.control_num())
+        let control_types: TypeRow = iter::repeat_n(qb_t(), control_num)
             .collect::<Vec<_>>()
             .into();
+        let inout_signature = control_types.extend(tail_loop.rest.iter());
+
         let mut builder = TailLoopBuilder::new(
             tail_loop.just_inputs.clone(),
-            control_types.extend(tail_loop.rest.iter()),
+            inout_signature,
             tail_loop.just_outputs.clone(),
         )?;
-        self.modify_dfg_body(h, n, &mut builder)?;
+        self.modify_dfg_body(h, tl_node, &mut builder)?;
         let new_tail_loop = self.insert_sub_dfg(new_dfg, builder)?;
+        if is_power_loop {
+            new_dfg
+                .hugr_mut()
+                .set_metadata::<IsPowerLoop>(new_tail_loop, true);
+        }
 
         // connect the controls and register IOs
-        let offset = self.control_num();
         for (i, ctrl) in self.controls().iter_mut().enumerate() {
             new_dfg.hugr_mut().connect(
                 ctrl.node(),
@@ -816,22 +979,28 @@ impl<N: HugrNode> ModifierResolver<N> {
             );
             *ctrl = Wire::new(new_tail_loop, i + just_output_num);
         }
-        for port in h.node_inputs(n) {
-            let new_port = if port.index() < just_input_num {
-                port
-            } else {
-                port.shift(offset)
-            };
-            self.map_insert((n, port).into(), (new_tail_loop, new_port).into())?;
+        // The just_inputs/just_outputs prefixes keep their original port indices.
+        // Controls are inserted after them; wire_node_inout below maps only rest.
+        for index in 0..just_input_num {
+            let port = IncomingPort::from(index);
+            self.map_insert((tl_node, port).into(), (new_tail_loop, port).into())?;
         }
-        for port in h.node_outputs(n) {
-            let new_port = if port.index() < just_output_num {
-                port
-            } else {
-                port.shift(offset)
-            };
-            self.map_insert((n, port).into(), (new_tail_loop, new_port).into())?
+        for index in 0..just_output_num {
+            let port = OutgoingPort::from(index);
+            self.map_insert((tl_node, port).into(), (new_tail_loop, port).into())?;
         }
+        self.wire_node_inout(
+            tl_node,
+            new_tail_loop,
+            (tail_loop.rest.iter(), tail_loop.rest.iter()),
+            (just_input_num, just_output_num, control_num),
+        )?;
+        self.wire_state_order(
+            tl_node,
+            h.get_optype(tl_node),
+            new_tail_loop,
+            new_dfg.hugr().get_optype(new_tail_loop),
+        )?;
 
         Ok(())
     }
@@ -1012,6 +1181,22 @@ impl<N: HugrNode> ModifierResolver<N> {
     }
 }
 
+/// Checks whether a signed 64-bit exponent is greater than zero.
+fn check_positive(builder: &mut impl Dataflow, exponent: Wire) -> Result<Wire, BuildError> {
+    let zero = builder.add_load_value(ConstInt::new_s(6, 0).unwrap());
+    Ok(builder
+        .add_dataflow_op(IntOpDef::igt_s.with_log_width(6), [exponent, zero])?
+        .out_wire(0))
+}
+
+/// Checks whether a signed 64-bit exponent is less than zero.
+fn check_negative(builder: &mut impl Dataflow, exponent: Wire) -> Result<Wire, BuildError> {
+    let zero = builder.add_load_value(ConstInt::new_s(6, 0).unwrap());
+    Ok(builder
+        .add_dataflow_op(IntOpDef::ile_s.with_log_width(6), [exponent, zero])?
+        .out_wire(0))
+}
+
 /// Signatures and naming information for a validated custom implementation adapter.
 struct CustomAdapterSpec {
     original_signature: PolyFuncType,
@@ -1171,6 +1356,7 @@ mod test {
         type_row,
         types::{PolyFuncType, Signature, Term, Type, TypeArg, TypeBound, type_param::TypeParam},
     };
+    use petgraph::visit::{Topo, Walker};
 
     fn identity_function(
         module: &mut ModuleBuilder<Hugr>,
@@ -1194,6 +1380,7 @@ mod test {
             control: 1,
             accum_ctrl: vec![1],
             dagger: false,
+            exponent_inputs: Vec::new(),
         };
         resolver
     }
@@ -1279,7 +1466,7 @@ mod test {
         }
         let mut h = module.finish_hugr().unwrap();
         let modified = controlled_resolver()
-            .modify_fn(&mut h, recursive.node())
+            .modify_modifier_block(&mut h, recursive.node())
             .unwrap();
         h.validate().unwrap();
 
@@ -1330,15 +1517,26 @@ mod test {
         // Equal total control counts can have different control-array signatures.
         for accum_ctrl in [vec![2], vec![1, 1]] {
             for dagger in [false, true] {
-                resolver.modifiers = CombinedModifier {
-                    control: accum_ctrl.iter().sum(),
-                    accum_ctrl: accum_ctrl.clone(),
-                    dagger,
-                };
-                let first = resolver.modify_fn(&mut h, original.node()).unwrap();
-                let second = resolver.modify_fn(&mut h, original.node()).unwrap();
-                assert_eq!(first, second);
-                assert!(implementations.insert(first));
+                for power_count in 0..=2 {
+                    resolver.modifiers = CombinedModifier {
+                        control: accum_ctrl.iter().sum(),
+                        accum_ctrl: accum_ctrl.clone(),
+                        dagger,
+                        // Definition generation uses the number of exponents, not their sources.
+                        exponent_inputs: vec![
+                            (original.node(), IncomingPort::from(1));
+                            power_count
+                        ],
+                    };
+                    let first = resolver
+                        .modify_modifier_block(&mut h, original.node())
+                        .unwrap();
+                    let second = resolver
+                        .modify_modifier_block(&mut h, original.node())
+                        .unwrap();
+                    assert_eq!(first, second);
+                    assert!(implementations.insert(first));
+                }
             }
         }
         h.validate().unwrap();
@@ -1370,6 +1568,7 @@ mod test {
             control: 1,
             accum_ctrl: vec![1],
             dagger: false,
+            exponent_inputs: Vec::new(),
         };
 
         let first = resolver
@@ -1394,13 +1593,17 @@ mod test {
     }
 
     #[rstest::rstest]
-    #[case::dagger(vec![], true, "__modified__original[D]")]
-    #[case::control(vec![2], false, "__modified__original[C2]")]
-    #[case::control_and_dagger(vec![2], true, "__modified__original[C2D]")]
-    #[case::nested_controls(vec![1, 2], true, "__modified__original[C1.2D]")]
+    #[case::dagger(vec![], true, 0, "__modified__original[D]")]
+    #[case::control(vec![2], false, 0, "__modified__original[C2]")]
+    #[case::control_and_dagger(vec![2], true, 0, "__modified__original[C2D]")]
+    #[case::nested_controls(vec![1, 2], true, 0, "__modified__original[C1.2D]")]
+    #[case::power(vec![], false, 1, "__modified__original[P1]")]
+    #[case::nested_powers(vec![], false, 2, "__modified__original[P2]")]
+    #[case::all_modifiers(vec![1, 2], true, 2, "__modified__original[C1.2DP2]")]
     fn modified_function_name(
         #[case] accum_ctrl: Vec<usize>,
         #[case] dagger: bool,
+        #[case] power_count: usize,
         #[case] expected: &str,
     ) {
         let mut module = ModuleBuilder::new();
@@ -1411,9 +1614,13 @@ mod test {
             control: accum_ctrl.iter().sum(),
             accum_ctrl,
             dagger,
+            // Only the number of exponent inputs is used when modifying the definition.
+            exponent_inputs: vec![(original.node(), IncomingPort::from(1)); power_count],
         };
 
-        let modified = resolver.modify_fn(&mut h, original.node()).unwrap();
+        let modified = resolver
+            .modify_modifier_block(&mut h, original.node())
+            .unwrap();
 
         assert_eq!(
             h.get_optype(modified).as_func_defn().unwrap().func_name(),
@@ -1423,7 +1630,7 @@ mod test {
     }
 
     #[test]
-    fn modify_fn_uses_custom_implementation() {
+    fn classical_function_uses_custom_implementation() {
         let mut module = ModuleBuilder::new();
         let original = identity_function(&mut module, "original", Signature::new_endo([usize_t()]));
         let custom = identity_function(&mut module, "custom", Signature::new_endo([usize_t()]));
@@ -1431,9 +1638,13 @@ mod test {
         h.set_metadata::<metadata::DaggeredImplementation>(original.node(), "custom".to_string());
         let mut resolver = dagger_resolver();
 
-        let modified = resolver.modify_fn(&mut h, original.node()).unwrap();
+        let modified = resolver
+            .modify_fn_if_needed(&mut h, original.node(), None)
+            .unwrap();
 
-        assert_eq!(modified, custom.node());
+        // Custom dispatch must precede the shortcut for signatures without quantum data.
+        assert_eq!(modified, Some(custom.node()));
+        h.validate().unwrap();
     }
 
     /// Resolve a chain of private custom dagger implementations with nested modified calls.
@@ -1451,23 +1662,32 @@ mod test {
                 [Term::new_list([qb_t()]), Term::new_list(Vec::<Type>::new())],
             )
             .unwrap();
-        // main -> dagger(original) selects custom; custom -> dagger(leaf)
-        // selects inner_custom, whose own daggered call must also be resolved.
-        let [
-            (inner_custom, inner_call),
-            (custom, custom_call),
-            (main, main_call),
-        ] = [
+        // Each modifier wraps a block containing a direct call, as emitted by Guppy.
+        // The calls to original and leaf select custom and inner_custom; the daggered
+        // call to terminal inside inner_custom must also be resolved.
+        let [inner_custom, custom, main] = [
             ("inner_custom", terminal),
             ("custom", leaf),
             ("main", original),
         ]
         .map(|(name, callee)| {
+            let block = {
+                let mut block = module
+                    .define_function_vis(
+                        format!("{name}_block"),
+                        signature.clone(),
+                        hugr_core::Visibility::Private,
+                    )
+                    .unwrap();
+                let inputs = block.input_wires();
+                let call = block.call(&callee, &[], inputs).unwrap();
+                block.finish_with_outputs(call.outputs()).unwrap()
+            };
             let mut function = module
                 .define_function_vis(name, signature.clone(), hugr_core::Visibility::Private)
                 .unwrap();
             let [q] = function.input_wires_arr();
-            let loaded = function.load_func(&callee, &[]).unwrap();
+            let loaded = function.load_func(block.handle(), &[]).unwrap();
             let modified = function
                 .add_dataflow_op(dagger.clone(), [loaded])
                 .unwrap()
@@ -1480,10 +1700,7 @@ mod test {
                     [modified, q],
                 )
                 .unwrap();
-            (
-                function.finish_with_outputs(call.outputs()).unwrap().node(),
-                call.node(),
-            )
+            function.finish_with_outputs(call.outputs()).unwrap().node()
         });
         let mut h = module.finish_hugr().unwrap();
         h.set_entrypoint(main);
@@ -1491,15 +1708,34 @@ mod test {
         h.set_metadata::<metadata::DaggeredImplementation>(leaf.node(), "inner_custom".to_string());
         test_resolve(&mut h);
 
-        // The outer call uses the custom implementation, whose nested call is also resolved.
-        let loader = h.single_linked_output(main_call, 0).unwrap().0;
-        assert_eq!(h.static_source(loader), Some(custom));
-        let loader = h.single_linked_output(custom_call, 0).unwrap().0;
-        assert_eq!(h.static_source(loader), Some(inner_custom));
-        let loader = h.single_linked_output(inner_call, 0).unwrap().0;
         let modified_terminal =
             super::find_module_func_by_name(&h, "__modified__terminal[D]").unwrap();
-        assert_eq!(h.static_source(loader), Some(modified_terminal));
+        // Follow each replacement loader to its modified block, then check that the
+        // direct call inside the block selects the expected custom implementation.
+        for (caller, block_name, callee) in [
+            (main, "__modified__main_block[D]", custom),
+            (custom, "__modified__custom_block[D]", inner_custom),
+            (
+                inner_custom,
+                "__modified__inner_custom_block[D]",
+                modified_terminal,
+            ),
+        ] {
+            let call = h
+                .children(caller)
+                .filter(|&node| matches!(h.get_optype(node), OpType::CallIndirect(_)))
+                .exactly_one()
+                .unwrap_or_else(|_| panic!("Expected one resolved indirect call in {caller}"));
+            let loader = h.single_linked_output(call, 0).unwrap().0;
+            let block = super::find_module_func_by_name(&h, block_name).unwrap();
+            assert_eq!(h.static_source(loader), Some(block));
+            let call = h
+                .children(block)
+                .filter(|&node| matches!(h.get_optype(node), OpType::Call(_)))
+                .exactly_one()
+                .unwrap_or_else(|_| panic!("Expected one direct call in {block_name}"));
+            assert_eq!(h.static_source(call), Some(callee));
+        }
     }
 
     /// Retained private callees must be explored even when their calls are copied unchanged.
@@ -1591,7 +1827,7 @@ mod test {
         );
 
         let error = dagger_resolver()
-            .modify_fn(&mut h, original.node())
+            .modify_fn_if_needed(&mut h, original.node(), None)
             .unwrap_err();
 
         assert_matches!(error, ModifierResolverErrors::Unreachable { msg } => {
@@ -1609,7 +1845,7 @@ mod test {
         h.set_metadata::<metadata::DaggeredImplementation>(original.node(), "missing".to_string());
 
         let error = dagger_resolver()
-            .modify_fn(&mut h, original.node())
+            .modify_fn_if_needed(&mut h, original.node(), None)
             .unwrap_err();
 
         assert_matches!(error, ModifierResolverErrors::Unreachable { msg } => {
@@ -1630,7 +1866,7 @@ mod test {
         h.set_metadata::<metadata::DaggeredImplementation>(original.node(), "custom".to_string());
 
         let error = dagger_resolver()
-            .modify_fn(&mut h, original.node())
+            .modify_fn_if_needed(&mut h, original.node(), None)
             .unwrap_err();
 
         assert_matches!(error, ModifierResolverErrors::UnResolvable { node, msg, optype } => {
@@ -1659,7 +1895,7 @@ mod test {
         h.set_metadata::<metadata::NumControlQubits>(custom.node(), 1);
 
         let error = controlled_resolver()
-            .modify_fn(&mut h, original.node())
+            .modify_fn_if_needed(&mut h, original.node(), None)
             .unwrap_err();
 
         assert_matches!(error, ModifierResolverErrors::UnResolvable { node, msg, optype } => {
@@ -1686,7 +1922,7 @@ mod test {
         h.set_metadata::<metadata::NumControlQubits>(custom.node(), 1);
 
         let error = controlled_resolver()
-            .modify_fn(&mut h, original.node())
+            .modify_fn_if_needed(&mut h, original.node(), None)
             .unwrap_err();
 
         assert_matches!(error, ModifierResolverErrors::UnResolvable { node, msg, optype } => {
@@ -1715,7 +1951,7 @@ mod test {
         );
 
         let error = controlled_resolver()
-            .modify_fn(&mut h, original.node())
+            .modify_fn_if_needed(&mut h, original.node(), None)
             .unwrap_err();
 
         assert_matches!(error, ModifierResolverErrors::Unreachable { msg } => {
@@ -1761,6 +1997,97 @@ mod test {
         };
         let outputs = tail_loop.outputs();
         *func.finish_with_outputs(outputs).unwrap().handle()
+    }
+
+    #[rstest::rstest]
+    #[case::dagger(vec![], true)]
+    #[case::control(vec![1], false)]
+    #[case::controlled_dagger(vec![1], true)]
+    #[case::multiple_controls(vec![2], true)]
+    #[case::separate_control_groups(vec![1, 1], true)]
+    fn modify_resolved_power_loop(#[case] accum_ctrl: Vec<usize>, #[case] dagger: bool) {
+        let control_num = accum_ctrl.iter().sum();
+        let mut module = ModuleBuilder::new();
+        let mut func = module
+            .define_function("original", Signature::new([qb_t(), usize_t()], [qb_t()]))
+            .unwrap();
+        let [q, _classical] = func.input_wires_arr();
+        let q = func.add_dataflow_op(TketOp::X, [q]).unwrap().out_wire(0);
+        let q = func.add_dataflow_op(TketOp::S, [q]).unwrap().out_wire(0);
+        let original = func.finish_with_outputs([q]).unwrap();
+        let mut h = module.finish_hugr().unwrap();
+
+        let mut power_resolver = ModifierResolver::new();
+
+        // Test power resolution
+        power_resolver.modifiers.exponent_inputs = vec![(original.node(), IncomingPort::from(0))];
+        let powered = power_resolver
+            .modify_modifier_block(&mut h, original.node())
+            .unwrap();
+        h.validate().unwrap();
+
+        let mut resolver = ModifierResolver::new();
+        resolver.modifiers = CombinedModifier {
+            control: control_num,
+            accum_ctrl,
+            dagger,
+            exponent_inputs: vec![],
+        };
+        // Test power + optional control/dagger
+        let modified = resolver.modify_modifier_block(&mut h, powered).unwrap();
+        h.validate().unwrap();
+
+        let tail_loop = h
+            .descendants(modified)
+            .find(|&node| matches!(h.get_optype(node), OpType::TailLoop(_)))
+            .unwrap();
+
+        let [loop_in, loop_out] = h.get_io(tail_loop).unwrap();
+        // The classical parameter is carried unchanged, after the controls and target.
+        assert_eq!(
+            h.single_linked_output(loop_out, control_num + 2),
+            Some((loop_in, OutgoingPort::from(control_num + 1))),
+        );
+        let (decrement, _) = h.single_linked_output(loop_out, control_num + 3).unwrap();
+        // The subtraction must consume the current exponent counter, not the input.
+        assert_eq!(
+            h.single_linked_output(decrement, 0),
+            Some((loop_in, OutgoingPort::from(control_num + 2))),
+        );
+
+        // Read gates in execution order; child insertion order can differ after daggering.
+        let body = h
+            .children(tail_loop)
+            .find(|&node| matches!(h.get_optype(node), OpType::DFG(_)))
+            .unwrap();
+        let graph = h.scheduling_graph(body);
+        // Compare quantum gates, skipping I/O nodes and classical angle calculations.
+        let gates = Topo::new(graph.petgraph())
+            .iter(graph.petgraph())
+            .filter_map(|node| TketOp::from_optype(h.get_optype(graph.pg_to_node(node))))
+            .collect::<Vec<_>>();
+        use TketOp::{CRz, CX, Rz, Sdg, Toffoli, X};
+        let expected = match (control_num, dagger) {
+            // Dagger reverses X; S into Sdg; X.
+            (0, true) => vec![Sdg, X],
+            // Controlled S expands into CRz on the target and Rz on the control.
+            (1, false) => vec![CX, CRz, Rz],
+            // Sdg uses the same decomposition with negated angles, followed by CX.
+            (1, true) => vec![CRz, Rz, CX],
+            // With two controls, Sdg expands into Rz; Toffoli; Rz; Toffoli; Rz,
+            // plus a CRz phase correction. The final Toffoli is the controlled X.
+            (2, true) => vec![Rz, Toffoli, Rz, Toffoli, Rz, CRz, Toffoli],
+            _ => unreachable!(),
+        };
+        assert_eq!(gates, expected);
+
+        // The rebuilt loop must retain its power-loop marker.
+        assert_eq!(h.get_metadata::<IsPowerLoop>(tail_loop), Some(true));
+        // The preserved marker must allow another dagger of the rebuilt loop.
+        dagger_resolver()
+            .modify_modifier_block(&mut h, modified)
+            .unwrap();
+        h.validate().unwrap();
     }
 
     fn foo_conditional(module: &mut ModuleBuilder<Hugr>, t_num: usize) -> FuncID<true> {

@@ -1,7 +1,7 @@
 # Modifier examples
 
 This directory contains test guppy programs with modifier
-operations (`dagger` and `control`). The examples are used for regression
+operations (`dagger`, `control`, and `power`). The examples are used for regression
 testing of modifier compilation in tket2.
 
 Each example is defined as a `.py` [uv script](https://docs.astral.sh/uv/guides/scripts/)

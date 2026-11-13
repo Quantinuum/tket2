@@ -1,7 +1,7 @@
 //! Modify nodes related to function calls.
 
 use hugr::{
-    HugrView, IncomingPort, Wire,
+    HugrView, IncomingPort, Node, Wire,
     builder::{BuildError, Dataflow},
     core::HugrNode,
     extension::simple_op::MakeExtensionOp,
@@ -105,11 +105,12 @@ impl<N: HugrNode> ModifierResolver<N> {
                 panic!("Expected FuncDefn or FuncDecl, found {fn_optype:?}");
             }
         }
-
-        let modified_fn = self.modify_fn(h, func_node)?;
+        // Only a modifier block can be modified through a indirect call
+        let modified_fn = self.modify_modifier_block(h, func_node)?;
         // Give the replacement loader the modified function's signature
         let mut modified_sig = load_op.func_sig;
         self.modify_signature(modified_sig.body_mut(), false);
+        self.append_power_inputs(modified_sig.body_mut());
         let new_load =
             LoadFunction::try_new(modified_sig, load_op.type_args).map_err(BuildError::from)?;
 
@@ -126,15 +127,12 @@ impl<N: HugrNode> ModifierResolver<N> {
         h: &impl HugrMut<Node = N>,
         ind_call_node: N,
     ) -> Result<Vec<N>, ModifierResolverErrors<N>> {
-        let optype = h.get_optype(ind_call_node);
-        // First node must be a CallIndirect node
-        assert!(
-            matches!(optype, OpType::CallIndirect(_)),
-            "Expected CallIndirect, found {optype:?}"
-        );
-
         // Collection of modifiers to apply.
         let modifiers = self.modifiers_mut();
+        assert!(
+            modifiers.exponent_inputs.is_empty(),
+            "Nested functions do not inherit exponents."
+        );
         let (mut current, _) = h.single_linked_output(ind_call_node, 0).unwrap();
         let mut chain: Vec<N> = Vec::new();
 
@@ -188,13 +186,29 @@ impl<N: HugrNode> ModifierResolver<N> {
             }
 
             chain.push(current);
-            modifiers.push(optype.as_extension_op().unwrap(), current)?;
+            modifiers.push(optype.as_extension_op().unwrap(), current);
             let (new, _) = h
                 .single_linked_output(current, 0)
                 .expect("Expected exactly one output connected to input port 0 of a modifier node");
             current = new;
         }
         Ok(chain)
+    }
+
+    /// Map power modifiers' exponent inputs to the replacement call's runtime inputs.
+    fn wire_exponents(
+        &mut self,
+        exponent_inputs: &[(N, IncomingPort)],
+        new_call_node: Node,
+        exponent_port: usize,
+    ) -> Result<(), ModifierResolverErrors<N>> {
+        for (i, &input) in exponent_inputs.iter().enumerate() {
+            self.map_insert(
+                input.into(),
+                (new_call_node, IncomingPort::from(exponent_port + i)).into(),
+            )?;
+        }
+        Ok(())
     }
 
     pub(super) fn modify_indirect_call(
@@ -213,15 +227,27 @@ impl<N: HugrNode> ModifierResolver<N> {
             return Ok(());
         }
 
+        // The indirect call already have the control arrays required by its direct modifiers.
+        // Thus, we add controls from external modifiers before tracing the loader.
+        let mut new_ind_call = indir_call.clone();
+        self.modify_signature(&mut new_ind_call.signature, false);
+
         // Modify the function loaded by the indirect call preserving the modifier state.
-        let (load_node, modified_fn, new_load_op) =
+        let (load_node, modified_fn, new_load_op, exponent_inputs) =
             self.with_modifiers(self.modifiers().clone(), |this| {
                 // Follow the function operand through its modifiers to the loader.
                 let trace = this.trace_indirect_call_to_load(h, ind_call_node)?;
                 let load_node = *trace.last().unwrap();
                 // Apply the combined modifiers and build the replacement loader.
                 let (modified_fn, new_load_op) = this.modify_load(h, load_node)?;
-                Ok::<_, ModifierResolverErrors<N>>((load_node, modified_fn, new_load_op))
+                let exponent_inputs = this.modifiers().exponent_inputs.clone();
+                this.append_power_inputs(&mut new_ind_call.signature);
+                Ok::<_, ModifierResolverErrors<N>>((
+                    load_node,
+                    modified_fn,
+                    new_load_op,
+                    exponent_inputs,
+                ))
             })?;
 
         // Insert the modified loader into the new graph.
@@ -234,9 +260,8 @@ impl<N: HugrNode> ModifierResolver<N> {
             new_dfg.hugr().get_optype(new_load_node),
         )?;
 
-        // Construct the replacement IndirectCall with additional control-array inputs and outputs.
-        let mut new_ind_call = indir_call.clone();
-        self.modify_signature(&mut new_ind_call.signature, false);
+        let exponent_count = exponent_inputs.len();
+        let exponent_port = new_ind_call.signature.input_count() + 1 - exponent_count;
         let new_call_node = new_dfg.add_child_node(new_ind_call);
 
         // Pack the current control qubits into the arrays expected by the call.
@@ -249,6 +274,8 @@ impl<N: HugrNode> ModifierResolver<N> {
             *ctrl = Wire::new(new_call_node, i);
         }
         *self.controls() = self.unpack_controls(new_dfg, controls)?;
+
+        self.wire_exponents(&exponent_inputs, new_call_node, exponent_port)?;
 
         // Map the original arguments and results
         let signature = indir_call.signature();
@@ -316,7 +343,9 @@ mod tests {
     };
     use super::super::*;
     use crate::TketOp;
-    use crate::extension::modifier::{CONTROL_OP_ID, DAGGER_OP_ID, MODIFIER_EXTENSION};
+    use crate::extension::modifier::{
+        CONTROL_OP_ID, DAGGER_OP_ID, MODIFIER_EXTENSION, POWER_OP_ID,
+    };
     use hugr::{
         Hugr,
         builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
@@ -327,7 +356,7 @@ mod tests {
         },
         std_extensions::arithmetic::{
             int_ops::IntOpDef,
-            int_types::{ConstInt, INT_TYPES},
+            int_types::{ConstInt, INT_TYPES, int_type},
         },
         std_extensions::collections::array::{ArrayOpBuilder, array_type},
         types::{Signature, Term, Type},
@@ -442,7 +471,6 @@ mod tests {
             h.set_entrypoint(f.node());
             h
         };
-        h.validate().unwrap();
         test_resolve(&mut h);
         let name = if rebuilt {
             "__modified__ordered_loader[C1]"
@@ -477,7 +505,284 @@ mod tests {
             assert_eq!(predecessors, HashSet::from([markers[0], markers[1]]));
             assert_eq!(successors, HashSet::from([markers[2], markers[3]]));
         }
-        h.validate().unwrap();
+    }
+
+    #[rstest::rstest]
+    #[case::control(true, false)]
+    #[case::power(false, true)]
+    #[case::control_power(true, true)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
+    fn modified_call_preserves_order_edges(
+        #[case] control: bool,
+        #[case] power: bool,
+        // false = apply_modification; true = modify_indirect_call in a rebuilt body.
+        #[values(false, true)] rebuilt: bool,
+    ) {
+        let build_function = |module: &mut ModuleBuilder<Hugr>, _| {
+            let signature = Signature::new_endo([qb_t()]);
+            let identity = {
+                let mut f = module
+                    .define_function("identity", signature.clone())
+                    .unwrap();
+                f.set_unitary();
+                let outputs = f.input_wires();
+                f.finish_with_outputs(outputs).unwrap()
+            };
+            let mut f = module
+                .define_function(
+                    "ordered_call",
+                    Signature::new_endo(vec![qb_t(); 1 + usize::from(control)]),
+                )
+                .unwrap();
+            f.set_unitary();
+            let mut inputs = f.input_wires();
+            let control_wire = control.then(|| inputs.next().unwrap());
+            let q = inputs.next().unwrap();
+            // Tags stand for the surrounding before, other, and external operations.
+            let [before, other, external] = std::array::from_fn(|tag| {
+                f.add_child_node(hugr::ops::Tag::new(tag, vec![Default::default(); 37]))
+            });
+            let loaded = f.load_func(identity.handle(), &[]).unwrap();
+            let mut modified = loaded;
+            if power {
+                let exponent = f.add_load_value(ConstInt::new_s(6, 3).unwrap());
+                let modifier = MODIFIER_EXTENSION
+                    .instantiate_extension_op(
+                        &POWER_OP_ID,
+                        [Term::new_list([qb_t()]), Term::new_list(Vec::<Type>::new())],
+                    )
+                    .unwrap();
+                modified = f
+                    .add_dataflow_op(modifier, [modified, exponent])
+                    .unwrap()
+                    .out_wire(0);
+            }
+            let controls = control_wire.map(|control| {
+                let modifier = MODIFIER_EXTENSION
+                    .instantiate_extension_op(
+                        &CONTROL_OP_ID,
+                        [Term::BoundedNat(1), [qb_t().into()].into(), [].into()],
+                    )
+                    .unwrap();
+                modified = f.add_dataflow_op(modifier, [modified]).unwrap().out_wire(0);
+                f.add_new_array(qb_t(), [control]).unwrap()
+            });
+            let signature = Signature::new_endo(
+                control
+                    .then(|| array_type(1, qb_t()))
+                    .into_iter()
+                    .chain([qb_t()])
+                    .collect_vec(),
+            );
+            let call = f
+                .add_dataflow_op(
+                    CallIndirect { signature },
+                    [modified].into_iter().chain(controls).chain([q]),
+                )
+                .unwrap();
+            // before -> loader -> call -> external, with loader -> other -> call.
+            for (source, target) in [
+                (before, loaded.node()),
+                (loaded.node(), call.node()),
+                (loaded.node(), other),
+                (other, call.node()),
+                (call.node(), external),
+            ] {
+                connect_order(f.hugr_mut(), source, target);
+            }
+            let mut outputs = call.outputs().collect_vec();
+            if control {
+                outputs[0] = f.add_array_unpack(qb_t(), 1, outputs[0]).unwrap()[0];
+            }
+            *f.finish_with_outputs(outputs).unwrap().handle()
+        };
+        let mut h = if rebuilt {
+            // Resolve the outer control first, rebuilding the modified call through
+            // modify_indirect_call rather than resolving it in place.
+            let (mut h, _) = modifier_test_hugr(1 + usize::from(control), 1, build_function, false);
+            let main = dfg_modify::find_module_func_by_name(&h, "main").unwrap();
+            h.set_entrypoint(main);
+            h
+        } else {
+            let mut module = ModuleBuilder::new();
+            let f = build_function(&mut module, 1);
+            let mut h = module.finish_hugr().unwrap();
+            h.set_entrypoint(f.node());
+            h
+        };
+        test_resolve(&mut h);
+
+        let owner_name = if rebuilt {
+            "__modified__ordered_call[C1]"
+        } else {
+            "ordered_call"
+        };
+        let control_suffix = match (rebuilt, control) {
+            (true, true) => "C1.1",
+            (false, false) => "",
+            _ => "C1",
+        };
+        let power_suffix = if power { "P1" } else { "" };
+        let modified_name = format!("__modified__identity[{control_suffix}{power_suffix}]");
+        let owner = dfg_modify::find_module_func_by_name(&h, owner_name).unwrap();
+        let [before, other, external] = std::array::from_fn(|tag| {
+            h.children(owner)
+                .find(|&n| matches!(h.get_optype(n), OpType::Tag(t) if t.variants.len() == 37 && t.tag == tag))
+                .unwrap()
+        });
+        let call = h
+            .children(owner)
+            .filter(|&n| matches!(h.get_optype(n), OpType::CallIndirect(_)))
+            .exactly_one()
+            .unwrap_or_else(|_| panic!("Expected exactly one indirect call"));
+        let loader = h.single_linked_output(call, 0).unwrap().0;
+        let modified = dfg_modify::find_module_func_by_name(&h, &modified_name).unwrap();
+        // Check the loader actually used by the call points to the expected combined implementation.
+        assert_eq!(h.static_source(loader), Some(modified));
+        let expected_outputs = iter::repeat_n(
+            array_type(1, qb_t()),
+            usize::from(rebuilt) + usize::from(control),
+        )
+        .chain([qb_t()])
+        .collect_vec();
+        let expected_inputs = expected_outputs
+            .iter()
+            .cloned()
+            .chain(power.then(|| int_type(6)))
+            .collect_vec();
+        // Controls precede the original inputs, while exponents follow them and shift the order input.
+        assert_eq!(
+            h.get_optype(call).as_call_indirect().unwrap().signature,
+            Signature::new(expected_inputs, expected_outputs)
+        );
+
+        let order_edges = h
+            .children(owner)
+            .filter(|&source| h.get_optype(source).other_output() == Some(EdgeKind::StateOrder))
+            .flat_map(|source| {
+                let port = h.get_optype(source).other_output_port().unwrap();
+                h.linked_inputs(source, port)
+                    .map(move |(target, _)| (source, target))
+            })
+            .collect::<HashSet<_>>();
+        // Preserve both loader-to-call paths and ordering with the surrounding operations.
+        // Comparing the exact edge set also catches unexpected dependencies introduced by rebuilding.
+        assert_eq!(
+            order_edges,
+            HashSet::from([
+                (before, loader),
+                (loader, call),
+                (loader, other),
+                (other, call),
+                (call, external),
+            ])
+        );
+    }
+
+    #[rstest::rstest]
+    #[case::apply_modification(false)]
+    #[case::modify_indirect_call(true)]
+    /// Test that powering twice a function shares the modified implementation
+    /// NOTE: The test hugr is impossible to be obtained from Guppy
+    fn power_call_sites_share_modified_implementation(#[case] rebuilt: bool) {
+        let build_function = |module: &mut ModuleBuilder<Hugr>, _| {
+            let signature = Signature::new_endo([qb_t()]);
+            let target = {
+                let mut f = module
+                    .define_function("power_target", signature.clone())
+                    .unwrap();
+                f.set_unitary();
+                let [q] = f.input_wires_arr();
+                let q = f.add_dataflow_op(TketOp::X, [q]).unwrap().out_wire(0);
+                f.finish_with_outputs([q]).unwrap()
+            };
+            let mut f = module
+                .define_function("two_power_calls", Signature::new_endo([qb_t(), qb_t()]))
+                .unwrap();
+            f.set_unitary();
+            let inputs = f.input_wires().collect_vec();
+            let power = MODIFIER_EXTENSION
+                .instantiate_extension_op(
+                    &POWER_OP_ID,
+                    [Term::new_list([qb_t()]), Term::new_list(Vec::<Type>::new())],
+                )
+                .unwrap();
+            let mut outputs = Vec::new();
+            for (q, exponent) in inputs.into_iter().zip([2, 3]) {
+                let loaded = f.load_func(target.handle(), &[]).unwrap();
+                let exponent = f.add_load_value(ConstInt::new_s(6, exponent).unwrap());
+                let powered = f
+                    .add_dataflow_op(power.clone(), [loaded, exponent])
+                    .unwrap();
+                let call = f
+                    .add_dataflow_op(
+                        CallIndirect {
+                            signature: signature.clone(),
+                        },
+                        [powered.out_wire(0), q],
+                    )
+                    .unwrap();
+                outputs.push(call.out_wire(0));
+            }
+            *f.finish_with_outputs(outputs).unwrap().handle()
+        };
+        let mut h = if rebuilt {
+            let (mut h, _) = modifier_test_hugr(2, 1, build_function, false);
+            let main = dfg_modify::find_module_func_by_name(&h, "main").unwrap();
+            h.set_entrypoint(main);
+            h
+        } else {
+            let mut module = ModuleBuilder::new();
+            let f = build_function(&mut module, 2);
+            let mut h = module.finish_hugr().unwrap();
+            h.set_entrypoint(f.node());
+            h
+        };
+
+        test_resolve(&mut h);
+
+        let (owner_name, implementation_name) = if rebuilt {
+            (
+                "__modified__two_power_calls[C1]",
+                "__modified__power_target[C1P1]",
+            )
+        } else {
+            ("two_power_calls", "__modified__power_target[P1]")
+        };
+        let owner = dfg_modify::find_module_func_by_name(&h, owner_name).unwrap();
+        let implementation = dfg_modify::find_module_func_by_name(&h, implementation_name).unwrap();
+        let calls = h
+            .children(owner)
+            .filter(|&node| matches!(h.get_optype(node), OpType::CallIndirect(_)))
+            .collect_vec();
+        assert_eq!(calls.len(), 2);
+        let [input, _] = h.get_io(owner).unwrap();
+        let control_offset = usize::from(rebuilt);
+        for call in calls {
+            let loader = h.single_linked_output(call, 0).unwrap().0;
+            // Separate power nodes must reuse the same lowered function definition.
+            assert_eq!(h.static_source(loader), Some(implementation));
+
+            let (source, target_port) = h.single_linked_output(call, 1 + control_offset).unwrap();
+            assert_eq!(source, input);
+            let target_index = target_port.index() - control_offset;
+            let exponent_port = h
+                .get_optype(call)
+                .as_call_indirect()
+                .unwrap()
+                .signature
+                .input_count();
+            let (exponent_load, _) = h.single_linked_output(call, exponent_port).unwrap();
+            let constant = h.static_source(exponent_load).unwrap();
+            let exponent = h
+                .get_optype(constant)
+                .as_const()
+                .unwrap()
+                .get_custom_value::<ConstInt>()
+                .unwrap();
+            // Sharing the wrapper must preserve each call's own runtime exponent argument.
+            assert_eq!(exponent.value_s(), target_index as i64 + 2);
+        }
     }
 
     #[rstest::rstest]
@@ -986,7 +1291,13 @@ mod tests {
         // The plain call still uses f; the daggered call uses a resolved copy.
         assert_eq!(h.static_source(plain_call.node()), Some(f.node()));
         let daggered_f = dfg_modify::find_module_func_by_name(&h, "__modified__f[D]").unwrap();
-        let loader = h.single_linked_output(daggered_call.node(), 0).unwrap().0;
+        // Resolution replaces the indirect call, so find its replacement in main.
+        let daggered_call = h
+            .children(main_node)
+            .filter(|&node| matches!(h.get_optype(node), OpType::CallIndirect(_)))
+            .exactly_one()
+            .unwrap_or_else(|_| panic!("Expected one resolved indirect call in main"));
+        let loader = h.single_linked_output(daggered_call, 0).unwrap().0;
         assert_eq!(h.static_source(loader), Some(daggered_f));
         assert_ne!(daggered_f, f.node());
     }
