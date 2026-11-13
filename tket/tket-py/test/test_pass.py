@@ -230,7 +230,7 @@ def test_clifford_simp_with_swaps() -> None:
     cx_circ = CompilationState.from_tket1(Circuit(2).CX(0, 1).CX(1, 0))
     hugr = Hugr.from_str(cx_circ.to_str(), tket_registry())
     cliff_pass_perm = PytketHugrPass(CliffordSimp(allow_swaps=True))
-    # Simplify 2 CX circuit to a single CX with an implicit swap.
+    # Simplify 2*CX circuit to a single CX with an implicit swap.
     res = cliff_pass_perm.run(hugr)
     opt_circ = CompilationState.from_bytes(res.hugr.to_bytes())
     assert opt_circ.circuit_cost(lambda op: int(op == TketOp.CX)) == 1
