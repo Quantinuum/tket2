@@ -74,7 +74,7 @@ def main() -> None:
     index = array(0)
     # (S**3)† = S: multiply the qs[0] = |1> component by i.
     with dagger:
-        phases(qs[0], settings.exponent, index)
+        phases(qs, settings.exponent, index)
     # (|010> + i|110>) / sqrt(2).
 
     # Controlled Ry(pi/6)**3 = controlled Ry(pi/2): qs[2] goes |0> -> |+>.
@@ -90,7 +90,7 @@ def main() -> None:
 
     # Controlled S†: multiply the qs[2] = |1> components by -i.
     with control(qs[1]), dagger:
-        phases(qs[2], nat(1))
+        phases(qs, nat(1), index)
     # State: (|010> - i|011> + i|110> + |111>) / 2.
     # Expected amplitudes: 010 -> 0.5, 011 -> -0.5j, 110 -> 0.5j, 111 -> 0.5.
     state_result("r", qs[0], qs[1], qs[2])
