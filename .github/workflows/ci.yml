@@ -333,8 +333,8 @@ jobs:
       - name: Run tests with coverage instrumentation
         run: |
           cargo llvm-cov clean --workspace
-          cargo llvm-cov --no-report -p tket -p tket-qsystem -p tket1-passes -p badger-optimiser -p compile-rewriter --no-default-features --doctests
-          cargo llvm-cov --no-report -p tket -p tket-qsystem -p tket1-passes -p badger-optimiser -p compile-rewriter --all-features --doctests
+          cargo llvm-cov --no-report -p tket -p tket-qsystem -p tket1-passes -p badger-optimiser -p compile-rewriter -p tket-migrate --no-default-features --doctests
+          cargo llvm-cov --no-report -p tket -p tket-qsystem -p tket1-passes -p badger-optimiser -p compile-rewriter -p tket-migrate --all-features --doctests
       - name: Generate coverage report
         run: cargo llvm-cov report --codecov --output-path coverage.json
       - name: Upload coverage to codecov.io
