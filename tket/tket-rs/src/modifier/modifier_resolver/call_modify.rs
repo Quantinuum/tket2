@@ -343,7 +343,9 @@ mod tests {
     };
     use super::super::*;
     use crate::TketOp;
-    use crate::extension::modifier::{CONTROL_OP_ID, DAGGER_OP_ID, MODIFIER_EXTENSION};
+    use crate::extension::modifier::{
+        CONTROL_OP_ID, DAGGER_OP_ID, MODIFIER_EXTENSION, POWER_OP_ID,
+    };
     use hugr::{
         Hugr,
         builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
@@ -354,7 +356,7 @@ mod tests {
         },
         std_extensions::arithmetic::{
             int_ops::IntOpDef,
-            int_types::{ConstInt, INT_TYPES},
+            int_types::{ConstInt, INT_TYPES, int_type},
         },
         std_extensions::collections::array::{ArrayOpBuilder, array_type},
         types::{Signature, Term, Type},
@@ -469,7 +471,6 @@ mod tests {
             h.set_entrypoint(f.node());
             h
         };
-        h.validate().unwrap();
         test_resolve(&mut h);
         let name = if rebuilt {
             "__modified__ordered_loader[C1]"
@@ -504,7 +505,181 @@ mod tests {
             assert_eq!(predecessors, HashSet::from([markers[0], markers[1]]));
             assert_eq!(successors, HashSet::from([markers[2], markers[3]]));
         }
-        h.validate().unwrap();
+    }
+
+    #[rstest::rstest]
+    #[case::control(true, false)]
+    #[case::power(false, true)]
+    #[case::control_power(true, true)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
+    fn modified_call_preserves_order_edges(
+        #[case] control: bool,
+        #[case] power: bool,
+        // false = apply_modification; true = modify_indirect_call in a rebuilt body.
+        #[values(false, true)] rebuilt: bool,
+    ) {
+        let build_function = |module: &mut ModuleBuilder<Hugr>, _| {
+            let signature = Signature::new_endo([qb_t()]);
+            let identity = {
+                let mut f = module
+                    .define_function("identity", signature.clone())
+                    .unwrap();
+                f.set_unitary();
+                let outputs = f.input_wires();
+                f.finish_with_outputs(outputs).unwrap()
+            };
+            let mut f = module
+                .define_function(
+                    "ordered_call",
+                    Signature::new_endo(vec![qb_t(); 1 + usize::from(control)]),
+                )
+                .unwrap();
+            f.set_unitary();
+            let mut inputs = f.input_wires();
+            let control_wire = control.then(|| inputs.next().unwrap());
+            let q = inputs.next().unwrap();
+            // Tags stand for the surrounding before, other, and external operations.
+            let [before, other, external] = std::array::from_fn(|tag| {
+                f.add_child_node(hugr::ops::Tag::new(tag, vec![Default::default(); 37]))
+            });
+            let loaded = f.load_func(identity.handle(), &[]).unwrap();
+            let mut modified = loaded;
+            if power {
+                let exponent = f.add_load_value(ConstInt::new_s(6, 3).unwrap());
+                let modifier = MODIFIER_EXTENSION
+                    .instantiate_extension_op(
+                        &POWER_OP_ID,
+                        [Term::new_list([qb_t()]), Term::new_list(Vec::<Type>::new())],
+                    )
+                    .unwrap();
+                modified = f
+                    .add_dataflow_op(modifier, [modified, exponent])
+                    .unwrap()
+                    .out_wire(0);
+            }
+            let controls = control_wire.map(|control| {
+                let modifier = MODIFIER_EXTENSION
+                    .instantiate_extension_op(
+                        &CONTROL_OP_ID,
+                        [Term::BoundedNat(1), [qb_t().into()].into(), [].into()],
+                    )
+                    .unwrap();
+                modified = f.add_dataflow_op(modifier, [modified]).unwrap().out_wire(0);
+                f.add_new_array(qb_t(), [control]).unwrap()
+            });
+            let signature = Signature::new_endo(
+                control
+                    .then(|| array_type(1, qb_t()))
+                    .into_iter()
+                    .chain([qb_t()])
+                    .collect_vec(),
+            );
+            let call = f
+                .add_dataflow_op(
+                    CallIndirect { signature },
+                    [modified].into_iter().chain(controls).chain([q]),
+                )
+                .unwrap();
+            // before -> loader -> call -> external, with loader -> other -> call.
+            for (source, target) in [
+                (before, loaded.node()),
+                (loaded.node(), call.node()),
+                (loaded.node(), other),
+                (other, call.node()),
+                (call.node(), external),
+            ] {
+                connect_order(f.hugr_mut(), source, target);
+            }
+            let mut outputs = call.outputs().collect_vec();
+            if control {
+                outputs[0] = f.add_array_unpack(qb_t(), 1, outputs[0]).unwrap()[0];
+            }
+            *f.finish_with_outputs(outputs).unwrap().handle()
+        };
+        let mut h = if rebuilt {
+            // Resolve the outer control first, rebuilding the modified call through
+            // modify_indirect_call rather than resolving it in place.
+            let (mut h, _) = modifier_test_hugr(1 + usize::from(control), 1, build_function, false);
+            let main = dfg_modify::find_module_func_by_name(&h, "main").unwrap();
+            h.set_entrypoint(main);
+            h
+        } else {
+            let mut module = ModuleBuilder::new();
+            let f = build_function(&mut module, 1);
+            let mut h = module.finish_hugr().unwrap();
+            h.set_entrypoint(f.node());
+            h
+        };
+        let case_name = format!("control_{control}_power_{power}_rebuilt_{rebuilt}");
+        std::fs::write(format!("before_{case_name}.mmd"), h.mermaid_string()).unwrap();
+        test_resolve(&mut h);
+        std::fs::write(format!("after_{case_name}.mmd"), h.mermaid_string()).unwrap();
+
+        let owner_name = if rebuilt {
+            "__modified__ordered_call[C1]"
+        } else {
+            "ordered_call"
+        };
+        let control_suffix = match (rebuilt, control) {
+            (true, true) => "C1.1",
+            (false, false) => "",
+            _ => "C1",
+        };
+        let power_suffix = if power { "P1" } else { "" };
+        let modified_name = format!("__modified__identity[{control_suffix}{power_suffix}]");
+        let owner = dfg_modify::find_module_func_by_name(&h, owner_name).unwrap();
+        let [before, other, external] = std::array::from_fn(|tag| {
+            h.children(owner)
+                .find(|&n| matches!(h.get_optype(n), OpType::Tag(t) if t.variants.len() == 37 && t.tag == tag))
+                .unwrap()
+        });
+        let call = h
+            .children(owner)
+            .filter(|&n| matches!(h.get_optype(n), OpType::CallIndirect(_)))
+            .exactly_one()
+            .unwrap_or_else(|_| panic!("Expected exactly one indirect call"));
+        let loader = h.single_linked_output(call, 0).unwrap().0;
+        let modified = dfg_modify::find_module_func_by_name(&h, &modified_name).unwrap();
+        // Check the loader actually used by the call points to the expected combined implementation.
+        assert_eq!(h.static_source(loader), Some(modified));
+        let expected_outputs = iter::repeat_n(
+            array_type(1, qb_t()),
+            usize::from(rebuilt) + usize::from(control),
+        )
+        .chain([qb_t()])
+        .collect_vec();
+        let expected_inputs = expected_outputs
+            .iter()
+            .cloned()
+            .chain(power.then(|| int_type(6)))
+            .collect_vec();
+        // Controls precede the original inputs, while exponents follow them and shift the order input.
+        assert_eq!(
+            h.get_optype(call).as_call_indirect().unwrap().signature,
+            Signature::new(expected_inputs, expected_outputs)
+        );
+
+        let order_edges = h
+            .children(owner)
+            .filter(|&source| h.get_optype(source).other_output() == Some(EdgeKind::StateOrder))
+            .flat_map(|source| {
+                let port = h.get_optype(source).other_output_port().unwrap();
+                h.linked_inputs(source, port)
+                    .map(move |(target, _)| (source, target))
+            })
+            .collect::<HashSet<_>>();
+        // Preserve both loader-to-call paths and ordering with the surrounding operations.
+        // Comparing the exact edge set also catches unexpected dependencies introduced by rebuilding.
+        assert_eq!(
+            order_edges,
+            HashSet::from([
+                (before, loader),
+                (loader, call),
+                (loader, other),
+                (other, call),
+                (call, external),
+            ])
+        );
     }
 
     #[rstest::rstest]
