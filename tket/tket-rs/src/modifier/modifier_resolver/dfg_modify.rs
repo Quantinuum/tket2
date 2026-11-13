@@ -384,6 +384,10 @@ impl<N: HugrNode> ModifierResolver<N> {
             .unwrap_or_default();
         let requested_control_qubits = self.control_num();
 
+        assert!(
+            self.modifiers().exponent_inputs.is_empty(),
+            "Custom implementations must not inherit power exponents."
+        );
         match (requested_control_qubits, self.modifiers().dagger) {
             (0, true) => {
                 let Some(impl_name) = h
@@ -564,18 +568,14 @@ impl<N: HugrNode> ModifierResolver<N> {
         })
     }
 
-    /// Generates a new function modified by the combined modifier.
-    pub(crate) fn modify_fn(
+    /// Rebuilds a modifier block's function with the combined modifiers.
+    /// A Modifier block is a wrapper that contains the computation to be modified,
+    ///  thus it cannot have custom implementations.
+    pub(crate) fn modify_modifier_block(
         &mut self,
         h: &mut impl HugrMut<Node = N>,
         func: N,
     ) -> Result<N, ModifierResolverErrors<N>> {
-        // We first check for custom implementations.
-        if let Some(custom_func) = self.find_custom_implementation(h, func)? {
-            let custom_fn = self.custom_implementation_adapter(h, func, custom_func)?;
-            return Ok(custom_fn);
-        }
-
         self.modify_fn_inner(h, func)
     }
 
@@ -1466,7 +1466,7 @@ mod test {
         }
         let mut h = module.finish_hugr().unwrap();
         let modified = controlled_resolver()
-            .modify_fn(&mut h, recursive.node())
+            .modify_modifier_block(&mut h, recursive.node())
             .unwrap();
         h.validate().unwrap();
 
@@ -1523,8 +1523,12 @@ mod test {
                     dagger,
                     exponent_inputs: Vec::new(),
                 };
-                let first = resolver.modify_fn(&mut h, original.node()).unwrap();
-                let second = resolver.modify_fn(&mut h, original.node()).unwrap();
+                let first = resolver
+                    .modify_modifier_block(&mut h, original.node())
+                    .unwrap();
+                let second = resolver
+                    .modify_modifier_block(&mut h, original.node())
+                    .unwrap();
                 assert_eq!(first, second);
                 assert!(implementations.insert(first));
             }
@@ -1608,7 +1612,9 @@ mod test {
             exponent_inputs: vec![(original.node(), IncomingPort::from(1)); power_count],
         };
 
-        let modified = resolver.modify_fn(&mut h, original.node()).unwrap();
+        let modified = resolver
+            .modify_modifier_block(&mut h, original.node())
+            .unwrap();
 
         assert_eq!(
             h.get_optype(modified).as_func_defn().unwrap().func_name(),
@@ -1618,7 +1624,7 @@ mod test {
     }
 
     #[test]
-    fn modify_fn_uses_custom_implementation() {
+    fn classical_function_uses_custom_implementation() {
         let mut module = ModuleBuilder::new();
         let original = identity_function(&mut module, "original", Signature::new_endo([usize_t()]));
         let custom = identity_function(&mut module, "custom", Signature::new_endo([usize_t()]));
@@ -1626,9 +1632,13 @@ mod test {
         h.set_metadata::<metadata::DaggeredImplementation>(original.node(), "custom".to_string());
         let mut resolver = dagger_resolver();
 
-        let modified = resolver.modify_fn(&mut h, original.node()).unwrap();
+        let modified = resolver
+            .modify_fn_if_needed(&mut h, original.node(), None)
+            .unwrap();
 
-        assert_eq!(modified, custom.node());
+        // Custom dispatch must precede the shortcut for signatures without quantum data.
+        assert_eq!(modified, Some(custom.node()));
+        h.validate().unwrap();
     }
 
     /// Resolve a chain of private custom dagger implementations with nested modified calls.
@@ -1646,19 +1656,32 @@ mod test {
                 [Term::new_list([qb_t()]), Term::new_list(Vec::<Type>::new())],
             )
             .unwrap();
-        // main -> dagger(original) selects custom; custom -> dagger(leaf)
-        // selects inner_custom, whose own daggered call must also be resolved.
+        // Each modifier wraps a block containing a direct call, as emitted by Guppy.
+        // The calls to original and leaf select custom and inner_custom; the daggered
+        // call to terminal inside inner_custom must also be resolved.
         let [inner_custom, custom, main] = [
             ("inner_custom", terminal),
             ("custom", leaf),
             ("main", original),
         ]
         .map(|(name, callee)| {
+            let block = {
+                let mut block = module
+                    .define_function_vis(
+                        format!("{name}_block"),
+                        signature.clone(),
+                        hugr_core::Visibility::Private,
+                    )
+                    .unwrap();
+                let inputs = block.input_wires();
+                let call = block.call(&callee, &[], inputs).unwrap();
+                block.finish_with_outputs(call.outputs()).unwrap()
+            };
             let mut function = module
                 .define_function_vis(name, signature.clone(), hugr_core::Visibility::Private)
                 .unwrap();
             let [q] = function.input_wires_arr();
-            let loaded = function.load_func(&callee, &[]).unwrap();
+            let loaded = function.load_func(block.handle(), &[]).unwrap();
             let modified = function
                 .add_dataflow_op(dagger.clone(), [loaded])
                 .unwrap()
@@ -1681,12 +1704,16 @@ mod test {
 
         let modified_terminal =
             super::find_module_func_by_name(&h, "__modified__terminal[D]").unwrap();
-        // Resolution replaces each indirect call. Check the new calls throughout
-        // the custom implementation chain rather than retaining the original nodes.
-        for (caller, callee) in [
-            (main, custom),
-            (custom, inner_custom),
-            (inner_custom, modified_terminal),
+        // Follow each replacement loader to its modified block, then check that the
+        // direct call inside the block selects the expected custom implementation.
+        for (caller, block_name, callee) in [
+            (main, "__modified__main_block[D]", custom),
+            (custom, "__modified__custom_block[D]", inner_custom),
+            (
+                inner_custom,
+                "__modified__inner_custom_block[D]",
+                modified_terminal,
+            ),
         ] {
             let call = h
                 .children(caller)
@@ -1694,7 +1721,14 @@ mod test {
                 .exactly_one()
                 .unwrap_or_else(|_| panic!("Expected one resolved indirect call in {caller}"));
             let loader = h.single_linked_output(call, 0).unwrap().0;
-            assert_eq!(h.static_source(loader), Some(callee));
+            let block = super::find_module_func_by_name(&h, block_name).unwrap();
+            assert_eq!(h.static_source(loader), Some(block));
+            let call = h
+                .children(block)
+                .filter(|&node| matches!(h.get_optype(node), OpType::Call(_)))
+                .exactly_one()
+                .unwrap_or_else(|_| panic!("Expected one direct call in {block_name}"));
+            assert_eq!(h.static_source(call), Some(callee));
         }
     }
 
@@ -1787,7 +1821,7 @@ mod test {
         );
 
         let error = dagger_resolver()
-            .modify_fn(&mut h, original.node())
+            .modify_fn_if_needed(&mut h, original.node(), None)
             .unwrap_err();
 
         assert_matches!(error, ModifierResolverErrors::Unreachable { msg } => {
@@ -1805,7 +1839,7 @@ mod test {
         h.set_metadata::<metadata::DaggeredImplementation>(original.node(), "missing".to_string());
 
         let error = dagger_resolver()
-            .modify_fn(&mut h, original.node())
+            .modify_fn_if_needed(&mut h, original.node(), None)
             .unwrap_err();
 
         assert_matches!(error, ModifierResolverErrors::Unreachable { msg } => {
@@ -1826,7 +1860,7 @@ mod test {
         h.set_metadata::<metadata::DaggeredImplementation>(original.node(), "custom".to_string());
 
         let error = dagger_resolver()
-            .modify_fn(&mut h, original.node())
+            .modify_fn_if_needed(&mut h, original.node(), None)
             .unwrap_err();
 
         assert_matches!(error, ModifierResolverErrors::UnResolvable { node, msg, optype } => {
@@ -1855,7 +1889,7 @@ mod test {
         h.set_metadata::<metadata::NumControlQubits>(custom.node(), 1);
 
         let error = controlled_resolver()
-            .modify_fn(&mut h, original.node())
+            .modify_fn_if_needed(&mut h, original.node(), None)
             .unwrap_err();
 
         assert_matches!(error, ModifierResolverErrors::UnResolvable { node, msg, optype } => {
@@ -1882,7 +1916,7 @@ mod test {
         h.set_metadata::<metadata::NumControlQubits>(custom.node(), 1);
 
         let error = controlled_resolver()
-            .modify_fn(&mut h, original.node())
+            .modify_fn_if_needed(&mut h, original.node(), None)
             .unwrap_err();
 
         assert_matches!(error, ModifierResolverErrors::UnResolvable { node, msg, optype } => {
@@ -1911,7 +1945,7 @@ mod test {
         );
 
         let error = controlled_resolver()
-            .modify_fn(&mut h, original.node())
+            .modify_fn_if_needed(&mut h, original.node(), None)
             .unwrap_err();
 
         assert_matches!(error, ModifierResolverErrors::Unreachable { msg } => {
@@ -1981,7 +2015,9 @@ mod test {
 
         // Test power resolution
         power_resolver.modifiers.exponent_inputs = vec![(original.node(), IncomingPort::from(0))];
-        let powered = power_resolver.modify_fn(&mut h, original.node()).unwrap();
+        let powered = power_resolver
+            .modify_modifier_block(&mut h, original.node())
+            .unwrap();
         h.validate().unwrap();
 
         let mut resolver = ModifierResolver::new();
@@ -1992,7 +2028,7 @@ mod test {
             exponent_inputs: vec![],
         };
         // Test power + optional control/dagger
-        let modified = resolver.modify_fn(&mut h, powered).unwrap();
+        let modified = resolver.modify_modifier_block(&mut h, powered).unwrap();
         h.validate().unwrap();
 
         let tail_loop = h
@@ -2042,7 +2078,9 @@ mod test {
         // The rebuilt loop must retain its power-loop marker.
         assert_eq!(h.get_metadata::<IsPowerLoop>(tail_loop), Some(true));
         // The preserved marker must allow another dagger of the rebuilt loop.
-        dagger_resolver().modify_fn(&mut h, modified).unwrap();
+        dagger_resolver()
+            .modify_modifier_block(&mut h, modified)
+            .unwrap();
         h.validate().unwrap();
     }
 

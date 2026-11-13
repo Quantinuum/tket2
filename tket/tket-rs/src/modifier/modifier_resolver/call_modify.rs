@@ -105,8 +105,8 @@ impl<N: HugrNode> ModifierResolver<N> {
                 panic!("Expected FuncDefn or FuncDecl, found {fn_optype:?}");
             }
         }
-
-        let modified_fn = self.modify_fn(h, func_node)?;
+        // Only a modifier block can be modified through a indirect call
+        let modified_fn = self.modify_modifier_block(h, func_node)?;
         // Give the replacement loader the modified function's signature
         let mut modified_sig = load_op.func_sig;
         self.modify_signature(modified_sig.body_mut(), false);
