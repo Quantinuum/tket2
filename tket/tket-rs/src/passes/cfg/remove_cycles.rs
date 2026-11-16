@@ -13,7 +13,7 @@ use std::iter::successors;
 
 use crate::passes::{ComposablePass, PassScope, WithScope};
 
-use super::dom_tree::{DomTreeNode, DomTreeWithBackedges, EdgeSources, Path, leaf_targets};
+use super::dom_tree::{DomTreeNode, DomTreeWithBackedges, EdgeSources, PathSet, leaf_targets};
 
 /// A [ComposablePass] that removes cycles from all control-flow graphs (CFG) within its scope,
 /// transforming any such loops into nested [TailLoop] structures. (See [nest_loop].)
@@ -60,9 +60,9 @@ impl<H: HugrMut> ComposablePass<H> for RemoveCFGCyclesPass {
 
 /// Following removing cycles, used for the returned [DomTreeNode::loop_] to record information
 /// about the CFG nested within any generated TailLoop within the [DomTreeNode::node].
-pub struct InnerTailLoop<N, P: Path<N>>(pub Option<Box<DomTreeNode<N, P, InnerTailLoop<N, P>>>>);
+pub struct InnerTailLoop<N, P: PathSet<N>>(pub Option<Box<DomTreeNode<N, P, InnerTailLoop<N, P>>>>);
 
-impl<N, P: Path<N>> Default for InnerTailLoop<N, P> {
+impl<N, P: PathSet<N>> Default for InnerTailLoop<N, P> {
     fn default() -> Self {
         InnerTailLoop(None)
     }
@@ -72,7 +72,7 @@ impl<N, P: Path<N>> Default for InnerTailLoop<N, P> {
 /// which takes the place of all the original blocks in the loop.
 /// The new block (in fact the original header block) contains a [TailLoop] node which
 /// contains the rest of the blocks forming the original loop.
-pub fn nest_loop<H: HugrMut, P: Path<H::Node>>(
+pub fn nest_loop<H: HugrMut, P: PathSet<H::Node>>(
     dtn: DomTreeWithBackedges<H::Node, P>,
     hugr: &mut H,
 ) -> DomTreeNode<H::Node, P, InnerTailLoop<H::Node, P>> {
@@ -214,7 +214,7 @@ pub fn nest_loop<H: HugrMut, P: Path<H::Node>>(
 ///   edge, to a representation of the LCA in the dominator tree of all such edges,
 ///   given as a list of dominators starting from `self` and moving down the dominator
 ///   tree one node at a time until the LCA is reached.
-fn detach<H: HugrView, P: Path<H::Node>>(
+fn detach<H: HugrView, P: PathSet<H::Node>>(
     dtn: DomTreeWithBackedges<H::Node, P>,
     hugr: &H,
     loop_blocks: &HashSet<H::Node>,
@@ -258,7 +258,7 @@ fn block_inputs<H: HugrView>(hugr: &H, n: H::Node) -> TypeRow {
 fn loop_blocks<H: HugrView>(
     hugr: &H,
     loop_header: H::Node,
-    backedges: &impl Path<H::Node>,
+    backedges: &impl PathSet<H::Node>,
 ) -> HashSet<H::Node> {
     let mut blocks = HashSet::new();
     let mut queue = VecDeque::from_iter(backedges.leaves().map(|((node, _), _)| node));
@@ -433,7 +433,7 @@ fn tag_block<H: HugrMut>(hugr: &mut H, after: H::Node, tag: usize, rows: Vec<Typ
 /// TODO however if one node to be inserted *dominates* another, this will insert the two
 /// alongside each other, rather than as children. This could occur in a single-exit loop
 /// where the block tagging "which exit" dominates the block tagging "exit not continue".
-fn insert_at_lca<N: HugrNode, P: Path<N>>(
+fn insert_at_lca<N: HugrNode, P: PathSet<N>>(
     dtn: DomTreeWithBackedges<N, P>,
     hugr: &impl HugrView<Node = N>,
     insertees: HashSet<N>,

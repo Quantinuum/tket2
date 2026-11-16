@@ -8,7 +8,7 @@ use hugr_core::hugr::internal::PortgraphNodeMap;
 use petgraph::algo::dominators::{self, Dominators};
 use portgraph::NodeIndex;
 
-pub trait Path<N>: Debug + Sized {
+pub trait PathSet<N>: Debug + Sized {
     fn new_edge(node: N, outport: OutgoingPort) -> Self;
     fn new_branch(node: N, num_outports: usize, outport: OutgoingPort, ch: Self) -> Self;
     fn union(&mut self, other: &Self);
@@ -29,7 +29,7 @@ pub trait Path<N>: Debug + Sized {
 /// * The dominator children of each node in topsort order
 /// * The control flow edges leaving this dominator subtree represented by type `P`.
 /// * Extra information about loops (according to `LOOP`) - see e.g. [DomTreeWithBackedges]
-pub struct DomTreeNode<N, P: Path<N>, LOOP> {
+pub struct DomTreeNode<N, P: PathSet<N>, LOOP> {
     /// The CFG node at the root of this dominator subtree
     pub node: N,
     /// In topsort order (each child before any sibling to which the child has an exit edge);
@@ -45,7 +45,7 @@ pub struct DomTreeNode<N, P: Path<N>, LOOP> {
     pub loop_: LOOP,
 }
 
-impl<N: HugrNode, P: Path<N>, LOOP: Default> DomTreeNode<N, P, LOOP> {
+impl<N: HugrNode, P: PathSet<N>, LOOP: Default> DomTreeNode<N, P, LOOP> {
     /// Make a new instance by combining the children (provided in topsort order).
     /// `loop_fn` is called to update the [DomTreeNode::loop_] with each child exit edge
     /// targetting the main node (i.e. the loop header).
@@ -123,9 +123,9 @@ impl<N: HugrNode, P: Path<N>, LOOP: Default> DomTreeNode<N, P, LOOP> {
 }
 
 /// A [DomTreeNode] representing a loop as the paths back to the loop header.
-pub type DomTreeWithBackedges<N, P> = DomTreeNode<N, P, <P as Path<N>>::OptPath>;
+pub type DomTreeWithBackedges<N, P> = DomTreeNode<N, P, <P as PathSet<N>>::OptPath>;
 
-impl<N: HugrNode, P: Path<N>> DomTreeWithBackedges<N, P> {
+impl<N: HugrNode, P: PathSet<N>> DomTreeWithBackedges<N, P> {
     /// Creates a new instance as per [DomTreeNode::new], updating the [DomTreeNode::loop_]
     /// with gating paths that target the loop header.
     pub fn new(node: N, children: Vec<Self>, hugr: &impl HugrView<Node = N>) -> Self {
@@ -134,7 +134,7 @@ impl<N: HugrNode, P: Path<N>> DomTreeWithBackedges<N, P> {
 
     /// Builds a dominator tree for the given control flow graph (CFG).
     pub fn new_for_cfg(hugr: &impl HugrView<Node = N>, cfg: N) -> Self {
-        fn rev_sort<N: HugrNode, P: Path<N>>(
+        fn rev_sort<N: HugrNode, P: PathSet<N>>(
             hugr: &impl HugrView<Node = N>,
             ordered: &mut Vec<N>,
             child: N,
@@ -149,7 +149,7 @@ impl<N: HugrNode, P: Path<N>> DomTreeWithBackedges<N, P> {
             }
             ordered.push(child);
         }
-        fn build<H: HugrView, P: Path<H::Node>>(
+        fn build<H: HugrView, P: PathSet<H::Node>>(
             hugr: &H,
             doms: &Dominators<NodeIndex>,
             n: H::Node,
@@ -204,7 +204,7 @@ fn compute_dominators<H: HugrView>(
     (doms, sg.into_node_map())
 }
 
-pub(super) fn split_by_target<H: HugrView, P: Path<H::Node>>(
+pub(super) fn split_by_target<H: HugrView, P: PathSet<H::Node>>(
     gp: &P,
     hugr: &H,
 ) -> HashMap<H::Node, P> {
@@ -218,7 +218,7 @@ pub(super) fn split_by_target<H: HugrView, P: Path<H::Node>>(
     res
 }
 
-pub(super) fn leaf_targets<'a, H: HugrView, P: Path<H::Node> + 'a>(
+pub(super) fn leaf_targets<'a, H: HugrView, P: PathSet<H::Node> + 'a>(
     gp: &'a P::OptPath,
     hugr: &'a H,
 ) -> impl Iterator<Item = H::Node> + 'a {
@@ -230,7 +230,7 @@ pub(super) fn leaf_targets<'a, H: HugrView, P: Path<H::Node> + 'a>(
 
 pub type EdgeSources<N> = BTreeSet<(N, OutgoingPort)>;
 
-impl<N: HugrNode> Path<N> for EdgeSources<N> {
+impl<N: HugrNode> PathSet<N> for EdgeSources<N> {
     type OptPath = Self;
 
     fn new_edge(node: N, outport: OutgoingPort) -> Self {
