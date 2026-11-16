@@ -117,15 +117,14 @@ def test_optimize_guppy_ranges_array() -> None:
 
 
 @pytest.mark.parametrize(
-    ("name", "version_suffix", "start", "expected"),
+    ("name_ver", "start", "expected"),
     [
-        ("nested_array", "", "original", None),  # There is no nested_array.flat
+        ("nested_array", "original", None),  # There is no nested_array.flat
         # There was a significant change to angles between guppylang v1.1.x and v1.2,
         # hence the second testcase, but this only shows up when looking at rotation ops
         # - see test_angles_rotations.
         (
-            "angles",
-            "1.1",
+            ("angles", "1.1"),
             "flat",
             {
                 "tket.quantum.MeasureFree": 1,
@@ -135,7 +134,6 @@ def test_optimize_guppy_ranges_array() -> None:
         ),  # Since "flat" fails, do not bother testing "original"
         (
             "angles",
-            "",
             "flat",
             {
                 "tket.quantum.MeasureFree": 1,
@@ -145,7 +143,6 @@ def test_optimize_guppy_ranges_array() -> None:
         ),  # Since "flat" fails, do not bother testing "original"
         (
             "simple_cx",
-            "",
             "original",  # There is no "flat"
             {
                 "tket.quantum.QAlloc": 2,
@@ -153,10 +150,9 @@ def test_optimize_guppy_ranges_array() -> None:
                 "tket.result.result_bool": 2,
             },
         ),
-        ("nested", "", "flat", None),
+        ("nested", "flat", None),
         (
             "nested",
-            "",
             "original",
             {
                 "tket.quantum.QAlloc": 3,
@@ -166,10 +162,9 @@ def test_optimize_guppy_ranges_array() -> None:
                 "tket.quantum.CX": 1,
             },
         ),
-        ("ranges", "", "flat", None),
+        ("ranges", "flat", None),
         (
             "ranges",
-            "",
             "original",
             {
                 "tket.quantum.QAlloc": 4,
@@ -181,7 +176,6 @@ def test_optimize_guppy_ranges_array() -> None:
         ),
         (
             "false_branch",
-            "",
             "original",
             {
                 "tket.quantum.QAlloc": 1,
@@ -189,12 +183,11 @@ def test_optimize_guppy_ranges_array() -> None:
                 "tket.result.result_bool": 1,
             },
         ),
-        ("func_decls", "", "original", None),  # Note special-case optimizations below.
+        ("func_decls", "original", None),  # Note special-case optimizations below.
     ],
 )
 def test_optimize_guppy(
-    name: str,
-    version_suffix: str,
+    name_ver: str | tuple[str, str],
     start: Literal["flat", "original"],
     expected: dict[str, int] | None,
 ) -> None:
@@ -204,6 +197,7 @@ def test_optimize_guppy(
      to the full extent given by the .opt .hugr files, and can be lowered to QSystem.
     """
 
+    name, version_suffix = name_ver if isinstance(name_ver, tuple) else (name_ver, "")
     hugr = _load_guppy_circuit(name, version_suffix, start)
     hugr = Normalize()(hugr)
     if start == "original" and expected is None:
