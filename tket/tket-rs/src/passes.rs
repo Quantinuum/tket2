@@ -37,7 +37,14 @@ pub use dead_funcs::{RemoveDeadFuncsError, RemoveDeadFuncsPass};
 // Force a topological order on nodes.
 pub mod force_order;
 
+// CFG Analyses and Optimizations
 pub mod cfg;
+#[deprecated(note = "Use cfg::nest_cfgs instead", since = "0.23.0")]
+pub use cfg::nest_cfgs;
+
+#[deprecated(note = "Use cfg::normalize_cfgs instead", since = "0.23.0")]
+pub use cfg::normalize_cfgs;
+pub use normalize_cfgs::NormalizeCFGPass;
 
 // Normalize the structure of programs.
 pub mod normalize;
@@ -63,15 +70,8 @@ pub use modifier_resolver::ModifierResolverPass;
 pub mod monomorphize;
 pub use monomorphize::{MonomorphizePass, mangle_name};
 
-#[deprecated(note = "Use cfg::nest_cfgs instead", since = "0.23.0")]
-pub use cfg::nest_cfgs;
-
 // Find and localize non-local edges.
 pub mod non_local;
-
-// CFG normalization (merge blocks, simplify control flow).
-pub mod normalize_cfgs;
-pub use normalize_cfgs::NormalizeCFGPass;
 
 // Remove redundant order edges.
 pub mod redundant_order_edges;
