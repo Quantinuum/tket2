@@ -115,14 +115,6 @@ impl<N: HugrNode, P: PathSet<N>, LOOP: Default> DomTreeNode<N, P, LOOP> {
                 if let Some(child_exit_edges) = P::opt_as_ref(&child_dtn.exit_edges) {
                     let path_to_child_exit = path_to_child.concat(child_exit_edges);
                     for (tgt, path_to_exit) in split_by_target(&path_to_child_exit, hugr) {
-                        /*assert!(
-                            // if dst has no dominator, dst is the entry node
-                            doms.immediate_dominator(node_map.to_portgraph(lp.tgt))
-                                .is_none_or(|tgt_dom|
-                            //otherwise, tgt_dom must be ni or some dominator thereof
-                            // (i.e. tgt is a sibling of an nonstrict-ancestor of ni).
-                        doms.dominators(ni).unwrap().contains(&tgt_dom))
-                        );*/
                         if child_blocks.contains(&tgt) {
                             child_paths
                                 .entry(tgt)
