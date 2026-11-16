@@ -1,11 +1,7 @@
 //! Errors produced when resolving mappings and migrating a HUGR.
 
 use hugr::{
-    Node,
-    builder::BuildError,
-    extension::{SignatureError, resolution::ExtensionResolutionError},
-    hugr::ValidationError,
-    types::Signature,
+    Node, builder::BuildError, extension::SignatureError, hugr::ValidationError, types::Signature,
 };
 use thiserror::Error;
 use tket::passes::replace_types::ReplaceTypesError;
