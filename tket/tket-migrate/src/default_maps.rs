@@ -37,7 +37,7 @@ pub static BOOL_OP_MAPPING: LazyLock<OpMapping> = LazyLock::new(get_bool_op_map)
 ///
 /// `tket.quantum@0.2.1::MeasureFree` becomes
 /// `tket.quantum@0.3.0::MeasureFree` followed by `tket.measurement@0.1.0::Read`.
-pub fn get_tket_quantum_op_map() -> OpMapping {
+fn get_tket_quantum_op_map() -> OpMapping {
     let extension_name = "tket.quantum";
     let old_version = Version::new(0, 2, 1);
 
@@ -75,7 +75,7 @@ fn build_measurement_replacement() -> NodeTemplate {
 ///
 /// Boolean logic operations become the corresponding HUGR [`LogicOp`] operations,
 /// while `read` and `make_opaque` become passthroughs.
-pub fn get_bool_op_map() -> OpMapping {
+fn get_bool_op_map() -> OpMapping {
     let extension_name = "tket.bool";
     let version = Version::new(0, 2, 0);
 
@@ -153,7 +153,7 @@ pub fn get_bool_op_map() -> OpMapping {
 /// Define the mapping to replace the legacy TKET boolean type with the built-in HUGR boolean type.
 ///
 /// Maps `tket.bool@0.2.0::bool` to the type returned by [`bool_t`].
-pub fn get_bool_type_map() -> TypeMapping {
+fn get_bool_type_map() -> TypeMapping {
     vec![(
         VersionedElement::new(
             "bool".to_string(),
