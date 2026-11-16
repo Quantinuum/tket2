@@ -117,9 +117,9 @@ def test_optimize_guppy_ranges_array() -> None:
 
 
 @pytest.mark.parametrize(
-    ("name_ver", "start", "expected"),
+    ("name_ver", "start", "expected", "quantum_opt"),
     [
-        ("nested_array", "original", None),  # There is no nested_array.flat
+        ("nested_array", "original", None, _run_clifford_simp),
         # There was a significant change to angles between guppylang v1.1.x and v1.2,
         # hence the second testcase, but this only shows up when looking at rotation ops
         # - see test_angles_rotations.
@@ -131,6 +131,7 @@ def test_optimize_guppy_ranges_array() -> None:
                 "tket.quantum.QAlloc": 1,
                 "tket.result.result_bool": 1,
             },
+            _run_clifford_simp,
         ),  # Since "flat" fails, do not bother testing "original"
         (
             "angles",
@@ -140,6 +141,7 @@ def test_optimize_guppy_ranges_array() -> None:
                 "tket.quantum.QAlloc": 1,
                 "tket.result.result_bool": 1,
             },
+            _run_clifford_simp,
         ),  # Since "flat" fails, do not bother testing "original"
         (
             "simple_cx",
@@ -149,6 +151,7 @@ def test_optimize_guppy_ranges_array() -> None:
                 "tket.quantum.MeasureFree": 2,
                 "tket.result.result_bool": 2,
             },
+            _run_clifford_simp,
         ),
         ("nested", "flat", None),
         (
@@ -161,6 +164,7 @@ def test_optimize_guppy_ranges_array() -> None:
                 "TKET1.tk1op": 4,
                 "tket.quantum.CX": 1,
             },
+            _run_clifford_simp,
         ),
         ("ranges", "flat", None),
         (
@@ -173,23 +177,26 @@ def test_optimize_guppy_ranges_array() -> None:
                 "TKET1.tk1op": 2,
                 "tket.quantum.CX": 2,
             },
+            _run_clifford_simp,
         ),
         (
             "false_branch",
-            "original",
+            "original",  # There is no "flat"
             {
                 "tket.quantum.QAlloc": 1,
                 "tket.quantum.MeasureFree": 1,
                 "tket.result.result_bool": 1,
             },
+            _run_clifford_simp,
         ),
-        ("func_decls", "original", None),  # Note special-case optimizations below.
+        ("func_decls", "original", None, PytketHugrPass(RemoveRedundancies())),
     ],
 )
 def test_optimize_guppy(
     name_ver: str | tuple[str, str],
     start: Literal["flat", "original"],
     expected: dict[str, int] | None,
+    quantum_opt: Callable[[HugrCircuit], HugrCircuit],
 ) -> None:
     """Test optimization pipeline on Guppy circuits.
 
@@ -214,10 +221,7 @@ def test_optimize_guppy(
         except FileNotFoundError:
             pass
 
-    if name == "func_decls":
-        hugr = PytketHugrPass(RemoveRedundancies())(hugr)
-    else:
-        hugr = _run_clifford_simp(hugr)
+    hugr = quantum_opt(hugr)
 
     actual_counts = _count_gates(hugr)
     optimized_hugr = _load_guppy_circuit(name, version_suffix, "optimized")
