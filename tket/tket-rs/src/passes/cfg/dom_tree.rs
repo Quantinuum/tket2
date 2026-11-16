@@ -112,7 +112,6 @@ impl<N: HugrNode, P: PathSet<N>, LOOP: Default> DomTreeNode<N, P, LOOP> {
             .into_iter()
             .map(|child_dtn| {
                 let path_to_child = child_paths.remove(&child_dtn.node).unwrap();
-                // ALAN shouldn't need opt_as_ref here if concat does right thing
                 if let Some(child_exit_edges) = P::opt_as_ref(&child_dtn.exit_edges) {
                     let path_to_child_exit = path_to_child.concat(child_exit_edges);
                     for (tgt, path_to_exit) in split_by_target(&path_to_child_exit, hugr) {
