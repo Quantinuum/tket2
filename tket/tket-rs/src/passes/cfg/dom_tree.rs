@@ -113,19 +113,22 @@ impl<N: HugrNode, P: PathSet<N>, LOOP: Default> DomTreeNode<N, P, LOOP> {
             .map(|child_dtn| {
                 let path_to_child = child_paths.remove(&child_dtn.node).unwrap();
                 if let Some(child_exit_edges) = P::opt_as_ref(&child_dtn.exit_edges) {
-                    let path_to_child_exit = path_to_child.concat(child_exit_edges);
-                    for (tgt, path_to_exit) in split_by_target(&path_to_child_exit, hugr) {
-                        if child_blocks.contains(&tgt) {
-                            child_paths
-                                .entry(tgt)
-                                .and_modify(|p| p.union(&path_to_exit))
-                                .or_insert(path_to_exit);
-                        } else if tgt == node {
-                            loop_fn(&mut loop_, &path_to_exit)
-                        } else {
-                            P::union_opt(&mut exit_edges, &path_to_exit);
-                        }
+                    let mut paths = split_by_target(&path_to_child.concat(child_exit_edges), hugr);
+                    if let Some(backedges) = paths.remove(&node) {
+                        loop_fn(&mut loop_, &backedges);
                     }
+                    let (paths_to_siblings, parent_exits): (Vec<_>, Vec<_>) = paths
+                        .into_iter()
+                        .partition(|(tgt_n, _)| child_blocks.contains(&tgt_n));
+                    paths_to_siblings.into_iter().for_each(|(tgt, path)| {
+                        child_paths
+                            .entry(tgt)
+                            .and_modify(|p| p.union(&path))
+                            .or_insert(path);
+                    });
+                    parent_exits.into_iter().for_each(|(_, path)| {
+                        P::union_opt(&mut exit_edges, &path);
+                    })
                 }
                 (path_to_child, child_dtn)
             })
