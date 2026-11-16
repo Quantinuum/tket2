@@ -1,14 +1,12 @@
+use std::io;
+
 use crate::{
     error::MigrationError,
+    extension_loading::LOCAL_REGISTRY,
     update_maps::{OpMapping, TypeMapping},
 };
-use hugr::HugrView;
-use hugr::hugr::hugrmut::HugrMut;
-use hugr::{
-    Extension, Hugr,
-    extension::{ExtensionRegistry, resolution::WeakExtensionRegistry},
-    std_extensions::STD_REG,
-};
+use hugr::Hugr;
+use hugr::{HugrView, hugr::hugrmut::HugrMut};
 use tket::passes::{ComposablePass, ReplaceTypes};
 
 /// Applies operation and type migrations to a HUGR.
@@ -16,33 +14,20 @@ pub struct ExtensionUpdater {
     hugr: Hugr,
     op_mapping: OpMapping,
     type_mapping: TypeMapping,
-    new_extensions: Vec<Extension>,
 }
 
 impl ExtensionUpdater {
-    /// Creates an updater with the mappings and new extensions to register.
-    pub fn new(
-        hugr: Hugr,
-        op_mapping: OpMapping,
-        type_mapping: TypeMapping,
-        new_extensions: Vec<Extension>,
-    ) -> Self {
+    /// Creates an updater with mappings.
+    pub fn new(hugr: Hugr, op_mapping: OpMapping, type_mapping: TypeMapping) -> Self {
         Self {
             hugr,
             op_mapping,
             type_mapping,
-            new_extensions,
         }
     }
 
-    /// Registers new extensions and applies the configured replacements.
-    ///
-    /// Mappings whose source extension version is absent are skipped.
-    /// Errors identify failed source lookups, replacement construction, pass
-    /// execution, and extension registration.
-    /// Panics if we fail to resolve extension definitions after the migration.
+    /// NICOLA: TODO
     pub fn migrate(&mut self) -> Result<Hugr, MigrationError> {
-        self.add_new_extension()?;
         let mut replacer = ReplaceTypes::default();
 
         for (old_type, replacement) in self.type_mapping.iter() {
@@ -67,30 +52,44 @@ impl ExtensionUpdater {
         self.hugr.resolve_extension_defs(&registry).unwrap();
 
         self.hugr.validate()?;
+
+        // NICOLA: clone not needed?
         Ok(self.hugr.clone())
     }
+}
 
-    fn add_new_extension(&mut self) -> Result<(), MigrationError> {
-        let mut extensions = STD_REG.to_owned();
-        extensions.extend(self.hugr.extensions().clone());
-        let new_ext_registry = ExtensionRegistry::new_with_extension_resolution(
-            std::mem::take(&mut self.new_extensions),
-            &WeakExtensionRegistry::from(&extensions),
-        )
-        .map_err(MigrationError::RegisterExtensions)?;
-        extensions.extend(new_ext_registry);
-        self.hugr.use_extensions(extensions);
-        Ok(())
-    }
+/// Given an Hugr with the needed extensions, migrates it.
+///
+/// It apply default migration rules.
+fn default_migrate(hugr: Hugr) -> Result<Hugr, MigrationError> {
+    let mut updater = ExtensionUpdater::new(
+        hugr,
+        crate::default_maps::get_measurement_migratation_op_map(),
+        crate::default_maps::get_measurement_migratation_type_map(),
+    );
+    updater.migrate()
+}
+
+/// Migrates legacy TKET measurement and boolean operations using local extensions.
+///
+/// The HUGR may contain unresolved operations and types and no extension registry.
+pub fn migrate_hugr_default(mut hugr: Hugr) -> Result<Hugr, MigrationError> {
+    // Ensure that the hugr has all the extensions
+    hugr.use_extensions(&*LOCAL_REGISTRY);
+    default_migrate(hugr)
+}
+
+/// Migrates legacy TKET measurement and boolean operations using local extensions.
+///
+/// Reads a HUGR from bytes and migrates it.
+pub fn migrate_bytes_default(bytes: impl io::BufRead) -> Result<Hugr, MigrationError> {
+    let hugr = Hugr::load(bytes, Some(&LOCAL_REGISTRY))?;
+    default_migrate(hugr)
 }
 
 #[cfg(test)]
 pub(crate) mod test_helpers {
-    use super::ExtensionUpdater;
-    use crate::{
-        default_maps::{get_measurement_migratation_op_map, get_measurement_migratation_type_map},
-        update_maps::VersionedElement,
-    };
+    use crate::update_maps::VersionedElement;
     use hugr::{
         Extension, Hugr,
         builder::{
@@ -134,28 +133,8 @@ pub(crate) mod test_helpers {
         Ok(registry)
     }
 
-    pub(crate) fn load_new_extensions() -> Result<Vec<Extension>, Box<dyn Error>> {
-        let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-
-        let extension_dir = crate_dir.join("../tket-exts/src/tket_exts/data/tket");
-
-        let new_extension_paths = vec![
-            extension_dir.join("rotation.json"),
-            extension_dir.join("measurement.json"),
-            extension_dir.join("quantum.json"),
-        ];
-        load_extensions(&new_extension_paths)
-    }
-
     pub(crate) fn migrate_hugr(hugr: Hugr) -> Result<Hugr, Box<dyn Error>> {
-        let op_mapping = get_measurement_migratation_op_map();
-        let mut updater = ExtensionUpdater::new(
-            hugr,
-            op_mapping,
-            get_measurement_migratation_type_map(),
-            load_new_extensions()?,
-        );
-        Ok(updater.migrate()?)
+        Ok(super::migrate_hugr_default(hugr)?)
     }
 
     pub(crate) fn build_old_hugr(registry: &ExtensionRegistry) -> Result<Hugr, Box<dyn Error>> {
@@ -313,7 +292,6 @@ mod tests {
     use hugr::{
         Extension, HugrView,
         extension::{TypeDefBound, Version, prelude::bool_t},
-        hugr::hugrmut::HugrMut,
         ops::OpTrait,
         types::{Signature, Type},
     };
@@ -346,7 +324,6 @@ mod tests {
             hugr,
             OpMapping::new(HashMap::new()),
             TypeMapping::new(HashMap::new()),
-            vec![],
         );
         let new_hugr = updater.migrate()?;
         new_hugr.validate()?;
@@ -366,7 +343,6 @@ mod tests {
             )]
             .into(),
             TypeMapping::new(HashMap::new()),
-            vec![],
         );
         let migrated = updater.migrate()?;
         migrated.validate()?;
@@ -391,18 +367,9 @@ mod tests {
         for register_via_updater in [true, false] {
             let target =
                 VersionedElement::new("bool".into(), "tket.bool".into(), Version::new(0, 3, 0));
-            let mut hugr = old_boolean_graph(false)?;
+            let hugr = old_boolean_graph(false)?;
             let extension = new_boolean_extension()?;
             let expected: Type = extension.get_type("bool").unwrap().instantiate([])?.into();
-            let new_extensions = if register_via_updater {
-                // Exercise the same deserialization/resolution path as loaded extensions.
-                vec![serde_json::from_str(&serde_json::to_string(
-                    extension.as_ref(),
-                )?)?]
-            } else {
-                hugr.use_extensions([extension]);
-                vec![]
-            };
             let mut updater = ExtensionUpdater::new(
                 hugr,
                 OpMapping::default(),
@@ -411,7 +378,6 @@ mod tests {
                     TypeReplacementTemplate::VersionedElement(target.clone()),
                 )]
                 .into(),
-                new_extensions,
             );
             let migrated = updater.migrate()?;
             migrated.validate()?;
@@ -443,7 +409,6 @@ mod tests {
             )]
             .into(),
             TypeMapping::new(HashMap::new()),
-            vec![],
         );
         let new_hugr = updater.migrate()?;
         new_hugr.validate()?;
@@ -470,7 +435,6 @@ mod tests {
                 TypeReplacementTemplate::VersionedElement(missing("target_type")),
             )]
             .into(),
-            vec![],
         );
         // Neither source extension exists, so both mappings should be ignored.
         // The replacements are also missing: looking them up would fail the migration.
@@ -493,7 +457,6 @@ mod tests {
             )]
             .into(),
             vec![].into(),
-            vec![],
         );
         let error = updater.migrate().unwrap_err();
         assert!(matches!(
@@ -514,7 +477,6 @@ mod tests {
                 TypeReplacementTemplate::VersionedElement(missing("target_type")),
             )]
             .into(),
-            vec![],
         );
         let error = updater.migrate().unwrap_err();
         assert!(matches!(
@@ -531,7 +493,6 @@ mod tests {
             bool_graph()?,
             vec![(old_bool("nonexistent"), OpReplacementTemplate::Empty)].into(),
             vec![].into(),
-            vec![],
         );
         assert!(matches!(
             updater.migrate(),
@@ -554,7 +515,6 @@ mod tests {
             )]
             .into(),
             vec![(old_bool("bool"), TypeReplacementTemplate::Type(bool_t()))].into(),
-            vec![],
         );
         let error = updater.migrate().unwrap_err();
         assert!(

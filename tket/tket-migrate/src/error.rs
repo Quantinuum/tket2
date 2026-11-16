@@ -75,6 +75,9 @@ pub enum ReplacementError {
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum MigrationError {
+    /// Loading the input HUGR failed.
+    #[error("Could not load HUGR: {0}")]
+    Read(#[from] hugr::envelope::ReadError),
     /// A source definition cannot be resolved or instantiated.
     #[error(transparent)]
     SourceElement(#[from] VersionedElementError),
@@ -84,9 +87,9 @@ pub enum MigrationError {
     /// Applying the replacements to the HUGR failed.
     #[error("Could not apply extension replacements: {0}")]
     ReplaceTypes(#[from] ReplaceTypesError),
-    /// Resolving dependencies of the new extensions failed.
-    #[error("Could not register new extensions: {0}")]
-    RegisterExtensions(#[source] ExtensionResolutionError),
+    /// Reading a local extension file or directory failed.
+    #[error("Could not read local extensions: {0}")]
+    ReadExtensions(#[from] std::io::Error),
     /// Validating the migrated HUGR failed.
     #[error("Could not validate migrated HUGR: {0}")]
     Validate(#[from] ValidationError<Node>),

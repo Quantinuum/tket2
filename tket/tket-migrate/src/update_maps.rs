@@ -352,7 +352,7 @@ mod tests {
                 let description = format!("{construction:?}, {template:?}");
                 let (ops_map, types_map) = negation_maps(construction, template);
                 let mut updater =
-                    ExtensionUpdater::new(old_boolean_graph(true)?, ops_map, types_map, vec![]);
+                    ExtensionUpdater::new(old_boolean_graph(true)?, ops_map, types_map);
                 let migrated = updater.migrate()?;
                 migrated.validate()?;
                 assert_eq!(
@@ -407,7 +407,7 @@ mod tests {
             };
             assert_eq!(ops.iter().count(), 1);
             assert_eq!(types.iter().count(), 1);
-            let mut updater = ExtensionUpdater::new(old_boolean_graph(true)?, ops, types, vec![]);
+            let mut updater = ExtensionUpdater::new(old_boolean_graph(true)?, ops, types);
             let migrated = updater.migrate()?;
             migrated.validate()?;
             assert!(migrated.nodes().any(|node| {
