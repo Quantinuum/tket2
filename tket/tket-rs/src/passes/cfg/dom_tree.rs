@@ -8,17 +8,43 @@ use hugr_core::hugr::internal::PortgraphNodeMap;
 use petgraph::algo::dominators::{self, Dominators};
 use portgraph::NodeIndex;
 
+/// Trait for a description of a non-empty set of control-flow paths around a tree of [DomTreeNode]s.
+///
+/// Each instance describes a set of paths all of which *either*
+/// * lead to the same point (node), starting from the same dominator thereof, *or*
+/// * leave a particular subtree, starting from its root.
 pub trait PathSet<N>: Debug + Sized {
+    /// Make a singleton set: one path being a single control-flow edge.
     fn new_edge(node: N, outport: OutgoingPort) -> Self;
+    /// Make a new set of paths that start with the edge from `outport`, among `num_outports`
+    /// leaving `node`, followed by the set of paths `ch` (that must go from the target of said edge).
     fn new_branch(node: N, num_outports: usize, outport: OutgoingPort, ch: Self) -> Self;
+    /// Merge two path sets, both describing paths to the same location / out of the same subtree,
+    /// starting from the same point.
     fn union(&mut self, other: &Self);
+    /// Concatenate another path, i.e. that describes a set starting from the node reached by this path.
+    ///
+    /// (Will be called only when every element in `self` ends at the same node, not for [PathSet]s that
+    /// describe exits from a subtree to multiple targets.)
     fn concat(&self, other: &Self) -> Self;
 
+    /// Split this PathSet into disjoint subsets according to the final edge.
+    ///
+    /// If `self` describes paths to a node, each element will describe a different incoming edge to that node;
+    /// if this describes paths leaving a subtree, each element will be a different edge exiting that subtree.
+    ///
+    /// In either case, each element is a tuple, the first element indicating the final control-flow edge,
+    /// common to all paths in the PathSet being the second element of the tuple.
     fn split_by_last_edge(&self) -> impl Iterator<Item = ((N, OutgoingPort), Self)>;
 
+    /// Type describing a set of paths that may be empty. The type `Option<Self>` would be
+    /// valid for any implementation of [PathSet], but this allows for more efficient representations in some cases.
     type OptPath: From<Self> + Debug + Default;
 
+    /// If an `OptPath` is non-empty, return a reference to the contained `PathSet`; otherwise return `None`.
     fn opt_as_ref(opt: &Self::OptPath) -> Option<&Self>;
+    /// Updates an `OptPath` by unioning it with another `PathSet`. (After update, `opt` will
+    /// necessarily be non-empty, but we leave it as type `OptPath`.)
     fn union_opt(opt: &mut Self::OptPath, other: &Self);
 }
 
@@ -229,6 +255,7 @@ pub(super) fn leaf_targets<'a, H: HugrView, P: PathSet<H::Node> + 'a>(
     })
 }
 
+/// Implements [PathSet] merely as the set containing the final edge of each path.
 pub type EdgeSources<N> = BTreeSet<(N, OutgoingPort)>;
 
 impl<N: HugrNode> PathSet<N> for EdgeSources<N> {
