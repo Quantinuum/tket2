@@ -60,7 +60,8 @@ impl<H: HugrMut> ComposablePass<H> for RemoveCFGCyclesPass {
 
 /// Following removing cycles, used for the returned [DomTreeNode::loop_] to record information
 /// about the CFG nested within any generated TailLoop within the [DomTreeNode::node].
-pub struct InnerTailLoop<N, P: PathSet<N>>(pub Option<Box<DomTreeNode<N, P, InnerTailLoop<N, P>>>>);
+pub struct InnerTailLoop<N, P: PathSet<N>>(pub Option<Box<DTInner<N, P>>>);
+type DTInner<N, P> = DomTreeNode<N, P, InnerTailLoop<N, P>>;
 
 impl<N, P: PathSet<N>> Default for InnerTailLoop<N, P> {
     fn default() -> Self {
