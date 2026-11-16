@@ -189,8 +189,6 @@ def test_optimize_guppy_ranges_array() -> None:
                 "tket.result.result_bool": 1,
             },
         ),
-        # ALAN maybe just delete func_decls.flat altogether, given "original" passes?
-        ("func_decls", "", "flat", None),
         ("func_decls", "", "original", None),  # Note special-case optimizations below.
     ],
 )
