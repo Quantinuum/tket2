@@ -1,0 +1,245 @@
+{
+  "version": "0.2.0",
+  "name": "tket.bool",
+  "types": {
+    "bool": {
+      "extension": "tket.bool",
+      "name": "bool",
+      "params": [],
+      "description": "An opaque bool type",
+      "bound": {
+        "b": "Explicit",
+        "bound": "C"
+      }
+    }
+  },
+  "operations": {
+    "and": {
+      "extension": "tket.bool",
+      "name": "and",
+      "description": "Logical AND between two tket.bools.",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "tket.bool",
+              "id": "bool",
+              "args": [],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "tket.bool",
+              "id": "bool",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "tket.bool",
+              "id": "bool",
+              "args": [],
+              "bound": "C"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "eq": {
+      "extension": "tket.bool",
+      "name": "eq",
+      "description": "Equality between two tket.bools.",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "tket.bool",
+              "id": "bool",
+              "args": [],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "tket.bool",
+              "id": "bool",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "tket.bool",
+              "id": "bool",
+              "args": [],
+              "bound": "C"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "make_opaque": {
+      "extension": "tket.bool",
+      "name": "make_opaque",
+      "description": "Convert a Hugr bool_t (a unit sum) into an tket.bool.",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "tket.bool",
+              "id": "bool",
+              "args": [],
+              "bound": "C"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "not": {
+      "extension": "tket.bool",
+      "name": "not",
+      "description": "Negation of a tket.bool.",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "tket.bool",
+              "id": "bool",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "tket.bool",
+              "id": "bool",
+              "args": [],
+              "bound": "C"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "or": {
+      "extension": "tket.bool",
+      "name": "or",
+      "description": "Logical OR between two tket.bools.",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "tket.bool",
+              "id": "bool",
+              "args": [],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "tket.bool",
+              "id": "bool",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "tket.bool",
+              "id": "bool",
+              "args": [],
+              "bound": "C"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "read": {
+      "extension": "tket.bool",
+      "name": "read",
+      "description": "Convert a tket.bool into a Hugr bool_t (a unit sum).",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "tket.bool",
+              "id": "bool",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "xor": {
+      "extension": "tket.bool",
+      "name": "xor",
+      "description": "Logical XOR between two tket.bools.",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "tket.bool",
+              "id": "bool",
+              "args": [],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "tket.bool",
+              "id": "bool",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "tket.bool",
+              "id": "bool",
+              "args": [],
+              "bound": "C"
+            }
+          ]
+        }
+      },
+      "binary": false
+    }
+  }
+}

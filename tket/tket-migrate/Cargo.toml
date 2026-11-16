@@ -16,3 +16,6 @@ hugr.workspace = true
 serde_json.workspace = true
 thiserror = { workspace = true }
 tket = { path = "../tket-rs" }
+
+[dev-dependencies]
+hugr-core.workspace = true

@@ -91,9 +91,10 @@ recompile-modifier name:
     just test_files/modifier_examples/rh "{{name}}.py"
     just test_files/run_modifier_examples/rh "{{name}}"
 
-# Generate serialized declarations for the tket extensions
+# Generate unversioned Python declarations and versioned migration snapshots.
 gen-extensions:
     cargo run -p tket-qsystem gen-extensions -o tket/tket-exts/src/tket_exts/data --unversioned
+    cargo run -p tket-qsystem gen-extensions -o tket/tket-migrate/extensions
 
 # Update snapshot tests for both rust and python (requires `cargo-insta`)
 update-snapshots: update-snapshots-rs update-snapshots-py
