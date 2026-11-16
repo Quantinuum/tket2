@@ -1,5 +1,5 @@
 //! Analysis of Control-Flow Graphs using dominator-strong components decomposition
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fmt::Debug;
 
 use hugr::core::HugrNode;
@@ -162,16 +162,16 @@ impl<N: HugrNode, P: PathSet<N>> DomTreeWithBackedges<N, P> {
     pub fn new_for_cfg(hugr: &impl HugrView<Node = N>, cfg: N) -> Self {
         fn rev_sort<N: HugrNode, P: PathSet<N>>(
             hugr: &impl HugrView<Node = N>,
-            ordered: &mut Vec<N>,
-            child: N,
-            remaining_children: &mut HashMap<N, &DomTreeWithBackedges<N, P>>,
+            ordered: &mut Vec<DomTreeWithBackedges<N, P>>,
+            child: DomTreeWithBackedges<N, P>,
+            remaining_children: &mut BTreeMap<N, DomTreeWithBackedges<N, P>>,
         ) {
-            let Some(dtn) = remaining_children.remove(&child) else {
-                return;
-            };
             // Targets of exit edges pushed onto <ordered> first
-            for tgt in leaf_targets::<_, P>(&dtn.exit_edges, hugr) {
-                rev_sort(hugr, ordered, tgt, remaining_children);
+            for tgt in leaf_targets::<_, P>(&child.exit_edges, hugr) {
+                if let Some(dtn) = remaining_children.remove(&tgt) {
+                    debug_assert_eq!(dtn.node, tgt);
+                    rev_sort(hugr, ordered, dtn, remaining_children);
+                }
             }
             ordered.push(child);
         }
@@ -186,31 +186,20 @@ impl<N: HugrNode, P: PathSet<N>> DomTreeWithBackedges<N, P> {
                 .immediately_dominated_by(ni)
                 .map(|c| build(hugr, doms, node_map.from_portgraph(c), node_map))
                 .map(|c| (c.node, c))
-                .collect::<HashMap<_, _>>();
+                .collect::<BTreeMap<_, _>>();
 
-            // We want to process children in reverse topsort order: any child C1 with an exit edge to C2, must be processed *before* C2.
+            // We want to put children into topsort order: any child C1 with an exit edge to C2,
+            // must be *before* C2.
             let mut ordered_children = Vec::new();
 
-            let mut remaining_children = children_by_bb.iter().map(|(n, c)| (*n, c)).collect();
-            for child in children_by_bb.values() {
-                rev_sort(
-                    &hugr,
-                    &mut ordered_children,
-                    child.node,
-                    &mut remaining_children,
-                );
+            while let Some((_, child)) = children_by_bb.pop_first() {
+                rev_sort(&hugr, &mut ordered_children, child, &mut children_by_bb);
+                // `rev_sort` pushes the target of the exit edge C2 *before* C1...
             }
-            // This means targets of exit edges will be processed *after* all the sources of said exit edges:
+            // ...so reverse: targets of exit edges will be processed *after* all the sources of said exit edges:
             ordered_children.reverse();
 
-            DomTreeWithBackedges::<H::Node, P>::new(
-                n,
-                ordered_children
-                    .into_iter()
-                    .map(|n| children_by_bb.remove(&n).unwrap())
-                    .collect(),
-                hugr,
-            )
+            DomTreeWithBackedges::<H::Node, P>::new(n, ordered_children, hugr)
         }
 
         let (doms, node_map) = compute_dominators(hugr, cfg);
