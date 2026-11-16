@@ -1,5 +1,6 @@
 """Tests optimizing Hugrs generated offline by Guppy programs."""
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
 
@@ -153,7 +154,7 @@ def test_optimize_guppy_ranges_array() -> None:
             },
             _run_clifford_simp,
         ),
-        ("nested", "flat", None),
+        ("nested", "flat", None, _run_clifford_simp),
         (
             "nested",
             "original",
@@ -166,7 +167,7 @@ def test_optimize_guppy_ranges_array() -> None:
             },
             _run_clifford_simp,
         ),
-        ("ranges", "flat", None),
+        ("ranges", "flat", None, _run_clifford_simp),
         (
             "ranges",
             "original",
@@ -196,7 +197,7 @@ def test_optimize_guppy(
     name_ver: str | tuple[str, str],
     start: Literal["flat", "original"],
     expected: dict[str, int] | None,
-    quantum_opt: Callable[[HugrCircuit], HugrCircuit],
+    quantum_opt: Callable[[Hugr], Hugr],
 ) -> None:
     """Test optimization pipeline on Guppy circuits.
 
