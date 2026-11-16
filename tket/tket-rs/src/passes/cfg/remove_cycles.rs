@@ -155,7 +155,10 @@ pub fn nest_loop<H: HugrMut, P: PathSet<H::Node>>(
 
     // now build the dominator tree for inside the loop.
     // Its exit-edges will include all control-flow edges to any break_blocks.
-    let (loop_dtn, out_loop_children) = detach(dtn, hugr, &loop_blocks);
+    let DetachResult {
+        remaining: loop_dtn,
+        detached: out_loop_children,
+    } = detach(dtn, hugr, &loop_blocks);
     let loop_dtn = loop_dtn.unwrap(); // header is in loop!!
     assert!(P::opt_as_ref(&loop_dtn.loop_).is_some()); // detach has detailed assertion
 
@@ -202,6 +205,14 @@ pub fn nest_loop<H: HugrMut, P: PathSet<H::Node>>(
     dtn
 }
 
+struct DetachResult<T> {
+    /// The part of the original subtree left after detaching the specified blocks
+    remaining: Option<T>,
+    /// Subtrees that were detached, i.e. each rooted at a block requested to be detached
+    /// (for each requested block that was found).
+    detached: Vec<T>,
+}
+
 /// Detaches any parts of the subtree not containing within `loop_blocks`. (Makes sense
 /// only if `loop_blocks` is closed under control-flow predecessor relation as far back
 /// as [Self::node], but should not include non-loop predecessors thereof)
@@ -210,29 +221,25 @@ pub fn nest_loop<H: HugrMut, P: PathSet<H::Node>>(
 /// * `Option<Self>`: The remaining part of the current node after detaching the
 ///   non-loop blocks.
 /// * `Vec<Self>`: The subtrees that were detached as being outside the loop
-/// * `HashMap<N, Vec<N>>`: A mapping, from each node that is destination of a loop-exit
-///   edge, to a representation of the LCA in the dominator tree of all such edges,
-///   given as a list of dominators starting from `self` and moving down the dominator
-///   tree one node at a time until the LCA is reached.
 fn detach<H: HugrView, P: PathSet<H::Node>>(
     dtn: DomTreeWithBackedges<H::Node, P>,
     hugr: &H,
     loop_blocks: &HashSet<H::Node>,
-) -> (
-    Option<DomTreeWithBackedges<H::Node, P>>,
-    Vec<DomTreeWithBackedges<H::Node, P>>,
-) {
+) -> DetachResult<DomTreeWithBackedges<H::Node, P>> {
     if !loop_blocks.contains(&dtn.node) {
         // TODO maybe it is easier not to add even dominated break-blocks here,
         // and to add them alongside the non-dominated break-blocks later?
-        return (None, vec![dtn]);
+        return DetachResult {
+            remaining: None,
+            detached: vec![dtn],
+        };
     }
     let mut remaining_children = Vec::new();
     let mut detached = Vec::new();
     for (_, ch) in dtn.children {
-        let (ch, ch_detached) = detach(ch, hugr, loop_blocks);
-        remaining_children.extend(ch);
-        detached.extend(ch_detached);
+        let res = detach(ch, hugr, loop_blocks);
+        remaining_children.extend(res.remaining);
+        detached.extend(res.detached);
     }
     // Recompute exit_edges: we must remove any exits from inside a detached dominator tree;
     // but add any edge to a detached tree itself.
@@ -242,7 +249,10 @@ fn detach<H: HugrView, P: PathSet<H::Node>>(
         format!("{:?}", in_loop_dtn.loop_),
         format!("{:?}", dtn.loop_)
     ); // We have not detached the backedges
-    (Some(in_loop_dtn), detached)
+    DetachResult {
+        remaining: Some(in_loop_dtn),
+        detached,
+    }
 }
 
 /// Inputs for a control flow [BasicBlock] (DataflowBlock or ExitBlock)
