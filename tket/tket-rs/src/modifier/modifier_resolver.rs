@@ -1100,7 +1100,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                 this.add_edge_from_pv(h, op_node, pv)
             })
         } else if GlobalPhase::from_optype(optype).is_some() {
-            let inputs = self.modify_global_phase(op_node, new_dfg, &mut vec![])?;
+            let inputs = self.modify_global_phase(op_node, true, new_dfg, &mut vec![])?;
             self.corresp_map().insert(
                 (op_node, IncomingPort::from(0)).into(),
                 inputs.into_iter().map(Into::into).collect(),
