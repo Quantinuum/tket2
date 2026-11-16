@@ -6,6 +6,7 @@ use hugr::extension::{Version, simple_op::MakeRegisteredOp};
 use hugr::std_extensions::logic::LogicOp;
 use hugr::types::Signature;
 
+use crate::extension_loading::LOCAL_REGISTRY;
 use crate::update_maps::{
     OpMapping, OpReplacementTemplate, TypeMapping, TypeReplacementTemplate, VersionedElement,
 };
@@ -41,15 +42,51 @@ fn get_tket_quantum_op_map() -> OpMapping {
     let extension_name = "tket.quantum";
     let old_version = Version::new(0, 2, 1);
 
-    vec![(
-        VersionedElement::new(
-            "MeasureFree".to_string(),
-            extension_name.to_string(),
-            old_version,
-        ),
-        OpReplacementTemplate::TemplateInstance(build_measurement_replacement()),
-    )]
-    .into()
+    let mut replecements = Vec::new();
+
+    let extension = LOCAL_REGISTRY
+        .get_exact(extension_name, &old_version)
+        .expect("Bundled tket.quantum@0.2.1 extension is missing");
+    for (name, _definition) in extension.operations() {
+        replecements.push((
+            VersionedElement::new(
+                name.to_string(),
+                extension_name.to_string(),
+                old_version.clone(),
+            ),
+            OpReplacementTemplate::TemplateInstance(match name.as_str() {
+                "CRz" => NodeTemplate::SingleOp(TketOp::CRz.into()),
+                "CX" => NodeTemplate::SingleOp(TketOp::CX.into()),
+                "CY" => NodeTemplate::SingleOp(TketOp::CY.into()),
+                "CZ" => NodeTemplate::SingleOp(TketOp::CZ.into()),
+                "H" => NodeTemplate::SingleOp(TketOp::H.into()),
+                "Measure" => NodeTemplate::SingleOp(TketOp::Measure.into()),
+                "MeasureFree" => build_measurement_replacement(),
+                "QAlloc" => NodeTemplate::SingleOp(TketOp::QAlloc.into()),
+                "QFree" => NodeTemplate::SingleOp(TketOp::QFree.into()),
+                "Reset" => NodeTemplate::SingleOp(TketOp::Reset.into()),
+                "Rx" => NodeTemplate::SingleOp(TketOp::Rx.into()),
+                "Ry" => NodeTemplate::SingleOp(TketOp::Ry.into()),
+                "Rz" => NodeTemplate::SingleOp(TketOp::Rz.into()),
+                "S" => NodeTemplate::SingleOp(TketOp::S.into()),
+                "Sdg" => NodeTemplate::SingleOp(TketOp::Sdg.into()),
+                "T" => NodeTemplate::SingleOp(TketOp::T.into()),
+                "Tdg" => NodeTemplate::SingleOp(TketOp::Tdg.into()),
+                "Toffoli" => NodeTemplate::SingleOp(TketOp::Toffoli.into()),
+                "TryQAlloc" => NodeTemplate::SingleOp(TketOp::TryQAlloc.into()),
+                "V" => NodeTemplate::SingleOp(TketOp::V.into()),
+                "Vdg" => NodeTemplate::SingleOp(TketOp::Vdg.into()),
+                "X" => NodeTemplate::SingleOp(TketOp::X.into()),
+                "Y" => NodeTemplate::SingleOp(TketOp::Y.into()),
+                "Z" => NodeTemplate::SingleOp(TketOp::Z.into()),
+                // NICOLA TODO: not sure here
+                "symbolic_angle" => continue,
+                _ => panic!("Unexpected tket.quantum@0.2.1 operation: {name}"),
+            }),
+        ));
+    }
+
+    replecements.into()
 }
 
 /// Builds the replacement for MeasureFree.
