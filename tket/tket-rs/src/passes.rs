@@ -63,8 +63,8 @@ pub use modifier_resolver::ModifierResolverPass;
 pub mod monomorphize;
 pub use monomorphize::{MonomorphizePass, mangle_name};
 
-// Nest SESE regions in CFGs.
-pub mod nest_cfgs;
+#[deprecated(note = "Use cfg::nest_cfgs instead", since = "0.23.0")]
+pub use cfg::nest_cfgs;
 
 // Find and localize non-local edges.
 pub mod non_local;

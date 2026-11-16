@@ -1,4 +1,4 @@
-//! # Nest CFGs
+//! # Nest SESE regions in CFGs
 //!
 //! Identify Single-Entry-Single-Exit (SESE) regions in the CFG.
 //! These are pairs of edges (a,b) where
