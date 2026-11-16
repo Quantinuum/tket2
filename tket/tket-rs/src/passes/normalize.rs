@@ -141,7 +141,8 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for Normalize {
         if self.remove_cfg_cycles {
             RemoveCFGCyclesPass::default()
                 .with_scope(self.scope.clone())
-                .run(hugr).unwrap_or_else(|e| match e {});
+                .run(hugr)
+                .unwrap_or_else(|e| match e {});
         }
         if self.simplify_cfgs {
             NormalizeCFGPass::default()

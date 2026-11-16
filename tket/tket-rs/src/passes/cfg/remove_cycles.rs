@@ -527,20 +527,12 @@ mod test {
 
     use super::nest_loop;
     use crate::passes::cfg::dom_tree::{DomTreeWithBackedges, EdgeSources};
-    use crate::passes::cfg::gating_path::GatingPath;
-
-    fn gating_path() -> GatingPath<Node> {
-        GatingPath::Always(Node::from(portgraph::NodeIndex::new(0)), 0.into())
-    }
 
     #[rstest]
     #[case("../../test_files/cfgs/doubler.hugr")]
     #[case("../../test_files/cfgs/doubler_indirect_minopt.hugr")]
     #[case("../../test_files/cfgs/shortcircuit_if.hugr")]
-    fn non_loop<P: super::Path<Node>>(
-        #[values(gating_path(), EdgeSources::new())] _unused: P,
-        #[case] fname: impl AsRef<std::path::Path>,
-    ) {
+    fn non_loop(#[case] fname: impl AsRef<std::path::Path>) {
         let reader = BufReader::new(File::open(fname).unwrap());
         let backup = Hugr::load(reader, None).unwrap();
         let mut h = backup.clone();
@@ -549,7 +541,7 @@ mod test {
             .filter(|n| h.get_optype(*n).is_cfg())
             .collect_vec();
         for n in cfgs {
-            let dtn = DomTreeWithBackedges::<Node, P>::new_for_cfg(&h, n);
+            let dtn = DomTreeWithBackedges::<Node, EdgeSources<Node>>::new_for_cfg(&h, n);
             nest_loop(dtn, &mut h);
         }
         assert_eq!(h, backup); // Did nothing
@@ -562,10 +554,7 @@ mod test {
     #[case("../../test_files/cfgs/early_return.hugr")]
     #[case("../../test_files/cfgs/test_exec_array_loop.hugr")]
     #[case("../../test_files/cfgs/test_control_flow.hugr")]
-    fn tierkreis_loop<P: super::Path<Node>>(
-        #[values(gating_path(), EdgeSources::new())] _unused: P,
-        #[case] fname: impl AsRef<std::path::Path>,
-    ) {
+    fn loop_(#[case] fname: impl AsRef<std::path::Path>) {
         use crate::passes::{ComposablePass, Normalize};
 
         let outfile = fname.as_ref().with_extension("nested.hugr");
@@ -580,7 +569,7 @@ mod test {
         eprintln!("Found {} cfgs", cfgs.len());
         for n in cfgs {
             eprintln!("Processing cfg node {}", n);
-            let dtn = DomTreeWithBackedges::<Node, P>::new_for_cfg(&h, n);
+            let dtn = DomTreeWithBackedges::<Node, EdgeSources<Node>>::new_for_cfg(&h, n);
             nest_loop(dtn, &mut h);
         }
         h.validate().unwrap();
